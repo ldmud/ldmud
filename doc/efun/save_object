@@ -3,8 +3,7 @@ SYNOPSIS
         string save_object ()
 
 DESCRIPTION
-        Encode the publicly visible variables of the current object
-        into a string.
+        Encode the saveable variables of the current object into a string.
 
         In the first form, the string is written to the file <name>.
         A suffix ".c" will be stripped from the name, the suffix ".o"
@@ -15,6 +14,9 @@ DESCRIPTION
 
         In the second form the string is returned directly. If the
         object is destructed, the result is 0.
+
+        A variable is considered 'saveable' if it is not declared
+        as 'nosave' or 'static'.
 
 HISTORY
         Since LDMud 3.2.8, save_object() returns a success value.

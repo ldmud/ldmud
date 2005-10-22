@@ -3152,7 +3152,7 @@ count_callback_extra_refs (callback_t *cb)
 
 {
     if (!cb->is_lambda)
-        cb->function.named.ob->extra_ref++;
+        count_extra_ref_in_object(cb->function.named.ob);
     else
         count_extra_ref_in_vector(&cb->function.lambda, 1);
     if (cb->num_arg == 1)
@@ -3185,13 +3185,8 @@ clear_ref_in_callback (callback_t *cb)
 
     if (cb->is_lambda)
         clear_ref_in_vector(&(cb->function.lambda), 1);
-    else if (cb->function.named.ob->flags & O_DESTRUCTED
-      && cb->function.named.ob->ref)
-    {
-        cb->function.named.ob->ref = 0;
-        cb->function.named.ob->prog->ref = 0;
-        clear_inherit_ref(cb->function.named.ob->prog);
-    }
+    else
+        clear_object_ref(cb->function.named.ob);
 } /* clear_ref_in_callback() */
 
 /*-------------------------------------------------------------------------*/
@@ -3219,15 +3214,10 @@ count_ref_in_callback (callback_t *cb)
         object_t *ob;
 
         ob = cb->function.named.ob;
-        if (!ob->ref)
-        {
-            /* destructed */
-            note_malloced_block_ref(ob);
-            mark_program_ref(ob->prog);
-            note_malloced_block_ref(ob->name);
-            count_ref_from_string(ob->load_name);
-        }
-        ob->ref++;
+        if (!ob->ref) /* No refs after GC: object destructed */
+            mark_object_ref(ob);
+        else
+            ob->ref++;
         count_ref_from_string(cb->function.named.name);
     }
 } /* count_ref_in_callback() */

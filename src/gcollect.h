@@ -48,7 +48,9 @@ extern mapping_t *stale_mappings;
 
 extern void clear_memory_reference(void *p);
 extern void clear_inherit_ref(program_t *p);
+extern void clear_object_ref (object_t *p);
 extern void gc_mark_program_ref(program_t *p);
+extern void mark_object_ref(object_t *ob);
 extern void gc_reference_destructed_object(object_t *ob);
 extern void gc_note_malloced_block_ref(void *p);
 extern void gc_count_ref_from_string(string_t *p);

@@ -20,12 +20,13 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 143)
-(Parent-Version lpmud 3-3 142)
-(Version-Log "Handling of deleted protected mapping entries did create dead links.")
+(Project-Version lpmud 3-3 144)
+(Parent-Version lpmud 3-3 143)
+(Version-Log "Extra refcounts in callbacks weren't counted correctly.
+Made the GC of callbacks a bit more robust.")
 (New-Version-Log
 "")
-(Checkin-Time "Fri, 21 Dec 2001 06:57:19 -0700")
+(Checkin-Time "Sun, 23 Dec 2001 21:45:01 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -58,7 +59,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.4 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.33 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.206 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.207 644))
   (HISTORY (lpmud/f/49_HISTORY 1.228 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.13 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -118,7 +119,7 @@
   (src/bitstrings.h (lpmud/I/47_bitstrings 1.1 644))
   (src/bitstrings.c (lpmud/I/48_bitstrings 1.4 644))
   (src/call_out.h (lpmud/f/45_call_out.h 1.7.1.4 644))
-  (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.15 644))
+  (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.16 644))
   (src/closure.h (lpmud/f/44_closure.h 1.7.1.5 644))
   (src/closure.c (lpmud/d/4_closure.c 1.41.1.32 644))
   (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.1 644))
@@ -134,8 +135,8 @@
   (src/files.h (lpmud/I/49_files.h 1.1 644))
   (src/files.c (lpmud/I/50_files.c 1.12 644))
   (src/filestat.h (lpmud/f/51_filestat.h 1.7 644))
-  (src/gcollect.h (lpmud/f/33_gcollect.h 1.6.1.4 644))
-  (src/gcollect.c (lpmud/c/30_gcollect.c 1.41.1.38 644))
+  (src/gcollect.h (lpmud/f/33_gcollect.h 1.6.1.5 644))
+  (src/gcollect.c (lpmud/c/30_gcollect.c 1.41.1.39 644))
   (src/hash.h (lpmud/f/32_hash.h 1.5 644))
   (src/hash.c (lpmud/c/28_hash.c 1.12 644))
   (src/heartbeat.h (lpmud/m/41_heartbeat. 1.6.1.4 644))
@@ -185,7 +186,7 @@
   (src/simul_efun.h (lpmud/f/17_simul_efun 1.5.1.4 644))
   (src/simul_efun.c (lpmud/32_simul_efun 1.20.1.8 644))
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.19 644))
-  (src/simulate.c (lpmud/31_simulate.c 1.88.1.51 644))
+  (src/simulate.c (lpmud/31_simulate.c 1.88.1.52 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.7 644))
   (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.39 644))
   (src/sprintf.h (lpmud/f/15_sprintf.h 1.3.1.2 644))
@@ -955,7 +956,7 @@
   (doc/efun/rm (lpmud/p/51_rm 1.2 644))
   (doc/efun/rmdir (lpmud/q/0_rmdir 1.2 644))
   (doc/efun/rusage (lpmud/q/1_rusage 1.3 644))
-  (doc/efun/save_object (lpmud/q/2_save_objec 1.4 644))
+  (doc/efun/save_object (lpmud/q/2_save_objec 1.5 644))
   (doc/efun/save_value (lpmud/E/13_save_value 1.2 644))
   (doc/efun/say (lpmud/q/3_say 1.5 644))
   (doc/efun/send_erq (lpmud/q/4_send_erq 1.1.1.2 644))

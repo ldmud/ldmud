@@ -36,11 +36,19 @@
  *     void clear_inherit_ref(program_t *p)
  *         Clear the refcounts of all inherited programs of <p>.
  *
+ *     void clear_object_ref(object_t *p)
+ *         Make sure that the refcounts in object <p> are cleared.
+ *
  *     void mark_program_ref(program_t *p);
  *         Set the marker of program <p> and of all data referenced by <p>.
  *
  *     void reference_destructed_object(object_t *ob)
  *         Note the reference to a destructed object <ob>.
+ *
+ *     void mark_object_ref(object_t *ob)
+ *         To be called for destructed objects which are not
+ *         handled by reference_destructed_object(): mark the
+ *         object as referenced and increase its refcount.
  *
  *     void count_ref_from_string(string_t *p);
  *         Count the reference to string <p>.
@@ -279,7 +287,27 @@ clear_inherit_ref (program_t *p)
             clear_inherit_ref(p2);
         }
     }
-}
+} /* clear_inherit_ref() */
+
+/*-------------------------------------------------------------------------*/
+void
+clear_object_ref (object_t *p)
+
+/* If <p> is a destructed object, its refcounts are cleared.
+ * If <p> is a live object, its refcounts are assumed to be cleared
+ * by the GC main method.
+ */
+
+{
+    if ((p->flags & O_DESTRUCTED) && p->ref)
+    {
+        p->ref = 0;
+        p->prog->ref = 0;
+        if (p->prog->blueprint)
+            p->prog->blueprint->ref = 0;
+        clear_inherit_ref(p->prog);
+    }
+} /* clear_object_ref() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -386,6 +414,23 @@ gc_mark_program_ref (program_t *p)
 
 /*-------------------------------------------------------------------------*/
 void
+mark_object_ref (object_t *ob)
+
+/* Mark the object <ob> as referenced and increase its refcount.
+ * This method should be called only for destructed objects and
+ * from the GC main loop for the initial count of live objects.
+ */
+
+{
+    MARK_REF(ob);
+    mark_program_ref(ob->prog);
+    MARK_MSTRING_REF(ob->name);
+    MARK_MSTRING_REF(ob->load_name);
+    ob->ref++;
+} /* mark_object_ref() */
+
+/*-------------------------------------------------------------------------*/
+void
 gc_reference_destructed_object (object_t *ob)
 
 /* Note the reference to a destructed object <ob>. The referee has to
@@ -407,11 +452,7 @@ gc_reference_destructed_object (object_t *ob)
         /* Destructed objects are not swapped */
         ob->next_all = gc_obj_list_destructed;
         gc_obj_list_destructed = ob;
-        MARK_REF(ob);
-        ob->ref++;
-        mark_program_ref(ob->prog);
-        MARK_MSTRING_REF(ob->name);
-        MARK_MSTRING_REF(ob->load_name);
+        mark_object_ref(ob);
     }
     else
     {
@@ -1098,15 +1139,13 @@ garbage_collection(void)
                 ob->prog->ref = 0;
             }
         }
-        ob->ref++;
-        note_ref(ob);
+
+        mark_object_ref(ob);
 
         if (ob->prog->num_variables)
         {
             note_ref(ob->variables);
         }
-
-        mark_program_ref(ob->prog);
 
         count_ref_in_vector(ob->variables, ob->prog->num_variables);
 
@@ -1134,9 +1173,6 @@ garbage_collection(void)
             if (sent)
                 note_action_ref((action_t *)sent);
         }
-
-        MARK_MSTRING_REF(ob->name);
-        MARK_MSTRING_REF(ob->load_name);
 
         if (was_swapped)
         {

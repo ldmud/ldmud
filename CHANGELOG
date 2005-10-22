@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+21-Dec-2001 (Lars Duening)  (3.3.144)
+    - (simulate.c) When checking the refcounts, the extra_refs in objects
+        named in callbacks weren't counted corrected (reported by Tomba).
+    - (gcollect, call_out.c, simulate.c) Removed knowledge about the
+        GC internals from call_outs and callbacks.
+
 20-Dec-2001 (Lars Duening)  (3.3.143)
     - (mapping.c) The handling of protected deleted entries did create
          some dead links (reported by Tomba).
