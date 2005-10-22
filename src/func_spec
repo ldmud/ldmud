@@ -242,7 +242,7 @@ object  this_player();
         /* Technical efuns */
 
 /* void break_point(); */
-/* void swap(object); */ /* debugging only */
+        /* void swap(object); */
 
         /* Obsolete and deprecated functions */
 

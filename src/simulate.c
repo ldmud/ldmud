@@ -681,9 +681,9 @@ error (const char *fmt, ...)
         malloced_name = ref_mstring(current_object->name);
     }
 
-    /* Duplicate the error messages so far on stdout */
+    /* On a triple error, duplicate the error messages so far on stdout */
     
-    if (rt->type == ERROR_RECOVERY_APPLY)
+    if (num_error == 3)
     {
         /* Error context is secure_apply() */
 

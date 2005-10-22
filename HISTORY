@@ -43,7 +43,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
 
 
-07-Jun-2001 (Lars Duening) -- upcoming Release 3.2.9
+13-Jun-2001 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + allocate(): Accepts an optional initialisation value and can
@@ -188,6 +188,8 @@ For a detailed list of all changes see the file CHANGELOG.
            mixed variables.
        + Bugfix: A cast of an expression to its own type now longer inserts
            a conversion operation.
+       + Bugfix: Global variables can no longer be redefined in the same
+           scope.
 
 
     - Runtime:
@@ -195,6 +197,7 @@ For a detailed list of all changes see the file CHANGELOG.
            a runtime error.
        + The internal alarm timing is monitored and restarted in case the
            alarm gets lost (happens often on Cygwin).
+       + Normal runtime errors are no longer reported on the console.
        + Bugfix: IPv6 name lookup works again, and also with both xerq and erq.
        + Bugfix: The driver now longer gets a confused when a client like
            TinyFugue refuses to use CHARMODE.

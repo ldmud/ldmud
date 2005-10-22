@@ -1,6 +1,15 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+13-Jun-2001 (Lars Duening)  (3.3.63)
+    - (prolang.y) Global variables can no longer be redefined (reported
+         by Coogan).
+    - (doc/efun/operators) Clarified the behaviour of (<type>) casts.
+    - (simulate.c, interpret.c) Normal runtime errors (and their traceback)
+         are no longer reported on stdout at all (reported by Tomi).
+    - (etc/startmud.pl) Added a simple start/keep-alive script - feel
+         free to improve on it (thanks, Krystal-Anne!)
+
 11-Jun-2001 (Lars Duening)  (3.3.62)
     - (interpret) Nifty little crasher: if the object holding the closure
          currently execute is destructed, the interpreter happily tried

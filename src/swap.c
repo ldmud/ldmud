@@ -638,8 +638,8 @@ swap_program (object_t *ob)
 
     if (d_flag > 1)
     {
-        debug_message("%s Swap object %s (ref %ld)\n", time_stamp()
-                     , get_txt(ob->name), ob->ref);
+        debug_message("%s Swap object %s (obj ref %ld, prog ref %ld)\n"
+                     , time_stamp(), get_txt(ob->name), ob->ref, ob->prog->ref);
     }
 
     prog = ob->prog;

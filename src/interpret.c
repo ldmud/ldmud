@@ -13044,8 +13044,14 @@ again:
 
         object_t *ob;
 
+        /* Test the arguments */
+        if (sp->type != T_OBJECT)
+            RAISE_ARG_ERROR(1, TF_OBJECT, sp->type);
+
         ob = sp->u.ob;
-        if (ob != current_object) /* should also check csp */
+        if (ob != current_object
+         && !(ob->flags & O_DESTRUCTED)
+          ) /* should also check csp */
         {
             if (!O_PROG_SWAPPED(ob))
                 (void)swap_program(ob);
@@ -15158,6 +15164,10 @@ dump_trace (Bool how
 /* Write out a traceback, starting from the first frame. If a heart_beat()
  * is involved, return (uncounted) the name of the object that had it.
  *
+ * If <how> is FALSE (the normal case), the trace is written with
+ * debug_message() only. If <how> is TRUE (used for internal errors), the
+ * trace is also written to stdout.
+ *
  * If TRACE_CODE is defined and <how> is true, the last executed
  * instructions are printed, too.
  *
@@ -15196,7 +15206,8 @@ dump_trace (Bool how
 #endif /* TRACE_CODE */
 
     /* Print the trace */
-    fputs(sbuf.buf, stdout);
+    if (how)
+        fputs(sbuf.buf, stdout);
     debug_message("%s", sbuf.buf);
 
     /* Cleanup and return */

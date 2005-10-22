@@ -13,7 +13,7 @@ DESCRIPTION
         If it was the wrong command, the parser will continue
         searching for another command, until one returns 1 or give an
         error message to the user.
-        
+
         For example, there can be a wand and a rod. Both of these
         objects define as command "wave". One of them will be randomly
         called first, and it must look at the argument, and match
@@ -32,7 +32,10 @@ DESCRIPTION
         The object defining these commands must be present to the
         user, either being the user, being carried by the user,
         being the room around the user, or being an object in the
-        same room as the user.
+        same room as the user. If the player leaves this vicinity of the
+        object, the actions are automatically removed.
+
+        Actions can also be removed on demand with the remove_actions() efun.
         
         If argument <flag> is AA_SHORT (1), then the arguments may
         follow the verb without separating space. Any arguments after
@@ -99,4 +102,4 @@ HISTORY
         LDMud 3.3 removed the historical add_action(fun) notation.
 
 SEE ALSO
-        query_verb(E), query_command(E), init(A)
+        query_verb(E), query_command(E), remove_action(), init(A)

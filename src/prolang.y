@@ -2190,6 +2190,10 @@ define_variable (ident_t *name, fulltype_t flags, svalue_t *svp)
             yyerrorf( "Illegal to redefine 'nomask' variable '%s'"
                     , get_txt(name->name));
 
+        if ( !(flags & NAME_INHERITED))
+            yyerrorf( "Illegal to redefine global variable '%s'"
+                    , get_txt(name->name));
+
         /* Make sure that at least one of the two definitions is 'static'.
          * The variable which has not been inherited gets first pick.
          */

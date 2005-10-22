@@ -120,9 +120,20 @@ DESCRIPTION
 
         ( type ) var    Return the value of <var> converted to <type>.
                         <type> can be 'string', 'int', 'object', 'float'
-                        or 'int*'. The operator acts like the efuns
+                        or 'int*'. <var> must be of a specific type 
+                        for a conversion to take place; if <var> is 'mixed'
+                        or unknown, the cast is purely declarative.
+                        Also, if the type of <var> is that of <type>, the
+                        value is not changed.
+
+                        NB. The literal number 0 is of unknown type, as
+                        it doubles as 'not initialized' for strings, objects,
+                        and arrays.
+                        
+                        The operator acts like the efuns
                         to_string(), to_int(), to_object(), to_float()
-                        and to_array().
+                        and to_array(). It is advisable to use the
+                        efuns directly instead of the cast.
 
         ({ type }) var  <var> is now assumed to have the type <type>.
                         This is purely declarative, the actual value
@@ -137,7 +148,7 @@ DESCRIPTION
         expr1[expr2]        The array or mapping given by 'expr1' is
                         indexed by 'expr2'.
 
-        expr1[expr2..expr3] The symbolic form of extract(). Extracts a
+        expr1[expr2..expr3] Extracts a
                         piece from an array or string.
                         expr2 or expr3 may be omitted, default is the begin
                         or end of expr1.
