@@ -7336,6 +7336,12 @@ again:
         push_number(sp, 1);
         break;
 
+    CASE(F_NCONST1);                /* --- nconst1             --- */
+        /* Push the number -1 onto the stack.
+         */
+        push_number(sp, -1);
+        break;
+
     CASE(F_CLIT);                   /* --- clit <num>          --- */
     {
         /* Push the number <num> onto the stack.
@@ -10828,6 +10834,7 @@ again:
 
                 sp--;
                 m = sp->u.map;
+                check_map_for_destr(m);
 
                 /* Test for the special case 'm - m' */
                 if (m == argp->u.map)

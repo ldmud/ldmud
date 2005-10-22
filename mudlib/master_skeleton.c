@@ -809,7 +809,8 @@ int privilege_violation (string op, mixed who, mixed arg, mixed arg2)
 //   limited:          : Execute <arg> with reduced/changed limits.
 //   set_limits        : Set limits to <arg>.
 //   set_this_object   : Set this_object() to <arg>.
-//   shadow_add_action : Add an action to function <arg> from a shadow.
+//   shadow_add_action : Add an action to function <arg4> of object <arg3>
+//                       from the shadow <who> which is shadowing <arg3>.
 //   symbol_variable   : Attempt to create symbol of a hidden variable
 //                       of object <arg> with with index <arg2> in the
 //                       objects variable table.

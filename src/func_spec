@@ -54,6 +54,7 @@
         number
         const0
         const1
+        nconst1
         clit
         nclit
         float

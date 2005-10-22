@@ -40,10 +40,10 @@ DESCRIPTION
                           info in the wiz-list to arg3.
         set_driver_hook   Set hook <arg> to <arg2>.
         set_limits        Set limits to <arg>.
-        set_this_object          Set this_object() to arg3.
-        shadow_add_action Add an action to function arg4 that is
-                          shadowed by the object arg3.
-        symbol_variable          Attempt to make a symbol from a hidden
+        set_this_object   Set this_object() to arg3.
+        shadow_add_action Add an action to function <arg4> of object <arg3>
+                          from the shadow <who> which is shadowing <arg3>.
+        symbol_variable   Attempt to make a symbol from a hidden
                           inherited variable. arg3 is the object in
                           question, arg4 the number of the variable in
                           the variable table.

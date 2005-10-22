@@ -6780,6 +6780,25 @@ expr0:
               mem_block[A_PROGRAM].block[last_expression] =
                 F_NCLIT;
           }
+          else if (CURRENT_PROGRAM_SIZE - last_expression == 1
+           && mem_block[A_PROGRAM].block[last_expression] ==
+                F_CONST1 )
+          {
+              mem_block[A_PROGRAM].block[last_expression] =
+                F_NCONST1;
+          }
+          else if (CURRENT_PROGRAM_SIZE - last_expression == 1 + sizeof(p_int)
+           && mem_block[A_PROGRAM].block[last_expression] ==
+                F_NUMBER )
+          {
+              p_int number;
+
+              memcpy(&number, &(mem_block[A_PROGRAM].block[last_expression+1])
+                    , sizeof(number));
+              number = -number;
+              memcpy(&(mem_block[A_PROGRAM].block[last_expression+1]), &number
+                    , sizeof(number));
+          }
           else
           {
               ins_f_code(F_NEGATE);
@@ -9177,6 +9196,14 @@ function_name:
           $$.real  = $2;
       }
 
+    | L_COLON_COLON L_LOCAL
+      {
+          ident_t *lvar = lookup_local($2);
+
+          *($$.super = yalloc(1)) = '\0';
+          $$.real  = lvar;
+      }
+
     | anchestor L_COLON_COLON L_IDENTIFIER
       {
 %line
@@ -9222,6 +9249,55 @@ function_name:
 
           $$.real = $3; /* and don't forget the function ident */
       }
+
+    | anchestor L_COLON_COLON L_LOCAL
+      {
+%line
+          ident_t *lvar = lookup_local($3);
+
+          /* Attempt to call an efun directly even though there
+           * is a nomask simul-efun for it?
+           */
+          if ( !strcmp($1, "efun")
+           && lvar->type == I_TYPE_GLOBAL
+           && lvar->u.global.sim_efun >= 0
+           && simul_efunp[lvar->u.global.sim_efun].flags & TYPE_MOD_NO_MASK
+           && master_ob
+             )
+          {
+              /* Yup, check it with a privilege violation.
+               * If it's denied, ignore the "efun::" qualifier.
+               */
+
+              svalue_t *res;
+
+              push_ref_string(inter_sp, STR_NOMASK_SIMUL_EFUN);
+              push_c_string(inter_sp, current_file);
+              push_ref_string(inter_sp, lvar->name);
+              res = apply_master_ob(STR_PRIVILEGE, 3);
+              if (!res || res->type != T_NUMBER || res->u.number < 0)
+              {
+                  yyerrorf("Privilege violation: nomask simul_efun %s"
+                          , get_txt(lvar->name));
+                  yfree($1);
+                  $$.super = NULL;
+              }
+              else if (!res->u.number)
+              {
+                  yfree($1);
+                  $$.super = NULL;
+              }
+              else
+              {
+                  $$.super = $1;
+              }
+          }
+          else /* the qualifier is ok */
+              $$.super = $1;
+
+          $$.real = lvar; /* and don't forget the function ident */
+      }
+
 ; /* function_name */
 
 
@@ -10007,6 +10083,7 @@ insert_pop_value (void)
             break;
         case F_CONST0:
         case F_CONST1:
+        case F_NCONST1:
             mem_block[A_PROGRAM].current_size = last_expression;
             break;
         default: ins_f_code(F_POP_VALUE);

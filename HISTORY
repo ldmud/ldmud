@@ -59,7 +59,7 @@ For a detailed list of all changes see the file CHANGELOG.
            something different from '!'.
 
 
-10-Jan-2002 (Lars Duening) -- Release 3.2.9
+23-Jan-2002 (Lars Duening) -- Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -317,6 +317,9 @@ For a detailed list of all changes see the file CHANGELOG.
            the compiler to cross-define the second to the first. Invisible
            to the user, this messed up any use by __INIT and other local
            calls.
+       + Bugfix: The '::' operator did not recognize the separate namespaces
+           of variables and functions: void foo(string id) { ::id(id); }
+           lead to a syntax error.
 
     - Runtime:
        + Attempts to set a single string character to 0 now raise
@@ -334,6 +337,7 @@ For a detailed list of all changes see the file CHANGELOG.
            the H_TELNET_NEG hook.
        + New optional driver hook  H_AUTO_INCLUDE to set a string or
            closure for auto-include information.
+       + Errors while loading objects now include the inheritance chain.
        + Bugfix: IPv6 name lookup works again, and also with both xerq and erq.
        + Bugfix: The driver now longer gets a confused when a client like
            TinyFugue refuses to use CHARMODE.
@@ -574,6 +578,8 @@ For a detailed list of all changes see the file CHANGELOG.
            Same for '--'.
        + Bugfix: The preprocessor properly ignores a '//'-comment in
            the argument list for a function macro.
+       + Bugfix: copy()ing or subtracting mappings did not remove destructed
+           elements first.
 
     - Runtime:
        + If the driver is compiled for IPv6 support, the macro '__IPV6__'

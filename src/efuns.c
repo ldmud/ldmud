@@ -5021,6 +5021,7 @@ f_copy (svalue_t *sp)
         old = sp->u.map;
         if (old->ref != 1)
         {
+            check_map_for_destr(old);
             new = copy_mapping(old);
             if (!new)
                 error("(copy) Out of memory: mapping[%lu] for copy.\n"

@@ -8,5 +8,7 @@ Miscellaneous files for the driver:
 
 The following scripts are just working examples - use them to roll your own:
 
+  memusage    : A script to analyze OBJ_DUMP.
   startmud.pl : A simple start/keep-alive script
   start_mud, mudloop: A slightly more advance start/keep-alive script combo.
+

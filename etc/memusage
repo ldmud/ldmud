@@ -1,0 +1,84 @@
+#!/usr/bin/perl
+#
+# Originally written for MorgenGrauen
+# Take the OBJ_DUMP file and analyze it for memory hogs.
+
+$MUDLIBDIR="/usr/mud/mudlib/";
+$HOMES=$MUDLIBDIR."players/";
+$DOMAINS=$MUDLIBDIR."d/";
+
+$|=1;
+printf("Creating Object-Lists ... ");
+%by_mem=(); %inst=(); %envs=(); %TotalMem=(); $MemSum=0;
+%wizobj=();%wizmem=();%domobj=();%dommem=();
+open(DUMP,$MUDLIBDIR."OBJ_DUMP");
+for (<DUMP>)
+{
+	chop;
+	@line=split(' ');
+	$env=$line[4];
+	$env=$line[5].' *HB*' if ($env eq "HB");
+	@fname=split('#',$line[0]);
+	$mem{$line[0]}=$line[1];
+	$inst{$fname[0]}+=1;
+	$TotalMem{$fname[0]}+=$line[1];
+	$envs{$line[0]}=$env;
+	$MemSum+=$line[1];
+	@path=split("/",$line[0]);
+	if ($path[0] eq "players")
+	{
+		$wizobj{$path[1]}++;
+		$wizmem{$path[1]}+=$line[1];
+	}
+	if ($path[0] eq "d")
+	{
+		$wizobj{$path[2]}++;
+		$wizmem{$path[2]}+=$line[1];
+		$domobj{$path[1]}++;
+		$dommem{$path[1]}+=$line[1];
+	}
+}
+printf("done\nMEMORY list is being created ... sorting ... ");
+@keys=sort {$mem{$b} <=> $mem{$a}} keys %mem;
+print "dumping ... ";
+open(DUMP,">".$MUDLIBDIR."tmp/MEMORY_SORTED");
+printf DUMP "Memory usage according to OBJ_DUMP is %d bytes.\n",$MemSum;
+foreach $key (@keys)
+{
+  printf DUMP "%-30s: mem=%4d, env=%s\n", $key, $mem{$key}, $envs{$key};
+}
+close(DUMP);
+printf("done\nCOUNT_LIST is being created ... sorting ... ");
+@keys=sort {$inst{$b} <=> $inst{$a}} keys %inst;
+print "dumping ... ";
+open(DUMP,">".$MUDLIBDIR."tmp/COUNT_SORTED");
+foreach $key (@keys)
+{
+  printf DUMP "%3d instances using %4d Bytes: %s\n",$inst{$key},$TotalMem{$key},$key;
+}
+close(DUMP);
+printf("done\nTOTAL_MEM_LIST is being created ... sorting ... ");
+@keys=sort {$TotalMem{$b} <=> $TotalMem{$a}} keys %inst;
+print "dumping ... ";
+open(DUMP,">".$MUDLIBDIR."tmp/TOTAL_MEM");
+foreach $key (@keys)
+{
+  printf DUMP "%3d instances using %4d Bytes: %s\n",$inst{$key},$TotalMem{$key},$key;
+}
+close(DUMP);
+printf("done\nDumping OWNER list ... ");
+@keys=sort {$wizmem{$b} <=> $wizmem{$a}} keys %wizmem;
+open(DUMP,">".$MUDLIBDIR."tmp/BY_NAME");
+printf DUMP "How much Memory does each Wizard use ?\n";
+foreach $key (@keys)
+{
+	printf DUMP "%-14s: %4d objects using %9d bytes\n", $key,$wizobj{$key},$wizmem{$key};
+}
+printf DUMP "\n\nHow much Memory does each domain use ?\n";
+@keys=sort {$dommem{$b} <=> $dommem{$a}} keys %dommem;
+foreach $key (@keys)
+{
+	printf DUMP "%-14s: %4d objects using %9d bytes\n", $key,$domobj{$key},$dommem{$key};
+}
+close(DUMP);
+print "done\n";

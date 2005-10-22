@@ -104,6 +104,20 @@ struct give_uid_error_context
     object_t *new_object;  /* The object under processing */
 };
 
+
+/* --- struct namechain ---
+ *
+ * This structure is used by load_object() to build the current inheritence
+ * tree in the frames on the stack. The information is used to generate
+ * proper error messages.
+ */
+
+typedef struct namechain_s
+{
+    struct namechain_s * prev; /* Pointer to the previous element, or NULL */
+    char               * name; /* Pointer to the name to load */
+} namechain_t;
+
 /*-------------------------------------------------------------------------*/
 
 /* The runtime context stack.
@@ -1287,13 +1301,69 @@ legal_path (const char *path)
 } /* legal_path() */
 
 /*-------------------------------------------------------------------------*/
+static void load_object_error(const char *msg, const char *name, namechain_t *chain) NORETURN;
+
+static void
+load_object_error(const char *msg, const char *name, namechain_t *chain)
+
+/* Generate a compilation error message <msg>. If <name> is not NULL,
+ * ": '<name>'" is appended to the message. If <chain> is not NULL,
+ * " (inherited by <chain...>)" is appended to the message.
+ * The message is then printed to stderr and an error() with it is thrown.
+ */
+
+{
+    strbuf_t sbuf;
+    namechain_t *ptr;
+    char * buf;
+
+    strbuf_zero(&sbuf);
+
+    strbuf_add(&sbuf, msg);
+    if (name != NULL)
+    {
+        strbuf_add(&sbuf, ": '");
+        strbuf_add(&sbuf, name);
+        strbuf_add(&sbuf, "'");
+    }
+
+    if (chain != NULL)
+    {
+        strbuf_add(&sbuf, " (inherited");
+        for (ptr = chain; ptr != NULL; ptr = ptr->prev)
+        {
+            strbuf_add(&sbuf, " by '");
+            strbuf_add(&sbuf, ptr->name);
+            strbuf_add(&sbuf, "'");
+        }
+        strbuf_add(&sbuf, ")");
+    }
+
+    strbuf_add(&sbuf, ".\n");
+
+    /* Make a local copy of the message so as not to leak memory */
+    buf = alloca(strlen(sbuf.buf)+1);
+    if (!buf)
+        error("Out of stack memory (%lu bytes)\n", strlen(sbuf.buf)+1);
+    strcpy(buf, sbuf.buf);
+    strbuf_free(&sbuf);
+
+    fprintf(stderr, "%s %s", time_stamp(), buf);
+    error(buf);
+} /* load_object_error() */
+
+/*-------------------------------------------------------------------------*/
+#define MAX_LOAD_DEPTH 60 /* Make this a configurable constant */
+
 static object_t *
-load_object (const char *lname, Bool create_super, int depth)
+load_object (const char *lname, Bool create_super, int depth, namechain_t *chain)
 
 /* Load (compile) an object blueprint from the file <lname>.
  * <create_super> is true if the object has to be
  * initialized with CREATE_SUPER, and false if CREATE_OB is to be used.
- * <depth> is the limit of allowed recursive loads.
+ * <depth> is the current recursive load depth and is checked
+ * against MAX_LOAD_DEPTH.
+ * <chain> is the pointer to the calling frame's namechain structure.
  *
  * If the object can't be loaded because it inherits some other unloaded
  * object, call load_object() recursively to load the inherited object, then
@@ -1318,6 +1388,7 @@ load_object (const char *lname, Bool create_super, int depth)
     char       *name; /* Copy of <lname> */
     char       *fname; /* Filename for <name> */
     program_t  *prog;
+    namechain_t nlink;
 
 #ifdef DEBUG
     if ('/' == lname[0])
@@ -1346,6 +1417,9 @@ load_object (const char *lname, Bool create_super, int depth)
         *name++ = '/';  /* Add and hide a leading '/' */
     strcpy(name, lname);
     strcpy(fname, lname);
+
+    nlink.name = name;
+    nlink.prev = chain;
 
     if (strict_euids && current_object && current_object->eff_user == 0
      && current_object->name)
@@ -1383,16 +1457,27 @@ load_object (const char *lname, Bool create_super, int depth)
             if ( (c = *--p) < '0' || c > '9' ) {
                 if (c == '#' && name_length - i > 1)
                 {
-                    fprintf(stderr, "%s Illegal file to load: %s\n"
-                                  , time_stamp(), name);
-                    error("Illegal file to load: %s.\n", name);
+                    load_object_error("Illegal file to load", name, chain);
+                    /* NOTREACHED */
                 }
                 break;
             }
         }
     }
 
-    /* First check that the c-file exists.
+    /* Check if we were already trying to compile this object */
+    if (chain != NULL)
+    {
+        namechain_t * ptr;
+
+        for (ptr = chain; ptr != NULL; ptr = ptr->prev)
+        {
+            if (!strcmp(name, ptr->name))
+                load_object_error("Recursive inherit", name, chain);
+        }
+    }
+
+    /* Check that the c-file exists.
      */
     (void)strcpy(fname+name_length, ".c");
     if (ixstat(fname, &c_st) == -1)
@@ -1430,9 +1515,8 @@ load_object (const char *lname, Bool create_super, int depth)
             }
             fname[name_length] = '.';
         }
-        fprintf(stderr, "%s Could not load descr for '%s'\n"
-               , time_stamp(), name);
-        error("Failed to load file '%s'.\n", name);
+        load_object_error("Failed to load file", name, chain);
+        /* NOTREACHED */
         return NULL;
     }
 
@@ -1440,9 +1524,8 @@ load_object (const char *lname, Bool create_super, int depth)
      */
     if (!legal_path(fname))
     {
-        fprintf(stderr, "%s Illegal pathname: '%s'\n"
-               , time_stamp(), fname);
-        error("Illegal path name '%s'.\n", fname);
+        load_object_error("Illegal pathname", fname, chain);
+        /* NOTREACHED */
         return NULL;
     }
 
@@ -1467,7 +1550,8 @@ load_object (const char *lname, Bool create_super, int depth)
 
         if (current_file)
         {
-            error("Compiler is busy.\n");
+            error("Can't load '%s': compiler is busy with '%s'.\n"
+                 , name, current_file);
         }
 
         fd = ixopen(fname, O_RDONLY | O_BINARY);
@@ -1535,7 +1619,7 @@ load_object (const char *lname, Bool create_super, int depth)
              */
             if (num_parse_error > 0)
             {
-                error("Error in loading object '%s'\n", name);
+                load_object_error("Error in loading object", name, chain);
             }
 
             if (strcmp(pInherited, name) == 0)
@@ -1543,18 +1627,18 @@ load_object (const char *lname, Bool create_super, int depth)
                 error("Illegal to inherit self.\n");
             }
 
-            if (!depth)
+            if (depth >= MAX_LOAD_DEPTH)
             {
-                error("Too deep inheritance nesting.\n");
+                load_object_error("Too deep inheritance", name, chain);
             }
 
-            ob = load_object(pInherited, MY_TRUE, depth-1);
+            ob = load_object(pInherited, MY_TRUE, depth+1, &nlink);
             free_mstring(inter_sp->u.str);
             inter_sp--;
             if (!ob || ob->flags & O_DESTRUCTED)
             {
-                error("Error in loading object '%s' "
-                      "(inheritance failed)\n", name);
+                load_object_error("Error in loading object "
+                      "(inheritance failed)\n", name, chain);
             }
         } /* handling of inherit_file */
     } /* while() - compilation loop */
@@ -1562,7 +1646,7 @@ load_object (const char *lname, Bool create_super, int depth)
     /* Did the compilation succeed? */
     if (num_parse_error > 0)
     {
-        error("Error in loading object '%s'\n", name);
+        load_object_error("Error in loading object", name, chain);
     }
 
     /* We got the program. Now create the blueprint to hold it.
@@ -1882,7 +1966,7 @@ lookfor_object (string_t * str, Bool bLoad)
 
     if (!ob)
     {
-        ob = load_object(pName, 0, 60);
+        ob = load_object(pName, 0, 0, NULL);
     }
     if (!ob || ob->flags & O_DESTRUCTED)
         return NULL;

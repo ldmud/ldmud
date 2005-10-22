@@ -1,6 +1,20 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+23-Jan-2002 (Lars Duening)  (3.3.155)
+    - (prolang.y) The '::' operator did not recognize the separate
+        namespaces of local variables and functions (reported by
+        Imp via Gnomi).
+    - (func_spec, prolang.y, interpret.c) Added new bytecode instruction
+        nconst1 and create negative number constant right at compile
+        time instead of using negate() - especially useful for __INT_MIN__
+        (reported by Menaures).
+    - (efuns.c, interpret.c, mapping.c) check_map_for_destr() wasn't
+        called before copying or subtracting mappings (reported by Coogan).
+    - (simulate.c) Improved the loadtime error messages: they now print
+        the inheritance chain (suggested by Gnomi).
+    - (etc/memusage) Provided by Fiona - thanks!
+
 17-Jan-2002 (Lars Duening)  (3.3.154)
     - (simul_efun, simulate.c) Destructing the simul-efun object
         immediately invalidates all simul-efuns; this should reduce
