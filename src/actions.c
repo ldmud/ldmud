@@ -59,7 +59,7 @@
 #include "closure.h"
 #include "comm.h"
 #include "dumpstat.h"
-#include "efuns.h"
+#include "efuns.h" /* is_wizard_used */
 #include "exec.h"
 #include "interpret.h"
 #include "mapping.h"
@@ -1407,7 +1407,7 @@ e_add_action (svalue_t *func, svalue_t *cmd, int flag)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_add_action (svalue_t *sp, int num_arg)
+v_add_action (svalue_t *sp, int num_arg)
 
 /* EFUN add_action()
  *
@@ -1442,11 +1442,11 @@ f_add_action (svalue_t *sp, int num_arg)
     }
 
     return sp;
-} /* f_add_action() */
+} /* v_add_action() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_command (svalue_t *sp, int num_arg)
+v_command (svalue_t *sp, int num_arg)
 
 /* EFUN command()
  *
@@ -1515,7 +1515,7 @@ f_command (svalue_t *sp, int num_arg)
     put_number(sp, rc);
 
     return sp;
-} /* f_command() */
+} /* v_command() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *

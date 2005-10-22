@@ -9,6 +9,9 @@ DESCRIPTION
         given) against all strings in list, and return a new array with all
         strings that matched.
 
+        If there is an error in the regular expression, a runtime
+        error will be raised.
+
 EXAMPLE
         string strs;
         if (strs = regexp( ({"please, help me Sir John."}),

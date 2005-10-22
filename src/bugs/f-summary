@@ -28,7 +28,6 @@ f-990714-7: turn_array(): reverse an array or string.
 f-990716:   Lots of array efuns, with simul-efun code.
 f-990714-1: invert_mapping(): reverse mapping
 f-990203-22: member_values(): inverse mapping lookup
-f-990310-1: m_add(): like m + ([]), but faster.
 f-990310-2: m_flat(): to flatten a mapping (like '...' on arrays)
 f-990714-2: factorize(): like unique_array() on mappings
 f-981202-0: Operators like #'+ in lambda should take lots of arguments
@@ -247,6 +246,7 @@ f-020311: Add Berkeley DB to the driver
 f-020331-1: Hook for input_to()
 f-020420-0: Better isolate the error routine calls
 f-020714: Better buffering of data sent to players
+f-020811: Runtime warnings
 
 
 Installation

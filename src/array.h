@@ -115,14 +115,14 @@ extern vector_t * intersect_ordered_arr (vector_t *a1, vector_t *a2);
 extern vector_t *intersect_array(vector_t *a1, vector_t *a2);
 extern vector_t *join_array(vector_t *a1, vector_t *a2);
 
-extern svalue_t *f_allocate(svalue_t *sp, int num_arg);
+extern svalue_t *v_allocate(svalue_t *sp, int num_arg);
 extern svalue_t *x_filter_array(svalue_t *sp, int num_arg);
-extern svalue_t *f_sort_array(svalue_t *sp, int num_arg);
+extern svalue_t *v_sort_array(svalue_t *sp, int num_arg);
 extern svalue_t *x_map_array(svalue_t *sp, int num_arg);
 extern svalue_t *f_transpose_array(svalue_t *sp);
 
-extern svalue_t *f_filter_objects(svalue_t *sp, int num_arg);
-extern svalue_t *f_map_objects(svalue_t *sp, int num_arg);
+extern svalue_t *v_filter_objects(svalue_t *sp, int num_arg);
+extern svalue_t *v_map_objects(svalue_t *sp, int num_arg);
 extern svalue_t *f_unique_array(svalue_t *sp);
 
 extern void set_vector_user(vector_t *p, object_t *owner);

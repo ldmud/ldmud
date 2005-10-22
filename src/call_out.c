@@ -111,7 +111,7 @@ free_call (struct call *cop)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_call_out (svalue_t *sp, int num_arg)
+v_call_out (svalue_t *sp, int num_arg)
 
 /* EFUN: call_out()
  *
@@ -236,7 +236,7 @@ f_call_out (svalue_t *sp, int num_arg)
     cop->next = NULL;
 
     return sp;
-} /* f_call_out() */
+} /* v_call_out() */
 
 /*-------------------------------------------------------------------------*/
 void

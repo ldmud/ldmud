@@ -452,7 +452,10 @@ backend (void)
 
                 if (time_now - time_last_gc >= 60)
                 {
-                  sprintf(buf, "%s Garbage collection (slow_shut to do: %d, time since last gc: %d)\n", time_stamp(), slow_shut_down_to_do, time_now - time_last_gc);
+                  sprintf(buf, "%s Garbage collection (slow_shut to do: %d, "
+                               "time since last gc: %ld)\n"
+                             , time_stamp(), slow_shut_down_to_do
+                             , (long)(time_now - time_last_gc));
                   write(1, buf, strlen(buf));
                   command_giver = NULL;
                   current_object = NULL;
@@ -460,7 +463,11 @@ backend (void)
                 }
                 else
                 {
-                  sprintf(buf, "%s Garbage collection refused (slow_shut to do: %d, time since last gc: %d)\n", time_stamp(), slow_shut_down_to_do, time_now - time_last_gc);
+                  sprintf(buf, "%s Garbage collection refused "
+                               "(slow_shut to do: %d, "
+                               "time since last gc: %ld)\n"
+                             , time_stamp(), slow_shut_down_to_do
+                             , (long)(time_now - time_last_gc));
                   write(1, buf, strlen(buf));
                   reallocate_reserved_areas();
                 }
@@ -1210,7 +1217,7 @@ static int acc = 0;    /* Sum of lines for this backend loop */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_garbage_collection (svalue_t *sp, int num_arg)
+v_garbage_collection (svalue_t *sp, int num_arg)
 
 /* EFUN garbage_collection()
  *
@@ -1298,7 +1305,7 @@ f_garbage_collection (svalue_t *sp, int num_arg)
     time_last_gc = 0;  /* mark it as an 'unconditional' GC */
 
     return sp;
-} /* f_garbage_collection() */
+} /* v_garbage_collection() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *

@@ -408,3 +408,75 @@ with_apply_cache_bits=12
 enable_rxcache_table=yes
 with_rxcache_table=8192
 
+# --- Profiling ---
+# For profiling of the VM instruction implementations, refer to the Makefile
+
+# Enable usage statistics of VM instructions.
+enable_opcprof=no
+
+# If opcprof is enabled, this option includes the instruction names
+# into the statistic.
+enable_verbose_opcprof=no
+
+# --- Standard Debugging ---
+# These options are 'standard' debugging options.
+
+# Enable basic run time sanity checks. This will use more time
+# and space, but nevertheless you are strongly encouraged to keep
+# it defined.
+enable_debug=yes
+
+# Enable debug output from the LPC compiler.
+enable_yydebug=no
+
+# Disable inlining. Use this to debug obscure crashes, or for
+# speed tests.
+enable_no_inlines=no
+
+# Enable the shared string sanity checking (enables commandline option
+# --check-strings).
+enable_check_strings=yes
+
+# Shared strings are never really freed.
+enable_keep_strings=no
+
+# Activate debug prints in the telnet machine (lots of output).
+enable_debug_telnet=no
+
+# Activate allocation debug prints in the smalloc module (lots of output).
+enable_debug_smalloc_allocs=no
+
+# --- Specific Debugging ---
+# These options have been introduced to debug specific problems and will
+# be removed again later.
+
+# Trace changes to the tot_alloc_object and tot_alloc_object_size statistics,
+# in order to find the status bugs (enables commandline option
+# --check-object-stat). Will produce a decent amount of output on stderr.
+enable_check_object_stat=yes
+
+# Activate total mapping size consistency check code. It has a small impact on
+# the execution speed. This define was used to find the inaccuracy in the
+# mapping statistic.
+enable_check_mapping_total=no
+
+# Activate object refcount check code. It will produce a decent amount of log
+# output. It will also fatal() the driver as soon as it detects an
+# inconsistency in the list of destructed objects.
+enable_check_object_ref=no
+
+# Activate object referencing checking code during the GC. It will print error
+# messages to gcout when an object or program is referenced as something else.
+# No penalty for using.  Requires MALLOC_TRACE to work. Incompatible with
+# DUMP_GC_REFS.
+enable_check_object_gc_ref=yes
+
+# Deactivate the tracking of blueprints. This will disable the
+# efuns blueprint(), but probably avoid the object refcount bug.
+enable_no_blueprint=no
+
+# Sometimes the GC stumbles over invalid references to memory blocks (namely
+# 'Program referenced as something else'). Define this macro to get a detailed
+# dump of all found references (Warning: LOTS of output!).
+# Incompatible with CHECK_OBJECT_GC_REF.
+enable_dump_gc_refs=no

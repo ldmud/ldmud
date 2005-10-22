@@ -37,6 +37,10 @@ extern int check_state_level;
 extern Bool check_string_table_flag;
 #endif
 
+#ifdef CHECK_OBJECT_STAT
+extern Bool check_object_stat;
+#endif
+
 extern int port_numbers[];
 extern int numports;
 

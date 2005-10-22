@@ -230,8 +230,8 @@ struct replace_ob_s
 /* --- Variables --- */
 
 extern replace_ob_t *obj_list_replace;
-extern int tot_alloc_object;
-extern int tot_alloc_object_size;
+extern long tot_alloc_object;
+extern long tot_alloc_object_size;
 extern object_t NULL_object;
 
 
@@ -271,10 +271,10 @@ extern object_t *get_empty_object(int num_var);
 extern object_t *get_empty_object(int num_var, variable_t * variables, svalue_t *initialisers);
 #endif
 
-extern svalue_t *f_function_exists(svalue_t *sp, int num_arg);
+extern svalue_t *v_function_exists(svalue_t *sp, int num_arg);
 extern svalue_t *f_functionlist(svalue_t *sp);
-extern svalue_t *f_include_list (svalue_t *sp, int num_arg);
-extern svalue_t *f_inherit_list(svalue_t *sp, int num_arg);
+extern svalue_t *v_include_list (svalue_t *sp, int num_arg);
+extern svalue_t *v_inherit_list(svalue_t *sp, int num_arg);
 extern svalue_t *f_load_name(svalue_t *sp);
 extern svalue_t *f_object_name(svalue_t *sp);
 extern svalue_t *f_object_time(svalue_t *sp);
@@ -282,7 +282,7 @@ extern svalue_t *f_program_name(svalue_t *sp);
 extern svalue_t *f_program_time(svalue_t *sp);
 extern svalue_t *f_query_once_interactive(svalue_t *sp);
 extern svalue_t *f_rename_object(svalue_t *sp);
-extern svalue_t *f_replace_program(svalue_t *sp, int num_arg);
+extern svalue_t *v_replace_program(svalue_t *sp, int num_arg);
 extern svalue_t *f_tell_object(svalue_t *sp);
 extern svalue_t *f_set_next_reset(svalue_t *sp);
 
@@ -295,20 +295,20 @@ extern svalue_t *f_getuid(svalue_t *sp);
 extern svalue_t *f_creator(svalue_t *sp);
 #endif
 
-extern svalue_t *f_all_environment(svalue_t *sp, int num_arg);
+extern svalue_t *v_all_environment(svalue_t *sp, int num_arg);
 extern svalue_t *f_all_inventory(svalue_t *sp);
 #if defined(SUPPLY_PARSE_COMMAND)
 extern vector_t *deep_inventory(object_t *ob, Bool take_top);
   /* needed by parse.c */
 #endif
 extern svalue_t *f_deep_inventory(svalue_t *sp);
-extern svalue_t *f_environment(svalue_t *sp, int num_arg);
+extern svalue_t *v_environment(svalue_t *sp, int num_arg);
 extern svalue_t *f_first_inventory(svalue_t *sp);
 extern svalue_t *f_next_inventory(svalue_t *sp);
 extern svalue_t *f_move_object (svalue_t *sp);
-extern svalue_t *f_present(svalue_t *sp, int num_arg);
-extern svalue_t *f_say(svalue_t *sp, int num_arg);
-extern svalue_t *f_tell_room(svalue_t *sp, int num_arg);
+extern svalue_t *v_present(svalue_t *sp, int num_arg);
+extern svalue_t *v_say(svalue_t *sp, int num_arg);
+extern svalue_t *v_tell_room(svalue_t *sp, int num_arg);
 extern svalue_t *f_set_environment(svalue_t *sp);
 #ifdef F_TRANSFER
 extern svalue_t *f_transfer(svalue_t *svp);
@@ -319,7 +319,7 @@ extern void add_light(object_t *p, int n);
 extern svalue_t *f_set_light(svalue_t *sp);
 #endif
 
-extern svalue_t *f_save_object(svalue_t *sp, int numarg);
+extern svalue_t *v_save_object(svalue_t *sp, int numarg);
 extern svalue_t *f_save_value(svalue_t *sp);
 extern svalue_t *f_restore_object(svalue_t *sp);
 extern svalue_t *f_restore_value(svalue_t *sp);

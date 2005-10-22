@@ -301,7 +301,7 @@ enum ClassCodes {
   , C_EFUN2      /* Tabled efuns with 2 argument */
   , C_EFUN3      /* Tabled efuns with 3 argument */
   , C_EFUN4      /* Tabled efuns with 4 argument */
-  , C_EFUNV      /* Tabled efuns with variable arguments */
+  , C_EFUNV      /* Tabled efuns with more than 4 or variable arguments */
   , C_ALIAS      /* Aliased efuns. This must come right after
                   * the last C_EFUN*.
                   */
@@ -747,6 +747,7 @@ code:     optional_name ID optional_optype
         num_buff++;
         free($1);
     }
+    ;
 
 /* --- Efuns --- */
 
@@ -789,9 +790,11 @@ func: type ID optional_ID '(' arg_list optional_default ')' ';'
                         code_class = C_EFUN0 + min_arg;
                     else
                     {
-                        char buf[100];
-                        sprintf(buf, "Efun '%s' has too many arguments.\n", $2);
-                        fatal(buf);
+                        code_class = C_EFUNV;
+                        fprintf(stderr
+                               , "Efun '%s' has %d arguments and will be "
+                                 "considered a 'varargs' efun.\n"
+                               , $2, min_arg);
                     }
                 }
 
@@ -2852,7 +2855,7 @@ create_efun_defs (void)
             break;
         case C_EFUNV: 
             fprintf(fpw, "/* Prototypes of the tabled vararg efuns\n */\n\n");
-            pattern = "extern svalue_t *f_%s(svalue_t *, int);\n";
+            pattern = "extern svalue_t *v_%s(svalue_t *, int);\n";
             break;
         }
 
@@ -2869,15 +2872,19 @@ create_efun_defs (void)
 
     for (k = C_EFUN0; k < C_ALIAS; k++)
     {
+        char * prefix;
+
         switch(k)
         {
         case C_EFUN0: 
             fprintf(fpw, "/* The table of tabled efuns\n */\n\n");
             fprintf(fpw, "svalue_t *(*efun_table[]) (svalue_t *) = {\n");
+            prefix = "f_";
             break;
         case C_EFUNV: 
             fprintf(fpw, "/* The table of tabled vararg efuns\n */\n\n");
             fprintf(fpw, "svalue_t *(*vefun_table[]) (svalue_t *, int) = {\n");
+            prefix = "v_";
             break;
         }
 
@@ -2885,7 +2892,7 @@ create_efun_defs (void)
         j = i + num_instr[k];
         for(; i < j; i++)
         {
-            fprintf(fpw, "    /* %3d */ f_%s,\n", i, instr[i].key);
+            fprintf(fpw, "    /* %3d */ %s%s,\n", i, prefix, instr[i].key);
         }
 
         if (k == C_EFUNV-1 || k == C_ALIAS-1)
@@ -3362,7 +3369,7 @@ main (int argc, char ** argv)
 %union{ int i; char *p; }\n\
 %type <p> all\n\
 %%\n\
-all: { $<p>$ = 0; } 'a'\n\
+all: { $<p>$ = 0; } 'a';\n\
 %%\n\
 ");
         fclose(fpw);

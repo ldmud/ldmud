@@ -1181,7 +1181,7 @@ is_ordered (vector_t *v)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_allocate (svalue_t *sp, int num_arg)
+v_allocate (svalue_t *sp, int num_arg)
 
 /* EFUN allocate()
  *
@@ -1365,7 +1365,7 @@ f_allocate (svalue_t *sp, int num_arg)
     put_array(sp, v);
 
     return sp;
-} /* f_allocate() */
+} /* v_allocate() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -1672,7 +1672,7 @@ x_map_array (svalue_t *sp, int num_arg)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_sort_array (svalue_t * sp, int num_arg)
+v_sort_array (svalue_t * sp, int num_arg)
 
 /* EFUN sort_array()
  *
@@ -1826,11 +1826,11 @@ f_sort_array (svalue_t * sp, int num_arg)
 
     free_callback(&cb);
     return arg;
-} /* f_sort_array() */
+} /* v_sort_array() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_filter_objects (svalue_t *sp, int num_arg)
+v_filter_objects (svalue_t *sp, int num_arg)
 
 /* EFUN filter_objects()
  *
@@ -1987,11 +1987,11 @@ f_filter_objects (svalue_t *sp, int num_arg)
 
     put_array(sp, w);
     return sp;
-}
+} /* v_filter_objects() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_map_objects (svalue_t *sp, int num_arg)
+v_map_objects (svalue_t *sp, int num_arg)
 
 /* EFUN map_objects()
  *
@@ -2086,7 +2086,7 @@ f_map_objects (svalue_t *sp, int num_arg)
     free_array(p);
 
     return sp;
-} /* f_map_objects() */
+} /* v_map_objects() */
 
 /*-------------------------------------------------------------------------*/
 long

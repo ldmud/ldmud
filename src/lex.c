@@ -737,6 +737,10 @@ init_lexer(void)
 #endif
     sprintf(mtext, "%ld", (long)def_eval_cost);
     add_permanent_define("__MAX_EVAL_COST__", -1, string_copy(mtext), MY_FALSE);
+    sprintf(mtext, "%ld", (long)CATCH_RESERVED_COST);
+    add_permanent_define("__CATCH_EVAL_COST__", -1, string_copy(mtext), MY_FALSE);
+    sprintf(mtext, "%ld", (long)MASTER_RESERVED_COST);
+    add_permanent_define("__MASTER_EVAL_COST__", -1, string_copy(mtext), MY_FALSE);
 #ifdef USE_IPV6
     add_permanent_define("__IPV6__", -1, string_copy("1"), MY_FALSE);
 #endif

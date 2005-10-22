@@ -1,6 +1,37 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+12-Aug-2002 (Lars Duening)  (3.3.218)
+    - (lex.c) New predefined macros __CATCH_EVAL_COST__ and
+         __MASTER_EVAL_COST__ to carry the corresponding
+         configuration options over to LPC (suggested by Menaures).
+    - (Makefiles, configure, config.h) Moved the debugging options into
+         config.h to ensure clean recompilations, and made them
+         configurable through the normal configure mechanism.
+    - (make_func.y, lotsa files) Efuns with more than four fixed
+         arguments are implemented as vararg efuns. In addition,
+         because the vararg efun functions have a different signature
+         than the fixed efun functions, the former now use 'v_xxx()'
+         as standard name.
+
+11-Aug-2002 (Lars Duening)
+    - (driver.h, object.c, simulate.c, swap.c) Defining debug macro
+         CHECK_OBJECT_STAT allows tracing of all changes to the
+         tot_alloc_object(_size) statistics. Aim is to find the
+         discrepancy in the 'status' command. To activate the
+         tracing, the commandline option '--check-object-stat' must
+         be given.
+    - (interpret.c) The operations <map> += <map> and <map> -= <map>
+         now implement the copy-on-write semantic to mirror the
+         behaviour of the related array operations (suggested by Dafire).
+    - (interpret.c) get_type_info(<closure>,2) did not return the
+         bound object for efun, simul-efun and operator closures 
+         (reported by Gnomi).
+    - (interpret.c) Attempting to replace a program in an object
+         which already has closures bound no longer raises an error,
+         but issues a debug_message() (suggested by Pulami).
+    - (make_func.y) Removed two warnings by bison (reported by Gawain).
+
 10-Aug-2002 (Lars Duening)  (3.3.217)
     - (closure.c) In efun symbol_function(), symbols were freed as
          strings (reported by Freaky).

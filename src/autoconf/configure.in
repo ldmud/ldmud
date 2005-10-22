@@ -105,6 +105,23 @@ AC_MY_ARG_ENABLE(trace-code,yes,,[trace the most recently executed bytecode])
 
 AC_MY_ARG_ENABLE(rxcache_table,yes,,)
 
+AC_MY_ARG_ENABLE(opcprof,no,,[create VM instruction usage statistics])
+AC_MY_ARG_ENABLE(verbose-opcprof,no,,[with opcprof: include instruction names])
+AC_MY_ARG_ENABLE(debug,yes,,[enable sanity checks])
+AC_MY_ARG_ENABLE(yydebug,no,,[enable LPC compiler debug output])
+AC_MY_ARG_ENABLE(no-inlines,no,,[disable inlining])
+AC_MY_ARG_ENABLE(check-strings,yes,,[allow shared string sanity checks])
+AC_MY_ARG_ENABLE(keep-strings,no,,[don't free shared strings])
+AC_MY_ARG_ENABLE(debug-telnet,no,,[enable telnet machine diagnostics])
+AC_MY_ARG_ENABLE(debug-smalloc-allocs,no,,[enable small block diagnostics])
+
+AC_MY_ARG_ENABLE(check-object-stat,yes,,[trace changes to the object statistics])
+AC_MY_ARG_ENABLE(check-mapping-total,no,,[check the mapping statistic])
+AC_MY_ARG_ENABLE(check-object-ref,no,,[check object references])
+AC_MY_ARG_ENABLE(check-object-gc-ref,yes,,[check object references in GC])
+AC_MY_ARG_ENABLE(no-blueprint,no,,[disable blueprint tracking])
+AC_MY_ARG_ENABLE(dump-gc-refs,no,,[trace GC references])
+
 AC_MY_ARG_WITH(access-file,ACCESS.ALLOW,,[access permissions file])
 AC_MY_ARG_WITH(access-log,access.allow.log,,[access log file])
 
@@ -229,6 +246,23 @@ AC_CDEF_FROM_ENABLE(trace_code)
 
 AC_CDEF_FROM_ENABLE(rxcache_table)
 
+AC_CDEF_FROM_ENABLE(opcprof)
+AC_CDEF_FROM_ENABLE(verbose_opcprof)
+AC_CDEF_FROM_ENABLE(debug)
+AC_CDEF_FROM_ENABLE(yydebug)
+AC_CDEF_FROM_ENABLE(no_inlines)
+AC_CDEF_FROM_ENABLE(check_strings)
+AC_CDEF_FROM_ENABLE(keep_strings)
+AC_CDEF_FROM_ENABLE(debug_telnet)
+AC_CDEF_FROM_ENABLE(debug_smalloc_allocs)
+
+AC_CDEF_FROM_ENABLE(check_object_stat)
+AC_CDEF_FROM_ENABLE(check_mapping_total)
+AC_CDEF_FROM_ENABLE(check_object_ref)
+AC_CDEF_FROM_ENABLE(check_object_gc_ref)
+AC_CDEF_FROM_ENABLE(no_blueprint)
+AC_CDEF_FROM_ENABLE(dump_gc_refs)
+
 AC_STRING_VAL_FROM_WITH(access_file)
 AC_STRING_VAL_FROM_WITH(access_log)
 AC_STRING_VAL_FROM_WITH(swap_file)
@@ -301,6 +335,10 @@ fi
 
 if test "x$cdef_wizlist_file" = "x#undef"; then
   val_wizlist_file=
+fi
+
+if test "x$cdef_opcprof" = "x#undef"; then
+  cdef_verbose_opcprof=
 fi
 
 
@@ -1327,7 +1365,7 @@ else
   mv y_tab.c conftest.c
   YACCTAB=y_tab.
 fi
-if eval $compile; then
+if eval $ac_compile 2>&5; then
   MOVE_YACC_TAB='$(MV) $(YACCTAB)c'
   CLEAN_YACC_TAB=''
   AC_MSG_RESULT(no)
@@ -1359,7 +1397,7 @@ else
   mv y_tab.c conftest.c
   YACCTAB=y_tab.
 fi
-if eval $compile; then
+if eval $ac_compile 2>&5 ; then
   AC_MSG_RESULT(no)
 else
   EXTRA_CFLAGS="${EXTRA_CFLAGS} -U_SGI_SOURCE"
@@ -1562,6 +1600,23 @@ AC_SUBST(cdef_dynamic_costs)
 
 AC_SUBST(cdef_rxcache_table)
 AC_SUBST(cdef_wizlist_file)
+
+AC_SUBST(cdef_opcprof)
+AC_SUBST(cdef_verbose_opcprof)
+AC_SUBST(cdef_debug)
+AC_SUBST(cdef_yydebug)
+AC_SUBST(cdef_no_inlines)
+AC_SUBST(cdef_check_strings)
+AC_SUBST(cdef_keep_strings)
+AC_SUBST(cdef_debug_telnet)
+AC_SUBST(cdef_debug_smalloc_allocs)
+
+AC_SUBST(cdef_check_object_stat)
+AC_SUBST(cdef_check_mapping_total)
+AC_SUBST(cdef_check_object_ref)
+AC_SUBST(cdef_check_object_gc_ref)
+AC_SUBST(cdef_no_blueprint)
+AC_SUBST(cdef_dump_gc_refs)
 
 dnl second: valued defines
 dnl

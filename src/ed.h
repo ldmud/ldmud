@@ -21,7 +21,7 @@ extern void count_ed_buffer_extra_refs(ed_buffer_t *b);
 extern void free_ed_buffer(void);
 extern void ed_cmd(char *str);
 extern void save_ed_buffer(void);
-extern svalue_t *f_ed(svalue_t *sp, int num_arg);
+extern svalue_t *v_ed(svalue_t *sp, int num_arg);
 extern svalue_t *f_query_editing(svalue_t *sp);
 
 #endif /* ED_H__ */

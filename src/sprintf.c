@@ -22,7 +22,7 @@
  *        are broken into the size of 'precision', and the last line is
  *        padded to have a length of 'fs'.
  *  "#"   table mode, print a list of '\n' separated 'words' in a
- *        table within the field size.  only meaningful with strings.
+ *        compact table within the field size.  Only meaningful with strings.
  *   n    specifies the field size, a '*' specifies to use the corresponding
  *        arg as the field size.  If n is prepended with a zero, then the field
  *        is printed with leading zeros.
@@ -2100,6 +2100,13 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                                 tpres = n;
                             if (len*tpres < n)
                                 len++;
+                            /* Since the table will be filled by column,
+                             * the result will be a rectangle with as little
+                             * as possible empty space. This means we have
+                             * to adjust the no of columns (tpres) to
+                             * what the fill algorithm will actually
+                             * produce.
+                             */
                             if (len > 1 && n%tpres)
                                 tpres -= (tpres - n%tpres)/len;
 
@@ -2337,7 +2344,7 @@ add_table_now:
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_printf (svalue_t *sp, int num_arg)
+v_printf (svalue_t *sp, int num_arg)
 
 /* EFUN printf()
  *
@@ -2359,11 +2366,11 @@ f_printf (svalue_t *sp, int num_arg)
     sp = pop_n_elems(num_arg, sp);
 
     return sp;
-} /* f_printf() */
+} /* v_printf() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_sprintf (svalue_t *sp, int num_arg)
+v_sprintf (svalue_t *sp, int num_arg)
 
 /* EFUN sprintf()
  *
@@ -2397,7 +2404,7 @@ f_sprintf (svalue_t *sp, int num_arg)
         push_c_string(sp, s);
 
     return sp;
-} /* f_sprintf() */
+} /* v_sprintf() */
 
 /***************************************************************************/
 

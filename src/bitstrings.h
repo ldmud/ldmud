@@ -18,7 +18,7 @@ extern svalue_t *f_invert_bits(svalue_t *);
 extern svalue_t *f_last_bit(svalue_t *);
 extern svalue_t *f_next_bit(svalue_t *);
 extern svalue_t *f_count_bits(svalue_t *);
-extern svalue_t *f_copy_bits(svalue_t *, int num_arg);
+extern svalue_t *v_copy_bits(svalue_t *, int num_arg);
 
 #endif /* BITSTRINGS_H__ */
 

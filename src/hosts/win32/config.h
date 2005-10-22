@@ -379,5 +379,94 @@
 /* If using TRACE_CODE , how many instructions should be kept? */
 #define TOTAL_TRACE_LENGTH      0x1000
 
+/*----------------------------------------------------------------*/
+/* The following macros activate various debugging and profiling
+ * code segments.
+ */
+
+/* Enable basic run time sanity checks. This will use more time
+ * and space, but nevertheless you are strongly encouraged to keep
+ * it defined.
+ */
+#define DEBUG
+
+/* Enable debug output from the LPC compiler.
+ */
+/* #define YYDEBUG 1 */
+
+/* Disable inlining.
+ */
+/* #define NO_INLINES */
+
+/* Enable the shared string checking (enables commandline option
+ * --check-strings).
+ */
+#define CHECK_STRINGS
+
+/* Shared strings are never really freed.
+ */
+/* #define KEEP_STRINGS */
+
+/* Activate debug prints in the telnet machine.
+ */
+/* #define DEBUG_TELNET */
+
+/* Activate allocation debug prints in the smalloc module.
+ */
+/* #define DEBUG_SMALLOC_ALLOCS */
+
+/* Trace changes to the tot_alloc_object and tot_alloc_object_size
+ * statistics, in order to find the status bugs (enables commandline
+ * option --check-object-stat). Will produce a decent amount of
+ * output on stderr.
+ */
+#define CHECK_OBJECT_STAT
+
+/* Activate total mapping size consistency check code. It has a small
+ * impact on the execution speed. This define was used to find
+ * the inaccuracy in the mapping statistic.
+ */
+/* #define CHECK_MAPPING_TOTAL */
+
+/* Activate object refcount check code. It will produce a decent
+ * amount of log output. It will also fatal() the driver as soon
+ * as it detects an inconsistency in the list of destructed objects.
+ */
+/* #define CHECK_OBJECT_REF */
+
+/* Activate object referencing checking code during the GC. It will
+ * print error messages to gcout when an object or program is
+ * referenced as something else. No penalty for using.
+ * Requires MALLOC_TRACE to work. Incompatible with DUMP_GC_REFS.
+ */
+#ifdef MALLOC_TRACE
+#    define CHECK_OBJECT_GC_REF
+#endif
+
+/* Deactivate the tracking of blueprints. This will disable the
+ * efuns blueprint(), but probably avoid the object refcount bug.
+ */
+/* #define NO_BLUEPRINT */
+
+/* Sometimes the GC stumbles over invalid references to memory
+ * blocks (namely 'Program referenced as something else'). Define
+ * this macro to get a detailed dump of all found references
+ * (Warning: LOTS of output!). Incompatible with CHECK_OBJECT_GC_REF.
+ */
+/* #define DUMP_GC_REFS */
+
+/* Enable usage statistics of VM instructions.
+ * For profiling of the VM instructions themselves, see the Profiling
+ * Options in the Makefile.
+ */
+/* #define OPCPROF */
+
+#ifdef OPCPROF
+/* With OPCPROF, the dump of the statistics include the names
+ * of the instructions.
+ */
+/* #define VERBOSE_OPCPROF */
+#endif
+
 #endif /* CONFIG_H__ */
 

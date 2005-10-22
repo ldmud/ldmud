@@ -11,6 +11,10 @@ DESCRIPTION
         error values (other than 0) as given to throw() and raise_error() are
         returned as they are.
 
+        If at the time the catch() is encountered less than
+        __CATCH_EVAL_COST__ eval ticks are left, a runtime error will be
+        thrown and the expressions will not be executed.
+
         Normally, the caught error will be logged in the error logs for easier
         debugging. If the keyword 'nolog' is given, this log is suppressed.
 
@@ -27,4 +31,4 @@ HISTORY
         LDMud 3.3 implemented it as official form.
 
 SEE ALSO
-        throw(E), raise_error(E)
+        throw(E), raise_error(E), predefined(D)

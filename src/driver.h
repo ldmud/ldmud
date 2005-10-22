@@ -14,42 +14,6 @@
 
 #include "config.h"
 
-/* DEBUG: Some debug defines */
-
-/* Sometimes the GC stumbles over invalid references to memory
- * blocks (namely 'Program referenced as something else'). Define
- * this macro to get a detailed dump of all found references
- * (Warning: LOTS of output!).
- */
-/* #define DUMP_GC_REFS */
-
-/* Activate total mapping size consistency check code. It shouldn't
- * have any noticeable speed impact. This define was used to find
- * the inaccuracy in the mapping statistic.
- */
-/* #define CHECK_MAPPING_TOTAL */
-
-/* Activate object refcount check code. It will produce a decent
- * amount of log output. It will also fatal() the driver as soon
- * as it detects an inconsistency in the list of destructed objects.
- */
-/* #define CHECK_OBJECT_REF */
-
-/* Activate object referencing checking code during the GC. It will
- * print error messages to gcout when an object or program is
- * referenced as something else. No penalty for using.
- * Requires MALLOC_TRACE to work. Incompatible with DUMP_GC_REFS.
- */
-#ifdef MALLOC_TRACE
-#    define CHECK_OBJECT_GC_REF
-#endif
-
-/* Deactivate the tracking of blueprints. This will disable the
- * efuns blueprint(), but probably avoid the object refcount bug.
- */
-/* #define NO_BLUEPRINT */
-
-
 /* TODO: Some TODO defines */
 
 /* NO_NEGATIVE_RANGES: If defined, assignments to negative ranges
@@ -60,6 +24,7 @@
  */
 /* #undef NO_NEGATIVE_RANGES */
 
+/*----------------------------------------------------------------*/
 /* Verify some of the definitions in config.h */
 
 #if !defined(MALLOC_smalloc) && !defined(MALLOC_sysmalloc)

@@ -813,7 +813,7 @@ copy_bits ( string_t * dest, p_int deststart
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_copy_bits (svalue_t *sp, int num_arg)
+v_copy_bits (svalue_t *sp, int num_arg)
 
 /* EFUN copy_bits()
  *
@@ -1046,7 +1046,7 @@ f_copy_bits (svalue_t *sp, int num_arg)
 
     put_string(sp, result);
     return sp;
-} /* f_copy_bits() */
+} /* v_copy_bits() */
 
 /***************************************************************************/
 

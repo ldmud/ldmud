@@ -344,7 +344,7 @@ f_db_close (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_db_connect (svalue_t *sp, int num_args)
+v_db_connect (svalue_t *sp, int num_args)
 
 /* EFUN db_connect()
  *
@@ -429,7 +429,7 @@ f_db_connect (svalue_t *sp, int num_args)
     sock = (signed)tmp->handle;
     put_number(sp, sock);
     return sp;
-} /* f_db_connect() */
+} /* v_db_connect() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *

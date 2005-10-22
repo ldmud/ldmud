@@ -5319,7 +5319,7 @@ undefined_function:
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_bind_lambda (svalue_t *sp, int num_arg)
+v_bind_lambda (svalue_t *sp, int num_arg)
 
 /* EFUN bind_lambda()
  *
@@ -5450,7 +5450,7 @@ f_bind_lambda (svalue_t *sp, int num_arg)
     }
 
     return sp;
-} /* bind_lambda() */
+} /* v_bind_lambda() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *

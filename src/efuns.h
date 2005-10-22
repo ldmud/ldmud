@@ -24,11 +24,11 @@ extern svalue_t *f_md5_crypt(svalue_t *sp);
 extern svalue_t *f_regexp(svalue_t *);
 extern svalue_t *f_regexplode(svalue_t *sp);
 extern svalue_t* f_regreplace (svalue_t *sp);
-extern svalue_t* f_regmatch (svalue_t *sp, int num_arg);
+extern svalue_t* v_regmatch (svalue_t *sp, int num_arg);
 extern svalue_t *f_strstr(svalue_t *);
-extern svalue_t *f_trim(svalue_t *, int num_arg);
+extern svalue_t *v_trim(svalue_t *, int num_arg);
 extern svalue_t *f_upper_case(svalue_t *);
-extern svalue_t *f_terminal_colour(svalue_t *, int num_arg);
+extern svalue_t *v_terminal_colour(svalue_t *, int num_arg);
 #ifdef F_PROCESS_STRING
 extern svalue_t *f_process_string(svalue_t *sp);  /* optional */
 #endif
@@ -55,12 +55,12 @@ extern svalue_t *f_to_string (svalue_t *sp);
 extern svalue_t *f_to_object (svalue_t *sp);
 extern svalue_t *f_copy (svalue_t *sp);
 extern svalue_t *f_deep_copy (svalue_t *sp);
-extern svalue_t *f_filter (svalue_t *sp, int num_arg);
-extern svalue_t *f_get_type_info (svalue_t *sp, int num_arg);
-extern svalue_t *f_map (svalue_t *sp, int num_arg);
+extern svalue_t *v_filter (svalue_t *sp, int num_arg);
+extern svalue_t *v_get_type_info (svalue_t *sp, int num_arg);
+extern svalue_t *v_map (svalue_t *sp, int num_arg);
 extern svalue_t *f_member (svalue_t *sp);
-extern svalue_t *f_min (svalue_t *sp, int num_arg);
-extern svalue_t *f_max (svalue_t *sp, int num_arg);
+extern svalue_t *v_min (svalue_t *sp, int num_arg);
+extern svalue_t *v_max (svalue_t *sp, int num_arg);
 extern svalue_t *f_sgn (svalue_t *sp);
 extern svalue_t *f_quote (svalue_t *sp);
 extern svalue_t *f_unquote (svalue_t *sp);
@@ -68,15 +68,15 @@ extern svalue_t *f_gmtime (svalue_t *sp);
 extern svalue_t *f_localtime (svalue_t *sp);
 
 extern svalue_t *f_blueprint (svalue_t *sp);
-extern svalue_t *f_clones (svalue_t *sp, int num_args);
-extern svalue_t *f_object_info (svalue_t *sp, int num_args);
+extern svalue_t *v_clones (svalue_t *sp, int num_args);
+extern svalue_t *v_object_info (svalue_t *sp, int num_args);
 extern svalue_t *f_present_clone (svalue_t *sp);
 extern svalue_t *f_to_object(svalue_t *sp);
 extern svalue_t *f_set_is_wizard(svalue_t *sp);  /* optional */
 extern svalue_t *tell_room(svalue_t *sp);
 
 extern svalue_t *f_ctime(svalue_t *);
-extern svalue_t *f_debug_info(svalue_t *sp, int num_arg);
+extern svalue_t *v_debug_info(svalue_t *sp, int num_arg);
 extern svalue_t *f_rusage(svalue_t *sp);
 extern svalue_t *f_random(svalue_t *);
 extern svalue_t *f_shutdown(svalue_t *sp);

@@ -204,8 +204,8 @@ replace_ob_t *obj_list_replace = NULL;
   /* List of scheduled program replacements.
    */
 
-int tot_alloc_object = 0;
-int tot_alloc_object_size = 0;
+long tot_alloc_object = 0;
+long tot_alloc_object_size = 0;
   /* Total number of allocated object, and the sum of memory they use.
    */
 
@@ -270,12 +270,33 @@ _free_object ( object_t *ob, const char * file, int line)
     if (ob->prog)
     {
         program_t *prog = ob->prog;
+#ifdef CHECK_OBJECT_STAT
+        if (check_object_stat)
+        {
+            fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) free(%p '%s') with %d vars : %d -> (%ld:%ld)\n"
+                          , tot_alloc_object, tot_alloc_object_size, ob, ob->name ? get_txt(ob->name) : "<null>"
+                          , prog->num_variables
+                          , prog->num_variables * sizeof (svalue_t) + sizeof (object_t)
+                          , tot_alloc_object, tot_alloc_object_size - (prog->num_variables * sizeof (svalue_t) + sizeof (object_t))
+                          );
+        }
+#endif
         tot_alloc_object_size -=
             prog->num_variables * sizeof (svalue_t) +
             sizeof (object_t);
         free_prog(prog, MY_TRUE);
         ob->prog = NULL;
     }
+#ifdef CHECK_OBJECT_STAT
+    else
+    {
+        if (check_object_stat)
+        {
+            fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) free(%p '%s') has no program\n"
+                          , tot_alloc_object, tot_alloc_object_size, ob, ob->name ? get_txt(ob->name) : "<null>");
+        }
+    }
+#endif
 
     /* Deallocate the name */
     if (ob->name)
@@ -285,10 +306,31 @@ _free_object ( object_t *ob, const char * file, int line)
         if (lookup_object_hash(ob->name) == ob)
             fatal("Freeing object %s but name still in name table\n"
                  , get_txt(ob->name));
+#ifdef CHECK_OBJECT_STAT
+        if (check_object_stat)
+        {
+            fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) free(%p '%s') with name : %d -> (%ld:%ld)\n"
+                          , tot_alloc_object, tot_alloc_object_size, ob, get_txt(ob->name)
+                          , mstrsize(ob->name)
+                          , tot_alloc_object-1, tot_alloc_object_size - (mstrsize(ob->name)+1)
+                          );
+        }
+#endif
         tot_alloc_object_size -= mstrsize(ob->name);
         free_mstring(ob->name);
         ob->name = NULL;
     }
+#ifdef CHECK_OBJECT_STAT
+    else
+    {
+        if (check_object_stat)
+        {
+            fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) free(%p) has no name -> (%ld:%ld)\n"
+                          , tot_alloc_object, tot_alloc_object_size, ob
+                          , tot_alloc_object-1, tot_alloc_object_size);
+        }
+    }
+#endif
 
     /* Dereference the load_name */
     if (ob->load_name)
@@ -353,6 +395,16 @@ static mp_int last_id = 0;
         return NULL;
     }
 
+#ifdef CHECK_OBJECT_STAT
+    if (check_object_stat)
+    {
+        fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) new(%p) with %d vars : %d -> (%ld:%ld)\n"
+                      , tot_alloc_object, tot_alloc_object_size, ob
+                      , num_var, size2+size
+                      , tot_alloc_object+1, tot_alloc_object_size + size + size2
+                      );
+    }
+#endif
     tot_alloc_object++;
     tot_alloc_object_size += size + size2;
 
@@ -855,7 +907,18 @@ replace_programs (void)
 #endif
 
             /* Adjust the statistics */
-            tot_alloc_object_size -= i * sizeof(svalue_t[1]);
+#ifdef CHECK_OBJECT_STAT
+            if (check_object_stat)
+            {
+                fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) rprog(%p '%s') sub %d vars : %d -> (%ld:%ld)\n"
+                              , tot_alloc_object, tot_alloc_object_size, r_ob, r_ob->ob->name ? get_txt(r_ob->ob->name) : "<null>"
+                              , i
+                              , i * sizeof(svalue_t)
+                              , tot_alloc_object, tot_alloc_object_size - (i * sizeof(svalue_t))
+                              );
+            }
+#endif
+            tot_alloc_object_size -= i * sizeof(svalue_t);
 
             svp = r_ob->ob->variables; /* the old variables */
 
@@ -881,7 +944,7 @@ replace_programs (void)
                 memcpy(
                     (char *)new_vars,
                     (char *)svp,
-                    j * sizeof(svalue_t[1])
+                    j * sizeof(svalue_t)
                 );
                 svp += j;
             }
@@ -1292,7 +1355,7 @@ renumber_programs (void)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_function_exists (svalue_t *sp, int num_arg)
+v_function_exists (svalue_t *sp, int num_arg)
 
 /* EXEC function_exists()
  *
@@ -1486,7 +1549,7 @@ f_function_exists (svalue_t *sp, int num_arg)
     /* str had no ref on its own */
 
     return sp;
-} /* f_function_exists() */
+} /* v_function_exists() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -1801,7 +1864,7 @@ f_functionlist (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_include_list (svalue_t *sp, int num_arg)
+v_include_list (svalue_t *sp, int num_arg)
 
 /* EFUN include_list()
  *
@@ -2078,11 +2141,11 @@ f_include_list (svalue_t *sp, int num_arg)
     sp++;
     put_array(sp, vec);
     return sp;
-} /* f_include_list() */
+} /* v_include_list() */
  
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_inherit_list (svalue_t *sp, int num_arg)
+v_inherit_list (svalue_t *sp, int num_arg)
 
 /* EFUN inherit_list()
  *
@@ -2330,7 +2393,7 @@ f_inherit_list (svalue_t *sp, int num_arg)
 
     push_array(sp, vec);
     return sp;
-} /* f_inherit_list() */
+} /* v_inherit_list() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -2749,7 +2812,7 @@ f_rename_object (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_replace_program (svalue_t *sp, int num_arg)
+v_replace_program (svalue_t *sp, int num_arg)
 
 /* EFUN replace_program()
  *
@@ -2793,8 +2856,22 @@ f_replace_program (svalue_t *sp, int num_arg)
     if (current_object == simul_efun_object)
         error("replace_program on simul_efun object\n");
     if (current_object->flags & O_LAMBDA_REFERENCED)
-        error(
-          "Cannot schedule replace_program after binding lambda closures\n");
+    {
+        /* This was an error(), and should be a proper warning, except
+         * that the driver doesn't have such a thing.
+         */
+        debug_message("%s Object '%s', program '%s': Cannot schedule "
+                      "replace_program() after binding lambda closures.\n"
+                     , time_stamp(), current_object->name
+                     , current_prog->name
+                     );
+        for ( ; num_arg != 0; num_arg--)
+        {
+            free_svalue(sp);
+            sp--;
+        }
+        return sp;
+    }
 
     curprog = current_object->prog;
 
@@ -2898,7 +2975,7 @@ f_replace_program (svalue_t *sp, int num_arg)
     tmp->fun_offset = offsets[1];
 
     return sp;
-} /* f_replace_program() */
+} /* v_replace_program() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -3198,7 +3275,7 @@ move_object (void)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_all_environment (svalue_t *sp, int num_arg)
+v_all_environment (svalue_t *sp, int num_arg)
 
 /* EFUN all_environment()
  *
@@ -3269,7 +3346,7 @@ f_all_environment (svalue_t *sp, int num_arg)
         free_object(o, "all_environment");
 
     return sp;
-} /* f_all_environment() */
+} /* v_all_environment() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -3452,7 +3529,7 @@ f_deep_inventory (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_environment (svalue_t *sp, int num_arg)
+v_environment (svalue_t *sp, int num_arg)
 
 /* EFUN environment()
  *
@@ -3504,7 +3581,7 @@ f_environment (svalue_t *sp, int num_arg)
         put_number(sp, 0);
 
     return sp;
-} /* f_environment() */
+} /* v_environment() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -3769,7 +3846,7 @@ e_object_present (svalue_t *v, object_t *ob)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_present (svalue_t *sp, int num_arg)
+v_present (svalue_t *sp, int num_arg)
 
 /* EFUN present()
  *
@@ -3813,7 +3890,7 @@ f_present (svalue_t *sp, int num_arg)
         put_number(sp, 0);
     
     return sp;
-} /* f_present() */
+} /* v_present() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -4021,7 +4098,7 @@ e_say (svalue_t *v, vector_t *avoid)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_say (svalue_t *sp, int num_arg)
+v_say (svalue_t *sp, int num_arg)
 
 /* EFUN say()
  *
@@ -4107,7 +4184,7 @@ f_say (svalue_t *sp, int num_arg)
     free_svalue(sp--);
 
     return sp;
-} /* f_say() */
+} /* v_say() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -4237,7 +4314,7 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_tell_room (svalue_t *sp, int num_arg)
+v_tell_room (svalue_t *sp, int num_arg)
 
 /* EFUN tell_room()
  *
@@ -4300,7 +4377,7 @@ f_tell_room (svalue_t *sp, int num_arg)
     free_svalue(sp--);
 
     return sp;
-} /* f_tell_room() */
+} /* v_tell_room() */
 
 /*-------------------------------------------------------------------------*/
 #ifdef F_SET_LIGHT
@@ -5202,7 +5279,7 @@ register_array (vector_t *vec)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_save_object (svalue_t *sp, int numarg)
+v_save_object (svalue_t *sp, int numarg)
 
 /* EFUN save_object()
  *
@@ -5534,7 +5611,7 @@ f_save_object (svalue_t *sp, int numarg)
     } /* if (file or not file) */
     
     return sp;
-} /* f_save_object() */
+} /* v_save_object() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *

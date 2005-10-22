@@ -84,7 +84,7 @@ For a detailed list of all changes see the file CHANGELOG.
            regular expression code, or the PCRE package.
 
 
-10-Aug-2002 (Lars Duening) -- upcoming Release 3.2.9
+12-Aug-2002 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -116,6 +116,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + garbage_collection(): An optional filename argument specifies
             the filename for the next and only the next GC.
        + get_dir(): New flag GETDIR_PATH to return the full pathnames.
+       + get_type_info(): now returns the bound object for efun,
+            simul-efun and operator closures as well.
        + inherit_list(): the inherited objects can be returned in a 
            tree reflecting the inheritance structure. Virtual inherits
            can be returned tagged as such.
@@ -160,6 +162,9 @@ For a detailed list of all changes see the file CHANGELOG.
            empty string matched once too often at string end.
        + replace_program(): Argument can be omitted if only one inherit
            exists.
+       + replace_program(): If the object alread has closures bound, the
+           efun will issue a debug_message() and fail, instead of raising
+           a full runtime error.
        + sin(), cos(), tan(), atan(), atan2(), log(), exp(), sqrt(), pow():
            Integers are accepted as arguments, too.
        + sizeof(): Now also returns the length of strings.
@@ -360,6 +365,12 @@ For a detailed list of all changes see the file CHANGELOG.
            of the given width.
        + Duplicate inherits of a program on the toplevel raise a warning,
            resp. an error if pragma 'pedantic' is in effect.
+       + The operations <map> += <map> and <map> -= <map>
+           now implement the copy-on-write semantic to mirror the
+           behaviour of the related array operations (suggested by Dafire).
+       + New preprocessor macros __CATCH_EVAL_COST__ and
+           __MASTER_EVAL_COST__ for the corresponding evalcost
+           limits.
        + Bugfix: Adding mappings of different width throws an error, unless
            one of the mappings if empty.
        + Bugfix: Right shift by 32 or more bits was computed incorrectly.

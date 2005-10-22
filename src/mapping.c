@@ -3045,7 +3045,7 @@ f_m_allocate (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_m_add (svalue_t *sp, int num_arg)
+v_m_add (svalue_t *sp, int num_arg)
 
 /* EFUN m_allocate()
  *
@@ -3095,7 +3095,7 @@ f_m_add (svalue_t *sp, int num_arg)
     sp = pop_n_elems(num_arg-1, sp);
 
     return sp;
-} /* f_m_add() */
+} /* v_m_add() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -3499,7 +3499,7 @@ walk_mapping_prologue (mapping_t *m, svalue_t *sp, callback_t *cb)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_walk_mapping (svalue_t *sp, int num_arg)
+v_walk_mapping (svalue_t *sp, int num_arg)
 
 /* EFUN walk_mapping()
  *
@@ -3591,7 +3591,7 @@ f_walk_mapping (svalue_t *sp, int num_arg)
     while (--i > 0);
 
     return sp-1;
-} /* f_walk_mapping() */
+} /* v_walk_mapping() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -3791,7 +3791,7 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_filter_indices (svalue_t *sp, int num_arg)
+v_filter_indices (svalue_t *sp, int num_arg)
 
 /* EFUN filter_indices()
  *
@@ -3810,7 +3810,7 @@ f_filter_indices (svalue_t *sp, int num_arg)
 
 {
     return x_filter_mapping(sp, num_arg, MY_FALSE);
-}  /* f_filter_indices() */
+}  /* v_filter_indices() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -4014,7 +4014,7 @@ x_map_mapping (svalue_t *sp, int num_arg, Bool bFull)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_map_indices (svalue_t *sp, int num_arg)
+v_map_indices (svalue_t *sp, int num_arg)
 
 /* VEFUN map_indices()
  *
@@ -4033,11 +4033,11 @@ f_map_indices (svalue_t *sp, int num_arg)
 
 {
     return x_map_mapping(sp, num_arg, MY_FALSE);
-}  /* f_map_indices() */
+}  /* v_map_indices() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_m_contains (svalue_t *sp, int num_arg)
+v_m_contains (svalue_t *sp, int num_arg)
 
 /* EFUN m_contains()
  *
@@ -4098,7 +4098,7 @@ f_m_contains (svalue_t *sp, int num_arg)
     put_number(sp, 1);
 
     return sp;
-} /* f_m_contains() */
+} /* v_m_contains() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -4151,7 +4151,7 @@ f_m_reallocate (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_mkmapping (svalue_t *sp, int num_arg)
+v_mkmapping (svalue_t *sp, int num_arg)
 
 /* EFUN mkmapping()
  *
@@ -4220,7 +4220,7 @@ f_mkmapping (svalue_t *sp, int num_arg)
     push_mapping(sp, m);
 
     return sp;
-} /* f_mkmapping() */
+} /* v_mkmapping() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *

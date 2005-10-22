@@ -1129,11 +1129,6 @@ thread_socket_write(SOCKET_T socket, char *msg, size_t size, interactive_t *ip)
 
     /* Get a new buffer for the data to be written */
     xallocate(b, sizeof(struct write_buffer_s) + size - 1, "thread_socket_write()");
-    if (b == NULL)
-    {
-        errno = EWOULDBLOCK;
-        return -1;
-    }
     b->length = size;
     b->next = NULL;
 
@@ -6293,7 +6288,7 @@ f_interactive (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_input_to (svalue_t *sp, int num_arg)
+v_input_to (svalue_t *sp, int num_arg)
 
 /* EFUN input_to()
  *
@@ -6421,7 +6416,7 @@ f_input_to (svalue_t *sp, int num_arg)
     free_input_to(it);
     put_number(arg, 0);
     return arg;
-} /* e_input_to() */
+} /* v_input_to() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -6474,7 +6469,7 @@ f_query_input_pending (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_remove_input_to (svalue_t *sp, int num_arg)
+v_remove_input_to (svalue_t *sp, int num_arg)
 
 /* EFUN: remove_input_to()
  *
@@ -6593,7 +6588,7 @@ f_remove_input_to (svalue_t *sp, int num_arg)
     push_number(sp, rc);
 
     return sp;
-} /* f_remove_input_to() */
+} /* v_remove_input_to() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -6937,7 +6932,7 @@ f_set_prompt (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_snoop (svalue_t *sp, int num_arg)
+v_snoop (svalue_t *sp, int num_arg)
 
 /* EFUN snoop()
  *
@@ -6969,7 +6964,7 @@ f_snoop (svalue_t *sp, int num_arg)
     put_number(sp, i);
 
     return sp;
-} /* f_snoop() */
+} /* v_snoop() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *

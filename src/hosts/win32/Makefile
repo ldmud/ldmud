@@ -32,11 +32,8 @@ BINDIR = \\mud\\mudbin
 ERQ_DIR= \\mud\\mudbin\\erqdir
 #
 # Typical profiling, warning and optimizing options.
-#   -DOPCPROF: enable usage statistics of VM instructions
-#   -DVERBOSE_OPCPROF: with OPCPROF, the dump of the statistics includes
-#              the names of the instructions
 #   -p -DMARK: together they enable the profiling of VM instructions.
-#PROFIL= -DOPCPROF -DVERBOSE_OPCPROF
+#   Additional profiling can be activated in config.h .
 #PROFIL=-p -DMARK
 #PROFIL=-pg
 PROFIL=
@@ -54,17 +51,10 @@ OPTIMIZE= -O2 -g -fstrength-reduce -fno-force-mem -fno-force-addr -fno-inline-fu
 #OPTIMIZE= -g # no optimization; for frequent recompilations.
 #
 # Debugging options:
-#   -DDEBUG: Enable run time debugging. It will use more time and space.
-#            Nevertheless you are strongly encouraged to keep it defined.
-#   -DYYDEBUG[=1]: Debug output for the LPC compiler.
-#   -DNO_INLINES: Disable inlining
-#   -DCHECK_STRINGS: Enable the shared string checking.
-#   -DKEEP_STRINGS: Shared strings are never really freed.
-#   -DDEBUG_TELNET: Activates debug prints in the telnet machine
-#   -DDEBUG_SMALLOC_ALLOCS: Activates allocation debug prints in smalloc.
-#DEBUG = -DDEBUG
-DEBUG = -DDEBUG -DCHECK_STRINGS # -DKEEP_STRINGS -DDEBUG_TELNET
-#DEBUG=
+#   Debugging options should be set in config.h to guarantee a clean
+#   recompile.
+#DEBUG = -DDEBUG -DCHECK_STRINGS # -DKEEP_STRINGS -DDEBUG_TELNET
+DEBUG=
 #
 MPATH=-DMUD_LIB='"$(MUD_LIB)"' -DBINDIR='"$(BINDIR)"' -DERQ_DIR='"$(ERQ_DIR)"'
 #

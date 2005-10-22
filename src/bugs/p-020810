@@ -4,6 +4,88 @@ Date: 2002-08-10
 Type: Patch
 State: New
 
+NAME
+    Color support
+
+DESCRIPTION
+    Hyperborea has color support built into the driver itself. This makes
+    it extremely easy to generate output containing colors.
+
+    This tutorial will be short because this color stuff is
+    really simple.
+
+    Quoted below is a slightly edited version of Vawn's quick color
+    tutorial (qct)
+
+    A Hyperborea Ascii Color Code (HACC) looks like this:
+            \cCP
+
+    The capital 'C' is a letter that stands for a color.
+    The capital 'P' is a number or a letter that stands for
+    what special properties you would like turned on, i.e.
+    blinking or underline or bold or inverse display.
+
+    Valid values for 'C' are:
+
+    k/K - Foreground or Background is black, respectively
+    w/W - Foreground or Background is white
+    r/R - Foreground or Background is red
+    g/G - Foreground or Background is green
+    b/B - Foreground or Background is blue
+    y/Y - Foreground or Background is yellow
+    m/M - Foreground or Background is magenta
+    c/C - Foreground or Background is cyan
+     X  - Do not change the color
+
+    'P' is a bitfield. The bits are enumerated thusly:
+    
+    Bit Position      Effect
+    ==================================
+        1              Bold
+        2              Underline
+        4              Blink
+        8              Inverse
+    ==================================
+
+    Given the fact that P is a bitfield, properties can be combined by
+    simply adding the values. E.g., creating inverted bold text, P would
+    have a value of 8 (inverse) + 1 (bold) = 9.
+
+    Similarly, bold, blinking, inverted text is 1+4+8 = D.  
+    The reason the value is 'D' and not 13 is because P must
+    be exactly one character long. If the result of your addition
+    is ten or greater, then count from 'A'. I.e.,
+    'A' = 10
+    'B' = 11
+    'C' = 12
+    ...and so forth. The largest possible value is 'F', so this is
+    not as daunting as it may appear.
+
+    'P' may also be the special value of 'X', which means 'do not change the
+    properties.
+
+EXAMPLES
+      '\cG5' means a bold green background with blinking text.
+      '\cx1' means do not change the color, just make current one bold
+      '\cx4' means do not change the color, just make the text blink
+      '\cb0' means make the text blue.
+      '\cx0' means return the terminal to normal
+
+NOTES
+    Players can choose to activate ANSI color by using the command 'setenv
+    ansi 1' or disable it by using the command 'setenv ansi 0'. This means
+    that you should *NEVER* assume that players have color enabled.
+
+AUTHOR
+    Vawn
+
+DATE
+    January 2001
+
+CHANGES
+    none
+
++
 diff -N -u -r ldmud-328/src/color_parse.c ldmud-328-hyperborea/src/color_parse.c
 --- ldmud-328/src/color_parse.c	Wed Dec 31 17:00:00 1969
 +++ ldmud-328-hyperborea/src/color_parse.c	Fri Aug  9 11:18:34 2002

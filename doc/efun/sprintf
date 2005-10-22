@@ -72,7 +72,8 @@ DESCRIPTION
           "#"   table mode.  Ignored unless the argument type specifier is s.
                 Field size must be specified, if precision is specified then
                 it specifies the number of columns in the table, otherwise the
-                number is "optimally" generated.  Table mode is passed a list
+                number is "optimally" generated (as few lines and columns
+                as possible).  Table mode is passed a list
                 of backslash-n separated 'words' which are put in a format
                 similar to that of ls.
           "@"   the argument is an array.  the corresponding AFS (minus all

@@ -12,7 +12,6 @@ b-020318: Illegal instruction
 b-020331: Back stack at F_RETURN (maybe fixed)
 b-020415: Crasher with corrupted Memory
 b-020425-0: GC crashes on 'object referenced as something else'
-b-020801: nmap crashes LDMud
 
 
 Efuns

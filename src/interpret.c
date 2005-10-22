@@ -97,12 +97,12 @@
  *      F_EFUN2: efuns taking two arguments
  *      F_EFUN3: efuns taking three arguments
  *      F_EFUN4: efuns taking four arguments
- *      F_EFUNV: efuns taking a variable number of arguments
+ *      F_EFUNV: efuns taking more than four or a variable number of arguments
  *
  *    The implementation is such that the unprefixed instructions are
  *    implemented directly in the interpreter loop in a big switch()
  *    statement, whereas the prefixed instructions are implemented
- *    in separated functions and called via the lookup tables efun_table[]
+ *    in separate functions and called via the lookup tables efun_table[]
  *    and vefun_table[].
  *
  *    Every machine instruction, efun or else, is assigned a unique number
@@ -189,37 +189,26 @@
 #include <prof.h>
 #endif
 
-#define USES_SVALUE_STRLEN
 #include "interpret.h"
      
 #include "actions.h"
 #include "array.h"
 #include "backend.h"
-#include "call_out.h"
 #include "closure.h"
 #include "comm.h"
-#include "ed.h"
-#include "efuns.h"
 #include "exec.h"
 #include "filestat.h"
 #include "gcollect.h"
 #include "heartbeat.h"
 #include "instrs.h"
 #include "lex.h"
-#include "main.h"
 #include "mapping.h"
 #include "mstrings.h"
 #include "object.h"
-#include "otable.h"
-#include "parse.h"
-#include "prolang.h"
-#include "ptrtable.h"
-#include "sent.h"
 #include "simulate.h"
 #include "simul_efun.h"
 #include "stdstrings.h"
 #include "smalloc.h" /* malloc_increment_size() */
-#include "sprintf.h"
 #include "svalue.h"
 #include "swap.h"
 #include "switch.h"
@@ -10699,6 +10688,17 @@ again:
             else
             {
                 check_map_for_destr(u2.map);
+                if (argp->u.map->ref > 1)
+                {
+                    /* The target mapping has more than one user - we
+                     * need to implement the copy-on-write semantic.
+                     */
+                    mapping_t *m;
+                    check_map_for_destr(argp->u.map);
+                    m = copy_mapping(argp->u.map);
+                    free_mapping(argp->u.map);
+                    argp->u.map = m;
+                }
                 add_to_mapping(argp->u.map, u2.map);
                 sp -= 2;
                 free_mapping(u2.map);
@@ -10977,6 +10977,17 @@ again:
                      */
                     deref_mapping(m);
                     m = copy_mapping(m);
+                }
+                if (argp->u.map->ref > 1)
+                {
+                    /* The target mapping has more than one user - we
+                     * need to implement the copy-on-write semantic.
+                     */
+                    mapping_t *mtmp;
+                    check_map_for_destr(argp->u.map);
+                    mtmp = copy_mapping(argp->u.map);
+                    free_mapping(argp->u.map);
+                    argp->u.map = mtmp;
                 }
 
                 walk_mapping(m, sub_from_mapping_filter, argp->u.map);
@@ -18258,7 +18269,7 @@ check_a_lot_ref_counts (program_t *search_prog)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_apply (svalue_t *sp, int num_arg)
+v_apply (svalue_t *sp, int num_arg)
 
 /* EFUN apply()
  *
@@ -18380,11 +18391,11 @@ f_apply (svalue_t *sp, int num_arg)
     *sp = sp[1];
 
     return sp;
-} /* f_apply() */
+} /* v_apply() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_funcall (svalue_t *sp, int num_arg)
+v_funcall (svalue_t *sp, int num_arg)
 
 /* EFUN funcall()
  *
@@ -18430,7 +18441,7 @@ f_funcall (svalue_t *sp, int num_arg)
     }
 
     return sp;
-} /* f_funcall() */
+} /* v_funcall() */
 
 /*-------------------------------------------------------------------------*/
 static svalue_t *
@@ -18537,7 +18548,7 @@ int_call_resolved (Bool b_use_default, svalue_t *sp, int num_arg)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_call_resolved (svalue_t *sp, int num_arg)
+v_call_resolved (svalue_t *sp, int num_arg)
 
 /* EFUN call_resolved()
  *
@@ -18546,11 +18557,11 @@ f_call_resolved (svalue_t *sp, int num_arg)
 
 {
     return int_call_resolved(MY_TRUE, sp, num_arg);
-} /* f_call_resolved() */
+} /* v_call_resolved() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_call_direct_resolved (svalue_t *sp, int num_arg)
+v_call_direct_resolved (svalue_t *sp, int num_arg)
 
 /* EFUN call_direct_resolved()
  *
@@ -18559,7 +18570,7 @@ f_call_direct_resolved (svalue_t *sp, int num_arg)
 
 {
     return int_call_resolved(MY_FALSE, sp, num_arg);
-} /* f_call_direct_resolved() */
+} /* v_call_direct_resolved() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *

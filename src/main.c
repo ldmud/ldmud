@@ -88,6 +88,10 @@ int check_state_level = 0;     /* how of to check the state in the loop */
 Bool check_string_table_flag = MY_FALSE;
 #endif
 
+#ifdef CHECK_OBJECT_STAT
+Bool check_object_stat = MY_FALSE;
+#endif
+
 Bool strict_euids = MY_FALSE;  /* Enforce use of the euids */
 
 static uint32 random_seed = 0;  /* The seed for the pseudo-random generator. */
@@ -913,6 +917,9 @@ typedef enum OptNumber {
 #ifdef CHECK_STRINGS
  , cCheckStrings    /* --check-strings      */
 #endif
+#ifdef CHECK_OBJECT_STAT
+ , cCheckObjectStat /* --check-object-stat  */
+#endif
 #ifdef YYDEBUG
  , cYYDebug         /* --yydebug            */
 #endif
@@ -1003,6 +1010,9 @@ static LongOpt aLongOpts[]
 #endif
 #ifdef CHECK_STRINGS
     , { "check-strings",      cCheckStrings,   MY_FALSE }
+#endif
+#ifdef CHECK_OBJECT_STAT
+    , { "check-object-stat",  cCheckObjectStat, MY_FALSE }
 #endif
 #ifdef YYDEBUG
     , { "yydebug",            cYYDebug,        MY_FALSE }
@@ -1166,6 +1176,9 @@ options (void)
 #endif
 #ifdef USE_DEPRECATED
                               , "obsolete and deprecated efuns enabled\n"
+#endif
+#ifdef NO_NEGATIVE_RANGES
+                              , "assignments to negative ranges disabled\n"
 #endif
                               };
         size_t nStrings = sizeof(optstrings) / sizeof(optstrings[0]);
@@ -1335,11 +1348,20 @@ options (void)
 #       if defined(KEEP_STRINGS)
                               , "KEEP_STRINGS"
 #       endif
+#       if defined(CHECK_OBJECT_STAT)
+                              , "CHECK_OBJECT_STAT"
+#       endif
 #       if defined(DEBUG_TELNET)
                               , "DEBUG_TELNET"
 #       endif
+#       if defined(DEBUG_SMALLOC_ALLOCS)
+                              , "DEBUG_SMALLOC_ALLOCS"
+#       endif
 #       if defined(YYDEBUG)
                               , "YYDEBUG"
+#       endif
+#       if defined(NO_INLINES)
+                              , "NO_INLINES"
 #       endif
 #       if defined(MSDOS_FS)
                               , "MSDOS_FS"
@@ -1354,10 +1376,31 @@ options (void)
                               , "APPLY_CACHE_STAT"
 #       endif
 #       if defined(OPCPROF)
-                              , "OPC_PROF"
+                              , "OPCPROF"
 #           if defined(OPCPROF_VERBOSE)
                               , "OPCPROF_VERBOSE"
 #           endif
+#       endif
+#       if defined(CHECK_MAPPINGS)
+                              , "CHECK_MAPPINGS"
+#       endif
+#       if defined(CHECK_MAPPING_TOTAL)
+                              , "CHECK_MAPPING_TOTAL"
+#       endif
+#       if defined(CHECK_OBJECT_REF)
+                              , "CHECK_OBJECT_REF"
+#       endif
+#       if defined(CHECK_OBJECT_GC_REF)
+                              , "CHECK_OBJECT_GC_REF"
+#       endif
+#       if defined(NO_BLUEPRINT)
+                              , "NO_BLUEPRINT"
+#       endif
+#       if defined(CHECK_SMALLOC_TOTAL)
+                              , "CHECK_SMALLOC_TOTAL"
+#       endif
+#       if defined(DUMP_GC_REFS)
+                              , "DUMP_GC_REFS"
 #       endif
                               };
         size_t nStrings = sizeof(optstrings) / sizeof(optstrings[0]);
@@ -1452,6 +1495,9 @@ shortusage (void)
 #endif
 #ifdef CHECK_STRINGS
 "  --check-strings\n"
+#endif
+#ifdef CHECK_OBJECT_STAT
+"  --check-object-stat\n"
 #endif
 "  -V|--version\n"
 "  --options\n"
@@ -1641,6 +1687,12 @@ usage (void)
 "  --check-strings\n"
 "    Every backend cycle, all shared strings in the system are checked.\n"
 "    SLOW!\n"
+"\n"
+#endif
+#ifdef CHECK_OBJECT_STAT
+"  --check-object-stat\n"
+"    Activate tracing of the object size statistic - available in order\n"
+"    to find the bug in the statistics.\n"
 "\n"
 #endif
 "  -V|--version\n"
@@ -2089,6 +2141,12 @@ eval_arg (int eOption, const char * pValue)
 #ifdef CHECK_STRINGS
     case cCheckStrings:
         check_string_table_flag = MY_TRUE;
+        break;
+#endif
+
+#ifdef CHECK_OBJECT_STAT
+    case cCheckObjectStat:
+        check_object_stat = MY_TRUE;
         break;
 #endif
 

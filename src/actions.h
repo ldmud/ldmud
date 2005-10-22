@@ -23,8 +23,8 @@ extern void remove_shadow_actions (object_t *shadow, object_t *target);
 
 extern void restore_command_context (rt_context_t *context);
 extern Bool execute_command (char *str, object_t *ob);
-extern svalue_t *f_add_action(svalue_t *sp, int num_arg);
-extern svalue_t *f_command(svalue_t *sp, int num_arg);
+extern svalue_t *v_add_action(svalue_t *sp, int num_arg);
+extern svalue_t *v_command(svalue_t *sp, int num_arg);
 extern svalue_t *f_disable_commands(svalue_t *sp);
 extern svalue_t *f_enable_commands(svalue_t *sp);
 extern svalue_t *f_execute_command(svalue_t *sp);

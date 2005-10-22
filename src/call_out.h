@@ -12,7 +12,7 @@ extern size_t  call_out_status(strbuf_t *sbuf, Bool verbose);
 extern void  callout_dinfo_status(svalue_t *svp, int value);
 extern void  remove_stale_call_outs(void);
 
-extern svalue_t *f_call_out(svalue_t *sp, int num_arg);
+extern svalue_t *v_call_out(svalue_t *sp, int num_arg);
 extern svalue_t *f_call_out_info(svalue_t *sp);
 extern svalue_t *f_find_call_out(svalue_t *sp);
 extern svalue_t *f_remove_call_out(svalue_t *sp);

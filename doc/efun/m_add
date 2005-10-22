@@ -9,6 +9,10 @@ DESCRIPTION
         Unassigned entry values default to 0, extraneous <data> arguments
         are ignored.
 
+        The difference between m_add() and the operator += is that the
+        latter creates a duplicate of the target mapping if it has
+        several references (see EXAMPLES).
+
 EXAMPLES
         mapping m;
 
@@ -20,6 +24,14 @@ EXAMPLES
 
         m = ([ "foo":1;2 ]);
         m_add(m, "bar", 1) --> ([ "foo":1;2, "bar":1;0 ])
+
+
+        mapping a, b;
+
+        a = b = ([0]);
+        m_add(b, 1);
+        a += ([2]);
+          --> a = ([ 0, 1, 2 ]), b = ([ 0, 1 ])
 
 HISTORY
         Introduced in LDMud 3.2.9.

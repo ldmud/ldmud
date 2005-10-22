@@ -268,7 +268,7 @@ insert_alist (svalue_t *key, svalue_t * /* TODO: bool */ key_data, vector_t *lis
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_insert_alist (svalue_t *sp, int num_arg)
+v_insert_alist (svalue_t *sp, int num_arg)
 
 /* EFUN insert_alist()
  *
@@ -373,11 +373,11 @@ f_insert_alist (svalue_t *sp, int num_arg)
     *sp = *ret;
 
     return sp;
-} /* f_insert_alist() */
+} /* v_insert_alist() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_assoc (svalue_t *sp, int num_arg)
+v_assoc (svalue_t *sp, int num_arg)
 
 /* EFUN assoc()
  *
@@ -478,7 +478,7 @@ f_assoc (svalue_t *sp, int num_arg)
     }
 
     return sp;
-} /* f_assoc() */
+} /* v_assoc() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -514,7 +514,7 @@ f_intersect_alist (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_order_alist (svalue_t *sp, int num_arg)
+v_order_alist (svalue_t *sp, int num_arg)
 
 /* EFUN order_alist()
  *
@@ -574,7 +574,7 @@ f_order_alist (svalue_t *sp, int num_arg)
     put_array(sp, list);
 
     return sp;
-} /* f_order_alist() */
+} /* v_order_alist() */
 
 #endif /* USE_ALISTS */
 

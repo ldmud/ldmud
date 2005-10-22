@@ -40,18 +40,14 @@
 #include "call_out.h"
 #include "closure.h"
 #include "comm.h"
-#include "dumpstat.h"
-#include "ed.h"
-#include "exec.h"
 #include "filestat.h"
 #include "gcollect.h"
 #include "heartbeat.h"
 #include "interpret.h"
-#include "instrs.h"
+#include "instrs.h"  /* F_SET_LIGHT */
 #include "lex.h"
 #include "main.h"
 #include "mapping.h"
-#include "mregex.h"
 #include "mstrings.h"
 #include "object.h"
 #include "otable.h"
@@ -1734,6 +1730,16 @@ load_object (const char *lname, Bool create_super, int depth, namechain_t *chain
         error("Out of memory for new object '%s'\n", name);
 
     ob->name = new_mstring(name);
+#ifdef CHECK_OBJECT_STAT
+    if (check_object_stat)
+    {
+        fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) load(%p '%s') name: %d -> (%ld:%ld)\n"
+                      , tot_alloc_object, tot_alloc_object_size, ob, ob->name ? get_txt(ob->name) : "<null>"
+                      , mstrsize(ob->name)
+                      , tot_alloc_object, tot_alloc_object_size + (mstrsize(ob->name))
+                      );
+    }
+#endif
     tot_alloc_object_size += mstrsize(ob->name);
       /* Tabling this unique string is of not much use.
        * Note that the string must be valid for the ref_object()
@@ -1960,6 +1966,16 @@ clone_object (string_t *str1)
         error("Out of memory for new clone '%s'\n", get_txt(name));
 
     new_ob->name = make_new_name(name);
+#ifdef CHECK_OBJECT_STAT
+    if (check_object_stat)
+    {
+        fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) clone(%p '%s') name: %d -> (%ld:%ld)\n"
+                      , tot_alloc_object, tot_alloc_object_size, new_ob, new_ob->name ? get_txt(new_ob->name) : "<null>"
+                      , mstrsize(new_ob->name)
+                      , tot_alloc_object, tot_alloc_object_size + (mstrsize(new_ob->name))
+                      );
+    }
+#endif
     tot_alloc_object_size += mstrsize(new_ob->name);
     new_ob->load_name = ref_mstring(ob->load_name);
     new_ob->flags |= O_CLONE | O_WILL_CLEAN_UP;
@@ -2812,7 +2828,7 @@ status_parse (strbuf_t * sbuf, char * buff)
             strbuf_addf(sbuf, "Shadows:\t\t\t%8ld %9ld\n"
                             , alloc_shadow_sent
                             , alloc_shadow_sent * sizeof (shadow_t));
-            strbuf_addf(sbuf, "Objects:\t\t\t%8d %9d (%ld swapped, %ld Kbytes)\n"
+            strbuf_addf(sbuf, "Objects:\t\t\t%8ld %9d (%ld swapped, %ld Kbytes)\n"
                             , tot_alloc_object, tot_alloc_object_size
                             , num_vb_swapped, total_vb_bytes_swapped / 1024);
             strbuf_addf(sbuf, "Arrays:\t\t\t\t%8ld %9ld\n"
@@ -4582,7 +4598,7 @@ extract_limits ( struct limits_context_s * result
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_limited (svalue_t * sp, int num_arg)
+v_limited (svalue_t * sp, int num_arg)
 
 /* EFUN limited()
  *
@@ -4700,11 +4716,11 @@ f_limited (svalue_t * sp, int num_arg)
 
     /* Stack is clean and sp points to the result */
     return sp;
-} /* f_limited() */
+} /* v_limited() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_set_limits (svalue_t * sp, int num_arg)
+v_set_limits (svalue_t * sp, int num_arg)
 
 /* EFUN set_limits()
  *
@@ -4758,7 +4774,7 @@ f_set_limits (svalue_t * sp, int num_arg)
 
     sp = pop_n_elems(num_arg, sp);
     return sp;
-} /* f_set_limits() */
+} /* v_set_limits() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *

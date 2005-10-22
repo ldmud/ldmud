@@ -402,7 +402,7 @@ get_dir_error_handler (svalue_t *arg)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_cat (svalue_t *sp, int num_arg)
+v_cat (svalue_t *sp, int num_arg)
 
 /* EFUN cat()
  *
@@ -495,7 +495,7 @@ f_cat (svalue_t *sp, int num_arg)
     push_number(sp, rc);
 
     return sp;
-} /* f_cat() */
+} /* v_cat() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -1037,7 +1037,7 @@ f_mkdir (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_read_bytes (svalue_t *sp, int num_arg)
+v_read_bytes (svalue_t *sp, int num_arg)
 
 /* EFUN read_bytes()
  *
@@ -1160,11 +1160,11 @@ f_read_bytes (svalue_t *sp, int num_arg)
         push_string(sp, rc);
 
     return sp;
-} /* f_read_bytes() */
+} /* v_read_bytes() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_read_file (svalue_t *sp, int num_arg)
+v_read_file (svalue_t *sp, int num_arg)
 
 /* EFUN read_file()
  *
@@ -1389,7 +1389,7 @@ f_read_file (svalue_t *sp, int num_arg)
         push_string(sp, rc);
 
     return sp;
-} /* f_read_file() */
+} /* v_read_file() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *

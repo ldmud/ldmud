@@ -154,6 +154,11 @@ static lambda_t *stale_lambda_closures;
 
 #if defined(MALLOC_smalloc)
 
+#if defined(CHECK_OBJECT_GC_REF) && defined(DUMP_GC_REFS)
+#  error Must define either CHECK_OBJECT_GC_REF or DUMP_GC_REFS.
+#  undef DUMP_GC_REFS
+#endif
+
 #define CLEAR_REF(p) ( ((p_uint *)(p))[-SMALLOC_OVERHEAD] &= ~M_REF )
   /* Clear the memory block marker for <p>
    */

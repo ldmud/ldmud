@@ -3508,7 +3508,7 @@ save_ed_buffer (void)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_ed (svalue_t *sp, int num_arg)
+v_ed (svalue_t *sp, int num_arg)
 
 /* EFUN ed()
  *

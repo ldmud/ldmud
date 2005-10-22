@@ -988,7 +988,7 @@ f_regreplace (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t*
-f_regmatch (svalue_t *sp, int num_arg)
+v_regmatch (svalue_t *sp, int num_arg)
 
 /* EFUN regmatch()
  *
@@ -1188,7 +1188,7 @@ f_regmatch (svalue_t *sp, int num_arg)
     else
         put_number(sp, 0);
     return sp;
-} /* f_regmatch() */
+} /* v_regmatch() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -1236,7 +1236,7 @@ f_strstr (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_trim (svalue_t *sp, int num_arg)
+v_trim (svalue_t *sp, int num_arg)
 
 /* EFUN trim()
  *
@@ -1351,7 +1351,7 @@ f_trim (svalue_t *sp, int num_arg)
         free_svalue(argp+2);
 
     return argp;
-} /* f_trim() */
+} /* v_trim() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -2289,7 +2289,7 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_terminal_colour (svalue_t *sp, int num_arg)
+v_terminal_colour (svalue_t *sp, int num_arg)
 
 /* EFUN terminal_colour()
  *
@@ -2387,7 +2387,7 @@ f_terminal_colour (svalue_t *sp, int num_arg)
     put_string(sp, str);
 
     return sp;
-} /* f_terminal_colour() */
+} /* v_terminal_colour() */
 
 #ifdef F_PROCESS_STRING
 /*-------------------------------------------------------------------------*/
@@ -3577,7 +3577,7 @@ f_blueprint (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_clones (svalue_t *sp, int num_arg)
+v_clones (svalue_t *sp, int num_arg)
 
 /* EFUN clones()
  *
@@ -3803,11 +3803,11 @@ f_clones (svalue_t *sp, int num_arg)
     xfree(ores);
     
     return sp;
-} /* f_clones() */
+} /* v_clones() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_object_info (svalue_t *sp, int num_args)
+v_object_info (svalue_t *sp, int num_args)
 
 /* EFUN object_info()
  *
@@ -4090,7 +4090,7 @@ f_object_info (svalue_t *sp, int num_args)
         transfer_svalue_no_free(sp, &result);
 
     return sp;
-} /* f_object_info() */
+} /* v_object_info() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -4364,7 +4364,7 @@ x_min_max (svalue_t *sp, int num_arg, Bool bMax)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_max (svalue_t *sp, int num_arg)
+v_max (svalue_t *sp, int num_arg)
 
 /* VEFUN max()
  *
@@ -4381,11 +4381,11 @@ f_max (svalue_t *sp, int num_arg)
 
 {
     return x_min_max(sp, num_arg, MY_TRUE);
-} /* f_max() */
+} /* v_max() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_min (svalue_t *sp, int num_arg)
+v_min (svalue_t *sp, int num_arg)
 
 /* VEFUN min()
  *
@@ -4402,7 +4402,7 @@ f_min (svalue_t *sp, int num_arg)
 
 {
     return x_min_max(sp, num_arg, MY_FALSE);
-} /* f_min() */
+} /* v_min() */
 
 /*=========================================================================*/
 /*                              VALUES                                     */
@@ -5708,7 +5708,7 @@ f_deep_copy (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_filter (svalue_t *sp, int num_arg)
+v_filter (svalue_t *sp, int num_arg)
 
 /* EFUN filter()
  *
@@ -5734,11 +5734,11 @@ f_filter (svalue_t *sp, int num_arg)
     else
         return x_filter_array(sp, num_arg);
 
-} /* f_filter() */
+} /* v_filter() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_get_type_info (svalue_t *sp, int num_arg)
+v_get_type_info (svalue_t *sp, int num_arg)
 
 /* EFUN get_type_info()
  *
@@ -5797,7 +5797,8 @@ f_get_type_info (svalue_t *sp, int num_arg)
             switch(sp->x.closure_type)
             {
             default:
-                ob = NULL;
+                /* efun, simul-efun, operator closure */
+                ob = sp->u.ob;
                 break;
             case CLOSURE_LFUN:
             case CLOSURE_IDENTIFIER:
@@ -5853,11 +5854,11 @@ f_get_type_info (svalue_t *sp, int num_arg)
     }
 
     return sp;
-} /* f_get_type_info() */
+} /* v_get_type_info() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_map (svalue_t *sp, int num_arg)
+v_map (svalue_t *sp, int num_arg)
 
 /* EFUN map()
  *
@@ -5881,7 +5882,7 @@ f_map (svalue_t *sp, int num_arg)
     else
         return x_map_array(sp, num_arg);
 
-} /* f_map() */
+} /* v_map() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -6188,7 +6189,7 @@ f_sgn (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_debug_info (svalue_t *sp, int num_arg)
+v_debug_info (svalue_t *sp, int num_arg)
 
 /* EFUN debug_info()
  *
@@ -7009,7 +7010,7 @@ f_debug_info (svalue_t *sp, int num_arg)
     sp++;
     *sp = res;
     return sp;
-} /* f_debug_info() */
+} /* v_debug_info() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE svalue_t *

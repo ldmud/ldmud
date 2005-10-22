@@ -293,7 +293,7 @@ extern void remove_all_players(void);
 extern void  print_prompt(void);
 extern void  init_telopts(void);
 extern void  mudlib_telopts(void);
-extern svalue_t *f_input_to (svalue_t *sp, int num_arg);
+extern svalue_t *v_input_to (svalue_t *sp, int num_arg);
 
 extern svalue_t *f_query_udp_port(svalue_t *sp);
 
@@ -330,12 +330,12 @@ extern svalue_t *f_query_input_pending(svalue_t *sp);
 extern svalue_t *f_query_ip_name(svalue_t *sp);
 extern svalue_t *f_query_ip_number(svalue_t *sp);
 extern svalue_t *f_query_mud_port(svalue_t *sp);
-extern svalue_t *f_remove_input_to (svalue_t *sp, int num_arg);
+extern svalue_t *v_remove_input_to (svalue_t *sp, int num_arg);
 extern svalue_t *f_set_buffer_size(svalue_t *sp);
 extern svalue_t *f_set_combine_charset(svalue_t *sp);
 extern svalue_t *f_set_connection_charset(svalue_t *sp);
 extern svalue_t *f_set_prompt(svalue_t *sp);
-extern svalue_t *f_snoop(svalue_t *sp, int num_arg);
+extern svalue_t *v_snoop(svalue_t *sp, int num_arg);
 extern svalue_t *f_users(svalue_t *sp);
 
 #if defined(ACCESS_CONTROL)
