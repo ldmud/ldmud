@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+15-May-2001 (Lars Duening)  (3.3.56)
+    - (sscanf) Clarified the documentation regarding the matching of
+         '%s' (reported by Pulami and Gnomi)
+    - (closure.c) Compiling a simul_efun with extended varargs in a
+         lambda closure didn't work (reported by Gnomi).
+
 13-May-2001 (Lars Duening)  (3.3.55)
     - (prolang.y) Undid the casting change, as it broke the idiom
          's = (string)foo->bar();' where bar() may signal a failure

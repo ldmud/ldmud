@@ -42,7 +42,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
 
 
-13-May-2001 (Lars Duening) -- upcoming Release 3.2.9
+15-May-2001 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + allocate(): Accepts an optional initialisation value and can
@@ -63,6 +63,8 @@ For a detailed list of all changes see the file CHANGELOG.
             objects, it is switched over as well, like this_player().
        + filter(), map(), sort_array(), walk_mapping(): Protected lvalues
             (e.g. &(i[0])) are not allowed as callback parameters.
+       + lambda(): Simul efuns with extended varargs weren't compiled
+            correctly.
        + object_info(): OINFO_MEMORY also returns the program flags
            NO_INHERIT, NO_SHADOW and NO_CLONE, and gives a better account
            of the memory used for strings and variables.
