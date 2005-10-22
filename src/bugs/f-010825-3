@@ -1,0 +1,37 @@
+Short: Make > indexing default with an option ?
+From: Tomba@Batmud
+Date: 2001-08-25
+Type: Feature
+State: New
+
+Anyway, I was wondering what's the difference between normal indexing and
+> indexing. Isn't normal indexing just a subset of > indexing? If so, why
+not default to > style indexing and add a compile time option for allowing
+or disabling negative indexes. Just to clear up a bit, arr[-2] would be
+the same as arr[>-2] etc.
+
+Batmud's old driver works this way, and even if I have already made my own
+changes to ldmud to allow negative indexing, it'd be nice to have it by
+default. =)
+
+And Alfe said to this topic:
+
+Alfe says: man koennte vielleicht folgendes sagen:
+Alfe says: x[>a..>b] ist das, was x[a..b] bisher ist.
+Alfe says: x[a..b] ist das, was extract(x,a,b) bisher ist (d.h. vorzeichen
+  legt fest, ob von rechts oder links).
+Alfe says: und x[<a..<b] ist wie gehabt.
+
+Alfe says: aber dann muesste man mal durchs mud gehen und alle vorkommen von
+  x[a..b] ueberpruefen
+Alfe says: du kannst nicht garantieren, dass ein x[a..b] bisher immer mit
+  positiven werten arbeitete, also solltest du besser davon ausgehen, dass
+  alle stellen potentiell auch mit negativen werten passieren koennen.
+Alfe says: demnach stehe ich dieser version etwas ambivalent gegenueber.
+Alfe says: es waere zwar sehr schoen, wenn das < sagt: von rechts, das > sagt:
+  von links und sonst sagt das vorzeichen das.
+Alfe says: denn das ist logisch strukturiert.
+
+Alfe says: so gesehen waere es vielleicht besser, wenn das x[>a..>b]
+  bedeutet, dass das vorzeichen entscheidet und x[a..b] wie gehabt bleibt.
+

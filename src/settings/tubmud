@@ -18,8 +18,8 @@ with_time_to_swap=900
 with_time_to_swap_variables=2000
 with_time_to_reset=2700
 
-with_max_user_trace=90
-with_max_trace=100
+with_max_user_trace=110
+with_max_trace=120
 with_max_local=50
 
 with_portno=7680

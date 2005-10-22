@@ -24,10 +24,10 @@ DESCRIPTION
            e,E,f,F,g,G like in c.
           "O" : the argument is an LPC datatype to be printed in an arbituary
                 format, this is for debugging purposes.
-
-                If the argument is an object then the function printf_obj_name() on
-                the master object is called with the object as a parameter, the string
-                returned is included in brackets at the end of object file name.
+                If the argument is an object then the function
+                printf_obj_name() on the master object is called with the
+                object as a parameter, the string returned is included in
+                brackets at the end of object file name.
                 If 0 is returned then nothing is appended after the file name.
           "Q"   Like "O", except that special characters in strings are
                 printed in LPC notation.
@@ -44,11 +44,11 @@ DESCRIPTION
                 a 0, the argument is printed with leading zeroes.
           "."n  specifies the presision, for simple (not columns or tables)
                 strings specifies the truncation length.
-          ":"n  n specifies the fs _and_ the presision, if n is prepended by a zero
-                then the pad string is set to "0".
-          "'X'" the pad string is set to the char(s) between the single quotes,
-                if the field size is also prepended with a zero then which ever
-                is specified last will overrule.
+          ":"n  n specifies the fs _and_ the presision, if n is prepended by
+                a zero then the pad string is set to "0".
+          "'X'" the pad string is set to the char(s) between the single
+                quotes, if the field size is also prepended with a zero then
+                which ever is specified last will overrule.
                 NOTE:  to include "'" in the pad string, you must use "\\'"
                 (as the backslash has to be escaped past the interpreter),
                 similarly, to include "\" requires "\\\\".
@@ -62,7 +62,7 @@ DESCRIPTION
           "="   column mode.  Ignored unless the argument type specifier is s.
                 Field size must be specified, if precision is specified then it
                 specifies the width for the string to be wordwrapped in, if not
-                then the field size is.         The field size specifies the width of
+                then the field size is. The field size specifies the width of
                 the column and has the effect that the last line of the column
                 is padded with spaces to achieve this length.
           "#"   table mode.  Ignored unless the argument type specifier is s.
@@ -71,7 +71,7 @@ DESCRIPTION
                 number is "optimally" generated.  Table mode is passed a list
                 of slash-n separated 'words' which are put in a format similar
                 to that of ls.
-          "@"   the argument is an array.  the corresponding AFS (minus all
+          "@"   the argument is an array. The corresponding AFS (minus all
                 "@") is applied to each element of the array.
 
         When the formatting of an element results in several output lines
@@ -81,13 +81,12 @@ DESCRIPTION
         pad string has been given, even if it is the simple ' ', then
         the padding will not be removed.
 
-
 EXAMPLES
         sprintf("decimal=%d, octal=%o, hexadecimal=%x\n", 7, 7, 7);
 
         sprintf("array=%O\n", ({1, 2, 3}));
           this will return the following:
-        ({ /* sizeof() == 3 */
+        array=({ /* sizeof() == 3 */
           1,
           2,
           3

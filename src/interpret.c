@@ -2742,7 +2742,7 @@ push_aindexed_lvalue (svalue_t *sp, bytecode_p pc)
         }
         if (0 > (ind = i->u.number))
             ind = (mp_int)VEC_SIZE(vec->u.vec) + ind;
-        if (ind >= (mp_int)VEC_SIZE(vec->u.vec))
+        if (ind < 0 || ind >= (mp_int)VEC_SIZE(vec->u.vec))
         {
             ERRORF(("Index out of bounds for [>]: %ld, vector size: %lu.\n"
                    , (long)(i->u.number), VEC_SIZE(vec->u.vec)));
@@ -3009,7 +3009,7 @@ push_protected_aindexed_lvalue (svalue_t *sp, bytecode_p pc)
         }
         if (0 > (ind = i->u.number))
             ind = (mp_int)VEC_SIZE(vec->u.vec) + ind;
-        if (ind >= (mp_int)VEC_SIZE(vec->u.vec))
+        if (ind < 0 || ind >= (mp_int)VEC_SIZE(vec->u.vec))
         {
             ERRORF(("Index out of bounds for [>]: %ld, vector size: %lu.\n"
                    , (long)(i->u.number), VEC_SIZE(vec->u.vec)));
@@ -3416,7 +3416,7 @@ aindex_lvalue (svalue_t *sp, bytecode_p pc)
 
         if (0 > ind)
             ind = (mp_int)VEC_SIZE(vec->u.vec) + ind;
-        if (ind >= (mp_int)VEC_SIZE(vec->u.vec))
+        if (ind < 0 || ind >= (mp_int)VEC_SIZE(vec->u.vec))
         {
             ERRORF(("Index out of bounds for [>]: %ld, vector size: %lu.\n"
                    , (long)(i->u.number), VEC_SIZE(vec->u.vec)));
@@ -3437,7 +3437,7 @@ aindex_lvalue (svalue_t *sp, bytecode_p pc)
     {
         if (0 > ind)
             ind = (mp_int)mstrsize(vec->u.str) + ind;
-        if (ind >= (mp_int)mstrsize(vec->u.str))
+        if (ind < 0 || ind >= (mp_int)mstrsize(vec->u.str))
         {
             ERRORF(("Index out of bounds for [>]: %ld, string length: %ld\n"
                    , (long) i->u.number, (long)mstrsize(vec->u.str)));
@@ -4058,7 +4058,7 @@ protected_aindex_lvalue (svalue_t *sp, bytecode_p pc)
 
             if (0 > ind)
                 ind = (mp_int)VEC_SIZE(vec->u.vec) + ind;
-            if (ind >= (mp_int)VEC_SIZE(vec->u.vec))
+            if (ind < 0 || ind >= (mp_int)VEC_SIZE(vec->u.vec))
             {
                 ERRORF(("Index out of bounds for [>]: %ld, vector size: %lu.\n"
                        , (long)(i->u.number), VEC_SIZE(vec->u.vec)));
@@ -4089,7 +4089,7 @@ protected_aindex_lvalue (svalue_t *sp, bytecode_p pc)
 
             if (0 > ind)
                 ind = (mp_int)mstrsize(vec->u.str) + ind;
-            if (ind >= (mp_int)mstrsize(vec->u.str))
+            if (ind < 0 || ind >= (mp_int)mstrsize(vec->u.str))
             {
                 ERRORF(("Index out of bounds for [>]: %ld, string length: %ld\n"
                        , (long) i->u.number, (long)mstrsize(vec->u.str)));
@@ -4931,7 +4931,7 @@ push_aindexed_value (svalue_t *sp, bytecode_p pc)
 
         if (0 > ind)
             ind = (mp_int)mstrsize(vec->u.str) + ind;
-        if (ind >= (mp_int)mstrsize(vec->u.str))
+        if (ind < 0 || ind >= (mp_int)mstrsize(vec->u.str))
         {
             ERRORF(("Index out of bounds for [>]: %ld, string length: %ld\n"
                    , (long) i->u.number, (long)mstrsize(vec->u.str)));
@@ -4954,7 +4954,7 @@ push_aindexed_value (svalue_t *sp, bytecode_p pc)
         sp = vec;
         if (0 > (ind = i->u.number))
             ind = (mp_int)VEC_SIZE(vec->u.vec) + ind;
-        if (ind >= (mp_int)VEC_SIZE(vec->u.vec))
+        if (ind < 0 || ind >= (mp_int)VEC_SIZE(vec->u.vec))
         {
             ERRORF(("Index out of bounds for [>]: %ld, vector size: %lu.\n"
                    , (long)(i->u.number), VEC_SIZE(vec->u.vec)));
@@ -8033,11 +8033,17 @@ again:
          * Result is the number of variables assigned.
          */
         int i;
+        svalue_t *arg;
 
         num_arg = LOAD_UINT8(pc);
           /* GET_NUM_ARG doesn't work here. Trust me on that. */
         inter_sp = sp;
         inter_pc = pc;
+        arg = sp - num_arg + 1;
+        if (arg[0].type != T_STRING)
+            BAD_ARG_ERROR(1, T_STRING, arg[0].type);
+        if (arg[1].type != T_STRING)
+            BAD_ARG_ERROR(2, T_STRING, arg[1].type);
         i = e_sscanf(num_arg, sp);
         pop_n_elems(num_arg-1);
         free_svalue(sp);
@@ -16996,6 +17002,8 @@ count_extra_ref_in_object (object_t *ob)
         if (NULL == register_pointer(ptable, ob->prog))
             return;
         ob->prog->extra_ref = 1;
+        if (ob->prog->blueprint)
+            count_extra_ref_in_object(ob->prog->blueprint);
         count_inherits(ob->prog);
     }
 
@@ -17006,7 +17014,7 @@ count_extra_ref_in_object (object_t *ob)
         if ( NULL != (buf = O_GET_SHADOW(ob)->ed_buffer) )
             count_ed_buffer_extra_refs(buf);
     }
-} /* count_extra_ref_in_closure() */
+} /* count_extra_ref_in_object() */
 
 /*-------------------------------------------------------------------------*/
 static void

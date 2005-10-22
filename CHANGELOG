@@ -1,6 +1,20 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+26-Aug-2001 (Lars Duening)  (3.3.91)
+    - (interpret.c) Efun sscanf() didn't check its arguments (reported by
+        Tomba).
+    - (simulate.c) Running the driver with '-d -d' crashed it when loading
+        objects.
+    - (interpret.c) The refcount check for got to count the blueprint
+        reference in programs (reported by Tomba).
+    - (smalloc.c) The check against MAX_MALLOCED was incomplete and
+        could lead to use of foreign memory (reported by Menaures).
+
+25-Aug-2001 (Lars Duening)
+    - (prolang.y) The range checks for the new [>] indexing were not complete
+        (reported by Tomba).
+
 23-Aug-2001 (Lars Duening)  (3.3.90)
     - (array.c) ERQ callbacks for a destructed object don't have a
         current_object at the time the error occurs. The error handling code
@@ -239,7 +253,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
         option was less than flawless.
     - (main.c) Instead of scanning the arguments twice, all encountered
         -f options are stored in a temporary list and evaluated when
-        it's time.
+        it's time (f-010603-1).
     - (main.c) Laid the groundwork for nested sources for the command
         arguments.
 

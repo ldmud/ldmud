@@ -1581,10 +1581,15 @@ load_object (const char *lname, Bool create_super, int depth)
     if (!ob)
         error("Out of memory for new object '%s'\n", name);
 
+    ob->name = new_mstring(name);
+    tot_alloc_object_size += mstrsize(ob->name);
+      /* Tabling this unique string is of not much use.
+       * Note that the string must be valid for the ref_object()
+       * below to work in debugging mode.
+       */
+
     prog->blueprint = ref_object(ob, "load_object: blueprint reference");
 
-    ob->name = new_mstring(name);  /* Shared string is no good here */
-    tot_alloc_object_size += mstrsize(ob->name);
     if (!compat_mode)
         name--;  /* Make the leading '/' visible again */
     ob->load_name = new_tabled(name);  /* but here it is */
@@ -1647,7 +1652,9 @@ load_object (const char *lname, Bool create_super, int depth)
     command_giver = check_object(save_command_giver);
 
     if (d_flag > 1 && ob)
+    {
         debug_message("%s --%s loaded\n", time_stamp(), get_txt(ob->name));
+    }
 
     return ob;
 } /* load_object() */
@@ -1865,7 +1872,9 @@ lookfor_object (string_t * str, Bool bLoad)
         return ob;
 
     if (!ob)
+    {
         ob = load_object(pName, 0, 60);
+    }
     if (!ob || ob->flags & O_DESTRUCTED)
         return NULL;
     return ob;

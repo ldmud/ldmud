@@ -94,13 +94,15 @@ f-010411: Extend map(),filter(),... for strings.
 f-010516-0: Allow add_actions() on closures
 f-010516-1: Add a priority to notify_fail()
 f-010603-0: Efun to count the number of lines in a file
-f-010603-1: Specify commandline options in a file
 f-010603-2: Efun to resolve paths
 f-010603-3: multicast-call_other with exclusion
 f-010603-4: Safe recompile of objects
 f-010603-5: New datatypes NULL and ERROR
 f-010701: On save/restore object, pass full filename to valid_write/read
 f-010717: Blocksatz in sprintf()
+f-010825-0: New shadows efuns
+f-010825-1: New object list efuns
+f-010825-2: efun query_input_to()
 
 
 Language
@@ -128,6 +130,7 @@ f-010610-1: Allow reversed foreach()
 f-010610-2: Label (loop-) statements
 f-010713-0: Better Inline closure syntax
 f-010805: Explicite namespace qualifier for simul efuns
+f-010825-3: Make > indexing default with an option ?
 
 
 Compiler

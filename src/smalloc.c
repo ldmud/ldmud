@@ -2122,8 +2122,12 @@ found_fit:
         {
             if (max_malloced > 0
              && (mp_int)(sbrk_stat.size + chunk_size) > max_malloced
-             && (chunk_size = max_malloced - sbrk_stat.size - (heap_start?0:SINT) )
-                < block_size)
+             && (    sbrk_stat.size + (heap_start ? 0 : SINT) >= max_malloced
+                 || (chunk_size = max_malloced - sbrk_stat.size
+                                               - (heap_start?0:SINT) )
+                     < block_size
+                )
+               )
             {
                 static char mess[] = "MAX_MALLOCED limit reached.\n";
                 write(2, mess, sizeof(mess)-1);

@@ -1,0 +1,9 @@
+Short: efun query_input_to()
+From: Tomba@Batmud
+Date: 2001-08-25
+Type: Feature
+State: New
+
+query_input_to() returns the name of the function to which input_to() was
+set.
+

@@ -5,6 +5,9 @@ DESCRIPTION
         returns true if arg was passed by reference to the current
         function, instead of the usual call-by-value.
 
+        Not that arg has to be passed by reference to the efun, 
+        a.g. referencep(&x).
+
 SEE ALSO
         closurep(E), floatp(E), mappingp(E), objectp(E), intp(E),
         pointerp(E), stringp(E), symbolp(E), clonep(E), references(LPC)

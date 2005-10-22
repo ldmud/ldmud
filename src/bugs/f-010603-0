@@ -15,3 +15,5 @@ file to see what they missed. Right now the closest I can come to
 getting the function of tail with number of lines as an argument
 is to write a version of cat that takes a starting line and an
 ending line.
+
+Also suggested by Tomi Valkeinen (BatMud): count_lines()

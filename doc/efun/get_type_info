@@ -1,4 +1,5 @@
 SYNOPSIS
+        mixed get_type_info(mixed arg)
         mixed get_type_info(mixed arg, int flag)
 
 DESCRIPTION
@@ -33,6 +34,7 @@ HISTORY
         Secondary string information was introduced in 3.2.7.
         Up to 3.2.7 inclusive, get_type_info(closure,2) did not return
           the object from a lambda closure or bound-lambda closure.
+        In the 3.2 branch, the 'flag' argument could be of any type.
 
 SEE ALSO
         debug_info(E), typeof(E)
