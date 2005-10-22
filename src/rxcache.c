@@ -142,11 +142,7 @@ void rx_init(void)
 
 /*--------------------------------------------------------------------*/
 const char *
-rx_error_message (int code
-#ifndef USE_PCRE
-                           UNUSED
-#endif
-                 )
+rx_error_message (int code)
 
 /* Return a constant string with the error message for <code>.
  * If <code> is not an error, NULL is returned.

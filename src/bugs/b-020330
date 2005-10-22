@@ -2,37 +2,8 @@ Short: Crash in recursive simul-efun
 Date: Fri, 2 Nov 2001 12:04:15 +0100
 From: Daniel Fischer <dfischer@gmx.de>
 Type: Bug
-State: New
+State: Not reproducible
 Driver: 3.3.188,  3.3.119
-
-The following still malfunctions in 3.3 (freezes on BeOS). The trick is to call the sefun via an object which is loaded after the Mud started up.
-With the test master:
-
---- sefun.c ---
-void ptest (void) {
-    debug_message("sefun:ptest\n");
-    set_this_object(previous_object());
-    ptest();
-}
---- a.c ---
-int fun()
-{
-    ptest();
-}
---- master.c::flag() ---
-    if (arg == "test")
-    {
-        call_out("flag", 2, "test2");
-        return;
-    }
-
-    if (arg == "test2")
-    {
-       load_object("a")->fun();
-        return;
-    }
-
----------------------------------------------------
 
 Das folgende crasht (reproduzierbar) mit 3-3.119 zumindest in meiner 
 simul_efun:

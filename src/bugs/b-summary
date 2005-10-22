@@ -8,11 +8,8 @@ b-020228-1: Crash in terminal_colour()
 b-020228-0: Refcount errors when handling destructed objects
 b-020303-0: Crasher on corrupt string.
 b-020321: Strange crasher: bus error on existing variables
-b-020324: Problem with H_DEFAULT_METHOD
-b-020328-0: Inheritance causes memory corruption
 b-020318: Illegal instruction 
-b-020330: Crash in recursive simul-efun
-b-020331: Back stack at F_RETURN
+b-020331: Back stack at F_RETURN (maybe fixed)
 
 
 Efuns
@@ -54,3 +51,4 @@ b-000904: ERQ compile problems
 
 Not Reproducible
 --------------------------------------------------------------------------
+b-020330: Crash in recursive simul-efun

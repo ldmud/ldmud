@@ -15130,7 +15130,7 @@ int_apply (string_t *fun, object_t *ob, int num_arg
 
             argp = inter_sp - num_arg + 1;
             for (i = 0; i < num_arg; i++)
-                inter_sp[-i+num_extra] = inter_sp[i];
+                inter_sp[-i+num_extra] = inter_sp[-i];
             inter_sp += num_extra;
 
             /* Add the three new arguments: &result, ob, fun

@@ -637,14 +637,24 @@ f_regexplode (svalue_t *sp)
 
         /* Copy the text leading up to the current delimiter match. */
         len = match->start - start;
-        memsafe(txt = mstr_extract(text, start, (size_t)len), (size_t)len, "text before delimiter");
-        put_string(svp, txt);
+        if (len)
+        {
+            memsafe(txt = mstr_extract(text, start, match->start), (size_t)len, "text before delimiter");
+            put_string(svp, txt);
+        }
+        else
+            put_ref_string(svp, STR_EMPTY);
         svp++;
 
         /* Copy the matched delimiter */
         len = match->end - match->start;
-        memsafe(txt = mstr_extract(text, match->start, (size_t)len), (size_t)len, "matched delimiter");
-        put_string(svp, txt);
+        if (len)
+        {
+            memsafe(txt = mstr_extract(text, match->start, match->end), (size_t)len, "matched delimiter");
+            put_string(svp, txt);
+        }
+        else
+            put_ref_string(svp, STR_EMPTY);
         svp++;
 
         start = match->end;
@@ -656,15 +666,22 @@ f_regexplode (svalue_t *sp)
         string_t *txt;
 
         len = mstrsize(text) - start;
-        memsafe(txt = mstr_extract(text, start, (size_t)len), (size_t)len, "remaining text");
-        put_string(svp, txt);
+        if (len > 0)
+        {
+            memsafe(txt = mstr_extract(text, start, mstrsize(text)), (size_t)len, "remaining text");
+            put_string(svp, txt);
+        }
+        else
+            put_ref_string(svp, STR_EMPTY);
     }
 
     /* Cleanup */
     free_regexp(reg);
-    free_string_svalue(sp);
+    free_svalue(sp);
     sp--;
-    free_string_svalue(sp);
+    free_svalue(sp);
+    sp--;
+    free_svalue(sp);
 
     /* Return the result */
     put_array(sp, ret);

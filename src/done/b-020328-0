@@ -2,9 +2,8 @@ Short: Inheritance causes memory corruption
 From: "Heiko Kopp" <heiko.kopp@informatik.uni-rostock.de>
 Date: Wed, 20 Mar 2002 18:12:11 +0100
 Type: Bug
-State: New
+State: Done - fixed in 3.3.195
 Driver: 3.3.x
-See also: b-020318
 
 Hier kommt der Backtrace:
 

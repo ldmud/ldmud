@@ -1,6 +1,14 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+02-Apr-2002 (Lars Duening)
+    - (efuns.c) Efun regexplode() did not remove all its arguments
+         (maybe b-020331).
+    - (efuns.c) Efun regexplode() misinterpreted how to extract
+         substrings from a string.
+    - (interpret.c) When calling the default method, the code to
+         massage the stack in fact clobbered memory (b-020324, b-020328-0).
+
 31-Mar-2002 (Lars Duening)  (3.3.194)
     - (simulate.c) Load errors during the initial master load crashed
          the driver in the error handling.

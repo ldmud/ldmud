@@ -3,7 +3,7 @@ Date: Sun, 24 Mar 2002 23:49:28 +0100 (CET)
 From: Markus Peter <warp@spin.de>
 Driver: 3.3.182
 Type: Bug
-State: New
+State: Done - fixed in 3.3.195
 
 
 Ich wollte mal ein wenig mit H_DEFAULT_METHOD rumspielen in 3.3.182 und

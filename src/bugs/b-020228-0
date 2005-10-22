@@ -18,6 +18,315 @@ Swapping? Replace programs? Something else?
 
 
 ----------------------------------------------------------------------------
+Date: Mon, 1 Apr 2002 20:38:49 +0200 (CEST)
+From: Markus Peter <warp@spin.de>
+
+hallo
+
+hab noch ein wenig mit 3.3.188 rumgespielt nachdem die neueren driver bei
+mir nicht laufen. Mit H_DEFAULT_METHOD kann ich den ref count 0 but not
+destructed Fehler trotz dieses NO_BLUEPRINT defines ganz gut provozieren
+- ich starte den Master mit default_method gesetzt auf einen String und
+das Mud stuerzt in der Regel nach einer Minute ab - selbst wenn ich mich
+als einziger einlog. Ich sorge dafuer dass 3, 4 Raeume geladen werden,
+schon crashts. Hab auch mal ein wenig mit der Lib rumgespielt - alle
+replace_programs mal raus, dann wieder rein und so, aber das hatte keinen
+Einfluss auf das Ergebnis.
+
+Logfiles haengen wie ueblich an, Cores sind nicht brauchbar (bin
+mittlerweile schon bei nur mit -g compilieren angelangt - ich find nicht
+raus woran das liegt, ist evtl. wirklich das System)
+
+-- 
+Markus Peter - SPiN AG
+warp@spin.de
+
+ ---------------------------- err.log -------------------------
+2002.04.01 20:31:42 [xerq] Demon started
+2002.04.01 20:31:42 LDMud 3.3.188 (3-3.188)
+2002.04.01 20:31:42 Random seed: 0x3ca8a78e
+Loading init file /etc/init_file
+Preloading: daemon/boot
+Preloading: kernel/login
+Preloading: daemon/aliasd
+Preloading: daemon/sould
+Preloading: daemon/strings
+Preloading: daemon/parserd
+Preloading: daemon/userd
+Preloading: daemon/saved
+Preloading: daemon/banishd
+Preloading: daemon/channeld
+Preloading: daemon/language
+Preloading: std/player
+Preloading: std/room
+Preloading: daemon/autodoc
+Preloading: daemon/net
+Preloading: dom/world/servers/timed
+Preloading: dom/world/servers/map
+Preloading: dom/world/servers/bankd
+2002.04.01 20:31:42 LDMud ready for users.
+2002.04.01 20:31:46 [xerq] command: rlookup
+2002.04.01 20:31:46 [xerq] command: open_tcp
+2002.04.01 20:31:46 [xerq] command: listen
+2002.04.01 20:31:47 [xerq] command: send
+2002.04.01 20:31:50 Object 0x834bb68 dom/main/room/circle-n-2 ref count 0, but not destructed.
+2002.04.01 20:31:50 Current object was daemon/socketd
+kernel/master kernel/master.c line 34
+81d183e:  50          ==                         (2: 52)	line 34
+81d183f:  23          return                     (1: 51)
+kernel/master kernel/master.c (/kernel/master/security.h) line 146
+81d1cd8:  92          restore_arg_frame          (2: 49)	line 146
+81d1cd9:  38        9 ||                         (1: 48)
+81d1cdb:  91          save_arg_frame             (0: 47)	line 147
+81d1cdc:  28        0 local                      (1: 48)
+81d1cde:  10       72 cstring0                   (2: 49)
+81d1ce0: 103          call_function              (3: 50)
+kernel/master kernel/master.c line 34
+81d1833:  28        0 local                      (0: 50)	line 34
+81d1835:  15          const0                     (1: 51)
+81d1836:  28        1 local                      (2: 52)
+81d1838: 181          strlen                     (3: 53)
+81d1839:  16          const1                     (3: 53)
+81d183a:  42          -                          (4: 54)
+81d183b:  64          ..                         (3: 53)
+81d183c:  28        1 local                      (1: 51)
+81d183e:  50          ==                         (2: 52)
+81d183f:  23          return                     (1: 51)
+kernel/master kernel/master.c (/kernel/master/security.h) line 147
+81d1ce3:  92          restore_arg_frame          (2: 49)	line 147
+81d1ce4:  99 385883139 branch_when_zero           (1: 48)
+81d1ce9:  91          save_arg_frame             (0: 47)	line 149
+81d1cea:  28        0 local                      (1: 48)
+81d1cec:  10       73 cstring0                   (2: 49)
+81d1cee: 103          call_function              (3: 50)
+kernel/master kernel/master.c line 34
+81d1833:  28        0 local                      (0: 50)	line 34
+81d1835:  15          const0                     (1: 51)
+81d1836:  28        1 local                      (2: 52)
+81d1838: 181          strlen                     (3: 53)
+81d1839:  16          const1                     (3: 53)
+81d183a:  42          -                          (4: 54)
+81d183b:  64          ..                         (3: 53)
+81d183c:  28        1 local                      (1: 51)
+81d183e:  50          ==                         (2: 52)
+81d183f:  23          return                     (1: 51)
+kernel/master kernel/master.c (/kernel/master/security.h) line 149
+81d1cf1:  92          restore_arg_frame          (2: 49)	line 149
+81d1cf2:  99 385883139 branch_when_zero           (1: 48)
+81d1cf7:  28        1 local                      (0: 47)	line 151
+81d1cf9:  26          switch                     (1: 48)
+81d1cff:  91          save_arg_frame             (0: 47)	line 158
+81d1d00:  28        0 local                      (1: 48)
+81d1d02:  10       74 cstring0                   (2: 49)
+81d1d04: 103          call_function              (3: 50)
+kernel/master kernel/master.c line 34
+81d1833:  28        0 local                      (0: 50)	line 34
+81d1835:  15          const0                     (1: 51)
+81d1836:  28        1 local                      (2: 52)
+81d1838: 181          strlen                     (3: 53)
+81d1839:  16          const1                     (3: 53)
+81d183a:  42          -                          (4: 54)
+81d183b:  64          ..                         (3: 53)
+81d183c:  28        1 local                      (1: 51)
+81d183e:  50          ==                         (2: 52)
+81d183f:  23          return                     (1: 51)
+kernel/master kernel/master.c (/kernel/master/security.h) line 158
+81d1d07:  92          restore_arg_frame          (2: 49)	line 158
+81d1d08:  99        3 branch_when_zero           (1: 48)
+81d1d0a:  28        0 local                      (0: 47)
+81d1d0c:  23          return                     (1: 48)
+daemon/intermud3/services std/modules/save.c line 19
+8213fac:  92          restore_arg_frame          (2: 41)	line 19
+8213fad:  88          pop_value                  (1: 40)
+8213fae:  24          return0                    (0: 39)	line 20
+daemon/intermud3/services daemon/intermud3/services.c line 273
+8358e13:  92          restore_arg_frame          (2: 40)	line 273
+8358e14:  88          pop_value                  (1: 39)	line 274
+8358e15:  25          break                      (0: 38)	line 277
+83595d5:  24          return0                    (0: 38)	line 515
+daemon/intermud3/i3d daemon/intermud3/i3d.c line 166
+8305440:  92          restore_arg_frame          (3: 28)	line 166
+8305441: 162          end_catch                  (2: 27)
+8305442:  92          restore_arg_frame          (2: 27)
+8305443:  88          pop_value                  (1: 26)	line 164
+8305444:  91          save_arg_frame             (0: 25)
+8305445:  28        2 local                      (1: 26)
+8305447: 103          call_function              (2: 27)
+83051f3:  90      769 clear_locals               (0: 32)	line 46
+83051f6:  28        0 local                      (0: 32)	line 50
+83051f8:  99          branch_when_zero           (1: 33)
+8305206:   8        4 identifier                 (0: 32)	line 53
+8305208: 179          sizeof                     (1: 33)
+8305209: 111        2 push_local_variable_lvalue (1: 33)
+830520b:  40          (void)=                    (2: 34)
+830520c:   8        2 identifier                 (0: 32)	line 57
+830520e:  17          nconst1                    (1: 33)
+830520f:  51          !=                         (2: 34)
+8305210:  37          &&                         (1: 33)
+8305214:  99          branch_when_zero           (1: 33)
+8305268:   8        4 identifier                 (0: 32)	line 75
+830526a: 179          sizeof                     (1: 33)
+830526b: 111        2 push_local_variable_lvalue (1: 33)
+830526d:  39          =                          (2: 34)
+830526e:  18        3 clit                       (1: 33)
+8305270:  46          >                          (2: 34)
+8305271:  37        4 &&                         (1: 33)
+8305273:   8        2 identifier                 (0: 32)
+8305275:  17          nconst1                    (1: 33)
+8305276:  50          ==                         (2: 34)
+8305277:  99       47 branch_when_zero           (1: 33)
+8305279:   8        4 identifier                 (0: 32)	line 76
+830527b:  15          const0                     (1: 33)
+830527c:  60          index                      (2: 34)
+830527d:  18       24 clit                       (1: 33)
+830527f:  56          <<                         (2: 34)
+8305280:   8        4 identifier                 (1: 33)
+8305282:  16          const1                     (2: 34)
+8305283:  60          index                      (3: 35)
+8305284:  18       16 clit                       (2: 34)
+8305286:  56          <<                         (3: 35)
+8305287:  54          |                          (2: 34)
+8305288:   8        4 identifier                 (1: 33)
+830528a:  18        2 clit                       (2: 34)
+830528c:  60          index                      (3: 35)
+830528d:  18        8 clit                       (2: 34)
+830528f:  56          <<                         (3: 35)
+8305290:  54          |                          (2: 34)
+8305291:   8        4 identifier                 (1: 33)
+8305293:  18        3 clit                       (2: 34)
+8305295:  60          index                      (3: 35)
+8305296:  54          |                          (2: 34)
+8305297: 106        2 push_identifier_lvalue     (1: 33)
+8305299:  40          (void)=                    (2: 34)
+830529a:   8        4 identifier                 (0: 32)	line 77
+830529c:  18        4 clit                       (1: 33)
+830529e:  73          nx_range                   (2: 34)
+830529f: 106        4 push_identifier_lvalue     (1: 33)
+83052a1:  40          (void)=                    (2: 34)
+83052a2:  18        3 clit                       (0: 32)	line 78
+83052a4: 111        2 push_local_variable_lvalue (1: 33)
+83052a6:  78          -=                         (2: 34)
+83052a7:  88          pop_value                  (1: 33)
+83052a8:  28        2 local                      (0: 32)	line 81
+83052aa:   8        2 identifier                 (1: 33)
+83052ac:  48          <                          (2: 34)
+83052ad:  99       14 branch_when_zero           (1: 33)
+83052af:   8        4 identifier                 (0: 32)	line 83
+83052b1: 297       90 to_string                  (1: 33)
+83052b3: 106        5 push_identifier_lvalue     (1: 33)
+83052b5:  40          (void)=                    (2: 34)
+83052b6: 150        0 aggregate                  (0: 32)	line 84
+83052b9: 106        4 push_identifier_lvalue     (1: 33)
+83052bb:  40          (void)=                    (2: 34)
+83052bc:  24          return0                    (0: 32)	line 85
+830544a:  92          restore_arg_frame          (2: 27)	line 164
+830544b: 111        4 push_local_variable_lvalue (1: 26)
+830544d:  39          =                          (2: 27)
+830544e: 102       30 bbranch_when_non_zero      (1: 26)
+8305450:  25          break                      (0: 25)	line 172
+830556c:  24          return0                    (0: 25)	line 218
+daemon/socketd daemon/socketd.c line 59
+8303952:  92          restore_arg_frame          (2: 16)	line 59
+8303953:  88          pop_value                  (1: 15)
+8303954:  24          return0                    (0: 14)	line 60
+8303b75:  92          restore_arg_frame          (2: 12)	line 153
+8303b76:  88          pop_value                  (1: 11)	line 154
+8303b77:  25          break                      (0: 10)	line 156
+8303be4:  25          break                      (0: 10)	line 167
+8303c23:  24          return0                    (0: 10)	line 175
+daemon/socketd <lambda ?> line 0
+83dc31e:  92          restore_arg_frame          (2:  3)	line 0
+83dc31f:  23          return                     (1:  2)
+83dc317:  91          save_arg_frame             (0:  1)
+83dc318:  28        0 local                      (1:  2)
+83dc31a:  15          const0                     (2:  3)
+83dc31b: 103          call_function              (3:  4)
+daemon/socketd daemon/socketd.c line 118
+8303a87:  90     1026 clear_locals               (0: 10)	line 118
+8303a8a:  91          save_arg_frame             (0: 10)	line 122
+8303a8b:  28        0 local                      (1: 11)
+8303a8d:  21    -4043 closure                    (2: 12)
+8303a90:  18      255 clit                       (3: 13)
+8303a92: 390          map                        (4: 14)
+daemon/socketd <lambda ?> line 0
+bfffd76c:  53          &                          (2: 16)	line 0
+bfffd76d:  23          return                     (1: 15)
+bfffd76c:  53          &                          (2: 16)
+bfffd76d:  23          return                     (1: 15)
+bfffd76c:  53          &                          (2: 16)
+bfffd76d:  23          return                     (1: 15)
+bfffd76c:  53          &                          (2: 16)
+bfffd76d:  23          return                     (1: 15)
+bfffd76c:  53          &                          (2: 16)
+bfffd76d:  23          return                     (1: 15)
+bfffd76c:  53          &                          (2: 16)
+bfffd76d:  23          return                     (1: 15)
+bfffd76c:  53          &                          (2: 16)
+bfffd76d:  23          return                     (1: 15)
+bfffd76c:  53          &                          (2: 16)
+bfffd76d:  23          return                     (1: 15)
+bfffd76c:  53          &                          (2: 16)
+bfffd76d:  23          return                     (1: 15)
+bfffd76c:  53          &                          (2: 16)
+bfffd76d:  23          return                     (1: 15)
+bfffd76c:  53          &                          (2: 16)
+bfffd76d:  23          return                     (1: 15)
+bfffd76c:  53          &                          (2: 16)
+bfffd76d:  23          return                     (1: 15)
+bfffd76c:  53          &                          (2: 16)
+bfffd76d:  23          return                     (1: 15)
+bfffd76c:  53          &                          (2: 16)
+bfffd76d:  23          return                     (1: 15)
+bfffd76c:  53          &                          (2: 16)
+bfffd76d:  23          return                     (1: 15)
+bfffd76c:  53          &                          (2: 16)
+bfffd76d:  23          return                     (1: 15)
+bfffd76c:  53          &                          (2: 16)
+bfffd76d:  23          return                     (1: 15)
+bfffd76c:  53          &                          (2: 16)
+bfffd76d:  23          return                     (1: 15)
+dom/main/room/circle-n-2 <lambda ?> line 0
+bfffd76c:  53          &                          (2: 16)
+8303a94:  92 111   0  40   8   0  28   1
+<lambda 0x83dc315> in '    daemon/socketd.c' ('      daemon/socketd') offset 7
+'      socket_cb' in '    daemon/socketd.c' ('      daemon/socketd') line 122
+#'&              for '    daemon/socketd.c' ('      daemon/socketd')
+2002.04.01 20:31:50 LDMud aborting on fatal error.
+[xerq] read: Connection reset by peer
+2002.04.01 20:31:50 [xerq] Demon exiting.
+
+ --------------------------- debug.log ------------------------
+2002.04.01 20:31:42 LDMud 3.3.188 (3-3.188)
+2002.04.01 20:31:42 Random seed: 0x3ca8a78e
+2002.04.01 20:31:42 UDP recv-socket requested for port: 6664
+Loading init file /etc/init_file
+Preloading: daemon/boot
+Preloading: kernel/login
+Preloading: daemon/aliasd
+Preloading: daemon/sould
+Preloading: daemon/strings
+Preloading: daemon/parserd
+Preloading: daemon/userd
+Preloading: daemon/saved
+Preloading: daemon/banishd
+Preloading: daemon/channeld
+Preloading: daemon/language
+Preloading: std/player
+Preloading: std/room
+Preloading: daemon/autodoc
+Preloading: daemon/net
+Preloading: dom/world/servers/timed
+Preloading: dom/world/servers/map
+Preloading: dom/world/servers/bankd
+2002.04.01 20:31:42 LDMud ready for users.
+2002.04.01 20:31:50 Object 0x834bb68 dom/main/room/circle-n-2 ref count 0, but not destructed.
+2002.04.01 20:31:50 Current object was daemon/socketd
+2002.04.01 20:31:50 Dump of the call chain:
+<lambda 0x83dc315> in '    daemon/socketd.c' ('      daemon/socketd') offset 7
+'      socket_cb' in '    daemon/socketd.c' ('      daemon/socketd') line 122
+#'&              for '    daemon/socketd.c' ('      daemon/socketd')
+
+----------------------------------------------------------------------------
 Date: Wed, 27 Mar 2002 13:28:31 +0100 (CET)
 From: Markus Peter <warp@spin.de>
 hallo
