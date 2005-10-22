@@ -12487,7 +12487,10 @@ epilog (void)
             mem_block[A_ARGUMENT_INDEX].current_size = 0;
         }
         for (i=0; i<NUMPAREAS; i++)
-            size += align(mem_block[i].current_size);
+        {
+            if (i != A_LINENUMBERS)
+                size += align(mem_block[i].current_size);
+        }
             
         size += align(num_function_names * sizeof *prog->function_names);
         size += align(num_functions * sizeof *prog->functions);
@@ -12638,11 +12641,28 @@ epilog (void)
 
         /* Add the linenumber information.
          */
-        prog->line_numbers = p;
-        if (mem_block[A_LINENUMBERS].current_size)
-            memcpy(p, mem_block[A_LINENUMBERS].block,
-                   mem_block[A_LINENUMBERS].current_size);
-        p += align(mem_block[A_LINENUMBERS].current_size);
+        {
+            size_t linenumber_size;
+
+            linenumber_size = mem_block[A_LINENUMBERS].current_size
+                              + sizeof(prog->line_numbers);
+
+            if ( !(prog->line_numbers = xalloc(linenumber_size)) )
+            {
+                total_prog_block_size -= prog->total_size + mstrsize(prog->name)+1;
+                total_num_prog_blocks -= 1;
+                xfree(prog);
+                yyerrorf("Out of memory: linenumber structure (%lu bytes)"
+                        , (unsigned long)linenumber_size);
+                break;
+            }
+            total_prog_block_size += linenumber_size;
+            prog->line_numbers->size = linenumber_size;
+            if (mem_block[A_LINENUMBERS].current_size)
+                memcpy( prog->line_numbers->line_numbers
+                      , mem_block[A_LINENUMBERS].block
+                      , mem_block[A_LINENUMBERS].current_size);
+        }
 
         /* Correct the variable index offsets */
         fix_variable_index_offsets(prog);

@@ -24,6 +24,7 @@ typedef struct interactive_s      interactive_t;      /* comm.h */
 typedef struct input_to_s         input_to_t;         /* comm.h */
 typedef struct instr_s            instr_t;            /* exec.h */
 typedef struct lambda_s           lambda_t;           /* closure.h */
+typedef struct linenumbers_s      linenumbers_t;      /* exec.h */
 typedef struct mapping_s          mapping_t;          /* mapping.h */
 typedef struct object_s           object_t;           /* object.h */
 typedef struct program_s          program_t;          /* exec.h */

@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+21-Apr-2002 (Lars Duening)  (3.3.203)
+    - (exec.h, prolang.y, interpret.c, object.c, swap.c) Linenumbers are
+         now kept in a separate memory block, which makes swapping them
+         out and back in simpler.
+
 20-Apr-2002 (Lars Duening)  (3.3.202)
     - (prolang.y, lex.c) Calls to the master during a compilation now check
          the available evaluation costs. If the limit is exceeded, a

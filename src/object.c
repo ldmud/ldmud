@@ -547,9 +547,11 @@ _free_prog (program_t *progp, Bool free_all, const char * file, int line
      * This has to be done before the program is removed from the
      * swapper, else the following test would fail.
      */
-    if (progp->swap_num != -1 && progp->line_numbers)
+    if (progp->line_numbers)
     {
+        total_prog_block_size -= progp->line_numbers->size;
         xfree(progp->line_numbers);
+        progp->line_numbers = NULL;
     }
 
     /* Is it a 'real' free? Then dereference all the

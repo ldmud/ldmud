@@ -77,6 +77,11 @@
  *       are not removed so that the string literals stay in memory all
  *       the time.
  *
+ * The linenumber information is allocated separately from the main program
+ * block so that it can be swapped separately more easily. The struct
+ * linenumbers_s is allocated to size and holds the line number information
+ * as an array of bytecodes:
+ *
  *   bytecode_t line_numbers[]: the line number information,
  *       encoded in a kind of delta compression. When a program
  *       is swapped in, the line numbers are allocated separately
@@ -677,8 +682,10 @@ struct program_s
        * the structure.
        */
     mp_int          load_time;     /* When has it been compiled ? */
-    bytecode_p      line_numbers;
-      /* Line number information, NULL when not swapped in
+    linenumbers_t  *line_numbers;
+      /* Line number information, NULL when not swapped in.
+       * If swapped out, the data is stored in the swap file at
+       * .swapnum+.total_size .
        */
     unsigned short *function_names;
 #define PROGRAM_END(program) ((bytecode_p)(program).function_names)
@@ -770,6 +777,23 @@ struct program_s
       /* Number of variables (inherited and own) of this program */
     unsigned short num_inherited;
       /* Number of (directly) inherited programs */
+};
+
+
+/* --- struct linenumbers_s: the linenumber head structure
+ *
+ * This structure is the head of the memory block with the linenumbers
+ * data.
+ */
+
+struct linenumbers_s
+{
+    size_t     size;             /* Total allocated size of this structure */
+    bytecode_t line_numbers[1];
+      /* Array [.size - sizeof(.size)] with the delta-compressed
+       * line number information. This is actually one byte too many, but
+       * that simplifies the swapping code.
+       */
 };
 
 

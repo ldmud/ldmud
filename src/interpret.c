@@ -16442,11 +16442,10 @@ get_line_number (bytecode_p p, program_t *progp, string_t **namep)
     struct incinfo *inctop = NULL;  /* The include information stack. */
     int relocated_from = 0;
     int relocated_to = -1;
-    p_int old_total;
-      /* If the line numbers needed SYSTEM privilege to be swapped in,
-       * this value is the old progp->total_size, serving as a flag
-       * that the line numbers have to be deallocated again when
-       * the function finishes.
+    Bool used_system_mem;
+      /* TRUE if the line numbers needed SYSTEM privilege to be swapped in,
+       * because this means that afterwards they need to be deallocated
+       * again.
        */
 
     if (!progp || !p)
@@ -16455,7 +16454,7 @@ get_line_number (bytecode_p p, program_t *progp, string_t **namep)
         return 0;
     }
 
-    old_total = 0;
+    used_system_mem = MY_FALSE;
 
     /* Get the line numbers */
     if (!progp->line_numbers)
@@ -16465,12 +16464,18 @@ get_line_number (bytecode_p p, program_t *progp, string_t **namep)
             /* Uhhmm, out of memory - try to pull some rank */
 
             int save_privilege;
+            Bool rc;
 
-            old_total = progp->total_size;
+            used_system_mem = MY_TRUE;
             save_privilege = malloc_privilege;
             malloc_privilege = MALLOC_SYSTEM;
-            load_line_numbers_from_swap(progp);
+            rc = load_line_numbers_from_swap(progp);
             malloc_privilege = save_privilege;
+            if (!rc)
+            {
+                *namep = ref_mstring(STR_UNDEFINED);
+                return 0;
+            }
         }
     }
 
@@ -16492,7 +16497,7 @@ get_line_number (bytecode_p p, program_t *progp, string_t **namep)
      * counting up the line number <i> while decrementing the <offset>.
      * If the offset becomes <= 0, we found the line.
      */
-    for (i = 0, p = progp->line_numbers; ; )
+    for (i = 0, p = progp->line_numbers->line_numbers; ; )
     {
         int o;
 
@@ -16645,14 +16650,15 @@ get_line_number (bytecode_p p, program_t *progp, string_t **namep)
         *namep = ref_mstring(progp->name);
     }
 
-    if (old_total)
+    if (used_system_mem)
     {
         /* We used SYSTEM priviledged memory - now we have to return it.
          */
 
+        total_prog_block_size -= progp->line_numbers->size;
+        total_bytes_unswapped -= progp->line_numbers->size;
         xfree(progp->line_numbers);
-        total_prog_block_size -= progp->total_size - old_total;
-        progp->total_size = old_total;
+        progp->line_numbers = NULL;
         reallocate_reserved_areas();
     }
 

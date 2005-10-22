@@ -362,7 +362,7 @@ gc_mark_program_ref (program_t *p)
         }
 #endif /* !NO_BLUEPRINT */
 
-        if (p->swap_num != -1 && p->line_numbers)
+        if (p->line_numbers)
             note_ref(p->line_numbers);
 
         /* Non-inherited functions */
