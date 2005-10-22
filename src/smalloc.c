@@ -488,8 +488,10 @@ static char *esbrk(word_t);
 #ifdef MALLOC_TRACE
 static char *_large_malloc(word_t, Bool, const char *, int);
 #define large_malloc(size, force_m) _large_malloc(size, force_m, file, line)
+#define large_malloc_int(size, force_m) _large_malloc(size, force_m, __FILE__, __LINE__)
 #else
 static char *large_malloc(word_t, Bool);
+#define large_malloc_int(size, force_m) large_malloc(size, force_m)
 #endif
 static void large_free(char *);
 
@@ -878,7 +880,7 @@ smalloc (size_t size
         }
 
         /* Get a new small chunk; if possible, from fresh memory */
-        next_unused = (word_t*)large_malloc(small_chunk_size + sizeof(word_t*)
+        next_unused = (word_t*)large_malloc_int(small_chunk_size + sizeof(word_t*)
                                            , MY_TRUE);
 
         /* If this is the first small chunk allocation, it might fail because
@@ -892,7 +894,7 @@ smalloc (size_t size
                      , (p_int)(small_chunk_size)
                    );
             small_chunk_size = SMALL_CHUNK_SIZE;
-            next_unused = (word_t*)large_malloc(small_chunk_size+sizeof(word_t*)
+            next_unused = (word_t*)large_malloc_int(small_chunk_size+sizeof(word_t*)
                                                , MY_TRUE);
         }
 

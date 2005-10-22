@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+06-May-2002 (Lars Duening)  (3.3.207)
+    - (smalloc.c) With CHECK_OBJECT_GC_REF, small chunks could lead to
+         misleading diagnostics during the GC.
+
 03-May-2002 (Lars Duening)  (3.3.206)
     - (interpret) The H_DEFAULT_METHOD can now be specified with varargs
          arguments and still receive by-reference variables, similar to

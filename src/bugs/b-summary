@@ -45,6 +45,7 @@ b-020223: Memory corruption (in stress test)
 b-020304: Memory Leaks in Darkwind
 b-020314: Memory leaks in OSB and FinalFrontier
 b-020306: LDMud vs TinyFugue prompt
+b-020506: Small block  statistics wrong in OSB
 
 Installation
 --------------------------------------------------------------------------
