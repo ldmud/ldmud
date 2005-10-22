@@ -148,16 +148,16 @@ endif
 # $Format: "ifeq ($ReleaseType$, pre)"$
 ifeq (dev, pre)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 174
+  SETVERFLAGS += d 175
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-pre.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-pre.174
+  VSTRING = 3.3.0-pre.175
 endif
 # $Format: "ifeq ($ReleaseType$, dev)"$
 ifeq (dev, dev)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 174
+  SETVERFLAGS += d 175
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-dev.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-dev.174
+  VSTRING = 3.3.0-dev.175
 endif
 
 else
@@ -165,12 +165,12 @@ else
 # --- Development Versions ---
 
 # $Format: "SETVERFLAGS = -app $ReleaseMajor$ $ReleaseMinor$ $ProjectMinorVersion$"$
-SETVERFLAGS = -app 3 3 174
+SETVERFLAGS = -app 3 3 175
 
 # $Format: "  SETVERFLAGS += f"$
   SETVERFLAGS += f
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ProjectMinorVersion$"$
-  VSTRING = 3.3.174
+  VSTRING = 3.3.175
 
 endif
 
@@ -504,9 +504,9 @@ $(OBJ)/dumpstat.o : svalue.h smalloc.h stdstrings.h simulate.h ptrtable.h \
     dumpstat.h typedefs.h driver.h strfuns.h sent.h instrs.h port.h \
     config.h hosts/unix.h hosts/be/be.h machine.h
 
-$(OBJ)/ed.o : xalloc.h svalue.h stdstrings.h simulate.h rxcache.h regexp.h \
-    object.h mstrings.h main.h interpret.h gcollect.h filestat.h comm.h \
-    closure.h actions.h ed.h typedefs.h driver.h strfuns.h sent.h exec.h \
+$(OBJ)/ed.o : xalloc.h svalue.h stdstrings.h simulate.h rxcache.h object.h \
+    mstrings.h main.h interpret.h gcollect.h filestat.h comm.h closure.h \
+    actions.h ed.h typedefs.h driver.h strfuns.h sent.h exec.h regexp.h \
     instrs.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/efuns.o : ../mudlib/sys/time.h ../mudlib/sys/strings.h \
@@ -655,8 +655,9 @@ $(OBJ)/regexp.o : main.h xalloc.h simulate.h comm.h regexp.h driver.h \
     hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/rxcache.o : ../mudlib/sys/debug_info.h xalloc.h svalue.h strfuns.h \
-    regexp.h mstrings.h hash.h gcollect.h rxcache.h driver.h typedefs.h \
-    port.h config.h hosts/unix.h hosts/be/be.h machine.h
+    simulate.h regexp.h mstrings.h hash.h gcollect.h rxcache.h driver.h \
+    typedefs.h sent.h exec.h port.h config.h hosts/unix.h hosts/be/be.h \
+    machine.h
 
 $(OBJ)/simul_efun.o : xalloc.h swap.h svalue.h stdstrings.h simulate.h \
     ptrtable.h object.h mstrings.h lex.h interpret.h instrs.h gcollect.h \

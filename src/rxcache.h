@@ -4,35 +4,64 @@
 #include "driver.h"
 
 #include "regexp.h"
+#include "mstrings.h"
 #include "strfuns.h"
 
-#ifdef RXCACHE_TABLE
+/* --- Types --- */
 
-extern void rxcache_init(void);
-extern regexp * regcomp_cache(string_t * expr, Bool excompat, Bool from_ed);
+/* --- struct regexp_s: the regexp structure wrapper ---
+ *
+ * This structure wraps the actual regexp structure into a common
+ * format.
+#ifdef RXCACHE_TABLE
+ * The regexp cache embeds this structure into a larger one which
+ * it uses to manage the cached expressions.
+#endif
+ */
+
+struct regexp_s {
+    p_uint ref;   /* Number of refs */
+    regexp * rx;  /* The actual regular expression */
+};
+
+/* --- Variables --- */
+
+/* --- Macros --- */
+
+/* regexp_t *ref_regexp(regexp_t *r)
+ *   Add another ref to regexp <r> and return the regexp <r>.
+ */
+
+#define ref_regexp(r) ((r)->ref++, (r))
+
+/* void free_regexp(regexp_t *r)
+ *   Subtract one ref from regexp <r>, and free the regexp fully if
+ *   the refcount reaches zero.
+ */
+
+#define free_regexp(r) MACRO( if (--((r)->ref) <= 0) rx_free(r); )
+
+/* p_int deref_regexp(regexp_t *r)
+ *   Subtract one ref from regexp <r>, but don't check if it needs to
+ *   be freed. Result is the number of refs left.
+ */
+
+#define deref_regexp(r) (--(r)->ref)
+
+/* --- Prototypes --- */
+
+extern void rx_init(void);
+extern regexp_t * rx_compile(string_t * expr, Bool excompat, Bool from_ed);
+extern Bool   rx_exec (regexp_t *prog, char *string, char *start);
+extern char * rx_sub (regexp_t *prog, char *source, char *dest, int n, Bool quiet);
+extern void   rx_free(regexp_t *);
 extern size_t rxcache_status(strbuf_t *sbuf, Bool verbose);
 extern void   rxcache_dinfo_status(svalue_t *svp, int value);
-extern regexp * rx_dup(regexp *);
-extern void rx_free(regexp *);
 
 #if defined(GC_SUPPORT)
 extern void clear_rxcache_refs(void);
 extern void count_rxcache_refs(void);
-extern void count_rxcache_ref(regexp *);
+extern void count_regexp_ref(regexp_t *);
 #endif /* if GC_SUPPORT */
-
-#define REGCOMP(x,y,z) regcomp_cache(x,y,z)
-#define RX_DUP(x)      rx_dup(x)
-#define REGFREE(x)     rx_free(x)
-
-#else
-
-#include "mstrings.h"
-
-#define REGCOMP(x,y,z) regcomp(get_txt(x),y,z)
-#define RX_DUP(x)      (x)
-#define REGFREE(x)     xfree(x)
-
-#endif /* if RXCACHE_TABLE */
 
 #endif /* RXCACHE_H_ */

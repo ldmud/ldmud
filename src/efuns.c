@@ -430,7 +430,7 @@ f_regexp (svalue_t *sp)
 
 {
     vector_t *v;               /* The vector to match */
-    struct regexp *reg;        /* compiled regexp */
+    regexp_t *reg;             /* compiled regexp */
     CBool *res;                /* res[i] true -> v[i] matches */
     mp_int num_match, v_size;  /* Number of matches, size of <v> */
     vector_t *ret;             /* The result vector */
@@ -450,7 +450,7 @@ f_regexp (svalue_t *sp)
         }
 
         /* Compile the regexp (or take it from the cache) */
-        reg = REGCOMP(pattern, 0, MY_FALSE);
+        reg = rx_compile(pattern, 0, MY_FALSE);
         if (reg == NULL)
         {
             break;
@@ -462,7 +462,7 @@ f_regexp (svalue_t *sp)
         res = alloca(v_size * sizeof(*res));
         if (!res)
         {
-            REGFREE(reg);
+            free_regexp(reg);
             error("Stack overflow in regexp()");
             /* NOTREACHED */
             return sp;
@@ -478,7 +478,7 @@ f_regexp (svalue_t *sp)
 
             eval_cost++;
             line = v->item[i].u.str;
-            if (regexec(reg, get_txt(line), get_txt(line)) == 0)
+            if (rx_exec(reg, get_txt(line), get_txt(line)) == 0)
                 continue;
 
             res[i] = MY_TRUE;
@@ -494,7 +494,7 @@ f_regexp (svalue_t *sp)
             num_match++;
         }
 
-        REGFREE(reg);
+        free_regexp(reg);
     }while(0);
 
     free_svalue(sp--);
@@ -533,7 +533,7 @@ f_regexplode (svalue_t *sp)
     char     *text;                    /* Input text from the vm stack */
     string_t *textstr;                 /* ditto, as string_t */
     string_t *pattern;                 /* Delimiter pattern from the vm stack */
-    struct regexp *reg;                /* Compiled pattern */
+    regexp_t *reg;                     /* Compiled pattern */
     struct regexplode_match *matches;  /* List of matches */
     struct regexplode_match **matchp;  /* Pointer to previous_match.next */
     struct regexplode_match *match;    /* Current match structure */
@@ -548,7 +548,7 @@ f_regexplode (svalue_t *sp)
     text = get_txt(textstr);
     pattern = sp->u.str;
 
-    reg = REGCOMP(pattern, 0, MY_FALSE);
+    reg = rx_compile(pattern, 0, MY_FALSE);
     if (reg == 0) {
         inter_sp = sp;
         error("Unrecognized search pattern");
@@ -562,7 +562,7 @@ f_regexplode (svalue_t *sp)
     str = text;        /* Remaining <text> to analyse */
     num_match = 0;
     matchp = &matches;
-    while (regexec(reg, str, text)) {
+    while (rx_exec(reg, str, text)) {
         eval_cost++;
         match = (struct regexplode_match *)alloca(sizeof *match);
         if (!match)
@@ -571,8 +571,8 @@ f_regexplode (svalue_t *sp)
             /* NOTREACHED */
             return sp;
         }
-        match->start = reg->startp[0];
-        match->end = str = reg->endp[0];
+        match->start = reg->rx->startp[0];
+        match->end = str = reg->rx->endp[0];
         *matchp = match;
         matchp = &match->next;
         num_match++;
@@ -583,7 +583,7 @@ f_regexplode (svalue_t *sp)
 
     /* Prepare the result vector */
     if (max_array_size && num_match > ((max_array_size-1) >> 1) ) {
-        REGFREE(reg);
+        free_regexp(reg);
         inter_sp = sp;
         error("Illegal array size");
         /* NOTREACHED */
@@ -626,7 +626,7 @@ f_regexplode (svalue_t *sp)
     }
 
     /* Cleanup */
-    REGFREE(reg);
+    free_regexp(reg);
     free_string_svalue(sp);
     sp--;
     free_string_svalue(sp);
@@ -666,7 +666,7 @@ f_regreplace (svalue_t *sp)
 #define F_GLOBAL   0x1
 #define F_EXCOMPAT 0x2
 
-    struct regexp *pat;
+    regexp_t *pat;
     int   flags;
     char *oldbuf, *buf, *curr, *new, *start, *old, *sub, *match = NULL;
     size_t matchsize = 0;
@@ -675,7 +675,7 @@ f_regreplace (svalue_t *sp)
     size_t  origspace;
 
     /*
-     * Must set inter_sp before call to regcomp,
+     * Must set inter_sp before call to rx_compile(),
      * because it might call regerror.
      */
     inter_sp = sp;
@@ -707,7 +707,7 @@ f_regreplace (svalue_t *sp)
     buf = (char*)rexalloc(buf,origspace);\
     if (!buf) { \
         xfree(oldbuf); \
-        if (pat) REGFREE(pat); \
+        if (pat) free_regexp(pat); \
         error("(regreplace) Out of memory (%lu bytes) for buffer\n"\
              , (unsigned long)origspace); \
     } \
@@ -723,12 +723,12 @@ f_regreplace (svalue_t *sp)
 
     xallocate(buf, (size_t)space, "buffer");
     new = buf;
-    pat = REGCOMP(sp[-2].u.str,(flags & F_EXCOMPAT) ? 1 : 0, MY_FALSE);
-    /* regcomp returns NULL on bad regular expressions. */
+    pat = rx_compile(sp[-2].u.str,(flags & F_EXCOMPAT) ? 1 : 0, MY_FALSE);
+    /* rx_compile() returns NULL on bad regular expressions. */
 
-    if (pat && regexec(pat,curr,start)) {
+    if (pat && rx_exec(pat,curr,start)) {
         do {
-            size_t diff = (size_t)(pat->startp[0]-curr);
+            size_t diff = (size_t)(pat->rx->startp[0]-curr);
             space -= diff; /* TODO: space -= diff+1 ? */
             while (space <= 0) {
                 XREALLOC;
@@ -741,7 +741,7 @@ f_regreplace (svalue_t *sp)
              */
             if (subclosure != NULL)
             {
-                size_t patsize = pat->endp[0] - pat->startp[0];
+                size_t patsize = pat->rx->endp[0] - pat->rx->startp[0];
 
                 if (patsize+1 > matchsize)
                 {
@@ -756,7 +756,7 @@ f_regreplace (svalue_t *sp)
                     {
                         xfree(buf);
                         if (pat)
-                            REGFREE(pat);
+                            free_regexp(pat);
                         error("Out of memory for matched string (%lu bytes)\n"
                              , (unsigned long)patsize+1);
                         /* NOTREACHED */
@@ -765,11 +765,11 @@ f_regreplace (svalue_t *sp)
                     match = nmatch;
                 }
 
-                memcpy(match, pat->startp[0], patsize);
+                memcpy(match, pat->rx->startp[0], patsize);
                 match[patsize] = '\0';
 
                 push_c_string(inter_sp, match);
-                push_number(inter_sp, pat->startp[0] - start);
+                push_number(inter_sp, pat->rx->startp[0] - start);
                 call_lambda(subclosure, 2);
                 transfer_svalue(&apply_return_value, inter_sp);
                 inter_sp--;
@@ -778,7 +778,7 @@ f_regreplace (svalue_t *sp)
                 {
                     xfree(buf);
                     if (pat)
-                        REGFREE(pat);
+                        free_regexp(pat);
                     if (match)
                         xfree(match);
                     error("Invalid type for replacement pattern: %s, expected string.\n", typename(apply_return_value.type));
@@ -799,7 +799,7 @@ f_regreplace (svalue_t *sp)
              * some irritating messages from regerror()
              */
             *old = '\0';
-            while (NULL == (new = regsub(pat, sub, new, space, 1)) )
+            while (NULL == (new = rx_sub(pat, sub, new, space, 1)) )
             {
                 int xold;
 
@@ -807,7 +807,7 @@ f_regreplace (svalue_t *sp)
                 {
                     xfree(buf);
                     if (pat)
-                        REGFREE(pat);
+                        free_regexp(pat);
                     if (match)
                         xfree(match);
                     error("Internal error in regreplace().\n");
@@ -824,7 +824,7 @@ f_regreplace (svalue_t *sp)
             while (space <= 0) {
                 XREALLOC;
             }
-            if (curr == pat->endp[0])
+            if (curr == pat->rx->endp[0])
             {
                 /* prevent infinite loop
                  * by advancing one character.
@@ -837,11 +837,11 @@ f_regreplace (svalue_t *sp)
                 *new++ = *curr++;
             }
             else
-                curr = pat->endp[0];
+                curr = pat->rx->endp[0];
         } while (  (flags & F_GLOBAL)
-                 && !pat->reganch
+                 && !pat->rx->reganch
                  && *curr != '\0'
-                 && regexec(pat,curr,start)
+                 && rx_exec(pat,curr,start)
                 );
         space -= strlen(curr)+1;
         if (space <= 0) {
@@ -858,7 +858,7 @@ f_regreplace (svalue_t *sp)
     if (match)
         xfree(match);
     if (pat)
-        REGFREE(pat);
+        free_regexp(pat);
 
     free_svalue(sp);
     sp--;
@@ -6478,9 +6478,7 @@ f_debug_info (svalue_t *sp, int num_arg)
             hbeat_dinfo_status(dinfo_arg, value);
             callout_dinfo_status(dinfo_arg, value);
             string_dinfo_status(dinfo_arg, value);
-#ifdef RXCACHE_TABLE
             rxcache_dinfo_status(dinfo_arg, value);
-#endif
 
             if (value == -1)
                 put_array(&res, v);

@@ -59,7 +59,6 @@
 #include "main.h"
 #include "mstrings.h"
 #include "object.h"
-#include "regexp.h"
 #include "rxcache.h"
 #include "simulate.h"
 #include "stdstrings.h"
@@ -192,7 +191,7 @@ struct ed_buffer_s
     Bool    fchanged;          /* True: file-changed */
     int     nofname;
     int     mark['z'-'a'+1];
-    regexp *oldpat;
+    regexp_t *oldpat;
     LINE    Line0;             /* anchor of the line buffer */
     int     CurLn;             /* number of current line */
     LINE   *CurPtr;            /* CurLn and CurPtr must be kept in sync */
@@ -364,7 +363,7 @@ static void _count_blanks(char *str, int blanks);
 static LINE *getptr(int num);
 static void putcntl(char c);
 static void prntln(char *str, int vflg, int lin);
-static regexp *optpat(void);
+static regexp_t *optpat(void);
 
 /*-------------------------------------------------------------------------*/
 size_t
@@ -535,7 +534,7 @@ ckglob (void)
  */
 
 {
-    regexp        *glbpat;
+    regexp_t      *glbpat;
     char        c, delim, *lin;
     int        num;
     LINE        *ptr;
@@ -568,7 +567,7 @@ ckglob (void)
             if (glbpat)
             {
                 lin = gettxtl(ptr);
-                if (regexec(glbpat, lin, lin))
+                if (rx_exec(glbpat, lin, lin))
                 {
                     if (c=='g') ptr->l_stat |= LGLOB;
                 }
@@ -951,7 +950,7 @@ dowrite (int from, int to, string_t *fname, Bool apflg)
 
 /*-------------------------------------------------------------------------*/
 static INLINE int /* only used once */
-find (regexp *pat, Bool dir)
+find (regexp_t *pat, Bool dir)
 
 /* Find the <pat>tern in the text, starting 'after' the current line.
  * If <dir> is false, the search is carried out forward, else backwards.
@@ -974,7 +973,7 @@ find (regexp *pat, Bool dir)
     for (i = 0; i < P_LASTLN; i++ )
     {
         char *line_start = gettxtl(lin);
-        if( regexec(pat, line_start, line_start) )
+        if( rx_exec(pat, line_start, line_start) )
             return(num);
         if( dir )
             num = nextln(num), lin = getnextptr(lin);
@@ -988,7 +987,7 @@ find (regexp *pat, Bool dir)
 #if 0 /* unused */
 
 static int
-findg (regexp *pat, Bool dir)
+findg (regexp_t *pat, Bool dir)
 
 /* Find the <pat>tern in the text, starting 'after' the current line
  * and print matching lines (like a grep).
@@ -1010,7 +1009,7 @@ findg (regexp *pat, Bool dir)
 
     for (i = 0; i < P_LASTLN; i++ )
     {
-        if (regexec(pat, gettxtl(lin), gettxtl(lin)))
+        if (rx_exec(pat, gettxtl(lin), gettxtl(lin)))
         {
             prntln( gettxtl( lin ), P_LFLG, (P_NFLG ? P_CURLN : 0));
              count++;
@@ -1146,7 +1145,7 @@ getnum (int first)
  *   \[a-z]: line of given mark
  */
 {
-    regexp    *srchpat;
+    regexp_t *srchpat;
     int    num;
     char    c;
 
@@ -1617,7 +1616,7 @@ transfer (int num)
 
 
 /*-------------------------------------------------------------------------*/
-static regexp *
+static regexp_t *
 optpat (void)
 
 /* Parse a search- or replace-match pattern from the command input, compile
@@ -1654,10 +1653,10 @@ optpat (void)
     if (*str == EOS)
         return(P_OLDPAT);
     if(P_OLDPAT)
-        REGFREE(P_OLDPAT);
+        free_regexp(P_OLDPAT);
 
     memsafe(buf = new_mstring(str), strlen(str), "regexp pattern string");
-    P_OLDPAT = REGCOMP(buf,P_EXCOMPAT, MY_TRUE);
+    P_OLDPAT = rx_compile(buf, P_EXCOMPAT, MY_TRUE);
     free_mstring(buf);
     return P_OLDPAT;
 }
@@ -1774,7 +1773,7 @@ set_ed_buf (void)
 
 /*-------------------------------------------------------------------------*/
 static INLINE int /* only used once */
-subst (regexp *pat, char *sub, Bool gflg, Bool pflag)
+subst (regexp_t *pat, char *sub, Bool gflg, Bool pflag)
 
 /* Scan the range P_LINE1 to P_LINE2 and replace in every line matching <pat>
  * the matched pattern by <sub>. If <gflg> is true, all matching patterns
@@ -1804,23 +1803,23 @@ subst (regexp *pat, char *sub, Bool gflg, Bool pflag)
             still_running = FALSE;
 
         current = start = gettxtl(P_CURPTR);
-        if ( regexec(pat, current, start) )
+        if ( rx_exec(pat, current, start) )
         {
             space = MAXLINE;
             do
             {
                 /* Copy leading text */
-                size_t diff = (size_t)(pat->startp[0] - current);
+                size_t diff = (size_t)(pat->rx->startp[0] - current);
                 if ( (space -= diff) < 0)
                     return SUB_FAIL;
                 strncpy( new, current, diff );
                 new += diff;
                 /* Do substitution */
                 old = new;
-                new = regsub( pat, sub, new, space,0);
+                new = rx_sub( pat, sub, new, space,0);
                 if (!new || (space-= new-old) < 0)
                     return SUB_FAIL;
-                if (current == pat->endp[0])
+                if (current == pat->rx->endp[0])
                 {
                     /* prevent infinite loop */
                     if (!*current)
@@ -1830,8 +1829,8 @@ subst (regexp *pat, char *sub, Bool gflg, Bool pflag)
                     *new++ = *current++;
                 }
                 else
-                    current = pat->endp[0];
-            } while(gflg && !pat->reganch && regexec(pat, current, start));
+                    current = pat->rx->endp[0];
+            } while(gflg && !pat->rx->reganch && rx_exec(pat, current, start));
 
             /* Copy trailing chars */
             if ( (space -= strlen(current)+1 ) < 0)
@@ -2603,7 +2602,7 @@ docmd (Bool glob)
 
 {
     static char  rhs[MAXPAT];
-    regexp      *subpat;
+    regexp_t    *subpat;
     int          c, err, line3;
     int          apflg, pflag, gflag;
     int          nchng;
@@ -2768,7 +2767,7 @@ docmd (Bool glob)
         if (*inptr != NL)
             return ERR;
 
-        nchng = subst(REGCOMP(STR_CRPATTERN, P_EXCOMPAT, MY_TRUE), "", 0, 0);
+        nchng = subst(rx_compile(STR_CRPATTERN, P_EXCOMPAT, MY_TRUE), "", 0, 0);
 
         if (nchng < 0)
             return ERR;
@@ -3174,7 +3173,7 @@ clear_ed_buffer_refs (ed_buffer_t *b)
 
     /* For rxcache */
     if (b->oldpat)
-        b->oldpat->refs = 0;
+        b->oldpat->ref = 0;
 
     clear_ref_in_vector(&b->prompt, 1);
 }
@@ -3220,13 +3219,8 @@ count_ed_buffer_refs (ed_buffer_t *b)
         }
     }
 
-#ifdef RXCACHE_TABLE
     if (b->oldpat)
-        count_rxcache_ref(b->oldpat);
-#else
-    if (b->oldpat)
-        note_malloced_block_ref((char *)b->oldpat);
-#endif
+        count_regexp_ref(b->oldpat);
     count_ref_in_vector(&b->prompt, 1);
 }
 
@@ -3273,7 +3267,7 @@ free_ed_buffer (void)
 
     if(P_OLDPAT)
     {
-        REGFREE(P_OLDPAT);
+        free_regexp(P_OLDPAT);
         P_OLDPAT = NULL;
     }
 

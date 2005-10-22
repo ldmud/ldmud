@@ -1075,9 +1075,7 @@ garbage_collection(void)
     clear_simul_efun_refs();
     clear_interpreter_refs();
     clear_comm_refs();
-#ifdef RXCACHE_TABLE
     clear_rxcache_refs();
-#endif
 
     null_vector.ref = 0;
 
@@ -1239,9 +1237,7 @@ garbage_collection(void)
     count_comm_refs();
     count_interpreter_refs();
     count_heart_beat_refs();
-#ifdef RXCACHE_TABLE
     count_rxcache_refs();
-#endif
 
     if (reserved_user_area)
         note_ref(reserved_user_area);

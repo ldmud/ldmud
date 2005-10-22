@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+01-Mar-2002 (Lars Duening)  (3.3.175)
+    - (rxcache, ed.c, efuns.c, regexp) Extended the rxcache module
+        into a wrapper around the regexp structure to hide the actual
+        regexp implementation behind a simple API (some regexp efuns
+        still use internal knowledge, though).
+
 28-Feb-2002 (Lars Duening)  (3.3.174)
     - (simulate, efuns.c, gcollect.c, interpret.c) In addition to the
         last uncaught-error trace, debug_info() can now also return

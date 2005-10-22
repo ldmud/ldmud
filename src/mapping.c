@@ -3966,7 +3966,7 @@ f_mkmapping (svalue_t *sp, int num_arg)
 
     if (max_mapping_size && length * num_arg > max_mapping_size)
         error("Illegal mapping size: %ld elements (%ld x %ld)\n"
-             , length * num_arg, length, num_arg);
+             , length * num_arg, length, (long)num_arg);
 
     /* Allocate the mapping */
     num_values = num_arg - 1;

@@ -2736,9 +2736,7 @@ status_parse (strbuf_t * sbuf, char * buff)
         tot += add_string_status(sbuf, verbose);
         tot += print_call_out_usage(sbuf, verbose);
         tot += total_mapping_size();
-#ifdef RXCACHE_TABLE
         tot += rxcache_status(sbuf, verbose);
-#endif
         if (verbose)
         {
             strbuf_add(sbuf, "\nOther:\n");

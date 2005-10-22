@@ -79,6 +79,36 @@ wird ueber eine ganze Reihe Files verteilt ist - da gab ich dir dann am
 besten Wizardrechte in unserem MUD so dass du dir das selber ansehen
 kannst, wenn du willst.
 
+
+
+> > Ich hab seit ner Weile regelmaessig crashes im driver, aktuell bei Version
+> > 3.3.171 - diesmal hab ich allerdings wenigstens einen backtrace:
+> >
+> > Program terminated with signal 11, Segmentation fault.
+> > #0  0x400e0b30 in ?? ()
+> > (gdb) bt
+> > #0  0x400e0b30 in ?? ()
+> > #1  0x08068519 in f_terminal_colour (sp=0x8113ac0, num_arg=4) at
+> > efuns.c:2045
+>
+> Kannst du mir in diesem Frame die Werte von sp[-1], *sp, *cl, *map,
+> indent und wrap sagen?
+
+(gdb) up
+#1  0x08068519 in f_terminal_colour (sp=0x8113ac0, num_arg=4) at
+efuns.c:2045
+2045        str = e_terminal_colour(sp[-1].u.str, map, cl, indent, wrap);
+(gdb) info locals
+sp = (svalue_t *) 0x200
+num_arg = 138510332
+indent = -362884
+wrap = 623191333
+str = (string_t *) 0xfffa767c
+map = (mapping_t *) 0x8417ffc
+cl = (svalue_t *) 0x25252525
+
+die speicheradressen sind alle ungueltig
+
 -- 
 Markus Peter - SPiN AG
 warp@spin.de

@@ -1,10 +1,19 @@
 /*------------------------------------------------------------------
- * Regular Expression Cache
- * Written 1998 by Lars Duening.
+ * Regular Expression Wrapper and Cache
+ * Written 1998, 2002 by Lars Duening.
  * Share and Enjoy!
  *------------------------------------------------------------------
- * Implementation of a cache for compiled regular expressions and
- * regexp matches. Usage of the cache can reduce the setup time
+ * This module serves as wrapper around optional alternative 
+ * regular expression implementations. It wraps the unique regexp
+ * structures and calls into a unified API.
+ *
+ * Beware! rx_exec() stores result data in the regexp structure (the
+ * startp[] and end[] arrays), so the same pattern must not be used
+ * in two concurrent regcomp_cache/regexec pairs.
+ *
+#ifdef RXCACHE_TABLE
+ * Additionally, the regular expressions are held in a cache.
+ * Usage of the cache can reduce the setup time
  * for regexps by factor 4; the actual regexp matching showed up
  * in experiments as being fast enough to make a cache for the
  * results worthless.
@@ -14,18 +23,7 @@
  *
  * The table sizes are specified in config.h as follows:
  *   RXCACHE_TABLE: size of the expression hash table
- *
- * If RXCACHE_TABLE is not defined, the whole caching is disabled.
- *
- * The include rxcache.h file offers some macros for transparent use:
- *   REGCOMP() wrap up the calls to regcomp().
- *   RX_DUP() and REGFREE() handle the refcounting necessary.
- * The macros map to the standard uncached, non-refcounted calls
- * if the rxcache is disabled.
- *
- * Beware! regexec() stores result data in the regexp structure (the
- * startp[] and end[] arrays), so the same pattern must not be used
- * in two concurrent regcomp_cache/regexec pairs.
+#endif
  *
  * TODO: Using shared strings as cache-indices can speed things up,
  * TODO:: especially when knowing where to find the hashvalue from
@@ -48,6 +46,7 @@
 #include "hash.h"
 #include "mstrings.h"
 #include "regexp.h"
+#include "simulate.h"
 #include "strfuns.h"
 #include "svalue.h"
 #include "xalloc.h"
@@ -67,20 +66,20 @@
 #endif
 
 
-/* One expression hashtable entry */
+/* One expression hashtable entry, derived from regexp_t. */
 
 typedef struct RxHashEntry {
+    regexp_t   base;     /* The base regexp_t structure */
     string_t * pString;  /* Generator string, a counted tabled string
                           * NULL if unused */
     p_uint     hString;  /* Hash of pString */
     Bool       from_ed;  /* The from_ed value */
     Bool       excompat; /* The excompat value */
-    regexp   * pRegexp;  /* The generated regular expression from regcomp() */
 } RxHashEntry;
 
 
 /* Variables */
-static RxHashEntry xtable[RXCACHE_TABLE];  /* The Expression Hashtable */
+static RxHashEntry * xtable[RXCACHE_TABLE];  /* The Expression Hashtable */
 
 /* Expression cache statistics */
 static uint32 iNumXRequests   = 0;  /* Number of calls to regcomp() */
@@ -89,18 +88,22 @@ static uint32 iNumXCollisions = 0;  /* Number of hashcollisions */
 static uint32 iNumXEntries    = 0;  /* Number of used cache entries */
 static uint32 iXSizeAlloc     = 0;  /* Dynamic memory held in regexp structs */
 
+#endif /* RXCACHE_TABLE */
+
 /*--------------------------------------------------------------------*/
-void rxcache_init(void)
+void rx_init(void)
 
 /* Initialise the module. */
 
 {
+#ifdef RXCACHE_TABLE
     memset(xtable, 0, sizeof(xtable));
+#endif
 }
 
 /*--------------------------------------------------------------------*/
-regexp *
-regcomp_cache (string_t * expr, Bool excompat, Bool from_ed)
+regexp_t *
+rx_compile (string_t * expr, Bool excompat, Bool from_ed)
 
 /* Compile a regexp structure from the expression <expr>, more or
  * less ex compatible.
@@ -109,21 +112,26 @@ regcomp_cache (string_t * expr, Bool excompat, Bool from_ed)
  * else enter the newly compiled structure into the table.
  *
  * The caller gets his own reference to the structure, which he has
- * to rx_free() after use.
+ * to free_regexp() after use.
  */
 
 {
-    p_uint hExpr;
     regexp * pRegexp;
+
+#ifdef RXCACHE_TABLE
+    p_uint hExpr;
+    int h;
     RxHashEntry *pHash;
 
     iNumXRequests++;
 
     hExpr = whashmem(get_txt(expr), mstrsize(expr), 100);
-    pHash = xtable+RxStrHash(hExpr);
+    h = RxStrHash(hExpr);
+    pHash = xtable[h];
 
     /* Look for a ready-compiled regexp */
-    if (pHash->pString != NULL
+    if (pHash != NULL
+     && pHash->pString != NULL
      && pHash->hString == hExpr
      && pHash->from_ed == from_ed
      && pHash->excompat == excompat
@@ -131,38 +139,107 @@ regcomp_cache (string_t * expr, Bool excompat, Bool from_ed)
        )
     {
         iNumXFound++;
-        return rx_dup(pHash->pRegexp);
+        return ref_regexp((regexp_t *)pHash);
     }
+#endif
 
-    /* Regexp not found: compile a new one and enter it
-     * into the table.
+    /* Regexp not found: compile a new one.
      */
     pRegexp = regcomp((unsigned char *)get_txt(expr), excompat, from_ed);
     if (NULL == pRegexp)
         return NULL;
 
+#ifndef RXCACHE_TABLE
+
+    /* Wrap up the new regular expression and return it */
+    {
+        regexp_t * rc;
+
+        xallocate(rc, sizeof(*rc), "Regexp structure");
+        rc->ref = 1;
+        rc->rx = pRegexp;
+        return rc;
+    }
+#else
+
+    /* Wrap up the new regular expression and enter it into the table */
     expr = make_tabled_from(expr);
 
-    if (NULL != pHash->pString)
+    if (NULL != pHash)
     {
         iNumXCollisions++;
         iNumXEntries--;
-        iXSizeAlloc -= pHash->pRegexp->regalloc;
-
-        free_mstring(pHash->pString);
-        rx_free(pHash->pRegexp);
+        iXSizeAlloc -= pHash->base.rx->regalloc;
+        free_regexp((regexp_t *)pHash);
     }
+
+    xallocate(pHash, sizeof(*pHash), "Regexp cache structure");
+    xtable[h] = pHash;
+
+    pHash->base.rx = pRegexp;
+    pHash->base.ref = 1;
     pHash->pString = expr; /* refs are transferred */
     pHash->hString = hExpr;
-    pHash->pRegexp = pRegexp;
     pHash->from_ed = from_ed;
     pHash->excompat = excompat;
 
     iNumXEntries++;
     iXSizeAlloc += pRegexp->regalloc;
 
-    return rx_dup(pRegexp);
-} /* regcomp_cache() */
+    return ref_regexp((regexp_t *)pHash);
+#endif
+} /* rx_compile() */
+
+/*-------------------------------------------------------------------------*/
+Bool
+rx_exec (regexp_t *prog, char *string, char *start)
+
+/* Match the regexp <prog> against the <string> starting at the
+ * position <start>.
+ *
+ * Return TRUE if found.
+ */
+
+{
+    return regexec(prog->rx, string, start);
+} /* rx_exec() */
+
+/*-------------------------------------------------------------------------*/
+char *
+rx_sub (regexp_t *prog, char *source, char *dest, int n, Bool quiet)
+
+/* After a regexp match, substitute the tokens '\<num>' in <source>
+ * with the appropriate matched () expressions, and store the
+ * result in <dest> (max size <n>).
+ *
+ * Return NULL on failure, and <dest> on success. If <quiet> is
+ * FALSE, a failure also generates a call to regerror().
+ */
+
+{
+    return regsub (prog->rx, source, dest, n, quiet);
+} /* rx_sub() */
+
+/*--------------------------------------------------------------------*/
+void
+rx_free (regexp_t * expr)
+
+/* Deallocate a regexp structure <expr> and all associated data.
+#ifdef RXCACHE_TABLE
+ * <expr> is in fact a RxHashEntry structure.
+#endif
+ */
+
+{
+#ifdef RXCACHE_TABLE
+    {
+        RxHashEntry * pHash = (RxHashEntry *)expr;
+        free_mstring(pHash->pString);
+    }
+#endif
+    xfree(expr->rx);
+    xfree(expr);
+} /* rx_free() */
 
 /*--------------------------------------------------------------------*/
 size_t
@@ -173,6 +250,8 @@ rxcache_status (strbuf_t *sbuf, Bool verbose)
  */
 
 {
+#ifdef RXCACHE_TABLE
+
     uint32 iNumXReq;  /* Number of regcomp() requests, made non-zero */
 
 #if defined(__MWERKS__) && !defined(WARN_ALL)
@@ -205,6 +284,11 @@ rxcache_status (strbuf_t *sbuf, Bool verbose)
 #if defined(__MWERKS__)
 #    pragma warn_largeargs reset
 #endif
+
+#else
+
+    return 0;
+#endif
 } /* rxcache_status() */
 
 /*-------------------------------------------------------------------------*/
@@ -219,6 +303,8 @@ rxcache_dinfo_status (svalue_t *svp, int value)
  */
 
 {
+#ifdef RXCACHE_TABLE
+
 #define ST_NUMBER(which,code) \
     if (value == -1) svp[which].u.number = code; \
     else if (value == which) svp->u.number = code
@@ -231,33 +317,8 @@ rxcache_dinfo_status (svalue_t *svp, int value)
     ST_NUMBER(DID_ST_RX_REQ_COLL, iNumXCollisions);
 
 #undef ST_NUMBER
+#endif
 } /* rxcache_dinfo_status() */
-
-/*--------------------------------------------------------------------*/
-regexp *
-rx_dup (regexp * expr)
-
-/* Increase the reference count of <expr> and return it.
- */
-
-{
-    expr->refs++;
-    return expr;
-}
-
-/*--------------------------------------------------------------------*/
-void
-rx_free (regexp * expr)
-
-/* Decrease the reference count of <expr>. If it reaches 0, the
- * structure and all associated data is deallocated.
- */
-
-{
-    expr->refs--;
-    if (!expr->refs)
-        xfree(expr);
-}
 
 /*--------------------------------------------------------------------*/
 #if defined(GC_SUPPORT)
@@ -272,12 +333,34 @@ clear_rxcache_refs (void)
  */
 
 {
+#ifdef RXCACHE_TABLE
     int i;
 
     for (i = 0; i < RXCACHE_TABLE; i++)
-        if (NULL != xtable[i].pString)
-            xtable[i].pRegexp->refs = 0;
+        if (NULL != xtable[i])
+        {
+            xtable[i]->base.ref = 0;
+        }
+#endif
 } /* clear_rxcache_refs() */
+
+/*--------------------------------------------------------------------*/
+void
+count_regexp_ref (regexp_t * pRegexp)
+
+/* Mark all memory associated with one regexp structure and count
+ * the refs.
+ * This function is called both from rxcache as well as from ed.
+ */
+
+{
+    note_malloced_block_ref(pRegexp);
+    note_malloced_block_ref(pRegexp->rx);
+#ifdef RXCACHE_TABLE
+    count_ref_from_string(((RxHashEntry *)pRegexp)->pString);
+#endif
+    pRegexp->ref++;
+} /* count_rxcache_ref() */
 
 /*--------------------------------------------------------------------*/
 void
@@ -286,36 +369,21 @@ count_rxcache_refs (void)
 /* Mark all memory referenced from the hashtables. */
 
 {
+#ifdef RXCACHE_TABLE
     int i;
 
     for (i = 0; i < RXCACHE_TABLE; i++)
     {
-        if (NULL != xtable[i].pString)
+        if (NULL != xtable[i])
         {
-            count_ref_from_string(xtable[i].pString);
-            count_rxcache_ref(xtable[i].pRegexp);
+            count_regexp_ref((regexp_t *)xtable[i]);
         }
     } /* for (i) */
+#endif
 
 } /* count_rxcache_refs() */
 
-/*--------------------------------------------------------------------*/
-void
-count_rxcache_ref (regexp * pRegexp)
-
-/* Mark all memory associated with one regexp structure and count
- * the refs.
- * This function is called both from rxcache as well as from ed.
- */
-
-{
-    note_malloced_block_ref((char *)pRegexp);
-    pRegexp->refs++;
-} /* count_rxcache_ref() */
-
 #endif /* if GC_SUPPORT */
-
-#endif /* if RXCACHE_TABLE */
 
 /*====================================================================*/
 

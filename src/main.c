@@ -194,9 +194,7 @@ main (int argc, char **argv)
     /* Initialisations */
 
     init_interpret();
-#ifdef RXCACHE_TABLE
-    rxcache_init();
-#endif
+    rx_init();
 
     put_number(&const0, 0);
     put_number(&const1, 1);
