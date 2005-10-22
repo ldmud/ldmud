@@ -42,7 +42,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
 
 
-03-June-2001 (Lars Duening) -- upcoming Release 3.2.9
+04-Jun-2001 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + allocate(): Accepts an optional initialisation value and can
@@ -171,8 +171,6 @@ For a detailed list of all changes see the file CHANGELOG.
        + It is now possible to cast to '(mixed)'.
        + If operands of different types are given to '?:', the result
            will have the type 'mixed'.
-       + Under strict type checking, the type checking at function return
-           is more strict.
        + Integers and floats can now be compared against each other.
        + Bugfix: Adding mappings of different width throws an error, unless
            one of the mappings if empty.

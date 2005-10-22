@@ -4018,15 +4018,15 @@ return:
           {
               fulltype_t rtype = exact_types & TYPE_MOD_MASK;
 
-              if ((   (rtype & ~TYPE_MOD_POINTER) != TYPE_ANY
-                   && ($2.type & ~TYPE_MOD_POINTER) == TYPE_ANY
-                  )
-               || !MASKED_TYPE($2.type, rtype))
+              /* More checks, ie. mixed vs non-mixed, would be nice,
+               * but the general type tracking is too lacking for it.
+               */
+              if (!MASKED_TYPE($2.type, rtype))
               {
                   char tmp[100];
                   strcpy(tmp, get_type_name($2.type));
                   yyerrorf("Return type not matching: got %s, expected %s;"
-                         , tmp, get_type_name(exact_types));
+                         , tmp, get_type_name(rtype));
               }
           }
 

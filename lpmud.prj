@@ -22,20 +22,12 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 59)
-(Parent-Version lpmud 3-3 58)
-(Version-Log "The lexer can create literal strings with embedded 0s.
-check_alarm() also restores the alarm signal handler.
-It is now possible to cast to '(mixed)'.
-Improved the type tracking of '?:'.
-Improved the type checking at function return under strict_types.
-Casting of an expression to its own type is now a no-op.
-Integers and floats can now be compared against each other.
-The program->blueprint pointer introduced in 3.3.40 wasn't traced by
-the GC.")
+(Project-Version lpmud 3-3 60)
+(Parent-Version lpmud 3-3 59)
+(Version-Log "The type check on function return was too strict.")
 (New-Version-Log
 "")
-(Checkin-Time "Sun, 03 Jun 2001 23:49:11 -0600")
+(Checkin-Time "Mon, 04 Jun 2001 23:36:14 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -68,8 +60,8 @@ the GC.")
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.3 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.16 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.122 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.178 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.123 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.179 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.10 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -179,7 +171,7 @@ the GC.")
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.7 644))
   (src/port.c (lpmud/39_port.c 1.17.1.5 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.12 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.57 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.58 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))
