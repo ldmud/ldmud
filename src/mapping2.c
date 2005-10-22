@@ -32,6 +32,30 @@
  * with fast operation. Both the hashed and the condensed index may
  * be absent.
  *
+ * Within the data blocks (mapping_data_t), a key and its values forms
+ * an entity called 'entry', and the datablocks are always allocated to
+ * hold whole entries. The datablocks are chained together in a list,
+ * with the most recently allocated one at the head. When entries are
+ * deleted, their key svalues are chained together in a freelist, so 
+ * that subsequent allocations can reused the space. If the freelist
+ * is empty, a new entry is allocated from the yet unused space in the
+ * head block.
+ *
+ * A mapping can have only one mapping_keys_t block, which is a block
+ * of pointers to the key-svalues of the indexed data and is created
+ * when a mapping is compacted. The pointers are kept in sorted order,
+ * with the exeception that deleted entries receive a NULL pointer in
+ * the key block. 
+ *
+ * A mapping can have only one mapping_hash_t block,  which is used
+ * to record all the new additions to the mapping since the last
+ * compaction. While the new entries' data is added directly to the 
+ * mappings data blocks, the key pointers are kept in a hash table
+ * in the mapping_hash_t structure. The hash table grows with the
+ * number of hashed entries, so that the average chain length is
+ * no more than 2. For easier computations,the number of buckets
+ * is always a power of 2.
+ *
  * All mappings with a hash_mapping structure are considered 'dirty'
  * and kept in a singly-linked list. The backend (or the garbage collector)
  * calls in regular intervals the function compact_mappings(), which
@@ -63,95 +87,77 @@
  *   }
  *
  *   .ref is the number of references, as usual.
+ *
  *   .user is, as usual, the wizlist entry of the owner object.
+ *
  *   .num_values and .num_entries give the width (including the key!)
- *     and size of the mapping.
+ *   and number of valid entries in the mapping.
+ *
  *   .data is a list of of data blocks holding all the svalues for keys
- *     and values. Only the first block in this list may have unused
- *     entries outside the freelist.
- *     If .data is NULL, the mapping is factually empty, but
- *     not yet deallocated because it is member of the dirtylist.
+ *   and values. Only the first block in this list may have unused
+ *   entries outside the freelist.
+ *   If .data is NULL, the mapping is factually empty, but
+ *   not yet deallocated because it is member of the dirtylist.
  *   Free entries in .data are chained together in a freelist and anchored
- *     at .free.
+ *   at .free.
+ *
  *   .keys and .hash are the condensed resp. hashed index to the mapping
- *     keys.
- *     During the garbage collection, .hash is used for a temporary list
- *     of mappings with 'stale' keys (ie keys referencing destructed objects
- *     or lambdas).
- * TODO: XXX Check the GC
+ *   keys. .hash also serves as indicator if the mapping is 'dirty',
+ *   and therefore contains all the information about the dirtyness.
+ *   During the garbage collection, .hash is used for a temporary list
+ *   of mappings with 'stale' keys (ie keys referencing destructed objects
+ *   or lambdas).
  *
+ * -- mapping_data_t --
  *
-#if 0
- * -- struct condensed_mapping --
- *
- *   struct condensed_mapping {
- *       "svalue_t m_values[ ... ];"
- *       "svalue_t misc[ ... ];"
- *       p_int misc_size;
- *       p_int string_size;
- *       "string_t *string[ ... ];"
- *       "svalue_t s_values[ ... ];"
+ *   mapping_data_t {
+ *       mapping_data_s * next;
+ *       size_t           size;
+ *       size_t           first;
+ *       svalue_t         data[.size]
  *   }
  *
- *   Well, things are a bit more complicated than that: the actual
- *   struct condensed_mapping consists only of the members .misc_size
- *   and .string_size, with the mapping_t.condensed pointing
- *   to struct condensed_mapping.misc_size. However, on creation the
- *   structure is always embedded in a memory block big enough to
- *   hold the implied members string[], s_values[], misc[] and m_values[]
- *   as well.
+ *   This structure keeps the actual mapping data in .data. The list of
+ *   datablocks is linked together through the .next pointer.
  *
- *   This condensed part of a mapping distinguishes between entries
- *   index by strings and entries indexed by other 'misc' values.
- *   For each type, the data is kept in two areas. The first area
- *   is an array of the key values (string[] resp. misc[]), the second
- *   area is an array of values for each key (s_values[] resp. m_values[]).
- *   Within the value arrays, the values for one entry are always stored
- *   consecutive. The association between the key and value areas is
- *   (assuming 'num' values per key):
+ *   .size is the number of svalues in this block, which is always
+ *   a multiple of mapping->num_values;
  *
- *     .string[x] -> .s_values[num * x .. num * x + num - 1]
- *     .misc[x]   -> .m_values[num * x .. num * x + num - 1]
+ *   .first is the first used(!) svalue in the .data[]. The svalues
+ *   are allocated from the end downwards, and only the first block
+ *   in the mapping's chain can have a .first != 0.
  *
- *   The keys are stored in sorted order (so that indexing operations
- *   can use a fast binary search). The sorting order for string keys
- *   is given by their address (unique because they are shared), the
- *   sorting order for the misc keys is given by the tuple
- *   (.type, .u.number, .x.generic), with the exception of closure keys,
- *   which are sorted by (.type, closure_cmp()). By using the .type
- *   as the primary key, the order between closures and other types
- *   is still correct.
+ *   Deleted entries in the blocks are kept in the freelist anchored
+ *   in mapping->free. The list is chained through the former key svalues'
+ *   .u.lvalue pointer, the key svalues have a type of T_INVALID. The
+ *   data values associated with such a deleted key are set to svalue 0.
  *
- *   Deleted or otherwise invalid string keys have an odd pointer
- *   value, invalid misc keys have the .type T_INVALID. Both are
- *   still kept in proper sorting order (of course!) which for invalid misc
- *   keys means that they cluster at the bottom of the condensed key block.
- *   The values for invalid keys are usually set to svalue-0.
+ * -- mapping_keys_t --
  *
- *   .misc_size and .string_size give the size of the .misc[] resp.
- *   .string[] arrays in byte (for speed reasons).
+ *   mapping_keys_t {
+ *       size_t    size;
+ *       svalue_t *data[.size];
+ *   }
  *
- *   A few macros help with this structure:
+ *   This structure holds the compacted key indices ("keys") for a mapping.
+ *   Every 'key' (entry in .data[]) points to the key svalue in one
+ *   of the mappings' datablocks. The keys are kept in sorted order so
+ *   that a binary search is possible. If an entry is deleted, its
+ *   key is set to NULL (and mapping->hash->condensed_deleted is incremented),
+ *   but otherwise left in place.
  *
- *     CM_MISC(cm)
- *       For condensed_mapping <cm>, return a pointer to the svalue
- *       after the last misc key in that mapping.
+ *   .size is the number of entries in the .data[] array, valid and deleted.
  *
- *     CM_STRING(cm)
- *       For condensed_mapping <cm>, return a pointer to the first
- *       string key in that mapping.
+ * -- mapping_hash_t --
  *
- *
- * -- struct hash_mapping --
- *
- *   struct hash_mapping {
- *       p_int mask;
- *       p_int used;
- *       p_int condensed_deleted;
- *       p_int ref;
- *       struct map_chain *deleted;
- *       mapping_t        *next_dirty;
- *       struct map_chain *chains[ 1 +.mask ];
+ *   hash_mapping_t {
+ *       p_int        mask;
+ *       p_int        used;
+ *       p_int        condensed_deleted;
+ *       p_int        ref;
+ *       map_chain_t *deleted;
+ *       mapping_t   *next_dirty;
+ *       map_chain_t *chains[ 1 +.mask ];
  *   }
  *
  *   This structure keeps track of the changes to a mapping. Every mapping
@@ -183,28 +189,20 @@
  *   protection is in effect. If the .ref falls back to 0, all
  *   the pending deletions of the .deleted entries are performed.
  *
- * -- struct map_chain --
+ * -- map_chain_t --
  *
  *   This structure is used to keep single entries in the hash chains
  *   of hash_mapping, and occasionally, in the .deleted list of
  *   protector mappings.
  *
- *   struct map_chain {
- *       struct map_chain *next;
- *       svalue_t key;
- *       svalue_t data[map.num_values];
+ *   map_chain_t {
+ *       map_chain_t *next;
+ *       svalue_t *key;
  *   }
  *
  *   .next is the next struct map_chain in the hash chain (or .deleted list).
- *   .key is the key value of the entry, .data[] are the data values.
- *   Some places in the module assume that .data[-1] == .key.
- *
- *   The structure is allocated big enough to hold all the values.
- *   This macro helps with the computation:
- *
- *     MAP_CHAIN_SIZE(n)
- *       Size of a map_chain structure for <n> values
-#endif
+ *   .key points to the key value of the entry, with the data svalue following
+ *   right behind.
  *
  *---------------------------------------------------------------------------
  */
@@ -225,17 +223,11 @@
 #include "main.h"
 #include "mstrings.h"
 #include "object.h"
-#include "regexp.h"
 #include "simulate.h"
 #include "smalloc.h"
 #include "svalue.h"
 #include "wiz_list.h"
 #include "xalloc.h"
-
-#define MIN_P_INT  ( (p_int)-1  << (sizeof(p_int)  * 8 - 1) )
-#define MIN_PH_INT ( (ph_int)-1 << (sizeof(ph_int) * 8 - 1) )
-  /* Smallest value a p_int/ph_int variable can hold.
-   */
 
 /*-------------------------------------------------------------------------*/
 /* Types */
@@ -419,11 +411,10 @@ static svalue_t walk_mapping_string_svalue
 
 /*-------------------------------------------------------------------------*/
 static INLINE svalue_t *
-new_map_entry (mapping_t * m, int num_entries)
+new_map_entry (mapping_t * m)
 
-/* Return a fresh block of svalues for a new entry in mapping <m>.
- * If a new mapping_data_t has to be allocated, allocate it for
- * <num_entries> entries (0 uses the default size). 
+/* Return a fresh block of svalues for a new entry in mapping <m>, allocating
+ * a new mapping_data_t if necessary.
  *
  * Return NULL if out of memory.
  */
@@ -449,11 +440,8 @@ new_map_entry (mapping_t * m, int num_entries)
         {
             /* Well, first we need a first block with free space */
             mapping_data_t * mdata;
-            size_t size = (size_t)num_entries;
 
-            if (!size)
-                size = MAPPING_DATA_SIZE;
-            size *= m->num_values;
+            size_t size = (size_t)m->num_values * MAPPING_DATA_SIZE;
 
             mdata = xalloc(  sizeof(*mdata)
                            + sizeof(svalue_t) * (size - 1)
@@ -482,9 +470,10 @@ new_map_entry (mapping_t * m, int num_entries)
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-free_map_entry (mapping_t * m, svalue_t *entry)
+free_map_entry (mapping_t * m, svalue_t *entry, Bool no_data)
 
 /* Free the svalue entry block <entry> of mapping <m>.
+ * If <no_data> is TRUE, the svalues themselves are supposed to be empty.
  */
 
 {
@@ -492,7 +481,8 @@ free_map_entry (mapping_t * m, svalue_t *entry)
 
     for (ix = m->num_values-1; ix >= 0; ix--)
     {
-        free_svalue(entry+ix);
+        if (!no_data)
+            free_svalue(entry+ix);
         put_number(entry+ix, 0);
     }
 
@@ -513,12 +503,12 @@ free_map_entry (mapping_t * m, svalue_t *entry)
 
 /*-------------------------------------------------------------------------*/
 static mapping_t *
-get_new_mapping ( wiz_list_t * user
-                , mp_int num_values, mp_int data_size, mp_int hash_size)
+get_new_mapping ( wiz_list_t * user, mp_int num_values
+                , mp_int data_size, mp_int hash_size, mp_int key_size)
 
 /* Allocate a basic mapping with <num_values> values per key, and set it
- * up to have an initial datablock of <data_size> entries, and hash
- * suitable for <hash_size> entries.
+ * up to have an initial datablock of <data_size> entries, a hash
+ * suitable for <hash_size> entries, and a keyblock for <key_size> entries.
  * The .user is of the mapping is set to <user>.
  *
  * Return the new mapping, or NULL when out of memory.
@@ -526,8 +516,8 @@ get_new_mapping ( wiz_list_t * user
 
 {
     mapping_data_t *dm;
-    size_t dm_size;
     mapping_hash_t *hm;
+    mapping_keys_t *km;
     mapping_t *m;
 
     /* Allocate the structures */
@@ -535,14 +525,16 @@ get_new_mapping ( wiz_list_t * user
     if (!m)
         return NULL;
 
+    /* Set up the data block for <data_size> entries */
+
     dm = NULL;
     if (data_size > 0)
     {
-        dm_size = (size_t)data_size;
+        size_t dm_size = (size_t)data_size;
 
         dm_size *= num_values + 1;
 
-        dm = xalloc(sizeof(*mdata) + sizeof(svalue_t) * (dm_size - 1));
+        dm = xalloc(sizeof(*dm) + sizeof(svalue_t) * (dm_size - 1));
         if (!dm)
         {
             xfree(m);
@@ -554,9 +546,25 @@ get_new_mapping ( wiz_list_t * user
         dm->first = dm_size;
     }
 
-    /* If <size> is given, create a mapping_hash structure <hm> and
-     * setup it up to hold that many entries.
-     */
+    /* Set up the key block for <key_size> entries */
+
+    km = NULL;
+    if (key_size > 0)
+    {
+        size_t km_size = (size_t)key_size;
+
+        km = xalloc(sizeof(*km) + sizeof(svalue_t *) * (km_size - 1));
+        if (!km)
+        {
+            if (dm) xfree(dm);
+            xfree(m);
+            return NULL;
+        }
+
+        km->size = km_size;
+    }
+
+    /* Set up the hash block for <hash_size> entries */
 
     hm = NULL;
     if (hash_size > 0)
@@ -591,6 +599,7 @@ get_new_mapping ( wiz_list_t * user
         if (hash_size > (mp_int)((MAXINT - sizeof *hm - 0x100000) / sizeof *mcp)
          || !(hm = xalloc(sizeof *hm + sizeof *mcp * hash_size) ) )
         {
+            if (km) xfree(km);
             if (dm) xfree(dm);
             xfree(m);
             return NULL;
@@ -624,7 +633,7 @@ get_new_mapping ( wiz_list_t * user
     /* Initialise the mapping */
 
     m->data = dm;
-    m->keys = NULL;
+    m->keys = km;
     m->hash = hm;
     m->num_values = num_values+1;
     m->num_entries = 0;
@@ -636,6 +645,8 @@ get_new_mapping ( wiz_list_t * user
         m->user->mapping_total += SIZEOF_MD(dm);
     if (hm)
         m->user->mapping_total += SIZEOF_MH(hm);
+    if (km)
+        m->user->mapping_total += SIZEOF_MK(km);
 
     num_mappings++;
 
@@ -662,7 +673,7 @@ allocate_mapping (mp_int size, mp_int num_values)
     if (dm_size)
         dm_size = MAPPING_DATA_SIZE;
 
-    return get_new_mapping(current_object->user, num_values, dm_size, size);
+    return get_new_mapping(current_object->user, num_values, dm_size, size, 0);
 } /* allocate_mapping() */
 
 /*-------------------------------------------------------------------------*/
@@ -924,9 +935,7 @@ free_protector_mapping (mapping_t *m)
 
         for (mc = hm->deleted; mc; mc = next)
         {
-            mp_int j;
-
-            free_map_entry(m, mc->key);
+            free_map_entry(m, mc->key, MY_FALSE);
             next = mc->next;
             xfree(mc);
         }
@@ -1204,7 +1213,7 @@ _get_map_lvalue (mapping_t *m, svalue_t *map_index
     /* Get the new entry svalues, but don't assign the key value
      * yet - further steps might still fail.
      */
-    entry = new_map_entry(m, 0);
+    entry = new_map_entry(m);
     if (NULL == entry)
         return NULL;
 
@@ -1221,7 +1230,7 @@ _get_map_lvalue (mapping_t *m, svalue_t *map_index
         hm = xalloc(sizeof *hm);
         if (!hm)
         {
-            free_map_entry(entry);
+            free_map_entry(m, entry, MY_FALSE);
             return NULL; /* Oops */
         }
 
@@ -1249,7 +1258,7 @@ _get_map_lvalue (mapping_t *m, svalue_t *map_index
         if (!mc)
         {
             /* Keep the empty mapping_hash_t around */
-            free_map_entry(entry);
+            free_map_entry(m, entry, MY_FALSE);
             return NULL;
         }
         mc->next = NULL;
@@ -1285,7 +1294,7 @@ _get_map_lvalue (mapping_t *m, svalue_t *map_index
         hm = xalloc(sizeof *hm - sizeof *mcp + sizeof *mcp * size);
         if (!hm)
         {
-            free_map_entry(entry);
+            free_map_entry(m, entry, MY_FALSE);
             return NULL;
         }
 
@@ -1326,7 +1335,7 @@ _get_map_lvalue (mapping_t *m, svalue_t *map_index
     mc = xalloc(sizeof(*mc));
     if (!mc)
     {
-        free_map_entry(entry);
+        free_map_entry(m, entry, MY_FALSE);
         return NULL;
     }
 
@@ -1378,7 +1387,7 @@ check_map_for_destr (mapping_t *m)
             {
                 /* Destructed key: remove the whole entry */
                 m->num_entries--;
-                free_map_entry(entry);
+                free_map_entry(m, entry, MY_FALSE);
                 km->data[ix] = NULL;
 
                 /* Count the deleted entry in the hash part.
@@ -1464,10 +1473,10 @@ check_map_for_destr (mapping_t *m)
                     }
                     else
                     {
-                        free_map_entry(entry);
+                        free_map_entry(m, entry, MY_FALSE);
                         xfree(mc);
-                        m->user->mapping_total -= sizeof(*mc);
                     }
+                    m->user->mapping_total -= sizeof(*mc);
                     hm->used--;
                     continue;
                 }
@@ -1520,7 +1529,7 @@ remove_mapping (mapping_t *m, svalue_t *map_index)
         {
             /* The entry is in the condensed part */
 
-            free_map_entry(entry);
+            free_map_entry(m, entry, MY_FALSE);
             km->data[key_ix] = NULL;
 
             /* Count the deleted entry in the hash part.
@@ -1578,10 +1587,10 @@ remove_mapping (mapping_t *m, svalue_t *map_index)
             }
             else
             {
-                free_map_entry(entry);
+                free_map_entry(m, entry, MY_FALSE);
                 xfree(mc);
-                m->user->mapping_total -= sizeof(*mc);
             }
+            m->user->mapping_total -= sizeof(*mc);
             hm->used--;
         }
         else
@@ -1623,13 +1632,22 @@ resize_mapping (mapping_t *m, mp_int new_width)
      * big enough to hold all entries.
      */
 
-    m2 = get_new_mapping(m->user, new_width-1, m->num_entries, 0);
-    if (!m2)
     {
-        outofmem(sizeof *m2 + sizeof(svalue_t) * m->num_entries * new_width
-                , "result mapping base structure");
-        /* NOTREACHED */
-        return NULL;
+        p_int km_size = 0;
+        if (m->keys)
+        {
+            km_size = m->keys->size;
+            if (m->hash)
+                km_size -= m->hash->condensed_deleted;
+        }
+        m2 = get_new_mapping(m->user, new_width-1, m->num_entries, 0, km_size);
+        if (!m2)
+        {
+            outofmem(sizeof *m2 + sizeof(svalue_t) * m->num_entries * new_width
+                    , "result mapping base structure");
+            /* NOTREACHED */
+            return NULL;
+        }
     }
 
     /* --- Copy the hash part, if existent ---
@@ -1679,7 +1697,7 @@ resize_mapping (mapping_t *m, mp_int new_width)
                 }
 
                 /* Copy the key and the common values */
-                entry = new_map_entry(m2, 0);
+                entry = new_map_entry(m2);
                 if (entry == NULL)
                 {
                     xfree(hm2);
@@ -1712,22 +1730,10 @@ resize_mapping (mapping_t *m, mp_int new_width)
 
     if (NULL != (km = m->keys))
     {
-        mp_int size = km->size;
         size_t ix, ix2;
 
-        if (m->hash)
-            size -= m->hash->condensed_deleted;
-
-        km2 = xalloc(sizeof(*km) + sizeof(svalue_t*) * (size-1));
-        if (!km2)
-        {
-            outofmem(xalloc(sizeof(*km) + sizeof(svalue_t*) * (size-1)) 
-                    . "key block");
-            /* NOTREACHED */
-            return NULL;
-        }
-
-        km2->size = size;
+        /* The new key block is already in the mapping */
+        km2 = m2->km;
 
         for (ix = ix2 = 0; ix < km->size; ix++)
         {
@@ -1735,7 +1741,7 @@ resize_mapping (mapping_t *m, mp_int new_width)
 
             if (key != NULL)
             {
-                svalue_t * entry = new_map_entry(m2, 0);
+                svalue_t * entry = new_map_entry(m2);
                 mp_int i;
 
                 if (entry == NULL)
@@ -1759,10 +1765,6 @@ resize_mapping (mapping_t *m, mp_int new_width)
                 } while (--i > 0);
             }
         } /* for (all keys) */
-
-        /* Plug the new key block into the new mapping */
-        m2->keys = km2;
-        m->user->mapping_total += SIZEOF_MK(km2);
     }
 
 
@@ -1815,27 +1817,7 @@ add_mapping (mapping_t *m1, mapping_t *m2)
     mapping_t * m3;
       /* The result mapping */
     mapping_hash_t * hm;
-
-    struct condensed_mapping *cm1, *cm2, *cm3;
-      /* Condensed parts of m1, m2 and m3 */
-    svalue_t *condensed_start, *condensed_end;
-      /* Start and end of the memory block *cm3 is embedded in */
-    mp_int string_size, misc_size;
-      /* string- and misc- size of cm3 */
-
-    struct hash_mapping *hm;
-    svalue_t *svp1, *svp2, *svp3;
-    svalue_t *data1, *data2, *data3;
-    string_t **str1, **str2, **str3;
-    mp_int size, size1, size2;
-    mp_int i;
-    mp_int u_d;
-    mp_int dirty;
-      /* Number of condensed-deleted entries in cm3 */
-
-
-    cm1 = m1->condensed;
-    cm2 = m2->condensed;
+    p_int km3size;
 
     /* Special case: number of values per entry differs.
      * If one of the mappings is empty, the other one is returned.
@@ -1868,9 +1850,13 @@ add_mapping (mapping_t *m1, mapping_t *m2)
         if (m1->hash) hsize += m1->hash->used;
         if (m2->hash) hsize += m2->hash->used;
 
+        km3size = 0;
+        if (m1->keys) km3size += m1->keys->size;
+        if (m2->keys) km3size += m2->keys->size;
+
         m3 = get_new_mapping( m->user, num_values-1
                             , m1->num_entries + m2->num_entries
-                            , hsize);
+                            , hsize, km3size);
 
         if (!m3)
         {
@@ -1888,7 +1874,7 @@ add_mapping (mapping_t *m1, mapping_t *m2)
 
     {
         mapping_keys_t *km1, *km2, *km3;
-        size_t km1size, km2size, km3size;
+        size_t km1size, km2size;
         size_t ix1, ix2, ix3;
 
         km1 = m1->keys;
@@ -1897,15 +1883,7 @@ add_mapping (mapping_t *m1, mapping_t *m2)
         km2 = m2->keys;
         km2size = km2 ? km2->size : 0;
 
-        km3 = xalloc(sizeof(*km3) + sizeof(svalue_t*) * (km1size + km2size -1));
-        if (!km3)
-        {
-            outofmem( sizeof(*km3) + sizeof(svalue_t*) * (km1size + km2size - 1)
-                    , "result key block");
-            /* NOTREACHED */
-            return NULL;
-        }
-        km3->size = km3size;
+        km3 = m3->keys;
 
         /* Loop over the mappings in parallel */
         for ( ix1 = ix2 = ix3 = 0
@@ -2018,10 +1996,6 @@ add_mapping (mapping_t *m1, mapping_t *m2)
         /* NULL out any remaming entries in km3 */
         for ( ; ix3 < km3size; ix3++)
             km3->data[ix3] = NULL;
-
-        /* Plug km3 into m3 */
-        m3->keys = km3;
-        m3->user->mapping_total += SIZEOF_MK(km3);
     } /* Merge condensed entries */
 
     /* Now copy the two hash parts, using get_map_lvalue() to create
@@ -2081,7 +2055,6 @@ add_mapping (mapping_t *m1, mapping_t *m2)
 
 } /* add_mapping() */
 
-#if 0
 /*-------------------------------------------------------------------------*/
 void
 walk_mapping ( mapping_t *m
@@ -2101,50 +2074,22 @@ walk_mapping ( mapping_t *m
     svalue_t *svp, *data;
     mp_int size;
     mp_int num_values;
-    struct hash_mapping *hm;
+    mapping_data_t *dm;
 
     num_values = m->num_values;
 
-    /* Walk the condensed string-key entries,
-     * using walk_mapping_string_svalue to pass the key to <func>.
-     */
-    str = CM_STRING(m->condensed);
-    size = m->condensed->string_size;
-    data = (svalue_t *)((char *)str + size);
-    while ( (size -= sizeof(string_t *)) >= 0)
+    /* Just walk through all the data blocks */
+    for (dm = m->data; dm != NULL; dm = dm->next)
     {
-        if ( !( (p_int)(walk_mapping_string_svalue.u.str = *str++) & 1 ) )
-            (*func)(&walk_mapping_string_svalue, data, extra);
-        data += num_values;
-    }
+        size_t ix;
 
-    /* Walk the condensed misc-key entries.
-     */
-    svp = CM_MISC(m->condensed);
-    size = m->condensed->misc_size;
-    data = (svalue_t *)((char *)svp - size);
-    while ( (size -= sizeof(svalue_t)) >= 0)
-    {
-        data -= num_values;
-        if ( (--svp)->type != T_INVALID )
-            (*func)(svp, data, extra);
-    }
+        for (ix = dm->first; ix < dm->size; ix += num_values)
+        {
+            svalue_t *entry = &(dm->data[ix]);
 
-    /* Walk the hashed entries
-     */
-    if ( NULL != (hm = m->hash) )
-    {
-        struct map_chain **mcp, *mc;
-
-        mcp = hm->chains;
-        size = hm->mask;
-        do {
-            if ( NULL != (mc = *mcp++) ) {
-                do {
-                    (*func)(&mc->key, mc->data, extra);
-                } while ( NULL != (mc = mc->next) );
-            }
-        } while (--size >= 0);
+            if (entry->type != T_INVALID)
+                (*func)(entry, entry+1, extra);
+        }
     }
 
 } /* walk_mapping() */
@@ -2161,9 +2106,8 @@ compact_mappings (mp_int num)
  * minimum.
  *
  * The merger is a two step process: first, all hashed entries are
- * separated into string and misc key entries and sorted, then
- * the sorted entries are merged with the condensed part. The sort
- * itself is done using Mergesort, with special treatment for those
+ * sorted, then the sorted entries are merged with the condensed part.
+ * The sort itself is done using Mergesort, with special treatment for those
  * portions that don't make up the current power of 2.
  *
  * The function is big, but functionally simple: there is only so
@@ -2176,6 +2120,8 @@ compact_mappings (mp_int num)
     malloc_privilege = MALLOC_SYSTEM;
       /* compact_mappings() is called in very low memory situations,
        * so it has to be allowed to use the system reserve.
+       * Neat sideeffect: all allocations are guaranteed to work (else
+       * the driver would terminate).
        */
 
     if (last_indexing_protector.type == T_PROTECTOR_MAPPING)
@@ -2204,14 +2150,30 @@ compact_mappings (mp_int num)
     m = dirty_mapping_head_hash.next_dirty;
     while (--num >= 0)
     {
-        struct hash_mapping *hm;
+        
+        mapping_hash_t *hm;
           /* The hash part of m (guaranteed to exist!) */
-        struct condensed_mapping *cm;
+        mapping_keys_t *km;
           /* The condensed part of m */
         int num_values;
           /* Number of values per entry */
 
-        struct condensed_mapping *cm2;
+        mapping_t *m2;
+          /* Temporary holder for the compacted result mapping */
+        mapping_keys_t *km2;
+          /* The new condensed part of the mapping */
+
+        map_chain_t *hook1, *hook2;
+          /* All hashed entries in two long chains.
+           */
+
+        map_chain_t **mcpp, *mcp, *next;
+        map_chain_t *last_hash;
+          /* Auxiliaries */
+
+        mp_int count1, count2;
+          /* The condensed part of m */
+        mapping_keys_t *cm2;
           /* The new condensed part of the mapping */
 
         mp_int string_used, misc_used;
@@ -2219,17 +2181,6 @@ compact_mappings (mp_int num)
 
         mp_int runlength;
           /* Current Mergesort partition length */
-
-        struct map_chain *string_hook1, *misc_hook1;
-        struct map_chain *string_hook2, *misc_hook2;
-          /* All string-/misc-keyed entries in two long chains.
-           * Two chains each, since this is what Mergesort expects.
-           */
-
-        mp_int count1, count2;
-        struct map_chain **mcpp, *mcp, *next;
-        struct map_chain *last_string, *last_misc;
-          /* Auxiliaries */
 
 #ifdef DEBUG
         if (!m->user)
@@ -2239,288 +2190,144 @@ compact_mappings (mp_int num)
                    * mappings referenced by a deleted value
                    */
 
-        cm = m->condensed;
         hm = m->hash;
+        km = m->keys;
 
-#ifdef DEBUG
         if (hm->ref) {
             fatal("compact_mappings(): remaining ref count %ld!\n", hm->ref);
         }
-#endif /* DEBUG */
 
-        /* Test if there are any hashed values to merge or
-         * deleted values to compact
+        /* If this is an empty mapping awaiting deallocation,
+         * just do that.
          */
-        if (!hm->used && !hm->condensed_deleted)
+        if (NULL == m->data)
         {
-            if (!cm)
-            {
-                /* It's an empty mapping awaiting its deallocation */
-                xfree((char *)m);
-                empty_mapping_load -= 2;
-            }
-            else
-            {
-                m->hash = NULL;
-                /* the ref count has been incremented above; on the other
-                 * hand, the last real reference might have gone with the
-                 * deleted keys. If that is the case, free_mapping() will
-                 * deallocate it.
-                 */
-                free_mapping(m);
-            }
-
-            /* No hashed keys, condensed part is compact: just deallocate
-             * the hash part.
-             */
+            m->user->mapping_total -= sizeof(*m) + SIZEOF_MH(hm);
+            xfree(m);
             m = hm->next_dirty;
-            xfree( (char *)hm );
+            xfree(hm);
+            empty_mapping_load -= 2;
             continue;
         }
 
+        /* Test if the mapping needs compaction at all.
+         * If not, just delete the hash part.
+         */
+        if (!hm->user && !hm->condensed_deleted && !m->free)
+        {
+            m->user->mapping_total -= SIZEOF_MH(hm);
+            m->hash = NULL;
+
+            /* the ref count has been incremented above; on the other
+             * hand, the last real reference might have gone with the
+             * deleted keys. If that is the case, free_mapping() will
+             * deallocate it (since we NULL out the .hash).
+             */
+            free_mapping(m);
+
+            m = hm->next_dirty;
+            xfree(hm);
+            continue;
+        }
+
+        /* Nope, this one needs compaction.
+         * Get the temporary result mapping (we need it for the
+         * datablock).
+         */
+
         num_values = m->num_values;
 
+        m2 = get_new_mapping(m->user, num_values-1, m->num_entries, 0,
+                             m->num_entries);
+        km2 = m2->keys;
 
         /* --- Setup Mergesort ---
          *
-         * Unravel all hash chains into four chains: two for string
-         * keyed entries, two for misc keyed. These two chains
-         * dangle from string_hook{1,2} resp. misc_hook{1,2}.
+         * Unravel all hash chains into two chains, dangling from hook1
+         * and hook2.
          *
          * The chains differ in length by at most 1 element. Within
          * the chains, the elements are pairwise sorted.
          *
-         * In this loop, *_hook1 is always the next chain to add to,
-         * and last_* is the first element of the next pair to add.
+         * In this loop, hook1 is always the next chain to add to,
+         * and last_hash is the first element of the next pair to add.
          */
         mcpp = hm->chains;
         count1 = hm->mask;
-        string_hook1 = string_hook2 = NULL;
-        misc_hook1 = misc_hook2 = NULL;
-        misc_used = 0;
-        last_string = last_misc = NULL;
+        hook1 = hook2 = NULL;
+        last_hash = NULL;
+
         do {
             mcp = *mcpp++;
             while (mcp)
             {
                 next = mcp->next;
 
-                if (mcp->key.type != T_STRING)
+                if (last_hash)
                 {
-                    if (last_misc)
-                    {
-                        p_int d;
+                    p_int d = mcompare(mcp->key, last_hash->key);
 
-                        if (! (d = last_misc->key.type - mcp->key.type))
-                        {
-                            if (last_misc->key.type == T_CLOSURE)
-                            {
-                                d = closure_cmp(&mcp->key, &last_misc->key);
-                            }
-                            else if ( !(d = (last_misc->key.u.number >> 1) -
-                                            (mcp->key.u.number >> 1) ) )
-                                d = last_misc->key.x.generic -
-                                     mcp->key.x.generic;
-                        }
-
-                        if (d > 0) {
-                            last_misc->next = misc_hook1;
-                            mcp->next = last_misc;
-                            misc_hook1 = misc_hook2;
-                            misc_hook2 = mcp;
-                        } else {
-                            mcp->next = misc_hook1;
-                            last_misc->next = mcp;
-                            misc_hook1 = misc_hook2;
-                            misc_hook2 = last_misc;
-                        }
-                        misc_used += 2;
-                        last_misc = NULL;
+                    if (d > 0) {
+                        last_hash->next = hook1;
+                        mcp->next = last_hash;
+                        hook1 = hook2;
+                        hook2 = mcp;
+                    } else {
+                        mcp->next = hook1;
+                        last_hash->next = mcp;
+                        hook1 = hook2;
+                        hook2 = last_hash;
                     }
-                    else
-                    {
-                        last_misc = mcp;
-                    }
+                    last_hash = NULL;
                 }
                 else
                 {
-                    if (last_string)
-                    {
-                        if (last_string->key.u.str > mcp->key.u.str)
-                        {
-                            last_string->next = string_hook1;
-                            mcp->next = last_string;
-                            string_hook1 = string_hook2;
-                            string_hook2 = mcp;
-                        }
-                        else
-                        {
-                            mcp->next = string_hook1;
-                            last_string->next = mcp;
-                            string_hook1 = string_hook2;
-                            string_hook2 = last_string;
-                        }
-                        last_string = 0;
-                    }
-                    else
-                    {
-                        last_string = mcp;
-                    }
+                    last_hash = mcp;
                 }
                 mcp = next;
             }
         } while (--count1 >= 0);
 
         /* Add the remaining odd element */
-        if (last_string)
+        if (last_hash)
         {
-            last_string->next = string_hook1;
-            string_hook1 = last_string;
-        }
-        if (last_misc)
-        {
-            misc_used++;
-            last_misc->next = misc_hook1;
-            misc_hook1 = last_misc;
+            last_hash->next = hook1;
+            hook1 = last_hash;
         }
 
-        string_used = hm->used - misc_used;
 
-
-        /* --- Mergesort the string-key entries ---
+        /* --- Mergesort the hashed entries ---
          *
-         * Sort string_hook1 and string_hook2 into string_hook1.
+         * Sort hook1 and hook2 into hook1.
          */
-        for (runlength = 2; runlength < string_used; runlength <<= 1)
+        for (runlength = 2; runlength < hm->used; runlength <<= 1)
         {
-            struct map_chain *out_hook1, *out_hook2, **out1, **out2;
+            map_chain_t *out_hook1, *out_hook2, **out1, **out2;
               /* The output chains, which serve as input chains in
                * the next pass
                */
 
-            count1 = string_used & (runlength-1);
-            count2 = string_used & runlength;
+            count1 = hm->used & (runlength-1);
+            count2 = hm->used & runlength;
             if (!count1)
             {
                 out2 = &out_hook1;
-                *out2 = string_hook2;
-                while (--count2 >= 0)
-                {
-                    out2 = &(*out2)->next;
-                }
-                string_hook2 = *out2;
-                count1 = count2 = runlength;
-                out1 = &out_hook2;
-            }
-            else if (!count2)
-            {
-                out2 = &out_hook1;
-                *out2 = string_hook1;
-                do {
-                    out2 = &(*out2)->next;
-                } while (--count1);
-                string_hook1 = *out2;
-                count1 = count2 = runlength;
-                out1 = &out_hook2;
-            }
-            else
-            {
-                out1 = &out_hook1;
-                out2 = &out_hook2;
-            }
-            while (string_hook1)
-            {
-                /* Sort the next runlength elements onto out1 */
-                while (1)
-                {
-                    if (string_hook2->key.u.str <
-                        string_hook1->key.u.str)
-                    {
-                        *out1 = string_hook2;
-                        out1 = &string_hook2->next;
-                        string_hook2 = *out1;
-                        if (!--count2)
-                        {
-                            *out1 = string_hook1;
-                            do {
-                                out1 = &(*out1)->next;
-                            } while (--count1);
-                            string_hook1 = *out1;
-                            break;
-                        }
-                    }
-                    else
-                    {
-                        *out1 = string_hook1;
-                        out1 = &string_hook1->next;
-                        string_hook1 = *out1;
-                        if (!--count1)
-                        {
-                            *out1 = string_hook2;
-                            do {
-                                out1 = &(*out1)->next;
-                            } while (--count2);
-                            string_hook2 = *out1;
-                            break;
-                        }
-                    }
-                }
-
-                /* Now switch the chains */
-                {
-                    struct map_chain **temp;
-
-                    temp = out1;
-                    out1 = out2;
-                    out2 = temp;
-                }
-                count1 = count2 = runlength;
-            }
-
-            /* Terminate the out-chains and set them up
-             * as next input chains.
-             */
-            *out1 = NULL;
-            *out2 = NULL;
-            string_hook1 = out_hook1;
-            string_hook2 = out_hook2;
-        }
-        if (!string_hook1)
-            string_hook1 = string_hook2;
-
-
-        /* --- Mergesort the misc-key entries ---
-         *
-         * Sort misc_hook1 and misc_hook2 into misc_hook1.
-         */
-        for (runlength = 2; runlength < misc_used; runlength <<= 1)
-        {
-            struct map_chain *out_hook1, *out_hook2, **out1, **out2;
-              /* The output chains, which serve as input chains in
-               * the next pass
-               */
-
-            count1 = misc_used & (runlength-1);
-            count2 = misc_used & runlength;
-            if (!count1)
-            {
-                out2 = &out_hook1;
-                *out2 = misc_hook2;
+                *out2 = hook2;
                 while (--count2 >= 0) {
                     out2 = &(*out2)->next;
                 }
-                misc_hook2 = *out2;
+                hook2 = *out2;
                 count1 = count2 = runlength;
                 out1 = &out_hook2;
             }
             else if (!count2)
             {
                 out2 = &out_hook1;
-                *out2 = misc_hook1;
+                *out2 = hook1;
                 do {
                     out2 = &(*out2)->next;
                 } while (--count1);
-                misc_hook1 = *out2;
+                hook1 = *out2;
                 count1 = count2 = runlength;
                 out1 = &out_hook2;
             }
@@ -2529,51 +2336,40 @@ compact_mappings (mp_int num)
                 out1 = &out_hook1;
                 out2 = &out_hook2;
             }
-            while (misc_hook1)
+
+            while (hook1)
             {
                 /* Sort the next runlength elements onto out1 */
                 while (1) {
-                    p_int d;
-
-                    if (! (d = misc_hook2->key.type - misc_hook1->key.type))
-                    {
-                        if (misc_hook1->key.type == T_CLOSURE)
-                        {
-                            d = closure_cmp(&misc_hook1->key, &misc_hook2->key);
-                        }
-                        else if ( !(d = (misc_hook2->key.u.number >> 1) -
-                                        (misc_hook1->key.u.number >> 1) ) )
-                            d = misc_hook2->key.x.generic -
-                                misc_hook1->key.x.generic;
-                    }
+                    p_int d = mcompare(hook1->key, hook2->key);
 
                     if (d < 0)
                     {
-                        *out1 = misc_hook2;
-                        out1 = &misc_hook2->next;
-                        misc_hook2 = *out1;
+                        *out1 = hook2;
+                        out1 = &hook2->next;
+                        hook2 = *out1;
                         if (!--count2)
                         {
-                            *out1 = misc_hook1;
+                            *out1 = hook1;
                             do {
                                 out1 = &(*out1)->next;
                             } while (--count1);
-                            misc_hook1 = *out1;
+                            hook1 = *out1;
                             break;
                         }
                     }
                     else
                     {
-                        *out1 = misc_hook1;
-                        out1 = &misc_hook1->next;
-                        misc_hook1 = *out1;
+                        *out1 = hook1;
+                        out1 = &hook1->next;
+                        hook1 = *out1;
                         if (!--count1)
                         {
-                            *out1 = misc_hook2;
+                            *out1 = hook2;
                             do {
                                 out1 = &(*out1)->next;
                             } while (--count2);
-                            misc_hook2 = *out1;
+                            hook2 = *out1;
                             break;
                         }
                     }
@@ -2581,7 +2377,7 @@ compact_mappings (mp_int num)
 
                 /* Now switch the chains */
                 {
-                    struct map_chain **temp;
+                    map_chain_t **temp;
 
                     temp = out1;
                     out1 = out2;
@@ -2595,367 +2391,130 @@ compact_mappings (mp_int num)
              */
             *out1 = NULL;
             *out2 = NULL;
-            misc_hook1 = out_hook1;
-            misc_hook2 = out_hook2;
+            hook1 = out_hook1;
+            hook2 = out_hook2;
         }
-        if (!misc_hook1)
-            misc_hook1 = misc_hook2;
+        if (!hook1)
+            hook1 = hook2;
 
 
         /* --- Merge the old condensed part with the sorted lists ---
          */
         {
-            mp_int misc_deleted;
-              /* Number deleted misc-keyed entries */
-            mp_int string_total, misc_total;
-              /* Total number of valid string-/misc-keyed entries */
-            char *condensed_start;
-              /* Begin of memory allocated for cm2 */
-            char *cm1_end, *cm2_end;
-              /* End of string-keyed value areas in cm resp. cm2 */
+            size_t ix1;  /* Index into the old keys */
+            size_t ix2;  /* Index into the new keys */
 
-            string_t **str1, **str2;
-            svalue_t *key1, *key2;
-            svalue_t *data1, *data2;
-              /* Auxiliaries */
-
-
-            /* Count the number of deleted misc-keyed entries.
-             * As a safety measure, also free their associated
-             * values, which should be svalue-0 by now anyway.
-             */
-
-            misc_deleted = 0;
-            if (hm->condensed_deleted)
-            {
-                svalue_t *svp;
-                svalue_t *data;
-                mp_int size;
-
-                size = cm->misc_size;
-                svp = CM_MISC(cm) - (size / sizeof(svalue_t));
-                data = svp - (size / sizeof(svalue_t)) * num_values;
-
-                while ( (size -= sizeof(svalue_t)) >= 0
-                     && (svp++)->type == T_INVALID
-                      )
-                {
-                    int i;
-
-                    misc_deleted++;
-
-                    for (i = num_values; --i >= 0; )
-                    {
-                        free_svalue(data++);
-                    }
-                }
-            }
-
-
-            /* Compute the total number of entries */
-
-            string_total = (mp_int)
-                           (string_used + cm->string_size/sizeof(string_t *) -
-                        (hm->condensed_deleted - misc_deleted));
-            misc_total = (mp_int)
-                         (misc_used + cm->misc_size/sizeof(svalue_t) -
-                        misc_deleted);
-
-
-            /* Allocate and initialise the new condensed structure */
-
-            condensed_start = xalloc(sizeof *cm2 +
-                (string_total+misc_total)*sizeof(svalue_t)*(num_values+1)-
-                string_total * (sizeof(svalue_t)-sizeof(char *))
-            );
-            cm2 = (struct condensed_mapping *)
-                   (condensed_start +
-                    misc_total * (num_values+1) * sizeof(svalue_t) );
-            cm2->string_size = (p_int)(string_total * sizeof(string_t*));
-            cm2->misc_size = (p_int)(misc_total * sizeof(svalue_t));
-
-
-            /* Merge the string-keyed entries from cm with the sorted
-             * hash entries dangling from string_hook1 into cm2.
-             */
-
-            str1 = CM_STRING(cm);
-            data1 = (svalue_t *)((char *)str1 + cm->string_size);
-            str2 = CM_STRING(cm2);
-            data2 = (svalue_t *)((char *)str2 + cm2->string_size);
-            count1 = cm->string_size;
-
-            /* For all leading invalid keys, free the associated
-             * values (this is more a safety measure as the values should
-             * be svalue-0 anyway).
-             */
-            while (count1 && (p_int)*str1 & 1)
-            {
-                int i;
-
-                i = num_values;
-                while (--i >= 0) {
-                    free_svalue(data1++);
-                }
-                str1++;
-                count1 -= sizeof(char *);
-            }
-
-            /* Do the actual merge */
-            if (string_hook1 && count1)
-            {
-                while (1)
-                {
-                    if (string_hook1->key.u.str < *str1)
-                    {
-                        /* Take entry from string_hook1 */
-
-                        struct map_chain *temp;
-                        svalue_t *data;
-                        int i;
-
-                        temp = string_hook1;
-                        *str2++ = temp->key.u.str;
-                        data = temp->data;
-                        i = num_values;
-                        while (--i >= 0)
-                        {
-                            *data2++ = *data++;
-                        }
-                        string_hook1 = temp->next;
-                        xfree( (char *)temp );
-                        if (!string_hook1)
-                            break;
-                    }
-                    else
-                    {
-                        /* Take entry from old condensed part */
-
-                        int i;
-
-                        *str2++ = *str1++;
-                        i = num_values;
-                        while (--i >= 0)
-                        {
-                            *data2++ = *data1++;
-                        }
-                        if ( !(count1 -= sizeof(char*)) )
-                            break;
-
-                        /* Skip eventual following invalid entries in cm */
-                        if ((p_int)*str1 & 1)
-                        {
-                            do {
-                                i = num_values;
-                                while (--i >= 0) {
-                                    free_svalue(data1++);
-                                }
-                                str1++;
-                                if ( !(count1 -= sizeof(char*)) )
-                                    break;
-                            } while ((p_int)*str1 & 1);
-                            if (!count1)
-                                break;
-                        }
-                    }
-                } /* while(1) */
-            } /* if (string_hook1 && count1) */
-
-            /* Copy any remaining entries from the old condensed part
-             * or the string_hook1
-             */
-            if (count1)
-            {
-                /* Copy from the condensed part */
-
-                while (1)
-                {
-                    int i;
-
-                    *str2++ = *str1++;
-                    i = num_values;
-                    while (--i >= 0)
-                    {
-                        *data2++ = *data1++;
-                    }
-                    if ( !(count1 -= sizeof(char*)) )
-                        break;
-
-                    /* Skip eventual following invalid entries in cm */
-                    if ((p_int)*str1 & 1)
-                    {
-                        do {
-                            i = num_values;
-                            while (--i >= 0) {
-                                free_svalue(data1++);
-                            }
-                            str1++;
-                            if ( !(count1 -= sizeof(char*)) )
-                                break;
-                        } while ((p_int)*str1 & 1);
-                        if (!count1)
-                            break;
-                    }
-                }
-            }
-            else
-            {
-                /* Copy from string_hook1 */
-
-                while (string_hook1)
-                {
-                    struct map_chain *temp;
-                    svalue_t *data;
-                    int i;
-
-                    temp = string_hook1;
-                    *str2++ = temp->key.u.str;
-                    data = temp->data;
-                    i = num_values;
-                    while (--i >= 0) {
-                        *data2++ = *data++;
-                    }
-                    string_hook1 = temp->next;
-                    xfree(temp);
-                }
-            }
-
-
-            /* Remember the actual end of the areas used */
-
-            cm1_end = (char *)data1;
-            cm2_end = (char *)data2;
-
-
-            /* Merge the misc-keyed entries from cm with the sorted
-             * hash entries dangling from misc_hook1 into cm2.
-             */
-
-            key1 = CM_MISC(cm);
-            data1 = (svalue_t *)((char *)key1 - cm->misc_size);
-            key2 = CM_MISC(cm2);
-            data2 = (svalue_t *)((char *)key2 - cm2->misc_size);
-            count1 = cm->misc_size - misc_deleted * sizeof(svalue_t);
+            ix1 = ix2 = 0;
 
             /* Do the actual merge.
-             * Note that count1 already excludes the deleted keys "at
-             * the end".
              */
-            if (misc_hook1 && count1)
+            while (hook1 && km && ix1 < km->size)
             {
-                while (1)
+                svalue_t * key, * entry;
+                int d;
+
+                key = km->data[ix1];
+                if (!key)
                 {
-                    p_int d;
+                    ix1++;
+                    continue;
+                }
 
-                    if (! (d = misc_hook1->key.type - key1[-1].type))
-                    {
-                        if (misc_hook1->key.type == T_CLOSURE)
-                        {
-                            d = closure_cmp(&key1[-1], &misc_hook1->key);
-                        }
-                        else if ( !(d = (misc_hook1->key.u.number >> 1) -
-                                        (key1[-1].u.number >> 1) ) )
-                            d = misc_hook1->key.x.generic -
-                                key1[-1].x.generic;
-                    }
+                d = mcompare(key, hook1->key);
 
-                    if (d < 0)
-                    {
-                        /* Take entry from misc_hook1 */
+                entry = new_map_entry(m2);
+                km2->data[ix2++] = entry;
 
-                        struct map_chain *temp;
-                        svalue_t *data;
-                        int i;
+                if (d < 0)
+                {
+                    /* Take entry from hook1 */
 
-                        temp = misc_hook1;
-                        *--key2 = temp->key;
-                        data = temp->data + num_values;
-                        i = num_values;
-                        while (--i >= 0) {
-                            *--data2 = *--data;
-                        }
-                        misc_hook1 = temp->next;
-                        xfree( (char *)temp );
-                        if (!misc_hook1)
-                            break;
-                    }
-                    else
-                    {
-                        /* Take entry from the old condensed part */
+                    map_chain_t *temp;
+                    int i;
 
-                        int i;
+                    for (key = hook1->key, i = num_values; i > 0; --i)
+                        *entry++ = *key++;
 
-                        *--key2 = *--key1;
-                        i = num_values;
-                        while (--i >= 0) {
-                            *--data2 = *--data1;
-                        }
-                        if (! (count1 -= sizeof(svalue_t)) )
-                            break;
-                    }
-                } /* while(1) */
-            } /* if (misc_hook1 && count1) */
+                    temp = hook1;
+                    hook1 = temp->next;
+                    xfree(temp);
+                }
+                else
+                {
+                    /* Take entry from the old condensed part */
+
+                    int i;
+
+                    for (i = num_values; i > 0; --i)
+                        *entry++ = *key++;
+
+                    ix1++;
+                }
+            } /* if (hook1 && ix1 < km->size) */
 
             /* Copy any remaining entries from the old condensed part
              * or the misc_hook1
              */
-            if (count1)
+            if (km && ix1 < km->size)
             {
                 /* Copy from the old condensed part */
 
-                while (1)
+                while (ix1 < km->size)
                 {
-                    int i;
+                    svalue_t * key = km->data[ix1++];
+                    
+                    if (key != NULL)
+                    {
+                        svalue_t * entry;
+                        int i;
 
-                    *--key2 = *--key1;
-                    i = num_values;
-                    while (--i >= 0) {
-                        *--data2 = *--data1;
+                        entry = new_map_entry(m2);
+                        km2->data[ix2++] = entry;
+                        for (i = num_values; i > 0; --i)
+                            *entry++ = *key++;
                     }
-                    if (! (count1 -= sizeof(svalue_t)) )
-                        break;
                 }
             }
             else
             {
-                /* Copy from misc_hook1 */
+                /* Copy from hook1 */
 
-                while (misc_hook1)
+                while (hook1)
                 {
-                    struct map_chain *temp;
-                    svalue_t *data;
+                    map_chain_t *temp;
+                    svalue_t *key, *data;
                     int i;
 
-                    temp = misc_hook1;
-                    *--key2 = temp->key;
-                    data = temp->data + num_values;
-                    i = num_values;
-                    while (--i >= 0) {
-                        *--data2 = *--data;
-                    }
-                    misc_hook1 = temp->next;
+                    entry = new_map_entry(m2);
+                    km2->data[ix2++] = entry;
+                    for (key = hook1->key,i = num_values; i > 0; --i)
+                        *entry++ = *key++;
+
+                    temp = hook1;
+                    hook1 = temp->next;
                     xfree(temp);
                 }
             }
-
-
-            /* Adjust the accounting in the users wizlist entry */
-            m->user->mapping_total +=
-                (cm2_end - (char *)data2) -
-                (cm1_end - (char *)data1);
-
-            /* Free the old condensed mapping part */
-            {
-                svalue_t *data;
-
-                data = CM_MISC(cm) - (cm->misc_size / sizeof(svalue_t)) * (1+num_values);
-                xfree(data);
-            }
-
         } /* --- End of Merge --- */
 
-        m->condensed = cm2;
-        m->hash = NULL;
+        /* Switch the new key and data blocks from m2 to m, and
+         * vice versa for the old ones. We don't assign the hash block
+         * as we already deleted all the map_chain structures.
+         */
+        m->keys = km2;
+        m2->keys = km;
+        {
+            mapping_data_t * dm2 = m2->data;
+            m2->data = m1->data;
+            m->data = dm2;
+        }
+        m->free = NULL; /* We just compacted it */
+        m->hash = NULL; /* dito */
+
+        m->user->mapping_total -= SIZEOF_MH(hm);
+          /* This also takes into account the deallocation of the
+           * map_chain_t structures.
+           */
 
         free_mapping(m);
           /* Undo the initial m->ref++; if there was a recursive
@@ -2963,9 +2522,14 @@ compact_mappings (mp_int num)
            * now.
            */
 
+        free_empty_mapping(m2);
+          /* Get rid of the temporary mapping and the old key
+           * and data blocks.
+           */
+
         m = hm->next_dirty;
 
-        xfree( (char *)hm );
+        xfree(hm);
     } /* while (num >= 0) */
 
     /* m is now the first of the remaining uncompacted mappings, or
@@ -2992,7 +2556,7 @@ total_mapping_size (void)
         total += wl->mapping_total;
     }
     return total;
-}
+} /* total_mapping_size() */
 
 /*-------------------------------------------------------------------------*/
 
@@ -3000,9 +2564,9 @@ total_mapping_size (void)
  */
 struct set_mapping_user_locals
 {
-    int num_values;        /* Number of values per key */
-    object_t *owner;  /* Owner to set */
-    svalue_t *hairy;
+    int        num_values;  /* Number of values per entry */
+    object_t  *owner;       /* Owner to set */
+    svalue_t **hairy;
       /* Next free entry in the array of keys which need manual tweaking */
 };
 
@@ -3029,15 +2593,15 @@ set_mapping_user_filter (svalue_t *key, svalue_t *data, void *extra)
     locals = (struct set_mapping_user_locals *)extra;
     owner = locals->owner;
 
-    if (key->type == T_CLOSURE && !CLOSURE_MALLOCED(key->x.closure_type))
+    if (key->type == T_CLOSURE)
     {
-        *locals->hairy++ = *key;
+        *(locals->hairy++) = key;
     }
     else
     {
         set_svalue_user(key, owner);
     }
-    for (i = locals->num_values; --i >= 0;)
+    for (i = locals->num_values; --i > 0;)
     {
         set_svalue_user(data++, owner);
     }
@@ -3055,25 +2619,22 @@ set_mapping_user (mapping_t *m, object_t *owner)
  */
 
 {
-    struct condensed_mapping *cm;
     int num_values;
     mp_int total;
     wiz_list_t *user;
     struct set_mapping_user_locals locals;
-    svalue_t *first_hairy;
+    svalue_t **first_hairy;
     mp_int i;
 
     num_values = m->num_values;
-    cm = m->condensed;
 
     /* Move the total size in the wizlist from the old owner
      * to the new one
      */
-    total = (mp_int)(
-      sizeof *m + sizeof(char *) + sizeof *cm + sizeof(char *) +
-        ( cm->string_size * (sizeof(svalue_t)/sizeof(string_t*)) +
-          cm->misc_size) * (1 + num_values) -
-        cm->string_size * (sizeof(svalue_t)/sizeof(string_t *) - 1));
+    total = (mp_int)( sizeof(*m)
+                     + (m->keys) ? SIZEOF_MK(m->keys) : 0
+                     + (m->data) ? SIZEOF_MD(m->data) : 0
+                    );
     m->user->mapping_total -= total;
     user = owner->user;
     m->user = user;
@@ -3084,16 +2645,18 @@ set_mapping_user (mapping_t *m, object_t *owner)
 
     locals.owner = owner;
     locals.num_values = num_values;
-    locals.hairy = first_hairy = (svalue_t *)alloca((size_t)cm->misc_size);
+    first_hairy = alloca(((m->keys) ? m->keys->size : 1) * sizeof(svalue_t *)); 
     if (!first_hairy)
     {
         error("Stack overflow.\n");
         /* NOTREACHED */
         return;
     }
+    locals.hairy = first_hairy;
     walk_mapping(m, set_mapping_user_filter, &locals);
 
-    /* All 'hairy' keys are changed by reassignment to the mapping
+    /* All 'hairy' keys are changed by reassignment to the mapping.
+     * Be aware that changing the user might not change the search order.
      */
     for (i = locals.hairy - first_hairy; --i >= 0; first_hairy++)
     {
@@ -3101,7 +2664,7 @@ set_mapping_user (mapping_t *m, object_t *owner)
         mp_int j;
 
         /* Create the new key by changing its owner */
-        assign_svalue_no_free(&new_key, first_hairy);
+        assign_svalue_no_free(&new_key, *first_hairy);
         set_svalue_user(&new_key, owner);
 
         /* Create a new entry in the mapping for the new key */
@@ -3112,15 +2675,19 @@ set_mapping_user (mapping_t *m, object_t *owner)
          * the old ones by this.
          */
         source = get_map_value(m, first_hairy);
-        if (num_values)
-            memcpy((char *)dest, (char *)source, num_values * sizeof *dest);
-        for (j = num_values; --j >= 0; source++)
-            source->type = T_INVALID;
+        if (source != dest)
+        {
+            if (num_values)
+                memcpy((char *)dest, (char *)source, (num_values-1) * sizeof *dest);
+            for (j = num_values; --j > 0; source++)
+                source->type = T_INVALID;
 
-        /* Remove the old entry */
-        remove_mapping(m, first_hairy);
+            /* Remove the old entry */
+            remove_mapping(m, *first_hairy);
+        }
     }
 } /* set_mapping_user() */
+
 
 #ifdef GC_SUPPORT
 
@@ -3136,56 +2703,37 @@ count_ref_in_mapping (mapping_t *m)
  */
 
 {
-    string_t **str;
-    svalue_t *svp, *data;
     mp_int size;
     mp_int num_values;
     Bool any_destructed = MY_FALSE;
 
     num_values = m->num_values;
 
-
-    /* Count references by condensed string keys and their data */
-
-    str = CM_STRING(m->condensed);
-    size = m->condensed->string_size;
-    while ( (size -= sizeof(string_t *)) >= 0)
-    {
-        count_ref_from_string(*str++);
-    }
-
-    data = (svalue_t *)str;
-    count_ref_in_vector(
-      (svalue_t *)str,
-      m->condensed->string_size / sizeof *str * num_values
-    );
-
-
-    /* Count references by condensed misc keys and their data.
+    /* Count references by condensed keys and their data.
      * Take special care of keys referencing destructed objects/lambdas.
      */
 
-    svp = CM_MISC(m->condensed);
-    size = m->condensed->misc_size;
-    while ( (size -= sizeof(svalue_t)) >= 0)
+    size = m->keys->size;
+    while ( --size >= 0)
     {
-        --svp;
-        if (destructed_object_ref(svp))
+        svalue_t * key = m->keys->data[size];
+
+        if (destructed_object_ref(key))
         {
             /* This key is a destructed object, resp. is bound to a destructed
-             * object. The entry has to be deleted (later).
+             * object. The entry has to be deleted.
              */
 
-            if (svp->type == T_CLOSURE &&
-                svp->x.closure_type == CLOSURE_BOUND_LAMBDA)
+            if (key->type == T_CLOSURE &&
+                key->x.closure_type == CLOSURE_BOUND_LAMBDA)
             {
                 /* We don't want changing keys, even if they are still valid
                  * unbound closures
                  */
-                lambda_t *l = svp->u.lambda;
+                lambda_t *l = key->u.lambda;
 
-                svp->x.closure_type = CLOSURE_LAMBDA;
-                svp->u.lambda = l->function.lambda;
+                key->x.closure_type = CLOSURE_LAMBDA;
+                key->u.lambda = l->function.lambda;
                 if (!l->ref) {
                     l->function.lambda->ob = l->ob;
                     l->ref = -1;
@@ -3195,14 +2743,22 @@ count_ref_in_mapping (mapping_t *m)
                     l->function.lambda->ob = gc_obj_list_destructed;
                 }
             }
-            count_ref_in_vector(svp, 1);
-            if (svp->type == T_CLOSURE) {
-                /* *svp has been transformed into an efun closure bound
-                 * to the master
+            count_ref_in_vector(key, 1);
+            if (key->type == T_CLOSURE) {
+                /* *key has been transformed by count_ref_in_vector()
+                 * into an efun closure bound to the master
                  */
-                svp->u.ob->ref--;
+                key->u.ob->ref--;
             }
-            svp->type = T_INVALID;
+
+            /* Free the entry block, but don't bother freeing the
+             * svalues - this is the GC after all, and freeing them
+             * might even confuse the memory allocator.
+             */
+            free_map_entry(m, key, MY_TRUE);
+            m->num_entries--;
+            m->keys->data[size] = NULL;
+
             if (!any_destructed)
             {
                 any_destructed = MY_TRUE;
@@ -3212,7 +2768,7 @@ count_ref_in_mapping (mapping_t *m)
                  * compact_mappings(num_dirty_mappings) , the hash field is
                  * known to be NULL.
                  */
-                m->hash = (struct hash_mapping *)stale_mappings;
+                m->hash = (mapping_hash_t *)stale_mappings;
                 stale_mappings = m;
                 /* We are going to use free_svalue() later to get rid of the
                  * data asscoiated with the keys. This data might reference
@@ -3225,15 +2781,9 @@ count_ref_in_mapping (mapping_t *m)
         }
         else
         {
-            count_ref_in_vector(svp, 1);
+            count_ref_in_vector(key, num_values);
         }
     }
-
-    size = m->condensed->misc_size * num_values;
-    count_ref_in_vector(
-      (svalue_t *)((char *)svp - size),
-      size / sizeof *svp
-    );
 } /* count_ref_in_mapping() */
 
 /*-------------------------------------------------------------------------*/
@@ -3241,9 +2791,10 @@ void
 clean_stale_mappings (void)
 
 /* GC support: After count_ref_in_mapping(), the gc will free all
- * unreferenced destructed objects and lambdas. This may have changed
- * several keys in the stale_mappings to T_INVALID. Since the objective
- * is to recover memory, these mappings are now compacted.
+ * unreferenced destructed objects and lambdas. This may have removed
+ * several keys in the stale_mappings. Since the objective
+ * is to recover memory, we try to compact these mappings now.
+ * Be aware that the mappings might be empty now.
  */
 
 {
@@ -3251,87 +2802,134 @@ clean_stale_mappings (void)
 
     for (m = stale_mappings; m; m = next)
     {
-        struct condensed_mapping *cm, *cm2;
-        char *cm2_start;
-        mp_int size;
-        mp_int data_size;
-          /* Size of the misc-keyed values of cm */
-        mp_int deleted_size;
-          /* Total size deleted from the misc-part of cm */
-        mp_int preserved_size;
-          /* Preserved size from the string-part of cm */
-        mp_int i, num_values;
-        svalue_t *svp, *svp2, *data, *data2;
-        mp_int num_deleted = 0;
-          /* Number of deleted misc-key entries */
+        mapping_keys_t *km;
+        mapping_data_t *dm;
+        size_t size;
+        mp_int num_values;
+        mp_int i;
 
+        /* Unlink from the stale_mapping list */
         next = (mapping_t *)m->hash;
         m->hash = NULL;
 
         num_values = m->num_values;
-        cm = m->condensed;
+        km = m->keys;
+        dm = m->data;
 
-        /* Count the number of invalid misc keys */
+        /* Try to reallocate a new key block */
 
-        svp = CM_MISC(cm);
-        i = size = cm->misc_size;
-        while ( (i -= sizeof(svalue_t)) >= 0)
+        if (m->num_entries)
         {
-            if ( (--svp)->type == T_INVALID)
-                num_deleted++;
-        }
+            mapping_keys_t *km2;
+            size_t ix1, ix2;
 
-        /* Compute the various sizes and update the wizlist total */
+            size = sizeof(*km2) + sizeof(svalue_t*) * (m->num_entries-1);
+            km2 = xalloc(size);
+            if (!km2)
+            {
+                fprintf(stderr, "%s Unable to compact stale mapping: Out of memory "
+                                "for new key block (%ld bytes).\n"
+                              , time_stamp(), (long)size);
+                debug_message("%s Unable to compact stale mapping: Out of memory "
+                              "for new key block (%ld bytes).\n"
+                             , time_stamp(), (long)size);
 
-        data_size = size * num_values;
-        deleted_size = (mp_int)(num_deleted * sizeof(svalue_t) * (num_values + 1));
-        preserved_size = (mp_int)(sizeof(*cm2) +
-          cm->string_size *
-          (1 + (sizeof(svalue_t)/sizeof(string_t *)) * num_values));
-        m->user->mapping_total -= deleted_size;
-
-        /* Allocate the new condensed part and initialise it */
-
-        cm2_start = xalloc((size_t)(data_size + size - deleted_size + preserved_size));
-        if (!cm2_start)
-        {
-            fatal("Out of memory (%lu bytes) for condensed mapping.\n"
-                 , (unsigned long)(data_size + size - deleted_size + preserved_size));
-            /* NOTREACHED */
-            continue;
-        }
-        cm2 = (struct condensed_mapping *)
-          (cm2_start + data_size + size - deleted_size);
-        memcpy((char *)cm2, (char *)cm, (size_t)preserved_size);
-        cm2->misc_size = (p_int)(size - num_deleted * sizeof(svalue_t));
-
-        /* Copy the data for all valid misc-keys into the new
-         * condensed part.
-         */
-        data = svp;
-        svp2 = CM_MISC(cm2);
-        data2 = (svalue_t *)((char *)svp2 - size) + num_deleted;
-        svp = CM_MISC(cm);
-        i = size;
-        while ( (i -= sizeof(svalue_t)) >= 0)
-        {
-            if ( (--svp)->type == T_INVALID) {
-                mp_int j;
-
-                for (j = num_values; --j >= 0; ) {
-                    free_svalue(--data);
-                }
+                /* No use in even trying to compact the much bigger data
+                 * block either.
+                 */
                 continue;
             }
-            *--svp2 = *svp;
-            data -= num_values;
-            data2 -= num_values;
-            memcpy(data2, data, num_values * sizeof(svalue_t));
+
+            km2->size = m->num_entries;
+
+            /* Copy the keys */
+            for (ix1 = ix2 = 0; ix1 < km->size; ix1++)
+            {
+                svalue_t * key = km->size[ix1];
+
+                if (key != NULL)
+                    km2->data[ix2++] = key;
+            }
+
+            /* Replace the old keyblock by the new one. */
+            m->user->mapping_total += SIZEOF_MK(km2);
+            m->keys = km2;
         }
-        m->condensed = cm2;
+        else
+        {
+            /* Mapping is empty - no keyblock needed. */
+            m->keys = NULL;
+        }
 
-        xfree((char *)cm - data_size - size); /* No longer needed */
+        /* Delete the old keyblock */
+        m->user->mapping_total -= SIZEOF_MK(km);
+        xfree(km);
 
+        km = m->keys;
+
+        /* Now try to compact the data block */
+
+        if (m->num_entries)
+        {
+            mapping_data_t * dm2;
+            size_t ixk, ixd;
+            svalue_t * dest;
+
+            size = sizeof(*dm2) + sizeof(svalue_t) * (m->num_entries * num_values - 1);
+            dm2 = xalloc(size);
+
+            if (!dm2)
+            {
+                fprintf(stderr, "%s Unable to compact stale mapping: Out of memory "
+                                "for new data block (%ld bytes).\n"
+                              , time_stamp(), (long)size);
+                debug_message("%s Unable to compact stale mapping: Out of memory "
+                              "for new data block (%ld bytes).\n"
+                             , time_stamp(), (long)size);
+
+                /* No use in even trying to compact the much bigger data
+                 * block either.
+                 */
+                continue;
+            }
+
+            dm2->size = m->num_entries * num_values;
+            dm2->first = 0;
+
+            /* Transfer the values from the old data block, key by key */
+            for (dest = &(dm2->data[0]), ix = 0 ; ix < km->size ; ix++)
+            {
+                svalue_t *src = km->data[ix];
+
+                for (i = num_values; i > 0; i--)
+                {
+                    *dest++ = *src++;
+                }
+            }
+
+            /* Replace the old datablock by the new one */
+            m->user->mapping_total += SIZEOF_MD(dm2);
+            m->data = dm2;
+            m->free = NULL;
+        }
+        else
+        {
+            /* Mapping is empty - no datablock needed. */
+            m->data = NULL;
+            m->free = NULL;
+        }
+
+        /* Delete the old datablocks (though there should
+         * be only one)
+         */
+        while (dm != NULL)
+        {
+            mapping_data_t *next = dm->next;
+
+            m->user->mapping_total -= SIZEOF_MD(dm);
+            xfree(dm);
+            dm = next;
+        }
         free_mapping(m); /* Undo the ref held by the stale-mapping list */
     }
 } /* clean_stale_mappings() */
@@ -3341,36 +2939,6 @@ clean_stale_mappings (void)
 /*=========================================================================*/
 
 /*                            EFUNS                                        */
-
-/*-------------------------------------------------------------------------*/
-#ifdef F_COPY_MAPPING
-
-svalue_t *
-f_copy_mapping (svalue_t *sp)
-
-/* EFUN copy_mapping()
- *
- *   mapping copy_mapping(mapping)
- *
- * This efun is needed to create copies of mappings instead of
- * just passing a reference, like adding/subtraction from a
- * mapping do.
- * TODO: This efun is outdated by the copy() efun.
- */
-
-{
-    mapping_t *m, *m2;
-
-    m = sp->u.map;
-    check_map_for_destr(m);
-    m2 = copy_mapping(m);
-    free_mapping(m);
-    sp->u.map = m2;
-
-    return sp;
-} /* f_copy_mapping() */
-
-#endif
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -3518,11 +3086,11 @@ f_m_values (svalue_t *sp)
     inter_sp = sp;
 
     m = sp->u.map;
-    if (m->num_values < 1)
+    if (m->num_values < 2)
         error("m_values() applied on mapping with no values.\n");
-    if (num < 0 || num >= m->num_values)
+    if (num < 0 || num >= m->num_values-1)
         error("Illegal index %d to m_values(): should be in 0..%d.\n"
-             , num, m->num_values-1);
+             , num, m->num_values-2);
 
     /* Get the size of the mapping */
     check_map_for_destr(m);
@@ -3555,11 +3123,11 @@ add_to_mapping_filter (svalue_t *key, svalue_t *data, void *extra)
     int i;
 
     data2 = get_map_lvalue_unchecked((mapping_t *)extra, key);
-    for (i = ((mapping_t *)extra)->num_values; --i >= 0;)
+    for (i = ((mapping_t *)extra)->num_values; --i > 0;)
     {
         assign_svalue(data2++, data++);
     }
-}
+} /* add_to_mapping_filter() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -3579,28 +3147,40 @@ add_to_mapping (mapping_t *m1, mapping_t *m2)
 {
     if (m2->num_values != m1->num_values)
     {
-        struct condensed_mapping *cm1, *cm2;
-
-        cm2 = m2->condensed;
-        if (!cm2->string_size && !cm2->misc_size && !m2->hash)
+        /* If one of the two mappings is empty, we can adjust its width
+         * after getting rid of all pending data blocks.
+         */
+        if (0 == m2->num_entries)
         {
+            while (m2->data)
+            {
+                mapping_data_t *dm = m2->data;
+                m2->data = dm->next;
+                m2->user->mapping_total -= SIZEOF_MD(dm);
+                xfree(dm);
+            }
+            m2->free = NULL;
             m2->num_values = m1->num_values;
+        }
+        else if (0 == m1->num_entries)
+        {
+            while (m1->data)
+            {
+                mapping_data_t *dm = m1->data;
+                m1->data = dm->next;
+                m1->user->mapping_total -= SIZEOF_MD(dm);
+                xfree(dm);
+            }
+            m1->free = NULL;
+            m1->num_values = m2->num_values;
         }
         else
         {
-            cm1 = m1->condensed;
-            if (!cm1->string_size && !cm1->misc_size && !m1->hash)
-            {
-                m1->num_values = m2->num_values;
-            }
-            else
-            {
-                return;
-            }
+            return;
         }
     }
     walk_mapping(m2, add_to_mapping_filter, m1);
-}
+} /* add_to_mapping() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -3616,7 +3196,7 @@ sub_from_mapping_filter ( svalue_t *key, svalue_t *data UNUSED
 #    pragma unused(data)
 #endif
     remove_mapping((mapping_t *)extra, key);
-}
+} /* sub_from_mapping_filter() */
 
 /*-------------------------------------------------------------------------*/
 mapping_t *
@@ -3629,14 +3209,14 @@ subtract_mapping (mapping_t *minuend, mapping_t *subtrahend)
  */
 
 {
-    /* this could be done faster, especially if there the mappings are
+    /* TODO: This could be done faster, especially if there the mappings are
      * mainly condensed. On the other hand, the priority of fast mapping
      * subtraction is unknown.
      */
     minuend = copy_mapping(minuend);
     walk_mapping(subtrahend, sub_from_mapping_filter, minuend);
     return minuend;
-}
+} /* subtract_mapping() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -3656,7 +3236,7 @@ f_walk_mapping_filter (svalue_t *key, svalue_t *data, void *extra)
     assign_svalue_no_free(svp, key);
     (++svp)->u.lvalue = data;
     *(svalue_t **)extra = ++svp;
-}
+} /* f_walk_mapping_filter() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -3688,30 +3268,21 @@ f_walk_mapping_cleanup (svalue_t *arg)
      */
     if (svp[1].x.generic)
     {
-        struct hash_mapping *hm;
-        int num_values;
+        mapping_hash_t *hm;
 
         hm = m->hash;
-        num_values = m->num_values;
 
         if (!--hm->ref)
         {
             /* Last ref gone: deallocated the pending deleted entries */
 
-            struct map_chain *mc, *next;
-            svalue_t *svp2;
+            map_chain_t *mc, *next;
 
             for (mc = hm->deleted; mc; mc = next)
             {
-                mp_int j;
-
-                svp2 = &mc->key;
-                j = num_values;
-                do {
-                    free_svalue(svp2++);
-                } while (--j >= 0);
+                free_map_entry(m, mc->key, MY_FALSE);
                 next = mc->next;
-                xfree( (char *)mc );
+                xfree(mc);
             }
         }
     }
@@ -3760,18 +3331,17 @@ walk_mapping_prologue (mapping_t *m, svalue_t *sp, callback_t *cb)
  */
 
 {
-    struct hash_mapping *hm;
+    mapping_hash_t *hm;
     svalue_t *pointers;
     svalue_t *write_pointer, *read_pointer;
-    mp_int i;
 
-    i = (mp_int)(m->condensed->string_size/sizeof(string_t *) +
-        m->condensed->misc_size/sizeof(svalue_t));
     if ( NULL != (hm = m->hash) ) {
-        i += hm->used - hm->condensed_deleted;
-        if (!m->num_values) {
-            hm = 0;
-        } else if (!hm->ref++) {
+        if (m->num_values == 1)
+        {
+            hm = NULL; /* Flag: no values per key */
+        }
+        else if (!hm->ref++)
+        {
             hm->deleted = NULL;
         }
     }
@@ -3780,15 +3350,15 @@ walk_mapping_prologue (mapping_t *m, svalue_t *sp, callback_t *cb)
     pointers[0].u.error_handler = f_walk_mapping_cleanup;
     pointers[1].type = T_CALLBACK;
     pointers[1].u.cb = cb;
-    pointers[2].u.number = i;
+    pointers[2].u.number = m->num_entries;
     pointers[3].u.map = m;
-    pointers[3].x.generic = hm != 0;
+    pointers[3].x.generic = hm != NULL;
     (++sp)->type = T_LVALUE;
     sp->u.lvalue = pointers;
     read_pointer = write_pointer = pointers + 4;
     walk_mapping(m, f_walk_mapping_filter, &write_pointer);
     return read_pointer;
-}
+} /* walk_mapping_prologue() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -3861,7 +3431,7 @@ f_walk_mapping (svalue_t *sp, int num_arg)
         assign_svalue_no_free( (sp2 = sp+1), read_pointer++ );
 
         /* Push the values as lvalues */
-        for (j = num_values, data = (read_pointer++)->u.lvalue; --j >= 0; )
+        for (j = num_values - 1, data = (read_pointer++)->u.lvalue; --j >= 0; )
         {
              (++sp2)->type = T_LVALUE;
              sp2->u.lvalue = data++;
@@ -3955,9 +3525,9 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
     bFull = bFull ? 1 : 0;
       /* So we can use it as the number of extra arguments */
 
-    if (bFull && num_values > 1)
+    if (bFull && num_values > 2)
     {
-        dvec = allocate_array(num_values);
+        dvec = allocate_array(num_values-1);
         if (!dvec)
         {
             inter_sp = sp;
@@ -3970,7 +3540,7 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
 
     read_pointer = walk_mapping_prologue(m, sp, &cb);
 
-    m = allocate_mapping(read_pointer[-2].u.number, num_values);
+    m = allocate_mapping(read_pointer[-2].u.number, num_values-1);
     if (!m)
     {
         inter_sp = sp + 1;
@@ -3997,11 +3567,11 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
 
         if (bFull) /* Push the data */
         {
-            if (!num_values)
+            if (num_values == 1)
             {
                 push_number(inter_sp, 0);
             }
-            else if (1 == num_values)
+            else if (2 == num_values)
             {
                 push_svalue(read_pointer[1].u.lvalue);
             }
@@ -4011,7 +3581,7 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
 
                 v = read_pointer[1].u.lvalue;
                 for (j = 0, svp = dvec->item
-                    ; j < num_values
+                    ; j < num_values-1
                     ; j++, svp++, v++)
                     assign_svalue(svp, v);
                 push_svalue(dvec_sp);
@@ -4033,7 +3603,7 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
          * Therefore assign the pair to the new mapping.
          */
         v = get_map_lvalue_unchecked(m, read_pointer);
-        for (j = num_values, data = read_pointer[1].u.lvalue; --j >= 0; )
+        for (j = num_values-1, data = read_pointer[1].u.lvalue; --j >= 0; )
         {
             assign_svalue_no_free(v++, data++);
         }
@@ -4166,9 +3736,9 @@ x_map_mapping (svalue_t *sp, int num_arg, Bool bFull)
     bFull = bFull ? 1 : 0;
       /* So we can use it as the number of extra arguments */
 
-    if (bFull && num_values > 1)
+    if (bFull && num_values > 2)
     {
-        dvec = allocate_array(num_values);
+        dvec = allocate_array(num_values-1);
         if (!dvec)
         {
             inter_sp = sp;
@@ -4204,9 +3774,9 @@ x_map_mapping (svalue_t *sp, int num_arg, Bool bFull)
 
         if (bFull) /* Push the data */
         {
-            if (!num_values)
+            if (1 == num_values)
                 push_number(inter_sp, 0);
-            else if (1 == num_values)
+            else if (2 == num_values)
             {
                 v = get_map_value(arg_m, key);
                 push_svalue(v);
@@ -4217,7 +3787,7 @@ x_map_mapping (svalue_t *sp, int num_arg, Bool bFull)
                 svalue_t *svp;
 
                 v = get_map_value(arg_m, key);
-                for (j = 0, svp = dvec->item; j < num_values; j++, svp++, v++)
+                for (j = 0, svp = dvec->item; j < num_values-1; j++, svp++, v++)
                     assign_svalue(svp, v);
                 push_svalue(dvec_sp);
             }
@@ -4304,9 +3874,9 @@ f_m_contains (svalue_t *sp, int num_arg)
             vefun_arg_error(num_arg + i, T_LVALUE, sp[i].type, sp);
     if (sp[-1].type != T_MAPPING)
         vefun_arg_error(num_arg-1, T_MAPPING, sp[-1].type, sp);
-    if (sp[-1].u.map->num_values != num_arg -2)
+    if (sp[-1].u.map->num_values-1 != num_arg -2)
         error("Not enough lvalues: given %ld, required %ld.\n"
-             , (long)num_arg-2, (long)sp[-1].u.map->num_values);
+             , (long)num_arg-2, (long)sp[-1].u.map->num_values-1);
 
     item = get_map_value(sp[-1].u.map, sp);
     if (item == &const0)
@@ -4358,9 +3928,9 @@ f_m_reallocate (svalue_t *sp)
  */
 
 {
-    int new_width;          /* Requested width of the target mapping */
-    mapping_t *m;      /* Argument mapping */
-    mapping_t *new_m;  /* New mapping */
+    int        new_width;  /* Requested width of the target mapping */
+    mapping_t *m;          /* Argument mapping */
+    mapping_t *new_m;      /* New mapping */
 
     /* Test and get arguments */
     new_width = sp->u.number;
@@ -4486,10 +4056,10 @@ f_unmkmapping (svalue_t *sp)
     /* Determine the size of the mapping and allocate the result vector */
     check_map_for_destr(m);
     size = (mp_int)MAP_SIZE(m);
-    v = allocate_array(m->num_values+1);
+    v = allocate_array(m->num_values);
 
     /* Allocate the sub vectors */
-    for (i = 0, svp = v->item; i <= m->num_values; i++, svp++)
+    for (i = 0, svp = v->item; i < m->num_values; i++, svp++)
     {
         vector_t *v2;
 
@@ -4500,7 +4070,7 @@ f_unmkmapping (svalue_t *sp)
     /* Copy the elements from the mapping into the vector brush */
     vip.svp = v->item;
     vip.num = 0;
-    vip.width = m->num_values;
+    vip.width = m->num_values-1;
     walk_mapping(m, m_unmake_filter, &vip);
 
     /* Clean up the stack and push the result */
@@ -4531,14 +4101,12 @@ f_widthof (svalue_t *sp)
     if (sp->type != T_MAPPING)
         efun_arg_error(1, T_MAPPING, sp->type, sp);
 
-    width = sp->u.map->num_values;
+    width = sp->u.map->num_values-1;
     free_mapping(sp->u.map);
     put_number(sp, width);
 
     return sp;
 } /* f_widthof() */
-
-#endif
 
 /***************************************************************************/
 

@@ -1,6 +1,17 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+22-Apr-2001 (Lars Duening)  (3.3.47)
+    - (array.c) When using a multi-dimensional allocate(), specifying
+         0-sized dimensions could crash the driver (reported by Menaures).
+    - (Makefile.in) When doing 'make install', the driver is now installed
+         as 'driver', not 'parse' (reported by Eivind).
+    - (docs) Some corrections, provided by Fiona.
+    - (closure.c) The generation of sparse lookup ranges failed to properly
+         generate default-jumps for the values between two consecutive
+         ranges (e.g. 'case -2..-1:, case 1..2:' was smudged into 'case -2..1:
+         case 0..2:') (reported by Menaures).
+
 20-Apr-2001 (Lars Duening)  (3.3.46)
     - (mapping.c) Removed a couple of fatal bugs in the key deletion
          (reported by Freaky).

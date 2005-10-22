@@ -10,4 +10,4 @@ EXAMPLE
         living(this_player())
         
 SEE ALSO
-        enable_commands(E), set_living_name(E)
+        enable_commands(E)

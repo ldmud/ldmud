@@ -98,17 +98,13 @@ driver: $(OBJ)
 
 install: driver
 	$(mkinstalldirs) $(BINDIR)
-	$(INSTALL) -c $? $(BINDIR)/parse
+	$(INSTALL) -c $? $(BINDIR)/driver
 
 install-utils:
 	(cd util; $(MAKE) $(MFLAGS) install)
 
 utils:
 	(cd util; $(MAKE) $(MFLAGS))
-
-parse: driver
-	-$(MV) parse parse.old
-	$(CP) driver parse
 
 lint: *.c
 	lint *.c
@@ -117,7 +113,7 @@ clean:
 	$(RM) $(YACCTAB)h $(YACCTAB)c make_func.c *.o mkfunc@EXEEXT@
 	$(RM) stdstrings.c stdstrings.h
 	$(RM) efun_defs.c instrs.h lang.y lang.h lang.c y.output tags TAGS
-	$(RM) parse core mudlib/core mudlib/debug.log lpmud.log driver
+	$(RM) driver core mudlib/core mudlib/debug.log lpmud.log driver
 	(cd util ; echo "Cleaning in util." ; $(MAKE) clean)
 
 distclean: clean

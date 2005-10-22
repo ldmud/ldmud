@@ -6167,15 +6167,22 @@ store_case_labels( p_int total_length
                     	 */
                         key_num--;
                         tmp = tmp->next;
-                        if (tmp->addr == 1)
-                        {
-                            /* It is a range: move to the range end entry.
-                             * It's .line is 0 which will force the code
-                             * to insert all values for this range.
-                             */
-                            key_num--;
-                            tmp = tmp->next;
-                        }
+                        /* This next entry might be the begin of a new range.
+                         * However, we don't want to move tmp to its end
+                         * entry quite yet, since we still have to fill in
+                         * the 'default' jump points for all interim values.
+                         */
+                    }
+                    if (key == tmp->key && tmp->addr == 1)
+                    {
+                        /* tmp is the beginning of a range, and key (finally)
+                         * caught up with it. We can now move tmp to the end
+                         * entry for this range.
+                         * It's .line is 0 which will force the code
+                         * to insert all values for this range.
+                         */
+                        key_num--;
+                        tmp = tmp->next;
                     }
 
                     /* Get the address to insert */

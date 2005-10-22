@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-18-Apr-2001 (Lars Duening) -- Development Release 3.3
+22-Apr-2001 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -164,6 +164,9 @@ For a detailed list of all changes see the file CHANGELOG.
        + Bugfix: All <op>= assignment can now operate on indexed strings
            on the left hand side.
        + Bugfix: Additions of floats to 0 yielded the wrong type.
+       + Bugfix: For closely consecutive switch case ranges (e.g. 'case
+           -2..-1: case 1..2:') the compiler generated faulty lookup
+           tables.
 
     - Runtime:
        + Attempts to set a single string character to 0 now raise

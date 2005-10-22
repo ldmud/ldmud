@@ -19,4 +19,4 @@ DESCRIPTION
         returned.
 
 SEE ALSO
-        query_host_name(E), query_udp_port(E)
+        query_udp_port(E)

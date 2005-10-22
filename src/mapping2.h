@@ -70,6 +70,39 @@ extern svalue_t *_get_map_lvalue(mapping_t *m, svalue_t *map_index, Bool need_lv
 extern void check_map_for_destr(mapping_t *m);
 extern mapping_t *resize_mapping(mapping_t *m, mp_int new_width);
 #define copy_mapping(m) resize_mapping((m), (m)->num_values-1)
+extern mapping_t *add_mapping(mapping_t *m1, mapping_t *m2);
+extern void walk_mapping(mapping_t *m, void (*func)(svalue_t *key, svalue_t *val, void *extra), void *extra);
+extern void compact_mappings(mp_int num);
+extern mp_int total_mapping_size(void);
+extern void set_mapping_user(mapping_t *m, object_t *owner);
+
+extern svalue_t *f_m_allocate(svalue_t *sp);
+extern svalue_t *f_m_contains(svalue_t *sp, int num_arg);
+extern svalue_t *f_m_delete(svalue_t *sp);
+extern vector_t *m_indices(mapping_t *m);
+extern svalue_t *f_m_indices(svalue_t *sp);
+extern svalue_t *f_m_values(svalue_t *sp);
+extern svalue_t *f_mkmapping (svalue_t *sp, int num_arg);
+extern void sub_from_mapping_filter(svalue_t *key, svalue_t *data, void *extra);
+extern void add_to_mapping(mapping_t *m1, mapping_t *m2);
+extern mapping_t *subtract_mapping(mapping_t *minuend, mapping_t *subtrahend);
+extern svalue_t *x_filter_mapping(svalue_t *sp, int num_arg, Bool bFull);
+extern svalue_t *f_filter_indices (svalue_t *sp, int num_arg);
+extern svalue_t *x_map_mapping(svalue_t *sp, int num_arg, Bool bFull);
+extern svalue_t *f_map_indices (svalue_t *sp, int num_arg);
+extern svalue_t *f_walk_mapping(svalue_t *sp, int num_arg);
+extern svalue_t *f_m_reallocate (svalue_t *sp);
+extern svalue_t *f_unmkmapping (svalue_t *sp);
+extern svalue_t *f_widthof (svalue_t *sp);
+
+#ifdef DEBUG
+extern void check_dirty_mapping_list(void);
+#endif
+
+#ifdef GC_SUPPORT
+extern void count_ref_in_mapping(mapping_t *m);
+extern void clean_stale_mappings(void);
+#endif
 
 #endif /* MAPPING_H__ */
 
@@ -114,41 +147,6 @@ struct mvf_info
    */
 
 /* --- Prototypes --- */
-
-extern mapping_t *add_mapping(mapping_t *m1, mapping_t *m2);
-extern void walk_mapping(mapping_t *m, void (*func)(svalue_t *key, svalue_t *val, void *extra), void *extra);
-extern void compact_mappings(mp_int num);
-extern mp_int total_mapping_size(void);
-extern void set_mapping_user(mapping_t *m, object_t *owner);
-
-extern svalue_t *f_copy_mapping(svalue_t *sp);
-extern svalue_t *f_m_allocate(svalue_t *sp);
-extern svalue_t *f_m_contains(svalue_t *sp, int num_arg);
-extern svalue_t *f_m_delete(svalue_t *sp);
-extern vector_t *m_indices(mapping_t *m);
-extern svalue_t *f_m_indices(svalue_t *sp);
-extern svalue_t *f_m_values(svalue_t *sp);
-extern svalue_t *f_mkmapping (svalue_t *sp, int num_arg);
-extern void sub_from_mapping_filter(svalue_t *key, svalue_t *data, void *extra);
-extern void add_to_mapping(mapping_t *m1, mapping_t *m2);
-extern mapping_t *subtract_mapping(mapping_t *minuend, mapping_t *subtrahend);
-extern svalue_t *x_filter_mapping(svalue_t *sp, int num_arg, Bool bFull);
-extern svalue_t *f_filter_indices (svalue_t *sp, int num_arg);
-extern svalue_t *x_map_mapping(svalue_t *sp, int num_arg, Bool bFull);
-extern svalue_t *f_map_indices (svalue_t *sp, int num_arg);
-extern svalue_t *f_walk_mapping(svalue_t *sp, int num_arg);
-extern svalue_t *f_m_reallocate (svalue_t *sp);
-extern svalue_t *f_unmkmapping (svalue_t *sp);
-extern svalue_t *f_widthof (svalue_t *sp);
-
-#ifdef DEBUG
-extern void check_dirty_mapping_list(void);
-#endif
-
-#ifdef GC_SUPPORT
-extern void count_ref_in_mapping(mapping_t *m);
-extern void clean_stale_mappings(void);
-#endif
 
 #endif
 

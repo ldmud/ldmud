@@ -6,4 +6,4 @@ DESCRIPTION
         failure.
 
 SEE ALSO
-        rmdir(E), rm(E), get_dir(E), file_size(E), ls(E)
+        rmdir(E), rm(E), get_dir(E), file_size(E)

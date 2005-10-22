@@ -42,4 +42,4 @@ AUTHOR
         Someone
 
 SEE ALSO
-        files(C), inheritance(C), create(A), reset(A)
+        files(C), inheritance(LPC), create(A), reset(A)

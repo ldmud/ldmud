@@ -19,4 +19,4 @@ EXAMPLE
         can be accessed via find_living("dummymonster").
 
 SEE ALSO
-        command(E), living(E), disable_commands(E), native(C), hook(C)
+        command(E), living(E), disable_commands(E), native(C), hooks(C)

@@ -5,4 +5,5 @@ DESCRIPTION
         Return 1 if arg is an object.
 
 SEE ALSO
-        intp(E), stringp(E), pointerp(E)
+        clonep(E), intp(E), stringp(E), pointerp(E), symbolp(E),
+        referencep(E), symbolp(E)

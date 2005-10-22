@@ -6,4 +6,5 @@ DESCRIPTION
         function, instead of the usual call-by-value.
 
 SEE ALSO
-        references(LPC)
+        closurep(E), floatp(E), mappingp(E), objectp(E), intp(E),
+        pointerp(E), stringp(E), symbolp(E), clonep(E), references(LPC)

@@ -67,7 +67,7 @@ DESCRIPTION
         breaches - any use of them should be scrutinized closely.
 
 SEE ALSO        
+        send_erq(E), set_this_object(E), rename_object(E),
         simul_efun(C), call_out_info(E), shadow(E), add_action(E),
-        wizlist(E), send_erq(E), set_this_object(E), rename_object(E),
         bind_lambda(E), send_udp(E), set_auto_include_string(E),
         input_to(E), execute_command(E)

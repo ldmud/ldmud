@@ -6,4 +6,4 @@ DESCRIPTION
         current execution ended.
 
 SEE ALSO
-        getrusage(E)
+        rusage(E)

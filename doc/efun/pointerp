@@ -5,4 +5,5 @@ DESCRIPTION
         Return 1 if arg is a pointer, i.e. an array.
 
 SEE ALSO
-        intp(E), stringp(E), objectp(E)
+        closurep(E), floatp(E), mappingp(E), objectp(E), intp(E),
+        referencep(E), stringp(E), symbolp(E), clonep(E)

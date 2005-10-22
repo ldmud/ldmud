@@ -31,4 +31,4 @@ EXAMPLES
         catch_tell() works.
 
 SEE ALSO
-        write(E), say(E), catch_tell(E)
+        write(E), say(E), catch_tell(A)

@@ -5,6 +5,5 @@ DESCRIPTION
         Return 1 if arg is an integer number.
 
 SEE ALSO
-
         closurep(E), floatp(E), mappingp(E), objectp(E), pointerp(E),
-        referencep(E), stringp(E), symbolp(E)
+        referencep(E), stringp(E), symbolp(E), clonep(E)

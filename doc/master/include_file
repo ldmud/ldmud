@@ -26,5 +26,4 @@ HISTORY
         Introduced in LDMud 3.2.8.
 
 SEE ALSO
-        H_INCLUDE_DIRS(hooks), inherit_file(M)
-
+        hooks(C), inherit_file(M)

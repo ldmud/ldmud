@@ -1396,9 +1396,17 @@ f_allocate (svalue_t *sp, int num_arg)
                 assign_svalue_no_free(svp, sp);
         }
     }
-    else if (argp->type == T_POINTER && VEC_SIZE(argp->u.vec) == 0)
+    else if (argp->type == T_POINTER
+          && (    VEC_SIZE(argp->u.vec) == 0)
+               || (   VEC_SIZE(argp->u.vec) == 1
+                   && argp->u.vec->item->type == T_NUMBER
+                   && argp->u.vec->item->u.number == 0)
+             )
     {
-        /* Special case: result is the empty array */
+        /* Special case: result is the empty array.
+         * The condition catches ( ({}) ) as well as ( ({0}) )
+         * (the generic code below can't handle either of them).
+         */
         v = allocate_array(0);
     }
     else if (argp->type == T_POINTER)
@@ -1445,6 +1453,9 @@ f_allocate (svalue_t *sp, int num_arg)
             if (size < 0 || (max_array_size && (size_t)size > max_array_size))
                 error("Illegal array size: %ld\n", (long)size);
 
+            if (size == 0 && dim < num_dim-1)
+                error("Only the last dimension can have empty arrays.\n");
+
             count *= (size_t)size;
             if (max_array_size && count > max_array_size)
                 error("Illegal total array size: %lu\n", (unsigned long)count);
@@ -1487,7 +1498,7 @@ f_allocate (svalue_t *sp, int num_arg)
             if (dim == num_dim-1)
             {
                 /* Last dimension: assign the init value */
-                if (hasInitValue)
+                if (hasInitValue && curpos[dim] < sizes[dim])
                     assign_svalue_no_free(curvec[dim]->item+curpos[dim], sp);
             }
             else if (!curvec[dim+1])
@@ -1499,7 +1510,7 @@ f_allocate (svalue_t *sp, int num_arg)
                 dim++;
                 continue;
             }
-            else
+            else if (curpos[dim] < sizes[dim])
             {
                 /* We got a vector from a lower lever */
                 put_array(curvec[dim]->item+curpos[dim], curvec[dim+1]);

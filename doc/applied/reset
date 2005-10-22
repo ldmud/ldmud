@@ -28,5 +28,5 @@ DESCRIPTION
         than reset() to reset an object.
 
 SEE ALSO
-        clean_up(A), heart_beat(A), call_out(E), create(E), __INIT(E),
-        hooks(C), initialisation(E), native(C)
+        clean_up(A), heart_beat(A), call_out(E), create(A), __INIT(A),
+        hooks(C), initialisation(M), native(C)

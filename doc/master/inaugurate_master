@@ -25,6 +25,5 @@ DESCRIPTION
         e.g. set_auto_include_string(), or give the master a decent euid.
 
 SEE ALSO
-        initialisation(M), create(M), simul_efun(C), get_bb_id(M),
-        get_master_uid(M), flag(M),
-        reactivate_destructed_master(M)
+        initialisation(M), create(A), simul_efun(C), get_master_uid(M),
+        flag(M), reactivate_destructed_master(M)

@@ -85,6 +85,5 @@ HISTORY
          - call_other can be applied on arrays of objects.
 
 SEE ALSO
-        function_exists(E), call_resolved(E), create(E), pragma(LPC),
+        function_exists(E), call_resolved(E), create(A), pragma(LPC),
         extern_call(E), functions(LPC)
-

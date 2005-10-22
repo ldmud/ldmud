@@ -6,4 +6,4 @@ DESCRIPTION
         and 0 if any failure occured.
 
 SEE ALSO
-        file_size(E), cat(E), log_file(E), write_bytes(E), read_file(E)
+        file_size(E), cat(E), write_bytes(E), read_file(E)

@@ -64,4 +64,4 @@ HISTORY
         __VERSION_MINOR__, __VERSION_MICRO__ and __VERSION_PATCH__.
 
 SEE ALSO
-    query_host_name(E), version(E), pragma(LPC), preprocessor(LPC)
+    pragma(LPC), preprocessor(LPC)

@@ -217,8 +217,7 @@ Windows 95/98/NT
   which is a port of gcc, bash, and other GNU/Unix programs. Once it
   is installed and running, the procedure is the same as under Unix.
 
-  CygWin is available from <URL:http://sourceware.cygnus.com/cygwin/>,
-  and the homepage is <URL:http://www.cygnus.com/>.
+  CygWin is available from <URL:http://www.cygwin.com/>.
 
   One common pitfall is if the installation does not create the '/bin'
   directory in which the CygWin executables are expected. A typical
@@ -239,9 +238,12 @@ Windows 95/98/NT
   The following comments were provided by Robert Nurrie(?) who had
   an misconfigured Cygnus installation (Summer 2000):
 
-  "Make sure you've used the setup.exe you get when clicking the 'install
-   cygwin now' link in the upper right corner of their website, instead of the
-   setup.exe found on the ftp-site.
+    "Make sure you've used the setup.exe you get when clicking the 'install
+     cygwin now' link in the upper right corner of their website, instead of
+     the setup.exe found on the ftp-site.
    
-   Oh, and when you're given the choice of default text file type you
-   should of course chose Dos, as that seems to be the key."
+     Oh, and when you're given the choice of default text file type you
+     should of course chose Dos, as that seems to be the key."
+
+  Brandon Mathis points out, "that to compile under Windows you have to
+  use 'tar -xvfz' and not WinZIP to extract the source".

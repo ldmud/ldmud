@@ -8,4 +8,4 @@ HISTORY
         Introduced in 3.2@70
 
 SEE ALSO
-        intp(E)
+        intp(E), referencep(E), symbolp(E)
