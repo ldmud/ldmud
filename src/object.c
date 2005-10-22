@@ -2702,43 +2702,41 @@ f_rename_object (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_replace_program (svalue_t *sp)
+f_replace_program (svalue_t *sp, int num_arg)
 
 /* EFUN replace_program()
  *
+ *   void replace_program()
  *   void replace_program(string program)
  *
- * Substitutes a program with an inherited one. This is useful if you
- * consider the performance and memory consumption of the driver. A
- * program which doesn't need any additional variables and functions
- * (except during creation) can call replace_program() to increase the
- * function-cache hit-rate of
- * the driver which decreases with the number of programs in the
- * system. Any object can call replace_program() but looses all extra
- * variables and functions which are not defined by the inherited
+ * Substitutes a program with the inherited program <program>. If the object
+ * inherits only one program, the argument may be omitted and the efun will
+ * automatically select the one inherited program.
+ *
+ * This efun is useful if you consider the performance and memory consumption
+ * of the driver. A program which doesn't need any additional variables and
+ * functions (except during creation) can call replace_program() to increase
+ * the function-cache hit-rate of the driver which decreases with the number
+ * of programs in the system. Any object can call replace_program() but looses
+ * all extra variables and functions which are not defined by the inherited
  * program.
  *
- * When replace_program() takes effect, shadowing is stopped on
- * the object since 3.2@166.
+ * When replace_program() takes effect, shadowing is stopped on the object
+ * since 3.2@166.
  *
- * It is not possible to replace the program of an object after
- * (lambda) closures have been bound to it. It is of course
- * possible to first replace the program and then bind lambda
- * closures to it.
+ * It is not possible to replace the program of an object after (lambda)
+ * closures have been bound to it. It is of course possible to first replace
+ * the program and then bind lambda closures to it.
  *
- * The program replacement does not take place with the call to
- * the efun, but is merely scheduled to be carried out at the end
- * of the backend cycle. This may cause closures to have
- * references to then vanished lfuns of the object. This poses no
- * problem as long as these references are never executed after
+ * The program replacement does not take place with the call to the efun, but
+ * is merely scheduled to be carried out at the end of the backend cycle. This
+ * may cause closures to have references to then vanished lfuns of the object.
+ * This poses no problem as long as these references are never executed after
  * they became invalid.
  */
 
 {
     replace_ob_t *tmp;
-    long name_len;
-    char *name;
-    string_t *sname;
     program_t *new_prog;  /* the replacing program */
     int offsets[2];            /* the offsets of the replacing prog */
 
@@ -2750,35 +2748,60 @@ f_replace_program (svalue_t *sp)
         error(
           "Cannot schedule replace_program after binding lambda closures\n");
 
-    /* Create the full program name with a trailing '.c' and without
-     * a leading '/' to match the internal name representation.
-     */
-    name_len = (long)mstrsize(sp->u.str);
-    name = alloca((size_t)name_len+3);
-    strcpy(name, get_txt(sp->u.str));
-    if (name[name_len-2] != '.' || name[name_len-1] != 'c')
-        strcat(name,".c");
-    if (*name == '/')
-        name++;
-    memsafe(sname = new_mstring(name), name_len+3, "normalized program name");
-
-    new_prog = search_inherited(sname, current_object->prog, offsets);
-    if (!new_prog)
+    if (num_arg < 1)
     {
-        /* Given program not inherited, maybe it's the current already.
-         */
-        if (mstreq(sname, current_object->prog->name ))
-        {
-            new_prog = current_object->prog;
-            offsets[0] = offsets[1] = 0;
-        }
-        else
-        {
-            free_mstring(sname);
-            error("program to replace the current one with has "
-                  "to be inherited\n");
-        }
+        /* Just take the first inherited program */
+        if (current_object->prog->num_inherited < 1)
+            error("replace_program called with no inherited program\n");
+        if (current_object->prog->num_inherited > 1)
+            error("replace_program() requires argument for object with more than one inherit\n");
+
+        new_prog = current_object->prog->inherit[0].prog;
+        offsets[0] = current_object->prog->inherit[0].variable_index_offset;
+        offsets[1] = current_object->prog->inherit[0].function_index_offset;
     }
+    else
+    {
+        string_t *sname;
+        long name_len;
+        char *name;
+
+        /* Create the full program name with a trailing '.c' and without
+         * a leading '/' to match the internal name representation.
+         */
+        name_len = (long)mstrsize(sp->u.str);
+        name = alloca((size_t)name_len+3);
+        strcpy(name, get_txt(sp->u.str));
+        if (name[name_len-2] != '.' || name[name_len-1] != 'c')
+            strcat(name,".c");
+        if (*name == '/')
+            name++;
+        memsafe(sname = new_mstring(name), name_len+3, "normalized program name");
+
+        new_prog = search_inherited(sname, current_object->prog, offsets);
+        if (!new_prog)
+        {
+            /* Given program not inherited, maybe it's the current already.
+             */
+            if (mstreq(sname, current_object->prog->name ))
+            {
+                new_prog = current_object->prog;
+                offsets[0] = offsets[1] = 0;
+            }
+            else
+            {
+                free_mstring(sname);
+                error("program to replace the current one with has "
+                      "to be inherited\n");
+            }
+        }
+
+        free_mstring(sname);
+
+        free_svalue(sp);
+        sp--;
+
+    } /* if (num_arg) */
 
     /* Program found, now create a new replace program entry, or
      * change an existing one.
@@ -2797,11 +2820,6 @@ f_replace_program (svalue_t *sp)
     tmp->new_prog = new_prog;
     tmp->var_offset = offsets[0];
     tmp->fun_offset = offsets[1];
-
-    free_mstring(sname);
-
-    free_svalue(sp);
-    sp--;
 
     return sp;
 } /* f_replace_program() */

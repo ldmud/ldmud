@@ -2,7 +2,7 @@
 #define LPC_FUNCTIONLIST_H
 
 #ifndef __DRIVER_SOURCE__
-#include <lpctypes.h>
+#include "lpctypes.h"
 #endif
 
 #define NAME_INHERITED      0x80000000 /* Defined by inheritance         */

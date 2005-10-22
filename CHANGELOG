@@ -1,6 +1,16 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+25-Nov-2001 (Lars Duening)  (3.3.131)
+    - (mudlib/sys/functionlist.h) Changed the <> include of lpctypes.h
+        into a "" include (suggested by Heiko).
+    - (prolang.y) Inheriting two private functions of the same caused the
+        compiler to crossdefine the second one to the first. Not directly
+        visible to the user, this messed up any use of these functions
+        by INITIALIZATION_BY___INIT (reported by Gimli).
+    - (object.c) Efun replace_program() can omit the argument if the
+        object has only one inherit (suggested by Pulami).
+
 24-Nov-2001 (Lars Duening)  (3.3.130)
     - (lex.c) The auto-include strings needed to be prefixed with a newline
          internally - yet, the newline was added after the string (reported

@@ -10944,9 +10944,13 @@ copy_functions (program_t *from, fulltype_t type)
                                         , current_func_index - n );
                             p->u.global.function = current_func_index;
                         }
-                        else
+                        else if ( (fun.flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN)) == 0
+                              ||  (OldFunction->flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN)) == 0
+                                )
                         {
-                            /* prefer the first one */
+                            /* At least one of the functions is visible:
+                             * prefer the first one.
+                             */
                             cross_define( OldFunction, &fun
                                         , n - current_func_index );
                         }

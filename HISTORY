@@ -57,7 +57,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
 
 
-21-Nov-2001 (Lars Duening) -- upcoming Release 3.2.9
+25-Nov-2001 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -119,6 +119,8 @@ For a detailed list of all changes see the file CHANGELOG.
            instead of just a constant string.
        + regreplace(): Pattern which could match on the
            empty string matched once too often at string end.
+       + replace_program(): Argument can be omitted if only one inherit
+           exists.
        + sin(), cos(), tan(), atan(), atan2(), log(), exp(), sqrt(), pow():
            Integers are accepted as arguments, too.
        + sizeof(): Now also returns the length of strings.
@@ -286,6 +288,10 @@ For a detailed list of all changes see the file CHANGELOG.
        + Bugfix: Termination of a macro definition with End-of-file in
            an include file confused the lexer.
        + Bugfix: Inherited private functions no longer hide (simul-)efuns.
+       + Bugfix: Inheriting two private functions with the same name caused
+           the compiler to cross-define the second to the first. Invisible
+           to the user, this messed up any use by __INIT and other local
+           calls.
 
     - Runtime:
        + Attempts to set a single string character to 0 now raise

@@ -2900,7 +2900,7 @@ docmd (Bool glob)
               return ERR;
         }
 
-        *inptr++;
+        inptr++;
         tabsize = atoi(inptr);
 
         if (deflt(P_CURLN,P_CURLN) < 0)
