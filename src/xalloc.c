@@ -212,11 +212,36 @@ assert_stack_gap (void)
  */
 
 {
-    static enum { Normal, Error, Fatal } condition = Normal;
+    static enum { Initial, Normal, Error, Fatal } condition = Initial;
     ptrdiff_t gap;
     
+    /* Don't check the gap after a Fatal error or if the system is
+     * not fully initialised yet.
+     */
     if (stack_direction == 0 || condition == Fatal || heap_end == NULL)
         return;
+
+    /* On the first call, test if checking the gap actually makes sense.
+     * Reason: Some systems like Cygwin put the stack below the heap.
+     * If checking is not necessary, the 'condition' will be set to Fatal.
+     * TODO: Does Cygwin's Heap grow downwards?
+     */
+    if (condition == Initial)
+    {
+        condition = Fatal; /* Prevent recursion */
+        if ((char *)heap_end > (char *)&gap)
+        {
+            printf("%s Heap/stack check disabled: heap %p > stack %p\n"
+                  , time_stamp(), heap_end, &gap);
+            debug_message("%s Heap/stack check disabled: heap %p > stack %p\n"
+                  , time_stamp(), heap_end, &gap);
+            /* Leave condition at 'Fatal' */
+            return;
+        }
+
+        /* Yup, we can check the gap */
+        condition = Normal;
+    }
 
     /* First check if heap and stack overlap. We do this first to
      * rule out negative 'gap' values which can be caused by overflows.

@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+11-Mar-2002 (Lars Duening)  (3.3.183)
+    - (simulate.c) The CHECK_OBJECT_REF check was still overzealous;
+        unfortunately not with the FF mudlib I tested it with. Hmpf.
+    - (xalloc.c) The heap/stack gap check didn't expect the stack to
+        be located under the heap, as Cygwin does it.
+
 10-Mar-2002 (Lars Duening)  (3.3.182)
     - (actions.c, simulate.c) The CHECK_OBJECT_REF check was overzealous
         and didn't track properly the changes in object sentences. Sorry.

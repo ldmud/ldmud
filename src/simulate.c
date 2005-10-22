@@ -2547,12 +2547,15 @@ handle_newly_destructed_objects (void)
     while (newly_destructed_objs)
     {
         object_t *ob = newly_destructed_objs;
+
 #ifdef CHECK_OBJECT_REF
+        object_t *next_ob = ob->next_all;
         object_shadow_t *sh = newly_destructed_obj_shadows;
-        newly_destructed_obj_shadows = sh->next;
+        object_shadow_t *next_sh = sh->next;
+#else
+        newly_destructed_objs = ob->next_all;
 #endif /* CHECK_OBJECT_REF */
 
-        newly_destructed_objs = ob->next_all;
 #ifdef DEBUG
         if (!(ob->flags & O_DESTRUCTED))
             fatal("Non-destructed object %p '%s' in list of destructed objects.\n"
@@ -2561,6 +2564,8 @@ handle_newly_destructed_objects (void)
 #endif
 #ifdef CHECK_OBJECT_REF
         remove_object(ob, sh);
+        newly_destructed_objs = next_ob;
+        newly_destructed_obj_shadows = next_sh;
 #else
         remove_object(ob);
 #endif /* CHECK_OBJECT_REF */

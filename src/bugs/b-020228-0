@@ -1577,4 +1577,28 @@ No program to trace.
 ****************************************\c
 ****************************************
 
-----------
+------------------------------------------------------------------------
+Date: Mon, 11 Mar 2002 18:07:43 +0100
+From: Christian Mudra <mudra@informatik.uni-kl.de>
+Subject: dev408 crash
+
+Hi Lars,
+
+das hier ist gerade gecrasht:
+
+Program terminated with signal 10, Bus error.
+#0  0x9e094 in remove_destructed_objects () at simulate.c:2507
+2507                ob->prev_all->next_all = ob->next_all;
+(gdb) bt
+#0  0x9e094 in remove_destructed_objects () at simulate.c:2507
+#1  0x21614 in backend () at backend.c:343
+#2  0x7be38 in main (argc=-268438400, argv=0xeffff90c) at main.c:428
+(gdb) q
+
+in morgen.debug.log findet sich kein Eintrag, der letzte war 10 min vor
+dem crash. lpmud.log sichern wir nicht.
+
+Was tun?
+
+Coogan.
+
