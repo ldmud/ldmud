@@ -1,6 +1,17 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+08-Sep-2001 (Lars Duening)
+    - (interpret.c) The test if a function call should be trace or not
+        was done against the command_giver, not against the
+        current_interactive as documented (reported by Gnomi).
+    - (simulate.c) When entering a fatal(), the given format string is
+        printed as is to stderr (just a precaution).
+    - (smalloc.c) The 'magic match' failed messages now give the expected
+        block address and sizes, too.
+    - (lex.c) Added warning when an unknown pragma is encountered (suggested
+        by Robert).
+
 05-Sep-2001 (Lars Duening)  (3.3.99)
     - (prolang.y) The driver couldn't handle (multiple?) second-level inherits
         of a 'private nomask' function, which inline closure now are (reported

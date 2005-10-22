@@ -5839,8 +5839,8 @@ trace_test (int b)
 {
     interactive_t *ip;
 
-    return command_giver
-        && O_SET_INTERACTIVE(ip, command_giver)
+    return current_interactive
+        && O_SET_INTERACTIVE(ip, current_interactive)
         && (ip->trace_level & b)
         && (ip->trace_prefix == NULL
             || (current_object

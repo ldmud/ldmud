@@ -582,8 +582,10 @@ static void large_free(char *);
         block[M_FILE] = (word_t)file; \
         block[M_LINE] = line; \
         if (block[M_MAGIC] != SIZE_MOD_INDEX(sfmagic, size) ) \
-            fatal("allocation from free list:  magic match failed: " \
+            fatal("allocation from free list for %lu bytes: " \
+                  "block %p magic match failed, " \
                   "expected %lx, found %lx\n" \
+                 , block, (unsigned long) size \
                  , SIZE_MOD_INDEX(sfmagic, size), block[M_MAGIC]); \
         block[M_MAGIC] = SIZE_MOD_INDEX(samagic, size); \
       } while(0)
@@ -970,11 +972,13 @@ xfree (POINTER ptr)
 
 #ifdef MALLOC_TRACE
     if (block[M_MAGIC] == sfmagic[i % NELEM(samagic)])
-        fatal("xfree: block %lx (user %lx) freed twice\n"
-             , (unsigned long)block, (unsigned long)ptr);
+        fatal("xfree: block %lx size %lu (user %lx) freed twice\n"
+             , (unsigned long)block, (unsigned long)(i * SINT)
+             , (unsigned long)ptr);
     if (block[M_MAGIC] != samagic[i % NELEM(samagic)])
-        fatal("xfree: magic match failed: expected %lx, found %lx\n"
-             , samagic[i], block[M_MAGIC]);
+        fatal("xfree: block %p magic match failed: "
+              "size %lu, expected %lx, found %lx\n"
+             , block, (unsigned long)(i * SINT), samagic[i], block[M_MAGIC]);
     block[M_MAGIC] = sfmagic[i % NELEM(sfmagic)];
 #endif
 
@@ -1204,8 +1208,11 @@ remove_from_free_list (word_t *ptr)
 
 #ifdef MALLOC_TRACE
     if (ptr[M_MAGIC] != LFMAGIC)
-        fatal("remove_from_free_list: magic match failed: expected %lx, "
-              "found %lx\n", (unsigned long)ptr[M_MAGIC]
+        fatal("remove_from_free_list: block %p, "
+              "magic match failed: expected %lx, "
+              "found %lx\n"
+             , ptr
+             , (unsigned long)ptr[M_MAGIC]
              , (unsigned long)LFMAGIC);
 #endif
     fake((do_check_avl(),"remove_from_free_list called"));
@@ -1778,8 +1785,8 @@ remove_from_free_list (word_t *ptr)
 {
 #ifdef MALLOC_TRACE
    if (ptr[M_MAGIC] != LFMAGIC)
-       fatal("remove_from_free_list: magic match failed: "
-             "expected %lx, found %lx\n", ptr[M_MAGIC], LFMAGIC);
+       fatal("remove_from_free_list: block %p magic match failed: "
+             "expected %lx, found %lx\n", ptr, ptr[M_MAGIC], LFMAGIC);
 #endif
    count_back(large_free_stat, *ptr & M_MASK);
 
@@ -2366,11 +2373,15 @@ large_free (char *ptr)
 
 #ifdef MALLOC_TRACE
     if (p[M_MAGIC] == LFMAGIC)
-        fatal("large_free: block %lx (user %lx) freed twice\n"
-             , (unsigned long)p, (unsigned long)ptr);
+        fatal("large_free: block %lx size %lu, (user %lx) freed twice\n"
+             , (unsigned long)p, (unsigned long)(size * SINT)
+             , (unsigned long)ptr);
     if (p[M_MAGIC] != LAMAGIC)
-        fatal("large_free(%p): magic match failed: expected %lx, found %lx\n"
-             , ptr, (unsigned long)p[M_MAGIC], (unsigned long)LAMAGIC);
+        fatal("large_free(%p): block %p magic match failed: size %lu, "
+              "expected %lx, found %lx\n"
+             , ptr, p
+             , (unsigned long)(size * SINT)
+             , (unsigned long)p[M_MAGIC], (unsigned long)LAMAGIC);
 #endif
 
     /* If the next block is free, coagulate */

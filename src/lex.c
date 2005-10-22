@@ -2209,6 +2209,19 @@ handle_pragma (char *str)
         show_code_window();
     }
 #endif
+    else if (master_ob)
+    {
+        /* Calling yywarnf() without a master can cause the game
+         * to shut down, because yywarnf() eventually tries to call
+         * a master lfun.
+         */
+        yywarnf("Unknown #pragma '%s'", str);
+    }
+    else
+    {
+        debug_message("Warning: Unknown #pragma '%s': file %s, line %d\n"
+                     , str, current_file, current_line);
+    }
 } /* handle_pragma() */
 
 /*-------------------------------------------------------------------------*/

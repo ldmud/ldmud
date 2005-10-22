@@ -45,7 +45,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
 
 
-29-Aug-2001 (Lars Duening) -- upcoming Release 3.2.9
+08-Sep-2001 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -264,6 +264,9 @@ For a detailed list of all changes see the file CHANGELOG.
            are removed from the local variables as well.
        + Bugfix: Removing or destructing a shadow now properly
            removes all associated actions.
+       + Bugfix: The tracing checks weren't done against the current
+           interactive as documented, but instead against the current
+           commandgiver.
 
     - Other Changes:
        + New driver option '--pidfile <filename>' to write the pid of the

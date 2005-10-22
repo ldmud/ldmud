@@ -29,7 +29,7 @@ EXAMPLE
           --> ({ ({ 0, 0, 0 }), ({ 0, 0, 0 }) })
 
 HISTORY
-        LDMud 3.2.9 added the initialisation value and the multi-dimensional
+        LDMud 3.2.9 added the initialization value and the multi-dimensional
           allocation.
 
 SEE ALSO
