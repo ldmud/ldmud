@@ -1751,8 +1751,11 @@ eval_arg (int eOption, const char * pValue)
 
 #ifdef YYDEBUG
     case cYYDebug:
+      {
+        extern int yydebug;
         yydebug = MY_TRUE;
         break;
+      }
 #endif
 
     case cMaster:

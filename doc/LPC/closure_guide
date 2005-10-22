@@ -406,11 +406,11 @@ Table of Contents
            for each assignment.
 
            lambda(0, ({#'foreach, 'o, ({#'users})
-                                    , ({'#call_other, 'o, "die" })
+                                    , ({#'call_other, 'o, "die" })
                      }));
 
            lambda(0, ({#'foreach, ({'k, 'v}), ({ ...mapping...})
-                                    , ({'#printf, "%O:%O\n", 'k, 'v })
+                                    , ({#'printf, "%O:%O\n", 'k, 'v })
                      }));
 
       #'return gets one argument and acts like the "return" statement in LPC

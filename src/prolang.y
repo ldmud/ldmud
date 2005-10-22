@@ -1885,10 +1885,19 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
 
     flags |= type & ~TYPE_MOD_MASK; /* Move the visibility-info into flags */
     
-    if (p->type == I_TYPE_GLOBAL
-     && (num = p->u.global.function) >= 0
-     )
-    {
+    do {
+        function_t *funp;
+        Bool args_differ, compare_args;
+
+        if (p->type != I_TYPE_GLOBAL) break;
+        if ((num = p->u.global.function) < 0) break;
+
+        funp = FUNCTION(num);
+
+        if ((funp->flags & (NAME_INHERITED|TYPE_MOD_PRIVATE))
+         == (NAME_INHERITED|TYPE_MOD_PRIVATE))
+            break;
+
         /* The function was already defined. It may be one of several reasons:
          *
          *   1. There has been a prototype.
@@ -1898,10 +1907,6 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
          *   5. A "late" prototype has been encountered.
          */
 
-        function_t *funp;
-        Bool args_differ, compare_args;
-
-        funp = FUNCTION(num);
         args_differ = MY_FALSE;
         compare_args = MY_FALSE;
         
@@ -2076,7 +2081,7 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
         /* That's it */
         return num;
 
-    } /* if (function already defined) */
+    } while(0); /* Test and handle for already defined functions */
 
     /* It's a new function! */
     
@@ -2128,6 +2133,7 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
         q->next = all_efun_shadows;
         all_efun_shadows = q;
     }
+    /* else: Other cases don't need special treatment */
 
     p->u.global.function = num;
 
@@ -8551,6 +8557,7 @@ function_call:
               {
                   yyerrorf("Too many arguments to %s", instrs[f].name);
                   pop_arg_stack (num_arg - max);
+                  $4 -= num_arg - max; /* Don't forget this for the final pop */
                   num_arg = max;
               }
 
@@ -10741,10 +10748,6 @@ copy_functions (program_t *from, fulltype_t type)
             if ( (fun.flags & (NAME_HIDDEN|TYPE_MOD_NO_MASK|NAME_UNDEFINED) ) ==
                  (NAME_HIDDEN|TYPE_MOD_NO_MASK) )
                 break;
-            if ( (fun.flags & (NAME_INHERITED|TYPE_MOD_PRIVATE) ) ==
-                 (NAME_INHERITED|TYPE_MOD_PRIVATE) )
-                break;
-
 
             /* Visible: create a new identifier for it */
             p = make_global_identifier(get_txt(fun.name), I_TYPE_GLOBAL);

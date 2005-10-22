@@ -1,6 +1,17 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+21-Aug-2001 (Lars Duening)  (3.3.88)
+    - (prolang.y) The 'private' correction caused the driver to crash
+         under obscure circumstances. I implemented the correction now
+         in a different way, and it seems to work now (reported by Bardioc and
+         many others).
+    - (prolang.y) If an efun was called with too many arguments, the
+         extraneous args were popped twice from the argument stack, so that
+         subsequent function calls clobbered memory (reported by Dafire).
+    - (simulate.c) Added an error when the time left for a catch() is less
+         than the reserved cost.
+
 19-Aug-2001 (Lars Duening)  (3.3.87)
     - (prolang.y) Defining a function which is also a private function in an
          inherited object no longer redefines the inherited one (reported by

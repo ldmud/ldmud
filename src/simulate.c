@@ -307,6 +307,15 @@ catch_instruction ( bytecode_t catch_inst, uint offset
     /* Increase the eval_cost for the duration of the catch so that
      * there is enough time left to handle an eval-too-big error.
      */
+    if (max_eval_cost && eval_cost + CATCH_RESERVED_COST >= max_eval_cost)
+    {
+        error("Not enough eval time left for catch(): required %ld, available %ld\n"
+             , (long)CATCH_RESERVED_COST, (long)(max_eval_cost - eval_cost)
+             );
+        /* NOTREACHED */
+        return MY_TRUE;
+    }
+
     eval_cost += CATCH_RESERVED_COST;
     assigned_eval_cost += CATCH_RESERVED_COST;
 

@@ -61,6 +61,7 @@
 #include "driver.h"
 #include "typedefs.h"
  
+#include "my-alloca.h"
 #include <stdio.h>
 #include <setjmp.h>
 #include <sys/types.h>
