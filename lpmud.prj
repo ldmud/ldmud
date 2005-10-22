@@ -20,12 +20,12 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 170)
-(Parent-Version lpmud 3-3 169)
-(Version-Log "Forgot to close a comment in gcollect.c .")
+(Project-Version lpmud 3-3 171)
+(Parent-Version lpmud 3-3 170)
+(Version-Log "Local variable definitions can appear anywhere in a block.")
 (New-Version-Log
 "")
-(Checkin-Time "Mon, 18 Feb 2002 21:27:27 -0700")
+(Checkin-Time "Wed, 20 Feb 2002 23:13:14 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -59,8 +59,8 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.5 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.36 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.233 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.242 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.234 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.243 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.13 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -211,7 +211,7 @@
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.11 644))
   (src/port.c (lpmud/39_port.c 1.17.1.6 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.14 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.7 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.8 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))
@@ -432,7 +432,7 @@
   (src/bugs/b-011113 (lpmud/Q/43_b-011113 1.1 644) :no-keywords)
   (src/bugs/b-020205-0 (lpmud/Q/40_b-020205-0 1.5 644) :no-keywords)
 
-  (src/bugs/f-summary (lpmud/C/37_f-summary 1.39.1.52 644) :no-keywords)
+  (src/bugs/f-summary (lpmud/C/37_f-summary 1.39.1.53 644) :no-keywords)
   (src/bugs/f-981027-0 (lpmud/g/29_f-981027-0 1.2 644) :no-keywords)
   (src/bugs/f-981027-1 (lpmud/g/28_f-981027-1 1.2 644) :no-keywords)
   (src/bugs/f-981027-2 (lpmud/g/27_f-981027-2 1.2 644) :no-keywords)
@@ -559,7 +559,6 @@
   (src/bugs/f-000407 (lpmud/G/45_f-000407 1.1 644) :no-keywords)
   (src/bugs/f-000413-0 (lpmud/G/48_f-000413-0 1.1 644) :no-keywords)
   (src/bugs/f-000421 (lpmud/H/3_f-000421 1.1 644) :no-keywords)
-  (src/bugs/f-000430-1 (lpmud/H/4_f-000430-1 1.1 644) :no-keywords)
   (src/bugs/f-000430-2 (lpmud/H/5_f-000430-2 1.1 644) :no-keywords)
   (src/bugs/f-000530 (lpmud/H/17_f-000530 1.2 644) :no-keywords)
   (src/bugs/f-000616 (lpmud/H/21_f-000616 1.1 644) :no-keywords)
@@ -674,6 +673,7 @@
   (src/done/f-991020-0 (lpmud/E/17_f-991020-0 1.4 644) :no-keywords)
   (src/done/f-000221 (lpmud/G/12_f-000221 1.2 644) :no-keywords)
   (src/done/f-000306-1 (lpmud/G/29_f-000306-1 1.1.1.1 644) :no-keywords)
+  (src/done/f-000430-1 (lpmud/H/4_f-000430-1 1.1.1.1 644) :no-keywords)
   (src/done/f-000505 (lpmud/H/7_f-000505 1.1.1.1 644) :no-keywords)
   (src/done/f-000716 (lpmud/I/33_f-000716 1.2.1.2 644) :no-keywords)
   (src/done/f-000918 (lpmud/K/40_f-000918 1.1 644) :no-keywords)

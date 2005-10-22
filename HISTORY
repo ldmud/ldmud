@@ -69,7 +69,7 @@ For a detailed list of all changes see the file CHANGELOG.
            something different from '!'.
 
 
-17-Feb-2002 (Lars Duening) -- Release 3.2.9
+20-Feb-2002 (Lars Duening) -- Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -315,6 +315,8 @@ For a detailed list of all changes see the file CHANGELOG.
          error if none of the inherited objects defines the called function.
        + In a for() statement, variables may now be declared without
           initialisation (e.g. 'for (int i; ...)').
+       + Definitions of local variables can appear anywhere in a block. The
+          variables are defined from the point of definition onward.
        + Bugfix: Adding mappings of different width throws an error, unless
            one of the mappings if empty.
        + Bugfix: Right shift by 32 or more bits was computed incorrectly.

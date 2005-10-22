@@ -2,7 +2,7 @@ Short: C++-style variable definitions
 Date: Wed, 26 Apr 2000 21:17:22 -0700 (PDT)
 From: David Gibby <oop_apprentice@yahoo.com>
 Type: Feature
-State: New
+State: Done in LDMud 3.2.9-dev.405 and 3.3.171
 
 Could you allow variables to be declared
 anywhere down in the scope as C++ does? 

@@ -3999,7 +3999,7 @@ block:
 
       { enter_block_scope(); }
 
-      local_declarations
+      statements
 
       {
           /* If this is a local block, the declarations inserted
@@ -4019,15 +4019,17 @@ block:
           }
       }
 
-      statements '}'
+      '}'
 
       { leave_block_scope(); }
 ; /* block */
 
 
-local_declarations:
+statements:
       /* empty */
-    | local_declarations basic_type local_name_list ';' ;
+    | statements basic_type local_name_list ';' 
+    | statements statement
+;
 
 
 local_name_list:
@@ -4148,11 +4150,6 @@ new_local_name:
           $$.type = current_type | $1;
       }
 ; /* new_local_name */
-
-
-statements:
-      /* empty */
-    | statements statement
 
 
 statement:
