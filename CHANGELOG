@@ -1,6 +1,15 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+30-Jan-2002 (Lars Duening)  (3..3.158)
+    - (gcollect.c) The GC forgot to clear the refcounts in the known
+         destructed objects, thus sometimes causing a 'First reference
+         to program, but refcount != 0' fatal error (reported by Coogan,
+         reproduced by Menaures).
+    - (object.c) replace_program() without argument can now skip
+         the extra inherits added by the compiler to accomodate
+         virtual variables (reported by Nathan).
+
 26-Jan-2002 (Lars Duening)  (3.3.157)
     - (prolang.y) The wildcarded supercall "*":: no longer throws an
          error if none of the inherited objects defines the called function.

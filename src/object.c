@@ -2745,7 +2745,8 @@ f_replace_program (svalue_t *sp, int num_arg)
 {
     replace_ob_t *tmp;
     program_t *new_prog;  /* the replacing program */
-    int offsets[2];            /* the offsets of the replacing prog */
+    program_t *curprog;   /* the current program */
+    int offsets[2];       /* the offsets of the replacing prog */
 
     if (!current_object)
         error("replace_program called with no current object\n");
@@ -2755,17 +2756,45 @@ f_replace_program (svalue_t *sp, int num_arg)
         error(
           "Cannot schedule replace_program after binding lambda closures\n");
 
+    curprog = current_object->prog;
+
     if (num_arg < 1)
     {
         /* Just take the first inherited program */
-        if (current_object->prog->num_inherited < 1)
-            error("replace_program called with no inherited program\n");
-        if (current_object->prog->num_inherited > 1)
-            error("replace_program() requires argument for object with more than one inherit\n");
+        size_t replace_index;  /* Inherit index of the replacing program */
 
-        new_prog = current_object->prog->inherit[0].prog;
-        offsets[0] = current_object->prog->inherit[0].variable_index_offset;
-        offsets[1] = current_object->prog->inherit[0].function_index_offset;
+        /* Just take the first normal inherited program */
+        if (curprog->num_inherited < 1)
+            error("replace_program called with no inherited program\n");
+        replace_index = 0;
+        if (curprog->num_inherited > 1)
+        {
+            /* The object might have extra inherits caused by virtual
+             * variables. Since they preceed the associated 'real'
+             * inherit, search forward in the inherit list for the real
+             * one.
+             */
+            for ( ; replace_index < curprog->num_inherited
+                  ; replace_index++)
+            {
+                if (!(curprog->inherit[replace_index].inherit_type
+                      & INHERIT_TYPE_EXTRA))
+                    break;
+            }
+            /* replace_index must now be the last inherit for the
+             * auto-replace_program to work.
+             */
+            if (replace_index + 1 != curprog->num_inherited)
+            {
+                error("replace_program() requires argument for object "
+                      "with more than one inherit\n");
+                /* NOTREACHED */
+            }
+        }
+
+        new_prog = curprog->inherit[replace_index].prog;
+        offsets[0] = curprog->inherit[replace_index].variable_index_offset;
+        offsets[1] = curprog->inherit[replace_index].function_index_offset;
     }
     else
     {
@@ -2790,9 +2819,9 @@ f_replace_program (svalue_t *sp, int num_arg)
         {
             /* Given program not inherited, maybe it's the current already.
              */
-            if (mstreq(sname, current_object->prog->name ))
+            if (mstreq(sname, curprog->name ))
             {
-                new_prog = current_object->prog;
+                new_prog = curprog;
                 offsets[0] = offsets[1] = 0;
             }
             else
@@ -2813,7 +2842,7 @@ f_replace_program (svalue_t *sp, int num_arg)
     /* Program found, now create a new replace program entry, or
      * change an existing one.
      */
-    if (!(current_object->prog->flags & P_REPLACE_ACTIVE)
+    if (!(curprog->flags & P_REPLACE_ACTIVE)
      || !(tmp = retrieve_replace_program_entry()) )
     {
         tmp = xalloc(sizeof *tmp);
@@ -2821,7 +2850,7 @@ f_replace_program (svalue_t *sp, int num_arg)
         tmp->ob = current_object;
         tmp->next = obj_list_replace;
         obj_list_replace = tmp;
-        current_object->prog->flags |= P_REPLACE_ACTIVE;
+        curprog->flags |= P_REPLACE_ACTIVE;
     }
 
     tmp->new_prog = new_prog;

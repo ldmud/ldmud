@@ -324,8 +324,8 @@ gc_mark_program_ref (program_t *p)
         if (p->ref++)
         {
             dump_malloc_trace(1, p);
-            fatal("First reference to program %p, but ref count %ld != 0\n"
-                 , p, (long)p->ref - 1
+            fatal("First reference to program %p '%s', but ref count %ld != 0\n"
+                 , p, get_txt(p->name), (long)p->ref - 1
                  );
         }
 
@@ -402,7 +402,8 @@ gc_mark_program_ref (program_t *p)
         if (!p->ref++)
         {
             dump_malloc_trace(1, p);
-            fatal("Program block %p referenced as something else\n", p);
+            fatal("Program block %p '%s' referenced as something else\n"
+                 , p, get_txt(p->name));
         }
     }
 } /* gc_mark_program_ref() */
@@ -438,8 +439,9 @@ gc_reference_destructed_object (object_t *ob)
         if (ob->ref)
         {
             dump_malloc_trace(1, ob);
-            fatal("First reference to destructed object %p, but ref count %ld != 0\n"
-                 , ob, (long)ob->ref
+            fatal("First reference to destructed object %p '%s', "
+                  "but ref count %ld != 0\n"
+                 , ob, get_txt(ob->name), (long)ob->ref
                  );
         }
 
@@ -454,7 +456,8 @@ gc_reference_destructed_object (object_t *ob)
         {
             write_malloc_trace(ob);
             dump_malloc_trace(1, ob);
-            fatal("Destructed object %p referenced as something else\n", ob);
+            fatal("Destructed object %p '%s' referenced as something else\n"
+                 , ob, get_txt(ob->name));
         }
     }
 }
@@ -1091,6 +1094,23 @@ garbage_collection(void)
 
     null_vector.ref = 0;
 
+    /* Finally, walk the of destructed objects and clear all references
+     * in them.
+     */
+    for (ob = destructed_objs; ob;  ob = ob->next_all)
+    {
+        if (d_flag > 4)
+        {
+            debug_message("%s clearing refs for destructed object '%s'\n"
+                         , time_stamp(), get_txt(ob->name));
+        }
+
+        ob->prog->ref = 0;
+        clear_inherit_ref(ob->prog);
+        ob->ref = 0;
+    }
+
+
     /* --- Pass 3: Compute the ref counts, and set M_REF where appropriate ---
      */
 
@@ -1285,7 +1305,7 @@ W("DEBUG: GC frees destructed '"); W(get_txt(ob->name)); W("'\n");
         if (TEST_REF(ob))
         {
             dprintf1(gcollect_outfd
-                    , "Found leaked destructed object '%s'\n"
+                    , "Freeing destructed object '%s'\n"
                     , (p_int)get_txt(ob->name)
                     );
             ob->ref = 0; /* Since it was never reached by the clear pass */
