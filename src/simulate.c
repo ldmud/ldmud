@@ -40,6 +40,7 @@
 #include "call_out.h"
 #include "closure.h"
 #include "comm.h"
+#include "ed.h"
 #include "filestat.h"
 #include "gcollect.h"
 #include "heartbeat.h"
@@ -48,6 +49,7 @@
 #include "lex.h"
 #include "main.h"
 #include "mapping.h"
+#include "mregex.h"
 #include "mstrings.h"
 #include "object.h"
 #include "otable.h"
@@ -1733,7 +1735,7 @@ load_object (const char *lname, Bool create_super, int depth, namechain_t *chain
 #ifdef CHECK_OBJECT_STAT
     if (check_object_stat)
     {
-        fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) load(%p '%s') name: %d -> (%ld:%ld)\n"
+        fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) load(%p '%s') name: %ld -> (%ld:%ld)\n"
                       , tot_alloc_object, tot_alloc_object_size, ob, ob->name ? get_txt(ob->name) : "<null>"
                       , mstrsize(ob->name)
                       , tot_alloc_object, tot_alloc_object_size + (mstrsize(ob->name))
@@ -1969,7 +1971,7 @@ clone_object (string_t *str1)
 #ifdef CHECK_OBJECT_STAT
     if (check_object_stat)
     {
-        fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) clone(%p '%s') name: %d -> (%ld:%ld)\n"
+        fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) clone(%p '%s') name: %ld -> (%ld:%ld)\n"
                       , tot_alloc_object, tot_alloc_object_size, new_ob, new_ob->name ? get_txt(new_ob->name) : "<null>"
                       , mstrsize(new_ob->name)
                       , tot_alloc_object, tot_alloc_object_size + (mstrsize(new_ob->name))

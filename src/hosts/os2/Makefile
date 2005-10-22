@@ -259,11 +259,12 @@ heartbeat.o : ../mudlib/sys/debug_info.h xalloc.h wiz_list.h svalue.h \
 
 interpret.o : ../mudlib/sys/trace.h ../mudlib/sys/debug_info.h \
     ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h switch.h swap.h \
-    svalue.h smalloc.h stdstrings.h simul_efun.h simulate.h object.h \
-    mstrings.h mapping.h lex.h instrs.h heartbeat.h gcollect.h filestat.h \
-    exec.h comm.h closure.h backend.h array.h actions.h interpret.h \
-    my-alloca.h typedefs.h driver.h ptrtable.h strfuns.h sent.h main.h \
-    port.h config.h hosts/unix.h hosts/be/be.h machine.h
+    svalue.h smalloc.h stdstrings.h simul_efun.h simulate.h prolang.h \
+    parse.h otable.h object.h mstrings.h mapping.h lex.h instrs.h \
+    heartbeat.h gcollect.h filestat.h exec.h efuns.h ed.h comm.h closure.h \
+    call_out.h backend.h array.h actions.h interpret.h my-alloca.h \
+    typedefs.h driver.h ptrtable.h strfuns.h sent.h main.h port.h config.h \
+    hosts/unix.h hosts/be/be.h machine.h
 
 lex.o : efun_defs.c ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h \
     svalue.h strfuns.h stdstrings.h simul_efun.h simulate.h prolang.h \
@@ -373,11 +374,11 @@ simul_efun.o : xalloc.h swap.h svalue.h stdstrings.h simulate.h ptrtable.h \
 simulate.o : ../mudlib/sys/rtlimits.h ../mudlib/sys/files.h \
     ../mudlib/sys/driver_hook.h ../mudlib/sys/debug_info.h xalloc.h \
     wiz_list.h svalue.h swap.h strfuns.h stdstrings.h smalloc.h \
-    simul_efun.h sent.h prolang.h otable.h object.h mstrings.h mapping.h \
-    main.h lex.h instrs.h interpret.h heartbeat.h gcollect.h filestat.h \
-    comm.h closure.h call_out.h backend.h array.h actions.h simulate.h \
-    my-alloca.h typedefs.h driver.h ptrtable.h exec.h port.h config.h \
-    hosts/unix.h hosts/be/be.h machine.h
+    simul_efun.h sent.h prolang.h otable.h object.h mstrings.h mregex.h \
+    mapping.h main.h lex.h instrs.h interpret.h heartbeat.h gcollect.h \
+    filestat.h ed.h comm.h closure.h call_out.h backend.h array.h actions.h \
+    simulate.h my-alloca.h typedefs.h driver.h ptrtable.h exec.h regexp.h \
+    pcre/pcre.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
 sprintf.o : xalloc.h swap.h svalue.h stdstrings.h simul_efun.h simulate.h \
     sent.h random.h ptrtable.h object.h mstrings.h mapping.h main.h \

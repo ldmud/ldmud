@@ -128,6 +128,11 @@ extern svalue_t *f_unique_array(svalue_t *sp);
 extern void set_vector_user(vector_t *p, object_t *owner);
 extern long total_array_size(void);
 
+#ifdef USE_ALISTS
+extern vector_t * shrink_array (vector_t *p, mp_int n);
+extern int array_cmp (svalue_t *p1, svalue_t *p2);
+#endif
+
 #if defined(GC_SUPPORT)
 extern void clear_array_size (void);
 extern void count_array_size (vector_t *vec);

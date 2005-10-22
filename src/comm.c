@@ -193,6 +193,10 @@ extern int socketpair(int, int, int, int[2]);
 #    define MAXHOSTNAMELEN 64
 #endif
 
+#ifndef INET_ADDRSTRLEN
+#    define INET_ADDRSTRLEN 16
+#endif
+
 /* Amazing how complicated networking can be, hm? */
 
 /*-------------------------------------------------------------------------*/
@@ -5607,7 +5611,7 @@ get_host_ip_number (void)
 
 {
 #ifndef USE_IPV6
-    char buf[INET6_ADDRSTRLEN+3];
+    char buf[INET_ADDRSTRLEN+3];
 
     sprintf(buf, "\"%s\"", inet_ntoa(host_ip_number));
 #else

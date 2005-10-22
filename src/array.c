@@ -326,7 +326,7 @@ free_empty_vector (vector_t *p)
 
 /*-------------------------------------------------------------------------*/
 static INLINE vector_t *
-shrink_array (vector_t *p, mp_int n)
+i_shrink_array (vector_t *p, mp_int n)
 
 /* Create and return a new array containing just the first <n> elements
  * of <p>. <p> itself is freed (and thus possibly deallocated).
@@ -352,6 +352,12 @@ shrink_array (vector_t *p, mp_int n)
     free_array(p);
     return res;
 }
+
+#ifdef USE_ALISTS
+vector_t * shrink_array (vector_t *p, mp_int n) { return i_shrink_array(p, n); }
+#endif
+
+#define shrink_array(p,n) i_shrink_array(p,n)
 
 /*-------------------------------------------------------------------------*/
 void
@@ -774,7 +780,7 @@ add_array (vector_t *p, vector_t *q)
 
 /*-------------------------------------------------------------------------*/
 static INLINE int
-array_cmp (svalue_t *p1, svalue_t *p2)
+i_array_cmp (svalue_t *p1, svalue_t *p2)
 
 /* Array order function.
  *
@@ -817,7 +823,13 @@ array_cmp (svalue_t *p1, svalue_t *p2)
         break;
     }
     return 0;
-} /* array_cmp() */
+} /* i_array_cmp() */
+
+#ifdef USE_ALISTS
+int array_cmp (svalue_t *p1, svalue_t *p2) { return i_array_cmp(p1, p2); }
+#endif
+
+#define array_cmp(p1, p2) i_array_cmp(p1, p2)
 
 /*-------------------------------------------------------------------------*/
 static long

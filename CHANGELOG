@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+14-Aug-2002 (Lars Duening) (3.3.222)
+    - (comm.c) Compilation broke under BeOS.
+    - (object.c, swap.c, simulate.c) Removed warnings.
+    - (object.c) An error message printed memory garbage.
+    - (array) Forgot to export array_cmp() and shrink_array() when
+         using alists (reported by Markus).
+
 14-Aug-2002 (Lars Duening)  (3.3.221)
     - (array, interpret.c, prolang.y) Added the symmetric difference
          operators '^' and '^=' for arrays; complemented '|' for arrays
