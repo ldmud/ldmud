@@ -10088,7 +10088,7 @@ again:
         if (sp->type == T_POINTER && (sp-1)->type == T_POINTER)
         {
             inter_sp = sp - 2;
-            (sp-1)->u.vec = intersect_array(sp->u.vec, (sp-1)->u.vec);
+            (sp-1)->u.vec = intersect_array((sp-1)->u.vec, sp->u.vec);
             sp--;
             break;
         }
@@ -10161,18 +10161,28 @@ again:
          *
          * Possible type combinations:
          *   int ^ int    -> int
+         *   array ^ array  -> array
          *
-         * TODO: Extend this to vectors and mappings.
+         * TODO: Extend this to mappings.
          */
 
         int i;
 
-        TYPE_TEST_LEFT((sp-1), T_NUMBER);
-        TYPE_TEST_RIGHT(sp, T_NUMBER);
+        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_POINTER);
+        if ((sp-1)->type == T_NUMBER)
+        {
+            TYPE_TEST_RIGHT(sp, T_NUMBER);
+            i = (sp-1)->u.number ^ sp->u.number;
+            sp--;
+            sp->u.number = i;
+        }
+        else if ((sp-1)->type == T_POINTER)
+        {
+            TYPE_TEST_RIGHT(sp, T_POINTER);
+            sp--;
+            sp->u.vec = symmetric_diff_array(sp->u.vec, (sp+1)->u.vec);
+        }
 
-        i = (sp-1)->u.number ^ sp->u.number;
-        sp--;
-        sp->u.number = i;
         break;
     }
 
@@ -11533,9 +11543,10 @@ again:
          * assign the result to sp[0] and also leave it on the stack.
          *
          * Possible type combinations:
-         *   int         | int                -> int
+         *   int   | int   -> int
+         *   array | array -> array
          *
-         * TODO: Extend this to mappings and arrays.
+         * TODO: Extend this to arrays.
          */
 
         svalue_t *argp;
@@ -11575,7 +11586,30 @@ again:
             break;
         }
 
-        OP_ARG_ERROR(1, TF_NUMBER, argp->type);
+        if (argp->type == T_POINTER)
+        {
+            /* Join an array */
+
+            vector_t *vec1, *vec2;
+
+            if (sp[-1].type != T_POINTER)
+            {
+                OP_ARG_ERROR(2, TF_POINTER, sp[-1].type);
+                /* NOTREACHED */
+            }
+            inter_sp = sp - 2;
+            vec1 = argp->u.vec;
+            vec2 = sp[-1].u.vec;
+            argp->type = T_NUMBER;
+            vec1 = join_array(vec1, vec2);
+            put_ref_array(argp, vec1);
+            sp--;
+            sp->u.vec = argp->u.vec;
+            free_svalue(sp+1);
+            break;
+        }
+
+        OP_ARG_ERROR(1, TF_NUMBER|TF_POINTER, argp->type);
         /* NOTREACHED */
         break;
     }
@@ -11586,9 +11620,10 @@ again:
          * assign the result to sp[0] and also leave it on the stack.
          *
          * Possible type combinations:
-         *   int         ^ int                -> int
+         *   int   ^ int   -> int
+         *   array ^ array -> array
          *
-         * TODO: Extend this to mappings and arrays.
+         * TODO: Extend this to mappings.
          */
 
         svalue_t *argp;
@@ -11628,7 +11663,30 @@ again:
             break;
         }
 
-        OP_ARG_ERROR(1, TF_NUMBER, argp->type);
+        if (argp->type == T_POINTER)
+        {
+            /* Symm-diff an array */
+
+            vector_t *vec1, *vec2;
+
+            if (sp[-1].type != T_POINTER)
+            {
+                OP_ARG_ERROR(2, TF_POINTER, sp[-1].type);
+                /* NOTREACHED */
+            }
+            inter_sp = sp - 2;
+            vec1 = argp->u.vec;
+            vec2 = sp[-1].u.vec;
+            argp->type = T_NUMBER;
+            vec1 = symmetric_diff_array(vec1, vec2);
+            put_ref_array(argp, vec1);
+            sp--;
+            sp->u.vec = argp->u.vec;
+            free_svalue(sp+1);
+            break;
+        }
+
+        OP_ARG_ERROR(1, TF_NUMBER|TF_POINTER, argp->type);
         /* NOTREACHED */
         break;
     }

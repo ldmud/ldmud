@@ -8,7 +8,9 @@ DESCRIPTION
         
         If an object self-destructs, it will not immediately terminate
         execution. If the efun this_object() will be called by the
-        destructed object, the result will be 0.
+        destructed object, the result will be 0. Furthermore, all
+        calls to other objects and to simul-efuns will be ignored, instead
+        the driver will return 0 als 'call' result.
         
         To keep things consistent, most mudlibs frown upon the
         destruct()ion of other objects, and instead demand call_others

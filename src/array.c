@@ -325,7 +325,7 @@ free_empty_vector (vector_t *p)
 }
 
 /*-------------------------------------------------------------------------*/
-static vector_t *
+static INLINE vector_t *
 shrink_array (vector_t *p, mp_int n)
 
 /* Create and return a new array containing just the first <n> elements
@@ -790,6 +790,8 @@ array_cmp (svalue_t *p1, svalue_t *p2)
  * Especially, it works for strings because the caller makes sure
  * that only directly tabled strings are used.
  *
+ * See also compare_single() for a more specialized version.
+ *
  * TODO: Is the assumption '.number is big enough to hold everything
  * TODO:: in the svalue' true for future hardware?
  * TODO: Reinterpreting the pointers as 'integer' may not be portable
@@ -818,15 +820,57 @@ array_cmp (svalue_t *p1, svalue_t *p2)
 } /* array_cmp() */
 
 /*-------------------------------------------------------------------------*/
+static long
+compare_single (svalue_t *svp1, svalue_t *svp2)
+
+/* Compare *svp1 and *svp2, return 0 if equal, and -1 if not.
+ *
+ * See also array_cmp() for the general version.
+ */
+
+{
+    if (svp1->type != svp2->type)
+        return -1;
+
+    if (svp1->type == T_STRING)
+    {
+        return mstreq(svp1->u.str, svp2->u.str) ? 0 : -1;
+    }
+
+    if (svp1->type == T_CLOSURE)
+    {
+        return closure_cmp(svp1, svp2);
+    }
+
+    /* All other types have to be equal by address, visible in u.number */
+    /* TODO: This comparison is not valid according to ISO C */
+    if (svp1->u.number != svp2->u.number)
+        return -1;
+
+    switch (svp1->type)
+    {
+    case T_FLOAT:
+    case T_SYMBOL:
+    case T_QUOTED_ARRAY:
+        return svp1->x.generic != svp2->x.generic ? -1 : 0;
+    default:
+        return 0;
+    }
+
+    /* NOTREACHED */
+    return 0;
+} /* compare_single() */
+
+/*-------------------------------------------------------------------------*/
 ptrdiff_t *
 get_array_order (vector_t * vec )
 
 /* Determine the order of the elements in vector <vec> and return the
  * sorted indices (actually svalue_t* pointer diffs). The order is
- * determined by array_cmp().
+ * determined by array_cmp() (which happens to be high-to-low).
  * 
- * As a side effect, strings in the key vector are made shared, and
- * destructed objects in key and data vectors are replaced by svalue 0s.
+ * As a side effect, strings in the vector are made shared, and
+ * destructed objects in the vector are replaced by svalue 0s.
  */
 
 {
@@ -838,9 +882,9 @@ get_array_order (vector_t * vec )
        */
 
     svalue_t **root;
-      /* Auxiliary array with the sorted keys as svalue* into inlists[0].vec.
+      /* Auxiliary array with the sorted keys as svalue* into vec.
        * This way the sorting is given by the order of the pointers, while
-       * the original position is given by (pointer-inlists[0].vec->item).
+       * the original position is given by (pointer - vec->item).
        * The very first element is a dummy (heapsort uses array indexing
        * starting with index 1), the next <keynum> elements are scratch
        * area, the final <keynum> elements hold the sorted keys in reverse
@@ -853,39 +897,17 @@ get_array_order (vector_t * vec )
 
     keynum = (mp_int)VEC_SIZE(vec);
 
-    /* Allocate the auxiliary array. */
-    root = (svalue_t **)alloca(keynum * sizeof(svalue_t *[2])
-                                           + sizeof(svalue_t)
-                              );
-    if (!root)
-    {
-        error("Stack overflow in get_array_order()");
-        /* NOTREACHED */
-        return NULL;
-    }
-
     xallocate(sorted, keynum * sizeof(ptrdiff_t) + sizeof(ptrdiff_t)
              , "sorted index array");
       /* The extra sizeof(ptrdiff_t) is just to have something in
        * case keynum is 0.
        */
 
-    /*
-     * Heapsort inlists[0].vec into *root.
-     * TODO: For small arrays a simpler sort like linear insertion or
-     * TODO:: even bubblesort might be faster (less overhead). Best solution
-     * TODO:: would be to offer both algorithms and determine the threshhold
-     * TODO:: at startup.
+    /* Make sure that strings can be compared by their pointer,
+     * and null out destructed objects.
      */
-
-    /* Heapify the keys into the first half of root */
-    for ( j = 1, inpnt = vec->item
-        ; j <= keynum
-        ; j++, inpnt++)
+    for ( j = 0, inpnt = vec->item; j <= keynum; j++, inpnt++)
     {
-        int curix, parix;
-
-        /* make sure that strings can be compared by their pointer */
         if (inpnt->type == T_STRING)
         {
             if (!mstr_d_tabled(inpnt->u.str))
@@ -898,6 +920,136 @@ get_array_order (vector_t * vec )
             free_svalue(inpnt);
             put_number(inpnt, 0);
         }
+    }
+
+    /* For small arrays, use something else but Heapsort - trading
+     * less overhead for worse complexity.
+     * TODO: The limit of '6' is arbitrary (it was the transition point
+     * TODO:: on my machine) - a better way would be to test the system
+     * TODO:: speed at startup.
+     */
+    if (keynum <= 6)
+    {
+        switch (keynum)
+        {
+        case 0:
+            /* Do nothing */
+            break;
+
+        case 1:
+            sorted[0] = 0;
+            break;
+
+        case 2:
+            if (array_cmp(vec->item, vec->item + 1) > 0)
+            {
+                sorted[0] = 0;
+                sorted[1] = 1;
+            }
+            else
+            {
+                sorted[0] = 1;
+                sorted[1] = 0;
+            }
+            break;
+
+        case 3:
+          {
+            int d;
+
+            sorted[0] = 0;
+            sorted[1] = 1;
+            sorted[2] = 2;
+            d = array_cmp(vec->item, vec->item + 1);
+            if (d < 0)
+            {
+                sorted[1] = 0;
+                sorted[0] = 1;
+            }
+            d = array_cmp(vec->item + sorted[0], vec->item + sorted[2]);
+            if (d < 0)
+            {
+                ptrdiff_t tmp = sorted[2];
+                sorted[2] = sorted[0];
+                sorted[0] = tmp;
+            }
+            d = array_cmp(vec->item + sorted[1], vec->item + sorted[2]);
+            if (d < 0)
+            {
+                ptrdiff_t tmp = sorted[2];
+                sorted[2] = sorted[1];
+                sorted[1] = tmp;
+            }
+            break;
+          } /* case 3 */
+
+        default:
+          {
+            size_t  start;  /* Index of the next position to set */
+
+            /* Initialise the sorted[] array */
+            for (start = 0; start < keynum; start++)
+                sorted[start] = (ptrdiff_t)start;
+
+            /* Outer loop: walk start through the array, being the position
+             * where the next highest element has to go.
+             */
+            for (start = 0; start < keynum-1; start++)
+            {
+                size_t    max_idx;  /* Index (in sorted[]) of the current max */
+                svalue_t *max;      /* Pointer to the current max svalue */
+                size_t    test_idx; /* Index of element to test */
+                
+                /* Find the highest element in the remaining vector */
+                max_idx = start;
+                max = vec->item + sorted[start];
+
+                for (test_idx = start+1; test_idx < keynum; test_idx++)
+                {
+                    svalue_t *test = vec->item + sorted[test_idx];
+
+                    if (array_cmp(max, test) < 0)
+                    {
+                        max_idx = test_idx;
+                        max = test;
+                    }
+                }
+
+                /* Put the found maximum at position start */
+                if (max_idx != start)
+                {
+                    ptrdiff_t tmp = sorted[max_idx];
+                    sorted[max_idx] = sorted[start];
+                    sorted[start] = tmp;
+                }
+            }
+            break;
+          } /* case default */
+        } /* switch(keynum) */
+
+        return sorted;
+    }
+
+    /* Allocate the auxiliary array. */
+    root = (svalue_t **)alloca(keynum * sizeof(svalue_t *[2])
+                                           + sizeof(svalue_t)
+                              );
+    if (!root)
+    {
+        error("Stack overflow in get_array_order()");
+        /* NOTREACHED */
+        return NULL;
+    }
+
+    /* Heapsort vec into *root.
+     */
+
+    /* Heapify the keys into the first half of root */
+    for ( j = 1, inpnt = vec->item
+        ; j <= keynum
+        ; j++, inpnt++)
+    {
+        int curix, parix;
 
         /* propagate the new element up in the heap as much as necessary */
         for (curix = j; 0 != (parix = curix>>1); ) {
@@ -961,13 +1113,14 @@ vector_t *
 order_array (vector_t *vec)
 
 /* Order the array <vec> and return a new vector with the sorted data.
- * The sorting order is the internal order defined by array_cmp().
+ * The sorting order is the internal order defined by array_cmp() (which
+ * happens to be high-to-low).
  *
- * This function and lookup_array() are used in several places for internal
- * lookup functions (e.g. in sort_array()).
+ * This function and lookup_key() are used in several places for internal
+ * lookup functions (e.g. in say()).
  *
- * As a side effect, strings in the key vector are made shared, and
- * destructed objects in key and data vectors are replaced by svalue 0s.
+ * As a side effect, strings in the vector are made shared, and
+ * destructed objects in the vector are replaced by svalue 0s.
  */
 
 {
@@ -996,49 +1149,233 @@ order_array (vector_t *vec)
 } /* order_array() */
 
 /*-------------------------------------------------------------------------*/
-static long
-compare_single (svalue_t *svp, vector_t *vec)
+long
+lookup_key (svalue_t *key, vector_t *vec)
 
-/* Compare *svp and v->item[0], return 0 if equal, and -1 if not.
+/* Lookup up value <key> in ordered vector <vec> and return it's position.
+ * If not found, return as negative number the position at which the
+ * key would have to be inserted, incremented by 1. That is:
+ *   -1          -> key should be at position 0,
+ *   -2          -> key should be at position 1,
+ *   -len(vec)-1 -> key should be appended to the vector.
  *
- * The function is used by subtract_array() and must match the signature
- * of lookup_key().
+ * <vec> must be sorted according to array_cmp(), else the result will be
+ * interesting, but useless.
+ *
+ * The function is used by object.c and pkg-alists.c .
  */
 
 {
-    svalue_t *p2 = &vec->item[0];
+    mp_int i, o, d, keynum;
+    svalue_t shared_string_key; 
+      /* The svalue used to shared search key during the search.
+       * It does not count as reference!
+       */
 
-    if (svp->type != p2->type)
-        return -1;
-
-    if (svp->type == T_STRING)
+    /* If key is a non-shared string, lookup and use the shared copy.
+     */
+    if (key->type == T_STRING && !mstr_d_tabled(key->u.str))
     {
-        return mstreq(svp->u.str, p2->u.str) ? 0 : -1;
+        shared_string_key.type = T_STRING;
+        if ( !(shared_string_key.u.str = find_tabled(key->u.str)) )
+        {
+            return -1;
+        }
+        key = &shared_string_key;
     }
 
-    if (svp->type == T_CLOSURE)
-    {
-        return closure_cmp(svp, p2);
-    }
-
-    /* All other types have to be equal by address, visible in u.number */
-    /* TODO: This comparison is not valid according to ISO C */
-    if (svp->u.number != p2->u.number)
+    if ( !(keynum = (mp_int)VEC_SIZE(vec)) )
         return -1;
 
-    switch (svp->type)
-    {
-    case T_FLOAT:
-    case T_SYMBOL:
-    case T_QUOTED_ARRAY:
-        return svp->x.generic != p2->x.generic ? -1 : 0;
-    default:
-        return 0;
+    /* Simple binary search */
+
+    i = keynum >> 1;
+    o = (i+2) >> 1;
+    for (;;) {
+        d = array_cmp(key, &vec->item[i]);
+        if (d < 0)
+        {
+            i -= o;
+            if (i < 0)
+            {
+                i = 0;
+            }
+        }
+        else if (d > 0) 
+        {
+            i += o;
+            if (i >= keynum)
+            {
+                i = keynum-1;
+            }
+        }
+        else
+        {
+            /* Found! */
+            return i;
+        }
+
+        if (o <= 1)
+        {
+            /* Last element to try */
+            d = array_cmp(key, &vec->item[i]);
+            if (d == 0) return i;
+            if (d > 0) return -(i+1)-1;
+            return -i-1;
+        }
+        o = (o+1) >> 1;
     }
 
     /* NOTREACHED */
-    return 0;
-}
+    return -1;
+} /* lookup_key() */
+
+/*-------------------------------------------------------------------------*/
+static Bool *
+match_arrays (vector_t *vec1, vector_t *vec2)
+
+/* Compare the contents of the two (unordered) vectors <vec1> and
+ * <vec2> and return a boolean vector describing for each vector
+ * which elements are in both.
+ *
+ * The resulting bool vector has len(vec1)+len(vec2) flags (but
+ * at least 1); the first describing the elements of vec1, the last
+ * describing those of vec2. Each flag is FALSE if the vector entry
+ * is unique, and TRUE if the same value appears in the other vector.
+ *
+ * When out of memory, an error() is thrown.
+ */
+
+{
+    size_t  len1, len2, len; /* Length of vec1, vec2, and both summed */
+    Bool   *flags;           /* The resulting flag vector */
+
+    len1 = VEC_SIZE(vec1);
+    len2 = VEC_SIZE(vec2);
+
+    /* Get the flag vector, default it to 'non matching'. */
+    len = len1 + len2; if (!len) len = 1;
+    xallocate(flags, len * sizeof(Bool), "flag vector");
+    memset(flags, 0, len * sizeof(Bool));
+    
+    /* Test some special cases */
+
+    /* Special case: if one of the vectors is empty, no elements match */
+    if (len1 == 0 || len2 == 0)
+        return flags;
+
+    /* Special case: if one of the vectors has only one element,
+     * a simple linear comparison is sufficient.
+     */
+    if (len1 == 1 || len2 == 1)
+    {
+        svalue_t * rover;  /* Pointer to the long vector elements */
+        size_t     rlen;   /* Length (remaining) in the long vector */
+        svalue_t * elem;   /* Pointer to the single-elem vector elements */
+        Bool     * rflag;  /* Pointer to the long vector flags */
+        Bool     * eflag;  /* Pointer to the single-elem vector flag */
+
+        /* Sort out which vector is which */
+        if  (len1 == 1)
+        {
+            /* Even more special case: both vectors have just one elem */
+            if (len2 == 1)
+            {
+                if (!compare_single(vec1->item, vec2->item))
+                {
+                    flags[0] = flags[1] = MY_TRUE;
+                }
+                return flags;
+            }
+
+            /* vec1 is the short one */
+            rover = vec2->item;
+            rlen = len2;
+            rflag = flags + len1;
+            elem = vec1->item;
+            eflag = flags;
+        }
+        else /* len2 == 1 */
+        {
+            /* vec2 is the short one */
+            rover = vec1->item;
+            rlen = len1;
+            rflag = flags;
+            elem = vec2->item;
+            eflag = flags + len1;
+        }
+
+        /* Now loop over all elements in the long vector and compare
+         * them to the one in the short vector.
+         */
+        for ( ; rlen != 0; rlen--, rover++, rflag++)
+        {
+            if (!compare_single(rover, elem))
+                *rflag = *eflag = MY_TRUE;
+        }
+
+        /* Done */
+        return flags;
+    } /* if (one vector has only one element */
+
+    /* The generic matching routine: first both arrays are ordered,
+     * then compared side by side.
+     */
+    {
+        ptrdiff_t *sorted1, *sorted2; /* Ordered indices to the vectors */
+        ptrdiff_t *index1, *index2;   /* Current elements to compare */
+        Bool      *flag1, *flag2;     /* flags base pointers */
+
+        sorted1 = get_array_order(vec1);
+        sorted2 = get_array_order(vec2);
+
+        /* Set up the comparison */
+        index1 = sorted1;
+        index2 = sorted2;
+        flag1 = flags;
+        flag2 = flags + len1;
+
+        /* Compare side by side. Any element left uncompared at
+         * the end is automatically non-matching.
+         */
+        while (len1 != 0 && len2 != 0)
+        {
+            int d;
+
+            d = array_cmp(vec1->item + *index1, vec2->item + *index2);
+            if (d == 0)
+            {
+                /* Elements match */
+                flag1[*index1] = MY_TRUE;
+                flag2[*index2] = MY_TRUE;
+            }
+
+            /* Advance in array(s) */
+            if (d >= 0)
+            {
+                index1++;
+                len1--;
+            }
+
+            if (d <= 0)
+            {
+                index2++;
+                len2--;
+            }
+        } /* while (in both vectors) */
+
+        /* Cleanup */
+        xfree(sorted1);
+        xfree(sorted2);
+
+        /* Done */
+        return flags;
+    }
+
+    /* NOTREACHED */
+    return flags;
+
+} /* match_array() */
 
 /*-------------------------------------------------------------------------*/
 vector_t *
@@ -1047,101 +1384,343 @@ subtract_array (vector_t *minuend, vector_t *subtrahend)
 /* Subtract all elements in <subtrahend> from the vector <minuend>
  * and return the resulting difference vector.
  * <subtrahend> and <minuend> are freed.
- *
- * The function uses order_array()/lookup_key()/compare_single() on
- * <subtrahend> for faster operation, and recognizes subtrahends with
- * only one element and/or one reference.
  */
 
 {
-    vector_t *difference;    /* Resulting difference vector,
-                                with extra zeroes at the end */
-    vector_t *vtmpp;         /* {( Ordered <subtrahend> }) */
-    svalue_t *source, *dest; /* Pointers into minuend
-                                and difference vector */
-    mp_int i;
-    mp_int minuend_size    = (mp_int)VEC_SIZE(minuend);
-    mp_int subtrahend_size = (mp_int)VEC_SIZE(subtrahend);
+    Bool     *flags;       /* The result from match_arrays() */
+    size_t    result_size; /* Size of the result array */
+    vector_t *result;      /* Result array */
+    svalue_t *dest;        /* Pointer for storing the result elements */
+    size_t i;
 
-    long (*lookup_function)(svalue_t *, vector_t *);
-      /* Function to find an svalue in a sorted vector.
-       * Use of this indirection allows to replace lookup() with
-       * faster functions for special cases.
-       */
+    size_t minuend_size    = VEC_SIZE(minuend);
+    size_t subtrahend_size = VEC_SIZE(subtrahend);
 
     /* Handle empty vectors quickly */
 
-    if (minuend_size == 0)
+    if (minuend_size == 0 || subtrahend_size == 0)
     {
         free_array(subtrahend);
         return minuend;
     }
-    if (subtrahend_size == 0)
-    {
-        free_array(subtrahend);
-        return shrink_array(minuend, minuend_size);
-    }
 
-    /* Order the subtrahend */
-    if (subtrahend_size == 1)
-    {
-        if (destructed_object_ref(&subtrahend->item[0]))
-        {
-            assign_svalue(&subtrahend->item[0], &const0);
-        }
-        lookup_function = &compare_single;
-        vtmpp = subtrahend;
-    }
-    else
-    {
-        vtmpp = order_array(subtrahend);
-        free_array(subtrahend);
-        lookup_function = &lookup_key;
-        subtrahend = vtmpp;
-    }
+    /* Non-trivial arrays: match them up */
+    flags = match_arrays(minuend, subtrahend);
 
-    /* Scan minuend and look up every element in the ordered subtrahend.
-     * If it's not there, add the element to the difference vector.
-     * If minuend is referenced only once, reuse its memory.
+    /* Count how many elements would be left in minuend
+     * and allocate the result array.
      */
-    if (minuend->ref == 1)
+    for (i = result_size = 0; i < minuend_size; i++)
     {
-        for (source = minuend->item, i = minuend_size ; i-- ; source++)
-        {
-            if (destructed_object_ref(source))
-                assign_svalue(source, &const0);
-            if ( (*lookup_function)(source, subtrahend) > -1 ) break;
-        }
-        for (dest = source++; i-- > 0 ; source++)
-        {
-            if (destructed_object_ref(source))
-                assign_svalue(source, &const0);
-            if ( (*lookup_function)(source, subtrahend) < 0 )
-                assign_svalue(dest++, source);
-        }
-        free_array(vtmpp);
-        return shrink_array(minuend, dest - minuend->item);
+        if (!flags[i])
+            result_size++;
     }
 
-    /* The difference can be equal to minuend in the worst case */
-    difference = allocate_array(minuend_size);
-
-    for (source = minuend->item, dest = difference->item, i = minuend_size
-        ; i--
-        ; source++)
+    if (result_size == minuend_size)
     {
-        if (destructed_object_ref(source))
-            assign_svalue(source, &const0);
-        if ( (*lookup_function)(source, subtrahend) < 0 )
-            assign_svalue_no_free(dest++, source);
+        /* No elements to remove */
+        xfree(flags);
+        free_array(subtrahend);
+        return minuend;
     }
 
-    free_array(vtmpp);
+    result = allocate_array(result_size);
+
+    /* Copy the elements to keep from minuend into result.
+     * We count down result_size to be able to stop as early
+     * as possible.
+     */
+    for ( dest = result->item, i = 0
+        ; i < minuend_size && result_size != 0
+        ; i++
+        )
+    {
+        if (!flags[i])
+        {
+            assign_svalue_no_free(dest, minuend->item+i);
+            dest++;
+            result_size--;
+        }
+    }
+
+    /* Cleanup and return */
+    xfree(flags);
     free_array(minuend);
+    free_array(subtrahend);
 
-    /* Shrink the difference vector to the needed size and return it. */
-    return shrink_array(difference, dest-difference->item);
+    return result;
 } /* subtract_array() */
+
+/*-------------------------------------------------------------------------*/
+vector_t *
+intersect_array (vector_t *vec1, vector_t *vec2)
+
+/* OPERATOR & (array intersection)
+ *
+ * Perform an intersection of the two vectors <vec1> and <vec2>.
+ * The result is a new vector with all elements which are present in both
+ * input vectors.
+ *
+ * Both <vec1> and <vec2> are freed.
+ */
+
+{
+    Bool     *flags;       /* The result from match_arrays() */
+    size_t    result_size; /* Size of the result array */
+    vector_t *result;      /* Result array */
+    svalue_t *dest;        /* Pointer for storing the result elements */
+    size_t i;
+
+    size_t vec1_size = VEC_SIZE(vec1);
+    size_t vec2_size = VEC_SIZE(vec2);
+
+    /* Handle empty arrays quickly */
+
+    if (vec1_size == 0 || vec2_size == 0)
+    {
+        free_array(vec2);
+        return shrink_array(vec1, 0);
+          /* Fancy way of creating an empty array */
+    }
+
+    /* Non-trivial arrays: match them up */
+    flags = match_arrays(vec1, vec2);
+
+    /* Count how many elements have to be copied from vec1
+     * and allocate the result array.
+     */
+    for (i = result_size = 0; i < vec1_size; i++)
+    {
+        if (flags[i])
+            result_size++;
+    }
+
+    if (result_size == vec1_size)
+    {
+        /* No elements to remove */
+        xfree(flags);
+        free_array(vec2);
+        return vec1;
+    }
+
+    result = allocate_array(result_size);
+
+    /* Copy the elements to keep from vec1 into result.
+     * We count down result_size to be able to stop as early
+     * as possible.
+     */
+    for ( dest = result->item, i = 0
+        ; i < vec1_size && result_size != 0
+        ; i++
+        )
+    {
+        if (flags[i])
+        {
+            assign_svalue_no_free(dest, vec1->item+i);
+            dest++;
+            result_size--;
+        }
+    }
+
+    /* Cleanup and return */
+    xfree(flags);
+    free_array(vec1);
+    free_array(vec2);
+
+    return result;
+} /* intersect_array() */
+
+/*-------------------------------------------------------------------------*/
+vector_t *
+join_array (vector_t *vec1, vector_t *vec2)
+
+/* OPERATOR | (array union)
+ *
+ * Perform a join of the two vectors <vec1> and <vec2>.
+ * The result is a new vector with all elements <vec1> and those elements
+ * from <vec2> which are not present in <vec1>.
+ *
+ * Both <vec1> and <vec2> are freed.
+ */
+
+{
+    Bool     *flags;       /* The result from match_arrays() */
+    size_t    result_size; /* Size of the result array */
+    vector_t *result;      /* Result array */
+    svalue_t *src;         /* Pointer for getting the result elements */
+    svalue_t *dest;        /* Pointer for storing the result elements */
+    size_t i;
+
+    size_t vec1_size = VEC_SIZE(vec1);
+    size_t vec2_size = VEC_SIZE(vec2);
+    size_t sum_size = vec1_size + vec2_size;
+
+    /* Handle empty arrays quickly */
+
+    if (vec1_size == 0)
+    {
+        free_array(vec1);
+        return vec2;
+    }
+
+    if (vec2_size == 0)
+    {
+        free_array(vec2);
+        return vec1;
+    }
+
+    /* Non-trivial arrays: match them up */
+    flags = match_arrays(vec1, vec2);
+
+    /* Count how many elements have to be copied from vec2
+     * (we have to get all from vec1 anyway) and allocate the result array.
+     */
+    result_size = 0;
+    for (i = vec1_size; i < sum_size; i++)
+    {
+        if (!flags[i])
+            result_size++;
+    }
+
+    if (result_size == 0)
+    {
+        /* No elements to copy */
+        xfree(flags);
+        free_array(vec2);
+        return vec1;
+    }
+
+    result = allocate_array(vec1_size+result_size);
+
+    /* Copy the elements to keep from vec1 into result.
+     */
+    for (dest = result->item, i = 0 ; i < vec1_size ; i++)
+    {
+        assign_svalue_no_free(dest, vec1->item+i);
+        dest++;
+    }
+
+    /* Copy the elements to keep from vec1 into result.
+     * We count down result_size to be able to stop as early
+     * as possible.
+     */
+    for ( src = vec2->item, dest = result->item + vec1_size, i = vec1_size
+        ; i < sum_size && result_size != 0
+        ; i++, src++
+        )
+    {
+        if (!flags[i])
+        {
+            assign_svalue_no_free(dest, src);
+            dest++;
+            result_size--;
+        }
+    }
+
+    /* Cleanup and return */
+    xfree(flags);
+    free_array(vec1);
+    free_array(vec2);
+
+    return result;
+} /* join_array() */
+
+/*-------------------------------------------------------------------------*/
+vector_t *
+symmetric_diff_array (vector_t *vec1, vector_t *vec2)
+
+/* OPERATOR ^ (symmetric array difference)
+ *
+ * Compute the symmetric difference of the two vectors <vec1> and <vec2>.
+ * The result is a new vector with all elements which are present in only
+ * one of the input vectors.
+ *
+ * Both <vec1> and <vec2> are freed.
+ */
+
+{
+    Bool     *flags;       /* The result from match_arrays() */
+    size_t    result_size; /* Size of the result array */
+    vector_t *result;      /* Result array */
+    svalue_t *src;         /* Pointer for getting the result elements */
+    svalue_t *dest;        /* Pointer for storing the result elements */
+    size_t i;
+
+    size_t vec1_size = VEC_SIZE(vec1);
+    size_t vec2_size = VEC_SIZE(vec2);
+    size_t sum_size = vec1_size + vec2_size;
+
+    /* Handle empty arrays quickly */
+
+    if (vec1_size == 0)
+    {
+        free_array(vec1);
+        return vec2;
+    }
+
+    if (vec2_size == 0)
+    {
+        free_array(vec2);
+        return vec1;
+    }
+
+    /* Non-trivial arrays: match them up */
+    flags = match_arrays(vec1, vec2);
+
+    /* Count how many elements have to be copied
+     * and allocate the result array.
+     */
+    for (i = result_size = 0; i < sum_size; i++)
+    {
+        if (!flags[i])
+            result_size++;
+    }
+
+    result = allocate_array(result_size);
+
+    /* Copy the elements to keep from vec1 into result.
+     * We count down result_size to be able to stop as early
+     * as possible.
+     */
+    dest = result->item;
+    for ( src = vec1->item, i = 0
+        ; i < vec1_size && result_size != 0
+        ; i++, src++
+        )
+    {
+        if (!flags[i])
+        {
+            assign_svalue_no_free(dest, src);
+            dest++;
+            result_size--;
+        }
+    }
+
+    /* Copy the elements to keep from vec2 into result, starting
+     * at the current position <dest>.
+     * We count down result_size to be able to stop as early
+     * as possible.
+     */
+    for ( src = vec2->item, i = vec1_size
+        ; i < sum_size && result_size != 0
+        ; i++, src++
+        )
+    {
+        if (!flags[i])
+        {
+            assign_svalue_no_free(dest, src);
+            dest++;
+            result_size--;
+        }
+    }
+
+    /* Cleanup and return */
+    xfree(flags);
+    free_array(vec1);
+    free_array(vec2);
+
+    return result;
+} /* symmetric_diff_array() */
 
 /*-------------------------------------------------------------------------*/
 Bool
@@ -2087,229 +2666,6 @@ v_map_objects (svalue_t *sp, int num_arg)
 
     return sp;
 } /* v_map_objects() */
-
-/*-------------------------------------------------------------------------*/
-long
-lookup_key (svalue_t *key, vector_t *vec)
-
-/* Lookup up value <key> in ordered vector <vec> and return it's position.
- * If not found, return as negative number the position at which the
- * key would have to be inserted, incremented by 1. That is:
- *   -1          -> key should be at position 0,
- *   -2          -> key should be at position 1,
- *   -len(vec)-1 -> key should be appended to the vector.
- *
- * <vec> be sorted according to array_cmp(), else the result will be
- * interesting, but useless.
- */
-
-{
-    mp_int i, o, d, keynum;
-    svalue_t shared_string_key; 
-      /* The svalue used to shared search key during the search.
-       * It does not count as reference!
-       */
-
-    /* If key is a non-shared string, lookup and use the shared copy.
-     */
-    if (key->type == T_STRING && !mstr_d_tabled(key->u.str))
-    {
-        shared_string_key.type = T_STRING;
-        if ( !(shared_string_key.u.str = find_tabled(key->u.str)) )
-        {
-            return -1;
-        }
-        key = &shared_string_key;
-    }
-
-    if ( !(keynum = (mp_int)VEC_SIZE(vec)) )
-        return -1;
-
-    /* Simple binary search */
-
-    i = keynum >> 1;
-    o = (i+2) >> 1;
-    for (;;) {
-        d = array_cmp(key, &vec->item[i]);
-        if (d < 0)
-        {
-            i -= o;
-            if (i < 0)
-            {
-                i = 0;
-            }
-        }
-        else if (d > 0) 
-        {
-            i += o;
-            if (i >= keynum)
-            {
-                i = keynum-1;
-            }
-        }
-        else
-        {
-            /* Found! */
-            return i;
-        }
-
-        if (o <= 1)
-        {
-            /* Last element to try */
-            d = array_cmp(key, &vec->item[i]);
-            if (d == 0) return i;
-            if (d > 0) return -(i+1)-1;
-            return -i-1;
-        }
-        o = (o+1) >> 1;
-    }
-
-    /* NOTREACHED */
-    return -1;
-} /* lookup_key() */
-
-/*-------------------------------------------------------------------------*/
-vector_t *
-intersect_ordered_arr (vector_t *a1, vector_t *a2)
-
-/* Compute the intersection of the two ordered arrays <a1> and <a2>.
- *
- * The result is a new sorted(!) vector with all elements, which are present
- * in both input vectors.
- * This function is called by intersect_array() and f_intersect_alists().
- */
-
-{
-    vector_t *a3;
-    mp_int d, l, i1, i2, a1s, a2s;
-
-    a1s = (mp_int)VEC_SIZE(a1);
-    a2s = (mp_int)VEC_SIZE(a2);
-    a3 = allocate_array( a1s < a2s ? a1s : a2s);
-    for (i1=i2=l=0; i1 < a1s && i2 < a2s; ) {
-        d = array_cmp(&a1->item[i1], &a2->item[i2]);
-        if (d<0)
-            i1++;
-        else if (d>0)
-            i2++;
-        else {
-            assign_svalue_no_free(&a3->item[l++], &a2->item[(i1++,i2++)] );
-        }
-    }
-    return shrink_array(a3, l);
-} /* intersect_ordered_arr() */
-
-
-/*-------------------------------------------------------------------------*/
-vector_t *
-intersect_array (vector_t *a1, vector_t *a2)
-
-/* OPERATOR & (array intersection)
- *
- * Perform an intersection of the two vectors <a1> and <a2>.
- * The result is a new vector with all elements which are present in both
- * input vectors.
- *
- * The result vector is also sorted according to array_cmp(), but
- * don't rely on it.
- * TODO: Make it keep the order by intersecting over index arrays.
- */
-
-{
-    vector_t *vtmpp1, *vtmpp2, *vtmpp3;
-
-    /* Order the two ingoing lists and then perform the intersection.
-     */
-
-    vtmpp1 = order_array(a1);
-    free_array(a1);
-
-    vtmpp2 = order_array(a2);
-    free_array(a2);
-
-    vtmpp3 = intersect_ordered_arr(vtmpp1, vtmpp2);
-
-    free_array(vtmpp1);
-    free_array(vtmpp2);
-
-    return vtmpp3;
-} /* intersect_array() */
-
-/*-------------------------------------------------------------------------*/
-vector_t *
-join_array (vector_t *a1, vector_t *a2)
-
-/* OPERATOR | (array union)
- *
- * Perform a join of the two vectors <a1> and <a2>.
- * The result is a new vector with all elements <a1> and those elements
- * from <a2> which are not present in <a1>.
- *
- * The result vector is also sorted according to array_cmp(), but
- * don't rely on it.
- * TODO: Make it keep the order by joining over index arrays.
- */
-
-{
-    vector_t *vtmpp1, *vtmpp2, *vtmpp3;
-    mp_int d, l, i1, i2, a1s, a2s;
-
-    /* Order the two ingoing lists and then perform the union.
-     */
-
-    vtmpp1 = order_array(a1);
-    free_array(a1);
-
-    vtmpp2 = order_array(a2);
-    free_array(a2);
-
-    a1s = (mp_int)VEC_SIZE(vtmpp1);
-    a2s = (mp_int)VEC_SIZE(vtmpp2);
-    vtmpp3 = allocate_array( a1s + a2s);
-
-    /* Copy <a1> as is */
-    for (i1 = l = 0; i1 < a1s; i1++, l++)
-        assign_svalue_no_free(&vtmpp3->item[l], &vtmpp1->item[i1]);
-
-    /* Copy those elements from <a2> which are not in <a1>.
-     * The copy condition in this loop is that the current element
-     * indexed in <a1> is 'bigger' than the current element in <a2>.
-     */
-    for (i1=i2=0, l = a1s; i1 < a1s && i2 < a2s; )
-    {
-        d = array_cmp(&vtmpp1->item[i1], &vtmpp2->item[i2]);
-        if (d < 0)
-        {
-            /* Current element in <a1> is smaller - step forward */
-            i1++;
-        }
-        else if (d == 0)
-        {
-            /* Elements are equal - skip */
-            i1++;
-            i2++;
-        }
-        else
-        {
-            /* Element in <a1> is bigger, so this <a2> element
-             * must be unique.
-             */
-            assign_svalue_no_free(&vtmpp3->item[l++], &vtmpp2->item[i2++] );
-        }
-    }
-
-    /* Copy the remaining elements from <a2> if any.
-     * This happens if the last element in <a1> is smaller than
-     * the remaining elements in <a2>.
-     */
-    for ( ; i2 < a2s; i2++, l++)
-        assign_svalue_no_free(&vtmpp3->item[l], &vtmpp2->item[i2]);
-
-    free_array(vtmpp1);
-    free_array(vtmpp2);
-
-    return shrink_array(vtmpp3, l);
-} /* join_array() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *

@@ -156,6 +156,8 @@ f-020507-0: Distinguish between generic and specific empty mappings
 f-020507-1: Rethink the 'mapping += mapping' semantics.
 f-020507-3: Range operators on 2d mappings
 f-020528: Inline-Closures with runtime arguments
+f-020813-0: const parameter
+f-020813-1: Redesigning arrays and mappings, and lvalues.
 
 
 Compiler

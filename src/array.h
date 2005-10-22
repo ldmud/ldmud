@@ -111,9 +111,9 @@ extern vector_t *order_array (vector_t *vec);
 extern long lookup_key (svalue_t *key, vector_t *vec);
 extern vector_t *subtract_array(vector_t *minuend, vector_t *subtrahend);
 extern Bool is_ordered(vector_t *v);
-extern vector_t * intersect_ordered_arr (vector_t *a1, vector_t *a2);
-extern vector_t *intersect_array(vector_t *a1, vector_t *a2);
-extern vector_t *join_array(vector_t *a1, vector_t *a2);
+extern vector_t *intersect_array(vector_t *vec1, vector_t *vec2);
+extern vector_t *join_array(vector_t *vec1, vector_t *vec2);
+extern vector_t * symmetric_diff_array (vector_t *vec1, vector_t *vec2);
 
 extern svalue_t *v_allocate(svalue_t *sp, int num_arg);
 extern svalue_t *x_filter_array(svalue_t *sp, int num_arg);

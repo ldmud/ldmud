@@ -6178,11 +6178,26 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 '^' expr0
       {
-          if (exact_types && !BASIC_TYPE($1.type,TYPE_NUMBER))
-              type_error("Bad argument 1 to ^", $1.type);
-          if (exact_types && !BASIC_TYPE($3.type,TYPE_NUMBER))
-              type_error("Bad argument 2 to ^", $3.type);
-          $$.type = TYPE_NUMBER;
+          if (($1.type | $3.type) & TYPE_MOD_POINTER)
+          {
+              if (exact_types
+               && ($1.type ^ $3.type) & TYPE_MOD_POINTER
+                 )
+                  yyerrorf("Incompatible types for arguments to | %s"
+                          , get_two_types($1.type, $3.type));
+              if ($1.type == $3.type)
+                  $$.type = $1.type;
+              else
+                  $$.type = TYPE_ANY|TYPE_MOD_POINTER;
+          }
+          else
+          {
+              if (exact_types && !BASIC_TYPE($1.type,TYPE_NUMBER))
+                  type_error("Bad argument 1 to ^", $1.type);
+              if (exact_types && !BASIC_TYPE($3.type,TYPE_NUMBER))
+                  type_error("Bad argument 2 to ^", $3.type);
+              $$.type = TYPE_NUMBER;
+          }
           ins_f_code(F_XOR);
       }
 

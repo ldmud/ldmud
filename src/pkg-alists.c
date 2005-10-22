@@ -61,6 +61,37 @@
 #include "xalloc.h"
 
 /*-------------------------------------------------------------------------*/
+static vector_t *
+intersect_ordered_arr (vector_t *a1, vector_t *a2)
+
+/* Compute the intersection of the two ordered arrays <a1> and <a2>.
+ *
+ * The result is a new sorted(!) vector with all elements, which are present
+ * in both input vectors.
+ * This function is called by intersect_array() and f_intersect_alists().
+ */
+
+{
+    vector_t *a3;
+    mp_int d, l, i1, i2, a1s, a2s;
+
+    a1s = (mp_int)VEC_SIZE(a1);
+    a2s = (mp_int)VEC_SIZE(a2);
+    a3 = allocate_array( a1s < a2s ? a1s : a2s);
+    for (i1=i2=l=0; i1 < a1s && i2 < a2s; ) {
+        d = array_cmp(&a1->item[i1], &a2->item[i2]);
+        if (d<0)
+            i1++;
+        else if (d>0)
+            i2++;
+        else {
+            assign_svalue_no_free(&a3->item[l++], &a2->item[(i1++,i2++)] );
+        }
+    }
+    return shrink_array(a3, l);
+} /* intersect_ordered_arr() */
+
+/*-------------------------------------------------------------------------*/
 vector_t *
 order_alist (svalue_t *inlists, int listnum, Bool reuse)
 

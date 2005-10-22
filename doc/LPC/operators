@@ -50,6 +50,9 @@ DESCRIPTION
 
         expr1 ^ expr2        The result is the bitwise xor of 'expr1' and
                         'expr2'.
+                        For arrays, the symmetric difference is computed:
+                        all elements from <expr1> which are not in <expr2>,
+                        plus all those from <expr2> which are not in <expr1>.
 
         expr1 & expr2        The result is the bitwise and of 'expr1' and
                         'expr2'.
@@ -186,7 +189,7 @@ NOTE
 
 HISTORY
         LDMud 3.2.9 added '>>>' and '>>>='.
+        LDMud 3.3 extended '|' and '^' to arrays.
 
 SEE ALSO
         arrays(LPC), alists(LPC), mappings(LPC), closures(LPC)
-
