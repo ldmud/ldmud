@@ -232,6 +232,19 @@ DESCRIPTION
               int DID_ST_TABLED_SIZE
                   Total number and size of existing directly tabled strings.
 
+              int DID_ST_STR_CHAINS
+                  Number of hash chains in the string table.
+
+              int DID_ST_STR_ADDED
+                  Number of distinct strings added to the table so far.
+
+              int DID_ST_STR_DELETED
+                  Number of distinct strings removed from the table so far.
+
+              int DID_ST_STR_COLLISIONS
+                  Number of distinct strings added to an existing hash chain
+                  so far.
+
               int DID_ST_STR_SEARCHES
               int DID_ST_STR_SEARCHLEN
                   Number and accumulated length of string searches by address.
@@ -239,6 +252,10 @@ DESCRIPTION
               int DID_ST_STR_SEARCHES_BYVALUE
               int DID_ST_STR_SEARCHLEN_BYVALUE
                   Number and accumulated length of string searches by value.
+
+              int DID_ST_STR_FOUND
+              int DID_ST_STR_FOUND_BYVALUE 
+                  Number of successful searches by address resp. by value.
 
               int DID_ST_RX_CACHED
                   Number of regular expressions cached.

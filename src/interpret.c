@@ -8320,7 +8320,7 @@ again:
             double d;
 
             d = READ_DOUBLE(svp) + 1.0;
-            if (d < DBL_MIN || d > DBL_MAX)
+            if (d < (-DBL_MAX) || d > DBL_MAX)
                 ERRORF(("Numeric overflow: (%g)++\n", READ_DOUBLE(svp)));
             sp->type = T_FLOAT;
             STORE_DOUBLE(svp, d);
@@ -8382,7 +8382,7 @@ again:
             double d;
 
             d = READ_DOUBLE(svp) - 1.0;
-            if (d < DBL_MIN || d > DBL_MAX)
+            if (d < (-DBL_MAX) || d > DBL_MAX)
                 ERRORF(("Numeric overflow: (%g)--\n", READ_DOUBLE(svp)));
             sp->type = T_FLOAT;
             STORE_DOUBLE(svp, d);
@@ -8447,7 +8447,7 @@ again:
             sp->type = T_FLOAT;
             STORE_DOUBLE(sp, d);
             d += 1.0;
-            if (d < DBL_MIN || d > DBL_MAX)
+            if (d < (-DBL_MAX) || d > DBL_MAX)
                 ERRORF(("Numeric overflow: (%g)++\n", READ_DOUBLE(svp)));
             STORE_DOUBLE(svp, d);
             break;
@@ -8508,7 +8508,7 @@ again:
             sp->type = T_FLOAT;
             STORE_DOUBLE(sp, d);
             d -= 1.0;
-            if (d < DBL_MIN || d > DBL_MAX)
+            if (d < (-DBL_MAX) || d > DBL_MAX)
                 ERRORF(("Numeric overflow: (%g)--\n", READ_DOUBLE(svp)));
             STORE_DOUBLE(svp, d);
             break;
@@ -8565,7 +8565,7 @@ again:
             double d;
 
             d = READ_DOUBLE(svp) + 1.0;
-            if (d < DBL_MIN || d > DBL_MAX)
+            if (d < (-DBL_MAX) || d > DBL_MAX)
                 ERRORF(("Numeric overflow: ++(%g)\n", READ_DOUBLE(svp)));
             sp->type = T_FLOAT;
             STORE_DOUBLE(sp, d);
@@ -8624,7 +8624,7 @@ again:
             double d;
 
             d = READ_DOUBLE(svp) - 1.0;
-            if (d < DBL_MIN || d > DBL_MAX)
+            if (d < (-DBL_MAX) || d > DBL_MAX)
                 ERRORF(("Numeric overflow: --(%g)\n", READ_DOUBLE(svp)));
             sp->type = T_FLOAT;
             STORE_DOUBLE(sp, d);
@@ -8889,7 +8889,7 @@ again:
                 double sum;
 
                 sum = (double)((sp-1)->u.number) + READ_DOUBLE(sp);
-                if (sum < DBL_MIN || sum > DBL_MAX)
+                if (sum < (-DBL_MAX) || sum > DBL_MAX)
                     ERRORF(("Numeric overflow: %ld + %g\n"
                            , (long)(sp-1)->u.number, READ_DOUBLE(sp)));
                 STORE_DOUBLE(sp-1, sum);
@@ -8913,7 +8913,7 @@ again:
             if (sp->type == T_FLOAT)
             {
                 sum = READ_DOUBLE(sp-1) + READ_DOUBLE(sp);
-                if (sum < DBL_MIN || sum > DBL_MAX)
+                if (sum < (-DBL_MAX) || sum > DBL_MAX)
                     ERRORF(("Numeric overflow: %g + %g\n"
                            , READ_DOUBLE(sp-1), READ_DOUBLE(sp)));
                 STORE_DOUBLE(sp-1, sum);
@@ -8923,7 +8923,7 @@ again:
             if (sp->type == T_NUMBER)
             {
                 sum = READ_DOUBLE(sp-1) + (double)(sp->u.number);
-                if (sum < DBL_MIN || sum > DBL_MAX)
+                if (sum < (-DBL_MAX) || sum > DBL_MAX)
                     ERRORF(("Numeric overflow: %g + %ld\n"
                            , READ_DOUBLE(sp-1), (long)sp->u.number));
                 STORE_DOUBLE(sp-1, sum);
@@ -9046,7 +9046,7 @@ again:
                 double diff;
 
                 diff = (double)((sp-1)->u.number) - READ_DOUBLE(sp);
-                if (diff < DBL_MIN || diff > DBL_MAX)
+                if (diff < (-DBL_MAX) || diff > DBL_MAX)
                     ERRORF(("Numeric overflow: %ld - %g\n"
                            , (long)(sp-1)->u.number, READ_DOUBLE(sp)));
                 sp--;
@@ -9065,7 +9065,7 @@ again:
             if (sp->type == T_FLOAT)
             {
                 diff = READ_DOUBLE(sp-1) - READ_DOUBLE(sp);
-                if (diff < DBL_MIN || diff > DBL_MAX)
+                if (diff < (-DBL_MAX) || diff > DBL_MAX)
                     ERRORF(("Numeric overflow: %g - %g\n"
                            , READ_DOUBLE(sp-1), READ_DOUBLE(sp)));
                 sp--;
@@ -9075,7 +9075,7 @@ again:
             if (sp->type == T_NUMBER)
             {
                 diff = READ_DOUBLE(sp-1) - (double)(sp->u.number);
-                if (diff < DBL_MIN || diff > DBL_MAX)
+                if (diff < (-DBL_MAX) || diff > DBL_MAX)
                     ERRORF(("Numeric overflow: %g - %ld\n"
                            , READ_DOUBLE(sp-1), (long)sp->u.number));
                 sp--;
@@ -9206,7 +9206,7 @@ again:
                 double product;
 
                 product = (sp-1)->u.number * READ_DOUBLE(sp);
-                if (product < DBL_MIN || product > DBL_MAX)
+                if (product < (-DBL_MAX) || product > DBL_MAX)
                     ERRORF(("Numeric overflow: %ld * %g\n"
                            , (long)(sp-1)->u.number, READ_DOUBLE(sp)));
                 sp--;
@@ -9313,7 +9313,7 @@ again:
             if (sp->type == T_FLOAT)
             {
                 product = READ_DOUBLE(sp-1) * READ_DOUBLE(sp);
-                if (product < DBL_MIN || product > DBL_MAX)
+                if (product < (-DBL_MAX) || product > DBL_MAX)
                     ERRORF(("Numeric overflow: %g * %g\n"
                            , READ_DOUBLE(sp-1), READ_DOUBLE(sp)));
                 STORE_DOUBLE(sp-1, product);
@@ -9323,7 +9323,7 @@ again:
             if (sp->type == T_NUMBER)
             {
                 product = READ_DOUBLE(sp-1) * sp->u.number;
-                if (product < DBL_MIN || product > DBL_MAX)
+                if (product < (-DBL_MAX) || product > DBL_MAX)
                     ERRORF(("Numeric overflow: %g * %ld\n"
                            , READ_DOUBLE(sp-1), (long)sp->u.number));
                 STORE_DOUBLE(sp-1, product);
@@ -9480,7 +9480,7 @@ again:
                 sp--;
                 dtmp = sp->u.number / dtmp;
                 dtmp = (double)(sp-1)->u.number / dtmp;
-                if (dtmp < DBL_MIN || dtmp > DBL_MAX)
+                if (dtmp < (-DBL_MAX) || dtmp > DBL_MAX)
                     ERRORF(("Numeric overflow: %ld / %g\n"
                            , (long)(sp-1)->u.number, READ_DOUBLE(sp)));
                 STORE_DOUBLE(sp, dtmp);
@@ -9504,7 +9504,7 @@ again:
                 }
                 sp--;
                 dtmp = READ_DOUBLE(sp) / dtmp;
-                if (dtmp < DBL_MIN || dtmp > DBL_MAX)
+                if (dtmp < (-DBL_MAX) || dtmp > DBL_MAX)
                     ERRORF(("Numeric overflow: %g / %g\n"
                            , READ_DOUBLE(sp-1), READ_DOUBLE(sp)));
                 STORE_DOUBLE(sp, dtmp);
@@ -9519,7 +9519,7 @@ again:
                 dtmp = (float)sp->u.number;
                 sp--;
                 dtmp = READ_DOUBLE(sp) / dtmp;
-                if (dtmp < DBL_MIN || dtmp > DBL_MAX)
+                if (dtmp < (-DBL_MAX) || dtmp > DBL_MAX)
                     ERRORF(("Numeric overflow: %g / %ld\n"
                            , READ_DOUBLE(sp-1), (long)sp->u.number));
                 STORE_DOUBLE(sp, dtmp);
@@ -10467,7 +10467,7 @@ again:
                 double sum;
 
                 sum = (double)(argp->u.number) + READ_DOUBLE(sp-1);
-                if (sum < DBL_MIN || sum > DBL_MAX)
+                if (sum < (-DBL_MAX) || sum > DBL_MAX)
                     ERRORF(("Numeric overflow: %ld + %g\n"
                            , (long)argp->u.number, READ_DOUBLE(sp-1)));
                 argp->type = T_FLOAT;
@@ -10611,7 +10611,7 @@ again:
                     * it in a register
                     */
                 d = READ_DOUBLE(argp) + READ_DOUBLE(sp-1);
-                if (d < DBL_MIN || d > DBL_MAX)
+                if (d < (-DBL_MAX) || d > DBL_MAX)
                     ERRORF(("Numeric overflow: %g + %g\n"
                            , READ_DOUBLE(argp), READ_DOUBLE(sp-1)));
                 STORE_DOUBLE(argp, d);
@@ -10623,7 +10623,7 @@ again:
                 double d;
 
                 d = READ_DOUBLE(argp) + (double)sp[-1].u.number;
-                if (d < DBL_MIN || d > DBL_MAX)
+                if (d < (-DBL_MAX) || d > DBL_MAX)
                     ERRORF(("Numeric overflow: %g + %ld\n"
                            , READ_DOUBLE(argp), (long)(sp-1)->u.number));
                 STORE_DOUBLE(argp, d);
@@ -10796,7 +10796,7 @@ again:
                  */
                 sp--;
                 d = READ_DOUBLE(argp) - READ_DOUBLE(sp);
-                if (d < DBL_MIN || d > DBL_MAX)
+                if (d < (-DBL_MAX) || d > DBL_MAX)
                     ERRORF(("Numeric overflow: %g + %g\n"
                            , READ_DOUBLE(argp), READ_DOUBLE(sp)));
                 STORE_DOUBLE(argp, d);
@@ -10809,7 +10809,7 @@ again:
 
                 sp--;
                 d = READ_DOUBLE(argp) - (double)sp->u.number;
-                if (d < DBL_MIN || d > DBL_MAX)
+                if (d < (-DBL_MAX) || d > DBL_MAX)
                     ERRORF(("Numeric overflow: %g + %ld\n"
                            , READ_DOUBLE(argp), (long)sp->u.number));
                 STORE_DOUBLE(argp, d);
@@ -11006,7 +11006,7 @@ again:
             if (sp->type == T_FLOAT)
             {
                 d = READ_DOUBLE(argp) * READ_DOUBLE(sp);
-                if (d < DBL_MIN || d > DBL_MAX)
+                if (d < (-DBL_MAX) || d > DBL_MAX)
                     ERRORF(("Numeric overflow: %g * %g\n"
                            , READ_DOUBLE(argp), READ_DOUBLE(sp)));
                 STORE_DOUBLE(argp, d);
@@ -11015,7 +11015,7 @@ again:
             else if (sp->type == T_NUMBER)
             {
                 d = READ_DOUBLE(argp) * (double)sp->u.number;
-                if (d < DBL_MIN || d > DBL_MAX)
+                if (d < (-DBL_MAX) || d > DBL_MAX)
                     ERRORF(("Numeric overflow: %g * %ld\n"
                            , READ_DOUBLE(argp), (long)sp->u.number));
                 STORE_DOUBLE(argp, d);
@@ -11213,7 +11213,7 @@ again:
                 if (d == 0.0)
                     ERROR("Division by zero\n");
                 d = READ_DOUBLE(argp) / d;
-                if (d < DBL_MIN || d > DBL_MAX)
+                if (d < (-DBL_MAX) || d > DBL_MAX)
                     ERRORF(("Numeric overflow: %g / %g\n"
                            , READ_DOUBLE(argp), READ_DOUBLE(sp)));
                 STORE_DOUBLE(argp, d);
@@ -11226,7 +11226,7 @@ again:
                 if (i == 0)
                     ERROR("Division by zero\n");
                 d = READ_DOUBLE(argp) / (double)i;
-                if (d < DBL_MIN || d > DBL_MAX)
+                if (d < (-DBL_MAX) || d > DBL_MAX)
                     ERRORF(("Numeric overflow: %g / %ld\n"
                            , READ_DOUBLE(argp), (long)sp->u.number));
                 STORE_DOUBLE(argp, d);
@@ -14088,7 +14088,7 @@ again:
             double d;
  
             d = -READ_DOUBLE(sp);
-            if (d < DBL_MIN || d > DBL_MAX)
+            if (d < (-DBL_MAX) || d > DBL_MAX)
                 ERRORF(("Numeric overflow: -(%g)\n", READ_DOUBLE(sp)));
             STORE_DOUBLE(sp,d);
             break;

@@ -43,8 +43,8 @@ DESCRIPTION
                            to not read the information.
       __INT_MAX__        : the largest integer number
       __INT_MIN__        : the smallest integer number
-      __FLOAT_MAX__      : the largest float number
-      __FLOAT_MIN__      : the smallest float number
+      __FLOAT_MAX__      : the largest (positive) float number
+      __FLOAT_MIN__      : the smallest (positive) float number
 
       __LPC_NOSAVE__     : always defined, since the 'nosave' keyword is
                            now an official LPC feature.

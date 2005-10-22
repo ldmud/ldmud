@@ -1,6 +1,14 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+12-Jan-2002 (Lars Duening)  (3.3.153)
+    - (configure.in) Fiona pointed out that just halving the rxcache
+        size doesn't seem to increase the fill ratio. As an experiment
+        I now set the default size to prime 8191.
+    - (efuns.c, interpret.c) The float range checks stupidly compared against
+        DBL_MIN for the low limit instead of -DBL_MAX (reported by Ben).
+    - (mstrings.c, efuns.c) Added string table related statistics.
+
 10-Jan-2002 (Lars Duening)  (3.3.152)
     - (lex.c) Added new predefined macros __FLOAT_MIN__ and __FLOAT_MAX__
         for the float value limits.

@@ -4141,13 +4141,13 @@ f_atan (svalue_t *sp)
     if (sp->type != T_FLOAT)
     {
         d = atan((double)(sp->u.number));
-        if (d < DBL_MIN || d > DBL_MAX)
+        if (d < (-DBL_MAX) || d > DBL_MAX)
             error("Numeric overflow: atan(%ld)\n", (long)sp->u.number);
     }
     else 
     {
         d = atan(READ_DOUBLE(sp));
-        if (d < DBL_MIN || d > DBL_MAX)
+        if (d < (-DBL_MAX) || d > DBL_MAX)
             error("Numeric overflow: atan(%g)\n", READ_DOUBLE(sp));
     }
     sp->type = T_FLOAT;
@@ -4180,7 +4180,7 @@ f_atan2 (svalue_t *sp)
     else
         y = READ_DOUBLE(sp-1);
     d = atan2(y, x);
-    if (d < DBL_MIN || d > DBL_MAX)
+    if (d < (-DBL_MAX) || d > DBL_MAX)
         error("Numeric overflow: atan(%g, %g)\n", y, x);
     sp--;
     sp->type = T_FLOAT;
@@ -4212,7 +4212,7 @@ f_log (svalue_t *sp)
     if (d <= 0.)
         error("Bad arg 1 for log(): value %f out of range\n", d);
     e = log(d);
-    if (e < DBL_MIN || e > DBL_MAX)
+    if (e < (-DBL_MAX) || e > DBL_MAX)
         error("Numeric overflow: log(%g)\n", d);
     sp->type = T_FLOAT;
     STORE_DOUBLE(sp, e);
@@ -4238,13 +4238,13 @@ f_exp (svalue_t *sp)
     if (sp->type != T_FLOAT)
     {
         d = exp((double)sp->u.number);
-        if (d < DBL_MIN || d > DBL_MAX)
+        if (d < (-DBL_MAX) || d > DBL_MAX)
             error("Numeric overflow: exp(%ld)\n", (long)sp->u.number);
     }
     else 
     {
         d = exp(READ_DOUBLE(sp));
-        if (d < DBL_MIN || d > DBL_MAX)
+        if (d < (-DBL_MAX) || d > DBL_MAX)
             error("Numeric overflow: exp(%g)\n", READ_DOUBLE(sp));
     }
     sp->type = T_FLOAT;
@@ -4275,7 +4275,7 @@ f_sqrt (svalue_t *sp)
     if (d < 0.)
         error("Bad arg 1 for sqrt(): value %f out of range\n", d);
     e = sqrt(d);
-    if (e < DBL_MIN || e > DBL_MAX)
+    if (e < (-DBL_MAX) || e > DBL_MAX)
         error("Numeric overflow: sqrt(%g)\n", d);
     sp->type = T_FLOAT;
     STORE_DOUBLE(sp, e);
@@ -4303,7 +4303,7 @@ f_ceil (svalue_t *sp)
     if (sp->type == T_FLOAT)
     {
         d = ceil(READ_DOUBLE(sp));
-        if (d < DBL_MIN || d > DBL_MAX)
+        if (d < (-DBL_MAX) || d > DBL_MAX)
             error("Numeric overflow: ceil(%g)\n", READ_DOUBLE(sp));
     }
     else
@@ -4337,7 +4337,7 @@ f_floor (svalue_t *sp)
     if (sp->type == T_FLOAT)
     {
         d = floor(READ_DOUBLE(sp));
-        if (d < DBL_MIN || d > DBL_MAX)
+        if (d < (-DBL_MAX) || d > DBL_MAX)
             error("Numeric overflow: floor(%g)\n", READ_DOUBLE(sp));
     }
     else
@@ -4379,7 +4379,7 @@ f_pow (svalue_t *sp)
     if (x < 0.0  && y != (double)((long)y))
         error("Can't raise negative number to fractional powers.\n");
     d = pow(x, y);
-    if (d < DBL_MIN || d > DBL_MAX)
+    if (d < (-DBL_MAX) || d > DBL_MAX)
         error("Numeric overflow: pow(%g, %g)\n", x, y);
     sp--;
     sp->type = T_FLOAT;
@@ -4419,7 +4419,7 @@ f_to_int (svalue_t *sp)
         double d;
 
         d = READ_DOUBLE(sp);
-        if (d < DBL_MIN || d > DBL_MAX)
+        if (d < (-DBL_MAX) || d > DBL_MAX)
             error("Numeric overflow: to_int(%g)\n", d);
         n = (long)d;
         break;
@@ -5894,6 +5894,19 @@ f_debug_info (svalue_t *sp, int num_arg)
  *        int DID_ST_TABLED_SIZE
  *            Total number and size of existing directly tabled strings.
  *
+ *        int DID_ST_STR_CHAINS
+ *            Number of hash chains in the string table.
+ *
+ *        int DID_ST_STR_ADDED
+ *            Number of distinct strings added to the table so far.
+ *
+ *        int DID_ST_STR_DELETED
+ *            Number of distinct strings removed from the table so far.
+ *
+ *        int DID_ST_STR_COLLISIONS
+ *            Number of distinct strings added to an existing hash chain
+ *            so far.
+ *
  *        int DID_ST_STR_SEARCHES
  *        int DID_ST_STR_SEARCHLEN
  *            Number and accumulated length of string searches by address.
@@ -5901,6 +5914,10 @@ f_debug_info (svalue_t *sp, int num_arg)
  *        int DID_ST_STR_SEARCHES_BYVALUE
  *        int DID_ST_STR_SEARCHLEN_BYVALUE
  *            Number and accumulated length of string searches by value.
+ *
+ *        int DID_ST_STR_FOUND
+ *        int DID_ST_STR_FOUND_BYVALUE 
+ *            Number of successful searches by address resp. by value.
  *
  *
  *        int DID_ST_RX_CACHED

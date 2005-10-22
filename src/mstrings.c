@@ -134,6 +134,22 @@ static mp_uint mstr_tabled_size = 0;
   /* Total memory held in the string table.
    */
 
+static mp_uint mstr_chains = 0;
+  /* Number of hash chains in the string table.
+   */
+
+static mp_uint mstr_added = 0;
+  /* Number of distinct strings added to the string table.
+   */
+
+static mp_uint mstr_deleted = 0;
+  /* Number of distinct strings delete from the string table.
+   */
+
+static mp_uint mstr_collisions = 0;
+  /* Number of collisions when adding a new distinct string.
+   */
+
 static mp_uint mstr_itabled = 0;
   /* Number of indirectly tabled strings.
    */
@@ -160,12 +176,20 @@ static mp_uint mstr_searches_byvalue = 0;
   /* Number of searches in the string table with content comparison.
    */
 
+static mp_uint mstr_found_byvalue = 0;
+  /* Number of successful searches in the string table with content comparison.
+   */
+
 static mp_uint mstr_searchlen = 0;
   /* Number of search steps along hash chains without content comparisons.
    */
 
 static mp_uint mstr_searches = 0;
   /* Number of searches in the string table without content comparisons.
+   */
+
+static mp_uint mstr_found = 0;
+  /* Number of successful searches in the string table with content comparison.
    */
 
 /*-------------------------------------------------------------------------*/
@@ -204,6 +228,9 @@ find_and_move (const char * const s, size_t size, int idx)
         rover->link = stringtable[idx];
         stringtable[idx] = rover;
     }
+
+    if (rover)
+        mstr_found_byvalue++;
 
     return rover;
 } /* find_and_move() */
@@ -244,6 +271,9 @@ move_to_head (string_t *s, int idx)
         stringtable[idx] = s;
     }
 
+    if (rover)
+        mstr_found_byvalue++;
+
     return rover;
 } /* move_to_head() */
 
@@ -256,7 +286,7 @@ make_new_tabled (const char * const pTxt, size_t size, int idx MTRACE_DECL)
  *
  * Create a new tabled string by copying the data string <pTxt> of length
  * <size> and return it counting the result as one reference. The string
- * MUST NOT yet exist in the table, nor are the statistics updated.
+ * MUST NOT yet exist in the table.
  *
  * If memory runs out, NULL is returned.
  */
@@ -287,6 +317,12 @@ make_new_tabled (const char * const pTxt, size_t size, int idx MTRACE_DECL)
     string->str = sdata;
     string->info.tabled = MY_TRUE;
     string->info.ref = 1;
+
+    mstr_added++;
+    if (NULL == stringtable[idx])
+        mstr_chains++;
+    else
+        mstr_collisions++;
 
     string->link = stringtable[idx];
     stringtable[idx] = string;
@@ -529,6 +565,12 @@ mstring_make_tabled (string_t * pStr, Bool deref_arg MTRACE_DECL)
     {
         /* We can simply reuse the string_t we already have */
 
+        mstr_added++;
+        if (NULL == stringtable[idx])
+            mstr_chains++;
+        else
+            mstr_collisions++;
+
         string = pStr;
         string->info.tabled = MY_TRUE;
         string->link = stringtable[idx];
@@ -592,6 +634,12 @@ mstring_table_inplace (string_t * pStr MTRACE_DECL)
         string->str = pStr->str;
         string->info.tabled = MY_TRUE;
         string->info.ref = 1;
+
+        mstr_added++;
+        if (NULL == stringtable[idx])
+            mstr_chains++;
+        else
+            mstr_collisions++;
 
         string->link = stringtable[idx];
         stringtable[idx] = string;
@@ -802,6 +850,11 @@ mstring_free (string_t *s)
         stringtable[idx] = s->link;
         xfree(s->str);
         xfree(s);
+
+        mstr_deleted++;
+        if (NULL == stringtable[idx])
+            mstr_chains--;
+
     }
     else if (s->link == NULL)
     {
@@ -1448,13 +1501,27 @@ add_string_status (strbuf_t *sbuf, Bool verbose)
                                           - distinct_overhead) * 100L) 
                           / (mstr_used_size - mstr_used * STR_OVERHEAD)
                         );
-        strbuf_addf(sbuf, "Searches by address: %lu - average length: %7.3f\n"
+        strbuf_addf(sbuf, "Searches by address: %lu - found: %lu (%.1f%%) - avg length: %7.3f\n"
                         , mstr_searches
+                        , mstr_found, 100.0 * (float)mstr_found / (float)mstr_searches
                         , (float)mstr_searchlen / (float)mstr_searches
                         );
-        strbuf_addf(sbuf, "Searches by content: %lu - average length: %7.3f\n"
+        strbuf_addf(sbuf, "Searches by content: %lu - found: %lu (%.1f%%) - avg length: %7.3f\n"
                         , mstr_searches_byvalue
+                        , mstr_found_byvalue, 100.0 * (float)mstr_found_byvalue / (float)mstr_searches
                         , (float)mstr_searchlen_byvalue / (float)mstr_searches_byvalue
+                        );
+        strbuf_addf(sbuf, "Hash chains: %lu (%.1f%%)\n"
+                        , mstr_chains
+                        , 100.0 * (float)mstr_chains / (float)HTABLE_SIZE
+                        );
+        strbuf_addf(sbuf, "Distinct strings added: %lu "
+                          "- deleted: %lu "
+                          "- coll.: %lu (%.1f%% added/%1.f%% chains)\n"
+                        , mstr_added, mstr_deleted
+                        , mstr_collisions
+                        , 100.0 * (float)mstr_collisions / (float)mstr_added
+                        , 100.0 * (float)mstr_collisions / (float)mstr_chains
                         );
     }
 
@@ -1485,6 +1552,11 @@ string_dinfo_status (svalue_t *svp, int value)
     ST_NUMBER(DID_ST_STR_OVERHEAD, sizeof(string_t)+sizeof(string_data_t)-1);
     ST_NUMBER(DID_ST_STR_IT_OVERHEAD, sizeof(string_t));
     
+    ST_NUMBER(DID_ST_STR_CHAINS,     mstr_chains);
+    ST_NUMBER(DID_ST_STR_ADDED,      mstr_added);
+    ST_NUMBER(DID_ST_STR_DELETED,    mstr_deleted);
+    ST_NUMBER(DID_ST_STR_COLLISIONS, mstr_collisions);
+
     ST_NUMBER(DID_ST_UNTABLED,      mstr_untabled);
     ST_NUMBER(DID_ST_UNTABLED_SIZE, mstr_untabled_size);
     ST_NUMBER(DID_ST_ITABLED,       mstr_itabled);
@@ -1496,6 +1568,8 @@ string_dinfo_status (svalue_t *svp, int value)
     ST_NUMBER(DID_ST_STR_SEARCHLEN,         mstr_searchlen);
     ST_NUMBER(DID_ST_STR_SEARCHES_BYVALUE,  mstr_searches_byvalue);
     ST_NUMBER(DID_ST_STR_SEARCHLEN_BYVALUE, mstr_searchlen_byvalue);
+    ST_NUMBER(DID_ST_STR_FOUND,             mstr_found);
+    ST_NUMBER(DID_ST_STR_FOUND_BYVALUE,     mstr_found_byvalue);
 
 #undef ST_NUMBER
 } /* string_dinfo_status() */

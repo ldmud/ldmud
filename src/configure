@@ -149,7 +149,7 @@ ac_help="$ac_help
 ac_help="$ac_help
   --with-apply-cache-bits=VALUE       default=12"
 ac_help="$ac_help
-  --with-rxcache-table=VALUE          default=16384"
+  --with-rxcache-table=VALUE          default=8191"
 ac_help="$ac_help
   --with-max-byte-transfer=VALUE      default=50000"
 ac_help="$ac_help
@@ -1173,7 +1173,7 @@ if test "${with_apply_cache_bits+set}" = set; then
 fi
 
 
-DEFAULTwith_rxcache_table=16384
+DEFAULTwith_rxcache_table=8191
 # Check whether --with-rxcache-table or --without-rxcache-table was given.
 if test "${with_rxcache_table+set}" = set; then
   withval="$with_rxcache_table"
