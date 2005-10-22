@@ -99,6 +99,7 @@ f-010603-2: Efun to resolve paths
 f-010603-3: multicast-call_other with exclusion
 f-010603-4: Safe recompile of objects
 f-010603-5: New datatypes NULL and ERROR
+f-010701: On save/restore object, pass full filename to valid_write/read
 
 
 Language

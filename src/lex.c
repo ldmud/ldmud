@@ -2097,7 +2097,9 @@ skip_pp_comment (char *p)
 
 /* Skip a '//' line comment. <p> points to the first character after
  * the comment introducer, the function returns a pointer to the first
- * character after the terminating newline.
+ * character after the terminating newline. If the comment is ended
+ * prematurely by the end of file, the returned pointer will point at the
+ * EOF character.
  * Note that a '\<newline>' lineend does not terminate the comment.
  */
 
@@ -2107,6 +2109,10 @@ skip_pp_comment (char *p)
     for (;;)
     {
         c = *p++;
+        if (CHAR_EOF == c)
+        {
+            return p-1;
+        }
         if (c == '\n')
         {
             store_line_number_info();

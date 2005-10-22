@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+01-Jul-2001 (Lars Duening)  (3.3.71)
+    - (configure) 'with_wizlist_file=no' didn't work from settings files
+        (reported by Freaky).
+    - (lex.c)  '//' comments didn't like to be terminated by the end of
+        file (reported by Matthew).
+
 30-Jun-2001 (Lars Duening)  (3.3.70)
     - (hosts/os2) Updated the OS/2 port (provided by Bart).
 

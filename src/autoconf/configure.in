@@ -205,15 +205,6 @@ else
   enable_use_mysql="yes"
 fi
 
-if test "x$with_wizlist_file" != "xno"; then
-  cdef_wizlist_file="#define"
-  if test "x$with_wizlist_file" = "xyes"; then
-    with_wizlist_file=""
-  fi
-else
-  cdef_wizlist_file="#undef"
-fi
-
 AC_CDEF_FROM_ENABLE(access_control)
 AC_CDEF_FROM_ENABLE(access_log)
 AC_CDEF_FROM_ENABLE(align_functions)
@@ -291,6 +282,15 @@ fi
 
 if test "x$cdef_rxcache_table" = "x#undef"; then
   val_rxcache_table=
+fi
+
+if test "x$with_wizlist_file" != "xno"; then
+  cdef_wizlist_file="#define"
+  if test "x$with_wizlist_file" = "xyes"; then
+    with_wizlist_file=""
+  fi
+else
+  cdef_wizlist_file="#undef"
 fi
 
 if test "x$cdef_wizlist_file" = "x#undef"; then
@@ -379,7 +379,6 @@ yes
 #endif
 ],
 [ EXTRA_CFLAGS="${EXTRA_CFLAGS} -DOS2" ])
-fi
 
 dnl Checking for headers
 

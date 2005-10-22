@@ -21,9 +21,7 @@ DESCRIPTION
         will treat '/* this /* is */' as the comment.
 
         Line comments start with '//' and continue until the unescaped(!)
-        end of the line. Note that this is different from the C/C++
-        behaviour where line comments continue until the first end of line,
-        escaped or not.
+        end of the line (as in the new C standard).
 
         It is not possible to next block and line comments within
         each other. Meaning: '//' within /* ... */ has no special meaning,

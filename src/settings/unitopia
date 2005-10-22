@@ -39,6 +39,9 @@ with_udp_port=3335
 enable_malloc_trace=yes
 enable_malloc_lpc_trace=yes
 
+# --- Wizlist ---
+with_wizlist_file=no
+
 # --- Access Control ---
 enable_access_control=no
 
