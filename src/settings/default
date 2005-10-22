@@ -277,6 +277,10 @@ enable_lpc_nosave=yes
 #  <path>: mySQL support is compiled in, <path> is added to the link paths
 #          and should be the path to libmysqlclient, 
 #          e.g. enable_use_mysql=/usr/local/lib/mysql .
+#          The include files are searched in /usr/local/include, <path>,
+#          and <path>/include.
+#          The libraries are searched in the default path, <path>/lib/mysql,
+#          <path>/lib and <path>, in this order.
 
 enable_use_mysql=no
 

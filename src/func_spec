@@ -423,11 +423,11 @@ mixed  *functionlist(object|string, int default: F_CONST1);
 string *inherit_list(object default: F_THIS_OBJECT);
 int     input_to(string|closure, void|int, ...);
 int     interactive(object default: F_THIS_OBJECT);
-string  load_name(string|object default: F_THIS_OBJECT);
+string  load_name(null|string|object default: F_THIS_OBJECT);
 object  load_object(string);
 string  function_exists(string, object default: F_THIS_OBJECT);
 mixed  *object_info(object, int, void|int);
-string  object_name(object default: F_THIS_OBJECT);
+string  object_name(null|object default: F_THIS_OBJECT);
 int     object_time(object default: F_THIS_OBJECT);
 object  present_clone(object|string, object default: F_THIS_OBJECT); /* PRELIMINARY */
 string  program_name(object default: F_THIS_OBJECT);

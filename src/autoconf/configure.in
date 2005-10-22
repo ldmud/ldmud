@@ -533,7 +533,7 @@ fi
 fi
 
 AC_CACHE_CHECK(for mySQL,lp_cv_has_mysql,
-for TESTPATH in "" "$mysql_path" "/usr/local/include"; do
+for TESTPATH in "" "$mysql_path" "$mysql_path/include" "/usr/local/include"; do
     saveflags="$CFLAGS"
     if test "x$TESTPATH" != "x"; then
         CFLAGS="$CFLAGS -I$TESTPATH"
@@ -562,21 +562,47 @@ CFLAGS="$saveflags"
 done
 )
 
+# The system has the include files - now search for the libraries.
 if test $lp_cv_has_mysql = yes; then
   saveflags="$CFLAGS"
   AC_DEFINE(HAS_MYSQL)
-if test $enable_use_mysql = yes; then
-  if test "x$mysql_path" = "x"; then
-      AC_CHECK_LIB(mysqlclient,main, PKGLIBS="$PKGLIBS -lmysqlclient")
-  else
-      LIBS="$LIBS -L$mysql_path"
-      AC_CHECK_LIB(mysqlclient,main, PKGLIBS="$PKGLIBS -L$mysql_path -lmysqlclient")
+
+  if test $enable_use_mysql = yes; then
+    if test "x$mysql_path" = "x"; then
+        AC_CHECK_LIB(mysqlclient,main, PKGLIBS="$PKGLIBS -lmysqlclient")
+    else
+        tmp=""
+
+        if test -d "${mysql_path}/lib/mysql"; then
+            CFLAGS="$saveflags -L${mysql_path}/lib/mysql"
+            AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -L${mysql_path}/lib/mysql -lmysqlclient")
+        elif test -d "${mysql_path}/lib"; then
+            CFLAGS="$saveflags -L${mysql_path}/lib"
+            AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -L${mysql_path}/lib -lmysqlclient")
+        else
+            CFLAGS="$saveflags -L$mysql_path"
+            AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -L$mysql_path -lmysqlclient")
+        fi
+
+        if test "x$tmp" = "x"; then
+            echo "mysqlclient library not found - disabling mySQL support"
+            cdef_use_mysql="#undef"
+            enable_use_mysql="no"
+            mysql_path=
+            lp_cv_has_mysql="no"
+        else
+            PKGLIBS="$tmp"
+        fi
+    fi
   fi
-  # On some systems, mysqlclient requires the compression libz.
-  AC_CHECK_LIB(z,main, PKGLIBS="$PKGLIBS -lz")
-  # On some systems, mysqlclient requires the libnsl.
-  AC_CHECK_LIB(nsl,main, PKGLIBS="$PKGLIBS -lnsl")
-fi
+
+  if test $enable_use_mysql = yes; then
+    # On some systems, mysqlclient requires the compression libz.
+    AC_CHECK_LIB(z,main, PKGLIBS="$PKGLIBS -lz")
+    # On some systems, mysqlclient requires the libnsl.
+    AC_CHECK_LIB(nsl,main, PKGLIBS="$PKGLIBS -lnsl")
+  fi
+
   CFLAGS="$saveflags"
 fi
 

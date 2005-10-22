@@ -1,0 +1,46 @@
+Short: Allow wildcarded calls with arguments
+From: Lars
+Date: 2001-08-02
+Type: Feature
+State: New
+
+Allow wildcarded calls with arguments, e.g. "*":foo(i).
+
+For this, implement a new opcode ROLLOVER, which takes this stack
+
+   mixed* results = ({ r1, r2, r3 })
+   arg1
+   arg2
+   arg3
+   arg4
+   r4     <--- sp
+
+and leaves it behind as
+
+   mixed* results = ({ r1, r2, r3, r4 })
+   arg1
+   arg2
+   arg3
+   arg4
+   arg1
+   arg2
+   arg3
+   arg4     <--- sp
+
+so the sequence could be
+
+   compute arg1
+   compute arg2
+   compute arg3
+   compute arg4
+   const0
+   rollover
+   call fun
+   rollover
+   call fun
+   roll over
+   call fun
+   ...
+
+With modifications of course.
+

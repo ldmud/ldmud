@@ -15,6 +15,8 @@ DESCRIPTION
         function synthesizes the load name as it should be and returns
         that. If the given name is illegal, the function returns 0.
 
+        As a special case, if <ob> is 0, the function returns 0.
+
         For virtual objects this efun of course returns the virtual filename.
         If <obj> is omitted, the name for the current object is returned.
 
@@ -36,6 +38,7 @@ EXAMPLE
 HISTORY
         Introduced in LDMud 3.2.6.
         Strings are accepted as arguments since 3.2.8.
+        0 is accepted as argument since 3.2.9.
 
 SEE ALSO
         clone_object(E), clonep(E), object_name(E), load_object(E),

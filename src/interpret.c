@@ -3195,10 +3195,10 @@ index_lvalue (svalue_t *sp, bytecode_p pc)
             return NULL;
         }
 
-        /* If the string is tabled, i.e. not changeable, allocate
-         * a new copy which can be changed.
+        /* If the string is tabled, i.e. not changeable, or has more than
+         * one reference, allocate a new copy which can be changed safely.
          */
-        if (mstr_tabled(vec->u.str))
+        if (!mstr_singular(vec->u.str))
         {
             string_t *p;
             
@@ -3330,10 +3330,10 @@ rindex_lvalue (svalue_t *sp, bytecode_p pc)
             return NULL;
         }
 
-        /* If the string is tabled, i.e. not changeable, allocate
-         * a new copy which can be changed.
+        /* If the string is tabled, i.e. not changeable, or has more than
+         * one reference, allocate a new copy which can be changed safely.
          */
-        if (mstr_tabled(vec->u.str))
+        if (!mstr_singular(vec->u.str))
         {
             string_t *p;
             
@@ -3438,10 +3438,10 @@ aindex_lvalue (svalue_t *sp, bytecode_p pc)
             return NULL;
         }
 
-        /* If the string is tabled, i.e. not changeable, allocate
-         * a new copy which can be changed.
+        /* If the string is tabled, i.e. not changeable, or has more than
+         * one reference, allocate a new copy which can be changed safely.
          */
-        if (mstr_tabled(vec->u.str))
+        if (!mstr_singular(vec->u.str))
         {
             string_t *p;
             
@@ -3574,10 +3574,10 @@ protected_index_lvalue (svalue_t *sp, bytecode_p pc)
                 return NULL;
             }
 
-            /* If the string is tabled, i.e. not changeable, allocate
-             * a new copy which can be changed.
+            /* If the string is tabled, i.e. not changeable, or has more than
+             * one reference, allocate a new copy which can be changed safely.
              */
-            if (mstr_tabled(vec->u.str))
+            if (!mstr_singular(vec->u.str))
             {
                 string_t *p;
                 
@@ -3707,10 +3707,10 @@ protected_index_lvalue (svalue_t *sp, bytecode_p pc)
                 return NULL;
             }
 
-            /* If the string is tabled, i.e. not changeable, allocate
-             * a new copy which can be changed.
+            /* If the string is tabled, i.e. not changeable, or has more than
+             * one reference, allocate a new copy which can be changed safely.
              */
-            if (mstr_tabled(vec->u.str))
+            if (!mstr_singular(vec->u.str))
             {
                 string_t *p;
                 
@@ -3857,10 +3857,10 @@ protected_rindex_lvalue (svalue_t *sp, bytecode_p pc)
                 return NULL;
             }
 
-            /* If the string is tabled, i.e. not changeable, allocate
-             * a new copy which can be changed.
+            /* If the string is tabled, i.e. not changeable, or has more than
+             * one reference, allocate a new copy which can be changed safely.
              */
-            if (mstr_tabled(vec->u.str))
+            if (!mstr_singular(vec->u.str))
             {
                 string_t *p;
                 
@@ -3940,10 +3940,10 @@ protected_rindex_lvalue (svalue_t *sp, bytecode_p pc)
                 return NULL;
             }
 
-            /* If the string is tabled, i.e. not changeable, allocate
-             * a new copy which can be changed.
+            /* If the string is tabled, i.e. not changeable, or has more than
+             * one reference, allocate a new copy which can be changed safely.
              */
-            if (mstr_tabled(vec->u.str))
+            if (!mstr_singular(vec->u.str))
             {
                 string_t *p;
                 
@@ -4090,10 +4090,10 @@ protected_aindex_lvalue (svalue_t *sp, bytecode_p pc)
                 return NULL;
             }
 
-            /* If the string is tabled, i.e. not changeable, allocate
-             * a new copy which can be changed.
+            /* If the string is tabled, i.e. not changeable, or has more than
+             * one reference, allocate a new copy which can be changed safely.
              */
-            if (mstr_tabled(vec->u.str))
+            if (!mstr_singular(vec->u.str))
             {
                 string_t *p;
                 
@@ -4175,10 +4175,10 @@ protected_aindex_lvalue (svalue_t *sp, bytecode_p pc)
                 return NULL;
             }
 
-            /* If the string is tabled, i.e. not changeable, allocate
-             * a new copy which can be changed.
+            /* If the string is tabled, i.e. not changeable, or has more than
+             * one reference, allocate a new copy which can be changed safely.
              */
-            if (mstr_tabled(vec->u.str))
+            if (!mstr_singular(vec->u.str))
             {
                 string_t *p;
                 
@@ -4483,10 +4483,10 @@ protected_range_lvalue (int code, svalue_t *sp)
         break;
 
     case T_STRING:
-        /* If the string is tabled, i.e. not changeable, allocate
-         * a new copy which can be changed.
+        /* If the string is tabled, i.e. not changeable, or has more than
+         * one reference, allocate a new copy which can be changed safely.
          */
-        if (mstr_tabled(vec->u.str))
+        if (!mstr_singular(vec->u.str))
         {
             string_t *p;
             
@@ -5157,21 +5157,6 @@ find_virtual_value (int num)
         progpp += sizeof(inherit_t);
     inheritp = (inherit_t *)
                  (((PTRTYPE)(progpp)) - offsetof(inherit_t, prog));
-#ifdef DEBUG
-    /* TODO: Remove me if nobody reports an error. */
-    {
-        inherit_t * inheritp2 = (inherit_t *)(
-                 ((PTRTYPE)(progpp))-
-                 ((PTRTYPE)(&((inherit_t *)0)->prog)-(PTRTYPE) 0)
-               );
-        if (inheritp != inheritp2)
-        {
-            fprintf(stderr, "DEBUG: %s inheritp %p, inheritp2 %p, progpp %p\n"
-                   , time_stamp(), inheritp, inheritp2, progpp);
-            inheritp = inheritp2;
-        }
-    }
-#endif
 
     /* Compute the actual variable address */
 
@@ -6004,9 +5989,9 @@ pull_error_context (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 void
-push_control_stack ( svalue_t *sp
-                   , bytecode_p     pc
-                   , svalue_t *fp
+push_control_stack ( svalue_t   *sp
+                   , bytecode_p  pc
+                   , svalue_t   *fp
                    )
 
 /* Push the current execution context onto the control stack.
@@ -6130,12 +6115,17 @@ setup_new_frame1 (int fx, int fun_ix_offs, int var_ix_offs)
 
 /*-------------------------------------------------------------------------*/
 static INLINE svalue_t *
-setup_new_frame2 (fun_hdr_p funstart, svalue_t *sp)
+setup_new_frame2 (fun_hdr_p funstart, svalue_t *sp, Bool allowRefs)
 
 /* Before calling the function at <funstart>, massage the data on the
  * stack ending at <sp> to match the formal argumentlist of the function
  * (excessive args are removed, missing args are provided as 0),
  * and allocate the local variables on the stack.
+ *
+ * If <allowRefs> is TRUE, references may be passed as extended varargs
+ * ('(varargs mixed *)'). Currently this is used only for simul efuns.
+ * TODO: Investigate if holding references in arrays is really such a
+ * TODO:: a bad thing. Maybe it's just an implementation issue.
  *
  * csp->num_local_variables is supposed to hold the number of actual
  * arguments on the stack.
@@ -6198,7 +6188,7 @@ setup_new_frame2 (fun_hdr_p funstart, svalue_t *sp)
                 v = allocate_uninit_array(i);
                 while (--i >= 0)
                 {
-                    if (sp->type == T_LVALUE)
+                    if (!allowRefs && sp->type == T_LVALUE)
                         num_arg = -1; /* mark error condition */
                     v->item[i] = *sp--;
                 }
@@ -6295,7 +6285,7 @@ setup_new_frame (int fx)
 
     flags = setup_new_frame1(fx, 0, 0);
     inter_sp = setup_new_frame2(
-      current_prog->program + (flags & FUNSTART_MASK), inter_sp
+      current_prog->program + (flags & FUNSTART_MASK), inter_sp, MY_FALSE
     );
 #ifdef DEBUG
     if (!current_object->variables && variable_index_offset)
@@ -11550,7 +11540,7 @@ again:
         csp->funstart = funstart;
 
         /* Setup the stack, arguments and local vars */
-        sp = setup_new_frame2(funstart, sp);
+        sp = setup_new_frame2(funstart, sp, MY_FALSE);
 
         /* Finish the setup */
 
@@ -11707,7 +11697,7 @@ again:
         csp->funstart = funstart;
 
         /* Setup the stack, arguments and local vars */
-        sp = setup_new_frame2(funstart, sp);
+        sp = setup_new_frame2(funstart, sp, MY_FALSE);
 
         /* Finish the setup */
         fp = inter_fp;
@@ -12577,7 +12567,7 @@ again:
             current_variables = ob->variables;
             if (current_variables)
                 current_variables += entry->variable_index_offset;
-            new_sp = setup_new_frame2(funstart, sp);
+            new_sp = setup_new_frame2(funstart, sp, MY_TRUE);
             /* The simul_efun object should not use simul_efuns itself... */
             previous_ob = current_object;
             current_object = ob;
@@ -12950,10 +12940,11 @@ again:
             {
                 string_t *str;
 
-                /* If the string is tabled, i.e. not changeable, allocate
-                 * a new copy which can be changed and put it into the lvalue.
+                /* If the string is tabled, i.e. not changeable, or has more
+                 * than one reference, allocate a new copy which can be
+                 * changed safely.
                  */
-                if (mstr_tabled(arg->u.str))
+                if (!mstr_singular(arg->u.str))
                 {
                     memsafe(str = dup_mstring(arg->u.str), mstrsize(arg->u.str)
                            , "modifiable string");
@@ -14262,7 +14253,7 @@ retry_for_shadow:
             current_variables = ob->variables;
             if (current_variables)
                 current_variables += cache[ix].variable_index_offset;
-            inter_sp = setup_new_frame2(funstart, inter_sp);
+            inter_sp = setup_new_frame2(funstart, inter_sp, MY_FALSE);
             previous_ob = current_object;
             current_object = ob;
             save_csp = csp;
@@ -14370,7 +14361,7 @@ retry_for_shadow:
                         goto failure;
                 }
                 csp->funstart = funstart;
-                inter_sp = setup_new_frame2(funstart, inter_sp);
+                inter_sp = setup_new_frame2(funstart, inter_sp, MY_FALSE);
                 previous_ob = current_object;
                 current_object = ob;
                 save_csp = csp;
@@ -15084,16 +15075,22 @@ call_lambda (svalue_t *lsvp, int num_arg)
         }
 
         /* Finish the setup of the control frame.
-         * This is a real inter-object call, so we create a second
-         * frame to really capture the control flow.
+         * This is a real inter-object call.
          */
         csp->extern_call = MY_TRUE;
+#if 0
+TODO: Formerly, a funcall() on an alien lfun created a second control frame,
+TODO:: supposedly to "properly capture the control flow". This seemed a bit
+TODO:: nonsensical, and indeed caused confusing duplicate entries in
+TODO:: caller_stack(). However, if there are complaints, we might need
+TODO:: to reactivate this code.
         csp->funstart = NULL;
         push_control_stack(sp, 0, inter_fp);
         csp->ob = current_object;
         csp->prev_ob = previous_ob;
         csp->num_local_variables = num_arg;
         previous_ob = current_object;
+#endif
         current_object = l->function.alien.ob;
         current_prog = current_object->prog;
         /* inter_sp == sp */
@@ -15102,9 +15099,11 @@ call_lambda (svalue_t *lsvp, int num_arg)
         csp->funstart = funstart;
         eval_instruction(FUNCTION_CODE(funstart), inter_sp);
         /* The result is on the stack (inter_sp) */
+#if 0
         current_object = csp->ob;
         previous_ob = csp->prev_ob;
         pop_control_stack();
+#endif
         return;
       }
 
@@ -15207,7 +15206,7 @@ call_lambda (svalue_t *lsvp, int num_arg)
         function_index_offset = 0;
         funstart = l->function.code + 1;
         csp->funstart = funstart;
-        sp = setup_new_frame2(funstart, sp);
+        sp = setup_new_frame2(funstart, sp, MY_FALSE);
         current_variables = current_object->variables;
         current_strings = current_prog->strings;
         eval_instruction(FUNCTION_CODE(funstart), sp);
@@ -16148,12 +16147,7 @@ name_computed: /* Jump target from the catch detection */
 
 /*-------------------------------------------------------------------------*/
 string_t *
-dump_trace (Bool how
-#ifndef TRACE_CODE
-                     UNUSED
-#endif
-           , vector_t ** rvec
-           )
+dump_trace (Bool how, vector_t ** rvec)
 
 /* Write out a traceback, starting from the first frame. If a heart_beat()
  * is involved, return (uncounted) the name of the object that had it.
@@ -16171,9 +16165,6 @@ dump_trace (Bool how
  */
 
 {
-#if defined(__MWERKS__) && !defined(TRACE_CODE)
-#    pragma unused(how)
-#endif
     strbuf_t sbuf;
     string_t *hb_obj_name;
 

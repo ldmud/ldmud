@@ -45,7 +45,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
 
 
-01-Aug-2001 (Lars Duening) -- upcoming Release 3.2.9
+05-Aug-2001 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -72,6 +72,8 @@ For a detailed list of all changes see the file CHANGELOG.
             (e.g. &(i[0])) are not allowed as callback parameters.
        + lambda(): Simul efuns with extended varargs weren't compiled
             correctly.
+       + load_name(), object_name(): 0 is now accepted as argument, the
+            efuns returns 0 in that case.
        + object_info(): OINFO_MEMORY also returns the program flags
            NO_INHERIT, NO_SHADOW and NO_CLONE, and gives a better account
            of the memory used for strings and variables.
@@ -235,6 +237,10 @@ For a detailed list of all changes see the file CHANGELOG.
        + Normal runtime errors are no longer reported on the console.
        + New optional driver hook H_SEND_NOTIFY_FAIL to send a notify fail
            message to the proper receiver.
+       + For the first 255 simul efuns, it is now permissible to catch
+           reference parameters in a varargs parameter. However, the only
+           permitted use is to pass them flat in a function call (using
+           apply())!
        + Bugfix: IPv6 name lookup works again, and also with both xerq and erq.
        + Bugfix: The driver now longer gets a confused when a client like
            TinyFugue refuses to use CHARMODE.

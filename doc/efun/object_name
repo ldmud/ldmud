@@ -6,6 +6,8 @@ DESCRIPTION
         Get the name of an object <ob> or, if no argument is given, of
         the current object.
 
+        As a special case, if <ob> is 0, the function returns 0.
+
         This name is the name under which the object is stored in the
         muds object table. It is initialised at the creation of the
         object such that blueprints are named after the file they are
@@ -27,6 +29,9 @@ EXAMPLES
         This is guaranteed to be true for all objects ob that are not
         destructed.
         
+HISTORY
+        0 is accepted as argument since 3.2.9.
+
 SEE ALSO
         clone_object(E), load_name(E), load_object(E), find_object(E),
         object_time(E), program_name(E), rename_object(E)

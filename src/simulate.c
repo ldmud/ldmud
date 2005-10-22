@@ -2083,7 +2083,10 @@ destruct (object_t *ob)
              */
             do {
                 remove_shadow_actions(shadowed_by, ob);
-                shadowed_by = O_GET_SHADOW(shadowed_by)->shadowed_by;
+                if (O_GET_SHADOW(shadowed_by) != NULL)
+                    shadowed_by = O_GET_SHADOW(shadowed_by)->shadowed_by;
+                else
+                    shadowed_by = NULL;
             } while (shadowed_by != NULL);
         }
 

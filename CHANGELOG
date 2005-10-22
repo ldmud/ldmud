@@ -1,6 +1,24 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+05-Aug-2001 (Lars Duening)  (3.3.83)
+    - (mstrings.h, interpret.c) The duplication of shared strings before
+         a modification did not catch shared untabled strings. And the memory
+         usage was calculated off-by-one, too (reported by Niels).
+    - (simulate.c) Destructing an object with a single shadow crashed the
+         driver (reported by Craig).
+    - (object.c) Efuns load_name() and object_name() now accept 0 as
+         argument and pass it through (suggested by Niels).
+    - (interpret.c) Calling an alien-lfun created two control frames instead
+         of just one, with no obvious purpose. I removed one of the frames
+         but commenting out the code, so if it is needed nonetheless, it
+         will be easy to reactivate (reported by Niels).
+    - (interpret.c) For the first 255 simul-efuns it is now permissible to
+         receive references in a varargs parameter, e.g. to implement
+         a simulated call_other(). Handle with care! (reported by Coogan)
+    - (configure) Improved the search for mySQL libraries - it is amazing in
+         how many different ways this package is installed.
+
 01-Aug-2001 (Lars Duening)  (3.3.82)
     - (prolang.y) The error message for the case that a wildcarded super
          call tried to pass arguments was confusing (reported by Gimli).

@@ -1687,6 +1687,8 @@ f_load_name (svalue_t *sp)
  * filename.  If <obj> is omitted, the name for the current object is
  * returned.
  *
+ * As a special case, if <obj> is 0, the function returns 0.
+ *
  * In contrast to the object_name(), the load name can not be changed
  * by with rename_object(). However, if an object uses
  * replace_program() the load name no longer reflects the actual
@@ -1702,6 +1704,12 @@ f_load_name (svalue_t *sp)
     char *hash;    /* Position of the hash in the name */
     char *mem;     /* Allocated memory blocks */
     object_t *ob;
+
+    /* If the argument is 0, just return 0. */
+    if (sp->type == T_NUMBER)
+    {
+        return sp;
+    }
 
     /* If the argument is an object, we just need to read the name */
     if (sp->type == T_OBJECT)
@@ -1806,6 +1814,8 @@ f_object_name (svalue_t *sp)
  * Get the name of an object <ob> or, if no argument is given, of
  * the current object.
  *
+ * As a special case, if <obj> is 0, the function returns 0.
+ *
  * This name is the name under which the object is stored in the
  * muds object table. It is initialised at the creation of the
  * object such that blueprints are named after the file they are
@@ -1824,6 +1834,12 @@ f_object_name (svalue_t *sp)
 
 {
     string_t *name, *res;
+
+    /* If the argument is 0, just return 0. */
+    if (sp->type == T_NUMBER)
+    {
+        return sp;
+    }
 
     name = sp->u.ob->name;
     if (compat_mode)

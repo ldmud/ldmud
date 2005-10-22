@@ -1,0 +1,8 @@
+Short: Explicite namespace qualifier for simul efuns
+From: Niels Boehm
+Date: 2001-08-05
+Type: Feature
+State: New
+
+It would be nice to call simul efuns directly using sfun::fun(), bypassing any
+lfun of the same name. This is similar to the known efun::fun() syntax.
