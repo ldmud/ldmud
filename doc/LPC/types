@@ -71,4 +71,4 @@ DESCRIPTION
 SEE ALSO
     alists(LPC), arrays(LPC), mappings(LPC), closures(LPC),
     typeof(E), get_type_info(E), inheritance(LPC), pragma(LPC),
-    modifiers(LPC)
+    modifiers(LPC), escape(LPC)

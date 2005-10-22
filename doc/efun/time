@@ -17,4 +17,4 @@ EXAMPLE
         Print out the current date and time.
 
 SEE ALSO
-        ctime(E), time(E)
+        ctime(E), gmtime(E), localtime(E), utime(E)

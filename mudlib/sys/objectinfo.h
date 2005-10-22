@@ -1,5 +1,5 @@
-#ifndef _OBJECTINFO_H_
-#define _OBJECTINFO_H_
+#ifndef LPC_OBJECTINFO_H_
+#define LPC_OBJECTINFO_H_
 
 /* Definition of argument values for object_info() and
  * of the indices in the corresponding result arrays.
@@ -77,4 +77,4 @@
 
 #define OIM_MAX 19  /* Number of OIM_ result elements */
 
-#endif /* _OBJECTINFO_H_ */
+#endif /* LPC_OBJECTINFO_H_ */

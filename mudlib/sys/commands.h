@@ -1,5 +1,5 @@
-#ifndef _COMMANDS_H_
-#define _COMMANDS_H_
+#ifndef LPC_COMMANDS_H_
+#define LPC_COMMANDS_H_
 
 /* Flags accepted by add_action(fun, verb, flag).
  * (Below, VERB is what the player enters).
@@ -25,4 +25,4 @@
 
 #define CMD_SIZE     6
 
-#endif /* _COMMANDS_H_ */
+#endif /* LPC_COMMANDS_H_ */

@@ -4698,7 +4698,8 @@ send_erq (int handle, int request, const char *arg, size_t arglen)
         return MY_FALSE;
 
     /* Create the message and add it to buf[] */
-    *(uint32*)buf = htonl(erq_pending_len = arglen + 9);
+    erq_pending_len = arglen + 9;
+    *(uint32*)buf = htonl(erq_pending_len);
     *(uint32*)(buf+4) = htonl(handle);
     buf[8] = (char)request;
     memcpy(buf + 9, arg, arglen);

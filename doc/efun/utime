@@ -18,4 +18,4 @@ HISTORY
         Introduced in LDMud 3.2.9.
 
 SEE ALSO
-        ctime(E), time(E)
+        ctime(E), gmtime(E), localtime(E), time(E)

@@ -1,5 +1,5 @@
-#ifndef _DEBUG_INFO_H_
-#define _DEBUG_INFO_H_ 1
+#ifndef LPC_DEBUG_INFO_H_
+#define LPC_DEBUG_INFO_H_ 1
 
 /* Request values for efun debug_info().
  */
@@ -180,4 +180,4 @@
 #define TRACE_TYPE_LAMBDA  3
 #define TRACE_TYPE_LFUN    4
 
-#endif /* _DEBUG_INFO_H_ */
+#endif /* LPC_DEBUG_INFO_H_ */

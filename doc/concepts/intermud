@@ -7,15 +7,13 @@ DESCRIPTION
 	in general not muddriver or mudlib dependant, though the number of
 	implementations is limited.
 
-	The Wunderland supports only two of these protocols. The rather old
-	but widely spread 'Zebedee Intermud', and 'Intermud 3'. Most of the
-	known german muds only support the former one - that is internally
-	called 'Intermud 2' altough it differs quite a lot from the real
-	Intermud 2 protocol.
+	This text is about the rather old widely spread 'Zebedee Intermud',
+	which is also called 'Intermud 2' altough it differs quite a lot
+	from the real Intermud 2 protocol.
 
-	Full Information on Intermud 3 could be found on the web at
-	http://www.imaginary.com/protocols/intermud3.html so there is no
-	discussion here - the following is just about Zebedee Intermud
+	Full information on the newer Intermud 3 could be found on the
+	web at http://www.imaginary.com/protocols/intermud3.html so there
+	is no discussion here - the following is just about Zebedee Intermud
 	(aka Intermud 2).
 
 	Zebedee Intermud communication is handled by the /secure/inetd
@@ -49,12 +47,17 @@ SERVICES
 	    "CMD"
 	        The body of this header may be:
 	        ""        for normal intermud messages, 
-	        "emote"   if the message is an emote, 
+	        "emote"   if the message is an emote/gemote, 
 	        "history" for an history request: the last 20 lines of
 	                  this channel will be shown. 
 	        "list"    to list all remote users listening to this channel 
-	        "finger"  Retreive information about a player or creator on
-	                  a remote mud. 
+
+	    "EMOTE"     (optional)
+	        The body is 1 if the message is an emote.
+	        The body is 2 if the message is a gemote.
+
+	"finger"
+	    Retreive information about a player or creator on a remote mud. 
 
 	    "DATA"
 	        The player of whom information is requested 

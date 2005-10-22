@@ -1,6 +1,17 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+13-Jul-2001 (Lars Duening)  (3.3.74)
+    - (comm.c, parse.c, parse_old.c) Removed a couple of
+        undefined behaviours, detected by gcc 3.0 (thanks, Largo!)
+    - (sprintf.c) Format modifier '$' instructs (s)printf() to not remove
+         padding white space before a lineend.
+    - (efuns) New efuns gmtime() and localtime() to return the time broken
+         up into its constituents (suggested by Markus Peter).
+    - (lex.c) Escaped character constants are now only parsed up to a
+         maximum length. If no valid digits are found, the whole item
+         is simply treated as escaped character (thanks, Fiona!).
+
 05-Jul-2001 (Lars Duening)  (3.3.73)
     - (prolang.y) It is now possible again to redefine a non-static inherited
          variable with a static one (or vice versa), but it also generates

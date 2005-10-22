@@ -14,6 +14,7 @@
  *        NB: std (s)printf() defaults to right justification, which is
  *            unnatural in the context of a mainly string based language
  *            but has been retained for "compatability" ;)
+ *  "$"   pad whitespace before a line end is kept
  *  "|"   centered within field size.
  *  "="   column mode if strings are greater than field size.  this is only
  *        meaningful with strings, all other types are ignored. The strings
@@ -114,6 +115,7 @@
  *   00000x00 00000000 : table mode (INFO_TABLE)?
  *
  *   0000x000 00000000 : field is to be left-padded with zero
+ *   000x0000 00000000 : pad-spaces before a newline are kept
  */
 
 typedef unsigned int format_info;
@@ -139,6 +141,7 @@ typedef unsigned int format_info;
 #define INFO_TABLE    0x400
 
 #define INFO_PS_ZERO  0x800
+#define INFO_PS_KEEP  0x1000
 
 /*-------------------------------------------------------------------------*/
 
@@ -1028,7 +1031,7 @@ add_justified ( fmt_state_t *st
 
     sppos = 0;
     is_space_pad = MY_FALSE;
-    if (pad[0] == ' ' && pad[1] == '\0')
+    if (pad[0] == ' ' && pad[1] == '\0' && !(finfo & INFO_PS_KEEP))
         is_space_pad = MY_TRUE;
 
     switch(finfo & INFO_J)
@@ -1568,6 +1571,7 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                 case '+': finfo |= INFO_PP_PLUS; break;
                 case '-': finfo |= INFO_J_LEFT; break;
                 case '|': finfo |= INFO_J_CENTRE; break;
+                case '$': finfo |= INFO_PS_KEEP; break;
                 case '@': finfo |= INFO_ARRAY; break;
                 case '=': finfo |= INFO_COLS; break;
                 case '#': finfo |= INFO_TABLE; break;

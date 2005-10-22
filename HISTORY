@@ -43,7 +43,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
 
 
-29-Jun-2001 (Lars Duening) -- upcoming Release 3.2.9
+13-Jul-2001 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + allocate(): Accepts an optional initialisation value and can
@@ -74,6 +74,8 @@ For a detailed list of all changes see the file CHANGELOG.
            Single values can be returned instead of the whole array.
        + printf(), sprintf(): A leading zero in the field size will now print
            only leading zeros and not interfere with the pad string option.
+       + printf(), sprintf(): New format modifier '$' allows to keep padding
+           white space before a line end.
        + query_udp_port(), send_udp(): Renamed from query_imp_port() and
            send_imp().
        + regexp functions: more compatible with 8-bit characters.
@@ -115,6 +117,8 @@ For a detailed list of all changes see the file CHANGELOG.
          db_exec(), db_fetch(), db_handles(), db_coldefs(), db_insert_id(),
          db_error():
            Optional: mySQL support.
+       + gmtime(), localtime(): Return the time broken up into its
+           constituents.
        + md5_encrypt(): Compute the MD5 message digest for a string.
        + min(), max(): To select the minimum resp. maximum among a bunch
            of numbers or strings.
@@ -208,6 +212,9 @@ For a detailed list of all changes see the file CHANGELOG.
            scope.
        + Bugfix: It is now possible to use symbols in inline closures, ie.
            "(: 'a :)".
+       + Bugfix: Escaped character constants are now only parsed up to a
+           maximum length. If no valid digits are found, the whole item
+           is simply treated as escaped character.
 
 
     - Runtime:

@@ -339,7 +339,7 @@ find_living_object (string_t *name, Bool player)
     put_ref_string(sp, name);
     if (!sp->u.str)
         error("(parse_command) Out of memory (%lu bytes) for result\n"
-             , mstrsize(name));
+             , (unsigned long)mstrsize(name));
     inter_sp = sp;
     call_lambda(svp, 1);
     pop_stack();
@@ -564,7 +564,8 @@ load_lpc_info (size_t ix, object_t *ob)
                 tmp = allocate_array(VEC_SIZE(ret->u.vec));
                 if (!tmp)
                     error("(parse_command) Out of memory: array[%lu] for "
-                          "plural names.\n", VEC_SIZE(ret->u.vec));
+                          "plural names.\n"
+                         , (unsigned long)VEC_SIZE(ret->u.vec));
                 sing = ret->u.vec;
                 for (il = 0; il < VEC_SIZE(tmp); il++)
                 {

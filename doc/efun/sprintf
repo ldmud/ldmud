@@ -57,6 +57,7 @@ Modifiers:
             unnatural in the context of a mainly string based language
             but has been retained for "compatability" ;)
   "|"   centered within field size.
+  "$"   pad whitespace before a line end is kept
   "="   column mode.  Ignored unless the argument type specifier is s.
         Field size must be specified, if precision is specified then it
         specifies the width for the string to be wordwrapped in, if not
@@ -92,6 +93,8 @@ HISTORY
         LDMud 3.2.9 added the "%^" sequence for compatibility with
           terminal_colour() and clarified the meaning of leading
           0s in the field size modifier.
+        LDMud 3.2.9 added the '$' modifier to help in the formatting
+          of tables.
 
 SEE ALSO
         printf(E), terminal_colour(E)

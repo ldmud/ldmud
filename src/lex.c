@@ -2263,6 +2263,113 @@ number (long i)
 
 /*-------------------------------------------------------------------------*/
 static INLINE char *
+parse_numeric_escape (char * cp, unsigned char * p_char)
+
+/* Parse a character constant in one of the following formats:
+ *   <decimal>      (max 3 digits)
+ *   0o<octal>      (max 3 digits)
+ *   0x<sedecimal>  (max 2 digits)
+ *   x<sedecimal>   (max 2 digits)
+ *   0b<binary>     (max 8 digits)
+ *
+ * with <cp> pointing to the first character. The function parses
+ * until the first illegal character, but at max the given number of
+ * digits.
+ *
+ * The parsed number is stored in *<p_num>, the function returns the pointer
+ * to the first character after the number.
+ * If no valid character constant could be found, NULL is returned.
+ */
+
+{
+    char c;
+    int num_digits = 3;
+    unsigned long l;
+    unsigned long base = 10;
+
+    c = *cp++;
+
+    if ('0' == c)
+    {
+        /* '0' introduces decimal, octal, binary and sedecimal numbers, or it
+         * can be a float.
+         *
+         * Sedecimals are handled in a following if-clause to allow the
+         * two possible prefixes.
+         */
+
+        c = *cp++;
+
+        switch (c)
+        {
+        case 'X': case 'x':
+            /* Sedecimal number are handled below - here just fall
+             * through.
+             */
+            NOOP;
+            break;
+
+        case 'b': case 'B':
+          {
+            c = '0';
+            num_digits = 8;
+            base = 2;
+            break;
+          }
+
+        case 'o': case 'O':
+            c = '0';
+            base = 8;
+            num_digits = 3;
+            break;
+        } /* switch(c) */
+    } /* if ('0' == c) */
+
+    if ( c == 'X' || c == 'x' )
+    {
+        if (!leXdigit(*cp))
+        {
+            yywarn("Character constant used with no valid digits");
+            return NULL;
+        }
+
+        /* strtol() gets the sign bit wrong,
+         * strtoul() isn't portable enough.
+         */
+        num_digits = 2;
+        l = 0;
+        while(leXdigit(c = *cp++) && num_digits-- > 0)
+        {
+            if (c > '9')
+                c = (char)((c & 0xf) + ( '9' + 1 - ('a' & 0xf) ));
+            l <<= 4;
+            l += c - '0';
+        }
+    }
+    else
+    {
+        /* Parse a normal number from here */
+
+        l = c - '0';
+        if  (l < 0 || l > base)
+        {
+            yywarn("Character constant used with no valid digits");
+            return NULL;
+        }
+        while (lexdigit(c = *cp++) && c < '0'+base && num_digits-- > 0)
+              l = l * base + (c - '0');
+    }
+
+    if (l >= 256)
+        yywarn("Character constant out of range (> 255)");
+
+    *p_char = l & 0xff;
+    return cp-1;
+
+} /* parse_numeric_escape() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE char *
 parse_number (char * cp, unsigned long * p_num)
 
 /* Parse a positive integer number in one of the following formats:
@@ -2410,13 +2517,14 @@ parse_escaped_char (char * cp, char * p_char)
     case '5': case '6': case '7': case '8': case '9':
     case 'x': case 'X':
       {
-        unsigned long l;
+        char * cp2;
 
-        cp = parse_number(cp-1, &l);
-        if (l >= 256)
-            yywarn("Character constant out of range (> 255).");
-
-        c = l & 0xff;
+        /* If no valid escaped character is found, treat the sequence
+         * as a normal escaped character.
+         */
+        cp2 = parse_numeric_escape(cp-1, (unsigned char *)&c);
+        if (cp2 != NULL)
+            cp = cp2;
       }
     } /* switch() */
 

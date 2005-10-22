@@ -1,5 +1,5 @@
-#ifndef _DRIVER_HOOK_H_
-#define _DRIVER_HOOK_H_ 1
+#ifndef LPC_DRIVER_HOOK_H_
+#define LPC_DRIVER_HOOK_H_ 1
 
 /* --- Driver Hooks ---
  */
@@ -26,5 +26,5 @@
 
 #define NUM_CLOSURE_HOOKS       19  /* Number of hooks */
 
-#endif /* _DRIVER_HOOK_ */
+#endif /* LPC_DRIVER_HOOK_ */
 

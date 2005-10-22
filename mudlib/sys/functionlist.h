@@ -1,5 +1,5 @@
-#ifndef FUNCTIONLIST_H
-#define FUNCTIONLIST_H
+#ifndef LPC_FUNCTIONLIST_H
+#define LPC_FUNCTIONLIST_H
 
 #include "/sys/lpctypes.h"
 
@@ -25,4 +25,4 @@
 #define RETURN_FUNCTION_NUMARG	0x08
 #define RETURN_FUNCTION_ARGTYPE 0x10 /* not implemented */
 
-#endif /* FUNCTIONLIST_H */
+#endif /* LPC_FUNCTIONLIST_H */

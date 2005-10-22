@@ -61,6 +61,8 @@ extern svalue_t *f_min (svalue_t *sp, int num_arg);
 extern svalue_t *f_max (svalue_t *sp, int num_arg);
 extern svalue_t *f_sgn (svalue_t *sp);
 extern svalue_t *f_quote (svalue_t *sp);
+extern svalue_t *f_gmtime (svalue_t *sp);
+extern svalue_t *f_localtime (svalue_t *sp);
 
 extern svalue_t *f_clones (svalue_t *sp, int num_args);
 extern svalue_t *f_object_info (svalue_t *sp, int num_args);

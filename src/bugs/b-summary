@@ -56,6 +56,7 @@ b-000830: malloc status is inconsistent
 b-010115: Memory leaks in dev.251
 b-010115-1: Make sure that all master calls use leading slashes.
 b-010610-1: CRT doesn't work well in charmode
+b-010713-0: OSB shows inconsistent malloc statistics
 
 
 Installation

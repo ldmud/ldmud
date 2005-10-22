@@ -66,6 +66,8 @@
  *    efun: debug_info()
  *    efun: rusage() (optional)
  *    efun: shutdown()
+ *    efun: gmtime()
+ *    efun: localtime()
  *    efun: time()
  *    efun: utime()
  *
@@ -81,6 +83,10 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
+#ifdef HAVE_SYS_TIME_H
+#include <sys/time.h>
+#endif
+#include <time.h>
 
 #include "efuns.h"
 
@@ -115,6 +121,7 @@
 #include "../mudlib/sys/debug_info.h"
 #include "../mudlib/sys/objectinfo.h"
 #include "../mudlib/sys/strings.h"
+#include "../mudlib/sys/time.h"
 
 /* Forward declarations */
 static void copy_svalue (svalue_t *dest, svalue_t *, struct pointer_table *);
@@ -6114,6 +6121,128 @@ f_debug_info (svalue_t *sp, int num_arg)
 } /* f_debug_info() */
 
 /*-------------------------------------------------------------------------*/
+static INLINE svalue_t *
+x_gm_localtime (svalue_t *sp, Bool localTime)
+
+/* Implementation of the efuns gmtime() and localtime()
+ * localTime = TRUE: return localtime(), otherwise gmtime()
+ */
+
+{
+    time_t      clk;
+    struct tm * pTm;
+    vector_t  * v;
+
+    if (sp->type != T_NUMBER)
+    {
+        if (VEC_SIZE(sp->u.vec) != 2)
+            error("Bad arg 1 to %s(): Invalid array size %ld, expected 2.\n"
+                 , localTime ? "localtime" : "gmtime"
+                 , (long)VEC_SIZE(sp->u.vec));
+        if (sp->u.vec->item[0].type != T_NUMBER)
+            error("Bad arg 1 to %s(): Element 0 is '%s', expected 'int'.\n"
+                 , localTime ? "localtime" : "gmtime"
+                 , efun_arg_typename(sp->u.vec->item[0].type));
+        if (sp->u.vec->item[1].type != T_NUMBER)
+            error("Bad arg 1 to %s(): Element 1 is '%s', expected 'int'.\n"
+                 , localTime ? "localtime" : "gmtime"
+                 , efun_arg_typename(sp->u.vec->item[1].type));
+        clk = sp->u.vec->item[0].u.number;
+    }
+    else
+    {
+        clk = sp->u.number;
+    }
+
+    pTm = (localTime ? localtime : gmtime)(&clk);
+
+    v = allocate_array(TM_MAX);
+    if (!v)
+        error("Out of memory: array[%d] for result.\n", TM_MAX);
+    
+    v->item[TM_SEC].u.number = pTm->tm_sec;
+    v->item[TM_MIN].u.number = pTm->tm_min;
+    v->item[TM_HOUR].u.number = pTm->tm_hour;
+    v->item[TM_MDAY].u.number = pTm->tm_mday;
+    v->item[TM_MON].u.number = pTm->tm_mon;
+    v->item[TM_YEAR].u.number = pTm->tm_year + 1900;
+    v->item[TM_WDAY].u.number = pTm->tm_wday;
+    v->item[TM_YDAY].u.number = pTm->tm_yday;
+    v->item[TM_ISDST].u.number = pTm->tm_isdst ? 1 : 0;
+
+    free_svalue(sp);
+    put_array(sp, v); /* Adopt the ref */
+
+    return sp;
+} /* x_gm_localtime() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_gmtime (svalue_t *sp)
+
+/* TEFUN gmtime()
+ *
+ *   int * gmtime(int clock = time())
+ *   int * gmtime(int* uclock)
+ *
+ * Interpret the argument clock as number of seconds since Jan,
+ * 1st, 1970, 0:00, and return the time in UTC in a nice structure.
+ *
+ * Alternatively, accept an array of two ints: the first is <clock>
+ * value as in the first form, the second int is the number of
+ * microseconds elapsed in the current second.
+ * 
+ * The result is an array of integers:
+ *
+ *   int TM_SEC   (0) : Seconds (0..59)
+ *   int TM_MIN   (1) : Minutes (0..59)
+ *   int TM_HOUR  (2) : Hours (0..23)
+ *   int TM_MDAY  (3) : Day of the month (1..31)
+ *   int TM_MON   (4) : Month of the year (0..11)
+ *   int TM_YEAR  (5) : Year (e.g.  2001)
+ *   int TM_WDAY  (6) : Day of the week (Sunday = 0)
+ *   int TM_YDAY  (7) : Day of the year (0..365)
+ *   int TM_ISDST (8) : TRUE: Daylight saving time
+ */
+
+{
+    return x_gm_localtime(sp, MY_FALSE);
+} /* f_gmtime() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_localtime (svalue_t *sp)
+
+/* TEFUN localtime()
+ *
+ *   int * localtime(int clock = time())
+ *   int * localtime(int* uclock)
+ *
+ * Interpret the argument clock as number of seconds since Jan,
+ * 1st, 1970, 0:00, and return the time in local time in a nice structure.
+ *
+ * Alternatively, accept an array of two ints: the first is <clock>
+ * value as in the first form, the second int is the number of
+ * microseconds elapsed in the current second.
+ * 
+ * The result is an array of integers:
+ *
+ *   int TM_SEC   (0) : Seconds (0..59)
+ *   int TM_MIN   (1) : Minutes (0..59)
+ *   int TM_HOUR  (2) : Hours (0..23)
+ *   int TM_MDAY  (3) : Day of the month (1..31)
+ *   int TM_MON   (4) : Month of the year (0..11)
+ *   int TM_YEAR  (5) : Year (e.g.  2001)
+ *   int TM_WDAY  (6) : Day of the week (Sunday = 0)
+ *   int TM_YDAY  (7) : Day of the year (0..365)
+ *   int TM_ISDST (8) : TRUE: Daylight saving time
+ */
+
+{
+    return x_gm_localtime(sp, MY_TRUE);
+} /* f_localtime() */
+
+/*-------------------------------------------------------------------------*/
 #ifdef F_RUSAGE
 
 svalue_t *
@@ -6254,7 +6383,7 @@ f_ctime(svalue_t *sp)
                  , efun_arg_typename(sp->u.vec->item[0].type));
         if (sp->u.vec->item[1].type != T_NUMBER)
             error("Bad arg 1 to ctime(): Element 1 is '%s', expected 'int'.\n"
-                 , efun_arg_typename(sp->u.vec->item[0].type));
+                 , efun_arg_typename(sp->u.vec->item[1].type));
         ts = utime_string( sp->u.vec->item[0].u.number
                          , sp->u.vec->item[1].u.number);
     }

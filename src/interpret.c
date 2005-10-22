@@ -8563,7 +8563,7 @@ again:
     {
         /* Compute sp[-1] modulus sp[0] pop both arguments from the stack
          * and push the result.
-         * TODO: Could be extended to cover arrays and mappings.
+         * TODO: Could be extended to cover floats(!), arrays and mappings.
          * TODO: Define properly and add the rem operation.
          *
          * Possible type combinations:

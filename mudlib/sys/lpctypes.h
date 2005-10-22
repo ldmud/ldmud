@@ -1,5 +1,5 @@
-#ifndef LPCTYPES_H
-#define LPCTYPES_H
+#ifndef LPC_LPCTYPES_H
+#define LPC_LPCTYPES_H
 
 /* compile time types, from functionlist() */
 
@@ -42,4 +42,4 @@
 #define CLOSURE_IS_EFUN(x)	 (((x) & 0xf800) == 0xf000)
 #define CLOSURE_IS_OPERATOR(x)	 (((x) & 0xf800) == 0xe800)
 
-#endif /* LPCTYPES_H */
+#endif /* LPC_LPCTYPES_H */

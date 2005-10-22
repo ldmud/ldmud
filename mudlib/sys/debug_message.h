@@ -1,5 +1,5 @@
-#ifndef _DEBUG_MESSAGE_H_
-#define _DEBUG_MESSAGE_H_ 1
+#ifndef LPC_DEBUG_MESSAGE_H_
+#define LPC_DEBUG_MESSAGE_H_ 1
 
 /* Definitions and macros for the debug_message() */
 
@@ -15,4 +15,4 @@
 #define DMSG_TARGET (DMSG_STDOUT|DMSG_STDERR|DMSG_LOGFILE)
   /* Mask for all target bitflags */
 
-#endif /* _DEBUG_MESSAGE_H_ */
+#endif /* LPC_DEBUG_MESSAGE_H_ */

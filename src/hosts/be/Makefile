@@ -147,16 +147,16 @@ endif
 # $Format: "ifeq ($ReleaseType$, pre)"$
 ifeq (dev, pre)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 73
+  SETVERFLAGS += d 74
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-pre.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-pre.73
+  VSTRING = 3.3.0-pre.74
 endif
 # $Format: "ifeq ($ReleaseType$, dev)"$
 ifeq (dev, dev)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 73
+  SETVERFLAGS += d 74
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-dev.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-dev.73
+  VSTRING = 3.3.0-dev.74
 endif
 
 else
@@ -164,12 +164,12 @@ else
 # --- Development Versions ---
 
 # $Format: "SETVERFLAGS = -app $ReleaseMajor$ $ReleaseMinor$ $ProjectMinorVersion$"$
-SETVERFLAGS = -app 3 3 73
+SETVERFLAGS = -app 3 3 74
 
 # $Format: "  SETVERFLAGS += f"$
   SETVERFLAGS += f
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ProjectMinorVersion$"$
-  VSTRING = 3.3.73
+  VSTRING = 3.3.74
 
 endif
 
@@ -500,14 +500,14 @@ $(OBJ)/ed.o : xalloc.h svalue.h stdstrings.h simulate.h rxcache.h regexp.h \
     closure.h actions.h ed.h typedefs.h driver.h strfuns.h sent.h exec.h \
     instrs.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
-$(OBJ)/efuns.o : ../mudlib/sys/strings.h ../mudlib/sys/objectinfo.h \
-    ../mudlib/sys/debug_info.h xalloc.h wiz_list.h svalue.h swap.h \
-    strfuns.h smalloc.h simulate.h stdstrings.h rxcache.h random.h \
-    ptrtable.h otable.h object.h mstrings.h md5.h mapping.h main.h \
-    interpret.h instrs.h heartbeat.h dumpstat.h comm.h closure.h call_out.h \
-    backend.h array.h actions.h efuns.h my-rusage.h my-alloca.h typedefs.h \
-    driver.h sent.h exec.h regexp.h port.h config.h hosts/unix.h \
-    hosts/be/be.h machine.h
+$(OBJ)/efuns.o : ../mudlib/sys/time.h ../mudlib/sys/strings.h \
+    ../mudlib/sys/objectinfo.h ../mudlib/sys/debug_info.h xalloc.h \
+    wiz_list.h svalue.h swap.h strfuns.h smalloc.h simulate.h stdstrings.h \
+    rxcache.h random.h ptrtable.h otable.h object.h mstrings.h md5.h \
+    mapping.h main.h interpret.h instrs.h heartbeat.h dumpstat.h comm.h \
+    closure.h call_out.h backend.h array.h actions.h efuns.h my-rusage.h \
+    my-alloca.h typedefs.h driver.h sent.h exec.h regexp.h port.h config.h \
+    hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/files.o : ../mudlib/sys/files.h xalloc.h svalue.h stdstrings.h \
     simulate.h mstrings.h main.h lex.h interpret.h filestat.h comm.h \
