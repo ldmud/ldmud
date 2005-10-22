@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+20-Dec-2001 (Lars Duening)  (3.3.143)
+    - (mapping.c) The handling of protected deleted entries did create
+         some dead links (reported by Tomba).
+
 19-Dec-2001 (Lars Duening)  (3.3.142)
     - (object.c) Efun say(): one variable was initialized wrongly,
          occasionally causing the driver to crash (reported by Nostradamus).

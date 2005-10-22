@@ -20,12 +20,12 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 142)
-(Parent-Version lpmud 3-3 141)
-(Version-Log "Corrected a wrongly initialized variable in say().")
+(Project-Version lpmud 3-3 143)
+(Parent-Version lpmud 3-3 142)
+(Version-Log "Handling of deleted protected mapping entries did create dead links.")
 (New-Version-Log
 "")
-(Checkin-Time "Wed, 19 Dec 2001 20:50:28 -0700")
+(Checkin-Time "Fri, 21 Dec 2001 06:57:19 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -58,7 +58,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.4 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.33 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.205 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.206 644))
   (HISTORY (lpmud/f/49_HISTORY 1.228 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.13 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -129,7 +129,7 @@
   (src/ed.h (lpmud/f/34_ed.h 1.5.1.4 644))
   (src/ed.c (lpmud/c/33_ed.c 1.32.1.15 644))
   (src/efuns.h (lpmud/l/20_efuns.h 1.13.1.11 644))
-  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47 644))
+  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.1 644))
   (src/exec.h (lpmud/c/32_exec.h 1.34.1.16 644))
   (src/files.h (lpmud/I/49_files.h 1.1 644))
   (src/files.c (lpmud/I/50_files.c 1.12 644))
@@ -147,7 +147,7 @@
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.8 644))
   (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.1 644))
   (src/mapping.h (lpmud/f/30_mapping.h 1.12.1.9 644))
-  (src/mapping.c (lpmud/b/6_mapping.c 1.36.1.33 644))
+  (src/mapping.c (lpmud/b/6_mapping.c 1.36.1.34 644))
   (src/md5.h (lpmud/L/18_md5.h 1.2 644))
   (src/md5.c (lpmud/L/19_md5.c 1.5 644))
   (src/mempools.h (lpmud/D/48_mempools.h 1.2.1.3 644))
@@ -364,6 +364,17 @@
 
   ;; Bug reports and Feature requests
   (src/bugs/README (lpmud/g/40_README 1.5 644) :no-keywords)
+
+  (src/bugs/bat-011215-diff/profil2.h (lpmud/Q/11_profil2.h 1.1 644))
+  (src/bugs/bat-011215-diff/profil2.c (lpmud/Q/12_profil2.c 1.1 644))
+  (src/bugs/bat-011215-diff/frame.h (lpmud/Q/13_frame.h 1.1 644))
+  (src/bugs/bat-011215-diff/frame.c (lpmud/Q/14_frame.c 1.1 644))
+  (src/bugs/bat-011215-diff/crc32.h (lpmud/Q/15_crc32.h 1.1 644))
+  (src/bugs/bat-011215-diff/crc32.c (lpmud/Q/16_crc32.c 1.1 644))
+  (src/bugs/bat-011215-diff/bat.h (lpmud/Q/17_bat.h 1.1 644))
+  (src/bugs/bat-011215-diff/bat.c (lpmud/Q/18_bat.c 1.1 644))
+  (src/bugs/bat-011215-diff/bat-011215.diff (lpmud/Q/19_bat-011215 1.1 644))
+  (src/bugs/bat-011215-diff/CHANGELOG.BAT (lpmud/Q/20_CHANGELOG. 1.1 644))
 
   (src/bugs/b-summary (lpmud/C/34_b-summary 1.47.1.17 644) :no-keywords)
   (src/bugs/b-981028 (lpmud/g/37_b-981028 1.6 644) :no-keywords)
@@ -843,7 +854,7 @@
   (doc/efun/get_error_file (lpmud/o/49_get_error_ 1.3 644))
   (doc/efun/get_eval_cost (lpmud/m/14_get_eval_c 1.7 644))
   (doc/efun/get_extra_wizinfo (lpmud/o/50_get_extra_ 1.4 644))
-  (doc/efun/get_type_info (lpmud/o/51_get_type_i 1.9 644))
+  (doc/efun/get_type_info (lpmud/o/51_get_type_i 1.10 644))
   (doc/efun/geteuid (lpmud/p/0_geteuid 1.3 644))
   (doc/efun/getuid (lpmud/p/1_getuid 1.2 644))
   (doc/efun/gmtime (lpmud/N/7_gmtime 1.1 644))

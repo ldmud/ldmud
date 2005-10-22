@@ -1452,6 +1452,12 @@ remove_mapping (mapping_t *m, svalue_t *map_index)
             if (mc2 == NULL)
                 fatal("Mapping entry didn't hash to the same spot.\n");
 
+            /* Unlink the found entry */
+            if (prev)
+                prev->next = mc->next;
+            else
+                hm->chains[idx] = mc->next;
+
             /* If the mapping is a protector mapping, move
              * the entry into the 'deleted' list, else
              * just deallocate it.
@@ -1463,11 +1469,6 @@ remove_mapping (mapping_t *m, svalue_t *map_index)
             }
             else
             {
-                if (prev)
-                    prev->next = mc->next;
-                else
-                    hm->chains[idx] = mc->next;
-
                 free_map_chain(m, mc, MY_FALSE);
             }
             hm->used--;
@@ -3222,9 +3223,11 @@ f_walk_mapping_cleanup (svalue_t *arg)
 
             for (mc = hm->deleted; mc; mc = next)
             {
-                free_map_chain(m, mc, MY_FALSE);
                 next = mc->next;
+                free_map_chain(m, mc, MY_FALSE);
             }
+
+            hm->deleted = NULL;
         }
     }
 
