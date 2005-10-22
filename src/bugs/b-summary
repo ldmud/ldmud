@@ -12,6 +12,7 @@ b-020324: Problem with H_DEFAULT_METHOD
 b-020328-0: Inheritance causes memory corruption
 b-020318: Illegal instruction 
 b-020330: Crash in recursive simul-efun
+b-020331: Back stack at F_RETURN
 
 
 Efuns

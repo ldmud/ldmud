@@ -117,6 +117,7 @@ f-020310: inherits() returns all programs inheriting a given program
 f-020312: Filename argument to garbage_collection()
 f-020327-0: Use PCRE and traditional regexps in parallel
 f-020328-0: Introduce 'regexp' LPC datatype
+f-020331: Efun this_function()
 
 
 Language
@@ -235,6 +236,7 @@ f-020131-0: privilege_violation("limited") should pass limits
 f-020220: Heartbeat functionality
 f-020309: Stack size watch
 f-020311: Add Berkeley DB to the driver
+f-020331-1: Hook for input_to()
 
 
 Installation

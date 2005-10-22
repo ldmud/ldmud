@@ -650,6 +650,7 @@ error (const char *fmt, ...)
     string_t *malloced_error;        /* copy of emsg_buf+1 */
     string_t *malloced_file = NULL;  /* copy of program name */
     string_t *malloced_name = NULL;  /* copy of the object name */
+    object_t *curobj = NULL;         /* Verified current object */
     char      fixed_fmt[10000];
       /* Note: When changing this buffer, also change the HEAP_STACK_GAP
        * limit in xalloc.c!
@@ -672,7 +673,13 @@ error (const char *fmt, ...)
     /* Make fmt sane */
     fmt = limit_error_format(fixed_fmt, sizeof(fixed_fmt), fmt);
 
-    if (current_object)
+    /* Check the current object */
+    curobj = NULL;
+    if (current_object != NULL
+     && current_object != &dummy_current_object_for_loads)
+        curobj = current_object;
+
+    if (curobj)
         assign_eval_cost();
 
     /* We allow recursive errors only from "sensitive" environments.
@@ -740,11 +747,11 @@ error (const char *fmt, ...)
     /* If we have a current_object, determine the program location
      * of the fault.
      */
-    if (current_object)
+    if (curobj)
     {
         line_number = get_line_number_if_any(&file);
         debug_message("%s program: %s, object: %s line %ld\n"
-                     , ts, get_txt(file), get_txt(current_object->name)
+                     , ts, get_txt(file), get_txt(curobj->name)
                      , line_number);
         if (current_prog && num_error < 3)
         {
@@ -752,7 +759,7 @@ error (const char *fmt, ...)
         }
 
         malloced_file = file; /* Adopt reference */
-        malloced_name = ref_mstring(current_object->name);
+        malloced_name = ref_mstring(curobj->name);
     }
 
     /* On a triple error, duplicate the error messages so far on stdout */
@@ -762,10 +769,10 @@ error (const char *fmt, ...)
         /* Error context is secure_apply() */
 
         printf("%s error in function call: %s", ts, emsg_buf+1);
-        if (current_object)
+        if (curobj)
         {
             printf("%s program: %s, object: %s line %ld\n"
-                  , ts, get_txt(file), get_txt(current_object->name)
+                  , ts, get_txt(file), get_txt(curobj->name)
                   , line_number
                   );
         }
@@ -867,7 +874,7 @@ error (const char *fmt, ...)
         RESET_LIMITS;
         push_ref_string(inter_sp, malloced_error);
         a = 1;
-        if (current_object)
+        if (curobj)
         {
             push_ref_string(inter_sp, malloced_file);
             push_ref_string(inter_sp, malloced_name);
@@ -891,7 +898,7 @@ error (const char *fmt, ...)
         }
         else
         {
-            if (!current_object)
+            if (!curobj)
             {
                 /* Push dummy values to keep the argument order correct */
                 push_number(inter_sp, 0);
@@ -921,7 +928,7 @@ error (const char *fmt, ...)
             push_ref_valid_object(inter_sp, culprit, "runtime_error");
             push_ref_string(inter_sp, malloced_error);
             a = 2;
-            if (current_object)
+            if (curobj)
             {
                 push_ref_string(inter_sp, malloced_file);
                 push_ref_string(inter_sp, malloced_name);

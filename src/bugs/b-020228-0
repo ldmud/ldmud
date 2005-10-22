@@ -654,6 +654,47 @@ times>...
         set = {__sigbits = {8192, 0, 0, 0}}
 
 
+(gdb) frame 2
+#2  0x9a2d4 in remove_destructed_objects () at simulate.c:2666
+2666            free_object(victim, "remove_destructed_objects");
+(gdb) print victim
+$1 = (object_t *) 0x71bd84
+(gdb) print sh
+$2 = (object_shadow_t *) 0x380f68
+(gdb) print preb
+No symbol "preb" in current context.
+(gdb) print prev
+$3 = (object_shadow_t *) 0x6b4870
+(gdb) whatis victim
+type = object_t *
+(gdb) print *victim
+$4 = {flags = 24, ref = 0, total_light = 0, time_reset = 0,
+  time_of_ref = 1016690550, load_time = 1016677654, load_id = 7,
+  extra_ref = 0, prog = 0x2fe178,
+  name = 0x48548c "domains/ptown/obj/bronkey#1434",
+  load_name = 0x712884 "domains/ptown/obj/bronkey", next_all = 0x71aaec,
+  prev_all = 0x71dd8c, next_hash = 0x0, next_inv = 0x0, contains = 0x0,
+  super = 0x0, sent = 0x0, user = 0x304610, eff_user = 0x304610,
+  extra_num_variables = 23, variables = 0x4af3d0, ticks = 247, gigaticks =
+0}
+(gdb) print *prev
+$5 = {next = 0x380f68, obj = 0x71dd8c, flags = 1040, ref = 652, sent =
+0x0}
+(gdb) print *ob
+$6 = {flags = 24, ref = 36, total_light = 0, time_reset = 0,
+  time_of_ref = 1016690550, load_time = 1016677654, load_id = 8,
+  extra_ref = 0, prog = 0x3f3430,
+  name = 0x641e00 "domains/ptown/obj/quill#1435",
+  load_name = 0x32c548 "domains/ptown/obj/quill", next_all = 0x71d620,
+  prev_all = 0x71dd8c, next_hash = 0x0, next_inv = 0x0, contains = 0x0,
+  super = 0x0, sent = 0x0, user = 0x304610, eff_user = 0x304610,
+  extra_num_variables = 23, variables = 0x1ded40, ticks = 222, gigaticks =
+0}
+(gdb) print *sh
+$7 = {next = 0x53508c, obj = 0x71bd84, flags = 24, ref = 48, sent = 0x0}
+(gdb)
+
+
 -------------------------------------------------------------------------
 
 Date: Thu, 28 Feb 2002 14:42:38 GMT
