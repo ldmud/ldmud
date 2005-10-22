@@ -1173,6 +1173,22 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
     int i;
     Bool maybe_at_end;     /* TRUE if the next text might start a new line */
     Bool no_keys;          /* TRUE if no delimiter in the string */
+    Bool indent_overflows;
+      /* Used to catch this boundary condition:
+       *   t_c("\\/ "*32, 0, indent > MAX_STRING_LENGTH - 40, 40)
+       * In this case, the last indent is followed by no data, which the
+       * data copying part notices, but not the previous length calculation
+       * part.
+       * Set to TRUE in the length calculation when the possibility arises.
+       */
+
+    if (wrap && indent > wrap)
+    {
+        error("(terminal_colour) indent %ld > wrap %ld\n"
+             , (long)indent, (long)wrap);
+        /* NOTREACHED */
+        return NULL;
+    }
 
     instr = get_txt(text);
     num_tmp = 0;
@@ -1479,6 +1495,7 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
     start = -1;
     space = 0;
     maybe_at_end = MY_FALSE;
+    indent_overflows =  MY_FALSE;
     j = 0; /* gathers the total length of the final string */
     j_extra = 0; /* gathers the extra length needed during fmt'ing */
     for (i = 0; i < num; i++)
@@ -1646,6 +1663,7 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                         /* Reduce this part to fit; all the following
                          * parts will be reduced to shreds^W0.
                          */
+                        indent_overflows = MY_TRUE;
                         lens[i] -= (j - MAX_STRING_LENGTH);
                         j = MAX_STRING_LENGTH;
                         if (lens[i] < z)
@@ -1661,6 +1679,7 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
         else
         {
             /* This replacement does not need to be wrapped. */
+            indent_overflows = MY_FALSE;
             j += -lens[i];
             if (j > MAX_STRING_LENGTH)
             {
@@ -1928,16 +1947,21 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
 
     /* now we have what we want */
 #ifdef DEBUG
-    if (cp - get_txt(deststr) != j) {
+    if ((long)(cp - get_txt(deststr)) != j
+     && (!indent_overflows || (long)(cp - get_txt(deststr)) != wrap)
+       ) {
       fatal("Length miscalculated in terminal_colour()\n"
-            "    Expected: %i Was: %ld\n"
+            "    Expected: %i (or %i) Was: %ld\n"
             "    In string: %.*s\n"
             "    Out string: %.*s\n"
-            "    Indent: %i Wrap: %i\n"
-           , j, (long)(cp - get_txt(deststr))
+            "    Indent: %i Wrap: %i, indent overflow: %s\n"
+           , j, wrap
+           , (long)(cp - get_txt(deststr))
            , (int)mstrsize(text), get_txt(text)
            , (int)mstrsize(deststr), get_txt(deststr)
-           , indent, wrap);
+           , indent, wrap
+           , indent_overflows ? "true" : "false"
+           );
     }
 #endif
     return deststr;

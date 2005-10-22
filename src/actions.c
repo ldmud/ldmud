@@ -1287,12 +1287,12 @@ e_add_action (svalue_t *func, svalue_t *cmd, int flag)
     p = new_action_sent();
 
     /* Set ->function to the function name, made tabled */
-    p->function = make_tabled(func->u.str);
+    p->function = make_tabled(func->u.str); func->type = T_NUMBER;
     p->ob = ob;
     p->shadow_ob = shadow_ob;
 
     /* Set ->verb to the command verb, made tabled */
-    p->verb = make_tabled(cmd->u.str);
+    p->verb = make_tabled(cmd->u.str); cmd->type = T_NUMBER;
     p->sent.type = SENT_PLAIN;
     p->short_verb = 0;
 

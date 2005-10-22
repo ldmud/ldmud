@@ -3310,7 +3310,8 @@ walk_mapping_prologue (mapping_t *m, svalue_t *sp, callback_t *cb)
             hm->deleted = NULL;
         }
     }
-    pointers = (svalue_t *)xalloc( (m->num_entries * 2 + 4) * sizeof(svalue_t) );
+    xallocate(pointers, (m->num_entries * 2 + 4) * sizeof(svalue_t)
+                      , "walk_mapping prologue" );
     pointers[0].type = T_ERROR_HANDLER;
     pointers[0].u.error_handler = f_walk_mapping_cleanup;
     pointers[1].type = T_CALLBACK;
