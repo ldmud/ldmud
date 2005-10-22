@@ -1110,7 +1110,7 @@ getfn (Bool writeflg)
     if (get_txt(file)[0] != '/')
     {
         push_ref_string(inter_sp, file);
-        ret = apply_master_ob(STR_ABS_PATH, 1);
+        ret = apply_master(STR_ABS_PATH, 1);
         if (!ret || (ret->type == T_NUMBER && ret->u.number == 0))
         {
             free_mstring(file);
@@ -1746,7 +1746,7 @@ set (void)
         svalue_t *ret;
         push_ref_object(inter_sp, command_giver, "save ed");
         push_number(inter_sp, P_SHIFTWIDTH | P_FLAGS );
-        ret = apply_master_ob(STR_SAVE_ED,2);
+        ret = apply_master(STR_SAVE_ED,2);
         if ( ret && ret->type==T_NUMBER && ret->u.number > 0 )
             return ED_OK;
     }
@@ -3160,7 +3160,7 @@ ed_start (string_t *file_arg, string_t *exit_fn, object_t *exit_ob)
     push_apply_value();
     push_ref_object(inter_sp, command_giver, "retr ed");
 
-    setup = apply_master_ob(STR_RETR_ED,1);
+    setup = apply_master(STR_RETR_ED,1);
     if ( setup && setup->type==T_NUMBER && setup->u.number )
     {
         ED_BUFFER->flags      = setup->u.number & ALL_FLAGS_MASK;
@@ -3473,7 +3473,7 @@ save_ed_buffer (void)
     (void)O_SET_INTERACTIVE(save, command_giver);
     ED_BUFFER = EXTERN_ED_BUFFER;
     push_ref_string(inter_sp, P_FNAME);
-    stmp = apply_master_ob(STR_GET_ED_FNAME,1);
+    stmp = apply_master(STR_GET_ED_FNAME,1);
     if (save)
     {
         save->catch_tell_activ = MY_FALSE;

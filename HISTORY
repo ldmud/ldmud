@@ -86,7 +86,7 @@ For a detailed list of all changes see the file CHANGELOG.
            regular expression code, or the PCRE package (default).
 
 
-19-Aug-2002 (Lars Duening) -- upcoming Release 3.2.9
+21-Aug-2002 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -436,6 +436,8 @@ For a detailed list of all changes see the file CHANGELOG.
          use background threads to send the data to the network, thus
          avoiding EWOULDBLOCK problems.
        + Signal USR2 forces the driver to reopen the host.debug.log file.
+       + External master calls (like for ERQ messages) get the same eval-cost
+           benefits during error handling as normal call-others.
        + Bugfix: IPv6 name lookup works again, and also with both xerq and erq.
        + Bugfix: The driver now longer gets a confused when a client like
            TinyFugue refuses to use CHARMODE.

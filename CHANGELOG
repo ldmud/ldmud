@@ -1,6 +1,15 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+21-Aug-2002 (Lars Duening)  (3.3.231)
+   - (comm.c, object.c, simulate.c, swap.c) Corrected some warnings
+        (reported by Dafire).
+   - (interpret, and some more files) Master applies caused by external events
+        (like ERQ messages) are now distinguished from internal calls
+        (like valid_write()) so that the error handling for external calls
+        receive the full eval cost benefits (suggested by Fiona).
+   - (Makefile.in s): Added missing @EXEEXT@ tags.
+
 20-Aug-2002 (Lars Duening)  (3.3.230)
    - (main.c) Needed to #include <netdb.h> on Solaris to get the
         MAXHOSTNAMELEN macro (thanks, Coogan).

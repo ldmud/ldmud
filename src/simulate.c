@@ -572,7 +572,7 @@ fatal (const char *fmt, ...)
 
     /* Before shutting down, try to inform the game about it */
     push_ref_string(inter_sp, STR_FATAL_ERROR);
-    apply_master_ob(STR_SHUTDOWN, 1);
+    callback_master(STR_SHUTDOWN, 1);
 
     /* Dump core and exit */
     dump_core();
@@ -911,7 +911,7 @@ error (const char *fmt, ...)
         }
 
         save_cmd = command_giver;
-        apply_master_ob(STR_RUNTIME, a);
+        apply_master(STR_RUNTIME, a);
         command_giver = save_cmd;
 
         if (culprit)
@@ -934,7 +934,7 @@ error (const char *fmt, ...)
                 a += 3;
             }
 
-            svp = apply_master_ob(STR_HEART_ERROR, a);
+            svp = apply_master(STR_HEART_ERROR, a);
             command_giver = save_cmd;
             if (svp && (svp->type != T_NUMBER || svp->u.number) )
             {
@@ -1009,7 +1009,7 @@ parse_error (Bool warning, const char *error_file, int line, const char *what
         push_c_string(inter_sp, error_file);
         push_c_string(inter_sp, buff);
         push_number(inter_sp, warning ? 1 : 0);
-        apply_master_ob(STR_LOG_ERROR, 3);
+        apply_master(STR_LOG_ERROR, 3);
     }
 } /* parse_error() */
 
@@ -1544,7 +1544,7 @@ load_object (const char *lname, Bool create_super, int depth, namechain_t *chain
         svalue_t *svp;
 
         push_c_string(inter_sp, fname);
-        svp = apply_master_ob(STR_COMP_OBJ, 1);
+        svp = apply_master(STR_COMP_OBJ, 1);
         if (svp && svp->type == T_OBJECT)
         {
             /* We got an object from the call, but is it what it
@@ -1738,7 +1738,8 @@ load_object (const char *lname, Bool create_super, int depth, namechain_t *chain
         fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) load(%p '%s') name: %ld -> (%ld:%ld)\n"
                       , tot_alloc_object, tot_alloc_object_size, ob, ob->name ? get_txt(ob->name) : "<null>"
                       , mstrsize(ob->name)
-                      , tot_alloc_object, tot_alloc_object_size + (mstrsize(ob->name))
+                      , tot_alloc_object
+                      , tot_alloc_object_size + (mstrsize(ob->name))
                       );
     }
 #endif
@@ -1974,7 +1975,8 @@ clone_object (string_t *str1)
         fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) clone(%p '%s') name: %ld -> (%ld:%ld)\n"
                       , tot_alloc_object, tot_alloc_object_size, new_ob, new_ob->name ? get_txt(new_ob->name) : "<null>"
                       , mstrsize(new_ob->name)
-                      , tot_alloc_object, tot_alloc_object_size + (mstrsize(new_ob->name))
+                      , tot_alloc_object
+                      , tot_alloc_object_size + (mstrsize(new_ob->name))
                       );
     }
 #endif
@@ -2120,7 +2122,7 @@ destruct_object (svalue_t *v)
     }
 
     push_ref_object(inter_sp, ob, "destruct");
-    result = apply_master_ob(STR_PREP_DEST, 1);
+    result = apply_master(STR_PREP_DEST, 1);
     if (!result)
         error("No prepare_destruct\n");
 
@@ -3110,9 +3112,9 @@ check_valid_path (string_t *path, object_t *caller, string_t* call_fun, Bool wri
     push_ref_string(inter_sp, call_fun);
     push_ref_valid_object(inter_sp, caller, "check_valid_path");
     if (writeflg)
-        v = apply_master_ob(STR_VALID_WRITE, 4);
+        v = apply_master(STR_VALID_WRITE, 4);
     else
-        v = apply_master_ob(STR_VALID_READ, 4);
+        v = apply_master(STR_VALID_READ, 4);
 
     if (!v || (v->type == T_NUMBER && v->u.number == 0))
         return NULL;
@@ -4094,7 +4096,7 @@ validate_shadowing (object_t *ob)
     }
 
     push_ref_object(inter_sp, ob, "shadow");
-    ret = apply_master_ob(STR_QUERY_SHADOW, 1);
+    ret = apply_master(STR_QUERY_SHADOW, 1);
 
     if (!((ob->flags|cob->flags) & O_DESTRUCTED)
      && ret && !(ret->type == T_NUMBER && ret->u.number == 0))

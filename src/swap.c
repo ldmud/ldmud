@@ -1326,7 +1326,7 @@ swap_variables (object_t *ob)
         fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) swapout(%p '%s') %d vars : %ld -> (%ld:%ld)\n"
                       , tot_alloc_object, tot_alloc_object_size, ob, ob->name ? get_txt(ob->name) : "<null>"
                       , num_variables
-                      , num_variables * sizeof (svalue_t)
+                      , (long)(num_variables * sizeof (svalue_t))
                       , tot_alloc_object, tot_alloc_object_size - (num_variables * sizeof (svalue_t))
                       );
     }
@@ -1741,7 +1741,7 @@ load_ob_from_swap (object_t *ob)
             fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) swapin(%p '%s') %d vars : %ld -> (%ld:%ld)\n"
                           , tot_alloc_object, tot_alloc_object_size, ob, ob->name ? get_txt(ob->name) : "<null>"
                           , ob->prog->num_variables
-                          , ob->prog->num_variables * sizeof (svalue_t)
+                          , (long)(ob->prog->num_variables * sizeof (svalue_t))
                           , tot_alloc_object, tot_alloc_object_size - (ob->prog->num_variables * sizeof (svalue_t))
                           );
         }

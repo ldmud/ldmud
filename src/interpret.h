@@ -156,7 +156,10 @@ extern string_t *dump_trace(Bool how, vector_t **rvec);
 extern int get_line_number_if_any(string_t **name);
 extern void reset_machine(Bool first);
 extern svalue_t *secure_apply(string_t *fun, object_t *ob, int num_arg);
-extern svalue_t *apply_master_ob(string_t *fun, int num_arg);
+extern svalue_t *apply_master_ob(string_t *fun, int num_arg, Bool external);
+#define apply_master(fun, num_arg) apply_master_ob(fun, num_arg, MY_FALSE)
+#define callback_master(fun, num_arg) apply_master_ob(fun, num_arg, MY_TRUE)
+
 extern void assert_master_ob_loaded(void);
 extern svalue_t *secure_call_lambda(svalue_t *closure, int num_arg);
 extern void remove_object_from_stack(object_t *ob);

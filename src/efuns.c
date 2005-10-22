@@ -2546,7 +2546,7 @@ f_process_string(svalue_t *sp)
         svalue_t *ret;
 
         current_object = command_giver;
-        ret = apply_master_ob(STR_GET_BB_UID,0);
+        ret = apply_master(STR_GET_BB_UID,0);
         if (!ret)
             return sp;
 

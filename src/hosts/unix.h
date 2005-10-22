@@ -35,7 +35,7 @@ extern void perror(const char *);
 extern long int strtol(const char *, char **, int);
 #endif
 
-#if defined(USING_CYGWIN) || defined(sun)
+#if defined(CYGWIN) || defined(sun)
 extern time_t time(time_t *tloc);
 #endif
 

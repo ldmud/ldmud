@@ -5851,7 +5851,7 @@ privilege_violation (string_t *what, svalue_t *where, svalue_t *sp)
     sp++;
     assign_svalue_no_free(sp, where);
     inter_sp = sp;
-    svp = apply_master_ob(STR_PRIVILEGE, 3);
+    svp = apply_master(STR_PRIVILEGE, 3);
 
     /* Is there a lfun to call? */
     if (!svp || svp->type != T_NUMBER || svp->u.number < 0)
@@ -5928,7 +5928,7 @@ privilege_violation4 ( string_t *what,    object_t *whom
             push_number(sp, how_num);
     }
     inter_sp = sp;
-    svp = apply_master_ob(STR_PRIVILEGE, 4);
+    svp = apply_master(STR_PRIVILEGE, 4);
 
     /* Was it the proper lfun to call? */
     if (!svp || svp->type != T_NUMBER || svp->u.number < 0)
@@ -15396,7 +15396,8 @@ apply (string_t *fun, object_t *ob, int num_arg)
 
 /*-------------------------------------------------------------------------*/
 static void
-secure_apply_error (svalue_t *save_sp, struct control_stack *save_csp)
+secure_apply_error ( svalue_t *save_sp, struct control_stack *save_csp
+                   , Bool clear_costs)
 
 /* Recover from an error during a secure apply. <save_sp> and <save_csp>
  * are the saved evaluator stack and control stack pointers, saving the
@@ -15406,6 +15407,11 @@ secure_apply_error (svalue_t *save_sp, struct control_stack *save_csp)
  * then calls runtime_error() in the master object with the necessary
  * information, unless it is a triple fault - in that case only a
  * debug_message() is generated.
+ *
+ * If <clear_costs> is TRUE, the eval costs and limits will be reset
+ * before runtime_error() is called. This is used for top-level master
+ * applies which should behave like normal function calls in the error
+ * handling.
  */
 
 {
@@ -15494,8 +15500,14 @@ secure_apply_error (svalue_t *save_sp, struct control_stack *save_csp)
             a++;
         }
 
+        if (clear_costs)
+        {
+            CLEAR_EVAL_COST;
+            RESET_LIMITS;
+        }
+
         save_cmd = command_giver;
-        apply_master_ob(STR_RUNTIME, a);
+        apply_master(STR_RUNTIME, a);
         command_giver = save_cmd;
         /* STR_RUNTIME freed all the current_ variables, except
          * current_error_trace.
@@ -15541,7 +15553,7 @@ secure_apply (string_t *fun, object_t *ob, int num_arg)
     save_csp = csp;
     if (setjmp(error_recovery_info.con.text))
     {
-        secure_apply_error(save_sp - num_arg, save_csp);
+        secure_apply_error(save_sp - num_arg, save_csp, MY_FALSE);
         result = NULL;
     }
     else
@@ -15554,12 +15566,21 @@ secure_apply (string_t *fun, object_t *ob, int num_arg)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-apply_master_ob (string_t *fun, int num_arg)
+apply_master_ob (string_t *fun, int num_arg, Bool external)
 
-/* Call function <fun> in the master object with <num_arg> arguments pushed
+/* Aliases:
+ *   apply_master(fun, num_arg) == apply_master_ob(fun, num_arg, FALSE)
+ *   callback_master(fun, num_arg) == apply_master_ob(fun, num_arg, TRUE)
+ *
+ * Call function <fun> in the master object with <num_arg> arguments pushed
  * onto the stack (<inter_sp> points to the last one). static and protected
  * functions can be called from the outside. The function takes care
  * of calling shadows where necessary.
+ *
+ * If <external> is TRUE, it means that this call is due to some external
+ * event (like an ERQ message) instead of being caused by a running program.
+ * The effect of this flag is that the error handling is like for a normal
+ * function call (clearing the eval costs before calling runtime_error()).
  *
  * apply_master_object() returns a pointer to the function result when the
  * call was successfull, or NULL on failure. The arguments are popped in
@@ -15613,7 +15634,7 @@ apply_master_ob (string_t *fun, int num_arg)
     save_csp = csp;
     if (setjmp(error_recovery_info.con.text))
     {
-        secure_apply_error(save_sp - num_arg, save_csp);
+        secure_apply_error(save_sp - num_arg, save_csp, external);
         printf("%s Error in master_ob->%s()\n", time_stamp(), get_txt(fun));
         debug_message("%s Error in master_ob->%s()\n", time_stamp(), get_txt(fun));
         result = NULL;
@@ -15892,7 +15913,7 @@ assert_master_ob_loaded (void)
 
         initialize_master_uid();
         push_number(inter_sp, 3);
-        apply_master_ob(STR_INAUGURATE, 1);
+        apply_master(STR_INAUGURATE, 1);
         assert_master_ob_loaded();
           /* ...in case inaugurate_master() destructed this object again */
         inside = MY_FALSE;
@@ -16394,7 +16415,7 @@ secure_call_lambda (svalue_t *closure, int num_arg)
 
     if (setjmp(error_recovery_info.con.text))
     {
-        secure_apply_error(save_sp - num_arg, save_csp);
+        secure_apply_error(save_sp - num_arg, save_csp, MY_FALSE);
         result = NULL;
     }
     else
@@ -18747,7 +18768,7 @@ f_trace (svalue_t *sp)
         inter_sp = sp;
         push_ref_string(inter_sp, STR_TRACE);
         push_number(inter_sp, sp->u.number);
-        arg = apply_master_ob(STR_VALID_TRACE, 2);
+        arg = apply_master(STR_VALID_TRACE, 2);
         if (arg)
         {
             /* ... then set the new tracelevel */
@@ -18801,7 +18822,7 @@ f_traceprefix (svalue_t *sp)
         push_ref_string(inter_sp, STR_TRACEPREFIX);
         inter_sp++; assign_svalue_no_free(inter_sp, sp);
         assign_eval_cost();
-        arg = apply_master_ob(STR_VALID_TRACE,2);
+        arg = apply_master(STR_VALID_TRACE,2);
         if (arg)
         {
             /* ... then so shall it be */

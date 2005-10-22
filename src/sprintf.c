@@ -774,7 +774,7 @@ svalue_to_string ( fmt_state_t *st
             stradd(st, &str, "/");
         stradd(st, &str, get_txt(obj->u.ob->name));
         push_ref_object(inter_sp, obj->u.ob, "sprintf");
-        temp = apply_master_ob(STR_PRINTF_OBJ_NAME, 1);
+        temp = apply_master(STR_PRINTF_OBJ_NAME, 1);
         if (temp && (temp->type == T_STRING)) {
             stradd(st, &str, " (\"");
             stradd(st, &str, get_txt(temp->u.str));

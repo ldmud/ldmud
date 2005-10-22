@@ -276,8 +276,9 @@ _free_object ( object_t *ob, const char * file, int line)
             fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) free(%p '%s') with %d vars : %ld -> (%ld:%ld)\n"
                           , tot_alloc_object, tot_alloc_object_size, ob, ob->name ? get_txt(ob->name) : "<null>"
                           , prog->num_variables
-                          , prog->num_variables * sizeof (svalue_t) + sizeof (object_t)
-                          , tot_alloc_object, tot_alloc_object_size - (prog->num_variables * sizeof (svalue_t) + sizeof (object_t))
+                          , (long)(prog->num_variables * sizeof (svalue_t) + sizeof (object_t))
+                          , (long)tot_alloc_object
+                          , (long)(tot_alloc_object_size - (prog->num_variables * sizeof (svalue_t) + sizeof (object_t)))
                           );
         }
 #endif
@@ -312,7 +313,8 @@ _free_object ( object_t *ob, const char * file, int line)
             fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) free(%p '%s') with name : %ld -> (%ld:%ld)\n"
                           , tot_alloc_object, tot_alloc_object_size, ob, get_txt(ob->name)
                           , mstrsize(ob->name)
-                          , tot_alloc_object-1, tot_alloc_object_size - (mstrsize(ob->name)+1)
+                          , tot_alloc_object-1
+                          , tot_alloc_object_size - (mstrsize(ob->name)+1)
                           );
         }
 #endif
@@ -327,7 +329,8 @@ _free_object ( object_t *ob, const char * file, int line)
         {
             fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) free(%p) has no name -> (%ld:%ld)\n"
                           , tot_alloc_object, tot_alloc_object_size, ob
-                          , tot_alloc_object-1, tot_alloc_object_size);
+                          , tot_alloc_object-1
+                          , tot_alloc_object_size);
         }
     }
 #endif
@@ -400,8 +403,10 @@ static mp_int last_id = 0;
     {
         fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) new(%p) with %d vars : %ld -> (%ld:%ld)\n"
                       , tot_alloc_object, tot_alloc_object_size, ob
-                      , num_var, size2+size
-                      , tot_alloc_object+1, tot_alloc_object_size + size + size2
+                      , num_var
+                      , (long)(size2+size)
+                      , tot_alloc_object+1
+                      , tot_alloc_object_size + size + size2
                       );
     }
 #endif
@@ -913,7 +918,7 @@ replace_programs (void)
                 fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) rprog(%p '%s') sub %d vars : %ld -> (%ld:%ld)\n"
                               , tot_alloc_object, tot_alloc_object_size, r_ob, r_ob->ob->name ? get_txt(r_ob->ob->name) : "<null>"
                               , i
-                              , i * sizeof(svalue_t)
+                              , (long)(i * sizeof(svalue_t))
                               , tot_alloc_object, tot_alloc_object_size - (i * sizeof(svalue_t))
                               );
             }
@@ -3151,7 +3156,7 @@ f_seteuid (svalue_t *sp)
     push_ref_valid_object(sp, current_object, "seteuid");
     push_ref_string(sp, argp->u.str);
     inter_sp = sp;
-    ret = apply_master_ob(STR_VALID_SETEUID, 2);
+    ret = apply_master(STR_VALID_SETEUID, 2);
     if (!ret || ret->type != T_NUMBER || ret->u.number != 1)
     {
         if (out_of_memory)

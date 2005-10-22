@@ -1717,7 +1717,7 @@ e_parse_command ( string_t *cmd          /* Command to parse */
 
     /* Get the default ids of 'general references' from master object
     */
-    pval = apply_master_ob(STR_PC_ID_LIST, 0);
+    pval = apply_master(STR_PC_ID_LIST, 0);
     if (pval && pval->type == T_POINTER)
     {
         gId_list_d = ref_array(pval->u.vec);
@@ -1725,7 +1725,7 @@ e_parse_command ( string_t *cmd          /* Command to parse */
     else
         gId_list_d = NULL;
 
-    pval = apply_master_ob(STR_PC_P_ID_LIST, 0);
+    pval = apply_master(STR_PC_P_ID_LIST, 0);
     if (pval && pval->type == T_POINTER)
     {
         gPluid_list_d = ref_array(pval->u.vec);
@@ -1733,7 +1733,7 @@ e_parse_command ( string_t *cmd          /* Command to parse */
     else
         gPluid_list_d = NULL;
 
-    pval = apply_master_ob(STR_PC_ADJ_LIST, 0);
+    pval = apply_master(STR_PC_ADJ_LIST, 0);
     if (pval && pval->type == T_POINTER)
     {
         gAdjid_list_d = ref_array(pval->u.vec);
@@ -1741,7 +1741,7 @@ e_parse_command ( string_t *cmd          /* Command to parse */
     else
         gAdjid_list_d = NULL;
 
-    pval = apply_master_ob(STR_PC_PREPOS, 0);
+    pval = apply_master(STR_PC_PREPOS, 0);
     if (pval && pval->type == T_POINTER)
     {
         gPrepos_list = ref_array(pval->u.vec);
@@ -1749,7 +1749,7 @@ e_parse_command ( string_t *cmd          /* Command to parse */
     else
         gPrepos_list = allocate_array(0);
 
-    pval = apply_master_ob(STR_PC_ALLWORD,0);
+    pval = apply_master(STR_PC_ALLWORD,0);
     if (pval && pval->type == T_STRING)
         gAllword = ref_mstring(pval->u.str);
     else

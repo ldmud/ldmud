@@ -1693,7 +1693,7 @@ inc_open (char *buf, char *name, mp_int namelen, char delim)
             push_c_string(inter_sp, current_file);
 
         push_number(inter_sp, (delim == '"') ? 0 : 1);
-        res = apply_master_ob(STR_INCLUDE_FILE, 3);
+        res = apply_master(STR_INCLUDE_FILE, 3);
 
         if (res && !(res->type == T_NUMBER && !res->u.number))
         {
@@ -3746,7 +3746,7 @@ yylex1 (void)
                     push_ref_string(inter_sp, STR_NOMASK_SIMUL_EFUN);
                     push_c_string(inter_sp, current_file);
                     push_ref_string(inter_sp, p->name);
-                    res = apply_master_ob(STR_PRIVILEGE, 3);
+                    res = apply_master(STR_PRIVILEGE, 3);
                     if (!res || res->type != T_NUMBER || res->u.number < 0)
                     {
                         yyerrorf(

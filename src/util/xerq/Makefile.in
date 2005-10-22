@@ -49,7 +49,7 @@ LDFLAGS=@LDFLAGS@
 
 OBJ = erq.o execute.o socket.o lookup.o
 
-erq:	$(OBJ)
+erq@EXEEXT@:	$(OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) $(OBJ) -o $@ $(LIBS)
 
 %.o : %.c
@@ -60,12 +60,12 @@ erq:	$(OBJ)
 	@top_srcdir@/machine.h \
 	@top_srcdir@/port.h
 
-install: erq
+install: erq@EXEEXT@
 	$(mkinstalldirs) $(BINDIR) $(ERQ_DIR)
-	$(INSTALL) erq $(BINDIR)/erq
+	$(INSTALL) erq@EXEEXT@ $(BINDIR)/erq@EXEEXT@
 
 clean:
-	rm -f erq *.o *~
+	rm -f erq@EXEEXT@ *.o *~
 
 realclean: clean
 	

@@ -3447,7 +3447,7 @@ inheritance:
               else
                   push_c_string(inter_sp, current_file);
 
-              res = apply_master_ob(STR_INHERIT_FILE, 2);
+              res = apply_master(STR_INHERIT_FILE, 2);
 
               if (res && !(res->type == T_NUMBER && !res->u.number))
               {
@@ -9537,7 +9537,7 @@ function_name:
               push_ref_string(inter_sp, STR_NOMASK_SIMUL_EFUN);
               push_c_string(inter_sp, current_file);
               push_ref_string(inter_sp, $3->name);
-              res = apply_master_ob(STR_PRIVILEGE, 3);
+              res = apply_master(STR_PRIVILEGE, 3);
               if (!res || res->type != T_NUMBER || res->u.number < 0)
               {
                   yyerrorf("Privilege violation: nomask simul_efun %s"
@@ -9594,7 +9594,7 @@ function_name:
               push_ref_string(inter_sp, STR_NOMASK_SIMUL_EFUN);
               push_c_string(inter_sp, current_file);
               push_ref_string(inter_sp, lvar->name);
-              res = apply_master_ob(STR_PRIVILEGE, 3);
+              res = apply_master(STR_PRIVILEGE, 3);
               if (!res || res->type != T_NUMBER || res->u.number < 0)
               {
                   yyerrorf("Privilege violation: nomask simul_efun %s"

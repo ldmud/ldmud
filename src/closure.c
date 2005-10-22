@@ -5249,7 +5249,7 @@ undefined_function:
             push_ref_string(inter_sp, STR_NOMASK_SIMUL_EFUN);
             push_ref_valid_object(inter_sp, current_object, "nomask simul_efun");
             push_ref_string(inter_sp, p->name);
-            res = apply_master_ob(STR_PRIVILEGE, 3);
+            res = apply_master(STR_PRIVILEGE, 3);
             
             if (!res || res->type != T_NUMBER || res->u.number < 0)
             {

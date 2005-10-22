@@ -442,7 +442,7 @@ backend (void)
                 master_will_be_updated = MY_FALSE;
                 command_giver = NULL;
                 current_object = &dummy_current_object_for_loads;
-                apply_master_ob(STR_EXT_RELOAD, 0);
+                callback_master(STR_EXT_RELOAD, 0);
                 current_object = NULL;
             }
 
@@ -494,7 +494,7 @@ backend (void)
                         current_interactive = NULL;
 
                         push_number(inter_sp, minutes);
-                        apply_master_ob(STR_SLOW_SHUT, 1);
+                        callback_master(STR_SLOW_SHUT, 1);
                     }
                     else
                     {
@@ -1106,7 +1106,7 @@ preload_objects (int eflag)
     /* Call master->epilog(<eflag>)
      */
     push_number(inter_sp, eflag);
-    ret = apply_master_ob(STR_EPILOG, 1);
+    ret = callback_master(STR_EPILOG, 1);
 
     if ((ret == 0) || (ret->type != T_POINTER))
         return;
@@ -1141,7 +1141,7 @@ preload_objects (int eflag)
         RESET_LIMITS;
         CLEAR_EVAL_COST;
         push_ref_string(inter_sp, prefiles->item[ix].u.str);
-        (void)apply_master_ob(STR_PRELOAD, 1);
+        (void)apply_master(STR_PRELOAD, 1);
 
     }
 

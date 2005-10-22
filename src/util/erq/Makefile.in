@@ -50,17 +50,17 @@ LDFLAGS=@LDFLAGS@
 
 
 
-all:	erq
+all:	erq@EXEEXT@
 
 FORCE: install
 
-erq:	erq.c
-#	$(CC) erq.c -lresolv -o erq
-	$(CC) $(CFLAGS) $(LDFLAGS) erq.c -o erq $(LIBS)
+erq@EXEEXT@:	erq.c
+#	$(CC) erq.c -lresolv -o erq@EXEEXT@
+	$(CC) $(CFLAGS) $(LDFLAGS) erq.c -o erq@EXEEXT@ $(LIBS)
 
-install: erq
+install: erq@EXEEXT@
 	$(mkinstalldirs) $(BINDIR)
-	$(INSTALL) erq $(BINDIR)/erq
+	$(INSTALL) erq@EXEEXT@ $(BINDIR)/erq@EXEEXT@
 
 clean:
-	-rm -f *.o erq *~
+	-rm -f *.o erq@EXEEXT@ *~

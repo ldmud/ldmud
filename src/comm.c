@@ -1119,13 +1119,17 @@ ipc_remove (void)
 #define PTHREAD_WRITE_MAX_SIZE 100000
 
 static int
-thread_socket_write(SOCKET_T socket, char *msg, size_t size, interactive_t *ip)
+thread_socket_write(SOCKET_T s UNUSED, char *msg, size_t size, interactive_t *ip)
 
 /* Stand in for socket_write(): take the data to be written and append
  * it to the buffer list of <ip>.
  */
 
 {
+#ifdef __MWERKS__
+#    pragma unused(s)
+#endif
+
     struct write_buffer_s *b;
 
     if (size == 0)
@@ -1186,7 +1190,7 @@ writer_thread_cleanup(void *arg)
     }
     ip->write_first = NULL;
 
-    fprintf(stderr, "Thread %d canceled and cleaned up!\n", pthread_self());
+    fprintf(stderr, "Thread %ld canceled and cleaned up!\n", pthread_self());
 } /* writer_thread_cleanup() */
 
 /*-------------------------------------------------------------------------*/
@@ -2384,7 +2388,7 @@ get_message (char *buff)
                     push_string(inter_sp, udp_data); /* adopts the ref */
                     push_number(inter_sp, ntohs(addr.sin_port));
                     RESET_LIMITS;
-                    apply_master_ob(STR_RECEIVE_UDP, 3);
+                    callback_master(STR_RECEIVE_UDP, 3);
                     CLEAR_EVAL_COST;
                 }
             }
@@ -2792,7 +2796,7 @@ remove_interactive (object_t *ob, Bool force)
         current_interactive = NULL;
         push_ref_object(inter_sp, ob, "remove_interactive");
         malloc_privilege = MALLOC_MASTER;
-        apply_master_ob(STR_DISCONNECT, 1);
+        callback_master(STR_DISCONNECT, 1);
         /* master might have used exec() */
         ob = interactive->ob;
     }
@@ -3138,7 +3142,7 @@ new_player (SOCKET_T new_socket, struct sockaddr_in *addr, size_t addrlen
 
     /* Call master->connect() and evaluate the result.
      */
-    ret = apply_master_ob(STR_CONNECT, 0);
+    ret = callback_master(STR_CONNECT, 0);
     if (new_interactive != O_GET_INTERACTIVE(master_ob))
         return;
     if (ret == NULL
@@ -3547,7 +3551,7 @@ remove_all_players (void)
         RESET_LIMITS;
         CLEAR_EVAL_COST;
         push_ref_object(inter_sp, all_players[i]->ob, "remove_all_players");
-        (void)apply_master_ob(STR_REMOVE_PL, 1);
+        (void)callback_master(STR_REMOVE_PL, 1);
         if ( !(all_players[i]->ob->flags & O_DESTRUCTED) ) {
             destruct(all_players[i]->ob);
         }
@@ -3733,7 +3737,7 @@ set_snoop (object_t *me, object_t *you)
         push_number(inter_sp, 0);
     else
         push_ref_object(inter_sp, you, "snoop");
-    ret = apply_master_ob(STR_VALID_SNOOP, 2);
+    ret = apply_master(STR_VALID_SNOOP, 2);
 
     if (!ret || ret->type != T_NUMBER || ret->u.number == 0)
         return 0;
@@ -4891,7 +4895,7 @@ stop_erq_demon (Bool notify)
             free_erq = erqp;
             CLEAR_EVAL_COST;
             RESET_LIMITS;
-            apply_master_ob(STR_STALE_ERQ, 1);
+            callback_master(STR_STALE_ERQ, 1);
         }
         erqp++;
     } while (--i);
@@ -5654,7 +5658,7 @@ f_query_snoop (svalue_t *sp)
         if (current_object != master_ob)
         {
             assign_eval_cost();
-            arg1 = apply_master_ob(STR_VALID_QSNOOP, 1);
+            arg1 = apply_master(STR_VALID_QSNOOP, 1);
             if (arg1 == 0 || arg1->type != T_NUMBER || !arg1->u.number)
             {
                 ob = NULL;
@@ -6166,7 +6170,7 @@ f_exec (svalue_t *sp)
           /* TODO: FinalFrontier suggests 'current_object->prog->name' */
         push_ref_object(inter_sp, ob, "exec");
         push_ref_object(inter_sp, obfrom, "exec");
-        v = apply_master_ob(STR_VALID_EXEC, 3);
+        v = apply_master(STR_VALID_EXEC, 3);
         if (!v || v->type != T_NUMBER || v->u.number == 0)
             break;
 

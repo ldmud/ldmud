@@ -5,7 +5,7 @@ Topics covered:
   - IPv 6
   - mySQL
   - BeOS
-  - Window 95/98/NT
+  - Windows 95/98/NT
   - OS/2
 
 
@@ -168,13 +168,8 @@ mySQL
   be searched in <path>/include and <path>, the library files will be search
   in <path>/lib/mysql, <path>/lib, and <path>, in this order.
 
-  Before you compile the driver, you have to add the username and password
-  of the Mud user to the driver (if you haven't done so already, now would
-  be a good time to set up this user in the mySQL database).  You will then
-  need to modify your mudlib to use this username and password in the
-  db_connect() call(s).
-  If you chose to not create either a username and/or a password,
-  leave the corresponding entry at 0.
+  The username and password for the mySQL database are specified by
+  the mudlib as arguments to the efun db_connect().
 
   Use mysqladmin to create any databases you want to provide - the
   names are later used in the efun db_connect() to connect to
@@ -253,6 +248,9 @@ Windows 95/98/NT
     where the executables are stored, e.g.
     /compiler/Cygnus/B19/H-i386-cygwin32/bin . In this directory, give
     the command 'mount $PWD /bin'.
+
+  Solution 3: Use a newer version of Cygwin where this problem apparently
+    has been solved.
 
   A driver compiled by David Gibbs (ishara@btinternet.com) is available
   at <URL:http://www.einy.freeserve.co.uk/lpmud.index.html>.

@@ -1479,7 +1479,7 @@ garbage_collection(void)
             RESET_LIMITS;
             CLEAR_EVAL_COST;
             malloc_privilege = MALLOC_MASTER;
-            res = apply_master_ob(STR_QUOTA_DEMON, 0);
+            res = callback_master(STR_QUOTA_DEMON, 0);
         }
         /* Once: remove_uids(res && (res->type != T_NUMBER || res->u.number) );
          * but that function was never implemented.

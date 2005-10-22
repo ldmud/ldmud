@@ -193,7 +193,7 @@ get_simul_efun_object (void)
     free_defines(); /* to prevent #defines hideing places for globals */
 
     /* Get the name(s) of the simul_efun  object. */
-    svp = apply_master_ob(STR_GET_SEFUN, 0);
+    svp = apply_master(STR_GET_SEFUN, 0);
     if (svp == NULL)
     {
         printf("%s No simul_efun\n", time_stamp());

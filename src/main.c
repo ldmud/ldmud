@@ -466,7 +466,7 @@ main (int argc, char **argv)
     ref_object(master_ob, "main");
     initialize_master_uid();
     push_number(inter_sp, 0);
-    apply_master_ob(STR_INAUGURATE, 1);
+    callback_master(STR_INAUGURATE, 1);
     setup_print_block_dispatcher();
 
     /* Evaluate all the 'f' arguments we received, if any. */
@@ -476,7 +476,7 @@ main (int argc, char **argv)
 
         f_head = f_head->next;
         push_c_string(inter_sp, fdata->txt);
-        (void)apply_master_ob(STR_FLAG, 1);
+        (void)callback_master(STR_FLAG, 1);
         free(fdata);
         if (game_is_being_shut_down) {
             fprintf(stderr, "%s Shutdown by master object.\n", time_stamp());
@@ -506,7 +506,7 @@ main (int argc, char **argv)
 
     printf("%s LDMud shutting down.\n", time_stamp());
 
-    apply_master_ob(STR_SHUTDOWN, 0);
+    callback_master(STR_SHUTDOWN, 0);
     ipc_remove();
     remove_all_players();
     handle_newly_destructed_objects();
@@ -536,7 +536,7 @@ void initialize_master_uid (void)
 {
     svalue_t *ret;
 
-    ret = apply_master_ob(STR_GET_M_UID, 0);
+    ret = apply_master(STR_GET_M_UID, 0);
     if (ret && ret->type == T_NUMBER && ret->u.number)
     {
         master_ob->user = &default_wizlist_entry;

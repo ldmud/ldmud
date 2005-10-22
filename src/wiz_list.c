@@ -305,7 +305,7 @@ get_wiz_name (const char *file)
         return NULL;
 
     push_c_string(inter_sp, file);
-    ret = apply_master_ob(STR_GET_WNAME, 1);
+    ret = apply_master(STR_GET_WNAME, 1);
     if (ret == 0 || ret->type != T_STRING)
         return NULL;
     return ret->u.str;
