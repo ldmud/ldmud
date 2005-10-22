@@ -746,7 +746,6 @@ svalue_to_string ( fmt_state_t *st
             locals.num_values = obj->u.map->num_values;
             locals.st = st;
             locals.quote = quoteStrings;
-            check_map_for_destr(obj->u.map);
             walk_mapping(obj->u.map, svalue_to_string_filter, &locals);
             str = locals.spb;
             add_indent(st, &str, indent);

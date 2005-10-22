@@ -293,7 +293,6 @@ mark_program_ref (program_t *p)
         if (p->ref++)
         {
             dump_malloc_trace(1, p);
-            dump_lpc_trace(1, p);
             fatal("First reference to program %p, but ref count %ld != 0\n"
                  , p, (long)p->ref - 1
                  );
@@ -380,7 +379,6 @@ reference_destructed_object (object_t *ob)
         if (ob->ref)
         {
             dump_malloc_trace(1, ob);
-            dump_lpc_trace(1, ob);
             fatal("First reference to destructed object %p, but ref count %ld != 0\n"
                  , ob, (long)ob->ref
                  );

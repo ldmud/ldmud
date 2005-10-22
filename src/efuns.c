@@ -4965,7 +4965,6 @@ copy_svalue (svalue_t *dest, svalue_t *src
             /* Create a new array, assign it to dest, and store it
              * in the table, too.
              */
-            check_map_for_destr(old);
             size = (mp_int)MAP_SIZE(old);
             info.width = old->num_values;
             new = allocate_mapping(size, info.width);

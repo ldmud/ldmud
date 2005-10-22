@@ -24,12 +24,14 @@ DESCRIPTION
         Finally, if D is marked as living then call O->init(), with
         this_player() set to D.
 
-        With 3.2.1, the actual move handling is part of the object
+        With 3.2.1, the actual move handling became part of the object
         library, so a given installation may implement any other
-        scheme of calling init(), therefore rendering the following
-        example almost useless.
+        scheme of calling init().
 
 EXAMPLE
+        (This example assumes a traditional implementation of the
+         movement handling)
+
         Lets say we have a object structure of living (l1 and l2) and
         non living objects (n1 and n2) as the following:
         

@@ -18,7 +18,7 @@ Differences of the driver to standard LDMud:
   - The object save file format differs, and is claimed to be compatible
     with DGD.
 
-To create the DT2 version of LDMud:
+To create the pre-Nov-2001 DT2 version of LDMud:
  - apply the src.diff to the standard sources, configure the driver and
    compile it;
  - add the code from obj/simul_efun_add.c to the simul_efun object;

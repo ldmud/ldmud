@@ -181,14 +181,14 @@ copy_file (const char *from, const char *to, int mode)
 
     if (close (ifd) < 0)
     {
-        error("%s: close failed", from);
+        error("%s: close failed\n", from);
         close(ofd);
         return 1;
     }
 
     if (close (ofd) < 0)
     {
-        error("%s: close failed", to);
+        error("%s: close failed\n", to);
         return 1;
     }
 
@@ -225,13 +225,13 @@ move_file (const char *from, const char *to)
         if (from_stats.st_dev == to_stats.st_dev
           && from_stats.st_ino == to_stats.st_ino)
         {
-            error("`%s' and `%s' are the same file", from, to);
+            error("'%s' and '%s' are the same file\n", from, to);
             return 1;
         }
 
         if (S_ISDIR (to_stats.st_mode))
         {
-            error("%s: cannot overwrite directory", to);
+            error("%s: cannot overwrite directory\n", to);
             return 1;
         }
 
@@ -263,7 +263,7 @@ move_file (const char *from, const char *to)
 
     if (errno != EXDEV)
     {
-        error("cannot move `%s' to `%s'", from, to);
+        error("cannot move '%s' to '%s'\n", from, to);
         return 1;
     }
 
@@ -271,7 +271,7 @@ move_file (const char *from, const char *to)
 
     if (!S_ISREG(from_stats.st_mode))
     {
-        error("cannot move `%s' across filesystems: Not a regular file\n", from);
+        error("cannot move '%s' across filesystems: Not a regular file\n", from);
         return 1;
     }
 
@@ -280,7 +280,7 @@ move_file (const char *from, const char *to)
 
     if (unlink(from))
     {
-        error("cannot remove `%s'", from);
+        error("cannot remove '%s'\n", from);
         return 1;
     }
     FCOUNT_DEL(from);
@@ -599,13 +599,13 @@ f_copy_file (svalue_t *sp)
             if (from_stats.st_dev == to_stats.st_dev
               && from_stats.st_ino == to_stats.st_ino)
             {
-                error("`%s' and `%s' are the same file", fromB, to);
+                error("'%s' and '%s' are the same file\n", fromB, to);
                 break;
             }
 
             if (S_ISDIR(to_stats.st_mode))
             {
-                error("%s: cannot overwrite directory", to);
+                error("%s: cannot overwrite directory\n", to);
                 break;
             }
 
@@ -619,7 +619,7 @@ f_copy_file (svalue_t *sp)
 
         if (!S_ISREG(from_stats.st_mode))
         {
-            error("cannot copy `%s': Not a regular file\n", fromB);
+            error("cannot copy '%s': Not a regular file\n", fromB);
             break;
         }
 

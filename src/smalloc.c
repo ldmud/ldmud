@@ -3231,6 +3231,8 @@ write_lpc_trace (int d, word_t *p)
     }
 } /* write_lpc_trace() */
 
+#endif /* MALLOC_LPC_TRACE */
+
 /*-------------------------------------------------------------------------*/
 void
 dump_lpc_trace (int d, void *p)
@@ -3243,10 +3245,10 @@ dump_lpc_trace (int d, void *p)
  */
 
 {
+#if defined(MALLOC_LPC_TRACE)
     write_lpc_trace(d, ((word_t *)p) - OVERHEAD);
-} /* dump_lpc_trace() */
-
 #endif /* MALLOC_LPC_TRACE */
+} /* dump_lpc_trace() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -3801,7 +3803,7 @@ consolidate_freelists (void)
                 small_free[SMALL_BLOCK_MAX]++;
 
 #ifdef MALLOC_TRACE
-                block[M_MAGIC] = SIZE_MOD_INDEX(sfmagic, size);
+                block[M_MAGIC] = SIZE_MOD_INDEX(sfmagic, size * SINT);
 #endif
             }
             else

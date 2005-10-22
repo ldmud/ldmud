@@ -20,15 +20,17 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 120)
-(Parent-Version lpmud 3-3 119)
-(Version-Log "The lexer in make_func can now handle DOS-style lineends.
-Corrected the computation of num_dirty_mappings.
-Added some additional debug information on the 'first ref to' sanity checks
-in the GC.")
+(Project-Version lpmud 3-3 121)
+(Parent-Version lpmud 3-3 120)
+(Version-Log "Removed a compilation problem.
+Remove unnecessary calls to check_map_for_destr().
+Fixed a bug/occasional crasher in the freelist consolidation.
+Corrected some error messages.
+Corrected the weight computations in efun transfer().
+Calling #'efuns with default arguments sometimes generated incorrect bytecode.")
 (New-Version-Log
 "")
-(Checkin-Time "Mon, 12 Nov 2001 19:51:15 -0700")
+(Checkin-Time "Tue, 13 Nov 2001 21:24:52 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -60,8 +62,8 @@ in the GC.")
   ;; Information about the driver and the distribution in general
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.4 644))
-  (CREDITS (lpmud/d/22_CREDITS 1.70.1.30 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.183 644))
+  (CREDITS (lpmud/d/22_CREDITS 1.70.1.31 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.184 644))
   (HISTORY (lpmud/f/49_HISTORY 1.214 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.13 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -130,19 +132,19 @@ in the GC.")
   (src/ed.h (lpmud/f/34_ed.h 1.5.1.4 644))
   (src/ed.c (lpmud/c/33_ed.c 1.32.1.13 644))
   (src/efuns.h (lpmud/l/20_efuns.h 1.13.1.11 644))
-  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.41 644))
+  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.42 644))
   (src/exec.h (lpmud/c/32_exec.h 1.34.1.12 644))
   (src/files.h (lpmud/I/49_files.h 1.1 644))
-  (src/files.c (lpmud/I/50_files.c 1.11 644))
+  (src/files.c (lpmud/I/50_files.c 1.12 644))
   (src/filestat.h (lpmud/f/51_filestat.h 1.7 644))
   (src/gcollect.h (lpmud/f/33_gcollect.h 1.6.1.3 644))
-  (src/gcollect.c (lpmud/c/30_gcollect.c 1.41.1.34 644))
+  (src/gcollect.c (lpmud/c/30_gcollect.c 1.41.1.35 644))
   (src/hash.h (lpmud/f/32_hash.h 1.5 644))
   (src/hash.c (lpmud/c/28_hash.c 1.12 644))
   (src/heartbeat.h (lpmud/m/41_heartbeat. 1.6.1.4 644))
   (src/heartbeat.c (lpmud/m/42_heartbeat. 1.18.1.6 644))
   (src/interpret.h (lpmud/b/13_interpret. 1.33.1.22 644))
-  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.91 644))
+  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.92 644))
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.8 644))
   (src/lex.c (lpmud/b/12_lex.c 1.62.1.63 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.6 644))
@@ -158,7 +160,7 @@ in the GC.")
   (src/my-alloca.h (lpmud/f/29_my-alloca. 1.3.1.2 644))
   (src/my-rusage.h (lpmud/f/28_my-rusage. 1.7 644))
   (src/object.h (lpmud/44_object.h 1.34.1.10 644))
-  (src/object.c (lpmud/45_object.c 1.62.1.42 644))
+  (src/object.c (lpmud/45_object.c 1.62.1.43 644))
   (src/otable.h (lpmud/f/27_otable.h 1.8.1.4 644))
   (src/otable.c (lpmud/43_otable.c 1.22.1.3 644))
   (src/parser.c (lpmud/L/13_parser.c 1.1 644))
@@ -188,9 +190,9 @@ in the GC.")
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.19 644))
   (src/simulate.c (lpmud/31_simulate.c 1.88.1.50 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.7 644))
-  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.35 644))
+  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.36 644))
   (src/sprintf.h (lpmud/f/15_sprintf.h 1.3.1.2 644))
-  (src/sprintf.c (lpmud/28_sprintf.c 1.31.1.28 644))
+  (src/sprintf.c (lpmud/28_sprintf.c 1.31.1.29 644))
   (src/strfuns.h (lpmud/B/51_strfuns.h 1.11.1.4 644))
   (src/strfuns.c (lpmud/C/0_strfuns.c 1.9.1.10 644))
   (src/svalue.h (lpmud/f/39_datatypes. 1.34.1.14 644))
@@ -708,9 +710,9 @@ in the GC.")
   (doc/applied/drop (lpmud/n/14_drop 1.2 644))
   (doc/applied/exit (lpmud/n/15_exit 1.3 644))
   (doc/applied/get (lpmud/n/16_get 1.2 644))
-  (doc/applied/heart_beat (lpmud/n/17_heart_beat 1.3 644))
+  (doc/applied/heart_beat (lpmud/n/17_heart_beat 1.4 644))
   (doc/applied/id (lpmud/n/18_id 1.3 644))
-  (doc/applied/init (lpmud/n/19_init 1.3 644))
+  (doc/applied/init (lpmud/n/19_init 1.4 644))
   (doc/applied/logon (lpmud/n/20_logon 1.2 644))
   (doc/applied/modify_command (lpmud/n/21_modify_com 1.2 644))
   (doc/applied/parse_command_adjectiv_id_list (lpmud/n/22_parse_comm 1.2 644))
@@ -1103,7 +1105,7 @@ in the GC.")
 
 
   ;; Mudlib Support
-  (mud/README (lpmud/t/12_README 1.6.1.1 644))
+  (mud/README (lpmud/t/12_README 1.6.1.2 644))
 
   ;; Mudlib Support: Heaven7
   (mud/heaven7/INFO.txt (lpmud/K/19_INFO.txt 1.1 644))
@@ -1117,7 +1119,7 @@ in the GC.")
   (mud/sticklib/README.install (lpmud/D/23_README.ins 1.2 644))
 
   ;; Mudlib Support: patches for Deeper Trouble 2.
-  (mud/dt2/INFO.txt (lpmud/E/41_INFO.txt 1.3 644))
+  (mud/dt2/INFO.txt (lpmud/E/41_INFO.txt 1.3.1.1 644))
   (mud/dt2/README (lpmud/E/42_README 1.2 644))
   (mud/dt2/src.diff (lpmud/F/8_src.diff 1.3 644) :no-keywords)
   (mud/dt2/doc.diff (lpmud/F/9_doc.diff 1.1 644) :no-keywords)

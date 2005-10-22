@@ -8900,6 +8900,7 @@ again:
             TYPE_TEST_RIGHT(sp, T_MAPPING);
             check_map_for_destr((sp-1)->u.map);
             check_map_for_destr(sp->u.map);
+              /* required for add_mapping() */
             inter_pc = pc;
             inter_sp = sp;
             m = add_mapping((sp-1)->u.map,sp->u.map);
@@ -13818,7 +13819,6 @@ again:
         if (sp->type == T_MAPPING)
         {
             mapping_t *m = sp->u.map;
-            check_map_for_destr(m);
             i = (long)MAP_SIZE(m);
             free_svalue(sp);
             put_number(sp, i);
@@ -15570,7 +15570,7 @@ TODO:: to reactivate this code. (July 2001)
                 /* To call an operator or efun, we have to construct
                  * a small piece of program with this instruction.
                  */
-                bytecode_t code[8];    /* the code fragment */
+                bytecode_t code[9];    /* the code fragment */
                 bytecode_p p;          /* the code pointer */
 
                 int min, max, def;
@@ -15592,7 +15592,9 @@ TODO:: to reactivate this code. (July 2001)
                         /* We lack one argument for which a default
                          * is provided.
                          */
-                        *p++ = (bytecode_t)(def);
+                        if (instrs[def].prefix)
+                            *p++ = instrs[def].prefix;
+                        *p++ = instrs[def].opcode;
                         max--;
                         min--;
                     }

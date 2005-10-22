@@ -21,9 +21,21 @@ added bonus value of demonstrating a) a traditional compat-mode master
 with mudwho support, and b) how a mud can run in both compat and plain mode.
 
 
+The following muds run natively on LDMud:
+
+  OSB - 0.2.528 (LDMud 3.2.9)
+    <URL:telnet://osb.lpmud.com:4242>
+    <URL:ftp://osb.lpmud.com:4243/pub/lib/>
+
+  Deeper Trouble - The 2nd Generation  (after Nov 2001, LDMud 3.2.9-dev.349)
+    <URL:telnet://sunsite.auc.dk:4242/>
+
+TODO: Complete this list (Tubmud, PK-Mud, Unitopia, etc)
+
+
 Support exists for these muds:
 
-  Deeper Trouble - The 2nd Generation  (LDMud 3.2.8-dev.158)
+  Deeper Trouble - The 2nd Generation  (before Nov 2001, LDMud 3.2.8-dev.158)
     <URL:telnet://sunsite.auc.dk:4242/>
 
   Heaven7 3.1.1  (LDMud 3.2.9-dev.255)
@@ -34,13 +46,4 @@ Support exists for these muds:
 
   StickLib - 0.99c (LDMud 3.2.7-dev.155)
     <URL:http://www.hut.fi/~doomdark/proj/sticklib/sticklib.html>
-
-
-The following muds run natively on LDMud:
-
-  OSB - 0.2.528 (LDMud 3.2.7-dev.123)
-       <URL:ftp://osb.mud.de:4243/pub/lib/> (currently defunct)
-    or <URL:ftp://ftp.bearnip.com/pub/mud/>
-
-TODO: Complete this list (Tubmud, PK-Mud, Unitopia, etc)
 

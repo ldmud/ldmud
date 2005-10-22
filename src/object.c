@@ -4128,37 +4128,37 @@ f_transfer (svalue_t *sp)
                 result = 6;
                 break;
             }
+        }
 
-            /* If it is not a room, correct the total weight in
-             * the destination.
+        /* If it is not a room, correct the total weight in
+         * the destination.
+         */
+        if (to->super && weight)
+        {
+            /* Check if the destination can carry that much.
              */
-            if (to->super && weight)
+            push_number(inter_sp, weight);
+            ret = sapply(STR_ADD_WEIGHT, to, 1);
+            if (ret && ret->type == T_NUMBER && ret->u.number == 0)
             {
-                /* Check if the destination can carry that much.
-                 */
-                push_number(inter_sp, weight);
-                ret = sapply(STR_ADD_WEIGHT, to, 1);
-                if (ret && ret->type == T_NUMBER && ret->u.number == 0)
-                {
-                    result = 1;
-                    break;
-                }
-
-                if (to->flags & O_DESTRUCTED)
-                {
-                    result = 1;
-                    break;
-                }
+                result = 1;
+                break;
             }
 
-            /* If it is not a room, correct the weight in
-             * the 'from' object.
-             */
-            if (from && from->super && weight)
+            if (to->flags & O_DESTRUCTED)
             {
-                push_number(inter_sp, -weight);
-                (void)sapply(STR_ADD_WEIGHT, from, 1);
+                result = 1;
+                break;
             }
+        }
+
+        /* If it is not a room, correct the weight in
+         * the 'from' object.
+         */
+        if (from && from->super && weight)
+        {
+            push_number(inter_sp, -weight);
+            (void)sapply(STR_ADD_WEIGHT, from, 1);
         }
 
         /* When we come here, the move is ok */

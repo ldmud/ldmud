@@ -1,6 +1,22 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+13-Nov-2001 (Lars Duening)  (3.3.121)
+    - (gcollect.c, smalloc.c) Removed a compilation problem when
+        MALLOC_LPC_TRACE is not defined (reported by Menaures).
+    - (efuns.c, interpret.c, sprintf.c) Removed unnecessary calls
+        to check_map_for_destr().
+    - (smalloc.c) The computation of a 'magic' word in the freelist
+        consolidation was wrong, causing bus errors in Tubmud.
+    - (files.c) Added missing newlines to some error messages
+        (thanks, Freaky!)
+    - (object.c) Efun transfer() miscalculated the weights when the
+        target wasn't a living (reported by Zordiac).
+    - (interpret.c) When calling a #'efun which takes another efun as
+        default argument, call_lambda() generated incorrect bytecode
+        in the trampoline stub by assuming that instruction code
+        equalled bytecode. Example: funcall(#'ctime) (reported by Dan).
+
 12-Nov-2001 (Lars Duening)  (3.3.120)
     - (make_func.y) Lexer now understands lines terminated with CRLFs
         instead of just LFs (reported by Holger).
