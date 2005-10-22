@@ -7,11 +7,21 @@ SYNOPSIS
 DESCRIPTION
         This function is similar to explode but accepts a regular
         expression <pattern> as delimiter (interpreted according to <opt>
-        if given). Every second part of the returned array is a delimiter.
+        if given).
+
+        If flag RE_OMIT_DELIM is not set in <opt>, then every second element
+        in the result vector will be the text that matched the delimiter.
+        If the flag is set, then the result vector will contain only
+        the text between the delimiters.
+
+EXAMPLES
+        regexplode("abcdef", "cde")                -> ({ "ab", "cde", "f" })
+        regexplode("abcdef", "cde", RE_OMIT_DELIM) -> ({ "ab", "f" })
 
 HISTORY
         Introduced in 3.2@61
-        LDMud 3.3 added the optional <opt> argument.
+        LDMud 3.3 added the optional <opt> argument and the RE_OMIT_DELIM
+          flag.
 
 SEE ALSO
-        explode(E), regexp(E), regreplace(E)
+        explode(E), regexp(E), regmatch(E), regreplace(E)

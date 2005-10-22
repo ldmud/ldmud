@@ -47,6 +47,7 @@
 #include "interpret.h"
 #include "lex.h"
 #include "mapping.h"
+#include "mregex.h"
 #include "mstrings.h"
 #include "object.h"
 #include "otable.h"
@@ -55,7 +56,6 @@
 #include "pcre/pcre.h"
 #endif
 #include "random.h"
-#include "rxcache.h"
 #include "simulate.h"
 #include "simul_efun.h"
 #include "stdstrings.h"
@@ -1106,7 +1106,7 @@ options (void)
 #ifndef USE_PCRE
   fputs("        regexps: traditional.\n", stdout);
 #else
-  printf("        regexps: PCRE %d.%d.\n", PCRE_MAJOR, PCRE_MINOR);
+  printf("        regexps: PCRE %d.%d\n", PCRE_MAJOR, PCRE_MINOR);
 #endif
 
 #ifndef USE_ALISTS

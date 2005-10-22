@@ -105,12 +105,12 @@
 #include "main.h"
 #include "mapping.h"
 #include "md5.h"
+#include "mregex.h"
 #include "mstrings.h"
 #include "object.h"
 #include "otable.h"
 #include "ptrtable.h"
 #include "random.h"
-#include "rxcache.h"
 #include "stdstrings.h"
 #include "simulate.h"
 #include "smalloc.h" /* smalloc_dinfo_data() */
@@ -535,8 +535,9 @@ f_regexplode (svalue_t *sp)
  *   string *regexplode (string text, string pattern, int opt)
  *
  * Explode the <text> by the delimiter <pattern> (interpreted according
- * to <opt> if given), returning a vector of the exploded text. Every second
- * element in the result vector is the text that matched the delimiter.
+ * to <opt> if given), returning a vector of the exploded text.
+ * If flag RE_OMIT_DELIM is not set, then every second element in the result
+ * vector will be the text that matched the delimiter.
  * Evalcost: number of matches.
  */
 
@@ -558,6 +559,7 @@ f_regexplode (svalue_t *sp)
     vector_t *ret;                     /* Result vector */
     svalue_t *svp;                     /* Next element in ret to fill in */
     int num_match;                     /* Number of matches */
+    int arraysize;                     /* Size of result array */
     int       opt;                     /* RE options */
     int       rc;                      /* Result from rx_exec() */
     size_t    start;                   /* Start position for match */
@@ -581,6 +583,7 @@ f_regexplode (svalue_t *sp)
      */
     start = 0;
     num_match = 0;
+    matches = NULL;
     matchp = &matches;
     while ((rc = rx_exec(reg, text, start)) > 0)
     {
@@ -616,14 +619,19 @@ f_regexplode (svalue_t *sp)
     *matchp = 0; /* Terminate list properly */
 
     /* Prepare the result vector */
-    if (max_array_size && num_match > ((max_array_size-1) >> 1) ) {
+    if (opt & RE_OMIT_DELIM)
+        arraysize = num_match+1;
+    else
+        arraysize = 2 * num_match + 1;
+
+    if (max_array_size && arraysize > max_array_size-1 ) {
         free_regexp(reg);
         inter_sp = sp;
         error("Illegal array size");
         /* NOTREACHED */
         return sp;
     }
-    ret = allocate_array((num_match << 1) + 1);
+    ret = allocate_array(arraysize);
 
     /* Walk down the list of matches, extracting the
      * text parts and matched delimiters, copying them
@@ -647,15 +655,18 @@ f_regexplode (svalue_t *sp)
         svp++;
 
         /* Copy the matched delimiter */
-        len = match->end - match->start;
-        if (len)
+        if (!(opt & RE_OMIT_DELIM))
         {
-            memsafe(txt = mstr_extract(text, match->start, match->end-1), (size_t)len, "matched delimiter");
-            put_string(svp, txt);
+            len = match->end - match->start;
+            if (len)
+            {
+                memsafe(txt = mstr_extract(text, match->start, match->end-1), (size_t)len, "matched delimiter");
+                put_string(svp, txt);
+            }
+            else
+                put_ref_string(svp, STR_EMPTY);
+            svp++;
         }
-        else
-            put_ref_string(svp, STR_EMPTY);
-        svp++;
 
         start = match->end;
     }
@@ -713,19 +724,32 @@ f_regreplace (svalue_t *sp)
  */
 
 {
-    regexp_t *pat;
-    int   flags;
-    char *oldbuf, *buf, *new, *old, *match = NULL;
-    string_t * text, * sub;
-    size_t start;
-    size_t matchsize = 0;
-    svalue_t *subclosure = NULL;
-    long  space;
-    size_t  origspace;
-    int rc;
+    /* The found delimiter matches are kept in a list of these
+     * structures which are allocated on the stack.
+     */
+    struct regreplace_match {
+        size_t start, end;              /* Start and end of the match in text */
+        string_t *sub;                  /* Substituted string (counted ref) */
+        struct regreplace_match *next;  /* Next list element */
+    };
 
-    /*
-     * Must set inter_sp before call to rx_compile(),
+    int       flags;                   /* RE options */
+    string_t *sub = NULL;              /* Replacement string */
+    svalue_t *subclosure = NULL;       /* Replacement closure */
+    string_t *text;                    /* Input string */
+    string_t *pattern;                 /* Delimiter pattern from the vm stack */
+    string_t *result;                  /* Result string */
+    char     *dst;                     /* Result copy pointer */
+    regexp_t *reg;                     /* Compiled pattern */
+    struct regreplace_match *matches;  /* List of matches */
+    struct regreplace_match **matchp;  /* Pointer to previous_match.next */
+    struct regreplace_match *match;    /* Current match structure */
+    int       num_matches;             /* Number of matches */
+    int       rc;                      /* Result from rx_exec() */
+    size_t    start;                   /* Start position for match */
+    size_t    reslen;                  /* Result length */
+
+    /* Must set inter_sp before call to rx_compile(),
      * because it might call regerror.
      */
     inter_sp = sp;
@@ -743,225 +767,372 @@ f_regreplace (svalue_t *sp)
         subclosure = sp-1;
     }
 
+    pattern = sp[-2].u.str;
     text = sp[-3].u.str;
 
-    space = (long)(origspace = (mstrsize(text) + 1)*2);
-      /* The '+1' so that empty strings don't cause a 'malloc size = 0' error.
-       */
+    reg = rx_compile(pattern, flags, MY_FALSE);
+    if (reg == 0) {
+        error("Unrecognized search pattern");
+        /* NOTREACHED */
+        return sp;
+    }
 
-/* reallocate on the fly */
-#define XREALLOC \
-    space += origspace;\
-    origspace = origspace*2;\
-    oldbuf = buf;\
-    buf = (char*)rexalloc(buf,origspace);\
-    if (!buf) { \
-        xfree(oldbuf); \
-        if (pat) free_regexp(pat); \
-        error("(regreplace) Out of memory (%lu bytes) for buffer\n"\
-             , (unsigned long)origspace); \
-    } \
-    new = buf + (new-oldbuf)
-
-/* The rexalloc() above read originally 'rexalloc(buf, origspace*2)'.
- * Marcus inserted the '*2' since he experienced strange driver
- * crashes without. I think that the error corrected in dev.28 was the
- * real reason for the crashes, so that the safety factor is no longer
- * necessary. However, if regreplace() causes crashes again, this
- * is one thing to try.
- */
-
-    xallocate(buf, (size_t)space, "buffer");
-    new = buf;
-    pat = rx_compile(sp[-2].u.str, flags, MY_FALSE);
-    /* rx_compile() returns NULL on bad regular expressions. */
-
+    /* Loop over <text>, repeatedly matching it against the pattern,
+     * until all matches have been found and recorded.
+     */
     start = 0;
-    rc = 0;
-    if (pat)
-        rc = rx_exec(pat, text, start);
+    num_matches = 0;
+    matches = NULL;
+    matchp = &matches;
+    reslen = 0;
+    while ((rc = rx_exec(reg, text, start)) > 0)
+    {
+        eval_cost++;
+        match = alloca(sizeof *match);
+        if (!match)
+        {
+            free_regexp(reg);
+            for (match = matches; match != NULL; match = match->next)
+            {
+                if (match->sub)
+                    free_mstring(match->sub);
+            }
+            error("Stack overflow in regexplode()");
+            /* NOTREACHED */
+            return sp;
+        }
+        rx_get_match(reg, text, &(match->start), &(match->end));
+        match->sub = NULL;
+        match->next = NULL;
+        *matchp = match;
+        matchp = &match->next;
+        num_matches++;
+
+        /* Compute the replacement string */
+        /* Determine the replacement pattern.
+         */
+        if (subclosure != NULL)
+        {
+            mp_int len;
+            string_t *matched_text;
+
+            len = match->end - match->start;
+            if (len)
+            {
+                matched_text = mstr_extract(text, match->start, match->end-1);
+                if (!matched_text)
+                {
+                    free_regexp(reg);
+                    for (match = matches; match != NULL; match = match->next)
+                    {
+                        if (match->sub)
+                            free_mstring(match->sub);
+                    }
+                    outofmem((size_t)len, "matched text");
+                    /* NOTREACHED */
+                    return NULL;
+                }
+            }
+            else
+                matched_text = ref_mstring(STR_EMPTY);
+
+            push_string(inter_sp, matched_text); /* Gives up the ref */
+            push_number(inter_sp, match->start);
+            call_lambda(subclosure, 2);
+            transfer_svalue(&apply_return_value, inter_sp);
+            inter_sp--;
+
+            if (apply_return_value.type != T_STRING)
+            {
+                free_regexp(reg);
+                for (match = matches; match != NULL; match = match->next)
+                {
+                    if (match->sub)
+                        free_mstring(match->sub);
+                }
+                error("Invalid type for replacement pattern: %s, expected string.\n", typename(apply_return_value.type));
+                /* NOTREACHED */
+                return NULL;
+            }
+
+            sub = apply_return_value.u.str;
+        }
+
+        match->sub = rx_sub(reg, text, sub);
+        if (!match->sub)
+        {
+            free_regexp(reg);
+            for (match = matches; match != NULL; match = match->next)
+            {
+                if (match->sub)
+                    free_mstring(match->sub);
+            }
+            outofmemory("substituted string");
+            /* NOTREACHED */
+            return NULL;
+        }
+
+        /* Count the length(s) */
+        reslen += match->start - start;
+        reslen += mstrsize(sub);
+
+        /* Prepare for the next match 
+         * Avoid another rx_exec() call if we are at the end.
+         */
+        start = match->end;
+
+        if (start == mstrsize(text)
+         || (match->start == start && ++start == mstrsize(text)) )
+            break;
+
+        /* If RE_GLOBAL is not set, don't look for a second match */
+        if (num_matches && (flags & RE_GLOBAL) == 0)
+            break;
+    } /* while(matches) */
 
     if (rc < 0) /* Premature abort on error */
     {
-        xfree(buf);
-        if (pat)
-            free_regexp(pat);
-        if (match)
-            xfree(match);
-        inter_sp = sp;
+        free_regexp(reg);
+        for (match = matches; match != NULL; match = match->next)
+        {
+            if (match->sub)
+                free_mstring(match->sub);
+        }
         error("regexp: %s\n", rx_error_message(rc));
         /* NOTREACHED */
         return NULL;
     }
 
-    if (pat && rc > 0) {
-        do {
-            size_t mstart, mend;
-            size_t diff;
-            
-            
-            rx_get_match(pat, text, &mstart, &mend);
-            diff = mstart - start;
-            space -= diff; /* TODO: space -= diff+1 ? */
-            while (space <= 0) {
-                XREALLOC;
+    /* Add the remaining length */
+    reslen += mstrsize(text) - start;
+
+    /* Prepare the result string */
+    result = alloc_mstring(reslen);
+    if (!result)
+    {
+        free_regexp(reg);
+        for (match = matches; match != NULL; match = match->next)
+        {
+            if (match->sub)
+                free_mstring(match->sub);
+        }
+        outofmem(reslen, "result string");
+        /* NOTREACHED */
+        return NULL;
+    }
+
+    /* Walk down the list of matches, extracting the
+     * text parts and substitute strings, copying them
+     * into the result.
+     */
+    dst = get_txt(result);
+    start = 0;
+    for (match = matches; match; match = match->next)
+    {
+        size_t len;
+
+        /* Copy the text leading up to the current delimiter match. */
+        len = match->start - start;
+        if (len)
+        {
+            memcpy(dst, get_txt(text)+start, len);
+            dst += (size_t)len;
+        }
+
+        /* Copy the substitute string */
+        len = mstrsize(match->sub);
+        if (len)
+        {
+            memcpy(dst, get_txt(match->sub), len);
+            dst += (size_t)len;
+        }
+
+        start = match->end;
+    }
+
+    /* Copy the remaining text if any */
+    {
+        size_t len;
+
+        len = mstrsize(text) - start;
+        if (len)
+        {
+            memcpy(dst, get_txt(text)+start, len);
+            dst += (size_t)len;
+        }
+    }
+
+    /* Cleanup */
+    free_regexp(reg);
+    for (match = matches; match != NULL; match = match->next)
+        if (match->sub)
+            free_mstring(match->sub);
+    free_svalue(sp);
+    sp--;
+    free_svalue(sp);
+    sp--;
+    free_svalue(sp);
+    sp--;
+    free_svalue(sp);
+
+    /* Return the result */
+    put_string(sp, result);
+    return sp;
+} /* f_regreplace() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t*
+f_regmatch (svalue_t *sp)
+
+/* EFUN regmatch()
+ *
+ *     string    regmatch (string txt, string pattern)
+ *     string[*] regmatch (string txt, string pattern, int flags)
+ *
+ * Match the string <txt> against <pattern>, which is interpreted according
+ * to the RE options given in <flags>.
+ *
+ * If there is no match, the result is 0. If there is a match, the exact
+ * result is determined by the flag RE_MATCH_SUBS:
+ *
+ * If the flag RE_MATCH_SUBS is not set, the result is the matched expression.
+ *
+ * If the flag RE_MATCH_SUBS is set, the result is an array of the matched
+ * string(s) of the first match. Entry [0] is the full string matching the
+ * <pattern>, following entries are the string segments matching
+ * parenthesized subexpressions in <pattern>. If a particular subexpression
+ * didn't have a match, the corresponding array entry will be the empty
+ * string.
+ */
+
+{
+    regexp_t *reg;      /* The compiled RE */
+    int       flags;    /* RE options */
+    string_t *text;     /* Input string */
+    string_t *pattern;  /* Delimiter pattern from the vm stack */
+    int       rc;       /* Result from rx_exec() */
+    vector_t *result;   /* Result vector */
+    string_t *resstr;   /* Result string */
+
+    /* Must set inter_sp before call to rx_compile(),
+     * because it might call regerror.
+     */
+    inter_sp = sp;
+
+    /* Extract the arguments */
+    flags = sp->u.number;
+    pattern = sp[-1].u.str;
+    text = sp[-2].u.str;
+
+    reg = rx_compile(pattern, flags, MY_FALSE);
+    if (reg == 0) {
+        error("Unrecognized match pattern");
+        /* NOTREACHED */
+        return sp;
+    }
+
+    rc = rx_exec(reg, text, 0);
+    if (rc < 0)
+    {
+        free_regexp(reg);
+        error("regexp: %s\n", rx_error_message(rc));
+        /* NOTREACHED */
+        return NULL;
+    }
+
+    result = NULL;
+    resstr = NULL;
+    if (rc != 0)
+    {
+        if (flags & RE_MATCH_SUBS)
+        {
+            int num_matches = rx_num_matches(reg);
+            int i;
+
+            if (max_array_size && num_matches > max_array_size-1 ) {
+                free_regexp(reg);
+                inter_sp = sp;
+                error("Illegal array size: %d", num_matches);
+                /* NOTREACHED */
+                return sp;
             }
-            strncpy(new, get_txt(text)+start, (size_t)diff);
-            new += diff;
-            old  = new;
-
-            /* Determine the replacement pattern.
-             */
-            if (subclosure != NULL)
+            result = allocate_array(num_matches);
+            if (!result)
             {
-                size_t patsize = mend - mstart;
+                free_regexp(reg);
+                outofmemory("result array");
+                /* NOTREACHED */
+                return NULL;
+            }
 
-                if (patsize+1 > matchsize)
+            for (i = 0; i < num_matches; i++)
+            {
+                size_t start, end;
+
+                if (!rx_get_match_n(reg, text, i, &start, &end)
+                 || start >= end
+                   )
                 {
-                    char * nmatch;
+                    put_ref_string(&(result->item[i]), STR_EMPTY);
+                }
+                else
+                {
+                    string_t *str = mstr_extract(text, start, end-1);
 
-                    matchsize = patsize+1;
-                    if (match)
-                        nmatch = rexalloc(match, matchsize);
-                    else
-                        nmatch = xalloc(matchsize);
-                    if (!nmatch)
+                    if (!str)
                     {
-                        xfree(buf);
-                        if (pat)
-                            free_regexp(pat);
-                        error("Out of memory for matched string (%lu bytes)\n"
-                             , (unsigned long)patsize+1);
+                        free_regexp(reg);
+                        free_array(result);
+                        outofmem(end-start, "matched string");
                         /* NOTREACHED */
                         return NULL;
                     }
-                    match = nmatch;
+
+                    put_string(&(result->item[i]), str);
                 }
+            } /* for (i) */
+        }
+        else
+        {
+            size_t start, end;
 
-                memcpy(match, get_txt(text)+mstart, patsize);
-                match[patsize] = '\0';
-
-                push_c_string(inter_sp, match);
-                push_number(inter_sp, mstart - start);
-                call_lambda(subclosure, 2);
-                transfer_svalue(&apply_return_value, inter_sp);
-                inter_sp--;
-
-                if (apply_return_value.type != T_STRING)
-                {
-                    xfree(buf);
-                    if (pat)
-                        free_regexp(pat);
-                    if (match)
-                        xfree(match);
-                    error("Invalid type for replacement pattern: %s, expected string.\n", typename(apply_return_value.type));
-                    /* NOTREACHED */
-                    return NULL;
-                }
-
-                sub = apply_return_value.u.str;
-            }
-
-            /* Now what may have happen here. We *could*
-             * be out of mem (as in 'space') or it could be
-             * a regexp problem. the 'space' problem we
-             * can handle, the regexp problem not.
-             * hack: we store a \0 into *old ... if it is
-             * still there on failure, it is a real failure.
-             * if not, increase space. The player could get
-             * some irritating messages from regerror()
-             */
-            *old = '\0';
-            while (NULL == (new = rx_sub(pat, sub, new, space, 1)) )
+            rx_get_match(reg, text, &start, &end);
+            if (start >= end)
             {
-                int xold;
-
-                if (!*old)
-                {
-                    xfree(buf);
-                    if (pat)
-                        free_regexp(pat);
-                    if (match)
-                        xfree(match);
-                    error("Internal error in regreplace().\n");
-                    /* NOTREACHED */
-                    return NULL;
-                }
-                xold = old - buf;
-                XREALLOC;
-                new = buf + xold;
-                old = buf + xold;
-                *old='\0';
-            }
-            space -= new - old;
-            while (space <= 0) {
-                XREALLOC;
-            }
-            if (start == mend)
-            {
-                /* prevent infinite loop
-                 * by advancing one character.
-                 */
-                if (start == mstrsize(text)) break;
-                --space;
-                while (space <= 0) {
-                    XREALLOC;
-                }
-                *new++ = get_txt(text)[start++];
+                resstr = ref_mstring(STR_EMPTY);
             }
             else
-                start = mend;
-        } while (  (flags & RE_GLOBAL)
-#ifndef USE_PCRE
-                 && !pat->rx->reganch
-#endif
-                 && start < mstrsize(text)
-                 && (rc = rx_exec(pat, text, start)) > 0
-                );
+            {
+                resstr = mstr_extract(text, start, end-1);
 
-        if (rc < 0) /* Premature abort on error */
-        {
-            xfree(buf);
-            if (pat)
-                free_regexp(pat);
-            if (match)
-                xfree(match);
-            inter_sp = sp;
-            error("regexp: %s\n", rx_error_message(rc));
-            /* NOTREACHED */
-            return NULL;
-        }
+                if (!resstr)
+                {
+                    free_regexp(reg);
+                    outofmem(end-start, "matched string");
+                    /* NOTREACHED */
+                    return NULL;
+                }
+            }
+        } /* if (flag & RE_MATCH_SUBS) */
+    } /* if (rc > 0) */
 
-        space -= mstrsize(text) - start + 1;
-        if (space <= 0) {
-            XREALLOC;
-        }
-        strcpy(new, get_txt(text)+start);
-    }
+    /* Cleanup */
+    free_regexp(reg);
+    free_svalue(sp);
+    sp--;
+    free_svalue(sp);
+    sp--;
+    free_svalue(sp);
+
+    /* Return the result */
+    if (result)
+        put_array(sp, result);
+    else if (resstr)
+        put_string(sp, resstr);
     else
-    {
-        /* Pattern not found -> no editing necessary */
-        strcpy(buf, get_txt(text));
-    }
-
-    if (match)
-        xfree(match);
-    if (pat)
-        free_regexp(pat);
-
-    free_svalue(sp);
-    sp--;
-    free_svalue(sp);
-    sp--;
-    free_svalue(sp);
-    sp--;
-    free_svalue(sp);
-    put_c_string(sp, buf);
-    xfree(buf);
+        put_number(sp, 0);
     return sp;
-
-#undef XREALLOC
-}
+} /* f_regmatch() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *

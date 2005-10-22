@@ -24,4 +24,12 @@
 #define RE_UNGREEDY        0x0400
 #define RE_NOTEMPTY        0x0800
 
+/* Options specific for regmatch(): */
+
+#define RE_MATCH_SUBS      0x1000  /* Return matched subexpressions */
+
+/* Options specific for regexplode(): */
+
+#define RE_OMIT_DELIM      0x1000  /* Omit the delimiters */
+
 #endif /* LPC_REGEXP_H_ */

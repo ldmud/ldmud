@@ -1,0 +1,36 @@
+SYNOPSIS
+        #include <regexp.h>
+
+        string  regmatch (string text, string pattern)
+        string  regmatch (string text, string pattern, int opt)
+        string *regmatch (string text, string pattern, int opt)
+
+DESCRIPTION
+        Match the string <txt> against <pattern> (interpreted according
+        to <opt> if given).
+
+        If there is no match, the result is 0. If there is a match, the exact
+        result is determined by the flag RE_MATCH_SUBS:
+
+        If the flag RE_MATCH_SUBS is not set, the result is the matched
+        expression.
+
+        If the flag RE_MATCH_SUBS is set, the result is an array of the
+        matched string(s) of the first match. Entry [0] is the full string
+        matching the <pattern>, following entries are the string segments
+        matching parenthesized subexpressions in <pattern>. If a particular
+        subexpression didn't have a match, the corresponding array entry will
+        be the empty string.
+
+EXAMPLE
+        regmatch("abcdefcdf", "cd")    -> "cd"
+        regmatch("abcdefcdf", "cd(e)") -> "cde"
+
+        regmatch("abcdefcdf", "cd", RE_MATCH_SUBS)    -> ({ "cd" })
+        regmatch("abcdefcdf", "cd(e)", RE_MATCH_SUBS) -> ({ "cde", "e" })
+        
+HISTORY
+        Introduced in LDMud 3.3.198.
+
+SEE ALSO
+        regexplode(E), regreplace(E), regexp(E)

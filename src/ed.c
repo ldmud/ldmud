@@ -57,9 +57,9 @@
 #include "gcollect.h"
 #include "interpret.h"
 #include "main.h"
+#include "mregex.h"
 #include "mstrings.h"
 #include "object.h"
-#include "rxcache.h"
 #include "simulate.h"
 #include "stdstrings.h"
 #include "svalue.h"
@@ -1841,6 +1841,7 @@ subst (regexp_t *pat, char *sub, Bool gflg, Bool pflag)
                 /* Copy leading text */
                 size_t mstart, mend;
                 size_t diff;
+                string_t * substr;
                   
                 rx_get_match_str(pat, start, &mstart, &mend);
                 diff = start + mstart - current;
@@ -1850,9 +1851,18 @@ subst (regexp_t *pat, char *sub, Bool gflg, Bool pflag)
                 new += diff;
                 /* Do substitution */
                 old = new;
-                new = rx_sub_str( pat, sub, new, space,0);
-                if (!new || (space-= new-old) < 0)
+                substr = rx_sub_str( pat, current, sub);
+                if (!substr)
                     return SUB_FAIL;
+                if ((space-= mstrsize(substr)) < 0)
+                {
+                    free_mstring(substr);
+                    return SUB_FAIL;
+                }
+                memcpy(new, get_txt(substr), mstrsize(substr));
+                new += mstrsize(substr);
+                free_mstring(substr);
+
                 if (current == start + mend)
                 {
                     /* prevent infinite loop */
@@ -3215,7 +3225,7 @@ clear_ed_buffer_refs (ed_buffer_t *b)
         }
     }
 
-    /* For rxcache */
+    /* For the RE cache */
     if (b->oldpat)
         b->oldpat->ref = 0;
 

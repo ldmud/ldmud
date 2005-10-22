@@ -1,6 +1,16 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+05-Apr-2002 (Lars Duening)  (3.3.198)
+    - (efuns, rxcache, ed.c) Implemented regexp substitution and
+         made ed and regreplace() work with PCRE.
+    - (efuns, rxcache, func_spec) New efun regmatch().
+    - (main.c, rxcache.c) PCRE-related bugfixes.
+    - (pkg-pcre.c, pcre/internal.h) New unified wrapper for all PCRE
+        modules. For this to work, the PCRE internal.h had to be
+        protected against multiple inclusion.
+    - (mregex) The files formerly known as rxcache.[ch].
+
 04-Apr-2002 (Lars Duening)  (3.3.197)
     - (mapping.c) During a GC, the .hash member in a mapping does not
          point to a mapping-hash structure - the statistics code

@@ -1,5 +1,5 @@
 LDMud, a LPmud gamedriver.
-Copyright 1997-2001 by Lars Duening.
+Copyright 1997-2002 by Lars Duening.
 
 LDMud is based on LPmud, which is
 Copyright 1989-1991 by Lars Pensj|, and, starting with version 3.1.2,
@@ -56,5 +56,6 @@ The Apache-compatible MD5 password encryption is Copyright (C) 2000 Apache
 Software Foundation.
 
 The PCRE (Perl Compatible Regular Expression) is Copyright (C) 1997-2001 by
-Philip Hazel. LDMud contains just the files required for the driver; see
-pcre/LICENCE for the licence terms and the location of the full package.
+Philip Hazel. LDMud contains just the files required for the driver (with
+one small modification to eliminate a build problem); see pcre/LICENCE for the
+licence terms and the location of the full package.

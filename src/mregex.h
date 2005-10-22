@@ -3,11 +3,12 @@
 
 #include "driver.h"
 
-#include "regexp.h"
 #include "mstrings.h"
 #include "strfuns.h"
 #ifdef USE_PCRE
 #include "pcre/pcre.h"
+#else
+#include "regexp.h"
 #endif
 
 /* --- Types --- */
@@ -68,10 +69,12 @@ extern const char * rx_error_message (int code);
 extern regexp_t * rx_compile (string_t * expr, int opt, Bool from_ed);
 extern int    rx_exec (regexp_t *prog, string_t * string, size_t start);
 extern int    rx_exec_str (regexp_t *prog, char * string, char * start);
-extern char * rx_sub (regexp_t *prog, string_t *source, char *dest, int n, Bool quiet);
-extern char * rx_sub_str (regexp_t *prog, char *source, char *dest, int n, Bool quiet);
+extern string_t * rx_sub (regexp_t *prog, string_t *source, string_t *subst);
+extern string_t * rx_sub_str (regexp_t *prog, char *source, char *subst);
+extern int rx_num_matches (regexp_t *prog);
 extern void rx_get_match (regexp_t *prog, string_t * str, size_t * start, size_t * end);
 extern void rx_get_match_str (regexp_t *prog, char * str, size_t * start, size_t * end);
+extern Bool rx_get_match_n (regexp_t *prog, string_t * str, int n, size_t * start, size_t * end);
 extern void   rx_free(regexp_t *);
 extern size_t rxcache_status(strbuf_t *sbuf, Bool verbose);
 extern void   rxcache_dinfo_status(svalue_t *svp, int value);

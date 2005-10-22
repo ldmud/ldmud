@@ -51,11 +51,11 @@
 #include "lex.h"
 #include "main.h"
 #include "mapping.h"
+#include "mregex.h"
 #include "mstrings.h"
 #include "object.h"
 #include "otable.h"
 #include "prolang.h"
-#include "rxcache.h"
 #include "sent.h"
 #include "simul_efun.h"
 #include "smalloc.h" /* dump_malloc_data() */

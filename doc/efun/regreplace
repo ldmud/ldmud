@@ -52,4 +52,4 @@ AUTHOR
         Marcus@TAPPMud contributed the original efun and man page
         
 SEE ALSO
-        regexp(E), regexplode(E), sscanf(E), trim(E)
+        regexp(E), regexplode(E), regmatch(E), sscanf(E), trim(E)

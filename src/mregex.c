@@ -39,7 +39,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "rxcache.h"
+#include "mregex.h"
 
 #include "gcollect.h"
 #include "hash.h"
@@ -451,6 +451,7 @@ rx_exec_str (regexp_t *prog, char * string, char * start)
                   , string, strlen(string), start - string, pcre_opt
                   , prog->pSubs, prog->num_subs
                   );
+    prog->res = rc;
     
     /* Reverse the roles of return codes 0 (not enough entries in subs[])
      * and PCRE_ERROR_NOMATCH.
@@ -463,6 +464,101 @@ rx_exec_str (regexp_t *prog, char * string, char * start)
     return regexec(prog->rx, string, start);
 #endif
 } /* rx_exec_str() */
+
+/*-------------------------------------------------------------------------*/
+int
+rx_num_matches (regexp_t *prog)
+
+/* After a successful match of <prog>, return the number of matched
+ * expressions and parenthesized expressions.
+ * In other words: the result is at least 1 (for the fully matched
+ * expressions), plus the number of matched '()' sub expressions.
+ *
+ * The function tries to detect when it is called after an unsuccessful
+ * match and return 0 in that case.
+ */
+
+{
+#ifdef USE_PCRE
+    return prog->res >= 1 ? prog->res : 0;
+#else
+    int num, i;
+
+    for (num = 0, i = 0
+        ; i < sizeof(prog->rx->startp) / sizeof(prog->rx->startp[0])
+        ; i++)
+    {
+        if (prog->rx->startp[i] != NULL
+         && prog->rx->endp[i] != NULL
+           )
+            num++;
+    }
+
+    return num;
+#endif
+} /* rx_num_matches() */
+
+/*-------------------------------------------------------------------------*/
+Bool
+rx_get_match_n (regexp_t *prog, string_t * str, int n, size_t * start, size_t * end)
+
+/* After a successful match of <prog> against <str>, store the start
+ * and end position of the match <n> in *<start> and *<end> and retuern TRUE.
+ * The end position is in fact the position of the first character after
+ * the match.
+ *
+ * <n> is 0 for the whole expression, and any positive number for the
+ * matched subexpressions.
+ *
+ * If the requested match does not exist, *<start> and *<end> are both
+ * set to 0 and the function returns FALSE.
+ */
+
+{
+    Bool rc;
+
+#ifdef USE_PCRE
+#ifdef __MWERKS__
+#    pragma unused(str)
+#endif
+
+    if (n < 0
+     || n >= prog->res
+     || prog->pSubs[2*n] < 0
+     || prog->pSubs[2*n+1] < 0
+       )
+    {
+        *start = 0;
+        *end = 0;
+        rc = MY_FALSE;
+    }
+    else
+    {
+        *start = (size_t)prog->pSubs[2*n];
+        *end = (size_t)prog->pSubs[2*n+1];
+        rc = MY_TRUE;
+    }
+#else
+    if (n < 0
+     || n >= sizeof(prog->rx->startp) / sizeof(prog->rx->startp[0])
+     || prog->rx->startp[n] == NULL
+     || prog->rx->endp[n] == NULL
+       )
+    {
+        *start = 0;
+        *end = 0;
+        rc = MY_FALSE;
+    }
+    else
+    {
+        *start = prog->rx->startp[n] - get_txt(str);
+        *end = prog->rx->endp[n] - get_txt(str);
+        rc = MY_TRUE;
+    }
+#endif
+
+    return rc;
+} /* rx_get_match_n() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -509,9 +605,8 @@ rx_get_match_str (regexp_t *prog, char * str, size_t * start, size_t * end)
 } /* rx_get_match_str() */
 
 /*-------------------------------------------------------------------------*/
-#if 0
 string_t *
-rx_sub2 (regexp_t *prog, string_t *source, string_t *subst, Bool quiet)
+rx_sub (regexp_t *prog, string_t *source, string_t *subst)
 
 /* <prog> describes a regexp match in string <source>. Take the
  * replacement string <subst> and substitute any matched subparentheses.
@@ -521,13 +616,11 @@ rx_sub2 (regexp_t *prog, string_t *source, string_t *subst, Bool quiet)
  */
 
 {
-#ifdef USE_PCRE
-    size_t left;
-    int no;
-    char * src;
-    char * dst;
-    Bool   copyPass;  /* Pass indicator */
-    size_t len;       /* Computed length of the result */
+    Bool   copyPass;   /* Pass indicator */
+    size_t len;        /* Computed length of the result */
+    string_t * result; /* Result string */
+
+    result = NULL;
 
     /* Make two passes over the the string: one to compute the size
      * of the result, the second to create the result.
@@ -536,11 +629,20 @@ rx_sub2 (regexp_t *prog, string_t *source, string_t *subst, Bool quiet)
     len = 0;
     do
     {
+        char * src;
+        char * dst = NULL;
+        size_t left;
+
         left = mstrsize(subst);
         src = get_txt(subst);
+        if (copyPass)
+            dst = get_txt(result);
         
         while (left-- > 0)
         {
+            int no;
+            char c;
+
             c = *src++;
             if (c == '&')
                 no = 0;
@@ -558,197 +660,90 @@ rx_sub2 (regexp_t *prog, string_t *source, string_t *subst, Bool quiet)
                 else
                     len++;
             }
-            else if (prog->startp[no] != NULL
-                 &&  prog->endp[no] != NULL)
+            else
+#ifdef USE_PCRE
+            if (prog->pSubs[2*no] != -1
+             && prog->pSubs[2*no+1] != -1
+               )
             {
-                len = prog->endp[no] - prog->startp[no];
-                if ( (n-=len) < 0 )
+                size_t start = (size_t)prog->pSubs[2*no];
+                size_t sublen = (size_t)prog->pSubs[2*no+1] - start;
+
+                if (copyPass)
                 {
-                    if (!quiet) regerror("line too long");
-                    return NULL;
+                    memcpy(dst, get_txt(source)+start, sublen);
+                    dst += sublen;
                 }
-                strncpy(dst, prog->startp[no], len);
-                dst += len;
-                if (len != 0 && *(dst - 1) == '\0')
+                else
                 {
-                    regerror("damaged match string");
-                    return NULL;
+                    len += sublen;
                 }
             }
-        }
+#else
+            if (prog->rx->startp[no] != NULL
+             && prog->rx->endp[no] != NULL
+               )
+            {
+                size_t sublen = prog->rx->endp[no] - prog->rx->startp[no];
+
+                if (copyPass)
+                {
+                    memcpy(dst, prog->rx->startp[no], sublen);
+                    dst += sublen;
+                }
+                else
+                {
+                    len += sublen;
+                }
+            }
+#endif
+        } /* while(left-- > 0) */
+
         /* End of pass */
+        if (!copyPass)
+        {
+            result = alloc_mstring(len);
+            if (!result)
+                return NULL;
+        }
         copyPass = !copyPass;
     } while (copyPass);
-#if 0
-    left = mstrsize(source);
-    src = get_txt(source);
-    dst = dest;
-    while (left-- > 0)
-    {
-        c = *src++;
-        if (c == '&')
-            no = 0;
-        else if (c == '\\' && '0' <= *src && *src <= '9')
-            no = *src++ - '0';
-        else
-            no = -1;
 
-        if (no < 0) /* Ordinary character. */
-        {
-            if (c == '\\' && (*src == '\\' || *src == '&'))
-                c = *src++;
-            if (--n < 0)
-            {
-                if (!quiet)
-                    regerror("line too long");
-                return NULL;
-            }
-            *dst++ = c;
-        }
-        else if (prog->startp[no] != NULL
-             &&  prog->endp[no] != NULL)
-        {
-            len = prog->endp[no] - prog->startp[no];
-            if ( (n-=len) < 0 )
-            {
-                if (!quiet) regerror("line too long");
-                return NULL;
-            }
-            strncpy(dst, prog->startp[no], len);
-            dst += len;
-            if (len != 0 && *(dst - 1) == '\0')
-            {
-                regerror("damaged match string");
-                return NULL;
-            }
-        }
-    }
-
-    if (--n < 0)
-    {
-        if (!quiet)
-            regerror("line too long");
-        return NULL;
-    }
-    *dst = '\0';
-    return dst;
-#endif
-    error("DEBUG: TODO: rx_sub() not implemented for PCRE\n"); return NULL;
-#else
-    return regsub (prog->rx, get_txt(source), dest, n, quiet);
-#endif
-} /* rx_sub2() */
-#endif
-
-/*-------------------------------------------------------------------------*/
-char *
-rx_sub (regexp_t *prog, string_t *source, char *dest, int n, Bool quiet)
-
-/* After a regexp match, substitute the tokens '\<num>' in <source>
- * with the appropriate matched () expressions, and store the
- * result in <dest> (max size <n>).
- *
- * Return NULL on failure, and <dest> on success. If <quiet> is
- * FALSE, a failure also generates a call to regerror().
- */
-
-{
-#ifdef USE_PCRE
-    size_t left;
-    int no;
-    char * src;
-    char * dst;
-
-#if 0
-    left = mstrsize(source);
-    src = get_txt(source);
-    dst = dest;
-    while (left-- > 0)
-    {
-        c = *src++;
-        if (c == '&')
-            no = 0;
-        else if (c == '\\' && '0' <= *src && *src <= '9')
-            no = *src++ - '0';
-        else
-            no = -1;
-
-        if (no < 0) /* Ordinary character. */
-        {
-            if (c == '\\' && (*src == '\\' || *src == '&'))
-                c = *src++;
-            if (--n < 0)
-            {
-                if (!quiet)
-                    regerror("line too long");
-                return NULL;
-            }
-            *dst++ = c;
-        }
-        else if (prog->startp[no] != NULL
-             &&  prog->endp[no] != NULL)
-        {
-            len = prog->endp[no] - prog->startp[no];
-            if ( (n-=len) < 0 )
-            {
-                if (!quiet) regerror("line too long");
-                return NULL;
-            }
-            strncpy(dst, prog->startp[no], len);
-            dst += len;
-            if (len != 0 && *(dst - 1) == '\0')
-            {
-                regerror("damaged match string");
-                return NULL;
-            }
-        }
-    }
-
-    if (--n < 0)
-    {
-        if (!quiet)
-            regerror("line too long");
-        return NULL;
-    }
-    *dst = '\0';
-    return dst;
-#endif
-    error("DEBUG: TODO: rx_sub() not implemented for PCRE\n"); return NULL;
-#else
-    return regsub (prog->rx, get_txt(source), dest, n, quiet);
-#endif
+    return result;
 } /* rx_sub() */
 
 /*-------------------------------------------------------------------------*/
-char *
-rx_sub_str (regexp_t *prog, char *source, char *dest, int n, Bool quiet)
+string_t *
+rx_sub_str (regexp_t *prog, char *source, char *subst)
 
-/* After a regexp match, substitute the tokens '\<num>' in <source>
- * with the appropriate matched () expressions, and store the
- * result in <dest> (max size <n>).
+/* <prog> describes a regexp match in string <source>. Take the
+ * replacement string <subst> and substitute any matched subparentheses.
+ * The result is a new string with one reference.
  *
- * Return NULL on failure, and <dest> on success. If <quiet> is
- * FALSE, a failure also generates a call to regerror().
+ * Returns NULL when out of memory.
  */
 
 {
-#ifdef USE_PCRE
-    string_t *str;
-    char * rc;
+    string_t *m_source;
+    string_t *m_subst;
+    string_t *rc;
 
-    str = new_mstring(source);
-    if (!str)
+    m_source = new_mstring(source);
+    if (!m_source)
     {
-        if (!quiet)
-            regerror("Out of memory.\n");
         return NULL;
     }
-    rc = rx_sub(prog, str, dest, n, quiet);
-    free_mstring(str);
+
+    m_subst = new_mstring(subst);
+    if (!m_subst)
+    {
+        free_mstring(m_source);
+        return NULL;
+    }
+    rc = rx_sub(prog, m_source, m_subst);
+    free_mstring(m_source);
+    free_mstring(m_subst);
     return rc;
-#else
-    return regsub (prog->rx, source, dest, n, quiet);
-#endif
 } /* rx_sub_str() */
 
 /*--------------------------------------------------------------------*/
@@ -895,6 +890,8 @@ count_regexp_ref (regexp_t * pRegexp)
     note_malloced_block_ref(pRegexp->pProg);
     if (pRegexp->pHints)
         note_malloced_block_ref(pRegexp->pHints);
+    if (pRegexp->pSubs)
+        note_malloced_block_ref(pRegexp->pSubs);
 #else
     note_malloced_block_ref(pRegexp->rx);
 #endif

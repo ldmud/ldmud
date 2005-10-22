@@ -3,6 +3,8 @@
 
 #include "driver.h"
 
+#ifndef USE_PCRE
+
 #define NSUBEXP  50
   /* Number of allowed () expressions.
    */
@@ -51,5 +53,7 @@ extern regexp *regcomp(unsigned char *expr, Bool excompat, Bool from_ed);
 extern Bool regexec(regexp *prog, char *string, char *start);
 extern char *regsub(regexp *prog, char *source, char *dest, int n, Bool quiet);
 extern void regerror(char *);
+
+#endif /* USE_PCRE */
 
 #endif /* REGEXP_H_ */
