@@ -2296,6 +2296,7 @@ found_fit:
     {
         /* split block pointed to by ptr into two blocks */
 
+        ptr[size] = 0; /* Init the header word */
         build_block(ptr+size, real_size-size);
         fake("Built empty block");
 #ifdef DEBUG

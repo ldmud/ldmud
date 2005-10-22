@@ -229,7 +229,7 @@
  * Undefine RXCACHE_TABLE to disable the all regexp caching.
  */
 
-#define RXCACHE_TABLE            8191
+#define RXCACHE_TABLE            8192
 
 /*
  * Should newly defined LPC functions be aligned in memory? this costs 1.5

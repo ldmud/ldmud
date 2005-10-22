@@ -401,5 +401,5 @@ with_apply_cache_bits=12
 # how big the cache shall be (max: 65536).
 
 enable_rxcache_table=yes
-with_rxcache_table=8191
+with_rxcache_table=8192
 

@@ -30,6 +30,8 @@
  * TODO: Using shared strings as cache-indices can speed things up,
  * TODO:: especially when knowing where to find the hashvalue from
  * TODO:: the strtable.
+ * TODO: Use in-table chaining to improve the use of the table space
+ * TODO:: and reduce the number of collisions.
  *------------------------------------------------------------------
  */
 

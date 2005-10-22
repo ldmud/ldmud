@@ -6532,6 +6532,9 @@ f_restore_object (svalue_t *sp)
         space = strchr(cur, ' ');
         if (!file)
             pt = strchr(cur, '\n');
+        else
+            pt = NULL;
+
         if (space == NULL || (!file && pt && pt < space))
         {
             /* No space? It must be the version line! */

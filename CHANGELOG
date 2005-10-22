@@ -1,6 +1,40 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+17-Jan-2002 (Lars Duening)  (3.3.154)
+    - (simul_efun, simulate.c) Destructing the simul-efun object
+        immediately invalidates all simul-efuns; this should reduce
+        the number of 'undefined function' errors when doing manual
+        reloads of the simul-efun object.
+    - (smalloc.c, prolang.y, closure.c) Modified some memory accesses
+        in order to keep Memory Check tools like ZeroFault happy.
+    - (regexp.c) The .from_ed member in a newly compiled regexp
+        wasn't set.
+    - (object.c) One variable wasn't set.
+
+16-Jan-2002 (Lars Duening)
+    - (simul_efun) When reloading the simul-efun objects, all previous
+        sefuns are discarded and removed from the symbol table. Otherwise
+        if the simul-efun object used cross-defined sefuns itself, the
+        recompiled object would not recognize the cross-defined calls
+        and instead pick up the older inactive entry from the symbol
+        table. This problem may still occur when reloading a simul-efun
+        object by hand (reported by Coogan and some other people).
+    - (lex) Inferior identifier entries now have their own string
+        reference.
+    - (lex.h, prolang.y) The magic values for ident_t.u.global now
+        have symbolic names.
+
+15-Jan-2002 (Lars Duening)
+    - (configure) Fiona did more analysis on the rxcache hash and found
+        out that using a prime table size doesn't help. I set the size back
+        to 8192; let's see how bad the collisions are at this small table
+        size.
+
+14-Jan-2002 (Lars Duening)
+    - (interpret.c) The overflow error messages for float divisions
+        named the wrong values (thanks, Guandalug!).
+
 12-Jan-2002 (Lars Duening)  (3.3.153)
     - (configure.in) Fiona pointed out that just halving the rxcache
         size doesn't seem to increase the fill ratio. As an experiment

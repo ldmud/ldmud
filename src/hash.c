@@ -4,6 +4,7 @@
  *---------------------------------------------------------------------------
  * A simple and fast generic string hasher based on Peter K. Pearson's
  * article in Communications of the ACM 33-6, pp. 677.
+ * TODO: Use Bob Jenkins hash instead of Pearson's?
  *---------------------------------------------------------------------------
  */
 

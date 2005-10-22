@@ -2134,7 +2134,10 @@ destruct (object_t *ob)
     remove_object_from_stack(ob);
 
     if (ob == simul_efun_object)
+    {
         simul_efun_object = NULL;
+        invalidate_simul_efuns();
+    }
 
     set_heart_beat(ob, MY_FALSE);
 

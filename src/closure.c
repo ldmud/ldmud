@@ -6508,6 +6508,7 @@ align_switch (bytecode_p pc)
     int32 tablen, offset, size;
     unsigned char a2;  /* Alignment byte 2 */
     unsigned char abuf[sizeof(p_int)-1]; /* Buffer for the alignment bytes */
+    bytecode_p     off_pc;  /* Pointer after the instruction block */
     unsigned char *startu;  /* Unaligned start address */
     unsigned char *starta;  /* Aligned start address */
 
@@ -6543,16 +6544,22 @@ align_switch (bytecode_p pc)
     }
 
     /* Now align the tables, moving the alignment bytes around */
-    memcpy(abuf, pc+offset+len-1, 2);
-    PUT_UINT8(pc+len+1, GET_UINT8(pc+offset+len+1));
+    off_pc = pc + offset + len;
+
+    abuf[0] = off_pc[-1];
+    abuf[1] = off_pc[0];
     abuf[2] = a2;
-    PUT_UINT8(pc+offset+len+1, a2);
-    startu = pc+offset+len+2 + sizeof(p_int) - 4;
+    PUT_UINT8(pc+len+1, GET_UINT8(off_pc+1));
+    PUT_UINT8(off_pc+1, a2);
+    startu = off_pc+2 + sizeof(p_int) - 4;
     starta = (unsigned char *)((p_int)startu & ~(sizeof(char *)-1));
     size = (long)(tablen + tablen / sizeof(char*) * len);
-    move_memory(starta, startu, (size_t)size);
-    move_memory(starta+size, abuf + sizeof abuf - (startu-starta)
-               , (size_t)(startu-starta));
+    if (starta != startu)
+    {
+        move_memory(starta, startu, (size_t)size);
+        move_memory(starta+size, abuf + sizeof abuf - (startu-starta)
+                   , (size_t)(startu-starta));
+    }
 } /* align_switch() */
 
 /***************************************************************************/

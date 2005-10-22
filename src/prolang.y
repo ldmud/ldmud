@@ -1503,6 +1503,8 @@ fix_branch (int ltoken, p_int dest, p_int loc)
         p_int i, j;
         bytecode_p p;
 
+        mem_block[A_PROGRAM].block[loc] = 0; /* Init it */
+
         /* Update the break address */
         if ( current_break_address > loc
          && !(current_break_address & (BREAK_ON_STACK|BREAK_DELIMITER) ) )
@@ -1534,7 +1536,9 @@ fix_branch (int ltoken, p_int dest, p_int loc)
         p = PROGRAM_BLOCK + mem_block[A_PROGRAM].current_size-1;
         i = mem_block[A_PROGRAM].current_size - loc;
         for( ; --i >= 0; --p )
+        {
             PUT_CODE(p, GET_CODE(p-1));
+        }
 
         /* Store the new branch instruction */
         PUT_CODE(p, ltoken);
@@ -2199,14 +2203,14 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
         /* should be I_TYPE_UNKNOWN now. */
 
         p->type = I_TYPE_GLOBAL;
-        p->u.global.variable = -1;
-        p->u.global.efun     = -1;
-        p->u.global.sim_efun = -1;
+        p->u.global.variable = I_GLOBAL_VARIABLE_OTHER;
+        p->u.global.efun     = I_GLOBAL_EFUN_OTHER;
+        p->u.global.sim_efun = I_GLOBAL_SEFUN_OTHER;
 
         p->next_all = all_globals;
         all_globals = p;
     }
-    else if (p->u.global.variable == -2)
+    else if (p->u.global.variable == I_GLOBAL_VARIABLE_FUN)
     {
         /* The previous _GLOBAL use is the permanent efun definition:
          * mark the efun as shadowed.
@@ -2272,15 +2276,15 @@ define_variable (ident_t *name, fulltype_t flags, svalue_t *svp)
         }
 
         name->type = I_TYPE_GLOBAL;
-        name->u.global.function = -1;
-        name->u.global.variable = -1; /* mark it as 'yet undef' for now */
-        name->u.global.efun     = -1;
-        name->u.global.sim_efun = -1;
+        name->u.global.function = I_GLOBAL_FUNCTION_VAR;
+        name->u.global.variable = I_GLOBAL_VARIABLE_OTHER; /* mark it as 'yet undef' for now */
+        name->u.global.efun     = I_GLOBAL_EFUN_OTHER;
+        name->u.global.sim_efun = I_GLOBAL_SEFUN_OTHER;
 
         name->next_all = all_globals;
         all_globals = name;
     }
-    else if (name->u.global.function == -2)
+    else if (name->u.global.function == I_GLOBAL_FUNCTION_EFUN)
     {
         /* The previous _GLOBAL use is the permanent efun definition:
          * mark the efun as shadowed.
@@ -2392,15 +2396,15 @@ redeclare_variable (ident_t *name, fulltype_t flags, int n)
 
         /* I_TYPE_UNKNOWN */
         name->type = I_TYPE_GLOBAL;
-        name->u.global.function = -1;
-        name->u.global.variable = -1; /* default: it's hidden */
-        name->u.global.efun     = -1;
-        name->u.global.sim_efun = -1;
+        name->u.global.function = I_GLOBAL_FUNCTION_VAR;
+        name->u.global.variable = I_GLOBAL_VARIABLE_OTHER; /* default: it's hidden */
+        name->u.global.efun     = I_GLOBAL_EFUN_OTHER;
+        name->u.global.sim_efun = I_GLOBAL_SEFUN_OTHER;
         
         name->next_all = all_globals;
         all_globals = name;
     }
-    else if (name->u.global.function == -2)
+    else if (name->u.global.function == I_GLOBAL_FUNCTION_EFUN)
     {
         /* The previous _GLOBAL use is the permanent efun definition:
          * mark the efun as shadowed.
@@ -3168,10 +3172,10 @@ def:  type optional_star L_IDENTIFIER  /* Function definition or prototype */
               /* prevent freeing by exotic name clashes */
               ident_t *p = $3;
               p->type = I_TYPE_GLOBAL;
-              p->u.global.variable = -1;
-              p->u.global.efun     = -1;
-              p->u.global.sim_efun = -1;
-              p->u.global.function = -1;
+              p->u.global.variable = I_GLOBAL_VARIABLE_OTHER;
+              p->u.global.efun     = I_GLOBAL_EFUN_OTHER;
+              p->u.global.sim_efun = I_GLOBAL_SEFUN_OTHER;
+              p->u.global.function = I_GLOBAL_FUNCTION_VAR;
               p->next_all = all_globals;
               all_globals = p;
           }
@@ -8321,10 +8325,10 @@ function_call:
               /* prevent freeing by exotic name clashes */
               /* also makes life easier below */
               real_name->type = I_TYPE_GLOBAL;
-              real_name->u.global.function = -1;
-              real_name->u.global.variable = -1;
-              real_name->u.global.efun     = -1;
-              real_name->u.global.sim_efun = -1;
+              real_name->u.global.function = I_GLOBAL_FUNCTION_VAR;
+              real_name->u.global.variable = I_GLOBAL_VARIABLE_OTHER;
+              real_name->u.global.efun     = I_GLOBAL_EFUN_OTHER;
+              real_name->u.global.sim_efun = I_GLOBAL_SEFUN_OTHER;
               real_name->next_all = all_globals;
               all_globals = real_name;
           }
@@ -10834,7 +10838,6 @@ copy_functions (program_t *from, fulltype_t type)
          * easily without using gotos.
          */
         switch (0) {
-            Bool forcenew;
         default:
             /* Test if the function is visible at all.
              * For this test, 'private nomask' degenerates to 'private'
@@ -10862,8 +10865,6 @@ copy_functions (program_t *from, fulltype_t type)
             p = make_global_identifier(get_txt(fun.name), I_TYPE_GLOBAL);
             if (!p)
                 break;
-
-            forcenew = MY_FALSE;
 
             if (p->type != I_TYPE_UNKNOWN)
             {
@@ -10996,7 +10997,7 @@ copy_functions (program_t *from, fulltype_t type)
                 }
                 else /* n < 0: not an lfun */
                 {
-                    if (n != -2
+                    if (n != I_GLOBAL_FUNCTION_EFUN
                      || (fun.flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN)) == 0
                        )
                      {
@@ -11004,7 +11005,7 @@ copy_functions (program_t *from, fulltype_t type)
                          * a (simul-)efun.
                          */
 
-                        if (n == -2)
+                        if (n == I_GLOBAL_FUNCTION_EFUN)
                         {
                             /* This inherited function shadows an efun */
 
@@ -11031,17 +11032,18 @@ copy_functions (program_t *from, fulltype_t type)
                      * the symbol-table.
                      */
                 }
-            }
-            else /* p is I_TYPE_UNKNOWN */
+            } /* if (p != I_TYPE_UNKNOWN) */
+
+            if (p->type == I_TYPE_UNKNOWN)
             {
                 /* First time this function-ident was ever encountered.
                  * Just make a new global.
                  */
                 
                 p->type = I_TYPE_GLOBAL;
-                p->u.global.variable = -1;
-                p->u.global.efun     = -1;
-                p->u.global.sim_efun = -1;
+                p->u.global.variable = I_GLOBAL_VARIABLE_OTHER;
+                p->u.global.efun     = I_GLOBAL_EFUN_OTHER;
+                p->u.global.sim_efun = I_GLOBAL_SEFUN_OTHER;
                 p->u.global.function = current_func_index;
                 p->next_all = all_globals;
                 all_globals = p;
@@ -12168,8 +12170,8 @@ epilog (void)
 
         for (t = all_efun_shadows; NULL != (s = t); )
         {
-            s->shadow->u.global.function = -2;
-            s->shadow->u.global.variable = -2;
+            s->shadow->u.global.function = I_GLOBAL_FUNCTION_EFUN;
+            s->shadow->u.global.variable = I_GLOBAL_VARIABLE_FUN;
             t = s->next;
             xfree(s);
         }

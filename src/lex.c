@@ -647,10 +647,10 @@ init_lexer(void)
             continue;
         }
         p->type = I_TYPE_GLOBAL;
-        p->u.global.efun     =  (short)n;
-        p->u.global.sim_efun = -1;
-        p->u.global.function = -2;
-        p->u.global.variable = -2;
+        p->u.global.efun     = (short)n;
+        p->u.global.sim_efun = I_GLOBAL_SEFUN_OTHER;
+        p->u.global.function = I_GLOBAL_FUNCTION_EFUN;
+        p->u.global.variable = I_GLOBAL_VARIABLE_FUN;
         p->next_all = all_efuns;
         all_efuns = p;
     }
@@ -878,7 +878,7 @@ lookfor_shared_identifier (char *s, int n, int depth, Bool bCreate)
                     curr = xalloc(sizeof *curr);
                     if ( NULL != curr )
                     {
-                        curr->name = inferior->name;
+                        curr->name = ref_mstring(inferior->name);
                         curr->next = inferior->next;
                         curr->type = I_TYPE_UNKNOWN;
                         curr->inferior = inferior;
@@ -953,7 +953,7 @@ make_global_identifier (char *s, int n)
     if (ip->type > I_TYPE_GLOBAL)
     {
         /* Somebody created a #define with this name.
-         * Fake an ident-table entry.
+         * Back-insert an ident-table entry.
          */
         do {
             q = ip;
@@ -968,7 +968,7 @@ make_global_identifier (char *s, int n)
                         , (unsigned long) sizeof(ident_t));
                 return NULL;
             }
-            ip->name = q->name;
+            ip->name = ref_mstring(q->name);
             ip->type = I_TYPE_UNKNOWN;
             ip->inferior = NULL;
             ip->hash = q->hash;
@@ -980,10 +980,24 @@ make_global_identifier (char *s, int n)
 } /* make_global_identifier() */
 
 /*-------------------------------------------------------------------------*/
-void
-free_shared_identifier (ident_t *p)
+static INLINE void
+free_identifier (ident_t *p)
 
-/* Remove the identifier <p> (which may be an inferior entry ) from the
+/* Deallocate the identifier <p> which must not be in any list or table
+ * anymore.
+ * It is a fatal error if it can't be found.
+ */
+
+{
+    free_mstring(p->name);
+    xfree(p);
+} /* free_identifier() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE void
+unlink_shared_identifier (ident_t *p)
+
+/* Unlink the identifier <p> (which may be an inferior entry ) from the
  * identifier table.
  * It is a fatal error if it can't be found.
  */
@@ -1000,7 +1014,7 @@ free_shared_identifier (ident_t *p)
     s = p->name;
 
 #if defined(LEXDEBUG)
-    printf("%s freeing '%s'\n", time_stamp(), get_txt(s));
+    printf("%s unlinking '%s'\n", time_stamp(), get_txt(s));
     fflush(stdout);
 #endif
 
@@ -1031,17 +1045,13 @@ free_shared_identifier (ident_t *p)
                         {
                             curr->inferior->next = curr->next;
                             *q = curr->inferior;
-                            xfree(curr);
                             return; /* success */
                         }
                         *q = curr->next;
-                        free_mstring(curr->name);
-                        xfree(curr);
                         return;
                     }
 
                     *q = curr->inferior;
-                    xfree(curr);
                     return; /* success */
                 }
                 q = &curr->inferior;
@@ -1058,6 +1068,25 @@ free_shared_identifier (ident_t *p)
 
     fatal("free_shared_identifier: name '%s' not found!\n", get_txt(p->name));
     /* NOTREACHED */
+} /* unlink_shared_identifier() */
+
+/*-------------------------------------------------------------------------*/
+void
+free_shared_identifier (ident_t *p)
+
+/* Remove the identifier <p> (which may be an inferior entry ) from the
+ * identifier table.
+ * It is a fatal error if it can't be found.
+ */
+
+{
+#if defined(LEXDEBUG)
+    printf("%s freeing '%s'\n", time_stamp(), get_txt(p->name));
+    fflush(stdout);
+#endif
+
+    unlink_shared_identifier(p);
+    free_identifier(p);
 } /* free_shared_identifier() */
 
 /*-------------------------------------------------------------------------*/
@@ -4038,9 +4067,9 @@ yylex1 (void)
                             else
                             {
                                 *q = p->next;
-                                free_mstring(p->name);
                             }
                             xfree(p->u.define.exps.str);
+                            free_mstring(p->name);
                             p->name = NULL;
                                 /* mark for later freeing by all_defines */
                             /* success */
@@ -4052,7 +4081,6 @@ yylex1 (void)
                             {
                                 p->inferior->next = p->next;
                                 *q = p->inferior;
-                                (void)ref_mstring(p->name);
                             }
                             else
                             {
@@ -5163,7 +5191,6 @@ free_defines (void)
             if (curr->name == p->name) /* found it */
             {
                 p->next = curr->next;
-                free_mstring(p->name);
                 break;
             }
             prev = &curr->next;
@@ -6464,6 +6491,19 @@ show_lexer_status (strbuf_t * sbuf, Bool verbose UNUSED)
 /*-------------------------------------------------------------------------*/
 #ifdef GC_SUPPORT
 
+static INLINE void
+count_ident_refs (ident_t *id)
+
+/* GC support: count all references held by one identifier (ignoring
+ * inferiors).
+ */
+
+{
+    count_ref_from_string(id->name);
+    note_malloced_block_ref(id);
+} /* count_ident_refs() */
+
+/*-------------------------------------------------------------------------*/
 void
 count_lex_refs (void)
 
@@ -6478,9 +6518,14 @@ count_lex_refs (void)
     for (i = ITABLE_SIZE; --i >= 0; )
     {
         id = ident_table[i];
-        for ( ; id; id = id->next) {
-            count_ref_from_string(id->name);
-            note_malloced_block_ref(id);
+        for ( ; id; id = id->next)
+        {
+            ident_t *id2;
+            count_ident_refs(id);
+            for (id2 = id->inferior; id2 != NULL; id2 = id2->next)
+            {
+                count_ident_refs(id);
+            }
         }
     }
 

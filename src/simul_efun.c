@@ -10,8 +10,9 @@
  * it is easier to find it again after an update). When a simul-efun is
  * removed from the game, the master may provide 'backup' objects which
  * still provide the old simul-efun so that older programs still run
- * (albeit slower). The semantic of a simul-efun call is that of a call-other,
- * and specific calls may even be implemented as such.
+ * albeit slower (see interpret.c:call_simul_efun()). The semantic of
+ * a simul-efun call is that of a call-other, and specific calls may even
+ * be implemented as such.
  *
  * The driver keeps a table (simul_efunp) of all simul-efuns compiled so far,
  * distinguished by name and number of arguments. If a simul-efun is removed
@@ -65,12 +66,16 @@ object_t *simul_efun_object  = NULL;
    */
 
 vector_t *simul_efun_vector  = NULL;
-  /* When available, all alternative simul_efun object names
+  /* When available, all simul_efun object names
+   * The first is the name of the primary object - it these object's 
+   * functions which are tabled. All alternative objects are used
+   * using a normal apply() from interpret.c:call_simul_efun().
    */
 
 simul_efun_table_t simul_efun_table[256];
   /* The table holding the information for all simul-efuns which
    * can be called directly with the SIMUL_EFUN instruction.
+   * A .funstart of NULL marks unused/discarded entries.
    */
 
 int num_simul_efun = 0;
@@ -90,7 +95,8 @@ static program_t *simul_efun_program= NULL;
    */
 
 static ident_t *all_simul_efuns = NULL;
-  /* The list of all simul_efun identifiers.
+  /* The list of all active simul_efun identifiers, which are also
+   * held in the symbol table.
    */
 
 static short all_discarded_simul_efun = -1;
@@ -99,24 +105,17 @@ static short all_discarded_simul_efun = -1;
    */
 
 /*-------------------------------------------------------------------------*/
-object_t *
-get_simul_efun_object (void)
+void
+invalidate_simul_efuns (void)
 
-/* (Re)load the simul_efun object and extract all information we need.
- * Result is a copy of the simul_efun_object pointer, or NULL on failure.
- *
- * At the time of call, simul_efun_object must be NULL.
+/* Invalidate all simul_efun information - usually because the
+ * object is destructed.
  */
 
 {
     simul_efun_table_t *entry;
-    svalue_t           *svp;
-    object_t           *ob;
-    program_t          *progp;
     ident_t            *id;
-    CBool              *visible; /* Flag for every function: visible or not */
-    string_t           *name;
-    int                 i, j, num_fun;
+    int                 i, j;
 
     /* Invalidate the simul_efun table */
     for (entry = simul_efun_table, i = 256; --i >= 0; )
@@ -125,16 +124,29 @@ get_simul_efun_object (void)
         entry++;
     }
 
-    free_defines(); /* to prevent #defines hideing places for globals */
-
-    /* Mark all simulefun identifier entries as non-existing */
+    /* Mark all simulefun identifier entries as non-existing.
+     * Remove all sefun shadows for efuns.
+     */
     for (id = all_efuns; id; id = id->next_all)
     {
-        id->u.global.sim_efun |= -0x8000;
+        id->u.global.sim_efun = I_GLOBAL_SEFUN_OTHER;
     }
-    for (id = all_simul_efuns; id; id = id->next_all)
+
+    /* Mark all simulefun identifier entries as non-existing
+     * and move them into the inactive list.
+     */
+    while (all_simul_efuns != NULL)
     {
-        id->u.global.sim_efun |= -0x8000;
+        id = all_simul_efuns;
+        j = id->u.global.sim_efun;
+
+        all_simul_efuns = all_simul_efuns->next_all;
+
+        simul_efunp[j].offset.func = all_discarded_simul_efun;
+        all_discarded_simul_efun = j;
+
+        free_shared_identifier(id);
+        id->u.global.sim_efun = I_GLOBAL_SEFUN_OTHER;
     }
 
     /* Free the old program and vector, if any */
@@ -149,6 +161,29 @@ get_simul_efun_object (void)
         free_array(simul_efun_vector);
         simul_efun_vector = NULL;
     }
+} /* invalidate_simul_efuns() */
+
+/*-------------------------------------------------------------------------*/
+object_t *
+get_simul_efun_object (void)
+
+/* (Re)load the simul_efun object and extract all information we need.
+ * Result is a copy of the simul_efun_object pointer, or NULL on failure.
+ *
+ * At the time of call, simul_efun_object must be NULL.
+ */
+
+{
+    svalue_t           *svp;
+    object_t           *ob;
+    program_t          *progp;
+    CBool              *visible; /* Flag for every function: visible or not */
+    string_t           *name;
+    int                 i, j, num_fun;
+
+    invalidate_simul_efuns(); /* Invalidate the simul_efun information */
+
+    free_defines(); /* to prevent #defines hideing places for globals */
 
     /* Get the name(s) of the simul_efun  object. */
     svp = apply_master_ob(STR_GET_SEFUN, 0);
@@ -286,10 +321,10 @@ get_simul_efun_object (void)
             if (p->type == I_TYPE_UNKNOWN)
             {
                 p->type = I_TYPE_GLOBAL;
-                p->u.global.function = -2;
-                p->u.global.variable = -2;
-                p->u.global.efun     = -1;
-                p->u.global.sim_efun = -1;
+                p->u.global.function = I_GLOBAL_FUNCTION_EFUN;
+                p->u.global.variable = I_GLOBAL_VARIABLE_FUN;
+                p->u.global.efun     = I_GLOBAL_EFUN_OTHER;
+                p->u.global.sim_efun = I_GLOBAL_SEFUN_OTHER;
                 p->next_all = all_simul_efuns;
                 all_simul_efuns = p;
             }
@@ -299,46 +334,31 @@ get_simul_efun_object (void)
 
             /* Find the proper index in simul_efunp[] */
             switch(0) { default: /* TRY... */
-                if ((j = p->u.global.sim_efun) != -1)
+
+                /* Try to find a discarded sefun entry with matching
+                 * arguments to reuse.
+                 */
+                if (all_discarded_simul_efun >= 0)
                 {
-                    /* We are reusing an earlier sefun */
+                    int last;
 
-                    j &= ~-0x8000;
-                    if (simul_efunp[j].num_arg != num_arg
-                     || 0 != ((simul_efunp[j].flags ^ flags) & TYPE_MOD_XVARARGS) 
-                       )
+                    j = all_discarded_simul_efun;
+                    while ( (j = simul_efunp[last = j].offset.func) >= 0)
                     {
-                        /* Numbers of arguments changed: discard the earlier
-                         * sefun.
-                         */
-                        int last;
+                        if (num_arg != simul_efunp[j].num_arg
+                         || 0 != ((simul_efunp[j].flags ^ flags) & TYPE_MOD_XVARARGS) 
+                           )
+                            continue;
+                        if (!mstreq(function_name, simul_efunp[j].name))
+                            continue;
 
-                        simul_efunp[j].offset.func = all_discarded_simul_efun;
-                        all_discarded_simul_efun = j;
-
-                        /* But try to find an even earlier discarded sefun
-                         * for the same name with the correct number of args.
-                         */
-                        while ( (j = simul_efunp[last = j].offset.func) >= 0)
-                        {
-                            if (num_arg != simul_efunp[j].num_arg
-                             || 0 != ((simul_efunp[j].flags ^ flags) & TYPE_MOD_XVARARGS) 
-                               )
-                                continue;
-                            if (!mstreq(function_name, simul_efunp[j].name))
-                                continue;
-
-                            /* Found one: remove it from the 'discarded' list */
-                            simul_efunp[last].offset.func =
-                                  simul_efunp[j].offset.func;
-                            break;
-                        }
-                        if (j >= 0)
-                            break; /* switch */
+                        /* Found one: remove it from the 'discarded' list */
+                        simul_efunp[last].offset.func =
+                              simul_efunp[j].offset.func;
+                        break;
                     }
-                    else
-                        /* Same number of arguments */
-                        break;          /* switch */
+                    if (j >= 0)
+                        break; /* switch */
                 }
 
                 /* New simul_efun: make a new entry */

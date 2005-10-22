@@ -145,6 +145,16 @@ struct ident_s
 #define I_TYPE_RESWORD    4  /* reserved word */
 #define I_TYPE_DEFINE     5
 
+/* ident_t.global magic values */
+
+#define I_GLOBAL_FUNCTION_VAR    (-1)
+#define I_GLOBAL_FUNCTION_EFUN   (-2)
+#define I_GLOBAL_VARIABLE_OTHER  (-1)
+#define I_GLOBAL_VARIABLE_FUN    (-2)
+#define I_GLOBAL_EFUN_OTHER      (-1)
+#define I_GLOBAL_SEFUN_OTHER     (-1)
+
+
 #define lookup_predef(p) (p->type == I_TYPE_GLOBAL ? p->u.global.efun : -1)
 
 

@@ -842,6 +842,7 @@ regcomp (unsigned char *expr, Bool excompat, Bool from_ed)
     }
     r->regalloc = sizeof(regexp)+regsize;
     r->refs = 1;
+    r->from_ed = from_ed;
 
     /* Second pass: emit code. */
     regparse = expr2;

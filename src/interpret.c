@@ -9478,11 +9478,10 @@ again:
                 if (dtmp == 0.)
                     ERROR("Division by zero\n");
                 sp--;
-                dtmp = sp->u.number / dtmp;
-                dtmp = (double)(sp-1)->u.number / dtmp;
+                dtmp = (double)sp->u.number / dtmp;
                 if (dtmp < (-DBL_MAX) || dtmp > DBL_MAX)
                     ERRORF(("Numeric overflow: %ld / %g\n"
-                           , (long)(sp-1)->u.number, READ_DOUBLE(sp)));
+                           , (long)(sp)->u.number, READ_DOUBLE(sp+1)));
                 STORE_DOUBLE(sp, dtmp);
                 sp->type = T_FLOAT;
                 break;
@@ -9506,7 +9505,7 @@ again:
                 dtmp = READ_DOUBLE(sp) / dtmp;
                 if (dtmp < (-DBL_MAX) || dtmp > DBL_MAX)
                     ERRORF(("Numeric overflow: %g / %g\n"
-                           , READ_DOUBLE(sp-1), READ_DOUBLE(sp)));
+                           , READ_DOUBLE(sp), READ_DOUBLE(sp+1)));
                 STORE_DOUBLE(sp, dtmp);
                 break;
             }
@@ -9516,12 +9515,12 @@ again:
                     ERROR("Division by zero\n");
                     return MY_FALSE;
                 }
-                dtmp = (float)sp->u.number;
+                dtmp = (double)sp->u.number;
                 sp--;
                 dtmp = READ_DOUBLE(sp) / dtmp;
                 if (dtmp < (-DBL_MAX) || dtmp > DBL_MAX)
                     ERRORF(("Numeric overflow: %g / %ld\n"
-                           , READ_DOUBLE(sp-1), (long)sp->u.number));
+                           , READ_DOUBLE(sp), (long)(sp+1)->u.number));
                 STORE_DOUBLE(sp, dtmp);
                 break;
             }
