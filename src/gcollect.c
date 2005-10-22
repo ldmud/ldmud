@@ -1170,6 +1170,14 @@ garbage_collection(void)
         if (all_players[i] == NULL)
             continue;
 
+#ifdef USE_PTHREAD
+        {
+            struct write_buffer_s *pwb;
+            for (pwb = all_players[i]->write_first; pwb != NULL; pwb = pwb->next)
+                clear_memory_reference(pwb);
+        }
+#endif
+
         for ( it = all_players[i]->input_to; it != NULL; it = it->next)
         {
             clear_memory_reference(it);
@@ -1326,6 +1334,14 @@ garbage_collection(void)
             continue;
 
         note_ref(all_players[i]);
+
+#ifdef USE_PTHREAD
+        {
+            struct write_buffer_s *pwb;
+            for (pwb = all_players[i]->write_first; pwb != NULL; pwb = pwb->next)
+                note_ref(pwb);
+        }
+#endif
 
         /* There are no destructed interactives, or interactives
          * referencing destructed objects.

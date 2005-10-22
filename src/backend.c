@@ -280,6 +280,24 @@ handle_usr1 (int sig UNUSED)
 } /* handle_usr1() */
 
 /*-------------------------------------------------------------------------*/
+static RETSIGTYPE
+handle_usr2 (int sig UNUSED)
+
+/* SIGUSR2 handler: reopen the debug.log file.
+ */
+
+{
+#ifdef __MWERKS__
+#    pragma unused(sig)
+#endif
+    reopen_debug_log = MY_TRUE;
+    (void)signal(SIGUSR2, handle_usr2);
+#ifndef RETSIGTYPE_VOID
+    return 0;
+#endif
+} /* handle_usr1() */
+
+/*-------------------------------------------------------------------------*/
 static INLINE void
 cleanup_stuff (void)
 
@@ -354,6 +372,7 @@ backend (void)
 
     (void)signal(SIGHUP,  handle_hup);
     (void)signal(SIGUSR1, handle_usr1);
+    (void)signal(SIGUSR2, handle_usr2);
     if (!t_flag) {
         /* Start the first alarm */
         ALARM_HANDLER_FIRST_CALL(catch_alarm);
@@ -429,11 +448,11 @@ backend (void)
 
             if (garbage_collect_to_do) {
                 time_t time_now = time(NULL);
-                char buf[90];
+                char buf[120];
 
                 if (time_now - time_last_gc >= 60)
                 {
-                  sprintf(buf, "%s Garbage collection, slow_shut to do: %d\n", time_stamp(), slow_shut_down_to_do);
+                  sprintf(buf, "%s Garbage collection (slow_shut to do: %d, time since last gc: %d)\n", time_stamp(), slow_shut_down_to_do, time_now - time_last_gc);
                   write(1, buf, strlen(buf));
                   command_giver = NULL;
                   current_object = NULL;
@@ -441,7 +460,7 @@ backend (void)
                 }
                 else
                 {
-                  sprintf(buf, "%s No garbage collection, slow_shut to do: %d\n", time_stamp(), slow_shut_down_to_do);
+                  sprintf(buf, "%s Garbage collection refused (slow_shut to do: %d, time since last gc: %d)\n", time_stamp(), slow_shut_down_to_do, time_now - time_last_gc);
                   write(1, buf, strlen(buf));
                   reallocate_reserved_areas();
                 }

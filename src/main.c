@@ -153,6 +153,11 @@ char input_escape = '!';
   /* The input escape/input_to() bypass character.
    */
 
+Bool reopen_debug_log = MY_FALSE;
+  /* Set to TRUE by the USR2 handler to force the driver to reopen
+   * the debug.log file.
+   */
+
 /*-------------------------------------------------------------------------*/
 
 /* Forward declarations for the argument parser in the lower half */
@@ -529,7 +534,14 @@ vdebug_message(const char *fmt, va_list va)
     char deb[100];
     char *file;
 
-    if (fp == NULL) {
+    if (fp == NULL || reopen_debug_log) {
+        if (fp != NULL)
+        {
+            fclose(fp);
+            fp = NULL;
+        }
+        reopen_debug_log = MY_FALSE;
+
         if ( !(file = debug_file) ) {
             sprintf(deb,"%s.debug.log", query_host_name());
             file = deb;

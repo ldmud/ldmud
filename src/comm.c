@@ -53,6 +53,19 @@
  *
  * TODO: The noecho/charmode logic, especially in combination with
  * TODO:: the telnet machine is frustratingly underdocumented.
+ *
+#ifdef USE_PTHREAD
+ * The data is not written directly to the sockets, but instead to
+ * an intermediate buffer, from which a secondary thread does the actual
+ * writing. The buffers are stored in a linked list in the interactive-s
+ * structure. Advantage is that the driver is no longer bothered by blocking
+ * sockets.
+ *
+ * TODO: Generalize the background buffer and either use pthreads, or a call
+ * TODO:: from the backend loop to write the data. Also allow to set the
+ * TODO:: PTHREAD_MAX_WRITE from the commandline (incl. unlimited), and don't
+ * TODO:: immediately discard EWOULDBLOCK-failed messages.
+#endif
  *---------------------------------------------------------------------------
  */
 
@@ -434,6 +447,10 @@ static void update_ip_entry(const char *oldname, const char *newname);
 
 #endif /* ERQ_DEMON */
 
+#ifdef USE_PTHREAD
+static void *writer_thread(void *arg);
+static void writer_thread_cleanup(void *arg);
+#endif
 
 #ifdef USE_IPV6
 
@@ -1045,7 +1062,9 @@ prepare_ipc(void)
             perror("listen");
             exit(1);
         }
+#ifndef USE_PTHREAD
         set_socket_nonblocking(sos[i]);
+#endif
         set_close_on_exec(sos[i]);
 
         if (socket_number(sos[i]) >= min_nfds)
@@ -1090,6 +1109,171 @@ ipc_remove (void)
 #endif
 
 } /* ipc_remove() */
+
+/*-------------------------------------------------------------------------*/
+#ifdef USE_PTHREAD
+#define PTHREAD_WRITE_MAX_SIZE 100000
+
+static int
+thread_socket_write(SOCKET_T socket, char *msg, size_t size, interactive_t *ip)
+
+/* Stand in for socket_write(): take the data to be written and append
+ * it to the buffer list of <ip>.
+ */
+
+{
+    struct write_buffer_s *b;
+
+    if (size == 0)
+        return 0;
+
+    /* Get a new buffer for the data to be written */
+    xallocate(b, sizeof(struct write_buffer_s) + size - 1, "thread_socket_write()");
+    if (b == NULL)
+    {
+        errno = EWOULDBLOCK;
+        return -1;
+    }
+    b->length = size;
+    b->next = NULL;
+
+    memcpy(b->buffer, msg, size);
+
+    /* Chain in the new buffer */
+
+    pthread_mutex_lock(&ip->write_mutex);
+
+    if(ip->write_first)
+        ip->write_last = ip->write_last->next = b;
+    else
+        ip->write_first = ip->write_last = b;
+    ip->write_size += size;
+
+    /* Make sure that the amount of data pending never exceeds
+     * PTHREAD_MAX_SIZE.
+     */
+    while (ip->write_size >= PTHREAD_WRITE_MAX_SIZE)
+    {
+        struct write_buffer_s *tmp = ip->write_first;
+        ip->write_first = tmp->next;
+        ip->write_size -= tmp->length;
+        xfree(tmp);
+    }
+
+    pthread_mutex_unlock(&ip->write_mutex);
+    pthread_cond_signal(&ip->write_cond);
+
+    errno = 0;
+    return size;
+} /* thread_socket_write() */
+
+/*-------------------------------------------------------------------------*/
+static void
+writer_thread_cleanup(void *arg)
+
+/* The given thread is canceled - remove all associated data structures.
+ */
+
+{
+    interactive_t * ip = (interactive_t *) arg;
+    struct write_buffer_s *buf = ip->write_first, *tmp;
+
+    while (buf)
+    {
+	tmp = buf->next;
+	if (buf)
+            xfree(buf);
+	buf = tmp;
+    }
+    ip->write_first = NULL;
+
+    fprintf(stderr, "Thread %d canceled and cleaned up!\n", pthread_self());
+} /* writer_thread_cleanup() */
+
+/*-------------------------------------------------------------------------*/
+void *
+writer_thread (void *arg)
+
+/* The thread to write the pending data for the given interactive <arg>.
+ * The buffer to be written is removed from the chain before the write
+ * is attempted, so that a block here won't block add_message().
+ */
+
+{
+    interactive_t *ip = (interactive_t *) arg;
+    struct write_buffer_s *buf;
+
+    pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL); /* make us cancelable */
+    pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL);
+    pthread_cleanup_push(writer_thread_cleanup, ip);
+      /* MacOS X: pthread_cleanup_push() is a macro which opens a new scope
+       * and uses scope-local variable to store the cleanup handler.
+       * To close the scope, pthread_cleanup_pop() needs to be 'invoked'
+       * below.
+       */
+
+    while (MY_TRUE)
+    {
+	/* cancellation point */
+	pthread_testcancel();
+
+	/* mutex protected getting of first write_buffer */
+	pthread_mutex_lock(&ip->write_mutex);
+	if  (!ip->write_first)
+        {
+            /* if no first write_buffer -> wait on signal from mainthread */
+	    pthread_cond_wait(&ip->write_cond, &ip->write_mutex);
+        }
+	buf = ip->write_first;
+	ip->write_first = buf->next;
+        ip->write_size -= buf->length;
+	pthread_mutex_unlock(&ip->write_mutex);
+
+	/* write the stuff to socket */
+        if ((socket_write(ip->socket, buf->buffer, buf->length)) == -1) 
+        {
+            switch (errno) {
+              case EINTR:
+                fprintf(stderr, "%s comm: write EINTR. Message discarded.\n", time_stamp());
+
+              case EWOULDBLOCK:
+                fprintf(stderr, "%s comm: write EWOULDBLOCK. Message discarded.\n", time_stamp());
+
+              case EMSGSIZE:
+                fprintf(stderr, "%s comm: write EMSGSIZE.\n", time_stamp());
+
+              case EINVAL:
+                fprintf(stderr, "%s comm: write EINVAL.\n", time_stamp());
+
+              case ENETUNREACH:
+                fprintf(stderr, "%s comm: write ENETUNREACH.\n", time_stamp());
+
+              case EHOSTUNREACH:
+                fprintf(stderr, "%s comm: write EHOSTUNREACH.\n", time_stamp());
+
+              case EPIPE:
+                fprintf(stderr, "%s comm: write EPIPE detected\n", time_stamp());
+
+              default:
+                {
+                  int e = errno;
+                  fprintf(stderr, "%s comm: write: unknown errno %d\n"
+                                , time_stamp(), e);
+                }
+            } /* switch (errno) */
+        } /* if socket_write() == -1 */
+
+	if (buf)
+        {
+	    xfree(buf);
+        }
+    } /* while forever */
+
+    /* Remove the thread cleanup handler */
+    pthread_cleanup_pop(0);
+} /* writer_thread() */
+
+#endif /* USE_PTHREAD */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -1479,7 +1663,11 @@ if (sending_telnet_command)
 
         for (retries = 6;;) {
 
+#ifdef USE_PTHREAD
+            if ((n = (int)thread_socket_write(ip->socket, ip->message_buf, (size_t)chunk, ip)) != -1)
+#else
             if ((n = (int)socket_write(ip->socket, ip->message_buf, (size_t)chunk)) != -1)
+#endif
             {
                 break;
             }
@@ -2123,8 +2311,9 @@ get_message (char *buff)
                     {
                         /* EBADF would be a valid cause for an abort,
                          * same goes for ENOTSOCK, EOPNOTSUPP, EFAULT.
-                         * However, don't abort() because it tends to
-                         * leave Mud admins baffled.
+                         * However, don't abort() because that tends to
+                         * leave Mud admins baffled (and would opens the 
+                         * door for DoS attacks).
                          */
                         int errorno = errno;
                         fprintf( stderr
@@ -2468,8 +2657,13 @@ get_message (char *buff)
                     }
                     if (length > ip->chars_ready)
                     {
+#ifdef USE_PTHREAD
+                        thread_socket_write(ip->socket, ip->text + ip->chars_ready
+                                    , (size_t)(length - ip->chars_ready), ip);
+#else
                         socket_write(ip->socket, ip->text + ip->chars_ready
                                     , (size_t)(length - ip->chars_ready));
+#endif
                         ip->chars_ready = length;
                     }
                 }
@@ -2652,6 +2846,10 @@ remove_interactive (object_t *ob, Bool force)
             trace_level |= interactive->trace_level;
             add_message(message_flush);
         }
+#ifdef USE_PTHREAD
+        /* buffer list is cleaned up by thread */
+        pthread_cancel(interactive->write_thread);
+#endif
         shutdown(interactive->socket, 2);
         socket_close(interactive->socket);
     } /* if (erq or user) */
@@ -2678,6 +2876,10 @@ remove_interactive (object_t *ob, Bool force)
         free_object(interactive->modify_command, "remove_interactive");
     }
 
+#ifdef USE_PTHREAD
+    pthread_mutex_destroy(&interactive->write_mutex);
+    pthread_cond_destroy(&interactive->write_cond);
+#endif
     free_svalue(&interactive->prompt);
 
     if (interactive->trace_prefix)
@@ -2784,7 +2986,9 @@ new_player (SOCKET_T new_socket, struct sockaddr_in *addr, size_t addrlen
 #endif
 
     /* Set some useful socket options */
+#ifndef USE_PTHREAD
     set_socket_nonblocking(new_socket);
+#endif
     set_close_on_exec(new_socket);
     set_socket_own(new_socket);
 
@@ -2914,6 +3118,14 @@ new_player (SOCKET_T new_socket, struct sockaddr_in *addr, size_t addrlen
     new_interactive->access_class = class;
 #endif
     new_interactive->socket = new_socket;
+
+#ifdef USE_PTHREAD
+    pthread_mutex_init(&new_interactive->write_mutex, NULL);
+    pthread_cond_init(&new_interactive->write_cond, NULL);
+    new_interactive->write_first = new_interactive->write_last = NULL;
+    new_interactive->write_size = 0;
+    pthread_create(&new_interactive->write_thread, NULL, writer_thread, new_interactive);
+#endif
 
     /* Add the new interactive structure to the list of users */
 
@@ -4194,6 +4406,19 @@ telnet_neg (interactive_t *ip)
                 if (ip->text[0] == input_escape
                  && ! (find_no_bang(ip) & IGNORE_BANG) )
                 {
+#ifdef USE_PTHREAD
+                    if (to > &ip->text[ip->chars_ready])
+                    {
+                        thread_socket_write(ip->socket, &ip->text[ip->chars_ready],
+                          (size_t)(to - &ip->text[ip->chars_ready]), ip);
+                        ip->chars_ready = to - ip->text;
+                    }
+                    if (to > first) {
+                        thread_socket_write(ip->socket, "\b \b", 3, ip);
+                        to--;
+                        ip->chars_ready--;
+                    }
+#else
                     if (to > &ip->text[ip->chars_ready])
                     {
                         socket_write(ip->socket, &ip->text[ip->chars_ready],
@@ -4205,6 +4430,7 @@ telnet_neg (interactive_t *ip)
                         to--;
                         ip->chars_ready--;
                     }
+#endif
                     goto ts_data;
                 }
                 /* FALLTHROUGH */
@@ -5385,11 +5611,13 @@ get_host_ip_number (void)
  */
 
 {
-    char buf[20];
-
 #ifndef USE_IPV6
+    char buf[INET6_ADDRSTRLEN+3];
+
     sprintf(buf, "\"%s\"", inet_ntoa(host_ip_number));
 #else
+    char buf[INET6_ADDRSTRLEN+3];
+
     sprintf(buf, "\"%s\"", inet6_ntoa(host_ip_number));
 #endif
     return string_copy(buf);
@@ -5854,7 +6082,12 @@ f_binary_message (svalue_t *sp)
              */
 
             for (i = 6; i > 0; i--) {
+#ifdef USE_PTHREAD
+                wrote = (mp_int)thread_socket_write(ip->socket, message
+                                                   , (size_t)size, ip);
+#else
                 wrote = (mp_int)socket_write(ip->socket, get_txt(msg), mstrsize(msg));
+#endif
                 if (wrote != -1 || errno != EINTR || i != 1)
                     break;
             }

@@ -4,6 +4,9 @@
 #include "driver.h"
 #include "typedefs.h"
 #include <sys/types.h>
+#ifdef USE_PTHREAD
+#include <pthread.h>
+#endif
 
 #include "simulate.h"   /* callback_t for input_to_t */
 #include "svalue.h"
@@ -72,7 +75,24 @@
 
 /* --- Types --- */
 
-/* --- struct input_to: input_to() datastructure
+/* --- struct write_buffer_s: async write datastructure
+ *
+ * This data structure holds all the information for pending messages
+ * which are to be written by a background thread. The structure is
+ * allocated to the necessary length to hold the full message.
+ * The instances are kept in a linked list from the interactive_t
+ * structure.
+ */
+#ifdef USE_PTHREAD
+struct write_buffer_s
+{
+    struct write_buffer_s *next;
+    size_t length;
+    char buffer[1 /* .length */ ];
+};
+#endif
+
+/* --- struct input_to_s: input_to() datastructure
  *
  * input-to structures describe a pending input_to() for a given
  * interactive object. Every object can have one input-to pending, the
@@ -167,6 +187,15 @@ struct interactive_s {
 
     char message_buf[MAX_SOCKET_PACKET_SIZE];
       /* The send buffer. */
+
+#ifdef USE_PTHREAD
+    pthread_mutex_t 	   write_mutex;
+    pthread_cond_t	   write_cond;
+    pthread_t		   write_thread;
+    struct write_buffer_s *write_first;
+    struct write_buffer_s *write_last;
+    unsigned long         write_size;
+#endif
 };
 
 /* --- Bitflags and masks for interactive.noecho ---

@@ -180,6 +180,7 @@ f-010802: Allow wildcarded calls with arguments
 f-011213-0: Lexer should not use magic EOF characters
 f-020203-1: Warn if inner variables shadow outer ones.
 f-020321: Deactivate sefun (when loading the master or on pragma)
+p-020810: Hyperborea patches for ANSI support
 
 
 Runtime
@@ -236,6 +237,7 @@ f-010318: Runtime ERQ Executable directory specification
 f-010707: Fast Callouts
 f-010928-0: Make telnet negotiation options more configurable
 p-011012: MCCP patch
+p-020810-1: Threads for MCCP
 f-011215: Signal handling
 f-020128: syslog like logging for the driver
 f-020131-0: privilege_violation("limited") should pass limits

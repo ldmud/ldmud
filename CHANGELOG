@@ -1,6 +1,22 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+10-Aug-2002 (Lars Duening)  (3.3.217)
+    - (closure.c) In efun symbol_function(), symbols were freed as
+         strings (reported by Freaky).
+    - (main, backend.c) Signal USR2 forces the driver to reopen the
+         host.debug.log file (thanks, Gawain!).
+    - (comm, gcollect.c) Experimental: Defining USE_PTHREAD (if your
+         system has pthread support) activates code which uses threads
+         to write the socket data to the network in the background.
+         Intention is to avoid EWOULDBLOCK errors on slow connections
+         (thanks, Gawain!)
+
+08-Aug-2002 (Lars Duening)
+    - (comm.c) When using IPv6, get_host_ip_number() used a too small
+         buffer (thanks, Fiona!)
+    - (backend.c) Improved the 'doing a GC' messages somewhat.
+
 05-Aug-2002 (Lars Duening)  (3.3.216)
     - (mapping.c) Embarassing: the bugfix broke map() and filter()
          for all non-multi-value mappings (reported by Casey).

@@ -5268,7 +5268,7 @@ undefined_function:
 
         /* Symbol is ok - create the closure value */
         
-        free_string_svalue(sp);
+        free_svalue(sp);
         sp->type = T_CLOSURE;
         if (!efun_override && p->u.global.sim_efun >= 0)
         {
