@@ -299,21 +299,15 @@ cleanup_stuff (void)
         replace_programs();
     }
 
-#ifdef USE_FREE_CLOSURE_HOOK
-    /* Free older driver hooks
-     */
-    free_old_driver_hooks();
-#endif
-
     /* Rebind all bindable closures back to the master */
-    for  (i = 0; i < NUM_CLOSURE_HOOKS; i++)
+    for  (i = 0; i < NUM_DRIVER_HOOKS; i++)
     {
-        if (closure_hook[i].type == T_CLOSURE
-         && closure_hook[i].x.closure_type == CLOSURE_LAMBDA)
+        if (driver_hook[i].type == T_CLOSURE
+         && driver_hook[i].x.closure_type == CLOSURE_LAMBDA)
         {
             lambda_t *l;
 
-            l = closure_hook[i].u.lambda;
+            l = driver_hook[i].u.lambda;
             if (l->ob != master_ob)
             {
                 free_object(l->ob, "backend");
@@ -925,24 +919,24 @@ static Bool did_swap;
             CLEAR_EVAL_COST;
             command_giver = NULL;
             trace_level = 0;
-            if (closure_hook[H_CLEAN_UP].type == T_CLOSURE)
+            if (driver_hook[H_CLEAN_UP].type == T_CLOSURE)
             {
                 lambda_t *l;
 
-                l = closure_hook[H_CLEAN_UP].u.lambda;
-                if (closure_hook[H_CLEAN_UP].x.closure_type == CLOSURE_LAMBDA)
+                l = driver_hook[H_CLEAN_UP].u.lambda;
+                if (driver_hook[H_CLEAN_UP].x.closure_type == CLOSURE_LAMBDA)
                 {
                     free_object(l->ob, "clean_up");
                     l->ob = ref_object(obj, "clean_up");
                 }
                 push_ref_object(inter_sp, obj, "clean up");
-                call_lambda(&closure_hook[H_CLEAN_UP], 2);
+                call_lambda(&driver_hook[H_CLEAN_UP], 2);
                 svp = inter_sp;
                 pop_stack();
             }
-            else if (closure_hook[H_CLEAN_UP].type == T_STRING)
+            else if (driver_hook[H_CLEAN_UP].type == T_STRING)
             {
-                svp = apply(closure_hook[H_CLEAN_UP].u.str, obj, 1);
+                svp = apply(driver_hook[H_CLEAN_UP].u.str, obj, 1);
             }
             else
             {

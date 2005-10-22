@@ -170,26 +170,9 @@ object_t *previous_ob;
   /* The previous object which called the current_object.
    */
 
-svalue_t closure_hook[NUM_CLOSURE_HOOKS];
+svalue_t driver_hook[NUM_DRIVER_HOOKS];
   /* The table with all driver hooks.
    */
-
-#ifdef USE_FREE_CLOSURE_HOOK
-static svalue_t *old_hooks = NULL;
-  /* Array of entries holding all the old driver hook closures replaced
-   * during this and the previous execution threads. The closures are
-   * not freed immediately on replacement in case they are still used.
-   * Instead, the backend frees them explicitely.
-   */
-
-static int num_old_hooks = 0;
-  /* The current number of entries in <old_hooks>
-   */
-
-static int max_old_hooks = 0;
-  /* The allocated length of <old_hooks>
-   */
-#endif
 
 Bool game_is_being_shut_down = MY_FALSE;
   /* TRUE if a shutdown was requested resp. is in progress.
@@ -1058,14 +1041,14 @@ give_uid_to_object (object_t *ob, int hook, int numarg)
 
     ob->user = &default_wizlist_entry;  /* Default uid */
 
-    if ( NULL != (l = closure_hook[hook].u.lambda) )
+    if ( NULL != (l = driver_hook[hook].u.lambda) )
     {
-        if (closure_hook[hook].x.closure_type == CLOSURE_LAMBDA)
+        if (driver_hook[hook].x.closure_type == CLOSURE_LAMBDA)
         {
             free_object(l->ob, "give_uid_to_object");
             l->ob = ref_object(ob, "give_uid_to_object");
         }
-        call_lambda(&closure_hook[hook], numarg);
+        call_lambda(&driver_hook[hook], numarg);
         ret = inter_sp;
         xfree(ret[-1].u.lvalue); /* free error context */
 
@@ -3259,80 +3242,19 @@ count_ref_in_callback (callback_t *cb)
 
 /*-------------------------------------------------------------------------*/
 void
-init_closure_hooks()
+init_driver_hooks()
 
-/* Init the closure hooks.
+/* Init the driver hooks.
  */
 
 {
     int i;
 
-    for (i = NUM_CLOSURE_HOOKS; --i >= 0; )
+    for (i = NUM_DRIVER_HOOKS; --i >= 0; )
     {
-        put_number(closure_hook + i, 0);
+        put_number(driver_hook + i, 0);
     }
-} /* init_closure_hooks() */
-
-#ifdef USE_FREE_CLOSURE_HOOK
-/*-------------------------------------------------------------------------*/
-void
-free_closure_hooks (svalue_t *svp, int count)
-
-/* "Free" the <count> closures in <svp>[], ie. store them for later
- * deletion by the backend.
- *
- * This is used for closures which are held by the gamedriver, ie.
- * have only one reference like the hooks or the prompt, and may be
- * freed while they are executed.
- */
-
-{
-    svalue_t *new;
-
-    if (max_old_hooks < num_old_hooks + count)
-    {
-        int delta;
-
-        delta = (count > NUM_CLOSURE_HOOKS) ? count : NUM_CLOSURE_HOOKS;
-
-        if (old_hooks)
-            new = rexalloc(old_hooks
-                          , (max_old_hooks + delta) * sizeof(*new));
-        else
-            new = xalloc(delta * sizeof(*new));
-        if (!new)
-            return;
-        old_hooks = new;
-        max_old_hooks += delta;
-    }
-    memcpy(old_hooks + num_old_hooks, svp, count * sizeof(*svp));
-    num_old_hooks += count;
-} /* free_closure_hooks() */
-
-/*-------------------------------------------------------------------------*/
-void
-free_old_driver_hooks (void)
-
-/* Free all closures queued in <old_hooks>, and the <old_hooks> array itself.
- * This function is called from the backend and from the garbage collector.
- */
-
-{
-    int i;
-
-    if (!old_hooks)
-        return;
-
-    for (i = num_old_hooks; i--;)
-    {
-        free_svalue(&old_hooks[i]);
-    }
-
-    xfree(old_hooks);
-    old_hooks = NULL;
-    num_old_hooks = max_old_hooks = 0;
-} /* free_old_driver_hooks() */
-#endif
+} /* init_driver_hooks() */
 
 /*-------------------------------------------------------------------------*/
 Bool
@@ -3911,10 +3833,10 @@ f_set_driver_hook (svalue_t *sp)
     /* Get the arguments */
     n = sp[-1].u.number;
      
-    if (n < 0 || n >= NUM_CLOSURE_HOOKS)
+    if (n < 0 || n >= NUM_DRIVER_HOOKS)
     {
         error("Bad hook number: %ld, expected 0..%ld\n"
-             , n, (long)NUM_CLOSURE_HOOKS-1);
+             , n, (long)NUM_DRIVER_HOOKS-1);
         /* NOTREACHED */
         return sp;
     }
@@ -3926,14 +3848,14 @@ f_set_driver_hook (svalue_t *sp)
         return sp - 2;
     }
 
-    old = closure_hook[n]; /* Remember this for freeing */
+    old = driver_hook[n]; /* Remember this for freeing */
 
     /* Check the type of the hook and set it if ok
      */
     switch(sp->type)
     {
     case T_NUMBER:
-        put_number(closure_hook + n, 0);
+        put_number(driver_hook + n, 0);
         break;
 
     case T_STRING:
@@ -3947,7 +3869,7 @@ f_set_driver_hook (svalue_t *sp)
 
         if ( NULL != (str = make_tabled_from(sp->u.str)) )
         {
-            put_string(closure_hook + n, str);
+            put_string(driver_hook + n, str);
             if (n == H_NOECHO)
                 mudlib_telopts();
         }
@@ -3996,9 +3918,9 @@ f_set_driver_hook (svalue_t *sp)
         if (sp->x.closure_type == CLOSURE_UNBOUND_LAMBDA
          && sp->u.lambda->ref == 1)
         {
-            closure_hook[n] = *sp;
-            closure_hook[n].x.closure_type = CLOSURE_LAMBDA;
-            closure_hook[n].u.lambda->ob = ref_object(master_ob, "hook closure");
+            driver_hook[n] = *sp;
+            driver_hook[n].x.closure_type = CLOSURE_LAMBDA;
+            driver_hook[n].u.lambda->ob = ref_object(master_ob, "hook closure");
             break;
         }
         else if (!CLOSURE_IS_LFUN(sp->x.closure_type))
@@ -4017,17 +3939,12 @@ default_test:
             break; /* flow control hint */
         }
 
-        closure_hook[n] = *sp;
+        driver_hook[n] = *sp;
         break;
     }
 
-#ifdef USE_FREE_CLOSURE_HOOK
-    if (old.type != T_NUMBER)
-        free_closure_hooks(&old, 1); /* free it in the backend */
-#else
     if (old.type != T_NUMBER)
         free_svalue(&old);
-#endif
 
     return sp - 2;
 } /* f_set_driver_hook() */

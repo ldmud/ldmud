@@ -1584,6 +1584,8 @@ name_to_hook(char *name)
         return H_COMMAND;
     if ( !strcmp(name, "SEND_NOTIFY_FAIL") )
         return H_SEND_NOTIFY_FAIL;
+    if ( !strcmp(name, "DEFAULT_METHOD") )
+        return H_DEFAULT_METHOD;
     return -1;
 }
 
@@ -3137,7 +3139,7 @@ create_lang (void)
                 continue;
             }
             if MATCH("hookmap") {
-                handle_map(line_buffer+9, NUM_CLOSURE_HOOKS, name_to_hook);
+                handle_map(line_buffer+9, NUM_DRIVER_HOOKS, name_to_hook);
                 continue;
             }
             if MATCH("//") {

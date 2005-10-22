@@ -6876,6 +6876,7 @@ again:
      */
     if (instrs[instruction].min_arg != instrs[instruction].max_arg
      && instruction != F_CALL_OTHER
+     && instruction != F_CALL_DIRECT
        )
     {
         num_arg = GET_UINT8(pc);
@@ -12589,7 +12590,7 @@ again:
          *
          * <code> is an uint8 and indexes the function list *simul_efunp.
          * TODO: Add a F_SIMUL_EFUN for codes > 0xff; right now this
-         * TODO:: is compiled as CALL_OTHER. Affected are prolang.y and
+         * TODO:: is compiled as CALL_DIRECT. Affected are prolang.y and
          * TODO:: simul_efun.c
          */
 
@@ -12673,7 +12674,7 @@ again:
              * eval_instruction(), so we can get the result from the
              * stack.
              * We recurse because some simul_efuns are called with
-             * F_CALL_OTHER, and the functions should not be able
+             * F_CALL_DIRECT, and the functions should not be able
              * to see any difference.
              */
             program_t *prog;
@@ -13825,12 +13826,15 @@ again:
 
     /* --- Efuns: Functions and Closures --- */
 
+    CASE(F_CALL_DIRECT);            /* --- call_direct         --- */
     CASE(F_CALL_OTHER);             /* --- call_other          --- */
     {
-        /* EFUN call_other()
+        /* EFUN call_other(), call_direct()
          *
          *     unknown call_other(object|string ob, string str, mixed arg, ...)
          *     unknown ob->fun(mixed arg, ...)
+         *
+         *     unknown call_direct(object|string ob, string str, mixed arg, ...)
          *
          * Call a member function in another object with an argument. The
          * return value is returned from the other object.  The object can be
@@ -13846,12 +13850,17 @@ again:
          * If it is given by a string and the object does not exist yet, it will
          * be loaded.
          *
+         * The difference between call_other() and call_direct()
+         * is that the latter does not allow the evaluation of default
+         * methods.
+         *
          * TODO: A VOID_CALL_OTHER would be nice to have when the result
          * TODO:: is not used.
          */
 
         svalue_t *arg;
         object_t *ob;
+        Bool      b_use_default;
 
         num_arg = sp - ap + 1;
         inter_pc = pc;
@@ -13897,6 +13906,9 @@ again:
                            , get_txt(arg[0].u.str)));
             }
 
+            b_use_default =    (instruction != F_CALL_DIRECT)
+                            && (ob != master_ob);
+
             /* Traceing, if necessary */
             if (TRACEP(TRACE_CALL_OTHER) && TRACE_IS_INTERACTIVE())
             {
@@ -13909,10 +13921,14 @@ again:
 
             /* Call the function with the remaining args on the stack.
              */
-            if (!int_apply(arg[1].u.str, ob, num_arg-2, MY_FALSE, MY_TRUE))
+            if (!int_apply(arg[1].u.str, ob, num_arg-2, MY_FALSE, b_use_default))
             {
                 /* Function not found */
-                pop_n_elems(num_arg);
+                if (b_use_default) /* int_apply() removed the args */
+                    sp -= num_arg-2;
+                else
+                    pop_n_elems(num_arg-2);
+                pop_n_elems(2);
                 push_number(sp, 0);
                 break;
             }
@@ -14001,6 +14017,9 @@ again:
                     continue;
                 }
 
+                b_use_default =    (instruction != F_CALL_DIRECT)
+                                && (ob != master_ob);
+
                 /* Traceing, if necessary */
                 if (TRACEP(TRACE_CALL_OTHER) && TRACE_IS_INTERACTIVE())
                 {
@@ -14023,10 +14042,13 @@ again:
                 inter_sp = sp; /* was clobbered by the previous loop */
                 if (!int_apply(arg[1].u.str, ob, num_arg-2, MY_FALSE, MY_TRUE))
                 {
-                    /* Function not found: clean up the stack and
-                     * assign 0 as result.
+                    /* Function not found, Assign 0 as result.
                      */
-                    pop_n_elems(num_arg-2);
+                    if (b_use_default) /* int_apply() removed the args */
+                        sp -= num_arg-2;
+                    else
+                        pop_n_elems(num_arg-2);
+                    sp -= num_arg-2;
                     free_svalue(svp);
                     put_number(svp, 0);
                 }
@@ -14553,7 +14575,9 @@ int_apply (string_t *fun, object_t *ob, int num_arg
  *
  * Results:
  *   APPLY_NOT_FOUND (0): The function was not found (and neither a default
- *       lfun, if allowed) and the arguments must be removed by the caller.
+ *       lfun, if allowed). If <b_use_default> was TRUE, the arguments
+ *       have already been removed, otherwise the arguments must be
+ *       removed by the caller.
  *       One eason for failure can be an attempt to call an inherited
  *       function '::foo' with this function.
  *
@@ -14570,10 +14594,94 @@ int_apply (string_t *fun, object_t *ob, int num_arg
  */
 
 {
-    if (apply_low(fun, ob, num_arg, b_ign_prot)) return APPLY_FOUND;
+    if (apply_low(fun, ob, num_arg, b_ign_prot))
+        return APPLY_FOUND;
+
     if (b_use_default)
     {
-        /* TODO: Add the default call here, return APPLY_DEFAULT_FOUND on success */
+        /* Check if there is a hook */
+        svalue_t * hook = driver_hook + H_DEFAULT_METHOD;
+
+        if (hook->type == T_STRING || hook->type == T_CLOSURE)
+        {
+            /* We got a default method hook.
+             * Now we have to rearrange the stack contents to
+             * make space for three more values.
+             */
+            svalue_t result;
+            svalue_t * argp;
+            int num_extra = (hook->type == T_STRING) ? 2 : 3;
+            int i, rc;
+
+            result = const0;
+
+            argp = inter_sp - num_arg + 1;
+            for (i = 0; i < num_arg; i++)
+                inter_sp[-i+num_extra] = inter_sp[i];
+            inter_sp += num_extra;
+
+            /* Add the three new arguments: &result, ob, fun
+             * to the arguments on the stack.
+             */
+            argp[0].type = T_LVALUE;
+            argp[0].u.lvalue = &result;
+            if (hook->type == T_CLOSURE)
+            {
+                put_ref_object(argp+1, ob, "int_apply");
+                put_ref_string(argp+2, fun);
+            }
+            else
+                put_ref_string(argp+1, fun);
+
+            /* Call the function */
+            if (hook->type == T_STRING)
+            {
+                rc = apply_low(hook->u.str, ob, num_arg+num_extra, b_ign_prot);
+            }
+            else /* hook->type == T_CLOSURE */
+            {
+                call_lambda(hook, num_arg+num_extra);
+                rc = 1; /* This call obviousy succeeds */
+            }
+
+            /* Evaluate the result and clean up the stack */
+            if (!rc)
+            {
+                /* Can happen only for T_STRING hooks: Function not found, 
+                 * but caller expects a clean stack.
+                 */
+                inter_sp = _pop_n_elems(num_arg+num_extra, inter_sp);
+                rc = APPLY_NOT_FOUND;
+            }
+            else if (inter_sp->type == T_NUMBER
+             && inter_sp->u.number == 0)
+            {
+                /* Default method found, but it denied executing the call.
+                 */
+                inter_sp--;
+                free_svalue(&result);
+                rc = APPLY_NOT_FOUND;
+            }
+            else
+            {
+                /* Default method found and executed.
+                 * Copy the result onto the stack.
+                 */
+                transfer_svalue(inter_sp, &result);
+                rc = APPLY_DEFAULT_FOUND;
+            }
+
+            /* rc is now the return value from int_apply(), and
+             * the result, if any, is on the stack.
+             */
+
+            return rc;
+        } /* if (hook is STRING or CLOSURE) */
+
+        /* If we come here, there was no suitable default hook to
+         * call - remove the arguments.
+         */
+        inter_sp = _pop_n_elems(num_arg, inter_sp);
     }
     return APPLY_NOT_FOUND;
 } /* int_apply() */
@@ -14649,7 +14757,8 @@ sapply_int (string_t *fun, object_t *ob, int num_arg
     /* Do the call */
     if (!int_apply(fun, ob, num_arg, b_find_static, b_use_default))
     {
-        inter_sp = _pop_n_elems(num_arg, inter_sp);
+        if (!b_use_default) /* int_apply() did not clean up the stack */
+            inter_sp = _pop_n_elems(num_arg, inter_sp);
         return NULL;
     }
     transfer_svalue(&apply_return_value, inter_sp);
@@ -15083,21 +15192,12 @@ assert_master_ob_loaded (void)
             current_object = &dummy_current_object_for_loads;
         }
 
-#ifdef USE_FREE_CLOSURE_HOOK
-        /* don't free the closure hooks now since they might be
-         * still in use - the backend will take care of them.
+        /* Free the driver hooks.
          */
-        free_closure_hooks(closure_hook, NUM_CLOSURE_HOOKS);
-        for (i = NUM_CLOSURE_HOOKS; i--;)
-            closure_hook[i] = const0;
-#else
-        /* Free the closure hooks.
-         */
-        for (i = NUM_CLOSURE_HOOKS; i--;)
+        for (i = NUM_DRIVER_HOOKS; i--;)
         {
-            assign_svalue(closure_hook+i, &const0);
+            assign_svalue(driver_hook+i, &const0);
         }
-#endif
 
         init_telopts();
 
@@ -17406,7 +17506,7 @@ check_a_lot_ref_counts (program_t *search_prog)
     count_extra_ref_in_vector(&indexing_quickfix, 1);
     count_extra_ref_in_vector(&last_indexing_protector, 1);
     null_vector.extra_ref++;
-    count_extra_ref_in_vector(closure_hook, NUM_CLOSURE_HOOKS);
+    count_extra_ref_in_vector(driver_hook, NUM_DRIVER_HOOKS);
 
     /* Done with the counting */
     free_pointer_table(ptable);
@@ -17664,22 +17764,29 @@ f_funcall (svalue_t *sp, int num_arg)
 } /* f_funcall() */
 
 /*-------------------------------------------------------------------------*/
-svalue_t *
-f_call_resolved (svalue_t *sp, int num_arg)
+static svalue_t *
+int_call_resolved (Bool b_use_default, svalue_t *sp, int num_arg)
 
-/* EFUN call_resolved()
+/* EFUN call_resolved(), call_direct_resolved()
  *
  *   int call_resolved(mixed & result, object ob, string func, ...)
+ *   int call_direct_resolved(mixed & result, object ob, string func, ...)
  *
- * Similar to call_other(). If ob->func() is defined and publicly
+ * Similar to call_other(_direct)(). If ob->func() is defined and publicly
  * accessible, any of the optional extra arguments are passed to
  * ob->func(...). The result of that function call is stored in
  * result, which must be passed by reference.
  *
  * If the current object is already destructed, or the ob does not
  * exist, or ob does not define a public accessible function named
- * func, call_resolved() returns 0 as failure code, else 1 for
+ * func, call_direct_resolved() returns 0 as failure code, else 1 for
  * success.
+ *
+ * If the current object is already destructed, or the ob does not
+ * exist, or ob does not define a public accessible function named
+ * func and no default method is available, call_resolved() returns 0.
+ * If the call succeeded, the efun returns 1; if the call succeeded
+ * through a default method, the efun returns -1.
  *
  * ob can also be a file_name. If a string is passed for ob, and
  * no object with that name does exist, an error occurs.
@@ -17730,11 +17837,17 @@ f_call_resolved (svalue_t *sp, int num_arg)
 
     /* Send the remaining arguments to the function.
      */
-    rc = int_apply(arg[2].u.str, ob, num_arg-3, MY_FALSE, MY_TRUE);
+    if (ob == master_ob)
+        b_use_default = MY_FALSE;
+    rc = int_apply(arg[2].u.str, ob, num_arg-3, MY_FALSE, b_use_default);
     if (rc == APPLY_NOT_FOUND)
     {
         /* Function not found */
-        sp = _pop_n_elems(num_arg-1, sp);
+        if (b_use_default)
+            sp -= num_arg-3;
+        else
+            sp = _pop_n_elems(num_arg-3, sp);
+        sp = _pop_n_elems(2, sp);
         free_svalue(sp);
         put_number(sp, 0);
         return sp;
@@ -17752,6 +17865,32 @@ f_call_resolved (svalue_t *sp, int num_arg)
 
     return sp;
 } /* f_call_resolved() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_call_resolved (svalue_t *sp, int num_arg)
+
+/* EFUN call_resolved()
+ *
+ * This is just a wrapper around the real implementation.
+ */
+
+{
+    return int_call_resolved(MY_TRUE, sp, num_arg);
+} /* f_call_resolved() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_call_direct_resolved (svalue_t *sp, int num_arg)
+
+/* EFUN call_direct_resolved()
+ *
+ * This is just a wrapper around the real implementation.
+ */
+
+{
+    return int_call_resolved(MY_FALSE, sp, num_arg);
+} /* f_call_direct_resolved() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *

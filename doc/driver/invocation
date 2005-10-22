@@ -83,10 +83,15 @@ DESCRIPTION
         and other objects.
 
       --erq <filename>
+      --erq "<filename> <erq args>"
         Use <filename> instead of 'erq' as the basename of the ERQ executable.
         If the name starts with a '/', it is take to be an absolute pathname,
         otherwise it is interpreted relative to <bindir>. If not specified,
         'erq' is used as the executable name.
+
+        By enclosing the argument value in quotes, it is possible to pass
+        arguments (e.g. --execdir) to the erq. These arguments however must
+        not contain embedded spaces.
 
       -N|--no-erq
         Don't start the erq demon (if it would be started at all).

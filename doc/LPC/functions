@@ -71,6 +71,9 @@ DESCRIPTION
            ob->fun(a, b, c)
            call_other(ob, "fun", a, b, c)
 
+        Note: See the entry H_DEFAULT_METHOD in hooks(C) for a modification
+        of this behaviour.
+
         Functions in the same object are called just by writing their name,
         followed by the arguments in parenthesis:
 

@@ -2823,11 +2823,11 @@ new_player (SOCKET_T new_socket, struct sockaddr_in *addr, size_t addrlen
     if (i >= MAX_PLAYERS)
     {
         /* calling closures here would need special error handling */
-        if (closure_hook[H_NO_IPC_SLOT].type == T_STRING)
+        if (driver_hook[H_NO_IPC_SLOT].type == T_STRING)
         {
             string_t *msg;
 
-            msg = closure_hook[H_NO_IPC_SLOT].u.str;
+            msg = driver_hook[H_NO_IPC_SLOT].u.str;
             socket_write(new_socket, get_txt(msg), mstrsize(msg));
         }
         else
@@ -2999,24 +2999,24 @@ set_noecho (interactive_t *ip, char noecho)
     if ((confirm ^ old) & (NOECHO_MASK|CHARMODE_MASK) )
     {
         ob = ip->ob;
-        if (closure_hook[H_NOECHO].type == T_STRING)
+        if (driver_hook[H_NOECHO].type == T_STRING)
         {
             DTN(("set_noecho():   calling H_NOECHO\n"));
             push_number(inter_sp, noecho);
             push_ref_object(inter_sp, ob, "set_no_echo");
-            secure_apply(closure_hook[H_NOECHO].u.str, ob, 2);
+            secure_apply(driver_hook[H_NOECHO].u.str, ob, 2);
         }
-        else if (closure_hook[H_NOECHO].type == T_CLOSURE)
+        else if (driver_hook[H_NOECHO].type == T_CLOSURE)
         {
             DTN(("set_noecho():   calling H_NOECHO\n"));
-            if (closure_hook[H_NOECHO].x.closure_type == CLOSURE_LAMBDA)
+            if (driver_hook[H_NOECHO].x.closure_type == CLOSURE_LAMBDA)
             {
-                free_object(closure_hook[H_NOECHO].u.lambda->ob, "set_noecho");
-                closure_hook[H_NOECHO].u.lambda->ob = ref_object(ob, "set_noecho");
+                free_object(driver_hook[H_NOECHO].u.lambda->ob, "set_noecho");
+                driver_hook[H_NOECHO].u.lambda->ob = ref_object(ob, "set_noecho");
             }
             push_number(inter_sp, noecho);
             push_ref_object(inter_sp, ob, "set_no_echo");
-            secure_call_lambda(&closure_hook[H_NOECHO], 2);
+            secure_call_lambda(&driver_hook[H_NOECHO], 2);
         }
         else
         {
@@ -3829,19 +3829,19 @@ h_telnet_neg (int n)
 
     RESET_LIMITS;
     CLEAR_EVAL_COST;
-    if (closure_hook[H_TELNET_NEG].type == T_STRING)
+    if (driver_hook[H_TELNET_NEG].type == T_STRING)
     {
         svp =
-          secure_apply(closure_hook[H_TELNET_NEG].u.str, command_giver, n);
+          secure_apply(driver_hook[H_TELNET_NEG].u.str, command_giver, n);
     }
-    else if (closure_hook[H_TELNET_NEG].type == T_CLOSURE)
+    else if (driver_hook[H_TELNET_NEG].type == T_CLOSURE)
     {
-        if (closure_hook[H_TELNET_NEG].x.closure_type == CLOSURE_LAMBDA)
+        if (driver_hook[H_TELNET_NEG].x.closure_type == CLOSURE_LAMBDA)
         {
-            free_object(closure_hook[H_TELNET_NEG].u.lambda->ob, "h_telnet_neg");
-            closure_hook[H_TELNET_NEG].u.lambda->ob = ref_object(command_giver, "h_telnet_neg");
+            free_object(driver_hook[H_TELNET_NEG].u.lambda->ob, "h_telnet_neg");
+            driver_hook[H_TELNET_NEG].u.lambda->ob = ref_object(command_giver, "h_telnet_neg");
         }
-        svp = secure_call_lambda(&closure_hook[H_TELNET_NEG], n);
+        svp = secure_call_lambda(&driver_hook[H_TELNET_NEG], n);
     }
     else
     {
@@ -4535,7 +4535,10 @@ start_erq_demon (const char *suffix, size_t suffixlen)
         if (strlen(erq_file) + 1 + suffixlen <= sizeof path)
         {
             sprintf(path, "%s%.*s", erq_file, (int)suffixlen, suffix);
-            execl((char *)path, "erq", "--forked", 0);
+            if (erq_args)
+                execv((char *)path, erq_args);
+            else
+                execl((char *)path, "erq", "--forked", 0);
         }
         write(1, "0", 1);  /* indicate failure back to the driver */
         printf("%s exec of erq demon failed.\n", time_stamp());
@@ -4624,8 +4627,8 @@ stop_erq_demon (Bool notify)
     {
         RESET_LIMITS;
         CLEAR_EVAL_COST;
-        if (closure_hook[H_ERQ_STOP].type == T_CLOSURE) {
-            secure_call_lambda(&closure_hook[H_ERQ_STOP], 0);
+        if (driver_hook[H_ERQ_STOP].type == T_CLOSURE) {
+            secure_call_lambda(&driver_hook[H_ERQ_STOP], 0);
         }
     }
 } /* stop_erq_demon() */
@@ -6396,16 +6399,6 @@ f_set_prompt (svalue_t *sp)
         sp[1] = *prompt;
         *prompt = *sp;
         *sp = sp[1];
-#ifdef USE_FREE_CLOSURE_HOOK
-        if (sp->type == T_CLOSURE)
-        {
-            /* In case the prompt is changed from within the prompt
-             * closure.
-             */
-            addref_closure(sp, "unset_prompt");
-            free_closure_hooks(sp, 1);
-        }
-#endif
     }
     else /* It's a number */
     {

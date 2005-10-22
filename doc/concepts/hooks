@@ -165,6 +165,43 @@ DESCRIPTION
           returns 0, no further attempt to clean up this object will be done.
 
 
+        H_DEFAULT_METHOD
+          Optional hook to provide default implementation for unresolved
+          calls. Hook setting can be any closure, or the name of the function
+          to call in the object.
+
+          This hook is called whenever a call_other(), call_resolved() or
+          call_out() on named function (as opposed to a closure) couldn't
+          be resolved. The hook has then the opportunity to provide
+          a default implementation.
+
+          Except from this behaviour are calls to the master object, to
+          simul-efuns, and calls done with call_direct() and
+          call_direct_resolved().
+
+          If the hook is the name of an lfun, it is called in the target
+          object as:
+
+            int <name>(mixed & result, string fun, varargs args)
+
+          with <fun> being the name of the called function, <args> the
+          arguments passed in the call (if any), and <result> the
+          reference to a variable for the result.
+
+          If the hook is a closure, it is called as:
+
+            int <closure>(mixed & result, object ob, string fun, varargs args)
+
+          with <ob> being the target object, and the other arguments
+          as before.
+          
+          If the hook can resolve the call, it has to return the call result
+          in <result> and 1 as function result.
+
+          If the hook can not (or doesn't want to) resolve the call, it has
+          to return 0.
+
+
         H_COMMAND
           Optional hook to parse and execute commands. If this hook is used,
           it bypasses the normal command parsing done by the driver (including
@@ -434,6 +471,7 @@ HISTORY
             were introduced in 3.2.1@85.
         H_COMMAND was introduced in 3.2.7.
         H_SEND_NOTIFY_FAIL was introduced in 3.2.9.
+        H_DEFAULT_METHOD was introduced in 3.3.113.
 
 SEE ALSO
         native(C), set_driver_hook(E)

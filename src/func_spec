@@ -254,6 +254,10 @@ int     sizeof(null|string|mixed|mixed *|mapping);
         /* Functions and Closures */
 
 unknown call_other(object|string|object *|string *, string, ...);
+unknown call_direct(object|string|object *|string *, string, ...);
+          /* The lexer switches the return type between 'unknown'
+           * and 'any' depending on the _types pragmas.
+           */
 int     extern_call();
 
         /* Objects */
@@ -407,6 +411,7 @@ int     remove_call_out(string|closure);
 object *caller_stack(int default: F_CONST0);
 int     caller_stack_depth();
 int     call_resolved(mixed &, null|object|string, string, ...);
+int     call_direct_resolved(mixed &, null|object|string, string, ...);
 object  previous_object(int);
 
 mixed  *heart_beat_info();

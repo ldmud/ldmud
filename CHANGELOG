@@ -1,6 +1,20 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+12-Oct-2001 (Lars Duening)  (3.3.113)
+    - (sprintf.c) Improved the flushing algorithm: spaces are more
+        evenly distributed, newlines in columns didn't work properly
+        (reported by Slava).
+    - (make_func, func_spec, interpret, simulate, lex) Implemented
+        the optional H_DEFAULT_METHOD driver hook to implement
+        default methods for unresolved calls.
+    - (lots of files) Renamed closure_hook[] to the more sensical
+        driver_hook[]. And got rid of USE_FREE_CLOSURE_HOOK.
+    - (erq, xerq) Erq now accepts an '--execdir' argument to override
+        the default ERQ_DIR setting (suggested by Freaky).
+    - (main, comm.c) It is now possible to pass simple arguments to the
+        erq with the --erq commandline option (suggested by Freaky).
+
 11-Oct-2001 (Lars Duening)  (3.3.112)
     - (sprintf.c) New formatting modifier '$' allows flush formatting
         of strings and columns of strings (f-010717).

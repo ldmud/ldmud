@@ -108,6 +108,8 @@ int udp_port = UDP_PORT;
 
 char *erq_file = NULL;        /* Base- or pathname of the erq executable,
                                * or NULL */
+char **erq_args = NULL;       /* Optional arguments of the erq executable,
+                                 or NULL */
 
 char *mud_lib;                /* Path to the mudlib */
 char master_name[100] = "";   /* Name of the master object */
@@ -261,7 +263,7 @@ main (int argc, char **argv)
     if (numports < 1) /* then use the default port */
         numports = 1;
 
-    init_closure_hooks();
+    init_driver_hooks();
     reserve_memory();
     init_otable();
     for (i = 0; i < (int)(sizeof consts / sizeof consts[0]); i++)
@@ -361,7 +363,7 @@ main (int argc, char **argv)
 
     if (!no_erq_demon)
         start_erq_demon("", 0);
-#endif
+#endif /* ERQ_DEMON */
     initialize_host_ip_number();
 
     (void)signal(SIGFPE, SIG_IGN);
@@ -1327,7 +1329,7 @@ shortusage (void)
 "  -d|--debug\n"
 "  -c|--list-compiles\n"
 "  -e|--no-preload\n"
-"  --erq <filename>\n"
+"  --erq <filename> | --erq \"<filename> <erq args>\"\n"
 "  -N|--no-erq\n"
 "  -t|--no-heart\n"
 "  -f|--funcall <word>\n"
@@ -1433,10 +1435,13 @@ usage (void)
 "    and other objects.\n"
 "\n"
 "  --erq <filename>\n"
+"  --erq \"<filename> <erq arguments>\"\n"
 "    Use <filename> instead of 'erq' as the name of the ERQ executable.\n"
 "    If the name starts with a '/', it is take to be an absolute pathname,\n"
 "    otherwise it is interpreted relative to " BINDIR ".\n"
 "    If not specified, 'erq' is used as executable name.\n"
+"    With the proper use of quotes it is legal to pass arbitrary arguments\n"
+"    to the erq, however, these may not contain spaces themselves.\n"
 "\n"
 "  -N|--no-erq\n"
 "    Don't start the erq demon (if it would be started at all).\n"
@@ -1491,7 +1496,7 @@ usage (void)
 "    Reuse free space in the swap file immediately.\n"
 "\n"
 "  --max-malloc <size>\n"
-"    Restrict total memory allocations to <size> bytes. A <size> of 0"
+"    Restrict total memory allocations to <size> bytes. A <size> of 0\n"
 "    or 'unlimited' removes any restriction.\n"
 "\n"
 "  --min-malloc <size>\n"
@@ -1642,10 +1647,66 @@ eval_arg (int eOption, const char * pValue)
         break;
 
     case cErq:
+      {
+        char * begin_arg;
+
         if (erq_file != NULL)
             free(erq_file);
+        if (erq_args != NULL)
+        {
+            free(erq_args);
+            erq_args = NULL;
+        }
         erq_file = strdup(pValue);
+        begin_arg = strchr(erq_file, ' ');
+        if (begin_arg)
+        {
+            /* Split the string into command and arguments */
+
+            int num_args;
+            char * cp;
+
+            /* Skip leading spaces */
+            *begin_arg++ = '\0';
+            while (*begin_arg == ' ') cp++;
+
+            /* Count the arguments */
+            for (num_args = 0, cp = begin_arg; *cp != '\0'; )
+            {
+                /* Found an argument: skip it */
+                num_args++;
+                while (*cp != ' ' && *cp != '\0') cp++;
+
+                /* Skip trailing spaces */
+                while (*cp == ' ') cp++;
+            }
+
+            if (num_args != 0);
+            {
+                /* There are arguments!
+                 * Put them into the argument array.
+                 */
+                erq_args = malloc(sizeof(*erq_args) * (num_args+3));
+                erq_args[0] = "erq";
+                erq_args[1] = "--forked";
+                erq_args[num_args+2] = NULL;
+
+                for (num_args = 2, cp = begin_arg; *cp != '\0'; )
+                {
+                    /* Found an argument: store and skip it */
+                    erq_args[num_args++] = cp;
+                    while (*cp != ' ' && *cp != '\0') cp++;
+
+                    /* Ensure termination */
+                    *cp++ = '\0';
+
+                    /* Skip trailing spaces */
+                    while (*cp == ' ') cp++;
+                }
+            }
+        }
         break;
+      }
 
     case cNoERQ:
         no_erq_demon++;

@@ -16,11 +16,18 @@ DESCRIPTION
         ERQ_DEMON defined (in config.h).
 
         When the driver starts up, it tries to fork off the program
-        'BINDIR/erq --forked' (with BINDIR defined in the Makefile).
-        If this succeeds, the erq may talk with the driver through
-        stdin and stdout (piped through AF_UNIX sockets). The erq has
-        to signal its successfull start by writing the character '1'
-        back to the driver.
+        'BINDIR/erq --forked <other args>' (with BINDIR defined in
+        the Makefile). If this succeeds, the erq may talk with
+        the driver through stdin and stdout (piped through AF_UNIX
+        sockets). The erq has to signal its successfull start by
+        writing the character '1' back to the driver.
+
+        The erq has to understand these commandline arguments:
+
+          --forked: explained above
+          --execdir <dir>: The directory where the callable executables
+                    can be found. If not specified, ERQ_DIR is used.
+                    <dir> must not end in a '/' and should be absolute.
 
         At runtime, the erq may be changed/removed from within the
         mudlib using the efun attach_erq_demon(). This efun is given
@@ -536,6 +543,7 @@ HISTORY
         ERQ_SEND, ERQ_SPAWN, ERQ_KILL were introduced with 3.2.1@82.
         ERQ_OPEN_UDP, ERQ_OPEN_TCP, ERQ_LIST were introduced with 3.2.1@98.
         ERQ_RLOOKUPV6 was introduced in 3.2.8.
+        LDMud 3.2.9 added the '--execdir' argument to erq.
 
 SEE ALSO
         attach_erq_demon(E), send_erq(E), stale_erq(M), rfc 931

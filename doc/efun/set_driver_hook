@@ -30,6 +30,10 @@ DESCRIPTION
             closure), function name.
           Optional hooks for creation/reset/clean up-actions.
 
+        H_DEFAULT_METHOD
+          arg: lambda closure, lfun closure, function name.
+          Optional hook for default method implementation.
+
         H_MODIFY_COMMAND
           arg: lambda closure, lfun closure, function name, mapping
           Optional hook for modifying player commands before the

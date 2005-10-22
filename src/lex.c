@@ -1657,7 +1657,7 @@ inc_open (char *buf, char *name, mp_int namelen, char delim)
 
     /* Handle a '<'-include. */
 
-    if (closure_hook[H_INCLUDE_DIRS].type == T_POINTER)
+    if (driver_hook[H_INCLUDE_DIRS].type == T_POINTER)
     {
         char * cp;
 
@@ -1696,7 +1696,7 @@ inc_open (char *buf, char *name, mp_int namelen, char delim)
 
         /* If we come here, the include file was not found */
     }
-    else if (closure_hook[H_INCLUDE_DIRS].type == T_CLOSURE)
+    else if (driver_hook[H_INCLUDE_DIRS].type == T_CLOSURE)
     {
         /* H_INCLUDE_DIRS is a function generating the full
          * include file name.
@@ -1707,12 +1707,12 @@ inc_open (char *buf, char *name, mp_int namelen, char delim)
         /* Setup and call the closure */
         push_c_string(inter_sp, name);
         push_c_string(inter_sp, current_file);
-        if (closure_hook[H_INCLUDE_DIRS].x.closure_type == CLOSURE_LAMBDA)
+        if (driver_hook[H_INCLUDE_DIRS].x.closure_type == CLOSURE_LAMBDA)
         {
-            free_object(closure_hook[H_INCLUDE_DIRS].u.lambda->ob, "inc_open");
-            closure_hook[H_INCLUDE_DIRS].u.lambda->ob = ref_object(current_object, "inc_open");
+            free_object(driver_hook[H_INCLUDE_DIRS].u.lambda->ob, "inc_open");
+            driver_hook[H_INCLUDE_DIRS].u.lambda->ob = ref_object(current_object, "inc_open");
         }
-        svp = secure_call_lambda(&closure_hook[H_INCLUDE_DIRS], 2);
+        svp = secure_call_lambda(&driver_hook[H_INCLUDE_DIRS], 2);
 
         /* The result must be legal relative pathname */
 
@@ -1976,6 +1976,7 @@ handle_include (char *name)
         /* Initialise the rest of the lexer state */
         pragma_strict_types = PRAGMA_WEAK_TYPES;
         instrs[F_CALL_OTHER].ret_type = TYPE_ANY;
+        instrs[F_CALL_DIRECT].ret_type = TYPE_ANY;
         current_line = 0;
         linebufend   = outp - 1; /* allow trailing zero */
         linebufstart = linebufend - MAXLINE;
@@ -2192,18 +2193,21 @@ handle_pragma (char *str)
         {
             pragma_strict_types = PRAGMA_STRICT_TYPES;
             instrs[F_CALL_OTHER].ret_type = TYPE_UNKNOWN;
+            instrs[F_CALL_DIRECT].ret_type = TYPE_UNKNOWN;
             validPragma = MY_TRUE;
         }
         else if (strncmp(base, "strong_types", namelen) == 0)
         {
             pragma_strict_types = PRAGMA_STRONG_TYPES;
             instrs[F_CALL_OTHER].ret_type = TYPE_ANY;
+            instrs[F_CALL_DIRECT].ret_type = TYPE_ANY;
             validPragma = MY_TRUE;
         }
         else if (strncmp(base, "weak_types", namelen) == 0)
         {
             pragma_strict_types = PRAGMA_WEAK_TYPES;
             instrs[F_CALL_OTHER].ret_type = TYPE_ANY;
+            instrs[F_CALL_DIRECT].ret_type = TYPE_ANY;
             validPragma = MY_TRUE;
         }
         else if (strncmp(base, "save_types", namelen) == 0)
@@ -2787,6 +2791,8 @@ yylex1 (void)
                 current_line = p->line + 1;
                 pragma_strict_types = p->pragma_strict_types;
                 instrs[F_CALL_OTHER].ret_type =
+                    call_other_return_types[pragma_strict_types];
+                instrs[F_CALL_DIRECT].ret_type =
                     call_other_return_types[pragma_strict_types];
                 yyin_des = p->yyin_des;
                 saved_char = p->saved_char;
@@ -4421,6 +4427,7 @@ start_new_file (int fd)
 
     pragma_strict_types = PRAGMA_WEAK_TYPES;
     instrs[F_CALL_OTHER].ret_type = TYPE_ANY;
+    instrs[F_CALL_DIRECT].ret_type = TYPE_ANY;
     pragma_use_local_scopes = MY_TRUE;
     pragma_save_types = MY_FALSE;
     pragma_verbose_errors = MY_FALSE;

@@ -1134,9 +1134,10 @@ add_flush ( fmt_state_t *st
 {
     int i;
     size_t sppos;
-    int num_words;   /* Number of words in the input */
-    int num_chars;   /* Number of non-space characters in the input */
-    int num_spaces;  /* Number of spaces required */
+    int num_words;    /* Number of words in the input */
+    int num_chars;    /* Number of non-space characters in the input */
+    int num_spaces;   /* Number of spaces required */
+    int min_spaces;   /* Min number of pad spaces */
     size_t pos;
 
     /* Check how much data we have */
@@ -1147,7 +1148,7 @@ add_flush ( fmt_state_t *st
     /* Find the first non-space character.
      * If it's all spaces, return.
      */
-    for (pos = 0; pos < len && *str == ' '; pos++, str--) NOOP;
+    for (pos = 0; pos < len && *str == ' '; pos++, str++) NOOP;
     if (pos >= len)
         return;
 
@@ -1181,6 +1182,8 @@ add_flush ( fmt_state_t *st
      * at least one space between each word.
      */
     num_spaces = fs - num_chars;
+    min_spaces = num_spaces / (num_words-1);
+      /* min_spaces * (num_words-1) <= num_spaces < min_spaces * num_words */
 
     /* Loop again over the data, now adding spaces as we go. */
 
@@ -1200,12 +1203,18 @@ add_flush ( fmt_state_t *st
             break;
 
         /* There is a word following - add spaces */
-        if (num_spaces == num_words) /* Exactly one space per word avail. */
-            padlength = 1;
-        else if (num_words == 1) /* Last word: add all remaining padding */
+        if (num_words == 1) /* Last word: add all remaining padding */
             padlength = (int)num_spaces;
-        else /* Determine random amound of padding, up to 2 * avg padding */
-            padlength = 1 + (int)random_number(2 * (num_spaces - num_words) / num_words + 1);
+        else if (num_spaces < min_spaces * num_words) /* Space underrun */
+            padlength = 1;
+        else if (num_spaces == min_spaces * num_words)
+            /* Exactly the min. padlength per word avail. */
+            padlength = min_spaces;
+        else if (num_spaces >= min_spaces * num_words + 2)
+            /* Force an extra space */
+            padlength = min_spaces+1;
+        else /* Randomly add one space */
+            padlength = min_spaces + (int)random_number(2);
         sppos = st->bpos;
         ADD_PADDING(" ", padlength);
         st->sppos = sppos;
@@ -1241,7 +1250,9 @@ add_justified ( fmt_state_t *st
 
     switch(finfo & INFO_J)
     {
+    case INFO_J_FLUSH:
     case INFO_J_LEFT:
+        /* Also called for the last line of a flush block */
         ADD_STRN(str, len)
         if (is_space_pad)
             sppos = st->bpos;
@@ -1267,10 +1278,8 @@ add_justified ( fmt_state_t *st
             st->sppos = sppos;
         break;
 
-    case INFO_J_FLUSH:
     default:
       { /* std (s)printf defaults to right justification.
-         * Also called for the last line of a flush block
          */
         if (finfo & INFO_PS_ZERO)
         {
@@ -1340,11 +1349,15 @@ add_column (fmt_state_t *st, cst **column)
      */
     if ((COL->info & INFO_J) == INFO_J_FLUSH
      && *COL_D && *(COL_D+1)
-     && *p != '\n'
+     && *p != '\n' && *p != '\0'
        )
+    {
         add_flush(st, COL_D, p - COL_D, COL->size);
+    }
     else
+    {
         add_justified(st, COL_D, p - COL_D, COL->pad, COL->size, COL->info);
+    }
 
     COL_D += done; /* inc'ed below ... */
 

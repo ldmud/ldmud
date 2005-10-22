@@ -268,6 +268,9 @@ static char buf[ERQ_BUFSIZE];
   /* The receive buffer.
    */
 
+static const char * erq_dir = ERQ_DIR;
+  /* The filename of the directory with the ERQ executables. */
+
 /*-------------------------------------------------------------------------*/
 /* Forward declarations */
 
@@ -502,13 +505,13 @@ execute (char *buf, long buflen, char *status, int *sockets)
         return 0;
     }
 
-    if (strlen(ERQ_DIR) + strlen(p) + 2 > sizeof(path))
+    if (strlen(erq_dir) + strlen(p) + 2 > sizeof(path))
     {
         status[0] = ERQ_E_PATHLEN;
         return 0;
     }
 
-    sprintf(path, "%s/%s", ERQ_DIR, p);
+    sprintf(path, "%s/%s", erq_dir, p);
     if (sockets)
     {
         if(socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) < 0)
@@ -1425,15 +1428,43 @@ main (int argc, char **argv)
     child_t *child, *next_child;
     union ticket_u ticket;
 
-    /* Check if we have been forked off the driver */
-    if (argc > 1 && !strcmp(argv[1], "--forked"))
+    /* Quick and dirty commandline parser */
     {
-        write1("1", 1); /* indicate sucessful fork/execl */
-    }
-    else
-    {
-        fprintf(stderr, "%s dynamic attachement unimplemented\n", time_stamp());
-        goto die;
+        int is_forked = 0;
+        int i;
+
+        for (i = 1; i < argc; i++)
+        {
+            if (!strcmp(argv[i], "--forked"))
+                is_forked = 1;
+            else if (!strcmp(argv[i], "--execdir"))
+            {
+                if (i+1 >= argc)
+                {
+                    fprintf(stderr, "%s Missing value for --execdir.\n"
+                                  , time_stamp());
+                    goto die;
+                }
+                erq_dir = argv[i+1];
+                i++;
+            }
+            else
+            {
+                fprintf(stderr, "%s Unknown argument '%s'.\n"
+                              , time_stamp(), argv[i]);
+                goto die;
+            }
+        }
+        /* Check if we have been forked off the driver */
+        if (is_forked)
+        {
+            write1("1", 1); /* indicate sucessful fork/execl */
+        }
+        else
+        {
+            fprintf(stderr, "%s dynamic attachement unimplemented\n", time_stamp());
+            goto die;
+        }
     }
 
 #if defined(DETACH) && defined(TIOCNOTTY)

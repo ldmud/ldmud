@@ -104,6 +104,7 @@ f-010825-1: New object list efuns
 f-010825-2: efun query_input_to()
 f-010903: get_dir() should return full pathnames
 f-010908: caller_stack should include function names
+f-011011: Another sort of deep_call_other() ?
 
 
 Language
@@ -206,6 +207,7 @@ f-010216: Possible implementation of T_ERROR
 f-010318: Runtime ERQ Executable directory specification
 f-010707: Fast Callouts
 f-010928-0: Make telnet negotiation options more configurable
+p-011012: mccp patch
 
 
 Installation
@@ -223,5 +225,5 @@ Future
 --------------------------------------------------------------------------
 f-010615-0: Implementing ID# based svalues
 f-010615-1: Strong and weak links
-f-010615-2:Efficient vector implementation
+f-010615-2: Efficient vector implementation
 f-010828: Save loadable dump

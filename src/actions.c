@@ -517,10 +517,10 @@ call_modify_command (char *buff)
             ip->modify_command = 0;
             free_object(ob, "modify_command");
         }
-        else if (closure_hook[H_MODIFY_COMMAND_FNAME].type == T_STRING)
+        else if (driver_hook[H_MODIFY_COMMAND_FNAME].type == T_STRING)
         {
             push_c_string(inter_sp, buff);
-            svp = sapply(closure_hook[H_MODIFY_COMMAND_FNAME].u.str, ob, 1);
+            svp = sapply(driver_hook[H_MODIFY_COMMAND_FNAME].u.str, ob, 1);
             /* !command_giver means that the command_giver has been destructed. */
             if (!command_giver)
                 return MY_TRUE;
@@ -528,33 +528,33 @@ call_modify_command (char *buff)
     }
     else
     {
-        if (closure_hook[H_MODIFY_COMMAND].type == T_CLOSURE)
+        if (driver_hook[H_MODIFY_COMMAND].type == T_CLOSURE)
         {
             lambda_t *l;
 
-            l = closure_hook[H_MODIFY_COMMAND].u.lambda;
-            if (closure_hook[H_MODIFY_COMMAND].x.closure_type == CLOSURE_LAMBDA)
+            l = driver_hook[H_MODIFY_COMMAND].u.lambda;
+            if (driver_hook[H_MODIFY_COMMAND].x.closure_type == CLOSURE_LAMBDA)
             {
                 free_object(l->ob, "call_modify_command");
                 l->ob = ref_object(command_giver, "call_modify_command");
             }
             push_c_string(inter_sp, buff);
             push_ref_object(inter_sp, command_giver, "call_modify_command");
-            call_lambda(&closure_hook[H_MODIFY_COMMAND], 2);
+            call_lambda(&driver_hook[H_MODIFY_COMMAND], 2);
             transfer_svalue(svp = &apply_return_value, inter_sp--);
             if (!command_giver)
                 return MY_TRUE;
         }
-        else if (closure_hook[H_MODIFY_COMMAND].type == T_STRING
+        else if (driver_hook[H_MODIFY_COMMAND].type == T_STRING
             && !(O_DESTRUCTED & command_giver->flags))
         {
             push_c_string(inter_sp, buff);
             svp =
-              sapply(closure_hook[H_MODIFY_COMMAND].u.str, command_giver, 1);
+              sapply(driver_hook[H_MODIFY_COMMAND].u.str, command_giver, 1);
             if (!command_giver)
                 return MY_TRUE;
         }
-        else if (closure_hook[H_MODIFY_COMMAND].type == T_MAPPING)
+        else if (driver_hook[H_MODIFY_COMMAND].type == T_MAPPING)
         {
             svalue_t sv;
             string_t * str;
@@ -563,7 +563,7 @@ call_modify_command (char *buff)
             {
                 put_string(&sv, str);
                 svp =
-                  get_map_value(closure_hook[H_MODIFY_COMMAND].u.map, &sv);
+                  get_map_value(driver_hook[H_MODIFY_COMMAND].u.map, &sv);
                 if (svp->type == T_CLOSURE)
                 {
                     push_ref_string(inter_sp, sv.u.str);
@@ -685,8 +685,8 @@ notify_no_command (char *command, object_t *save_command_giver)
 
     Bool      useHook;
 
-    useHook = (   closure_hook[H_SEND_NOTIFY_FAIL].type == T_CLOSURE
-               || closure_hook[H_SEND_NOTIFY_FAIL].type == T_STRING
+    useHook = (   driver_hook[H_SEND_NOTIFY_FAIL].type == T_CLOSURE
+               || driver_hook[H_SEND_NOTIFY_FAIL].type == T_STRING
               );
 
     svp = &error_msg;
@@ -717,23 +717,23 @@ notify_no_command (char *command, object_t *save_command_giver)
             useHook = MY_FALSE;
         }
     }
-    else if (closure_hook[H_NOTIFY_FAIL].type == T_STRING)
+    else if (driver_hook[H_NOTIFY_FAIL].type == T_STRING)
     {
         if (!useHook)
-            tell_object(command_giver, closure_hook[H_NOTIFY_FAIL].u.str);
+            tell_object(command_giver, driver_hook[H_NOTIFY_FAIL].u.str);
         else
-            push_svalue(&closure_hook[H_NOTIFY_FAIL]);
+            push_svalue(&driver_hook[H_NOTIFY_FAIL]);
     }
-    else if (closure_hook[H_NOTIFY_FAIL].type == T_CLOSURE)
+    else if (driver_hook[H_NOTIFY_FAIL].type == T_CLOSURE)
     {
-        if (closure_hook[H_NOTIFY_FAIL].x.closure_type == CLOSURE_LAMBDA)
+        if (driver_hook[H_NOTIFY_FAIL].x.closure_type == CLOSURE_LAMBDA)
         {
-            free_object(closure_hook[H_NOTIFY_FAIL].u.lambda->ob, "notify_no_command");
-            closure_hook[H_NOTIFY_FAIL].u.lambda->ob = ref_object(command_giver, "notify_no_command");
+            free_object(driver_hook[H_NOTIFY_FAIL].u.lambda->ob, "notify_no_command");
+            driver_hook[H_NOTIFY_FAIL].u.lambda->ob = ref_object(command_giver, "notify_no_command");
         }
         push_c_string(inter_sp, command);
         push_ref_valid_object(inter_sp, save_command_giver, "notify_no_command");
-        call_lambda(&closure_hook[H_NOTIFY_FAIL], 2);
+        call_lambda(&driver_hook[H_NOTIFY_FAIL], 2);
         if (inter_sp->type == T_STRING)
         {
             if (!useHook)
@@ -760,19 +760,19 @@ notify_no_command (char *command, object_t *save_command_giver)
             push_number(inter_sp, 0);
         push_ref_valid_object(inter_sp, save_command_giver, "notify-fail save_command_giver");
 
-        if (closure_hook[H_SEND_NOTIFY_FAIL].type == T_STRING)
+        if (driver_hook[H_SEND_NOTIFY_FAIL].type == T_STRING)
         {
-            (void)sapply_ign_prot( closure_hook[H_SEND_NOTIFY_FAIL].u.str
+            (void)sapply_ign_prot( driver_hook[H_SEND_NOTIFY_FAIL].u.str
                                  , command_giver, 3);
         }
         else
         {
-            if (closure_hook[H_SEND_NOTIFY_FAIL].x.closure_type == CLOSURE_LAMBDA)
+            if (driver_hook[H_SEND_NOTIFY_FAIL].x.closure_type == CLOSURE_LAMBDA)
             {
-                free_object(closure_hook[H_SEND_NOTIFY_FAIL].u.lambda->ob, "notify_no_command");
-                closure_hook[H_SEND_NOTIFY_FAIL].u.lambda->ob = ref_object(command_giver, "notify_no_command");
+                free_object(driver_hook[H_SEND_NOTIFY_FAIL].u.lambda->ob, "notify_no_command");
+                driver_hook[H_SEND_NOTIFY_FAIL].u.lambda->ob = ref_object(command_giver, "notify_no_command");
             }
-            call_lambda(&closure_hook[H_SEND_NOTIFY_FAIL], 3);
+            call_lambda(&driver_hook[H_SEND_NOTIFY_FAIL], 3);
             pop_stack();
         }
     }
@@ -1170,27 +1170,27 @@ execute_command (char *str, object_t *ob)
     last_command = str;
 
     /* Execute the command */
-    if (closure_hook[H_COMMAND].type == T_STRING)
+    if (driver_hook[H_COMMAND].type == T_STRING)
     {
         svalue_t *svp;
 
         push_c_string(inter_sp, str);
-        svp = sapply_ign_prot(closure_hook[H_COMMAND].u.str, ob, 1);
+        svp = sapply_ign_prot(driver_hook[H_COMMAND].u.str, ob, 1);
         res = (svp->type != T_NUMBER) || (svp->u.number != 0);
     }
-    else if (closure_hook[H_COMMAND].type == T_CLOSURE)
+    else if (driver_hook[H_COMMAND].type == T_CLOSURE)
     {
         lambda_t *l;
 
-        l = closure_hook[H_COMMAND].u.lambda;
-        if (closure_hook[H_COMMAND].x.closure_type == CLOSURE_LAMBDA)
+        l = driver_hook[H_COMMAND].u.lambda;
+        if (driver_hook[H_COMMAND].x.closure_type == CLOSURE_LAMBDA)
         {
             free_object(l->ob, "execute_command");
             l->ob = ref_object(ob, "execute_command");
         }
         push_c_string(inter_sp, str);
         push_ref_object(inter_sp, ob, "execute_command");
-        call_lambda(&closure_hook[H_COMMAND], 2);
+        call_lambda(&driver_hook[H_COMMAND], 2);
         res = (inter_sp->type != T_NUMBER) || (inter_sp->u.number != 0);
         free_svalue(inter_sp);
         inter_sp--;
@@ -1928,20 +1928,7 @@ f_notify_fail (svalue_t *sp)
 {
     if (command_giver && !(command_giver->flags & O_DESTRUCTED))
     {
-#ifdef USE_FREE_CLOSURE_HOOK
-        if (error_msg.type == T_CLOSURE)
-            /* It might be the closure we're just executing, so
-             * keep it around for now.
-             * TODO: It'd be safer if the interpreter would keep
-             * TODO:: an additional ref on all closures it is executing.
-             */
-            free_closure_hooks(&error_msg, 1);
-        else
-            free_svalue(&error_msg);
-        transfer_svalue_no_free(&error_msg, sp);
-#else
         transfer_svalue(&error_msg, sp);
-#endif
         if (error_obj)
             free_object(error_obj, "notify_fail");
         error_obj = ref_object(current_object, "notify_fail");

@@ -899,9 +899,6 @@ garbage_collection(void)
     free_defines();
     free_all_local_names();
     remove_unknown_identifier();
-#ifdef USE_FREE_CLOSURE_HOOK
-    free_old_driver_hooks();
-#endif
     purge_action_sent();
     purge_shadow_sent();
     check_wizlist_for_destr();
@@ -1022,7 +1019,7 @@ garbage_collection(void)
 
     /* Process the driver hooks */
 
-    clear_ref_in_vector(closure_hook, NUM_CLOSURE_HOOKS);
+    clear_ref_in_vector(driver_hook, NUM_DRIVER_HOOKS);
 
     /* Let the modules process their data */
 
@@ -1216,7 +1213,7 @@ garbage_collection(void)
 
     /* Process the driver hooks */
 
-    count_ref_in_vector(closure_hook, NUM_CLOSURE_HOOKS);
+    count_ref_in_vector(driver_hook, NUM_DRIVER_HOOKS);
 
     garbage_collection_in_progress = 0;
 

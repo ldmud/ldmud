@@ -102,12 +102,12 @@ execute (char *buf, int buflen, char *status, int *esockets, int keep_sockets)
         status[0] = ERQ_E_ILLEGAL;
         return 0;
     }
-    if (strlen(ERQ_DIR) + strlen(p) + 2 > sizeof(path))
+    if (strlen(erq_dir) + strlen(p) + 2 > sizeof(path))
     {
         status[0] = ERQ_E_PATHLEN;
         return 0;
     }
-    sprintf(path, "%s/%s", ERQ_DIR, p);
+    sprintf(path, "%s/%s", erq_dir, p);
 
     /* Create the sockets to communicate with the caller */
     if (esockets)

@@ -673,14 +673,14 @@ reset_object (object_t *ob, int arg)
     }
 #endif
 
-    if (closure_hook[arg].type == T_CLOSURE)
+    if (driver_hook[arg].type == T_CLOSURE)
     {
         lambda_t *l;
 
         if (arg == H_RESET)
             previous_ob = ob;
 
-        l = closure_hook[arg].u.lambda;
+        l = driver_hook[arg].u.lambda;
         free_object(l->ob, "reset_object");
         if (l->function.code[1] && arg != H_RESET)
         {
@@ -690,13 +690,13 @@ reset_object (object_t *ob, int arg)
              */
             l->ob = ref_object(current_object, "reset_object");
             push_ref_object(inter_sp, ob, "reset");
-            call_lambda(&closure_hook[arg], 1);
+            call_lambda(&driver_hook[arg], 1);
         }
         else
         {
             /* no arguments, just bind to target */
             l->ob = ref_object(ob, "reset_object");
-            call_lambda(&closure_hook[arg], 0);
+            call_lambda(&driver_hook[arg], 0);
         }
 
         /* If the call returned a number, use it as the current
@@ -709,13 +709,13 @@ reset_object (object_t *ob, int arg)
 
         pop_stack();
     }
-    else if (closure_hook[arg].type == T_STRING)
+    else if (driver_hook[arg].type == T_STRING)
     {
         if (arg == H_RESET)
             previous_ob = ob;
 
         push_number(inter_sp, arg == H_RESET);
-        if (!sapply(closure_hook[arg].u.str, ob, 1) && arg == H_RESET)
+        if (!sapply(driver_hook[arg].u.str, ob, 1) && arg == H_RESET)
             ob->time_reset = 0;
     }
 
@@ -2750,17 +2750,17 @@ move_object (void)
     lambda_t *l;
     object_t *save_command = command_giver;
 
-    if (NULL != ( l = closure_hook[H_MOVE_OBJECT1].u.lambda) )
+    if (NULL != ( l = driver_hook[H_MOVE_OBJECT1].u.lambda) )
     {
         free_object(l->ob, "move_object");
         l->ob = ref_object(inter_sp[-1].u.ob, "move_object");
-        call_lambda(&closure_hook[H_MOVE_OBJECT1], 2);
+        call_lambda(&driver_hook[H_MOVE_OBJECT1], 2);
     }
-    else if (NULL != ( l = closure_hook[H_MOVE_OBJECT0].u.lambda) )
+    else if (NULL != ( l = driver_hook[H_MOVE_OBJECT0].u.lambda) )
     {
         free_object(l->ob, "move_object");
         l->ob = ref_object(current_object, "move_object");
-        call_lambda(&closure_hook[H_MOVE_OBJECT0], 2);
+        call_lambda(&driver_hook[H_MOVE_OBJECT0], 2);
     }
     else
         error("Don't know how to move objects.\n");

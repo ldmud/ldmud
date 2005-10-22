@@ -1,0 +1,560 @@
+Short: mccp patch :)
+From:   "Bastian Hoyer" <dafire@dafire.de>
+Date:   Thu Oct 11 21:02:00 2001
+Type: Patch
+State: New
+----------
+
+
+Also .. ich hab den patch gleich fuer die 3-3-111 gemacht :)
+
+Hier eine Beschreibung was ich geaendert hab:
+
+1. Das schreiben des zlib-stream geht ueber ein extra write in
+add_message:) das koennte man vielleicht umschreiben das das ueber die
+normale ausgabe geht :)
+
+2. 3 neue variablen in der interactive_t struct ( der zlib_stream, ein
+puffer und welche mccp version verwendet wird)
+
+3. in new_player wird dem client gesagt das wir compress 2 oder 1 wollen
+(send_will)
+
+4. die telopts werden statt in den hook in eine neue funktion umgeleitet
+und da bearbeitet
+
+5. bei mccp verbindungen geht binary_message immer ueber add_message
+
+6. neue efun query_mccp(object) (default this_player) gibt 0 wenn kein
+mccp laeuft, ansonsten TELOPT_COMPRESS oder TELOPT_COMPRESS2
+
+------------------------------------------------------------------
+diff -c5 -r 3-3/src/comm.c 3-3.daf/src/comm.c
+*** 3-3/src/comm.c	Thu Oct 11 20:12:35 2001
+--- 3-3.daf/src/comm.c	Thu Oct 11 20:27:15 2001
+***************
+*** 406,415 ****
+--- 406,418 ----
+  
+  /*-------------------------------------------------------------------------*/
+  
+  /* Forward declarations */
+  
++ static int start_compress(interactive_t *,unsigned char telopt);
++ static void mccp_telnet_neg(int);
++ 
+  static void free_input_to(input_to_t *);
+  static void telnet_neg(interactive_t *);
+  static void send_will(int);
+  static void send_wont(int);
+  static void send_do(int);
+***************
+*** 1469,1483 ****
+          chunk = dest - ip->message_buf;
+          if (chunk < min_length)
+          {
+              break;
+          }
+! 
+          /* Write .message_buf[] to the network. */
+  
+!         for (retries = 6;;) {
+  
+              if ((n = (int)socket_write(ip->socket, ip->message_buf, (size_t)chunk)) != -1)
+              {
+                  break;
+              }
+              switch (errno) {
+--- 1472,1532 ----
+          chunk = dest - ip->message_buf;
+          if (chunk < min_length)
+          {
+              break;
+          }
+!         
+          /* Write .message_buf[] to the network. */
++         
++         if (ip->out_compress)
++         {
++            int iBlck, iPtr, iWrt = 0;
+  
+!            ip->out_compress->next_in = (unsigned char *) ip->message_buf;
+!            ip->out_compress->avail_in = chunk;
+  
++            while (ip->out_compress->avail_in)
++            {
++               ip->out_compress->avail_out = COMPRESS_BUF_SIZE -
++                                             (ip->out_compress->next_out -
++                                              ip->out_compress_buf);
++               
++               if (ip->out_compress->avail_out)
++               {
++                  int status = deflate(ip->out_compress, Z_SYNC_FLUSH);
++                  
++                  if (status != Z_OK)
++                     return;
++               }
++               
++               length = ip->out_compress->next_out - ip->out_compress_buf;
++               if (length > 0)
++               {
++                  for (iPtr = 0; iPtr < length; iPtr += iWrt)
++                  {
++                     iBlck = UMIN(length - iPtr, 4096);
++                     if ((iWrt = write(ip->socket, ip->out_compress_buf + iPtr, iBlck)) < 0)
++                     {
++                        perror("Text_to_socket (compressed):");
++                        return;
++                     }
++                  }
++                  if (iWrt <= 0) break;
++                  if (iPtr > 0)
++                  {
++                     if (iPtr < length)
++                        memmove(ip->out_compress_buf, ip->out_compress_buf + iPtr, length - iPtr);
++                     
++                     ip->out_compress->next_out = ip->out_compress_buf + length - iPtr;
++                  }
++               }
++            }
++            n=chunk;
++         }
++         else
++         for (retries = 6;;) {
++            
+              if ((n = (int)socket_write(ip->socket, ip->message_buf, (size_t)chunk)) != -1)
+              {
+                  break;
+              }
+              switch (errno) {
+***************
+*** 2461,2470 ****
+--- 2510,2520 ----
+                          comm_fatal(ip, "comm: data length < 0: %ld\n", (long)length);
+                          continue;
+                      }
+                      if (length > ip->chars_ready)
+                      {
++                        printf("PROBLEM?\n");
+                          socket_write(ip->socket, ip->text + ip->chars_ready
+                                      , (size_t)(length - ip->chars_ready));
+                          ip->chars_ready = length;
+                      }
+                  }
+***************
+*** 2873,2882 ****
+--- 2923,2934 ----
+      master_ob->flags |= O_ONCE_INTERACTIVE;
+      new_interactive->ob = master_ob;
+  
+      /* Initialize the rest of the interactive structure */
+  
++     new_interactive->compressing = 0;
++     new_interactive->out_compress = NULL;
+      new_interactive->input_to = NULL;
+      put_ref_string(&new_interactive->prompt, STR_DEFAULT_PROMPT);
+      new_interactive->modify_command = NULL;
+      new_interactive->msg_discarded = MY_FALSE;
+      new_interactive->set_input_to = MY_FALSE;
+***************
+*** 2961,2970 ****
+--- 3013,3026 ----
+      }
+  #ifdef ERQ_DEMON
+      (void) lookup_ip_entry(new_interactive->addr.sin_addr, MY_TRUE);
+      /* TODO: We could pass the retrieved hostname right to login */
+  #endif
++ 
++     send_will(TELOPT_COMPRESS2);
++     send_will(TELOPT_COMPRESS);
++     
+      logon(ob);
+      flush_all_player_mess();
+  } /* new_player() */
+  
+  /*-------------------------------------------------------------------------*/
+***************
+*** 3987,4005 ****
+      telopts_do[TELOPT_SGA] = reply_to_do_sga;
+      telopts_dont[TELOPT_SGA] = reply_to_dont_sga;
+  
+      /* Mud specific protocols */
+  
+!     telopts_do[TELOPT_COMPRESS] = reply_h_telnet_neg;
+!     telopts_dont[TELOPT_COMPRESS] = reply_h_telnet_neg;
+!     telopts_will[TELOPT_COMPRESS] = reply_h_telnet_neg;
+!     telopts_wont[TELOPT_COMPRESS] = reply_h_telnet_neg;
+! 
+!     telopts_do[TELOPT_COMPRESS2] = reply_h_telnet_neg;
+!     telopts_dont[TELOPT_COMPRESS2] = reply_h_telnet_neg;
+!     telopts_will[TELOPT_COMPRESS2] = reply_h_telnet_neg;
+!     telopts_wont[TELOPT_COMPRESS2] = reply_h_telnet_neg;
+  
+      telopts_do[TELOPT_MSP] = reply_h_telnet_neg;
+      telopts_dont[TELOPT_MSP] = reply_h_telnet_neg;
+      telopts_will[TELOPT_MSP] = reply_h_telnet_neg;
+      telopts_wont[TELOPT_MSP] = reply_h_telnet_neg;
+--- 4043,4061 ----
+      telopts_do[TELOPT_SGA] = reply_to_do_sga;
+      telopts_dont[TELOPT_SGA] = reply_to_dont_sga;
+  
+      /* Mud specific protocols */
+  
+!     telopts_do[TELOPT_COMPRESS] = mccp_telnet_neg;
+!     telopts_dont[TELOPT_COMPRESS] = mccp_telnet_neg;
+!     telopts_will[TELOPT_COMPRESS] = mccp_telnet_neg;
+!     telopts_wont[TELOPT_COMPRESS] = mccp_telnet_neg;
+! 
+!     telopts_do[TELOPT_COMPRESS2] = mccp_telnet_neg;
+!     telopts_dont[TELOPT_COMPRESS2] = mccp_telnet_neg;
+!     telopts_will[TELOPT_COMPRESS2] = mccp_telnet_neg;
+!     telopts_wont[TELOPT_COMPRESS2] = mccp_telnet_neg;
+  
+      telopts_do[TELOPT_MSP] = reply_h_telnet_neg;
+      telopts_dont[TELOPT_MSP] = reply_h_telnet_neg;
+      telopts_will[TELOPT_MSP] = reply_h_telnet_neg;
+      telopts_wont[TELOPT_MSP] = reply_h_telnet_neg;
+***************
+*** 5656,5665 ****
+--- 5712,5725 ----
+   *
+   * The idea behind the flag settings is that sending command
+   * codes for colours and other things needs to bypass the allowed
+   * charset filters, but isn't important enough to waste bandwith
+   * on a synchronous transmission.
++  *
++  * If the client uses MCCP compression add_message ist always used
++  * with flushing buffer _after_ the Message.
++  *
+   */
+  
+  {
+      string_t *msg;
+      mp_int wrote = 0, i;
+***************
+*** 5703,5723 ****
+       && !ip->do_close)
+      {
+          save_command_giver = command_giver;
+          command_giver = current_object;
+  
+!         if (sp->u.number & 1)
+          {
+              /* Write before flush... */
+  
+              sending_telnet_command = MY_TRUE; /* turn of IAC quoting */
+  
+              add_message(FMT_STRING, msg);
+  
+              sending_telnet_command = MY_FALSE;
+  
+!             if (sp->u.number & 2)
+                  add_message(message_flush);
+              wrote = 0;
+          }
+          else
+          {
+--- 5763,5783 ----
+       && !ip->do_close)
+      {
+          save_command_giver = command_giver;
+          command_giver = current_object;
+  
+!         if ((sp->u.number & 1)||ip->out_compress)
+          {
+              /* Write before flush... */
+  
+              sending_telnet_command = MY_TRUE; /* turn of IAC quoting */
+  
+              add_message(FMT_STRING, msg);
+  
+              sending_telnet_command = MY_FALSE;
+  
+!             if (sp->u.number & 2||ip->out_compress)
+                  add_message(message_flush);
+              wrote = 0;
+          }
+          else
+          {
+***************
+*** 6520,6525 ****
+--- 6580,6792 ----
+  
+      return sp;
+  } /* f_query_udp_port() */
+  
+  /***************************************************************************/
++ 
++ static void
++ mccp_telnet_neg (int option)
++ 
++ {
++     interactive_t *ip = O_GET_INTERACTIVE(command_giver);
++ 
++     switch(ip->tn_state) {
++      case TS_DO:
++        start_compress(ip,option);
++        break;
++      default:
++        printf("MCCP NEG (%d) STATE (%d)\n",option,ip->tn_state);
++     }
++ }
++ 
++ 
++ svalue_t *
++ f_query_mccp (svalue_t *sp)
++ 
++ /* EFUN query_mccp()
++  *
++  *       mixed query_mccp(object ob)
++  *
++  * this efun returns 0 if no mccp is used for interactive ob.
++  * if ob|this_player uses mccp it returns TELOPT_COMPRESS or
++  * TELOPT_COMPRESS2
++  */
++ 
++ {
++     interactive_t *ip;
++ 
++     /* Make sure the object is interactive */
++     if (!(O_SET_INTERACTIVE(ip, sp->u.ob))
++      || ip->closing)
++     {
++         error("Bad arg 1 to query_mccp(): object not interactive.\n");
++         return sp;
++     }
++ 
++     free_svalue(sp);
++     put_number(sp,ip->compressing);
++ 
++     return sp;
++ } /* query_mccp() */
++ 
++ 
++ 
++ /*
++  * mccp.c - support functions for the Mud Client Compression Protocol
++  *
++  * see http://www.randomly.org/projects/MCCP/
++  *
++  * Copyright (c) 1999, Oliver Jowett <oliver@randomly.org>
++  *
++  * This code may be freely distributed and used if this copyright
++  * notice is retained intact.
++  */
++ 
++ 
++ 
++ void *zlib_alloc(void *opaque, unsigned int items, unsigned int size)
++ {
++   return calloc(items, size);
++ }
++ 
++ void zlib_free(void *opaque, void *address)
++ {
++   free(address);
++ }
++ 
++ 
++ static int start_compress(interactive_t *ip, unsigned char telopt )
++ {
++   z_stream *s;
++ 
++   /* already compressing */
++   if (ip->out_compress)
++     return 1;
++ 
++   /* allocate and init stream, buffer */
++   s = (z_stream *) malloc(sizeof(*s));
++   ip->out_compress_buf = (unsigned char *) malloc(COMPRESS_BUF_SIZE);
++ 
++   s->next_in    =  NULL;
++   s->avail_in   =  0;
++   s->next_out   =  ip->out_compress_buf;
++   s->avail_out  =  COMPRESS_BUF_SIZE;
++   s->zalloc     =  zlib_alloc;
++   s->zfree      =  zlib_free;
++   s->opaque     =  NULL;
++ 
++   if (deflateInit(s, 9) != Z_OK)
++   {
++     free(ip->out_compress_buf);
++     free(s);
++     return 0;
++   }
++ 
++   /* version 1 or 2 support */
++   if (telopt == TELOPT_COMPRESS)
++   {
++      DTF(("%s TDEBUG: send IAC SB %02x WILL SE\n", time_stamp(), telopt));
++      SEND_TELNET_COMMAND(
++             add_message("%c", IAC);
++             add_message("%c%c%c%c", SB, telopt, WILL, SE);
++             add_message(message_flush);
++             );
++   }
++   else if (telopt == TELOPT_COMPRESS2)
++   {
++      DTF(("%s TDEBUG: send IAC SB %02x WILL SE\n", time_stamp(), telopt));
++      SEND_TELNET_COMMAND(
++             add_message("%c", IAC);
++             add_message("%c%c%c%c", SB, telopt, IAC, SE);
++             add_message(message_flush);
++             );
++   }
++   else
++   {
++     printf("Bad teleoption %d passed", telopt);
++     free(ip->out_compress_buf);
++     free(s);
++     return 0;
++   }
++   
++   ip->compressing = telopt; 
++   ip->out_compress = s;
++ 
++   /* success */
++   return 1;
++ }
++ 
++ /*
++   beenden des compressed zeugs wird noch nicht unterstuetzt :)
++   also ist der rest des files erst mal ueberfluessig :)
++ */
++ 
++ /* Try to send any pending compressed-but-not-sent data in `desc' */
++ int process_compressed(interactive_t *ip)
++ {
++   int iStart, nBlock, nWrite, len;
++ 
++   if (!ip->out_compress)
++     return 1;
++     
++   len = ip->out_compress->next_out - ip->out_compress_buf;
++   if (len > 0)
++   {
++     for (iStart = 0; iStart < len; iStart += nWrite)
++     {
++       nBlock = UMIN (len - iStart, 4096);
++       if ((nWrite = write(ip->socket, ip->out_compress_buf + iStart, nBlock)) < 0)
++       {
++         if (errno == EAGAIN || errno == ENOSR)
++           break;
++ 
++           /* write error */
++         return 0;
++       }
++       if (nWrite <= 0)
++         break;
++     }
++ 
++     if (iStart)
++     {
++       if (iStart < len)
++         memmove(ip->out_compress_buf, ip->out_compress_buf+iStart, len - iStart);
++ 
++       ip->out_compress->next_out = ip->out_compress_buf + len - iStart;
++     }
++   }
++ 
++   /* success */
++   return 1;
++ }
++ 
++ /* Cleanly shut down compression on `desc' */
++ int end_compress(interactive_t *ip)
++ {
++   unsigned char dummy[1];
++ 
++   if (!ip->out_compress)
++     return 1;
++ 
++   ip->out_compress->avail_in = 0;
++   ip->out_compress->next_in  = dummy;
++ 
++   /* No terminating signature is needed - receiver will get Z_STREAM_END */
++   if (deflate(ip->out_compress, Z_FINISH) != Z_STREAM_END)
++     return 0;
++ 
++     /* try to send any residual data */
++   if (!process_compressed(ip))
++     return 0;
++ 
++     /* reset compression values */
++   deflateEnd(ip->out_compress);
++   free(ip->out_compress_buf);
++   free(ip->out_compress);
++   ip->compressing      = 0;
++   ip->out_compress     = NULL;
++   ip->out_compress_buf = NULL;
++ 
++   /* success */
++   return 1;
++ }
+  
+diff -c5 -r 3-3/src/comm.h 3-3.daf/src/comm.h
+*** 3-3/src/comm.h	Thu Oct 11 20:12:35 2001
+--- 3-3.daf/src/comm.h	Thu Oct 11 15:46:22 2001
+***************
+*** 2,11 ****
+--- 2,12 ----
+  #define COMM_H__ 1
+  
+  #include "driver.h"
+  #include "typedefs.h"
+  #include <sys/types.h>
++ #include <zlib.h>
+  
+  #include "simulate.h"   /* callback_t for input_to_t */
+  #include "svalue.h"
+  
+  /* TODO: Make the following a separate "my-socket.h" include, also
+***************
+*** 165,174 ****
+--- 166,180 ----
+         * and a terminating '\0'.
+         */
+  
+      char message_buf[MAX_SOCKET_PACKET_SIZE];
+        /* The send buffer. */
++ 
++    unsigned char   compressing;                 /* MCCP support */
++    z_stream      * out_compress;                /* MCCP support */
++    unsigned char * out_compress_buf;            /* MCCP support */
++    
+  };
+  
+  /* --- Bitflags and masks for interactive.noecho ---
+   *
+   * 'noecho' is a historical misnomer as it actually represents several
+***************
+*** 313,319 ****
+--- 319,328 ----
+  extern svalue_t *f_users(svalue_t *sp);
+  
+  #if defined(ACCESS_CONTROL)
+  extern void refresh_access_data(void (*add_entry)(struct sockaddr_in *, int, long*) );
+  #endif /* ACCESS_CONTROL */
++ 
++ #define COMPRESS_BUF_SIZE 8192
++ #define UMIN(a,b) ((a) < (b) ? (a) : (b))
+  
+  #endif /* COMM_H__ */
+diff -c5 -r 3-3/src/func_spec 3-3.daf/src/func_spec
+*** 3-3/src/func_spec	Thu Oct 11 20:12:44 2001
+--- 3-3.daf/src/func_spec	Thu Oct 11 20:08:29 2001
+***************
+*** 464,473 ****
+--- 464,474 ----
+  int     query_mud_port(int|object default: F_THIS_PLAYER);
+  int     set_buffer_size(int);
+  void    set_combine_charset(int *|string);
+  void    set_connection_charset(int *|string, int default: F_CONST1);
+  mixed   set_prompt(string|closure|int, object default: F_THIS_PLAYER);
++ mixed   query_mccp(null|object default: F_THIS_PLAYER);
+  
+  void    write(mixed);
+  object *users();
+  
+  #ifdef ERQ_DEMON
+------------------------------------------------------------------

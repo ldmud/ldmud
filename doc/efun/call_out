@@ -16,6 +16,10 @@ DESCRIPTION
         i.e. "public" and "static" functions. "private" and "protected"
         functions can't be called.
 
+        If <fun> does not define a publicly accessible function, the
+        efun will call the H_DEFAULT_METHOD hook if set.
+        Calls to the master object never use the H_DEFAULT_METHOD hook.
+        
         The execution of the call_out()s implies a simple (not
         exhaustive) measure against rabbits: the evaluation costs of
         those call_outs() executing at the same time are summed up on

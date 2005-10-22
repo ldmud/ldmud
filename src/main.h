@@ -20,6 +20,7 @@ extern svalue_t const0, const1;
 extern double consts[5];
 extern char *mud_lib;
 extern char *erq_file;
+extern char **erq_args;
 extern char master_name[];
 extern string_t * master_name_str;
 extern char *debug_file;

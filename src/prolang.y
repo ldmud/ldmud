@@ -169,7 +169,7 @@ svalue_t *prog_variable_values;
 
 #define SH(x) - -(1 << (x))
 
-short hook_type_map[NUM_CLOSURE_HOOKS] =
+short hook_type_map[NUM_DRIVER_HOOKS] =
 %hookmap \
     H_MOVE_OBJECT0: 0, \
     H_MOVE_OBJECT1: 0, \
@@ -190,6 +190,7 @@ short hook_type_map[NUM_CLOSURE_HOOKS] =
     H_MODIFY_COMMAND_FNAME: SH(T_STRING), \
     H_COMMAND:        SH(T_CLOSURE) SH(T_STRING), \
     H_SEND_NOTIFY_FAIL: SH(T_CLOSURE) SH(T_STRING), \
+    H_DEFAULT_METHOD: SH(T_CLOSURE) SH(T_STRING), \
 
 #undef SH
 
@@ -8405,7 +8406,7 @@ function_call:
                   /* call-other: the number of arguments will be
                    * corrected at runtime.
                    */
-                  add_f_code(F_CALL_OTHER);
+                  add_f_code(F_CALL_DIRECT);
                   CURRENT_PROGRAM_SIZE++;
                   ap_needed = MY_TRUE;
               }
@@ -8849,7 +8850,7 @@ function_call:
           got_ellipsis[argument_level] = MY_FALSE;
 
           /* If call_other() has been replaced by a sefun, and
-           * if we need to use F_CALL_OTHER to call it, we have
+           * if we need to use F_CALL_DIRECT to call it, we have
            * to insert additional code before the <expr4> already parsed.
            * Putting this code block before the <expr4> in the rule
            * however yields a faulty grammar.
@@ -8968,7 +8969,7 @@ function_call:
                   /* call-other: the number of arguments will be
                    * detected and corrected at runtime.
                    */
-                  add_f_code(F_CALL_OTHER);
+                  add_f_code(F_CALL_DIRECT);
                   CURRENT_PROGRAM_SIZE++;
               }
               else

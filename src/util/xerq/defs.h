@@ -193,6 +193,7 @@ struct retry_s
 
 /* --- Variables --- */
 
+extern const char * erq_dir;
 extern child_t *childs;
 extern socket_t *sockets;
 extern int seq_number, seq_interval;

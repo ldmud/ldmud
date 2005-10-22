@@ -44,6 +44,9 @@ void (*erq_table[])(char *, int)
 #endif
 
 /*-------------------------------------------------------------------------*/
+const char * erq_dir = ERQ_DIR;
+  /* The filename of the directory with the ERQ executables. */
+
 child_t *childs;
   /* List of active children. The main loop will remove _EXITED children.
    */
@@ -149,17 +152,45 @@ main(int argc, char *argv[])
 
     master_pid = getpid();
 
-    /* Only "--forked" use is supported. */
-    if (argc > 1 && !strcmp(argv[1], "--forked"))
+    /* Quick and dirty commandline parser */
     {
-        write(1, "1", 1);
-        fprintf(stderr, "%s Demon started\n", time_stamp() );
-    }
-    else
-    {
-        fprintf(stderr, "%s Dynamic attachment unimplemented\n"
-                      , time_stamp());
-        die();
+        int is_forked = 0;
+        int i;
+
+        for (i = 1; i < argc; i++)
+        {
+            if (!strcmp(argv[i], "--forked"))
+                is_forked = 1;
+            else if (!strcmp(argv[i], "--execdir"))
+            {
+                if (i+1 >= argc)
+                {
+                    fprintf(stderr, "%s Missing value for --execdir.\n"
+                                  , time_stamp());
+                    die();
+                }
+                erq_dir = argv[i+1];
+                i++;
+            }
+            else
+            {
+                fprintf(stderr, "%s Unknown argument '%s'.\n"
+                              , time_stamp(), argv[i]);
+                die();
+            }
+        }
+        /* Check if we have been forked off the driver */
+        if (is_forked)
+        {
+            write(1, "1", 1); /* indicate sucessful fork/execl */
+            fprintf(stderr, "%s Demon started\n", time_stamp() );
+        }
+        else
+        {
+            fprintf(stderr, "%s Dynamic attachement unimplemented\n"
+                          , time_stamp());
+            die();
+        }
     }
 
     /* Initialize */
