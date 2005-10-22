@@ -1,6 +1,14 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+05-Mar-2002 (Lars Duening)  (3.3.178)
+    - (efuns.c) deep_copy() didn't handle quoted arrays properly (reported
+        by Gnomi).
+    - (efuns, func_spec) New efun unquote() (suggested by Gnomi).
+    - (object, gcollect.c, driver.h) Debug macro CHECK_OBJECT_REF activates
+        a trace of blueprint allocations/deallocations, to be used to debug
+        the strange refcount bugs recently encountered (b-020228-0).
+
 04-Mar-2002 (Lars Duening)  (3.3.177)
     - (prolang.y) Publically inheriting functions which had been inherited
         protected before now overrides the earlier inherit (reported by

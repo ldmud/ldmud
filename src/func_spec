@@ -316,6 +316,7 @@ mixed   deep_copy(mixed);
 int     ed(void|string, void|null|string);
 mixed   get_type_info(mixed, void|int);
 mixed   quote(mixed *|quoted_array|symbol|string);
+mixed   unquote(quoted_array|symbol);
 
 string  save_value(mixed);
 mixed   restore_value(string);

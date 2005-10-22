@@ -173,16 +173,29 @@ struct replace_ob_s
 
 #ifndef DEBUG
 
+#ifndef CHECK_OBJECT_REF
 #  define free_object(o,from) MACRO( if (--((o)->ref) <= 0) _free_object(o); )
+#else
+#  define free_object(o,from) MACRO( if (--((o)->ref) <= 0) _free_object(o, __FILE__, __LINE__); )
+#endif
 
 #else
 
+#ifndef CHECK_OBJECT_REF
 #  define free_object(o,from) MACRO(\
       (o)->ref--;\
       if (d_flag > 1) printf("Sub ref from object %s: %ld (%s)\n"\
                             , get_txt((o)->name), (o)->ref, from);\
       if ((o)->ref <= 0) _free_object(o); \
     )
+#else
+#  define free_object(o,from) MACRO(\
+      (o)->ref--;\
+      if (d_flag > 1) printf("Sub ref from object %s: %ld (%s)\n"\
+                            , get_txt((o)->name), (o)->ref, from);\
+      if ((o)->ref <= 0) _free_object(o, __FILE__, __LINE__); \
+    )
+#endif
 
 #endif
 
@@ -210,6 +223,9 @@ struct replace_ob_s
    * return <o> else.
    */
 
+#ifdef CHECK_OBJECT_REF
+#define free_prog(p,f) _free_prog(p,f, __FILE__, __LINE__)
+#endif
 
 /* --- Variables --- */
 
@@ -235,12 +251,20 @@ extern void do_free_sub_strings(int num_strings, string_t ** strings
                                , int num_variables, variable_t *variable_names
                                , int num_includes, include_t *includes
                                );
+#ifndef CHECK_OBJECT_REF
 extern void free_prog(program_t *progp, Bool free_all);
+#else
+extern void _free_prog(program_t *progp, Bool free_all, const char * file, int line);
+#endif
 extern void reset_object(object_t *ob, int arg);
 extern void replace_programs(void);
 extern Bool shadow_catch_message(object_t *ob, const char *str);
 
+#ifndef CHECK_OBJECT_REF
 extern void _free_object(object_t *);
+#else
+extern void _free_object(object_t *, const char * file, int line);
+#endif
 #ifdef INITIALIZATION_BY___INIT
 extern object_t *get_empty_object(int num_var);
 #else

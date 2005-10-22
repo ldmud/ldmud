@@ -6,6 +6,16 @@ State: New
 Driver: 3.2.9-dev.404
 
 
+On first look, this all seems to be an invalid prog->blueprint pointer which
+points to an already-freed object. The crash happens when one of the clones is
+destructed.
+
+Swapping? Replace programs? Something else?
+
+3.2.9-dev.411/3.3.178 adds a trace of blueprint allocations/deallocations.
+
+
+
 Date: Thu, 28 Feb 2002 14:42:38 GMT
 Subject: Crash heute (3-2.404)
 

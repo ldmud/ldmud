@@ -5187,7 +5187,10 @@ copy_svalue (svalue_t *dest, svalue_t *src
             new = allocate_uninit_array(size);
             put_array(dest, new);
             if (src->type == T_QUOTED_ARRAY)
+            {
+                dest->type = T_QUOTED_ARRAY;
                 dest->x.quotes = src->x.quotes;
+            }
             rec->data = dest;
 
             /* Copy the values */
@@ -5279,6 +5282,7 @@ f_deep_copy (svalue_t *sp)
         NOOP
         break;
 
+    case T_QUOTED_ARRAY:
     case T_POINTER:
       {
         vector_t *old;
@@ -5292,6 +5296,8 @@ f_deep_copy (svalue_t *sp)
             if (!ptable)
                 error("(deep_copy) Out of memory for pointer table.\n");
             copy_svalue(&new, sp, ptable);
+            if (sp->type == T_QUOTED_ARRAY)
+                new.x.quotes = sp->x.quotes;
             transfer_svalue(sp, &new);
             free_pointer_table(ptable);
         }
@@ -5717,6 +5723,41 @@ f_quote (svalue_t *sp)
 
     return sp;
 } /* f_quote() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_unquote (svalue_t *sp)
+
+/* EFUN unquote()
+ *
+ *   mixed unquote(mixed)
+ *
+ * Removes a quote from quoted arrays and symbols. When the
+ * last quote from a symbol is removed, the result is a string.
+ */
+
+{
+    switch (sp->type)
+    {
+    case T_QUOTED_ARRAY:
+        sp->x.quotes--;
+        if (!sp->x.quotes)
+            sp->type = T_POINTER;
+        break;
+
+    case T_SYMBOL:
+        sp->x.quotes--;
+        if (!sp->x.quotes)
+            sp->type = T_STRING;
+        break;
+
+    default:
+        efun_gen_arg_error(1, sp->type, sp);
+        /* NOTREACHED */
+    }
+
+    return sp;
+} /* f_unquote() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *

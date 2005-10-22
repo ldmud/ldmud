@@ -29,6 +29,11 @@
  */
 #define CHECK_MAPPING_TOTAL
 
+/* Activate object refcount check code. It will produce a decent
+ * amount of log output.
+ */
+#define CHECK_OBJECT_REF
+
 
 /* TODO: Some TODO defines */
 

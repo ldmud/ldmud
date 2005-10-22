@@ -297,6 +297,9 @@ clear_object_ref (object_t *p)
 {
     if ((p->flags & O_DESTRUCTED) && p->ref)
     {
+#if defined(CHECK_OBJECT_REF) && defined(DEBUG)
+        p->extra_ref = p->ref;
+#endif
         p->ref = 0;
         p->name->info.ref = 0;
         p->prog->ref = 0;
@@ -305,7 +308,12 @@ clear_object_ref (object_t *p)
          && (p->prog->blueprint->flags & O_DESTRUCTED)
          && p->prog->blueprint->ref
            )
+        {
+#if defined(CHECK_OBJECT_REF) && defined(DEBUG)
+            p->prog->blueprint->extra_ref = p->prog->blueprint->ref;
+#endif
             p->prog->blueprint->ref = 0;
+        }
         clear_inherit_ref(p->prog);
     }
 } /* clear_object_ref() */
@@ -683,6 +691,9 @@ gc_count_ref_in_vector (svalue_t *svp, size_t num)
                     p->x.closure_type = F_UNDEF+CLOSURE_EFUN;
                     p->u.ob = master_ob;
                     master_ob->ref++;
+#if defined(CHECK_OBJECT_REF) && defined(DEBUG)
+                    master_ob->extra_ref++;
+#endif
                     reference_destructed_object(ob);
                 }
                 else
@@ -771,6 +782,9 @@ gc_count_ref_in_closure (svalue_t *csvp)
             csvp->x.closure_type = F_UNDEF+CLOSURE_EFUN;
             csvp->u.ob = master_ob;
             master_ob->ref++;
+#if defined(CHECK_OBJECT_REF) && defined(DEBUG)
+            master_ob->extra_ref++;
+#endif
         }
         return;
     }
@@ -818,6 +832,9 @@ gc_count_ref_in_closure (svalue_t *csvp)
                 csvp->x.closure_type = F_UNDEF+CLOSURE_EFUN;
                 csvp->u.ob = master_ob;
                 master_ob->ref++;
+#if defined(CHECK_OBJECT_REF) && defined(DEBUG)
+                master_ob->extra_ref++;
+#endif
             }
         }
         else
@@ -996,6 +1013,9 @@ garbage_collection(void)
                          , time_stamp(), get_txt(ob->name));
         }
         was_swapped = 0;
+#if defined(CHECK_OBJECT_REF) && defined(DEBUG)
+        ob->extra_ref = ob->ref;
+#endif
         if (ob->flags & O_SWAPPED
          && (was_swapped = load_ob_from_swap(ob)) & 1)
         {
@@ -1351,7 +1371,19 @@ garbage_collection(void)
     time_last_gc = time(NULL);
     dprintf2(gcollect_outfd, "%s GC freed %d destructed objects.\n"
             , (long)time_stamp(), dobj_count);
-}
+#if defined(CHECK_OBJECT_REF) && defined(DEBUG)
+    for (ob = obj_list; ob; ob = ob->next_all) {
+        if (ob->extra_ref != ob->ref
+         && strchr(get_txt(ob->name), '#') == NULL
+           )
+        {
+            dprintf4(2, "DEBUG: GC object %x '%s': refs %d, extra_refs %d\n"
+                      , (p_int)ob, (p_int)get_txt(ob->name), (p_int)ob->ref
+                      , (p_int)ob->extra_ref);
+        }
+    }
+#endif
+} /* garbage_collection() */
 
 
 #if defined(MALLOC_TRACE)

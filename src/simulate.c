@@ -1793,6 +1793,11 @@ load_object (const char *lname, Bool create_super, int depth, namechain_t *chain
         debug_message("%s --%s loaded\n", time_stamp(), get_txt(ob->name));
     }
 
+#ifdef CHECK_OBJECT_REF
+    if (strchr(get_txt(ob->name), '#') == NULL)
+        printf("DEBUG: new_object(%p '%s') ref %ld flags %x\n"
+              , ob, get_txt(ob->name), (long)ob->ref, ob->flags);
+#endif
     return ob;
 } /* load_object() */
 

@@ -216,8 +216,13 @@ object_t NULL_object = { 0 };
    */
 
 /*-------------------------------------------------------------------------*/
+#ifndef CHECK_OBJECT_REF
 void
 _free_object (object_t *ob)
+#else
+void
+_free_object (object_t *ob, const char * file, int line)
+#endif
 
 /* Deallocate/dereference all memory and structures held by <ob>.
  * At the time of call, the object must be have at no refcount left,
@@ -233,6 +238,11 @@ _free_object (object_t *ob)
     if (ob->ref > 0)
         fatal("Object with %ld refs passed to _free_object()\n", ob->ref);
 
+#ifdef CHECK_OBJECT_REF
+    if (strchr(get_txt(ob->name), '#') == NULL)
+        printf("DEBUG: (%s:%d) free_object(%p '%s') ref %d flags %x\n"
+              , file, line, ob, get_txt(ob->name), ob->ref, ob->flags);
+#endif
     if (d_flag)
         printf("%s free_object: %s.\n", time_stamp(), get_txt(ob->name));
 
@@ -462,8 +472,13 @@ do_free_sub_strings (int num_strings,   string_t **strings
 }
 
 /*-------------------------------------------------------------------------*/
+#ifndef CHECK_OBJECT_REF
 void
 free_prog (program_t *progp, Bool free_all)
+#else
+void
+_free_prog (program_t *progp, Bool free_all, const char * file, int line)
+#endif
 
 /* Decrement the refcount for program <progp>. If it reaches 0, the program
  * is freed.
@@ -487,6 +502,11 @@ free_prog (program_t *progp, Bool free_all)
     if (progp->ref > 0)
         return;
 
+#ifdef CHECK_OBJECT_REF
+    if (strchr(get_txt(progp->name), '#') == NULL)
+        printf("DEBUG: (%s:%d) free_prog(%p '%s') ref %d\n"
+              , file, line, progp, get_txt(progp->name), progp->ref);
+#endif
     if (d_flag)
         printf("%s free_prog: %s\n", time_stamp(), get_txt(progp->name));
     if (progp->ref < 0)
@@ -496,6 +516,12 @@ free_prog (program_t *progp, Bool free_all)
     {
         object_t * blueprint = progp->blueprint;
         progp->blueprint = NULL;
+#ifdef CHECK_OBJECT_REF
+    if (strchr(get_txt(blueprint->name), '#') == NULL)
+        printf("DEBUG: (%s:%d) free_prog(%p '%s') ref %d : blueprint (%p '%s') ref %d, flags %x\n"
+              , file, line, progp, get_txt(progp->name), progp->ref
+              , blueprint, get_txt(blueprint->name), blueprint->ref, blueprint->flags);
+#endif
         free_object(blueprint, "free_prog");
     }
 

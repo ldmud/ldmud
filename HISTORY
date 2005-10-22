@@ -73,7 +73,7 @@ For a detailed list of all changes see the file CHANGELOG.
            the maximum number of keys.
 
 
-04-Mar-2002 (Lars Duening) -- upcoming Release 3.2.9
+05-Mar-2002 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -171,6 +171,7 @@ For a detailed list of all changes see the file CHANGELOG.
            call outs.
        + call_resolved(): Now accepts a destructed object as second parameter
            as it should.
+       + deep_copy(): Didn't handle quoted arrays properly.
        + functionlist(): The filter flags didn't really work.
        + input_to(): The option IGNORE_BANG didn't work. In charmode, !-escapes
            after the first received data are now recognized. 
@@ -210,6 +211,7 @@ For a detailed list of all changes see the file CHANGELOG.
            of numbers or strings.
        + remove_input_to(): Remove a pending input_to.
        + sgn(): Return the sign of a numeric argument.
+       + unquote(): Remove a quote from a quoted array or symbol.
        + utime(): Return the current time in microsecond resolution.
 
     - Master Object:
