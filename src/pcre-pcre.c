@@ -8,5 +8,6 @@
 #include "driver.h"
 
 #ifdef USE_PCRE
+#define NEWLINE '\n'
 #include "pcre/pcre.c"
 #endif

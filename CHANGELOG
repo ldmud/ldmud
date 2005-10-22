@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+31-Mar-2002 (Lars Duening)  (3.3.193)
+    - (rxcache, efuns.c, ed.c, mstrings.c) The driver again compiles
+         when PCRE is activated, but substituting strings is not
+         implemented yet; and matching strings hasn't been tested.
+
 30-Mar-2002 (Lars Duening)  (3.3.192)
     - (driver.h) The blueprint code helped some people (but not all), so I
          re-activated it as a counter-check.

@@ -568,12 +568,20 @@ ckglob (void)
              */
             if (glbpat)
             {
+                int rc;
                 lin = gettxtl(ptr);
-                if (rx_exec(glbpat, lin, lin))
+                rc = rx_exec_str(glbpat, lin, lin);
+                if (rc < 0)
+                {
+                    add_message("ed: %s\n", rx_error_message(rc) );
+                    return ERR;
+                }
+
+                if (rc > 0)
                 {
                     if (c=='g') ptr->l_stat |= LGLOB;
                 }
-                else
+                else 
                 {
                     if (c=='v') ptr->l_stat |= LGLOB;
                 }
@@ -974,8 +982,15 @@ find (regexp_t *pat, Bool dir)
 
     for (i = 0; i < P_LASTLN; i++ )
     {
+        int rc;
         char *line_start = gettxtl(lin);
-        if( rx_exec(pat, line_start, line_start) )
+        rc = rx_exec_str(pat, line_start, line_start);
+        if (rc < 0)
+        {
+            add_message("ed: %s\n", rx_error_message(rc) );
+            return ERR;
+        }
+        if (rc)
             return(num);
         if( dir )
             num = nextln(num), lin = getnextptr(lin);
@@ -1011,7 +1026,14 @@ findg (regexp_t *pat, Bool dir)
 
     for (i = 0; i < P_LASTLN; i++ )
     {
-        if (rx_exec(pat, gettxtl(lin), gettxtl(lin)))
+        int rc;
+        rc = rx_exec_str(pat, gettxtl(lin), gettxtl(lin)))
+        if (rc < 0)
+        {
+            add_message("ed: %s\n", rx_error_message(rc) );
+            return ERR;
+        }
+        if (rc > 0)
         {
             prntln( gettxtl( lin ), P_LFLG, (P_NFLG ? P_CURLN : 0));
              count++;
@@ -1797,7 +1819,7 @@ subst (regexp_t *pat, char *sub, Bool gflg, Bool pflag)
     for (setCurLn( prevln( P_LINE1 ) ); still_running; )
     {
         char    *start, *current;
-        int    space;
+        int    space, rc;
 
         nextCurLn();
         new = buf;
@@ -1805,23 +1827,33 @@ subst (regexp_t *pat, char *sub, Bool gflg, Bool pflag)
             still_running = FALSE;
 
         current = start = gettxtl(P_CURPTR);
-        if ( rx_exec(pat, current, start) )
+        rc = rx_exec_str(pat, current, start);
+        if (rc < 0)
+        {
+            add_message("ed: %s\n", rx_error_message(rc) );
+            return SUB_FAIL;
+        }
+        if ( rc )
         {
             space = MAXLINE;
             do
             {
                 /* Copy leading text */
-                size_t diff = (size_t)(pat->rx->startp[0] - current);
+                size_t mstart, mend;
+                size_t diff;
+                  
+                rx_get_match_str(pat, start, &mstart, &mend);
+                diff = start + mstart - current;
                 if ( (space -= diff) < 0)
                     return SUB_FAIL;
                 strncpy( new, current, diff );
                 new += diff;
                 /* Do substitution */
                 old = new;
-                new = rx_sub( pat, sub, new, space,0);
+                new = rx_sub_str( pat, sub, new, space,0);
                 if (!new || (space-= new-old) < 0)
                     return SUB_FAIL;
-                if (current == pat->rx->endp[0])
+                if (current == start + mend)
                 {
                     /* prevent infinite loop */
                     if (!*current)
@@ -1831,8 +1863,18 @@ subst (regexp_t *pat, char *sub, Bool gflg, Bool pflag)
                     *new++ = *current++;
                 }
                 else
-                    current = pat->rx->endp[0];
-            } while(gflg && !pat->rx->reganch && rx_exec(pat, current, start));
+                    current = start + mend;
+            } while(gflg
+#ifndef USE_PCRE
+                 && !pat->rx->reganch
+#endif
+                 && (rc = rx_exec_str(pat, current, start)) > 0);
+
+            if (rc < 0)
+            {
+                add_message("ed: %s\n", rx_error_message(rc) );
+                return SUB_FAIL;
+            }
 
             /* Copy trailing chars */
             if ( (space -= strlen(current)+1 ) < 0)

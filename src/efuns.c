@@ -440,6 +440,7 @@ f_regexp (svalue_t *sp)
     vector_t *ret;             /* The result vector */
     string_t * pattern;        /* The pattern passed in */
     int        opt;            /* The RE options passed in */
+    int        rc;             /* Resultcode from the rx_exec() call */
     mp_int i;
 
     v = (sp-2)->u.vec;
@@ -469,6 +470,7 @@ f_regexp (svalue_t *sp)
         if (!res)
         {
             free_regexp(reg);
+            inter_sp = sp;
             error("Stack overflow in regexp()");
             /* NOTREACHED */
             return sp;
@@ -484,8 +486,17 @@ f_regexp (svalue_t *sp)
 
             eval_cost++;
             line = v->item[i].u.str;
-            if (rx_exec(reg, get_txt(line), get_txt(line)) == 0)
+            rc = rx_exec(reg, line, 0);
+            if (rc == 0)
                 continue;
+            if (rc < 0)
+            {
+                free_regexp(reg);
+                inter_sp = sp;
+                error("regexp: %s\n", rx_error_message(rc));
+                /* NOTREACHED */
+                return NULL;
+            }
 
             res[i] = MY_TRUE;
             num_match++;
@@ -534,12 +545,11 @@ f_regexplode (svalue_t *sp)
      * structures which are allocated on the stack.
      */
     struct regexplode_match {
-        char *start, *end;              /* Start and end of the match in text */
+        size_t start, end;              /* Start and end of the match in text */
         struct regexplode_match *next;  /* Next list element */
     };
 
-    char     *text;                    /* Input text from the vm stack */
-    string_t *textstr;                 /* ditto, as string_t */
+    string_t *text;                    /* Input string */
     string_t *pattern;                 /* Delimiter pattern from the vm stack */
     regexp_t *reg;                     /* Compiled pattern */
     struct regexplode_match *matches;  /* List of matches */
@@ -549,12 +559,12 @@ f_regexplode (svalue_t *sp)
     svalue_t *svp;                     /* Next element in ret to fill in */
     int num_match;                     /* Number of matches */
     int       opt;                     /* RE options */
-    char *str;
+    int       rc;                      /* Result from rx_exec() */
+    size_t    start;                   /* Start position for match */
 
     /* Get the efun arguments */
 
-    textstr = sp[-2].u.str;
-    text = get_txt(textstr);
+    text = sp[-2].u.str;
     pattern = sp[-1].u.str;
     opt = (int)sp->u.number;
 
@@ -569,26 +579,40 @@ f_regexplode (svalue_t *sp)
     /* Loop over <text>, repeatedly matching it against the pattern,
      * until all matches have been found and recorded.
      */
-    str = text;        /* Remaining <text> to analyse */
+    start = 0;
     num_match = 0;
     matchp = &matches;
-    while (rx_exec(reg, str, text)) {
+    while ((rc = rx_exec(reg, text, start)) > 0)
+    {
         eval_cost++;
         match = (struct regexplode_match *)alloca(sizeof *match);
         if (!match)
         {
+            free_regexp(reg);
+            inter_sp = sp;
             error("Stack overflow in regexplode()");
             /* NOTREACHED */
             return sp;
         }
-        match->start = reg->rx->startp[0];
-        match->end = str = reg->rx->endp[0];
+        rx_get_match(reg, text, &(match->start), &(match->end));
+        start = match->end;
         *matchp = match;
         matchp = &match->next;
         num_match++;
-        if (!*str || (match->start == str && !*++str) )
+        if (start == mstrsize(text)
+         || (match->start == start && ++start == mstrsize(text)) )
             break;
     }
+
+    if (rc < 0) /* Premature abort on error */
+    {
+        free_regexp(reg);
+        inter_sp = sp;
+        error("regexp: %s\n", rx_error_message(rc));
+        /* NOTREACHED */
+        return NULL;
+    }
+
     *matchp = 0; /* Terminate list properly */
 
     /* Prepare the result vector */
@@ -606,32 +630,33 @@ f_regexplode (svalue_t *sp)
      * into ret.
      */
     svp = ret->item;
+    start = 0;
     for (match = matches; match; match = match->next) {
         mp_int len;
         string_t *txt;
 
         /* Copy the text leading up to the current delimiter match. */
-        len = match->start - text;
-        memsafe(txt = new_n_mstring(text, (size_t)len), (size_t)len, "text before delimiter");
-        text += len;
+        len = match->start - start;
+        memsafe(txt = mstr_extract(text, start, (size_t)len), (size_t)len, "text before delimiter");
         put_string(svp, txt);
         svp++;
 
         /* Copy the matched delimiter */
-        len = match->end - text;
-        memsafe(txt = new_n_mstring(text, (size_t)len), (size_t)len, "matched delimiter");
-        text += len;
+        len = match->end - match->start;
+        memsafe(txt = mstr_extract(text, match->start, (size_t)len), (size_t)len, "matched delimiter");
         put_string(svp, txt);
         svp++;
+
+        start = match->end;
     }
 
     /* Copy the remaining text (maybe the empty string) */
     {
-        mp_int len;
+        size_t len;
         string_t *txt;
 
-        len = (mp_int)mstrsize(textstr) - (text - get_txt(textstr));
-        memsafe(txt = new_n_mstring(text, (size_t)len), (size_t)len, "remaining text");
+        len = mstrsize(text) - start;
+        memsafe(txt = mstr_extract(text, start, (size_t)len), (size_t)len, "remaining text");
         put_string(svp, txt);
     }
 
@@ -673,11 +698,14 @@ f_regreplace (svalue_t *sp)
 {
     regexp_t *pat;
     int   flags;
-    char *oldbuf, *buf, *curr, *new, *start, *old, *sub, *match = NULL;
+    char *oldbuf, *buf, *new, *old, *match = NULL;
+    string_t * text, * sub;
+    size_t start;
     size_t matchsize = 0;
     svalue_t *subclosure = NULL;
     long  space;
     size_t  origspace;
+    int rc;
 
     /*
      * Must set inter_sp before call to rx_compile(),
@@ -689,7 +717,7 @@ f_regreplace (svalue_t *sp)
     flags = sp->u.number;
     if (sp[-1].type == T_STRING)
     {
-        sub = get_txt(sp[-1].u.str);
+        sub = sp[-1].u.str;
         subclosure = NULL;
     }
     else /* it's a closure */
@@ -698,9 +726,9 @@ f_regreplace (svalue_t *sp)
         subclosure = sp-1;
     }
 
-    start = curr = get_txt(sp[-3].u.str);
+    text = sp[-3].u.str;
 
-    space = (long)(origspace = (mstrsize(sp[-3].u.str) + 1)*2);
+    space = (long)(origspace = (mstrsize(text) + 1)*2);
       /* The '+1' so that empty strings don't cause a 'malloc size = 0' error.
        */
 
@@ -731,14 +759,37 @@ f_regreplace (svalue_t *sp)
     pat = rx_compile(sp[-2].u.str, flags, MY_FALSE);
     /* rx_compile() returns NULL on bad regular expressions. */
 
-    if (pat && rx_exec(pat,curr,start)) {
+    start = 0;
+    rc = 0;
+    if (pat)
+        rc = rx_exec(pat, text, start);
+
+    if (rc < 0) /* Premature abort on error */
+    {
+        xfree(buf);
+        if (pat)
+            free_regexp(pat);
+        if (match)
+            xfree(match);
+        inter_sp = sp;
+        error("regexp: %s\n", rx_error_message(rc));
+        /* NOTREACHED */
+        return NULL;
+    }
+
+    if (pat && rc > 0) {
         do {
-            size_t diff = (size_t)(pat->rx->startp[0]-curr);
+            size_t mstart, mend;
+            size_t diff;
+            
+            
+            rx_get_match(pat, text, &mstart, &mend);
+            diff = mstart - start;
             space -= diff; /* TODO: space -= diff+1 ? */
             while (space <= 0) {
                 XREALLOC;
             }
-            strncpy(new,curr,(size_t)diff);
+            strncpy(new, get_txt(text)+start, (size_t)diff);
             new += diff;
             old  = new;
 
@@ -746,7 +797,7 @@ f_regreplace (svalue_t *sp)
              */
             if (subclosure != NULL)
             {
-                size_t patsize = pat->rx->endp[0] - pat->rx->startp[0];
+                size_t patsize = mend - mstart;
 
                 if (patsize+1 > matchsize)
                 {
@@ -770,11 +821,11 @@ f_regreplace (svalue_t *sp)
                     match = nmatch;
                 }
 
-                memcpy(match, pat->rx->startp[0], patsize);
+                memcpy(match, get_txt(text)+mstart, patsize);
                 match[patsize] = '\0';
 
                 push_c_string(inter_sp, match);
-                push_number(inter_sp, pat->rx->startp[0] - start);
+                push_number(inter_sp, mstart - start);
                 call_lambda(subclosure, 2);
                 transfer_svalue(&apply_return_value, inter_sp);
                 inter_sp--;
@@ -791,7 +842,7 @@ f_regreplace (svalue_t *sp)
                     return NULL;
                 }
 
-                sub = get_txt(apply_return_value.u.str);
+                sub = apply_return_value.u.str;
             }
 
             /* Now what may have happen here. We *could*
@@ -829,35 +880,51 @@ f_regreplace (svalue_t *sp)
             while (space <= 0) {
                 XREALLOC;
             }
-            if (curr == pat->rx->endp[0])
+            if (start == mend)
             {
                 /* prevent infinite loop
                  * by advancing one character.
                  */
-                if (!*curr) break;
+                if (start == mstrsize(text)) break;
                 --space;
                 while (space <= 0) {
                     XREALLOC;
                 }
-                *new++ = *curr++;
+                *new++ = get_txt(text)[start++];
             }
             else
-                curr = pat->rx->endp[0];
+                start = mend;
         } while (  (flags & RE_GLOBAL)
+#ifndef USE_PCRE
                  && !pat->rx->reganch
-                 && *curr != '\0'
-                 && rx_exec(pat,curr,start)
+#endif
+                 && start < mstrsize(text)
+                 && (rc = rx_exec(pat, text, start)) > 0
                 );
-        space -= strlen(curr)+1;
+
+        if (rc < 0) /* Premature abort on error */
+        {
+            xfree(buf);
+            if (pat)
+                free_regexp(pat);
+            if (match)
+                xfree(match);
+            inter_sp = sp;
+            error("regexp: %s\n", rx_error_message(rc));
+            /* NOTREACHED */
+            return NULL;
+        }
+
+        space -= mstrsize(text) - start + 1;
         if (space <= 0) {
             XREALLOC;
         }
-        strcpy(new,curr);
+        strcpy(new, get_txt(text)+start);
     }
     else
     {
         /* Pattern not found -> no editing necessary */
-        strcpy(buf,start);
+        strcpy(buf, get_txt(text));
     }
 
     if (match)

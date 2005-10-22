@@ -7,9 +7,8 @@
  * regular expression implementations. It wraps the unique regexp
  * structures and calls into a unified API.
  *
- * Beware! rx_exec() stores result data in the regexp structure (the
- * startp[] and end[] arrays), so the same pattern must not be used
- * in two concurrent regcomp_cache/regexec pairs.
+ * Beware! rx_exec() stores result data in the regexp structure, so the
+ * same pattern must not be used in two concurrent rx_compile/rx_exec pairs.
  *
 #ifdef RXCACHE_TABLE
  * Additionally, the regular expressions are held in a cache.
@@ -47,6 +46,7 @@
 #include "mstrings.h"
 #include "regexp.h"
 #ifdef USE_PCRE
+#include "comm.h" /* add_message() */
 #include "pcre/pcre.h"
 #endif
 #include "simulate.h"
@@ -141,6 +141,50 @@ void rx_init(void)
 } /* rx_init() */
 
 /*--------------------------------------------------------------------*/
+const char *
+rx_error_message (int code
+#ifndef USE_PCRE
+                           UNUSED
+#endif
+                 )
+
+/* Return a constant string with the error message for <code>.
+ * If <code> is not an error, NULL is returned.
+ */
+
+{
+#ifdef USE_PCRE
+    const char* text;
+
+    if (code > 0)
+        return NULL;
+    switch (code)
+    {
+    case PCRE_ERROR_NOMATCH:
+        text = "too many capturing parentheses"; break;
+    case PCRE_ERROR_NULL:
+        text = "code or subject NULL"; break;
+    case PCRE_ERROR_BADOPTION:
+        text = "unknown option specified"; break;
+    case PCRE_ERROR_BADMAGIC:
+        text = "regex memory invalid"; break;
+    case PCRE_ERROR_UNKNOWN_NODE:
+        text = "regex memory violated"; break;
+    case PCRE_ERROR_NOMEMORY:
+        text = "out of memory"; break;
+    default:
+        text = "unknown internal error"; break;
+    }
+    return text;
+#else
+#ifdef __MWERKS__
+#    pragma unused(code)
+#endif
+    return NULL;
+#endif
+}  /* rx_error_message() */
+
+/*--------------------------------------------------------------------*/
 regexp_t *
 rx_compile (string_t * expr, int opt, Bool from_ed)
 
@@ -160,9 +204,11 @@ rx_compile (string_t * expr, int opt, Bool from_ed)
 #ifdef USE_PCRE
     pcre       * pProg;     /* The generated regular expression */
     pcre_extra * pHints;    /* Study data */
+    int        * pSubs;     /* Capturing and work area */
     const char * pErrmsg;
     int          erridx;
     int          pcre_opt;  /* <opt> translated into PCRE opts */
+    int          num_subs;  /* Number of capturing parentheses */
 #else
     regexp * pRegexp;
 #endif
@@ -202,7 +248,9 @@ rx_compile (string_t * expr, int opt, Bool from_ed)
      && pHash->pString != NULL
      && pHash->hString == hExpr
      && pHash->base.from_ed == from_ed
+#ifdef USE_PCRE
      && pHash->base.opt == opt
+#endif
      && mstreq(pHash->pString, expr)
        )
     {
@@ -214,31 +262,57 @@ rx_compile (string_t * expr, int opt, Bool from_ed)
     /* Regexp not found: compile a new one.
      */
 #ifdef USE_PCRE
-     pcre_malloc_size = 0;
-     pcre_malloc_err  = "compiling regex";
-     pProg = pcre_compile(get_txt(expr), pcre_opt, &pErrmsg, &erridx, NULL);
- 
-     if (NULL == pProg)
-     {
-         if (from_ed)
-             add_message("pcre: %s at offset %d\n", pErrmsg, erridx);
-         else
-             error("pcre: %s at offset %d\n", pErrmsg, erridx);
-         return NULL;
-     }
- 
-     pcre_malloc_err  = "studying regex";
-     pHints = pcre_study(pProg, 0, &pErrmsg);
- 
-     if (pErrmsg)
-     {
-         xfree(pProg);
-         if (from_ed)
-             add_message("pcre: %s\n", pErrmsg);
-         else
-             error("pcre: %s\n", pErrmsg);
-         return NULL;
-     }
+    pcre_malloc_size = 0;
+    pcre_malloc_err  = "compiling regex";
+    pProg = pcre_compile(get_txt(expr), pcre_opt, &pErrmsg, &erridx, NULL);
+
+    if (NULL == pProg)
+    {
+        if (from_ed)
+            add_message("pcre: %s at offset %d\n", pErrmsg, erridx);
+        else
+            error("pcre: %s at offset %d\n", pErrmsg, erridx);
+        return NULL;
+    }
+
+    pcre_malloc_err  = "studying regex";
+    pHints = pcre_study(pProg, 0, &pErrmsg);
+
+    if (pErrmsg)
+    {
+        xfree(pProg);
+        if (from_ed)
+            add_message("pcre: %s\n", pErrmsg);
+        else
+            error("pcre: %s\n", pErrmsg);
+        return NULL;
+    }
+
+    {
+       int rc;
+
+        rc = pcre_fullinfo(pProg, pHints, PCRE_INFO_CAPTURECOUNT, &num_subs);
+        if (rc != 0)
+        {
+            xfree(pProg);
+            xfree(pHints);
+            if (from_ed)
+                add_message("pcre: %s\n", rx_error_message(rc));
+            else
+                error("pcre: %s\n", rx_error_message(rc));
+            return NULL;
+        }
+        num_subs = 3 * (num_subs+1);
+    }
+
+    pSubs = xalloc(num_subs * sizeof (*pSubs));
+    if (pSubs == NULL)
+    {
+        xfree(pProg);
+        xfree(pHints);
+        outofmem(num_subs * sizeof (*pSubs), "regexp work area");
+    }
+    pcre_malloc_size += num_subs * sizeof (*pSubs);
 #else
     pRegexp = regcomp((unsigned char *)get_txt(expr)
                      , opt & RE_EXCOMPATIBLE, from_ed);
@@ -259,6 +333,8 @@ rx_compile (string_t * expr, int opt, Bool from_ed)
 #ifdef USE_PCRE
         rc->pProg = pProg;
         rc->pHints = pHints;
+        rc->pSubs = pSubs;
+        rc->num_subs = num_subs;
 #else
         rc->rx = pRegexp;
 #endif
@@ -288,6 +364,8 @@ rx_compile (string_t * expr, int opt, Bool from_ed)
 #ifdef USE_PCRE
     pHash->base.pProg = pProg;
     pHash->base.pHints = pHints;
+    pHash->base.pSubs = pSubs;
+    pHash->base.num_subs = num_subs;
     pHash->size = pcre_malloc_size;
 #else
     pHash->base.rx = pRegexp;
@@ -302,25 +380,269 @@ rx_compile (string_t * expr, int opt, Bool from_ed)
 } /* rx_compile() */
 
 /*-------------------------------------------------------------------------*/
-Bool
-rx_exec (regexp_t *prog, char *string, char *start)
+int
+rx_exec (regexp_t *prog, string_t * string, size_t start)
 
-/* Match the regexp <prog> against the <string> starting at the
- * position <start>.
+/* Match the regexp <prog> against the <string>, starting the match
+ * at the position <start>.
  *
- * Return TRUE if found.
+ * Return a positive number if pattern matched, 0 if it did not match,
+ * or a negative error code (this can be printed with rx_error_message()).
  */
 
 {
 #ifdef USE_PCRE
+    int rc;
+    int pcre_opt;
+
+    /* Determine the RE compilation options */
+
+    pcre_opt = 0;
+    if (prog->opt & RE_ANCHORED) pcre_opt |= PCRE_ANCHORED;
+    if (prog->opt & RE_NOTBOL)   pcre_opt |= PCRE_NOTBOL;
+    if (prog->opt & RE_NOTEOL)   pcre_opt |= PCRE_NOTEOL;
+    if (prog->opt & RE_NOTEMPTY) pcre_opt |= PCRE_NOTEMPTY;
+
+    rc = pcre_exec( prog->pProg, prog->pHints
+                  , get_txt(string), mstrsize(string), start, pcre_opt
+                  , prog->pSubs, prog->num_subs
+                  );
+    prog->res = rc;
+    
+    /* Reverse the roles of return codes 0 (not enough entries in subs[])
+     * and PCRE_ERROR_NOMATCH.
+     */
+    if (rc == PCRE_ERROR_NOMATCH) rc = 0;
+    else if (rc == 0) rc = PCRE_ERROR_NOMATCH;
+
+    return rc;
 #else
-    return regexec(prog->rx, string, start);
+    return regexec(prog->rx, get_txt(string)+start, get_txt(string));
 #endif
 } /* rx_exec() */
 
 /*-------------------------------------------------------------------------*/
+int
+rx_exec_str (regexp_t *prog, char * string, char * start)
+
+/* Match the regexp <prog> against the <string> whose real begin
+ * is at <start>.
+ *
+ * Return a positive number if pattern matched, 0 if it did not match,
+ * or a negative error code (this can be printed with rx_error_message()).
+ *
+ * This method is used by ed().
+ */
+
+{
+#ifdef USE_PCRE
+    int rc;
+    int pcre_opt;
+
+    /* Determine the RE compilation options */
+
+    pcre_opt = 0;
+    if (prog->opt & RE_ANCHORED) pcre_opt |= PCRE_ANCHORED;
+    if (prog->opt & RE_NOTBOL)   pcre_opt |= PCRE_NOTBOL;
+    if (prog->opt & RE_NOTEOL)   pcre_opt |= PCRE_NOTEOL;
+    if (prog->opt & RE_NOTEMPTY) pcre_opt |= PCRE_NOTEMPTY;
+
+    rc = pcre_exec( prog->pProg, prog->pHints
+                  , string, strlen(string), start - string, pcre_opt
+                  , prog->pSubs, prog->num_subs
+                  );
+    
+    /* Reverse the roles of return codes 0 (not enough entries in subs[])
+     * and PCRE_ERROR_NOMATCH.
+     */
+    if (rc == PCRE_ERROR_NOMATCH) rc = 0;
+    else if (rc == 0) rc = PCRE_ERROR_NOMATCH;
+
+    return rc;
+#else
+    return regexec(prog->rx, string, start);
+#endif
+} /* rx_exec_str() */
+
+/*-------------------------------------------------------------------------*/
+void
+rx_get_match (regexp_t *prog, string_t * str, size_t * start, size_t * end)
+
+/* After a successful match of <prog> against <str>, return the start
+ * and end position of the match in *<start> and *<end>. The end
+ * position is in fact the position of the first character after the match.
+ */
+
+{
+#ifdef USE_PCRE
+#ifdef __MWERKS__
+#    pragma unused(str)
+#endif
+    *start = (size_t)prog->pSubs[0];
+    *end = (size_t)prog->pSubs[1];
+#else
+    *start = prog->rx->startp[0] - get_txt(str);
+    *end = prog->rx->endp[0] - get_txt(str);
+#endif
+} /* rx_get_match() */
+
+/*-------------------------------------------------------------------------*/
+void
+rx_get_match_str (regexp_t *prog, char * str, size_t * start, size_t * end)
+
+/* After a successful match of <prog> against <str>, return the start
+ * and end position of the match in *<start> and *<end>. The end
+ * position is in fact the position of the first character after the match.
+ */
+
+{
+#ifdef USE_PCRE
+#ifdef __MWERKS__
+#    pragma unused(str)
+#endif
+    *start = (size_t)prog->pSubs[0];
+    *end = (size_t)prog->pSubs[1];
+#else
+    *start = prog->rx->startp[0] - str;
+    *end = prog->rx->endp[0] - str;
+#endif
+} /* rx_get_match_str() */
+
+/*-------------------------------------------------------------------------*/
+#if 0
+string_t *
+rx_sub2 (regexp_t *prog, string_t *source, string_t *subst, Bool quiet)
+
+/* <prog> describes a regexp match in string <source>. Take the
+ * replacement string <subst> and substitute any matched subparentheses.
+ * The result is a new string with one reference.
+ *
+ * Returns NULL when out of memory.
+ */
+
+{
+#ifdef USE_PCRE
+    size_t left;
+    int no;
+    char * src;
+    char * dst;
+    Bool   copyPass;  /* Pass indicator */
+    size_t len;       /* Computed length of the result */
+
+    /* Make two passes over the the string: one to compute the size
+     * of the result, the second to create the result.
+     */
+    copyPass = MY_FALSE;
+    len = 0;
+    do
+    {
+        left = mstrsize(subst);
+        src = get_txt(subst);
+        
+        while (left-- > 0)
+        {
+            c = *src++;
+            if (c == '&')
+                no = 0;
+            else if (c == '\\' && '0' <= *src && *src <= '9')
+                no = *src++ - '0';
+            else
+                no = -1;
+
+            if (no < 0) /* Ordinary character. */
+            {
+                if (c == '\\' && (*src == '\\' || *src == '&'))
+                    c = *src++;
+                if (copyPass)
+                    *dst++ = c;
+                else
+                    len++;
+            }
+            else if (prog->startp[no] != NULL
+                 &&  prog->endp[no] != NULL)
+            {
+                len = prog->endp[no] - prog->startp[no];
+                if ( (n-=len) < 0 )
+                {
+                    if (!quiet) regerror("line too long");
+                    return NULL;
+                }
+                strncpy(dst, prog->startp[no], len);
+                dst += len;
+                if (len != 0 && *(dst - 1) == '\0')
+                {
+                    regerror("damaged match string");
+                    return NULL;
+                }
+            }
+        }
+        /* End of pass */
+        copyPass = !copyPass;
+    } while (copyPass);
+#if 0
+    left = mstrsize(source);
+    src = get_txt(source);
+    dst = dest;
+    while (left-- > 0)
+    {
+        c = *src++;
+        if (c == '&')
+            no = 0;
+        else if (c == '\\' && '0' <= *src && *src <= '9')
+            no = *src++ - '0';
+        else
+            no = -1;
+
+        if (no < 0) /* Ordinary character. */
+        {
+            if (c == '\\' && (*src == '\\' || *src == '&'))
+                c = *src++;
+            if (--n < 0)
+            {
+                if (!quiet)
+                    regerror("line too long");
+                return NULL;
+            }
+            *dst++ = c;
+        }
+        else if (prog->startp[no] != NULL
+             &&  prog->endp[no] != NULL)
+        {
+            len = prog->endp[no] - prog->startp[no];
+            if ( (n-=len) < 0 )
+            {
+                if (!quiet) regerror("line too long");
+                return NULL;
+            }
+            strncpy(dst, prog->startp[no], len);
+            dst += len;
+            if (len != 0 && *(dst - 1) == '\0')
+            {
+                regerror("damaged match string");
+                return NULL;
+            }
+        }
+    }
+
+    if (--n < 0)
+    {
+        if (!quiet)
+            regerror("line too long");
+        return NULL;
+    }
+    *dst = '\0';
+    return dst;
+#endif
+    error("DEBUG: TODO: rx_sub() not implemented for PCRE\n"); return NULL;
+#else
+    return regsub (prog->rx, get_txt(source), dest, n, quiet);
+#endif
+} /* rx_sub2() */
+#endif
+
+/*-------------------------------------------------------------------------*/
 char *
-rx_sub (regexp_t *prog, char *source, char *dest, int n, Bool quiet)
+rx_sub (regexp_t *prog, string_t *source, char *dest, int n, Bool quiet)
 
 /* After a regexp match, substitute the tokens '\<num>' in <source>
  * with the appropriate matched () expressions, and store the
@@ -332,10 +654,102 @@ rx_sub (regexp_t *prog, char *source, char *dest, int n, Bool quiet)
 
 {
 #ifdef USE_PCRE
+    size_t left;
+    int no;
+    char * src;
+    char * dst;
+
+#if 0
+    left = mstrsize(source);
+    src = get_txt(source);
+    dst = dest;
+    while (left-- > 0)
+    {
+        c = *src++;
+        if (c == '&')
+            no = 0;
+        else if (c == '\\' && '0' <= *src && *src <= '9')
+            no = *src++ - '0';
+        else
+            no = -1;
+
+        if (no < 0) /* Ordinary character. */
+        {
+            if (c == '\\' && (*src == '\\' || *src == '&'))
+                c = *src++;
+            if (--n < 0)
+            {
+                if (!quiet)
+                    regerror("line too long");
+                return NULL;
+            }
+            *dst++ = c;
+        }
+        else if (prog->startp[no] != NULL
+             &&  prog->endp[no] != NULL)
+        {
+            len = prog->endp[no] - prog->startp[no];
+            if ( (n-=len) < 0 )
+            {
+                if (!quiet) regerror("line too long");
+                return NULL;
+            }
+            strncpy(dst, prog->startp[no], len);
+            dst += len;
+            if (len != 0 && *(dst - 1) == '\0')
+            {
+                regerror("damaged match string");
+                return NULL;
+            }
+        }
+    }
+
+    if (--n < 0)
+    {
+        if (!quiet)
+            regerror("line too long");
+        return NULL;
+    }
+    *dst = '\0';
+    return dst;
+#endif
+    error("DEBUG: TODO: rx_sub() not implemented for PCRE\n"); return NULL;
+#else
+    return regsub (prog->rx, get_txt(source), dest, n, quiet);
+#endif
+} /* rx_sub() */
+
+/*-------------------------------------------------------------------------*/
+char *
+rx_sub_str (regexp_t *prog, char *source, char *dest, int n, Bool quiet)
+
+/* After a regexp match, substitute the tokens '\<num>' in <source>
+ * with the appropriate matched () expressions, and store the
+ * result in <dest> (max size <n>).
+ *
+ * Return NULL on failure, and <dest> on success. If <quiet> is
+ * FALSE, a failure also generates a call to regerror().
+ */
+
+{
+#ifdef USE_PCRE
+    string_t *str;
+    char * rc;
+
+    str = new_mstring(source);
+    if (!str)
+    {
+        if (!quiet)
+            regerror("Out of memory.\n");
+        return NULL;
+    }
+    rc = rx_sub(prog, str, dest, n, quiet);
+    free_mstring(str);
+    return rc;
 #else
     return regsub (prog->rx, source, dest, n, quiet);
 #endif
-} /* rx_sub() */
+} /* rx_sub_str() */
 
 /*--------------------------------------------------------------------*/
 void

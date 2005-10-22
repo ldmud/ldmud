@@ -27,8 +27,11 @@ struct regexp_s {
     Bool   from_ed;  /* TRUE: Print error msgs directly to user */
     int    opt;      /* Additional options */
 #ifdef USE_PCRE
-    pcre        * pProg;   /* The generated regular expression */
-    pcre_extra  * pHints;  /* Study data */
+    pcre        * pProg;     /* The generated regular expression */
+    pcre_extra  * pHints;    /* Study data */
+    int           res;       /* Result of last rx_exec() */
+    int           num_subs;  /* Number of elements in pSubs */
+    int         * pSubs;     /* Substring offsets + workarea */
 #else
     regexp * rx;  /* The actual regular expression */
 #endif
@@ -61,9 +64,14 @@ struct regexp_s {
 /* --- Prototypes --- */
 
 extern void rx_init(void);
+extern const char * rx_error_message (int code);
 extern regexp_t * rx_compile (string_t * expr, int opt, Bool from_ed);
-extern Bool   rx_exec (regexp_t *prog, char *string, char *start);
-extern char * rx_sub (regexp_t *prog, char *source, char *dest, int n, Bool quiet);
+extern int    rx_exec (regexp_t *prog, string_t * string, size_t start);
+extern int    rx_exec_str (regexp_t *prog, char * string, char * start);
+extern char * rx_sub (regexp_t *prog, string_t *source, char *dest, int n, Bool quiet);
+extern char * rx_sub_str (regexp_t *prog, char *source, char *dest, int n, Bool quiet);
+extern void rx_get_match (regexp_t *prog, string_t * str, size_t * start, size_t * end);
+extern void rx_get_match_str (regexp_t *prog, char * str, size_t * start, size_t * end);
 extern void   rx_free(regexp_t *);
 extern size_t rxcache_status(strbuf_t *sbuf, Bool verbose);
 extern void   rxcache_dinfo_status(svalue_t *svp, int value);
