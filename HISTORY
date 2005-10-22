@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-05-Apr-2001 (Lars Duening) -- Development Release 3.3
+11-Apr-2001 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -69,6 +69,8 @@ For a detailed list of all changes see the file CHANGELOG.
            normal runtime errors, and those occuring during a heartbeat.
        + include_file(), H_INCLUDE_DIRS: The pathnames can now start
            with leading slashes.
+       + If a master is forced to reload via SIGUSR1, all inherited objects
+           (if any) are reloaded as well.
        + Bugfix: slow_shut_down() was not called with previous_object(),
            this_player() and this_interactive() being 0.
        + Bugfix: When reactivating a destructed master, the lfuns
@@ -118,6 +120,7 @@ For a detailed list of all changes see the file CHANGELOG.
        + Bugfix: Right shift by 32 or more bits was computed incorrectly.
        + Bugfix: All <op>= assignment operators can now operate on
            indexed strings on the left hand side.
+       + Bugfix: Additions of floats to 0 yielded the wrong type.
 
     - Runtime:
        + Revamped the string handling to use refcounted strings everywhere.

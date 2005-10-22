@@ -3729,7 +3729,7 @@ compile_value (svalue_t *value, int opt_flags)
                 if (current.code_left < 4)
                     realloc_code();
                 current.code_left -= 4;
-                STORE_CODE(current.codep, F_CALL_FUNCTION_BY_ADDRESS);
+                STORE_CODE(current.codep, F_CALL_FUNCTION);
                 STORE_SHORT(current.codep, l->function.index);
                 STORE_CODE(current.codep, instrs[F_RESTORE_ARG_FRAME].opcode);
                 if (block_size > 0x100)

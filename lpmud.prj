@@ -22,12 +22,14 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 39)
-(Parent-Version lpmud 3-3 38)
-(Version-Log "Small correction to Makefile.in and smalloc.c")
+(Project-Version lpmud 3-3 40)
+(Parent-Version lpmud 3-3 39)
+(Version-Log "SIGUSR1 does a deep destruct on the master.
+Additions of floats to 0 yielded the wrong type.
+Arguments passed to runtime_error() from master applies were wrong.")
 (New-Version-Log
 "")
-(Checkin-Time "Sun, 08 Apr 2001 23:09:01 -0600")
+(Checkin-Time "Wed, 11 Apr 2001 22:30:48 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -60,8 +62,8 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.3 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.12 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.102 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.162 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.103 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.163 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.9 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -86,7 +88,7 @@
   (src/settings/dt2 (lpmud/F/5_dt2 1.1.1.1 744))
   (src/settings/eotl (lpmud/G/40_eotl 1.2.1.1 744))
   (src/settings/evermore (lpmud/E/31_evermore 1.1.1.1 744))
-  (src/settings/evermore-native (lpmud/H/28_evermore-n 1.1.1.1 744))
+  (src/settings/evermore-native (lpmud/H/28_evermore-n 1.1.1.2 744))
   (src/settings/finalfrontier (lpmud/I/29_finalfront 1.1.1.2 744))
   (src/settings/forgottendreams (lpmud/H/2_forgottend 1.2.1.1 744))
   (src/settings/heaven7 (lpmud/K/22_heaven7 1.2 644))
@@ -113,13 +115,13 @@
   (src/array.h (lpmud/f/47_array.h 1.18.1.12 644))
   (src/array.c (lpmud/d/12_array.c 1.46.1.23 644))
   (src/backend.h (lpmud/f/46_backend.h 1.20.1.3 644))
-  (src/backend.c (lpmud/d/6_backend.c 1.68.1.22 644))
+  (src/backend.c (lpmud/d/6_backend.c 1.68.1.23 644))
   (src/bitstrings.h (lpmud/I/47_bitstrings 1.1 644))
   (src/bitstrings.c (lpmud/I/48_bitstrings 1.3 644))
   (src/call_out.h (lpmud/f/45_call_out.h 1.7.1.4 644))
   (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.10 644))
   (src/closure.h (lpmud/f/44_closure.h 1.7.1.4 644))
-  (src/closure.c (lpmud/d/4_closure.c 1.41.1.24 644))
+  (src/closure.c (lpmud/d/4_closure.c 1.41.1.25 644))
   (src/comm.c (lpmud/d/2_comm1.c 1.69.1.34 644))
   (src/comm.h (lpmud/d/3_comm.h 1.26.1.12 644))
   (src/driver.h (lpmud/f/36_driver.h 1.15.1.6 644))
@@ -129,7 +131,7 @@
   (src/ed.c (lpmud/c/33_ed.c 1.32.1.13 644))
   (src/efuns.h (lpmud/l/20_efuns.h 1.13.1.8 644))
   (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.25 644))
-  (src/exec.h (lpmud/c/32_exec.h 1.34.1.11 644))
+  (src/exec.h (lpmud/c/32_exec.h 1.34.1.12 644))
   (src/files.h (lpmud/I/49_files.h 1.1 644))
   (src/files.c (lpmud/I/50_files.c 1.8 644))
   (src/filestat.h (lpmud/f/51_filestat.h 1.7 644))
@@ -140,7 +142,7 @@
   (src/heartbeat.h (lpmud/m/41_heartbeat. 1.6.1.4 644))
   (src/heartbeat.c (lpmud/m/42_heartbeat. 1.18.1.5 644))
   (src/interpret.h (lpmud/b/13_interpret. 1.33.1.16 644))
-  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.56 644))
+  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.57 644))
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.8 644))
   (src/lex.c (lpmud/b/12_lex.c 1.62.1.39 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.5 644))
@@ -169,7 +171,7 @@
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.5 644))
   (src/port.c (lpmud/39_port.c 1.17.1.4 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.12 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.47 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.48 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))
@@ -181,8 +183,8 @@
   (src/sent.h (lpmud/33_sent.h 1.11.1.3 644))
   (src/simul_efun.h (lpmud/f/17_simul_efun 1.5.1.4 644))
   (src/simul_efun.c (lpmud/32_simul_efun 1.20.1.7 644))
-  (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.15 644))
-  (src/simulate.c (lpmud/31_simulate.c 1.88.1.31 644))
+  (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.16 644))
+  (src/simulate.c (lpmud/31_simulate.c 1.88.1.32 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.7 644))
   (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.26 644))
   (src/sprintf.h (lpmud/f/15_sprintf.h 1.3.1.2 644))
@@ -202,7 +204,7 @@
   (src/xalloc.c (lpmud/H/0_xalloc.c 1.2.1.1 644))
 
   ;; Build files
-  (src/func_spec (lpmud/c/31_func_spec 1.53.1.25 644))
+  (src/func_spec (lpmud/c/31_func_spec 1.53.1.26 644))
   (src/string_spec (lpmud/F/6_string_spe 1.13 644))
   (src/mkfunc.c (lpmud/L/14_mkfunc.c 1.1 644))
   (src/make_func.y (lpmud/b/7_make_func. 1.25.1.12 644))
@@ -408,7 +410,7 @@
   ;; Bug reports and Feature requests
   (src/bugs/README (lpmud/g/40_README 1.5 644) :no-keywords)
 
-  (src/bugs/b-summary (lpmud/C/34_b-summary 1.47.1.9 644) :no-keywords)
+  (src/bugs/b-summary (lpmud/C/34_b-summary 1.47.1.10 644) :no-keywords)
   (src/bugs/b-981028 (lpmud/g/37_b-981028 1.6 644) :no-keywords)
   (src/bugs/b-981202-3 (lpmud/h/27_b-981202-3 1.1 644) :no-keywords)
   (src/bugs/order_alist/room/dino.c (lpmud/h/28_dino.c 1.2 644) :no-keywords)
@@ -457,8 +459,9 @@
   (src/bugs/b-001016-1 (lpmud/J/32_b-001016-1 1.1 644) :no-keywords)
   (src/bugs/b-010115 (lpmud/K/14_b-010115 1.2 644) :no-keywords)
   (src/bugs/b-010115-1 (lpmud/K/15_b-010115-1 1.1 644) :no-keywords)
+  (src/bugs/b-010410 (lpmud/L/28_b-010410 1.1 644) :no-keywords)
 
-  (src/bugs/f-summary (lpmud/C/37_f-summary 1.39.1.14 644) :no-keywords)
+  (src/bugs/f-summary (lpmud/C/37_f-summary 1.39.1.15 644) :no-keywords)
   (src/bugs/f-981027-0 (lpmud/g/29_f-981027-0 1.2 644) :no-keywords)
   (src/bugs/f-981027-1 (lpmud/g/28_f-981027-1 1.2 644) :no-keywords)
   (src/bugs/f-981027-2 (lpmud/g/27_f-981027-2 1.2 644) :no-keywords)
@@ -613,8 +616,9 @@
   (src/bugs/f-010309-1 (lpmud/K/47_f-010309-1 1.1 644) :no-keywords)
   (src/bugs/f-010318 (lpmud/L/7_f-010318 1.1 644) :no-keywords)
   (src/bugs/f-010320 (lpmud/L/8_f-010320 1.1 644) :no-keywords)
-  (src/bugs/f-010406-0 (lpmud/L/21_f-010406-0 1.1 644) :no-keywords)
+  (src/bugs/f-010406-0 (lpmud/L/21_f-010406-0 1.2 644) :no-keywords)
   (src/bugs/f-010406-1 (lpmud/L/22_f-010406-1 1.1 644) :no-keywords)
+  (src/bugs/f-010411 (lpmud/L/29_f-010411 1.1 644) :no-keywords)
 
   (src/bugs/p-981027-1 (lpmud/g/25_p-981027-1 1.2 644) :no-keywords)
   (src/bugs/doomdark/strutil.c (lpmud/g/31_strutil.c 1.2 644) :no-keywords)

@@ -10678,8 +10678,7 @@ again:
         break;
     }
 
-                 /* --- call_function_by_address <index>       --- */
-    CASE(F_CALL_FUNCTION_BY_ADDRESS);
+    CASE(F_CALL_FUNCTION)         /* --- call_function <index> --- */
     {
         /* Call the function <index> with the arguments on the stack.
          * <index> is a (16-Bit) unsigned short, giving the index within
@@ -10711,7 +10710,7 @@ again:
          */
 #ifdef DEBUG
         if (func_offset >= current_object->prog->num_functions)
-            fatal("call_function_by_address: "
+            fatal("call_function: "
                   "Illegal function index: offset %hu (index %hu), %d functions\n"
                  , func_offset, func_index
                  , current_object->prog->num_functions);
@@ -10764,17 +10763,27 @@ again:
         break;
     }
 
-           /* --- call_explicit_inherited <prog> <index>       --- */
-    CASE(F_CALL_EXPLICIT_INHERITED);
+                   /* --- call_inherited        <prog> <index> --- */
+                   /* --- call_inherited_noargs <prog> <index> --- */
+    CASE(F_CALL_INHERITED);
+    CASE(F_CALL_INHERITED_NOARGS);
     {
         /* Call the (inherited) function <index> in program <prog> with
-         * the arguments on the stack.
+         * the arguments on the stack; or for the _noargs code, with no
+         * arguments.
          *
          * <index> is a (16-Bit) unsigned short, giving the index within
          * the programs function table.
          * <prog> is a (16-Bit) unsigned short, giving the index within
          * the current programs inherit table.
-         * The number of arguments is determined through the ap pointer.
+         *
+         * The number of arguments, if needed, is determined through the
+         * ap pointer.
+         * 
+         * The _noargs code is used to implement wildcarded
+         * super calls, which take no argument, but store their results
+         * above the ap. Without this extra bytecode, the normal argument
+         * massaging would remove the intermediate results.
          */
 
         unsigned short prog_index;  /* Index within the inherit table */
@@ -10794,7 +10803,7 @@ again:
 #ifdef DEBUG
         if (func_index >= inheritp->prog->num_functions)
         {
-            fatal("call_explicit_inherited: Illegal function index: "
+            fatal("call_inherited: Illegal function index: "
                   "program %d, func %d, %d functions\n"
                  , prog_index, func_index, inheritp->prog->num_functions);
         }
@@ -10877,7 +10886,10 @@ again:
 
         /* Search for the function definition and determine the offsets.
          */
-        csp->num_local_variables = sp - ap + 1;
+        if (instruction != F_CALL_INHERITED_NOARGS)
+            csp->num_local_variables = sp - ap + 1;
+        else
+            csp->num_local_variables = 0;
         flags = setup_new_frame1(
           func_index,
           function_index_offset + inheritp->function_index_offset,
@@ -13303,6 +13315,39 @@ secure_apply_error (svalue_t *save_sp, struct control_stack *save_csp)
             push_number(inter_sp, current_error_line_number);
             a += 3;
         }
+
+        if (current_heart_beat)
+        {
+            /* Heartbeat error: turn off the heartbeat in the object
+             * and also pass it to RUNTIME_ERROR.
+             */
+
+            object_t *culprit;
+
+            culprit = current_heart_beat;
+            current_heart_beat = NULL;
+            set_heart_beat(culprit, MY_FALSE);
+            debug_message("%s Heart beat in %s turned off.\n"
+                         , time_stamp(), get_txt(culprit->name));
+            push_ref_valid_object(inter_sp, culprit, "heartbeat error");
+            a++;
+        }
+        else
+        {
+            if (!current_error_file)
+            {
+                /* Push dummy values to keep the argument order correct */
+                push_number(inter_sp, 0);
+                push_number(inter_sp, 0);
+                push_number(inter_sp, 0);
+                a += 3;
+            }
+
+            /* Normal error: push -1 instead of a culprit. */
+            push_number(inter_sp, -1);
+            a++;
+        }
+
         save_cmd = command_giver;
         apply_master_ob(STR_RUNTIME, a);
         command_giver = save_cmd;
@@ -13504,6 +13549,10 @@ assert_master_ob_loaded (void)
             /* If we come here, we had a destructed master and failed
              * to load a new one. Now try to reactivate the
              * old one again.
+             *
+             * We don't have to reactivate any destructed inherits, though:
+             * as long as the master references their programs, that's all
+             * we need.
              */
 
             /* First, make sure that there is no half-done object

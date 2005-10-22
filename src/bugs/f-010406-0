@@ -59,3 +59,102 @@ zurueckliefert in dem alle Vars dann abgebildet werden *grueble* ich
 schick dir das dann ;o) Mal sehen ob beim Driver die Docu zu den Savefiles
 schon gut genug ist ;o))
 
+----
+Zum Regex Kram fiel mir noch ein, dass es schoen waere, wenn man regexp()
+auch ohne Array benutzen kann, wenn man nur sehen will ob ein String passt
+muss man den zZ via sizeof(regexp(({str}), re)) testen. Je mehr ich
+darueber nachdenke, desdo weniger trivial erscheint es mit mit den
+PerlREs. Die koennen in Perl naemlich verschiedene Modi haben, die man nun
+eigentlich mituebergeben koennen muesste. Ausserdem sollte man auch auf
+die Klammerausdruecke zugreifen koennen, dort waere am besten irgendwie
+sowas...
+
+  n_regexp(string str, string RE, string parameter).
+
+Wenn 'parameter' nicht gegeben ist, wird der normale endliche Automat des
+Muds benutzt. Sonst wird halt der Perl-Automat benutzt, der die Parameter
+erhaelt. Wenn die RE gefunden wird lieferts 'wahr' sonst 'unwahr'.
+Weiterhin (und deswegen wuerde ich die Efuns trennen dh anders nennen)
+waere eine Unterstuertzung fuer die Rueckwaertsreferenzen klasse. Also
+was man bei regreplace mit \1 usw erhalten kann. Ich traeume mir vor, dass
+ich an n_regexp() nun auch angeben kann, welche Referenzen mich
+interessieren und die liefert es dann als Array. (Da das doch sehr anders
+ist als regexp() eine andere Efun.)
+Also parameter = "ig\1\5\9" oder so ('\'s sollen "\\" sein ;o).
+
+
+Btw kann man den (nichtdeterministischen) Automaten mit einer Zeile in die
+ewigen Jagdgruende schicken ('regular expressions' von oreilly entnommen):
+
+ regexp(({"=XX============================================"}), "X(.+)+X")
+
+Eventuell sollte man in dem FA halt einfach jedem Backtracking eine
+eval-cost zuordnen um das zu verhindern (die Laufzeit des Matchens oben
+ist propotional pow(2, strlen)). Das waere zB moeglich bei Zeile 1158 des
+regexp.c:
+                        return MY_TRUE;
+                /* Couldn't or didn't -- back up. */
+                no--;
++               evals += 5;
++               if (evals > evals_max) regerror("too many backtracks");
+                reginput = save + no;
+            }
+
+(mit evals und evals_max symbolisch fuer die Kosten). Ich schlage gerade
+vor genau DAS als Kriterium zu nehmen, weil das ziemlich sicher soetwas
+unendliches erkennt, alles andere kann auch 'viel' werden, aber da kanns
+trotzdem gleich fertig sein.
+----------------------
+
+Hmm, hatte heute ein wenig Zeit und hab mir mal das PCRE Paket
+angeschaut. Das ist ja wirklich supereinfach zu benutzen. Konnte dann dem
+nicht wiederstehen, es gleich mal in den Driver reinzufummeln. Das
+Resultat hab ich dir mal als diff angehaengt.
+
+Es funktioniert alles genau so wie ich es mir ertraeume ;o) naja, fast.
+Auf jeden Fall so aehnlich wie ichs in den Mails an dich beschrieb.
+Was bei dem Diff absolut fehlt ist eine 'richtige' Integration. Sprich man
+muss das Paket sich selbst holen und die Bibliothek erzeugen. Ausserdem
+sind noch feste Pfade drin, halt die meiner Testumgebung. Weitere
+Aenderungen die ich am Makefile vorgenommen hab unten.
+
+Ich hab keine Ahnung ob dir der Code gefaellt, und ich muss auch sagen ich
+hab noch nie was am Driver gemacht, keine Ahnung zB ob ich irgendwo ein
+Speicherloch eingenaut hab (wegen Strings zB). Da das alles ueber xalloc()
+laeuft bin ich aber guter Hoffnung.
+
+Wenn du meinst, dass ich auf dem richtigen Wege bin, kann ich da gerne
+weitermachen; das 3. Argument haette ich gerne optional, die Manpage fehlt
+auch noch, es kostet keine evals, die compilierten Regexs werden nicht
+gebuffert und so weiter und so fort.
+
+Ich hoffe das bringt den Driver einen Schritt naeher an 'richtige' Regexs.
+
+
+Gruesse aus dem inzwischen dunklen Hamburg,
+
+   Fini
+
+
+----
+
+Zum PCRE-Paket: Also erstmal haben die sonne komische Licence, die
+teilweise die GPL ueberdecken koennte (ich glaube der Driver ist unter
+GPL, oder? *gg*). Da muesste dann mal wer schauen, ob man das Paket mit in
+die Dist packen darf oder nicht. Letztere waere natuerlich aeusserst
+laestig.
+
+Gut. Dann zum Testen hab ich das ganze statisch gelinkt gehabt, weil ich
+compiliere und teste auf verschiedenen Systemen. Das funzte auch soweit
+ganz gut. Da ich keinerlei Rechte auf dem Compilier-Rechner hab, hatte ich
+den Pcre-Krempel in einem Nachbarverzeichnis liegen. In dem Makefile hab
+ich dann das Dazulinken aktiviert durch
+LIBS=-lm  -lcrypt -lpcre -L/mud/src/pcre-3.4/ -static
+wenn das 'richtig' in die Driver-Dist kommt muesste das natuerlich alles
+automagisch gehen ;o)
+
+Btw den Automaten kann man (selbstverstaendlich) mit derselben Regex von
+letztens in eine 'unendliche' Schleife schicken. Wie man dort dann
+nachtraeglich Evalkosten pro Backtrack einbaut *gruebel*...
+Uebrigens ist der Pcre-Automat etwa doppelt so schnell bei der Schleife,
+20 '=' nach den XX dauern bei mir 2 bzw 4 Sekunden.

@@ -1,6 +1,25 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+11-Apr-2001 (Lars Duening)  (3.3.40)
+    - (prolang.y, interpret.c, func_spec) Wildcarded calls to inherited
+        functions confused arguments with results and messed up the stack.
+        Introduced a dedicated bytecode for this situation.
+    - (prolang.y) Additions of floats to constant 0 yielded TYPE_ANY
+         instead of TYPE_FLOAT.
+    - (interpret.c) Arguments passed to runtime_error() were wrong
+         if the error happened in a master apply (reported by Gnomi).
+
+10-Apr-2001 (Lars Duening)
+    - (exec.h, prolang.y, simulate.c) The program structure received
+        a pointer pointing to the blueprint object. Main purpose is to 
+        allow the cheap deep update of the master object, but other uses will
+        probably show up as well.
+    - (simulate.c) Added function deep_destruct() to destruct an
+        object and the blueprints of all inherited programs.
+    - (backend.c, interpret.c) The signal SIGUSR1 now destructs the
+        master object and all its inherits, to allow a clean reload.
+
 07-Apr-2001 (Lars Duening)  (3.3.39)
     - (smalloc.c) The multiple-of allocation was not quite correct.
     - (Makefile.in) The pkg-mysql file was missing from the build

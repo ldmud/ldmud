@@ -387,7 +387,7 @@ backend (void)
             }
 
             if (master_will_be_updated) {
-                destruct(master_ob);
+                deep_destruct(master_ob);
                 master_will_be_updated = MY_FALSE;
                 command_giver = NULL;
                 current_object = &dummy_current_object_for_loads;

@@ -35,6 +35,7 @@ Language
 Compiler
 --------------------------------------------------------------------------
 b-990217-1: virtual inherits need cleaner implementation.
+b-010410: Branchpatching messes up line number information
 
 
 Runtime

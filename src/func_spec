@@ -138,8 +138,9 @@
         branch_when_non_zero
         bbranch_when_zero
         bbranch_when_non_zero
-        call_function_by_address
-        call_explicit_inherited
+        call_function
+        call_inherited
+        call_inherited_noargs
         push_identifier_lvalue
         virtual_variable
         push_virtual_variable_lvalue

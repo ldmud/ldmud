@@ -214,6 +214,7 @@ extern void free_old_driver_hooks (void);
 extern void set_svalue_user(svalue_t *svp, object_t *owner);
 extern void destruct_object(svalue_t *v);
 extern void destruct(object_t *ob);
+extern void deep_destruct (object_t *ob);
 extern void remove_destruct_objects(void);
 extern void print_svalue(svalue_t *arg);
 extern const char *make_name_sane(const char *pName, Bool addSlash);

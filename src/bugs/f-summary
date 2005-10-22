@@ -90,6 +90,7 @@ f-010307: Short(est) Path Algorithms
 f-010223: Useful coloured string efuns
 f-010320: limited() vs resetting of runtime costs
 f-010406-0: Improved RegExps, using PCRE
+f-010411: Extend map(),filter(),... for strings.
 
 
 Language

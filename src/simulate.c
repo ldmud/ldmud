@@ -814,6 +814,15 @@ error (const char *fmt, ...)
         }
         else
         {
+            if (!current_object)
+            {
+                /* Push dummy values to keep the argument order correct */
+                push_number(inter_sp, 0);
+                push_number(inter_sp, 0);
+                push_number(inter_sp, 0);
+                a += 3;
+            }
+
             /* Normal error: push -1 instead of a culprit. */
             push_number(inter_sp, -1);
             a++;
@@ -1564,6 +1573,8 @@ load_object (const char *lname, Bool create_super, int depth)
     if (!ob)
         error("Out of memory for new object '%s'\n", name);
 
+    prog->blueprint = ref_object(ob, "load_object: blueprint reference");
+
     ob->name = new_mstring(name);  /* Shared string is no good here */
     tot_alloc_object_size += mstrsize(ob->name);
     if (!compat_mode)
@@ -1948,6 +1959,43 @@ destruct_object (svalue_t *v)
 
 /*-------------------------------------------------------------------------*/
 void
+deep_destruct (object_t *ob)
+
+/* Destruct an object <ob> and the blueprint objects of all inherited
+ * programs. The actual destruction work is done by destruct().
+ *
+ * The objects are still kept around until the end of the execution because
+ * it might still hold a running program. The destruction will be completed
+ * from the backend by a call to remove_object().
+ */
+
+{
+    program_t *prog;
+    int i;
+
+    /* Destruct the object itself */
+    destruct(ob);
+
+    /* Loop through all the inherits and destruct the blueprints
+     * of the inherited programs.
+     */
+    prog = ob->prog;
+    if (prog != NULL)
+    {
+        for (i = 0; i < prog->num_inherited; ++i)
+        {
+            program_t *iprog = prog->inherit[i].prog;
+
+            if (iprog != NULL && iprog->blueprint != NULL)
+            {
+                destruct(iprog->blueprint);
+            }
+        }
+    }
+} /* deep_destruct() */
+
+/*-------------------------------------------------------------------------*/
+void
 destruct (object_t *ob)
 
 /* Really destruct an object <ob>. This function is called from
@@ -2108,7 +2156,7 @@ remove_object (object_t *ob)
  * with destruct() already.
  *
  * The function frees all variables and remaining sentences in the object
- * and the calls free_object(). The object structure and the program
+ * and then calls free_object(). The object structure and the program
  * will be freed as soon as there are no further references to the object
  * (the program must remain behind in case it was inherited).
  * TODO: Distinguish data- and inheritance references?
@@ -2125,6 +2173,13 @@ remove_object (object_t *ob)
 
     if (O_IS_INTERACTIVE(ob))
         remove_interactive(ob, MY_FALSE);
+
+    /* If this is a blueprint object, NULL out the pointer in the program. */
+    if (ob->prog->blueprint == ob)
+    {
+        ob->prog->blueprint = NULL;
+        deref_object(ob, "remove_object: blueprint reference");
+    }
 
     /* We must deallocate variables here, not in 'free_object()'.
      * That is because one of the local variables may point to this object,

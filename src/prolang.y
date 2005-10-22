@@ -1410,6 +1410,8 @@ fix_branch (int ltoken, p_int dest, p_int loc)
  * into its long-branch variant <ltoken>.
  *
  * Return TRUE if the long branch had to be used, FALSE otherwise.
+ * TODO: This really confuses the line number detection code, as suddenly
+ * TODO:: the recorded offset are no longer accurate.
  */
 
 {
@@ -3300,7 +3302,7 @@ inheritance:
               
                   transfer_init_control();
                   ins_f_code(F_SAVE_ARG_FRAME);
-                  ins_f_code(F_CALL_EXPLICIT_INHERITED);
+                  ins_f_code(F_CALL_INHERITED);
                   ins_short(INHERIT_COUNT);
                   ins_short(initializer);
                   ins_f_code(F_RESTORE_ARG_FRAME);
@@ -5850,9 +5852,11 @@ expr0:
               else if (($1.type == TYPE_NUMBER || $1.type == TYPE_FLOAT)
                      && $4.type == TYPE_STRING)
                   $$.type = TYPE_STRING;
-              else if ($1.type == TYPE_FLOAT && $4.type == TYPE_NUMBER)
+              else if ($1.type == TYPE_FLOAT
+                    && ($4.type == TYPE_NUMBER || $4.type == TYPE_ANY))
                   $$.type = TYPE_FLOAT;
-              else if ($1.type == TYPE_NUMBER && $4.type == TYPE_FLOAT)
+              else if (($1.type == TYPE_NUMBER || $1.type == TYPE_ANY)
+                    && $4.type == TYPE_FLOAT)
                   $$.type = TYPE_FLOAT;
           }
       } /* '+' */
@@ -6549,6 +6553,7 @@ expr4:
               current++;
               add_f_code(F_CONST0);
               $$.type = TYPE_ANY;
+              /* TODO: Introduce a TYPE_NULL instead */
           }
           else if ( number == 1 )
           {
@@ -7837,8 +7842,8 @@ function_call:
           int        simul_efun;
           vartype_t *arg_types = NULL;  /* Argtypes from the program */
           int        first_arg;         /* Startindex in arg_types[] */
-          Bool       ap_needed;
-          Bool       has_ellipsis;
+          Bool       ap_needed;         /* TRUE if arg frame is needed */
+          Bool       has_ellipsis;      /* TRUE if '...' was used */
 
           has_ellipsis = got_ellipsis[argument_level];
           ap_needed = MY_FALSE;
@@ -7973,7 +7978,7 @@ function_call:
                   /* Normal lfun in this program */
 
                   ap_needed = MY_TRUE;
-                  add_f_code(F_CALL_FUNCTION_BY_ADDRESS);
+                  add_f_code(F_CALL_FUNCTION);
                   add_short(f);
                   funp = FUNCTION(f);
                   arg_types = (vartype_t *)mem_block[A_ARGUMENT_TYPES].block;
@@ -8245,7 +8250,7 @@ function_call:
                   $1.real, 0, 0, 0, NAME_UNDEFINED, TYPE_UNKNOWN
               );
               ap_needed = MY_TRUE;
-              add_f_code(F_CALL_FUNCTION_BY_ADDRESS);
+              add_f_code(F_CALL_FUNCTION);
               add_short(f);
               CURRENT_PROGRAM_SIZE += 3;
               funp = FUNCTION(f);
@@ -8266,7 +8271,7 @@ function_call:
               add_f_code(F_RESTORE_ARG_FRAME);
               CURRENT_PROGRAM_SIZE++;
           }
-          else
+          else if (!ap_needed)
           {
               /* Since the arg frame is not needed, remove the
                * earlier save_arg_frame instruction.
@@ -9875,9 +9880,10 @@ insert_inherited (char *super_name, string_t *real_name
         }
 
         /* Generate the function call */
-        add_f_code(F_CALL_EXPLICIT_INHERITED);
+        add_f_code(F_CALL_INHERITED);
         add_short(ip - (inherit_t *)mem_block[A_INHERITS].block);
         add_short(found_ix);
+        CURRENT_PROGRAM_SIZE += 5;
 
         /* Return the program pointer */
         *super_p = ip->prog;
@@ -9901,7 +9907,6 @@ insert_inherited (char *super_name, string_t *real_name
             if (FUNCTION_NUM_ARGS(funstart) & ~0x7f)
                 fun_p->type |= TYPE_MOD_XVARARGS;
         }
-        CURRENT_PROGRAM_SIZE += 5;
         return found_ix;
     } /* if (foundp) */
 
@@ -9930,7 +9935,7 @@ insert_inherited (char *super_name, string_t *real_name
         for (; num_inherits > 0; ip0++, num_inherits--)
         {
             funflag_t flags;
-            PREPARE_INSERT(6)
+            PREPARE_INSERT(10)
 
             /* ip->prog->name includes .c */
             int l = mstrsize(ip0->prog->name) - 2;
@@ -9990,10 +9995,12 @@ insert_inherited (char *super_name, string_t *real_name
                 /* duplicate inherit */
                 continue;
 
-            /* Generate the function call */
-            add_f_code(F_CALL_EXPLICIT_INHERITED);
+            /* Generate the function call.
+             */
+            add_f_code(F_CALL_INHERITED_NOARGS);
             add_short(ip_index);
             add_short(i);
+            CURRENT_PROGRAM_SIZE += 5;
 
             /* Mark this function as called */
             was_called[ip_index] = MY_TRUE;
@@ -10021,7 +10028,6 @@ insert_inherited (char *super_name, string_t *real_name
                 fun_p->num_arg = FUNCTION_NUM_ARGS(funstart);
             }
             calls++;
-            CURRENT_PROGRAM_SIZE += 5;
         } /* for() */
 
         /* The calls above left their results on the stack.
@@ -10117,7 +10123,7 @@ copy_functions (program_t *from, fulltype_t type)
  * An explicit call to an inherited function will not be
  * done through this entry (because this entry can be replaced by a new
  * definition). If an function defined by inheritance is called,
- * this is done with F_CALL_EXPLICIT_INHERITED
+ * this is done with F_CALL_INHERITED
  *
 %ifdef INITIALIZATION_BY___INIT
  * The result is the function index of the inherited __INIT function,
@@ -11525,6 +11531,7 @@ epilog (void)
             yyerrorf("Out of memory: filename '%s'", current_file);
             break;
         }
+        prog->blueprint = NULL;
         prog->total_size = size;
         prog->ref = 0;
         prog->heart_beat = heart_beat;
