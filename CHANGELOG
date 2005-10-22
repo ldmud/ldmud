@@ -1,8 +1,15 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+11-Jun-2001 (Lars Duening)  (3.3.62)
+    - (interpret) Nifty little crasher: if the object holding the closure
+         currently execute is destructed, the interpreter happily tried
+         to free the closure after execution without noticing
+         that it already has been freed (as part of the object destruction
+         process) (reported by Freaky).
+
 09-Jun-2001 (Lars Duening)  (3.3.61)
-    - (mstrings.c) strstr("text", "") errorenously returned 'not found'
+    - (mstrings.c) strstr("text", "") erroneously returned 'not found'
          instead of 0 (reported by Bardioc).
     - (mapping) Corrected the SIZEOF_ macros (most of them gave a too
          big number, but SIZEOF_MC undercalculated for wide mappings);

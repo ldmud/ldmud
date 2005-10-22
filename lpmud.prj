@@ -22,14 +22,12 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 61)
-(Parent-Version lpmud 3-3 60)
-(Version-Log "The driver sent out unnecessary telnet negotiations.
-When destructing an object, references through closures are also removed
-from the stack.")
+(Project-Version lpmud 3-3 62)
+(Parent-Version lpmud 3-3 61)
+(Version-Log "Removed a crasher related to the closure dereferencing on object destruction.")
 (New-Version-Log
 "")
-(Checkin-Time "Sun, 10 Jun 2001 23:27:10 -0600")
+(Checkin-Time "Mon, 11 Jun 2001 21:23:22 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -62,7 +60,7 @@ from the stack.")
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.3 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.16 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.124 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.125 644))
   (HISTORY (lpmud/f/49_HISTORY 1.180 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.10 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -141,8 +139,8 @@ from the stack.")
   (src/hash.c (lpmud/c/28_hash.c 1.12 644))
   (src/heartbeat.h (lpmud/m/41_heartbeat. 1.6.1.4 644))
   (src/heartbeat.c (lpmud/m/42_heartbeat. 1.18.1.6 644))
-  (src/interpret.h (lpmud/b/13_interpret. 1.33.1.16 644))
-  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.65 644))
+  (src/interpret.h (lpmud/b/13_interpret. 1.33.1.17 644))
+  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.66 644))
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.8 644))
   (src/lex.c (lpmud/b/12_lex.c 1.62.1.44 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.5 644))
@@ -918,7 +916,7 @@ from the stack.")
   (doc/efun/slice_array (lpmud/q/24_slice_arra 1.3 644))
   (doc/efun/snoop (lpmud/q/25_snoop 1.4 644))
   (doc/efun/sort_array (lpmud/c/36_sort_array 1.6.1.1 644))
-  (doc/efun/sprintf (lpmud/c/35_sprintf 1.3.1.6 644))
+  (doc/efun/sprintf (lpmud/c/35_sprintf 1.3.1.7 644))
   (doc/efun/sprintf.de (lpmud/L/36_sprintf.de 1.1 644))
   (doc/efun/sqrt (lpmud/q/26_sqrt 1.1.1.2 644))
   (doc/efun/sscanf (lpmud/q/27_sscanf 1.5 644))

@@ -720,6 +720,7 @@ init_interpret (void)
  * a svalue_t, only the data referenced by it.
  *
  * destructed_object_ref(v): test if <v> references a destructed object.
+ * get_object_ref(v): return the object referenced by <v>, if any.
  * free_string_svalue(v): free string svalue <v>.
  * free_object_svalue(v): free object svalue <v>.
  * zero_object_svalue(v): replace the object in svalue <v> by number 0.
@@ -1050,6 +1051,42 @@ _destructed_object_ref (svalue_t *svp)
 Bool destructed_object_ref (svalue_t *v) { return _destructed_object_ref(v); }
 
 #define destructed_object_ref(v) _destructed_object_ref(v)
+
+/*-------------------------------------------------------------------------*/
+static INLINE object_t *
+_get_object_ref (svalue_t *svp)
+
+/* If <svp> references an object (destructed or alive), return the object.
+ * Return NULL otherwise.
+ */
+
+{
+    lambda_t *l;
+    int type;
+
+    if (svp->type != T_OBJECT && svp->type != T_CLOSURE)
+        return NULL;
+
+    if (svp->type == T_OBJECT || !CLOSURE_MALLOCED(type = svp->x.closure_type))
+        return svp->u.ob;
+
+    /* Lambda closure */
+    
+    l = svp->u.lambda;
+
+    if (CLOSURE_HAS_CODE(type) && type == CLOSURE_UNBOUND_LAMBDA)
+        return NULL;
+    
+    if (type == CLOSURE_ALIEN_LFUN)
+        return l->function.alien.ob;
+
+    return l->ob;
+    
+} /* _get_object_ref() */
+
+object_t * get_object_ref (svalue_t *v) { return _get_object_ref(v); }
+
+#define get_object_ref(v) _get_object_ref(v)
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
@@ -5727,7 +5764,7 @@ void
 remove_object_from_stack (object_t *ob)
 
 /* Object <ob> was/will be destructed, so remove all references from
- * to it from the stack (this includes references through closures).
+ * to it from the stack, including references through closures.
  */
 
 {
@@ -5735,40 +5772,11 @@ remove_object_from_stack (object_t *ob)
 
     for (svp = start_of_stack; svp <= inter_sp; svp++)
     {
-        if (svp->type == T_OBJECT)
+        if (get_object_ref(svp) == ob)
         {
-            if (svp->u.ob == ob)
-            {
-                free_object(ob, "remove_object_from_stack");
-                put_number(svp, 0);
-            }
+            free_svalue(svp);
+            put_number(svp, 0);
         }
-        else if (svp->type == T_CLOSURE)
-        {
-            ph_int type = svp->x.closure_type;
-
-            if (!CLOSURE_MALLOCED(type))
-            {
-                /* A simple closure */
-                if (svp->u.ob == ob)
-                {
-                    free_svalue(svp);
-                    put_number(svp, 0);
-                }
-            }
-            else if (!CLOSURE_HAS_CODE(type) || type != CLOSURE_UNBOUND_LAMBDA)
-            {
-                /* A lambda or alien-lfun closure */
-                lambda_t * l = svp->u.lambda;
-
-                if (ob == ((type == CLOSURE_ALIEN_LFUN) ? l->function.alien.ob
-                                                        : l->ob))
-                {
-                    free_svalue(svp);
-                    put_number(svp, 0);
-                }
-            }
-        } /* if object or closure */
     } /* foreach svp in stack */
 } /* remove_object_from_stack() */
 
@@ -16413,11 +16421,13 @@ f_apply (svalue_t *sp, int num_arg)
 
     inter_sp = sp;
 
-    call_lambda(args, num_arg - 1);
 
-    /* Cleanup the stack */
+    /* Call the closure and push the result.
+     * Note that the closure might destruct itself.
+     */
+    call_lambda(args, num_arg - 1);
     sp = args;
-    free_closure(sp);
+    free_svalue(sp);
     *sp = sp[1];
 
     return sp;
@@ -16452,10 +16462,12 @@ f_funcall (svalue_t *sp, int num_arg)
             return sp;
         }
 
-        /* Call the closure and push the result */
+        /* Call the closure and push the result.
+         * Note that the closure might destruct itself.
+         */
         call_lambda(args, num_arg - 1);
         sp = args;
-        free_closure(sp);
+        free_svalue(sp);
         *sp = sp[1];
     }
     else
