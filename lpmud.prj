@@ -20,14 +20,12 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 160)
-(Parent-Version lpmud 3-3 159)
-(Version-Log "Made process_string() more logical.
-The '|' operator can now join arrays.
-Too long error messages crashed the driver.")
+(Project-Version lpmud 3-3 161)
+(Parent-Version lpmud 3-3 160)
+(Version-Log "Inherited public undefined functions were hidden by (simul-)efuns.")
 (New-Version-Log
 "")
-(Checkin-Time "Sun, 03 Feb 2002 16:04:15 -0700")
+(Checkin-Time "Tue, 05 Feb 2002 19:33:09 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -60,7 +58,7 @@ Too long error messages crashed the driver.")
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.4 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.35 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.223 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.224 644))
   (HISTORY (lpmud/f/49_HISTORY 1.237 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.13 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -174,7 +172,7 @@ Too long error messages crashed the driver.")
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.11 644))
   (src/port.c (lpmud/39_port.c 1.17.1.6 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.14 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.4 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.5 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))
@@ -185,7 +183,7 @@ Too long error messages crashed the driver.")
   (src/rxcache.c (lpmud/e/30_rxcache.c 1.11.1.10 644))
   (src/sent.h (lpmud/33_sent.h 1.11.1.4 644))
   (src/simul_efun.h (lpmud/f/17_simul_efun 1.5.1.5 644))
-  (src/simul_efun.c (lpmud/32_simul_efun 1.20.1.10 644))
+  (src/simul_efun.c (lpmud/32_simul_efun 1.20.1.11 644))
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.22 644))
   (src/simulate.c (lpmud/31_simulate.c 1.88.1.59 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.7 644))

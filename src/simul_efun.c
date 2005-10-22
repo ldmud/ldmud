@@ -146,7 +146,6 @@ invalidate_simul_efuns (void)
         all_discarded_simul_efun = j;
 
         free_shared_identifier(id);
-        id->u.global.sim_efun = I_GLOBAL_SEFUN_OTHER;
     }
 
     /* Free the old program and vector, if any */

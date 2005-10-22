@@ -11116,6 +11116,7 @@ copy_functions (program_t *from, fulltype_t type)
                 {
                     if (n != I_GLOBAL_FUNCTION_EFUN
                      || (fun.flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN)) == 0
+                     || (fun.flags & (NAME_UNDEFINED)) != 0
                        )
                      {
                         /* This is not an inherited private function shadowing
@@ -11144,7 +11145,7 @@ copy_functions (program_t *from, fulltype_t type)
                          */
                         p->u.global.function = current_func_index;
                     }
-                    /* else: inherited private function must not hide
+                    /* else: inherited private defined function must not hide
                      * the (simul-)efun and is thusly not added to
                      * the symbol-table.
                      */

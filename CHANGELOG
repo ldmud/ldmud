@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+05-Feb-2002 (Lars Duening)  (3.3.161)
+    - (prolang.y) Inherited public but undefined function were hidden
+         by (simul-)efuns of the same name, making a resolution by
+         crossdefinition through another inherited module impossible
+         (reported by Fiona).
+
 03-Feb-2002 (Lars Duening)  (3.3.160)
     - (simulate, prolang.y, lex.c) Added a limit safety check to
         limit_error_format(), and increased the buffer sizes for the
