@@ -5734,15 +5734,66 @@ remove_object_from_stack (object_t *ob)
 }
 
 /*-------------------------------------------------------------------------*/
+static INLINE void
+put_default_argument (svalue_t *sp, int instruction)
+
+/* Evaluate <instruction> and put it's result into *<sp>.
+ * This function is used to generate default arguments for efuns at runtime,
+ * and therefor implements just the instructions F_CONST0, F_CONST1,
+ * F_TIME, F_THIS_OBJECT, and F_THIS_PLAYER.
+ */
+
+{
+    switch(instruction)
+    {
+    case F_CONST0:
+        put_number(sp, 0);
+        break;
+
+    case F_CONST1:
+        put_number(sp, 1);
+        break;
+
+    case F_TIME:
+        put_number(sp, current_time);
+        break;
+
+    case F_THIS_OBJECT:
+        if (current_object->flags & O_DESTRUCTED)
+        {
+            put_number(sp, 0);
+            break;
+        }
+        put_ref_object(sp, current_object, "default: this_object");
+        break;
+
+    case F_THIS_PLAYER:
+        if (command_giver && !(command_giver->flags & O_DESTRUCTED))
+            put_ref_object(sp, command_giver, "default: this_player");
+        else
+            put_number(sp, 0);
+        break;
+
+    default:
+        fatal("Unimplemented runtime default argument '%s' to %s().\n"
+             , get_f_name(instruction), get_f_name(complete_instruction(-2))
+             );
+        break;
+    }
+} /* put_default_argument() */
+
+/*-------------------------------------------------------------------------*/
 Bool
 eval_instruction (bytecode_p first_instruction
                  , svalue_t *initial_sp)
 
 /* Evaluate the code starting at <first_instruction>, using <inital_sp>
- * as the stack pointer. All other variables like current_prog must be
- * setup before the call. The function will return upon encountering
- * a F_RETURN instruction for which .extern_call or .catch_call is true,
- * or upon encountering a F_END_CATCH instruction.
+ * as the stack pointer.
+ *
+ * All other variables like current_prog must be setup before the call.
+ * The function will return upon encountering a F_RETURN instruction
+ * for which .extern_call or .catch_call is true, or upon encountering
+ * a F_END_CATCH instruction.
  *
  * The result will state the reason for returning: FALSE for F_RETURN,
  * and TRUE for F_END_CATCH.
@@ -5774,6 +5825,20 @@ eval_instruction (bytecode_p first_instruction
 #ifdef DEBUG
     svalue_t *expected_stack; /* Expected stack at the instr end */
 #endif
+
+static svalue_t *ap;
+  /* Argument frame pointer: pointer to first outgoing argument to be passed to
+   * called function. This variable is static in order to survive longjmp()s,
+   * its actual scope is just within one execution of eval_instruction().
+   */
+
+static Bool use_ap;
+  /* TRUE if the next simul_efun/efun call is to determine the number of
+   * arguments from the current *ap value. This variable is static in order
+   * to survive longjmp()s, its actual scope is just within one execution
+   * of eval_instruction().
+   */
+
 
     /* Handy macros:
      *
@@ -5881,6 +5946,8 @@ eval_instruction (bytecode_p first_instruction
     sp = initial_sp;
     pc = first_instruction;
     fp = inter_fp;
+    ap = inter_fp; /* so that call_lambda() can call us for efun closures */
+    use_ap = MY_FALSE;
     SET_TRACE_EXEC;
 
     /* ------ The evaluation loop ------ */
@@ -6004,10 +6071,15 @@ again:
         num_arg = -1;
     }
 
-    if (num_arg != -1)
+    if (num_arg != -1 && !use_ap)
     {
         expected_stack = sp - num_arg +
             ( instrs[instruction].ret_type == TYPE_VOID ? 0 : 1 );
+    }
+    else if (use_ap)
+    {
+        expected_stack = ap -
+            ( instrs[instruction].ret_type == TYPE_VOID ? 1 : 0 );
     }
     else
     {
@@ -6081,6 +6153,20 @@ again:
 
         int code;
 
+        /* Check the number of arguments on the stack */
+        if (use_ap)
+        {
+            int numarg = sp - ap + 1;
+
+            if (numarg < 0)
+                ERRORF(("Not enough args for %s: got %d, expected none.\n"
+                       , instrs[instruction].name, numarg));
+            if (numarg > 0)
+                ERRORF(("Too many args for %s: got %d, expected none.\n"
+                       , instrs[instruction].name, numarg));
+            use_ap = MY_FALSE;
+        }
+
         code = LOAD_UINT8(pc);
 #ifdef TRACE_CODE
         previous_instruction[last] = code + EFUN0_OFFSET;
@@ -6106,6 +6192,27 @@ again:
 
         code = LOAD_UINT8(pc);
         instruction = code + EFUN1_OFFSET;
+
+        /* Correct then number of arguments on the stack */
+        if (use_ap)
+        {
+            int numarg = sp - ap + 1;
+            int def;
+
+            if (numarg == 0 && (def = instrs[instruction].Default) != 0)
+            {
+                put_default_argument(++sp, def);
+                numarg++;
+            }
+
+            if (numarg < 1)
+                ERRORF(("Not enough args for %s: got %d, expected 1.\n"
+                       , instrs[instruction].name, numarg));
+            if (numarg > 1)
+                ERRORF(("Too many args for %s: got %d, expected 1.\n"
+                       , instrs[instruction].name, numarg));
+            use_ap = MY_FALSE;
+        }
 
 #ifdef TRACE_CODE
         previous_instruction[last] = instruction;
@@ -6133,6 +6240,27 @@ again:
         code = LOAD_UINT8(pc);
         instruction = code + EFUN2_OFFSET;
 
+        /* Correct then number of arguments on the stack */
+        if (use_ap)
+        {
+            int numarg = sp - ap + 1;
+            int def;
+
+            if (numarg == 1 && (def = instrs[instruction].Default) != 0)
+            {
+                put_default_argument(++sp, def);
+                numarg++;
+            }
+
+            if (numarg < 2)
+                ERRORF(("Not enough args for %s: got %d, expected 2.\n"
+                       , instrs[instruction].name, numarg));
+            if (numarg > 2)
+                ERRORF(("Too many args for %s: got %d, expected 2.\n"
+                       , instrs[instruction].name, numarg));
+            use_ap = MY_FALSE;
+        }
+
 #ifdef TRACE_CODE
         previous_instruction[last] = instruction;
 #endif
@@ -6155,11 +6283,31 @@ again:
          */
 
         int code;
-        int numarg;
 
         code = LOAD_UINT8(pc);
         instruction = code + EFUN3_OFFSET;
-        numarg = instrs[instruction].min_arg;
+
+        /* Correct then number of arguments on the stack */
+        if (use_ap)
+        {
+            int numarg = sp - ap + 1;
+            int def;
+
+            if (numarg == 2 && (def = instrs[instruction].Default) != 0)
+            {
+                put_default_argument(++sp, def);
+                numarg++;
+            }
+
+            if (numarg < 3)
+                ERRORF(("Not enough args for %s: got %d, expected 3.\n"
+                       , instrs[instruction].name, numarg));
+            if (numarg > 3)
+                ERRORF(("Too many args for %s: got %d, expected 3.\n"
+                       , instrs[instruction].name, numarg));
+            use_ap = MY_FALSE;
+        }
+
 
 #ifdef TRACE_CODE
         previous_instruction[last] = instruction;
@@ -6170,7 +6318,7 @@ again:
         inter_sp = sp;
         inter_pc = pc;
         ASSIGN_EVAL_COST
-        test_efun_args(instruction, numarg, sp-numarg+1);
+        test_efun_args(instruction, 3, sp-2);
         sp = (*efun_table[instruction-TEFUN_OFFSET])(sp);
         break;
     }
@@ -6183,11 +6331,30 @@ again:
          */
 
         int code;
-        int numarg;
 
         code = LOAD_UINT8(pc);
         instruction = code + EFUN4_OFFSET;
-        numarg = instrs[instruction].min_arg;
+
+        /* Correct then number of arguments on the stack */
+        if (use_ap)
+        {
+            int numarg = sp - ap + 1;
+            int def;
+
+            if (numarg == 3 && (def = instrs[instruction].Default) != 0)
+            {
+                put_default_argument(++sp, def);
+                numarg++;
+            }
+
+            if (numarg < 4)
+                ERRORF(("Not enough args for %s: got %d, expected 4.\n"
+                       , instrs[instruction].name, numarg));
+            if (numarg > 4)
+                ERRORF(("Too many args for %s: got %d, expected 4.\n"
+                       , instrs[instruction].name, numarg));
+            use_ap = MY_FALSE;
+        }
 
 #ifdef TRACE_CODE
         previous_instruction[last] = instruction;
@@ -6198,15 +6365,16 @@ again:
         inter_sp = sp;
         inter_pc = pc;
         ASSIGN_EVAL_COST
-        test_efun_args(instruction, numarg, sp-numarg+1);
+        test_efun_args(instruction, 4, sp-3);
         sp = (*efun_table[instruction-TEFUN_OFFSET])(sp);
         break;
     }
 
-    CASE(F_EFUNV);                  /* --- efunv <code> <nargs> --- */
+    CASE(F_EFUNV);                  /* --- efunv <code>        --- */
     {
         /* Call the tabled efun EFUNV_OFFSET + <code>, where <code> is
-         * a uint8, with uint8 <nargs> argumentson the stack.
+         * a uint8, with the number of arguments determined through the
+         * ap pointer.
          * The number of arguments accepted by the efun is given by the
          * .min_arg and .max_arg entries in the instrs[] table.
          */
@@ -6217,7 +6385,8 @@ again:
         code = LOAD_UINT8(pc);
         instruction = code + EFUNV_OFFSET;
 
-        numarg = LOAD_UINT8(pc);
+        numarg = sp - ap + 1;
+        use_ap = MY_FALSE;
 
 #ifdef TRACE_CODE
         previous_instruction[last] = instruction;
@@ -10239,6 +10408,117 @@ again:
         break;
       }
 
+    CASE(F_SAVE_ARG_FRAME);         /* --- save_arg_frame      --- */
+      {
+        /* Save the current value of ap on the stack and set ap to
+         * the next stack entry.
+         */
+
+        ++sp;
+        sp->type = T_INVALID;
+        sp->u.lvalue = ap;
+        ap = sp+1;
+        break;
+      }
+
+    CASE(F_RESTORE_ARG_FRAME);      /* --- restore_arg_frame   --- */
+      {
+        /* While sp points at a function result, restore the value
+         * of ap from sp[-1]; then move the result down there.
+         */
+
+        ap = sp[-1].u.lvalue;
+        sp[-1] = sp[0];
+        sp--;
+        break;
+      }
+
+    CASE(F_USE_ARG_FRAME);          /* --- use_arg_frame       --- */
+      {
+        /* Used as a prefix (and only as a prefix) to instructions which
+         * usually know or take the number of arguments from the bytecode.
+         * With this prefix, the instruction uses the difference between
+         * sp and ap as the real number of arguments.
+         *
+         * use_arg_frame is recognized by: simul_efun, efun{0,1,2,3,4,v}.
+         */
+
+#ifdef DEBUG
+        if (use_ap)
+            fatal("Previous use_arg_frame hasn't been consumed.\n");
+#endif
+        use_ap = MY_TRUE;
+        break;
+      }
+
+    CASE(F_FLATTEN_XARG);           /* --- flatten_xarg        --- */
+      {
+        /* Take the value at sp and if it is an array, put the array's
+         * contents onto the stack in its place. Other values stay
+         * as they are.
+         * The number of values left on the stack is added to num_xargs
+         * (since the compiler didn't count them).
+         */
+
+        if (sp->type == T_POINTER)
+        {
+            /* The argument is an array: flatten it */
+
+            vector_t *vec;  /* the array */
+            svalue_t *svp;  /* pointer into the array */
+            long i;         /* (remaining) vector size */
+
+            vec = sp->u.vec;
+            i = (long)VEC_SIZE(vec);
+
+            /* Check if there is enough space on the stack.
+             */
+            if (i + (sp - start_of_stack) >= EVALUATOR_STACK_SIZE)
+            {
+                error("VM Stack overflow: %ld too high.\n"
+                     , (long)(i + (sp - start_of_stack) - EVALUATOR_STACK_SIZE) );
+                /* NOTREACHED */
+                break;
+            }
+
+            /* Push the array elements onto the stack, overwriting the
+             * array value itself.
+             */
+            if (deref_array(vec))
+            {
+                for (svp = vec->item; --i >= 0; )
+                {
+                    if (destructed_object_ref(svp))
+                    {
+                        put_number(sp, 0);
+                        sp++;
+                        svp++;
+                    }
+                    else
+                        assign_svalue_no_free(sp++, svp++);
+                }
+            }
+            else
+            {
+                /* The array will be freed, so use a faster function */
+                for (svp = vec->item; --i >= 0; ) {
+                    if (destructed_object_ref(svp))
+                    {
+                        put_number(sp, 0);
+                        sp++;
+                        svp++;
+                    }
+                    else
+                        transfer_svalue_no_free(sp++, svp++);
+                }
+                free_empty_vector(vec);
+            }
+
+            sp--; /* undo the last extraneous sp++ */
+        }
+        break;
+      }
+
     CASE(F_LBRANCH);                /* --- lbranch <offset>    --- */
     {
         /* Jump by (16-Bit) short <offset> bytes.
@@ -10397,12 +10677,13 @@ again:
         break;
     }
 
-                 /* --- call_function_by_address <index> <num> --- */
+                 /* --- call_function_by_address <index>       --- */
     CASE(F_CALL_FUNCTION_BY_ADDRESS);
     {
-        /* Call the function <index> with <num> args on the stack.
+        /* Call the function <index> with the arguments on the stack.
          * <index> is a (16-Bit) unsigned short, giving the index within
-         * the programs function table. <num> a uint8.
+         * the programs function table. The number of arguments is determined
+         * through the ap pointer.
          *
          * Since the function may be redefined through inheritance, the
          * function must be searched in the current_objects program, which
@@ -10455,7 +10736,7 @@ again:
 
         /* Search for the function definition and determine the offsets.
          */
-        csp->num_local_variables = GET_UINT8(pc);
+        csp->num_local_variables = sp - ap + 1;
         flags = setup_new_frame1(func_offset, 0, 0);
         funstart = (fun_hdr_p)(current_prog->program + (flags & FUNSTART_MASK));
         csp->funstart = funstart;
@@ -10482,17 +10763,17 @@ again:
         break;
     }
 
-           /* --- call_explicit_inherited <prog> <index> <num> --- */
+           /* --- call_explicit_inherited <prog> <index>       --- */
     CASE(F_CALL_EXPLICIT_INHERITED);
     {
         /* Call the (inherited) function <index> in program <prog> with
-         * <num> arguments on the stack.
+         * the arguments on the stack.
          *
          * <index> is a (16-Bit) unsigned short, giving the index within
          * the programs function table.
          * <prog> is a (16-Bit) unsigned short, giving the index within
          * the current programs inherit table.
-         * <num> a uint8.
+         * The number of arguments is determined through the ap pointer.
          */
 
         unsigned short prog_index;  /* Index within the inherit table */
@@ -10595,7 +10876,7 @@ again:
 
         /* Search for the function definition and determine the offsets.
          */
-        csp->num_local_variables = EXTRACT_UCHAR(pc);
+        csp->num_local_variables = sp - ap + 1;
         flags = setup_new_frame1(
           func_index,
           function_index_offset + inheritp->function_index_offset,
@@ -11094,14 +11375,15 @@ again:
         sp = protected_range_lvalue(RR_RANGE, sp);
         break;
 
-    CASE(F_SIMUL_EFUN); /* --- simul_efun <code> [<num_arg>]   --- */
+    CASE(F_SIMUL_EFUN);             /* --- simul_efun <code>   --- */
     {
-        /* Call the simul_efun <code>. If it's a function taking varargs,
-         * <num_arg> gives the number of arguments, otherwise the compiler
-         * already took care of fixing the stack.
+        /* Call the simul_efun <code> with the arguments on the stack.
+         * If the simul_efun takes a variable number of arguments, or
+         * if use_ap is TRUE, then the number of arguments is determined
+         * through the ap pointer; otherwise the code assumes that the
+         * compiler left the proper number of arguments on the stack.
          *
          * <code> is an uint8 and indexes the function list *simul_efunp.
-         * <num_arg> is an uint8.
          * TODO: Add a F_SIMUL_EFUN for codes > 0xff; right now this
          * TODO:: is compiled as CALL_OTHER. Affected are prolang.y and
          * TODO:: simul_efun.c
@@ -11110,18 +11392,46 @@ again:
         int                 code;      /* the function index */
         fun_hdr_p           funstart;  /* the actual function */
         object_t           *ob;        /* the simul_efun object */
+        int                 def_narg;  /* expected number of arguments */
         simul_efun_table_t *entry;
 
         ASSIGN_EVAL_COST  /* we're changing objects */
 
         /* Get the sefun code and the number of arguments on the stack */
         code = (int)LOAD_UINT8(pc);
-        num_arg = simul_efunp[code].num_arg;
-        if (num_arg == SIMUL_EFUN_VARARGS
-         || simul_efunp[code].flags & TYPE_MOD_XVARARGS
+        def_narg = simul_efunp[code].num_arg;
+
+        if (use_ap
+         || def_narg == SIMUL_EFUN_VARARGS
+         || (simul_efunp[code].flags & TYPE_MOD_XVARARGS)
            )
         {
-            num_arg = (int)LOAD_UINT8(pc);
+            use_ap = MY_FALSE;  /* Reset the flag */
+            num_arg = sp - ap + 1;
+        }
+        else
+            num_arg = def_narg;
+
+        /* Correct the number of arguments on the stack */
+        if (num_arg != def_narg && def_narg != SIMUL_EFUN_VARARGS)
+        {
+            /* Add eventually missing arguments */
+            while (num_arg < def_narg)
+            {
+                sp++;
+                put_number(sp, 0);
+                num_arg++;
+            }
+
+            /* Remove extraneous arguments */
+            if (!(simul_efunp[code].flags & TYPE_MOD_XVARARGS))
+            {
+                while (num_arg > def_narg)
+                {
+                    free_svalue(sp--);
+                    num_arg--;
+                }
+            }
         }
 
         /* No external calls may be done when this object is destructed.
@@ -12153,7 +12463,7 @@ again:
         svalue_t *arg;
         object_t *ob;
 
-        GET_NUM_ARG
+        num_arg = sp - ap + 1;
         inter_pc = pc;
         inter_sp = sp;
 
@@ -13658,8 +13968,8 @@ call_lambda (svalue_t *lsvp, int num_arg)
                 /* To call an operator or efun, we have to construct
                  * a small piece of program with this instruction.
                  */
-                bytecode_t code[5];  /* the code fragment */
-                bytecode_p p;        /* the code pointer */
+                bytecode_t code[8];    /* the code fragment */
+                bytecode_p p;          /* the code pointer */
 
                 int min, max, def;
 
@@ -13713,10 +14023,6 @@ call_lambda (svalue_t *lsvp, int num_arg)
                 if (instrs[i].prefix)
                     *p++ = instrs[i].prefix;
                 *p++ = instrs[i].opcode;
-
-                /* Store the <nargs> code, if necessary */
-                if (min != max)
-                    *p++ = (bytecode_t)num_arg;
 
                 /* And finally the return instruction */
                 if ( instrs[i].ret_type == TYPE_VOID )

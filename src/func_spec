@@ -126,6 +126,10 @@
         pop_value
         dup
         clear_locals
+        save_arg_frame
+        restore_arg_frame
+        use_arg_frame
+        flatten_xarg
         lbranch
         lbranch_when_zero
         lbranch_when_non_zero

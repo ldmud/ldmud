@@ -1,6 +1,22 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+05-Apr-2001 (Lars Duening)  (3.3.37)
+    - (object.c) Removed an occasional crasher from restore_object()
+        (reported by Freaky).
+    - (func_spec, prolang.y, interpret.c) Reworked and completed the
+        support for the '...' argument operator.
+    - (object.c) The error messages for save_object() and restore_object()
+        also print the filename in question.
+
+04-Apr-2001 (Lars Duening) 
+    - (func_spec, prolang.y, interpret.c) Added experimental support
+        for the '...' argument operator (flatten argument). It works
+        for lfuns and probably simul_efuns and doesn't break existing
+        code, but I have to rework it to handle efuns efficiently.
+        One of the problems is the one pass nature of the LPC compiler,
+        which allows to nest function calls into function call arguments.
+
 04-Apr-2001 (Lars Duening)  (3.3.36)
     - (Makefiles) Corrected.
     - (efuns, md5) New efun md5_encrypt() (thanks, Gawain!)

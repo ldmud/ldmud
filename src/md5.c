@@ -30,6 +30,8 @@
 #include "machine.h"
 #include "md5.h"
 
+#include <string.h>
+
 /*--------------------------------------------------------------------*/
 /* Forward declarations */
 

@@ -262,7 +262,7 @@ find_living_object (const char *name, Bool player)
     put_c_string(sp, name);
     if (!sp->u.str)
         error("(parse_command) Out of memory (%lu bytes) for result\n"
-             , strlen(name));
+             , (unsigned long) strlen(name));
     inter_sp = sp;
     call_lambda(svp, 1);
     pop_stack();

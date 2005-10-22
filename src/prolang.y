@@ -670,6 +670,16 @@ static p_uint last_include_start;
    * not generate information ('simple includes').
    */
 
+static int argument_level;
+  /* Nesting level of function call arguments. 
+   * Used to detect nested function calls, like foo( bar () ).
+   */
+
+static Bool got_ellipsis[COMPILER_STACK_SIZE];
+  /* Flags indexed by <argument_level>, telling if the current function
+   * arguments used the L_ELLIPSIS operator.
+   * TODO: This should be dynamic.
+   */
 
 /*-------------------------------------------------------------------------*/
 /* Forward declarations */
@@ -2563,6 +2573,7 @@ free_const_list_svalue (svalue_t *svp)
 %token L_DEC
 %token L_DEFAULT
 %token L_DO
+%token L_ELLIPSIS
 %token L_ELSE
 %token L_EQ
 %token L_FLOAT
@@ -2760,8 +2771,8 @@ free_const_list_svalue (svalue_t *svp)
       /* A qualified function name: "<super>::<func>" */
 
     struct {
-        int    simul_efun;  /* -1, or index of the simul_efun */
-        p_int  start;       /* Address of the function call */
+        int    simul_efun;    /* -1, or index of the simul_efun */
+        p_int  start;         /* Address of the function call */
     } function_call_head;
       /* Used to save address and possible sefun-index over
        * the argument parsing in a function call.
@@ -2836,7 +2847,7 @@ free_const_list_svalue (svalue_t *svp)
 %type <number> argument argument_list lvalue_list
   /* number of arguments */
 
-%type <number> expr_list expr_list3 expr_list2
+%type <number> expr_list expr_list3 e_expr_list2 expr_list2
   /* Number of expressions in an expression list */
 
 %type <number> m_expr_values
@@ -7610,10 +7621,87 @@ expr_list2:
     | expr_list2 ',' expr0  { $$ = $1 + 1; add_arg_type($3.type); }
 ; /* expr_list2 */
 
+e_expr_list2:
+      expr0
+      { 
+          $$ = 1;
+          if (!got_ellipsis[argument_level])
+              add_arg_type($1.type);
+          else
+              add_arg_type(TYPE_ANY);
+      }
+
+    | expr0 L_ELLIPSIS        
+      {
+          PREPARE_INSERT(2);
+
+          $$ = 0;
+          got_ellipsis[argument_level] = MY_TRUE;
+          add_f_code(F_FLATTEN_XARG);
+          CURRENT_PROGRAM_SIZE++;
+      }
+
+    | e_expr_list2 ',' expr0
+      { 
+          $$ = $1 + 1;
+          if (!got_ellipsis[argument_level])
+              add_arg_type($3.type);
+          else
+              add_arg_type(TYPE_ANY);
+      }
+
+    | e_expr_list2 ',' expr0 L_ELLIPSIS
+      {
+          PREPARE_INSERT(2);
+
+          $$ = $1;
+          got_ellipsis[argument_level] = MY_TRUE;
+          add_f_code(F_FLATTEN_XARG);
+          CURRENT_PROGRAM_SIZE++;
+      }
+; /* e_expr_list2 */
+
 expr_list3:
-      /* empty */           { $$ = 0; }
-    | expr0                 { $$ = 1;      add_arg_type($1.type); }
-    | expr_list2 ',' expr0  { $$ = $1 + 1; add_arg_type($3.type); }
+      /* empty */
+      { $$ = 0; }
+
+    | expr0
+      { 
+          $$ = 1;
+          if (!got_ellipsis[argument_level])
+              add_arg_type($1.type);
+          else
+              add_arg_type(TYPE_ANY);
+      }
+
+    | expr0 L_ELLIPSIS        
+      {
+          PREPARE_INSERT(2);
+
+          $$ = 0;
+          got_ellipsis[argument_level] = MY_TRUE;
+          add_f_code(F_FLATTEN_XARG);
+          CURRENT_PROGRAM_SIZE++;
+      }
+
+    | e_expr_list2 ',' expr0
+      { 
+          $$ = $1 + 1;
+          if (!got_ellipsis[argument_level])
+              add_arg_type($3.type);
+          else
+              add_arg_type(TYPE_ANY);
+      }
+
+    | e_expr_list2 ',' expr0 L_ELLIPSIS
+      {
+          PREPARE_INSERT(2);
+
+          $$ = $1;
+          got_ellipsis[argument_level] = MY_TRUE;
+          add_f_code(F_FLATTEN_XARG);
+          CURRENT_PROGRAM_SIZE++;
+      }
 ; /* expr_list3 */
 
 
@@ -7674,6 +7762,23 @@ function_call:
           $<function_call_head>$.start = CURRENT_PROGRAM_SIZE;
           $<function_call_head>$.simul_efun = -1;
 
+          /* Insert the save_arg_frame instruction.
+           * If it's not really needed, we'll remove it later. 
+           */
+          {
+              PREPARE_INSERT(2)
+              add_f_code(F_SAVE_ARG_FRAME);
+              CURRENT_PROGRAM_SIZE++;
+          }
+
+          if (argument_level+1 == sizeof(got_ellipsis)/sizeof(got_ellipsis[0]))
+          {
+              yyerror("Functions nested too deeply.");
+              YYACCEPT;
+          }
+          argument_level++;
+          got_ellipsis[argument_level] = MY_FALSE;
+
           real_name = $1.real;
             /* we rely on the fact that $1.real->type is either
              * I_TYPE_UNKNOWN or I_TYPE_GLOBAL here. All others are filtered
@@ -7705,7 +7810,7 @@ function_call:
                   /* The simul-efun has to be called by name:
                    * prepare the extra args for the call_other
                    */
-                  PREPARE_INSERT(6)
+                  PREPARE_INSERT(8)
                   string_t *p;
 
                   p = ref_mstring(real_name->name);
@@ -7726,12 +7831,17 @@ function_call:
            * proper instructions to call the function.
            */
 %line
-          PREPARE_INSERT(6)
+          PREPARE_INSERT(10)
           int        f = 0;             /* Function index */
           Bool       efun_override;     /* TRUE on explicite efun calls */
           int        simul_efun;
           vartype_t *arg_types = NULL;  /* Argtypes from the program */
           int        first_arg;         /* Startindex in arg_types[] */
+          Bool       ap_needed;
+          Bool       has_ellipsis;
+
+          has_ellipsis = got_ellipsis[argument_level];
+          ap_needed = MY_FALSE;
 
           efun_override = ($1.super && strcmp($1.super, get_txt(STR_EFUN)) == 0);
 
@@ -7758,16 +7868,25 @@ function_call:
                       yyerrorf("Too many arguments to simul_efun %s"
                               , get_txt(funp->name));
 
-                  if ($4 < funp->num_arg)
+                  if ($4 < funp->num_arg && !has_ellipsis)
                   {
                       if (pragma_pedantic)
                           yyerrorf("Missing arguments to simul_efun %s"
                                   , get_txt(funp->name));
                       else
+                      {
                           yywarnf("Missing arguments to simul_efun %s"
                                  , get_txt(funp->name));
+                          ap_needed = MY_TRUE;
+                      }
                   }
+
               }
+
+              if (funp->num_arg == SIMUL_EFUN_VARARGS
+               || (funp->flags & TYPE_MOD_XVARARGS)
+               || has_ellipsis)
+                  ap_needed = MY_TRUE;
 
               if (simul_efun & ~0xff)
               {
@@ -7777,46 +7896,20 @@ function_call:
                   add_f_code(F_CALL_OTHER);
                   add_byte($4 + 2);
                   CURRENT_PROGRAM_SIZE += 2;
+                  ap_needed = MY_TRUE;
               }
               else
               {
-                  /* Direct call: we have to add the missing arguments.
-                   * resp. encode the number of arguments passed.
-                   */
-                  if (funp->num_arg != SIMUL_EFUN_VARARGS
-                   && !(funp->flags & TYPE_MOD_XVARARGS))
+                  /* Direct call */
+
+                  if (ap_needed)
                   {
-                      int i;
-
-                      i = funp->num_arg - $4;
-                      if (funp->flags & TYPE_MOD_XVARARGS)
-                          i--; /* Last argument may be omitted */
-                          
-                      if (i > 4
-                       && CURRENT_PROGRAM_SIZE + i + 2 >
-                                  mem_block[A_PROGRAM].max_size)
-                      {
-                          realloc_a_program();
-                          __PREPARE_INSERT__p = PROGRAM_BLOCK 
-                                                + CURRENT_PROGRAM_SIZE;
-                      }
-                      CURRENT_PROGRAM_SIZE += i;
-                      while ( --i >= 0 )
-                      {
-                          add_f_code(F_CONST0);
-                      }
+                      add_f_code(F_USE_ARG_FRAME);
+                      CURRENT_PROGRAM_SIZE++;
                   }
-
                   add_f_code(F_SIMUL_EFUN);
                   add_byte(simul_efun);
-                  if (funp->num_arg == SIMUL_EFUN_VARARGS
-                   || funp->flags & TYPE_MOD_XVARARGS)
-                  {
-                      add_byte($4);
-                      CURRENT_PROGRAM_SIZE += 3;
-                  }
-                  else
-                      CURRENT_PROGRAM_SIZE += 2;
+                  CURRENT_PROGRAM_SIZE += 2;
               }
               $$.type = funp->type & TYPE_MOD_MASK;
           } /* if (simul-efun) */
@@ -7828,6 +7921,8 @@ function_call:
               /* LFUN or INHERITED LFUN */
               function_t *funp;
               function_t  inherited_function;
+
+              ap_needed = MY_TRUE;
 
               if ($1.super)
               {
@@ -7907,7 +8002,8 @@ function_call:
               if (funp->num_arg != $4
                && !(funp->flags & TYPE_MOD_VARARGS)
                && (first_arg != INDEX_START_NONE)
-               && exact_types)
+               && exact_types
+               && !has_ellipsis)
               {
                   if (funp->num_arg-1 > $4 || !(funp->flags & TYPE_MOD_XVARARGS))
                     yyerrorf("Wrong number of arguments to %.60s"
@@ -7991,7 +8087,7 @@ function_call:
               num_arg = $4;
 
               /* Check and/or complete number of arguments */
-              if (def && num_arg == min-1)
+              if (def && num_arg == min-1 && !has_ellipsis)
               {
                   /* Default argument */
                   add_f_code(def);
@@ -8000,6 +8096,7 @@ function_call:
                   min--;
               }
               else if (num_arg < min
+                    && !has_ellipsis
                     && (   (f2 = proxy_efun(f, num_arg)) < 0
                         || (f = f2, MY_FALSE) )
                        )
@@ -8081,6 +8178,23 @@ function_call:
                   } /* for (all args) */
               } /* if (check arguments) */
 
+              /* If the function takes a variable number of arguments
+               * the ap is needed and evaluated automatically.
+               * If the function takes a fixed number of arguments, but
+               * the ellipsis has been used, the ap is needed but not
+               * evaluated automatically.
+               */
+              if (max != min)
+              {
+                  ap_needed = MY_TRUE;
+              }
+              else if (has_ellipsis)
+              {
+                  ap_needed = MY_TRUE;
+                  add_byte(F_USE_ARG_FRAME);
+                  CURRENT_PROGRAM_SIZE++;
+              }
+
               /* Alias for an efun? */
               if (f > LAST_INSTRUCTION_CODE)
                   f = efun_aliases[f-LAST_INSTRUCTION_CODE-1];
@@ -8094,16 +8208,10 @@ function_call:
               add_byte(instrs[f].opcode);
               CURRENT_PROGRAM_SIZE++;
 
-              /* Only store number of arguments for instructions
-               * that allowed a variable number.
+              /* If the efun doesn't return a value, fake a 0.
+               * This is especially important is ap_needed, as the
+               * restore_arg_frame expects a result on the stack.
                */
-              if (max != min)
-              {
-                  add_byte($4);/* Number of actual arguments */
-                  CURRENT_PROGRAM_SIZE++;
-              }
-
-              /* If the efun doesn't return a value, fake a 0 */
               if ( instrs[f].ret_type == TYPE_VOID )
               {
                   last_expression = mem_block[A_PROGRAM].current_size;
@@ -8128,6 +8236,7 @@ function_call:
               f = define_new_function(MY_FALSE,
                   $1.real, 0, 0, 0, NAME_UNDEFINED, TYPE_UNKNOWN
               );
+              ap_needed = MY_TRUE;
               add_f_code(F_CALL_FUNCTION_BY_ADDRESS);
               add_short(f);
               add_byte($4);        /* Number of actual arguments */
@@ -8140,6 +8249,37 @@ function_call:
               $$.type = TYPE_ANY;  /* Just a guess */
           }
 
+          /* Do the post processing of the arg frame handling */
+          if (ap_needed)
+          {
+              /* Restore the previous arg frame pointer */
+
+              add_f_code(F_RESTORE_ARG_FRAME);
+              CURRENT_PROGRAM_SIZE++;
+          }
+          else
+          {
+              /* Since the arg frame is not needed, remove the
+               * earlier save_arg_frame instruction.
+               */
+
+              bytecode_p src, dest;
+              size_t left;
+
+              dest = PROGRAM_BLOCK + $<function_call_head>2.start;
+              src = dest+1;
+              left = CURRENT_PROGRAM_SIZE - $<function_call_head>2.start - 1; 
+
+              while (left-- > 0)
+              {
+                  *dest++ = *src++;
+              }
+
+              CURRENT_PROGRAM_SIZE--;
+          }
+
+          argument_level--;
+
           if ($1.super)
               yfree($1.super);
           pop_arg_stack($4);   /* Argument types no longer needed */
@@ -8149,6 +8289,38 @@ function_call:
     | expr4 L_ARROW 
       {
 %line
+          /* Insert the save_arg_frame instruction.
+           * If it's not really needed, we'll remove it later. 
+           * Putting this code block before the <expr4> in the rule
+           * however yields a faulty grammar.
+           */
+          {
+              char *p, *q;
+              p_int left;
+
+              /* Move the generated code forward by 1 */
+              p = mem_block[A_PROGRAM].block + CURRENT_PROGRAM_SIZE;
+              q = p + 1;
+              for (left = CURRENT_PROGRAM_SIZE - $1.start
+                  ; left > 0
+                  ; left--, p++, q++)
+                  *q = *p;
+
+              /* p now points to program[$1.start].
+               * Store the instruction there.
+               */
+              p[0] = F_SAVE_ARG_FRAME;
+              CURRENT_PROGRAM_SIZE += 1;
+          }
+
+          if (argument_level+1 == sizeof(got_ellipsis)/sizeof(got_ellipsis[0]))
+          {
+              yyerror("Functions nested too deeply.");
+              YYACCEPT;
+          }
+          argument_level++;
+          got_ellipsis[argument_level] = MY_FALSE;
+
           /* If call_other() has been replaced by a sefun, and
            * if we need to use F_CALL_OTHER to call it, we have
            * to insert additional code before the <expr4> already parsed.
@@ -8230,6 +8402,7 @@ function_call:
           /* otherwise the name was given by an expression for which
            * the code and value have been already generated.
            */
+
       }
 
       '(' expr_list3 ')'
@@ -8237,25 +8410,33 @@ function_call:
       {
           /* Now generate the CALL_OTHER resp. the SIMUL_EFUN instruction. */
 
+          PREPARE_INSERT(10)
+          Bool has_ellipsis;
+          Bool ap_needed;
+
+          has_ellipsis = got_ellipsis[argument_level];
+          ap_needed = MY_TRUE;
+
           if (call_other_sefun >= 0)
           {
               /* SIMUL EFUN */
               
-              PREPARE_INSERT(6)
               function_t *funp;
               int num_arg;
 
               num_arg = $7 + 2; /* Don't forget the obj and the fun! */
 
               funp = &simul_efunp[call_other_sefun];
-              if (num_arg > funp->num_arg && !(funp->flags & TYPE_MOD_XVARARGS))
+              if (num_arg > funp->num_arg
+               && !(funp->flags & TYPE_MOD_XVARARGS)
+               && !has_ellipsis)
                   yyerrorf("Too many arguments to simul_efun %s"
                           , get_txt(funp->name));
 
               if (call_other_sefun & ~0xff)
               {
                   /* call-other: the number of arguments will be
-                   * corrected at runtime.
+                   * detected and corrected at runtime.
                    */
                   add_f_code(F_CALL_OTHER);
                   add_byte(num_arg + 2);
@@ -8263,11 +8444,10 @@ function_call:
               }
               else
               {
-                  /* Direct call: we have to add the missing arguments.
-                   * resp. encode the number of arguments passed.
-                   */
+                  /* Direct call */
                   if (funp->num_arg != SIMUL_EFUN_VARARGS
-                   && !(funp->flags & TYPE_MOD_XVARARGS))
+                   && !(funp->flags & TYPE_MOD_XVARARGS)
+                   && !has_ellipsis)
                   {
                       int i;
 
@@ -8290,16 +8470,19 @@ function_call:
                       }
                   }
 
+                  if (funp->num_arg != SIMUL_EFUN_VARARGS
+                   && !(funp->flags & TYPE_MOD_XVARARGS)
+                   && !has_ellipsis)
+                      ap_needed = MY_FALSE;
+
+                  if (ap_needed)
+                  {
+                      add_f_code(F_USE_ARG_FRAME);
+                      CURRENT_PROGRAM_SIZE++;
+                  }
                   add_f_code(F_SIMUL_EFUN);
                   add_byte(call_other_sefun);
-                  if (funp->num_arg == SIMUL_EFUN_VARARGS
-                   || funp->flags & TYPE_MOD_XVARARGS)
-                  {
-                      add_byte(num_arg);
-                      CURRENT_PROGRAM_SIZE += 3;
-                  }
-                  else
-                      CURRENT_PROGRAM_SIZE += 2;
+                  CURRENT_PROGRAM_SIZE += 2;
               }
               $$.type = funp->type & TYPE_MOD_MASK;
           }
@@ -8315,6 +8498,38 @@ function_call:
             /* No good need of these arguments because we don't
              * know what we are going to call.
              */
+
+          /* Do the post processing of the arg frame handling */
+          if (ap_needed)
+          {
+              /* Restore the previous arg frame pointer */
+
+              add_f_code(F_RESTORE_ARG_FRAME);
+              CURRENT_PROGRAM_SIZE++;
+          }
+          else
+          {
+              /* Since the arg frame is not needed, remove the
+               * earlier save_arg_frame instruction.
+               */
+
+              bytecode_p src, dest;
+              size_t left;
+
+              dest = PROGRAM_BLOCK + $<function_call_head>2.start;
+              src = dest+1;
+              left = CURRENT_PROGRAM_SIZE - $<function_call_head>2.start - 1; 
+
+              while (left-- > 0)
+              {
+                  *dest++ = *src++;
+              }
+
+              CURRENT_PROGRAM_SIZE--;
+          }
+
+          argument_level--;
+
       }
 
 ; /* function_call */
@@ -10816,6 +11031,8 @@ prolog(void)
     last_initializer_end = -3;
     variables_initialized = 0;
 %endif
+    argument_level = 0;
+    got_ellipsis[0] = MY_FALSE;
 
     /* Check if call_other() has been replaced by a sefun.
      */

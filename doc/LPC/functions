@@ -78,8 +78,19 @@ DESCRIPTION
            compute(a)
            do_that(a, "foo")
 
+        Array function arguments can be 'flattened' with the '...' operator.
+        For example:
+
+           mixed * m = ({ "foo", "bar" });
+           fun(m..., 1);
+
+        will be executed as:
+
+           fun("foo", "bar", 1);
+
+
         If the number of values passed to the function does not match the
-        number of expected arguments (and if type checking is enabled), the
+        number of expected arguments (and if type checking is not enabled), the
         driver will perform the necessary adaption at call time: excess
         values are ignored, missing values are substituted by the number 0.
         The values passed to the called function are massaged by the driver

@@ -2828,6 +2828,12 @@ yylex1 (void)
             return L_NOT;
 
         case '.':
+            if (yyp[0] == '.' && yyp[1] == '.')
+            {
+                yyp += 2;
+                outp = yyp;
+                return L_ELLIPSIS;
+            }
             TRY('.',L_RANGE);
             goto badlex;
 
@@ -2835,7 +2841,6 @@ yylex1 (void)
             TRY(':', L_COLON_COLON);
             outp = yyp;
             return ':';
-
 
         /* --- Inline Function --- */
 

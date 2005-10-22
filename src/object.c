@@ -4537,7 +4537,7 @@ f_save_object (svalue_t *sp, int numarg)
         sfile = check_valid_path(sp->u.str, ob, STR_SAVE_OBJECT, MY_TRUE);
         if (sfile == NULL)
         {
-            error("Illegal use of save_object()\n");
+            error("Illegal use of save_object('%s')\n", get_txt(sp->u.str));
             /* NOTREACHED */
             return sp;
         }
@@ -4552,7 +4552,7 @@ f_save_object (svalue_t *sp, int numarg)
         if (!name)
         {
             free_mstring(sfile);
-            error("Stack overflow in save_object()\n");
+            error("Stack overflow in save_object('%s')\n", get_txt(sp->u.str));
             /* NOTREACHED */
             return sp;
         }
@@ -5741,9 +5741,9 @@ f_restore_object (svalue_t *sp)
         /* Get a valid filename */
 
         sfile = check_valid_path(sp->u.str, ob, STR_RESTORE_OBJECT, MY_FALSE);
-        if (file == NULL)
+        if (sfile == NULL)
         {
-            error("Illegal use of restore_object()\n");
+            error("Illegal use of restore_object('%s')\n", get_txt(sp->u.str));
             /* NOTREACHED */
             return sp;
         }
@@ -5757,7 +5757,7 @@ f_restore_object (svalue_t *sp)
         if (!name)
         {
             free_mstring(sfile);
-            error("Stack overflow in restore_object()\n");
+            error("Stack overflow in restore_object('%s')\n", get_txt(sp->u.str));
             /* NOTREACHED */
             return sp;
         }
@@ -5962,7 +5962,8 @@ f_restore_object (svalue_t *sp)
                             free_svalue(&tmp->v);
                         while (NULL != (tmp = tmp->next));
                     }
-                    error("Stack overflow in restore_object()\n");
+                    error("Stack overflow in restore_object('%s')\n"
+                         , file ? name : get_txt(current_object->name));
                     /* NOTREACHED */
                     return sp;
                 }
