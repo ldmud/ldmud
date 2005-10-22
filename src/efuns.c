@@ -778,7 +778,11 @@ f_regreplace (svalue_t *sp)
             }
             else
                 curr = pat->endp[0];
-        } while ((flags&F_GLOBAL) && !pat->reganch && regexec(pat,curr,start));
+        } while (  (flags & F_GLOBAL)
+                 && !pat->reganch
+                 && *curr != '\0'
+                 && regexec(pat,curr,start)
+                );
         space -= strlen(curr)+1;
         if (space <= 0) {
             XREALLOC;

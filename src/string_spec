@@ -94,7 +94,6 @@ WRITE_FILE         "write_file"
 
 CATCH_TELL      "catch_tell"
 CATCH_MSG       "catch_msg"
-CLEAN_UP        "clean_up"
 ID              "id"
 VARINIT         "__INIT"
 

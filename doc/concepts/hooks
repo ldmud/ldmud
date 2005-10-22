@@ -139,7 +139,7 @@ DESCRIPTION
 
           If the hook is a closure, it is called as
 
-            int <closure>(object ob, int ref)
+            int <closure>(int ref, object ob)
 
           with the object to clean up as first, and its refcount as
           second argument. Lambda closures are also bound to the
@@ -160,9 +160,9 @@ DESCRIPTION
           The cleanup method has the possibility to destruct the
           object. To survive this time, but try again some time later,
           the call has to result in a non-zero value.
-          If the call results in 0 (as its the case if the
-          hook specifies a non-existing lfun), no further attempt to
-          clean up this object will be done.
+
+          If the hook specifies a non-existing lfun, or if the call
+          returns 0, no further attempt to clean up this object will be done.
 
 
         H_COMMAND

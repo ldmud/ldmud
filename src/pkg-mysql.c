@@ -36,6 +36,7 @@
 #include "array.h"
 #include "interpret.h"
 #include "mstrings.h"
+#include "simulate.h"
 #include "svalue.h"
 #include "xalloc.h"
 
@@ -194,6 +195,10 @@ remove_dat (db_dat_t *dat)
 } /* remove_dat() */
 
 /*-------------------------------------------------------------------------*/
+#if 0
+
+/* UNUSED for now */
+
 static unsigned int
 remove_dat_by_handle (int i)
 
@@ -207,6 +212,8 @@ remove_dat_by_handle (int i)
     tmp = find_dat_by_handle(i);
     return remove_dat(tmp);
 } /* remove_dat_by_handle() */
+
+#endif
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -475,9 +482,8 @@ f_db_exec (svalue_t *sp)
     string_t     *s;
     db_dat_t     *dat;
     unsigned int  handle;
-    unsigned int  err_no;
 
-    handle = (unsigned int)sp[-1].u.number;
+    handle = (unsigned int)sp.u.number;
     s = sp->u.str;
 
     if ( !(dat = find_dat_by_handle(handle)) )
@@ -643,7 +649,7 @@ f_db_handles (svalue_t *sp)
     elems = 1;
 
     /* Count how many handles there are */
-    while (tmp = tmp->next)
+    while (NULL != (tmp = tmp->next))
         elems++;
 
    /* Allocate an array to store all handle-ids */

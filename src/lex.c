@@ -4781,19 +4781,25 @@ add_define (char *name, short nargs, char *exps)
     }
 
     /* If such a macro already exists with different meaning,
-     * generate an error.
+     * generate an error. If the meaning doesn't change, generate
+     * a warning.
      */
     if (p->type != I_TYPE_UNKNOWN)
     {
+        char buf[200+NSIZE];
+        sprintf(buf, "Redefinition of #define %s", name);
+
         if (nargs != p->u.define.nargs
          || p->u.define.special
          || strcmp(exps,p->u.define.exps.str) != 0)
         {
-            char buf[200+NSIZE];
-            sprintf(buf, "Redefinition of #define %s", name);
             yyerror(buf);
+            return;
         }
-        return;
+        else
+        {
+            yywarn(buf);
+        }
     }
 
     /* New macro: initialise the ident.u.define and

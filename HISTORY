@@ -45,7 +45,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
 
 
-17-Jul-2001 (Lars Duening) -- upcoming Release 3.2.9
+24-Jul-2001 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -81,6 +81,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + printf(), sprintf(): If an explicite pad string is defined, even
            if it is space, the efuns won't remove white space before a line
            end.
+       + printf(), sprintf(): Printing numbers with leading zeroes and a
+           sign character printed the sign in the wrong place.
        + query_udp_port(), send_udp(): Renamed from query_imp_port() and
            send_imp().
        + regexp functions: more compatible with 8-bit characters.
@@ -88,6 +90,8 @@ For a detailed list of all changes see the file CHANGELOG.
            least one match'.
        + regreplace(): Accepts a closure to produce the replacement string
            instead of just a constant string.
+       + regreplace(): Pattern which could match on the
+           empty string matched once too often at string end.
        + sin(), cos(), tan(), atan(), atan2(), log(), exp(), sqrt(), pow():
            Integers are accepted as arguments, too.
        + terminal_colour(): Colour keys can now be mapped using a closure.

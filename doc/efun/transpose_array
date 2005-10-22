@@ -3,7 +3,7 @@ SYNOPSIS
 
 DESCRIPTION
         transpose_array ( ({ ({1,2,3}), ({a,b,c}) }) )
-                        == ({ ({1,a}), ({2,b)}, ({3,c}) })
+                        == ({ ({1,a}), ({2,b}), ({3,c}) })
 
         transpose_array() applied to an alist results in an array of
         ({ key, data }) pairs, useful if you want to use sort_array()
@@ -16,7 +16,7 @@ EXAMPLE
                                    ({ #'[, 'b, 0}) }) )
 
         The given mapping 'map' is returned as an array of
-        ({ key,        data })         pairs, sorted by the keys.
+        ({ key, data }) pairs, sorted by the keys.
 
 SEE ALSO
         alists(LPC), sort_array(E)

@@ -1,19 +1,28 @@
 SYNOPSIS
-        int clean_up(int refcount)
+        int <lfun> (int refcount)
+        int <closure>(int ref, object ob)
 
 DESCRIPTION
-        clean_up() is applied by the parser when an object hasn't been
+        The hook H_CLEAN_UP defines a lfun or a closure used to clean
+        up an object. In older drivers this was hardwired to the lfun
+        clean_up().
+
+        The function is applied by the driver when an object hasn't been
         used for a long time, to give it a possibility to
-        self-destruct. The refcount passed as argument will be 0 for
+        self-destruct. The refcount <ref> passed as argument will be 0 for
         clone objects, 1 for a simple loaded object, and greater when
         the object is cloned or inherited by some existing object.  It
         is recommended not to self_destruct the object when the
         reference count is greater than one.
+
         By convention, a refcount < 0 is used if some other object
         asks the called object to clean_up.
 
-        If clean_up returns 0, it will not be called again in that
-        object until it is swapped out and in again.
+        If the function is a closure, the second argument <ob> is the
+        object to clean up.
+
+        If the hook specifies a non-existing lfun, or if the call
+        returns 0, no further attempt to clean up this object will be done.
 
         Returning a non-zero value is only recommended when the reason
         why the object can't self-destruct is likely to vanish without
@@ -34,5 +43,9 @@ EXAMPLES
         self-destruct if it is neither inherited nor used as a
         blueprint, is empty and was not entered for a long time.
 
+HISTORY
+        Before 3.2.1, the function was hardwired to the lfun clean_up().
+
 SEE ALSO
-        reset(A), heart_beat(A), call_out(A), destruct(E), remove(A)
+        reset(A), heart_beat(A), call_out(A), destruct(E), remove(A),
+        hooks(C)

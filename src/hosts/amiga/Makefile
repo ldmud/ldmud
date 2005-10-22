@@ -163,9 +163,10 @@ pkg-alists.o : pkg-alists.c xalloc.h svalue.h simulate.h mstrings.h main.h \
     strfuns.h sent.h exec.h instrs.h port.h config.h hosts/unix.h \
     hosts/be/be.h machine.h
 
-pkg-mysql.o : pkg-mysql.c xalloc.h svalue.h mstrings.h interpret.h array.h \
-    pkg-mysql.h my-alloca.h typedefs.h driver.h instrs.h port.h config.h \
-    exec.h hosts/unix.h hosts/be/be.h machine.h
+pkg-mysql.o : pkg-mysql.c xalloc.h svalue.h simulate.h mstrings.h \
+    interpret.h array.h pkg-mysql.h my-alloca.h typedefs.h driver.h \
+    strfuns.h sent.h exec.h instrs.h port.h config.h hosts/unix.h \
+    hosts/be/be.h machine.h
 
 port.o : port.c hosts/crypt.c main.h backend.h my-rusage.h driver.h \
     typedefs.h port.h config.h hosts/unix.h hosts/be/be.h machine.h

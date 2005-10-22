@@ -1696,11 +1696,6 @@ load_ob_from_swap (object_t *ob)
 
     /* Update the object flags */
     ob->flags &= ~O_SWAPPED;
-    if (!(ob->flags & (O_DESTRUCTED|O_WILL_CLEAN_UP))
-     && function_exists(STR_CLEAN_UP, ob))
-    {
-        ob->flags |= O_WILL_CLEAN_UP;
-    }
 
     return result;
 } /* load_ob_from_swap() */

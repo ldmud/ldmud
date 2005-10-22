@@ -1947,7 +1947,25 @@ add_table_now:
                             tmpl = pres; /* well.... */
                     }
                     if ((unsigned int)tmpl < fs)
-                        add_justified(st, temp, tmpl, pad, fs, finfo);
+                    {
+                        if ((finfo & INFO_PS_ZERO) != 0
+                         && (   temp[0] == ' '
+                             || temp[0] == '+'
+                             || temp[0] == '-'
+                            )
+                         && (finfo & INFO_J) != INFO_J_LEFT
+                           )
+                        {
+                            /* Non-left justification and we're printing
+                             * with leading zeroes: preserve the sign
+                             * character in the right place.
+                             */
+                            ADD_STRN(temp, 1);
+                            add_justified(st, temp+1, tmpl-1, pad, fs-1, finfo);
+                        }
+                        else
+                            add_justified(st, temp, tmpl, pad, fs, finfo);
+                    }
                     else
                         ADD_STRN(temp, tmpl)
                     break;

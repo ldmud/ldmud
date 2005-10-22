@@ -4,6 +4,8 @@ CONCEPT
 
 DESCRIPTION
 
+        TODO: This is out of date. Also document the relation with reset
+
         (Collected from the Changelogs of the driver source)
 
         The swapping algorithm has been changed. A test is done for

@@ -1,6 +1,23 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+25-Jul-2001 (Lars Duening)  (3.3.79)
+    - (sprintf.c) Printing numbers with leading zeroes and a sign character
+        printed the sign in the wrong place (reported by Dafire).
+    - (backend.c) The check_alarm() function did not quite work right
+        (thanks, Coogan!).
+    - (efuns.c) Efun regreplace(): Pattern which could match on the
+        empty string matched once too often at string end.
+        E.g. regreplace("blah fasel", ".*", "ERSATZ", 1) returned
+        "ERSATZERSATZ" instead of just "ERSATZ" (thanks, Fiona!).
+    - (lex.c) Redefinition of a macro yields a warning even if the
+        definition doesn't change (suggested by Gnomi).
+    - (backend.c, simulate.c) The initial setting of the O_WILL_CLEAN_UP flag
+        checked for the hardcoded "clean_up" lfun instead for what the
+        H_CLEAN_UP hook said. Also, the documentation was slightly out
+        of sync with the reality (thanks, Niels).
+    - (mysql.c) db_error() used a non-existing argument (thanks, Dafire!).
+
 17-Jul-2001 (Lars Duening)  (3.3.78)
     - (array, gcollect.c, mapping) The GC now recounts the number of arrays 
         and mappings in the game (reported by Niels).
@@ -208,7 +225,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
 02-Jun-2001 (Lars Duening)
     - (lex.c, mstrings) The lexer can now create literal strings with
          embedded \0 characters.
-    - (backend.c) The check_alarm() function also restored the alarm
+    - (backend.c) The check_alarm() function also restores the alarm
          signal handler.
     - (prolang.y) It is now possible to cast to '(mixed)'.
     - (prolang.y) Improved the type tracking of '?:': it now accepts

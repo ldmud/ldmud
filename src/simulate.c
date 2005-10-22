@@ -1629,7 +1629,7 @@ load_object (const char *lname, Bool create_super, int depth)
         }
     }
 
-    if ( !(ob->flags & O_DESTRUCTED) && function_exists(STR_CLEAN_UP, ob) )
+    if ( !(ob->flags & O_DESTRUCTED))
         ob->flags |= O_WILL_CLEAN_UP;
 
     /* Restore the command giver */

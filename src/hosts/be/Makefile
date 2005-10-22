@@ -147,16 +147,16 @@ endif
 # $Format: "ifeq ($ReleaseType$, pre)"$
 ifeq (dev, pre)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 78
+  SETVERFLAGS += d 79
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-pre.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-pre.78
+  VSTRING = 3.3.0-pre.79
 endif
 # $Format: "ifeq ($ReleaseType$, dev)"$
 ifeq (dev, dev)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 78
+  SETVERFLAGS += d 79
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-dev.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-dev.78
+  VSTRING = 3.3.0-dev.79
 endif
 
 else
@@ -164,12 +164,12 @@ else
 # --- Development Versions ---
 
 # $Format: "SETVERFLAGS = -app $ReleaseMajor$ $ReleaseMinor$ $ProjectMinorVersion$"$
-SETVERFLAGS = -app 3 3 78
+SETVERFLAGS = -app 3 3 79
 
 # $Format: "  SETVERFLAGS += f"$
   SETVERFLAGS += f
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ProjectMinorVersion$"$
-  VSTRING = 3.3.78
+  VSTRING = 3.3.79
 
 endif
 
@@ -607,9 +607,9 @@ $(OBJ)/pkg-alists.o : xalloc.h svalue.h simulate.h mstrings.h main.h \
     strfuns.h sent.h exec.h instrs.h port.h config.h hosts/unix.h \
     hosts/be/be.h machine.h
 
-$(OBJ)/pkg-mysql.o : xalloc.h svalue.h mstrings.h interpret.h array.h \
-    pkg-mysql.h my-alloca.h typedefs.h driver.h instrs.h port.h config.h \
-    exec.h hosts/unix.h hosts/be/be.h machine.h
+$(OBJ)/pkg-mysql.o : xalloc.h svalue.h simulate.h mstrings.h interpret.h \
+    array.h pkg-mysql.h my-alloca.h typedefs.h driver.h strfuns.h sent.h \
+    exec.h instrs.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/port.o : hosts/crypt.c main.h backend.h my-rusage.h driver.h \
     typedefs.h port.h config.h hosts/unix.h hosts/be/be.h machine.h

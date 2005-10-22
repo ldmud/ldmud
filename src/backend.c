@@ -594,7 +594,7 @@ backend (void)
 
 #ifdef ALARM_HANDLER
 
-ALARM_HANDLER(catch_alarm, alarm_called = MY_TRUE; comm_time_to_call_heart_beat = 1; total_alarms++; )
+ALARM_HANDLER(catch_alarm, alarm_called = MY_TRUE; comm_time_to_call_heart_beat = MY_TRUE; total_alarms++; )
 
 #else
 
@@ -606,7 +606,7 @@ catch_alarm (int dummy UNUSED)
 #endif
     (void)signal(SIGALRM, (RETSIGTYPE(*)(int))catch_alarm);
     alarm_called = MY_TRUE;
-    comm_time_to_call_heart_beat = 1;
+    comm_time_to_call_heart_beat = MY_TRUE;
     total_alarms++;
 #ifndef RETSIGTYPE_VOID
     return 0;
@@ -632,7 +632,15 @@ void check_alarm (void)
     static mp_int last_alarm_time = 0;
     mp_int curtime = get_current_time();
 
-    if (last_alarm_time && !alarm_called && curtime - last_alarm_time > 30)
+    if (!last_alarm_time) /* initialize it */
+        last_alarm_time = curtime;
+
+    if (alarm_called)
+    {
+        /* We got an alarm - restart the timer */
+        last_alarm_time = curtime;
+    }
+    else if (curtime - last_alarm_time > 15)
     {
         debug_message("%s Last alarm was %ld seconds ago - restarting it.\n"
                      , time_stamp(), curtime - last_alarm_time);
@@ -642,10 +650,11 @@ void check_alarm (void)
         time_to_call_heart_beat = MY_TRUE;
         (void)signal(SIGALRM, (RETSIGTYPE(*)(int))catch_alarm);
         alarm(ALARM_TIME);
+
+        last_alarm_time = curtime; /* Since we just restarted it */
     }
 
     alarm_called = MY_FALSE;
-    last_alarm_time = curtime;
 } /* check_alarm() */
 
 /*-------------------------------------------------------------------------*/
@@ -841,7 +850,6 @@ static Bool did_swap;
           && !bResetCalled
           && (!did_swap || !comm_time_to_call_heart_beat))
         {
-            int was_swapped = obj->flags & O_SWAPPED ;
             int save_reset_state = obj->flags & O_RESET_STATE;
             svalue_t *svp;
 
@@ -902,8 +910,9 @@ static Bool did_swap;
             if (obj->flags & O_DESTRUCTED)
                 continue;
 
-            if ((!svp || (svp->type == T_NUMBER && svp->u.number == 0))
-              && was_swapped )
+            if (!svp
+             || (svp->type == T_NUMBER && svp->u.number == 0)
+               )
                 obj->flags &= ~O_WILL_CLEAN_UP;
             obj->flags |= save_reset_state;
 
