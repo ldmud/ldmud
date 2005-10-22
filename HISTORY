@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-02-Apr-2001 (Lars Duening) -- Development Release 3.3
+04-Apr-2001 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -54,6 +54,7 @@ For a detailed list of all changes see the file CHANGELOG.
        + db_affected_rows(), db_conv_string(), db_close(), db_connect(),
          db_exec(), db_fetch(), db_handles(), db_coldefs(), db_insert_id():
            Optional: mySQL support.
+       + md5_encrypt(): Compute the MD5 message digest for a string.
        + min(), max(): To select the minimum resp. maximum among a bunch
            of numbers or strings.
        + sgn(): Return the sign of a numeric argument.
@@ -108,11 +109,13 @@ For a detailed list of all changes see the file CHANGELOG.
        + Experimental: Extended the construct catch() with the keyword
            'nolog', which suppresses logging the caught error in the logfiles.
            It is meant for objects like wizard tools.
+       + It is no longer possible to prematurely end an inline closure
+           function by inserting a free '}'.
        + Bugfix: Adding mappings of different width throws an error, unless
            one of the mappings if empty.
        + Bugfix: Right shift by 32 or more bits was computed incorrectly.
        + Bugfix: All <op>= assignment operators can now operate on
-        indexed strings on the left hand side.
+           indexed strings on the left hand side.
 
     - Runtime:
        + Revamped the string handling to use refcounted strings everywhere.

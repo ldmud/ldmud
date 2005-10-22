@@ -2853,6 +2853,7 @@ yylex1 (void)
                 size_t pos_return;  /* position of the 'return' */
                 char name[256+MAXPATHLEN+1];
                 int level;       /* Nesting level of embedded (: :) */
+                int blevel;      /* Nesting level of embedded { } */
                 int first_line;  /* For error messages */
                 char *start;
 
@@ -2935,6 +2936,7 @@ yylex1 (void)
                  */
                 yyp++;
                 level = 1;
+                blevel = 0;
                 start = yyp;
                 while (level)
                 {
@@ -2954,6 +2956,8 @@ yylex1 (void)
                          && (yyp[1] != ':' || yyp[2] == ':' || yyp[2] == ')')
                            )
                             level++, yyp++;
+                        else if (yyp[0] == '{')
+                            yyp++;
                         break;
 
                     case ':':
@@ -2964,6 +2968,22 @@ yylex1 (void)
                     case '#':
                         if (*yyp == '\'')
                             yyp++;
+                        break;
+
+                    case '{':
+                        blevel++;
+                        break;
+
+                    case '}':
+                        if (yyp[0] != ')')
+                        {
+                            if (!blevel)
+                            {
+                                yyerror("Illegal block nesting");
+                                return -1;
+                            }
+                            blevel--;
+                        }
                         break;
 
                     case '/':

@@ -99,7 +99,7 @@ endif
            call_out.c closure.c \
            comm.c dumpstat.c ed.c efuns.c files.c gcollect.c hash.c \
            heartbeat.c \
-           interpret.c lex.c main.c mapping.c mempools.c mstrings.c \
+           interpret.c lex.c main.c mapping.c md5.c mempools.c mstrings.c \
            object.c otable.c parser.c parse.c parse_old.c pkg-mysql.c port.c \
            ptrtable.c random.c \
            regexp.c rxcache.c simulate.c simul_efun.c stdstrings.c \
@@ -146,16 +146,16 @@ endif
 # $Format: "ifeq ($ReleaseType$, pre)"$
 ifeq (dev, pre)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 35
+  SETVERFLAGS += d 36
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-pre.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-pre.35
+  VSTRING = 3.3.0-pre.36
 endif
 # $Format: "ifeq ($ReleaseType$, dev)"$
 ifeq (dev, dev)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 35
+  SETVERFLAGS += d 36
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-dev.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-dev.35
+  VSTRING = 3.3.0-dev.36
 endif
 
 else
@@ -163,12 +163,12 @@ else
 # --- Development Versions ---
 
 # $Format: "SETVERFLAGS = -app $ReleaseMajor$ $ReleaseMinor$ $ProjectMinorVersion$"$
-SETVERFLAGS = -app 3 3 35
+SETVERFLAGS = -app 3 3 36
 
 # $Format: "  SETVERFLAGS += f"$
   SETVERFLAGS += f
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ProjectMinorVersion$"$
-  VSTRING = 3.3.35
+  VSTRING = 3.3.36
 
 endif
 
@@ -518,11 +518,11 @@ $(OBJ)/ed.o : xalloc.h svalue.h stdstrings.h simulate.h rxcache.h regexp.h \
 $(OBJ)/efuns.o : ../mudlib/sys/strings.h ../mudlib/sys/objectinfo.h \
     ../mudlib/sys/debug_info.h xalloc.h wiz_list.h svalue.h swap.h \
     strfuns.h smalloc.h simulate.h stdstrings.h rxcache.h random.h \
-    ptrtable.h otable.h object.h mstrings.h mapping.h main.h interpret.h \
-    instrs.h heartbeat.h dumpstat.h comm.h closure.h call_out.h backend.h \
-    array.h actions.h efuns.h my-rusage.h my-alloca.h typedefs.h driver.h \
-    sent.h exec.h regexp.h port.h config.h hosts/unix.h hosts/be/be.h \
-    hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
+    ptrtable.h otable.h object.h mstrings.h md5.h mapping.h main.h \
+    interpret.h instrs.h heartbeat.h dumpstat.h comm.h closure.h call_out.h \
+    backend.h array.h actions.h efuns.h my-rusage.h my-alloca.h typedefs.h \
+    driver.h sent.h exec.h regexp.h port.h config.h hosts/unix.h \
+    hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
     ./hosts/amiga/ixfile.h
 
 $(OBJ)/files.o : ../mudlib/sys/files.h xalloc.h svalue.h stdstrings.h \
@@ -585,6 +585,8 @@ $(OBJ)/mapping.o : xalloc.h wiz_list.h svalue.h smalloc.h simulate.h \
     sent.h exec.h instrs.h port.h config.h hosts/unix.h hosts/be/be.h \
     hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
     ./hosts/amiga/ixfile.h
+
+$(OBJ)/md5.o : md5.h machine.h
 
 $(OBJ)/mempools.o : xalloc.h gcollect.h mempools.h driver.h typedefs.h \
     port.h config.h hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h \

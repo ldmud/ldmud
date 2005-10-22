@@ -12,6 +12,7 @@
  *    efun: capitalize()
  *    efun: crypt()
  *    efun: make_shared_string()
+ *    efun: md5_encrypt()
  *    efun: regexp()
  *    efun: regexplode()
  *    efun: regreplace()
@@ -95,6 +96,7 @@
 #include "interpret.h"
 #include "main.h"
 #include "mapping.h"
+#include "md5.h"
 #include "mstrings.h"
 #include "object.h"
 #include "otable.h"
@@ -312,6 +314,41 @@ f_make_shared_string (svalue_t *sp)
 
     return sp;
 } /* f_make_shared_string() */
+
+/*--------------------------------------------------------------------*/
+svalue_t *
+f_md5_encrypt (svalue_t *sp)
+
+/* EFUN: md5_encrypt()
+ *
+ *   string md5_encrypt(string arg)
+ *
+ * Create and return a MD5 message digest from the string <arg>.
+ */
+
+{
+    MD5_CTX context;
+    string_t *s_digest;
+    unsigned char *digest, d[17];
+    int i;
+   
+    memsafe(s_digest = alloc_mstring(32), 32, "md5 encryption result");
+    digest = (unsigned char *)get_txt(s_digest);
+
+    MD5Init(&context);
+    MD5Update(&context, (unsigned char *)get_txt(sp->u.str), mstrsize(sp->u.str));
+    MD5Final(&context, d);
+
+    d[16]='\0';
+
+    for (i = 0; i < 16; i++)
+        sprintf((char *)digest+2*i, "%02x", d[i]);
+
+    free_string_svalue(sp);
+    put_string(sp, s_digest);
+
+    return sp;
+} /* f_md5_encrypt() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *

@@ -71,14 +71,14 @@ SRC=lex.c main.c interpret.c simulate.c object.c backend.c array.c\
     comm.c ed.c regexp.c mapping.c wiz_list.c swap.c xalloc.c\
     call_out.c otable.c dumpstat.c mstrings.c hash.c port.c files.c\
     pkg-mysql.c ptrtable.c heartbeat.c actions.c mempools.c bitstrings.c \
-    access_check.c parse_old.c parse.c prolang.y parser.c\
+    access_check.c parse_old.c parse.c prolang.y parser.c md5.c \
     efuns.c simul_efun.c strfuns.c sprintf.c gcollect.c closure.c
 OBJ=parser.o lex.o main.o interpret.o simulate.o object.o backend.o array.o\
     comm.o ed.o regexp.o mapping.o wiz_list.o swap.o xalloc.o\
     call_out.o otable.o dumpstat.o mstrings.o hash.o port.o files.o\
     pkg-mysql.o ptrtable.o heartbeat.o actions.o mempools.o bitstrings.o \
     access_check.o parse_old.o parse.o simul_efun.o strfuns.o sprintf.o\
-    efuns.o gcollect.o closure.o
+    efuns.o gcollect.o closure.o md5.o
 
 driver: $(OBJ)
 	$(CC) $(OPTIMIZE) $(LDFLAGS) $(OBJ) -Zmts -o driver.exe
@@ -224,11 +224,11 @@ ed.o : xalloc.h svalue.h stdstrings.h simulate.h rxcache.h regexp.h \
 efuns.o : ../mudlib/sys/strings.h ../mudlib/sys/objectinfo.h \
     ../mudlib/sys/debug_info.h xalloc.h wiz_list.h svalue.h swap.h \
     strfuns.h smalloc.h simulate.h stdstrings.h rxcache.h random.h \
-    ptrtable.h otable.h object.h mstrings.h mapping.h main.h interpret.h \
-    instrs.h heartbeat.h dumpstat.h comm.h closure.h call_out.h backend.h \
-    array.h actions.h efuns.h my-rusage.h my-alloca.h typedefs.h driver.h \
-    sent.h exec.h regexp.h port.h config.h hosts/unix.h hosts/be/be.h \
-    hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
+    ptrtable.h otable.h object.h mstrings.h md5.h mapping.h main.h \
+    interpret.h instrs.h heartbeat.h dumpstat.h comm.h closure.h call_out.h \
+    backend.h array.h actions.h efuns.h my-rusage.h my-alloca.h typedefs.h \
+    driver.h sent.h exec.h regexp.h port.h config.h hosts/unix.h \
+    hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
     ./hosts/amiga/ixfile.h
 
 files.o : ../mudlib/sys/files.h xalloc.h svalue.h stdstrings.h simulate.h \
@@ -291,6 +291,8 @@ mapping.o : xalloc.h wiz_list.h svalue.h smalloc.h simulate.h regexp.h \
     exec.h instrs.h port.h config.h hosts/unix.h hosts/be/be.h \
     hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
     ./hosts/amiga/ixfile.h
+
+md5.o : md5.h machine.h
 
 mempools.o : xalloc.h gcollect.h mempools.h driver.h typedefs.h port.h \
     config.h hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h \

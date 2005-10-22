@@ -48,3 +48,6 @@ itself was written by Shawn J. Cokus.
 The xerq demon is Copyright (C) 1995 by Brian Gerst. Use of the source
 code is subject to the restriction that it must not be used for monetary
 gain.
+
+The MD5 message digest algorithm is Copyright (C) 1991-2, RSA Data Security,
+Inc.

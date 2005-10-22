@@ -13,4 +13,4 @@ DESCRIPTION
         input_to() can be used with special argument.
 
 SEE ALSO
-        input_to(E)
+        md5_encrypt(E), input_to(E)

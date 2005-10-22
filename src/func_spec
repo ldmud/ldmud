@@ -304,6 +304,7 @@ string *explode(string, string);
 string  implode(string *, string);
 string  lower_case(string);
 string  make_shared_string(string);
+string  md5_encrypt(string);
 string *regexp(string *, string);
 string *regexplode(string, string);
 string  regreplace(string,string,string,int);
