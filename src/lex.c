@@ -2150,7 +2150,7 @@ handle_pragma (char *str)
      * or to spaces before it.
      */
     for ( base = str, next = NULL
-        ; base != NULL && *base != '\0'
+        ; base != NULL && *base != '\0' && *base != '\r'
         ; base = next
         )
     {
@@ -2158,14 +2158,14 @@ handle_pragma (char *str)
         Bool validPragma;
 
         /* Skip spaces */
-        base = base + strspn(base, " \t");
-        if ('\0' == *base)
+        base = base + strspn(base, " \t\r");
+        if ('\0' == *base || '\r' == *base)
             break;
 
         /* Find next delimiter, if any, and determine the
          * length of the pragma name.
          */
-        next = strpbrk(base, " \t,");
+        next = strpbrk(base, " \t,\r");
         if (NULL == next)
             namelen = strlen(base);
         else
@@ -2266,7 +2266,7 @@ handle_pragma (char *str)
         if (NULL != next)
         {
             /* Skip spaces */
-            next = next + strspn(next, " \t");
+            next = next + strspn(next, " \t\r");
 
             if (',' == *next)
             {
@@ -2276,7 +2276,7 @@ handle_pragma (char *str)
             else
                 validPragma = MY_FALSE;
 
-            if ('\0' == *next)
+            if ('\0' == *next || '\r' == *next)
             {
                 /* End of string */
                 next = NULL;

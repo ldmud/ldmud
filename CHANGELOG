@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+27-Sep-2001 (Lars Duening)  (3.3.102)
+    - (lex.c) Pragma recognition no longer stumbles over CRs at the line
+        end (reported by Freaky and Slava).
+    - (interpret.c) The idiom of assigning to a range [i..i-1] in order to
+        insert elements is legal again - a lot of mudlibs already use it
+        (reported by Andre).
+
 26-Sep-2001 (Lars Duening)  (3.3.101)
     - (interpret.c) Assignments to negative length ranges (eg. [3..2]) are
         caught and throw an error (reported by Gimli).
