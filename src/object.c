@@ -522,7 +522,7 @@ _free_prog (program_t *progp, Bool free_all, const char * file, int line
     {
         object_t * blueprint = progp->blueprint;
         progp->blueprint = NULL;
-        remove_prog_swap(progp);
+        remove_prog_swap(progp, MY_TRUE);
 #if 0 && defined(CHECK_OBJECT_REF)
     if (strchr(get_txt(blueprint->name), '#') == NULL)
         printf("DEBUG: (%s:%d) free_prog(%p '%s') ref %ld : blueprint (%p '%s') ref %ld, flags %x\n"
@@ -562,7 +562,7 @@ _free_prog (program_t *progp, Bool free_all, const char * file, int line
         funflag_t *functions;
 
         /* Remove the swap entry */
-        remove_prog_swap(progp);
+        remove_prog_swap(progp, MY_FALSE);
 
         program = progp->program;
         functions = progp->functions;

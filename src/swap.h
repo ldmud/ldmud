@@ -21,7 +21,7 @@ extern Bool swap_variables(object_t *ob);
 extern Bool swap(object_t *ob, int mode);
 extern int load_ob_from_swap(object_t *ob);
 extern Bool load_line_numbers_from_swap(program_t *prog);
-extern void remove_prog_swap(program_t *prog);
+extern void remove_prog_swap(program_t *prog, Bool load_line_numbers);
 extern void name_swap_file(const char *name);
 extern void unlink_swap_file(void);
 extern size_t swap_overhead (void);

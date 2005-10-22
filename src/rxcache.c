@@ -509,6 +509,138 @@ rx_get_match_str (regexp_t *prog, char * str, size_t * start, size_t * end)
 } /* rx_get_match_str() */
 
 /*-------------------------------------------------------------------------*/
+#if 0
+string_t *
+rx_sub2 (regexp_t *prog, string_t *source, string_t *subst, Bool quiet)
+
+/* <prog> describes a regexp match in string <source>. Take the
+ * replacement string <subst> and substitute any matched subparentheses.
+ * The result is a new string with one reference.
+ *
+ * Returns NULL when out of memory.
+ */
+
+{
+#ifdef USE_PCRE
+    size_t left;
+    int no;
+    char * src;
+    char * dst;
+    Bool   copyPass;  /* Pass indicator */
+    size_t len;       /* Computed length of the result */
+
+    /* Make two passes over the the string: one to compute the size
+     * of the result, the second to create the result.
+     */
+    copyPass = MY_FALSE;
+    len = 0;
+    do
+    {
+        left = mstrsize(subst);
+        src = get_txt(subst);
+        
+        while (left-- > 0)
+        {
+            c = *src++;
+            if (c == '&')
+                no = 0;
+            else if (c == '\\' && '0' <= *src && *src <= '9')
+                no = *src++ - '0';
+            else
+                no = -1;
+
+            if (no < 0) /* Ordinary character. */
+            {
+                if (c == '\\' && (*src == '\\' || *src == '&'))
+                    c = *src++;
+                if (copyPass)
+                    *dst++ = c;
+                else
+                    len++;
+            }
+            else if (prog->startp[no] != NULL
+                 &&  prog->endp[no] != NULL)
+            {
+                len = prog->endp[no] - prog->startp[no];
+                if ( (n-=len) < 0 )
+                {
+                    if (!quiet) regerror("line too long");
+                    return NULL;
+                }
+                strncpy(dst, prog->startp[no], len);
+                dst += len;
+                if (len != 0 && *(dst - 1) == '\0')
+                {
+                    regerror("damaged match string");
+                    return NULL;
+                }
+            }
+        }
+        /* End of pass */
+        copyPass = !copyPass;
+    } while (copyPass);
+#if 0
+    left = mstrsize(source);
+    src = get_txt(source);
+    dst = dest;
+    while (left-- > 0)
+    {
+        c = *src++;
+        if (c == '&')
+            no = 0;
+        else if (c == '\\' && '0' <= *src && *src <= '9')
+            no = *src++ - '0';
+        else
+            no = -1;
+
+        if (no < 0) /* Ordinary character. */
+        {
+            if (c == '\\' && (*src == '\\' || *src == '&'))
+                c = *src++;
+            if (--n < 0)
+            {
+                if (!quiet)
+                    regerror("line too long");
+                return NULL;
+            }
+            *dst++ = c;
+        }
+        else if (prog->startp[no] != NULL
+             &&  prog->endp[no] != NULL)
+        {
+            len = prog->endp[no] - prog->startp[no];
+            if ( (n-=len) < 0 )
+            {
+                if (!quiet) regerror("line too long");
+                return NULL;
+            }
+            strncpy(dst, prog->startp[no], len);
+            dst += len;
+            if (len != 0 && *(dst - 1) == '\0')
+            {
+                regerror("damaged match string");
+                return NULL;
+            }
+        }
+    }
+
+    if (--n < 0)
+    {
+        if (!quiet)
+            regerror("line too long");
+        return NULL;
+    }
+    *dst = '\0';
+    return dst;
+#endif
+    error("DEBUG: TODO: rx_sub() not implemented for PCRE\n"); return NULL;
+#else
+    return regsub (prog->rx, get_txt(source), dest, n, quiet);
+#endif
+} /* rx_sub2() */
+#endif
+
+/*-------------------------------------------------------------------------*/
 char *
 rx_sub (regexp_t *prog, string_t *source, char *dest, int n, Bool quiet)
 

@@ -8,8 +8,15 @@
 
 /* --- Variables --- */
 
+/* Status of the GC:
+ *   gcInactive == 0: 'no collection' is active, i.e. all refcounts are valid
+ *   gcClearRefs:     'clear refcounts' phase
+ *   gcCountRefs:     'recompute refcounts' phase
+ */
+typedef enum { gcInactive = 0, gcClearRefs, gcCountRefs } gc_status_t;
+extern gc_status_t gc_status;
+
 extern int gcollect_outfd;
-extern int garbage_collection_in_progress;
 extern object_t *gc_obj_list_destructed;
 extern lambda_t *stale_misc_closures;
 extern mapping_t *stale_mappings;
@@ -84,7 +91,7 @@ extern void clear_ref_in_vector(svalue_t *svp, size_t num);
 
 #else
 
-#define garbage_collection_in_progress (0)
+#define gc_status (0)
 
 #endif /* GC_SUPPORT */
 

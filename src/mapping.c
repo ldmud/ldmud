@@ -2739,6 +2739,9 @@ void
 count_mapping_size (mapping_t *m)
 
 /* Add the mapping <m> to the statistics.
+ * This method is called from the garbage collector only, at which point
+ * the .hash member is either NULL or used as link pointer for a list
+ * of stale mappings.
  */
 
 {
@@ -2747,34 +2750,31 @@ count_mapping_size (mapping_t *m)
     num_mappings++;
 
     total = sizeof(*m);
+#if 0 && defined(CHECK_MAPPING_TOTAL)
     dprintf3(gcollect_outfd, "DEBUG: map '%s' %d (num values %d)"
                            , (p_int)(m->user->name ? get_txt(m->user->name) : "<0>")
                            , (p_int)total, (p_int)m->num_values);
+#endif
+
     if (m->cond != NULL)
     {
         mp_int subtotal;
         
         subtotal = SIZEOF_MC(m->cond, m->num_values);
         total += subtotal;
+#if 0 && defined(CHECK_MAPPING_TOTAL)
         dprintf2(gcollect_outfd, " + %d (size %d)"
                                , (p_int)subtotal
                                , (p_int)m->cond->size
                                );
-    }
-    if (m->hash != NULL)
-    {
-        mp_int subtotal;
-        subtotal = SIZEOF_MH_ALL(m->hash, m->num_values);
-        total += subtotal;
-        dprintf4(gcollect_outfd, " + %d (hash %d, mask %d, used %d)"
-                               , (p_int)subtotal
-                               , (p_int)sizeof(m->hash)
-                               , (p_int)m->hash->mask
-                               , (p_int)m->hash->used
-                               );
+#endif
     }
 
+    /* m->hash does not point to a hash structure at this time */
+
+#if 0 && defined(CHECK_MAPPING_TOTAL)
     dprintf1(gcollect_outfd, " = %d\n", (p_int)total);
+#endif
 
     m->user->mapping_total += total;
     check_total_mapping_size();

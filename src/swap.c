@@ -1039,7 +1039,7 @@ free_swapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
         {
         case T_STRING | T_MOD_SWAPPED:
         case T_SYMBOL | T_MOD_SWAPPED:
-            if (!garbage_collection_in_progress)
+            if (!gc_status)
                 free_mstring(svp->u.str);
             p = (unsigned char *)strchr((char *)p + 1 + sizeof svp->x, 0) + 1;
             break;
@@ -1158,7 +1158,7 @@ swap_variables (object_t *ob)
     if (ob == simul_efun_object)
         return MY_TRUE;
 
-    if (garbage_collection_in_progress)
+    if (gc_status)
     {
         /* Complete the previous swap operation */
         num_variables = ob->prog->num_variables;
@@ -1332,7 +1332,7 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
 
             memcpy(&svp->x, p, sizeof svp->x);
             p += sizeof svp->x;
-            if (garbage_collection_in_progress)
+            if (gc_status)
             {
                 svp->type = T_NUMBER;
             }
@@ -1390,8 +1390,11 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
                 return NULL;
             }
 #ifdef GC_SUPPORT
-            if (garbage_collection_in_progress == 3)
+            if (gc_status == gcCountRefs)
             {
+                /* Pretend that this memory block already existing
+                 * in the clear phase.
+                 */
                 clear_memory_reference(v);
                 v->ref = 0;
             }
@@ -1412,7 +1415,7 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
             p += sizeof num_keys;
             memcpy(&user, p, sizeof user);
             p += sizeof user;
-            if (garbage_collection_in_progress)
+            if (gc_status)
             {
                 /* The garbage collector is not prepared to handle hash
                  * mappings. On the other hand, the order of keys does
@@ -1440,8 +1443,11 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
                         data += num_values;
                     }
 #ifdef GC_SUPPORT
-                    if (garbage_collection_in_progress == 3)
+                    if (gc_status == gcCountRefs)
                     {
+                        /* Pretend that this memory block already existing
+                         * in the clear phase.
+                         */
                         clear_memory_reference(m);
                         clear_memory_reference(cm);
                         m->ref = 0;
@@ -1670,7 +1676,7 @@ load_ob_from_swap (object_t *ob)
         {
             ob->variables = variables;
             result |= 2;
-            if (garbage_collection_in_progress)
+            if (gc_status)
             {
                 /* Called from within the GC - free later.
                  * Also keep the swap-block
@@ -1750,10 +1756,11 @@ load_line_numbers_from_swap (program_t *prog)
 
 /*-------------------------------------------------------------------------*/
 void
-remove_prog_swap (program_t *prog)
+remove_prog_swap (program_t *prog, Bool load_line_numbers)
 
-/* Program <prog> is going to be deleted - remove its swapfile entry if
- * it has one.
+/* Program <prog> is going to be deleted or has been changed - remove its
+ * swapfile entry if it has one. If <load_line_numbers> is true, load
+ * the line number information back into memory before removing the swap entry.
  */
 
 {
@@ -1771,16 +1778,28 @@ remove_prog_swap (program_t *prog)
     if (swapfile_size <= swap_num)
         fatal("Attempt to remove swap entry beyond the end of the swapfile.\n");
 
-    /* The linenumber information has probably not been unswapped, thus
-     * prog->total_size is just the current size in memory.
-     */
-    if (fseek(swap_file, swap_num, 0 ) == -1)
-        fatal("Couldn't seek the swap file, errno %d, offset %ld.\n",
-              errno, swap_num);
-    if (fread(&tmp_prog, sizeof tmp_prog, 1, swap_file) != 1)
+    if (!prog->line_numbers && load_line_numbers)
     {
-        fatal("Couldn't read the swap file.\n");
+        if (!load_line_numbers_from_swap(prog))
+            fatal("Can't unswap the line numbers.\n");
     }
+
+    if (!prog->line_numbers)
+    {
+        /* The linenumber information has not been unswapped, thus
+         * prog->total_size is just the current size in memory.
+         */
+        if (fseek(swap_file, swap_num, 0 ) == -1)
+            fatal("Couldn't seek the swap file, errno %d, offset %ld.\n",
+                  errno, swap_num);
+        if (fread(&tmp_prog, sizeof tmp_prog, 1, swap_file) != 1)
+        {
+            fatal("Couldn't read the swap file.\n");
+        }
+    }
+    else
+        tmp_prog.total_size = prog->total_size;
+
     swap_free(prog->swap_num);
     total_bytes_unswapped -= prog->total_size;
     total_bytes_swapped -= tmp_prog.total_size;

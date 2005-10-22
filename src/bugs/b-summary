@@ -5,7 +5,7 @@ b-010911: String table corrupt
 b-011220: LDMud instability in Alatia
 b-020115: Illegal vector memsize
 b-020228-1: Crash in terminal_colour()
-b-020228-0: Refcount errors when handling destructed objects
+b-020228-0: Refcount errors when handling destructed objects (Maybe fixed)
 b-020303-0: Crasher on corrupt string.
 b-020321: Strange crasher: bus error on existing variables
 b-020318: Illegal instruction 

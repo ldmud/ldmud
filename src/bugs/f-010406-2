@@ -9,7 +9,14 @@ See: f-010406-0
  - Teach ed() the PCRE options in PERL modifier syntax
  - Document the regexp patterns and options in a (C) manpage.
  - Since PCRE returns error codes, regexp.[ch] might do it as well.
- - Need to adapt regreplace, ie. rx_sub() in particular.
+ - Use regexp::regsub() to write a general rxcache::rx_sub() which
+    in a first pass determines the length of the replacement string
+    and in a second pass creates the result as a new string, which
+    is then passed back.
+ - Using the new rxcache::rx_sub(), regreplace() can be rewritten
+    using regexplode() as base, not requiring a preallocated buffer
+    anymore.
+ - Adapt ed() to the new rx_sub().
 
 ---------------------------------------------------------------------------
 ( A copy of those parts of f-010406-0 which still need consideration)

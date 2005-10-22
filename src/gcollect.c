@@ -120,13 +120,8 @@ int gcollect_outfd = 2;
   /* The file (default is stderr) to dump the reclaimed blocks on.
    */
 
-
-/* Are the ref counts unusable, i.e. is phase 2 or two 3 in progress ? */
-int garbage_collection_in_progress = 0;
+gc_status_t gc_status = gcInactive;
   /* The current state of the garbage collection.
-   *   0 means 'no collection' is active, i.e. all refcounts are valid
-   *   2 is the 'clear refcounts' phase
-   *   3 is the 'recompute refcounts' phase
    * swap uses this information when swapping in objects.
    */
 
@@ -355,7 +350,7 @@ gc_mark_program_ref (program_t *p)
             {
                 reference_destructed_object(p->blueprint);
                 p->blueprint = NULL;
-                remove_prog_swap(p);
+                remove_prog_swap(p, MY_TRUE);
             }
             else
             {
@@ -1012,7 +1007,7 @@ garbage_collection(void)
     /* --- Pass 2: clear the ref counts ---
      */
 
-    garbage_collection_in_progress = 2;
+    gc_status = gcClearRefs;
     if (d_flag > 3)
     {
         debug_message("%s start of garbage_collection\n", time_stamp());
@@ -1138,7 +1133,7 @@ garbage_collection(void)
     /* --- Pass 3: Compute the ref counts, and set M_REF where appropriate ---
      */
 
-    garbage_collection_in_progress = 3;
+    gc_status = gcCountRefs;
 
     gc_obj_list_destructed = NULL;
     stale_lambda_closures = NULL;
@@ -1292,7 +1287,7 @@ garbage_collection(void)
 
     count_ref_in_vector(driver_hook, NUM_DRIVER_HOOKS);
 
-    garbage_collection_in_progress = 0;
+    gc_status = gcInactive;
 
     /* --- Pass 4: remove stralloced strings with M_REF cleared ---
      */

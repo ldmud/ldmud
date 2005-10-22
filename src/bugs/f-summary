@@ -118,6 +118,7 @@ f-020312: Filename argument to garbage_collection()
 f-020327-0: Use PCRE and traditional regexps in parallel
 f-020328-0: Introduce 'regexp' LPC datatype
 f-020331: Efun this_function()
+f-020404: New efun strreplace()
 
 
 Language
