@@ -262,11 +262,11 @@ binop_bits (svalue_t *sp, int instr)
             error("Illegal bit pattern in %s character %d\n"
                    , get_f_name(instr), (int)c2);
         if (instr == F_AND_BITS)
-            restxt[arg_len] = (char)(c1 & c2);
+            restxt[arg_len] = (char)((c1-' ') & (c2-' ')) + ' ';
         else if (instr == F_OR_BITS)
-            restxt[arg_len] = (char)(c1 | c2);
+            restxt[arg_len] = (char)((c1-' ') | (c2-' ')) + ' ';
         else if (instr == F_XOR_BITS)
-            restxt[arg_len] = (char)((c1 ^ c2) + ' ');
+            restxt[arg_len] = (char)((c1-' ') ^ (c2-' ')) + ' ';
     }
 
     /* Clean up the stack and push the result. */

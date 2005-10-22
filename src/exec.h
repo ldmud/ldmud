@@ -49,8 +49,9 @@
  *       makes sure that each string is unique.
  *
  *       The last strings are the names of all files included by the programs
- *       source file, stored in reverse order of their appearance (multiple
- *       included files appear several times).
+ *       source file which also generated code, stored in reverse order of
+ *       their appearance (multiple included files appear several times) and
+ *       as they were given in the source.
  *
  *       When a program is swapped, the reference counts to these strings are
  *       not removed so that the string literals stay in memory all the time.

@@ -153,7 +153,7 @@ typedef unsigned int format_info;
 
 /*-------------------------------------------------------------------------*/
 
-#define BUFF_SIZE 65536
+#define BUFF_SIZE 0x20000  /* 128 KByte */
   /* Max size of returned string.
    */
 
@@ -222,7 +222,6 @@ struct ColumnSlashTable
     format_info     info;    /* formatting data */
     cst            *next;    /* next column structure */
 };
-
 
 /* --- struct sprintf_buffer: dynamic string buffer
  *
@@ -1526,7 +1525,8 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
         while ( NULL != (tcst = st->csts) )
         {
             st->csts = tcst->next;
-            if (tcst->info & INFO_TABLE && tcst->d.tab)
+            if ((tcst->info & (INFO_COLS|INFO_TABLE)) == INFO_TABLE
+             && tcst->d.tab)
                 xfree(tcst->d.tab);
             xfree(tcst);
         }
@@ -1961,6 +1961,11 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
 
                         if (!fs)
                             ERROR(ERR_CST_REQUIRES_FS);
+
+                        if ((finfo & (INFO_COLS | INFO_TABLE))
+                          == (INFO_COLS | INFO_TABLE)
+                           )
+                            ERROR(ERR_INVALID_FORMAT_STR);
 
                         /* Find the end of the list of columns/tables */
                         temp = &st->csts;

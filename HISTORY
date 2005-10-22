@@ -56,7 +56,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
 
 
-18-Nov-2001 (Lars Duening) -- upcoming Release 3.2.9
+19-Nov-2001 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -131,6 +131,8 @@ For a detailed list of all changes see the file CHANGELOG.
            deprecated efuns.
 
     - Corrected efuns:
+       + and_bits, or_bits(), xor_bits(): The bits 5, 11, 17,... were
+           mishandled.
        + call_out(): In release 3.2.8 lvalues were not allowed as arguments -
            now they are again.
        + call_resolved(): Now accepts a destructed object as second parameter
@@ -148,6 +150,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + printf(), sprintf(): Column-formatting a string with one
            newline printed one newline too few if the formatstring didn't
            end immediately.
+       + printf(), sprintf(): A format instruction '%#=s' is now rejected.
+       + printf(), sprintf(): Max length of a result is now 128 KByte.
        + sscanf(): the format '%s%d' failed to parse 'ab1cd' correctly.
 
     - New efuns:
@@ -157,7 +161,8 @@ For a detailed list of all changes see the file CHANGELOG.
            Optional: mySQL support.
        + gmtime(), localtime(): Return the time broken up into its
            constituents.
-       + include_list(): Return the files included in a program file.
+       + include_list(): (preliminary) Return the files included
+           in a program file.
        + md5(): Compute the MD5 message digest for a string.
        + min(), max(): To select the minimum resp. maximum among a bunch
            of numbers or strings.
@@ -203,6 +208,10 @@ For a detailed list of all changes see the file CHANGELOG.
            to a non-interactive object.
        + Allowing adding an action between two objects with no environment.
        + "stack overflow" runtime errors freed svalues twice.
+       + It was possible to instruct sprintf to format a string
+         as both columns and as a table. sprintf() then formatted it as
+         columns, but any error (like buffer overflow) would crash the
+         driver.
 
     - Language:
        + New operators '>>>' and '>>>=' for logical right shifts.

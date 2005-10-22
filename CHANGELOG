@@ -1,6 +1,22 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+19-Nov-2001 (Lars Duening)  (3.3.127)
+    - (sprintf.c) It was possible to instruct sprintf to format a string
+        as both columns and as a table. sprintf() then formatted it as
+        columns, but any error (like buffer overflow) would crash the
+        driver. The error recovery is now more robust, and such an invalid
+        format string is rejected (reported by Menaures).
+    - (sprintf.c) Max size of the result is now 128 KByte.
+    - (lex.c) A H_AUTO_INCLUDE closure also receives a flag telling if
+        it was a <>-type include or not (suggested by Freaky).
+    - (bitstrings.c) Efuns and_bits(), or_bits(), xor_bits() mishandled
+        the bits 5, 11, 17, ... (thanks, Fuchur!)
+    - (prolang.y) The bugfix yesterday was not quite correct: a pair
+        of missing parentheses completely changed the meaning of the
+        check for private inherited functions, causing the driver to crash
+        (reported by Freaky).
+
 18-Nov-2001 (Lars Duening)  (3.3.126)
     - (object.c) Efun inherit_list: the tagging of virtual inherits
         returned a random value for the main program (reported by Freaky).

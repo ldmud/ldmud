@@ -23,8 +23,8 @@
 #define H_MODIFY_COMMAND_FNAME  16
 #define H_COMMAND               17
 #define H_SEND_NOTIFY_FAIL      18
-#define H_DEFAULT_METHOD        19
-#define H_AUTO_INCLUDE          20
+#define H_AUTO_INCLUDE          19
+#define H_DEFAULT_METHOD        20
 
 #define NUM_DRIVER_HOOKS        21  /* Number of hooks */
 

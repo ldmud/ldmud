@@ -1,3 +1,4 @@
+PRELIMINARY
 SYNOPSIS
         string *include_list ()
         string *include_list (object ob)
@@ -34,12 +35,14 @@ EXAMPLES
           include_list(b) -> ({ "b.c", "d.c" })
 
 BUGS
-        It would be nice to return a result showing the actual
-        include relationships.
+        At the moment, this efun is only minimally useful:
+         - only include files for which code was generated are listed
+         - the names of the files appear as they were given in the source
+         - no flag for ""- and <>-type includes.
 
 
 HISTORY
-        Introduced in LDMud 3.2.9/3.3.126.
+        Introduced in a preliminary form in LDMud 3.2.9/3.3.126.
 
 
 SEE ALSO

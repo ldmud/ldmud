@@ -1755,6 +1755,15 @@ f_include_list (svalue_t *sp, int num_arg)
  * TODO:: store the include depth for every included file. This information
  * TODO:: can be stored in a new array in the program structure and
  * TODO:: swapped with the lineinformation.
+ * TODO:: It is actually worse: the compiler stores only the names of
+ * TODO:: includes for which code is generated, and just the names as
+ * TODO:: they appear in the source code. To make this efun useful, we
+ * TODO:: have to introduce a new block of data with the filename as
+ * TODO:: given in the source, the current_file actually used, the depth
+ * TODO:: and evtl. the delimiter. Actually, most of this information can
+ * TODO:: be tacked onto the strings[] block - it's just that the restricted
+ * TODO:: list of include names as it is now must be kept, as the linenumber
+ * TODO:: information relies on it.
  */
 
 {
@@ -1806,11 +1815,7 @@ f_include_list (svalue_t *sp, int num_arg)
         size_t slen;  /* Also used for error reporting */
 
         slen = mstrsize(ob->prog->name);
-
-        if (compat_mode)
-            str = ref_mstring(ob->prog->name);
-        else
-            str = add_slash(ob->prog->name);
+        str = ref_mstring(ob->prog->name);
 
         if (!str)
         {
@@ -1830,11 +1835,7 @@ f_include_list (svalue_t *sp, int num_arg)
         size_t slen;  /* Also used for error reporting */
 
         slen = mstrsize(*include_names);
-
-        if (compat_mode)
-            str = ref_mstring(*include_names);
-        else
-            str = add_slash(*include_names);
+        str = ref_mstring(*include_names);
 
         if (!str)
         {

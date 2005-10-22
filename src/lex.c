@@ -1416,13 +1416,14 @@ handle_cond (Bool c)
 
 /*-------------------------------------------------------------------------*/
 static void
-add_auto_include (const char * obj_file, const char *cur_file)
+add_auto_include (const char * obj_file, const char *cur_file, Bool sys_include)
 
 /* A new file <cur_file> was opened while compiling object <object_file>.
  * Add the auto-include information if available.
  *
  * If <cur_file> is NULL, then the <object_file> itself has just been
- * opened, otherwise <cur_file> is an included file.
+ * opened, otherwise <cur_file> is an included file. In the latter case,
+ * flag <sys_include> purveys if it was a <>-type include.
  *
  * The global <current_line> must be valid and will be modified.
  */
@@ -1443,10 +1444,16 @@ add_auto_include (const char * obj_file, const char *cur_file)
         /* Setup and call the closure */
         push_c_string(inter_sp, obj_file);
         if (cur_file != NULL)
+        {
             push_c_string(inter_sp, (char *)cur_file);
+            push_number(inter_sp, sys_include ? 1 : 0);
+        }
         else
+        {
             push_number(inter_sp, 0);
-        svp = secure_call_lambda(driver_hook+H_AUTO_INCLUDE, 2);
+            push_number(inter_sp, 0);
+        }
+        svp = secure_call_lambda(driver_hook+H_AUTO_INCLUDE, 3);
         if (svp && svp->type == T_STRING)
         {
             auto_include_string = svp->u.str;
@@ -2033,7 +2040,7 @@ handle_include (char *name)
         yyin_des = fd;
         _myfilbuf();
 
-        add_auto_include(object_file, current_file);
+        add_auto_include(object_file, current_file, delim != '"');
     }
     else
     {
@@ -4473,7 +4480,7 @@ start_new_file (int fd)
 
     lex_fatal = MY_FALSE;
 
-    add_auto_include(object_file, NULL);
+    add_auto_include(object_file, NULL, MY_FALSE);
 
     pragma_strict_types = PRAGMA_WEAK_TYPES;
     instrs[F_CALL_OTHER].ret_type = TYPE_ANY;

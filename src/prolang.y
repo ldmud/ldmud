@@ -10969,7 +10969,7 @@ copy_functions (program_t *from, fulltype_t type)
                 else /* n < 0: not an lfun */
                 {
                     if (n != -2
-                     || fun.flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN) == 0
+                     || (fun.flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN)) == 0
                        )
                      {
                         /* This is not an inherited private function shadowing
@@ -10992,6 +10992,10 @@ copy_functions (program_t *from, fulltype_t type)
                             q->next = all_efun_shadows;
                             all_efun_shadows = q;
                         }
+
+                        /* Update the symbol table entry to point
+                         * to the newly read function.
+                         */
                         p->u.global.function = current_func_index;
                     }
                     /* else: inherited private function must not hide
