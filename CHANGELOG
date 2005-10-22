@@ -1,6 +1,23 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+11-Feb-2002 (Lars Duening)  (3.3.167)
+    - (Makefiles) Corrected the compilation and call to dftables (reported
+         by Menaures).
+    - (comm.c) If on shutdown players were already destructed in
+        notify_shutdown(), the following remove_player() was passed
+        destructed objects (reported by Dafire).
+    - (bitstrings.c) Corrected a crasher in the new efun copy_bits().
+    - (bitstrings.c) copy_bits() malfunctioned if src range to copy ended
+        in unset bits (reported by Menaures).
+    - (efuns.c) In efun terminal_colour(), the wrapping analysis had
+        to be separated from the initial length gathering since the
+        analysis requires all lengths to be available. Without the
+        separation, the driver ran into a fatal sanity error on some
+        input values (reported by Dafire).
+    - (actions.c) Argument errors in add_action() would leak the
+        action sentence.
+
 10-Feb-2002 (Lars Duening)  (3.3.166)
     - (config.h, autoconf, lex.c) New configuration parameter --use-pcre
          (disabled by default) to enable the use of PCRE instead of

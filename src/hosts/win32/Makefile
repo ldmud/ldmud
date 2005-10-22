@@ -146,7 +146,7 @@ mkfunc: mkfunc.o hash.o exec.h
 	$(CC) $(OPTIMIZE) $(LDFLAGS) mkfunc.o hash.o -o mkfunc
 
 dftables.o : pcre/dftables.c pcre/maketables.c pcre/config.h
-	$(CC) $(CFLAGS) -c dftables.c -o dftables.o
+	$(CC) $(CFLAGS) -c pcre/dftables.c -o dftables.o
 
 dftables : dftables.o
 	$(CC) $(OPTIMIZE) (LDFLAGS) dftables.o -o dftables
@@ -172,7 +172,7 @@ lang.c lang.h: lang.y
 	$(MV) $(YACCTAB)h lang.h
 
 pcre/chartables.c : dftables
-	dftables > pcre/chartables.c
+	./dftables > pcre/chartables.c
 
 #--------------------------------------------------------
 # Dependencies, manual and automatic.

@@ -1385,12 +1385,6 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
      * The lengths are collected in the lens[] array to save the
      * need for repeated strlens().
      */
-    col = 0;
-    start = -1;
-    space = 0;
-    maybe_at_end = MY_FALSE;
-    j = 0; /* gathers the total length of the final string */
-    j_extra = 0; /* gathers the extra length needed during fmt'ing */
     for (i = 0; i < num; i++)
     {
         string_t * str;
@@ -1475,7 +1469,20 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
             if (wrap)
                 lens[i] = -lens[i];
         }
+    } /* for (i = 0..num) for length gathering */
 
+    /* Do the wrapping analysis.
+     * In order to do this, we need to have all lengths already
+     * available.
+     */
+    col = 0;
+    start = -1;
+    space = 0;
+    maybe_at_end = MY_FALSE;
+    j = 0; /* gathers the total length of the final string */
+    j_extra = 0; /* gathers the extra length needed during fmt'ing */
+    for (i = 0; i < num; i++)
+    {
         if (lens[i] > 0)
         {
             /* This part must be considered for wrapping/indentation */
@@ -1559,7 +1566,7 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
 
                                 if (col - space > 2)
                                 {
-                                    /* Check if the following word is too
+                                    /* Check if the current word is too
                                      * long to be put on one line. If it
                                      * is, don't bother breaking at the last
                                      * space.
@@ -1568,7 +1575,7 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                                     int test_i = i;
                                     Bool done = MY_FALSE;
 
-                                    next_word_len = space;
+                                    next_word_len = col - space;
                                     for ( ; !done && test_i <  num; test_i++)
                                     {
                                         if (lens[test_i] < 0)
@@ -1665,7 +1672,7 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                 j = MAX_STRING_LENGTH;
             }
         } /* if (lens[i] > 0) */
-    } /* for (i = 0..num) */
+    } /* for (i = 0..num) for wrapping analysis */
 
 
     /* Now we have the final string in parts and length in j.
@@ -1771,7 +1778,7 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
 
                             if (col - space > 2)
                             {
-                                /* Check if the following word is too
+                                /* Check if the current word is too
                                  * long to be put on one line. If it
                                  * is, don't bother breaking at the last
                                  * space.
@@ -1780,12 +1787,13 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                                 int test_i = i;
                                 Bool done = MY_FALSE;
 
-                                next_word_len = space;
+                                next_word_len = col - space;
                                 for ( ; !done && test_i <  num; test_i++)
                                 {
                                     if (lens[test_i] < 0)
                                         continue;
-                                    for ( ; !done && test_k < lens[test_i]; test_k++)
+                                    for ( ; !done && test_k < lens[test_i]
+                                          ; test_k++)
                                     {
                                         char testc = parts[test_i][test_k];
                                         if (testc == ' ' || testc == '\n')

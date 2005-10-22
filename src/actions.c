@@ -1314,6 +1314,7 @@ e_add_action (svalue_t *func, svalue_t *cmd, int flag)
         {
             if (-flag >= mstrsize(p->verb))
             {
+                free_action_sent(p);
                 error("Bad arg 3 to add_action(): value %ld larger than verb '%s'.\n"
                      , (long)flag, get_txt(p->verb));
                 /* NOTREACHED */
@@ -1327,6 +1328,7 @@ e_add_action (svalue_t *func, svalue_t *cmd, int flag)
         }
         else
         {
+            free_action_sent(p);
             error("Bad arg 3 to add_action(): value %ld too big.\n"
                  , (long)flag);
             /* NOTREACHED */

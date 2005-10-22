@@ -143,7 +143,7 @@ mkfunc@EXEEXT@: mkfunc.o hash.o exec.h
 	$(CC) @OPTIMIZE_LINKING@ $(LDFLAGS) mkfunc.o hash.o -o mkfunc@EXEEXT@
 
 dftables.o : pcre/dftables.c pcre/maketables.c pcre/config.h
-	$(CC) $(CFLAGS) -c dftables.c -o dftables.o
+	$(CC) $(CFLAGS) -c pcre/dftables.c -o dftables.o
 
 dftables@EXEEXT@ : dftables.o
 	$(CC) @OPTIMIZE_LINKING@ $(LDFLAGS) dftables.o -o dftables@EXEEXT@
@@ -169,7 +169,7 @@ lang.c lang.h: lang.y
 	$(MV) $(YACCTAB)h lang.h
 
 pcre/chartables.c : dftables@EXEEXT@
-	dftables@EXEEXT@ > pcre/chartables.c
+	./dftables@EXEEXT@ > pcre/chartables.c
 
 #--------------------------------------------------------
 # Dependencies, manual and automatic.

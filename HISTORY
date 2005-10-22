@@ -69,7 +69,7 @@ For a detailed list of all changes see the file CHANGELOG.
            something different from '!'.
 
 
-09-Feb-2002 (Lars Duening) -- Release 3.2.9
+11-Feb-2002 (Lars Duening) -- Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -261,6 +261,8 @@ For a detailed list of all changes see the file CHANGELOG.
            mess up the interpreter stack or cause it to execute garbage
            bytecode.
        + Too long error messages overwrote the stack.
+       + When players were already destructed in notify_shutdown(),
+           the following remove_player() was passed the destructed objects.
 
     - Language:
        + New operators '>>>' and '>>>=' for logical right shifts.

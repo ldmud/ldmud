@@ -896,7 +896,7 @@ f_copy_bits (svalue_t *sp, int num_arg)
               "(last bit: %ld).\n"
              , (long)deststart, (long)destlen);
 
-    if (copylen < 0)
+    if (!copyall && copylen < 0)
     {
         if (srcstart + copylen < 0)
             error("Bad argument 5 to copy_bits(): Length %ld out of range "
@@ -940,8 +940,14 @@ f_copy_bits (svalue_t *sp, int num_arg)
             result = ref_mstring(src);
         else
         {
-            copylen = srclen - srcstart;
+            if (srclen > srcstart)
+                copylen = srclen - srcstart;
+            else
+                copylen = 0;
             resultlen = deststart + copylen;
+            if (resultlen > MAX_BITS || resultlen < 0)
+                error("copy_bits: Result too big: %lu bits\n"
+                     , (unsigned long)resultlen);
 
             /* Get the result string and store the reference on the stack
              * for error cleanups.
@@ -973,15 +979,21 @@ f_copy_bits (svalue_t *sp, int num_arg)
     }
     else
     {
-        p_int destendlen;
+        p_int destendlen;   /* Length of the end part of dest to copy */
+        p_int srccopylen;   /* Actual number of bits to copy from src */
 
         /* Get the length to copy and the length of the result */
+        srccopylen = copylen;
         if (srcstart + copylen >= srclen)
-            copylen = srclen - srcstart;
+            srccopylen = srclen - srcstart;
 
         resultlen = deststart + copylen;
         if (resultlen < destlen)
             resultlen = destlen;
+
+        if (resultlen > MAX_BITS || resultlen < 0)
+            error("copy_bits: Result too big: %lu bits\n"
+                 , (unsigned long)resultlen);
 
         destendlen = destlen - (deststart + copylen);
 
@@ -1003,12 +1015,13 @@ f_copy_bits (svalue_t *sp, int num_arg)
         }
 
         /* Copy the source part into the result */
-        copy_bits(result, deststart, src, srcstart, copylen);
+        copy_bits(result, deststart, src, srcstart, srccopylen);
 
         /* Copy the remainder of dest into the result */
         if (destendlen > 0)
         {
-            copy_bits( result, deststart + copylen, dest, deststart + copylen
+            copy_bits( result, deststart + copylen
+                     , dest, deststart + copylen
                      , destendlen);
         }
     }

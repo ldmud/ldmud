@@ -3329,7 +3329,7 @@ remove_all_players (void)
     int i;
 
     for (i = 0; i < MAX_PLAYERS; i++) {
-        if (all_players[i] == 0)
+        if (all_players[i] == 0 || (all_players[i]->ob->flags & O_DESTRUCTED))
             continue;
         command_giver = all_players[i]->ob;
         trace_level |= all_players[i]->trace_level;
