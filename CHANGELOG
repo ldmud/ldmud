@@ -1,6 +1,15 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+12-Nov-2001 (Lars Duening)  (3.3.120)
+    - (make_func.y) Lexer now understands lines terminated with CRLFs
+        instead of just LFs (reported by Holger).
+    - (mapping.c) Adjusted the computation of num_dirty_mappings in
+        remove_empty_mappings(). This should the fix the inconsistency
+        in this counter (thanks, Andre and Carsten!)
+    - (gcollect.c, xalloc) When a 'First ref to' with unmatching refcount
+        is encountered, the memory allocation information is dumped, too.
+
 24-Oct-2001 (Lars Duening)  (3.3.119)
     - (efuns.c) If a closure is used with regreplace(), it will be
         passed the position of the found substring, too (suggested

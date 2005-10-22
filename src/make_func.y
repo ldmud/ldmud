@@ -2160,6 +2160,7 @@ yylex1 (void)
         {
         case ' ':
         case '\t':
+        case '\r':
             continue;
 
         case '#':

@@ -694,14 +694,22 @@ check_dirty_mapping_list (void)
     int i;
     mapping_t *m;
 
-    for (m = &dirty_mapping_head, i = num_dirty_mappings; --i >= 0; )
+    for (m = &dirty_mapping_head, i = num_dirty_mappings; m && --i >= 0; )
     {
         m = m->hash->next_dirty;
     }
+    if (!m)
+        fatal("expected %ld dirty mappings, found only %ld\n"
+             , (long)num_dirty_mappings, (long)num_dirty_mappings - i
+             );
     if (m != last_dirty_mapping)
-        fatal("last_dirty_mapping not at end of dirty list\n");
+        fatal("last_dirty_mapping not at end of list of %ld dirty mappings\n"
+             , (long)num_dirty_mappings
+             );
     if (m->hash->next_dirty)
-        fatal("dirty mapping list not terminated\n");
+        fatal("list of %ld dirty mapping list\n"
+             , (long)num_dirty_mappings
+             );
 }
 
 #endif
@@ -758,6 +766,7 @@ remove_empty_mappings (void)
             xfree(m);
             *mp = m = hm->next_dirty;
             xfree(hm);
+            num_dirty_mappings--;
             continue;
         }
         last = m;
@@ -769,8 +778,6 @@ remove_empty_mappings (void)
 
     /* Adjust the counters */
 
-    num_dirty_mappings -=
-      (empty_mapping_load + 2*EMPTY_MAPPING_THRESHOLD + empty_mapping_base) >> 1;
     empty_mapping_load = 2*(-EMPTY_MAPPING_THRESHOLD) - empty_mapping_base;
 
 #ifdef DEBUG

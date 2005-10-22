@@ -3231,6 +3231,21 @@ write_lpc_trace (int d, word_t *p)
     }
 } /* write_lpc_trace() */
 
+/*-------------------------------------------------------------------------*/
+void
+dump_lpc_trace (int d, void *p)
+
+/* Write the object and program which allocated the memory block <p>
+ * onto file <d>.
+ * In contrast to write_lpc_trace(), the address of the memory block is
+ * the one returned by xalloc(), ie. pointing after the memory block
+ * header.
+ */
+
+{
+    write_lpc_trace(d, ((word_t *)p) - OVERHEAD);
+} /* dump_lpc_trace() */
+
 #endif /* MALLOC_LPC_TRACE */
 
 /*-------------------------------------------------------------------------*/

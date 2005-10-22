@@ -291,7 +291,13 @@ mark_program_ref (program_t *p)
         variable_t *variable_names;
 
         if (p->ref++)
-            fatal("First reference to program, but ref count != 0\n");
+        {
+            dump_malloc_trace(1, p);
+            dump_lpc_trace(1, p);
+            fatal("First reference to program %p, but ref count %ld != 0\n"
+                 , p, (long)p->ref - 1
+                 );
+        }
 
         /* Mark the blueprint object, if any */
         if (p->blueprint)
@@ -372,7 +378,13 @@ reference_destructed_object (object_t *ob)
     if (TEST_REF(ob))
     {
         if (ob->ref)
-            fatal("First reference to destructed object, but ref count != 0\n");
+        {
+            dump_malloc_trace(1, ob);
+            dump_lpc_trace(1, ob);
+            fatal("First reference to destructed object %p, but ref count %ld != 0\n"
+                 , ob, (long)ob->ref
+                 );
+        }
 
         /* Destructed objects are not swapped */
         ob->next_all = gc_obj_list_destructed;

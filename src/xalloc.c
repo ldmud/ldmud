@@ -122,6 +122,20 @@ xalloc (size_t size)
 
 /*-------------------------------------------------------------------------*/
 void
+dump_lpc_trace (int d, void *adr)
+
+/* Stand in for the malloc lpc trace dump routine which the stdlib allocator
+ * lacks.
+ */
+
+{
+#define WRITES(d, s) write((d), (s), strlen(s))
+    WRITES(d, "No malloc lpc trace.\n");
+#undef WRITES
+} /* dump_lpc_trace() */
+
+/*-------------------------------------------------------------------------*/
+void
 dump_malloc_trace (int d, void *adr)
 
 /* Stand in for the malloc trace dump routine which the stdlib allocator

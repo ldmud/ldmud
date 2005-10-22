@@ -146,6 +146,7 @@ extern POINTER xalloc(size_t size);
 
 /* --- Associated functions --- */
 
+extern void dump_lpc_trace (int d, void *p);
 extern void dump_malloc_trace (int d, void *adr);
 
 extern void reserve_memory (void);
