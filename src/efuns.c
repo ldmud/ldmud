@@ -2312,10 +2312,24 @@ sscanf_search (char *str, char *fmt, struct sscanf_info *info)
     {
         if (b != '%')
         {
-            /* It's another %-spec: match it */
+            /* It's another %-spec: try to find its match within the
+             * <str> by attempting the match at one character after the
+             * other.
+             */
             for (fmt -= 2; *str; str++)
             {
                 sscanf_match(str, fmt, info);
+
+                /* If the sequence was '%s%d', the '%d' has to match
+                 * on the first try, otherwise all will be assigned to
+                 * the '%s'.
+                 */
+                if (b == 'd' && info->match_end == str)
+                    return str + strlen(str);
+
+                /* If we found a match at the current position of str,
+                 * the '%s' ends here and the next match starts.
+                 */
                 if (info->match_end)
                     return str;
             }

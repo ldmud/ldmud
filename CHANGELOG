@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+13-May-2001 (Lars Duening)  (3.3.55)
+    - (prolang.y) Undid the casting change, as it broke the idiom
+         's = (string)foo->bar();' where bar() may signal a failure
+         by returning integer 0. It's the old 0/nil dichotomy again.
+    - (efuns.c) Efun sscanf(): the format '%s%d' failed to parse 'ab1cd'
+         correctly (reported by Pulami).
+
 09-May-2001 (Lars Duening)  (3.3.54)
     - (prolang.y) Casting an unknown or mixed type now always inserts
          a proper conversion (reported by Tomi).

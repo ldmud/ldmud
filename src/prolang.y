@@ -6215,14 +6215,14 @@ expr0:
       {
           $$ = $2;
           $$.type = $1;
-          if ($1 != TYPE_VOID)
+          if ($2.type != TYPE_ANY
+           && $2.type != TYPE_UNKNOWN
+           && $1 != TYPE_VOID)
           {
               switch($1)
               {
               default:
-                  /* Normal type cast */
-                  if ($2.type != TYPE_ANY && $2.type != TYPE_UNKNOWN)
-                      type_error("Illegal cast", $1);
+                  type_error("Illegal cast", $1);
                   break;
               case TYPE_NUMBER:
                   ins_f_code(F_TO_INT);
