@@ -1473,48 +1473,49 @@ mixed valid_read  (string path, string euid, string fun, object caller)
 {
     string user;
 
+debug_message(sprintf("valid_read fun %O path %O\n", fun, path));
     switch ( fun ) {
-	case "restore_object": return 1;
-	case "ed_start":
-	    if ( previous_object() && previous_object() != this_player() )
-		return 0;
-	    if (!path) {
-		/* request for file with last error */
-		mixed *error;
+        case "restore_object": return 1;
+        case "ed_start":
+            if ( previous_object() && previous_object() != this_player() )
+                return 0;
+            if (!path) {
+                /* request for file with last error */
+                mixed *error;
 
-		error =
-		  get_error_file(({string})this_player()->query_real_name());
-		if (!error || error[3]) {
-		    write("No error.\n");
-		    return 0;
-		}
-		write(error[0][1..]+" line "+error[1]+": "+error[2]+"\n");
-		return error[0];
-	    }
-	    if (path[0] != '/')
-		path = "/"+path;
-	case "read_file":
-	case "read_bytes":
-	case "file_size":
-	case "get_dir":
-	case "do_rename":
-	    if (caller == this_object()) return 1;
-	case "tail":
-	case "print_file":
-	case "make_path_absolute": /* internal use, see below */
-	    set_this_object(caller);
-	    if( this_player() && query_ip_number(this_player()) ) {
-	        path = (string)this_player()->valid_read(path);
-	        if (!stringp(path)) {
-	            write("Bad file name.\n");
-	            return 0;
-	        }
-	        return path;
-	    }
-	    path = (string)"obj/player"->valid_read(path);
-	    if (stringp(path))
-	        return path;
-	    return 0;
+                error =
+                  get_error_file(({string})this_player()->query_real_name());
+                if (!error || error[3]) {
+                    write("No error.\n");
+                    return 0;
+                }
+                write(error[0][1..]+" line "+error[1]+": "+error[2]+"\n");
+                return ADD_SLASH(error[0]);
+            }
+            if (path[0] != '/')
+                path = "/"+path;
+        case "read_file":
+        case "read_bytes":
+        case "file_size":
+        case "get_dir":
+        case "do_rename":
+            if (caller == this_object()) return 1;
+        case "tail":
+        case "print_file":
+        case "make_path_absolute": /* internal use, see below */
+            set_this_object(caller);
+            if( this_player() && query_ip_number(this_player()) ) {
+                path = (string)this_player()->valid_read(path);
+                if (!stringp(path)) {
+                    write("Bad file name.\n");
+                    return 0;
+                }
+                return ADD_SLASH(path);
+            }
+            path = (string)"obj/player"->valid_read(path);
+            if (stringp(path))
+                return ADD_SLASH(path);
+            return 0;
     }
     /* if a case failed to return a value or the caller function wasn't
      * recognized, we come here.
@@ -1560,38 +1561,44 @@ mixed valid_write (string path, string euid, string fun, object caller)
 {
     string user;
 
+    if (path[0] == '/' && path != "/")
+        path = path[1..];
+
     switch ( fun ) {
     case "objdump":
-        if (path == "/OBJ_DUMP") return path;
+        if (path == "OBJ_DUMP") return path;
         return 0;
 
     case "opcdump":
-        if (path == "/OPC_DUMP") return path;
+        if (path == "OPC_DUMP") return path;
         return 0;
 
     case "save_object":
         if ( user = GETUID(previous_object()) ) {
-            if ( path[0 .. strlen(user)+8] == "/players/" + user
+            if ( path[0 .. strlen(user)+7] == "players/" + user
              &&  sscanf(path, ".%s", user) == 0)
-                return path;
+                return ADD_SLASH(path);
         } else {
-            user = object_name(previous_object());
+            user = efun::object_name(previous_object());
+#ifndef __COMPAT_MODE__
+            user = user[1..];
+#endif
             if ( user[0..3] == "obj/"
              ||  user[0..4] == "room/"
              ||  user[0..3] == "std/"  )
-                return path;
+                return ADD_SLASH(path);
         }
         return 0; /* deny access */
     default:
         return 0; /* deny access */
     case "write_file":
         if (caller == this_object()) return 1;
-        if (path[0..4] == "/log/"
-         && !(   sizeof(regexp(({path[5..34]}), "/"))
-              || path[5] == '.'
-              || strlen(path) > 35
-	    ) ) {
-            return path;
+        if (path[0..3] == "log/"
+         && !(   sizeof(regexp(({path[4..33]}), "/"))
+              || path[4] == '.'
+              || strlen(path) > 34
+            ) ) {
+            return ADD_SLASH(path);
         }
         break;
     case "ed_start":
@@ -1600,13 +1607,13 @@ mixed valid_write (string path, string euid, string fun, object caller)
         break;
     case "rename_from":
     case "rename_to":
-        if ((   object_name(caller) == SIMUL_EFUN_FILE
-             || object_name(caller) == SPARE_SIMUL_EFUN_FILE)
-         && path[0..4] == "/log/"
-         && !(   sizeof(regexp(({path[5..34]}), "/"))
-              || path[5] == '.'
-              || strlen(path) > 35
-	    ) ) {
+        if ((   efun::object_name(caller) == SIMUL_EFUN_FILE
+             || efun::object_name(caller) == SPARE_SIMUL_EFUN_FILE)
+         && path[0..3] == "log/"
+         && !(   sizeof(regexp(({path[4..33]}), "/"))
+              || path[4] == '.'
+              || strlen(path) > 34
+            ) ) {
             return 1;
         }
     case "mkdir":
@@ -1617,17 +1624,18 @@ mixed valid_write (string path, string euid, string fun, object caller)
     }
 
     set_this_object(caller);
-    if( this_player() && query_ip_number(this_player()) ) {
-	path = (string)this_player()->valid_write(path);
-	if (!stringp(path)) {
-	    write("Bad file name.\n");
-	    return 0;
-	}
-	return path;
+    if( this_player() && query_ip_number(this_player()) )
+    {
+        path = (string)this_player()->valid_write(path);
+        if (!stringp(path)) {
+            write("Bad file name.\n");
+            return 0;
+        }
+        return ADD_SLASH(path);
     }
     path = (string)"obj/player"->valid_write(path);
     if (stringp(path))
-	return path;
+        return ADD_SLASH(path);
 
     return 0;
 }

@@ -461,15 +461,15 @@ do_free_sub_strings (int num_strings,   string_t **strings
 
 /*-------------------------------------------------------------------------*/
 void
-free_prog (program_t *progp, Bool free_sub_strings)
+free_prog (program_t *progp, Bool free_all)
 
 /* Decrement the refcount for program <progp>. If it reaches 0, the program
  * is freed.
  *
- * If free_sub_strings is TRUE, all object strings are freed, and
- * free_prog() is called for all inherited programs.
+ * If free_all is TRUE, all object strings and the blueprint reference are
+ * freed, and free_prog() is called for all inherited programs.
  *
- * The only case when free_sub_strings is not true, is, when the swapper
+ * The only case when free_all is not true, is, when the swapper
  * swapped out the program and now attempts to free the memory.
  * This means that the string data is kept in memory all the time.
  * TODO: Swapping the strings is tricky, as they are all shared.
@@ -490,6 +490,13 @@ free_prog (program_t *progp, Bool free_sub_strings)
     if (progp->ref < 0)
         fatal("Negative ref count for prog ref.\n");
 
+    if (free_all && progp->blueprint)
+    {
+        object_t * blueprint = progp->blueprint;
+        progp->blueprint = NULL;
+        free_object(blueprint, "free_prog");
+    }
+
     /* Update the statistics */
     total_prog_block_size -= progp->total_size;
     total_num_prog_blocks -= 1;
@@ -507,7 +514,7 @@ free_prog (program_t *progp, Bool free_sub_strings)
     /* Is it a 'real' free? Then dereference all the
      * things held by the program, too.
      */
-    if (free_sub_strings)
+    if (free_all)
     {
         int i;
         bytecode_p program;
@@ -868,14 +875,6 @@ replace_programs (void)
             replace_program_lambda_adjust(r_ob);
         }
 
-        /* Free the old program, finally */
-        free_prog(old_prog, MY_TRUE);
-
-#ifdef DEBUG
-        if (d_flag)
-            debug_message("%s program freed.\n", time_stamp());
-#endif
-
         /* Remove current shadows */
 
         if (r_ob->ob->flags & O_SHADOW)
@@ -908,6 +907,14 @@ replace_programs (void)
             }
         }
         xfree(r_ob);
+
+        /* Free the old program, finally */
+        free_prog(old_prog, MY_TRUE);
+
+#ifdef DEBUG
+        if (d_flag)
+            debug_message("%s program freed.\n", time_stamp());
+#endif
     }
 
     /* Done with the list */

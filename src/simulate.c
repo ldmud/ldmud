@@ -2224,7 +2224,9 @@ remove_object (object_t *ob)
     if (O_IS_INTERACTIVE(ob))
         remove_interactive(ob, MY_FALSE);
 
-    /* If this is a blueprint object, NULL out the pointer in the program. */
+    /* If this is a blueprint object, NULL out the pointer in the program
+     * to remove the extraneous reference.
+     */
     if (ob->prog->blueprint == ob)
     {
         ob->prog->blueprint = NULL;

@@ -666,7 +666,7 @@ swap_program (object_t *ob)
     {
         total_bytes_unswapped -= prog->total_size;
         ob->prog = (program_t *)(prog->swap_num | 1);
-        free_prog(prog, MY_FALSE);        /* Do not free the strings or swapfile */
+        free_prog(prog, MY_FALSE);  /* Do not free the strings or blueprint */
         ob->flags |= O_SWAPPED;
         num_unswapped--;
         return MY_TRUE;
@@ -686,7 +686,7 @@ swap_program (object_t *ob)
 
     /* Free the program */
     prog->swap_num = -1; /* for free_prog() , don't free linenumbers */
-    free_prog(prog, MY_FALSE);  /* Don't free the shared strings or the swapfile */
+    free_prog(prog, MY_FALSE);  /* Don't free the shared strings or the blueprint */
 
     /* Mark the program as swapped */
     ob->prog = (program_t *)(swap_num | 1);

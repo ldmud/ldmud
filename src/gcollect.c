@@ -1288,6 +1288,7 @@ W("DEBUG: GC frees destructed '"); W(get_txt(ob->name)); W("'\n");
                     , "Found leaked destructed object '%s'\n"
                     , (p_int)get_txt(ob->name)
                     );
+            ob->ref = 0; /* Since it was never reached by the clear pass */
             reference_destructed_object(ob);
         }
 

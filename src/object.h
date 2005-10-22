@@ -235,7 +235,7 @@ extern void do_free_sub_strings(int num_strings, string_t ** strings
                                , int num_variables, variable_t *variable_names
                                , int num_includes, include_t *includes
                                );
-extern void free_prog(program_t *progp, Bool free_sub_strings);
+extern void free_prog(program_t *progp, Bool free_all);
 extern void reset_object(object_t *ob, int arg);
 extern void replace_programs(void);
 extern Bool shadow_catch_message(object_t *ob, const char *str);

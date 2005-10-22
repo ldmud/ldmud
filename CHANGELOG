@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+03-Jan-2002 (Lars Duening)  (3.3.150)
+    - (gcollect.c) Forgot to clear the refcounts in the list of
+        destructed objects. Oops.
+    - (object.c) free_prog() now also frees its blueprint reference, which
+        should remove at least one major refcount leak.
+    - (lp-245/obj/master.c, lp-245/obj/player.c) Small corrections.
+
 02-Jan-2002 (Lars Duening)  (3.3.149)
     - (simulate, comm.c) Corrected a potential crasher when bad arguments
         are passed to efun input_to(): the embedded callback structure
