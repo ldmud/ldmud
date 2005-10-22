@@ -1,29 +1,10 @@
 Crasher
 --------------------------------------------------------------------------
-b-981028:  3.2.4 crashes on Solaris 2.6
-b-990305-01: 3.2-dev.38 and 3.2.1@139 crash in find_string()
-b-991123-0: 3.2.7-dev.104 and 3.2.8-dev.156 crash in find_string()
-b-991214: GC crashed on lambda closure with illegal data
-b-991219: Gamedriver fatal()s.
-b-000207: Finalfrontier cores
-b-000218: Finalfrontier: illegal mapping size 
-b-000503: dev.185 cores in free_string().
-b-000603: Evermore: bad stack at F_RETURN
-b-000611: dev.20x crashes on Hyperborea (Maybe fixed)
-b-000622: Cygwin und dev209
-b-000702: dev.200 in UNItopia cores on fast connects (Probably fixed)
-b-000701: dev.200 cores in UNItopia (due to an inherit?)
-b-000607: dev.20x fails magic match in xfree()
-b-000718: dev.216 crashes on illegal string svalue in Unitopia (Maybe fixed)
-b-000822: Crash in walk_mapping()
 b-000909: dev.226 crashes TubMud
-b-001016: Unitopia crashes on invalid string in reset()
-b-001016-1: Wunderland crashes after 0-ref string
 
 
 Efuns
 --------------------------------------------------------------------------
-b-981202-3: Array-indexing malfunctions on rare occasions.
 b-000214: regexp() error?
 b-000304: Various bugs
 
@@ -43,20 +24,12 @@ b-010801-0: #' recognition in lexer insufficient
 
 Runtime
 --------------------------------------------------------------------------
-b-990429: Memory leaks
 b-990505-0: Memory leak in call_lambda()/send_erq()?
-b-990505-1: Memory leak in load_object()?
-b-020205-0: Memoryleaks in Unitopia - New date
+b-020205-0: Memoryleaks in Unitopia - set_prompt() and the soul
 b-990605: In a lot of error places, inter_sp/inter_pc are wrong.
-b-991226: Search lengths too long.
-b-000104: Memory leak in clone_object()?
-b-000217-3: Memoryleak in Finalfrontier
-b-000306-3: Memoryleak in the actions?
-b-000308: call_out freezes totally (maybe fixed)
-b-010115: Memory leaks in dev.251
 b-010115-1: Make sure that all master calls use leading slashes.
 b-010610-1: CRT doesn't work well in charmode
-b-010831: memory-leak in map rooms?
+b-011113: status for actions wrong
 
 Installation
 --------------------------------------------------------------------------
@@ -65,12 +38,3 @@ b-000904: ERQ compile problems
 
 Not Reproducible
 --------------------------------------------------------------------------
-b-990713-1: shadow on destructed object with heartbeat
-b-000207-2: query_notify_fail() fails
-b-000326: EotL: set_prompt() causes check-refcounts to fail
-b-000411-0: sprintf() tables don't work properly
-b-000221-2: foreach() and redeclarations
-b-000718-1: Driver doesn't compile on Cygwin
-b-000718-2: Indirect virtual inherits clobber global variables
-b-001001: StickMud crashes on dev.232
-

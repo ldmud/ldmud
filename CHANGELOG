@@ -1,6 +1,9 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+07-Feb-2002 (Lars Duening)  (3.3.164)
+    - (bugs/) Cleaned up the bug reports.
+
 06-Feb-2002 (Lars Duening)  (3.3.163)
     - (prolang.y, make_func.y, comm.c) New optional driver hook
          H_DEFAULT_PROMPT to specify a prompt different from the
