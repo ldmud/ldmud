@@ -20,14 +20,12 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 131)
-(Parent-Version lpmud 3-3 130)
-(Version-Log "Changed the <> include of lpctypes.h in functionlist.h into a \"\" include.
-Fixed an invalid cross-define if two private functions with the same name were inherited.
-Efun replace_program() can omit the argument if the object has only one inherit.")
+(Project-Version lpmud 3-3 132)
+(Parent-Version lpmud 3-3 131)
+(Version-Log "Corrected the cross-define bugfix.")
 (New-Version-Log
 "")
-(Checkin-Time "Sun, 25 Nov 2001 19:12:35 -0700")
+(Checkin-Time "Tue, 27 Nov 2001 20:03:21 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -60,7 +58,7 @@ Efun replace_program() can omit the argument if the object has only one inherit.
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.4 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.32 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.194 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.195 644))
   (HISTORY (lpmud/f/49_HISTORY 1.224 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.13 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -157,7 +155,7 @@ Efun replace_program() can omit the argument if the object has only one inherit.
   (src/my-alloca.h (lpmud/f/29_my-alloca. 1.3.1.2 644))
   (src/my-rusage.h (lpmud/f/28_my-rusage. 1.7 644))
   (src/object.h (lpmud/44_object.h 1.34.1.13 644))
-  (src/object.c (lpmud/45_object.c 1.62.1.49 644))
+  (src/object.c (lpmud/45_object.c 1.62.1.50 644))
   (src/otable.h (lpmud/f/27_otable.h 1.8.1.4 644))
   (src/otable.c (lpmud/43_otable.c 1.22.1.3 644))
   (src/parser.c (lpmud/L/13_parser.c 1.1 644))
@@ -172,7 +170,7 @@ Efun replace_program() can omit the argument if the object has only one inherit.
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.9 644))
   (src/port.c (lpmud/39_port.c 1.17.1.6 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.13 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.80 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.81 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))

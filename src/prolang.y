@@ -10944,8 +10944,8 @@ copy_functions (program_t *from, fulltype_t type)
                                         , current_func_index - n );
                             p->u.global.function = current_func_index;
                         }
-                        else if ( (fun.flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN)) == 0
-                              ||  (OldFunction->flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN)) == 0
+                        else if ( (fun.flags & TYPE_MOD_PRIVATE) == 0
+                              ||  (OldFunction->flags & TYPE_MOD_PRIVATE) == 0
                                 )
                         {
                             /* At least one of the functions is visible:
@@ -10986,7 +10986,7 @@ copy_functions (program_t *from, fulltype_t type)
                 }
                 else /* n < 0: not an lfun */
                 {
-                    if (n != -2
+                    if (1 || n != -2
                      || (fun.flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN)) == 0
                        )
                      {

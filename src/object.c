@@ -1765,32 +1765,12 @@ f_include_list (svalue_t *sp, int num_arg)
  */
 
 {
-    /* Local structure to hold the found programs */
-    struct iinfo {
-        struct iinfo * next;     /* Next structure in flat list */
-        int            depth;    /* Include depth */
-        include_t    * inc;      /* The include information */
-          /* The following members are used to recreate the inherit tree */
-        int            count;    /* Number of direct includes */
-        struct iinfo * parent;   /* Parent include, or NULL */
-        struct iinfo * child;    /* First child include */
-        struct iinfo * sibling;  /* Next include on same level */
-          /* These members are used to create the result tree */
-        size_t         index;    /* # of this include file in the parent vec */
-        vector_t     * vec;      /* Result vector for this include */
-    } *begin, *end;         /* Flat list of all found includes */      
-
-    Mempool   pool;         /* The memory pool to allocate from */
     object_t  *ob;          /* Analyzed object */
     vector_t  *vec;         /* Result vector */
     int        count;       /* Total number of includes */
     svalue_t  *argp;        /* Arguments */
     include_t *includes;    /* Pointer to the include information */
     p_int     flags;
-
-    /* Get the memory pool */
-    memsafe(pool = new_mempool(sizeof(*begin) * 64)
-           , sizeof(*begin) * 64, "memory pool");
 
     /* Get the arguments */
     argp = sp - num_arg + 1;
@@ -1808,7 +1788,6 @@ f_include_list (svalue_t *sp, int num_arg)
     if (O_PROG_SWAPPED(ob))
         if (load_ob_from_swap(ob) < 0)
         {
-            mempool_delete(pool);
             error("Out of memory: unswap object '%s'\n", get_txt(ob->name));
             /* NOTREACHED */
             return NULL;
@@ -1848,8 +1827,29 @@ f_include_list (svalue_t *sp, int num_arg)
     }
     else  /* Tree-type result */
     {
+        /* Local structure to hold the found programs */
+        struct iinfo {
+            struct iinfo * next;     /* Next structure in flat list */
+            int            depth;    /* Include depth */
+            include_t    * inc;      /* The include information */
+              /* The following members are used to recreate the inherit tree */
+            int            count;    /* Number of direct includes */
+            struct iinfo * parent;   /* Parent include, or NULL */
+            struct iinfo * child;    /* First child include */
+            struct iinfo * sibling;  /* Next include on same level */
+              /* These members are used to create the result tree */
+            size_t         index;    /* # of this include file in the parent
+                                      * vector */
+            vector_t     * vec;      /* Result vector for this include */
+        } *begin, *end;         /* Flat list of all found includes */      
+
         struct iinfo * last;    /* Last include found on this depth */
         struct iinfo * next;    /* Next include to work */
+        Mempool   pool;         /* The memory pool to allocate from */
+
+        /* Get the memory pool */
+        memsafe(pool = new_mempool(sizeof(*begin) * 64)
+               , sizeof(*begin) * 64, "memory pool");
 
         /* Walk the list of included files and build the tree from it.
          */
@@ -1994,6 +1994,7 @@ f_include_list (svalue_t *sp, int num_arg)
             }
         }
 
+        mempool_delete(pool);
         sp--; /* Remove the temporary storage of vec on the stack */
     }
 
@@ -2013,7 +2014,6 @@ f_include_list (svalue_t *sp, int num_arg)
         if (!str)
         {
             free_array(vec);
-            mempool_delete(pool);
             error("(include_list) Out of memory: (%lu bytes) for filename\n"
                  , (unsigned long)slen);
         }
@@ -2024,7 +2024,6 @@ f_include_list (svalue_t *sp, int num_arg)
 
     /* Done */
 
-    mempool_delete(pool);
     sp = pop_n_elems(num_arg, sp);
 
     sp++;
@@ -2069,10 +2068,6 @@ f_inherit_list (svalue_t *sp, int num_arg)
     svalue_t *argp;         /* Arguments */
     p_int     flags;
 
-    /* Get the memory pool */
-    memsafe(pool = new_mempool(sizeof(*begin) * 64)
-           , sizeof(*begin) * 64, "memory pool");
-
     /* Get the arguments */
     argp = sp - num_arg + 1;
 
@@ -2088,11 +2083,14 @@ f_inherit_list (svalue_t *sp, int num_arg)
 
     if (O_PROG_SWAPPED(ob))
         if (load_ob_from_swap(ob) < 0) {
-            mempool_delete(pool);
             error("Out of memory: unswap object '%s'\n", get_txt(ob->name));
             /* NOTREACHED */
             return NULL;
         }
+
+    /* Get the memory pool */
+    memsafe(pool = new_mempool(sizeof(*begin) * 64)
+           , sizeof(*begin) * 64, "memory pool");
 
     /* Perform a breadth search on ob's inherit tree and append the
      * found programs to the iinfo list while counting them.
