@@ -52,6 +52,15 @@ Unix or Unix-like system
   start configure with the proper commandline arguments.
 
 
+  The following environment variables can be used to tweak the behaviour
+  of the configure script:
+    CC:           the name of the C compiler
+    CFLAGS:       compiler flags to be used during the configure script
+    EXTRA_CFLAGS: compiler flags to be used when compiling the game driver
+    LDFLAGS:      linker flags to be used by configure and for linking the
+                  game driver.
+
+
   After configuration is finished, you may want to modify the Makefile
   to fine tune those parameters which are not covered by the configuration.
 
@@ -144,6 +153,11 @@ mySQL
 -----
   If your machine has mySQL installed, the driver can be configured to use
   it: give '--enable-use-mysql=yes' as argument to the configure script.
+
+  Alternatively, if your mySQL uses an unusual include/library path,
+  the option can be given as '--enable-use-mysql=/unusual/path', which
+  will use the given path as search path for both include and library
+  files.
 
   Before you compile the driver, you have to add the username and password
   of the Mud user to the driver (if you haven't done so already, now would

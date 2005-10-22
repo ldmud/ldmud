@@ -22,5 +22,7 @@ enable_supply_parse_command=no
 enable_initialization_by___init=yes
 enable_use_system_crypt=no
 
+enable_use_mysql=/usr/local/lib/mysql
+
 enable_erq=xerq
 

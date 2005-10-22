@@ -976,6 +976,17 @@ add_to_mem_block (int n, void *data, size_t size)
    * are pointer types and one of them is a *ANY.
    */
 
+#define REDEFINED_TYPE(e,t) \
+    (   BASIC_TYPE( (e), (t) ) \
+     || ( (t) == (TYPE_MOD_POINTER|TYPE_ANY) ) \
+     || ( (e) == (TYPE_MOD_POINTER|TYPE_ANY) ) \
+    )
+
+  /* Return TRUE if type <t> is a proper redefinition of <e>.
+   * This is the case if <e> and <t> are compatible base types,
+   * or if one of them is *ANY.
+   */
+
 /*-------------------------------------------------------------------------*/
 static char *
 get_type_name (fulltype_t type)
@@ -8294,7 +8305,7 @@ function_call:
 
                           tmp1 = *argp++ & TYPE_MOD_RMASK;
                           tmp2 = *arg_types++ & TYPE_MOD_MASK;
-                          if (!MASKED_TYPE(tmp1, tmp2))
+                          if (!REDEFINED_TYPE(tmp1, tmp2))
                           {
                               yyerrorf("Bad type for argument %d of %s %s",
                                 anum_arg - i,

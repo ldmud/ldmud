@@ -3057,7 +3057,35 @@ yylex1 (void)
                       {
                         char delimiter = yyp[-1];
 
-                        if (delimiter == '\''
+                        /* If the delimiter is a ', we have to check
+                         * for (possibly escaped) character constants
+                         * and symbols.
+                         */
+                        if (delimiter == '\'' && *yyp == '\\')
+                        {
+                            /* Parse an escape sequence */
+
+                            if ('\n' != yyp[1] && CHAR_EOF != yyp[1])
+                            {
+                                char *cp;
+                                char lc; /* Since c is 'register' */
+
+                                cp = parse_escaped_char(yyp+1, &lc);
+                                if (!cp)
+                                    yyerror("Illegal character constant");
+                                yyp = cp;
+                            }
+
+                            /* Test if it's terminated by a quote (this also
+                             * catches the \<nl> and \<eof> case).
+                             */
+                            if (*yyp++ != '\'')
+                            {
+                                yyp--;
+                                yyerror("Illegal character constant");
+                            }
+                        }
+                        else if (delimiter == '\''
                          && ( (    yyp[1] != '\''
                                || (   *yyp == '\''
                                    && (   yyp[1] == '('
@@ -3090,7 +3118,9 @@ yylex1 (void)
                             /* If the first non-quote is not an alnum, it must
                              * be a quoted aggregrate or an error.
                              */
-                            if (!isalpha((unsigned char)*yyp) && *yyp != '_')
+                            if (!isalpha((unsigned char)*yyp)
+                                 && *yyp != '_'
+                               )
                             {
                                 if (*yyp == '(' && yyp[1] == '{')
                                 {

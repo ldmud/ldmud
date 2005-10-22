@@ -1,6 +1,17 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+30-Jun-2001 (Lars Duening)  (3.3.69)
+    - (prolang.y) Relaxed type checking somewhat so that a non-mixed
+        function argument can be redefined to mixed, and vice versa
+        (suggested by Gnomi)
+    - (lex.c) Escaped character constants in inline closures weren't
+        recognized (reported by Freaky and Gnomi)
+    - (doc/LPC/comments) New.
+    - (configure.in) When using mySQL, also check for libnsl.
+    - (configure.in) The mySQL path is now used for both include
+        and library searches.
+
 29-Jun-2001 (Lars Duening)  (3.3.68)
     - (prolang.y) Accidentally it was no longer possible to redefine 
         privately inherited variables (reported by Gnomi).

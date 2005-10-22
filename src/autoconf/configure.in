@@ -513,6 +513,11 @@ fi
 
 AC_CACHE_CHECK(for mySQL,lp_cv_has_mysql,
 saveflags="$CFLAGS"
+if test $enable_use_mysql = yes; then
+  if test "x$mysql_path" != "x"; then
+      CFLAGS="$CFLAGS -I$mysql_path"
+  fi
+fi
 AC_TRY_COMPILE([
 #include <sys/types.h>
 #include <mysql/mysql.h>
@@ -530,17 +535,23 @@ CFLAGS="$saveflags"
 ))
 
 if test $lp_cv_has_mysql = yes; then
+  saveflags="$CFLAGS"
   AC_DEFINE(HAS_MYSQL)
 if test $enable_use_mysql = yes; then
   if test "x$mysql_path" = "x"; then
       AC_CHECK_LIB(mysqlclient,main, PKGLIBS="$PKGLIBS -lmysqlclient")
   else
       LIBS="$LIBS -L$mysql_path"
+      CFLAGS="$CFLAGS -I$mysql_path"
+      EXTRA_CFLAGS="$EXTRA_CFLAGS -I$mysql_path"
       AC_CHECK_LIB(mysqlclient,main, PKGLIBS="$PKGLIBS -L$mysql_path -lmysqlclient")
   fi
   # On some systems, mysqlclient requires the compression libz.
   AC_CHECK_LIB(z,main, PKGLIBS="$PKGLIBS -lz")
+  # On some systems, mysqlclient requires the libnsl.
+  AC_CHECK_LIB(nsl,main, PKGLIBS="$PKGLIBS -lnsl")
 fi
+  CFLAGS="$saveflags"
 fi
 
 AC_CACHE_CHECK(if rename handles directories,

@@ -2870,7 +2870,7 @@ create_efun_defs (void)
                     ? _MCTs : 0 )
                 | ( (isascii(c) && isxdigit((unsigned)c))  ? _MCTx : 0 )
                 | ( ((isascii(c) && (isalnum ((unsigned)c) || c == '_'))
-                   || ((c) >= 0xC0 && (c) <= 0xFF))
+                   || (((unsigned)c) >= 0xC0 && ((unsigned)c) <= 0xFF))
                     ? _MCTa : 0 )
                );
         c++;
