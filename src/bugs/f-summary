@@ -105,6 +105,7 @@ f-010825-2: efun query_input_to()
 f-010903: get_dir() should return full pathnames
 f-010908: caller_stack should include function names
 f-011011: Another sort of deep_call_other() ?
+f-011015-1: Left, Center, and Flush formatting for terminal_colour()
 
 
 Language
@@ -134,6 +135,8 @@ f-010713-0: Better Inline closure syntax
 f-010805: Explicite namespace qualifier for simul efuns
 f-010825-3: Make > indexing default with an option ?
 f-010917: default arguments for functions
+f-011015-2: Comparison-by-Value for Arrays and Mappings
+f-011015-0: Long Ints on LPC Level
 
 
 Compiler

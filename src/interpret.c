@@ -14048,7 +14048,6 @@ again:
                         sp -= num_arg-2;
                     else
                         pop_n_elems(num_arg-2);
-                    sp -= num_arg-2;
                     free_svalue(svp);
                     put_number(svp, 0);
                 }

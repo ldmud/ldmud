@@ -1,0 +1,8 @@
+Short: Comparison-by-Value for Arrays and Mappings
+From: wolf.dieter@dallinger.de
+Date: 2001-10-09
+Type: Feature
+State: New
+
+The '==' operator compares mappings and arrays by reference. It would be nice
+to have a second operator which compares by value.

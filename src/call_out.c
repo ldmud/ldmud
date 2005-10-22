@@ -205,13 +205,13 @@ f_call_out (svalue_t *sp, int num_arg)
     call_list_free = cop->next;
     cop->command_giver = command_giver; /* save current player context */
     if (command_giver)
-        ref_object(command_giver, "new_call_out");  /* Bump its ref */
+        ref_object(command_giver, "f_call_out");  /* Bump its ref */
 
     /* Adjust the stack and get the delay */
     sp = arg - 1;
     delay = arg[1].u.number;
-    if (delay < 1)
-        delay = 1;
+    if (delay < 0)
+        delay = 0;
 
     /* Insert the new structure at its proper place in the list */
 

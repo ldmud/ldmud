@@ -22,14 +22,12 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 114)
-(Parent-Version lpmud 3-3 113)
-(Version-Log "Removed a free memory read.
-Removed a bug in call_other/call_direct on arrays of objects.
-The driver again compiles with system malloc.")
+(Project-Version lpmud 3-3 115)
+(Parent-Version lpmud 3-3 114)
+(Version-Log "Removed another bug in call_other on arrays of objects.")
 (New-Version-Log
 "")
-(Checkin-Time "Sun, 14 Oct 2001 21:12:52 -0600")
+(Checkin-Time "Mon, 15 Oct 2001 19:19:56 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -61,9 +59,9 @@ The driver again compiles with system malloc.")
   ;; Information about the driver and the distribution in general
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.4 644))
-  (CREDITS (lpmud/d/22_CREDITS 1.70.1.28 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.177 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.211 644))
+  (CREDITS (lpmud/d/22_CREDITS 1.70.1.29 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.178 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.212 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.13 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -119,7 +117,7 @@ The driver again compiles with system malloc.")
   (src/bitstrings.h (lpmud/I/47_bitstrings 1.1 644))
   (src/bitstrings.c (lpmud/I/48_bitstrings 1.3 644))
   (src/call_out.h (lpmud/f/45_call_out.h 1.7.1.4 644))
-  (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.13 644))
+  (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.14 644))
   (src/closure.h (lpmud/f/44_closure.h 1.7.1.5 644))
   (src/closure.c (lpmud/d/4_closure.c 1.41.1.32 644))
   (src/comm.c (lpmud/d/2_comm1.c 1.69.1.45 644))
@@ -142,7 +140,7 @@ The driver again compiles with system malloc.")
   (src/heartbeat.h (lpmud/m/41_heartbeat. 1.6.1.4 644))
   (src/heartbeat.c (lpmud/m/42_heartbeat. 1.18.1.6 644))
   (src/interpret.h (lpmud/b/13_interpret. 1.33.1.21 644))
-  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.89 644))
+  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.90 644))
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.8 644))
   (src/lex.c (lpmud/b/12_lex.c 1.62.1.63 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.6 644))
@@ -418,7 +416,7 @@ The driver again compiles with system malloc.")
   (src/bugs/b-010801-0 (lpmud/N/17_b-010801-0 1.1 644) :no-keywords)
   (src/bugs/b-010831 (lpmud/N/35_b-010831 1.1 644) :no-keywords)
 
-  (src/bugs/f-summary (lpmud/C/37_f-summary 1.39.1.38 644) :no-keywords)
+  (src/bugs/f-summary (lpmud/C/37_f-summary 1.39.1.39 644) :no-keywords)
   (src/bugs/f-981027-0 (lpmud/g/29_f-981027-0 1.2 644) :no-keywords)
   (src/bugs/f-981027-1 (lpmud/g/28_f-981027-1 1.2 644) :no-keywords)
   (src/bugs/f-981027-2 (lpmud/g/27_f-981027-2 1.2 644) :no-keywords)
@@ -602,6 +600,9 @@ The driver again compiles with system malloc.")
   (src/bugs/f-010917 (lpmud/N/42_f-010917 1.1 644) :no-keywords)
   (src/bugs/f-010928-0 (lpmud/N/45_f-010928-0 1.1 644) :no-keywords)
   (src/bugs/f-011011 (lpmud/N/49_f-011011 1.1 644) :no-keywords)
+  (src/bugs/f-011015-0 (lpmud/O/1_f-011015-0 1.1 644) :no-keywords)
+  (src/bugs/f-011015-1 (lpmud/O/2_f-011015-1 1.1 644) :no-keywords)
+  (src/bugs/f-011015-2 (lpmud/O/3_f-011015-2 1.1 644) :no-keywords)
 
   (src/bugs/p-981027-1 (lpmud/g/25_p-981027-1 1.2 644) :no-keywords)
   (src/bugs/doomdark/strutil.c (lpmud/g/31_strutil.c 1.2 644) :no-keywords)

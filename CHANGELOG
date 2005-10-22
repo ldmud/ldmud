@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+15-Oct-2001 (Lars Duening)  (3.3.115)
+    - (interpret.c) Another error in call_other() on arrays of objects.
+        (reported by Dafire)
+    - (call_out.c) The minimum delay can now be 0 (suggested by Tomba).
+
 14-Oct-2001 (Lars Duening)  (3.3.114)
     - (efuns.c) Removed a free-memory access in efun strstr() (thanks,
         Tomba!)
