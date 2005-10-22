@@ -1254,7 +1254,8 @@ e_add_action (svalue_t *func, svalue_t *cmd, int flag)
     /* And the commandgiver must be in the vicinity */
     if (ob != command_giver
      && ob->super != command_giver
-     && ob->super != command_giver->super
+     && (ob->super == NULL || ob->super != command_giver->super)
+       /* above condition includes the check command_giver->super == NULL */
      && ob != command_giver->super)
         error("add_action from object '%s' that was not present to '%s'.\n"
              , get_txt(ob->name), get_txt(command_giver->name));

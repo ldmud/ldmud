@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+21-Oct-2001 (Lars Duening)  (3.3.118)
+    - (actions.c) Removed a crasher when add_action() was performed between
+        two objects with no environment (thanks, Fuchur!).
+
 18-Oct-2001 (Lars Duening)  (3.3.117)
     - (doc/LPC/arrays, doc/efun/sprintf) Improved examples by
         Coogan (thanks!).

@@ -15,7 +15,7 @@ DESCRIPTION
 
 EXAMPLE
         While compiling 'foo.c':
-          expand_define("__FILE__") --> "file.c"
+          expand_define("__FILE__") --> "foo.c"
 
 HISTORY
         Introduced in 3.2.1@93.

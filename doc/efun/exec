@@ -1,5 +1,5 @@
 SYNOPSIS
-        object exec(object new, object old)
+        int exec(object new, object old)
 
 DESCRIPTION
         exec() switches the connection from the interactive object old
@@ -8,7 +8,10 @@ DESCRIPTION
         exchaning the two connections between the object. If the new
         object is not interactive, the old will not be interactive
         anymore after the exec call succeeded.
-        It is used to load different "user objects" or to reconnect
+
+        The result is 1 on success, and 0 on failure.
+
+        exec() is used to load different "user objects" or to reconnect
         link dead users.
 
         To provide security mechanisms, the interpreter calls
@@ -30,7 +33,7 @@ EXAMPLE
         destruct(this_object());
 
 HISTORY
-    LDMud 3.2.9 added the switchover of this_interactive().
+        LDMud 3.2.9 added the switchover of this_interactive().
 
 SEE ALSO
         connect(M), disconnect(M), logon(A), interactive(E)
