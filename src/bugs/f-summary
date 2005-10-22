@@ -106,10 +106,13 @@ f-011011: Another sort of deep_call_other() ?
 f-011015-1: Left, Center, and Flush formatting for terminal_colour()
 f-011016-0: sprintf() and colour strings
 f-011029: Efun copy_object()
+f-011119: New Standardnotation for callbacks
+f-011207: Linenumbers for functionlist()
 f-011229-0: Add support for PostgreSQL
 f-011229-1: Add support for Berkeley DB
 f-011230: Implement seeded randoms
 f-020127: Bitstring efuns for shifting and copying
+f-020307: Default 'option' parameter for regexp functions
 f-020310: inherits() returns all programs inheriting a given program
 f-020312: Filename argument to garbage_collection()
 f-020327-0: Use PCRE and traditional regexps in parallel
@@ -169,6 +172,7 @@ f-010801: Proper inline compilation of inline closures
 f-010802: Allow wildcarded calls with arguments
 f-011213-0: Lexer should not use magic EOF characters
 f-020203-1: Warn if inner variables shadow outer ones.
+f-020321: Deactivate sefun (when loading the master or on pragma)
 
 
 Runtime
@@ -225,8 +229,11 @@ f-010318: Runtime ERQ Executable directory specification
 f-010707: Fast Callouts
 f-010928-0: Make telnet negotiation options more configurable
 p-011012: MCCP patch
+f-011215: Signal handling
+f-020128: syslog like logging for the driver
 f-020131-0: privilege_violation("limited") should pass limits
 f-020220: Heartbeat functionality
+f-020309: Stack size watch
 f-020311: Add Berkeley DB to the driver
 
 
@@ -249,3 +256,4 @@ f-010615-2: Efficient vector implementation
 f-010828: Save loadable dump
 f-011124: Logging idea: Shared Library
 f-020206: Use OpenSSL or sshwrapper with the driver.
+f-020302: Detection of Telnet-Clients

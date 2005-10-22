@@ -221,7 +221,7 @@ void
 _free_object (object_t *ob)
 #else
 void
-_free_object (object_t *ob, const char * file, int line)
+_free_object ( object_t *ob, const char * file, int line)
 #endif
 
 /* Deallocate/dereference all memory and structures held by <ob>.
@@ -230,7 +230,6 @@ _free_object (object_t *ob, const char * file, int line)
  */
 
 {
-
 #ifdef DEBUG
 
     /* Check the reference count */
@@ -242,6 +241,11 @@ _free_object (object_t *ob, const char * file, int line)
     if (strchr(get_txt(ob->name), '#') == NULL)
         printf("DEBUG: (%s:%d) free_object(%p '%s') ref %ld flags %x\n"
               , file, line, ob, get_txt(ob->name), ob->ref, ob->flags);
+#elif defined(CHECK_OBJECT_REF)
+#   ifdef __MWERKS__
+#       pragma unused(file)
+#       pragma unused(line)
+#   endif
 #endif
     if (d_flag)
         printf("%s free_object: %s.\n", time_stamp(), get_txt(ob->name));
@@ -477,7 +481,8 @@ void
 free_prog (program_t *progp, Bool free_all)
 #else
 void
-_free_prog (program_t *progp, Bool free_all, const char * file, int line)
+_free_prog (program_t *progp, Bool free_all, const char * file, int line
+           )
 #endif
 
 /* Decrement the refcount for program <progp>. If it reaches 0, the program
@@ -522,6 +527,11 @@ _free_prog (program_t *progp, Bool free_all, const char * file, int line)
         printf("DEBUG: (%s:%d) free_prog(%p '%s') ref %ld : blueprint (%p '%s') ref %ld, flags %x\n"
               , file, line, progp, get_txt(progp->name), progp->ref
               , blueprint, get_txt(blueprint->name), blueprint->ref, blueprint->flags);
+#elif defined(CHECK_OBJECT_REF)
+#   ifdef __MWERKS__
+#       pragma unused(file)
+#       pragma unused(line)
+#   endif
 #endif
         free_object(blueprint, "free_prog");
     }

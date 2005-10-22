@@ -13,9 +13,648 @@ destructed.
 Swapping? Replace programs? Something else?
 
 3.2.9-dev.411/3.3.178 adds a trace of blueprint allocations/deallocations.
-3.2.9-dev.423/3.3.188 disables all blueprint code
+3.2.9-dev.423/3.3.188 disables all blueprint code. Doesn't seem to help
+  Evermore, but seemed to help Markus Peter. Strange.
 
 
+----------------------------------------------------------------------------
+Date: Wed, 27 Mar 2002 13:28:31 +0100 (CET)
+From: Markus Peter <warp@spin.de>
+hallo
+
+mal wieder ein crash (mittlerweile 3.3.186):
+Program terminated with signal 11, Segmentation fault.
+#0  0x080be5da in fatal (fmt=0x80e5040 <Address 0x80e5040 out of bounds>)
+    at simulate.c:523
+523             *((char*)0) = 0/a;
+(gdb) bt
+#0  0x080be5da in fatal (fmt=0x80e5040 <Address 0x80e5040 out of bounds>)
+    at simulate.c:523
+Cannot access memory at address 0x80be3f8
+(gdb) info local
+fmt = 0x80e5040 <Address 0x80e5040 out of bounds>
+va = 0xbfffe038
+ts = 0x8115748 "\002"
+in_fatal = 1
+
+logs haengen wie ueblich an
+
+ ----------------------------  err.log  --------------------------------
+2002.03.27 13:26:22 Object 0x874d554 home/tetley/vodka#485 ref count 0, but not destructed.
+std/liquid_container#304 std/base.c line 306
+82c6f05:  23          return                     (1: 34)	line 306
+82c7195:  92          restore_arg_frame          (2: 34)	line 460
+82c7196:  99          branch_when_zero           (1: 33)
+82c71a8:  91          save_arg_frame             (0: 32)	line 461
+82c71a9:  91          save_arg_frame             (1: 33)
+82c71aa: 377       15 environment                (2: 34)
+82c71ac:  92          restore_arg_frame          (3: 35)
+82c71ad:  10        6 cstring0                   (2: 34)
+82c71af:  91          save_arg_frame             (3: 35)
+82c71b0: 103          call_function              (4: 36)
+std/liquid_container#304 std/container/container.c line 61
+81a7b3f:  91          save_arg_frame             (0: 36)	line 61
+81a7b40: 103          call_function              (1: 37)
+std/liquid_container#304 std/base.c line 217
+82c6d43:   8        5 identifier                 (0: 37)	line 217
+82c6d45:  23          return                     (1: 38)
+std/liquid_container#304 std/container/container.c line 61
+81a7b43:  92          restore_arg_frame          (2: 38)	line 61
+81a7b44:   8        0 identifier                 (1: 37)
+81a7b46:  18        2 clit                       (2: 38)
+81a7b48:  44          /                          (3: 39)
+81a7b49:  41          +                          (2: 38)
+81a7b4a:  23          return                     (1: 37)
+std/liquid_container#304 std/base.c line 461
+82c71b3:  92          restore_arg_frame          (5: 37)	line 461
+82c71b4: 174          negate                     (4: 36)
+82c71b5: 167          call_other                 (4: 36)
+std/player#303 std/container/container.c line 53
+81a7b1b:  28        0 local                      (0: 36)	line 53
+81a7b1d: 106        0 push_identifier_lvalue     (1: 37)
+81a7b1f:  76          (void)+=                   (2: 38)
+81a7b20:  91          save_arg_frame             (0: 36)	line 54
+81a7b21: 377       15 environment                (1: 37)
+81a7b23:  92          restore_arg_frame          (2: 38)
+81a7b24:  99       15 branch_when_zero           (1: 37)
+81a7b26:  91          save_arg_frame             (0: 36)	line 55
+81a7b27:  91          save_arg_frame             (1: 37)
+81a7b28: 377       15 environment                (2: 38)
+81a7b2a:  92          restore_arg_frame          (3: 39)
+81a7b2b:  10        2 cstring0                   (2: 38)
+81a7b2d:  28        0 local                      (3: 39)
+81a7b2f:  18        2 clit                       (4: 40)
+81a7b31:  44          /                          (5: 41)
+81a7b32: 167          call_other                 (4: 40)
+home/warpi/workroom std/container/container.c line 53
+81a7b1b:  28        0 local                      (0: 40)	line 53
+81a7b1d: 106        0 push_identifier_lvalue     (1: 41)
+81a7b1f:  76          (void)+=                   (2: 42)
+81a7b20:  91          save_arg_frame             (0: 40)	line 54
+81a7b21: 377       15 environment                (1: 41)
+81a7b23:  92          restore_arg_frame          (2: 42)
+81a7b24:  99          branch_when_zero           (1: 41)
+81a7b35:  24          return0                    (0: 40)	line 56
+std/player#303 std/container/container.c line 55
+81a7b33:  92          restore_arg_frame          (2: 38)	line 55
+81a7b34:  88          pop_value                  (1: 37)
+81a7b35:  24          return0                    (0: 36)	line 56
+std/liquid_container#304 std/base.c line 461
+82c71b6:  92          restore_arg_frame          (2: 34)	line 461
+82c71b7:  88          pop_value                  (1: 33)
+82c71b8:  91          save_arg_frame             (0: 32)	line 463
+82c71b9: 184          this_object                (1: 33)
+82c71ba: 223       15 deep_inventory             (2: 34)
+82c71bc:  10       31 cstring0                   (2: 34)
+82c71be: 380       18 filter_objects             (3: 35)
+82c71c0:  92          restore_arg_frame          (2: 34)
+82c71c1:  88          pop_value                  (1: 33)
+82c71c2: 184          this_object                (0: 32)	line 464
+82c71c3: 224          destruct                   (1: 33)
+kernel/master kernel/master.c line 263
+81ae38f:  90      769 clear_locals               (0: 38)	line 263
+81ae392:  28        0 local                      (0: 38)	line 267
+81ae394: 236       28 interactive                (1: 39)
+81ae396:  99          branch_when_zero           (1: 39)
+81ae39a:  91          save_arg_frame             (0: 38)	line 269
+81ae39b:  28        0 local                      (1: 39)
+81ae39d: 377       15 environment                (2: 40)
+81ae39f:  92          restore_arg_frame          (2: 40)
+81ae3a0: 111        1 push_local_variable_lvalue (1: 39)
+81ae3a2:  40          (void)=                    (2: 40)
+81ae3a3:  28        1 local                      (0: 38)	line 270
+81ae3a5: 100          branch_when_non_zero       (1: 39)
+81ae3d4:  98          branch                     (0: 38)	line 278
+81ae3e2:  28        0 local                      (0: 38)
+81ae3e4: 230       22 first_inventory            (1: 39)
+81ae3e6: 102       17 bbranch_when_non_zero      (1: 39)
+81ae3e8:  91          save_arg_frame             (0: 38)	line 281
+81ae3e9:  29       10 catch                      (1: 39)
+81ae3eb:  91          save_arg_frame             (1: 39)
+81ae3ec:  28        0 local                      (2: 40)
+81ae3ee:  10       97 cstring0                   (3: 41)
+81ae3f0:  10      151 cstring0                   (4: 42)
+81ae3f2: 167          call_other                 (5: 43)
+std/liquid_container#304 std/basic/hooks.c line 58
+82c66b7:   8        0 identifier                 (0: 43)	line 58
+82c66b9:  59          !                          (1: 44)
+82c66ba:  38          ||                         (1: 44)
+82c66c2:  99        1 branch_when_zero           (1: 44)
+82c66c4:  24          return0                    (0: 43)
+kernel/master kernel/master.c line 281
+81ae3f3:  92          restore_arg_frame          (3: 41)	line 281
+81ae3f4: 162          end_catch                  (2: 40)
+81ae3f5:  92          restore_arg_frame          (2: 40)
+81ae3f6:  88          pop_value                  (1: 39)
+81ae3f7:  91          save_arg_frame             (0: 38)	line 282
+81ae3f8:  29       10 catch                      (1: 39)
+81ae3fa:  91          save_arg_frame             (1: 39)
+81ae3fb:  28        0 local                      (2: 40)
+81ae3fd:  10       97 cstring0                   (3: 41)
+81ae3ff:  10      152 cstring0                   (4: 42)
+81ae401: 167          call_other                 (5: 43)
+std/liquid_container#304 std/basic/hooks.c line 58
+82c66b7:   8        0 identifier                 (0: 43)	line 58
+82c66b9:  59          !                          (1: 44)
+82c66ba:  38          ||                         (1: 44)
+82c66c2:  99        1 branch_when_zero           (1: 44)
+82c66c4:  24          return0                    (0: 43)
+kernel/master kernel/master.c line 282
+81ae402:  92          restore_arg_frame          (3: 41)	line 282
+81ae403: 162          end_catch                  (2: 40)
+81ae404:  92          restore_arg_frame          (2: 40)
+81ae405:  88          pop_value                  (1: 39)
+81ae406:  24          return0                    (0: 38)	line 283
+std/liquid_container#304 std/base.c line 464
+82c71c5:  15          const0                     (0: 32)	line 464
+82c71c6:  88          pop_value                  (1: 33)
+82c71c7:  24          return0                    (0: 32)	line 465
+std/player#303 std/base.c line 463
+82c71c0:  92          restore_arg_frame          (2: 31)	line 463
+82c71c1:  88          pop_value                  (1: 30)
+82c71c2: 184          this_object                (0: 29)	line 464
+82c71c3: 224          destruct                   (1: 30)
+kernel/master kernel/master.c line 263
+81ae38f:  90      769 clear_locals               (0: 35)	line 263
+81ae392:  28        0 local                      (0: 35)	line 267
+81ae394: 236       28 interactive                (1: 36)
+81ae396:  99          branch_when_zero           (1: 36)
+81ae39a:  91          save_arg_frame             (0: 35)	line 269
+81ae39b:  28        0 local                      (1: 36)
+81ae39d: 377       15 environment                (2: 37)
+81ae39f:  92          restore_arg_frame          (2: 37)
+81ae3a0: 111        1 push_local_variable_lvalue (1: 36)
+81ae3a2:  40          (void)=                    (2: 37)
+81ae3a3:  28        1 local                      (0: 35)	line 270
+81ae3a5: 100          branch_when_non_zero       (1: 36)
+81ae3d4:  98          branch                     (0: 35)	line 278
+81ae3e2:  28        0 local                      (0: 35)
+81ae3e4: 230       22 first_inventory            (1: 36)
+81ae3e6: 102       17 bbranch_when_non_zero      (1: 36)
+81ae3e8:  91          save_arg_frame             (0: 35)	line 281
+81ae3e9:  29       10 catch                      (1: 36)
+81ae3eb:  91          save_arg_frame             (1: 36)
+81ae3ec:  28        0 local                      (2: 37)
+81ae3ee:  10       97 cstring0                   (3: 38)
+81ae3f0:  10      151 cstring0                   (4: 39)
+81ae3f2: 167          call_other                 (5: 40)
+std/player#303 std/basic/hooks.c line 58
+82c66b7:   8        0 identifier                 (0: 40)	line 58
+82c66b9:  59          !                          (1: 41)
+82c66ba:  38          ||                         (1: 41)
+82c66c2:  99        1 branch_when_zero           (1: 41)
+82c66c4:  24          return0                    (0: 40)
+kernel/master kernel/master.c line 281
+81ae3f3:  92          restore_arg_frame          (3: 38)	line 281
+81ae3f4: 162          end_catch                  (2: 37)
+81ae3f5:  92          restore_arg_frame          (2: 37)
+81ae3f6:  88          pop_value                  (1: 36)
+81ae3f7:  91          save_arg_frame             (0: 35)	line 282
+81ae3f8:  29       10 catch                      (1: 36)
+81ae3fa:  91          save_arg_frame             (1: 36)
+81ae3fb:  28        0 local                      (2: 37)
+81ae3fd:  10       97 cstring0                   (3: 38)
+81ae3ff:  10      152 cstring0                   (4: 39)
+81ae401: 167          call_other                 (5: 40)
+std/player#303 std/basic/hooks.c line 58
+82c66b7:   8        0 identifier                 (0: 40)	line 58
+82c66b9:  59          !                          (1: 41)
+82c66ba:  38          ||                         (1: 41)
+82c66c2:  99        1 branch_when_zero           (1: 41)
+82c66c4:  24          return0                    (0: 40)
+kernel/master kernel/master.c line 282
+81ae402:  92          restore_arg_frame          (3: 38)	line 282
+81ae403: 162          end_catch                  (2: 37)
+81ae404:  92          restore_arg_frame          (2: 37)
+81ae405:  88          pop_value                  (1: 36)
+81ae406:  24          return0                    (0: 35)	line 283
+std/player#303 std/base.c line 464
+82c71c5:  15          const0                     (0: 29)	line 464
+82c71c6:  88          pop_value                  (1: 30)
+82c71c7:  24          return0                    (0: 29)	line 465
+std/player#303 std/player.c line 498
+82d55c3:  92          restore_arg_frame          (3: 30)	line 498
+82d55c4: 162          end_catch                  (2: 29)
+82d55c5:  92          restore_arg_frame          (2: 29)
+82d55c6:  88          pop_value                  (1: 28)
+82d55c7: 184          this_object                (0: 27)	line 499
+82d55c8:  99          branch_when_zero           (1: 28)
+82d55d5: 184          this_object                (0: 27)	line 501
+82d55d6:  99          branch_when_zero           (1: 28)
+82d55dd:  24          return0                    (0: 27)	line 503
+std/player#303 <lambda ?> line 0
+84794b6:  92          restore_arg_frame          (2: 25)	line 0
+84794b7:  23          return                     (1: 24)
+std/player#303 std/player.c line 277
+82d507c:  92          restore_arg_frame          (2: 23)	line 277
+82d507d:  23          return                     (1: 22)
+82d56f8:  92          restore_arg_frame          (2: 18)	line 536
+82d56f9:  88          pop_value                  (1: 17)
+82d56fa:  16          const1                     (0: 16)	line 537
+82d56fb:  23          return                     (1: 17)
+daemon/userd daemon/userd.c line 171
+83cbb1e:  92          restore_arg_frame          (2: 13)	line 171
+83cbb1f:  88          pop_value                  (1: 12)
+83cbb20:  24          return0                    (0: 11)	line 172
+83cbaeb:  92          restore_arg_frame          (2:  1)	line 175
+83cbaec: 106        0 push_identifier_lvalue     (1:  0)
+83cbaee:  40          (void)=                    (2:  1)
+83cbaef:  91          save_arg_frame             (0: -1)	line 176
+83cbaf0:  10        1 cstring0                   (1:  0)
+83cbaf2:  18       60 clit                       (2:  1)
+83cbaf4: 369        7 call_out                   (3:  2)
+83cbaf6:  15          const0                     (1:  0)
+83cbaf7:  92          restore_arg_frame          (2:  1)
+83cbaf8:  88          pop_value                  (1:  0)
+83cbaf9:  24          return0                    (0: -1)	line 177
+No program counter.
+No program to trace.
+2002.03.27 13:26:22 LDMud aborting on fatal error.
+[xerq] read: Resource temporarily unavailable
+2002.03.27 13:26:23 [xerq] Demon exiting.
+
+----------------------------------------------------------------------------
+Hallo
+
+Kam leider bisher nicht zur gezielten Bugsuche, aber der Driver (3.3.184)
+ist nach etwa einer Woche Laufzeit (ohne H_DEFAULT_METHOD) mal wieder
+gecrasht mit der selben Meldung. Logfiles haengen an.
+Coredump ist wieder unbrauchbar weitestgehend. Liegt das an der
+Implementierung von fatal() oder an meinem System, dass er nicht
+ordentlich dumpen mag? Momentan kompilier ich mit -O2 - sollte man da noch
+eine Stufe niedriger gehen ?
+
+Program terminated with signal 11, Segmentation fault.
+#0  0x080be41b in fatal (fmt=0x80ea100 <Address 0x80ea100 out of bounds>)
+    at simulate.c:523
+523             *((char*)0) = 0/a;
+(gdb) bt
+#0  0x080be41b in fatal (fmt=0x80ea100 <Address 0x80ea100 out of bounds>)
+    at simulate.c:523
+Cannot access memory at address 0x80be3f8
+(gdb) info locals
+fmt = 0x80ea100 <Address 0x80ea100 out of bounds>
+va = 0x83881a4
+ts = 0x84bed28 "\030\002"
+in_fatal = 1
+
+ -------------------- err.log ---------------------
+2002.03.22 22:39:23 [xerq] Demon started
+2002.03.22 22:39:23 LDMud 3.3.184 (3-3.184)
+2002.03.22 22:39:23 Random seed: 0x3c9ba48b
+2002.03.24 20:30:24 Object 0x83ff04c std/money#1013 ref count 0, but not destructed.
+std/player#602 std/player.c (/std/player/message.c) line 58
+82d3efa:  10       13 cstring0                   (1: 23)	line 58
+82d3efc:  50          ==                         (2: 24)
+82d3efd:  38        5 ||                         (1: 23)
+82d3eff:  28        2 local                      (0: 22)
+82d3f01:  10       22 cstring0                   (1: 23)
+82d3f03:  50          ==                         (2: 24)
+82d3f04:  99          branch_when_zero           (1: 23)
+82d3f19:  91          save_arg_frame             (0: 22)	line 61
+82d3f1a:  10        0 cstring0                   (1: 23)
+82d3f1c:  10       24 cstring0                   (2: 24)
+82d3f1e:  91          save_arg_frame             (3: 25)
+82d3f1f:  10        2 cstring0                   (4: 26)
+82d3f21: 103          call_function              (5: 27)
+std/player#602 std/player.c line 568
+82d56d3:   8       48 identifier                 (0: 27)	line 568
+82d56d5:  28        0 local                      (1: 28)
+82d56d7: 244       36 lower_case                 (2: 29)
+82d56d9:  60          index                      (2: 29)
+82d56da:  23          return                     (1: 28)
+std/player#602 std/player.c (/std/player/message.c) line 61
+82d3f24:  92          restore_arg_frame          (5: 27)	line 61
+82d3f25: 167          call_other                 (4: 26)
+daemon/termcap daemon/termcap.c line 28
+81acbcf:  90      257 clear_locals               (0: 27)	line 28
+81acbd2:   8        0 identifier                 (0: 27)	line 29
+81acbd4:  28        0 local                      (1: 28)
+81acbd6:  60          index                      (2: 29)
+81acbd7: 111        1 push_local_variable_lvalue (1: 28)
+81acbd9:  40          (void)=                    (2: 29)
+81acbda:  28        1 local                      (0: 27)	line 30
+81acbdc: 100       32 branch_when_non_zero       (1: 28)
+81acbde:   8        0 identifier                 (0: 27)
+81acbe0:  10       58 cstring0                   (1: 28)
+81acbe2:  10        0 cstring0                   (2: 29)
+81acbe4:  10       59 cstring0                   (3: 30)
+81acbe6:  10        0 cstring0                   (4: 31)
+81acbe8:  10       60 cstring0                   (5: 32)
+81acbea:  10        0 cstring0                   (6: 33)
+81acbec:  10       61 cstring0                   (7: 34)
+81acbee:  10        0 cstring0                   (8: 35)
+81acbf0:  10       62 cstring0                   (9: 36)
+81acbf2:  10        0 cstring0                   (10: 37)
+81acbf4: 152      261 m_caggregate               (11: 38)
+81acbf7:  28        0 local                      (2: 29)
+81acbf9:  60          index                      (3: 30)
+81acbfa:  60          index                      (2: 29)
+81acbfb: 111        1 push_local_variable_lvalue (1: 28)
+81acbfd:  40          (void)=                    (2: 29)
+81acbfe:  28        1 local                      (0: 27)	line 31
+81acc00:  99        5 branch_when_zero           (1: 28)
+81acc02:  28        1 local                      (0: 27)
+81acc04:  23          return                     (1: 28)
+std/player#602 std/player.c (/std/player/message.c) line 61
+82d3f26:  92          restore_arg_frame          (2: 24)	line 61
+82d3f27: 111        7 push_local_variable_lvalue (1: 23)
+82d3f29:  40          (void)=                    (2: 24)
+82d3f2a:  28        7 local                      (0: 22)	line 64
+82d3f2c:  59          !                          (1: 23)
+82d3f2d:  38        5 ||                         (1: 23)
+82d3f2f:  28        3 local                      (0: 22)
+82d3f31:  18        4 clit                       (1: 23)
+82d3f33:  53          &                          (2: 24)
+82d3f34:  38        8 ||                         (1: 23)
+82d3f36:  91          save_arg_frame             (0: 22)
+82d3f37:  10       25 cstring0                   (1: 23)
+82d3f39: 103          call_function              (2: 24)
+std/player#602 std/player.c line 568
+82d56d3:   8       48 identifier                 (0: 24)	line 568
+82d56d5:  28        0 local                      (1: 25)
+82d56d7: 244       36 lower_case                 (2: 26)
+82d56d9:  60          index                      (2: 26)
+82d56da:  23          return                     (1: 25)
+std/player#602 std/player.c (/std/player/message.c) line 64
+82d3f3c:  92          restore_arg_frame          (2: 24)	line 64
+82d3f3d:  59          !                          (1: 23)
+82d3f3e:  99          branch_when_zero           (1: 23)
+82d3f6b:  91          save_arg_frame             (0: 22)	line 69
+82d3f6c:  28        1 local                      (1: 23)
+82d3f6e:  28        7 local                      (2: 24)
+82d3f70:  28        3 local                      (3: 25)	line 70
+82d3f72:  16          const1                     (4: 26)
+82d3f73:  53          &                          (5: 27)
+82d3f74:  99 241307395 branch_when_zero           (4: 26)
+82d3f79:  91          save_arg_frame             (3: 25)
+82d3f7a:  10       27 cstring0                   (4: 26)
+82d3f7c: 103          call_function              (5: 27)
+std/player#602 std/player.c line 575
+82d56e3:  28        0 local                      (0: 27)	line 575
+82d56e5: 244       36 lower_case                 (1: 28)
+82d56e7: 111        0 push_local_variable_lvalue (1: 28)
+82d56e9:  40          (void)=                    (2: 29)
+82d56ea:   8       48 identifier                 (0: 27)	line 576
+82d56ec:  28        0 local                      (1: 28)
+82d56ee:  60          index                      (2: 29)
+82d56ef:  37        7 &&                         (1: 28)
+82d56f1:   8       48 identifier                 (0: 27)
+82d56f3:  28        0 local                      (1: 28)
+82d56f5:  60          index                      (2: 29)
+82d56f6: 295       87 to_int                     (1: 28)
+82d56f8:  23          return                     (1: 28)
+std/player#602 std/player.c (/std/player/message.c) line 70
+82d3f7f:  92          restore_arg_frame          (5: 27)	line 70
+82d3f80:  38          ||                         (4: 26)
+82d3f84:  18        2 clit                       (4: 26)
+82d3f86:  42          -                          (5: 27)
+82d3f87:  28        5 local                      (4: 26)	line 71
+82d3f89: 411       49 terminal_colour            (5: 27)
+82d3f8b:  92          restore_arg_frame          (2: 24)
+82d3f8c: 111        1 push_local_variable_lvalue (1: 23)
+82d3f8e:  40          (void)=                    (2: 24)
+82d3f8f:  91          save_arg_frame             (0: 22)	line 75
+82d3f90: 184          this_object                (1: 23)
+82d3f91:  10       28 cstring0                   (2: 24)
+82d3f93: 167          call_other                 (3: 25)
+std/player#602 std/player.c line 78
+82d4c0b:   8       53 identifier                 (0: 25)	line 78
+82d4c0d:  23          return                     (1: 26)
+std/player#602 std/player.c (/std/player/message.c) line 75
+82d3f94:  92          restore_arg_frame          (2: 24)	line 75
+82d3f95:  37        6 &&                         (1: 23)
+82d3f97:  28        1 local                      (0: 22)	line 76
+82d3f99: 181          strlen                     (1: 23)
+82d3f9a:  18        3 clit                       (1: 23)
+82d3f9c:  47          >=                         (2: 24)
+82d3f9d:  37          &&                         (1: 23)
+82d3fb3:  99          branch_when_zero           (1: 23)	line 78
+82d3fbd:  28        2 local                      (0: 22)	line 82
+82d3fbf:  10       13 cstring0                   (1: 23)
+82d3fc1:  50          ==                         (2: 24)
+82d3fc2:  99          branch_when_zero           (1: 23)
+82d3fce:  28        2 local                      (0: 22)	line 84
+82d3fd0:  10       18 cstring0                   (1: 23)
+82d3fd2:  50          ==                         (2: 24)
+82d3fd3:  99          branch_when_zero           (1: 23)
+82d3fdd:   8       63 identifier                 (0: 22)	line 88
+82d3fdf:  37          &&                         (1: 23)
+82d3fe6:  99     6145 branch_when_zero           (1: 23)
+82d3fe9:  91          save_arg_frame             (0: 22)	line 90
+82d3fea: 184          this_object                (1: 23)
+82d3feb:  10       31 cstring0                   (2: 24)
+82d3fed:  10       32 cstring0                   (3: 25)
+82d3fef: 167          call_other                 (4: 26)
+std/player#602 std/basic/property.c line 27
+82c6023:  90      257 clear_locals               (0: 27)	line 27
+82c6026:   8        1 identifier                 (0: 27)	line 29
+82c6028: 100     6145 branch_when_non_zero       (1: 28)
+82c602b:   8        1 identifier                 (0: 27)	line 30
+82c602d:  28        0 local                      (1: 28)
+82c602f:  60          index                      (2: 29)
+82c6030:  37          &&                         (1: 28)
+82c603f:  99          branch_when_zero           (1: 28)
+82c6048:  91          save_arg_frame             (0: 27)	line 32
+82c6049:   8        2 identifier                 (1: 28)
+82c604b:  37        5 &&                         (2: 29)
+82c604d:   8        2 identifier                 (1: 28)
+82c604f:  28        0 local                      (2: 29)
+82c6051:  60          index                      (3: 30)
+82c6052: 381       19 funcall                    (2: 29)
+82c6054:  92          restore_arg_frame          (2: 29)
+82c6055:  38        6 ||                         (1: 28)
+82c6057:  91          save_arg_frame             (0: 27)
+82c6058:  28        1 local                      (1: 28)
+82c605a: 381       19 funcall                    (2: 29)
+82c605c:  92          restore_arg_frame          (2: 29)
+82c605d:  23          return                     (1: 28)
+std/player#602 std/player.c (/std/player/message.c) line 90
+82d3ff0:  92          restore_arg_frame          (2: 24)	line 90
+82d3ff1:  37          &&                         (1: 23)
+82d401b:  99          branch_when_zero           (1: 23)	line 92
+82d4028: 184          this_object                (0: 22)	line 95
+82d4029:  28        1 local                      (1: 23)
+82d402b: 349       43 tell_object                (2: 24)
+82d402d:  15          const0                     (0: 22)
+82d402e:  88          pop_value                  (1: 23)
+82d402f:  24          return0                    (0: 22)	line 97
+kernel/simul_efun kernel/simul_efun.c line 167
+81ecac4:  92          restore_arg_frame          (2: 12)	line 167
+81ecac5:  88          pop_value                  (1: 11)
+81ecac6:  98          branch                     (0: 10)	line 168
+81ecace:  24          return0                    (0: 10)	line 169
+std/player#602 std/player.c line 611
+82d576f:  92          restore_arg_frame          (2:  9)	line 611
+82d5770:  88          pop_value                  (1:  8)
+82d5771:  25          break                      (0:  7)	line 612
+82d5789:  28        0 local                      (0:  7)	line 613
+82d578b:  23          return                     (1:  8)
+82d57c3:  92          restore_arg_frame          (2:  3)	line 622
+82d57c4:  88          pop_value                  (1:  2)
+82d57c5:  91          save_arg_frame             (0:  1)	line 623
+82d57c6: 103          call_function              (1:  2)
+std/player#602 std/player.c (/std/player/telnet_neg.c) line 45
+82d4097:  91          save_arg_frame             (0:  2)	line 45
+82d4098: 184          this_object                (1:  3)
+82d4099:  10       35 cstring0                   (2:  4)
+82d409b:  10       36 cstring0                   (3:  5)
+82d409d: 167          call_other                 (4:  6)
+std/player#602 std/player.c line 568
+82d56d3:   8       48 identifier                 (0:  6)	line 568
+82d56d5:  28        0 local                      (1:  7)
+82d56d7: 244       36 lower_case                 (2:  8)
+82d56d9:  60          index                      (2:  8)
+82d56da:  23          return                     (1:  7)
+std/player#602 std/player.c (/std/player/telnet_neg.c) line 45
+82d409e:  92          restore_arg_frame          (2:  4)	line 45
+82d409f: 100       11 branch_when_non_zero       (1:  3)
+82d40a1:  18      255 clit                       (0:  2)	line 46
+82d40a3:  18      249 clit                       (1:  3)
+82d40a5: 150        2 aggregate                  (2:  4)
+82d40a8:  15          const0                     (1:  3)
+82d40a9: 309        3 binary_message             (2:  4)
+82d40ab:  88          pop_value                  (1:  3)
+82d40ac:  24          return0                    (0:  2)	line 48
+std/player#602 std/player.c line 623
+82d57c9:  92          restore_arg_frame          (2:  3)	line 623
+82d57ca:  88          pop_value                  (1:  2)
+82d57cb:  24          return0                    (0:  1)	line 624
+std/player#602 <lambda ?> line 0
+83af563:  92          restore_arg_frame          (2:  1)	line 0
+83af564:  23          return                     (1:  0)
+836104b:   0 136 201  55   8   3   0 192
+No program to trace.
+2002.03.24 20:30:24 LDMud aborting on fatal error.
+[xerq] read: Resource temporarily unavailable
+2002.03.24 20:30:25 [xerq] Demon exiting.
+ -------------------- debug.log ---------------------
+2002.03.22 22:39:23 LDMud 3.3.184 (3-3.184)
+2002.03.22 22:39:23 Random seed: 0x3c9ba48b
+2002.03.22 22:39:23 UDP recv-socket requested for port: 4246
+Loading init file /etc/init_file
+Preloading: daemon/boot
+Preloading: kernel/login
+Preloading: daemon/aliasd
+Preloading: daemon/sould
+Preloading: daemon/strings
+Preloading: daemon/parserd
+Preloading: daemon/userd
+Preloading: daemon/saved
+Preloading: daemon/banishd
+Preloading: daemon/channeld
+Preloading: daemon/language
+Preloading: std/player
+Preloading: std/room
+Preloading: daemon/autodoc
+Preloading: daemon/net
+Preloading: dom/world/servers/timed
+Preloading: dom/world/servers/map
+Preloading: dom/world/servers/bankd
+2002.03.22 22:39:23 LDMud ready for users.
+2002.03.23 02:17:35 Connection reset by peer detected.
+2002.03.23 10:56:06 regexp error: * follows nothing
+2002.03.23 10:56:06 program: command/wizobj.c, object: command/wizobj line 328
+'   auto_command' in '        std/player.c' ('       std/player#65') line 192
+'   auto_command' in '        std/living.c' ('       std/player#65') line 43
+'     do_command' in '    daemon/parserd.c' ('      daemon/parserd') line 1185
+'      exec_find' in '    command/wizobj.c' ('      command/wizobj') line 328
+2002.03.23 11:37:58 Connection reset by peer detected.
+2002.03.23 11:48:27 Connection reset by peer detected.
+2002.03.23 11:59:01 Connection reset by peer detected.
+2002.03.23 12:08:40 Connection reset by peer detected.
+2002.03.23 12:09:29 Connection reset by peer detected.
+2002.03.23 12:09:31 Connection reset by peer detected.
+2002.03.23 12:09:32 Connection reset by peer detected.
+2002.03.23 12:09:34 Connection reset by peer detected.
+2002.03.23 12:09:35 Connection reset by peer detected.
+2002.03.23 12:09:37 Connection reset by peer detected.
+2002.03.23 12:09:45 Connection reset by peer detected.
+2002.03.23 12:09:53 Connection reset by peer detected.
+2002.03.23 12:10:01 Connection reset by peer detected.
+2002.03.23 12:10:22 Connection reset by peer detected.
+2002.03.23 12:10:33 Connection reset by peer detected.
+2002.03.23 12:21:35 Connection reset by peer detected.
+2002.03.23 12:25:29 Connection reset by peer detected.
+2002.03.23 12:26:11 Connection reset by peer detected.
+2002.03.23 12:37:11 Connection reset by peer detected.
+2002.03.23 12:37:14 Connection reset by peer detected.
+2002.03.23 12:46:41 Connection reset by peer detected.
+2002.03.23 12:46:41 Connection reset by peer detected.
+2002.03.23 12:46:48 Connection reset by peer detected.
+2002.03.23 12:46:51 Connection reset by peer detected.
+2002.03.23 12:46:55 Connection reset by peer detected.
+2002.03.23 12:46:57 Caught error: Bad arg 1 to load_object(): got 'number', expected 'string'.
+'     parse_line' in '       kernel/http.c' ('     kernel/http#366') line 271
+' handle_request' in '       kernel/http.c' ('     kernel/http#366') line 253
+'     handle_get' in '       kernel/http.c' ('     kernel/http#366') line 203
+'get_file_contents' in '       kernel/http.c' ('     kernel/http#366') line 185
+'        request' in 'home/phinyx/public_html/index.c' ('home/phinyx/public_html/index') line 13
+'          CATCH' in 'home/phinyx/public_html/index.c' ('home/phinyx/public_html/index') line 13
+2002.03.23 12:46:57 ... execution continues.
+2002.03.23 12:46:57 Connection reset by peer detected.
+2002.03.23 12:47:02 Connection reset by peer detected.
+2002.03.23 12:47:13 Connection reset by peer detected.
+2002.03.23 12:47:21 Connection reset by peer detected.
+2002.03.23 12:47:23 Connection reset by peer detected.
+2002.03.23 12:47:26 Connection reset by peer detected.
+2002.03.23 12:47:28 Connection reset by peer detected.
+2002.03.23 14:19:55 Connection reset by peer detected.
+2002.03.23 16:53:41 Connection reset by peer detected.
+2002.03.23 17:30:04 Bad arg 1 to clone_object(): got 'number', expected 'string/object'.
+2002.03.23 17:30:04 program: command/wizobj.c, object: command/wizobj line 271
+'   auto_command' in '        std/player.c' ('      std/player#444') line 192
+'   auto_command' in '        std/living.c' ('      std/player#444') line 43
+'     do_command' in '    daemon/parserd.c' ('      daemon/parserd') line 1185
+'     exec_clone' in '    command/wizobj.c' ('      command/wizobj') line 271
+2002.03.23 17:39:48 Connection reset by peer detected.
+2002.03.23 21:58:22 Connection reset by peer detected.
+2002.03.23 22:32:03 Connection reset by peer detected.
+2002.03.24 15:33:28 Connection reset by peer detected.
+2002.03.24 16:40:15 Connection reset by peer detected.
+2002.03.24 20:13:22 Connection reset by peer detected.
+2002.03.24 20:16:12 Connection reset by peer detected.
+2002.03.24 20:19:11 Connection reset by peer detected.
+2002.03.24 20:30:24 Object 0x83ff04c std/money#1013 ref count 0, but not destructed.
+2002.03.24 20:30:24 Dump of the call chain:
+No program to trace.
+ -----------------------------------------
+
+Date: Thu, 21 Mar 2002 19:19:26 +0000 (GMT)
+From: pixie@loki.cgc.ns.ca
+
+Hi,
+
+Looks like the clean up routines are still causing some problems.  Here's
+the backtrace from the core file:
+
+(gdb) bt full
+#0  0xff1cee8c in ?? ()
+No symbol table info available.
+#1  0x7c37c in _free_object (ob=0x71bd84, file=0xc6900 "simulate.c",
+line=2666)
+    at object.c:267
+No locals.
+#2  0x9a2d4 in remove_destructed_objects () at simulate.c:2666
+        victim = (object_t *) 0x71bd84
+        ob = (object_t *) 0x71aaec
+        sh = (object_shadow_t *) 0x380f68
+        prev = (object_shadow_t *) 0x6b4870
+#3  0x1a24c in backend () at backend.c:343
+        buff = "from\000on\000ve\000shop\000:\005\220)\23046\0002\000>|)*\
+000\000\000\001\000\000\000(:\023\\(w\000\000\000\000:\005\220\000\000$\006/
+usr/sh9222lib/zoneinfo/GMT\000\000\000\000\000\000\000\000\026\000\017\000\000
+\000\000\000\000\000\005\000\000\000\000``\000\000\000I\000\000\000\00
+0\000+", '\000' <repeats 11 times>, "P\001", '\000' <repeats 16 times>,
+"/usr/s
+hare/lib/zon\000\004\000\000P\001GMT\000*r\224", '\000' <repeats 24
+times>...
+#4  0x73bd8 in main (argc=0, argv=0xffbefd14) at main.c:429
+        i = 906240
+        set = {__sigbits = {8192, 0, 0, 0}}
+
+
+-------------------------------------------------------------------------
 
 Date: Thu, 28 Feb 2002 14:42:38 GMT
 Subject: Crash heute (3-2.404)
@@ -1600,6 +2239,39 @@ in morgen.debug.log findet sich kein Eintrag, der letzte war 10 min vor
 dem crash. lpmud.log sichern wir nicht.
 
 Was tun?
+
+(gdb) print *ob
+$1 = {flags = 722, ref = 0, total_light = 0, time_reset = 927712, 
+  time_of_ref = 585882, load_time = 45375528, load_id = 524288, 
+  extra_ref = 33496952, prog = 0x90001, name = 0x33afb0 "a", 
+  load_name = 0x90001 "\002@\bÐ", next_all = 0x3526f8, prev_all = 0x90001, 
+  next_hash = 0x35274c, next_inv = 0x90001, contains = 0x3527a0, 
+  super = 0x90001, sent = 0x3527f4, user = 0x90001, eff_user = 0x346794, 
+  extra_num_variables = 589825, variables = 0x34868c, ticks = 589825, 
+  gigaticks = 3481464}
+
+(gdb) print *(ob->prev_all)
+$2 = {flags = 576, ref = 14681216, total_light = -24032, 
+  time_reset = -2145335529, time_of_ref = 299472, load_time = 48477394, 
+  load_id = 14682258, extra_ref = 37750996, prog = 0x8e00710, 
+  name = 0x8020c1d4 <Address 0x8020c1d4 out of bounds>, 
+  load_name = 0x2a600213 <Address 0x2a600213 out of bounds>, 
+  next_all = 0x498d0, prev_all = 0x2630480, next_hash = 0xa22000b6, 
+  next_inv = 0x10000935, contains = 0x49804, super = 0x8000142d, 
+  sent = 0x67019, user = 0x491a2, eff_user = 0x10001ba8, 
+  extra_num_variables = 383976614, variables = 0x1323b47f, ticks = 4293075408, 
+  gigaticks = 73598162}
+
+(gdb) print *(ob->next_all)
+$3 = {flags = 25088, ref = 805306379, total_light = 52, time_reset = 5, 
+  time_of_ref = 1962105, load_time = 811336, load_id = 519, 
+  extra_ref = 655594590, prog = 0x17c51c8, name = 0x3526f8 "b", 
+  load_name = 0x1d "", next_all = 0x17c5cb0, prev_all = 0x3000000a, 
+  next_hash = 0x340efc, next_inv = 0x5, contains = 0x1df079, super = 0xc6148, 
+  sent = 0x1f3, user = 0x4e62041a, eff_user = 0x47e94c, 
+  extra_num_variables = 23, variables = 0x63000000, ticks = 805306379, 
+  gigaticks = 3411708}
+
 
 Coogan.
 

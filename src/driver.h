@@ -38,7 +38,7 @@
 /* Deactivate the tracking of blueprints. This will disable the
  * efuns blueprint(), but probably avoid the object refcount bug.
  */
-#define NO_BLUEPRINT
+/* #define NO_BLUEPRINT */
 
 
 /* TODO: Some TODO defines */

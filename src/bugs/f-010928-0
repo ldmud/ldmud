@@ -19,4 +19,12 @@ So my request basically is: Could options 90 and 91 be added to the list
 of options which are handled through H_TELNET_NEG or can the list of
 options be made configurable without patching the driver ?
 
---- I added the options 90 and 91 explicitely, the generic configuration (e.g. via map set in driver hook) would be a nice idea.
+--- I added the options 90 and 91 explicitely, the generic configuration (e.g.
+via map set in driver hook) would be a nice idea.
+
+From: Lars Duening <lars@bearnip.com>
+Date: Mon, 04 Feb 2002 21:43:51 -0700
+
+Allow a driver hook to specify which telnet hooks are to be piped through the 
+mudlib - not this all-or-nothing like now.
+

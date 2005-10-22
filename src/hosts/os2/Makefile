@@ -188,16 +188,16 @@ actions.o : ../mudlib/sys/driver_hook.h ../mudlib/sys/commands.h xalloc.h \
 array.o : xalloc.h wiz_list.h swap.h svalue.h simulate.h stdstrings.h \
     rxcache.h regexp.h object.h mstrings.h mempools.h mapping.h main.h \
     interpret.h closure.h backend.h array.h my-alloca.h typedefs.h driver.h \
-    strfuns.h sent.h exec.h instrs.h port.h config.h hosts/unix.h \
-    hosts/be/be.h machine.h
+    strfuns.h sent.h exec.h pcre/pcre.h instrs.h port.h config.h \
+    hosts/unix.h hosts/be/be.h machine.h
 
 backend.o : ../mudlib/sys/debug_message.h ../mudlib/sys/driver_hook.h \
     xalloc.h wiz_list.h swap.h svalue.h stdstrings.h simulate.h rxcache.h \
     regexp.h random.h otable.h object.h mstrings.h mapping.h main.h lex.h \
     interpret.h heartbeat.h gcollect.h filestat.h exec.h ed.h comm.h \
     closure.h call_out.h array.h actions.h backend.h my-alloca.h typedefs.h \
-    driver.h strfuns.h sent.h instrs.h port.h config.h hosts/unix.h \
-    hosts/be/be.h machine.h
+    driver.h strfuns.h sent.h pcre/pcre.h instrs.h port.h config.h \
+    hosts/unix.h hosts/be/be.h machine.h
 
 bitstrings.o : xalloc.h svalue.h simulate.h mstrings.h main.h lex.h \
     interpret.h bitstrings.h typedefs.h driver.h strfuns.h sent.h exec.h \
@@ -227,18 +227,20 @@ dumpstat.o : xalloc.h svalue.h smalloc.h stdstrings.h simulate.h ptrtable.h \
     dumpstat.h typedefs.h driver.h strfuns.h sent.h instrs.h port.h \
     config.h hosts/unix.h hosts/be/be.h machine.h
 
-ed.o : xalloc.h svalue.h stdstrings.h simulate.h rxcache.h object.h \
-    mstrings.h main.h interpret.h gcollect.h filestat.h comm.h closure.h \
-    actions.h ed.h typedefs.h driver.h strfuns.h sent.h exec.h regexp.h \
-    instrs.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
+ed.o : ../mudlib/sys/regexp.h xalloc.h svalue.h stdstrings.h simulate.h \
+    rxcache.h object.h mstrings.h main.h interpret.h gcollect.h filestat.h \
+    comm.h closure.h actions.h ed.h typedefs.h driver.h strfuns.h sent.h \
+    exec.h pcre/pcre.h regexp.h instrs.h port.h config.h hosts/unix.h \
+    hosts/be/be.h machine.h
 
 efuns.o : ../mudlib/sys/time.h ../mudlib/sys/strings.h \
-    ../mudlib/sys/objectinfo.h ../mudlib/sys/debug_info.h xalloc.h \
-    wiz_list.h svalue.h swap.h strfuns.h smalloc.h simulate.h stdstrings.h \
-    rxcache.h random.h ptrtable.h otable.h object.h mstrings.h md5.h \
-    mapping.h main.h interpret.h instrs.h heartbeat.h dumpstat.h comm.h \
-    closure.h call_out.h backend.h array.h actions.h efuns.h my-rusage.h \
-    my-alloca.h typedefs.h driver.h sent.h exec.h regexp.h port.h config.h \
+    ../mudlib/sys/regexp.h ../mudlib/sys/objectinfo.h \
+    ../mudlib/sys/debug_info.h xalloc.h wiz_list.h svalue.h swap.h \
+    strfuns.h smalloc.h simulate.h stdstrings.h rxcache.h random.h \
+    ptrtable.h otable.h object.h mstrings.h md5.h mapping.h main.h \
+    interpret.h instrs.h heartbeat.h dumpstat.h comm.h closure.h call_out.h \
+    backend.h array.h actions.h efuns.h my-rusage.h my-alloca.h typedefs.h \
+    driver.h sent.h exec.h pcre/pcre.h regexp.h port.h config.h \
     hosts/unix.h hosts/be/be.h machine.h
 
 files.o : ../mudlib/sys/files.h xalloc.h svalue.h stdstrings.h simulate.h \
@@ -251,8 +253,8 @@ gcollect.o : ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h swap.h \
     prolang.h parse.h otable.h object.h mstrings.h mapping.h main.h lex.h \
     interpret.h instrs.h heartbeat.h filestat.h exec.h ed.h comm.h \
     closure.h call_out.h backend.h array.h actions.h gcollect.h typedefs.h \
-    driver.h svalue.h ptrtable.h strfuns.h regexp.h port.h config.h \
-    hosts/unix.h hosts/be/be.h machine.h
+    driver.h svalue.h ptrtable.h strfuns.h pcre/pcre.h regexp.h port.h \
+    config.h hosts/unix.h hosts/be/be.h machine.h
 
 hash.o : hash.h
 
@@ -372,10 +374,10 @@ regexp.o : main.h xalloc.h simulate.h comm.h regexp.h driver.h typedefs.h \
     svalue.h strfuns.h sent.h exec.h port.h config.h hosts/unix.h \
     hosts/be/be.h machine.h
 
-rxcache.o : ../mudlib/sys/debug_info.h xalloc.h svalue.h strfuns.h \
-    simulate.h regexp.h mstrings.h hash.h gcollect.h rxcache.h driver.h \
-    typedefs.h sent.h exec.h port.h config.h hosts/unix.h hosts/be/be.h \
-    machine.h
+rxcache.o : ../mudlib/sys/regexp.h ../mudlib/sys/debug_info.h xalloc.h \
+    svalue.h strfuns.h simulate.h pcre/pcre.h regexp.h mstrings.h hash.h \
+    gcollect.h rxcache.h driver.h typedefs.h sent.h exec.h port.h config.h \
+    hosts/unix.h hosts/be/be.h machine.h
 
 simul_efun.o : xalloc.h swap.h svalue.h stdstrings.h simulate.h ptrtable.h \
     object.h mstrings.h lex.h interpret.h instrs.h gcollect.h exec.h \
@@ -389,7 +391,8 @@ simulate.o : ../mudlib/sys/rtlimits.h ../mudlib/sys/files.h \
     mapping.h main.h lex.h instrs.h interpret.h heartbeat.h gcollect.h \
     filestat.h exec.h ed.h dumpstat.h comm.h closure.h call_out.h backend.h \
     array.h actions.h simulate.h my-alloca.h typedefs.h driver.h ptrtable.h \
-    regexp.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
+    pcre/pcre.h regexp.h port.h config.h hosts/unix.h hosts/be/be.h \
+    machine.h
 
 sprintf.o : xalloc.h swap.h svalue.h stdstrings.h simul_efun.h simulate.h \
     sent.h random.h ptrtable.h object.h mstrings.h mapping.h main.h \

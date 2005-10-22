@@ -3,9 +3,15 @@ Crasher
 b-000909: dev.226 crashes TubMud
 b-010911: String table corrupt
 b-011220: LDMud instability in Alatia
+b-020115: Illegal vector memsize
 b-020228-1: Crash in terminal_colour()
 b-020228-0: Refcount errors when handling destructed objects
 b-020303-0: Crasher on corrupt string.
+b-020321: Strange crasher: bus error on existing variables
+b-020324: Problem with H_DEFAULT_METHOD
+b-020328-0: Inheritance causes memory corruption
+b-020318: Illegal instruction 
+b-020330: Crash in recursive simul-efun
 
 
 Efuns
@@ -31,12 +37,14 @@ Runtime
 --------------------------------------------------------------------------
 b-020205-0: Memoryleaks in Unitopia - set_prompt() and the soul (maybe fixed)
 b-990605: In a lot of error places, inter_sp/inter_pc are wrong.
+b-010802: Shortcomings of the new string implementation
 b-010115-1: Make sure that all master calls use leading slashes.
 b-010610-1: CRT doesn't work well in charmode
 b-011113: status for actions wrong
 b-020223: Memory corruption (in stress test)
+b-020304: Memory Leaks in Darkwind
 b-020314: Memory leaks in OSB and FinalFrontier
-b-020326-0: Problems when using putty/SecureCRT
+b-020306: LDMud vs TinyFugue prompt
 
 Installation
 --------------------------------------------------------------------------

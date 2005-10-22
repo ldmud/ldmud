@@ -1,0 +1,82 @@
+Short: Shortcomings of the new string implementation
+Date: Fri, 3 Aug 2001 02:12:41 +0200 (MET DST)
+Type: Bug
+State: New
+
+
+>>Und dann muß ich Dich gleich mit ein paar gewünschten Features und
+>>entdeckten Halbbugs (Features? ;) überfallen - quasi als Geburtstags-
+>>geschenk ...
+>>
+>>1. chars nimmt der driver offenbar ja bevorzugt als signed an (also
+>>   ich würde eher unsigned mögen, aber das ist Gewohnheitssache ;) -
+>>   also beispielsweise "\160"[0] ergibt -96, genauso wie '\160' oder
+>>   to_array("\160")[0] - allerdings macht er leider bei (mindestens)
+>>   einer Funktion eine kleine Ausnahme ... nämlich bei member() ...
+>>    string s = "a\160b"; return member(s,s[1]);
+>>   ergibt nämlich nicht, wie intuitiv zu erwarten, 1, sondern -1 ...
+>>   Der Grund ist, daß member() bei einem 2. Argument ausserhalb des
+>>   Bereiches 0 .. 255 immer -1 zurückgibt - schade eigentlich.
+>>   Besser wäre es doch, wenn der Funktion der Wertebereich des 2.
+>>   Argumentes egal wäre, und es nur die 8 LSBs interessieren würde.
+>>   (So wie es ja z.B. to_string() auch macht:
+>>    to_string( ({256+65}) ) ergibt erwartungsgemäß "A", genauso wie
+>>    to_string( ({-191}) ))
+>>   Ich hab das diff schonmal vorbereitet ;)
+>> Hmm, ich denke es waere hier sauberer, characters fest als die Werte=20
+>> 0..255 zu definieren. to_string() stellt eine Ausnahme dar, indem es auf
+>> deterministische Weise Information verliert.
+
+Jo, klar, ich mag 0..255 auch lieber als -128..127 (immerhin haben alle
+latin-1 Tabellen und unicode auch ausschlie=DFlich positive Numerierung),
+der Punkt ist halt, da=DF es konsistent sein mu=DF - also jede Funktion, di=
+e
+int's im Sinne von chars ausgibt, sollte 0..255 liefern (also auch
+stringval[indexnum]), jede Funktion die int's im Sinne von chars erwartet,
+sollte 0..255 akzeptieren und zu guter Letzt sollte natuerlich  '<char>'
+auch Werte zw. 0..255 liefern.
+
+Ohne Anspruch auf Vollst=E4ndigkeit, und ohne da=DF ich jetzt wei=DF, welch=
+e der
+Funktionen aktuell 0..255 akzeptieren/liefern, -128..127 akzeptieren
+liefern bzw. alle m=F6glichen int's akzeptieren hier eine Auflistung:
+
+ + Funktionen, die in irgendeiner Weise chars als input haben (k=F6nnen):
+
+  int binary_message(int *message, int flags)
+  int member(string s, int elem)
+  int send_erq(int request, int *data, closure callback)
+  int send_udp(string host, int port, int * message)
+  string to_string(int *a)
+  (string)intarrayval
+
+ + Funktionen und anderes, das irgendwie chars zur=FCckgibt (geben kann):
+
+  '<char>'
+  stringval[indexnum]
+  int *to_array(string s)
+  int *to_array(symbol s)
+  (int *)stringval
+  (int *)symbolval
+
+
+Wegen den type-casts ... die m=FCssen nat=FCrlich nicht sein, es ist v=F6ll=
+ig in
+Ordnung, wenn es ausschlie=DFlich die to_XXX() Funktionen gibt - allerdings
+m=FCssen dann Versuche, via (newtype)value zu casten, mit einem Error
+honoriert werden ... Wenn ich momentan z.B. folgende (nicht sehr
+sinnvolle) Funktion habe:
+
+float deg2rad(mixed deg)
+{
+  return (float)deg / 180 * 3.14159265359793;
+}
+
+und diese mit z.B. deg2rad(10) aufrufe, kommt 0.0 raus, was nat=FCrlich
+verwundert, wenn man nicht wei=DF, da=DF (float) nicht funktioniert.
+
+
+Ach ja, bevor ich's vergesse ... floor() scheint ja int's als Argumente zu
+akzeptieren (was leider noch nicht doc/efun/floor steht), allerdings
+vermisse ich dieses Verhalten bei ceil() :/
+

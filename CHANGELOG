@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+30-Mar-2002 (Lars Duening)  (3.3.192)
+    - (driver.h) The blueprint code helped some people (but not all), so I
+         re-activated it as a counter-check.
+    - (bugs/) Updated the files.
+
 28-Mar-2002 (Lars Duening)  (3.3.191)
     - (efuns.c) Passing 0 as second argument to md5_crypt() caused
          to the driver to write over array bounds (reported by Markus Peter).
