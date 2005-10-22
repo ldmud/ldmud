@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+11-Oct-2001 (Lars Duening)  (3.3.112)
+    - (sprintf.c) New formatting modifier '$' allows flush formatting
+        of strings and columns of strings (f-010717).
+    - (interpret.c) Added the apply framework for default methods.
+
 10-Oct-2001 (Lars Duening)  (3.3.111)
     - (object.c) Efun inherit_list() can now return the inheritance
         structure as a tree (part of f-991020-0).

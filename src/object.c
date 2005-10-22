@@ -667,7 +667,7 @@ reset_object (object_t *ob, int arg)
      */
     if (arg != H_RESET)
     {
-        sapply_int(STR_VARINIT, ob, 0, MY_TRUE);
+        sapply_ign_prot(STR_VARINIT, ob, 0);
         if (ob->flags & O_DESTRUCTED)
             return;
     }

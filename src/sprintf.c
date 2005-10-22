@@ -15,6 +15,8 @@
  *            unnatural in the context of a mainly string based language
  *            but has been retained for "compatability" ;)
  *  "|"   centered within field size.
+ *  "$"   flushed to field size. Makes sense only for strings and columns
+ *        of strings.
  *  "="   column mode if strings are greater than field size.  this is only
  *        meaningful with strings, all other types are ignored. The strings
  *        are broken into the size of 'precision', and the last line is
@@ -80,6 +82,7 @@
 #include "mstrings.h"
 #include "object.h"
 #include "ptrtable.h"
+#include "random.h"
 #include "sent.h"
 #include "simulate.h"
 #include "simul_efun.h"
@@ -108,6 +111,7 @@
  *                                00 : right;
  *                                01 : centre;
  *                                10 : left;
+ *                                11 : flush;
  *   00000000 xx000000 : positive pad char INFO_PP:
  *                                00 : none;
  *                                01 : ' ';
@@ -134,6 +138,7 @@ typedef unsigned int format_info;
 #define INFO_J        0x30
 #define INFO_J_CENTRE 0x10
 #define INFO_J_LEFT   0x20
+#define INFO_J_FLUSH  0x30
 
 #define INFO_PP       0xC0
 #define INFO_PP_SPACE 0x40
@@ -316,9 +321,9 @@ static sprintf_buffer_t *svalue_to_string(fmt_state_t *
 /*-------------------------------------------------------------------------*/
 #define ADD_STRN(s, n) { \
     if (st->bpos + n > BUFF_SIZE) ERROR(ERR_BUFF_OVERFLOW); \
-    if (n >= 1 && s[0] == '\n' && st->sppos != -1) st->bpos = st->sppos; \
+    if (n >= 1 && (s)[0] == '\n' && st->sppos != -1) st->bpos = st->sppos; \
     st->sppos = -1; \
-    strncpy(st->buff+st->bpos, s, n); \
+    strncpy(st->buff+st->bpos, (s), n); \
     st->bpos += n; \
 }
 
@@ -1117,6 +1122,102 @@ svalue_to_string ( fmt_state_t *st
 
 /*-------------------------------------------------------------------------*/
 static void
+add_flush ( fmt_state_t *st
+          , char *str, size_t len, int fs
+          )
+
+/* Justify string <str> (length <len>) within the fieldsize <fs> to flush
+ * at both borders.
+ * After that, add it to the global buff[].
+ */
+
+{
+    int i;
+    size_t sppos;
+    int num_words;   /* Number of words in the input */
+    int num_chars;   /* Number of non-space characters in the input */
+    int num_spaces;  /* Number of spaces required */
+    size_t pos;
+
+    /* Check how much data we have */
+
+    num_words = 0;
+    num_chars = 0;
+
+    /* Find the first non-space character.
+     * If it's all spaces, return.
+     */
+    for (pos = 0; pos < len && *str == ' '; pos++, str--) NOOP;
+    if (pos >= len)
+        return;
+
+    len -= (size_t)pos;
+    pos = 0;
+    num_words = 1;
+
+    while (pos < len)
+    {
+        /* Find the end of the word */
+        for ( ; pos < len && str[pos] != ' '; pos++, num_chars++) NOOP;
+        if (pos >= len)
+            break;
+
+        /* Find the start of the next word */
+        for ( ; pos < len && str[pos] == ' '; pos++) NOOP;
+        if (pos >= len)
+            break;
+
+        /* We got a new word - count it */
+        num_words++;
+    }
+
+#ifdef DEBUG
+    if (fs < num_words - 1 + num_chars)
+        fatal("add_flush(): fieldsize %d < data length %d\n", fs, num_words - 1 + num_chars);
+#endif
+
+    /* Compute the number of spaces we need to insert.
+     * It is guaranteed here that we have enough space to insert
+     * at least one space between each word.
+     */
+    num_spaces = fs - num_chars;
+
+    /* Loop again over the data, now adding spaces as we go. */
+
+    for (pos = 0; pos < len; )
+    {
+        int mark;
+        int padlength;
+
+        /* Find the end of the current word */
+        for (mark = pos ; pos < len && str[pos] != ' '; pos++) NOOP;
+
+        /* Add the word */
+        ADD_STRN(str+mark, pos - mark);
+        num_words--;
+
+        if (pos >= len || num_words < 1)
+            break;
+
+        /* There is a word following - add spaces */
+        if (num_spaces == num_words) /* Exactly one space per word avail. */
+            padlength = 1;
+        else if (num_words == 1) /* Last word: add all remaining padding */
+            padlength = (int)num_spaces;
+        else /* Determine random amound of padding, up to 2 * avg padding */
+            padlength = 1 + (int)random_number(2 * (num_spaces - num_words) / num_words + 1);
+        sppos = st->bpos;
+        ADD_PADDING(" ", padlength);
+        st->sppos = sppos;
+        num_spaces -= padlength;
+
+        /* Find the start of the next word */
+        for ( ; pos < len && str[pos] == ' '; pos++) NOOP;
+    }
+} /* add_flush() */
+
+/*-------------------------------------------------------------------------*/
+static void
 add_justified ( fmt_state_t *st
               , char *str, size_t len, char *pad, int fs
               , format_info finfo)
@@ -1166,8 +1267,11 @@ add_justified ( fmt_state_t *st
             st->sppos = sppos;
         break;
 
+    case INFO_J_FLUSH:
     default:
-      { /* std (s)printf defaults to right justification */
+      { /* std (s)printf defaults to right justification.
+         * Also called for the last line of a flush block
+         */
         if (finfo & INFO_PS_ZERO)
         {
             ADD_PADDING("0", fs - len)
@@ -1204,6 +1308,8 @@ add_column (fmt_state_t *st, cst **column)
     /* Set done to the actual number of characters to copy.
      */
     length = COL->pres;
+    if ((COL->info & INFO_J) == INFO_J_FLUSH && length > COL->size)
+        length = COL->size;
     for (p = COL_D; length && *p && *p !='\n'; p++, length--) NOOP;
     done = p - COL_D;
     if (*p && *p !='\n')
@@ -1217,7 +1323,9 @@ add_column (fmt_state_t *st, cst **column)
             /* handle larger than column size words... */
             if (!done)
             {
-                /* Sorry, it's one big word */
+                /* Sorry, it's one big word.
+                 * Print the word over the fieldsize.
+                 */
                 done = save - 1;
                 p += save;
                 break;
@@ -1227,7 +1335,17 @@ add_column (fmt_state_t *st, cst **column)
         }
     }
 
-    add_justified(st, COL_D, p - COL_D, COL->pad, COL->size, COL->info);
+    /* On flush formatting, don't format the last line that way, nor
+     * flush lines ending in NL.
+     */
+    if ((COL->info & INFO_J) == INFO_J_FLUSH
+     && *COL_D && *(COL_D+1)
+     && *p != '\n'
+       )
+        add_flush(st, COL_D, p - COL_D, COL->size);
+    else
+        add_justified(st, COL_D, p - COL_D, COL->pad, COL->size, COL->info);
+
     COL_D += done; /* inc'ed below ... */
 
     /* if this or the next character is a '\0' then take this column out
@@ -1675,6 +1793,7 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                 case '+': finfo |= INFO_PP_PLUS; break;
                 case '-': finfo |= INFO_J_LEFT; break;
                 case '|': finfo |= INFO_J_CENTRE; break;
+                case '$': finfo |= INFO_J_FLUSH; break;
                 case '@': finfo |= INFO_ARRAY; break;
                 case '=': finfo |= INFO_COLS; break;
                 case '#': finfo |= INFO_TABLE; break;
@@ -1965,12 +2084,43 @@ add_table_now:
                     }
                     else
                     {
+                        Bool flushString;
+
                         /* not column or table */
                         if (pres && pres < slen)
                         {
                             slen = pres;
                         }
-                        if (fs && fs > (unsigned int)slen)
+
+                        /* Determine whether to print this string
+                         * flushed, or not.
+                         */
+                        flushString = MY_FALSE;
+                        if (fs && (finfo & INFO_J) == INFO_J_FLUSH)
+                        {
+                            /* Flush the string only if it doesn't
+                             * end in a NL.
+                             * Also, strip off trailing spaces.
+                             */
+                            for ( ;    slen > 0
+                                    && get_txt(carg->u.str)[slen-1] == ' '
+                                  ; slen--
+                               ) NOOP;
+
+                            if ( slen != 0
+                              && (unsigned int)slen <= fs
+                              && get_txt(carg->u.str)[slen-1] != '\n'
+                               )
+                                flushString = MY_TRUE;
+                        }
+
+                        /* not column or table */
+
+                        if (flushString)
+                        {
+                            add_flush(st, get_txt(carg->u.str), slen, fs);
+                        }
+                        else if (fs && fs > (unsigned int)slen)
                         {
                             add_justified(st, get_txt(carg->u.str)
                                          , slen, pad, fs, finfo);

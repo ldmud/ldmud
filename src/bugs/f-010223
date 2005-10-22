@@ -3,6 +3,7 @@ From:  "Alexander Weidt et al." <tubmud@cs.tu-berlin.de>
 Date: Fri Feb 23 13:42:33 2001
 Type: Feature
 New: Acknowledged
+See also: f-990309-1
 
 Hi Lars,,
 
@@ -133,4 +134,26 @@ varargs string coloured_sprintf(string format,varargs mixed *args) {
   return apply(#'sprintf,format,args);
 }
 
+----------------------------------------------------------------------------
+And Slava wrote in Oct 2001:
+
+Recently I revealed great demand in something like hibrid of
+sprintf+terminal_colour. Also I've discovered, that some time ago
+there was something about this topic - f-990309-1.
+
+In the matter of fact there is a great demand in such a functionality
+in the driver. Till now, there are no official way, how to handle
+coloured strings. I mean, yes you can do something with it - wrap,
+and do very rudimentary formatting, using terminal_colour. But this is
+not enough.
+
+Furthermore, without additional and expensive workarounds, there are no
+way how to:
+
+1. format coloured string like in sprintf(), especially using such a
+   modifiers, like: '-=', '|=', etc.
+2. measure coloured string length like in strlen() or sizeof()
+3. Use all the great funs, that we have for their non-coloured
+   equivalents. All because of there is difference in actual string
+   size and its displayable one.
 

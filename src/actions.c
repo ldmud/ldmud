@@ -762,9 +762,8 @@ notify_no_command (char *command, object_t *save_command_giver)
 
         if (closure_hook[H_SEND_NOTIFY_FAIL].type == T_STRING)
         {
-            (void)sapply_int( closure_hook[H_SEND_NOTIFY_FAIL].u.str
-                            , command_giver, 3, MY_TRUE
-                            );
+            (void)sapply_ign_prot( closure_hook[H_SEND_NOTIFY_FAIL].u.str
+                                 , command_giver, 3);
         }
         else
         {
@@ -1176,7 +1175,7 @@ execute_command (char *str, object_t *ob)
         svalue_t *svp;
 
         push_c_string(inter_sp, str);
-        svp = sapply_int(closure_hook[H_COMMAND].u.str, ob, 1, MY_TRUE);
+        svp = sapply_ign_prot(closure_hook[H_COMMAND].u.str, ob, 1);
         res = (svp->type != T_NUMBER) || (svp->u.number != 0);
     }
     else if (closure_hook[H_COMMAND].type == T_CLOSURE)

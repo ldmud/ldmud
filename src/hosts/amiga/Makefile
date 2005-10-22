@@ -129,12 +129,14 @@ mstrings.o : mstrings.c ../mudlib/sys/debug_info.h xalloc.h svalue.h \
     driver.h typedefs.h sent.h exec.h port.h config.h hosts/unix.h \
     hosts/be/be.h machine.h
 
-object.o : object.c ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h \
-    svalue.h swap.h strfuns.h stdstrings.h simul_efun.h simulate.h sent.h \
-    random.h ptrtable.h prolang.h otable.h mstrings.h mapping.h main.h \
+object.o : object.c ../mudlib/sys/functionlist.h \
+    ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h svalue.h swap.h \
+    strfuns.h stdstrings.h simul_efun.h simulate.h sent.h random.h \
+    ptrtable.h prolang.h otable.h mstrings.h mempools.h mapping.h main.h \
     instrs.h interpret.h filestat.h exec.h comm.h closure.h backend.h \
-    array.h actions.h object.h my-alloca.h typedefs.h driver.h port.h \
-    config.h hosts/unix.h hosts/be/be.h machine.h
+    array.h actions.h object.h my-alloca.h typedefs.h driver.h \
+    /sys/lpctypes.h ../mudlib/sys/lpctypes.h port.h config.h hosts/unix.h \
+    hosts/be/be.h machine.h
 
 otable.o : otable.c ../mudlib/sys/debug_info.h xalloc.h svalue.h simulate.h \
     strfuns.h object.h mstrings.h hash.h gcollect.h backend.h otable.h \
@@ -202,8 +204,8 @@ simulate.o : simulate.c ../mudlib/sys/rtlimits.h ../mudlib/sys/files.h \
     regexp.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
 sprintf.o : sprintf.c xalloc.h swap.h svalue.h stdstrings.h simul_efun.h \
-    simulate.h sent.h ptrtable.h object.h mstrings.h mapping.h main.h \
-    instrs.h interpret.h exec.h comm.h closure.h array.h actions.h \
+    simulate.h sent.h random.h ptrtable.h object.h mstrings.h mapping.h \
+    main.h instrs.h interpret.h exec.h comm.h closure.h array.h actions.h \
     sprintf.h my-alloca.h typedefs.h driver.h strfuns.h port.h config.h \
     hosts/unix.h hosts/be/be.h machine.h
 

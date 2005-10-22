@@ -51,7 +51,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
 
 
-05-Oct-2001 (Lars Duening) -- upcoming Release 3.2.9
+11-Oct-2001 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -96,6 +96,8 @@ For a detailed list of all changes see the file CHANGELOG.
            for inherited lfun closures is printed as well.
        + printf(), sprintf(): New format specifier 'Q' act like 'O', but quotes
            special characters in strings.
+       + printf(), sprintf(): New format modifier '$' implements flush
+           formatting for strings and columns of strings.
        + query_udp_port(), send_udp(): Renamed from query_imp_port() and
            send_imp().
        + regexp functions: more compatible with 8-bit characters.

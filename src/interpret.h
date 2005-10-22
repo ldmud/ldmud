@@ -145,8 +145,9 @@ extern Bool privilege_violation(string_t *what, svalue_t *where, svalue_t *sp);
 extern Bool privilege_violation4(string_t *what, object_t *whom, string_t *how_str, int how_num, svalue_t *sp);
 extern void push_apply_value(void);
 extern void pop_apply_value (void);
-extern svalue_t *sapply_int(string_t *fun, object_t *ob, int num_arg, Bool b_ign_prot);
-#define sapply(f,o,n) sapply_int(f,o,n, MY_FALSE)
+extern svalue_t *sapply_int(string_t *fun, object_t *ob, int num_arg, Bool b_ign_prot, Bool b_use_default);
+#define sapply(f,o,n) sapply_int(f,o,n, MY_FALSE, MY_TRUE)
+#define sapply_ign_prot(f,o,n) sapply_int(f,o,n, MY_TRUE, MY_TRUE)
 extern svalue_t *apply(string_t *fun, object_t *ob, int num_arg);
 extern void call_function(program_t *progp, int fx);
 extern int get_line_number(bytecode_p p, program_t *progp, string_t **namep);

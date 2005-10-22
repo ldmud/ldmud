@@ -667,7 +667,8 @@ static struct pointer_table *ptable;
 /*-------------------------------------------------------------------------*/
 /* Forward declarations */
 
-static Bool apply_low(string_t *, object_t *, int, Bool);
+enum { APPLY_NOT_FOUND = 0, APPLY_FOUND, APPLY_DEFAULT_FOUND };
+static int int_apply(string_t *, object_t *, int, Bool, Bool);
 static void call_simul_efun(int code, object_t *ob, int num_arg);
 #ifdef DEBUG
 static void check_extra_ref_in_vector(svalue_t *svp, size_t num);
@@ -9028,6 +9029,7 @@ again:
         /* Multiply sp[-1] by sp[0] pop both arguments from the stack
          * and push the result.
          * TODO: Could be extended to cover mappings.
+         * TODO:: array/string multiplied by element === implode.
          *
          * Possible type combinations:
          *   int         * int                -> int
@@ -13907,7 +13909,7 @@ again:
 
             /* Call the function with the remaining args on the stack.
              */
-            if (!apply_low(arg[1].u.str, ob, num_arg-2, MY_FALSE))
+            if (!int_apply(arg[1].u.str, ob, num_arg-2, MY_FALSE, MY_TRUE))
             {
                 /* Function not found */
                 pop_n_elems(num_arg);
@@ -14019,7 +14021,7 @@ again:
                 /* Call the function with the remaining args on the stack.
                  */
                 inter_sp = sp; /* was clobbered by the previous loop */
-                if (!apply_low(arg[1].u.str, ob, num_arg-2, MY_FALSE))
+                if (!int_apply(arg[1].u.str, ob, num_arg-2, MY_FALSE, MY_TRUE))
                 {
                     /* Function not found: clean up the stack and
                      * assign 0 as result.
@@ -14536,6 +14538,47 @@ failure2:
 } /* apply_low() */
 
 /*-------------------------------------------------------------------------*/
+static int
+int_apply (string_t *fun, object_t *ob, int num_arg
+          , Bool b_ign_prot, Bool b_use_default
+          )
+/* The wrapper around apply_low() to handle default methods.
+ *
+ * Call function <fun> in <ob>ject with <num_arg> arguments pushed
+ * onto the stack (<inter_sp> points to the last one). static and protected
+ * functions can't be called from the outside unless <b_ign_prot> is true.
+ * int_apply() takes care of calling shadows where necessary.
+ * If <b_use_default> is true and the function call can't be resolved,
+ * the function will try to call the default method if one is defined.
+ *
+ * Results:
+ *   APPLY_NOT_FOUND (0): The function was not found (and neither a default
+ *       lfun, if allowed) and the arguments must be removed by the caller.
+ *       One eason for failure can be an attempt to call an inherited
+ *       function '::foo' with this function.
+ *
+ *   APPLY_FOUND: The function was found, and the arguments on the stack
+ *       have been popped and replaced with the result. But note
+ *       that <ob> might have been destructed during the call.
+ *
+ *   APPLY_DEFAULT_FOUND: The function was not found, but the call to the
+ *       default function succeeded and the arguments on the stack
+ *       have been popped and replaced with the result. But note
+ *       that <ob> might have been destructed during the call.
+ *
+ * The function call will swap in the object and also unset its reset status.
+ */
+
+{
+    if (apply_low(fun, ob, num_arg, b_ign_prot)) return APPLY_FOUND;
+    if (b_use_default)
+    {
+        /* TODO: Add the default call here, return APPLY_DEFAULT_FOUND on success */
+    }
+    return APPLY_NOT_FOUND;
+} /* int_apply() */
+
+/*-------------------------------------------------------------------------*/
 void
 push_apply_value (void)
 
@@ -14563,12 +14606,15 @@ pop_apply_value (void)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-sapply_int (string_t *fun, object_t *ob, int num_arg, Bool b_find_static)
+sapply_int (string_t *fun, object_t *ob, int num_arg
+           , Bool b_find_static, Bool b_use_default)
 
 /* Call function <fun> in <ob>ject with <num_arg> arguments pushed
  * onto the stack (<inter_sp> points to the last one). static and protected
  * functions can't be called from the outside unless <b_find_static> is true.
  * sapply() takes care of calling shadows where necessary.
+ * If <b_use_default> is true, an unresolved apply may be redirected to
+ * a default lfun.
  *
  * sapply() returns a pointer to the function result when the call was
  * successfull, or NULL on failure. The arguments are popped in any case.
@@ -14601,7 +14647,7 @@ sapply_int (string_t *fun, object_t *ob, int num_arg, Bool b_find_static)
 #endif
 
     /* Do the call */
-    if (!apply_low(fun, ob, num_arg, b_find_static))
+    if (!int_apply(fun, ob, num_arg, b_find_static, b_use_default))
     {
         inter_sp = _pop_n_elems(num_arg, inter_sp);
         return NULL;
@@ -14640,7 +14686,7 @@ apply (string_t *fun, object_t *ob, int num_arg)
 
 {
     tracedepth = 0;
-    return sapply_int(fun, ob, num_arg, MY_FALSE);
+    return sapply_int(fun, ob, num_arg, MY_FALSE, MY_TRUE);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -14855,7 +14901,7 @@ apply_master_ob (string_t *fun, int num_arg)
     }
     else
     {
-        result = sapply_int(fun, master_ob, num_arg, MY_TRUE);
+        result = sapply_int(fun, master_ob, num_arg, MY_TRUE, MY_FALSE);
     }
 
     /* Free the reserve if we used it */
@@ -15012,9 +15058,9 @@ assert_master_ob_loaded (void)
             if (current_object == &dummy_current_object_for_loads)
                 current_object = master_ob;
             push_number(inter_sp, removed);
-            sapply_int(STR_REACTIVATE, ob, 1, MY_TRUE);
+            sapply_int(STR_REACTIVATE, ob, 1, MY_TRUE, MY_FALSE);
             push_number(inter_sp, 2 - (removed ? 1 : 0));
-            sapply_int(STR_INAUGURATE, ob, 1, MY_TRUE);
+            sapply_int(STR_INAUGURATE, ob, 1, MY_TRUE, MY_FALSE);
             fprintf(stderr, "%s Old master reactivated.\n", time_stamp());
             inside = MY_FALSE;
             return;
@@ -15588,7 +15634,7 @@ call_simul_efun (int code, object_t *ob, int num_arg)
     function_name = simul_efunp[code].name;
 
     /* First, try calling the function in the given object */
-    if (!apply_low(function_name, ob, num_arg, MY_FALSE))
+    if (!int_apply(function_name, ob, num_arg, MY_FALSE, MY_FALSE))
     {
         /* Function not found: try the alternative sefun objects */
         if (simul_efun_vector)
@@ -15606,7 +15652,7 @@ call_simul_efun (int code, object_t *ob, int num_arg)
                 }
                 if ( !(ob = get_object(v->u.str)) )
                     continue;
-                if (apply_low(function_name, ob, num_arg, MY_FALSE))
+                if (int_apply(function_name, ob, num_arg, MY_FALSE, MY_FALSE))
                     return;
             }
             return;
@@ -17642,6 +17688,7 @@ f_call_resolved (svalue_t *sp, int num_arg)
 {
     svalue_t *arg;
     object_t *ob;
+    int rc;
 
     arg = sp - num_arg + 1;
 
@@ -17683,7 +17730,8 @@ f_call_resolved (svalue_t *sp, int num_arg)
 
     /* Send the remaining arguments to the function.
      */
-    if (!apply_low(arg[2].u.str, ob, num_arg-3, MY_FALSE))
+    rc = int_apply(arg[2].u.str, ob, num_arg-3, MY_FALSE, MY_TRUE);
+    if (rc == APPLY_NOT_FOUND)
     {
         /* Function not found */
         sp = _pop_n_elems(num_arg-1, sp);
@@ -17700,7 +17748,7 @@ f_call_resolved (svalue_t *sp, int num_arg)
     transfer_svalue(arg, sp--);  /* Copy the function call result */
     sp = _pop_n_elems(2, sp);     /* Remove old arguments to call_solved */
     free_svalue(sp);             /* Free the lvalue */
-    put_number(sp, 1);
+    put_number(sp, rc == APPLY_FOUND ? 1 : -1);
 
     return sp;
 } /* f_call_resolved() */
