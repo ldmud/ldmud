@@ -58,12 +58,3 @@ with_max_players=200
 with_htable_size=0x10000
 with_otable_size=0x4000
 with_apply_cache_bits=14
-
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1.0.4 (GNU/Linux)
-Comment: For info see http://www.gnupg.org
-
-iD8DBQE66eu68UXMXiC+9cQRAu/oAJwI0pLUqdnmr9QOy2M7Zcwf5vA2VgCgwt9A
-xvkmxP3mzQRxaQXIoh51eJI=
-=9TUU
------END PGP SIGNATURE-----

@@ -1063,14 +1063,13 @@ subtract_array (vector_t *minuend, vector_t *subtrahend)
      * If it's not there, add the element to the difference vector.
      * If minuend is referenced only once, reuse its memory.
      */
-
     if (minuend->ref == 1)
     {
         for (source = minuend->item, i = minuend_size ; i-- ; source++)
         {
             if (destructed_object_ref(source))
                 assign_svalue(source, &const0);
-            if ( (*lookup_function)(source, subtrahend) >-1 ) break;
+            if ( (*lookup_function)(source, subtrahend) > -1 ) break;
         }
         for (dest = source++; i-- > 0 ; source++)
         {
@@ -1088,7 +1087,8 @@ subtract_array (vector_t *minuend, vector_t *subtrahend)
 
     for (source = minuend->item, dest = difference->item, i = minuend_size
         ; i--
-        ; source++) {
+        ; source++)
+    {
         if (destructed_object_ref(source))
             assign_svalue(source, &const0);
         if ( (*lookup_function)(source, subtrahend) < 0 )
@@ -2075,11 +2075,13 @@ lookup_key (svalue_t *key, vector_t *vec)
 
     /* If key is a non-shared string, lookup and use the shared copy.
      */
-    if (key->type == T_STRING && !mstr_d_tabled(key->u.str)) {
-
+    if (key->type == T_STRING && !mstr_d_tabled(key->u.str))
+    {
         shared_string_key.type = T_STRING;
         if ( !(shared_string_key.u.str = find_tabled(key->u.str)) )
+        {
             return -1;
+        }
         key = &shared_string_key;
     }
 
@@ -2116,8 +2118,9 @@ lookup_key (svalue_t *key, vector_t *vec)
 
         if (o <= 1)
         {
-            /* Not found at all */
+            /* Last element to try */
             d = array_cmp(key, &vec->item[i]);
+            if (d == 0) return i;
             if (d > 0) return -(i+1)-1;
             return -i-1;
         }

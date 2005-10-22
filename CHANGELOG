@@ -1,6 +1,15 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+29-Apr-2001 (Lars Duening)  (3.3.53)
+    - (mapping.c) m_values() failed to properly check the mapping width,
+         especially on empty mappings.
+    - (array.c) Looking up a key in an array failed on some arrays (reported
+         by Freaky).
+    - (prolang.y) Nested definitions of inline closure no longer generates
+         warnings about the arguments shadowing previous declarations
+         (reported by Freaky).
+
 28-Apr-2001 (Lars Duening)  (3.3.52)
     - (several files) Removed the support for Atari and OS/2, restricted
          the Amiga support to gcc/ixemul.

@@ -22,12 +22,14 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 52)
-(Parent-Version lpmud 3-3 51)
-(Version-Log "Removed support for Atari and OS/2; restricted Amiga support to gcc/ixemul.")
+(Project-Version lpmud 3-3 53)
+(Parent-Version lpmud 3-3 52)
+(Version-Log "Looking up keys in arrays failed occasionally.
+m_values() did not check the mapping width properly.
+Nested definitions of inline closures generated spurious warnings.")
 (New-Version-Log
 "")
-(Checkin-Time "Sat, 28 Apr 2001 19:24:00 -0600")
+(Checkin-Time "Sun, 29 Apr 2001 23:35:22 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -60,8 +62,8 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.3 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.14 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.115 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.171 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.116 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.172 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.10 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -99,7 +101,7 @@
   (src/settings/silberland (lpmud/C/26_silberland 1.4.1.2 744))
   (src/settings/sticklib (lpmud/D/14_sticklib 1.2.1.1.1.2 744))
   (src/settings/tubmud (lpmud/C/27_tubmud 1.7.1.4 744))
-  (src/settings/unitopia (lpmud/C/7_unitopia 1.6.1.4.1.5 744))
+  (src/settings/unitopia (lpmud/C/7_unitopia 1.6.1.4.1.6 744))
   (src/settings/wunderland (lpmud/D/24_wunderland 1.3.1.2 744))
 
   (src/C_COMPILER_BUGS (lpmud/d/21_C_COMPILER 1.6.1.2 644))
@@ -111,7 +113,7 @@
   (src/actions.h (lpmud/D/11_actions.h 1.6.1.3 644))
   (src/actions.c (lpmud/D/12_actions.c 1.15.1.18 644))
   (src/array.h (lpmud/f/47_array.h 1.18.1.14 644))
-  (src/array.c (lpmud/d/12_array.c 1.46.1.28 644))
+  (src/array.c (lpmud/d/12_array.c 1.46.1.29 644))
   (src/backend.h (lpmud/f/46_backend.h 1.20.1.3 644))
   (src/backend.c (lpmud/d/6_backend.c 1.68.1.24 644))
   (src/bitstrings.h (lpmud/I/47_bitstrings 1.1 644))
@@ -146,7 +148,7 @@
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.5 644))
   (src/main.c (lpmud/b/8_main.c 1.60.1.31 644))
   (src/mapping.h (lpmud/f/30_mapping.h 1.12.1.6 644))
-  (src/mapping.c (lpmud/b/6_mapping.c 1.36.1.21 644))
+  (src/mapping.c (lpmud/b/6_mapping.c 1.36.1.22 644))
   (src/md5.h (lpmud/L/18_md5.h 1.1 644))
   (src/md5.c (lpmud/L/19_md5.c 1.3 644))
   (src/mempools.h (lpmud/D/48_mempools.h 1.2.1.3 644))
@@ -171,7 +173,7 @@
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.7 644))
   (src/port.c (lpmud/39_port.c 1.17.1.5 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.12 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.51 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.52 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))

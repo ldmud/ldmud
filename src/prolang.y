@@ -1609,10 +1609,12 @@ free_local_names (int depth)
 
 /*-------------------------------------------------------------------------*/
 static ident_t *
-add_local_name (ident_t *ident, fulltype_t type, int depth)
+add_local_name (ident_t *ident, fulltype_t type, int depth, Bool may_shadow)
 
 /* Declare a new local variable <ident> with the type <type> on
- * the scope depth <depth>.
+ * the scope depth <depth>. If <may_shadow> is TRUE, the declaration is
+ * allowed to shadow a previous one (this is used to declare inline
+ * functions on the fly).
  * Return the (adjusted) ident for the new variable.
  */
 
@@ -1628,9 +1630,11 @@ add_local_name (ident_t *ident, fulltype_t type, int depth)
             /* We're overlaying some other definition.
              * If it's a global, it's ok.
              */
-            if (ident->type != I_TYPE_GLOBAL)
+            if (!may_shadow && ident->type != I_TYPE_GLOBAL)
+            {
                 yywarnf( "Variable '%s' shadows previous declaration"
                        , get_txt(ident->name));
+            }
             ident = make_shared_identifier(get_txt(ident->name), I_TYPE_LOCAL, depth);
         }
 
@@ -1786,7 +1790,7 @@ redeclare_local (int num, fulltype_t type, int depth)
     }
     else
     {
-        q = add_local_name(q, type, depth);
+        q = add_local_name(q, type, depth, MY_FALSE);
     }
 
     return q;
@@ -3595,12 +3599,12 @@ new_arg_name:
           if (exact_types && $1 == 0)
           {
               yyerror("Missing type for argument");
-              add_local_name($3, TYPE_ANY, block_depth);
+              add_local_name($3, TYPE_ANY, block_depth, MY_FALSE);
                 /* Supress more errors */
           }
           else
           {
-              add_local_name($3, $1 | $2, block_depth);
+              add_local_name($3, $1 | $2, block_depth, MY_FALSE);
           }
       }
 
@@ -3848,7 +3852,7 @@ new_local_name:
           block_scope_t *scope = block_scope + block_depth - 1;
           ident_t *q;
 
-          q = add_local_name($2, current_type | $1, block_depth);
+          q = add_local_name($2, current_type | $1, block_depth, MY_FALSE);
 
           if (use_local_scopes && scope->num_locals == 1)
           {
@@ -8867,7 +8871,7 @@ inline_fun:
                name[1] = (char)('1' + i);
                add_local_name(make_shared_identifier( name, I_TYPE_UNKNOWN
                                                     , block_depth)
-                             , TYPE_ANY, block_depth);
+                             , TYPE_ANY, block_depth, MY_TRUE);
            }
 
            /* Declare the function */

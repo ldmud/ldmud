@@ -2901,8 +2901,6 @@ f_m_values (svalue_t *sp)
     inter_sp = sp;
 
     m = sp->u.map;
-    if (m->num_values < 2)
-        error("m_values() applied on mapping with no values.\n");
     if (num < 0 || num >= m->num_values)
         error("Illegal index %d to m_values(): should be in 0..%d.\n"
              , num, m->num_values-1);
@@ -2910,6 +2908,9 @@ f_m_values (svalue_t *sp)
     /* Get the size of the mapping */
     check_map_for_destr(m);
     size = (mp_int)MAP_SIZE(m);
+
+    if (size > 0 && m->num_values < 1)
+        error("m_values() applied on mapping with no values.\n");
 
     v = allocate_array(size);
 
