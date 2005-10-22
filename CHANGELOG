@@ -1,6 +1,16 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+07-Feb-2002 (Lars Duening)  (3.3.165)
+    - (ed, comm, efuns) Modified the print_prompt() routine so that
+         the editor prompt is take directly from the editor buffer.
+         This allows to get rid of the swapping of editor and normal command
+         prompts, which may also have been responsible for the memory
+         leaks reported in b-020205-0 (though I can't prove that). As an
+         aside, the f_set_prompt() function moved from efuns.c to comm.c .
+    - (actions.c) If notify_fail() was not used from an undestructed
+         command giver, the given failure notice value leaked (b-020205-1).
+
 07-Feb-2002 (Lars Duening)  (3.3.164)
     - (bugs/) Cleaned up the bug reports.
 

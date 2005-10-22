@@ -69,7 +69,7 @@ For a detailed list of all changes see the file CHANGELOG.
            something different from '!'.
 
 
-06-Feb-2002 (Lars Duening) -- Release 3.2.9
+07-Feb-2002 (Lars Duening) -- Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -167,6 +167,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + map() and other efuns taking callbacks arguments: The pattern
            'function, object, extra' was parsed such that 'object' became
            part of the 'extra' arguments.
+       + notify_fail(): When used by an object which is not an
+            undestructed command_giver, this efun no longer leaks memory.
        + object_info(): The returned OIB_NAME now starts with a '/' in plain
            mode.
        + printf(), sprintf(): The formatter "%^" will print "%^", for

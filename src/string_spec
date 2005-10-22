@@ -91,6 +91,11 @@ TAIL               "tail"
 WRITE_BYTES        "write_bytes"
 WRITE_FILE         "write_file"
 
+    /* Editor strings */
+
+ED_PROMPT          ":"
+ED_APPEND_PROMPT   "*\b"
+
     /* Object lfuns */
 
 CATCH_TELL      "catch_tell"

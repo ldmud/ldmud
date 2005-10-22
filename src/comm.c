@@ -2678,7 +2678,6 @@ remove_interactive (object_t *ob, Bool force)
         free_object(interactive->modify_command, "remove_interactive");
     }
 
-    prompt_from_ed_buffer(interactive);
     free_svalue(&interactive->prompt);
 
     if (interactive->trace_prefix)
@@ -3345,43 +3344,6 @@ remove_all_players (void)
 }
 
 /*-------------------------------------------------------------------------*/
-void
-set_prompt (const char *str)
-
-/* Set the prompt of the current command_giver to C string <str>.
- * This function is not called for the efun set_prompt().
- */
-
-{
-    svalue_t *promptp;
-
-#ifdef DEBUG
-    if (!O_IS_INTERACTIVE(command_giver))
-        fatal("set_prompt() of non-interactive object.\n");
-#endif
-    promptp = &O_GET_INTERACTIVE(command_giver)->prompt;
-    free_svalue(promptp);
-    put_c_string(promptp, str);
-}
-
-/*-------------------------------------------------------------------------*/
-svalue_t *
-query_prompt (object_t *ob)
-
-/* Return the prompt setting of interactive object <ob>.
- * Note that you will get a pointer to the very svalue the object
- * uses.
- */
-
-{
-#ifdef DEBUG
-    if (!O_IS_INTERACTIVE(ob))
-        fatal("query_prompt() of non-interactive object\n");
-#endif
-    return &O_GET_INTERACTIVE(ob)->prompt;
-}
-
-/*-------------------------------------------------------------------------*/
 static void
 print_prompt_string (string_t *prompt)
 
@@ -3458,7 +3420,11 @@ print_prompt (void)
     if (!(O_SET_INTERACTIVE(ip, command_giver)))
         fatal("print_prompt() of non-interactive object\n");
 
-    if (ip->input_to == NULL)
+    if (ip->input_to != NULL)
+    {
+        prompt = &ip->input_to->prompt;
+    }
+    else if (NULL == (prompt = get_ed_prompt(ip)))
     {
         prompt = &ip->prompt;
         if (prompt->type != T_CLOSURE && prompt->type != T_STRING)
@@ -3466,10 +3432,6 @@ print_prompt (void)
             prompt = &driver_hook[H_DEFAULT_PROMPT];
             usingDefaultPrompt = MY_TRUE;
         }
-    }
-    else
-    {
-        prompt = &ip->input_to->prompt;
     }
 
     if (prompt->type == T_CLOSURE)
@@ -5997,7 +5959,6 @@ f_exec (svalue_t *sp)
         /* If <ob> has a connection, flush it */
         if (stale_interactive)
         {
-            prompt_from_ed_buffer(stale_interactive);
             if (stale_interactive->message_length)
             {
                 command_giver = ob;
@@ -6007,7 +5968,6 @@ f_exec (svalue_t *sp)
 
         /* Flush the connection of <obfrom> */
 
-        prompt_from_ed_buffer(ip);
         if (ip->message_length) {
             command_giver = obfrom;
             add_message(message_flush);
@@ -6036,7 +5996,6 @@ f_exec (svalue_t *sp)
             if (stale_interactive->snoop_on)
                 stale_interactive->snoop_on->snoop_by = obfrom;
             stale_interactive->catch_tell_activ = MY_TRUE;
-            prompt_to_ed_buffer(stale_interactive);
         }
         else
         {
@@ -6048,8 +6007,6 @@ f_exec (svalue_t *sp)
             ref_object(ob, "exec");
             free_object(obfrom, "exec");
         }
-
-        prompt_to_ed_buffer(ip);
 
         /* If this_player() or this_interactive() point to one of the
          * involved objects, switch it too.
@@ -6689,7 +6646,7 @@ f_set_prompt (svalue_t *sp)
     }
 
     /* Get the address of the prompt svalue */
-    prompt = query_prompt(sp->u.ob);
+    prompt = &O_GET_INTERACTIVE(sp->u.ob)->prompt;
 
     free_object_svalue(sp);
     sp--;

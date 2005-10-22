@@ -220,7 +220,8 @@ DESCRIPTION
           not set, the driver will just print the prompt to the user.
 
           The hook is called with the prompt string as single argument
-          and has to print the prompt using the write() efun.
+          and has to print the prompt, e.g. using write() or
+          binary_message().
 
           If the hook is a string, it is the name of an lfun in the command
           giver:

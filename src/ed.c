@@ -207,10 +207,10 @@ struct ed_buffer_s
     int     leading_blanks;    /* Current number of leading blanks when
                                   using autoindentation. */
     int     cur_autoindent;
-    string_t    *exit_fn;       /* Function to be called when player exits */
-                                /* TODO: Make this a callback */
-    object_t *exit_ob;    /* Object holding <exit_fn> */
-    svalue_t old_prompt;  /* Original prompt */
+    string_t *exit_fn;         /* Function to be called when player exits */
+                               /* TODO: Make this a callback */
+    object_t *exit_ob;         /* Object holding <exit_fn> */
+    svalue_t prompt;           /* Editor prompt, a counted shared string */
 };
 
 /* ed_buffer.flag values
@@ -267,6 +267,7 @@ struct ed_buffer_s
 #define P_MORE          (ED_BUFFER->moring)
 #define P_LEADBLANKS    (ED_BUFFER->leading_blanks)
 #define P_CUR_AUTOIND   (ED_BUFFER->cur_autoindent)
+#define P_PROMPT        (ED_BUFFER->prompt)
 
 
 /*-------------------------------------------------------------------------*/
@@ -390,6 +391,19 @@ ed_buffer_size (ed_buffer_t *buffer)
 } /* ed_buffer_size() */
 
 /*-------------------------------------------------------------------------*/
+static INLINE void
+set_ed_prompt (ed_buffer_t * ed_buffer, string_t * prompt)
+
+/* Reference and set string <prompt> as new prompt in <ed_buffer>.
+ * The prompt svalue must already have been initialized as T_STRING.
+ */
+
+{
+    free_mstring(ed_buffer->prompt.u.str);
+    ed_buffer->prompt.u.str = ref_mstring(prompt);
+} /* set_ed_prompt() */
+
+/*-------------------------------------------------------------------------*/
 static int
 append (int line, Bool glob)
 
@@ -407,7 +421,7 @@ append (int line, Bool glob)
         add_message(P_SMALLNUMBER ? "%3d " : "%6d. ",P_CURLN+1);
     if (P_CUR_AUTOIND)
         add_message("%*s", P_LEADBLANKS, "");
-    set_prompt("*\b");
+    set_ed_prompt(ED_BUFFER, STR_ED_APPEND_PROMPT);
     return ED_OK;
 }
 
@@ -426,7 +440,7 @@ more_append (char *str)
     if(str[0] == '.' && str[1] == '\0')
     {
         P_APPENDING = FALSE;
-        set_prompt(":");
+        set_ed_prompt(ED_BUFFER, STR_ED_PROMPT);
         return ED_OK;
     }
 
@@ -463,39 +477,22 @@ more_append (char *str)
 }
 
 /*-------------------------------------------------------------------------*/
-void
-prompt_from_ed_buffer (interactive_t *ip)
+svalue_t *
+get_ed_prompt (interactive_t *ip)
 
-/* Restore the <ip>->prompt from the saved prompt of <ip>->ed_buffer.
+/* Return a pointer to the prompt svalue in <ip>->ed_buffer.
+ * Return NULL if <ip> is not editing.
  */
 
 {
     ed_buffer_t *ed_buffer;
 
-    if (NULL != (ed_buffer = O_GET_EDBUFFER(ip->ob))
-     && ed_buffer->old_prompt.type != T_INVALID)
+    if (NULL != (ed_buffer = O_GET_EDBUFFER(ip->ob)))
     {
-        transfer_svalue(&ip->prompt, &ed_buffer->old_prompt);
-        ed_buffer->old_prompt.type = T_INVALID;
+        return &(ed_buffer->prompt);
     }
-}
-
-/*-------------------------------------------------------------------------*/
-void
-prompt_to_ed_buffer (interactive_t *ip)
-
-/* Save the current <ip>->prompt in the ed_buffer and change the prompt
- * to '*\b' (append mode) or ':' (normal command mode).
- */
-
-{
-    ed_buffer_t *ed_buffer;
-
-    if ( NULL != (ed_buffer = O_GET_EDBUFFER(ip->ob)) ) {
-        transfer_svalue(&ed_buffer->old_prompt, &ip->prompt);
-        put_c_string(&ip->prompt, ed_buffer->appending ? "*\b" : ":");
-    }
-}
+    return NULL;
+} /* get_ed_prompt() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -3061,7 +3058,7 @@ ed_start (string_t *file_arg, string_t *exit_fn, object_t *exit_ob)
 
 {
     string_t *new_path;
-    svalue_t *setup, *prompt;
+    svalue_t *setup;
     ed_buffer_t *old_ed_buffer;
 
     if (!command_giver || !(O_IS_INTERACTIVE(command_giver)))
@@ -3098,9 +3095,7 @@ ed_start (string_t *file_arg, string_t *exit_fn, object_t *exit_ob)
     ED_BUFFER->truncflg = MY_TRUE;
     ED_BUFFER->flags |= EIGHTBIT_MASK | TABINDENT_MASK;
     ED_BUFFER->shiftwidth= 4;
-    prompt = query_prompt(command_giver);
-    ED_BUFFER->old_prompt = *prompt;
-    put_c_string(prompt, ":");
+    put_ref_string(&(ED_BUFFER->prompt), STR_ED_PROMPT);
     ED_BUFFER->CurPtr = &ED_BUFFER->Line0;
     if (exit_fn)
     {
@@ -3181,7 +3176,7 @@ clear_ed_buffer_refs (ed_buffer_t *b)
     if (b->oldpat)
         b->oldpat->refs = 0;
 
-    clear_ref_in_vector(&b->old_prompt, 1);
+    clear_ref_in_vector(&b->prompt, 1);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -3232,7 +3227,7 @@ count_ed_buffer_refs (ed_buffer_t *b)
     if (b->oldpat)
         note_malloced_block_ref((char *)b->oldpat);
 #endif
-    count_ref_in_vector(&b->old_prompt, 1);
+    count_ref_in_vector(&b->prompt, 1);
 }
 
 #endif /* GC_SUPPORT */
@@ -3274,14 +3269,7 @@ free_ed_buffer (void)
     clrbuf();
     ob   = ED_BUFFER->exit_ob;
     name = ED_BUFFER->exit_fn;
-    if (O_IS_INTERACTIVE(command_giver))
-    {
-        transfer_svalue( query_prompt(command_giver), &ED_BUFFER->old_prompt );
-    }
-    else
-    {
-        free_svalue(&ED_BUFFER->old_prompt);
-    }
+    free_svalue(&ED_BUFFER->prompt);
 
     if(P_OLDPAT)
     {
@@ -3395,7 +3383,6 @@ ed_cmd (char *str)
         xfree((char *)ED_BUFFER);
         EXTERN_ED_BUFFER = 0;
         add_message("FATAL ERROR\n");
-        set_prompt("> ");
         ED_BUFFER = old_ed_buffer;
         return;
 #endif

@@ -20,12 +20,13 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 164)
-(Parent-Version lpmud 3-3 163)
-(Version-Log "Cleaned up the bug reports.")
+(Project-Version lpmud 3-3 165)
+(Parent-Version lpmud 3-3 164)
+(Version-Log "Simplified the editor prompt handling.
+Fixed a memory leak in notify_fail().")
 (New-Version-Log
 "")
-(Checkin-Time "Thu, 07 Feb 2002 22:38:39 -0700")
+(Checkin-Time "Thu, 07 Feb 2002 23:03:48 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -58,8 +59,8 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.4 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.35 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.227 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.238 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.228 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.239 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.13 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -110,7 +111,7 @@
   (src/access_check.c (lpmud/d/14_access_che 1.15.1.3 644))
   (src/alloca.c (lpmud/d/13_alloca.c 1.10 644))
   (src/actions.h (lpmud/D/11_actions.h 1.6.1.4 644))
-  (src/actions.c (lpmud/D/12_actions.c 1.15.1.28 644))
+  (src/actions.c (lpmud/D/12_actions.c 1.15.1.29 644))
   (src/array.h (lpmud/f/47_array.h 1.18.1.16 644))
   (src/array.c (lpmud/d/12_array.c 1.46.1.33 644))
   (src/backend.h (lpmud/f/46_backend.h 1.20.1.4 644))
@@ -121,13 +122,13 @@
   (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.17 644))
   (src/closure.h (lpmud/f/44_closure.h 1.7.1.5 644))
   (src/closure.c (lpmud/d/4_closure.c 1.41.1.33 644))
-  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.5 644))
-  (src/comm.h (lpmud/d/3_comm.h 1.26.1.16 644))
+  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.6 644))
+  (src/comm.h (lpmud/d/3_comm.h 1.26.1.17 644))
   (src/driver.h (lpmud/f/36_driver.h 1.15.1.8 644))
   (src/dumpstat.h (lpmud/f/35_dumpstat.h 1.8 644))
   (src/dumpstat.c (lpmud/c/34_dumpstat.c 1.20.1.9 644))
-  (src/ed.h (lpmud/f/34_ed.h 1.5.1.4 644))
-  (src/ed.c (lpmud/c/33_ed.c 1.32.1.15 644))
+  (src/ed.h (lpmud/f/34_ed.h 1.5.1.5 644))
+  (src/ed.c (lpmud/c/33_ed.c 1.32.1.16 644))
   (src/efuns.h (lpmud/l/20_efuns.h 1.13.1.11 644))
   (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.11 644))
   (src/exec.h (lpmud/c/32_exec.h 1.34.1.17 644))
@@ -206,7 +207,7 @@
 
   ;; Build files
   (src/func_spec (lpmud/c/31_func_spec 1.53.1.45.1.1 644))
-  (src/string_spec (lpmud/F/6_string_spe 1.14.1.1 644))
+  (src/string_spec (lpmud/F/6_string_spe 1.14.1.2 644))
   (src/mkfunc.c (lpmud/L/14_mkfunc.c 1.1 644))
   (src/make_func.y (lpmud/b/7_make_func. 1.25.1.23 644))
 
@@ -378,7 +379,7 @@
   (src/bugs/bat-011215-diff/bat-011215.diff (lpmud/Q/19_bat-011215 1.1 644))
   (src/bugs/bat-011215-diff/CHANGELOG.BAT (lpmud/Q/20_CHANGELOG. 1.1 644))
 
-  (src/bugs/b-summary (lpmud/C/34_b-summary 1.47.1.19 644) :no-keywords)
+  (src/bugs/b-summary (lpmud/C/34_b-summary 1.47.1.20 644) :no-keywords)
   (src/bugs/b-990217-1 (lpmud/k/10_b-990217-1 1.3 644) :no-keywords)
   (src/bugs/b-990505-0 (lpmud/t/1_b-990505-0 1.5.1.1 644) :no-keywords)
   (src/bugs/b-990605 (lpmud/t/4_b-990605 1.1 644) :no-keywords)
@@ -393,7 +394,7 @@
   (src/bugs/b-010610-1 (lpmud/M/23_b-010610-1 1.2 644) :no-keywords)
   (src/bugs/b-010801-0 (lpmud/N/17_b-010801-0 1.1 644) :no-keywords)
   (src/bugs/b-011113 (lpmud/Q/43_b-011113 1.1 644) :no-keywords)
-  (src/bugs/b-020205-0 (lpmud/Q/40_b-020205-0 1.2 644) :no-keywords)
+  (src/bugs/b-020205-0 (lpmud/Q/40_b-020205-0 1.3 644) :no-keywords)
 
   (src/bugs/f-summary (lpmud/C/37_f-summary 1.39.1.51 644) :no-keywords)
   (src/bugs/f-981027-0 (lpmud/g/29_f-981027-0 1.2 644) :no-keywords)
@@ -714,7 +715,7 @@
   (doc/concepts/concepts (lpmud/n/31_concepts 1.2 644))
   (doc/concepts/erq (lpmud/n/32_erq 1.6 644))
   (doc/concepts/files (lpmud/n/33_files 1.2 644))
-  (doc/concepts/hooks (lpmud/h/9_hooks 1.10.1.12 644))
+  (doc/concepts/hooks (lpmud/h/9_hooks 1.10.1.13 644))
   (doc/concepts/imp (lpmud/n/34_imp 1.4 644))
   (doc/concepts/intermud (lpmud/M/48_intermud 1.5 644))
   (doc/concepts/intermud.basic (lpmud/M/49_intermud.b 1.2 644))

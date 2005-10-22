@@ -1935,6 +1935,8 @@ f_notify_fail (svalue_t *sp)
             free_object(error_obj, "notify_fail");
         error_obj = ref_object(current_object, "notify_fail");
     }
+    else
+        free_svalue(sp);
 
     put_number(sp, 0);
 

@@ -7,8 +7,7 @@
 /* --- Prototypes --- */
 
 extern size_t ed_buffer_size (ed_buffer_t *buffer);
-extern void prompt_from_ed_buffer(interactive_t *ip);
-extern void prompt_to_ed_buffer(interactive_t *ip);
+extern svalue_t * get_ed_prompt (interactive_t *ip);
 
 #ifdef GC_SUPPORT
 extern void clear_ed_buffer_refs(ed_buffer_t *b);

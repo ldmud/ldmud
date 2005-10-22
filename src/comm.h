@@ -261,8 +261,6 @@ extern void set_noecho(interactive_t *i, char noecho);
 extern int  find_no_bang (interactive_t *ip);
 extern Bool call_function_interactive(interactive_t *i, char *str);
 extern void remove_all_players(void);
-extern void set_prompt(const char *str);
-extern svalue_t *query_prompt(object_t *ob);
 extern void  print_prompt(void);
 extern void  init_telopts(void);
 extern void  mudlib_telopts(void);
