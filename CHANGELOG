@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+05-Jul-2001 (Lars Duening)  (3.3.73)
+    - (prolang.y) It is now possible again to redefine a non-static inherited
+         variable with a static one (or vice versa), but it also generates
+         a warning.
+    - (doc/concepts/intermud*) Intermud-2 documentation added (thanks, Fiona!)
+
 03-Jul-2001 (Lars Duening)  (3.3.72)
     - (prolang.y) How embarrassing! The code for !INITIALIZATION_BY_INIT
         had a bad syntax error - and I didn't notice it (thanks, Bardioc!)

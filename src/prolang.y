@@ -2208,10 +2208,13 @@ define_variable (ident_t *name, fulltype_t flags, svalue_t *svp)
             yyerrorf( "Illegal to redefine 'nomask' variable '%s'"
                     , get_txt(name->name));
 
-        /* We can redefine inherited variables if they are private or hidden
+        /* We can redefine inherited variables if they are private or hidden,
+         * or if one of them is static.
          */
         if (  (   !(VARIABLE(n)->flags & NAME_INHERITED)
-               || !(VARIABLE(n)->flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN))
+               || (   !(VARIABLE(n)->flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN))
+                   && !((flags ^ VARIABLE(n)->flags) & TYPE_MOD_STATIC)
+                  )
               )
             && !(flags & NAME_INHERITED)
            )
@@ -2222,6 +2225,16 @@ define_variable (ident_t *name, fulltype_t flags, svalue_t *svp)
             else
                 yyerrorf("Illegal to redefine global variable '%s'"
                         , get_txt(name->name));
+        }
+
+        if ((flags ^ VARIABLE(n)->flags) & TYPE_MOD_STATIC)
+        {
+            yywarnf("Redefining inherited%s variable '%s' with a%s variable.\n"
+                   , (VARIABLE(n)->flags & TYPE_MOD_STATIC)
+                     ? " static" : " non-static"
+                   , get_txt(name->name)
+                   , (flags & TYPE_MOD_STATIC) ? " static" : " non-static"
+                   );
         }
 
         /* Make sure that at least one of the two definitions is 'static'.

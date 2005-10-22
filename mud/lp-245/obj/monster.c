@@ -54,7 +54,7 @@ object init_ob;
 
 int random_pick;
 
-int spell_chance, spell_dam;
+int spell_chance, spell_damage;
 string spell_mess1, spell_mess2;
 object me;
 object create_room;
@@ -123,7 +123,7 @@ heart_beat()
       spell_chance > random(100)) {
 	say(spell_mess1 + "\n", attacker_ob);
 	tell_object(attacker_ob, spell_mess2 + "\n");
-	attacker_ob->hit_player(random(spell_dam));
+	attacker_ob->hit_player(random(spell_damage));
     }
     attack();
     if (attacker_ob && whimpy && hit_point < max_hp/5)
@@ -252,7 +252,7 @@ set_spell_mess2(m) {
     spell_mess2 = m;
 }
 set_spell_dam(d) {
-    spell_dam = d;
+    spell_damage = d;
 }
 
 /* Set the frog curse. */

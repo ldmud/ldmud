@@ -4,7 +4,7 @@ SYNOPSIS
 
 DESCRIPTION
         If an object that identifies (*) to the name ``str'' is present
-        in the inventory or environment of this_object (), then return
+        in the inventory or environment of this_object(), then return
         it. If "str" has the form "<id> <n>" the <n>-th object matching
         <id> will be returned.
 

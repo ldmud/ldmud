@@ -6,7 +6,8 @@ LAST UPDATED
         Pepel,             18-Nov-93
 
 DESRIPTION
-        This document describes IMP, the intermud message protocol.
+        This document describes IMP, the intermud message protocol,
+        also known as Intermud-1.
 
         Imp messages are exchanged between muds using UDP
         (unreliable datagram protocol) packets. Each mud provides
@@ -59,4 +60,4 @@ NOTE
         the connection to other muds.
 
 SEE ALSO
-        send_imp(E), receive_imp(M)
+        send_imp(E), receive_imp(M), intermud(C)

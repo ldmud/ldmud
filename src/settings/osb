@@ -4,7 +4,7 @@
 #
 # configure will strip this part from the script.
 
-exec ./configure --prefix=/users/phil/osb --libexec=/users/phil/osb/erq --libdir=/users/phil/osb/mudlib --with-setting=osb $*
+CFLAGS="-I/usr/local/include" EXTRA_CFLAGS="$CFLAGS" exec ./configure --prefix=/users/phil/osb --libexec=/users/phil/osb/erq --libdir=/users/phil/osb/mudlib --with-setting=osb $*
 exit 1
 
 # --- The actual settings ---

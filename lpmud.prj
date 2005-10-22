@@ -22,12 +22,12 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 72)
-(Parent-Version lpmud 3-3 71)
-(Version-Log "The !INITIALIZATION_BY_INIT code in prolang.y had a syntax error.")
+(Project-Version lpmud 3-3 73)
+(Parent-Version lpmud 3-3 72)
+(Version-Log "Relaxed the function argument typechecking a bit.")
 (New-Version-Log
 "")
-(Checkin-Time "Tue, 03 Jul 2001 21:29:15 -0600")
+(Checkin-Time "Sun, 08 Jul 2001 22:15:33 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -60,7 +60,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.3 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.20 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.135 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.136 644))
   (HISTORY (lpmud/f/49_HISTORY 1.186 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.12 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -92,7 +92,7 @@
   (src/settings/heaven7 (lpmud/K/22_heaven7 1.3 644))
   (src/settings/hyperborea (lpmud/H/20_hyperborea 1.2 744))
   (src/settings/morgengrauen (lpmud/K/37_morgengrau 1.2 644))
-  (src/settings/osb (lpmud/C/8_osb 1.8 744))
+  (src/settings/osb (lpmud/C/8_osb 1.9 744))
   (src/settings/pkmud (lpmud/C/25_pkmud 1.5.1.2 744))
   (src/settings/psycmuve (lpmud/I/42_psycmuve 1.1.1.2 744))
   (src/settings/quovadis (lpmud/H/12_quovadis 1.1.1.4 744))
@@ -171,7 +171,7 @@
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.8 644))
   (src/port.c (lpmud/39_port.c 1.17.1.6 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.12 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.62 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.63 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))
@@ -323,10 +323,12 @@
   (src/util/xerq/DONE (lpmud/k/49_DONE 1.1 644))
 
   ;; Additional files (Icons, etc)
-  (etc/README (lpmud/s/41_README 1.2 644))
+  (etc/README (lpmud/s/41_README 1.3 644))
   (etc/icon-32x32.xpm (lpmud/s/42_icon-32x32 1.1 644) :no-keywords)
   (etc/icon-16x16.xpm (lpmud/s/43_icon-16x16 1.1 644) :no-keywords)
-  (etc/startmud.pl (lpmud/M/27_startmud.p 1.1 744) :no-keywords)
+  (etc/startmud.pl (lpmud/M/27_startmud.p 1.2 744) :no-keywords)
+  (etc/start_mud (lpmud/M/45_start_mud 1.1 644))
+  (etc/mudloop (lpmud/M/46_mudloop 1.1 644))
 
   ;; Driver-related include files for the mudlib
   (mudlib/sys/commands.h (lpmud/D/15_commands.h 1.3 644))
@@ -412,7 +414,7 @@
   (src/bugs/b-010610-0 (lpmud/M/22_b-010610-0 1.1 644) :no-keywords)
   (src/bugs/b-010610-1 (lpmud/M/23_b-010610-1 1.1 644) :no-keywords)
 
-  (src/bugs/f-summary (lpmud/C/37_f-summary 1.39.1.22 644) :no-keywords)
+  (src/bugs/f-summary (lpmud/C/37_f-summary 1.39.1.23 644) :no-keywords)
   (src/bugs/f-981027-0 (lpmud/g/29_f-981027-0 1.2 644) :no-keywords)
   (src/bugs/f-981027-1 (lpmud/g/28_f-981027-1 1.2 644) :no-keywords)
   (src/bugs/f-981027-2 (lpmud/g/27_f-981027-2 1.2 644) :no-keywords)
@@ -597,6 +599,7 @@
   (src/bugs/p-000401-0 (lpmud/G/39_p-000401-0 1.1 644) :no-keywords)
   (src/bugs/b-000607 (lpmud/H/19_b-000607 1.4 644) :no-keywords)
   (src/bugs/p-000630 (lpmud/H/35_p-000630 1.2.1.1 644) :no-keywords)
+  (src/bugs/p-010707 (lpmud/M/47_p-010707 1.1 644))
 
   ; Solved bugs and requests.
   (src/done/README (lpmud/h/22_README 1.1 644) :no-keywords)
@@ -690,7 +693,9 @@
   (doc/concepts/erq (lpmud/n/32_erq 1.5 644))
   (doc/concepts/files (lpmud/n/33_files 1.2 644))
   (doc/concepts/hooks (lpmud/h/9_hooks 1.10.1.6 644))
-  (doc/concepts/imp (lpmud/n/34_imp 1.3 644))
+  (doc/concepts/imp (lpmud/n/34_imp 1.4 644))
+  (doc/concepts/intermud (lpmud/M/48_intermud 1.1 644))
+  (doc/concepts/intermud.basic (lpmud/M/49_intermud.b 1.1 644))
   (doc/concepts/memory (lpmud/n/35_memory 1.2 644))
   (doc/concepts/mysql (lpmud/F/18_HOWTO 1.1.1.4 644))
   (doc/concepts/native (lpmud/n/36_native 1.7 644))
@@ -850,8 +855,8 @@
   (doc/efun/parse_command (lpmud/p/19_parse_comm 1.5 644))
   (doc/efun/pointerp (lpmud/p/20_pointerp 1.3 644))
   (doc/efun/pow (lpmud/C/46_pow 1.1.1.2 644))
-  (doc/efun/present (lpmud/p/21_present 1.3 644))
-  (doc/efun/present_clone (lpmud/t/11_present_cl 1.3 644))
+  (doc/efun/present (lpmud/p/21_present 1.4 644))
+  (doc/efun/present_clone (lpmud/t/11_present_cl 1.4 644))
   (doc/efun/previous_object (lpmud/l/34_previous_o 1.3.1.2 644))
   (doc/efun/printf (lpmud/p/22_printf 1.3 644))
   (doc/efun/process_string (lpmud/p/23_process_st 1.4 644))
@@ -1377,7 +1382,7 @@
   (mud/lp-245/obj/player.c (lpmud/y/25_player.c 1.4 644))
   (mud/lp-245/obj/newspaper.c (lpmud/y/26_newspaper. 1.1 644))
   (mud/lp-245/obj/monster.talk.c (lpmud/y/27_monster.ta 1.2 644))
-  (mud/lp-245/obj/monster.c (lpmud/y/28_monster.c 1.2 644))
+  (mud/lp-245/obj/monster.c (lpmud/y/28_monster.c 1.3 644))
   (mud/lp-245/obj/money.c (lpmud/y/29_money.c 1.1 644))
   (mud/lp-245/obj/master.c (lpmud/y/30_master.c 1.14 644))
   (mud/lp-245/obj/marker.c (lpmud/y/31_marker.c 1.1 644))
