@@ -520,6 +520,8 @@ if test $enable_use_mysql = yes; then
       LIBS="$LIBS -L$mysql_path"
       AC_CHECK_LIB(mysqlclient,main, PKGLIBS="$PKGLIBS -L$mysql_path -lmysqlclient")
   fi
+  # On some systems, mysqlclient requires the compression libz.
+  AC_CHECK_LIB(z,main, PKGLIBS="$PKGLIBS -lz")
 fi
 fi
 

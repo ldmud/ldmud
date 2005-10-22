@@ -1423,8 +1423,7 @@ f_functionlist (svalue_t *sp)
      * TODO: Due to the dedicated 'find hidden name' loop, this shouldn't
      * TODO:: be necessary, nor the VISTAG_ALL at all.
      */
-    flags = mode_flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN);
-    if (flags != (TYPE_MOD_PRIVATE|NAME_HIDDEN))
+    if ((mode_flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN)) == 0)
     {
         fun = prog->functions;
         for (i = prog->num_functions; --i >= 0; )

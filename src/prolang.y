@@ -3274,6 +3274,7 @@ inheritance:
               /* Copy the functions and variables, and take
                * care of the initializer.
                */
+
 %ifdef INITIALIZATION_BY___INIT
               initializer = copy_functions(ob->prog, $1[0]);
               copy_variables(ob->prog, $1[1]);
@@ -3298,7 +3299,16 @@ inheritance:
               /* Fix up the inherit indices */
               fix_function_inherit_indices(ob->prog);
 
-              /* Update and store the inherit structure */
+              /* Update and store the inherit structure.
+               *
+               * If the program was inherited non-virtual, the v_i_offset
+               * may become negative here if the program itself inherits
+               * other programs with variables virtually. That is ok
+               * because in the final program the sub-inherited virtual
+               * variables no longer are immediately before the programs
+               * non-virtual variables, but the program's code doesn't know
+               * that and continues to 'offset over' them.
+               */
               inherit.variable_index_offset
                 = $1[1] & TYPE_MOD_VIRTUAL
                   ? V_VARIABLE_COUNT - ob->prog->num_variables

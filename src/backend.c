@@ -738,6 +738,7 @@ static Bool did_swap;
           )
     {
         mp_int time_since_ref; /* Time since last reference */
+        mp_int min_time_to_swap; /* Variable swap exclusion time before reset */
         Bool bResetCalled;  /* TRUE: reset() called */
 
         num_last_processed++;
@@ -756,6 +757,13 @@ static Bool did_swap;
         /* Set Variables */
         time_since_ref = current_time - obj->time_of_ref;
         bResetCalled = MY_FALSE;
+
+        /* Variables won't be swapped if a reset is due shortly.
+         * "shortly" means half the var swap interval, but at max 5 minutes.
+         */
+        min_time_to_swap = 5 * 60;
+        if (time_to_swap_variables / 2 < min_time_to_swap)
+            min_time_to_swap = time_to_swap_variables/2;
 
         /* ------ Reset ------ */
 
@@ -896,8 +904,8 @@ no_clean_up:
          *
          * Variables are swapped after time_to_swap_variables has elapsed
          * since the last ref, and if the object is either still reset or
-         * the next reset is at least time_to_swap_variables/2 in the
-         * future. When a reset is due, this second condition delays the
+         * the next reset is at least min(5 minutes, time_to_swap_variables/2)
+         * in the future. When a reset is due, this second condition delays the
          * costly variable swapping until after the reset.
          *
          * Programs are swapped after time_to_swap has elapsed, and if
@@ -917,7 +925,7 @@ no_clean_up:
              && obj->variables
              && ( obj->flags & O_RESET_STATE
                || !obj->time_reset
-               || (obj->time_reset - current_time > time_to_swap_variables/2)))
+               || (obj->time_reset - current_time > min_time_to_swap)))
             {
 #ifdef DEBUG
                 if (d_flag)

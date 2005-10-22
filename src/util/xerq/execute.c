@@ -39,9 +39,11 @@ execute (char *buf, int buflen, char *status, int *esockets, int keep_sockets)
 {
     char path[256], argbuf[1024], *p, *args[96], **argp, c;
     pid_t pid;
+    int quoted;
 
     XPRINTF((stderr, "%s execute('%s':%d)\n", time_stamp(), buf, buflen));
 
+    quoted = 0;
     status[1] = 0;
     if (buflen >= sizeof argbuf)
     {
@@ -66,7 +68,11 @@ execute (char *buf, int buflen, char *status, int *esockets, int keep_sockets)
                 return 0;
             }
         }
-        else if (isgraph(c))
+        else if (c == '"')
+        {
+            quoted = !quoted;
+        }
+        else if (isgraph(c) || quoted)
         {
             *p++ = c;
         }

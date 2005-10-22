@@ -259,7 +259,7 @@ DESCRIPTION
                    TRUE if the swapper is currently recycling free block.
 
                int DID_MEM_PERM
-               int DID_MEM_PERM
+               int DID_MEM_PERM_SIZE
                    Number and size of permanent (non-GCable) allocations
                    (smalloc only).
 

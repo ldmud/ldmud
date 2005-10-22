@@ -79,7 +79,7 @@ extern lambda_t *lambda(vector_t *args, svalue_t *block, object_t *origin);
 extern void      free_closure(svalue_t *svp);
 extern int       symbol_operator(char *symbol, char **endp);
 extern void      symbol_efun(svalue_t *sp);
-extern svalue_t *f_bind_lambda(svalue_t *sp);
+extern svalue_t *f_bind_lambda(svalue_t *sp, int num_arg);
 extern svalue_t *f_lambda(svalue_t *sp);
 extern svalue_t *f_symbol_function(svalue_t *sp);
 extern svalue_t *f_symbol_variable(svalue_t *sp);

@@ -1352,19 +1352,175 @@ is_alist (vector_t *v)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_allocate (svalue_t *sp)
+f_allocate (svalue_t *sp, int num_arg)
 
 /* EFUN allocate()
  *
- *     mixed *allocate(int size)
+ *     mixed *allocate(int|int* size)
+ *     mixed *allocate(int|int* size, mixed init_value)
  *
- * Allocate an empty array of <size> elements.
+ * Allocate an array of <size> elements (if <size> is an array, the result
+ * will be a multidimensional array), either empty or all
+ * elements initialized with <init_value>.
  */
 
 {
     vector_t *v;
+    svalue_t *argp;
+    size_t new_size;
 
-    v = allocate_array(sp->u.number); /* Will have ref count == 1 */
+    argp = sp - num_arg + 1;
+
+    if (argp->type == T_NUMBER)
+    {
+        new_size = (size_t)argp->u.number;
+
+        if (num_arg == 1 || (sp->type == T_NUMBER && !sp->u.number))
+            v = allocate_array(new_size);
+        else
+        {
+            size_t i;
+            svalue_t *svp;
+
+            v = allocate_uninit_array(new_size);
+            for (svp = v->item, i = 0; i < new_size; i++, svp++)
+                assign_svalue_no_free(svp, sp);
+        }
+    }
+    else if (argp->type == T_POINTER && VEC_SIZE(argp->u.vec) == 0)
+    {
+        /* Special case: result is the empty array */
+        v = allocate_array(0);
+    }
+    else if (argp->type == T_POINTER)
+    {
+        svalue_t *svp;
+        size_t dim, num_dim;
+        size_t count;
+        Bool hasInitValue = MY_FALSE;
+        size_t * curpos = alloca(VEC_SIZE(argp->u.vec) * sizeof(*curpos));
+        size_t * sizes = alloca(VEC_SIZE(argp->u.vec) * sizeof(*sizes));
+        vector_t ** curvec = alloca(VEC_SIZE(argp->u.vec) * sizeof(*curvec));
+
+        num_dim = VEC_SIZE(argp->u.vec);
+
+        if (!curpos || !curvec || !sizes)
+        {
+            error("Out of stack memory.\n");
+            /* NOTREACHED */
+        }
+
+        if (num_arg == 2 && (sp->type != T_NUMBER || sp->u.number != 0))
+            hasInitValue = MY_TRUE;
+
+        /* Check the size array for consistency, and also count how many
+         * elements we're going to allocate.
+         */
+        for ( dim = 0, count = 0, svp = argp->u.vec->item
+            ; dim < num_dim
+            ; dim++, svp++
+            )
+        {
+            p_int size;
+
+            if (svp->type != T_NUMBER)
+            {
+                error("Bad argument to allocate(): size[%d] is a '%s', "
+                      "expected 'int'.\n"
+                     , (int)dim, typename(svp->type));
+                /* NOTREACHED */
+            }
+
+            size = svp->u.number;
+
+            if (size < 0 || (max_array_size && (size_t)size > max_array_size))
+                error("Illegal array size: %ld\n", (long)size);
+
+            count *= (size_t)size;
+            if (max_array_size && count > max_array_size)
+                error("Illegal total array size: %lu\n", (unsigned long)count);
+
+            sizes[dim] = (size_t)size;
+            curvec[dim] = NULL;
+        }
+
+        /* Now loop over the dimensions, creating the array structure */
+        dim = 0;
+        curpos[0] = 0;
+        while (dim > 0 || curpos[0] < sizes[0])
+        {
+            if (!curvec[dim])
+            {
+                /* We just entered this dimension.
+                 * Create a new array and initialise the loop.
+                 */
+                if (hasInitValue || dim+1 < num_dim)
+                {
+                    curvec[dim] = allocate_uninit_array(sizes[dim]);
+                }
+                else
+                {
+                    curvec[dim] = allocate_array(sizes[dim]);
+                    /* This is the last dimension, and there is nothing
+                     * to initialize: return immediately to the higher level
+                     */
+                    curpos[dim] = sizes[dim]; /* In case dim == 0 */
+                    if (dim > 0)
+                        dim--;
+                    continue;
+                }
+                curpos[dim] = 0;
+            }
+
+            /* curvec[dim] is valid, and we have to put the next
+             * element in at index curpos[dim].
+             */
+            if (dim == num_dim-1)
+            {
+                /* Last dimension: assign the init value */
+                if (hasInitValue)
+                    assign_svalue_no_free(curvec[dim]->item+curpos[dim], sp);
+            }
+            else if (!curvec[dim+1])
+            {
+                /* We need a vector from a lower dimension, but it doesn't
+                 * exist yet: setup the loop parameters to go into
+                 * that lower level.
+                 */
+                dim++;
+                continue;
+            }
+            else
+            {
+                /* We got a vector from a lower lever */
+                put_array(curvec[dim]->item+curpos[dim], curvec[dim+1]);
+                curvec[dim+1] = NULL;
+            }
+
+            /* Continue to the next element. If we are at the end
+             * of this dimension, return to the next higher one.
+             */
+            curpos[dim]++;
+            if (curpos[dim] >= sizes[dim] && dim > 0)
+            {
+                dim--;
+            }
+        } /* while() */
+
+        /* The final vector is now in curvec[0] */
+        v = curvec[0];
+    }
+    else
+    {
+        /* The type checker should prevent this case */
+        fatal("Illegal arg 1 to allocate(): got '%s', expected 'int|int*'.\n"
+             , typename(argp->type));
+    } /* if (argp->type) */
+
+    if (num_arg == 2)
+        free_svalue(sp--);
+
+    free_svalue(sp);
     put_array(sp, v);
 
     return sp;

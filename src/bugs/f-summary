@@ -87,6 +87,8 @@ f-000627: Search efun
 f-000905-1: More flexible wrapping for terminal_colour().
 f-001220-0: Extend the debug_info() method to handle interactives.
 f-010307: Short(est) Path Algorithms
+f-010223: Useful coloured string efuns
+f-010320: limited() vs resetting of runtime costs
 
 
 Language
@@ -178,6 +180,7 @@ f-000905-0: Graceful charmode recovery.
 f-001116: Faster callouts
 f-001220-1: Possible implementation detail of the telnet machine
 f-010216: Possible implementation of T_ERROR
+f-010318: Runtime ERQ Executable directory specification
 
 
 Installation

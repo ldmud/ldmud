@@ -1446,6 +1446,11 @@ remove_mapping (mapping_t *m, svalue_t *map_index)
             map_index->u.str = ref_mstring(tmpstr);
         }
 
+        /* Strings don't have a secondary information: fake one for
+         * the hash lookup code.
+         */
+        map_index->x.generic = (short)(map_index->u.number << 1);
+
         str = map_index->u.str;
         keystart = (char *)CM_STRING(cm);
         size = cm->string_size;

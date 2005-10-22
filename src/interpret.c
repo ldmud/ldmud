@@ -4632,8 +4632,8 @@ complete_instruction (int instr)
         case F_EFUN4:  instr = pc[1] + EFUN4_OFFSET; break;
         case F_EFUNV:  instr = pc[1] + EFUNV_OFFSET; break;
         default:
-            fatal("Unknown prefix code %d '%s' encountered.\n"
-                 , instr, get_f_name(instr));
+            /* This is the instruction code we need */
+            NOOP;
             break;
         }
     }
@@ -5392,7 +5392,7 @@ setup_new_frame1 (int fx, int fun_ix_offs, int var_ix_offs)
      * This is an iteration walking along the inherit chain.
      */
     fun_ix_offs += fx;
-    while(flags & NAME_INHERITED)
+    while (flags & NAME_INHERITED)
     {
         inherit_t *inheritp;
 
@@ -5781,7 +5781,7 @@ eval_instruction (bytecode_p first_instruction
      *                number was read correctly.
      *
      *   RAISE_ARG_ERROR(arg,expected,got),
-     *   OP_ARG_ERROR(arg,expected.got):
+     *   OP_ARG_ERROR(arg,expected,got):
      *                Argument <arg> had type <got> (LPC type tag), not
      *                type <expected> (bit-encoded).
      *
@@ -9077,7 +9077,6 @@ again:
             string_t *new_string;
 
             /* Perform the addition, creating new_string */
-            /* TODO: Make this use memcpy() instead of strcpy() */
             if (type2 == T_STRING)
             {
                 string_t *left, *right;

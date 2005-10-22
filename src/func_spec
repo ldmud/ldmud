@@ -328,7 +328,7 @@ int     count_bits(string);
 
         /* Arrays and Mappings */
 
-mixed  *allocate(int);
+mixed  *allocate(int|int*, void|mixed);
 mixed  *filter_objects(mixed *, string, ...);
 mixed  *map_objects(mixed *, string, ...);
 mixed  *sort_array(mixed *,string|closure, ...);
@@ -359,8 +359,7 @@ int     widthof(null|mapping);
 mixed   apply(mixed|closure, ...);
 mixed   funcall(mixed|closure, ...);
 
-closure bind_lambda(closure, object default: F_CONST1);
-  /* TODO: Change this into bind_lambda(closure, null|object|void) */
+closure bind_lambda(closure, object|void);
 closure lambda(null|mixed *, mixed);
 closure symbol_function(symbol|string, null|string|object default: F_CONST0);
 closure symbol_variable(symbol|string|int);

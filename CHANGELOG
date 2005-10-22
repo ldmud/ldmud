@@ -1,6 +1,22 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+20-Mar-2001 (Lars Duening)  (3.3.32)
+    - (erq, xerq/execute.c) Quoted arguments are recognized and not split into
+        words (provided by Christian W., thanks!)
+    - (backend.c) The no-var-swapping time before a reset() is limited to
+        5 minutes max, otherwise a lot of muds will never swap variables.
+    - (object.c) A correction to the correction to functionlist() (thanks,
+        Fiona!).
+    - (func_spec, array.c) Efun allocate() now accepts an initialisation
+        value (f-981229-09a).
+    - (configure.in) When using mySQL, the script also checks for and links
+        in the libz (reported by Bardioc).
+
+19-Mar-2001 (Lars Duening)
+    - (func_spec, closure.c) The definition of bind_lambda() didn't work.
+    - (mapping.c) Keyvalues for strings were still computed incorrectly.
+
 16-Mar-2001 (Lars Duening)  (3.3.31)
     - (pkg-mysql.c) Dafire provided to new mySQL efuns: db_insert_id()
         and db_coldefs() - thanks!.

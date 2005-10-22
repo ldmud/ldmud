@@ -5018,11 +5018,11 @@ undefined_function:
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_bind_lambda (svalue_t *sp)
+f_bind_lambda (svalue_t *sp, int num_arg)
 
 /* EFUN bind_lambda()
  *
- *     closure bind_lambda(closure cl, object ob = 1)
+ *     closure bind_lambda(closure cl [, object ob ])
  *
  * Binds an unbound closure <cl> to object <ob> and return the
  * bound closure.
@@ -5033,15 +5033,17 @@ f_bind_lambda (svalue_t *sp)
  * If the argument <ob> is omitted, the closure is bound to
  * this_object(), and additionally the function accepts unbindable
  * closures without complaint.
- *
- * Note: the 'default' value for <ob> is const1 so that the omittal
- * can be detected.
  */
 
 {
     object_t *ob;
 
-    if (sp->type == T_OBJECT)
+    if (num_arg == 1)
+    {
+        /* this_object() is fine */
+        ob = ref_object(current_object, "bind_lambda");
+    }
+    else /* (sp->type == T_OBJECT) */
     {
         /* If <ob> is given, check for a possible privilege breach */
         ob = sp->u.ob;
@@ -5052,20 +5054,10 @@ f_bind_lambda (svalue_t *sp)
             sp--;
             return sp;
         }
-    }
-    else if (sp->type == T_NUMBER && sp->u.number == 1)
-    {
-        /* this_object is ok */
-        ob = ref_object(current_object, "bind_lambda");
-    }
-    else
-    {
-        efun_arg_error(2, T_OBJECT, sp->type, sp);
-        /* NOTREACHED */
-        return sp;
+
+        sp--; /* points to closure now */
     }
 
-    sp--;  /* points to the closure now */
     inter_sp = sp;
 
     switch(sp->x.closure_type)
