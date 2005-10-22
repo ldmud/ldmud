@@ -5735,6 +5735,9 @@ expr0:
           $$.type = TYPE_ANY;
 
           /* Check the types */
+          /* TODO: Implement the typechecks, including result type
+           * TODO:: by table lookups.
+           */
           if (exact_types)
           {
               vartype_t first_type  = $1.type;
@@ -5783,8 +5786,12 @@ expr0:
                   if ( !BASIC_TYPE(second_type,TYPE_NUMBER)
                    &&  !BASIC_TYPE(second_type ,TYPE_STRING) )
                       type_error("Bad argument 2 to &", second_type);
-                  $$.type =   BASIC_TYPE(first_type ,TYPE_NUMBER)
-                            ? TYPE_NUMBER : TYPE_STRING;
+                  if ( first_type == TYPE_ANY )
+                      $$.type =   BASIC_TYPE(second_type ,TYPE_NUMBER)
+                                ? TYPE_NUMBER : TYPE_STRING;
+                  else
+                      $$.type =   BASIC_TYPE(first_type ,TYPE_NUMBER)
+                                ? TYPE_NUMBER : TYPE_STRING;
               }
           } /* end of exact_types code */
       } /* end of '&' code */
@@ -6208,14 +6215,14 @@ expr0:
       {
           $$ = $2;
           $$.type = $1;
-          if ($2.type != TYPE_ANY
-           && $2.type != TYPE_UNKNOWN
-           && $1 != TYPE_VOID)
+          if ($1 != TYPE_VOID)
           {
               switch($1)
               {
               default:
-                  type_error("Illegal cast", $1);
+                  /* Normal type cast */
+                  if ($2.type != TYPE_ANY && $2.type != TYPE_UNKNOWN)
+                      type_error("Illegal cast", $1);
                   break;
               case TYPE_NUMBER:
                   ins_f_code(F_TO_INT);

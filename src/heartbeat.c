@@ -497,7 +497,7 @@ hbeat_dinfo_status (svalue_t *svp, int value)
     ST_NUMBER(DID_ST_HBEAT_PROCESSED, hb_num_done);
     ST_DOUBLE(DID_ST_HBEAT_AVG_PROC
              , avg_num_hb_objs
-               ? avg_num_hb_done / avg_num_hb_objs
+               ? ((double)avg_num_hb_done / avg_num_hb_objs)
                : 1.0
              );
 

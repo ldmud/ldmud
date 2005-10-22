@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-29-Apr-2001 (Lars Duening) -- Development Release 3.3
+06-May-2001 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -42,7 +42,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
 
 
-25-Apr-2001 (Lars Duening) -- upcoming Release 3.2.9
+09-May-2001 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + allocate(): Accepts an optional initialisation value and can
@@ -173,6 +173,11 @@ For a detailed list of all changes see the file CHANGELOG.
        + Bugfix: For closely consecutive switch case ranges (e.g. 'case
            -2..-1: case 1..2:') the compiler generated faulty lookup
            tables.
+       + Bugfix: Improved the typetracking for operator '&' when used with
+           mixed variables.
+       + Bugfix: Casting an unknown or mixed type now always performs a
+           proper conversion.
+
 
     - Runtime:
        + Attempts to set a single string character to 0 now raise
@@ -185,6 +190,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + Bugfix: On mapping addition or element assignment, invalid keys (like
            destructed objects) were still counted against the allowed mapping
            size.
+       + Bugfix: Simple reference loops as created by
+           'b = 0 || &a; b = 0 || &a;' are detected.
 
     - Other Changes:
        + New driver option '--pidfile <filename>' to write the pid of the

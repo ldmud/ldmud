@@ -1492,9 +1492,31 @@ inl_transfer_svalue (svalue_t *dest, svalue_t *v)
 
 {
 
+    /* Unravel the T_LVALUE chain, if any. */
+    while (dest->type == T_LVALUE || dest->type == T_PROTECTED_LVALUE)
+        dest = dest->u.lvalue;
+
+    /* Ad-hoc protection against endless reference loops,
+     * e.g. created by 'b = 0 || &a; b = 0 || &a;'
+     * We have to check for this before we free the dest value, otherwise
+     * the error() call will free dest again during the stack cleanup.
+     */
+    if (v->type == T_LVALUE || v->type == T_PROTECTED_LVALUE)
+    {
+        svalue_t * rover;
+
+        for ( rover = v
+            ; rover->type == T_LVALUE || rover->type == T_PROTECTED_LVALUE
+            ; rover = rover->u.lvalue)
+        {
+            if (rover == dest || rover->u.lvalue == dest)
+                error("Assignment would create reference loop.\n");
+        }
+        
+    }
+
+
     /* Free the <dest> svalue.
-     * If <dest> is a lvalue, the loop will traverse the lvalue chain until
-     * the actual svalue is found.
      * If a T_xxx_LVALUE is found, the transfer will be done here
      * immediately.
      */
@@ -1503,11 +1525,6 @@ inl_transfer_svalue (svalue_t *dest, svalue_t *v)
     {
         switch (dest->type)
         {
-        case T_LVALUE:
-        case T_PROTECTED_LVALUE:
-            dest = dest->u.lvalue;
-            continue;
-
         case T_STRING:
             free_mstring(dest->u.str);
             break;

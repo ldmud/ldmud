@@ -22,14 +22,15 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 53)
-(Parent-Version lpmud 3-3 52)
-(Version-Log "Looking up keys in arrays failed occasionally.
-m_values() did not check the mapping width properly.
-Nested definitions of inline closures generated spurious warnings.")
+(Project-Version lpmud 3-3 54)
+(Parent-Version lpmud 3-3 53)
+(Version-Log "Added protection against reference loops.
+Improved type tracking for '&'.
+Casting unknown or mixed values now always use a proper conversion.
+Added basic support for the MorgenGrauen mudlib.")
 (New-Version-Log
 "")
-(Checkin-Time "Sun, 29 Apr 2001 23:35:22 -0600")
+(Checkin-Time "Wed, 09 May 2001 16:55:56 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -61,9 +62,9 @@ Nested definitions of inline closures generated spurious warnings.")
   ;; Information about the driver and the distribution in general
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.3 644))
-  (CREDITS (lpmud/d/22_CREDITS 1.70.1.14 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.116 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.172 644))
+  (CREDITS (lpmud/d/22_CREDITS 1.70.1.15 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.117 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.173 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.10 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -140,9 +141,9 @@ Nested definitions of inline closures generated spurious warnings.")
   (src/hash.h (lpmud/f/32_hash.h 1.5 644))
   (src/hash.c (lpmud/c/28_hash.c 1.12 644))
   (src/heartbeat.h (lpmud/m/41_heartbeat. 1.6.1.4 644))
-  (src/heartbeat.c (lpmud/m/42_heartbeat. 1.18.1.5 644))
+  (src/heartbeat.c (lpmud/m/42_heartbeat. 1.18.1.6 644))
   (src/interpret.h (lpmud/b/13_interpret. 1.33.1.16 644))
-  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.61 644))
+  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.62 644))
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.8 644))
   (src/lex.c (lpmud/b/12_lex.c 1.62.1.42 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.5 644))
@@ -173,7 +174,7 @@ Nested definitions of inline closures generated spurious warnings.")
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.7 644))
   (src/port.c (lpmud/39_port.c 1.17.1.5 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.12 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.52 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.53 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))
@@ -1035,7 +1036,7 @@ Nested definitions of inline closures generated spurious warnings.")
 
 
   ;; Mudlib Support
-  (mud/README (lpmud/t/12_README 1.6 644))
+  (mud/README (lpmud/t/12_README 1.6.1.1 644))
 
   ;; Mudlib Support: Heaven7
   (mud/heaven7/INFO.txt (lpmud/K/19_INFO.txt 1.1 644))
@@ -1067,6 +1068,10 @@ Nested definitions of inline closures generated spurious warnings.")
   (mud/dt2/obsolete/secure/domains (lpmud/E/46_domains 1.1 644))
   (mud/dt2/obsolete/secure/security.h (lpmud/E/47_security.h 1.1 644))
   (mud/dt2/obsolete/321@141-dt2.diff (lpmud/E/48_diff-321@1 1.1 644))
+
+  ;; Mudlib Support: patches for MorgenGrauen 3.2.6
+  (mud/morgengrauen/lib/mudlib.diff (lpmud/L/48_mudlib.dif 1.1 644))
+  (mud/morgengrauen/INFO.txt (lpmud/L/49_INFO.txt 1.1 644))
 
   ;; Mudlib Support: the LP-2.4.5 mudlib
   (mud/lp-245/sys/wizlist.h (lpmud/t/13_wizlist.h 1.2 644))

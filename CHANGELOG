@@ -1,6 +1,22 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+09-May-2001 (Lars Duening)  (3.3.54)
+    - (prolang.y) Casting an unknown or mixed type now always inserts
+         a proper conversion (reported by Tomi).
+    - (heartbeat.c) The result for DID_ST_HBEAT_AVG_PROC was computed
+         as int instead of float (reported by Freaky).
+    - (mud/morgengrauen) Added basic support for the MorgenGrauen 3.2.6
+         mudlib.
+
+08-May-2001 (Lars Duening)
+    - (prolang.y) The expression 'a & b' failed to track the types if one
+         of the operands was of TYPE_ANY (reported by Gnomi).
+
+06-May-2001 (Lars Duening)
+    - (interpret.c) Added a protection against simple reference loops
+         as created by 'b = 0 || &a; b = 0 || &a;' (reported by Gnomi).
+
 29-Apr-2001 (Lars Duening)  (3.3.53)
     - (mapping.c) m_values() failed to properly check the mapping width,
          especially on empty mappings.
