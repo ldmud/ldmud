@@ -1,6 +1,4 @@
 This directory holds the host dependent parts and emulations of the driver.
+
 Don't assume just because a system is listed here it means that the driver
 still runs on that system.
-
-Especially the msdos/ port is kept just for curiosity value; since 3.2.5
-it is no longer supported.

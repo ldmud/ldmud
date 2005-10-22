@@ -1,5 +1,0 @@
-This directory contains the includes needed to compile any program using
-BSD-style sockets for Internetworking.
-Install them into your compiler's include-path to use them.
-But take care that you don't overwrite includes already existing!
-

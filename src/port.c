@@ -323,31 +323,6 @@ char * crypt(char *pass, char *salt)
 #endif
 
 /*-------------------------------------------------------------------------*/
-#ifdef atarist
-
-#ifndef ATARI_TT /* exp is in <math-688.h>, which is included by lint.h */
-double
-exp (double a) /* can't compute anything but exp(-n/900) */
-{
-    float r = 1.;
-    int i;
-
-    i = (a * -0.033);
-    while (--i >= 0) {
-        r *= 6.911322453e-14      ; /* exp(-1/0.033) (inaccurate) */
-        a += 30.3030303030303030303;
-    }
-    i = (a * -900. + 0.1);
-    while (--i >= 0 ) {
-        r *= .9988895059            ; /* exp(-1/900) (inaccurate) */
-    }
-    return (double)r;
-}
-#endif /* ATARI_TT */
-
-#endif /* atarist */
-
-/*-------------------------------------------------------------------------*/
 #if !defined(HAVE_GETRUSAGE)
 
 #include <sys/times.h>
@@ -371,7 +346,7 @@ getrusage (int who, struct rusage *rusage)
 }
 #endif /* getrusage implemented using times() */
 
-#if defined(AMIGA) || defined(__CYGWIN__)
+#if defined(__CYGWIN__)
 /*-----------------------------------------------------------------------
 ** void init_rusage (void)
 ** int getrusage (int who, struct rusage *rusage)
@@ -381,20 +356,6 @@ getrusage (int who, struct rusage *rusage)
 ** Reason is that some wiz use the efun getrusage() to measure times
 ** in subseconds.
 */
-
-#ifdef __SASC
-
-struct rtime {
-  long tv_sec;
-  long tv_usec;
-};
-
-struct rusage {
-  struct rtime ru_utime;
-  struct rtime ru_stime;
-};
-
-#endif
 
 static clock_t first_clock;
 
@@ -416,7 +377,7 @@ getrusage (int who, struct rusage *rusage) {
   return 0;
 }
 
-#endif /* AMIGA || CYGWIN */
+#endif /* CYGWIN */
 
 /***************************************************************************/
 

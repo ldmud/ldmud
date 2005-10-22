@@ -107,11 +107,6 @@
 
 #include "../mudlib/sys/debug_info.h"
  
-/* TODO: Use get_host_name() instead of gethostname() */
-#ifdef AMIGA
-#include "hosts/amiga/socket.h"
-#endif
-
 /*-------------------------------------------------------------------------*/
 
 typedef struct swap_block_s swap_block_t;

@@ -34,9 +34,6 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#ifdef OS2
-#include <io.h>
-#endif
 
 #include "lex.h"
 
@@ -74,10 +71,6 @@
  * TODO: Does Standard-C allow recursive macro expansion? If not, we
  * TODO:: should disallow it, too.
  */
-
-#ifdef AMIGA
-#    include "hosts/amiga/socket.h"
-#endif
 
 #if defined(hpux) && !defined(__GNUC__)
 /* This compilers handling of (char) is broken */

@@ -28,16 +28,7 @@
 #include <stdarg.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-
-#ifdef AMIGA
-#    include "hosts/amiga/nsignal.h"
-#else
-#    include <signal.h>
-#endif
-
-#if defined(OS2)
-#    define lstat stat
-#endif
+#include <signal.h>
 
 /*-------------------------------------------------------------------------*/
 
@@ -517,15 +508,11 @@ fatal (const char *fmt, ...)
     printf("%s LDMud aborting on fatal error.\n", time_stamp());
     fflush(stdout);
 
-#if !defined(AMIGA) || !defined(__SASC)
     sleep(1); /* let stdout settle down... abort can ignore the buffer... */
-#else
-    Delay(50);        /* Call Dos.library to wait... */
-#endif
 
     va_end(va);
 
-#if !defined(AMIGA) && !defined(__BEOS__)
+#if !defined(__BEOS__)
     /* we want a core dump, and abort() seems to fail for linux and sun */
     (void)signal(SIGFPE, SIG_DFL);
     {

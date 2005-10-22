@@ -66,12 +66,7 @@
 #include <sys/time.h>
 #include <stdarg.h>
 #include <stddef.h>
-
-#if defined(AMIGA) && !defined(__SASC)
-#    include <ioctl.h>
-#else
-#    include <sys/ioctl.h>
-#endif
+#include <sys/ioctl.h>
 
 #define TELOPTS
 #include "telnet.h"
@@ -84,11 +79,7 @@
 #    include <sys/param.h>
 #endif
 
-#ifndef AMIGA
-#    include <signal.h>
-#else
-#    include "hosts/amiga/nsignal.h"
-#endif
+#include <signal.h>
 
 #ifdef _AIX
 #    include <sys/select.h>
@@ -153,7 +144,7 @@
 #    define socket_close  close
 #endif /* SOCKET_LIB */
 
-#if defined(SunOS4) || defined(atarist)
+#if defined(SunOS4)
 struct timeval;
 extern SOCKET_T socket(int, int, int);
 extern int getpeername(SOCKET_T, struct sockaddr *, int *);

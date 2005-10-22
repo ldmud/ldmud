@@ -47,12 +47,16 @@
 
 #ifdef USE_ALISTS
 
+#include "pkg-alists.h"
+
 #include "my-alloca.h"
 #include <stddef.h>
 
 #include "array.h"
+#include "interpret.h" /* destructed_object_ref(), error functions */
 #include "main.h"
 #include "mstrings.h"
+#include "simulate.h"  /* error() */
 #include "svalue.h"
 #include "xalloc.h"
 

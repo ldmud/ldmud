@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+28-Apr-2001 (Lars Duening)  (3.3.52)
+    - (several files) Removed the support for Atari and OS/2, restricted
+         the Amiga support to gcc/ixemul.
+    - (pkg-alists.c) Removed compiler warnings.
+
 27-Apr-2001 (Lars Duening)  (3.3.51)
     - (sprintf.c) Duh. A typo caused '%^' to eat the next character
          from the format string (reported by Robert).

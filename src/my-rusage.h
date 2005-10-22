@@ -15,10 +15,6 @@
 #    define getrusage(a, b)  syscall(SYS_GETRUSAGE, a, b)
 #endif
 
-#if defined(AMIGA) && !defined(__SASC)
-#    include <sys/resource.h>
-#endif
-
 #if defined(HAVE_GETRUSAGE)
 #    if defined(RUSAGE_USEC) || defined(__hpux__)
 #        define RUSAGE_TIME(t) ( (t).tv_sec * 1000 + (t).tv_usec / 1000 )

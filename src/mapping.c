@@ -223,6 +223,7 @@ struct map_chain_s {
   /* Number of 'freed' empty mappings allowed in the dirty list
    * at any time. This way the dirty list can be single-linked only
    * and still allow fast 'freeing' of unused mappings.
+   * TODO: Make the list doubly-linked - the memory savings are irrelevant.
    */
 
 static mapping_hash_t dirty_mapping_head_hash;

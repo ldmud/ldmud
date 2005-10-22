@@ -99,13 +99,6 @@ extern int errno;
 #    include <bstring.h>
 #endif
 
-#ifdef AMIGA
-#    include "hosts/amiga/patchfloat.h"
-#endif /* AMIGA */
-#ifdef ATARI_TT
-#    include <math-688.h>
-#    define _MATH_H
-#endif
 #include <math.h>
 
 #ifdef __BEOS__
@@ -205,7 +198,7 @@ extern int errno;
 #    undef USE_MYSQL
 #endif
 
-#if ( defined( atarist ) && !defined ( minix ) ) || defined( MSDOS ) || defined(__CYGWIN__)
+#if defined( MSDOS ) || defined(__CYGWIN__)
 #define MSDOS_FS
 #endif
 
@@ -289,13 +282,7 @@ typedef char  CBool;
 #    define FREE_RETURN return 1;
 #endif
 
-#if defined(AMIGA) && defined(_DCC)
-    /* DICE v2.06 pessimizes constant pointer arithmetic,
-     * assuming 0 as difference of constant pointers. */
-#    define PTRTYPE unsigned long
-#else
-#    define PTRTYPE char *
-#endif
+#define PTRTYPE char *
 
 
 /*------------------------------------------------------------------
@@ -370,8 +357,6 @@ typedef signed long ssize_t;
 
 #if defined(HOST_INCLUDE)
 #    include HOST_INCLUDE
-#elif defined(AMIGA)
-#    include "hosts/amiga/amiga.h"
 #elif defined(__BEOS__)
 #    include "hosts/be/be.h"
 #else
@@ -419,7 +404,7 @@ extern char *crypt(const char *, const char *);
 #    define crypt(pass, salt) _crypt(pass, salt)
 #endif
 
-#if defined(AMIGA) || defined(__CYGWIN__)
+#if defined(__CYGWIN__)
 extern void init_rusage(void);
 #else
 #define init_rusage()

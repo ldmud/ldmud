@@ -35,12 +35,6 @@
 #include <sys/types.h>
 #include <ctype.h>
 #include <stdarg.h>
-#ifdef NeXT
-#include <sys/param.h>
-#endif
-#ifdef AMIGA
-#include "hosts/amiga/socket.h"
-#endif
 
 #include "main.h"
 
@@ -409,10 +403,6 @@ main (int argc, char **argv)
 #endif
 #endif
 
-#if defined(AMIGA)
-    amiga_end();
-#endif
-    
     return 0; /* TODO: There are constants for this */
 } /* main() */
 
@@ -466,11 +456,7 @@ vdebug_message(const char *fmt, va_list va)
             sprintf(deb,"%s.debug.log", query_host_name());
             file = deb;
         }
-#ifndef AMIGA
         fp = fopen(file, "w");
-#else
-        fp = fopen(file, "a");
-#endif
         if (fp == NULL) {
             perror(file);
             abort();

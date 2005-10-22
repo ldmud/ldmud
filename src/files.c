@@ -50,10 +50,6 @@ extern int lstat PROT((CONST char *, struct stat *));
 extern int fchmod PROT((int, int));
 #endif
 
-#if defined(OS2)
-#    define lstat stat
-#endif
-
 /*-------------------------------------------------------------------------*/
 
 #include "files.h"
@@ -261,13 +257,11 @@ move_file (const char *from, const char *to)
         return 0;
     }
 
-#if !defined(AMIGA)
     if (errno != EXDEV)
     {
         error("cannot move `%s' to `%s'", from, to);
         return 1;
     }
-#endif
 
     /* rename failed on cross-filesystem link.  Copy the file instead. */
 
@@ -291,101 +285,15 @@ move_file (const char *from, const char *to)
 } /* move_file() */
 
 /*-------------------------------------------------------------------------*/
-#ifdef atarist
-/* this code is provided to speed up ls() on an Atari ST/TT . */
 
-#include <support.h>
-#include <limits.h>
-#include <osbind.h>
+/* If your system's native methods can provide a speedier directory access
+ * than opendir/readdir/closedir(), implement them as xopendir() and friends,
+ * and define XDIR to the datastructure you need.
+ */
 
-extern long _unixtime PROT((unsigned, unsigned));
-
-struct xdirect {
-    /* inode and position in directory aren't usable in a portable way,
-     * so why support them anyway?
-     */
-    short d_namlen;
-    char  d_name[16];
-    int   size;
-    int   time;
-};
-
-typedef struct
-{
-    _DTA dta;
-    char *dirname;
-    long status;
-} xdir;
-#define XDIR xdir
-
-static long olddta;
-
-/*-------------------------------------------------------------------------*/
-static XDIR *xopendir(path)
-char *path;
-{
-    char pattern[MAXPATHLEN+1];
-    XDIR *d;
-    long status;
-
-    d = (XDIR *)xalloc(sizeof(XDIR));
-    _unx2dos(path, pattern);
-    strcat(pattern, "\\*.*");
-    olddta = Fgetdta();
-    Fsetdta(&d->dta);
-    d->status = status = Fsfirst(pattern, 0xff);
-    if (status && status != -ENOENT) {
-        xfree(d);
-        return 0;
-    }
-    d->dirname = string_copy(pattern);
-    return d;
-}
-
-/*-------------------------------------------------------------------------*/
-#define XOPENDIR(dest, path) ((dest) = xopendir(path))
-
-static struct xdirect *xreaddir(d)
-XDIR *d;
-{
-    static struct xdirect xde;
-
-    if (d->status)
-        return 0;
-    _dos2unx(d->dta.dta_name, xde.d_name);
-    xde.d_namlen = strlen(xde.d_name);
-    if (FA_DIR & d->dta.dta_attribute)
-        xde.size = -2;
-    else
-        xde.size = d->dta.dta_size;
-    xde.time = _unixtime(d->dta.dta_time, d->dta.dta_date);
-    d->status = Fsnext();
-    return &xde;
-}
-
-/*-------------------------------------------------------------------------*/
-static void xclosedir(d)
-XDIR *d;
-{
-    Fsetdta(olddta);
-    xfree(d->dirname);
-    xfree(d);
-}
-
-/*-------------------------------------------------------------------------*/
-static void xrewinddir(d)
-XDIR *d;
-{
-    long status;
-
-    Fsetdta(&d->dta);
-    d->status = status = Fsfirst(d->dirname, 0xff);
-}
-
-#endif /* atarist */
-
-/*-------------------------------------------------------------------------*/
 #ifndef XDIR
+
+/* Use the normal Posix calls */
 
 struct xdirect
 {

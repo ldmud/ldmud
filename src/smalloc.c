@@ -1009,7 +1009,7 @@ xfree (POINTER ptr)
 
 /* Extra types and definitions for the AVL routines */
 
-#if defined(atarist) || defined (sun) || defined(AMIGA) || defined(__linux__) || defined(__BEOS__)
+#if defined (sun) || defined(AMIGA) || defined(__linux__) || defined(__BEOS__)
     /* there is a type signed char */
     typedef /*signed*/ char balance_t;
 #   define BALANCE_T_BITS 8
@@ -1017,7 +1017,7 @@ xfree (POINTER ptr)
     typedef short balance_t;
 #   define BALANCE_T_BITS 16
 #endif
-#if (defined(atarist) && !defined(ATARI_TT)) || defined(sparc) || defined(AMIGA)
+#if defined(sparc) || defined(AMIGA)
     /* try to avoid multiple shifts, because these are costly */
 #   define NO_BARREL_SHIFT
 #endif

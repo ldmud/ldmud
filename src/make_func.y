@@ -266,10 +266,6 @@
 
 /*-------------------------------------------------------------------------*/
 
-#if defined(AMIGA)
-#    define isascii(c) ((c) >= 0 && (c) <= 255)
-#endif
-
 #undef isalunum
 #define isalunum(c) (isascii((unsigned char)c) && (isalnum((unsigned char)c) || (c) == '_' ))
 

@@ -67,8 +67,6 @@ For a detailed list of all changes see the file CHANGELOG.
            NO_INHERIT, NO_SHADOW and NO_CLONE, and gives a better account
            of the memory used for strings and variables.
            Single values can be returned instead of the whole array.
-       + printf(), sprintf(): The formatter "%^" will print "%^", for
-           compatibility with terminal_colour().
        + printf(), sprintf(): A leading zero in the field size will now print
            only leading zeros and not interfere with the pad string option.
        + query_udp_port(), send_udp(): Renamed from query_imp_port() and
@@ -94,6 +92,8 @@ For a detailed list of all changes see the file CHANGELOG.
            after the first received data are now recognized. 
        + object_info(): The returned OIB_NAME now starts with a '/' in plain
            mode.
+       + printf(), sprintf(): The formatter "%^" will print "%^", for
+           compatibility with terminal_colour().
 
     - New efuns:
        + db_affected_rows(), db_conv_string(), db_close(), db_connect(),

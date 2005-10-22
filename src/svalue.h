@@ -353,7 +353,7 @@ struct svalue_s
 
 /* --- The fast format */
 
-#if defined(atarist) || (defined(AMIGA) && defined(_DCC))
+#if (defined(AMIGA) && defined(_DCC))
 
 #define FLOAT_FORMAT_1
 
@@ -372,10 +372,7 @@ struct svalue_s
  * and being more stable.
  */
 
-static
-#ifdef atarist
-inline
-#endif
+static INLINE
 double READ_DOUBLE(struct svalue *svalue_pnt)
 {        double tmp;
         (*(long*)&tmp) = svalue_pnt->u.mantissa;

@@ -37,12 +37,4 @@ extern long int strtol(const char *, char **, int);
 extern time_t time(time_t *tloc);
 #endif
 
-#if defined(AMIGA) && defined(__GNUC__)
-#undef AMIGA
-#endif
-
-#if 0 && defined(__CYGWIN__)
-extern char * ctime(time_t *tloc);
-#endif
-
 #endif /* __HOSTS_UNIX_H__ */

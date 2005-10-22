@@ -38,12 +38,8 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/time.h>
-#ifdef AMIGA
-#include "hosts/amiga/nsignal.h"
-#else
 #include <signal.h>
 #include <sys/times.h>
-#endif
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <time.h>
@@ -238,22 +234,6 @@ logon (object_t *ob)
 }
 
 /*-------------------------------------------------------------------------*/
-#ifdef AMIGA
-
-static void
-exit_alarm_timer (void)
-
-/* Clean up the alarm timer on program exit.
- * This is set as atexit() function.
- */
-
-{
-    alarm(0);
-}
-
-#endif
-
-/*-------------------------------------------------------------------------*/
 static RETSIGTYPE
 handle_hup (int sig UNUSED)
 
@@ -318,9 +298,6 @@ backend (void)
         time_to_call_heart_beat = MY_FALSE;
         alarm(ALARM_TIME);
     }
-#ifdef AMIGA
-    atexit(exit_alarm_timer);
-#endif
 
     printf("%s LDMud ready for users.\n", time_stamp());
     fflush(stdout);
@@ -601,7 +578,8 @@ ALARM_HANDLER(catch_alarm, alarm_called = MY_TRUE; comm_time_to_call_heart_beat 
 
 #else
 
-void catch_alarm (int dummy UNUSED)
+RETSIGTYPE
+catch_alarm (int dummy UNUSED)
 {
 #ifdef __MWERKS__
 #    pragma unused(dummy)
@@ -610,6 +588,9 @@ void catch_alarm (int dummy UNUSED)
     alarm_called = MY_TRUE;
     comm_time_to_call_heart_beat = 1;
     total_alarms++;
+#ifndef RETSIGTYPE_VOID
+    return 0;
+#endif
 }
 
 #endif
