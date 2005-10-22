@@ -42,7 +42,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
 
 
-24-May-2001 (Lars Duening) -- upcoming Release 3.2.9
+03-June-2001 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + allocate(): Accepts an optional initialisation value and can
@@ -168,6 +168,12 @@ For a detailed list of all changes see the file CHANGELOG.
        + It is no longer possible to prematurely end an inline closure
            function by inserting a free '}'.
        + Global functions are no longer hidden by local variables.
+       + It is now possible to cast to '(mixed)'.
+       + If operands of different types are given to '?:', the result
+           will have the type 'mixed'.
+       + Under strict type checking, the type checking at function return
+           is more strict.
+       + Integers and floats can now be compared against each other.
        + Bugfix: Adding mappings of different width throws an error, unless
            one of the mappings if empty.
        + Bugfix: Right shift by 32 or more bits was computed incorrectly.
@@ -181,6 +187,8 @@ For a detailed list of all changes see the file CHANGELOG.
            tables.
        + Bugfix: Improved the typetracking for operator '&' when used with
            mixed variables.
+       + Bugfix: A cast of an expression to its own type now longer inserts
+           a conversion operation.
 
 
     - Runtime:

@@ -13,7 +13,7 @@ DESCRIPTION
         and the data arrays; the same permutation that is applied to
         the key array is applied to all data arrays.
 
-        Complexity is O(n * lg(n) * m), where n is the number of
+        Complexity is O(n * lg(n) + n * m), where n is the number of
         elements in the key array and m is the number of data arrays + 1.
 
         Note that the dimensions of the arrays are used the other

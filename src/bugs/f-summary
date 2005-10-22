@@ -93,6 +93,12 @@ f-010406-0: Improved RegExps, using PCRE
 f-010411: Extend map(),filter(),... for strings.
 f-010516-0: Allow add_actions() on closures
 f-010516-1: Add a priority to notify_fail()
+f-010603-0: Efun to count the number of lines in a file
+f-010603-1: Specify commandline options in a file
+f-010603-2: Efun to resolve paths
+f-010603-3: multicast-call_other with exclusion
+f-010603-4: Safe recompile of objects
+f-010603-5: New datatypes NULL and ERROR
 
 
 Language

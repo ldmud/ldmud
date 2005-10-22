@@ -1251,6 +1251,7 @@ if test -f "settings/$withval" ; then
 cat >conftest.sed <<\EOF
 /^#.*/ d
 /^[ \t]*$/ d
+s/#.*$//
 s/disable_\([^= \t]*\)/enable_\1=no/
 /^enable_/ s/^/DEFAULT/p
 /^with_/ s/^/DEFAULT/p

@@ -2133,7 +2133,7 @@ destruct (object_t *ob)
     ob->next_inv = NULL;
     ob->contains = NULL;
     ob->flags &= ~O_ENABLE_COMMANDS;
-    ob->flags |= O_DESTRUCTED;  /* should come last! */
+    ob->flags |= O_DESTRUCTED;  /* must come last! */
     new_destructed++;
     if (command_giver == ob)
         command_giver = NULL;

@@ -440,6 +440,36 @@ mstring_new_tabled (const char * const pTxt MTRACE_DECL)
 
 /*-------------------------------------------------------------------------*/
 string_t *
+mstring_new_n_tabled (const char * const pTxt, size_t size MTRACE_DECL)
+
+/* Aliased to: new_n_tabled(pTxt, len)
+ *
+ * Create a new tabled string by copying the C string <pTxt> of length <size>
+ * and return it counting the result as one reference. If a tabled string
+ * for the same <pTxt> already exists, a reference to that one is returned.
+ *
+ * If memory runs out, NULL is returned.
+ */
+
+{
+    int        idx;
+    string_t * string;
+
+    idx = StrHash(pTxt, size);
+
+    /* Check if the string has already been tabled */
+    string = find_and_move(pTxt, size, idx);
+    if (string)
+    {
+        return ref_mstring(string);
+    }
+
+    /* No: create a new one */
+    return make_new_tabled(pTxt, size, idx MTRACE_PASS);
+} /* mstring_new_tabled() */
+
+/*-------------------------------------------------------------------------*/
+string_t *
 mstring_make_tabled (string_t * pStr, Bool deref_arg MTRACE_DECL)
 
 /* Aliased to: make_tabled(pStr), make_tabled_from(pStr)

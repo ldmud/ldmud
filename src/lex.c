@@ -564,7 +564,7 @@ static char optab2[]
 /* Forward declarations */
 
 static INLINE int number(long);
-static INLINE int string(char *);
+static INLINE int string(char *, size_t);
 static void handle_define(char *, Bool);
 static void add_define(char *, short, char *);
 static void add_permanent_define(char *, short, void *, Bool);
@@ -2406,19 +2406,18 @@ parse_escaped_char (char * cp, char * p_char)
 
 /*-------------------------------------------------------------------------*/
 static void
-add_lex_string (char *str)
+add_lex_string (char *str, size_t slen)
 
-/* Add <str> to the global <last_lex_string> in order to implement
- * Standard-C style string concatenation.
+/* Add <str> with length <slen> to the global <last_lex_string> in order
+ * to implement Standard-C style string concatenation.
  */
 
 {
-    size_t len1, len2;
+    size_t len1;
     string_t *new;
 
     len1 = mstrsize(last_lex_string);
-    len2 = strlen(str);
-    if (len1+len2 > MAX_ANSI_CONCAT)
+    if (len1+slen > MAX_ANSI_CONCAT)
     {
         /* Without this test, compilation would still terminate eventually,
          * thus it would still be 'correct', but it could take several hours.
@@ -2427,26 +2426,27 @@ add_lex_string (char *str)
         /* leave the old string, ignore the new addition */
         return;
     }
-    new = mstr_add_txt(last_lex_string, str, len2);
+    new = mstr_add_txt(last_lex_string, str, slen);
     if (!new)
     {
         lexerrorf("Out of memory for string concatenation (%lu bytes)"
-                , (unsigned long)len1+len2);
+                , (unsigned long)len1+slen);
     }
     free_mstring(last_lex_string);
     last_lex_string = make_tabled(new);
     if (!last_lex_string)
     {
         lexerrorf("Out of memory for string concatenation (%lu bytes)"
-                , (unsigned long)len1+len2);
+                , (unsigned long)len1+slen);
     }
 } /* add_lex_string() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE int
-string (char *str)
+string (char *str, size_t slen)
 
-/* Return a string to yacc: set last_lex_string to <str> and return L_STRING.
+/* Return a string to yacc: set last_lex_string to <str> of length <slen>
+ * and return L_STRING.
  * If there is a string in last_lex_string already, <str> is appended
  * and yylex() is called recursively to allow ANSI string concatenation.
  */
@@ -2454,16 +2454,16 @@ string (char *str)
 {
     if (last_lex_string)
     {
-        add_lex_string(str);
+        add_lex_string(str,  slen);
         return yylex();
     }
     else
     {
-        last_lex_string = new_tabled(str);
+        last_lex_string = new_n_tabled(str, slen);
         if (!last_lex_string)
         {
             lexerrorf("Out of memory for string literal (%lu bytes)"
-                    , (unsigned long)strlen(str));
+                    , (unsigned long)slen);
         }
     }
     return L_STRING;
@@ -3847,7 +3847,7 @@ yylex1 (void)
                     outp = p-1;
                     /* myfilbuf(); not needed */
                     lexerror("Newline in string");
-                    return string("");
+                    return string("", 0);
                 }
                 SAVEC;
 
@@ -3885,7 +3885,7 @@ yylex1 (void)
                         {
                             outp = p;
                             lexerror("End of file in string");
-                            return string("");
+                            return string("", 0);
                         }
                         if (!*p)
                         {
@@ -3912,7 +3912,7 @@ yylex1 (void)
             } /* for() */
 
             outp = p;
-            return string(yytext);
+            return string(yytext, yyp-yytext);
         }
 
 

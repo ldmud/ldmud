@@ -1,6 +1,30 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+03-June-2001 (Lars Duening)  (3.3.59)
+    - (prolang.y) A cast of a type to itself is now a no-op as it should
+         be (reported by Gnomi). 
+    - (interpret.c, prolang.y) Integers and float can now be compared
+         against each other (suggested by Gnomi).
+    - (gcollect.c) The GC forgot to trace the program->blueprint pointer
+         which was introduced 3.3.40 (reported by Coogan).
+
+02-June-2001 (Lars Duening)
+    - (lex.c, mstrings) The lexer can now create literal strings with
+         embedded \0 characters.
+    - (backend.c) The check_alarm() function also restored the alarm
+         signal handler.
+    - (prolang.y) It is now possible to cast to '(mixed)'.
+    - (prolang.y) Improved the type tracking of '?:': it now accepts
+         operands of different types and evaluates to 'mixed' in that
+         case (reported by Dennis VanHoey)
+    - (prolang.y) Improved the type checking at function return under
+         strict_types.
+
+25-May-2001 (Lars Duening)
+    - (configure) Comments may now appear at the end of the lines in
+         a settings file (thanks, Bertram!).
+
 24-May-2001 (Lars Duening)  (3.3.58)
     - (efuns) Efun terminal_colour() can now use closures to translate
          colour keys (suggested by Elric).

@@ -76,7 +76,7 @@ DESCRIPTION
         The masters (e)uid is determined by a call to
         master->get_master_uid():
 
-             "<uid"> -> uid = "<uid>", euid = "<euid>"
+             "<uid"> -> uid = "<uid>", euid = "<uid>"
 
         In non-strict-euids mode, more results are possible:
 

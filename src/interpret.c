@@ -8586,6 +8586,22 @@ again:
             break;
         }
 
+        if ((sp-1)->type == T_NUMBER && sp->type == T_FLOAT)
+        {
+            i = (double)((sp-1)->u.number) > READ_DOUBLE( sp );
+            sp--;
+            put_number(sp, i);
+            break;
+        }
+
+        if ((sp-1)->type == T_FLOAT && sp->type == T_NUMBER)
+        {
+            i = READ_DOUBLE( sp-1 ) > (double)(sp->u.number);
+            sp--;
+            put_number(sp, i);
+            break;
+        }
+
         TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_STRING|TF_FLOAT);
         TYPE_TEST_EXP_RIGHT(sp, TF_NUMBER|TF_STRING|TF_FLOAT);
         ERRORF(("Arguments to > don't match: %s vs %s\n"
@@ -8625,6 +8641,22 @@ again:
         if ((sp-1)->type == T_FLOAT && sp->type == T_FLOAT)
         {
             i = READ_DOUBLE( sp-1 ) >= READ_DOUBLE( sp );
+            sp--;
+            put_number(sp, i);
+            break;
+        }
+
+        if ((sp-1)->type == T_NUMBER && sp->type == T_FLOAT)
+        {
+            i = (double)((sp-1)->u.number) >= READ_DOUBLE( sp );
+            sp--;
+            put_number(sp, i);
+            break;
+        }
+
+        if ((sp-1)->type == T_FLOAT && sp->type == T_NUMBER)
+        {
+            i = READ_DOUBLE( sp-1 ) >= (double)(sp->u.number);
             sp--;
             put_number(sp, i);
             break;
@@ -8674,6 +8706,22 @@ again:
             break;
         }
 
+        if ((sp-1)->type == T_NUMBER && sp->type == T_FLOAT)
+        {
+            i = (double)((sp-1)->u.number) < READ_DOUBLE( sp );
+            sp--;
+            put_number(sp, i);
+            break;
+        }
+
+        if ((sp-1)->type == T_FLOAT && sp->type == T_NUMBER)
+        {
+            i = READ_DOUBLE( sp-1 ) < (double)(sp->u.number);
+            sp--;
+            put_number(sp, i);
+            break;
+        }
+
         TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_STRING|TF_FLOAT);
         TYPE_TEST_EXP_RIGHT(sp, TF_NUMBER|TF_STRING|TF_FLOAT);
         ERRORF(("Arguments to < don't match: %s vs %s\n"
@@ -8718,6 +8766,22 @@ again:
             break;
         }
 
+        if ((sp-1)->type == T_NUMBER && sp->type == T_FLOAT)
+        {
+            i = (double)((sp-1)->u.number) <= READ_DOUBLE( sp );
+            sp--;
+            put_number(sp, i);
+            break;
+        }
+
+        if ((sp-1)->type == T_FLOAT && sp->type == T_NUMBER)
+        {
+            i = READ_DOUBLE( sp-1 ) <= (double)(sp->u.number);
+            sp--;
+            put_number(sp, i);
+            break;
+        }
+
         TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_STRING|TF_FLOAT);
         TYPE_TEST_EXP_RIGHT(sp, TF_NUMBER|TF_STRING|TF_FLOAT);
         ERRORF(("Arguments to <= don't match: %s vs %s\n"
@@ -8731,58 +8795,64 @@ again:
          * else 0 (of course after popping both arguments).
          *
          * Comparable types are all types, each to its own. Comparisons
-         * between distinct types always yield 'unequal'.
+         * between distinct types (except between int and float) always
+         * yield 'unequal'.
          * Vectors and mappings are compared by ref only.
          */
 
         int i = 0;
 
-        if ((sp-1)->type != sp->type)
+        if ((sp-1)->type == T_NUMBER && sp->type == T_FLOAT)
         {
-            pop_stack();
-            free_svalue(sp);
-            put_number(sp, 0);
-            break;
+            i = (double)((sp-1)->u.number) == READ_DOUBLE( sp );
         }
-
-        switch(sp->type)
+        else if ((sp-1)->type == T_FLOAT && sp->type == T_NUMBER)
         {
-        case T_NUMBER:
-            i = (sp-1)->u.number == sp->u.number;
-            break;
-        case T_POINTER:
-            i = (sp-1)->u.vec == sp->u.vec;
-            break;
-        case T_STRING:
-            i = mstreq((sp-1)->u.str, sp->u.str);
-            break;
-        case T_OBJECT:
-            i = (sp-1)->u.ob == sp->u.ob;
-            break;
-        case T_FLOAT:
-            /* This is of little use... well, at least 0. == 0. ... */
-            i = (sp-1)->u.generic == sp->u.generic &&
-                (sp-1)->x.generic == sp->x.generic;
-            break;
+            i = READ_DOUBLE( sp-1 ) == (double)(sp->u.number);
+        }
+        else if ((sp-1)->type != sp->type)
+        {
+            i = 0;
+        }
+        else /* type are equal */
+        {
+            switch(sp->type)
+            {
+            case T_NUMBER:
+                i = (sp-1)->u.number == sp->u.number;
+                break;
+            case T_POINTER:
+                i = (sp-1)->u.vec == sp->u.vec;
+                break;
+            case T_STRING:
+                i = mstreq((sp-1)->u.str, sp->u.str);
+                break;
+            case T_OBJECT:
+                i = (sp-1)->u.ob == sp->u.ob;
+                break;
+            case T_FLOAT:
+                i = READ_DOUBLE( sp-1 ) == READ_DOUBLE( sp );
+                break;
 
-        case T_CLOSURE:
-            i = closure_eq(sp-1, sp);
-            break;
+            case T_CLOSURE:
+                i = closure_eq(sp-1, sp);
+                break;
 
-        case T_SYMBOL:
-        case T_QUOTED_ARRAY:
-            i = (sp-1)->u.generic  == sp->u.generic &&
-                (sp-1)->x.generic == sp->x.generic;
-            break;
-        case T_MAPPING:
-            i = (sp-1)->u.map == sp->u.map;
-            break;
-        default:
-            if (sp->type == T_LVALUE)
-                error("Reference passed to ==\n");
-            FATALF(("Illegal type '%s' to ==\n",typename(sp->type)));
-            /* NOTREACHED */
-            return MY_FALSE;
+            case T_SYMBOL:
+            case T_QUOTED_ARRAY:
+                i = (sp-1)->u.generic  == sp->u.generic &&
+                    (sp-1)->x.generic == sp->x.generic;
+                break;
+            case T_MAPPING:
+                i = (sp-1)->u.map == sp->u.map;
+                break;
+            default:
+                if (sp->type == T_LVALUE)
+                    error("Reference passed to ==\n");
+                FATALF(("Illegal type '%s' to ==\n",typename(sp->type)));
+                /* NOTREACHED */
+                return MY_FALSE;
+            }
         }
 
         pop_stack();
@@ -8797,57 +8867,64 @@ again:
          * else 0 (of course after popping both arguments).
          *
          * Comparable types are all types, each to its own. Comparisons
-         * between distinct types always yield 'unequal'.
+         * between distinct types (except between int and float) always
+         * yield 'unequal'.
          * Vectors and mappings are compared by ref only.
          */
 
         int i = 0;
 
-        if ((sp-1)->type != sp->type)
+        if ((sp-1)->type == T_NUMBER && sp->type == T_FLOAT)
         {
-            pop_stack();
-            assign_svalue(sp, &const1);
-            break;
+            i = (double)((sp-1)->u.number) != READ_DOUBLE( sp );
         }
-
-        switch(sp->type)
+        else if ((sp-1)->type == T_FLOAT && sp->type == T_NUMBER)
         {
-        case T_NUMBER:
-            i = (sp-1)->u.number != sp->u.number;
-            break;
-        case T_STRING:
-            i = !mstreq((sp-1)->u.str, sp->u.str);
-            break;
-        case T_POINTER:
-            i = (sp-1)->u.vec != sp->u.vec;
-            break;
-        case T_OBJECT:
-            i = (sp-1)->u.ob != sp->u.ob;
-            break;
-        case T_FLOAT:
-            /* This is of little use... well, at least 0. != 0. ... */
-            i = (sp-1)->u.generic  != sp->u.generic ||
-                (sp-1)->x.generic != sp->x.generic;
-            break;
+            i = READ_DOUBLE( sp-1 ) != (double)(sp->u.number);
+        }
+        else if ((sp-1)->type != sp->type)
+        {
+            i = 1;
+        }
+        else /* type are equal */
+        {
+            switch(sp->type)
+            {
+            case T_NUMBER:
+                i = (sp-1)->u.number != sp->u.number;
+                break;
+            case T_STRING:
+                i = !mstreq((sp-1)->u.str, sp->u.str);
+                break;
+            case T_POINTER:
+                i = (sp-1)->u.vec != sp->u.vec;
+                break;
+            case T_OBJECT:
+                i = (sp-1)->u.ob != sp->u.ob;
+                break;
+            case T_FLOAT:
+                i = READ_DOUBLE( sp-1 ) != READ_DOUBLE( sp );
+                break;
 
-        case T_CLOSURE:
-            i = !closure_eq(sp-1, sp);
-            break;
+            case T_CLOSURE:
+                i = !closure_eq(sp-1, sp);
+                break;
 
-        case T_SYMBOL:
-        case T_QUOTED_ARRAY:
-            i = (sp-1)->u.generic  != sp->u.generic ||
-                (sp-1)->x.generic != sp->x.generic;
-            break;
-        case T_MAPPING:
-            i = (sp-1)->u.map != sp->u.map;
-            break;
-        default:
-            if (sp->type == T_LVALUE)
-                error("Reference passed to !=\n");
-            FATALF(("Illegal type '%s' to !=\n",typename(sp->type)));
-            /* NOTREACHED */
-            return MY_FALSE;
+            case T_SYMBOL:
+            case T_QUOTED_ARRAY:
+                i = (sp-1)->u.generic  != sp->u.generic ||
+                    (sp-1)->x.generic != sp->x.generic;
+                break;
+            case T_MAPPING:
+                i = (sp-1)->u.map != sp->u.map;
+                break;
+            default:
+                if (sp->type == T_LVALUE)
+                    error("Reference passed to !=\n");
+                FATALF(("Illegal type '%s' to !=\n",typename(sp->type)));
+                /* NOTREACHED */
+                return MY_FALSE;
+            }
         }
 
         pop_stack();

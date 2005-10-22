@@ -227,8 +227,11 @@ static INLINE void
 note_ref (void *p)
 
 /* Note the reference to memory block <p>.
- * Reference a memory block <p>, and write a diagnostic if it is the
- * second reference.
+ *
+ * It is no use to write a diagnostic on the second or higher reference
+ * to the memory block, as this can happen when an object is swapped in,
+ * marked, swapped out, and the next swapped-in object reuses the memory block
+ * released from the one before.
  */
 
 {
@@ -237,18 +240,6 @@ note_ref (void *p)
         MARK_REF(p);
         return;
     }
-
-    /* This was:
-
-    write_malloc_trace(p);
-    WRITES(gout, "memory block referenced twice or more\n");
-
-     * This situation arises during the mark phase if an object
-     * swapped in, marked, swapped out, and the next swapped-in
-     * object reuses the memory block released from the one
-     * before.
-     */
-
 } /* note_ref() */
 
 void note_malloced_block_ref (void *p) { note_ref(p); }
@@ -299,6 +290,23 @@ mark_program_ref (program_t *p)
         if (p->ref++)
             fatal("First reference to program, but ref count != 0\n");
 
+        /* Mark the blueprint object, if any */
+        if (p->blueprint)
+        {
+            if (p->blueprint->flags & O_DESTRUCTED)
+            {
+                reference_destructed_object(p->blueprint);
+                p->blueprint = NULL;
+            }
+            else
+            {
+                p->blueprint->ref++;
+                /* No note_ref() necessary: the blueprint is in
+                 * the global object list
+                 */
+            }
+        }
+
         if (p->swap_num != -1 && p->line_numbers)
             note_ref(p->line_numbers);
 
@@ -346,7 +354,7 @@ mark_program_ref (program_t *p)
         if (!p->ref++)
             fatal("Program block referenced as something else\n");
     }
-}
+} /* mark_program_ref() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -475,6 +483,8 @@ clear_ref_in_vector (svalue_t *svp, size_t num)
             {
                 p->u.ob->ref = 0;
                 p->u.ob->prog->ref = 0;
+                if (p->u.ob->prog->blueprint)
+                    p->u.ob->prog->blueprint->ref = 0;
                 clear_inherit_ref(p->u.ob->prog);
             }
             continue;
@@ -516,6 +526,8 @@ clear_ref_in_vector (svalue_t *svp, size_t num)
             {
                 p->u.ob->ref = 0;
                 p->u.ob->prog->ref = 0;
+                if (p->u.ob->prog->blueprint)
+                    p->u.ob->prog->blueprint->ref = 0;
                 clear_inherit_ref(p->u.ob->prog);
             }
             continue;
@@ -813,6 +825,8 @@ clear_ref_in_closure (lambda_t *l, ph_int type)
     {
         l->ob->ref = 0;
         l->ob->prog->ref = 0;
+        if (l->ob->prog->blueprint)
+            l->ob->prog->blueprint->ref = 0;
         clear_inherit_ref(l->ob->prog);
     }
 
@@ -822,9 +836,11 @@ clear_ref_in_closure (lambda_t *l, ph_int type)
     {
         l->function.alien.ob->ref = 0;
         l->function.alien.ob->prog->ref = 0;
+        if (l->function.alien.ob->prog->blueprint)
+            l->function.alien.ob->prog->blueprint->ref = 0;
         clear_inherit_ref(l->function.alien.ob->prog);
     }
-}
+} /* clear_ref_in_closure() */
 
 /*-------------------------------------------------------------------------*/
 static void

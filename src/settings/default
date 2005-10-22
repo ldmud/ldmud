@@ -22,7 +22,7 @@
 # be given without surrounding quotes.
 #
 # In both cases no whitespace is allowed around the '=' and nothing
-# else may appear on the line, not even comments!
+# else may appear on the line, except a trailing comment!
 #
 # Configure will strip everything from this file which doesn't match one
 # of its option specification patterns, allowing us to make the files

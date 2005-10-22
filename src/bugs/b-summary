@@ -36,6 +36,7 @@ Compiler
 --------------------------------------------------------------------------
 b-990217-1: virtual inherits need cleaner implementation.
 b-010410: Branchpatching messes up line number information
+b-010603-0: Failed assignments leave behind empty mapping entries.
 
 
 Runtime

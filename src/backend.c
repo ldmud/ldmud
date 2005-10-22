@@ -634,9 +634,10 @@ void check_alarm (void)
         debug_message("%s Last alarm was %ld seconds ago - restarting it.\n"
                      , time_stamp(), curtime - last_alarm_time);
 
-        alarm(0); /* in case the alarm is still alive, but just slow */
+        alarm(0); /* stop alarm in case it is still alive, but just slow */
         comm_time_to_call_heart_beat = MY_TRUE;
         time_to_call_heart_beat = MY_TRUE;
+        (void)signal(SIGALRM, (RETSIGTYPE(*)(int))catch_alarm);
         alarm(ALARM_TIME);
     }
 

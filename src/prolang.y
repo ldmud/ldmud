@@ -4016,11 +4016,18 @@ return:
 %line
           if (exact_types)
           {
-              if (!MASKED_TYPE($2.type, exact_types & TYPE_MOD_MASK))
-                  type_error("Return type not matching", exact_types);
-              /* if (exact_types & ~TYPE_MOD_POINTER) == TYPE_ANY ,
-               * a reference in $2.type remains undetected.
-               */
+              fulltype_t rtype = exact_types & TYPE_MOD_MASK;
+
+              if ((   (rtype & ~TYPE_MOD_POINTER) != TYPE_ANY
+                   && ($2.type & ~TYPE_MOD_POINTER) == TYPE_ANY
+                  )
+               || !MASKED_TYPE($2.type, rtype))
+              {
+                  char tmp[100];
+                  strcpy(tmp, get_type_name($2.type));
+                  yyerrorf("Return type not matching: got %s, expected %s;"
+                         , tmp, get_type_name(exact_types));
+              }
           }
 
           if ($2.type & TYPE_MOD_REFERENCE)
@@ -5554,16 +5561,15 @@ expr0:
           type1 = $4.type;
           type2 = $7.type;
 
-          if (exact_types
-           && !compatible_types(type1, type2)
-           && instrs[F_CALL_OTHER].ret_type != TYPE_ANY)
+          if (!compatible_types(type1, type2))
           {
-
-              type_error("Different types in ?: expr", type1);
-              type_error("                      and ", type2);
+              $$.type = TYPE_ANY;
+              if ((type1 & TYPE_MOD_POINTER) != 0
+               && (type2 & TYPE_MOD_POINTER) != 0)
+                  $$.type |= TYPE_MOD_POINTER;
+              /* TODO: yyinfof("Different types to ?: */
           }
-
-          if (type1 == TYPE_ANY)
+          else if (type1 == TYPE_ANY)
               $$.type = type2;
           else if (type2 == TYPE_ANY)
               $$.type = type1;
@@ -5805,7 +5811,10 @@ expr0:
       {
           vartype_t t1 = $1.type, t2 = $3.type;
           if (exact_types
-           && t1 != t2 && t1 != TYPE_ANY && t2 != TYPE_ANY)
+           && t1 != t2 && t1 != TYPE_ANY && t2 != TYPE_ANY
+           && !(t1 == TYPE_NUMBER && t2 == TYPE_FLOAT)
+           && !(t1 == TYPE_FLOAT && t2 == TYPE_NUMBER)
+             )
           {
               yyerrorf("== always false because of different types %s"
                       , get_two_types($1.type, $3.type));
@@ -5819,7 +5828,10 @@ expr0:
       {
           vartype_t t1 = $1.type, t2 = $3.type;
           if (exact_types
-           && t1 != t2 && t1 != TYPE_ANY && t2 != TYPE_ANY)
+           && t1 != t2 && t1 != TYPE_ANY && t2 != TYPE_ANY
+           && !(t1 == TYPE_NUMBER && t2 == TYPE_FLOAT)
+           && !(t1 == TYPE_FLOAT && t2 == TYPE_NUMBER)
+             )
            {
               yyerrorf("!= always true because of different types %s"
                       , get_two_types($1.type, $3.type));
@@ -6221,12 +6233,17 @@ expr0:
           $$.type = $1;
           if ($2.type != TYPE_ANY
            && $2.type != TYPE_UNKNOWN
-           && $1 != TYPE_VOID)
+           && $1 != TYPE_VOID
+           && $1 != $2.type
+             )
           {
               switch($1)
               {
               default:
                   type_error("Illegal cast", $1);
+                  break;
+              case TYPE_ANY:
+                  /* Do nothing, just adapt the type information */
                   break;
               case TYPE_NUMBER:
                   ins_f_code(F_TO_INT);
