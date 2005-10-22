@@ -12,6 +12,23 @@ DESCRIPTION
         set_is_wizard() was called), this command is allowed only for
         users that have this flag set.
 
+        For every object, a line is written into the file with the
+        following information in the given order:
+          - object name
+          - size in memory, shared data counted only once
+          - size in memory if data wouldn't be shared
+          - number of references
+          - 'HB' if the object has a heartbeat, nothing if not.
+          - the name of the environment, or '--' if the object has no
+            environment
+          - in parentheses the number of execution ticks spent in this
+            object
+          - the swap status:
+             nothing if not swapped,
+             'PROG SWAPPED' if only the program is swapped
+             'VAR SWAPPED' if only the variabes are swapped
+             'SWAPPED' if both program and variables are swapped
+
 SEE ALSO
         malloc(D), status(D), memory(C), objects(C), debug_info(E),
         set_is_wizard(E)

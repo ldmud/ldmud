@@ -1,6 +1,19 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+30-Dec-2001 (Lars Duening)  (3.3.146)
+    - (interpret.c) abs(INT_MIN) now generates an overflow error (reported
+        by Menaures).
+    - (sprintf.c) When adding columns, a one-line column ending with a
+        newline inserted the newline on-the spot instead of delaying
+        it until the end of the line as it was done with multiline
+        columns (reported by Gnomi).
+
+29-Dec-2001 (Lars Duening)
+    - (driver/dumpallobj, efun/debug_info) Explained the format of
+        the OBJDUMP file.
+    - (settings/tubmud) Updated (thanks, Coogan!)
+
 28-Dec-2001 (Lars Duening)  (3.3.145)
     - (interpret.c) When calling a simul_efun in a vanished object, the
         local stackpointer of eval_instruction() was not synchronized
@@ -10,6 +23,8 @@ See the file HISTORY for a user-oriented summary of all the changes.
         flag. Since the exact format of the F_SIMUL_EFUN instruction depends
         on this flag, this could trip the bytecode interpreter (reported by
         Gnomi).
+    - (mudlib/astar.c) An implementation of the A* pathfinding algorithm,
+        donated by Acius (thanks!).
 
 21-Dec-2001 (Lars Duening)  (3.3.144)
     - (simulate.c) When checking the refcounts, the extra_refs in objects

@@ -3975,6 +3975,12 @@ f_abs (svalue_t *sp)
 {
     if (sp->type == T_NUMBER)
     {
+        if (sp->u.number == PINT_MIN)
+        {
+            error("Numeric overflow: abs(%ld)\n", (long)sp->u.number);
+            /* NOTREACHED */
+            return NULL;
+        }
         if (sp->u.number < 0)
             sp->u.number = - sp->u.number;
     }

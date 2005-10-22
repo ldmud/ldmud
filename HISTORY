@@ -59,7 +59,7 @@ For a detailed list of all changes see the file CHANGELOG.
            something different from '!'.
 
 
-28-Dec-2001 (Lars Duening) -- upcoming Release 3.2.9
+30-Dec-2001 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -159,6 +159,10 @@ For a detailed list of all changes see the file CHANGELOG.
            end immediately.
        + printf(), sprintf(): A format instruction '%#=s' is now rejected.
        + printf(), sprintf(): Max length of a result is now 128 KByte.
+       + printf(), sprintf(): One-line columns ending with a newline now
+           behave like multi-line columns and delay adding the newline
+           until the end of the line and only if no other columns are
+           pending.
        + sscanf(): the format '%s%d' failed to parse 'ab1cd' correctly.
 
     - New efuns:

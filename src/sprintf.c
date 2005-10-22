@@ -1471,6 +1471,7 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
     int           pres;            /* precision */
     unsigned int  err_num;         /* error code */
     char         *pad;             /* fs pad string */
+    int           column_stat;     /* Most recent column add status */
 
 #   define GET_NEXT_ARG {\
         if (++arg >= argc) ERROR(ERR_TO_FEW_ARGS); \
@@ -1625,6 +1626,7 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
 
     format_char = 0;
     nelemno = 0;
+    column_stat = 0;
 
     arg = -1;
     st->bpos = 0;
@@ -1638,12 +1640,16 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
         {
             /* Line- or Format end */
 
-            int column_stat = 0;
-
             if (!st->csts)
             {
-                /* No columns/tables to resolve */
+                /* No columns/tables to resolve, but add a second
+                 * newline if there is one pending from an added
+                 * column
+                 */
 
+                if (column_stat == 2)
+                    ADD_CHAR('\n');
+                column_stat = 0;
                 if (!format_str[fpos])
                     break;
                 ADD_CHAR('\n');
@@ -1651,6 +1657,9 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                 continue;
             }
 
+            column_stat = 0; /* If there was a newline pending, it
+                              * will be implicitely added now.
+                              */
             ADD_CHAR('\n');
             st->line_start = st->bpos;
 
@@ -1990,10 +1999,7 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                             (*temp)->start = st->bpos - st->line_start;
 
                             /* Format the first line from the column */
-                            if (2 == add_column(st, temp))
-                            {
-                                ADD_CHAR('\n');
-                            }
+                            column_stat = add_column(st, temp);
                         }
                         else
                         {

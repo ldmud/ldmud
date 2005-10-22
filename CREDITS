@@ -117,6 +117,7 @@ Lars Duening thanks:
  - Bart van Driessche (bart@multi.franken.de, Hunter@FinalFrontier) did the
      new OS/2 port.
  - Menaures added the tab character conversion to the editor.
+ - Acius donated the LPC implementation of the A* pathfinding algorithm.
  - for bug reports, critics, fixes, patches and other support:
      Acius (acius@bigfoot.com)
      Alex@TubMud (at16@st-andrews.ac.uk)

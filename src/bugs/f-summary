@@ -105,6 +105,9 @@ f-011011: Another sort of deep_call_other() ?
 f-011015-1: Left, Center, and Flush formatting for terminal_colour()
 f-011016-0: sprintf() and colour strings
 f-011029: Efun copy_object()
+f-011229-0: Add support for PostgreSQL
+f-011229-1: Add support for Berkeley DB
+f-011230: Implement seeded randoms
 
 
 Language
