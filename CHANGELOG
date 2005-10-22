@@ -1,6 +1,9 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+06-Feb-2002 (Lars Duening)  (3.3.162)
+    - (bugs) Added more information about memory leaks.
+
 05-Feb-2002 (Lars Duening)  (3.3.161)
     - (prolang.y) Inherited public but undefined function were hidden
          by (simul-)efuns of the same name, making a resolution by

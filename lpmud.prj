@@ -20,12 +20,12 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 161)
-(Parent-Version lpmud 3-3 160)
-(Version-Log "Inherited public undefined functions were hidden by (simul-)efuns.")
+(Project-Version lpmud 3-3 162)
+(Parent-Version lpmud 3-3 161)
+(Version-Log "Added more information about memory leaks in bugs/.")
 (New-Version-Log
 "")
-(Checkin-Time "Tue, 05 Feb 2002 19:33:09 -0700")
+(Checkin-Time "Wed, 06 Feb 2002 08:03:53 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -58,7 +58,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.4 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.35 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.224 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.225 644))
   (HISTORY (lpmud/f/49_HISTORY 1.237 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.13 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -378,7 +378,7 @@
   (src/bugs/bat-011215-diff/bat-011215.diff (lpmud/Q/19_bat-011215 1.1 644))
   (src/bugs/bat-011215-diff/CHANGELOG.BAT (lpmud/Q/20_CHANGELOG. 1.1 644))
 
-  (src/bugs/b-summary (lpmud/C/34_b-summary 1.47.1.17 644) :no-keywords)
+  (src/bugs/b-summary (lpmud/C/34_b-summary 1.47.1.18 644) :no-keywords)
   (src/bugs/b-981028 (lpmud/g/37_b-981028 1.6 644) :no-keywords)
   (src/bugs/b-981202-3 (lpmud/h/27_b-981202-3 1.1 644) :no-keywords)
   (src/bugs/order_alist/room/dino.c (lpmud/h/28_dino.c 1.2 644) :no-keywords)
@@ -388,7 +388,7 @@
   (src/bugs/b-990217-1 (lpmud/k/10_b-990217-1 1.3 644) :no-keywords)
   (src/bugs/b-990305-01 (lpmud/l/9_b-990305-0 1.4 644) :no-keywords)
   (src/bugs/b-990429 (lpmud/s/49_b-990429 1.3 644) :no-keywords)
-  (src/bugs/b-990505-0 (lpmud/t/1_b-990505-0 1.5 644) :no-keywords)
+  (src/bugs/b-990505-0 (lpmud/t/1_b-990505-0 1.5.1.1 644) :no-keywords)
   (src/bugs/b-990505-1 (lpmud/t/2_b-990505-1 1.2 644) :no-keywords)
   (src/bugs/b-990605 (lpmud/t/4_b-990605 1.1 644) :no-keywords)
   (src/bugs/b-990713-1 (lpmud/C/36_b-990713-1 1.3 644) :no-keywords)
@@ -431,6 +431,7 @@
   (src/bugs/b-010610-1 (lpmud/M/23_b-010610-1 1.2 644) :no-keywords)
   (src/bugs/b-010801-0 (lpmud/N/17_b-010801-0 1.1 644) :no-keywords)
   (src/bugs/b-010831 (lpmud/N/35_b-010831 1.1 644) :no-keywords)
+  (src/bugs/b-020205-0 (lpmud/Q/40_b-020205-0 1.1 644) :no-keywords)
 
   (src/bugs/f-summary (lpmud/C/37_f-summary 1.39.1.50 644) :no-keywords)
   (src/bugs/f-981027-0 (lpmud/g/29_f-981027-0 1.2 644) :no-keywords)

@@ -46,6 +46,7 @@ Runtime
 b-990429: Memory leaks
 b-990505-0: Memory leak in call_lambda()/send_erq()?
 b-990505-1: Memory leak in load_object()?
+b-020205-0: Memoryleaks in Unitopia - New date
 b-990605: In a lot of error places, inter_sp/inter_pc are wrong.
 b-991226: Search lengths too long.
 b-000104: Memory leak in clone_object()?
