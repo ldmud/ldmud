@@ -1,11 +1,23 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+16-May-2001 (Lars Duening)  (3.3.57)
+    - (mapping.c) Missing parentheses around a ?: construct could crash
+         the driver (thanks, Bardioc).
+    - (prolang.y) The non-__INIT code referenced F_ORDER_ALIST even when
+         alists are disabled (thanks, Bardioc).
+    - (backend.c) The call to clean_up() erroreously counted the internal
+         blueprint-program reference to the reference count passed to the
+         clean_up() apply. Additionally, before the call all pending
+         destructed objects are removed (suggested by Elric).
+    - (rxcache.c) The regexp cache forgot to compare the excompat flag,
+         occasionally selecting the wrong regexp (thanks, Fiona).
+
 15-May-2001 (Lars Duening)  (3.3.56)
     - (sscanf) Clarified the documentation regarding the matching of
          '%s' (reported by Pulami and Gnomi)
     - (closure.c) Compiling a simul_efun with extended varargs in a
-         lambda closure didn't work (reported by Gnomi).
+         lambda closure created faulty bytecode (reported by Gnomi).
 
 13-May-2001 (Lars Duening)  (3.3.55)
     - (prolang.y) Undid the casting change, as it broke the idiom

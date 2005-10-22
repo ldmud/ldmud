@@ -3695,7 +3695,7 @@ compile_value (svalue_t *value, int opt_flags)
             {
             	/* We can call by index */
             	
-                function_t *funp;
+                function_t *funp = &simul_efunp[simul_efun];
 
                 if (needs_ap)
                 {

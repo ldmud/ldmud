@@ -1,0 +1,8 @@
+Short: Add a priority to notify_fail()
+Date: 2001-05-16
+From: Gnomi
+Type: Feature
+State: New
+
+Add a numeric priority to notify_fails(), so that a previous message
+is replaced only by one with a higher priority.

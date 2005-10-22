@@ -42,7 +42,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
 
 
-15-May-2001 (Lars Duening) -- upcoming Release 3.2.9
+16-May-2001 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + allocate(): Accepts an optional initialisation value and can

@@ -72,6 +72,7 @@ typedef struct RxHashEntry {
                           * NULL if unused */
     p_uint     hString;  /* Hash of pString */
     Bool       from_ed;  /* The from_ed value */
+    Bool       excompat; /* The excompat value */
     regexp   * pRegexp;  /* The generated regular expression from regcomp() */
 } RxHashEntry;
 
@@ -123,6 +124,7 @@ regcomp_cache (string_t * expr, Bool excompat, Bool from_ed)
     if (pHash->pString != NULL
      && pHash->hString == hExpr
      && pHash->from_ed == from_ed
+     && pHash->excompat == excompat
      && mstreq(pHash->pString, expr)
        )
     {
@@ -151,6 +153,8 @@ regcomp_cache (string_t * expr, Bool excompat, Bool from_ed)
     pHash->pString = expr; /* refs are transferred */
     pHash->hString = hExpr;
     pHash->pRegexp = pRegexp;
+    pHash->from_ed = from_ed;
+    pHash->excompat = excompat;
 
     iNumXEntries++;
     iXSizeAlloc += pRegexp->regalloc;

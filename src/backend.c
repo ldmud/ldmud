@@ -831,14 +831,26 @@ static Bool did_swap;
 
             did_swap = MY_TRUE;
 
+            /* Remove all pending destructed objects, to get a true refcount.
+             */
+            remove_destructed_objects();
+
             /* Supply a flag to the object that says if this program
              * is inherited by other objects. Cloned objects might as well
              * believe they are not inherited. Swapped objects will not
              * have a ref count > 1 (and will have an invalid ob->prog
-             * pointer).
+             * pointer). If the object is a blueprint, the extra reference
+             * from the program will not be counted.
              */
-            push_number(inter_sp, obj->flags & (O_CLONE|O_REPLACED) ? 0 :
-              ( O_PROG_SWAPPED(obj) ? 1 : obj->prog->ref) );
+            if (obj->flags & (O_CLONE|O_REPLACED))
+                push_number(inter_sp, 0);
+            else if (O_PROG_SWAPPED(obj))
+                push_number(inter_sp, 1);
+            else if (obj->prog->blueprint == obj)
+                push_number(inter_sp, obj->prog->ref - 1);
+            else
+                push_number(inter_sp, obj->prog->ref);
+
             RESET_LIMITS;
             CLEAR_EVAL_COST;
             command_giver = NULL;

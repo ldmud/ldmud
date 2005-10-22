@@ -2500,7 +2500,7 @@ set_mapping_user (mapping_t *m, object_t *owner)
      * to the new one
      */
     total = (mp_int)( sizeof(*m)
-                     + (m->cond) ? SIZEOF_MC(m->cond, m->num_values) : 0
+                     + ((m->cond) ? SIZEOF_MC(m->cond, m->num_values) : 0)
                     );
     m->user->mapping_total -= total;
     user = owner->user;

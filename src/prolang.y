@@ -9464,6 +9464,7 @@ constant_function_call:
           list = svp->u.const_list;
           switch($<const_call_head>2.function)
           {
+#ifdef F_ORDER_ALIST
           case F_ORDER_ALIST:
             {
               size_t i, listsize;
@@ -9515,6 +9516,8 @@ constant_function_call:
               free_array(vec);
               break;
             }
+#endif /* F_ORDER_ALIST */
+
           default:
               yyerror("Illegal function call in initialization");
               free_svalue(svp);
