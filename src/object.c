@@ -1894,6 +1894,8 @@ f_program_name (svalue_t *sp)
  * of <obj> was compiled (the 'load name'), but changes if an
  * object replaces its programs with the efun replace_program().
  *
+ * As a special case, if <ob> is 0, the function returns 0.
+ *
  * The name always ends in '.c'. It starts with a '/' unless the
  * driver is running in COMPAT mode.
  */
@@ -1901,6 +1903,12 @@ f_program_name (svalue_t *sp)
 {
     string_t *name, *res;
     object_t *ob;
+
+    /* If the argument is 0, just return 0. */
+    if (sp->type == T_NUMBER)
+    {
+        return sp;
+    }
 
     ob = sp->u.ob;
     if (O_PROG_SWAPPED(ob))

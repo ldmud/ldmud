@@ -2273,16 +2273,21 @@ parse_numeric_escape (char * cp, unsigned char * p_char)
 
         case 'b': case 'B':
           {
-            c = '0';
+            c = *cp++;
             num_digits = 8;
             base = 2;
             break;
           }
 
         case 'o': case 'O':
-            c = '0';
+            c = *cp++;
             base = 8;
             num_digits = 3;
+            break;
+
+        default:
+            c = '0';
+            cp--;
             break;
         } /* switch(c) */
     } /* if ('0' == c) */
@@ -2318,7 +2323,7 @@ parse_numeric_escape (char * cp, unsigned char * p_char)
             yywarn("Character constant used with no valid digits");
             return NULL;
         }
-        while (lexdigit(c = *cp++) && c < '0'+base && num_digits-- > 0)
+        while (lexdigit(c = *cp++) && c < '0'+base && --num_digits > 0)
               l = l * base + (c - '0');
     }
 

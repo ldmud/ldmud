@@ -1,6 +1,16 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+07-Aug-2001 (Lars Duening)  (3.3.84)
+    - (lex.c) The recognition of numeric character constants was slightly
+         wrong (thanks, Fiona).
+
+06-Aug-2001 (Lars Duening)
+    - (object.c) Efun program_name() now accepts 0 as
+         argument and pass it through (suggested by Niels).
+    - (func_spec, efuns.c) Efuns floor() and ceil() also accept integers
+         values (suggested by Niels).
+
 05-Aug-2001 (Lars Duening)  (3.3.83)
     - (mstrings.h, interpret.c) The duplication of shared strings before
          a modification did not catch shared untabled strings. And the memory

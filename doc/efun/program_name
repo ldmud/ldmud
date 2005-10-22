@@ -10,6 +10,9 @@ DESCRIPTION
         of <obj> was compiled (the 'load name'), but changes if an object
         replaces its programs with the efun replace_program().
 
+        As a special case, if <ob> is passed as 0, the function will
+        return 0.
+
         The name always ends in '.c'. It starts with a '/' unless the
         driver is running in COMPAT mode.
 
@@ -23,6 +26,7 @@ EXAMPLE
 
 HISTORY
         Introduced in LDMud 3.2.6.
+        LDMud 3.2.9 allowed a 0 argument.
 
 SEE ALSO
         clone_object(E), clonep(E), load_name(E), load_object(E),

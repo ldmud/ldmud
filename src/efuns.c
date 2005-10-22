@@ -4119,17 +4119,22 @@ f_ceil (svalue_t *sp)
 
 /* EFUN ceil()
  *
- *   float ceil(float)
+ *   float ceil(int|float)
  *
  * Returns the smallest whole number which is still bigger
- * than the argument.
+ * than the argument. If the argument value is an integer, the result
+ * will be the argument value, converted to float.
  */
 
 {
     STORE_DOUBLE_USED
     double d;
 
-    d = ceil(READ_DOUBLE(sp));
+    if (sp->type == T_FLOAT)
+        d = ceil(READ_DOUBLE(sp));
+    else
+        d = sp->u.number;
+
     STORE_DOUBLE(sp, d);
 
     return sp;
@@ -4141,17 +4146,22 @@ f_floor (svalue_t *sp)
 
 /* EFUN floor()
  *
- *   float floor(float)
+ *   float floor(int|float)
  *
  * Returns the biggest whole number which is not larger
- * than the argument.
+ * than the argument. If the argument value is an integer, the result
+ * will be the argument value, converted to float.
  */
 
 {
     STORE_DOUBLE_USED
     double d;
 
-    d = floor(READ_DOUBLE(sp));
+    if (sp->type == T_FLOAT)
+        d = ceil(READ_DOUBLE(sp));
+    else
+        d = sp->u.number;
+
     STORE_DOUBLE(sp, d);
 
     return sp;

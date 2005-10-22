@@ -292,8 +292,8 @@ float   atan2(int|float,int|float);
 float   log(int|float);
 float   exp(int|float);
 float   sqrt(int|float);
-float   ceil(float);
-float   floor(float);
+float   ceil(int|float);
+float   floor(int|float);
 float   pow(int|float,int|float);
 
 mixed   max(mixed|mixed*, ...);
@@ -430,7 +430,7 @@ mixed  *object_info(object, int, void|int);
 string  object_name(null|object default: F_THIS_OBJECT);
 int     object_time(object default: F_THIS_OBJECT);
 object  present_clone(object|string, object default: F_THIS_OBJECT); /* PRELIMINARY */
-string  program_name(object default: F_THIS_OBJECT);
+string  program_name(null|object default: F_THIS_OBJECT);
 int     program_time(object default: F_THIS_OBJECT);
 void    replace_program(string);
 mixed   query_editing(object);
