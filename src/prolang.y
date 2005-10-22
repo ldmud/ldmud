@@ -298,29 +298,31 @@ struct efun_shadow_s
     * INDEX_START_NONE is used for functions with no type information.
     */
 
-#define NUMPAREAS                  8  /* Number of saved areas */
+#define A_INCLUDES                 8
+   /* (include_t) Tabled descriptors of all included files, in the order
+    * of appearance.
+    */
 
-#define A_FUNCTIONS                8
+#define NUMPAREAS                  9  /* Number of saved areas */
+
+#define A_FUNCTIONS                9
    /* (function_t): Function definitions
     */
 
 %ifndef INITIALIZATION_BY___INIT
-#    define A_VARIABLE_VALUES      9
+#    define A_VARIABLE_VALUES     10 
        /* (svalue_t) Initializers for non-virtual variables.
         */
-#    define A_VIRTUAL_VAR_VALUES  10
+#    define A_VIRTUAL_VAR_VALUES  11
        /* (svalue_t) Initializers for virtual variables.
         */
 %endif
 
-#define A_STRING_NEXT             11
+#define A_STRING_NEXT             12
    /* (int) During compilation, the strings in A_STRINGS are organized
     * in a hash table (prog_string_indizes/_tags). The hash chains are
     * linked together using the indizes in this area. The end of
     * a chain is marked by a negative next-index.
-    */
-#define A_INCLUDE_NAMES           12
-   /* (string_t *) Tabled names of include files in the order of appearance.
     */
 
 #define NUMAREAS                  13  /* Total number of areas */
@@ -427,6 +429,10 @@ static mem_block_t mem_block[NUMAREAS];
 
 #define PROG_STRING_NEXT(n) ((int *)mem_block[A_STRING_NEXT].block)[n]
   /* Index the chain-index for program string <n>.
+   */
+
+#define INCLUDE_COUNT  (mem_block[A_INCLUDES].current_size / sizeof(include_t))
+  /* Return the total number of include files encountered so far.
    */
 
 /*-------------------------------------------------------------------------*/
@@ -730,6 +736,10 @@ yyerror (const char *str)
     context = lex_error_context();
     fprintf(stderr, "%s %s: %s line %d %s\n"
                   , time_stamp(), current_file, str, current_line, context);
+    /* TODO: lex should implement a function get_include_stack() which
+     * TODO:: returns an svalue-array with the current include stack.
+     * TODO:: This could be printed, and also passed to parse_error().
+     */
     fflush(stderr);
     parse_error(MY_FALSE, current_file, current_line, str, context);
     if (num_parse_error == 0)
@@ -770,6 +780,10 @@ yywarn (const char *str)
     context = lex_error_context();
     fprintf(stderr, "%s %s: Warning: %s line %d %s\n"
                   , time_stamp(), current_file, str, current_line, context);
+    /* TODO: lex should implement a function get_include_stack() which
+     * TODO:: returns an svalue-array with the current include stack.
+     * TODO:: This could be printed, and also passed to parse_error().
+     */
     fflush(stderr);
     parse_error(MY_TRUE, current_file, current_line, str, context);
     if (master_ob && num_parse_error == 0)
@@ -11495,59 +11509,125 @@ store_line_number_backward (int offset)
 } /* store_line_number_backward() */
 
 /*-------------------------------------------------------------------------*/
-void
-store_include_info (char *name)
+mp_uint
+store_include_info (char *name, char * filename, char delim, int depth)
 
-/* The lexer is going to include file <name>.
+/* The lexer is going to include file <filename> from an directive
+ * nameing <name> using <delim>iter. This will be include depth <depth>.
+ *
+ * Result is the offset of the include information in the mem_block.
+ * It is to be considered a handle and has to be passed to
+ * store_include_end().
  */
 
 {
-    string_t *sname;
+    mp_uint rc;
 
-    if (last_include_start == mem_block[A_LINENUMBERS].current_size)
+    /* Generate and store the plain include information */
     {
-        simple_includes++;
+        include_t inc;
+        char * tmp;
+        size_t len;
+
+        /* Add a leading slash to the filename if necessary,
+         * then make it a tabled string and store it.
+         */
+        if (!compat_mode && *filename != '/')
+        {
+            tmp = alloca(strlen(filename)+2);
+            if (tmp == NULL)
+            {
+                yyerror("Out of stack memory: copy of filename");
+            }
+            else
+            {
+                *tmp = '/';
+                strcpy(tmp+1, filename);
+                filename = tmp;
+            }
+        }
+        else if (compat_mode && *filename == '/')
+            filename++;
+
+        inc.filename = new_tabled(filename);
+        if (inc.filename == NULL)
+        {
+            inc.filename = ref_mstring(STR_DEFAULT);
+            yyerror("Out of memory: sharing include filename");
+        }
+
+        /* Surround the <name> with the delimiters, then
+         * make it a tabled string and store it.
+         */
+        len = strlen(name);
+        tmp = alloca(len+3);
+        if (tmp == NULL)
+        {
+            yyerror("Out of stack memory: copy of name");
+        }
+        else
+        {
+            *tmp = delim == '"' ? delim : '<';
+            strcpy(tmp+1, name);
+            tmp[len+1] = delim;
+            tmp[len+2] = '\0';
+
+            inc.name = new_tabled(tmp);
+            if (inc.name == NULL)
+            {
+                inc.name = ref_mstring(STR_DEFAULT);
+                yyerror("Out of memory: sharing include name");
+            }
+        }
+
+        /* Complete the structure and store it */
+        inc.depth = depth;
+        rc = mem_block[A_INCLUDES].current_size;
+        add_to_mem_block(A_INCLUDES, &inc, sizeof inc);
     }
-    else
+
+    /* Store the information for the linenumber tracing */
+
     {
-        simple_includes = 0;
+        if (last_include_start == mem_block[A_LINENUMBERS].current_size)
+        {
+            simple_includes++;
+        }
+        else
+        {
+            simple_includes = 0;
+        }
+
+        stored_lines++;  /* don't count the #include line */
+
+        /* Use up the amounts of lines collected */
+        while (stored_lines < current_line)
+        {
+            int lines;
+
+            lines = current_line - stored_lines;
+            if (lines > LI_MAXEMPTY) lines = LI_MAXEMPTY;
+            stored_lines += lines;
+            byte_to_mem_block(A_LINENUMBERS, 256 - lines);
+        }
+
+        /* Store the bytecode and mark the position */
+        byte_to_mem_block(A_LINENUMBERS, LI_INCLUDE);
+        last_include_start = mem_block[A_LINENUMBERS].current_size;
+
+        /* Restart linecount */
+        stored_lines = 0;
     }
 
-    stored_lines++;  /* don't count the #include line */
-
-    /* Use up the amounts of lines collected */
-    while (stored_lines < current_line)
-    {
-        int lines;
-
-        lines = current_line - stored_lines;
-        if (lines > LI_MAXEMPTY) lines = LI_MAXEMPTY;
-        stored_lines += lines;
-        byte_to_mem_block(A_LINENUMBERS, 256 - lines);
-    }
-
-    /* Store the bytecode and mark the position */
-    byte_to_mem_block(A_LINENUMBERS, LI_INCLUDE);
-    last_include_start = mem_block[A_LINENUMBERS].current_size;
-
-    /* Remember the included filename in A_INCLUDE_NAMES */
-    sname = new_tabled(name);
-    if (!sname)
-    {
-        sname = ref_mstring(STR_DEFAULT);
-        yyerror("Out of memory: sharing string");
-    }
-    add_to_mem_block(A_INCLUDE_NAMES, &sname, sizeof sname);
-
-    /* Restart linecount */
-    stored_lines = 0;
+    return rc;
 } /* store_include_info() */
 
 /*-------------------------------------------------------------------------*/
 void
-store_include_end (void)
+store_include_end (mp_uint inc_offset)
 
-/* The current include ended.
+/* The current include ended. <inc_offset> has to be the offset returned by
+ * store_include_info() for this include file.
  */
 
 {
@@ -11556,8 +11636,10 @@ store_include_end (void)
     stored_lines = current_line-1;
     if (last_include_start == mem_block[A_LINENUMBERS].current_size)
     {
+        include_t * inc = (include_t *)(mem_block[A_INCLUDES].block + inc_offset);
         /* No code was generated in this include - remove the
-         * information stored by store_include_info().
+         * line number information stored by store_include_info()
+         * and tag the include information in A_INCLUDES.
          */
 
         last_include_start = mem_block[A_LINENUMBERS].current_size - 1;
@@ -11575,10 +11657,8 @@ store_include_end (void)
         {
             last_include_start--;
         }
-        free_mstring( *(string_t **)
-          (mem_block[A_INCLUDE_NAMES].block +
-           (mem_block[A_INCLUDE_NAMES].current_size -= sizeof(string_t *)))
-        );
+
+        inc->depth = -inc->depth;
 
         /* If we return to the auto_include_string, current_line has been
          * negative, and hence stored_lines became negative.  However,
@@ -11707,7 +11787,6 @@ epilog (void)
     int          size, i;
     mp_int       num_functions;
     mp_int       num_strings;
-    mp_int       num_includes;
     mp_int       num_variables;
     bytecode_p   p;
     ident_t     *g, *q;
@@ -11789,20 +11868,6 @@ epilog (void)
      */
     if (mem_block[A_STRINGS].current_size > 0x10000 * sizeof (string_t *))
         yyerror("Too many strings");
-
-    /* Add the names of the include files in reversed order
-     * to the program strings.
-     */
-    num_includes = mem_block[A_INCLUDE_NAMES].current_size / sizeof(char *);
-    while (mem_block[A_INCLUDE_NAMES].current_size)
-    {
-        add_to_mem_block(
-          A_STRINGS,
-          mem_block[A_INCLUDE_NAMES].block +
-            (mem_block[A_INCLUDE_NAMES].current_size -= sizeof(string_t *)),
-          sizeof(string_t*)
-        );
-    }
 
     /* Get and check the numbers of functions, strings, and variables */
     num_functions = FUNCTION_COUNT;
@@ -12201,7 +12266,6 @@ epilog (void)
          */
         prog->strings = (string_t **)p;
         prog->num_strings = num_strings;
-        prog->num_includes = num_includes;
         if (mem_block[A_STRINGS].current_size)
             memcpy(p, mem_block[A_STRINGS].block,
                    mem_block[A_STRINGS].current_size);
@@ -12232,6 +12296,18 @@ epilog (void)
             prog->inherit = NULL;
         }
         p += align(mem_block[A_INHERITS].current_size);
+
+        /* Add the include file information */
+        prog->num_includes = INCLUDE_COUNT;
+        if (prog->num_includes)
+        {
+            memcpy(p, mem_block[A_INCLUDES].block
+                    , mem_block[A_INCLUDES].current_size);
+            prog->includes = (include_t *)p;
+        }
+        else
+            prog->includes = NULL;
+        p += align(mem_block[A_INCLUDES].current_size);
 
         /* Add the argument type information
          */
@@ -12320,7 +12396,9 @@ epilog (void)
         do_free_sub_strings( num_strings
                            , (string_t **)mem_block[A_STRINGS].block
                            , num_variables
-                           , (variable_t *)mem_block[A_VIRTUAL_VAR].block );
+                           , (variable_t *)mem_block[A_VIRTUAL_VAR].block
+                           , INCLUDE_COUNT
+                           , (include_t *)mem_block[A_INCLUDES].block );
 
         compiled_prog = NULL;
 

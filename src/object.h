@@ -231,7 +231,10 @@ extern void reference_prog(program_t *, char *);
 #ifdef DEALLOCATE_MEMORY_AT_SHUTDOWN
 extern void remove_all_objects(void);
 #endif
-extern void do_free_sub_strings(int num_strings, string_t ** strings, int num_variables, variable_t *variable_names);
+extern void do_free_sub_strings(int num_strings, string_t ** strings
+                               , int num_variables, variable_t *variable_names
+                               , int num_includes, include_t *includes
+                               );
 extern void free_prog(program_t *progp, Bool free_sub_strings);
 extern void reset_object(object_t *ob, int arg);
 extern void replace_programs(void);

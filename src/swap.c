@@ -318,11 +318,12 @@ locate_out (program_t *prog)
 
     if (d_flag > 1)
     {
-        debug_message ("%s locate_out: %lX %lX %lX %lX %lX %lX %lX %lX\n"
+        debug_message ("%s locate_out: %lX %lX %lX %lX %lX %lX %lX %lX %lX\n"
             , time_stamp(),
             (long)prog->program, (long)prog->line_numbers,
             (long)prog->functions, (long)prog->strings,
             (long)prog->variable_names, (long)prog->inherit,
+            (long)prog->includes,
             (long)prog->argument_types, (long)prog->type_start);
     }
 
@@ -335,6 +336,7 @@ locate_out (program_t *prog)
     prog->strings        = MAKEOFFSET(string_t**, strings);
     prog->variable_names = MAKEOFFSET(variable_t *, variable_names);
     prog->inherit        = MAKEOFFSET(inherit_t *, inherit);
+    prog->includes       = MAKEOFFSET(include_t *, includes);
     if (prog->type_start)
     {
         prog->argument_types = MAKEOFFSET(unsigned short *, argument_types);
@@ -378,6 +380,7 @@ locate_in (program_t *prog)
     prog->strings        = MAKEPTR(string_t**, strings);
     prog->variable_names = MAKEPTR(variable_t*, variable_names);
     prog->inherit        = MAKEPTR(inherit_t*, inherit);
+    prog->includes       = MAKEPTR(include_t*, includes);
     if (prog->type_start)
     {
         prog->argument_types = MAKEPTR(unsigned short *, argument_types);
@@ -386,11 +389,12 @@ locate_in (program_t *prog)
 
     if (d_flag > 1)
     {
-        debug_message ("%s locate_in: %lX %lX %lX %lX %lX %lX %lX %lX\n"
+        debug_message ("%s locate_in: %lX %lX %lX %lX %lX %lX %lX %lX %lX\n"
             , time_stamp(),
             (long)prog->program, (long)prog->line_numbers,
             (long)prog->functions, (long)prog->strings,
             (long)prog->variable_names, (long)prog->inherit,
+            (long)prog->includes,
             (long)prog->argument_types, (long)prog->type_start);
     }
 

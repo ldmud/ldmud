@@ -363,6 +363,15 @@ gc_mark_program_ref (program_t *p)
         for (i=0; i< p->num_inherited; i++)
             mark_program_ref(p->inherit[i].prog);
 
+        /* Included files */
+
+        for (i=0; i< p->num_includes; i++)
+        {
+            string_t *str;
+            str = p->includes[i].name; MARK_MSTRING_REF(str);
+            str = p->includes[i].filename; MARK_MSTRING_REF(str);
+        }
+
         MARK_MSTRING_REF(p->name);
     }
     else

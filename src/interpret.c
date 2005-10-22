@@ -15841,7 +15841,7 @@ get_line_number (bytecode_p p, program_t *progp, string_t **namep)
 
     int offset;            /* (Remaining) program offset to resolve */
     int i;                 /* Current line number */
-    string_t **include_names;  /* Pointer to the array of include file names */
+    include_t *includes;   /* Pointer to the next include info */
     struct incinfo *inctop = NULL;  /* The include information stack. */
     int relocated_from = 0;
     int relocated_to = -1;
@@ -15888,7 +15888,7 @@ get_line_number (bytecode_p p, program_t *progp, string_t **namep)
         return 0;
     }
 
-    include_names = progp->strings + progp->num_strings;
+    includes = progp->includes;
 
     /* Decode the line number information until the line number
      * for offset is found. We do this by reading the line byte codes,
@@ -15926,10 +15926,16 @@ get_line_number (bytecode_p p, program_t *progp, string_t **namep)
 
                         struct incinfo *inc_new;
 
+                        /* Find the next include which generated code.
+                         * We know that there is one.
+                         */
+                        while (includes->depth < 0) includes++;
+
                         i++;
                         inc_new = xalloc(sizeof *inc_new);
                         /* TODO: What if this fails? */
-                        inc_new->name = *--include_names;
+                        inc_new->name = includes->filename;
+                        includes++;
                         inc_new->super = inctop;
                         inc_new->super_line = i;
                         inctop = inc_new;

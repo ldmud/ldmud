@@ -48,11 +48,6 @@
  *       use the strings simply by an (easily swappable) index. The compiler
  *       makes sure that each string is unique.
  *
- *       The last strings are the names of all files included by the programs
- *       source file which also generated code, stored in reverse order of
- *       their appearance (multiple included files appear several times) and
- *       as they were given in the source.
- *
  *       When a program is swapped, the reference counts to these strings are
  *       not removed so that the string literals stay in memory all the time.
  *       This saves time on swap-in, and the string sharing saves more memory
@@ -60,7 +55,9 @@
  * TODO: Does it?
  *
  *   struct variable_s variable_names[]: an array describing all variables
- *       with type and name, inherited or own.
+ *       with type and name, inherited or own. When a program is swapped, the
+ *       reference counts to these strings are not removed so that the
+ *       string literals stay in memory all the time.
  *
  *   struct inherit inherit[]: an array describing all inherited programs.
  *
@@ -73,6 +70,12 @@
  *       -> index in .argument_types[], which gives the index of
  *       the first argument type. If this index is INDEX_START_NONE,
  *       the function has no type information.
+ *
+ *   include_t includes[]: an array listing all include files used
+ *       to compile the program, in the order they were encountered.
+ *       When a program is swapped, the reference counts to these strings
+ *       are not removed so that the string literals stay in memory all
+ *       the time.
  *
  *   bytecode_t line_numbers[]: the line number information,
  *       encoded in a kind of delta compression. When a program
@@ -610,6 +613,30 @@ struct inherit_s
 };
 
 
+/* --- struct include_s: description of one include file
+ *
+ * This structure describes one include file used to compile the
+ * program.
+ */
+
+struct include_s
+{
+    string_t   *name;
+      /* Name as it was found in the program. First and last
+       * character are the delimiters - either "" or <>.
+       */
+
+    string_t   *filename;
+      /* Actual filename of the include file, in compat mode
+       * without leading slash.
+       */
+    int         depth;
+      /* The absolute value is the include depth, counting from 1 upwards.
+       * If the include did not generate code, the value is stored negative.
+       */
+};
+
+
 /* --- struct program_s: the program head structure
  *
  * This structure is actually just the head of the memory block
@@ -670,8 +697,8 @@ struct program_s
     string_t **strings;
       /* Array [.num_strings] of the shared strings used by the program.
        * Stored in reverse order at the end of the array are the pointers
-       * to the names of all included files, used when retrieving line
-       * numbers.
+       * to the names of all included files which generated code - these
+       * are used when retrieving line numbers.
        */
     variable_t *variable_names;
       /* Array [.num_variables] with the flags, types and names of all
@@ -679,6 +706,9 @@ struct program_s
        */
     inherit_t *inherit;
       /* Array [.num_inherited] of descriptors for inherited programs.
+       */
+    include_t *includes;
+      /* Array [.num_includes] of descriptors for included files.
        */
     unsigned short flags;
       /* Flags for the program: */

@@ -395,6 +395,7 @@ static struct incstate
     int         line;           /* Current line */
     char      * file;           /* Filename */
     ptrdiff_t   linebufoffset;  /* Position of linebufstart */
+    mp_uint     inc_offset;     /* Handle returned by store_include_info() */
     int pragma_strict_types;
     char saved_char;
 } *inctop = NULL;
@@ -1994,9 +1995,8 @@ handle_include (char *name)
      */
     if ((fd = inc_open(buf, name, p - name, delim)) >= 0)
     {
-        struct incstate *is;
-
-        store_include_info(name);
+        struct incstate *is, *ip;
+        int inc_depth;
 
         /* Copy the current state, but don't put it on the stack
          * yet in case we run into an error further down.
@@ -2028,6 +2028,12 @@ handle_include (char *name)
 
         /* Now it is save to put the saved state onto the stack*/
         inctop = is;
+
+        /* Compute the include depth and store the include information */
+        for (inc_depth = 0, ip = inctop; ip; ip = ip->next)
+            inc_depth++;
+
+        inctop->inc_offset = store_include_info(name, current_file, delim, inc_depth);
 
         /* Initialise the rest of the lexer state */
         pragma_strict_types = PRAGMA_WEAK_TYPES;
@@ -2844,6 +2850,8 @@ yylex1 (void)
                 xfree(current_file);
                 nexpands = 0;
 
+                store_include_end(p->inc_offset);
+
                 /* Restore the previous state */
                 current_file = p->file;
                 current_line = p->line + 1;
@@ -2865,7 +2873,6 @@ yylex1 (void)
                     outp = yyp;
                     yyp = _myfilbuf();
                 }
-                store_include_end();
                 break;
             }
 

@@ -1,48 +1,82 @@
-PRELIMINARY
 SYNOPSIS
+        #include <sys/include_list.h>
+
         string *include_list ()
         string *include_list (object ob)
         string *include_list (object ob, int flags)
 
 
 DESCRIPTION
-        Returns the names of all files included into the compilation
+        Return information about all files included into the compilation
         of <ob>, including <ob> program's own filename.
         If <ob> is omitted, it defaults to the current object.
-        The value of <flags> is currently ignored.
 
-        The result is an array of filenames, starting the with the filename
-        of <ob>'s program itself, followed by the names of all included files
-        in the order they were encountered during compilation.
+        In the resulting array(s), the information for one include file takes
+        up three elements:
+
+          string [i+0]: the name as it appeared in the program, including the
+                        delimiters ("" or <>, resp.).
+          string [i+1]: the absolute filename of the include file.
+          int    [i+2]: the inclusion depth (usually 1, more for nested
+                        includes).
+
+        The first entry in the result is the program's own name in [i+0],
+        the other two elements [i+1] and [i+2] are 0.
+
+        The <flag> determines the exact structure of the result:
+
+        <flag> = INCLIST_FLAT (0, default):
+          The result is a flat array of the entries, starting the with
+          the entry for <ob> itself, followed by the entries for all
+          included files in the order they were encountered.
+
+        <flag> = INCLIST_TREE (1):
+          The result is an array starting the with the entry
+          of <ob> itself, followed by the entries for all directly included
+          files. If one of the included files has no nested includes by itself,
+          then its information will be stored directly in the array.
+          If one included file has includes by itself, a subvector will
+          be created and stored in the result vector (again in [i+0], with
+          [i+1] and [i+2] being 0). Theese subvectors have the same
+          structure as the main result vector.
 
         If objects, including <ob>, had been undergone a replace_program(),
         the returned filenames will reflect the actual active program.
 
-        The returned names always begin with '/' (absolute path), except
-        when the parser runs in COMPAT mode.
+        The returned proper filenames always begin with '/' (absolute path),
+        except when the parser runs in COMPAT mode.
 
 
 EXAMPLES
-        Given this source code:
+        Given this source code (and /sys as system include directory):
 
-          a.c:  #include "b.c"
-                #include "c.c"
-          b.c:  #include "d.c"
+          a.c:  #include "b.h"
+                #include <c.h>
+          b.h:  #include "d.h"
+          c.h:  #define BAR
+          d.h:  #define FOO
 
         the efun will give these results:
 
-          include_list(a) -> ({ "a.c", "b.c", "d.c", "c.c" })
-          include_list(b) -> ({ "b.c", "d.c" })
+          include_list(a, INCLIST_FLAT)
+            -> ({ "a.c", 0, 0
+                , "\"b.h\"", "/.../b.h", 1
+                , "\"d.h\"", "/.../d.h", 2
+                , "<c.h>",   "/sys/c.h", 1
+               })
 
-BUGS
-        At the moment, this efun is only minimally useful:
-         - only include files for which code was generated are listed
-         - the names of the files appear as they were given in the source
-         - no flag for ""- and <>-type includes.
+          include_list(a, INCLIST_TREE)
+            -> ({ "a.c", 0, 0
+                , ({ "\"b.h\"", "/.../b.h", 1
+                   , "\"d.h\"", "/.../d.h", 2
+                  }), 0, 0
+                , "<c.h>",   "/sys/c.h", 1
+               })
 
 
 HISTORY
         Introduced in a preliminary form in LDMud 3.2.9/3.3.126.
+        Properly implemented in LDMud 3.3.127 .
 
 
 SEE ALSO

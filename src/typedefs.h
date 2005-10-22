@@ -18,6 +18,7 @@ typedef struct case_state_s       case_state_t;       /* switch.h */
 typedef struct ed_buffer_s        ed_buffer_t;        /* ed.c */
 typedef struct function_s         function_t;         /* exec.h */
 typedef struct ident_s            ident_t;            /* lex.h */
+typedef struct include_s          include_t;          /* exec.h */
 typedef struct inherit_s          inherit_t;          /* exec.h */
 typedef struct interactive_s      interactive_t;      /* comm.h */
 typedef struct input_to_s         input_to_t;         /* comm.h */

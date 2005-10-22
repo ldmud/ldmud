@@ -195,6 +195,7 @@
 
 #include "../mudlib/sys/driver_hook.h"
 #include "../mudlib/sys/functionlist.h"
+#include "../mudlib/sys/include_list.h"
 #include "../mudlib/sys/inherit_list.h"
 
 /*-------------------------------------------------------------------------*/
@@ -426,11 +427,13 @@ reference_prog (program_t *progp, char *from)
 void
 do_free_sub_strings (int num_strings,   string_t **strings
                     ,int num_variables, variable_t *variable_names
+                    ,int num_includes,  include_t *includes
                     )
 
 /* Free a bunch of shared strings used in connection with an object:
- * the <num_strings> strings in the array <strings>, and the
- * the <num_variables> names of the vars in array <variable_names>.
+ * the <num_strings> strings in the array <strings>, 
+ * the <num_variables> names of the vars in array <variable_names>, and 
+ * the <num_includes> names of the includes in array <includes>.
  *
  * The function is called from free_prog() and from the compiler epilog().
  */
@@ -446,6 +449,13 @@ do_free_sub_strings (int num_strings,   string_t **strings
     for (i = num_variables; --i >= 0; )
     {
         free_mstring(variable_names[i].name);
+    }
+
+    /* Free all include names */
+    for (i = num_includes; --i >= 0; )
+    {
+        free_mstring(includes[i].name);
+        free_mstring(includes[i].filename);
     }
 }
 
@@ -526,9 +536,10 @@ free_prog (program_t *progp, Bool free_sub_strings)
             }
         }
 
-        /* Free the strings and variable names */
+        /* Free the strings, variable names and include filenames. */
         do_free_sub_strings( progp->num_strings, progp->strings
                            , progp->num_variables, progp->variable_names
+                           , progp->num_includes, progp->includes
                            );
 
         /* Free all inherited objects */
@@ -1751,28 +1762,35 @@ f_include_list (svalue_t *sp, int num_arg)
  *
  * Return a list with the names of all files included by the program 
  * of object <ob>, including <ob>'s program file itself.
- * TODO: To implement a tree-structured return, the lexer needs to
- * TODO:: store the include depth for every included file. This information
- * TODO:: can be stored in a new array in the program structure and
- * TODO:: swapped with the lineinformation.
- * TODO:: It is actually worse: the compiler stores only the names of
- * TODO:: includes for which code is generated, and just the names as
- * TODO:: they appear in the source code. To make this efun useful, we
- * TODO:: have to introduce a new block of data with the filename as
- * TODO:: given in the source, the current_file actually used, the depth
- * TODO:: and evtl. the delimiter. Actually, most of this information can
- * TODO:: be tacked onto the strings[] block - it's just that the restricted
- * TODO:: list of include names as it is now must be kept, as the linenumber
- * TODO:: information relies on it.
  */
 
 {
-    object_t  *ob;             /* Analyzed object */
-    vector_t  *vec;            /* Result vector */
-    svalue_t  *svp;            /* Pointer to next vec entry to fill in */
-    int        count;          /* Total number of includes */
-    svalue_t  *argp;           /* Arguments */
-    string_t **include_names;  /* Pointer to the include names */
+    /* Local structure to hold the found programs */
+    struct iinfo {
+        struct iinfo * next;     /* Next structure in flat list */
+        int            depth;    /* Include depth */
+        include_t    * inc;      /* The include information */
+          /* The following members are used to recreate the inherit tree */
+        int            count;    /* Number of direct includes */
+        struct iinfo * parent;   /* Parent include, or NULL */
+        struct iinfo * child;    /* First child include */
+        struct iinfo * sibling;  /* Next include on same level */
+          /* These members are used to create the result tree */
+        size_t         index;    /* # of this include file in the parent vec */
+        vector_t     * vec;      /* Result vector for this include */
+    } *begin, *end;         /* Flat list of all found includes */      
+
+    Mempool   pool;         /* The memory pool to allocate from */
+    object_t  *ob;          /* Analyzed object */
+    vector_t  *vec;         /* Result vector */
+    int        count;       /* Total number of includes */
+    svalue_t  *argp;        /* Arguments */
+    include_t *includes;    /* Pointer to the include information */
+    p_int     flags;
+
+    /* Get the memory pool */
+    memsafe(pool = new_mempool(sizeof(*begin) * 64)
+           , sizeof(*begin) * 64, "memory pool");
 
     /* Get the arguments */
     argp = sp - num_arg + 1;
@@ -1782,72 +1800,231 @@ f_include_list (svalue_t *sp, int num_arg)
     else
         ob = current_object;
 
-#if 0
-    TODO: Not yet
     if (num_arg >= 2)
         flags = argp[1].u.number;
     else
         flags = 0;
-#endif
 
     if (O_PROG_SWAPPED(ob))
         if (load_ob_from_swap(ob) < 0)
         {
+            mempool_delete(pool);
             error("Out of memory: unswap object '%s'\n", get_txt(ob->name));
             /* NOTREACHED */
             return NULL;
         }
 
-    /* Get the location and number of the include file names,
-     * and allocate the result vector.
+    /* Create the result.
+     * Depending on the flags value, this can be a flat list or a tree.
      */
 
-    include_names = ob->prog->strings + ob->prog->num_strings - 1;
-    count = ob->prog->num_includes;
+    if (!(flags & INCLIST_TREE))
+    {
+        svalue_t *svp;
 
-    vec = allocate_array(count+1);
-    svp = vec->item;
+        /* Get the result array */
+        vec = allocate_array((ob->prog->num_includes+1) * 3);
+        svp = vec->item;
 
-    /* Store the program name itself */
+        /* Walk the includes information and copy it into the result vector
+         */
+        for (  svp = vec->item+3
+             , count = ob->prog->num_includes
+             , includes = ob->prog->includes
+            ; count > 0
+            ; count--, includes++, svp += 3
+            )
+        {
+            int depth;
+
+            put_ref_string(svp, includes->name);
+            put_ref_string(svp+1, includes->filename);
+            depth = includes->depth;
+            if (depth > 0)
+                put_number(svp+2, depth);
+            else
+                put_number(svp+2, -depth);
+        }
+    }
+    else  /* Tree-type result */
+    {
+        struct iinfo * last;    /* Last include found on this depth */
+        struct iinfo * next;    /* Next include to work */
+
+        /* Walk the list of included files and build the tree from it.
+         */
+
+        begin = mempool_alloc(pool, sizeof(*begin));
+        if (NULL == begin)
+        {
+            mempool_delete(pool);
+            outofmem(sizeof(*begin), "allocation from mempool");
+        }
+
+        /* Root node for the object's program itself */
+        begin->next = NULL;
+        begin->child = NULL;
+        begin->sibling = NULL;
+        begin->inc = NULL;
+        begin->depth = 0;
+        begin->count = 0;
+        begin->parent = NULL;
+        begin->vec = NULL;
+        begin->index = 0;
+
+        end = begin;
+        last = begin;
+
+        includes = ob->prog->includes;
+        count = ob->prog->num_includes;
+
+        for ( ; count > 0; count--, includes++)
+        {
+            /* Get new node and put it into the flat list */
+            end->next = mempool_alloc(pool, sizeof(*end));
+            if (NULL == end->next)
+            {
+                mempool_delete(pool);
+                outofmem(sizeof(*end), "allocation from mempool");
+            }
+            end = end->next;
+            end->next = NULL;
+            end->inc = includes;
+            end->depth = includes->depth > 0 ? includes->depth : - includes->depth;
+
+            /* Handle the tree-based information */
+            end->child = NULL;
+            end->sibling = NULL;
+
+            if (last->depth > end->depth)
+            {
+                /* We reached a leaf with <last> - this new was included from
+                 * some parent above.
+                 */
+                while (last->depth > end->depth)
+                    last = last->parent;
+
+                /* Got back up to the right sibling level, no go to the end
+                 * of the sibling list (just in case - we should already
+                 * be there).
+                 */
+                while (last->sibling)
+                    last = last->sibling;
+            }
+            /* Now the new file is either a sibling or a child of <last> */
+
+            if (last->depth == end->depth)
+            {
+                /* Sibling to <last> */
+                last->sibling = end;
+                end->parent = last->parent;
+                last = end;
+                end->parent->count++;
+            }
+            else /* last->depth < end->depth */
+            {
+                /* Included from <last> */
+                last->child = end;
+                last->count++;
+                end->parent = last;
+                last = end;
+            }
+
+            /* Init the rest */
+            end->count = 0;
+            end->index = end->parent->count;
+            end->vec = NULL;
+        }
+
+        /* Get the top result array and keep a reference to it on the
+         * stack so that it will be deallocated on an error.
+         */
+        vec = allocate_array((begin->count+1) * 3);
+        begin->vec = vec;
+        push_array(sp, vec); inter_sp = sp;
+
+        /* Loop through all the include infos and copy them into
+         * their result vector. We create the subvectors when
+         * we encounter them.
+         * Invariant: <next> points to the next iinfo to work.
+         */
+        for (next = begin->child; next != NULL; )
+        {
+            /* If this child has no includes, we just copy the
+             * name into its proper place in the parent vector.
+             *
+             * Otherwise we create a vector for this include
+             * and store the names in there.
+             */
+            if (next->child == NULL)
+            {
+                svalue_t *svp;
+
+                svp = &next->parent->vec->item[next->index*3];
+                put_ref_string(svp, next->inc->name);
+                put_ref_string(svp+1, next->inc->filename);
+                put_number(svp+2, next->depth);
+                
+                /* If we are in the last sibling, roll back up to
+                 * the parents.
+                 */
+                while (next->sibling == NULL && next->parent != NULL)
+                    next = next->parent;
+
+                /* Advance to the next sibling. If by  */
+                next = next->sibling;
+            }
+            else
+            {
+                svalue_t *svp;
+
+                next->vec = allocate_array((next->count+1)*3);
+
+                svp = &next->parent->vec->item[next->index*3];
+                put_array(svp, next->vec);
+                  /* svp[1] and svp[2] are already 0 */
+
+                svp = next->vec->item;
+                put_ref_string(svp, next->inc->name);
+                put_ref_string(svp+1, next->inc->filename);
+                put_number(svp+2, next->depth);
+
+                /* Descend into the first child */
+                next = next->child;
+            }
+        }
+
+        sp--; /* Remove the temporary storage of vec on the stack */
+    }
+
+    /* Copy the information about the program file itself. */
 
     {
         string_t *str;
         size_t slen;  /* Also used for error reporting */
 
         slen = mstrsize(ob->prog->name);
-        str = ref_mstring(ob->prog->name);
+
+        if (compat_mode)
+            str = ref_mstring(ob->prog->name);
+        else
+            str = add_slash(ob->prog->name);
 
         if (!str)
         {
             free_array(vec);
-            error("(inherit_list) Out of memory: (%lu bytes) for filename\n"
+            mempool_delete(pool);
+            error("(include_list) Out of memory: (%lu bytes) for filename\n"
                  , (unsigned long)slen);
         }
-        put_string(svp, str);
-        svp++;
-    }
 
-    /* Now copy all include names from the program into the array */
-
-    for ( ; count > 0; count--, svp++, include_names--)
-    {
-        string_t *str;
-        size_t slen;  /* Also used for error reporting */
-
-        slen = mstrsize(*include_names);
-        str = ref_mstring(*include_names);
-
-        if (!str)
-        {
-            free_array(vec);
-            error("(inherit_list) Out of memory: (%lu bytes) for filename\n"
-                 , (unsigned long)slen);
-        }
-        put_string(svp, str);
+        put_string(vec->item, str);
+        /* vec->item[1] and vec->item[2] are already 0 */
     }
 
     /* Done */
 
+    mempool_delete(pool);
     sp = pop_n_elems(num_arg, sp);
 
     sp++;
@@ -1928,6 +2105,7 @@ f_inherit_list (svalue_t *sp, int num_arg)
         outofmem(sizeof(*begin), "allocation from mempool");
     }
 
+    /* Root node for the object's program itself */
     begin->next = NULL;
     begin->prog = ob->prog;
     begin->virtual = MY_FALSE;
