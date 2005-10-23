@@ -8,4 +8,5 @@ HISTORY
         Introduced in 3.2@70
 
 SEE ALSO
-        intp(E), referencep(E), symbolp(E)
+        clonep(E), floatp(E), mappingp(E), objectp(E), intp(E),
+        referencep(E), pointerp(E), stringp(E), symbolp(E), structp(E)

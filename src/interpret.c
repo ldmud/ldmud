@@ -14638,6 +14638,25 @@ again:
         break;
     }
 
+#ifdef USE_STRUCTS
+    CASE(F_STRUCTP);                /* --- structp             --- */
+    {
+        /* EFUN structp()
+         *
+         *   int structp(mixed)
+         *
+         * Returns 1 if the argument is a struct.
+         */
+
+        int i;
+
+        i = sp->type == T_STRUCT;
+        free_svalue(sp);
+        put_number(sp, i);
+        break;
+    }
+#endif
+
     CASE(F_SYMBOLP);                /* --- symbolp             --- */
     {
         /* EFUN symbolp()

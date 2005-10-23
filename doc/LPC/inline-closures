@@ -83,7 +83,7 @@ DESCRIPTION
         In the definition of an inline closure, some elements are
         optional:
 
-          <returntype>     defaults to 'unknown'
+          <returntype>     defaults to 'mixed'
           ( <arguments> )  defaults to '(mixed $1 ...  mixed $9)'
           : <context>      no default
         

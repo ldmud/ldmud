@@ -24,4 +24,6 @@ HISTORY
         with replaced programs no longer count as clones.
 
 SEE ALSO
-        load_name(E), clone_object(E), clones(E)
+        load_name(E), clone_object(E), clones(E), closurep(E), floatp(E),
+        mappingp(E), objectp(E), intp(E), referencep(E), pointerp(E),
+        stringp(E), symbolp(E), structp(E)

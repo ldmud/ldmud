@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+05-Oct-2002 (Lars Duening)  (3.3.273)
+  - (prolang.y) Inline closures without returntype specification are now
+       typed to return 'mixed' instead of 'unknown'. This makes them
+       play better with #pragma strict_types (reported by Dafire).
+  - (func_spec, interpret.c) Completely forgot to implement the structp()
+       predicated.
+
 05-Oct-2002 (Lars Duening)  (3.3.272)
   - (gcollect.c) Oops, MALLOC_TRACE and USE_NEW_INLINES caused a compilation
        error.

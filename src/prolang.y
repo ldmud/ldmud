@@ -5213,7 +5213,7 @@ printf("DEBUG: After inline block: program size %ld\n", CURRENT_PROGRAM_SIZE);
 #ifdef DEBUG_INLINES
 printf("DEBUG: After L_BEGIN_INLINE: program size %ld\n", CURRENT_PROGRAM_SIZE);
 #endif /* DEBUG_INLINES */
-          if (!prepare_inline_closure(TYPE_UNKNOWN))
+          if (!prepare_inline_closure(TYPE_ANY))
               YYACCEPT;
 
           /* Synthesize $1..$9 as arguments */
@@ -5278,9 +5278,9 @@ inline_opt_type:
       /* empty */
       {
 #ifdef DEBUG_INLINES
-          printf("DEBUG: inline_opt_type default: UNKNOWN\n");
+          printf("DEBUG: inline_opt_type default: ANY\n");
 #endif /* DEBUG_INLINES */
-          $$ = TYPE_UNKNOWN;
+          $$ = TYPE_ANY;
       }
     | basic_type optional_star
       {

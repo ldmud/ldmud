@@ -247,6 +247,9 @@ int     objectp(mixed);
 int     pointerp(mixed);
 int     referencep(mixed &);
 int     stringp(mixed);
+#ifdef USE_STRUCTS
+int     structp(mixed);
+#endif
 int     symbolp(mixed);
 int     typeof(mixed|mixed &);
 
