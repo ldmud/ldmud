@@ -22,7 +22,6 @@ b-990217-1: virtual inherits need cleaner implementation.
 b-010410: Branchpatching messes up line number information
 b-010603-0: Failed assignments leave behind empty mapping entries.
 b-010610-0: Type tracking fails on arrays
-b-010801-0: #' recognition in lexer insufficient
 
 
 Runtime

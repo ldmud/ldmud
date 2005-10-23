@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+08-Oct-2002 (Lars Duening)  (3.3.278)
+  - (configure) Forgot to regenerate it.
+  - (lex.c, prolang) Implemented #'inh::fun lfun closures (b-010801-0).
+
 07-Oct-2002 (Lars Duening)  (3.3.277)
   - (comm.c, main.c, efuns.c) Removed compilation problems with BeOS.
   - (prolang.y) In struct literals, a trailing ',' is now allowed

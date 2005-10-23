@@ -893,6 +893,8 @@ Optional Features:
         check object references in GC
   --enable-no-blueprint               default=disabled
         disable blueprint tracking
+  --enable-check-smalloc-total        default=disabled
+        trace smalloc statistics
   --enable-dump-gc-refs               default=disabled
         trace GC references
 
@@ -1619,6 +1621,13 @@ DEFAULTenable_no_blueprint=no
 # Check whether --enable-no-blueprint or --disable-no-blueprint was given.
 if test "${enable_no_blueprint+set}" = set; then
   enableval="$enable_no_blueprint"
+
+fi;
+
+DEFAULTenable_check_smalloc_total=no
+# Check whether --enable-check-smalloc-total or --disable-check-smalloc-total was given.
+if test "${enable_check_smalloc_total+set}" = set; then
+  enableval="$enable_check_smalloc_total"
 
 fi;
 
@@ -2473,6 +2482,16 @@ if test "x$enable_no_blueprint" = "xyes"; then
   cdef_no_blueprint="#define"
 else
   cdef_no_blueprint="#undef"
+fi
+
+if test "x$enable_check_smalloc_total" = "x" && test "x$DEFAULTenable_check_smalloc_total" != "x"; then
+  enable_check_smalloc_total=$DEFAULTenable_check_smalloc_total
+fi
+
+if test "x$enable_check_smalloc_total" = "xyes"; then
+  cdef_check_smalloc_total="#define"
+else
+  cdef_check_smalloc_total="#undef"
 fi
 
 if test "x$enable_dump_gc_refs" = "x" && test "x$DEFAULTenable_dump_gc_refs" != "x"; then
@@ -11031,6 +11050,7 @@ fi
 
 
 
+
 ac_config_files="$ac_config_files Makefile config.h util/Makefile util/indent/Makefile util/xerq/Makefile util/erq/Makefile"
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -11655,6 +11675,7 @@ s,@cdef_check_mapping_total@,$cdef_check_mapping_total,;t t
 s,@cdef_check_object_ref@,$cdef_check_object_ref,;t t
 s,@cdef_check_object_gc_ref@,$cdef_check_object_gc_ref,;t t
 s,@cdef_no_blueprint@,$cdef_no_blueprint,;t t
+s,@cdef_check_smalloc_total@,$cdef_check_smalloc_total,;t t
 s,@cdef_dump_gc_refs@,$cdef_dump_gc_refs,;t t
 s,@val_access_file@,$val_access_file,;t t
 s,@val_access_log@,$val_access_log,;t t

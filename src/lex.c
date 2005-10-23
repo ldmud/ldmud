@@ -4321,8 +4321,8 @@ yylex1 (void)
 
                 ident_t *p;
                 char *wordstart = ++yyp;
-                Bool efun_override;
-                    /* True if 'efun::' is specified. */
+                char *super_name = NULL;
+                Bool efun_override;  /* True if 'efun::' is specified. */
 
                 /* Set yyp to the last character of the functionname
                  * after the #'.
@@ -4334,7 +4334,7 @@ yylex1 (void)
                 /* the assignment is good for the data flow analysis :-} */
 
                 /* Just one character? It must be an operator */
-                if (yyp == wordstart)
+                if (yyp == wordstart && *yyp != ':')
                 {
                     int i;
 
@@ -4344,14 +4344,13 @@ yylex1 (void)
                     return L_CLOSURE;
                 }
 
-                /* Test for the 'efun::' override. If it is there,
+                /* Test for an inherited function name specification.
+                 * If found, set super_name to the inherit name, and
                  * reset wordstart/yyp to point to the name after the '::'.
                  */
-                efun_override = MY_FALSE;
-                if (yyp - wordstart == 4
-                 && !strncmp(wordstart, "efun::", 6))
+                if (':' == *yyp && ':' == *(yyp+1))
                 {
-                    efun_override = MY_TRUE;
+                    super_name = wordstart;
                     wordstart = yyp += 2;
                     do
                         c = *yyp++;
@@ -4359,9 +4358,39 @@ yylex1 (void)
                     c = *--yyp;
                 }
 
+                /* Test for the 'efun::' override.
+                 */
+                efun_override = MY_FALSE;
+                if (super_name != NULL && !strncmp(super_name, "efun::", 6))
+                {
+                    efun_override = MY_TRUE;
+                    super_name = NULL;
+                }
+
                 outp = yyp;
 
                 /* Lookup the name parsed from the text */
+
+                if (super_name != NULL)
+                {
+                    short ix;
+
+                    *yyp = '\0'; /* c holds the char at this place */
+                    *(wordstart-2) = '\0';
+                    ix = find_inherited(super_name, wordstart);
+                    if (ix < 0)
+                    {
+                        yyerrorf("Undefined function: %.50s::%.50s"
+                                , super_name, wordstart);
+                        ix = CLOSURE_EFUN_OFFS;
+                    }
+                    *yyp = c;
+                    *(wordstart-2) = ':';
+
+                    yylval.closure.number = ix;
+                    return L_CLOSURE;
+                }
+
                 *yyp = '\0'; /* c holds the char at this place */
                 p = make_shared_identifier(wordstart, I_TYPE_GLOBAL, 0);
                 *yyp = c;

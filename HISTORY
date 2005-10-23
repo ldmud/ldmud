@@ -96,7 +96,7 @@ For a detailed list of all changes see the file CHANGELOG.
            regular expression code, or the PCRE package (default).
 
 
-30-Sep-2002 (Lars Duening) -- Release 3.2.9
+07-Oct-2002 (Lars Duening) -- Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -387,6 +387,8 @@ For a detailed list of all changes see the file CHANGELOG.
            name is available in the predefined macro __DEBUG_LOG__.
        + Pragma warn_deprecated causes the compiler to print a warning
            when a deprecated efun is used.
+       + Lfun closures can now explicite name inherited functions
+           (#'base::create).
        + Bugfix: Adding mappings of different width throws an error, unless
            one of the mappings if empty.
        + Bugfix: Right shift by 32 or more bits was computed incorrectly.

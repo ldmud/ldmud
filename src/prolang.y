@@ -13707,41 +13707,29 @@ add_new_init_jump (void)
 %endif /* INITIALIZATION_BY___INIT */
 
 /*-------------------------------------------------------------------------*/
-static int
-insert_inherited (char *super_name, string_t *real_name
-                 , program_t **super_p, function_t *fun_p
-                 , int num_arg, bytecode_p __prepare_insert__p
-                 )
+static short
+lookup_inherited (char *super_name, string_t *real_name
+                 , inherit_t **pIP, funflag_t *pFlags)
 
-/* The compiler encountered a <super_name>::<real_name>() call with
- * <num_arg> arguments; the codepointer is <__prepare_insert__p>.
+/* Lookup an inherited function <super_name>::<real_name> and return
+ * it's function index, setting *pIP to the inherit_t pointer and
+ * *pFlags to the function flags.
+ * Return -1 if not found, *pIP set to NULL, and *pFlags set to 0.
  *
- * Look up the function information and set *<super_p> and *<fun_p>
- * the program pointer and the function_t information. Also compile
- * the function call(s).
- *
- * Result is the function index, or one of the negative error codes:
- * INHERITED_NOT_FOUND (-1): the function wasn't found.
- * INHERITED_WILDCARDED_ARGS (-2): it was a wildcarded supercall with
- *   arguments
- * INHERITED_WILDCARDED_NOT_FOUND (-3): it was a wildcarded supercall,
- *   but not a single function was found.
-
- * Result is -1 if the function wasn't found, -2 if it was a wildcarded
- * supercall to a function with arguments, otherwise the function index.
- *
- * <super_name> can be an empty string, the (partial) name of one
- * of the inherits, or a wildcarded name (and no args). In the latter
- * case, the function is called in all inherits matching the pattern.
- * The results from such a wildcarded call are returned in an array,
- * <super_p>, <fun_p> and the returned function index are those of
- * the first function found.
+ * <super_name> can be an empty string or the (partial) name of one
+ * of the inherits. <real_name> must be shared string.
  */
-
 {
     inherit_t *ip, *foundp;
     int num_inherits, super_length;
     short found_ix;
+
+    found_ix = -1;
+    *pIP = NULL;
+    *pFlags = 0;
+
+    if (!real_name)
+        return -1;
 
     /* Strip leading '/' */
     while (*super_name == '/')
@@ -13779,9 +13767,7 @@ insert_inherited (char *super_name, string_t *real_name
      * with virtual inherits the order gets messed up.
      */
     ip = (inherit_t *)mem_block[A_INHERITS].block;
-    for ( foundp = NULL, found_ix = -1
-        ; num_inherits > 0
-        ; ip++, num_inherits--)
+    for ( foundp = NULL ; num_inherits > 0 ; ip++, num_inherits--)
     {
         short i;
 
@@ -13790,7 +13776,7 @@ insert_inherited (char *super_name, string_t *real_name
             continue;
 
         /* Test if super_name matches the end of the name of the inherit. */
-        if (*super_name)
+        if (super_length)
         {
             /* ip->prog->name includes .c */
             int l = mstrsize(ip->prog->name)-2;
@@ -13820,17 +13806,16 @@ insert_inherited (char *super_name, string_t *real_name
             if (foundp->inherit_depth < 2) /* toplevel inherit */
                 break;
         }
-    } /* for (all includes) */
+    } /* for (all inherits) */
 
     if (foundp != NULL)
     {
         funflag_t flags;
-        bytecode_p __PREPARE_INSERT__p = __prepare_insert__p;
 
         /* Found it! */
         ip = foundp;
 
-        flags = ip->prog->functions[found_ix];
+        *pFlags = flags = ip->prog->functions[found_ix];
 
         if (flags & NAME_INHERITED)
         {
@@ -13859,6 +13844,80 @@ insert_inherited (char *super_name, string_t *real_name
                 found_ix -= ip2->function_index_offset;
             }
         }
+
+        *pIP = ip;
+    } /* if (foundp) */
+
+    return found_ix;
+} /* lookup_inherited() */
+
+/*-------------------------------------------------------------------------*/
+short
+find_inherited (char *super_name, char *real_name)
+
+/* Lookup an inherited function <super_name>::<real_name> and return
+ * it's function index. Return -1 if not found.
+ *
+ * This function is called by the lexer to resolve #'<inherited_fun> closures,
+ * so both strings are not shared.
+ *
+ * <super_name> can be an empty string or the (partial) name of one
+ * of the inherits.
+ */
+
+{
+    inherit_t *ip;
+    funflag_t flags;
+    string_t *rname;
+
+    rname = find_tabled_str(real_name);
+
+    return rname ? lookup_inherited(super_name, rname, &ip, &flags) : -1;
+} /* find_inherited() */
+
+/*-------------------------------------------------------------------------*/
+static int
+insert_inherited (char *super_name, string_t *real_name
+                 , program_t **super_p, function_t *fun_p
+                 , int num_arg, bytecode_p __prepare_insert__p
+                 )
+
+/* The compiler encountered a <super_name>::<real_name>() call with
+ * <num_arg> arguments; the codepointer is <__prepare_insert__p>.
+ *
+ * Look up the function information and set *<super_p> and *<fun_p>
+ * the program pointer and the function_t information. Also compile
+ * the function call(s).
+ *
+ * Result is the function index, or one of the negative error codes:
+ * INHERITED_NOT_FOUND (-1): the function wasn't found.
+ * INHERITED_WILDCARDED_ARGS (-2): it was a wildcarded supercall with
+ *   arguments
+ * INHERITED_WILDCARDED_NOT_FOUND (-3): it was a wildcarded supercall,
+ *   but not a single function was found.
+
+ * Result is -1 if the function wasn't found, -2 if it was a wildcarded
+ * supercall to a function with arguments, otherwise the function index.
+ *
+ * <super_name> can be an empty string, the (partial) name of one
+ * of the inherits, or a wildcarded name (and no args). In the latter
+ * case, the function is called in all inherits matching the pattern.
+ * The results from such a wildcarded call are returned in an array,
+ * <super_p>, <fun_p> and the returned function index are those of
+ * the first function found.
+ */
+
+{
+    inherit_t *ip;
+    funflag_t flags;
+    short found_ix;
+
+    found_ix = lookup_inherited(super_name, real_name, &ip, &flags);
+
+    if (ip != NULL)
+    {
+        /* Found it! */
+        bytecode_p __PREPARE_INSERT__p = __prepare_insert__p;
 
         /* Generate the function call */
         add_f_code(F_CALL_INHERITED);
@@ -13889,7 +13948,7 @@ insert_inherited (char *super_name, string_t *real_name
                 fun_p->type |= TYPE_MOD_XVARARGS;
         }
         return found_ix;
-    } /* if (foundp) */
+    } /* if (ip) */
 
 
     /* Inherit not found, maybe it's a wildcarded call */
@@ -13897,6 +13956,7 @@ insert_inherited (char *super_name, string_t *real_name
     {
         Bool *was_called;  /* Flags which inh. fun has been called already */
         inherit_t *ip0;
+        int num_inherits;
         int calls = 0;
         int ip_index;
         int first_index;

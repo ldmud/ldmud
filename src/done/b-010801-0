@@ -2,7 +2,7 @@ Short: #' recognition in lexer insufficient
 From: Bardioc
 Date: 2001-08-01
 Type: Bug
-State: Acknowledged
+State: Done - implemented in 3.2.9-dev.468, 3.3.278
 
 2. Wenn ich innerhalb einer Closure eine Funktion aufrufe,
    z.b. #'add_daemon_command aus einer abgeleiteten Klasse
