@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+06-Sep-2002 (Lars Duening)  (3.3.246)
+  - (prolang.y, func_spec, interpret.c, closure.c, object.c, swap.c,
+     efuns.c) structs are now fully implemented (at least as far as I
+       can see); internally they are used and accessed like arrays
+       (f-981229-05).
+
 05-Sep-2002 (Lars Duening)  (3.3.245)
   - (prolang.y) The function header for __INIT() was generated incorrectly
        (reported by Markus).

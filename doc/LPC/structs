@@ -1,4 +1,3 @@
-PRELIMINARY
 CONCEPT
         structs
 
@@ -118,15 +117,29 @@ USAGE
          'three'.
 
 
+USAGE IN CLOSURES
+         Due to the special nature of structs (see below), it is
+         possible only to create anonymous structs in closures using
+         the operator #'(< :
+
+           ({ #(<, 1, 2, 3 })
+
+         creates a struct with the three members 1, 2, 3. To access
+         these members within a closure, one has to use the #'[]
+         operator.
+
+
 MISCELLANEOUS
-         Internally, structs are implemented as arrays. Logically, all
-         array efuns like filter() can be used on structs as well.
+         structs are mostly a compile-time convenience in that the
+         struct names and member names are available only to the
+         LPC compiler. At runtime, structs are a special kind of array
+         with a fixed number of elements.
 
          Support for structs is signaled by the macro __LPC_STRUCTS__.
 
 
 HISTORY
-        Implementation of structs began in 3.3.237, and is not finished yet.
+        structs were fully implemented first in LDMud 3.3.246.
 
 
 SEE ALSO

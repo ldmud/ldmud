@@ -4782,9 +4782,9 @@ f_transfer (svalue_t *sp)
 /* Forward Declarations */
 
 static Bool save_svalue(svalue_t *, char, Bool);
-static void save_array(vector_t *);
+static void save_array(vector_t *, Bool);
 static int restore_size(char **str);
-INLINE static Bool restore_array(svalue_t *, char **str);
+INLINE static Bool restore_array(svalue_t *, char **str, Bool);
 static int restore_svalue(svalue_t *, char **, char);
 static void register_array(vector_t *);
 static void register_mapping (mapping_t *map);
@@ -5119,7 +5119,11 @@ register_mapping_filter (svalue_t *key, svalue_t *data, void *extra)
 {
     int i;
 
-    if (key->type == T_POINTER)
+    if (key->type == T_POINTER
+#ifdef USE_STRUCTS
+     || key->type == T_STRUCT
+#endif /* USE_STRUCTS */
+       )
     {
         register_array  (key->u.vec);
     }
@@ -5130,7 +5134,11 @@ register_mapping_filter (svalue_t *key, svalue_t *data, void *extra)
 
     for (i = (p_int)extra; --i >= 0; data++)
     {
-        if (data->type == T_POINTER)
+        if (data->type == T_POINTER
+#ifdef USE_STRUCTS
+         || data->type == T_STRUCT
+#endif /* USE_STRUCTS */
+           )
         {
             register_array  (data->u.vec);
         }
@@ -5179,8 +5187,14 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
         break;
 
     case T_POINTER:
-        save_array(v->u.vec);
+        save_array(v->u.vec, MY_FALSE);
         break;
+
+#ifdef USE_STRUCTS
+    case T_STRUCT:
+        save_array(v->u.vec, MY_TRUE);
+        break;
+#endif /* USE_STRUCTS */
 
     case T_NUMBER:
       {
@@ -5245,9 +5259,9 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
 
 /*-------------------------------------------------------------------------*/
 static void
-save_array (vector_t *v)
+save_array (vector_t *v, Bool is_struct)
 
-/* Encode the array <v> and write it to the write buffer.
+/* Encode the array/struct <v> and write it to the write buffer.
  */
 
 {
@@ -5260,11 +5274,14 @@ save_array (vector_t *v)
     if (recall_pointer(v))
         return;
 
-    /* Write the '({'... */
+    /* Write the '({'/'(<'... */
     {
         L_PUTC_PROLOG
         L_PUTC('(')
-        L_PUTC('{')
+        if (is_struct)
+            L_PUTC('<')
+        else
+            L_PUTC('{')
         L_PUTC_EPILOG
     }
 
@@ -5274,10 +5291,13 @@ save_array (vector_t *v)
         save_svalue(val++, ',', MY_FALSE);
     }
 
-    /* ... and the '})' */
+    /* ... and the '})'/'>)' */
     {
         L_PUTC_PROLOG
-        L_PUTC('}')
+        if (is_struct)
+            L_PUTC('>')
+        else
+            L_PUTC('}')
         L_PUTC(')')
         L_PUTC_EPILOG
     }
@@ -5301,7 +5321,11 @@ register_array (vector_t *vec)
     v = vec->item;
     for (i = (long)VEC_SIZE(vec); --i >= 0; v++)
     {
-        if (v->type == T_POINTER)
+        if (v->type == T_POINTER
+#ifdef USE_STRUCTS
+         || v->type == T_STRUCT
+#endif /* USE_STRUCTS */
+           )
         {
             register_array  (v->u.vec);
         }
@@ -5505,7 +5529,11 @@ v_save_object (svalue_t *sp, int numarg)
         if (names->flags & TYPE_MOD_STATIC)
             continue;
 
-        if (v->type == T_POINTER)
+        if (v->type == T_POINTER
+#ifdef USE_STRUCTS
+         || v->type == T_STRUCT
+#endif /* USE_STRUCTS */
+           )
             register_array  (v->u.vec);
         else if (v->type == T_MAPPING)
             register_mapping(v->u.map);
@@ -5694,7 +5722,11 @@ f_save_value (svalue_t *sp)
 
     /* First look at the value for arrays and mappings
      */
-    if (sp->type == T_POINTER)
+    if (sp->type == T_POINTER
+#ifdef USE_STRUCTS
+     || sp->type == T_STRUCT
+#endif /* USE_STRUCTS */
+       )
         register_array(sp->u.vec);
     else if (sp->type == T_MAPPING)
         register_mapping(sp->u.map);
@@ -6051,7 +6083,7 @@ restore_mapping (svalue_t *svp, char **str)
     }
     *str = tmp_par.str;
     return MY_TRUE;
-}
+} /* restore_mapping() */
 
 /*-------------------------------------------------------------------------*/
 static int
@@ -6080,6 +6112,9 @@ restore_size (char **str)
         switch(*pt)
         {
         case '}':  /* End of array */
+#ifdef USE_STRUCTS
+        case '>':  /* End of struct */
+#endif /* USE_STRUCTS */
           {
             if (pt[1] != ')')
                 return -1;
@@ -6109,14 +6144,18 @@ restore_size (char **str)
             break;
           }
 
-        case '(':  /* Embedded array or mapping */
+        case '(':  /* Embedded array, struct or mapping */
           {
             /* Lazy way of doing it, a bit inefficient */
             struct rms_parameters tmp_par;
             int tsiz;
 
             tmp_par.str = pt + 2;
-            if (pt[1] == '{')
+            if (pt[1] == '{'
+#ifdef USE_STRUCTS
+             || pt[1] == '<'
+#endif /* USE_STRUCTS */
+               )
                 tsiz = restore_size(&tmp_par.str);
             else if (pt[1] == '[')
                 tsiz = restore_map_size(&tmp_par);
@@ -6168,10 +6207,10 @@ restore_size (char **str)
 
 /*-------------------------------------------------------------------------*/
 static INLINE Bool
-restore_array (svalue_t *svp, char **str)
+restore_array (svalue_t *svp, char **str, Bool is_struct)
 
 /* Restore an array from the text starting at *<str> (which points
- * just after the leading '({') and store it into *<svp>.
+ * just after the leading '({'/'(<') and store it into *<svp>.
  * Return TRUE if the restore was successful, FALSE else (*<svp> is
  * set to const0 in that case).
  * On a successful return, *<str> is set to point after the array text
@@ -6207,7 +6246,14 @@ restore_array (svalue_t *svp, char **str)
     *svp = const0; /* in case allocate_array() throws an error */
 
     v = allocate_array(siz);
+#ifdef USE_STRUCTS
+    if (is_struct)
+        put_array(svp, v);
+    else
+        put_struct(svp, v);
+#else
     put_array(svp, v);
+#endif /* USE_STRUCTS */
 
     /* Restore the values */
 
@@ -6222,7 +6268,7 @@ restore_array (svalue_t *svp, char **str)
     /* Check for the trailing '})' */
 
     pt = *str;
-    if (*pt++ != '}' || *pt++ != ')' ) {
+    if (*pt++ != (is_struct ? '>' : '}') || *pt++ != ')' ) {
         return MY_FALSE;
     }
 
@@ -6303,7 +6349,7 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
         break;
       }
 
-    case '(': /* Unshared mapping or array */
+    case '(': /* Unshared mapping, struct or array */
         *pt = cp+2;
         switch ( cp[1] )
         {
@@ -6316,10 +6362,19 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
 
         case '{':
           {
-            if ( !restore_array(svp, pt) )
+            if ( !restore_array(svp, pt, MY_FALSE) )
                 return MY_FALSE;
             break;
           }
+
+#ifdef USE_STRUCTS
+        case '<':
+          {
+            if ( !restore_array(svp, pt, MY_TRUE) )
+                return MY_FALSE;
+            break;
+          }
+#endif /* USE_STRUCTS */
 
         default:
             *svp = const0;

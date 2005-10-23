@@ -2725,7 +2725,11 @@ push_indexed_lvalue (svalue_t *sp, bytecode_p pc)
 
     /* Index a vector.
      */
-    if (vec->type == T_POINTER)
+    if (vec->type == T_POINTER
+#ifdef USE_STRUCTS
+     || vec->type == T_STRUCT
+#endif /* USE_STRUCTS */
+       )
     {
         if (i->type != T_NUMBER)
         {
@@ -2741,8 +2745,18 @@ push_indexed_lvalue (svalue_t *sp, bytecode_p pc)
         }
         if ((size_t)ind >= VEC_SIZE(vec->u.vec))
         {
-            ERRORF(("Index out of bounds for []: %ld, vector size: %lu.\n"
+#ifdef USE_STRUCTS
+            if (vec->type == T_POINTER)
+                ERRORF(("Index for [] out of bounds: %ld, vector size: %lu\n"
+                       , (long)ind, VEC_SIZE(vec->u.vec)));
+            else
+                ERRORF(("struct member index out of bounds: index %ld, "
+                        "struct size: %lu\n"
+                       , (long)ind, VEC_SIZE(vec->u.vec)));
+#else
+            ERRORF(("Index for [] out of bounds: %ld, vector size: %lu\n"
                    , (long)ind, VEC_SIZE(vec->u.vec)));
+#endif /* USE_STRUCTS */
             return NULL;
         }
 
@@ -2983,6 +2997,7 @@ static INLINE svalue_t *
 push_protected_indexed_lvalue (svalue_t *sp, bytecode_p pc)
 
 /* Op. F_PUSH_PROTECTED_INDEXED_LVALUE(vector  v=sp[-1], int   i=sp[0])
+ * Op. F_PUSH_PROTECTED_INDEXED_LVALUE(struct  v=sp[-1], int   i=sp[0])
  * Op. F_PUSH_PROTECTED_INDEXED_LVALUE(mapping v=sp[-1], mixed i=sp[0])
  *
  * Compute the lvalue &(v[i]), store it in a struct protected_lvalue, and
@@ -3002,7 +3017,11 @@ push_protected_indexed_lvalue (svalue_t *sp, bytecode_p pc)
 
     /* Index a vector.
      */
-    if (vec->type == T_POINTER)
+    if (vec->type == T_POINTER
+#ifdef USE_STRUCTS
+     || vec->type == T_POINTER
+#endif /* USE_STRUCTS */
+       )
     {
         if (i->type != T_NUMBER)
         {
@@ -3019,8 +3038,18 @@ push_protected_indexed_lvalue (svalue_t *sp, bytecode_p pc)
 
         if ((size_t)ind >= VEC_SIZE(vec->u.vec))
         {
+#ifdef USE_STRUCTS
+            if (vec->type == T_POINTER)
+                ERRORF(("Index out of bounds for []: %ld, vector size: %lu.\n"
+                       , (long)ind, VEC_SIZE(vec->u.vec)));
+            else
+                ERRORF(("struct member lookup out of bounds: index %ld, "
+                        "struct size: %lu.\n"
+                       , (long)ind, VEC_SIZE(vec->u.vec)));
+#else
             ERRORF(("Index out of bounds for []: %ld, vector size: %lu.\n"
                    , (long)ind, VEC_SIZE(vec->u.vec)));
+#endif /* USE_STRUCTS */
             return NULL;
         }
 
@@ -3305,6 +3334,7 @@ static INLINE svalue_t *
 index_lvalue (svalue_t *sp, bytecode_p pc)
 
 /* Operator F_INDEX_LVALUE (string|vector &v=sp[0], int   i=sp[-1])
+ *          F_INDEX_LVALUE (struct        &v=sp[0], int   i=sp[-1])
  *          F_INDEX_LVALUE (mapping       &v=sp[0], mixed i=sp[-1])
  *
  * Compute the index &(v[i]) of lvalue <v> and push it into the stack. The
@@ -3333,7 +3363,11 @@ index_lvalue (svalue_t *sp, bytecode_p pc)
 
     /* Index a vector.
      */
-    if (type == T_POINTER)
+    if (type == T_POINTER
+#ifdef USE_STRUCTS
+     || type == T_STRUCT
+#endif /* USE_STRUCTS */
+       )
     {
         vector_t *v = vec->u.vec;
 
@@ -3352,8 +3386,18 @@ index_lvalue (svalue_t *sp, bytecode_p pc)
 
         if ((size_t)ind >= VEC_SIZE(v))
         {
+#ifdef USE_STRUCTS
+            if (type == T_POINTER)
+                ERRORF(("Index for [] out of bounds: %ld, vector size: %lu\n"
+                       , (long)ind, VEC_SIZE(v)));
+            else
+                ERRORF(("struct member index out of bounds: index %ld, "
+                        "struct size: %lu\n"
+                       , (long)ind, VEC_SIZE(v)));
+#else
             ERRORF(("Index for [] out of bounds: %ld, vector size: %lu\n"
                    , (long)ind, VEC_SIZE(v)));
+#endif /* USE_STRUCTS */
             return NULL;
         }
 
@@ -3676,6 +3720,7 @@ static INLINE svalue_t *
 protected_index_lvalue (svalue_t *sp, bytecode_p pc)
 
 /* Operator F_PROTECTED_INDEX_LVALUE (string|vector &v=sp[0], int   i=sp[-1])
+ *          F_PROTECTED_INDEX_LVALUE (struct        &v=sp[0], int   i=sp[-1])
  *          F_PROTECTED_INDEX_LVALUE (mapping       &v=sp[0], mixed i=sp[-1])
  *
  * Compute the index &(*v[i]) of lvalue <v>, wrap it into a protector, and push
@@ -3708,7 +3753,11 @@ protected_index_lvalue (svalue_t *sp, bytecode_p pc)
 
         /* Index a vector.
          */
-        if (type == T_POINTER)
+        if (type == T_POINTER
+#ifdef USE_STRUCTS
+         || type == T_STRUCT
+#endif /* USE_STRUCTS */
+           )
         {
             vector_t *v = vec->u.vec;
             struct protected_lvalue *lvalue;
@@ -3728,8 +3777,18 @@ protected_index_lvalue (svalue_t *sp, bytecode_p pc)
 
             if ((size_t)ind >= VEC_SIZE(v))
             {
+#ifdef USE_STRUCTS
+                if (type == T_POINTER)
+                    ERRORF(("Index for [] out of bounds: %ld, vector size: %lu.\n"
+                           , (long)ind, VEC_SIZE(v)));
+                else
+                    ERRORF(("struct lookup out of bounds: index %ld, "
+                            "struct size: %lu\n"
+                           , (long)ind, VEC_SIZE(vec->u.vec)));
+#else
                 ERRORF(("Index for [] out of bounds: %ld, vector size: %lu.\n"
                        , (long)ind, VEC_SIZE(v)));
+#endif /* USE_STRUCTS */
                 return NULL;
             }
 
@@ -4811,8 +4870,8 @@ protected_range_lvalue (int code, svalue_t *sp)
 static INLINE svalue_t *
 push_indexed_value (svalue_t *sp, bytecode_p pc)
 
-/* Operator F_INDEX (string|vector v=sp[0], int   i=sp[-1])
- *          F_INDEX (mapping       v=sp[0], mixed i=sp[-1])
+/* Operator F_INDEX (string|vector v=sp[-1], int   i=sp[0])
+ *          F_INDEX (mapping       v=sp[-1], mixed i=sp[0])
  *
  * Compute the value (v[i]) and push it onto the stack.
  * If the value would be a destructed object, 0 is pushed onto the stack
@@ -4865,6 +4924,9 @@ push_indexed_value (svalue_t *sp, bytecode_p pc)
       }
 
     case T_POINTER:
+#ifdef USE_STRUCTS
+    case T_STRUCT:
+#endif /* USE_STRUCTS */
         if (i->type != T_NUMBER)
         {
             ERRORF(("Illegal index for []: got %s, expected number.\n"
@@ -4883,8 +4945,18 @@ push_indexed_value (svalue_t *sp, bytecode_p pc)
 
         if (ind < 0 || (size_t)ind >= VEC_SIZE(vec->u.vec))
         {
+#ifdef USE_STRUCTS
+            if (vec->type == T_POINTER)
+                ERRORF(("Index for [] out of bounds: %ld, vector size: %lu\n"
+                       , (long)ind, VEC_SIZE(vec->u.vec)));
+            else
+                ERRORF(("struct lookup out of bounds: index %ld, "
+                        "struct size: %lu\n"
+                       , (long)ind, VEC_SIZE(vec->u.vec)));
+#else
             ERRORF(("Index for [] out of bounds: %ld, vector size: %lu\n"
                    , (long)ind, VEC_SIZE(vec->u.vec)));
+#endif /* USE_STRUCTS */
             return NULL;
         }
 
@@ -12523,6 +12595,7 @@ again:
 
     CASE(F_PUSH_INDEXED_LVALUE);    /* --- push_indexed_lvalue --- */
         /* Operator F_PUSH_INDEXED_LVALUE(vector  v=sp[-1], int   i=sp[0])
+         * Operator F_PUSH_INDEXED_LVALUE(struct  v=sp[-1], int   i=sp[0])
          * Operator F_PUSH_INDEXED_LVALUE(mapping v=sp[-1], mixed i=sp[0])
          *
          * Compute the lvalue &(v[i]) and push it into the stack. If v has
@@ -12557,6 +12630,7 @@ again:
 
     CASE(F_INDEX_LVALUE);           /* --- index_lvalue       --- */
         /* Operator F_INDEX_LVALUE (string|vector &v=sp[0], int   i=sp[-1])
+         *          F_INDEX_LVALUE (struct        &v=sp[0], int   i=sp[-1])
          *          F_INDEX_LVALUE (mapping       &v=sp[0], mixed i=sp[-1])
          *
          * Compute the index &(v[i]) of lvalue <v> and push it into the stack.
@@ -12596,8 +12670,9 @@ again:
         break;
 
     CASE(F_INDEX);                  /* --- index              --- */
-        /* Operator F_INDEX (string|vector v=sp[0], int   i=sp[-1])
-         *          F_INDEX (mapping       v=sp[0], mixed i=sp[-1])
+        /* Operator F_INDEX (string|vector v=sp[-1], int   i=sp[0])
+         *          F_INDEX (struct        v=sp[-1], int   i=sp[0])
+         *          F_INDEX (mapping       v=sp[-1], mixed i=sp[0])
          *
          * Compute the value (v[i]) and push it onto the stack.  If the value
          * would be a destructed object, 0 is pushed onto the stack and the
@@ -12823,6 +12898,7 @@ again:
                           /* --- push_protected_indexed_lvalue --- */
     CASE(F_PUSH_PROTECTED_INDEXED_LVALUE);
         /* Op. (vector  v=sp[-1], int   i=sp[0])
+         * Op. (struct  v=sp[-1], int   i=sp[0])
          * Op. (mapping v=sp[-1], mixed i=sp[0])
          *
          * Compute the lvalue &(v[i]), store it in a struct
@@ -12872,6 +12948,7 @@ again:
                                  /* --- protected_index_lvalue --- */
     CASE(F_PROTECTED_INDEX_LVALUE);
         /* Operator (string|vector &v=sp[0], int   i=sp[-1])
+         *          (struct        &v=sp[0], int   i=sp[-1])
          *          (mapping       &v=sp[0], mixed i=sp[-1])
          *
          * Compute the index &(*v[i]) of lvalue <v>, wrap it into a
@@ -13437,6 +13514,63 @@ again:
         put_mapping(sp, m);
         break;
     }
+
+#ifdef USE_STRUCTS
+    CASE(F_S_AGGREGATE);       /* --- s_aggregate <size> <num> --- */
+    CASE(F_S_M_AGGREGATE);
+                  /* --- s_m_aggregate <size> <num> <index>... --- */
+    {
+        /* Create a struct (nominal size <size>) from the <num> values
+         * currently on the stack.
+         * For F_S_AGGREGATE, the values on the stack are to be assigned
+         * to the struct members in ascending order.
+         * For F_S_M_AGGREGATE, the <index>... values give for each
+         * value on the stack into which struct member the value has to go.
+         * This list of indices is given in reverse order, that is the
+         * index for the topmost stack value comes first.
+         */
+        vector_t * vec;
+        int size, num_values;
+        svalue_t * svp;
+
+        size = LOAD_UINT8(pc);
+        num_values = LOAD_UINT8(pc);
+
+        vec = allocate_array(size);
+        if  (!vec)
+            ERROR("Out of memory!\n");
+        
+        if (instruction == F_S_AGGREGATE)
+        {
+            /* Easy way: just move all the values into the vector */
+
+            for (svp = vec->item + num_values - 1
+                ; num_values > 0
+                ; num_values--, svp--, sp--
+                )
+            {
+                *svp = *sp;
+            }
+        }
+        else
+        {
+            /* Complex way: assign using the indices */
+            int index;
+
+            for ( ; num_values > 0 ; num_values--, sp--)
+            {
+                index = LOAD_UINT8(pc);
+                vec->item[index] = *sp;
+            }
+        }
+
+        /* Put the struct onto the stack */
+        sp++;
+        put_struct(sp, vec);
+
+        break;
+   }
+#endif
 
     CASE(F_PREVIOUS_OBJECT0);       /* --- previous_object0    --- */
         /* EFUN previous_object(void)
@@ -14287,9 +14421,6 @@ again:
          *
          * Returns a code for the type of the argument, as defined in
          * <sys/lpctypes.h>
-#ifdef USE_STRUCTS
-         * TODO: Implement structs.
-#endif
          */
 
         mp_int i = sp->type;
@@ -14415,7 +14546,11 @@ again:
             break;
         }
 
+#ifdef USE_STRUCTS
+        if (sp->type == T_POINTER || sp->type == T_STRUCT)
+#else
         if (sp->type == T_POINTER)
+#endif /* USE_STRUCTS */
         {
             i = (long)VEC_SIZE(sp->u.vec);
             free_svalue(sp);

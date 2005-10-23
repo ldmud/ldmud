@@ -124,6 +124,9 @@
 typedef struct block_scope_s       block_scope_t;
 typedef struct const_list_s        const_list_t;
 typedef struct const_list_svalue_s const_list_svalue_t;
+#ifdef USE_STRUCTS
+typedef struct struct_init_s       struct_init_t;
+#endif /* USE_STRUCTS */
 typedef struct efun_shadow_s       efun_shadow_t;
 typedef struct mem_block_s         mem_block_t;
 
@@ -234,6 +237,21 @@ struct const_list_svalue_s
     const_list_t *last_member; /* For nested struct initialisations */
 #endif /* USE_STRUCTS */
 };
+
+#ifdef USE_STRUCTS
+/* --- struct struct_init_s: Descriptor for one struct literal member
+ *
+ * When createing struct literals at runtime, a list of these structures
+ * keeps the information about the order and type of members encountered.
+ */
+ 
+struct struct_init_s
+{
+    struct_init_t * next;  /* Next member entry */
+    vartype_t       type;  /* Type of expression */
+    string_t      * name;  /* Member name, or NULL if unnamed */
+};
+#endif /* USE_STRUCTS */
 
 /* --- struct efun_shadow_t: Store info about masked efuns ---
  *
@@ -1246,7 +1264,7 @@ efun_argument_error(int arg, int instr
 
 /*-------------------------------------------------------------------------*/
 static Bool
-compatible_types (fulltype_t t1, fulltype_t t2)
+compatible_types (fulltype_t t1, fulltype_t t2, Bool is_assign)
 
 /* Compare the two types <t1> and <t2> and return TRUE if they are compatible.
  * Rules:
@@ -1254,9 +1272,42 @@ compatible_types (fulltype_t t1, fulltype_t t2)
  *   - TYPE_UNKNOWN is incompatible to everything
  *   - TYPE_ANY is compatible to everything
  *   - two POINTER types are compatible if at least one is *TYPE_ANY.
+ *
+ * If <is_assign> is true, it is assumed that <t2> will be assigned
+ * to a var of <t1>, and the following rules have to match as well:
+ *   - a struct <t1> is compatible to a derived struct <t2>.
+ *   - if <t1> is a struct, <t2> must be, too.
  */
 
 {
+#ifdef USE_STRUCTS
+    if (is_assign && (t1 & PRIMARY_TYPE_MASK) == T_STRUCT)
+    {
+        int id1, id2;
+        
+        /* Check if t2 is a struct */
+        if ((t2 & PRIMARY_TYPE_MASK) != T_STRUCT)
+            return MY_FALSE;
+
+        /* Check if t1 is a base-struct of t2 */
+        id1 = GET_SEC_TYPE_INFO(t1);
+        id2 = GET_SEC_TYPE_INFO(t2);
+
+        while (id2 >= 0 && id1 != id2)
+        {
+            id2 = STRUCT_DEF(id2).base;
+        }
+
+        /* If the base structs match, just pretend that t2 is the
+         * same struct as t1. This will make the following tests
+         * work as normal.
+         */
+        if (id2 >= 0)
+            t2 = (t2 & ~SEC_TYPE_MASK)
+               | MAKE_SEC_TYPE_INFO(id1);
+    }
+#endif
+
     if (t1 == TYPE_UNKNOWN || t2 == TYPE_UNKNOWN)
         return MY_FALSE;
     if (t1 == t2)
@@ -2355,6 +2406,250 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
     return num;
 } /* define_new_function() */
 
+/*-------------------------------------------------------------------------*/
+%ifdef INITIALIZATION_BY___INIT
+
+static void
+define_variable (ident_t *name, fulltype_t flags)
+
+%else /* then !INITIALIZATION_BY___INIT */
+
+static void
+define_variable (ident_t *name, fulltype_t flags, svalue_t *svp)
+
+%endif /* INITIALIZATION_BY___INIT */
+
+/* Define a new global variable <name> of type <flags>.
+ * If !INITIALIZATION_BY___INIT, then <svp> is the initializer for the
+ * variable.
+ */
+
+{
+    variable_t dummy;
+    int n;
+
+    if (name->type != I_TYPE_GLOBAL)
+    {
+        /* This is the first _GLOBAL use of this identifier:
+         * make an appropriate entry in the identifier table.
+         */
+        
+        if (name->type != I_TYPE_UNKNOWN)
+        {
+            /* The ident has been used before otherwise, so
+             * get a fresh structure.
+             */
+            name = make_shared_identifier(get_txt(name->name), I_TYPE_GLOBAL, 0);
+        }
+
+        name->type = I_TYPE_GLOBAL;
+        name->u.global.function  = I_GLOBAL_FUNCTION_VAR;
+        name->u.global.variable  = I_GLOBAL_VARIABLE_OTHER; /* mark it as 'yet undef' for now */
+        name->u.global.efun      = I_GLOBAL_EFUN_OTHER;
+        name->u.global.sim_efun  = I_GLOBAL_SEFUN_OTHER;
+#ifdef USE_STRUCTS
+        name->u.global.struct_id = I_GLOBAL_STRUCT_NONE;
+#endif /* USE_STRUCTS */
+
+        name->next_all = all_globals;
+        all_globals = name;
+    }
+    else if (name->u.global.function == I_GLOBAL_FUNCTION_EFUN)
+    {
+        /* The previous _GLOBAL use is the permanent efun definition:
+         * mark the efun as shadowed.
+         */
+        efun_shadow_t *q;
+
+        q = xalloc(sizeof(efun_shadow_t));
+        q->shadow = name;
+        q->next = all_efun_shadows;
+        all_efun_shadows = q;
+    }
+
+    /* If the variable already exists, make sure that we can redefine it */
+    if ( (n = name->u.global.variable) >= 0)
+    {
+        /* Visible nomask variables can't be redefined */
+        if ( VARIABLE(n)->flags & TYPE_MOD_NO_MASK && !(flags & NAME_HIDDEN))
+            yyerrorf( "Illegal to redefine 'nomask' variable '%s'"
+                    , get_txt(name->name));
+
+        /* We can redefine inherited variables if they are private or hidden,
+         * or if one of them is static.
+         */
+        if (  (   !(VARIABLE(n)->flags & NAME_INHERITED)
+               || (   !(VARIABLE(n)->flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN))
+                   && !((flags ^ VARIABLE(n)->flags) & TYPE_MOD_STATIC)
+                  )
+              )
+            && !(flags & NAME_INHERITED)
+           )
+        {
+            if (VARIABLE(n)->flags & NAME_INHERITED)
+                yyerrorf("Illegal to redefine inherited variable '%s'"
+                        , get_txt(name->name));
+            else
+                yyerrorf("Illegal to redefine global variable '%s'"
+                        , get_txt(name->name));
+        }
+
+        if (((flags ^ VARIABLE(n)->flags) & (TYPE_MOD_STATIC|TYPE_MOD_PRIVATE))
+            == TYPE_MOD_STATIC
+         && !(flags & NAME_INHERITED)
+           )
+        {
+            yywarnf("Redefining inherited %s variable '%s' with a %s variable"
+                   , (VARIABLE(n)->flags & TYPE_MOD_STATIC)
+                     ? "nosave" : "non-nosave"
+                   , get_txt(name->name)
+                   , (flags & TYPE_MOD_STATIC) ? "nosave" : "non-nosave"
+                   );
+        }
+
+        /* Make sure that at least one of the two definitions is 'static'.
+         * The variable which has not been inherited gets first pick.
+         */
+        if (flags & NAME_INHERITED)
+        {
+            flags |= ~(VARIABLE(n)->flags) & TYPE_MOD_STATIC;
+        }
+        else
+        {
+            VARIABLE(n)->flags |=   ~flags & TYPE_MOD_STATIC;
+        }
+    }
+
+    /* Prepare the new variable_t */
+
+    if (flags & TYPE_MOD_NOSAVE)
+    {
+        /* 'nosave' is internally saved as 'static' (historical reason) */
+        flags |= TYPE_MOD_STATIC;
+        flags ^= TYPE_MOD_NOSAVE;
+    }
+
+    dummy.name = ref_mstring(name->name);
+    dummy.flags = flags;
+
+    if (flags & TYPE_MOD_VIRTUAL)
+    {
+        if (!(flags & NAME_HIDDEN))
+            name->u.global.variable = VIRTUAL_VAR_TAG | V_VARIABLE_COUNT;
+        add_to_mem_block(A_VIRTUAL_VAR, &dummy, sizeof dummy);
+%ifndef INITIALIZATION_BY___INIT
+        add_to_mem_block(A_VIRTUAL_VAR_VALUES, svp, sizeof *svp);
+%endif /* INITIALIZATION_BY___INIT */
+    }
+    else
+    {
+        if (!(flags & NAME_HIDDEN))
+            name->u.global.variable = NV_VARIABLE_COUNT;
+        add_to_mem_block(A_VARIABLES, &dummy, sizeof dummy);
+%ifndef INITIALIZATION_BY___INIT
+        add_to_mem_block(A_VARIABLE_VALUES, svp, sizeof *svp);
+%endif /* INITIALIZATION_BY___INIT */
+    }
+} /* define_variable() */
+
+/*-------------------------------------------------------------------------*/
+static void
+redeclare_variable (ident_t *name, fulltype_t flags, int n)
+
+/* The variable <name> is inherited virtually with number <n>.
+ * Redeclare it from its original type to <flags>.
+ */
+
+{
+    if (name->type != I_TYPE_GLOBAL)
+    {
+        /* This is the first _GLOBAL use of this identifier:
+         * make an appropriate entry in the identifier table.
+         */
+
+        /* I_TYPE_UNKNOWN */
+        name->type = I_TYPE_GLOBAL;
+        name->u.global.function  = I_GLOBAL_FUNCTION_VAR;
+        name->u.global.variable  = I_GLOBAL_VARIABLE_OTHER; /* default: it's hidden */
+        name->u.global.efun      = I_GLOBAL_EFUN_OTHER;
+        name->u.global.sim_efun  = I_GLOBAL_SEFUN_OTHER;
+#ifdef USE_STRUCTS
+        name->u.global.struct_id = I_GLOBAL_STRUCT_NONE;
+#endif /* USE_STRUCTS */
+        
+        name->next_all = all_globals;
+        all_globals = name;
+    }
+    else if (name->u.global.function == I_GLOBAL_FUNCTION_EFUN)
+    {
+        /* The previous _GLOBAL use is the permanent efun definition:
+         * mark the efun as shadowed.
+         */
+        efun_shadow_t *q;
+
+        q = xalloc(sizeof(efun_shadow_t));
+        q->shadow = name;
+        
+        q->next = all_efun_shadows;
+        all_efun_shadows = q;
+    }
+    /* else: the variable is inherited after it has been defined
+     * in the child program.
+     */
+
+    /* The variable is hidden, do nothing else */
+    if (flags & NAME_HIDDEN)
+        return;
+        
+    if (name->u.global.variable >= 0 && name->u.global.variable != n)
+    {
+        if (VARIABLE(name->u.global.variable)->flags & TYPE_MOD_NO_MASK )
+            yyerrorf( "Illegal to redefine 'nomask' variable '%s'"
+                    , get_txt(name->name));
+    }
+    else if (V_VARIABLE(n)->flags & TYPE_MOD_NO_MASK
+          && !(V_VARIABLE(n)->flags & NAME_HIDDEN)
+          && (V_VARIABLE(n)->flags ^ flags) & TYPE_MOD_STATIC )
+    {
+        yyerrorf("Illegal to redefine 'nomask' variable \"%s\""
+                , get_txt(name->name));
+    }
+    
+    if (flags & TYPE_MOD_NOSAVE)
+    {
+        /* 'nosave' is internally saved as 'static' (historical reason) */
+        flags |= TYPE_MOD_STATIC;
+        flags ^= TYPE_MOD_NOSAVE;
+    }
+
+    name->u.global.variable = n;
+    V_VARIABLE(n)->flags = flags;
+} /* redeclare_variable() */
+
+/*-------------------------------------------------------------------------*/
+static int
+verify_declared (ident_t *p)
+
+/* Check that <p> is a global variable.
+ * If yes, return the index of that variable, -1 otherwise.
+ */
+
+{
+    int r;
+
+    if (p->type != I_TYPE_GLOBAL
+     || (r = p->u.global.variable) < 0)
+    {
+        yyerrorf("Variable %s not declared !", get_txt(p->name));
+        return -1;
+    }
+    
+    return r;
+} /* verify_declared() */
+
+
+/* =============================   STRUCTS   ============================= */
+
 #ifdef USE_STRUCTS
 /*-------------------------------------------------------------------------*/
 static int
@@ -2609,249 +2904,219 @@ adjust_struct_id (vartype_t type, int offset)
              ;
     return type;
 } /* adjust_struct_id() */
-#endif /* USE_STRUCTS */
 
 /*-------------------------------------------------------------------------*/
-%ifdef INITIALIZATION_BY___INIT
+static Bool
+create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
 
-static void
-define_variable (ident_t *name, fulltype_t flags)
-
-%else /* then !INITIALIZATION_BY___INIT */
-
-static void
-define_variable (ident_t *name, fulltype_t flags, svalue_t *svp)
-
-%endif /* INITIALIZATION_BY___INIT */
-
-/* Define a new global variable <name> of type <flags>.
- * If !INITIALIZATION_BY___INIT, then <svp> is the initializer for the
- * variable.
+/* The compiler has created code for <length> expressions in order
+ * to create a struct literal of struct <pdef>.
+ * Analyze the <list> of member descriptions and generate the appropriate
+ * bytecode.
+ *
+ * Return TRUE on success, and FALSE if an error occured (the caller will
+ * then clean up the bytecode).
  */
 
 {
-    variable_t dummy;
-    int n;
+    struct_init_t * p;
+    struct_member_t * pmember;
+    void * block;    /* Allocation block for flags and index */
+    Bool * flags;    /* Flag: which struct members have been set */
+    int  * index;    /* For each expr in order, list the struct member index */
+    int    consumed; /* To check if we used all elements */
+    int    count, member;
+    int    i;
+    Bool got_error = MY_FALSE;
 
-    if (name->type != I_TYPE_GLOBAL)
+    /* Check if there is one member assigned by name */
+    for (p = list; p != NULL; p = p->next)
+        if (p->name != NULL)
+            break;
+
+    if (length == 0 || p == NULL)
     {
-        /* This is the first _GLOBAL use of this identifier:
-         * make an appropriate entry in the identifier table.
-         */
-        
-        if (name->type != I_TYPE_UNKNOWN)
+        /* Simplest case: all members assigned by position. */
+
+        int member;
+        struct_member_t * pmember;
+
+        /* Check the types */
+        if (exact_types && length > 0)
         {
-            /* The ident has been used before otherwise, so
-             * get a fresh structure.
-             */
-            name = make_shared_identifier(get_txt(name->name), I_TYPE_GLOBAL, 0);
+            for (member = 0, pmember = &(STRUCT_MEMBER(pdef->members)), p = list
+                ; member < length
+                ; member++, pmember++, p = p->next
+                )
+            {
+                if (!TYPE(pmember->type, p->type) )
+                {
+                    yyerrorf("Type mismatch %s for member '%s' "
+                             "in struct '%s'"
+                            , get_two_types(pmember->type, p->type)
+                            , get_txt(pmember->name), get_txt(pdef->name)
+                            );
+                    got_error = MY_TRUE;
+                }
+            }
+
+            if (got_error)
+                return MY_FALSE;
         }
 
-        name->type = I_TYPE_GLOBAL;
-        name->u.global.function  = I_GLOBAL_FUNCTION_VAR;
-        name->u.global.variable  = I_GLOBAL_VARIABLE_OTHER; /* mark it as 'yet undef' for now */
-        name->u.global.efun      = I_GLOBAL_EFUN_OTHER;
-        name->u.global.sim_efun  = I_GLOBAL_SEFUN_OTHER;
-#ifdef USE_STRUCTS
-        name->u.global.struct_id = I_GLOBAL_STRUCT_NONE;
-#endif /* USE_STRUCTS */
+        /* The types check out - create the bytecode */
+        ins_f_code(F_S_AGGREGATE);
+        ins_byte(pdef->num_members);
+        ins_byte(length);
 
-        name->next_all = all_globals;
-        all_globals = name;
+        return MY_TRUE;
     }
-    else if (name->u.global.function == I_GLOBAL_FUNCTION_EFUN)
-    {
-        /* The previous _GLOBAL use is the permanent efun definition:
-         * mark the efun as shadowed.
-         */
-        efun_shadow_t *q;
 
-        q = xalloc(sizeof(efun_shadow_t));
-        q->shadow = name;
-        q->next = all_efun_shadows;
-        all_efun_shadows = q;
+    /* We have named members in there - sort them out */
+
+    consumed = 0;
+
+    block = xalloc( pdef->num_members * sizeof(*flags)
+                  + length * sizeof(*index));
+    flags = (Bool *)block;
+    index = (int *)((char *)block + pdef->num_members * sizeof(*flags));
+
+    for (i = 0; i < pdef->num_members; i++)
+    {
+        flags[i] = MY_FALSE;
     }
 
-    /* If the variable already exists, make sure that we can redefine it */
-    if ( (n = name->u.global.variable) >= 0)
+    for (i = 0; i < length; i++)
     {
-        /* Visible nomask variables can't be redefined */
-        if ( VARIABLE(n)->flags & TYPE_MOD_NO_MASK && !(flags & NAME_HIDDEN))
-            yyerrorf( "Illegal to redefine 'nomask' variable '%s'"
-                    , get_txt(name->name));
+        index[i] = -1;
+    }
 
-        /* We can redefine inherited variables if they are private or hidden,
-         * or if one of them is static.
-         */
-        if (  (   !(VARIABLE(n)->flags & NAME_INHERITED)
-               || (   !(VARIABLE(n)->flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN))
-                   && !((flags ^ VARIABLE(n)->flags) & TYPE_MOD_STATIC)
-                  )
-              )
-            && !(flags & NAME_INHERITED)
-           )
+    /* First loop through list: assign the named members
+     */
+    for (p = list, count = 0; p != NULL; p = p->next, count++)
+    {
+
+        if (p->name == NULL)
+            continue;
+
+        consumed++;
+        member = find_struct_member(pdef, p->name);
+        if (member >= 0)
+            pmember = &STRUCT_MEMBER(pdef->members+member);
+
+        if (member < 0)
         {
-            if (VARIABLE(n)->flags & NAME_INHERITED)
-                yyerrorf("Illegal to redefine inherited variable '%s'"
-                        , get_txt(name->name));
-            else
-                yyerrorf("Illegal to redefine global variable '%s'"
-                        , get_txt(name->name));
+            yyerrorf( "No such member '%s' in struct '%s'"
+                    , get_txt(p->name), get_txt(pdef->name)
+                    );
+            got_error = MY_TRUE;
         }
-
-        if (((flags ^ VARIABLE(n)->flags) & (TYPE_MOD_STATIC|TYPE_MOD_PRIVATE))
-            == TYPE_MOD_STATIC
-         && !(flags & NAME_INHERITED)
-           )
+        else if (flags[member])
         {
-            yywarnf("Redefining inherited %s variable '%s' with a %s variable"
-                   , (VARIABLE(n)->flags & TYPE_MOD_STATIC)
-                     ? "nosave" : "non-nosave"
-                   , get_txt(name->name)
-                   , (flags & TYPE_MOD_STATIC) ? "nosave" : "non-nosave"
-                   );
+            yyerrorf( "Multiple initializations of member '%s' "
+                      "in struct '%s'"
+                    , get_txt(p->name), get_txt(pdef->name)
+                    );
+            got_error = MY_TRUE;
         }
-
-        /* Make sure that at least one of the two definitions is 'static'.
-         * The variable which has not been inherited gets first pick.
-         */
-        if (flags & NAME_INHERITED)
+        else if (exact_types
+              && !TYPE( pmember->type , p->type) )
         {
-            flags |= ~(VARIABLE(n)->flags) & TYPE_MOD_STATIC;
+            yyerrorf("Type mismatch %s when initializing member '%s' "
+                     "in struct '%s'"
+                    , get_two_types(pmember->type, p->type)
+                    , get_txt(p->name), get_txt(pdef->name)
+                    );
+            got_error = MY_TRUE;
         }
         else
         {
-            VARIABLE(n)->flags |=   ~flags & TYPE_MOD_STATIC;
+            flags[member] = MY_TRUE;
+            index[count] = member;
+        }
+    } /* for() */
+
+    if (got_error)
+    {
+        xfree(block);
+        return MY_FALSE;
+    }
+
+    /* Second loop through list: assign the unnamed members
+     */
+
+    /* Find the first un-set member */
+    for (member = 0; member < pdef->num_members && flags[member]
+        ; member++) /* NOOP */;
+
+    if (member < pdef->num_members)
+    {
+        for (p = list, count = 0; p != NULL; p = p->next, count++)
+        {
+
+            if (p->name != NULL)
+                continue;
+
+            consumed++;
+            pmember = &STRUCT_MEMBER(pdef->members+member);
+            if (exact_types
+                  && !TYPE( pmember->type , p->type) )
+            {
+                yyerrorf("Type mismatch %s when initializing member '%s' "
+                         "in struct '%s'"
+                        , get_two_types(pmember->type, p->type)
+                        , get_txt(pmember->name), get_txt(pdef->name)
+                        );
+                got_error = MY_TRUE;
+            }
+            else
+            {
+                flags[member] = MY_TRUE;
+                index[count] = member;
+            }
+        } /* for() */
+    }
+
+    if (got_error)
+    {
+        xfree(block);
+        return MY_FALSE;
+    }
+
+    /* Sanity checks */
+
+    if (consumed < length)
+    {
+        yyerrorf("Too many elements for struct '%s'"
+                , get_txt(pdef->name)
+                );
+        xfree(block);
+        return MY_FALSE;
+    }
+
+    for (i = 0; i < length; i++)
+    {
+        if (index[i] < 0)
+        {
+            fatal("struct literal: expression %d not assigned to any member.\n"
+                 , i);
+            /* NOTREACHED */
         }
     }
 
-    /* Prepare the new variable_t */
+    /* Finally, create the code */
+    ins_f_code(F_S_M_AGGREGATE);
+    ins_byte(pdef->num_members);
+    ins_byte(length);
+    for (i = length-1; i >= 0; i--)
+        ins_byte(index[i]);
 
-    if (flags & TYPE_MOD_NOSAVE)
-    {
-        /* 'nosave' is internally saved as 'static' (historical reason) */
-        flags |= TYPE_MOD_STATIC;
-        flags ^= TYPE_MOD_NOSAVE;
-    }
+    /* Done */
+    xfree(block);
 
-    dummy.name = ref_mstring(name->name);
-    dummy.flags = flags;
-
-    if (flags & TYPE_MOD_VIRTUAL)
-    {
-        if (!(flags & NAME_HIDDEN))
-            name->u.global.variable = VIRTUAL_VAR_TAG | V_VARIABLE_COUNT;
-        add_to_mem_block(A_VIRTUAL_VAR, &dummy, sizeof dummy);
-%ifndef INITIALIZATION_BY___INIT
-        add_to_mem_block(A_VIRTUAL_VAR_VALUES, svp, sizeof *svp);
-%endif /* INITIALIZATION_BY___INIT */
-    }
-    else
-    {
-        if (!(flags & NAME_HIDDEN))
-            name->u.global.variable = NV_VARIABLE_COUNT;
-        add_to_mem_block(A_VARIABLES, &dummy, sizeof dummy);
-%ifndef INITIALIZATION_BY___INIT
-        add_to_mem_block(A_VARIABLE_VALUES, svp, sizeof *svp);
-%endif /* INITIALIZATION_BY___INIT */
-    }
-} /* define_variable() */
-
-/*-------------------------------------------------------------------------*/
-static void
-redeclare_variable (ident_t *name, fulltype_t flags, int n)
-
-/* The variable <name> is inherited virtually with number <n>.
- * Redeclare it from its original type to <flags>.
- */
-
-{
-    if (name->type != I_TYPE_GLOBAL)
-    {
-        /* This is the first _GLOBAL use of this identifier:
-         * make an appropriate entry in the identifier table.
-         */
-
-        /* I_TYPE_UNKNOWN */
-        name->type = I_TYPE_GLOBAL;
-        name->u.global.function  = I_GLOBAL_FUNCTION_VAR;
-        name->u.global.variable  = I_GLOBAL_VARIABLE_OTHER; /* default: it's hidden */
-        name->u.global.efun      = I_GLOBAL_EFUN_OTHER;
-        name->u.global.sim_efun  = I_GLOBAL_SEFUN_OTHER;
-#ifdef USE_STRUCTS
-        name->u.global.struct_id = I_GLOBAL_STRUCT_NONE;
+    return MY_TRUE;
+} /* create_struct_literal() */
 #endif /* USE_STRUCTS */
-        
-        name->next_all = all_globals;
-        all_globals = name;
-    }
-    else if (name->u.global.function == I_GLOBAL_FUNCTION_EFUN)
-    {
-        /* The previous _GLOBAL use is the permanent efun definition:
-         * mark the efun as shadowed.
-         */
-        efun_shadow_t *q;
-
-        q = xalloc(sizeof(efun_shadow_t));
-        q->shadow = name;
-        
-        q->next = all_efun_shadows;
-        all_efun_shadows = q;
-    }
-    /* else: the variable is inherited after it has been defined
-     * in the child program.
-     */
-
-    /* The variable is hidden, do nothing else */
-    if (flags & NAME_HIDDEN)
-        return;
-        
-    if (name->u.global.variable >= 0 && name->u.global.variable != n)
-    {
-        if (VARIABLE(name->u.global.variable)->flags & TYPE_MOD_NO_MASK )
-            yyerrorf( "Illegal to redefine 'nomask' variable '%s'"
-                    , get_txt(name->name));
-    }
-    else if (V_VARIABLE(n)->flags & TYPE_MOD_NO_MASK
-          && !(V_VARIABLE(n)->flags & NAME_HIDDEN)
-          && (V_VARIABLE(n)->flags ^ flags) & TYPE_MOD_STATIC )
-    {
-        yyerrorf("Illegal to redefine 'nomask' variable \"%s\""
-                , get_txt(name->name));
-    }
-    
-    if (flags & TYPE_MOD_NOSAVE)
-    {
-        /* 'nosave' is internally saved as 'static' (historical reason) */
-        flags |= TYPE_MOD_STATIC;
-        flags ^= TYPE_MOD_NOSAVE;
-    }
-
-    name->u.global.variable = n;
-    V_VARIABLE(n)->flags = flags;
-} /* redeclare_variable() */
-
-/*-------------------------------------------------------------------------*/
-static int
-verify_declared (ident_t *p)
-
-/* Check that <p> is a global variable.
- * If yes, return the index of that variable, -1 otherwise.
- */
-
-{
-    int r;
-
-    if (p->type != I_TYPE_GLOBAL
-     || (r = p->u.global.variable) < 0)
-    {
-        yyerrorf("Variable %s not declared !", get_txt(p->name));
-        return -1;
-    }
-    
-    return r;
-} /* verify_declared() */
-
 
 /* =========================   PROGRAM STRINGS   ========================= */
 
@@ -3518,6 +3783,26 @@ free_const_list_svalue (svalue_t *svp)
        * the argument parsing in a function call.
        */
 
+%ifdef USE_STRUCTS
+    struct {
+        int length;            /* Number of initializers parsed */
+        /* Description of initializers parsed: */
+        struct struct_init_s * list;  /* Head of list */
+        struct struct_init_s * last;  /* Tail of list */
+    } struct_init_list;
+      /* For runtime struct literals: head of the list describing
+       * the encountered member initializers.
+       */
+
+    struct {
+        string_t * name;  /* Member name, or NULL if unnamed */
+        vartype_t  type;  /* Member expr type */
+    } struct_init_member;
+      /* For runtime struct literals: information about a single
+       * member initializer.
+       */
+%endif /* USE_STRUCTS */
+
 %ifndef INITIALIZATION_BY___INIT
 
     struct {
@@ -3539,16 +3824,16 @@ free_const_list_svalue (svalue_t *svp)
     svalue_t svalue;
       /* Used for constant float initializers: the float value */
 
-#ifdef USE_STRUCTS
+%ifdef USE_STRUCTS
     struct {
         svalue_t * initialized;  /* svalue currently initialized */
         int        id;           /* struct id */
-    } struct_init;
+    } struct_const_init;
       /* Used to hold the information about which type
        * struct is to be created, and where to store it.
        */
-#endif /* USE_STRUCTS */
-%endif
+%endif /* USE_STRUCTS */
+%endif /* !INITIALIZATION_BY___INIT */
 
 } /* YYSTYPE */
 
@@ -3581,6 +3866,10 @@ free_const_list_svalue (svalue_t *svp)
 %type <address>      optional_else
 %type <string>       anchestor
 %type <sh_string>    call_other_name identifier
+%ifdef USE_STRUCTS
+%type <struct_init_member> struct_init
+%type <struct_init_list>   opt_struct_init opt_struct_init2
+%endif /* USE_STRUCTS */
 %type <function_name> function_name
 
 %ifndef INITIALIZATION_BY___INIT
@@ -3897,7 +4186,6 @@ function_body:
 %ifdef USE_STRUCTS
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 /* Definition of a struct
- * TODO: Implement structs
  */
 
 struct_decl:
@@ -4005,23 +4293,6 @@ member_name:
       }
 ; /* member_name */
 
-
-/* The following rules are used to parse struct literals */
-
-opt_struct_init:
-      struct_init
-    | opt_struct_init ',' struct_init
-; /* opt_struct_init */
-
-struct_init:
-      identifier ':' expr0
-      {
-          free_mstring($1);
-      }
-    | expr0
-      {
-      }
-; /* struct_init */
 
 %endif /* USE_STRUCTS */
 
@@ -4729,7 +5000,7 @@ new_name:
               yyerror("Illegal initialization");
 
           /* Do the types match? */
-          if (!compatible_types((actual_type | $1) & TYPE_MOD_MASK, $5.type))
+          if (!compatible_types((actual_type | $1) & TYPE_MOD_MASK, $5.type, MY_TRUE))
           {
               yyerrorf("Type mismatch %s when initializing %s"
                       , get_two_types(actual_type | $1, $5.type)
@@ -4859,7 +5130,7 @@ new_local :
 
           /* Check the assignment for validity */
           type2 = $3.type;
-          if (exact_types && !compatible_types($1.type, type2))
+          if (exact_types && !compatible_types($1.type, type2, MY_TRUE))
           {
               yyerrorf("Bad assignment %s", get_two_types($1.type, $3.type));
           }
@@ -5618,7 +5889,7 @@ expr_decl:
 %line
           /* Check the assignment for validity */
           type2 = $3.type;
-          if (exact_types && !compatible_types($1.type, type2))
+          if (exact_types && !compatible_types($1.type, type2, MY_TRUE))
           {
               yyerrorf("Bad assignment %s", get_two_types($1.type, $3.type));
           }
@@ -6512,7 +6783,7 @@ expr0:
 
           /* Check the validity of the assignment */
           if (exact_types
-           && !compatible_types($1.type, type2)
+           && !compatible_types(type1, type2, MY_TRUE)
              )
           {
               Bool ok = MY_FALSE;
@@ -6599,6 +6870,18 @@ expr0:
 
           if (type2 & TYPE_MOD_REFERENCE)
               yyerror("Can't trace reference assignments.");
+
+#ifdef USE_STRUCTS
+          /* Special checks for struct assignments */
+          if ((type1 & PRIMARY_TYPE_MASK) == T_STRUCT
+           || (type2 & PRIMARY_TYPE_MASK) == T_STRUCT
+             )
+          {
+              restype = type1;
+              if ($2 != F_ASSIGN)
+                  yyerror("Only plain assigment allowed for structs");
+          }
+#endif /* USE_STRUCTS */
 
           /* Create the code to push the lvalue */
           length = $1.length;
@@ -6736,7 +7019,7 @@ expr0:
           type1 = $4.type;
           type2 = $7.type;
 
-          if (!compatible_types(type1, type2))
+          if (!compatible_types(type1, type2, MY_FALSE))
           {
               $$.type = TYPE_ANY;
               if ((type1 & TYPE_MOD_POINTER) != 0
@@ -8135,55 +8418,135 @@ expr4:
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 %ifdef USE_STRUCTS
-    | '(' '<' identifier '>' opt_struct_init ')'
+    | '(' '<' identifier '>'
+      {
+          int num;
+          
+          num = find_struct($3);
+          if (num < 0)
+          {
+              yyerrorf("Unknown struct '%s'", get_txt($3));
+              YYACCEPT;
+          }
+          $<number>$ = num;
+          free_mstring($3);
+      }
+
+      note_start opt_struct_init ')'
+
       {
           /* Generate a literal struct */
-          /* TODO: Implement structs */
 
-          yyerror("TODO: struct literals not implemented");
-          free_mstring($3);
+          int num = $<number>5;
+          struct_def_t *pdef = &(STRUCT_DEF(num));
+
+          if ($7.length > STRUCT_MAX_MEMBERS || $7.length > pdef->num_members)
+          {
+              /* Too many elements - create an empty struct */
+              yyerrorf("Too many elements for literal struct '%s'"
+                      , get_txt(pdef->name));
+              CURRENT_PROGRAM_SIZE = $6.start;
+              create_struct_literal(pdef, 0, NULL);
+          }
+          else if (!create_struct_literal(pdef, $7.length, $7.list))
+          {
+              /* Creation failed - create an empty struct */
+              CURRENT_PROGRAM_SIZE = $6.start;
+              create_struct_literal(pdef, 0, NULL);
+          }
+
+          /* Free the list of member descriptors */
+          while ($7.list != NULL)
+          {
+              struct_init_t * p = $7.list;
+              $7.list = p->next;
+              if (p->name != NULL)
+                  free_mstring(p->name);
+              xfree(p);
+          }
+
+          $$.type = TYPE_STRUCT | MAKE_SEC_TYPE_INFO(num);
+          $$.start = $6.start;
+          $$.code = -1;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr4 L_ARROW identifier
       {
           /* Lookup a struct member */
-          /* TODO: Implement structs */
-          yyerror("TODO: struct member lookup not implemented");
+
+          $$.start = $1.start;
+          $$.code = -1;
+          $$.type = $1.type; /* default */
+
+          if (($1.type & ~SEC_TYPE_MASK) != T_STRUCT)
+          {
+              yyerrorf("Bad type for struct lookup: %s"
+                      , get_type_name($1.type));
+          }
+          else
+          {
+              int num;
+              struct_def_t * pdef = &(STRUCT_DEF(GET_SEC_TYPE_INFO($1.type)));
+
+              num = find_struct_member(pdef, $3);
+              if (num < 0)
+              {
+                  yyerrorf("No such member '%s' for struct '%s'"
+                          , get_txt($3), get_txt(pdef->name)
+                          );
+              }
+              else
+              {
+                  ins_f_code(F_CLIT);
+                  ins_byte(num);
+                  ins_f_code(F_INDEX);
+                  $$.type = STRUCT_MEMBER(pdef->members + num).type;
+              }
+          }
           free_mstring($3);
-          /* TODO: From MudOS
-            {
-		if ($1->type == TYPE_ANY) {
-		    int cmi;
-		    unsigned char tp;
-		    
-		    if ((cmi = lookup_any_class_member($3, &tp)) != -1) {
-			CREATE_UNARY_OP_1($$, F_MEMBER, tp, $1, 0);
-			$$->l.number = cmi;
-		    } else {
-			CREATE_ERROR($$);
-		    }
-		} else if (!IS_CLASS($1->type)) {
-		    yyerror("Left argument of -> is not a class");
-		    CREATE_ERROR($$);
-		} else {
-		    CREATE_UNARY_OP_1($$, F_MEMBER, 0, $1, 0);
-		    $$->l.number = lookup_class_member(CLASS_IDX($1->type),
-						       $3,
-						       &($$->type));
-		}
-		    
-		scratch_free($3);
-            }
-         */
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | '&' '(' expr4 L_ARROW identifier ')'
+
       {
           /* Create a reference to a struct member */
-          /* TODO: Implement structs */
-          yyerror("TODO: struct member lookup not implemented");
+
+          $$.start = $3.start;
+          $$.code = -1;
+          $$.type = $3.type; /* default */
+
+          if (($3.type & ~SEC_TYPE_MASK) != T_STRUCT)
+          {
+              yyerrorf("Bad type for struct lookup: %s"
+                      , get_type_name($3.type));
+          }
+          else
+          {
+              int num;
+              struct_def_t * pdef = &(STRUCT_DEF(GET_SEC_TYPE_INFO($3.type)));
+
+              num = find_struct_member(pdef, $5);
+              if (num < 0)
+              {
+                  yyerrorf("No such member '%s' for struct '%s'"
+                          , get_txt($5), get_txt(pdef->name)
+                          );
+              }
+              else
+              {
+                  /* Insert the index code */
+                  ins_f_code(F_CLIT);
+                  ins_byte(num);
+
+                  arrange_protected_lvalue($3.start, $3.code, $3.end,
+                     F_PROTECTED_INDEX_LVALUE
+                  );
+                  $$.type = STRUCT_MEMBER(pdef->members + num).type
+                          | TYPE_MOD_REFERENCE;
+              }
+          }
           free_mstring($5);
       }
 %endif /* USE_STRUCTS */
@@ -8900,8 +9263,92 @@ lvalue:
     | expr4 L_ARROW identifier
       {
           /* Create a struct member lvalue */
-          /* TODO: Implement structs */
-          yyerror("TODO: struct member lookup not implemented");
+
+          if (($1.type & ~SEC_TYPE_MASK) != T_STRUCT)
+          {
+              yyerrorf("Bad type for struct lookup: %s"
+                      , get_type_name($1.type));
+          }
+          else
+          {
+              int num;
+              struct_def_t * pdef = &(STRUCT_DEF(GET_SEC_TYPE_INFO($1.type)));
+
+              num = find_struct_member(pdef, $3);
+              if (num < 0)
+              {
+                  yyerrorf("No such member '%s' for struct '%s'"
+                          , get_txt($3), get_txt(pdef->name)
+                          );
+              }
+              else
+              {
+                  bytecode_p p, q;
+                  p_int start, current;
+
+                  /* Insert the index code */
+                  ins_f_code(F_CLIT);
+                  ins_byte(num);
+
+                  /* Generate/add an INDEX_LVALUE */
+          
+                  start = $1.start;
+                  current = CURRENT_PROGRAM_SIZE;
+
+                  p = PROGRAM_BLOCK;
+                  q = yalloc(current-start+2); /* assign uses an extra byte */
+
+                  /* First change the rvalue 'expr4' into an lvalue.
+                   */
+                  if ($1.code >= 0)
+                  {
+                      p_int end, start2;
+
+                      if ( 0 != (end = $1.end) )
+                      {
+                          /* Multibyte instruction */
+                          start2 = end+1;
+                          if ($1.code == F_PUSH_IDENTIFIER16_LVALUE)
+                              p[start] = $1.code;
+                          else
+                              p[end] = $1.code;
+                          memcpy(q, p + start2, current - start2);
+                          memcpy(q + current - start2, p + start, start2 - start);
+                          q[current - start] = F_INDEX_LVALUE;
+                      }
+                      else
+                      {
+                          /* Simple relocation/insertion */
+                          bytecode_t c;
+
+                          start2 = start + 2;
+                          c = p[start+1];
+                          memcpy(q, p + start2, current - start2);
+                          p = q + current - start2;
+                          *p++ = $1.code;
+                          *p++ = c;
+                          *p = F_INDEX_LVALUE;
+                      }
+                  }
+                  else
+                  {
+                      /* We can just copy the instruction block
+                       * and add a PUSH_(R)INDEXED_LVALUE
+                       */
+                      memcpy(q, p + start, current - start);
+                      q[current - start] = F_PUSH_INDEXED_LVALUE;
+                  }
+
+                  /* This is what we return */
+                  $$.length = current + 1 - start;
+                  $$.u.p = q;
+
+                  CURRENT_PROGRAM_SIZE = start;
+                  last_expression = -1;
+
+                  $$.type = STRUCT_MEMBER(pdef->members + num).type;
+              }
+          }
           free_mstring($3);
       }
 %endif /* USE_STRUCTS */
@@ -9377,6 +9824,67 @@ m_expr_values:
 ; /* m_expr_values */
 
 
+%ifdef USE_STRUCTS
+/* The following rules are used to parse struct literals in expressions */
+
+opt_struct_init:
+      /* empty */       { $$.length = 0; $$.list = $$.last = NULL; }
+    | opt_struct_init2  { $$ = $1; }
+; /* opt_struct_init */
+
+opt_struct_init2:
+      /* empty */
+      {
+          /* The end of a struct_init (or a list with just one
+           * element) - this is the first rule reduced.
+           */
+
+          $<struct_init_list>$.list = NULL;
+          $<struct_init_list>$.last = NULL;
+          $<struct_init_list>$.length = 0;
+      }
+      struct_init
+      {
+          struct_init_t * p;
+
+          p = xalloc(sizeof(*p));
+          p->next = NULL;
+          p->name = $2.name;
+          p->type = $2.type;
+          $$.length = 1;
+          $$.list = p;
+          $$.last = p;
+      }
+
+    | opt_struct_init2 ',' struct_init
+      {
+          struct_init_t * p;
+
+          p = xalloc(sizeof(*p));
+          p->next = NULL;
+          p->name = $3.name;
+          p->type = $3.type;
+          $$.length = $1.length + 1;
+          $$.list = $1.list;
+          $1.last->next = p;
+          $$.last = p;
+      }
+; /* opt_struct_init2 */
+
+struct_init:
+      identifier ':' expr0
+      {
+          $$.name = $1;
+          $$.type = $3.type;
+      }
+    | expr0
+      {
+          $$.name = NULL;
+          $$.type = $1.type;
+      }
+; /* struct_init */
+
+%endif /* USE_STRUCTS */
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 /* Function calls and inline functions.
  */
@@ -10850,9 +11358,38 @@ lvalue_list:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | lvalue_list ',' expr4 L_ARROW identifier
       {
-          /* Lookup a struct member */
-          /* TODO: Implement structs */
-          yyerror("TODO: struct member lookup not implemented");
+          /* Create a reference to a struct member */
+
+          $$ = 1 + $1;
+
+          if (($3.type & ~SEC_TYPE_MASK) != T_STRUCT)
+          {
+              yyerrorf("Bad type for struct lookup: %s"
+                      , get_type_name($3.type));
+          }
+          else
+          {
+              int num;
+              struct_def_t * pdef = &(STRUCT_DEF(GET_SEC_TYPE_INFO($3.type)));
+
+              num = find_struct_member(pdef, $5);
+              if (num < 0)
+              {
+                  yyerrorf("No such member '%s' for struct '%s'"
+                          , get_txt($5), get_txt(pdef->name)
+                          );
+              }
+              else
+              {
+                  /* Insert the index code */
+                  ins_f_code(F_CLIT);
+                  ins_byte(num);
+
+                  arrange_protected_lvalue($3.start, $3.code, $3.end,
+                     F_PROTECTED_INDEX_LVALUE
+                  );
+              }
+          }
           free_mstring($5);
       }
 %endif /* USE_STRUCTS */
@@ -10993,16 +11530,16 @@ struct_constant:
               yyerrorf("Unknown struct '%s'", get_txt($3));
               YYACCEPT;
           }
-          $<struct_init>$.initialized = currently_initialized;
-          $<struct_init>$.id = num;
+          $<struct_const_init>$.initialized = currently_initialized;
+          $<struct_const_init>$.id = num;
           free_mstring($3);
       }
       opt_const_struct_init ')'
       {
           /* Generate a literal struct */
 
-          struct_def_t * pdef = &(STRUCT_DEF($<struct_init>5.id));
-          svalue_t     * svp = $<struct_init>5.initialized;
+          struct_def_t * pdef = &(STRUCT_DEF($<struct_const_init>5.id));
+          svalue_t     * svp = $<struct_const_init>5.initialized;
 
           if ($6.length > STRUCT_MAX_MEMBERS || $6.length > pdef->num_members)
           {
@@ -11548,7 +12085,7 @@ transfer_init_control (void)
           /* Must happen before PREPARE_INSERT()! */
         {
             string_t *name;
-            PREPARE_INSERT(sizeof name + 3);
+            PREPARE_INSERT(FUNCTION_HDR_SIZE);
 
             name = ref_mstring(STR_VARINIT);
             memcpy(__PREPARE_INSERT__p , (char *)&name, sizeof name);
@@ -11560,8 +12097,9 @@ transfer_init_control (void)
 #endif /* USE_STRUCTS */
             add_byte(0);         /* FUNCTION_NUM_ARGS */
             add_byte(0);         /* FUNCTION_NUM_VARS */
-            first_initializer_start =
-              (CURRENT_PROGRAM_SIZE += sizeof name + 3) - 2;
+            first_initializer_start =   CURRENT_PROGRAM_SIZE
+                                      + FUNCTION_PRE_HDR_SIZE;
+            CURRENT_PROGRAM_SIZE += FUNCTION_HDR_SIZE;
         }
     }
     else if ((p_int)(CURRENT_PROGRAM_SIZE - 2) == last_initializer_end)
@@ -12040,6 +12578,7 @@ copy_structs (program_t *from, fulltype_t flags, int offset)
         current_struct = define_new_struct( MY_FALSE, p, f);
 
         STRUCT_DEF(current_struct).prog = pdef->prog;
+        STRUCT_DEF(current_struct).base += offset;
 
         /* Now copy the members */
         if (!(f & NAME_HIDDEN))

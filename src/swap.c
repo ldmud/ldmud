@@ -913,6 +913,9 @@ swap_svalues (svalue_t *svp, mp_int num, varblock_t *block)
           }
 
         case T_POINTER:
+#ifdef USE_STRUCTS
+        case T_STRUCT:
+#endif
           {
             size_t size;
 
@@ -924,7 +927,7 @@ swap_svalues (svalue_t *svp, mp_int num, varblock_t *block)
                 swapping_alist = MY_TRUE;
 
             CHECK_SPACE(1 + sizeof(size) + sizeof(wiz_list_t *))
-            *p++ = T_POINTER | T_MOD_SWAPPED;
+            *p++ = svp->type | T_MOD_SWAPPED;
             rest--;
             ADD_TO_BLOCK(size)
             ADD_TO_BLOCK(svp->u.vec->user)
@@ -1099,6 +1102,9 @@ free_swapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
             /* FALLTHROUGH */
             
         case T_POINTER | T_MOD_SWAPPED:
+#ifdef USE_STRUCTS
+        case T_STRUCT | T_MOD_SWAPPED:
+#endif
             p += 1 + sizeof(size_t) + sizeof(wiz_list_t *);
             p =
               free_swapped_svalues(svp->u.vec->item, VEC_SIZE(svp->u.vec), p);
@@ -1162,6 +1168,9 @@ free_swapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
         case T_STRING:
         case T_SYMBOL:
         case T_POINTER:
+#ifdef USE_STRUCTS
+        case T_STRUCT:
+#endif
         case T_QUOTED_ARRAY:
         case T_MAPPING:
         case T_NUMBER:
@@ -1441,6 +1450,9 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
             /* FALLTHROUGH */
 
         case T_POINTER | T_MOD_SWAPPED:
+#ifdef USE_STRUCTS
+        case T_STRUCT | T_MOD_SWAPPED:
+#endif
           {
             size_t size;
             wiz_list_t *user;
@@ -1572,6 +1584,9 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
         case T_STRING:
         case T_SYMBOL:
         case T_POINTER:
+#ifdef USE_STRUCTS
+        case T_STRUCT:
+#endif
         case T_QUOTED_ARRAY:
         case T_MAPPING:
         case T_NUMBER:

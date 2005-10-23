@@ -2176,11 +2176,11 @@ x_filter_array (svalue_t *sp, int num_arg)
 svalue_t *
 x_map_array (svalue_t *sp, int num_arg)
 
-/* EFUN map() on arrays
+/* EFUN map() on arrays and structs
  *
- *   mixed * map(mixed *arg, string func, string|object ob, mixed extra...)
- *   mixed * map(mixed *arg, closure cl, mixed extra...)
- *   mixed * map(mixed *arr, mapping map)
+ *   mixed * map(mixed *|struct arg, string func, string|object ob, mixed extra...)
+ *   mixed * map(mixed *|struct arg, closure cl, mixed extra...)
+ *   mixed * map(mixed *|struct arr, mapping map)
  *
  * Map the elements of <arr> through a filter defined by the other
  * arguments, and return an array of the elements returned by the filter.
@@ -2299,7 +2299,7 @@ x_map_array (svalue_t *sp, int num_arg)
      * the arr on the stack with the result.
      */
     free_array(arr);
-    arg->u.vec = res;
+    arg->u.vec = res; /* Keep svalue type: T_POINTER or T_STRUCT */
 
     return arg;
 } /* x_map_array () */

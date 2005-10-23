@@ -322,6 +322,9 @@ struct svalue_s
 #define TF_SYMBOL        (1 << T_SYMBOL)
 #define TF_QUOTED_ARRAY  (1 << T_QUOTED_ARRAY)
 #define TF_NULL          (1 << T_NULL)
+#ifdef USE_STRUCTS
+#define TF_STRUCT        (1 << T_STRUCT)
+#endif /* USE_STRUCTS */
 
 #define TF_ANYTYPE       (~0)
   /* This is used in the efun_lpc_types[]

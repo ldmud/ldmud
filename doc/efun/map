@@ -4,6 +4,11 @@ SYNOPSIS
         mixed * map(mixed *arg, closure cl, mixed extra...)
         mixed * map(mixed *arg, mapping m)
 
+        mixed * map(struct arg, string func, string|object ob
+                                           , mixed extra...)
+        mixed * map(struct arg, closure cl, mixed extra...)
+        mixed * map(struct arg, mapping m)
+
         mapping map(mapping arg, string func, string|object ob
                                             , mixed extra...)
         mapping map(mapping arg, closure cl, mixed extra...)

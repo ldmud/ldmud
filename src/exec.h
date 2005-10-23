@@ -622,7 +622,11 @@ typedef bytecode_p fun_hdr_p;
   /* Number of function header bytes before the function pointer.
    */
 
-#define FUNCTION_HDR_SIZE     (FUNCTION_PRE_HDR_SIZE + 2*sizeof(char))
+#define FUNCTION_POST_HDR_SIZE (2 * sizeof(char))
+  /* Number of function header bytes after the function pointer.
+   */
+
+#define FUNCTION_HDR_SIZE     (FUNCTION_PRE_HDR_SIZE + FUNCTION_POST_HDR_SIZE)
   /* Total size of the function header.
    */
 

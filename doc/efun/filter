@@ -9,12 +9,12 @@ SYNOPSIS
         mapping filter (mapping arg, closure cl, mixed extra...)
 
 DESCRIPTION
-        Call the function <ob>-><func>() resp. the closure <cl> for every
-        element of the array, struct, or mapping <arg>, and return a result
-        made from those elements for which the function call returns TRUE.
-        The <extra> arguments are passed as additional parameters to the
-        function calls and must not be references of array of mapping
-        elements (like &(i[1]) ).
+        Call the function <ob>-><func>() resp. the closure <cl> for
+        every element of the array, or mapping <arg>, and return a
+        result made from those elements for which the function call
+        returns TRUE.  The <extra> arguments are passed as additional
+        parameters to the function calls and must not be references of
+        array of mapping elements (like &(i[1]) ).
 
         If <ob> is omitted, or neither a string nor an object, it
         defaults to this_object().

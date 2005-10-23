@@ -5457,6 +5457,9 @@ f_copy (svalue_t *sp)
 
     case T_QUOTED_ARRAY:
     case T_POINTER:
+#ifdef USE_STRUCTS
+    case T_STRUCT:
+#endif /* USE_STRUCTS */
       {
         vector_t *old, *new;
         size_t size, i;
@@ -5559,6 +5562,9 @@ copy_svalue (svalue_t *dest, svalue_t *src
 
     case T_QUOTED_ARRAY:
     case T_POINTER:
+#ifdef USE_STRUCTS
+    case T_STRUCT:
+#endif /* USE_STRUCTS */
       {
         struct pointer_record *rec;
         vector_t *old, *new;
@@ -5597,7 +5603,12 @@ copy_svalue (svalue_t *dest, svalue_t *src
             {
                 svalue_t * svp = &old->item[i];
 
-                if (svp->type == T_MAPPING || svp->type == T_POINTER)
+                if (svp->type == T_MAPPING
+                 || svp->type == T_POINTER
+#ifdef USE_STRUCTS
+                 || svp->type == T_STRUCT
+#endif /* USE_STRUCTS */
+                   )
                     copy_svalue(&new->item[i], svp, ptable);
                 else
                     assign_svalue_no_free(&new->item[i], svp);
@@ -5741,9 +5752,6 @@ v_filter (svalue_t *sp, int num_arg)
  *
  * If <ob> is omitted, or neither an object nor a string, then
  * this_object() is used.
-#ifdef USE_STRUCTS
- * TODO: Implement structs.
-#endif
  */
 
 {
@@ -5785,9 +5793,6 @@ v_get_type_info (svalue_t *sp, int num_arg)
  * TODO: The flags should be defined in an include file.
  * TODO: The array returned for closures should contain all
  * TODO:: three items.
-#ifdef USE_STRUCTS
- * TODO: Implement structs.
-#endif
  */
 
 {
@@ -5886,6 +5891,9 @@ v_map (svalue_t *sp, int num_arg)
  *   mixed * map(mixed *arg, string func, string|object ob, mixed extra...)
  *   mixed * map(mixed *arg, closure cl, mixed extra...)
  *
+ *   mixed * map(struct arg, string func, string|object ob, mixed extra...)
+ *   mixed * map(struct arg, closure cl, mixed extra...)
+ *
  *   mapping map(mapping arg, string func, string|object ob, mixed extra...)
  *   mapping map(mapping arg, closure cl, mixed extra...)
  *
@@ -5895,9 +5903,6 @@ v_map (svalue_t *sp, int num_arg)
  *
  * If <ob> is omitted, or neither an object nor a string, then
  * this_object() is used.
-#ifdef USE_STRUCTS
- * TODO: Implement structs.
-#endif
  */
 
 {
@@ -5922,9 +5927,6 @@ f_member (svalue_t *sp)
  * the first arg, or -1 if none found. For mappings it checks, if
  * key is present in mapping m and returns 1 if so, 0 if key is
  * not in m.
-#ifdef USE_STRUCTS
- * TODO: Implement structs.
-#endif
  */
 
 {

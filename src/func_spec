@@ -199,6 +199,10 @@
         aggregate
         m_aggregate
         m_caggregate
+#ifdef USE_STRUCTS
+        s_aggregate
+        s_m_aggregate
+#endif /* USE_STRUCTS */
         previous_object0
         lambda_cconstant
         lambda_constant
@@ -250,7 +254,11 @@ int     strlen(null|string);
 
         /* Arrays and Mapings */
 
+#ifdef USE_STRUCTS
+int     sizeof(null|string|mixed|mixed *|mapping|struct);
+#else
 int     sizeof(null|string|mixed|mixed *|mapping);
+#endif /* USE_STRUCTS */
 
         /* Functions and Closures */
 
@@ -380,7 +388,11 @@ mixed  *unique_array(mixed *, string, mixed default: F_CONST0);
 mixed   filter(mapping|mixed *, string|closure|mapping, ...);
 mapping filter_indices(mapping, string|closure,  ...);
 
+#ifdef USE_STRUCTS
+mixed   map(mixed *|mapping|struct, mapping|string|closure, ...);
+#else
 mixed   map(mixed *|mapping, mapping|string|closure, ...);
+#endif
 mapping map_indices(mapping, string|closure, ...);
 
 mapping m_allocate(int, int default: F_CONST1);

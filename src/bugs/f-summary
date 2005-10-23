@@ -124,7 +124,6 @@ p-990204-0: Patches for FinalFrontier
 f-981229-17: anonymous function syntax
 f-990203-02: dito
 p-990710-0: Handles (objects associated with a string)
-f-981229-05: struct foo {} type
 f-990203-31: re: f-981229-05: better saving method for small arrays?
 f-981229-27: m[x;y], m[x][y] as alternatives to m[x,y]
 f-981229-29: MudOS 'ref's instead of Amylaars '&'s.

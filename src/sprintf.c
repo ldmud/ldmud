@@ -685,13 +685,23 @@ svalue_to_string ( fmt_state_t *st
       /* FALLTHROUGH */
 
     case T_POINTER:
+#ifdef USE_STRUCTS
+    case T_STRUCT:
+#endif /* USE_STRUCTS */
       {
         size_t size;
 
         size = VEC_SIZE(obj->u.vec);
         if (!size)
         {
+#ifdef USE_STRUCTS
+            if (obj->type == T_POINTER)
+                stradd(st, &str, "({ })");
+            else /* T_STRUCT */
+                stradd(st, &str, "(< >)");
+#else
             stradd(st, &str, "({ })");
+#endif /* USE_STRUCTS */
         }
         else
         {
@@ -703,7 +713,14 @@ svalue_to_string ( fmt_state_t *st
                 /* New array */
                 prec->id_number = st->pointer_id++;
                 
+#ifdef USE_STRUCTS
+                if (obj->type == T_POINTER)
+                    stradd(st, &str, "({ /* #");
+                else /* T_STRUCT */
+                    stradd(st, &str, "(< /* #");
+#else
                 stradd(st, &str, "({ /* #");
+#endif /* USE_STRUCTS */
                 numadd(st, &str, prec->id_number);
                 stradd(st, &str, ", size: ");
                 numadd(st, &str, size);
@@ -713,14 +730,36 @@ svalue_to_string ( fmt_state_t *st
                 str = svalue_to_string(st, &(obj->u.vec->item[i]), str, indent+2, MY_FALSE, quoteStrings);
                 stradd(st, &str, "\n");
                 add_indent(st, &str, indent);
+#ifdef USE_STRUCTS
+                if (obj->type == T_POINTER)
+                    stradd(st, &str, "})");
+                else /* T_STRUCT */
+                    stradd(st, &str, ">)");
+#else
                 stradd(st, &str, "})");
+#endif /* USE_STRUCTS */
             }
             else
             {
                 /* Recursion! */
+#ifdef USE_STRUCTS
+                if (obj->type == T_POINTER)
+                {
+                    stradd(st, &str, "({ #");
+                    numadd(st, &str, prec->id_number);
+                    stradd(st, &str, " })");
+                }
+                else
+                {
+                    stradd(st, &str, "(< #");
+                    numadd(st, &str, prec->id_number);
+                    stradd(st, &str, " >)");
+                }
+#else
                 stradd(st, &str, "({ #");
                 numadd(st, &str, prec->id_number);
                 stradd(st, &str, " })");
+#endif /* USE_STRUCTS */
             }
         }
         break;

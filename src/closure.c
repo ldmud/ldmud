@@ -2,7 +2,6 @@
  * Closure compiler and functions; including the switch() code generation.
  *
  *---------------------------------------------------------------------------
- * TODO: Add struct support.
  * Closures implement the possibility to treat code as data. This means
  * both 'function pointers' (efun, simul-efun and lfun closures) as well
  * as functions compiled from data at runtime (lambda closures).
@@ -3084,6 +3083,41 @@ compile_value (svalue_t *value, int opt_flags)
                     break;
                   }
 
+#ifdef USE_STRUCTS
+                /* ({#'(<, <expr1>, ..., <exprN> })
+                 */
+                case F_S_AGGREGATE:
+                  {
+                    /* This is compiled as:
+                     *
+                     *   <expr1>
+                     *   ...
+                     *   <exprN>
+                     *   F_S_AGGREGATE N N
+                     */
+                    int i, size;
+
+                    size = block_size - 1;
+                    if (size > STRUCT_MAX_MEMBERS)
+                    {
+                        lambda_error("Too many elements for struct.\n");
+                        size = STRUCT_MAX_MEMBERS;
+                    }
+                    i = size;
+                    while (--i >= 0)
+                    {
+                        compile_value(++argp, REF_REJECTED);
+                    }
+                    if (current.code_left < 3)
+                        realloc_code();
+                    current.code_left -= 3;
+                    STORE_CODE(current.codep, F_S_AGGREGATE);
+                    STORE_UINT8(current.codep, (unsigned char)size);
+                    STORE_UINT8(current.codep, (unsigned char)size);
+                    break;
+                  }
+#endif
+
                 /* ({#'return })
                  * ({#'return, <expr> })
                  */
@@ -4736,6 +4770,9 @@ symbol_operator (char *symbol, char **endp)
  *   #'[>     -> F_AINDEX               
  *   #'({     -> F_AGGREGATE            
  *   #'([     -> F_M_CAGGREGATE         
+#ifdef USE_STRUCTS
+ *   #'(<     -> F_S_AGGREGATE         
+#endif 
  *
  * Note that all operators must have a instrs[].Default value of '0'.
  * If necessary, update the lex::init_lexer()::binary_operators[] to
@@ -5049,6 +5086,13 @@ symbol_operator (char *symbol, char **endp)
             ret = F_M_CAGGREGATE;
             break;
         }
+#ifdef USE_STRUCTS
+        else if (c == '<')
+        {
+            ret = F_S_AGGREGATE;
+            break;
+        }
+#endif /* USE_STRUCTS */
         symbol--;
         /* FALL THROUGH */
     default:
