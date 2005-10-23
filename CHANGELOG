@@ -1,6 +1,9 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+02-Sep-2002 (Lars Duening)  (3.3.240)
+  - (prolang.y) Added a missing %endif (thanks, Guandalug!)
+
 01-Sep-2002 (Lars Duening)  (3.3.239)
   - (mstrings.c) The string statistics are off - added 'DEBUG: SSTAT'
        diagnostics when that happens.

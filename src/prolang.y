@@ -10250,6 +10250,7 @@ lvalue_list:
           yyerror("struct member lookup not implemented");
           free_mstring($5);
       }
+%endif /* USE_STRUCTS */
 
 ; /* lvalue_list */
 
