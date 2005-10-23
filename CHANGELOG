@@ -1,6 +1,15 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+29-Nov-2002 (Lars Duening)  (3.3.314)
+  - (sysmalloc.c) This file is no longer needed (actually it has been
+      useless since 3.2.8-dev.188).
+  - (dumpstat.c) Didn't compile with MALLOC_sysmalloc.
+  - (lex.c) pragma_combine_strings was never initialised with a default.
+  - (lex.c) Changed the FLOAT_MIN/FLOAT_MAX predefined to reflect
+      the C-float limits, not the C-double limits, as the gamedriver's
+      floats are somewhere inbetween the two.
+
 27-Nov-2002 (Lars Duening)  (3.3.313)
   - (patchlevel.h, hosts/be/Makefile, hosts/be/set-version) The version
       flags of the BeOS executable are now read from patchlevel.h and not set

@@ -366,7 +366,8 @@ DESCRIPTION
             ERQ_OK          : Operation succeeded, no <info> is replied.
             ERQ_E_TICKET    : The given ticket is invalid, no <info> replied.
             ERQ_E_INCOMPLETE: Only <info> chars of the text have been
-                              sent.
+                              sent. The erq will send a ERQ_OK message
+                              once all data has been sent.
             ERQ_E_WOULDBLOCK: Error E_WOULDBLOCK (also stored in <info>)
                               happened while sending the text.
             ERQ_E_PIPE      : Error E_PIPE (also stored in <info>)
@@ -465,7 +466,8 @@ DESCRIPTION
             ERQ_OK          : Operation succeeded, no <info> is replied.
             ERQ_E_TICKET    : The given ticket is invalid, no <info> replied.
             ERQ_E_INCOMPLETE: Only <info> chars of the text have been
-                              sent.
+                              sent. The erq will send a ERQ_OK message
+                              once all data has been sent.
             ERQ_E_WOULDBLOCK: Error E_WOULDBLOCK (also stored in <info>)
                               happened while sending the text.
             ERQ_E_PIPE      : Error E_PIPE (also stored in <info>)

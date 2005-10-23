@@ -14,6 +14,11 @@
 ;;    3-3-structs.*: The 3-3 subbranch for 'struct' re-development,
 ;;                   branched off 3-3.294
 ;;
+;; TODO: Improved structs
+;; TODO: Try replacing smalloc with an adjusted ptmalloc, if it makes sense.
+;; TODO:: The malloc-tracing and memory reserves can be handled on xalloc.c
+;; TODO:: level; the GC and fallback-to-malloc() however needs to go into
+;; TODO:: the ptmalloc itself.
 ;; TODO: general coloured efuns
 ;; TODO:  sockets (p-020912),
 ;; TODO: state dumps.
@@ -24,12 +29,13 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 313)
-(Parent-Version lpmud 3-3 312)
-(Version-Log "The BeOS version flags are now read from patchlevel.h instead of being stored directly in the BeOS Makefile")
+(Project-Version lpmud 3-3 314)
+(Parent-Version lpmud 3-3 313)
+(Version-Log "Removed the defunct sysmalloc.c. Corrected dumpstat.c .
+Small corrections to the lexer.")
 (New-Version-Log
 "")
-(Checkin-Time "Wed, 27 Nov 2002 21:55:50 -0700")
+(Checkin-Time "Sat, 30 Nov 2002 00:29:53 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -65,7 +71,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.50 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.376 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.377 644))
   (HISTORY (lpmud/f/49_HISTORY 1.284 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.18 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -74,7 +80,7 @@
   (src/configure (lpmud/d/0_configure 1.19.1.64 755))
   (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.20 644))
   (src/machine.h.in (lpmud/b/9_machine.h. 1.9.1.4 644))
-  (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.19 644))
+  (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.19.1.1 644))
   (src/mkinstalldirs (lpmud/c/4_mkinstalld 1.1 644))
   (src/install-sh (lpmud/c/5_install-sh 1.2 755))
 
@@ -135,7 +141,7 @@
   (src/comm.h (lpmud/d/3_comm.h 1.26.1.29 644))
   (src/driver.h (lpmud/f/36_driver.h 1.15.1.21 644))
   (src/dumpstat.h (lpmud/f/35_dumpstat.h 1.8 644))
-  (src/dumpstat.c (lpmud/c/34_dumpstat.c 1.20.1.11.1.2 644))
+  (src/dumpstat.c (lpmud/c/34_dumpstat.c 1.20.1.11.1.3 644))
   (src/ed.h (lpmud/f/34_ed.h 1.5.1.6 644))
   (src/ed.c (lpmud/c/33_ed.c 1.32.1.26 644))
   (src/efuns.h (lpmud/l/20_efuns.h 1.13.1.19 644))
@@ -154,7 +160,7 @@
   (src/interpret.h (lpmud/b/13_interpret. 1.33.1.35 644))
   (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.4 644))
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.15 644))
-  (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.33 644))
+  (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.34 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.12 644))
   (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.27 644))
   (src/mapping.h (lpmud/f/30_mapping.h 1.12.1.14 644))
@@ -242,7 +248,6 @@
   (src/swap.h (lpmud/f/14_swap.h 1.7.1.3 644))
   (src/swap.c (lpmud/25_swap.c 1.36.1.40 644))
   (src/switch.h (lpmud/24_switch.h 1.9 644))
-  (src/sysmalloc.c (lpmud/23_sysmalloc. 1.1 644))
   (src/telnet.h (lpmud/22_telnet.h 1.5.1.3 644))
   (src/typedefs.h (lpmud/d/50_typedefs.h 1.12.1.6 644))
   (src/wiz_list.h (lpmud/1_wiz_list.h 1.5.1.7 644))
@@ -279,7 +284,7 @@
   (src/hosts/be/config.h (lpmud/e/34_config.h 1.32.1.27 644))
   (src/hosts/be/be.h (lpmud/e/35_be.h 1.7 644))
   (src/hosts/be/beyacc (lpmud/i/39_beyacc 1.1 744))
-  (src/hosts/be/Makefile (lpmud/e/37_Makefile 1.60.1.71.1.1 644))
+  (src/hosts/be/Makefile (lpmud/e/37_Makefile 1.60.1.71.1.2 644))
   (src/hosts/be/icon-32x32.raw (lpmud/s/37_icon-32x32 1.1 644) :no-keywords)
   (src/hosts/be/icon-16x16.raw (lpmud/s/38_icon-16x16 1.1 644) :no-keywords)
   (src/hosts/be/driver.rsrc (lpmud/s/39_driver.rsr 1.1 644) :no-keywords)
@@ -292,7 +297,7 @@
 
   ;; Host: OS/2
   (src/hosts/os2/machine.h (lpmud/m/36_machine.h 1.1 644))
-  (src/hosts/os2/Makefile (lpmud/m/37_Makefile 1.26 644))
+  (src/hosts/os2/Makefile (lpmud/m/37_Makefile 1.26.1.1 644))
 
   ;; Host: Win32
   (src/hosts/win32/tubmud.bmp (lpmud/g/20_tubmud.bmp 1.1 644) :no-keywords)
@@ -878,7 +883,7 @@
   (doc/applied/reset (lpmud/n/30_reset 1.4 644))
 
   (doc/concepts/concepts (lpmud/n/31_concepts 1.2 644))
-  (doc/concepts/erq (lpmud/n/32_erq 1.8 644))
+  (doc/concepts/erq (lpmud/n/32_erq 1.9 644))
   (doc/concepts/files (lpmud/n/33_files 1.2 644))
   (doc/concepts/hooks (lpmud/h/9_hooks 1.10.1.17 644))
   (doc/concepts/imp (lpmud/n/34_imp 1.4 644))
@@ -1271,7 +1276,7 @@
   (doc/LPC/references (lpmud/c/48_references 1.3 644))
   (doc/LPC/structs (lpmud/a/b/16_structs 1.7 644))
   (doc/LPC/switch (lpmud/c/47_switch 1.6 644))
-  (doc/LPC/types (lpmud/r/35_types 1.4.1.5 644))
+  (doc/LPC/types (lpmud/r/35_types 1.4.1.6 644))
   (doc/LPC/varargs (lpmud/r/36_varargs 1.2 644))
   (doc/LPC/while (lpmud/r/37_while 1.3 644))
 

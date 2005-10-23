@@ -830,9 +830,9 @@ init_lexer(void)
     add_permanent_define("__INT_MAX__", -1, string_copy(mtext), MY_FALSE);
     sprintf(mtext, "(%ld)", PINT_MIN);
     add_permanent_define("__INT_MIN__", -1, string_copy(mtext), MY_FALSE);
-    sprintf(mtext, "(%g)", DBL_MAX);
+    sprintf(mtext, "(%g)", FLT_MAX);
     add_permanent_define("__FLOAT_MAX__", -1, string_copy(mtext), MY_FALSE);
-    sprintf(mtext, "(%g)", DBL_MIN);
+    sprintf(mtext, "(%g)", FLT_MIN);
     add_permanent_define("__FLOAT_MIN__", -1, string_copy(mtext), MY_FALSE);
 
     /* Add the permanent macro definitions given on the commandline */
@@ -5421,6 +5421,7 @@ start_new_file (int fd)
     pragma_no_shadow = MY_FALSE;
     pragma_pedantic = MY_FALSE;
     pragma_warn_deprecated = MY_FALSE;
+    pragma_combine_strings = MY_TRUE;
 
     nexpands = 0;
 

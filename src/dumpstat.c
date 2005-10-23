@@ -23,9 +23,14 @@
 #include "ptrtable.h"
 #include "simulate.h"
 #include "stdstrings.h"
-#include "smalloc.h" /* malloced_size() */
 #include "svalue.h"
 #include "xalloc.h"
+
+#ifdef MALLOC_smalloc
+#  include "smalloc.h" /* malloced_size() */
+#else
+#  include "instrs.h"  /* F_RETURN, F_RETURN0 */
+#endif
 
 /*-------------------------------------------------------------------------*/
 
