@@ -326,14 +326,18 @@ static SOCKET_T udp_s = -1;
 
 /* --- Networking information --- */
 
+static char host_name[MAXHOSTNAMELEN+1];
+  /* This computer's hostname, used for query_host_name() efun.
+   */
+
 static struct in_addr host_ip_number;
   /* This computer's numeric IP address only, used for
-   * the query_host_name() fun. */
+   * the query_host_ip_number() efun.
+   */
 
-static struct sockaddr_in host_ip_addr;
-  /* This computer's full IP address, used with varying port numbers
-   * to open the driver's ports.
-   * TODO: Can't this be local?
+static struct sockaddr_in host_ip_addr_template;
+  /* The template address of this computer. It is copied locally
+   * and augmented with varying port numbers to open the driver's ports.
    */
 
 char * domain_name = NULL;
@@ -844,57 +848,123 @@ set_socket_own (SOCKET_T new_socket)
 
 /*-------------------------------------------------------------------------*/
 void
-initialize_host_ip_number (void)
+initialize_host_ip_number (const char *hname, const char * haddr)
 
-/* Initialise the globals host_ip_number and host_ip_address.
- * Open the UDP port if requested so that it can be used
- * in inaugurate_master().
+/* Initialise the globals host_ip_number and host_ip_addr_template.
+ * If <hname> or <haddr> are given, the hostname/hostaddr are parsed
+ * from the strings, otherwise they are queried from the system.
+ *
+ * Open the UDP port if requested so that it can be used in inaugurate_master().
  * exit() on failure.
  */
 
 {
-    char host_name[MAXHOSTNAMELEN+1];
-    struct hostent *hp;
-    char *p;
+    char *domain;
     length_t tmp;
 
-    if (gethostname(host_name, sizeof host_name) == -1) {
-        perror("gethostname");
-        exit(1);
-    }
-    hp = gethostbyname(host_name);
-    if (!hp) {
-        fprintf(stderr, "%s gethostbyname: unknown host '%s'.\n", time_stamp(), host_name);
-        exit(1);
-    }
-    memset(&host_ip_addr, 0, sizeof host_ip_addr);
-    memcpy(&host_ip_addr.sin_addr, hp->h_addr, (size_t)hp->h_length);
-    host_ip_addr.sin_family = (unsigned short)hp->h_addrtype;
-    host_ip_number = host_ip_addr.sin_addr;
-
-    /* Initialize domain_name for the lexer */
-    p = strchr(hp->h_name, '.');
-    if (p)
+    /* Get the (possibly qualified) hostname */
+    if (hname != NULL)
     {
-        p++;
-        domain_name = strdup(p);
+        if (strlen(hname) > MAXHOSTNAMELEN)
+        {
+            fprintf(stderr, "%s Given hostname '%s' too long.\n", hname);
+            exit(1);
+        }
+        else
+            strcpy(host_name, hname);
+    }
+    else
+    {
+        if (gethostname(host_name, sizeof host_name) == -1) {
+            herror("gethostname");
+            exit(1);
+        }
+    }
+
+    /* Get the host address */
+    memset(&host_ip_addr_template, 0, sizeof host_ip_addr_template);
+    if (haddr != NULL)
+    {
+#ifndef USE_IPV6
+        inet_aton(haddr, &host_ip_number);
+        host_ip_addr_template.sin_family = AF_INET;
+        host_ip_addr_template.sin_addr = host_ip_number;
+#else
+        host_ip_number = inet6_addr(haddr);
+        host_ip_addr_template.sin_family = AF_INET6;
+        host_ip_addr_template.sin_addr = host_ip_number;
+#endif
+
+        /* Find the domain part of the hostname */
+        domain = strchr(host_name, '.');
+    }
+    else
+    {
+        struct hostent *hp;
+
+        hp = gethostbyname(host_name);
+        if (!hp) {
+            fprintf(stderr, "%s gethostbyname: unknown host '%s'.\n", time_stamp(), host_name);
+            exit(1);
+        }
+        memcpy(&host_ip_addr_template.sin_addr, hp->h_addr, (size_t)hp->h_length);
+        host_ip_addr_template.sin_family = (unsigned short)hp->h_addrtype;
+        host_ip_number = host_ip_addr_template.sin_addr;
+
+        /* Now set the template to the proper _ANY value */
+        memset(&host_ip_addr_template.sin_addr, 0, sizeof(host_ip_addr_template.sin_addr));
+#ifndef USE_IPV6
+        host_ip_addr_template.sin_addr.s_addr = INADDR_ANY;
+        host_ip_addr_template.sin_family = AF_INET;
+#else
+        host_ip_addr_template.sin_addr = in6addr_any;
+        host_ip_addr_template.sin_family = AF_INET6;
+#endif
+
+        /* Find the domain part of the hostname */
+        if (hname == NULL)
+            domain = strchr(hp->h_name, '.');
+        else
+            domain = strchr(host_name, '.');
+    }
+
+#ifndef USE_IPV6
+    printf("%s Hostname '%s' address '%s'\n"
+          , time_stamp(), host_name, inet_ntoa(host_ip_number));
+    debug_message("%s Hostname '%s' address '%s'\n"
+                 , time_stamp(), host_name, inet_ntoa(host_ip_number));
+#else
+    printf("%s Hostname '%s' address '%s'\n"
+          , time_stamp(), host_name, inet6_ntoa(host_ip_number));
+    debug_message("%s Hostname '%s' address '%s'\n"
+                 , time_stamp(), host_name, inet6_ntoa(host_ip_number));
+#endif
+
+    /* Put the domain name part of the hostname into domain_name, then
+     * strip it off the host_name[] (as only query_host_name() is going
+     * to need it).
+     * Note that domain may not point into host_name[] here.
+     */
+    if (domain)
+    {
+        domain_name = strdup(domain+1);
     }
     else
         domain_name = strdup("unknown");
+
+    domain = strchr(host_name, '.');
+    if (domain)
+        *domain = '\0';
 
     /* Initialize upd at an early stage so that the master object can use
      * it in inaugurate_master() , and the port number is known.
      */
     if (udp_port != -1)
     {
-        memset(&host_ip_addr.sin_addr, 0, sizeof(host_ip_addr.sin_addr));
-#ifndef USE_IPV6
-        host_ip_addr.sin_addr.s_addr = INADDR_ANY;
-        host_ip_addr.sin_family = AF_INET;
-#else
-        host_ip_addr.sin_addr = in6addr_any;
-        host_ip_addr.sin_family = AF_INET6;
-#endif
+        struct sockaddr_in host_ip_addr;
+
+        memcpy(&host_ip_addr, &host_ip_addr_template, sizeof(host_ip_addr));
+
         host_ip_addr.sin_port = htons((u_short)udp_port);
         debug_message("%s UDP recv-socket requested for port: %d\n"
                      , time_stamp(), udp_port);
@@ -944,6 +1014,8 @@ initialize_host_ip_number (void)
      * initialise it.
      */
     if (udp_s >= 0) {
+        struct sockaddr_in host_ip_addr;
+
         tmp = sizeof(host_ip_addr);
         if (!getsockname(udp_s, (struct sockaddr *)&host_ip_addr, &tmp))
         {
@@ -1020,19 +1092,16 @@ prepare_ipc(void)
      * Remember: positive number are actual port numbers to be opened,
      * negative numbers are the fd numbers of already existing sockets.
      */
-    for (i = 0; i < numports; i++) {
-        if (port_numbers[i] > 0) {
+    for (i = 0; i < numports; i++)
+    {
+        struct sockaddr_in host_ip_addr;
+ 
+        memcpy(&host_ip_addr, &host_ip_addr_template, sizeof(host_ip_addr));
 
+        if (port_numbers[i] > 0)
+        {
             /* Real port number */
 
-            memset(&host_ip_addr.sin_addr, 0, sizeof(host_ip_addr.sin_addr));
-#ifndef USE_IPV6
-            host_ip_addr.sin_addr.s_addr = INADDR_ANY;
-            host_ip_addr.sin_family = AF_INET;
-#else
-            host_ip_addr.sin_addr = in6addr_any;
-            host_ip_addr.sin_family = AF_INET6;
-#endif
             host_ip_addr.sin_port = htons((u_short)port_numbers[i]);
             sos[i] = socket(host_ip_addr.sin_family, SOCK_STREAM, 0);
             if ((int)sos[i] == -1) {
@@ -1335,7 +1404,7 @@ writer_thread_cleanup(void *arg)
         ip->write_current = NULL;
     }
 
-    fprintf(stderr, "Thread %ld canceled and cleaned up!\n", (long)pthread_self());
+    dprintf1(1, "Thread %d canceled and cleaned up!\n", (long)pthread_self());
 } /* writer_thread_cleanup() */
 
 /*-------------------------------------------------------------------------*/
@@ -5770,17 +5839,8 @@ query_host_name (void)
  */
 
 {
-    static char name[MAXHOSTNAMELEN+1];
-    char *p;
-
-    gethostname(name, sizeof name);
-    name[sizeof name - 1] = '\0';        /* Just to make sure */
-    /* some platforms return the FQHN, but we don't want it. */
-    p = strchr(name, '.');
-    if (p)
-        *p = '\0';
-    return name;
-}
+    return host_name;
+} /* query_host_name() */
 
 /*-------------------------------------------------------------------------*/
 char *
@@ -5802,7 +5862,7 @@ get_host_ip_number (void)
     sprintf(buf, "\"%s\"", inet6_ntoa(host_ip_number));
 #endif
     return string_copy(buf);
-}
+} /* query_host_ip_number() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *

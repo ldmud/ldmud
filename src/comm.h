@@ -292,7 +292,7 @@ extern int inet_volume;
 
 /* --- Prototypes --- */
 
-extern void  initialize_host_ip_number(void);
+extern void  initialize_host_ip_number(const char *, const char *);
 extern void  prepare_ipc(void);
 extern void  ipc_remove(void);
 #ifdef USE_PTHREAD

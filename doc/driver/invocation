@@ -57,7 +57,16 @@ DESCRIPTION
         Use <pathname> as the top directory of the mudlib.
 
       --debug-file <filename>
-        Log all debug output in <filename> instead of <mudlib>/<host>.debug.log .
+        Log all debug output in <filename> instead of
+        <mudlib>/<host>.debug.log .
+
+      --hostname <name>
+        Use <name> as hostname instead of what the system says.
+
+      --hostaddr <addr>
+        Use <addr> as address of this machine, instead of what the
+        system says.  In particular this address will be used to open
+        the driver ports.
 
       --no-compat
       --compat
@@ -270,5 +279,5 @@ DESCRIPTION -- Argument Parser
     of the current line is ignored.
 
 HISTORY
-    LDMud 3.2.9 added the --max-thread-pending, --args and
-      --random-seed options.
+    LDMud 3.2.9 added the --max-thread-pending, --hostname,
+    --hostaddr, --args and --random-seed options.

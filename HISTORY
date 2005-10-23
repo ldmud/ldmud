@@ -93,7 +93,7 @@ For a detailed list of all changes see the file CHANGELOG.
            regular expression code, or the PCRE package (default).
 
 
-25-Sep-2002 (Lars Duening) -- upcoming Release 3.2.9
+30-Sep-2002 (Lars Duening) -- Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -488,6 +488,11 @@ For a detailed list of all changes see the file CHANGELOG.
        + New driver option '--random-seed <num>' sets the seed value
            for the random number generator for debugging purposes.
            If not given, the driver chooses a seed value on its own.
+       + New driver option '--hostname <name>' to specify the hostname,
+           overriding the value returned by the system.
+       + New driver option '--hostaddr <addr>' to specify the hosts address,
+           overriding the value returned by the system. In particular
+           this address will be used to open the driver ports under.
        + Removed a couple of fatal race-conditions in the xerq.
        + New configuration option 'trace-code' enables the bytecode
            tracing.

@@ -1782,6 +1782,23 @@ load_object (const char *lname, Bool create_super, int depth, namechain_t *chain
     /* We got the program. Now create the blueprint to hold it.
      */
 
+    if (NULL != (ob = lookup_object_hash_str(name)))
+    {
+        /* The object magically appeared!
+         * This can happen if rename_object() is used carelessly
+         * in the mudlib handler for compiler warnings.
+         */
+#ifndef INITIALIZATION_BY___INIT
+        for (i = compiled_prog->num_variables; --i >= 0; )
+            free_svalue(&prog_variable_values[i]);
+#endif
+        free_prog(compiled_prog, MY_TRUE);
+        load_object_error("Object appeared while it was compiled"
+                         , name, chain);
+        /* NOTREACHED */
+        return NULL;
+    }
+
     prog = compiled_prog;
 
 #ifdef INITIALIZATION_BY___INIT

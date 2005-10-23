@@ -184,10 +184,10 @@ enter_object_hash (object_t *ob)
     if (s)
     {
         if (s != ob)
-            fatal("Duplicate object \"%s\" in object hash table"
+            fatal("Duplicate object \"%s\" in object hash table.\n"
                  , get_txt(ob->name));
         else
-            fatal( "Entering object \"%s\" twice in object table"
+            fatal( "Entering object \"%s\" twice in object table.\n"
                  , get_txt(ob->name));
     }
     if (ob->next_hash)

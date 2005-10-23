@@ -100,6 +100,13 @@ Bool strict_euids = MY_FALSE;  /* Enforce use of the euids */
 
 static uint32 random_seed = 0;  /* The seed for the pseudo-random generator. */
 
+static char * hostname = NULL;
+static char * hostaddr = NULL;
+  /* Hostname and -addr given on the commandline. They are passed as
+   * arguments to initialize_host_ip() and are then no longer used.
+   */
+
+
 /* -- Configuration options -- */
 
 long time_to_reset          = TIME_TO_RESET;
@@ -305,8 +312,8 @@ main (int argc, char **argv)
         }
 
         /* If the name of the debug log file hasn't been set, use a sensible
-         * default and make it available in the macro __DEBUG_LOG__. This must
-         * happen before the first debug_message().
+         * default and make it available in the macro __DEBUG_LOG__. This
+         * should happen before the first debug_message().
          */
 
         if  (!debug_file)
@@ -451,7 +458,9 @@ main (int argc, char **argv)
         if (!no_erq_demon)
             start_erq_demon("", 0);
 #endif /* ERQ_DEMON */
-        initialize_host_ip_number();
+        initialize_host_ip_number(hostname, hostaddr);
+        free(hostname); hostname = NULL;
+        free(hostaddr); hostaddr = NULL;
 
         (void)signal(SIGFPE, SIG_IGN);
         current_object = &dummy_current_object_for_loads;
@@ -597,6 +606,9 @@ vdebug_message(const char *fmt, va_list va)
             fp = NULL;
         }
         reopen_debug_log = MY_FALSE;
+
+        if (!debug_file) /* We can get called before it's been set */
+            return;
 
         fp = fopen(debug_file, "w");
         if (fp == NULL) {
@@ -939,6 +951,8 @@ typedef enum OptNumber {
  , cMaster          /* --master             */
  , cMudlib          /* --mudlib             */
  , cDebugFile       /* --debug-file         */
+ , cHostname        /* --hostname           */
+ , cHostaddr        /* --hostaddr           */
  , cMaxMalloc       /* --max-malloc         */
  , cMaxArray        /* --max-array          */
  , cMaxBytes        /* --max-bytes          */
@@ -1043,6 +1057,20 @@ static Option aOptions[]
       , "  --debug-file <filename>\n"
       , "  --debug-file <filename>\n"
         "    Log all debug output in <filename> instead of <host>.debug.log .\n"
+      }
+
+    , { 0,   "hostname",           cHostname,       MY_TRUE 
+      , "  --hostname <name>\n"
+      , "  --hostname <name>\n"
+        "    Use <name> as hostname, instead of what the system says.\n"
+      }
+
+    , { 0,   "hostaddr",           cHostaddr,       MY_TRUE 
+      , "  --hostaddr <addr>\n"
+      , "  --hostaddr <addr>\n"
+        "    Use <addr> as address of this machine, instead of what the\n"
+             "system says. In particular this address will be used to open\n"
+             "the driver ports.\n"
       }
 
     , { 0,   "compat",             cCompat,         MY_FALSE 
@@ -2113,6 +2141,19 @@ eval_arg (int eOption, const char * pValue)
         break;
       }
 #endif
+
+
+    case cHostname:
+        if (hostname != NULL)
+            free(hostname);
+        hostname = strdup(pValue);
+        break;
+
+    case cHostaddr:
+        if (hostaddr != NULL)
+            free(hostaddr);
+        hostaddr = strdup(pValue);
+        break;
 
     case cMaster:
         if (strlen(pValue) >= sizeof(master_name)) {

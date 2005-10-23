@@ -1,6 +1,20 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+30-Sep-2002 (Lars Duening)  (3.3.267)
+  - (comm.c) Changed the fprintf() in the thread cleanup routine into a
+      malloc-friendlier dprintf1().
+  - (main.c) Added a check into debug_message() if the name of the
+      debug log file has already been set (reported by Dafire).
+  - (simulate.c) The driver now checks if an object to be loaded appears
+      out of nowhere while it is being compiled (this can happen if the mudlib
+      warning handler is careless with rename_object()) and throws an error
+      (reported by Gnomi).
+  - (main.c, comm) New commandline options --hostname and --hostaddr
+      to override the values returned by the system. In particular,
+      --hostaddr will be used as the address to open to the driver
+      ports.
+
 27-Sep-2002 (Lars Duening)  (3.3.266)
   - (comm, main.c, configure) Based on a patch by Gawain, PTHREADS and
       PCRE (requires Fiona's patch) can now be configured like other

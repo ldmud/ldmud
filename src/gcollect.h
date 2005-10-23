@@ -38,6 +38,11 @@ extern mapping_t *stale_mappings;
  * to call.
  */
 
+#if defined(CHECK_OBJECT_GC_REF) && defined(DUMP_GC_REFS)
+#  error Must not define both CHECK_OBJECT_GC_REF and DUMP_GC_REFS together.
+#  undef DUMP_GC_REFS
+#endif
+
 #ifdef DUMP_GC_REFS
 
 #define GC_REF_DUMP(type,p,txt,fun) \
