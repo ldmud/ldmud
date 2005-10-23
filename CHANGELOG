@@ -1,7 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-01-Oct-2002 (Lars Duening)
+02-Oct-2002 (Lars Duening)  (3.3.269)
+  - (prolang.y) Added the basic infrastructure to compile an inline closure.
+       Still missing: context recognition, translation of local variable
+       uses, extended context (': ..' syntax), mandatory local scopes,
+       and line numbers.
+
+01-Oct-2002 (Lars Duening)  (3.3.268)
   - (comm.c) Forgot a parameter in an error message (thanks, Freaky!)
   - (main.c, comm) The hostname was initialized to late, so the debug.log
       file was opened with the wrong name (reported by Dafire).

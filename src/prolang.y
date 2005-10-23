@@ -306,74 +306,87 @@ struct efun_shadow_s
  * the others are of internal use for the compiler only.
  */
 
-#define A_PROGRAM                  0
-   /* (bytecode_t): Program code.
-    */
-#define A_STRINGS                  1
-   /* (string_t*) Strings used by the program, all tabled.
-    */
-#define A_VARIABLES                2
-   /* (variable_t) The information for all non-virtual variables.
-    */
-#define A_VIRTUAL_VAR              3
-   /* (variable_t) The information for all virtual variables.
-    */
-#define A_LINENUMBERS              4
-   /* (char) The linenumber information.
-    */
-#define A_INHERITS                 5
-   /* (inherit_t) The information for the inherited programs.
-    */
-#define A_ARGUMENT_TYPES           6
-   /* (vartype_t) Types of the arguments of all functions with
-    * typechecking. The argument types for a specific function
-    * can be found using the ARGUMENT_INDEX
-    */
-#define A_ARGUMENT_INDEX           7
-   /* (unsigned short) Index of the first argument type of function <n>.
-    * INDEX_START_NONE is used for functions with no type information.
-    */
+enum e_saved_areas {
+   A_PROGRAM = 0
+    /* (bytecode_t): Program code.
+     */
+ , A_STRINGS
+    /* (string_t*) Strings used by the program, all tabled.
+     */
+ , A_VARIABLES
+    /* (variable_t) The information for all non-virtual variables.
+     */
+ , A_VIRTUAL_VAR
+    /* (variable_t) The information for all virtual variables.
+     */
+ , A_LINENUMBERS
+    /* (char) The linenumber information.
+     */
+ , A_INHERITS
+    /* (inherit_t) The information for the inherited programs.
+     */
+ , A_ARGUMENT_TYPES
+    /* (vartype_t) Types of the arguments of all functions with
+     * typechecking. The argument types for a specific function
+     * can be found using the ARGUMENT_INDEX
+     */
+ , A_ARGUMENT_INDEX
+    /* (unsigned short) Index of the first argument type of function <n>.
+     * INDEX_START_NONE is used for functions with no type information.
+     */
 
-#define A_INCLUDES                 8
-   /* (include_t) Tabled descriptors of all included files, in the order
-    * of appearance.
-    */
+ , A_INCLUDES
+    /* (include_t) Tabled descriptors of all included files, in the order
+     * of appearance.
+     */
 
 #ifdef USE_STRUCTS
-#define A_STRUCT_DEFS              9
-   /* (struct_def_t) Tabled descriptors of all struct definitions.
-    */
+ , A_STRUCT_DEFS
+    /* (struct_def_t) Tabled descriptors of all struct definitions.
+     */
 
-#define A_STRUCT_MEMBERS          10 
-   /* (struct_member_t) Tabled descriptors of all struct member definitions.
-    */
-
-#define NUMPAREAS                 11  /* Number of saved areas */
-#else
-#define NUMPAREAS                  9  /* Number of saved areas */
+ , A_STRUCT_MEMBERS
+    /* (struct_member_t) Tabled descriptors of all struct member definitions.
+     */
 #endif /* USE_STRUCTS */
+ , NUMPAREAS  /* Number of saved areas */
+};
 
-#define A_FUNCTIONS               (NUMPAREAS+0)
-   /* (function_t): Function definitions
-    */
+enum e_internal_areas {
+   A_FUNCTIONS = NUMPAREAS
+     /* (function_t): Function definitions
+      */
 
 %ifndef INITIALIZATION_BY___INIT
-#    define A_VARIABLE_VALUES     (NUMPAREAS+1) 
-       /* (svalue_t) Initializers for non-virtual variables.
-        */
-#    define A_VIRTUAL_VAR_VALUES  (NUMPAREAS+2)
-       /* (svalue_t) Initializers for virtual variables.
-        */
+ , A_VARIABLE_VALUES
+     /* (svalue_t) Initializers for non-virtual variables.
+      */
+ , A_VIRTUAL_VAR_VALUES
+     /* (svalue_t) Initializers for virtual variables.
+      */
 %endif
 
-#define A_STRING_NEXT             (NUMPAREAS+3)
+ , A_STRING_NEXT
    /* (int) During compilation, the strings in A_STRINGS are organized
     * in a hash table (prog_string_indizes/_tags). The hash chains are
     * linked together using the indizes in this area. The end of
     * a chain is marked by a negative next-index.
     */
 
-#define NUMAREAS                  (NUMPAREAS+4)  /* Total number of areas */
+%ifdef USE_NEW_INLINES
+ , A_INLINE_PROGRAM
+    /* (bytecode_t): Program saved from the compiled but not yet inserted
+     * inline closures.
+     */
+ , A_INLINE_CLOSURE
+    /* (inline_closure_t): The currently pending inline closures. The lexical
+     * nesting is achieved with the .prev/.next pointers in the
+     * inline_closure_t structures.
+     */
+%endif /* USE_NEW_INLINES */
+
+ , NUMAREAS  /* Total number of areas */
+};
 
 
 /* --- struct mem_block_s: One memory area ---
@@ -406,6 +419,7 @@ static mem_block_t mem_block[NUMAREAS];
   /* The current program size.
    */
 
+
 #define FUNCTION(n) ((function_t *)mem_block[A_FUNCTIONS].block + (n))
   /* Return the function_t* for function number <n>.
    */
@@ -414,13 +428,16 @@ static mem_block_t mem_block[NUMAREAS];
   /* Number of function_t stored so far in A_FUNCTIONS.
    */
 
+
 #define INHERIT_COUNT (mem_block[A_INHERITS].current_size / sizeof(inherit_t))
   /* Number of inherit_t stored so far in A_INHERITS.
    */
 
+
 #define ARGUMENT_INDEX(n) ((unsigned short *)mem_block[A_ARGUMENT_INDEX].block)[n]
   /* Lookup the start index of the types for function number <n>.
    */
+
 
 #define ARGTYPE_COUNT (mem_block[A_ARGUMENT_TYPES].current_size / sizeof(vartype_t))
   /* Number of vartype_t stored so far in A_ARGUMENT_TYPES.
@@ -429,6 +446,7 @@ static mem_block_t mem_block[NUMAREAS];
 #define ARGUMENT_TYPE(n)  ((vartype_t *)mem_block[A_ARGUMENT_TYPES].block)[n]
   /* Index the vartype_t <n>.
    */
+
 
 #define NV_VARIABLE(n) ((variable_t *)mem_block[A_VARIABLES].block + (n))
   /* Return the variable_t* for the non-virtual variable <n>.
@@ -506,6 +524,26 @@ static mem_block_t mem_block[NUMAREAS];
   /* Return the total number of include files encountered so far.
    */
 
+%ifdef USE_NEW_INLINES
+#define INLINE_PROGRAM_BLOCK(n) ((bytecode_p)(mem_block[A_INLINE_PROGRAM].block + (n)))
+  /* Return the inline-closure program block at address <n>, properly typed.
+   */
+
+#define INLINE_PROGRAM_SIZE (mem_block[A_INLINE_PROGRAM].current_size)
+  /* The current program size.
+   */
+
+#define INLINE_CLOSURE(n) ((inline_closure_t *)mem_block[A_INLINE_CLOSURE].block)[n]
+  /* Return the inline-closure program block at address <n>, properly typed.
+   */
+
+#define INLINE_CLOSURE_COUNT  (mem_block[A_INLINE_CLOSURE].current_size/sizeof(inline_closure_t))
+  /* Return the inline-closure program block at address <n>, properly typed.
+   */
+
+%endif /* USE_NEW_INLINES */
+
+
 /*-------------------------------------------------------------------------*/
 /* Information describing nested local blocks (scopes).
  */
@@ -536,6 +574,67 @@ static Bool use_local_scopes;
    * a function. Reason is that the pragma must not change inside
    * a function.
    */
+
+/*-------------------------------------------------------------------------*/
+#ifdef USE_NEW_INLINES
+/* Information describing inline closures.
+*/
+
+typedef struct inline_closure_s inline_closure_t;
+
+struct inline_closure_s
+{
+    mp_int prev;
+      /* Index of the enclosing inline closure, or -1 if none.
+       */
+
+    /* --- Compilation information --- */
+    mp_uint start;
+      /* While compiling the closure: start address of the code in A_PROGRAM.
+       * For pending closures: start address of the code in A_INLINE_PROGRAM.
+       */
+    mp_uint length;
+      /* Length of the compiled code.
+       */
+    int function;
+      /* Function index
+       */
+    fulltype_t returntype;
+      /* The return type.
+       */
+    ident_t * ident;
+      /* The ident entry with the function name.
+       */
+    int num_args;
+      /* Number of arguments.
+       */
+
+    /* --- Saved Globals --- */
+    fulltype_t exact_types;
+      /* The enclosing return type setting.
+       */
+    int block_depth;
+      /* Block depth at definition point.
+       */
+    int num_locals;
+    int max_num_locals;
+      /* Current and max number of locals at definition point.
+       */
+    int break_stack_size;
+    int max_break_stack_size;
+      /* Current and max break stack size at definition point.
+       */
+};
+
+static inline_closure_t * current_inline;
+  /* NULL, or pointer to the current inline_closure_t structure while
+   * compiling an inline closure.
+   */
+
+static unsigned int inline_closure_id;
+  /* ID Number for the inline closure name.
+   */
+#endif /* USE_NEW_INLINES */
 
 /*-------------------------------------------------------------------------*/
 /* Other Variables */
@@ -3250,6 +3349,362 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
 } /* create_struct_literal() */
 #endif /* USE_STRUCTS */
 
+#ifdef USE_NEW_INLINES
+/* ========================   LOCALS and SCOPES   ======================== */
+
+/*-------------------------------------------------------------------------*/
+static void
+new_inline_closure (void)
+
+/* Create a new inline closure structure and push it on top of the stack.
+ */
+
+{
+    inline_closure_t ict;
+
+    if (current_inline == NULL)
+    {
+        ict.prev = -1;
+    }
+    else
+    {
+        ict.prev = current_inline - &(INLINE_CLOSURE(0));
+    }
+printf("DEBUG: new inline #%d: prev %d\n", INLINE_CLOSURE_COUNT, ict.prev);
+
+    /* Initialize the other fields */
+    ict.start = CURRENT_PROGRAM_SIZE;
+    ict.length = 0;
+    ict.function = -1;
+    ict.ident = NULL;
+    ict.returntype = 0;
+    ict.num_args = 0;
+
+printf("DEBUG:   start: %ld, depth %d, locals: %d/%d, break: %d/%d\n", CURRENT_PROGRAM_SIZE, block_depth, current_number_of_locals, max_number_of_locals, current_break_stack_need, max_break_stack_need);
+    ict.block_depth          = block_depth;
+    ict.break_stack_size     = current_break_stack_need;
+    ict.max_break_stack_size = max_break_stack_need;
+    ict.num_locals           = current_number_of_locals;
+    ict.max_num_locals       = max_number_of_locals;
+    ict.exact_types          = exact_types;
+    
+    /* Add the structure to the memblock */
+    add_to_mem_block(A_INLINE_CLOSURE, &ict, sizeof(ict));
+    current_inline = &(INLINE_CLOSURE(INLINE_CLOSURE_COUNT-1));
+} /* new_inline_closure() */
+
+/*-------------------------------------------------------------------------*/
+static void
+finish_inline_closure (Bool bAbort)
+
+/* The compilation of the current inline closure is finished - move
+ * everything out of the way of the ongoing compilation.
+ * If <bAbort> is TRUE, the closure is just finished, but not stored.
+ */
+
+{
+    mp_uint backup_start;
+{
+    mp_int index = current_inline - &(INLINE_CLOSURE(0));
+printf("DEBUG: %s inline #%d: prev %d, start %ld, length %ld, function %d pc %ld\n", bAbort ? "abort" : "finish", index, current_inline->prev, current_inline->start, current_inline->length, current_inline->function, FUNCTION(current_inline->function)->offset.pc);
+printf("DEBUG:   depth %d, locals: %d/%d, break: %d/%d\n", current_inline->block_depth, current_inline->num_locals, current_inline->max_num_locals, current_inline->break_stack_size, current_inline->max_break_stack_size);
+}
+
+    if (!bAbort)
+    {
+        /* Move the program code into the backup storage */
+        backup_start = INLINE_PROGRAM_SIZE;
+printf("DEBUG:   move code to %ld\n", backup_start);
+        add_to_mem_block( A_INLINE_PROGRAM, PROGRAM_BLOCK+current_inline->start
+                        , current_inline->length);
+        CURRENT_PROGRAM_SIZE = current_inline->start;
+        current_inline->start = backup_start;
+    }
+    else
+    {
+        CURRENT_PROGRAM_SIZE = current_inline->start;
+    }
+
+    free_local_names(current_inline->block_depth+1);
+
+    /* Reset some globals */
+    block_depth              = current_inline->block_depth;
+    current_number_of_locals = current_inline->num_locals;
+    max_number_of_locals     = current_inline->max_num_locals;
+    current_break_stack_need = current_inline->break_stack_size;
+    max_break_stack_need     = current_inline->max_break_stack_size;
+    exact_types              = current_inline->exact_types;
+
+    /* Remove the structure from the lexical nesting stack */
+    if (current_inline->prev == -1)
+        current_inline = NULL;
+    else
+        current_inline = &(INLINE_CLOSURE(current_inline->prev));
+} /* finish_inline_closure() */
+
+/*-------------------------------------------------------------------------*/
+static void
+insert_pending_inline_closures (void)
+
+/* The compilation is a point where pending inline closures can be
+ * inserted. Do that now.
+ */
+
+{
+    mp_int index;
+printf("DEBUG: insert_inline_closures(): %d pending\n", INLINE_CLOSURE_COUNT);
+
+    for (index = 0; index < INLINE_CLOSURE_COUNT; index++)
+    {
+        inline_closure_t * ict = &(INLINE_CLOSURE(index));
+printf("DEBUG:   #%d: start %ld, length %ld, function %d: new start %ld\n", index, ict->start, ict->length, ict->function, CURRENT_PROGRAM_SIZE);
+        FUNCTION(ict->function)->offset.pc = CURRENT_PROGRAM_SIZE + FUNCTION_PRE_HDR_SIZE;
+        add_to_mem_block(A_PROGRAM, INLINE_PROGRAM_BLOCK(ict->start)
+                        , ict->length);
+    }
+
+    /* Empty the datastorages */
+    mem_block[A_INLINE_CLOSURE].current_size = 0;
+    mem_block[A_INLINE_PROGRAM].current_size = 0;
+} /* insert_pending_inline_closure() */
+
+/*-------------------------------------------------------------------------*/
+static Bool
+prepare_inline_closure (fulltype_t returntype)
+
+/* Called after parsing 'func <type>', this creates the identifier
+ * with the synthetic function name. The function also sets up the inline
+ * closure structure and block scope.
+ *
+ * If the name can't be generated, FALSE is returned, otherwise TRUE.
+ *
+ * TODO: This function shares a lot of code with the generic function
+ * TODO:: setup.
+ */
+
+{
+    char name[256+MAXPATHLEN+1];
+    ident_t * ident;
+
+    /* Create the name of the new inline function.
+     * We have to make sure the name is really unique.
+     */
+    do
+    {
+        char * start;
+
+        sprintf(name, "__inline_%s_%d_%04x", current_file
+                     , current_line, inline_closure_id++);
+
+        /* Convert all non-alnums to '_' */
+        for (start = name; *start != '\0'; start++)
+        {
+            if (!isalnum((unsigned char)(*start)))
+                *start = '_';
+        }
+    } while (    find_shared_identifier(name, 0, 0)
+              && inline_closure_id != 0);
+    if (inline_closure_id == 0)
+    {
+        yyerror("Can't generate unique name for inline closure.");
+        return MY_FALSE;
+    }
+
+    ident = make_shared_identifier(name, I_TYPE_UNKNOWN, 0);
+
+printf("DEBUG: New inline closure name: '%s'\n", name);
+
+    new_inline_closure();
+    enter_block_scope(); /* Scope for the context */
+    enter_block_scope(); /* Argument scope */
+
+    if (!(returntype & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
+                          | TYPE_MOD_PROTECTED | TYPE_MOD_STATIC)))
+    {
+        returntype |= default_funmod;
+    }
+
+    /* Require exact types? */
+    if (returntype & TYPE_MOD_MASK)
+    {
+        exact_types = returntype;
+    }
+    else
+    {
+        if (pragma_strict_types != PRAGMA_WEAK_TYPES)
+            yyerror("\"#pragma strict_types\" requires type of function");
+        exact_types = 0;
+    }
+
+    if (returntype & TYPE_MOD_NOSAVE)
+    {
+        yyerror("can't declare a function as nosave");
+        returntype &= ~TYPE_MOD_NOSAVE;
+    }
+
+    if (ident->type == I_TYPE_UNKNOWN)
+    {
+        /* prevent freeing by exotic name clashes */
+        ident->type = I_TYPE_GLOBAL;
+        ident->u.global.variable  = I_GLOBAL_VARIABLE_OTHER;
+        ident->u.global.efun      = I_GLOBAL_EFUN_OTHER;
+        ident->u.global.sim_efun  = I_GLOBAL_SEFUN_OTHER;
+        ident->u.global.function  = I_GLOBAL_FUNCTION_VAR;
+#ifdef USE_STRUCTS
+        ident->u.global.struct_id = I_GLOBAL_STRUCT_NONE;
+#endif /* USE_STRUCTS */
+        ident->next_all = all_globals;
+        all_globals = ident;
+    }
+
+    /* Store the data in the inline_closure_t */
+    current_inline->ident = ident;
+    current_inline->returntype = returntype;
+} /* prepare_inline_closure() */
+
+/*-------------------------------------------------------------------------*/
+static Bool
+inline_closure_prototype (int num_args)
+
+/* Called after parsing 'func <type> <arguments>', this function
+ * creates the function prototype entry.
+ *
+ * Return FALSE if out of memory (the internal structures have been cleaned
+ * up then), TRUE otherwise.
+ *
+ * TODO: This function shares a lot of code with the generic function
+ * TODO:: setup.
+ */
+
+{
+    if ( current_number_of_locals
+     && (full_type_of_locals[current_number_of_locals-1]
+         & TYPE_MOD_VARARGS)
+       )
+    {
+%line
+        /* The last argument has to allow an array. */
+        vartype_t *t;
+
+        current_inline->returntype |= TYPE_MOD_XVARARGS;
+
+        t = type_of_locals + (current_number_of_locals-1);
+        if (!(*t & TYPE_MOD_POINTER)
+         && (*t & TYPE_MOD_RMASK) != TYPE_ANY
+           )
+        {
+            if ((*t & TYPE_MOD_RMASK) != TYPE_UNKNOWN)
+                yyerror(
+                  "varargs parameter must be declared array or mixed");
+            /* Keep the visibility, but change the type to
+             * '&any'
+             */
+            *t &= ~TYPE_MOD_RMASK;
+            *t |= TYPE_ANY;
+        }
+    }
+
+    /* Define the prototype.
+     */
+    current_inline->num_args = num_args;
+    current_inline->function
+      = define_new_function(MY_FALSE, current_inline->ident, num_args, 0, 0
+                           , NAME_UNDEFINED|NAME_PROTOTYPE
+                           , current_inline->returntype);
+printf("DEBUG:   Function index: %d\n", current_inline->function);
+
+    /* A function with code: align the function and
+     * make space for the function header.
+     * Result is the address of the FUNCTION_NAME space.
+     */
+    CURRENT_PROGRAM_SIZE = align(CURRENT_PROGRAM_SIZE);
+    current_inline->start = CURRENT_PROGRAM_SIZE;
+    if (realloc_a_program(FUNCTION_HDR_SIZE))
+    {
+        CURRENT_PROGRAM_SIZE += FUNCTION_HDR_SIZE;
+    }
+    else
+    {
+        yyerrorf("Out of memory: program size %lu\n"
+                , mem_block[A_PROGRAM].current_size + FUNCTION_HDR_SIZE);
+        finish_inline_closure(MY_TRUE);
+        return MY_FALSE;
+    }
+
+    return MY_TRUE;
+} /* inline_closure_prototype() */
+
+/*-------------------------------------------------------------------------*/
+static void
+complete_inline_closure ( void )
+
+/* Called after parsing 'func <type> <arguments> <block>', this function
+ * updates the function header and moves the closure into the pending
+ * area.
+ *
+ * TODO: This function shares a lot of code with the generic function
+ * TODO:: setup.
+ */
+
+{
+    p_int start;
+    bytecode_p p;
+    int max_locals, max_break_stack, num_args;
+    string_t * name;
+%line
+
+printf("DEBUG: Generate inline closure function:\n");
+    start = current_inline->start;
+    name = current_inline->ident->name;
+    num_args = current_inline->num_args;
+    max_locals = max_number_of_locals
+                 - current_inline->max_num_locals;
+    max_break_stack = max_break_stack_need
+                      - current_inline->max_break_stack_size;
+
+    /* Generate the function header and update the ident-table entry.
+     */
+
+    p = &(PROGRAM_BLOCK[start]);
+
+    /* FUNCTION_NAME */
+    memcpy(p, &name, sizeof name);
+    p += sizeof name;
+    (void)ref_mstring(name);
+printf("DEBUG:   Name: '%s'\n", get_txt(name));
+    /* FUNCTION_TYPE */
+#if defined(USE_STRUCTS)
+    STORE_SHORT(p, current_inline->returntype);
+#else
+    *p++ = current_inline->returntype;
+#endif
+
+    /* FUNCTION_NUM_ARGS */
+    if (current_inline->returntype & TYPE_MOD_XVARARGS)
+      *p++ = num_args | ~0x7f;
+    else
+      *p++ = num_args;
+printf("DEBUG:   Args: %d\n", num_args);
+
+    /* FUNCTION_NUM_VARS */
+printf("DEBUG:   Vargs: %d\n", max_locals - num_args + max_break_stack);
+    *p   = max_locals - num_args + max_break_stack;
+
+    define_new_function(MY_TRUE, current_inline->ident, num_args
+                       , max_locals - num_args + max_break_stack
+                       , start + FUNCTION_PRE_HDR_SIZE, 0
+                       , current_inline->returntype);
+
+    ins_f_code(F_RETURN0); /* catch a missing return */
+    current_inline->length = CURRENT_PROGRAM_SIZE - start;
+
+    /* Clean up */
+    leave_block_scope();  /* Argument scope */
+    leave_block_scope();  /* Context scope */
+    finish_inline_closure(MY_FALSE);
+} /* complete_inline_closure() */
+#endif /* USE_NEW_INLINES */
+
 /* =========================   PROGRAM STRINGS   ========================= */
 
 /*-------------------------------------------------------------------------*/
@@ -4097,6 +4552,9 @@ free_const_list_svalue (svalue_t *svp)
 %type <fulltype>     non_void_type opt_basic_non_void_type basic_non_void_type
 %type <fulltypes>    inheritance_qualifier inheritance_qualifiers
 %type <fulltype>     inheritance_modifier_list inheritance_modifier
+%ifdef USE_NEW_INLINES
+%type <fulltype>     inline_opt_type
+%endif /* USE_NEW_INLINES */
 %type <type>         decl_cast cast
 %type <lrvalue>      note_start comma_expr expr0 expr4
 %type <lrvalue>      function_call inline_fun
@@ -4133,6 +4591,9 @@ free_const_list_svalue (svalue_t *svp)
   /* program address or -1 */
 
 %type <number> argument argument_list lvalue_list
+%ifdef USE_NEW_INLINES
+%type <number> inline_opt_args
+%endif /* USE_NEW_INLINES */
   /* number of arguments */
 
 %type <number> expr_list expr_list3 e_expr_list2 expr_list2
@@ -4366,7 +4827,7 @@ def:  type optional_star L_IDENTIFIER  /* Function definition or prototype */
                 *p++ = $6;
 
               /* FUNCTION_NUM_VARS */
-              *p   = max_number_of_locals - $6+ max_break_stack_need;
+              *p   = max_number_of_locals - $6 + max_break_stack_need;
 
               define_new_function(MY_TRUE, $3, $6, max_number_of_locals - $6+
                       max_break_stack_need,
@@ -4378,12 +4839,14 @@ def:  type optional_star L_IDENTIFIER  /* Function definition or prototype */
           /* Clean up */
           free_all_local_names();
           
+          block_depth = 0;
+
 #ifndef USE_NEW_INLINES
           if (first_inline_fun)
               insert_inline_fun_now = MY_TRUE;
+#else
+          insert_pending_inline_closures();
 #endif /* USE_NEW_INLINES */
-
-          block_depth = 0;
       }
 
     | type name_list ';' /* Variable definition */
@@ -4393,6 +4856,8 @@ def:  type optional_star L_IDENTIFIER  /* Function definition or prototype */
 #ifndef USE_NEW_INLINES
           if (first_inline_fun)
               insert_inline_fun_now = MY_TRUE;
+#else
+          insert_pending_inline_closures();
 #endif /* USE_NEW_INLINES */
       }
 
@@ -4439,18 +4904,69 @@ function_body:
 /* Inline functions
  */
 
-inline_func: L_FUNC inline_opt_args block
-           | L_BEGIN_INLINE comma_expr L_END_INLINE
-           ; /* inline_func */
+inline_func:
+      L_FUNC inline_opt_type
+
+      {
+          if (!prepare_inline_closure($2))
+              YYACCEPT;
+      }
+      
+      inline_opt_args
+
+      {
+          if (!inline_closure_prototype($4))
+              YYACCEPT;
+      }
+
+      block
+
+      {
+         complete_inline_closure();
+      }
+
+
+    | L_BEGIN_INLINE
+
+      {
+          int i;
+
+          if (!prepare_inline_closure(TYPE_UNKNOWN))
+              YYACCEPT;
+
+          /* Synthesize $1..$9 as arguments */
+          for (i = 1; i < 10; i++)
+          {
+              char name[4];
+              ident_t *ident;
+
+              sprintf(name, "$%d", i);
+              ident = make_shared_identifier(name, I_TYPE_UNKNOWN, 0);
+              add_local_name(ident, TYPE_ANY, block_depth, MY_TRUE);
+          }
+
+          if (!inline_closure_prototype(9))
+              YYACCEPT;
+      }
+      
+      comma_expr
+
+      L_END_INLINE
+
+      {
+         complete_inline_closure();
+      }
+
+; /* inline_func */
 
 inline_opt_args:
-      /* empty */
-    | inline_opt_type '(' argument ')'
+      /* empty */       { return 0; }
+    | '(' argument ')'  { return $2; }
 ; /* inline_opt_args */
 
 inline_opt_type:
-      /* empty */ {}
-    | basic_type optional_star {}
+      /* empty */              { return TYPE_UNKNOWN; }
+    | basic_type optional_star { return $1 | $2; }
 ; /* inline_opt_type */
 %endif /* USE_NEW_INLINES */
 
@@ -5172,10 +5688,28 @@ new_arg_name:
 
     | non_void_type optional_star L_LOCAL
       {
-          /* A local name is redeclared. Since this is the argument
-           * list, it can't be legal.
+%ifndef USE_NEW_INLINES
+          /* A local name is redeclared. Since this is the argument list of a
+           * function, it can't be legal.
            */
           yyerror("Illegal to redeclare local name");
+%else
+          /* A local name is redeclared. */
+          if (current_inline == NULL)
+          {
+              /* Since this is the argument list of a function, it can't be
+               * legal.
+               */
+              yyerror("Illegal to redeclare local name");
+          }
+          else
+          {
+              /* However, it is legal for the argument list of an inline
+               * closure.
+               */
+              (void)redeclare_local($2, current_type | $1, block_depth);
+          }
+%endif
       }
 ; /* new_arg_name */
 
@@ -14048,6 +14582,10 @@ prolog(void)
     use_local_scopes = MY_TRUE;
     default_varmod = 0;
     default_funmod = 0;
+#ifdef USE_NEW_INLINES
+    current_inline = NULL;
+    inline_closure_id = 0;
+#endif /* USE_NEW_INLINES */
 
     free_all_local_names();   /* In case of earlier error */
 
