@@ -394,7 +394,12 @@
 
 /* Define this if you want structs supported.
  */
-@cdef_use_pcre@ USE_STRUCTS
+@cdef_use_structs@ USE_STRUCTS
+
+/* Define this if you want the new inline closure syntax supported.
+ * (f-020528)
+ */
+@cdef_use_new_inlines@ USE_NEW_INLINES
 
 
 /* --- Profiling ---

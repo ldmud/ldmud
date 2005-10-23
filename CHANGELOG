@@ -1,6 +1,17 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+09-Sep-2002 (Lars Duening)  (3.3.249)
+  - (exec.h) The NAME_HIDDEN flag interfered with the struct id in
+       full variable types.
+  - (config.h.in) Oops, USE_STRUCTS was controlled by the PCRE
+       configuration option.
+  - (configure, config.h.in, prolang.y, lex.c) Just for fun I added
+       the necessary rules for a new inline function syntax. This
+       change is controlled by configuration option use-new-inlines,
+       and since it is incompatible with existing code, it is by
+       default OFF.
+
 08-Sep-2002 (Lars Duening)  (3.3.248)
   - (dumpstat.c) The status dump (also accessed by debug_info(2))
        couldn't handle structs (thanks, Markus).

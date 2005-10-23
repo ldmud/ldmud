@@ -767,6 +767,28 @@ void runtime_error (string err, string prg, string curobj, int line
 // Note that <prg> denotes the program actually executed (which might be
 // inherited) whereas <curobj> is just the offending object for which the
 // program was executed.
+//
+// One common pitfall in the implementation of runtime_error() is that
+// runtime_error() itself could run out of evaluation ticks, causing a
+// runtime error itself. The workaround is to use limited() like this:
+//
+//   static void
+//   handle_runtime_error (string err, string prg, string curobj, int line)
+//   { ... the actual error handler ... }
+//
+//   static void
+//   call_runtime_error (string err, string prg, string curobj, int line)
+//   {
+//       limited(#'handle_runtime_error, ({ 200000 }), err, prg, curobj, line);
+//   }
+//   
+//   void
+//   runtime_error (string err, string prg, string curobj, int line)
+//   {
+//       limited(#'call_runtime_error, ({ LIMIT_UNLIMITED })
+//              , err, prg, curobj, line);
+//   }
+
 
 
 //===========================================================================

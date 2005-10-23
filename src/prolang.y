@@ -3579,6 +3579,11 @@ free_const_list_svalue (svalue_t *svp)
 %token L_ELLIPSIS
 %token L_ELSE
 %token L_EQ
+%ifdef USE_NEW_INLINES
+%token L_FUNC
+%token L_BEGIN_INLINE
+%token L_END_INLINE
+%endif /* USE_NEW_INLINES */
 %token L_FLOAT
 %token L_FLOAT_DECL
 %token L_FOR
@@ -4190,6 +4195,26 @@ function_body:
 
     | ';' { $$ = -1; }
 ; /* function_body */
+
+%ifdef USE_NEW_INLINES
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+/* Inline functions
+ */
+
+inline_func: L_FUNC inline_opt_args block
+           | L_BEGIN_INLINE comma_expr L_END_INLINE
+           ; /* inline_func */
+
+inline_opt_args:
+      /* empty */
+    | inline_opt_type '(' argument ')'
+; /* inline_opt_args */
+
+inline_opt_type:
+      /* empty */ {}
+    | basic_type optional_star {}
+; /* inline_opt_type */
+%endif /* USE_NEW_INLINES */
 
 %ifdef USE_STRUCTS
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -8171,6 +8196,9 @@ pre_inc_dec:
 expr4:
       function_call  %prec '~'
     | inline_fun
+%ifdef USE_NEW_INLINES
+    | inline_func    %prec '~' {}
+%endif /* USE_NEW_INLINES */
     | catch          %prec '~'
     | sscanf         %prec '~'
 %ifdef SUPPLY_PARSE_COMMAND

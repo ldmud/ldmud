@@ -426,6 +426,9 @@ static struct s_reswords reswords[]
    , { "float",          L_FLOAT_DECL    }
    , { "for",            L_FOR           }
    , { "foreach",        L_FOREACH       }
+#ifdef USE_NEW_INLINES
+   , { "func",           L_FUNC          }
+#endif
    , { "if",             L_IF            }
 #ifdef L_IN
    , { "in",             L_IN            }
@@ -3199,12 +3202,16 @@ yylex1 (void)
 
         case ':':
             TRY(':', L_COLON_COLON);
+#ifdef USE_NEW_INLINES
+            TRY(')', L_END_INLINE);
+#endif /* USE_NEW_INLINES */
             outp = yyp;
             return ':';
 
         /* --- Inline Function --- */
 
         case '(':
+#ifndef USE_NEW_INLINES
             /* Check for '(:' but ignore '(::' which can occur e.g.
              * in 'if (::remove())'. However, accept '(:::' e.g. from
              * '(:::remove()', and '(::)'.
@@ -3572,6 +3579,19 @@ yylex1 (void)
                 yylval.ident = make_shared_identifier(name, I_TYPE_UNKNOWN, 0);
                 return L_INLINE_FUN;
             }
+#else /* USE_NEW_INLINES */
+            /* Check for '(:' but ignore '(::' which can occur e.g.
+             * in 'if (::remove())'. However, accept '(:::' e.g. from
+             * '(:::remove()', and '(::)'.
+             */
+
+            if (*yyp == ':'
+             && (yyp[1] != ':' || yyp[2] == ':' || yyp[2] == ')'))
+            {
+                yyp++;
+                return L_BEGIN_INLINE;
+            }
+#endif /* USE_NEW_INLINES */
 
             /* FALL THROUGH */
         /* --- Single-char Operators and Punctuation --- */

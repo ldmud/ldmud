@@ -3,6 +3,7 @@ From: Lars
 Date: 991104
 Type: Feature
 State: Acknowledged.
+See also: f-020528
 
 Inline closures still lack the ability to use the values of
 the local vars of their creating function.

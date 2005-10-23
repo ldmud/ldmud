@@ -462,4 +462,9 @@
  */
 #define USE_STRUCTS
 
+/* Define this if you want the new inline closure syntax supported.
+ * (f-020528)
+ */
+#undef USE_NEW_INLINES
+
 #endif /* CONFIG_H__ */

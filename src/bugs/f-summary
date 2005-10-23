@@ -139,7 +139,6 @@ f-010309-2:'yield' to convert statements into expressions
 f-010610-0: Casts should just check types, not convert them.
 f-010610-1: Allow reversed foreach()
 f-010610-2: Label (loop-) statements
-f-010713-0: Better Inline closure syntax
 f-010805: Explicite namespace qualifier for simul efuns
 f-010825-3: Make > indexing default with an option ?
 f-010917: default arguments for functions

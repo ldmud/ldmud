@@ -3,6 +3,63 @@ From: d-chat
 Date: 2002-05-28 (actually one year earlier)
 Type: Feature
 State: New
+See also: f-991104-1
+
+Generische Syntax:
+  func mixed (int a, int b, ...) {}
+  func (int a, int b, ...) {}
+  func {} -> implicite parameters $1..
+
+To pass parameters from the generating function to the lfun, a special kind of
+lfun closure is used internally which adds an array of initial values:
+
+
+  void caller() {
+    int i;
+    return func int (int a) { return a + i; }
+  }
+
+is compiled as
+
+  int _func_1(mixed * _vals, int a) { return a + _vals[i]; }
+  void caller() {
+    int i;
+    return special_lfun(#'_func_1, ({ i }));
+  }
+
+A funcall()/apply() on this special lfun then executes internally:
+
+   _func_1( ({ i }), a);
+
+Assignments to the inherited vars are possible, but effect just this closure,
+not the creating function.
+
+How to implement with a one-pass compiler and without lexer hacks:
+
+Lexer recognizes keyword 'func' as L_FUNC, value is the synthetic name of the
+function. Parser upon receipt of L_FUNC pushes the current program memblock
+into a stack and starts a fresh one with the function header, parsing the
+arguments and everything. References to local variables create global
+variables, and are noted. Once the inline closure is finished, the program
+memblock is stored in a list; the previous program block is popped, and the
+assignment of the local variables to the globals is done.
+
+The problem is recognizing the locals: every rule recognizing a local would
+have to check if an inline closure is parsed and if yes generate the code to
+reference the _vals[] array instead instead.
+
+Value-returning Smiley-closures could be implemented like this:
+
+ (: ... :)   -> L_BEGIN_INLINE ... L_END_INLINE
+
+Statement smiley-closures might be supportable if the terminating
+';' is taken out of the statement rule and written explicitely whereever
+a statement is used (block, statements). statement would have to return
+a flag if the statement left a value on the stack, and the ';' recognition
+would have to insert the F_POP instruction (see current handling of comma_expr
+in statement).
+
+-------------------------------------------------------------------------
 
 [d-chat:Alfe@Tubmud] nee, im ernst mal mateese: die smiley-notation fuer
   closures hat noch einen grossen nachteil: man kann keine werte in eine

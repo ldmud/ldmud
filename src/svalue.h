@@ -101,7 +101,11 @@ union u {
       /* T_ERROR_HANDLER: this function is
        * executed on a free_svalue(), receiving the T_ERROR_HANDLER svalue
        * as argument. This allows the transparent implemention of cleanup
-       * functions which are called even after runtime errors.
+       * functions which are called even after runtime errors. In order
+       * to pass additional information to the error_handler(), embed
+       * the T_ERROR_HANDLER svalue into a larger structure (possible since
+       * it has to be referenced by pointer) and let the error_handler()
+       * execute the appropriate casts.
        */
 
 #ifndef INITIALIZATION_BY___INIT
@@ -217,7 +221,8 @@ struct svalue_s
 
 #define T_ERROR_HANDLER                   0x15
   /* Not an actual value, this is used internally for cleanup
-   * operations.
+   * operations. See the description of the error_handler() member
+   * for details.
    */
 
 #define T_NULL                            0x16

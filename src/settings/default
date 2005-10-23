@@ -411,6 +411,9 @@ with_rxcache_table=8192
 # Define this to enable LPC structs.
 enable_use_structs=yes
 
+# Define this to enable the new inline function syntax.
+enable_use_new_inlines=no
+
 
 # --- Profiling ---
 # For profiling of the VM instruction implementations, refer to the Makefile

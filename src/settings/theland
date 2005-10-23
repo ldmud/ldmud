@@ -17,5 +17,6 @@ enable_malloc_lpc_trace=yes
 enable_use_pcre=yes
 enable_use_alists=yes
 enable_use_mysql=/usr/include/mysql
+enable_dynamic_costs=yes
 with_udp_port=6664
 with_read_file_max_size=100000
