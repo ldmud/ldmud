@@ -12,7 +12,7 @@ DESCRIPTION
         return value of the separator function this object will not be
         included in the returned array. The returned array is an array
         of arrays of objects in the form:
-        
+
         ({ ({ Same1:1, Same1:2, ... Same1:N }),
            ({ Same2:1, Same2:2, ... Same2:N }),
               ....
@@ -21,10 +21,10 @@ DESCRIPTION
 EXAMPLE
         mixed *arr;
         arr=unique_array(users(), "_query_level", -1);
-        
+
         This will return an array of arrays holding all user objects
         grouped together by their user levels. Wizards have a user
         level of -1 so they will not appear in the the returned array.
-        
+
 SEE ALSO
         filter(E), map(E)

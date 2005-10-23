@@ -21,7 +21,7 @@ EXAMPLE
            write("The action verb was: "+query_verb(1)+(str ? str : "")+"\n");
            return 1;
         }
-        
+
         The command 'sing ...' will print:
             Your command was: sing
             The action verb was: sing

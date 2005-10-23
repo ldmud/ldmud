@@ -16,10 +16,10 @@ DESCRIPTION
         check_valid_path().
 
         Return 1 on success, 0 if there was nothing to restore.
-        
+
         Variables that has the type modifer 'nosave' will not be restored.
         Example: nosave int xxx;
-        
+
         If inheritance is used, then it might be possible that a
         variable will exist with the same name in more than one place,
         and thus appear in the  save file multiple times. When

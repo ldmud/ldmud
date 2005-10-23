@@ -104,7 +104,7 @@
 #include "xalloc.h"
 
 #include "../mudlib/sys/debug_info.h"
- 
+
 /*-------------------------------------------------------------------------*/
 
 typedef struct swap_block_s swap_block_t;
@@ -257,7 +257,7 @@ static mp_int num_swapfree = 0;
 mp_int num_vb_swapped = 0;
   /* Number of variables blocks in the swapfile.
    */
-   
+
 mp_int total_vb_bytes_swapped = 0;
   /* Total size of variables stored in the swapfile.
    */
@@ -1080,7 +1080,7 @@ free_swapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
  * collector, which means that some of the object and closure values
  * stored with swap_svalues() might have become invalid meanwhile.
  * In those cases, the stored data is adjusted.
- * 
+ *
  * Take care to not interfere with a garbage_collection in progress!
  */
 
@@ -1105,7 +1105,7 @@ free_swapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
         case T_QUOTED_ARRAY | T_MOD_SWAPPED:
             p += sizeof svp->x;
             /* FALLTHROUGH */
-            
+
         case T_POINTER | T_MOD_SWAPPED:
 #ifdef USE_STRUCTS
         case T_STRUCT | T_MOD_SWAPPED:
@@ -1329,7 +1329,7 @@ swap_variables (object_t *ob)
       ob->variables, num_variables
       , (unsigned char *)block->start + sizeof total_size
     );
-    
+
     num_vb_swapped++;
     total_vb_bytes_swapped += total_size - sizeof total_size;
     xfree(block->start);
@@ -1408,13 +1408,13 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
  *
  * Return the next byte to read, or NULL when out of memory.
  */
- 
+
 {
     /* For all values yadda yadda... */
     for (;--num >= 0; svp++)
     {
         svp->type = *p & ~T_MOD_SWAPPED; /* get the original type */
-        
+
         switch(*p++)
         {
         case T_STRING | T_MOD_SWAPPED:
@@ -1614,7 +1614,7 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
             fatal("bad type %d in read_unswapped_svalues()\n", svp->type);
         }
     } /* for() */
-    
+
     return p;
 } /* read_unswapped_svalues() */
 
@@ -1663,7 +1663,7 @@ load_ob_from_swap (object_t *ob)
     if (swap_num & 1)
     {
         /* Swap in the program */
-        
+
         program_t tmp_prog, *prog;
 
         swap_num &= ~1;
@@ -1723,7 +1723,7 @@ load_ob_from_swap (object_t *ob)
     if (swap_num & 1)
     {
         /* Swap in the variables */
-        
+
         p_int total_size;
         unsigned char *block;
         mp_int size;
@@ -1945,7 +1945,7 @@ name_swap_file (const char *name)
 
 /* Set the swap file name to a copy of <name>.
  */
- 
+
 {
     xstrncpy(file_name, name, sizeof file_name);
     file_name[sizeof file_name - 1] = '\0';
@@ -2027,12 +2027,12 @@ swap_dinfo_data (svalue_t *svp, int value)
  * If <value> is -1, <svp> points indeed to a value block; other it is
  * the index of the desired value and <svp> points to a single svalue.
  */
- 
+
 {
 #define ST_NUMBER(which,code) \
     if (value == -1) svp[which].u.number = code; \
     else if (value == which) svp->u.number = code
-    
+
     ST_NUMBER(DID_SW_PROGS, num_swapped - num_unswapped);
     ST_NUMBER(DID_SW_PROG_SIZE, total_bytes_swapped - total_bytes_unswapped);
     ST_NUMBER(DID_SW_PROG_UNSWAPPED, num_unswapped);

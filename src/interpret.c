@@ -208,7 +208,7 @@
 #endif
 
 #include "interpret.h"
-     
+
 #include "actions.h"
 #include "array.h"
 #include "backend.h"
@@ -539,7 +539,7 @@ int32 assigned_eval_cost;
    * thread leaves the object again, the difference between the actual
    * eval_cost value and the older assigned_eval_cost is accounted to
    * the current object.
-   * The implementation combines both actions in one function 
+   * The implementation combines both actions in one function
    * assign_eval_cost().
    */
 
@@ -1010,7 +1010,7 @@ free_svalue (svalue_t *v)
     case T_CALLBACK:
         free_callback(v->u.cb);
         break;
-        
+
     case T_LVALUE:
         switch (v->u.lvalue->type)
         {
@@ -1099,18 +1099,18 @@ _destructed_object_ref (svalue_t *svp)
         return (svp->u.ob->flags & O_DESTRUCTED) ? MY_TRUE : MY_FALSE;
 
     /* Lambda closure */
-    
+
     l = svp->u.lambda;
 
     if (CLOSURE_HAS_CODE(type) && type == CLOSURE_UNBOUND_LAMBDA)
         return MY_FALSE;
-    
+
     if (type == CLOSURE_ALIEN_LFUN
      && (l->function.alien.ob->flags & O_DESTRUCTED))
         return MY_TRUE;
 
     return (l->ob->flags & O_DESTRUCTED) ? MY_TRUE : MY_FALSE;
-    
+
 } /* _destructed_object_ref() */
 
 Bool destructed_object_ref (svalue_t *v) { return _destructed_object_ref(v); }
@@ -1136,17 +1136,17 @@ _get_object_ref (svalue_t *svp)
         return svp->u.ob;
 
     /* Lambda closure */
-    
+
     l = svp->u.lambda;
 
     if (CLOSURE_HAS_CODE(type) && type == CLOSURE_UNBOUND_LAMBDA)
         return NULL;
-    
+
     if (type == CLOSURE_ALIEN_LFUN)
         return l->function.alien.ob;
 
     return l->ob;
-    
+
 } /* _get_object_ref() */
 
 object_t * get_object_ref (svalue_t *v) { return _get_object_ref(v); }
@@ -2689,8 +2689,8 @@ push_referenced_mapping (mapping_t *m)
  *                 protector          -> vector/mapping
  *       by: push_protected_(r)indexed_lvalue()
  *           push_protected_indexed_map_lvalue()
- *           protected_(r)index_lvalue() 
- *     
+ *           protected_(r)index_lvalue()
+ *
  *
  *     (LVALUE) -> (PROTECTED_CHAR_LVALUE)
  *                    .lvalue -> untabled string svalue
@@ -2699,7 +2699,7 @@ push_referenced_mapping (mapping_t *m)
  *                    .protector: T_INVALID or the string's .protector value
  *                                if the string itself is result of a protected
  *                                lvalue index.
- *     
+ *
  *       by: protected_(r)index_lvalue() on string lvalue
  *
  *
@@ -2708,10 +2708,10 @@ push_referenced_mapping (mapping_t *m)
  *                   special_lvalue.size:  size of the string/vector
  *                                 .ind1:  lower index
  *                                 .ind2:  upper index
- *     
+ *
  *       by: range_lvalue()
- *     
- *     
+ *
+ *
  *     (LVALUE) -> (T_PROTECTED_{STRING,POINTER}_RANGE_LVALUE)
  *                   .v   :   indexed-on string/vector
  *                   .lvalue -> svalue of indexed-on string/vector
@@ -2719,9 +2719,9 @@ push_referenced_mapping (mapping_t *m)
  *                   .ind1:  lower index
  *                   .ind2:  upper index
  *                   .protector: the protector of the initial lvalue, if any.
- *     
+ *
  *       by: protected_range_lvalue()
- *     
+ *
  *
  * TODO: A lot of the functions differ only in minute details - test how
  * TODO:: much time merging the functions (and adding if()s for the
@@ -3512,7 +3512,7 @@ index_lvalue (svalue_t *sp, bytecode_p pc)
         if (!mstr_singular(vec->u.str))
         {
             string_t *p;
-            
+
             memsafe(p = dup_mstring(vec->u.str), mstrsize(vec->u.str)
                    , "modifiable string");
 
@@ -3657,7 +3657,7 @@ rindex_lvalue (svalue_t *sp, bytecode_p pc)
         if (!mstr_singular(vec->u.str))
         {
             string_t *p;
-            
+
             memsafe(p = dup_mstring(vec->u.str), mstrsize(vec->u.str)
                    , "modifiable string");
 
@@ -3765,7 +3765,7 @@ aindex_lvalue (svalue_t *sp, bytecode_p pc)
         if (!mstr_singular(vec->u.str))
         {
             string_t *p;
-            
+
             memsafe(p = dup_mstring(vec->u.str), mstrsize(vec->u.str)
                    , "modifiable string");
 
@@ -3916,7 +3916,7 @@ protected_index_lvalue (svalue_t *sp, bytecode_p pc)
             if (!mstr_singular(vec->u.str))
             {
                 string_t *p;
-                
+
                 memsafe(p = dup_mstring(vec->u.str), mstrsize(vec->u.str)
                        , "modifiable string");
 
@@ -4055,7 +4055,7 @@ protected_index_lvalue (svalue_t *sp, bytecode_p pc)
             if (!mstr_singular(vec->u.str))
             {
                 string_t *p;
-                
+
                 memsafe(p = dup_mstring(vec->u.str), mstrsize(vec->u.str)
                        , "modifiable string");
 
@@ -4209,7 +4209,7 @@ protected_rindex_lvalue (svalue_t *sp, bytecode_p pc)
             if (!mstr_singular(vec->u.str))
             {
                 string_t *p;
-                
+
                 memsafe(p = dup_mstring(vec->u.str), mstrsize(vec->u.str)
                        , "modifiable string");
 
@@ -4294,7 +4294,7 @@ protected_rindex_lvalue (svalue_t *sp, bytecode_p pc)
             if (!mstr_singular(vec->u.str))
             {
                 string_t *p;
-                
+
                 memsafe(p = dup_mstring(vec->u.str), mstrsize(vec->u.str)
                        , "modifiable string");
 
@@ -4444,7 +4444,7 @@ protected_aindex_lvalue (svalue_t *sp, bytecode_p pc)
             if (!mstr_singular(vec->u.str))
             {
                 string_t *p;
-                
+
                 memsafe(p = dup_mstring(vec->u.str), mstrsize(vec->u.str)
                        , "modifiable string");
 
@@ -4529,7 +4529,7 @@ protected_aindex_lvalue (svalue_t *sp, bytecode_p pc)
             if (!mstr_singular(vec->u.str))
             {
                 string_t *p;
-                
+
                 memsafe(p = dup_mstring(vec->u.str), mstrsize(vec->u.str)
                        , "modifiable string");
 
@@ -4837,7 +4837,7 @@ protected_range_lvalue (int code, svalue_t *sp)
         if (!mstr_singular(vec->u.str))
         {
             string_t *p;
-            
+
             memsafe(p = dup_mstring(vec->u.str), mstrsize(vec->u.str)
                    , "modifiable string");
 
@@ -9525,7 +9525,7 @@ again:
         else if ((sp-1)->type == T_STRING)
         {
             string_t * result;
-            
+
             TYPE_TEST_RIGHT(sp, T_STRING);
             inter_sp = sp;
             result = intersect_strings((sp-1)->u.str, sp->u.str, MY_TRUE);
@@ -9630,10 +9630,10 @@ again:
 
                 if (sp[-1].u.number < 0)
                     ERROR("Bad right arg to *: negative number.\n");
-                
+
                 slen = mstrsize(sp->u.str);
                 if (slen > (size_t)PINT_MAX
-                 || (   slen != 0           
+                 || (   slen != 0
                      && PINT_MAX / (p_int)slen < sp[-1].u.number)
                  || (   sp[-1].u.number != 0
                      && PINT_MAX / sp[-1].u.number < (p_int)slen)
@@ -9646,7 +9646,7 @@ again:
                 if (!result)
                     ERRORF(("Out of memory (%ld bytes).\n"
                            , (long)(mstrsize(sp->u.str) * sp[-1].u.number)));
-                
+
                 DYN_STRING_COST(mstrsize(result))
                 free_svalue(sp);
                 sp--;
@@ -9659,7 +9659,7 @@ again:
                 vector_t *result;
                 mp_int reslen;
                 size_t len;
-                
+
                 if (sp[-1].u.number < 0)
                     ERROR("Bad right arg to *: negative number.\n");
 
@@ -9674,7 +9674,7 @@ again:
                 {
                     size_t left;
                     svalue_t *from, *to;
-                    
+
                     /* Seed result[] with one copy of the array.
                      * To save memory we make sure that all strings
                      * are made shared.
@@ -9752,10 +9752,10 @@ again:
 
                 if (sp->u.number < 0)
                     ERROR("Bad left arg to *: negative number.\n");
-                
+
                 slen = mstrsize(sp[-1].u.str);
                 if (slen > (size_t)PINT_MAX
-                 || (   slen != 0           
+                 || (   slen != 0
                      && PINT_MAX / (p_int)slen < sp->u.number)
                  || (   sp->u.number != 0
                      && PINT_MAX / sp->u.number < (p_int)slen)
@@ -9787,7 +9787,7 @@ again:
                 vector_t *result;
                 mp_int reslen;
                 size_t len;
-                
+
                 if (sp->u.number < 0)
                     ERROR("Bad left arg to *: negative number.\n");
 
@@ -9801,7 +9801,7 @@ again:
                 {
                     size_t left;
                     svalue_t *from, *to;
-                    
+
                     /* Seed result[] with one copy of the array.
                      * To save memory we make sure that all strings
                      * are made shared.
@@ -10410,7 +10410,7 @@ again:
         if (sp->type == T_STRING && (sp-1)->type == T_STRING)
         {
             string_t * result;
-            
+
             inter_sp = sp;
             result = intersect_strings(sp[-1].u.str, sp->u.str, MY_FALSE);
             free_string_svalue(sp-1);
@@ -10756,7 +10756,7 @@ again:
             {
                 res = mstr_extract(sp[-2].u.str, from, to);
             }
-            
+
             if (res == NULL)
             {
                 ERRORF(("Out of memory (%ld bytes).\n", to-from+1));
@@ -10841,7 +10841,7 @@ again:
             {
                 char buff[80];
                 size_t len;
-                
+
                 buff[sizeof(buff)-1] = '\0';
                 sprintf(buff, "%ld", (long)u2.number);
                 if (buff[sizeof(buff)-1] != '\0')
@@ -11191,7 +11191,7 @@ again:
         case T_STRING:   /* Subtract from a string */
         {
             string_t * result;
-            
+
             if (type2 != T_STRING)
             {
                 OP_ARG_ERROR(2, TF_STRING, type2);
@@ -11499,11 +11499,11 @@ again:
                 ERROR("Bad right arg to *=: negative number\n");
                 /* NOTREACHED */
             }
-            
+
             len = mstrsize(argp->u.str);
 
             if (len > (size_t)PINT_MAX
-             || (   len != 0           
+             || (   len != 0
                  && PINT_MAX / (p_int)len < sp->u.number)
              || (   sp->u.number != 0
                  && PINT_MAX / sp->u.number < (p_int)len)
@@ -11516,7 +11516,7 @@ again:
             result = mstr_repeat(argp->u.str, (size_t)sp->u.number);
             if (!result)
                 ERRORF(("Out of memory (%lu bytes).\n", (unsigned long)reslen));
-            
+
             DYN_STRING_COST(reslen)
 
             free_string_svalue(argp);
@@ -11530,7 +11530,7 @@ again:
             vector_t *result;
             mp_int reslen;
             size_t len;
-            
+
             sp--;
             if (sp->type != T_NUMBER)
             {
@@ -11542,7 +11542,7 @@ again:
                 ERROR("Bad right arg to *=: negative number\n");
                 /* NOTREACHED */
             }
-            
+
             inter_sp = sp;
             inter_pc = pc;
             len = VEC_SIZE(argp->u.vec);
@@ -11554,7 +11554,7 @@ again:
             {
                 size_t left;
                 svalue_t *from, *to;
-                
+
                 /* Seed result[] with one copy of the array.
                  * To save memory we make sure that all strings
                  * are made shared.
@@ -11591,7 +11591,7 @@ again:
             assign_svalue_no_free(sp, argp);
             break;
         }
-        
+
         OP_ARG_ERROR(1, TF_STRING|TF_FLOAT|TF_POINTER|TF_NUMBER
                     , argp->type);
         /* NOTREACHED */
@@ -11831,7 +11831,7 @@ again:
         if (argp->type == T_STRING)
         {
             string_t * result;
-            
+
             if (sp[-1].type != T_STRING)
             {
                 OP_ARG_ERROR(2, TF_STRING, sp[-1].type);
@@ -12591,7 +12591,7 @@ again:
          *
          * The number of arguments, if needed, is determined through the
          * ap pointer.
-         * 
+         *
          * The _noargs code is used to implement wildcarded
          * super calls, which take no argument, but store their results
          * above the ap. Without this extra bytecode, the normal argument
@@ -13852,7 +13852,7 @@ again:
         vec = allocate_array(size+1);
         if  (!vec)
             ERROR("Out of memory!\n");
-        
+
         put_ref_string(vec->item, current_strings[name]);
 
         if (instruction == F_S_AGGREGATE)
@@ -14052,7 +14052,7 @@ again:
          *
          * ushort <offset> is the distance to the FOREACH_NEXT
          * instruction follwing the codeblock after the instruction,
-         * counted from the byte following this instruction. 
+         * counted from the byte following this instruction.
          *
          * The instruction pushes two or three more values onto
          * the stack to store its internal status.
@@ -14202,7 +14202,7 @@ again:
             if (m->num_values == 0 || nargs-1 == 1)
             {
                 /* Special case: we can replace the mapping
-                 * by its indices only (and we also don't need to 
+                 * by its indices only (and we also don't need to
                  * created references).
                  */
                 free_svalue(sp);
@@ -14254,10 +14254,10 @@ again:
 
         /* Now branch to the FOREACH_NEXT */
         pc += offset;
-        
+
         break;
     }
-    
+
     CASE(F_FOREACH_NEXT);         /* --- foreach_next <offset> --- */
     {
         /* Start the next (resp. the first) iteration of a foreach()
@@ -14270,7 +14270,7 @@ again:
         p_int     ix;
         svalue_t *lvalue;  /* Pointer to the first lvalue */
         Bool      gen_refs;
-        
+
 
         LOAD_SHORT(offset, pc);
 
@@ -14286,12 +14286,12 @@ again:
         if (sp[-1].x.generic < 0)
         {
             /* We loop over a mapping */
-            
+
             mapping_t *m;
             vector_t  *indices;
             svalue_t  *values;
             int        left;
-            
+
             lvalue = sp + sp[-1].x.generic - 2;
 
             m = sp[-3].u.map;
@@ -14414,7 +14414,7 @@ again:
                      * We stop processing and continue with the following
                      * FOREACH_END instruction.
                      */
-                     
+
                 if (!gen_refs)
                 {
                     assign_svalue(lvalue, sp[-2].u.vec->item+ix);
@@ -14448,7 +14448,7 @@ again:
         pc -= offset;
         break;
     }
-    
+
     CASE(F_FOREACH_END);            /* --- foreach_end         --- */
     {
         /* The foreach() loop ended or was terminated by a break.
@@ -14476,7 +14476,7 @@ again:
 
         break;
     }
-    
+
     CASE(F_END_CATCH);                  /* --- end_catch       --- */
         /* For a catch(...guarded code...) statement, the compiler
          * generates a F_END_CATCH as last instruction of the
@@ -14795,7 +14795,7 @@ again:
         {
             STORE_DOUBLE_USED
             double d;
- 
+
             d = -READ_DOUBLE(sp);
             if (d < (-DBL_MAX) || d > DBL_MAX)
                 ERRORF(("Numeric overflow: -(%g)\n", READ_DOUBLE(sp)));
@@ -14989,7 +14989,7 @@ again:
         if (arg[0].type != T_POINTER)
         {
             /* --- The normal call other to a single object --- */
-            
+
             ASSIGN_EVAL_COST
 
             if (arg[0].type == T_OBJECT)
@@ -15076,7 +15076,7 @@ again:
             for ( ; size != 0; size--, svp++)
             {
                 int i;
-                
+
                 ASSIGN_EVAL_COST
                 inter_sp = sp; /* Might be clobbered from previous loop */
 
@@ -15133,7 +15133,7 @@ again:
                  */
                 for (i = 2; i < num_arg; i++)
                     assign_svalue_no_free(++sp, arg+i);
-                    
+
                 /* Call the function with the remaining args on the stack.
                  */
                 inter_sp = sp; /* update to new setting */
@@ -15166,10 +15166,10 @@ again:
              */
             free_string_svalue(sp); sp--;
         }
-        
+
         break;
     }
-    
+
     CASE(F_EXTERN_CALL);               /* --- extern_call     --- */
       {
         /* EFUN extern_call()
@@ -15607,7 +15607,7 @@ retry_for_shadow:
                     )
                 {
                     /* Not found */
-                    
+
                     previous_ob = csp->prev_ob;
                     current_object = csp->ob;
                     pop_control_stack();
@@ -15759,7 +15759,7 @@ int_apply (string_t *fun, object_t *ob, int num_arg
             /* Evaluate the result and clean up the stack */
             if (!rc)
             {
-                /* Can happen only for T_STRING hooks: Function not found, 
+                /* Can happen only for T_STRING hooks: Function not found,
                  * but caller expects a clean stack.
                  */
                 inter_sp = _pop_n_elems(num_arg+num_extra, inter_sp);
@@ -15940,7 +15940,7 @@ secure_apply_error ( svalue_t *save_sp, struct control_stack *save_csp
 
         while (csp > save_csp+1)
             pop_control_stack();
-       
+
         previous_ob = csp->prev_ob;
         current_object = csp->ob;
         pop_control_stack();
@@ -17178,7 +17178,7 @@ get_line_number (bytecode_p p, program_t *progp, string_t **namep)
                         i -= off+1;
                         break;
                       }
-                      
+
                     case LI_INCLUDE:
                       {
                         /* Included file: push the information */
@@ -17288,7 +17288,7 @@ get_line_number (bytecode_p p, program_t *progp, string_t **namep)
                            , get_txt(progp->name), get_txt(inctop->name));
             memsafe(*namep = new_mstring(namebuf), strlen(namebuf), "filename");
         }
-        else 
+        else
             *namep = ref_mstring(inctop->name);
 
         /* Free the include stack structures */

@@ -314,7 +314,7 @@ static struct ipentry {
    * TODO:: of a day. After that, even existing entries need to be
    * TODO:: re-resolved. Maybe an additional size limit. (suggested by Coogan)
    */
- 
+
 static int ipcur = 0;
   /* Index of the next entry to use in the iptable[].
    */
@@ -361,15 +361,15 @@ static int min_nfds = 0;
 
 #ifdef DEBUG_TELNET
 
-#define DT(x) printf("%s TDEBUG: ", time_stamp()); printf x 
-#define DTN(x) printf("%s TDEBUG: '%s' ", time_stamp(), get_txt(ip->ob->name)); printf x 
-#define DTF(x) printf x 
+#define DT(x) printf("%s TDEBUG: ", time_stamp()); printf x
+#define DTN(x) printf("%s TDEBUG: '%s' ", time_stamp(), get_txt(ip->ob->name)); printf x
+#define DTF(x) printf x
 
 #else
 
-#define DT(x) 
+#define DT(x)
 #define DTN(x)
-#define DTF(x) 
+#define DTF(x)
 
 #endif
 
@@ -633,7 +633,7 @@ comm_fatal (interactive_t *ip, char *fmt, ...)
         fatal("Recursive call to comm_fatal().");
     in_fatal = MY_TRUE;
     ts = time_stamp();
-    
+
     /* Print the error message */
 
     va_start(va, fmt);
@@ -656,7 +656,7 @@ comm_fatal (interactive_t *ip, char *fmt, ...)
     (void)dump_trace(MY_TRUE, NULL); fflush(stdout);
 
     va_end(va);
-    
+
     /* Dump the interactive structure */
 
     fprintf(stderr, "--- Dump of current interactive structure (%p..%p) --- \n"
@@ -1155,7 +1155,7 @@ prepare_ipc(void)
     for (i = 0; i < numports; i++)
     {
         struct sockaddr_in host_ip_addr;
- 
+
         memcpy(&host_ip_addr, &host_ip_addr_template, sizeof(host_ip_addr));
 
         if (port_numbers[i] > 0)
@@ -1496,7 +1496,7 @@ writer_thread (void *arg)
     while (MY_TRUE)
     {
         struct write_buffer_s * buf;
-            
+
 	/* cancellation point */
 	pthread_testcancel();
 
@@ -1535,7 +1535,7 @@ writer_thread (void *arg)
         {
             /* write the stuff to socket */
             buf->errorno = 0;
-            if ((socket_write(ip->socket, buf->buffer, buf->length)) == -1) 
+            if ((socket_write(ip->socket, buf->buffer, buf->length)) == -1)
             {
                 buf->errorno = errno;
             } /* if socket_write() == -1 */
@@ -1565,7 +1565,7 @@ add_message (const char *fmt, ...)
 /* Send a message to the current command_giver. The message is composed
  * from the <fmt> string and the following arguments using the normal
  * printf() semantics.
- * 
+ *
  * The format string "%s" is special in that it bypasses the normal
  * printf() handling and uses the given char* argument directly as data
  * source, allowing to send strings of arbitrary length.
@@ -1610,7 +1610,7 @@ add_message (const char *fmt, ...)
        * socket.
        * TODO: Actually, it is used just as a flag for flush/non-flush.
        */
-    string_t *srcstr; 
+    string_t *srcstr;
       /* If not NULL, this string was passed in to be printed.
        * source will point to the first real character of it.
        */
@@ -2616,7 +2616,7 @@ get_message (char *buff)
                         /* EBADF would be a valid cause for an abort,
                          * same goes for ENOTSOCK, EOPNOTSUPP, EFAULT.
                          * However, don't abort() because that tends to
-                         * leave Mud admins baffled (and would opens the 
+                         * leave Mud admins baffled (and would opens the
                          * door for DoS attacks).
                          */
                         int errorno = errno;
@@ -2813,7 +2813,7 @@ get_message (char *buff)
                     Bool end_of_line = MY_FALSE;
 
                     DTN(("  Unescaped input\n"));
-                    
+
                     if (ip->tn_state != TS_READY)
                     {
                         /* .text[] contains an incomplete negotiation.
@@ -2891,7 +2891,7 @@ get_message (char *buff)
                     /* destix is now the number of characters stored in
                      * buff[], and is at least 1.
                      */
-                    
+
                     if (!buff[destix-1])
                     {
                         /* End of line. Reinitialise the telnet machine
@@ -3667,7 +3667,7 @@ find_no_bang (interactive_t *ip)
 
     if (ip->noecho & IGNORE_BANG)
         return ip->noecho;
-        
+
     for (it = ip->input_to; it; it = it->next)
         if (it->noecho & IGNORE_BANG)
             return it->noecho;
@@ -3695,7 +3695,7 @@ call_function_interactive (interactive_t *i, char *str)
     object_t   *ob;   /* object holding <function> */
 
     it = i->input_to;
-    
+
     /* _Are_ there an input_to() pending? */
     if (!it)
         return MY_FALSE;
@@ -3892,7 +3892,7 @@ print_prompt_string (string_t *prompt)
     if (hook->type == T_CLOSURE)
     {
         object_t *ob;
-        
+
         /* Needed for clean error recovery */
 
         previous_ob = 0;
@@ -3970,7 +3970,7 @@ print_prompt (void)
     if (prompt->type == T_CLOSURE)
     {
         object_t *ob;
-        
+
         /* Needed for clean error recovery */
 
         previous_ob = 0;
@@ -4826,12 +4826,12 @@ telnet_neg (interactive_t *ip)
                                 ip->text_end++;
                                 end++;
                             }
-                                
+
                             from++;
                             for (cp = end; cp != from-1; cp--)
                                 *cp = *(cp-1);
                         }
-                            
+
                         if ((ip->noecho & (CHARMODE_REQ|CHARMODE)) != (CHARMODE_REQ))
                         {
                             *to++ = '\r';
@@ -6244,7 +6244,7 @@ f_send_udp (svalue_t *sp)
         }
 
 #else /* USE_IPV6 */
-        
+
         /* TODO: Uh-oh, blocking DNS in the execution thread */
         hp = gethostbyname2(to_host, AF_INET6);
         if (hp == 0) hp = gethostbyname2(to_host, AF_INET);
@@ -6257,7 +6257,7 @@ f_send_udp (svalue_t *sp)
         }
         name.sin_family = AF_INET6;
 #endif /* USE_IPV6 */
-        
+
         name.sin_port = htons(to_port);
 
         /* Send the message. */
@@ -6842,7 +6842,7 @@ v_find_input_to (svalue_t *sp, int num_arg)
  *  - <fun> is a closure: the input_to closure has to match.
  * If both <ob> and <fun> are specified, both the object and the function name
  * have to match.
- * 
+ *
  * Return -1 if not found, or the position in the input_to stack (0 being
  * _least_ recently added input_to).
  */
@@ -6903,7 +6903,7 @@ v_find_input_to (svalue_t *sp, int num_arg)
                  && mstreq(it->fun.function.named.name, arg[1].u.str))
                     found = MY_TRUE;
                 break;
-                
+
             case T_OBJECT:
                 if (num_arg > 2)
                 {
@@ -6978,7 +6978,7 @@ v_remove_input_to (svalue_t *sp, int num_arg)
  *  - <fun> is a closure: the input_to closure has to match.
  * If both <ob> and <fun> are specified, both the object and the function name
  * have to match.
- * 
+ *
  * Return 1 on success, or 0 on failure (no input_to found, object is not
  * interactive or has no input_to pending).
  */
@@ -7053,7 +7053,7 @@ v_remove_input_to (svalue_t *sp, int num_arg)
                  && mstreq(it->fun.function.named.name, arg[1].u.str))
                     found = MY_TRUE;
                 break;
-                
+
             case T_OBJECT:
                 if (num_arg > 2)
                 {
@@ -7169,7 +7169,7 @@ f_input_to_info (svalue_t *sp)
             ob = callback_object(&(it->fun));
             if (!ob)
                 continue;
-                
+
             /* Get the subarray */
 
             vv = allocate_array(2 + it->fun.num_arg);

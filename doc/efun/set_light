@@ -8,7 +8,7 @@ DESCRIPTION
         light. The returned value is the total number of lights in
         this room. So if you call set_light(0) it will return the
         light level of the current object.
-        
+
         Note that the value of the argument is added to the light of
         the current object.
 

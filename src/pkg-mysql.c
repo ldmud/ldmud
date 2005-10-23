@@ -95,7 +95,7 @@ allocate_new_dat(void)
     }
 
     /* The chained list exists */
-    
+
     tmp = my_dat->prev = pxalloc(sizeof(db_dat_t));
     if ( !tmp )
     {
@@ -584,7 +584,7 @@ f_db_fetch (svalue_t *sp)
         return sp;
     }
 
-    if (!dat->mysql_result) 
+    if (!dat->mysql_result)
     {
        free_svalue(sp);
        put_number(sp, 0);
@@ -605,7 +605,7 @@ f_db_fetch (svalue_t *sp)
     }
 
     /* How many columns does every line contain? */
-    
+
     num_cols = mysql_num_fields(dat->mysql_result);
     v = allocate_array(num_cols);
     if (!v)
@@ -614,7 +614,7 @@ f_db_fetch (svalue_t *sp)
         /* NOTREACHED */
         return sp;
     }
-    
+
     for (i = 0; i < num_cols; i++)
         if (dat->mysql_row[i])
             put_c_string(v->item+i, dat->mysql_row[i]);
@@ -722,7 +722,7 @@ f_db_insert_id (svalue_t *sp)
 /*-------------------------------------------------------------------------*/
 svalue_t *
 f_db_coldefs (svalue_t *sp)
- 
+
 /* TEFUN db_coldefs()
  *
  *   string * db_coldefs(int handle)
@@ -738,7 +738,7 @@ f_db_coldefs (svalue_t *sp)
     int           num_fields, i;
     unsigned int  handle;
     MYSQL_FIELD  *fields;
-     
+
     handle = (unsigned int)sp->u.number;
     if ( !(dat = find_dat_by_handle(handle)) )
     {
@@ -752,9 +752,9 @@ f_db_coldefs (svalue_t *sp)
         put_number(sp, 0);
         return sp;
     }
-    
+
     num_fields = mysql_num_fields(dat->mysql_result);
-     
+
     v = allocate_array(num_fields);
     if (!v)
     {
@@ -762,14 +762,14 @@ f_db_coldefs (svalue_t *sp)
         /* NOTREACHED */
         return sp;
     }
- 
+
     fields = mysql_fetch_fields(dat->mysql_result);
-     
+
     for (i = 0; i < num_fields; i++)
     {
         put_c_string(v->item+i, fields[i].name);
     }
-  
+
     free_svalue(sp); /* It's a number */
     put_array(sp, v);
     return sp;

@@ -305,7 +305,7 @@ cleanup_vector (svalue_t *svp, size_t num, ptrtable_t * ptable)
             if (register_pointer(ptable, p->u.map) != NULL)
             {
                 cleanup_map_extra_t extra;
-                
+
                 extra.width = p->u.map->num_values;
                 extra.ptable = ptable;
                 check_map_for_destr(p->u.map);
@@ -316,7 +316,7 @@ cleanup_vector (svalue_t *svp, size_t num, ptrtable_t * ptable)
         case T_STRING:
             if (!mstr_tabled(p->u.str))
             {
-                string_t * str = make_tabled(p->u.str);
+                string_t * str = make_tabled_from(p->u.str);
                 if (str != NULL)
                 {
                     free_mstring(p->u.str);
@@ -531,7 +531,7 @@ write_malloc_trace (void * p)
 
 #else
 
-#define write_malloc_trace(p) 
+#define write_malloc_trace(p)
 #define WRITES(d, s)
 
 #endif /* MALLOC_TRACE */
@@ -1951,8 +1951,8 @@ show_mstring (int d, void *block, int depth)
         {
             WRITES(d, "Ind. tabled string: <not printing data>");
         }
-        /* TODO: This is how it should be 
-         * TODO:: show_mstring_data(d, str->str, depth); 
+        /* TODO: This is how it should be
+         * TODO:: show_mstring_data(d, str->str, depth);
          * TODO:: alas it crashes the driver when destructed leaked objects
          * TODO:: are found 'cause their name is no langer value (though
          * TODO:: the reason for that is yet unknown). See 3.3.168 mails/bugs.
@@ -2056,9 +2056,9 @@ show_array(int d, void *block, int depth)
      * partly overwritten by the smalloc pointers already.
      */
     a_size = (mp_int)(  malloced_size(a)
-                   - ( SMALLOC_OVERHEAD + 
-                       ( sizeof(vector_t) - sizeof(svalue_t) ) / SIZEOF_CHAR_P 
-                     ) 
+                   - ( SMALLOC_OVERHEAD +
+                       ( sizeof(vector_t) - sizeof(svalue_t) ) / SIZEOF_CHAR_P
+                     )
 
                   ) / (sizeof(svalue_t)/SIZEOF_CHAR_P);
 

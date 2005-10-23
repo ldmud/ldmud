@@ -447,7 +447,7 @@ void reset_all()
             #'tan,
             #'tell_object,
             #'tell_room,
-            #'terminal_colour, 
+            #'terminal_colour,
             #'test_bit,
             #'this_interactive,
             #'this_object,

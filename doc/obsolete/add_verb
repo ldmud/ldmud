@@ -6,7 +6,7 @@ DESCRIPTION
         This function is connected to the add_action() function. It
         will set up the command str to trigger a call to the function
         set up by the previous call to add_action().
-        
+
         This function is now obsolete as the verb can be given directly
         with add_action(). add_verb() remains for compatibility.
 

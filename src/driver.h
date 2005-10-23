@@ -56,7 +56,7 @@
 #if defined(MALLOC_smalloc)
 #  define GC_SUPPORT 1
 #endif
- 
+
 /* When we have allocation tracing, the allocator annotates every
  * allocation with the source filename and line where the allocation
  * occured. To allow the annotation of the allocations of higher structures

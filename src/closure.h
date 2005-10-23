@@ -17,7 +17,7 @@
  * right before the struct lambda and indexed from the end.
  * For lfun closures, the context variables are stored after the
  * lambda_s. If the lfun closure has no context variables, or for
- * other kinds of closures the context[] part is not allocated at all. 
+ * other kinds of closures the context[] part is not allocated at all.
  */
 
 struct lambda_s
@@ -28,7 +28,7 @@ struct lambda_s
      * which are indexed from the end. That means that value #x can
      * be found at address ((svalue_t *)lambda_t)[-x-1].
      */
-     
+
     p_int ref;          /* ref count */
     object_t *ob;
       /* Object the closure is bound to (for bound UNBOUND_LAMBDAs just

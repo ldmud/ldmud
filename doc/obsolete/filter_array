@@ -15,9 +15,9 @@ DESCRIPTION
         If ob->fun(arr[index], extra) returns != 0 resp.
         map[arr[index]] exists, the element is included in the
         returned array.
-        
+
         If arr is not an array, an error occurs.
-        
+
         The extra argument(s) are optional and must not be protected
         references like &(i[0]).
         If <ob> is omitted, or neither a string nor an object, it

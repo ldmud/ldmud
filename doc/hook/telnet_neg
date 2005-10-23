@@ -51,7 +51,7 @@ DESCRIPTION
         For example:, if the driver receives the sequence
 
           IAC SB <opt> <opts>...
-        
+
         followed by IAC SB/SE,  the hook is called with 'SB' as first
         argument, <opt> as second, and <opts> as an array of integers as
         third argument.

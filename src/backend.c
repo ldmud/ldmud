@@ -609,7 +609,7 @@ backend (void)
                     print_prompt();
                 }
             }
-        
+
             do_state_check(2, "after handling message");
         }
         else
@@ -1395,7 +1395,7 @@ f_debug_message (svalue_t *sp)
  *
  * The parameter <flags> is a combination of bitflags determining the
  * target and the mode of writing.
- * 
+ *
  * The target flags are: DMSG_STDOUT, DMSG_STDERR and DMSG_LOGFILE.
  * If the flag DMSG_STAMP is given, the message is prepended with the
  * current date and time in the format 'YYYY.MM.DD HH:MM:SS '.
@@ -1424,7 +1424,7 @@ f_debug_message (svalue_t *sp)
         if (sp->u.number & DMSG_LOGFILE)
             debug_message("%s ", time_stamp());
     }
-    
+
     while (slen > 0)
     {
         while (slen > 0 && *pTxt == '\0')

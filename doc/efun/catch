@@ -6,7 +6,7 @@ DESCRIPTION
         Evaluate the expressions. If there is no error, 0 is returned.
         If there is an error, the evaluation of the expressions stops at
         that point, and a string with the error message is returned.
-        
+
         System error messages start with a leading '*', user-defined
         error values (other than 0) as given to throw() and raise_error() are
         returned as they are.

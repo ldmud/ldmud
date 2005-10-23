@@ -9,20 +9,20 @@ SYNOPSIS
 DESCRIPTION
         Call the function <fun> with any given <args> as parameters,
         and execute it with the given runtime limits.
-        
+
         After the function exits, the currently active limits are restored.
         Result of the efun is the result of the closure call.
- 
+
         The runtime limits can be given in two ways: as an array (like the
         one returned from query_limits(), or as a list of tagged values.  If
         the efun is used without any limit specification, all limits are
         supposed to be 'unlimited'.
- 
+
         The limit settings recognize two special values:
             LIMIT_UNLIMITED: the limit is deactivated
             LIMIT_KEEP:      the former setting is kept
             LIMIT_DEFAULT:   the 'global' default setting is used.
-       
+
         The efun causes a privilege violation ("limited", current_object,
         closure).
 

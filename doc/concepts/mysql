@@ -8,7 +8,7 @@ DESCRIPTION
         activates a number of efuns.
 
         -- Configuration --
-        
+
         Create a dedicated user in the mySQL database for the driver.
         Enter this username and password in the file pkg-mysql.c, function
         mysql_real_connect(), and compile the driver (the username and
@@ -43,7 +43,7 @@ DESCRIPTION
         either 0 if there was an error in your command (this can have
         various reasons), otherwise your handle is returned again. A typical
         SQL-statement to retrieve data would be like this:
-        
+
                 select aliases.command from aliases where (name = 'mario' AND
                   alias regexp 'l.*')
 

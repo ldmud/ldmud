@@ -38,7 +38,7 @@ Language
            c = b-a;
          }
        are not legal and shouldn't be used.
-     - Don't make assumptions about the size of the base types (e.g. 
+     - Don't make assumptions about the size of the base types (e.g.
        a char might have more than 8 bits). If such an assumption
        is unavoidable, comment it clearly and if possible add a test
        to raise a compile or runtime error if the assumption is not met.
@@ -80,7 +80,7 @@ Style
     should start with an uppercase letter. Macro identifiers should be
     all UPPERCASE, other identifiers may be under_scored or SkudlyCaps.
     Hungarian notation is accepted only in a very light form: pFoo for
-    pointers, ppFoo for pointer to pointers, iFoo for integer types, 
+    pointers, ppFoo for pointer to pointers, iFoo for integer types,
     sFoo for string pointers, aFoo for complex types - you get the
     idea. But no alpzsFoo and friends.
 
@@ -181,7 +181,7 @@ Commenting
        int bar;
          /* long comment which doesn't fit on one line.
           */
-    
+
     The major steps in a function should be preceeded by a comment
     explaining them. Also, wherever a critical design decision has
     been made, a comment should line out the whats and whys:
@@ -238,4 +238,4 @@ Commenting
 
         /**********************************************************/
 
-        
+

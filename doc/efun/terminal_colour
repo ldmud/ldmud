@@ -8,7 +8,7 @@ DESCRIPTION
         colour-defines of the form "%^KEY%^" (see below for details) from the
         input-string and replaces them by the apropriate values found
         for the color-key specified by <map>.
-        
+
         If <map> is a mapping, the entries queries have the
         format "KEY" : "value", non-string contents are ignored with one
         exception: if the mapping contains an entry 0:value, it is used
@@ -104,7 +104,7 @@ EXAMPLES
             "this is the first line\nand this is the second line"
 
         a string wrapped with indent 3 would look like:
-        
+
             "this is the first line\n   and this is the indented second one"
 
 HISTORY
@@ -115,6 +115,6 @@ HISTORY
         mappings.
         LDMud 3.2.9/3.3.102 officialized the "%%^^" replacement pattern for
         better MudOS compatibility.
-        
+
 SEE ALSO
         sprintf(E)

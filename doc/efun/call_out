@@ -7,7 +7,7 @@ DESCRIPTION
         closure cl. The call will take place in delay seconds, with the
         remaining argument list provided. delay can be a minimum time
         of one second.
-        
+
         call_out() saves and restores the current user. It is now
         possible to use say() or write() which rely on a current
         user to be something useful.
@@ -19,7 +19,7 @@ DESCRIPTION
         If <fun> does not define a publicly accessible function, the
         efun will call the H_DEFAULT_METHOD hook if set.
         Calls to the master object never use the H_DEFAULT_METHOD hook.
-        
+
         The execution of the call_out()s implies a simple (not
         exhaustive) measure against rabbits: the evaluation costs of
         those call_outs() executing at the same time are summed up on
@@ -30,7 +30,7 @@ DESCRIPTION
 
 EXAMPLE
         call_out("RefreshMe", 10);
-        
+
         This will call the function RefreshMe() in 10 seconds without
         any arguments. The function RefreshMe() can then call out
         itself again which will result in a loop (not in a recursion)

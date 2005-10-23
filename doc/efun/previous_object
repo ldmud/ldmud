@@ -30,7 +30,7 @@ EXAMPLE
               return;
            ...
         }
-        
+
         This example shows how we can check if the last call to a
         function of the current object is secure or if we should abort
         execution.

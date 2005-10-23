@@ -3,7 +3,7 @@
  * Written 1998, 2002 by Lars Duening.
  * Share and Enjoy!
  *------------------------------------------------------------------
- * This module serves as wrapper around optional alternative 
+ * This module serves as wrapper around optional alternative
  * regular expression implementations. It wraps the unique regexp
  * structures and calls into a unified API.
  *
@@ -431,7 +431,7 @@ rx_exec (regexp_t *prog, string_t * string, size_t start)
                   , prog->pSubs, prog->num_subs
                   );
     prog->res = rc;
-    
+
     /* Reverse the roles of return codes 0 (not enough entries in subs[])
      * and PCRE_ERROR_NOMATCH.
      */
@@ -475,7 +475,7 @@ rx_exec_str (regexp_t *prog, char * string, char * start)
                   , prog->pSubs, prog->num_subs
                   );
     prog->res = rc;
-    
+
     /* Reverse the roles of return codes 0 (not enough entries in subs[])
      * and PCRE_ERROR_NOMATCH.
      */
@@ -665,7 +665,7 @@ rx_sub (regexp_t *prog, string_t *source, string_t *subst)
         src = get_txt(subst);
         if (copyPass)
             dst = get_txt(result);
-        
+
         while (left-- > 0)
         {
             int no;
@@ -873,7 +873,7 @@ rxcache_dinfo_status (svalue_t *svp, int value)
 #define ST_NUMBER(which,code) \
     if (value == -1) svp[which].u.number = code; \
     else if (value == which) svp->u.number = code
-    
+
     ST_NUMBER(DID_ST_RX_CACHED, iNumXEntries);
     ST_NUMBER(DID_ST_RX_TABLE, RXCACHE_TABLE);
     ST_NUMBER(DID_ST_RX_TABLE_SIZE, iXSizeAlloc);

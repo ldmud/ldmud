@@ -29,7 +29,7 @@ DESCRIPTION
         The other parameters passed are the name <fun> of the called
         function, the arguments <args> passed to the call (if any),
         and a reference <result> to a variable for the call result.
-        
+
         If the hook can resolve the call, it has to return the call
         result in <result> and 1 as function result.
 

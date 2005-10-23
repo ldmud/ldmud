@@ -9,7 +9,7 @@ DESCRIPTION
         'issuing' the command).
 
         Each entry in the result array is itself an array of:
-          
+
           string [CMDM_VERB]:   The matched verb.
           string [CMDM_ARG]:    The argument string remaining, or 0 if none.
           object [CMDM_OBJECT]: The object defining the action.

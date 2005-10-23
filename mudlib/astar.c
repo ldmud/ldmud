@@ -3,21 +3,21 @@
 Date: Thu, 13 Dec 2001 00:34:12 -0700
 From: Acius <helpsfamily@attbi.com>
 
-A while back we were talking about eventually putting path-finding in 
-the driver, but I don't know if anyone came up with anything really 
-specific (I might add that I've been off the mailing list for a little 
-while now, thanks to @Home's problems). I wanted path-finding for my 
-MUD, and since it sounded like it might be a while until Lars has enough 
-time to play with it, I've implemented A-star in LP/C. The code is 
+A while back we were talking about eventually putting path-finding in
+the driver, but I don't know if anyone came up with anything really
+specific (I might add that I've been off the mailing list for a little
+while now, thanks to @Home's problems). I wanted path-finding for my
+MUD, and since it sounded like it might be a while until Lars has enough
+time to play with it, I've implemented A-star in LP/C. The code is
 attached to this message.
 
-I have a couple reasons for posting the code: Firstly, anyone who might 
-want to use it can try it, and if they post their modifications and 
-bugfixes, I get better code for free :-). Also, it serves as an 
-interface and behavior suggestion for future code to be put into the 
-driver. I wrote it with this idea in mind, and I have attempted to make 
-the code a very general way to do 2d path-finding. The code could be 
-placed in a simul_efun for now, and simply commented out or removed when 
+I have a couple reasons for posting the code: Firstly, anyone who might
+want to use it can try it, and if they post their modifications and
+bugfixes, I get better code for free :-). Also, it serves as an
+interface and behavior suggestion for future code to be put into the
+driver. I wrote it with this idea in mind, and I have attempted to make
+the code a very general way to do 2d path-finding. The code could be
+placed in a simul_efun for now, and simply commented out or removed when
 and if driver path-finding code comes on line.
 
 The parameters are:
@@ -25,10 +25,10 @@ The parameters are:
 * A string, giving the map on which you're doing the search
 * The x, y of the starting location
 * The x, y of the goal location
-* A mapping of ([ character: cost ]) for all of the characters used in 
-the map string. All characters not included in the mapping are assumed 
-to be walls. A cost of 0 might not get the best path if you use it, 
-since Manhattan distance is used to guide the search and it will 
+* A mapping of ([ character: cost ]) for all of the characters used in
+the map string. All characters not included in the mapping are assumed
+to be walls. A cost of 0 might not get the best path if you use it,
+since Manhattan distance is used to guide the search and it will
 overestimate (go read a good article on A-star).
 
 Here's a quick example of how to use it:
@@ -37,11 +37,11 @@ Here's a quick example of how to use it:
 .#...
 ...
 
-I want to get from the upper left corner (0, 0) to the upper right 
-corner (4, 0), and I need to know the path to get there. The #'s are 
-walls, and may not be crossed. The '*' may be crossed, but it is a 
-"poisonous" tile and should not be crossed if there is an alternative. 
-Note that the grid doesn't have to be square; the function will append 
+I want to get from the upper left corner (0, 0) to the upper right
+corner (4, 0), and I need to know the path to get there. The #'s are
+walls, and may not be crossed. The '*' may be crossed, but it is a
+"poisonous" tile and should not be crossed if there is an alternative.
+Note that the grid doesn't have to be square; the function will append
 each line with "\27"'s to make it square.
 
 Here's how to make a function call to get this path:
@@ -54,14 +54,14 @@ if( path )
 else
     write("No path could be found.\n");
 
-On my MUD, the call to find_path returns the string "sseeneen". If you 
-lower the cost of '*' to 5 (just change the 100 to a 5), then it returns 
+On my MUD, the call to find_path returns the string "sseeneen". If you
+lower the cost of '*' to 5 (just change the 100 to a 5), then it returns
 the string "eeseen".
 
-If there are any other questions, please email me; this message is 
-getting long enough already. I particularly want to hear from you if you 
-get it working (or can't!) and if you find bugs or ways to make it more 
-efficient (it is not very efficient). I tried not to put in anything 
+If there are any other questions, please email me; this message is
+getting long enough already. I particularly want to hear from you if you
+get it working (or can't!) and if you find bugs or ways to make it more
+efficient (it is not very efficient). I tried not to put in anything
 MUDlib-specific, but sometimes I forget.
 
 -- Acius

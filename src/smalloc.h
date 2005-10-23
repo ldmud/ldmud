@@ -4,7 +4,7 @@
 #include "driver.h"
 #include "typedefs.h"
 
-#include "svalue.h" 
+#include "svalue.h"
 
 #ifndef MALLOC_smalloc /* sigh */
 

@@ -5,7 +5,7 @@ SYNOPSIS
 DESCRIPTION
         Remove next pending call-out for function fun in this object.
         The time left is returned.
-        
+
         -1 is returned if there were no call-outs pending to this
         function.
 

@@ -6,9 +6,9 @@ DESCRIPTION
         Crypt the string <str> the first two characters
         from the string <seed> as a seed. If <seed> is an integer, then
         a random seed is used.
-        
+
         The result has the first two characters as the seed.
-        
+
         The efun uses the MD5 algorithm for encryption, and the result
         is compatible with the Apache password encryption.
 

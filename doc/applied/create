@@ -18,12 +18,12 @@ EXAMPLE
         void create() {
            cloner=this_player();
         }
-        
+
         Initialize the global variable to hold the one who
         created/cloned the object.
 
         For 3.2.1, the mudlib may be programmed to call other lfuns
         than create() on an objects creation.
-        
+
 SEE ALSO
         reset(A), init(A), __INIT(A), initialisation(LPC), hooks(C), native(C)

@@ -112,7 +112,7 @@ svalue_size (svalue_t *v, mp_int * pTotal)
         locals.composite = 0;
         locals.num_values = v->u.map->num_values;
         walk_mapping(v->u.map, svalue_size_map_filter, &locals);
-    
+
         *pTotal = locals.total + overhead;
         return (overhead + locals.composite) / v->u.map->ref;
     }

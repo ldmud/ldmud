@@ -21,7 +21,7 @@
 // (siehe /secure/master/compiler_control::privilege_violation())
 //
 
-/* 
+/*
  * Nur der Shutdown-Daemon darf die efun shutdown verwenden!
  */
 

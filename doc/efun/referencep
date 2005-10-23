@@ -5,7 +5,7 @@ DESCRIPTION
         returns true if arg was passed by reference to the current
         function, instead of the usual call-by-value.
 
-        Note that arg has to be passed by reference to the efun, 
+        Note that arg has to be passed by reference to the efun,
         a.g. referencep(&x).
 
 SEE ALSO

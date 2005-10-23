@@ -478,7 +478,7 @@ hbeat_dinfo_status (svalue_t *svp, int value)
 #define ST_NUMBER(which,code) \
     if (value == -1) svp[which].u.number = code; \
     else if (value == which) svp->u.number = code
-    
+
 #define ST_DOUBLE(which,code) \
     if (value == -1) { \
         svp[which].type = T_FLOAT; \
@@ -487,9 +487,9 @@ hbeat_dinfo_status (svalue_t *svp, int value)
         svp->type = T_FLOAT; \
         STORE_DOUBLE(svp, code); \
     }
-    
+
     STORE_DOUBLE_USED;
-    
+
     ST_NUMBER(DID_ST_HBEAT_OBJS, num_hb_objs);
     ST_NUMBER(DID_ST_HBEAT_CALLS, num_hb_calls);
     ST_NUMBER(DID_ST_HBEAT_CALLS_TOTAL, total_hb_calls);

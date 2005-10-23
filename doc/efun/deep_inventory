@@ -6,7 +6,7 @@ DESCRIPTION
         Returns an array of the objects contained in the inventory of
         ob (or this_object() if no arg given) and in the inventories
         of these objects, climbing down recursively.
-        
+
         ob
            ob1
            ob2

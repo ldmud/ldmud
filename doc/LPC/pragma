@@ -48,7 +48,7 @@ DESCRIPTION
         pedantic: Certain warnings are treated as errors:
                 - failure to pass enough arguments to simul efuns
         sloppy: Turns off pedantic (the default).
-        
+
         When an object is compiled with type testing (#pragma
         strict_types), all types are saved of the arguments for that
         function during compilation.  If the #pragma save_types is

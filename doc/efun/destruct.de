@@ -32,7 +32,7 @@ BEISPIEL
         if(ob)        // es existiert noch, vielleicht ist die Lfun
                       // remove() nicht definiert?
             destruct(ob);
-        
+
         Dies ist die Standard-Methode, ein Objekt zu zerstoeren, ihm aber
         vorher noch die Chance zu geben, es selber zu tun.
 

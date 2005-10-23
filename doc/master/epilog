@@ -12,5 +12,5 @@ DESCRIPTION
         ``no object to preload''. The resulting strings will be passed
         one at a time as arguments to preload().
 
-SEE ALSO        
+SEE ALSO
         preload(M), master(M)

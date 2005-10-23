@@ -48,7 +48,7 @@ DESCRIPTION
         gamedriver.
 
                 client                        server
-            IAC WILL TTYPE                
+            IAC WILL TTYPE
                                     IAC DO TTYPE
 
         Or:

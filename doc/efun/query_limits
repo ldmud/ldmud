@@ -9,7 +9,7 @@ DESCRIPTION
         Return an array with the current runtime limits, resp. if <defaults>
         is true, the default runtime limits. The entries in the returned
         array are:
- 
+
           int[LIMIT_EVAL]:    the max number of eval costs
           int[LIMIT_ARRAY]:   the max number of array entries
           int[LIMIT_MAPPING]: the max number of mapping entries
@@ -18,7 +18,7 @@ DESCRIPTION
           int[LIMIT_FILE]:    the max number of bytes handled with
                                 one read_file()/write_file() call.
           int[LIMIT_CALLOUTS]: the number of callouts at one time.
-       
+
         A limit of '0' aka LIMIT_UNLIMITED means 'no limit'.
 
 EXAMPLES

@@ -145,7 +145,7 @@ void main(int Number_Of_Runs) {
     Int_1_Loc = Int_2_Loc / Int_3_Loc;
     Int_2_Loc = 7 * (Int_2_Loc - Int_3_Loc) - Int_1_Loc;
     Int_1_Loc = Proc_2(Int_1_Loc);
-  }  
+  }
   End_Time = times();
   write("Execution ends.\n");
   write("Final values of the variables used in the benchmark:\n\n");
@@ -233,7 +233,7 @@ void Proc_1(mixed * Ptr_Val_Par) {
     Next_Record[M_ENUM_COMP] = Proc_6(Ptr_Val_Par[M_ENUM_COMP]);
     Next_Record[M_PTR_COMP] = Ptr_Glob[M_PTR_COMP];
     Next_Record[M_INT_COMP] = Proc_7(  Next_Record[M_INT_COMP], 10);
-  } else  
+  } else
     Ptr_Val_Par = copy_record(Ptr_Val_Par[M_PTR_COMP]);
 }
 
@@ -241,13 +241,13 @@ int Proc_2(int Int_Par) {
   int Int_Loc, Enum_Loc;
 
   Int_Loc = Int_Par + 10;
-  do  
+  do
     if (Ch_1_Glob == 'A') {
       Int_Loc -= 1;
       Int_Par = Int_Loc - Int_Glob;
       Enum_Loc = Ident_1;
     }
-  while (Enum_Loc != Ident_1);  
+  while (Enum_Loc != Ident_1);
   return Int_Par;
 }
 
@@ -256,7 +256,7 @@ mixed * Proc_3(mixed * Ptr_Ref_Par) {
     Ptr_Ref_Par = Ptr_Glob[M_PTR_COMP];
   Ptr_Glob[M_INT_COMP] = Proc_7(10, Int_Glob);
   return Ptr_Ref_Par;
-}  
+}
 
 void Proc_4() {
   int Bool_Loc;

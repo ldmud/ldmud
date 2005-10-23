@@ -535,7 +535,7 @@ struct inherit_s
  * array.
  *
  * Structures are internally identified by an ID number, counting from
- * 1 upwards (not from 0!). 
+ * 1 upwards (not from 0!).
  */
 
 struct struct_def_s

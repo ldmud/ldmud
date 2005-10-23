@@ -29,7 +29,7 @@
  *      int32  heart_beats;
  *      mp_int size_array;
  *      mp_int mapping_total;
- *      svalue_t extra;    
+ *      svalue_t extra;
  *      int32  last_call_out;
  *      int32  call_out_cost;
  *      string_t *file_name;
@@ -92,7 +92,7 @@
 
 #include "wiz_list.h"
 #include "../mudlib/sys/wizlist.h"
- 
+
 #include "array.h"
 #include "backend.h"
 #include "gcollect.h"
@@ -149,7 +149,7 @@ name_wizlist_file (const char *name)
 
 /* Set the swap file name to a copy of <name>.
  */
- 
+
 {
     /* Skip leading '/' */
     while (*name == '/') name++;
@@ -243,7 +243,7 @@ add_name (string_t * str)
         ; prev = this, this = this->next
         )
     { NOOP; }
-    
+
     if (!prev)
     {
         wl->next = all_wiz;
@@ -254,7 +254,7 @@ add_name (string_t * str)
         wl->next = this;
         prev->next = wl;
     }
-    
+
     return wl;
 } /* add_name() */
 
@@ -413,7 +413,7 @@ save_error (const char *msg, const char *file, int line)
     /* Set the file_name */
     if (wl->file_name)
         free_mstring(wl->file_name);
-        
+
     len = strlen(file);
     copy = alloca(len + 4); /* May add .c plus the null byte, and / */
     *copy = '/';
@@ -518,10 +518,10 @@ f_set_extra_wizinfo (svalue_t *sp)
  *   void set_extra_wizinfo (object wiz, mixed extra)
  *   void set_extra_wizinfo (string wiz, mixed extra)
  *   void set_extra_wizinfo (int    wiz, mixed extra)
- * 
+ *
  * Set the value <extra> as the 'extra' information for the wizlist
  * entry of <wiz>.
- * 
+ *
  * If <wiz> is an object, the entry of its creator (uid) is used.
  * If <wiz> is a string (a creator aka uid), it names the entry
  * to use.
@@ -583,7 +583,7 @@ f_get_extra_wizinfo (svalue_t *sp)
  * The function causes a privilege violation
  * ("get_extra_wizinfo", this_object(), <wiz>).
  */
- 
+
 {
     wiz_list_t *user;
     short type;
@@ -659,7 +659,7 @@ f_get_error_file (svalue_t *sp)
  *
  * If there is no error stored for the given <name>, 0 is
  * returned.
- * 
+ *
  * If <set_forget_flag> is non-zero, the 'forget' flag is set
  * for the error message after it has been returned.
  */
@@ -700,7 +700,7 @@ f_get_error_file (svalue_t *sp)
     put_array(sp, vec);
     return sp;
 
-#   undef FORGET_FLAG 
+#   undef FORGET_FLAG
 } /* f_get_error_file() */
 
 /*=========================================================================*/

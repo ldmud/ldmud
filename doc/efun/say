@@ -9,7 +9,7 @@ SYNOPSIS
 
 DESCRIPTION
         There are two major modes of calling:
-        
+
         If the first argument is a string <str>, it will be send to
         all livings in the current room        except to the initiator.
 
@@ -39,7 +39,7 @@ EXAMPLES
         say("Hi!\n");
         say("Hi!\n", this_player());
         Both calls are equal when called by a not living object.
-        
+
         Object 1 (living):
            void catch_tell(string str) {
               write("Received: "+str+"\n");
@@ -50,12 +50,12 @@ EXAMPLES
               say("HiHo!\n");
               ...
            }
-        
+
         This examples shows how say() together with catch_tell()
         works. The 2nd object must not be living so the write() will
         go to the current user.
-        
-        
+
+
         Object 1 (living):
            void catch_msg(mixed *arr, object who) {
               int i;
@@ -69,7 +69,7 @@ EXAMPLES
               say( ({ "Hello", "there!" }) );
               ...
            }
-        
+
         This is a bit complex example to demonstrate how say() and
         catch_msg() works. Here we also use a non living object to
         send the message so the who in catch_msg() will be the current

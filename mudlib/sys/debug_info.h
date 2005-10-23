@@ -54,7 +54,7 @@
 #define DID_ST_HBEAT_SLOTS        19
 #define DID_ST_HBEAT_SIZE         20
 #define DID_ST_HBEAT_PROCESSED    21
-#define DID_ST_HBEAT_AVG_PROC     22 
+#define DID_ST_HBEAT_AVG_PROC     22
 
 #define DID_ST_CALLOUTS           23
 #define DID_ST_CALLOUT_SLOTS      24
@@ -136,7 +136,7 @@
 #define DID_SW_RECYCLE_FREE    15
 
 #define DID_SWAP_MAX           16
-    
+
 
 /* Indices into the array resulting from debug_info(DINFO_DATA, DID_MEMORY)
  */
@@ -160,7 +160,7 @@
 #define DID_MEM_SWASTED_SIZE   16
 #define DID_MEM_UNUSED         17
 #define DID_MEM_MINC_CALLS     18
-#define DID_MEM_MINC_SUCCESS   19 
+#define DID_MEM_MINC_SUCCESS   19
 #define DID_MEM_MINC_SIZE      20
 #define DID_MEM_PERM           21
 #define DID_MEM_PERM_SIZE      22
@@ -170,7 +170,7 @@
 #define DID_MEM_ALLOCATED      26
 #define DID_MEM_USED           27
 #define DID_MEM_TOTAL_UNUSED   28
- 
+
 #define DID_MEMORY_MAX         29
 
 

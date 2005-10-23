@@ -6,7 +6,7 @@ DESCRIPTION
         Execute str as a command given directly by the user. Any
         effects of the command will apply to the current object,
         or to the given <ob>ject.
-        
+
         Return value is 0 for failure. Otherwise a numeric value is
         returned which tells the evaluation cost. Bigger number means
         higher cost.  The evaluation cost is approximately the number

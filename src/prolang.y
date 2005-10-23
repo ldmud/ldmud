@@ -155,7 +155,7 @@ int num_virtual_variables;
    * are offset by this value, in effect collecting the virtual
    * variables at the start of the variable indices.
    */
-   
+
 program_t *compiled_prog;
   /* After yyparse(), the finished program.
    */
@@ -221,7 +221,7 @@ short hook_type_map[NUM_DRIVER_HOOKS] =
  * a list of these structures is used to collect the information about
  * the array content.
  */
- 
+
 struct const_list_s
 {
     const_list_t *next;
@@ -240,7 +240,7 @@ struct const_list_s
  * The .head svalue_t is a T_ERROR_HANDLER pointing to a deallocation
  * function for the list.
  */
- 
+
 struct const_list_svalue_s
 {
     svalue_t     head;  /* the error handler */
@@ -256,7 +256,7 @@ struct const_list_svalue_s
  * When createing struct literals at runtime, a list of these structures
  * keeps the information about the order and type of members encountered.
  */
- 
+
 struct struct_init_s
 {
     struct_init_t * next;  /* Next member entry */
@@ -269,7 +269,7 @@ struct struct_init_s
  *
  * This structure is used when global identifiers shadow efun names.
  */
- 
+
 struct efun_shadow_s
 {
     efun_shadow_t *next;    /* Linkpointer for the list of shadows */
@@ -731,7 +731,7 @@ static p_int comp_stack[COMPILER_STACK_SIZE];
   /* A stack of addresses (offsets) in the generated program code for
    * later backpatching.
    */
-   
+
 static size_t comp_stackp;
   /* Index of the next unused entry in <comp_stack>.
    */
@@ -790,7 +790,7 @@ static vartype_t *type_of_locals;
    * the local variables.
    * Points to a location in mem_block A_LOCAL_TYPES;
    */
-   
+
 static fulltype_t * full_type_of_locals;
   /* The full types of the local variables.
    * Points to a location in mem_block A_FULL_LOCAL_TYPES;
@@ -802,7 +802,7 @@ static vartype_t * type_of_context;
    * the context variables.
    * Points to a location in mem_block A_LOCAL_TYPES;
    */
-   
+
 static fulltype_t * full_type_of_context;
   /* The full types of the context variables.
    * Points to a location in mem_block A_FULL_LOCAL_TYPES;
@@ -949,7 +949,7 @@ static int current_break_stack_need = 0;
   /* Current depth of the required switch/break stack at this point
    * in a function.
    */
-   
+
 static int max_break_stack_need = 0;
   /* Total depth of the required switch/break stack for this function.
    * This information is required when computing the 'num_locals'
@@ -975,7 +975,7 @@ static p_uint last_include_start;
    */
 
 static int argument_level;
-  /* Nesting level of function call arguments. 
+  /* Nesting level of function call arguments.
    * Used to detect nested function calls, like foo( bar () ).
    */
 
@@ -1228,7 +1228,7 @@ realloc_mem_block (mem_block_t *mbp, mp_int size)
     do {
         max_size *= 2;
     } while (size > max_size);
-    
+
     p = rexalloc(mbp->block, max_size);
     if (!p)
     {
@@ -1417,7 +1417,7 @@ get_type_name (fulltype_t type)
         reference = MY_TRUE;
         type &= ~TYPE_MOD_REFERENCE;
     }
-    
+
     if (type >= sizeof type_name / sizeof type_name[0])
         fatal("Bad type %ld: %s line %d\n"
              , (long)type,  current_file, current_line);
@@ -1529,7 +1529,7 @@ compatible_types (fulltype_t t1, fulltype_t t2, Bool is_assign)
     if (is_assign && (t1 & PRIMARY_TYPE_MASK) == T_STRUCT)
     {
         int id1, id2;
-        
+
         /* Check if t1 is a base-struct of t2 */
         id1 = GET_SEC_TYPE_INFO(t1);
         id2 = GET_SEC_TYPE_INFO(t2);
@@ -1828,7 +1828,7 @@ push_address (void)
 
 /* Push the current program size as address onto the compiler stack.
  */
- 
+
 {
     if (comp_stackp >= COMPILER_STACK_SIZE)
     {
@@ -1932,7 +1932,7 @@ fix_branch (int ltoken, p_int dest, p_int loc)
             }
             current_continue_address++;
         }
-        
+
         ins_byte(0); /* Just to make sure the memory is there */
 
         /* Move the code */
@@ -2007,7 +2007,7 @@ yymove_switch_instructions (int len, p_int blocklen)
             }
             current_continue_address += len;
         }
-        
+
         move_memory(
           mem_block[A_PROGRAM].block + switch_pc + len,
           mem_block[A_PROGRAM].block + switch_pc,
@@ -2049,7 +2049,7 @@ free_all_local_names (void)
 
 {
     ident_t *p,*q;
-    
+
     for (q = all_locals; NULL != (p = q);)
     {
         q = p->next_all;
@@ -2174,7 +2174,7 @@ if (current_inline && current_inline->block_depth+2 == block_depth && ident->typ
             max_number_of_locals = current_number_of_locals;
         block_scope[depth-1].num_locals++;
     }
-    
+
     return ident;
 } /* add_local_name() */
 
@@ -2235,7 +2235,7 @@ add_context_name (ident_t *ident, fulltype_t type, int num)
 {
     int depth;
     block_scope_t * block;
-    
+
     depth = current_inline->block_depth+1;
     block = & block_scope[depth-1];
 
@@ -2290,7 +2290,7 @@ printf("DEBUG: add_context_name('%s', num %d) depth %d, context %d\n", get_txt(i
 
         block->num_locals++;
     }
-    
+
     return ident;
 } /* add_context_name() */
 
@@ -2454,7 +2454,7 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
     unsigned short argument_start_index;
 
     flags |= type & ~TYPE_MOD_MASK; /* Move the visibility-info into flags */
-    
+
     do {
         function_t *funp;
         Bool args_differ, compare_args;
@@ -2481,7 +2481,7 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
 
         args_differ = MY_FALSE;
         compare_args = MY_FALSE;
-        
+
         /* The following checks are useful only when done before
          * a functionbody appears, otherwise the warning/error message
          * line numbers will be misleading.
@@ -2489,7 +2489,7 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
         if (!complete)
         {
             if ((funp->flags & TYPE_MOD_NO_MASK)
-             && !(funp->flags & (NAME_PROTOTYPE|NAME_UNDEFINED)) 
+             && !(funp->flags & (NAME_PROTOTYPE|NAME_UNDEFINED))
              && ((flags & (NAME_PROTOTYPE|NAME_UNDEFINED)) == (NAME_PROTOTYPE|NAME_UNDEFINED))
                )
                 yyerrorf("Illegal to redefine 'nomask' function \"%s\""
@@ -2637,7 +2637,7 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
             } /* if (exact_types && already defined) */
 
          } /* if (!complete) */
-        
+
         /* Remember the heart_beat() function */
         if (mstreq(p->name, STR_HEART_BEAT))
             heart_beat = num;
@@ -2675,7 +2675,7 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
             }
 
         }
-        
+
         funp->num_local = num_local;
         funp->flags = flags;
         funp->offset.pc = offset;
@@ -2687,7 +2687,7 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
     } while(0); /* Test and handle for already defined functions */
 
     /* It's a new function! */
-    
+
     if (mstreq(p->name, STR_HEART_BEAT))
         heart_beat = FUNCTION_COUNT;
 
@@ -2706,7 +2706,7 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
         /* This is the first _GLOBAL use of this identifier:
          * make an appropriate entry in the identifier table.
          */
-        
+
         if (p->type != I_TYPE_UNKNOWN)
         {
             /* The ident has been used before otherwise, so
@@ -2783,7 +2783,7 @@ define_variable (ident_t *name, fulltype_t flags, svalue_t *svp)
         /* This is the first _GLOBAL use of this identifier:
          * make an appropriate entry in the identifier table.
          */
-        
+
         if (name->type != I_TYPE_UNKNOWN)
         {
             /* The ident has been used before otherwise, so
@@ -2926,7 +2926,7 @@ redeclare_variable (ident_t *name, fulltype_t flags, int n)
 #ifdef USE_STRUCTS
         name->u.global.struct_id = I_GLOBAL_STRUCT_NONE;
 #endif /* USE_STRUCTS */
-        
+
         name->next_all = all_globals;
         all_globals = name;
     }
@@ -2939,7 +2939,7 @@ redeclare_variable (ident_t *name, fulltype_t flags, int n)
 
         q = xalloc(sizeof(efun_shadow_t));
         q->shadow = name;
-        
+
         q->next = all_efun_shadows;
         all_efun_shadows = q;
     }
@@ -2950,7 +2950,7 @@ redeclare_variable (ident_t *name, fulltype_t flags, int n)
     /* The variable is hidden, do nothing else */
     if (flags & NAME_HIDDEN)
         return;
-        
+
     if (name->u.global.variable >= 0 && name->u.global.variable != n)
     {
         if (VARIABLE(name->u.global.variable)->flags & TYPE_MOD_NO_MASK )
@@ -2964,7 +2964,7 @@ redeclare_variable (ident_t *name, fulltype_t flags, int n)
         yyerrorf("Illegal to redefine 'nomask' variable \"%s\""
                 , get_txt(name->name));
     }
-    
+
     if (flags & TYPE_MOD_NOSAVE)
     {
         /* 'nosave' is internally saved as 'static' (historical reason) */
@@ -2993,7 +2993,7 @@ verify_declared (ident_t *p)
         yyerrorf("Variable %s not declared !", get_txt(p->name));
         return -1;
     }
-    
+
     return r;
 } /* verify_declared() */
 
@@ -3163,7 +3163,7 @@ def_function_prototype (int num_args
     }
 
     /* We got the complete prototype: define it */
-    
+
     if ( current_number_of_locals
      && (full_type_of_locals[current_number_of_locals-1]
          & TYPE_MOD_VARARGS)
@@ -3335,7 +3335,7 @@ define_new_struct ( Bool proto, ident_t *p, funflag_t flags)
 {
     int          num;
     struct_def_t sdef;
-    
+
     /* If this is a redeclaration, check for consistency. */
     if (p->type == I_TYPE_GLOBAL && (num = p->u.global.struct_id) > 0
      && !(flags & NAME_HIDDEN)
@@ -3389,7 +3389,7 @@ define_new_struct ( Bool proto, ident_t *p, funflag_t flags)
          * Update the stored information and return its index.
          */
         pdef->flags = flags & ~NAME_PROTOTYPE;
-        
+
         return num;
     }
 
@@ -3412,7 +3412,7 @@ define_new_struct ( Bool proto, ident_t *p, funflag_t flags)
         /* This is the first _GLOBAL use of this identifier:
          * make an appropriate entry in the identifier table.
          */
-        
+
         if (p->type != I_TYPE_UNKNOWN)
         {
             /* The ident has been used before otherwise, so
@@ -3784,7 +3784,7 @@ printf("DEBUG: new inline #%d: prev %d\n", INLINE_CLOSURE_COUNT, ict.prev);
     ict.num_args = 0;
     ict.parse_context = MY_FALSE;
     ict.current_line  = current_line;
-    
+
 #ifdef DEBUG_INLINES
 printf("DEBUG:   start: %ld, depth %d, locals: %d/%d, break: %d/%d\n", CURRENT_PROGRAM_SIZE, block_depth, current_number_of_locals, max_number_of_locals, current_break_stack_need, max_break_stack_need);
 #endif /* DEBUG_INLINES */
@@ -3821,7 +3821,7 @@ printf("DEBUG:   local types: %d/%d, context types: %d/%d\n", ict.local_type_sta
 printf("DEBUG:   type ptrs: %p/%p, %p/%p\n", type_of_locals, full_type_of_locals, type_of_context, full_type_of_context );
 #endif /* DEBUG_INLINES */
     }
-    
+
     max_break_stack_need = current_break_stack_need = 0;
     max_number_of_locals = current_number_of_locals = 0;
 
@@ -3976,7 +3976,7 @@ printf("DEBUG:   #%d: start %ld, length %ld, function %d: new start %ld\n", ix, 
 #ifdef DEBUG_INLINES
 printf("DEBUG:        li_start %ld, li_length %ld, new li_start %ld\n", ict->li_start, ict->li_length, LINENUMBER_SIZE);
 #endif /* DEBUG_INLINES */
-       
+
             add_to_mem_block(A_LINENUMBERS, INLINE_PROGRAM_BLOCK(ict->li_start)
                             , ict->li_length);
         }
@@ -4299,7 +4299,7 @@ store_prog_string (string_t *str)
     }
 
     /* Add a totally new string */
-    
+
     str_size = mem_block[A_STRINGS].current_size;
     next_size = mem_block[A_STRING_NEXT].current_size;
 
@@ -4328,7 +4328,7 @@ store_prog_string (string_t *str)
 
     /* Store the string index as new prog_string_index[] */
     *indexp = str_size / sizeof str;
-    
+
     last_string_is_new = MY_TRUE;
     return *indexp;
 } /* store_prog_string() */
@@ -4449,7 +4449,7 @@ copy_svalue (svalue_t *svp)
     default:
         return &const0;
     }
-    
+
     return svp;
 } /* copy_svalue() */
 
@@ -4738,14 +4738,14 @@ free_const_list_svalue (svalue_t *svp)
 %token L_INC
 %token L_INHERIT
 %token L_INLINE_FUN
-%token L_INT   
+%token L_INT
 %token L_LAND
 %token L_LE
 %token L_LOCAL
 %token L_LOR
 %token L_LSH
-%token L_MAPPING     
-%token L_MIXED       
+%token L_MAPPING
+%token L_MIXED
 %token L_NE
 %token L_NO_MASK
 %token L_NOSAVE
@@ -4773,10 +4773,10 @@ free_const_list_svalue (svalue_t *svp)
 %endif
 %token L_SWITCH
 %token L_SYMBOL
-%token L_SYMBOL_DECL 
+%token L_SYMBOL_DECL
 %token L_VARARGS
 %token L_VIRTUAL
-%token L_VOID        
+%token L_VOID
 %token L_WHILE
 
 /* Textbook solution to the 'dangling else' shift/reduce conflict.
@@ -4797,7 +4797,7 @@ free_const_list_svalue (svalue_t *svp)
 
     double float_number;
       /* Literal floats */
-      
+
     struct {
         p_int number;
     } closure;
@@ -4828,7 +4828,7 @@ free_const_list_svalue (svalue_t *svp)
       /* Inheritance: [0]: code inheritance qualifiers
        *              [1]: variable inheritance qualifiers
        */
-       
+
     svalue_t *initialized;
       /* Position where to store the variable initializer.
        */
@@ -5150,9 +5150,9 @@ def:  type optional_star L_IDENTIFIER  /* Function definition or prototype */
           def_function_typecheck($1|$2, $3);
 #endif /* USE_NEW_INLINES */
       }
-      
+
       '(' argument ')'
-      
+
       {
 #ifdef USE_NEW_INLINES
           def_function_prototype($6, MY_FALSE);
@@ -5193,7 +5193,7 @@ def:  type optional_star L_IDENTIFIER  /* Function definition or prototype */
 %ifdef USE_STRUCTS
     | struct_decl
 %endif /* USE_STRUCTS */
-    | inheritance 
+    | inheritance
     | default_visibility
 ; /* def */
 
@@ -5241,7 +5241,7 @@ printf("DEBUG: After inline_opt_type: program size %ld\n", CURRENT_PROGRAM_SIZE)
           if (!prepare_inline_closure($2))
               YYACCEPT;
       }
-      
+
       inline_opt_args
 
       {
@@ -5304,7 +5304,7 @@ printf("DEBUG: After L_BEGIN_INLINE: program size %ld\n", CURRENT_PROGRAM_SIZE);
 printf("DEBUG: Before comma_expr: program size %ld\n", CURRENT_PROGRAM_SIZE);
 #endif /* DEBUG_INLINES */
       }
-      
+
       statements inline_comma_expr
 
       L_END_INLINE
@@ -5401,7 +5401,7 @@ inline_comma_expr:
 
 struct_decl:
       type_modifier_list L_STRUCT L_IDENTIFIER ';'
-      { 
+      {
           int num;
           char name[256+MAXPATHLEN];
 
@@ -5414,7 +5414,7 @@ struct_decl:
           STRUCT_DEF(current_struct-1).unique_name = new_tabled(name);
       }
     | type_modifier_list L_STRUCT L_IDENTIFIER
-      { 
+      {
           char name[256+MAXPATHLEN];
 
           current_struct = define_new_struct(MY_FALSE, $3, $1);
@@ -5426,7 +5426,7 @@ struct_decl:
           STRUCT_DEF(current_struct-1).unique_name = new_tabled(name);
       }
       opt_base_struct '{' opt_member_list '}' ';'
-      { 
+      {
           /* All the work is done by the nonterminals above. */
       }
 ; /* struct_decl */
@@ -5434,7 +5434,7 @@ struct_decl:
 opt_base_struct:
       /* empty */ { }
     | '(' L_IDENTIFIER ')'
-      { 
+      {
           /* Look up the struct id for the given identifier */
 
           int num = -1;
@@ -5604,9 +5604,9 @@ inheritance:
                   /* We got a result - either a new name or a "reject it"
                    * value.
                    */
-                   
+
                   char * cp;
-            
+
                   if (res->type != T_STRING)
                   {
                       yyerrorf("Illegal to inherit file '%s'."
@@ -5615,7 +5615,7 @@ inheritance:
                   }
 
                   for (cp = get_txt(res->u.str); *cp == '/'; cp++) NOOP;
-            
+
                   if (!legal_path(cp))
                   {
                       yyerrorf("Illegal path '%s'.", get_txt(res->u.str));
@@ -5752,11 +5752,11 @@ inheritance:
               initializer = copy_functions(ob->prog, $1[0]);
               copy_variables(ob->prog, $1[1]);
 #endif
-          
+
               if (initializer > -1)
               {
                   /* We inherited a __INIT() function: create a call */
-              
+
                   transfer_init_control();
                   ins_f_code(F_SAVE_ARG_FRAME);
                   ins_f_code(F_CALL_INHERITED);
@@ -5916,7 +5916,7 @@ inheritance_qualifier:
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 /* Default visibility.
- * 
+ *
  * We use the inheritance modifier notation to specify the default
  * visibility of functions and variables.
  */
@@ -5986,7 +5986,7 @@ type_modifier:
     | L_PRIVATE    { $$ = TYPE_MOD_PRIVATE; }
     | L_PUBLIC     { $$ = TYPE_MOD_PUBLIC; }
     | L_VARARGS    { $$ = TYPE_MOD_VARARGS; }
-    | L_PROTECTED  { $$ = TYPE_MOD_PROTECTED; } 
+    | L_PROTECTED  { $$ = TYPE_MOD_PROTECTED; }
     | L_NOSAVE     { $$ = TYPE_MOD_NOSAVE; }
 ;
 
@@ -6073,7 +6073,7 @@ identifier:
           $$ = ref_mstring($1->name);
       }
 ;
- 
+
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 
@@ -6285,7 +6285,7 @@ new_name:
            * to the currently_initialized buffer set above, so
            * we just have to check the validity.
            */
-           
+
           fulltype_t actual_type = current_type;
 
           if (!(actual_type & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
@@ -6345,7 +6345,7 @@ block:
 
 statements:
       /* empty */
-    | statements basic_type local_name_list ';' 
+    | statements basic_type local_name_list ';'
     | statements statement
 ;
 
@@ -6474,7 +6474,7 @@ printf("DEBUG:   context name '%s'\n", get_txt($2->name));
                   ins_byte(scope->first_local);
                   ins_byte(0);
               }
-              
+
               $$.u.simple[0] = F_PUSH_LOCAL_VARIABLE_LVALUE;
               $$.u.simple[1] = q->u.local.num;
           }
@@ -6491,14 +6491,14 @@ printf("DEBUG:   context name '%s'\n", get_txt($2->name));
               ins_byte(scope->first_local);
               ins_byte(0);
           }
-          
+
           $$.u.simple[0] = F_PUSH_LOCAL_VARIABLE_LVALUE;
           $$.u.simple[1] = q->u.local.num;
 #endif /* USE_NEW_INLINES */
           $$.length = 0;
           $$.type = current_type | $1;
       }
-      
+
     | optional_star L_LOCAL
       {
           /* A local name is redeclared. If this happens on a deeper
@@ -6584,10 +6584,10 @@ statement:
     | L_BREAK ';'
       {
           /* Compile the break statement */
-          
+
           if (current_break_address == 0)
               yyerror("break statement outside loop");
-              
+
           if (current_break_address & BREAK_ON_STACK)
           {
               /* We break from a switch() */
@@ -6597,7 +6597,7 @@ statement:
           else
           {
               /* A normal loop break: add the LBRANCH to the list */
-              
+
               ins_f_code(F_LBRANCH);
               ins_short(current_break_address);
               current_break_address = CURRENT_PROGRAM_SIZE - 2;
@@ -6715,7 +6715,7 @@ return:
 while:
       {
           /* Save the previous environment */
-         
+
           $<numbers>$[0] = current_continue_address;
           $<numbers>$[1] = current_break_address;
 
@@ -6779,7 +6779,7 @@ while:
           /* The body compiled ok. Now patch up the breaks and continues
            * and insert the condition checking.
            */
-           
+
           p_int offset;
           p_int next_addr;
           p_int addr = pop_address();
@@ -6809,7 +6809,7 @@ while:
           if (offset < -0xff)
           {
               /* We need a LBRANCH instead of the BBRANCH */
-              
+
               bytecode_p codep;
 
               if (offset < -0x8000)
@@ -6862,7 +6862,7 @@ do:
           /* Save the previous environment */
           $<numbers>$[0] = current_continue_address;
           $<numbers>$[1] = current_break_address;
-          
+
           current_break_address = BREAK_DELIMITER;
           current_continue_address = CONTINUE_DELIMITER;
 
@@ -6875,7 +6875,7 @@ do:
           /* The body is complete - we can already patch up
            * the continue statements.
            */
-           
+
           p_int next_addr;
           p_int current;
 %line
@@ -6896,7 +6896,7 @@ do:
           /* The loop is complete - we just need the final branch
            * instruction and to patch up the breaks.
            */
-           
+
           p_int offset;
           p_int next_addr;
           p_int addr = pop_address();
@@ -6982,7 +6982,7 @@ do:
  * c: <cond>
  *    BBRANCH_WHEN_NON_ZERO l
  */
- 
+
 for:
       L_FOR '('
 
@@ -7004,7 +7004,7 @@ for:
           insert_pop_value();
 
           /* From here, the <body> will be placed eventually */
-          
+
           current_continue_address = CONTINUE_DELIMITER;
           $<number>$ = CURRENT_PROGRAM_SIZE;
       }
@@ -7017,7 +7017,7 @@ for:
            * in an 'expression' on the compiler stack for later
            * re-insertion.
            */
-           
+
           p_int start, length;
           bytecode_p expression;
 
@@ -7060,7 +7060,7 @@ for:
            * for later re-insertion and start the compilation
            * of the loop body.
            */
-           
+
           p_int length;
 
           /* Save the code block */
@@ -7103,7 +7103,7 @@ for:
            * code saved on the compiler stack and patch up
            * the break and continues.
            */
-           
+
           p_int offset;
           p_int next_addr;
 
@@ -7115,7 +7115,7 @@ for:
               upd_short(current_continue_address,
                   CURRENT_PROGRAM_SIZE - current_continue_address);
           }
-          
+
           if ( $<expression>9.line != current_line
            || (    $<expression>12.line != current_line
                 && $<expression>12.length)
@@ -7336,13 +7336,13 @@ for_expr:
 
 foreach:
 
-      L_FOREACH '(' 
+      L_FOREACH '('
 
       {
           /* Save the previous environment */
           $<numbers>$[0] = current_continue_address;
           $<numbers>$[1] = current_break_address;
-          
+
           current_break_address = BREAK_DELIMITER;
           current_continue_address = CONTINUE_DELIMITER;
 
@@ -7359,7 +7359,7 @@ foreach:
           /* Remember the starting address of the expression */
           $<address>$ = CURRENT_PROGRAM_SIZE;
       }
-      
+
       foreach_expr ')'
 
       {
@@ -7404,7 +7404,7 @@ foreach:
           /* The body is complete - patch up the continue and
            * break statements and generate the remaining statements.
            */
-           
+
           p_int next_addr;
           p_int addr;
           mp_uint current;
@@ -7447,26 +7447,26 @@ foreach:
           else /* Create the full statement */
           {
               /* First patch up the continue statements */
-          
+
               for(; current_continue_address > 0
                   ; current_continue_address = next_addr)
-              { 
+              {
                   next_addr = read_short(current_continue_address);
                   upd_short(current_continue_address,
                       current - current_continue_address);
               }
-  
+
               /* Create the FOREACH_NEXT instruction and update
                * the branch of the earlier F_FOREACH.
                */
 
               upd_short(addr - 2, current - addr);
- 
+
               ins_f_code(F_FOREACH_NEXT);
               ins_short(current + 3 - addr);
 
               current += 3;
-          
+
               /* Finish up the breaks.
                */
               for (; current_break_address > 0
@@ -7481,7 +7481,7 @@ foreach:
                */
               ins_f_code(F_FOREACH_END);
           }
-              
+
           /* Restore the previous environment */
           current_continue_address = $<numbers>3[0];
           current_break_address    = $<numbers>3[1];
@@ -7657,7 +7657,7 @@ switch:
         /* We start a new switch(), which might be nested into
          * an outer switch().
          */
-         
+
         case_state_t *statep;
 %line
         current_break_stack_need++;
@@ -7891,12 +7891,12 @@ condStart:
           /* When we enter a condition, we must not allow case labels
            * anymore.
            */
-             
+
           mp_uint current;
           bytecode_p current_code;
 
           /* Turn off the case labels */
-            
+
           $$[0] = current_break_address;
           current_break_address &= ~CASE_LABELS_ENABLED;
 
@@ -8129,7 +8129,7 @@ expr0:
                       break;
                   }
                   break;
-                  
+
               case F_SUB_EQ:
                   switch(type1)
                   {
@@ -8141,7 +8141,7 @@ expr0:
                       break;
                   }
                   break;
-                  
+
               case F_MULT_EQ:
                   switch(type1)
                   {
@@ -8164,7 +8164,7 @@ expr0:
                       }
                   }
                   break;
-                  
+
               case F_DIV_EQ:
                   switch(type1)
                   {
@@ -8176,7 +8176,7 @@ expr0:
                       break;
                   }
                   break;
-                  
+
               } /* switch(assign op) */
 
               if (!ok)
@@ -8275,7 +8275,7 @@ expr0:
               /* We have to make it a long branch and move the code
                * generated so far.
                */
-               
+
               int i;
               bytecode_p p;
 
@@ -8368,7 +8368,7 @@ expr0:
     | expr0 L_LOR %prec L_LOR
       {
           /* Insert the LOR and remember the position */
-          
+
           ins_f_code(F_LOR);
           $<address>$ = CURRENT_PROGRAM_SIZE;
           ins_byte(0);
@@ -8378,7 +8378,7 @@ expr0:
 
       {
           /* Update the offset the earlier LOR instruction */
-          
+
           p_int address, offset;
 
           last_expression = -1;
@@ -8403,7 +8403,7 @@ expr0:
                *
                * The extra DUP compensates the svalue the LBRANCH eats.
                */
-               
+
               int i;
               bytecode_p p;
 
@@ -8448,7 +8448,7 @@ expr0:
 
       {
           /* Update the offset the earlier LAND instruction */
-          
+
           p_int address, offset;
 
           last_expression = -1;
@@ -8474,7 +8474,7 @@ expr0:
                *
                * The extra DUP compensates the svalue the LBRANCH eats.
                */
-               
+
               int i;
               bytecode_p p;
 
@@ -9616,7 +9616,7 @@ expr4:
     | L_STRING
       {
           /* Push a constant string */
-          
+
           int string_number;
           PREPARE_INSERT(3)
           string_t *p;
@@ -9661,7 +9661,7 @@ expr4:
     | L_NUMBER
       {
           /* Store a number */
-          
+
           p_int current;
           p_int number;
           PREPARE_INSERT(1 + sizeof (p_int))
@@ -9744,7 +9744,7 @@ expr4:
     | L_FLOAT
       {
           /* Generate a float literal */
-          
+
           int exponent;
 
           $$.start = CURRENT_PROGRAM_SIZE;
@@ -9759,7 +9759,7 @@ expr4:
     | '(' note_start comma_expr ')'        %prec '~'
       {
           /* A nested expression */
-          
+
           $$.type = $3.type;
           $$.start = $2.start;
           $$.code = -1;
@@ -9769,7 +9769,7 @@ expr4:
     | '(' '{' note_start expr_list '}' ')' %prec '~'
       {
           /* Generate an array */
-          
+
           check_aggregate_types($4);
             /* We don't care about these types,
              * unless a reference appears
@@ -9791,7 +9791,7 @@ expr4:
            * array first and then applying QUOTE as often
            * as possible.
            */
-           
+
           int quotes;
 
           check_aggregate_types($3);
@@ -9835,7 +9835,7 @@ expr4:
     | '(' '[' note_start m_expr_list ']' ')'
       {
           /* Generate a mapping */
-          
+
           mp_int num_keys;
 
           check_aggregate_types($4[0]);
@@ -9882,7 +9882,7 @@ expr4:
     | '(' '<' identifier '>'
       {
           int num;
-          
+
           num = find_struct($3);
           if (num < 0)
           {
@@ -10017,7 +10017,7 @@ expr4:
       {
 %line
           /* Generate a range expression */
-          
+
           $$.start = $1.start;
           $$.code = -1;
 
@@ -10320,7 +10320,7 @@ expr4:
           if (i & VIRTUAL_VAR_TAG)
           {
               /* Access a virtual variable */
-              
+
               $$.code = F_PUSH_VIRTUAL_VARIABLE_LVALUE;
               *p++ = F_VIRTUAL_VARIABLE;
               *p = i;
@@ -10329,7 +10329,7 @@ expr4:
           else
           {
               /* Access a non-virtual variable */
-              
+
               if ((i + num_virtual_variables) & ~0xff)
               {
                   $$.code = F_PUSH_IDENTIFIER16_LVALUE;
@@ -10496,7 +10496,7 @@ lvalue:
     | expr4 index_expr %prec '['
       {
           /* Generate/add an (R)INDEX_LVALUE */
-          
+
           bytecode_p p, q;
           p_int start, current;
 %line
@@ -10526,7 +10526,7 @@ lvalue:
                       q[current - start] = F_INDEX_LVALUE;
                   else if ($2.inst == F_RINDEX)
                       q[current - start] = F_RINDEX_LVALUE;
-                  else 
+                  else
                       q[current - start] = F_AINDEX_LVALUE;
               }
               else
@@ -10544,7 +10544,7 @@ lvalue:
                       *p = F_INDEX_LVALUE;
                   else if ($2.inst == F_RINDEX)
                       *p = F_RINDEX_LVALUE;
-                  else 
+                  else
                       *p = F_AINDEX_LVALUE;
               }
           }
@@ -10558,7 +10558,7 @@ lvalue:
                   q[current - start] = F_PUSH_INDEXED_LVALUE;
               else if ($2.inst == F_RINDEX)
                   q[current - start] = F_PUSH_RINDEXED_LVALUE;
-              else 
+              else
                   q[current - start] = F_PUSH_AINDEXED_LVALUE;
           }
 
@@ -10614,7 +10614,7 @@ lvalue:
     | expr4 '[' expr0 ',' expr0 ']' %prec '['
       {
           /* Generate/add an PUSH_INDEXED_MAP_LVALUE */
-          
+
           bytecode_p p, q;
           p_int start, current;
 %line
@@ -10810,7 +10810,7 @@ lvalue:
               ins_byte(num);
 
               /* Generate/add an INDEX_LVALUE */
-      
+
               start = $1.start;
               current = CURRENT_PROGRAM_SIZE;
 
@@ -10993,13 +10993,13 @@ index_range :
           /* Simulate an expression yielding 0 for the lower bound.
            * We pretend that it's part of the upper bound expr.
            */
-          
+
           p_int current;
           p_int length;
           bytecode_p mark, p;
 
           current = CURRENT_PROGRAM_SIZE;
-              
+
           if (!realloc_a_program(1))
           {
               yyerrorf("Out of memory: program size %lu\n", current+1);
@@ -11030,13 +11030,13 @@ index_range :
           /* Simulate an expression yielding 0 for the lower bound.
            * We pretend that it's part of the upper bound expr.
            */
-          
+
           p_int current;
           p_int length;
           bytecode_p mark, p;
 
           current = CURRENT_PROGRAM_SIZE;
-              
+
           if (!realloc_a_program(1))
           {
               yyerrorf("Out of memory: program size %lu\n", current+1);
@@ -11067,13 +11067,13 @@ index_range :
           /* Simulate an expression yielding 0 for the lower bound.
            * We pretend that it's part of the upper bound expr.
            */
-          
+
           p_int current;
           p_int length;
           bytecode_p mark, p;
 
           current = CURRENT_PROGRAM_SIZE;
-              
+
           if (!realloc_a_program(1))
           {
               yyerrorf("Out of memory: program size %lu\n", current+1);
@@ -11203,7 +11203,7 @@ index_range :
           /* Simulate an expression yielding <1 for the upper bound.
            * We pretend that it's part of the lower bound expr.
            */
-          
+
           $$.inst  = F_RX_RANGE;
           $$.start = $3.start;
           $$.end   = $3.end;
@@ -11217,7 +11217,7 @@ index_range :
           /* Simulate an expression yielding <1 for the upper bound.
            * We pretend that it's part of the lower bound expr.
            */
-          
+
           $$.inst  = F_AX_RANGE;
           $$.start = $3.start;
           $$.end   = $3.end;
@@ -11246,7 +11246,7 @@ expr_list2:
 
 e_expr_list2:
       expr0
-      { 
+      {
           $$ = 1;
           if (!got_ellipsis[argument_level])
               add_arg_type($1.type);
@@ -11254,7 +11254,7 @@ e_expr_list2:
               add_arg_type(TYPE_ANY);
       }
 
-    | expr0 L_ELLIPSIS        
+    | expr0 L_ELLIPSIS
       {
           PREPARE_INSERT(2);
 
@@ -11265,7 +11265,7 @@ e_expr_list2:
       }
 
     | e_expr_list2 ',' expr0
-      { 
+      {
           $$ = $1 + 1;
           if (!got_ellipsis[argument_level])
               add_arg_type($3.type);
@@ -11289,7 +11289,7 @@ expr_list3:
       { $$ = 0; }
 
     | expr0
-      { 
+      {
           $$ = 1;
           if (!got_ellipsis[argument_level])
               add_arg_type($1.type);
@@ -11297,7 +11297,7 @@ expr_list3:
               add_arg_type(TYPE_ANY);
       }
 
-    | expr0 L_ELLIPSIS        
+    | expr0 L_ELLIPSIS
       {
           PREPARE_INSERT(2);
 
@@ -11308,7 +11308,7 @@ expr_list3:
       }
 
     | e_expr_list2 ',' expr0
-      { 
+      {
           $$ = $1 + 1;
           if (!got_ellipsis[argument_level])
               add_arg_type($3.type);
@@ -11459,7 +11459,7 @@ function_call:
           $<function_call_head>$.simul_efun = -1;
 
           /* Insert the save_arg_frame instruction.
-           * If it's not really needed, we'll remove it later. 
+           * If it's not really needed, we'll remove it later.
            */
           {
               PREPARE_INSERT(2)
@@ -11684,7 +11684,7 @@ function_call:
                       {
                           first_arg = INDEX_START_NONE;
                       }
-                      
+
                       funp = &inherited_function;
                   }
                   else
@@ -11974,7 +11974,7 @@ function_call:
                   PREPARE_INSERT(4)
 
                   function_t *funp;
-      
+
                   f = define_new_function(MY_FALSE,
                       $1.real, 0, 0, 0, NAME_UNDEFINED, TYPE_UNKNOWN
                   );
@@ -12016,7 +12016,7 @@ function_call:
 
               dest = PROGRAM_BLOCK + $<function_call_head>2.start;
               src = dest+1;
-              left = CURRENT_PROGRAM_SIZE - $<function_call_head>2.start - 1; 
+              left = CURRENT_PROGRAM_SIZE - $<function_call_head>2.start - 1;
 
               while (left-- > 0)
               {
@@ -12044,7 +12044,7 @@ function_call:
           $<function_call_head>$.start = CURRENT_PROGRAM_SIZE;
 
           /* Insert the save_arg_frame instruction.
-           * If it's not really needed, we'll remove it later. 
+           * If it's not really needed, we'll remove it later.
            * Putting this code block before the <expr4> in the rule
            * however yields a faulty grammar.
            */
@@ -12088,7 +12088,7 @@ function_call:
            * Putting this code block before the <expr4> in the rule
            * however yields a faulty grammar.
            */
-           
+
           if (call_other_sefun >= 0
            && call_other_sefun & ~0xff)
           {
@@ -12182,7 +12182,7 @@ function_call:
           if (call_other_sefun >= 0)
           {
               /* SIMUL EFUN */
-              
+
               function_t *funp;
               int num_arg;
 
@@ -12215,7 +12215,7 @@ function_call:
                       i = funp->num_arg - num_arg;
                       if (funp->flags & TYPE_MOD_XVARARGS)
                           i--; /* Last argument may be omitted */
-                          
+
                       if (i > 4)
                       {
                           if (!realloc_a_program(i+2))
@@ -12224,8 +12224,8 @@ function_call:
                                       , mem_block[A_PROGRAM].current_size + i+2);
                               YYACCEPT;
                           }
-                          
-                          __PREPARE_INSERT__p = PROGRAM_BLOCK 
+
+                          __PREPARE_INSERT__p = PROGRAM_BLOCK
                                                 + CURRENT_PROGRAM_SIZE;
                       }
                       CURRENT_PROGRAM_SIZE += i;
@@ -12283,7 +12283,7 @@ function_call:
 
               dest = PROGRAM_BLOCK + $<function_call_head>4.start;
               src = dest+1;
-              left = CURRENT_PROGRAM_SIZE - $<function_call_head>4.start - 1; 
+              left = CURRENT_PROGRAM_SIZE - $<function_call_head>4.start - 1;
 
               while (left-- > 0)
               {
@@ -12321,7 +12321,7 @@ call_other_name:
            && $2.type != TYPE_ANY)
               type_error("Illegal type for lfun name", (p_int)$2.type);
       }
-      
+
 ; /* call_other_name */
 
 
@@ -12670,7 +12670,7 @@ catch:
 ; /* catch */
 
 
-opt_catch_mods : 
+opt_catch_mods :
       ';' identifier
 
       {
@@ -13099,10 +13099,10 @@ array_constant:
 
 %ifdef USE_STRUCTS
 struct_constant:
-      '(' '<' identifier '>' 
+      '(' '<' identifier '>'
       {
           int num;
-          
+
           num = find_struct($3);
           if (num < 0)
           {
@@ -13495,7 +13495,7 @@ arrange_protected_lvalue (p_int start, int code, p_int end, int newcode)
         if (end)
         {
             /* Variant 1: cycle a codeblock and modify instructions */
-            
+
             p_int length;
             bytecode_p q;
 
@@ -13563,7 +13563,7 @@ arrange_protected_lvalue (p_int start, int code, p_int end, int newcode)
              * to
              *   <instrs...> <code> <arg> <newcode>
              */
-            
+
             int instr_arg;
             p_int length;
 
@@ -13586,7 +13586,7 @@ arrange_protected_lvalue (p_int start, int code, p_int end, int newcode)
     else
     {
         /* Variant 3: Just add a modified <newcode> */
-        
+
         switch(newcode)
         {
         case F_PROTECTED_INDEX_LVALUE:
@@ -13601,14 +13601,14 @@ arrange_protected_lvalue (p_int start, int code, p_int end, int newcode)
         default:
             yyerror("Need lvalue for range lvalue.");
         }
-        
+
         if (!realloc_a_program(2))
         {
             yyerrorf("Out of memory: program size %lu\n"
                     , CURRENT_PROGRAM_SIZE + 2);
             return;
         }
-            
+
         p = PROGRAM_BLOCK + current;
         PUT_CODE(p, instrs[newcode].opcode);
     }
@@ -13660,7 +13660,7 @@ transfer_init_control (void)
         /* First call: we have to generate the __INIT function
          * header.
          */
-         
+
         CURRENT_PROGRAM_SIZE = align(CURRENT_PROGRAM_SIZE);
           /* Must happen before store_function_header() */
         realloc_a_program(FUNCTION_HDR_SIZE);
@@ -13823,7 +13823,7 @@ lookup_inherited (char *super_name, string_t *real_name
             /* The parent inherits the function itself: we have to
              * check if it's a virtual inheritance.
              */
-            
+
             inherit_t *ip2;
             program_t *prog1, *prog2;
             int numvar2;
@@ -13973,7 +13973,7 @@ insert_inherited (char *super_name, string_t *real_name
         was_called = alloca(sizeof(*was_called)*num_inherits);
         for (i = 0; i < num_inherits; i++)
             was_called[i] = MY_FALSE;
-          
+
         /* Test every inherit if the name matches and if
          * it does, generate the function call.
          */
@@ -14007,7 +14007,7 @@ insert_inherited (char *super_name, string_t *real_name
                 /* The parent inherits the function itself: we have to
                  * check if it's a virtual inheritance.
                  */
-            
+
                 inherit_t *ip2;
                 program_t *prog1, *prog2;
                 int numvar2;
@@ -14136,7 +14136,7 @@ get_function_id (program_t *progp, int fx)
         flags = progp->functions[fx];
     }
 
-    /* Walk the inherit chain */    
+    /* Walk the inherit chain */
     while(flags & NAME_INHERITED)
     {
         inherit_t *inheritp;
@@ -14612,7 +14612,7 @@ copy_functions (program_t *from, fulltype_t type
                 /* First time this function-ident was ever encountered.
                  * Just make a new global.
                  */
-                
+
                 p->type = I_TYPE_GLOBAL;
                 p->u.global.variable  = I_GLOBAL_VARIABLE_OTHER;
                 p->u.global.efun      = I_GLOBAL_EFUN_OTHER;
@@ -15196,7 +15196,7 @@ store_include_info (char *name, char * filename, char delim, int depth)
         }
         else
         {
-            *tmp = delim == '"' ? delim 
+            *tmp = delim == '"' ? delim
                                 : (delim == '>' ? '<' : '(');
             strcpy(tmp+1, name);
             tmp[len+1] = delim;
@@ -15294,7 +15294,7 @@ store_include_end (mp_uint inc_offset, int include_line)
     else
     {
         /* Store the include end and correct the linenumber */
-        
+
         byte_to_mem_block(A_LINENUMBERS, LI_INCLUDE_END);
     }
 } /* store_include_end() */
@@ -15832,7 +15832,7 @@ epilog (void)
             if (i != A_LINENUMBERS)
                 size += align(mem_block[i].current_size);
         }
-            
+
         size += align(num_function_names * sizeof *prog->function_names);
         size += align(num_functions * sizeof *prog->functions);
 

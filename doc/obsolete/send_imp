@@ -6,7 +6,7 @@ SYNOPSIS
 DESCRIPTION
         Sends The message in an UDP packet to the given host and port
         number.
-    
+
         The message can be given either as string, or as array of
         bytes. The latter variant allows to send binary data as well.
 

@@ -48,7 +48,7 @@ mp_int reserved_system_size = RESERVED_SYSTEM_SIZE;
 
 mp_int min_malloced       = MIN_MALLOCED;           /* Allocation limits */
 mp_int min_small_malloced = MIN_SMALL_MALLOCED;     /* Allocation limits */
-mp_int max_malloced       = MAX_MALLOCED; 
+mp_int max_malloced       = MAX_MALLOCED;
 
 int stack_direction = 0; /*  0: Unknown stack behaviour
                           * +1: Stack grows upward
@@ -235,7 +235,7 @@ assert_stack_gap (void)
 {
     static enum { Initial, Normal, Error, Fatal } condition = Initial;
     ptrdiff_t gap;
-    
+
     /* Don't check the gap after a Fatal error or if the system is
      * not fully initialised yet.
      */
@@ -331,7 +331,7 @@ reserve_memory (void)
 
 {
     void * ptr;
-      
+
     /* First, check if max_malloced is a sensible value.
      * We overestimate the requirement a bit...
      */

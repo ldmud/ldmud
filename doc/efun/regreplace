@@ -8,13 +8,13 @@ DESCRIPTION
         This function looks through txt looking for the regular
         expression pattern. If it finds it, it replaces it by the
         replacepattern.
-        
+
         The replacepattern can be a constant string, or a closure taking
         the matched substring and the position at which it was found
         as arguments and returning the replacement pattern string.
-        
+
         The flag is a bitmask of the usual regexp options. Additionally
-        the efun recognizes RE_GLOBAL: if set, the search and replace 
+        the efun recognizes RE_GLOBAL: if set, the search and replace
         is repeated as often as the pattern matches.
 
         The function returns the modified string (or the original if it
@@ -34,7 +34,7 @@ EXAMPLE
          */
         msgin = regreplace(msgin, "tells you: (.*)",
                  "tells you: <underline>\\1</underline>", 1);
-        
+
         /* replaces all <underline> html tags by the vt100 escape
          * sequence for underline.
          */
@@ -45,13 +45,13 @@ EXAMPLE
 
 HISTORY
         Introduced in 3.2.1@125
-        The use of a closure as replacepattern was introduced in 
+        The use of a closure as replacepattern was introduced in
         LDMud 3.2.9.
 
 AUTHOR
         Marcus@TAPPMud contributed the original idea for the efun and the
         man page.
-        
+
 SEE ALSO
         regexp(E), regexplode(E), regmatch(E), sscanf(E), trim(E),
         regexp(C)

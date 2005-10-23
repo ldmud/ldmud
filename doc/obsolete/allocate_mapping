@@ -16,7 +16,7 @@ DESCRIPTION
         function execution ended. It is also useful if you want the
         mapping to have a certain width even if you don't provide
         all the data items for the keys yet.
-        
+
 HISTORY
         Renamed to 'm_allocate()' in LDMud 3.2.6.
         Since LDMud 3.2.9, not available if driver is compiled without

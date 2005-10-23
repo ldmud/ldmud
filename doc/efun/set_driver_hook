@@ -82,7 +82,7 @@ DESCRIPTION
           arg: lambda closure, lfun closure, string.
           Optional hook to specifiy how to perform the telnet actions
           to switch the echo mode (used for e.g. password input_to()s).
-        
+
         H_ERQ_STOP
           arg: lambda closure, lfun closure.
           Optional hook to notify the mudlib about the termination of

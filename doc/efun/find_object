@@ -11,7 +11,7 @@ EXAMPLE
         obj = find_object("std/thing.c");
         obj = find_object("/std/thing");
         obj = find_object("/std/thing.c");
-        
+
         All four statements are equal.
 
         obj = find_object("/std/thing#42");

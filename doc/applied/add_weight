@@ -14,7 +14,7 @@ DESCRIPTION
 
         The function is also called with the negative weight in the
         object that the moving leaves.
-        
+
         Note that no set_weight() is required by the parser.
 
 HISTORY

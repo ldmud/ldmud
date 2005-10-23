@@ -341,7 +341,7 @@ f_md5 (svalue_t *sp)
     string_t *s_digest;
     unsigned char *digest, d[17];
     int i;
-   
+
     memsafe(s_digest = alloc_mstring(32), 32, "md5 encryption result");
     digest = (unsigned char *)get_txt(s_digest);
 
@@ -410,7 +410,7 @@ f_md5_crypt(svalue_t *sp)
     MD5Encode((unsigned char *)get_txt((sp-1)->u.str)
              ,(unsigned char *)salt
              , crypted
-             , sizeof(crypted));   
+             , sizeof(crypted));
     sp = pop_n_elems(2, sp);
     push_c_string(sp, crypted);
 
@@ -877,7 +877,7 @@ f_regreplace (svalue_t *sp)
         reslen += match->start - start;
         reslen += mstrsize(match->sub);
 
-        /* Prepare for the next match 
+        /* Prepare for the next match
          * Avoid another rx_exec() call if we are at the end.
          */
         start = match->end;
@@ -2223,7 +2223,7 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
 
                 /* If we are indenting, check if we have to add the
                  * indentation space.
-                 * Note: if kind == 2, it's the current character which 
+                 * Note: if kind == 2, it's the current character which
                  *   will go onto the next line, otherwise it's the next
                  *   character will. The difference is important in the
                  *   call to at_end().
@@ -2543,7 +2543,7 @@ f_process_string(svalue_t *sp)
     string_t *str;             /* The argument string */
 
     str = sp->u.str;
-    
+
     if (NULL == strchr(get_txt(str), '@'))
         return sp;  /* Nothing to do */
 
@@ -3619,7 +3619,7 @@ v_clones (svalue_t *sp, int num_arg)
  * If the driver is compiled with DYNAMIC_COSTS, the cost of this
  * efun is proportional to the number of objects in the game.
  */
- 
+
 {
     string_t  *name;     /* The (tabled) load-name to search */
     mp_int     mintime;  /* 0 or lowest load_time for an object to qualify */
@@ -3681,7 +3681,7 @@ v_clones (svalue_t *sp, int num_arg)
             }
 
             free_svalue(sp--); inter_sp = sp;
-            
+
             if (sp->type == T_OBJECT)
                 reference = sp->u.ob;
             else if (sp->type == T_STRING)
@@ -3819,7 +3819,7 @@ v_clones (svalue_t *sp, int num_arg)
     put_array(sp, res);
 
     xfree(ores);
-    
+
     return sp;
 } /* v_clones() */
 
@@ -3857,7 +3857,7 @@ v_object_info (svalue_t *sp, int num_args)
     }
     else
         value = -1;
-  
+
     o = argp->u.ob;
 
     /* Depending on the <type> argument, determine the
@@ -3884,7 +3884,7 @@ v_object_info (svalue_t *sp, int num_args)
     if (value == -1) svp[which].u.number = code; \
     else if (value == which) svp->u.number = code; \
     else {}
-    
+
 #define ST_DOUBLE(which,code) \
     if (value == -1) { \
         svp[which].type = T_FLOAT; \
@@ -3893,28 +3893,28 @@ v_object_info (svalue_t *sp, int num_args)
         svp->type = T_FLOAT; \
         STORE_DOUBLE(svp, code); \
     } else {}
-            
+
 #define ST_STRING(which,code) \
     if (value == -1) { \
         put_ref_string(svp+which, code); \
     } else if (value == which) { \
         put_ref_string(svp, code); \
     } else {}
-            
+
 #define ST_NOREF_STRING(which,code) \
     if (value == -1) { \
         put_string(svp+which, code); \
     } else if (value == which) { \
         put_string(svp, code); \
     } else {}
-            
+
 #define ST_OBJECT(which,code,tag) \
     if (value == -1) { \
         put_ref_object(svp+which, code, tag); \
     } else if (value == which) { \
         put_ref_object(svp, code, tag); \
     } else {}
-            
+
     default:
         error("Illegal value %ld for object_info().\n", sp->u.number);
         /* NOTREACHED */
@@ -3964,7 +3964,7 @@ v_object_info (svalue_t *sp, int num_args)
         {
             ST_NOREF_STRING(OIB_NAME, add_slash(o->name));
         }
-  
+
         ST_STRING(OIB_LOAD_NAME, o->load_name);
 
         o2 = o->next_all;
@@ -3996,7 +3996,7 @@ v_object_info (svalue_t *sp, int num_args)
         {
             ST_OBJECT(OIP_PREV, o2, "object_info(1) next");
         } /* else the element was already allocated as 0 */
-  
+
         if (value == -1 || value == OIP_POS)
         {
             /* Find the non-destructed predecessor of the object */
@@ -4030,9 +4030,9 @@ v_object_info (svalue_t *sp, int num_args)
         prog = o->prog;
 
         ST_NUMBER(OIM_REF, prog->ref);
-  
+
         ST_STRING(OIM_NAME, prog->name);
-  
+
         ST_NUMBER(OIM_PROG_SIZE, (long)(PROGRAM_END(*prog) - prog->program));
 
           /* Program size */
@@ -4273,7 +4273,7 @@ x_min_max (svalue_t *sp, int num_arg, Bool bMax)
     {
         if (num_arg > 1)
         {
-           error("Bad arguments to %s: only one array accepted.\n", fname); 
+           error("Bad arguments to %s: only one array accepted.\n", fname);
            /* NOTREACHED */
         }
         valuep = argp->u.vec->item;
@@ -4281,7 +4281,7 @@ x_min_max (svalue_t *sp, int num_arg, Bool bMax)
         gotArray = MY_TRUE;
         if (left < 1)
         {
-           error("Bad argument 1 to %s: array must not be empty.\n", fname); 
+           error("Bad argument 1 to %s: array must not be empty.\n", fname);
            /* NOTREACHED */
         }
     }
@@ -4305,7 +4305,7 @@ x_min_max (svalue_t *sp, int num_arg, Bool bMax)
                     vefun_arg_error(num_arg - left + 1, T_STRING, valuep->type, sp);
                 /* NOTREACHED */
             }
-            
+
             cmp = mstrcmp(valuep->u.str, result->u.str);
             if (bMax ? (cmp > 0) : (cmp < 0))
                 result = valuep;
@@ -4479,7 +4479,7 @@ f_sin (svalue_t *sp)
 
     if (sp->type != T_FLOAT)
         d = sin((double)(sp->u.number));
-    else 
+    else
         d = sin(READ_DOUBLE(sp));
     sp->type = T_FLOAT;
     STORE_DOUBLE(sp, d);
@@ -4528,7 +4528,7 @@ f_cos (svalue_t *sp)
 
     if (sp->type != T_FLOAT)
         d = cos((double)(sp->u.number));
-    else 
+    else
         d = cos(READ_DOUBLE(sp));
     sp->type = T_FLOAT;
     STORE_DOUBLE(sp, d);
@@ -4577,7 +4577,7 @@ f_tan (svalue_t *sp)
 
     if (sp->type != T_FLOAT)
         d = tan((double)(sp->u.number));
-    else 
+    else
         d = tan(READ_DOUBLE(sp));
     sp->type = T_FLOAT;
     STORE_DOUBLE(sp, d);
@@ -4606,7 +4606,7 @@ f_atan (svalue_t *sp)
         if (d < (-DBL_MAX) || d > DBL_MAX)
             error("Numeric overflow: atan(%ld)\n", (long)sp->u.number);
     }
-    else 
+    else
     {
         d = atan(READ_DOUBLE(sp));
         if (d < (-DBL_MAX) || d > DBL_MAX)
@@ -4703,7 +4703,7 @@ f_exp (svalue_t *sp)
         if (d < (-DBL_MAX) || d > DBL_MAX)
             error("Numeric overflow: exp(%ld)\n", (long)sp->u.number);
     }
-    else 
+    else
     {
         d = exp(READ_DOUBLE(sp));
         if (d < (-DBL_MAX) || d > DBL_MAX)
@@ -5735,7 +5735,7 @@ v_get_type_info (svalue_t *sp, int num_arg)
         {
             long p;
             string_t * name;
-            
+
             sp--;
             name = sp->u.vec->item->u.str;
             p = mstrchr(name, ' ');
@@ -6299,7 +6299,7 @@ v_debug_info (svalue_t *sp, int num_arg)
  *            Number and size of swapped-out programs.
  *
  *        int DID_ST_USER_RESERVE
- *        int DID_ST_MASTER_RESERVE     
+ *        int DID_ST_MASTER_RESERVE
  *        int DID_ST_SYSTEM_RESERVE
  *            Current sizes of the three memory reserves.
  *
@@ -6368,7 +6368,7 @@ v_debug_info (svalue_t *sp, int num_arg)
  *            Number and accumulated length of string searches by value.
  *
  *        int DID_ST_STR_FOUND
- *        int DID_ST_STR_FOUND_BYVALUE 
+ *        int DID_ST_STR_FOUND_BYVALUE
  *            Number of successful searches by address resp. by value.
  *
  *
@@ -6565,7 +6565,7 @@ v_debug_info (svalue_t *sp, int num_arg)
     svalue_t *arg;
     svalue_t res;
     object_t *ob;
-  
+
     arg = sp-num_arg+1;
     inter_sp = sp;
 
@@ -6822,7 +6822,7 @@ v_debug_info (svalue_t *sp, int num_arg)
         vector_t *v;
         svalue_t *dinfo_arg;
         int       value = -1;
-  
+
         if (num_arg != 2 && num_arg != 3)
             error("bad number of arguments to debug_info\n");
         if (arg[1].type != T_NUMBER)
@@ -6959,7 +6959,7 @@ v_debug_info (svalue_t *sp, int num_arg)
     }
 
     /* Clean up the stack and return the result */
-    
+
     sp = pop_n_elems(num_arg, sp);
 
     sp++;
@@ -7006,7 +7006,7 @@ x_gm_localtime (svalue_t *sp, Bool localTime)
     v = allocate_array(TM_MAX);
     if (!v)
         error("Out of memory: array[%d] for result.\n", TM_MAX);
-    
+
     v->item[TM_SEC].u.number = pTm->tm_sec;
     v->item[TM_MIN].u.number = pTm->tm_min;
     v->item[TM_HOUR].u.number = pTm->tm_hour;
@@ -7038,7 +7038,7 @@ f_gmtime (svalue_t *sp)
  * Alternatively, accept an array of two ints: the first is <clock>
  * value as in the first form, the second int is the number of
  * microseconds elapsed in the current second.
- * 
+ *
  * The result is an array of integers:
  *
  *   int TM_SEC   (0) : Seconds (0..59)
@@ -7071,7 +7071,7 @@ f_localtime (svalue_t *sp)
  * Alternatively, accept an array of two ints: the first is <clock>
  * value as in the first form, the second int is the number of
  * microseconds elapsed in the current second.
- * 
+ *
  * The result is an array of integers:
  *
  *   int TM_SEC   (0) : Seconds (0..59)
@@ -7153,7 +7153,7 @@ f_rusage (svalue_t *sp)
 /*-------------------------------------------------------------------------*/
 svalue_t *
 f_random (svalue_t *sp)
-    
+
 /* EFUN random()
  *
  *   int random(int n)
@@ -7282,7 +7282,7 @@ f_utime (svalue_t *sp)
  *
  * Return the time since 1. Jan 1970, 00:00:00 GMT in microsecond
  * precision.
- * 
+ *
  * Return is an array:
  *   int[0]: number of seconds elapsed
  *   int[1]: number of microseconds within the current second.

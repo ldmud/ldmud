@@ -13,7 +13,7 @@ DESCRIPTION
 
 EXAMPLE
         write(ctime(time())+"\n");
-        
+
         Print out the current date and time.
 
 SEE ALSO

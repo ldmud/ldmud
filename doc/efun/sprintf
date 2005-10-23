@@ -39,7 +39,7 @@ DESCRIPTION
                 the formatting information.  Order is not important unless
                 otherwise specified.  "n" is used to specify a integer, which
                 can be a "*" in which case the next argument is used as the
-                number. 
+                number.
 
         Modifiers:
            n    specifies the field size. If the size is prepended with

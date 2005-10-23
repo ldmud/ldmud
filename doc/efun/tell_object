@@ -11,10 +11,10 @@ EXAMPLES
         object who;
         who=find_player("wessex");
         tell_object(who, "Hi!\n");
-        
+
         Just tell Wessex a simple "Hi!".
-        
-        
+
+
         Object 1 (living with the name "dummymonster"):
            void catch_tell(string str) {
               write("Received: "+str+"\n");
@@ -26,7 +26,7 @@ EXAMPLES
               tell_object(who, "Follow me, mortal one!\n");
               ...
            }
-        
+
         This examples shows how tell_object() together with
         catch_tell() works.
 

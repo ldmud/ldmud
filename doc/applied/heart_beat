@@ -14,7 +14,7 @@ DESCRIPTION
 
         The function this_player() will return this object, but only if
         it is living. Otherwise, this_player() will return 0.
-        
+
         The function will be called only if there is at least one interactive
         user in the game.
 
@@ -31,7 +31,7 @@ EXAMPLE
         void heart_beat() {
            tell_object(owner, "Your heart goes: BUM BUM\n");
         }
-        
+
         We have to use tell_object() because write goes to the current
         user and this can only be the object itself or nobody.
 

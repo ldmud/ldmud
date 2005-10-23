@@ -290,7 +290,7 @@ sort_string (const string_t * p_in, size_t len, long ** pos)
     long   * tmppos;  /* Temporary position array */
     size_t   step;
     size_t   i, j;
-    
+
     in = get_txt(p_in);
     out = xalloc(len+1);
     tmp = xalloc(len+1);
@@ -354,7 +354,7 @@ sort_string (const string_t * p_in, size_t len, long ** pos)
     for (step = 2; step < len; step *= 2)
     {
         size_t start, dest, left;
-        
+
         /* Exchange out and tmp */
         {
             char *tmp2;
@@ -413,7 +413,7 @@ sort_string (const string_t * p_in, size_t len, long ** pos)
             } /* for (sort run) */
         } /* for (start) */
     } /* for(step) */
-    
+
     /* Free the temporary data */
     if (tmppos)
         xfree(tmppos);
@@ -538,7 +538,7 @@ trim_all_spaces (const string_t * txt)
     /* Skip leading spaces */
     while (src_ix < srclen && *src == ' ')
         src_ix++, src++;
-      
+
     /* Copy characters, but fold embedded spaces. */
     for ( ; src_ix < srclen; src_ix++, src++, dest_ix++)
     {

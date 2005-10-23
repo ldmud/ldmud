@@ -24,7 +24,7 @@ DESCRIPTION
         each of the array/struct values as first parameter, followed by the
         <extra> arguments. If the result from the function call is true,
         the array element in question is included into the efun result.
-        
+
         If the efun is used with a mapping <map> instead of a function,
         every array element which is key in <map> is included into the
         result.

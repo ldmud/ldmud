@@ -62,7 +62,7 @@
 
 #include "driver.h"
 #include "typedefs.h"
- 
+
 #include "my-alloca.h"
 #include <stdio.h>
 #include <setjmp.h>
@@ -229,7 +229,7 @@ struct ColumnSlashTable
  * way all the user sees is a char[] which automagically happens
  * to be of the right size.
  */
- 
+
 struct sprintf_buffer
 {
     /* char text[.size - sizeof(sprintf_buffer_t)]; */
@@ -679,7 +679,7 @@ svalue_to_string ( fmt_state_t *st
                 stradd(st, &str, tmpstr);
             }
 
-        } 
+        }
 
         stradd(st, &str, "\"");
         break;
@@ -721,7 +721,7 @@ svalue_to_string ( fmt_state_t *st
             {
                 /* New array */
                 prec->id_number = st->pointer_id++;
-                
+
 #ifdef USE_STRUCTS
                 if (obj->type != T_STRUCT)
                     stradd(st, &str, "({ /* #");
@@ -919,7 +919,7 @@ svalue_to_string ( fmt_state_t *st
             {
                 /* New array */
                 prec->id_number = st->pointer_id++;
-                
+
                 stradd(st, &str, "({ /* #");
                 numadd(st, &str, prec->id_number);
                 stradd(st, &str, ", size: ");
@@ -943,7 +943,7 @@ svalue_to_string ( fmt_state_t *st
         break;
     }
 
-  case T_PROTECTED_LVALUE:              
+  case T_PROTECTED_LVALUE:
       stradd(st, &str, "prot lvalue: ");
       str = svalue_to_string(st, obj->u.lvalue, str, indent+2, trailing, quoteStrings);
       break;
@@ -2210,7 +2210,7 @@ v_printf (svalue_t *sp, int num_arg)
 
 {
     string_t *str;
-    
+
     str = string_print_formatted(get_txt((sp-num_arg+1)->u.str)
                                 , num_arg-1, sp-num_arg+2);
     if (command_giver)

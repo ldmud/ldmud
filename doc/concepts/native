@@ -14,7 +14,7 @@ DESCRIPTION
         Starting with 3.2.1, the distinction between compat and native
         mode is more and more transferred into the mudlib, with the
         future goal of having a modeless driver.
-        
+
         Starting with 3.2.7, native mode no longer exists as such,
         only 'plain' (quasi a superset of 'native' and 'compat')
         and 'compat' mode, and since 3.2.9 the mode selection can be
@@ -68,7 +68,7 @@ DESCRIPTION
             !compat &  native :  create() :  reset()
              compat & !native :  reset(0) :  reset(1)
              compat &  native :  reset(0) :  reset(1)
-        
+
           If INITIALIZATION_BY___INIT was defined, the lfun __INIT()
           is called first on creation to initialize the objects
           variables.

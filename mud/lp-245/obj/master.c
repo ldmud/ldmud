@@ -818,7 +818,7 @@ void move_or_destruct(object what, object to)
     if (!catch(what->move(to, 1)))
         return;
     */
-    
+
     /*
      * Failed to move the object. Therefore it is destroyed.
      */

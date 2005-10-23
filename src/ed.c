@@ -576,7 +576,7 @@ ckglob (void)
                 {
                     if (c=='g') ptr->l_stat |= LGLOB;
                 }
-                else 
+                else
                 {
                     if (c=='v') ptr->l_stat |= LGLOB;
                 }
@@ -1847,7 +1847,7 @@ subst (regexp_t *pat, char *sub, Bool gflg, Bool pflag)
                 size_t mstart, mend;
                 size_t diff;
                 string_t * substr;
-                  
+
                 rx_get_match_str(pat, start, &mstart, &mend);
                 diff = start + mstart - current;
                 if ( (space -= diff) < 0)

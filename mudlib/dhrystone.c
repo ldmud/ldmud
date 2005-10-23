@@ -132,7 +132,7 @@ void main(int Number_Of_Runs) {
     Int_1_Loc = Int_2_Loc / Int_3_Loc;
     Int_2_Loc = 7 * (Int_2_Loc - Int_3_Loc) - Int_1_Loc;
     Proc_2(&Int_1_Loc);
-  }  
+  }
   End_Time = times();
   write("Execution ends.\n");
   write("Final values of the variables used in the benchmark:\n\n");
@@ -222,7 +222,7 @@ void Proc_1(mapping Ptr_Val_Par) {
     Next_Record["Ptr_Comp"] = Ptr_Glob["Ptr_Comp"];
     Proc_7(  Next_Record["var_1"][Int_Comp], 10,
 	   &(Next_Record["var_1"][Int_Comp]));
-  } else  
+  } else
     Ptr_Val_Par = copy_record(Ptr_Val_Par["Ptr_Comp"]);
 }
 
@@ -230,19 +230,19 @@ void Proc_2(int Int_Par_Ref) {
   int Int_Loc, Enum_Loc;
 
   Int_Loc = Int_Par_Ref + 10;
-  do  
+  do
     if (Ch_1_Glob == 'A') {
       Int_Loc -= 1;
       Int_Par_Ref = Int_Loc - Int_Glob;
       Enum_Loc = Ident_1;
-    } while (Enum_Loc != Ident_1);  
+    } while (Enum_Loc != Ident_1);
 }
 
 void Proc_3(mapping Ptr_Ref_Par) {
   if (Ptr_Glob != 0)
     Ptr_Ref_Par = Ptr_Glob["Ptr_Comp"];
   Proc_7(10, Int_Glob, &(Ptr_Glob["var_1"][Int_Comp]));
-}  
+}
 
 void Proc_4() {
   int Bool_Loc;

@@ -7,7 +7,7 @@ SYNOPSIS
 DESCRIPTION
         Prints the given text to stdout, stderr, the <host>.debug.log file,
         or any combination of these.
-        
+
         The parameter <flags> is a combination of bitflags determining the
         target and the mode of writing.
 

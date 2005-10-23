@@ -40,31 +40,31 @@ REGULAR EXPRESSION DETAILS
         are  recognized anywhere in the pattern except within square
         brackets, and those that are recognized in square  brackets.
         Outside square brackets, the meta-characters are as follows:
-        
+
           .       Match any character.
-          
+
           ^       Match begin of line.
-          
+
           $       Match end of line.
-          
+
           \<      Match begin of word.
-          
+
           \>      Match end of word.
 
           \B      not at edge of a word (supposed to be like the emacs
                   compatibility one in gnu egrep)
 
           x|y     Match regexp x or regexp y.
-          
+
           ()      Match enclosed regexp like a 'simple' one (unless
                   RE_EXCOMPATIBLE is set).
-          
+
           x*      Match any number (0 or more) of regexp x.
 
           x+      Match any number (1 or more) of regexp x.
-          
+
           [..]    Match one of the characters enclosed.
-          
+
           [^ ..]  Match none of the characters enclosed. The .. are to
                   replaced by single characters or character ranges:
 
@@ -73,7 +73,7 @@ REGULAR EXPRESSION DETAILS
           [ab0-9] matches a, b or any digit.
 
           [^a-z]  does not match any lowercase character.
-          
+
           \c      match character c even if it's one of the special
                   characters.
 

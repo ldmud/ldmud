@@ -250,10 +250,10 @@ vector_t *current_error_trace = NULL;
 /* --- Runtime limits --- */
 
 /* Each of these limits comes as pair: one def_... value which holds the
- * limit set at startup or with the set_limits() efun, and the max_... 
+ * limit set at startup or with the set_limits() efun, and the max_...
  * value which holds the limit currently in effect. Before every execution,
  * max_... are initialised from def_... with the RESET_LIMITS macro.
- * 
+ *
  * A limit of 0 usually means 'no limit'.
  */
 
@@ -553,7 +553,7 @@ fatal (const char *fmt, ...)
     in_fatal = MY_TRUE;
 
     ts = time_stamp();
-    
+
     va_start(va, fmt);
 
     fflush(stdout);
@@ -666,7 +666,7 @@ error (const char *fmt, ...)
     va_list   va;
 
     ts = time_stamp();
-    
+
     /* Find the last error recovery context, but do not yet unroll
      * the stack: the current command context might be needed
      * in the runtime error apply.
@@ -770,7 +770,7 @@ error (const char *fmt, ...)
     }
 
     /* On a triple error, duplicate the error messages so far on stdout */
-    
+
     if (num_error == 3)
     {
         /* Error context is secure_apply() */
@@ -847,7 +847,7 @@ error (const char *fmt, ...)
     if (object_name)
     {
         /* Error occured in a heart_beat() function */
-        
+
         object_t *ob;
 
         ob = find_object(object_name);
@@ -871,7 +871,7 @@ error (const char *fmt, ...)
         /* We have memory: call master:runtime(), and maybe
          * also master:heart_beat_error().
          */
-        
+
         int a;
         object_t *save_cmd;
         object_t *culprit = NULL;
@@ -1016,7 +1016,7 @@ warnf (char *fmt, ...)
     va_list   va;
 
     ts = time_stamp();
-    
+
     va_start(va, fmt);
 
     /* Make fmt sane */
@@ -2499,7 +2499,7 @@ check_all_object_shadows (void)
         check_object_shadow(ob, sh);
 
     for (ob = destructed_objs, sh = destructed_obj_shadows
-        ; ob != NULL 
+        ; ob != NULL
         ; ob = ob->next_all, sh = sh->next
         )
         check_object_shadow(ob, sh);
@@ -2659,7 +2659,7 @@ remove_object (object_t *ob
 /*-------------------------------------------------------------------------*/
 void
 handle_newly_destructed_objects (void)
-  
+
 /* Finish up all newly destructed objects kept in the newly_destructed_objs
  * list: deallocate as many associated resources and, if there are
  * more than one references to the object, put it into the destructed_objs list.
@@ -2759,7 +2759,7 @@ remove_destructed_objects (void)
 #endif /* CHECK_OBJECT_REF */
     }
 }  /* remove_destructed_objects() */
-  
+
 /*-------------------------------------------------------------------------*/
 static INLINE shadow_t *
 new_shadow_sent(void)
@@ -2816,7 +2816,7 @@ purge_shadow_sent(void)
 
 {
     sentence_t *p;
-    
+
     for (;free_sent; free_sent = p) {
         p = free_sent->next;
         xfree(free_sent);
@@ -3089,14 +3089,14 @@ dinfo_data_status (svalue_t *svp, int value)
  * If <value> is -1, <svp> points indeed to a value block; other it is
  * the index of the desired value and <svp> points to a single svalue.
  */
- 
+
 {
     STORE_DOUBLE_USED;
 
 #define ST_NUMBER(which,code) \
     if (value == -1) svp[which].u.number = code; \
     else if (value == which) svp->u.number = code
-    
+
 #define ST_DOUBLE(which,code) \
     if (value == -1) { \
         svp[which].type = T_FLOAT; \
@@ -3105,7 +3105,7 @@ dinfo_data_status (svalue_t *svp, int value)
         svp->type = T_FLOAT; \
         STORE_DOUBLE(svp, code); \
     }
-    
+
     ST_NUMBER(DID_ST_ACTIONS,           alloc_action_sent);
     ST_NUMBER(DID_ST_ACTIONS_SIZE,      alloc_action_sent * sizeof (action_t));
     ST_NUMBER(DID_ST_SHADOWS,           alloc_shadow_sent);
@@ -3127,7 +3127,7 @@ dinfo_data_status (svalue_t *svp, int value)
                   : (double)avg_last_processed / avg_in_list
                  )
              );
-        
+
     ST_NUMBER(DID_ST_ARRAYS,         num_arrays);
     ST_NUMBER(DID_ST_ARRAYS_SIZE,    total_array_size());
 
@@ -3219,7 +3219,7 @@ check_valid_path (string_t *path, object_t *caller, string_t* call_fun, Bool wri
     {
         (void)ref_mstring(path);
     }
-    else 
+    else
     {
         path = ref_mstring(v->u.str);
     }
@@ -3276,7 +3276,7 @@ free_callback_args (callback_t *cb)
 {
     svalue_t *dest;
     int nargs;
-    
+
     nargs = cb->num_arg;
 
     if (nargs == 1)
@@ -3350,7 +3350,7 @@ setup_callback_args (callback_t *cb, int nargs, svalue_t * args
 
 {
     svalue_t *dest;
-    
+
     cb->num_arg = nargs;
 
     if (nargs < 1)
@@ -3361,7 +3361,7 @@ setup_callback_args (callback_t *cb, int nargs, svalue_t * args
     else
     {
         /* Transfer the arguments into the callback structure */
-        
+
         if (nargs > 1)
         {
             xallocate(dest, sizeof(*dest) * nargs, "callback structure");
@@ -3386,7 +3386,7 @@ setup_callback_args (callback_t *cb, int nargs, svalue_t * args
                  * But to do that, we first have to free all
                  * remaining arguments from the caller.
                  */
-                
+
                 int error_index = cb->num_arg - nargs - 1;
 
                 do {
@@ -3426,7 +3426,7 @@ setup_function_callback ( callback_t *cb, object_t * ob, string_t * fun
 
 {
     int error_index;
-    
+
     cb->is_lambda = MY_FALSE;
     cb->function.named.name = make_tabled_from(fun);
     cb->function.named.ob = ref_object(ob, "callback");
@@ -3461,7 +3461,7 @@ setup_closure_callback ( callback_t *cb, svalue_t *cl
 
 {
     int error_index;
-    
+
     cb->is_lambda = MY_TRUE;
     transfer_svalue_no_free(&(cb->function.lambda), cl);
 
@@ -3580,7 +3580,7 @@ callback_object (callback_t *cb)
 
 {
     object_t *ob;
-    
+
     if (cb->is_lambda)
         ob = !CLOSURE_MALLOCED(cb->function.lambda.x.closure_type)
              ? cb->function.lambda.u.ob
@@ -3631,7 +3631,7 @@ execute_callback (callback_t *cb, int nargs, Bool keep, Bool toplevel)
     /* Push the arguments, if any, onto the stack */
 
     num_arg = cb->num_arg;
-    
+
     if (num_arg)
     {
         svalue_t * argp;
@@ -4123,7 +4123,7 @@ validate_shadowing (object_t *ob)
     if (victim->flags & P_NO_SHADOW)
         error("shadow '%s' on '%s': Can't shadow a 'no_shadow' program.\n"
              , get_txt(cob->name), get_txt(ob->name));
-    
+
     if (cob->flags & O_SHADOW)
     {
         shadow_t *shadow_sent = O_GET_SHADOW(cob);
@@ -4367,7 +4367,7 @@ f_set_driver_hook (svalue_t *sp)
  *   void set_driver_hook(int what, closure arg)
  *   void set_driver_hook(int what, string arg)
  *   void set_driver_hook(int what, string * arg)
- * 
+ *
  * This privileged efun sets the driver hook 'what' (values are
  * defined in /sys/driverhooks.h) to 'arg'.
  * The exact meanings and types of 'arg' depend of the hook set.
@@ -4384,7 +4384,7 @@ f_set_driver_hook (svalue_t *sp)
 
     /* Get the arguments */
     n = sp[-1].u.number;
-     
+
     if (n < 0 || n >= NUM_DRIVER_HOOKS)
     {
         error("Bad hook number: %ld, expected 0..%ld\n"
@@ -4595,7 +4595,7 @@ extract_limits ( struct limits_context_s * result
 
         for (limit = 0; limit < LIMIT_MAX && limit < num; limit++)
         {
-        
+
             if (svp[limit].type != T_NUMBER)
                 error("Illegal %s value: got a %s, expected a number\n"
                      , limitnames[limit], typename(svp[limit].type));
@@ -4773,7 +4773,7 @@ v_limited (svalue_t * sp, int num_arg)
     else
     {
         struct limits_context_s context;
-        
+
         /* Save the current runtime limits and set the new ones */
         save_limits_context(&context);
         context.rt.last = rt_context;
@@ -4793,7 +4793,7 @@ v_limited (svalue_t * sp, int num_arg)
         inter_sp = sp;
         call_lambda(argp, cl_args);
         sp = inter_sp;
-        
+
         /* Overwrite the closure with the result */
         free_svalue(argp); /* The closure might have self-destructed */
         *argp = *sp;
@@ -4898,14 +4898,14 @@ f_query_limits (svalue_t * sp)
 {
     vector_t *vec;
     Bool def;
-    
+
     def = sp->u.number != 0;
-    
+
     vec = allocate_uninit_array(LIMIT_MAX);
     if (!vec)
         error("(query_limits) Out of memory: array[%d] for result.\n"
              , LIMIT_MAX);
-    
+
     put_number(vec->item+LIMIT_EVAL,     def ? def_eval_cost : max_eval_cost);
     put_number(vec->item+LIMIT_ARRAY,    def ? def_array_size : max_array_size);
     put_number(vec->item+LIMIT_MAPPING,  def ? def_mapping_size : max_mapping_size);

@@ -3,7 +3,7 @@
 
 #include "driver.h"
 
-#include "typedefs.h" 
+#include "typedefs.h"
 #include "strfuns.h"    /* strbuf_t */
 
 /* --- Variables --- */

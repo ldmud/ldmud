@@ -22,7 +22,7 @@ EXAMPLE
            write("Your command was:"+query_command()+"\n");
            return 1;
         }
-        
+
         When ever you type "sing ..." you get "Your command was: sing ...".
 
 SEE ALSO

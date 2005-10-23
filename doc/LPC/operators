@@ -129,7 +129,7 @@ DESCRIPTION
 
         ( type ) var    Return the value of <var> converted to <type>.
                         <type> can be 'string', 'int', 'object', 'float'
-                        or 'int*'. <var> must be of a specific type 
+                        or 'int*'. <var> must be of a specific type
                         for a conversion to take place; if <var> is 'mixed'
                         or unknown, the cast is purely declarative.
                         Also, if the type of <var> is that of <type>, the
@@ -138,7 +138,7 @@ DESCRIPTION
                         NB. The literal number 0 is of unknown type, as
                         it doubles as 'not initialized' for strings, objects,
                         and arrays.
-                        
+
                         The operator acts like the efuns
                         to_string(), to_int(), to_object(), to_float()
                         and to_array(). It is advisable to use the

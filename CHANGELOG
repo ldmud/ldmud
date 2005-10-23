@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+18-Nov-2002 (Lars Duening)  (3.3.305)
+  - (gcollect.c) When cleaning up an untabled string, a string was
+      freed twice.
+  - (svalue.h) Corrected the macro arguments to the put_object() family
+      (reported by Ctx).
+  - (many files) Removed trailing spaces from lineends.
+
 16-Nov-2002 (Lars Duening)  (3.3.304)
   - (smalloc.c) If the allocator ran out of memory, the exit handling
       triggered the 'Multiple threads' safety check. Not really a problem,

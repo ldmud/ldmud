@@ -20,14 +20,14 @@ DESCRIPTION
         saves more memory than swapping, as swapping only frees the
         program code, while self-destruction also frees the internal
         object representation.
-        
+
         The call of clean_up() has been modified. There is a constant
         in config.h that defines how long time until clean_up is
         called in an object. This call is independent of reset() and
         swapping. It is recommended that the swapping time is
         something short, like 10 minutes to 30 minutes, while the time
         to clean_up is longer.
-        
+
         Fixed several bugs in the swap/reset/clean_up logic.
         Recommended values are that the swap time is short (less than
         30 minutes), and that reset time is medium (aprox 60 minutes),
@@ -42,15 +42,15 @@ DESCRIPTION
         better than the swap algorithm, as even cloned objects can be
         cleaned up and a self destruction is more efficient than
         swapping (memory wise).
-        
+
         Changed mechanism of calling clean_up() slightly. Only objects
         that defines the function will be called. And, only clean_up()
         that returns non-zero will be called again. This will minimize
         calls of clean_up(), while still cost very litte to maintain.
-        
+
         clean_up() now gets a flag as argument, which will be non-zero
         if the the program of this object is used for inheritance by
         other objects.
-        
+
 SEE ALSO
         clean_up(A), slow_shut_down(M), quota_demon(M), malloc(D)

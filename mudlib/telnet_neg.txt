@@ -12,7 +12,7 @@ That's it!
 With the TM (Timing Mark) lag  measuring  accuracy,  everything  is a little
 bit more complicated. In  fact  every  player receives the  value,  that is
 actually the sum of the two values: the server lag (load), and the telnet
-connection lag. 
+connection lag.
 
 Whether this is suitable for your own mudlib or not, you should decide.
 
@@ -46,8 +46,8 @@ void inaugurate_master (int arg) {
             .
 */
   set_driver_hook(H_TELNET_NEG, "telnet_neg");
-  set_driver_hook(H_NOECHO, unbound_lambda( 
-    ({ 'flag, 'user }), ({ #',,({ #'?, ({ #'==, 'flag, 1 }), 
+  set_driver_hook(H_NOECHO, unbound_lambda(
+    ({ 'flag, 'user }), ({ #',,({ #'?, ({ #'==, 'flag, 1 }),
       ({ #'binary_message, quote( ({ IAC, WILL, TELOPT_ECHO }) ), 3 }),
       ({ #'binary_message, quote( ({ IAC, WONT, TELOPT_ECHO }) ), 3 })
     }) }) ) );
@@ -102,7 +102,7 @@ int measure_lag() {
     if(!snt) {                                       // If Timing Mark was
                                                      // received, send it again
 
-      start_time = utime();                          // Mark the time, 
+      start_time = utime();                          // Mark the time,
                                                      // we sent Timing Mark
 
       binary_message( ({ IAC, DO, TELOPT_TM }), 3 ); // Send Timing Mark
@@ -115,7 +115,7 @@ int measure_lag() {
     call_out("measure_lag",2);                       // still no answer - set
                                                      // the value of lag to -1
                                                      // this will return to the
-                                                     // requesting user the 
+                                                     // requesting user the
                                                      // string value of "?.??"
 }
 // ------------------------------------------------------------------------
@@ -143,7 +143,7 @@ void telnet_neg( int action, int option, mixed *sb) {
             break;
             }
                      // --------------------------------
-   case TELOPT_NAWS: // NAWS (Terminal size) Handling 
+   case TELOPT_NAWS: // NAWS (Terminal size) Handling
                      // According to RFC-1073
                      // --------------------------------
             {
@@ -157,7 +157,7 @@ void telnet_neg( int action, int option, mixed *sb) {
                                 (sb[0]*256)+sb[1],(sb[2]*256)+sb[3]);
                         break;
                         }
-                            
+
               case WILL: // IAC WILL NAWS
                         {
                         will_naws_rcvd=1;
@@ -180,7 +180,7 @@ void telnet_neg( int action, int option, mixed *sb) {
                         break;
               }
             }
-   default: 
+   default:
             break;
     }
   }

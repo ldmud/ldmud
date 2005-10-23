@@ -49,7 +49,7 @@
 #include "xalloc.h"
 
 #include "../mudlib/sys/debug_info.h"
- 
+
 /*-------------------------------------------------------------------------*/
 
   /* The description of one callout.
@@ -569,7 +569,7 @@ callout_dinfo_status (svalue_t *svp, int value)
 #define ST_NUMBER(which,code) \
     if (value == -1) svp[which].u.number = code; \
     else if (value == which) svp->u.number = code
-    
+
     remove_stale_call_outs();
     ST_NUMBER(DID_ST_CALLOUTS, num_callouts);
     ST_NUMBER(DID_ST_CALLOUT_SLOTS, num_call);
@@ -724,7 +724,7 @@ get_all_call_outs (void)
         ob = callback_object(&(cop->fun));
         if (!ob)
             continue;
-            
+
         /* Get the subarray */
 
         vv = allocate_array(3 + cop->fun.num_arg);
@@ -802,7 +802,7 @@ f_call_out_info (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_find_call_out (svalue_t *sp) 
+f_find_call_out (svalue_t *sp)
 
 /* EFUN find_call_out()
  *
@@ -821,7 +821,7 @@ f_find_call_out (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_remove_call_out (svalue_t *sp) 
+f_remove_call_out (svalue_t *sp)
 
 /* EFUN remove_call_out()
  *

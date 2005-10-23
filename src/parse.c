@@ -97,7 +97,7 @@
  *
  * In addition the master object may offer the same functions to provide
  * reasonable defaults (like 'thing' as generic singular name):
- * 
+ *
  *      string *parse_command_id_list()
  *        - Would normally return: ({ "one", "thing" })
  *
@@ -213,7 +213,7 @@ struct parse_context_s
   vector_t *id_d, *plid_d, *adjid_d, *prepos;
   string_t *allword;
     /* This context: the lists of ids and such. */
-    
+
   vector_t *wvec, *patvec, *obvec;
     /* Next context(!): word, pattern and object vector */
 };
@@ -327,7 +327,7 @@ find_living_object (string_t *name, Bool player)
       /* In theory this could lose the last ref to the result object.
        * In praxis, those objects have more refs.
        */
-    
+
     return inter_sp[1].type != T_OBJECT ? NULL : inter_sp[1].u.ob;
 } /* find_living_object() */
 
@@ -434,7 +434,7 @@ parse_to_plural (string_t *str)
  * word in the string (giving "the boxes of the kings").
  * TODO: TubMud has a good plural maker.
  */
- 
+
 {
     vector_t *words;
     svalue_t  stmp;
@@ -539,7 +539,7 @@ load_lpc_info (size_t ix, object_t *ob)
             if (make_plural)
             {
                 /* Pluralize the singular names */
-                
+
                 vector_t *tmp, *sing;
                 svalue_t sval;
                 string_t *str;
@@ -629,7 +629,7 @@ parse_error_handler (svalue_t *arg UNUSED)
         free_mstring(gAllword);
 
     /* Restore the previous lists */
-    
+
     gId_list_d    = old->id_d;
     gPluid_list_d = old->plid_d;
     gAdjid_list_d = old->adjid_d;
@@ -658,7 +658,7 @@ stack_put (svalue_t *pval, svalue_t *sp, size_t pos, int max)
  * the parsed results into the variables passed to the efun, and we
  * never know what the wizards are going to pass there.
  */
- 
+
 {
     if (pval && pos < max && sp[pos].type == T_LVALUE)
         transfer_svalue(sp[pos].u.lvalue, pval);
@@ -708,7 +708,7 @@ find_string (string_t *str, vector_t *wvec, size_t *cix_in)
  * the position of the last word of the found string.
  * If not round, return -1, <cix_in> will be set to the end of <wvec>.
  */
- 
+
 {
     int fpos;
     string_t *p1;
@@ -719,7 +719,7 @@ find_string (string_t *str, vector_t *wvec, size_t *cix_in)
     for (; *cix_in < VEC_SIZE(wvec); (*cix_in)++)
     {
         p1 = wvec->item[*cix_in].u.str;
-        
+
         /* Quick test: first character has to match */
         if (get_txt(p1)[0] != get_txt(str)[0])
             continue;
@@ -766,7 +766,7 @@ find_string (string_t *str, vector_t *wvec, size_t *cix_in)
     }
 
     /* Not found */
-    
+
     return -1;
 } /* find_string() */
 
@@ -792,7 +792,7 @@ member_string (string_t *str, vector_t *svec)
         if (mstreq(svec->item[il].u.str, str))
             return (int)il;
     }
-    
+
     return -1;
 } /* member_string() */
 
@@ -848,7 +848,7 @@ check_adjectiv (size_t obix, vector_t *wvec, size_t from, size_t to)
      * test them against the single adjective strings.
      * TODO: This test could be implemented faster.
      */
-     
+
     adstr = NULL;
     adstrp = xalloc(sum);  /* Workspace */
 
@@ -869,7 +869,7 @@ check_adjectiv (size_t obix, vector_t *wvec, size_t from, size_t to)
                     strcat(adstrp, " ");
                 strcat(adstrp, get_txt(wvec->item[sum].u.str));
             }
-            
+
             adstr = new_mstring(adstrp);
 
             if ((member_string(adstr, ids) >= 0)
@@ -925,7 +925,7 @@ number_parse( vector_t *obvec UNUSED  /* in: array of objects to match against *
     cix = *cix_in; *fail = MY_FALSE;
 
     ones = 0;
-    
+
     /* First try to parse the number in digit representation */
     if (sscanf(get_txt(wvec->item[cix].u.str), "%d", &num))
     {
@@ -952,7 +952,7 @@ number_parse( vector_t *obvec UNUSED  /* in: array of objects to match against *
     for (ten = 0; ten < 10; ten++)
     {
         char *second;
-        
+
         /* Test if the first part of the word matches */
         if (!PREFIXED(num10[ten], get_txt(wvec->item[cix].u.str)))
             continue;
@@ -963,7 +963,7 @@ number_parse( vector_t *obvec UNUSED  /* in: array of objects to match against *
         for (ones = 0; ones < 10; ones++)
         {
             char *tmp;
-            
+
             tmp = (ten>1) ? num1[ones] : num1[ten*10+ones];
             if (!strcmp(second, tmp))
             {
@@ -1118,7 +1118,7 @@ item_parse (vector_t *obvec, vector_t *wvec, size_t *cix_in, Bool *fail)
 {
     static svalue_t stmp;  /* Result buffer */
 
-    vector_t *tmp;   
+    vector_t *tmp;
     vector_t *ret;
     svalue_t *pval;
     size_t    cix, tix;
@@ -1168,10 +1168,10 @@ item_parse (vector_t *obvec, vector_t *wvec, size_t *cix_in, Bool *fail)
 
         /* Get the id-info for this object */
         load_lpc_info(obix, obvec->item[obix].u.ob);
-        
+
         if (obvec->item[obix].u.ob->flags & O_DESTRUCTED) /* Oops */
             continue;
-            
+
         if (match_object(obix, wvec, &cix, &plur_flag))
         {
             assign_svalue_no_free(&tmp->item[tix++],&obvec->item[obix]);
@@ -1232,7 +1232,7 @@ living_parse (vector_t *obvec, vector_t *wvec, size_t *cix_in, Bool *fail)
     *fail = MY_FALSE;
 
     /* Fill live with all living objects from <obvec> */
-    
+
     tix = 0;
     live = allocate_array(VEC_SIZE(obvec));
 
@@ -1300,14 +1300,14 @@ single_parse (vector_t *obvec, vector_t *wvec, size_t *cix_in, Bool *fail)
     {
         if (osvp->type != T_OBJECT)
             continue;
-            
+
         *fail = MY_FALSE;
         cix = *cix_in;
-        
+
         load_lpc_info(obix,osvp->u.ob);
         if (osvp->u.ob->flags & O_DESTRUCTED) /* Oops */
             continue;
-            
+
         plur_flag = MY_FALSE;
         if (match_object(obix, wvec, &cix, &plur_flag))
         {
@@ -1361,7 +1361,7 @@ prepos_parse (vector_t *wvec, size_t *cix_in, Bool *fail, svalue_t *prepos)
       if (!strchr(get_txt(tmp),' '))
       {
           /* A single word match */
-          
+
           if (mstreq(tmp, wvec->item[*cix_in].u.str))
           {
               (*cix_in)++;
@@ -1371,7 +1371,7 @@ prepos_parse (vector_t *wvec, size_t *cix_in, Bool *fail, svalue_t *prepos)
       else
       {
           /* Multiword match */
-          
+
           tvec = explode_string(tmp, STR_SPACE);
           for (tix = 0; tix < VEC_SIZE(tvec); tix++)
           {
@@ -1517,7 +1517,7 @@ one_parse ( vector_t *obvec       /* in: array of objects to match against */
     default:
         *fail = MY_FALSE; /* Skip invalid patterns */
     }
-    
+
     return pval;
 } /* one_parse() */
 
@@ -1639,9 +1639,9 @@ e_parse_command ( string_t *cmd          /* Command to parse */
         return MY_FALSE;
 
     /* Prepare some variables */
-    
+
     xallocate(old, sizeof *old, "parse context");
-        
+
     wvec = explode_string(cmd, STR_SPACE);
     if (!wvec)
         wvec = allocate_array(0);
@@ -1694,7 +1694,7 @@ e_parse_command ( string_t *cmd          /* Command to parse */
     inter_sp->u.lvalue = &error_handler_addr;
 
     /* Make space for the list arrays */
-    
+
     gId_list    = allocate_array(VEC_SIZE(obvec));
     gPluid_list = allocate_array(VEC_SIZE(obvec));
     gAdjid_list = allocate_array(VEC_SIZE(obvec));
@@ -1762,7 +1762,7 @@ e_parse_command ( string_t *cmd          /* Command to parse */
             else
             {
                 size_t fword, ocix, fpix;
-                
+
                 ocix = fword = cix;
                 fpix = ++pix;
 

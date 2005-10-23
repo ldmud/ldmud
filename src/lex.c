@@ -872,65 +872,65 @@ symbol_operator (char *symbol, char **endp)
  *
  * Recognized are the following operators:
  *
- *   #'+=     -> F_ADD_EQ               
- *   #'++     -> F_POST_INC             
- *   #'+      -> F_ADD                  
- *   #'-=     -> F_SUB_EQ               
- *   #'--     -> F_POST_DEC             
- *   #'-      -> F_SUBTRACT             
- *   #'*=     -> F_MULT_EQ              
- *   #'*      -> F_MULTIPLY             
- *   #'/=     -> F_DIV_EQ               
- *   #'/      -> F_DIVIDE               
- *   #'%=     -> F_MOD_EQ               
- *   #'%      -> F_MOD                  
- *   #',      -> F_POP_VALUE            
- *   #'^=     -> F_XOR_EQ               
- *   #'^      -> F_XOR                  
- *   #'||     -> F_LOR                  
- *   #'|=     -> F_OR_EQ                
- *   #'|      -> F_OR                   
- *   #'&&     -> F_LAND                 
- *   #'&=     -> F_AND_EQ               
- *   #'&      -> F_AND                  
- *   #'~      -> F_COMPL                
- *   #'<=     -> F_LE                   
- *   #'<<=    -> F_LSH_EQ               
- *   #'<<     -> F_LSH                  
- *   #'<      -> F_LT                   
- *   #'>=     -> F_GE                   
- *   #'>>=    -> F_RSH_EQ               
- *   #'>>>=   -> F_RSHL_EQ               
- *   #'>>>    -> F_RSHL                  
- *   #'>>     -> F_RSH                  
- *   #'>      -> F_GT                   
- *   #'==     -> F_EQ                   
- *   #'=      -> F_ASSIGN               
- *   #'!=     -> F_NE                   
- *   #'!      -> F_NOT                  
- *   #'?!     -> F_BRANCH_WHEN_NON_ZERO 
- *   #'?      -> F_BRANCH_WHEN_ZERO     
- *   #'[..]   -> F_RANGE                
- *   #'[..<]  -> F_NR_RANGE             
- *   #'[<..]  -> F_RN_RANGE             
- *   #'[<..<] -> F_RR_RANGE             
- *   #'[..>]  -> F_NA_RANGE             
- *   #'[>..]  -> F_AN_RANGE             
- *   #'[<..>] -> F_RA_RANGE             
- *   #'[>..<] -> F_AR_RANGE             
- *   #'[>..>] -> F_AA_RANGE             
+ *   #'+=     -> F_ADD_EQ
+ *   #'++     -> F_POST_INC
+ *   #'+      -> F_ADD
+ *   #'-=     -> F_SUB_EQ
+ *   #'--     -> F_POST_DEC
+ *   #'-      -> F_SUBTRACT
+ *   #'*=     -> F_MULT_EQ
+ *   #'*      -> F_MULTIPLY
+ *   #'/=     -> F_DIV_EQ
+ *   #'/      -> F_DIVIDE
+ *   #'%=     -> F_MOD_EQ
+ *   #'%      -> F_MOD
+ *   #',      -> F_POP_VALUE
+ *   #'^=     -> F_XOR_EQ
+ *   #'^      -> F_XOR
+ *   #'||     -> F_LOR
+ *   #'|=     -> F_OR_EQ
+ *   #'|      -> F_OR
+ *   #'&&     -> F_LAND
+ *   #'&=     -> F_AND_EQ
+ *   #'&      -> F_AND
+ *   #'~      -> F_COMPL
+ *   #'<=     -> F_LE
+ *   #'<<=    -> F_LSH_EQ
+ *   #'<<     -> F_LSH
+ *   #'<      -> F_LT
+ *   #'>=     -> F_GE
+ *   #'>>=    -> F_RSH_EQ
+ *   #'>>>=   -> F_RSHL_EQ
+ *   #'>>>    -> F_RSHL
+ *   #'>>     -> F_RSH
+ *   #'>      -> F_GT
+ *   #'==     -> F_EQ
+ *   #'=      -> F_ASSIGN
+ *   #'!=     -> F_NE
+ *   #'!      -> F_NOT
+ *   #'?!     -> F_BRANCH_WHEN_NON_ZERO
+ *   #'?      -> F_BRANCH_WHEN_ZERO
+ *   #'[..]   -> F_RANGE
+ *   #'[..<]  -> F_NR_RANGE
+ *   #'[<..]  -> F_RN_RANGE
+ *   #'[<..<] -> F_RR_RANGE
+ *   #'[..>]  -> F_NA_RANGE
+ *   #'[>..]  -> F_AN_RANGE
+ *   #'[<..>] -> F_RA_RANGE
+ *   #'[>..<] -> F_AR_RANGE
+ *   #'[>..>] -> F_AA_RANGE
  *   #'[..    -> F_NX_RANGE
- *   #'[<..   -> F_RX_RANGE       
- *   #'[>..   -> F_AX_RANGE       
- *   #'[,]    -> F_MAP_INDEX            
- *   #'[      -> F_INDEX                
- *   #'[<     -> F_RINDEX               
- *   #'[>     -> F_AINDEX               
- *   #'({     -> F_AGGREGATE            
- *   #'([     -> F_M_CAGGREGATE         
+ *   #'[<..   -> F_RX_RANGE
+ *   #'[>..   -> F_AX_RANGE
+ *   #'[,]    -> F_MAP_INDEX
+ *   #'[      -> F_INDEX
+ *   #'[<     -> F_RINDEX
+ *   #'[>     -> F_AINDEX
+ *   #'({     -> F_AGGREGATE
+ *   #'([     -> F_M_CAGGREGATE
 #ifdef USE_STRUCTS
- *   #'(<     -> F_S_AGGREGATE         
-#endif 
+ *   #'(<     -> F_S_AGGREGATE
+#endif
  *
  * Note that all operators must have a instrs[].Default value of '0'.
  * If necessary, update the lex::init_lexer()::binary_operators[] to
@@ -1318,7 +1318,7 @@ symbol_efun (string_t *name, svalue_t *sp)
         char *cstr;
 
         /* Take care of an leading efun override */
-        
+
         if ( len >= 6 && !strncmp(str, "efun::", 6) )
         {
             str += 6;
@@ -1409,7 +1409,7 @@ symbol_efun (string_t *name, svalue_t *sp)
                 }
 
                 /* Got the reserved word: return the closure value */
-                
+
                 sp->type = T_CLOSURE;
                 sp->x.closure_type = (short)(code + CLOSURE_OPERATOR);
                 sp->u.ob = ref_object(current_object, "symbol_efun");
@@ -1420,7 +1420,7 @@ symbol_efun (string_t *name, svalue_t *sp)
         }
 
         /* It is a real identifier */
-        
+
         if (!p || p->type < I_TYPE_GLOBAL
          || (( efun_override || p->u.global.sim_efun < 0 )
              && p->u.global.efun < 0)
@@ -1447,7 +1447,7 @@ undefined_function:
             push_ref_valid_object(inter_sp, current_object, "nomask simul_efun");
             push_ref_string(inter_sp, p->name);
             res = apply_master(STR_PRIVILEGE, 3);
-            
+
             if (!res || res->type != T_NUMBER || res->u.number < 0)
             {
             	/* Override attempt is fatal */
@@ -1464,12 +1464,12 @@ undefined_function:
         }
 
         /* Symbol is ok - create the closure value */
-        
+
         sp->type = T_CLOSURE;
         if (!efun_override && p->u.global.sim_efun >= 0)
         {
             /* Handle non-overridden simul efuns */
-          
+
             sp->x.closure_type = (short)(p->u.global.sim_efun + CLOSURE_SIMUL_EFUN);
             sp->u.ob = ref_object(current_object, "symbol_efun");
         }
@@ -1525,7 +1525,7 @@ lookfor_shared_identifier (char *s, int n, int depth, Bool bCreate)
  * <depth>.
  *
  * If bCreate is FALSE, the function just checks if the given identfier
- * exists in the table. The identifier is considered found, if there 
+ * exists in the table. The identifier is considered found, if there
  * is an entry in the table for this very name, and with a type equal
  * or greater than <n>. If <n> is LOCAL and the found identifier is LOCAL
  * as well, the identifier is considered found if <depth> is equal or smaller
@@ -2531,7 +2531,7 @@ open_include_file (char *buf, char *name, mp_int namelen, char delim)
              */
 
             char * cp;
-            
+
             if (res->type != T_STRING)
             {
                 yyerrorf("Illegal to include file '%s'.", name);
@@ -2545,7 +2545,7 @@ open_include_file (char *buf, char *name, mp_int namelen, char delim)
             }
 
             for (cp = get_txt(res->u.str); *cp == '/'; cp++) NOOP;
-            
+
             if (!legal_path(cp))
             {
                 yyerrorf("Illegal path '%s'.", get_txt(res->u.str));
@@ -2576,7 +2576,7 @@ open_include_file (char *buf, char *name, mp_int namelen, char delim)
     }
 
     /* The master apply didn't succeed, try the manual handling */
-    
+
     if (delim == '"') /* It's a "-include */
     {
         /* Merge the <name> with the <current_file> name. */
@@ -6497,7 +6497,7 @@ _expand_define (struct defn *p, ident_t * macro)
                         {
                             r = skip_pp_comment(r);
                         }
-                        else 
+                        else
                         {
                             --r;
                             *q++ = '/';

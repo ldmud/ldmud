@@ -6,10 +6,10 @@ DESCRIPTION
         privileged to do so by the master object. In most
         installations it can always be set to the current uid of the
         object, to the uid of the creator of the object file, or to 0.
-        
+
         When this value is 0, the current object's uid can be changed
         by export_uid(), and only then.
-        
+
         If strict euid usage is enforced, objects with euid 0 cannot
         load or clone other objects.
 

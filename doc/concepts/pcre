@@ -336,9 +336,9 @@ BACKSLASH
         circumflex  and  dollar  (described below) in that they only
         ever match at the very start and end of the subject  string,
         whatever  options  are  set.  They  are  not affected by the
-        RE_NOTBOL or RE_NOTEOL options. The difference between \Z 
-        and \z is that  \Z  matches  before  a newline  that is the 
-        last character of the string as well as at the end of the 
+        RE_NOTBOL or RE_NOTEOL options. The difference between \Z
+        and \z is that  \Z  matches  before  a newline  that is the
+        last character of the string as well as at the end of the
         string, whereas \z  matches only at the end.
 
 
@@ -615,7 +615,7 @@ SUBPATTERNS
 
         2. It sets up the subpattern as a capturing  subpattern  (as
         defined  above).   When the whole pattern matches, that por-
-        tion of the subject string that matched  the  subpattern 
+        tion of the subject string that matched  the  subpattern
         can be referenced in functions like regreplace() in the
         replacement string with the \<num> notation. Opening
         parentheses are counted  from  left to right (starting from
@@ -1383,7 +1383,7 @@ DIFFERENCES FROM PERL
 
 NOTES
         The \< and \> metacharacters from Henry Spencers package
-        are not available in PCRE, but can be emulate with \b, 
+        are not available in PCRE, but can be emulate with \b,
         as required also in conjunction with \W or \w.
 
         In LDMud, backtracks are limited by the EVAL_COST runtime

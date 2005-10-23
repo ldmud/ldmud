@@ -71,7 +71,7 @@ union u {
        *   to allow proper cleanup during error recoveries. The interpreter
        *   knows how to free it, but that's all.
        */
-      
+
     void *generic;
       /* Use read-only, this member is used to read the svalue generically
        * as "a pointer". It is mostly used in comparisons.
@@ -119,7 +119,7 @@ union u {
        * Once complete, the .u.const_list is replaced by the completed .u.vec.
        */
 #endif
-       
+
 };
 
 /* --- struct svalue_s: the LPC data structure ---
@@ -272,7 +272,7 @@ struct svalue_s
 #define CLOSURE_LFUN            0  /* lfun in this object */
 #define CLOSURE_ALIEN_LFUN      1  /* lfun in an other object */
 #define CLOSURE_IDENTIFIER      2  /* variable in this object */
-   
+
 #define CLOSURE_PRELIMINARY     3
     /* Efun closure used in a static initialization */
 
@@ -311,7 +311,7 @@ struct svalue_s
   /* TRUE if the closure is callable.
    */
 
-/* --- The primary types in bit-flag encoding --- 
+/* --- The primary types in bit-flag encoding ---
  *
  * This flag encoding is used for the runtime typetests.
  * Not all svalue types have a corresponding bitflag.
@@ -450,7 +450,7 @@ double READ_DOUBLE(struct svalue *svalue_pnt)
    *   in the function <from>.
    */
 
-  
+
 /* void put_<type>(sp, value): Initialise svalue *sp with value of <type>.
  *   'sp' is evaluated several times and must point to an otherwise
  *   empty svalue. If <value> is a refcounted value, its refcount is
@@ -508,7 +508,7 @@ double READ_DOUBLE(struct svalue *svalue_pnt)
 
 #define put_valid_object(sp,val,from) \
     ( ((val) && !((val)->flags & O_DESTRUCTED)) \
-      ? (put_object(sp,val,from), 0) : put_number(sp, 0))
+      ? (put_object(sp,val), 0) : put_number(sp, 0))
 
 #define put_ref_string(sp,val) \
     ( (sp)->type = T_STRING, (sp)->u.str = ref_mstring(val) )
@@ -534,12 +534,12 @@ double READ_DOUBLE(struct svalue *svalue_pnt)
 #define push_ref_object(sp,val,from) \
     ( (sp)++, put_ref_object(sp,val,from) )
 #define push_object(sp,val,from) \
-    ( (sp)++, put_object(sp,val,from) )
+    ( (sp)++, put_object(sp,val) )
 
 #define push_ref_valid_object(sp,val,from) \
     ( (sp)++, put_ref_valid_object(sp,val,from) )
 #define push_valid_object(sp,val,from) \
-    ( (sp)++, put_valid_object(sp,val,from) )
+    ( (sp)++, put_valid_object(sp,val) )
 
 #define push_ref_string(sp,val) \
     ( (sp)++, put_ref_string(sp,val) )
@@ -561,7 +561,7 @@ double READ_DOUBLE(struct svalue *svalue_pnt)
  *   DYN_MAPPING_COST(l): increase eval_cost depending on mapping length <l>.
  *
  * Covered so far are:
- *   F_ALLOCATE, F_ADD, F_ADD_EQ, F_VOID_ADD_EQ, F_MULTIPLY, 
+ *   F_ALLOCATE, F_ADD, F_ADD_EQ, F_VOID_ADD_EQ, F_MULTIPLY,
  *   F_MULT_EQ of strings
  *
  * TODO: Expand this to all datatypes and sizes.

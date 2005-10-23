@@ -3,7 +3,7 @@
  *
  *---------------------------------------------------------------------------
  * Simul-efuns are a way to provide a mudlib with additional efuns which are
- * nevertheless implemented in LPC. 
+ * nevertheless implemented in LPC.
  *
  * The simul-efuns are implemented in one "simul-efun object" which is
  * loaded by the master and made known to the driver by it's name (this way
@@ -67,7 +67,7 @@ object_t *simul_efun_object  = NULL;
 
 vector_t *simul_efun_vector  = NULL;
   /* When available, all simul_efun object names
-   * The first is the name of the primary object - it these object's 
+   * The first is the name of the primary object - it these object's
    * functions which are tabled. All alternative objects are used
    * using a normal apply() from interpret.c:call_simul_efun().
    */
@@ -199,7 +199,7 @@ get_simul_efun_object (void)
         printf("%s No simul_efun\n", time_stamp());
         return NULL;
     }
-    
+
     if (svp->type == T_POINTER)
     {
         simul_efun_vector = svp->u.vec;
@@ -357,7 +357,7 @@ get_simul_efun_object (void)
                     while ( (j = simul_efunp[last = j].offset.func) >= 0)
                     {
                         if (num_arg != simul_efunp[j].num_arg
-                         || 0 != ((simul_efunp[j].flags ^ flags) & TYPE_MOD_XVARARGS) 
+                         || 0 != ((simul_efunp[j].flags ^ flags) & TYPE_MOD_XVARARGS)
                            )
                             continue;
                         if (!mstreq(function_name, simul_efunp[j].name))

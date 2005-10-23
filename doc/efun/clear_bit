@@ -4,7 +4,7 @@ SYNOPSIS
 DESCRIPTION
         Return the new string where bit n is cleared in string str.
         Note that the old string str is not modified.
-        
+
         Each character contains 6 bits. So you can store a value
         between 0 and 63 ( 2^6=64) in one character. Starting
         character is the blank character " " which has the value 0.
@@ -14,15 +14,15 @@ DESCRIPTION
 EXAMPLES
         string s;
         s=clear_bit("_",5);
-        
+
         Because "_" is the highest possible value (63), the variable s
         will now contain the charcter "?" wich is equal to 31
         (63-2^5=31).
-        
+
         string s;
         s=clear_bit("?<",3);
         s=clear_bit(s,8);
-        
+
         s will now contain the string "78". "?" equals 31 and "<"
         equals 28. Now "?<" is equal to 31+28<<6=31+1792=1823 which is
         in binary notation (highest bit on the right side)

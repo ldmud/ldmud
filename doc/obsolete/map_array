@@ -9,9 +9,9 @@ DESCRIPTION
         in ob is called for each element in arr with that element as
         parameter. A second parameter extra is sent in each call if
         given. ob can be an object or a string. Principal function:
-        
+
         foreach (index) arr[index] = ob->fun(arr[index],extra);
-        
+
         The value returned by ob->fun(array[index],extra) replaces the
         existing element in the array. If arr is not an array, then 0
         will be returned.
@@ -25,7 +25,7 @@ EXAMPLE
         string ask_for_uid(object obj) {
            return getuid(obj);
         }
-        
+
         void func() {
            string *names;
            names = map_array(users(), "ask_for_uid", this_object());
@@ -33,7 +33,7 @@ EXAMPLE
            names = map_array(users(), #'getuid );
            ...
         }
-        
+
         This will create an array holding all uids of the current
         users.
 

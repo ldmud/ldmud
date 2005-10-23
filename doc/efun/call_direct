@@ -20,7 +20,7 @@ DESCRIPTION
         The object(s) can be given directly or via a string (i.e. its
         object_name). If it is given by a string and the object does not
         exist yet, it will be loaded.
-        
+
         ob->fun(args) and "ob_name"->fun(args) is equivalent to
         call_other(ob, "fun", args). Nowadays the ob_name string can
         also be a variable.
@@ -55,7 +55,7 @@ EXAMPLES
 
         You have to do explicit type casting because of the unknown
         return type, if you have set #pragma strict_types.
-        
+
         // This statement calls the lfun short() in all interactive users
         // and stores the collected results in a variable.
         string * s;

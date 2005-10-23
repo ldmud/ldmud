@@ -23,7 +23,7 @@ struct mapping_s {
     p_int       ref;               /* Number of references */
     wiz_list_t *user;              /* Who made the mapping */
     p_int       num_values;        /* Number of values for a key */
-    p_int       num_entries;       /* Number of valid entries */ 
+    p_int       num_entries;       /* Number of valid entries */
     struct mapping_cond_s * cond;  /* Condensed entries */
     struct mapping_hash_s * hash;  /* Hashed entries */
 };
@@ -31,7 +31,7 @@ struct mapping_s {
 /* --- struct mapping_hash_s: the hashed index ---
  *
  * New entries in a mapping are stored in a hash structure for fast
- * access. The hash grows dynamically with the number of entries - 
+ * access. The hash grows dynamically with the number of entries -
  * the structure is then reallocated to fit - the goal is to keep
  * on average two entries per hash bucket.
  *

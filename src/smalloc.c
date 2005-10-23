@@ -38,12 +38,12 @@
  * first word for the list pointer.
  *
  * If a small block can't be allocated from the appropriate free list nor the
- * small chunk, the system tries two more strategies before allocating a 
+ * small chunk, the system tries two more strategies before allocating a
  * new small chunk. First, it checks the list of oversized free small blocks
  * for a block large enough to be split. If no such block exists,
  * the allocator then searches the freelists of larger block sizes for
  * a possible split.
- * 
+ *
  * The idea behind this strategy is to improve the reuse of free small block
  * space, at the cost of higher fragmentation. To battle the fragmentation,
  * the allocator allows to 'consolidate' the free lists: it searches the
@@ -138,12 +138,12 @@
 #endif
 
 #include "../mudlib/sys/debug_info.h"
- 
+
 #define SINT (SIZEOF_CHAR_P)
 
 /* Initialiser macros for the tables */
 
-#define INIT8  0, 0, 0, 0, 0, 0, 0, 0 
+#define INIT8  0, 0, 0, 0, 0, 0, 0, 0
 #define INIT16 INIT8, INIT8
 #define INIT32 INIT16, INIT16
 
@@ -374,7 +374,7 @@ static word_t *last_small_chunk = NULL;
    * The first word of each chunk points to the previously allocated
    * one.
    */
-   
+
 static word_t *sfltable[SMALL_BLOCK_MAX+1] = {INIT_SMALL_BLOCK_MAX, 0};
   /* List of free small blocks of the various sizes.
    * The blocks are linked through the first non-header word_t.
@@ -673,7 +673,7 @@ smalloc (size_t size
     }
 
     /* It's a small block */
-    
+
     size = (size+OVERHEAD*SINT+SINT-1) & ~(SINT-1); /* block size in bytes */
 
     /* Update statistics */
@@ -736,7 +736,7 @@ smalloc (size_t size
                 /* Make sure that the split leaves a legal block behind */
                 if (bsize < wsize + OVERHEAD + 1)
                     continue;
-                
+
                 count_back(small_free_stat, bsize * SINT);
 
                 /* If the split leaves behind a normally sized small
@@ -871,7 +871,7 @@ smalloc (size_t size
 
         /* Not enough space in the small chunk left and all other strategies
          * failed, too - get a new small chunk */
-      
+
         fake("Allocating new small chunk.");
         if (unused_size)
         {
@@ -1926,7 +1926,7 @@ static char *
 large_malloc ( word_t size, Bool force_more)
 
 #else
-              
+
 static char *
 _large_malloc ( word_t size, Bool force_more
               , const char *file, int line
@@ -2162,7 +2162,7 @@ found_fit:
          || block_size > CHUNK_SIZE - SMALL_BLOCK_MAX_BYTES - OVERHEAD*SINT )
         {
             chunk_size = block_size;
-            
+
         }
         else
         {
@@ -2183,7 +2183,7 @@ found_fit:
 #           else
                 chunk_size += ALLOC_MULTIPLE;
 #           endif
-                
+
             chunk_size &= ~ALLOC_MULTIPLE;
         }
 
@@ -2229,21 +2229,21 @@ found_fit:
                 "Temporarily out of MEMORY. Freeing system reserve.\n";
             static char mess4[] =
                 "Totally out of MEMORY.\n";
-            static char mess_d1[] = 
+            static char mess_d1[] =
                 "Low on MEMORY: Trying to allocate large ";
-            static char mess_d2[] = 
+            static char mess_d2[] =
                 " bytes for ";
-            static char mess_d3[] = 
+            static char mess_d3[] =
                 " bytes request";
 #ifdef MALLOC_TRACE
-            static char mess_d4[] = 
+            static char mess_d4[] =
                 " (";
-            static char mess_d5[] = 
+            static char mess_d5[] =
                 " line ";
-            static char mess_d6[] = 
+            static char mess_d6[] =
                 ")";
 #endif
-            static char mess_nl[] = 
+            static char mess_nl[] =
                 "\n";
 
             ulog2f("lmalloc(%d / %d): Didn't get the memory from the system.\n"
@@ -2562,7 +2562,7 @@ esbrk (word_t size)
                 *p = THIS_BLOCK | (heap_start - p); /* no M_GC_FREE */
                 overlap = 0;
             }
-            
+
             heap_start = (word_t *)block;
         }
         else if (block >= (char *)heap_end)
@@ -2977,7 +2977,7 @@ smalloc_dinfo_data (svalue_t *svp, int value)
 #define ST_NUMBER(which,code) \
     if (value == -1) svp[which].u.number = code; \
     else if (value == which) svp->u.number = code
-    
+
     if (value == -1)
         put_ref_string(svp+DID_MEM_NAME, STR_SMALLOC);
     else if (value == DID_MEM_NAME)
@@ -3358,7 +3358,7 @@ write_lpc_trace (int d, word_t *p)
 
             line = get_line_number(pc, prog, &file);
             dprintf2(d, "%s line:%d\n", (p_int)get_txt(file), line);
-        
+
             if (file)
                 free_mstring(file);
         }
@@ -3408,7 +3408,7 @@ dump_malloc_trace (int d
                   )
 
 /* Write the allocation information (file, linenumber, object and such) of
- * the memory block <adr> onto file <d>. 
+ * the memory block <adr> onto file <d>.
  * <adr> is the address returned by xalloc(), ie. pointing after the memory
  * block header.
  */
@@ -3716,7 +3716,7 @@ sm_check_malloc_data (const char *file, int line)
                            , (p_int)file, (p_int)line);
 
     dprintf4(gcollect_outfd, " small (alloc %d, free %d, wasted %d, unused %d)"
-           , (p_int)s_alloc.size 
+           , (p_int)s_alloc.size
            , (p_int)s_free.size
            , (p_int)s_wasted.size
            , (p_int)unused

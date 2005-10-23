@@ -305,7 +305,7 @@ otable_dinfo_status (svalue_t *svp, int value)
 #define ST_NUMBER(which,code) \
     if (value == -1) svp[which].u.number = code; \
     else if (value == which) svp->u.number = code
-    
+
     ST_NUMBER(DID_ST_OTABLE, objs_in_table);
     ST_NUMBER(DID_ST_OTABLE_SLOTS, OTABLE_SIZE);
     ST_NUMBER(DID_ST_OTABLE_SIZE, OTABLE_SIZE * sizeof(object_t *));

@@ -8,10 +8,10 @@
  *
  * Mempools: allocation of objects with identical time of death.
  *           Attempts to deallocate single objects have no effect.
- *           
+ *
  * Fifopools: allocation/deallocation of objects follows (more than less)
  *            a fifo pattern.
- *            
+ *
  * Note: the GC will deallocate all memory pools.
  * TODO: Implement a clear-ref/mark-ref call for the pools in case somebody
  * TODO:: wants to keep on to a pool for longer.
@@ -90,7 +90,7 @@ typedef union align align_t;
 /* --- struct memblock_s: manages one block of memory ---
  * Used for the low-level allocation of memory, the various allocators
  * then work within the allocated arena.
- * 
+ *
  * Mempools fill the arena from the end. pMark marks the break between
  * the (low) unused and (high) used memory, pointing to the first used
  * byte.
@@ -114,7 +114,7 @@ struct memblock_s {
     char    *pMark;     /* End of unused arena */
     size_t   length;    /* Total size of this memblock */
     union {
-        align_t a;  
+        align_t a;
         char data[1];   /* Placeholder for data arena */
     } u;
 };
@@ -173,7 +173,7 @@ fifopool_size (size_t elemsize, unsigned int num)
 /* Return the size for a fifopool suitable to hold <num> object of size
  * <elemsize>, taking into account all the overhead.
  */
-  
+
 {
     return num * (ROUND(elemsize) + SIZEOF_FIFO_T);
 }
@@ -427,7 +427,7 @@ alloc_from_fifo (Mempool pPool, size_t iSize)
             pBlock->length = sizeof(*pBlock)-sizeof(pBlock->u)
                              + pPool->iAllocSize;
             pBlock->pMark = pBlock->u.data + pPool->iAllocSize;
-            
+
             /* For fifopools, add a sentinel (pseudo-used block) at the end
              * of the arena.
              */
@@ -525,7 +525,7 @@ mempool_free (Mempool pPool, void * adr)
             pFifo = (fifo_t *)pBlock->pMark;
         }
     }
-   
+
     /* If the leading memblock(s) of the pool are completely free,
      * move them over into the free list.
      */
@@ -541,7 +541,7 @@ mempool_free (Mempool pPool, void * adr)
             pBlock = pPool->pBlocks;
         }
     }
-    
+
     /* That's it */
 } /* mempool_free() */
 
@@ -571,7 +571,7 @@ mempool_reset (Mempool pPool)
         pBlock = pBlock->pNext;
         xfree(pThis);
     }
-    
+
     pBlock = pPool->pFree;
     while (pBlock != NULL)
     {
@@ -653,7 +653,7 @@ mempool_delete (Mempool pPool)
                 pPrev->pNextSub = pPool->pNextSub;
         }
     }
-    
+
     /* Delete all depending pools, but take care that those
      * pools don't start to scan our subpool list.
      */

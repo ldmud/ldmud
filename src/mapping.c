@@ -483,7 +483,7 @@ get_new_mapping ( wiz_list_t * user, mp_int num_values
     if (num_values > 0)
     {
         if (num_values > SSIZE_MAX /* TODO: SIZET_MAX, see port.h */
-         || (   num_values != 0 
+         || (   num_values != 0
              && (SSIZE_MAX - sizeof(map_chain_t)) / num_values < sizeof(svalue_t))
            )
             return NULL;
@@ -985,7 +985,7 @@ find_map_entry ( mapping_t *m, svalue_t *map_index
                 key--;
 
             cmp = svalue_cmp(map_index, key);
-            
+
             if (cmp == 0)
             {
                 /* Found it */
@@ -1011,7 +1011,7 @@ find_map_entry ( mapping_t *m, svalue_t *map_index
             }
         }
     }
-    
+
     /* At this point, the key was not found in the condensed index
      * of the mapping. Try the hashed index next.
      */
@@ -1516,7 +1516,7 @@ resize_mapping (mapping_t *m, mp_int new_width)
             /* NOTREACHED */
             return NULL;
         }
-          
+
     }
 
     /* Get the target mapping without a hash, but with a condensed block
@@ -1982,8 +1982,8 @@ walk_mapping ( mapping_t *m
 
     if (NULL != (cm = m->cond))
     {
-        size_t ix; 
-        
+        size_t ix;
+
         for ( ix = 0, key = &(cm->data[0]), data = COND_DATA(cm, 0, num_values)
             ; ix < cm->size
             ; ix++, key++, data += num_values
@@ -2073,7 +2073,7 @@ compact_mappings (mp_int num)
     m = dirty_mapping_head_hash.next_dirty;
     while (--num >= 0)
     {
-        
+
         mapping_hash_t *hm;
           /* The hash part of m (guaranteed to exist!) */
         mapping_cond_t *cm;
@@ -2654,7 +2654,7 @@ set_mapping_user (mapping_t *m, object_t *owner)
 
     locals.owner = owner;
     locals.num_values = num_values;
-    first_hairy = alloca(((m->cond) ? m->cond->size : 1) * sizeof(svalue_t *)); 
+    first_hairy = alloca(((m->cond) ? m->cond->size : 1) * sizeof(svalue_t *));
     if (!first_hairy)
     {
         error("Stack overflow.\n");
@@ -2749,7 +2749,7 @@ count_mapping_size (mapping_t *m)
     if (m->cond != NULL)
     {
         mp_int subtotal;
-        
+
         subtotal = SIZEOF_MC(m->cond, m->num_values);
         total += subtotal;
 #if 0 && defined(CHECK_MAPPING_TOTAL)
@@ -3043,7 +3043,7 @@ v_m_add (svalue_t *sp, int num_arg)
  *
  * Add (or replace) an entry with index <key> in mapping <map>.
  * The modified mapping is also returned as result.
- * 
+ *
  * The values for the entry are taken from the <data> arguments.
  * Unassigned entry values default to 0, extraneous <data> arguments
  * are ignore.
@@ -3078,7 +3078,7 @@ v_m_add (svalue_t *sp, int num_arg)
          */
         put_number(argp, 0);
     }
-        
+
     /* We leave the reference to the mapping on the stack as result,
      * but pop everything else.
      */
@@ -3384,7 +3384,7 @@ f_walk_mapping_cleanup (svalue_t *arg)
     if (svp->u.cb)
         free_callback(svp->u.cb);
     svp++;
-    
+
     m = svp[1].u.map;
 
     /* If the mapping had a hash part prior to the f_walk_mapping(),

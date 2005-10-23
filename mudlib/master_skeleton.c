@@ -784,7 +784,7 @@ void runtime_error (string err, string prg, string curobj, int line
 //   {
 //       limited(#'handle_runtime_error, ({ 200000 }), err, prg, curobj, line);
 //   }
-//   
+//
 //   void
 //   runtime_error (string err, string prg, string curobj, int line)
 //   {
@@ -975,7 +975,7 @@ string get_bb_uid()
 // current object (e.g. from notify_fail method). The current object
 // will be set to the current command giver, and will receive the euid
 // returned from this function.
-// 
+//
 // If strict-euids, this function must exist and return a string.
 // Otherwise the function is optional and/or may return 0.
 

@@ -57,7 +57,7 @@ DESCRIPTION
 
 
         The ranged form (<expr1> .. <expr2>):
-            
+
             <expr1> and <expr2> are evaluated and must yield integers.
             The loop will count up <var> from <expr1> to <expr2>, basically
             implementing a counted loop.
@@ -90,7 +90,7 @@ DESCRIPTION
         remains.
 
 
-WARNING 
+WARNING
         The additional syntax forms using "in" as keyword are meant
         to make re-engineering of MudOS objects easier. Do not use them
         for newly written code, as they may not be available in future.

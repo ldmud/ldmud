@@ -57,7 +57,7 @@ printbits (string_t *bstr)
 #endif
 
 /*-------------------------------------------------------------------------*/
-static INLINE p_int 
+static INLINE p_int
 last_bit (string_t *str)
 
 /* Return the number of the last set bit in bitstring <str>.
@@ -1056,7 +1056,7 @@ v_copy_bits (svalue_t *sp, int num_arg)
                      , destendlen);
         }
     }
-    
+
     /* Clean up the stack and push the result */
     sp--; /* The result reference for error cleanup */
     free_svalue(sp--);

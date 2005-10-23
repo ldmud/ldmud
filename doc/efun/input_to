@@ -34,7 +34,7 @@ DESCRIPTION
           INPUT_CHARMODE  (2):
               The connection is switched from line- into charmode to
               retrieve a single character(!) from the player.
-              
+
               After execution of <fun>, the connection is switched
               back into linemode unless a subsequent input_to( , 2)
               has been issued.

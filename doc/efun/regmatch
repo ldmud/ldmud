@@ -36,7 +36,7 @@ EXAMPLE
 
         regmatch("abcdefcdf", "cd", RE_MATCH_SUBS)    -> ({ "cd" })
         regmatch("abcdefcdf", "cd(e)", RE_MATCH_SUBS) -> ({ "cde", "e" })
-        
+
 HISTORY
         Introduced in LDMud 3.3.198.
         Modified in 3.3.214 to return 0 for non-matches, and to take and

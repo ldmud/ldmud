@@ -131,7 +131,7 @@ DESCRIPTION
         similar to the inherit syntax:
 
           default private;
-            
+
             All variables and functions are by default private.
 
           default private variables public functions;

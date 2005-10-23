@@ -21,9 +21,9 @@ DESCRIPTION
 
 EXAMPLES
         tell_object(environment(this_player()), "Hi!\n");
-        
+
         Just send a simple "Hi!" to all livings in the current.
-        
+
         Object 1 (living):
            void catch_tell(string str) {
               write("Received: "+str+"\n");
@@ -34,7 +34,7 @@ EXAMPLES
               tell_room(environment(this_player()), "HiHo!\n");
               ...
            }
-        
+
         This examples shows how tell_room() together with catch_tell() works.
 
 SEE ALSO

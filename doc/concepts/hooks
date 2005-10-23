@@ -114,7 +114,7 @@ DESCRIPTION
           Optional hook to specifiy how to perform the telnet actions
           to switch the echo mode (used for e.g. password input_to()s).
           If not set, a default handling is performed.
-          
+
           IMPORTANT: If this hook is used, the control of all telnet
           negotiation is transferred to the mudlib (you must combine it
           with H_TELNET_NEG to conform to the telnet protocol).

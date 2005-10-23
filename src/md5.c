@@ -13,17 +13,17 @@
  * is identified as the "RSA Data Security, Inc. MD5 Message-Digest
  * Algorithm" in all material mentioning or referencing this software
  * or this function.
- * 
+ *
  * License is also granted to make and use derivative works provided
  * that such works are identified as "derived from the RSA Data
  * Security, Inc. MD5 Message-Digest Algorithm" in all material
  * mentioning or referencing the derived work.
- * 
+ *
  * RSA Data Security, Inc. makes no representations concerning either
  * the merchantability of this software or the suitability of this
  * software for any particular purpose. It is provided "as is"
  * without express or implied warranty of any kind.
- * 
+ *
  * These notices must be retained in any copies of any part of this
  * documentation and/or software.
  *------------------------------------------------------------------
@@ -413,7 +413,7 @@ MD5_memset (unsigned char * output, int value, unsigned int len)
  */
 
 {
-#ifdef HAVE_MEMSET 
+#ifdef HAVE_MEMSET
     memset(output, value, len);
 #else
     unsigned int i;
@@ -469,7 +469,7 @@ MD5Encode(unsigned char *pw,
     MD5_CTX ctx, ctx1;
     unsigned long l;
 
-    /* 
+    /*
      * Refine the salt first.  It's possible we were given an already-hashed
      * string as the salt argument, so extract the actual salt value from it
      * if so.  Otherwise just use the string up to the first '$' as the salt.

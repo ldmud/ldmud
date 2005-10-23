@@ -6,7 +6,7 @@ SYNOPSIS
 DESCRIPTION
         Return the load name for the object <obj> which may be given
         directly or by its name.
-        
+
         If <obj> is a clone, return the load_name() of <obj>'s blueprint.
         If <obj> is a blueprint, return the filename from which the
         blueprint was compiled.
@@ -33,7 +33,7 @@ EXAMPLE
         write(load_name(o));  --> writes "/std/thing" in !compat mode
                                      and "std/thing"  in compat mode
         write(load_name("/std/thing"));  --> same as above
-        write(load_name("/std/thing#4n5")); --> writes 0 
+        write(load_name("/std/thing#4n5")); --> writes 0
 
 HISTORY
         Introduced in LDMud 3.2.6.

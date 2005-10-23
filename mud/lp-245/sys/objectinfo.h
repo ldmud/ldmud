@@ -65,7 +65,7 @@
 #define OIM_NUM_STRINGS          7
 #define OIM_SIZE_STRINGS         8
 #define OIM_SIZE_STRINGS_DATA    9
-#define OIM_SIZE_STRINGS_TOTAL  10 
+#define OIM_SIZE_STRINGS_TOTAL  10
 #define OIM_NUM_INHERITED       11
 #define OIM_SIZE_INHERITED      12
 #define OIM_TOTAL_SIZE          13
@@ -74,7 +74,7 @@
 #define OIM_NO_INHERIT          16
 #define OIM_NO_CLONE            17
 #define OIM_NO_SHADOW           18
-#define OIM_NUM_INCLUDES        19 
+#define OIM_NUM_INCLUDES        19
 
 #define OIM_MAX 20  /* Number of OIM_ result elements */
 

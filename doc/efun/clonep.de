@@ -10,7 +10,7 @@ BESCHREIBUNG
         Wird kein Argument uebergeben, so wird this_object() getestet.
         Liefert 0, wenn das Argument von einem anderen Typ.
         Ein Objekt, dessen Programm mittels replace_program() ersetzt wurde,
-        zaehlt nicht als Klon. 
+        zaehlt nicht als Klon.
 
 BEISPIEL
         object o;

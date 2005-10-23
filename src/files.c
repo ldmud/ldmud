@@ -104,7 +104,7 @@ strip_trailing_slashes (char *path)
 static int
 copy_file (const char *from, const char *to, int mode)
 
-/* Copy the file <from> to <to> with access <mode>. 
+/* Copy the file <from> to <to> with access <mode>.
  * Return 0 on success, 1 or errno on failure.
  */
 
@@ -524,7 +524,7 @@ f_copy_file (svalue_t *sp)
     string_t *path;
     char *cp, *to;
     int result;
-    
+
     /* Check the arguments */
 
     do {
@@ -630,7 +630,7 @@ f_copy_file (svalue_t *sp)
     free_svalue(sp);
     free_svalue(sp-1);
     put_number(sp-1, result);
-   
+
     return sp-1;
 } /* f_copy_file() */
 
@@ -693,7 +693,7 @@ f_get_dir (svalue_t *sp)
  * To query the content of a directory, use the directory name with a
  * trailing '/' or '/.', for example get_dir("/path/."). Use the
  * directory name as it is to get information about the directory itself.
- * 
+ *
  * The optional second argument mask can be used to get
  * information about the specified files.
  *
@@ -740,7 +740,7 @@ f_get_dir (svalue_t *sp)
         Bool            in_top_dir = MY_FALSE;
         struct xdirect *de;
         struct stat     st;
-        char           *p; 
+        char           *p;
         char           *regexpr = 0;
         int             nqueries;
 
@@ -813,7 +813,7 @@ f_get_dir (svalue_t *sp)
         else if (*p != '\0' && strcmp(path, "."))
         {
             /* We matched a single file */
-            
+
             svalue_t *stmp;
 
             if (*p == '/' && *(p + 1) != '\0')
@@ -1212,7 +1212,7 @@ v_read_file (svalue_t *sp, int num_arg)
         long size; /* TODO: fpos_t? */
 
         p = NULL; /* Silence spurious warnings */
-        end = NULL; 
+        end = NULL;
 
         if (len < 0 && len != -1)
             break;

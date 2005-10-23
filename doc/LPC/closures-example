@@ -65,7 +65,7 @@ DESCRIPTION
         Note also the missing #'return: it is not needed. The result
         of a lambda-closure is the last value computed.
 
-        
+
         Another example: Task is to reduce the HP of every living in a
         room by 10, unless the result would be negative.
         Selecting all livings in a room is simply
@@ -111,7 +111,7 @@ DESCRIPTION
               })
             ) // of lambda()
           );
-        
+
         It is worthy to point out how local variables like 'hp' are
         declared in a lambda-closure: not at all. They are just used
         by writing their symbol 'hp . Same applies to the closures
@@ -121,7 +121,7 @@ DESCRIPTION
         lambda(), and the lambda() is recompiled every time this
         statement is executed!
 
-        
+
         So far, lambda-closures seem to be just complicated, and in
         fact: they are. Their powers lie elsewhere.
 
@@ -179,7 +179,7 @@ DESCRIPTION -- When to use which closure?
         First, a closure is only then useful if it needn't to live any
         longer than the object defining it. Reason: when the defining
         object gets destructed, the closure will vanish, too.
-        
+
         Efun-, lfun- and inline closures should be used where useful, as they
         mostly do the job and are easy to read. The disadvantage of lfun- and
         inline closures is that they make a replace_program() impossible

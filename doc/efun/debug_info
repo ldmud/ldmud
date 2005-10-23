@@ -82,7 +82,7 @@ DESCRIPTION
             the driver specified by <arg2>. The result of the function
             is an array with the information, or 0 for unsupported values
             of <arg2>.
-            
+
             If <arg3> is given and in the range of array indices
             for the given <arg2>, the result will be just the indexed array
             entry, but not the full array.
@@ -185,7 +185,7 @@ DESCRIPTION
                   Number and size of swapped-out programs.
 
               int DID_ST_USER_RESERVE
-              int DID_ST_MASTER_RESERVE     
+              int DID_ST_MASTER_RESERVE
               int DID_ST_SYSTEM_RESERVE
                   Current sizes of the three memory reserves.
 
@@ -254,7 +254,7 @@ DESCRIPTION
                   Number and accumulated length of string searches by value.
 
               int DID_ST_STR_FOUND
-              int DID_ST_STR_FOUND_BYVALUE 
+              int DID_ST_STR_FOUND_BYVALUE
                   Number of successful searches by address resp. by value.
 
               int DID_ST_RX_CACHED
@@ -276,41 +276,41 @@ DESCRIPTION
                   a cached one.
 
             <arg2> == DID_SWAP (1): Returns the "status swap" information:
- 
+
                int DID_SW_PROGS
                int DID_SW_PROG_SIZE
                    Number and size of swapped-out program blocks.
- 
+
                int DID_SW_PROG_UNSWAPPED
                int DID_SW_PROG_U_SIZE
                    Number and size of unswapped program blocks.
- 
+
                int DID_SW_VARS
                int DID_SW_VAR_SIZE
                    Number and size of swapped-out variable blocks.
- 
+
                int DID_SW_FREE
                int DID_SW_FREE_SIZE
                    Number and size of free blocks in the swap file.
- 
+
                int DID_SW_FILE_SIZE
                    Size of the swap file.
- 
+
                int DID_SW_REUSED
                    Total reused space in the swap file.
- 
+
                int DID_SW_SEARCHES
                int DID_SW_SEARCH_LEN
                    Number and total length of searches for block to reuse
                    in the swap file.
- 
+
                int DID_SW_F_SEARCHES
                int DID_SW_F_SEARCH_LEN
                    Number and total length of searches for a block to free.
- 
+
                int DID_SW_COMPACT
                    TRUE if the swapper is running in compact mode.
- 
+
                int DID_SW_RECYCLE_FREE
                    TRUE if the swapper is currently recycling free block.
 
@@ -405,7 +405,7 @@ DESCRIPTION
             by <arg2>. The result of the function is either an array (format
             explained below), or a printable string. Omitting <arg2> defaults
             to DIT_CURRENT.
- 
+
             <arg2> == DIT_CURRENT (0): Current call trace
                    == DIT_ERROR   (1): Most recent error call trace (caught
                                        or uncaught)

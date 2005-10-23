@@ -29,7 +29,7 @@ DESCRIPTION
           else do_c;
 
         is interpreted as
-        
+
           if (a) {
             if (b) do_b;
             else   do_c;

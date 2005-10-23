@@ -723,7 +723,7 @@ hs_regcomp (unsigned char *expr, Bool excompat
  * Beware that the optimization-preparation code in here knows about some
  * of the structure of the compiled regexp.
  */
- 
+
 {
     unsigned char   *scan;
     unsigned char   *longest;

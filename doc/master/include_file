@@ -3,7 +3,7 @@ SYNOPSIS
 
 DESCRIPTION
         Generate the pathname of an included file.
- 
+
         Arguments:
           previous_object(): The object causing the compile.
           file             : The name given in the #include directive.

@@ -96,7 +96,7 @@ DESCRIPTION
 
         In addition the master object may offer the same functions to provide
         reasonable defaults (like 'thing' as generic singular name):
- 
+
              string *parse_command_id_list()
                - Would normally return: ({ "one", "thing" })
 

@@ -16,7 +16,7 @@ DESCRIPTION
 
         If the blueprint exists and has a heart_beat(), clone_object()
         turns it off.
-        
+
         Note that the pathname must be complete, which means there are no
         relative paths allowed.
 

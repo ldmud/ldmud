@@ -81,9 +81,9 @@ extern string_t * mstring_resize (string_t * pStr, size_t n MTRACE_DECL);
 extern string_t * mstring_find_tabled (const string_t * pStr);
 extern string_t * mstring_find_tabled_str (const char * const pTxt, size_t size);
 extern int        mstring_compare(const string_t * const pStr1
-                                 , const string_t * const pStr2); 
+                                 , const string_t * const pStr2);
 extern Bool       mstring_equal(const string_t * const pStr1
-                               , const string_t * const pStr2); 
+                               , const string_t * const pStr2);
 extern void mstring_free (string_t *s);
 extern string_t * mstring_ref ( string_t * str);
 extern unsigned long mstring_deref ( string_t * str);
@@ -196,7 +196,7 @@ extern void   string_dinfo_status(svalue_t *svp, int value);
 
   /* void free_mstring(s)
    *
-   *   Decrement the refcount for string <s>, and if it reaches 0, 
+   *   Decrement the refcount for string <s>, and if it reaches 0,
    *   deallocate <s> altogether.
    */
 

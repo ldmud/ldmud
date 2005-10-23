@@ -4,7 +4,7 @@ CONCEPT
 DESCRIPTION
         There is support for arrays. The arrays can't be declared, but
         should be allocated dynamically with the function 'allocate()'
-        (see efun/allocate). 
+        (see efun/allocate).
 
         Arrays are stored by reference, so all assignments of whole
         arrays will just copy the address. The array will be

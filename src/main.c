@@ -120,7 +120,7 @@ int port_numbers[MAXNUMPORTS] = { PORTNO };
    */
 int numports = 0;  /* Number of specified ports */
 
-int udp_port = UDP_PORT; 
+int udp_port = UDP_PORT;
   /* Port number for UDP. A negative number disables it. */
 
 char *erq_file = NULL;        /* Base- or pathname of the erq executable,
@@ -399,7 +399,7 @@ main (int argc, char **argv)
 
         reset_machine(MY_TRUE); /* Cold reset the machine */
         init_lexer();
-          /* The lexer needs the master_name, but also the VM 
+          /* The lexer needs the master_name, but also the VM
            * to throw errors.
            */
 
@@ -741,7 +741,7 @@ dprintf_first (int fd, char *s, p_int a)
 
 {
     char *p;
-    
+
     do {
         if ( !(p = strchr(s, '%')) )
         {
@@ -1013,58 +1013,58 @@ static Option aOptions[]
         "    commandline.\n"
       }
 
-    , { 'P', "inherit",            cInherited,      MY_TRUE 
+    , { 'P', "inherit",            cInherited,      MY_TRUE
       , "  -P|--inherit <fd-number>\n"
       , "  -P|--inherit <fd-number>\n"
         "    Inherit filedescriptor <fd-number> from the parent process\n"
         "    as socket to listen for connections.\n"
       }
 
-    , { 'u', "udp",                cUdpPort,        MY_TRUE 
+    , { 'u', "udp",                cUdpPort,        MY_TRUE
       , "  -u|--udp <portnumber>\n"
       , "  -u|--udp <portnumber>\n"
         "    Specify the <portnumber> for the UDP port, overriding the compiled-in\n"
         "    default.\n"
       }
 
-    , { 'D', "define",             cDefine,         MY_TRUE 
+    , { 'D', "define",             cDefine,         MY_TRUE
       , "  -D|--define <macro>[=<text>]\n"
       , "  -D|--define <macro>[=<text>]\n"
         "    Add <macro> (optionally to be expanded to <text>) to the list of\n"
         "    predefined macros known by the LPC compiler.\n"
       }
 
-    , { 'E', "eval-cost",          cEvalcost,       MY_TRUE 
+    , { 'E', "eval-cost",          cEvalcost,       MY_TRUE
       , "  -E|--eval-cost <ticks>\n"
       , "  -E|--eval-cost <ticks>\n"
         "    Set the number of <ticks> available for one evaluation thread.\n"
       }
 
-    , { 'M', "master",             cMaster,         MY_TRUE 
+    , { 'M', "master",             cMaster,         MY_TRUE
       , "  -M|--master <filename>\n"
       , "  -M|--master <filename>\n"
         "    Use <filename> for the master object.\n"
       }
 
-    , { 'm', "mudlib",             cMudlib,         MY_TRUE 
+    , { 'm', "mudlib",             cMudlib,         MY_TRUE
       , "  -m|--mudlib <pathname>\n"
       , "  -m|--mudlib <pathname>\n"
         "    Use <pathname> as the top directory of the mudlib.\n"
       }
 
-    , { 0,   "debug-file",         cDebugFile,      MY_TRUE 
+    , { 0,   "debug-file",         cDebugFile,      MY_TRUE
       , "  --debug-file <filename>\n"
       , "  --debug-file <filename>\n"
         "    Log all debug output in <filename> instead of <host>.debug.log .\n"
       }
 
-    , { 0,   "hostname",           cHostname,       MY_TRUE 
+    , { 0,   "hostname",           cHostname,       MY_TRUE
       , "  --hostname <name>\n"
       , "  --hostname <name>\n"
         "    Use <name> as hostname, instead of what the system says.\n"
       }
 
-    , { 0,   "hostaddr",           cHostaddr,       MY_TRUE 
+    , { 0,   "hostaddr",           cHostaddr,       MY_TRUE
       , "  --hostaddr <addr>\n"
       , "  --hostaddr <addr>\n"
         "    Use <addr> as address of this machine, instead of what the\n"
@@ -1072,7 +1072,7 @@ static Option aOptions[]
              "the driver ports.\n"
       }
 
-    , { 0,   "compat",             cCompat,         MY_FALSE 
+    , { 0,   "compat",             cCompat,         MY_FALSE
       , "  --compat\n"
       , "  --compat\n"
         "  --no-compat\n"
@@ -1081,24 +1081,24 @@ static Option aOptions[]
         "    object.\n"
       }
 
-    , { 0,   "no-compat",          cNoCompat,       MY_FALSE 
+    , { 0,   "no-compat",          cNoCompat,       MY_FALSE
       , "  --no-compat\n"
       , NULL
       }
 
-    , { 'd', "debug",              cDebug,          MY_FALSE 
+    , { 'd', "debug",              cDebug,          MY_FALSE
       , "  -d|--debug\n"
       , "  -d|--debug\n"
         "    Generate debug output; repeat the argument for even more output.\n"
       }
 
-    , { 'c', "list-compiles",      cTrace,          MY_FALSE 
+    , { 'c', "list-compiles",      cTrace,          MY_FALSE
       , "  -c|--list-compiles\n"
       , "  -c|--list-compiles\n"
         "    List the name of every compiled file on stderr.\n"
       }
 
-    , { 'e', "no-preload",         cNoPreload,      MY_FALSE 
+    , { 'e', "no-preload",         cNoPreload,      MY_FALSE
       , "  -e|--no-preload\n"
       , "  -e|--no-preload\n"
         "    Pass a non-zero argument (the number of occurences of this option)\n"
@@ -1106,7 +1106,7 @@ static Option aOptions[]
         "    and other objects.\n"
       }
 
-    , { 0,   "erq",                cErq,            MY_TRUE 
+    , { 0,   "erq",                cErq,            MY_TRUE
       , "  --erq <filename> | --erq \"<filename> <erq args>\"\n"
       , "  --erq <filename>\n"
         "  --erq \"<filename> <erq arguments>\"\n"
@@ -1118,19 +1118,19 @@ static Option aOptions[]
         "    to the erq, however, these may not contain spaces themselves.\n"
       }
 
-    , { 'N', "no-erq",             cNoERQ,          MY_FALSE 
+    , { 'N', "no-erq",             cNoERQ,          MY_FALSE
       , "  -N|--no-erq\n"
       , "  -N|--no-erq\n"
         "    Don't start the erq demon (if it would be started at all).\n"
       }
 
-    , { 't', "no-heart",           cNoHeart,        MY_FALSE 
+    , { 't', "no-heart",           cNoHeart,        MY_FALSE
       , "  -t|--no-heart\n"
       , "  -t|--no-heart\n"
         "    Disable heartbeats and call_outs.\n"
       }
 
-    , { 'f', "funcall",            cFuncall,        MY_TRUE 
+    , { 'f', "funcall",            cFuncall,        MY_TRUE
       , "  -f|--funcall <word>\n"
       , "  -f|--funcall <word>\n"
         "    The lfun master->flag() is called with <word> as argument before the\n"
@@ -1145,35 +1145,35 @@ static Option aOptions[]
         "    reset time. A time <= 0 disables the cleanup mechanism.\n"
       }
 
-    , { 0,   "reset-time",         cResetTime,      MY_TRUE 
+    , { 0,   "reset-time",         cResetTime,      MY_TRUE
       , "  --reset-time <time>\n"
       , "  --reset-time <time>\n"
         "    The time in seconds for an object before it is reset.\n"
         "    A time <= 0 disables the reset mechanism.\n"
       }
 
-    , { 0,   "max-array",          cMaxArray,       MY_TRUE 
+    , { 0,   "max-array",          cMaxArray,       MY_TRUE
       , "  --max-array <size>\n"
       , "  --max-array <size>\n"
         "    The maximum number of elements an array can hold.\n"
         "    Set to 0, arrays of any size are allowed.\n"
       }
 
-    , { 0,   "max-callouts",       cMaxCallouts,    MY_TRUE 
+    , { 0,   "max-callouts",       cMaxCallouts,    MY_TRUE
       , "  --max-callouts <number>\n"
       , "  --max-callouts <number>\n"
         "    The maximum number of callouts at one time.\n"
         "    Set to 0, any number of callouts is allowed.\n"
       }
 
-    , { 0,   "max-mapping",        cMaxMapping,     MY_TRUE 
+    , { 0,   "max-mapping",        cMaxMapping,     MY_TRUE
       , "  --max-mapping <size>\n"
       , "  --max-mapping <size>\n"
         "    The maximum number of elements (keys+values) a mapping can hold.\n"
         "    Set to 0, mappings of any size are allowed.\n"
       }
 
-    , { 0,   "max-bytes",          cMaxBytes,       MY_TRUE 
+    , { 0,   "max-bytes",          cMaxBytes,       MY_TRUE
       , "  --max-bytes <size>\n"
       , "  --max-bytes <size>\n"
         "    The maximum number of bytes one read_bytes()/write_bytes() call\n"
@@ -1181,7 +1181,7 @@ static Option aOptions[]
         "    Set to 0, arrays of any size are allowed.\n"
       }
 
-    , { 0,   "max-file",           cMaxFile,        MY_TRUE 
+    , { 0,   "max-file",           cMaxFile,        MY_TRUE
       , "  --max-file <size>\n"
       , "  --max-file <size>\n"
         "    The maximum number of bytes one read_file()/write_file() call\n"
@@ -1189,7 +1189,7 @@ static Option aOptions[]
         "    Set to 0, arrays of any size are allowed.\n"
       }
 
-    , { 0,   "max-thread-pending", cMaxThreadPend,  MY_TRUE 
+    , { 0,   "max-thread-pending", cMaxThreadPend,  MY_TRUE
       , "  --max-thread-pending <size>\n"
       , "  --max-thread-pending <size>\n"
         "    The maximum number of bytes to be kept pending by the socket write\n"
@@ -1200,7 +1200,7 @@ static Option aOptions[]
 #endif
       }
 
-    , { 's', NULL,                 cSwap,           MY_TRUE 
+    , { 's', NULL,                 cSwap,           MY_TRUE
       , NULL
       , "  -s <time>  | --swap-time <time>\n"
         "  -s v<time> | --swap-variables <time>\n"
@@ -1208,36 +1208,36 @@ static Option aOptions[]
         "    A time less or equal 0 disables swapping.\n"
       }
 
-    , { 0,   "swap-time",          cSwapTime,       MY_TRUE 
+    , { 0,   "swap-time",          cSwapTime,       MY_TRUE
       , "  -s <time>  | --swap-time <time>\n"
       , NULL
       }
 
-    , { 0,   "swap-variables",     cSwapVars,       MY_TRUE 
+    , { 0,   "swap-variables",     cSwapVars,       MY_TRUE
       , "  -s v<time> | --swap-variables <time>\n"
       , NULL
       }
 
-    , { 0,   "swap-file",          cSwapFile,       MY_TRUE 
+    , { 0,   "swap-file",          cSwapFile,       MY_TRUE
       , "  -s f<name> | --swap-file <name>\n"
       , "  -s f<name> | --swap-file <name>\n"
         "    Swap into file <name> instead of LP_SWAP.<host> .\n"
       }
 
-    , { 0,   "swap-compact",       cSwapCompact,    MY_FALSE 
+    , { 0,   "swap-compact",       cSwapCompact,    MY_FALSE
       , "  -s c       | --swap-compact\n"
       , "  -s c | --swap-compact\n"
         "    Reuse free space in the swap file immediately.\n"
       }
 
-    , { 0,   "max-malloc",         cMaxMalloc,      MY_TRUE 
+    , { 0,   "max-malloc",         cMaxMalloc,      MY_TRUE
       , "  --max-malloc <size>\n"
       , "  --max-malloc <size>\n"
         "    Restrict total memory allocations to <size> bytes. A <size> of 0\n"
         "    or 'unlimited' removes any restriction.\n"
       }
 
-    , { 0,   "min-malloc",         cMinMalloc,      MY_TRUE 
+    , { 0,   "min-malloc",         cMinMalloc,      MY_TRUE
       , "  --min-malloc <size>\n"
       , "  --min-malloc <size>\n"
         "  --min-small-malloc <size>\n"
@@ -1245,12 +1245,12 @@ static Option aOptions[]
         "    allocation. A size of 0 disables the explicite initial allocations.\n"
       }
 
-    , { 0,   "min-small-malloc",   cMinSmallMalloc, MY_TRUE 
+    , { 0,   "min-small-malloc",   cMinSmallMalloc, MY_TRUE
       , "  --min-small-malloc <size>\n"
       , NULL
       }
 
-    , { 'r', NULL,                 cReserved,       MY_TRUE 
+    , { 'r', NULL,                 cReserved,       MY_TRUE
       , NULL
       , "  -r u<size> | --reserve-user <size>\n"
         "  -r m<size> | --reserve-master <size>\n"
@@ -1259,34 +1259,34 @@ static Option aOptions[]
         "    be held until main memory runs out.\n"
       }
 
-    , { 0,   "reserve-user",       cReserveUser,    MY_TRUE 
+    , { 0,   "reserve-user",       cReserveUser,    MY_TRUE
       , "  -r u<size> | --reserve-user <size>\n"
       , NULL
       }
 
-    , { 0,   "reserve-master",     cReserveMaster,  MY_TRUE 
+    , { 0,   "reserve-master",     cReserveMaster,  MY_TRUE
       , "  -r m<size> | --reserve-master <size>\n"
       , NULL
       }
 
-    , { 0,   "reserve-system",     cReserveSystem,  MY_TRUE 
+    , { 0,   "reserve-system",     cReserveSystem,  MY_TRUE
       , "  -r s<size> | --reserve-system <size>\n"
       , NULL
       }
 
-    , { 0,   "strict-euids",       cStrictEuids,    MY_FALSE 
+    , { 0,   "strict-euids",       cStrictEuids,    MY_FALSE
       , "  --strict-euids\n"
       , "  --strict-euids\n"
         "  --no-strict-euids\n"
         "    Enforce/don't enforce the proper use of euids.\n"
       }
 
-    , { 0,   "no-strict-euids",    cNoStrictEuids,  MY_FALSE 
+    , { 0,   "no-strict-euids",    cNoStrictEuids,  MY_FALSE
       , "  --no-strict-euids\n"
       , NULL
       }
 
-    , { 0,   "wizlist-file",       cWizlistFile,    MY_TRUE 
+    , { 0,   "wizlist-file",       cWizlistFile,    MY_TRUE
       , "  --wizlist-file <filename>\n"
       , "  --wizlist-file <filename>\n"
         "  --no-wizlist-file\n"
@@ -1294,18 +1294,18 @@ static Option aOptions[]
         "    relative the mudlib); resp. don't read or save the wizlist.\n"
       }
 
-    , { 0,   "no-wizlist-file",    cNoWizlistFile,  MY_FALSE 
+    , { 0,   "no-wizlist-file",    cNoWizlistFile,  MY_FALSE
       , "  --no-wizlist-file\n"
       ,
       }
 
-    , { 0,   "pidfile",            cPidFile,        MY_TRUE 
+    , { 0,   "pidfile",            cPidFile,        MY_TRUE
       , "  --pidfile <filename>\n"
       , "  --pidfile <filename>\n"
         "    Write the pid of the driver process into <filename>.\n"
       }
 
-    , { 0,   "random-seed",        cRandomSeed,     MY_TRUE 
+    , { 0,   "random-seed",        cRandomSeed,     MY_TRUE
       , "  --random-seed <num>\n"
       , "  --random-seed <num>\n"
         "    Seed value for the random number generator. If not given, the\n"
@@ -1313,7 +1313,7 @@ static Option aOptions[]
       }
 
 #ifdef GC_SUPPORT
-    , { 0,   "gcollect-outfd",     cGcollectFD,     MY_TRUE 
+    , { 0,   "gcollect-outfd",     cGcollectFD,     MY_TRUE
       , "  --gcollect-outfd <filename>|<num>\n"
       , "  --gcollect-outfd <filename>|<num>\n"
         "    Garbage collector output (like a log of all reclaimed memory blocks)\n"
@@ -1322,14 +1322,14 @@ static Option aOptions[]
 #endif
 
 #ifdef DEBUG
-    , { 0,   "check-refcounts",    cCheckRefs,      MY_FALSE 
+    , { 0,   "check-refcounts",    cCheckRefs,      MY_FALSE
       , "  --check-refcounts\n"
       , "  --check-refcounts\n"
         "    Every backend cycle, all refcounts in the system are checked.\n"
         "    SLOW!\n"
       }
 
-    , { 0,   "check-state",        cCheckState,     MY_TRUE 
+    , { 0,   "check-state",        cCheckState,     MY_TRUE
       , "  --check-state <lvl>\n"
       , "  --check-state <lvl>\n"
         "    Perform a regular simplistic check of the virtual machine according\n"
@@ -1339,7 +1339,7 @@ static Option aOptions[]
         "      = 2: at various points in the backend loop\n"
       }
 
-    , { 0,   "gobble-descriptors", cGobbleFDs,      MY_TRUE 
+    , { 0,   "gobble-descriptors", cGobbleFDs,      MY_TRUE
       , "  --gobble-descriptors <num>\n"
       , "  --gobble-descriptors <num>\n"
         "    <num> (more) filedescriptors are used up. You'll know when you need it.\n"
@@ -1347,7 +1347,7 @@ static Option aOptions[]
 #endif
 
 #ifdef CHECK_OBJECT_STAT
-    , { 0,   "check-object-stat",  cCheckObjectStat, MY_FALSE 
+    , { 0,   "check-object-stat",  cCheckObjectStat, MY_FALSE
       , "  --check-object-stat\n"
       , "  --check-object-stat\n"
         "    Activate tracing of the object size statistic - available in order\n"
@@ -1356,38 +1356,38 @@ static Option aOptions[]
 #endif
 
 #ifdef YYDEBUG
-    , { 'y', "yydebug",            cYYDebug,        MY_FALSE 
+    , { 'y', "yydebug",            cYYDebug,        MY_FALSE
       , "  --y|--yydebug\n"
       , "  --y|--yydebug\n"
         "    Enable debugging of the LPC compiler.\n"
       }
 #endif
 
-    , { 0,   "options",            cOptions,        MY_FALSE 
+    , { 0,   "options",            cOptions,        MY_FALSE
       , "  --options\n"
       , "  --options\n"
         "    Print the version and compilation options of the driver, then exit.\n"
       }
 
-    , { 'V', "version",            cVersion,        MY_FALSE 
+    , { 'V', "version",            cVersion,        MY_FALSE
       , "  -V|--version\n"
       , "  -V|--version\n"
         "    Print the version of the driver, then exit.\n"
       }
 
-    , { 0,   "longhelp",           cLongHelp,       MY_FALSE 
+    , { 0,   "longhelp",           cLongHelp,       MY_FALSE
       , "  --longhelp\n"
       , "  --longhelp\n"
         "    Display this help and exit.\n"
       }
 
-    , { 'h', "help",               cHelp,           MY_FALSE 
+    , { 'h', "help",               cHelp,           MY_FALSE
       , "  -h|-?|--help\n"
       , "  -h|-?|--help\n"
         "    Display the short help text and exit.\n"
       }
 
-    , { '?', NULL,                 cHelp,           MY_FALSE 
+    , { '?', NULL,                 cHelp,           MY_FALSE
       , NULL
       , NULL
       }
@@ -2401,7 +2401,7 @@ open_arg_file (InputSource ** ppInput, const char * pName)
             return MY_FALSE;
         }
     }
-    
+
     /* If the file would be opened in text mode, the size from fstat would
      * not match the number of characters that we can read.
      */
@@ -2472,9 +2472,9 @@ open_arg_file (InputSource ** ppInput, const char * pName)
         /* Ensure a terminating 0 */
         pData[size] = '\0';
     }
-    
+
     fclose(f);
-    
+
     /* Now scan the read data and search for words.
      * Store the found words in the Marker list, and insert the
      * \0 terminators.

@@ -25,7 +25,7 @@ DESCRIPTION
         string/array.
         If <to> is omitted, it defaults to the beginning of the
         string/array.
-        
+
         In the first form, the <index> must be within the bounds of
         the string/array, or a runtime error occurs.
         In the second form, the indexes will be fitted to the bounds

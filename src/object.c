@@ -157,7 +157,7 @@
 
 #include "driver.h"
 #include "typedefs.h"
- 
+
 #include "my-alloca.h"
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -506,9 +506,9 @@ do_free_sub_strings (int num_strings,   string_t **strings
                     )
 
 /* Free a bunch of shared strings used in connection with an object:
- * the <num_strings> strings in the array <strings>, 
- * the <num_variables> names of the vars in array <variable_names>, 
- * the <num_includes> names of the includes in array <includes>, 
+ * the <num_strings> strings in the array <strings>,
+ * the <num_variables> names of the vars in array <variable_names>,
+ * the <num_includes> names of the includes in array <includes>,
 #ifdef USE_STRUCTS
  * the <num_structs> names of the struct defs in array <struct_defs>, and.
  * the <num_members> names of the struct member defs in array <struct_members>.
@@ -1393,7 +1393,7 @@ v_function_exists (svalue_t *sp, int num_arg)
  * Look up a function <str> in the current object, respectively
  * in the object <ob>. Depending on the value of <flags>, one
  * of the following informations is returned:
- * 
+ *
  * <flags> == FEXISTS_PROGNAME (0, default):
  *   Return the name of the program the function is defined in.
  *   This can be either object_name(ob), or the name of an inherited
@@ -1428,7 +1428,7 @@ v_function_exists (svalue_t *sp, int num_arg)
 
     /* Evaluate arguments */
     argp = sp - num_arg + 1;
-    
+
     ob = NULL;
     flags = 0;
 
@@ -1904,7 +1904,7 @@ v_include_list (svalue_t *sp, int num_arg)
  *   string* include_list (object ob)
  *   string* include_list (object ob, int flags)
  *
- * Return a list with the names of all files included by the program 
+ * Return a list with the names of all files included by the program
  * of object <ob>, including <ob>'s program file itself.
  */
 
@@ -1985,7 +1985,7 @@ v_include_list (svalue_t *sp, int num_arg)
             size_t         index;    /* # of this include file in the parent
                                       * vector */
             vector_t     * vec;      /* Result vector for this include */
-        } *begin, *end;         /* Flat list of all found includes */      
+        } *begin, *end;         /* Flat list of all found includes */
 
         struct iinfo * last;    /* Last include found on this depth */
         struct iinfo * next;    /* Next include to work */
@@ -2108,7 +2108,7 @@ v_include_list (svalue_t *sp, int num_arg)
                 put_ref_string(svp, next->inc->name);
                 put_ref_string(svp+1, next->inc->filename);
                 put_number(svp+2, next->depth);
-                
+
                 /* If we are in the last sibling, roll back up to
                  * the parents.
                  */
@@ -2174,7 +2174,7 @@ v_include_list (svalue_t *sp, int num_arg)
     put_array(sp, vec);
     return sp;
 } /* v_include_list() */
- 
+
 /*-------------------------------------------------------------------------*/
 svalue_t *
 v_inherit_list (svalue_t *sp, int num_arg)
@@ -2201,7 +2201,7 @@ v_inherit_list (svalue_t *sp, int num_arg)
           /* These members are used to create the result tree */
         size_t         index;    /* # of this inherited program */
         vector_t     * vec;      /* Result vector for this program */
-    } *begin, *end;         /* Flat list of all found inherits */      
+    } *begin, *end;         /* Flat list of all found inherits */
     struct iinfo * next;    /* Next program to analyze */
 
     Mempool   pool;         /* The memory pool to allocate from */
@@ -2347,7 +2347,7 @@ v_inherit_list (svalue_t *sp, int num_arg)
             put_string(svp, str);
         }
     }
-    else 
+    else
     {
         /* Get the top result array and keep a reference to it on the
          * stack so that it will be deallocated on an error.
@@ -2514,7 +2514,7 @@ f_load_name (svalue_t *sp)
     {
         char *p;
         size_t len;
-        
+
         /* All characters after the '#' must be digits */
         for (p = hash+1; '\0' != *p; p++)
             if (*p < '0' || *p > '9')
@@ -2564,7 +2564,7 @@ f_load_name (svalue_t *sp)
 
     if (mem)
         xfree(mem);
-     
+
     return sp;
 } /* f_load_name() */
 
@@ -3403,7 +3403,7 @@ f_all_inventory (svalue_t *sp)
         put_number(sp, 0);
     else
         put_array(sp, vec);
-    
+
     return sp;
 } /* f_all_inventory() */
 
@@ -3898,7 +3898,7 @@ v_present (svalue_t *sp, int num_arg)
         put_ref_object(sp, ob, "present");
     else
         put_number(sp, 0);
-    
+
     return sp;
 } /* v_present() */
 
@@ -3911,7 +3911,7 @@ e_say (svalue_t *v, vector_t *avoid)
  * If the first element of <avoid> is not an object, the function
  * will store its command_giver object into it.
  */
- 
+
 {
     static svalue_t stmp = { T_OBJECT };
 
@@ -4058,7 +4058,7 @@ e_say (svalue_t *v, vector_t *avoid)
 
     case T_POINTER:
         /* say()'s evil twin: send <v> to all recipients' catch_msg() lfun */
-        
+
         for (curr_recipient = recipients; NULL != (ob = *curr_recipient++) ; )
         {
             if (ob->flags & O_DESTRUCTED)
@@ -4081,7 +4081,7 @@ e_say (svalue_t *v, vector_t *avoid)
     }
 
     /* Now send the message to all recipients */
-    
+
     for (curr_recipient = recipients; NULL != (ob = *curr_recipient++); )
     {
         interactive_t *ip;
@@ -4219,7 +4219,7 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
     /* Like in say(), collect the possible recipients.
      * First count how many there are.
      */
-    
+
     for (ob = room->contains; ob; ob = ob->next_inv)
     {
         interactive_t *ip;
@@ -4235,7 +4235,7 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
     if (num_recipients < 20)
         recipients = some_recipients;
     else
-        recipients = 
+        recipients =
           alloca( (num_recipients+1) * sizeof(object_t *) );
 
     /* Now fill the table */
@@ -4302,7 +4302,7 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
     }
 
     /* Now send the message to all recipients */
-    
+
     for (curr_recipient = recipients; NULL != (ob = *curr_recipient++); )
     {
         interactive_t *ip;
@@ -4444,7 +4444,7 @@ f_set_environment (svalue_t *sp)
     object_t *save_cmd = command_giver;
 
     /* Get and test the arguments */
-    
+
     item = sp[-1].u.ob;
 
     if (item->flags & O_SHADOW && O_GET_SHADOW(item)->shadowing)
@@ -4577,7 +4577,7 @@ f_transfer (svalue_t *sp)
         free_string_svalue(sp);
         put_ref_object(sp, to, "transfer"); /* for move_object() below */
     }
-        
+
     from = ob->super;
     result = 0; /* Default: success result */
 
@@ -4698,7 +4698,7 @@ f_transfer (svalue_t *sp)
 
         /* When we come here, the move is ok */
     } /* pseudo-switch() */
-        
+
     if (result)
     {
         /* All the applys might have changed these */
@@ -4895,7 +4895,7 @@ write_buffer (void)
     start = save_object_bufstart;
     if (save_object_descriptor >= 0)
     {
-    
+
         if (write( save_object_descriptor, start, SAVE_OBJECT_BUFSIZE )
           != SAVE_OBJECT_BUFSIZE )
             failed = MY_TRUE;
@@ -5373,7 +5373,7 @@ v_save_object (svalue_t *sp, int numarg)
     file = NULL;
     name = NULL;
     tmp_name = NULL;
-    
+
     /* Test the arguments */
     if (!numarg)
     {
@@ -5381,7 +5381,7 @@ v_save_object (svalue_t *sp, int numarg)
     }
     else
       file = get_txt(sp->u.str);
-    
+
     /* No need in saving destructed objects */
 
     ob = current_object;
@@ -5586,7 +5586,7 @@ v_save_object (svalue_t *sp, int numarg)
          */
 
         i = 0; /* Result from efun */
-    
+
         unlink(name);
 #if !defined(MSDOS_FS) && !defined(AMIGA) && !(defined(OS2) || defined(__EMX__)) && !defined(__BEOS__)
         if (link(tmp_name, name) == -1)
@@ -5617,7 +5617,7 @@ v_save_object (svalue_t *sp, int numarg)
          */
 
         sp++; /* We're returning a result. */
-        
+
         if (failed)
             put_number(sp, 0); /* Shouldn't happen */
         else if (buf_left != SAVE_OBJECT_BUFSIZE)
@@ -5650,7 +5650,7 @@ v_save_object (svalue_t *sp, int numarg)
              */
             strbuf_store(&save_string_buffer, sp);
     } /* if (file or not file) */
-    
+
     return sp;
 } /* v_save_object() */
 
@@ -5760,7 +5760,7 @@ f_save_value (svalue_t *sp)
          * the strbuf.
          */
         strbuf_store(&save_string_buffer, sp);
-        
+
     /* Clean up */
     free_pointer_table(ptable);
     ptable = NULL;
@@ -6628,8 +6628,8 @@ f_restore_object (svalue_t *sp)
     }
     else
         file = get_txt(sp->u.str);
-    
-    
+
+
     /* No use in restoring a destructed object, or an object
      * with no variables.
      */
@@ -6725,7 +6725,7 @@ f_restore_object (svalue_t *sp)
 
     max_shared_restored = 256;
     current_shared_restored = 0;
-  
+
     if (shared_restored_values)
     {
         debug_message("(restore) Freeing lost shared_restored_values.\n");
@@ -7026,7 +7026,7 @@ f_restore_value (svalue_t *sp)
         }
         buff = p+1;
     }
-    
+
     /* Initialise the shared value table */
 
     max_shared_restored = 256;
@@ -7050,7 +7050,7 @@ f_restore_value (svalue_t *sp)
     /* Place the result variable onto the stack */
     inter_sp = ++sp;
     *sp = const0;
-    
+
     /* Now parse the value in buff[] */
 
     p = buff;

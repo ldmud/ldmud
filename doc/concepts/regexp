@@ -18,7 +18,7 @@ DESCRIPTION
 
         For details, refer to the detailed manpages: hsregexp(C) for the
         Henry Spencer package, pcre(C) for the PCRE package.
-        
+
 
 REGULAR EXPRESSION DETAILS
         A regular expression is a pattern that is matched against  a
@@ -37,23 +37,23 @@ REGULAR EXPRESSION DETAILS
 
         The following metacharacters are 'universal' in that both regexp
         packages understand them in the same way:
-        
+
           .       Match any character.
-          
+
           ^       Match begin of line.
-          
+
           $       Match end of line.
-          
+
           x|y     Match regexp x or regexp y.
-          
+
           ()      Match enclosed regexp like a 'simple' one.
-          
+
           x*      Match any number (0 or more) of regexp x.
 
           x+      Match any number (1 or more) of regexp x.
-          
+
           [..]    Match one of the characters enclosed.
-          
+
           [^ ..]  Match none of the characters enclosed. The .. are to
                   replaced by single characters or character ranges:
 
@@ -62,7 +62,7 @@ REGULAR EXPRESSION DETAILS
           [ab0-9] matches a, b or any digit.
 
           [^a-z]  does not match any lowercase character.
-          
+
           \c      match character c even if it's one of the special
                   characters.
 

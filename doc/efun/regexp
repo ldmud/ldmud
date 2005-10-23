@@ -18,11 +18,11 @@ EXAMPLE
                                  "\\<help\\>.*\\<me\\>"))
            if (sizeof(strs)
               write("It matches.\n");
-        
+
         The regular expression will test the given string (which is
         packed into an array) if there is something like "help ... me"
         inside of it.
-        
+
 HISTORY
         LDMud 3.3 added the optional <opt> argument.
 

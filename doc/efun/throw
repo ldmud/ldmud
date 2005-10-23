@@ -11,6 +11,6 @@ DESCRIPTION
 EXAMPLE
         catch(throw("aborting execution"));
         This will just print the string "aborting execution".
-        
+
 SEE ALSO
         catch(E), raise_error(E)

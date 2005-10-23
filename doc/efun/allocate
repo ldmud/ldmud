@@ -9,7 +9,7 @@ DESCRIPTION
         Allocate an array of size elements. The number of elements
         must be >= 0 and not bigger than a system maximum (usually
         1000).
-        
+
         If <init_value> is given, all array elements will be set
         to this value (if <init_value> is an array or mapping, a shallow
         copy will be created for each element), otherwise they all will be 0.

@@ -37,7 +37,7 @@ DESCRIPTION
               limited(#'handle_runtime_error, ({ 200000 }), err, prg, curobj
                      , line);
           }
-          
+
           void
           runtime_error (string err, string prg, string curobj, int line)
           {

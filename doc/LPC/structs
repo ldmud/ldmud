@@ -4,7 +4,7 @@ CONCEPT
 INTRODUCTION
         structs are, next to arrays and mappings, a way to group a
         collection of value together.
-        
+
         A struct holds a fixed number of values, called 'members', and
         allows to access them by their given name. The name is resolved
         when the LPC code is compiled, making struct member access as fast
@@ -45,7 +45,7 @@ DEFINITION
 
             protected struct Bang {...};
 
-        
+
         struct definitions are promoted through inheritance like functions,
         with the difference that all structs live in the same flat namespace.
         This means: a struct defined in a program is visible in _all_
@@ -123,10 +123,10 @@ USAGE IN CLOSURES
 
 
 MISCELLANEOUS
-         structs are mostly a compile-time convenience in that the
-         struct names and member names are available only to the
-         LPC compiler. At runtime, structs are a special kind of array
-         with a fixed number of elements (which also means that
+         Currently, structs are mostly a compile-time convenience in
+         that the struct names and member names are available only to
+         the LPC compiler.  At runtime, structs are a special kind of
+         array with a fixed number of elements (which also means that
          runtime error messages will talk about 'indexing' instead of
          'member lookup').
 
@@ -135,6 +135,9 @@ MISCELLANEOUS
          a particular format of this string!
 
          Support for structs is signaled by the macro __LPC_STRUCTS__.
+
+         A new implementation of structs is underway, which will
+         make them datatypes on their own.
 
 
 HISTORY

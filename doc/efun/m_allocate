@@ -15,7 +15,7 @@ DESCRIPTION
         function execution ended. It is also useful if you want the
         mapping to have a certain width even if you don't provide
         all the data items for the keys yet.
-        
+
         If the goal is just to create an empty mapping with a certain
         width, the following notations can be used:
 
@@ -24,7 +24,7 @@ DESCRIPTION
         ([:width ]) : creates an empty mapping the given <width>, where
             <width> can be any expression yielding an integer result. In
             fact this notation is compiled as 'm_allocate(0, width)' .
-        
+
 EXAMPLES
         m_allocate(3, 7) -> mapping with 7 values per key, and with space
            for 3 entries.

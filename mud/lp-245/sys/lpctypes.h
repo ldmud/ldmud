@@ -12,7 +12,7 @@
 #define TYPE_FLOAT      6
 #define TYPE_ANY        7       /* Will match any type */
 #define TYPE_CLOSURE    8
-#define TYPE_SYMBOL     9 
+#define TYPE_SYMBOL     9
 #define TYPE_QUOTED_ARRAY 10
 
 #define TYPE_MOD_POINTER        0x0040  /* Pointer to a basic type        */

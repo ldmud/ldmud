@@ -2,7 +2,7 @@
 #define STRFUNS_H_ 1
 
 #include "driver.h"
-#include "typedefs.h" 
+#include "typedefs.h"
 
 #include <sys/types.h> /* TODO: Does C99 guarantee u_long in here? */
 

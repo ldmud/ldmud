@@ -593,7 +593,7 @@ check_for_duplicate_instr (const char *f_name, const char *key, int redef_ok)
              fprintf(stderr, "Entry '%s':'%s' duplicated as '%s':... .\n"
                            , instr[i].f_name, instr[i].key, f_name);
         }
-        
+
     }
     return rc;
 }
@@ -635,7 +635,7 @@ check_for_duplicate_string (const char *key, const char *buf)
              fprintf(stderr, "Warning: Entry '%s':'%s' duplicated as '%s':... .\n"
                            , instr[i].key, instr[i].buf, key);
         }
-        
+
     }
     return rc;
 }
@@ -899,7 +899,7 @@ func: type ID optional_ID '(' arg_list optional_default ')' optional_name ';'
              */
 
             int j;
-            
+
             for (j = last_current_lpc_type - i; j < curr_lpc_type_size; j++)
             {
                 if (j+1 < curr_lpc_type_size || curr_lpc_types[j] != 0)
@@ -1014,7 +1014,7 @@ stringdefs:  /* empty */
 stringdef: ID NAME
     {
         char *cp;
-        
+
         if (num_buff >= MAX_FUNC)
             yyerror("Too many string definitions!\n");
 
@@ -2401,7 +2401,7 @@ etype (long n)
 } /* etype() */
 
 /*-------------------------------------------------------------------------*/
-static long 
+static long
 type2flag (int n)
 
 /* Convert type <n> into the bitfield value needed to create the LPC
@@ -2613,7 +2613,7 @@ read_config (void)
     fclose(fpr);
 
 #undef MATCH
-    
+
     /* Sanity check on some of those USE_ defines: undefine
      * those which are not supported on the host system.
      */
@@ -2884,11 +2884,11 @@ create_efun_defs (void)
 
         switch(k)
         {
-        case C_EFUN0: 
+        case C_EFUN0:
             fprintf(fpw, "/* Prototypes of the tabled efuns\n */\n\n");
             pattern = "extern svalue_t *f_%s(svalue_t *);\n";
             break;
-        case C_EFUNV: 
+        case C_EFUNV:
             fprintf(fpw, "/* Prototypes of the tabled vararg efuns\n */\n\n");
             pattern = "extern svalue_t *v_%s(svalue_t *, int);\n";
             break;
@@ -2912,12 +2912,12 @@ create_efun_defs (void)
 
             switch(k)
             {
-            case C_EFUN0: 
+            case C_EFUN0:
                 fprintf(fpw, "/* The table of tabled efuns\n */\n\n");
                 fprintf(fpw, "svalue_t *(*efun_table[]) (svalue_t *) = {\n");
                 prefix = "f_";
                 break;
-            case C_EFUNV: 
+            case C_EFUNV:
                 fprintf(fpw, "/* The table of tabled vararg efuns\n */\n\n");
                 fprintf(fpw, "svalue_t *(*vefun_table[]) (svalue_t *, int) = {\n");
                 prefix = "v_";
@@ -3234,7 +3234,7 @@ create_stdstrings (void)
     int i;
 
     /* Create stdstrings.h */
-    
+
     if ((fpw = fopen(STDSTRINGS ".h", "w")) == NULL)
     {
        perror(STDSTRINGS ".h");
@@ -3299,7 +3299,7 @@ create_stdstrings (void)
     fclose(fpw);
 
     /* Create stdstrings.c */
-    
+
     if ((fpw = fopen(STDSTRINGS ".c", "w")) == NULL)
     {
        perror(STDSTRINGS ".c");
@@ -3353,7 +3353,7 @@ create_stdstrings (void)
          , fpw);
 
     fclose(fpw);
-    
+
 } /* create_stdstrings() */
 
 /*-------------------------------------------------------------------------*/
@@ -3410,7 +3410,7 @@ main (int argc, char ** argv)
     }
     if (action == MakeLang)
         create_lang();
-    
+
     if (action == MakeStrings)
         create_stdstrings();
 

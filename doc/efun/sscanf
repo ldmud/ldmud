@@ -9,7 +9,7 @@ DESCRIPTION
 
         The match operators in the format string have one of these
         formats:
-          %[!|~][<size>[.<minmatch>]]<type>        
+          %[!|~][<size>[.<minmatch>]]<type>
 
         <type> may be:
            d: matches any number.

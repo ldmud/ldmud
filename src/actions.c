@@ -251,7 +251,7 @@ purge_action_sent(void)
 
 {
     sentence_t *p;
-    
+
     for (;free_sent; free_sent = p) {
         p = free_sent->next;
         xfree(free_sent);
@@ -368,7 +368,7 @@ remove_action_sent (object_t *ob, object_t *player)
                 else if (tmp->verb)
                     debug_message("%s --Unlinking sentence fun=0, verb='%s'\n"
                                  , time_stamp(), get_txt(tmp->verb));
-                else 
+                else
                     debug_message("%s --Unlinking sentence fun=0, verb=0\n"
                                  , time_stamp());
             }
@@ -420,7 +420,7 @@ remove_shadow_action_sent (object_t *ob, object_t *player)
                 else if (tmp->verb)
                     debug_message("%s --Unlinking sentence fun=0, verb='%s'\n"
                                  , time_stamp(), get_txt(tmp->verb));
-                else 
+                else
                     debug_message("%s --Unlinking sentence fun=0, verb=0\n"
                                  , time_stamp());
             }
@@ -1600,7 +1600,7 @@ f_match_command(svalue_t * sp)
  * 'issuing' the command).
  *
  * Each entry in the result array is itself an array of:
- *   
+ *
  *   string [CMDM_VERB]:   The matched verb.
  *   string [CMDM_ARG]:    The argument string remaining, or 0 if none.
  *   object [CMDM_OBJECT]: The object defining the action.
@@ -1627,7 +1627,7 @@ f_match_command(svalue_t * sp)
     size_t    verb_length;         /* length of the verb */
     vector_t *rc;                  /* Result array */
 
-      /* The found matching actions are kept in a list of these 
+      /* The found matching actions are kept in a list of these
        * structures. References to strings and objects are counted.
        */
     struct cmd_s {
@@ -1941,12 +1941,12 @@ e_get_action (object_t *ob, string_t *verb)
     for (s = ob->sent; s; s = s->next)
     {
         action_t *sa;
-        
+
         if (SENT_IS_INTERNAL(s->type))
             continue;
-        
+
         sa = (action_t *)s;
-        
+
         if (verb != sa->verb)
             continue;
         /* verb will be 0 for SENT_MARKER */
@@ -2009,12 +2009,12 @@ e_get_all_actions (object_t *ob, int mask)
     for (s = ob->sent; s; s = s->next)
     {
         action_t * sa;
-        
+
         if (SENT_IS_INTERNAL(s->type))
             continue;
 
         sa = (action_t *)s;
-        
+
         if (mask & 1)
         {
             string_t * str;
@@ -2086,7 +2086,7 @@ e_get_object_actions (object_t *ob1, object_t *ob2)
             continue;
 
         sa = (action_t *)s;
-        
+
         if (sa->ob == ob2) {
             put_ref_string(p, sa->verb);
             p++;
@@ -2309,7 +2309,7 @@ f_query_verb (svalue_t *sp)
         else
             put_ref_string(sp, last_action_verb);
     }
-    
+
     return sp;
 } /* f_query_verb() */
 
@@ -2356,7 +2356,7 @@ f_query_notify_fail (svalue_t *sp)
 
 {
     p_int flag;
-    
+
     flag = sp->u.number;
     free_svalue(sp);
 

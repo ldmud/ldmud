@@ -9,7 +9,7 @@
  * The structure of an array ("vector") is defined in datatypes.h as this:
  *
  *   vector_t_s {
- *       p_int size; 
+ *       p_int size;
  *       p_int ref;
  *       p_int extra_ref;          (ifdef DEBUG)
  *       wiz_list_t *user;
@@ -823,7 +823,7 @@ get_array_order (vector_t * vec )
 /* Determine the order of the elements in vector <vec> and return the
  * sorted indices (actually svalue_t* pointer diffs). The order is
  * determined by svalue_cmp() (which happens to be high-to-low).
- * 
+ *
  * As a side effect, strings in the vector are made shared, and
  * destructed objects in the vector are replaced by svalue 0s.
  */
@@ -937,7 +937,7 @@ get_array_order (vector_t * vec )
                 size_t    max_idx;  /* Index (in sorted[]) of the current max */
                 svalue_t *max;      /* Pointer to the current max svalue */
                 size_t    test_idx; /* Index of element to test */
-                
+
                 /* Find the highest element in the remaining vector */
                 max_idx = start;
                 max = vec->item + sorted[start];
@@ -1105,7 +1105,7 @@ lookup_key (svalue_t *key, vector_t *vec)
 
 {
     mp_int i, o, d, keynum;
-    svalue_t shared_string_key; 
+    svalue_t shared_string_key;
       /* The svalue used to shared search key during the search.
        * It does not count as reference!
        */
@@ -1139,7 +1139,7 @@ lookup_key (svalue_t *key, vector_t *vec)
                 i = 0;
             }
         }
-        else if (d > 0) 
+        else if (d > 0)
         {
             i += o;
             if (i >= keynum)
@@ -1195,7 +1195,7 @@ match_arrays (vector_t *vec1, vector_t *vec2)
     len = len1 + len2; if (!len) len = 1;
     xallocate(flags, len * sizeof(Bool), "flag vector");
     memset(flags, 0, len * sizeof(Bool));
-    
+
     /* Test some special cases */
 
     /* Special case: if one of the vectors is empty, no elements match */
@@ -2032,7 +2032,7 @@ x_filter_array (svalue_t *sp, int num_arg)
 
         int         error_index;
         callback_t  cb;
-        
+
         assign_eval_cost();
         inter_sp = sp;
 
@@ -2070,7 +2070,7 @@ x_filter_array (svalue_t *sp, int num_arg)
             }
 
             push_svalue(w++);
-            
+
             v = apply_callback(&cb, 1);
             if (!v || (v->type == T_NUMBER && !v->u.number) )
                 continue;
@@ -2224,7 +2224,7 @@ x_map_array (svalue_t *sp, int num_arg)
 
         free_callback(&cb);
     }
-    
+
     /* The arguments have been removed already, now just replace
      * the arr on the stack with the result.
      */
@@ -2977,9 +2977,9 @@ make_unique (vector_t *arr, string_t *func, svalue_t *skipnum)
     /* Special case: unifying an empty array */
     if (!arr_size)
         return allocate_array(0);
-    
+
     /* Get the memory for the arr_size unique-structures we're going
-     * to need. 
+     * to need.
      * TODO: Implement an automatic memory-cleanup in case of errors,
      * TODO:: e.g. by adding a dedicated structure on the runtime stack.
      */
@@ -3030,7 +3030,7 @@ make_unique (vector_t *arr, string_t *func, svalue_t *skipnum)
     }
 
     mempool_delete(pool);
-    
+
     return ret;
 } /* make_unique() */
 

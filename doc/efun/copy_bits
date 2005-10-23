@@ -33,7 +33,7 @@ EXAMPLES
         copy_bits(src, dest, 10, 5) === dest[0..4] + src[10..]
         copy_bits(src, dest, 10, 5, 3)
                                     === dest[0..4] + src[10..12] + dest[8..]
-        
+
           (The src[]/dest[] is just for explanatory purposes!)
 
 HISTORY

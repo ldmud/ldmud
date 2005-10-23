@@ -8,7 +8,7 @@ DESCRIPTION
         Look up a function <str> in the current object, respectively
         in the object <ob>. Depending on the value of <flags>, one
         of the following informations is returned:
-        
+
         <flags> == FEXISTS_PROGNAME (0, default):
           Return the name of the program the function is defined in.
           This can be either object_name(ob), or the name of an inherited

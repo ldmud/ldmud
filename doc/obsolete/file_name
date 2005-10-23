@@ -18,13 +18,13 @@ DESCRIPTION
 
         The name of an object can be changed with rename_object(), and
         object_name() will reflect any of these changes.
-        
+
         The returned name always begins with '/' (absolute path),
         except when the parser runs in COMPAT mode.
 
 EXAMPLES
                 find_object(file_name(ob)) == ob
-        
+
         This is guaranteed to be true for all objects ob that are not
         destructed.
 

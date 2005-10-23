@@ -2,7 +2,7 @@
  * String Management
  *
  *---------------------------------------------------------------------------
- * To reduce the memory used for string storage, the driver implements 
+ * To reduce the memory used for string storage, the driver implements
  * string sharing: for every string the driver keeps track in a refcount
  * how many users it has. If the refcount falls back to 0, the string can
  * be safely deallocated again. On the other hand, if a refcount overflows
@@ -122,9 +122,9 @@ static string_t ** stringtable = NULL;
   /* Number of virtually allocated strings - every reference counts
    * as separate copy.
    */
-   
+
        mp_uint mstr_used_size = 0;
-  /* Total virtual size of allocated strings counted 
+  /* Total virtual size of allocated strings counted
    * - every reference counts as separate copy.
    * This does include the memory by the string management structures.
    */
@@ -132,7 +132,7 @@ static string_t ** stringtable = NULL;
 static mp_uint mstr_tabled = 0;
   /* Number of distinct strings in the string table.
    */
-   
+
 static mp_uint mstr_tabled_size = 0;
   /* Total memory held in the string table.
    */
@@ -156,7 +156,7 @@ static mp_uint mstr_collisions = 0;
 static mp_uint mstr_itabled = 0;
   /* Number of indirectly tabled strings.
    */
-   
+
 static mp_uint mstr_itabled_size = 0;
   /* Amount of memory held in itabled strings, of which only
    * <mstr_itabled> * sizeof(string_t) is not shared with the string
@@ -166,7 +166,7 @@ static mp_uint mstr_itabled_size = 0;
 static mp_uint mstr_untabled = 0;
   /* Number of distinct untabled strings.
    */
-   
+
 static mp_uint mstr_untabled_size = 0;
   /* Total memory held in untabled strings.
    */
@@ -283,7 +283,7 @@ move_to_head (string_t *s, int idx)
 static INLINE string_t *
 make_new_tabled (const char * const pTxt, size_t size, int idx MTRACE_DECL)
 
-/* Helper function for mstring_new_tabled(), mstring_new_n_tabled(), 
+/* Helper function for mstring_new_tabled(), mstring_new_n_tabled(),
  * and mstring_make_tabled().
  *
  * Create a new tabled string by copying the data string <pTxt> of length
@@ -928,7 +928,7 @@ mstring_deref ( string_t * str)
 
 /*-------------------------------------------------------------------------*/
 Bool
-mstring_equal(const string_t * const pStr1, const string_t * const pStr2) 
+mstring_equal(const string_t * const pStr1, const string_t * const pStr2)
 
 /* Aliased to: mstreq(pStr1, pStr2)
  *
@@ -951,7 +951,7 @@ mstring_equal(const string_t * const pStr1, const string_t * const pStr2)
 
 /*-------------------------------------------------------------------------*/
 int
-mstring_compare (const string_t * const pStr1, const string_t * const pStr2) 
+mstring_compare (const string_t * const pStr1, const string_t * const pStr2)
 
 /* Aliased to: mstrcmp(pStr1, pStr2)
  *
@@ -971,7 +971,7 @@ mstring_compare (const string_t * const pStr1, const string_t * const pStr2)
     if (mstr_i_tabled(pStr1) && mstr_d_tabled(pStr2) && pStr1->link == pStr2)
         return 0;
 
-    /* We have to compare two strings by byte. 
+    /* We have to compare two strings by byte.
      * Remember to take the difference in length into account when the
      * leading parts match.
      */
@@ -1541,10 +1541,10 @@ add_string_status (strbuf_t *sbuf, Bool verbose)
                         );
         strbuf_addf(sbuf, "\nSpace required / total string bytes: "
                           "%lu%% with, %lu%% without overhead.\n"
-                        , ((distinct_size + stringtable_size) * 100L) 
+                        , ((distinct_size + stringtable_size) * 100L)
                           / (mstr_used_size)
                         , ((distinct_size + stringtable_size
-                                          - distinct_overhead) * 100L) 
+                                          - distinct_overhead) * 100L)
                           / (mstr_used_size - mstr_used * STR_OVERHEAD)
                         );
         strbuf_addf(sbuf, "Searches by address: %lu - found: %lu (%.1f%%) - avg length: %7.3f\n"
@@ -1591,14 +1591,14 @@ string_dinfo_status (svalue_t *svp, int value)
 #define ST_NUMBER(which,code) \
     if (value == -1) svp[which].u.number = code; \
     else if (value == which) svp->u.number = code
-   
+
     ST_NUMBER(DID_ST_STRINGS, mstr_used);
     ST_NUMBER(DID_ST_STRING_SIZE, mstr_used_size);
 
     ST_NUMBER(DID_ST_STR_TABLE_SIZE, HTABLE_SIZE * sizeof(string_t *));
     ST_NUMBER(DID_ST_STR_OVERHEAD, sizeof(string_t)+sizeof(string_data_t)-1);
     ST_NUMBER(DID_ST_STR_IT_OVERHEAD, sizeof(string_t));
-    
+
     ST_NUMBER(DID_ST_STR_CHAINS,     mstr_chains);
     ST_NUMBER(DID_ST_STR_ADDED,      mstr_added);
     ST_NUMBER(DID_ST_STR_DELETED,    mstr_deleted);

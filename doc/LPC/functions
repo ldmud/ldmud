@@ -97,7 +97,7 @@ DESCRIPTION
         driver will perform the necessary adaption at call time: excess
         values are ignored, missing values are substituted by the number 0.
         The values passed to the called function are massaged by the driver
-        to match the argument list 
+        to match the argument list
 
 
         FUNCTIONS AND INHERITANCE
