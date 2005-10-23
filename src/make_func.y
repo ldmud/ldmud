@@ -415,7 +415,12 @@ static long lpc_types[MAX_ARGTYPES];
 #    define LPC_T_CLOSURE       (1 << 8)
 #    define LPC_T_SYMBOL        (1 << 9)
 #    define LPC_T_QUOTED_ARRAY  (1 << 10)
+#ifdef USE_STRUCTS
+#    define LPC_T_STRUCT        (1 << 11)
+#    define LPC_T_NULL          (1 << 12)
+#else
 #    define LPC_T_NULL          (1 << 11)
+#endif
 
 
 static int last_current_type = 0;
@@ -652,7 +657,7 @@ check_for_duplicate_string (const char *key, const char *buf)
 %token NAME ID
 
 %token VOID INT STRING OBJECT MAPPING FLOAT CLOSURE SYMBOL QUOTED_ARRAY
-%token MIXED UNKNOWN NUL
+%token MIXED UNKNOWN NUL STRUCT
 
 %token DEFAULT
 
@@ -660,7 +665,7 @@ check_for_duplicate_string (const char *key, const char *buf)
 
 %token UN_OP BIN_OP TRI_OP
 
-%type <number> VOID MIXED UNKNOWN NUL
+%type <number> VOID MIXED UNKNOWN NUL STRUCT
 %type <number> INT STRING OBJECT MAPPING FLOAT CLOSURE SYMBOL QUOTED_ARRAY
 %type <number> basic arg_type
   /* Value is the basic type value
@@ -944,7 +949,7 @@ func: type ID optional_ID '(' arg_list optional_default ')' ';'
 type: basic opt_star opt_ref { $$ = $1 | $2 | $3; };
 
 basic: VOID | INT | STRING | MAPPING | FLOAT | MIXED | OBJECT | CLOSURE |
-        UNKNOWN | SYMBOL | QUOTED_ARRAY | NUL ;
+        UNKNOWN | SYMBOL | QUOTED_ARRAY | STRUCT | NUL ;
 
 opt_star : '*' { $$ = MF_TYPE_MOD_POINTER; }
         |      { $$ = 0;                   } ;
@@ -1056,6 +1061,9 @@ static struct type types[]
     , { "mixed",        MIXED }
     , { "null",         NUL }
     , { "unknown",      UNKNOWN }
+#ifdef USE_STRUCTS
+    , { "struct",       STRUCT }
+#endif
     };
 
 /*-------------------------------------------------------------------------*/
@@ -1531,6 +1539,10 @@ name_to_type (char *name)
         return TYPE_MAPPING;
     if ( !strcmp(name, "CLOSURE") )
         return TYPE_CLOSURE;
+#ifdef USE_STRUCTS
+    if ( !strcmp(name, "STRUCT") )
+        return TYPE_STRUCT;
+#endif
     return -1;
 }
 
@@ -2402,6 +2414,9 @@ type2flag (int n)
       case UNKNOWN: return LPC_T_ANY;     break;
       case QUOTED_ARRAY:
         return LPC_T_QUOTED_ARRAY; break;
+#ifdef USE_STRUCTS
+      case STRUCT:  return LPC_T_STRUCT;  break;
+#endif
     default: yyerror("(type2flag) Bad type!"); return 0;
     }
 } /* type2flag() */
@@ -2438,6 +2453,9 @@ ctype (int n)
       case NUL:     p = "0";             break;
       case QUOTED_ARRAY:
         p = "TYPE_QUOTED_ARRAY"; break;
+#ifdef USE_STRUCTS
+      case STRUCT:  p = "TYPE_STRUCT"; break;
+#endif
     default: yyerror("(ctype) Bad type!"); return 0;
     }
     strcat(buff, p);

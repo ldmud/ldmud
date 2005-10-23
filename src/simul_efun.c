@@ -315,7 +315,8 @@ get_simul_efun_object (void)
         {
             string_t *function_name;
             ident_t *p;
-            unsigned char type, num_arg, num_locals;
+            vartype_t type;
+            unsigned char num_arg, num_locals;
 
             memcpy(  &function_name, FUNCTION_NAMEP(funstart)
                    , sizeof function_name);

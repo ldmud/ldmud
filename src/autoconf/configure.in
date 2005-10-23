@@ -229,7 +229,6 @@ fi
 
 AC_CDEF_FROM_ENABLE(access_control)
 AC_CDEF_FROM_ENABLE(access_log)
-AC_CDEF_FROM_ENABLE(align_functions)
 AC_CDEF_FROM_ENABLE(compat_mode)
 AC_CDEF_FROM_ENABLE(strict_euids)
 AC_CDEF_FROM_ENABLE(supply_parse_command)
@@ -1585,7 +1584,6 @@ dnl
 AC_SUBST(cdef_erq_demon)
 AC_SUBST(cdef_access_control)
 AC_SUBST(cdef_access_log)
-AC_SUBST(cdef_align_functions)
 AC_SUBST(cdef_compat_mode)
 AC_SUBST(cdef_strict_euids)
 AC_SUBST(cdef_supply_parse_command)

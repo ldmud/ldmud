@@ -351,12 +351,6 @@
  */
 #define DEFMAX                   @val_defmax@
 
-/* Should newly defined LPC functions be aligned in memory? this costs 1.5
- * bytes on average, but saves some time when searching in case of an
- * apply_low cache function miss.
- */
-@cdef_align_functions@ ALIGN_FUNCTIONS
-
 
 /* --- Internal Tables --- */
 

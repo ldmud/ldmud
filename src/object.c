@@ -1822,7 +1822,11 @@ f_functionlist (svalue_t *sp)
 
         if (mode_flags & RETURN_FUNCTION_TYPE) {
             svp--;
+#ifdef USE_STRUCTS
+            svp->u.number = FUNCTION_TYPE(funstart) & ~SEC_TYPE_MASK; /* return type */
+#else
             svp->u.number = FUNCTION_TYPE(funstart); /* return type */
+#endif
         }
 
         if (mode_flags & RETURN_FUNCTION_FLAGS) {

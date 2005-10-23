@@ -3299,7 +3299,11 @@ def:  type optional_star L_IDENTIFIER  /* Function definition or prototype */
               (void)ref_mstring($3->name);
 
               /* FUNCTION_TYPE */
+#if defined(USE_STRUCTS)
+              STORE_SHORT(p, $2);
+#else
               *p++ = $2;
+#endif
 
               /* FUNCTION_NUM_ARGS */
               if ($2 & TYPE_MOD_XVARARGS)
@@ -3312,7 +3316,7 @@ def:  type optional_star L_IDENTIFIER  /* Function definition or prototype */
 
               define_new_function(MY_TRUE, $3, $6, max_number_of_locals - $6+
                       max_break_stack_need,
-                      start + sizeof $3->name + 1, 0, $2);
+                      start + FUNCTION_PRE_HDR_SIZE, 0, $2);
 
               ins_f_code(F_RETURN0); /* catch a missing return */
           }
@@ -3349,9 +3353,7 @@ function_body:
        */
       {
 %line
-#ifdef ALIGN_FUNCTIONS
           CURRENT_PROGRAM_SIZE = align(CURRENT_PROGRAM_SIZE);
-#endif
           $<number>$ = CURRENT_PROGRAM_SIZE;
           if (realloc_a_program(FUNCTION_HDR_SIZE))
           {
@@ -10886,10 +10888,8 @@ transfer_init_control (void)
          * header.
          */
          
-#ifdef ALIGN_FUNCTIONS
         CURRENT_PROGRAM_SIZE = align(CURRENT_PROGRAM_SIZE);
-        /* Must happen before PREPARE_INSERT()! */
-#endif
+          /* Must happen before PREPARE_INSERT()! */
         {
             string_t *name;
             PREPARE_INSERT(sizeof name + 3);
@@ -12596,9 +12596,7 @@ epilog (void)
              */
             if ((f->flags & (NAME_UNDEFINED|NAME_INHERITED)) == NAME_UNDEFINED)
             {
-#ifdef ALIGN_FUNCTIONS
                 CURRENT_PROGRAM_SIZE = align(CURRENT_PROGRAM_SIZE);
-#endif
                 if (!realloc_a_program(FUNCTION_HDR_SIZE + 2))
                 {
                     yyerrorf("Out of memory: program size %lu\n"
@@ -12607,13 +12605,17 @@ epilog (void)
                 else
                 {
                     (void)ref_mstring(f->name);
-                    f->offset.pc = CURRENT_PROGRAM_SIZE + sizeof f->name + 1;
+                    f->offset.pc = CURRENT_PROGRAM_SIZE + FUNCTION_PRE_HDR_SIZE;
                     p = PROGRAM_BLOCK + CURRENT_PROGRAM_SIZE;
                     memcpy(p, (char *)&f->name, sizeof f->name);
-                    p += sizeof f->name;
-                    *p++ = f->type;
-                    *p++ = f->num_arg;
-                    *p++ = f->num_local;
+                    p += sizeof f->name; /* FUNCTION_NAME */
+#ifdef USE_STRUCTS
+                    STORE_SHORT(p, f->type); /* FUNCTION_TYPE */
+#else
+                    *p++ = f->type; /* FUNCTION_TYPE */
+#endif
+                    *p++ = f->num_arg;   /* FUNCTION_NUM_ARGS */
+                    *p++ = f->num_local; /* FUNCTION_NUM_VARS */
 %ifdef INITIALIZATION_BY___INIT
                     /* If __INIT() is undefined (i.e. there was a prototype, but
                      * no explicit function nor the automagic initialization code,
@@ -12631,7 +12633,7 @@ epilog (void)
 %ifdef INITIALIZATION_BY___INIT
                     }
 %endif
-                    CURRENT_PROGRAM_SIZE += sizeof f->name + 5;
+                    CURRENT_PROGRAM_SIZE += FUNCTION_HDR_SIZE + 2;
                 }
             }
 
@@ -12714,21 +12716,15 @@ epilog (void)
                 while (funname_start1)
                 {
                     while (1) {
-#ifdef ALIGN_FUNCTIONS
-                        /* Compare as (char*) so that the pointers end
-                         * up in numerical order. If not done, binary
-                         * search won't work.
+                        /* Compare the two pointers.
+                         * The comparison operation has to match the
+                         * one in closure.c:function_cmp().
                          */
-                        if ((  (char *)(funname_start1->name)
-                             - (char *)(funname_start2->name)
-                            ) < 0)
-#else
                         if (memcmp(
                               &funname_start2->name,
                               &funname_start1->name,
                               sizeof(char *)
                             ) < 0)
-#endif
                         {
                             *out1 = funname_start2;
                             out1 = &funname_start2->offset.next;

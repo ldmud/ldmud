@@ -13,7 +13,6 @@ exit 1
 enable_erq=xerq
 enable_access_control=no
 enable_access_log=no
-enable_align_functions=yes
 enable_compat_mode=no
 enable_strict_euids=yes
 enable_supply_parse_command=yes

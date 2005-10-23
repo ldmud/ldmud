@@ -72,8 +72,6 @@ with_otable_size=256
 enable_rxcache_table=yes
 with_rxcache_table=4096
 
-enable_align_functions=yes
-
 #-- TIMER MECHANISMS
 
 # short resets, not strictly necessary but useful

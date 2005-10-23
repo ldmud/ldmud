@@ -206,7 +206,33 @@ typedef uint32          fulltype_t;  /* Full: type and visibility */
 #define TYPE_CLOSURE        8
 #define TYPE_SYMBOL         9
 #define TYPE_QUOTED_ARRAY  10
+#ifdef USE_STRUCTS
+#define TYPE_STRUCT        11   /* Secondary info is the struct id */
 
+#define TYPEMAP_SIZE       12   /* Number of types */
+
+/* Flags, or'ed on top of the basic type */
+
+#define TYPE_MOD_POINTER    0x0010  /* Pointer to a basic type */
+#define TYPE_MOD_REFERENCE  0x0020  /* Reference to a type */
+
+/* Macros to set and extract the secondary type information */
+#define MAKE_SEC_TYPE_INFO(x) (((vartype_t)(x) & 0x3FF) << 6)
+#define GET_SEC_TYPE_INFO(x) (((vartype_t)(x) >> 6) & 0x3FF)
+
+#define MAX_SEC_TYPE_INFO  (0x400)
+  /* Max value of secondary type info
+   */
+
+#define SEC_TYPE_MASK      (0xFF60)
+  /* Mask for the secondary type info
+   */
+
+#define TYPE_MOD_MASK   0x0000ffff
+  /* Mask for basic type and flags.
+   */
+
+#else
 #define TYPEMAP_SIZE       11   /* Number of types */
 
 /* Flags, or'ed on top of the basic type */
@@ -217,6 +243,7 @@ typedef uint32          fulltype_t;  /* Full: type and visibility */
 #define TYPE_MOD_MASK   0x000000ff
   /* Mask for basic type and flags.
    */
+#endif
 
 #define TYPE_MOD_RMASK  (TYPE_MOD_MASK & ~TYPE_MOD_REFERENCE)
   /* Mask to delete TYPE_MOD_REFERENCE and the visibility mods from
@@ -517,7 +544,11 @@ typedef fulltype_t funflag_t;  /* Function flags */
  *
  * struct fun_hdr {
  *     shared string_t * name_of_function;   (4 Bytes)
+#ifdef USE_STRUCTS
+ *     vartype_t         return_type;        (2 Byte)
+#else
  *     byte              return_type;        (1 Byte)
+#endif
  * --> byte              number_formal_args; (1 Byte)
  *         Bit 7: set if the function has a 'varargs' argument
  * TODO: some code makes use of the fact that this makes the number negative
@@ -535,8 +566,8 @@ typedef fulltype_t funflag_t;  /* Function flags */
  * is implemented using macros taking the 'function address', typedef'd
  * as fun_hdr_p, as argument and evaluate to the desired value.
  *
- * WARNING: if ALIGN_FUNCTIONS is not defined, the name_of_function pointer
- *   is not aligned properly to be directly used as a pointer!
+ * The whole header structure is aligned properly so that the name_of_function
+ * pointer and the return_type short can be used directly.
  *
  * Note: Changes here can affect the struct lambda layout and associated
  *       constants.
@@ -559,14 +590,29 @@ typedef bytecode_p fun_hdr_p;
    */
 
 
+#if defined(USE_STRUCTS)
+#define FUNCTION_NAMEP(p)     ((void *)((char *)p - sizeof(vartype_t) - sizeof(string_t *)))
+#define FUNCTION_TYPE(p)      (*((vartype_t *)((char *)p - sizeof(vartype_t))))
+#else
 #define FUNCTION_NAMEP(p)     ((void *)((char *)p - sizeof(char) - sizeof(string_t *)))
 #define FUNCTION_TYPE(p)      (*((unsigned char *)((char *)p - sizeof(char))))
+#endif
 #define FUNCTION_NUM_ARGS(p)  EXTRACT_SCHAR((char *)p)
 #define FUNCTION_NUM_VARS(p)  (*((unsigned char *)((char *)p + sizeof(char))))
 #define FUNCTION_CODE(p)      ((bytecode_p)((unsigned char *)p + 2* sizeof(char)))
 #define FUNCTION_FROM_CODE(p) ((fun_hdr_p)((unsigned char *)p - 2* sizeof(char)))
 
-#define FUNCTION_HDR_SIZE     (sizeof(string_t*) + 3)
+#if defined(USE_STRUCTS)
+#define FUNCTION_PRE_HDR_SIZE (sizeof(string_t*) + 2)
+#else
+#define FUNCTION_PRE_HDR_SIZE (sizeof(string_t*) + 1)
+#endif
+  /* Number of function header bytes before the function pointer.
+   */
+
+#define FUNCTION_HDR_SIZE     (FUNCTION_PRE_HDR_SIZE + 2)
+  /* Total size of the function header.
+   */
 
 
 /* --- struct variable_s: description of one variable

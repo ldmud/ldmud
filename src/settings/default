@@ -371,11 +371,6 @@ with_max_local=50
 
 with_defmax=65000
 
-# Align LPC functions in memory? This costs on average 1.5 bytes per function,
-# but saves some time when searching in case of an apply cache miss.
-
-enable_align_functions=yes
-
 
 # --- Internal Tables ---
 

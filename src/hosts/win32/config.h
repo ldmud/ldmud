@@ -231,13 +231,6 @@
 
 #define RXCACHE_TABLE            8192
 
-/*
- * Should newly defined LPC functions be aligned in memory? this costs 1.5
- * bytes on average, but saves some time when searching in case of an
- * apply_low cache function miss.
- */
-#define ALIGN_FUNCTIONS
-
 /* Define COMPAT_MODE if you are using the 2.4.5 mudlib or one of its
  * derivatives.
  * TODO: Make this a runtime option.

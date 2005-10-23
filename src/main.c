@@ -1287,9 +1287,6 @@ options (void)
   printf("       Compiler: max stack size:          %6d\n"
          "                 max local variables:     %6d\n"
          "                 max define length:       %6d\n"
-#ifdef ALIGN_FUNCTIONS
-         "                 functions are aligned.\n"
-#endif
         , COMPILER_STACK_SIZE
         , MAX_LOCAL
         , DEFMAX

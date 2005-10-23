@@ -1,6 +1,14 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+05-Sep-2002 (Lars Duening)  (3.3.243)
+  - (exec.h, prolang.y, make_func.y, closure.c, main.c) Added a compile-time
+       type 'TYPE_STRUCT' and provided space in the function header to 
+       store it. A side effect is that ALIGN_FUNCTIONS is now mandatory; it
+       was the default anyway and nobody I know ever disabled it. Another
+       side effect is that I found another magic constant which I hadn't
+       given a macro name before.
+
 04-Sep-2002 (Lars Duening)  (3.3.242)
   - (mstrings.c) I found one place where the string statistics were
        computed wrongly.
