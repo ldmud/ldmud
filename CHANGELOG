@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+29-Aug-2002 (Lars Duening)  (3.3.237)
+  - (prolang.y, lex.c, main.c, configure) Added syntax support for structs
+        - no code yet to actually use them.
+
 28-Aug-2002 (Lars Duening)  (3.3.236)
   - (prolang.y) When removing the arg-frame instruction from a call_other,
         the compiler looked up the wrong program offset.

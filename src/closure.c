@@ -2,6 +2,7 @@
  * Closure compiler and functions; including the switch() code generation.
  *
  *---------------------------------------------------------------------------
+ * TODO: Add struct support.
  * Closures implement the possibility to treat code as data. This means
  * both 'function pointers' (efun, simul-efun and lfun closures) as well
  * as functions compiled from data at runtime (lambda closures).

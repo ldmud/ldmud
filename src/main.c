@@ -1206,6 +1206,9 @@ options (void)
 #ifdef NO_NEGATIVE_RANGES
                               , "assignments to negative ranges disabled\n"
 #endif
+#ifdef USE_STRUCTS
+                              , "structs enabled\n"
+#endif
                               };
         size_t nStrings = sizeof(optstrings) / sizeof(optstrings[0]);
         size_t i;

@@ -2843,6 +2843,9 @@ free_const_list_svalue (svalue_t *svp)
 %token L_STATUS
 %token L_STRING
 %token L_STRING_DECL
+%ifdef USE_STRUCTS
+%token L_STRUCT
+%endif
 %token L_SWITCH
 %token L_SYMBOL
 %token L_SYMBOL_DECL 
@@ -3065,7 +3068,7 @@ free_const_list_svalue (svalue_t *svp)
 %type <case_label>   case_label
 %type <address>      optional_else
 %type <string>       anchestor
-%type <sh_string>    call_other_name
+%type <sh_string>    call_other_name identifier
 %type <function_name> function_name
 
 %ifndef INITIALIZATION_BY___INIT
@@ -3331,6 +3334,7 @@ def:  type optional_star L_IDENTIFIER  /* Function definition or prototype */
               insert_inline_fun_now = MY_TRUE;
       }
 
+    | struct_decl
     | inheritance 
     | default_visibility
 ; /* def */
@@ -3367,6 +3371,95 @@ function_body:
 
     | ';' { $$ = -1; }
 ; /* function_body */
+
+%ifdef USE_STRUCTS
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+/* Definition of a struct
+ * TODO: Implement structs
+ */
+
+struct_decl:
+      type_modifier_list L_STRUCT L_IDENTIFIER opt_base_struct
+      '{' member_list '}' ';'
+      { 
+          if ($3->type == I_TYPE_UNKNOWN)
+              free_shared_identifier($3);
+          yyerror("struct declarations not implemented");
+      }
+; /* struct_decl */
+
+opt_base_struct:
+      /* empty */
+    | '(' L_IDENTIFIER ')'
+      { 
+          if ($2->type == I_TYPE_UNKNOWN)
+              free_shared_identifier($2);
+      }
+; /* opt_base_struct */
+
+member_list:
+      member
+    | member_list member
+; /* member_list */
+
+member:
+      basic_non_void_type member_name_list ';'
+      {
+      }
+; /* member */
+
+member_name_list:
+      member_name
+    | member_name_list ',' member_name
+; /* member_name_list */
+
+member_name:
+      optional_star L_IDENTIFIER
+      {
+          if ($2->type == I_TYPE_UNKNOWN)
+              free_shared_identifier($2);
+      }
+; /* member_name */
+
+
+/* The following rules are used to parse struct literals */
+
+opt_struct_init:
+      struct_init
+    | opt_struct_init ',' struct_init
+; /* opt_struct_init */
+
+struct_init:
+      identifier ':' expr0
+      {
+          free_mstring($1);
+      }
+    | expr0
+      {
+      }
+; /* struct_init */
+
+%ifndef INITIALIZATION_BY___INIT
+
+/* The following rules are used to parse constant struct literals */
+
+opt_const_struct_init:
+      const_struct_init
+    | opt_const_struct_init ',' const_struct_init
+; /* opt_struct_init */
+
+const_struct_init:
+      identifier ':' constant
+      {
+          free_mstring($1);
+      }
+    | constant
+      {
+      }
+; /* const_struct_init */
+%endif /* !INITIALIZATION_BY___INIT */
+
+%endif /* USE_STRUCTS */
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 
@@ -3829,13 +3922,21 @@ basic_non_void_type:
     | L_FLOAT_DECL   { $$ = TYPE_FLOAT;   current_type = $$; };
     | L_MAPPING      { $$ = TYPE_MAPPING; current_type = $$; };
     | L_MIXED        { $$ = TYPE_ANY;     current_type = $$; }
-; /* basic_type */
+%ifdef USE_STRUCTS
+    | L_STRUCT identifier
+      {
+          yyerror("structs not implemented as type");
+          free_mstring($2);
+          /* TODO: Implement structs */
+      }
+%endif /* USE_STRUCTS */
+; /* basic_non_void_type */
 
 
 basic_type:
       basic_non_void_type
     | L_VOID         { $$ = TYPE_VOID;    current_type = $$; }
-; /* basic_non_void_type */
+; /* basic_type */
 
 
 cast:
@@ -3853,6 +3954,43 @@ decl_cast:
       }
 ;
 
+
+/* A generic identifier */
+
+identifier:
+      L_IDENTIFIER
+      {
+          string_t *p;
+
+          /* Extract the string from the ident structure */
+          p = ref_mstring($1->name);
+          if ($1->type == I_TYPE_UNKNOWN)
+              free_shared_identifier($1);
+          $$ = p;
+      }
+
+    | L_LOCAL
+      {
+          ident_t *p;
+
+          /* First, find the declaration of this local */
+          for (p = all_locals; p != NULL; p = p->next_all)
+          {
+              if (p->u.local.num == $1)
+              {
+                  /* We found the identifier.
+                   */
+                  break;
+              }
+          }
+
+          if (p)
+              $$ = ref_mstring(p->name);
+          else
+              fatal("Local variable %ld vanished.\n", (long)$1);
+      }
+;
+ 
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 
@@ -7392,6 +7530,61 @@ expr4:
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+%ifdef USE_STRUCTS
+    | '(' '<' identifier '>' opt_struct_init ')'
+      {
+          /* Generate a literal struct */
+          /* TODO: Implement structs */
+
+          yyerror("struct literals not implemented");
+          free_mstring($3);
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | expr4 L_ARROW identifier
+      {
+          /* Lookup a struct member */
+          /* TODO: Implement structs */
+          yyerror("struct member lookup not implemented");
+          free_mstring($3);
+          /* TODO: From MudOS
+            {
+		if ($1->type == TYPE_ANY) {
+		    int cmi;
+		    unsigned char tp;
+		    
+		    if ((cmi = lookup_any_class_member($3, &tp)) != -1) {
+			CREATE_UNARY_OP_1($$, F_MEMBER, tp, $1, 0);
+			$$->l.number = cmi;
+		    } else {
+			CREATE_ERROR($$);
+		    }
+		} else if (!IS_CLASS($1->type)) {
+		    yyerror("Left argument of -> is not a class");
+		    CREATE_ERROR($$);
+		} else {
+		    CREATE_UNARY_OP_1($$, F_MEMBER, 0, $1, 0);
+		    $$->l.number = lookup_class_member(CLASS_IDX($1->type),
+						       $3,
+						       &($$->type));
+		}
+		    
+		scratch_free($3);
+            }
+         */
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '&' '(' expr4 L_ARROW identifier ')'
+      {
+          /* Create a reference to a struct member */
+          /* TODO: Implement structs */
+          yyerror("struct member lookup not implemented");
+          free_mstring($5);
+      }
+%endif /* USE_STRUCTS */
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr4 index_range %prec '['
       {
 %line
@@ -8097,6 +8290,17 @@ lvalue:
                   type_error("Bad type of index", type);
           }
       }
+
+%ifdef USE_STRUCTS
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | expr4 L_ARROW identifier
+      {
+          /* Create a struct member lvalue */
+          /* TODO: Implement structs */
+          yyerror("struct member lookup not implemented");
+          free_mstring($3);
+      }
+%endif /* USE_STRUCTS */
 
 ; /* lvalue */
 
@@ -9153,9 +9357,12 @@ function_call:
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | expr4 L_ARROW 
+    | expr4 L_ARROW call_other_name %prec L_ARROW
       {
 %line
+          int string_number;
+          string_t *p;
+
           /* Save the (simple) state */
           $<function_call_head>$.start = CURRENT_PROGRAM_SIZE;
 
@@ -9240,21 +9447,15 @@ function_call:
 
               CURRENT_PROGRAM_SIZE += 6;
           }
-      }
 
-      call_other_name %prec L_ARROW
-
-      {
 %line
-          int string_number;
-          string_t *p;
-
-          /* If we received a string, it's a constant call. */
-          p = $4;
+          /* If we received a string as call_other_name, it's a constant call.
+           */
+          p = $3;
 
           if (p)
           {
-              /* Push the function name (the expr4 is already on the stack
+              /* Push the function name (the expr4 is already on the stack)
                */
               string_number = store_prog_string(p);
               if (string_number <= 0x0ff )
@@ -9308,7 +9509,7 @@ function_call:
               function_t *funp;
               int num_arg;
 
-              num_arg = $7 + 2; /* Don't forget the obj and the fun! */
+              num_arg = $6 + 2; /* Don't forget the obj and the fun! */
 
               funp = &simul_efunp[call_other_sefun];
               if (num_arg > funp->num_arg
@@ -9381,7 +9582,7 @@ function_call:
           }
           $$.code = -1;
           $$.start = $1.start;
-          pop_arg_stack($7);
+          pop_arg_stack($6);
             /* No good need of these arguments because we don't
              * know what we are going to call.
              */
@@ -9403,9 +9604,9 @@ function_call:
               bytecode_p src, dest;
               size_t left;
 
-              dest = PROGRAM_BLOCK + $<function_call_head>3.start;
+              dest = PROGRAM_BLOCK + $<function_call_head>4.start;
               src = dest+1;
-              left = CURRENT_PROGRAM_SIZE - $<function_call_head>3.start - 1; 
+              left = CURRENT_PROGRAM_SIZE - $<function_call_head>4.start - 1; 
 
               while (left-- > 0)
               {
@@ -9423,37 +9624,8 @@ function_call:
 
 
 call_other_name:
-      L_IDENTIFIER
-      {
-          string_t *p;
-
-          /* Extract the string from the ident structure */
-          p = ref_mstring($1->name);
-          if ($1->type == I_TYPE_UNKNOWN)
-              free_shared_identifier($1);
-          $$ = p;
-      }
-
-    | L_LOCAL
-      {
-          ident_t *p;
-
-          /* First, find the declaration of this local */
-          for (p = all_locals; p != NULL; p = p->next_all)
-          {
-              if (p->u.local.num == $1)
-              {
-                  /* We found the identifier.
-                   */
-                  break;
-              }
-          }
-
-          if (p)
-              $$ = ref_mstring(p->name);
-          else
-              fatal("Local variable %ld vanished.\n", (long)$1);
-      }
+      identifier
+      { $$ = $1; }
 
     | L_STRING L_STRING
       { fatal("presence of rule should prevent its reduction"); }
@@ -10067,6 +10239,16 @@ lvalue_list:
           }
       }
 
+%ifdef USE_STRUCTS
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | lvalue_list ',' expr4 L_ARROW identifier
+      {
+          /* Lookup a struct member */
+          /* TODO: Implement structs */
+          yyerror("struct member lookup not implemented");
+          free_mstring($5);
+      }
+
 ; /* lvalue_list */
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -10082,6 +10264,9 @@ lvalue_list:
 svalue_constant:
       constant_function_call
     | array_constant
+%ifdef USE_STRUCTS
+    | struct_constant
+%endif /* USE_STRUCTS */
     | constant
       {
           svalue_t *svp = currently_initialized;
@@ -10187,6 +10372,19 @@ array_constant:
       }
 ; /* array_constant */
 
+
+%ifdef USE_STRUCTS
+struct_constant:
+    | '(' '<' identifier '>' opt_const_struct_init ')'
+      {
+          /* Generate a literal struct */
+          /* TODO: Implement structs */
+
+          yyerror("struct literals not implemented");
+          free_mstring($3);
+      }
+; /* struct_constant */
+%endif /* USE_STRUCTS */
 
 float_constant:
       L_FLOAT

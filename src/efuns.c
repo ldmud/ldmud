@@ -5741,6 +5741,9 @@ v_filter (svalue_t *sp, int num_arg)
  *
  * If <ob> is omitted, or neither an object nor a string, then
  * this_object() is used.
+#ifdef USE_STRUCTS
+ * TODO: Implement structs.
+#endif
  */
 
 {
@@ -5782,6 +5785,9 @@ v_get_type_info (svalue_t *sp, int num_arg)
  * TODO: The flags should be defined in an include file.
  * TODO: The array returned for closures should contain all
  * TODO:: three items.
+#ifdef USE_STRUCTS
+ * TODO: Implement structs.
+#endif
  */
 
 {
@@ -5889,6 +5895,9 @@ v_map (svalue_t *sp, int num_arg)
  *
  * If <ob> is omitted, or neither an object nor a string, then
  * this_object() is used.
+#ifdef USE_STRUCTS
+ * TODO: Implement structs.
+#endif
  */
 
 {
@@ -5913,6 +5922,9 @@ f_member (svalue_t *sp)
  * the first arg, or -1 if none found. For mappings it checks, if
  * key is present in mapping m and returns 1 if so, 0 if key is
  * not in m.
+#ifdef USE_STRUCTS
+ * TODO: Implement structs.
+#endif
  */
 
 {

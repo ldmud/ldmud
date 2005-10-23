@@ -393,6 +393,16 @@
  */
 @cdef_rxcache_table@ RXCACHE_TABLE            @val_rxcache_table@
 
+/* --- Current Developments ---
+ * These options can be used to disable developments-in-progress if their
+ * code turns out to be interrrupting.
+ */
+
+/* Define this if you want structs supported.
+ */
+@cdef_use_pcre@ USE_STRUCTS
+
+
 /* --- Profiling ---
  * For profiling of the VM instruction implementations, refer to the Makefile
  */

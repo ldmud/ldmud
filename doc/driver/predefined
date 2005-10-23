@@ -51,8 +51,10 @@ DESCRIPTION
       __FLOAT_MAX__      : the largest (positive) float number
       __FLOAT_MIN__      : the smallest (positive) float number
 
-      __LPC_NOSAVE__     : always defined, since the 'nosave' keyword is
-                           now an official LPC feature.
+      __LPC_NOSAVE__     : always defined
+      __LPC_STRUCTS__    : defined when struct support is enabled.
+                           Once structs are fully supported, this macro
+                           will always be defined.
 
     If the ERQ is supported, the following macros are defined:
 
@@ -82,7 +84,8 @@ HISTORY
          __INT_MAX__, __INT_MIN__, __FLOAT_MIN__, __FLOAT_MAX__,
         __CATCH_EVAL_COST__, __MASTER_EVAL_COST__, __RESET_TIME__,
         __CLEANUP_TIME__, __DRIVER_LOG__, and __WIZLIST__.
-    3.3 made __LPC_NOSAVE__ always defined and added __ALISTS__, __PCRE__.
+    3.3 made __LPC_NOSAVE__ always defined and added __ALISTS__, 
+        __LPC_STRUCTS__, and __PCRE__.
 
 SEE ALSO
     pragma(LPC), preprocessor(LPC)

@@ -7,6 +7,10 @@
  *---------------------------------------------------------------------------
  * This file refers to, but does not define 'basic' types like mappings,
  * arrays or lambdas.
+#ifdef USE_STRUCTS
+ * TODO: Implement structs as unique type, with the struct id as
+ * TODO:: secondary information.
+#endif
  */
 
 #include "driver.h"

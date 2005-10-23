@@ -14262,6 +14262,9 @@ again:
          *
          * Returns a code for the type of the argument, as defined in
          * <sys/lpctypes.h>
+#ifdef USE_STRUCTS
+         * TODO: Implement structs.
+#endif
          */
 
         mp_int i = sp->type;

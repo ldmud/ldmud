@@ -447,6 +447,9 @@ static struct s_reswords reswords[]
    , { "sscanf",         L_SSCANF        }
    , { "static",         L_STATIC        }
    , { "status",         L_STATUS        }
+#ifdef USE_STRUCTS
+   , { "struct",         L_STRUCT        }
+#endif
    , { "string",         L_STRING_DECL   }
    , { "switch",         L_SWITCH        }
    , { "symbol",         L_SYMBOL_DECL   }
@@ -760,6 +763,9 @@ init_lexer(void)
     add_permanent_define("__LPC_NOSAVE__", -1, string_copy("1"), MY_FALSE);
 #ifdef USE_DEPRECATED
     add_permanent_define("__DEPRECATED__", -1, string_copy("1"), MY_FALSE);
+#endif
+#ifdef USE_STRUCTS
+    add_permanent_define("__LPC_STRUCTS__", -1, string_copy("1"), MY_FALSE);
 #endif
     if (wizlist_name[0] != '\0')
     {

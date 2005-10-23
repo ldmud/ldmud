@@ -1,0 +1,116 @@
+PRELIMINARY
+CONCEPT
+        structs
+
+INTRODUCTION
+        structs are, next to arrays and mappings, a way to group a
+        collection of value together.
+        
+        A struct holds a fixed number of values, called 'members', and
+        allows to access them by their given name. The name is resolved
+        when the LPC code is compiled, making struct member access as fast
+        as array member access.
+
+        structs are passed by reference.
+
+
+DEFINITION
+        A new struct type has to be defined at the top level of an
+        object. For example
+
+            struct Foo {
+              int        one, *two;
+              struct Bar three;
+            };
+
+        defines the new struct 'Foo' with three members: integer 'one',
+        integer array 'two', and struct Bar 'three'
+
+        It is possible to 'inherit' structs from each other. Given above
+        definition of struct Foo, the following definition
+
+            struct Quux (Foo) {
+              int four;
+            };
+
+        is equivalent to the definition
+
+            struct Quux {
+              int        one, *two;
+              struct Bar three;
+              int four;
+            };
+
+
+        The usual visibility modifiers apply, e.g.
+
+            protected struct Bang {...};
+
+        
+        struct definitions are promoted through inheritance like functions,
+        with the difference that all structs live in the same flat namespace.
+        This means: a struct defined in a program is visible in _all_
+        inherited programs, regardless of how deep the inheritance is
+        nested.  This also means that in one program there must not be
+        two structs, inherited or not, with the same name.
+
+
+USAGE
+        To use a struct, its definition must be visible - either because it
+        is defined in the object compiled, or it has been inherited.
+
+
+        A variable to hold a struct is defined like this:
+
+            struct Foo var;
+
+        and similar for function arguments:
+
+            void fun (struct Foo arg)
+
+
+        A struct member is accessed using the -> operator:
+
+            struct Foo var = ...;
+
+            var->one = 1;
+
+
+        Literal structs are written using (<>) as delimiters:
+
+            (<Foo>)
+                creates an empty instance of struct Foo
+
+            (<Foo> 1, ({ 2 }), bar)
+                creates an instance of struct Foo, and assigns 1 to member
+                'one', ({ 2 }) to member 'two', and the content of variable
+                bar to member 'three'.
+
+            (<Foo> two: ({ 2 }) )
+               creates an instance of struct Foo which is all empty except
+               for member 'two' which is assigned the value ({ 2 }).
+
+        If both named and unnamed initializers are used, the compiler
+        assigns the unnamed initializers in order to all members for which
+        no named initializer could be found. For example
+
+            (<Foo> two: ({ 2 }), 1, bar)
+
+         creates an instance of struct Foo, and assigns 1 to member 'one',
+         ({ 2 }) to member 'two', and the content of variable bar to member
+         'three'.
+
+
+MISCELLANEOUS
+         Internally, structs are implemented as arrays. Logically, all
+         array efuns like filter() can be used on structs as well.
+
+         Support for structs is signaled by the macro __LPC_STRUCTS__.
+
+
+HISTORY
+        Implementation of structs began in 3.3.237, and is not finished yet.
+
+
+SEE ALSO
+        mappings(LPC)

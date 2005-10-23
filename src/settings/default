@@ -408,6 +408,15 @@ with_apply_cache_bits=12
 enable_rxcache_table=yes
 with_rxcache_table=8192
 
+
+# --- Current Developments ---
+# These options can be used to disable developments-in-progress if their
+# code turns out to be interrrupting.
+
+# Define this to enable LPC structs.
+enable_use_structs=yes
+
+
 # --- Profiling ---
 # For profiling of the VM instruction implementations, refer to the Makefile
 

@@ -9,24 +9,25 @@ SYNOPSIS
         mapping filter (mapping arg, closure cl, mixed extra...)
 
 DESCRIPTION
-        Call the function <ob>-><func>() resp. the closure <cl> for
-        every element of the array or mapping <arg>, and return
-        a result made from those elements for which the function
-        call returns TRUE. The <extra> arguments are passed as additional
-        parameters to the function calls and must not be references of array
-        of mapping elements (like &(i[1]) ).
+        Call the function <ob>-><func>() resp. the closure <cl> for every
+        element of the array, struct, or mapping <arg>, and return a result
+        made from those elements for which the function call returns TRUE.
+        The <extra> arguments are passed as additional parameters to the
+        function calls and must not be references of array of mapping
+        elements (like &(i[1]) ).
 
         If <ob> is omitted, or neither a string nor an object, it
         defaults to this_object().
 
 
-        If <arg> is an array, the function will be called with
-        each of the array values as first parameter, followed by the <extra>
-        arguments. If the result from the function call is true, the array
-        element in question is included into the efun result.
+        If <arg> is an array or struct, the function will be called with
+        each of the array/struct values as first parameter, followed by the
+        <extra> arguments. If the result from the function call is true,
+        the array element in question is included into the efun result.
         
         If the efun is used with a mapping <map> instead of a function,
-        every array element which is key in <map> is included into the result.
+        every array element which is key in <map> is included into the
+        result.
 
 
         If <arg> is a mapping, the function will be called with
@@ -49,8 +50,9 @@ DESCRIPTION
         per key, and mappings of arrays) can be treated in the same way.
 
 
-        Note that filter() used with arrays behaves like filter_array(),
-        but used with mappings is a generalisation of filter_indices().
+        Historical Note: filter() used with arrays behaves like
+        filter_array(), but used with mappings is a generalisation of
+        filter_indices().
 
 
 HISTORY

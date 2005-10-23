@@ -11,25 +11,25 @@ SYNOPSIS
 
 DESCRIPTION
         Call the function <ob>-><func>() resp. the closure <cl> for
-        every element of the array or mapping <arg>, and return a result
+        every element of the array, struct or mapping <arg>, and return a result
         made up from the returned values.
 
         If <ob> is omitted, or neither a string nor an object, it
         defaults to this_object().
 
 
-        If <arg> is an array, the function will be called with each
-        of the array elements as first parameter, followed by the
-        <extra> arguments. The result of the efun is an array with
-        all the results returned from the function calls. Thus the
+        If <arg> is an array or struct, the function will be called with
+        each of the array/struct elements as first parameter, followed by
+        the <extra> arguments. The result of the efun is an array/struct
+        with all the results returned from the function calls. Thus the
         operation could be described as:
 
           foreach(index) result[index] = ob->func(arg[index], extra...)
 
-        If <arg> is an array, and a mapping is specified instead
-        of a function, the result is an array with the values found
-        in the mapping for the original values, resp. with the original
-        values for which no mapping entry exists. In other words:
+        If <arg> is an array/struct, and a mapping is specified instead of
+        a function, the result is an array/struct with the values found in
+        the mapping for the original values, resp. with the original values
+        for which no mapping entry exists. In other words:
 
           foreach(index)
              if (arg[index] exists as key in map)
@@ -64,8 +64,8 @@ DESCRIPTION
         per key, and mappings of arrays) can be treated in the same way.
 
 
-        Note that map() used with arrays behaves like map_array(), but used
-        with mappings generalises map_indices()!
+        Historical Note: map() used with arrays behaves like map_array(),
+        but used with mappings generalises map_indices()!
 
 
 EXAMPLES

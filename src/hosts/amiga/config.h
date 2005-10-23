@@ -472,4 +472,8 @@
 /* #define VERBOSE_OPCPROF */
 #endif
 
+/* Define this if you want structs supported.
+ */
+#define USE_STRUCTS
+
 #endif /* CONFIG_H__ */

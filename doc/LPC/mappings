@@ -443,4 +443,5 @@ HISTORY
         The ([:width ]) notation was added in LDMud 3.2.9/3.3.208 .
 
 SEE ALSO
-        alists(LPC), closures(LPC), mkmapping(E), walk_mapping(E)
+        alists(LPC), closures(LPC), structs(LPC), mkmapping(E),
+        walk_mapping(E)
