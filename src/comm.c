@@ -2438,6 +2438,12 @@ get_message (char *buff)
                         remove_interactive(ip->ob, MY_FALSE);
                         continue;
                     }
+                    if (errno == ECONNREFUSED) {
+                        debug_message("%s Connection refused detected.\n"
+                                     , time_stamp());
+                        remove_interactive(ip->ob, MY_FALSE);
+                        continue;
+                    }
                     if (errno == EWOULDBLOCK) {
                         debug_message("%s read would block socket %d!\n"
                                      , time_stamp(), ip->socket);
@@ -2466,7 +2472,8 @@ get_message (char *buff)
                         continue;
                     }
                     perror("read");
-                    debug_message("%s Unknown errno %d\n", time_stamp(), errno);
+                    debug_message("%s Unexpected errno %d\n"
+                                 , time_stamp(), errno);
                     remove_interactive(ip->ob, MY_FALSE);
                     continue;
                 }

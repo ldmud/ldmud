@@ -329,10 +329,26 @@ binop_bits (svalue_t *sp, int instr)
         c2 = argtxt[arg_len];
         if (c1 > 0x3f + ' ' || c1 < ' ')
             error("Illegal bit pattern in %s character %d\n"
-                   , get_f_name(instr), (int)c1);
+                   , instr == INSTR_OR_BITS
+                     ?  "or_bits()"
+                     : (instr == INSTR_AND_BITS
+                        ?  "and_bits()"
+                         : (instr == INSTR_XOR_BITS
+                            ? "xor_bits()"
+                            : "unknown"
+                       ))
+                   , (int)c1);
         if (c2 > 0x3f + ' ' || c2 < ' ')
             error("Illegal bit pattern in %s character %d\n"
-                   , get_f_name(instr), (int)c2);
+                   , instr == INSTR_OR_BITS
+                     ?  "or_bits()"
+                     : (instr == INSTR_AND_BITS
+                        ?  "and_bits()"
+                         : (instr == INSTR_XOR_BITS
+                            ? "xor_bits()"
+                            : "unknown"
+                       ))
+                   , (int)c2);
         if (instr == INSTR_AND_BITS)
             restxt[arg_len] = (char)((c1-' ') & (c2-' ')) + ' ';
         else if (instr == INSTR_OR_BITS)

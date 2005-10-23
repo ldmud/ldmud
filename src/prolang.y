@@ -9541,6 +9541,14 @@ lvalue:
       {
           /* Create a struct member lvalue */
 
+          int num;
+          vartype_t member_type;
+
+          /* If the struct lookup is ok, set num and member_type */
+
+          num = 0;
+          member_type = TYPE_UNKNOWN;
+
           if (($1.type & ~SEC_TYPE_MASK) != T_STRUCT)
           {
               yyerrorf("Bad type for struct lookup: %s"
@@ -9548,7 +9556,6 @@ lvalue:
           }
           else
           {
-              int num;
               struct_def_t * pdef = &(STRUCT_DEF(GET_SEC_TYPE_INFO($1.type)));
 
               num = find_struct_member(pdef, $3);
@@ -9560,72 +9567,82 @@ lvalue:
               }
               else
               {
-                  bytecode_p p, q;
-                  p_int start, current;
+                  member_type = STRUCT_MEMBER(pdef->members + num).type;
+              }
+          }
 
-                  /* Insert the index code */
-                  ins_f_code(F_CLIT);
-                  ins_byte(num);
+          /* We have to generate some code, so if the struct lookup is
+           * invalid, we just play long and generate code to look up
+           * member #0 in whatever we got.
+           */
 
-                  /* Generate/add an INDEX_LVALUE */
-          
-                  start = $1.start;
-                  current = CURRENT_PROGRAM_SIZE;
+          {
+              bytecode_p p, q;
+              p_int start, current;
 
-                  p = PROGRAM_BLOCK;
-                  q = yalloc(current-start+2); /* assign uses an extra byte */
+              /* Insert the index code */
+              ins_f_code(F_CLIT);
+              ins_byte(num);
 
-                  /* First change the rvalue 'expr4' into an lvalue.
-                   */
-                  if ($1.code >= 0)
+              /* Generate/add an INDEX_LVALUE */
+      
+              start = $1.start;
+              current = CURRENT_PROGRAM_SIZE;
+
+              p = PROGRAM_BLOCK;
+              q = yalloc(current-start+2); /* assign uses an extra byte */
+
+              /* First change the rvalue 'expr4' into an lvalue.
+               */
+              if ($1.code >= 0)
+              {
+                  p_int end, start2;
+
+                  if ( 0 != (end = $1.end) )
                   {
-                      p_int end, start2;
-
-                      if ( 0 != (end = $1.end) )
-                      {
-                          /* Multibyte instruction */
-                          start2 = end+1;
-                          if ($1.code == F_PUSH_IDENTIFIER16_LVALUE)
-                              p[start] = $1.code;
-                          else
-                              p[end] = $1.code;
-                          memcpy(q, p + start2, current - start2);
-                          memcpy(q + current - start2, p + start, start2 - start);
-                          q[current - start] = F_INDEX_LVALUE;
-                      }
+                      /* Multibyte instruction */
+                      start2 = end+1;
+                      if ($1.code == F_PUSH_IDENTIFIER16_LVALUE)
+                          p[start] = $1.code;
                       else
-                      {
-                          /* Simple relocation/insertion */
-                          bytecode_t c;
-
-                          start2 = start + 2;
-                          c = p[start+1];
-                          memcpy(q, p + start2, current - start2);
-                          p = q + current - start2;
-                          *p++ = $1.code;
-                          *p++ = c;
-                          *p = F_INDEX_LVALUE;
-                      }
+                          p[end] = $1.code;
+                      memcpy(q, p + start2, current - start2);
+                      memcpy(q + current - start2, p + start, start2 - start);
+                      q[current - start] = F_INDEX_LVALUE;
                   }
                   else
                   {
-                      /* We can just copy the instruction block
-                       * and add a PUSH_(R)INDEXED_LVALUE
-                       */
-                      memcpy(q, p + start, current - start);
-                      q[current - start] = F_PUSH_INDEXED_LVALUE;
+                      /* Simple relocation/insertion */
+                      bytecode_t c;
+
+                      start2 = start + 2;
+                      c = p[start+1];
+                      memcpy(q, p + start2, current - start2);
+                      p = q + current - start2;
+                      *p++ = $1.code;
+                      *p++ = c;
+                      *p = F_INDEX_LVALUE;
                   }
-
-                  /* This is what we return */
-                  $$.length = current + 1 - start;
-                  $$.u.p = q;
-
-                  CURRENT_PROGRAM_SIZE = start;
-                  last_expression = -1;
-
-                  $$.type = STRUCT_MEMBER(pdef->members + num).type;
               }
+              else
+              {
+                  /* We can just copy the instruction block
+                   * and add a PUSH_(R)INDEXED_LVALUE
+                   */
+                  memcpy(q, p + start, current - start);
+                  q[current - start] = F_PUSH_INDEXED_LVALUE;
+              }
+
+              /* This is what we return */
+              $$.length = current + 1 - start;
+              $$.u.p = q;
+
+              CURRENT_PROGRAM_SIZE = start;
+              last_expression = -1;
+
+              $$.type = member_type;
           }
+
           free_mstring($3);
       }
 %endif /* USE_STRUCTS */

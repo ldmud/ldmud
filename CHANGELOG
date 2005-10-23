@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+17-Sep-2002 (Lars Duening)  (3.3.258)
+  - (bitstrings.c, swap.c, simulate.h) Removed warnings (reported by Dafire).
+  - (comm.c) ECONNREFUSED is recognized as error (suggested by Coogan).
+  - (prolang.y) Assignments to a struct member caused the LPC compiler to
+       dereference uninitialized memory when the member lookup failed
+       (reported by Bardioc).
+
 16-Sep-2002 (Lars Duening)  (3.3.257)
   - (comm.c) With PThreads: forgot to detach new threads after creation
        (thanks, Gawain!)
