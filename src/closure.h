@@ -30,7 +30,7 @@ struct lambda_s
     union               /* Closure information: */
     {
         unsigned short index;
-          /* _LFUN/_ALIEN_LFUN: index in the function table
+          /* _LFUN: index in the function table
            * _IDENTIFIER: index in the variable table
            */
 #       define VANISHED_VARCLOSURE_INDEX ((unsigned short)-1)

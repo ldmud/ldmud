@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+11-Sep-2002 (Lars Duening)  (3.3.251)
+  - (main.c) Redesigned the argument definition array to combine all
+       information (short version, long version, short and long help
+       text) in one place. Also got rid of the COMPAT arguments.
+
 10-Sep-2002 (Lars Duening)  (3.3.250)
   - (func_spec, efuns) The efuns to_array() and to_string() can now
        handle structs; new efun to_struct().

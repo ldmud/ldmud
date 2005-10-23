@@ -167,6 +167,7 @@ struct ident_s
 #define lookup_predef(p) (p->type == I_TYPE_GLOBAL ? p->u.global.efun : -1)
 
 
+#ifndef USE_NEW_INLINES
 /* --- struct inline_fun: linked list element of saved function texts ---
  *
  * The functions inlined by (: ... :) have their code (plus the function
@@ -179,6 +180,7 @@ struct inline_fun
     strbuf_t buf;              /* the complete function text */
     struct inline_fun * next;  /* next list element */
 };
+#endif /* USE_NEW_INLINES */
 
 
 /* --- Variables --- */
@@ -198,9 +200,11 @@ extern Bool pragma_no_shadow;
 extern Bool pragma_pedantic;
 extern string_t *last_lex_string;
 extern ident_t *all_efuns;
+#ifndef USE_NEW_INLINES
 extern struct inline_fun * first_inline_fun;
 extern Bool insert_inline_fun_now;
 extern unsigned int next_inline_fun;
+#endif /* USE_NEW_INLINES */
 
 /* Values of pragma_strict_types */
 

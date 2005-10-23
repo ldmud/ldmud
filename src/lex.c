@@ -348,6 +348,7 @@ static ident_t *undefined_permanent_defines = NULL;
    * the ident_table.
    */
 
+#ifndef USE_NEW_INLINES
 /*-------------------------------------------------------------------------*/
 
 struct inline_fun * first_inline_fun = NULL;
@@ -364,6 +365,7 @@ unsigned int next_inline_fun = 0;
   /* The running count of inline functions, used to 'name' the next
    * function to generate.
    */
+#endif /* USE_NEW_INLINES */
 
 /*-------------------------------------------------------------------------*/
 
@@ -427,7 +429,7 @@ static struct s_reswords reswords[]
    , { "for",            L_FOR           }
    , { "foreach",        L_FOREACH       }
 #ifdef USE_NEW_INLINES
-   , { "func",           L_FUNC          }
+   , { "function",       L_FUNC          }
 #endif
    , { "if",             L_IF            }
 #ifdef L_IN
@@ -2831,7 +2833,7 @@ string (char *str, size_t slen)
         }
     }
     return L_STRING;
-}
+} /* string() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE int
@@ -2866,6 +2868,7 @@ yylex1 (void)
 
 #define TRY(c, t) if (*yyp == (c)) {yyp++; outp = yyp; return t;}
 
+#ifndef USE_NEW_INLINES
     /* If we are at a point suitable for inline function insertion,
      * do it.
      * Note: It is not strictly necessary to insert all of them
@@ -2892,6 +2895,7 @@ yylex1 (void)
             first_inline_fun = fun;
         }
     }
+#endif /* USE_NEW_INLINES */
 
     yyp = outp;
 
@@ -4600,8 +4604,10 @@ start_new_file (int fd)
 
     nexpands = 0;
 
+#ifndef USE_NEW_INLINES
     next_inline_fun = 0;
     insert_inline_fun_now = MY_FALSE;
+#endif /* USE_NEW_INLINES */
 } /* start_new_file() */
 
 /*-------------------------------------------------------------------------*/
@@ -4641,6 +4647,7 @@ end_new_file (void)
         last_lex_string = NULL;
     }
 
+#ifndef USE_NEW_INLINES
     while (first_inline_fun)
     {
         struct inline_fun * fun = first_inline_fun;
@@ -4649,6 +4656,7 @@ end_new_file (void)
         strbuf_free(&(fun->buf));
         xfree(fun);
     }
+#endif /* USE_NEW_INLINES */
 
 } /* end_new_file() */
 

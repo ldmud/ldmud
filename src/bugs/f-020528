@@ -40,6 +40,9 @@ a context lfun has three variable spaces: global, local, and context.
 As a result, assignments to the inherited vars are possible, but effect just
 this closure, not the creating function.
 
+The '==' and '!=' operators need to be extended to compare two inlines with
+identical context values as equal.
+
     Note: with this context (and linking of contexts through a
     'parent_context' pointer in the VM control record) it would be possible to
     use implement local functions as in Oberon. Creating an lfun from a local

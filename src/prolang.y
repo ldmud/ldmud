@@ -4376,8 +4376,10 @@ def:  type optional_star L_IDENTIFIER  /* Function definition or prototype */
           /* Clean up */
           free_all_local_names();
           
+#ifndef USE_NEW_INLINES
           if (first_inline_fun)
               insert_inline_fun_now = MY_TRUE;
+#endif /* USE_NEW_INLINES */
 
           block_depth = 0;
       }
@@ -4386,8 +4388,10 @@ def:  type optional_star L_IDENTIFIER  /* Function definition or prototype */
       {
           if ($1 == 0)
               yyerror("Missing type");
+#ifndef USE_NEW_INLINES
           if (first_inline_fun)
               insert_inline_fun_now = MY_TRUE;
+#endif /* USE_NEW_INLINES */
       }
 
 %ifdef USE_STRUCTS

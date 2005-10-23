@@ -828,10 +828,11 @@ dprintf4 (int fd, char *s, p_int a, p_int b, p_int c, p_int d)
  * proper command arguments.
  *
  * Id numbers are associated with their option strings/letters by the
- * statically initialized arrays aShortOpts and aLongOpts. Every element
- * of these two arrays is a structure defining the option's name (string
- * or letter), the associated id number, and whether or not the option
- * takes a value. The order of the elements does not matter.
+ * statically initialized arrays aOptions. Every element
+ * in this array is a structure defining the option's name (string
+ * or letter), the associated id number, whether or not the option
+ * takes a value, and the short and long help text. The order of the
+ * elements does not matter, except for the help text output.
  *
  * The parsing is done by calling the function
  *
@@ -884,6 +885,17 @@ typedef struct LongOpt {
   int         eNumber;  /* The associated option number */
   short       bValue;   /* True: takes a value */
 } LongOpt;
+
+/* Description of an option */
+
+typedef struct Option {
+  char        cOption;  /* The short option char, or \0 if none */
+  char      * pOption;  /* The long option string, or NULL if none */
+  int         eNumber;  /* The associated option number */
+  short       bValue;   /* True: takes a value */
+  char      * pSHelp;   /* Short help string, or NULL */
+  char      * pLHelp;   /* Long help string, or NULL */
+} Option;
 
 /* Every recognized option has a ordinal number */
 
@@ -957,96 +969,377 @@ typedef enum OptNumber {
 
 /* Comprehensive lists of recognized options */
 
-static ShortOpt aShortOpts[]
-  = { { 'c', cTrace,     MY_FALSE }
-    , { 'D', cDefine,    MY_TRUE }
-    , { 'd', cDebug,     MY_FALSE }
-    , { 'E', cEvalcost,  MY_TRUE }
-    , { 'e', cNoPreload, MY_FALSE }
-    , { 'f', cFuncall,   MY_TRUE }
-    , { 'M', cMaster,    MY_TRUE }
-    , { 'm', cMudlib,    MY_TRUE }
-    , { 'N', cNoERQ,     MY_FALSE }
-    , { 'P', cInherited, MY_TRUE }
-    , { 'r', cReserved,  MY_TRUE }
-    , { 's', cSwap,      MY_TRUE }
-    , { 't', cNoHeart,   MY_FALSE }
-    , { 'u', cUdpPort,   MY_TRUE }
-#ifdef YYDEBUG
-    , { 'y', cYYDebug,   MY_FALSE }
-#endif
-    , { 'V', cVersion,   MY_FALSE }
-    , { 'h', cHelp,      MY_FALSE }
-    , { '?', cHelp,      MY_FALSE }
-    };
+static Option aOptions[]
+  = { { 0,   "args",               cArgFile,        MY_TRUE
+      , "  --args <filename>\n"
+      , "  --args <filename>\n"
+        "    Read the options from <filename> as if they were given on the\n"
+        "    commandline.\n"
+      }
 
-static LongOpt aLongOpts[]
-  = { { "args",               cArgFile,        MY_TRUE }
-    , { "cleanup-time",       cCleanupTime,    MY_TRUE }
-    , { "compat",             cCompat,         MY_FALSE }
-    , { "no-compat",          cNoCompat,       MY_FALSE }
-    , { "debug",              cDebug,          MY_FALSE }
-    , { "define",             cDefine,         MY_TRUE }
-    , { "debug-file",         cDebugFile,      MY_TRUE }
-    , { "debug_file",         cDebugFile,      MY_TRUE } /* TODO: COMPAT */
-    , { "erq",                cErq,            MY_TRUE }
-    , { "eval-cost",          cEvalcost,       MY_TRUE }
-    , { "funcall",            cFuncall,        MY_TRUE }
-    , { "list-compiles",      cTrace,          MY_FALSE }
-    , { "master",             cMaster,         MY_TRUE }
-    , { "mudlib",             cMudlib,         MY_TRUE }
-    , { "max-malloc",         cMaxMalloc,      MY_TRUE }
-    , { "max_malloced",       cMaxMalloc,      MY_TRUE } /* TODO: COMPAT */
-    , { "max-array",          cMaxArray,       MY_TRUE }
-    , { "max-bytes",          cMaxBytes,       MY_TRUE }
-    , { "max-callouts",       cMaxCallouts,    MY_TRUE }
-    , { "max-file",           cMaxFile,        MY_TRUE }
-    , { "max-mapping",        cMaxMapping,     MY_TRUE }
-    , { "min-malloc",         cMinMalloc,      MY_TRUE }
-    , { "min-small-malloc",   cMinSmallMalloc, MY_TRUE }
-    , { "inherit",            cInherited,      MY_TRUE }
-    , { "no-erq",             cNoERQ,          MY_FALSE }
-    , { "no-heart",           cNoHeart,        MY_FALSE }
-    , { "no-preload",         cNoPreload,      MY_FALSE }
-    , { "pidfile",            cPidFile,        MY_TRUE }
-    , { "random-seed",        cRandomSeed,     MY_TRUE }
-    , { "reset-time",         cResetTime,      MY_TRUE }
-    , { "reserve-user",       cReserveUser,    MY_TRUE }
-    , { "reserve-master",     cReserveMaster,  MY_TRUE }
-    , { "reserve-system",     cReserveSystem,  MY_TRUE }
-    , { "strict-euids",       cStrictEuids,    MY_FALSE }
-    , { "no-strict-euids",    cNoStrictEuids,  MY_FALSE }
-    , { "swap-time",          cSwapTime,       MY_TRUE }
-    , { "swap-variables",     cSwapVars,       MY_TRUE }
-    , { "swap-file",          cSwapFile,       MY_TRUE }
-    , { "swap-compact",       cSwapCompact,    MY_FALSE }
-    , { "wizlist-file",       cWizlistFile,    MY_TRUE }
-    , { "no-wizlist-file",    cNoWizlistFile,  MY_FALSE }
+    , { 'P', "inherit",            cInherited,      MY_TRUE 
+      , "  -P|--inherit <fd-number>\n"
+      , "  -P|--inherit <fd-number>\n"
+        "    Inherit filedescriptor <fd-number> from the parent process\n"
+        "    as socket to listen for connections.\n"
+      }
+
+    , { 'u', "udp",                cUdpPort,        MY_TRUE 
+      , "  -u|--udp <portnumber>\n"
+      , "  -u|--udp <portnumber>\n"
+        "    Specify the <portnumber> for the UDP port, overriding the compiled-in\n"
+        "    default.\n"
+      }
+
+    , { 'D', "define",             cDefine,         MY_TRUE 
+      , "  -D|--define <macro>[=<text>]\n"
+      , "  -D|--define <macro>[=<text>]\n"
+        "    Add <macro> (optionally to be expanded to <text>) to the list of\n"
+        "    predefined macros known by the LPC compiler.\n"
+      }
+
+    , { 'E', "eval-cost",          cEvalcost,       MY_TRUE 
+      , "  -E|--eval-cost <ticks>\n"
+      , "  -E|--eval-cost <ticks>\n"
+        "    Set the number of <ticks> available for one evaluation thread.\n"
+      }
+
+    , { 'M', "master",             cMaster,         MY_TRUE 
+      , "  -M|--master <filename>\n"
+      , "  -M|--master <filename>\n"
+        "    Use <filename> for the master object.\n"
+      }
+
+    , { 'm', "mudlib",             cMudlib,         MY_TRUE 
+      , "  -m|--mudlib <pathname>\n"
+      , "  -m|--mudlib <pathname>\n"
+        "    Use <pathname> as the top directory of the mudlib.\n"
+      }
+
+    , { 0,   "debug-file",         cDebugFile,      MY_TRUE 
+      , "  --debug-file <filename>\n"
+      , "  --debug-file <filename>\n"
+        "    Log all debug output in <filename> instead of <host>.debug.log .\n"
+      }
+
+    , { 0,   "compat",             cCompat,         MY_FALSE 
+      , "  --compat\n"
+      , "  --compat\n"
+        "  --no-compat\n"
+        "    Select the mode (compat or plain) of the driver.\n"
+        "    Note that this choice does not affect the default name of the master\n"
+        "    object.\n"
+      }
+
+    , { 0,   "no-compat",          cNoCompat,       MY_FALSE 
+      , "  --no-compat\n"
+      , NULL
+      }
+
+    , { 'd', "debug",              cDebug,          MY_FALSE 
+      , "  -d|--debug\n"
+      , "  -d|--debug\n"
+        "    Generate debug output; repeat the argument for even more output.\n"
+      }
+
+    , { 'c', "list-compiles",      cTrace,          MY_FALSE 
+      , "  -c|--list-compiles\n"
+      , "  -c|--list-compiles\n"
+        "    List the name of every compiled file on stderr.\n"
+      }
+
+    , { 'e', "no-preload",         cNoPreload,      MY_FALSE 
+      , "  -e|--no-preload\n"
+      , "  -e|--no-preload\n"
+        "    Pass a non-zero argument (the number of occurences of this option)\n"
+        "    to master->preload(), which usually inhibits all preloads of castles\n"
+        "    and other objects.\n"
+      }
+
+    , { 0,   "erq",                cErq,            MY_TRUE 
+      , "  --erq <filename> | --erq \"<filename> <erq args>\"\n"
+      , "  --erq <filename>\n"
+        "  --erq \"<filename> <erq arguments>\"\n"
+        "    Use <filename> instead of 'erq' as the name of the ERQ executable.\n"
+        "    If the name starts with a '/', it is take to be an absolute pathname,\n"
+        "    otherwise it is interpreted relative to " BINDIR ".\n"
+        "    If not specified, 'erq' is used as executable name.\n"
+        "    With the proper use of quotes it is legal to pass arbitrary arguments\n"
+        "    to the erq, however, these may not contain spaces themselves.\n"
+      }
+
+    , { 'N', "no-erq",             cNoERQ,          MY_FALSE 
+      , "  -N|--no-erq\n"
+      , "  -N|--no-erq\n"
+        "    Don't start the erq demon (if it would be started at all).\n"
+      }
+
+    , { 't', "no-heart",           cNoHeart,        MY_FALSE 
+      , "  -t|--no-heart\n"
+      , "  -t|--no-heart\n"
+        "    Disable heartbeats and call_outs.\n"
+      }
+
+    , { 'f', "funcall",            cFuncall,        MY_TRUE 
+      , "  -f|--funcall <word>\n"
+      , "  -f|--funcall <word>\n"
+        "    The lfun master->flag() is called with <word> as argument before the\n"
+        "    gamedriver accepts network connections.\n"
+      }
+
+    , { 0,   "cleanup-time",       cCleanupTime,    MY_TRUE
+      , "  --cleanup-time <time>\n"
+      , "  --cleanup-time <time>\n"
+        "    The idle time in seconds for an object before the driver tries to\n"
+        "    clean it up. This time should be substantially higher than the\n"
+        "    reset time. A time <= 0 disables the cleanup mechanism.\n"
+      }
+
+    , { 0,   "reset-time",         cResetTime,      MY_TRUE 
+      , "  --reset-time <time>\n"
+      , "  --reset-time <time>\n"
+        "    The time in seconds for an object before it is reset.\n"
+        "    A time <= 0 disables the reset mechanism.\n"
+      }
+
+    , { 0,   "max-array",          cMaxArray,       MY_TRUE 
+      , "  --max-array <size>\n"
+      , "  --max-array <size>\n"
+        "    The maximum number of elements an array can hold.\n"
+        "    Set to 0, arrays of any size are allowed.\n"
+      }
+
+    , { 0,   "max-callouts",       cMaxCallouts,    MY_TRUE 
+      , "  --max-callouts <number>\n"
+      , "  --max-callouts <number>\n"
+        "    The maximum number of callouts at one time.\n"
+        "    Set to 0, any number of callouts is allowed.\n"
+      }
+
+    , { 0,   "max-mapping",        cMaxMapping,     MY_TRUE 
+      , "  --max-mapping <size>\n"
+      , "  --max-mapping <size>\n"
+        "    The maximum number of elements (keys+values) a mapping can hold.\n"
+        "    Set to 0, mappings of any size are allowed.\n"
+      }
+
+    , { 0,   "max-bytes",          cMaxBytes,       MY_TRUE 
+      , "  --max-bytes <size>\n"
+      , "  --max-bytes <size>\n"
+        "    The maximum number of bytes one read_bytes()/write_bytes() call\n"
+        "    can handle.\n"
+        "    Set to 0, arrays of any size are allowed.\n"
+      }
+
+    , { 0,   "max-file",           cMaxFile,        MY_TRUE 
+      , "  --max-file <size>\n"
+      , "  --max-file <size>\n"
+        "    The maximum number of bytes one read_file()/write_file() call\n"
+        "    can handle.\n"
+        "    Set to 0, arrays of any size are allowed.\n"
+      }
+
+    , { 's', NULL,                 cSwap,           MY_TRUE 
+      , NULL
+      , "  -s <time>  | --swap-time <time>\n"
+        "  -s v<time> | --swap-variables <time>\n"
+        "    Time in seconds before an object (or its variables) are swapped out.\n"
+        "    A time less or equal 0 disables swapping.\n"
+      }
+
+    , { 0,   "swap-time",          cSwapTime,       MY_TRUE 
+      , "  -s <time>  | --swap-time <time>\n"
+      , NULL
+      }
+
+    , { 0,   "swap-variables",     cSwapVars,       MY_TRUE 
+      , "  -s v<time> | --swap-variables <time>\n"
+      , NULL
+      }
+
+    , { 0,   "swap-file",          cSwapFile,       MY_TRUE 
+      , "  -s f<name> | --swap-file <name>\n"
+      , "  -s f<name> | --swap-file <name>\n"
+        "    Swap into file <name> instead of LP_SWAP.<host> .\n"
+      }
+
+    , { 0,   "swap-compact",       cSwapCompact,    MY_FALSE 
+      , "  -s c       | --swap-compact\n"
+      , "  -s c | --swap-compact\n"
+        "    Reuse free space in the swap file immediately.\n"
+      }
+
+    , { 0,   "max-malloc",         cMaxMalloc,      MY_TRUE 
+      , "  --max-malloc <size>\n"
+      , "  --max-malloc <size>\n"
+        "    Restrict total memory allocations to <size> bytes. A <size> of 0\n"
+        "    or 'unlimited' removes any restriction.\n"
+      }
+
+    , { 0,   "min-malloc",         cMinMalloc,      MY_TRUE 
+      , "  --min-malloc <size>\n"
+      , "  --min-malloc <size>\n"
+        "  --min-small-malloc <size>\n"
+        "    Determine the sizes for the explicite initial large resp. small chunk\n"
+        "    allocation. A size of 0 disables the explicite initial allocations.\n"
+      }
+
+    , { 0,   "min-small-malloc",   cMinSmallMalloc, MY_TRUE 
+      , "  --min-small-malloc <size>\n"
+      , NULL
+      }
+
+    , { 'r', NULL,                 cReserved,       MY_TRUE 
+      , NULL
+      , "  -r u<size> | --reserve-user <size>\n"
+        "  -r m<size> | --reserve-master <size>\n"
+        "  -r s<size> | --reserve-system <size>\n"
+        "    Reserve <size> amount of memory for user/master/system allocations to\n"
+        "    be held until main memory runs out.\n"
+      }
+
+    , { 0,   "reserve-user",       cReserveUser,    MY_TRUE 
+      , "  -r u<size> | --reserve-user <size>\n"
+      , NULL
+      }
+
+    , { 0,   "reserve-master",     cReserveMaster,  MY_TRUE 
+      , "  -r m<size> | --reserve-master <size>\n"
+      , NULL
+      }
+
+    , { 0,   "reserve-system",     cReserveSystem,  MY_TRUE 
+      , "  -r s<size> | --reserve-system <size>\n"
+      , NULL
+      }
+
+    , { 0,   "strict-euids",       cStrictEuids,    MY_FALSE 
+      , "  --strict-euids\n"
+      , "  --strict-euids\n"
+        "  --no-strict-euids\n"
+        "    Enforce/don't enforce the proper use of euids.\n"
+      }
+
+    , { 0,   "no-strict-euids",    cNoStrictEuids,  MY_FALSE 
+      , "  --no-strict-euids\n"
+      , NULL
+      }
+
+    , { 0,   "wizlist-file",       cWizlistFile,    MY_TRUE 
+      , "  --wizlist-file <filename>\n"
+      , "  --wizlist-file <filename>\n"
+        "  --no-wizlist-file\n"
+        "    Read and save the wizlist in the named file (always interpreted\n"
+        "    relative the mudlib); resp. don't read or save the wizlist.\n"
+      }
+
+    , { 0,   "no-wizlist-file",    cNoWizlistFile,  MY_FALSE 
+      , "  --no-wizlist-file\n"
+      ,
+      }
+
+    , { 0,   "pidfile",            cPidFile,        MY_TRUE 
+      , "  --pidfile <filename>\n"
+      , "  --pidfile <filename>\n"
+        "    Write the pid of the driver process into <filename>.\n"
+      }
+
+    , { 0,   "random-seed",        cRandomSeed,     MY_TRUE 
+      , "  --random-seed <num>\n"
+      , "  --random-seed <num>\n"
+        "    Seed value for the random number generator. If not given, the\n"
+        "    driver chooses a seed value on its own.\n"
+      }
+
 #ifdef GC_SUPPORT
-    , { "gcollect-outfd",     cGcollectFD,     MY_TRUE }
-    , { "gcollect_outfd",     cGcollectFD,     MY_TRUE } /* TODO: COMPAT */
+    , { 0,   "gcollect-outfd",     cGcollectFD,     MY_TRUE 
+      , "  --gcollect-outfd <filename>|<num>\n"
+      , "  --gcollect-outfd <filename>|<num>\n"
+        "    Garbage collector output (like a log of all reclaimed memory blocks)\n"
+        "    is sent to <filename> (or inherited fd <num>) instead of stderr.\n"
+      }
 #endif
-    , { "udp",                cUdpPort,        MY_TRUE }
+
 #ifdef DEBUG
-    , { "check-refcounts",    cCheckRefs,      MY_FALSE }
-    , { "check-state",        cCheckState,     MY_TRUE }
-    , { "gobble-descriptors", cGobbleFDs,      MY_TRUE }
-    , { "check_a_lot_of_ref_counts", cCheckRefs, MY_FALSE } /* TODO: COMPAT */
-    , { "gobble_descriptors", cGobbleFDs,      MY_TRUE }    /* TODO: COMPAT */
+    , { 0,   "check-refcounts",    cCheckRefs,      MY_FALSE 
+      , "  --check-refcounts\n"
+      , "  --check-refcounts\n"
+        "    Every backend cycle, all refcounts in the system are checked.\n"
+        "    SLOW!\n"
+      }
+
+    , { 0,   "check-state",        cCheckState,     MY_TRUE 
+      , "  --check-state <lvl>\n"
+      , "  --check-state <lvl>\n"
+        "    Perform a regular simplistic check of the virtual machine according\n"
+        "    to <lvl>:\n"
+        "      = 0: no check\n"
+        "      = 1: once per backend loop\n"
+        "      = 2: at various points in the backend loop\n"
+      }
+
+    , { 0,   "gobble-descriptors", cGobbleFDs,      MY_TRUE 
+      , "  --gobble-descriptors <num>\n"
+      , "  --gobble-descriptors <num>\n"
+        "    <num> (more) filedescriptors are used up. You'll know when you need it.\n"
+      }
 #endif
+
 #ifdef CHECK_STRINGS
-    , { "check-strings",      cCheckStrings,   MY_FALSE }
+    , { 0,   "check-strings",      cCheckStrings,   MY_FALSE 
+      , "  --check-strings\n"
+      , "  --check-strings\n"
+        "    Every backend cycle, all shared strings in the system are checked.\n"
+        "    SLOW!\n"
+      }
 #endif
+
 #ifdef CHECK_OBJECT_STAT
-    , { "check-object-stat",  cCheckObjectStat, MY_FALSE }
+    , { 0,   "check-object-stat",  cCheckObjectStat, MY_FALSE 
+      , "  --check-object-stat\n"
+      , "  --check-object-stat\n"
+        "    Activate tracing of the object size statistic - available in order\n"
+        "    to find the bug in the statistics.\n"
+      }
 #endif
+
 #ifdef YYDEBUG
-    , { "yydebug",            cYYDebug,        MY_FALSE }
+    , { 'y', "yydebug",            cYYDebug,        MY_FALSE 
+      , "  --y|--yydebug\n"
+      , "  --y|--yydebug\n"
+        "    Enable debugging of the LPC compiler.\n"
+      }
 #endif
-    , { "options",            cOptions,        MY_FALSE }
-    , { "version",            cVersion,        MY_FALSE }
-    , { "longhelp",           cLongHelp,       MY_FALSE }
-    , { "help",               cHelp,           MY_FALSE }
+
+    , { 0,   "options",            cOptions,        MY_FALSE 
+      , "  --options\n"
+      , "  --options\n"
+        "    Print the version and compilation options of the driver, then exit.\n"
+      }
+
+    , { 'V', "version",            cVersion,        MY_FALSE 
+      , "  -V|--version\n"
+      , "  -V|--version\n"
+        "    Print the version of the driver, then exit.\n"
+      }
+
+    , { 0,   "longhelp",           cLongHelp,       MY_FALSE 
+      , "  --longhelp\n"
+      , "  --longhelp\n"
+        "    Display this help and exit.\n"
+      }
+
+    , { 'h', "help",               cHelp,           MY_FALSE 
+      , "  -h|-?|--help\n"
+      , "  -h|-?|--help\n"
+        "    Display the short help text and exit.\n"
+      }
+
+    , { '?', NULL,                 cHelp,           MY_FALSE 
+      , NULL
+      , NULL
+      }
+
     };
 
 /*-------------------------------------------------------------------------*/
@@ -1208,6 +1501,9 @@ options (void)
 #endif
 #ifdef USE_STRUCTS
                               , "structs enabled\n"
+#endif
+#ifdef USE_NEW_INLINES
+                              , "new inline closures enabled\n"
 #endif
                               };
         size_t nStrings = sizeof(optstrings) / sizeof(optstrings[0]);
@@ -1463,74 +1759,18 @@ shortusage (void)
 /* Print the short help information to stdout. */
 
 {
+  int i;
+
   version();
   fputs("\n"
 "Usage: driver [options] [<portnumber>...]\n"
 "\nOptions are:\n"
 "\n"
-"  --args <filename\n"
-"  -P|--inherit <fd-number>\n"
-"  -u|--udp <portnumber>\n"
-"  -D|--define <macro>[=<text>]\n"
-"  -E|--eval-cost <ticks>\n"
-"  -M|--master <filename>\n"
-"  -m|--mudlib <pathname>\n"
-"  --debug-file <filename>\n"
-"  --compat\n"
-"  --no-compat\n"
-"  -d|--debug\n"
-"  -c|--list-compiles\n"
-"  -e|--no-preload\n"
-"  --erq <filename> | --erq \"<filename> <erq args>\"\n"
-"  -N|--no-erq\n"
-"  -t|--no-heart\n"
-"  -f|--funcall <word>\n"
-"  --strict-euids\n"
-"  --no-strict-euids\n"
-"  --cleanup-time\n"
-"  --reset-time\n"
-"  --max-array\n"
-"  --max-callouts\n"
-"  --max-mapping\n"
-"  --max-bytes\n"
-"  --max-file\n"
-"  -s <time>  | --swap-time <time>\n"
-"  -s v<time> | --swap-variables <time>\n"
-"  -s f<name> | --swap-file <name>\n"
-"  -s c       | --swap-compact\n"
-"  --max-malloc <size>\n"
-"  --min-malloc <size>\n"
-"  --min-small-malloc <size>\n"
-"  -r u<size> | --reserve-user <size>\n"
-"  -r m<size> | --reserve-master <size>\n"
-"  -r s<size> | --reserve-system <size>\n"
-"  --pidfile <filename>\n"
-"  --wizlist-file <filename>\n"
-"  --no-wizlist-file\n"
-#ifdef GC_SUPPORT
-"  --gcollect-outfd <filename>|<num>\n"
-#endif
-#ifdef YYDEBUG
-"  --y|--yydebug\n"
-#endif
-"  --random-seed <num>\n"
-#ifdef DEBUG
-"  --check-refcounts\n"
-"  --check-state <lvl>\n"
-"  --gobble-descriptors <num>\n"
-#endif
-#ifdef CHECK_STRINGS
-"  --check-strings\n"
-#endif
-#ifdef CHECK_OBJECT_STAT
-"  --check-object-stat\n"
-#endif
-"  -V|--version\n"
-"  --options\n"
-"  --longhelp\n"
-"  -h|-?|--help\n"
        , stdout);
 
+  for (i = 0; i < sizeof(aOptions) / sizeof(aOptions[0]); i++)
+      if (aOptions[i].pSHelp != NULL)
+          fputs(aOptions[i].pSHelp, stdout);
 } /* shortusage() */
 
 /*-------------------------------------------------------------------------*/
@@ -1540,199 +1780,22 @@ usage (void)
 /* Print the help information to stdout. */
 
 {
+  int i;
+
   version();
   fputs("\n"
 "Usage: driver [options] [<portnumber>...]\n"
 "\nOptions are:\n"
-"\n"
-"  --args <filename>\n"
-"    Read the options from <filename> as if they were given on the\n"
-"    commandline.\n"
-"\n"
-"  -P|--inherit <fd-number>\n"
-"    Inherit filedescriptor <fd-number> from the parent process\n"
-"    as socket to listen for connections.\n"
-"\n"
-"  -u|--udp <portnumber>\n"
-"    Specify the <portnumber> for the UDP port, overriding the compiled-in\n"
-"    default.\n"
-"\n"
-"  -D|--define <macro>[=<text>]\n"
-"    Add <macro> (optionally to be expanded to <text>) to the list of\n"
-"    predefined macros known by the LPC compiler.\n"
-"\n"
-"  -E|--eval-cost <ticks>\n"
-"    Set the number of <ticks> available for one evaluation thread.\n"
-"\n"
-"  -M|--master <filename>\n"
-"    Use <filename> for the master object.\n"
-"\n"
-"  -m|--mudlib <pathname>\n"
-"    Use <pathname> as the top directory of the mudlib.\n"
-"\n"
-"  --debug-file <filename>\n"
-"    Log all debug output in <filename> instead of <host>.debug.log .\n"
-"\n"
-"  --compat\n"
-"  --no-compat\n"
-"    Select the mode (compat or plain) of the driver.\n"
-"    Note that this choice does not affect the default name of the master\n"
-"    object.\n"
-"\n"
-"  -d|--debug\n"
-"    Generate debug output; repeat the argument for even more output.\n"
-"\n"
-"  -c|--list-compiles\n"
-"    List the name of every compiled file on stderr.\n"
-"\n"
-"  -e|--no-preload\n"
-"    Pass a non-zero argument (the number of occurences of this option)\n"
-"    to master->preload(), which usually inhibits all preloads of castles\n"
-"    and other objects.\n"
-"\n"
-"  --erq <filename>\n"
-"  --erq \"<filename> <erq arguments>\"\n"
-"    Use <filename> instead of 'erq' as the name of the ERQ executable.\n"
-"    If the name starts with a '/', it is take to be an absolute pathname,\n"
-"    otherwise it is interpreted relative to " BINDIR ".\n"
-"    If not specified, 'erq' is used as executable name.\n"
-"    With the proper use of quotes it is legal to pass arbitrary arguments\n"
-"    to the erq, however, these may not contain spaces themselves.\n"
-"\n"
-"  -N|--no-erq\n"
-"    Don't start the erq demon (if it would be started at all).\n"
-"\n"
-"  -t|--no-heart\n"
-"    Disable heartbeats and call_outs.\n"
-"\n"
-"  -f|--funcall <word>\n"
-"    The lfun master->flag() is called with <word> as argument before the\n"
-"    gamedriver accepts network connections.\n"
-"\n"
-"  --cleanup-time <time>\n"
-"    The idle time in seconds for an object before the driver tries to\n"
-"    clean it up. This time should be substantially higher than the\n"
-"    reset time. A time <= 0 disables the cleanup mechanism.\n"
-"\n"
-"  --reset-time <time>\n"
-"    The time in seconds for an object before it is reset.\n"
-"    A time <= 0 disables the reset mechanism.\n"
-"\n"
-"  --max-array <size>\n"
-"    The maximum number of elements an array can hold.\n"
-"    Set to 0, arrays of any size are allowed.\n"
-"\n"
-"  --max-callouts <size>\n"
-"    The maximum number of callouts at one time.\n"
-"    Set to 0, any number of callouts is allowed.\n"
-"\n"
-"  --max-mapping <size>\n"
-"    The maximum number of elements (keys+values) a mapping can hold.\n"
-"    Set to 0, mappings of any size are allowed.\n"
-"\n"
-"  --max-bytes <size>\n"
-"    The maximum number of bytes one read_bytes()/write_bytes() call\n"
-"    can handle.\n"
-"    Set to 0, arrays of any size are allowed.\n"
-"\n"
-"  --max-file <size>\n"
-"    The maximum number of bytes one read_file()/write_file() call\n"
-"    can handle.\n"
-"    Set to 0, arrays of any size are allowed.\n"
-"\n"
-"  -s <time>  | --swap-time <time>\n"
-"  -s v<time> | --swap-variables <time>\n"
-"    Time in seconds before an object (or its variables) are swapped out.\n"
-"    A time less or equal 0 disables swapping.\n"
-"\n"
-"  -s f<name> | --swap-file <name>\n"
-"    Swap into file <name> instead of LP_SWAP.<host> .\n"
-"\n"
-"  -s c | --swap-compact\n"
-"    Reuse free space in the swap file immediately.\n"
-"\n"
-"  --max-malloc <size>\n"
-"    Restrict total memory allocations to <size> bytes. A <size> of 0\n"
-"    or 'unlimited' removes any restriction.\n"
-"\n"
-"  --min-malloc <size>\n"
-"  --min-small-malloc <size>\n"
-"    Determine the sizes for the explicite initial large resp. small chunk\n"
-"    allocation. A size of 0 disables the explicite initial allocations.\n"
-"\n"
-"  -r u<size> | --reserve-user <size>\n"
-"  -r m<size> | --reserve-master <size>\n"
-"  -r s<size> | --reserve-system <size>\n"
-"    Reserve <size> amount of memory for user/master/system allocations to\n"
-"    be held until main memory runs out.\n"
-"\n"
-"  --strict-euids\n"
-"  --no-strict-euids\n"
-"    Enforce/don't enforce the proper use of euids.\n"
-"\n"
-"  --wizlist-file <filename>\n"
-"  --no-wizlist-file\n"
-"    Read and save the wizlist in the named file (always interpreted\n"
-"    relative the mudlib); resp. don't read or save the wizlist.\n"
-"\n"
-"  --pidfile <filename>\n"
-"    Write the pid of the driver process into <filename>.\n"
-"\n"
-#ifdef GC_SUPPORT
-"  --gcollect-outfd <filename>|<num>\n"
-"    Garbage collector output (like a log of all reclaimed memory blocks)\n"
-"    is sent to <filename> (or inherited fd <num>) instead of stderr.\n"
-"\n"
-#endif
-#ifdef YYDEBUG
-"  --y|--yydebug\n"
-"    Enable debugging of the LPC compiler.\n"
-"\n"
-#endif
-"  --random-seed <num>\n"
-"    Seed value for the random number generator. If not given, the\n"
-"    driver chooses a seed value on its own.\n"
-"\n"
-#ifdef DEBUG
-"  --check-refcounts\n"
-"    Every backend cycle, all refcounts in the system are checked.\n"
-"    SLOW!\n"
-"\n"
-"  --check-state <lvl>\n"
-"    Perform a regular simplistic check of the virtual machine according\n"
-"    to <lvl>:\n"
-"      = 0: no check\n"
-"      = 1: once per backend loop\n"
-"      = 2: at various points in the backend loop\n"
-"\n"
-"  --gobble-descriptors <num>\n"
-"    <num> (more) filedescriptors are used up. You'll know when you need it.\n"
-"\n"
-#endif
-#ifdef CHECK_STRINGS
-"  --check-strings\n"
-"    Every backend cycle, all shared strings in the system are checked.\n"
-"    SLOW!\n"
-"\n"
-#endif
-#ifdef CHECK_OBJECT_STAT
-"  --check-object-stat\n"
-"    Activate tracing of the object size statistic - available in order\n"
-"    to find the bug in the statistics.\n"
-"\n"
-#endif
-"  -V|--version\n"
-"    Print the version of the driver, then exit.\n"
-"\n"
-"  --options\n"
-"    Print the version and compilation options of the driver, then exit.\n"
-"\n"
-"  --longhelp\n"
-"    Display this help and exit.\n"
-"  -h|-?|--help\n"
-"    Display the short help text and exit.\n"
        , stdout);
 
+  for (i = 0; i < sizeof(aOptions) / sizeof(aOptions[0]); i++)
+  {
+      if (aOptions[i].pLHelp != NULL)
+      {
+          fputs("\n", stdout);
+          fputs(aOptions[i].pLHelp, stdout);
+      }
+  }
 } /* usage() */
 
 /*-------------------------------------------------------------------------*/
@@ -2619,12 +2682,12 @@ getargs (int argc, char ** argv, int (*opt_eval)(int, const char *) )
         {
           if (bShort) /* search the short option */
           {
-            for (iOption = 0; iOption < sizeof(aShortOpts) / sizeof(aShortOpts[0]); iOption++)
+            for (iOption = 0; iOption < sizeof(aOptions) / sizeof(aOptions[0]); iOption++)
             {
-              if (*pArg == aShortOpts[iOption].cOption)
+              if (*pArg == aOptions[iOption].cOption)
               {
-                eOption = (OptNumber)aShortOpts[iOption].eNumber;
-                bTakesValue = aShortOpts[iOption].bValue;
+                eOption = (OptNumber)aOptions[iOption].eNumber;
+                bTakesValue = aOptions[iOption].bValue;
                 pArg++; iArglen--;  /* Consume this character */
                 break;
               }
@@ -2647,12 +2710,13 @@ getargs (int argc, char ** argv, int (*opt_eval)(int, const char *) )
           }
           else  /* search the long option */
           {
-            for (iOption = 0; iOption < sizeof(aLongOpts) / sizeof(aLongOpts[0]); iOption++)
-              if (iArglen == strlen(aLongOpts[iOption].pOption)
-               && !strncasecmp(pArg, aLongOpts[iOption].pOption, iArglen))
+            for (iOption = 0; iOption < sizeof(aOptions) / sizeof(aOptions[0]); iOption++)
+              if (aOptions[iOption].pOption != NULL
+               && iArglen == strlen(aOptions[iOption].pOption)
+               && !strncasecmp(pArg, aOptions[iOption].pOption, iArglen))
               {
-                eOption = (OptNumber)aLongOpts[iOption].eNumber;
-                bTakesValue = aLongOpts[iOption].bValue;
+                eOption = (OptNumber)aOptions[iOption].eNumber;
+                bTakesValue = aOptions[iOption].bValue;
                 break;
               }
           }
@@ -2686,9 +2750,9 @@ getargs (int argc, char ** argv, int (*opt_eval)(int, const char *) )
           {
             fputs("driver: Option '", stderr);
             if (bShort)
-              putc((unsigned char)(aShortOpts[iOption].cOption), stderr);
+              putc((unsigned char)(aOptions[iOption].cOption), stderr);
             else
-              fputs(aLongOpts[iOption].pOption, stderr);
+              fputs(aOptions[iOption].pOption, stderr);
             fputs("' expects a value.\n", stderr);
             free_sources(pInput);
             return 1;
