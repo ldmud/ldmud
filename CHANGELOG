@@ -1,7 +1,17 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-18-Nov-2002 (Lars Duening)  (3.3.305)
+19-Nov-2002 (Lars Duening)  (3.3.306)
+  - (closure.c, interpret.c) In order to convert a dangling lfun closure
+      during a replace_program() into a dangling alien-lfun closure, the
+      closure needs to be created as alien-lfun in the first place (reported
+      by Pulami).
+
+18-Nov-2002 (Lars Duening)
+  - (closure, interpret.c, gcollect.c) Moved the context[] array from the top
+      level of the closure_t into  closure_t.function.lfun, where it belongs.
+
+17-Nov-2002 (Lars Duening)  (3.3.305)
   - (gcollect.c) When cleaning up an untabled string, a string was
       freed twice.
   - (svalue.h) Corrected the macro arguments to the put_object() family

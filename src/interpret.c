@@ -7770,7 +7770,7 @@ again:
             {
                 unsigned short i;
                 svalue_t * arg = sp - context_size;
-                svalue_t * context = sp->u.lambda->context;
+                svalue_t * context = sp->u.lambda->function.lfun.context;
 
                 for (i = 0; i < context_size; i++)
                     transfer_svalue_no_free(context+i, arg+i);
@@ -16521,6 +16521,26 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
             return;
         }
 
+#ifdef DEBUG
+#ifdef USE_NEW_INLINES
+        if (l->function.lfun.index >= current_object->prog->num_functions)
+            fatal("Calling non-existing lfun closure #%hu in program '%s' "
+                  "with %hu functions.\n"
+                 , l->function.lfun.index
+                 , current_object->prog->name
+                 , current_object->prog->num_functions
+                );
+#else
+        if (l->function.index >= current_object->prog->num_functions)
+            fatal("Calling non-existing lfun closure #%hu in program '%s' "
+                  "with %hu functions.\n"
+                 , l->function.index
+                 , current_object->prog->name
+                 , current_object->prog->num_functions
+                );
+#endif
+#endif
+
         /* Ok, object and program are there */
 
         current_prog = current_object->prog;
@@ -16530,7 +16550,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
 #else /* USE_NEW_INLINES */
         flags = setup_new_frame(l->function.lfun.index);
         if (l->function.lfun.context_size > 0)
-            inter_context = l->context;
+            inter_context = l->function.lfun.context;
 #endif /* USE_NEW_INLINES */
         funstart = current_prog->program + (flags & FUNSTART_MASK);
         csp->funstart = funstart;
@@ -16586,6 +16606,16 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
             /* NOTREACHED */
             return;
         }
+
+#ifdef DEBUG
+        if (l->function.alien.index >= l->function.alien.ob->prog->num_functions)
+            fatal("Calling non-existing lfun closure #%hu in program '%s' "
+                  "with %hu functions.\n"
+                 , l->function.alien.index
+                 , l->function.alien.ob->prog->name
+                 , l->function.alien.ob->prog->num_functions
+                );
+#endif
 
         /* If the object creating the closure wasn't the one in which
          * it will be executed, we need to record the fact in a second

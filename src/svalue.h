@@ -506,7 +506,7 @@ double READ_DOUBLE(struct svalue *svalue_pnt)
     ( ((val) && !((val)->flags & O_DESTRUCTED)) \
       ? (put_ref_object(sp,val,from), 0) : put_number(sp, 0))
 
-#define put_valid_object(sp,val,from) \
+#define put_valid_object(sp,val) \
     ( ((val) && !((val)->flags & O_DESTRUCTED)) \
       ? (put_object(sp,val), 0) : put_number(sp, 0))
 
@@ -533,12 +533,12 @@ double READ_DOUBLE(struct svalue *svalue_pnt)
 
 #define push_ref_object(sp,val,from) \
     ( (sp)++, put_ref_object(sp,val,from) )
-#define push_object(sp,val,from) \
+#define push_object(sp,val) \
     ( (sp)++, put_object(sp,val) )
 
 #define push_ref_valid_object(sp,val,from) \
     ( (sp)++, put_ref_valid_object(sp,val,from) )
-#define push_valid_object(sp,val,from) \
+#define push_valid_object(sp,val) \
     ( (sp)++, put_valid_object(sp,val) )
 
 #define push_ref_string(sp,val) \

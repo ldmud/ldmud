@@ -2180,6 +2180,7 @@ add_table_now:
         xfree(st->tmp);
 
     /* Copy over the result */
+    result = NULL; /* to avoid a warning */
     if  (st->bpos > 1)
         result = new_n_mstring(st->buff, st->bpos-1);
     else

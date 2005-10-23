@@ -796,12 +796,14 @@ static Bool did_swap;
    * processed per call, even if there is no time left to begin with.
    */
 
-    object_t *obj;          /* Current object worked on */
-    mp_int    num_cleanup;  /* Number of objects to data-clean in this
+static  mp_int num_cleanup; /* Number of objects to data-clean in this
                              * call. It is computed so that all objects
                              * are cleaned in one hour, but at least
                              * one per call.
+                             * static so that errors won't clobber it.
                              */
+
+    object_t *obj;          /* Current object worked on */
 
     struct error_recovery_info error_recovery_info;
       /* Local error recovery info */

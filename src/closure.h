@@ -48,6 +48,8 @@ struct lambda_s
         struct {
             unsigned short index;        /* Index in the function table */
             unsigned short context_size; /* Number of context vars */
+            svalue_t context[ /* .lfun.context_size */ 1];
+              /* lfun-closure context variables, if any */
         } lfun;
 #endif /* USE_NEW_INLINES */
 #       define VANISHED_VARCLOSURE_INDEX ((unsigned short)-1)
@@ -75,12 +77,9 @@ struct lambda_s
             /* CLOSURE_ALIEN_LFUN: */
             object_t       *ob;     /* Originating object */
             unsigned short  index;  /* Index in the objects variable table */
+            /* TODO: Add the context here, too */
         } alien;
     } function;
-#ifdef USE_NEW_INLINES
-    svalue_t context[ /* .lfun.context_size */ 1];
-      /* lfun-closure context variables, if any */
-#endif /* USE_NEW_INLINES */
 };
 
 #define LAMBDA_VALUE_OFFSET \

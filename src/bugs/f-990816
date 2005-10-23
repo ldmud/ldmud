@@ -7,6 +7,9 @@ State: Acknowledged
 poll() scales better for a large number of users, but is not implemented
 everywhere.
 
+See CUJ 2002/12 which presents a wrapper around poll(), /dev/poll and the (imo
+superior) FreeBSD kqueues.
+
 Implementation maybe by simulation poll() through select() where not
 supported.
 
