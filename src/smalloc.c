@@ -590,11 +590,14 @@ static void large_free(char *);
         block[M_FILE] = (word_t)file; \
         block[M_LINE] = line; \
         if (block[M_MAGIC] != SIZE_MOD_INDEX(sfmagic, size) ) \
+        { \
+            in_malloc = 0; \
             fatal("allocation from free list for %lu bytes: " \
                   "block %p magic match failed, " \
                   "expected %lx, found %lx\n" \
                  , (unsigned long) size, block \
                  , SIZE_MOD_INDEX(sfmagic, size), block[M_MAGIC]); \
+        } \
         block[M_MAGIC] = SIZE_MOD_INDEX(samagic, size); \
       } while(0)
 #  define MAKE_SMALL_TRACE_UNCHECKED(block, size) do { \
@@ -641,20 +644,26 @@ smalloc (size_t size
     smalloc_size = size;
 
     if (size == 0)
+    {
+        in_malloc = 0;
 #       ifndef MALLOC_TRACE
             fatal("Malloc size = 0.\n");
 #       else
             fatal("(%s, %d) Malloc size = 0.\n", file, line);
 #       endif
+    }
 
     /* TODO: For the following test, see SIZET_limits in port.h */
     if (size >= ULONG_MAX - OVERHEAD*SINT - SINT)
+    {
+        in_malloc = 0;
 #       ifndef MALLOC_TRACE
             fatal("Malloc size exceeds numerical limit.\n");
 #       else
             fatal("(%s, %d) Malloc size exceeds numerical limit.\n"
                  , file, line);
 #       endif
+    }
 
     if (in_malloc++)
     {
@@ -1010,13 +1019,19 @@ sfree (POINTER ptr)
 
 #ifdef MALLOC_TRACE
     if (block[M_MAGIC] == sfmagic[i % NELEM(samagic)])
+    {
+        in_malloc = 0;
         fatal("xfree: block %lx size %lu (user %lx) freed twice\n"
              , (unsigned long)block, (unsigned long)(i * SINT)
              , (unsigned long)ptr);
+    }
     if (block[M_MAGIC] != samagic[i % NELEM(samagic)])
+    {
+        in_malloc = 0;
         fatal("xfree: block %p magic match failed: "
               "size %lu, expected %lx, found %lx\n"
              , block, (unsigned long)(i * SINT), samagic[i], block[M_MAGIC]);
+    }
     block[M_MAGIC] = sfmagic[i % NELEM(sfmagic)];
 #endif
 
@@ -1215,6 +1230,7 @@ do_check_avl(void)
     {
         fflush(stderr);
         fflush(stdout);
+        in_malloc = 0;
         fatal("Inconsistency could crash the driver\n");
     }
     return 0;
@@ -1249,7 +1265,10 @@ check_free_block (void *m)
     if (!(*(p+size) & THIS_BLOCK))
     {
         if (!contains(free_tree, (struct free_block *)(p+size+OVERHEAD)) )
+        {
+            in_malloc = 0;
             fatal("not found\n");
+        }
     }
     return 0;
 } /* check_free_block() */
@@ -1272,6 +1291,8 @@ remove_from_free_list (word_t *ptr)
 
 #ifdef MALLOC_TRACE
     if (ptr[M_MAGIC] != LFMAGIC)
+    {
+        in_malloc = 0;
         fatal("remove_from_free_list: block %p, "
               "magic match failed: expected %lx, "
               "found %lx\n"
@@ -1279,6 +1300,7 @@ remove_from_free_list (word_t *ptr)
              , (unsigned long)LFMAGIC
              , (unsigned long)ptr[M_MAGIC]
              );
+    }
 #endif
     fake((do_check_avl(),"remove_from_free_list called"));
     p = (struct free_block *)(ptr+OVERHEAD);
@@ -1850,8 +1872,11 @@ remove_from_free_list (word_t *ptr)
 {
 #ifdef MALLOC_TRACE
    if (ptr[M_MAGIC] != LFMAGIC)
+    {
+        in_malloc = 0;
        fatal("remove_from_free_list: block %p magic match failed: "
              "expected %lx, found %lx\n", ptr, LFMAGIC, ptr[M_MAGIC]);
+    }
 #endif
    count_back(large_free_stat, *ptr & M_MASK);
 
@@ -2437,10 +2462,15 @@ large_free (char *ptr)
 
 #ifdef MALLOC_TRACE
     if (p[M_MAGIC] == LFMAGIC)
+    {
+        in_malloc = 0;
         fatal("large_free: block %lx size %lu, (user %lx) freed twice\n"
              , (unsigned long)p, (unsigned long)(size * SINT)
              , (unsigned long)ptr);
+    }
     if (p[M_MAGIC] != LAMAGIC)
+    {
+        in_malloc = 0;
         fatal("large_free(%p): block %p magic match failed: size %lu, "
               "expected %lx, found %lx\n"
              , ptr, p
@@ -2448,6 +2478,7 @@ large_free (char *ptr)
              , (unsigned long)LAMAGIC
              , (unsigned long)p[M_MAGIC]
              );
+    }
 #endif
 
     /* If the next block is free, coagulate */
@@ -2502,7 +2533,10 @@ esbrk (word_t size)
         /* First call: allocate the first fake block */
         heap_start = heap_end = (word_t *)sbrk(0);
         if (!esbrk(SINT))
+        {
+            in_malloc = 0;
             fatal("Couldn't malloc anything\n");
+        }
         *heap_start = PREV_BLOCK;
         fake("Allocated little fake block");
         count_up(large_wasted_stat, SINT);
@@ -3492,7 +3526,10 @@ clear_M_REF_flags (void)
     {
         *p &= ~M_REF;
         if (p + (*p & M_MASK) > heap_end)
+        {
+            in_malloc = 0;
             fatal("pointer larger than brk()\n");
+        }
         p += *p & M_MASK;
     }
 
@@ -3532,6 +3569,7 @@ clear_M_REF_flags (void)
              * won't throw away the values, making them unreadable
              * in the core.
              */
+            in_malloc = 0;
             fatal("Small block error, start: %lx, %lx vs. %lx\n",
               (long)(p+1), (long)q, (long)end);
         }
@@ -4142,7 +4180,10 @@ test_small(void)
             q += size & M_MASK;
         }
         if (q > end)
+        {
+            in_malloc = 0;
             fatal("Small block error\n");
+        }
     }
 } /* test_small() */
 

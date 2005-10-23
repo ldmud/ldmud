@@ -1,6 +1,15 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+20-Nov-2002 (Lars Duening)  (3.3.307)
+  - (closure.c) Corrected refcount errors in the handling
+      of soon-to-be dangling alien-lfun closures.
+  - (smalloc.c) Made sure that before each call to fatal() the thread-check
+      is reset.
+  - (closure, gcollect.c, interpret.c) Moved the context variables back to the
+      closure_t toplevel - the alien-lfuns needed them as well, and the inner
+      location was reason for strange crashes.
+
 19-Nov-2002 (Lars Duening)  (3.3.306)
   - (closure.c, interpret.c) In order to convert a dangling lfun closure
       during a replace_program() into a dangling alien-lfun closure, the

@@ -7762,15 +7762,17 @@ again:
 #ifdef DEBUG
             if (instruction == F_CONTEXT_CLOSURE
              && sp->x.closure_type != CLOSURE_LFUN
+             && sp->x.closure_type != CLOSURE_ALIEN_LFUN
                )
-                fatal("(eval_instruction) context_closure used for non-lfun.\n");
+                fatal("(eval_instruction) context_closure used for non-lfun "
+                      "closure type %d.\n", sp->x.closure_type);
 #endif
             /* Now copy the context values */
-            if (context_size > 0)
+            if (context_size != 0)
             {
                 unsigned short i;
                 svalue_t * arg = sp - context_size;
-                svalue_t * context = sp->u.lambda->function.lfun.context;
+                svalue_t * context = sp->u.lambda->context;
 
                 for (i = 0; i < context_size; i++)
                     transfer_svalue_no_free(context+i, arg+i);
@@ -16550,7 +16552,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
 #else /* USE_NEW_INLINES */
         flags = setup_new_frame(l->function.lfun.index);
         if (l->function.lfun.context_size > 0)
-            inter_context = l->function.lfun.context;
+            inter_context = l->context;
 #endif /* USE_NEW_INLINES */
         funstart = current_prog->program + (flags & FUNSTART_MASK);
         csp->funstart = funstart;
@@ -16646,6 +16648,10 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
         current_prog = current_object->prog;
         /* inter_sp == sp */
         flags = setup_new_frame(l->function.alien.index);
+#ifdef USE_NEW_INLINES
+        if (l->function.alien.context_size > 0)
+            inter_context = l->context;
+#endif /* USE_NEW_INLINES */
         funstart = current_prog->program + (flags & FUNSTART_MASK);
         csp->funstart = funstart;
         eval_instruction(FUNCTION_CODE(funstart), inter_sp);

@@ -252,7 +252,12 @@ cleanup_closure (svalue_t *csvp, ptrtable_t * ptable)
     if (type == CLOSURE_LFUN && l->function.lfun.context_size != 0)
     {
         unsigned short size = l->function.lfun.context_size;
-        cleanup_vector(l->function.lfun.context, size, ptable);
+        cleanup_vector(l->context, size, ptable);
+    }
+    if (type == CLOSURE_ALIEN_LFUN && l->function.alien.context_size != 0)
+    {
+        unsigned short size = l->function.alien.context_size;
+        cleanup_vector(l->context, size, ptable);
     }
 #endif /* USE_NEW_INLINES */
 } /* cleanup_closure() */
@@ -1228,8 +1233,15 @@ gc_count_ref_in_closure (svalue_t *csvp)
         {
             unsigned short size = l->function.lfun.context_size;
             l->function.lfun.context_size = 0; /* Prevent recursion */
-            count_ref_in_vector(l->function.lfun.context, size);
+            count_ref_in_vector(l->context, size);
             l->function.lfun.context_size = size;
+        }
+        if (type == CLOSURE_ALIEN_LFUN && l->function.alien.context_size != 0)
+        {
+            unsigned short size = l->function.alien.context_size;
+            l->function.alien.context_size = 0; /* Prevent recursion */
+            count_ref_in_vector(l->context, size);
+            l->function.alien.context_size = size;
         }
 #endif /* USE_NEW_INLINES */
     }
@@ -1274,8 +1286,15 @@ clear_ref_in_closure (lambda_t *l, ph_int type)
     {
         unsigned short size = l->function.lfun.context_size;
         l->function.lfun.context_size = 0; /* Prevent recursion */
-        clear_ref_in_vector(l->function.lfun.context, size);
+        clear_ref_in_vector(l->context, size);
         l->function.lfun.context_size = size;
+    }
+    if (type == CLOSURE_ALIEN_LFUN && l->function.alien.context_size != 0)
+    {
+        unsigned short size = l->function.alien.context_size;
+        l->function.alien.context_size = 0; /* Prevent recursion */
+        clear_ref_in_vector(l->context, size);
+        l->function.alien.context_size = size;
     }
 #endif /* USE_NEW_INLINES */
 } /* clear_ref_in_closure() */

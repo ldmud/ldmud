@@ -14,8 +14,7 @@
 ;;    3-3-structs.*: The 3-3 subbranch for 'struct' re-development,
 ;;                   branched off 3-3.294
 ;;
-;; TODO: Add context to alien-lfun closures, to handle the replace_program
-;; TODO:: problem.
+;; TODO: Merge lfun- and alien-lfun closures.
 ;; TODO: general coloured efuns, sockets (p-020912),
 ;; TODO:  sockets (p-020912),
 ;; TODO: state dumps.
@@ -25,13 +24,14 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 306)
-(Parent-Version lpmud 3-3 305)
-(Version-Log "Moved the context variables from the closure_t toplevel to closure_t.function.lfun.
-In order to convert lfun closures in a replace_program() into alien-lfun closures, they have to be created as alien-lfuns in the first place.")
+(Project-Version lpmud 3-3 307)
+(Parent-Version lpmud 3-3 306)
+(Version-Log "Corrected refcount errors in the dangling closure handling.
+Reset the thread-check in smalloc before calls to fatal().
+Moved the context variables back to the closure_t toplevel - the alien-lfuns needed them as well, and the inner location was reason for strange crashes.")
 (New-Version-Log
 "")
-(Checkin-Time "Tue, 19 Nov 2002 23:16:36 -0700")
+(Checkin-Time "Wed, 20 Nov 2002 22:56:05 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -67,7 +67,7 @@ In order to convert lfun closures in a replace_program() into alien-lfun closure
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.50 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.369 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.370 644))
   (HISTORY (lpmud/f/49_HISTORY 1.284 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.18 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -131,8 +131,8 @@ In order to convert lfun closures in a replace_program() into alien-lfun closure
   (src/bytecode.h (lpmud/a/b/26_bytecode.h 1.1 644))
   (src/call_out.h (lpmud/f/45_call_out.h 1.7.1.6 644))
   (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.23 644))
-  (src/closure.h (lpmud/f/44_closure.h 1.7.1.13 644))
-  (src/closure.c (lpmud/d/4_closure.c 1.41.1.47.1.2 644))
+  (src/closure.h (lpmud/f/44_closure.h 1.7.1.14 644))
+  (src/closure.c (lpmud/d/4_closure.c 1.41.1.47.1.3 644))
   (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.38 644))
   (src/comm.h (lpmud/d/3_comm.h 1.26.1.29 644))
   (src/driver.h (lpmud/f/36_driver.h 1.15.1.21 644))
@@ -147,14 +147,14 @@ In order to convert lfun closures in a replace_program() into alien-lfun closure
   (src/files.c (lpmud/i/50_files.c 1.18 644))
   (src/filestat.h (lpmud/f/51_filestat.h 1.7 644))
   (src/gcollect.h (lpmud/f/33_gcollect.h 1.6.1.11 644))
-  (src/gcollect.c (lpmud/c/30_gcollect.c 1.41.1.81 644))
+  (src/gcollect.c (lpmud/c/30_gcollect.c 1.41.1.82 644))
   (src/hash.h (lpmud/f/32_hash.h 1.5 644))
   (src/hash.c (lpmud/c/28_hash.c 1.15 644))
   (src/heartbeat.h (lpmud/m/41_heartbeat. 1.6.1.5 644))
   (src/heartbeat.c (lpmud/m/42_heartbeat. 1.18.1.8 644))
   (src/i-svalue_cmp.h (lpmud/a/b/20_i-svalue_c 1.3 644))
   (src/interpret.h (lpmud/b/13_interpret. 1.33.1.34 644))
-  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.2 644))
+  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.3 644))
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.15 644))
   (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.33 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.12 644))
@@ -235,7 +235,7 @@ In order to convert lfun closures in a replace_program() into alien-lfun closure
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.31 644))
   (src/simulate.c (lpmud/31_simulate.c 1.88.1.90 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.11 644))
-  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.55 644))
+  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.56 644))
   (src/sprintf.h (lpmud/f/15_sprintf.h 1.3.1.4 644))
   (src/sprintf.c (lpmud/28_sprintf.c 1.31.1.46 644))
   (src/strfuns.h (lpmud/b/51_strfuns.h 1.11.1.5 644))

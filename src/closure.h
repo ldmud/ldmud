@@ -48,8 +48,6 @@ struct lambda_s
         struct {
             unsigned short index;        /* Index in the function table */
             unsigned short context_size; /* Number of context vars */
-            svalue_t context[ /* .lfun.context_size */ 1];
-              /* lfun-closure context variables, if any */
         } lfun;
 #endif /* USE_NEW_INLINES */
 #       define VANISHED_VARCLOSURE_INDEX ((unsigned short)-1)
@@ -77,9 +75,16 @@ struct lambda_s
             /* CLOSURE_ALIEN_LFUN: */
             object_t       *ob;     /* Originating object */
             unsigned short  index;  /* Index in the objects variable table */
-            /* TODO: Add the context here, too */
+            unsigned short  context_size; /* Number of context vars */
         } alien;
     } function;
+
+    svalue_t context[ /* .(alien-)lfun.context_size */ 1];
+      /* (alien-)lfun-closure context variables, if any.
+       * Putting this array into the function.lfun function.alien somehow
+       * causes memory corruption because some lambda structures won't
+       * be allocated large enough.
+       */
 };
 
 #define LAMBDA_VALUE_OFFSET \
@@ -91,7 +96,7 @@ struct lambda_s
 #ifndef USE_NEW_INLINES
 #define SIZEOF_LAMBDA(num) sizeof(struct lambda_s)
 #else /* USE_NEW_INLINES */
-#define SIZEOF_LAMBDA(num) (sizeof(struct lambda_s) + ((num)-1) * sizeof(svalue_t))
+#define SIZEOF_LAMBDA(num) (sizeof(struct lambda_s) + (((int)num)-1) * sizeof(svalue_t))
 #endif /* USE_NEW_INLINES */
   /* size_t SIZEOF_LAMBDA(int num)
    *   Size of a lambda closure with <num> context variables.
