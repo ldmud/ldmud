@@ -2947,6 +2947,7 @@ get_message (char *buff)
                 }
                 else if (ip->tn_state != TS_READY)
                 {
+                    DT(("'%s'   Escaped input\n", ip->ob->name));
                     length = (TN_START_VALID(ip->tn_state)
                               ? ip->tn_start
                               : ip->command_end
@@ -4251,7 +4252,7 @@ reply_to_do_echo (int option)
             /* We were previously told not to echo */
             send_will(option);
         }
-        DTN(("  we don't need to say WILL\n"));
+        else DTN(("  we don't need to say WILL\n"));
         /* If we already said that we will echo, be quiet */
         ip->noecho |= NOECHO_MASK;
     } else {
@@ -4275,7 +4276,7 @@ reply_to_dont_echo (int option)
             /* We were granted the option before */
             send_wont(option);
         }
-        DTN(("  we don't need to say WONT\n"));
+        else DTN(("  we don't need to say WONT\n"));
         ip->noecho = (char)((ip->noecho & ~NOECHO) | NOECHO_ACK);
     }
 }
@@ -4298,7 +4299,7 @@ reply_to_do_sga (int option)
             ip->supress_go_ahead = MY_TRUE;
             send_will(option);
         }
-        DTN(("  we don't need to say WILL\n"));
+        else DTN(("  we don't need to say WILL\n"));
     } else {
         send_wont(option);
     }
@@ -4338,7 +4339,7 @@ reply_to_will_sga (int option)
         if ( !(ip->noecho & CHARMODE) ) {
             send_do(option);
         }
-        DTN(("  we don't need to say DO\n"));
+        else DTN(("  we don't need to say DO\n"));
         DTN(("  noecho: %02x -> %02x\n", ip->noecho, (char)(ip->noecho  | CHARMODE_MASK)));
         ip->noecho |= CHARMODE_MASK;
     } else {
@@ -4362,7 +4363,7 @@ reply_to_wont_sga (int option)
             /* We were granted the option before */
             send_dont(option);
         }
-        DTN(("  we don't need to say DONT\n"));
+        else DTN(("  we don't need to say DONT\n"));
         DTN(("  noecho: %02x -> %02x\n", ip->ob->name, ip->noecho, (unsigned char)((ip->noecho & ~CHARMODE) | CHARMODE_ACK)));
         ip->noecho = (char)((ip->noecho & ~CHARMODE) | CHARMODE_ACK);
           /* Don't reset CHARMODE_REQ here: this WONT can be the answer
@@ -4539,12 +4540,15 @@ init_telopts (void)
     telopts_will[TELOPT_BINARY] = reply_h_telnet_neg;
     telopts_wont[TELOPT_BINARY] = reply_h_telnet_neg;
 
+    /* Tinyfugue can do bad things to your health */
     telopts_do[TELOPT_EOR] = reply_h_telnet_neg;
     telopts_dont[TELOPT_EOR] = reply_h_telnet_neg;
     telopts_will[TELOPT_EOR] = reply_h_telnet_neg;
     telopts_wont[TELOPT_EOR] = reply_h_telnet_neg;
 
-    /* Tinyfugue can do bad things to your health */
+    /* TODO: These hooks are never called because there is
+     * TODO:: no IAC DO/DONT/WILL/WONT EOR, just IAC EOR?
+     */
     telopts_do[EOR] = reply_h_telnet_neg;
     telopts_dont[EOR] = reply_h_telnet_neg;
     telopts_will[EOR] = reply_h_telnet_neg;

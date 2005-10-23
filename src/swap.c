@@ -1091,18 +1091,14 @@ free_swapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
         {
         case T_STRING | T_MOD_SWAPPED:
         case T_SYMBOL | T_MOD_SWAPPED:
-            if (!gc_status)
             {
-                p += 1 + sizeof(svp->x) + sizeof(mp_int) + mstrsize(svp->u.str);
-                free_mstring(svp->u.str);
-            }
-            else
-            {
-                /* GC active: svp no longer holds the actual string */
                 mp_int strsize;
                 p += 1 + sizeof(svp->x);
                 memcpy(&strsize, p, sizeof(strsize));
                 p += sizeof(strsize) + strsize;
+
+                if (!gc_status)
+                    free_mstring(svp->u.str);
             }
             break;
 

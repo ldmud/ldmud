@@ -354,13 +354,13 @@ cleanup_object (object_t * obj, ptrtable_t * ptable)
  */
 
 {
-#ifndef NEW_CLEANUUP
+#ifndef NEW_CLEANUP
     return;
 #else
     ptrtable_t * local_ptable = NULL;
     int was_swapped = 0;
 
-printf("%s DEBUG: Cleanup object %s\n", time_stamp(), get_txt(obj->name));
+printf("%s DEBUG: Cleanup object '%s'\n", time_stamp(), get_txt(obj->name));
     /* Make sure we have a pointer table */
     if (ptable == NULL)
     {
@@ -419,7 +419,7 @@ cleanup_all_objects (void)
  */
 
 {
-#ifndef NEW_CLEANUUP
+#ifndef NEW_CLEANUP
     return;
 #else
     ptrtable_t * ptable = NULL;

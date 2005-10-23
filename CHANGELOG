@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+15-Nov-2002 (Lars Duening)  (3.3.300)
+  - (gcollect.c) He - the new cleanup was permanently disable due to
+      a typo on the #ifdef expression. Ah, the joys of using the
+      C preprocessor...
+
 14-Nov-2002 (Lars Duening)  (3.3.299)
   - (swap.c) Swapping strings during a GC could crash the driver.
 
