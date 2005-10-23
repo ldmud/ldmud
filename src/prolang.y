@@ -9156,6 +9156,9 @@ function_call:
     | expr4 L_ARROW 
       {
 %line
+          /* Save the (simple) state */
+          $<function_call_head>$.start = CURRENT_PROGRAM_SIZE;
+
           /* Insert the save_arg_frame instruction.
            * If it's not really needed, we'll remove it later. 
            * Putting this code block before the <expr4> in the rule
@@ -9400,9 +9403,9 @@ function_call:
               bytecode_p src, dest;
               size_t left;
 
-              dest = PROGRAM_BLOCK + $<function_call_head>2.start;
+              dest = PROGRAM_BLOCK + $<function_call_head>3.start;
               src = dest+1;
-              left = CURRENT_PROGRAM_SIZE - $<function_call_head>2.start - 1; 
+              left = CURRENT_PROGRAM_SIZE - $<function_call_head>3.start - 1; 
 
               while (left-- > 0)
               {

@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+28-Aug-2002 (Lars Duening)  (3.3.236)
+  - (prolang.y) When removing the arg-frame instruction from a call_other,
+        the compiler looked up the wrong program offset.
+
 28-Aug-2002 (Lars Duening)  (3.3.235)
    - (mud/lp-245) Provided all object lfuns with proper argument and return
         types.
