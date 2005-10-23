@@ -1,6 +1,17 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+27-Aug-2002 (Lars Duening)  (3.3.234)
+   - (prolang.y) Fixed two typos in messages.
+
+26-Aug-2002 (Lars Duening)
+   - (swap.c) The OSTAT diagnostic for swap-in subtracted instead of added
+        to compute the expected new tot_alloc_object_size value (reported
+        by Coogan).
+
+25-Aug-2002 (Lars Duening)
+   - (comm.c) The pthreads code didn't compile (reported by Markus).
+
 24-Aug-2002 (Lars Duening)  (3.3.233)
    - (efuns.c) Efun terminal_colour(): some random characters were appended
         to the result string (reported by Markus).

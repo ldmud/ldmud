@@ -179,6 +179,7 @@ f-011213-0: Lexer should not use magic EOF characters
 f-020203-1: Warn if inner variables shadow outer ones.
 f-020321: Deactivate sefun (when loading the master or on pragma)
 p-020810: Hyperborea patches for ANSI support
+f-020825: Quote special chars in the source text error messages
 
 
 Runtime

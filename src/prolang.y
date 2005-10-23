@@ -4334,7 +4334,7 @@ return:
               {
                   char tmp[100];
                   strcpy(tmp, get_type_name($2.type));
-                  yyerrorf("Return type not matching: got %s, expected %s;"
+                  yyerrorf("Return type not matching: got %s, expected %s"
                          , tmp, get_type_name(rtype));
               }
           }
@@ -8858,8 +8858,10 @@ function_call:
                && !has_ellipsis)
               {
                   if (funp->num_arg-1 > $4 || !(funp->flags & TYPE_MOD_XVARARGS))
-                    yyerrorf("Wrong number of arguments to %.60s"
-                            , get_txt($1.real->name));
+                    yyerrorf("Wrong number of arguments to %.60s: "
+                             "expected %d, got %d"
+                            , get_txt($1.real->name)
+                            , funp->num_arg, $4);
               }
 
               /* Check the argument types.

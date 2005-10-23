@@ -1742,7 +1742,7 @@ load_ob_from_swap (object_t *ob)
                           , tot_alloc_object, tot_alloc_object_size, ob, ob->name ? get_txt(ob->name) : "<null>"
                           , ob->prog->num_variables
                           , (long)(ob->prog->num_variables * sizeof (svalue_t))
-                          , tot_alloc_object, tot_alloc_object_size - (ob->prog->num_variables * sizeof (svalue_t))
+                          , tot_alloc_object, tot_alloc_object_size + (ob->prog->num_variables * sizeof (svalue_t))
                           );
         }
 #endif

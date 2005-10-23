@@ -20,13 +20,14 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 233)
-(Parent-Version lpmud 3-3 232)
-(Version-Log "Bugfix to terminal_colour(): random characters were appended to the string.
-restore_object() prints in case of an error the line number of the offending line")
+(Project-Version lpmud 3-3 234)
+(Parent-Version lpmud 3-3 233)
+(Version-Log "Corrected a compilation error in the pthreads code in comm.c.
+Corrected the swap-in OSTAT diagnostic message.
+Fixed typos in two LPC compiler messages.")
 (New-Version-Log
 "")
-(Checkin-Time "Sat, 24 Aug 2002 12:20:53 -0600")
+(Checkin-Time "Wed, 28 Aug 2002 15:57:13 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -62,7 +63,7 @@ restore_object() prints in case of an error the line number of the offending lin
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.7 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.44 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.296 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.297 644))
   (HISTORY (lpmud/f/49_HISTORY 1.266 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.16 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -126,7 +127,7 @@ restore_object() prints in case of an error the line number of the offending lin
   (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.20 644))
   (src/closure.h (lpmud/f/44_closure.h 1.7.1.6 644))
   (src/closure.c (lpmud/d/4_closure.c 1.41.1.37 644))
-  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.16 644))
+  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.17 644))
   (src/comm.h (lpmud/d/3_comm.h 1.26.1.19 644))
   (src/driver.h (lpmud/f/36_driver.h 1.15.1.19 644))
   (src/dumpstat.h (lpmud/f/35_dumpstat.h 1.8 644))
@@ -215,7 +216,7 @@ restore_object() prints in case of an error the line number of the offending lin
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.12 644))
   (src/port.c (lpmud/39_port.c 1.17.1.7 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.14 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.26 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.27 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7.1.1 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))
@@ -235,7 +236,7 @@ restore_object() prints in case of an error the line number of the offending lin
   (src/strfuns.c (lpmud/c/0_strfuns.c 1.9.1.10 644))
   (src/svalue.h (lpmud/f/39_datatypes. 1.34.1.15 644))
   (src/swap.h (lpmud/f/14_swap.h 1.7.1.3 644))
-  (src/swap.c (lpmud/25_swap.c 1.36.1.28 644))
+  (src/swap.c (lpmud/25_swap.c 1.36.1.29 644))
   (src/switch.h (lpmud/24_switch.h 1.9 644))
   (src/sysmalloc.c (lpmud/23_sysmalloc. 1.1 644))
   (src/telnet.h (lpmud/22_telnet.h 1.5.1.2 644))
@@ -492,7 +493,7 @@ restore_object() prints in case of an error the line number of the offending lin
   (src/bugs/b-020425-0 (lpmud/v/39_b-020425-0 1.1 644) :no-keywords)
   (src/bugs/b-020506 (lpmud/v/41_b-020506 1.1 644) :no-keywords)
 
-  (src/bugs/f-summary (lpmud/c/37_f-summary 1.39.1.74 644) :no-keywords)
+  (src/bugs/f-summary (lpmud/c/37_f-summary 1.39.1.75 644) :no-keywords)
   (src/bugs/f-981027-0 (lpmud/g/29_f-981027-0 1.2 644) :no-keywords)
   (src/bugs/f-981027-1 (lpmud/g/28_f-981027-1 1.2 644) :no-keywords)
   (src/bugs/f-981027-2 (lpmud/g/27_f-981027-2 1.2 644) :no-keywords)
@@ -717,6 +718,7 @@ restore_object() prints in case of an error the line number of the offending lin
   (src/bugs/f-020811 (lpmud/a/b/6_f-020811 1.1 644) :no-keywords)
   (src/bugs/f-020813-0 (lpmud/a/b/8_f-020813-0 1.1 644) :no-keywords)
   (src/bugs/f-020813-1 (lpmud/a/b/9_f-020813-1 1.1 644) :no-keywords)
+  (src/bugs/f-020825 (lpmud/a/b/15_f-020825 1.1 644) :no-keywords)
 
   (src/bugs/p-981027-1 (lpmud/g/25_p-981027-1 1.2 644) :no-keywords)
   (src/bugs/doomdark/strutil.c (lpmud/g/31_strutil.c 1.2 644) :no-keywords)
@@ -867,7 +869,7 @@ restore_object() prints in case of an error the line number of the offending lin
   (doc/concepts/objects (lpmud/n/38_objects 1.4 644))
   (doc/concepts/regexp (lpmud/v/29_regexp 1.1 644))
   (doc/concepts/hsregexp (lpmud/v/30_hsregexp 1.2 644))
-  (doc/concepts/pcre (lpmud/v/31_pcre 1.2 644))
+  (doc/concepts/pcre (lpmud/v/31_pcre 1.3 644))
   (doc/concepts/rtfm (lpmud/n/39_rtfm 1.1 644))
   (doc/concepts/simul_efun (lpmud/n/40_simul_efun 1.2 644))
   (doc/concepts/uids (lpmud/n/41_uids 1.8 644))

@@ -6086,8 +6086,8 @@ f_binary_message (svalue_t *sp)
 
             for (i = 6; i > 0; i--) {
 #ifdef USE_PTHREAD
-                wrote = (mp_int)thread_socket_write(ip->socket, message
-                                                   , (size_t)size, ip);
+                wrote = (mp_int)thread_socket_write(ip->socket, get_txt(msg)
+                                                   , mstrsize(msg), ip);
 #else
                 wrote = (mp_int)socket_write(ip->socket, get_txt(msg), mstrsize(msg));
 #endif
