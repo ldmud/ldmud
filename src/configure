@@ -9394,6 +9394,7 @@ if test $lp_cv_sys_rename_handles_directories = yes; then
 _ACEOF
 
 fi
+rmdir conftestdirfrom conftestdirto >& /dev/null
 
 if test $ac_cv_func_getrusage = "yes" ; then
 echo "$as_me:$LINENO: checking full availability of struct rusage members" >&5

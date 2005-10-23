@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+06-Oct-2002 (Lars Duening)  (3.3.274)
+  - (prolang.y) New inlines: Improved the error handling for the (::) form:
+       the parser now recovers gracefully if statements are used instead
+       of expressions (reported by Dafire and Nostradamus).
+
 05-Oct-2002 (Lars Duening)  (3.3.273)
   - (prolang.y) Inline closures without returntype specification are now
        typed to return 'mixed' instead of 'unknown'. This makes them

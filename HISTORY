@@ -29,7 +29,6 @@ For a detailed list of all changes see the file CHANGELOG.
        + regexp(), regexplode(): Optionally take RE interpretation options.
        + regexplode(): New flag RE_OMIT_DELIM allows to omit the matched
            delimiters from the result.
-       + structp(): Predicate efun to detect structs.
        + transfer(): Available (in compat mode) only when USE_DEPRECATED
            is in effect.
        + wizlist_info(): Added the number of mappings to the result.
@@ -45,6 +44,7 @@ For a detailed list of all changes see the file CHANGELOG.
            the MD5 message digest algorithm.
        + regmatch(): To match a string against a regexp and optionally retrieve
            the match results for subexpressions.
+       + structp(): Predicate efun to detect structs.
        + to_struct(): Convert an array into a struct.
 
     - Master Object:

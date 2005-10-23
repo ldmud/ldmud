@@ -668,11 +668,11 @@ struct inline_closure_s
     Bool parse_context;
       /* TRUE if the context variable definitions are parsed.
        */
+    int current_line;
+      /* Current line number, used to adjust the generated linenumbers.
+       */
 
     /* --- Saved Globals --- */
-    int current_line;
-      /* Current line number.
-       */
     void * include_handle;
       /* Current include state.
        */
@@ -1407,7 +1407,8 @@ get_type_name (fulltype_t type)
     }
     
     if (type >= sizeof type_name / sizeof type_name[0])
-        fatal("Bad type %ld\n", (long)type);
+        fatal("Bad type %ld: %s line %d\n"
+             , (long)type,  current_file, current_line);
 
     strcat(buff, type_name[type]);
 
@@ -3451,6 +3452,7 @@ printf("DEBUG: new inline #%d: prev %d\n", INLINE_CLOSURE_COUNT, ict.prev);
     ict.returntype = 0;
     ict.num_args = 0;
     ict.parse_context = MY_FALSE;
+    ict.current_line  = current_line;
     
 #ifdef DEBUG_INLINES
 printf("DEBUG:   start: %ld, depth %d, locals: %d/%d, break: %d/%d\n", CURRENT_PROGRAM_SIZE, block_depth, current_number_of_locals, max_number_of_locals, current_break_stack_need, max_break_stack_need);
@@ -3461,7 +3463,6 @@ printf("DEBUG:   start: %ld, depth %d, locals: %d/%d, break: %d/%d\n", CURRENT_P
     ict.num_locals           = current_number_of_locals;
     ict.max_num_locals       = max_number_of_locals;
     ict.exact_types          = exact_types;
-    ict.current_line         = current_line;
     ict.include_handle       = get_include_handle();
     ict.local_type_start        = type_of_locals - &(LOCAL_TYPE(0));
     ict.full_local_type_start   = full_type_of_locals - &(FULL_LOCAL_TYPE(0));
@@ -3585,7 +3586,6 @@ printf("DEBUG:   move li data to %ld\n", backup_start);
     current_break_stack_need = current_inline->break_stack_size;
     max_break_stack_need     = current_inline->max_break_stack_size;
     exact_types              = current_inline->exact_types;
-    current_line             = current_inline->current_line;
 
 #ifdef DEBUG_INLINES
 printf("DEBUG:   local types: %d/%d, context types: %d/%d\n", current_inline->local_type_start, current_inline->full_local_type_start, current_inline->context_type_start, current_inline->full_context_type_start);
@@ -5234,7 +5234,7 @@ printf("DEBUG: Before comma_expr: program size %ld\n", CURRENT_PROGRAM_SIZE);
 #endif /* DEBUG_INLINES */
       }
       
-      comma_expr
+      inline_expr_body
 
       L_END_INLINE
 
@@ -5312,6 +5312,17 @@ context_decl:
       basic_type local_name_list
       { /* Empty action to void value from local_name_list */ }
 ; /* context_decl */
+
+
+inline_expr_body:
+      /* While the body of an (: :) closure is just a comma_expr, we need
+       * to do some more work in order to sync properly after errors caused
+       * bu people using statements in the closure.
+       * If we didn't, the parser would become complete confused.
+       */
+      comma_expr { }
+    | error statements 
+; /* inline_expr_body */
 
 %endif /* USE_NEW_INLINES */
 

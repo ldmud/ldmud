@@ -108,6 +108,10 @@ NOTES
         ('(: :)' syntax only, no context variables) for backwards
         compatibility.
 
+        The old inline closures allowed not just expressions within
+        the (: :), but alternatively statements as well (for example
+        '(: return 1; :)' ). This is no longer supported.
+
 HISTORY
         LDMud 3.2.7 implemented the older, restricted form of inline
         closures.
