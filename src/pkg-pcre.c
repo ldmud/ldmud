@@ -31,7 +31,7 @@
 
 #define LDMUD_CHECK_EVAL_COST \
     eval_cost += 1; \
-    if (max_eval_cost && max_eval_cost < eval_cost) { \
+    if (EVALUATION_TOO_LONG()) { \
         md->errorcode = RE_ERROR_BACKTRACK; \
         return FALSE; \
     }

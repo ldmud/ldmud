@@ -554,6 +554,32 @@ double READ_DOUBLE(struct svalue *svalue_pnt)
 #define psh_callback(sp,val) \
     ( (sp)++, put_callback(sp,val) )
 
+/* The following macros implement the dynamic cost evaluations:
+ *
+ *   DYN_STRING_COST(l):  increase eval_cost depending on string length <l>.
+ *   DYN_ARRAY_COST(l):   increase eval_cost depending on array length <l>.
+ *   DYN_MAPPING_COST(l): increase eval_cost depending on mapping length <l>.
+ *
+ * Covered so far are:
+ *   F_ADD, F_ADD_EQ, F_VOID_ADD_EQ, F_MULTIPLY, F_MULT_EQ of strings
+ *
+ * TODO: Expand this to all datatypes and sizes.
+ */
+
+#if defined(DYNAMIC_COSTS)
+
+#define DYN_STRING_COST(l)  eval_cost += (l) / 1000;
+#define DYN_ARRAY_COST(l)  eval_cost += (l) / 1000;
+#define DYN_MAPPING_COST(l)  eval_cost += (l) / 1000;
+
+#else
+
+#define DYN_STRING_COST(l)
+#define DYN_ARRAY_COST(l)
+#define DYN_MAPPING_COST(l)
+
+#endif
+
 /* --- Prototypes (in interpret.c) --- */
 
 extern void free_string_svalue(svalue_t *v);

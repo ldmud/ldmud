@@ -127,7 +127,7 @@
 #include "../mudlib/sys/time.h"
 
 /* Forward declarations */
-static void copy_svalue (svalue_t *dest, svalue_t *, struct pointer_table *);
+static void copy_svalue (svalue_t *dest, svalue_t *, struct pointer_table *, int);
 
 /* Macros */
 
@@ -5310,6 +5310,7 @@ f_copy (svalue_t *sp)
         size = VEC_SIZE(old);
         if (old->ref != 1 && old != &null_vector)
         {
+            DYN_ARRAY_COST(size);
             new = allocate_uninit_array((int)size);
             if (!new)
                 error("(copy) Out of memory: array[%lu] for copy.\n"
@@ -5328,6 +5329,7 @@ f_copy (svalue_t *sp)
         old = sp->u.map;
         if (old->ref != 1)
         {
+            DYN_MAPPING_COST(old->num_entries);
             check_map_for_destr(old);
             new = copy_mapping(old);
             if (!new)
@@ -5348,8 +5350,9 @@ f_copy (svalue_t *sp)
 /* Data packet passed to deep_copy_mapping() during a mapping walk.
  */
 struct csv_info {
+    int depth;                     /* Depth of the copy procedure */
     int width;                     /* width of the mapping */
-    mapping_t * dest;         /* the mapping to copy into */
+    mapping_t * dest;              /* the mapping to copy into */
     struct pointer_table *ptable;  /* the pointer table to use */
 };
 
@@ -5367,7 +5370,7 @@ deep_copy_mapping (svalue_t *key, svalue_t *val, void *extra)
     svalue_t *newdata;
     int i;
 
-    copy_svalue(&newkey, key, info->ptable);
+    copy_svalue(&newkey, key, info->ptable, info->depth);
     newdata = get_map_lvalue_unchecked(info->dest, &newkey);
     if (!newdata)
     {
@@ -5376,19 +5379,21 @@ deep_copy_mapping (svalue_t *key, svalue_t *val, void *extra)
         return;
     }
     for (i = info->width; i-- > 0; newdata++, val++)
-        copy_svalue(newdata, val, info->ptable);
+        copy_svalue(newdata, val, info->ptable, info->depth);
 
     free_svalue(&newkey); /* no longer needed */
-}
+} /* deep_copy_mapping() */
 
 /*-------------------------------------------------------------------------*/
 static void
 copy_svalue (svalue_t *dest, svalue_t *src
-            , struct pointer_table *ptable)
+            , struct pointer_table *ptable
+            , int depth)
 
 /* Copy the svalue <src> into the yet uninitialised svalue <dest>.
  * If <src> is an array or mapping, recurse to achieve a deep copy, using
  * <ptable> to keep track of the arrays and mappings encountered.
+ * <depth> is the nesting depth of this value.
  *
  * The records in the pointer table store the svalue* of the created
  * copy for each registered array and mapping in the .data member.
@@ -5396,6 +5401,12 @@ copy_svalue (svalue_t *dest, svalue_t *src
 
 {
     assert_stack_gap();
+    if (EVALUATION_TOO_LONG())
+    {
+        put_number(dest, 0); /* Need to store something! */
+        return;
+    }
+
     switch (src->type)
     {
     default:
@@ -5427,6 +5438,10 @@ copy_svalue (svalue_t *dest, svalue_t *src
         if (rec->ref_count++ < 0) /* New array */
         {
             size = (mp_int)VEC_SIZE(old);
+            DYN_ARRAY_COST(size);
+#if defined(DYNAMIC_COSTS)
+            eval_cost += (depth+1) / 10;
+#endif
 
             /* Create a new array, assign it to dest, and store
              * it in the table, too.
@@ -5445,13 +5460,14 @@ copy_svalue (svalue_t *dest, svalue_t *src
             {
                 svalue_t * svp = &old->item[i];
 
-                if (svp->type == T_MAPPING
+                if (svp->type == T_QUOTED_ARRAY
+                 || svp->type == T_MAPPING
                  || svp->type == T_POINTER
 #ifdef USE_STRUCTS
                  || svp->type == T_STRUCT
 #endif /* USE_STRUCTS */
                    )
-                    copy_svalue(&new->item[i], svp, ptable);
+                    copy_svalue(&new->item[i], svp, ptable, depth+1);
                 else
                     assign_svalue_no_free(&new->item[i], svp);
             }
@@ -5483,6 +5499,10 @@ copy_svalue (svalue_t *dest, svalue_t *src
               /* Doesn't matter if this is too big due to destructed
                * elements.
                */
+            DYN_MAPPING_COST(size);
+#if defined(DYNAMIC_COSTS)
+            eval_cost += (depth+1) / 10;
+#endif
             info.width = old->num_values;
             new = allocate_mapping(size, info.width);
             if (!new)
@@ -5550,7 +5570,7 @@ f_deep_copy (svalue_t *sp)
             ptable = new_pointer_table();
             if (!ptable)
                 error("(deep_copy) Out of memory for pointer table.\n");
-            copy_svalue(&new, sp, ptable);
+            copy_svalue(&new, sp, ptable, 0);
             if (sp->type == T_QUOTED_ARRAY)
                 new.x.quotes = sp->x.quotes;
             transfer_svalue(sp, &new);
@@ -5567,7 +5587,7 @@ f_deep_copy (svalue_t *sp)
         ptable = new_pointer_table();
         if (!ptable)
             error("(deep_copy) Out of memory for pointer table.\n");
-        copy_svalue(&new, sp, ptable);
+        copy_svalue(&new, sp, ptable, 0);
         transfer_svalue(sp, &new);
         free_pointer_table(ptable);
         break;

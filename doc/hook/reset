@@ -23,10 +23,13 @@ DESCRIPTION
         be reset again, unless directed otherwise by set_next_reset().
 
         If the hook is defined as the name of an lfun in the object,
-        it is called in the object with 1 as argument,    and any
-        result is ignored.  In this call the previous_object() is the
-        object initiating the reset.  If the function does not exist,
-        the object won't be reset again.
+        it is called in the object with 1 as argument, and any result
+        is ignored.  In this call the previous_object() is the object
+        initiating the reset.  If the function does not exist, the
+        object won't be reset again.
+
+        Note that an object is only reset by call to this hook if it
+        has been used since the last reset.
 
 HISTORY
 

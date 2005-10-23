@@ -1,6 +1,14 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+10-Oct-2002 (Lars Duening)  (3.3.282)
+  - (object.c) Restoring structs in mappings didn't work (reported by Tomba).
+  - (efuns.c, svalue.h, interpret.c) Evaluation cost of  deep_copy() is
+       now proportional to size and nesting depth of copied arrays
+       and mappings, if DYNAMIC_COST is defined (suggested by Gnomi).
+  - (main, configure) Removed the last remnants of debug options CHECK_STRINGS
+       and KEEP_STRINGS.
+
 09-Oct-2002 (Lars Duening)  (3.3.281)
   - (actions.c, interpret) The OPC dump function still used char* strings
        instead of the new strings (reported by Nostradamus).

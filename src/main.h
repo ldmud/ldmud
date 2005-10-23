@@ -33,10 +33,6 @@ extern Bool check_a_lot_ref_counts_flag;
 extern int check_state_level;
 #endif
 
-#ifdef CHECK_STRINGS
-extern Bool check_string_table_flag;
-#endif
-
 #ifdef CHECK_OBJECT_STAT
 extern Bool check_object_stat;
 #endif

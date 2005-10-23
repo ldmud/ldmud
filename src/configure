@@ -875,10 +875,6 @@ Optional Features:
         enable LPC compiler debug output
   --enable-no-inlines                 default=disabled
         disable inlining
-  --enable-check-strings              default=enabled
-        allow shared string sanity checks
-  --enable-keep-strings               default=disabled
-        don't free shared strings
   --enable-debug-telnet               default=disabled
         enable telnet machine diagnostics
   --enable-debug-smalloc-allocs       default=disabled
@@ -1557,20 +1553,6 @@ DEFAULTenable_no_inlines=no
 # Check whether --enable-no-inlines or --disable-no-inlines was given.
 if test "${enable_no_inlines+set}" = set; then
   enableval="$enable_no_inlines"
-
-fi;
-
-DEFAULTenable_check_strings=yes
-# Check whether --enable-check-strings or --disable-check-strings was given.
-if test "${enable_check_strings+set}" = set; then
-  enableval="$enable_check_strings"
-
-fi;
-
-DEFAULTenable_keep_strings=no
-# Check whether --enable-keep-strings or --disable-keep-strings was given.
-if test "${enable_keep_strings+set}" = set; then
-  enableval="$enable_keep_strings"
 
 fi;
 
@@ -2391,26 +2373,6 @@ if test "x$enable_no_inlines" = "xyes"; then
   cdef_no_inlines="#define"
 else
   cdef_no_inlines="#undef"
-fi
-
-if test "x$enable_check_strings" = "x" && test "x$DEFAULTenable_check_strings" != "x"; then
-  enable_check_strings=$DEFAULTenable_check_strings
-fi
-
-if test "x$enable_check_strings" = "xyes"; then
-  cdef_check_strings="#define"
-else
-  cdef_check_strings="#undef"
-fi
-
-if test "x$enable_keep_strings" = "x" && test "x$DEFAULTenable_keep_strings" != "x"; then
-  enable_keep_strings=$DEFAULTenable_keep_strings
-fi
-
-if test "x$enable_keep_strings" = "xyes"; then
-  cdef_keep_strings="#define"
-else
-  cdef_keep_strings="#undef"
 fi
 
 if test "x$enable_debug_telnet" = "x" && test "x$DEFAULTenable_debug_telnet" != "x"; then
@@ -11666,8 +11628,6 @@ s,@cdef_verbose_opcprof@,$cdef_verbose_opcprof,;t t
 s,@cdef_debug@,$cdef_debug,;t t
 s,@cdef_yydebug@,$cdef_yydebug,;t t
 s,@cdef_no_inlines@,$cdef_no_inlines,;t t
-s,@cdef_check_strings@,$cdef_check_strings,;t t
-s,@cdef_keep_strings@,$cdef_keep_strings,;t t
 s,@cdef_debug_telnet@,$cdef_debug_telnet,;t t
 s,@cdef_debug_smalloc_allocs@,$cdef_debug_smalloc_allocs,;t t
 s,@cdef_check_object_stat@,$cdef_check_object_stat,;t t

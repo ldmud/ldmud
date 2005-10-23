@@ -460,15 +460,6 @@
  */
 @cdef_no_inlines@ NO_INLINES
 
-/* Enable the shared string checking (enables commandline option
- * --check-strings).
- */
-@cdef_check_strings@ CHECK_STRINGS
-
-/* Shared strings are never really freed.
- */
-@cdef_keep_strings@ KEEP_STRINGS
-
 /* Activate debug prints in the telnet machine.
  */
 @cdef_debug_telnet@ DEBUG_TELNET

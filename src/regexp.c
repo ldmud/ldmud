@@ -1161,7 +1161,7 @@ regmatch (unsigned char *prog)
                 no--;
                 reginput = save + no;
                 eval_cost += 1;
-                if (max_eval_cost && max_eval_cost < eval_cost)
+                if (EVALUATION_TOO_LONG())
                     return RE_ERROR_BACKTRACK;
             }
             return RE_NOMATCH;

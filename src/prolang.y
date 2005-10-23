@@ -5578,7 +5578,7 @@ inheritance:
            * loaded, this test can only fail when the master is compiled.
            */
           if (master_ob && !(master_ob->flags & O_DESTRUCTED)
-           && (!max_eval_cost || eval_cost < max_eval_cost)
+           && !EVALUATION_TOO_LONG()
              )
           {
               svalue_t *res;
@@ -5629,7 +5629,7 @@ inheritance:
               }
               /* else: no result - use the string as it is */
           }
-          else if (max_eval_cost && eval_cost >= max_eval_cost)
+          else if (EVALUATION_TOO_LONG())
           {
               yyerrorf("Can't call master::%s for "
                        "'%s': eval cost too big"
@@ -12378,7 +12378,7 @@ function_name:
            && $3->u.global.sim_efun >= 0
            && simul_efunp[$3->u.global.sim_efun].flags & TYPE_MOD_NO_MASK
            && master_ob
-           && (!max_eval_cost || eval_cost < max_eval_cost)
+           && (!EVALUATION_TOO_LONG())
              )
           {
               /* Yup, check it with a privilege violation.
@@ -12408,7 +12408,7 @@ function_name:
                   $$.super = $1;
               }
           }
-          else if (max_eval_cost && eval_cost >= max_eval_cost)
+          else if (EVALUATION_TOO_LONG())
           {
               yyerrorf("Can't call master::%s for "
                        "'nomask simul_efun %s': eval cost too big"
@@ -12435,7 +12435,7 @@ function_name:
            && lvar->u.global.sim_efun >= 0
            && simul_efunp[lvar->u.global.sim_efun].flags & TYPE_MOD_NO_MASK
            && master_ob
-           && (!max_eval_cost || eval_cost < max_eval_cost)
+           && (!EVALUATION_TOO_LONG())
              )
           {
               /* Yup, check it with a privilege violation.
@@ -12465,7 +12465,7 @@ function_name:
                   $$.super = $1;
               }
           }
-          else if (max_eval_cost && eval_cost >= max_eval_cost)
+          else if (EVALUATION_TOO_LONG())
           {
               yyerrorf("Can't call master::%s for "
                        "'nomask simul_efun %s': eval cost too big"

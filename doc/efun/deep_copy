@@ -8,6 +8,9 @@ DESCRIPTION
 
         For other values this function is a no-op.
 
+        If DYNAMIC_COST is defined, every nested mapping or array counts
+        towards the evaluation cost in both size and nesting depth.
+
 EXAMPLE
         mixed *a, *b;
 
@@ -19,6 +22,7 @@ EXAMPLE
 
 HISTORY
         Introduced in LDMud 3.2.6.
+        LDMud 3.2.9 added the dynamic cost to the efun.
 
 SEE ALSO
         copy(E)

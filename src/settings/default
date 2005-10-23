@@ -463,13 +463,6 @@ enable_yydebug=no
 # speed tests.
 enable_no_inlines=no
 
-# Enable the shared string sanity checking (enables commandline option
-# --check-strings).
-enable_check_strings=yes
-
-# Shared strings are never really freed.
-enable_keep_strings=no
-
 # Activate debug prints in the telnet machine (lots of output).
 enable_debug_telnet=no
 

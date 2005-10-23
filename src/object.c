@@ -855,6 +855,7 @@ reset_object (object_t *ob, int arg)
         if (arg == H_RESET)
             previous_ob = ob;
 
+printf("DEBUG: reset_object('%s') lfun '%s'\n", get_txt(ob->name), get_txt(driver_hook[arg].u.str));
         push_number(inter_sp, arg == H_RESET);
         if (!sapply(driver_hook[arg].u.str, ob, 1) && arg == H_RESET)
             ob->time_reset = 0;
@@ -5861,7 +5862,11 @@ restore_map_size (struct rms_parameters *parameters)
             int tsiz;
 
             parameters->str = pt + 2;
-            if (pt[1] == '{')
+            if (pt[1] == '{'
+#ifdef USE_STRUCTS
+             || pt[1] == '<'
+#endif /* USE_STRUCTS */
+               )
                 tsiz = restore_size(&parameters->str);
             else if (pt[1] == '[')
                 tsiz = restore_map_size(parameters);
@@ -6067,14 +6072,15 @@ restore_mapping (svalue_t *svp, char **str)
 static int
 restore_size (char **str)
 
-/* Determine the size of an array to be restored.
- * The array text starts at *str, which points after the initial '({'.
+/* Determine the size of an array/struct to be restored.
+ * The array/struct text starts at *str, which points after the initial '({'
+ * resp. '(<'.
  *
- * The recognized size of the array is returned, or -1 if the array text
+ * The recognized size of the array/struct is returned, or -1 if the text
  * is ill formed. *<str> is set to point to the character after the
- * array text.
+ * array/struct text.
  *
- * The function calls itself and restore_array_size() recursively
+ * The function calls itself and restore_map_size() recursively
  * for embedded arrays and mappings.
  */
 

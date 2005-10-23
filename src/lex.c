@@ -2360,7 +2360,7 @@ inc_open (char *buf, char *name, mp_int namelen, char delim)
      * loaded, this test can only fail when the master is compiled.
      */
     if (master_ob && !(master_ob->flags & O_DESTRUCTED)
-     && (!max_eval_cost || eval_cost < max_eval_cost)
+     && (!EVALUATION_TOO_LONG())
        )
     {
         svalue_t *res;
@@ -2426,7 +2426,7 @@ inc_open (char *buf, char *name, mp_int namelen, char delim)
             return -1;
         }
     }
-    else if (max_eval_cost && eval_cost >= max_eval_cost)
+    else if (EVALUATION_TOO_LONG())
     {
         yyerrorf("Can't call master::%s for '%s': eval cost too big"
                 , get_txt(STR_INCLUDE_FILE), name);
@@ -4497,7 +4497,7 @@ yylex1 (void)
                  && simul_efunp[p->u.global.sim_efun].flags & TYPE_MOD_NO_MASK
                  && p->u.global.efun >= 0
                  && master_ob
-                 && (!max_eval_cost || eval_cost < max_eval_cost)
+                 && (!EVALUATION_TOO_LONG())
                    )
                 {
                     svalue_t *res;
@@ -4519,7 +4519,7 @@ yylex1 (void)
                         efun_override = MY_FALSE;
                     }
                 }
-                else if (max_eval_cost && eval_cost >= max_eval_cost)
+                else if (EVALUATION_TOO_LONG())
                 {
                     yyerrorf("Can't call master::%s for "
                              "'nomask simul_efun %s': eval cost too big"

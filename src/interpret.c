@@ -326,32 +326,6 @@ struct cache
    */
 
 
-/* The following macros implement the dynamic cost evaluations:
- *
- *   DYN_STRING_COST(l): increase eval_cost depending on stringlength <l>.
- *   DYN_ARRAY_COST(l):  increase eval_cost depending on arraylength <l>.
- *
- * If these are ever needed outside of interpret.c, we make them inline
- * functions.
- *
- * Covered so far are:
- *   F_ADD, F_ADD_EQ, F_VOID_ADD_EQ, F_MULTIPLY, F_MULT_EQ of strings
- *
- * TODO: Expand this to all datatypes and sizes.
- */
-
-#if defined(DYNAMIC_COSTS)
-
-#define DYN_STRING_COST(l)  eval_cost += (l) / 1000;
-#define DYN_ARRAY_COST(l)  eval_cost += (l) / 1000;
-
-#else
-
-#define DYN_STRING_COST(l)
-#define DYN_ARRAY_COST(l)
-
-#endif
-
 /*-------------------------------------------------------------------------*/
 /* Tracing */
 

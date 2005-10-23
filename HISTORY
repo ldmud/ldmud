@@ -96,7 +96,7 @@ For a detailed list of all changes see the file CHANGELOG.
            regular expression code, or the PCRE package (default).
 
 
-07-Oct-2002 (Lars Duening) -- Release 3.2.9
+10-Oct-2002 (Lars Duening) -- Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -121,6 +121,9 @@ For a detailed list of all changes see the file CHANGELOG.
             of all destructed objects, by default in <mudlib>/DEST_OBJ_DUMP.
        + debug_message(): New second argument determines where to
             log the message, and if to prepend a timestamp.
+       + deep_copy(): If DYNAMIC_COST is active, the evaluation cost
+            depends on size and nesting depth of copied arrays, structs
+            and mappings.
        + exec(): If this_interactive() points to one of the involved
             objects, it is switched over as well, like this_player().
        + filter(), map(), sort_array(), walk_mapping(): Protected lvalues

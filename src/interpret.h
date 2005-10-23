@@ -82,6 +82,10 @@ struct control_stack {
  */
 #define CLEAR_EVAL_COST (assigned_eval_cost = eval_cost = 0)
 
+/* Check if the current evaluation took too long
+ */
+#define EVALUATION_TOO_LONG() \
+    (max_eval_cost && (eval_cost >= max_eval_cost || eval_cost < 0))
 
 /* --- Variables --- */
 

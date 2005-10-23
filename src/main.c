@@ -88,10 +88,6 @@ Bool check_a_lot_ref_counts_flag = MY_FALSE;  /* The name says it. */
 int check_state_level = 0;     /* how of to check the state in the loop */
 #endif
 
-#ifdef CHECK_STRINGS
-Bool check_string_table_flag = MY_FALSE;
-#endif
-
 #ifdef CHECK_OBJECT_STAT
 Bool check_object_stat = MY_FALSE;
 #endif
@@ -995,9 +991,6 @@ typedef enum OptNumber {
  , cCheckState      /* --check-state        */
  , cGobbleFDs       /* --gobble-descriptors */
 #endif
-#ifdef CHECK_STRINGS
- , cCheckStrings    /* --check-strings      */
-#endif
 #ifdef CHECK_OBJECT_STAT
  , cCheckObjectStat /* --check-object-stat  */
 #endif
@@ -1353,15 +1346,6 @@ static Option aOptions[]
       }
 #endif
 
-#ifdef CHECK_STRINGS
-    , { 0,   "check-strings",      cCheckStrings,   MY_FALSE 
-      , "  --check-strings\n"
-      , "  --check-strings\n"
-        "    Every backend cycle, all shared strings in the system are checked.\n"
-        "    SLOW!\n"
-      }
-#endif
-
 #ifdef CHECK_OBJECT_STAT
     , { 0,   "check-object-stat",  cCheckObjectStat, MY_FALSE 
       , "  --check-object-stat\n"
@@ -1608,7 +1592,7 @@ options (void)
 #if defined(USE_PTHREAD)
          "                 max pthread write size: %7d\n"
 #endif /* USE_PTHREAD */
-         "                 max eval cost:          %7d %s\n"
+         "                 max eval cost:        %9d %s\n"
          "                 catch eval cost:        %7d\n"
          "                 master eval cost:       %7d\n"
          "                 eval stack:             %7d\n"
@@ -1752,12 +1736,6 @@ options (void)
         char * optstrings[] = { "  Other options: "
 #       if defined(DEBUG)
                               , "DEBUG"
-#       endif
-#       if defined(CHECK_STRINGS)
-                              , "CHECK_STRINGS"
-#       endif
-#       if defined(KEEP_STRINGS)
-                              , "KEEP_STRINGS"
 #       endif
 #       if defined(CHECK_OBJECT_STAT)
                               , "CHECK_OBJECT_STAT"
@@ -2338,12 +2316,6 @@ eval_arg (int eOption, const char * pValue)
             }
             break;
         }
-#endif
-
-#ifdef CHECK_STRINGS
-    case cCheckStrings:
-        check_string_table_flag = MY_TRUE;
-        break;
 #endif
 
 #ifdef CHECK_OBJECT_STAT
