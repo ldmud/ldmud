@@ -4644,7 +4644,7 @@ f_transfer (svalue_t *sp)
             }
 
             ret = sapply(STR_CANPUTGET, to, 0);
-            if (!ret || (ret->type != T_NUMBER && ret->type != 0)
+            if (!ret || (ret->type != T_NUMBER && ret->u.number != 0)
              || (to->flags & O_DESTRUCTED) || (ob->flags & O_DESTRUCTED))
             {
                 result = 5;
