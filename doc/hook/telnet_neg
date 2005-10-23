@@ -15,9 +15,25 @@ DESCRIPTION
         minimal negotiation takes place).
 
         The hook is called whenever the driver receives a demand for
-        option negotiation upon NAWS (window size) and TELOPT_TTYPE
-        (terminal type). The hook has then to perform the negotiation
-        using the efun binary_message().
+        option negotiation for:
+
+            TELOPT_NAWS:     window size
+            TELOPT_TTYPE:    terminal type
+            TELOPT_TM:       timing mark
+            TELOPT_NEWENV:
+            TELOPT_ENVIRON:
+            TELOPT_XDISPLOC:
+            TELOPT_TSPEED:
+            TELOPT_BINARY:   binary data, needed for non-ASCII charsets
+            TELOPT_EOR:      used by TinyFugue
+
+            TELOPT_COMPRESS:  MCP specific
+            TELOPT_COMPRESS2: MCP specific
+            TELOPT_MSP:       MCP specific
+            TELOPT_MXP:       MCP specific
+
+        The hook has then to perform the negotiation using the efun
+        binary_message().
 
         Alternatively, if H_NOECHO is set, this hook is called for
         _all_ telnet data received.

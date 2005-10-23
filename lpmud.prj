@@ -21,13 +21,12 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 288)
-(Parent-Version lpmud 3-3 287)
-(Version-Log "The Lexer performed its initialisations in the wrong order.
-Improved the library checking of configure so that only the actually required libraries are added to the compile.")
+(Project-Version lpmud 3-3 289)
+(Parent-Version lpmud 3-3 288)
+(Version-Log "Improved the telnet negotiation handling.")
 (New-Version-Log
 "")
-(Checkin-Time "Wed, 30 Oct 2002 13:27:41 -0700")
+(Checkin-Time "Thu, 31 Oct 2002 18:55:56 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -63,7 +62,7 @@ Improved the library checking of configure so that only the actually required li
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.49 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.351 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.352 644))
   (HISTORY (lpmud/f/49_HISTORY 1.282 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.18 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -129,8 +128,8 @@ Improved the library checking of configure so that only the actually required li
   (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.22 644))
   (src/closure.h (lpmud/f/44_closure.h 1.7.1.11 644))
   (src/closure.c (lpmud/d/4_closure.c 1.41.1.46 644))
-  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.29 644))
-  (src/comm.h (lpmud/d/3_comm.h 1.26.1.28 644))
+  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.30 644))
+  (src/comm.h (lpmud/d/3_comm.h 1.26.1.29 644))
   (src/driver.h (lpmud/f/36_driver.h 1.15.1.20 644))
   (src/dumpstat.h (lpmud/f/35_dumpstat.h 1.8 644))
   (src/dumpstat.c (lpmud/c/34_dumpstat.c 1.20.1.11 644))
@@ -1225,7 +1224,7 @@ Improved the library checking of configure so that only the actually required li
   (doc/hook/print_prompt (lpmud/a/b/48_print_prom 1.1 644))
   (doc/hook/reset (lpmud/a/b/49_reset 1.2 644))
   (doc/hook/send_notify_fail (lpmud/a/b/50_send_notif 1.1 644))
-  (doc/hook/telnet_neg (lpmud/a/b/51_telnet_neg 1.1 644))
+  (doc/hook/telnet_neg (lpmud/a/b/51_telnet_neg 1.2 644))
 
   (doc/LPC/alists (lpmud/c/51_alists 1.5 644))
   (doc/LPC/arrays (lpmud/r/13_arrays 1.4 644))

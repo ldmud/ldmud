@@ -84,6 +84,13 @@
 
 #define FMT_STRING ((const char *)&add_message)
 
+/* 'Format string' to use with add_message() when sending
+ * a string with binary characters and of fixed size
+ * to the player.
+ */
+
+#define FMT_BINARY (FMT_STRING+1)
+
 /* --- Types --- */
 
 /* --- struct write_buffer_s: async write datastructure

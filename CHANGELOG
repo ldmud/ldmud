@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+31-Oct-2002 (Lars Duening)  (3.3.289)
+  - (comm.c) Added TELOPT_BINARY to the telnet negotiations forwarded
+      to H_TELNET_NEG (suggested by Fiona).
+  - (comm.c) Made sure that telnet negotiations are sent out as quasi-
+      binary messages (before, the default handling of TELOPT_BINARY failed
+      because that option is character 0; reported by Fiona).
+
 30-Oct-2002 (Lars Duening)  (3.3.288)
   - (lex.c) When starting a new compile, the order of initialisations
       was wrong (in particular: auto-include was handled before the

@@ -1558,8 +1558,10 @@ add_message (const char *fmt, ...)
  * 
  * The format string "%s" is special in that it bypasses the normal
  * printf() handling and uses the given char* argument directly as data
- * source, allowing to send strings of arbitrary length. Similar, the
- * format string FMT_STRING accepts a string_t argument of arbitrary length.
+ * source, allowing to send strings of arbitrary length.
+ * The format string FMT_STRING accepts a string_t argument of arbitrary length.
+ * The format string FMT_BINARY accepts a char* as text argument, followed
+ * by a size_t with the string length. The text may contain any character.
  *
  * All other format strings compose the message to send in a local buffer
  * and are therefore subject to a length restriction.
@@ -1707,8 +1709,8 @@ add_message (const char *fmt, ...)
 
         /* Compose the final message in buff[] (while checking for overruns)
          * and point source to it.
-         * Recognize the special formats '%s' and FMT_STRING to bypass buff[]
-         * for messages of arbitrary length.
+         * Recognize the special formats '%s', FMT_STRING and FMT_BINARY
+         * to bypass buff[] for messages of arbitrary length and content.
          */
 
         if (fmt == FMT_STRING)
@@ -1718,6 +1720,13 @@ add_message (const char *fmt, ...)
 
             source = get_txt(srcstr);
             srclen = mstrsize(srcstr);
+        }
+        else if (fmt == FMT_BINARY)
+        {
+            source = va_arg(va, char *);
+            srclen = va_arg(va, size_t);
+            va_end(va);
+            srcstr = NULL;
         }
         else if (fmt[0] == '%' && fmt[1] == 's' && !fmt[2])
         {
@@ -2034,7 +2043,7 @@ if (sending_telnet_command)
     {
         remove_flush_entry(ip);
     }
-}
+} /* add_message() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
@@ -4136,6 +4145,24 @@ set_snoop (object_t *me, object_t *you)
  */
 
 /*-------------------------------------------------------------------------*/
+static INLINE
+send_telnet_option (char action, char option)
+
+/* Send IAC <action> <option> */
+
+{
+    char msg[3];
+
+    msg[0] = IAC;
+    msg[1] = action;
+    msg[2] = option;
+    SEND_TELNET_COMMAND(
+      add_message(FMT_BINARY, msg, 3);
+      add_message(message_flush);
+    )
+} /* send_telnet_option() */
+
+/*-------------------------------------------------------------------------*/
 static void
 send_wont (int option)
 
@@ -4143,11 +4170,7 @@ send_wont (int option)
 
 {
     DTF(("%s TDEBUG: send IAC WONT %02x\n", time_stamp(), option));
-    SEND_TELNET_COMMAND(
-      add_message("%c", IAC);
-      add_message("%c%c", WONT, option);
-      add_message(message_flush);
-    )
+    send_telnet_option(WONT, option);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -4158,11 +4181,7 @@ send_dont (int option)
 
 {
     DTF(("%s TDEBUG: send IAC DONT %02x\n", time_stamp(), option));
-    SEND_TELNET_COMMAND(
-      add_message("%c", IAC);
-      add_message("%c%c", DONT, option);
-      add_message(message_flush);
-    )
+    send_telnet_option(DONT, option);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -4173,11 +4192,7 @@ send_will (int option)
 
 {
     DTF(("%s TDEBUG: send IAC WILL %02x\n", time_stamp(), option));
-    SEND_TELNET_COMMAND(
-      add_message("%c", IAC);
-      add_message("%c%c", WILL, option);
-      add_message(message_flush);
-    )
+    send_telnet_option(WILL, option);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -4188,11 +4203,7 @@ send_do (int option)
 
 {
     DTF(("%s TDEBUG: send IAC DO %02x\n", time_stamp(), option));
-    SEND_TELNET_COMMAND(
-      add_message("%c", IAC);
-      add_message("%c%c", DO, option);
-      add_message(message_flush);
-    )
+    send_telnet_option(DO, option);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -4464,44 +4475,53 @@ init_telopts (void)
     for (i = NTELOPTS; --i >= 0; ) {
         telopts_wont[i] = reply_nil;
     }
+
     telopts_wont[TELOPT_SGA] = reply_to_wont_sga;
+
     telopts_do[TELOPT_TM] = reply_h_telnet_neg;
     telopts_dont[TELOPT_TM] = reply_h_telnet_neg;
     telopts_will[TELOPT_TM] = reply_h_telnet_neg;
     telopts_wont[TELOPT_TM] = reply_h_telnet_neg;
+
     telopts_do[TELOPT_NEWENV] = reply_h_telnet_neg;
     telopts_dont[TELOPT_NEWENV] = reply_h_telnet_neg;
     telopts_will[TELOPT_NEWENV] = reply_h_telnet_neg;
     telopts_wont[TELOPT_NEWENV] = reply_h_telnet_neg;
+
     telopts_do[TELOPT_ENVIRON] = reply_h_telnet_neg;
     telopts_dont[TELOPT_ENVIRON] = reply_h_telnet_neg;
     telopts_will[TELOPT_ENVIRON] = reply_h_telnet_neg;
     telopts_wont[TELOPT_ENVIRON] = reply_h_telnet_neg;
+
     telopts_do[TELOPT_XDISPLOC] = reply_h_telnet_neg;
     telopts_dont[TELOPT_XDISPLOC] = reply_h_telnet_neg;
     telopts_will[TELOPT_XDISPLOC] = reply_h_telnet_neg;
     telopts_wont[TELOPT_XDISPLOC] = reply_h_telnet_neg;
+
     telopts_do[TELOPT_LINEMODE] = reply_h_telnet_neg;
     telopts_dont[TELOPT_LINEMODE] = reply_h_telnet_neg;
     telopts_will[TELOPT_LINEMODE] = reply_h_telnet_neg;
     telopts_wont[TELOPT_LINEMODE] = reply_h_telnet_neg;
+
     telopts_do[TELOPT_NAWS] = reply_h_telnet_neg;
     telopts_dont[TELOPT_NAWS] = reply_h_telnet_neg;
     telopts_will[TELOPT_NAWS] = reply_h_telnet_neg;
     telopts_wont[TELOPT_NAWS] = reply_h_telnet_neg;
+
     telopts_do[TELOPT_TTYPE] = reply_h_telnet_neg;
     telopts_dont[TELOPT_TTYPE] = reply_h_telnet_neg;
     telopts_will[TELOPT_TTYPE] = reply_h_telnet_neg;
     telopts_wont[TELOPT_TTYPE] = reply_h_telnet_neg;
+
     telopts_do[TELOPT_TSPEED] = reply_h_telnet_neg;
     telopts_dont[TELOPT_TSPEED] = reply_h_telnet_neg;
     telopts_will[TELOPT_TSPEED] = reply_h_telnet_neg;
     telopts_wont[TELOPT_TSPEED] = reply_h_telnet_neg;
 
-    telopts_do[TELOPT_EOR] = reply_h_telnet_neg;
-    telopts_dont[TELOPT_EOR] = reply_h_telnet_neg;
-    telopts_will[TELOPT_EOR] = reply_h_telnet_neg;
-    telopts_wont[TELOPT_EOR] = reply_h_telnet_neg;
+    telopts_do[TELOPT_BINARY] = reply_h_telnet_neg;
+    telopts_dont[TELOPT_BINARY] = reply_h_telnet_neg;
+    telopts_will[TELOPT_BINARY] = reply_h_telnet_neg;
+    telopts_wont[TELOPT_BINARY] = reply_h_telnet_neg;
 
     /* Tinyfugue can do bad things to your health */
     telopts_do[EOR] = reply_h_telnet_neg;
@@ -6365,7 +6385,7 @@ f_binary_message (svalue_t *sp)
 
             if (sp->u.number & 2)
                 add_message(message_flush);
-            wrote = 0;
+            wrote = mstrsize(msg);
         }
         else
         {
