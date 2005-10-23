@@ -4464,16 +4464,16 @@ f_set_driver_hook (svalue_t *sp)
       }
 
     case T_CLOSURE:
-        if (n == H_NOECHO)
-        {
-            mudlib_telopts();
-        }
         if (sp->x.closure_type == CLOSURE_UNBOUND_LAMBDA
          && sp->u.lambda->ref == 1)
         {
             driver_hook[n] = *sp;
             driver_hook[n].x.closure_type = CLOSURE_LAMBDA;
             driver_hook[n].u.lambda->ob = ref_object(master_ob, "hook closure");
+            if (n == H_NOECHO)
+            {
+                mudlib_telopts();
+            }
             break;
         }
         else if (!CLOSURE_IS_LFUN(sp->x.closure_type))
@@ -4493,6 +4493,11 @@ default_test:
         }
 
         driver_hook[n] = *sp;
+
+        if (n == H_NOECHO)
+        {
+            mudlib_telopts();
+        }
         break;
     }
 

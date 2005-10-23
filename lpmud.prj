@@ -23,14 +23,15 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 297)
-(Parent-Version lpmud 3-3 296)
-(Version-Log "Reduced the data-cleanup rate for swapped and reset objects.
-Changed the swapping of strings so that it no longer uses 0 as terminator character.
-Improved the handling of 0 in strings for debug_message(), sprintf() and printf().")
+(Project-Version lpmud 3-3 298)
+(Parent-Version lpmud 3-3 297)
+(Version-Log "Corrected a off-by-one error in sprintf().
+Removed a crasher in get_type_info(unbound-lambda,2).
+The telnet negotiations are redirected only after the H_NOECHO hook is confirmed.
+Corrected a potential problem when interactive objects with pending data are forcefully disconnected.")
 (New-Version-Log
 "")
-(Checkin-Time "Wed, 13 Nov 2002 18:24:32 -0700")
+(Checkin-Time "Wed, 13 Nov 2002 22:17:57 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -66,7 +67,7 @@ Improved the handling of 0 in strings for debug_message(), sprintf() and printf(
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.49 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.360 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.361 644))
   (HISTORY (lpmud/f/49_HISTORY 1.284 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.18 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -132,7 +133,7 @@ Improved the handling of 0 in strings for debug_message(), sprintf() and printf(
   (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.22 644))
   (src/closure.h (lpmud/f/44_closure.h 1.7.1.11 644))
   (src/closure.c (lpmud/d/4_closure.c 1.41.1.47 644))
-  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.34 644))
+  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.35 644))
   (src/comm.h (lpmud/d/3_comm.h 1.26.1.29 644))
   (src/driver.h (lpmud/f/36_driver.h 1.15.1.20 644))
   (src/dumpstat.h (lpmud/f/35_dumpstat.h 1.8 644))
@@ -140,7 +141,7 @@ Improved the handling of 0 in strings for debug_message(), sprintf() and printf(
   (src/ed.h (lpmud/f/34_ed.h 1.5.1.6 644))
   (src/ed.c (lpmud/c/33_ed.c 1.32.1.25 644))
   (src/efuns.h (lpmud/l/20_efuns.h 1.13.1.19 644))
-  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.54 644))
+  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.55 644))
   (src/exec.h (lpmud/c/32_exec.h 1.34.1.33 644))
   (src/files.h (lpmud/i/49_files.h 1.2 644))
   (src/files.c (lpmud/i/50_files.c 1.17 644))
@@ -232,11 +233,11 @@ Improved the handling of 0 in strings for debug_message(), sprintf() and printf(
   (src/simul_efun.h (lpmud/f/17_simul_efun 1.5.1.5 644))
   (src/simul_efun.c (lpmud/32_simul_efun 1.20.1.17 644))
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.31 644))
-  (src/simulate.c (lpmud/31_simulate.c 1.88.1.88 644))
+  (src/simulate.c (lpmud/31_simulate.c 1.88.1.89 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.10 644))
   (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.53 644))
   (src/sprintf.h (lpmud/f/15_sprintf.h 1.3.1.3 644))
-  (src/sprintf.c (lpmud/28_sprintf.c 1.31.1.43 644))
+  (src/sprintf.c (lpmud/28_sprintf.c 1.31.1.44 644))
   (src/strfuns.h (lpmud/b/51_strfuns.h 1.11.1.4 644))
   (src/strfuns.c (lpmud/c/0_strfuns.c 1.9.1.10 644))
   (src/svalue.h (lpmud/f/39_datatypes. 1.34.1.23 644))

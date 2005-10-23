@@ -320,7 +320,7 @@ static sprintf_buffer_t *svalue_to_string(fmt_state_t *
     if (st->bpos + n > BUFF_SIZE) ERROR(ERR_BUFF_OVERFLOW); \
     if (n >= 1 && (s)[0] == '\n' && st->sppos != -1) st->bpos = st->sppos; \
     st->sppos = -1; \
-    memcpy(st->buff+st->bpos, (s), n); \
+    memcpy(st->buff+st->bpos, (s), n);\
     st->bpos += n; \
 }
 
@@ -2180,7 +2180,10 @@ add_table_now:
         xfree(st->tmp);
 
     /* Copy over the result */
-    result = new_n_mstring(st->buff, st->bpos);
+    if  (st->bpos > 1)
+        result = new_n_mstring(st->buff, st->bpos-1);
+    else
+        result = ref_mstring(STR_EMPTY);
     if (!result)
         result = ref_mstring(STR_OUT_OF_MEMORY);
     xfree(st);

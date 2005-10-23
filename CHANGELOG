@@ -1,6 +1,20 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+13-Nov-2002 (Lars Duening)  (3.3.298)
+  - (sprintf.c) Corrected an off-by-one error which sometimes clobbered
+      the result of sprintf().
+  - (efuns.c) get_type_info(,2) on an unbound-lambda crashed the driver
+      because an uninitialized variable was used (thanks, Ctx!)
+  - (simulate.c) If the H_NOECHO hook is set, the telnet negotiations
+      are redirected only after the hook setting is verified (thanks,
+      Fiona!)
+  - (comm.c) Corrected a potential problem when an interactive object
+      with pending data is forcefully made non-interactive: from my
+      reading of the code it seems that the object remained in the
+      list of players-to-flush, even though it no longer had a valid
+      interactive_t attribute.
+
 13-Nov-2002 (Lars Duening)  (3.3.297)
   - (backend.c) Reset and swapped objects are data-cleaned only
       every time_to_clean_up seconds (or 3600 seconds if no cleanup

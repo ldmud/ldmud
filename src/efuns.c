@@ -5695,6 +5695,7 @@ v_get_type_info (svalue_t *sp, int num_arg)
         {
             object_t *ob;
 
+            ob = NULL;
             sp--;
             switch(sp->x.closure_type)
             {
@@ -5710,6 +5711,9 @@ v_get_type_info (svalue_t *sp, int num_arg)
                 break;
             case CLOSURE_ALIEN_LFUN:
                 ob = sp->u.lambda->function.alien.ob;
+                break;
+            case CLOSURE_UNBOUND_LAMBDA:
+                ob = NULL;
                 break;
             }
             free_svalue(sp);

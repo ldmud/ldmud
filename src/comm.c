@@ -310,6 +310,9 @@ static struct ipentry {
    * TODO: Instead of a simple circular buffer, the lookup should be
    * TODO:: hashed over the IP address. Worst case would still be O(IPSIZE),
    * TODO:: but best case would be O(1).
+   * TODO: Allow unlimited numbers of entries, but give them a max lifetime
+   * TODO:: of a day. After that, even existing entries need to be
+   * TODO:: re-resolved. Maybe an additional size limit. (suggested by Coogan)
    */
  
 static int ipcur = 0;
@@ -2111,7 +2114,10 @@ remove_flush_entry (interactive_t *ip)
         O_GET_INTERACTIVE(ip->next_player_for_flush)->previous_player_for_flush
           = ip->previous_player_for_flush;
     }
-}
+
+    ip->previous_player_for_flush = NULL;
+    ip->next_player_for_flush = NULL;
+} /* remove_flush_entry() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -2134,7 +2140,7 @@ flush_all_player_mess (void)
         add_message(message_flush);
     }
     command_giver = save;
-}
+} /* flush_all_player_mess() */
 
 /*-------------------------------------------------------------------------*/
 Bool
@@ -3142,6 +3148,9 @@ remove_interactive (object_t *ob, Bool force)
             trace_level |= interactive->trace_level;
             add_message(message_flush);
         }
+
+        remove_flush_entry(interactive); /* To be sure */
+
 #ifdef USE_PTHREAD
         pthread_cancel(interactive->write_thread);
           /* buffer list is returned by thread */
