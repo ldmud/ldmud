@@ -704,7 +704,8 @@ if test $lp_cv_has_pthreads = yes; then
 #include <pthread.h>
 void t (void)
 {
-    pthread_mutex_lock(NULL);
+    pthread_t pid;
+    pthread_cancel(pid);
 }
 int main(void)
 {

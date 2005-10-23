@@ -973,10 +973,13 @@ smalloc (size_t size
 } /* smalloc() */
 
 /*-------------------------------------------------------------------------*/
-void
-xfree (POINTER ptr)
+static void
+sfree (POINTER ptr)
 
 /* Return the memoryblock <ptr> to the allocator.
+ * This function does the actual freeing, without checking for mutexes
+ * and stack gaps; it is also used internally by the allocator to free
+ * the memory reserves.
  */
 
 {
@@ -985,17 +988,6 @@ xfree (POINTER ptr)
 
     if (!ptr)
         return;
-
-    assert_stack_gap();
-
-    if (in_malloc++)
-    {
-        in_malloc = 0;
-        writes(1, "Multiple threads in xfree()\n");
-        fatal("Multiple threads in xfree()\n");
-        /* NOTREACHED */
-        return;
-    }
 
     /* Get the real block address and size */
     block = (word_t *) ptr;
@@ -1007,7 +999,6 @@ xfree (POINTER ptr)
         /* It's a big block */
         fake("xfree calls large_free");
         large_free(ptr);
-        in_malloc--;
         return;
     }
 
@@ -1033,6 +1024,33 @@ xfree (POINTER ptr)
     sfltable[i] = block;
     small_free[i] += 1;
     fake("Freed");
+} /* sfree() */
+
+/*-------------------------------------------------------------------------*/
+void
+xfree (POINTER ptr)
+
+/* Return the memoryblock <ptr> to the allocator.
+ * This is a wrapper for sfree() which performs checks for stack-gaps
+ * and such.
+ */
+
+{
+    if (!ptr)
+        return;
+
+    assert_stack_gap();
+
+    if (in_malloc++)
+    {
+        in_malloc = 0;
+        writes(1, "Multiple threads in xfree()\n");
+        fatal("Multiple threads in xfree()\n");
+        /* NOTREACHED */
+        return;
+    }
+
+    sfree(ptr);
     in_malloc--;
 } /* xfree() */
 
@@ -2270,7 +2288,7 @@ found_fit:
                 extra_jobs_to_do = MY_TRUE;
                 if (reserved_user_area)
                 {
-                    xfree(reserved_user_area);
+                    sfree(reserved_user_area);
                     reserved_user_area = NULL;
                     write(2, mess1, sizeof(mess1)-1);
                     goto retry;
@@ -2278,14 +2296,14 @@ found_fit:
 
                 if (malloc_privilege >= MALLOC_MASTER && reserved_master_area)
                 {
-                    xfree(reserved_master_area);
+                    sfree(reserved_master_area);
                     reserved_master_area = NULL;
                     write(2, mess2, sizeof(mess2)-1);
                     goto retry;
                 }
                 if (malloc_privilege >= MALLOC_SYSTEM && reserved_system_area)
                 {
-                    xfree(reserved_system_area);
+                    sfree(reserved_system_area);
                     reserved_system_area = 0;
                     write(2, mess3, sizeof(mess3)-1);
                     goto retry;

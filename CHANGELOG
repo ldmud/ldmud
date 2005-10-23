@@ -1,6 +1,14 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+04-Nov-2002 (Lars Duening)  (3.3.291)
+  - (smalloc.c) The thread-check in xfree() also triggered when the
+      memory reserves were released (reported by Bardioc).
+
+03-Nov-2002 (Lars Duening)
+  - (configure.in) Made the check for -lpthread more robust (reported by
+      Markus Peter).
+
 01-Nov-2002 (Lars Duening)  (3.3.290)
   - (comm.c) *blush* Deleted TELOPT_EOR handling by act of stupidity..
 
