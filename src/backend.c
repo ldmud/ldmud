@@ -86,7 +86,7 @@ mp_int current_time;
    */
 
 Bool time_to_call_heart_beat;
-  /* True: It's time to call the heart beat. Set by comm1.c when it recognizes
+  /* True: It's time to call the heart beat. Set by comm.c when it recognizes
    *   an alarm(). */
 
 volatile mp_int alarm_called = MY_FALSE;
@@ -791,9 +791,17 @@ static Bool did_reset;
 static Bool did_swap;
   /* True if one reset call or cleanup/swap was performed.
    * static so that errors won't clobber it.
+   *
+   * The flags are used to make sure that at least one object is successfully
+   * processed per call, even if there is no time left to begin with.
    */
 
-    object_t *obj;   /* Current object worked on */
+    object_t *obj;          /* Current object worked on */
+    mp_int    num_cleanup;  /* Number of objects to data-clean in this
+                             * call. It is computed so that all objects
+                             * are cleaned in one hour, but at least
+                             * one per call.
+                             */
 
     struct error_recovery_info error_recovery_info;
       /* Local error recovery info */
@@ -803,6 +811,10 @@ static Bool did_swap;
     num_last_processed = 0;
     did_reset = MY_FALSE;
     did_swap = MY_FALSE;
+
+    num_cleanup = num_listed_objs / (3600 / ALARM_TIME);
+    if (num_cleanup < 1)
+        num_cleanup = 1;
 
     error_recovery_info.rt.last = rt_context;
     error_recovery_info.rt.type = ERROR_RECOVERY_BACKEND;
@@ -857,9 +869,6 @@ static Bool did_swap;
         min_time_to_swap = 5 * 60;
         if (time_to_swap_variables / 2 < min_time_to_swap)
             min_time_to_swap = time_to_swap_variables/2;
-
-        /* ------ Data cleanup ------ */
-        cleanup_object(obj, NULL);
 
         /* ------ Reset ------ */
 
@@ -917,6 +926,41 @@ static Bool did_swap;
             } /* if (call reset or not) */
         } /* if (needs reset?) */
 
+
+        /* ------ Data Cleanup ------ */
+
+        /* Objects are processed at a rate suitable to cover
+         * all listed objects in one hour; but at least one per call.
+         *
+         * For objects with swapped variables or objects in reset state,
+         * the variables are cleaned only every time_to_clean_up seconds,
+         * or 3600 * seconds if the time is 0.
+         */
+        if (num_cleanup > 0)
+        {
+            mp_int delay = 0;
+
+            /* For inactive objects, determine the delay time */
+            if (((obj->flags & O_RESET_STATE) && !bResetCalled)
+             || ((obj->flags & O_SWAPPED) && O_VAR_SWAPPED(obj))
+               )
+            {
+                delay = time_to_cleanup ? time_to_cleanup : 3600;
+            }
+
+            if (delay && delay <= time_since_ref)
+            {
+#ifdef DEBUG
+                if (d_flag)
+                    fprintf(stderr, "%s DATA CLEANUP %s\n"
+                                  , time_stamp(), get_txt(obj->name));
+#endif
+
+                cleanup_object(obj, NULL);
+            }
+
+            num_cleanup--;
+        }
 
         /* ------ Clean Up ------ */
 
@@ -1347,6 +1391,7 @@ f_debug_message (svalue_t *sp)
  *   debug_message(string text, int flags)
  *
  * Print the <text> to stdout, stderr, and/or the <host>.debug.log file.
+ * The <text> may contain embedded \0 characters, which are ignored.
  *
  * The parameter <flags> is a combination of bitflags determining the
  * target and the mode of writing.
@@ -1360,30 +1405,47 @@ f_debug_message (svalue_t *sp)
  */
 
 {
+    mp_int  slen;
+    char   *pTxt;
+
     if ((sp->u.number & ~(DMSG_STDOUT|DMSG_STDERR|DMSG_LOGFILE|DMSG_STAMP)) != 0)
         error("Argument 2 to debug_message() out of range: %ld, expected 0..15\n"
              , (long)sp->u.number);
-    if (!(sp->u.number & DMSG_TARGET) || (sp->u.number & DMSG_STDOUT))
+
+    slen = (mp_int)mstrsize((sp-1)->u.str);
+    pTxt = get_txt((sp-1)->u.str);
+
+    if (sp->u.number & DMSG_STAMP)
     {
-        if (sp->u.number & DMSG_STAMP)
-            printf("%s %s", time_stamp(), get_txt((sp-1)->u.str));
-        else
-            printf("%s", get_txt((sp-1)->u.str));
+        if (!(sp->u.number & DMSG_TARGET) || (sp->u.number & DMSG_STDOUT))
+            printf("%s ", time_stamp());
+        if (sp->u.number & DMSG_STDERR)
+            fprintf(stderr, "%s ", time_stamp());
+        if (sp->u.number & DMSG_LOGFILE)
+            debug_message("%s ", time_stamp());
     }
-    if (sp->u.number & DMSG_STDERR)
+    
+    while (slen > 0)
     {
-        if (sp->u.number & DMSG_STAMP)
-            fprintf(stderr, "%s %s", time_stamp(), get_txt((sp-1)->u.str));
-        else
-            fprintf(stderr, "%s", get_txt((sp-1)->u.str));
+        while (slen > 0 && *pTxt == '\0')
+        {
+            pTxt++;
+            slen--;
+        }
+        if (slen > 0)
+        {
+            if (!(sp->u.number & DMSG_TARGET) || (sp->u.number & DMSG_STDOUT))
+                fputs(pTxt, stdout);
+            if (sp->u.number & DMSG_STDERR)
+                fputs("%s", stderr);
+            if (sp->u.number & DMSG_LOGFILE)
+                debug_message("%s", pTxt);
+
+            slen -= strlen(pTxt);
+            pTxt += strlen(pTxt);
+        }
     }
-    if (!(sp->u.number & DMSG_TARGET) || (sp->u.number & DMSG_LOGFILE))
-    {
-        if (sp->u.number & DMSG_STAMP)
-            debug_message("%s %s", time_stamp(), get_txt((sp-1)->u.str));
-        else
-            debug_message("%s", get_txt((sp-1)->u.str));
-    }
+
     free_svalue(sp);
     free_svalue(sp-1);
     return sp - 2;

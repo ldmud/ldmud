@@ -1,6 +1,21 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+13-Nov-2002 (Lars Duening)  (3.3.297)
+  - (backend.c) Reset and swapped objects are data-cleaned only
+      every time_to_clean_up seconds (or 3600 seconds if no cleanup
+      time is set); active objects are data-cleaned every time
+      the processing gets to them.
+  - (swap.c) When swapping strings, the length is now explicitely stored
+      in the swap file. The old format added a \0 character as terminator,
+      and consequently malfunctioned or crashed on strings using \0 as
+      data character.
+  - (backend.c, sprintf.c) The efuns debug_message(), sprintf() and printf()
+      can now handle strings with \0 characters better.
+  - (config.h) Moved the NEW_CLEANUP define into the config.h file and made
+      it active again; but it still has to be modified by hand if so
+      desired.
+
 13-Nov-2002 (Lars Duening)  (3.3.296)
   - (gcollect.c) The cleanup code did not check for the NO_BLUEPRINT
       define (reported by Bardioc).

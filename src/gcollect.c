@@ -360,6 +360,7 @@ cleanup_object (object_t * obj, ptrtable_t * ptable)
     ptrtable_t * local_ptable = NULL;
     int was_swapped = 0;
 
+printf("%s DEBUG: Cleanup object %s\n", time_stamp(), get_txt(obj->name));
     /* Make sure we have a pointer table */
     if (ptable == NULL)
     {

@@ -440,6 +440,11 @@
  */
 #define CHECK_OBJECT_STAT
 
+/* Enable the automatic data cleanup from the backend.
+ * TODO: Remove this macro once it is proven stable.
+ */
+#define NEW_CLEANUP
+
 /* Activate total mapping size consistency check code. It has a small
  * impact on the execution speed. This define was used to find
  * the inaccuracy in the mapping statistic.

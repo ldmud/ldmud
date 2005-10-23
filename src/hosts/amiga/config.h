@@ -460,6 +460,11 @@
 #    define CHECK_OBJECT_GC_REF
 #endif
 
+/* Enable the automatic data cleanup from the backend.
+ * TODO: Remove this macro once it is proven stable.
+ */
+#define NEW_CLEANUP
+
 /* Deactivate the tracking of blueprints. This will disable the
  * efuns blueprint(), but probably avoid the object refcount bug.
  */

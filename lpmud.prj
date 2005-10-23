@@ -23,12 +23,14 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 296)
-(Parent-Version lpmud 3-3 295)
-(Version-Log "Deactivated the new cleanup code since it seems to interfere with the swapper.")
+(Project-Version lpmud 3-3 297)
+(Parent-Version lpmud 3-3 296)
+(Version-Log "Reduced the data-cleanup rate for swapped and reset objects.
+Changed the swapping of strings so that it no longer uses 0 as terminator character.
+Improved the handling of 0 in strings for debug_message(), sprintf() and printf().")
 (New-Version-Log
 "")
-(Checkin-Time "Wed, 13 Nov 2002 12:44:48 -0700")
+(Checkin-Time "Wed, 13 Nov 2002 18:24:32 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -64,14 +66,14 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.49 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.359 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.360 644))
   (HISTORY (lpmud/f/49_HISTORY 1.284 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.18 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
   ;; Configuration
   (src/configure (lpmud/d/0_configure 1.19.1.64 755))
-  (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.19 644))
+  (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.20 644))
   (src/machine.h.in (lpmud/b/9_machine.h. 1.9.1.4 644))
   (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.19 644))
   (src/mkinstalldirs (lpmud/c/4_mkinstalld 1.1 644))
@@ -122,7 +124,7 @@
   (src/array.h (lpmud/f/47_array.h 1.18.1.21 644))
   (src/array.c (lpmud/d/12_array.c 1.46.1.47 644))
   (src/backend.h (lpmud/f/46_backend.h 1.20.1.7 644))
-  (src/backend.c (lpmud/d/6_backend.c 1.68.1.35.1.17 644))
+  (src/backend.c (lpmud/d/6_backend.c 1.68.1.35.1.18 644))
   (src/bitstrings.h (lpmud/i/47_bitstrings 1.3 644))
   (src/bitstrings.c (lpmud/i/48_bitstrings 1.12 644))
   (src/bytecode.h (lpmud/a/b/26_bytecode.h 1.1 644))
@@ -144,7 +146,7 @@
   (src/files.c (lpmud/i/50_files.c 1.17 644))
   (src/filestat.h (lpmud/f/51_filestat.h 1.7 644))
   (src/gcollect.h (lpmud/f/33_gcollect.h 1.6.1.11 644))
-  (src/gcollect.c (lpmud/c/30_gcollect.c 1.41.1.76 644))
+  (src/gcollect.c (lpmud/c/30_gcollect.c 1.41.1.77 644))
   (src/hash.h (lpmud/f/32_hash.h 1.5 644))
   (src/hash.c (lpmud/c/28_hash.c 1.15 644))
   (src/heartbeat.h (lpmud/m/41_heartbeat. 1.6.1.4 644))
@@ -234,12 +236,12 @@
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.10 644))
   (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.53 644))
   (src/sprintf.h (lpmud/f/15_sprintf.h 1.3.1.3 644))
-  (src/sprintf.c (lpmud/28_sprintf.c 1.31.1.42 644))
+  (src/sprintf.c (lpmud/28_sprintf.c 1.31.1.43 644))
   (src/strfuns.h (lpmud/b/51_strfuns.h 1.11.1.4 644))
   (src/strfuns.c (lpmud/c/0_strfuns.c 1.9.1.10 644))
   (src/svalue.h (lpmud/f/39_datatypes. 1.34.1.23 644))
   (src/swap.h (lpmud/f/14_swap.h 1.7.1.3 644))
-  (src/swap.c (lpmud/25_swap.c 1.36.1.36 644))
+  (src/swap.c (lpmud/25_swap.c 1.36.1.37 644))
   (src/switch.h (lpmud/24_switch.h 1.9 644))
   (src/sysmalloc.c (lpmud/23_sysmalloc. 1.1 644))
   (src/telnet.h (lpmud/22_telnet.h 1.5.1.2 644))
@@ -251,7 +253,7 @@
 
   ;; Build files
   (src/func_spec (lpmud/c/31_func_spec 1.53.1.45.1.22 644))
-  (src/string_spec (lpmud/f/6_string_spe 1.14.1.6 644))
+  (src/string_spec (lpmud/f/6_string_spe 1.14.1.7 644))
   (src/mkfunc.c (lpmud/l/14_mkfunc.c 1.1 644))
   (src/make_func.y (lpmud/b/7_make_func. 1.25.1.30 644))
 
@@ -267,14 +269,14 @@
   (src/hosts/amiga/StartMUD (lpmud/l/42_StartMUD 1.1 644))
   (src/hosts/amiga/README.Amiga.info (lpmud/l/43_README.Ami 1.1 644) :no-keywords)
   (src/hosts/amiga/machine.h (lpmud/c/2_machine.h 1.6.1.3 644))
-  (src/hosts/amiga/config.h (lpmud/c/7_config.h 1.23.1.25 644))
+  (src/hosts/amiga/config.h (lpmud/c/7_config.h 1.23.1.26 644))
   (src/hosts/amiga/README.Amiga (lpmud/c/12_README.Ami 1.4 644))
   (src/hosts/amiga/README (lpmud/c/13_README 1.4 644))
 
   ;; Host: BeOS
   (src/hosts/be/socketinc.h (lpmud/e/32_socketinc. 1.3 644))
   (src/hosts/be/machine.h (lpmud/e/33_machine.h 1.14.1.4 644))
-  (src/hosts/be/config.h (lpmud/e/34_config.h 1.32.1.26 644))
+  (src/hosts/be/config.h (lpmud/e/34_config.h 1.32.1.27 644))
   (src/hosts/be/be.h (lpmud/e/35_be.h 1.7 644))
   (src/hosts/be/beyacc (lpmud/i/39_beyacc 1.1 744))
   (src/hosts/be/Makefile (lpmud/e/37_Makefile 1.60.1.71 644))
@@ -295,7 +297,7 @@
   ;; Host: Win32
   (src/hosts/win32/tubmud.bmp (lpmud/g/20_tubmud.bmp 1.1 644) :no-keywords)
   (src/hosts/win32/machine.h (lpmud/g/21_machine.h 1.4.1.2 644))
-  (src/hosts/win32/config.h (lpmud/g/22_config.h 1.18.1.23 644))
+  (src/hosts/win32/config.h (lpmud/g/22_config.h 1.18.1.24 644))
   (src/hosts/win32/Readme.rtf (lpmud/g/23_Readme.rtf 1.2.1.1 644))
   (src/hosts/win32/Makefile (lpmud/g/24_Makefile 1.10.1.18 644))
 

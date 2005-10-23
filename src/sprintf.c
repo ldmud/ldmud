@@ -320,7 +320,7 @@ static sprintf_buffer_t *svalue_to_string(fmt_state_t *
     if (st->bpos + n > BUFF_SIZE) ERROR(ERR_BUFF_OVERFLOW); \
     if (n >= 1 && (s)[0] == '\n' && st->sppos != -1) st->bpos = st->sppos; \
     st->sppos = -1; \
-    strncpy(st->buff+st->bpos, (s), n); \
+    memcpy(st->buff+st->bpos, (s), n); \
     st->bpos += n; \
 }
 
@@ -401,6 +401,26 @@ realloc_sprintf_buffer (fmt_state_t *st, sprintf_buffer_t *b)
 
 /*-------------------------------------------------------------------------*/
 static void
+straddn (fmt_state_t *st, sprintf_buffer_t **buffer, char *add, int len)
+
+/* Add string <add> of <len> characters to the <buffer>.
+ */
+
+{
+    sprintf_buffer_t *b = *buffer;
+    int o;
+
+    o = b->offset;
+    if ( (b->offset = o + len) >= 0)
+    {
+        *buffer = b = realloc_sprintf_buffer(st, b);
+        o = b->offset - len;
+    }
+    memcpy(BUF_TEXT(b) + o, add, len);
+} /* straddn() */
+
+/*-------------------------------------------------------------------------*/
+static void
 stradd (fmt_state_t *st, sprintf_buffer_t **buffer, char *add)
 
 /* Add string <add> to the <buffer>.
@@ -408,18 +428,7 @@ stradd (fmt_state_t *st, sprintf_buffer_t **buffer, char *add)
  */
 
 {
-    sprintf_buffer_t *b = *buffer;
-    int o;
-    int len;
-
-    len = strlen(add);
-    o = b->offset;
-    if ( (b->offset = o + len) >= 0)
-    {
-        *buffer = b = realloc_sprintf_buffer(st, b);
-        o = b->offset - len;
-    }
-    strcpy(BUF_TEXT(b) + o, add);
+    straddn(st, buffer, add, strlen(add));
 } /* stradd() */
 
 /*-------------------------------------------------------------------------*/
@@ -583,7 +592,7 @@ svalue_to_string ( fmt_state_t *st
 
         if (!quoteStrings)
         {
-            stradd(st, &str, get_txt(obj->u.str));
+            straddn(st, &str, get_txt(obj->u.str), mstrsize(obj->u.str));
         }
         else
         {
@@ -603,6 +612,7 @@ svalue_to_string ( fmt_state_t *st
                 case '\a':
                 case 0x1b:
                 case 0x08:
+                case 0x00:
                 case '\\':
                     len += 2; break;
                 default:
@@ -646,6 +656,7 @@ svalue_to_string ( fmt_state_t *st
                     case '\a': strcpy(dest, "\\a"); dest += 2; break;
                     case 0x1b: strcpy(dest, "\\e"); dest += 2; break;
                     case 0x08: strcpy(dest, "\\b"); dest += 2; break;
+                    case 0x00: strcpy(dest, "\\0"); dest += 2; break;
                     case '\\': strcpy(dest, "\\\\"); dest += 2; break;
                     default:
                         if (c >= 0x20 && c < 0x7F)
@@ -1306,20 +1317,23 @@ add_table (fmt_state_t *st, cst **table)
 } /* add_table() */
 
 /*-------------------------------------------------------------------------*/
-static char *
+static string_t *
 string_print_formatted (char *format_str, int argc, svalue_t *argv)
 
 /* The (s)printf() function: format <format_str> with the given arguments
- * and return a pointer to the result (stored in a static buffer).
+ * and return a pointer to the result (a string with one reference).
+ *
  * If an error occurs and RETURN_ERROR_MESSAGES is defined, an error
  * will return the error string as result; if R_E_M is undefined, an
  * true error() is raised.
  */
 
 {
-    fmt_state_t  *st;     /* The formatting state */
-static char buff[BUFF_SIZE]; /* The buffer to return the result */
-
+#ifndef RETURN_ERROR_MESSAGES
+static char buff[BUFF_SIZE];         /* For error messages */
+#endif
+    string_t     *result;          /* The result string */
+    fmt_state_t  *st;              /* The formatting state */
     svalue_t     *carg;            /* current arg */
     int           arg;             /* current arg number */
     format_info   finfo;           /* parse formatting info */
@@ -1474,13 +1488,18 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
         sprintf(st->buff + strlen(st->buff)
                , err, EXTRACT_ERR_ARGUMENT(err_num));
         strcat(st->buff, "\n");
+#ifndef RETURN_ERROR_MESSAGES
         strcpy(buff, st->buff);
         xfree(st);
-#ifndef RETURN_ERROR_MESSAGES
         error("%s", buff); /* buff may contain a '%' */
         /* NOTREACHED */
+#else
+        result = new_mstring(st->buff);
+        if (!result)
+            result = ref_mstring(STR_OUT_OF_MEMORY);
+        xfree(st);
 #endif /* RETURN_ERROR_MESSAGES */
-        return buff;
+        return result;
     }
 
     format_char = 0;
@@ -1806,7 +1825,7 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                     /* Store the created result in .clean and pass it
                      * to case INFO_T_STRING is 'the' carg.
                      */
-                    put_string(&st->clean, new_mstring(st->tmp));
+                    put_string(&st->clean, new_n_mstring(st->tmp, b->size + b->offset - (p_int)sizeof(sprintf_buffer_t) ));
                     carg = &st->clean;
 
                     free_pointer_table(st->ptable);
@@ -1816,12 +1835,11 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
 
                 case INFO_T_STRING:
                   {
-                    int slen;
+                    mp_int slen;
 
                     if (carg->type != T_STRING)
                         ERROR1(ERR_INCORRECT_ARG, 's');
-                    slen = strlen(get_txt(carg->u.str));
-
+                    slen = mstrsize(carg->u.str);
 
                     if (finfo & (INFO_COLS | INFO_TABLE) )
                     {
@@ -2162,11 +2180,13 @@ add_table_now:
         xfree(st->tmp);
 
     /* Copy over the result */
-    strcpy(buff, st->buff);
+    result = new_n_mstring(st->buff, st->bpos);
+    if (!result)
+        result = ref_mstring(STR_OUT_OF_MEMORY);
     xfree(st);
 
     /* Done */
-    return buff;
+    return result;
 
 #undef GET_NEXT_ARG
 #undef SAVE_CHAR
@@ -2186,14 +2206,14 @@ v_printf (svalue_t *sp, int num_arg)
  */
 
 {
-    char *str;
+    string_t *str;
     
     str = string_print_formatted(get_txt((sp-num_arg+1)->u.str)
                                 , num_arg-1, sp-num_arg+2);
     if (command_giver)
-        tell_object_str(command_giver, str);
+        tell_object(command_giver, str);
     else
-        add_message("%s", str);
+        add_message(FMT_STRING, str);
     sp = pop_n_elems(num_arg, sp);
 
     return sp;
@@ -2215,13 +2235,7 @@ v_sprintf (svalue_t *sp, int num_arg)
  */
 
 {
-    char *s;
-
-    /*
-     * string_print_formatted() returns a pointer to it's internal
-     * buffer, or to an internal constant...  Either way, it must
-     * be copied before it's returned as a string.
-     */
+    string_t *s;
 
     s = string_print_formatted(get_txt((sp-num_arg+1)->u.str),
                                num_arg-1, sp-num_arg+2);
@@ -2229,10 +2243,7 @@ v_sprintf (svalue_t *sp, int num_arg)
     if (!s)
         push_number(sp, 0);
     else
-        /* string_print_formatted() owns the string returned,
-         * so copy it.
-         */
-        push_c_string(sp, s);
+        push_string(sp, s);
 
     return sp;
 } /* v_sprintf() */

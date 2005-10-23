@@ -819,12 +819,12 @@ swap_svalues (svalue_t *svp, mp_int num, varblock_t *block)
  * swtype := (ph_int)svp->type | TYPE_MOD_SWAPPED.
  *
  * STRING, SYMBOL:
- *    swtype, (ph_int)svp->x, string, \0
+ *    swtype, (ph_int)svp->x, (mp_int)mstrsize(string), string
  *
  *    For strings, svp->x.generic is 1 for untabled strings, and 0 for
  *    tabled string.
  *
- * POINTER:
+ * POINTER, STRUCTS:
  *    swtype, (size_t)size, (wiz_list_t*) user, values...
  *
  * QUOTED_ARRAY:
@@ -896,14 +896,16 @@ swap_svalues (svalue_t *svp, mp_int num, varblock_t *block)
             if (swapping_alist)
                 goto swap_opaque;
 
-            len = mstrsize(svp->u.str) + 1;
-            size = 1 + sizeof svp->x + len;
+            len = mstrsize(svp->u.str);
+            size = 1 + sizeof svp->x + sizeof(len) + len;
             CHECK_SPACE(size)
             rest -= size;
 
             *p++ = svp->type | T_MOD_SWAPPED;
             memcpy(p, &svp->x, sizeof(svp->x));
             p += sizeof svp->x;
+            memcpy(p, &len, sizeof(len));
+            p += sizeof len;
             memcpy(p, get_txt(svp->u.str), len);
             p += len;
             break;
@@ -1089,9 +1091,9 @@ free_swapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
         {
         case T_STRING | T_MOD_SWAPPED:
         case T_SYMBOL | T_MOD_SWAPPED:
+            p += 1 + sizeof(svp->x) + sizeof(mp_int) + mstrsize(svp->u.str);
             if (!gc_status)
                 free_mstring(svp->u.str);
-            p = (unsigned char *)strchr((char *)p + 1 + sizeof svp->x, 0) + 1;
             break;
 
         case T_QUOTED_ARRAY | T_MOD_SWAPPED:
@@ -1353,8 +1355,11 @@ Bool
 swap (object_t *ob, int mode)
 
 /* Swap the object <ob> according to <mode>:
+ *
  *   <mode> & 0x01: swap program
  *   <mode> & 0x02: swap variables
+ *
+ * The same flags are returned by load_ob_from_swap().
  *
  * Result is TRUE if all requested swaps succeeded.
  */
@@ -1410,9 +1415,12 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
         case T_SYMBOL | T_MOD_SWAPPED:
           {
             string_t *s;
+            mp_int    len;
 
             memcpy(&svp->x, p, sizeof svp->x);
             p += sizeof svp->x;
+            memcpy(&len, p, sizeof len);
+            p += sizeof len;
             if (gc_status)
             {
                 svp->type = T_NUMBER;
@@ -1422,11 +1430,11 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
                 if (svp->type == T_STRING
                  && svp->x.generic != 0)
                 {
-                    s = new_mstring((char *)p);
+                    s = new_n_mstring((char *)p, len);
                 }
                 else
                 {
-                    s = new_tabled((char *)p);
+                    s = new_n_tabled((char *)p, len);
                 }
 
                 if (!s)
@@ -1437,7 +1445,7 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
 
                 svp->u.str = s;
             }
-            p = (unsigned char *)strchr((char *)p, '\0') + 1;
+            p += len;
             break;
           }
 
@@ -1635,6 +1643,8 @@ load_ob_from_swap (object_t *ob)
  *
  *    result & 0x01: program swapped in
  *    result & 0x02: variables swapped in
+ *
+ * The same flags are accepted by swap() as argument.
  */
 
 {
