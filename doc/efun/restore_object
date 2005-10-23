@@ -20,13 +20,14 @@ DESCRIPTION
         Variables that has the type modifer 'nosave' will not be restored.
         Example: nosave int xxx;
         
-        If inheritance is used, then it might be possible that a variable
-        will exist with the same name in more than one place. When
-        restoring, only one of these variables will be restored if
-        encountered in the save file.
-        A good practice is to have verbose and unique name on non-static
-        variables, which also will make it more easy to read or patch the
-        save file manually.
+        If inheritance is used, then it might be possible that a
+        variable will exist with the same name in more than one place,
+        and thus appear in the  save file multiple times. When
+        restoring, the variables are restored in the order they are
+        found in the inheritance tree.  A good practice is to have
+        verbose and unique name on non-static variables, which also
+        will make it more easy to read or patch the save file
+        manually.
 
 HISTORY
         Restoring directly from a string was added in LDMud 3.2.8 and

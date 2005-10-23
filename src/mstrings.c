@@ -578,6 +578,8 @@ mstring_make_tabled (string_t * pStr, Bool deref_arg MTRACE_DECL)
 
     if (pStr->info.ref == 1 && deref_arg)
     {
+        size_t msize;
+
         /* We can simply reuse the string_t we already have */
 
         mstr_added++;
@@ -590,6 +592,15 @@ mstring_make_tabled (string_t * pStr, Bool deref_arg MTRACE_DECL)
         string->info.tabled = MY_TRUE;
         string->link = stringtable[idx];
         stringtable[idx] = string;
+
+        msize = mstr_mem_size(string);
+#ifdef SSTAT
+printf("DEBUG: SSTAT %d: tabled %lu:%lu + (%lu:%lu) = %lu:%lu\n", __LINE__, mstr_tabled, mstr_tabled_size, 1, msize, mstr_tabled+1, mstr_tabled_size+msize);
+#endif
+        mstr_tabled++;
+        mstr_tabled_size += msize;
+        mstr_untabled--;
+        mstr_untabled_size -= msize;
     }
     else
     {
@@ -664,11 +675,11 @@ mstring_table_inplace (string_t * pStr MTRACE_DECL)
 
         mstr_used++;
         mstr_used_size += msize;
-        mstr_tabled++;
-        mstr_tabled_size += msize;
 #ifdef SSTAT
 printf("DEBUG: SSTAT %d: tabled %lu:%lu + (%lu:%lu) = %lu:%lu\n", __LINE__, mstr_tabled, mstr_tabled_size, 1, msize, mstr_tabled+1, mstr_tabled_size+msize);
 #endif
+        mstr_tabled++;
+        mstr_tabled_size += msize;
     }
     else
     {
@@ -856,11 +867,11 @@ mstring_free (string_t *s)
 
         int idx;
 
-        mstr_tabled--;
-        mstr_tabled_size -= msize;
 #ifdef SSTAT
 printf("DEBUG: SSTAT %d: tabled %lu:%lu - (%lu:%lu) = %lu:%lu\n", __LINE__, mstr_tabled, mstr_tabled_size, 1, msize, mstr_tabled-1, mstr_tabled_size-msize);
 #endif
+        mstr_tabled--;
+        mstr_tabled_size -= msize;
 
         idx = StrHash(s->str->txt, mstrsize(s));
         if (NULL == move_to_head(s, idx))

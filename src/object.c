@@ -273,7 +273,7 @@ _free_object ( object_t *ob, const char * file, int line)
 #ifdef CHECK_OBJECT_STAT
         if (check_object_stat)
         {
-            fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) free(%p '%s') with %d vars : %ld -> (%ld:%ld)\n"
+            fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) free( %p '%s') with %d vars : %ld -> (%ld:%ld)\n"
                           , tot_alloc_object, tot_alloc_object_size, ob, ob->name ? get_txt(ob->name) : "<null>"
                           , prog->num_variables
                           , (long)(prog->num_variables * sizeof (svalue_t) + sizeof (object_t))
@@ -293,7 +293,7 @@ _free_object ( object_t *ob, const char * file, int line)
     {
         if (check_object_stat)
         {
-            fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) free(%p '%s') has no program\n"
+            fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) free( %p '%s') has no program\n"
                           , tot_alloc_object, tot_alloc_object_size, ob, ob->name ? get_txt(ob->name) : "<null>");
         }
     }
@@ -310,7 +310,7 @@ _free_object ( object_t *ob, const char * file, int line)
 #ifdef CHECK_OBJECT_STAT
         if (check_object_stat)
         {
-            fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) free(%p '%s') with name : %ld -> (%ld:%ld)\n"
+            fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) free( %p '%s') with name : %ld -> (%ld:%ld)\n"
                           , tot_alloc_object, tot_alloc_object_size, ob, get_txt(ob->name)
                           , mstrsize(ob->name)
                           , tot_alloc_object-1
@@ -327,7 +327,7 @@ _free_object ( object_t *ob, const char * file, int line)
     {
         if (check_object_stat)
         {
-            fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) free(%p) has no name -> (%ld:%ld)\n"
+            fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) free( %p ) has no name -> (%ld:%ld)\n"
                           , tot_alloc_object, tot_alloc_object_size, ob
                           , tot_alloc_object-1
                           , tot_alloc_object_size);
@@ -401,7 +401,7 @@ static mp_int last_id = 0;
 #ifdef CHECK_OBJECT_STAT
     if (check_object_stat)
     {
-        fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) new(%p) with %d vars : %ld -> (%ld:%ld)\n"
+        fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) new( %p ) with %d vars : %ld -> (%ld:%ld)\n"
                       , tot_alloc_object, tot_alloc_object_size, ob
                       , num_var
                       , (long)(size2+size)
@@ -915,7 +915,7 @@ replace_programs (void)
 #ifdef CHECK_OBJECT_STAT
             if (check_object_stat)
             {
-                fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) rprog(%p '%s') sub %d vars : %ld -> (%ld:%ld)\n"
+                fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) rprog( %p '%s') sub %d vars : %ld -> (%ld:%ld)\n"
                               , tot_alloc_object, tot_alloc_object_size, r_ob, r_ob->ob->name ? get_txt(r_ob->ob->name) : "<null>"
                               , i
                               , (long)(i * sizeof(svalue_t))

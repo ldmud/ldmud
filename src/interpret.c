@@ -16394,12 +16394,23 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-secure_call_lambda (svalue_t *closure, int num_arg)
+secure_call_lambda (svalue_t *closure, int num_arg, Bool external)
 
-/* Call the closure <closure> with <num_arg> arguments on the stack.
+/* Aliases:
+ *   secure_apply_lambda(fun, num_arg)
+ *     == secure_call_lambda(fun, num_arg, FALSE)
+ *   secure_callback_lambda(fun, num_arg)
+ *     == secure_call_lambda(fun, num_arg, TRUE)
+ *
+ * Call the closure <closure> with <num_arg> arguments on the stack.
  * On success, the functions returns a pointer to the result in the
  * global apply_return_value, on failure it returns NULL. The arguments are
  * removed in either case.
+ *
+ * If <external> is TRUE, it means that this call is due to some external
+ * event (like an ERQ message) instead of being caused by a running program.
+ * The effect of this flag is that the error handling is like for a normal
+ * function call (clearing the eval costs before calling runtime_error()).
  *
  * This error recovery is the difference to call_lambda().
  */
@@ -16418,7 +16429,7 @@ secure_call_lambda (svalue_t *closure, int num_arg)
 
     if (setjmp(error_recovery_info.con.text))
     {
-        secure_apply_error(save_sp - num_arg, save_csp, MY_FALSE);
+        secure_apply_error(save_sp - num_arg, save_csp, external);
         result = NULL;
     }
     else

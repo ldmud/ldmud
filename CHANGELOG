@@ -1,6 +1,19 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+04-Sep-2002 (Lars Duening)  (3.3.242)
+  - (mstrings.c) I found one place where the string statistics were
+       computed wrongly.
+
+03-Sep-2002 (Lars Duening)
+  - (interpret, lex.c, comm.c) Lambda-callbacks now clear the evaluation
+       costs before processing an error as well.
+  - (swap.c) The object statistics get messed up when the GC swaps objects.
+       Let's see if this change corrects all of the discrepancies. In
+       general the reason for the discrepancies was that variables
+       were counted more often as 'swapped in' than they had been
+       swapped out.
+
 02-Sep-2002 (Lars Duening)  (3.3.241)
   - (mstrings.c) The SSTAT diagnostic produced far too much output; but
        since the test run in OSB gave me a first clue, I can now search

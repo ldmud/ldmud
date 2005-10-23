@@ -161,7 +161,10 @@ extern svalue_t *apply_master_ob(string_t *fun, int num_arg, Bool external);
 #define callback_master(fun, num_arg) apply_master_ob(fun, num_arg, MY_TRUE)
 
 extern void assert_master_ob_loaded(void);
-extern svalue_t *secure_call_lambda(svalue_t *closure, int num_arg);
+extern svalue_t *secure_call_lambda(svalue_t *closure, int num_arg, Bool external);
+#define secure_apply_lambda(fun, num_arg) secure_call_lambda(fun, num_arg, MY_FALSE)
+#define secure_callback_lambda(fun, num_arg) secure_call_lambda(fun, num_arg, MY_TRUE)
+
 extern void remove_object_from_stack(object_t *ob);
 extern void int_call_lambda(svalue_t *lsvp, int num_arg, Bool allowRefs);
 #define call_lambda(lsvp, num_arg) int_call_lambda(lsvp, num_arg, MY_FALSE)

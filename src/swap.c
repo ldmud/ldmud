@@ -1251,6 +1251,20 @@ swap_variables (object_t *ob)
         xfree(ob->variables);
         ob->variables = (svalue_t *)(last_variable_swap_num | 1);
         ob->flags |= O_SWAPPED;
+
+#ifdef CHECK_OBJECT_STAT
+        if (check_object_stat)
+        {
+            fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) swapout( %p '%s') gc %d vars : %ld -> (%ld:%ld)\n"
+                          , tot_alloc_object, tot_alloc_object_size, ob, ob->name ? get_txt(ob->name) : "<null>"
+                          , num_variables
+                          , (long)(num_variables * sizeof (svalue_t))
+                          , tot_alloc_object, tot_alloc_object_size - (num_variables * sizeof (svalue_t))
+                          );
+        }
+#endif
+        tot_alloc_object_size -= num_variables * sizeof (svalue_t);
+
         return MY_TRUE;
     }
 
@@ -1323,7 +1337,7 @@ swap_variables (object_t *ob)
 #ifdef CHECK_OBJECT_STAT
     if (check_object_stat)
     {
-        fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) swapout(%p '%s') %d vars : %ld -> (%ld:%ld)\n"
+        fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) swapout( %p '%s') %d vars : %ld -> (%ld:%ld)\n"
                       , tot_alloc_object, tot_alloc_object_size, ob, ob->name ? get_txt(ob->name) : "<null>"
                       , num_variables
                       , (long)(num_variables * sizeof (svalue_t))
@@ -1735,18 +1749,6 @@ load_ob_from_swap (object_t *ob)
             xfree(block);
             return result | -0x80;
         }
-#ifdef CHECK_OBJECT_STAT
-        if (check_object_stat)
-        {
-            fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) swapin(%p '%s') %d vars : %ld -> (%ld:%ld)\n"
-                          , tot_alloc_object, tot_alloc_object_size, ob, ob->name ? get_txt(ob->name) : "<null>"
-                          , ob->prog->num_variables
-                          , (long)(ob->prog->num_variables * sizeof (svalue_t))
-                          , tot_alloc_object, tot_alloc_object_size + (ob->prog->num_variables * sizeof (svalue_t))
-                          );
-        }
-#endif
-        tot_alloc_object_size += ob->prog->num_variables * sizeof (svalue_t);
 
         fread(block, size, 1, swap_file);
 
@@ -1762,6 +1764,19 @@ load_ob_from_swap (object_t *ob)
         {
             ob->variables = variables;
             result |= 2;
+#ifdef CHECK_OBJECT_STAT
+            if (check_object_stat)
+            {
+                fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) swapin( %p '%s') %d vars : %ld -> (%ld:%ld)\n"
+                              , tot_alloc_object, tot_alloc_object_size, ob, ob->name ? get_txt(ob->name) : "<null>"
+                              , ob->prog->num_variables
+                              , (long)(ob->prog->num_variables * sizeof (svalue_t))
+                              , tot_alloc_object, tot_alloc_object_size + (ob->prog->num_variables * sizeof (svalue_t))
+                              );
+            }
+#endif
+            tot_alloc_object_size += ob->prog->num_variables * sizeof (svalue_t);
+
             if (gc_status)
             {
                 /* Called from within the GC - free later.
@@ -1781,6 +1796,16 @@ load_ob_from_swap (object_t *ob)
         else
         {
             /* Out of memory */
+#ifdef CHECK_OBJECT_STAT
+            if (check_object_stat)
+            {
+                fprintf(stderr, "DEBUG: OSTAT: (%ld:%ld) swapin( %p '%s') %d vars failed\n"
+                              , tot_alloc_object, tot_alloc_object_size, ob, ob->name ? get_txt(ob->name) : "<null>"
+                              , ob->prog->num_variables
+                              );
+            }
+#endif
+
             xfree(block);
             result |= -0x80;
         }

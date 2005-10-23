@@ -1511,7 +1511,7 @@ add_auto_include (const char * obj_file, const char *cur_file, Bool sys_include)
             push_number(inter_sp, 0);
             push_number(inter_sp, 0);
         }
-        svp = secure_call_lambda(driver_hook+H_AUTO_INCLUDE, 3);
+        svp = secure_apply_lambda(driver_hook+H_AUTO_INCLUDE, 3);
         if (svp && svp->type == T_STRING)
         {
             auto_include_string = svp->u.str;
@@ -1836,7 +1836,7 @@ inc_open (char *buf, char *name, mp_int namelen, char delim)
             free_object(driver_hook[H_INCLUDE_DIRS].u.lambda->ob, "inc_open");
             driver_hook[H_INCLUDE_DIRS].u.lambda->ob = ref_object(current_object, "inc_open");
         }
-        svp = secure_call_lambda(&driver_hook[H_INCLUDE_DIRS], 2);
+        svp = secure_apply_lambda(&driver_hook[H_INCLUDE_DIRS], 2);
 
         /* The result must be legal relative pathname */
 

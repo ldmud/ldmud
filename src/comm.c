@@ -2266,7 +2266,7 @@ get_message (char *buff)
                                 assigned_eval_cost = eval_cost = user->call_out_cost;
                             }
                             RESET_LIMITS;
-                            secure_call_lambda(erqp, 2);
+                            secure_callback_lambda(erqp, 2);
                             user->call_out_cost = eval_cost;
                             if (!keep_handle || (ob->flags & O_DESTRUCTED))
                             {
@@ -3235,7 +3235,7 @@ set_noecho (interactive_t *ip, char noecho)
             }
             push_number(inter_sp, noecho);
             push_ref_object(inter_sp, ob, "set_no_echo");
-            secure_call_lambda(&driver_hook[H_NOECHO], 2);
+            secure_callback_lambda(&driver_hook[H_NOECHO], 2);
         }
         else
         {
@@ -4094,7 +4094,7 @@ h_telnet_neg (int n)
             free_object(driver_hook[H_TELNET_NEG].u.lambda->ob, "h_telnet_neg");
             driver_hook[H_TELNET_NEG].u.lambda->ob = ref_object(command_giver, "h_telnet_neg");
         }
-        svp = secure_call_lambda(&driver_hook[H_TELNET_NEG], n);
+        svp = secure_callback_lambda(&driver_hook[H_TELNET_NEG], n);
     }
     else
     {
@@ -4907,7 +4907,7 @@ stop_erq_demon (Bool notify)
         RESET_LIMITS;
         CLEAR_EVAL_COST;
         if (driver_hook[H_ERQ_STOP].type == T_CLOSURE) {
-            secure_call_lambda(&driver_hook[H_ERQ_STOP], 0);
+            secure_callback_lambda(&driver_hook[H_ERQ_STOP], 0);
         }
     }
 } /* stop_erq_demon() */
