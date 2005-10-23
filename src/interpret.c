@@ -6124,22 +6124,27 @@ do_trace (char *msg, char *fname, char *post)
 
 /*-------------------------------------------------------------------------*/
 static void
-do_trace_call (fun_hdr_p funstart)
+do_trace_call (fun_hdr_p funstart, Bool is_lambda)
 
 /* Trace a call to the function starting at <funstart>.
  */
 
 {
-    string_t *name;
-
     if (!++traceing_recursion || !TRACE_IS_INTERACTIVE()) /* Do not recurse! */
     {
         int save_var_ix_offset = variable_index_offset;
           /* TODO: Might be clobbered, but where? */
 
         /* Trace the function itself */
-        memcpy(&name, FUNCTION_NAMEP(funstart), sizeof name);
-        do_trace("Call direct ", get_txt(name), " ");
+        if (is_lambda)
+            do_trace("Call direct ", "lambda-closure", " ");
+        else
+        {
+            string_t *name;
+
+            memcpy(&name, FUNCTION_NAMEP(funstart), sizeof name);
+            do_trace("Call direct ", get_txt(name), " ");
+        }
 
         /* If requested, also trace the arguments */
         if (TRACEHB)
@@ -6440,7 +6445,8 @@ setup_new_frame1 (int fx, int fun_ix_offs, int var_ix_offs)
 
 /*-------------------------------------------------------------------------*/
 static INLINE svalue_t *
-setup_new_frame2 (fun_hdr_p funstart, svalue_t *sp, Bool allowRefs)
+setup_new_frame2 (fun_hdr_p funstart, svalue_t *sp
+                 , Bool allowRefs, Bool is_lambda)
 
 /* Before calling the function at <funstart>, massage the data on the
  * stack ending at <sp> to match the formal argumentlist of the function
@@ -6452,6 +6458,9 @@ setup_new_frame2 (fun_hdr_p funstart, svalue_t *sp, Bool allowRefs)
  * TODO: Investigate if holding references in arrays is really such a
  * TODO:: a bad thing. Maybe it's just an implementation issue.
  * TODO:: This also affects apply_low() and call_lambda().
+ *
+ * <is_lambda> has to be TRUE if the function is a lambda closure.
+ * This information is needed for proper tracing.
  *
  * csp->num_local_variables is supposed to hold the number of actual
  * arguments on the stack.
@@ -6587,7 +6596,7 @@ setup_new_frame2 (fun_hdr_p funstart, svalue_t *sp, Bool allowRefs)
     if (TRACEP(TRACE_CALL) && TRACE_IS_INTERACTIVE())
     {
       inter_sp = sp;
-      do_trace_call(funstart);
+      do_trace_call(funstart, is_lambda);
     }
 
 
@@ -6613,6 +6622,7 @@ setup_new_frame (int fx)
     flags = setup_new_frame1(fx, 0, 0);
     inter_sp = setup_new_frame2(
       current_prog->program + (flags & FUNSTART_MASK), inter_sp, MY_FALSE
+      , MY_FALSE
     );
 #ifdef DEBUG
     if (!current_object->variables && variable_index_offset)
@@ -12456,7 +12466,7 @@ again:
         csp->funstart = funstart;
 
         /* Setup the stack, arguments and local vars */
-        sp = setup_new_frame2(funstart, sp, MY_FALSE);
+        sp = setup_new_frame2(funstart, sp, MY_FALSE, MY_FALSE);
 
         /* Finish the setup */
 
@@ -12617,7 +12627,7 @@ again:
         csp->funstart = funstart;
 
         /* Setup the stack, arguments and local vars */
-        sp = setup_new_frame2(funstart, sp, MY_FALSE);
+        sp = setup_new_frame2(funstart, sp, MY_FALSE, MY_FALSE);
 
         /* Finish the setup */
         fp = inter_fp;
@@ -13576,7 +13586,7 @@ again:
             current_variables = ob->variables;
             if (current_variables)
                 current_variables += entry->variable_index_offset;
-            new_sp = setup_new_frame2(funstart, sp, MY_TRUE);
+            new_sp = setup_new_frame2(funstart, sp, MY_TRUE, MY_FALSE);
             /* The simul_efun object should not use simul_efuns itself... */
             previous_ob = current_object;
             current_object = ob;
@@ -15370,7 +15380,7 @@ retry_for_shadow:
             current_variables = ob->variables;
             if (current_variables)
                 current_variables += cache[ix].variable_index_offset;
-            inter_sp = setup_new_frame2(funstart, inter_sp, allowRefs);
+            inter_sp = setup_new_frame2(funstart, inter_sp, allowRefs, MY_FALSE);
             previous_ob = current_object;
             current_object = ob;
             save_csp = csp;
@@ -15482,7 +15492,7 @@ retry_for_shadow:
                         goto failure;
                 }
                 csp->funstart = funstart;
-                inter_sp = setup_new_frame2(funstart, inter_sp, allowRefs);
+                inter_sp = setup_new_frame2(funstart, inter_sp, allowRefs, MY_FALSE);
                 previous_ob = current_object;
                 current_object = ob;
                 save_csp = csp;
@@ -16594,7 +16604,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
         function_index_offset = 0;
         funstart = l->function.code + 1;
         csp->funstart = funstart;
-        sp = setup_new_frame2(funstart, sp, allowRefs);
+        sp = setup_new_frame2(funstart, sp, allowRefs, MY_TRUE);
         current_variables = current_object->variables;
         current_strings = current_prog->strings;
         eval_instruction(FUNCTION_CODE(funstart), sp);
@@ -18983,7 +18993,7 @@ int_call_resolved (Bool b_use_default, svalue_t *sp, int num_arg)
         if (!++traceing_recursion)
         {
             inter_sp = sp;
-            do_trace("Call other ", get_txt(arg[1].u.str), "\n");
+            do_trace("Call other ", get_txt(arg[2].u.str), "\n");
         }
         traceing_recursion--;
     }

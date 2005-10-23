@@ -198,9 +198,9 @@ struct interactive_s {
      * TODO: These two lists + one extra can be combined into
      * TODO:: one list, plus two roving pointers into it.
      */
-    pthread_mutex_t 	   write_mutex;
-    pthread_cond_t	   write_cond;
-    pthread_t		   write_thread;
+    pthread_mutex_t        write_mutex;
+    pthread_cond_t         write_cond;
+    pthread_t              write_thread;
     struct write_buffer_s *write_first;  /* List of buffers to write */
     struct write_buffer_s *write_last;
     unsigned long          write_size;

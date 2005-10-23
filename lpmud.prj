@@ -20,16 +20,12 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 263)
-(Parent-Version lpmud 3-3 262)
-(Version-Log "Using a range-foreach() with an empty loop body crashed the driver.
-Made the USE_PTHREAD code threadsafe in regards to memory allocations and deallocations.
-Fixed a refcount error in gcollect.c .
-Some small bugfixes.
-")
+(Project-Version lpmud 3-3 264)
+(Parent-Version lpmud 3-3 263)
+(Version-Log "Using LPC tracing with lambda closures or call_resolved() crashed the driver.")
 (New-Version-Log
 "")
-(Checkin-Time "Tue, 24 Sep 2002 23:21:18 -0600")
+(Checkin-Time "Wed, 25 Sep 2002 00:35:05 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -65,8 +61,8 @@ Some small bugfixes.
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.47 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.326 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.271 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.327 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.272 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.16 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -132,7 +128,7 @@ Some small bugfixes.
   (src/closure.h (lpmud/f/44_closure.h 1.7.1.11 644))
   (src/closure.c (lpmud/d/4_closure.c 1.41.1.45 644))
   (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.21 644))
-  (src/comm.h (lpmud/d/3_comm.h 1.26.1.20 644))
+  (src/comm.h (lpmud/d/3_comm.h 1.26.1.21 644))
   (src/driver.h (lpmud/f/36_driver.h 1.15.1.19 644))
   (src/dumpstat.h (lpmud/f/35_dumpstat.h 1.8 644))
   (src/dumpstat.c (lpmud/c/34_dumpstat.c 1.20.1.11 644))
@@ -152,7 +148,7 @@ Some small bugfixes.
   (src/heartbeat.c (lpmud/m/42_heartbeat. 1.18.1.7 644))
   (src/i-svalue_cmp.h (lpmud/a/b/20_i-svalue_c 1.2 644))
   (src/interpret.h (lpmud/b/13_interpret. 1.33.1.31 644))
-  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.44 644))
+  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.45 644))
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.14 644))
   (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.24 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.11 644))

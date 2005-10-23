@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+2%-Sep-2002 (Lars Duening)  (3.3.264)
+  - (interpret.c) The LPC tracing code crashed when used with lambda
+      closures or with call_resolved() (reported by Nostradamus).
+
 24-Sep-2002 (Lars Duening)  (3.3.263)
   - (comm, backend.c, gcollect.c) smalloc is not threadsafe, which
       caused the implementation of USE_PTHREAD code to trash the
