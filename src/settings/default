@@ -63,6 +63,14 @@ with_max_byte_transfer=50000
 
 with_max_callouts=0
 
+# If PThreads are used, this is the max amount of data held pending
+# for writing. If the amount is exceeded, the oldest data blocks
+# are discarded.
+# If 0, any amount of data is allowed.
+
+with_pthread_write_max_size=100000
+
+
 # --- Timing ---
 
 # If an object is left alone for this time, it will be 'cleaned up'.
@@ -172,9 +180,6 @@ enable_erq=erq
 with_erq_max_reply=1024 
 with_erq_max_send=1024 
 
-# Enable support for IPv6 (assuming your system supports it).
-
-enable_use_ipv6=no
 
 #----------- Compilation Options ----------
 # To change these options, the config.h must be recreated and the
@@ -218,6 +223,11 @@ enable_apply_cache_stat=yes
 # '.<hostname>' to the file.
 
 with_swap_file=LP_SWAP.3
+
+# Enable support for IPv6 (assuming your system supports it).
+
+enable_use_ipv6=no
+
 
 # --- Wizlist ---
 

@@ -383,6 +383,15 @@
 /* If using TRACE_CODE , how many instructions should be kept? */
 #define TOTAL_TRACE_LENGTH      0x1000
 
+/* If you want to use threads to write the data to the sockets 
+ * define USE_PTHREAD. To limit the memory usage of each thread
+ * define PTHREAD_WRITE_MAX_SIZE to a value greater than zero.
+ * The implementation will discard the oldest not yet written 
+ * data blocks to keep memoty usage under the limit.
+ */
+#undef USE_PTHREAD
+#define PTHREAD_WRITE_MAX_SIZE 100000
+
 /*----------------------------------------------------------------*/
 /* The following macros activate various debugging and profiling
  * code segments.

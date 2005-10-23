@@ -3,9 +3,9 @@ SYNOPSIS
 
 DESCRIPTION
         Evaluates the closure <cl> with the following arguments.
-        If the last argument is an array, it will be flattened: ie. the
-        array itself will be removed and its contents added to the 
-        argument list of <cl>
+        If the last argument is an array or struct, it will be
+        flattened: ie. the array/struct itself will be removed and its
+        contents added to the argument list of <cl>
 
         If <cl> is not a closure, it will simply be returned (and all
         other arguments are ignored).
@@ -43,6 +43,7 @@ HISTORY
         argument.
         LDMud 3.3 added the '...' operator and thus made apply() in fact
         redundant.
+        LDMud 3.3.266 added support for structs.
 
 SEE ALSO
         funcall(E), closures(LPC), varargs(LPC)

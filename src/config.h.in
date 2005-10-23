@@ -39,6 +39,12 @@
  */
 #define MAX_CALLOUTS              @val_max_callouts@
 
+/* When USE_PTHREAD is used, define this to the maximum amount of data
+ * to be held pending for writing.
+ * A value of 0 means 'unlimited'.
+ */
+#define PTHREAD_WRITE_MAX_SIZE @val_pthreads_write_max_size@
+
 
 /* --- Timing --- */
 
@@ -156,6 +162,13 @@
  */
 @cdef_use_ipv6@ USE_IPV6
 
+/* If you want to use threads to write the data to the sockets 
+ * define USE_PTHREAD.
+ */
+ 
+@cdef_use_pthreads@ USE_PTHREAD
+
+ 
 
 /* ----------- Compilation Options ----------
  * To change these options, the config.h must be recreated and the

@@ -125,6 +125,13 @@ DESCRIPTION
         can handle.
         Set to 0, arrays of any size are allowed.
 
+      --max-thread-pending <size>\n"
+        The maximum number of bytes to be kept pending by the socket write
+        thread.
+        Set to 0, an unlimited amount of data can be kept pending.
+
+        This option is ignored if pthreads are not used.
+
       --cleanup-time <time>
         The idle time in seconds for an object before the driver tries to
         clean it up. It should be substantially longer than the reset time.
@@ -263,4 +270,5 @@ DESCRIPTION -- Argument Parser
     of the current line is ignored.
 
 HISTORY
-    LDMud 3.2.9 added the --args and --random-seed options.
+    LDMud 3.2.9 added the --max-thread-pending, --args and
+      --random-seed options.

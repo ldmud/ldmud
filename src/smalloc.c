@@ -99,7 +99,7 @@
  *  - if !SYSTEM privilege: set out_of_memory and return NULL
  *  - if SYSTEM privilege: dump the lpc backtrace and exit(2) resp. fatal().
  *
- * If any of the reserves is freed, the garbage_collect_to_do flag is set.
+ * If any of the reserves is freed, the gc_request flag is set.
  *
  *
  * SMalloc also implements support for a garbage collector: every memory
@@ -627,7 +627,7 @@ smalloc (size_t size
  *  - if !SYSTEM privilege: set out_of_memory and return NULL
  *  - if SYSTEM privilege: dump the lpc backtrace and exit(2) resp. fatal().
  *
- * If any of the reserves is freed, the garbage_collect_to_do flag is set.
+ * If any of the reserves is freed, the gc_request flag is set.
  */
 
 {
@@ -1911,7 +1911,7 @@ _large_malloc ( word_t size, Bool force_more
  *  - if !SYSTEM privilege: set out_of_memory and return NULL
  *  - if SYSTEM privilege: dump the lpc backtrace and exit(2) resp. fatal().
  *
- * If any of the reserves is freed, the garbage_collect_to_do flag is set.
+ * If any of the reserves is freed, the gc_request flag is set.
  */
 
 {
@@ -2236,7 +2236,8 @@ found_fit:
 
                 /* Free the next reserve, the try again */
 
-                garbage_collect_to_do = MY_TRUE;
+                if (gc_request == gcDont)
+                    gc_request = gcMalloc;
                 extra_jobs_to_do = MY_TRUE;
                 if (reserved_user_area)
                 {

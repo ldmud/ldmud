@@ -125,8 +125,10 @@ Bool extra_jobs_to_do = MY_FALSE;
    *   parsing commands or calling the heart_beat.
    */
 
-Bool garbage_collect_to_do = MY_FALSE;
-  /* True: A garbage collection is due (requires extra_jobs_to_do).
+GC_Request gc_request = gcDont;
+  /* gcDont: No garbage collection is due.
+   * gcMalloc: The mallocator requested a gc (requires extra_jobs_to_do).
+   * gcEfun: GC requested by efun (requires extra_jobs_to_do).
    */
 
 /* TODO: all the 'extra jobs to do' should be collected here, in a nice
@@ -135,7 +137,8 @@ Bool garbage_collect_to_do = MY_FALSE;
 
 Bool mud_is_up = MY_FALSE;
   /* True: the driver is finished with the initial processing
-   * and has entered the main loop.
+   * and has entered the main loop. This flag is currently not
+   * used by the driver, but can be useful for printf()-style debugging.
    */
 
 static double load_av = 0.0;
@@ -446,15 +449,19 @@ backend (void)
                 current_object = NULL;
             }
 
-            if (garbage_collect_to_do) {
+            if (gc_request != gcDont) {
                 time_t time_now = time(NULL);
                 char buf[120];
 
-                if (time_now - time_last_gc >= 60)
+                if (gc_request == gcEfun
+                 || time_now - time_last_gc >= 60)
                 {
-                  sprintf(buf, "%s Garbage collection (slow_shut to do: %d, "
+                  sprintf(buf, "%s Garbage collection req by %s "
+                               "(slow_shut to do: %d, "
                                "time since last gc: %ld)\n"
-                             , time_stamp(), slow_shut_down_to_do
+                             , time_stamp()
+                             , gc_request == gcEfun ? "efun" : "allocator"
+                             , slow_shut_down_to_do
                              , (long)(time_now - time_last_gc));
                   write(1, buf, strlen(buf));
                   command_giver = NULL;
@@ -463,16 +470,18 @@ backend (void)
                 }
                 else
                 {
-                  sprintf(buf, "%s Garbage collection refused "
+                  sprintf(buf, "%s Garbage collection req by %s refused "
                                "(slow_shut to do: %d, "
                                "time since last gc: %ld)\n"
-                             , time_stamp(), slow_shut_down_to_do
+                             , time_stamp()
+                             , gc_request == gcEfun ? "efun" : "allocator"
+                             , slow_shut_down_to_do
                              , (long)(time_now - time_last_gc));
                   write(1, buf, strlen(buf));
                   reallocate_reserved_areas();
                 }
 
-                garbage_collect_to_do = MY_FALSE;
+                gc_request = gcDont;
 
                 if (slow_shut_down_to_do)
                 {
@@ -1302,7 +1311,8 @@ v_garbage_collection (svalue_t *sp, int num_arg)
         sp = pop_n_elems(num_arg, sp);
     }
 
-    extra_jobs_to_do = garbage_collect_to_do = MY_TRUE;
+    extra_jobs_to_do = MY_TRUE;
+    gc_request = gcEfun;
     time_last_gc = 0;  /* mark it as an 'unconditional' GC */
 
     return sp;

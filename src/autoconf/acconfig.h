@@ -87,6 +87,12 @@
 /* define the erq include file. */
 #undef ERQ_INCLUDE
 
+/* Does the machine offer pthread library? */
+#undef HAS_PTHREADS
+
+/* Does the machine offer pcre library? (Not that we need it :-) */
+#undef HAS_PCRE
+
 /* define the host-specific include file */
 #undef HOST_INCLUDE
 

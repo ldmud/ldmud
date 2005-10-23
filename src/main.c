@@ -945,6 +945,7 @@ typedef enum OptNumber {
  , cMaxCallouts     /* --max-callouts       */
  , cMaxFile         /* --max-file           */
  , cMaxMapping      /* --max-mapping        */
+ , cMaxThreadPend   /* --max-thread-pending */
  , cMinMalloc       /* --min-malloc         */
  , cMinSmallMalloc  /* --min-small-malloc   */
  , cNoERQ           /* --no-erq             */
@@ -1159,6 +1160,17 @@ static Option aOptions[]
         "    The maximum number of bytes one read_file()/write_file() call\n"
         "    can handle.\n"
         "    Set to 0, arrays of any size are allowed.\n"
+      }
+
+    , { 0,   "max-thread-pending", cMaxThreadPend,  MY_TRUE 
+      , "  --max-thread-pending <size>\n"
+      , "  --max-thread-pending <size>\n"
+        "    The maximum number of bytes to be kept pending by the socket write\n"
+        "    thread.\n"
+        "    Set to 0, an unlimited amount of data can be kept pending.\n"
+#ifndef USE_PTHREAD
+        "    (Ignored since pthreads are not supported)\n"
+#endif
       }
 
     , { 's', NULL,                 cSwap,           MY_TRUE 
@@ -1468,6 +1480,12 @@ options (void)
   fputs("          mySQL: supported.\n", stdout);
 #endif
 
+#ifdef USE_PTHREAD
+  fputs("       PThreads: supported.\n", stdout);
+#else
+  fputs("       PThreads: not supported.\n", stdout);
+#endif
+
 #ifndef USE_PCRE
   fputs("        regexps: traditional.\n", stdout);
 #else
@@ -1553,6 +1571,9 @@ options (void)
   printf(" Runtime limits: max read file size:     %7d\n"
          "                 max byte read/write:    %7d\n"
          "                 max socket buf size:    %7d\n"
+#if defined(USE_PTHREAD)
+         "                 max pthread write size: %7d\n"
+#endif /* USE_PTHREAD */
          "                 max eval cost:          %7d %s\n"
          "                 catch eval cost:        %7d\n"
          "                 master eval cost:       %7d\n"
@@ -1570,6 +1591,9 @@ options (void)
 #endif
         , READ_FILE_MAX_SIZE, MAX_BYTE_TRANSFER
         , SET_BUFFER_SIZE_MAX
+#if defined(USE_PTHREAD)
+        , PTHREAD_WRITE_MAX_SIZE
+#endif /* USE_PTHREAD */
         , MAX_COST
 #if defined(DYNAMIC_COSTS)
         , "(dynamic)"
@@ -2026,7 +2050,18 @@ eval_arg (int eOption, const char * pValue)
             }
         }
         else
-            fprintf(stderr, "Illegal limit '%s' ignored.\n", pValue);
+            fprintf(stderr, "Illegal value for limit '%s' ignored.\n", pValue);
+        break;
+      }
+
+    case cMaxThreadPend:
+      {
+        long val = atoi(pValue);
+
+        if (val >= 0)
+            pthread_write_max_size = val;
+        else
+            fprintf(stderr, "Illegal value for limit '%s' ignored.\n", pValue);
         break;
       }
 

@@ -10177,6 +10177,9 @@ again:
                 i = (sp-1)->u.number == sp->u.number;
                 break;
             case T_POINTER:
+#ifdef USE_STRUCTS
+            case T_STRUCT:
+#endif
                 i = (sp-1)->u.vec == sp->u.vec;
                 break;
             case T_STRING:
@@ -10252,6 +10255,9 @@ again:
                 i = !mstreq((sp-1)->u.str, sp->u.str);
                 break;
             case T_POINTER:
+#ifdef USE_STRUCTS
+            case T_STRUCT:
+#endif
                 i = (sp-1)->u.vec != sp->u.vec;
                 break;
             case T_OBJECT:
@@ -12174,14 +12180,18 @@ again:
 
     CASE(F_FLATTEN_XARG);           /* --- flatten_xarg        --- */
       {
-        /* Take the value at sp and if it is an array, put the array's
-         * contents onto the stack in its place. Other values stay
+        /* Take the value at sp and if it is an array (or struct), put
+         * the array's contents onto the stack in its place. Other values stay
          * as they are.
          * This code is used in conjunction with save/restore/use_arg_frame
          * to implement flexible varargs.
          */
 
-        if (sp->type == T_POINTER)
+        if (sp->type == T_POINTER
+#ifdef USE_STRUCTS
+         || sp->type == T_STRUCT
+#endif
+           )
         {
             /* The argument is an array: flatten it */
 
@@ -14005,13 +14015,16 @@ again:
         if (arg->type != T_STRING
          && arg->type != T_POINTER
          && arg->type != T_NUMBER
+#ifdef USE_STRUCTS
+         && arg->type != T_STRUCT
+#endif
          && arg->type != T_MAPPING)
-            ERRORF(("foreach() got a %s, requires a (&)string/array/mapping or number.\n"
+            ERRORF(("foreach() got a %s, requires a (&)string/array/mapping/struct or number.\n"
                    , typename(sp->type)
                    ));
 
         if (gen_refs && arg->type == T_NUMBER)
-            ERROR("foreach() got a &number, requires a (&)string/array/mapping or number.\n"
+            ERROR("foreach() got a &number, requires a (&)string/array/mapping/struct or number.\n"
                    );
 
         /* Find out how many variables we require */
@@ -14050,7 +14063,11 @@ again:
                 put_string(sp, str);
             }
         }
-        else if (arg->type == T_POINTER)
+        else if (arg->type == T_POINTER
+#ifdef USE_STRUCTS
+              || arg->type == T_STRUCT
+#endif /* USE_STRUCTS */
+                )
         {
             check_for_destr(arg->u.vec);
             count = (p_int)VEC_SIZE(arg->u.vec);
@@ -14293,7 +14310,11 @@ again:
                     lvalue->u.protected_char_lvalue = val;
                 }
             }
-            else if (sp[-2].type == T_POINTER)
+            else if (sp[-2].type == T_POINTER
+#ifdef USE_STRUCTS
+                  || sp[-2].type == T_STRUCT
+#endif /* USE_STRUCTS */
+                    )
             {
                 if (ix >= (p_int)VEC_SIZE(sp[-2].u.vec))
                     break;
@@ -18519,6 +18540,9 @@ count_extra_ref_in_vector (svalue_t *svp, size_t num)
 
         case T_QUOTED_ARRAY:
         case T_POINTER:
+#ifdef USE_STRUCTS
+        case T_STRUCT:
+#endif /* USE_STRUCTS */
             p->u.vec->extra_ref++;
             if (NULL == register_pointer(ptable, p->u.vec) )
                 continue;
@@ -18557,6 +18581,9 @@ check_extra_ref_in_vector (svalue_t *svp, size_t num)
         {
         case T_QUOTED_ARRAY:
         case T_POINTER:
+#ifdef USE_STRUCTS
+        case T_STRUCT:
+#endif /* USE_STRUCTS */
             if (NULL == register_pointer(ptable, p->u.vec) )
                 continue;
             check_extra_ref_in_vector(&p->u.vec->item[0], VEC_SIZE(p->u.vec));
@@ -18780,7 +18807,11 @@ v_apply (svalue_t *sp, int num_arg)
         return sp;
     }
 
-    if (sp->type == T_POINTER)
+    if (sp->type == T_POINTER
+#ifdef USE_STRUCTS
+     || sp->type == T_STRUCT
+#endif /* USE_STRUCTS */
+       )
     {
         /* The last argument is an array: flatten it */
 

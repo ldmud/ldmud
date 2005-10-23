@@ -282,6 +282,8 @@ extern int num_player;
 extern char *message_flush;
 extern char *domain_name;
 
+extern long pthread_write_max_size;
+
 #ifdef COMM_STAT
 extern int add_message_calls;
 extern int inet_packets;

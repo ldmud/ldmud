@@ -1,6 +1,24 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+27-Sep-2002 (Lars Duening)  (3.3.266)
+  - (comm, main.c, configure) Based on a patch by Gawain, PTHREADS and
+      PCRE (requires Fiona's patch) can now be configured like other
+      options. New commandline option --max-thread-pending to set
+      the limit for pending data to write.
+
+26-Sep-2002 (Lars Duening)
+  - (interpret.c) struct can now be compared for equality and
+      inequality; they can be used as values in foreach() statements
+      and with the '...' operator resp. apply().
+
+25-Sep-2002 (Lars Duening)
+  - (comm.c) If a connection is marked for removal (.do_close != 0),
+      telnet commands can still be sent. This is to allow the input_to()
+      handling to properly reset the connection to linemode even if
+      the input_to() handler has called remove_interactive().
+  - (backend, smalloc.c) Made the GC request log output nicer.
+
 25-Sep-2002 (Lars Duening)  (3.3.265)
   - (comm, gcollect.c) Removed compiler warnings, and a crash
       in pthreads thread cleanup (reported by Dafire)

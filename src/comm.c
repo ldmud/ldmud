@@ -62,8 +62,7 @@
  * sockets.
  *
  * TODO: Generalize the background buffer and either use pthreads, or a call
- * TODO:: from the backend loop to write the data. Also allow to set the
- * TODO:: PTHREAD_MAX_WRITE from the commandline (incl. unlimited), and don't
+ * TODO:: from the backend loop to write the data. Also  don't
  * TODO:: immediately discard EWOULDBLOCK-failed messages.
 #endif
  *---------------------------------------------------------------------------
@@ -218,6 +217,12 @@ char *message_flush = NULL;
    * It is a variable instead of a define to keep gcc from complaining about
    * a 'null format string'.
    */
+
+long pthread_write_max_size = PTHREAD_WRITE_MAX_SIZE;
+  /* Amount of data held pending in the pthread fifo queue.
+   * Evaluated only with USE_PTHREAD.
+   */
+
 
 #ifdef COMM_STAT
 
@@ -1241,7 +1246,6 @@ comm_cleanup_interactives (void)
 
 /*-------------------------------------------------------------------------*/
 #ifdef USE_PTHREAD
-#define PTHREAD_WRITE_MAX_SIZE 100000
 
 static int
 thread_socket_write(SOCKET_T s UNUSED, char *msg, size_t size, interactive_t *ip)
@@ -1278,9 +1282,10 @@ thread_socket_write(SOCKET_T s UNUSED, char *msg, size_t size, interactive_t *ip
     ip->write_size += size;
 
     /* Make sure that the amount of data pending never exceeds
-     * PTHREAD_MAX_SIZE.
+     * the maximum.
      */
-    while (ip->write_size >= PTHREAD_WRITE_MAX_SIZE)
+    while (pthread_write_max_size != 0
+        && ip->write_size >= pthread_write_max_size)
     {
         struct write_buffer_s *tmp = ip->write_first;
         ip->write_first = tmp->next;
@@ -1499,7 +1504,7 @@ add_message (const char *fmt, ...)
      || (   command_giver->flags & O_DESTRUCTED
          && fmt != message_flush )
      || !(O_SET_INTERACTIVE(ip, command_giver))
-     || (ip->do_close && fmt != message_flush)
+     || (ip->do_close && fmt != message_flush && !sending_telnet_command)
        )
     {
         putchar(']');

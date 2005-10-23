@@ -141,6 +141,12 @@
 /* Does the machine offer mySQL? */
 /* #undef HAS_MYSQL */
 
+/* Does the machine offer pthread library? */
+/* #undef HAS_PTHREADS */
+
+/* Does the machine offer pcre library? */
+/* #undef HAS_PCRE */
+
 /* define the erq include file. */
 #define ERQ_INCLUDE "util/erq/erq.h"
 

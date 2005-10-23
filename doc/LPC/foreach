@@ -13,11 +13,12 @@ SYNTAX
         foreach (<var>, <var2>, ... ,<varN> in <expr>) <statement>;
 
 DESCRIPTION
-        The instruction evaluates its range specification - either a simple
-        <expr> which can yield an array, a string, a mapping or an integer, 
-        or an integer range <expr1> through <expr2> - and executes <statement>
-        once for each value in the range. The respective value is assigned
-        to <var> right before <statement> is executed.
+        The instruction evaluates its range specification - either a
+        simple <expr> which can yield an array, a struct, a string, a
+        mapping or an integer, or an integer range <expr1> through
+        <expr2> - and executes <statement> once for each value in the
+        range. The respective value is assigned to <var> right before
+        <statement> is executed.
 
         A 'break' in the <statement> will terminate the loop. A
         'continue' will continue the execution from the beginning of
@@ -29,13 +30,14 @@ DESCRIPTION
 
         The normal form (one <expr>):
 
-            <expr> is evaluated and has to yield an array, a string or
-            a mapping (or reference to the former), or to an integer.
+            <expr> is evaluated and has to yield an array, a struct, a
+            string or a mapping (or reference to the former), or an
+            integer.
 
-            If <expr> is a array or string, the values of <expr> (in case
-            of the string, the integer values of the characters) are then
-            assigned one after another to <var> and <statement> is execute
-            for every assignment.
+            If <expr> is a array, struct, or string, the values of
+            <expr> (in case of the string, the integer values of the
+            characters) are then assigned one after another to <var>
+            and <statement> is execute for every assignment.
 
             If <expr> is a mapping, the keys are assigned to <var>, and
             the values for each key are assigned in order to <var2>..<varN>.
@@ -69,15 +71,15 @@ DESCRIPTION
 
         WHAT HAPPENS IF <expr> IS CHANGED IN THE LOOP?
 
-        If <expr> yields an array:
-         - assignments to single array elements or to array ranges effect
+        If <expr> yields an array or struct:
+         - assignments to single elements or to array ranges effect
            the values assigned to the variable:
              a = ({1, 2, 3})
              foreach(x : a) { a[1..2] = ({4, 5}); write(x+" "); }
            will write ("1 4 5 ").
-         - operations which implicitely copy the array (this includes
-           range assignments which change the size) don't have an effect
-           on the loop.
+         - operations which implicitely copy the array or struct (this
+           includes range assignments which change the size) don't
+           have an effect on the loop.
 
         If <expr> yields an mapping, the loop will run over the indices
         the mapping had at the begin of the loop. Deleted indices are silently
@@ -120,6 +122,7 @@ EXAMPLES
 HISTORY
         LDMud 3.3.44 introduced the use of references, the loop over
           an integer expression, and the loop over an integer range.
+        LDMud 3.3.266 added support for structs.
 
 
 SEE ALSO

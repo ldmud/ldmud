@@ -93,6 +93,7 @@ AC_MY_ARG_ENABLE(udp-send,yes,,)
 AC_MY_ARG_ENABLE(use-ipv6,no,,[Enables support for IPv6])
 AC_MY_ARG_ENABLE(use-alists,no,,[Enables alist support])
 AC_MY_ARG_ENABLE(use-mysql,no,,[Enables mySQL support])
+AC_MY_ARG_ENABLE(use-pthreads,no,,[enable using of threads for socket writes])
 AC_MY_ARG_ENABLE(use-pcre,yes,,[Enables PCRE instead of traditional regexps])
 AC_MY_ARG_ENABLE(use-deprecated,yes,,[Enables obsolete and deprecated efuns])
 AC_MY_ARG_ENABLE(use-structs,yes,,[Enables structs])
@@ -130,6 +131,7 @@ AC_MY_ARG_ENABLE(dump-gc-refs,no,,[trace GC references])
 AC_MY_ARG_WITH(access-file,ACCESS.ALLOW,,[access permissions file])
 AC_MY_ARG_WITH(access-log,access.allow.log,,[access log file])
 
+AC_MY_ARG_WITH(pthreads-write-max-size,100000,,[max size of write buffer per thread])
 AC_MY_ARG_WITH(erq-max-reply,1024,,)
 AC_MY_ARG_WITH(erq-max-send,1024,,)
 AC_MY_ARG_WITH(erq-debug,0,,[ERQ debug level])
@@ -239,6 +241,7 @@ AC_CDEF_FROM_ENABLE(initialization_by___init)
 AC_CDEF_FROM_ENABLE(use_system_crypt)
 AC_CDEF_FROM_ENABLE(use_alists)
 AC_CDEF_FROM_ENABLE(use_pcre)
+AC_CDEF_FROM_ENABLE(use_pthreads)
 AC_CDEF_FROM_ENABLE(use_ipv6)
 AC_CDEF_FROM_ENABLE(use_deprecated)
 AC_CDEF_FROM_ENABLE(use_structs)
@@ -280,6 +283,7 @@ AC_STRING_VAL_FROM_WITH(wizlist_file)
 AC_STRING_VAL_FROM_WITH(master_name)
 AC_STRING_VAL_FROM_WITH(input_escape)
 
+AC_INT_VAL_FROM_WITH(pthreads_write_max_size)
 AC_INT_VAL_FROM_WITH(erq_max_reply)
 AC_INT_VAL_FROM_WITH(erq_max_send)
 AC_INT_VAL_FROM_WITH(erq_debug)
@@ -585,6 +589,44 @@ if test $enable_use_ipv6 = yes; then
   AC_CHECK_LIB(inet6,main, LIBS="$LIBS -linet6")
 fi
 fi
+
+AC_CACHE_CHECK(for pthreads support,lp_cv_has_pthreads,
+saveflags="$CFLAGS"
+CFLAGS="$CFLAGS -I/usr/include"
+AC_TRY_COMPILE([
+#include <pthread.h>
+
+void foo(void)
+{
+    int i = PTHREAD_CREATE_JOINABLE;
+}
+],,lp_cv_has_pthreads=yes,
+lp_cv_has_pthreads=no
+CFLAGS="$saveflags"
+))
+if test $lp_cv_has_pthreads = yes; then
+  AC_DEFINE(HAS_PTHREADS)
+    if test $enable_use_pthreads = yes; then
+      AC_CHECK_LIB(pthread,main, LIBS="$LIBS -lpthread")
+    fi
+  else
+    enable_use_pthreads=no
+fi
+
+AC_CACHE_CHECK(for pcre support,lp_cv_has_pcre,
+saveflags="$CFLAGS"
+CFLAGS="$CFLAGS -I/usr/include"
+AC_TRY_COMPILE([
+#include <pcre.h>
+
+pcre_extra foo(void)
+{
+    return;
+}
+],,lp_cv_has_pcre=yes,
+lp_cv_has_pcre=no
+CFLAGS="$saveflags"
+))
 
 AC_CACHE_CHECK(for mySQL,lp_cv_has_mysql,
 for TESTPATH in "" "$mysql_path" "$mysql_path/include" "/usr/local/include" "/usr/include" "/usr/lib/mysql"; do
@@ -1598,6 +1640,7 @@ AC_SUBST(cdef_initialization_by___init)
 AC_SUBST(cdef_use_system_crypt)
 AC_SUBST(cdef_use_ipv6)
 AC_SUBST(cdef_use_mysql)
+AC_SUBST(cdef_use_pthreads)
 AC_SUBST(cdef_use_alists)
 AC_SUBST(cdef_use_pcre)
 AC_SUBST(cdef_use_deprecated)
@@ -1641,6 +1684,7 @@ AC_SUBST(val_access_log)
 AC_SUBST(val_erq_max_reply)
 AC_SUBST(val_erq_max_send)
 AC_SUBST(val_erq_debug)
+AC_SUBST(val_pthreads_write_max_size)
 AC_SUBST(val_read_file_max_size)
 AC_SUBST(val_time_to_clean_up)
 AC_SUBST(val_time_to_swap)

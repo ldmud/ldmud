@@ -82,11 +82,10 @@ Unix or Unix-like system
   'Setting up ipc', the driver is up and accepting connections. Test
   it with 'telnet localhost 4242'.
 
-  pthread:
-    If your systems supports pthreads, defining "-DUSE_PTHREAD" in
-    the variable EXTRA_CFLAGS passed to configure will allow to compile
-    the driver with pthread support. Currently this means that background
-    threads will be used to write data to the network.
+  pthreads:
+    If your systems supports pthreads, --enable-use-pthreads will allow to
+    compile the driver with pthread support. Currently this means that
+    background threads will be used to write data to the network.
 
   FreeBSD:
     When using gcc, it can happen that the compiler
