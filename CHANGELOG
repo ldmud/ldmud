@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+27-Nov-2002 (Lars Duening)  (3.3.311)
+  - (comm.c) The correction of the threads racing condition unfortunately
+      introduced a deadlock - Gawain found and fixed it (thanks!).
+
 27-Nov-2002 (Lars Duening)  (3.3.310)
   - (object.c) Corrected the deprecated efun transfer(): the check
       for dest->can_put_and_get() was implemented wrong (reported by

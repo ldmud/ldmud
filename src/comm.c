@@ -3453,6 +3453,13 @@ new_player (SOCKET_T new_socket, struct sockaddr_in *addr, size_t addrlen
 
 #ifdef USE_PTHREAD
     pthread_mutex_init(&new_interactive->write_mutex, NULL);
+    {
+        pthread_mutexattr_t mutexattr;
+        pthread_mutexattr_init(&mutexattr);
+        pthread_mutexattr_settype(&mutexattr, PTHREAD_MUTEX_ERRORCHECK);
+        pthread_mutex_init(&new_interactive->write_mutex, &mutexattr);
+        pthread_mutexattr_destroy(&mutexattr);
+    }
     pthread_cond_init(&new_interactive->write_cond, NULL);
     new_interactive->write_first = new_interactive->write_last = NULL;
     new_interactive->write_size = 0;
