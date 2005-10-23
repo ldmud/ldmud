@@ -1791,6 +1791,9 @@ options (void)
 #       if defined(DUMP_GC_REFS)
                               , "DUMP_GC_REFS"
 #       endif
+#       if defined(NEW_CLEANUP)
+                              , "NEW_CLEANUP"
+#       endif
                               };
         size_t nStrings = sizeof(optstrings) / sizeof(optstrings[0]);
         size_t iInitial = strlen(optstrings[0]);

@@ -1,6 +1,14 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+13-Nov-2002 (Lars Duening)  (3.3.296)
+  - (gcollect.c) The cleanup code did not check for the NO_BLUEPRINT
+      define (reported by Bardioc).
+  - (gcollect.c, main.c) The new cleanup code seems to interfere with
+      the swapper, therefore I deactivated it for the moment using
+      the #define NEW_CLEANUP. If you want the new cleanup code, add
+      this define in the Makefile to the compiler flags.
+
 12-Nov-2002 (Lars Duening)  (3.3.295)
   - (port.h) The 'malloc' attribute is now used only with gcc 3 or newer.
   - (lex.c) Corrected the line counting with auto-includes (reported by

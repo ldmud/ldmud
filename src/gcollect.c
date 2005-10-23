@@ -354,6 +354,9 @@ cleanup_object (object_t * obj, ptrtable_t * ptable)
  */
 
 {
+#ifndef NEW_CLEANUUP
+    return;
+#else
     ptrtable_t * local_ptable = NULL;
     int was_swapped = 0;
 
@@ -378,6 +381,7 @@ cleanup_object (object_t * obj, ptrtable_t * ptable)
     }
 
 
+#ifndef NO_BLUEPRINT
     /* If the object's program blueprint is destructed, remove that
      * reference.
      */
@@ -389,6 +393,7 @@ cleanup_object (object_t * obj, ptrtable_t * ptable)
         free_object(obj->prog->blueprint, "cleanup object");
         obj->prog->blueprint = NULL;
     }
+#endif
 
     /* Clean up all the variables */
     cleanup_vector(obj->variables, obj->prog->num_variables, ptable);
@@ -401,6 +406,7 @@ cleanup_object (object_t * obj, ptrtable_t * ptable)
 
     if (local_ptable != NULL)
         free_pointer_table(local_ptable);
+#endif /* NEW_CLEANUP */
 } /* cleanup_object() */
 
 /*-------------------------------------------------------------------------*/
@@ -412,6 +418,9 @@ cleanup_all_objects (void)
  */
 
 {
+#ifndef NEW_CLEANUUP
+    return;
+#else
     ptrtable_t * ptable = NULL;
     object_t   * ob;
 
@@ -432,6 +441,7 @@ cleanup_all_objects (void)
 
     /* Clean up */
     free_pointer_table(ptable);
+#endif /* NEW_CLEANUP */
 } /* cleanup_all_objects() */
 
 /*=========================================================================*/

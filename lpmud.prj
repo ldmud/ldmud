@@ -23,14 +23,12 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 295)
-(Parent-Version lpmud 3-3 294)
-(Version-Log "Corrected the use of the malloc attribute with gcc.
-Corrected the line counting with auto-include.
-Added a proactive memory cleanup to catch stale mapping/array entries early on.")
+(Project-Version lpmud 3-3 296)
+(Parent-Version lpmud 3-3 295)
+(Version-Log "Deactivated the new cleanup code since it seems to interfere with the swapper.")
 (New-Version-Log
 "")
-(Checkin-Time "Wed, 13 Nov 2002 01:29:54 -0700")
+(Checkin-Time "Wed, 13 Nov 2002 12:44:48 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -66,7 +64,7 @@ Added a proactive memory cleanup to catch stale mapping/array entries early on."
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.49 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.358 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.359 644))
   (HISTORY (lpmud/f/49_HISTORY 1.284 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.18 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -146,7 +144,7 @@ Added a proactive memory cleanup to catch stale mapping/array entries early on."
   (src/files.c (lpmud/i/50_files.c 1.17 644))
   (src/filestat.h (lpmud/f/51_filestat.h 1.7 644))
   (src/gcollect.h (lpmud/f/33_gcollect.h 1.6.1.11 644))
-  (src/gcollect.c (lpmud/c/30_gcollect.c 1.41.1.75 644))
+  (src/gcollect.c (lpmud/c/30_gcollect.c 1.41.1.76 644))
   (src/hash.h (lpmud/f/32_hash.h 1.5 644))
   (src/hash.c (lpmud/c/28_hash.c 1.15 644))
   (src/heartbeat.h (lpmud/m/41_heartbeat. 1.6.1.4 644))
@@ -157,7 +155,7 @@ Added a proactive memory cleanup to catch stale mapping/array entries early on."
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.15 644))
   (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.32 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.12 644))
-  (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.25 644))
+  (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.26 644))
   (src/mapping.h (lpmud/f/30_mapping.h 1.12.1.13 644))
   (src/mapping.c (lpmud/b/6_mapping.c 1.36.1.51 644))
   (src/md5.h (lpmud/l/18_md5.h 1.2 644))
