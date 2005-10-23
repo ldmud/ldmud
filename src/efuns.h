@@ -49,6 +49,9 @@ extern svalue_t *f_ceil (svalue_t *sp);
 extern svalue_t *f_floor (svalue_t *sp);
 extern svalue_t *f_pow (svalue_t *sp);
 extern svalue_t *f_to_array (svalue_t *sp);
+#ifdef USE_STRUCTS
+extern svalue_t * f_to_struct (svalue_t *sp);
+#endif
 extern svalue_t *f_to_int (svalue_t *sp);
 extern svalue_t *f_to_float (svalue_t *sp);
 extern svalue_t *f_to_string (svalue_t *sp);

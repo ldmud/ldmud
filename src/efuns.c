@@ -4967,9 +4967,9 @@ f_to_string (svalue_t *sp)
  *
  * The argument is converted to a string. Works with int, float,
  * object, arrays (to convert an array of int back into a string),
- * symbols, strings, and closures.
+ * structs, symbols, strings, and closures.
  *
- * Converts variable/lfun closure to the appropriate names.
+ * Converts variable/lfun closures and structs to the appropriate names.
  */
 
   {
@@ -5048,6 +5048,18 @@ f_to_string (svalue_t *sp)
         free_array(sp->u.vec);
         break;
       }
+
+#ifdef USE_STRUCTS
+    case T_STRUCT:
+      {
+        string_t *rc;
+
+        sprintf(buf, "<struct %p>", sp->u.vec);
+        memsafe(rc = new_mstring(buf), strlen(buf), "converted struct");
+        put_string(sp, rc);
+        break;
+      }
+#endif
 
     case T_CLOSURE:
       {
@@ -5141,9 +5153,9 @@ f_to_string (svalue_t *sp)
               string_t *rc;
 
               if (sp->x.closure_type == CLOSURE_PRELIMINARY)
-                  sprintf(buf, "<prelim lambda 0x%p>", l);
+                  sprintf(buf, "<prelim lambda %p>", l);
               else
-                  sprintf(buf, "<free lambda 0x%p>", l);
+                  sprintf(buf, "<free lambda %p>", l);
               memsafe(rc = new_mstring(buf), strlen(buf), "converted lambda");
               put_string(sp, rc);
               break;
@@ -5155,9 +5167,9 @@ f_to_string (svalue_t *sp)
               string_t *rc;
 
               if (sp->x.closure_type == CLOSURE_BOUND_LAMBDA)
-                  sprintf(buf, "<bound lambda 0x%p:", l);
+                  sprintf(buf, "<bound lambda %p:", l);
               else
-                  sprintf(buf, "<lambda 0x%p:", l);
+                  sprintf(buf, "<lambda %p:", l);
 
               ob = l->ob;
 
@@ -5322,11 +5334,13 @@ f_to_array (svalue_t *sp)
  *   mixed *to_array(symbol)
  *   mixed *to_array(quotedarray)
  *   mixed *to_array(mixed *)
+ *   mixed *to_array(struct)
  *
  * Strings and symbols are converted to an int array that
  * consists of the args characters.
  * Quoted arrays are ``dequoted'', and arrays are left as they
  * are.
+ * structs are converted into normal arrays.
  */
 
 {
@@ -5356,6 +5370,11 @@ f_to_array (svalue_t *sp)
         free_string_svalue(sp);
         put_array(sp, v);
         break;
+#ifdef USE_STRUCTS
+    case T_STRUCT:
+        sp->type = T_POINTER;
+        break;
+#endif
     case T_QUOTED_ARRAY:
         /* Unquote it fully */
         sp->type = T_POINTER;
@@ -5367,6 +5386,38 @@ f_to_array (svalue_t *sp)
 
     return sp;
 } /* f_to_array() */
+
+#ifdef USE_STRUCTS
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_to_struct (svalue_t *sp)
+
+/* EFUN to_struct()
+ *
+ *   mixed to_struct(mixed *)
+ *   mixed to_struct(struct)
+ *
+ * An array is converted into a struct of the same length.
+ * structs are returned unchanged.
+ */
+
+{
+    switch (sp->type)
+    {
+    default:
+        fatal("Bad arg 1 to to_struct(): type %s\n", typename(sp->type));
+        break;
+    case T_POINTER:
+        sp->type = T_STRUCT;
+        break;
+    case T_STRUCT:
+        /* Good as it is */
+        break;
+    }
+
+    return sp;
+} /* f_to_struct() */
+#endif /* USE_STRUCTS */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *

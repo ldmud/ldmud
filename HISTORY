@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-05-Sep-2002 (Lars Duening) -- Development Release 3.3
+10-Sep-2002 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -12,6 +12,8 @@ For a detailed list of all changes see the file CHANGELOG.
          filter_array(), filter_mapping(), m_sizeof(), map_array(),
          map_mapping(), mapping_contains(), member_array(),
          set_auto_include_string().
+       + copy(), deep_copy(), get_type_info(), to_array(), to_string():
+           Added struct support.
        + add_action(): Historical usage with just one argument no longer
            supported.
        + assoc(), insert_alist(), order_alist(), intersect_alist(): Optional
@@ -39,6 +41,7 @@ For a detailed list of all changes see the file CHANGELOG.
            the MD5 message digest algorithm.
        + regmatch(): To match a string against a regexp and optionally retrieve
            the match results for subexpressions.
+       + to_struct(): Convert an array into a struct.
 
     - Master Object:
 

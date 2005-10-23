@@ -1,0 +1,16 @@
+SYNOPSIS
+        mixed to_struct(mixed *)
+        mixed to_struct(struct)
+
+DESCRIPTION
+        The given array is returned as a struct. Structs are returned
+        unchanged.
+
+        Since the returned struct can't be known at compile time, the
+        efun is declared to return 'mixed'.
+
+HISTORY
+        Introduced in LDMud 3.3.250 .
+
+SEE ALSO
+        to_array(E), to_string(E)

@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+10-Sep-2002 (Lars Duening)  (3.3.250)
+  - (func_spec, efuns) The efuns to_array() and to_string() can now
+       handle structs; new efun to_struct().
+  - (prolang.y) Removed the ability to create struct literals
+       with named and unnamed initializers - it's borderline
+       featuritis.
+
 09-Sep-2002 (Lars Duening)  (3.3.249)
   - (exec.h) The NAME_HIDDEN flag interfered with the struct id in
        full variable types.

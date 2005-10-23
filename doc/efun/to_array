@@ -3,14 +3,21 @@ SYNOPSIS
         mixed *to_array(symbol)
         mixed *to_array(quotedarray)
         mixed *to_array(mixed *)
+        mixed *to_array(struct)
 
         (int*)<value>
 
 DESCRIPTION
         Strings and symbols are converted to an int array that
         consists of the args characters.
+
         Quoted arrays are ``dequoted'', and arrays are left as they
         are.
 
+        structs are converted into a normal array.
+
+HISTORY
+        LDMud 3.3.250 added structs to the accepted data types.
+
 SEE ALSO
-        to_int(E), to_string(E)
+        to_int(E), to_string(E), to_struct(E)

@@ -316,7 +316,12 @@ int     sgn(int|float);
 int     to_int(int|string|float|closure);
 float   to_float(float|string|int);
 string  to_string(mixed);
-int    *to_array(string|mixed*|symbol|quoted_array);
+#ifdef USE_STRUCTS
+mixed  *to_array(string|mixed*|symbol|quoted_array|struct);
+mixed   to_struct(mixed*|struct);
+#else
+mixed  *to_array(string|mixed*|symbol|quoted_array);
+#endif
 object  to_object(null|object|string|closure);
 
 mixed   copy(mixed);

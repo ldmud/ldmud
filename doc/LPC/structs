@@ -106,15 +106,8 @@ USAGE
                creates an instance of struct Foo which is all empty except
                for member 'two' which is assigned the value ({ 2 }).
 
-        If both named and unnamed initializers are used, the compiler
-        assigns the unnamed initializers in order to all members for which
-        no named initializer could be found. For example
-
-            (<Foo> two: ({ 2 }), 1, bar)
-
-         creates an instance of struct Foo, and assigns 1 to member 'one',
-         ({ 2 }) to member 'two', and the content of variable bar to member
-         'three'.
+        It is not possible to use both named and unnamed initializers
+        in the same literal.
 
 
 USAGE IN CLOSURES

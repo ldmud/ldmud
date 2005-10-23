@@ -24,25 +24,38 @@ is compiled as
   int _func_1(mixed * _vals, int a) { return a + _vals[i]; }
   void caller() {
     int i;
-    return special_lfun(#'_func_1, ({ i }));
+    return context_lfun(#'_func_1, ({ i }));
   }
 
 A funcall()/apply() on this special lfun then executes internally:
 
    _func_1( ({ i }), a);
 
-Assignments to the inherited vars are possible, but effect just this closure,
-not the creating function.
+On VM level, the VM gets a new svalue_t* 'context' which points to the
+inherited context variables (i in this example). The storage area is in the
+closure_t, similar to how arrays are stored. The context variables are
+accessed using special bytecodes similar to the F_LOCAL bytecodes. In effect,
+a context lfun has three variable spaces: global, local, and context.
+
+As a result, assignments to the inherited vars are possible, but effect just
+this closure, not the creating function.
+
+    Note: with this context (and linking of contexts through a
+    'parent_context' pointer in the VM control record) it would be possible to
+    use implement local functions as in Oberon. Creating an lfun from a local
+    function would be legal, however the context pointer would be NULL and any
+    attempt to access a context variable would cause a runtime error.
 
 How to implement with a one-pass compiler and without lexer hacks:
 
 Lexer recognizes keyword 'func' as L_FUNC, value is the synthetic name of the
-function. Parser upon receipt of L_FUNC pushes the current program memblock
-into a stack and starts a fresh one with the function header, parsing the
-arguments and everything. References to local variables create global
-variables, and are noted. Once the inline closure is finished, the program
-memblock is stored in a list; the previous program block is popped, and the
-assignment of the local variables to the globals is done.
+function. Parser upon receipt of L_FUNC remembers the current program address
+and starts a new function. Once the inline function is complete, the block is
+stored in a list, and the program size is set back to the stored address.
+Now the assignment of the local variables to the context is done.
+When the creating function is complete, all stored inline functions are
+inserted back into the program block. Be careful though with the backpatching
+lists.
 
 The problem is recognizing the locals: every rule recognizing a local would
 have to check if an inline closure is parsed and if yes generate the code to
@@ -58,6 +71,9 @@ a statement is used (block, statements). statement would have to return
 a flag if the statement left a value on the stack, and the ';' recognition
 would have to insert the F_POP instruction (see current handling of comma_expr
 in statement).
+
+No idea about the linenumber information yet. Maybe record names, lines and
+program sizes and replay when the inline closures is inserted?
 
 -------------------------------------------------------------------------
 

@@ -115,6 +115,14 @@
 #include "pkg-alists.h"  /* order_alist() */
 #endif
 
+#ifdef USE_STRUCTS
+#  undef HYBRID_STRUCT_LITERALS
+  /* Define this if struct literals shall be able to mix named and
+   * unnamed initializers. Several people have that already called
+   * an unnecessary feature.
+   */
+#endif
+
 #define lint  /* redef again to prevent spurious warnings */
 
 #define YYMAXDEPTH        600
@@ -2848,9 +2856,6 @@ add_struct_member ( string_t *name, vartype_t type, int from_struct )
     struct_member_t  member;
 
     pdef = &STRUCT_DEF(current_struct);
-#if 0
-printf("DEBUG: add_struct_member('%s', %x, %d) to struct '%s'\n", get_txt(name), type, from_struct, get_txt(pdef->name));
-#endif
 
     if (pdef->num_members != 0)
     {
@@ -2980,6 +2985,120 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
         return MY_TRUE;
     }
 
+#ifndef HYBRID_STRUCT_LITERALS
+    /* We have named members in there - sort them out */
+
+    consumed = 0;
+
+    block = xalloc( pdef->num_members * sizeof(*flags)
+                  + length * sizeof(*index));
+    flags = (Bool *)block;
+    index = (int *)((char *)block + pdef->num_members * sizeof(*flags));
+
+    for (i = 0; i < pdef->num_members; i++)
+    {
+        flags[i] = MY_FALSE;
+    }
+
+    for (i = 0; i < length; i++)
+    {
+        index[i] = -1;
+    }
+
+    /* Loop through list: assign the named members.
+     */
+    for (p = list, count = 0; p != NULL; p = p->next, count++)
+    {
+
+        if (p->name == NULL)
+        {
+            if (!got_error)
+            {
+                yyerrorf( "Can't mix named and unnamed initializers "
+                          "in struct '%s'"
+                        , get_txt(pdef->name)
+                        );
+                got_error = MY_TRUE;
+            }
+            continue;
+        }
+
+        consumed++;
+        member = find_struct_member(pdef, p->name);
+        if (member >= 0)
+            pmember = &STRUCT_MEMBER(pdef->members+member);
+
+        if (member < 0)
+        {
+            yyerrorf( "No such member '%s' in struct '%s'"
+                    , get_txt(p->name), get_txt(pdef->name)
+                    );
+            got_error = MY_TRUE;
+        }
+        else if (flags[member])
+        {
+            yyerrorf( "Multiple initializations of member '%s' "
+                      "in struct '%s'"
+                    , get_txt(p->name), get_txt(pdef->name)
+                    );
+            got_error = MY_TRUE;
+        }
+        else if (exact_types
+              && !TYPE( pmember->type , p->type) )
+        {
+            yyerrorf("Type mismatch %s when initializing member '%s' "
+                     "in struct '%s'"
+                    , get_two_types(pmember->type, p->type)
+                    , get_txt(p->name), get_txt(pdef->name)
+                    );
+            got_error = MY_TRUE;
+        }
+        else
+        {
+            flags[member] = MY_TRUE;
+            index[count] = member;
+        }
+    } /* for() */
+
+    if (got_error)
+    {
+        xfree(block);
+        return MY_FALSE;
+    }
+
+    /* Sanity checks */
+
+    if (consumed < length)
+    {
+        yyerrorf("Too many elements for struct '%s'"
+                , get_txt(pdef->name)
+                );
+        xfree(block);
+        return MY_FALSE;
+    }
+
+    for (i = 0; i < length; i++)
+    {
+        if (index[i] < 0)
+        {
+            fatal("struct literal: expression %d not assigned to any member.\n"
+                 , i);
+            /* NOTREACHED */
+        }
+    }
+
+    /* Finally, create the code */
+    ins_f_code(F_S_M_AGGREGATE);
+    ins_byte(pdef->num_members);
+    ins_byte(length);
+    for (i = length-1; i >= 0; i--)
+        ins_byte(index[i]);
+
+    /* Done */
+    xfree(block);
+
+    return MY_TRUE;
+#else /* HYBRID_STRUCT_LITERALS */
     /* We have named members in there - sort them out */
 
     consumed = 0;
@@ -3123,6 +3242,8 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
     xfree(block);
 
     return MY_TRUE;
+#endif /* HYBRID_STRUCT_LITERALS */
+
 } /* create_struct_literal() */
 #endif /* USE_STRUCTS */
 
@@ -3400,6 +3521,10 @@ list_to_struct (struct_def_t * pdef, int length, svalue_t *initialized)
     if (length)
     {
         Bool * flags;    /* Flags which struct members have been set */
+#ifndef HYBRID_STRUCT_LITERALS
+        Bool   got_named, got_unnamed;
+        Bool   got_error;
+#endif /* HYBRID_STRUCT_LITERALS */
         int    i;
         int    consumed; /* Number of constants consumed */
         int    member;   /* Member to set */
@@ -3413,6 +3538,112 @@ list_to_struct (struct_def_t * pdef, int length, svalue_t *initialized)
         for (i = 0; i < pdef->num_members; i++)
             flags[i] = MY_FALSE;
 
+#ifndef HYBRID_STRUCT_LITERALS
+        /* First loop through list: check if there is no mixed initialization.
+         */
+        got_error = go_named = got_unnamed = MY_FALSE;
+        list = &clsv->list;
+        do {
+
+            if (list->member != NULL)
+            {
+                if (got_unnamed)
+                {
+                    got_error = MY_TRUE:
+                }
+                got_named = MY_TRUE;
+            }
+            else /* list->member == NULL */
+            {
+                if (got_named)
+                {
+                    got_error = MY_TRUE:
+                }
+                got_unnamed = MY_TRUE;
+            }
+            list = list->next;
+        } while (NULL != list);
+
+        if (got_error)
+        {
+            yyerrorf( "Can't mix named and unnamed initializers "
+                      "in struct '%s'"
+                    , get_txt(pdef->name)
+                    );
+        }
+
+        if (got_named && !got_unnamed)
+        {
+            /* The one second loop through list: assign the named members
+             */
+            list = &clsv->list;
+            do {
+
+                consumed++;
+                member = find_struct_member(pdef, list->member);
+                if (member >= 0)
+                    pmember = &STRUCT_MEMBER(pdef->members+member);
+
+                if (member < 0)
+                    yyerrorf( "No such member '%s' in struct '%s'"
+                            , get_txt(list->member), get_txt(pdef->name)
+                            );
+                else if (flags[member])
+                {
+                    yyerrorf( "Multiple initializations of member '%s' "
+                              "in struct '%s'"
+                            , get_txt(list->member), get_txt(pdef->name)
+                            );
+                }
+                else if (exact_types
+                      && !TYPE( pmember->type , type_rtoc(&list->val)) )
+                {
+                    yyerrorf("Type mismatch %s when initializing member '%s' "
+                             "in struct '%s'"
+                            , get_two_types(pmember->type, type_rtoc(&list->val))
+                            , get_txt(list->member), get_txt(pdef->name)
+                            );
+                }
+                else
+                {
+                    vec->item[member] = list->val;
+                    flags[member] = MY_TRUE;
+                }
+
+                list = list->next;
+            } while (NULL != list);
+        } /* if got_named && !got_unnamed */
+
+        if (got_unnamed && !got_named)
+        {
+            /* The other second loop through list: assign the unnamed members
+             */
+            list = &clsv->list;
+            member = 0;
+
+            do {
+                pmember = &STRUCT_MEMBER(pdef->members+member);
+                consumed++;
+                if (exact_types
+                 && !TYPE( pmember->type , type_rtoc(&list->val)) )
+                {
+                    yyerrorf("Type mismatch %s when initializing member '%s' "
+                             "in struct '%s'"
+                            , get_two_types(pmember->type, type_rtoc(&list->val))
+                            , get_txt(list->member), get_txt(pdef->name)
+                            );
+                }
+                else
+                {
+                    vec->item[member] = list->val;
+                    flags[member] = MY_TRUE;
+                }
+
+                list = list->next;
+                member++;
+            } while (NULL != list && member < pdef->num_members);
+        } /* if got_unnamed && !got_named */
+#else /* HYBRID_STRUCT_LITERALS */
         /* First loop through list: assign the named members
          */
         list = &clsv->list;
@@ -3491,6 +3722,7 @@ list_to_struct (struct_def_t * pdef, int length, svalue_t *initialized)
                 list = list->next;
             } while (NULL != list && member < pdef->num_members);
         }
+#endif /* HYBRID_STRUCT_LITERALS */
 
         xfree(flags); flags = NULL;
 
