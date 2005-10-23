@@ -98,9 +98,6 @@
 
 #include "../mudlib/sys/debug_info.h"
 
-/* DEBUG: Define this to trace the string allocations */
-/* #define SSTAT */
-
 /*-------------------------------------------------------------------------*/
 
 /* Hash function, adapted to our table size.
@@ -342,9 +339,6 @@ make_new_tabled (const char * const pTxt, size_t size, int idx MTRACE_DECL)
         msize = mstr_mem_size(string);
         mstr_used++;
         mstr_used_size += msize;
-#ifdef SSTAT
-printf("DEBUG: SSTAT %d: tabled %lu:%lu + (%lu:%lu) = %lu:%lu\n", __LINE__, mstr_tabled, mstr_tabled_size, 1, msize, mstr_tabled+1, mstr_tabled_size+msize);
-#endif
         mstr_tabled++;
         mstr_tabled_size += msize;
     }
@@ -594,9 +588,6 @@ mstring_make_tabled (string_t * pStr, Bool deref_arg MTRACE_DECL)
         stringtable[idx] = string;
 
         msize = mstr_mem_size(string);
-#ifdef SSTAT
-printf("DEBUG: SSTAT %d: tabled %lu:%lu + (%lu:%lu) = %lu:%lu\n", __LINE__, mstr_tabled, mstr_tabled_size, 1, msize, mstr_tabled+1, mstr_tabled_size+msize);
-#endif
         mstr_tabled++;
         mstr_tabled_size += msize;
         mstr_untabled--;
@@ -675,9 +666,6 @@ mstring_table_inplace (string_t * pStr MTRACE_DECL)
 
         mstr_used++;
         mstr_used_size += msize;
-#ifdef SSTAT
-printf("DEBUG: SSTAT %d: tabled %lu:%lu + (%lu:%lu) = %lu:%lu\n", __LINE__, mstr_tabled, mstr_tabled_size, 1, msize, mstr_tabled+1, mstr_tabled_size+msize);
-#endif
         mstr_tabled++;
         mstr_tabled_size += msize;
     }
@@ -867,9 +855,6 @@ mstring_free (string_t *s)
 
         int idx;
 
-#ifdef SSTAT
-printf("DEBUG: SSTAT %d: tabled %lu:%lu - (%lu:%lu) = %lu:%lu\n", __LINE__, mstr_tabled, mstr_tabled_size, 1, msize, mstr_tabled-1, mstr_tabled_size-msize);
-#endif
         mstr_tabled--;
         mstr_tabled_size -= msize;
 

@@ -250,6 +250,10 @@ extern void remove_all_objects(void);
 extern void do_free_sub_strings(int num_strings, string_t ** strings
                                , int num_variables, variable_t *variable_names
                                , int num_includes, include_t *includes
+#ifdef USE_STRUCTS
+                               ,int num_structs,  struct_def_t *struct_defs
+                               ,int num_members,  struct_member_t *struct_members
+#endif /* USE_STRUCTS */
                                );
 #ifndef CHECK_OBJECT_REF
 extern void free_prog(program_t *progp, Bool free_all);

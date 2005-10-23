@@ -224,6 +224,10 @@ typedef uint32          fulltype_t;  /* Full: type and visibility */
   /* Max value of secondary type info
    */
 
+#define PRIMARY_TYPE_MASK      (0xF)
+  /* Mask for the primary type info (sans modifiers)
+   */
+
 #define SEC_TYPE_MASK      (0xFF60)
   /* Mask for the secondary type info
    */
@@ -642,6 +646,12 @@ struct variable_s
 struct inherit_s
 {
     program_t *prog;  /* Pointer to the inherited program */
+#ifdef USE_STRUCTS
+    unsigned short struct_index_offset;
+      /* Offset of the inherited program's struct_defs block within the
+       * inheriting program's struct_defs table.
+       */
+#endif /* USE_STRUCTS */
     unsigned short function_index_offset;
       /* Offset of the inherited program's function block within the
        * inheriting program's function block.
@@ -662,6 +672,42 @@ struct inherit_s
 #   define INHERIT_TYPE_DUPLICATE   0x0004  /* Flag: Duplicate virt inherit */
     unsigned short inherit_depth;           /* Depth of inherit */
 };
+
+
+#ifdef USE_STRUCTS
+/* --- struct struct_def: description of one struct
+ *
+ * The information about structs visible in the program are stored
+ * in an array of these structures; this includes all inherited structs.
+ * The information about the struct members are stored in a separate
+ * array.
+ */
+
+struct struct_def_s
+{
+    string_t * name;         /* Tabled name of the struct */
+    program_t * prog;        /* The program the struct was originally defined
+                              * in. This pointer is not counted and may
+                              * be used just for comparisons.
+                              */
+    unsigned short inh;      /* If inherited: index+1 into program_t.inherit[]
+                              * 0 if defined in this program
+                              */
+    unsigned short num_members;  /* Number of data members */
+    unsigned short members;  /* Index into program_t.struct_members[] */
+    funflag_t      flags;    /* Visibility */
+};
+
+
+/* --- struct struct_member: description of one struct member
+ */
+
+struct struct_member_s
+{
+    string_t * name;         /* Tabled name of the struct member */
+    vartype_t  type;         /* The type of the member */
+};
+#endif /* USE_STRUCTS */
 
 
 /* --- struct include_s: description of one include file
@@ -769,6 +815,13 @@ struct program_s
     include_t *includes;
       /* Array [.num_includes] of descriptors for included files.
        */
+#ifdef USE_STRUCTS
+    struct_def_t *struct_defs;
+      /* Array [.num_structs] of struct descriptors */
+    struct_member_t *struct_members;
+      /* Array [.num_struct_members] of struct member descriptors */
+#endif /* USE_STRUCTS */
+
     unsigned short flags;
       /* Flags for the program: */
 
@@ -823,6 +876,12 @@ struct program_s
       /* Number of variables (inherited and own) of this program */
     unsigned short num_inherited;
       /* Number of (directly) inherited programs */
+#ifdef USE_STRUCTS
+    unsigned short num_structs;
+      /* Number of listed struct definitions */
+    unsigned short num_struct_members;
+      /* Number of listed struct member definitions */
+#endif /* USE_STRUCTS */
 };
 
 

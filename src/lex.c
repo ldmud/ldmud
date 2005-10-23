@@ -656,6 +656,9 @@ init_lexer(void)
         p->u.global.sim_efun = I_GLOBAL_SEFUN_OTHER;
         p->u.global.function = I_GLOBAL_FUNCTION_EFUN;
         p->u.global.variable = I_GLOBAL_VARIABLE_FUN;
+#ifdef USE_STRUCTS
+        p->u.global.struct_id = I_GLOBAL_STRUCT_NONE;
+#endif
         p->next_all = all_efuns;
         all_efuns = p;
     }

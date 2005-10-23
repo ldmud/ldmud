@@ -55,6 +55,23 @@ DEFINITION
         two structs, inherited or not, with the same name.
 
 
+        To declare a struct without defining it, write:
+
+            struct Quux;
+
+        This notation is useful if you have two structs referencing
+        each other:
+
+            struct Quux;
+
+            struct Bar {
+              struct Quux quux;
+            };
+            struct Quux {
+              struct Bar bar;
+            };
+
+
 USAGE
         To use a struct, its definition must be visible - either because it
         is defined in the object compiled, or it has been inherited.

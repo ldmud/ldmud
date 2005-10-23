@@ -305,29 +305,41 @@ struct efun_shadow_s
     * of appearance.
     */
 
-#define NUMPAREAS                  9  /* Number of saved areas */
+#ifdef USE_STRUCTS
+#define A_STRUCT_DEFS              9
+   /* (struct_def_t) Tabled descriptors of all struct definitions.
+    */
 
-#define A_FUNCTIONS                9
+#define A_STRUCT_MEMBERS          10 
+   /* (struct_member_t) Tabled descriptors of all struct member definitions.
+    */
+
+#define NUMPAREAS                 11  /* Number of saved areas */
+#else
+#define NUMPAREAS                  9  /* Number of saved areas */
+#endif /* USE_STRUCTS */
+
+#define A_FUNCTIONS               (NUMPAREAS)
    /* (function_t): Function definitions
     */
 
 %ifndef INITIALIZATION_BY___INIT
-#    define A_VARIABLE_VALUES     10 
+#    define A_VARIABLE_VALUES     (NUMPAREAS+1) 
        /* (svalue_t) Initializers for non-virtual variables.
         */
-#    define A_VIRTUAL_VAR_VALUES  11
+#    define A_VIRTUAL_VAR_VALUES  (NUMPAREAS+2)
        /* (svalue_t) Initializers for virtual variables.
         */
 %endif
 
-#define A_STRING_NEXT             12
+#define A_STRING_NEXT             (NUMPAREAS+3)
    /* (int) During compilation, the strings in A_STRINGS are organized
     * in a hash table (prog_string_indizes/_tags). The hash chains are
     * linked together using the indizes in this area. The end of
     * a chain is marked by a negative next-index.
     */
 
-#define NUMAREAS                  13  /* Total number of areas */
+#define NUMAREAS                  (NUMPAREAS+4)  /* Total number of areas */
 
 
 /* --- struct mem_block_s: One memory area ---
@@ -380,6 +392,10 @@ static mem_block_t mem_block[NUMAREAS];
   /* Number of vartype_t stored so far in A_ARGUMENT_TYPES.
    */
 
+#define ARGUMENT_TYPE(n)  ((vartype_t *)mem_block[A_ARGUMENT_TYPES].block)[n]
+  /* Index the vartype_t <n>.
+   */
+
 #define NV_VARIABLE(n) ((variable_t *)mem_block[A_VARIABLES].block + (n))
   /* Return the variable_t* for the non-virtual variable <n>.
    */
@@ -420,6 +436,25 @@ static mem_block_t mem_block[NUMAREAS];
 #define INHERIT_COUNT  (mem_block[A_INHERITS].current_size / sizeof(inherit_t))
   /* Return the number of inherits encountered so far.
    */
+
+#ifdef USE_STRUCTS
+#define STRUCT_DEF(n)     ((struct_def_t *)mem_block[A_STRUCT_DEFS].block)[n]
+  /* Index the struct_def_t <n>.
+   */
+
+#define STRUCT_COUNT  (mem_block[A_STRUCT_DEFS].current_size / sizeof(struct_def_t))
+  /* Return the number of structs encountered so far.
+   */
+
+#define STRUCT_MEMBER(n)     ((struct_member_t *)mem_block[A_STRUCT_MEMBERS].block)[n]
+  /* Index the struct_member_t <n>.
+   */
+
+#define STRUCT_MEMBER_COUNT  (mem_block[A_STRUCT_MEMBERS].current_size / sizeof(struct_member_t))
+  /* Return the number of struct members encountered so far.
+   */
+
+#endif /* USE_STRUCTS */
 
 #define PROG_STRING(n) ((string_t **)mem_block[A_STRINGS].block)[n]
   /* Index the pointer for program string <n>.
@@ -631,6 +666,12 @@ static p_int current_continue_address;
   /* Special value: no continue encountered (yet).
    */
 
+#ifdef USE_STRUCTS
+static int current_struct;
+  /* Index of the current structure to be defined.
+   */
+#endif /* USE_STRUCTS */
+
 static fulltype_t current_type;
   /* The current basic type.
    */
@@ -716,12 +757,25 @@ int yyparse(void);
 %ifdef INITIALIZATION_BY___INIT
 static void add_new_init_jump(void);
 static void transfer_init_control(void);
+#ifdef USE_STRUCTS
+static void copy_variables(program_t *, fulltype_t, int);
+static int copy_functions(program_t *, fulltype_t type, int);
+#else
 static void copy_variables(program_t *, fulltype_t);
 static int copy_functions(program_t *, fulltype_t type);
+#endif
 %else
+#ifdef USE_STRUCTS
+static void copy_variables(program_t *, fulltype_t, svalue_t *, int);
+static void copy_functions(program_t *, fulltype_t type, int);
+#else
 static void copy_variables(program_t *, fulltype_t, svalue_t *);
 static void copy_functions(program_t *, fulltype_t type);
+#endif
 %endif
+#ifdef USE_STRUCTS
+static void copy_structs(program_t *, fulltype_t, int);
+#endif /* USE_STRUCTS */
 static void fix_function_inherit_indices(program_t *);
 static void fix_variable_index_offsets(program_t *);
 
@@ -2234,9 +2288,12 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
         /* should be I_TYPE_UNKNOWN now. */
 
         p->type = I_TYPE_GLOBAL;
-        p->u.global.variable = I_GLOBAL_VARIABLE_OTHER;
-        p->u.global.efun     = I_GLOBAL_EFUN_OTHER;
-        p->u.global.sim_efun = I_GLOBAL_SEFUN_OTHER;
+        p->u.global.variable  = I_GLOBAL_VARIABLE_OTHER;
+        p->u.global.efun      = I_GLOBAL_EFUN_OTHER;
+        p->u.global.sim_efun  = I_GLOBAL_SEFUN_OTHER;
+#ifdef USE_STRUCTS
+        p->u.global.struct_id = I_GLOBAL_STRUCT_NONE;
+#endif /* USE_STRUCTS */
 
         p->next_all = all_globals;
         all_globals = p;
@@ -2269,6 +2326,225 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
 
     return num;
 } /* define_new_function() */
+
+#ifdef USE_STRUCTS
+/*-------------------------------------------------------------------------*/
+static int
+define_new_struct ( Bool proto, ident_t *p, funflag_t flags)
+
+/* Define a new struct <p> with the visibility <flags>.
+ * If <proto> is TRUE, the function is called for a struct forward
+ * declaration; if <proto> is FALSE, the struct is about to be defined.
+ *
+ * Result is the index (id) of the struct in the struct_defs table.
+ *
+ * If a prototype is encountered, the struct definition is stored
+ * with an additional visibility flag of NAME_PROTOTYPE.
+ *
+ * If NAME_HIDDEN is set in flags, the struct is added to the program
+ * but no visibility checks occur - this is for inherited structs
+ * which are no longer visible, but have to be kept in order to
+ * keep the struct ids intact.
+ */
+
+{
+    int          num;
+    struct_def_t sdef;
+    
+    /* If this is a redeclaration, check for consistency. */
+    if (p->type == I_TYPE_GLOBAL && (num = p->u.global.struct_id) >= 0
+     && !(flags & NAME_HIDDEN)
+      )
+    {
+        struct_def_t *pdef;
+
+        pdef = &STRUCT_DEF(num);
+
+        /* Check if the visibility is conserved.
+         */
+        {
+#            define TYPE_MOD_VIS \
+            ( TYPE_MOD_NO_MASK \
+            | TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC \
+            | TYPE_MOD_PROTECTED)
+            funflag_t f1 = pdef->flags;
+            funflag_t f2 = flags;
+
+            /* Smooth out irrelevant differences */
+            if (f1 & TYPE_MOD_STATIC) f1 |= TYPE_MOD_PROTECTED;
+            if (f2 & TYPE_MOD_STATIC) f2 |= TYPE_MOD_PROTECTED;
+
+            if ( ((f1 ^ f2) & TYPE_MOD_VIS) )
+            {
+                char buff[100];
+
+                strcpy(buff, get_visibility(pdef->flags));
+                yywarnf("Inconsistent declaration of struct %s: Visibility changed from '%s' to '%s'"
+                       , get_txt(p->name), buff, get_visibility(flags));
+            }
+#           undef TYPE_MOD_VIS
+        }
+
+        /* If this is just another prototype, return */
+        if (proto)
+            return num;
+
+        /* If this is a redefinition of a completed struct, complain
+         * and return.
+         */
+        if (!proto && !(pdef->flags & NAME_PROTOTYPE))
+        {
+            yyerrorf("Duplicate definition of struct %s"
+                    , get_txt(p->name));
+            return num;
+        }
+
+        /* At this point, we have in our hands the definition of a
+         * previously just declared struct.
+         * Update the stored information and return its index.
+         */
+        pdef->flags = flags & ~NAME_PROTOTYPE;
+        
+        return num;
+    }
+
+    /* This is a new struct! */
+
+    /* Fill in the struct_def_t */
+    sdef.name        = ref_mstring(p->name);
+    sdef.prog        = NULL;
+    sdef.inh         = 0;
+    sdef.num_members = 0;
+    sdef.members     = 0;
+    sdef.flags       = proto ? (flags | NAME_PROTOTYPE)
+                             : (flags & ~NAME_PROTOTYPE);
+
+    num = STRUCT_COUNT;
+
+    if (p->type != I_TYPE_GLOBAL)
+    {
+        /* This is the first _GLOBAL use of this identifier:
+         * make an appropriate entry in the identifier table.
+         */
+        
+        if (p->type != I_TYPE_UNKNOWN)
+        {
+            /* The ident has been used before otherwise, so
+             * get a fresh structure.
+             */
+            p = make_shared_identifier(get_txt(p->name), I_TYPE_GLOBAL, 0);
+        }
+        /* should be I_TYPE_UNKNOWN now. */
+
+        p->type = I_TYPE_GLOBAL;
+        p->u.global.function  = I_GLOBAL_FUNCTION_EFUN;
+        p->u.global.variable  = I_GLOBAL_VARIABLE_OTHER;
+        p->u.global.efun      = I_GLOBAL_EFUN_OTHER;
+        p->u.global.sim_efun  = I_GLOBAL_SEFUN_OTHER;
+        p->u.global.struct_id = I_GLOBAL_STRUCT_NONE;
+
+        p->next_all = all_globals;
+        all_globals = p;
+    }
+
+    if  (!(flags & NAME_HIDDEN))
+        p->u.global.struct_id = num;
+
+    /* Store the function_t in the functions area */
+    add_to_mem_block(A_STRUCT_DEFS, &sdef, sizeof sdef);
+
+    return num;
+} /* define_new_struct() */
+
+/*-------------------------------------------------------------------------*/
+static int
+find_struct ( string_t * name )
+
+/* Find the struct <name> and return its index. Return -1 if not found.
+ */
+
+{
+    ident_t * p;
+
+    p = find_shared_identifier(get_txt(name), I_TYPE_GLOBAL, 0);
+    if (p == NULL || p->u.global.struct_id < 0)
+        return -1;
+    if (STRUCT_DEF(p->u.global.struct_id).flags & NAME_HIDDEN)
+        return -1;
+    return p->u.global.struct_id;
+}
+
+/*-------------------------------------------------------------------------*/
+static void
+add_struct_member ( string_t *name, vartype_t type, int from_struct )
+
+/* Add a new member <name> with type <type> to the most recently defined
+ * struct. If <from_struct> is >= 0, it is the index of the struct from
+ * which the member is inherited.
+ * Raise an error if a member of the same name already exists.
+ */
+
+{
+    struct_def_t    *pdef;
+    struct_member_t  member;
+
+    pdef = &STRUCT_DEF(current_struct);
+#if 0
+printf("DEBUG: add_struct_member('%s', %x, %d) to struct '%s'\n", get_txt(name), type, from_struct, get_txt(pdef->name));
+#endif
+
+    if (pdef->num_members != 0)
+    {
+        /* Not the first member: check if the name already occured */
+        int i, member_idx;
+
+        for (i = pdef->num_members, member_idx = STRUCT_MEMBER_COUNT-1
+            ; i > 0
+            ; i--, member_idx--
+            )
+        {
+            if (mstreq(name, STRUCT_MEMBER(member_idx).name))
+            {
+                if (from_struct < 0)
+                    yyerrorf("Duplicate member '%s' in struct '%s'"
+                            , get_txt(name), get_txt(pdef->name));
+                else
+                    yyerrorf("Duplicate member '%s' in struct '%s' "
+                             "inherited from struct '%s'"
+                            , get_txt(name), get_txt(pdef->name)
+                            , get_txt(STRUCT_DEF(from_struct).name));
+                return;
+            }
+        }
+    }
+
+    /* Member is ok: add it */
+    if (pdef->num_members == 0)
+    {
+        /* First member */
+        pdef->members = STRUCT_MEMBER_COUNT;
+    }
+
+    member.name = ref_mstring(name);
+    member.type = type;
+    add_to_mem_block(A_STRUCT_MEMBERS, &member, sizeof member);
+    pdef->num_members++;
+} /* add_struct_member() */
+
+/*-------------------------------------------------------------------------*/
+static vartype_t
+adjust_struct_id (vartype_t type, int offset)
+
+/* If type <type> is a struct, adjust its id by <offset> */
+
+{
+    if ((type & PRIMARY_TYPE_MASK) == TYPE_STRUCT)
+        type = (type & ~SEC_TYPE_MASK)
+             | MAKE_SEC_TYPE_INFO(GET_SEC_TYPE_INFO(type)+offset)
+             ;
+    return type;
+} /* adjust_struct_id() */
+#endif /* USE_STRUCTS */
 
 /*-------------------------------------------------------------------------*/
 %ifdef INITIALIZATION_BY___INIT
@@ -2307,10 +2583,13 @@ define_variable (ident_t *name, fulltype_t flags, svalue_t *svp)
         }
 
         name->type = I_TYPE_GLOBAL;
-        name->u.global.function = I_GLOBAL_FUNCTION_VAR;
-        name->u.global.variable = I_GLOBAL_VARIABLE_OTHER; /* mark it as 'yet undef' for now */
-        name->u.global.efun     = I_GLOBAL_EFUN_OTHER;
-        name->u.global.sim_efun = I_GLOBAL_SEFUN_OTHER;
+        name->u.global.function  = I_GLOBAL_FUNCTION_VAR;
+        name->u.global.variable  = I_GLOBAL_VARIABLE_OTHER; /* mark it as 'yet undef' for now */
+        name->u.global.efun      = I_GLOBAL_EFUN_OTHER;
+        name->u.global.sim_efun  = I_GLOBAL_SEFUN_OTHER;
+#ifdef USE_STRUCTS
+        name->u.global.struct_id = I_GLOBAL_STRUCT_NONE;
+#endif /* USE_STRUCTS */
 
         name->next_all = all_globals;
         all_globals = name;
@@ -2430,10 +2709,13 @@ redeclare_variable (ident_t *name, fulltype_t flags, int n)
 
         /* I_TYPE_UNKNOWN */
         name->type = I_TYPE_GLOBAL;
-        name->u.global.function = I_GLOBAL_FUNCTION_VAR;
-        name->u.global.variable = I_GLOBAL_VARIABLE_OTHER; /* default: it's hidden */
-        name->u.global.efun     = I_GLOBAL_EFUN_OTHER;
-        name->u.global.sim_efun = I_GLOBAL_SEFUN_OTHER;
+        name->u.global.function  = I_GLOBAL_FUNCTION_VAR;
+        name->u.global.variable  = I_GLOBAL_VARIABLE_OTHER; /* default: it's hidden */
+        name->u.global.efun      = I_GLOBAL_EFUN_OTHER;
+        name->u.global.sim_efun  = I_GLOBAL_SEFUN_OTHER;
+#ifdef USE_STRUCTS
+        name->u.global.struct_id = I_GLOBAL_STRUCT_NONE;
+#endif /* USE_STRUCTS */
         
         name->next_all = all_globals;
         all_globals = name;
@@ -3209,10 +3491,13 @@ def:  type optional_star L_IDENTIFIER  /* Function definition or prototype */
               /* prevent freeing by exotic name clashes */
               ident_t *p = $3;
               p->type = I_TYPE_GLOBAL;
-              p->u.global.variable = I_GLOBAL_VARIABLE_OTHER;
-              p->u.global.efun     = I_GLOBAL_EFUN_OTHER;
-              p->u.global.sim_efun = I_GLOBAL_SEFUN_OTHER;
-              p->u.global.function = I_GLOBAL_FUNCTION_VAR;
+              p->u.global.variable  = I_GLOBAL_VARIABLE_OTHER;
+              p->u.global.efun      = I_GLOBAL_EFUN_OTHER;
+              p->u.global.sim_efun  = I_GLOBAL_SEFUN_OTHER;
+              p->u.global.function  = I_GLOBAL_FUNCTION_VAR;
+#ifdef USE_STRUCTS
+              p->u.global.struct_id = I_GLOBAL_STRUCT_NONE;
+#endif /* USE_STRUCTS */
               p->next_all = all_globals;
               all_globals = p;
           }
@@ -3383,23 +3668,81 @@ function_body:
  */
 
 struct_decl:
-      type_modifier_list L_STRUCT L_IDENTIFIER opt_base_struct
-      '{' member_list '}' ';'
+      type_modifier_list L_STRUCT L_IDENTIFIER ';'
       { 
-          if ($3->type == I_TYPE_UNKNOWN)
-              free_shared_identifier($3);
-          yyerror("struct declarations not implemented");
+          int num;
+          num = define_new_struct(MY_TRUE, $3, $1);
+          if (num >= MAX_SEC_TYPE_INFO)
+              yyerror("Too many structs declared");
+      }
+    | type_modifier_list L_STRUCT L_IDENTIFIER
+      { 
+          current_struct = define_new_struct(MY_FALSE, $3, $1);
+          if (current_struct >= MAX_SEC_TYPE_INFO)
+              yyerror("Too many structs declared");
+      }
+      opt_base_struct '{' opt_member_list '}' ';'
+      { 
+          /* All the work is done by the nonterminals above. */
       }
 ; /* struct_decl */
 
 opt_base_struct:
-      /* empty */
+      /* empty */ { }
     | '(' L_IDENTIFIER ')'
       { 
-          if ($2->type == I_TYPE_UNKNOWN)
+          /* Look up the struct id for the given identifier */
+
+          int num = -1;
+          ident_t *p;
+
+          if (p->type == I_TYPE_UNKNOWN)
+          {
+              /* Identifier -> no such struct encountered yet */
+              yyerrorf("Unknown base struct '%s'", get_txt($2->name));
               free_shared_identifier($2);
+          }
+          else
+          {
+              ident_t *p = $2;
+
+              /* Find the global struct identifier */
+              while (p != NULL && p->type != I_TYPE_GLOBAL)
+                  p = p->inferior;
+
+              if (p == NULL || (num = p->u.global.struct_id) < 0)
+              {
+                  yyerrorf("Unknown base struct '%s'", get_txt($2->name));
+              }
+              else if (STRUCT_DEF(num).flags & NAME_PROTOTYPE)
+              {
+                  yyerrorf("Undefined base struct '%s'", get_txt($2->name));
+              }
+              else
+              {
+                  struct_def_t *pdef;
+
+                  pdef = &STRUCT_DEF(num);
+                  if (pdef->num_members > 0)
+                  {
+                      int count;
+                      struct_member_t *member;
+
+                      member = &STRUCT_MEMBER(pdef->members);
+                      count = pdef->num_members;
+
+                      for ( ; count > 0; count--, member++ )
+                          add_struct_member(member->name, member->type, num);
+                  }
+              }
+          }
       }
 ; /* opt_base_struct */
+
+opt_member_list:
+      /* empty */
+    | member_list
+; /* opt_member_list */
 
 member_list:
       member
@@ -3409,6 +3752,9 @@ member_list:
 member:
       basic_non_void_type member_name_list ';'
       {
+          /* The member_name_list adds the struct members, using
+           * the value of current_type set by basic_non_void_type.
+           */
       }
 ; /* member */
 
@@ -3420,6 +3766,7 @@ member_name_list:
 member_name:
       optional_star L_IDENTIFIER
       {
+          add_struct_member($2->name, current_type | $1, -1);
           if ($2->type == I_TYPE_UNKNOWN)
               free_shared_identifier($2);
       }
@@ -3625,6 +3972,9 @@ inheritance:
           else
               inherit.inherit_type = INHERIT_TYPE_NORMAL;
           inherit.function_index_offset = FUNCTION_COUNT;
+#ifdef USE_STRUCTS
+          inherit.struct_index_offset = STRUCT_COUNT;
+#endif /* USE_STRUCTS */
           inherit.inherit_depth = 1;
 
           /* If it's a virtual inherit, check if it has been
@@ -3680,9 +4030,17 @@ inheritance:
                * care of the initializer.
                */
 
+#ifdef USE_STRUCTS
+              copy_structs(ob->prog, $1[0], inherit.struct_index_offset);
+#endif
 %ifdef INITIALIZATION_BY___INIT
+#ifdef USE_STRUCTS
+              initializer = copy_functions(ob->prog, $1[0], inherit.struct_index_offset);
+              copy_variables(ob->prog, $1[1], inherit.struct_index_offset);
+#else
               initializer = copy_functions(ob->prog, $1[0]);
               copy_variables(ob->prog, $1[1]);
+#endif
           
               if (initializer > -1)
               {
@@ -3698,12 +4056,28 @@ inheritance:
                   add_new_init_jump();
               }
 %else  /* INITIALIZATION_BY___INIT */
+#ifdef USE_STRUCTS
+              copy_functions(ob->prog, $1[0], inherit.struct_index_offset);
+              copy_variables(ob->prog, $1[1], ob->variables, inherit.struct_index_offset);
+#else
               copy_functions(ob->prog, $1[0]);
               copy_variables(ob->prog, $1[1], ob->variables);
+#endif
 %endif /* INITIALIZATION_BY___INIT */
 
               /* Fix up the inherit indices */
               fix_function_inherit_indices(ob->prog);
+
+#ifdef USE_STRUCTS
+              /* Fix up the struct inherit indices */
+              {
+                  int left = STRUCT_COUNT - inherit.struct_index_offset;
+                  struct_def_t *pdef = &STRUCT_DEF(inherit.struct_index_offset);
+
+                  for (; left > 0; left--, pdef++)
+                      pdef->inh = INHERIT_COUNT;
+              }
+#endif /* USE_STRUCTS */
 
               /* Update and store the inherit structure.
                *
@@ -3929,9 +4303,19 @@ basic_non_void_type:
 %ifdef USE_STRUCTS
     | L_STRUCT identifier
       {
-          yyerror("structs not implemented as type");
+          int num;
+
+          num = find_struct($2);
+          if (num < 0)
+          {
+              yyerrorf("Unknown struct '%s'", get_txt($2));
+              $$ = TYPE_UNKNOWN;
+          }
+          else
+              $$ = TYPE_STRUCT | MAKE_SEC_TYPE_INFO(num);
+
           free_mstring($2);
-          /* TODO: Implement structs */
+          current_type = $$;
       }
 %endif /* USE_STRUCTS */
 ; /* basic_non_void_type */
@@ -7540,7 +7924,7 @@ expr4:
           /* Generate a literal struct */
           /* TODO: Implement structs */
 
-          yyerror("struct literals not implemented");
+          yyerror("TODO: struct literals not implemented");
           free_mstring($3);
       }
 
@@ -7549,7 +7933,7 @@ expr4:
       {
           /* Lookup a struct member */
           /* TODO: Implement structs */
-          yyerror("struct member lookup not implemented");
+          yyerror("TODO: struct member lookup not implemented");
           free_mstring($3);
           /* TODO: From MudOS
             {
@@ -7583,7 +7967,7 @@ expr4:
       {
           /* Create a reference to a struct member */
           /* TODO: Implement structs */
-          yyerror("struct member lookup not implemented");
+          yyerror("TODO: struct member lookup not implemented");
           free_mstring($5);
       }
 %endif /* USE_STRUCTS */
@@ -8301,7 +8685,7 @@ lvalue:
       {
           /* Create a struct member lvalue */
           /* TODO: Implement structs */
-          yyerror("struct member lookup not implemented");
+          yyerror("TODO: struct member lookup not implemented");
           free_mstring($3);
       }
 %endif /* USE_STRUCTS */
@@ -8831,10 +9215,13 @@ function_call:
               /* prevent freeing by exotic name clashes */
               /* also makes life easier below */
               real_name->type = I_TYPE_GLOBAL;
-              real_name->u.global.function = I_GLOBAL_FUNCTION_VAR;
-              real_name->u.global.variable = I_GLOBAL_VARIABLE_OTHER;
-              real_name->u.global.efun     = I_GLOBAL_EFUN_OTHER;
-              real_name->u.global.sim_efun = I_GLOBAL_SEFUN_OTHER;
+              real_name->u.global.function  = I_GLOBAL_FUNCTION_VAR;
+              real_name->u.global.variable  = I_GLOBAL_VARIABLE_OTHER;
+              real_name->u.global.efun      = I_GLOBAL_EFUN_OTHER;
+              real_name->u.global.sim_efun  = I_GLOBAL_SEFUN_OTHER;
+#ifdef USE_STRUCTS
+              real_name->u.global.struct_id = I_GLOBAL_STRUCT_NONE;
+#endif /* USE_STRUCTS */
               real_name->next_all = all_globals;
               all_globals = real_name;
           }
@@ -10249,7 +10636,7 @@ lvalue_list:
       {
           /* Lookup a struct member */
           /* TODO: Implement structs */
-          yyerror("struct member lookup not implemented");
+          yyerror("TODO: struct member lookup not implemented");
           free_mstring($5);
       }
 %endif /* USE_STRUCTS */
@@ -10385,7 +10772,7 @@ struct_constant:
           /* Generate a literal struct */
           /* TODO: Implement structs */
 
-          yyerror("struct literals not implemented");
+          yyerror("TODO: struct literals not implemented");
           free_mstring($3);
       }
 ; /* struct_constant */
@@ -11321,6 +11708,86 @@ get_function_id (program_t *progp, int fx)
 } /* get_function_id() */
 
 /*-------------------------------------------------------------------------*/
+#ifdef USE_STRUCTS
+static void
+copy_structs (program_t *from, fulltype_t flags, int offset)
+
+/* Copy the struct definitions from program <from> which is inherited
+ * with visibility <flags>. <offset> is the struct_index_offset of the
+ * inherited program in the struct_defs table.
+ */
+
+{
+    int struct_id;
+
+    if (STRUCT_COUNT + from->num_structs >= MAX_SEC_TYPE_INFO)
+    {
+        yyerror("Too many structs declared");
+        return;
+    }
+
+    for (struct_id = 0; struct_id < from->num_structs; struct_id++)
+    {
+        int id, member_id;
+        ident_t *p;
+        struct_def_t *pdef = from->struct_defs + struct_id;
+        fulltype_t f = flags | pdef->flags;
+
+        /* Is this struct visible to us? */
+        if (pdef->flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN))
+        {
+            f |= NAME_HIDDEN;
+        }
+
+        /* Duplicate definition? */
+        id = find_struct(pdef->name);
+        if (!(f & NAME_HIDDEN) && id >= 0)
+        {
+            /* We have a class with this name. Check if we just
+             * inherited it again, or if it's a name clash.
+             */
+            if (STRUCT_DEF(id).prog != pdef->prog)
+            {
+                yyerrorf("struct '%s' multiply inherited from '%s' "
+                         "and '%s'"
+                        , get_txt(STRUCT_DEF(id).name)
+                        , get_txt(INHERIT(STRUCT_DEF(id).inh-1).prog->name)
+                        , get_txt(from->name)
+                        );
+            }
+
+            f |= NAME_HIDDEN;
+        }
+
+        /* New struct */
+        p = make_global_identifier(get_txt(pdef->name), I_TYPE_GLOBAL);
+        if (p == NULL)
+            continue;
+
+        current_struct = define_new_struct( MY_FALSE, p, f);
+
+        STRUCT_DEF(current_struct).prog = pdef->prog;
+
+        /* Now copy the members */
+        if (!(f & NAME_HIDDEN))
+        {
+            struct_member_t *pmember;
+            int count;
+
+            for (count = 0, pmember = &(from->struct_members[pdef->members])
+                ; count < pdef->num_members
+                ; count++, pmember++
+                )
+            {
+                add_struct_member( pmember->name
+                                 , adjust_struct_id(pmember->type, offset), -1);
+            }
+        }
+    }
+} /* copy_structs() */
+#endif /* USE_STRUCTS */
+
+/*-------------------------------------------------------------------------*/
 static
 %ifdef INITIALIZATION_BY___INIT
        int
@@ -11328,13 +11795,19 @@ static
        void
 %endif
 
-copy_functions (program_t *from, fulltype_t type)
+copy_functions (program_t *from, fulltype_t type
+#ifdef USE_STRUCTS
+               , int struct_offset
+#endif
+               )
 
 /* The functions of the program <from> are inherited with visibility <type>.
  * Copy all the function definitions into this program, but as UNDEFINED
  * so that they can be redefined in the current program. The epilog()
  * will later update the non-redefined inherited functions and also copy
  * the types.
+ * struct arguments and return types  have their struct id adjusted
+ * by <struct_offset>.
  *
  * An explicit call to an inherited function will not be
  * done through this entry (because this entry can be replaced by a new
@@ -11469,6 +11942,10 @@ copy_functions (program_t *from, fulltype_t type)
            */
 
         fun.flags |= type & TYPE_MOD_NO_MASK;
+
+#ifdef USE_STRUCTS
+        fun.type = adjust_struct_id(fun.type, struct_offset);
+#endif /* USE_STRUCTS */
 
         /* Perform a lot of tests and actions for the visibility
          * and definitiability. The switch() allows us to abort
@@ -11692,10 +12169,13 @@ copy_functions (program_t *from, fulltype_t type)
                  */
                 
                 p->type = I_TYPE_GLOBAL;
-                p->u.global.variable = I_GLOBAL_VARIABLE_OTHER;
-                p->u.global.efun     = I_GLOBAL_EFUN_OTHER;
-                p->u.global.sim_efun = I_GLOBAL_SEFUN_OTHER;
-                p->u.global.function = current_func_index;
+                p->u.global.variable  = I_GLOBAL_VARIABLE_OTHER;
+                p->u.global.efun      = I_GLOBAL_EFUN_OTHER;
+                p->u.global.sim_efun  = I_GLOBAL_SEFUN_OTHER;
+                p->u.global.function  = current_func_index;
+#ifdef USE_STRUCTS
+                p->u.global.struct_id = I_GLOBAL_STRUCT_NONE;
+#endif /* USE_STRUCTS */
                 p->next_all = all_globals;
                 all_globals = p;
             }
@@ -11741,11 +12221,28 @@ copy_functions (program_t *from, fulltype_t type)
                  */
                 tmp_short = ARGTYPE_COUNT;
                 if (fun.num_arg)
+                {
+#ifdef USE_STRUCTS
+                    int count;
+                    vartype_t *arg;
+#endif /* USE_STRUCTS */
                     add_to_mem_block(
                       A_ARGUMENT_TYPES,
                       &from->argument_types[from->type_start[i]],
-                      (sizeof (unsigned short)) * fun.num_arg
+                      (sizeof (vartype_t)) * fun.num_arg
                     );
+#ifdef USE_STRUCTS
+                    /* If an argument type is a struct, adjust the id */
+                    for (count = 0, arg = &ARGUMENT_TYPE(tmp_short)
+                        ; count < fun.num_arg
+                        ; count++, arg++
+                        )
+                    {
+                        *arg = adjust_struct_id(*arg, struct_offset);
+                    }
+#endif /* USE_STRUCTS */
+                }
+
             }
         }
         else
@@ -11774,9 +12271,13 @@ copy_variables (program_t *from, fulltype_t type
 %ifndef INITIALIZATION_BY___INIT
                , svalue_t *initializers
 %endif
+#ifdef USE_STRUCTS
+               , int struct_offset
+#endif
                )
 
-/* Inherit the variables of <from> with visibility <type>.
+/* Inherit the variables of <from> with visibility <type>; struct variables
+ * have their struct id adjusted by <struct_offset>.
  * The variables are copied into our program, and it is important that
  * they are stored in the same order with the same index.
  */
@@ -11982,7 +12483,11 @@ copy_variables (program_t *from, fulltype_t type
             if (!p)
                 return;
 
+#ifdef USE_STRUCTS
+            new_type = adjust_struct_id(type, struct_offset);
+#else
             new_type = type;
+#endif
 
             /* 'public' variables should not become private when inherited
              * 'private'.
@@ -12841,6 +13346,27 @@ epilog (void)
     /* Now create the program structure */
     switch (0) { default:
 
+#if 0 && defined(USE_STRUCTS)
+{
+    int count, i;
+
+    for (i = 0; i < STRUCT_COUNT; i++)
+        printf("DEBUG: [%d] struct %s: %d members @ %d, inh %d, flags %x\n"
+              , i, get_txt(STRUCT_DEF(i).name)
+              , STRUCT_DEF(i).num_members , STRUCT_DEF(i).members
+              , STRUCT_DEF(i).inh
+              , STRUCT_DEF(i).flags
+              );
+
+    printf("\n");
+    for (i = 0; i < STRUCT_MEMBER_COUNT; i++)
+        printf("DEBUG: [%d] member %s: %x\n"
+              , i, get_txt(STRUCT_MEMBER(i).name)
+              , STRUCT_MEMBER(i).type
+              );
+
+}
+#endif /* USE_STRUCTS */
         /* One error, don't create anything */
         if (num_parse_error > 0 || inherit_file)
             break;
@@ -12856,7 +13382,7 @@ epilog (void)
             mem_block[A_ARGUMENT_TYPES].current_size = 0;
             mem_block[A_ARGUMENT_INDEX].current_size = 0;
         }
-        for (i=0; i<NUMPAREAS; i++)
+        for (i = 0; i< NUMPAREAS; i++)
         {
             if (i != A_LINENUMBERS)
                 size += align(mem_block[i].current_size);
@@ -12976,6 +13502,32 @@ epilog (void)
         }
         p += align(mem_block[A_INHERITS].current_size);
 
+#ifdef USE_STRUCTS
+        /* Add the struct information.
+         */
+        prog->num_structs = STRUCT_COUNT;
+        if (prog->num_structs)
+        {
+            memcpy(p, mem_block[A_STRUCT_DEFS].block,
+                   mem_block[A_STRUCT_DEFS].current_size);
+            prog->struct_defs = (struct_def_t *)p;
+        } else {
+            prog->struct_defs = NULL;
+        }
+        p += align(mem_block[A_STRUCT_DEFS].current_size);
+
+        prog->num_struct_members = STRUCT_MEMBER_COUNT;
+        if (prog->num_struct_members)
+        {
+            memcpy(p, mem_block[A_STRUCT_MEMBERS].block,
+                   mem_block[A_STRUCT_MEMBERS].current_size);
+            prog->struct_members = (struct_member_t *)p;
+        } else {
+            prog->struct_members = NULL;
+        }
+        p += align(mem_block[A_STRUCT_MEMBERS].current_size);
+#endif /* USE_STRUCTS */
+
         /* Add the include file information */
         prog->num_includes = INCLUDE_COUNT;
         if (prog->num_includes)
@@ -13037,6 +13589,12 @@ epilog (void)
         /* Correct the variable index offsets */
         fix_variable_index_offsets(prog);
 
+#ifdef USE_STRUCTS
+        /* For all structs defined in this program, set the .prog info */
+        for (i = 0; i < prog->num_structs; i++)
+            prog->struct_defs[i].prog = prog;
+#endif /* USE_STRUCTS */
+
         prog->swap_num = -1;
 
         /* Free the memareas */
@@ -13094,11 +13652,18 @@ epilog (void)
                            , num_variables
                            , (variable_t *)mem_block[A_VIRTUAL_VAR].block
                            , INCLUDE_COUNT
-                           , (include_t *)mem_block[A_INCLUDES].block );
+                           , (include_t *)mem_block[A_INCLUDES].block
+#ifdef USE_STRUCTS
+                           , STRUCT_COUNT
+                           , (struct_def_t *)mem_block[A_STRUCT_DEFS].block
+                           , STRUCT_MEMBER_COUNT
+                           , (struct_member_t *)mem_block[A_STRUCT_MEMBERS].block
+#endif /* USE_STRUCTS */
+                           );
 
         compiled_prog = NULL;
 
-        for (i=0; i<NUMAREAS; i++)
+        for (i = 0; i < NUMAREAS; i++)
             xfree(mem_block[i].block);
 
         return;

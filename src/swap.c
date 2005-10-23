@@ -317,17 +317,6 @@ locate_out (program_t *prog)
     if (!prog)
         return MY_FALSE;
 
-    if (d_flag > 1)
-    {
-        debug_message ("%s locate_out: %lX %lX %lX %lX %lX %lX %lX %lX\n"
-            , time_stamp(),
-            (long)prog->program,
-            (long)prog->functions, (long)prog->strings,
-            (long)prog->variable_names, (long)prog->inherit,
-            (long)prog->includes,
-            (long)prog->argument_types, (long)prog->type_start);
-    }
-
 #define MAKEOFFSET(type, name) (type)&p[(char *)prog->name - (char *)prog]
 
     prog->program        = MAKEOFFSET(bytecode_p, program);
@@ -336,6 +325,10 @@ locate_out (program_t *prog)
     prog->strings        = MAKEOFFSET(string_t**, strings);
     prog->variable_names = MAKEOFFSET(variable_t *, variable_names);
     prog->inherit        = MAKEOFFSET(inherit_t *, inherit);
+#ifdef USE_STRUCTS
+    prog->struct_defs    = MAKEOFFSET(struct_def_t *, struct_defs);
+    prog->struct_members = MAKEOFFSET(struct_member_t *, struct_members);
+#endif /* USE_STRUCTS */
     prog->includes       = MAKEOFFSET(include_t *, includes);
     if (prog->type_start)
     {
@@ -379,22 +372,15 @@ locate_in (program_t *prog)
     prog->strings        = MAKEPTR(string_t**, strings);
     prog->variable_names = MAKEPTR(variable_t*, variable_names);
     prog->inherit        = MAKEPTR(inherit_t*, inherit);
+#ifdef USE_STRUCTS
+    prog->struct_defs    = MAKEPTR(struct_def_t*, struct_defs);
+    prog->struct_members = MAKEPTR(struct_member_t *, struct_members);
+#endif /* USE_STRUCTS */
     prog->includes       = MAKEPTR(include_t*, includes);
     if (prog->type_start)
     {
         prog->argument_types = MAKEPTR(unsigned short *, argument_types);
         prog->type_start     = MAKEPTR(unsigned short *, type_start);
-    }
-
-    if (d_flag > 1)
-    {
-        debug_message ("%s locate_in: %lX %lX %lX %lX %lX %lX %lX %lX\n"
-            , time_stamp(),
-            (long)prog->program,
-            (long)prog->functions, (long)prog->strings,
-            (long)prog->variable_names, (long)prog->inherit,
-            (long)prog->includes,
-            (long)prog->argument_types, (long)prog->type_start);
     }
 
     return MY_TRUE;

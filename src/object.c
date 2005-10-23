@@ -501,12 +501,20 @@ void
 do_free_sub_strings (int num_strings,   string_t **strings
                     ,int num_variables, variable_t *variable_names
                     ,int num_includes,  include_t *includes
+#ifdef USE_STRUCTS
+                    ,int num_structs,  struct_def_t *struct_defs
+                    ,int num_members,  struct_member_t *struct_members
+#endif /* USE_STRUCTS */
                     )
 
 /* Free a bunch of shared strings used in connection with an object:
  * the <num_strings> strings in the array <strings>, 
- * the <num_variables> names of the vars in array <variable_names>, and 
- * the <num_includes> names of the includes in array <includes>.
+ * the <num_variables> names of the vars in array <variable_names>, 
+ * the <num_includes> names of the includes in array <includes>, 
+#ifdef USE_STRUCTS
+ * the <num_structs> names of the struct defs in array <struct_defs>, and.
+ * the <num_members> names of the struct member defs in array <struct_members>.
+#endif
  *
  * The function is called from free_prog() and from the compiler epilog().
  */
@@ -530,6 +538,18 @@ do_free_sub_strings (int num_strings,   string_t **strings
         free_mstring(includes[i].name);
         free_mstring(includes[i].filename);
     }
+
+#ifdef USE_STRUCTS
+    /* Free all struct names */
+    for  (i = num_structs; --i >= 0; )
+    {
+        free_mstring(struct_defs[i].name);
+    }
+    for  (i = num_members; --i >= 0; )
+    {
+        free_mstring(struct_members[i].name);
+    }
+#endif /* USE_STRUCTS */
 }
 
 /*-------------------------------------------------------------------------*/
@@ -646,6 +666,10 @@ _free_prog (program_t *progp, Bool free_all, const char * file, int line
         do_free_sub_strings( progp->num_strings, progp->strings
                            , progp->num_variables, progp->variable_names
                            , progp->num_includes, progp->includes
+#ifdef USE_STRUCTS
+                           , progp->num_structs, progp->struct_defs
+                           , progp->num_struct_members, progp->struct_members
+#endif /* USE_STRUCTS */
                            );
 
         /* Free all inherited objects */

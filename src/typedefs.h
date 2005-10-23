@@ -36,6 +36,10 @@ typedef struct shadow_s           shadow_t;           /* sent.h */
 typedef struct simul_efun_table_s simul_efun_table_t; /* simul_efun.h */
 typedef struct string_s           string_t;           /* mstrings.h */
 typedef struct strbuf_s           strbuf_t;           /* strfuns.h */
+#ifdef USE_STRUCTS
+typedef struct struct_def_s       struct_def_t;       /* exec.h */
+typedef struct struct_member_s    struct_member_t;    /* exec.h */
+#endif /* USE_STRUCTS */
 typedef struct svalue_s           svalue_t;           /* svalue.h */
 typedef struct variable_s         variable_t;         /* exec.h */
 typedef struct vector_s           vector_t;           /* array.h */

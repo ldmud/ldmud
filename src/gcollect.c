@@ -426,7 +426,7 @@ gc_mark_program_ref (program_t *p)
 
                 memcpy(
                   &name,
-                  program + (functions[i] & FUNSTART_MASK) - 1 - sizeof name,
+                  FUNCTION_NAMEP(program + (functions[i] & FUNSTART_MASK)),
                   sizeof name
                 );
                 MARK_MSTRING_REF(name);
@@ -452,6 +452,15 @@ gc_mark_program_ref (program_t *p)
 
         for (i=0; i< p->num_inherited; i++)
             mark_program_ref(p->inherit[i].prog);
+
+#ifdef USE_STRUCTS
+        /* struct definitions and members */
+        for (i = 0; i < p->num_structs; i++)
+            MARK_MSTRING_REF(p->struct_defs[i].name);
+
+        for (i = 0; i < p->num_struct_members; i++)
+            MARK_MSTRING_REF(p->struct_members[i].name);
+#endif /* USE_STRUCTS */
 
         /* Included files */
 

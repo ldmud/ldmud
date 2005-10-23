@@ -1,7 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-05-Sep-2002 (Lars Duening)  (3.3.243)
+04-Sep-2002 (Lars Duening)  (3.3.244)
+  - (gcollect.c, prolang.y, exec.h, object) Implemented the parsing
+       and inheritance of struct definitions (the latter untested).
+  - (mstrings.c) The string statistics seem to be correct, so I removed
+       the 'SSTAT' diagnostics altogether.
+
+04-Sep-2002 (Lars Duening)  (3.3.243)
   - (exec.h, prolang.y, make_func.y, closure.c, main.c) Added a compile-time
        type 'TYPE_STRUCT' and provided space in the function header to 
        store it. A side effect is that ALIGN_FUNCTIONS is now mandatory; it
