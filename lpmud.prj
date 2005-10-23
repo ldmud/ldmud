@@ -20,16 +20,12 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 259)
-(Parent-Version lpmud 3-3 258)
-(Version-Log "Added doc/obsolete/ and doc/hook/.
-Deprecated efun transfer().
-Removed compat-mode of parse_command().
-Efuns set_light(), set_is_wizard(), process_string() are configurable.
-Reduced include file couplings.")
+(Project-Version lpmud 3-3 260)
+(Parent-Version lpmud 3-3 259)
+(Version-Log "Corrected compilation error.")
 (New-Version-Log
 "")
-(Checkin-Time "Wed, 18 Sep 2002 11:42:56 -0600")
+(Checkin-Time "Wed, 18 Sep 2002 12:11:46 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -65,7 +61,7 @@ Reduced include file couplings.")
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.7 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.45 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.322 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.323 644))
   (HISTORY (lpmud/f/49_HISTORY 1.271 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.16 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -74,7 +70,7 @@ Reduced include file couplings.")
   (src/configure (lpmud/d/0_configure 1.19.1.53 755))
   (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.13 644))
   (src/machine.h.in (lpmud/b/9_machine.h. 1.9.1.3 644))
-  (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.17 644))
+  (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.18 644))
   (src/mkinstalldirs (lpmud/c/4_mkinstalld 1.1 644))
   (src/install-sh (lpmud/c/5_install-sh 1.2 755))
 
@@ -145,7 +141,7 @@ Reduced include file couplings.")
   (src/files.c (lpmud/i/50_files.c 1.17 644))
   (src/filestat.h (lpmud/f/51_filestat.h 1.7 644))
   (src/gcollect.h (lpmud/f/33_gcollect.h 1.6.1.9 644))
-  (src/gcollect.c (lpmud/c/30_gcollect.c 1.41.1.69 644))
+  (src/gcollect.c (lpmud/c/30_gcollect.c 1.41.1.70 644))
   (src/hash.h (lpmud/f/32_hash.h 1.5 644))
   (src/hash.c (lpmud/c/28_hash.c 1.15 644))
   (src/heartbeat.h (lpmud/m/41_heartbeat. 1.6.1.4 644))
@@ -278,7 +274,7 @@ Reduced include file couplings.")
   (src/hosts/be/config.h (lpmud/e/34_config.h 1.32.1.24 644))
   (src/hosts/be/be.h (lpmud/e/35_be.h 1.7 644))
   (src/hosts/be/beyacc (lpmud/i/39_beyacc 1.1 744))
-  (src/hosts/be/Makefile (lpmud/e/37_Makefile 1.60.1.70 644))
+  (src/hosts/be/Makefile (lpmud/e/37_Makefile 1.60.1.71 644))
   (src/hosts/be/icon-32x32.raw (lpmud/s/37_icon-32x32 1.1 644) :no-keywords)
   (src/hosts/be/icon-16x16.raw (lpmud/s/38_icon-16x16 1.1 644) :no-keywords)
   (src/hosts/be/driver.rsrc (lpmud/s/39_driver.rsr 1.1 644) :no-keywords)
@@ -291,7 +287,7 @@ Reduced include file couplings.")
 
   ;; Host: OS/2
   (src/hosts/os2/machine.h (lpmud/m/36_machine.h 1.1 644))
-  (src/hosts/os2/Makefile (lpmud/m/37_Makefile 1.25 644))
+  (src/hosts/os2/Makefile (lpmud/m/37_Makefile 1.26 644))
 
   ;; Host: Win32
   (src/hosts/win32/tubmud.bmp (lpmud/g/20_tubmud.bmp 1.1 644) :no-keywords)

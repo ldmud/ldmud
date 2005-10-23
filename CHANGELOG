@@ -1,6 +1,9 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+18-Sep-2002 (Lars Duening)  (3.3.260)
+  - (gcollect.c) Oops, didn't compile with MALLOC_TRACE enabled.
+
 18-Sep-2002 (Lars Duening)  (3.3.259)
   - (doc/obsolete/) New directory to hold obsolete manpages - useful
        when reworking old code (suggested by Coogan).

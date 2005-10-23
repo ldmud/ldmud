@@ -83,6 +83,9 @@
 #include "filestat.h"
 #include "heartbeat.h"
 #include "interpret.h"
+#if defined(MALLOC_smalloc) && defined(MALLOC_TRACE)
+#include "instrs.h" /* Need F_ALLOCATE for setting up print dispatcher */
+#endif
 #include "lex.h"
 #include "main.h"
 #include "mapping.h"

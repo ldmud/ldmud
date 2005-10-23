@@ -283,7 +283,7 @@ files.o : ../mudlib/sys/files.h xalloc.h svalue.h stdstrings.h simulate.h \
 
 gcollect.o : ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h swap.h \
     stdstrings.h smalloc.h simul_efun.h simulate.h sent.h prolang.h parse.h \
-    otable.h object.h mstrings.h mregex.h mapping.h main.h lex.h \
+    otable.h object.h mstrings.h mregex.h mapping.h main.h lex.h instrs.h \
     interpret.h heartbeat.h filestat.h ed.h comm.h closure.h call_out.h \
     backend.h array.h actions.h gcollect.h typedefs.h driver.h svalue.h \
     ptrtable.h exec.h strfuns.h bytecode.h regexp.h pcre/pcre.h port.h \
@@ -469,7 +469,7 @@ efuns.o : stdstrings.h
 
 files.o : stdstrings.h
 
-gcollect.o : stdstrings.h
+gcollect.o : stdstrings.h instrs.h
 
 interpret.o : stdstrings.h instrs.h
 

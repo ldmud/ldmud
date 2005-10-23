@@ -149,16 +149,16 @@ endif
 # $Format: "ifeq ($ReleaseType$, pre)"$
 ifeq (dev, pre)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 259
+  SETVERFLAGS += d 260
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-pre.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-pre.259
+  VSTRING = 3.3.0-pre.260
 endif
 # $Format: "ifeq ($ReleaseType$, dev)"$
 ifeq (dev, dev)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 259
+  SETVERFLAGS += d 260
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-dev.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-dev.259
+  VSTRING = 3.3.0-dev.260
 endif
 
 else
@@ -166,12 +166,12 @@ else
 # --- Development Versions ---
 
 # $Format: "SETVERFLAGS = -app $ReleaseMajor$ $ReleaseMinor$ $ProjectMinorVersion$"$
-SETVERFLAGS = -app 3 3 259
+SETVERFLAGS = -app 3 3 260
 
 # $Format: "  SETVERFLAGS += f"$
   SETVERFLAGS += f
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ProjectMinorVersion$"$
-  VSTRING = 3.3.259
+  VSTRING = 3.3.260
 
 endif
 
@@ -530,7 +530,7 @@ $(OBJ)/files.o : ../mudlib/sys/files.h xalloc.h svalue.h stdstrings.h \
 
 $(OBJ)/gcollect.o : ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h swap.h \
     stdstrings.h smalloc.h simul_efun.h simulate.h sent.h prolang.h parse.h \
-    otable.h object.h mstrings.h mregex.h mapping.h main.h lex.h \
+    otable.h object.h mstrings.h mregex.h mapping.h main.h lex.h instrs.h \
     interpret.h heartbeat.h filestat.h ed.h comm.h closure.h call_out.h \
     backend.h array.h actions.h gcollect.h typedefs.h driver.h svalue.h \
     ptrtable.h exec.h strfuns.h bytecode.h regexp.h pcre/pcre.h port.h \
@@ -717,7 +717,7 @@ $(OBJ)/efuns.o : stdstrings.h
 
 $(OBJ)/files.o : stdstrings.h
 
-$(OBJ)/gcollect.o : stdstrings.h
+$(OBJ)/gcollect.o : stdstrings.h instrs.h
 
 $(OBJ)/interpret.o : stdstrings.h instrs.h
 
