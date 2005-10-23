@@ -3,7 +3,9 @@
 
 #include "driver.h"
 #include "typedefs.h"
+#ifndef USE_NEW_INLINES
 #include "strfuns.h"
+#endif
 
 /* --- Types --- */
 
@@ -217,6 +219,8 @@ extern unsigned int next_inline_fun;
 /* --- Prototypes --- */
 
 extern void init_lexer(void);
+extern int  symbol_operator(char *symbol, char **endp);
+extern void symbol_efun(string_t *name, svalue_t *sp);
 extern ident_t *lookfor_shared_identifier(char *, int, int, Bool);
 #define make_shared_identifier(s,n,d) lookfor_shared_identifier(s,n,d, MY_TRUE)
 #define find_shared_identifier(s,n,d) lookfor_shared_identifier(s,n,d, MY_FALSE)

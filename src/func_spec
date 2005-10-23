@@ -278,7 +278,7 @@ object  this_player();
         /* Technical efuns */
 
 /* void break_point(); */
-        /* void swap(object); */
+/* void swap(object); */
 
         /* Obsolete and deprecated functions */
 
@@ -591,12 +591,40 @@ string  getuid(object default: F_THIS_OBJECT);
         /* Technical efuns */
 
 
-        /* Functions only used in compatibility mode. */
+        /* Functions only used in compatibility mode.
+         * When running in native mode, both are invisible.
+         */
 
-#ifdef COMPAT_MODE
 int     transfer(object, object|string);
 string  creator F_GETUID (object);
-#endif
+
+
+        /* Packages */
+
+#ifdef USE_ALISTS  /* Alists */
+
+mixed   assoc(mixed, mixed *, mixed|void, mixed|void);
+mixed   insert_alist(mixed, mixed, ...);
+mixed  *intersect_alist(mixed *,mixed *);
+mixed  *order_alist(mixed *, void|mixed *, ...);
+
+#endif /* USE_ALISTS */
+
+
+#ifdef USE_MYSQL  /* mySQL-Support */
+
+int     db_affected_rows(int);
+string *db_coldefs(int);
+string  db_conv_string(string);
+int     db_close(int);
+int     db_connect(string, void|string, void|string);
+string  db_error(int);
+int     db_exec(int, string);
+mixed   db_fetch(int);
+int    *db_handles();
+int     db_insert_id(int);
+
+#endif /* USE_MYSQL */
 
 
 /* The following functions are optional. Comment out the ones not wanted.
@@ -614,38 +642,5 @@ string  process_string(string);
 int     set_light(int);
 int     set_is_wizard(object, int default: F_CONST1);
 
-
-        /* Packages */
-
-
-        /* Alists */
-
-#ifdef USE_ALISTS
-
-mixed   assoc(mixed, mixed *, mixed|void, mixed|void);
-mixed   insert_alist(mixed, mixed, ...);
-mixed  *intersect_alist(mixed *,mixed *);
-mixed  *order_alist(mixed *, void|mixed *, ...);
-
-#endif /* USE_ALISTS */
-
-
-        /* mySQL-Support */
-
-#ifdef USE_MYSQL
-
-
-int     db_affected_rows(int);
-string *db_coldefs(int);
-string  db_conv_string(string);
-int     db_close(int);
-int     db_connect(string, void|string, void|string);
-string  db_error(int);
-int     db_exec(int, string);
-mixed   db_fetch(int);
-int    *db_handles();
-int     db_insert_id(int);
-
-#endif /* USE_MYSQL */
 
 /***************************************************************************/

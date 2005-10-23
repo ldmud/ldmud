@@ -755,7 +755,7 @@ function_exists (string_t *fun, object_t *ob, Bool show_hidden
     funstart = progp->program  + (flags & FUNSTART_MASK);
 
     /* And after all this, the function may be undefined */
-    if (FUNCTION_CODE(funstart)[0] == F_UNDEF)
+    if (is_undef_function(funstart))
     {
         return NULL;
     }
@@ -1858,7 +1858,7 @@ f_functionlist (svalue_t *sp)
             /* If the function starts with the bytecodes F_UNDEF,
              * it referenced but undefined. But you know that.
              */
-            if (FUNCTION_CODE(funstart)[0] == F_UNDEF)
+            if (is_undef_function(funstart))
             {
                 active_flags |= NAME_UNDEFINED;
             }
@@ -3070,8 +3070,6 @@ f_tell_object (svalue_t *sp)
 } /* f_tell_object() */
 
 /*-------------------------------------------------------------------------*/
-#ifdef F_EXPORT_UID
-
 svalue_t *
 f_export_uid (svalue_t *sp)
 
@@ -3100,11 +3098,7 @@ f_export_uid (svalue_t *sp)
     return sp;
 } /* f_export_uid() */
 
-#endif
-
 /*-------------------------------------------------------------------------*/
-#ifdef F_GETEUID
-
 svalue_t *
 f_geteuid (svalue_t *sp)
 
@@ -3139,11 +3133,7 @@ f_geteuid (svalue_t *sp)
     return sp;
 } /* f_geteuid() */
 
-#endif
-
 /*-------------------------------------------------------------------------*/
-#ifdef F_SETEUID
-
 svalue_t *
 f_seteuid (svalue_t *sp)
 
@@ -3206,21 +3196,9 @@ f_seteuid (svalue_t *sp)
     return argp;
 } /* f_seteuid() */
 
-#endif
-
 /*-------------------------------------------------------------------------*/
-#if defined(F_GETUID) || defined(F_CREATOR)
-#ifdef F_GETUID
-
 svalue_t *
 f_getuid (svalue_t *sp)
-
-#else
-
-svalue_t *
-f_creator (svalue_t *sp)
-
-#endif
 
 /* EFUN getuid()
  *
@@ -3249,7 +3227,6 @@ f_creator (svalue_t *sp)
     return sp;
 } /* f_getuid() == f_creator() */
 
-#endif
 
 /*=========================================================================*/
 /*                             INVENTORIES                                 */

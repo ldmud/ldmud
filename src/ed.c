@@ -46,11 +46,11 @@
 
 #include "ed.h"
 #include "actions.h"
-#include "closure.h"
 #include "comm.h"
 #include "filestat.h"
 #include "gcollect.h"
 #include "interpret.h"
+#include "lex.h"
 #include "main.h"
 #include "mregex.h"
 #include "mstrings.h"

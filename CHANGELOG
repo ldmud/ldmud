@@ -1,6 +1,14 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+15-Sep-2002 (Lars Duening)  (3.3.256)
+  - (bitstrings.c, closure, efuns.c, interpret, gcollect.c, object.c,
+     simul_efun.c, swap.c)
+       Reduced coupling to instrs.h .
+  - (closure, ed.c, lex, parse.c, parse_old.c) Reduced coupling to lang.h .
+  - (func_spec, lex.c, object) Config option COMPAT_MODE now just defines
+       the default run mode.
+
 15-Sep-2002 (Lars Duening)  (3.3.255)
   - (mstrings.c) Corrected the search statistics.
   - (prolang.y, lex, interpret.c, simulate, func_spec) New pragma

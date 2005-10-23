@@ -14806,7 +14806,7 @@ compile_file(void)
      * or inherit_file != NULL here.
      */
     epilog();
-}
+} /* compile_file() */
 
 /*-------------------------------------------------------------------------*/
 #if defined( DEBUG ) && defined ( TRACE_CODE )

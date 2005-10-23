@@ -21,7 +21,6 @@
 #include "bitstrings.h"
 
 #include "interpret.h"
-#include "instrs.h"
 #include "mstrings.h"
 #include "simulate.h"
 #include "svalue.h"
@@ -272,13 +271,17 @@ binop_bits (svalue_t *sp, int instr)
  * TODO: Apply to an optional range (start, length) only.
  */
 
+#define INSTR_OR_BITS   0
+#define INSTR_AND_BITS  1
+#define INSTR_XOR_BITS  2
+
 {
     size_t  len1, len2, arg_len;
     string_t *result, *arg;
     char *restxt, *argtxt;
     Bool  use_short; /* TRUE for AND: use shorter string for result */
 
-    use_short = (instr == F_AND_BITS);
+    use_short = (instr == INSTR_AND_BITS);
 
     /* Get the arguments.
      * Sort the two arguments in shorter and longer string.
@@ -330,11 +333,11 @@ binop_bits (svalue_t *sp, int instr)
         if (c2 > 0x3f + ' ' || c2 < ' ')
             error("Illegal bit pattern in %s character %d\n"
                    , get_f_name(instr), (int)c2);
-        if (instr == F_AND_BITS)
+        if (instr == INSTR_AND_BITS)
             restxt[arg_len] = (char)((c1-' ') & (c2-' ')) + ' ';
-        else if (instr == F_OR_BITS)
+        else if (instr == INSTR_OR_BITS)
             restxt[arg_len] = (char)((c1-' ') | (c2-' ')) + ' ';
-        else if (instr == F_XOR_BITS)
+        else if (instr == INSTR_XOR_BITS)
             restxt[arg_len] = (char)((c1-' ') ^ (c2-' ')) + ' ';
     }
 
@@ -360,7 +363,7 @@ f_or_bits (svalue_t *sp)
  */
 
 {
-    return binop_bits(sp, F_OR_BITS);
+    return binop_bits(sp, INSTR_OR_BITS);
 } /* f_or_bits() */
 
 /*-------------------------------------------------------------------------*/
@@ -377,7 +380,7 @@ f_and_bits (svalue_t *sp)
  */
 
 {
-    return binop_bits(sp, F_AND_BITS);
+    return binop_bits(sp, INSTR_AND_BITS);
 } /* f_and_bits() */
 
 /*-------------------------------------------------------------------------*/
@@ -394,7 +397,7 @@ f_xor_bits (svalue_t *sp)
  */
 
 {
-    return binop_bits(sp, F_XOR_BITS);
+    return binop_bits(sp, INSTR_XOR_BITS);
 } /* f_xor_bits() */
 
 /*-------------------------------------------------------------------------*/

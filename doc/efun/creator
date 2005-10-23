@@ -2,8 +2,9 @@ SYNOPSIS
         string creator(object ob)
 
 DESCRIPTION
-        This functions is not available in native mode, which uses
-        user-ids instead.
+        This efun is for backward compatibility only. It is only
+        available in compat mode.
+
         Returns the creator (i.e. the name of the wizard or domain) of
         the object. Default for ob is this_object().
 

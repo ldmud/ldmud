@@ -16721,6 +16721,18 @@ call_function (program_t *progp, int fx)
 } /* call_function() */
 
 /*-------------------------------------------------------------------------*/
+Bool
+is_undef_function (fun_hdr_p fun)
+
+/* Return TRUE if the function <fun> is referenced, but undefined.
+ * It's a small function, but reduces the coupling to instrs.h .
+ */
+
+{
+    return GET_CODE(FUNCTION_CODE(fun)) == F_UNDEF;
+} /* is_undef_function() */
+
+/*-------------------------------------------------------------------------*/
 int
 get_line_number (bytecode_p p, program_t *progp, string_t **namep)
 

@@ -47,7 +47,6 @@
 #include <ctype.h>
 
 #include "regexp.h"
-#include "comm.h"
 #include "interpret.h" /* eval_cost */
 #include "simulate.h"
 #include "xalloc.h"

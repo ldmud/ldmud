@@ -293,11 +293,7 @@ extern svalue_t *f_set_next_reset(svalue_t *sp);
 extern svalue_t *f_export_uid(svalue_t *sp);
 extern svalue_t *f_geteuid(svalue_t *sp);
 extern svalue_t *f_seteuid(svalue_t *sp);
-#ifndef COMPAT_MODE
 extern svalue_t *f_getuid(svalue_t *sp);
-#else
-extern svalue_t *f_creator(svalue_t *sp);
-#endif
 
 extern svalue_t *v_all_environment(svalue_t *sp, int num_arg);
 extern svalue_t *f_all_inventory(svalue_t *sp);
@@ -316,7 +312,7 @@ extern svalue_t *v_tell_room(svalue_t *sp, int num_arg);
 extern svalue_t *f_set_environment(svalue_t *sp);
 #ifdef F_TRANSFER
 extern svalue_t *f_transfer(svalue_t *svp);
-#endif /* F_TRANSFER */
+#endif
 
 #ifdef F_SET_LIGHT
 extern void add_light(object_t *p, int n);

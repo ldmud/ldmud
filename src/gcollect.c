@@ -83,7 +83,6 @@
 #include "exec.h"
 #include "filestat.h"
 #include "heartbeat.h"
-#include "instrs.h"
 #include "interpret.h"
 #include "lex.h"
 #include "main.h"
@@ -762,12 +761,7 @@ gc_count_ref_in_vector (svalue_t *svp, size_t num
                 ob = p->u.ob;
                 if (ob->flags & O_DESTRUCTED)
                 {
-                    p->x.closure_type = F_UNDEF+CLOSURE_EFUN;
-                    p->u.ob = master_ob;
-                    master_ob->ref++;
-#if defined(CHECK_OBJECT_REF) && defined(DEBUG)
-                    master_ob->extra_ref++;
-#endif
+                    store_undef_closure(p);
                     reference_destructed_object(ob);
                 }
                 else
@@ -853,12 +847,7 @@ gc_count_ref_in_closure (svalue_t *csvp)
         }
         else
         {
-            csvp->x.closure_type = F_UNDEF+CLOSURE_EFUN;
-            csvp->u.ob = master_ob;
-            master_ob->ref++;
-#if defined(CHECK_OBJECT_REF) && defined(DEBUG)
-            master_ob->extra_ref++;
-#endif
+            store_undef_closure(csvp);
         }
         return;
     }
@@ -903,12 +892,7 @@ gc_count_ref_in_closure (svalue_t *csvp)
             }
             else
             {
-                csvp->x.closure_type = F_UNDEF+CLOSURE_EFUN;
-                csvp->u.ob = master_ob;
-                master_ob->ref++;
-#if defined(CHECK_OBJECT_REF) && defined(DEBUG)
-                master_ob->extra_ref++;
-#endif
+                store_undef_closure(csvp);
             }
         }
         else

@@ -15,13 +15,13 @@
  * operator closure:   type = CLOSURE_OPERATOR (-0x1800) + instr
  *   These are the closures for the LPC operators (e.g. #'&& or #'?).
  *   The 'instr' is usually the machine instruction implementing
- *   the operator (see symbol_operator() for the exact mapping).
+ *   the operator (see lex::symbol_operator() for the exact mapping).
  *   u.ob is the object this closure is bound to.
  *
  * efun closure:       type = CLOSURE_EFUN (-0x1000) + instr
  *   These are the closures for the LPC efuns (e.g. #'atan or #'call_other).
  *   The 'instr' is usually the machine instruction implementing
- *   the efun (see symbol_efun() for the exact mapping).
+ *   the efun (see lex::symbol_efun() for the exact mapping).
  *   u.ob is the object this closure is bound to.
  *
  * operator and efun closure could be implemented using the same number
@@ -153,7 +153,6 @@
 #include "exec.h"
 #include "instrs.h"
 #include "interpret.h"
-#include "lang.h"     /* for the L_ tokens */
 #include "lex.h"
 #include "main.h"
 #include "mstrings.h"
@@ -4910,664 +4909,39 @@ free_closure (svalue_t *svp)
 } /* free_closure() */
 
 /*-------------------------------------------------------------------------*/
-int
-symbol_operator (char *symbol, char **endp)
+void
+store_undef_closure (svalue_t *sp)
 
-/* Analyse the text starting at <symbol> (which points to the first character
- * after the assumed "#'") if it describes a closure symbol. If yes, return
- * the operator code and set *<endp> to the first character after the
- * recognized operator.
- * If no operator can be recognized, return -1 and set *<endp> to <symbol>.
- *
- * The function is called from lex.c, ed.c and from symbol_efun().
- *
- * Recognized are the following operators:
- *
- *   #'+=     -> F_ADD_EQ               
- *   #'++     -> F_POST_INC             
- *   #'+      -> F_ADD                  
- *   #'-=     -> F_SUB_EQ               
- *   #'--     -> F_POST_DEC             
- *   #'-      -> F_SUBTRACT             
- *   #'*=     -> F_MULT_EQ              
- *   #'*      -> F_MULTIPLY             
- *   #'/=     -> F_DIV_EQ               
- *   #'/      -> F_DIVIDE               
- *   #'%=     -> F_MOD_EQ               
- *   #'%      -> F_MOD                  
- *   #',      -> F_POP_VALUE            
- *   #'^=     -> F_XOR_EQ               
- *   #'^      -> F_XOR                  
- *   #'||     -> F_LOR                  
- *   #'|=     -> F_OR_EQ                
- *   #'|      -> F_OR                   
- *   #'&&     -> F_LAND                 
- *   #'&=     -> F_AND_EQ               
- *   #'&      -> F_AND                  
- *   #'~      -> F_COMPL                
- *   #'<=     -> F_LE                   
- *   #'<<=    -> F_LSH_EQ               
- *   #'<<     -> F_LSH                  
- *   #'<      -> F_LT                   
- *   #'>=     -> F_GE                   
- *   #'>>=    -> F_RSH_EQ               
- *   #'>>>=   -> F_RSHL_EQ               
- *   #'>>>    -> F_RSHL                  
- *   #'>>     -> F_RSH                  
- *   #'>      -> F_GT                   
- *   #'==     -> F_EQ                   
- *   #'=      -> F_ASSIGN               
- *   #'!=     -> F_NE                   
- *   #'!      -> F_NOT                  
- *   #'?!     -> F_BRANCH_WHEN_NON_ZERO 
- *   #'?      -> F_BRANCH_WHEN_ZERO     
- *   #'[..]   -> F_RANGE                
- *   #'[..<]  -> F_NR_RANGE             
- *   #'[<..]  -> F_RN_RANGE             
- *   #'[<..<] -> F_RR_RANGE             
- *   #'[..>]  -> F_NA_RANGE             
- *   #'[>..]  -> F_AN_RANGE             
- *   #'[<..>] -> F_RA_RANGE             
- *   #'[>..<] -> F_AR_RANGE             
- *   #'[>..>] -> F_AA_RANGE             
- *   #'[..    -> F_NX_RANGE
- *   #'[<..   -> F_RX_RANGE       
- *   #'[>..   -> F_AX_RANGE       
- *   #'[,]    -> F_MAP_INDEX            
- *   #'[      -> F_INDEX                
- *   #'[<     -> F_RINDEX               
- *   #'[>     -> F_AINDEX               
- *   #'({     -> F_AGGREGATE            
- *   #'([     -> F_M_CAGGREGATE         
-#ifdef USE_STRUCTS
- *   #'(<     -> F_S_AGGREGATE         
-#endif 
- *
- * Note that all operators must have a instrs[].Default value of '0'.
- * If necessary, update the lex::init_lexer()::binary_operators[] to
- * include the operator values.
+/* Store into <sp> an efun closure to F_UNDEF, referencing the
+ * master object. The old value of *sp is overwritten.
+ * It is called by the GC to replace closures bound to destructed
+ * objects.
  */
 
 {
-    char c;
-    int ret;
-
-    switch(*symbol)
-    {
-    case '+':
-        c = symbol[1];
-        if (c == '=')
-        {
-            symbol++;
-            ret = F_ADD_EQ;
-            break;
-        }
-        else if (c == '+')
-        {
-            symbol++;
-            ret = F_POST_INC;
-            break;
-        }
-        ret = F_ADD;
-        break;
-
-    case '-':
-        c = symbol[1];
-        if (c == '=')
-        {
-            symbol++;
-            ret = F_SUB_EQ;
-            break;
-        }
-        else if (c == '-')
-        {
-            symbol++;
-            ret = F_POST_DEC;
-            break;
-        }
-        ret = F_SUBTRACT;
-        break;
-
-    case '*':
-        if (symbol[1] == '=')
-        {
-            symbol++;
-            ret = F_MULT_EQ;
-            break;
-        }
-        ret = F_MULTIPLY;
-        break;
-
-    case '/':
-        if (symbol[1] == '=')
-        {
-            symbol++;
-            ret = F_DIV_EQ;
-            break;
-        }
-        ret = F_DIVIDE;
-        break;
-
-    case '%':
-        if (symbol[1] == '=')
-        {
-            symbol++;
-            ret = F_MOD_EQ;
-            break;
-        }
-        ret = F_MOD;
-        break;
-
-    case ',':
-        ret = F_POP_VALUE;
-        break;
-
-    case '^':
-        if (symbol[1] == '=')
-        {
-            symbol++;
-            ret = F_XOR_EQ;
-            break;
-        }
-        ret = F_XOR;
-        break;
-
-    case '|':
-        c = *++symbol;
-        if (c == '|')
-        {
-            ret = F_LOR;
-            break;
-        }
-        else if (c == '=')
-        {
-            ret = F_OR_EQ;
-            break;
-        }
-        symbol--;
-        ret = F_OR;
-        break;
-
-    case '&':
-        c = *++symbol;
-        if (c == '&')
-        {
-            ret = F_LAND;
-            break;
-        }
-        else if (c == '=')
-        {
-            ret = F_AND_EQ;
-            break;
-        }
-        symbol--;
-        ret = F_AND;
-        break;
-
-    case '~':
-        ret = F_COMPL;
-        break;
-
-    case '<':
-        c = *++symbol;
-        if (c == '=')
-        {
-            ret = F_LE;
-            break;
-        }
-        else if (c == '<')
-        {
-            if (symbol[1] == '=')
-            {
-                symbol++;
-                ret = F_LSH_EQ;
-                break;
-            }
-            ret = F_LSH;
-            break;
-        }
-        symbol--;
-        ret = F_LT;
-        break;
-
-    case '>':
-        c = *++symbol;
-        if (c == '=')
-        {
-            ret = F_GE;
-            break;
-        }
-        else if (c == '>')
-        {
-            if (symbol[1] == '=')
-            {
-                symbol++;
-                ret = F_RSH_EQ;
-                break;
-            }
-            if (symbol[1] == '>')
-            {
-                symbol++;
-                if (symbol[1] == '=')
-                {
-                    symbol++;
-                    ret = F_RSHL_EQ;
-                    break;
-                }
-                ret = F_RSHL;
-                break;
-            }
-            ret = F_RSH;
-            break;
-        }
-        symbol--;
-        ret = F_GT;
-        break;
-
-    case '=':
-        if (symbol[1] == '=')
-        {
-            symbol++;
-            ret = F_EQ;
-            break;
-        }
-        ret = F_ASSIGN;
-        break;
-
-    case '!':
-        if (symbol[1] == '=')
-        {
-            symbol++;
-            ret = F_NE;
-            break;
-        }
-        ret = F_NOT;
-        break;
-
-    case '?':
-        if (symbol[1] == '!')
-        {
-            symbol++;
-            ret = F_BRANCH_WHEN_NON_ZERO;
-            break;
-        }
-        ret = F_BRANCH_WHEN_ZERO;
-        break;
-
-    case '[':
-        c = *++symbol;
-        if (c == '<')
-        {
-            if (symbol[1] == '.' && symbol[2] == '.')
-            {
-                c = *(symbol+=3);
-                if (c == ']')
-                {
-                    ret = F_RN_RANGE;
-                    break;
-                }
-                else if (c == '>' && symbol[1] == ']')
-                {
-                    symbol++;
-                    ret = F_RA_RANGE;
-                    break;
-                }
-                else if (c == '<' && symbol[1] == ']')
-                {
-                    symbol++;
-                    ret = F_RR_RANGE;
-                    break;
-                }
-                symbol--;
-                ret = F_RX_RANGE;
-                break;
-            }
-            ret = F_RINDEX;
-            break;
-        }
-        else if (c == '>')
-        {
-            if (symbol[1] == '.' && symbol[2] == '.')
-            {
-                c = *(symbol+=3);
-                if (c == ']')
-                {
-                    ret = F_AN_RANGE;
-                    break;
-                }
-                else if (c == '>' && symbol[1] == ']')
-                {
-                    symbol++;
-                    ret = F_AA_RANGE;
-                    break;
-                }
-                else if (c == '<' && symbol[1] == ']')
-                {
-                    symbol++;
-                    ret = F_AR_RANGE;
-                    break;
-                }
-                symbol--;
-                ret = F_AX_RANGE;
-                break;
-            }
-            ret = F_AINDEX;
-            break;
-        }
-        else if (c == '.' && symbol[1] == '.')
-        {
-            c = *(symbol+=2);
-            if (c == ']') {
-                ret = F_RANGE;
-                break;
-            } else if (c == '>' && symbol[1] == ']') {
-                symbol++;
-                ret = F_NA_RANGE;
-                break;
-            } else if (c == '<' && symbol[1] == ']') {
-                symbol++;
-                ret = F_NR_RANGE;
-                break;
-            }
-            symbol--;
-            ret = F_NX_RANGE;
-            break;
-        }
-        else if (c == ',' && symbol[1] == ']')
-        {
-            symbol++;
-            ret = F_MAP_INDEX;
-            break;
-        }
-        symbol--;
-        ret = F_INDEX;
-        break;
-
-    case '(':
-        c = *++symbol;
-        if (c == '{')
-        {
-            ret = F_AGGREGATE;
-            break;
-        }
-        else if (c == '[')
-        {
-            ret = F_M_CAGGREGATE;
-            break;
-        }
-#ifdef USE_STRUCTS
-        else if (c == '<')
-        {
-            ret = F_S_AGGREGATE;
-            break;
-        }
-#endif /* USE_STRUCTS */
-        symbol--;
-        /* FALL THROUGH */
-    default:
-        ret = -1;
-        symbol--;
-        break;
-    }
-
-    /* Symbol is not an operator */
-    *endp = symbol+1;
-    return ret;
-} /* symbol_operator() */
+    sp->type = T_CLOSURE;
+    sp->x.closure_type = F_UNDEF+CLOSURE_EFUN;
+    sp->u.ob = master_ob;
+    master_ob->ref++;
+#if defined(CHECK_OBJECT_REF) && defined(DEBUG)
+    master_ob->extra_ref++;
+#endif
+} /* store_undef_closure() */
 
 /*-------------------------------------------------------------------------*/
-void
-symbol_efun (svalue_t *sp)
+Bool
+is_undef_closure (svalue_t *sp)
 
-/* This function implements the efun symbol_function(). It is also called by
- * parse_command to lookup the (simul)efuns find_living() and find_player()
- * at runtime.
+/* Return TRUE if <sp> is an efun closure to F_UNDEF.
+ * It's a simple function, but it reduces the couplings to instrs.h .
  *
- * The function takes the string/symbol svalue <sp> and looks up the efun
- * or operator given by <sp>->u.string. If the efun/operator is found, the
- * value <sp> is turned into the proper closure value, otherwise it is set
- * to the numeric value 0.
- *
- * Accepted symbols are:
- *
- *   #'<operator>: see symbol_operator()
- *
- *   #'if          -> F_BRANCH_WHEN_ZERO       +CLOSURE_OPERATOR
- *   #'do          -> F_BBRANCH_WHEN_NON_ZERO  +CLOSURE_OPERATOR
- *   #'while       -> F_BBRANCH_WHEN_ZERO      +CLOSURE_OPERATOR
- *   #'foreach     -> F_FOREACH                +CLOSURE_OPERATOR
- *   #'continue    -> F_BRANCH                 +CLOSURE_OPERATOR
- *   #'default     -> F_CSTRING0               +CLOSURE_OPERATOR
- *   #'switch      -> F_SWITCH                 +CLOSURE_OPERATOR
- *   #'break       -> F_BREAK                  +CLOSURE_OPERATOR
- *   #'return      -> F_RETURN                 +CLOSURE_OPERATOR
- *   #'sscanf      -> F_SSCANF                 +CLOSURE_OPERATOR
- *   #'catch       -> F_CATCH                  +CLOSURE_OPERATOR
- *
- *   #'<efun>      -> F_<efun>                 +CLOSURE_EFUN
- *   #'<sefun>     -> <function-index>         +CLOSURE_SIMUL_EFUN
+ * Called by swap.c and efuns.c
  */
 
 {
-    Bool efun_override = MY_FALSE;
-    char *str;
-    size_t len;
-
-    str = get_txt(sp->u.str);
-    len = mstrsize(sp->u.str);
-
-    /* If the first character is alphanumeric, the string names a function,
-     * otherwise an operator.
-     */
-    if (isalunum(*str))
-    {
-    	/* It is a function or keyword.
-    	 */
-
-        ident_t *p;
-        char *cstr;
-
-        /* Take care of an leading efun override */
-        
-        if ( len >= 6 && !strncmp(str, "efun::", 6) )
-        {
-            str += 6;
-            len -= 6;
-            efun_override = MY_TRUE;
-        }
-
-        /* Convert the string_t into a C string for local purposes */
-        cstr = alloca(len+1);
-        if (!cstr)
-        {
-            inter_sp = sp;
-            outofmem(len, "identifier");
-        }
-        memcpy(cstr, str, len);
-        cstr[len] = '\0';
-
-        /* Lookup the identifier in the string in the global table
-         * of identifers.
-         */
-        if ( !(p = make_shared_identifier(cstr, I_TYPE_GLOBAL, 0)) )
-        {
-            inter_sp = sp;
-            outofmem(len, "identifier");
-        }
-
-        /* Loop through the possible multiple definitions.
-         */
-        while (p->type > I_TYPE_GLOBAL)
-        {
-            /* Is it a reserved word? */
-            if (p->type == I_TYPE_RESWORD)
-            {
-                int code;
-
-                switch(code = p->u.code)
-                {
-                default:
-                    /* Unimplemented reserved word */
-                    if ( NULL != (p = p->inferior) )
-                        continue;
-                    goto undefined_function;
-
-                case L_IF:
-                    code = F_BRANCH_WHEN_ZERO;
-                    break;
-
-                case L_DO:
-                    code = F_BBRANCH_WHEN_NON_ZERO;
-                    break;
-
-                case L_WHILE:
-                    /* the politically correct code   /
-                    /  was already taken, see above. */
-                    code = F_BBRANCH_WHEN_ZERO;
-                    break;
-
-                case L_FOREACH:
-                    code = F_FOREACH;
-                    break;
-
-                case L_CONTINUE:
-                    code = F_BRANCH;
-                    break;
-
-                case L_DEFAULT:
-                    code = F_CSTRING0;
-                    break;
-
-                case L_SWITCH:
-                    code = F_SWITCH;
-                    break;
-                case L_BREAK:
-                    code = F_BREAK;
-                    break;
-                case L_RETURN:
-                    code = F_RETURN;
-                    break;
-                case L_SSCANF:
-                    code = F_SSCANF;
-                    break;
-#ifdef SUPPLY_PARSE_COMMAND
-                case L_PARSE_COMMAND:
-                    code = F_PARSE_COMMAND;
-                    break;
-#endif
-                case L_CATCH:
-                    code = F_CATCH;
-                    break;
-                }
-
-                /* Got the reserved word: return the closure value */
-                
-                free_svalue(sp);
-                sp->type = T_CLOSURE;
-                sp->x.closure_type = (short)(code + CLOSURE_OPERATOR);
-                sp->u.ob = ref_object(current_object, "symbol_efun");
-                return;
-            }
-            if ( !(p = p->inferior) )
-                break; /* Found a valid definition */
-        }
-
-        /* It is a real identifier */
-        
-        if (!p || p->type < I_TYPE_GLOBAL
-         || (( efun_override || p->u.global.sim_efun < 0 )
-             && p->u.global.efun < 0)
-           )
-        {
-            /* But it's a (new) local identifier or a non-existing function */
-            if (p && p->type == I_TYPE_UNKNOWN)
-                free_shared_identifier(p);
-
-undefined_function:
-            free_svalue(sp);
-            put_number(sp, 0);
-            return;
-        }
-
-        /* Attempting to override a 'nomask' simul efun?
-         * Check it with a privilege violation.
-         */
-        if (efun_override && p->u.global.sim_efun >= 0
-         && simul_efunp[p->u.global.sim_efun].flags & TYPE_MOD_NO_MASK)
-        {
-            svalue_t *res;
-
-            inter_sp = sp;
-            push_ref_string(inter_sp, STR_NOMASK_SIMUL_EFUN);
-            push_ref_valid_object(inter_sp, current_object, "nomask simul_efun");
-            push_ref_string(inter_sp, p->name);
-            res = apply_master(STR_PRIVILEGE, 3);
-            
-            if (!res || res->type != T_NUMBER || res->u.number < 0)
-            {
-            	/* Override attempt is fatal */
-                error(
-                  "Privilege violation: nomask simul_efun %s\n",
-                  get_txt(p->name)
-                );
-            }
-            else if (!res->u.number)
-            {
-            	/* Override attempt not fatal, but rejected nevertheless */
-                efun_override = MY_FALSE;
-            }
-        }
-
-        /* Symbol is ok - create the closure value */
-        
-        free_svalue(sp);
-        sp->type = T_CLOSURE;
-        if (!efun_override && p->u.global.sim_efun >= 0)
-        {
-            /* Handle non-overridden simul efuns */
-          
-            sp->x.closure_type = (short)(p->u.global.sim_efun + CLOSURE_SIMUL_EFUN);
-            sp->u.ob = ref_object(current_object, "symbol_efun");
-        }
-        else
-        {
-            /* Handle efuns (possibly aliased).
-             * We know that p->u.global.efun >= 0 here.
-             */
-            sp->x.closure_type = (short)(p->u.global.efun + CLOSURE_EFUN);
-            if (sp->x.closure_type > LAST_INSTRUCTION_CODE + CLOSURE_EFUN)
-                sp->x.closure_type = (short)(CLOSURE_EFUN +
-                  efun_aliases[
-                    sp->x.closure_type - CLOSURE_EFUN - LAST_INSTRUCTION_CODE - 1]);
-            sp->u.ob = ref_object(current_object, "symbol_efun");
-        }
-    }
-    else
-    {
-        int i;
-        char *end;
-
-        i = symbol_operator(str, &end);
-        /* If there was a valid operator with trailing junk, *end, but i >= 0.
-         * On the other hand, if we passed the empty string, i < 0, but !*end.
-         * Thus, we have to test for (*end || i < 0) .
-         */
-
-        free_svalue(sp);
-        if (*end || i < 0)
-        {
-            put_number(sp, 0);
-            return;
-        }
-        sp->type = T_CLOSURE;
-        if (instrs[i].Default == -1) {
-            sp->x.closure_type = (short)(i + CLOSURE_OPERATOR);
-        } else {
-            sp->x.closure_type = (short)(i + CLOSURE_EFUN);
-        }
-        sp->u.ob = ref_object(current_object, "symbol_efun");
-    }
-} /* symbol_efun() */
+    return (sp->type == T_CLOSURE)
+        && (sp->x.closure_type == F_UNDEF+CLOSURE_EFUN);
+} /* is_undef_closure() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -5801,8 +5175,12 @@ f_symbol_function (svalue_t *sp)
         /* If it's the number 0, an efun symbol is desired */
         if (sp->type == T_NUMBER && sp->u.number == 0)
         {
+            string_t *name;
             sp--;
-            symbol_efun(sp);
+            inter_sp = sp;
+            name = sp->u.str;
+            symbol_efun(name, sp);
+            free_mstring(name);
             return sp;
         }
 

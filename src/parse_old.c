@@ -115,9 +115,9 @@
 
 #include "actions.h"
 #include "array.h"
-#include "closure.h"
 #include "interpret.h"
 #include "gcollect.h"
+#include "lex.h"
 #include "main.h"
 #include "mstrings.h"
 #include "object.h"
@@ -234,41 +234,29 @@ find_living_object (const char *name, Bool player)
  */
 
 {
-    static string_t *function_names[2] = { NULL };
-
-    svalue_t *sp, *svp;
-
-    if (function_names[0] == NULL)
-    {
-        function_names[0] = ref_mstring(STR_PC_FIND_LIVING);
-        function_names[1] = ref_mstring(STR_PC_FIND_PLAYER);
-    }
-
-    sp = inter_sp;
-    sp++;
+    svalue_t *svp;
 
     /* Get or create the closure for the function to call */
     svp = &find_living_closures[player ? 1 : 0];
     if (svp->type == T_INVALID)
     {
         /* We have to create the closure */
-        put_ref_string(sp, function_names[player ? 1 : 0]);
-        inter_sp = sp;
-        symbol_efun(sp);
-        *svp = *sp;
-        inter_sp = sp - 1;
+        symbol_efun(player ? STR_PC_FIND_PLAYER : STR_PC_FIND_LIVING, svp);
     }
 
     /* Call the closure */
-    put_c_string(sp, name);
-    if (!sp->u.str)
+    put_c_string(inter_sp+1, name);
+    if (!inter_sp[1].u.str)
         error("(parse_command) Out of memory (%lu bytes) for result\n"
              , (unsigned long) strlen(name));
-    inter_sp = sp;
+    inter_sp++;
     call_lambda(svp, 1);
     pop_stack();
+      /* In theory this could lose the last ref to the result object.
+       * In praxis, those objects have more refs.
+       */
     
-    return sp->type != T_OBJECT ? NULL : sp->u.ob;
+    return inter_sp[1].type != T_OBJECT ? NULL : inter_sp[1].u.ob;
 } /* find_living_object() */
 
 /*-------------------------------------------------------------------------*/

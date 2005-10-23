@@ -100,7 +100,7 @@
 #include "comm.h"
 #include "dumpstat.h"
 #include "heartbeat.h"
-#include "instrs.h"
+#include "instrs.h" /* F_SET_IS_WIZARD, F_PROCESS_STRING */
 #include "interpret.h"
 #include "main.h"
 #include "mapping.h"
@@ -5476,7 +5476,7 @@ f_to_object (svalue_t *sp)
     case T_CLOSURE:
         n = sp->x.closure_type;
         o = sp->u.ob;
-        if (n == CLOSURE_EFUN + F_UNDEF)
+        if (is_undef_closure(sp))
             o = NULL;
         else if (CLOSURE_MALLOCED(n))
         {
@@ -7238,8 +7238,6 @@ f_localtime (svalue_t *sp)
 } /* f_localtime() */
 
 /*-------------------------------------------------------------------------*/
-#ifdef F_RUSAGE
-
 svalue_t *
 f_rusage (svalue_t *sp)
 
@@ -7299,8 +7297,6 @@ f_rusage (svalue_t *sp)
 
     return sp;
 } /* f_rusage() */
-
-#endif /* F_RUSAGE */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *

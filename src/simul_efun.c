@@ -38,7 +38,6 @@
 #include "array.h"
 #include "exec.h"
 #include "gcollect.h"
-#include "instrs.h"
 #include "interpret.h"
 #include "lex.h"
 #include "mstrings.h"
@@ -305,7 +304,7 @@ get_simul_efun_object (void)
         funstart = inherit_progp->program + (flags2 & FUNSTART_MASK);
 
         /* Don't stumble over undefined functions */
-        if (GET_CODE(FUNCTION_CODE(funstart)) == F_UNDEF)
+        if (is_undef_function(funstart))
         {
             flags |= NAME_UNDEFINED;
         }

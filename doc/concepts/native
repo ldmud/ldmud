@@ -95,13 +95,9 @@ DESCRIPTION
         Efuns In General
           creator(), transfer()
             These exist only in compat mode (creator() is
-            identical with getuid() from !compat mode).
+            identical with getuid()).
 
-          getuid()
-            Exists only in !compat mode (getuid() is identical with
-            creator()).
-
-          file_name(),function_exists()
+          object_name(),function_exists()
             In !compat mode, the returned filenames start with a
             leading '/', in compat mode they don't.
 
