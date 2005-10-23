@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+03-Oct-2002 (Lars Duening)  (3.3.270)
+  - (prolang.y) The new inline closures is alpha-complete: I think I have
+       implemented everything, but I haven't tested it yet.
+  - (lex.c, prolang.y) Some internal changes to make implementation of
+       new inline closures simpler.
+
 02-Oct-2002 (Lars Duening)  (3.3.269)
   - (prolang.y) Added the basic infrastructure to compile an inline closure.
        Still missing: context recognition, translation of local variable

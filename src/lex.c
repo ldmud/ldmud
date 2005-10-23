@@ -232,6 +232,7 @@ static Mempool lexpool = NULL;
  * after the macro use), then outp is set back to point at the beginning
  * of the added text, lexing the just expanded text next.
  *
+#ifndef USE_NEW_INLINES
  * Functionals (inline functions) are somewhat similar to macros. When a
  * definition '(: ... :)' is encountered, a copy of text between the
  * delimiters is stored verbatim in the list of inline functions, starting at
@@ -240,6 +241,7 @@ static Mempool lexpool = NULL;
  * and the compiler is at a safe place to accept a function definition
  * (signalled in insert_inline_fun_now), the text of the pending functions is
  * inserted into the input stream like a macro.
+#endif
  */
 
 static int yyin_des;
@@ -788,6 +790,9 @@ init_lexer(void)
 #endif
 #ifdef USE_STRUCTS
     add_permanent_define("__LPC_STRUCTS__", -1, string_copy("1"), MY_FALSE);
+#endif
+#ifdef USE_NEW_INLINES
+    add_permanent_define("__LPC_INLINE_CLOSURES__", -1, string_copy("1"), MY_FALSE);
 #endif
     if (wizlist_name[0] != '\0')
     {
@@ -2545,6 +2550,20 @@ inc_open (char *buf, char *name, mp_int namelen, char delim)
     /* File not found */
     return -1;
 } /* inc_open() */
+
+/*-------------------------------------------------------------------------*/
+#ifdef USE_NEW_INLINES
+void *
+get_include_handle (void)
+
+/* Helper function for inline closures: return the current inctop
+ * setting so that the compiler can check if a closures spans files.
+ */
+
+{
+    return (void*)inctop;
+} /* get_include_handle() */
+#endif /* USE_NEW_INLINES */
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
@@ -5172,7 +5191,7 @@ yylex1 (void)
                 return p->u.code;
 
             case I_TYPE_LOCAL:
-                yylval.number = p->u.local.num;
+                yylval.ident = p;
                 outp = yyp;
                 return L_LOCAL;
 

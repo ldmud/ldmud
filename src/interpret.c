@@ -12656,11 +12656,13 @@ again:
          *
          * <var_ix> is a uint8.
          */
-#ifdef DEBUG
+
         if (inter_context == NULL)
-            fatal("(eval_instruction) context_identifier: "
+            error("(eval_instruction) context_identifier: "
                   "inter_context is NULL\n");
-#endif
+            /* May happen if somebody does a funcall(symbol_function())
+             * on the lfun of an context closure.
+             */
 
         sp++;
         assign_checked_svalue_no_free(sp, inter_context+LOAD_UINT8(pc));
@@ -12677,11 +12679,13 @@ again:
          */
         unsigned short var_index;
 
-#ifdef DEBUG
+
         if (inter_context == NULL)
-            fatal("(eval_instruction) context_identifier16: "
+            error("(eval_instruction) context_identifier16: "
                   "inter_context is NULL\n");
-#endif
+            /* May happen if somebody does a funcall(symbol_function())
+             * on the lfun of an context closure.
+             */
 
         LOAD_SHORT(var_index, pc);
         sp++;
@@ -12694,11 +12698,13 @@ again:
          *
          * <num> is an uint8.
          */
-#ifdef DEBUG
+
         if (inter_context == NULL)
-            fatal("(eval_instruction) context_identifier: "
+            error("(eval_instruction) context_identifier: "
                   "inter_context is NULL\n");
-#endif
+            /* May happen if somebody does a funcall(symbol_function())
+             * on the lfun of an context closure.
+             */
 
         sp++;
         sp->type = T_LVALUE;
@@ -12714,11 +12720,13 @@ again:
          */
         unsigned short var_index;
 
-#ifdef DEBUG
+
         if (inter_context == NULL)
-            fatal("(eval_instruction) context_identifier: "
+            error("(eval_instruction) context_identifier: "
                   "inter_context is NULL\n");
-#endif
+            /* May happen if somebody does a funcall(symbol_function())
+             * on the lfun of an context closure.
+             */
 
         LOAD_SHORT(var_index, pc);
         sp++;

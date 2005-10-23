@@ -74,6 +74,16 @@
  * these instructions can be modified to generated protected lvalues as well.
  * TODO: This whole thing is quite complex and not very well documented.
  * TODO:: It's propably easier to rewrite interpreter and compiler...
+ *
+#ifdef USE_NEW_INLINES
+ * Another challenge is the compilation of inline closures, as they
+ * are implemented as separate lfuns (with synthetic names), but encountered
+ * in the middle of a regular lfun or even another inline closure. The
+ * compiler therefore stores his state when it recognizes another
+ * inline closures, and then resets its state as if a normal lfun is
+ * compiled. When the inline closure is complete, its data is moved into
+ * a backup storage area, and the compiler restores its previous state.
+#endif
  *---------------------------------------------------------------------------
  */
 
@@ -373,10 +383,27 @@ enum e_internal_areas {
     * a chain is marked by a negative next-index.
     */
 
+ , A_FULL_LOCAL_TYPES
+   /* (fulltype_t) The full types of local and context variables.
+#ifdef USE_NEW_INLINES
+    * For normal functions, only the beginning of the area is used.
+    * The rest is used stack-wise for nested inline closures.
+#endif
+    */
+
+ , A_LOCAL_TYPES
+   /* The short type (ie: just the type, no visibility information) of
+    * the local and context variables.
+#ifdef USE_NEW_INLINES
+    * For normal functions, only the beginning of the area is used.
+    * The rest is used stack-wise for nested inline closures.
+#endif
+    */
+
 %ifdef USE_NEW_INLINES
  , A_INLINE_PROGRAM
-    /* (bytecode_t): Program saved from the compiled but not yet inserted
-     * inline closures.
+    /* (bytecode_t, char): Program and linenumbers saved from the compiled
+     * but not yet inserted inline closures.
      */
  , A_INLINE_CLOSURE
     /* (inline_closure_t): The currently pending inline closures. The lexical
@@ -417,6 +444,15 @@ static mem_block_t mem_block[NUMAREAS];
 
 #define CURRENT_PROGRAM_SIZE (mem_block[A_PROGRAM].current_size)
   /* The current program size.
+   */
+
+
+#define LINENUMBER_BLOCK ((char *)(mem_block[A_LINENUMBERS].block))
+  /* The current linenumber block, properly typed.
+   */
+
+#define LINENUMBER_SIZE (mem_block[A_LINENUMBERS].current_size)
+  /* The current linenumber data size.
    */
 
 
@@ -524,6 +560,16 @@ static mem_block_t mem_block[NUMAREAS];
   /* Return the total number of include files encountered so far.
    */
 
+#define FULL_LOCAL_TYPE_COUNT  (mem_block[A_FULL_LOCAL_TYPES].current_size / sizeof(fulltype_t))
+#define LOCAL_TYPE_COUNT  (mem_block[A_LOCAL_TYPES].current_size / sizeof(vartype_t))
+  /* Return the total number of types.
+   */
+
+#define FULL_LOCAL_TYPE(n) ((fulltype_t *)mem_block[A_FULL_LOCAL_TYPES].block)[n]
+#define LOCAL_TYPE(n) ((vartype_t *)mem_block[A_LOCAL_TYPES].block)[n]
+  /* Return the local/context var type at index <n>.
+   */
+
 %ifdef USE_NEW_INLINES
 #define INLINE_PROGRAM_BLOCK(n) ((bytecode_p)(mem_block[A_INLINE_PROGRAM].block + (n)))
   /* Return the inline-closure program block at address <n>, properly typed.
@@ -538,7 +584,7 @@ static mem_block_t mem_block[NUMAREAS];
    */
 
 #define INLINE_CLOSURE_COUNT  (mem_block[A_INLINE_CLOSURE].current_size/sizeof(inline_closure_t))
-  /* Return the inline-closure program block at address <n>, properly typed.
+  /* Return the number of saved inline-closures.
    */
 
 %endif /* USE_NEW_INLINES */
@@ -596,6 +642,14 @@ struct inline_closure_s
     mp_uint length;
       /* Length of the compiled code.
        */
+    mp_uint li_start;
+      /* While compiling the closure: start address of the data in
+       * A_LINENUMBERS.
+       * For pending closures: start address of the data in A_INLINE_PROGRAM.
+       */
+    mp_uint li_length;
+      /* Length of the linenumber data.
+       */
     int function;
       /* Function index
        */
@@ -610,11 +664,19 @@ struct inline_closure_s
        */
 
     /* --- Saved Globals --- */
+    int current_line;
+      /* Current line number.
+       */
+    void * include_handle;
+      /* Current include state.
+       */
     fulltype_t exact_types;
       /* The enclosing return type setting.
        */
     int block_depth;
       /* Block depth at definition point.
+       * +1: Context depth
+       * +2: Argument depth
        */
     int num_locals;
     int max_num_locals;
@@ -624,11 +686,24 @@ struct inline_closure_s
     int max_break_stack_size;
       /* Current and max break stack size at definition point.
        */
+    mp_uint full_local_type_start;
+    mp_uint local_type_start;
+    mp_uint full_context_type_start;
+    mp_uint context_type_start;
+      /* Start indices of the local/context variable type information
+       * in A_(FULL_)LOCAL_TYPES.
+       */
+    mp_uint full_local_type_size;
+    mp_uint local_type_size;
+      /* Current size of the A_(FULL_)LOCAL_TYPES memblocks.
+       */
 };
 
 static inline_closure_t * current_inline;
   /* NULL, or pointer to the current inline_closure_t structure while
    * compiling an inline closure.
+   * This variable is also used as flag that we're currently compiling
+   * an inline_closure.
    */
 
 static unsigned int inline_closure_id;
@@ -696,14 +771,29 @@ static mem_block_t type_of_arguments;
    * but will be reused.
    */
 
-static vartype_t type_of_locals[MAX_LOCAL];
+static vartype_t *type_of_locals;
   /* The short type (ie: just the type, no visibility information) of
    * the local variables.
+   * Points to a location in mem_block A_LOCAL_TYPES;
    */
    
-static fulltype_t full_type_of_locals[MAX_LOCAL];
+static fulltype_t * full_type_of_locals;
   /* The full types of the local variables.
+   * Points to a location in mem_block A_FULL_LOCAL_TYPES;
    */
+
+#ifdef USE_NEW_INLINES
+static vartype_t * type_of_context;
+  /* The short type (ie: just the type, no visibility information) of
+   * the context variables.
+   * Points to a location in mem_block A_LOCAL_TYPES;
+   */
+   
+static fulltype_t * full_type_of_context;
+  /* The full types of the context variables.
+   * Points to a location in mem_block A_FULL_LOCAL_TYPES;
+   */
+#endif /* USE_NEW_INLINES */
 
 static int current_number_of_locals = 0;
   /* Current (active) number of local variables at this point in the
@@ -1131,6 +1221,28 @@ realloc_mem_block (mem_block_t *mbp, mp_int size)
     mbp->max_size = max_size;
     return p;
 } /* realloc_mem_block() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE void
+extend_mem_block (int n, size_t size)
+
+/* Reserve <size> bytes at the current position in memory area <n>.
+ * This does increase the .current_size .
+ */
+
+{
+    mem_block_t *mbp = &mem_block[n];
+
+    if (size)
+    {
+        if (mbp->current_size + size > mbp->max_size)
+        {
+            if (!realloc_mem_block(mbp, mbp->current_size + size))
+                return;
+        }
+        mbp->current_size += size;
+    }
+} /* extend_mem_block() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
@@ -1973,13 +2085,13 @@ add_local_name (ident_t *ident, fulltype_t type, int depth, Bool may_shadow)
 
 /* Declare a new local variable <ident> with the type <type> on
  * the scope depth <depth>. If <may_shadow> is TRUE, the declaration is
- * allowed to shadow a previous one (this is used to declare inline
- * functions on the fly).
+ * allowed to shadow a previous one without generating a warning (this is
+ * used to declare inline functions on the fly).
  * Return the (adjusted) ident for the new variable.
  */
 
 {
-    if (current_number_of_locals >= MAX_LOCAL
+    if (current_number_of_locals >= MAX_LOCAL /* size of type recording array */
      || current_number_of_locals >= 256)
         yyerror("Too many local variables");
 
@@ -2002,6 +2114,9 @@ add_local_name (ident_t *ident, fulltype_t type, int depth, Bool may_shadow)
         ident->type = I_TYPE_LOCAL;
         ident->u.local.num = current_number_of_locals;
         ident->u.local.depth = depth;
+#ifdef USE_NEW_INLINES
+        ident->u.local.context = -1;
+#endif /* USE_NEW_INLINES */
 
         /* Put the ident into the list of all locals */
         if (all_locals && all_locals->u.local.depth > depth)
@@ -2022,6 +2137,151 @@ add_local_name (ident_t *ident, fulltype_t type, int depth, Bool may_shadow)
     
     return ident;
 } /* add_local_name() */
+
+/*-------------------------------------------------------------------------*/
+static ident_t *
+redeclare_local (ident_t *ident, fulltype_t type, int depth)
+
+/* Redeclare a local name <ident>, to <type> at <depth>.
+ * If this happens on a deeper level, it is legal: the new declaration
+ * is added and the new identifier is returned.
+ * If it is illegal, an yyerror() is risen and the ident of the older
+ * declaration is returned for error recovery.
+ */
+
+{
+    if (all_locals && all_locals->u.local.depth > depth)
+    {
+        fatal("List of locals clobbered: list depth %d, "
+              "block depth %d\n"
+              , all_locals->u.local.depth, depth);
+    }
+
+
+    if (ident->u.local.depth >= depth
+     || (ident->u.local.depth == 1 && depth == 2)
+#ifdef USE_NEW_INLINES
+     || (current_inline && ident->u.local.depth == current_inline->block_depth+2
+                        && depth == current_inline->block_depth+3
+        )
+#endif /* USE_NEW_INLINES */
+       )
+    {
+        yyerrorf("Illegal to redeclare local name '%s'", get_txt(ident->name));
+    }
+    else
+    {
+        ident = add_local_name(ident, type, depth, MY_FALSE);
+    }
+
+    return ident;
+} /* redeclare_local() */
+
+#ifdef USE_NEW_INLINES
+/*-------------------------------------------------------------------------*/
+static ident_t *
+add_context_name (ident_t *ident, fulltype_t type, int num)
+
+/* Declare a new context variable <ident> with the type <type> for the
+ * currently compiled inline closure. <num> is -1 for independent context
+ * variables, or the index of the inherited local variable.
+ * Return the (adjusted) ident for the new variable.
+ */
+
+{
+    int depth;
+    block_scope_t * block;
+    
+    depth = current_inline->block_depth+1;
+    block = & block_scope[depth-1];
+
+printf("DEBUG: add_context_name('%s', num %d) depth %d, context %d\n", get_txt(ident->name), num, depth, block->num_locals);
+    if (block->num_locals >= 256
+     || block->num_locals >= MAX_LOCAL /* size of type recording array */
+       )
+        yyerror("Too many context variables");
+
+    else
+    {
+        if (ident->type != I_TYPE_UNKNOWN)
+        {
+            /* We're overlaying some other definition, but that's ok.
+             */
+            ident = make_shared_identifier(get_txt(ident->name), I_TYPE_LOCAL, depth);
+        }
+
+        /* Initialize the ident */
+        ident->type = I_TYPE_LOCAL;
+        ident->u.local.num = num;
+        ident->u.local.depth = depth;
+        ident->u.local.context = block->num_locals;
+
+        /* Put the ident into the list of all locals.
+         */
+        if (all_locals && all_locals->u.local.depth > depth)
+        {
+            /* This context variable was detected after we already
+             * added locals - find the proper insertion point.
+             */
+            ident_t * prev, *this;
+
+            for ( prev = all_locals, this = all_locals->next_all
+                ; this && this->u.local.depth > depth
+                ; prev = this, this = this->next_all) NOOP;
+
+            ident->next_all = this;
+            prev->next_all = ident;
+        }
+        else
+        {
+            ident->next_all = all_locals;
+            all_locals = ident;
+        }
+
+        /* Record the type */
+        type_of_context[block->num_locals] = type;
+        full_type_of_context[block->num_locals] = type;
+
+        block->num_locals++;
+    }
+    
+    return ident;
+} /* add_context_name() */
+
+/*-------------------------------------------------------------------------*/
+static ident_t *
+check_for_context_local (ident_t *ident)
+
+/* The LPC code uses local variable <ident>. If we're compiling
+ * an inline closure, check if it is an inherited local for which
+ * no context variable has been created yet. If yes, create the context
+ * variable.
+ * Return the (possibly updated) ident.
+ */
+
+{
+    if (current_inline
+     && ident->u.local.depth <= current_inline->block_depth)
+    {
+        /* This local has been inherited - create the
+         * proper context variable.
+         */
+       if (ident->u.local.context >= 0)
+       {
+           yyerrorf("Can't use context variable '%s' "
+                    "across closure boundaries", get_txt(ident->name));
+           ident = redeclare_local(ident, TYPE_ANY, block_depth);
+       }
+       else
+           ident = add_context_name( ident
+                                   , full_type_of_locals[ident->u.local.num] 
+                                   , ident->u.local.num);
+    }
+
+    return ident;
+} /* check_for_context_local() */
+
+#endif /* USE_NEW_INLINES */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -2069,92 +2329,6 @@ leave_block_scope (void)
         block_depth--;
     }
 } /* leave_block_scope() */
-
-/*-------------------------------------------------------------------------*/
-static ident_t *
-lookup_local (int num)
-
-/* Lookup the ident_t structure for local variable <num>.
- */
-
-{
-    ident_t *p, *q;
-
-    /* First, find the previous declaration of this local */
-    q = NULL;
-    for (p = all_locals; p != NULL; p = p->next_all)
-    {
-        if (p->u.local.num == num)
-        {
-            q = p;
-            break;
-        }
-    }
-
-    /* q should be set here and point to the previous declaration.
-     */
-    if (!q)
-        fatal("Local identifier %ld not found in list.\n", (long)num);
-
-    return q;
-} /* lookup_local() */
-
-/*-------------------------------------------------------------------------*/
-static ident_t *
-redeclare_local (int num, fulltype_t type, int depth)
-
-/* Redeclare a local name, identified by <num>, to <type> at <depth>.
- * If this happens on a deeper level, it is legal: the new declaration
- * is added and the new identifier is returned.
- * If it is illegal, an yyerror() is risen and the ident of the older
- * declaration is returned for error recovery.
- */
-
-{
-    ident_t *p, *q;
-
-    if (all_locals && all_locals->u.local.depth > depth)
-    {
-        fatal("List of locals clobbered: list depth %d, "
-              "block depth %d\n"
-              , all_locals->u.local.depth, depth);
-    }
-
-    /* First, find the previous declaration of this local */
-    q = NULL;
-    for (p = all_locals; p != NULL; p = p->next_all)
-    {
-        if (p->u.local.num == num)
-        {
-            /* We found the identifier, and due to the list properties
-             * it is also the one with deepest depth.
-             */
-            q = p;
-            break;
-        }
-    }
-
-    /* q should be set here and point to the previous declaration.
-     * If it is of lower depth, it may be shadowed. However, it
-     * is not possible to shadow an argument (depth 1) with
-     * a function-local variable (depth 2).
-     */
-    if (!q)
-        fatal("Local identifier %ld not found in list.\n", (long)num);
-
-    if (q->u.local.depth >= depth
-     || (q->u.local.depth == 1 && depth == 2)
-       )
-    {
-        yyerrorf("Illegal to redeclare local name '%s'", get_txt(q->name));
-    }
-    else
-    {
-        q = add_local_name(q, type, depth, MY_FALSE);
-    }
-
-    return q;
-} /* redeclare_local() */
 
 
 /* ======================   GLOBALS and FUNCTIONS   ====================== */
@@ -3375,11 +3549,13 @@ printf("DEBUG: new inline #%d: prev %d\n", INLINE_CLOSURE_COUNT, ict.prev);
     /* Initialize the other fields */
     ict.start = CURRENT_PROGRAM_SIZE;
     ict.length = 0;
+    ict.li_start = LINENUMBER_SIZE;
+    ict.li_length = 0;
     ict.function = -1;
     ict.ident = NULL;
     ict.returntype = 0;
     ict.num_args = 0;
-
+    
 printf("DEBUG:   start: %ld, depth %d, locals: %d/%d, break: %d/%d\n", CURRENT_PROGRAM_SIZE, block_depth, current_number_of_locals, max_number_of_locals, current_break_stack_need, max_break_stack_need);
     ict.block_depth          = block_depth;
     ict.break_stack_size     = current_break_stack_need;
@@ -3387,7 +3563,33 @@ printf("DEBUG:   start: %ld, depth %d, locals: %d/%d, break: %d/%d\n", CURRENT_P
     ict.num_locals           = current_number_of_locals;
     ict.max_num_locals       = max_number_of_locals;
     ict.exact_types          = exact_types;
+    ict.current_line         = current_line;
+    ict.include_handle       = get_include_handle();
+    ict.local_type_start        = type_of_locals - &(LOCAL_TYPE(0));
+    ict.full_local_type_start   = full_type_of_locals - &(FULL_LOCAL_TYPE(0));
+    ict.context_type_start      = type_of_context - &(LOCAL_TYPE(0));
+    ict.full_context_type_start = full_type_of_context - &(FULL_LOCAL_TYPE(0));
+    ict.local_type_size         = mem_block[A_LOCAL_TYPES].current_size;
+    ict.full_local_type_size    = mem_block[A_FULL_LOCAL_TYPES].current_size;
+printf("DEBUG:   local types: %d/%d, context types: %d/%d\n", ict.local_type_start, ict.full_local_type_start, ict.context_type_start, ict.full_context_type_start);
+
+    /* Extend the type memblocks */
+    {
+        mp_uint type_count = LOCAL_TYPE_COUNT;
+        mp_uint full_type_count = FULL_LOCAL_TYPE_COUNT;
+
+        extend_mem_block(A_LOCAL_TYPES, 2 * MAX_LOCAL * sizeof(vartype_t));
+        extend_mem_block(A_FULL_LOCAL_TYPES, 2 * MAX_LOCAL * sizeof(fulltype_t));
+
+        type_of_context = &(LOCAL_TYPE(type_count));
+        type_of_locals = &(LOCAL_TYPE(type_count+MAX_LOCAL));
+        full_type_of_context = &(FULL_LOCAL_TYPE(full_type_count));
+        full_type_of_locals = &(FULL_LOCAL_TYPE(full_type_count+MAX_LOCAL));
+    }
     
+    max_break_stack_need = current_break_stack_need = 0;
+    max_number_of_locals = current_number_of_locals = 0;
+
     /* Add the structure to the memblock */
     add_to_mem_block(A_INLINE_CLOSURE, &ict, sizeof(ict));
     current_inline = &(INLINE_CLOSURE(INLINE_CLOSURE_COUNT-1));
@@ -3399,41 +3601,83 @@ finish_inline_closure (Bool bAbort)
 
 /* The compilation of the current inline closure is finished - move
  * everything out of the way of the ongoing compilation.
+ * Note that only the codeblock .start/.length is saved; if there is
+ * already code generated afterwards, it is moved forward. Ditto for
+ * the linenumbers.
+ *
  * If <bAbort> is TRUE, the closure is just finished, but not stored.
  */
 
 {
-    mp_uint backup_start;
+    mp_uint backup_start, start, length;
 {
     mp_int index = current_inline - &(INLINE_CLOSURE(0));
 printf("DEBUG: %s inline #%d: prev %d, start %ld, length %ld, function %d pc %ld\n", bAbort ? "abort" : "finish", index, current_inline->prev, current_inline->start, current_inline->length, current_inline->function, FUNCTION(current_inline->function)->offset.pc);
 printf("DEBUG:   depth %d, locals: %d/%d, break: %d/%d\n", current_inline->block_depth, current_inline->num_locals, current_inline->max_num_locals, current_inline->break_stack_size, current_inline->max_break_stack_size);
 }
 
+    /* Move the program code into the backup storage */
+    start = current_inline->start;
+    length = current_inline->length;
     if (!bAbort)
     {
-        /* Move the program code into the backup storage */
         backup_start = INLINE_PROGRAM_SIZE;
 printf("DEBUG:   move code to %ld\n", backup_start);
-        add_to_mem_block( A_INLINE_PROGRAM, PROGRAM_BLOCK+current_inline->start
-                        , current_inline->length);
-        CURRENT_PROGRAM_SIZE = current_inline->start;
+        add_to_mem_block( A_INLINE_PROGRAM, PROGRAM_BLOCK+start, length);
         current_inline->start = backup_start;
     }
     else
     {
-        CURRENT_PROGRAM_SIZE = current_inline->start;
+        current_inline->length = 0; /* Marks this one invalid */
+    }
+
+    if (start + length < CURRENT_PROGRAM_SIZE)
+    {
+        memmove( PROGRAM_BLOCK+start
+               , PROGRAM_BLOCK+start+length
+               , CURRENT_PROGRAM_SIZE - length - start
+               );
+    }
+    CURRENT_PROGRAM_SIZE -= length;
+
+    /* Move the linenumber data into the backup storage */
+    start = current_inline->li_start;
+    length = current_inline->li_length;
+    if (!bAbort)
+    {
+        backup_start = INLINE_PROGRAM_SIZE;
+printf("DEBUG:   move li data to %ld\n", backup_start);
+        add_to_mem_block( A_INLINE_PROGRAM, LINENUMBER_BLOCK+start, length);
+        current_inline->li_start = backup_start;
+    }
+
+    if (start + length < LINENUMBER_SIZE)
+    {
+        memmove( LINENUMBER_BLOCK+start
+               , LINENUMBER_BLOCK+start+length
+               , LINENUMBER_SIZE - length - start
+               );
     }
 
     free_local_names(current_inline->block_depth+1);
 
-    /* Reset some globals */
+    /* Restore the globals */
     block_depth              = current_inline->block_depth;
     current_number_of_locals = current_inline->num_locals;
     max_number_of_locals     = current_inline->max_num_locals;
     current_break_stack_need = current_inline->break_stack_size;
     max_break_stack_need     = current_inline->max_break_stack_size;
     exact_types              = current_inline->exact_types;
+    current_line             = current_inline->current_line;
+
+printf("DEBUG:   local types: %d/%d, context types: %d/%d\n", current_inline->local_type_start, current_inline->full_local_type_start, current_inline->context_type_start, current_inline->full_context_type_start);
+    type_of_locals = &(LOCAL_TYPE(current_inline->local_type_start));
+    full_type_of_locals = &(FULL_LOCAL_TYPE(current_inline->full_local_type_start));
+    type_of_context = &(LOCAL_TYPE(current_inline->context_type_start));
+    full_type_of_context = &(FULL_LOCAL_TYPE(current_inline->full_context_type_start));
+
+    mem_block[A_LOCAL_TYPES].current_size = current_inline->local_type_size;
+    mem_block[A_FULL_LOCAL_TYPES].current_size = current_inline->full_local_type_size;
 
     /* Remove the structure from the lexical nesting stack */
     if (current_inline->prev == -1)
@@ -3459,8 +3703,19 @@ printf("DEBUG: insert_inline_closures(): %d pending\n", INLINE_CLOSURE_COUNT);
         inline_closure_t * ict = &(INLINE_CLOSURE(index));
 printf("DEBUG:   #%d: start %ld, length %ld, function %d: new start %ld\n", index, ict->start, ict->length, ict->function, CURRENT_PROGRAM_SIZE);
         FUNCTION(ict->function)->offset.pc = CURRENT_PROGRAM_SIZE + FUNCTION_PRE_HDR_SIZE;
-        add_to_mem_block(A_PROGRAM, INLINE_PROGRAM_BLOCK(ict->start)
-                        , ict->length);
+        if (ict->length != 0)
+        {
+            add_to_mem_block(A_PROGRAM, INLINE_PROGRAM_BLOCK(ict->start)
+                            , ict->length);
+
+            store_line_number_info();
+            if (current_line > ict->current_line)
+                store_line_number_backward(current_line - ict->current_line);
+printf("DEBUG:        li_start %ld, li_length %ld, new start %ld\n", index, ict->li_start, ict->li_length, LINENUMBER_SIZE);
+       
+            add_to_mem_block(A_LINENUMBERS, INLINE_PROGRAM_BLOCK(ict->li_start)
+                            , ict->li_length);
+        }
     }
 
     /* Empty the datastorages */
@@ -3479,12 +3734,21 @@ prepare_inline_closure (fulltype_t returntype)
  * If the name can't be generated, FALSE is returned, otherwise TRUE.
  *
  * TODO: This function shares a lot of code with the generic function
- * TODO:: setup.
+ * TODO:: setup. To do this, use entry#0 for gathering the normal
+ * TODO:: function information, and entries #1.. for the actual inlines.
+ * TODO:: Or use a handful of globals, and save the in the closure entries
+ * TODO:: as needed.
  */
 
 {
     char name[256+MAXPATHLEN+1];
     ident_t * ident;
+
+    if (!use_local_scopes)
+    {
+        yyerror("Inline closures require local scoping");
+        return MY_FALSE;
+    }
 
     /* Create the name of the new inline function.
      * We have to make sure the name is really unique.
@@ -3506,7 +3770,7 @@ prepare_inline_closure (fulltype_t returntype)
               && inline_closure_id != 0);
     if (inline_closure_id == 0)
     {
-        yyerror("Can't generate unique name for inline closure.");
+        yyerror("Can't generate unique name for inline closure");
         return MY_FALSE;
     }
 
@@ -3573,7 +3837,10 @@ inline_closure_prototype (int num_args)
  * up then), TRUE otherwise.
  *
  * TODO: This function shares a lot of code with the generic function
- * TODO:: setup.
+ * TODO:: setup. To do this, use entry#0 for gathering the normal
+ * TODO:: function information, and entries #1.. for the actual inlines.
+ * TODO:: Or use a handful of globals, and save the in the closure entries
+ * TODO:: as needed.
  */
 
 {
@@ -3619,6 +3886,8 @@ printf("DEBUG:   Function index: %d\n", current_inline->function);
      */
     CURRENT_PROGRAM_SIZE = align(CURRENT_PROGRAM_SIZE);
     current_inline->start = CURRENT_PROGRAM_SIZE;
+    store_line_number_info();
+    current_inline->li_start = LINENUMBER_SIZE;
     if (realloc_a_program(FUNCTION_HDR_SIZE))
     {
         CURRENT_PROGRAM_SIZE += FUNCTION_HDR_SIZE;
@@ -3640,27 +3909,38 @@ complete_inline_closure ( void )
 
 /* Called after parsing 'func <type> <arguments> <block>', this function
  * updates the function header and moves the closure into the pending
- * area.
+ * area. After that, the function also completes the generation of
+ * the F_CONTEXT_CLOSURE instruction.
  *
  * TODO: This function shares a lot of code with the generic function
- * TODO:: setup.
+ * TODO:: setup. To do this, use entry#0 for gathering the normal
+ * TODO:: function information, and entries #1.. for the actual inlines.
+ * TODO:: Or use a handful of globals, and save the in the closure entries
+ * TODO:: as needed.
  */
 
 {
-    p_int start;
+    p_int start, li_start;
     bytecode_p p;
-    int max_locals, max_break_stack, num_args;
+    int num_args;
     string_t * name;
 %line
 
 printf("DEBUG: Generate inline closure function:\n");
+    if  (current_inline->include_handle != get_include_handle())
+    {
+        yyerror("Implementation restriction: Inline closure must not span "
+                "include file limits");
+        /* Clean up */
+        leave_block_scope();  /* Argument scope */
+        leave_block_scope();  /* Context scope */
+        finish_inline_closure(MY_TRUE);
+    }
+
     start = current_inline->start;
+    li_start = current_inline->li_start;
     name = current_inline->ident->name;
     num_args = current_inline->num_args;
-    max_locals = max_number_of_locals
-                 - current_inline->max_num_locals;
-    max_break_stack = max_break_stack_need
-                      - current_inline->max_break_stack_size;
 
     /* Generate the function header and update the ident-table entry.
      */
@@ -3687,16 +3967,76 @@ printf("DEBUG:   Name: '%s'\n", get_txt(name));
 printf("DEBUG:   Args: %d\n", num_args);
 
     /* FUNCTION_NUM_VARS */
-printf("DEBUG:   Vargs: %d\n", max_locals - num_args + max_break_stack);
-    *p   = max_locals - num_args + max_break_stack;
+printf("DEBUG:   Vargs: %d\n", max_number_of_locals - num_args + max_break_stack_need);
+    *p   = max_number_of_locals - num_args + max_break_stack_need;
 
     define_new_function(MY_TRUE, current_inline->ident, num_args
-                       , max_locals - num_args + max_break_stack
+                       , max_number_of_locals - num_args + max_break_stack_need
                        , start + FUNCTION_PRE_HDR_SIZE, 0
                        , current_inline->returntype);
 
     ins_f_code(F_RETURN0); /* catch a missing return */
     current_inline->length = CURRENT_PROGRAM_SIZE - start;
+
+    store_line_number_info();
+    current_inline->li_length = LINENUMBER_SIZE - li_start;
+
+    /* Add the code to push the values of the inherited local
+     * variables onto the stack, followed by the F_CONTEXT_CLOSURE
+     * instruction. Since this code is after the recorded .length,
+     * the finish_inline_closure() call will move it backward into
+     * its rightful place.
+     */
+    {
+        int depth = current_inline->block_depth+1;
+        block_scope_t * context = &(block_scope[depth]);
+
+printf("DEBUG:   %d context vars, depth %d\n", context->num_locals, depth);
+        if (context->num_locals != 0)
+        {
+            /* To get the context->local information in the right order
+             * we read the locals as they are and store the information
+             * in an array.
+             */
+            int * lcmap = alloca(context->num_locals * sizeof(int));
+            ident_t * id;
+            int i;
+
+            for (i = 0; i < context->num_locals; i++)
+                lcmap[i] = -1;
+
+            for (id = all_locals
+                ; id && id->u.local.depth >= depth
+                ; id = id->next_all)
+            {
+if (id->u.local.depth == depth) printf("DEBUG:     '%s': local %d, context %d\n", get_txt(id->name), id->u.local.num, id->u.local.context);
+                if (id->u.local.depth == depth
+                 && id->u.local.context >= 0
+                 && id->u.local.num >= 0
+                   )
+                {
+                    lcmap[id->u.local.context] = id->u.local.num;
+                }
+            }
+
+            /* Got all context->local mappings, now create the bytecode */
+            for (i = 0; i < context->num_locals; i++)
+            {
+                if (lcmap[i] != -1)
+                {
+                    ins_f_code(F_LOCAL);
+                    ins_byte(lcmap[i]);
+printf("DEBUG:     -> F_LOCAL %d\n", lcmap[i]);
+                }
+            }
+        } /* Push local vars */
+
+        /* Add the context_closure instruction */
+printf("DEBUG:     -> F_CONTEXT_CLOSURE %d\n", context->num_locals);
+        ins_f_code(F_CONTEXT_CLOSURE);
+        ins_short(context->num_locals);
+    } /* Complete F_CONTEXT_CLOSURE instruction */
+
 
     /* Clean up */
     leave_block_scope();  /* Argument scope */
@@ -4546,14 +4886,14 @@ free_const_list_svalue (svalue_t *svp)
 %type <closure>      L_CLOSURE
 %type <symbol>       L_SYMBOL
 %type <number>       L_QUOTED_AGGREGATE
-%type <ident>        L_IDENTIFIER L_INLINE_FUN
+%type <ident>        L_IDENTIFIER L_INLINE_FUN L_LOCAL
 %type <fulltype>     optional_star type type_modifier_list type_modifier
 %type <fulltype>     opt_basic_type basic_type
 %type <fulltype>     non_void_type opt_basic_non_void_type basic_non_void_type
 %type <fulltypes>    inheritance_qualifier inheritance_qualifiers
 %type <fulltype>     inheritance_modifier_list inheritance_modifier
 %ifdef USE_NEW_INLINES
-%type <fulltype>     inline_opt_type
+%type <fulltype>     inline_opt_type context_name
 %endif /* USE_NEW_INLINES */
 %type <type>         decl_cast cast
 %type <lrvalue>      note_start comma_expr expr0 expr4
@@ -4565,7 +4905,7 @@ free_const_list_svalue (svalue_t *svp)
 %type <lrvalue>      parse_command
 %endif
 %type <lvalue>       lvalue name_lvalue local_name_lvalue foreach_var_lvalue
-%type <lvalue>       local_name_list new_local new_local_name
+%type <lvalue>       new_local_name
 %type <index>        index_range index_expr
 %type <case_label>   case_label
 %type <address>      optional_else
@@ -4604,9 +4944,6 @@ free_const_list_svalue (svalue_t *svp)
 
 %type <number> L_ASSIGN
   /* Instruction code of the assignment, e.g. F_ADD_EQ */
-
-%type <number> L_LOCAL
-  /* Index number of the local variable */
 
 %type <number> foreach_expr
   /* FOREACH_LOOP  (0) Normal foreach loop value
@@ -4908,6 +5245,7 @@ inline_func:
       L_FUNC inline_opt_type
 
       {
+printf("DEBUG: After inline_opt_type: program size %ld\n", CURRENT_PROGRAM_SIZE);
           if (!prepare_inline_closure($2))
               YYACCEPT;
       }
@@ -4915,13 +5253,22 @@ inline_func:
       inline_opt_args
 
       {
+printf("DEBUG: After inline_opt_args: program size %ld\n", CURRENT_PROGRAM_SIZE);
           if (!inline_closure_prototype($4))
               YYACCEPT;
       }
 
+      inline_opt_context
+
+      {
+printf("DEBUG: After inline_opt_context: program size %ld\n", CURRENT_PROGRAM_SIZE);
+      }
+
+
       block
 
       {
+printf("DEBUG: After inline block: program size %ld\n", CURRENT_PROGRAM_SIZE);
          complete_inline_closure();
       }
 
@@ -4954,13 +5301,30 @@ inline_func:
       L_END_INLINE
 
       {
+         ins_f_code(F_RETURN);
          complete_inline_closure();
       }
 
 ; /* inline_func */
 
 inline_opt_args:
-      /* empty */       { return 0; }
+      /* empty */
+      {
+          int i;
+
+          /* Synthesize $1..$9 as arguments */
+          for (i = 1; i < 10; i++)
+          {
+              char name[4];
+              ident_t *ident;
+
+              sprintf(name, "$%d", i);
+              ident = make_shared_identifier(name, I_TYPE_UNKNOWN, 0);
+              add_local_name(ident, TYPE_ANY, block_depth, MY_TRUE);
+          }
+
+          return 9;
+      }
     | '(' argument ')'  { return $2; }
 ; /* inline_opt_args */
 
@@ -4968,6 +5332,83 @@ inline_opt_type:
       /* empty */              { return TYPE_UNKNOWN; }
     | basic_type optional_star { return $1 | $2; }
 ; /* inline_opt_type */
+
+inline_opt_context:
+      /* empty */
+    |  ':' inline_context_list
+;
+
+inline_context_list:
+      context_decl
+    | inline_context_list ',' context_decl
+; /* inline_context_list */
+
+
+context_decl:
+      context_name L_ASSIGN expr0
+      {
+          /* TODO: This code duplicates a lot from comma_expr_decl
+           * TODO:: and local_name_list.
+           */
+
+          vartype_t type2;
+%line
+          /* Check the assignment for validity */
+          type2 = $3.type;
+          if (exact_types && !compatible_types($1, type2, MY_TRUE))
+          {
+              yyerrorf("Bad assignment %s", get_two_types($1, $3.type));
+          }
+
+          if ($2 != F_ASSIGN)
+          {
+              yyerror("Only plain assignments allowed here.");
+          }
+
+          if (type2 & TYPE_MOD_REFERENCE)
+              yyerror("Can't trace reference assignments.");
+
+          /* Just leave the value on the stack for the context_closure
+           * instruction.
+           */
+      }
+
+    | context_name
+      {
+          /* The context_closure instruction expects a value on
+           * the stack, so just push a 0.
+           */
+%line
+          ins_f_code(F_CONST0);
+      }
+; /* context_decl */
+
+context_name:
+      basic_type optional_star L_IDENTIFIER
+      {
+          /* A new context variable */
+
+          (void) add_context_name($3, $2 | $1, -1);
+          $$ = $2 | $1;
+      }
+      
+    | basic_type optional_star L_LOCAL
+      {
+          /* A local name is redeclared. Since this is the context, it
+           * is legal.
+           */
+
+          block_scope_t *scope = block_scope + block_depth - 1;
+
+          if (current_inline->block_depth+1 <= $3->u.local.depth)
+             yyerrorf("Illegal to redeclare local name '%s'"
+                     , get_txt($3->name));
+
+          (void)add_context_name($3, $2 | $1, -1);
+          $$ = $2 | $1;
+      }
+; /* context_name */
+
 %endif /* USE_NEW_INLINES */
 
 %ifdef USE_STRUCTS
@@ -5634,23 +6075,7 @@ identifier:
 
     | L_LOCAL
       {
-          ident_t *p;
-
-          /* First, find the declaration of this local */
-          for (p = all_locals; p != NULL; p = p->next_all)
-          {
-              if (p->u.local.num == $1)
-              {
-                  /* We found the identifier.
-                   */
-                  break;
-              }
-          }
-
-          if (p)
-              $$ = ref_mstring(p->name);
-          else
-              fatal("Local variable %ld vanished.\n", (long)$1);
+          $$ = ref_mstring($1->name);
       }
 ;
  
@@ -5707,7 +6132,7 @@ new_arg_name:
               /* However, it is legal for the argument list of an inline
                * closure.
                */
-              (void)redeclare_local($2, current_type | $1, block_depth);
+              redeclare_local($3, $1 | $2, block_depth);
           }
 %endif
       }
@@ -5929,14 +6354,18 @@ local_name_list:
 
 new_local :
       new_local_name
+      {
+          /* Empty action to void the value of new_local_name */
+      }
+
     | new_local_name L_ASSIGN expr0
       {
           /* We got a "<name> = <expr>" type declaration. */
 
           p_int length;
           vartype_t type2;
-%line
 
+%line
           /* Check the assignment for validity */
           type2 = $3.type;
           if (exact_types && !compatible_types($1.type, type2, MY_TRUE))
@@ -7034,27 +7463,12 @@ foreach_in:
      * TODO: Make MudOS-compats switchable.
      */
 
-      L_IDENTIFIER
+      identifier
 
       {
-          if (!mstreq($1->name, STR_IN))
+          if (!mstreq($1, STR_IN))
               yyerror("Expected keyword 'in' in foreach()");
-          if ($1->type == I_TYPE_UNKNOWN)
-              free_shared_identifier($1);
-      }
-      
-    | L_LOCAL
-
-      {
-          ident_t *id;
-
-          /* Find the ident structure for this local */
-          for (id = all_locals; id; id = id->next_all)
-              if (id->u.local.num == $1)
-                  break;
-          
-          if (id && !mstreq(id->name, STR_IN))
-              yyerror("Expected keyword 'in' in foreach()");
+          free_mstring($1);
       }
 
     | ':'
@@ -8642,12 +9056,31 @@ expr0:
           int i;
           PREPARE_INSERT(3)
 %line
-          add_f_code(F_PUSH_LOCAL_VARIABLE_LVALUE);
-          add_byte($2);
+#ifdef USE_NEW_INLINES
+          $2 = check_for_context_local($2);
+
+          if ($2->u.local.context >= 0)
+          {
+              add_f_code(F_PUSH_CONTEXT_LVALUE);
+              add_byte($2->u.local.context);
+              i = type_of_context[$2->u.local.context];
+          }
+          else
+          {
+              add_f_code(F_PUSH_LOCAL_VARIABLE_LVALUE);
+              add_byte($2->u.local.num);
+              i = type_of_locals[$2->u.local.num];
+          }
           CURRENT_PROGRAM_SIZE =
             (last_expression = CURRENT_PROGRAM_SIZE + 2) + 1;
+#else /* USE_NEW_INLINES */
+          add_f_code(F_PUSH_LOCAL_VARIABLE_LVALUE);
+          add_byte($2->u.local.num);
+          CURRENT_PROGRAM_SIZE =
+            (last_expression = CURRENT_PROGRAM_SIZE + 2) + 1;
+          i = type_of_locals[$2->u.local.num];
+#endif /* USE_NEW_INLINES */
           add_f_code($1.code);
-          i = type_of_locals[$2];
           if (exact_types
            && !BASIC_TYPE(i, TYPE_NUMBER)
            && !BASIC_TYPE(i, TYPE_FLOAT))
@@ -9476,6 +9909,10 @@ expr4:
           mp_uint current;
           bytecode_p p;
 %line
+#ifdef USE_NEW_INLINES
+          $2 = check_for_context_local($2);
+#endif /* USE_NEW_INLINES */
+
           $$.start = current = CURRENT_PROGRAM_SIZE;
           $$.code = -1;
           if (!realloc_a_program(2))
@@ -9484,10 +9921,26 @@ expr4:
               YYACCEPT;
           }
           p = PROGRAM_BLOCK + current;
-          *p++ = F_PUSH_LOCAL_VARIABLE_LVALUE;
-          *p = $2;
+#ifdef USE_NEW_INLINES
+          if ($2->u.local.context >= 0)
+          {
+              *p++ = F_PUSH_CONTEXT_LVALUE;
+              *p = $2->u.local.context;
+              $$.type = type_of_context[$2->u.local.context] | TYPE_MOD_REFERENCE;
+          }
+          else
+          {
+              *p++ = F_PUSH_LOCAL_VARIABLE_LVALUE;
+              *p = $2->u.local.num;
+              $$.type = type_of_locals[$2->u.local.num] | TYPE_MOD_REFERENCE;
+          }
           CURRENT_PROGRAM_SIZE = current + 2;
-          $$.type = type_of_locals[$2] | TYPE_MOD_REFERENCE;
+#else /* USE_NEW_INLINES */
+          *p++ = F_PUSH_LOCAL_VARIABLE_LVALUE;
+          *p = $2->u.local.num;
+          CURRENT_PROGRAM_SIZE = current + 2;
+          $$.type = type_of_locals[$2->u.local.num] | TYPE_MOD_REFERENCE;
+#endif /* USE_NEW_INLINES */
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -9705,6 +10158,10 @@ expr4:
           mp_uint current;
           bytecode_p p;
 %line
+#ifdef USE_NEW_INLINES
+          $1 = check_for_context_local($1);
+#endif /* USE_NEW_INLINES */
+
           $$.start = current = CURRENT_PROGRAM_SIZE;
           $$.code = F_PUSH_LOCAL_VARIABLE_LVALUE;
           $$.end = 0;
@@ -9714,10 +10171,26 @@ expr4:
               YYACCEPT;
           }
           p = PROGRAM_BLOCK + current;
-          *p++ = F_LOCAL;
-          *p = $1;
+#ifdef USE_NEW_INLINES
+          if ($1->u.local.context >= 0)
+          {
+              *p++ = F_CONTEXT_IDENTIFIER;
+              *p = $1->u.local.context;
+              $$.type = type_of_context[$1->u.local.context];
+          }
+          else
+          {
+              *p++ = F_LOCAL;
+              *p = $1->u.local.num;
+              $$.type = type_of_locals[$1->u.local.num];
+          }
           CURRENT_PROGRAM_SIZE = current + 2;
-          $$.type = type_of_locals[$1];
+#else /* USE_NEW_INLINES */
+          *p++ = F_LOCAL;
+          *p = $1->u.local.num;
+          CURRENT_PROGRAM_SIZE = current + 2;
+          $$.type = type_of_locals[$1->u.local.num];
+#endif /* USE_NEW_INLINES */
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -10246,10 +10719,28 @@ name_lvalue:
 %line
           /* Generate the lvalue for a local */
 
-          $$.u.simple[0] = F_PUSH_LOCAL_VARIABLE_LVALUE;
-          $$.u.simple[1] = $1;
+#ifdef USE_NEW_INLINES
+          $1 = check_for_context_local($1);
+
+          if ($1->u.local.context >= 0)
+          {
+              $$.u.simple[0] = F_PUSH_CONTEXT_LVALUE;
+              $$.u.simple[1] = $1->u.local.context;
+              $$.type = type_of_context[$1->u.local.context];
+          }
+          else
+          {
+              $$.u.simple[0] = F_PUSH_LOCAL_VARIABLE_LVALUE;
+              $$.u.simple[1] = $1->u.local.num;
+              $$.type = type_of_locals[$1->u.local.num];
+          }
           $$.length = 0;
-          $$.type = type_of_locals[$1];
+#else /* USE_NEW_INLINES */
+          $$.u.simple[0] = F_PUSH_LOCAL_VARIABLE_LVALUE;
+          $$.u.simple[1] = $1->u.local.num;
+          $$.length = 0;
+          $$.type = type_of_locals[$1->u.local.num];
+#endif /* USE_NEW_INLINES */
       }
 ; /* name_lvalue */
 
@@ -11627,7 +12118,7 @@ function_name:
 
     | L_LOCAL
       {
-          ident_t *lvar = lookup_local($1);
+          ident_t *lvar = $1;
           ident_t *fun = find_shared_identifier(get_txt(lvar->name), I_TYPE_UNKNOWN, 0);
 
           /* Search the inferior list for this identifier for a global
@@ -11655,7 +12146,7 @@ function_name:
 
     | L_COLON_COLON L_LOCAL
       {
-          ident_t *lvar = lookup_local($2);
+          ident_t *lvar = $2;
 
           *($$.super = yalloc(1)) = '\0';
           $$.real  = lvar;
@@ -11719,7 +12210,7 @@ function_name:
     | anchestor L_COLON_COLON L_LOCAL
       {
 %line
-          ident_t *lvar = lookup_local($3);
+          ident_t *lvar = $3;
 
           /* Attempt to call an efun directly even though there
            * is a nomask simul-efun for it?
@@ -11962,29 +12453,12 @@ catch:
 
 
 opt_catch_mods : 
-      ';' L_IDENTIFIER
+      ';' identifier
 
       {
-          if (!mstreq($2->name, STR_NOLOG))
+          if (!mstreq($2, STR_NOLOG))
               yyerror("Expected keyword 'nolog' in catch()");
-          if ($2->type == I_TYPE_UNKNOWN)
-              free_shared_identifier($2);
-          $$ = 1;
-      }
-
-    | ';' L_LOCAL
-
-      {
-          ident_t *id;
-
-          /* Find the ident structure for this local */
-          for (id = all_locals; id; id = id->next_all)
-              if (id->u.local.num == $2)
-                  break;
-          
-          if (id && !mstreq(id->name, STR_NOLOG))
-              yyerror("Expected keyword 'nolog' in catch()");
-
+          free_mstring($2);
           $$ = 1;
       }
 
@@ -12071,9 +12545,25 @@ lvalue_list:
 %line
           /* Push the lvalue for a local variable */
 
+#ifdef USE_NEW_INLINES
+          $3 = check_for_context_local($3);
+
+          if ($3->u.local.context >= 0)
+          {
+              ins_f_code(F_PUSH_CONTEXT_LVALUE);
+              ins_byte($3->u.local.context);
+          }
+          else
+          {
+              ins_f_code(F_PUSH_LOCAL_VARIABLE_LVALUE);
+              ins_byte($3->u.local.num);
+          }
+          $$ = 1 + $1;
+#else /* USE_NEW_INLINES */
           $$ = 1 + $1;
           ins_f_code(F_PUSH_LOCAL_VARIABLE_LVALUE);
-          ins_byte($3);
+          ins_byte($3->u.local.num);
+#endif /* USE_NEW_INLINES */
       }
 
     | lvalue_list ',' expr4 index_expr
@@ -14598,6 +15088,15 @@ prolog(void)
         mem_block[i].current_size = 0;
         mem_block[i].max_size = START_BLOCK_SIZE;
     }
+
+    type_of_locals = &(LOCAL_TYPE(0));
+    full_type_of_locals = &(FULL_LOCAL_TYPE(0));
+#ifdef USE_NEW_INLINES
+    type_of_locals = type_of_context;
+    full_type_of_locals = full_type_of_context;
+#endif /* USE_NEW_INLINES */
+    extend_mem_block(A_LOCAL_TYPES, MAX_LOCAL * sizeof(vartype_t));
+    extend_mem_block(A_FULL_LOCAL_TYPES, MAX_LOCAL * sizeof(fulltype_t));
 
     stored_lines = 0;
     stored_bytes = 0;

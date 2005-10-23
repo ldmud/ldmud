@@ -139,6 +139,12 @@ struct ident_s
         } global;
         struct {             /*   Local identifier: */
             int num;         /*     Number, also the index on the stack */
+            int context;     /*     -1 for normal locals, or the index
+                              *       in the context frame. In that case,
+                              *       .num is either -1 or the index
+                              *       of the related local of the defining
+                              *       function.
+                              */
             int depth;       /*     Definition depth */
         } local;
     } u;
@@ -237,6 +243,9 @@ extern void set_inc_list(vector_t *v);
 extern void remove_unknown_identifier(void);
 extern char *lex_error_context(void);
 extern svalue_t *f_expand_define(svalue_t *sp);
+#ifdef USE_NEW_INLINES
+extern void * get_include_handle (void);
+#endif /* USE_NEW_INLINES */
 
 #ifdef GC_SUPPORT
 extern void count_lex_refs(void);

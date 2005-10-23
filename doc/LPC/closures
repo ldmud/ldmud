@@ -34,42 +34,10 @@ DESCRIPTION
         this_player().  Of course, this is only a rather simple
         application.
 
-        Inline closures are a variant of lfun closures, the difference being
-        that the function text is written right where the closure is used,
-        enclosed in a pair of '(:' and ':)'. The compiler will then take care
-        of creating a proper lfun and lfun-closure. The arguments passed to
-        such an inline closure are accessible by position: $1 would be the
-        first argument, $2 the second, and so on. With this, the above example
-        would read:
-
-          int * bar() {
-            return filter_array(({ 10,50,30,70 }), (: ($1 * 2) > 42 :));
-          }
-
-        or alternatively:
-
-          int * bar() {
-            return filter_array(({ 10,50,30,70 }), (: return ($1 * 2) > 42; :));
-          }
-
-        The difference between the two versions is that in the first form the
-        text of the inline closure must be an expression only, whereas in the
-        second form any legal statement is allowed. The compiler distinguishes
-        the two forms by the last character before the ':)': if it's a ';' or
-        '}', the compiler treats the closure as statement(s), otherwise as
-        expression.
-
-        Inline closures may also nested, so that the following (not very
-        useful) example is legal, too:
-
-          return filter_array( ({ 10, 50, 30, 70 })
-                             , (: string *s;
-                                  s = map_array(users(), (: $1->query_name() :));
-                                  return s[random(sizeof(s))] + ($1 * 2);
-                                :));
-
-        The notation of inline closures is modelled after the MudOS
-        functionals, but there are a few important differences in behaviour.
+        Inline closures are a variant of lfun closures, the difference
+        being that the function text is written right where the
+        closure is used.  Since they are pretty powerful by
+        themselves, inline closures have their own manpage.
 
         More useful instances of closures can be created
         using the lambda() efun. It is much like the lambda function
@@ -289,116 +257,6 @@ DESCRIPTION
                  ({#'= 'h, 'a, }), ({#'=, 'a, 'b }), ({#'=, 'b, 'h }) })
         will swap 'a and 'b when compiled and executed.
 
-        ------------
-
-        An example from Amylaar:
-
-        I have tested the replace_program() functionality with one
-        example, which I include below. The room is commonly known as
-        /room/orc_valley.c .  A prerequisite to make this work is to
-        have valued properties in room.c .
-
-        The property C_EXTRA_RESET, if defined, is evaluated at reset
-        time in the reset() of the used room.c .  Moreover, you need
-        a function to query an unprocessed property to use
-        orc_valley.c from fortress.c (That is, don't do an automatic
-        funcall there.)  If you can't supply such a function, you
-        have to set the property "get_orc" at the end of orc_valley.c
-        's extra_reset() with: add_prop("get_orc", lambda(0, get_orc)
-        ); which will set the property to a function that returns the
-        function that is in the variable get_orc at the time you do
-        the add_prop() call.
-        
-        Back to fortress.c : Assume you have the function
-        successfully queried and stored in the variable get_orc. Now
-        you can compute your extra_reset() function by: get_orc =
-        lambda( 0, ({#'funcall, get_orc, 8, 40}) ); which creates the
-        usual 8 orcs with an a_chat chance of 40.
-        
-        Here comes the orc_valley.c source:
-        
-            ----------- cut here ------- cut here -------- cut here ---
-        
-        #include "room.h"
-        #include "/sys/stdproperties.h"
-        #undef EXTRA_RESET
-        #define EXTRA_RESET extra_reset();
-        
-        extra_reset() {
-            closure get_orc;
-        
-            replace_program("room/room"); /* Must come first. */
-            get_orc = lambda( ({'num_orcs, 'chat_chance}),
-               ({#'?!, ({#'present, "orc", ({#'previous_object}) }),
-                   ({#'do,
-                       ({#'=, 'orc, ({#'clone_object, "obj/monster"}) }),
-                       ({#'=, 'i, 9}),
-                       ({#'do,
-                           ({#'call_other, 'orc, "set_level",
-                               ({#'+, ({#'random, 2}), 1}) }),
-                           ({#'call_other, 'orc,
-                               ({#'[,
-                                   quote(({"set_aggressive",
-                                               "set_ac", "set_short",
-                                               "set_al", "set_ep", "set_hp",
-                                               "set_race",
-                                               "set_alias", "set_name"})),
-                                  ({#'-=, 'i, 1}) }),
-                               ({#'[,
-                                   quote(({1, 0, "An orc", -60, 1014,
-                                           30, "orc",
-                                      "dirty crap", "orc"})), 'i}) }),
-                       'i, 0}),
-                       ({#'call_other, 'orc, "load_a_chat", 'chat_chance,
-                           quote(({ "Orc says: Kill 'em!\n",
-                               "Orc says: Bloody humans!\n",
-                               "Orc says: Stop 'em!\n",
-                               "Orc says: Get 'em!\n",
-                               "Orc says: Let's rip out his guts!\n",
-                               "Orc says: Kill 'em before they run away!\n",
-                               "Orc says: What is that human doing here!\n",
-                           })) }),
-                       ({#'=, 'n, ({#'*, ({#'random, 3}), 5}) }),
-                       ({#'=, 'weapon, ({#'clone_object, "obj/weapon"}) }),
-                       ({#'=, 'i, 5}),
-                       ({#'do,
-                           ({#'call_other, 'weapon,
-                               ({#'[,
-                                   quote(({ "set_alt_name",
-                                       "set_weight", "set_value",
-                                       "set_class", "set_name"})),
-                                       ({#'-=, 'i, 1}) }),
-                               ({#'[,
-                                   quote(({ "knife", 1, 8,  5, "knife",
-                                       "knife", 1, 15, 7, "curved knife",
-                                       "axe",   2, 25, 9, "hand axe",  })),
-                                   ({#'+, 'n, 'i}) }) }),
-                       'i, 0}),
-                       ({#'transfer, 'weapon, 'orc}),
-                       ({#'command,
-                           ({#'+, "wield ",
-                               ({#'call_other, 'weapon,
-                               "query_name"}) }), 'orc}),
-                       ({#'move_object, 'orc, ({#'previous_object}) }),
-                   ({#'-=, 'num_orcs, 1}), 0})
-               })
-            );
-            add_prop("get_orc", get_orc);
-            get_orc = lambda( 0, ({#'funcall, get_orc, 2, 50}) );
-            add_prop(C_EXTRA_RESET, get_orc);
-            funcall(get_orc);
-        }
-        
-        TWO_EXIT("room/slope", "east",
-                "room/fortress", "north",
-                "The orc valley",
-                "You are in the orc valley. This place is inhabited"
-                "by orcs.\n"
-                "There is a fortress to the north, with lot of signs
-                of orcs.\n", 1)
-        
-            ----------- cut here ------- cut here -------- cut here ----
-        
 
         Procedural elements:
         ====================
@@ -465,42 +323,9 @@ DESCRIPTION
         refer to this object.
 
 
-        The following is mostly vapourware.
-
-        Well, another application would be that some things in the
-        driver can be, sort of, microprogrammed.  The master object
-        could set some hooks in inaugurate_master(), like creating the
-        code for move_object(), using a primitive low_move_object() or
-        __move_object() or such. All calls of init(), exit(), etc. can
-        thus be controlled on mudlib level.  The driver would do an
-        implicit bind_lambda() to the victim when the closure is used.
-
-        e.g.
-        ({#'?, ({#'=, 'ob, ({#'first_inventory, 'destination}) }),
-            ({#'do,
-                ({#'call_other, 'ob, "init"}),
-            ({#'=, 'ob, ({#'next_inventory, 'ob}) }), 0 })
-        })
-
-        or
-
-        ({#'filter_objects, ({#'all_inventory, 'destination}), "init"})
-        /* Won't show init failures due to move/destruct */
-
-        is equivalent to
-
-        if (ob = first_inventory(destination) ) {
-            do {
-                ob->init();
-            } while(ob = next_inventory(ob) );
-        }
-
-        and it's speed is mainly determined by the call_other. Thus,
-        it shouldn't be noticably slower than the current C code in
-        move_object().
-
 AUTHOR
         MacBeth, Amylaar, Hyp
 
 SEE ALSO
         closures-abstract(LPC), closures-example(LPC), closure_guide(LPC)
+        inline-closures(LPC)
