@@ -128,55 +128,6 @@ ifdef D
     CFLAGS += ${D}
 endif
 
-# The following variables are used to describe the version
-# of the driver binary.
-
-# $Format: "ifeq (\$(shell echo \$\$(($ReleaseMinor$ / 2))), 0)"$
-ifeq ($(shell echo $$((3 / 2))), 0)
-
-# --- Stable Versions ---
-
-# $Format: "SETVERFLAGS = -app $ReleaseMajor$ $ReleaseMinor$ $ReleaseMicro$"$
-SETVERFLAGS = -app 3 3 0
-
-# $Format: "ifeq ($ReleaseType$, rel)"$
-ifeq (dev, rel)
-# $Format: "  SETVERFLAGS += f"$
-  SETVERFLAGS += f
-# $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$"$
-  VSTRING = 3.3.0
-endif
-# $Format: "ifeq ($ReleaseType$, pre)"$
-ifeq (dev, pre)
-# $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 312
-# $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-pre.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-pre.312
-endif
-# $Format: "ifeq ($ReleaseType$, dev)"$
-ifeq (dev, dev)
-# $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 312
-# $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-dev.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-dev.312
-endif
-
-else
-
-# --- Development Versions ---
-
-# $Format: "SETVERFLAGS = -app $ReleaseMajor$ $ReleaseMinor$ $ProjectMinorVersion$"$
-SETVERFLAGS = -app 3 3 312
-
-# $Format: "  SETVERFLAGS += f"$
-  SETVERFLAGS += f
-# $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ProjectMinorVersion$"$
-  VSTRING = 3.3.312
-
-endif
-
-SETVERFLAGS += -short $(VSTRING) -long "LDMud $(VSTRING) - a LPMud Gamedriver."
-
 #--------------------------------------------------------
 # Application Independent Information
 #--------------------------------------------------------
@@ -317,7 +268,7 @@ $(TARGET): $(OBJ) depend $(OBJS) $(RSRC_FULL)
 	$(LD) -o $@ $(OBJS) $(LDFLAGS)
 	$(XRES) -o $@ $(MIMS) $(RSRC_FULL)
 	$(MIMESET) -f $@
-	setversion $@ $(SETVERFLAGS)
+	hosts/be/set-version $@
 ifneq ($(CPU), $(NATIVE))
 	[ -f $(OBJ_NATIVE)/$(IMG_NAME) ] && copyattr -n 'BEOS:M:STD_ICON' $(OBJ_NATIVE)/$(IMG_NAME) $@
 	[ -f $(OBJ_NATIVE)/$(IMG_NAME) ] && copyattr -n 'BEOS:L:STD_ICON' $(OBJ_NATIVE)/$(IMG_NAME) $@

@@ -7,8 +7,8 @@
  *--------------------------------------------------------------------------
  */
 
-/* $Format: "#if $ReleaseMinor$ / 2 == 0"$ */
-#if 3 / 2 == 0
+/* $Format: "#if $ReleaseMinor$ % 2 == 0"$ */
+#if 3 % 2 == 0
 #    define IS_STABLE 1
 #else
 #    define IS_DEVELOPMENT 1
@@ -18,10 +18,10 @@
 #define IS_RELEASE() (!strcmp("dev", "rel"))
 
 /* $Format: "#define RELEASE_DATE \"$ProjectDate$\""$ */
-#define RELEASE_DATE "Wed, 27 Nov 2002 21:15:40 -0700"
+#define RELEASE_DATE "Wed, 27 Nov 2002 21:55:50 -0700"
 
 /* $Format: "#define PROJ_VERSION \"$ProjectVersion$\""$ */
-#define PROJ_VERSION "3-3.312"
+#define PROJ_VERSION "3-3.313"
 
 #if IS_STABLE
 
@@ -29,15 +29,15 @@
 #define GAME_VERSION "3.3.0"
 
 /* $Format: "#define LONG_VERSION \"$ReleaseVersion$-$ReleaseType$.$ProjectMinorVersion$\""$ */
-#define LONG_VERSION "3.3.0-dev.312"
+#define LONG_VERSION "3.3.0-dev.313"
 
 #else
 
 /* $Format: "#define GAME_VERSION \"$DevelopmentVersion$\""$ */
-#define GAME_VERSION "3.3.312"
+#define GAME_VERSION "3.3.313"
 
 /* $Format: "#define LONG_VERSION \"$DevelopmentVersion$\""$ */
-#define LONG_VERSION "3.3.312"
+#define LONG_VERSION "3.3.313"
 
 #endif
 
@@ -51,10 +51,13 @@
 #define VERSION_MICRO "0"
 
 /* $Format: "#define VERSION_PATCH \"$ProjectMinorVersion$\""$ */
-#define VERSION_PATCH "312"
+#define VERSION_PATCH "313"
 
 /* $Format: "#define LOCAL_LEVEL \"\""$ */
 #define LOCAL_LEVEL ""
+
+/* $Format: "#define RELEASE_TYPE \"$ReleaseType$\""$ */
+#define RELEASE_TYPE "dev"
 
 /* TODO: Add something like the perl local patchlevel management. */
 /* TODO: Add LPC defines for the various version number parts */

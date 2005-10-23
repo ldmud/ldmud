@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+27-Nov-2002 (Lars Duening)  (3.3.313)
+  - (patchlevel.h, hosts/be/Makefile, hosts/be/set-version) The version
+      flags of the BeOS executable are now read from patchlevel.h and not set
+      directly in the BeOS Makefile.
+
 27-Nov-2002 (Lars Duening)  (3.3.312)
   - (object.c) Efun transfer() was still incorrect. Funny though that
       nobody noticed it before :-) (reported by Nostradamus).
