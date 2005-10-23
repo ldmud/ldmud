@@ -106,7 +106,6 @@ f-011029: Efun copy_object()
 f-011119: New Standardnotation for callbacks
 f-011207: Linenumbers for functionlist()
 f-011229-0: Add support for PostgreSQL
-p-021031: Postgres-SQL Patch
 f-011229-1: Add support for Berkeley DB
 f-011230: Implement seeded randoms
 f-020127: Bitstring efuns for shifting and copying

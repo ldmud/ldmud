@@ -281,13 +281,10 @@ cleanup_vector (svalue_t *svp, size_t num, ptrtable_t * ptable)
         {
         case T_OBJECT:
           {
-            object_t *ob;
-
-            ob = p->u.ob;
-            if (ob->flags & O_DESTRUCTED)
+            if (p->u.ob->flags & O_DESTRUCTED)
             {
+                free_object(p->u.ob, "cleanup svalues");
                 put_number(p, 0);
-                reference_destructed_object(ob);
             }
             break;
           }
@@ -314,7 +311,7 @@ cleanup_vector (svalue_t *svp, size_t num, ptrtable_t * ptable)
                 check_map_for_destr(p->u.map);
                 walk_mapping(p->u.map, cleanup_mapping_filter, &extra);
             }
-            continue;
+            break;
 
         case T_STRING:
             if (!mstr_tabled(p->u.str))
@@ -360,7 +357,6 @@ cleanup_object (object_t * obj, ptrtable_t * ptable)
     ptrtable_t * local_ptable = NULL;
     int was_swapped = 0;
 
-printf("%s DEBUG: Cleanup object '%s'\n", time_stamp(), get_txt(obj->name));
     /* Make sure we have a pointer table */
     if (ptable == NULL)
     {
@@ -827,7 +823,7 @@ gc_reference_destructed_object (object_t *ob)
                  , ob, get_txt(ob->name));
         }
     }
-}
+} /* gc_reference_destructed_object() */
 
 /*-------------------------------------------------------------------------*/
 static void

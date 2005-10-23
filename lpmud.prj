@@ -23,12 +23,12 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 302)
-(Parent-Version lpmud 3-3 301)
-(Version-Log "The list of players-to-flush could get clobbered.")
+(Project-Version lpmud 3-3 303)
+(Parent-Version lpmud 3-3 302)
+(Version-Log "The cleanup code could forget to free a destructed object.")
 (New-Version-Log
 "")
-(Checkin-Time "Fri, 15 Nov 2002 20:23:47 -0700")
+(Checkin-Time "Sat, 16 Nov 2002 11:32:45 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -63,8 +63,8 @@
   ;; Information about the driver and the distribution in general
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
-  (CREDITS (lpmud/d/22_CREDITS 1.70.1.49 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.365 644))
+  (CREDITS (lpmud/d/22_CREDITS 1.70.1.50 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.366 644))
   (HISTORY (lpmud/f/49_HISTORY 1.284 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.18 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -144,7 +144,7 @@
   (src/files.c (lpmud/i/50_files.c 1.17 644))
   (src/filestat.h (lpmud/f/51_filestat.h 1.7 644))
   (src/gcollect.h (lpmud/f/33_gcollect.h 1.6.1.11 644))
-  (src/gcollect.c (lpmud/c/30_gcollect.c 1.41.1.78 644))
+  (src/gcollect.c (lpmud/c/30_gcollect.c 1.41.1.79 644))
   (src/hash.h (lpmud/f/32_hash.h 1.5 644))
   (src/hash.c (lpmud/c/28_hash.c 1.15 644))
   (src/heartbeat.h (lpmud/m/41_heartbeat. 1.6.1.4 644))
@@ -487,7 +487,7 @@
   (src/bugs/b-020916-files/registry.o (lpmud/b/b/38_registry.o 1.1 644) :no-keywords)
   (src/bugs/b-020916-files/debugger.h (lpmud/b/b/39_debugger.h 1.1 644) :no-keywords)
 
-  (src/bugs/f-summary (lpmud/c/37_f-summary 1.39.1.85 644) :no-keywords)
+  (src/bugs/f-summary (lpmud/c/37_f-summary 1.39.1.86 644) :no-keywords)
   (src/bugs/f-981027-0 (lpmud/g/29_f-981027-0 1.2 644) :no-keywords)
   (src/bugs/f-981027-1 (lpmud/g/28_f-981027-1 1.2 644) :no-keywords)
   (src/bugs/f-981027-2 (lpmud/g/27_f-981027-2 1.2 644) :no-keywords)
@@ -673,7 +673,10 @@
   (src/bugs/f-011213-0 (lpmud/q/6_f-011213-0 1.1 644) :no-keywords)
   (src/bugs/f-011213-1 (lpmud/q/7_f-011213-1 1.1 644) :no-keywords)
   (src/bugs/f-011215 (lpmud/u/19_f-011215 1.1 644) :no-keywords)
-  (src/bugs/f-011229-0 (lpmud/q/23_f-011229-0 1.2 644) :no-keywords)
+  (src/bugs/f-011229-0 (lpmud/q/23_f-011229-0 1.3 644) :no-keywords)
+  (src/bugs/psql/pgsql.diff (lpmud/c/b/1_pgsql.diff 1.1 644) :no-keywords)
+  (src/bugs/psql/pgsql.h (lpmud/c/b/2_pgsql.h 1.1 644) :no-keywords)
+  (src/bugs/psql/sql.c (lpmud/c/b/3_sql.c 1.1 644) :no-keywords)
   (src/bugs/f-011229-1 (lpmud/q/24_f-011229-1 1.1 644) :no-keywords)
   (src/bugs/f-011230 (lpmud/q/25_f-011230 1.1 644) :no-keywords)
   (src/bugs/f-020127 (lpmud/q/32_f-020127 1.1 644) :no-keywords)
@@ -734,7 +737,6 @@
   (src/bugs/p-020810-1 (lpmud/a/b/4_p-020810-1 1.1 644) :no-keywords)
   (src/bugs/p-020912 (lpmud/a/b/21_p-020912 1.3 644) :no-keywords)
   (src/bugs/p-021021 (lpmud/b/b/49_p-021021 1.1 644) :no-keywords)
-  (src/bugs/p-021031 (lpmud/b/b/50_p-021031 1.1 644) :no-keywords)
 
   ; Solved bugs and requests.
   (src/done/README (lpmud/h/22_README 1.1 644) :no-keywords)

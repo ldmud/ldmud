@@ -2,6 +2,29 @@ Short: Add support for PostgreSQL
 Date: 2001-12-29
 Type: Feature
 State: New
-See also: f-011229-1, p-021031
+See also: f-011229-1
 
-The title says it all :-)
+See files psql/ for the Ctx' patch.
+
+Ctx wrote:
+
+Ich hab mal fuer den Eigenbedarf ein paar Postgres-Efuns geschrieben,
+die auch voellig asynchron arbeiten. Ich habe mich hierbei fuer Postgres
+entschieden, da z.B. die Mysql-clientlibrary keine Funktionen zum
+asynchronen connectionhandling bietet.
+Vielleicht findest du ja, dass diese den Driver bereichern wuerden, ich
+schick den patch (pgsql.diff) mit einem kleinen Client (sql.c und
+pgsql.h) einfach mal ;)
+Der Code ist vielleicht etwas mager dokumentiert, bei Interesse an der
+Verwendung kann ich das aendern, ansonsten mach ich mir die Arbeit nicht
+;)
+Ich wuerde den Code selbstverstaendlich ohne Vorbehalte (was Copyright,
+Lizenzierung oder sonstigen Rechtskram betrifft) zur Verfuegung stellen.
+
+Gruss
+
+Florian Heinz (aka Ctx)
+
+PS: Es existieren auch asynchrone MySQL-Efuns, jedoch ist die
+Implementation mangels lib-befehle mit einem externen prozess ziemlich
+unsauber.
