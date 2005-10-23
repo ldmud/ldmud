@@ -4,7 +4,7 @@ State: Unclassified
 From: Marcus Meissner <marcus@jet.franken.de>
 From: Lars
 Date: Tue, 22 Dec 1998 11:57:41 +0100 (MET)
-See also: f-991104-0
+See also: f-991104-0, p-020912
 
 Ich meine damit, erstmal genau ueberlegen, wie die API aussehen soll
 und nicht einfach die UNIX socket* functions nachbilden, sonder etwas

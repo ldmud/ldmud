@@ -951,6 +951,15 @@ gc_count_ref_in_closure (svalue_t *csvp)
                 count_ref_in_closure(&sv);
             }
         }
+#ifdef USE_NEW_INLINES
+        if (type == CLOSURE_LFUN && l->function.lfun.context_size != 0)
+        {
+            unsigned short size = l->function.lfun.context_size;
+            l->function.lfun.context_size = 0; /* Prevent recursion */
+            count_ref_in_vector(l->context, size);
+            l->function.lfun.context_size = size;
+        }
+#endif /* USE_NEW_INLINES */
     }
 } /* count_ref_in_closure() */
 
@@ -988,6 +997,15 @@ clear_ref_in_closure (lambda_t *l, ph_int type)
 
     if (type == CLOSURE_ALIEN_LFUN)
         clear_object_ref(l->function.alien.ob);
+#ifdef USE_NEW_INLINES
+    if (type == CLOSURE_LFUN && l->function.lfun.context_size != 0)
+    {
+        unsigned short size = l->function.lfun.context_size;
+        l->function.lfun.context_size = 0; /* Prevent recursion */
+        clear_ref_in_vector(l->context, size);
+        l->function.lfun.context_size = size;
+    }
+#endif /* USE_NEW_INLINES */
 } /* clear_ref_in_closure() */
 
 /*-------------------------------------------------------------------------*/

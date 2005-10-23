@@ -116,6 +116,7 @@ f-020328-0: Introduce 'regexp' LPC datatype
 f-020331: Efun this_function()
 f-020404: New efun strreplace()
 f-020507-2: Slicing mappings
+p-020912: Socket support a la MudOS
 
 
 Language

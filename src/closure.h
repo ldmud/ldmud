@@ -4,6 +4,9 @@
 #include "driver.h"
 #include "typedefs.h"
 #include "exec.h"
+#ifdef USE_NEW_INLINES
+#include "svalue.h"
+#endif /* USE_NEW_INLINES */
 
 /* --- Types --- */
 
@@ -11,6 +14,9 @@
  *
  * If the closure uses constant values, they are stored in an svalue[]
  * right before the struct lambda and indexed from the end.
+ * For lfun closures, the context variables are stored after the
+ * lambda_s. If the lfun closure has no context variables, or for
+ * other kinds of closures the context[] part is not allocated at all. 
  */
 
 struct lambda_s
@@ -29,13 +35,23 @@ struct lambda_s
        */
     union               /* Closure information: */
     {
+#ifndef USE_NEW_INLINES
         unsigned short index;
           /* _LFUN: index in the function table
            * _IDENTIFIER: index in the variable table
            */
+#else /* USE_NEW_INLINES */
+        unsigned short var_index;
+          /* _IDENTIFIER: index in the variable table
+           */
+        struct {
+            unsigned short index;        /* Index in the function table */
+            unsigned short context_size; /* Number of context vars */
+        } lfun;
+#endif /* USE_NEW_INLINES */
 #       define VANISHED_VARCLOSURE_INDEX ((unsigned short)-1)
           /*              Special value for vanished variable closures.
-           *              TODO: it's tested with >=0 partially :-(,
+           *              TODO: it's tested with >=0 at places :-(,
            */
         bytecode_t code[1];
           /* LAMBDA and UNBOUND_LAMBDA closures: the function code, starting
@@ -60,12 +76,25 @@ struct lambda_s
             unsigned short  index;  /* Index in the objects variable table */
         } alien;
     } function;
+#ifdef USE_NEW_INLINES
+    svalue_t context[ /* .lfun.context_size */ 1];
+      /* lfun-closure context variables, if any */
+#endif /* USE_NEW_INLINES */
 };
 
 #define LAMBDA_VALUE_OFFSET \
   (sizeof(svalue_t) + offsetof(lambda_t, function.code[1]))
   /* Offset from the fun_hdr_p of a lambda closure to the first
    * constant value (the one with index number 0).
+   */
+
+#ifndef USE_NEW_INLINES
+#define SIZEOF_LAMBDA(num) sizeof(struct lambda_s)
+#else /* USE_NEW_INLINES */
+#define SIZEOF_LAMBDA(num) (sizeof(struct lambda_s) + ((num)-1) * sizeof(svalue_t))
+#endif /* USE_NEW_INLINES */
+  /* size_t SIZEOF_LAMBDA(int num)
+   *   Size of a lambda closure with <num> context variables.
    */
 
 /* --- Prototypes --- */
@@ -76,7 +105,11 @@ extern int       closure_cmp (svalue_t * left, svalue_t * right);
 extern Bool      lambda_ref_replace_program(lambda_t *l, int type, p_int size, vector_t *args, svalue_t *block);
 extern void      set_closure_user(svalue_t *svp, object_t *owner);
 extern void      replace_program_lambda_adjust(replace_ob_t *r_ob);
+#ifndef USE_NEW_INLINES
 extern void      closure_literal(svalue_t *dest, int ix);
+#else /* USE_NEW_INLINES */
+extern void      closure_literal(svalue_t *dest, int ix, unsigned short num);
+#endif /* USE_NEW_INLINES */
 extern lambda_t *lambda(vector_t *args, svalue_t *block, object_t *origin);
 extern void      free_closure(svalue_t *svp);
 extern int       symbol_operator(char *symbol, char **endp);

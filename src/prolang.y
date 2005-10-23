@@ -2934,7 +2934,7 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
     struct_member_t * pmember;
     void * block;    /* Allocation block for flags and index */
     Bool * flags;    /* Flag: which struct members have been set */
-    int  * index;    /* For each expr in order, list the struct member index */
+    int  * ix;       /* For each expr in order, list the struct member index */
     int    consumed; /* To check if we used all elements */
     int    count, member;
     int    i;
@@ -2948,9 +2948,6 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
     if (length == 0 || p == NULL)
     {
         /* Simplest case: all members assigned by position. */
-
-        int member;
-        struct_member_t * pmember;
 
         /* Check the types */
         if (exact_types && length > 0)
@@ -2989,9 +2986,9 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
     consumed = 0;
 
     block = xalloc( pdef->num_members * sizeof(*flags)
-                  + length * sizeof(*index));
+                  + length * sizeof(*ix));
     flags = (Bool *)block;
-    index = (int *)((char *)block + pdef->num_members * sizeof(*flags));
+    ix = (int *)((char *)block + pdef->num_members * sizeof(*flags));
 
     for (i = 0; i < pdef->num_members; i++)
     {
@@ -3000,7 +2997,7 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
 
     for (i = 0; i < length; i++)
     {
-        index[i] = -1;
+        ix[i] = -1;
     }
 
     /* Loop through list: assign the named members.
@@ -3054,7 +3051,7 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
         else
         {
             flags[member] = MY_TRUE;
-            index[count] = member;
+            ix[count] = member;
         }
     } /* for() */
 
@@ -3077,7 +3074,7 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
 
     for (i = 0; i < length; i++)
     {
-        if (index[i] < 0)
+        if (ix[i] < 0)
         {
             fatal("struct literal: expression %d not assigned to any member.\n"
                  , i);
@@ -3090,7 +3087,7 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
     ins_byte(pdef->num_members);
     ins_byte(length);
     for (i = length-1; i >= 0; i--)
-        ins_byte(index[i]);
+        ins_byte(ix[i]);
 
     /* Done */
     xfree(block);
@@ -3102,9 +3099,9 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
     consumed = 0;
 
     block = xalloc( pdef->num_members * sizeof(*flags)
-                  + length * sizeof(*index));
+                  + length * sizeof(*ix));
     flags = (Bool *)block;
-    index = (int *)((char *)block + pdef->num_members * sizeof(*flags));
+    ix = (int *)((char *)block + pdef->num_members * sizeof(*flags));
 
     for (i = 0; i < pdef->num_members; i++)
     {
@@ -3113,7 +3110,7 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
 
     for (i = 0; i < length; i++)
     {
-        index[i] = -1;
+        ix[i] = -1;
     }
 
     /* First loop through list: assign the named members
@@ -3157,7 +3154,7 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
         else
         {
             flags[member] = MY_TRUE;
-            index[count] = member;
+            ix[count] = member;
         }
     } /* for() */
 
@@ -3197,7 +3194,7 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
             else
             {
                 flags[member] = MY_TRUE;
-                index[count] = member;
+                ix[count] = member;
             }
         } /* for() */
     }
@@ -3221,7 +3218,7 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
 
     for (i = 0; i < length; i++)
     {
-        if (index[i] < 0)
+        if (ix[i] < 0)
         {
             fatal("struct literal: expression %d not assigned to any member.\n"
                  , i);
@@ -3234,7 +3231,7 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
     ins_byte(pdef->num_members);
     ins_byte(length);
     for (i = length-1; i >= 0; i--)
-        ins_byte(index[i]);
+        ins_byte(ix[i]);
 
     /* Done */
     xfree(block);
@@ -3510,7 +3507,6 @@ list_to_struct (struct_def_t * pdef, int length, svalue_t *initialized)
 {
     const_list_t *list;
     vector_t *vec;
-    svalue_t *svp;
     void *block;
     const_list_svalue_t *clsv;
 
@@ -4482,7 +4478,6 @@ opt_base_struct:
           /* Look up the struct id for the given identifier */
 
           int num = -1;
-          ident_t *p;
 
           if ($2->type == I_TYPE_UNKNOWN)
           {
@@ -10452,9 +10447,9 @@ function_call:
               {
                   if (funp->num_arg-1 > $4 || !(funp->flags & TYPE_MOD_XVARARGS))
                     yyerrorf("Wrong number of arguments to %.60s: "
-                             "expected %d, got %d"
+                             "expected %ld, got %ld"
                             , get_txt($1.real->name)
-                            , funp->num_arg, $4);
+                            , (long)funp->num_arg, (long)$4);
               }
 
               /* Check the argument types.
@@ -10750,7 +10745,7 @@ function_call:
       {
 %line
           int string_number;
-          string_t *p;
+          string_t *name;
 
           /* Save the (simple) state */
           $<function_call_head>$.start = CURRENT_PROGRAM_SIZE;
@@ -10840,13 +10835,13 @@ function_call:
 %line
           /* If we received a string as call_other_name, it's a constant call.
            */
-          p = $3;
+          name = $3;
 
-          if (p)
+          if (name)
           {
               /* Push the function name (the expr4 is already on the stack)
                */
-              string_number = store_prog_string(p);
+              string_number = store_prog_string(name);
               if (string_number <= 0x0ff )
               {
                   ins_f_code(F_CSTRING0);
@@ -10872,7 +10867,7 @@ function_call:
                   ins_f_code(F_STRING);
                   ins_short(string_number);
               }
-          } /* if (p) */
+          } /* if (name) */
           /* otherwise the name was given by an expression for which
            * the code and value have been already generated.
            */
@@ -11745,7 +11740,12 @@ svalue_constant:
               l = xalloc(sizeof *l);
               l->ref = 1;
               l->ob = ref_object(current_object, "closure");
+#ifndef USE_NEW_INLINES
               l->function.index = ix;
+#else /* USE_NEW_INLINES */
+              l->function.lfun.index = ix;
+              l->function.lfun.context_size = 0;
+#endif /* USE_NEW_INLINES */
               svp->u.lambda = l;
               svp->x.closure_type = CLOSURE_PRELIMINARY;
           }
@@ -12814,7 +12814,7 @@ copy_structs (program_t *from, fulltype_t flags, int offset)
 
     for (struct_id = 0; struct_id < from->num_structs; struct_id++)
     {
-        int id, member_id;
+        int id;
         ident_t *p;
         struct_def_t *pdef = from->struct_defs + struct_id;
         fulltype_t f = flags | pdef->flags;

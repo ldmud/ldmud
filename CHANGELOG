@@ -1,14 +1,21 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-12-Sep-2002 (Lars Duening)  (3.3.253)
+13-Sep-2002 (Lars Duening)  (3.3.253)
+  - (interpret.c, prolang.y) Removed compiler warnings.
+  - (array, mapping.c, pkg-alists.c, i-svalue_cmp.h) Exported the
+       svalue comparison inline functions into their own include file.
+  - (closure, gcollect.c, other files) With USE_NEW_INLINES: lfun closures
+       can now carry a bunch of context values with them.
+
+12-Sep-2002 (Lars Duening)  (3.3.252)
   - (interpret.c) DYNAMIC_COSTS now also covers array additions.
   - (prolang.y) When inheriting variables, the function to
        adjust the struct-id inadvertendly stripped away the
        inheritance flags. This caused virtual variables to
        go uninitialized or worse.
 
-11-Sep-2002 (Lars Duening)  (3.3.252)
+11-Sep-2002 (Lars Duening)
   - (prolang.y) Oops, typos in the constant-struct code when __INIT
        is not used (thanks, Guandalug).
 

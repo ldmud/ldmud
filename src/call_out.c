@@ -455,74 +455,39 @@ find_call_out (object_t *ob, svalue_t *fun, Bool do_free_call)
 
     if (fun->type != T_STRING)
     {
-        ph_int type;
-
         if (fun->type == T_CLOSURE)
         {
-            if (!CLOSURE_MALLOCED(type = fun->x.closure_type)
-             && type >= CLOSURE_EFUN)
+            for (copp = &call_list; NULL != (cop = *copp); copp = &cop->next)
             {
-                for (copp = &call_list; NULL != (cop = *copp); copp = &cop->next)
+                delay += cop->delta;
+                if (cop->fun.is_lambda
+                 && closure_eq(&(cop->fun.function.lambda), fun)
+                   )
                 {
-                    delay += cop->delta;
-                    if (cop->fun.is_lambda
-                     && cop->fun.function.lambda.x.closure_type == type
-                     && cop->fun.function.lambda.u.ob == ob)
-                    {
-                        goto found;
-                    }
+                    goto found;
                 }
-                goto not_found;
-            }
-            else if (type != CLOSURE_UNBOUND_LAMBDA)
-            {
-                lambda_t *l;
-
-                l = fun->u.lambda;
-                if (type != CLOSURE_LFUN)
-                type = CLOSURE_UNBOUND_LAMBDA;
-                for (copp = &call_list; NULL != (cop = *copp); copp = &cop->next)
-                {
-                    delay += cop->delta;
-                    if (cop->fun.is_lambda
-                     && (   cop->fun.function.lambda.u.lambda == l
-                         || (   cop->fun.function.lambda.x.closure_type == type
-                             && cop->fun.function.lambda.u.lambda->ob == l->ob
-                             && cop->fun.function.lambda.u.lambda->function.index
-                                == l->function.index)
-                        )
-                       )
-                    {
-                        goto found;
-                    }
-                }
-                /* FALLTHROUGH*/
-not_found:
-                free_svalue(fun);
-                put_number(fun, -1);
-                return;
-found:
-                free_svalue(fun);
-                if (do_free_call)
-                {
-                    if (cop->next)
-                        cop->next->delta += cop->delta;
-                    *copp = cop->next;
-                    free_call(cop);
-                    num_callouts--;
-                }
-                /* It is possible to have delay < 0 if we are
-                 * called from inside call_out() .
-                 */
-                if (delay < 0)
-                    delay = 0;
-                put_number(fun, delay);
-                return;
             }
 
-            /* All other types of closures can't be found */
+            /* Not found */
             free_svalue(fun);
             put_number(fun, -1);
+            return;
+found:
+            free_svalue(fun);
+            if (do_free_call)
+            {
+                if (cop->next)
+                    cop->next->delta += cop->delta;
+                *copp = cop->next;
+                free_call(cop);
+                num_callouts--;
+            }
+            /* It is possible to have delay < 0 if we are
+             * called from inside call_out() .
+             */
+            if (delay < 0)
+                delay = 0;
+            put_number(fun, delay);
             return;
         }
         fatal("find_call_out() got %s, expected string/closure.\n"

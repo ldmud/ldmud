@@ -204,6 +204,8 @@
 #include "wiz_list.h"
 #include "xalloc.h"
 
+#include "i-svalue_cmp.h"
+
 /*-------------------------------------------------------------------------*/
 /* Types */
 
@@ -874,38 +876,6 @@ free_protector_mapping (mapping_t *m)
 } /* free_protector_mapping() */
 
 /*-------------------------------------------------------------------------*/
-static INLINE p_int
-mcompare (svalue_t * left, svalue_t * right)
-
-/* Compare the two svalues *<left> and *<right>, using the mapping
- * sorting order, and return:
- *   -1: <left> is smaller than <right>
- *    0: <left> and <right> are equal
- *    1: <left> is bigger than <right>
- */
-
-{
-    int rc;
-
-    rc = left->type - right->type;
-    if (rc)
-        return rc;
-
-    if (left->type == T_CLOSURE)
-        return closure_cmp(left, right);
-
-    /* This comparison works for T_NUMBERS because the missing bit
-     * from u.number is stored in x.generic.
-     */
-
-    rc = (left->u.number >> 1) - (right->u.number >> 1);
-    if (rc)
-        return rc;
-
-    return left->x.generic - right->x.generic;
-} /* mcompare() */
-
-/*-------------------------------------------------------------------------*/
 static INLINE mp_int
 mhash (svalue_t * svp)
 
@@ -1010,7 +980,7 @@ find_map_entry ( mapping_t *m, svalue_t *map_index
             while (key > keystart && key->type == T_INVALID)
                 key--;
 
-            cmp = mcompare(map_index, key);
+            cmp = svalue_cmp(map_index, key);
             
             if (cmp == 0)
             {
@@ -1053,7 +1023,7 @@ find_map_entry ( mapping_t *m, svalue_t *map_index
 
         for (mc = hm->chains[idx]; mc != NULL; mc = mc->next)
         {
-            if (0 == mcompare(&(mc->data[0]), map_index))
+            if (svalue_eq(&(mc->data[0]), map_index))
             {
                 /* Found it */
                 *ppChain = mc;
@@ -1821,7 +1791,7 @@ add_mapping (mapping_t *m1, mapping_t *m2)
             /* Ok, it's a new entry */
             m3->num_entries++;
 
-            cmp = mcompare(src1_key, src2_key);
+            cmp = svalue_cmp(src1_key, src2_key);
 
             if (cmp < 0)
             {
@@ -2219,7 +2189,7 @@ compact_mappings (mp_int num)
 
                     if (last_hash)
                     {
-                        p_int d = mcompare(&(mcp->data[0]), &(last_hash->data[0]));
+                        p_int d = svalue_cmp(&(mcp->data[0]), &(last_hash->data[0]));
 
                         if (d < 0) {
                             last_hash->next = hook1;
@@ -2295,7 +2265,7 @@ compact_mappings (mp_int num)
                 {
                     /* Sort the next runlength elements onto out1 */
                     while (1) {
-                        p_int d = mcompare(&(hook1->data[0]), &(hook2->data[0]));
+                        p_int d = svalue_cmp(&(hook1->data[0]), &(hook2->data[0]));
 
                         if (d > 0)
                         {
@@ -2379,7 +2349,7 @@ compact_mappings (mp_int num)
                         continue;
                     }
 
-                    d = mcompare(src_key, &(hook1->data[0]));
+                    d = svalue_cmp(src_key, &(hook1->data[0]));
 
                     if (d > 0)
                     {

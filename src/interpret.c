@@ -7610,7 +7610,11 @@ again:
             sp++;
             inter_sp = sp;
             inter_pc = pc;
+#ifndef USE_NEW_INLINES
             closure_literal(sp, ix);
+#else /* USE_NEW_INLINES */
+            closure_literal(sp, ix, 0);
+#endif /* USE_NEW_INLINES */
             /* If out of memory, this will set sp to svalue-0 and
              * throw an error.
              */
@@ -13562,12 +13566,12 @@ again:
         else
         {
             /* Complex way: assign using the indices */
-            int index;
+            int ix;
 
             for ( ; num_values > 0 ; num_values--, sp--)
             {
-                index = LOAD_UINT8(pc);
-                vec->item[index] = *sp;
+                ix = LOAD_UINT8(pc);
+                vec->item[ix] = *sp;
             }
         }
 
@@ -16175,7 +16179,11 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
 
         current_prog = current_object->prog;
         /* inter_sp == sp */
+#ifndef USE_NEW_INLINES
         flags = setup_new_frame(l->function.index);
+#else /* USE_NEW_INLINES */
+        flags = setup_new_frame(l->function.lfun.index);
+#endif /* USE_NEW_INLINES */
         funstart = current_prog->program + (flags & FUNSTART_MASK);
         csp->funstart = funstart;
         eval_instruction(FUNCTION_CODE(funstart), inter_sp);
@@ -16300,7 +16308,11 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
         }
 
         /* Do we have the variable? */
+#ifndef USE_NEW_INLINES
         if ( (i = (short)l->function.index) < 0)
+#else /* USE_NEW_INLINES */
+        if ( (i = (short)l->function.var_index) < 0)
+#endif /* USE_NEW_INLINES */
         {
             error("Variable not inherited\n");
             /* NOTREACHED */

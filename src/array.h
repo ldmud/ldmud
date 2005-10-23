@@ -130,7 +130,6 @@ extern long total_array_size(void);
 
 #ifdef USE_ALISTS
 extern vector_t * shrink_array (vector_t *p, mp_int n);
-extern int array_cmp (svalue_t *p1, svalue_t *p2);
 #endif
 
 #if defined(GC_SUPPORT)

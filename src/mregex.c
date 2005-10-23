@@ -216,7 +216,7 @@ rx_compile (string_t * expr, int opt, Bool from_ed)
  */
 
 {
-    char       * pErrmsg;
+    const char * pErrmsg;
     int          erridx;
 #ifdef USE_PCRE
     pcre       * pProg;     /* The generated regular expression */

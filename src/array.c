@@ -77,6 +77,8 @@
 #include "wiz_list.h"
 #include "xalloc.h"
 
+#include "i-svalue_cmp.h"
+
 /*-------------------------------------------------------------------------*/
 
 #define ALLOC_VECTOR(nelem) \
@@ -776,102 +778,7 @@ add_array (vector_t *p, vector_t *q)
         assign_svalue_no_free (d++, s++);
     }
     return p;
-}
-
-/*-------------------------------------------------------------------------*/
-static INLINE int
-i_array_cmp (svalue_t *p1, svalue_t *p2)
-
-/* Array order function.
- *
- * Compare the svalues <p1> and <p2> and return an integer with the
- * following meaning:
- *
- *   > 0: <p1> 'is greater than' <p2>
- *   = 0: <p1> 'is equal to' <p2>
- *   < 0: <p1> 'is less than' <p2>
- *
- * The relation need not make sense with the actual interpretation
- * of <p1>/<p2>, as long as it defines a deterministic order relation.
- * Especially, it works for strings because the caller makes sure
- * that only directly tabled strings are used.
- *
- * See also compare_single() for a more specialized version.
- *
- * TODO: Is the assumption '.number is big enough to hold everything
- * TODO:: in the svalue' true for future hardware?
- * TODO: Reinterpreting the pointers as 'integer' may not be portable
- * TODO:: enough.
- */
-
-{
-    register int d;
-
-    /* Avoid a numeric overflow by first comparing the values halfed. */
-    if ( 0 != (d = p1->type - p2->type) ) return d;
-
-    if (p1->type == T_CLOSURE)
-        return closure_cmp(p1, p2);
-
-    if ( 0 != (d = (p1->u.number >> 1) - (p2->u.number >> 1)) ) return d;
-    if ( 0 != (d = p1->u.number - p2->u.number) ) return d;
-    switch (p1->type) {
-      case T_FLOAT:
-      case T_SYMBOL:
-      case T_QUOTED_ARRAY:
-        if ( 0 != (d = p1->x.generic - p2->x.generic) ) return d;
-        break;
-    }
-    return 0;
-} /* i_array_cmp() */
-
-#ifdef USE_ALISTS
-int array_cmp (svalue_t *p1, svalue_t *p2) { return i_array_cmp(p1, p2); }
-#endif
-
-#define array_cmp(p1, p2) i_array_cmp(p1, p2)
-
-/*-------------------------------------------------------------------------*/
-static long
-compare_single (svalue_t *svp1, svalue_t *svp2)
-
-/* Compare *svp1 and *svp2, return 0 if equal, and -1 if not.
- *
- * See also array_cmp() for the general version.
- */
-
-{
-    if (svp1->type != svp2->type)
-        return -1;
-
-    if (svp1->type == T_STRING)
-    {
-        return mstreq(svp1->u.str, svp2->u.str) ? 0 : -1;
-    }
-
-    if (svp1->type == T_CLOSURE)
-    {
-        return closure_cmp(svp1, svp2);
-    }
-
-    /* All other types have to be equal by address, visible in u.number */
-    /* TODO: This comparison is not valid according to ISO C */
-    if (svp1->u.number != svp2->u.number)
-        return -1;
-
-    switch (svp1->type)
-    {
-    case T_FLOAT:
-    case T_SYMBOL:
-    case T_QUOTED_ARRAY:
-        return svp1->x.generic != svp2->x.generic ? -1 : 0;
-    default:
-        return 0;
-    }
-
-    /* NOTREACHED */
-    return 0;
-} /* compare_single() */
+} /* add_array() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
@@ -909,7 +816,7 @@ get_array_order (vector_t * vec )
 
 /* Determine the order of the elements in vector <vec> and return the
  * sorted indices (actually svalue_t* pointer diffs). The order is
- * determined by array_cmp() (which happens to be high-to-low).
+ * determined by svalue_cmp() (which happens to be high-to-low).
  * 
  * As a side effect, strings in the vector are made shared, and
  * destructed objects in the vector are replaced by svalue 0s.
@@ -966,7 +873,7 @@ get_array_order (vector_t * vec )
             break;
 
         case 2:
-            if (array_cmp(vec->item, vec->item + 1) > 0)
+            if (svalue_cmp(vec->item, vec->item + 1) > 0)
             {
                 sorted[0] = 0;
                 sorted[1] = 1;
@@ -985,20 +892,20 @@ get_array_order (vector_t * vec )
             sorted[0] = 0;
             sorted[1] = 1;
             sorted[2] = 2;
-            d = array_cmp(vec->item, vec->item + 1);
+            d = svalue_cmp(vec->item, vec->item + 1);
             if (d < 0)
             {
                 sorted[1] = 0;
                 sorted[0] = 1;
             }
-            d = array_cmp(vec->item + sorted[0], vec->item + 2);
+            d = svalue_cmp(vec->item + sorted[0], vec->item + 2);
             if (d < 0)
             {
                 ptrdiff_t tmp = sorted[2];
                 sorted[2] = sorted[0];
                 sorted[0] = tmp;
             }
-            d = array_cmp(vec->item + sorted[1], vec->item + sorted[2]);
+            d = svalue_cmp(vec->item + sorted[1], vec->item + sorted[2]);
             if (d < 0)
             {
                 ptrdiff_t tmp = sorted[2];
@@ -1033,7 +940,7 @@ get_array_order (vector_t * vec )
                 {
                     svalue_t *test = vec->item + sorted[test_idx];
 
-                    if (array_cmp(max, test) < 0)
+                    if (svalue_cmp(max, test) < 0)
                     {
                         max_idx = test_idx;
                         max = test;
@@ -1078,7 +985,7 @@ get_array_order (vector_t * vec )
 
         /* propagate the new element up in the heap as much as necessary */
         for (curix = j; 0 != (parix = curix>>1); ) {
-            if ( array_cmp(root[parix], inpnt) > 0 ) {
+            if ( svalue_cmp(root[parix], inpnt) > 0 ) {
                 root[curix] = root[parix];
                 curix = parix;
             } else {
@@ -1109,7 +1016,7 @@ get_array_order (vector_t * vec )
                 break;
             }
             if (root[child2]) {
-                if (!root[child] || array_cmp(root[child], root[child2]) > 0)
+                if (!root[child] || svalue_cmp(root[child], root[child2]) > 0)
                 {
                     root[curix] = root[child2];
                     curix = child2;
@@ -1138,7 +1045,7 @@ vector_t *
 order_array (vector_t *vec)
 
 /* Order the array <vec> and return a new vector with the sorted data.
- * The sorting order is the internal order defined by array_cmp() (which
+ * The sorting order is the internal order defined by svalue_cmp() (which
  * happens to be high-to-low).
  *
  * This function and lookup_key() are used in several places for internal
@@ -1184,7 +1091,7 @@ lookup_key (svalue_t *key, vector_t *vec)
  *   -2          -> key should be at position 1,
  *   -len(vec)-1 -> key should be appended to the vector.
  *
- * <vec> must be sorted according to array_cmp(), else the result will be
+ * <vec> must be sorted according to svalue_cmp(), else the result will be
  * interesting, but useless.
  *
  * The function is used by object.c and pkg-alists.c .
@@ -1217,7 +1124,7 @@ lookup_key (svalue_t *key, vector_t *vec)
     i = keynum >> 1;
     o = (i+2) >> 1;
     for (;;) {
-        d = array_cmp(key, &vec->item[i]);
+        d = svalue_cmp(key, &vec->item[i]);
         if (d < 0)
         {
             i -= o;
@@ -1243,7 +1150,7 @@ lookup_key (svalue_t *key, vector_t *vec)
         if (o <= 1)
         {
             /* Last element to try */
-            d = array_cmp(key, &vec->item[i]);
+            d = svalue_cmp(key, &vec->item[i]);
             if (d == 0) return i;
             if (d > 0) return -(i+1)-1;
             return -i-1;
@@ -1309,7 +1216,7 @@ match_arrays (vector_t *vec1, vector_t *vec2)
             /* Even more special case: both vectors have just one elem */
             if (len2 == 1)
             {
-                if (!compare_single(vec1->item, vec2->item))
+                if (!svalue_eq(vec1->item, vec2->item))
                 {
                     flags[0] = flags[1] = MY_TRUE;
                 }
@@ -1338,7 +1245,7 @@ match_arrays (vector_t *vec1, vector_t *vec2)
          */
         for ( ; rlen != 0; rlen--, rover++, rflag++)
         {
-            if (!compare_single(rover, elem))
+            if (!svalue_eq(rover, elem))
                 *rflag = *eflag = MY_TRUE;
         }
 
@@ -1370,7 +1277,7 @@ match_arrays (vector_t *vec1, vector_t *vec2)
         {
             int d;
 
-            d = array_cmp(vec1->item + *index1, vec2->item + *index2);
+            d = svalue_cmp(vec1->item + *index1, vec2->item + *index2);
             if (d == 0)
             {
                 /* Elements match */
@@ -1389,7 +1296,7 @@ match_arrays (vector_t *vec1, vector_t *vec2)
                     index1++;
                     len1--;
                     if (len1 != 0)
-                        d = compare_single(test_val, vec1->item + *index1);
+                        d = svalue_eq(test_val, vec1->item + *index1);
                 }
                 while (len1 != 0 && d == 0);
 
@@ -1398,7 +1305,7 @@ match_arrays (vector_t *vec1, vector_t *vec2)
                     index2++;
                     len2--;
                     if (len2 != 0)
-                        d = compare_single(test_val, vec2->item + *index2);
+                        d = svalue_eq(test_val, vec2->item + *index2);
                 }
                 while (len2 != 0 && d == 0);
 
@@ -1786,7 +1693,7 @@ is_ordered (vector_t *v)
  *
  * The conditions are:
  *   - every string is shared
- *   - all elements are sorted according to array_cmp().
+ *   - all elements are sorted according to svalue_cmp().
  *
  * This predicate is currently used just by the swapper, historically
  * to avoid swapping out alist values. This is because the internal order
@@ -1800,7 +1707,7 @@ is_ordered (vector_t *v)
     for (svp = v->item, i = (mp_int)VEC_SIZE(v); --i > 0; svp++) {
         if (svp->type == T_STRING && !mstr_d_tabled(svp->u.str))
             return MY_FALSE;
-        if (array_cmp(svp, svp+1) > 0)
+        if (svalue_cmp(svp, svp+1) > 0)
             return MY_FALSE;
     }
     if (svp->type == T_STRING && !mstr_d_tabled(svp->u.str))

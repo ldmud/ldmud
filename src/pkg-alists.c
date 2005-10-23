@@ -60,6 +60,8 @@
 #include "svalue.h"
 #include "xalloc.h"
 
+#include "i-svalue_cmp.h"
+
 /*-------------------------------------------------------------------------*/
 static vector_t *
 intersect_ordered_arr (vector_t *a1, vector_t *a2)
@@ -79,7 +81,7 @@ intersect_ordered_arr (vector_t *a1, vector_t *a2)
     a2s = (mp_int)VEC_SIZE(a2);
     a3 = allocate_array( a1s < a2s ? a1s : a2s);
     for (i1=i2=l=0; i1 < a1s && i2 < a2s; ) {
-        d = array_cmp(&a1->item[i1], &a2->item[i2]);
+        d = svalue_cmp(&a1->item[i1], &a2->item[i2]);
         if (d<0)
             i1++;
         else if (d>0)

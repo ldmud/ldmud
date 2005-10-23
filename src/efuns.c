@@ -4891,11 +4891,20 @@ f_to_int (svalue_t *sp)
         break;
 
     case T_CLOSURE:
+#ifndef USE_NEW_INLINES
         if (sp->x.closure_type != CLOSURE_IDENTIFIER
          && sp->x.closure_type != CLOSURE_LFUN
            )
             error("Bad arg 1 to to_int(): not a lfun or variable closure.\n");
         n = sp->u.lambda->function.index;
+#else /* USE_NEW_INLINES */
+        if (sp->x.closure_type == CLOSURE_IDENTIFIER)
+            n = sp->u.lambda->function.var_index;
+        else if (sp->x.closure_type == CLOSURE_LFUN)
+            n = sp->u.lambda->function.lfun.index;
+        else
+            error("Bad arg 1 to to_int(): not a lfun or variable closure.\n");
+#endif /* USE_NEW_INLINES */
         free_closure(sp);
         break;
 
@@ -5082,6 +5091,7 @@ f_to_string (svalue_t *sp)
                     error("Out of memory.\n");
             }
 
+#ifndef USE_NEW_INLINES
             if (l->function.index != VANISHED_VARCLOSURE_INDEX)
             {
                 /* Get the variable name */
@@ -5089,6 +5099,15 @@ f_to_string (svalue_t *sp)
                  , l->ob->prog->variable_names[l->function.index].name
                 );
             }
+#else /* USE_NEW_INLINES */
+            if (l->function.var_index != VANISHED_VARCLOSURE_INDEX)
+            {
+                /* Get the variable name */
+                put_ref_string(sp
+                 , l->ob->prog->variable_names[l->function.var_index].name
+                );
+            }
+#endif /* USE_NEW_INLINES */
             else
             {
                 /* Variable vanished in a replace_program() */
@@ -5109,7 +5128,11 @@ f_to_string (svalue_t *sp)
             if (sp->x.closure_type == CLOSURE_LFUN)
             {
                 ob = l->ob;
+#ifndef USE_NEW_INLINES
                 ix = l->function.index;
+#else /* USE_NEW_INLINES */
+                ix = l->function.lfun.index;
+#endif /* USE_NEW_INLINES */
             }
             else
             {

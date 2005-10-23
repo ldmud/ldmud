@@ -851,7 +851,11 @@ svalue_to_string ( fmt_state_t *st
             if (type == CLOSURE_LFUN)
             {
                 ob = l->ob;
+#ifndef USE_NEW_INLINES
                 ix = l->function.index;
+#else /* USE_NEW_INLINES */
+                ix = l->function.lfun.index;
+#endif /* USE_NEW_INLINES */
             }
             else
             {
@@ -903,7 +907,11 @@ svalue_to_string ( fmt_state_t *st
             lambda_t *l;
 
             l = obj->u.lambda;
+#ifndef USE_NEW_INLINES
             if (l->function.index == VANISHED_VARCLOSURE_INDEX)
+#else /* USE_NEW_INLINES */
+            if (l->function.var_index == VANISHED_VARCLOSURE_INDEX)
+#endif /* USE_NEW_INLINES */
             {
                 stradd(st, &str, "<local variable from replaced program>");
                 break;
@@ -919,7 +927,11 @@ svalue_to_string ( fmt_state_t *st
             stradd(st, &str, "#'");
             stradd(st, &str, get_txt(l->ob->name));
             stradd(st, &str, "->");
+#ifndef USE_NEW_INLINES
             stradd(st, &str, get_txt(l->ob->prog->variable_names[l->function.index].name));
+#else /* USE_NEW_INLINES */
+            stradd(st, &str, get_txt(l->ob->prog->variable_names[l->function.var_index].name));
+#endif /* USE_NEW_INLINES */
             break;
           }
 
