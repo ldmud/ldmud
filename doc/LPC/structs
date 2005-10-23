@@ -133,7 +133,9 @@ MISCELLANEOUS
          structs are mostly a compile-time convenience in that the
          struct names and member names are available only to the
          LPC compiler. At runtime, structs are a special kind of array
-         with a fixed number of elements.
+         with a fixed number of elements (which also means that
+         runtime error messages will talk about 'indexing' instead of
+         'member lookup').
 
          Support for structs is signaled by the macro __LPC_STRUCTS__.
 

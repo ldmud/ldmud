@@ -1,6 +1,14 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+08-Sep-2002 (Lars Duening)  (3.3.248)
+  - (dumpstat.c) The status dump (also accessed by debug_info(2))
+       couldn't handle structs (thanks, Markus).
+  - (efuns.c) The argument checks for debug_info(DINFO_STATUS)
+       accepted objects instead strings (thanks, Markus).
+  - (prolang.y) Assignments of mixed/mixed* to struct don't need
+       a cast (suggested by Markus).
+
 06-Sep-2002 (Lars Duening)  (3.3.247)
   - (object.c) Restoring arrays or structs confused the two types
        (thanks, Markus!).

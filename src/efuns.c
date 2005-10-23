@@ -6830,9 +6830,9 @@ v_debug_info (svalue_t *sp, int num_arg)
          || (sp->type == T_NUMBER && sp->u.number == 0)) {
             sp->u.str = STR_EMPTY; /* Just for status_parse() */
         } else {
-            if (arg[1].type != T_OBJECT)
-                vefun_exp_arg_error(2, (1 << T_OBJECT)|(1 << T_NULL)
-                                     , arg[1].type, sp);
+            if (arg[1].type != T_STRING)
+                vefun_exp_arg_error(2, (1 << T_STRING)|(1 << T_NULL)
+                                      , arg[1].type, sp);
         }
         if (status_parse(&sbuf, get_txt(sp->u.str)))
             strbuf_store(&sbuf, &res);

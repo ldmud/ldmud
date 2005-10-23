@@ -1276,19 +1276,20 @@ compatible_types (fulltype_t t1, fulltype_t t2, Bool is_assign)
  * If <is_assign> is true, it is assumed that <t2> will be assigned
  * to a var of <t1>, and the following rules have to match as well:
  *   - a struct <t1> is compatible to a derived struct <t2>.
- *   - if <t1> is a struct, <t2> must be, too.
+ *   - if <t1> is a struct, <t2> must be a struct or TYPE_ANY.
  */
 
 {
+    if (t1 == TYPE_UNKNOWN || t2 == TYPE_UNKNOWN)
+        return MY_FALSE;
+    if (t1 == TYPE_ANY || t2 == TYPE_ANY)
+        return MY_TRUE;
+
 #ifdef USE_STRUCTS
     if (is_assign && (t1 & PRIMARY_TYPE_MASK) == T_STRUCT)
     {
         int id1, id2;
         
-        /* Check if t2 is a struct */
-        if ((t2 & PRIMARY_TYPE_MASK) != T_STRUCT)
-            return MY_FALSE;
-
         /* Check if t1 is a base-struct of t2 */
         id1 = GET_SEC_TYPE_INFO(t1);
         id2 = GET_SEC_TYPE_INFO(t2);
@@ -1308,18 +1309,25 @@ compatible_types (fulltype_t t1, fulltype_t t2, Bool is_assign)
     }
 #endif
 
-    if (t1 == TYPE_UNKNOWN || t2 == TYPE_UNKNOWN)
-        return MY_FALSE;
     if (t1 == t2)
         return MY_TRUE;
-    if (t1 == TYPE_ANY || t2 == TYPE_ANY)
-        return MY_TRUE;
+
     if ((t1 & TYPE_MOD_POINTER) && (t2 & TYPE_MOD_POINTER))
     {
         if ((t1 & TYPE_MOD_MASK) == (TYPE_ANY|TYPE_MOD_POINTER)
          || (t2 & TYPE_MOD_MASK) == (TYPE_ANY|TYPE_MOD_POINTER))
             return MY_TRUE;
     }
+
+#ifdef USE_STRUCTS
+    if (is_assign && (t1 & PRIMARY_TYPE_MASK) == T_STRUCT)
+    {
+        /* Check if t2 is a struct */
+        if ((t2 & PRIMARY_TYPE_MASK) != T_STRUCT)
+            return MY_FALSE;
+    }
+#endif
+
     return MY_FALSE;
 } /* compatible_types() */
 
@@ -7728,6 +7736,10 @@ expr0:
               switch($1)
               {
               default:
+#ifdef USE_STRUCTS
+                  if (($1 & PRIMARY_TYPE_MASK) == TYPE_STRUCT)
+                      break; /* Do nothing, just adapt the type information */
+#endif /* USE_STRUCTS */
                   type_error("Illegal cast", $1);
                   break;
               case TYPE_ANY:

@@ -19,12 +19,12 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 247)
-(Parent-Version lpmud 3-3 246)
-(Version-Log "Restoring arrays or structs confused the two types.")
+(Project-Version lpmud 3-3 248)
+(Parent-Version lpmud 3-3 247)
+(Version-Log "struct bugfixes")
 (New-Version-Log
 "")
-(Checkin-Time "Fri, 06 Sep 2002 10:33:29 -0600")
+(Checkin-Time "Mon, 09 Sep 2002 00:10:00 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -60,7 +60,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.7 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.44 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.310 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.311 644))
   (HISTORY (lpmud/f/49_HISTORY 1.268 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.16 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -128,11 +128,11 @@
   (src/comm.h (lpmud/d/3_comm.h 1.26.1.19 644))
   (src/driver.h (lpmud/f/36_driver.h 1.15.1.19 644))
   (src/dumpstat.h (lpmud/f/35_dumpstat.h 1.8 644))
-  (src/dumpstat.c (lpmud/c/34_dumpstat.c 1.20.1.10 644))
+  (src/dumpstat.c (lpmud/c/34_dumpstat.c 1.20.1.11 644))
   (src/ed.h (lpmud/f/34_ed.h 1.5.1.6 644))
   (src/ed.c (lpmud/c/33_ed.c 1.32.1.23 644))
   (src/efuns.h (lpmud/l/20_efuns.h 1.13.1.16 644))
-  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.43 644))
+  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.44 644))
   (src/exec.h (lpmud/c/32_exec.h 1.34.1.25 644))
   (src/files.h (lpmud/i/49_files.h 1.2 644))
   (src/files.c (lpmud/i/50_files.c 1.17 644))
@@ -213,7 +213,7 @@
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.12 644))
   (src/port.c (lpmud/39_port.c 1.17.1.7 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.14 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.35 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.36 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7.1.1 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))
@@ -1214,7 +1214,7 @@
   (doc/LPC/pragma (lpmud/r/33_pragma 1.9 644))
   (doc/LPC/preprocessor (lpmud/r/34_preprocess 1.3 644))
   (doc/LPC/references (lpmud/c/48_references 1.3 644))
-  (doc/LPC/structs (lpmud/a/b/16_structs 1.3 644))
+  (doc/LPC/structs (lpmud/a/b/16_structs 1.4 644))
   (doc/LPC/switch (lpmud/c/47_switch 1.6 644))
   (doc/LPC/types (lpmud/r/35_types 1.4.1.4 644))
   (doc/LPC/varargs (lpmud/r/36_varargs 1.2 644))

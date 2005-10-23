@@ -119,6 +119,9 @@ svalue_size (svalue_t *v, mp_int * pTotal)
 
     case T_POINTER:
     case T_QUOTED_ARRAY:
+#ifdef USE_STRUCTS
+    case T_STRUCT:
+#endif
     {
         if (v->u.vec == &null_vector) return 0;
         if (NULL == register_pointer(ptable, v->u.vec) ) return 0;
