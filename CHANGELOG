@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+30-Nov-2002 (Lars Duening)  (3.3.316)
+  - (prolang.y) Brainfart: the last patch created a problem, instead of
+      solving one. The bug was that "*"::fun() looked at _all_ inherited
+      programs, not just the directly inherited ones.
+
 30-Nov-2002 (Lars Duening)  (3.3.315)
   - (prolang.y) When making wildcarded supercalls ("*"::fun()), the compiler
       takes care that each function is called only once (reported by Gnomi).

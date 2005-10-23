@@ -13956,13 +13956,6 @@ insert_inherited (char *super_name, string_t *real_name
     if (strpbrk(super_name, "*?"))
     {
         Bool *was_called;  /* Flags which inh. fun has been called already */
-        program_t **called_prog;
-        int        *called_ix;
-            /* List of which functions (defined by program and index) have
-             * been called. This is slower, but more precise than using
-             * was_called[] - for better speed we use both.
-             * The list is filled up to index <calls>.
-             */
         inherit_t *ip0;
         int num_inherits;
         int calls = 0;
@@ -13981,9 +13974,6 @@ insert_inherited (char *super_name, string_t *real_name
         for (i = 0; i < num_inherits; i++)
             was_called[i] = MY_FALSE;
 
-        called_prog = alloca(sizeof(*called_prog)*num_inherits);
-        called_ix = alloca(sizeof(*called_ix)*num_inherits);
-
         /* Test every inherit if the name matches and if
          * it does, generate the function call.
          */
@@ -14001,6 +13991,12 @@ insert_inherited (char *super_name, string_t *real_name
 
             if (ip->inherit_type & INHERIT_TYPE_DUPLICATE)
                 /* duplicate inherit */
+                continue;
+
+            if (ip->inherit_depth > 1)
+                /* Only consider direct inherits, otherwise we would even
+                 * call functions in sub-inherits which have been redefined.
+                 */
                 continue;
 
             if ( !match_string(super_name, get_txt(ip->prog->name), l) )
@@ -14038,8 +14034,6 @@ insert_inherited (char *super_name, string_t *real_name
                     do --ip; while (ip->prog != prog2);
                     i -= ip2->function_index_offset;
                 } /* if (virtually inherited) */
-
-                flags = ip->prog->functions[i];
             } /* if (inherited) */
 
             ip_index = ip - (inherit_t *)mem_block[A_INHERITS].block;
@@ -14051,44 +14045,6 @@ insert_inherited (char *super_name, string_t *real_name
              || was_called[ip_index])
                 /* duplicate inherit */
                 continue;
-
-            /* If this function is inherited, determine the originating
-             * program and check if we called it already.
-             */
-            if (flags & NAME_INHERITED)
-            {
-                inherit_t *ip2;
-                program_t *prog2;
-                int        i2, ix;
-                Bool       found;
-
-                i2 = i;
-                ip2 = ip;
-                prog2 = ip2->prog;
-
-                while (prog2->functions[i2] & NAME_INHERITED)
-                {
-                    ip2 = &prog2->inherit[prog2->functions[i2] & INHERIT_MASK];
-                    prog2 = ip2->prog;
-                    i2 -= ip2->function_index_offset;
-                }
-
-                for (found = MY_FALSE, ix = 0; !found && ix < calls; ix++)
-                {
-                    if (called_prog[ix] == prog2
-                     && called_ix[ix]   == i2
-                       )
-                    {
-                        found = MY_TRUE;
-                        break;
-                    }
-                }
-                if (found) /* Duplicate call */
-                    continue;
-
-                called_prog[calls] = prog2;
-                called_ix[calls] = i2;
-            }
 
             if (!calls) /* First function found */
                 first_index = i;

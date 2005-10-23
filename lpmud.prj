@@ -29,12 +29,12 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 315)
-(Parent-Version lpmud 3-3 314)
-(Version-Log "When making wildcarded supercalls, the compiler takes care that each function is called only once.")
+(Project-Version lpmud 3-3 316)
+(Parent-Version lpmud 3-3 315)
+(Version-Log "Last patch was a brainfart: wildcarded supercalls should just check the directly inherited programs.")
 (New-Version-Log
 "")
-(Checkin-Time "Sat, 30 Nov 2002 13:20:31 -0700")
+(Checkin-Time "Sat, 30 Nov 2002 17:53:19 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -70,8 +70,8 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.50 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.378 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.285 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.379 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.286 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.18 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -225,7 +225,7 @@
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.15 644))
   (src/port.c (lpmud/39_port.c 1.17.1.7 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.17 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.5 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.6 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7.1.1 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))

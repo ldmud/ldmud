@@ -437,7 +437,7 @@ For a detailed list of all changes see the file CHANGELOG.
            lead to a syntax error.
        + Bugfix: Using auto-includes no longer generate wrong line numbers
            in error messages.
-       + Bugfix: "*"::foo() now calls each inherited function only once.
+       + Bugfix: "*"::foo() checks just the directly inherited programs.
 
     - Runtime:
        + Attempts to set a single string character to 0 now raise
