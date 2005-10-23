@@ -855,7 +855,6 @@ reset_object (object_t *ob, int arg)
         if (arg == H_RESET)
             previous_ob = ob;
 
-printf("DEBUG: reset_object('%s') lfun '%s'\n", get_txt(ob->name), get_txt(driver_hook[arg].u.str));
         push_number(inter_sp, arg == H_RESET);
         if (!sapply(driver_hook[arg].u.str, ob, 1) && arg == H_RESET)
             ob->time_reset = 0;

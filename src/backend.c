@@ -888,7 +888,6 @@ static Bool did_swap;
                 if (d_flag)
                     fprintf(stderr, "%s RESET %s\n", time_stamp(), get_txt(obj->name));
 #endif
-printf("DEBUG:     resetting '%s' swapped %d\n", get_txt(obj->name), !!(obj->flags& O_SWAPPED));
                 if (obj->flags & O_SWAPPED
                  && load_ob_from_swap(obj) < 0)
                    continue;

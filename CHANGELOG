@@ -1,7 +1,7 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-10-Oct-2002 (Lars Duening)  (3.3.282)
+10-Oct-2002 (Lars Duening)  (3.3.282, .283)
   - (object.c) Restoring structs in mappings didn't work (reported by Tomba).
   - (efuns.c, svalue.h, interpret.c) Evaluation cost of  deep_copy() is
        now proportional to size and nesting depth of copied arrays

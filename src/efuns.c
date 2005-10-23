@@ -5503,6 +5503,7 @@ copy_svalue (svalue_t *dest, svalue_t *src
 #if defined(DYNAMIC_COSTS)
             eval_cost += (depth+1) / 10;
 #endif
+            info.depth = depth+1;
             info.width = old->num_values;
             new = allocate_mapping(size, info.width);
             if (!new)
