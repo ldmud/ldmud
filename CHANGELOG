@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+30-Nov-2002 (Lars Duening)  (3.3.315)
+  - (prolang.y) When making wildcarded supercalls ("*"::fun()), the compiler
+      takes care that each function is called only once (reported by Gnomi).
+
 29-Nov-2002 (Lars Duening)  (3.3.314)
   - (sysmalloc.c) This file is no longer needed (actually it has been
       useless since 3.2.8-dev.188).

@@ -98,7 +98,7 @@ For a detailed list of all changes see the file CHANGELOG.
            regular expression code, or the PCRE package (default).
 
 
-06-Nov-2002 (Lars Duening) -- Release 3.2.9
+30-Nov-2002 (Lars Duening) -- Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -437,6 +437,7 @@ For a detailed list of all changes see the file CHANGELOG.
            lead to a syntax error.
        + Bugfix: Using auto-includes no longer generate wrong line numbers
            in error messages.
+       + Bugfix: "*"::foo() now calls each inherited function only once.
 
     - Runtime:
        + Attempts to set a single string character to 0 now raise
