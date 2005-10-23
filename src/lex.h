@@ -198,6 +198,7 @@ extern Bool pragma_no_clone;
 extern Bool pragma_no_inherit;
 extern Bool pragma_no_shadow;
 extern Bool pragma_pedantic;
+extern Bool pragma_warn_deprecated;
 extern string_t *last_lex_string;
 extern ident_t *all_efuns;
 #ifndef USE_NEW_INLINES

@@ -7623,13 +7623,27 @@ again:
         {
             sp++;
             sp->type = T_CLOSURE;
-            sp->x.closure_type = (short)
-              (ix >= CLOSURE_SIMUL_EFUN_OFFS
-                ? ix
-                : (instrs[ix - CLOSURE_EFUN_OFFS].Default == -1
-                    ? ix + CLOSURE_OPERATOR-CLOSURE_EFUN
-                    : ix));
             sp->u.ob = ref_object(current_object, "closure");
+            if (ix >= CLOSURE_SIMUL_EFUN_OFFS)
+            {
+                /* Sefun closure */
+                sp->x.closure_type = (short)ix;
+            }
+            else
+            {
+                /* Efun or operator closure */
+                if (pragma_warn_deprecated
+                 && instrs[ix - CLOSURE_EFUN_OFFS].deprecated != NULL)
+                    warnf("Warning: %s() is deprecated: %s\n"
+                         , instrs[ix - CLOSURE_EFUN_OFFS].name
+                         , instrs[ix - CLOSURE_EFUN_OFFS].deprecated
+                         );
+
+                sp->x.closure_type
+                  = (short)(  instrs[ix - CLOSURE_EFUN_OFFS].Default == -1
+                            ? ix + CLOSURE_OPERATOR-CLOSURE_EFUN
+                            : ix);
+            }
         }
         break;
     }

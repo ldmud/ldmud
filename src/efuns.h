@@ -3,7 +3,7 @@
 
 #include "driver.h"
 #include "typedefs.h"
-#include "instrs.h"     /* F_SET_IS_WIZARD, F_TRANSFER, and others */
+#include "instrs.h"     /* F_SET_IS_WIZARD, F_PROCESS_STRING */
 
 /* --- Variables --- */
 

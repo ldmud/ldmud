@@ -4,7 +4,6 @@
 #include "driver.h"
 #include <stddef.h>
 
-#include "instrs.h"     /* F_INHERIT_LIST */
 #include "typedefs.h"
 #include "svalue.h"
 

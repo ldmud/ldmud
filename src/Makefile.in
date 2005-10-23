@@ -231,9 +231,9 @@ backend.o : ../mudlib/sys/debug_message.h ../mudlib/sys/driver_hook.h \
     driver.h strfuns.h sent.h instrs.h regexp.h pcre/pcre.h port.h config.h \
     hosts/unix.h hosts/be/be.h machine.h
 
-bitstrings.o : xalloc.h svalue.h simulate.h mstrings.h main.h lex.h \
-    interpret.h bitstrings.h typedefs.h driver.h strfuns.h sent.h exec.h \
-    instrs.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
+bitstrings.o : xalloc.h svalue.h simulate.h mstrings.h instrs.h interpret.h \
+    bitstrings.h typedefs.h driver.h strfuns.h sent.h exec.h port.h \
+    config.h hosts/unix.h hosts/be/be.h machine.h
 
 call_out.o : ../mudlib/sys/debug_info.h xalloc.h wiz_list.h swap.h svalue.h \
     strfuns.h stdstrings.h simulate.h object.h mstrings.h main.h \
@@ -277,8 +277,8 @@ efuns.o : ../mudlib/sys/time.h ../mudlib/sys/strings.h \
 
 files.o : ../mudlib/sys/files.h xalloc.h svalue.h stdstrings.h simulate.h \
     mstrings.h main.h lex.h interpret.h filestat.h comm.h array.h files.h \
-    my-alloca.h typedefs.h driver.h strfuns.h sent.h exec.h instrs.h port.h \
-    config.h hosts/unix.h hosts/be/be.h machine.h
+    my-alloca.h typedefs.h driver.h strfuns.h sent.h exec.h port.h config.h \
+    hosts/unix.h hosts/be/be.h machine.h
 
 gcollect.o : ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h swap.h \
     stdstrings.h smalloc.h simul_efun.h simulate.h sent.h prolang.h parse.h \
@@ -380,16 +380,16 @@ dftables.o : pcre/maketables.c pcre/internal.h pcre/pcre.h pcre/config.h
 
 pkg-alists.o : i-svalue_cmp.h xalloc.h svalue.h simulate.h mstrings.h \
     main.h interpret.h array.h my-alloca.h pkg-alists.h typedefs.h driver.h \
-    closure.h strfuns.h sent.h exec.h instrs.h port.h config.h hosts/unix.h \
+    closure.h strfuns.h sent.h exec.h port.h config.h hosts/unix.h \
     hosts/be/be.h machine.h
 
 pkg-mysql.o : xalloc.h svalue.h simulate.h mstrings.h interpret.h array.h \
     pkg-mysql.h my-alloca.h typedefs.h driver.h strfuns.h sent.h exec.h \
-    instrs.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
+    port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
 pkg-pcre.o : pcre/study.c pcre/maketables.c pcre/get.c pcre/pcre.c \
     simulate.h interpret.h pkg-pcre.h driver.h pcre/internal.h \
-    pcre/chartables.c svalue.h strfuns.h sent.h exec.h typedefs.h instrs.h \
+    pcre/chartables.c svalue.h strfuns.h sent.h exec.h typedefs.h \
     pcre/pcre.h port.h config.h pcre/config.h hosts/unix.h hosts/be/be.h \
     machine.h
 
@@ -404,7 +404,7 @@ random.o : random.h driver.h port.h config.h hosts/unix.h hosts/be/be.h \
     machine.h
 
 regexp.o : main.h xalloc.h simulate.h interpret.h comm.h regexp.h driver.h \
-    typedefs.h svalue.h strfuns.h sent.h exec.h instrs.h port.h config.h \
+    typedefs.h svalue.h strfuns.h sent.h exec.h port.h config.h \
     hosts/unix.h hosts/be/be.h machine.h
 
 simul_efun.o : xalloc.h swap.h svalue.h stdstrings.h simulate.h ptrtable.h \
@@ -449,7 +449,7 @@ wiz_list.o : xalloc.h svalue.h stdstrings.h simulate.h object.h mstrings.h \
 xalloc.o : smalloc.c main.h simulate.h interpret.h xalloc.h driver.h \
     ../mudlib/sys/debug_info.h object.h exec.h svalue.h stdstrings.h \
     mstrings.h gcollect.h backend.h smalloc.h typedefs.h strfuns.h sent.h \
-    instrs.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
+    port.h config.h instrs.h hosts/unix.h hosts/be/be.h machine.h
 
 # --- DO NOT MODIFY THIS LINE -- AUTO-DEPENDS PRECEDE ---
 # --- DO NOT MODIFY THIS LINE -- SELECTED AUTO-DEPENDS FOLLOW ---
@@ -473,7 +473,7 @@ ed.o : stdstrings.h instrs.h
 
 efuns.o : stdstrings.h instrs.h
 
-files.o : stdstrings.h instrs.h
+files.o : stdstrings.h
 
 gcollect.o : stdstrings.h instrs.h
 
@@ -500,14 +500,6 @@ parse.o : stdstrings.h instrs.h
 parse_old.o : stdstrings.h instrs.h
 
 parser.o : lang.c stdstrings.h instrs.h
-
-pkg-alists.o : instrs.h
-
-pkg-mysql.o : instrs.h
-
-pkg-pcre.o : instrs.h
-
-regexp.o : instrs.h
 
 simul_efun.o : stdstrings.h instrs.h
 

@@ -981,6 +981,70 @@ error (const char *fmt, ...)
 
 /*-------------------------------------------------------------------------*/
 void
+warnf (char *fmt, ...)
+
+/* A system runtime warning occured: generate a message from printf-style
+ * <fmt> with a timestamp, and print it using debug_message().
+ *
+ * Note: Both 'warn' and 'warning' are already taken on some systems.
+ * TODO: Extend this to let the mudlib handle warnings.
+ * TODO: Add a pwarnf(<prefmt>, <postfmt>,...) function which translates the
+ * TODO:: errno into a string and calls error(<prefmt><errmsg><postfmt>, ...).
+ */
+
+{
+    char     *ts;
+    string_t *file;                  /* program name */
+    object_t *curobj = NULL;         /* Verified current object */
+    char      msg_buf[2000];
+      /* The buffer for the error message to be created.
+       */
+    char      fixed_fmt[10000];
+      /* Note: When changing this buffer, also change the HEAP_STACK_GAP
+       * limit in xalloc.c!
+       */
+    mp_int    line_number = 0;
+    va_list   va;
+
+    ts = time_stamp();
+    
+    va_start(va, fmt);
+
+    /* Make fmt sane */
+    fmt = limit_error_format(fixed_fmt, sizeof(fixed_fmt), fmt);
+
+    /* Check the current object */
+    curobj = NULL;
+    if (current_object != NULL
+     && current_object != &dummy_current_object_for_loads)
+        curobj = current_object;
+
+    if (curobj)
+        assign_eval_cost();
+
+    /* Generate the error message */
+    vsprintf(msg_buf, fmt, va);
+    va_end(va);
+
+    debug_message("%s ", ts);
+    debug_message("%s", emsg_buf+1);
+
+    /* If we have a current_object, determine the program location
+     * of the fault.
+     */
+    if (curobj)
+    {
+        line_number = get_line_number_if_any(&file);
+        debug_message("%s program: %s, object: %s line %ld\n"
+                     , ts, get_txt(file), get_txt(curobj->name)
+                     , line_number);
+    }
+
+    fflush(stdout);
+} /* warnf() */
+
+/*-------------------------------------------------------------------------*/
+void
 parse_error (Bool warning, const char *error_file, int line, const char *what
             , const char *context)
 

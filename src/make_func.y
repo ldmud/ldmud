@@ -101,7 +101,7 @@
  *
  * An efun is defined this way:
  *
- *    ret-type name [ alias ] ([argtype-1, ... , argtype-n]);
+ *    ret-type name [ alias ] ([argtype-1, ... , argtype-n]) [ "msg" ];
  *
  *        This is the efun <name>, with the compiler source name F_<NAME>,
  *        which returns a value of type <ret-type> and takes n >= 0
@@ -124,6 +124,11 @@
  *
  *        Alternatively, the last argument can be given as '...' if the
  *        efun can handle arbitrarily many arguments.
+ *
+ *        If the efun is deprecated, <msg> is the warning message to
+ *        print when the efun is used and pragma warn_deprecated is in
+ *        effect. The message will be prefixed by the compiler
+ *        with "<name> is deprecated: ".
  *
  *        The following types are recognized:
  *           void, int, string, object, mapping, float, closure, symbol
@@ -734,12 +739,12 @@ code:     optional_name ID optional_optype
         instr[num_buff].code_class = current_code_class;
         num_instr[current_code_class]++;
         if ($3 == 0)
-            sprintf(buff, "{ %s, %s-%s_OFFSET, 0, 0, -1, 0, -1, -1, \"%s\" },\n"
+            sprintf(buff, "{ %s, %s-%s_OFFSET, 0, 0, -1, 0, -1, -1, \"%s\", NULL },\n"
                         , classprefix[instr[num_buff].code_class]
                         , f_name, classtag[instr[num_buff].code_class]
                         , $1);
         else
-            sprintf(buff, "{ %s, %s-%s_OFFSET, %d, %d, 0, TYPE_ANY, -1, -1, \"%s\" },\n"
+            sprintf(buff, "{ %s, %s-%s_OFFSET, %d, %d, 0, TYPE_ANY, -1, -1, \"%s\", NULL },\n"
                         , classprefix[instr[num_buff].code_class]
                         , f_name, classtag[instr[num_buff].code_class]
                         , $3, $3
@@ -765,7 +770,7 @@ optional_ID:   ID
 optional_default:   DEFAULT ':' ID { $$ = $3; }
                   | /* empty */    { $$ = "0"; } ;
 
-func: type ID optional_ID '(' arg_list optional_default ')' ';'
+func: type ID optional_ID '(' arg_list optional_default ')' optional_name ';'
     {
         char buff[500];
         char *f_name;
@@ -915,17 +920,26 @@ func: type ID optional_ID '(' arg_list optional_default ')' ';'
             char * tag;
 
             tag = (code_class == C_EFUN) ? classtag[C_CODE] : classtag[code_class];
-            sprintf(buff, "{ %s, %s-%s_OFFSET, %d, %d, %s, %s, %d, %d, \"%s\" },\n"
+            sprintf(buff, "{ %s, %s-%s_OFFSET, %d, %d, %s, %s, %d, %d, \"%s\""
                         , f_prefix, f_name, tag
                         , unlimit_max ? -1 : max_arg, min_arg
                         , $6, ctype($1), arg_index, lpc_index, $2
                    );
         }
         else
-            sprintf(buff, "{ 0, 0, %d, %d, %s, %s, %d, %d, \"%s\" },\n"
+        {
+            sprintf(buff, "{ 0, 0, %d, %d, %s, %s, %d, %d, \"%s\""
                         , unlimit_max ? -1 : max_arg, min_arg
                         , $6, ctype($1), arg_index, lpc_index, $2
                    );
+        }
+
+        if ($8 != NULL)
+            sprintf(buff+strlen(buff), ", \"%s\"", $8);
+        else
+            strcat(buff, ", NULL");
+
+        strcat(buff, " },\n");
 
         if (strlen(buff) > sizeof buff)
              fatal("Local buffer overwritten !\n");

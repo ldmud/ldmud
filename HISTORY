@@ -90,7 +90,7 @@ For a detailed list of all changes see the file CHANGELOG.
            regular expression code, or the PCRE package (default).
 
 
-21-Aug-2002 (Lars Duening) -- upcoming Release 3.2.9
+15-Sep-2002 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -378,6 +378,8 @@ For a detailed list of all changes see the file CHANGELOG.
            to return the default reset and cleanup interval time.
        + If the driver uses the default debug.log file, its (mudlib)
            name is available in the predefined macro __DEBUG_LOG__.
+       + Pragma warn_deprecated causes the compiler to print a warning
+           when a deprecated efun is used.
        + Bugfix: Adding mappings of different width throws an error, unless
            one of the mappings if empty.
        + Bugfix: Right shift by 32 or more bits was computed incorrectly.

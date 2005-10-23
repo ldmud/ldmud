@@ -4,7 +4,6 @@
 #include "driver.h"
 
 #include "typedefs.h"  /* object_t */
-#include "instrs.h"     /* F_ADD_VERB, F_ADD_XVERB */
 
 /* --- Variables --- */
 

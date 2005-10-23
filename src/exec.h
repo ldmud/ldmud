@@ -467,6 +467,9 @@ struct instr_s
                           * is available.
                           */
     char *name;          /* The printable name of the instruction. */
+    char *deprecated;    /* Usually NULL, for deprecated efuns this is
+                          * the warning message to print.
+                          */
 };
 
 

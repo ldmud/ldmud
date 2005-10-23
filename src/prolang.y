@@ -10544,6 +10544,11 @@ function_call:
                   $$.type = instrs[f].ret_type;
                   argp = &efun_arg_types[instrs[f].arg_index];
 
+                  /* Warn if the efun is deprecated */
+                  if (pragma_warn_deprecated && instrs[f].deprecated != NULL)
+                      yywarnf("%s() is deprecated: %s"
+                             , instrs[f].name, instrs[f].deprecated);
+
                   num_arg = $4;
 
                   /* Check and/or complete number of arguments */
@@ -11764,15 +11769,26 @@ svalue_constant:
               svp->u.lambda = l;
               svp->x.closure_type = CLOSURE_PRELIMINARY;
           }
+          else if (ix >= CLOSURE_SIMUL_EFUN_OFFS)
+          {
+              /* Sefun closure */
+              svp->x.closure_type = (short)ix;
+              svp->u.ob = ref_object(current_object, "closure");
+          }
           else
           {
-              /* Efun, sefun or operator closure */
+              /* Efun or operator closure */
+              if (pragma_warn_deprecated
+               && instrs[ix - CLOSURE_EFUN_OFFS].deprecated != NULL)
+                  yywarnf("%s() is deprecated: %s"
+                         , instrs[ix - CLOSURE_EFUN_OFFS].name
+                         , instrs[ix - CLOSURE_EFUN_OFFS].deprecated
+                         );
+
               svp->x.closure_type
-                = ix >= CLOSURE_SIMUL_EFUN_OFFS
-                  ? ix
-                  : (  instrs[ix - CLOSURE_EFUN_OFFS].Default == -1
-                     ? ix + CLOSURE_OPERATOR-CLOSURE_EFUN
-                     : ix);
+                = (short)(  instrs[ix - CLOSURE_EFUN_OFFS].Default == -1
+                          ? ix + CLOSURE_OPERATOR-CLOSURE_EFUN
+                          : ix);
               svp->u.ob = ref_object(current_object, "closure");
           }
       }

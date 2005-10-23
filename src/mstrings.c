@@ -274,7 +274,7 @@ move_to_head (string_t *s, int idx)
     }
 
     if (rover)
-        mstr_found_byvalue++;
+        mstr_found++;
 
     return rover;
 } /* move_to_head() */
@@ -1535,7 +1535,7 @@ add_string_status (strbuf_t *sbuf, Bool verbose)
                         );
         strbuf_addf(sbuf, "Searches by content: %lu - found: %lu (%.1f%%) - avg length: %7.3f\n"
                         , mstr_searches_byvalue
-                        , mstr_found_byvalue, 100.0 * (float)mstr_found_byvalue / (float)mstr_searches
+                        , mstr_found_byvalue, 100.0 * (float)mstr_found_byvalue / (float)mstr_searches_byvalue
                         , (float)mstr_searchlen_byvalue / (float)mstr_searches_byvalue
                         );
         strbuf_addf(sbuf, "Hash chains: %lu (%.1f%%)\n"

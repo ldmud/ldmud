@@ -244,6 +244,7 @@ extern object_t *lookfor_object(string_t *str, Bool bLoad);
 extern object_t *find_object_str(const char *str);
 extern Bool status_parse(strbuf_t * sbuf, char *buff);
 extern void dinfo_data_status(svalue_t * svp, int value);
+extern void warnf VARPROT((char *, ...), printf, 1, 2) NORETURN;
 extern void error VARPROT((const char *, ...), printf, 1, 2) NORETURN;
 extern void fatal VARPROT((const char *, ...), printf, 1, 2) NORETURN;
 extern void throw_error(void);

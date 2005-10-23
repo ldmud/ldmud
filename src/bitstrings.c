@@ -21,8 +21,7 @@
 #include "bitstrings.h"
 
 #include "interpret.h"
-#include "lex.h"
-#include "main.h"
+#include "instrs.h"
 #include "mstrings.h"
 #include "simulate.h"
 #include "svalue.h"

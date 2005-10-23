@@ -99,7 +99,7 @@ union u {
        */
     void (*error_handler) (svalue_t *);
       /* T_ERROR_HANDLER: this function is
-       * executed on a free_svalue(), receiving the T_ERROR_HANDLER svalue
+       * executed on a free_svalue(), receiving the T_ERROR_HANDLER svalue*
        * as argument. This allows the transparent implemention of cleanup
        * functions which are called even after runtime errors. In order
        * to pass additional information to the error_handler(), embed

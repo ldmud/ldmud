@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+15-Sep-2002 (Lars Duening)  (3.3.255)
+  - (mstrings.c) Corrected the search statistics.
+  - (prolang.y, lex, interpret.c, simulate, func_spec) New pragma
+       'warn_deprecated' causes the compiler to print warnings when
+       a deprecated efun is used (suggested by Dafire).
+  - (regexp, mregex.c) Removed name clashes with system libraries.
+
 15-Sep-2002 (Lars Duening)  (3.3.254)
   - (mapping.c) Accidentally broke the mapping functionality with the
        new svalue_cmp()/svalue_eq() functions.

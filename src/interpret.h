@@ -5,7 +5,7 @@
 
 #include "driver.h"
 #include "typedefs.h"
-#include "instrs.h"
+#include "exec.h"
 #include "svalue.h"
 
 /* --- Types --- */

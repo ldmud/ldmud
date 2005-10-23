@@ -87,7 +87,7 @@ typedef struct RxHashEntry {
 static RxHashEntry * xtable[RXCACHE_TABLE];  /* The Expression Hashtable */
 
 /* Expression cache statistics */
-static uint32 iNumXRequests   = 0;  /* Number of calls to regcomp() */
+static uint32 iNumXRequests   = 0;  /* Number of calls to rx_compile() */
 static uint32 iNumXFound      = 0;  /* Number of calls satisfied from table */
 static uint32 iNumXCollisions = 0;  /* Number of hashcollisions */
 static uint32 iNumXEntries    = 0;  /* Number of used cache entries */
@@ -328,9 +328,9 @@ rx_compile (string_t * expr, int opt, Bool from_ed)
     }
     pcre_malloc_size += num_subs * sizeof (*pSubs);
 #else
-    pRegexp = regcomp((unsigned char *)get_txt(expr)
-                     , opt & RE_EXCOMPATIBLE
-                     , &pErrmsg, &erridx);
+    pRegexp = hs_regcomp((unsigned char *)get_txt(expr)
+                        , opt & RE_EXCOMPATIBLE
+                        , &pErrmsg, &erridx);
     if (NULL == pRegexp)
     {
         if (from_ed)
@@ -436,7 +436,7 @@ rx_exec (regexp_t *prog, string_t * string, size_t start)
 
     return rc;
 #else
-    return regexec(prog->rx, get_txt(string)+start, get_txt(string));
+    return hs_regexec(prog->rx, get_txt(string)+start, get_txt(string));
 #endif
 } /* rx_exec() */
 
@@ -480,7 +480,7 @@ rx_exec_str (regexp_t *prog, char * string, char * start)
 
     return rc;
 #else
-    return regexec(prog->rx, string, start);
+    return hs_regexec(prog->rx, string, start);
 #endif
 } /* rx_exec_str() */
 
@@ -813,7 +813,7 @@ rxcache_status (strbuf_t *sbuf, Bool verbose)
 {
 #ifdef RXCACHE_TABLE
 
-    uint32 iNumXReq;  /* Number of regcomp() requests, made non-zero */
+    uint32 iNumXReq;  /* Number of rx_compile() requests, made non-zero */
 
 #if defined(__MWERKS__) && !defined(WARN_ALL)
 #    pragma warn_largeargs off

@@ -149,16 +149,16 @@ endif
 # $Format: "ifeq ($ReleaseType$, pre)"$
 ifeq (dev, pre)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 254
+  SETVERFLAGS += d 255
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-pre.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-pre.254
+  VSTRING = 3.3.0-pre.255
 endif
 # $Format: "ifeq ($ReleaseType$, dev)"$
 ifeq (dev, dev)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 254
+  SETVERFLAGS += d 255
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-dev.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-dev.254
+  VSTRING = 3.3.0-dev.255
 endif
 
 else
@@ -166,12 +166,12 @@ else
 # --- Development Versions ---
 
 # $Format: "SETVERFLAGS = -app $ReleaseMajor$ $ReleaseMinor$ $ProjectMinorVersion$"$
-SETVERFLAGS = -app 3 3 254
+SETVERFLAGS = -app 3 3 255
 
 # $Format: "  SETVERFLAGS += f"$
   SETVERFLAGS += f
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ProjectMinorVersion$"$
-  VSTRING = 3.3.254
+  VSTRING = 3.3.255
 
 endif
 
@@ -478,9 +478,9 @@ $(OBJ)/backend.o : ../mudlib/sys/debug_message.h \
     my-alloca.h typedefs.h driver.h strfuns.h sent.h instrs.h regexp.h \
     pcre/pcre.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
-$(OBJ)/bitstrings.o : xalloc.h svalue.h simulate.h mstrings.h main.h lex.h \
+$(OBJ)/bitstrings.o : xalloc.h svalue.h simulate.h mstrings.h instrs.h \
     interpret.h bitstrings.h typedefs.h driver.h strfuns.h sent.h exec.h \
-    instrs.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
+    port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/call_out.o : ../mudlib/sys/debug_info.h xalloc.h wiz_list.h swap.h \
     svalue.h strfuns.h stdstrings.h simulate.h object.h mstrings.h main.h \
@@ -525,7 +525,7 @@ $(OBJ)/efuns.o : ../mudlib/sys/time.h ../mudlib/sys/strings.h \
 $(OBJ)/files.o : ../mudlib/sys/files.h xalloc.h svalue.h stdstrings.h \
     simulate.h mstrings.h main.h lex.h interpret.h filestat.h comm.h \
     array.h files.h my-alloca.h typedefs.h driver.h strfuns.h sent.h exec.h \
-    instrs.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
+    port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/gcollect.o : ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h swap.h \
     stdstrings.h smalloc.h simul_efun.h simulate.h sent.h prolang.h parse.h \
@@ -629,16 +629,16 @@ $(OBJ)/dftables.o : pcre/maketables.c pcre/internal.h pcre/pcre.h \
 
 $(OBJ)/pkg-alists.o : i-svalue_cmp.h xalloc.h svalue.h simulate.h \
     mstrings.h main.h interpret.h array.h my-alloca.h pkg-alists.h \
-    typedefs.h driver.h closure.h strfuns.h sent.h exec.h instrs.h port.h \
-    config.h hosts/unix.h hosts/be/be.h machine.h
+    typedefs.h driver.h closure.h strfuns.h sent.h exec.h port.h config.h \
+    hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/pkg-mysql.o : xalloc.h svalue.h simulate.h mstrings.h interpret.h \
     array.h pkg-mysql.h my-alloca.h typedefs.h driver.h strfuns.h sent.h \
-    exec.h instrs.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
+    exec.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/pkg-pcre.o : pcre/study.c pcre/maketables.c pcre/get.c pcre/pcre.c \
     simulate.h interpret.h pkg-pcre.h driver.h pcre/internal.h \
-    pcre/chartables.c svalue.h strfuns.h sent.h exec.h typedefs.h instrs.h \
+    pcre/chartables.c svalue.h strfuns.h sent.h exec.h typedefs.h \
     pcre/pcre.h port.h config.h pcre/config.h hosts/unix.h hosts/be/be.h \
     machine.h
 
@@ -653,8 +653,8 @@ $(OBJ)/random.o : random.h driver.h port.h config.h hosts/unix.h \
     hosts/be/be.h machine.h
 
 $(OBJ)/regexp.o : main.h xalloc.h simulate.h interpret.h comm.h regexp.h \
-    driver.h typedefs.h svalue.h strfuns.h sent.h exec.h instrs.h port.h \
-    config.h hosts/unix.h hosts/be/be.h machine.h
+    driver.h typedefs.h svalue.h strfuns.h sent.h exec.h port.h config.h \
+    hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/simul_efun.o : xalloc.h swap.h svalue.h stdstrings.h simulate.h \
     ptrtable.h object.h mstrings.h lex.h interpret.h instrs.h gcollect.h \
@@ -698,7 +698,7 @@ $(OBJ)/wiz_list.o : xalloc.h svalue.h stdstrings.h simulate.h object.h \
 $(OBJ)/xalloc.o : smalloc.c main.h simulate.h interpret.h xalloc.h driver.h \
     ../mudlib/sys/debug_info.h object.h exec.h svalue.h stdstrings.h \
     mstrings.h gcollect.h backend.h smalloc.h typedefs.h strfuns.h sent.h \
-    instrs.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
+    port.h config.h instrs.h hosts/unix.h hosts/be/be.h machine.h
 
 # --- DO NOT MODIFY THIS LINE -- AUTO-DEPENDS PRECEDE ---
 # --- DO NOT MODIFY THIS LINE -- SELECTED AUTO-DEPENDS FOLLOW ---
@@ -722,7 +722,7 @@ $(OBJ)/ed.o : stdstrings.h instrs.h
 
 $(OBJ)/efuns.o : stdstrings.h instrs.h
 
-$(OBJ)/files.o : stdstrings.h instrs.h
+$(OBJ)/files.o : stdstrings.h
 
 $(OBJ)/gcollect.o : stdstrings.h instrs.h
 
@@ -749,14 +749,6 @@ $(OBJ)/parse.o : stdstrings.h instrs.h
 $(OBJ)/parse_old.o : stdstrings.h instrs.h
 
 $(OBJ)/parser.o : lang.c stdstrings.h instrs.h
-
-$(OBJ)/pkg-alists.o : instrs.h
-
-$(OBJ)/pkg-mysql.o : instrs.h
-
-$(OBJ)/pkg-pcre.o : instrs.h
-
-$(OBJ)/regexp.o : instrs.h
 
 $(OBJ)/simul_efun.o : stdstrings.h instrs.h
 

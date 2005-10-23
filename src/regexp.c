@@ -69,11 +69,11 @@
  * Regstart and reganch permit very fast decisions on suitable starting points
  * for a match, cutting down the work a lot.  Regmust permits fast rejection
  * of lines that cannot possibly match.  The regmust tests are costly enough
- * that regcomp() supplies a regmust only if the r.e. contains something
+ * that hs_regcomp() supplies a regmust only if the r.e. contains something
  * potentially expensive (at present, the only such thing detected is * or +
  * at the start of the r.e., which can involve a lot of backup).  Regmlen is
- * supplied because the test in regexec() needs it and regcomp() is computing
- * it anyway.
+ * supplied because the test in hs_regexec() needs it and hs_regcomp() is
+ * computing it anyway.
  *
  *----------------------------------------------------------------------------
  *
@@ -189,7 +189,7 @@
 #define WORST     0   /* Worst case. */
 
 /*-------------------------------------------------------------------------*/
-/* Global work variables for regcomp().
+/* Global work variables for hs_regcomp().
  */
 static short   *regparse;       /* Input-scan pointer. */
 static int      regnpar;        /* () count. */
@@ -198,7 +198,7 @@ static unsigned char *regcode;  /* Code-emit pointer; &regdummy = don't. */
 static long     regsize;        /* Code size. */
 static char   **ppErrMsg;       /* Place where to store an error message */
 
-/* Global variables for regexec().
+/* Global variables for hs_regexec().
  */
 static unsigned char  *reginput;  /* String-input pointer. */
 static unsigned char  *regbol;    /* Beginning of input, for ^ check. */
@@ -701,8 +701,8 @@ reg (Bool paren, int *flagp)
 
 /*-------------------------------------------------------------------------*/
 regexp *
-regcomp (unsigned char *expr, Bool excompat
-        , char ** errmsg, int * erridx)
+hs_regcomp (unsigned char *expr, Bool excompat
+           , char ** errmsg, int * erridx)
 
 /* Compile a regular expression in <expr> into internal code; if <excompat>
  * is TRUE; \( \) operators like in Unix ex are allowed. Result is the
@@ -903,11 +903,11 @@ regcomp (unsigned char *expr, Bool excompat
     XFREE(expr2);
     rc = r; r = NULL;
     return rc;
-} /* regcomp() */
+} /* hs_regcomp() */
 
 /*-------------------------------------------------------------------------*/
 int
-regexec (regexp *prog, char *string, char *start)
+hs_regexec (regexp *prog, char *string, char *start)
 
 /* Match the regexp <prog> against the <string> starting at the
  * position <start>.
@@ -970,7 +970,7 @@ regexec (regexp *prog, char *string, char *start)
 
     /* Failure. */
     return RE_NOMATCH;
-} /* regexec() */
+} /* hs_regexec() */
 
 /*-------------------------------------------------------------------------*/
 static int
@@ -1366,7 +1366,7 @@ regprop (unsigned char *op)
 
 /*-------------------------------------------------------------------------*/
 void
-regdump (regexp *rg)
+hs_regdump (regexp *rg)
 
 /* regdump - dump a regexp onto stdout in vaguely comprehensible form
  */
@@ -1408,7 +1408,7 @@ regdump (regexp *rg)
     if (rg->regmust != NULL)
         printf("must have \"%s\"", rg->regmust);
     printf("\n");
-} /* regdump() */
+} /* hs_regdump() */
 
 #endif /* DEBUG */
 

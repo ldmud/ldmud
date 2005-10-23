@@ -45,11 +45,11 @@ typedef struct regexp
 /* --- Prototypes --- */
 #ifdef DEBUG
 extern Bool regnarrate;
-void regdump(regexp *rg);
+void hs_regdump(regexp *rg);
 #endif
 
-extern regexp *regcomp(unsigned char *expr, Bool excompat, char ** errmsg, int * erridx);
-extern int regexec(regexp *prog, char *string, char *start);
+extern regexp *hs_regcomp(unsigned char *expr, Bool excompat, char ** errmsg, int * erridx);
+extern int hs_regexec(regexp *prog, char *string, char *start);
 
 /* Return codes from regexec() */
 
