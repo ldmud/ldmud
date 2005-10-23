@@ -3894,7 +3894,7 @@ printf("DEBUG:   program size: %ld\n", CURRENT_PROGRAM_SIZE);
     {
         backup_start = INLINE_PROGRAM_SIZE;
 #ifdef DEBUG_INLINES
-printf("DEBUG:   move li data to %ld\n", backup_start);
+printf("DEBUG:   move li data to %ld, from %ld length %ld\n", backup_start, start, length);
 #endif /* DEBUG_INLINES */
         add_to_mem_block( A_INLINE_PROGRAM, LINENUMBER_BLOCK+start, length);
         current_inline->li_start = backup_start;
@@ -3902,11 +3902,15 @@ printf("DEBUG:   move li data to %ld\n", backup_start);
 
     if (start + length < LINENUMBER_SIZE)
     {
+#ifdef DEBUG_INLINES
+printf("DEBUG:   move li data forward: from %ld, length %ld, to %ld\n", start+length, LINENUMBER_SIZE - length - start, start);
+#endif /* DEBUG_INLINES */
         memmove( LINENUMBER_BLOCK+start
                , LINENUMBER_BLOCK+start+length
                , LINENUMBER_SIZE - length - start
                );
     }
+    LINENUMBER_SIZE -= length;
 
     free_local_names(current_inline->block_depth+1);
 

@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+15-Nov-2002 (Lars Duening)  (3.3.301)
+  - (prolang.y) After removing the linenumber information for an inline
+      closure from the LINENUMBER memory block, the compiler forgot to
+      adjust the size of the block accordingly (reported by Zonk and
+      Guandalug).
+
 15-Nov-2002 (Lars Duening)  (3.3.300)
   - (gcollect.c) He - the new cleanup was permanently disable due to
       a typo on the #ifdef expression. Ah, the joys of using the
