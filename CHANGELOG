@@ -1,6 +1,15 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+30-Oct-2002 (Lars Duening)  (3.3.288)
+  - (lex.c) When starting a new compile, the order of initialisations
+      was wrong (in particular: auto-include was handled before the
+      lexer was set up) (reported by Freaky).
+  - (configure, (x)erq/Makefile.in) Only link in libraries actually
+      needed by the erq (suggested by Freaky).
+  - (configure) Modified the configure so that only required libraries
+      are added to the compile (suggested by Freaky).
+
 29-Oct-2002 (Lars Duening)  (3.3.287)
   - (comm, func_spec) find_input_to() and remove_input_to() can now
       match on both object and string name.

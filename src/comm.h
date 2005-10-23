@@ -56,6 +56,17 @@
 #define s_addr      s6_addr
 #define in_addr     in6_addr
 
+#if defined(__APPLE__) && defined(__MACH__) && !defined(s6_addr32)
+
+/* These are non-standard defines, and some OS don't offer them
+ * by default: OS-X
+ */
+
+#  define s6_addr8  __u6_addr.__u6_addr8
+#  define s6_addr16 __u6_addr.__u6_addr16
+#  define s6_addr32 __u6_addr.__u6_addr32
+#endif
+
 #endif /* USE_IPV6 */
 
 

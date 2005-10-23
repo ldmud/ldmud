@@ -514,17 +514,70 @@ if test "x$ac_cv_type_signal" = "xvoid"; then
 EOF
 fi
 
+# --- Check for common system libraries ---
+
 AC_CHECK_LIB(m,main)
 AC_CHECK_LIB(socket,main)
+
+ERQ_LIBS="$LIBS"
+
 AC_CHECK_LIB(ucb,main, LIBS="$LIBS -lc -lucb")
-AC_CHECK_LIB(crypto,main, LIBS="$LIBS -lcrypto")
-AC_CHECK_LIB(crypt,main, LIBS="$LIBS -lcrypt")
 if test $ac_cv_lib_socket_main = "yes" || test $ac_cv_lib_ucb_main = "yes"; then
       AC_CHECK_LIB(nsl,main)
 fi
-AC_CHECK_LIB(resolv,main, LIBS="$LIBS -lresolv")
+
+AC_CACHE_CHECK(if -lresolv is needed, lp_cv_need_lib_resolv,
+    AC_TRY_RUN([
+#include <netdb.h>
+void t (void)
+{
+    herror("foo");
+}
+int main(void)
+{
+    return 0;
+}
+    ],
+    lp_cv_need_lib_resolv=no,
+    lp_cv_need_lib_resolv=yes
+))
+if test "lp_cv_need_lib_resolv" = "yes"; then
+    AC_CHECK_LIB(resolv,main, LIBS="$LIBS -lresolv")
+fi
+
+# --- Check if we need the crypto libraries ---
+
+if test "x$enable_use_system_crypt" = "x" || test "x$enable_use_system_crypt" = "xyes"; then
+    AC_CHECK_FUNCS(crypt _crypt)
+    AC_CACHE_CHECK(if -lcrypt is needed, lp_cv_need_lib_crypto,
+        AC_TRY_RUN([
+void t (void)
+{
+#ifdef HAS_CRYPT
+    crypt("foo", "bar");
+#endif
+#ifdef HAS__CRYPT
+    _crypt("foo", "bar");
+#endif
+}
+int main(void)
+{
+    return 0;
+}
+        ],
+        lp_cv_need_lib_crypto=no,
+        lp_cv_need_lib_crypto=yes
+    ))
+    if test "lp_cv_need_lib_crypto" = "yes"; then
+        AC_CHECK_LIB(crypto,main, LIBS="$LIBS -lcrypto")
+        AC_CHECK_LIB(crypt,main, LIBS="$LIBS -lcrypt")
+    fi
+fi
+
+# --- Check for functions ---
+
 AC_FUNC_ALLOCA
-AC_CHECK_FUNCS(fchmod getrusage bzero memset memcpy memmem strdup strcspn crypt _crypt)
+AC_CHECK_FUNCS(fchmod getrusage bzero memset memcpy memmem strdup strcspn)
 AC_CHECK_FUNCS(strchr strrchr getcwd memmove sysconf gettimeofday wait3 waitpid)
 AC_CHECK_FUNCS(fcntl getdomainname)
 
@@ -574,10 +627,12 @@ if test $lp_cv_func_inet_ntoa_ok = yes ; then
   AC_DEFINE(INET_NTOA_OK)
 fi
 
+# --- IPV6 ---
+
 AC_CACHE_CHECK(for IPv6 support,lp_cv_has_ipv6,
-saveflags="$CFLAGS"
-CFLAGS="$CFLAGS -I/usr/inet6/include"
-AC_TRY_COMPILE([
+    saveflags="$CFLAGS"
+    CFLAGS="$CFLAGS -I/usr/inet6/include"
+    AC_TRY_COMPILE([
 #include <sys/types.h>
 #include <netinet/in.h>
 
@@ -587,59 +642,109 @@ struct sockaddr_in6 foo(void)
     
     return ad;
 }
-],,lp_cv_has_ipv6=yes,
-lp_cv_has_ipv6=no
-CFLAGS="$saveflags"
+    ],,lp_cv_has_ipv6=yes,
+    lp_cv_has_ipv6=no
+    CFLAGS="$saveflags"
 ))
 if test $lp_cv_has_ipv6 = yes; then
-  AC_DEFINE(HAS_IPV6)
-if test $enable_use_ipv6 = yes; then
-  AC_CHECK_LIB(inet6,main, LIBS="$LIBS -linet6")
-fi
+    AC_DEFINE(HAS_IPV6)
+    if test $enable_use_ipv6 = yes; then
+        AC_CACHE_CHECK(if -linet6 is needed, lp_cv_need_lib_inet6,
+            AC_TRY_RUN([
+#include <sys/types.h>
+#include <netinet/in.h>
+void t (void)
+{
+    struct sockaddr_in6 ad;
+    inet6_ntoa(ad.sin_addr);
+}
+int main(void)
+{
+    return 0;
+}
+            ],
+            lp_cv_need_lib_inet6=no,
+            lp_cv_need_lib_inet6=yes
+        ))
+        if test "lp_cv_need_lib_inet6" = "yes"; then
+            AC_CHECK_LIB(inet6,main, LIBS="$LIBS -linet6")
+        fi
+    fi
+else
+    if test $enable_use_ipv6 = yes; then
+        echo "IPV6 not supported - disabling IPV6 support."
+        AC_NOT_AVAILABLE(use-ipv6)
+    fi
+    cdef_use_ipv6="#undef"
+    enable_use_ipv6=no
 fi
 
+# --- PThreads ---
+
 AC_CACHE_CHECK(for pthreads support,lp_cv_has_pthreads,
-saveflags="$CFLAGS"
-CFLAGS="$CFLAGS -I/usr/include"
-AC_TRY_COMPILE([
+    saveflags="$CFLAGS"
+    CFLAGS="$CFLAGS -I/usr/include"
+    AC_TRY_COMPILE([
 #include <pthread.h>
 
 void foo(void)
 {
     int i = PTHREAD_CREATE_JOINABLE;
 }
-],,lp_cv_has_pthreads=yes,
-lp_cv_has_pthreads=no
-CFLAGS="$saveflags"
+    ],,lp_cv_has_pthreads=yes,
+    lp_cv_has_pthreads=no
+    CFLAGS="$saveflags"
 ))
+
 if test $lp_cv_has_pthreads = yes; then
-  AC_DEFINE(HAS_PTHREADS)
-  if test $enable_use_pthreads = yes; then
-    AC_CHECK_LIB(pthread,main, LIBS="$LIBS -lpthread")
-  fi
+    AC_DEFINE(HAS_PTHREADS)
+    if test $enable_use_pthreads = yes; then
+        AC_CACHE_CHECK(if -lpthread is needed, lp_cv_need_lib_pthread,
+            AC_TRY_RUN([
+#include <pthread.h>
+void t (void)
+{
+    pthread_mutex_lock(NULL);
+}
+int main(void)
+{
+    return 0;
+}
+            ],
+            lp_cv_need_lib_pthread=no,
+            lp_cv_need_lib_pthread=yes
+        ))
+        if test "lp_cv_need_lib_pthread" = "yes"; then
+            AC_CHECK_LIB(pthread,main, LIBS="$LIBS -lpthread")
+        fi
+    fi
 else
-  if test $enable_use_pthreads = yes; then
-      echo "pthreads not supported - disabling pthreads support."
-      AC_NOT_AVAILABLE(use-pthreads)
-  fi
-  cdef_use_pthreads="#undef"
-  enable_use_pthreads=no
+    if test $enable_use_pthreads = yes; then
+        echo "pthreads not supported - disabling pthreads support."
+        AC_NOT_AVAILABLE(use-pthreads)
+    fi
+    cdef_use_pthreads="#undef"
+    enable_use_pthreads=no
 fi
 
+# --- PCRE ---
+
 AC_CACHE_CHECK(for pcre support,lp_cv_has_pcre,
-saveflags="$CFLAGS"
-CFLAGS="$CFLAGS -I/usr/include"
-AC_TRY_COMPILE([
+    saveflags="$CFLAGS"
+    CFLAGS="$CFLAGS -I/usr/include"
+    AC_TRY_COMPILE([
 #include <pcre.h>
 
 pcre_extra foo(void)
 {
     return;
 }
-],,lp_cv_has_pcre=yes,
-lp_cv_has_pcre=no
-CFLAGS="$saveflags"
+    ],,lp_cv_has_pcre=yes,
+    lp_cv_has_pcre=no
+    CFLAGS="$saveflags"
 ))
+
+# --- mySQL ---
 
 AC_CACHE_CHECK(for mySQL,lp_cv_has_mysql,
 for TESTPATH in "" "$mysql_path" "$mysql_path/include" "/usr/local/include" "/usr/include" "/usr/lib/mysql"; do
@@ -707,10 +812,53 @@ if test $lp_cv_has_mysql = yes; then
   fi
 
   if test $enable_use_mysql = yes; then
-    # On some systems, mysqlclient requires the compression libz.
-    AC_CHECK_LIB(z,main, PKGLIBS="$PKGLIBS -lz")
-    # On some systems, mysqlclient requires the libnsl.
-    AC_CHECK_LIB(nsl,main, PKGLIBS="$PKGLIBS -lnsl")
+      # Some systems need additional libraries
+      savelibs="$LIBS"
+      LIBS="$LIBS $PKGLIBS"
+
+      AC_CACHE_CHECK(if -lz is needed, lp_cv_need_lib_z,
+          AC_TRY_RUN([
+#include <mysql/mysql.h>
+void t (void)
+{
+    MYSQL *dat;
+
+    mysql_real_connect(dat, "localhost", "user", "pwd", "db", 0, 0, 0);
+}
+int main(void)
+{
+    return 0;
+}
+          ],
+          lp_cv_need_lib_z=no,
+          lp_cv_need_lib_z=yes
+      ))
+      if test "lp_cv_need_lib_z" = "yes"; then
+          AC_CHECK_LIB(z,main, PKGLIBS="$PKGLIBS -lz")
+      fi
+
+      AC_CACHE_CHECK(if -lnsl is needed, lp_cv_need_lib_nsl,
+          AC_TRY_RUN([
+#include <mysql/mysql.h>
+void t (void)
+{
+    MYSQL *dat;
+
+    mysql_real_connect(dat, "localhost", "user", "pwd", "db", 0, 0, 0);
+}
+int main(void)
+{
+    return 0;
+}
+          ],
+          lp_cv_need_lib_nsl=no,
+          lp_cv_need_lib_nsl=yes
+      ))
+      if test "lp_cv_need_lib_nsl" = "yes"; then
+          AC_CHECK_LIB(nsl,main, PKGLIBS="$PKGLIBS -lnsl")
+      fi
+
+      LIBS="$savelibs"
   fi
 
   CFLAGS="$saveflags"
@@ -719,6 +867,8 @@ else
       AC_NOT_AVAILABLE(use-mysql)
   fi
 fi
+
+# ---
 
 AC_CACHE_CHECK(if rename handles directories,
 lp_cv_sys_rename_handles_directories,
@@ -1750,6 +1900,7 @@ dnl finally: some remaining stuff
 dnl
 AC_SUBST(erq_sub)
 AC_SUBST(PKGLIBS)
+AC_SUBST(ERQ_LIBS)
 
 dnl
 dnl Ok. now lets make the Makefiles; also these in subdirs! [Mubo]

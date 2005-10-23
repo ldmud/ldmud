@@ -21,15 +21,13 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 287)
-(Parent-Version lpmud 3-3 286)
-(Version-Log "find_input_to() and remove_input_to() can match on object+string.
-A certain regmatch() argument combination crashed the driver.
-Improved the handling of auto-includes.
-The xerq now sends an ERQ_OK after emptying a queue entry.")
+(Project-Version lpmud 3-3 288)
+(Parent-Version lpmud 3-3 287)
+(Version-Log "The Lexer performed its initialisations in the wrong order.
+Improved the library checking of configure so that only the actually required libraries are added to the compile.")
 (New-Version-Log
 "")
-(Checkin-Time "Tue, 29 Oct 2002 19:35:24 -0700")
+(Checkin-Time "Wed, 30 Oct 2002 13:27:41 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -65,20 +63,20 @@ The xerq now sends an ERQ_OK after emptying a queue entry.")
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.49 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.350 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.351 644))
   (HISTORY (lpmud/f/49_HISTORY 1.282 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.18 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
   ;; Configuration
-  (src/configure (lpmud/d/0_configure 1.19.1.61 755))
+  (src/configure (lpmud/d/0_configure 1.19.1.62 755))
   (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.19 644))
   (src/machine.h.in (lpmud/b/9_machine.h. 1.9.1.4 644))
   (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.19 644))
   (src/mkinstalldirs (lpmud/c/4_mkinstalld 1.1 644))
   (src/install-sh (lpmud/c/5_install-sh 1.2 755))
 
-  (src/autoconf/configure.in (lpmud/d/7_configure. 1.20.1.9.1.51 644))
+  (src/autoconf/configure.in (lpmud/d/7_configure. 1.20.1.9.1.52 644))
   (src/autoconf/acconfig.h (lpmud/d/10_acconfig.h 1.6.1.4 644))
 
   (src/settings/README (lpmud/c/22_README 1.14.1.12 644))
@@ -132,7 +130,7 @@ The xerq now sends an ERQ_OK after emptying a queue entry.")
   (src/closure.h (lpmud/f/44_closure.h 1.7.1.11 644))
   (src/closure.c (lpmud/d/4_closure.c 1.41.1.46 644))
   (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.29 644))
-  (src/comm.h (lpmud/d/3_comm.h 1.26.1.27 644))
+  (src/comm.h (lpmud/d/3_comm.h 1.26.1.28 644))
   (src/driver.h (lpmud/f/36_driver.h 1.15.1.20 644))
   (src/dumpstat.h (lpmud/f/35_dumpstat.h 1.8 644))
   (src/dumpstat.c (lpmud/c/34_dumpstat.c 1.20.1.11 644))
@@ -154,7 +152,7 @@ The xerq now sends an ERQ_OK after emptying a queue entry.")
   (src/interpret.h (lpmud/b/13_interpret. 1.33.1.33 644))
   (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.53 644))
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.15 644))
-  (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.30 644))
+  (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.31 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.12 644))
   (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.25 644))
   (src/mapping.h (lpmud/f/30_mapping.h 1.12.1.13 644))
@@ -335,7 +333,7 @@ The xerq now sends an ERQ_OK after emptying a queue entry.")
   (src/util/indent/Makefile.in (lpmud/17_Makefile 1.5.1.1 644))
   (src/util/indent/wrapper (lpmud/d/25_wrapper 1.1 644))
 
-  (src/util/erq/Makefile.in (lpmud/c/11_Makefile.i 1.1.1.3 644))
+  (src/util/erq/Makefile.in (lpmud/c/11_Makefile.i 1.1.1.4 644))
   (src/util/erq/erq.h (lpmud/d/26_erq.h 1.1.1.4.1.1 644))
   (src/util/erq/erq.c (lpmud/d/27_erq.c 1.1.1.8.1.6.1.4.1.2 644))
 
@@ -366,7 +364,7 @@ The xerq now sends an ERQ_OK after emptying a queue entry.")
   (src/util/xerq/docs/socketd/socket_accept (lpmud/k/45_socket_acc 1.1 644))
   (src/util/xerq/defs.h (lpmud/k/46_defs.h 1.5.1.3.1.6 644))
   (src/util/xerq/README (lpmud/k/47_README 1.3 644))
-  (src/util/xerq/Makefile.in (lpmud/k/48_Makefile 1.6.1.5 644))
+  (src/util/xerq/Makefile.in (lpmud/k/48_Makefile 1.6.1.6 644))
   (src/util/xerq/DONE (lpmud/k/49_DONE 1.1 644))
 
   ;; Additional files (Icons, etc)

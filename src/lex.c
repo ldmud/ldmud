@@ -2298,6 +2298,8 @@ start_new_include (int fd, string_t * str
     *(outp = linebufend) = '\0';
     set_input_source(fd, str);
     _myfilbuf();
+
+    return MY_TRUE;
 } /* start_new_include() */
 
 /*-------------------------------------------------------------------------*/
@@ -5406,8 +5408,6 @@ start_new_file (int fd)
 
     lex_fatal = MY_FALSE;
 
-    add_auto_include(object_file, NULL, MY_FALSE);
-
     pragma_strict_types = PRAGMA_WEAK_TYPES;
     instrs[F_CALL_OTHER].ret_type = TYPE_ANY;
     instrs[F_CALL_DIRECT].ret_type = TYPE_ANY;
@@ -5426,6 +5426,8 @@ start_new_file (int fd)
     next_inline_fun = 0;
     insert_inline_fun_now = MY_FALSE;
 #endif /* USE_NEW_INLINES */
+
+    add_auto_include(object_file, NULL, MY_FALSE);
 } /* start_new_file() */
 
 /*-------------------------------------------------------------------------*/
