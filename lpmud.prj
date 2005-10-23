@@ -19,12 +19,14 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 251)
-(Parent-Version lpmud 3-3 250)
-(Version-Log "Improved the internal structure of the commandline argument parser somewhat.")
+(Project-Version lpmud 3-3 252)
+(Parent-Version lpmud 3-3 251)
+(Version-Log "Corrected typos in the prolang.y when __INIT is not used.
+Array additions are now subject to DYNAMIC_COST.
+Inheriting variables with USE_STRUCTS stripped away their inheritance flags, causing virtual variables to go unnoticed.")
 (New-Version-Log
 "")
-(Checkin-Time "Wed, 11 Sep 2002 01:06:02 -0600")
+(Checkin-Time "Thu, 12 Sep 2002 16:03:21 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -60,16 +62,16 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.7 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.45 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.314 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.315 644))
   (HISTORY (lpmud/f/49_HISTORY 1.269 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.16 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
   ;; Configuration
   (src/configure (lpmud/d/0_configure 1.19.1.51 755))
-  (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.11 644))
+  (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.12 644))
   (src/machine.h.in (lpmud/b/9_machine.h. 1.9.1.3 644))
-  (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.12 644))
+  (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.13 644))
   (src/mkinstalldirs (lpmud/c/4_mkinstalld 1.1 644))
   (src/install-sh (lpmud/c/5_install-sh 1.2 755))
 
@@ -144,7 +146,7 @@
   (src/heartbeat.h (lpmud/m/41_heartbeat. 1.6.1.4 644))
   (src/heartbeat.c (lpmud/m/42_heartbeat. 1.18.1.6 644))
   (src/interpret.h (lpmud/b/13_interpret. 1.33.1.26 644))
-  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.37 644))
+  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.38 644))
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.12 644))
   (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.21 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.11 644))
@@ -156,7 +158,7 @@
   (src/mempools.h (lpmud/d/48_mempools.h 1.2.1.3 644))
   (src/mempools.c (lpmud/d/49_mempools.c 1.2.1.4 644))
   (src/mregex.h (lpmud/e/29_rxcache.h 1.7.1.10 644))
-  (src/mregex.c (lpmud/e/30_rxcache.c 1.11.1.21 644))
+  (src/mregex.c (lpmud/e/30_rxcache.c 1.11.1.22 644))
   (src/mstrings.h (lpmud/i/35_mstrings.h 1.17 644))
   (src/mstrings.c (lpmud/i/36_mstrings.c 1.21.1.14 644))
   (src/my-alloca.h (lpmud/f/29_my-alloca. 1.3.1.2 644))
@@ -204,7 +206,7 @@
   (src/pcre/ChangeLog (lpmud/r/30_ChangeLog 1.1 644))
   (src/pcre/COPYING (lpmud/r/31_COPYING 1.1 644))
   (src/pcre/AUTHORS (lpmud/r/32_AUTHORS 1.1 644))
-  (src/pkg-alists.c (lpmud/l/38_pkg-alists 1.5 644))
+  (src/pkg-alists.c (lpmud/l/38_pkg-alists 1.6 644))
   (src/pkg-alists.h (lpmud/l/39_pkg-alists 1.3 644))
   (src/pkg-mysql.c (lpmud/j/1_pkg-mysql. 1.17 644))
   (src/pkg-mysql.h (lpmud/j/2_pkg-mysql. 1.3 644))
@@ -213,7 +215,7 @@
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.12 644))
   (src/port.c (lpmud/39_port.c 1.17.1.7 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.14 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.39 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.40 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7.1.1 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))
@@ -261,17 +263,17 @@
   (src/hosts/amiga/StartMUD (lpmud/l/42_StartMUD 1.1 644))
   (src/hosts/amiga/README.Amiga.info (lpmud/l/43_README.Ami 1.1 644) :no-keywords)
   (src/hosts/amiga/machine.h (lpmud/c/2_machine.h 1.6.1.3 644))
-  (src/hosts/amiga/config.h (lpmud/c/7_config.h 1.23.1.21 644))
+  (src/hosts/amiga/config.h (lpmud/c/7_config.h 1.23.1.22 644))
   (src/hosts/amiga/README.Amiga (lpmud/c/12_README.Ami 1.4 644))
   (src/hosts/amiga/README (lpmud/c/13_README 1.4 644))
 
   ;; Host: BeOS
   (src/hosts/be/socketinc.h (lpmud/e/32_socketinc. 1.3 644))
   (src/hosts/be/machine.h (lpmud/e/33_machine.h 1.14.1.3 644))
-  (src/hosts/be/config.h (lpmud/e/34_config.h 1.32.1.22 644))
+  (src/hosts/be/config.h (lpmud/e/34_config.h 1.32.1.23 644))
   (src/hosts/be/be.h (lpmud/e/35_be.h 1.7 644))
   (src/hosts/be/beyacc (lpmud/i/39_beyacc 1.1 744))
-  (src/hosts/be/Makefile (lpmud/e/37_Makefile 1.60.1.65 644))
+  (src/hosts/be/Makefile (lpmud/e/37_Makefile 1.60.1.66 644))
   (src/hosts/be/icon-32x32.raw (lpmud/s/37_icon-32x32 1.1 644) :no-keywords)
   (src/hosts/be/icon-16x16.raw (lpmud/s/38_icon-16x16 1.1 644) :no-keywords)
   (src/hosts/be/driver.rsrc (lpmud/s/39_driver.rsr 1.1 644) :no-keywords)
@@ -284,12 +286,12 @@
 
   ;; Host: OS/2
   (src/hosts/os2/machine.h (lpmud/m/36_machine.h 1.1 644))
-  (src/hosts/os2/Makefile (lpmud/m/37_Makefile 1.20 644))
+  (src/hosts/os2/Makefile (lpmud/m/37_Makefile 1.21 644))
 
   ;; Host: Win32
   (src/hosts/win32/tubmud.bmp (lpmud/g/20_tubmud.bmp 1.1 644) :no-keywords)
   (src/hosts/win32/machine.h (lpmud/g/21_machine.h 1.4.1.2 644))
-  (src/hosts/win32/config.h (lpmud/g/22_config.h 1.18.1.19 644))
+  (src/hosts/win32/config.h (lpmud/g/22_config.h 1.18.1.20 644))
   (src/hosts/win32/Readme.rtf (lpmud/g/23_Readme.rtf 1.2.1.1 644))
   (src/hosts/win32/Makefile (lpmud/g/24_Makefile 1.10.1.17 644))
 
@@ -381,7 +383,7 @@
   (mudlib/sys/files.h (lpmud/t/7_files.h 1.1.1.2 644))
   (mudlib/sys/include_list.h (lpmud/p/26_include_li 1.1 644))
   (mudlib/sys/inherit_list.h (lpmud/p/18_inherit_li 1.1 644))
-  (mudlib/sys/functionlist.h (lpmud/49_functionli 1.4.1.8 644))
+  (mudlib/sys/functionlist.h (lpmud/49_functionli 1.4.1.9 644))
   (mudlib/sys/input_to.h (lpmud/t/8_input_to.h 1.1.1.2 644))
   (mudlib/sys/lpctypes.h (lpmud/48_lpctypes.h 1.2.1.5 644))
   (mudlib/sys/objectinfo.h (lpmud/m/20_objectinfo 1.7.1.5 644))
@@ -456,7 +458,7 @@
   (src/bugs/ferrycode/cog.c (lpmud/u/6_cog.c 1.1 644))
   (src/bugs/ferrycode/carrack.c (lpmud/u/7_carrack.c 1.1 644))
 
-  (src/bugs/b-summary (lpmud/c/34_b-summary 1.47.1.34 644) :no-keywords)
+  (src/bugs/b-summary (lpmud/c/34_b-summary 1.47.1.35 644) :no-keywords)
   (src/bugs/b-990217-1 (lpmud/k/10_b-990217-1 1.3 644) :no-keywords)
   (src/bugs/b-990605 (lpmud/t/4_b-990605 1.1 644) :no-keywords)
   (src/bugs/b-000214 (lpmud/f/41_b-000214 1.1 644) :no-keywords)
@@ -489,8 +491,9 @@
   (src/bugs/b-020415 (lpmud/v/38_b-020415 1.2 644) :no-keywords)
   (src/bugs/b-020425-0 (lpmud/v/39_b-020425-0 1.1 644) :no-keywords)
   (src/bugs/b-020506 (lpmud/v/41_b-020506 1.1 644) :no-keywords)
+  (src/bugs/b-020826 (lpmud/a/b/18_b-020826 1.1 644) :no-keywords)
 
-  (src/bugs/f-summary (lpmud/c/37_f-summary 1.39.1.77 644) :no-keywords)
+  (src/bugs/f-summary (lpmud/c/37_f-summary 1.39.1.78 644) :no-keywords)
   (src/bugs/f-981027-0 (lpmud/g/29_f-981027-0 1.2 644) :no-keywords)
   (src/bugs/f-981027-1 (lpmud/g/28_f-981027-1 1.2 644) :no-keywords)
   (src/bugs/f-981027-2 (lpmud/g/27_f-981027-2 1.2 644) :no-keywords)
@@ -714,6 +717,7 @@
   (src/bugs/f-020813-0 (lpmud/a/b/8_f-020813-0 1.1 644) :no-keywords)
   (src/bugs/f-020813-1 (lpmud/a/b/9_f-020813-1 1.2 644) :no-keywords)
   (src/bugs/f-020825 (lpmud/a/b/15_f-020825 1.1 644) :no-keywords)
+  (src/bugs/f-020904 (lpmud/a/b/19_f-020904 1.1 644) :no-keywords)
 
   (src/bugs/p-981027-1 (lpmud/g/25_p-981027-1 1.2 644) :no-keywords)
   (src/bugs/doomdark/strutil.c (lpmud/g/31_strutil.c 1.2 644) :no-keywords)

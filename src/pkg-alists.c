@@ -379,7 +379,10 @@ v_insert_alist (svalue_t *sp, int num_arg)
         {
             if (VEC_SIZE(sp[-1].u.vec) != (size_t)listsize)
             {
-                error("Size mismatch of the data arrays.\n");
+                error("Size mismatch of the data arrays: "
+                      "vec size %ld, list size %ld.\n"
+                     , (long)VEC_SIZE(sp[-1].u.vec), (long)listsize
+                     );
                 /* NOTREACHED */
                 return sp;
             }
@@ -390,7 +393,8 @@ v_insert_alist (svalue_t *sp, int num_arg)
     {
         if (num_arg - 1 != listsize)
         {
-            error("Not enough data given.\n");
+            error("Not enough data given: %ld arguments, %ld listsize.\n"
+                 , (long)num_arg - 1, (long)listsize);
             /* NOTREACHED */
             return sp;
         }

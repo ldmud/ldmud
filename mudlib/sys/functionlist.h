@@ -3,7 +3,6 @@
 
 #ifndef __DRIVER_SOURCE__
 #include "lpctypes.h"
-#endif
 
 #define NAME_INHERITED      0x80000000 /* Defined by inheritance         */
 #define TYPE_MOD_STATIC     0x40000000 /* Static function or variable    */
@@ -27,6 +26,8 @@
 #define NAME_UNDEFINED      0x00000200 /* Not defined yet                */
 #define NAME_TYPES_LOST     0x00000100 /* inherited, no save_types       */
 #endif /* USE_STRUCTS */
+
+#endif
 
 /* Return value flag types for functionlist() */
 

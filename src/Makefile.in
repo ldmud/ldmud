@@ -368,12 +368,12 @@ parse_old.o : xalloc.h wiz_list.h svalue.h stdstrings.h simulate.h random.h \
     actions.h parse.h my-alloca.h typedefs.h driver.h strfuns.h sent.h \
     exec.h instrs.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
-parser.o : lang.c pkg-alists.h ../mudlib/sys/driver_hook.h xalloc.h \
-    wiz_list.h switch.h swap.h svalue.h stdstrings.h simul_efun.h \
-    simulate.h object.h mstrings.h mapping.h main.h lex.h instrs.h \
-    interpret.h gcollect.h exec.h closure.h backend.h array.h prolang.h \
-    my-alloca.h typedefs.h driver.h ptrtable.h strfuns.h sent.h port.h \
-    config.h hosts/unix.h hosts/be/be.h machine.h
+parser.o : lang.c ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h switch.h \
+    swap.h svalue.h stdstrings.h simul_efun.h simulate.h object.h \
+    mstrings.h mapping.h main.h lex.h instrs.h interpret.h gcollect.h \
+    exec.h closure.h backend.h array.h prolang.h my-alloca.h typedefs.h \
+    driver.h ptrtable.h strfuns.h sent.h port.h config.h hosts/unix.h \
+    hosts/be/be.h machine.h
 
 dftables.o : pcre/maketables.c pcre/internal.h pcre/pcre.h pcre/config.h
 

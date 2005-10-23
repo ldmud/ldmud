@@ -311,6 +311,7 @@ struct cache
 /* The following macros implement the dynamic cost evaluations:
  *
  *   DYN_STRING_COST(l): increase eval_cost depending on stringlength <l>.
+ *   DYN_ARRAY_COST(l):  increase eval_cost depending on arraylength <l>.
  *
  * If these are ever needed outside of interpret.c, we make them inline
  * functions.
@@ -324,10 +325,12 @@ struct cache
 #if defined(DYNAMIC_COSTS)
 
 #define DYN_STRING_COST(l)  eval_cost += (l) / 1000;
+#define DYN_ARRAY_COST(l)  eval_cost += (l) / 1000;
 
 #else
 
 #define DYN_STRING_COST(l)
+#define DYN_ARRAY_COST(l)
 
 #endif
 
@@ -9178,6 +9181,7 @@ again:
             TYPE_TEST_RIGHT(sp, T_POINTER);
             inter_sp = sp;
             inter_pc = pc;
+            DYN_ARRAY_COST(VEC_SIZE(sp->u.vec)+VEC_SIZE(sp[-1].u.vec));
             inter_add_array(sp->u.vec, &(sp-1)->u.vec);
             sp--;
             break;
@@ -9474,6 +9478,7 @@ again:
                 len = VEC_SIZE(sp->u.vec);
                 reslen = sp[-1].u.number * (mp_int)len;
                 result = allocate_uninit_array(reslen);
+                DYN_ARRAY_COST(reslen);
 
                 if (sp[-1].u.number > 0 && len)
                 {
@@ -10829,6 +10834,7 @@ again:
 
                 inter_sp = sp;
                 inter_pc = pc;
+                DYN_ARRAY_COST(VEC_SIZE(u2.vec)+VEC_SIZE(argp->u.vec));
                 v = inter_add_array(u2.vec, &argp->u.vec);
                 if (instruction == F_VOID_ADD_EQ)
                 {
@@ -11336,6 +11342,7 @@ again:
             len = VEC_SIZE(argp->u.vec);
             reslen = sp->u.number * (mp_int)len;
             result = allocate_uninit_array(reslen);
+            DYN_ARRAY_COST(reslen);
 
             if (sp->u.number > 0 && len)
             {

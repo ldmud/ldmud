@@ -464,6 +464,7 @@
 
 /* Define this if you want the new inline closure syntax supported.
  * (f-020528)
+ * NOT IMPLEMENTED YET - WILL CRASH THE DRIVER!
  */
 #undef USE_NEW_INLINES
 

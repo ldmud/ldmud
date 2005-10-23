@@ -18,6 +18,7 @@ Efuns
 --------------------------------------------------------------------------
 b-000214: regexp() error?
 b-000304: Various bugs
+b-020826: save_object() on mappings fails
 
 
 Language

@@ -111,10 +111,6 @@
 
 #include "../mudlib/sys/driver_hook.h"
 
-#ifdef USE_ALISTS
-#include "pkg-alists.h"  /* order_alist() */
-#endif
-
 #ifdef USE_STRUCTS
 #  undef HYBRID_STRUCT_LITERALS
   /* Define this if struct literals shall be able to mix named and
@@ -351,7 +347,7 @@ struct efun_shadow_s
 #define NUMPAREAS                  9  /* Number of saved areas */
 #endif /* USE_STRUCTS */
 
-#define A_FUNCTIONS               (NUMPAREAS)
+#define A_FUNCTIONS               (NUMPAREAS+0)
    /* (function_t): Function definitions
     */
 
@@ -2905,10 +2901,12 @@ add_struct_member ( string_t *name, vartype_t type, int from_struct )
 } /* add_struct_member() */
 
 /*-------------------------------------------------------------------------*/
-static vartype_t
-adjust_struct_id (vartype_t type, int offset)
+static fulltype_t
+adjust_struct_id (fulltype_t type, int offset)
 
-/* If type <type> is a struct, adjust its id by <offset> */
+/* If type <type> is a struct, adjust its id by <offset>.
+ * <type> is of type fulltype_t so as to not lose inheritance flags.
+ */
 
 {
     if ((type & PRIMARY_TYPE_MASK) == TYPE_STRUCT)
@@ -3541,7 +3539,7 @@ list_to_struct (struct_def_t * pdef, int length, svalue_t *initialized)
 #ifndef HYBRID_STRUCT_LITERALS
         /* First loop through list: check if there is no mixed initialization.
          */
-        got_error = go_named = got_unnamed = MY_FALSE;
+        got_error = got_named = got_unnamed = MY_FALSE;
         list = &clsv->list;
         do {
 
@@ -3549,7 +3547,7 @@ list_to_struct (struct_def_t * pdef, int length, svalue_t *initialized)
             {
                 if (got_unnamed)
                 {
-                    got_error = MY_TRUE:
+                    got_error = MY_TRUE;
                 }
                 got_named = MY_TRUE;
             }
@@ -3557,7 +3555,7 @@ list_to_struct (struct_def_t * pdef, int length, svalue_t *initialized)
             {
                 if (got_named)
                 {
-                    got_error = MY_TRUE:
+                    got_error = MY_TRUE;
                 }
                 got_unnamed = MY_TRUE;
             }
@@ -11679,7 +11677,7 @@ lvalue_list:
  * The generated value is stored in *currently_initialized.
  *
  * The constant initialization may contain function calls, however,
- * so far only the now rather useless order_alist() is supported.
+ * so far none are implemented.
  */
 
 svalue_constant:
@@ -11859,6 +11857,7 @@ opt_const_struct_init2:
           clsv->head.u.error_handler = free_const_list_svalue;
           clsv->list.next = NULL;
           clsv->list.val.type = T_INVALID;
+          clsv->list.member = NULL;
           clsv->last_member = member_currently_initialized;
           currently_initialized = &clsv->list.val;
           member_currently_initialized = &clsv->list;

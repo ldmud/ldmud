@@ -1,6 +1,17 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+12-Sep-2002 (Lars Duening)  (3.3.253)
+  - (interpret.c) DYNAMIC_COSTS now also covers array additions.
+  - (prolang.y) When inheriting variables, the function to
+       adjust the struct-id inadvertendly stripped away the
+       inheritance flags. This caused virtual variables to
+       go uninitialized or worse.
+
+11-Sep-2002 (Lars Duening)  (3.3.252)
+  - (prolang.y) Oops, typos in the constant-struct code when __INIT
+       is not used (thanks, Guandalug).
+
 11-Sep-2002 (Lars Duening)  (3.3.251)
   - (main.c) Redesigned the argument definition array to combine all
        information (short version, long version, short and long help
