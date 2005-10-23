@@ -201,9 +201,10 @@ main (int argc, char **argv)
 /* The main function. Nuff said. */
 
 {
-    int i, rc;
+    int i;
     char *p;
     sigset_t set;
+    volatile int rc;
 
     rc = 0;
 

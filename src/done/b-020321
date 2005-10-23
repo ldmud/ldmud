@@ -2,7 +2,7 @@ Short: Strange crasher: bus error on existing variables
 Date: Thu, 21 Mar 2002 21:30:10 +0100
 From: Christian Mudra <mudra@informatik.uni-kl.de>
 Type: Bug
-State: New
+State: Abandoned.
 Driver: 3.2.9-dev.408
 
 Hi Lars,

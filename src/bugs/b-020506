@@ -3,7 +3,7 @@ Date: Mon, 06 May 2002 12:43:38 -0600
 From: Lars Duening <c-lars.duening@wcom.com>
 Type: Bug
 State: New
-Driver: 3.2.9-dev.434
+Driver: 3.2.9-dev.434, 3.3.276
 
 > malloc                                                                        
 Type                   Count      Space (bytes)                       

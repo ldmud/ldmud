@@ -3,7 +3,7 @@ From:    sark@oberon.krans.com
 To:      lars@bearnip.com
 Short: Various bugs
 Type: Bug
-State: New
+State: Abandoned.
 
 These are bugs/features which exists in the LPmud Amylaar driver 03.02@316
 and 03.02.1@130 running in COMPAT MODE.

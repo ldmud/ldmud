@@ -512,6 +512,10 @@ enable_check_object_gc_ref=yes
 # efuns blueprint(), but probably avoid the object refcount bug.
 enable_no_blueprint=no
 
+# Activate total smalloc size consistency check code. This will produce
+# a lot of output in the GC log.
+enable_check_smalloc_total=no
+
 # Sometimes the GC stumbles over invalid references to memory blocks (namely
 # 'Program referenced as something else'). Define this macro to get a detailed
 # dump of all found references (Warning: LOTS of output!).

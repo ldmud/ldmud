@@ -934,7 +934,7 @@ initialize_host_ip_number (const char *hname, const char * haddr)
     if (haddr != NULL)
     {
 #ifndef USE_IPV6
-        inet_aton(haddr, &host_ip_number);
+        host_ip_number.s_addr = inet_addr(haddr);
         host_ip_addr_template.sin_family = AF_INET;
         host_ip_addr_template.sin_addr = host_ip_number;
 #else

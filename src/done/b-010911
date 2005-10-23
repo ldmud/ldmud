@@ -2,7 +2,7 @@ Short: String table corrupt
 Date: Tue, 11 Sep 2001 17:53:42 -0700
 From: Ben Fennema <bfennema@ix.netcom.com>
 Type: Bug
-State: New
+State: Abandoned.
 Driver: 3.2.9-dev.336, -dev.363
 
 How do you read these crash dumps anyways?

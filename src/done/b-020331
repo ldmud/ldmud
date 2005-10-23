@@ -3,7 +3,7 @@ Date: Sun, 31 Mar 2002 16:11:52 +0200 (CEST)
 From: Markus Peter <warp@spin.de>
 Driver: 3.3.192
 Type: Bug
-State: Probably fixed in 3.3.195
+State: Done - fixed in 3.3.195
 
 Wollte heut den 3.3.192 ausprobieren - kam leider nicht weit, das MUD ist
 etwa 1 Sekunde nach dem Booten gecrasht.

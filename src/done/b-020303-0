@@ -2,7 +2,7 @@ Short: Crasher on corrupt string.
 Date: Sun, 3 Mar 2002 18:37:02 -0600
 From: Gnomi <Gnomi@UNItopia.bera.rus.Uni-Stuttgart.DE>
 Type: Bug
-State: New
+State: Abandoned.
 Driver: 3.2.9-dev.405
 
 Hi,

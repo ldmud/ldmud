@@ -3614,6 +3614,86 @@ free_unreferenced_memory (void)
 } /* free_unreferenced_memory() */
 
 /*-------------------------------------------------------------------------*/
+#ifndef CHECK_SMALLOC_TOTAL
+#define check_malloc_data() NOOP
+#else
+#define check_malloc_data() sm_check_malloc_data(__FILE__, __LINE__)
+
+static void
+sm_check_malloc_data (const char *file, int line)
+
+/* For the status commands and functions: add the smalloc statistic
+ * to the buffer <sbuf>.
+ */
+
+{
+    t_stat sbrk_st, clib_st, perm_st;
+    t_stat l_alloc, l_free, l_wasted;
+    t_stat s_alloc, s_free, s_wasted, s_chunk;
+    unsigned long unused;
+    Bool didHeader;
+
+    didHeader = MY_FALSE;
+
+    /* Get a snapshot of the statistics. */
+
+    sbrk_st = sbrk_stat;
+    clib_st = clib_alloc_stat;
+    perm_st = perm_alloc_stat;
+    l_alloc = large_alloc_stat; l_alloc.size *= SINT;
+    l_free = large_free_stat; l_free.size *= SINT;
+    l_wasted = large_wasted_stat;
+    s_alloc = small_alloc_stat;
+    s_free = small_free_stat;
+    s_wasted = small_chunk_wasted;
+    s_chunk = small_chunk_stat;
+    unused = unused_size;
+
+    dprintf2(gcollect_outfd, "DEBUG: (%s:%d)"
+                           , (p_int)file, (p_int)line);
+
+    dprintf4(gcollect_outfd, " total (alloc %d, free %d, wasted %d) %d "
+           , (p_int)l_alloc.size
+           , (p_int)l_free.size
+           , (p_int)l_wasted.size
+           , (p_int)(l_alloc.size + l_free.size + l_wasted.size)
+           );
+
+    if (l_alloc.size + l_free.size + l_wasted.size != sbrk_st.size)
+        writes(gcollect_outfd, "!=");
+    else
+        writes(gcollect_outfd, "==");
+
+    dprintf1(gcollect_outfd, " sbrk %d\n"
+            , (p_int)sbrk_st.size
+            );
+
+    dprintf2(gcollect_outfd, "DEBUG: (%s:%d)"
+                           , (p_int)file, (p_int)line);
+
+    dprintf4(gcollect_outfd, " small (alloc %d, free %d, wasted %d, unused %d)"
+           , (p_int)s_alloc.size 
+           , (p_int)s_free.size
+           , (p_int)s_wasted.size
+           , (p_int)unused
+           );
+    dprintf1(gcollect_outfd, " %d "
+           , (p_int)(s_alloc.size + s_free.size + s_wasted.size + unused)
+           );
+
+    if (s_alloc.size + s_free.size + s_wasted.size + unused != s_chunk.size)
+        writes(gcollect_outfd, "!=");
+    else
+        writes(gcollect_outfd, "==");
+
+    dprintf1(gcollect_outfd, " chunk %d\n"
+           , (p_int)s_chunk.size
+           );
+
+} /* check_malloc_data() */
+#endif
+
+/*-------------------------------------------------------------------------*/
 void
 consolidate_freelists (void)
 
@@ -3633,6 +3713,16 @@ consolidate_freelists (void)
 #  define DEB1(s,t1)       (void)0
 #  define DEB2(s,t1,t2)    (void)0
 #  define DEB3(s,t1,t2,t3) (void)0
+#endif
+
+#if defined(CHECK_SMALLOC_TOTAL)
+#  define SDEB1(s,t1)       dprintf1(gcollect_outfd, s, (p_int)t1)
+#  define SDEB2(s,t1,t2)    dprintf2(gcollect_outfd, s, (p_int)t1, (p_int)t2)
+#  define SDEB3(s,t1,t2,t3) dprintf3(gcollect_outfd, s, (p_int)t1, (p_int)t2, (p_int)t3)
+#else
+#  define SDEB1(s,t1)       (void)0
+#  define SDEB2(s,t1,t2)    (void)0
+#  define SDEB3(s,t1,t2,t3) (void)0
 #endif
 
     word_t *chunk, *prev_chunk;

@@ -1,11 +1,21 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+07-Oct-2002 (Lars Duening)  (3.3.277)
+  - (comm.c, main.c, efuns.c) Removed compilation problems with BeOS.
+  - (prolang.y) In struct literals, a trailing ',' is now allowed
+       (suggested by Zonk).
+  - (prolang.y) Oh My Ghod. The range index [..<expr0>] created faulty
+       bytecode, maybe even clobbered random memory, if the expression
+       was anything complicated, like 'm++' or 'm = 4'. This bug
+       was caused by uninitialized the LPC parser not initializing
+       the internal return value from parsing <expr0>, so the bug
+       didn't manifest itself every time (reported by Zonk).
+
 06-Oct-2002 (Lars Duening)  (3.3.276)
   - (prolang.y, interpret.c, efuns.c, sprintf.c, gcollect.c, exec.h)
-       structs now carry
-       an identification string internally, which is displayed 
-       in sprintf() and can be retrieved using get_type_info().
+       structs now carry an identification string internally, which is
+       displayed in sprintf() and can be retrieved using get_type_info().
 
 06-Oct-2002 (Lars Duening)  (3.3.275)
   - (prolang.y) New inlines: found a way to implement the old (: expr; :)

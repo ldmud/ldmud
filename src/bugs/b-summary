@@ -1,23 +1,14 @@
 Crasher
 --------------------------------------------------------------------------
-b-000909: dev.226 crashes TubMud
-b-010911: String table corrupt
-b-011220: LDMud instability in Alatia
 b-020115: Illegal vector memsize
 b-020228-1: Crash in terminal_colour()
-b-020228-0: Refcount errors when handling destructed objects (Maybe fixed)
-b-020303-0: Crasher on corrupt string.
-b-020321: Strange crasher: bus error on existing variables
-b-020318: Illegal instruction 
-b-020331: Back stack at F_RETURN (maybe fixed)
 b-020415: Crasher with corrupted Memory
 b-020425-0: GC crashes on 'object referenced as something else'
+b-020916: Segmentation fault in save_object()
 
 
 Efuns
 --------------------------------------------------------------------------
-b-000214: regexp() error?
-b-000304: Various bugs
 b-020826: save_object() on mappings fails
 
 
@@ -36,12 +27,9 @@ b-010801-0: #' recognition in lexer insufficient
 
 Runtime
 --------------------------------------------------------------------------
-b-020205-0: Memoryleaks in Unitopia - set_prompt() and the soul (maybe fixed)
-b-990605: In a lot of error places, inter_sp/inter_pc are wrong.
 b-010802: Shortcomings of the new string implementation
 b-010115-1: Make sure that all master calls use leading slashes.
 b-010610-1: CRT doesn't work well in charmode
-b-011113: status for actions wrong
 b-020223: Memory corruption (in stress test)
 b-020304: Memory Leaks in Darkwind
 b-020314: Memory leaks in OSB and FinalFrontier
@@ -50,7 +38,6 @@ b-020506: Small block statistics wrong in OSB
 
 Installation
 --------------------------------------------------------------------------
-b-000904: ERQ compile problems
 
 
 Not Reproducible

@@ -5654,14 +5654,12 @@ v_get_type_info (svalue_t *sp, int num_arg)
 
     argp = sp - num_arg + 1;
     i = argp->type;
+    j = -1;
     str = NULL;
 
     /* Determine the second return value */
     switch(i)
     {
-    default:
-        j = -1;
-        break;
     case T_STRING:
         j = (mstr_tabled(sp[-1].u.str)) ? 0 : 1;
         break;

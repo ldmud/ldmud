@@ -2,7 +2,7 @@ Short: Refcount errors when handling destructed objects
 From: Bastian Hoyer
 Date: 2002-02-28
 Type: Bug
-State: Probably fixed.
+State: Done.
 Driver: 3.2.9-dev.404
 
 

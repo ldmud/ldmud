@@ -1499,7 +1499,7 @@ efun_argument_error(int arg, int instr
             strcat(msg, "/");
         strcat(msg, get_type_name(*expected));
     }
-    yyerrorf("Bad arg %d type to %s(): got %s, expected %s;"
+    yyerrorf("Bad arg %d type to %s(): got %s, expected %s"
             , arg, instrs[instr].name, get_type_name(got), msg);
 } /* efun_argument_error() */
 
@@ -4854,7 +4854,8 @@ free_const_list_svalue (svalue_t *svp)
     }
     lrvalue;
       /* Used for expressions which may return a rvalue or lvalues.
-       * .type is always used, the others only for indexed lvalues.
+       * It is also used by the index range generation to move around
+       * the index expressions.
        * Lvalue generation in places where either a r- or an lvalue
        * is acceptible first generates the rvalue code, but stores
        * the necessary information to patch the code to produce
@@ -8094,6 +8095,8 @@ expr0:
           p_int length;
           vartype_t type1, type2, restype;
 %line
+          $$ = $3;
+
           type1 = $1.type;
           type2 = $3.type;
           restype = type2; /* Assume normal assignment */
@@ -8226,6 +8229,7 @@ expr0:
               *dest++ = *source;
               *dest = $2;
           }
+          $$.end = CURRENT_PROGRAM_SIZE;
           $$.type = restype;
       }
 
@@ -8233,6 +8237,7 @@ expr0:
     | error L_ASSIGN expr0  %prec L_ASSIGN
       {
           yyerror("Bad assignment: illegal lhs (target)");
+          $$ = $3;
           $$.type = TYPE_ANY;
       }
 
@@ -8335,6 +8340,8 @@ expr0:
           type1 = $4.type;
           type2 = $7.type;
 
+          $$ = $1;
+          $$.end = CURRENT_PROGRAM_SIZE;
           if (!compatible_types(type1, type2, MY_FALSE))
           {
               $$.type = TYPE_ANY;
@@ -8415,6 +8422,9 @@ expr0:
               mem_block[A_PROGRAM].block[address] = offset;
           }
 
+          $$ = $1;
+          $$.end = CURRENT_PROGRAM_SIZE;
+
           /* Determine the result type */
           if ($1.type == $4.type)
               $$.type = $1.type;
@@ -8483,6 +8493,9 @@ expr0:
               mem_block[A_PROGRAM].block[address] = offset;
           }
 
+          $$ = $1;
+          $$.end = CURRENT_PROGRAM_SIZE;
+
           /* Determine the return type */
           if ($1.type == $4.type)
               $$.type = $1.type;
@@ -8493,6 +8506,8 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 '|' expr0
       {
+          $$ = $1;
+
           if (($1.type | $3.type) & TYPE_MOD_POINTER)
           {
               if (exact_types
@@ -8514,11 +8529,15 @@ expr0:
               $$.type = TYPE_NUMBER;
           }
           ins_f_code(F_OR);
+
+          $$.end = CURRENT_PROGRAM_SIZE;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 '^' expr0
       {
+          $$ = $1;
+
           if (($1.type | $3.type) & TYPE_MOD_POINTER)
           {
               if (exact_types
@@ -8540,12 +8559,16 @@ expr0:
               $$.type = TYPE_NUMBER;
           }
           ins_f_code(F_XOR);
+
+          $$.end = CURRENT_PROGRAM_SIZE;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 '&' expr0
       {
+          $$ = $1;
           ins_f_code(F_AND);
+          $$.end = CURRENT_PROGRAM_SIZE;
           $$.type = TYPE_ANY;
 
           /* Check the types */
@@ -8614,6 +8637,8 @@ expr0:
     | expr0 L_EQ expr0
       {
           vartype_t t1 = $1.type, t2 = $3.type;
+
+          $$ = $1;
           if (exact_types
            && t1 != t2 && t1 != TYPE_ANY && t2 != TYPE_ANY
            && !(t1 == TYPE_NUMBER && t2 == TYPE_FLOAT)
@@ -8625,12 +8650,15 @@ expr0:
           }
           ins_f_code(F_EQ);
           $$.type = TYPE_NUMBER;
+          $$.end = CURRENT_PROGRAM_SIZE;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 L_NE expr0
       {
           vartype_t t1 = $1.type, t2 = $3.type;
+
+          $$ = $1;
           if (exact_types
            && t1 != t2 && t1 != TYPE_ANY && t2 != TYPE_ANY
            && !(t1 == TYPE_NUMBER && t2 == TYPE_FLOAT)
@@ -8641,19 +8669,46 @@ expr0:
                       , get_two_types($1.type, $3.type));
           }
           ins_f_code(F_NE);
+          $$.end = CURRENT_PROGRAM_SIZE;
           $$.type = TYPE_NUMBER;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | expr0 '>'  expr0  { $$.type = TYPE_NUMBER; ins_f_code(F_GT); }
-    | expr0 L_GE expr0  { $$.type = TYPE_NUMBER; ins_f_code(F_GE); }
-    | expr0 '<'  expr0  { $$.type = TYPE_NUMBER; ins_f_code(F_LT); }
-    | expr0 L_LE expr0  { $$.type = TYPE_NUMBER; ins_f_code(F_LE); }
+    | expr0 '>'  expr0
+      {
+          $$ = $1;
+          $$.type = TYPE_NUMBER;
+          ins_f_code(F_GT);
+          $$.end = CURRENT_PROGRAM_SIZE;
+      }
+    | expr0 L_GE  expr0
+      {
+          $$ = $1;
+          $$.type = TYPE_NUMBER;
+          ins_f_code(F_GE);
+          $$.end = CURRENT_PROGRAM_SIZE;
+      }
+    | expr0 '<'  expr0
+      {
+          $$ = $1;
+          $$.type = TYPE_NUMBER;
+          ins_f_code(F_LT);
+          $$.end = CURRENT_PROGRAM_SIZE;
+      }
+    | expr0 L_LE  expr0
+      {
+          $$ = $1;
+          $$.type = TYPE_NUMBER;
+          ins_f_code(F_LE);
+          $$.end = CURRENT_PROGRAM_SIZE;
+      }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 L_LSH expr0
       {
+          $$ = $1;
           ins_f_code(F_LSH);
+          $$.end = CURRENT_PROGRAM_SIZE;
           $$.type = TYPE_NUMBER;
           if (exact_types)
           {
@@ -8667,8 +8722,10 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 L_RSH expr0
       {
+          $$ = $1;
           ins_f_code(F_RSH);
           $$.type = TYPE_NUMBER;
+          $$.end = CURRENT_PROGRAM_SIZE;
           if (exact_types)
           {
               if (!BASIC_TYPE($1.type, TYPE_NUMBER))
@@ -8681,7 +8738,9 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 L_RSHL expr0
       {
+          $$ = $1;
           ins_byte(F_RSHL);
+          $$.end = CURRENT_PROGRAM_SIZE;
           $$.type = TYPE_NUMBER;
           if (exact_types)
           {
@@ -8710,6 +8769,8 @@ expr0:
           mp_uint current_size;
           bytecode_p p;
 %line
+          $$ = $1;
+
           current_size = CURRENT_PROGRAM_SIZE;
           p = &(PROGRAM_BLOCK[current_size]);
 
@@ -8803,12 +8864,14 @@ expr0:
                           );
 #endif /* USE_STRUCTS */
           }
+          $$.end = CURRENT_PROGRAM_SIZE;
       } /* '+' */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 '-' expr0
       {
 %line
+          $$ = $1;
           $$.type = TYPE_ANY;
 
           if (exact_types)
@@ -8928,12 +8991,15 @@ expr0:
           } /* if (exact_types) */
 
           ins_f_code(F_SUBTRACT);
+          $$.end = CURRENT_PROGRAM_SIZE;
       } /* '-' */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 '*' expr0
       {
           vartype_t type1, type2;
+
+          $$ = $1;
 
           type1 = $1.type;
           type2 = $3.type;
@@ -8955,6 +9021,7 @@ expr0:
           }
 
           ins_f_code(F_MULTIPLY);
+          $$.end = CURRENT_PROGRAM_SIZE;
 
           if (type1 == TYPE_FLOAT || type2 == TYPE_FLOAT )
           {
@@ -8993,13 +9060,17 @@ expr0:
                   type_error("Bad argument number 2 to '%'", $3.type);
           }
 
+          $$ = $1;
           ins_f_code(F_MOD);
+          $$.end = CURRENT_PROGRAM_SIZE;
           $$.type = TYPE_NUMBER;
       }
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 '/' expr0
       {
           vartype_t type1, type2;
+
+          $$ = $1;
 
           type1 = $1.type;
           type2 = $3.type;
@@ -9013,6 +9084,7 @@ expr0:
           }
 
           ins_f_code(F_DIVIDE);
+          $$.end = CURRENT_PROGRAM_SIZE;
 
           if (type1 == TYPE_FLOAT || type2 == TYPE_FLOAT )
           {
@@ -9077,6 +9149,7 @@ expr0:
                   break;
               }
           }
+          $$.end = CURRENT_PROGRAM_SIZE;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -9090,6 +9163,7 @@ expr0:
           int i;
           PREPARE_INSERT(4)
 %line
+          $$.start = $1.start;
           i = verify_declared($2);
 
           if (i != -1)
@@ -9136,6 +9210,7 @@ expr0:
           CURRENT_PROGRAM_SIZE += 1;
 
           add_f_code($1.code);
+          $$.end = CURRENT_PROGRAM_SIZE;
           $$.type = i;
       }
 
@@ -9145,7 +9220,9 @@ expr0:
           int i;
           PREPARE_INSERT(3)
 %line
+          $$.start = $1.start;
 #ifdef USE_NEW_INLINES
+
           $2 = check_for_context_local($2);
 
           if ($2->u.local.context >= 0)
@@ -9177,6 +9254,7 @@ expr0:
               argument_type_error($1.code, i);
           }
           $$.type = i;
+          $$.end = CURRENT_PROGRAM_SIZE;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -9186,6 +9264,8 @@ expr0:
           bytecode_p p;
           int start, restype;
 %line
+          $$.start = $1.start;
+
           if ($3.type1 & TYPE_MOD_REFERENCE)
               yyerror("Reference used as index");
 
@@ -9305,6 +9385,7 @@ expr0:
           *p = $1.code;
           last_expression = current + 1;
           CURRENT_PROGRAM_SIZE = current + 2;
+          $$.end = CURRENT_PROGRAM_SIZE;
           $$.type = restype;
       } /* pre_inc_dec expr4 [index_expr] */
 
@@ -9314,6 +9395,8 @@ expr0:
           mp_uint current;
           bytecode_p p;
 %line
+          $$.start = $1.start;
+
           if ($4.type & TYPE_MOD_REFERENCE
            || $6.type & TYPE_MOD_REFERENCE)
               yyerror("Reference used as index");
@@ -9351,6 +9434,7 @@ expr0:
           *p = $1.code;
           last_expression = current + 1;
           CURRENT_PROGRAM_SIZE = current + 2;
+          $$.end = CURRENT_PROGRAM_SIZE;
           $$.type = TYPE_ANY;
       } /* pre_inc_dec expr4 [expr0 ',' expr0] */
 
@@ -9360,7 +9444,9 @@ expr0:
           $$ = $2;
           last_expression = CURRENT_PROGRAM_SIZE;
           ins_f_code(F_NOT);        /* Any type is valid here. */
+          $$.end = CURRENT_PROGRAM_SIZE;
           $$.type = TYPE_NUMBER;
+printf("DEBUG: L_NOT: start %d, end %d, size %d\n", $$.start, $$.end, CURRENT_PROGRAM_SIZE);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -9371,6 +9457,7 @@ expr0:
           ins_f_code(F_COMPL);
           if (exact_types && !BASIC_TYPE($2.type, TYPE_NUMBER))
               type_error("Bad argument to ~", $2.type);
+          $$.end = CURRENT_PROGRAM_SIZE;
           $$.type = TYPE_NUMBER;
       }
 
@@ -9411,12 +9498,13 @@ expr0:
           {
               ins_f_code(F_NEGATE);
           }
-          type = $2.type;
+          $$.end = CURRENT_PROGRAM_SIZE;
 
+          type = $2.type;
           if (exact_types
            && !BASIC_TYPE(type, TYPE_NUMBER)
            && type != TYPE_FLOAT )
-              type_error("Bad argument to unary '-'", $2.type);
+              type_error("Bad argument to unary '-'", type);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -9424,6 +9512,7 @@ expr0:
       {
 %line
           /* Create the code to push the lvalue plus POST_INC */
+          $$.start = CURRENT_PROGRAM_SIZE;
           if ($1.length)
           {
               add_to_mem_block(A_PROGRAM, $1.u.p, $1.length);
@@ -9443,6 +9532,7 @@ expr0:
               add_byte(*source);
               add_f_code(F_POST_INC);
           }
+          $$.end = CURRENT_PROGRAM_SIZE;
 
           /* Check the types */
           if (exact_types
@@ -9458,6 +9548,8 @@ expr0:
     | lvalue L_DEC %prec L_DEC
       {
 %line
+          $$.start = CURRENT_PROGRAM_SIZE;
+
           /* Create the code to push the lvalue plus POST_DEC */
           if ($1.length)
           {
@@ -9487,11 +9579,15 @@ expr0:
              )
               type_error("Bad argument to --", $1.type);
 
+          $$.end = CURRENT_PROGRAM_SIZE;
           $$.type = $1.type;
       } /* post-dec */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr4
+      {
+          $$ = $1;
+      }
 
 ; /* expr0 */
 
@@ -11269,8 +11365,18 @@ m_expr_values:
 
 opt_struct_init:
       /* empty */       { $$.length = 0; $$.list = $$.last = NULL; }
-    | opt_struct_init2  { $$ = $1; }
+    | opt_struct_init2  possible_comma { $$ = $1; }
+    | opt_struct_init2 ',' error
+      {
+          /* Allow the parser to resynchronize */
+          $$.length = 0; $$.list = $$.last = NULL;
+      }
 ; /* opt_struct_init */
+
+possible_comma :
+      /* empty */
+    | ','
+; /* possible_comma */
 
 opt_struct_init2:
       /* empty */
