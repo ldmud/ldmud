@@ -561,7 +561,8 @@ double READ_DOUBLE(struct svalue *svalue_pnt)
  *   DYN_MAPPING_COST(l): increase eval_cost depending on mapping length <l>.
  *
  * Covered so far are:
- *   F_ADD, F_ADD_EQ, F_VOID_ADD_EQ, F_MULTIPLY, F_MULT_EQ of strings
+ *   F_ALLOCATE, F_ADD, F_ADD_EQ, F_VOID_ADD_EQ, F_MULTIPLY, 
+ *   F_MULT_EQ of strings
  *
  * TODO: Expand this to all datatypes and sizes.
  */

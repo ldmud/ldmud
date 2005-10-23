@@ -11875,7 +11875,7 @@ function_call:
                                */
                               if (tmp1 == tmp2
 #ifdef USE_STRUCTS
-                               || IS_TYPE_STRUCT(tmp1) && IS_TYPE_STRUCT(tmp2)
+                               || (IS_TYPE_STRUCT(tmp1) && IS_TYPE_STRUCT(tmp2))
 #endif
                                  )
                                   break;

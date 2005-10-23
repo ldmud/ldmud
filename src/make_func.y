@@ -2905,33 +2905,35 @@ create_efun_defs (void)
             fprintf(fpw, "\n\n");
     }
 
-    for (k = C_EFUN0; k < C_ALIAS; k++)
     {
-        char * prefix;
-
-        switch(k)
+        char * prefix = NULL;
+        for (k = C_EFUN0; k < C_ALIAS; k++)
         {
-        case C_EFUN0: 
-            fprintf(fpw, "/* The table of tabled efuns\n */\n\n");
-            fprintf(fpw, "svalue_t *(*efun_table[]) (svalue_t *) = {\n");
-            prefix = "f_";
-            break;
-        case C_EFUNV: 
-            fprintf(fpw, "/* The table of tabled vararg efuns\n */\n\n");
-            fprintf(fpw, "svalue_t *(*vefun_table[]) (svalue_t *, int) = {\n");
-            prefix = "v_";
-            break;
-        }
 
-        i = instr_offset[k];
-        j = i + num_instr[k];
-        for(; i < j; i++)
-        {
-            fprintf(fpw, "    /* %3d */ %s%s,\n", i, prefix, instr[i].key);
-        }
+            switch(k)
+            {
+            case C_EFUN0: 
+                fprintf(fpw, "/* The table of tabled efuns\n */\n\n");
+                fprintf(fpw, "svalue_t *(*efun_table[]) (svalue_t *) = {\n");
+                prefix = "f_";
+                break;
+            case C_EFUNV: 
+                fprintf(fpw, "/* The table of tabled vararg efuns\n */\n\n");
+                fprintf(fpw, "svalue_t *(*vefun_table[]) (svalue_t *, int) = {\n");
+                prefix = "v_";
+                break;
+            }
 
-        if (k == C_EFUNV-1 || k == C_ALIAS-1)
-            fprintf(fpw, "};\n\n\n");
+            i = instr_offset[k];
+            j = i + num_instr[k];
+            for(; i < j; i++)
+            {
+                fprintf(fpw, "    /* %3d */ %s%s,\n", i, prefix, instr[i].key);
+            }
+
+            if (k == C_EFUNV-1 || k == C_ALIAS-1)
+                fprintf(fpw, "};\n\n\n");
+        }
     }
 
     /* TODO: create a my-ctype.[ch] and a utility program to create
@@ -3363,7 +3365,6 @@ main (int argc, char ** argv)
 
 {
     enum { NONE = 0, MakeInstrs, MakeLang, MakeStrings } action = NONE;
-    char line_buffer[MAKE_FUNC_MAXLINE + 1];
 
     /* --- Check what we have to do --- */
     if (argc == 2)

@@ -1737,7 +1737,8 @@ v_allocate (svalue_t *sp, int num_arg)
  *
  * Allocate an array of <size> elements (if <size> is an array, the result
  * will be a multidimensional array), either empty or all
- * elements initialized with <init_value>.
+ * elements initialized with <init_value>. If <init_value> is a
+ * mapping or array, allocate will create shallow copies of them.
  */
 
 {
@@ -1758,9 +1759,16 @@ v_allocate (svalue_t *sp, int num_arg)
             size_t i;
             svalue_t *svp;
 
+            /* If the initialisation value is a mapping, remove all
+             * destructed elements so that we can use copy_mapping()
+             * later on.
+             */
+            if (sp->type == T_MAPPING)
+                check_map_for_destr(sp->u.map);
+
             v = allocate_uninit_array(new_size);
             for (svp = v->item, i = 0; i < new_size; i++, svp++)
-                assign_svalue_no_free(svp, sp);
+                copy_svalue_no_free(svp, sp);
         }
     }
     else if (argp->type == T_POINTER
@@ -1796,7 +1804,16 @@ v_allocate (svalue_t *sp, int num_arg)
         }
 
         if (num_arg == 2 && (sp->type != T_NUMBER || sp->u.number != 0))
+        {
             hasInitValue = MY_TRUE;
+
+            /* If the initialisation value is a mapping, remove all
+             * destructed elements so that we can use copy_mapping()
+             * later on.
+             */
+            if (sp->type == T_MAPPING)
+                check_map_for_destr(sp->u.map);
+        }
 
         /* Check the size array for consistency, and also count how many
          * elements we're going to allocate.
@@ -1867,7 +1884,7 @@ v_allocate (svalue_t *sp, int num_arg)
             {
                 /* Last dimension: assign the init value */
                 if (hasInitValue && curpos[dim] < sizes[dim])
-                    assign_svalue_no_free(curvec[dim]->item+curpos[dim], sp);
+                    copy_svalue_no_free(curvec[dim]->item+curpos[dim], sp);
             }
             else if (!curvec[dim+1])
             {

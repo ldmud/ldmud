@@ -1,6 +1,20 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+07-Nov-2002 (Lars Duening)  (3.3.292)
+  - (closure.c) If a lfun-closure is left danging by a replace_program(),
+      it is now converted into an alien-lfun closure pointing to
+      master::dangling_lfun_closure(). This way the error handler has
+      a chance to determine the originating object (suggested by Gnomi).
+  - (closure.c) The handling of dangling alien-lfun closures actually
+      destroyed the alien.ob entry.
+  - (interpret, array.c) allocate() used with an array or mapping initialisation
+      value now creates shallow copies of the initialisation value for each
+      initialised element (suggested by Oskar).
+  - (interpret.c) The out-of-bounds condition [<0] was not caught (reported by
+      Dafire).
+  - (prolang.y, make_func.y) Removed warnings (reported by Freaky).
+
 04-Nov-2002 (Lars Duening)  (3.3.291)
   - (smalloc.c) The thread-check in xfree() also triggered when the
       memory reserves were released (reported by Bardioc).

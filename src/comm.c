@@ -1297,38 +1297,40 @@ interactive_cleanup (interactive_t *ip)
             break;
 
           case EINTR:
-            fprintf(stderr, "%s comm: write EINTR. Message discarded.\n", time_stamp());
+            dprintf1(2, "%s comm: write EINTR. Message discarded.\n"
+                      , (p_int)time_stamp());
             break;
 
           case EWOULDBLOCK:
-            fprintf(stderr, "%s comm: write EWOULDBLOCK. Message discarded.\n", time_stamp());
+            dprintf1(2, "%s comm: write EWOULDBLOCK. Message discarded.\n"
+                      , (p_int)time_stamp());
             break;
 
           case EMSGSIZE:
-            fprintf(stderr, "%s comm: write EMSGSIZE.\n", time_stamp());
+            dprintf1(2, "%s comm: write EMSGSIZE.\n", (p_int)time_stamp());
             break;
 
           case EINVAL:
-            fprintf(stderr, "%s comm: write EINVAL.\n", time_stamp());
+            dprintf1(2, "%s comm: write EINVAL.\n", (p_int)time_stamp());
             break;
 
           case ENETUNREACH:
-            fprintf(stderr, "%s comm: write ENETUNREACH.\n", time_stamp());
+            dprintf1(2, "%s comm: write ENETUNREACH.\n", (p_int)time_stamp());
             break;
 
           case EHOSTUNREACH:
-            fprintf(stderr, "%s comm: write EHOSTUNREACH.\n", time_stamp());
+            dprintf1(2, "%s comm: write EHOSTUNREACH.\n", (p_int)time_stamp());
             break;
 
           case EPIPE:
-            fprintf(stderr, "%s comm: write EPIPE detected\n", time_stamp());
+            dprintf1(2, "%s comm: write EPIPE detected\n", (p_int)time_stamp());
             break;
 
           default:
             {
               int e = tmp->errorno;
-              fprintf(stderr, "%s comm: write: unexpected errno %d\n"
-                            , time_stamp(), e);
+              dprintf2(2, "%s comm: write: unexpected errno %d\n"
+                        , (p_int)time_stamp(), (p_int)e);
               break;
             }
         } /* switch (ip->errorno) */

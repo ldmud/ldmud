@@ -751,6 +751,8 @@ init_interpret (void)
  * free_svalue(v):        free the svalue <v>.
  * assign_svalue_no_free(to,from): put a copy of <from> into <to>; <to>
  *                        is considered empty.
+ * copy_svalue_no_free(to,from): put a shallow value copy of <from> into <to>;
+ *                        <to> is considered empty.
  * assign_checked_svalue_no_free(to,from): put a copy of <from> into <to>;
  *                        <to> is considered empty, <from> may be destructed
  *                        object.
@@ -1269,6 +1271,69 @@ void assign_svalue_no_free (svalue_t *to, svalue_t *from)
 { inl_assign_svalue_no_free(to,from); }
 
 #define assign_svalue_no_free(to,from) inl_assign_svalue_no_free(to,from)
+
+/*-------------------------------------------------------------------------*/
+static INLINE void
+inl_copy_svalue_no_free (svalue_t *to, svalue_t *from)
+
+/* Put a duplicate of svalue <from> into svalue <to>, meaning that the original
+ * value is either copied when appropriate, or its refcount is increased.
+ * In particular, if <from> is a mapping (which must not contain destructed
+ * objects!) or array, a shallow copy is created.
+ * <to> is considered empty at the time of call.
+ *
+ * If <from> is a destructed object, <to> is set to the number 0 but
+ * <from> is left unchanged.
+ */
+
+{
+    assign_svalue_no_free(to, from);
+
+    /* For arrays and mappings, create a shallow copy */
+    if (from->type == T_MAPPING)
+    {
+        mapping_t *old, *new;
+
+        old = to->u.map;
+        if (old->ref != 1)
+        {
+            DYN_MAPPING_COST(MAP_SIZE(old));
+            new = copy_mapping(old);
+            if (!new)
+                error("Out of memory: mapping[%lu] for copy.\n"
+                     , MAP_SIZE(old));
+            free_mapping(old);
+            to->u.map = new;
+        }
+    }
+    else if (from->type == T_POINTER
+          || from->type == T_QUOTED_ARRAY)
+    {
+        vector_t *old, *new;
+        size_t size, i;
+
+        old = to->u.vec;
+        size = VEC_SIZE(old);
+        if (old->ref != 1 && old != &null_vector)
+        {
+            DYN_ARRAY_COST(size);
+            new = allocate_uninit_array((int)size);
+            if (!new)
+                error("Out of memory: array[%lu] for copy.\n"
+                     , (unsigned long) size);
+            for (i = 0; i < size; i++)
+                assign_svalue_no_free( &new->item[i]
+                                     , &old->item[i]);
+            free_array(old);
+            to->u.vec = new;
+        }
+    }
+} /* inl_copy_svalue_no_free() */
+
+void copy_svalue_no_free (svalue_t *to, svalue_t *from)
+{ inl_copy_svalue_no_free(to,from); }
+
+#define copy_svalue_no_free(to,from) inl_copy_svalue_no_free(to,from)
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
@@ -2867,7 +2932,10 @@ push_rindexed_lvalue (svalue_t *sp, bytecode_p pc)
             ERROR("Illegal index for [<]: not a positive number.\n");
             return NULL;
         }
-        if ( (ind = (mp_int)VEC_SIZE(vec->u.vec) - ind) < 0) {
+        if ( (ind = (mp_int)VEC_SIZE(vec->u.vec) - ind) < 0
+         ||  ind >= (mp_int)VEC_SIZE(vec->u.vec)
+           )
+        {
             ERRORF(("Index out of bounds for [<]: %ld, vector size: %lu.\n"
                    , (long)(i->u.number), VEC_SIZE(vec->u.vec)));
             return NULL;
@@ -3155,7 +3223,9 @@ push_protected_rindexed_lvalue (svalue_t *sp, bytecode_p pc)
             return NULL;
         }
 
-        if ( (ind = (mp_int)VEC_SIZE(vec->u.vec) - ind) < 0)
+        if ( (ind = (mp_int)VEC_SIZE(vec->u.vec) - ind) < 0
+         ||  ind >= (mp_int)VEC_SIZE(vec->u.vec)
+           )
         {
             ERRORF(("Index out of bounds for [<]: %ld, vector size: %lu\n"
                    , (long) i->u.number, VEC_SIZE(vec->u.vec)));
@@ -3551,7 +3621,9 @@ rindex_lvalue (svalue_t *sp, bytecode_p pc)
         vector_t *v = vec->u.vec;
 
 
-        if ( (ind = (mp_int)VEC_SIZE(v) - ind) < 0)
+        if ( (ind = (mp_int)VEC_SIZE(v) - ind) < 0
+         ||  ind >= (mp_int)VEC_SIZE(v)
+           )
         {
             ERRORF(("Index out of bounds for [<]: %ld, vector size: %lu\n"
                    , (long) i->u.number, VEC_SIZE(vec->u.vec)));
@@ -3570,7 +3642,9 @@ rindex_lvalue (svalue_t *sp, bytecode_p pc)
      */
     if (type == T_STRING)
     {
-        if ( (ind = (mp_int)mstrsize(vec->u.str) - ind) < 0)
+        if ( (ind = (mp_int)mstrsize(vec->u.str) - ind) < 0
+         ||  ind >= (mp_int)mstrsize(vec->u.str)
+           )
         {
             ERRORF(("Index out of bounds for [<]: %ld, string length: %ld\n"
                    , (long) i->u.number, (long)mstrsize(vec->u.str)));
@@ -4089,7 +4163,9 @@ protected_rindex_lvalue (svalue_t *sp, bytecode_p pc)
             vector_t *v = vec->u.vec;
             struct protected_lvalue *lvalue;
 
-            if ( (ind = (mp_int)VEC_SIZE(v) - ind) < 0)
+            if ( (ind = (mp_int)VEC_SIZE(v) - ind) < 0
+             ||  ind >= (mp_int)VEC_SIZE(v)
+               )
             {
                 ERRORF(("Index for [<] out of bounds: %ld, vector size: %lu\n"
                        , (long)i->u.number, VEC_SIZE(v)));
@@ -4118,7 +4194,9 @@ protected_rindex_lvalue (svalue_t *sp, bytecode_p pc)
         {
             struct protected_char_lvalue *val;
 
-            if ( (ind = (mp_int)mstrsize(vec->u.str)  - ind) < 0)
+            if ( (ind = (mp_int)mstrsize(vec->u.str)  - ind) < 0
+             || ind >= (mp_int)mstrsize(vec->u.str)
+               )
             {
                 ERRORF(("Index for [<] out of bounds: %ld, string length: %ld.\n"
                        , (long)i->u.number, (long)mstrsize(vec->u.str)));
@@ -4201,7 +4279,9 @@ protected_rindex_lvalue (svalue_t *sp, bytecode_p pc)
 
             vec = lvalue->v.u.lvalue; /* it's a string... */
 
-            if ( (ind = (mp_int)mstrsize(vec->u.str) - ind) < 0)
+            if ( (ind = (mp_int)mstrsize(vec->u.str) - ind) < 0
+             ||  ind >= (mp_int)mstrsize(vec->u.str)
+               )
             {
                 ERRORF(("Index for [<] out of bounds: %ld, string length: %ld.\n"
                        , (long)i->u.number, (long)mstrsize(vec->u.str)));
@@ -5088,9 +5168,15 @@ push_rindexed_value (svalue_t *sp, bytecode_p pc)
       {
         /* Index the string */
 
-        if ( (ind = (mp_int)mstrsize(vec->u.str) - ind) < 0 )
+        if ( (ind = (mp_int)mstrsize(vec->u.str) - ind) < 0)
         {
             ind = -1;
+        }
+        else if (ind >= (mp_int)mstrsize(vec->u.str))
+        {
+            ERRORF(("Index for [<] out of bounds: %ld, string size: %lu\n"
+                   , (long)i->u.number, mstrsize(vec->u.str)));
+            return NULL;
         }
         else
             ind = get_txt(vec->u.str)[ind];
@@ -5107,7 +5193,9 @@ push_rindexed_value (svalue_t *sp, bytecode_p pc)
     case T_POINTER:
         /* Drop the arguments */
         sp = vec;
-        if ( (ind = (mp_int)VEC_SIZE(vec->u.vec) - ind) < 0)
+        if ( (ind = (mp_int)VEC_SIZE(vec->u.vec) - ind) < 0
+         ||  ind >= (mp_int)VEC_SIZE(vec->u.vec)
+           )
         {
             ERRORF(("Index for [<] out of bounds: %ld, vector size: %lu\n"
                    , (long)i->u.number, VEC_SIZE(vec->u.vec)));

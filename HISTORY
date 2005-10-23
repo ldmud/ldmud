@@ -95,7 +95,7 @@ For a detailed list of all changes see the file CHANGELOG.
            regular expression code, or the PCRE package (default).
 
 
-29-Oct-2002 (Lars Duening) -- Release 3.2.9
+06-Nov-2002 (Lars Duening) -- Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -460,6 +460,9 @@ For a detailed list of all changes see the file CHANGELOG.
        + Signal USR2 forces the driver to reopen the host.debug.log file.
        + External master calls (like for ERQ messages) get the same eval-cost
            benefits during error handling as normal call-others.
+       + Lfun closures left danging by a replace_program() are now converted
+           into alien-lfun closures, so that the error handler has a chance
+           to determine the originating object.
        + Bugfix: IPv6 name lookup works again, and also with both xerq and erq.
        + Bugfix: The driver now longer gets a confused when a client like
            TinyFugue refuses to use CHARMODE.

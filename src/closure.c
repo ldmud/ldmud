@@ -838,19 +838,19 @@ replace_program_lambda_adjust (replace_ob_t *r_ob)
                 i = l->function.lfun.index -= r_ob->fun_offset;
 #endif /* USE_NEW_INLINES */
 
-                /* If the function vanished, replace it with a default */
+                /* If the function vanished, replace it with a default,
+                 * converting it into an alien-lfun closure
+                 */
                 if (i < 0 || i >= r_ob->new_prog->num_functions)
                 {
                     assert_master_ob_loaded();
-                    free_object(l->ob, "replace_program_lambda_adjust");
-                    l->ob = ref_object(master_ob, "replace_program_lambda_adjust");
+                    lrpp->l.x.closure_type = CLOSURE_ALIEN_LFUN;
+                    l->function.alien.ob
+                        = ref_object( master_ob
+                                    , "replace_program_lambda_adjust");
                     i = find_function( STR_DANGLING_LFUN
                                      , master_ob->prog);
-#ifndef USE_NEW_INLINES
-                    l->function.index = (unsigned short)(i < 0 ? 0 : i);
-#else /* USE_NEW_INLINES */
-                    l->function.lfun.index = (unsigned short)(i < 0 ? 0 : i);
-#endif /* USE_NEW_INLINES */
+                    l->function.alien.index = (unsigned short)(i < 0 ? 0 : i);
                 }
             }
             else if (lrpp->l.x.closure_type == CLOSURE_ALIEN_LFUN)
@@ -873,12 +873,7 @@ replace_program_lambda_adjust (replace_ob_t *r_ob)
                                     , "replace_program_lambda_adjust");
                     i = find_function( STR_DANGLING_LFUN
                                      , master_ob->prog);
-#ifndef USE_NEW_INLINES
-                    l->function.index = (unsigned short)(i < 0 ? 0 :i);
-#else /* USE_NEW_INLINES */
-                    l->function.lfun.index = (unsigned short)(i < 0 ? 0 :i);
-                    l->function.lfun.context_size = 0;
-#endif /* USE_NEW_INLINES */
+                    l->function.alien.index = (unsigned short)(i < 0 ? 0 :i);
                 }
             }
             else /* CLOSURE_IDENTIFIER */
