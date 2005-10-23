@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+15-Nov-2002 (Lars Duening)  (3.3.302)
+  - (comm.c) The call to remove_flush_entry() could clobber the list
+      of players to flush if it was called for a player not in the
+      flush list.
+
 15-Nov-2002 (Lars Duening)  (3.3.301)
   - (prolang.y) After removing the linenumber information for an inline
       closure from the LINENUMBER memory block, the compiler forgot to

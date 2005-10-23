@@ -2034,19 +2034,19 @@ if (sending_telnet_command)
 
     ip->message_length = length = dest - ip->message_buf;
 
-    /* Update the ring of interactives with pending data */
+    /* Update the list of interactives with pending data */
 
     if ( length && !old_message_length )
     {
-        /* Buffer became 'dirty': add this interactive to the list */
-
+        /* Buffer became 'dirty': add this interactive to the list.
+         */
         if ( NULL != (ip->next_player_for_flush = first_player_for_flush) )
         {
             O_GET_INTERACTIVE(first_player_for_flush)->
               previous_player_for_flush =
                 command_giver;
         }
-        ip->previous_player_for_flush = 0;
+        ip->previous_player_for_flush = NULL;
         first_player_for_flush = command_giver;
     }
     if ( !length && old_message_length ) /* buffer has become empty */
@@ -2091,7 +2091,8 @@ static void
 remove_flush_entry (interactive_t *ip)
 
 /* Remove the given interactive <ip> from the list of 'dirty' interactives
- * and make sure it is really clean.
+ * and make sure it is really clean. The function is safe to call for
+ * interactives not in the list.
  *
  * This function is called after an interactive sent all pending data (or
  * failing while doing so).
@@ -2099,12 +2100,20 @@ remove_flush_entry (interactive_t *ip)
 
 {
     ip->message_length = 0;
+
+    /* To make it safe for calling the function even for interactives
+     * not in the flush list, we check that <ip> is either in the middle
+     * or at the end of the flush list (one or both of the .previous
+     * and .next pointers is !NULL), or if .previous is NULL, that it is
+     * the first entry in the list.
+     */
+
     if ( ip->previous_player_for_flush )
     {
         O_GET_INTERACTIVE(ip->previous_player_for_flush)->next_player_for_flush
           = ip->next_player_for_flush;
     }
-    else
+    else if (first_player_for_flush == ip->ob)
     {
         first_player_for_flush = ip->next_player_for_flush;
     }
@@ -3425,6 +3434,8 @@ new_player (SOCKET_T new_socket, struct sockaddr_in *addr, size_t addrlen
     new_interactive->access_class = class;
 #endif
     new_interactive->socket = new_socket;
+    new_interactive->next_player_for_flush = NULL;
+    new_interactive->previous_player_for_flush = NULL;
 
 #ifdef USE_PTHREAD
     pthread_mutex_init(&new_interactive->write_mutex, NULL);
