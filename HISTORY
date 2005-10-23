@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-25-Sep-2002 (Lars Duening) -- Development Release 3.3
+04-Oct-2002 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -68,6 +68,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + Operators '^' and '^=' can compute the symmetric difference of
            two arrays.
        + Support for structs; preprocessor symbol __LPC_STRUCTS__ is defined.
+       + Real inline closures; preprocessor symbol __LPC_INLINE_CLOSURES__ is
+           defined.
        + Preprocessor symbol __PCRE__ is defined if the driver is configured
            to use PCRE for regular expressions.
 

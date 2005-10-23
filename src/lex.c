@@ -4290,6 +4290,7 @@ yylex1 (void)
              && (yyp[1] != ':' || yyp[2] == ':' || yyp[2] == ')'))
             {
                 yyp++;
+                outp = yyp;
                 return L_BEGIN_INLINE;
             }
 #endif /* USE_NEW_INLINES */

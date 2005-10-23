@@ -435,7 +435,7 @@ with_rxcache_table=8192
 enable_use_structs=yes
 
 # Define this to enable the new inline function syntax.
-enable_use_new_inlines=no
+enable_use_new_inlines=yes
 
 
 # --- Profiling ---

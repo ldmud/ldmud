@@ -2,7 +2,7 @@ Short: Inline-Closures with runtime arguments
 From: d-chat
 Date: 2002-05-28 (actually one year earlier)
 Type: Feature
-State: New
+State: Done - implemented in 3.3.271
 See also: f-991104-1
 
 Generische Syntax:

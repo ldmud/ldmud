@@ -154,7 +154,6 @@ f-020326-0: select() statement to complement switch()
 f-020507-0: Distinguish between generic and specific empty mappings
 f-020507-1: Rethink the 'mapping += mapping' semantics.
 f-020507-3: Range operators on 2d mappings
-f-020528: Inline-Closures with runtime arguments
 f-020813-0: const parameter
 f-020813-1: Redesigning arrays and mappings, and lvalues.
 f-020904: Index by value
@@ -167,7 +166,6 @@ f-981027-1: Spaces after \ should give a better error message.
 f-981110-1: static evalstack sizecheck for functions and closures
 f-981229-30: Preprocessor lacks: #, ##, and two bugs
 f-990228:  Replace __INIT by a nameless function with special callpattern
-f-991104-1: Inline closures are not real closures.
 b-000217-1: F_M_CAGGREGATE acts strange
 p-000316: Binary codefile support
 f-000906: Revamp the bytecode design

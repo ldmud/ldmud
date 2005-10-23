@@ -56,8 +56,8 @@ DESCRIPTION
         without initialisation:
 
           closure factory (int arg) {
-            return function int (int val) : int x = 2 * arg
-                                          , int y
+            return function int (int val) : int y, x = 2 * arg;
+                                            int z
                                           { return val * x; };
           }
 
@@ -111,7 +111,7 @@ NOTES
 HISTORY
         LDMud 3.2.7 implemented the older, restricted form of inline
         closures.
-        LDMud 3.3.270 implemented the full form of inline closures.
+        LDMud 3.3.271 implemented the full form of inline closures.
 
 SEE ALSO
         closures-abstract(LPC), closures-example(LPC), closure_guide(LPC)

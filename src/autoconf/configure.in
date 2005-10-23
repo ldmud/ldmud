@@ -10,22 +10,22 @@ dnl
 dnl some helper macros
 dnl
 
-AC_DEFUN(AC_UPDATE_VAR,
-if test "x$[$1]" = "x" && test "x$DEFAULT[$1]" != "x"; then
+AC_DEFUN([AC_UPDATE_VAR],
+[if test "x$[$1]" = "x" && test "x$DEFAULT[$1]" != "x"; then
   [$1]=$DEFAULT[$1]
-fi
+fi]
 )
 
-AC_DEFUN(AC_CDEF_FROM_ENABLE,
-AC_UPDATE_VAR(enable_[$1])
+AC_DEFUN([AC_CDEF_FROM_ENABLE],
+[AC_UPDATE_VAR(enable_[$1])
 if test "x$enable_[$1]" = "xyes"; then
   cdef_[$1]="#define"
 else
   cdef_[$1]="#undef"
 fi
-)
+])
 
-AC_DEFUN(AC_INT_VAL_FROM_WITH,
+AC_DEFUN([AC_INT_VAL_FROM_WITH],
 [if test "x$with_[$1]" != "x"; then
   with_[$1]=`echo $with_[$1]|
 changequote(, )dnl
@@ -36,7 +36,7 @@ AC_UPDATE_VAR(with_[$1])
 val_[$1]=$with_[$1]]
 )
 
-AC_DEFUN(AC_STRING_VAL_FROM_WITH,
+AC_DEFUN([AC_STRING_VAL_FROM_WITH],
 [if test "x$with_[$1]" != "x"; then
   with_[$1]=`echo $with_[$1]|
 changequote(, )dnl
@@ -47,7 +47,7 @@ AC_UPDATE_VAR(with_[$1])
 val_[$1]="\"$with_[$1]\""]
 )
 
-AC_DEFUN(AC_FORM_HELP,[  --$1[]dnl
+AC_DEFUN([AC_FORM_HELP],[  --$1[]dnl
 ifelse([$2],,,dnl
 builtin(format,%[]builtin(eval,(len([$1])<32)*(32-len([$1])))s,)  [default=$2])[]dnl
 ifelse([$3],,,[
@@ -97,7 +97,7 @@ AC_MY_ARG_ENABLE(use-pthreads,no,,[enable using of threads for socket writes])
 AC_MY_ARG_ENABLE(use-pcre,yes,,[Enables PCRE instead of traditional regexps])
 AC_MY_ARG_ENABLE(use-deprecated,yes,,[Enables obsolete and deprecated efuns])
 AC_MY_ARG_ENABLE(use-structs,yes,,[Enables structs])
-AC_MY_ARG_ENABLE(use-new-inlines,no,,[Enables new inline syntax])
+AC_MY_ARG_ENABLE(use-new-inlines,yes,,[Enables new inline syntax])
 AC_MY_ARG_ENABLE(use-set-light,yes,,[Enables efun set_light()])
 AC_MY_ARG_ENABLE(use-set-is-wizard,yes,,[Enables efun set_is_wizard()])
 AC_MY_ARG_ENABLE(use-parse-command,yes,,[Enables efun parse_command()])

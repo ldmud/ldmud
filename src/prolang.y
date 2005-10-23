@@ -121,13 +121,12 @@
 
 #include "../mudlib/sys/driver_hook.h"
 
-#ifdef USE_STRUCTS
-#  undef HYBRID_STRUCT_LITERALS
-  /* Define this if struct literals shall be able to mix named and
-   * unnamed initializers. Several people have that already called
-   * an unnecessary feature.
+#ifdef USE_NEW_INLINES
+#  undef DEBUG_INLINES
+  /* Define this to activate lots of debugging output during the compilation
+   * of inline closures.
    */
-#endif
+#endif /* USE_NEW_INLINES */
 
 #define lint  /* redef again to prevent spurious warnings */
 
@@ -635,6 +634,10 @@ struct inline_closure_s
        */
 
     /* --- Compilation information --- */
+    mp_uint end;
+      /* While compiling the closure: end of the program code before
+       * the closure. It is not identical to .start because of alignment.
+       */
     mp_uint start;
       /* While compiling the closure: start address of the code in A_PROGRAM.
        * For pending closures: start address of the code in A_INLINE_PROGRAM.
@@ -661,6 +664,9 @@ struct inline_closure_s
        */
     int num_args;
       /* Number of arguments.
+       */
+    Bool parse_context;
+      /* TRUE if the context variable definitions are parsed.
        */
 
     /* --- Saved Globals --- */
@@ -2081,12 +2087,19 @@ free_local_names (int depth)
 
 /*-------------------------------------------------------------------------*/
 static ident_t *
-add_local_name (ident_t *ident, fulltype_t type, int depth, Bool may_shadow)
+add_local_name (ident_t *ident, fulltype_t type, int depth
+#ifndef USE_NEW_INLINES
+               , Bool may_shadow
+#endif /* USE_NEW_INLINES */
+               )
 
 /* Declare a new local variable <ident> with the type <type> on
- * the scope depth <depth>. If <may_shadow> is TRUE, the declaration is
+ * the scope depth <depth>.
+#ifndef USE_NEW_INLINES
+ * If <may_shadow> is TRUE, the declaration is
  * allowed to shadow a previous one without generating a warning (this is
  * used to declare inline functions on the fly).
+#endif
  * Return the (adjusted) ident for the new variable.
  */
 
@@ -2100,13 +2113,27 @@ add_local_name (ident_t *ident, fulltype_t type, int depth, Bool may_shadow)
         if (ident->type != I_TYPE_UNKNOWN)
         {
             /* We're overlaying some other definition.
-             * If it's a global, it's ok.
+             * If it's a global, or if we are in an inline-closure arg list,
+             * it's ok.
              */
+#ifdef USE_NEW_INLINES
+#ifdef DEBUG_INLINES
+if (current_inline && current_inline->block_depth+2 == block_depth && ident->type != I_TYPE_GLOBAL) printf("DEBUG: redeclare local '%s' as inline arg, depth %d\n", get_txt(ident->name), block_depth);
+#endif /* DEBUG_INLINES */
+            if (ident->type != I_TYPE_GLOBAL
+             && !(current_inline && current_inline->block_depth+2 == block_depth)
+               )
+            {
+                yywarnf( "Variable '%s' shadows previous declaration"
+                       , get_txt(ident->name));
+            }
+#else /* USE_NEW_INLINES */
             if (!may_shadow && ident->type != I_TYPE_GLOBAL)
             {
                 yywarnf( "Variable '%s' shadows previous declaration"
                        , get_txt(ident->name));
             }
+#endif /* USE_NEW_INLINES */
             ident = make_shared_identifier(get_txt(ident->name), I_TYPE_LOCAL, depth);
         }
 
@@ -2171,7 +2198,11 @@ redeclare_local (ident_t *ident, fulltype_t type, int depth)
     }
     else
     {
+#ifdef USE_NEW_INLINES
+        ident = add_local_name(ident, type, depth);
+#else /* USE_NEW_INLINES */
         ident = add_local_name(ident, type, depth, MY_FALSE);
+#endif /* USE_NEW_INLINES */
     }
 
     return ident;
@@ -2195,7 +2226,9 @@ add_context_name (ident_t *ident, fulltype_t type, int num)
     depth = current_inline->block_depth+1;
     block = & block_scope[depth-1];
 
+#ifdef DEBUG_INLINES
 printf("DEBUG: add_context_name('%s', num %d) depth %d, context %d\n", get_txt(ident->name), num, depth, block->num_locals);
+#endif /* DEBUG_INLINES */
     if (block->num_locals >= 256
      || block->num_locals >= MAX_LOCAL /* size of type recording array */
        )
@@ -2260,13 +2293,19 @@ check_for_context_local (ident_t *ident)
  */
 
 {
+    int depth = ident->u.local.depth;
+
     if (current_inline
-     && ident->u.local.depth <= current_inline->block_depth)
+     && depth <= current_inline->block_depth)
     {
         /* This local has been inherited - create the
          * proper context variable.
          */
-       if (ident->u.local.context >= 0)
+       if (ident->u.local.context >= 0
+        || (current_inline->prev != -1
+            && depth <= INLINE_CLOSURE(current_inline->prev).block_depth
+           )
+          )
        {
            yyerrorf("Can't use context variable '%s' "
                     "across closure boundaries", get_txt(ident->name));
@@ -3261,7 +3300,6 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
         return MY_TRUE;
     }
 
-#ifndef HYBRID_STRUCT_LITERALS
     /* We have named members in there - sort them out */
 
     consumed = 0;
@@ -3374,152 +3412,6 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
     xfree(block);
 
     return MY_TRUE;
-#else /* HYBRID_STRUCT_LITERALS */
-    /* We have named members in there - sort them out */
-
-    consumed = 0;
-
-    block = xalloc( pdef->num_members * sizeof(*flags)
-                  + length * sizeof(*ix));
-    flags = (Bool *)block;
-    ix = (int *)((char *)block + pdef->num_members * sizeof(*flags));
-
-    for (i = 0; i < pdef->num_members; i++)
-    {
-        flags[i] = MY_FALSE;
-    }
-
-    for (i = 0; i < length; i++)
-    {
-        ix[i] = -1;
-    }
-
-    /* First loop through list: assign the named members
-     */
-    for (p = list, count = 0; p != NULL; p = p->next, count++)
-    {
-
-        if (p->name == NULL)
-            continue;
-
-        consumed++;
-        member = find_struct_member(pdef, p->name);
-        if (member >= 0)
-            pmember = &STRUCT_MEMBER(pdef->members+member);
-
-        if (member < 0)
-        {
-            yyerrorf( "No such member '%s' in struct '%s'"
-                    , get_txt(p->name), get_txt(pdef->name)
-                    );
-            got_error = MY_TRUE;
-        }
-        else if (flags[member])
-        {
-            yyerrorf( "Multiple initializations of member '%s' "
-                      "in struct '%s'"
-                    , get_txt(p->name), get_txt(pdef->name)
-                    );
-            got_error = MY_TRUE;
-        }
-        else if (exact_types
-              && !TYPE( pmember->type , p->type) )
-        {
-            yyerrorf("Type mismatch %s when initializing member '%s' "
-                     "in struct '%s'"
-                    , get_two_types(pmember->type, p->type)
-                    , get_txt(p->name), get_txt(pdef->name)
-                    );
-            got_error = MY_TRUE;
-        }
-        else
-        {
-            flags[member] = MY_TRUE;
-            ix[count] = member;
-        }
-    } /* for() */
-
-    if (got_error)
-    {
-        xfree(block);
-        return MY_FALSE;
-    }
-
-    /* Second loop through list: assign the unnamed members
-     */
-
-    /* Find the first un-set member */
-    for (member = 0; member < pdef->num_members && flags[member]
-        ; member++) /* NOOP */;
-
-    if (member < pdef->num_members)
-    {
-        for (p = list, count = 0; p != NULL; p = p->next, count++)
-        {
-
-            if (p->name != NULL)
-                continue;
-
-            consumed++;
-            pmember = &STRUCT_MEMBER(pdef->members+member);
-            if (exact_types
-                  && !TYPE( pmember->type , p->type) )
-            {
-                yyerrorf("Type mismatch %s when initializing member '%s' "
-                         "in struct '%s'"
-                        , get_two_types(pmember->type, p->type)
-                        , get_txt(pmember->name), get_txt(pdef->name)
-                        );
-                got_error = MY_TRUE;
-            }
-            else
-            {
-                flags[member] = MY_TRUE;
-                ix[count] = member;
-            }
-        } /* for() */
-    }
-
-    if (got_error)
-    {
-        xfree(block);
-        return MY_FALSE;
-    }
-
-    /* Sanity checks */
-
-    if (consumed < length)
-    {
-        yyerrorf("Too many elements for struct '%s'"
-                , get_txt(pdef->name)
-                );
-        xfree(block);
-        return MY_FALSE;
-    }
-
-    for (i = 0; i < length; i++)
-    {
-        if (ix[i] < 0)
-        {
-            fatal("struct literal: expression %d not assigned to any member.\n"
-                 , i);
-            /* NOTREACHED */
-        }
-    }
-
-    /* Finally, create the code */
-    ins_f_code(F_S_M_AGGREGATE);
-    ins_byte(pdef->num_members);
-    ins_byte(length);
-    for (i = length-1; i >= 0; i--)
-        ins_byte(ix[i]);
-
-    /* Done */
-    xfree(block);
-
-    return MY_TRUE;
-#endif /* HYBRID_STRUCT_LITERALS */
-
 } /* create_struct_literal() */
 #endif /* USE_STRUCTS */
 
@@ -3544,9 +3436,12 @@ new_inline_closure (void)
     {
         ict.prev = current_inline - &(INLINE_CLOSURE(0));
     }
+#ifdef DEBUG_INLINES
 printf("DEBUG: new inline #%d: prev %d\n", INLINE_CLOSURE_COUNT, ict.prev);
+#endif /* DEBUG_INLINES */
 
     /* Initialize the other fields */
+    ict.end = CURRENT_PROGRAM_SIZE;
     ict.start = CURRENT_PROGRAM_SIZE;
     ict.length = 0;
     ict.li_start = LINENUMBER_SIZE;
@@ -3555,8 +3450,11 @@ printf("DEBUG: new inline #%d: prev %d\n", INLINE_CLOSURE_COUNT, ict.prev);
     ict.ident = NULL;
     ict.returntype = 0;
     ict.num_args = 0;
+    ict.parse_context = MY_FALSE;
     
+#ifdef DEBUG_INLINES
 printf("DEBUG:   start: %ld, depth %d, locals: %d/%d, break: %d/%d\n", CURRENT_PROGRAM_SIZE, block_depth, current_number_of_locals, max_number_of_locals, current_break_stack_need, max_break_stack_need);
+#endif /* DEBUG_INLINES */
     ict.block_depth          = block_depth;
     ict.break_stack_size     = current_break_stack_need;
     ict.max_break_stack_size = max_break_stack_need;
@@ -3571,7 +3469,9 @@ printf("DEBUG:   start: %ld, depth %d, locals: %d/%d, break: %d/%d\n", CURRENT_P
     ict.full_context_type_start = full_type_of_context - &(FULL_LOCAL_TYPE(0));
     ict.local_type_size         = mem_block[A_LOCAL_TYPES].current_size;
     ict.full_local_type_size    = mem_block[A_FULL_LOCAL_TYPES].current_size;
+#ifdef DEBUG_INLINES
 printf("DEBUG:   local types: %d/%d, context types: %d/%d\n", ict.local_type_start, ict.full_local_type_start, ict.context_type_start, ict.full_context_type_start);
+#endif /* DEBUG_INLINES */
 
     /* Extend the type memblocks */
     {
@@ -3585,6 +3485,9 @@ printf("DEBUG:   local types: %d/%d, context types: %d/%d\n", ict.local_type_sta
         type_of_locals = &(LOCAL_TYPE(type_count+MAX_LOCAL));
         full_type_of_context = &(FULL_LOCAL_TYPE(full_type_count));
         full_type_of_locals = &(FULL_LOCAL_TYPE(full_type_count+MAX_LOCAL));
+#ifdef DEBUG_INLINES
+printf("DEBUG:   type ptrs: %p/%p, %p/%p\n", type_of_locals, full_type_of_locals, type_of_context, full_type_of_context );
+#endif /* DEBUG_INLINES */
     }
     
     max_break_stack_need = current_break_stack_need = 0;
@@ -3609,20 +3512,26 @@ finish_inline_closure (Bool bAbort)
  */
 
 {
-    mp_uint backup_start, start, length;
+    mp_uint backup_start, start, length, end;
+#ifdef DEBUG_INLINES
 {
     mp_int index = current_inline - &(INLINE_CLOSURE(0));
-printf("DEBUG: %s inline #%d: prev %d, start %ld, length %ld, function %d pc %ld\n", bAbort ? "abort" : "finish", index, current_inline->prev, current_inline->start, current_inline->length, current_inline->function, FUNCTION(current_inline->function)->offset.pc);
+printf("DEBUG: %s inline #%d: prev %d, end %ld, start %ld, length %ld, function %d pc %ld\n", bAbort ? "abort" : "finish", index, current_inline->prev, current_inline->end, current_inline->start, current_inline->length, current_inline->function, FUNCTION(current_inline->function)->offset.pc);
 printf("DEBUG:   depth %d, locals: %d/%d, break: %d/%d\n", current_inline->block_depth, current_inline->num_locals, current_inline->max_num_locals, current_inline->break_stack_size, current_inline->max_break_stack_size);
 }
+#endif /* DEBUG_INLINES */
 
     /* Move the program code into the backup storage */
     start = current_inline->start;
     length = current_inline->length;
+    end = current_inline->end;
+
     if (!bAbort)
     {
         backup_start = INLINE_PROGRAM_SIZE;
-printf("DEBUG:   move code to %ld\n", backup_start);
+#ifdef DEBUG_INLINES
+printf("DEBUG:   move code to backup %ld\n", backup_start);
+#endif /* DEBUG_INLINES */
         add_to_mem_block( A_INLINE_PROGRAM, PROGRAM_BLOCK+start, length);
         current_inline->start = backup_start;
     }
@@ -3633,12 +3542,18 @@ printf("DEBUG:   move code to %ld\n", backup_start);
 
     if (start + length < CURRENT_PROGRAM_SIZE)
     {
-        memmove( PROGRAM_BLOCK+start
+#ifdef DEBUG_INLINES
+printf("DEBUG:   move code forward: from %ld, length %ld, to %ld\n", start+length, CURRENT_PROGRAM_SIZE - length - start, end);
+#endif /* DEBUG_INLINES */
+        memmove( PROGRAM_BLOCK+end
                , PROGRAM_BLOCK+start+length
                , CURRENT_PROGRAM_SIZE - length - start
                );
     }
-    CURRENT_PROGRAM_SIZE -= length;
+    CURRENT_PROGRAM_SIZE -= length + (start - end);
+#ifdef DEBUG_INLINES
+printf("DEBUG:   program size: %ld\n", CURRENT_PROGRAM_SIZE);
+#endif /* DEBUG_INLINES */
 
     /* Move the linenumber data into the backup storage */
     start = current_inline->li_start;
@@ -3646,7 +3561,9 @@ printf("DEBUG:   move code to %ld\n", backup_start);
     if (!bAbort)
     {
         backup_start = INLINE_PROGRAM_SIZE;
+#ifdef DEBUG_INLINES
 printf("DEBUG:   move li data to %ld\n", backup_start);
+#endif /* DEBUG_INLINES */
         add_to_mem_block( A_INLINE_PROGRAM, LINENUMBER_BLOCK+start, length);
         current_inline->li_start = backup_start;
     }
@@ -3670,11 +3587,16 @@ printf("DEBUG:   move li data to %ld\n", backup_start);
     exact_types              = current_inline->exact_types;
     current_line             = current_inline->current_line;
 
+#ifdef DEBUG_INLINES
 printf("DEBUG:   local types: %d/%d, context types: %d/%d\n", current_inline->local_type_start, current_inline->full_local_type_start, current_inline->context_type_start, current_inline->full_context_type_start);
+#endif /* DEBUG_INLINES */
     type_of_locals = &(LOCAL_TYPE(current_inline->local_type_start));
     full_type_of_locals = &(FULL_LOCAL_TYPE(current_inline->full_local_type_start));
     type_of_context = &(LOCAL_TYPE(current_inline->context_type_start));
     full_type_of_context = &(FULL_LOCAL_TYPE(current_inline->full_context_type_start));
+#ifdef DEBUG_INLINES
+printf("DEBUG:   type ptrs: %p/%p, %p/%p\n", type_of_locals, full_type_of_locals, type_of_context, full_type_of_context );
+#endif /* DEBUG_INLINES */
 
     mem_block[A_LOCAL_TYPES].current_size = current_inline->local_type_size;
     mem_block[A_FULL_LOCAL_TYPES].current_size = current_inline->full_local_type_size;
@@ -3696,22 +3618,29 @@ insert_pending_inline_closures (void)
 
 {
     mp_int index;
-printf("DEBUG: insert_inline_closures(): %d pending\n", INLINE_CLOSURE_COUNT);
+#ifdef DEBUG_INLINES
+if (INLINE_CLOSURE_COUNT != 0) printf("DEBUG: insert_inline_closures(): %d pending\n", INLINE_CLOSURE_COUNT);
+#endif /* DEBUG_INLINES */
 
     for (index = 0; index < INLINE_CLOSURE_COUNT; index++)
     {
         inline_closure_t * ict = &(INLINE_CLOSURE(index));
+#ifdef DEBUG_INLINES
 printf("DEBUG:   #%d: start %ld, length %ld, function %d: new start %ld\n", index, ict->start, ict->length, ict->function, CURRENT_PROGRAM_SIZE);
-        FUNCTION(ict->function)->offset.pc = CURRENT_PROGRAM_SIZE + FUNCTION_PRE_HDR_SIZE;
+#endif /* DEBUG_INLINES */
         if (ict->length != 0)
         {
+            CURRENT_PROGRAM_SIZE = align(CURRENT_PROGRAM_SIZE);
+            FUNCTION(ict->function)->offset.pc = CURRENT_PROGRAM_SIZE + FUNCTION_PRE_HDR_SIZE;
             add_to_mem_block(A_PROGRAM, INLINE_PROGRAM_BLOCK(ict->start)
                             , ict->length);
 
             store_line_number_info();
             if (current_line > ict->current_line)
                 store_line_number_backward(current_line - ict->current_line);
-printf("DEBUG:        li_start %ld, li_length %ld, new start %ld\n", index, ict->li_start, ict->li_length, LINENUMBER_SIZE);
+#ifdef DEBUG_INLINES
+printf("DEBUG:        li_start %ld, li_length %ld, new li_start %ld\n", ict->li_start, ict->li_length, LINENUMBER_SIZE);
+#endif /* DEBUG_INLINES */
        
             add_to_mem_block(A_LINENUMBERS, INLINE_PROGRAM_BLOCK(ict->li_start)
                             , ict->li_length);
@@ -3757,13 +3686,13 @@ prepare_inline_closure (fulltype_t returntype)
     {
         char * start;
 
-        sprintf(name, "__inline_%s_%d_%04x", current_file
+        sprintf(name, "__inline_%s_%d_#%04x", current_file
                      , current_line, inline_closure_id++);
 
-        /* Convert all non-alnums to '_' */
+        /* Convert all non-alnums (but '#') to '_' */
         for (start = name; *start != '\0'; start++)
         {
-            if (!isalnum((unsigned char)(*start)))
+            if (!isalnum((unsigned char)(*start)) && '#' != *start)
                 *start = '_';
         }
     } while (    find_shared_identifier(name, 0, 0)
@@ -3776,11 +3705,20 @@ prepare_inline_closure (fulltype_t returntype)
 
     ident = make_shared_identifier(name, I_TYPE_UNKNOWN, 0);
 
+#ifdef DEBUG_INLINES
 printf("DEBUG: New inline closure name: '%s'\n", name);
+#endif /* DEBUG_INLINES */
 
     new_inline_closure();
     enter_block_scope(); /* Scope for the context */
     enter_block_scope(); /* Argument scope */
+
+#ifdef DEBUG_INLINES
+printf("DEBUG:   current_inline->depth: %d\n", current_inline->block_depth);
+printf("DEBUG:           context depth: %d\n", current_inline->block_depth+1);
+printf("DEBUG:               arg depth: %d\n", current_inline->block_depth+2);
+printf("DEBUG:           current depth: %d\n", block_depth);
+#endif /* DEBUG_INLINES */
 
     if (!(returntype & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
                           | TYPE_MOD_PROTECTED | TYPE_MOD_STATIC)))
@@ -3824,13 +3762,15 @@ printf("DEBUG: New inline closure name: '%s'\n", name);
     /* Store the data in the inline_closure_t */
     current_inline->ident = ident;
     current_inline->returntype = returntype;
+
+    return MY_TRUE;
 } /* prepare_inline_closure() */
 
 /*-------------------------------------------------------------------------*/
 static Bool
 inline_closure_prototype (int num_args)
 
-/* Called after parsing 'func <type> <arguments>', this function
+/* Called after parsing 'func <type> <arguments> <context>', this function
  * creates the function prototype entry.
  *
  * Return FALSE if out of memory (the internal structures have been cleaned
@@ -3844,6 +3784,9 @@ inline_closure_prototype (int num_args)
  */
 
 {
+#ifdef DEBUG_INLINES
+printf("DEBUG: inline_closure_prototype(%d)\n", num_args);
+#endif /* DEBUG_INLINES */
     if ( current_number_of_locals
      && (full_type_of_locals[current_number_of_locals-1]
          & TYPE_MOD_VARARGS)
@@ -3871,6 +3814,13 @@ inline_closure_prototype (int num_args)
         }
     }
 
+#ifdef DEBUG_INLINES
+printf("DEBUG:   current_inline->depth: %d: %d\n", current_inline->block_depth, block_scope[current_inline->block_depth-1].num_locals);
+printf("DEBUG:           context depth: %d: %d\n", current_inline->block_depth+1, block_scope[current_inline->block_depth+1-1].num_locals);
+printf("DEBUG:               arg depth: %d: %d\n", current_inline->block_depth+2, block_scope[current_inline->block_depth+2-1].num_locals);
+printf("DEBUG:           current depth: %d: %d\n", block_depth, block_scope[block_depth].num_locals);
+#endif /* DEBUG_INLINES */
+
     /* Define the prototype.
      */
     current_inline->num_args = num_args;
@@ -3878,12 +3828,18 @@ inline_closure_prototype (int num_args)
       = define_new_function(MY_FALSE, current_inline->ident, num_args, 0, 0
                            , NAME_UNDEFINED|NAME_PROTOTYPE
                            , current_inline->returntype);
+#ifdef DEBUG_INLINES
 printf("DEBUG:   Function index: %d\n", current_inline->function);
+#endif /* DEBUG_INLINES */
 
     /* A function with code: align the function and
      * make space for the function header.
      * Result is the address of the FUNCTION_NAME space.
      */
+    current_inline->end = CURRENT_PROGRAM_SIZE;
+#ifdef DEBUG_INLINES
+printf("DEBUG:   program size: %ld align to %ld\n", CURRENT_PROGRAM_SIZE, align(CURRENT_PROGRAM_SIZE));
+#endif /* DEBUG_INLINES */
     CURRENT_PROGRAM_SIZE = align(CURRENT_PROGRAM_SIZE);
     current_inline->start = CURRENT_PROGRAM_SIZE;
     store_line_number_info();
@@ -3926,7 +3882,9 @@ complete_inline_closure ( void )
     string_t * name;
 %line
 
+#ifdef DEBUG_INLINES
 printf("DEBUG: Generate inline closure function:\n");
+#endif /* DEBUG_INLINES */
     if  (current_inline->include_handle != get_include_handle())
     {
         yyerror("Implementation restriction: Inline closure must not span "
@@ -3942,6 +3900,13 @@ printf("DEBUG: Generate inline closure function:\n");
     name = current_inline->ident->name;
     num_args = current_inline->num_args;
 
+#ifdef DEBUG_INLINES
+printf("DEBUG:   current_inline->depth: %d: %d\n", current_inline->block_depth, block_scope[current_inline->block_depth-1].num_locals);
+printf("DEBUG:           context depth: %d: %d\n", current_inline->block_depth+1, block_scope[current_inline->block_depth+1-1].num_locals);
+printf("DEBUG:               arg depth: %d: %d\n", current_inline->block_depth+2, block_scope[current_inline->block_depth+2-1].num_locals);
+printf("DEBUG:           current depth: %d: %d\n", block_depth, block_scope[block_depth-1].num_locals);
+#endif /* DEBUG_INLINES */
+
     /* Generate the function header and update the ident-table entry.
      */
 
@@ -3951,7 +3916,9 @@ printf("DEBUG: Generate inline closure function:\n");
     memcpy(p, &name, sizeof name);
     p += sizeof name;
     (void)ref_mstring(name);
+#ifdef DEBUG_INLINES
 printf("DEBUG:   Name: '%s'\n", get_txt(name));
+#endif /* DEBUG_INLINES */
     /* FUNCTION_TYPE */
 #if defined(USE_STRUCTS)
     STORE_SHORT(p, current_inline->returntype);
@@ -3964,11 +3931,15 @@ printf("DEBUG:   Name: '%s'\n", get_txt(name));
       *p++ = num_args | ~0x7f;
     else
       *p++ = num_args;
+#ifdef DEBUG_INLINES
 printf("DEBUG:   Args: %d\n", num_args);
+#endif /* DEBUG_INLINES */
 
     /* FUNCTION_NUM_VARS */
-printf("DEBUG:   Vargs: %d\n", max_number_of_locals - num_args + max_break_stack_need);
-    *p   = max_number_of_locals - num_args + max_break_stack_need;
+#ifdef DEBUG_INLINES
+printf("DEBUG:   Stack: %d\n", max_number_of_locals - num_args + max_break_stack_need);
+#endif /* DEBUG_INLINES */
+    *p = max_number_of_locals - num_args + max_break_stack_need;
 
     define_new_function(MY_TRUE, current_inline->ident, num_args
                        , max_number_of_locals - num_args + max_break_stack_need
@@ -3976,6 +3947,9 @@ printf("DEBUG:   Vargs: %d\n", max_number_of_locals - num_args + max_break_stack
                        , current_inline->returntype);
 
     ins_f_code(F_RETURN0); /* catch a missing return */
+#ifdef DEBUG_INLINES
+printf("DEBUG:  -> F_RETURN0\n");
+#endif /* DEBUG_INLINES */
     current_inline->length = CURRENT_PROGRAM_SIZE - start;
 
     store_line_number_info();
@@ -3989,11 +3963,15 @@ printf("DEBUG:   Vargs: %d\n", max_number_of_locals - num_args + max_break_stack
      */
     {
         int depth = current_inline->block_depth+1;
-        block_scope_t * context = &(block_scope[depth]);
+        block_scope_t * context = &(block_scope[depth-1]);
 
+#ifdef DEBUG_INLINES
 printf("DEBUG:   %d context vars, depth %d\n", context->num_locals, depth);
+#endif /* DEBUG_INLINES */
         if (context->num_locals != 0)
         {
+            Bool got_mapped;
+
             /* To get the context->local information in the right order
              * we read the locals as they are and store the information
              * in an array.
@@ -4009,7 +3987,9 @@ printf("DEBUG:   %d context vars, depth %d\n", context->num_locals, depth);
                 ; id && id->u.local.depth >= depth
                 ; id = id->next_all)
             {
+#ifdef DEBUG_INLINES
 if (id->u.local.depth == depth) printf("DEBUG:     '%s': local %d, context %d\n", get_txt(id->name), id->u.local.num, id->u.local.context);
+#endif /* DEBUG_INLINES */
                 if (id->u.local.depth == depth
                  && id->u.local.context >= 0
                  && id->u.local.num >= 0
@@ -4020,20 +4000,36 @@ if (id->u.local.depth == depth) printf("DEBUG:     '%s': local %d, context %d\n"
             }
 
             /* Got all context->local mappings, now create the bytecode */
+            got_mapped = MY_FALSE;
             for (i = 0; i < context->num_locals; i++)
             {
                 if (lcmap[i] != -1)
                 {
                     ins_f_code(F_LOCAL);
                     ins_byte(lcmap[i]);
+                    got_mapped = MY_TRUE;
+#ifdef DEBUG_INLINES
 printf("DEBUG:     -> F_LOCAL %d\n", lcmap[i]);
+#endif /* DEBUG_INLINES */
+                }
+                else if (got_mapped)
+                {
+                    /* This shouldn't happen, as all explicite context
+                     * variables are created before the first implicite
+                     * reference can be encountered.
+                     */
+                    fatal("Explicite context var #%d has higher index than "
+                          "implicite context variables.", i);
                 }
             }
         } /* Push local vars */
 
         /* Add the context_closure instruction */
-printf("DEBUG:     -> F_CONTEXT_CLOSURE %d\n", context->num_locals);
+#ifdef DEBUG_INLINES
+printf("DEBUG:     -> F_CONTEXT_CLOSURE %d %d\n", current_inline->function, context->num_locals);
+#endif /* DEBUG_INLINES */
         ins_f_code(F_CONTEXT_CLOSURE);
+        ins_short(current_inline->function);
         ins_short(context->num_locals);
     } /* Complete F_CONTEXT_CLOSURE instruction */
 
@@ -4318,10 +4314,8 @@ list_to_struct (struct_def_t * pdef, int length, svalue_t *initialized)
     if (length)
     {
         Bool * flags;    /* Flags which struct members have been set */
-#ifndef HYBRID_STRUCT_LITERALS
         Bool   got_named, got_unnamed;
         Bool   got_error;
-#endif /* HYBRID_STRUCT_LITERALS */
         int    i;
         int    consumed; /* Number of constants consumed */
         int    member;   /* Member to set */
@@ -4335,7 +4329,6 @@ list_to_struct (struct_def_t * pdef, int length, svalue_t *initialized)
         for (i = 0; i < pdef->num_members; i++)
             flags[i] = MY_FALSE;
 
-#ifndef HYBRID_STRUCT_LITERALS
         /* First loop through list: check if there is no mixed initialization.
          */
         got_error = got_named = got_unnamed = MY_FALSE;
@@ -4440,86 +4433,6 @@ list_to_struct (struct_def_t * pdef, int length, svalue_t *initialized)
                 member++;
             } while (NULL != list && member < pdef->num_members);
         } /* if got_unnamed && !got_named */
-#else /* HYBRID_STRUCT_LITERALS */
-        /* First loop through list: assign the named members
-         */
-        list = &clsv->list;
-        do {
-
-            if (list->member != NULL)
-            {
-                consumed++;
-                member = find_struct_member(pdef, list->member);
-                if (member >= 0)
-                    pmember = &STRUCT_MEMBER(pdef->members+member);
-
-                if (member < 0)
-                    yyerrorf( "No such member '%s' in struct '%s'"
-                            , get_txt(list->member), get_txt(pdef->name)
-                            );
-                else if (flags[member])
-                {
-                    yyerrorf( "Multiple initializations of member '%s' "
-                              "in struct '%s'"
-                            , get_txt(list->member), get_txt(pdef->name)
-                            );
-                }
-                else if (exact_types
-                      && !TYPE( pmember->type , type_rtoc(&list->val)) )
-                {
-                    yyerrorf("Type mismatch %s when initializing member '%s' "
-                             "in struct '%s'"
-                            , get_two_types(pmember->type, type_rtoc(&list->val))
-                            , get_txt(list->member), get_txt(pdef->name)
-                            );
-                }
-                else
-                {
-                    vec->item[member] = list->val;
-                    flags[member] = MY_TRUE;
-                }
-            }
-            list = list->next;
-        } while (NULL != list);
-
-        /* Second loop through list: assign the unnamed members
-         */
-        list = &clsv->list;
-
-        /* Find the first un-set member */
-        for (member = 0; member < pdef->num_members && flags[member]
-            ; member++) /* NOOP */;
-
-        if (member < pdef->num_members)
-        {
-            do {
-                if (list->member == NULL)
-                {
-                    pmember = &STRUCT_MEMBER(pdef->members+member);
-                    consumed++;
-                    if (exact_types
-                     && !TYPE( pmember->type , type_rtoc(&list->val)) )
-                    {
-                        yyerrorf("Type mismatch %s when initializing member '%s' "
-                                 "in struct '%s'"
-                                , get_two_types(pmember->type, type_rtoc(&list->val))
-                                , get_txt(list->member), get_txt(pdef->name)
-                                );
-                    }
-                    else
-                    {
-                        vec->item[member] = list->val;
-                        flags[member] = MY_TRUE;
-                    }
-
-                    /* Find the next un-set member */
-                    for (member++; member < pdef->num_members && flags[member]
-                         ; member++) /* NOOP */;
-                }
-                list = list->next;
-            } while (NULL != list && member < pdef->num_members);
-        }
-#endif /* HYBRID_STRUCT_LITERALS */
 
         xfree(flags); flags = NULL;
 
@@ -4893,11 +4806,16 @@ free_const_list_svalue (svalue_t *svp)
 %type <fulltypes>    inheritance_qualifier inheritance_qualifiers
 %type <fulltype>     inheritance_modifier_list inheritance_modifier
 %ifdef USE_NEW_INLINES
-%type <fulltype>     inline_opt_type context_name
+%type <fulltype>     inline_opt_type
 %endif /* USE_NEW_INLINES */
 %type <type>         decl_cast cast
 %type <lrvalue>      note_start comma_expr expr0 expr4
-%type <lrvalue>      function_call inline_fun
+%type <lrvalue>      function_call
+%ifdef USE_NEW_INLINES
+%type <lrvalue>      inline_func
+%else /* USE_NEW_INLINES */
+%type <lrvalue>      inline_fun
+%endif /* USE_NEW_INLINES */
 %type <lrvalue>      catch sscanf
 %type <lrvalue>      for_init_expr for_expr
 %type <lrvalue>      comma_expr_decl expr_decl
@@ -5245,7 +5163,9 @@ inline_func:
       L_FUNC inline_opt_type
 
       {
+#ifdef DEBUG_INLINES
 printf("DEBUG: After inline_opt_type: program size %ld\n", CURRENT_PROGRAM_SIZE);
+#endif /* DEBUG_INLINES */
           if (!prepare_inline_closure($2))
               YYACCEPT;
       }
@@ -5253,22 +5173,34 @@ printf("DEBUG: After inline_opt_type: program size %ld\n", CURRENT_PROGRAM_SIZE)
       inline_opt_args
 
       {
+#ifdef DEBUG_INLINES
 printf("DEBUG: After inline_opt_args: program size %ld\n", CURRENT_PROGRAM_SIZE);
-          if (!inline_closure_prototype($4))
-              YYACCEPT;
+#endif /* DEBUG_INLINES */
+          current_inline->parse_context = MY_TRUE;
       }
 
       inline_opt_context
 
       {
+#ifdef DEBUG_INLINES
 printf("DEBUG: After inline_opt_context: program size %ld\n", CURRENT_PROGRAM_SIZE);
+#endif /* DEBUG_INLINES */
+          current_inline->parse_context = MY_FALSE;
+          if (!inline_closure_prototype($4))
+              YYACCEPT;
       }
 
 
       block
 
       {
+#ifdef DEBUG_INLINES
 printf("DEBUG: After inline block: program size %ld\n", CURRENT_PROGRAM_SIZE);
+#endif /* DEBUG_INLINES */
+         $$.start = current_inline->end;
+         $$.code = -1;
+         $$.type = TYPE_CLOSURE;
+
          complete_inline_closure();
       }
 
@@ -5278,6 +5210,9 @@ printf("DEBUG: After inline block: program size %ld\n", CURRENT_PROGRAM_SIZE);
       {
           int i;
 
+#ifdef DEBUG_INLINES
+printf("DEBUG: After L_BEGIN_INLINE: program size %ld\n", CURRENT_PROGRAM_SIZE);
+#endif /* DEBUG_INLINES */
           if (!prepare_inline_closure(TYPE_UNKNOWN))
               YYACCEPT;
 
@@ -5289,11 +5224,14 @@ printf("DEBUG: After inline block: program size %ld\n", CURRENT_PROGRAM_SIZE);
 
               sprintf(name, "$%d", i);
               ident = make_shared_identifier(name, I_TYPE_UNKNOWN, 0);
-              add_local_name(ident, TYPE_ANY, block_depth, MY_TRUE);
+              add_local_name(ident, TYPE_ANY, block_depth);
           }
 
           if (!inline_closure_prototype(9))
               YYACCEPT;
+#ifdef DEBUG_INLINES
+printf("DEBUG: Before comma_expr: program size %ld\n", CURRENT_PROGRAM_SIZE);
+#endif /* DEBUG_INLINES */
       }
       
       comma_expr
@@ -5301,7 +5239,15 @@ printf("DEBUG: After inline block: program size %ld\n", CURRENT_PROGRAM_SIZE);
       L_END_INLINE
 
       {
+#ifdef DEBUG_INLINES
+printf("DEBUG: After L_END_INLINE: program size %ld\n", CURRENT_PROGRAM_SIZE);
+#endif /* DEBUG_INLINES */
          ins_f_code(F_RETURN);
+
+         $$.start = current_inline->end;
+         $$.code = -1;
+         $$.type = TYPE_CLOSURE;
+
          complete_inline_closure();
       }
 
@@ -5320,94 +5266,52 @@ inline_opt_args:
 
               sprintf(name, "$%d", i);
               ident = make_shared_identifier(name, I_TYPE_UNKNOWN, 0);
-              add_local_name(ident, TYPE_ANY, block_depth, MY_TRUE);
+              add_local_name(ident, TYPE_ANY, block_depth);
           }
 
-          return 9;
+          $$ = 9;
       }
-    | '(' argument ')'  { return $2; }
+    | '(' argument ')'  { $$ = $2; }
 ; /* inline_opt_args */
 
 inline_opt_type:
-      /* empty */              { return TYPE_UNKNOWN; }
-    | basic_type optional_star { return $1 | $2; }
+      /* empty */
+      {
+#ifdef DEBUG_INLINES
+          printf("DEBUG: inline_opt_type default: UNKNOWN\n");
+#endif /* DEBUG_INLINES */
+          $$ = TYPE_UNKNOWN;
+      }
+    | basic_type optional_star
+      {
+#ifdef DEBUG_INLINES
+          printf("DEBUG: inline_opt_type: %s\n", get_type_name($1|$2));
+#endif /* DEBUG_INLINES */
+          $$ = $1 | $2;
+      }
 ; /* inline_opt_type */
 
 inline_opt_context:
       /* empty */
-    |  ':' inline_context_list
-;
+    |  ':' inline_context_list inline_semi
+; /* inline_opt_context */
+
+inline_semi:
+      /* empty */
+    | ';'
+; /* inline_semi */
 
 inline_context_list:
-      context_decl
-    | inline_context_list ',' context_decl
+      /* empty */
+    | context_decl
+    | inline_context_list ';' context_decl
 ; /* inline_context_list */
 
 
 context_decl:
-      context_name L_ASSIGN expr0
-      {
-          /* TODO: This code duplicates a lot from comma_expr_decl
-           * TODO:: and local_name_list.
-           */
-
-          vartype_t type2;
-%line
-          /* Check the assignment for validity */
-          type2 = $3.type;
-          if (exact_types && !compatible_types($1, type2, MY_TRUE))
-          {
-              yyerrorf("Bad assignment %s", get_two_types($1, $3.type));
-          }
-
-          if ($2 != F_ASSIGN)
-          {
-              yyerror("Only plain assignments allowed here.");
-          }
-
-          if (type2 & TYPE_MOD_REFERENCE)
-              yyerror("Can't trace reference assignments.");
-
-          /* Just leave the value on the stack for the context_closure
-           * instruction.
-           */
-      }
-
-    | context_name
-      {
-          /* The context_closure instruction expects a value on
-           * the stack, so just push a 0.
-           */
-%line
-          ins_f_code(F_CONST0);
-      }
+      basic_type local_name_list
+      { /* Empty action to void value from local_name_list */ }
 ; /* context_decl */
-
-context_name:
-      basic_type optional_star L_IDENTIFIER
-      {
-          /* A new context variable */
-
-          (void) add_context_name($3, $2 | $1, -1);
-          $$ = $2 | $1;
-      }
-      
-    | basic_type optional_star L_LOCAL
-      {
-          /* A local name is redeclared. Since this is the context, it
-           * is legal.
-           */
-
-          block_scope_t *scope = block_scope + block_depth - 1;
-
-          if (current_inline->block_depth+1 <= $3->u.local.depth)
-             yyerrorf("Illegal to redeclare local name '%s'"
-                     , get_txt($3->name));
-
-          (void)add_context_name($3, $2 | $1, -1);
-          $$ = $2 | $1;
-      }
-; /* context_name */
 
 %endif /* USE_NEW_INLINES */
 
@@ -6102,12 +6006,20 @@ new_arg_name:
           if (exact_types && $1 == 0)
           {
               yyerror("Missing type for argument");
+#ifdef USE_NEW_INLINES
+              add_local_name($3, TYPE_ANY, block_depth);
+#else /* USE_NEW_INLINES */
               add_local_name($3, TYPE_ANY, block_depth, MY_FALSE);
+#endif /* USE_NEW_INLINES */
                 /* Supress more errors */
           }
           else
           {
+#ifdef USE_NEW_INLINES
+              add_local_name($3, $1 | $2, block_depth);
+#else /* USE_NEW_INLINES */
               add_local_name($3, $1 | $2, block_depth, MY_FALSE);
+#endif /* USE_NEW_INLINES */
           }
       }
 
@@ -6349,23 +6261,42 @@ statements:
 
 local_name_list:
       new_local
-    | local_name_list ',' new_local ;
+    | local_name_list ',' new_local
+;
 
 
-new_local :
+new_local:
       new_local_name
       {
+#ifdef USE_NEW_INLINES
+%line
+          if (current_inline && current_inline->parse_context)
+          {
+              /* When parsing context variables, the context_closure instruction
+               * expects a value on the stack, so just push a 0.
+               */
+              ins_f_code(F_CONST0);
+#ifdef DEBUG_INLINES
+printf("DEBUG: inline context decl: name, program_size %d\n", CURRENT_PROGRAM_SIZE);
+#endif /* DEBUG_INLINES */
+          }
+#else /* USE_NEW_INLINES */
           /* Empty action to void the value of new_local_name */
+#endif /* USE_NEW_INLINES */
       }
 
     | new_local_name L_ASSIGN expr0
       {
           /* We got a "<name> = <expr>" type declaration. */
 
-          p_int length;
           vartype_t type2;
 
 %line
+#ifdef USE_NEW_INLINES
+#ifdef DEBUG_INLINES
+if (current_inline && current_inline->parse_context) printf("DEBUG: inline context decl: name = expr, program_size %d\n", CURRENT_PROGRAM_SIZE);
+#endif /* DEBUG_INLINES */
+#endif /* USE_NEW_INLINES */
           /* Check the assignment for validity */
           type2 = $3.type;
           if (exact_types && !compatible_types($1.type, type2, MY_TRUE))
@@ -6381,35 +6312,43 @@ new_local :
           if (type2 & TYPE_MOD_REFERENCE)
               yyerror("Can't trace reference assignments.");
 
-          /* Add the bytecode to create the lvalue and do the
-           * assignment.
+          /* If we're parsing a context variable, just leave the
+           * value on the stack for the context_closure instruction.
+           * For normal locals, add the bytecode to create the lvalue
+           * and do the assignment.
            */
-          length = $1.length;
-          if (length)
+#ifdef USE_NEW_INLINES
+          if (!current_inline || !current_inline->parse_context)
+#endif /* USE_NEW_INLINES */
           {
-              add_to_mem_block(A_PROGRAM, $1.u.p, length+1);
-              yfree($1.u.p);
-              last_expression = CURRENT_PROGRAM_SIZE-1;
-              mem_block[A_PROGRAM].block[last_expression] = F_VOID_ASSIGN;
-          }
-          else
-          {
-              bytecode_p source, dest;
-              mp_uint current_size;
-
-              source = $1.u.simple;
-              current_size = CURRENT_PROGRAM_SIZE;
-              if (!realloc_a_program(3))
+              p_int length;
+              length = $1.length;
+              if (length)
               {
-                  yyerrorf("Out of memory: program size %lu", current_size+3);
-                  YYACCEPT;
+                  add_to_mem_block(A_PROGRAM, $1.u.p, length+1);
+                  yfree($1.u.p);
+                  last_expression = CURRENT_PROGRAM_SIZE-1;
+                  mem_block[A_PROGRAM].block[last_expression] = F_VOID_ASSIGN;
               }
-              CURRENT_PROGRAM_SIZE = (last_expression = current_size + 2) + 1;
-              dest = PROGRAM_BLOCK + current_size;
-              *dest++ = *source++;
-              *dest++ = *source;
-              *dest = F_VOID_ASSIGN;
-          }
+              else
+              {
+                  bytecode_p source, dest;
+                  mp_uint current_size;
+
+                  source = $1.u.simple;
+                  current_size = CURRENT_PROGRAM_SIZE;
+                  if (!realloc_a_program(3))
+                  {
+                      yyerrorf("Out of memory: program size %lu", current_size+3);
+                      YYACCEPT;
+                  }
+                  CURRENT_PROGRAM_SIZE = (last_expression = current_size + 2) + 1;
+                  dest = PROGRAM_BLOCK + current_size;
+                  *dest++ = *source++;
+                  *dest++ = *source;
+                  *dest = F_VOID_ASSIGN;
+              }
+          } /* parsed context var */
       }
 ; /* new_local */
 
@@ -6421,6 +6360,34 @@ new_local_name:
           block_scope_t *scope = block_scope + block_depth - 1;
           ident_t *q;
 
+#ifdef USE_NEW_INLINES
+          if (current_inline && current_inline->parse_context)
+          {
+#ifdef DEBUG_INLINES
+printf("DEBUG:   context name '%s'\n", get_txt($2->name));
+#endif /* DEBUG_INLINES */
+              q = add_context_name($2, current_type | $1, -1);
+              $$.u.simple[0] = F_PUSH_CONTEXT_LVALUE;
+              $$.u.simple[1] = q->u.local.context;
+          }
+          else
+          {
+              q = add_local_name($2, current_type | $1, block_depth);
+              if (use_local_scopes && scope->num_locals == 1)
+              {
+                  /* First definition of a local, so insert the
+                   * clear_locals bytecode and remember its position
+                   */
+                  scope->addr = mem_block[A_PROGRAM].current_size;
+                  ins_f_code(F_CLEAR_LOCALS);
+                  ins_byte(scope->first_local);
+                  ins_byte(0);
+              }
+              
+              $$.u.simple[0] = F_PUSH_LOCAL_VARIABLE_LVALUE;
+              $$.u.simple[1] = q->u.local.num;
+          }
+#else /* USE_NEW_INLINES */
           q = add_local_name($2, current_type | $1, block_depth, MY_FALSE);
 
           if (use_local_scopes && scope->num_locals == 1)
@@ -6436,6 +6403,7 @@ new_local_name:
           
           $$.u.simple[0] = F_PUSH_LOCAL_VARIABLE_LVALUE;
           $$.u.simple[1] = q->u.local.num;
+#endif /* USE_NEW_INLINES */
           $$.length = 0;
           $$.type = current_type | $1;
       }
@@ -6449,6 +6417,38 @@ new_local_name:
           ident_t *q;
           block_scope_t *scope = block_scope + block_depth - 1;
 
+#ifdef USE_NEW_INLINES
+          if (current_inline && current_inline->parse_context)
+          {
+#ifdef DEBUG_INLINES
+printf("DEBUG:   context name '%s'\n", get_txt($2->name));
+#endif /* DEBUG_INLINES */
+              if (current_inline->block_depth+1 <= $2->u.local.depth)
+                 yyerrorf("Illegal to redeclare local name '%s'"
+                         , get_txt($2->name));
+
+              q = add_context_name($2, current_type | $1, -1);
+              $$.u.simple[0] = F_PUSH_CONTEXT_LVALUE;
+              $$.u.simple[1] = q->u.local.context;
+          }
+          else
+          {
+              q = redeclare_local($2, current_type | $1, block_depth);
+              if (use_local_scopes && scope->num_locals == 1)
+              {
+                  /* First definition of a local, so insert the
+                   * clear_locals bytecode and remember its position
+                   */
+                  scope->addr = mem_block[A_PROGRAM].current_size;
+                  ins_f_code(F_CLEAR_LOCALS);
+                  ins_byte(scope->first_local);
+                  ins_byte(0);
+              }
+
+              $$.u.simple[0] = F_PUSH_LOCAL_VARIABLE_LVALUE;
+              $$.u.simple[1] = q->u.local.num;
+          }
+#else /* USE_NEW_INLINES */
           q = redeclare_local($2, current_type | $1, block_depth);
 
           if (use_local_scopes && scope->num_locals == 1)
@@ -6464,6 +6464,7 @@ new_local_name:
 
           $$.u.simple[0] = F_PUSH_LOCAL_VARIABLE_LVALUE;
           $$.u.simple[1] = q->u.local.num;
+#endif /* USE_NEW_INLINES */
           $$.length = 0;
           $$.type = current_type | $1;
       }
@@ -9415,9 +9416,10 @@ pre_inc_dec:
 
 expr4:
       function_call  %prec '~'
-    | inline_fun
 %ifdef USE_NEW_INLINES
     | inline_func    %prec '~' {}
+%else /* USE_NEW_INLINES */
+    | inline_fun
 %endif /* USE_NEW_INLINES */
     | catch          %prec '~'
     | sscanf         %prec '~'
@@ -12287,6 +12289,7 @@ anchestor:
 ; /* anchestor */
 
 
+%ifndef USE_NEW_INLINES
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 /* The inline function expression.
  *
@@ -12365,6 +12368,7 @@ inline_fun:
       }
 ; /* inline_fun */
 
+%endif /* USE_NEW_INLINES */
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 /* The catch()-statement
@@ -15089,14 +15093,18 @@ prolog(void)
         mem_block[i].max_size = START_BLOCK_SIZE;
     }
 
+    extend_mem_block(A_LOCAL_TYPES, MAX_LOCAL * sizeof(vartype_t));
+    extend_mem_block(A_FULL_LOCAL_TYPES, MAX_LOCAL * sizeof(fulltype_t));
+
     type_of_locals = &(LOCAL_TYPE(0));
     full_type_of_locals = &(FULL_LOCAL_TYPE(0));
 #ifdef USE_NEW_INLINES
-    type_of_locals = type_of_context;
-    full_type_of_locals = full_type_of_context;
+    type_of_context = type_of_locals;
+    full_type_of_context = full_type_of_locals;
 #endif /* USE_NEW_INLINES */
-    extend_mem_block(A_LOCAL_TYPES, MAX_LOCAL * sizeof(vartype_t));
-    extend_mem_block(A_FULL_LOCAL_TYPES, MAX_LOCAL * sizeof(fulltype_t));
+#ifdef DEBUG_INLINES
+printf("DEBUG: prolog: type ptrs: %p/%p, %p/%p\n", type_of_locals, full_type_of_locals, type_of_context, full_type_of_context );
+#endif /* DEBUG_INLINES */
 
     stored_lines = 0;
     stored_bytes = 0;
