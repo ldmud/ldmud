@@ -298,7 +298,12 @@ static svalue_t *free_erq;
 static struct ipentry {
     struct in_addr  addr;  /* The address (only .s_addr is significant) */
     string_t       *name;  /* tabled string with the hostname for <addr> */
-} iptable[IPSIZE] = { { { 0 } , 0}, };
+} iptable[IPSIZE]
+#ifdef USE_IPV6
+  = { { { { { 0 } } }, 0}, };
+#else
+  = { { { 0 }, 0}, };
+#endif /* USE_IPV6 */
   /* Cache of known names for given IP addresses.
    * It is used as a ringbuffer, indexed by ipcur.
    * TODO: Null all entries in the table? Std-C should do that automatically.
@@ -3514,7 +3519,7 @@ set_noecho (interactive_t *ip, char noecho)
         {
             DTN(("set_noecho():   calling H_NOECHO\n"));
             push_number(inter_sp, noecho);
-            push_ref_object(inter_sp, ob, "set_no_echo");
+            push_ref_valid_object(inter_sp, ob, "set_no_echo");
             secure_apply(driver_hook[H_NOECHO].u.str, ob, 2);
         }
         else if (driver_hook[H_NOECHO].type == T_CLOSURE)
@@ -3526,7 +3531,7 @@ set_noecho (interactive_t *ip, char noecho)
                 driver_hook[H_NOECHO].u.lambda->ob = ref_object(ob, "set_noecho");
             }
             push_number(inter_sp, noecho);
-            push_ref_object(inter_sp, ob, "set_no_echo");
+            push_ref_valid_object(inter_sp, ob, "set_no_echo");
             secure_callback_lambda(&driver_hook[H_NOECHO], 2);
         }
         else
@@ -6138,7 +6143,9 @@ f_send_udp (svalue_t *sp)
     int to_port;
     char *msg;
     size_t msglen;
+#ifndef USE_IPV6
     int ip1, ip2, ip3, ip4;
+#endif /* USE_IPV6 */
     struct sockaddr_in name;
     struct hostent *hp;
     int ret = 0;

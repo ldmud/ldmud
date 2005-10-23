@@ -158,6 +158,7 @@ extern int errno;
  *   PROT(x)      for portable prototype definitions.
  *   NORETURN     attribute for non-returning functions.
  *   UNUSED       attribute for unused functions and variables.
+ *   MALLOC       attribute for malloc()-like functions
  *   FORMATDEBUG  attribute for printf-style prototypes.
  *   VARPROT      for portable printf-style prototype definitions.
  *   INLINE       attribute for inline functions, depending on
@@ -191,15 +192,18 @@ extern int errno;
 #    define PROT(x) ()
 #endif /* __STDC */
 
-#if defined(__GNUC__) && __GNUC__ >= 2 && (__GNUC_MINOR__ > 6 || __GNUC__ > 2) && !defined(__APPLE_CC__)
+#if defined(__GNUC__) && __GNUC__ >= 2 && (__GNUC_MINOR__ > 6 || __GNUC__ > 2)
 #    define NORETURN __attribute__ ((noreturn))
 #    define UNUSED   __attribute__ ((unused))
+#    define MALLOC   __attribute__ ((malloc))
 #elif defined(__MWERKS__)
 #    define NORETURN
 #    define UNUSED
+#    define MALLOC
 #else
 #    define NORETURN
 #    define UNUSED
+#    define MALLOC
 #endif
 
 #ifdef __GNUC__

@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+11-Nov-2002 (Lars Duening)  (3.3.294)
+  - (comm.c) When calling H_NOECHO, the code did not check if the
+      argument objects were still alive (reported by Fiona).
+  - (port.h, comm.c, xalloc.h, smalloc.h) Activated GCC attributes for
+      OS-X compilations, added GCC attribute 'malloc' to the allocator
+      functions, removed some warnings.
+
 07-Nov-2002 (Lars Duening)  (3.3.293)
   - (configure.in) The tests regarding which libraries are needed suffered
       from a disabling typo (reported by Nostradamus).

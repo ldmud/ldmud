@@ -49,19 +49,19 @@ extern int debugmalloc;
  * TODO:: all POINTER with void*.
  */
 #ifdef MALLOC_TRACE
-extern POINTER smalloc(size_t size, const char *file, int line);
+extern POINTER smalloc(size_t size, const char *file, int line) MALLOC;
 #else
-extern POINTER smalloc(size_t size);
+extern POINTER smalloc(size_t size) MALLOC;
 #endif
 
 extern POINTER rexalloc(POINTER ptr, size_t size);
-extern POINTER amalloc(size_t size);
-extern POINTER pxalloc(size_t size);
+extern POINTER amalloc(size_t size) MALLOC;
+extern POINTER pxalloc(size_t size) MALLOC;
 extern void xfree(POINTER ptr);
 extern void pfree(POINTER ptr);
 extern void afree(POINTER ptr);
 
-extern char * smalloc_string_copy (const char *str, const char *file, int line);
+extern char * smalloc_string_copy (const char *str, const char *file, int line) MALLOC;
 extern int malloc_size_mask(void);
 extern void dump_malloc_data(strbuf_t *sbuf);
 extern void smalloc_dinfo_data(svalue_t *svp, int value);

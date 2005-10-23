@@ -99,26 +99,26 @@ extern int stack_direction;
 #define xalloc_traced(size, file, line)  smalloc((size), (file), (line))
 #define xalloc(size) smalloc((size), __FILE__, __LINE__)
 
-extern POINTER smalloc(size_t, const char *, int);
+extern POINTER smalloc(size_t, const char *, int) MALLOC;
 
 #define string_copy_traced(s, file, line) smalloc_string_copy(s, file, line)
 #define string_copy(s) smalloc_string_copy(s, __FILE__ "::string_copy", __LINE__)
-extern char * smalloc_string_copy(const char *, const char *, int);
+extern char * smalloc_string_copy(const char *, const char *, int) MALLOC;
 
 #else
 
 #define xalloc_traced(size, file, line) smalloc((size))
 #define xalloc(size)                    smalloc((size))
 
-extern POINTER smalloc(size_t);
+extern POINTER smalloc(size_t) MALLOC;
 
 #endif
 
 #define xalloc_pass(size)  smalloc((size) MTRACE_PASS)
 
 extern POINTER rexalloc(POINTER, size_t);
-extern POINTER amalloc(size_t);
-extern POINTER pxalloc(size_t);
+extern POINTER amalloc(size_t) MALLOC;
+extern POINTER pxalloc(size_t) MALLOC;
 extern void xfree(POINTER);
 extern void pfree(POINTER);
 extern void afree(POINTER);
@@ -132,7 +132,7 @@ extern void afree(POINTER);
 
 #include <stdlib.h>
 
-extern POINTER xalloc(size_t size);
+extern POINTER xalloc(size_t size) MALLOC;
 
 #if defined(MALLOC_TRACE)
 #  define xalloc_traced(size,  file, line) xalloc((size))
@@ -164,7 +164,7 @@ extern void reserve_memory (void);
 #ifndef string_copy
 
 #define string_copy_traced(s, file, line) string_copy(s)
-extern char * string_copy(const char *str);
+extern char * string_copy(const char *str) MALLOC;
 
 #endif
 

@@ -23,6 +23,12 @@ to do that ;)
 
 DiEHARD.
 
+Note: Setting H_NOECHO is no longer required in order to negotiate NAWS
+  or TM - both options are now handed over to H_TELNET_NEG - but I kept
+  the code as example. Also note that the handling of both options here
+  is very minimal and does not completely conform to the corresponding
+  RFCs.
+
 --------------------------------------------------------------------------------
 
 This is a part of the code we use in the master.c file:
