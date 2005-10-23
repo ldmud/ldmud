@@ -35,6 +35,9 @@
 #define T_CLOSURE       0x8
 #define T_SYMBOL        0x9
 #define T_QUOTED_ARRAY  0xa
+#if defined(USE_STRUCTS) || defined(__LPC_STRUCTS__)
+#define T_STRUCT        0xb
+#endif
 
 #ifndef __DRIVER_SOURCE__
 

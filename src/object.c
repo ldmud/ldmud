@@ -6248,9 +6248,9 @@ restore_array (svalue_t *svp, char **str, Bool is_struct)
     v = allocate_array(siz);
 #ifdef USE_STRUCTS
     if (is_struct)
-        put_array(svp, v);
-    else
         put_struct(svp, v);
+    else
+        put_array(svp, v);
 #else
     put_array(svp, v);
 #endif /* USE_STRUCTS */

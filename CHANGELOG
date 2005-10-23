@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+06-Sep-2002 (Lars Duening)  (3.3.247)
+  - (object.c) Restoring arrays or structs confused the two types
+       (thanks, Markus!).
+
 06-Sep-2002 (Lars Duening)  (3.3.246)
   - (prolang.y, func_spec, interpret.c, closure.c, object.c, swap.c,
      efuns.c) structs are now fully implemented (at least as far as I

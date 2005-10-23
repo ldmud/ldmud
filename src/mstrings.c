@@ -1543,9 +1543,10 @@ add_string_status (strbuf_t *sbuf, Bool verbose)
                         , 100.0 * (float)mstr_chains / (float)HTABLE_SIZE
                         );
         strbuf_addf(sbuf, "Distinct strings added: %lu "
-                          "- deleted: %lu "
-                          "- coll.: %lu (%.1f%% added/%1.f%% chains)\n"
+                          "- deleted: %lu\n"
                         , mstr_added, mstr_deleted
+                        );
+        strbuf_addf(sbuf, "Collisions: %lu (%.1f%% added/%1.f%% chains)\n"
                         , mstr_collisions
                         , 100.0 * (float)mstr_collisions / (float)mstr_added
                         , 100.0 * (float)mstr_collisions / (float)mstr_chains
