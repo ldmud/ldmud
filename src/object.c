@@ -819,7 +819,7 @@ reset_object (object_t *ob, int arg)
         lambda_t *l;
 
         if (arg == H_RESET)
-            previous_ob = ob;
+            previous_ob = current_object = ob;
 
         l = driver_hook[arg].u.lambda;
         free_object(l->ob, "reset_object");
@@ -853,7 +853,7 @@ reset_object (object_t *ob, int arg)
     else if (driver_hook[arg].type == T_STRING)
     {
         if (arg == H_RESET)
-            previous_ob = ob;
+            previous_ob = current_object = ob;
 
         push_number(inter_sp, arg == H_RESET);
         if (!sapply(driver_hook[arg].u.str, ob, 1) && arg == H_RESET)

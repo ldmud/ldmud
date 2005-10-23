@@ -6765,6 +6765,105 @@ f_query_input_pending (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
+f_find_input_to (svalue_t *sp)
+
+/* EFUN: find_input_to()
+ *
+ *   int find_input_to (object player, string|closure|object fun)
+ *
+ * Find the input_to most recently added to the interactive <player> object
+ * matching the <fun> argument:
+ *  - <fun> is a string: the input_to functionname has to match
+ *  - <fun> is an object: the object the input_to function is bound to has
+ *                        to match
+ *  - <fun> is a closure: the input_to closure has to match.
+ * 
+ * Return -1 if not found, or the position in the input_to stack (0 being
+ * _least_ recently added input_to).
+ */
+
+{
+    svalue_t *arg;  /* Pointer to the arguments of the efun */
+    int       rc;   /* Resultvalue */
+
+    arg = sp - 1;
+
+    /* Process the command, terminating out when possible */
+    do {
+        input_to_t    *it;
+        interactive_t *ip;
+
+        /* Get the interactive object.
+         * If there is none, or if it is closing down or doesn't have
+         * an input_to set, fail.
+         */
+        if (!(O_SET_INTERACTIVE(ip, arg[0].u.ob))
+         || ip->closing || ip->input_to == NULL
+           )
+        {
+            rc = -1;
+            break;
+        }
+
+        /* Search for the right input_to */
+
+        for ( it = ip->input_to
+            ; it != NULL
+            ; it = it->next)
+        {
+            Bool found = MY_FALSE;
+
+            switch (arg[1].type)
+            {
+            case T_STRING:
+                if (!it->fun.is_lambda
+                 && mstreq(it->fun.function.named.name, arg[1].u.str))
+                    found = MY_TRUE;
+                break;
+                
+            case T_OBJECT:
+                if (callback_object(&(it->fun)) == arg[1].u.ob)
+                    found = MY_TRUE;
+                break;
+
+            case T_CLOSURE:
+                if (it->fun.is_lambda
+                 && closure_eq(&(it->fun.function.lambda), arg+1))
+                    found = MY_TRUE;
+                break;
+
+            default:
+                fatal("Unsupported argument type %d\n", arg[1].type);
+                break;
+            }
+
+            if (found)
+                break;
+        }
+
+        if (it != NULL)
+        {
+            /* We found the input_to: now count at which position it is */
+            for ( rc = 0
+                ; it->next != NULL
+                ; it = it->next, rc++) NOOP ;
+            break;
+        }
+
+        /* At this point, we didn't find the input_to */
+        rc = -1;
+    } while (0);
+
+    /* Return the result */
+    sp = pop_n_elems(2, sp);
+    sp++;
+    put_number(sp, rc);
+
+    return sp;
+} /* f_find_input_to() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
 v_remove_input_to (svalue_t *sp, int num_arg)
 
 /* EFUN: remove_input_to()
@@ -6885,6 +6984,113 @@ v_remove_input_to (svalue_t *sp, int num_arg)
 
     return sp;
 } /* v_remove_input_to() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t  *
+f_input_to_info (svalue_t *sp)
+
+/* EFUN: input_to_info()
+ *
+ *   mixed * input_to_info (object player)
+ *
+ * Construct an array of all input_to's pending for this interactive <player>.
+ * The first entry in the array is the least recently added input_to, the
+ * last element the most recently added one.
+ * Every item in the array is itself an array of 2 or more entries:
+ *  0:   The object (only if the function is a string).
+ *  1:   The function (string or closure).
+ *  2..: The argument(s).
+ */
+{
+    vector_t      *v;
+    int            num_pending;
+    input_to_t    *it;
+    interactive_t *ip;
+
+    /* Get the interactive object.
+     * If there is none, or if it is closing down or doesn't have
+     * an input_to set, the efun will return the empty array.
+     */
+    if (!(O_SET_INTERACTIVE(ip, sp->u.ob))
+     || ip->closing || ip->input_to == NULL
+       )
+    {
+        num_pending = 0;
+    }
+    else
+    {
+        /* Count the number of pending input_tos.
+         */
+        for ( num_pending = 0, it = ip->input_to
+            ; it != NULL
+            ; it = it->next, num_pending++) NOOP ;
+    }
+
+    /* Allocate the result arrray and fill it in */
+    v = allocate_array(num_pending);
+
+    if (num_pending > 0)
+    {
+        int i;
+
+        for (i = num_pending, it = ip->input_to
+            ; --i >= 0
+            ; it = it->next
+            )
+        {
+            vector_t *vv;
+            object_t *ob;
+
+            ob = callback_object(&(it->fun));
+            if (!ob)
+                continue;
+                
+            /* Get the subarray */
+
+            vv = allocate_array(2 + it->fun.num_arg);
+
+            if (it->fun.is_lambda)
+            {
+                if (it->fun.function.lambda.x.closure_type == CLOSURE_ALIEN_LFUN)
+                    put_ref_object( vv->item
+                                  , it->fun.function.lambda.u.lambda->function.alien.ob
+                                  , "input_to_info");
+                else
+                    put_ref_object(vv->item, ob, "input_to_info");
+                assign_svalue_no_free(&vv->item[1], &it->fun.function.lambda);
+            }
+            else
+            {
+                put_ref_object(vv->item, ob, "input_to_info");
+                put_ref_string(vv->item + 1, it->fun.function.named.name);
+            }
+
+            if (it->fun.num_arg > 0)
+            {
+                svalue_t *source, *dest;
+                int nargs;
+
+                nargs = it->fun.num_arg;
+                if (nargs > 1)
+                    source = it->fun.arg.u.lvalue;
+                else
+                    source = &(it->fun.arg);
+                dest = &vv->item[2];
+                do {
+                    assign_svalue_no_free(dest++, source++);
+                } while (--nargs);
+            }
+
+            put_array(v->item + i, vv);
+        }
+    }
+
+    /* Return the result */
+    free_svalue(sp);
+    put_array(sp, v);
+
+    return sp;
+} /* f_input_to_info() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *

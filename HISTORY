@@ -95,7 +95,7 @@ For a detailed list of all changes see the file CHANGELOG.
            regular expression code, or the PCRE package (default).
 
 
-15-Oct-2002 (Lars Duening) -- Release 3.2.9
+27-Oct-2002 (Lars Duening) -- Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -243,7 +243,10 @@ For a detailed list of all changes see the file CHANGELOG.
            Optional: mySQL support.
        + gmtime(), localtime(): Return the time broken up into its
            constituents.
+       + find_input_to(): Find a pending input_to.
        + include_list(): Return the files included in a program file.
+       + input_to_info(): Return information about all pending input_to's
+           for a player.
        + m_add(): To add a new entry to a mapping and assign all values
            in one go.
        + md5(): Compute the MD5 message digest for a string.

@@ -5,7 +5,7 @@ DESCRIPTION
         The LPC driver understands the following preprocessor
         directives:
 
-        #include, #define, #if, #ifdef, #ifndef, #else, #elsif,
+        #include, #define, #if, #ifdef, #ifndef, #else, #elif,
         #endif, #undef
                 same as in ANSI C
 

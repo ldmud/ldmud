@@ -55,6 +55,12 @@ int stack_direction = 0; /*  0: Unknown stack behaviour
                           * -1: Stack grows downward
                           */
 
+static int in_malloc = 0;
+  /* >0 when the core code in the allocator is executed.
+   * This variable serves as primitive safeguard against re-entrant
+   * calls to the allocator, for example by threads.
+   */
+
 /*-------------------------------------------------------------------------*/
 
 /* Include the allocator source */
@@ -87,6 +93,16 @@ xalloc (size_t size)
 
     if (going_to_exit)
         exit(3);
+
+    if (in_malloc++)
+    {
+        in_malloc = 0;
+        writes(1, "Multiple threads in smalloc()\n");
+        fatal("Multiple threads in smalloc()\n");
+        /* NOTREACHED */
+        return NULL;
+    }
+
     if (size == 0)
         fatal("Tried to allocate 0 bytes.\n");
     {
@@ -111,6 +127,7 @@ xalloc (size_t size)
             reserved_user_area = NULL;
             p = "Temporary out of MEMORY. Freeing reserve.\n";
             write(1, p, strlen(p));
+            in_malloc--;
             return xalloc(size);        /* Try again */
         }
         if (malloc_privilege >= MALLOC_MASTER && reserved_master_area) {
@@ -118,6 +135,7 @@ xalloc (size_t size)
             reserved_master_area = NULL;
             p = "Temporary out of MEMORY. Freeing master reserve.\n";
             write(1, p, strlen(p));
+            in_malloc--;
             return xalloc(size);        /* Try again */
         }
         if (malloc_privilege >= MALLOC_SYSTEM && reserved_system_area) {
@@ -125,12 +143,14 @@ xalloc (size_t size)
             reserved_system_area = NULL;
             p = "Temporary out of MEMORY. Freeing system reserve.\n";
             write(1, p, strlen(p));
+            in_malloc--;
             return xalloc(size);        /* Try again */
         }
         /* We can hardly survive out of memory without the garbage collector */
         going_to_exit = MY_TRUE;
         p = "Totally out of MEMORY.\n";
         write(1, p, strlen(p));
+        in_malloc--;
         (void)dump_trace(MY_FALSE, NULL);
         exit(2);
     }
@@ -148,6 +168,7 @@ xalloc (size_t size)
         assert_stack_gap();
     }
 
+    in_malloc--;
     return p;
 } /* xalloc() */
 

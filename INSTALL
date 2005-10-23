@@ -87,10 +87,13 @@ Unix or Unix-like system
     compile the driver with pthread support. Currently this means that
     background threads will be used to write data to the network.
 
+    WARNING: pthreads support is still experimental and might crash
+      your driver!
+
   FreeBSD:
-    When using gcc, it can happen that the compiler
-    aborts with signal 10 or 11. The reasons are unknown, but you can
-    restart the compilation process by typing "make" again (and again...).
+    When using gcc, it could happen that the compiler aborts with signal 10
+    or 11. The reasons are unknown, but you can restart the compilation
+    process by typing "make" again (and again...).
 
   AIX 3.4:
     The native compiler comes in several forms, of which only the

@@ -104,5 +104,6 @@ HISTORY
           input escape character.
 
 SEE ALSO
-        remove_input_to(E), query_input_pending(E),
-        privilege_violation(M), set_combine_charset(E)
+        privilege_violation(M), set_combine_charset(E),
+        query_input_pending(E), find_input_to(E), input_to_info(E),
+        remove_input_to(E)

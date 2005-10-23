@@ -656,8 +656,21 @@ smalloc (size_t size
                  , file, line);
 #       endif
 
+    if (in_malloc++)
+    {
+        in_malloc = 0;
+        writes(1,"Multiple threads in smalloc()\n");
+        fatal("Multiple threads in smalloc()\n");
+        /* NOTREACHED */
+        return NULL;
+    }
+
     if (size > SMALL_BLOCK_MAX_BYTES)
-      return large_malloc(size, MY_FALSE);
+    {
+        void * rc = large_malloc(size, MY_FALSE);
+        in_malloc--;
+        return rc;
+    }
 
     /* It's a small block */
     
@@ -687,6 +700,7 @@ smalloc (size_t size
         fake("From free list.");
         MADVISE(temp, orig_size);
 
+        in_malloc--;
         return (POINTER)temp;
     }
 
@@ -770,6 +784,7 @@ smalloc (size_t size
                         , (p_int)rsize * SINT);
 #endif
 
+                in_malloc--;
                 return (POINTER)this;
             }
         }
@@ -819,6 +834,7 @@ smalloc (size_t size
                     , (p_int)(usize - OVERHEAD) * SINT, (p_int)usize * SINT);
 #endif
 
+            in_malloc--;
             return (POINTER)pt;
         }
 
@@ -910,6 +926,7 @@ smalloc (size_t size
                         "block of %d bytes.\n"
                       , (p_int)(small_chunk_size)
                     );
+            in_malloc--;
             return NULL;
         }
 
@@ -951,6 +968,7 @@ smalloc (size_t size
 
     fake("allocation from chunk successful\n");
     MADVISE(temp, orig_size);
+    in_malloc--;
     return (POINTER)temp;
 } /* smalloc() */
 
@@ -970,6 +988,15 @@ xfree (POINTER ptr)
 
     assert_stack_gap();
 
+    if (in_malloc++)
+    {
+        in_malloc = 0;
+        writes(1, "Multiple threads in xfree()\n");
+        fatal("Multiple threads in xfree()\n");
+        /* NOTREACHED */
+        return;
+    }
+
     /* Get the real block address and size */
     block = (word_t *) ptr;
     block -= OVERHEAD;
@@ -980,6 +1007,7 @@ xfree (POINTER ptr)
         /* It's a big block */
         fake("xfree calls large_free");
         large_free(ptr);
+        in_malloc--;
         return;
     }
 
@@ -1005,6 +1033,7 @@ xfree (POINTER ptr)
     sfltable[i] = block;
     small_free[i] += 1;
     fake("Freed");
+    in_malloc--;
 } /* xfree() */
 
 /*=========================================================================*/

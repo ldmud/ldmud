@@ -25,4 +25,4 @@ HISTORY
         Introduced in LDMud 3.2.9 / 3.3.119 .
 
 SEE ALSO
-        input_to(E), query_input_pending(E)
+        input_to(E), find_input_to(E), input_to_info(E), query_input_pending(E)

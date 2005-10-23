@@ -1,6 +1,15 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+27-Oct-2002 (Lars Duening)  (3.3.286)
+  - (smalloc.c) Added a very primitive safeguard against interleaving
+      calls to the allocator - I suspect that this is the root cause
+      for the problems with pthreads.
+  - (object.c) When resetting an object, the previous_object() was
+      some random object (reported by Gnomi).
+  - (comm, func_spec) New efuns find_input_to() and input_to_info()
+      (suggested by Fiona).
+
 16-Oct-2002 (Lars Duening)  (3.3.285)
     - (configure) Some systems need libresolv in order to provide
         herror() (reported by Coogan).
