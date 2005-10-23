@@ -20,12 +20,12 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 237)
-(Parent-Version lpmud 3-3 236)
-(Version-Log "Added syntax support for structs.")
+(Project-Version lpmud 3-3 238)
+(Parent-Version lpmud 3-3 237)
+(Version-Log "Support for international characters was broken.")
 (New-Version-Log
 "")
-(Checkin-Time "Thu, 29 Aug 2002 18:10:42 -0600")
+(Checkin-Time "Fri, 30 Aug 2002 10:26:55 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -61,7 +61,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.7 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.44 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.300 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.301 644))
   (HISTORY (lpmud/f/49_HISTORY 1.267 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.16 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -133,7 +133,7 @@
   (src/ed.h (lpmud/f/34_ed.h 1.5.1.6 644))
   (src/ed.c (lpmud/c/33_ed.c 1.32.1.23 644))
   (src/efuns.h (lpmud/l/20_efuns.h 1.13.1.16 644))
-  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.41 644))
+  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.42 644))
   (src/exec.h (lpmud/c/32_exec.h 1.34.1.21 644))
   (src/files.h (lpmud/i/49_files.h 1.2 644))
   (src/files.c (lpmud/i/50_files.c 1.17 644))
@@ -147,7 +147,7 @@
   (src/interpret.h (lpmud/b/13_interpret. 1.33.1.25 644))
   (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.34 644))
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.10 644))
-  (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.16 644))
+  (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.17 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.11 644))
   (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.16 644))
   (src/mapping.h (lpmud/f/30_mapping.h 1.12.1.13 644))
@@ -248,7 +248,7 @@
   (src/func_spec (lpmud/c/31_func_spec 1.53.1.45.1.12 644))
   (src/string_spec (lpmud/f/6_string_spe 1.14.1.4 644))
   (src/mkfunc.c (lpmud/l/14_mkfunc.c 1.1 644))
-  (src/make_func.y (lpmud/b/7_make_func. 1.25.1.24 644))
+  (src/make_func.y (lpmud/b/7_make_func. 1.25.1.25 644))
 
   ;; Generic host files
   (src/hosts/README (lpmud/h/10_README 1.2 644))
@@ -715,7 +715,7 @@
   (src/bugs/f-020714 (lpmud/w/5_f-020714 1.1 644) :no-keywords)
   (src/bugs/f-020811 (lpmud/a/b/6_f-020811 1.1 644) :no-keywords)
   (src/bugs/f-020813-0 (lpmud/a/b/8_f-020813-0 1.1 644) :no-keywords)
-  (src/bugs/f-020813-1 (lpmud/a/b/9_f-020813-1 1.1 644) :no-keywords)
+  (src/bugs/f-020813-1 (lpmud/a/b/9_f-020813-1 1.2 644) :no-keywords)
   (src/bugs/f-020825 (lpmud/a/b/15_f-020825 1.1 644) :no-keywords)
 
   (src/bugs/p-981027-1 (lpmud/g/25_p-981027-1 1.2 644) :no-keywords)

@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+30-Aug-2002 (Lars Duening)  (3.3.238)
+  - (efuns.c, lex.c, make_func.y) Support for international characters
+       was broken (thanks, Oskar!).
+
 29-Aug-2002 (Lars Duening)  (3.3.237)
   - (prolang.y, lex.c, main.c, configure) Added syntax support for structs
         - no code yet to actually use them.

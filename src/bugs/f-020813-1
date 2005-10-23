@@ -17,6 +17,9 @@ for them to be by-reference datatyps.
 Having a by-reference type may feel unusual for programmers coming from other
 languages, but is no functional problem.
 
+Note: Python handles everything by reference. list.append() changes in-place,
+      list + x creates a new list.
+
 Solution 1: Implement the by-reference semantics consequentially
 
   This means:

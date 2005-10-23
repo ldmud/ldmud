@@ -3257,7 +3257,7 @@ yylex1 (void)
                     /* Convert all non-alnums to '_' */
                     for (start = name; *start != '\0'; start++)
                     {
-                        if (!isalnum((unsigned)(*start)))
+                        if (!isalnum((unsigned char)(*start)))
                             *start = '_';
                     }
                 } while (    find_shared_identifier(name, 0, 0)

@@ -2428,7 +2428,7 @@ process_value (const char *str, Bool original)
     object_t *ob;
 
     /* Simple check if the argument is valid */
-    if (strlen(str) < 1 || !isalpha((unsigned)(str[0])))
+    if (strlen(str) < 1 || !isalpha((unsigned char)(str[0])))
         return NULL;
 
     /* If necessary, copy the argument so that we can separate the various

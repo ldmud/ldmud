@@ -537,7 +537,7 @@ make_f_name (char *str)
     len = strlen(f_name);
     for (i = 0; i < len; i++)
     {
-        if (islower((unsigned)f_name[i]))
+        if (islower((unsigned char)f_name[i]))
             f_name[i] = (char)toupper(f_name[i]);
     }
     return mystrdup(f_name);
@@ -1724,7 +1724,7 @@ exgetc(void)
     char c;
 
     c = mygetc();
-    while (isalpha((unsigned)c) || c == '_' )
+    while (isalpha((unsigned char)c) || c == '_' )
     {
         char word[512], *p;
         int space_left;
@@ -2923,12 +2923,12 @@ create_efun_defs (void)
             fprintf(fpw, "\n    ");
         fprintf(fpw, "%d,"
                ,  ( (isascii(c) && make_func_isescaped(c)) ? _MCTe : 0 )
-                | ( (isascii(c) && isdigit ((unsigned)c))  ? _MCTd : 0 )
-                | ( (isascii(c) && isspace ((unsigned)c) && c != '\n')
+                | ( (isascii(c) && isdigit ((unsigned char)c))  ? _MCTd : 0 )
+                | ( (isascii(c) && isspace ((unsigned char)c) && c != '\n')
                     ? _MCTs : 0 )
-                | ( (isascii(c) && isxdigit((unsigned)c))  ? _MCTx : 0 )
-                | ( ((isascii(c) && (isalnum ((unsigned)c) || c == '_'))
-                   || (((unsigned)c) >= 0xC0 && ((unsigned)c) <= 0xFF))
+                | ( (isascii(c) && isxdigit((unsigned char)c))  ? _MCTx : 0 )
+                | ( ((isascii(c) && (isalnum ((unsigned char)c) || c == '_'))
+                   || (((unsigned char)c) >= 0xC0 && ((unsigned char)c) <= 0xFF))
                     ? _MCTa : 0 )
                );
         c++;
