@@ -24,26 +24,26 @@
  * The reason of this, is that the above saves a lot of memory.
  */
 
-string name, alias, short_desc, long_desc, value, weight;
+string name, alias, short_desc, long_desc;
 string type;
-int worn, ac;
+int worn, ac, value, weight;
 object worn_by;
 object next;
 string info;
 
-reset(arg)
+void reset(int arg)
 {
     if(arg)
 	return;
     type = "armour";
 }
 
-link(ob)
+void link(object ob)
 {
     next = ob;
 }
 
-remove_link(str)
+object remove_link(string str)
 {
     object ob;
 
@@ -57,19 +57,19 @@ remove_link(str)
     return this_object();
 }
 
-init() {
+void init() {
     add_action("wear", "wear");
     add_action("remove", "remove");
 }
 
-rec_short()
+string rec_short()
 {
     if(next)
 	return name + ", " + next->rec_short();
     return name;
 }
 
-short() {
+string short() {
     if (!short_desc)
 	return 0;
     if (worn)
@@ -77,16 +77,16 @@ short() {
     return short_desc;
 }
 
-long(str) {
+long(string str) {
     write(long_desc);
 }
 
-id(str)
+int id(string str)
 {
     return str == name || str == alias || str == type;
 }
 
-test_type(str)
+object test_type(string str)
 {
     if(str == type)
 	return this_object();
@@ -95,24 +95,24 @@ test_type(str)
     return 0;
 }
 
-tot_ac()
+int tot_ac()
 {
     if(next)
 	return ac + next->tot_ac();
     return ac;
 }
 
-query_type() { return type; }
+string query_type() { return type; }
 
-query_value() { return value; }
+int query_value() { return value; }
 
-query_worn() { return worn; }
+int query_worn() { return worn; }
 
-query_name() { return name; }
+string query_name() { return name; }
 
-armour_class() { return ac; }
+int armour_class() { return ac; }
 
-wear(str)
+int wear(string str)
 {
     object ob;
 
@@ -138,9 +138,9 @@ write("Worn armour " + ob->short() + ".\n");
     return 1;
 }
 
-get() { return 1; }
+int get() { return 1; }
 
-drop(silently) {
+int drop(int silently) {
     if (worn) {
 	worn_by->stop_wearing(name);
 	worn = 0;
@@ -151,7 +151,7 @@ drop(silently) {
     return 0;
 }
 
-remove(str) {
+int remove(string str) {
     if (!id(str))
 	return 0;
     if (!worn) {
@@ -163,24 +163,24 @@ remove(str) {
     return 1;
 }
 
-query_weight() { return weight; }
+int query_weight() { return weight; }
 
-set_id(n) { name = n; }
-set_name(n) { name = n; }
-set_short(s) { short_desc = s; long_desc = s + ".\n"; }
-set_value(v) { value = v; }
-set_weight(w) { weight = w; }
-set_ac(a) { ac = a; }
-set_alias(a) { alias = a; }
-set_long(l) { long_desc = l; }
-set_type(t) {
+void set_id(string n) { name = n; }
+void set_name(string n) { name = n; }
+void set_short(string s) { short_desc = s; long_desc = s + ".\n"; }
+void set_value(int v) { value = v; }
+void set_weight(int w) { weight = w; }
+void set_ac(int a) { ac = a; }
+void set_alias(string a) { alias = a; }
+void set_long(string l) { long_desc = l; }
+void set_type(string t) {
  type = t;
 }
-set_arm_light(l) { set_light(l); }
-set_info(i) {
+void set_arm_light(int l) { set_light(l); }
+void set_info(string i) {
     info = i;
 }
 
-query_info() {
+string query_info() {
     return info;
 }

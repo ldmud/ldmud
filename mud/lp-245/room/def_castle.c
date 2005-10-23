@@ -9,30 +9,42 @@
  * ourself to where we are supposed to be.
  */
 
-id(str) { return str == "castle"; }
+/* In the blueprint, both NAME and DEST are undefined. To make it
+ * possible to check the blueprint for errors, provide default
+ * definitions.
+ */
+#ifndef NAME
+#  define NAME "Nobody"
+#endif
 
-short() {
+#ifndef DEST
+#  define DEST "/room/church"
+#endif
+
+int id(string str) { return str == "castle"; }
+
+string short() {
     return "Castle of " + NAME;
 }
 
-long() {
+void long() {
     write("This is the " + short() + ".\n");
     write(NAME + " is a rather new wizard, but it is an amazing castle\n");
     write("just the same. However, the gates are closed.\n");
 }
 
-init() {
+void init() {
     add_action("enter", "enter");
 }
 
-enter(str) {
+int enter(string str) {
     if (!id(str))
 	return 0;
     write("It is not an open castle.\n");
     return 1;
 }
 
-reset(arg) {
+void reset(int arg) {
     if (arg)
 	return;
     move_object(this_object(), DEST);

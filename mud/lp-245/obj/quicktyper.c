@@ -28,9 +28,9 @@ and bug reports etc should be sent to me
 #include "debug.h"
 
 string	owner;
-object	list_ab;
-object	list_cmd;
-object	list_history;
+string	* list_ab;
+string	* list_cmd;
+string	* list_history;
 
 #define MAX_HISTORY	20
 int	history_pos;
@@ -46,7 +46,7 @@ contains();
 /*
   return som info for the interested
  */
-query_info()
+string query_info()
 {
     return "A magic quick typing utility made by Tech.";
 }
@@ -54,7 +54,7 @@ query_info()
 /*
   make it possible to retrieve information from the quicktyper
  */
-query_quicktyper(arg)
+mixed query_quicktyper(int arg)
 {
     if(arg == 0) {
 	return list_ab;
@@ -74,7 +74,7 @@ query_quicktyper(arg)
     return 0;
 }
 
-id(str)
+int id(string str)
 {
     if(str && (str == "quicktyper" || str == owner + "'s quicktyper" || str == "tech_quicktyper")) {
 	return 1;
@@ -82,14 +82,14 @@ id(str)
     return 0;
 }
 
-query_name()
+string query_name()
 {
     return owner + "'s quicktyper";
 }
 
 object	ob;	/* used to hold this_player() */
 
-    reset(arg)
+void reset(int  arg)
 {
 
     if(is_debug) {
@@ -112,11 +112,9 @@ object	ob;	/* used to hold this_player() */
     if(!list_history) {
 	list_history = allocate(MAX_HISTORY);
     }
-
-
 }
 
-init_alias_list() {
+void init_alias_list() {
     object	obj;
 
 #if 0
@@ -151,13 +149,13 @@ init_alias_list() {
     }
 }
 
-init(arg)
+void init()
 {
     int	i;
     object	obj;
 
     if(is_debug) {
-	write("init(" + arg + ")\n");
+	write("init()\n");
 	write("this_object()="); write(this_object()); write("\n");
 	write("environment(this_object())="); write(environment(this_object())); write("\n");
 	write("this_player()="); write(this_player()); write("\n");
@@ -213,14 +211,14 @@ init(arg)
     }
 }
 
-do_refresh() {
+int do_refresh() {
     write("Refreshing Quicktyper ..");
     refresh(this_player());
     write("Done.\n");
     return 1;
 }
 
-refresh(obj) {
+int refresh(object obj) {
 
     int	may_need_warning;
 
@@ -257,7 +255,7 @@ refresh(obj) {
 
 int	wrapped;
 
-do_old(verb, str) {
+int do_old(string verb, string str) {
     int	pos;
     string	temp;
 
@@ -372,7 +370,7 @@ do_old(verb, str) {
     return 0;
 }
 
-history() {
+int history() {
     int	i;
     int	number;
 
@@ -410,7 +408,7 @@ string	last_str_added;
 int	counter;
 #define COUNT_UNTIL_REFRESH	40
 
-history_add(str) {
+int history_add(string str) {
 
     string	verb;
     int	i;
@@ -493,14 +491,14 @@ history_add(str) {
     return 0;
 }
 
-short()
+string short()
 {
     int	temp;
 
     return owner + "'s quicktyper";
 }
 
-long()
+void long()
 {
     write("This is a typing aid to allow long commands to be replaced with short aliases.\n");
     write("It also contains a history of your commands\n");
@@ -508,7 +506,7 @@ long()
 
 }
 
-version(str) {
+int version(string str) {
     if(!str || !id(str)) {
 	return 0;
     }
@@ -516,7 +514,7 @@ version(str) {
     return 1;
 }
 
-alias(str) {
+int alias(string str) {
     int	i;
     string	ab, cmd;
 
@@ -579,7 +577,7 @@ alias(str) {
     return 0;
 }
 
-help(str) {
+int help(string str) {
     if(!str || !id(str)) {
 	return 0;
     }
@@ -609,7 +607,7 @@ help(str) {
     return 1;
 }
 
-get()
+int get()
 {
     if(contains("tech_quicktyper", this_player())) {
 	return 0;
@@ -617,17 +615,17 @@ get()
     return 1;
 }
 
-drop()
+int drop()
 {
     return 1;	/* cant drop ! */
 }
 
-query_value()
+int query_value()
 {
     return 0;	/* no value */
 }
 
-query_auto_load()
+string query_auto_load()
 {
     string	temp;
     int	i, count;
@@ -652,7 +650,7 @@ query_auto_load()
     return temp;	
 }
 
-do_it(str)
+int do_it(string str)
 {
     int	i;
     string	verb;
@@ -698,7 +696,7 @@ do_it(str)
     return 0;
 }
 
-init_arg(arg) {
+void init_arg(string arg) {
     int	temp;
     int	count, place;
     string	ab, cmd;
@@ -735,7 +733,7 @@ string	more_cmds;
 int	first_call;
 int	paused;
 
-heart_beat()
+void  heart_beat()
 {
     string	the_rest;
     string	cmd;
@@ -769,7 +767,7 @@ heart_beat()
     }
 }
 
-do_cmd(str)
+int do_cmd(string  str)
 {
 
     if(!str || str == "")  {
@@ -800,7 +798,7 @@ do_cmd(str)
     return 1;
 }
 
-resume() {
+int resume() {
     if(paused && ob && more_cmds && more_cmds != "") {
 	paused = 0;
 	first_call = 1;
@@ -817,7 +815,7 @@ resume() {
 
 /* check to see if an object "obj" contains another object "str" */
 
-contains(str, obj)
+int contains(string str, object obj)
 {
     object	ob;
 

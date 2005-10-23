@@ -3,21 +3,21 @@
 string file;
 int line;
 
-id(str) {
+int id(string str) {
     return str == "less" || str == "lesser";
 }
 
-short() {
+string short() {
     if (!file)
 	return "Lesser object";
     return "Less " + file;
 }
 
-init() {
+void init() {
     add_action("less", "less");
 }
 
-input(str) {
+void input(string str) {
     if (str == "" || str == "d")
 	line += CHUNK;
     else if (str == "q") {
@@ -37,18 +37,18 @@ input(str) {
     input_to("input");
 }
 
-less(str) {
+int less(string str) {
     file = str;
     line = 1;
     if (cat(file, line, CHUNK) == 0) {
 	write("No such file\n");
-	return;
+	return 0;
     }
     input_to("input");
     write(CHUNK + 1 + " more: ");
     return 1;
 }
 
-get() { return 1; }
+int get() { return 1; }
 
-query_value() { return 20; }
+int query_value() { return 20; }

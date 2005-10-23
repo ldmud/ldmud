@@ -109,13 +109,13 @@ int Str, Int, Con, Dex;
  * reduce_hit_point	Reduce hit points, but not below 0.
  */
 
-attack_object();
-stop_fight();
-transfer_all_to();
-short();
-query_gender_string();
-query_stats();
-show_age();
+void attack_object(object ob);
+void stop_fight();
+void transfer_all_to(object dest);
+string short();
+string query_gender_string();
+string query_stats();
+void show_age();
 
 /*
  * This routine is called from objects that moves the player.
@@ -125,9 +125,10 @@ show_age();
  * If the second argument exists, then the first argument is taken
  * as the movement message only.
  */
-move_player(dir_dest, optional_dest_ob)
+void move_player(string dir_dest, object optional_dest_ob)
 {
-    string dir, dest;
+    string dir;
+    object dest;
     object ob;
     int is_light, i;
 
@@ -221,7 +222,7 @@ move_player(dir_dest, optional_dest_ob)
  * heart_beat() from another player.
  * Compare this function to reduce_hit_point(dam).
  */
-hit_player(dam) {
+int hit_player(int dam) {
     if (!attacker_ob)
 	set_heart_beat(1);
     if (!attacker_ob && this_player() != this_object())
@@ -283,7 +284,7 @@ hit_player(dam) {
     return dam;
 }
 
-transfer_all_to(dest)
+void transfer_all_to(object dest)
 {
     object ob;
     object next_ob;
@@ -305,24 +306,24 @@ transfer_all_to(dest)
     money = 0;
 }
 
-query_name() {
+string query_name() {
     if (ghost)
 	return NAME_OF_GHOST;
     return cap_name;
 }
 
-query_alignment() {
+int query_alignment() {
     return alignment;
 }
 
-query_npc() {
+int query_npc() {
     return is_npc;
 }
 
 /*
  * This routine is called when we are attacked by a player.
  */
-attacked_by(ob) {
+void attacked_by(object ob) {
     if (!attacker_ob) {
 	attacker_ob = ob;
 	set_heart_beat(1);
@@ -334,7 +335,7 @@ attacked_by(ob) {
     }
 }
 
-show_stats() {
+void show_stats() {
     int i;
     write(short() + "\nlevel:\t" + level +
 	  "\ncoins:\t" + money +
@@ -362,7 +363,7 @@ show_stats() {
     show_age();
 }
 
-stop_wielding() {
+void stop_wielding() {
     if (!name_of_weapon) {
 	/* This should not happen ! */
 	log_file("wield_bug", "Weapon not wielded !\n");
@@ -374,7 +375,7 @@ stop_wielding() {
     weapon_class = 0;
 }
 
-stop_wearing(name) {
+void stop_wearing(string name) {
     if(!head_armour) {
 	/* This should not happen ! */
 	log_file("wearing_bug", "armour not worn!\n");
@@ -394,23 +395,23 @@ stop_wearing(name) {
     write("Ok.\n");
 }
 
-query_level() {
+int query_level() {
     return level;
 }
 
 /* This object is not worth anything in the shop ! */
-query_value() { return 0; }
+int query_value() { return 0; }
 
 /* It is never possible to pick up a player ! */
-get() { return 0; }
+int get() { return 0; }
 
 /*
  * Return true if there still is a fight.
  */
-attack()
+int attack()
 {
     int tmp;
-    int whit;
+    mixed whit;
     string name_of_attacker;
 
     if (!attacker_ob) {
@@ -538,7 +539,7 @@ attack()
 	return 1;
 }
 
-query_attack() {
+object query_attack() {
     /* Changed by Herder */
     return attacker_ob;
     /* OLD
@@ -548,7 +549,7 @@ query_attack() {
     */
 }
 
-drop_all_money(verbose) {
+void drop_all_money(int verbose) {
     object mon;
     if (money == 0)
 	return;
@@ -563,7 +564,7 @@ drop_all_money(verbose) {
 }
 
 /* Wield a weapon. */
-wield(w) {
+void wield(object w) {
     if (name_of_weapon)
 	stop_wielding();
     name_of_weapon = w;
@@ -573,7 +574,7 @@ wield(w) {
 }
 
 /* Wear some armour. */
-wear(a) {
+object wear(object a) {
     object old;
 
     if(head_armour) {
@@ -591,14 +592,14 @@ wear(a) {
     return 0;
 }
 
-add_weight(w) {
+int add_weight(int w) {
     if (w + local_weight > Str + 10 && level < 20)
 	return 0;
     local_weight += w;
     return 1;
 }
 
-heal_self(h) {
+void  heal_self(int h) {
     if (h <= 0)
 	return;
     hit_point += h;
@@ -609,18 +610,18 @@ heal_self(h) {
 	spell_points = max_sp;
 }
 
-restore_spell_points(h) {
+void restore_spell_points(int h) {
     spell_points += h;
     if (spell_points > max_sp)
 	spell_points = max_sp;
 }
 
-can_put_and_get(str)
+int can_put_and_get(string str)
 {
     return str != 0;
 }
 
-attack_object(ob)
+void attack_object(object ob)
 {
    if (ob->query_ghost())
        return;
@@ -642,9 +643,9 @@ attack_object(ob)
    attack();
 }
 
-query_ghost() { return ghost; }
+int query_ghost() { return ghost; }
 
-zap_object(ob)
+void zap_object(object ob)
 {
     ob->attacked_by(this_object());
     say(cap_name + " summons a flash from the sky.\n");
@@ -653,7 +654,7 @@ zap_object(ob)
     write("There is a big clap of thunder.\n\n");
 }
 
-missile_object(ob)
+void missile_object(object ob)
 {
     if (spell_points < 10) {
 	write("Too low on power.\n");
@@ -665,7 +666,7 @@ missile_object(ob)
     attacker_ob = ob;
 }
 
-shock_object(ob)
+void shock_object(object ob)
 {
     if (spell_points < 15) {
 	write("Too low on power.\n");
@@ -677,7 +678,7 @@ shock_object(ob)
     attacker_ob = ob;
 }
 
-fire_ball_object(ob)
+void fire_ball_object(object ob)
 {
     if (spell_points < 20) {
 	write("Too low on power.\n");
@@ -693,12 +694,12 @@ fire_ball_object(ob)
  * If no one is here (except ourself), then turn off the heart beat.
  */
 
-test_if_any_here()
+int test_if_any_here()
 {
     object ob;
     ob = environment();
     if (!ob)
-	return;
+	return 0;
     ob = first_inventory(environment());
     while(ob) {
 	if (ob != this_object() && living(ob) && !ob->query_npc())
@@ -708,7 +709,7 @@ test_if_any_here()
     return 0;
 }
 
-show_age() {
+void show_age() {
     int i;
 
     write("age:\t");
@@ -728,7 +729,7 @@ show_age() {
     write(i*2 + " seconds.\n");
 }
 
-stop_hunter()
+void stop_hunter()
 {
     hunter = 0;
     tell_object(this_object(), "You are no longer hunted.\n");
@@ -738,7 +739,7 @@ stop_hunter()
  * This function remains only because of compatibility, as command() now
  * can be called with an object as argument.
  */
-force_us(cmd) {
+void force_us(string cmd) {
     if (!this_player() || this_player()->query_level() <= level ||
 	query_ip_number(this_player()) == 0) {
 	tell_object(this_object(), this_player()->query_name() +
@@ -749,7 +750,7 @@ force_us(cmd) {
 }
 
 /* This is used by the shop etc. */
-add_money(m) {
+void add_money(int m) {
 #ifdef LOG_EXP
     if (this_player() && this_player() != this_object() &&
       query_ip_number(this_player()) && query_ip_number(this_object()) &&
@@ -763,19 +764,19 @@ add_money(m) {
 	add_worth(m);
 }
 
-query_money() {
+int query_money() {
     return money;
 }
 
-query_exp() {
+int query_exp() {
     return experience;
 }
 
-query_frog() {
+int query_frog() {
     return frog;
 }
 
-frog_curse(arg) {
+int frog_curse(string arg) {
     if (arg) {
 	if (frog)
 	    return 1;
@@ -788,7 +789,7 @@ frog_curse(arg) {
     return 0;
 }
 
-run_away() {
+void run_away() {
     object here;
     int i, j;
 
@@ -816,36 +817,36 @@ run_away() {
     }
 }
 
-query_hp() {
+int query_hp() {
     return hit_point;
 }
 
-query_wimpy() {
+int query_wimpy() {
     return whimpy;
 }
 
-query_current_room() {
+string query_current_room() {
     return object_name(environment(this_object()));
 }
 
-query_spell_points() {
+int query_spell_points() {
     return spell_points;
 }
 
-stop_fight() {
+void stop_fight() {
     attacker_ob = alt_attacker_ob;
     alt_attacker_ob = 0;
 }
 
-query_wc() {
+int query_wc() {
     return weapon_class;
 }
 
-query_ac() {
+int  query_ac() {
     return armour_class;
 }
 
-reduce_hit_point(dam) {
+int reduce_hit_point(int dam) {
     object o;
     if(this_player()!=this_object()) {
 	log_file("REDUCE_HP",query_name()+" by ");
@@ -867,26 +868,26 @@ reduce_hit_point(dam) {
     return hit_point;
 }
 
-query_age() {
+int query_age() {
     return age;
 }
 
 /*----------- Most of the gender handling here: ------------*/
 
-query_gender() { return gender; }
-query_neuter() { return !gender; }
-query_male() { return gender == 1; }
-query_female() { return gender == 2; }
+int query_gender() { return gender; }
+int query_neuter() { return !gender; }
+int query_male() { return gender == 1; }
+int query_female() { return gender == 2; }
 
-set_gender(g) {
+void set_gender(int g) {
     if (g == 0 || g == 1 || g == 2)
         gender = g;
 }
-set_neuter() { gender = 0; }
-set_male() { gender = 1; }
-set_female() { gender = 2; }
+int set_neuter() { gender = 0; }
+int set_male() { gender = 1; }
+int set_female() { gender = 2; }
 
-query_gender_string() {
+string query_gender_string() {
     if (!gender)
 	return "neuter";
     else if (gender == 1)
@@ -895,7 +896,7 @@ query_gender_string() {
 	return "female";
 }
 
-query_pronoun() {
+string query_pronoun() {
     if (!gender)
 	return "it";
     else if (gender == 1)
@@ -904,7 +905,7 @@ query_pronoun() {
 	return "she";
 }
 
-query_possessive() {
+string query_possessive() {
     if (!gender)
 	return "its";
     else if (gender == 1)
@@ -913,7 +914,7 @@ query_possessive() {
 	return "her";
 }
 
-query_objective() {
+string query_objective() {
     if (!gender)
 	return "it";
     else if (gender == 1)
@@ -928,7 +929,7 @@ query_objective() {
  * he then may use. If you mainpulate bits that you don't know what they
  * are used for, unexpected things can happen.
  */
-set_flag(n) {
+void set_flag(int n) {
     if (flags == 0)
 	flags = "";
 #ifdef LOG_FLAGS
@@ -944,13 +945,13 @@ set_flag(n) {
     flags = set_bit(flags, n);
 }
 
-test_flag(n) {
+int test_flag(int n) {
     if (flags == 0)
 	flags = "";
     return test_bit(flags, n);
 }
 
-clear_flag(n) {
+int clear_flag(int n) {
     if (flags == 0)
 	flags = "";
 #ifdef LOG_FLAGS
@@ -968,40 +969,40 @@ clear_flag(n) {
     return 1;
 }
 
-query_stats() {
+string query_stats() {
     return "str:\t" + Str +
 	  "\nint:\t" + Int +
 	  "\ncon:\t" + Con +
 	  "\ndex:\t" + Dex + "\n";
 }
 
-query_str() { return Str; }
-query_int() { return Int; }
-query_con() { return Con; }
-query_dex() { return Dex; }
+int query_str() { return Str; }
+int query_int() { return Int; }
+int query_con() { return Con; }
+int query_dex() { return Dex; }
 
 /* Note that previous object is 0 if called from ourselves. */
-set_str(i) {
+void set_str(int i) {
     if (i<1 || i > 20)
 	return;
     Str = i;
 }
 
-set_int(i) {
+void set_int(int i) {
     if (i<1 || i > 20)
 	return;
     Int = i;
     max_sp = 42 + Int * 8;
 }
 
-set_con(i) {
+void set_con(int i) {
     if (i<1 || i > 20)
 	return;
     Con = i;
     max_hp = 42 + Con * 8;
 }
 
-set_dex(i) {
+void  set_dex(int i) {
     if (i<1 || i > 20)
 	return;
     Dex = i;

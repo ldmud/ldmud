@@ -2,7 +2,7 @@
 
 inherit "room/room";
 
-reset(arg) {
+void reset(int arg) {
     if (arg) return;
 
     set_light(1);
@@ -15,10 +15,10 @@ reset(arg) {
         });
 }
 
-query_light() {
+int query_light() {
     return 1;
 }
-query_room_maker() {
+int query_room_maker() {
     return 101;
 }
 
@@ -28,7 +28,7 @@ query_room_maker() {
     to be lost by using the room maker
 */
 /*
-room_is_modified() {
+int room_is_modified() {
     return 1;
 }
 */

@@ -1,6 +1,6 @@
 inherit "room/room";
 
-reset(arg) {
+void reset(int arg) {
     if (arg) return;
 
     set_light(1);
@@ -12,7 +12,7 @@ reset(arg) {
     dest_dir = ({"room/shop", "east"});
 }
 
-init(arg)
+void init()
 {
 	object	ob;
 	int	does_exist;
@@ -28,6 +28,6 @@ init(arg)
 			move_object(ob, this_object());
 		}
 	}
-	::init(arg);
+	::init();
 }
 

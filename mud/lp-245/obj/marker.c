@@ -1,13 +1,13 @@
 object mark;
 
-init() {
+void init() {
     add_action("i_dump", "i_dump");
     add_action("i_mark", "i_mark");
     add_action("i_destruct", "i_destruct");
     add_action("i_call", "i_call");
 }
 
-i_dump(str) {
+int i_dump(string str) {
     int tmp;
     if (mark == 0) {
 	write("Nothing marked.\n");
@@ -41,8 +41,8 @@ i_dump(str) {
     return 1;
 }
 
-i_mark(str) {
-    string tmp;
+int i_mark(string str) {
+    mixed tmp;
 
     if (str == 0)
 	return 0;
@@ -98,15 +98,15 @@ i_mark(str) {
     return 0;
 }
 
-id(str) {
+int id(string str) {
     return str == "marker";
 }
 
-short() {
+string short() {
     return "Lars marker object";
 }
 
-long() {
+void long() {
     write("Commands available:\n");
     write("i_mark living 'name'\n");
     write("i_mark here\n");
@@ -118,13 +118,13 @@ long() {
     write("i_call 'function' 'argument'\n");
 }
 
-get() { return 1;}
+voidget() { return 1;}
 
-query_value() {
+int query_value() {
     return 10;
 }
 
-i_destruct() {
+int i_destruct() {
     object ob;
     if (!mark)
 	return 0;
@@ -135,7 +135,7 @@ i_destruct() {
     return 1;
 }
 
-i_call(str) {
+int i_call(string str) {
     string with, what;
     int iwhat;
 

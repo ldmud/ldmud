@@ -6,66 +6,13 @@ inherit "room/room";
 #define WRITE(x) tell_object(players[j], x)
 #define SPEAK(x) tell_object(players[j], "Death says: " + x)
 
-int players;
-
-init()
-{
-
-	object death;
-
-	::init();
-
-	death = find_living("moot");
-
-	add_action("filter", "", 1);
-
-	if (this_player() != death)
-	{
-
-		if(this_player()->query_ghost() != 1)
-		{
-
-			write("Death says: WHAT ARE YOU DOING HERE? YOUR TIME HAS NOT COME YET. BEGONE!\n");
-			move_object(this_player(), "/room/church");
-			return;
-		}
-
-		add_player(this_player());
-		set_heart_beat(1);
-	}
-
-}
-
-
-/*
- * Function name: reset
- * Description:   Reset the room
- */
-reset(arg)
-{
-
-	if (arg)
-		return;
-
-	create_death();
-	players = 0;
-	set_light(1);
-	no_castle_flag = 1;
-	short_desc = "death's workroom";
-	long_desc = "A dark room lighted with a dark light that seems to defy darkness not so much\n" +
-		"by actually illuminating the room as by being a darkpoint in less dark\n" +
-		"surroundings. In the strange light (dark?) you can see a centrally placed desk\n" +
-		"covered with books and diagrams. The walls are covered with bookshelves\n" +
-		"filled with dark tomes bound in leather that gleam with strange runes.\n\n";
-	dest_dir = 0;
-
-}
+mixed * players;
 
 /*
  * Function name: create_death
  * Description:   Create death.
  */
-create_death()
+void create_death()
 {
 
 	object death;
@@ -75,10 +22,52 @@ create_death()
 }
 
 /*
+ * Function name: remove_death_obj
+ * Description:   Remove the "death_mark"-object.
+ */
+void remove_death_obj(object player)
+{
+	
+	object plobj;
+
+	plobj = present("death_mark", player);
+
+	while (plobj = present("death_mark", player))
+	    destruct(plobj);
+}
+
+/*
+ * Function name: do_remove
+ * Description:   Removes players that's finished
+ */
+void do_remove()
+{
+	int j, nr;
+
+	if (!players)
+		return;
+
+	nr = sizeof(players);
+
+	for (j = 0 ; j < nr ; j += 2)
+	{
+		if (players[j + 1] == 70)
+		{
+			remove_death_obj(players[j]);
+			move_object(players[j], "/room/church");
+			/* Note that move_object() will call exit() */
+			/* remove_player(players[j]); */
+			do_remove();
+			return;
+		}
+	}
+}
+
+/*
  * Function name: heart_beat
  * Description:   Let the actions be governed by time.
  */
-heart_beat()
+void heart_beat()
 {
 
     int align, j, nr;
@@ -284,55 +273,14 @@ heart_beat()
 }
 
 /*
- * Function name: do_remove
- * Description:   Removes players that's finished
- */
-do_remove()
-{
-	int j, nr;
-
-	if (!players)
-		return;
-
-	nr = sizeof(players);
-
-	for (j = 0 ; j < nr ; j += 2)
-	{
-		if (players[j + 1] == 70)
-		{
-			remove_death_obj(players[j]);
-			move_object(players[j], "/room/church");
-			/* Note that move_object() will call exit() */
-			/* remove_player(players[j]); */
-			do_remove();
-			return;
-		}
-	}
-}
-
-/*
- * Function name: remove_death_obj
- * Description:   Remove the "death_mark"-object.
- */
-remove_death_obj(player)
-{
-	
-	object plobj;
-
-	plobj = present("death_mark", player);
-
-	while (plobj = present("death_mark", player))
-	    destruct(plobj);
-}
-
-/*
  * Function name: add_player
  * Description:   Adds a player to the list
  */
-add_player(plobj)
+void add_player(object plobj)
 {
 
-	int i, j, oldlist;
+	int i, j;
+        mixed * oldlist;
 
 	oldlist = players;
 
@@ -358,10 +306,11 @@ add_player(plobj)
  * Function name: remove_player
  * Description:   Removes a player from the list
  */
-remove_player(plobj)
+void remove_player(object plobj)
 {
 
-	int i, j, x, oldlist;
+	int i, j, x;
+        mixed * oldlist;
 
 	if(!players)
 		return;
@@ -399,7 +348,7 @@ remove_player(plobj)
  * Function name: exit
  * Description:   Remove players if they leave the room prematurly
  */
-exit(ob)
+void exit(object ob)
 {
 
 	remove_player(ob);
@@ -410,7 +359,7 @@ exit(ob)
  * Function name: filter
  * Description:   Filter out relevant commands.
  */
-filter(str)
+int filter(string str)
 {
 
 	string verb;
@@ -434,7 +383,7 @@ filter(str)
 
 }
 
-long(str)
+void long(string str)
 {
     int i;
     ::long(str);
@@ -451,3 +400,57 @@ long(str)
 	}
     }
 }
+
+void init()
+{
+
+	object death;
+
+	::init();
+
+	death = find_living("moot");
+
+	add_action("filter", "", 1);
+
+	if (this_player() != death)
+	{
+
+		if(this_player()->query_ghost() != 1)
+		{
+
+			write("Death says: WHAT ARE YOU DOING HERE? YOUR TIME HAS NOT COME YET. BEGONE!\n");
+			move_object(this_player(), "/room/church");
+			return;
+		}
+
+		add_player(this_player());
+		set_heart_beat(1);
+	}
+
+}
+
+
+/*
+ * Function name: reset
+ * Description:   Reset the room
+ */
+void reset(int arg)
+{
+
+	if (arg)
+		return;
+
+	create_death();
+	players = 0;
+	set_light(1);
+	no_castle_flag = 1;
+	short_desc = "death's workroom";
+	long_desc = "A dark room lighted with a dark light that seems to defy darkness not so much\n" +
+		"by actually illuminating the room as by being a darkpoint in less dark\n" +
+		"surroundings. In the strange light (dark?) you can see a centrally placed desk\n" +
+		"covered with books and diagrams. The walls are covered with bookshelves\n" +
+		"filled with dark tomes bound in leather that gleam with strange runes.\n\n";
+	dest_dir = 0;
+
+}
+

@@ -2,50 +2,50 @@ string type;
 string code;
 
 
-short()
+string short()
 {
  return "A " + type + " key";
 }
 
-set_key_data( str)
+int set_key_data(string  str)
 {
   if ( sscanf(str, "%s %s", type, code) == 2)
     return 1;
   return 2;
 }
-long()
+void long()
 {
  write("\nThis a " + type + " key, wonder where it fits?\n");
 }
 
-id( strang)
+int id(string  strang)
 {
  if ( ( strang == "key" )||( strang == type + " key")||( strang == "H_key") )
    return 1;
  return 0;
 }
 
-get()
+int get()
 {
   return 1;
 }
 
-query_value()
+int query_value()
 {
  return 10;
 }
 
-query_type() { return type; }
-query_code() { return code; }
+string query_type() { return type; }
+string query_code() { return code; }
 
-set_type( str) { type = str; }
-set_code( str) { code = str; }
+void set_type( string str) { type = str; }
+void set_code( string str) { code = str; }
 
-init()
+void init()
 {
 }
 
-reset( arg)
+void reset( int arg)
 {
  if(arg)
    return;

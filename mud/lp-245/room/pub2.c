@@ -7,7 +7,10 @@ int problem_value;
 
 object rules;
 
-reset(arg) {
+void start_player();
+void notify(string str);
+
+void reset(int arg) {
     start_player();
     if (!top_list || !present(top_list, this_object())) {
 	top_list = clone_object("obj/level_list");
@@ -21,18 +24,18 @@ reset(arg) {
     set_light( 1);
 }
 
-short() {
+string short() {
     return "The local pub";
 }
 
-init() {
+void init() {
     add_action("move", "west");
     add_action("order", "order");
     add_action("order", "buy");
     add_action("look", "look");
 }
 
-move() {
+int move() {
 #ifdef MUST_STAY_WITH_DRINKS
      if (has_drink(this_player())) {
         tell_object(this_player(),
@@ -44,7 +47,7 @@ move() {
      return 1;
 }
 
-long() {
+void long() {
     write("You are in the local pub.\n");
     write("You can order drinks here.\n\n");
     write("     First class beer    : 12 coins\n");
@@ -54,7 +57,7 @@ long() {
     write("The only obvious exit is to " +  "west" + ".\n");
 }
 
-order(str)
+int order(string str)
 {
     object drink;
     string name, short_desc, mess;
@@ -127,9 +130,9 @@ order(str)
 /*
  * Make this global, and only initialized once.
  */
-string chat_str, function, type, match;
+string * chat_str, * function, * type, * match;
 
-start_player() {
+void start_player() {
     if(!player) {
 	player = clone_object("obj/monster");
 	player->set_name("player");
@@ -170,7 +173,7 @@ start_player() {
     current_problem = 0;
 }
 
-got_play(str) {
+int got_play(string str) {
     string who, what;
     if (sscanf(str, "%s tells you: play %s\n", who , what) == 2 ||
 	sscanf(str, "%s says: play %s\n", who , what) == 2) {
@@ -203,7 +206,7 @@ got_play(str) {
     }
 }
 
-show_problem() {
+void show_problem() {
     if(current_problem > 2) {
 	write("The player looks tired.\n");
 	return;
@@ -250,7 +253,7 @@ show_problem() {
     }
 }
 
-make_move(str) {
+void make_move(string str) {
     if (solved_by) {
 	int i;
 	i = current_problem + 1;
@@ -269,12 +272,12 @@ make_move(str) {
     }
 }
 
-notify(str) {
+void notify(string str) {
     say(str);
     write(str);
 }
 
-look(str) {
+int look(string str) {
     string what, rest;
     if(str) {
 	if(!player || !living(player))
@@ -290,8 +293,8 @@ look(str) {
 }
 
 #ifdef MUST_STAY_WITH_DRINKS
-has_drink(obj) {
-     status drink;
+int has_drink(object obj) {
+     int drink;
      object ob;
      ob = first_inventory(obj);
      while(ob) {
@@ -307,6 +310,6 @@ has_drink(obj) {
 }
 #endif
 
-query_drop_castle() {
+int query_drop_castle() {
     return 1;
 }

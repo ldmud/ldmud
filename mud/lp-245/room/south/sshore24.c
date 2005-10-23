@@ -1,22 +1,22 @@
-reset(started)
+void reset(int started)
 {
     if (!started)
 	set_light(1);
 }
 
-init()
+void init()
 {
     add_action("west", "west");
     add_action("east", "east");
     add_action("southeast", "southeast");
 }
 
-short()
+string short()
 {
     return "The shore of Crescent Lake";
 }
 
-long()
+void long()
 {
     write("You are standing on the shore of Crescent Lake, a beautiful and\n" +
 	  "clear lake. Out in the centre of the lake stands the Isle\n" +
@@ -25,19 +25,19 @@ long()
 	  "The shore of Crescent Lake continues southeast and west\n");
 }
 
-east()
+int east()
 {
     this_player()->move_player("east#room/south/sforst49");
     return 1;
 }
 
-west()
+int west()
 {
     this_player()->move_player("west#room/south/sshore23");
     return 1;
 }
 
-southeast()
+int southeast()
 {
     this_player()->move_player("southeast#room/south/sshore25");
     return 1;

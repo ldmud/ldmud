@@ -5,7 +5,7 @@ object gold_stick, orc_slayer, shaman;
 #undef EXTRA_RESET
 #define EXTRA_RESET fix_shaman();
 
-fix_shaman()
+void fix_shaman()
 {
     if (!shaman || !living(shaman)) {
 	gold_stick = clone_object("obj/treasure");
@@ -50,7 +50,7 @@ ONE_EXIT("room/fortress", "south",
 	 "The orc treasury",
 	 "You are in the orc treasury. It is normally heavily guarded.\n", 1)
 
-weapon_hit(attacker)
+int weapon_hit(object attacker)
 {
     string alig;
 

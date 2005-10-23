@@ -1,20 +1,20 @@
-short() {
+string short() {
     return "The local prison";
 }
 
-long() {
+void long() {
     write("You are in the local prison.\n");
     write("There are no exits.\n");
 }
 
-reset(arg) {
+void reset(int arg) {
     if (arg)
 	return;
     set_light(1);
 }
 
-init() {
+void init() {
     add_action("quit", "quit");
 }
 
-quit() { return 1; }
+int quit() { return 1; }

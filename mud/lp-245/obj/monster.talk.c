@@ -57,12 +57,16 @@ object init_ob;
 
 int random_pick;
 
-int spell_chance, spell_dam;
+int spell_chance;
 string spell_mess1, spell_mess2;
 object me;
 object create_room;
 
-reset(arg)
+void random_move();
+void heal_slowly();
+void pick_any_obj();
+
+void reset(int arg)
 {
     if (arg) {
 	if (move_at_reset)
@@ -75,7 +79,7 @@ reset(arg)
     create_room = environment(me);
 }
 
-random_move()
+void random_move()
 {
     int n;
     n = random(4);
@@ -89,17 +93,17 @@ random_move()
 	command("north");
 }
 
-short() {
+string short() {
     return short_desc;
 }
 
-long() {
+void long() {
     write (long_desc);
 }
 
-id(str) { return str == name || str == alias || str == race || str == alt_name; }
+int id(string str) { return str == name || str == alias || str == race || str == alt_name; }
 
-heart_beat()
+void heart_beat()
 {
     int c;
 
@@ -157,7 +161,7 @@ heart_beat()
     }
 }
 
-can_put_and_get(str)
+int can_put_and_get(string str)
 {
     if (!str)
 	return 0;
@@ -166,7 +170,7 @@ can_put_and_get(str)
 
 int busy_catch_tell;
 
-catch_tell(str) {
+void catch_tell(string str) {
     string who;
 
     if (busy_catch_tell)	/* Should not happen, but does ! */
@@ -191,7 +195,7 @@ catch_tell(str) {
  * Call them in the order they appear.
  */
 
-set_name(n) {
+void set_name(string n) {
     name = n;
     alignment = 0;		/* Neutral monster */
     cap_name = capitalize(n);
@@ -199,7 +203,7 @@ set_name(n) {
     long_desc = "You see nothing special.\n";
 }
 
-set_level(l) {
+void set_level(int l) {
     level = l;
     weapon_class = level / 2 + 3;
     armour_class = level / 4;
@@ -213,32 +217,32 @@ set_level(l) {
 }
 
 /* Optional */
-set_alias(a) { alias = a; }
+void set_alias(string a) { alias = a; }
 /* Optional */
-set_alt_name(a) { alt_name = a; }
+void set_alt_name(string a) { alt_name = a; }
 /* Optional */
-set_race(r) { race = r; }
+void set_race(string r) { race = r; }
 /* optional */
-set_hp(hp) { max_hp = hp; hit_point = hp; }
+void set_hp(int hp) { max_hp = hp; hit_point = hp; }
 /* optional. Can only be lowered */
-set_ep(ep) { if (ep < experience) experience = ep; }
+void set_ep(int ep) { if (ep < experience) experience = ep; }
 /* optional */
-set_al(al) { alignment = al; }
+void set_al(int al) { alignment = al; }
 /* optional */
-set_short(sh) { short_desc = sh; long_desc = short_desc + "\n";}
+void set_short(string sh) { short_desc = sh; long_desc = short_desc + "\n";}
 /* optional */
-set_long(lo) { long_desc = lo; }
+void set_long(string lo) { long_desc = lo; }
 /* optional */
-set_wc(wc) { weapon_class = wc; }
+void set_wc(int wc) { weapon_class = wc; }
 /* optional */
-set_ac(ac) { armour_class = ac; }
+void set_ac(int ac) { armour_class = ac; }
 /* optional */
-set_move_at_reset() { move_at_reset = 1; }
+void set_move_at_reset() { move_at_reset = 1; }
 /* optional
  * 0: Peaceful.
  * 1: Attack on sight.
  */
-set_aggressive(a) {
+void set_aggressive(int a) {
     aggressive = a;
 }
 /*
@@ -247,27 +251,27 @@ set_aggressive(a) {
 /*
  * The percent chance of casting a spell.
  */
-set_chance(c) {
+void set_chance(int c) {
     spell_chance = c;
 }
 /* Message to the victim. */
-set_spell_mess1(m) {
+void set_spell_mess1(string m) {
     spell_mess1 = m;
 }
-set_spell_mess2(m) {
+void set_spell_mess2(string m) {
     spell_mess2 = m;
 }
-set_spell_dam(d) {
+void set_spell_dam(int d) {
     spell_dam = d;
 }
 
 /* Set the frog curse. */
-set_frog() {
+void set_frog() {
     frog = 1;
 }
 
 /* Set the whimpy mode */
-set_whimpy() {
+void set_whimpy() {
     whimpy = 1;
 }
 
@@ -276,28 +280,28 @@ set_whimpy() {
  * always good, because it checks the level of the caller, and this function
  * can be called by a room.
  */
-init_command(cmd) {
+void init_command(string cmd) {
     command(cmd);
 }
 
 /* Load chat */
 
-set_chat_chance(c) {
+void set_chat_chance(int c) {
     chat_chance = c;
 }
 
-remove_chat(str) {
+void remove_chat(string str) {
     chat_nr -= 1;
     chat_head = chat_head->remove_chat(str);
 }
 
 /* Load attack chat */
 
-set_a_chat_chance(c) {
+void set_a_chat_chance(int c) {
     a_chat_chance = c;
 }
 
-remove_a_chat(str) {
+void remove_a_chat(string str) {
     a_chat_nr -= 1;
     head = a_chat_head->remove_chat(str);
 }
@@ -305,29 +309,29 @@ remove_a_chat(str) {
 
 /* Catch the talk */
 
-set_object(ob) {
+void set_object(object ob) {
     talk_ob = ob;
 }
 
-set_function(func) {
+void set_function(string func) {
     talk_func = func;
 }
 
-set_type(type) {
+void set_type(string type) {
     talk_type = type;
 }
 
 
-remove_match(match) {
+void remove_match(string match) {
     head = head->remove_match(match);
 }
 
-set_dead_ob(ob)
+void set_dead_ob(object ob)
 {
     dead_ob = ob;
 }
 
-second_life()
+void second_life()
 {
     /* We have died remove chat and catch_talk */
     if(head)
@@ -340,12 +344,12 @@ second_life()
 	return dead_ob->monster_died(this_object());
 }
 
-set_random_pick(r)
+void set_random_pick(int r)
 {
     random_pick = r;
 }
 
-pick_any_obj() {
+void pick_any_obj() {
     object ob;
     int weight;
 
@@ -370,12 +374,12 @@ pick_any_obj() {
     }
 }
 
-set_init_ob(ob)
+void set_init_ob(object ob)
 {
     init_ob = ob;
 }
 
-init() {
+void init() {
 
     create_room = environment(me);
     if(this_player() == me)
@@ -393,14 +397,14 @@ init() {
     }
 }
 
-query_create_room() { return create_room; }
+object query_create_room() { return create_room; }
 
-query_race() { return race; }
+string query_race() { return race; }
 
 /*
  * The monster will heal itself slowly.
  */
-heal_slowly() {
+void heal_slowly() {
     hit_point += 120 / (INTERVAL_BETWEEN_HEALING * 2);
     if (hit_point > max_hp)
 	hit_point = max_hp;

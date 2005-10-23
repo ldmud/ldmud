@@ -24,18 +24,13 @@ ONE_EXIT("room/eastroad5","east",
 "hunger, but only a limited selection is available.\n",
 1)
 
-init() {
+void init() {
  add_action("buy","buy");
  add_action("buy","order");
  ::init();
 }
 
-long(s) {
- ::long(s);
- show_menu();
-}
-
-show_menu() {
+void show_menu() {
  write("\n");
  if(!(cm||mm||rmm))
   Speak("We have completely sold out...come back later.");
@@ -51,7 +46,12 @@ show_menu() {
  return;
 }
 
-no_food() {
+void long(string s) {
+ ::long(s);
+ show_menu();
+}
+
+int no_food() {
  Speak("Sorry - we have sold out of that.");
  if(cm||mm||rmm)
   Speak("Why don't you try something else ?");
@@ -60,7 +60,7 @@ no_food() {
  return 1;
 }
 
-pays(n) {
+int pays(int n) {
  if(this_player()->query_money()<n) {
   Speak("You cannot afford that.");
   return 0;
@@ -69,7 +69,7 @@ pays(n) {
  return 1;
 }
 
-tease(n) {
+int tease(int n) {
  if(Name==last_eater)
   Speak("My - Are we hungry today.");
  last_eater=Name;
@@ -77,7 +77,7 @@ tease(n) {
  return 1;
 }
 
-buy(s) {
+int buy(string s) {
  if(!s) {
   Speak("What do you want to buy ?");
   return 1;

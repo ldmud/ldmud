@@ -1,10 +1,10 @@
-reset(started)
+void reset(int started)
 {
     if (!started)
 	set_light(1);
 }
 
-init()
+void init()
 {
     add_action("north", "north");
     add_action("east", "east");
@@ -12,12 +12,12 @@ init()
     add_action("northwest", "northwest");
 }
 
-short()
+string short()
 {
     return "A small grove on the shore of the Isle of the Magi";
 }
 
-long()
+void long()
 {
     write("You are standing in a small grove on the shore of the Isle of the Magi\n" +
 	  "All of the trees here are either diseased, dead or heavily mutated\n" +
@@ -28,25 +28,25 @@ long()
 	  "of the hill, stands the ruined tower of Arcanarton\n");
 }
 
-north()
+int north()
 {
      this_player()->move_player("north#room/south/sislnd11");
      return 1;
 }
 
-east()
+int east()
 {
     this_player()->move_player("east#room/south/sislnd17");
     return 1;
 }
 
-southeast()
+int southeast()
 {
      this_player()->move_player("southeast#room/south/sislnd8");
      return 1;
 }
 
-northwest()
+int northwest()
 {
      this_player()->move_player("northwest#room/south/sislnd10");
      return 1;

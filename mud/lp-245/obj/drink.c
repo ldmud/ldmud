@@ -3,24 +3,24 @@ int value, strength, heal;
 int full;
 int pub_drink;		/* Drinks from the pub can't be removed from pub */
 
-set_value(str) {
+int set_value(string str) {
     if (sscanf(str, "%s#%s#%s#%d#%d#%d", name, short_desc, message,
 	heal, value, strength) != 6)
 	    return 0;
     return 1;
 }
 
-set_pub() {
+void set_pub() {
     pub_drink = 1;
 }
 
-id(str) {
+int id(string str) {
     if ((str == name || (str == "drk2" && pub_drink)) && full)
 	return 1;
     return str == "bottle";
 }
 
-short() {
+string short() {
     if (full)
 	return short_desc;
     return "empty bottle";
@@ -28,23 +28,23 @@ short() {
 
 /* The shop only buys empty bottles ! */
 
-query_value()
+int query_value()
 {
     if (!full) return 10;
     return 0;
 }
 
-long() {
+void long() {
     write(short() + ".\n");
 }
 
-reset(arg) {
+void reset(int arg) {
     if (arg)
         return;
     full = 1;
 }
 
-drink(str)
+int drink(string str)
 {
     int level, npc;
     string p_name;
@@ -78,14 +78,14 @@ drink(str)
     return 1;
 }
 
-init() {
+void init() {
     add_action("drink", "drink");
 }
 
-get() {
+int get() {
     return 1;
 }
 
-query_weight() {
+int query_weight() {
     return 1;
 }

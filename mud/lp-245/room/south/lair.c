@@ -1,23 +1,25 @@
 object wyrm;
 
-reset(started)
+void extra_reset();
+
+void reset(int started)
 {
      if (!started)
 	 set_light(0);
      extra_reset();
 }
 
-init()
+void init()
 {
     add_action("up", "up");
 }
 
-short()
+string short()
 {
     return "The bottom of the well";
 }
 
-long()
+void long()
 {
     write("You are standing at the bottom of the well, about thirty feet below the\n" +
 	  "surface. Bones lie strwen about in a random fashion, many of them broken\n" +
@@ -25,13 +27,13 @@ long()
 	  "\tThe only way out is the way in, back up the ladder.\n");
 }
 
-up()
+int up()
 {
     this_player()->move_player("up the ladder#room/south/sislnd17");
     return 1;
 }
 
-extra_reset()
+void extra_reset()
 {
      if (!wyrm || !living(wyrm))
 	 {

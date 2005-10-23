@@ -6,7 +6,7 @@ object troll;
 #define EXTRA_RESET\
     extra_reset();
 
-extra_reset() {
+void extra_reset() {
     object money;
     if (!troll || !living(troll)) {
 	troll = clone_object("obj/monster");

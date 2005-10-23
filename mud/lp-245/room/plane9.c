@@ -3,7 +3,7 @@
 object stethoscope;
 object frog;
 
-extra_reset() {
+void extra_reset() {
     if (!stethoscope || environment(stethoscope) != this_object()) {
 	stethoscope = clone_object("obj/stethoscope");
 	move_object(stethoscope, this_object());

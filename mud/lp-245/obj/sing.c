@@ -3,11 +3,11 @@
  * game driver, as a stand in for other objects.
  */
 
-short() {
+string short() {
     return "A singularity";
 }
 
-long() {
+void long() {
     write("This is a singularity. It is created in the space from\n");
     write("another creation failure.\n");
     write("if you find it somewhere, just being here, call a wizard,\n");
@@ -15,10 +15,10 @@ long() {
     write("game, otherwise.\n");
 }
 
-id(str) {
+int id(string str) {
     return str == "singularity";
 }
 
-get() { return 1; }
+int get() { return 1; }
 
-query_value() { return 1; }
+int query_value() { return 1; }

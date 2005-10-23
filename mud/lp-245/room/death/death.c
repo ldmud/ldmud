@@ -7,7 +7,7 @@ inherit "obj/monster";
  * Function name: init
  * Description:   Init Death
  */
-init()
+void  init()
 {
 
 	::init();
@@ -19,7 +19,7 @@ init()
  * Function name: reset
  * Description:   Reset Death
  */
-reset(arg)
+void reset(int arg)
 {
 
 	::reset(arg);
@@ -42,7 +42,7 @@ reset(arg)
  * Function name: long
  * Description:   Long description
  */
-long(str)
+int long(string str)
 {
 	
 	if (str == "death" || str == "moot")
@@ -80,7 +80,7 @@ long(str)
  * Function name: id
  * Description:   Identifies death and his belongings.
  */
-id(str)
+int id(string str)
 {
 
 	return str == "death" || str == "moot" || str == "scythe" || str == "robe";
@@ -91,7 +91,7 @@ id(str)
  * Function name: take_it
  * Description:   Try to take something from death.
  */
-take_it(str)
+int take_it(string str)
 {
 
 	string name;

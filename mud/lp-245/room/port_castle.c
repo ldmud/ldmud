@@ -5,26 +5,26 @@ int dropped;
 int grow_stage;
 string owner;
 
-set_owner(n) {
+void set_owner(string n) {
     owner = n;
 }
 
-reset(arg) {
+void reset(int arg) {
     if (arg)
 	return;
     dropped = 0;
     grow_stage = 5;
 }
 
-short() {
+string short() {
     return "portable castle";
 }
 
-long() {
+void long() {
     write(short() + ".\n");
 }
 
-heart_beat() {
+void heart_beat() {
     if (!dropped)
 	return;
     if (grow_stage > 0) {
@@ -36,7 +36,7 @@ heart_beat() {
 	string name;
 	say("The portable castle has grown into a full castle !\n");
 	shout("Something in the world has changed.\n");
-	name = create_wizard(lower_case(owner));
+	name = create_wizard(lower_case(owner), /* domain: */ 0);
 	if (name)
 	    move_object(name, environment());
 	destruct(this_object());
@@ -44,11 +44,11 @@ heart_beat() {
     }
 }
 
-id(str) {
+int id(string str) {
     return str == "castle";
 }
 
-drop() {
+int drop() {
     if (environment(this_player())->query_drop_castle()) {
 	write("Not this close to the city!\n");
 	return 1;
@@ -59,7 +59,7 @@ drop() {
     return 0;
 }
 
-get() {
+int get() {
     if (dropped) {
 	write("You can't take it anymore !\n");
 	return 0;

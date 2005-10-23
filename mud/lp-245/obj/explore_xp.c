@@ -15,21 +15,21 @@ string SaveName;
 string FailMessage;
 string OKMessage;
 
-set_fail_message( str)
+void set_fail_message( string str)
 {
     FailMessage = str;
 }
 
-set_ok_message( str)
+void set_ok_message( string str)
 {
     OKMessage = str;
 }
 
-set_name(str)
+void set_name(string str)
 {
     string TmpString;
     if (object_name(previous_object())[0..4] != "/obj" &&
-	!creator(this_object())&&!creator(previous_file())) {
+	!creator(this_object())&&!creator(previous_object())) {
 	write("Illegal usage, Savefile-path is illegal.\n");
 	destruct(this_object());
     }
@@ -48,17 +48,17 @@ set_name(str)
     }
 }
 
-query_name()
+string query_name()
 {
     return SaveName;
 }
 
-id(str)
+int id(string str)
 {
     return (str==DEFAULT_NAME)||(SaveName&&(str==SaveName));
 }
 
-short()
+string short()
 {
     if ( this_player() && this_player()->query_level() >= 20)
 	return "A player logger, name: <"+SaveName+">";
@@ -66,7 +66,38 @@ short()
 	return 0;
 }
 
-init()
+int PlayerHasVisited( string str)
+{
+    if ( str)
+	return sscanf( SaveString, "%s"+DELIMITER+str+DELIMITER, str);
+    else
+	return 0;
+}
+
+void AddPlayerToList( string str)
+{
+    if ( str) {
+	SaveString = SaveString+str+DELIMITER;
+	save_object( SaveName);
+    }
+}
+
+int AmountOfPlayerXP()
+{
+    int Amount, Level;
+    if ( this_player()) {
+	Amount = XP_FOR_LEVEL_ONE;
+	Level = this_player()->query_level();
+	while( Level > 0) {
+	    Amount = ( Amount * 13) / 10;
+	    Level -= 1;
+	}
+	return Amount;
+    }
+    return 0;
+}
+
+void init()
 {
     if ( this_player() && query_ip_number( this_player())) {
 	if (! PlayerHasVisited( this_player()->query_name())) {
@@ -83,38 +114,7 @@ init()
     }
 }
 
-PlayerHasVisited( str)
-{
-    if ( str)
-	return sscanf( SaveString, "%s"+DELIMITER+str+DELIMITER, str);
-    else
-	return 0;
-}
-
-AddPlayerToList( str)
-{
-    if ( str) {
-	SaveString = SaveString+str+DELIMITER;
-	save_object( SaveName);
-    }
-}
-
-AmountOfPlayerXP()
-{
-    int Amount, Level;
-    if ( this_player()) {
-	Amount = XP_FOR_LEVEL_ONE;
-	Level = this_player()->query_level();
-	while( Level > 0) {
-	    Amount = ( Amount * 13) / 10;
-	    Level -= 1;
-	}
-	return Amount;
-    }
-    return 0;
-}
-
-reset(arg)
+void reset(int arg)
 {
     if(arg)
 	return;

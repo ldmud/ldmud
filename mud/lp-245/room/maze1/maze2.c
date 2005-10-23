@@ -1,26 +1,26 @@
 int exit_num;
 
-short() {
+string short() {
     return "A maze";
 }
 
-long() {
+void long() {
     write("In a maze.\n");
     write("There are four obvious exits: north, south, west and east.\n");
 }
 
-reset() {
+void reset() {
     exit_num = random(4);	/* "grin" */
 }
 
-init() {
+void init() {
     add_action("e0", "north");
     add_action("e1", "south");
     add_action("e2", "east");
     add_action("e3", "west");
 }
 
-e0() {
+int e0() {
     if (exit_num == 0)
 	this_player()->move_player("north#room/maze1/maze3");
     else
@@ -28,7 +28,7 @@ e0() {
     return 1;
 }
 
-e1() {
+int e1() {
     if (exit_num == 1)
 	this_player()->move_player("south#room/maze1/maze3");
     else
@@ -36,7 +36,7 @@ e1() {
     return 1;
 }
 
-e2() {
+int e2() {
     if (exit_num == 2)
 	this_player()->move_player("east#room/maze1/maze3");
     else
@@ -44,7 +44,7 @@ e2() {
     return 1;
 }
 
-e3() {
+int e3() {
     if (exit_num == 3)
 	this_player()->move_player("west#room/maze1/maze3");
     else

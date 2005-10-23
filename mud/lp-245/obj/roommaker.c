@@ -19,17 +19,28 @@ also known as Anders Ripa email: ripa@cd.chalmers.se
 string	short_string;
 string	long_text;
 string	old_long_text;
-string	room_light;
+int	room_light;
 string	out_file_name;
 string	out_file_name_c;
 int	dir_cnt;
-object	dir_array;
+string	* dir_array;
 
 
 int	in_edit;
 
+static int edit_room(string str);
+static int edit_dirs(string str);
+static void show_help();
+static int do_edit(string str);
+static void do_file();
+static int show_room();
+static void help_dirs();
+static void show_dirs(int arg);
+static void add_line(string str);
+static void add(string str);
+
 static
-make(str)
+int make(string str)
 {
 	string	temp1, temp2;
 
@@ -63,9 +74,10 @@ make(str)
 }
 
 static
-check_file_ok(str)
+int check_file_ok(string str)
 {
-	object	ob, temp_dir;
+	object	ob;
+        string * temp_dir;
 	int	i;
 
 	if(str) {
@@ -109,7 +121,7 @@ check_file_ok(str)
 			}
 			room_light = ob->query_light();
 			in_edit = 1;	/* currently editing */
-			edit_room();
+			edit_room(0);
 			return 1;
 		} else {
 			write("error: couldnt find " + out_file_name + "\n");
@@ -132,7 +144,7 @@ check_file_ok(str)
 }
 
 static
-set_short(str) {
+int set_short(string str) {
 
 	if(!str || str == "") {
 		str = short_string;
@@ -154,7 +166,7 @@ set_short(str) {
 }
 
 static
-set_long(str)
+int set_long(string str)
 {
         int     long_ok;
 	int	i;
@@ -210,7 +222,7 @@ set_long(str)
 }
 
 static
-set_dir_cmd(str)
+int set_dir_cmd(string str)
 {
 	if(str && str == "~q") {
 		write("aborted.\n");
@@ -239,7 +251,7 @@ set_dir_cmd(str)
 }
 
 static
-set_dir_file(str)
+int set_dir_file(string str)
 {
 	if(str && str == "~q") {
 		write("aborted.\n");
@@ -274,7 +286,7 @@ set_dir_file(str)
 }
 
 static
-set_light_level(str)
+int set_light_level(string str)
 {
 	int	level;
 
@@ -301,7 +313,7 @@ set_light_level(str)
 /* the main edit menu */
 
 static
-edit_room(str)
+int edit_room(string str)
 {
 	int	sel;
 	int	match;
@@ -345,7 +357,7 @@ edit_room(str)
 }
 
 static
-show_help()
+void show_help()
 {
 	write("edit menu of room maker\n");
 	write("q     - exit from room maker without writing file\n");
@@ -361,7 +373,7 @@ show_help()
 }
 
 static
-do_edit(str) {
+int do_edit(string str) {
 	int	sel;
 
 	if(strlen(str) >= 1) {
@@ -397,7 +409,7 @@ do_edit(str) {
 int	edit_dir_num;
 
 static
-edit_dirs(str) {
+int edit_dirs(string str) {
 	int	num, sel;
 
 	if(str && str != "") {
@@ -479,7 +491,7 @@ edit_dirs(str) {
 }
 
 static
-change_dir(str) {
+int change_dir(string str) {
 	if(str && str != "") {
 		dir_array[edit_dir_num +1] = str;
 	}
@@ -489,7 +501,7 @@ change_dir(str) {
 }
 
 static
-change_room(str) {
+int change_room(string str) {
 	if(str && str != "") {
 		dir_array[edit_dir_num] = str;
 	}
@@ -498,7 +510,7 @@ change_room(str) {
 }
 
 static
-help_dirs()
+void help_dirs()
 {
 	write("direction editor\n");
 	write("m    - return to main edit menu\n");
@@ -510,7 +522,7 @@ help_dirs()
 }
 
 static
-show_dirs(arg) {
+void show_dirs(int arg) {
 	int	i;
 
 	i = 0;
@@ -524,7 +536,7 @@ show_dirs(arg) {
 }
 
 static
-show_room()
+int show_room()
 {
 	write("\n---file name---\n");
 	write(out_file_name_c + "\n");
@@ -543,12 +555,13 @@ show_room()
 string	file_text;
 
 static
-do_file()
+void do_file()
 {
 	int	i;
-	object	longs, ob;
+	object	ob;
 	string	slask;
 	int	ret;
+        string * longs;
 
 	file_text = "";
 
@@ -556,7 +569,7 @@ do_file()
 	add_line("");
 	add_line("inherit \"room/room\";");
 	add_line("");
-	add_line("reset(arg) {");
+	add_line("void reset(int arg) {");
 	add_line("    if (arg) return;");
 	add_line("");
 	add_line("    set_light(" + room_light + ");");
@@ -597,11 +610,11 @@ do_file()
 	add_line("}");
 
 	add_line("");
-	add_line("query_light() {");
+	add_line("int query_light() {");
 	add_line("    return " + room_light + ";");
 	add_line("}");
 
-	add_line("query_room_maker() {");
+	add_line("string query_room_maker() {");
 	add_line("    return " + VERSION + ";");
 	add_line("}");
 
@@ -613,7 +626,7 @@ do_file()
 	add("*"); add_line("/");
 
 	add("/"); add_line("*");
-	add_line("room_is_modified() {");
+	add_line("int room_is_modified() {");
 	add_line("    return 1;");
 	add_line("}");
 	add("*"); add_line("/");
@@ -648,7 +661,7 @@ do_file()
 }
 
 static
-add_line(str) {
+void add_line(string str) {
 	if(is_debug) {
 		write("add_line(");
 		write(str);
@@ -661,7 +674,7 @@ add_line(str) {
 }
 
 static
-add(str) {
+void add(string str) {
 	if(is_debug) {
 		write("add(");
 		write(str);
@@ -673,7 +686,7 @@ add(str) {
 	file_text = file_text + str;
 }
 
-init()
+void init()
 {
 	if(
 		this_player()
@@ -690,7 +703,7 @@ init()
 }
 
 static
-help(arg) {
+int help(string arg) {
 	if(!id(arg)) {
 		return 0;
 	}
@@ -711,7 +724,7 @@ help(arg) {
 	return 1;
 }
 
-version(str) {
+int version(string str) {
 	if(!str || !id(str)) {
 		return 0;
 	}
@@ -719,35 +732,34 @@ version(str) {
 	return 1;
 }
 
-get() {
+int get() {
 	return 1;
 }
 
-query_name()
+string query_name()
 {
 	return "room_maker";
 }
 
-id(str)
+int id(string str)
 {
 	return (str == "roommaker" || str == "room maker" || str == "room_maker" || str == "maker");
 }
 
-short()
+string short()
 {
 	return "A room maker";
 }
 
-long()
+void long()
 {
 	write("A portable room maker, for lazy wizards...\n");
 	write("usage: make roomfilename\n");
 	write("Do \"help room maker\n for more information.\n");
-	return 1;
 }
 
 
-query_info() {
+string query_info() {
     return "a powerful magical/technological creation utility. (wiz use only!)";
 }
 

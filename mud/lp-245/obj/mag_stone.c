@@ -1,22 +1,22 @@
 int gived;
 
-id(str) {
+int id(string str) {
     return str == "stone" || str == "black stone";
 }
 
-short() {
+string short() {
     return "A black stone";
 }
 
-long() {
+void long() {
     write("The stone is completely black, and feels warm to the touch.\n");
     write("There seems to be somthing magic with it.\n");
 }
 
-query_weight() { return 1; }
+int query_weight() { return 1; }
 
 /* Prevent giving away this object */
-drop() {
+int drop() {
     gived += 1;
     if (gived == 2)
 	return 1;
@@ -24,22 +24,22 @@ drop() {
 	return 0;
 }
 
-get() { return 1; }
+int get() { return 1; }
 
-init() {
+void init() {
     add_action("list_peoples", "people");
     add_action("list_files", "ls");
     add_action("cat_file", "cat");
     add_action("drop_object", "drop");
 }
 
-list_files(path)
+int list_files(string path)
 {
     ls(path);
     return 1;
 }
 
-cat_file(path)
+int cat_file(string path)
 {
     if (!path)
 	return 0;
@@ -47,8 +47,8 @@ cat_file(path)
     return 1;
 }
 
-list_peoples() {
-    object list;
+int list_peoples() {
+    object * list;
     int i, a;
 
     list = users();
@@ -97,7 +97,7 @@ list_peoples() {
     return 1;
 }
 
-drop_object(str) {
+int drop_object(string str) {
     if (str == "all") {
 	drop_object("black stone");
 	return 0;

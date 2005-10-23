@@ -1,12 +1,12 @@
 int full;
 
-id(str) {
+int id(string str) {
     if (str == "beer" && full)
 	return 1;
     return str == "bottle";
 }
 
-short() {
+string short() {
     if (full)
 	return "bottle of beer";
     return "empty bottle";
@@ -14,23 +14,23 @@ short() {
 
 /* The shop only buys empty bottles ! */
 
-query_value()
+int query_value()
 {
     if (!full) return 10;
     return 0;
 }
 
-long() {
+void long() {
     write(short() + ".\n");
 }
 
-reset(arg) {
+void reset(int arg) {
     if (arg)
         return;
     full = 1;
 }
 
-drink(str)
+int drink(string str)
 {
     if (str && str != "beer" && str != "from bottle")
 	return 0;
@@ -45,14 +45,14 @@ drink(str)
     return 1;
 }
 
-init() {
+void init() {
     add_action("drink", "drink");
 }
 
-get() {
+int get() {
     return 1;
 }
 
-query_weight() {
+int query_weight() {
     return 1;
 }

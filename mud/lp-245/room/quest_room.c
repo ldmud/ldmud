@@ -15,7 +15,7 @@ ONE_EXIT("room/wiz_hall", "south",
 "Note that players never can come here. set_quest(str) will return 1 if\n"+
 "this is the first time it was solved by this player, otherwise 0.\n", 1)
 
-count(silently) {
+int count(int silently) {
     object ob;
     int i;
 
@@ -45,7 +45,7 @@ count(silently) {
     return i - FREE_QUESTS;
 }
 
-list(i) {
+void list(int i) {
     object ob;
 
     ob = first_inventory(this_object());

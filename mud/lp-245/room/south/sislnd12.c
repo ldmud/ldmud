@@ -1,10 +1,10 @@
-reset(started)
+void reset(int started)
 {
     if (!started)
 	set_light(1);
 }
 
-init()
+void init()
 {
     add_action("south", "south");
     add_action("east", "east");
@@ -12,12 +12,12 @@ init()
     add_action("northeast", "northeast");
 }
 
-short()
+string short()
 {
     return "The shore of the Isle of the Magi";
 }
 
-long()
+void long()
 {
     write("You are standing on the shore of the Isle of the Magi\n" +
 	  "The shore of the island continues northeast to the ruined bridge\n" +
@@ -28,25 +28,25 @@ long()
 	  "A path does lead up the hill to the east though.\n");
 }
 
-south()
+int south()
 {
      this_player()->move_player("south#room/south/sislnd17");
      return 1;
 }
 
-east()
+int east()
 {
      this_player()->move_player("east#room/south/sislnd13");
      return 1;
 }
 
-west()
+int west()
 {
      this_player()->move_player("west#room/south/sislnd11");
      return 1;
 }
 
-northeast()
+int northeast()
 {
      this_player()->move_player("northeast#room/south/sislnd1");
      return 1;

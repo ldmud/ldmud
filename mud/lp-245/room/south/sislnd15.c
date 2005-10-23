@@ -1,10 +1,10 @@
-reset(started)
+void reset(int started)
 {
     if (!started)
 	set_light(1);
 }
 
-init()
+void init()
 {
     add_action("north", "north");
     add_action("south", "south");
@@ -13,12 +13,12 @@ init()
     add_action("look", "look");
 }
 
-short()
+string short()
 {
     return "A crumbling stone monument";
 }
 
-long()
+void long()
 {
     write("You are halfway up the hill.\n" +
 	  "A crumbling monument stands on the side of the hill here.\n" +
@@ -28,31 +28,31 @@ long()
 	  "of the island to the south and east\n");
 }
 
-north()
+int north()
 {
     this_player()->move_player("north#room/south/sislnd14");
     return 1;
 }
 
-south()
+int south()
 {
     this_player()->move_player("south#room/south/sislnd6");
     return 1;
 }
 
-east()
+int east()
 {
     this_player()->move_player("east#room/south/sislnd5");
     return 1;
 }
 
-west()
+int west()
 {
     this_player()->move_player("west#room/south/sislnd18");
     return 1;
 }
 
-look(str)
+int look(string str)
 {
     if (str != "at monument")
 	return 0;

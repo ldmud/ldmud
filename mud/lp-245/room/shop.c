@@ -18,37 +18,20 @@ TWO_EXIT("room/vill_road2", "south",
 "blue light in the doorway.\nTo the west you see a small room.\n", 1)
 
 
-sell(item) {
+object find_item_in_player(string i)
+{
     object ob;
 
-    if (!item)
-	return 0;
-    if (item == "all") {
-	object next;
-	ob = first_inventory(this_player());
-	while(ob) {
-	    next = next_inventory(ob);
-	    if (!ob->drop() && ob->query_value()) {
-		write(ob->short() + ":\t");
-		do_sell(ob);
-	    }
-	    ob = next;
-	}
-	write("Ok.\n");
-	return 1;
+    ob = first_inventory(this_player());
+    while(ob) {
+        if (ob->id(i))
+	    return ob;
+	ob = next_inventory(ob);
     }
-    ob = present(item, this_player());
-    if (!ob)
-	ob = present(item, this_object());
-    if (!ob) {
-	write("No such item ("); write(item); write(") here.\n");
-	return 1;
-    }
-    do_sell(ob);
-    return 1;
+    return 0;
 }
 
-do_sell(ob) {
+int do_sell(object ob) {
     int value, do_destroy;
     value = ob->query_value();
     if (!value) {
@@ -83,9 +66,39 @@ do_sell(ob) {
     return 1;
 }
 
-value(item) {
+int sell(string item) {
+    object ob;
+
+    if (!item)
+	return 0;
+    if (item == "all") {
+	object next;
+	ob = first_inventory(this_player());
+	while(ob) {
+	    next = next_inventory(ob);
+	    if (!ob->drop() && ob->query_value()) {
+		write(ob->short() + ":\t");
+		do_sell(ob);
+	    }
+	    ob = next;
+	}
+	write("Ok.\n");
+	return 1;
+    }
+    ob = present(item, this_player());
+    if (!ob)
+	ob = present(item, this_object());
+    if (!ob) {
+	write("No such item ("); write(item); write(") here.\n");
+	return 1;
+    }
+    do_sell(ob);
+    return 1;
+}
+
+int value(string item) {
     int value;
-    string name_of_item;
+    object name_of_item;
 
     if (!item)
 	return 0;
@@ -108,14 +121,14 @@ value(item) {
     return 1;
 }
 
-buy(item) {
+int buy(string item) {
     if (!item)
 	return 0;
     "room/store"->buy(item);
     return 1;
 }
 
-north() {
+int north() {
     if (this_player()->query_level() < 20) {
 	write("A strong magic force stops you.\n");
 	say(this_player()->query_name() +
@@ -127,24 +140,11 @@ north() {
     return 1;
 }
 
-list(obj) {
+int list(string obj) {
     "room/store"->inventory(obj);
     return 1;
 }
 
-find_item_in_player(i)
-{
-    object ob;
-
-    ob = first_inventory(this_player());
-    while(ob) {
-        if (ob->id(i))
-	    return ob;
-	ob = next_inventory(ob);
-    }
-    return 0;
-}
-
-query_drop_castle() {
+int query_drop_castle() {
     return 1;
 }

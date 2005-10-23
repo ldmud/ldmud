@@ -2,9 +2,9 @@
 #undef EXTRA_RESET
 #define EXTRA_RESET extra_reset();
 
-string chats;
+string * chats;
 
-get_chats() {
+string * get_chats() {
     if (!chats) {
 	chats = allocate(7);
 	chats[0] = "Orc says: Kill him!\n";
@@ -18,7 +18,7 @@ get_chats() {
     return chats;
 }
 
-extra_reset()
+void extra_reset()
 {
     object orc, weapon;
     int n,i,class,value,weight;

@@ -3,7 +3,7 @@ inherit "room/room";
 string messages;
 int new_mail;
 
-reset(arg) {
+void reset(int arg) {
     if (arg)
 	return;
     set_light(1);
@@ -16,18 +16,18 @@ reset(arg) {
     no_castle_flag = 1;
 }
 
-init() {
+void init() {
     ::init();
     move_object(clone_object("obj/mail_reader"), this_player());
 }
 
-exit() {
+void exit() {
     object ob;
     if (ob = present("mailread", this_player()))
 	destruct(ob);
 }
 
-query_mail(silent) {
+int query_mail(int silent) {
     string name;
     string new;
 

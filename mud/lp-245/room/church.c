@@ -3,7 +3,7 @@
 int lamp_is_lit, reboot_time, time_from_reset, last_reset_cycle;
 int list_length;
 
-reset(arg)
+void reset(string arg)
 {
     if (time_from_reset)
 	last_reset_cycle = time() - time_from_reset;
@@ -14,7 +14,7 @@ reset(arg)
     reboot_time = time();
 }
 
-init()
+void init()
 {
     add_action("west", "west");
     add_action("open", "open");
@@ -26,11 +26,11 @@ init()
     add_action("south", "south");
 }
 
-short() {
+string short() {
     return "Village church";
 }
 
-long(str)
+void long(string str)
 {
     if (str == "clock") {
 	int i, j;
@@ -93,17 +93,17 @@ long(str)
 
 }
 
-id(str) {
+int id(string str) {
     return str == "door" || str == "pit" || str == "clock";
 }
 
-xyzzy() {
+int xyzzy() {
     write("Everything shimmers.\n");
     write("You wake up elsewhere...\n");
     this_player()->move_player("elsewhere#room/test");
 }
 
-west() {
+int west() {
     if ("room/elevator"->query_door(0) ||
 	"room/elevator"->query_level(0) != 2) {
 	write("The door is closed.\n");
@@ -113,7 +113,7 @@ west() {
     return 1;
 }
 
-open(str)
+int open(string str)
 {
     if (str != "door")
 	return 0;
@@ -125,7 +125,7 @@ open(str)
     return 1;
 }
 
-close(str)
+int close(string str)
 {
     if (str != "door")
 	return 0;
@@ -133,7 +133,7 @@ close(str)
     return 1;
 }
 
-push(str)
+int push(string str)
 {
     if (str && str != "button")
 	return 0;
@@ -142,26 +142,26 @@ push(str)
     return 1;
 }
 
-elevator_arrives()
+void elevator_arrives()
 {
     say("The lamp on the button beside the elevator goes out.\n");
     lamp_is_lit = 0;
 }
 
-pray() {
+int pray() {
     return this_player()->remove_ghost();
 }
 
-prevent_look_at_inv(str)
+int prevent_look_at_inv(string str)
 {
     return str != 0;
 }
 
-south() {
+int south() {
     this_player()->move_player("south#room/vill_green");
     return 1;
 }
 
-query_drop_castle() {
+int query_drop_castle() {
     return 1;
 }

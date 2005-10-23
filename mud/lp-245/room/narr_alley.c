@@ -17,12 +17,12 @@ THREE_EXIT("room/vill_road1","north",
 	 "Narrow alley",
 	 "A narrow alley. There is a well in the middle.\n", 1)
 
-go_down() {
+int go_down() {
     this_player()->move_player("down#room/well");
     return 1;
 }
 
-id(str) {
+int id(string str) {
     if (str == "well")
 	return 1;
 }

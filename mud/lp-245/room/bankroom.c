@@ -1,13 +1,13 @@
 #include "std.h"
 
-reset(arg) {
+void reset(int arg) {
     if (!arg) {
 	set_light(1);
 	move_object(clone_object("obj/safe"), this_object());
     }
 }
 
-long(str) {
+void long(string str) {
     if (str == "door") {
 	if ("room/bank"->query_door())
 	    write("The door is closed.\n");
@@ -18,16 +18,16 @@ long(str) {
     write("You are in the backroom of the bank.\n");
 }
 
-short() {
+string short() {
     return "backroom of bank";
 }
 
-init() {
+void init() {
     add_action("west", "west");
     add_action("open", "open");
 }
 
-west() {
+int west() {
     if ("room/bank"->query_door()) {
 	write("The door is closed.\n");
 	return 1;
@@ -36,7 +36,7 @@ west() {
     return 1;
 }
 
-open(str) {
+int open(string str) {
     if (!str) return 0;
     if (!"room/bank"->query_door())
 	return 0;

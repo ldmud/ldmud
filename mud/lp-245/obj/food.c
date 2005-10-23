@@ -51,12 +51,12 @@
 string name, short, long, eating_mess, eater_mess, alias, alt_name;
 int value, strength, weight;
 
-init()
+void init()
 {
 	add_action("eat", "eat");
 }
 
-reset(arg)
+void reset(int arg)
 {
 	if (arg)
 		return;
@@ -65,18 +65,18 @@ reset(arg)
 	eater_mess = "Yum yum yum.\n";
 }
 
-prevent_insert()
+int prevent_insert()
 {
   write("You don't want to ruin " + short + ".\n");
   return 1;
 }
 
-id(str)
+int id(string str)
 {
 	return  str == name || str == alt_name || str == alias;
 }
 
-short()
+string short()
 {
 	if(!short)
 	    return name;
@@ -84,7 +84,7 @@ short()
 	return short;
 }
 
-long()
+void long()
 {
 	if(!long)
 		write(short() + ".\n");
@@ -92,12 +92,12 @@ long()
 		write(long);
 }
 
-get()
+int get()
 {
 	return 1;
 }
 
-eat(str)
+int eat(string str)
 {
 	object tp;
 
@@ -125,57 +125,57 @@ eat(str)
 	return 1;
 }
 
-min_cost()
+int min_cost()
 {
 	return 4 * strength + (strength * strength) / 10;
 }
 
-set_name(n)
+void set_name(string n)
 {
 	name = n;
 }
 
-set_short(s)
+void set_short(string s)
 {
 	short = s;
 }
 
-set_long(l)
+void set_long(string l)
 {
 	long = l;
 }
 
-set_value(v)
+void set_value(int v)
 {
 	value = v;
 }
 
-set_weight(w)
+void set_weight(int w)
 {
 	weight = w;
 }
 
-set_strength(s)
+void set_strength(int s)
 {
 	strength = s;
 }
 
-set_alias(a)
+void set_alias(string a)
 {
 	alias = a;
 }
 
-set_alt_name(an)
+void set_alt_name(string an)
 {
 	alt_name = an;
 }
 
-set_eating_mess(em)
+void set_eating_mess(string em)
 {
 	eating_mess = em;
 }
 
-set_eater_mess(em)
+void set_eater_mess(string em)
 {
 	eater_mess = em;
 }
@@ -184,7 +184,7 @@ set_eater_mess(em)
  * Things that other objects might want to know.
  */
 
-query_value()
+int query_value()
 {
 	if (value)
 		return value;
@@ -192,7 +192,7 @@ query_value()
 		return min_cost();
 }
 
-query_weight()
+int query_weight()
 {
 	return weight;
 }

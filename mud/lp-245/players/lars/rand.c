@@ -1,8 +1,8 @@
-get() { return 1; }
-short() { return "true"; }
-init() { add_action("test_random", "test"); }
-test_random(str) {
-   int i, a, b, s, k, iterations, range;
+int get() { return 1; }
+string short() { return "true"; }
+void init() { add_action("test_random", "test"); }
+int test_random(string str) {
+   int i, *a, b, s, k, iterations, range;
 
    if (sscanf(str, "%d %d", iterations, range) != 2) return 0;
    a = allocate(range);

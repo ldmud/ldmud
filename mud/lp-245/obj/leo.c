@@ -9,15 +9,15 @@ object next_dest;
 object give_him_castle;
 int delay;
 
-short() { return "Leo the Archwizard"; }
+string short() { return "Leo the Archwizard"; }
 
-long() {
+void long() {
     write(short() + ".\n");
 }
 
-id(str) { return str == name; }
+int id(string str) { return str == name; }
 
-reset(arg) {
+void reset(int arg) {
     if (arg)
 	return;
     msgout = "leaves";
@@ -36,7 +36,9 @@ reset(arg) {
     spell_points = 300;
 }
 
-catch_tell(str)
+void castle();
+
+void catch_tell(string str)
 {
     object from;
     string a;
@@ -88,7 +90,7 @@ catch_tell(str)
  * Always let the heart_beat do the talking, to simulate delay.
  */
 
-heart_beat()
+void heart_beat()
 {
     age += 1;
     if (attacker_ob) {
@@ -111,7 +113,7 @@ heart_beat()
 	set_heart_beat(0);
 }
 
-castle() {
+void castle() {
     write(
 "You are now ready to take the step into true wizardhood. But, to do this,\n");
     write(
@@ -123,8 +125,8 @@ castle() {
     input_to("castle2");
 }
 
-castle2(back_up_wiz) {
-    string castle_name;
+void castle2(string back_up_wiz) {
+    object castle_name;
     string player_name;
     string save_name;
     int save_level;

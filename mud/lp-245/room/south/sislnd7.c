@@ -1,22 +1,22 @@
-reset(started)
+void reset(int started)
 {
     if (!started)
 	set_light(1);
 }
 
-init()
+void init()
 {
     add_action("north", "north");
     add_action("northeast", "northeast");
     add_action("northwest", "northwest");
 }
 
-short()
+string short()
 {
     return "The shore of the Isle of the Magi";
 }
 
-long()
+void long()
 {
     write("You are standing on the shore of the Isle of the Magi\n" +
 	  "The shore of the island continues northeast and northwest from here\n" +
@@ -24,19 +24,19 @@ long()
 	  "of Arcanarton, the archmage who used to live on this island\n");
 }
 
-north()
+int north()
 {
      this_player()->move_player("north#room/south/sislnd16");
      return 1;
 }
 
-northeast()
+int northeast()
 {
      this_player()->move_player("northeast#room/south/sislnd6");
      return 1;
 }
 
-northwest()
+int northwest()
 {
      this_player()->move_player("northwest#room/south/sislnd8");
      return 1;

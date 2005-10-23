@@ -1,8 +1,8 @@
-short() {
+string short() {
     return "The void";
 }
 
-long() {
+void long() {
     write(short() + ".\n");
     write("You come to the void if you fall out of a room, and have nowhere to go.\n");
     write("Give the command 'church', and you will come back to village church.\n");
@@ -10,20 +10,20 @@ long() {
     this_player()->move_player("X#room/church");
 }
 
-init() {
+void init() {
     add_action("church", "church");
 }
 
-church() {
+int church() {
     this_player()->move_player("away#room/church");
     return 1;
 }
 
-reset(arg)
+void reset(int arg)
 {
     if (arg)
 	return;
     set_light(1);
 }
 
-id(str) { return str == "void"; }
+int id(string str) { return str == "void"; }

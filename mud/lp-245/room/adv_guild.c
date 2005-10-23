@@ -4,7 +4,7 @@
 #undef EXTRA_RESET
 #define EXTRA_RESET extra_reset(arg);
 
-extra_reset(arg) {
+void extra_reset(int arg) {
     object ob;
     if (arg)
 	return;
@@ -41,21 +41,21 @@ string title;         /* now with arrays. :) */
 object player_ob;
 string banished_by;
 
-get_next_exp();
-get_new_title();
-raise_cost();
-raise_con();
-raise_dex();
-raise_int();
-raise_str();
-too_high_average();
-alas();
-gnd_prn();
+int get_next_exp(int str);
+string get_new_title(int str);
+int raise_cost(int base, int action);
+void raise_con();
+void raise_dex();
+void raise_int();
+void raise_str();
+int too_high_average();
+void alas(string str);
+string gnd_prn();
 
 /* some minor changes by Iggy. */
 /* get level asks get_next_exp() and  get_next_title() */
 
-get_level(str)
+void get_level(int str)
 {
 	level = str;
 
@@ -64,9 +64,9 @@ get_level(str)
 	title      = get_new_title(level);
 }
 
-string male_title_str, fem_title_str, neut_title_str;
+string *male_title_str, *fem_title_str, *neut_title_str;
 /*xxx  return title */
-get_new_title(str)
+string get_new_title(int str)
 {
     if (!male_title_str){
 	male_title_str = allocate(20);
@@ -147,10 +147,10 @@ get_new_title(str)
 }
 
 
-int exp_str;
+int *exp_str;
 
 /*  returns the next_exp. */
-get_next_exp(str) {
+int get_next_exp(int str) {
     if(!exp_str){
 	exp_str = allocate(20);
 	
@@ -182,7 +182,7 @@ get_next_exp(str) {
  * This routine is called by monster, to calculate how much they are worth.
  * This value should not depend on the tuning.
  */
-query_cost(l) {
+int query_cost(int l) {
     player_ob = this_player();
     level = l;
     if (level >= 20)
@@ -195,41 +195,41 @@ query_cost(l) {
  * Special function for other guilds to call. Arguments are current level
  * and experience points.
  */
-query_cost_for_level(l, e) {
+int query_cost_for_level(int l, int e) {
     level = l;
     exp = e;
-    get_level();
+    get_level(0);
     if (next_exp <= exp)
 	return 0;
     return (next_exp - exp) * 1000 / EXP_COST;
 }
 
-cost_for_level()
+int cost_for_level()
 {
     int cost;
 
     player_ob = this_player();
     level = player_ob->query_level();
 
-    cost = raise_cost(player_ob->query_str());
+    cost = raise_cost(player_ob->query_str(), 0);
     if (cost)
 	write("Str: " + cost + " experience points.\n");
     else
 	write("Str: Not possible.\n");
 
-    cost = raise_cost(player_ob->query_con());
+    cost = raise_cost(player_ob->query_con(), 0);
     if (cost)
 	write("Con: " + cost + " experience points.\n");
     else
 	write("Con: Not possible.\n");
 
-    cost = raise_cost(player_ob->query_dex());
+    cost = raise_cost(player_ob->query_dex(), 0);
     if (cost)
 	write("Dex: " + cost + " experience points.\n");
     else
 	write("Dex: Not possible.\n");
 
-    cost = raise_cost(player_ob->query_int());
+    cost = raise_cost(player_ob->query_int(), 0);
     if (cost)
 	write("Int: " + cost + " experience points.\n");
     else
@@ -251,7 +251,7 @@ cost_for_level()
     return 1;
 }
 
-advance(arg)
+int advance(string arg)
 {
     string name_of_player;
     int cost;
@@ -335,7 +335,7 @@ advance(arg)
     return 1;
 }
 
-raise_con()
+void raise_con()
 {
     int lvl;
 
@@ -355,7 +355,7 @@ raise_con()
 	write("You don't have enough experience.\n");
 }
 
-raise_dex()
+void raise_dex()
 {
     int lvl;
 
@@ -375,7 +375,7 @@ raise_dex()
 	write("You don't have enough experience.\n");
 }
 
-raise_int()
+void raise_int()
 {
     int lvl;
 
@@ -395,7 +395,7 @@ raise_int()
 	write("You don't have enough experience.\n");
 }
 
-raise_str()
+void raise_str()
 {
     int lvl;
 
@@ -419,7 +419,7 @@ raise_str()
  * Compute cost for raising a stat one level. 'base' is the level that
  * you have now, but never less than 1.
  */
-raise_cost(base, action)
+int raise_cost(int base, int  action)
 {
     int cost, saldo;
 
@@ -439,7 +439,7 @@ raise_cost(base, action)
 /*
  * Banish a monster name from being used.
  */
-banish(who) {
+int banish(string who) {
     level = this_player()->query_level();
     if (level < 21)
 	return 0;
@@ -467,7 +467,7 @@ banish(who) {
     return 1;
 }
 
-south() {
+int south() {
     if (this_player()->query_level() < 20) {
 	write("A strong magic force stops you.\n");
 	say(this_player()->query_name(0) +
@@ -479,7 +479,7 @@ south() {
     return 1;
 }
 
-list_quests(num)
+int list_quests(string num)
 {
     int qnumber;
     if (num && (sscanf(num, "%d", qnumber) == 1))
@@ -489,11 +489,11 @@ list_quests(num)
     return 1;
 }
 
-query_drop_castle() {
+int query_drop_castle() {
     return 1;
 }
 
-alas(what) {
+void alas(string what) {
     write("Sorry " + gnd_prn() + ", but you are already as " + what +
 	  "\nas any");
     if (this_player()->query_gender() == 0)
@@ -505,7 +505,7 @@ alas(what) {
 /*
  * Check that the player does not have too high average of the stats.
  */
-too_high_average() {
+int too_high_average() {
     if ((this_player()->query_con() + this_player()->query_str() +
 	 this_player()->query_int() + this_player()->query_dex()) / 4 >=
             this_player()->query_level() + 3) {
@@ -516,7 +516,7 @@ too_high_average() {
     return 0;
 }
 
-gnd_prn() {
+string gnd_prn() {
     int gnd;
 
     gnd = this_player()->query_gender();

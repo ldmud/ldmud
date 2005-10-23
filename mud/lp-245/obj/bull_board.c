@@ -2,13 +2,13 @@ string messages, new_hd, new_body;
 int num_messages;
 object who;
 
-headers();
+void headers();
 
-id(str) {
+int id(string str) {
     return str == "bulletin board" || str == "board" || str == "bulletinboard";
 }
 
-long() {
+void long() {
     write("You can set up new notes with the command 'note headline'.\n");
     write("Read a note with 'read num', and remove an old note with\n");
     write("'remove num'.\n");
@@ -26,28 +26,28 @@ long() {
     headers();
 }
 
-short() {
+string short() {
     return ("A bulletin board");
 }
 
-get() {
+int get() {
     write("It is secured to the ground.\n");
     return 0;
 }
 
-init() {
+void init() {
     add_action("new", "note");
     add_action("read", "read");
     add_action("remove", "remove");
 }
 
-reset(arg) {
+void reset(int arg) {
     if (arg)
 	return;
     restore_object("bulletin");
 }
 
-headers() {
+void headers() {
     string hd, body, rest;
     int i, tmp;
 
@@ -64,7 +64,7 @@ headers() {
     }
 }
 
-new(hd) {
+int new(string hd) {
     if (!hd)
 	return 0;
     if (who && environment(who) == environment(this_object())) {
@@ -87,7 +87,7 @@ new(hd) {
     return 1;
 }
 
-get_body(str) {
+void get_body(string str) {
     if (str == "**") {
 	new_hd = new_hd + "(" + this_player()->query_name() +
 	    ", " + ctime(time())[4..9] + ")";
@@ -105,7 +105,7 @@ get_body(str) {
     input_to("get_body");
 }
 
-read(str) {
+int read(string str) {
     string hd, body, rest;
     int i, tmp;
 
@@ -122,7 +122,7 @@ read(str) {
 	tmp = sscanf(rest, "%s:\n**\n%s\n**\n%s", hd, body, rest);
 	if (tmp != 2 && tmp != 3) {
 	    write("Corrupt.\n");
-	    return;
+	    return 0;
 	}
 	if (i == 0) {
 	    say(this_player()->query_name() +
@@ -135,7 +135,7 @@ read(str) {
     write("Hm. This should not happen.\n");
 }
 
-remove(str) {
+int remove(string str) {
     string hd, body, rest;
     int i, tmp;
 
@@ -153,7 +153,7 @@ remove(str) {
 	tmp = sscanf(rest, "%s:\n**\n%s\n**\n%s", hd, body, rest);
 	if (tmp != 2 && tmp != 3) {
 	    write("Corrupt.\n");
-	    return;
+	    return 1;
 	}
 	if (i == 0) {
 	    say(this_player()->query_name() +

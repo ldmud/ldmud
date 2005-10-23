@@ -11,15 +11,15 @@
 string new_head, new_text, tmp_head, tmp_text;
 int msg_num;
 
-static string  messages, headers;
+static string  *messages, *headers;
 static int line, looked_at;
 static object curr_writer;
 
-id(str) {
+int id(string str) {
 	return str == "board" || str == "bulletin board" || str == "bulletinboard";
 }
 
-long() {
+void long() {
 	int ind;
 	write("This is a bulletin board.\n");
 	write("Usage : note <headline>, read/remove <message number>\n");
@@ -43,23 +43,23 @@ long() {
 	}
 }
 
-short() {
+string short() {
 	return "A bulletin board";
 }
 
-get() {
+int get() {
 	write("It is firmly secured to the ground.\n");
 	return 0;
 }
 
-init() {
+void init() {
 	add_action("new_msg", "note");
 	add_action("read_msg", "read");
 	add_action("remove_msg", "remove");
 	add_action("store_msg", "store");
 	if (!looked_at) {
 	        int i;
-		string arr;
+		string * arr;
 		messages = allocate(30);
 		headers = allocate(30);
 		looked_at = 1;
@@ -82,7 +82,7 @@ init() {
 	}
 }
 
-reset(arg) {
+void reset(int arg) {
 	if (arg)
 		if (!random(5)) {
 			say("A small gnome appears and secures some " +
@@ -91,7 +91,25 @@ reset(arg) {
 		}
 }
 
-new_msg(msg_head) {
+int save_board() {
+	int ind;
+	ind = 1;
+	tmp_head = implode(headers, "\n**\n") + "\n**\n";
+	tmp_text = implode(messages, "\n**\n") + "\n**\n";
+	save_object(BOARD_NAME);
+	tmp_head = "";
+	tmp_text = "";
+	return 1;
+}
+
+
+void error_log(string str) {
+	tell_room(environment(this_object()), "Board says '" + str + "'.\n");
+	log_file(ERROR_LOG, "Board : " + str);
+	return;
+}
+
+int new_msg(string msg_head) {
 	line = 1;
 	if (!msg_head)
 		return 0;
@@ -118,7 +136,7 @@ new_msg(msg_head) {
 	return 1;
 }
 
-get_msg(str) {
+void get_msg(string str) {
 	if (str == "~q") {
 		say(curr_writer->query_name() + " aborts writing a note.\n");
 		write("Note aborted.\n");
@@ -154,7 +172,7 @@ get_msg(str) {
 	input_to("get_msg");
 }
 
-read_msg(what_msg) {
+int read_msg(string what_msg) {
 	int note;
 	if (!sscanf(what_msg, "%d", note))
 		if (!sscanf(what_msg, "note %d", note))
@@ -173,7 +191,7 @@ read_msg(what_msg) {
 	return 1;
 }
 
-remove_msg(what_msg) {
+int remove_msg(string what_msg) {
 	string player, title, date;
 	int note, ind;
 	if (!sscanf(what_msg, "%d", note))
@@ -212,7 +230,7 @@ remove_msg(what_msg) {
 	write("Ok.\n");
 	return 1;
 }
-store_msg(str) {
+int store_msg(string str) {
 	int note;
 	string file;
 	if (!str)
@@ -230,20 +248,3 @@ store_msg(str) {
 	return 1;
 }
 
-save_board() {
-	int ind;
-	ind = 1;
-	tmp_head = implode(headers, "\n**\n") + "\n**\n";
-	tmp_text = implode(messages, "\n**\n") + "\n**\n";
-	save_object(BOARD_NAME);
-	tmp_head = "";
-	tmp_text = "";
-	return 1;
-}
-
-
-error_log(str) {
-	tell_room(environment(this_object()), "Board says '" + str + "'.\n");
-	log_file(ERROR_LOG, "Board : " + str);
-	return;
-}

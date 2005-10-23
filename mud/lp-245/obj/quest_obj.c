@@ -5,23 +5,23 @@
 
 string hint_string, name;
 
-set_hint(h) {
+void set_hint(string h) {
     hint_string = h;
 }
 
-set_name(n) {
+void set_name(string n) {
     name = n;
 }
 
-id(str) { return str == name || str == "quest"; }
+int id(string str) { return str == name || str == "quest"; }
 
-short() {
+string short() {
     return name;
 }
 
-long() {
+void long() {
     write("This is the quest '" + name + "':\n");
     write(hint_string);
 }
 
-hint() { return hint_string; }
+string hint() { return hint_string; }

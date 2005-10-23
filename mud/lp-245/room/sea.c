@@ -9,7 +9,7 @@ ONE_EXIT("room/jetty2","west",
 	 "All at sea",
 	 "You are swimming out at the sea.\n", 1)
 
-dive() {
+int dive() {
     object ob;
 
     ob = first_inventory(this_player());

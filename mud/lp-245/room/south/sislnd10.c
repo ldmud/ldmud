@@ -1,21 +1,21 @@
-reset(started)
+void reset(int started)
 {
     if (!started)
 	set_light(1);
 }
 
-init()
+void init()
 {
     add_action("east", "east");
     add_action("southeast", "southeast");
 }
 
-short()
+string short()
 {
     return "Focus Point";
 }
 
-long()
+void long()
 {
     write("You are standing in a small grove on the western most point of the Isle\n" +
 	  "of the Magi, Focus Point\n" +
@@ -28,13 +28,13 @@ long()
 	  "small grove from here\n" );
 }
 
-east()
+int east()
 {
     this_player()->move_player("east#room/south/sislnd11");
     return 1;
 }
 
-southeast()
+int southeast()
 {
      this_player()->move_player("southeast#room/south/sislnd9");
      return 1;

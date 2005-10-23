@@ -1,13 +1,13 @@
 /* start_mark.c */
 /* Mrpr 901122 */
 
-start_death();
+void  start_death();
 
 /*
  * Function name: init
  * Description:   Init this object
  */
-init()
+void init()
 {
 
 	start_death();
@@ -18,7 +18,7 @@ init()
  * Function name: get
  * Description:   Don't give it away.
  */
-get()
+int get()
 {
 	return 1;
 }
@@ -27,7 +27,7 @@ get()
  * Function name: id
  * Description:   Identify the object
  */
-id(str)
+int id(string str)
 {
 
 	return str == "death_mark";
@@ -38,7 +38,7 @@ id(str)
  * Function name: start_death
  * Description:   Start the death sequence.
  */
-start_death()
+void start_death()
 {
 	
 	object ned, my_host;
@@ -78,7 +78,7 @@ start_death()
  * Function name: query_auto_load
  * Description:   Automatic load of this object
  */
-query_auto_load()
+string query_auto_load()
 {
 
 	return "room/death/death_mark:";
@@ -89,7 +89,7 @@ query_auto_load()
  * Function name: drop
  * Description:   No dropping.
  */
-drop()
+int drop()
 {
 	return 1;
 }

@@ -1,10 +1,10 @@
-reset(started)
+void reset(int started)
 {
     if (!started)
 	set_light(1);
 }
 
-init()
+void init()
 {
     add_action("north", "north");
     add_action("south", "south");
@@ -13,12 +13,12 @@ init()
     add_action("down", "down");
 }
 
-short()
+string short()
 {
     return "An old disused well";
 }
 
-long()
+void long()
 {
     write("You are halfway up the hill.\n" +
 	  "An old, disused well stands here, the roof having fallen in from neglect.\n" +
@@ -29,31 +29,31 @@ long()
 	  "The well has a ladder runing down into it.\n");
 }
 
-north()
+int north()
 {
     this_player()->move_player("north#room/south/sislnd12");
     return 1;
 }
 
-south()
+int south()
 {
     this_player()->move_player("south#room/south/sislnd8");
     return 1;
 }
 
-east()
+int east()
 {
     this_player()->move_player("east#room/south/sislnd18");
     return 1;
 }
 
-west()
+int west()
 {
     this_player()->move_player("west#room/south/sislnd9");
     return 1;
 }
 
-down()
+int down()
 {
     this_player()->move_player("down the well#room/south/lair");
     return 1;

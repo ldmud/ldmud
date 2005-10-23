@@ -6,25 +6,28 @@ string chat_str;
 short() { return chat_str; }
 */
 
-link(ob) {
+void link(object ob) {
     next = ob;
 }
 
-load_chat(str) {
+void load_chat(string str) {
     chat_str = str;
 }
 
-set_monster(m) {
+void set_monster(object m) {
     monster = m;
 }
 
-chat(nr) {
+int chat(int nr) {
     object room;
 
     if (nr == 0){
 	room = environment(monster);
 	if(room)
-	    return tell_room(room,chat_str);
+        {
+	    tell_room(room,chat_str);
+            return 0;
+        }
     }
     nr -= 1;
     if (next)
@@ -33,7 +36,7 @@ chat(nr) {
 	return 0;
 }
 
-remove_chat(str) {
+object remove_chat(string str) {
     if (str == chat_str) {
 	destruct(this_object());
 	return next;
@@ -43,11 +46,11 @@ remove_chat(str) {
     return this_object();
 }
 
-collaps()
+void collaps()
 {
     if(next)
 	next->collaps();
     destruct(this_object());
 }
 
-drop() { return 1; }
+int drop() { return 1; }

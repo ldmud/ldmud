@@ -15,7 +15,7 @@ int dest;		/* Where we are going. */
 int moving_time;	/* How long we are going to move. */
 int delay_to_reset;	/* Move back to origin automatically after a delay. */
 
-init() {
+void init() {
     add_action("press", "press");
     add_action("press", "push");
     add_action("open_door", "open");
@@ -23,11 +23,11 @@ init() {
     add_action("go_east", "east");
 }
 
-short() {
+string short() {
     return "elevator";
 }
 
-reset(arg) {
+void reset(int arg) {
     door_is_open = 0;
     if (arg)
 	return;
@@ -41,9 +41,9 @@ reset(arg) {
  * Return true if closed door.
  */
 
-query_door() { return !door_is_open; }
+int query_door() { return !door_is_open; }
 
-long() {
+void long() {
     write("You are in the elevator. On the wall are three buttons,\n");
     write("numbered 1 to 3.\n");
     if (door_is_open)
@@ -52,7 +52,7 @@ long() {
 	write("There is a closed door to the east.\n");
 }
 
-press(button) {
+int press(string button) {
     string b;
     if (!button)
 	return 0;
@@ -93,7 +93,7 @@ press(button) {
     return 1;
 }
 
-heart_beat() {
+void heart_beat() {
     if (time_to_close_door > 0) {
 	time_to_close_door -= 1;
 	if (time_to_close_door == 0) {
@@ -117,7 +117,7 @@ heart_beat() {
 	"room/wiz_hall"->elevator_arrives();
 }
 
-open_door(str)
+int open_door(string str)
 {
     if (str != "door")
 	return 0;
@@ -136,7 +136,7 @@ open_door(str)
     return 1;
 }
 
-close_door(str)
+int close_door(string str)
 {
     if (str != "door")
 	return 0;
@@ -151,7 +151,7 @@ close_door(str)
     return 1;
 }
 
-go_east() {
+int go_east() {
     if (moving_time > 0) {
 	write("You can't go anywhere when the elevator is moving.\n");
 	return 1;
@@ -169,12 +169,12 @@ go_east() {
     return 1;
 }
 
-query_level() { return level; }
+int query_level() { return level; }
 
 /*
  * This routine is called from various rooms that the elevator connects to.
  */
-call_elevator(button) {
+int call_elevator(int button) {
     if (door_is_open)
 	return 0;
     if (moving_time > 0)
@@ -195,21 +195,21 @@ call_elevator(button) {
     return 1;
 }
 
-id(str) {
+int id(string str) {
     return str == "door" || str == "button" || str == "buttons";
 }
 
 /*
  * Only list inventory if not looking at anything special.
  */
-can_put_and_get()
+int can_put_and_get()
 {
     return 0;
 }
 /*
  * Called by others to see if the elevator is moving
  */
-is_moving() {
+int is_moving() {
     if (level == dest )
 	/* Still */
 	return 0;
@@ -220,6 +220,6 @@ is_moving() {
     return 2;
 }
 
-query_drop_castle() {
+int query_drop_castle() {
     return 1;
 }

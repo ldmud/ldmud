@@ -1,6 +1,6 @@
 inherit "room/room";
 
-reset(arg) {
+void reset(int arg) {
     if (arg) return;
 
     set_light(1);

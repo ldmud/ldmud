@@ -1,17 +1,27 @@
 #define MAX_LIST	30
 
 int value;
-string name_of_item;
+object name_of_item;
 
-short() {
+string short() {
     return "store room for the shop";
 }
 
-init() {
+void init() {
     add_action("south", "south");
 }
 
-inventory(str)
+void list(object ob)
+{
+    int value;
+
+    value = ob->query_value();
+    if (value) {
+	write(value*2 + ":\t" + ob->short() + ".\n");
+    }
+}
+
+void inventory(string str)
 {
     object ob;
     int max;
@@ -36,17 +46,7 @@ inventory(str)
     }
 }
 
-list(ob)
-{
-    int value;
-
-    value = ob->query_value();
-    if (value) {
-	write(value*2 + ":\t" + ob->short() + ".\n");
-    }
-}
-
-value(item) {
+int value(string item) {
     name_of_item = present(item);
     if (!name_of_item) {
 	return 0;
@@ -60,7 +60,7 @@ value(item) {
     return 1;
 }
 
-buy(item) {
+void buy(string item) {
     name_of_item = present(item);
     if (!name_of_item) {
 	write("No such item in the store.\n");
@@ -87,12 +87,12 @@ buy(item) {
     say(this_player()->query_name() + " buys " + item + ".\n");
 }
 
-south() {
+int south() {
     this_player()->move_player("leaves#room/shop");
     return 1;
 }
 
-heart_beat()
+void heart_beat()
 {
     object ob, next_ob;
     ob = first_inventory(this_object());
@@ -103,7 +103,7 @@ heart_beat()
     }
 }
 
-reset(arg) {
+void reset(int arg) {
     if (!arg)
 	set_light(1);
     if (!present("torch")) {
@@ -116,12 +116,12 @@ reset(arg) {
     }
 }
 
-long()
+void long()
 {
     write("All things from the shop are stored here.\n");
 }
 
-store(item)
+void store(object item)
 {
     string short_desc;
     object ob;

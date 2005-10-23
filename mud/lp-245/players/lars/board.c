@@ -2,16 +2,62 @@
 #define BLACK	1
 #define WHITE	2
 
-int board, mark, num_pass;
+int num_pass;
+mixed * board, *mark;
 
 object black, white;
 int to_play;
 
-short() {
+int occupied() {
+    if (to_play == EMPTY)
+	return 0;
+    if (black && present(black, environment(this_object()))) {
+	write("You have to wait for " + call_other(black, "query_name") +
+	      ".\n");
+	return 1;
+    }
+    if (white && present(white, environment(this_object()))) {
+	write("You have to wait for " + call_other(white, "query_name") +
+	      ".\n");
+	return 1;
+    }
+    return 0;
+}
+
+void display(mixed * b) {
+    int x, y;
+
+    if (to_play == BLACK)
+	write("Black '@' (" + black->query_name() + ") to play.\n\n");
+    else
+	write("White 'O' (" + white->query_name() + ") to play.\n\n");
+    write("  0 1 2 3 4 5 6 7 8\n");
+    while(x<9) {
+	write(x + " ");
+	while(y<9) {
+	    if (b[x][y] == EMPTY)
+		write(". ");
+	    else if (b[x][y] == BLACK)
+		write("@ ");
+	    else if (b[x][y] == WHITE)
+		write("O ");
+	    y += 1;
+	}
+	write("\n");
+	x += 1;
+	y = 0;
+    }
+}
+
+void notify(string str) {
+    say(this_player()->query_name() + " " + str);
+}
+
+string short() {
     return "board";
 }
 
-long() {
+void long() {
     write("A go board. If you want to play\n");
     write("with someone, do 'start name' with the name of your friend.\n");
     write("The player issuing the 'start' command will get black.\n");
@@ -22,25 +68,55 @@ long() {
     }
 }
 
-id(str) {
+int id(string str) {
     return str == "board" || str == "go board";
 }
 
-query_value() { return 10; }
+int query_value() { return 10; }
 
-get() {
+int get() {
     return !occupied();
 }
 
-reset(arg) {
+void reset(int arg) {
     if (arg)
-	return arg;
+	return;
     to_play = EMPTY;
 }
 
-start(str) {
+void place_hand(int n) {
+    board[2][2] = BLACK;
+    board[6][6] = BLACK;
+    if (n < 3)
+	return;
+    board[2][6] = BLACK;
+    if (n < 4)
+	return;
+    board[6][2] = BLACK;
+    if (n < 5)
+	return;
+    board[4][4] = BLACK;
+    if (n < 6)
+	return;
+    board[4][4] = EMPTY;
+    board[4][2] = BLACK;
+    board[4][6] = BLACK;
+    if (n < 7)
+	return;
+    board[4][4] = BLACK;
+    if (n < 8)
+	return;
+    board[4][4] = EMPTY;
+    board[2][4] = BLACK;
+    board[6][4] = BLACK;
+    if (n < 9)
+	return;
+    board[4][4] = BLACK;
+}
+
+int start(string str) {
     int i, handicap;
-    string name;
+    mixed name;
     if (environment() == this_player()) {
 	write("You mus put it down first !\n");
 	return 1;
@@ -86,37 +162,12 @@ start(str) {
     return 1;
 }
 
-display(b) {
-    int x, y;
-
-    if (to_play == BLACK)
-	write("Black '@' (" + black->query_name() + ") to play.\n\n");
-    else
-	write("White 'O' (" + white->query_name() + ") to play.\n\n");
-    write("  0 1 2 3 4 5 6 7 8\n");
-    while(x<9) {
-	write(x + " ");
-	while(y<9) {
-	    if (b[x][y] == EMPTY)
-		write(". ");
-	    else if (b[x][y] == BLACK)
-		write("@ ");
-	    else if (b[x][y] == WHITE)
-		write("O ");
-	    y += 1;
-	}
-	write("\n");
-	x += 1;
-	y = 0;
-    }
-}
-
-disp() {
+int disp() {
     display(board);
     return 1;
 }
 
-init() {
+void init() {
     add_action("disp", "disp");
     add_action("start", "start");
     add_action("patch", "patch");
@@ -125,12 +176,7 @@ init() {
     add_action("fill", "fill");
 }
 
-count_lib(b, x, y) {
-    clean(mark);
-    return lib(b, mark, x, y);
-}
-
-clean(b) {
+void clean(mixed * b) {
     int i, j;
 
     i = 0;
@@ -144,7 +190,7 @@ clean(b) {
     }
 }
 
-lib(b, m, x, y) {
+int lib(mixed *b, mixed *m, int x, int y) {
     int col, sum;
 
     sum = 0;
@@ -185,8 +231,49 @@ lib(b, m, x, y) {
     return sum;
 }
 
-patch(str) {
-    int x, y, col;
+int count_lib(mixed * b, int x, int y) {
+    clean(mark);
+    return lib(b, mark, x, y);
+}
+
+int rem_stones(mixed * b, int x, int y) {
+    int col, sum;
+
+    col = b[x][y];
+    b[x][y] = EMPTY;
+    sum = 1;
+    if (x>0 && b[x-1][y] == col)
+	sum += rem_stones(b, x-1, y);
+    if (y>0 && b[x][y-1] == col)
+	sum += rem_stones(b, x, y-1);
+    if (x<8 && b[x+1][y] == col)
+	sum += rem_stones(b, x+1, y);
+    if (y<8 && b[x][y+1] == col)
+	sum += rem_stones(b, x, y+1);
+    return sum;
+}
+
+int enter(mixed * b, int x, int y, int col) {
+    int ocol, sum;
+    b[x][y] = col;
+    if (col == BLACK)
+	ocol = WHITE;
+    else
+	ocol = BLACK;
+    if (x>0 && b[x-1][y] == ocol && count_lib(b, x-1, y) == 0)
+	sum += rem_stones(b, x-1, y);
+    if (y>0 && b[x][y-1] == ocol && count_lib(b, x, y-1) == 0)
+	sum += rem_stones(b, x, y-1);
+    if (x<8 && b[x+1][y] == ocol && count_lib(b, x+1, y) == 0)
+	sum += rem_stones(b, x+1, y);
+    if (y<8 && b[x][y+1] == ocol && count_lib(b, x, y+1) == 0)
+	sum += rem_stones(b, x, y+1);
+    return sum;
+}
+
+int patch(string str) {
+    int x, y;
+    mixed col;
     int ret;
 
     if (!str)
@@ -210,42 +297,7 @@ patch(str) {
     return 1;
 }
 
-rem_stones(b, x, y) {
-    int col, sum;
-
-    col = b[x][y];
-    b[x][y] = EMPTY;
-    sum = 1;
-    if (x>0 && b[x-1][y] == col)
-	sum += rem_stones(b, x-1, y);
-    if (y>0 && b[x][y-1] == col)
-	sum += rem_stones(b, x, y-1);
-    if (x<8 && b[x+1][y] == col)
-	sum += rem_stones(b, x+1, y);
-    if (y<8 && b[x][y+1] == col)
-	sum += rem_stones(b, x, y+1);
-    return sum;
-}
-
-enter(b, x, y, col) {
-    int ocol, sum;
-    b[x][y] = col;
-    if (col == BLACK)
-	ocol = WHITE;
-    else
-	ocol = BLACK;
-    if (x>0 && b[x-1][y] == ocol && count_lib(b, x-1, y) == 0)
-	sum += rem_stones(b, x-1, y);
-    if (y>0 && b[x][y-1] == ocol && count_lib(b, x, y-1) == 0)
-	sum += rem_stones(b, x, y-1);
-    if (x<8 && b[x+1][y] == ocol && count_lib(b, x+1, y) == 0)
-	sum += rem_stones(b, x+1, y);
-    if (y<8 && b[x][y+1] == ocol && count_lib(b, x, y+1) == 0)
-	sum += rem_stones(b, x, y+1);
-    return sum;
-}
-
-play(str) {
+int play(string str) {
     int x, y;
     int ret;
 
@@ -298,7 +350,39 @@ play(str) {
     return 1;
 }
 
-count_score(b) {
+int count_spaces2(mixed *b, int x, int y, int col)
+{
+    int tot;
+
+    if (x < 0 || x > 8 || y < 0 || y > 8)
+	return 0;
+    if (b[x][y] == EMPTY) {
+	if (mark[x][y])
+	    return 0;
+	mark[x][y] = 1;
+	tot = 1;
+    } else if (b[x][y] == col)
+	return 0;
+    else
+	return 2000;
+    write(x + " " + y + "\n");
+    tot += count_spaces2(b, x-1, y, col);
+    tot += count_spaces2(b, x+1, y, col);
+    tot += count_spaces2(b, x, y-1, col);
+    tot += count_spaces2(b, x, y+1, col);
+    return tot;
+}
+
+int count_spaces(mixed * b, int x, int y, int col)
+{
+    int tot;
+    tot = count_spaces2(b, x, y, col);
+    if (col == WHITE)
+	tot = -tot;
+    return tot;
+}
+
+int count_score(mixed *b) {
     int x, y;
     int score;
     int col, tmp;
@@ -335,7 +419,7 @@ count_score(b) {
     return score;
 }
 
-chose_random() {
+void chose_random() {
     int x, y, n;
     while(n < 10) {
 	x = random(9);
@@ -359,43 +443,7 @@ chose_random() {
     write("I pass.\n");
 }
 
-notify(str) {
-    say(this_player()->query_name() + " " + str);
-}
-
-count_spaces(b, x, y, col)
-{
-    int tot;
-    tot = count_spaces2(b, x, y, col);
-    if (col == WHITE)
-	tot = -tot;
-    return tot;
-}
-
-count_spaces2(b, x, y, col)
-{
-    int tot;
-
-    if (x < 0 || x > 8 || y < 0 || y > 8)
-	return 0;
-    if (b[x][y] == EMPTY) {
-	if (mark[x][y])
-	    return 0;
-	mark[x][y] = 1;
-	tot = 1;
-    } else if (b[x][y] == col)
-	return 0;
-    else
-	return 2000;
-    write(x + " " + y + "\n");
-    tot += count_spaces2(b, x-1, y, col);
-    tot += count_spaces2(b, x+1, y, col);
-    tot += count_spaces2(b, x, y-1, col);
-    tot += count_spaces2(b, x, y+1, col);
-    return tot;
-}
-
-score() {
+int score() {
     int tmp;
 
     write("The score is now ");
@@ -409,55 +457,30 @@ score() {
     return 1;
 }
 
-occupied() {
-    if (to_play == EMPTY)
-	return 0;
-    if (black && present(black, environment(this_object()))) {
-	write("You have to wait for " + call_other(black, "query_name") +
-	      ".\n");
+int ch(mixed * b, int x, int y, int col) {
+    if (x < 0 || x > 8 || y < 0 || y > 8)
 	return 1;
-    }
-    if (white && present(white, environment(this_object()))) {
-	write("You have to wait for " + call_other(white, "query_name") +
-	      ".\n");
+    if (b[x][y] == EMPTY || b[x][y] == col)
+	return 1;
+    return 0;
+}
+
+int fill_point(mixed *b, int x, int y, int col)
+{
+    if (board[x][y] != EMPTY)
+	return 0;
+    if (ch(b,x-1,y,col) && ch(b,x,y-1,col) &&
+	ch(b,x+1,y,col) && ch(b,x,y+1,col)) {
+	board[x][y] = col;
 	return 1;
     }
     return 0;
 }
 
-place_hand(n) {
-    board[2][2] = BLACK;
-    board[6][6] = BLACK;
-    if (n < 3)
-	return;
-    board[2][6] = BLACK;
-    if (n < 4)
-	return;
-    board[6][2] = BLACK;
-    if (n < 5)
-	return;
-    board[4][4] = BLACK;
-    if (n < 6)
-	return;
-    board[4][4] = EMPTY;
-    board[4][2] = BLACK;
-    board[4][6] = BLACK;
-    if (n < 7)
-	return;
-    board[4][4] = BLACK;
-    if (n < 8)
-	return;
-    board[4][4] = EMPTY;
-    board[2][4] = BLACK;
-    board[6][4] = BLACK;
-    if (n < 9)
-	return;
-    board[4][4] = BLACK;
-}
-
-fill() {
+int fill() {
     int x, y;
-    int tot, b;
+    int tot;
+    mixed * b;
     b = board;
     board = allocate(9);
     while(x<9) {
@@ -488,22 +511,3 @@ fill() {
     return 1;
 }
 
-fill_point(b, x, y, col)
-{
-    if (board[x][y] != EMPTY)
-	return 0;
-    if (ch(b,x-1,y,col) && ch(b,x,y-1,col) &&
-	ch(b,x+1,y,col) && ch(b,x,y+1,col)) {
-	board[x][y] = col;
-	return 1;
-    }
-    return 0;
-}
-
-ch(b, x, y, col) {
-    if (x < 0 || x > 8 || y < 0 || y > 8)
-	return 1;
-    if (b[x][y] == EMPTY || b[x][y] == col)
-	return 1;
-    return 0;
-}

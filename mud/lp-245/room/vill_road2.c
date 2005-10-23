@@ -2,11 +2,13 @@ inherit "room/room";
 
 object harry;
 int count;
-string chat_str;	/* This variable is only initialized once. */
-string a_chat_str;
-string function, type, match;
+string * chat_str;	/* This variable is only initialized once. */
+string * a_chat_str;
+string * function, * type, * match;
 
-reset(arg) {
+void start_harry();
+
+void reset(int arg) {
     dest_dir = ({ "room/vill_road1","west",
 		  "room/vill_shore","east",
 		  "room/adv_guild","south",
@@ -24,7 +26,7 @@ reset(arg) {
     set_light(1);
 }
 
-start_harry() {
+void start_harry() {
     if(!harry) {
 	if (!chat_str) {
 	    chat_str = allocate(10);
@@ -96,7 +98,12 @@ start_harry() {
     }
 }
 
-why_did(str) {
+void notify(string str) {
+    say(str);
+    write(str);
+}
+	
+void why_did(string str) {
     string who, what;
     sscanf(str, "%s %s", who, what);
     if(who == "harry" || who == "Harry")
@@ -118,12 +125,7 @@ why_did(str) {
     }
 }
 
-notify(str) {
-    say(str);
-    write(str);
-}
-	
-how_does_it_feel(str) {
+void how_does_it_feel(string str) {
     string who, what;
     sscanf(str, "%s %s", who, what);
     if(who == "harry" || who == "Harry")
@@ -134,7 +136,7 @@ how_does_it_feel(str) {
     }
 }
 
-smiles(str) {
+void smiles(string str) {
     string who, what;
     sscanf(str, "%s %s", who, what);
     if(who == "harry" || who == "Harry")
@@ -145,14 +147,14 @@ smiles(str) {
     }
 }
 
-say_hello(str) {
+void say_hello(string str) {
     string who;
     if (sscanf(str, "%s arrives.", who) == 1) {
 	notify( "Harry says: Hi " + who + ", nice to see you !\n");
     }
 }
 
-test_say(str) {
+void test_say(string str) {
     string a, b, message;
 
     sscanf(str, "%s %s", a, b);
@@ -179,13 +181,13 @@ test_say(str) {
     notify(message);
 }
 
-follow(str) {
+void follow(string str) {
     string who, where;
     if(sscanf(str, "%s leaves %s.\n", who, where) == 2)
 	harry->init_command(where);
 }
 
-gives(str) {
+void gives(string str) {
     string who, what, whom;
     int rand;
     object obj, next_obj;
@@ -238,7 +240,7 @@ gives(str) {
     }
 }
 
-monster_died() {
+void monster_died() {
     object obj, b;
     int num;
     obj = first_inventory(harry);
@@ -254,7 +256,7 @@ monster_died() {
 	notify("There is a crushing sound of bottles breaking, as the body falls.\n");
 }
 
-down() {
+int down() {
     this_player()->move_player("down#room/station");
     return 1;
 

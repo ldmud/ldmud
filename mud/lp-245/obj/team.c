@@ -4,7 +4,7 @@
 
 #define INIT_SIZE 2
 
-object members, pot_members, leader_ob;
+object *members, *pot_members, leader_ob;
 string leader_name, mout;
 
 /*
@@ -12,9 +12,9 @@ string leader_name, mout;
  * The arrays is extended if needed. The leader adds to the potential
  * members array.
  */
-add(item) {
+object * add(object item) {
     int i;
-    object vec2;
+    object * vec2;
 
     if (members == 0) {
 	pot_members = allocate(INIT_SIZE);
@@ -23,22 +23,22 @@ add(item) {
     i = 0;
     while(i<sizeof(members)) {
 	if (members[i] == 0) {
-	    vec[i] = item;
-	    return vec;
+	    members[i] = item;
+	    return members;
 	}
 	i += 1;
     }
-    vec2 = allocate(sizeof(vec) + INIT_SIZE);
+    vec2 = allocate(sizeof(members) + INIT_SIZE);
     i = 0;
-    while(i<sizeof(vec)) {
-	vec2[i] = vec[i];
+    while(i<sizeof(members)) {
+	vec2[i] = members[i];
 	i += 1;
     }
     vec2[i] = item;
     return vec2;
 }
 
-long() {
+void long() {
     int i;
     write("Leader " + leader_name + ": ");
     if (!pointerp(members)) {
@@ -53,11 +53,11 @@ long() {
     write("\n");
 }
 
-id(str) {
+int id(string str) {
     return str == "team object";
 }
 
-init() {
+void init() {
     if (leader_ob == 0) {
 	leader_ob = this_player();
 	leader_name = environment()->query_name();
@@ -67,10 +67,10 @@ init() {
     add_action("disband", "disband");
 }
 
-join(str) {
+int join(string str) {
     object ob;
     if (!str)
-	return;
+	return 0;
     ob = present(str, environment(environment()));
     if (!ob) {
 	write("No such player here.\n");
@@ -80,20 +80,20 @@ join(str) {
 	ob->query_name() + " to his team.\n", ob);
     tell_object(ob, "You are joined to the team of " +
 		leader_name + ".\n");
-    members = add(members, ob);
+    members = add(ob); /* takes members implicitely */
     write("Ok.\n");
     enable_commands();
     return 1;
 }
 
-drop() { return 1; }
+int drop() { return 1; }
 
-get() { return 1; }
+int get() { return 1; }
 
 string direction;
 object last_room;
 
-catch_tell(str) {
+void catch_tell(string str) {
     string dir;
 
     if (sscanf(str, leader_name + " " + mout + " %s.", dir) != 1)
@@ -105,7 +105,11 @@ catch_tell(str) {
     call_out("move", 0);
 }
 
-move() {
+void msg(string str) {
+    tell_object(environment(), str);
+}
+
+void move() {
     int i;
 
     if (!pointerp(members)){
@@ -131,11 +135,7 @@ move() {
     last_room = 0;
 }
 
-msg(str) {
-    tell_object(environment(), str);
-}
-
-disband(str) {
+int disband(string str) {
     object ob;
     int i;
     if (!str)

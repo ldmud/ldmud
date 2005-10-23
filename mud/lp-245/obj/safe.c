@@ -2,7 +2,7 @@ object listen_ob;
 int num_turn, safe_is_unlocked, safe_is_open;
 object money;
 
-reset(arg) {
+void reset(int arg) {
     num_turn = 0;
     safe_is_unlocked = 0;
     safe_is_open = 0;
@@ -13,7 +13,7 @@ reset(arg) {
     }
 }
 
-long(str) {
+void long(string str) {
     if (str == "wheel" || str == "code wheel") {
 	write("You see nothing special.\n");
 	return;
@@ -22,18 +22,23 @@ long(str) {
     write("Very heavy. On the safe is a numbered code wheel.\n");
 }
 
-short() {
+string short() {
     if (safe_is_open)
 	return "A safe (open)";
     return "A safe";
 }
 
-init() {
+int id(string str) {
+    return str == "safe" || str == "wheel" ||
+	str == "code wheel";
+}
+
+void init() {
     add_action("open", "open");
     add_action("turn", "turn");
 }
 
-open(str) {
+int open(string str) {
     if (!id(str))
 	return 0;
     if (!safe_is_unlocked) {
@@ -46,12 +51,7 @@ open(str) {
     return 1;
 }
 
-id(str) {
-    return str == "safe" || str == "wheel" ||
-	str == "code wheel";
-}
-
-turn(str) {
+int turn(string str) {
     int listen;
     if (str != "wheel" && str != "code wheel")
 	return 0;
@@ -71,14 +71,14 @@ turn(str) {
     return 1;
 }
 
-use_stethoscope(stet)
+int use_stethoscope(object stet)
 {
     listen_ob = stet;
     return 1;
 }
 
-can_put_and_get() {
+int can_put_and_get() {
     return safe_is_open;
 }
 
-add_weight() { return 1; }
+int add_weight() { return 1; }

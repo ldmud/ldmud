@@ -4,40 +4,40 @@
  * The torch can't be sold when it is lighted.
  */
 
-string amount_of_fuel;
+int amount_of_fuel;
 string name;
 status is_lighted;
 int weight;
 
-long() {
-    write(short() + "\n");
-}
-
-reset(arg) {
-    if (arg)
-	return;
-    amount_of_fuel = 2000; name = "torch"; is_lighted = 0; weight = 1;
-}
-
-set_weight(w) { weight = w; }
-
-query_weight() { return weight; }
-
-short() {
+string short() {
     if (is_lighted)
 	return name + " (lighted)";
     return name;
 }
 
-set_name(n) { name = n; }
-set_fuel(f) { amount_of_fuel = f; }
+void long() {
+    write(short() + "\n");
+}
 
-init() {
+void reset(int arg) {
+    if (arg)
+	return;
+    amount_of_fuel = 2000; name = "torch"; is_lighted = 0; weight = 1;
+}
+
+void set_weight(int w) { weight = w; }
+
+int query_weight() { return weight; }
+
+void set_name(string n) { name = n; }
+void set_fuel(int f) { amount_of_fuel = f; }
+
+void init() {
     add_action("light", "light");
     add_action("extinguish", "extinguish");
 }
 
-light(str) {
+int light(string str) {
     if (!str || str != name)
 	return 0;
     if (is_lighted) {
@@ -56,7 +56,7 @@ light(str) {
     return 1;
 }
 
-out_of_fuel() {
+void out_of_fuel() {
     object ob;
     if (set_light(-1) == 0)
 	say("There is darkness as a " + name + " goes dark.\n");
@@ -68,17 +68,17 @@ out_of_fuel() {
     destruct(this_object());
 }
 
-id(str) {
+int id(string str) {
     return str == name;
 }
 
-query_value() {
+int query_value() {
     return amount_of_fuel/100;
 }
 
-get() { return 1; }
+int get() { return 1; }
 
-extinguish(str) {
+int extinguish(string str) {
     int i;
 
     if (str && !id(str))

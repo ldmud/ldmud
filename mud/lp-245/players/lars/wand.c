@@ -2,21 +2,21 @@ int new_object;
 int new_value;
 string new_short, new_long, new_name;
 
-short()
+string short()
 {
     if (new_object)
 	return new_short;
     return "The wand of creation";
 }
 
-query_value()
+int query_value()
 {
     if (new_object)
 	return new_value;
     return 0;
 }
 
-long()
+void long()
 {
     if (new_object) {
 	write(new_long + "\n");
@@ -28,33 +28,33 @@ long()
     write("You probaly can't use it.\n");
 }
 
-init() {
+void init() {
     if (!new_object && call_other(this_player(), "query_level") > 19) {
-	add_action("light"); add_verb("light");
-	add_action("silence"); add_verb("silence");
-	add_action("wave"); add_verb("wave");
-	add_action("fetch"); add_verb("fetch");
-	add_action("low_remove"); add_verb("low_remove");
-	add_action("destr"); add_verb("destr");
-	add_action("rem_room"); add_verb("rem_room");
-	add_action("crash"); add_verb("crash");
-	add_action("echo"); add_verb("$");
-	add_action("trace"); add_verb("trace");
-	add_action("remove"); add_verb("remove");
-	add_action("find"); add_verb("find");
-	add_action("patch"); add_verb("patch");
-	add_action("lookplayer"); add_verb("lookplayer");
+	add_action("light", "light");
+	add_action("silence", "silence");
+	add_action("wave", "wave");
+	add_action("fetch", "fetch");
+	add_action("low_remove", "low_remove");
+	add_action("destr", "destr");
+	add_action("rem_room", "rem_room");
+	add_action("crash", "crash");
+	add_action("echo", "$");
+	add_action("trace", "trace");
+	add_action("remove", "remove");
+	add_action("find", "find");
+	add_action("patch", "patch");
+	add_action("lookplayer", "lookplayer");
     }
 }
 
-id(str)
+int id(string str)
 {
     if (new_object)
 	return str == new_name;
     return str == "wand" || str == "wand of creation";
 }
 
-wave(str)
+int wave(string str)
 {
     if (str && !id(str))
 	return 0;
@@ -73,7 +73,7 @@ wave(str)
     return 1;
 }
 
-set_new_name(str)
+void set_new_name(string str)
 {
     if (str == "") {
 	write("Aborted\n");
@@ -84,7 +84,7 @@ set_new_name(str)
     input_to("set_new_short");
 }
 
-set_new_short(str)
+void set_new_short(string str)
 {
     if (str == "") {
 	write("Aborted\n");
@@ -96,7 +96,7 @@ set_new_short(str)
     new_long = 0;
 }
 
-set_new_long(str)
+void set_new_long(string str)
 {
     if (str == "") {
 	write("Aborted.\n");
@@ -114,7 +114,7 @@ set_new_long(str)
     input_to("set_new_long");
 }
 
-set_new_value(str)
+void set_new_value(string str)
 {
     if (str == "") {
 	write("Aborted.\n");
@@ -131,17 +131,17 @@ set_new_value(str)
     write("Bad value. Aborted.\n");
 }
 
-get()
+int get()
 {
     return 1;
 }
 
-reset(arg) {
+int reset(string arg) {
     if (!arg)
 	set_light(1);
 }
 
-crash() {
+int crash() {
     shout("You hear a distant rumble.\n");
     shout(call_other(this_player(), "query_name") +
 	" has entered the game.\n");
@@ -149,14 +149,14 @@ crash() {
     return 1;
 }
 
-echo(str) {
+int echo(string str) {
     if (!str)
 	return 0;
     say (str + "\n");
     return 1;
 }
 
-trace(str) {
+int trace(string str) {
     object ob;
     if (call_other(this_player(), "query_level") < 20) {
 	write("Failure.\n");
@@ -178,7 +178,7 @@ trace(str) {
     return 1;
 }
 
-remove() {
+int remove() {
     object ob;
     if (call_other(this_player(), "query_level") < 20) {
 	write("Failure.\n");
@@ -195,7 +195,7 @@ remove() {
     return 1;
 }
 
-find(str) {
+int find(string str) {
     object ob;
 
     if (!str)
@@ -205,8 +205,9 @@ find(str) {
     return 1;
 }
 
-patch(str) {
-    string name, with, what;
+int patch(string str) {
+    string name, with;
+    mixed what;
     int iwhat;
     object ob;
 
@@ -238,7 +239,7 @@ patch(str) {
     return 1;
 }
 
-rem_room(str) {
+int rem_room(string str) {
     object ob;
 
     ob = find_object(str);
@@ -251,7 +252,7 @@ rem_room(str) {
     return 1;
 }
 
-destr(obj) {
+int destr(string obj) {
     object ob;
     ob = present(obj, this_player());
     if (!ob) {
@@ -265,7 +266,7 @@ destr(obj) {
     return 1;
 }
 
-low_remove(num)
+int low_remove(string num)
 {
     int n;
     object ob;
@@ -286,12 +287,12 @@ low_remove(num)
     return 1;
 }
 
-fetch(str) {
+int fetch(string str) {
     move_object(str, this_player());
     return 1;
 }
 
-silence(str) {
+int silence(string str) {
     object ob;
 
     ob = find_living(str);
@@ -304,7 +305,7 @@ silence(str) {
     return 1;
 }
 
-lookplayer(str) {
+int lookplayer(string str) {
     object ob;
     int i;
     if (!str)
@@ -327,7 +328,7 @@ lookplayer(str) {
     }
 }
 
-light() {
+int light() {
     write("Total light: " + set_light(0) + "\n");
     return 1;
 }

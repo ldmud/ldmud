@@ -1,21 +1,21 @@
-short() {
+string short() {
     return "A list of the top players" ;
 }
 
-long() {
+void long() {
     cat("/SORT_LEVEL");
 }
 
-init() {
+void init() {
     add_action("read", "read");
 }
 
-id(str) {
+int id(string str) {
     return str == "list" || str == "top" || str == "top players" ||
 	str == "list of top players" || str == "top list";
 }
 
-read(str) {
+int read(string str) {
     if (!id(str))
 	return 0;
     say(this_player()->query_name() + " reads the top list.\n");
@@ -23,8 +23,8 @@ read(str) {
     return 1;
 }
 
-query_weight() { return 1; }
+int query_weight() { return 1; }
 
-get() { return 1; }
+int get() { return 1; }
 
-query_value() { return 5; }
+int query_value() { return 5; }

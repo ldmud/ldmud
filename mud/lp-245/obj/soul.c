@@ -3,27 +3,27 @@
 object the_owner;
 string cap_name;
 
-get() {
+int get() {
     the_owner = this_player();
     cap_name = this_player()->query_name();
     return 1;
 }
 
-drop() { return 1; }
+int drop() { return 1; }
 
-id(str) { return str == "soul"; }
+int id(string str) { return str == "soul"; }
 
-long() {
+void long() {
     write("It is transparent.\n");
 }
 
-ghost() {
+int ghost() {
     the_owner = this_player();
     cap_name = this_player()->query_name();
     return this_player()->query_ghost();
 }
 
-init() {
+void init() {
     the_owner = this_player();
     cap_name = this_player()->query_name();
     add_action("applaud", "applaud");
@@ -96,7 +96,7 @@ init() {
     add_action("yawn", "yawn");
 }
 
-applaud() {
+int applaud() {
     if (ghost())
 	return 0;
     write("You applaud wholeheartedly.\n");
@@ -104,7 +104,7 @@ applaud() {
     return 1;
 }
 
-blush() {
+int blush() {
     if (ghost())
 	return 0;
     write("Your cheeks are burning.\n");
@@ -112,7 +112,7 @@ blush() {
     return 1;
 }
 
-bounce() {
+int bounce() {
     if (ghost())
 	return 0;
     write("B O I N G !!\n");
@@ -120,7 +120,7 @@ bounce() {
     return 1;
 }
 
-bow(str) {
+int bow(string str) {
     object who;
     if (ghost())
 	return 0;
@@ -138,7 +138,7 @@ bow(str) {
     return 1;
 }
 
-burp() {
+int burp() {
     if (ghost())
 	return 0;
     write("Excuse yourself!\n");
@@ -146,7 +146,7 @@ burp() {
     return 1;
 }
 
-cackle() {
+int cackle() {
     if (ghost())
 	return 0;
     write("You cackle gleefully.\n");
@@ -155,7 +155,7 @@ cackle() {
     return 1;
 }
 
-chuckle() {
+int chuckle() {
     if (ghost())
 	return 0;
     write("You chuckle politely.\n");
@@ -163,7 +163,7 @@ chuckle() {
     return 1;
 }
 
-clap() {
+int clap() {
     if (ghost())
 	return 0;
     write("You clap briefly.\n");
@@ -171,7 +171,7 @@ clap() {
     return 1;
 }
 
-comfort(str) {
+int comfort(string str) {
     object who;
     if (ghost())
 	return 0;
@@ -186,7 +186,7 @@ comfort(str) {
     return 1;
 }
 
-cough() {
+int cough() {
     if (ghost())
 	return 0;
     write("Cover your mouth when you do that!\n");
@@ -194,7 +194,7 @@ cough() {
     return 1;
 }
 
-cry() {
+int cry() {
     if (ghost())
 	return 0;
     write("Waaaaah!\n");
@@ -202,7 +202,7 @@ cry() {
     return 1;
 }
 
-cuddle(str) {
+int cuddle(string str) {
     object who;
     if (ghost())
 	return 0;
@@ -217,7 +217,7 @@ cuddle(str) {
     return 1;
 }
 
-curtsey() {
+int curtsey() {
     if (ghost())
 	return 0;
     write("You curtsey gracefully.\n");
@@ -225,7 +225,7 @@ curtsey() {
     return 1;
 }
 
-dance(str) {
+int dance(string str) {
     object who;
     if (ghost())
 	return 0;
@@ -243,7 +243,7 @@ dance(str) {
     return 1;
 }
 
-fart() {
+int fart() {
     if (ghost())
 	return 0;
     write("How rude!\n");
@@ -251,7 +251,7 @@ fart() {
     return 1;
 }
 
-flip() {
+int flip() {
     if (ghost())
 	return 0;
     write("You flip head over heels.\n");
@@ -259,7 +259,7 @@ flip() {
     return 1;
 }
 
-fondle(str) {
+int fondle(string str) {
     object who;
     if (ghost())
 	return 0;
@@ -274,7 +274,7 @@ fondle(str) {
     return 1;
 }
 
-french(str) {
+int french(string str) {
     object who;
     if (ghost())
 	return 0;
@@ -291,7 +291,7 @@ french(str) {
     return 1;
 }
 
-frown() {
+int frown() {
     if (ghost())
 	return 0;
     write("Is something wrong?\n");
@@ -299,7 +299,7 @@ frown() {
     return 1;
 }
 
-gasp() {
+int gasp() {
     if (ghost())
 	return 0;
     write("You gasp in astonishment.\n");
@@ -307,7 +307,7 @@ gasp() {
     return 1;
 }
 
-giggle() {
+int giggle() {
     if (ghost())
 	return 0;
     write("You giggle inanely.\n");
@@ -315,7 +315,7 @@ giggle() {
     return 1;
 }
 
-glare(str) {
+int glare(string str) {
     object who;
     if (ghost())
 	return 0;
@@ -330,7 +330,7 @@ glare(str) {
     return 1;
 }
 
-grin() {
+int grin() {
     if (ghost())
 	return 0;
     write("You grin evilly.\n");
@@ -338,7 +338,7 @@ grin() {
     return 1;
 }
 
-groan() {
+int groan() {
     if (ghost())
 	return 0;
     write("You groan.\n");
@@ -346,7 +346,7 @@ groan() {
     return 1;
 }
 
-grope(str) {
+int grope(string str) {
     object who;
     if (ghost())
 	return 0;
@@ -361,7 +361,7 @@ grope(str) {
     return 1;
 }
 
-growl(str) {
+int growl(string str) {
     object who;
     if (ghost())
 	return 0;
@@ -379,7 +379,7 @@ growl(str) {
     return 1;
 }
 
-hiccup() {
+int hiccup() {
     if (ghost())
 	return 0;
     write("Hic!\n");
@@ -387,7 +387,7 @@ hiccup() {
     return 1;
 }
 
-hug(str) {
+int hug(string str) {
     object who;
     if (ghost())
 	return 0;
@@ -402,7 +402,7 @@ hug(str) {
     return 1;
 }
 
-kick(str) {
+int kick(string str) {
     object who;
     if (ghost())
 	return 0;
@@ -417,7 +417,7 @@ kick(str) {
     return 1;
 }
 
-kiss(str) {
+int kiss(string str) {
     object who;
     if (ghost())
 	return 0;
@@ -437,7 +437,7 @@ kiss(str) {
     return 1;
 }
 
-knee(str) {
+int knee(string str) {
     object who;
     if (ghost())
 	return 0;
@@ -465,7 +465,7 @@ knee(str) {
     return 1;
 }
 
-laugh() {
+int laugh() {
     if (ghost())
 	return 0;
     write("You fall down laughing.\n");
@@ -473,7 +473,7 @@ laugh() {
     return 1;
 }
 
-lick(str) {
+int lick(string str) {
     object who;
     if (ghost())
 	return 0;
@@ -488,7 +488,7 @@ lick(str) {
     return 1;
 }
 
-love(str) {
+int love(string str) {
     object who;
     if (ghost())
 	return 0;
@@ -503,7 +503,7 @@ love(str) {
     return 1;
 }
 
-moan() {
+int moan() {
     if (ghost())
 	return 0;
     write("You start to moan.\n");
@@ -511,7 +511,7 @@ moan() {
     return 1;
 }
 
-nibble(str) {
+int nibble(string str) {
     object who;
     if (ghost())
 	return 0;
@@ -526,7 +526,7 @@ nibble(str) {
     return 1;
 }
 
-nod() {
+int nod() {
     if (ghost())
 	return 0;
     write("You nod solemnly.\n");
@@ -534,7 +534,7 @@ nod() {
     return 1;
 }
 
-poke(str) {
+int poke(string str) {
     object who;
     if (ghost())
 	return 0;
@@ -549,7 +549,7 @@ poke(str) {
     return 1;
 }
 
-pout() {
+int pout() {
     if (ghost())
 	return 0;
     write("Ah, don't take it so hard.\n");
@@ -557,7 +557,7 @@ pout() {
     return 1;
 }
 
-puke(str) {
+int puke(string str) {
     object who;
     if (ghost())
 	return 0;
@@ -575,7 +575,7 @@ puke(str) {
     return 1;
 }
 
-purr() {
+int purr() {
     if (ghost())
 	return 0;
     write("MMMMEEEEEEEEOOOOOOOWWWWWWW!\n");
@@ -583,7 +583,7 @@ purr() {
     return 1;
 }
 
-ruffle(str) {
+int ruffle(string str) {
     object who;
     if (ghost())
 	return 0;
@@ -598,7 +598,7 @@ ruffle(str) {
     return 1;
 }
 
-scream() {
+int scream() {
     if (ghost())
 	return 0;
     write("ARRGGGGGGHHHHHH!!!!\n");
@@ -606,7 +606,7 @@ scream() {
     return 1;
 }
 
-shake(str) {
+int shake(string str) {
     object who;
     if (ghost())
 	return 0;
@@ -624,7 +624,7 @@ shake(str) {
     return 1;
 }
 
-shiver() {
+int shiver() {
     if (ghost())
 	return 0;
     write("Brrrrrr!!!\n");
@@ -632,7 +632,7 @@ shiver() {
     return 1;
 }
 
-shrug() {
+int shrug() {
     if (ghost())
 	return 0;
     write("You shrug.\n");
@@ -640,7 +640,7 @@ shrug() {
     return 1;
 }
 
-sigh() {
+int sigh() {
     if (ghost())
 	return 0;
     write("You sigh.\n");
@@ -648,7 +648,7 @@ sigh() {
     return 1;
 }
 
-sing() {
+int sing() {
     if (ghost())
 	return 0;
     write("Oh sole mio!\n");
@@ -656,7 +656,7 @@ sing() {
     return 1;
 }
 
-slap(str) {
+int slap(string str) {
     object who;
     if (ghost())
 	return 0;
@@ -671,7 +671,7 @@ slap(str) {
     return 1;
 }
 
-smirk() {
+int smirk() {
     if (ghost())
 	return 0;
     write("You smirk.\n");
@@ -679,7 +679,7 @@ smirk() {
     return 1;
 }
 
-smile(str) {
+int smile(string str) {
     object who;
     if (ghost()) {
 	write("You smile inwardly.\n");
@@ -699,7 +699,7 @@ smile(str) {
     return 1;
 }
 
-snap() {
+int snap() {
     if (ghost())
 	return 0;
     write("You snap your fingers.\n");
@@ -708,7 +708,7 @@ snap() {
     return 1;
 }
 
-sneeze() {
+int sneeze() {
     if (ghost())
 	return 0;
     write("Gazundheit!\n");
@@ -716,7 +716,7 @@ sneeze() {
     return 1;
 }
 
-snicker() {
+int snicker() {
     if (ghost())
 	return 0;
     write("You snicker.\n");
@@ -724,7 +724,7 @@ snicker() {
     return 1;
 }
 
-sniff() {
+int sniff() {
     if (ghost())
 	return 0;
     write("You sniff.\n");
@@ -732,7 +732,7 @@ sniff() {
     return 1;
 }
 
-snore() {
+int snore() {
     if (ghost())
 	return 0;
     write("Zzzzzzzzzz...\n");
@@ -740,7 +740,7 @@ snore() {
     return 1;
 }
 
-snuggle(str) {
+int snuggle(string str) {
     object who;
     if (ghost())
 	return 0;
@@ -755,7 +755,7 @@ snuggle(str) {
     return 1;
 }
 
-spit(str) {
+int spit(string str) {
     object who;
     if (ghost())
 	return 0;
@@ -773,7 +773,7 @@ spit(str) {
     return 1;
 }
 
-squeeze(str) {
+int squeeze(string str) {
     object who;
     if (ghost())
 	return 0;
@@ -788,7 +788,7 @@ squeeze(str) {
     return 1;
 }
 
-stare(str) {
+int stare(string str) {
     object who;
     if (ghost())
 	return 0;
@@ -806,7 +806,7 @@ stare(str) {
     return 1;
 }
 
-strut() {
+int strut() {
     if (ghost())
 	return 0;
     write("Strut your stuff!\n");
@@ -814,7 +814,7 @@ strut() {
     return 1;
 }
 
-sulk() {
+int sulk() {
     if (ghost())
 	return 0;
     write("You sulk.\n");
@@ -822,7 +822,7 @@ sulk() {
     return 1;
 }
 
-thank(str) {
+int thank(string str) {
     object who;
     if (ghost())
 	return 0;
@@ -837,7 +837,7 @@ thank(str) {
     return 1;
 }
 
-twiddle() {
+int twiddle() {
     if (ghost())
 	return 0;
     write("You twiddle your thumbs.\n");
@@ -846,7 +846,7 @@ twiddle() {
     return 1;
 }
 
-whistle(str) {
+int whistle(string str) {
     object who;
     if (ghost())
 	return 0;
@@ -864,7 +864,7 @@ whistle(str) {
     return 1;
 }
 
-wiggle() {
+int wiggle() {
     if (ghost())
 	return 0;
     write("You wiggle your bottom.\n");
@@ -873,7 +873,7 @@ wiggle() {
     return 1;
 }
 
-wink(str) {
+int wink(string str) {
     object who;
     if (ghost())
 	return 0;
@@ -891,7 +891,7 @@ wink(str) {
     return 1;
 }
 
-yawn() {
+int yawn() {
     if (ghost())
 	return 0;
     write("My, what big teeth you have!\n");

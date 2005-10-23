@@ -13,7 +13,7 @@ int hush_up;
  * Function name: init
  * Description:   Initialize commandverbs
  */
-init()
+void init()
 {
 
 	add_action("read_rules", "rules");
@@ -26,7 +26,7 @@ init()
  * Function name: reset
  * Description:   Reset the scroll
  */
-reset(arg)
+void reset(int arg)
 {
 	if (arg)
 		return;
@@ -39,7 +39,7 @@ reset(arg)
  * Function name: id
  * Description:   Return 1 on positive identification.
  */
-id(str)
+int id(string str)
 {
 	return str == "scroll";
 }
@@ -48,7 +48,7 @@ id(str)
  * Function name: short
  * Description:   Return a short description
  */
-short()
+string short()
 {
 	return "A scroll labeled 'READ ME!'";
 }
@@ -57,7 +57,7 @@ short()
  * Function name: long
  * Description:   Write a long description
  */
-long()
+void long()
 {
 
 	write("The scroll is held rolled up with an blue and yellow band tied around its\n" +
@@ -69,7 +69,7 @@ long()
  * Function name: get
  * Description:   Gettable.
  */
-get()
+int get()
 {
 	return 1;
 }
@@ -78,7 +78,7 @@ get()
  * Function name: drop
  * Description:   Don't drop it.
  */
-drop()
+int drop()
 {
 	if(!hush_up)
 		write("Don't drop the scroll, it contains valuable information!\n");
@@ -89,7 +89,7 @@ drop()
  * Function name: query_auto_load
  * Description:   Autoload this object.
  */
-query_auto_load()
+string query_auto_load()
 {
 	return "doc/examples/init_scroll:";
 }
@@ -98,7 +98,7 @@ query_auto_load()
  * Function name: hush
  * Description:   Be quiet when quitting.
  */
-hush()
+void hush()
 {
 	hush_up = 1;
 }
@@ -107,7 +107,7 @@ hush()
  * Function name: read_scroll
  * Description:   Read the text
  */
-read_scroll()
+int read_scroll()
 {
 
 	log_file("examples.scroll", capitalize(this_player()->query_real_name()) + " has read the scroll. " + ctime(time()) + "\n");
@@ -122,7 +122,7 @@ read_scroll()
  * Function name: read_rules
  * Description:   Read the RULES
  */
-read_rules()
+int read_rules()
 {
 	log_file("examples.scroll", capitalize(this_player()->query_real_name()) + " has read the RULES. " + ctime(time()) + "\n");
 	this_player()->more("/doc/build/RULES");

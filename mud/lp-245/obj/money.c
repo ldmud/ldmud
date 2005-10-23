@@ -1,14 +1,14 @@
 int money;
 
-reset(arg) {
+void reset(int arg) {
     if (arg)
 	return;
     money = 1;
 }
 
-query_weight() { return 0; }
+int query_weight() { return 0; }
 
-short() {
+string short() {
     if (money == 0)
 	return 0;
     return money + " gold coins";
@@ -21,7 +21,7 @@ short() {
  901128: Changed by JnA to not destruct object until surely picked by the
  player, i.e. object moved to the players inventory with move_object()
 */
-init()
+void init()
 {
   if (environment(this_object())==this_player()) {
     this_player()->add_money(money);
@@ -30,23 +30,23 @@ init()
   }
 }
 
-get()
+int get()
 {
   return money>0;
 }
 
-set_money(m) {
+void set_money(int m) {
     money = m;
 }
 
-id(str) {
+int id(string str) {
     if (str == "coins")
 	return 1;
     if (str == "money")
 	return 1;
 }
 
-heart_beat() {
+void heart_beat() {
     if (money == 0)
 	destruct(this_object());
 }

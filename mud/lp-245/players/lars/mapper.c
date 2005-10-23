@@ -6,20 +6,20 @@ string data;
  */
 string data_this_room, room_complete, last_fail;
 
-id(str) {
+int id(string str) {
     return str == "mapper" || str == "robot mapper" || str == "robot";
 }
 
-short() {
+string short() {
     return "A mapper robot";
 }
 
-long() {
+void long() {
     write("A small and highly movable robot. It constantly looks in all\n");
     write("directions, storing all information.\n");
 }
 
-reset(arg) {
+void reset(int arg) {
     if (arg)
 	return;
     set_heart_beat(1);
@@ -30,7 +30,63 @@ reset(arg) {
     room_complete = 0;
 }
 
-heart_beat() {
+string get_dir(string dir) {
+    string rest, tmp_dir, tmp_dest;
+
+    rest = data_this_room;
+    while(rest != "") {
+	sscanf(rest, "%s-%s,%s", tmp_dir, tmp_dest, rest);
+	if (tmp_dir == "!" + dir)
+	    return "!";
+	if (tmp_dir == dir)
+	    return tmp_dest;
+    }
+    return "";
+}
+
+void mark_dir_complete(string dir) {
+    string rest, tmp_dir, tmp_dest;
+
+    rest = data_this_room;
+    data_this_room = "";
+    room_complete += 1;
+    while(rest != "") {
+	sscanf(rest, "%s-%s,%s", tmp_dir, tmp_dest, rest);
+	if (tmp_dir == dir) {
+	    data_this_room = data_this_room + "!" + tmp_dir + "-" +
+		tmp_dest + "," + rest;
+	    return;
+	}
+	data_this_room = data_this_room + tmp_dir + "-" +
+	    tmp_dest + ",";
+    }
+    data_this_room = data_this_room + "!" + dir + "-" + ",";
+}
+
+/*
+ * Extract current room out of data base.
+ */
+void get_this_room() {
+    string rest, tmp;
+    string scratch;
+
+    rest = data;
+    data = "";
+    while(rest != "") {
+	sscanf(rest, "%s\n%s", tmp, rest);
+	if (sscanf(tmp, current_room + ":%s(%d)", data_this_room,
+		   room_complete) == 2) {
+	    data = data + rest;
+	    return;
+	}
+	data = data + tmp + "\n";
+    }
+    data_this_room = "";
+    num_room += 1;
+    room_complete = 0;
+}
+
+void heart_beat() {
     int i;
     string cmd, scratch;
     object here;
@@ -60,7 +116,14 @@ heart_beat() {
 	mark_dir_complete(cmd);
 }
 
-move_player(dir_dest)
+void insert() {
+    if (current_room == "start")
+	return;
+    data = data + current_room + ":" + data_this_room +
+	"(" + room_complete + ")\n";
+}
+
+void move_player(string dir_dest)
 {
     string dir, dest;
     object ob;
@@ -85,11 +148,11 @@ move_player(dir_dest)
     get_this_room();
 }
 
-query_name() {
+string query_name() {
     return "Mapper robot";
 }
 
-show_stats() {
+void show_stats() {
     write("This is the mapper robot\n");
     write("Current room: " + current_room + "\n");
     write("Number of rooms visited: " + num_room + "\n");
@@ -99,69 +162,7 @@ show_stats() {
     write("Last failed dir: " + last_fail + "\n");
 }
 
-/*
- * Extract current room out of data base.
- */
-get_this_room() {
-    string rest, tmp;
-    string scratch;
 
-    rest = data;
-    data = "";
-    while(rest != "") {
-	sscanf(rest, "%s\n%s", tmp, rest);
-	if (sscanf(tmp, current_room + ":%s(%d)", data_this_room,
-		   room_complete) == 2) {
-	    data = data + rest;
-	    return;
-	}
-	data = data + tmp + "\n";
-    }
-    data_this_room = "";
-    num_room += 1;
-    room_complete = 0;
-}
-
-get_dir(dir) {
-    string rest, tmp_dir, tmp_dest;
-
-    rest = data_this_room;
-    while(rest != "") {
-	sscanf(rest, "%s-%s,%s", tmp_dir, tmp_dest, rest);
-	if (tmp_dir == "!" + dir)
-	    return "!";
-	if (tmp_dir == dir)
-	    return tmp_dest;
-    }
-    return "";
-}
-
-mark_dir_complete(dir) {
-    string rest, tmp_dir, tmp_dest;
-
-    rest = data_this_room;
-    data_this_room = "";
-    room_complete += 1;
-    while(rest != "") {
-	sscanf(rest, "%s-%s,%s", tmp_dir, tmp_dest, rest);
-	if (tmp_dir == dir) {
-	    data_this_room = data_this_room + "!" + tmp_dir + "-" +
-		tmp_dest + "," + rest;
-	    return;
-	}
-	data_this_room = data_this_room + tmp_dir + "-" +
-	    tmp_dest + ",";
-    }
-    data_this_room = data_this_room + "!" + dir + "-" + ",";
-}
-
-insert() {
-    if (current_room == "start")
-	return;
-    data = data + current_room + ":" + data_this_room +
-	"(" + room_complete + ")\n";
-}
-
-force_us(str) {
+void force_us(string str) {
     command(str);
 }

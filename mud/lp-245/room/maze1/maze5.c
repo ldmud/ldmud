@@ -1,25 +1,25 @@
 int exit_num;
 object leather;
 
-short() {
+string short() {
     return "End of maze";
 }
 
-long() {
+void long() {
     write("The end of the maze.\n");
     write("There are one obvious exit to the south.\n");
 }
 
-init() {
+void init() {
     add_action("e1", "south");
 }
 
-e1() {
+int e1() {
     this_player()->move_player("south#room/maze1/maze4");
     return 1;
 }
 
-reset() {
+void reset() {
     if (!leather || !present(leather)) {
 	leather = clone_object("obj/armour");
 	leather->set_ac(3);

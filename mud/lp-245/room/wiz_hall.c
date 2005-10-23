@@ -3,7 +3,7 @@
 int lamp_is_lit;
 object leo;
 
-init() {
+void init() {
     add_action("west", "west");
     add_action("open", "open");
     add_action("close", "close");
@@ -12,18 +12,18 @@ init() {
     add_action("south", "south");
 }
 
-short() {
+string short() {
     return "wizards hall";
 }
 
-long() {
+void long() {
     write("You are in the hall of the wizards.\n" +
 "There is a door to the west and a shimmering field to the north.\n");
     if (lamp_is_lit)
 	write("There is a lit lamp beside the elevator.\n");
 }
 
-open(str)
+int open(string str)
 {
     if (str != "door")
 	return 0;
@@ -35,7 +35,7 @@ open(str)
     return 1;
 }
 
-close(str)
+int close(string str)
 {
     if (str != "door")
 	return 0;
@@ -43,7 +43,7 @@ close(str)
     return 1;
 }
 
-west() {
+int west() {
     if ("room/elevator"->query_door() ||
 	"room/elevator"->query_level() != 1) {
 	write("The door is closed.\n");
@@ -53,7 +53,7 @@ west() {
     return 1;
 }
 
-reset(arg) {
+void reset(int arg) {
     if (!arg)
 	set_light(1);
     if (!leo) {
@@ -62,7 +62,7 @@ reset(arg) {
     }
 }
 
-push(str)
+int push(string str)
 {
     if (str && str != "button")
 	return 0;
@@ -71,13 +71,13 @@ push(str)
     return 1;
 }
 
-elevator_arrives()
+void elevator_arrives()
 {
     say("The lamp on the button beside the elevator goes out.\n");
     lamp_is_lit = 0;
 }
 
-north() {
+int north() {
     if (this_player()->query_level() < 21) {
 	write("A strong magic force stops you.\n");
 	return 1;

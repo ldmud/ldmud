@@ -2,12 +2,7 @@
 #undef EXTRA_RESET
 #define EXTRA_RESET fix_jacket();
 
-TWO_EXIT("room/wild1", "east",
-	 "room/clearing", "west",
-	 "In a forest",
-	 "You are in a big forest.\n", 1)
-
-fix_jacket()
+void fix_jacket()
 {
     object leather_jacket;
 
@@ -26,3 +21,8 @@ fix_jacket()
 	move_object(leather_jacket, this_object());
     }
 }
+
+TWO_EXIT("room/wild1", "east",
+	 "room/clearing", "west",
+	 "In a forest",
+	 "You are in a big forest.\n", 1)

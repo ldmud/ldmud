@@ -8,7 +8,7 @@
 
 inherit "obj/monster";
 
-reset(arg) {
+void reset(int arg) {
     ::reset(arg);
     if (arg)
 	return;
@@ -23,7 +23,7 @@ reset(arg) {
     move_player("X#room/church");
 }
 
-shut(seconds)
+void shut(int seconds)
 {
     int i;
 
@@ -50,7 +50,7 @@ shut(seconds)
 
 int transport_offer;
 
-cont_shutting(seconds) {
+void cont_shutting(int seconds) {
     string delay;
     int new_delay;
 
@@ -76,7 +76,7 @@ cont_shutting(seconds) {
     shout(cap_name + " shouts: Game reboot in " + delay + ".\n");
 }
 
-catch_tell(str) {
+void catch_tell(string str) {
     string who, what;
     object ob;
 

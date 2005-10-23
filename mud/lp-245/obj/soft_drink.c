@@ -56,12 +56,12 @@ string name, short_desc, long_desc, drinking_mess,
 	drinker_mess, alias, alt_name, empty_container;
 int value, strength, weight, full;
 
-init()
+void init()
 {
 	add_action("drink", "drink");
 }
 
-reset(arg)
+void reset(int arg)
 {
 	if (arg)
 		return;
@@ -72,7 +72,7 @@ reset(arg)
 	empty_container = "bottle";
 }
 
-prevent_insert()
+int prevent_insert()
 {
 	if (empty_container)
 		return 0;
@@ -83,7 +83,7 @@ prevent_insert()
 	}
 }
 
-id(str)
+int id(string str)
 {
 	if (full)
 		return  str == name || str == alt_name || str == alias;
@@ -91,7 +91,7 @@ id(str)
 		return str == empty_container;
 }
 
-short()
+string short()
 {
 	if (full)
 	{
@@ -104,7 +104,7 @@ short()
 		return "An empty " + empty_container;
 }
 
-long()
+void long()
 {
 	if (full)
 	{
@@ -117,12 +117,12 @@ long()
 		write(short() + "\n");
 }
 
-get()
+int get()
 {
 	return 1;
 }
 
-drink(str)
+int drink(string str)
 {
 	object tp;
 	string p_name;
@@ -131,7 +131,7 @@ drink(str)
 	p_name = capitalize(tp->query_name());
 
 	if (!full)
-		return;
+		return 0;
 
 	if (!str || !id(str))
 		return 0;
@@ -158,62 +158,62 @@ drink(str)
 	return 1;
 }
 
-min_cost()
+int min_cost()
 {
 	return 4 * strength + (strength * strength) / 10;
 }
 
-set_name(n)
+void set_name(string n)
 {
 	name = n;
 }
 
-set_short(s)
+void set_short(string s)
 {
 	short_desc = s;
 }
 
-set_long(l)
+void set_long(string l)
 {
 	long_desc = l;
 }
 
-set_value(v)
+void set_value(int v)
 {
 	value = v;
 }
 
-set_weight(w)
+void set_weight(int w)
 {
 	weight = w;
 }
 
-set_strength(s)
+void set_strength(int s)
 {
 	strength = s;
 }
 
-set_alias(a)
+void set_alias(string a)
 {
 	alias = a;
 }
 
-set_alt_name(an)
+void set_alt_name(string an)
 {
 	alt_name = an;
 }
 
-set_drinking_mess(dm)
+void set_drinking_mess(string dm)
 {
 	drinking_mess = dm;
 }
 
-set_drinker_mess(dm)
+void set_drinker_mess(string dm)
 {
 	drinker_mess = dm;
 }
 
-set_empty_container(ec)
+void set_empty_container(string ec)
 {
 	empty_container = ec;
 }
@@ -222,7 +222,7 @@ set_empty_container(ec)
  * Things that other objects might want to know.
  */
 
-query_value()
+int query_value()
 {
 	if (full)
 	{
@@ -235,7 +235,7 @@ query_value()
 		return 10;
 }
 
-query_weight()
+int query_weight()
 {
 	return weight;
 }

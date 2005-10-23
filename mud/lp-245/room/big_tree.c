@@ -14,13 +14,13 @@ TWO_EXIT("room/plane7", "east",
 	 "Big tree",
 	 "A big single tree on the plain.\n", 1)
 
-id(str) {
+int id(string str) {
     if (str == "tree" || str == "big tree")
 	return 1;
     return 0;
 }
 
-tie(str) {
+int tie(string str) {
     if (str == "tree" || str == "big tree") {
 	write("The branches are very high up.\n");
 	return 0;
@@ -28,7 +28,7 @@ tie(str) {
     return 0;
 }
 
-climb(str)
+int climb(string str)
 {
     if (!id(str))
 	return 0;

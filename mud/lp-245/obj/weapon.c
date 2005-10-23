@@ -25,7 +25,7 @@
  */
 
 status wielded;
-string wielded_by;
+object wielded_by;
 string name_of_weapon;
 string cap_name;
 string alt_name;
@@ -40,30 +40,30 @@ object hit_func;
 object wield_func;
 string info;
 
-query_name() { return name_of_weapon; }
+string query_name() { return name_of_weapon; }
 
-long() {
+void  long() {
     write(long_desc);
 }
 
-reset(arg) {
+void  reset(int arg) {
     if (arg)
 	return;
     wielded = 0; value = 0;
 }
 
-init() {
+void  init() {
     if (read_msg) {
 	add_action("read", "read");
     }
     add_action("wield", "wield");
 }
 
-id(str) {
+int id(string str) {
     return str == name_of_weapon || str == alt_name || str == alias_name;
 }
 
-wield(str) {
+int wield(string str) {
     if (!id(str))
 	return 0;
     if (environment() != this_player()) {
@@ -83,18 +83,18 @@ wield(str) {
     return 1;
 }
 
-short() {
+string short() {
     if (wielded)
 	if(short_desc)
 	    return short_desc + " (wielded)";
     return short_desc;
 }
 
-weapon_class() {
+int weapon_class() {
     return class_of_weapon;
 }
 
-drop(silently) {
+int drop(int silently) {
     if (wielded) {
 	wielded_by->stop_wielding();
 	wielded = 0;
@@ -104,71 +104,71 @@ drop(silently) {
     return 0;
 }
 
-un_wield() {
+void un_wield() {
     if (wielded)
 	wielded = 0;
 }
 
-hit(attacker)
+mixed hit(object attacker)
 {
     if (hit_func)
 	return hit_func->weapon_hit(attacker);
     return 0;
 }
 
-set_id(n) {
+void set_id(string n) {
     name_of_weapon = n;
     cap_name = capitalize(n);
     short_desc = cap_name;
     long_desc = "You see nothing special.\n";
 }
 
-set_name(n) {
+void set_name(string n) {
     name_of_weapon = n;
     cap_name = capitalize(n);
     short_desc = cap_name;
     long_desc = "You see nothing special.\n";
 }
 
-read(str) {
+int read(string str) {
     if (!id(str))
 	return 0;
     write(read_msg);
     return 1;
 }
 
-query_value() {
+int query_value() {
     return value;
 }
 
-get() { return 1; }
+int get() { return 1; }
 
-query_weight() { return local_weight; }
+int query_weight() { return local_weight; }
 
-set_class(c) { class_of_weapon = c; }
+void set_class(int c) { class_of_weapon = c; }
 
-set_weight(w) { local_weight = w; }
+void set_weight(int w) { local_weight = w; }
 
-set_value(v) { value = v; }
+void set_value(int v) { value = v; }
 
-set_alt_name(n) { alt_name = n; }
+void set_alt_name(string n) { alt_name = n; }
 
-set_hit_func(ob) { hit_func = ob; }
+void set_hit_func(object ob) { hit_func = ob; }
 
-set_wield_func(ob) { wield_func = ob; }
+void set_wield_func(object ob) { wield_func = ob; }
 
-set_alias(n) { alias_name = n; }
+void set_alias(string n) { alias_name = n; }
 
-set_short(sh) { short_desc = sh; long_desc = short_desc + "\n";}
+void set_short(string sh) { short_desc = sh; long_desc = short_desc + "\n";}
 
-set_long(long) { long_desc = long; }
+void set_long(string long) { long_desc = long; }
 
-set_read(str) { read_msg = str; }
+void set_read(string str) { read_msg = str; }
 
-set_info(i) {
+void set_info(string i) {
     info = i;
 }
 
-query_info() {
+string query_info() {
     return info;
 }

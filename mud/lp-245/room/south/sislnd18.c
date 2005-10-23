@@ -1,10 +1,10 @@
-reset(started)
+void reset(int started)
 {
     if (!started)
 	set_light(1);
 }
 
-init()
+void init()
 {
     add_action("north", "north");
     add_action("south", "south");
@@ -12,12 +12,12 @@ init()
     add_action("west", "west");
 }
 
-short()
+string short()
 {
     return "The ruins of Arcanarton's tower";
 }
 
-long()
+void long()
 {
     write("You are standing among the ruins of the tower of the evil mage, Arcanarton.\n" +
 	  "Legend has it that the tower was destroyed in the mage wars about five hundred\n" +
@@ -33,25 +33,25 @@ long()
 	  "To the south of the ruins, the hill slopes away, down to the edge of Crescent Lake.\n");
 }
 
-north()
+int north()
 {
     this_player()->move_player("north#room/south/sislnd13");
     return 1;
 }
 
-south()
+int south()
 {
     this_player()->move_player("north#room/south/sislnd16");
     return 1;
 }
 
-east()
+int east()
 {
     this_player()->move_player("north#room/south/sislnd15");
     return 1;
 }
 
-west()
+int west()
 {
     this_player()->move_player("west#room/south/sislnd17");
     return 1;

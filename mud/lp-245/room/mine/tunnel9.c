@@ -1,6 +1,6 @@
 #include "../std.h"
 
-string rope;
+int rope;
 
 #undef EXTRA_INIT
 #define EXTRA_INIT\
@@ -16,7 +16,7 @@ TWO_EXIT("room/mine/tunnel10", "west",
 	 "Hole in ceiling",
 	 "There is a big hole in the ceiling.\n", 0)
 
-go_up()
+int go_up()
 {
     if (!"room/mine/tunnel3"->query_rope()) {
         write("You can't go stright up with some kind of support.\n");
@@ -26,7 +26,7 @@ go_up()
     return 1;
 }
 
-tie(str)
+int tie(string str)
 {
     if (str != "ring" && str != "rings")
         return 0;
@@ -34,11 +34,11 @@ tie(str)
     return 1;
 }
 
-id(str) {
+int id(string str) {
     return str == "ring" || str == "rings";
 }
 
-untie(str) {
+int untie(string str) {
     rope = 0;
     return 1;
 }

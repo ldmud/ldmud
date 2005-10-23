@@ -31,21 +31,21 @@ TWO_EXIT("room/well", "east",
 	 "A room with black walls. There is a door to the east,\n" +
 	 "and a door to the west.\n", 0)
 
-open(str) {
+int open(string str) {
     if (str != "door" && str != "west door" && str != "east door")
 	return 0;
     write("There is no handle, and you can't push it up.\n");
     return 1;
 }
 
-close(str) {
+int close(string str) {
     if (str != "door" && str != "west door" && str != "east door")
 	return 0;
     write("There is no handle, and you can't push it closed.\n");
     return 1;
 }
 
-toggle_door() {
+int toggle_door() {
     write("You move the lever.\n");
     say(this_player()->query_name() + " pulled the lever.\n");
     if (west_door_open) {
@@ -61,6 +61,6 @@ toggle_door() {
     }
 }
 
-query_west_door() {
+int query_west_door() {
     return west_door_open;
 }

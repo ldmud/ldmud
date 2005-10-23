@@ -1,13 +1,13 @@
 int lamp_is_lit;
 
-reset(arg)
+void reset(int arg)
 {
     if (arg)
 	return;
     set_light(1);
 }
 
-init()
+string init()
 {
     add_action("west", "west");
     add_action("open", "open");
@@ -16,11 +16,11 @@ init()
     add_action("close", "close");
 }
 
-short() {
+string short() {
     return "The attic";
 }
 
-long(str)
+void long(string str)
 {
     if (str == "door") {
 	if (!"room/elevator"->query_door() &&
@@ -37,11 +37,11 @@ long(str)
 
 }
 
-id(str) {
+int id(string str) {
     return str == "door";
 }
 
-west() {
+int west() {
     if ("room/elevator"->query_door() ||
 	"room/elevator"->query_level() != 3) {
 	write("The door is closed.\n");
@@ -51,7 +51,7 @@ west() {
     return 1;
 }
 
-open(str)
+int open(string str)
 {
     if (str != "door")
 	return 0;
@@ -63,7 +63,7 @@ open(str)
     return 1;
 }
 
-close(str)
+int close(string str)
 {
     if (str != "door")
 	return 0;
@@ -71,7 +71,7 @@ close(str)
     return 1;
 }
 
-push(str)
+int push(string str)
 {
     if (str && str != "button")
 	return 0;
@@ -80,13 +80,13 @@ push(str)
     return 1;
 }
 
-elevator_arrives()
+void elevator_arrives()
 {
     say("The lamp on the button beside the elevator goes out.\n");
     lamp_is_lit = 0;
 }
 
-prevent_look_at_inv(str)
+int prevent_look_at_inv(string str)
 {
     return str != 0;
 }

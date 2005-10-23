@@ -1,40 +1,40 @@
-reset(started)
+void reset(int started)
 {
     if (!started)
 	set_light(1);
 }
 
-init()
+void init()
 {
     add_action("north", "north");
     add_action("south", "south");
     add_action("west", "west");
 }
 
-short()
+string short()
 {
     return "A dimly lit forest";
 }
 
-long()
+void long()
 {
     write("You are in part of a dimly lit forest.\n" +
 	  "Trails lead north, south and west\n");
 }
 
-north()
+int north()
 {
     this_player()->move_player("north#room/south/sforst2");
     return 1;
 }
 
-south()
+int south()
 {
     this_player()->move_player("south#room/south/sforst4");
     return 1;
 }
 
-west()
+int west()
 {
     this_player()->move_player("west#room/south/sforst7");
     return 1;

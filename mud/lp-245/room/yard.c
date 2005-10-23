@@ -7,12 +7,12 @@ object beggar;
 /*
  * Make these arrays global, so they only have to be initialized once.
  */
-string chat_str, a_chat_str, function, type, match;
+string *chat_str, *a_chat_str, *function, *type, *match;
 
-extra_reset() {
+void extra_reset() {
     no_castle_flag = 1;
     if (!present("knife")) {
-        string weapon;
+        object weapon;
         weapon = clone_object("obj/weapon");
         weapon->set_name("knife");
         weapon->set_class(5);
@@ -60,7 +60,7 @@ TWO_EXIT("room/vill_road1", "south",
 	 "Small yard",
 	 "A small yard surrounded by houses.\n", 1)
 
-give_beggar(str) {
+void give_beggar(string str) {
     int money;
     string who;
 

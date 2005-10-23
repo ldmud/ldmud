@@ -2,7 +2,7 @@
 
 object giant1, giant2, giant3;
 
-extra_reset() {
+void extra_reset() {
     object weapon;
     if (!giant2 || !living(giant2)) {
 	giant2 = clone_object("obj/monster");

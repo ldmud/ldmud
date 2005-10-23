@@ -30,74 +30,74 @@ string name, alias_name;
 string read_msg;
 string info;
 
-id(str)
+int id(string str)
 {
     return str == name || str == alias_name;
 }
 
-short() {
+string short() {
     return short_desc;
 }
 
-long() {
+void long() {
     write(long_desc);
 }
 
-query_value() { return value; }
+int query_value() { return value; }
 
-set_id(str) {
+void set_id(string str) {
     local_weight = 1;
     name = str;
 }
 
-set_alias(str) {
+void set_alias(string str) {
     alias_name = str;
 }
 
-set_short(str) {
+void  set_short(string str) {
     short_desc = str;
     long_desc = "You see nothing special.\n";
 }
 
-set_long(str) {
+void set_long(string str) {
     long_desc = str;
 }
 
-set_value(v) {
+void set_value(int v) {
     value = v;
 }
 
-set_weight(w) {
+void  set_weight(int w) {
     local_weight = w;
 }
 
-set_read(str) {
+void  set_read(string str) {
     read_msg = str;
 }
 
-set_info(i) {
+void set_info(string i) {
     info = i;
 }
 
-query_info() {
+string query_info() {
     return info;
 }
 
-get() {
+int get() {
     return 1;
 }
 
-query_weight() {
+int query_weight() {
     return local_weight;
 }
 
-init() {
+void init() {
     if (!read_msg)
 	return;
     add_action("read", "read");
 }
 
-read(str) {
+int read(string str) {
     if (str != name &&  str != alias_name)
 	return 0;
     write(read_msg);

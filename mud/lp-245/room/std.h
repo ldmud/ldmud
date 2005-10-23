@@ -7,25 +7,25 @@
 #define EXTRA_MOVE4
 
 #define ONE_EXIT(DEST, DIR, SH, LO, LIGHT)\
-reset(arg) { EXTRA_RESET if (arg) return; set_light(LIGHT); }\
-short() {\
+void reset(int arg) { EXTRA_RESET if (arg) return; set_light(LIGHT); }\
+string short() {\
     if (set_light(0))\
 	return SH;\
     return "dark room";\
 }\
 \
-init() {\
+void init() {\
     add_action("move", DIR);\
     EXTRA_INIT\
 }\
 \
-move() {\
+int move() {\
     EXTRA_MOVE1\
     call_other(this_player(), "move_player", DIR + "#" +DEST);\
     return 1;\
 }\
 \
-long(str) {\
+void long(string str) {\
     if (set_light(0) == 0){\
        write("It is dark.\n");\
        return;\
@@ -36,32 +36,32 @@ long(str) {\
 }
 
 #define TWO_EXIT(DEST1, DIR1, DEST2, DIR2, SH, LO, LIGHT)\
-reset(arg) { EXTRA_RESET if (arg) return; set_light(LIGHT); }\
-short() {\
+void reset(int arg) { EXTRA_RESET if (arg) return; set_light(LIGHT); }\
+string short() {\
     if (set_light(0))\
 	return SH;\
     return "dark room";\
 }\
 \
-init() {\
+void init() {\
     add_action("move1", DIR1);\
     add_action("move2", DIR2);\
     EXTRA_INIT\
 }\
 \
-move1() {\
+int move1() {\
     EXTRA_MOVE1\
     call_other(this_player(), "move_player", DIR1 + "#" + DEST1);\
     return 1;\
 }\
 \
-move2() {\
+int move2() {\
     EXTRA_MOVE2\
     call_other(this_player(), "move_player", DIR2 + "#" + DEST2);\
     return 1;\
 }\
 \
-long(str) {\
+void long(string str) {\
     if (set_light(0) == 0){\
        write("It is dark.\n");\
        return;\
@@ -72,39 +72,39 @@ long(str) {\
 }
 
 #define THREE_EXIT(DEST1, DIR1, DEST2, DIR2, DEST3, DIR3, SH, LO, LIGHT)\
-reset(arg) { EXTRA_RESET if (arg) return; set_light(LIGHT); }\
-short() {\
+void reset(int arg) { EXTRA_RESET if (arg) return; set_light(LIGHT); }\
+string short() {\
     if (set_light(0))\
 	return SH;\
     return "dark room";\
 }\
 \
-init() {\
+void init() {\
     add_action("move1", DIR1);\
     add_action("move2", DIR2);\
     add_action("move3", DIR3);\
     EXTRA_INIT\
 }\
 \
-move1() {\
+int move1() {\
     EXTRA_MOVE1\
     call_other(this_player(), "move_player", DIR1 + "#" + DEST1);\
     return 1;\
 }\
 \
-move2() {\
+int move2() {\
     EXTRA_MOVE2\
     call_other(this_player(), "move_player", DIR2 + "#" + DEST2);\
     return 1;\
 }\
 \
-move3() {\
+int move3() {\
     EXTRA_MOVE3\
     call_other(this_player(), "move_player", DIR3 + "#" + DEST3);\
     return 1;\
 }\
 \
-long(str) {\
+void long(string str) {\
     if (set_light(0) == 0){\
        write("It is dark.\n");\
        return;\
@@ -116,14 +116,14 @@ long(str) {\
 }
 
 #define FOUR_EXIT(DEST1, DIR1, DEST2, DIR2, DEST3, DIR3, DEST4, DIR4, SH, LO, LIGHT)\
-reset(arg) { EXTRA_RESET if (arg) return; set_light(LIGHT); }\
-short() {\
+void reset(int arg) { EXTRA_RESET if (arg) return; set_light(LIGHT); }\
+string short() {\
     if (set_light(0))\
 	return SH;\
     return "dark room";\
 }\
 \
-init() {\
+void init() {\
     add_action("move1", DIR1);\
     add_action("move2", DIR2);\
     add_action("move3", DIR3);\
@@ -131,31 +131,31 @@ init() {\
     EXTRA_INIT\
 }\
 \
-move1() {\
+int move1() {\
     EXTRA_MOVE1\
     call_other(this_player(), "move_player", DIR1 + "#" + DEST1);\
     return 1;\
 }\
 \
-move2() {\
+int move2() {\
     EXTRA_MOVE2\
     call_other(this_player(), "move_player", DIR2 + "#" + DEST2);\
     return 1;\
 }\
 \
-move3() {\
+int move3() {\
     EXTRA_MOVE3\
     call_other(this_player(), "move_player", DIR3 + "#" + DEST3);\
     return 1;\
 }\
 \
-move4() {\
+int move4() {\
     EXTRA_MOVE4\
     call_other(this_player(), "move_player", DIR4 + "#" + DEST4);\
     return 1;\
 }\
 \
-long(str) {\
+void long(string str) {\
     if (set_light(0) == 0){\
        write("It is dark.\n");\
        return;\

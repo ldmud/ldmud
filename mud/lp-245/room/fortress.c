@@ -1,11 +1,4 @@
-reset(arg)
-{
-    if (!arg)
-	set_light(1);
-    extra_reset();
-}
-
-extra_reset()
+void extra_reset()
 {
     object orc, weapon;
     int n,i,class,value,weight;
@@ -61,13 +54,13 @@ extra_reset()
 	}
     }
 }
-init()
+void init()
 {
     add_action("south", "south");
     add_action("north", "north");
 }
 
-north()
+int north()
 {
     if (present("orc")) {
 	write("An orc bars your way.\n");
@@ -77,18 +70,26 @@ north()
     return 1;
 }
 
-south()
+int south()
 {
     this_player()->move_player("south#room/orc_vall");
     return 1;
 }
 
-long()
+void long()
 {
     write("This is the local strong point of the orcs.\n");
     write("There is an entrance to a small room to the north.\n");
 }
 
-short() {
+string short() {
     return "The orc fortress";
 }
+
+void reset(int arg)
+{
+    if (!arg)
+	set_light(1);
+    extra_reset();
+}
+

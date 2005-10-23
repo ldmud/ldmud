@@ -10,7 +10,7 @@ TWO_EXIT("room/plane11", "south",
 	 "You are in a pass going into the mountain with a steep slope\nupwards to the north.\nHowever, the path is barred.\nThere is a tunnel entrance to the north.\n"+
 	 "It might be possible to climb up, though\n", 1)
 
-up() {
+int up() {
     this_player()->move_player("up#room/ravine");
     return 1;
 }

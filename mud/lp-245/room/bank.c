@@ -5,7 +5,7 @@ object guard;
 #undef EXTRA_RESET
 #define EXTRA_RESET extra_reset();
 
-extra_reset() {
+void extra_reset() {
     if (!guard || !living(guard)) {
 	object key, weapon;
         guard = clone_object("obj/monster");
@@ -21,7 +21,7 @@ extra_reset() {
 	weapon->set_short("A shortsword");
 	weapon->set_alias("sword");
 	weapon->set_long(
-"It is proffesional looking short sword, used by warriors and guards");
+"It is a professional looking short sword, used by warriors and guards");
 	weapon->set_class(15);
 	weapon->set_value(700);
 	weapon->set_weight(3);
@@ -67,11 +67,11 @@ ONE_EXIT("room/narr_alley","west",
 	 "with heavy iron bars. On the wall beside the counter, a door\n" +
 	 "leads further east\n", 1)
 
-id(str) {
+int id(string str) {
     return str == "door" || str == "counter";
 }
 
-open(str) {
+int open(string str) {
     if (str && str != "door")
 	return 0;
     if (door_is_open)
@@ -86,7 +86,7 @@ open(str) {
     return 1;
 }
 
-unlock(str) {
+int unlock(string str) {
     if (str && str != "door")
 	return 0;
     if (door_is_open || !door_is_locked)
@@ -104,7 +104,7 @@ unlock(str) {
     return 1;
 }
 
-east() {
+int east() {
     if (!door_is_open) {
 	write("The door is closed.\n");
 	return 1;
@@ -117,15 +117,15 @@ east() {
     return 1;
 }
 
-query_door() {
+int query_door() {
     return !door_is_open;
 }
 
-open_door_inside() {
+void open_door_inside() {
     door_is_locked = 0;
     door_is_open = 1;
 }
 
-query_drop_castle() {
+int query_drop_castle() {
     return 1;
 }

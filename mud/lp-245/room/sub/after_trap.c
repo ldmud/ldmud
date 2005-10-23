@@ -11,11 +11,8 @@ object rat;
 	write("The door is closed.\n");\
 	return 1;\
     }
-ONE_EXIT("room/sub/door_trap", "east",
-	 "Black room",
-	 "This is the black room.\n", 0)
 
-extra_reset() {
+void extra_reset() {
     object black_stone;
     if (!rat || !living(rat)) {
 	rat = clone_object("obj/monster");
@@ -34,3 +31,7 @@ extra_reset() {
 	move_object(black_stone, rat);
     }
 }
+
+ONE_EXIT("room/sub/door_trap", "east",
+	 "Black room",
+	 "This is the black room.\n", 0)

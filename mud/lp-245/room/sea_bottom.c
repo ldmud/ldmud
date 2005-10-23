@@ -5,7 +5,7 @@ object octopus;
 #undef EXTRA_RESET
 #define EXTRA_RESET extra_reset();
 
-extra_reset() {
+void extra_reset() {
     if (!octopus || !living(octopus)) {
 	object chest;
 	object money;

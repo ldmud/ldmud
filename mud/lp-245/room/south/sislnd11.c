@@ -1,22 +1,22 @@
-reset(started)
+void reset(int started)
 {
     if (!started)
 	set_light(1);
 }
 
-init()
+void init()
 {
     add_action("south", "south");
     add_action("east", "east");
     add_action("west", "west");
 }
 
-short()
+string short()
 {
     return "A grove on the shore of the Isle of the Magi";
 }
 
-long()
+void long()
 {
     write("You are standing in a grove on the shore of the Isle of the Magi\n" +
 	  "All of the trees in the grove are either diseased, dead or heavily mutated.\n" +
@@ -25,19 +25,19 @@ long()
 	  "The grove also continues to the south.\n");
 }
 
-south()
+int south()
 {
      this_player()->move_player("south#room/south/sislnd9");
      return 1;
 }
 
-east()
+int east()
 {
      this_player()->move_player("east#room/south/sislnd12");
      return 1;
 }
 
-west()
+int west()
 {
      this_player()->move_player("west#room/south/sislnd10");
      return 1;

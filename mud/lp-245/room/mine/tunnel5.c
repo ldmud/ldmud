@@ -13,6 +13,6 @@ TWO_EXIT("room/mine/tunnel4", "south",
 	 "In the tunnel into the mines.\n" +
 	 "There is a big stone table here.\n", 0)
 
-id(str) {
+int id(string str) {
     return str == "table" || str == "stone table";
 }

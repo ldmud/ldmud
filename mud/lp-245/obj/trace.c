@@ -4,11 +4,11 @@
  * and walk up and down the inventory lists.
  */
 
-string vars;
-object stores;
-string query_list;
+string * vars;
+mixed * stores;
+string * query_list;
 
-init() {
+void init() {
     if (this_player()->query_level() >= 20) {
 	add_action("help", "help");
 	add_action("Dump", "Dump");
@@ -24,8 +24,109 @@ init() {
     }
 }
 
-Dump(str) {
-    int tmp, i;
+static void disp(object ob) {
+    write(object_name(ob) + "\n");
+}
+
+void assign(string var, mixed val) {
+    int i;
+
+    while(i<sizeof(vars)) {
+	if (vars[i] == var) {
+	    stores[i] = val;
+	    return;
+	}
+	if (vars[i] == 0) {
+	    vars[i] = var;
+	    stores[i] = val;
+	    return;
+	}
+	i += 1;
+    }
+}
+
+static object find_item(object prev, string str) {
+    object ob;
+    mixed tmp;
+
+    if (str == "here")
+	return environment(this_player());
+    if (str == "^")
+	return environment(prev);
+    if (sscanf(str, "@%s", tmp) == 1)
+	return find_living(tmp);
+    if (sscanf(str, "*%s", tmp) == 1)
+	return find_player(tmp);
+    if (sscanf(str, "/%s", tmp) == 1) {
+	load_object(tmp);	/* Force load */
+        return find_object(tmp);
+    }
+    if (sscanf(str, "$%d", tmp) == 1) {
+	object * u;
+	u = users();
+	write("size: " + sizeof(u) + "\n");
+	if (tmp >= sizeof(u) || tmp < 0)
+	    return 0;
+	return u[tmp - 1];
+    }
+    if (sscanf(str, "$%s", tmp) == 1) {
+	int i;
+	while(i<sizeof(vars)) {
+	    if (tmp == vars[i])
+		return stores[i];
+	    i += 1;
+	}
+	return 0;
+    }
+    if (prev == 0)
+	prev = environment(this_player());
+    if (sscanf(str, "\"%s\"", tmp) == 1) {
+	ob = first_inventory(prev);
+	while(ob && ob->short() != tmp) {
+	    ob = next_inventory(ob);
+	}
+	return ob;
+    }
+    if (sscanf(str, "#%d", tmp) == 1) {
+	if (prev == 0)
+	    return 0;
+	ob = first_inventory(prev);
+	while(tmp > 1) {
+	    tmp -= 1;
+	    if (ob == 0)
+		return 0;
+	    ob = next_inventory(ob);
+	}
+	return ob;
+    }
+    return present(str, prev);
+}
+
+object parse_list(string str) {
+    string tmp, rest;
+    object prev;
+
+    prev = environment(this_player());
+    while(prev && str) {
+	if (sscanf(str, "%s:%s", tmp, rest) == 2) {
+	    prev = find_item(prev, tmp);
+	    str = rest;
+	    /* disp(prev); */
+	    continue;
+	}
+	prev = find_item(prev, str);
+	/* disp(prev); */
+	break;
+    }
+    assign("$", prev);
+    if (objectp(prev))
+	disp(prev);
+    return prev;
+}
+
+int Dump(string str) {
+    int i;
+    mixed tmp;
     object ob;
     string flag, path;
 
@@ -93,31 +194,31 @@ Dump(str) {
     return 1;
 }
 
-id(str) {
+int id(string str) {
     return str == "tracer" || str == "trace";
 }
 
-short() {
+string short() {
     return "General purpose object tracer";
 }
 
-long() {
+void long() {
     write("Genral purpose object information retriever.\n");
     write("Do 'help tracer' for more information.\n");
 }
 
 
-get() {
+int get() {
     if (this_player() && this_player()->query_level() < 20)
 	call_out("self_destruct", 2);
     return 1;
 }
 
-query_value() {
+int query_value() {
     return 10;
 }
 
-Destruct(str) {
+int Destruct(string str) {
     object ob;
     ob = parse_list(str);
     if (!ob)
@@ -127,7 +228,7 @@ Destruct(str) {
     return 1;
 }
 
-Call(str) {
+int Call(string str) {
     string with, what, item;
     int iwhat;
     object ob;
@@ -163,7 +264,7 @@ Call(str) {
     return 1;
 }
 
-Tell(str) {
+int Tell(string str) {
     string item, what;
     object ob;
     if (!str)
@@ -182,7 +283,7 @@ Tell(str) {
     return 1;
 }
 
-Clean(str) {
+int Clean(string str) {
     object ob, o, n;
 
     if (!str)
@@ -200,7 +301,7 @@ Clean(str) {
     return 1;
 }
 
-Trans(str) {
+int Trans(string str) {
     object mark;
 
     if (!str)
@@ -220,90 +321,7 @@ Trans(str) {
     return 1;
 }
 
-static find_item(prev, str) {
-    object ob;
-    string tmp;
-
-    if (str == "here")
-	return environment(this_player());
-    if (str == "^")
-	return environment(prev);
-    if (sscanf(str, "@%s", tmp) == 1)
-	return find_living(tmp);
-    if (sscanf(str, "*%s", tmp) == 1)
-	return find_player(tmp);
-    if (sscanf(str, "/%s", tmp) == 1) {
-	load_object(tmp);	/* Force load */
-        return find_object(tmp);
-    }
-    if (sscanf(str, "$%d", tmp) == 1) {
-	object u;
-	u = users();
-	write("size: " + sizeof(u) + "\n");
-	if (tmp >= sizeof(u) || tmp < 0)
-	    return 0;
-	return u[tmp - 1];
-    }
-    if (sscanf(str, "$%s", tmp) == 1) {
-	int i;
-	while(i<sizeof(vars)) {
-	    if (tmp == vars[i])
-		return stores[i];
-	    i += 1;
-	}
-	return 0;
-    }
-    if (prev == 0)
-	prev = environment(this_player());
-    if (sscanf(str, "\"%s\"", tmp) == 1) {
-	ob = first_inventory(prev);
-	while(ob && ob->short() != tmp) {
-	    ob = next_inventory(ob);
-	}
-	return ob;
-    }
-    if (sscanf(str, "#%d", tmp) == 1) {
-	if (prev == 0)
-	    return 0;
-	ob = first_inventory(prev);
-	while(tmp > 1) {
-	    tmp -= 1;
-	    if (ob == 0)
-		return 0;
-	    ob = next_inventory(ob);
-	}
-	return ob;
-    }
-    return present(str, prev);
-}
-
-parse_list(str) {
-    string tmp, rest;
-    object prev;
-
-    prev = environment(this_player());
-    while(prev && str) {
-	if (sscanf(str, "%s:%s", tmp, rest) == 2) {
-	    prev = find_item(prev, tmp);
-	    str = rest;
-	    /* disp(prev); */
-	    continue;
-	}
-	prev = find_item(prev, str);
-	/* disp(prev); */
-	break;
-    }
-    assign("$", prev);
-    if (objectp(prev))
-	disp(prev);
-    return prev;
-}
-
-static disp(ob) {
-    write(object_name(ob) + "\n");
-}
-
-Set(str) {
+int Set(string str) {
     object ob;
     string item, var;
 
@@ -318,24 +336,29 @@ Set(str) {
     return 1;
 }
 
-assign(var, val) {
-    int i;
-
-    while(i<sizeof(vars)) {
-	if (vars[i] == var) {
-	    stores[i] = val;
-	    return;
-	}
-	if (vars[i] == 0) {
-	    vars[i] = var;
-	    stores[i] = val;
-	    return;
-	}
-	i += 1;
-    }
+/*
+ * This function will be called by all clones.
+ */
+string * init_query() {
+    if (query_list)
+	return query_list;
+    query_list = ({
+	"query_ac", "query_alignment",
+	"query_attack", "query_auto_load", "query_code", "query_create_room",
+	"query_dir", "query_exp", "query_frog", "query_ghost",
+	"query_hit_point", "query_hp", "query_info", "query_intoxination",
+	"query_level", "query_listening", "query_max_weight", "query_money",
+	"query_name", "query_npc", "query_race", "query_real_name",
+	"query_spell_points", "query_soaked", "query_stuffed",
+	"query_title", "query_type", "query_value",
+	"query_wc", "query_weight", "query_wimpy", "query_worn",
+	"weapon_class", "armour_class", "query_age", "query_gender_string",
+	"query_str", "query_dex", "query_con", "query_int"
+    });
+    return query_list;
 }
 
-reset(arg) {
+void reset(int arg) {
     if (arg)
 	return;
     vars = allocate(5);
@@ -343,7 +366,7 @@ reset(arg) {
     query_list = init_query();
 }
 
-Goto(str) {
+int Goto(string str) {
     object mark;
 
     if (!str)
@@ -363,7 +386,7 @@ Goto(str) {
 /*
  * This will not work because command() only works for command_giver.
  */
-in(str) {
+int in(string str) {
     object mark, here;
     string path, cmd;
 
@@ -382,29 +405,7 @@ in(str) {
     return 1;
 }
 
-/*
- * This function will be called by all clones.
- */
-init_query() {
-    if (query_list)
-	return query_list;
-    query_list = ({
-	"query_ac", "query_alignment",
-	"query_attack", "query_auto_load", "query_code", "query_create_room",
-	"query_dir", "query_exp", "query_frog", "query_ghost",
-	"query_hit_point", "query_hp", "query_info", "query_intoxination",
-	"query_level", "query_listening", "query_max_weight", "query_money",
-	"query_name", "query_npc", "query_race", "query_real_name",
-	"query_spell_points", "query_soaked", "query_stuffed",
-	"query_title", "query_type", "query_value",
-	"query_wc", "query_weight", "query_wimpy", "query_worn",
-	"weapon_class", "armour_class", "query_age", "query_gender_string",
-	"query_str", "query_dex", "query_con", "query_int"
-    });
-    return query_list;
-}
-
-In(str) {
+int In(string str) {
     string path, cmd;
     object ob, old_ob;
     if (!str)
@@ -421,19 +422,19 @@ In(str) {
     return 1;
 }
 
-self_destruct() {
+void self_destruct() {
     tell_object(environment(this_object()),
 		"The tracer object suddenly gets warm.\n");
     call_out("self_destruct2", 2);
 }
 
-self_destruct2() {
+void self_destruct2() {
     tell_object(environment(this_object()),
 		"The tracer object dissapear in a flash of light.\n");
     destruct(this_object());
 }
 
-help(str) {
+int help(string str) {
     if (str == "tracer") {
 	write("Do 'help tracer item' for information what an item can be.\n");
 	write("Commands available:\n\n");
@@ -467,9 +468,9 @@ help(str) {
     return 0;
 }
 
-man(str) {
+int man(string str) {
     int i;
-    string manuals;
+    string * manuals;
 
     manuals = ({ "/doc", "/doc/efun", "/doc/lfun", "/doc/helpdir",
 		 "/doc/build", "/doc/w", "/doc/LPC" });
@@ -500,7 +501,7 @@ man(str) {
     return 1;
 }
 
-drop()
+int drop()
 {
 	/* Can't be dropped. Disappears at quit */
 	return 1;
