@@ -1337,7 +1337,7 @@ compatible_types (fulltype_t t1, fulltype_t t2, Bool is_assign)
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-add_arg_type (vartype_t type)
+i_add_arg_type (vartype_t type, int line)
 
 /* Add another function argument type to the argument type stack.
  */
@@ -1353,6 +1353,8 @@ add_arg_type (vartype_t type)
     *(vartype_t*)(mbp->block + mbp->current_size) = type;
     mbp->current_size += sizeof type;
 } /* add_arg_type() */
+
+#define add_arg_type(t) i_add_arg_type(t,__LINE__)
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
@@ -10399,9 +10401,6 @@ function_call:
                           }
 
                           $$.type = TYPE_ANY;
-                          if ($1.super)
-                              yfree($1.super);
-                          pop_arg_stack($4);  /* Argument types no longer needed */
                           break; /* Out of do..while(0) */
                       }
 

@@ -235,7 +235,7 @@ typedef uint32          fulltype_t;  /* Full: type and visibility */
   /* Mask for the primary type info (sans modifiers)
    */
 
-#define SEC_TYPE_MASK      (0xFF60)
+#define SEC_TYPE_MASK      (0xFFC0)
   /* Mask for the secondary type info
    */
 

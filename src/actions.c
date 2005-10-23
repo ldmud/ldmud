@@ -45,6 +45,11 @@
  *
  * It is possible to stack commands, ie. to execute a command from within
  * a command.
+ * TODO: Implement an efun match_command() which takes a command string
+ * TODO:: and an object, and returns array of all matching sentences with
+ * TODO:: the additional information like verb/argument split, etc.
+ * TODO:: This could be used to implement an inventory-independent command
+ * TODO:: system.
  *---------------------------------------------------------------------------
  */
 

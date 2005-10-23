@@ -595,7 +595,7 @@ string  getuid(object default: F_THIS_OBJECT);
          * When running in native mode, both are invisible.
          */
 
-int     transfer(object, object|string);
+int     transfer(object, object|string) "replace by a simul-efun";
 string  creator F_GETUID (object);
 
 
@@ -641,6 +641,13 @@ string  process_string(string);
 
 int     set_light(int);
 int     set_is_wizard(object, int default: F_CONST1);
+
+
+        /* Obsolete and deprecated functions */
+
+#ifdef USE_DEPRECATED
+
+#endif /* USE_DEPRECTED */
 
 
 /***************************************************************************/

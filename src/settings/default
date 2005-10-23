@@ -467,7 +467,7 @@ with_erq_debug=0
 # Trace changes to the tot_alloc_object and tot_alloc_object_size statistics,
 # in order to find the status bugs (enables commandline option
 # --check-object-stat). Will produce a decent amount of output on stderr.
-enable_check_object_stat=yes
+enable_check_object_stat=no
 
 # Activate total mapping size consistency check code. It has a small impact on
 # the execution speed. This define was used to find the inaccuracy in the

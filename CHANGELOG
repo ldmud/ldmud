@@ -1,6 +1,18 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+16-Sep-2002 (Lars Duening)  (3.3.257)
+  - (comm.c) With PThreads: forgot to detach new threads after creation
+       (thanks, Gawain!)
+  - (configure) The object statistic seems to be correct now, so the
+       OSTAT diagnostics are disabled by default.
+  - (closure.c) The argument checking when compiling sefuns in a lambda
+       closure didn't work properly (reported by Coogan).
+  - (exec.h) The mask SEC_TYPE_INFO was defined improperly.
+  - (prolang.y) If an explicite call to an inherited function couldn't
+       be compiled, the argument type stack got popped too often - eventually
+       causing memory corruption.
+
 15-Sep-2002 (Lars Duening)  (3.3.256)
   - (bitstrings.c, closure, efuns.c, interpret, gcollect.c, object.c,
      simul_efun.c, swap.c)

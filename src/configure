@@ -110,7 +110,7 @@ ac_help="$ac_help
   --enable-debug-smalloc-allocs       default=disabled
         enable small block diagnostics"
 ac_help="$ac_help
-  --enable-check-object-stat          default=enabled
+  --enable-check-object-stat          default=disabled
         trace changes to the object statistics"
 ac_help="$ac_help
   --enable-check-mapping-total        default=disabled
@@ -1020,7 +1020,7 @@ fi
 
 
 
-DEFAULTenable_check_object_stat=yes
+DEFAULTenable_check_object_stat=no
 # Check whether --enable-check-object-stat or --disable-check-object-stat was given.
 if test "${enable_check_object_stat+set}" = set; then
   enableval="$enable_check_object_stat"

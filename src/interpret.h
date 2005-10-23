@@ -5,7 +5,7 @@
 
 #include "driver.h"
 #include "typedefs.h"
-#include "exec.h"
+#include "exec.h" /* bytecode_t, bytecode_p */
 #include "svalue.h"
 
 /* --- Types --- */

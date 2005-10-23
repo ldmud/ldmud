@@ -12077,8 +12077,8 @@ again:
         /* Take the value at sp and if it is an array, put the array's
          * contents onto the stack in its place. Other values stay
          * as they are.
-         * The number of values left on the stack is added to num_xargs
-         * (since the compiler didn't count them).
+         * This code is used in conjunction with save/restore/use_arg_frame
+         * to implement flexible varargs.
          */
 
         if (sp->type == T_POINTER)

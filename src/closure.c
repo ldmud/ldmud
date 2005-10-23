@@ -3898,6 +3898,21 @@ compile_value (svalue_t *value, int opt_flags)
             /* Compile the arguments */
             
             num_arg = (mp_int)VEC_SIZE(block) - 1;
+            if (simul_efun <= 0xff)
+            {
+                function_t *funp = &simul_efunp[simul_efun];
+                if (num_arg > funp->num_arg
+                  && !(funp->flags & TYPE_MOD_XVARARGS)
+                   )
+                {
+                    lambda_error(
+                      "Too many arguments to simul_efun %s\n"
+                     , get_txt(funp->name)
+                    );
+                    num_arg = funp->num_arg;
+                }
+            }
+
             for (i = num_arg; --i >= 0; )
             {
                 compile_value(++argp, 0);
@@ -3922,18 +3937,22 @@ compile_value (svalue_t *value, int opt_flags)
             	
                 function_t *funp = &simul_efunp[simul_efun];
 
-                if (needs_ap)
+                if (!needs_ap)
                 {
                     /* The function takes fixed number of args:
                      * push 0s onto the stack for missing args
                      */
 
-                    if (num_arg > funp->num_arg)
+                    if (num_arg < funp->num_arg
+                      && funp->num_arg != SIMUL_EFUN_VARARGS
+                       )
+                    {
                         lambda_error(
-                          "Too many arguments to simul_efun %s\n"
+                          "Missing arguments to simul_efun %s\n"
                          , get_txt(funp->name)
                         );
-                    
+                    }
+
                     i = funp->num_arg - num_arg;
                     if (i > 1 && current.code_left < i + 3)
                         realloc_code();

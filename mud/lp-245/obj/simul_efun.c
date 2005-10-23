@@ -615,6 +615,8 @@ int transfer(object item, object dest)
     int weight;
     object from;
 
+    efun::set_this_object(previous_object());
+
     weight = item->query_weight();
     if (!item)
         return 3;

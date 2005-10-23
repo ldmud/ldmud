@@ -3,7 +3,7 @@
 
 #include "driver.h"
 #include "typedefs.h"
-#include "exec.h"
+#include "exec.h" /* bytecode_t, bytecode_p */
 #ifdef USE_NEW_INLINES
 #include "svalue.h"
 #endif /* USE_NEW_INLINES */

@@ -8,7 +8,7 @@ DESCRIPTION
         macro __PCRE__ is defined.
 
         Most of this manpage is lifted directly from the original PCRE
-        manpage.
+        manpage (dated 15 August 2001).
 
         The PCRE library is a set of functions that implement  regu- lar
         expression  pattern  matching using the same syntax and semantics

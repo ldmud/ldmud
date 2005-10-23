@@ -3128,6 +3128,7 @@ new_player (SOCKET_T new_socket, struct sockaddr_in *addr, size_t addrlen
     new_interactive->write_first = new_interactive->write_last = NULL;
     new_interactive->write_size = 0;
     pthread_create(&new_interactive->write_thread, NULL, writer_thread, new_interactive);
+    pthread_detach(new_interactive->write_thread);
 #endif
 
     /* Add the new interactive structure to the list of users */

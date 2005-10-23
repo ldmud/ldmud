@@ -21,7 +21,9 @@ DESCRIPTION
         set_modify_command(), if any.
 
         This mechanism is intended to expand aliases on quicktypers
-        or the like. See hooks(C), H_MODIFY_COMMAND_FNAME for details.
+        or the like. The name of the lfun called can be changed
+        from modify_command() to something else using the
+        H_MODIFY_COMMAND_FNAME hook.
 
 HISTORY
         Up to 3.2.1@108 the lfun called was hardcoded as

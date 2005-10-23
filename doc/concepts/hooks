@@ -312,7 +312,7 @@ DESCRIPTION
 
         H_MODIFY_COMMAND_FNAME
           Mandatory hook specifying the name of the 'modify_command'
-          function to call for newly entered commands as result of a
+          lfun to call for newly entered commands as result of a
           set_modify_command().
 
           Hook setting must be a string.

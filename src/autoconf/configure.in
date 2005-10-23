@@ -117,7 +117,7 @@ AC_MY_ARG_ENABLE(keep-strings,no,,[don't free shared strings])
 AC_MY_ARG_ENABLE(debug-telnet,no,,[enable telnet machine diagnostics])
 AC_MY_ARG_ENABLE(debug-smalloc-allocs,no,,[enable small block diagnostics])
 
-AC_MY_ARG_ENABLE(check-object-stat,yes,,[trace changes to the object statistics])
+AC_MY_ARG_ENABLE(check-object-stat,no,,[trace changes to the object statistics])
 AC_MY_ARG_ENABLE(check-mapping-total,no,,[check the mapping statistic])
 AC_MY_ARG_ENABLE(check-object-ref,no,,[check object references])
 AC_MY_ARG_ENABLE(check-object-gc-ref,yes,,[check object references in GC])
