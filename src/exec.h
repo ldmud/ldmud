@@ -541,9 +541,8 @@ struct inherit_s
 struct struct_def_s
 {
     string_t * name;         /* Tabled name of the struct */
-    program_t * prog;        /* The program the struct was originally defined
-                              * in. This pointer is not counted and may
-                              * be used just for comparisons.
+    string_t * unique_name;  /* Tabled unique name of the struct, in the
+                              * form "<name> <prog-name> <prog-id_number>"
                               */
     short          inh;      /* If inherited: index into program_t.inherit[]
                               * -1 if defined in this program

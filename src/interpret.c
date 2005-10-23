@@ -10187,11 +10187,19 @@ again:
                 i = (sp-1)->u.number == sp->u.number;
                 break;
             case T_POINTER:
-#ifdef USE_STRUCTS
-            case T_STRUCT:
-#endif
                 i = (sp-1)->u.vec == sp->u.vec;
                 break;
+#ifdef USE_STRUCTS
+            case T_STRUCT:
+                i = (sp-1)->u.vec == sp->u.vec;
+                if (!i && VEC_SIZE((sp-1)->u.vec) == 1
+                       && VEC_SIZE(sp->u.vec) == 1
+                   )
+                {
+                    i = 1;
+                }
+                break;
+#endif
             case T_STRING:
                 i = mstreq((sp-1)->u.str, sp->u.str);
                 break;
@@ -10265,11 +10273,13 @@ again:
                 i = !mstreq((sp-1)->u.str, sp->u.str);
                 break;
             case T_POINTER:
-#ifdef USE_STRUCTS
-            case T_STRUCT:
-#endif
                 i = (sp-1)->u.vec != sp->u.vec;
                 break;
+#ifdef USE_STRUCTS
+            case T_STRUCT:
+                i = (sp-1)->u.vec != sp->u.vec;
+                break;
+#endif
             case T_OBJECT:
                 i = (sp-1)->u.ob != sp->u.ob;
                 break;
@@ -13757,12 +13767,14 @@ again:
     }
 
 #ifdef USE_STRUCTS
-    CASE(F_S_AGGREGATE);       /* --- s_aggregate <size> <num> --- */
+    CASE(F_S_AGGREGATE);
+                        /* --- s_aggregate <name> <size> <num> --- */
     CASE(F_S_M_AGGREGATE);
-                  /* --- s_m_aggregate <size> <num> <index>... --- */
+           /* --- s_m_aggregate <name> <size> <num> <index>... --- */
     {
         /* Create a struct (nominal size <size>) from the <num> values
-         * currently on the stack.
+         * currently on the stack. The name of the struct is program
+         * string #<short>.
          * For F_S_AGGREGATE, the values on the stack are to be assigned
          * to the struct members in ascending order.
          * For F_S_M_AGGREGATE, the <index>... values give for each
@@ -13771,21 +13783,25 @@ again:
          * index for the topmost stack value comes first.
          */
         vector_t * vec;
+        unsigned short name;
         int size, num_values;
         svalue_t * svp;
 
+        LOAD_SHORT(name, pc);
         size = LOAD_UINT8(pc);
         num_values = LOAD_UINT8(pc);
 
-        vec = allocate_array(size);
+        vec = allocate_array(size+1);
         if  (!vec)
             ERROR("Out of memory!\n");
         
+        put_ref_string(vec->item, current_strings[name]);
+
         if (instruction == F_S_AGGREGATE)
         {
             /* Easy way: just move all the values into the vector */
 
-            for (svp = vec->item + num_values - 1
+            for (svp = vec->item + num_values
                 ; num_values > 0
                 ; num_values--, svp--, sp--
                 )

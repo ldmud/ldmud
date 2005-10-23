@@ -52,6 +52,8 @@ union u {
        *   the range.
 #ifdef USE_STRUCTS
        * T_STRUCT: pointer to the fixed-length vector structure.
+       *           The first element of the vector is a string with
+       *           the unique struct name.
 #endif
        */
     mapping_t *map;

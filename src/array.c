@@ -33,6 +33,12 @@
  * itself declares just an array of one element, it is task of the user
  * to allocated a big enough memory block.
  *
+#ifdef USE_STRUCTS
+ * Arrays are also used to implement structs; in this case the first
+ * element in .item contains a T_STRING with the unique name of the
+ * struct, and the other elements hold the data.
+#endif
+ *
  *
  * Some macros help with the use of vector variables:
  *

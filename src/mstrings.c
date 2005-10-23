@@ -1366,6 +1366,25 @@ mstring_prefixed (const string_t *p, const string_t *s)
 } /* mstring_prefixed() */
 
 /*-------------------------------------------------------------------------*/
+long
+mstring_chr (const string_t *p, char c)
+
+/* Aliased to: mstrchr(p,c)
+ *
+ * Search character <c> in string <s> and return its position.
+ * Return -1 if not found.
+ */
+
+{
+    char *pp;
+
+    pp = memchr(get_txt(p), c, mstrsize(p));
+    if (pp != NULL)
+        return pp - get_txt(p);
+    return -1;
+} /* mstring_chr() */
+
+/*-------------------------------------------------------------------------*/
 void
 mstring_init (void)
 

@@ -542,6 +542,7 @@ do_free_sub_strings (int num_strings,   string_t **strings
     for  (i = num_structs; --i >= 0; )
     {
         free_mstring(struct_defs[i].name);
+        free_mstring(struct_defs[i].unique_name);
     }
     for  (i = num_members; --i >= 0; )
     {

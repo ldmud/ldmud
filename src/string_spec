@@ -11,6 +11,7 @@
 DEFAULT "This string is used as a substitute if allocating another one failed."
 EMPTY           ""
 
+ANONYMOUS         "anonymous"
 ATAT              "@@"
 CALL_OTHER        "call_other"
 CATCH             "CATCH"

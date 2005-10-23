@@ -130,6 +130,10 @@ MISCELLANEOUS
          runtime error messages will talk about 'indexing' instead of
          'member lookup').
 
+         Internally structs can be identified by the ID string
+         returned from get_type_info(). However, do not rely on
+         a particular format of this string!
+
          Support for structs is signaled by the macro __LPC_STRUCTS__.
 
 
@@ -138,4 +142,4 @@ HISTORY
 
 
 SEE ALSO
-        mappings(LPC)
+        mappings(LPC), get_type_info(E)

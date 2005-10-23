@@ -5142,8 +5142,18 @@ f_to_array (svalue_t *sp)
         break;
 #ifdef USE_STRUCTS
     case T_STRUCT:
+      {
+        vector_t *vec;
+        size_t left;
+
+        vec = allocate_array(VEC_SIZE(sp->u.vec)-1);
+        for (left = VEC_SIZE(sp->u.vec)-1; left > 0; left--)
+            assign_svalue_no_free(vec->item+left-1, sp->u.vec->item+left);
+        free_array(sp->u.vec);
+        sp->u.vec = vec;
         sp->type = T_POINTER;
         break;
+      }
 #endif
     case T_QUOTED_ARRAY:
         /* Unquote it fully */
@@ -5178,8 +5188,19 @@ f_to_struct (svalue_t *sp)
         fatal("Bad arg 1 to to_struct(): type %s\n", typename(sp->type));
         break;
     case T_POINTER:
+      {
+        vector_t *vec;
+        size_t left;
+
+        vec = allocate_array(VEC_SIZE(sp->u.vec)+1);
+        for (left = VEC_SIZE(sp->u.vec); left > 0; left--)
+            assign_svalue_no_free(vec->item+left, sp->u.vec->item+left-1);
+        put_ref_string(vec->item, STR_ANONYMOUS);
+        free_array(sp->u.vec);
+        sp->u.vec = vec;
         sp->type = T_STRUCT;
         break;
+      }
     case T_STRUCT:
         /* Good as it is */
         break;
@@ -5605,6 +5626,10 @@ v_get_type_info (svalue_t *sp, int num_arg)
  * second element is returned.
  * If <arg> is a closure, the <flag> setting 2 lets the efun
  * return the object the closure is bound to.
+#ifdef USE_STRUCTS
+ * If <arg> is a struct, the <flag> setting 2 lets the efun
+ * return the basename of the struct.
+#endif
  * For every other <flag> setting, -1 is returned.
  *
  * The secondary information is:
@@ -5612,6 +5637,9 @@ v_get_type_info (svalue_t *sp, int num_arg)
  *   - for symbols and quoted arrays the number of quotes.
  *   - for closures, the (internal) closure type.
  *   - for strings 0 for shared strings, and non-0 for others.
+#ifdef USE_STRUCTS
+ *   - for structs, the unique name of the struct is returned.
+#endif
  *   - -1 for all other datatypes.
  *
  * TODO: The flags should be defined in an include file.
@@ -5621,10 +5649,12 @@ v_get_type_info (svalue_t *sp, int num_arg)
 
 {
     mp_int i, j;
+    string_t *str; /* != NULL: to use instead of j */
     svalue_t *argp;
 
     argp = sp - num_arg + 1;
     i = argp->type;
+    str = NULL;
 
     /* Determine the second return value */
     switch(i)
@@ -5660,7 +5690,7 @@ v_get_type_info (svalue_t *sp, int num_arg)
                 ob = sp->u.lambda->function.alien.ob;
                 break;
             }
-            free_closure(sp);
+            free_svalue(sp);
             if (!ob || ob->flags & O_DESTRUCTED)
                 put_number(sp, 0);
             else
@@ -5668,10 +5698,40 @@ v_get_type_info (svalue_t *sp, int num_arg)
             return sp;
             /* NOTREACHED */
         }
+        /* FALLTHROUGH */
     case T_SYMBOL:
     case T_QUOTED_ARRAY:
         j = argp->x.generic;
         break;
+#ifdef USE_STRUCTS
+    case T_STRUCT:
+        if (num_arg == 2 && sp->type == T_NUMBER && sp->u.number == 2)
+        {
+            long p;
+            string_t * name;
+            
+            sp--;
+            name = sp->u.vec->item->u.str;
+            p = mstrchr(name, ' ');
+            if (p <= 0)
+                str = ref_mstring(name);
+            else
+                str = mstr_extract(name, 0, p-1);
+            free_svalue(sp);
+            put_string(sp, str);
+            return sp;
+            /* NOTREACHED */
+        }
+        else if (num_arg == 2)
+        {
+            str = ref_mstring(sp[-1].u.vec->item->u.str);
+        }
+        else
+        {
+            str = ref_mstring(sp->u.vec->item->u.str);
+        }
+        break;
+#endif /* USE_STRUCTS */
     }
 
     /* Depending on flag, return the proper value */
@@ -5681,14 +5741,27 @@ v_get_type_info (svalue_t *sp, int num_arg)
 
         free_svalue(sp--);
         free_svalue(sp);
-        if (flagvalue != 1)
+        if (flagvalue == 2)
+        if (flagvalue != 1) /* 0 or else */
         {
-            if (flagvalue)
+            if (flagvalue) /* neither 0 nor 1 */
+            {
                 j = -1;
+            }
             else
+            {
                 j = i;
+            }
+            if (str != NULL)
+            {
+                free_mstring(str); str = NULL;
+            }
         }
-        put_number(sp, j);
+
+        if (str != NULL)
+            put_string(sp, str);
+        else
+            put_number(sp, j);
     }
     else
     {
@@ -5696,7 +5769,10 @@ v_get_type_info (svalue_t *sp, int num_arg)
 
         v = allocate_array(2);
         v->item[0].u.number = i;
-        v->item[1].u.number = j;
+        if (str != NULL)
+            put_string(v->item+1, str);
+        else
+            v->item[1].u.number = j;
         if (num_arg == 2)
             free_svalue(sp--);
         free_svalue(sp);

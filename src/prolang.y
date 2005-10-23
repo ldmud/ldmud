@@ -912,7 +912,7 @@ static p_int current_continue_address;
 
 #ifdef USE_STRUCTS
 static int current_struct;
-  /* Index of the current structure to be defined.
+  /* Index+1 of the current structure to be defined.
    */
 #endif /* USE_STRUCTS */
 
@@ -1025,6 +1025,7 @@ static void new_inline_closure (void);
 #endif /* USE_NEW_INLINES */
 static void fix_function_inherit_indices(program_t *);
 static void fix_variable_index_offsets(program_t *);
+static short store_prog_string (string_t *str);
 
 /*-------------------------------------------------------------------------*/
 void
@@ -1428,7 +1429,7 @@ get_type_name (fulltype_t type)
     if  (type == TYPE_STRUCT && sec_type_info > 0)
     {
         strcat(buff, " ");
-        strcat(buff, get_txt(STRUCT_DEF(sec_type_info).name));
+        strcat(buff, get_txt(STRUCT_DEF(sec_type_info-1).name));
     }
 #endif /* USE_STRUCTS */
     if (pointer)
@@ -3397,7 +3398,7 @@ define_new_struct ( Bool proto, ident_t *p, funflag_t flags)
 
     /* Fill in the struct_def_t */
     sdef.name        = ref_mstring(p->name);
-    sdef.prog        = NULL;
+    sdef.unique_name = NULL;
     sdef.base        = -1;
     sdef.inh         = -1;
     sdef.num_members = 0;
@@ -3624,6 +3625,7 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
 
         /* The types check out - create the bytecode */
         ins_f_code(F_S_AGGREGATE);
+        ins_short(store_prog_string(ref_mstring(pdef->unique_name)));
         ins_byte(pdef->num_members);
         ins_byte(length);
 
@@ -3733,10 +3735,11 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
 
     /* Finally, create the code */
     ins_f_code(F_S_M_AGGREGATE);
+    ins_short(store_prog_string(ref_mstring(pdef->unique_name)));
     ins_byte(pdef->num_members);
     ins_byte(length);
     for (i = length-1; i >= 0; i--)
-        ins_byte(ix[i]);
+        ins_byte(ix[i]+1);
 
     /* Done */
     xfree(block);
@@ -4239,7 +4242,7 @@ printf("DEBUG:     -> F_CONTEXT_CLOSURE %d %d\n", current_inline->function, cont
 static short
 store_prog_string (string_t *str)
 
-/* Add the shared string <str> to the strings used by the program.
+/* Add the tabled string <str> to the strings used by the program.
  * The function takes care that the same string is not stored twice.
  * Result is the index of the string in the table, the function
  * adopts the reference of <str>.
@@ -4428,6 +4431,9 @@ copy_svalue (svalue_t *svp)
         break;
     case T_POINTER:
     case T_QUOTED_ARRAY:
+#ifdef USE_STRUCTS
+    case T_STRUCT:
+#endif
         svp->u.vec->ref++;
         break;
     case T_MAPPING:
@@ -4501,8 +4507,8 @@ list_to_struct (struct_def_t * pdef, int length, svalue_t *initialized)
     void *block;
     const_list_svalue_t *clsv;
 
-%line
-    vec = allocate_array(pdef->num_members);
+    vec = allocate_array(pdef->num_members+1);
+    put_ref_string(vec->item, pdef->unique_name);
     if (length)
     {
         Bool * flags;    /* Flags which struct members have been set */
@@ -4588,7 +4594,7 @@ list_to_struct (struct_def_t * pdef, int length, svalue_t *initialized)
                 }
                 else
                 {
-                    vec->item[member] = list->val;
+                    vec->item[member+1] = list->val;
                     flags[member] = MY_TRUE;
                 }
 
@@ -4617,7 +4623,7 @@ list_to_struct (struct_def_t * pdef, int length, svalue_t *initialized)
                 }
                 else
                 {
-                    vec->item[member] = list->val;
+                    vec->item[member+1] = list->val;
                     flags[member] = MY_TRUE;
                 }
 
@@ -5394,15 +5400,27 @@ struct_decl:
       type_modifier_list L_STRUCT L_IDENTIFIER ';'
       { 
           int num;
+          char name[256+MAXPATHLEN];
+
           num = define_new_struct(MY_TRUE, $3, $1);
           if (num >= MAX_SEC_TYPE_INFO)
               yyerror("Too many structs declared");
+
+          sprintf(name, "%s (/%s #%ld)", get_txt($3->name)
+                      , current_file, current_id_number+1);
+          STRUCT_DEF(current_struct-1).unique_name = new_tabled(name);
       }
     | type_modifier_list L_STRUCT L_IDENTIFIER
       { 
+          char name[256+MAXPATHLEN];
+
           current_struct = define_new_struct(MY_FALSE, $3, $1);
           if (current_struct >= MAX_SEC_TYPE_INFO)
               yyerror("Too many structs declared");
+
+          sprintf(name, "%s (/%s #%ld)", get_txt($3->name)
+                      , current_file, current_id_number+1);
+          STRUCT_DEF(current_struct-1).unique_name = new_tabled(name);
       }
       opt_base_struct '{' opt_member_list '}' ';'
       { 
@@ -9750,6 +9768,20 @@ expr4:
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 %ifdef USE_STRUCTS
+    | '(' '<' note_start '>' ')'
+      {
+          yyerror("Missing identifier for empty struct literal");
+          $$.type = TYPE_UNKNOWN;
+          $$.start = $3.start;
+          $$.code = -1;
+      }
+    | '(' '<' note_start error ')'
+      {
+          /* Rule allows the parser to resynchronize after errors */
+          $$.type = TYPE_UNKNOWN;
+          $$.start = $3.start;
+          $$.code = -1;
+      }
     | '(' '<' identifier '>'
       {
           int num;
@@ -9831,7 +9863,7 @@ expr4:
               else
               {
                   ins_f_code(F_CLIT);
-                  ins_byte(num);
+                  ins_byte(num+1);
                   ins_f_code(F_INDEX);
                   $$.type = STRUCT_MEMBER(pdef->members + num).type;
               }
@@ -9870,7 +9902,7 @@ expr4:
               {
                   /* Insert the index code */
                   ins_f_code(F_CLIT);
-                  ins_byte(num);
+                  ins_byte(num+1);
 
                   arrange_protected_lvalue($3.start, $3.code, $3.end,
                      F_PROTECTED_INDEX_LVALUE
@@ -10664,6 +10696,7 @@ lvalue:
               {
                   member_type = STRUCT_MEMBER(pdef->members + num).type;
               }
+              num++;
           }
 
           /* We have to generate some code, so if the struct lookup is
@@ -11738,7 +11771,11 @@ function_call:
                               /* break if types are compatible; take care to
                                * handle references correctly
                                */
-                              if (tmp1 == tmp2)
+                              if (tmp1 == tmp2
+#ifdef USE_STRUCTS
+                               || IS_TYPE_STRUCT(tmp1) && IS_TYPE_STRUCT(tmp2)
+#endif
+                                 )
                                   break;
 
                               if ((tmp1 &
@@ -12802,7 +12839,7 @@ lvalue_list:
               {
                   /* Insert the index code */
                   ins_f_code(F_CLIT);
-                  ins_byte(num);
+                  ins_byte(num+1);
 
                   arrange_protected_lvalue($3.start, $3.code, $3.end,
                      F_PROTECTED_INDEX_LVALUE
@@ -13987,7 +14024,7 @@ copy_structs (program_t *from, fulltype_t flags, int offset)
             /* We have a struct with this name. Check if we just
              * inherited it again, or if it's a name clash.
              */
-            if (STRUCT_DEF(id-1).prog != pdef->prog)
+            if (!mstreq(STRUCT_DEF(id-1).unique_name, pdef->unique_name))
             {
                 yyerrorf("struct '%s' multiply inherited from '%s' "
                          "and '%s'"
@@ -14007,7 +14044,7 @@ copy_structs (program_t *from, fulltype_t flags, int offset)
 
         current_struct = define_new_struct( MY_FALSE, p, f);
 
-        STRUCT_DEF(current_struct-1).prog = pdef->prog;
+        STRUCT_DEF(current_struct-1).unique_name = ref_mstring(pdef->unique_name);
         STRUCT_DEF(current_struct-1).base += offset;
 
         /* Now copy the members */
@@ -15368,18 +15405,12 @@ epilog (void)
                 }
                 else
                 {
-                    (void)ref_mstring(f->name);
                     f->offset.pc = CURRENT_PROGRAM_SIZE + FUNCTION_PRE_HDR_SIZE;
-                    p = PROGRAM_BLOCK + CURRENT_PROGRAM_SIZE;
-                    memcpy(p, (char *)&f->name, sizeof f->name);
-                    p += sizeof f->name; /* FUNCTION_NAME */
-#ifdef USE_STRUCTS
-                    STORE_SHORT(p, f->type); /* FUNCTION_TYPE */
-#else
-                    *p++ = f->type; /* FUNCTION_TYPE */
-#endif
-                    *p++ = f->num_arg;   /* FUNCTION_NUM_ARGS */
-                    *p++ = f->num_local; /* FUNCTION_NUM_VARS */
+                    store_function_header( CURRENT_PROGRAM_SIZE
+                                         , f->name, f->type, f->num_arg
+                                         , f->num_local);
+                    p = PROGRAM_BLOCK + CURRENT_PROGRAM_SIZE
+                        + FUNCTION_HDR_SIZE;
 %ifdef INITIALIZATION_BY___INIT
                     /* If __INIT() is undefined (i.e. there was a prototype, but
                      * no explicit function nor the automagic initialization code,
@@ -15848,12 +15879,6 @@ epilog (void)
 
         /* Correct the variable index offsets */
         fix_variable_index_offsets(prog);
-
-#ifdef USE_STRUCTS
-        /* For all structs defined in this program, set the .prog info */
-        for (i = 0; i < prog->num_structs; i++)
-            prog->struct_defs[i].prog = prog;
-#endif /* USE_STRUCTS */
 
         prog->swap_num = -1;
 

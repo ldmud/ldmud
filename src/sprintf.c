@@ -715,16 +715,31 @@ svalue_to_string ( fmt_state_t *st
                 if (obj->type == T_POINTER)
                     stradd(st, &str, "({ /* #");
                 else /* T_STRUCT */
-                    stradd(st, &str, "(< /* #");
+                {
+                    stradd(st, &str, "(<'");
+                    stradd(st, &str, get_txt(obj->u.vec->item->u.str));
+                    stradd(st, &str, "' /* #");
+                }
 #else
                 stradd(st, &str, "({ /* #");
 #endif /* USE_STRUCTS */
                 numadd(st, &str, prec->id_number);
                 stradd(st, &str, ", size: ");
+#ifdef USE_STRUCTS
                 numadd(st, &str, size);
+#else
+                numadd(st, &str, size-1);
+#endif /* USE_STRUCTS */
                 stradd(st, &str, " */\n");
                 for (i = 0; i < size-1; i++)
+                {
+#ifdef USE_STRUCTS
+                    /* Skip the struct name entry */
+                    if (obj->type == T_STRUCT && !i)
+                        continue;
+#endif /* USE_STRUCTS */
                     str = svalue_to_string(st, &(obj->u.vec->item[i]), str, indent+2, MY_TRUE, quoteStrings);
+                }
                 str = svalue_to_string(st, &(obj->u.vec->item[i]), str, indent+2, MY_FALSE, quoteStrings);
                 stradd(st, &str, "\n");
                 add_indent(st, &str, indent);

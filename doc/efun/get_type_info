@@ -19,6 +19,9 @@ DESCRIPTION
         the object the lfun is defined in, not the object the closure is
         bound to).
 
+        If <arg> is a struct, the <flag> setting 2 lets the efun
+        return the base name of the struct.
+
         For every other <flag> setting, -1 is returned.
 
         The secondary information is:
@@ -26,6 +29,7 @@ DESCRIPTION
           - for symbols and quoted arrays the number of quotes.
           - for closures, the (internal) closure type.
           - for strings 0 for shared strings, and non-0 for others.
+          - for structs the unique identifier string
           - -1 for all other datatypes.
 
 BUGS
@@ -39,6 +43,7 @@ HISTORY
         Up to 3.2.7 inclusive, get_type_info(closure,2) did not return
           the object from a lambda closure or bound-lambda closure.
         In the 3.2 branch, the 'flag' argument could be of any type.
+        LDMud 3.3.276 added the secondary information for structs.
 
 SEE ALSO
         debug_info(E), typeof(E), to_object(E)
