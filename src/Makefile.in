@@ -42,7 +42,7 @@ NO_WARN= # no warning options - will work with all compilers :-)
 GCC_WARN= -Wall -Wshadow -Wparentheses # gcc settings
 CFG_WARN= @WCFLAGS@ # Warn options discovered by configure
 
-WARN= ${CFG_WARN}
+WARN= $(CFG_WARN)
 
 
 # Optimization and source level debugging options.
@@ -54,7 +54,7 @@ MED_OPTIMIZE= @MCFLAGS@ # medium optimization
 MIN_OPTIMIZE = @LCFLAGS@ # minimal optimization
 NO_OPTIMIZE= @DCFLAGS@ # no optimization; for frequent recompilations.
 
-OPTMIZE= $MED_OPTIMIZE
+OPTIMIZE= $(MED_OPTIMIZE)
 
 #
 # Debugging options:

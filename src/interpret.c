@@ -5173,7 +5173,7 @@ push_rindexed_value (svalue_t *sp, bytecode_p pc)
         else if (ind >= (mp_int)mstrsize(vec->u.str))
         {
             ERRORF(("Index for [<] out of bounds: %ld, string size: %lu\n"
-                   , (long)i->u.number, mstrsize(vec->u.str)));
+                   , (long)i->u.number, (unsigned long)mstrsize(vec->u.str)));
             return NULL;
         }
         else
