@@ -2318,14 +2318,11 @@ found_fit:
             }
 
             going_to_exit = MY_TRUE; /* Prevent recursions */
+            in_malloc = 0;
             write(2, mess4, sizeof(mess4)-1);
             (void)dump_trace(MY_FALSE, NULL);
-#           ifdef DEBUG
-                fatal("Out of memory (%lu bytes for %lu byte req)\n"
-                     , size * SINT, (unsigned long)smalloc_size);
-#           else
-                exit(2);
-#           endif
+            fatal("Out of memory (%lu bytes for %lu byte req)\n"
+                 , size * SINT, (unsigned long)smalloc_size);
         }
 
         /* Enough of the scary words - we got our memory block */

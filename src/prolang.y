@@ -4132,6 +4132,7 @@ printf("DEBUG: Generate inline closure function:\n");
         leave_block_scope();  /* Argument scope */
         leave_block_scope();  /* Context scope */
         finish_inline_closure(MY_TRUE);
+        return;
     }
 
     start = current_inline->start;

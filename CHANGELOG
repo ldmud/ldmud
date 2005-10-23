@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+16-Nov-2002 (Lars Duening)  (3.3.304)
+  - (smalloc.c) If the allocator ran out of memory, the exit handling
+      triggered the 'Multiple threads' safety check. Not really a problem,
+      as the driver would exit anyway, but it obscures what is happening.
+  - (prolang.y) Inline closures spanning include files were flagged
+      as faulty, still the driver generated code.
+
 16-Nov-2002 (Lars Duening)  (3.3.303)
   - (gcollect.c) The cleanup code could forget to free a destructed object.
 
