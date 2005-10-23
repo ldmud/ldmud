@@ -8,6 +8,9 @@ Miscellaneous files for the driver:
                    
   lpc-mode.el : LPC mode for EMACS, by Vivek Dasmohapatra <vivek@etla.org>
 
+  patch-o-matic: A bash script to automatically up/downgrade the driver
+                 with the latest patches from the bearnip.com website.
+
 The following scripts are just working examples - use them to roll your own:
 
   memusage    : A script to analyze OBJ_DUMP.

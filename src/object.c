@@ -6790,6 +6790,8 @@ f_restore_object (svalue_t *sp)
                 {
                     if (pt)
                         cur = pt+1;
+                    else if (!file)
+                        break;
                     continue;
                 }
             }

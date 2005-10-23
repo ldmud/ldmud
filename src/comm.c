@@ -470,7 +470,6 @@ static void update_ip_entry(const char *oldname, const char *newname);
 
 #ifdef USE_PTHREAD
 static void *writer_thread(void *arg);
-static void writer_thread_cleanup(void *arg);
 #endif
 
 #ifdef USE_IPV6
@@ -1472,6 +1471,21 @@ writer_thread_cleanup(void *arg)
 } /* writer_thread_cleanup() */
 
 /*-------------------------------------------------------------------------*/
+static void
+writer_thread_locked_cleanup (void *arg)
+
+/* The given thread is canceled - move all pending buffers into the
+ * written list, protecting the operation with a lock.
+ */
+
+{
+    interactive_t * ip = (interactive_t *) arg;
+    pthread_mutex_lock(&ip->write_mutex);
+    writer_thread_cleanup(arg);
+    pthread_mutex_unlock(&ip->write_mutex);
+} /* writer_thread_locked_cleanup() */
+
+/*-------------------------------------------------------------------------*/
 void *
 writer_thread (void *arg)
 
@@ -1486,7 +1500,7 @@ writer_thread (void *arg)
 
     pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &oldvalue); /* make us cancelable */
     pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, &oldvalue);
-    pthread_cleanup_push(writer_thread_cleanup, ip);
+    pthread_cleanup_push(writer_thread_locked_cleanup, ip);
       /* MacOS X: pthread_cleanup_push() is a macro which opens a new scope
        * and uses scope-local variable to store the cleanup handler.
        * To close the scope, pthread_cleanup_pop() needs to be 'invoked'

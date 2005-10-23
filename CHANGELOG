@@ -1,6 +1,17 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+27-Nov-2002 (Lars Duening)  (3.3.309)
+  - (comm.c) The thread-cleanup function now locks the structure before
+      performing the cleanup (suggested by Gawain).
+
+26-Nov-2002 (Lars Duening)
+  - (object.c) restore_object("#0:0") caught the driver in an endless loop
+      (thanks, Ctx!).
+
+21-Nov-2002 (Lars Duening)
+  - (etc/patch-o-matic) Contributed by Guandalug - thanks!
+
 21-Nov-2002 (Lars Duening)  (3.3.308)
   - (closure, interpret.c, gcollect.c, mapping.c, dumpstat.c, efuns.c,
      call_out.c, comm.c) Merged lfuns with alien-lfuns - the space advantage
