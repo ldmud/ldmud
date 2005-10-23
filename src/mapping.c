@@ -891,7 +891,6 @@ mhash (svalue_t * svp)
 
     if (svp->type != T_CLOSURE
      || (   svp->x.closure_type != CLOSURE_LFUN
-         && svp->x.closure_type != CLOSURE_ALIEN_LFUN
          && svp->x.closure_type != CLOSURE_IDENTIFIER )
        )
     {

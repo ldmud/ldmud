@@ -14,7 +14,6 @@
 ;;    3-3-structs.*: The 3-3 subbranch for 'struct' re-development,
 ;;                   branched off 3-3.294
 ;;
-;; TODO: Merge lfun- and alien-lfun closures.
 ;; TODO: general coloured efuns, sockets (p-020912),
 ;; TODO:  sockets (p-020912),
 ;; TODO: state dumps.
@@ -24,14 +23,12 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 307)
-(Parent-Version lpmud 3-3 306)
-(Version-Log "Corrected refcount errors in the dangling closure handling.
-Reset the thread-check in smalloc before calls to fatal().
-Moved the context variables back to the closure_t toplevel - the alien-lfuns needed them as well, and the inner location was reason for strange crashes.")
+(Project-Version lpmud 3-3 308)
+(Parent-Version lpmud 3-3 307)
+(Version-Log "Merged lfun- with alien-lfun closures.")
 (New-Version-Log
 "")
-(Checkin-Time "Wed, 20 Nov 2002 22:56:05 -0700")
+(Checkin-Time "Thu, 21 Nov 2002 02:21:42 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -67,7 +64,7 @@ Moved the context variables back to the closure_t toplevel - the alien-lfuns nee
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.50 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.370 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.371 644))
   (HISTORY (lpmud/f/49_HISTORY 1.284 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.18 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -130,37 +127,37 @@ Moved the context variables back to the closure_t toplevel - the alien-lfuns nee
   (src/bitstrings.c (lpmud/i/48_bitstrings 1.13 644))
   (src/bytecode.h (lpmud/a/b/26_bytecode.h 1.1 644))
   (src/call_out.h (lpmud/f/45_call_out.h 1.7.1.6 644))
-  (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.23 644))
-  (src/closure.h (lpmud/f/44_closure.h 1.7.1.14 644))
-  (src/closure.c (lpmud/d/4_closure.c 1.41.1.47.1.3 644))
-  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.38 644))
+  (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.24 644))
+  (src/closure.h (lpmud/f/44_closure.h 1.7.1.15 644))
+  (src/closure.c (lpmud/d/4_closure.c 1.41.1.47.1.4 644))
+  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.39 644))
   (src/comm.h (lpmud/d/3_comm.h 1.26.1.29 644))
   (src/driver.h (lpmud/f/36_driver.h 1.15.1.21 644))
   (src/dumpstat.h (lpmud/f/35_dumpstat.h 1.8 644))
-  (src/dumpstat.c (lpmud/c/34_dumpstat.c 1.20.1.11.1.1 644))
+  (src/dumpstat.c (lpmud/c/34_dumpstat.c 1.20.1.11.1.2 644))
   (src/ed.h (lpmud/f/34_ed.h 1.5.1.6 644))
   (src/ed.c (lpmud/c/33_ed.c 1.32.1.26 644))
   (src/efuns.h (lpmud/l/20_efuns.h 1.13.1.19 644))
-  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.56 644))
+  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.57 644))
   (src/exec.h (lpmud/c/32_exec.h 1.34.1.33.1.1 644))
   (src/files.h (lpmud/i/49_files.h 1.2 644))
   (src/files.c (lpmud/i/50_files.c 1.18 644))
   (src/filestat.h (lpmud/f/51_filestat.h 1.7 644))
   (src/gcollect.h (lpmud/f/33_gcollect.h 1.6.1.11 644))
-  (src/gcollect.c (lpmud/c/30_gcollect.c 1.41.1.82 644))
+  (src/gcollect.c (lpmud/c/30_gcollect.c 1.41.1.83 644))
   (src/hash.h (lpmud/f/32_hash.h 1.5 644))
   (src/hash.c (lpmud/c/28_hash.c 1.15 644))
   (src/heartbeat.h (lpmud/m/41_heartbeat. 1.6.1.5 644))
   (src/heartbeat.c (lpmud/m/42_heartbeat. 1.18.1.8 644))
   (src/i-svalue_cmp.h (lpmud/a/b/20_i-svalue_c 1.3 644))
-  (src/interpret.h (lpmud/b/13_interpret. 1.33.1.34 644))
-  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.3 644))
+  (src/interpret.h (lpmud/b/13_interpret. 1.33.1.35 644))
+  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.4 644))
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.15 644))
   (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.33 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.12 644))
   (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.27 644))
   (src/mapping.h (lpmud/f/30_mapping.h 1.12.1.14 644))
-  (src/mapping.c (lpmud/b/6_mapping.c 1.36.1.52 644))
+  (src/mapping.c (lpmud/b/6_mapping.c 1.36.1.53 644))
   (src/md5.h (lpmud/l/18_md5.h 1.2 644))
   (src/md5.c (lpmud/l/19_md5.c 1.6 644))
   (src/mempools.h (lpmud/d/48_mempools.h 1.2.1.3 644))
@@ -240,7 +237,7 @@ Moved the context variables back to the closure_t toplevel - the alien-lfuns nee
   (src/sprintf.c (lpmud/28_sprintf.c 1.31.1.46 644))
   (src/strfuns.h (lpmud/b/51_strfuns.h 1.11.1.5 644))
   (src/strfuns.c (lpmud/c/0_strfuns.c 1.9.1.11 644))
-  (src/svalue.h (lpmud/f/39_datatypes. 1.34.1.23.1.2 644))
+  (src/svalue.h (lpmud/f/39_datatypes. 1.34.1.23.1.3 644))
   (src/swap.h (lpmud/f/14_swap.h 1.7.1.3 644))
   (src/swap.c (lpmud/25_swap.c 1.36.1.40 644))
   (src/switch.h (lpmud/24_switch.h 1.9 644))
@@ -999,7 +996,7 @@ Moved the context variables back to the closure_t toplevel - the alien-lfuns nee
   (doc/efun/get_error_file (lpmud/o/49_get_error_ 1.3 644))
   (doc/efun/get_eval_cost (lpmud/m/14_get_eval_c 1.7 644))
   (doc/efun/get_extra_wizinfo (lpmud/o/50_get_extra_ 1.4 644))
-  (doc/efun/get_type_info (lpmud/o/51_get_type_i 1.11 644))
+  (doc/efun/get_type_info (lpmud/o/51_get_type_i 1.12 644))
   (doc/efun/geteuid (lpmud/p/0_geteuid 1.3 644))
   (doc/efun/getuid (lpmud/p/1_getuid 1.3 644))
   (doc/efun/gmtime (lpmud/n/7_gmtime 1.1 644))

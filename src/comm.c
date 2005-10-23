@@ -7176,9 +7176,9 @@ f_input_to_info (svalue_t *sp)
 
             if (it->fun.is_lambda)
             {
-                if (it->fun.function.lambda.x.closure_type == CLOSURE_ALIEN_LFUN)
+                if (it->fun.function.lambda.x.closure_type == CLOSURE_LFUN)
                     put_ref_object( vv->item
-                                  , it->fun.function.lambda.u.lambda->function.alien.ob
+                                  , it->fun.function.lambda.u.lambda->function.lfun.ob
                                   , "input_to_info");
                 else
                     put_ref_object(vv->item, ob, "input_to_info");

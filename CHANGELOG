@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+21-Nov-2002 (Lars Duening)  (3.3.308)
+  - (closure, interpret.c, gcollect.c, mapping.c, dumpstat.c, efuns.c,
+     call_out.c, comm.c) Merged lfuns with alien-lfuns - the space advantage
+      of lfuns over alien-lfuns is no longer that big, and the merger
+      simplifies the handling.
+
 20-Nov-2002 (Lars Duening)  (3.3.307)
   - (closure.c) Corrected refcount errors in the handling
       of soon-to-be dangling alien-lfun closures.

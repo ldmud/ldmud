@@ -148,8 +148,17 @@ svalue_size (svalue_t *v, mp_int * pTotal)
         if (!CLOSURE_MALLOCED(v->x.closure_type)) return 0;
         if (!CLOSURE_REFERENCES_CODE(v->x.closure_type))
         {
+#ifdef USE_NEW_INLINES
+            if (v->x.closure_type == CLOSURE_LFUN)
+                composite = SIZEOF_LAMBDA(v->u.lambda->function.lfun.context_size);
+            else /* CLOSURE_IDENTIFIER || CLOSURE_PRELIMINARY */
+                composite = sizeof *v->u.lambda;
+
+            composite += sizeof(char *);
+#else
             /* CLOSURE_LFUN || CLOSURE_IDENTIFIER || CLOSURE_PRELIMINARY */
             composite = sizeof *v->u.lambda + sizeof(char *);
+#endif
             *pTotal = composite;
             return composite / v->u.lambda->ref;
         }

@@ -15,9 +15,9 @@ DESCRIPTION
         second element is returned.
 
         If <arg> is a closure, the <flag> setting 2 lets the efun
-        return the object of the closure (which for 'alien lfun closures' is
-        the object the lfun is defined in, not the object the closure is
-        bound to).
+        return the object of the closure (which for 'lfun closures' is
+        the object the lfun is defined in, which is not necessarily the object
+        the closure is bound to).
 
         If <arg> is a struct, the <flag> setting 2 lets the efun
         return the base name of the struct.

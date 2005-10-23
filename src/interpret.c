@@ -744,7 +744,7 @@ init_interpret (void)
  * a svalue_t, only the data referenced by it.
  *
  * destructed_object_ref(v): test if <v> references a destructed object.
- * get_object_ref(v): return the object referenced by <v>, if any.
+ * object_ref(v,o):          test if <v> references object <o>
  * free_string_svalue(v): free string svalue <v>.
  * free_object_svalue(v): free object svalue <v>.
  * zero_object_svalue(v): replace the object in svalue <v> by number 0.
@@ -1105,8 +1105,8 @@ _destructed_object_ref (svalue_t *svp)
     if (CLOSURE_HAS_CODE(type) && type == CLOSURE_UNBOUND_LAMBDA)
         return MY_FALSE;
 
-    if (type == CLOSURE_ALIEN_LFUN
-     && (l->function.alien.ob->flags & O_DESTRUCTED))
+    if (type == CLOSURE_LFUN
+     && (l->function.lfun.ob->flags & O_DESTRUCTED))
         return MY_TRUE;
 
     return (l->ob->flags & O_DESTRUCTED) ? MY_TRUE : MY_FALSE;
@@ -1118,11 +1118,11 @@ Bool destructed_object_ref (svalue_t *v) { return _destructed_object_ref(v); }
 #define destructed_object_ref(v) _destructed_object_ref(v)
 
 /*-------------------------------------------------------------------------*/
-static INLINE object_t *
-_get_object_ref (svalue_t *svp)
+static INLINE Bool
+int_object_ref (svalue_t *svp, object_t *obj)
 
-/* If <svp> references an object (destructed or alive), return the object.
- * Return NULL otherwise.
+/* Return TRUE if <svp> references object <obj> (destructed or alive),
+ * return FALSE if it doesn't.
  */
 
 {
@@ -1130,28 +1130,26 @@ _get_object_ref (svalue_t *svp)
     int type;
 
     if (svp->type != T_OBJECT && svp->type != T_CLOSURE)
-        return NULL;
+        return MY_FALSE;
 
     if (svp->type == T_OBJECT || !CLOSURE_MALLOCED(type = svp->x.closure_type))
-        return svp->u.ob;
+        return svp->u.ob == obj;
 
     /* Lambda closure */
 
     l = svp->u.lambda;
 
     if (CLOSURE_HAS_CODE(type) && type == CLOSURE_UNBOUND_LAMBDA)
-        return NULL;
+        return MY_FALSE;
 
-    if (type == CLOSURE_ALIEN_LFUN)
-        return l->function.alien.ob;
+    if (type == CLOSURE_LFUN && l->function.lfun.ob == obj)
+        return MY_TRUE;
 
-    return l->ob;
+    return l->ob == obj;
 
-} /* _get_object_ref() */
+} /* int_object_ref() */
 
-object_t * get_object_ref (svalue_t *v) { return _get_object_ref(v); }
-
-#define get_object_ref(v) _get_object_ref(v)
+#define object_ref(v,o) int_object_ref(v,o)
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
@@ -6834,7 +6832,7 @@ remove_object_from_stack (object_t *ob)
 
     for (svp = VALUE_STACK; svp <= inter_sp; svp++)
     {
-        if (get_object_ref(svp) == ob)
+        if (object_ref(svp, ob))
         {
             free_svalue(svp);
             put_number(svp, 0);
@@ -7762,7 +7760,6 @@ again:
 #ifdef DEBUG
             if (instruction == F_CONTEXT_CLOSURE
              && sp->x.closure_type != CLOSURE_LFUN
-             && sp->x.closure_type != CLOSURE_ALIEN_LFUN
                )
                 fatal("(eval_instruction) context_closure used for non-lfun "
                       "closure type %d.\n", sp->x.closure_type);
@@ -16506,91 +16503,20 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
             return;
         }
 
-        /* Reference the object the lfun is bound to */
-        l->ob->time_of_ref = current_time;
-        l->ob->flags &= ~O_RESET_STATE;
-
-        current_object = l->ob;
-
-        /* Make the object resident */
-        if (current_object->flags & O_SWAPPED
-         && load_ob_from_swap(current_object) < 0)
-        {
-            /* inter_sp == sp */
-            CLEAN_CSP
-            error("Out of memory\n");
-            /* NOTREACHED */
-            return;
-        }
-
-#ifdef DEBUG
-#ifdef USE_NEW_INLINES
-        if (l->function.lfun.index >= current_object->prog->num_functions)
-            fatal("Calling non-existing lfun closure #%hu in program '%s' "
-                  "with %hu functions.\n"
-                 , l->function.lfun.index
-                 , current_object->prog->name
-                 , current_object->prog->num_functions
-                );
-#else
-        if (l->function.index >= current_object->prog->num_functions)
-            fatal("Calling non-existing lfun closure #%hu in program '%s' "
-                  "with %hu functions.\n"
-                 , l->function.index
-                 , current_object->prog->name
-                 , current_object->prog->num_functions
-                );
-#endif
-#endif
-
-        /* Ok, object and program are there */
-
-        current_prog = current_object->prog;
-        /* inter_sp == sp */
-#ifndef USE_NEW_INLINES
-        flags = setup_new_frame(l->function.index);
-#else /* USE_NEW_INLINES */
-        flags = setup_new_frame(l->function.lfun.index);
-        if (l->function.lfun.context_size > 0)
-            inter_context = l->context;
-#endif /* USE_NEW_INLINES */
-        funstart = current_prog->program + (flags & FUNSTART_MASK);
-        csp->funstart = funstart;
-        eval_instruction(FUNCTION_CODE(funstart), inter_sp);
-        /* The result is on the stack (inter_sp) */
-        return;
-      }
-
-    case CLOSURE_ALIEN_LFUN:  /* --- alien lfun closure --- */
-      {
-        funflag_t flags;
-        fun_hdr_p funstart;
-
-        /* Can't call from a destructed object */
-        if (l->ob->flags & O_DESTRUCTED)
-        {
-            /* inter_sp == sp */
-            CLEAN_CSP
-            error("Object '%s' the closure was bound to has been "
-                  "destructed\n", get_txt(l->ob->name));
-            /* NOTREACHED */
-            return;
-        }
-
         /* Reference the bound and the originating object */
         l->ob->time_of_ref = current_time;
-        l->function.alien.ob->time_of_ref = current_time;
-        l->function.alien.ob->flags &= ~O_RESET_STATE;
+        l->function.lfun.ob->time_of_ref = current_time;
+        l->function.lfun.ob->flags &= ~O_RESET_STATE;
 
         current_object = l->ob;
 
         /* Can't call a function in a destructed object */
-        if (l->function.alien.ob->flags & O_DESTRUCTED)
+        if (l->function.lfun.ob->flags & O_DESTRUCTED)
         {
             /* inter_sp == sp */
             CLEAN_CSP
             error("Object '%s' holding the closure has been "
-                  "destructed\n", get_txt(l->function.alien.ob->name));
+                  "destructed\n", get_txt(l->function.lfun.ob->name));
             /* NOTREACHED */
             return;
         }
@@ -16598,8 +16524,8 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
         /* Make the objects resident */
         if ( (   current_object->flags & O_SWAPPED
               && load_ob_from_swap(current_object) < 0)
-         ||  (   l->function.alien.ob->flags & O_SWAPPED
-              && load_ob_from_swap(l->function.alien.ob) < 0)
+         ||  (   l->function.lfun.ob->flags & O_SWAPPED
+              && load_ob_from_swap(l->function.lfun.ob) < 0)
            )
         {
             /* inter_sp == sp */
@@ -16610,12 +16536,12 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
         }
 
 #ifdef DEBUG
-        if (l->function.alien.index >= l->function.alien.ob->prog->num_functions)
+        if (l->function.lfun.index >= l->function.lfun.ob->prog->num_functions)
             fatal("Calling non-existing lfun closure #%hu in program '%s' "
                   "with %hu functions.\n"
-                 , l->function.alien.index
-                 , l->function.alien.ob->prog->name
-                 , l->function.alien.ob->prog->num_functions
+                 , l->function.lfun.index
+                 , l->function.lfun.ob->prog->name
+                 , l->function.lfun.ob->prog->num_functions
                 );
 #endif
 
@@ -16625,7 +16551,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
          * open up.
          */
 
-        if (l->ob != l->function.alien.ob)
+        if (l->ob != l->function.lfun.ob)
         {
             csp->extern_call = MY_TRUE;
             csp->funstart = NULL;
@@ -16644,12 +16570,12 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
          * This is a real inter-object call.
          */
         csp->extern_call = MY_TRUE;
-        current_object = l->function.alien.ob;
+        current_object = l->function.lfun.ob;
         current_prog = current_object->prog;
         /* inter_sp == sp */
-        flags = setup_new_frame(l->function.alien.index);
+        flags = setup_new_frame(l->function.lfun.index);
 #ifdef USE_NEW_INLINES
-        if (l->function.alien.context_size > 0)
+        if (l->function.lfun.context_size > 0)
             inter_context = l->context;
 #endif /* USE_NEW_INLINES */
         funstart = current_prog->program + (flags & FUNSTART_MASK);
@@ -16657,7 +16583,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
         eval_instruction(FUNCTION_CODE(funstart), inter_sp);
 
         /* If necessary, remove the second control frame */
-        if (l->ob != l->function.alien.ob)
+        if (l->ob != l->function.lfun.ob)
         {
             current_object = csp->ob;
             previous_ob = csp->prev_ob;
@@ -16696,11 +16622,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
         }
 
         /* Do we have the variable? */
-#ifndef USE_NEW_INLINES
-        if ( (i = (short)l->function.index) < 0)
-#else /* USE_NEW_INLINES */
         if ( (i = (short)l->function.var_index) < 0)
-#endif /* USE_NEW_INLINES */
         {
             error("Variable not inherited\n");
             /* NOTREACHED */
@@ -18637,9 +18559,9 @@ count_extra_ref_in_closure (lambda_t *l, ph_int type)
             if (NULL != register_pointer(ptable, l2) )
                 count_extra_ref_in_closure(l2, CLOSURE_UNBOUND_LAMBDA);
         }
-        else if (type == CLOSURE_ALIEN_LFUN)
+        else if (type == CLOSURE_LFUN)
         {
-            count_extra_ref_in_object(l->function.alien.ob);
+            count_extra_ref_in_object(l->function.lfun.ob);
         }
     }
 
@@ -18977,7 +18899,6 @@ v_apply (svalue_t *sp, int num_arg)
                 error("Uncallable closure in apply().\n");
             /* else: operator/sefun/efun closure: FALLTHROUGH */
         case CLOSURE_LFUN:
-        case CLOSURE_ALIEN_LFUN:
         case CLOSURE_LAMBDA:
         case CLOSURE_BOUND_LAMBDA:
             if (num_arg + (sp - VALUE_STACK) < EVALUATOR_STACK_SIZE)

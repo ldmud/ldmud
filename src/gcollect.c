@@ -254,11 +254,6 @@ cleanup_closure (svalue_t *csvp, ptrtable_t * ptable)
         unsigned short size = l->function.lfun.context_size;
         cleanup_vector(l->context, size, ptable);
     }
-    if (type == CLOSURE_ALIEN_LFUN && l->function.alien.context_size != 0)
-    {
-        unsigned short size = l->function.alien.context_size;
-        cleanup_vector(l->context, size, ptable);
-    }
 #endif /* USE_NEW_INLINES */
 } /* cleanup_closure() */
 
@@ -1155,8 +1150,8 @@ gc_count_ref_in_closure (svalue_t *csvp)
 
         ob = l->ob;
         if (ob->flags & O_DESTRUCTED
-         || (   type == CLOSURE_ALIEN_LFUN
-             && l->function.alien.ob->flags & O_DESTRUCTED) )
+         || (   type == CLOSURE_LFUN
+             && l->function.lfun.ob->flags & O_DESTRUCTED) )
         {
             l->ref = -1;
             if (type == CLOSURE_LAMBDA)
@@ -1168,10 +1163,10 @@ gc_count_ref_in_closure (svalue_t *csvp)
             {
                 l->ob = (object_t *)stale_misc_closures;
                 stale_misc_closures = l;
-                if (type == CLOSURE_ALIEN_LFUN)
+                if (type == CLOSURE_LFUN)
                 {
-                    if (l->function.alien.ob->flags & O_DESTRUCTED)
-                        reference_destructed_object(l->function.alien.ob);
+                    if (l->function.lfun.ob->flags & O_DESTRUCTED)
+                        reference_destructed_object(l->function.lfun.ob);
                 }
             }
 
@@ -1193,8 +1188,8 @@ gc_count_ref_in_closure (svalue_t *csvp)
              /* Object exists: count reference */
 
             ob->ref++;
-            if (type == CLOSURE_ALIEN_LFUN)
-                l->function.alien.ob->ref++;
+            if (type == CLOSURE_LFUN)
+                l->function.lfun.ob->ref++;
         }
     }
 
@@ -1236,13 +1231,6 @@ gc_count_ref_in_closure (svalue_t *csvp)
             count_ref_in_vector(l->context, size);
             l->function.lfun.context_size = size;
         }
-        if (type == CLOSURE_ALIEN_LFUN && l->function.alien.context_size != 0)
-        {
-            unsigned short size = l->function.alien.context_size;
-            l->function.alien.context_size = 0; /* Prevent recursion */
-            count_ref_in_vector(l->context, size);
-            l->function.alien.context_size = size;
-        }
 #endif /* USE_NEW_INLINES */
     }
 } /* count_ref_in_closure() */
@@ -1279,8 +1267,8 @@ clear_ref_in_closure (lambda_t *l, ph_int type)
     if (type != CLOSURE_UNBOUND_LAMBDA)
         clear_object_ref(l->ob);
 
-    if (type == CLOSURE_ALIEN_LFUN)
-        clear_object_ref(l->function.alien.ob);
+    if (type == CLOSURE_LFUN)
+        clear_object_ref(l->function.lfun.ob);
 #ifdef USE_NEW_INLINES
     if (type == CLOSURE_LFUN && l->function.lfun.context_size != 0)
     {
@@ -1288,13 +1276,6 @@ clear_ref_in_closure (lambda_t *l, ph_int type)
         l->function.lfun.context_size = 0; /* Prevent recursion */
         clear_ref_in_vector(l->context, size);
         l->function.lfun.context_size = size;
-    }
-    if (type == CLOSURE_ALIEN_LFUN && l->function.alien.context_size != 0)
-    {
-        unsigned short size = l->function.alien.context_size;
-        l->function.alien.context_size = 0; /* Prevent recursion */
-        clear_ref_in_vector(l->context, size);
-        l->function.alien.context_size = size;
     }
 #endif /* USE_NEW_INLINES */
 } /* clear_ref_in_closure() */
@@ -2044,11 +2025,7 @@ show_cl_literal (int d, void *block, int depth UNUSED)
         WRITES(d, "<null>");
 
     WRITES(d, ", index ");
-#ifdef USE_NEW_INLINES
-    writed(d, l->function.lfun.index);
-#else
-    writed(d, l->function.index);
-#endif /* USE_NEW_INLINES */
+    writed(d, l->function.var_index);
     WRITES(d, ", ref ");
     writed(d, l->ref);
     WRITES(d, "\n");
@@ -2152,8 +2129,7 @@ show_array(int d, void *block, int depth)
             break;
 
         case T_CLOSURE:
-            if (svp->x.closure_type == CLOSURE_LFUN
-             || svp->x.closure_type == CLOSURE_IDENTIFIER)
+            if (svp->x.closure_type == CLOSURE_IDENTIFIER)
                show_cl_literal(d, (char *)svp->u.lambda, depth);
             else
             {

@@ -36,32 +36,28 @@
  *   u.ob is the object this closure is bound to.
  *
  * lfun closure:           type = CLOSURE_LFUN (0)
- *   Reference to a lfun in the same object.
+ *   Reference to a lfun in an object.
  *   u.lambda points to the lambda structure with the detailed data.
  *
- * alien-lfun closure:     type = CLOSURE_ALIEN_LFUN (1)
- *   Reference to a lfun in an other object.
- *   u.lambda points to the lambda structure with the detailed data.
- *
- * identifier closure:     type = CLOSURE_IDENTIFIER (2)
+ * identifier closure:     type = CLOSURE_IDENTIFIER (1)
  *   Reference to a variable in this object.
  *   u.lambda points to the lambda structure with the detailed data.
  *
- * preliminary closure:    type = CLOSURE_PRELIMINARY (3)
+ * preliminary closure:    type = CLOSURE_PRELIMINARY (2)
  *   TODO: ???
  *
- * bound lambda closure:   type = CLOSURE_BOUND_LAMBDA (4)
+ * bound lambda closure:   type = CLOSURE_BOUND_LAMBDA (3)
  *   This is an unbound lambda closure which was bound to an object.
  *   To allow binding the same unbound lambda to different objects
  *   at the same time, this construct uses a double indirection:
  *   u.lambda points to a lambda structure with the binding information,
  *   which then points to the actual unbound lambda structure.
  *
- * lambda closure:         type = CLOSURE_LAMBDA (5)
+ * lambda closure:         type = CLOSURE_LAMBDA (4)
  *   Lambda closure bound to an object at compilation time.
  *   u.lambda points to the lambda structure with the compiled function.
  *
- * unbound lambda closure: type = CLOSURE_UNBOUND_LAMBDA (6)
+ * unbound lambda closure: type = CLOSURE_UNBOUND_LAMBDA (5)
  *   Unbound lambda closure, which is not bound to any object at
  *   compile time.
  *   u.lambda points to the lambda structure with the compiled function.
@@ -84,13 +80,20 @@
  *           during the execution of the lambda).
  *       union --- Closure information ---
  *       {
- *           unsigned short index;
- *               _LFUN:       index in the function table
+ *           unsigned short var_index;
  *               _IDENTIFIER: index in the variable table
  *               Function indices are lower than CLOSURE_IDENTIFIER_OFFS
  *               (0xe800), variable indices are higher.
  *               The special value VANISHED_VARCLOSURE_INDEX (-1) is
  *               used to mark vanished variables.
+ *
+ *           struct -- CLOSURE_LFUN
+ *           {
+ *               object_t *ob;
+ *                   Originating object
+ *               unsigned short  index
+ *                   Index in the objects function table
+ *           } lfun;
  *
  *           bytecode_t code[1];
  *               LAMBDA and UNBOUND_LAMBDA closures: the function code.
@@ -106,14 +109,13 @@
  *           lambda_t *lambda;
  *               BOUND_LAMBDA: pointer to the UNBOUND_LAMBDA structure.
  *
- *           struct -- CLOSURE_ALIEN_LFUN
- *           {
- *               object_t *ob;
- *                   Originating object
- *               unsigned short  index
- *                   Index in the objects variable table
- *           } alien;
  *       } function;
+ *
+ *       svalue_t context[.lfun.context_size];
+ *          lfun-closure context variables, if any.
+ *          Putting this array into the function.lfun somehow causes memory
+ *          corruption because some lambda structures won't be allocated large
+ *          enough.
  *   }
  *
  *
@@ -464,74 +466,24 @@ closure_eq (svalue_t * left, svalue_t * right)
     if (!i
      && left->x.closure_type == right->x.closure_type
      && (   left->x.closure_type == CLOSURE_LFUN
-         || left->x.closure_type == CLOSURE_ALIEN_LFUN
          || left->x.closure_type == CLOSURE_IDENTIFIER
         )
      && left->u.lambda->ob == right->u.lambda->ob
        )
     {
-#ifndef USE_NEW_INLINES
-        if (left->x.closure_type == CLOSURE_ALIEN_LFUN)
-        {
-            i =    (   left->u.lambda->function.alien.ob
-                    == right->u.lambda->function.alien.ob)
-                && (   left->u.lambda->function.alien.index
-                    == right->u.lambda->function.alien.index);
-        }
-        else
-            i =    left->u.lambda->function.index
-                == right->u.lambda->function.index;
-#else /* USE_NEW_INLINES */
-        if (left->x.closure_type == CLOSURE_ALIEN_LFUN)
+        if (left->x.closure_type == CLOSURE_LFUN)
         {
             unsigned context_size, ix;
 
-            i =    (   left->u.lambda->function.alien.ob
-                    == right->u.lambda->function.alien.ob)
-                && (   left->u.lambda->function.alien.index
-                    == right->u.lambda->function.alien.index)
-                && (    left->u.lambda->function.alien.context_size
-                     == right->u.lambda->function.alien.context_size)
-                ;
-
-            if (i)
-            {
-                /* There might be a difference is in the context svalues.
-                 * To prevent recursion, hide them while comparing them.
-                 */
-
-                context_size = left->u.lambda->function.alien.context_size;
-                left->u.lambda->function.alien.context_size = 0;
-                right->u.lambda->function.alien.context_size = 0;
-
-                for (ix = 0; i && ix < context_size; ix++)
-                {
-                    i = svalue_cmp( &(left->u.lambda->context[ix])
-                                  , &(right->u.lambda->context[ix])
-                                  );
-                }
-
-                /* Restore the context size.
-                 */
-                left->u.lambda->function.alien.context_size = context_size;
-                right->u.lambda->function.alien.context_size = context_size;
-            }
-        }
-        else if (left->x.closure_type == CLOSURE_IDENTIFIER)
-        {
-            i =    left->u.lambda->function.var_index
-                == right->u.lambda->function.var_index;
-        }
-        else /* CLOSURE_LFUN */
-        {
-            unsigned context_size, ix;
-
-            i =    (    left->u.lambda->function.lfun.index
-                     == right->u.lambda->function.lfun.index)
+            i =    (   left->u.lambda->function.lfun.ob
+                    == right->u.lambda->function.lfun.ob)
+                && (   left->u.lambda->function.lfun.index
+                    == right->u.lambda->function.lfun.index)
                 && (    left->u.lambda->function.lfun.context_size
                      == right->u.lambda->function.lfun.context_size)
                 ;
 
+#ifdef USE_NEW_INLINES
             if (i)
             {
                 /* There might be a difference is in the context svalues.
@@ -554,8 +506,13 @@ closure_eq (svalue_t * left, svalue_t * right)
                 left->u.lambda->function.lfun.context_size = context_size;
                 right->u.lambda->function.lfun.context_size = context_size;
             }
-        }
 #endif /* USE_NEW_INLINES */
+        }
+        else /* CLOSURE_IDENTIFIER */
+        {
+            i =    left->u.lambda->function.var_index
+                == right->u.lambda->function.var_index;
+        }
     }
 
     return (Bool)i;
@@ -586,7 +543,6 @@ closure_cmp (svalue_t * left, svalue_t * right)
      * for other closures a comparison of the lambda pointer is sufficient.
      */
     if (left->x.closure_type == CLOSURE_IDENTIFIER
-     || left->x.closure_type == CLOSURE_ALIEN_LFUN
      || left->x.closure_type == CLOSURE_LFUN
        )
     {
@@ -595,93 +551,20 @@ closure_cmp (svalue_t * left, svalue_t * right)
             return (left->u.lambda->ob < right->u.lambda->ob) ? -1 : 1;
         }
 
-#ifndef USE_NEW_INLINES
-        if (left->x.closure_type == CLOSURE_ALIEN_LFUN)
+        if (left->x.closure_type == CLOSURE_LFUN)
         {
+#ifdef USE_NEW_INLINES
             unsigned context_size, i;
             int d;
+#endif /* USE_NEW_INLINES */
 
-            if ( left->u.lambda->function.alien.ob
-              != right->u.lambda->function.alien.ob)
+            if ( left->u.lambda->function.lfun.ob
+              != right->u.lambda->function.lfun.ob)
             {
-                return (  left->u.lambda->function.alien.ob
-                        < right->u.lambda->function.alien.ob)
+                return (  left->u.lambda->function.lfun.ob
+                        < right->u.lambda->function.lfun.ob)
                        ? -1 : 1;
             }
-
-            /* This is the only field left, so it is guaranteed to differ */
-            return (  left->u.lambda->function.alien.index
-                    < right->u.lambda->function.alien.index)
-                   ? -1 : 1;
-        }
-        else
-        {
-            /* This is the only field left, so it is guaranteed to differ */
-            return (  left->u.lambda->function.index
-                    < right->u.lambda->function.index)
-                   ? -1 : 1;
-        }
-#else /* USE_NEW_INLINES */
-        if (left->x.closure_type == CLOSURE_ALIEN_LFUN)
-        {
-            unsigned context_size, i;
-            int d;
-
-            if ( left->u.lambda->function.alien.ob
-              != right->u.lambda->function.alien.ob)
-            {
-                return (  left->u.lambda->function.alien.ob
-                        < right->u.lambda->function.alien.ob)
-                       ? -1 : 1;
-            }
-
-            if (   left->u.lambda->function.alien.index
-                != right->u.lambda->function.alien.index
-               )
-                return (  left->u.lambda->function.alien.index
-                        < right->u.lambda->function.alien.index)
-                       ? -1 : 1;
-
-            /* The difference is in the context svalues.
-             * To prevent recursion, hide them while comparing them.
-             */
-            if (   left->u.lambda->function.alien.context_size
-                != right->u.lambda->function.alien.context_size
-               )
-                return (  left->u.lambda->function.alien.context_size
-                        < right->u.lambda->function.alien.context_size)
-                       ? -1 : 1;
-
-            context_size = left->u.lambda->function.alien.context_size;
-            left->u.lambda->function.alien.context_size = 0;
-            right->u.lambda->function.alien.context_size = 0;
-
-            for (i = 0, d = 0; d == 0 && i < context_size; i++)
-            {
-                d = svalue_cmp( &(left->u.lambda->context[i])
-                              , &(right->u.lambda->context[i])
-                              );
-            }
-
-            /* Restore the context size, the return the comparison
-             * result in d.
-             */
-            left->u.lambda->function.alien.context_size = context_size;
-            right->u.lambda->function.alien.context_size = context_size;
-
-            return d;
-        }
-        else if (left->x.closure_type == CLOSURE_IDENTIFIER)
-        {
-            /* This is the only field left, so it is guaranteed to differ */
-            return (  left->u.lambda->function.var_index
-                    < right->u.lambda->function.var_index)
-                   ? -1 : 1;
-        }
-        else /* CLOSURE_LFUN */
-        {
-            unsigned context_size, i;
-            int d;
 
             if (   left->u.lambda->function.lfun.index
                 != right->u.lambda->function.lfun.index
@@ -690,6 +573,7 @@ closure_cmp (svalue_t * left, svalue_t * right)
                         < right->u.lambda->function.lfun.index)
                        ? -1 : 1;
 
+#ifdef USE_NEW_INLINES
             /* The difference is in the context svalues.
              * To prevent recursion, hide them while comparing them.
              */
@@ -718,8 +602,17 @@ closure_cmp (svalue_t * left, svalue_t * right)
             right->u.lambda->function.lfun.context_size = context_size;
 
             return d;
-        }
+#else
+            return 0; /* Shouldn't be reached */
 #endif /* USE_NEW_INLINES */
+        }
+        else /* CLOSURE_IDENTIFIER */
+        {
+            /* This is the only field left, so it is guaranteed to differ */
+            return (  left->u.lambda->function.var_index
+                    < right->u.lambda->function.var_index)
+                   ? -1 : 1;
+        }
     }
 
     /* Normal closure: compare the lambda pointers */
@@ -812,11 +705,7 @@ set_closure_user (svalue_t *svp, object_t *owner)
 
         prog = owner->prog;
         l = svp->u.lambda;
-#ifndef USE_NEW_INLINES
-        ix = l->function.index;
-#else /* USE_NEW_INLINES */
         ix = l->function.lfun.index;
-#endif /* USE_NEW_INLINES */
 
         current_object = owner;
           /* Needed by lambda_ref_replace_program().
@@ -827,24 +716,15 @@ set_closure_user (svalue_t *svp, object_t *owner)
          * create the protector for the closure, otherwise mark the object
          * as referenced by a lambda.
          */
-        type = CLOSURE_LFUN;
-
-        if ( !(prog->flags & P_REPLACE_ACTIVE) )
+        if ( !(prog->flags & P_REPLACE_ACTIVE)
+         || !lambda_ref_replace_program( l
+                                       , ix >= CLOSURE_IDENTIFIER_OFFS
+                                         ? CLOSURE_IDENTIFIER
+                                         : CLOSURE_LFUN
+                                       , 0, NULL, NULL)
+           )
         {
             owner->flags |= O_LAMBDA_REFERENCED;
-        }
-        else if (!lambda_ref_replace_program( l
-                                            , ix >= CLOSURE_IDENTIFIER_OFFS
-                                              ? CLOSURE_IDENTIFIER
-                                              : CLOSURE_ALIEN_LFUN
-                                            , 0, NULL, NULL)
-                )
-         {
-             owner->flags |= O_LAMBDA_REFERENCED;
-         }
-        else
-        {
-            type = CLOSURE_ALIEN_LFUN;
         }
 
         current_object = curobj;
@@ -857,12 +737,8 @@ set_closure_user (svalue_t *svp, object_t *owner)
             ix -= CLOSURE_IDENTIFIER_OFFS;
             svp->x.closure_type = CLOSURE_IDENTIFIER;
 
-#ifdef USE_NEW_INLINES
             /* Update the closure index */
             l->function.var_index = (unsigned short)ix;
-#else
-            l->function.index = (unsigned short)ix;
-#endif /* USE_NEW_INLINES */
         }
         else
         {
@@ -875,22 +751,14 @@ set_closure_user (svalue_t *svp, object_t *owner)
             {
                 ix += CROSSDEF_NAME_OFFSET(flags);
             }
-            svp->x.closure_type = type;
+            svp->x.closure_type = CLOSURE_LFUN;
 
-            if (type == CLOSURE_LFUN)
-            {
+            /* Update the closure index */
+            l->function.lfun.ob = ref_object(owner, "closure");
+            l->function.lfun.index = (unsigned short)ix;
 #ifdef USE_NEW_INLINES
-                /* Update the closure index */
-                l->function.lfun.index = (unsigned short)ix;
-#else
-                l->function.index = (unsigned short)ix;
+            l->function.lfun.context_size = 0;
 #endif /* USE_NEW_INLINES */
-            }
-            else
-            {
-                l->function.alien.ob = ref_object(owner, "closure");
-                l->function.alien.index = (unsigned short)ix;
-            }
         }
 
         /* (Re)Bind the closure */
@@ -945,51 +813,20 @@ replace_program_lambda_adjust (replace_ob_t *r_ob)
 
                 /* Adjust the index of the lfun */
                 l = lrpp->l.u.lambda;
-#ifndef USE_NEW_INLINES
-                i = l->function.index -= r_ob->fun_offset;
-#else /* USE_NEW_INLINES */
                 i = l->function.lfun.index -= r_ob->fun_offset;
-#endif /* USE_NEW_INLINES */
-
-                /* If the function vanished, replace it with a default,
-                 * converting it into an alien-lfun closure
-                 */
-                if (i < 0 || i >= r_ob->new_prog->num_functions)
-                {
-                    assert_master_ob_loaded();
-                    free_object(l->ob, "replace_program_lambda_adjust");
-                    l->ob = ref_object( master_ob
-                                      , "replace_program_lambda_adjust");
-                    i = find_function( STR_DANGLING_LFUN
-                                     , master_ob->prog);
-#ifndef USE_NEW_INLINES
-                    l->function.index = (unsigned short)(i < 0 ? 0 : i);
-#else /* USE_NEW_INLINES */
-                    l->function.lfun.index = (unsigned short)(i < 0 ? 0 : i);
-#endif /* USE_NEW_INLINES */
-                }
-            }
-            else if (lrpp->l.x.closure_type == CLOSURE_ALIEN_LFUN)
-            {
-                lambda_t *l;
-                int i;
-
-                /* Adjust the index of the lfun */
-                l = lrpp->l.u.lambda;
-                i = l->function.alien.index -= r_ob->fun_offset;
 
                 /* If the function vanished, replace it with a default */
                 if (i < 0 || i >= r_ob->new_prog->num_functions)
                 {
                     assert_master_ob_loaded();
-                    free_object( l->function.alien.ob
+                    free_object( l->function.lfun.ob
                                , "replace_program_lambda_adjust");
-                    l->function.alien.ob
+                    l->function.lfun.ob
                         = ref_object(master_ob
                                     , "replace_program_lambda_adjust");
                     i = find_function( STR_DANGLING_LFUN
                                      , master_ob->prog);
-                    l->function.alien.index = (unsigned short)(i < 0 ? 0 :i);
+                    l->function.lfun.index = (unsigned short)(i < 0 ? 0 :i);
                 }
             }
             else /* CLOSURE_IDENTIFIER */
@@ -999,20 +836,12 @@ replace_program_lambda_adjust (replace_ob_t *r_ob)
 
                 /* Adjust the index of the identifier */
                 l = lrpp->l.u.lambda;
-#ifndef USE_NEW_INLINES
-                i = l->function.index -= r_ob->var_offset;
-#else /* USE_NEW_INLINES */
                 i = l->function.var_index -= r_ob->var_offset;
-#endif /* USE_NEW_INLINES */
 
                 /* If it vanished, mark it as such */
                 if (i >= r_ob->new_prog->num_variables)
                 {
-#ifndef USE_NEW_INLINES
-                    l->function.index = VANISHED_VARCLOSURE_INDEX;
-#else /* USE_NEW_INLINES */
                     l->function.var_index = VANISHED_VARCLOSURE_INDEX;
-#endif /* USE_NEW_INLINES */
                     /* TODO: This value should be properly publicized and
                      * TODO:: tested.
                      */
@@ -1161,8 +990,6 @@ closure_literal (svalue_t *dest, int ix, unsigned short num)
     lambda_t *l;
     funflag_t flags;
     program_t *prog;
-    int type = CLOSURE_LFUN;
-
 
     /* Allocate an initialise a new lambda structure */
 #ifndef USE_NEW_INLINES
@@ -1190,26 +1017,15 @@ closure_literal (svalue_t *dest, int ix, unsigned short num)
      * in lambda protector, otherwise mark the object as referenced by
      * a closure.
      */
-    if ( !(prog->flags & P_REPLACE_ACTIVE) )
-    {
-        current_object->flags |= O_LAMBDA_REFERENCED;
-    }
-    else if (!lambda_ref_replace_program( l
-                                        , ix >= CLOSURE_IDENTIFIER_OFFS
-                                          ? CLOSURE_IDENTIFIER
-                                          : CLOSURE_ALIEN_LFUN
-                                        , 0, NULL, NULL)
+    if ( !(prog->flags & P_REPLACE_ACTIVE)
+     || !lambda_ref_replace_program( l
+                                   , ix >= CLOSURE_IDENTIFIER_OFFS
+                                     ? CLOSURE_IDENTIFIER
+                                     : CLOSURE_LFUN
+                                   , 0, NULL, NULL)
        )
     {
         current_object->flags |= O_LAMBDA_REFERENCED;
-    }
-    else
-    {
-#ifdef USE_NEW_INLINES
-        if (num)
-            error("Can't create inline-closures with context when replace_program is active.\n");
-#endif
-        type = CLOSURE_ALIEN_LFUN;
     }
 
     /* Set ix to the proper index, and dest->x.closure_type to the
@@ -1224,11 +1040,7 @@ closure_literal (svalue_t *dest, int ix, unsigned short num)
                * have been inherited.
                */
         dest->x.closure_type = CLOSURE_IDENTIFIER;
-#ifndef USE_NEW_INLINES
-        l->function.index = (unsigned short)ix;
-#else
         l->function.var_index = (unsigned short)ix;
-#endif
     }
     else /* lfun closure */
     {
@@ -1238,38 +1050,20 @@ closure_literal (svalue_t *dest, int ix, unsigned short num)
         {
             ix += CROSSDEF_NAME_OFFSET(flags);
         }
-        dest->x.closure_type = type;
+        dest->x.closure_type = CLOSURE_LFUN;
 
-#ifndef USE_NEW_INLINES
-        l->function.index = (unsigned short)ix;
-#else /* USE_NEW_INLINES */
-        if (type == CLOSURE_LFUN)
+        l->function.lfun.ob = ref_object(current_object, "closure");
+        l->function.lfun.index = (unsigned short)ix;
+#ifdef USE_NEW_INLINES
+        l->function.lfun.context_size = num;
+
+        /* Init the context variables */
+        while (num > 0)
         {
-            l->function.lfun.index = (unsigned short)ix;
-            l->function.lfun.context_size = num;
-
-            /* Init the context variables */
-            while (num > 0)
-            {
-                num--;
-                put_number(&(l->context[num]), 0);
-            }
-        }
-        else
-        {
-            l->function.alien.ob = ref_object(current_object, "closure");
-            l->function.alien.index = (unsigned short)ix;
-            l->function.alien.context_size = num;
-
-            /* Init the context variables */
-            while (num > 0)
-            {
-                num--;
-                put_number(&(l->context[num]), 0);
-            }
+            num--;
+            put_number(&(l->context[num]), 0);
         }
 #endif /* USE_NEW_INLINES */
-
     }
 
     /* Fill in the rest of the lambda and of the result svalue */
@@ -4122,55 +3916,18 @@ compile_value (svalue_t *value, int opt_flags)
         case CLOSURE_PRELIMINARY:
             lambda_error("Unimplemented closure type for lambda()\n");
 
-        case CLOSURE_ALIEN_LFUN:
-          {
-            /* This is compiled as
-             *
-             *   <alien_lfun_closure>
-             *   <arg1>
-             *   ...
-             *   <argN>
-             *   FUNCALL N+1
-             */
-
-            mp_int i;
-            lambda_t *l;
-            mp_int block_size;
-
-            block_size = (mp_int)VEC_SIZE(block);
-
-            if (current.code_left < 1)
-                realloc_code();
-            current.code_left -= 1;
-            STORE_CODE(current.codep, instrs[F_SAVE_ARG_FRAME].opcode);
-
-            l = argp->u.lambda;
-            insert_value_push(argp);
-
-            for (i = block_size; --i; )
-            {
-                compile_value(++argp, 0);
-            }
-
-            if (current.code_left < 3)
-                realloc_code();
-            current.code_left -= 3;
-            STORE_CODE(current.codep, instrs[F_FUNCALL].prefix);
-            STORE_CODE(current.codep, instrs[F_FUNCALL].opcode);
-            STORE_CODE(current.codep, instrs[F_RESTORE_ARG_FRAME].opcode);
-            break;
-          } /* CLOSURE_ALIEN_LFUN */
-
         case CLOSURE_LFUN:
           {
             /* This is compiled as
              *   alien-lfun:             local lfun:
              *
-             *   <alien_lfun_closure>
+             *   <lfun_closure>
              *   <arg1>                   <arg1>
              *   ...                      ...
              *   <argN>                   <argN>
              *   FUNCALL N+1              CALL_BY_ADDRESS <lfun-index> N
+             *
+             * alien-lfun: lambda->ob != lambda->function.lfun.ob
              */
 
             mp_int i;
@@ -4179,7 +3936,9 @@ compile_value (svalue_t *value, int opt_flags)
 
             block_size = (mp_int)VEC_SIZE(block);
             l = argp->u.lambda;
-            if (l->ob != current.lambda_origin)
+            if (l->ob != current.lambda_origin
+             || l->ob != l->function.lfun.ob
+               )
             {
             	/* Compile it like an alien lfun */
             	
@@ -4188,7 +3947,7 @@ compile_value (svalue_t *value, int opt_flags)
                 current.code_left -= 1;
                 STORE_CODE(current.codep, instrs[F_SAVE_ARG_FRAME].opcode);
 
-                insert_value_push(argp);
+                insert_value_push(argp); /* Push the closure */
                 for (i = block_size; --i; )
                 {
                     compile_value(++argp, 0);
@@ -4218,11 +3977,7 @@ compile_value (svalue_t *value, int opt_flags)
                     realloc_code();
                 current.code_left -= 4;
                 STORE_CODE(current.codep, F_CALL_FUNCTION);
-#ifndef USE_NEW_INLINES
-                STORE_SHORT(current.codep, l->function.index);
-#else /* USE_NEW_INLINES */
                 STORE_SHORT(current.codep, l->function.lfun.index);
-#endif /* USE_NEW_INLINES */
                 STORE_CODE(current.codep, instrs[F_RESTORE_ARG_FRAME].opcode);
                 if (block_size > 0x100)
                     lambda_error("Too many arguments to lfun closure\n");
@@ -4273,17 +4028,10 @@ compile_value (svalue_t *value, int opt_flags)
                 if (current.code_left < 2)
                     realloc_code();
                 current.code_left -= 2;
-#ifndef USE_NEW_INLINES
-                if ((short)l->function.index < 0)
-                    lambda_error("Variable not inherited\n");
-                STORE_CODE(current.codep, F_IDENTIFIER);
-                STORE_CODE(current.codep, (bytecode_t)l->function.index);
-#else /* USE_NEW_INLINES */
                 if ((short)l->function.var_index < 0)
                     lambda_error("Variable not inherited\n");
                 STORE_CODE(current.codep, F_IDENTIFIER);
                 STORE_CODE(current.codep, (bytecode_t)l->function.var_index);
-#endif /* USE_NEW_INLINES */
             }
             break;
           } /* CLOSURE_IDENTIFIER */
@@ -4752,17 +4500,10 @@ compile_lvalue (svalue_t *argp, int flags)
                 if (current.code_left < 3)
                     realloc_code();
                 current.code_left -= 2;
-#ifndef USE_NEW_INLINES
-                if ((short)l->function.index < 0)
-                    lambda_error("Variable not inherited\n");
-                STORE_CODE(current.codep, F_PUSH_IDENTIFIER_LVALUE);
-                STORE_UINT8(current.codep, (bytecode_t)l->function.index);
-#else /* USE_NEW_INLINES */
                 if ((short)l->function.var_index < 0)
                     lambda_error("Variable not inherited\n");
                 STORE_CODE(current.codep, F_PUSH_IDENTIFIER_LVALUE);
                 STORE_UINT8(current.codep, (bytecode_t)l->function.var_index);
-#endif /* USE_NEW_INLINES */
                 return;
               }
             } /* switch(closure_type) */
@@ -4786,17 +4527,10 @@ compile_lvalue (svalue_t *argp, int flags)
             if (current.code_left < 3)
                 realloc_code();
             current.code_left -= 2;
-#ifndef USE_NEW_INLINES
-            if ((short)l->function.index < 0)
-                lambda_error("Variable not inherited\n");
-            STORE_CODE(current.codep, F_PUSH_IDENTIFIER_LVALUE);
-            STORE_CODE(current.codep, (bytecode_t)(l->function.index));
-#else /* USE_NEW_INLINES */
             if ((short)l->function.var_index < 0)
                 lambda_error("Variable not inherited\n");
             STORE_CODE(current.codep, F_PUSH_IDENTIFIER_LVALUE);
             STORE_CODE(current.codep, (bytecode_t)(l->function.var_index));
-#endif /* USE_NEW_INLINES */
             return;
           }
         }
@@ -5043,9 +4777,9 @@ free_closure (svalue_t *svp)
         return;
     }
 
-    if (type == CLOSURE_ALIEN_LFUN)
+    if (type == CLOSURE_LFUN)
     {
-        free_object(l->function.alien.ob, "free_closure");
+        free_object(l->function.lfun.ob, "free_closure");
     }
 
 #ifdef USE_NEW_INLINES
@@ -5054,17 +4788,6 @@ free_closure (svalue_t *svp)
         unsigned short num = l->function.lfun.context_size;
 
         l->function.lfun.context_size = 0; /* ...just in case... */
-        while (num > 0)
-        {
-            num--;
-            free_svalue(&(l->context[num]));
-        }
-    }
-    else if (type == CLOSURE_ALIEN_LFUN)
-    {
-        unsigned short num = l->function.alien.context_size;
-
-        l->function.alien.context_size = 0; /* ...just in case... */
         while (num > 0)
         {
             num--;
@@ -5154,11 +4877,7 @@ closure_to_string (svalue_t * sp)
             break;
         }
 
-#ifndef USE_NEW_INLINES
-        if (l->function.index == VANISHED_VARCLOSURE_INDEX)
-#else /* USE_NEW_INLINES */
         if (l->function.var_index == VANISHED_VARCLOSURE_INDEX)
-#endif /* USE_NEW_INLINES */
         {
             strcat(buf, "<local variable from replaced program>");
         }
@@ -5173,17 +4892,12 @@ closure_to_string (svalue_t * sp)
 
         sprintf(buf, "#'%s->%s"
                    , get_txt(l->ob->name)
-#ifndef USE_NEW_INLINES
-                   , get_txt(l->ob->prog->variable_names[l->function.index].name)
-#else /* USE_NEW_INLINES */
                    , get_txt(l->ob->prog->variable_names[l->function.var_index].name)
-#endif /* USE_NEW_INLINES */
               );
         break;
       }
 
     case CLOSURE_LFUN: /* Lfun closure */
-    case CLOSURE_ALIEN_LFUN:
       {
         program_t *prog;
         fun_hdr_p  fun;
@@ -5194,20 +4908,8 @@ closure_to_string (svalue_t * sp)
 
         if (sp->x.closure_type == CLOSURE_LFUN)
         {
-            ob = l->ob;
-#ifndef USE_NEW_INLINES
-            ix = l->function.index;
-#else /* USE_NEW_INLINES */
+            ob = l->function.lfun.ob;
             ix = l->function.lfun.index;
-#endif /* USE_NEW_INLINES */
-        }
-        else
-        {
-            ob = l->function.alien.ob;
-            ix = l->function.alien.index;
-            /* TODO: ix: After a replace_program, can this index
-             * TODO:: be negative?
-             */
         }
 
         if (ob->flags & O_DESTRUCTED)
@@ -5438,7 +5140,6 @@ v_bind_lambda (svalue_t *sp, int num_arg)
 
     switch(sp->x.closure_type)
     {
-    case CLOSURE_LFUN:
     case CLOSURE_LAMBDA:
     case CLOSURE_IDENTIFIER:
     case CLOSURE_PRELIMINARY:
@@ -5453,8 +5154,8 @@ v_bind_lambda (svalue_t *sp, int num_arg)
         return sp;
         break;
 
-    case CLOSURE_ALIEN_LFUN:
-        /* Rebind an alien lfun to the given object */
+    case CLOSURE_LFUN:
+        /* Rebind an lfun to the given object */
         free_object(sp->u.lambda->ob, "bind_lambda");
         sp->u.lambda->ob = ob;
         break;
@@ -5676,7 +5377,7 @@ f_symbol_function (svalue_t *sp)
        )
     {
         lambda_t *l;
-        ph_int closure_type;
+        object_t *curobj = current_object;
 
 #ifndef USE_NEW_INLINES
         l = xalloc(sizeof *l);
@@ -5695,76 +5396,35 @@ f_symbol_function (svalue_t *sp)
         }
 
         l->ref = 1;
-        l->ob = current_object;
-           /* If ob == current_object, adopt the reference,
-            * otherwise a reference will be added below.
-            */
+        l->ob = ref_object(current_object, "symbol_function");
 
-        /* Set the closure */
-        if (ob == current_object)
-        {
-            if (!(prog->flags & P_REPLACE_ACTIVE)
-             || !lambda_ref_replace_program( l
-                                           , CLOSURE_ALIEN_LFUN
-                                           , 0, NULL, NULL)
-               )
-            {
-                current_object->flags |= O_LAMBDA_REFERENCED;
-#ifndef USE_NEW_INLINES
-                l->function.index = (unsigned short)i;
-#else /* USE_NEW_INLINES */
-                l->function.lfun.index = (unsigned short)i;
-                l->function.lfun.context_size = 0;
-#endif /* USE_NEW_INLINES */
-                closure_type = CLOSURE_LFUN;
-            }
-            else
-            {
-                l->function.alien.ob
-                  = ref_object(current_object, "symbol_function");
-                l->function.alien.index = (unsigned short)i;
+        l->function.lfun.ob = ob; /* adopt the ref */
+        l->function.lfun.index = (unsigned short)i;
 #ifdef USE_NEW_INLINES
-                l->function.alien.context_size = 0;
+        l->function.lfun.context_size = 0;
 #endif /* USE_NEW_INLINES */
-                closure_type = CLOSURE_ALIEN_LFUN;
-            }
-        }
-        else
+
+        current_object = ob;
+          /* Required by lambda_ref_replace_program()
+           * It will be restored below from curobj.
+           */
+
+        if (!(prog->flags & P_REPLACE_ACTIVE)
+         || !lambda_ref_replace_program( l
+                                       , CLOSURE_LFUN
+                                       , 0, NULL, NULL)
+           )
         {
-            object_t *curobj = current_object;
-
-            l->function.alien.ob = ob; /* adopt the ref */
-            l->function.alien.index = (unsigned short)i;
-#ifdef USE_NEW_INLINES
-            l->function.alien.context_size = 0;
-#endif /* USE_NEW_INLINES */
-            closure_type = CLOSURE_ALIEN_LFUN;
-
-            ref_object(current_object, "symbol_function");
-              /* The ref missing from l->ob=current_object above */
-
-            current_object = ob;
-              /* Required by lambda_ref_replace_program()
-               * It will be restored below from curobj.
-               */
-
-            if (!(prog->flags & P_REPLACE_ACTIVE)
-             || !lambda_ref_replace_program( l
-                                           , CLOSURE_ALIEN_LFUN
-                                           , 0, NULL, NULL)
-               )
-            {
-                ob->flags |= O_LAMBDA_REFERENCED;
-            }
-
-            current_object = curobj;
+            ob->flags |= O_LAMBDA_REFERENCED;
         }
+
+        current_object = curobj;
 
         /* Clean up the stack and push the result */
         sp--;
         free_mstring(sp->u.str);
         sp->type = T_CLOSURE;
-        sp->x.closure_type = closure_type;
+        sp->x.closure_type = CLOSURE_LFUN;
         sp->u.lambda = l;
 
         return sp;
@@ -5916,11 +5576,7 @@ f_symbol_variable (svalue_t *sp)
 
     l->ob = ref_object(current_object, "symbol_variable");
     l->ref = 1;
-#ifndef USE_NEW_INLINES
-    l->function.index = (unsigned short)(n + (current_variables - current_object->variables));
-#else /* USE_NEW_INLINES */
     l->function.var_index = (unsigned short)(n + (current_variables - current_object->variables));
-#endif /* USE_NEW_INLINES */
     sp->type = T_CLOSURE;
     sp->x.closure_type = CLOSURE_IDENTIFIER;
     sp->u.lambda = l;

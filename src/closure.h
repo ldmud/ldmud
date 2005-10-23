@@ -36,24 +36,22 @@ struct lambda_s
        */
     union               /* Closure information: */
     {
-#ifndef USE_NEW_INLINES
-        unsigned short index;
-          /* _LFUN: index in the function table
-           * _IDENTIFIER: index in the variable table
-           */
-#else /* USE_NEW_INLINES */
         unsigned short var_index;
           /* _IDENTIFIER: index in the variable table
            */
-        struct {
-            unsigned short index;        /* Index in the function table */
-            unsigned short context_size; /* Number of context vars */
-        } lfun;
-#endif /* USE_NEW_INLINES */
 #       define VANISHED_VARCLOSURE_INDEX ((unsigned short)-1)
           /*              Special value for vanished variable closures.
            *              TODO: it's tested with >=0 at places :-(,
            */
+
+        struct {
+            /* CLOSURE_LFUN */
+            object_t       *ob;          /* Originating object */
+            unsigned short index;        /* Index in the object's function
+                                          * table */
+            unsigned short context_size; /* Number of context vars */
+        } lfun;
+
         bytecode_t code[1];
           /* LAMBDA and UNBOUND_LAMBDA closures: the function code, starting
            * with uint8 'num_values' and continuing with FUNCTION_NUM_ARGS
@@ -70,21 +68,16 @@ struct lambda_s
         lambda_t *lambda;
           /* BOUND_LAMBDA: pointer to the UNBOUND_LAMBDA structure.
            */
-        struct
-        {
-            /* CLOSURE_ALIEN_LFUN: */
-            object_t       *ob;     /* Originating object */
-            unsigned short  index;  /* Index in the objects variable table */
-            unsigned short  context_size; /* Number of context vars */
-        } alien;
     } function;
 
-    svalue_t context[ /* .(alien-)lfun.context_size */ 1];
-      /* (alien-)lfun-closure context variables, if any.
-       * Putting this array into the function.lfun function.alien somehow
-       * causes memory corruption because some lambda structures won't
-       * be allocated large enough.
+#ifdef USE_NEW_INLINES
+    svalue_t context[ /* .lfun.context_size */ 1];
+      /* lfun-closure context variables, if any.
+       * Putting this array into the function.lfun somehow causes memory
+       * corruption because some lambda structures won't be allocated large
+       * enough.
        */
+#endif
 };
 
 #define LAMBDA_VALUE_OFFSET \

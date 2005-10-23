@@ -731,9 +731,9 @@ get_all_call_outs (void)
 
         if (cop->fun.is_lambda)
         {
-            if (cop->fun.function.lambda.x.closure_type == CLOSURE_ALIEN_LFUN)
+            if (cop->fun.function.lambda.x.closure_type == CLOSURE_LFUN)
                 put_ref_object( vv->item
-                              , cop->fun.function.lambda.u.lambda->function.alien.ob
+                              , cop->fun.function.lambda.u.lambda->function.lfun.ob
                               , "get_all_call_outs");
             else
                 put_ref_object(vv->item, ob, "get_all_call_outs");

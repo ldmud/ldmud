@@ -4894,20 +4894,12 @@ f_to_int (svalue_t *sp)
         break;
 
     case T_CLOSURE:
-#ifndef USE_NEW_INLINES
-        if (sp->x.closure_type != CLOSURE_IDENTIFIER
-         && sp->x.closure_type != CLOSURE_LFUN
-           )
-            error("Bad arg 1 to to_int(): not a lfun or variable closure.\n");
-        n = sp->u.lambda->function.index;
-#else /* USE_NEW_INLINES */
         if (sp->x.closure_type == CLOSURE_IDENTIFIER)
             n = sp->u.lambda->function.var_index;
         else if (sp->x.closure_type == CLOSURE_LFUN)
             n = sp->u.lambda->function.lfun.index;
         else
             error("Bad arg 1 to to_int(): not a lfun or variable closure.\n");
-#endif /* USE_NEW_INLINES */
         free_closure(sp);
         break;
 
@@ -5649,7 +5641,8 @@ v_get_type_info (svalue_t *sp, int num_arg)
  * (i.e. the data type) is returned (as int). If flag is 1, the
  * second element is returned.
  * If <arg> is a closure, the <flag> setting 2 lets the efun
- * return the object the closure is bound to.
+ * return the object the closure is bound to, resp. for lfun closures
+ * it returns the object the closure function is defined in..
 #ifdef USE_STRUCTS
  * If <arg> is a struct, the <flag> setting 2 lets the efun
  * return the basename of the struct.
@@ -5703,14 +5696,13 @@ v_get_type_info (svalue_t *sp, int num_arg)
                 /* efun, simul-efun, operator closure */
                 ob = sp->u.ob;
                 break;
-            case CLOSURE_LFUN:
             case CLOSURE_IDENTIFIER:
             case CLOSURE_BOUND_LAMBDA:
             case CLOSURE_LAMBDA:
                 ob = sp->u.lambda->ob;
                 break;
-            case CLOSURE_ALIEN_LFUN:
-                ob = sp->u.lambda->function.alien.ob;
+            case CLOSURE_LFUN:
+                ob = sp->u.lambda->function.lfun.ob;
                 break;
             case CLOSURE_UNBOUND_LAMBDA:
                 ob = NULL;
