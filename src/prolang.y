@@ -9446,7 +9446,6 @@ expr0:
           ins_f_code(F_NOT);        /* Any type is valid here. */
           $$.end = CURRENT_PROGRAM_SIZE;
           $$.type = TYPE_NUMBER;
-printf("DEBUG: L_NOT: start %d, end %d, size %d\n", $$.start, $$.end, CURRENT_PROGRAM_SIZE);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
