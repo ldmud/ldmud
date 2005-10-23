@@ -300,6 +300,11 @@ main (int argc, char **argv)
             break;
         }
 
+        /* Setup comm::host_name, so that we can open the debug.log file
+         * with the proper name. We do the complete setup later.
+         */
+        initialize_host_name(hostname);
+
         /* Change to the mudlib dir early so that the debug.log file
          * is opened in the right place.
          * If a mudlib dir has been given by command option, we are already

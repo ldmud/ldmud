@@ -848,6 +848,53 @@ set_socket_own (SOCKET_T new_socket)
 
 /*-------------------------------------------------------------------------*/
 void
+initialize_host_name (const char *hname)
+
+/* This function is called at an early stage of the driver startup in order
+ * to initialise the global host_name with a useful value (specifically so
+ * that we can open the debug.log file).
+ * If <hname> is given, the hostname is parsed from the string, otherwise it
+ * is queried from the system.
+ *
+ * The value set in this function will later be overwritten by the
+ * call to initialize_host_ip_number().
+ *
+ * exit() on failure.
+ */
+
+{
+    char *domain;
+
+    /* Get the (possibly qualified) hostname */
+    if (hname != NULL)
+    {
+        if (strlen(hname) > MAXHOSTNAMELEN)
+        {
+            fprintf(stderr, "%s Given hostname '%s' too long.\n"
+                          , time_stamp(), hname);
+            exit(1);
+        }
+        else
+            strcpy(host_name, hname);
+    }
+    else
+    {
+        if (gethostname(host_name, sizeof host_name) == -1) {
+            herror("gethostname");
+            exit(1);
+        }
+    }
+
+    /* Cut off the domain name part of the hostname, if any.
+     */
+    domain = strchr(host_name, '.');
+    if (domain)
+        *domain = '\0';
+} /* initialize_host_name() */
+
+
+/*-------------------------------------------------------------------------*/
+void
 initialize_host_ip_number (const char *hname, const char * haddr)
 
 /* Initialise the globals host_ip_number and host_ip_addr_template.
@@ -867,7 +914,8 @@ initialize_host_ip_number (const char *hname, const char * haddr)
     {
         if (strlen(hname) > MAXHOSTNAMELEN)
         {
-            fprintf(stderr, "%s Given hostname '%s' too long.\n", hname);
+            fprintf(stderr, "%s Given hostname '%s' too long.\n"
+                          , time_stamp(), hname);
             exit(1);
         }
         else
@@ -904,7 +952,8 @@ initialize_host_ip_number (const char *hname, const char * haddr)
 
         hp = gethostbyname(host_name);
         if (!hp) {
-            fprintf(stderr, "%s gethostbyname: unknown host '%s'.\n", time_stamp(), host_name);
+            fprintf(stderr, "%s gethostbyname: unknown host '%s'.\n"
+                          , time_stamp(), host_name);
             exit(1);
         }
         memcpy(&host_ip_addr_template.sin_addr, hp->h_addr, (size_t)hp->h_length);
@@ -943,7 +992,8 @@ initialize_host_ip_number (const char *hname, const char * haddr)
     /* Put the domain name part of the hostname into domain_name, then
      * strip it off the host_name[] (as only query_host_name() is going
      * to need it).
-     * Note that domain may not point into host_name[] here.
+     * Note that domain might not point into host_name[] here, so we
+     * can't just stomp '\0' in there.
      */
     if (domain)
     {
@@ -956,7 +1006,7 @@ initialize_host_ip_number (const char *hname, const char * haddr)
     if (domain)
         *domain = '\0';
 
-    /* Initialize upd at an early stage so that the master object can use
+    /* Initialize udp at an early stage so that the master object can use
      * it in inaugurate_master() , and the port number is known.
      */
     if (udp_port != -1)
