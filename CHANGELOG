@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+18-Sep-2002 (Lars Duening)  (3.3.261)
+  - (func_spec, interpret, simulate) Added the infrastructure to create
+       context closures, and to access the context variables. Now we
+       'just' need the support in the compiler.
+
 18-Sep-2002 (Lars Duening)  (3.3.260)
   - (gcollect.c) Oops, didn't compile with MALLOC_TRACE enabled.
 

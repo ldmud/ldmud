@@ -41,6 +41,24 @@
  *    value 0.
  *
  *
+#ifdef USE_NEW_INLINES
+ * --- Context Variables ---
+ *
+ *    In order to implement 'real' inline closures, lfun closure carry with
+ *    them a set of svalue_t's, called the 'context'. When such a closure
+ *    is created, the context is filled with values from selected local
+ *    function variables.
+ *
+ *    The interpreter keeps the pointer <inter_context> pointed to the
+ *    currently value context, if there is one, or NULL if there is no
+ *    context. The context variables are accessed with a set of instructions
+ *    mirroring those to access object variables.
+ *
+ *    TODO: In fact, these contexts could be implemented as light-weight
+ *    TODO:: objects, removing the need for special cases.
+ *
+ *
+#endif
  * --- Control Stack ---
  *
  *    During nested function calls, the return information to the higher
@@ -481,6 +499,13 @@ static
 static svalue_t *inter_fp;
   /* Framepointer: pointer to first argument.
    */
+
+#ifdef USE_NEW_INLINES
+static svalue_t *inter_context;
+  /* Contextpointer: pointer to first context variable.
+   * May be NULL if no context is available.
+   */
+#endif /* USE_NEW_INLINES */
 
 static bytecode_p *break_sp;
   /* Points to address to branch to at next F_BREAK from within a switch().
@@ -6279,6 +6304,9 @@ void
 push_control_stack ( svalue_t   *sp
                    , bytecode_p  pc
                    , svalue_t   *fp
+#ifdef USE_NEW_INLINES
+                   , svalue_t   *context
+#endif /* USE_NEW_INLINES */
                    )
 
 /* Push the current execution context onto the control stack.
@@ -6302,6 +6330,9 @@ push_control_stack ( svalue_t   *sp
 
     /* csp->funstart  has to be set later, it is used only for tracebacks. */
     csp->fp = fp;
+#ifdef USE_NEW_INLINES
+    csp->context = context;
+#endif /* USE_NEW_INLINES */
     csp->prog = current_prog;
     csp->lambda = current_lambda; put_number(&current_lambda, 0);
     /* csp->extern_call = MY_FALSE; It is set by eval_instruction() */
@@ -6336,6 +6367,9 @@ pop_control_stack (void)
     current_lambda = csp->lambda;
     inter_pc = csp->pc;
     inter_fp = csp->fp;
+#ifdef USE_NEW_INLINES
+    inter_context = csp->context;
+#endif /* USE_NEW_INLINES */
     function_index_offset = csp->function_index_offset;
     current_variables     = csp->current_variables;
     break_sp = csp->break_sp;
@@ -6424,6 +6458,7 @@ setup_new_frame2 (fun_hdr_p funstart, svalue_t *sp, Bool allowRefs)
  *
  * Result is the new stackpointer, the framepointer <inter_fp>,
  * csp->num_local_variables and <break_sp> are set up.
+ * The context pointer <inter_context> is cleared.
  */
 
 {
@@ -6434,6 +6469,11 @@ setup_new_frame2 (fun_hdr_p funstart, svalue_t *sp, Bool allowRefs)
 
     /* Setup the frame pointer */
     inter_fp = sp - csp->num_local_variables + 1;
+
+#ifdef USE_NEW_INLINES
+    /* By default there is no context */
+    inter_context = NULL;
+#endif /* USE_NEW_INLINES */
 
     /* (Re)move excessive arguments.
      * TODO: This code uses that bit7 makes num_arg negative.
@@ -6586,7 +6626,7 @@ setup_new_frame (int fx)
         current_variables += variable_index_offset;
     current_strings = current_prog->strings;
     return flags;
-}
+} /* setup_new_frame() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -7586,6 +7626,9 @@ again:
     }
 
     CASE(F_CLOSURE);                /* --- closure <ix>        --- */
+#ifdef USE_NEW_INLINES
+    CASE(F_CONTEXT_CLOSURE); /* --- context_closure <ix> <num> --- */
+#endif /* USE_NEW_INLINES */
     {
         /* Push the closure value <ix> onto the stack.
          * <ix> is a uint16, stored low byte first.
@@ -7597,12 +7640,26 @@ again:
          * Operator symbols (0xf000..0xf7ff for which instrs[].Default == -1)
          * are moved into their 0xe800..0xefff range, then made signed and
          * stored.
+#ifdef USE_NEW_INLINES
+         *
+         * If it is a context closure, the context is sized to and initialized
+         * with the uint16 <num> values on the stack.
+#endif
          */
 
         /* TODO: uint16 */ unsigned short tmp_ushort;
         /* TODO: int32 */ int ix;
+#ifdef USE_NEW_INLINES
+        unsigned short context_size;
+#endif /* USE_NEW_INLINES */
 
         LOAD_SHORT(tmp_ushort, pc);
+#ifdef USE_NEW_INLINES
+        if (instruction == F_CONTEXT_CLOSURE)
+            LOAD_SHORT(context_size, pc);
+        else
+            context_size = 0;
+#endif /* USE_NEW_INLINES */
 
         ix = tmp_ushort;
         if (ix < 0xf000)
@@ -7613,14 +7670,43 @@ again:
 #ifndef USE_NEW_INLINES
             closure_literal(sp, ix);
 #else /* USE_NEW_INLINES */
-            closure_literal(sp, ix, 0);
+            closure_literal(sp, ix, context_size);
 #endif /* USE_NEW_INLINES */
             /* If out of memory, this will set sp to svalue-0 and
              * throw an error.
              */
+
+#ifdef USE_NEW_INLINES
+#ifdef DEBUG
+            if (instruction == F_CONTEXT_CLOSURE
+             && sp->x.closure_type != CLOSURE_LFUN
+               )
+                fatal("(eval_instruction) context_closure used for non-lfun.\n");
+#endif
+            /* Now copy the context values */
+            if (context_size > 0)
+            {
+                unsigned short i;
+                svalue_t * arg = sp - context_size;
+                svalue_t * context = sp->u.lambda->context;
+
+                for (i = 0; i < context_size; i++)
+                    transfer_svalue_no_free(context+i, arg+i);
+
+                /* Now move the created closure to the new top of the stack */
+                *arg = *sp;
+                inter_sp = sp = arg;
+            }
+#endif /* USE_NEW_INLINES */
         }
         else
         {
+#ifdef USE_NEW_INLINES
+#ifdef DEBUG
+            if (instruction == F_CONTEXT_CLOSURE)
+                fatal("(eval_instruction) context_closure used for non-lfun.\n");
+#endif
+#endif /* USE_NEW_INLINES */
             sp++;
             sp->type = T_CLOSURE;
             sp->u.ob = ref_object(current_object, "closure");
@@ -7715,6 +7801,9 @@ again:
         function_index_offset = csp->function_index_offset;
         current_variables     = csp->current_variables;
         break_sp = csp->break_sp;
+#ifdef USE_NEW_INLINES
+        inter_context = csp->context;
+#endif /* USE_NEW_INLINES */
         if (current_lambda.type == T_CLOSURE)
             free_closure(&current_lambda);
         current_lambda = csp->lambda;
@@ -8493,7 +8582,12 @@ again:
 #else
                               , (svalue_t ** volatile) &inter_sp
 #endif
-                              , inter_pc, inter_fp))
+                              , inter_pc, inter_fp
+#ifdef USE_NEW_INLINES
+                              , inter_context
+#endif /* USE_NEW_INLINES */
+                              )
+           )
         {
 #ifdef CHECK_OBJECT_REF
             check_all_object_shadows();
@@ -12342,7 +12436,11 @@ again:
         }
 
         /* Save all important global stack machine registers */
+#ifdef USE_NEW_INLINES
+        push_control_stack(sp, pc, fp, inter_context);
+#else
         push_control_stack(sp, pc, fp);
+#endif /* USE_NEW_INLINES */
 
         /* Set the current program back to the objects program _after_
          * the control stack push, since here is where we search for
@@ -12426,7 +12524,11 @@ again:
 #endif
 
         /* Save all important global stack machine registers */
+#ifdef USE_NEW_INLINES
+        push_control_stack(sp, pc, fp, inter_context);
+#else
         push_control_stack(sp, pc, fp);
+#endif /* USE_NEW_INLINES */
 
         /* If we do an explicit call into a virtually inherited base class we
          * have to find the first instance of the inherited variables.
@@ -12526,6 +12628,87 @@ again:
         break;
     }
 
+#ifdef USE_NEW_INLINES
+    CASE(F_CONTEXT_IDENTIFIER);  /* --- context_identifier <var_ix> --- */
+        /* Push value of context variable <var_ix>.
+         * It is possible that it is a variable that points to
+         * a destructed object. In that case, it has to be replaced by 0.
+         *
+         * <var_ix> is a uint8.
+         */
+#ifdef DEBUG
+        if (inter_context == NULL)
+            fatal("(eval_instruction) context_identifier: "
+                  "inter_context is NULL\n");
+#endif
+
+        sp++;
+        assign_checked_svalue_no_free(sp, inter_context+LOAD_UINT8(pc));
+        break;
+
+                               /* --- context_identifier16 <var_ix> --- */
+    CASE(F_CONTEXT_IDENTIFIER16);
+      {
+        /* Push value of context variable <var_ix>.
+         * It is possible that it is a variable that points to
+         * a destructed object. In that case, it has to be replaced by 0.
+         *
+         * <var_ix> is a (16-Bit) unsigned short.
+         */
+        unsigned short var_index;
+
+#ifdef DEBUG
+        if (inter_context == NULL)
+            fatal("(eval_instruction) context_identifier16: "
+                  "inter_context is NULL\n");
+#endif
+
+        LOAD_SHORT(var_index, pc);
+        sp++;
+        assign_checked_svalue_no_free(sp, inter_context+var_index);
+        break;
+     }
+
+    CASE(F_PUSH_CONTEXT_LVALUE);   /* --- push_context_lvalue <num> --- */
+        /* Push an lvalue onto the stack pointing to context variable <num>.
+         *
+         * <num> is an uint8.
+         */
+#ifdef DEBUG
+        if (inter_context == NULL)
+            fatal("(eval_instruction) context_identifier: "
+                  "inter_context is NULL\n");
+#endif
+
+        sp++;
+        sp->type = T_LVALUE;
+        sp->u.lvalue = inter_context + LOAD_UINT8(pc);
+        break;
+
+                                 /* --- push_context16_lvalue <num> --- */
+    CASE(F_PUSH_CONTEXT16_LVALUE);
+      {
+        /* Push an lvalue onto the stack pointing to context variable <num>.
+         *
+         * <num> is an (16-Bit) unsigned short.
+         */
+        unsigned short var_index;
+
+#ifdef DEBUG
+        if (inter_context == NULL)
+            fatal("(eval_instruction) context_identifier: "
+                  "inter_context is NULL\n");
+#endif
+
+        LOAD_SHORT(var_index, pc);
+        sp++;
+        sp->type = T_LVALUE;
+        sp->u.lvalue = inter_context + var_index;
+        break;
+      }
+
+#endif /* USE_NEW_INLINES */
+
     CASE(F_PUSH_IDENTIFIER_LVALUE);  /* --- push_identifier_lvalue <num> --- */
         /* Push an lvalue onto the stack pointing to object-global variable
          * <num>.
@@ -12538,7 +12721,7 @@ again:
         sp->u.lvalue = find_value((int)(LOAD_UINT8(pc) ));
         break;
 
-    CASE(F_VIRTUAL_VARIABLE);    /* --- virtual_variable <num> --- */
+    CASE(F_VIRTUAL_VARIABLE);         /* --- virtual_variable <num> --- */
         /* Push the virtual object-global variable <num> onto the stack.
          * It is possible that it is a variable that points to
          * a destructed object. In that case, it has to be replaced by 0.
@@ -12564,8 +12747,6 @@ again:
         sp->type = T_LVALUE;
         sp->u.lvalue = find_virtual_value((int)(LOAD_UINT8(pc) ));
         break;
-
-#ifdef F_IDENTIFIER16
 
     CASE(F_IDENTIFIER16);         /* --- identifier16 <var_ix> --- */
     {
@@ -12600,9 +12781,6 @@ again:
         sp->u.lvalue = find_value((int)var_index);
         break;
     }
-
-#endif /* F_IDENTIFIER16 */
-
                          /* --- push_local_variable_lvalue <num> --- */
     CASE(F_PUSH_LOCAL_VARIABLE_LVALUE);
         /* Push an lvalue onto the stack pointing to local variable <num>.
@@ -13377,7 +13555,11 @@ again:
             program_t *prog;
             svalue_t *new_sp;
 
+#ifdef USE_NEW_INLINES
+            push_control_stack(sp, pc, fp, inter_context);
+#else
             push_control_stack(sp, pc, fp);
+#endif /* USE_NEW_INLINES */
             csp->ob = current_object;
             csp->prev_ob = previous_ob;
             csp->funstart = funstart;
@@ -15166,7 +15348,11 @@ retry_for_shadow:
              */
             fun_hdr_p funstart;
 
+#ifdef USE_NEW_INLINES
+            push_control_stack(inter_sp, inter_pc, inter_fp, inter_context);
+#else
             push_control_stack(inter_sp, inter_pc, inter_fp);
+#endif /* USE_NEW_INLINES */
             csp->ob = current_object;
             csp->prev_ob = previous_ob;
             csp->num_local_variables = num_arg;
@@ -15228,7 +15414,11 @@ retry_for_shadow:
                 funflag_t flags;
                 fun_hdr_p funstart;
 
+#ifdef USE_NEW_INLINES
+                push_control_stack(inter_sp, inter_pc, inter_fp, inter_context);
+#else
                 push_control_stack(inter_sp, inter_pc, inter_fp);
+#endif /* USE_NEW_INLINES */
                   /* if an error occurs here, it won't leave the cache in an
                    * inconsistent state.
                    */
@@ -16143,7 +16333,11 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
      * If the closure can't be called, all this has to be undone
      * using the macro CLEAN_CSP.
      */
+#ifdef USE_NEW_INLINES
+    push_control_stack(sp, inter_pc, inter_fp, inter_context);
+#else
     push_control_stack(sp, inter_pc, inter_fp);
+#endif /* USE_NEW_INLINES */
     csp->ob = current_object;
     csp->prev_ob = previous_ob;
     csp->num_local_variables = num_arg;
@@ -16193,6 +16387,8 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
         flags = setup_new_frame(l->function.index);
 #else /* USE_NEW_INLINES */
         flags = setup_new_frame(l->function.lfun.index);
+        if (l->function.lfun.context_size > 0)
+            inter_context = l->context;
 #endif /* USE_NEW_INLINES */
         funstart = current_prog->program + (flags & FUNSTART_MASK);
         csp->funstart = funstart;
@@ -16259,7 +16455,11 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
         {
             csp->extern_call = MY_TRUE;
             csp->funstart = NULL;
+#ifdef USE_NEW_INLINES
+            push_control_stack(sp, 0, inter_fp, inter_context);
+#else
             push_control_stack(sp, 0, inter_fp);
+#endif /* USE_NEW_INLINES */
             csp->ob = current_object;
             csp->prev_ob = previous_ob;
             csp->num_local_variables = num_arg;
@@ -16535,6 +16735,9 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
                 csp->funstart = EFUN_FUNSTART;
                 csp->num_local_variables = 0;
                 inter_fp = sp - num_arg + 1;
+#ifdef USE_NEW_INLINES
+                inter_context = NULL;
+#endif /* USE_NEW_INLINES */
                 eval_instruction(code, sp);
                 /* The result is on the stack (inter_sp) */
                 return;
@@ -16698,7 +16901,11 @@ call_function (program_t *progp, int fx)
     funflag_t flags;
     fun_hdr_p funstart;
 
+#ifdef USE_NEW_INLINES
+    push_control_stack(inter_sp, inter_pc, inter_fp, inter_context);
+#else
     push_control_stack(inter_sp, inter_pc, inter_fp);
+#endif /* USE_NEW_INLINES */
     csp->ob = current_object;
     csp->prev_ob = previous_ob;
 #ifdef DEBUG

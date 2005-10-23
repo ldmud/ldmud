@@ -29,6 +29,9 @@ struct control_stack {
     svalue_t    lambda;     /* Current lambda, counted, or svalue-0 if none */
     bytecode_p  pc;         /* Program counter, points to next bytecode */
     svalue_t   *fp;         /* Frame pointer: first arg on stack */
+#ifdef USE_NEW_INLINES
+    svalue_t   *context;    /* Context pointer */
+#endif /* USE_NEW_INLINES */
     bytecode_p  funstart;
       /* Start of the function code.
        * Two magic values (SIMUL_EFUN_FUNSTART and EFUN_FUNSTART) mark
@@ -109,7 +112,11 @@ extern void assign_eval_cost(void);
 
 extern Bool eval_instruction(bytecode_p first_instruction, svalue_t *initial_sp);
 extern void free_string_svalue(svalue_t *v);
+#ifdef USE_NEW_INLINES
+extern void push_control_stack(svalue_t *sp, bytecode_p pc, svalue_t *fp, svalue_t *context);
+#else
 extern void push_control_stack(svalue_t *sp, bytecode_p pc, svalue_t *fp);
+#endif /* USE_NEW_INLINES */
 extern void pop_control_stack(void);
 extern struct longjump_s *push_error_context(svalue_t *sp, bytecode_t catch_inst);
 extern void pop_error_context (void);

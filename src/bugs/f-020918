@@ -1,0 +1,11 @@
+Short: Generic function call operator
+From: Lars
+Date: 2002-09-18
+Type: Feature
+State: New
+
+The function call operator() should be implemented as proper operator, so that
+code as in ' closure cl = ...; cl();' becomes possible (funcall() and apply()
+would serve the cases where a 'call' of a non-closure should be possible).
+
+This would also mean that object->name returns just a lfun-closure.

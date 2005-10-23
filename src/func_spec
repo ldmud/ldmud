@@ -152,6 +152,13 @@
         call_function
         call_inherited
         call_inherited_noargs
+#ifdef USE_NEW_INLINES
+        context_closure
+        context_identifier
+        push_context_lvalue
+        context_identifier16
+        push_context16_lvalue
+#endif /* USE_NEW_INLINES */
         push_identifier_lvalue
         virtual_variable
         push_virtual_variable_lvalue
