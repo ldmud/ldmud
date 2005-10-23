@@ -403,9 +403,8 @@ static void (*telopts_wont[NTELOPTS])(int);
 #define TS_SB         6
 #define TS_SB_IAC     7
 #define TS_READY      8
-#define TS_CR         9
-#define TS_SYNCH     10
-#define TS_INVALID   11
+#define TS_SYNCH      9
+#define TS_INVALID   10
 
   /* Telnet states
    */
@@ -695,7 +694,6 @@ comm_fatal (interactive_t *ip, char *fmt, ...)
       case TS_SB:      fprintf(stderr, " (TS_SB)\n"); break;
       case TS_SB_IAC:  fprintf(stderr, " (TS_SB_IAC)\n"); break;
       case TS_READY:   fprintf(stderr, " (TS_READY)\n"); break;
-      case TS_CR:      fprintf(stderr, " (TS_CR)\n"); break;
       case TS_SYNCH:   fprintf(stderr, " (TS_SYNCH)\n"); break;
       case TS_INVALID: fprintf(stderr, " (TS_INVALID)\n"); break;
       default: putc('\n', stderr);
@@ -711,7 +709,6 @@ comm_fatal (interactive_t *ip, char *fmt, ...)
       case TS_SB:      fprintf(stderr, " (TS_SB)\n"); break;
       case TS_SB_IAC:  fprintf(stderr, " (TS_SB_IAC)\n"); break;
       case TS_READY:   fprintf(stderr, " (TS_READY)\n"); break;
-      case TS_CR:      fprintf(stderr, " (TS_CR)\n"); break;
       case TS_SYNCH:   fprintf(stderr, " (TS_SYNCH)\n"); break;
       case TS_INVALID: fprintf(stderr, " (TS_INVALID)\n"); break;
       default: putc('\n', stderr);
@@ -2364,7 +2361,6 @@ get_message (char *buff)
                             switch (ip->tn_state)
                             {
                               case TS_DATA:
-                              case TS_CR:
                               case TS_READY:
                                 ip->tn_state = TS_SYNCH;
                                 ip->gobble_char = '\0';
@@ -2812,6 +2808,42 @@ get_message (char *buff)
             /* if ip->text[0] does not hold a valid character, the outcome
              * of the comparison to input_escape does not matter.
              */
+
+            /* ----- CHARMODE -----
+             * command_start is 0 at the beginning. Received chars start at
+             * text[0].  After the first character is processed, command_start
+             * will be 1.  Chars are in text[1] then. Only after a
+             * full_newline is command_start reset to 0. This is important for
+             * bang-escape, the first char in a 'line' is stored in text[0],
+             * subsequent chars are in text[1].
+             *
+             * chars_ready is the number of chars in the text buffer. If the
+             * user is slow this will be 1. If the user pastes data it could
+             * be more.  The chars are processed then one at a time (or if
+             * combine-charset is used that many until a non-combinable char
+             * is reached).
+             *
+             * The processed char(s) are copied to buff and handled in the
+             * backend.
+             *
+             * If telnet_neg() returned state READY, we want to process the
+             * string end marker (which represents the \r\n) also and have to
+             * add 1 to strlen() for the chars_ready.
+             *
+             * The remark above 'if (destix > 0 && !buff[destix-1])' is not
+             * quite true (anymore). Because we process the string terminating
+             * \0 as a char, we will have a destix > 0 always - even if we got
+             * a new line.  Mind, that buff[destix-1] is always buff[0] in
+             * that 'if', because newlines are never combinable and we always
+             * start with a new buffer for it!
+             *
+             * TODO: I dont think that it is nessesary to disable charmode if
+             * TODO:: the client refuses to use it. The disadvantage is a
+             * TODO:: confused lpc object (which could not know ot gets
+             * TODO:: linemode-lines). The charmode code does work with
+             * TODO:: clients in linemode.
+             */
+
             if ((ip->noecho & (CHARMODE_REQ|CHARMODE)) == (CHARMODE_REQ|CHARMODE))
             {
                 DTN(("CHARMODE_REQ\n"));
@@ -2863,6 +2895,8 @@ get_message (char *buff)
                          */
                         DTN(("    save machine state %d (DATA)\n"
                           , TS_DATA));
+                        length = strlen(ip->text + ip->command_start) + 1;
+                        ip->chars_ready = length;
                         ip->save_tn_state = TS_DATA;
                         end_of_line = MY_TRUE;
                         /* tn_state is TS_READY */
@@ -2936,7 +2970,7 @@ get_message (char *buff)
                         ip->tn_start -= ip->command_start - 1;
                         ip->command_end -= ip->command_start - 1;
 
-                        if (ip->command_end > 0)
+                        if (ip->command_start && ip->command_end > 0)
                         {
                             move_memory( ip->text, ip->text+ip->command_start
                                        , ip->command_end
@@ -3009,6 +3043,7 @@ get_message (char *buff)
                 strcpy(buff, ip->text);
                 command_giver = ip->ob;
                 trace_level = ip->trace_level;
+                ip->chars_ready = 0; /* for escaped charmode */
 
                 /* Reinitialize the telnet machine, possibly already
                  * producing the next command in .text[].
@@ -3557,24 +3592,37 @@ set_noecho (interactive_t *ip, char noecho)
     if ((confirm ^ old) & (NOECHO_MASK|CHARMODE_MASK) )
     {
         ob = ip->ob;
-        if (driver_hook[H_NOECHO].type == T_STRING)
+        if (driver_hook[H_NOECHO].type == T_STRING
+         || driver_hook[H_NOECHO].type == T_CLOSURE
+           )
         {
             DTN(("set_noecho():   calling H_NOECHO\n"));
             push_number(inter_sp, noecho);
             push_ref_valid_object(inter_sp, ob, "set_no_echo");
-            secure_apply(driver_hook[H_NOECHO].u.str, ob, 2);
-        }
-        else if (driver_hook[H_NOECHO].type == T_CLOSURE)
-        {
-            DTN(("set_noecho():   calling H_NOECHO\n"));
-            if (driver_hook[H_NOECHO].x.closure_type == CLOSURE_LAMBDA)
+            if (driver_hook[H_NOECHO].type == T_STRING)
+                secure_apply(driver_hook[H_NOECHO].u.str, ob, 2);
+            else 
             {
-                free_object(driver_hook[H_NOECHO].u.lambda->ob, "set_noecho");
-                driver_hook[H_NOECHO].u.lambda->ob = ref_object(ob, "set_noecho");
+                if (driver_hook[H_NOECHO].x.closure_type == CLOSURE_LAMBDA)
+                {
+                    free_object(driver_hook[H_NOECHO].u.lambda->ob
+                               , "set_noecho");
+                    driver_hook[H_NOECHO].u.lambda->ob
+                      = ref_object(ob, "set_noecho");
+                }
+                secure_callback_lambda(&driver_hook[H_NOECHO], 2);
             }
-            push_number(inter_sp, noecho);
-            push_ref_valid_object(inter_sp, ob, "set_no_echo");
-            secure_callback_lambda(&driver_hook[H_NOECHO], 2);
+            if (~confirm & old & CHARMODE_MASK)
+            {
+                if (ip->save_tn_state != TS_INVALID)
+                {
+                    DT(("'%s' set_noecho():     0 chars ready, "
+                        "saved state %d\n", ip->ob->name, ip->save_tn_state));
+                    ip->chars_ready = 0;
+                    ip->tn_state = ip->save_tn_state;
+                }
+                reset_input_buffer(ip);
+            }
         }
         else
         {
@@ -3722,7 +3770,7 @@ call_function_interactive (interactive_t *i, char *str)
         return MY_FALSE;
 
     /* Yes, there are. Check if we have to handle input escape. */
-    if (*str == input_escape)
+    if (*str == input_escape && str[1])
     {
         input_to_t * prev;
 
@@ -4655,6 +4703,50 @@ telnet_neg (interactive_t *ip)
  *
  * The start state for the telnet machine is TS_DATA, and whenever a command
  * text has been completed, it assumes the TS_READY state.
+ *
+ * The function tn_end and goes on until it reaches text_end or a full newline.
+ *
+ * When it returns:
+ *   tn_end is set to the first unprocessed character.
+ * When a full newline is found:
+ *   Processed commands start at command_start and are \0 terminated strings
+ *    state is set to READY
+ * else
+ *   Processed commands start at command_start and end at command_end-1
+ *   state is set to DATA (or something else if we got a fragmented
+ *     telnet negotiation).
+ *
+ * text_end could move a bit to the start of text if we deleted chars
+ * from the raw input string (e.g. because it was an IAC).
+ *
+ * If gobble_char is set, that char is removed from a fresh text packet.
+ * Removing of unwanted chars inside of a packet is done at the appropriate
+ * place (case '\r':). There is no gobbling of <LN><CR> sequences in
+ * character mode (why not?). Code would have to be added at case '\n':
+ * to gobble them in-packet.
+ *
+ * Example:
+ * text = "say hello\r\nsay hi\r\n";
+ * 
+ * Output would be:
+ * text = "say hello\0\nsay hi\r\n";
+ * 
+ * command_start = 0
+ * command_end = 0
+ * tn_end = 11 (s of 2nd say)
+ * text_end stays at 19 (first unused char in text)
+ * state = TS_READY
+ *
+ * After a second call of telnet_neg (almost always done by get_message())
+ * will pre process the second command:
+ *
+ * text = "say hi\0lo\0\nsay hi\r\n";
+ * 
+ * command_start = 0
+ * command_end = 0
+ * tn_end = 7
+ * text_end = 7
+ * state = READY
  */
 
 {
@@ -4674,6 +4766,9 @@ telnet_neg (interactive_t *ip)
 
     /* Gobble the character *from if gobble_char is set.
      * Also test for the end of current buffer content.
+     *
+     * If we want to gobble NL, we also gobble NUL
+     * (used for CR NL and CR NUL digraphs)
      */
     for (;;)
     {
@@ -4687,7 +4782,10 @@ telnet_neg (interactive_t *ip)
         if (ip->gobble_char) {
             DTN(("t_n: gobble char %02x (in buf: %02x)\n"
                , ip->gobble_char, *from));
-            if (*from == ip->gobble_char) {
+            if (*from == ip->gobble_char
+                || (*from == '\0' && ip->gobble_char == '\n')
+               )
+            {
                 from++;
             }
             ip->gobble_char = '\0';
@@ -4718,6 +4816,7 @@ telnet_neg (interactive_t *ip)
             {
         data_exhausted:
                 ip->text_end = ip->tn_end = ip->command_end = (short)(to - first);
+                *to = '\0';
                 if (ip->text_end >= MAX_TEXT)
                 {
                     /* this looks like a super-long command.
@@ -4729,7 +4828,6 @@ telnet_neg (interactive_t *ip)
                     ip->text_end = ip->tn_end = 0;
                     if (!(ip->noecho & CHARMODE_REQ))
                         ip->command_end = 0;
-                    *to = '\0';
                     ip->tn_state = TS_READY;
                     return;
                 }
@@ -4808,67 +4906,18 @@ telnet_neg (interactive_t *ip)
                 {
                     /* This might be a fragmented CR NL, CR NUL, or
                      * a broken client that ends lines with CR only.
-                     * If we are just looking for a line of text, we
-                     * can proceed now, else we have to wait for the
-                     * next character to make our decisions.
+                     * We proceed as full newline now, but gobble
+                     * NL or NUL if they are sent afterwards.
                      */
-                    if ( !(ip->noecho & CHARMODE_REQ)
-                     || (   ip->text[0] == input_escape
-                         && ! (find_no_bang(ip) & IGNORE_BANG))
-                       )
-                    {
-                        ip->gobble_char = '\n';
-                        goto full_newline;
-                    }
-                    ip->tn_state = TS_CR;
-                    goto data_exhausted;
+                    ip->gobble_char = '\n';
                 }
                 else
                 {
                     ch = (*from++ & 0xff);
-        ts_cr:
-                    if (ch != '\n')
+                    /* gobble following NL and NUL */
+                    if (ch && ch != '\n')
                         from--;
-
-                    if ((ip->noecho & CHARMODE_REQ) &&
-                        (   ip->text[0] != input_escape
-                         || find_no_bang(ip) & IGNORE_BANG))
-                    {
-                        if (from == to)
-                        {
-                            /* The client sent a single CR in CHARMODE,
-                             * there were no previous negotiations and thus
-                             * we have to make space to insert the CR.
-                             */
-                            char * cp;
-
-                            if (ip->text_end < MAX_TEXT-1)
-                            {
-                                ip->text_end++;
-                                end++;
-                            }
-
-                            from++;
-                            for (cp = end; cp != from-1; cp--)
-                                *cp = *(cp-1);
-                        }
-
-                        if ((ip->noecho & (CHARMODE_REQ|CHARMODE)) != (CHARMODE_REQ))
-                        {
-                            *to++ = '\r';
-                            ip->tn_state = TS_DATA;
-                            goto ts_data;
-                        }
-                        else
-                        {
-                            /* The client refused to go into char mode
-                             * and instead sent us a complete line.
-                             * Handle it as usual.
-                             */
-                            /* FALLTHROUGH to full_newline */
-                        }
-                    }
-                } /* if (from >= end) or not */
+                }
 
         full_newline:
                 /* Proper line end found: set telnet machine into TS_READY,
@@ -4896,20 +4945,11 @@ telnet_neg (interactive_t *ip)
                 }
 
             case '\n':
-                if ( !(ip->noecho & CHARMODE_REQ) ||
-                     (   ip->text[0] == input_escape
-                      && ! (find_no_bang(ip) & IGNORE_BANG)) )
-                {
-                    ip->gobble_char = '\r';
-                }
+                ip->gobble_char = '\r';
                 goto full_newline;
             } /* switch(ch) */
 
             /* NOTREACHED */
-
-        case TS_CR:
-            /* Complete a CR-?? combination. */
-            goto ts_cr;
 
         ts_iac:
         case TS_IAC:
