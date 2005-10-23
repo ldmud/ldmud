@@ -1,6 +1,24 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+16-Oct-2002 (Lars Duening)  (3.3.285)
+    - (configure) Some systems need libresolv in order to provide
+        herror() (reported by Coogan).
+    - (comm.c) Removed a compile warning (thanks, Fiona!).
+
+15-Oct-2002 (Lars Duening)
+  - (mkfunc.y, Makefile.in, prolang.y) We now assume that on principle
+       the yacc can't use default actions with anonymous yystack values.
+       The difference in code is too small to justify all the testing
+       effort.
+  - (prolang.y) bison 1.5 helped finding some small flaws.
+
+14-Oct-2002 (Lars Duening)
+  - (configure) If a requested option (like use-mysql) can't be used
+       because the system lacks the necessary support, the configure
+       script issues a warning and exits with return code 1 (suggested
+       by Freaky).
+
 13-Oct-2002 (Lars Duening)  (3.3.284)
   - (configure.in) The test for 'long long' was run twice. And if pthreads
        are not found, USE_PTHREADS is now deactivated (reported by Freaky).

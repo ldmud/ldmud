@@ -5218,9 +5218,7 @@ function_body:
 
       block
 
-%ifdef YACC_CANNOT_MIX_ANONYMOUS_WITH_DEFAULT
       { $$ = $<number>1; }
-%endif
 
     | ';' { $$ = -1; }
 ; /* function_body */
@@ -6007,8 +6005,8 @@ basic_non_void_type:
     | L_OBJECT       { $$ = TYPE_OBJECT;  current_type = $$; }
     | L_CLOSURE_DECL { $$ = TYPE_CLOSURE; current_type = $$; }
     | L_SYMBOL_DECL  { $$ = TYPE_SYMBOL;  current_type = $$; }
-    | L_FLOAT_DECL   { $$ = TYPE_FLOAT;   current_type = $$; };
-    | L_MAPPING      { $$ = TYPE_MAPPING; current_type = $$; };
+    | L_FLOAT_DECL   { $$ = TYPE_FLOAT;   current_type = $$; }
+    | L_MAPPING      { $$ = TYPE_MAPPING; current_type = $$; }
     | L_MIXED        { $$ = TYPE_ANY;     current_type = $$; }
 %ifdef USE_STRUCTS
     | L_STRUCT identifier
@@ -8026,10 +8024,10 @@ constant:
               $$ = 0;
           }
       }
-    | '(' constant ')' { $$ = $2; } ;
+    | '(' constant ')' { $$ = $2; }
     | '-'   constant %prec '~' { $$ = -$2; }
     | L_NOT constant { $$ = !$2; }
-    | '~'   constant { $$ = ~$2; } ;
+    | '~'   constant { $$ = ~$2; }
     | L_NUMBER
 ; /* constant */
 
@@ -8243,7 +8241,7 @@ expr0:
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | expr0 '?' %prec '?'
+    | expr0 '?'
       {
           /* Insert the branch to the :-part and remember this address */
           ins_f_code(F_BRANCH_WHEN_ZERO);
@@ -13170,9 +13168,9 @@ opt_const_struct_init2:
       }
 
       const_struct_init
-%ifdef YACC_CANNOT_MIX_ANONYMOUS_WITH_DEFAULT
+
       { $$ = $<const_list>1; }
-%endif
+
     | opt_const_struct_init2
       {
           /* One more element to the const_list */
@@ -13271,9 +13269,9 @@ const_expr_list2:
       }
 
       svalue_constant
-%ifdef YACC_CANNOT_MIX_ANONYMOUS_WITH_DEFAULT
+
       { $$ = $<const_list>1; }
-%endif
+
 
     | const_expr_list2 ','
       {

@@ -75,9 +75,7 @@ EXAMPLES
 
 
 HISTORY
-        Introduced in a preliminary form in LDMud 3.2.9/3.3.126.
-        Properly implemented in LDMud 3.3.127 .
-
+        Implemented in LDMud 3.2.9/3.3.128.
 
 SEE ALSO
         debug_info(E), inherit_list(E)

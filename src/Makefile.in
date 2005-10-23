@@ -129,8 +129,8 @@ make_func.c: make_func.y
 	@MOVE_YACC_TAB@ make_func.c
 	@CLEAN_YACC_TAB@
 
-mkfunc.o : mkfunc.c make_func.c driver.h config.h machine.h port.h
-	  $(CC) $(CFLAGS) -DYACC='"$(YACC)"' -c mkfunc.c
+#mkfunc.o : mkfunc.c make_func.c driver.h config.h machine.h port.h
+#	  $(CC) $(CFLAGS) -c mkfunc.c
 
 mkfunc@EXEEXT@: mkfunc.o hash.o exec.h
 	$(CC) @OPTIMIZE_LINKING@ $(LDFLAGS) mkfunc.o hash.o -o mkfunc@EXEEXT@

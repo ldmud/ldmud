@@ -532,7 +532,7 @@ inet6_ntoa (struct in6_addr in)
 
 /*-------------------------------------------------------------------------*/
 static struct in6_addr
-inet6_addr (char *to_host)
+inet6_addr (const char *to_host)
 
 /* Convert the name <to_host> into a ipv6 address and return it.
  */

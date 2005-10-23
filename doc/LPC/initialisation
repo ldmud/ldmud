@@ -13,7 +13,7 @@ DESCRIPTION
         no extra code in the program.
         Allowed expressions currently include integer literals,
         string literals, integer operators, string addition, bracketing,
-        array constructors, the empty mapping and order_alist().
+        array constructors, the empty mapping and structs.
         When an object with initialised variables is cloned or inherited,
         all initialised variables are copied from the blueprint.
         A special application of this feature is to have an initialised
@@ -36,3 +36,6 @@ DESCRIPTION
         a little worse than a medium-skilled lpc-programmer would
         generate, because it is scattered all over the program.
 
+HISTORY
+        Since LDMud 3.3, order_alist() is no longer accepted without
+          INITIALIZATION_BY___INIT.

@@ -12,17 +12,22 @@
 ;; Odd-numbered 'development' releases:
 ;;    <v>-<r>.*: The only branch for version <v>.<r>
 ;;
-;; TODO: Things to implement: general coloured efuns, sockets (p-020912).
+;; TODO: general coloured efuns, sockets (p-020912),
+;; TODO:  sockets (p-020912),
+;; TODO: state dumps.
 ;; TODO: One .c-file per efun.
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 284)
-(Parent-Version lpmud 3-3 283)
-(Version-Log "Corrected a configuration problem.")
+(Project-Version lpmud 3-3 285)
+(Parent-Version lpmud 3-3 284)
+(Version-Log "configure now warns about features disabled because of lack of support.
+Small corrections to prolang.y, and we now assume that anonymous yystack values can't be mixed with default actions.
+configure now checks for libresolv (implements herror() ).
+Removed a compiler warning.")
 (New-Version-Log
 "")
-(Checkin-Time "Sun, 13 Oct 2002 14:47:46 -0600")
+(Checkin-Time "Wed, 16 Oct 2002 22:27:03 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -58,20 +63,20 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.48 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.347 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.279 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.348 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.280 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.17 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
   ;; Configuration
-  (src/configure (lpmud/d/0_configure 1.19.1.60 755))
+  (src/configure (lpmud/d/0_configure 1.19.1.61 755))
   (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.19 644))
   (src/machine.h.in (lpmud/b/9_machine.h. 1.9.1.4 644))
-  (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.18 644))
+  (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.19 644))
   (src/mkinstalldirs (lpmud/c/4_mkinstalld 1.1 644))
   (src/install-sh (lpmud/c/5_install-sh 1.2 755))
 
-  (src/autoconf/configure.in (lpmud/d/7_configure. 1.20.1.9.1.50 644))
+  (src/autoconf/configure.in (lpmud/d/7_configure. 1.20.1.9.1.51 644))
   (src/autoconf/acconfig.h (lpmud/d/10_acconfig.h 1.6.1.4 644))
 
   (src/settings/README (lpmud/c/22_README 1.14.1.12 644))
@@ -102,7 +107,7 @@
   (src/settings/sticklib (lpmud/d/14_sticklib 1.2.1.1.1.4 744))
   (src/settings/theland (lpmud/a/b/12_spin 1.6 744))
   (src/settings/tubmud (lpmud/c/27_tubmud 1.7.1.11 744))
-  (src/settings/unitopia (lpmud/c/7_unitopia 1.6.1.4.1.13 744))
+  (src/settings/unitopia (lpmud/c/7_unitopia 1.6.1.4.1.14 744))
   (src/settings/wunderland (lpmud/d/24_wunderland 1.3.1.6 744))
 
   (src/C_COMPILER_BUGS (lpmud/d/21_C_COMPILER 1.6.1.2.1.2 644))
@@ -124,7 +129,7 @@
   (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.22 644))
   (src/closure.h (lpmud/f/44_closure.h 1.7.1.11 644))
   (src/closure.c (lpmud/d/4_closure.c 1.41.1.46 644))
-  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.26 644))
+  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.27 644))
   (src/comm.h (lpmud/d/3_comm.h 1.26.1.25 644))
   (src/driver.h (lpmud/f/36_driver.h 1.15.1.20 644))
   (src/dumpstat.h (lpmud/f/35_dumpstat.h 1.8 644))
@@ -213,7 +218,7 @@
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.13 644))
   (src/port.c (lpmud/39_port.c 1.17.1.7 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.16 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.62 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.63 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7.1.1 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))
@@ -247,7 +252,7 @@
   (src/func_spec (lpmud/c/31_func_spec 1.53.1.45.1.20 644))
   (src/string_spec (lpmud/f/6_string_spe 1.14.1.6 644))
   (src/mkfunc.c (lpmud/l/14_mkfunc.c 1.1 644))
-  (src/make_func.y (lpmud/b/7_make_func. 1.25.1.28 644))
+  (src/make_func.y (lpmud/b/7_make_func. 1.25.1.29 644))
 
   ;; Generic host files
   (src/hosts/README (lpmud/h/10_README 1.2 644))
@@ -990,7 +995,7 @@
   (doc/efun/gmtime (lpmud/n/7_gmtime 1.1 644))
   (doc/efun/heart_beat_info (lpmud/m/36_heart_beat 1.3 644))
   (doc/efun/implode (lpmud/p/2_implode 1.3 644))
-  (doc/efun/include_list (lpmud/p/25_include_li 1.3 644))
+  (doc/efun/include_list (lpmud/p/25_include_li 1.4 644))
   (doc/efun/inherit_list (lpmud/p/3_inherit_li 1.7 644))
   (doc/efun/input_to (lpmud/p/4_input_to 1.8.1.6 644))
   (doc/efun/insert_alist (lpmud/c/45_insert_ali 1.7 644))
@@ -1243,7 +1248,7 @@
   (doc/LPC/if (lpmud/h/15_if 1.2 644))
   (doc/LPC/inherit (lpmud/r/29_inherit 1.2 644))
   (doc/LPC/inheritance (lpmud/r/30_inheritanc 1.2 644))
-  (doc/LPC/initialisation (lpmud/c/49_initialisa 1.2 644))
+  (doc/LPC/initialisation (lpmud/c/49_initialisa 1.3 644))
   (doc/LPC/inline-closures (lpmud/b/b/30_inline-clo 1.5 644))
   (doc/LPC/lfuns (lpmud/r/31_lfuns 1.3 644))
   (doc/LPC/lpc (lpmud/r/32_lpc 1.2 644))

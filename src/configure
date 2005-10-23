@@ -1323,6 +1323,9 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
 
+not_available=""
+
+
 DEFAULTenable_erq=erq
 # Check whether --enable-erq or --disable-erq was given.
 if test "${enable_erq+set}" = set; then
@@ -7880,6 +7883,59 @@ _ACEOF
 fi
 
 fi
+echo "$as_me:$LINENO: checking for main in -lresolv" >&5
+echo $ECHO_N "checking for main in -lresolv... $ECHO_C" >&6
+if test "${ac_cv_lib_resolv_main+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lresolv  $LIBS"
+cat >conftest.$ac_ext <<_ACEOF
+#line $LINENO "configure"
+#include "confdefs.h"
+
+
+#ifdef F77_DUMMY_MAIN
+#  ifdef __cplusplus
+     extern "C"
+#  endif
+   int F77_DUMMY_MAIN() { return 1; }
+#endif
+int
+main ()
+{
+main ();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+         { ac_try='test -s conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  ac_cv_lib_resolv_main=yes
+else
+  echo "$as_me: failed program was:" >&5
+cat conftest.$ac_ext >&5
+ac_cv_lib_resolv_main=no
+fi
+rm -f conftest.$ac_objext conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+echo "$as_me:$LINENO: result: $ac_cv_lib_resolv_main" >&5
+echo "${ECHO_T}$ac_cv_lib_resolv_main" >&6
+if test $ac_cv_lib_resolv_main = yes; then
+  LIBS="$LIBS -lresolv"
+fi
+
 # The Ultrix 4.2 mips builtin alloca declared by alloca.h only works
 # for constant arguments.  Useless!
 echo "$as_me:$LINENO: checking for working alloca.h" >&5
@@ -8789,6 +8845,14 @@ fi
 
   fi
 else
+  if test $enable_use_pthreads = yes; then
+      echo "pthreads not supported - disabling pthreads support."
+      if test "x$not_available" = "x"; then
+    not_available="use-pthreads"
+else
+    not_available="$not_available, use-pthreads"
+fi
+  fi
   cdef_use_pthreads="#undef"
   enable_use_pthreads=no
 fi
@@ -9156,6 +9220,11 @@ fi
 
         if test "x$tmp" = "x"; then
             echo "mysqlclient library not found - disabling mySQL support"
+            if test "x$not_available" = "x"; then
+    not_available="use-mysql"
+else
+    not_available="$not_available, use-mysql"
+fi
             cdef_use_mysql="#undef"
             enable_use_mysql="no"
             mysql_path=
@@ -9278,6 +9347,14 @@ fi
   fi
 
   CFLAGS="$saveflags"
+else
+  if test $enable_use_mysql = yes; then
+      if test "x$not_available" = "x"; then
+    not_available="use-mysql"
+else
+    not_available="$not_available, use-mysql"
+fi
+  fi
 fi
 
 echo "$as_me:$LINENO: checking if rename handles directories" >&5
@@ -12084,3 +12161,10 @@ if test "$no_create" != yes; then
   $ac_cs_success || { (exit 1); exit 1; }
 fi
 
+
+if test "x$not_available" != "x"; then
+    echo ""
+    echo "WARNING: The following options were disabled because the system"
+    echo "lacked the necessary support: $not_available."
+    exit 1
+fi

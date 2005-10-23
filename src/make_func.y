@@ -3390,40 +3390,6 @@ main (int argc, char ** argv)
         return 1; /* TODO: There are constants for this */
     }
 
-    if (action == MakeLang)
-    {
-        /* --- Test YACC for default and anonymous rules ---
-         *
-         * This test uses THE_LANG as temporary file.
-         */
-        if ((fpw = fopen(THE_LANG, "w")) == 0) {
-            perror(THE_LANG);
-            exit(1);
-        }
-        fprintf(fpw, "%s", "\
-%union{ int i; char *p; }\n\
-%type <p> all\n\
-%%\n\
-all: { $<p>$ = 0; } 'a';\n\
-%%\n\
-");
-        fclose(fpw);
-        sprintf(line_buffer, "%s %s", YACC, THE_LANG);
-
-        fprintf(stderr, "checking default & anonymous rules in %s\n", YACC);
-        if (system(line_buffer))
-        {
-            fprintf(
-              stderr,
-"...it seems to have trouble with this combination, I'll avoid the latter.\n"
-            );
-            add_define("YACC_CANNOT_MIX_ANONYMOUS_WITH_DEFAULT", -1, "");
-        }
-        else
-            fprintf(stderr, "...good, it can handle them.\n");
-    }
-
-
     /* --- Read the config files --- */
     read_config();
     if (action == MakeInstrs)

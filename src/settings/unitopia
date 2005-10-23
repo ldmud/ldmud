@@ -10,7 +10,6 @@ exit 1
 # --- The actual settings ---
 
 # --- Runtime limits ---
-with_max_trace=80
 
 # --- Timing ---
 with_time_to_clean_up=5400
@@ -39,6 +38,7 @@ with_udp_port=3335
 #----------- Compilation Options ----------
 enable_malloc_trace=yes
 enable_malloc_lpc_trace=yes
+enable_use_pthreads=yes
 
 # --- Wizlist ---
 with_wizlist_file=no
@@ -54,7 +54,9 @@ enable_use_pcre=no
 
 # --- Runtime limits ---
 with_catch_reserved_cost=0x10000
-with_master_reserved_cost=0x1000
+with_master_reserved_cost=0x4000
+enable_dynamic_costs=yes
+with_max_trace=80
 with_max_players=200
 
 # --- Compiler ---
@@ -63,3 +65,11 @@ with_max_players=200
 with_htable_size=0x10000
 with_otable_size=0x4000
 with_apply_cache_bits=14
+
+# --- Profiling ---
+
+# --- Standard Debugging ---
+enable_check_strings=no
+
+# --- Specific Debugging ---
+enable_check_object_stat=no

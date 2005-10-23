@@ -69,12 +69,25 @@ AC_ARG_WITH([$1],AC_FORM_HELP([with-$1]ifelse($3,,[=VALUE],[=$3]),
 [$4]),[$5],[$6])
 ])
 
+AC_DEFUN(AC_NOT_AVAILABLE,
+[if test "x$not_available" = "x"; then
+    not_available="$1"
+else
+    not_available="[$not_available], $1"
+fi])
+
 dnl
 dnl let's start
 AC_INIT(prolang.y)
 
 dnl set the default prefix
 AC_PREFIX_DEFAULT(/usr/local/mud)
+
+dnl
+dnl This variable collects those requested features for which the system
+dnl doesn't offer the right support.
+
+not_available=""
 
 dnl
 dnl define default values for package arguments
@@ -509,6 +522,7 @@ AC_CHECK_LIB(crypt,main, LIBS="$LIBS -lcrypt")
 if test $ac_cv_lib_socket_main = "yes" || test $ac_cv_lib_ucb_main = "yes"; then
       AC_CHECK_LIB(nsl,main)
 fi
+AC_CHECK_LIB(resolv,main, LIBS="$LIBS -lresolv")
 AC_FUNC_ALLOCA
 AC_CHECK_FUNCS(fchmod getrusage bzero memset memcpy memmem strdup strcspn crypt _crypt)
 AC_CHECK_FUNCS(strchr strrchr getcwd memmove sysconf gettimeofday wait3 waitpid)
@@ -604,6 +618,10 @@ if test $lp_cv_has_pthreads = yes; then
     AC_CHECK_LIB(pthread,main, LIBS="$LIBS -lpthread")
   fi
 else
+  if test $enable_use_pthreads = yes; then
+      echo "pthreads not supported - disabling pthreads support."
+      AC_NOT_AVAILABLE(use-pthreads)
+  fi
   cdef_use_pthreads="#undef"
   enable_use_pthreads=no
 fi
@@ -677,6 +695,7 @@ if test $lp_cv_has_mysql = yes; then
 
         if test "x$tmp" = "x"; then
             echo "mysqlclient library not found - disabling mySQL support"
+            AC_NOT_AVAILABLE(use-mysql)
             cdef_use_mysql="#undef"
             enable_use_mysql="no"
             mysql_path=
@@ -695,6 +714,10 @@ if test $lp_cv_has_mysql = yes; then
   fi
 
   CFLAGS="$saveflags"
+else
+  if test $enable_use_mysql = yes; then
+      AC_NOT_AVAILABLE(use-mysql)
+  fi
 fi
 
 AC_CACHE_CHECK(if rename handles directories,
@@ -1734,3 +1757,13 @@ dnl make config.h, too. [Mubo]
 dnl
 AC_OUTPUT(Makefile config.h util/Makefile util/indent/Makefile
 util/xerq/Makefile util/erq/Makefile)
+
+dnl
+dnl At last, warn if any feature could not be enabled
+dnl
+if test "x$not_available" != "x"; then
+    echo ""
+    echo "WARNING: The following options were disabled because the system"
+    echo "lacked the necessary support: $not_available."
+    exit 1
+fi
