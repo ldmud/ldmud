@@ -161,7 +161,7 @@ order_alist (svalue_t *inlists, int listnum, Bool reuse)
          */
         if (reuse && inlists[i].u.vec->ref == 1) {
 
-            if (i)/* not the last iteration */
+            if (i) /* not the last iteration */
                 inlists[i].type = T_INVALID;
 
             for (j = keynum; --j >= 0; ) {
@@ -179,7 +179,7 @@ order_alist (svalue_t *inlists, int listnum, Bool reuse)
 
         } else {
 
-            if (i) /* not the last iteration */
+            if (i) /* Not the last iteration: get new out-vector */
                 v = allocate_array(keynum);
 
             for (j = keynum; --j >= 0; ) {

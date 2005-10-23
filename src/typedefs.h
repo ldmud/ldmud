@@ -28,6 +28,7 @@ typedef struct linenumbers_s      linenumbers_t;      /* exec.h */
 typedef struct mapping_s          mapping_t;          /* mapping.h */
 typedef struct object_s           object_t;           /* object.h */
 typedef struct program_s          program_t;          /* exec.h */
+typedef struct pointer_table      ptrtable_t;         /* ptrtable.h */
 typedef struct regexp_s           regexp_t;           /* mregex.h */
 typedef struct replace_ob_s       replace_ob_t;       /* object.h */
 typedef struct rt_context_s       rt_context_t;       /* backend.h */

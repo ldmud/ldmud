@@ -502,7 +502,7 @@ get_new_mapping ( wiz_list_t * user, mp_int num_values
     if (cond_size > 0)
     {
 
-        /* size_t */ cm_size = (size_t)cond_size;
+        /* !DEBUG: size_t */ cm_size = (size_t)cond_size;
         cm = xalloc(sizeof(*cm) + sizeof(svalue_t) * cm_size * (num_values+1) - 1);
         if (!cm)
         {

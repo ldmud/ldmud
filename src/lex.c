@@ -2351,8 +2351,10 @@ add_auto_include (const char * obj_file, const char *cur_file, Bool sys_include)
     if (auto_include_string != NULL)
     {
         /* The auto include string is handled like a normal include */
+        current_line++; /* Make sure to restore to line 1 */
         (void)start_new_include(-1, auto_include_string
                                , current_file, "auto include", ')');
+        current_line++; /* Make sure to start at line 1 */
     }
 } /* add_auto_include() */
 

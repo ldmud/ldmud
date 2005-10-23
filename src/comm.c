@@ -4152,7 +4152,7 @@ set_snoop (object_t *me, object_t *you)
  */
 
 /*-------------------------------------------------------------------------*/
-static INLINE
+static INLINE void
 send_telnet_option (char action, char option)
 
 /* Send IAC <action> <option> */
@@ -7632,4 +7632,3 @@ f_query_udp_port (svalue_t *sp)
 } /* f_query_udp_port() */
 
 /***************************************************************************/
-

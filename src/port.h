@@ -195,14 +195,17 @@ extern int errno;
 #if defined(__GNUC__) && __GNUC__ >= 2 && (__GNUC_MINOR__ > 6 || __GNUC__ > 2)
 #    define NORETURN __attribute__ ((noreturn))
 #    define UNUSED   __attribute__ ((unused))
-#    define MALLOC   __attribute__ ((malloc))
 #elif defined(__MWERKS__)
 #    define NORETURN
 #    define UNUSED
-#    define MALLOC
 #else
 #    define NORETURN
 #    define UNUSED
+#endif
+
+#if defined(__GNUC__) && __GNUC__ >= 3
+#    define MALLOC   __attribute__ ((malloc))
+#else
 #    define MALLOC
 #endif
 

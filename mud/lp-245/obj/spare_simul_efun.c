@@ -39,47 +39,6 @@ void start_simul_efun()
 	living_name_m = info[LIVING_NAME] = m_allocate(0, 1);
     if (!(name_living_m = info[NAME_LIVING]))
 	name_living_m = info[NAME_LIVING] = m_allocate(0, 1);
-    if (find_call_out("clean_simul_efun") < 0)
-	call_out("clean_simul_efun", 1800);
-}
-
-//---------------------------------------------------------------------------
-static void clean_simul_efun()
-{
-    /* There might be destructed objects as keys. */
-    m_indices(living_name_m);
-    remove_call_out("clean_simul_efun");
-    if (find_call_out("clean_name_living_m") < 0)
-    {
-	call_out(
-	  "clean_name_living_m",
-	  1,
-	  m_indices(name_living_m),
-	  sizeof(name_living_m)
-	);
-    }
-    call_out("clean_simul_efun", 3600);
-}
-
-//---------------------------------------------------------------------------
-static void clean_name_living_m(string *keys, int left)
-{
-    int i, j;
-    mixed a;
-
-    if (left) {
-	if (pointerp(a = name_living_m[keys[--left]]) && member(a, 0)>= 0) {
-	    i = sizeof(a);
-	    do {
-		if (a[--i])
-		    a[<++j] = a[i];
-	    } while (i);
-	    name_living_m[keys[left]] = a = j > 1 ? a[<j..] : a[<1];
-	}
-	if (!a)
-	    efun::m_delete(name_living_m, keys[left]);
-	call_out("clean_name_living_m", 1, keys, left);
-    }
 }
 
 //---------------------------------------------------------------------------

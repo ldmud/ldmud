@@ -12,6 +12,15 @@
  * memory allocator. When using a different allocator, all garbage_collect()
  * does is freeing as much memory as possible.
  *
+ * Additionally this module also offers a couple of functions to 'clean up'
+ * an object, ie. to scan all data referenced by this object for destructed
+ * objects and remove those references, and to change all untabled strings
+ * into tabled strings. These functions are used by the garbage collector
+ * to deallocate as much memory by normal means as possible; but they
+ * are also called from the backend as part of the regular reset/swap/cleanup
+ * handling.
+ *
+#ifdef MALLOC_smalloc
  * The garbage collector is a simple mark-and-sweep collector. First, all
  * references (refcounts and memory block markers) are cleared, then in
  * a second pass, all reachable references are recreated (refcounts are
@@ -58,7 +67,7 @@
  * thus, memory leaks can show up as soon as the memory is allocated.
  *
  * TODO: Allow to deactivate the dump of unreferenced memory on freeing.
- * TODO: Change all non-shared strings in shared ones after finishing the GC.
+#endif
  *---------------------------------------------------------------------------
  */
 
@@ -95,6 +104,7 @@
 #include "otable.h"
 #include "parse.h"
 #include "prolang.h"
+#include "ptrtable.h"
 #include "sent.h"
 #include "simulate.h"
 #include "simul_efun.h"
@@ -152,6 +162,282 @@ static lambda_t *stale_lambda_closures;
 #endif /* GC_SUPPORT */
 
 /*-------------------------------------------------------------------------*/
+
+/*=========================================================================*/
+
+/*            Object clean up
+ */
+
+/* Forward declarations */
+static void cleanup_vector (svalue_t *svp, size_t num, ptrtable_t * ptable);
+
+/* --- struct cleanup_map_extra: Info needed to clean up a mapping.
+ *
+ * A pointer to an instance of this structure is passed to the
+ * cleanup_mapping_filter() callback function.
+ */
+
+struct cleanup_map_extra_s
+{
+    p_int       width;   /* Width of the mapping */
+    ptrtable_t *ptable;  /* Pointertable to catch loops */
+};
+
+typedef struct cleanup_map_extra_s cleanup_map_extra_t;
+
+/*-------------------------------------------------------------------------*/
+static void
+cleanup_mapping_filter (svalue_t *key, svalue_t *data, void *extra)
+
+/* Clean up a single mapping element, <extra> points to
+ * a cleanup_map_extra_t instance.
+ */
+
+{
+    cleanup_map_extra_t * pData = (cleanup_map_extra_t*)extra;
+    cleanup_vector(key, 1, pData->ptable);
+    cleanup_vector(data, pData->width, pData->ptable);
+} /* cleanup_mapping_filter() */
+
+/*-------------------------------------------------------------------------*/
+static void
+cleanup_closure (svalue_t *csvp, ptrtable_t * ptable)
+
+/* Cleanup the closure <csvp>, using <ptable> as pointer table.
+ * This may change *<csvp> to svalue-0.
+ */
+
+{
+    ph_int    type = csvp->x.closure_type;
+    lambda_t *l    = csvp->u.lambda;
+
+    /* If this closure is bound to or defined in a destructed object, zero it
+     * out.
+     */
+    if (destructed_object_ref(csvp))
+    {
+        free_closure(csvp);
+        put_number(csvp, 0);
+        return;
+    }
+
+    if (!CLOSURE_MALLOCED(type)
+     || register_pointer(ptable, l) == NULL
+       )
+        return;
+
+    if (CLOSURE_HAS_CODE(type))
+    {
+        mp_int num_values;
+        svalue_t *svp;
+
+        svp = (svalue_t *)l;
+        if ( (num_values = EXTRACT_UCHAR(l->function.code)) == 0xff)
+            num_values = svp[-0x100].u.number;
+        svp -= num_values;
+        cleanup_vector(svp, (size_t)num_values, ptable);
+    }
+    else if (type == CLOSURE_BOUND_LAMBDA)
+    {
+        svalue_t dummy;
+
+        dummy.type = T_CLOSURE;
+        dummy.x.closure_type = CLOSURE_UNBOUND_LAMBDA;
+        dummy.u.lambda = l->function.lambda;
+
+        cleanup_closure(&dummy, ptable);
+    }
+
+#ifdef USE_NEW_INLINES
+    if (type == CLOSURE_LFUN && l->function.lfun.context_size != 0)
+    {
+        unsigned short size = l->function.lfun.context_size;
+        cleanup_vector(l->context, size, ptable);
+    }
+#endif /* USE_NEW_INLINES */
+} /* cleanup_closure() */
+
+/*-------------------------------------------------------------------------*/
+static void
+cleanup_vector (svalue_t *svp, size_t num, ptrtable_t * ptable)
+
+/* Cleanup the <num> svalues in vector/svalue block <svp>.
+ * <ptable> is used to keep track which complex values we already
+ * cleaned up.
+ */
+
+{
+    svalue_t *p;
+
+    if (!svp) /* e.g. when called for obj->variables */
+        return;
+
+    if (register_pointer(ptable, svp) == NULL) /* already cleaned up */
+        return;
+
+    for (p = svp; p < svp+num; p++)
+    {
+        switch(p->type)
+        {
+        case T_OBJECT:
+          {
+            object_t *ob;
+
+            ob = p->u.ob;
+            if (ob->flags & O_DESTRUCTED)
+            {
+                put_number(p, 0);
+                reference_destructed_object(ob);
+            }
+            break;
+          }
+
+        case T_POINTER:
+        case T_QUOTED_ARRAY:
+#ifdef USE_STRUCTS
+        case T_STRUCT:
+#endif /* USE_STRUCTS */
+            /* Don't clean the null vector */
+            if (p->u.vec != &null_vector)
+            {
+                cleanup_vector(&p->u.vec->item[0], VEC_SIZE(p->u.vec), ptable);
+            }
+            break;
+
+        case T_MAPPING:
+            if (register_pointer(ptable, p->u.map) != NULL)
+            {
+                cleanup_map_extra_t extra;
+                
+                extra.width = p->u.map->num_values;
+                extra.ptable = ptable;
+                check_map_for_destr(p->u.map);
+                walk_mapping(p->u.map, cleanup_mapping_filter, &extra);
+            }
+            continue;
+
+        case T_STRING:
+            if (!mstr_tabled(p->u.str))
+            {
+                string_t * str = make_tabled(p->u.str);
+                if (str != NULL)
+                {
+                    free_mstring(p->u.str);
+                    p->u.str = str;
+                }
+            }
+            break;
+
+        case T_CLOSURE:
+            cleanup_closure(p, ptable);
+            break;
+        }
+    } /* for */
+} /* cleanup_vector() */
+
+/*-------------------------------------------------------------------------*/
+void
+cleanup_object (object_t * obj, ptrtable_t * ptable)
+
+/* Cleanup object <ob>. If the caller cleans up several objects, he
+ * should pass a pointertable <ptable> this function will use to keep
+ * track which complex datastructures have already been cleaned.
+ * If NULL is passed as <ptable>, the function will create its own
+ * pointer table.
+ *
+ * If the object is on the swap, it will be swapped in for the time
+ * of the function.
+ *
+ * The function checks all variables of this object for references
+ * to destructed objects and removes them. Also, untabled strings
+ * are made tabled.
+ */
+
+{
+    ptrtable_t * local_ptable = NULL;
+    int was_swapped = 0;
+
+    /* Make sure we have a pointer table */
+    if (ptable == NULL)
+    {
+        ptable = local_ptable = new_pointer_table();
+        if (ptable == NULL)
+        {
+            outofmemory("object cleanup pointertable");
+            return;
+        }
+    }
+
+    /* Swap in the object if necessary */
+    if ((obj->flags & O_SWAPPED)
+     && (was_swapped = load_ob_from_swap(obj)) < 0)
+    {
+        error("(%s:%d) Out of memory swapping in %s\n", __FILE__, __LINE__
+             , get_txt(obj->name));
+        return;
+    }
+
+
+    /* If the object's program blueprint is destructed, remove that
+     * reference.
+     */
+
+    if (obj->prog->blueprint
+     && (obj->prog->blueprint->flags & O_DESTRUCTED)
+       )
+    {
+        free_object(obj->prog->blueprint, "cleanup object");
+        obj->prog->blueprint = NULL;
+    }
+
+    /* Clean up all the variables */
+    cleanup_vector(obj->variables, obj->prog->num_variables, ptable);
+
+    /* Clean up */
+    if (was_swapped)
+    {
+        swap(obj, was_swapped);
+    }
+
+    if (local_ptable != NULL)
+        free_pointer_table(local_ptable);
+} /* cleanup_object() */
+
+/*-------------------------------------------------------------------------*/
+static void
+cleanup_all_objects (void)
+
+/* Cleanup all objects in the game.
+ * This function is called by the garbage-collector right at the start.
+ */
+
+{
+    ptrtable_t * ptable = NULL;
+    object_t   * ob;
+
+    /* Make sure we have a pointer table */
+    ptable = new_pointer_table();
+    if (ptable == NULL)
+    {
+        outofmemory("object cleanup pointertable");
+        return;
+    }
+
+    /* Process the list of all objects */
+
+    for (ob = obj_list; ob; ob = ob->next_all)
+    {
+        cleanup_object(ob, ptable);
+    }
+
+    /* Clean up */
+    free_pointer_table(ptable);
+} /* cleanup_all_objects() */
+
+/*=========================================================================*/
+
+/*            The real collector - only with smalloc.
+ */
 
 #if defined(MALLOC_smalloc)
 
@@ -216,15 +502,7 @@ static void gc_MARK_MSTRING_REF (string_t * str);
 #define MARK_MSTRING_REF(str) \
   GC_REF_DUMP(string_t*, str, "Mark string", gc_MARK_MSTRING_REF)
 
-#endif /* MALLOC_smalloc */
-
-
-/*=========================================================================*/
-
-/*            The real collector - only with smalloc.
- */
-
-#if defined(MALLOC_smalloc)
+/*-------------------------------------------------------------------------*/
 
 #if defined(MALLOC_TRACE)
 
@@ -1081,6 +1359,7 @@ garbage_collection(void)
     purge_action_sent();
     purge_shadow_sent();
     check_wizlist_for_destr();
+    cleanup_all_objects(); /* creates dirty mappings! */
     compact_mappings(num_dirty_mappings);
     if (current_error_trace)
     {
@@ -1289,7 +1568,7 @@ garbage_collection(void)
 
         dprintf1(gcollect_outfd
                 , "Freeing destructed object '%s'\n"
-                , (p_int)ob->name
+                , (p_int)get_txt(ob->name)
                 );
         reference_destructed_object(ob); /* Clobbers .next_all */
 
@@ -1969,6 +2248,7 @@ garbage_collection (void)
     purge_action_sent();
     purge_shadow_sent();
     check_wizlist_for_destr();
+    cleanup_all_objects(); /* creates dirty mappings! */
     compact_mappings(num_dirty_mappings);
     if (current_error_trace)
     {

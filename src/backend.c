@@ -858,6 +858,9 @@ static Bool did_swap;
         if (time_to_swap_variables / 2 < min_time_to_swap)
             min_time_to_swap = time_to_swap_variables/2;
 
+        /* ------ Data cleanup ------ */
+        cleanup_object(obj, NULL);
+
         /* ------ Reset ------ */
 
         /* Check if a reset() is due. Objects which have not been touched
@@ -1067,14 +1070,6 @@ no_clean_up:
                     did_swap = MY_TRUE;
             }
         } /* if (obj can be swapped) */
-
-        /* TODO: Here would be nice place to convert all strings in an
-         * TODO:: object to shared strings, if the object was reset, cleant
-         * TODO:: up, or not used for some time. Also, all the destructed
-         * TODO:: object references in the object could be cleared.
-         * TODO:: The function (in simulate) could have the signature:
-         * TODO:: void clean_vars(object *ob, pointer_table *ptable).
-         */
 
     } /* End of loop */
 

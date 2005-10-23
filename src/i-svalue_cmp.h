@@ -27,7 +27,6 @@ svalue_cmp (svalue_t *left, svalue_t *right)
  *
  * The relation need not make sense with the actual interpretation
  * of <left>/<right>, as long as it defines a deterministic order relation.
- * For strings the caller has to make sure to compare only tabled strings.
  *
  * See also svalue_eq() for a more specialized version.
  *

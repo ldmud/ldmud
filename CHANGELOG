@@ -1,6 +1,23 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+12-Nov-2002 (Lars Duening)  (3.3.295)
+  - (port.h) The 'malloc' attribute is now used only with gcc 3 or newer.
+  - (lex.c) Corrected the line counting with auto-includes (reported by
+      Coogan).
+  - (gcollect, backend.c) Added a method to the garbage collector which
+      cleans up an object, ie. removes all references to destructed 
+      objects from its variables and changes all untabled strings
+      into tabled ones. This cleanup is performed by the backend as part
+      of the normal object processing, and by the GC for all objects before
+      the actual collection begins.
+
+      This change solves the problem that destructed objects in the
+      condensed part of a mapping go unnoticed if the mapping is only
+      added to/removed from. In Evermore, where objects served as keys
+      in a particular mapping, this led to an enormous mapping with
+      stale entries, which the regular GC flagged as 'leaks'.
+
 11-Nov-2002 (Lars Duening)  (3.3.294)
   - (comm.c) When calling H_NOECHO, the code did not check if the
       argument objects were still alive (reported by Fiona).
