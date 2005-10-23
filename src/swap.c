@@ -79,9 +79,6 @@
 #include <sys/stat.h>
 #include <stddef.h>
 #include <stdio.h>
-#ifdef HAVE_VALUES_H
-#include <values.h>
-#endif
 
 #include "swap.h"
 

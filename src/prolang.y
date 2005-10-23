@@ -93,6 +93,7 @@
 #include "typedefs.h"
 
 #include "my-alloca.h"
+#include <ctype.h>
 #include <stdio.h>
 #include <stdarg.h>
 
@@ -3949,16 +3950,16 @@ insert_pending_inline_closures (void)
  */
 
 {
-    mp_int index;
+    mp_int ix;
 #ifdef DEBUG_INLINES
 if (INLINE_CLOSURE_COUNT != 0) printf("DEBUG: insert_inline_closures(): %d pending\n", INLINE_CLOSURE_COUNT);
 #endif /* DEBUG_INLINES */
 
-    for (index = 0; index < INLINE_CLOSURE_COUNT; index++)
+    for (ix = 0; ix < INLINE_CLOSURE_COUNT; ix++)
     {
-        inline_closure_t * ict = &(INLINE_CLOSURE(index));
+        inline_closure_t * ict = &(INLINE_CLOSURE(ix));
 #ifdef DEBUG_INLINES
-printf("DEBUG:   #%d: start %ld, length %ld, function %d: new start %ld\n", index, ict->start, ict->length, ict->function, CURRENT_PROGRAM_SIZE);
+printf("DEBUG:   #%d: start %ld, length %ld, function %d: new start %ld\n", ix, ict->start, ict->length, ict->function, CURRENT_PROGRAM_SIZE);
 #endif /* DEBUG_INLINES */
         if (ict->length != 0)
         {
@@ -13980,7 +13981,6 @@ insert_inherited (char *super_name, string_t *real_name
                                        : INHERITED_NOT_FOUND;
         for (; num_inherits > 0; ip0++, num_inherits--)
         {
-            funflag_t flags;
             PREPARE_INSERT(10)
 
             /* ip->prog->name includes .c */

@@ -1,7 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-09-Oct-2002 (Lars Duening)
+09-Oct-2002 (Lars Duening)  (3.3.281)
+  - (actions.c, interpret) The OPC dump function still used char* strings
+       instead of the new strings (reported by Nostradamus).
+  - (prolang.y) Removed compilation warnings.
+
+09-Oct-2002 (Lars Duening)  (3.3.280)
   - (prolang.y) When processing inherited structs, the code overwrote
        random memory - especially when there weren't any structs to
        process (reported by Bardioc).

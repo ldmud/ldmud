@@ -687,7 +687,7 @@ special_parse (char *buff)
                 current_object = ref_object(command_giver, "opcdump");
                 no_curobj = MY_TRUE;
             }
-            opcdump("/OPC_DUMP");
+            opcdump(STR_OPCDUMP_FNAME);
             if (no_curobj)
             {
                 free_object(current_object, "opcdump");

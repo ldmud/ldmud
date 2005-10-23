@@ -17832,7 +17832,7 @@ count_interpreter_refs (void)
 /*-------------------------------------------------------------------------*/
 #ifdef OPCPROF
 Bool
-opcdump (char * fname)
+opcdump (string_t * fname)
 
 /* Print the usage statistics for the opcodes into the file <fname>.
  * Return TRUE on success, FALSE if <fname> can't be written.
@@ -17845,7 +17845,8 @@ opcdump (char * fname)
     fname = check_valid_path(fname, current_object, STR_OPCDUMP, MY_TRUE);
     if (!fname)
         return MY_FALSE;
-    f = fopen(fname, "w");
+    f = fopen(get_txt(fname), "w");
+    free_mstring(fname);
     if (!f)
         return MY_FALSE;
     FCOUNT_WRITE(fname);
@@ -17864,7 +17865,7 @@ opcdump (char * fname)
 
     return MY_TRUE;
 }
-#endif
+#endif /* OPCPROF */
 
 
 #ifdef TRACE_CODE

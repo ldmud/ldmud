@@ -639,7 +639,7 @@ int transfer(object item, object dest)
          */
         else if (environment(from))
         {
-            if (from->can_put_and_get() || !from)
+            if (!from->can_put_and_get() || !from)
                 return 3;
         }
     }
