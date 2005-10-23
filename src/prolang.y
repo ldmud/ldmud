@@ -211,6 +211,9 @@ struct const_list_s
 {
     const_list_t *next;
     svalue_t val;
+#ifdef USE_STRUCTS
+    string_t * member; /* NULL, or the member name to initialize */
+#endif
 };
 
 /* --- struct const_list_svalue_s: Head of a constant list ---
@@ -227,6 +230,9 @@ struct const_list_svalue_s
 {
     svalue_t     head;  /* the error handler */
     const_list_t list;  /* First element of the list */
+#ifdef USE_STRUCTS
+    const_list_t *last_member; /* For nested struct initialisations */
+#endif /* USE_STRUCTS */
 };
 
 /* --- struct efun_shadow_t: Store info about masked efuns ---
@@ -546,6 +552,12 @@ static Bool variables_initialized;
 static svalue_t *currently_initialized;
   /* The variable for which currently the initializer is compiled.
    */
+
+#ifdef USE_STRUCTS
+static const_list_t *member_currently_initialized;
+  /* The struct member for which currently the initializer is compiled.
+   */
+#endif /* USE_STRUCTS */
 
 %endif /* INITIALIZATION_BY___INIT */
 
@@ -1110,9 +1122,17 @@ get_type_name (fulltype_t type)
     static char buff[100];
     static char *type_name[] = { "unknown", "int", "string", "void", "object",
                                  "mapping", "float", "mixed", "closure",
-                                 "symbol", "quoted_array", };
+                                 "symbol", "quoted_array", "struct" };
+#ifdef USE_STRUCTS
+    int sec_type_info;
+#endif /* USE_STRUCTS */
 
     Bool pointer = MY_FALSE, reference = MY_FALSE;
+
+#ifdef USE_STRUCTS
+    sec_type_info = GET_SEC_TYPE_INFO(type);
+    type &= ~SEC_TYPE_MASK;
+#endif /* USE_STRUCTS */
 
     buff[0] = '\0';
     if (type & TYPE_MOD_STATIC)
@@ -1145,6 +1165,14 @@ get_type_name (fulltype_t type)
         fatal("Bad type %ld\n", (long)type);
 
     strcat(buff, type_name[type]);
+
+#ifdef USE_STRUCTS
+    if  (type == TYPE_STRUCT)
+    {
+        strcat(buff, " ");
+        strcat(buff, get_txt(STRUCT_DEF(sec_type_info).name));
+    }
+#endif /* USE_STRUCTS */
     if (pointer)
         strcat(buff, " *");
     if (reference)
@@ -1162,7 +1190,7 @@ get_two_types (fulltype_t type1, fulltype_t type2)
 {
     static char buff[100];
 
-    strcpy(buff, "( ");
+    strcpy(buff, "(");
     strcat(buff, get_type_name(type1));
     strcat(buff, " vs ");
     strcat(buff, get_type_name(type2));
@@ -2413,7 +2441,8 @@ define_new_struct ( Bool proto, ident_t *p, funflag_t flags)
     /* Fill in the struct_def_t */
     sdef.name        = ref_mstring(p->name);
     sdef.prog        = NULL;
-    sdef.inh         = 0;
+    sdef.base        = -1;
+    sdef.inh         = -1;
     sdef.num_members = 0;
     sdef.members     = 0;
     sdef.flags       = proto ? (flags | NAME_PROTOTYPE)
@@ -2472,7 +2501,34 @@ find_struct ( string_t * name )
     if (STRUCT_DEF(p->u.global.struct_id).flags & NAME_HIDDEN)
         return -1;
     return p->u.global.struct_id;
-}
+} /* find_struct() */
+
+/*-------------------------------------------------------------------------*/
+static int
+find_struct_member ( struct_def_t * pdef, string_t * name )
+
+/* Find the struct member <name> for struct <pdef> and return its index.
+ * Return -1 if not found.
+ */
+
+{
+    int member;
+    struct_member_t * pmember;
+
+    if (pdef->num_members < 1)
+        return -1;
+
+    for (member = 0, pmember = &STRUCT_MEMBER(pdef->members)
+        ; member < pdef->num_members
+        ; member++, pmember++
+        )
+    {
+        if (mstreq(pmember->name, name))
+            return member;
+    }
+
+    return -1;
+} /* find_struct_member() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -2519,16 +2575,25 @@ printf("DEBUG: add_struct_member('%s', %x, %d) to struct '%s'\n", get_txt(name),
     }
 
     /* Member is ok: add it */
+
     if (pdef->num_members == 0)
     {
         /* First member */
         pdef->members = STRUCT_MEMBER_COUNT;
+        pdef->base = from_struct;
     }
 
-    member.name = ref_mstring(name);
-    member.type = type;
-    add_to_mem_block(A_STRUCT_MEMBERS, &member, sizeof member);
-    pdef->num_members++;
+    if (pdef->num_members == STRUCT_MAX_MEMBERS)
+    {
+        yyerrorf("Too many members for struct '%s'", get_txt(pdef->name));
+    }
+    else
+    {
+        member.name = ref_mstring(name);
+        member.type = type;
+        add_to_mem_block(A_STRUCT_MEMBERS, &member, sizeof member);
+        pdef->num_members++;
+    }
 } /* add_struct_member() */
 
 /*-------------------------------------------------------------------------*/
@@ -2943,6 +3008,9 @@ type_rtoc (svalue_t *svp)
     case T_SYMBOL:       return TYPE_SYMBOL;
     case T_QUOTED_ARRAY: return TYPE_QUOTED_ARRAY;
     case T_MAPPING:      return TYPE_MAPPING;
+#ifdef USE_STRUCTS
+    case T_STRUCT:       return TYPE_STRUCT;
+#endif /* USE_STRUCTS */
     default:
         fatal("Bad svalue type at compile time.\n");
     }
@@ -2996,11 +3064,11 @@ copy_svalue (svalue_t *svp)
 } /* copy_svalue() */
 
 /*-------------------------------------------------------------------------*/
-static vector_t *
+static void
 list_to_vector (size_t length, svalue_t *initialized)
 
 /* <initialized>.u.lvalue points to a const_list of <length> elements: create
- * a vector from this list, store it in <initialized> and also return it.
+ * a vector from this list, store it in <initialized>.
  */
 
 {
@@ -3019,9 +3087,16 @@ list_to_vector (size_t length, svalue_t *initialized)
         clsv = initialized->u.const_list;
         list = &clsv->list;
         block = clsv;
+#ifdef USE_STRUCTS
+        member_currently_initialized = clsv->last_member;
+#endif /* USE_STRUCTS */
         svp = vec->item;
         do {
             *svp++ = list->val;
+#ifdef USE_STRUCTS
+            if (list->member != NULL) /* shouldn't happen here */
+                free_mstring(list->member);
+#endif /* USE_STRUCTS */
             list = list->next;
             xfree(block);
         } while ( NULL != (block = list) );
@@ -3029,8 +3104,147 @@ list_to_vector (size_t length, svalue_t *initialized)
 
     /* Return the array */
     put_array(initialized, vec);
-    return vec;
 } /* list_to_vector() */
+
+#ifdef USE_STRUCTS
+/*-------------------------------------------------------------------------*/
+static void
+list_to_struct (struct_def_t * pdef, int length, svalue_t *initialized)
+
+/* <initialized>.u.lvalue points to a const_list of <length> elements: create
+ * a struct matching <pdef> from this list, store it in <initialized>.
+ */
+
+{
+    const_list_t *list;
+    vector_t *vec;
+    svalue_t *svp;
+    void *block;
+    const_list_svalue_t *clsv;
+
+%line
+    vec = allocate_array(pdef->num_members);
+    if (length)
+    {
+        Bool * flags;    /* Flags which struct members have been set */
+        int    i;
+        int    consumed; /* Number of constants consumed */
+        int    member;   /* Member to set */
+        struct_member_t * pmember;
+
+        clsv = initialized->u.const_list;
+        consumed = 0;
+
+        /* Initialize the flags array */
+        flags = xalloc(pdef->num_members * sizeof(*flags));
+        for (i = 0; i < pdef->num_members; i++)
+            flags[i] = MY_FALSE;
+
+        /* First loop through list: assign the named members
+         */
+        list = &clsv->list;
+        do {
+
+            if (list->member != NULL)
+            {
+                consumed++;
+                member = find_struct_member(pdef, list->member);
+                if (member >= 0)
+                    pmember = &STRUCT_MEMBER(pdef->members+member);
+
+                if (member < 0)
+                    yyerrorf( "No such member '%s' in struct '%s'"
+                            , get_txt(list->member), get_txt(pdef->name)
+                            );
+                else if (flags[member])
+                {
+                    yyerrorf( "Multiple initializations of member '%s' "
+                              "in struct '%s'"
+                            , get_txt(list->member), get_txt(pdef->name)
+                            );
+                }
+                else if (exact_types
+                      && !TYPE( pmember->type , type_rtoc(&list->val)) )
+                {
+                    yyerrorf("Type mismatch %s when initializing member '%s' "
+                             "in struct '%s'"
+                            , get_two_types(pmember->type, type_rtoc(&list->val))
+                            , get_txt(list->member), get_txt(pdef->name)
+                            );
+                }
+                else
+                {
+                    vec->item[member] = list->val;
+                    flags[member] = MY_TRUE;
+                }
+            }
+            list = list->next;
+        } while (NULL != list);
+
+        /* Second loop through list: assign the unnamed members
+         */
+        list = &clsv->list;
+
+        /* Find the first un-set member */
+        for (member = 0; member < pdef->num_members && flags[member]
+            ; member++) /* NOOP */;
+
+        if (member < pdef->num_members)
+        {
+            do {
+                if (list->member == NULL)
+                {
+                    pmember = &STRUCT_MEMBER(pdef->members+member);
+                    consumed++;
+                    if (exact_types
+                     && !TYPE( pmember->type , type_rtoc(&list->val)) )
+                    {
+                        yyerrorf("Type mismatch %s when initializing member '%s' "
+                                 "in struct '%s'"
+                                , get_two_types(pmember->type, type_rtoc(&list->val))
+                                , get_txt(list->member), get_txt(pdef->name)
+                                );
+                    }
+                    else
+                    {
+                        vec->item[member] = list->val;
+                        flags[member] = MY_TRUE;
+                    }
+
+                    /* Find the next un-set member */
+                    for (member++; member < pdef->num_members && flags[member]
+                         ; member++) /* NOOP */;
+                }
+                list = list->next;
+            } while (NULL != list && member < pdef->num_members);
+        }
+
+        xfree(flags); flags = NULL;
+
+        /* Last loop: deallocate the list
+         */
+        list = &clsv->list;
+        block = clsv;
+        member_currently_initialized = clsv->last_member;
+        do {
+            if (list->member != NULL) /* shouldn't happen here */
+                free_mstring(list->member);
+            list = list->next;
+            xfree(block);
+        } while ( NULL != (block = list) );
+
+        /* Test if there were extra elements */
+        if (consumed < length)
+            yyerrorf("Too many initializers for struct '%s'"
+                    , get_txt(pdef->name)
+                    );
+
+    }
+
+    /* Return the array */
+    put_struct(initialized, vec);
+} /* list_to_struct() */
+#endif /* USE_STRUCTS */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -3047,9 +3261,16 @@ free_const_list_svalue (svalue_t *svp)
 
 %line
     list = &((const_list_svalue_t *)svp)->list;
+#ifdef USE_STRUCTS
+    member_currently_initialized = ((const_list_svalue_t *)svp)->last_member;
+#endif /* USE_STRUCTS */
     block = svp;
     do {
         free_svalue(&list->val);
+#ifdef USE_STRUCTS
+        if (list->member != NULL)
+            free_mstring(list->member);
+#endif /* USE_STRUCTS */
         list = list->next;
         xfree(block);
     } while ( NULL != (block = list) );
@@ -3318,6 +3539,15 @@ free_const_list_svalue (svalue_t *svp)
     svalue_t svalue;
       /* Used for constant float initializers: the float value */
 
+#ifdef USE_STRUCTS
+    struct {
+        svalue_t * initialized;  /* svalue currently initialized */
+        int        id;           /* struct id */
+    } struct_init;
+      /* Used to hold the information about which type
+       * struct is to be created, and where to store it.
+       */
+#endif /* USE_STRUCTS */
 %endif
 
 } /* YYSTYPE */
@@ -3356,6 +3586,9 @@ free_const_list_svalue (svalue_t *svp)
 %ifndef INITIALIZATION_BY___INIT
 %type <svalue>       float_constant
 %type <const_list>   const_expr_list const_expr_list2 const_expr_list3
+%ifdef USE_STRUCTS
+%type <const_list>   opt_const_struct_init opt_const_struct_init2
+%endif /* USE_STRUCTS */
 %endif
 
 /* Special uses of <number> */
@@ -3696,7 +3929,7 @@ opt_base_struct:
           int num = -1;
           ident_t *p;
 
-          if (p->type == I_TYPE_UNKNOWN)
+          if ($2->type == I_TYPE_UNKNOWN)
           {
               /* Identifier -> no such struct encountered yet */
               yyerrorf("Unknown base struct '%s'", get_txt($2->name));
@@ -3789,26 +4022,6 @@ struct_init:
       {
       }
 ; /* struct_init */
-
-%ifndef INITIALIZATION_BY___INIT
-
-/* The following rules are used to parse constant struct literals */
-
-opt_const_struct_init:
-      const_struct_init
-    | opt_const_struct_init ',' const_struct_init
-; /* opt_struct_init */
-
-const_struct_init:
-      identifier ':' constant
-      {
-          free_mstring($1);
-      }
-    | constant
-      {
-      }
-; /* const_struct_init */
-%endif /* !INITIALIZATION_BY___INIT */
 
 %endif /* USE_STRUCTS */
 
@@ -4551,6 +4764,9 @@ new_name:
           n = $2->u.global.variable;
           $<initialized>$ = currently_initialized
             = n & VIRTUAL_VAR_TAG ? V_VAR_VALUE(n) : NV_VAR_VALUE(n);
+#ifdef USE_STRUCTS
+          member_currently_initialized = NULL;
+#endif /* USE_STRUCTS */
       }
 
       L_ASSIGN svalue_constant
@@ -10767,15 +10983,114 @@ array_constant:
 
 %ifdef USE_STRUCTS
 struct_constant:
-    | '(' '<' identifier '>' opt_const_struct_init ')'
+      '(' '<' identifier '>' 
       {
-          /* Generate a literal struct */
-          /* TODO: Implement structs */
-
-          yyerror("TODO: struct literals not implemented");
+          int num;
+          
+          num = find_struct($3);
+          if (num < 0)
+          {
+              yyerrorf("Unknown struct '%s'", get_txt($3));
+              YYACCEPT;
+          }
+          $<struct_init>$.initialized = currently_initialized;
+          $<struct_init>$.id = num;
           free_mstring($3);
       }
+      opt_const_struct_init ')'
+      {
+          /* Generate a literal struct */
+
+          struct_def_t * pdef = &(STRUCT_DEF($<struct_init>5.id));
+          svalue_t     * svp = $<struct_init>5.initialized;
+
+          if ($6.length > STRUCT_MAX_MEMBERS || $6.length > pdef->num_members)
+          {
+              yyerrorf("Too many elements for literal struct '%s'"
+                      , get_txt(pdef->name));
+              free_svalue(svp);
+                /* Calls free_const_list_svalue() by means of error handler */
+              put_number(svp, 0);
+          }
+          else
+          {
+              list_to_struct(pdef, $6.length, svp);
+          }
+      }
 ; /* struct_constant */
+
+/* The following rules are used to parse constant struct literals */
+
+opt_const_struct_init:
+      /* empty */                { $$.length = 0; }
+    | opt_const_struct_init2     { $$ = $1; }
+; /* opt_const_struct_init */
+
+opt_const_struct_init2:
+      /* empty */
+      {
+          /* The end of a const_list (or a const_list with just one
+           * element) - this is the first rule reduced.
+           *
+           * Prepare the const list svalue to return the value.
+           */
+
+          svalue_t *svp;
+          const_list_svalue_t *clsv;
+%line
+          clsv = xalloc(sizeof *clsv);
+          svp = currently_initialized;
+          svp->type = T_LVALUE;
+          svp->u.lvalue = &clsv->head;
+          clsv->head.type = T_ERROR_HANDLER;
+          clsv->head.u.error_handler = free_const_list_svalue;
+          clsv->list.next = NULL;
+          clsv->list.val.type = T_INVALID;
+          clsv->last_member = member_currently_initialized;
+          currently_initialized = &clsv->list.val;
+          member_currently_initialized = &clsv->list;
+          $<const_list>$.l = &clsv->list;
+          $<const_list>$.length = 1;
+      }
+
+      const_struct_init
+%ifdef YACC_CANNOT_MIX_ANONYMOUS_WITH_DEFAULT
+      { $$ = $<const_list>1; }
+%endif
+    | opt_const_struct_init2
+      {
+          /* One more element to the const_list */
+
+          const_list_t *l;
+%line
+          l = xalloc(sizeof (const_list_t));
+          l->next = NULL;
+          l->val.type = T_INVALID;
+          l->member = NULL;
+          currently_initialized = &l->val;
+          member_currently_initialized = l;
+          $1.l->next = l;
+      }
+
+      ',' const_struct_init
+
+      {
+          $$.l = $1.l->next;
+          $$.length = $1.length+1;
+      }
+; /* opt_const_struct_init2 */
+
+const_struct_init:
+      identifier ':' svalue_constant
+      {
+          member_currently_initialized->member = $1;
+      }
+    | svalue_constant
+      {
+          member_currently_initialized->member = NULL;
+      }
+; /* const_struct_init */
+
 %endif /* USE_STRUCTS */
 
 float_constant:
@@ -10828,6 +11143,11 @@ const_expr_list2:
           clsv->head.type = T_ERROR_HANDLER;
           clsv->head.u.error_handler = free_const_list_svalue;
           clsv->list.next = NULL;
+#ifdef USE_STRUCTS
+          clsv->list.member = NULL;
+          clsv->last_member = member_currently_initialized;
+          member_currently_initialized = NULL;
+#endif /* USE_STRUCTS */
           clsv->list.val.type = T_INVALID;
           currently_initialized = &clsv->list.val;
           $<const_list>$.l = &clsv->list;
@@ -10848,6 +11168,9 @@ const_expr_list2:
           l = xalloc(sizeof (const_list_t));
           l->next = NULL;
           l->val.type = T_INVALID;
+#ifdef USE_STRUCTS
+          l->member = NULL;
+#endif /* USE_STRUCTS */
           currently_initialized = &l->val;
           $1.l->next = l;
       }
@@ -10890,60 +11213,6 @@ constant_function_call:
           list = svp->u.const_list;
           switch($<const_call_head>2.function)
           {
-#ifdef F_ORDER_ALIST
-          case F_ORDER_ALIST:
-            {
-              size_t i, listsize;
-              vector_t *vec;
-
-              if ($4.length == 1
-               && list->list.val.type == T_POINTER
-               && VEC_SIZE(vec = list->list.val.u.vec)
-               && vec->item[0].type == T_POINTER
-                 )
-              {
-                  xfree(list);
-              }
-              else
-              {
-                  vec = list_to_vector($4.length, svp);
-              }
-
-              if ((listsize = VEC_SIZE(vec))
-               && vec->item[0].type == T_POINTER)
-              {
-                  size_t keynum = VEC_SIZE(vec->item[0].u.vec);
-
-                  for (i = 0; i < VEC_SIZE(vec); i++)
-                  {
-                      if (vec->item[i].type != T_POINTER
-                       || VEC_SIZE(vec->item[i].u.vec) != keynum)
-                      {
-                          yyerrorf("bad data array %ld for alist", (long)i);
-                          free_array(vec);
-                          *svp = const0;
-                          break;
-                      }
-                  }
-              }
-              else
-              {
-                  yyerror("missing argument for order_alist");
-              }
-
-              if (listsize)
-              {
-                  put_array(svp, order_alist(vec->item, listsize, 1));
-              }
-              else
-              {
-                  *svp = const0;
-              }
-              free_array(vec);
-              break;
-            }
-#endif /* F_ORDER_ALIST */
-
           default:
               yyerror("Illegal function call in initialization");
               free_svalue(svp);
@@ -11284,9 +11553,13 @@ transfer_init_control (void)
             name = ref_mstring(STR_VARINIT);
             memcpy(__PREPARE_INSERT__p , (char *)&name, sizeof name);
             __PREPARE_INSERT__p += sizeof(name);
-            add_byte(TYPE_ANY);  /* return type */
-            add_byte(0);         /* num_arg */
-            add_byte(0);         /* num_local */
+#ifdef USE_STRUCTS
+            add_short(TYPE_ANY);  /* FUNCTION_TYPE */
+#else
+            add_byte(TYPE_ANY);  /* FUNCTION_TYPE */
+#endif /* USE_STRUCTS */
+            add_byte(0);         /* FUNCTION_NUM_ARGS */
+            add_byte(0);         /* FUNCTION_NUM_VARS */
             first_initializer_start =
               (CURRENT_PROGRAM_SIZE += sizeof name + 3) - 2;
         }
@@ -11751,7 +12024,7 @@ copy_structs (program_t *from, fulltype_t flags, int offset)
                 yyerrorf("struct '%s' multiply inherited from '%s' "
                          "and '%s'"
                         , get_txt(STRUCT_DEF(id).name)
-                        , get_txt(INHERIT(STRUCT_DEF(id).inh-1).prog->name)
+                        , get_txt(INHERIT(STRUCT_DEF(id).inh).prog->name)
                         , get_txt(from->name)
                         );
             }
@@ -13357,13 +13630,14 @@ epilog (void)
               , STRUCT_DEF(i).inh
               , STRUCT_DEF(i).flags
               );
-
     printf("\n");
+
     for (i = 0; i < STRUCT_MEMBER_COUNT; i++)
         printf("DEBUG: [%d] member %s: %x\n"
               , i, get_txt(STRUCT_MEMBER(i).name)
               , STRUCT_MEMBER(i).type
               );
+    printf("\n");
 
 }
 #endif /* USE_STRUCTS */

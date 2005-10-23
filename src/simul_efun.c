@@ -333,6 +333,9 @@ get_simul_efun_object (void)
                 p->u.global.variable = I_GLOBAL_VARIABLE_FUN;
                 p->u.global.efun     = I_GLOBAL_EFUN_OTHER;
                 p->u.global.sim_efun = I_GLOBAL_SEFUN_OTHER;
+#ifdef USE_STRUCTS
+                p->u.global.struct_id = I_GLOBAL_STRUCT_NONE;
+#endif
                 p->next_all = all_simul_efuns;
                 all_simul_efuns = p;
             }

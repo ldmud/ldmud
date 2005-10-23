@@ -236,6 +236,14 @@ typedef uint32          fulltype_t;  /* Full: type and visibility */
   /* Mask for basic type and flags.
    */
 
+/* Other type related defines */
+
+#define STRUCT_MAX_MEMBERS 255
+  /* We allow up to this number of members per struct, so that
+   * we can encode the number of actual members, where needed,
+   * in a single bytecode.
+   */
+
 #else
 #define TYPEMAP_SIZE       11   /* Number of types */
 
@@ -607,14 +615,14 @@ typedef bytecode_p fun_hdr_p;
 #define FUNCTION_FROM_CODE(p) ((fun_hdr_p)((unsigned char *)p - 2* sizeof(char)))
 
 #if defined(USE_STRUCTS)
-#define FUNCTION_PRE_HDR_SIZE (sizeof(string_t*) + 2)
+#define FUNCTION_PRE_HDR_SIZE (sizeof(string_t*) + sizeof(vartype_t))
 #else
-#define FUNCTION_PRE_HDR_SIZE (sizeof(string_t*) + 1)
+#define FUNCTION_PRE_HDR_SIZE (sizeof(string_t*) + sizeof(char))
 #endif
   /* Number of function header bytes before the function pointer.
    */
 
-#define FUNCTION_HDR_SIZE     (FUNCTION_PRE_HDR_SIZE + 2)
+#define FUNCTION_HDR_SIZE     (FUNCTION_PRE_HDR_SIZE + 2*sizeof(char))
   /* Total size of the function header.
    */
 
@@ -690,11 +698,12 @@ struct struct_def_s
                               * in. This pointer is not counted and may
                               * be used just for comparisons.
                               */
-    unsigned short inh;      /* If inherited: index+1 into program_t.inherit[]
-                              * 0 if defined in this program
+    short          inh;      /* If inherited: index into program_t.inherit[]
+                              * -1 if defined in this program
                               */
     unsigned short num_members;  /* Number of data members */
     unsigned short members;  /* Index into program_t.struct_members[] */
+    short          base;     /* Index of the base struct, or -1 if none */
     funflag_t      flags;    /* Visibility */
 };
 

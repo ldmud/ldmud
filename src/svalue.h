@@ -50,6 +50,9 @@ union u {
       /* T_POINTER, T_QUOTED_ARRAY: pointer to the vector structure.
        * T_(PROTECTED_)POINTER_RANGE_LVALUE: the target vector holding
        *   the range.
+#ifdef USE_STRUCTS
+       * T_STRUCT: pointer to the fixed-length vector structure.
+#endif
        */
     mapping_t *map;
       /* T_MAPPING: pointer to the mapping structure.
@@ -184,37 +187,40 @@ struct svalue_s
 #define T_CLOSURE       0x8  /* a closure */
 #define T_SYMBOL        0x9  /* a symbol */
 #define T_QUOTED_ARRAY  0xa  /* a quoted array */
+#ifdef USE_STRUCTS
+#define T_STRUCT        0xb  /* a struct */
+#endif /* USE_STRUCTS */
 
-#define T_CHAR_LVALUE                     0xb
+#define T_CHAR_LVALUE                     0xc
   /* .u.string points to the referenced character in a string */
 
   /* The following types must be used only in svalues referenced
    * by a T_LVALUE svalue.
    */
-#define T_STRING_RANGE_LVALUE             0x0c /* TODO: ??? */
-#define T_POINTER_RANGE_LVALUE            0x0d /* TODO: ??? */
-#define T_PROTECTED_CHAR_LVALUE           0x0e
+#define T_STRING_RANGE_LVALUE             0x0d /* TODO: ??? */
+#define T_POINTER_RANGE_LVALUE            0x0e /* TODO: ??? */
+#define T_PROTECTED_CHAR_LVALUE           0x0f
   /* A protected character lvalue */
-#define T_PROTECTED_STRING_RANGE_LVALUE   0x0f
+#define T_PROTECTED_STRING_RANGE_LVALUE   0x10
   /* A protected string range lvalue */
-#define T_PROTECTED_POINTER_RANGE_LVALUE  0x10
+#define T_PROTECTED_POINTER_RANGE_LVALUE  0x11
   /* A protected pointer/mapping range lvalue */
-#define T_PROTECTED_LVALUE                0x11
+#define T_PROTECTED_LVALUE                0x12
   /* A protected lvalue */
-#define T_PROTECTOR_MAPPING               0x12 /* TODO: ??? */
+#define T_PROTECTOR_MAPPING               0x13 /* TODO: ??? */
 
-#define T_CALLBACK                        0x13
+#define T_CALLBACK                        0x14
   /* A callback structure referenced from the stack to allow
    * proper cleanup during error recoveries. The interpreter
    * knows how to free it, but that's all.
    */
 
-#define T_ERROR_HANDLER                   0x14
+#define T_ERROR_HANDLER                   0x15
   /* Not an actual value, this is used internally for cleanup
    * operations.
    */
 
-#define T_NULL                            0x15
+#define T_NULL                            0x16
   /* Not an actual type, this is used in the efun_lpc_types[] table
    * to encode the acceptance of '0' instead of the real datatype.
    */
@@ -468,6 +474,13 @@ double READ_DOUBLE(struct svalue *svalue_pnt)
     ( (sp)->type = T_POINTER, (sp)->u.vec = ref_array(arr) )
 #define put_array(sp,arr) \
     ( (sp)->type = T_POINTER, (sp)->u.vec = arr )
+
+#ifdef USE_STRUCTS
+#define put_ref_struct(sp,arr) \
+    ( (sp)->type = T_STRUCT, (sp)->u.vec = ref_array(arr) )
+#define put_struct(sp,arr) \
+    ( (sp)->type = T_STRUCT, (sp)->u.vec = arr )
+#endif /* USE_STRUCTS */
 
 #define put_ref_mapping(sp,val) \
     ( (sp)->type = T_MAPPING, (sp)->u.map = ref_mapping(val) )

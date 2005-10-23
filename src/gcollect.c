@@ -632,6 +632,9 @@ clear_ref_in_vector (svalue_t *svp, size_t num)
 
         case T_POINTER:
         case T_QUOTED_ARRAY:
+#ifdef USE_STRUCTS
+        case T_STRUCT:
+#endif /* USE_STRUCTS */
             if (!p->u.vec->ref)
                 continue;
             p->u.vec->ref = 0;
@@ -709,6 +712,9 @@ gc_count_ref_in_vector (svalue_t *svp, size_t num
 
         case T_POINTER:
         case T_QUOTED_ARRAY:
+#ifdef USE_STRUCTS
+        case T_STRUCT:
+#endif /* USE_STRUCTS */
             /* Don't use CHECK_REF on the null vector */
             if (p->u.vec != &null_vector && CHECK_REF(p->u.vec))
             {
@@ -1777,6 +1783,9 @@ show_array(int d, void *block, int depth)
         switch(svp->type)
         {
         case T_POINTER:
+#ifdef USE_STRUCTS
+        case T_STRUCT:
+#endif /* USE_STRUCTS */
             show_array(d, (char *)svp->u.vec, depth+1);
             break;
 

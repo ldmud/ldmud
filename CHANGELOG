@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+05-Sep-2002 (Lars Duening)  (3.3.245)
+  - (prolang.y) The function header for __INIT() was generated incorrectly
+       (reported by Markus).
+  - (exec.h, prolang.y, svalue.h, gcollect.c, interpret.c) Implemented
+       constant struct initializations (!INITIALIZATION_BY___INIT).
+
 04-Sep-2002 (Lars Duening)  (3.3.244)
   - (gcollect.c, prolang.y, exec.h, object) Implemented the parsing
        and inheritance of struct definitions (the latter untested).

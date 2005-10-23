@@ -440,6 +440,7 @@ static const char * svalue_typename[]
    , /* T_CLOSURE */  "closure"
    , /* T_SYMBOL  */  "symbol"
    , /* T_QUOTED_ARRAY */  "quoted-array"
+   , /* T_STRUCT */  "struct"
    , /* T_CHAR_LVALUE */           "char-lvalue"
    , /* T_STRING_RANGE_LVALUE */   "string-range-lvalue"
    , /* T_POINTER_RANGE_LVALUE */  "array-range-lvalue"
@@ -921,6 +922,9 @@ free_protector_svalue (svalue_t *v)
     switch (v->type)
     {
       case T_POINTER:
+#ifdef USE_STRUCTS
+      case T_STRUCT:
+#endif /* USE_STRUCTS */
         free_array(v->u.vec);
         break;
       case T_MAPPING:
@@ -981,6 +985,9 @@ free_svalue (svalue_t *v)
 
     case T_QUOTED_ARRAY:
     case T_POINTER:
+#ifdef USE_STRUCTS
+    case T_STRUCT:
+#endif /* USE_STRUCTS */
         free_array(v->u.vec);
         break;
 
@@ -1230,6 +1237,9 @@ inl_assign_svalue_no_free (svalue_t *to, svalue_t *from)
 
     case T_QUOTED_ARRAY:
     case T_POINTER:
+#ifdef USE_STRUCTS
+    case T_STRUCT:
+#endif /* USE_STRUCTS */
         (void)ref_array(to->u.vec);
         break;
 
@@ -1290,6 +1300,9 @@ assign_checked_svalue_no_free (svalue_t *to, svalue_t *from)
 
     case T_QUOTED_ARRAY:
     case T_POINTER:
+#ifdef USE_STRUCTS
+    case T_STRUCT:
+#endif /* USE_STRUCTS */
         (void)ref_array(from->u.vec);
         break;
 
@@ -1343,6 +1356,9 @@ assign_from_lvalue:
         break;
       case T_QUOTED_ARRAY:
       case T_POINTER:
+#ifdef USE_STRUCTS
+      case T_STRUCT:
+#endif /* USE_STRUCTS */
         (void)ref_array(from->u.vec);
         break;
       case T_SYMBOL:
@@ -1435,6 +1451,9 @@ void assign_lrvalue_no_free (svalue_t *to, svalue_t *from)
 
     case T_QUOTED_ARRAY:
     case T_POINTER:
+#ifdef USE_STRUCTS
+    case T_STRUCT:
+#endif /* USE_STRUCTS */
         (void)ref_array(to->u.vec);
         break;
 
@@ -1515,6 +1534,9 @@ assign_svalue (svalue_t *dest, svalue_t *v)
 
         case T_QUOTED_ARRAY:
         case T_POINTER:
+#ifdef USE_STRUCTS
+        case T_STRUCT:
+#endif /* USE_STRUCTS */
           {
             vector_t *vec = dest->u.vec;
             assign_svalue_no_free(dest, v);
@@ -1684,6 +1706,9 @@ inl_transfer_svalue (svalue_t *dest, svalue_t *v)
 
         case T_QUOTED_ARRAY:
         case T_POINTER:
+#ifdef USE_STRUCTS
+        case T_STRUCT:
+#endif /* USE_STRUCTS */
             free_array(dest->u.vec);
             break;
 
