@@ -1736,7 +1736,11 @@ show_cl_literal (int d, void *block, int depth UNUSED)
         WRITES(d, "<null>");
 
     WRITES(d, ", index ");
+#ifdef USE_NEW_INLINES
+    writed(d, l->function.lfun.index);
+#else
     writed(d, l->function.index);
+#endif /* USE_NEW_INLINES */
     WRITES(d, ", ref ");
     writed(d, l->ref);
     WRITES(d, "\n");
@@ -1923,7 +1927,11 @@ setup_print_block_dispatcher (void)
     free_svalue(inter_sp--);
 
     current_object = master_ob;
+#ifdef USE_NEW_INLINES
+    closure_literal(&tmp_closure, 0, 0);
+#else
     closure_literal(&tmp_closure, 0);
+#endif /* USE_NEW_INLINES */
     store_print_block_dispatch_info(tmp_closure.u.lambda, show_cl_literal);
     free_svalue(&tmp_closure);
 }
