@@ -67,7 +67,7 @@ Unix or Unix-like system
 
   The compilation is done using make. Following targets are implemented:
 
-    <none>:        compile the driver
+    <none>:        compile the driver, named 'ldmud'.
     install:       compile the driver and install it in ${bindir}
     utils:         compile the utilities, especially the ERQ demon
     install-utils: compile and install the utilities in ${bindir}
@@ -78,7 +78,7 @@ Unix or Unix-like system
   and make sure that the files from mudlib/sys/ all go into your lib's
   include directory (usually 'sys/').
 
-  To test the driver, start it with 'driver &'. If you see the message
+  To test the driver, start it with 'ldmud &'. If you see the message
   'Setting up ipc', the driver is up and accepting connections. Test
   it with 'telnet localhost 4242'.
 

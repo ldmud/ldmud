@@ -271,15 +271,23 @@ static unsigned long erq_pending_len = 0;
    * to be cleared by stop_erq_demon().
    */
 
-static svalue_t pending_erq[MAX_PENDING_ERQ+1];
+typedef struct erq_callback_s {
+    svalue_t fun;
+    Bool     string_arg;
+} erq_callback_t;
+
+static erq_callback_t pending_erq[MAX_PENDING_ERQ+1];
   /* ERQ callback handles. The last one is reserved for callback-free
    * requests.
+   * .fun is the callback closure, .string_arg is TRUE if the closure
+   * takes its data as a string instead of an array as argument.
+   *
    * The free entries are organised in a singly linked list of
-   * T_INVALID svalues, using the u.lvalue to point to the next
+   * T_INVALID .fun svalues, using the .fun.u.generic to point to the next
    * free entry.
    */
 
-static svalue_t *free_erq;
+static erq_callback_t *free_erq;
   /* The first free entry in the freelist in pending_erq[] */
 
 /* The size of the IPTABLE depends on the number of users,
@@ -2541,33 +2549,54 @@ get_message (char *buff)
                          * handle - execute it (after some sanity checks).
                          */
 
+                        rest = msglen - 8;
                         if ((uint32)handle < MAX_PENDING_ERQ
-                         && (   (rest = msglen - 8) <= max_array_size
-                             || !max_array_size)
-                         && pending_erq[handle].type != T_INVALID)
+                         && pending_erq[handle].fun.type != T_INVALID
+                         && (   rest <= max_array_size
+                             || !max_array_size
+                             || pending_erq[handle].string_arg
+                            )
+                           )
                         {
-                            svalue_t *erqp = &pending_erq[handle];
-                            char *cp;
-                            vector_t *v;
-                            svalue_t *svp;
+                            svalue_t *erqp = &pending_erq[handle].fun;
                             object_t *ob;
                             wiz_list_t *user;
+                            int num_arg;
 
                             command_giver = 0;
                             current_interactive = 0;
                             ob = !CLOSURE_MALLOCED(erqp->x.closure_type)
                                  ? erqp->u.ob
                                  : erqp->u.lambda->ob;
-                            current_object = ob;
-                            v = allocate_array(rest);
-                            current_object = NULL;
-                            push_array(inter_sp, v);
-                            push_number(inter_sp, rest);
-                            cp = rp + 8;
-                            for (svp = v->item; --rest >=0; svp++)
+                            if (pending_erq[handle].string_arg)
                             {
-                                svp->u.number = *cp++;
+                                string_t * str;
+
+                                str = new_n_mstring(rp + 8, rest);
+                                push_string(inter_sp, str);
+
+                                num_arg = 1;
                             }
+                            else
+                            {
+                                char *cp;
+                                vector_t *v;
+                                svalue_t *svp;
+
+                                current_object = ob;
+                                v = allocate_array(rest);
+                                current_object = NULL;
+                                push_array(inter_sp, v);
+                                push_number(inter_sp, rest);
+                                cp = rp + 8;
+                                for (svp = v->item; --rest >=0; svp++)
+                                {
+                                    svp->u.number = *cp++;
+                                }
+
+                                num_arg = 2;
+                            }
+
                             user = ob->user;
                             if (user->last_call_out != current_time)
                             {
@@ -2577,14 +2606,14 @@ get_message (char *buff)
                                 assigned_eval_cost = eval_cost = user->call_out_cost;
                             }
                             RESET_LIMITS;
-                            secure_callback_lambda(erqp, 2);
+                            secure_callback_lambda(erqp, num_arg);
                             user->call_out_cost = eval_cost;
                             if (!keep_handle || (ob->flags & O_DESTRUCTED))
                             {
                                 free_svalue(erqp);
                                 erqp->type = T_INVALID;
-                                erqp->u.lvalue = free_erq;
-                                free_erq = erqp;
+                                erqp->u.generic = (void *)free_erq;
+                                free_erq = &pending_erq[handle];
                             }
                         } /* if(valid handle) */
 
@@ -4814,7 +4843,6 @@ telnet_neg (interactive_t *ip)
              */
             if (from >= end)
             {
-        data_exhausted:
                 ip->text_end = ip->tn_end = ip->command_end = (short)(to - first);
                 *to = '\0';
                 if (ip->text_end >= MAX_TEXT)
@@ -5172,21 +5200,21 @@ start_erq_demon (const char *suffix, size_t suffixlen)
  */
 
 {
-    svalue_t *erqp;
+    erq_callback_t *erqp;
     char path[MAXPATHLEN+1];
     int sockets[2];
     int pid;
     char c;
 
     /* Create the freelist in pending_erq[] */
-    pending_erq[0].type = T_INVALID;
-    pending_erq[0].u.lvalue = NULL;
+    pending_erq[0].fun.type = T_INVALID;
+    pending_erq[0].fun.u.generic = NULL;
 
     erqp = pending_erq + 1;
     while (erqp < &pending_erq[MAX_PENDING_ERQ])
     {
-        erqp->u.lvalue = erqp - 1;
-        erqp->type = T_INVALID;
+        erqp->fun.u.generic = (void *)(erqp - 1);
+        erqp->fun.type = T_INVALID;
         erqp++;
     }
     free_erq = &pending_erq[MAX_PENDING_ERQ-1];
@@ -5272,7 +5300,7 @@ stop_erq_demon (Bool notify)
  */
 
 {
-    svalue_t *erqp;
+    erq_callback_t *erqp;
     int i;
 
     if (erq_demon < 0)
@@ -5285,11 +5313,11 @@ stop_erq_demon (Bool notify)
     erqp = pending_erq;
     i = MAX_PENDING_ERQ;
     do {
-        if (erqp->type == T_CLOSURE)
+        if (erqp->fun.type == T_CLOSURE)
         {
-            *++inter_sp = *erqp;
-            erqp->type = T_INVALID;
-            erqp->u.lvalue = free_erq;
+            *++inter_sp = erqp->fun;
+            erqp->fun.type = T_INVALID;
+            erqp->fun.u.generic = (void *)free_erq;
             free_erq = erqp;
             CLEAR_EVAL_COST;
             RESET_LIMITS;
@@ -5483,8 +5511,9 @@ f_send_erq (svalue_t *sp)
 {
     char  *arg;
     size_t arglen;
-    svalue_t *new_erq;
+    erq_callback_t *new_erq;
     int i;
+    p_int erq_request;
 
     /* Set arg with the data to send. */
 
@@ -5507,9 +5536,14 @@ f_send_erq (svalue_t *sp)
             *cp++ = (char)(*svp++).u.number;
     }
 
+    erq_request = sp[-2].u.number;
+
     /* Test if this call is allowed. */
 
-    if (!privilege_violation4(STR_SEND_ERQ, 0, STR_EMPTY, sp[-2].u.number, sp)) {
+    if (!privilege_violation4(STR_SEND_ERQ, 0, STR_EMPTY
+                             , erq_request & (~ERQ_CB_STRING)
+                             , sp))
+    {
         goto failure;
     }
 
@@ -5521,7 +5555,7 @@ f_send_erq (svalue_t *sp)
 
     if (sp->type == T_NUMBER) { /* it's the number 0 */
         new_erq = &pending_erq[MAX_PENDING_ERQ];
-        new_erq->u.lvalue = free_erq;
+        new_erq->fun.u.generic = (void *)free_erq;
     }
     else if (sp->type == T_CLOSURE
           && sp->x.closure_type != CLOSURE_UNBOUND_LAMBDA)
@@ -5532,10 +5566,13 @@ f_send_erq (svalue_t *sp)
     /* Send the request and make up the result. */
 
     if (new_erq
-     && 0 != (i = send_erq(new_erq - pending_erq, sp[-2].u.number, arg, arglen)) )
+     && 0 != (i = send_erq(new_erq - pending_erq, erq_request & (~ERQ_CB_STRING)
+                          , arg, arglen))
+       )
     {
-        free_erq = new_erq->u.lvalue;
-        *new_erq = *sp;
+        free_erq = (erq_callback_t *)new_erq->fun.u.generic;
+        new_erq->fun = *sp;
+        new_erq->string_arg = (erq_request & ERQ_CB_STRING) != 0;
     }
     else
     {
@@ -5843,9 +5880,11 @@ clear_comm_refs (void)
 
 {
 #ifdef ERQ_DEMON
-    clear_ref_in_vector(
-      pending_erq, sizeof pending_erq / sizeof (svalue_t)
-    );
+    int i;
+    for (i = sizeof (pending_erq) / sizeof (*pending_erq); --i >= 0;)
+    {
+        clear_ref_in_vector(&pending_erq[i].fun, 1);
+    }
 #endif /* ERQ_DEMON */
 }
 
@@ -5863,9 +5902,11 @@ count_comm_refs (void)
         if (iptable[i].name)
             count_ref_from_string(iptable[i].name);
     }
-    count_ref_in_vector(
-      pending_erq, sizeof pending_erq / sizeof (svalue_t)
-    );
+
+    for (i = sizeof (pending_erq) / sizeof (*pending_erq); --i >= 0;)
+    {
+        count_ref_in_vector(&pending_erq[i].fun, 1);
+    }
 #endif /* ERQ_DEMON */
 }
 
@@ -6167,9 +6208,8 @@ count_comm_extra_refs (void)
     int i;
 
 #ifdef ERQ_DEMON
-    count_extra_ref_in_vector(
-      pending_erq, sizeof pending_erq / sizeof (svalue_t)
-    );
+    for (i = sizeof(pending_erq) / sizeof(*pending_erq); --i >= 0; )
+        count_extra_ref_in_vector(&pending_erq[i].fun, 1);
 #endif /* ERQ_DEMON */
 
     for (i = 0; i < MAX_PLAYERS; i++)

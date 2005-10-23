@@ -16540,7 +16540,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
             fatal("Calling non-existing lfun closure #%hu in program '%s' "
                   "with %hu functions.\n"
                  , l->function.lfun.index
-                 , l->function.lfun.ob->prog->name
+                 , get_txt(l->function.lfun.ob->prog->name)
                  , l->function.lfun.ob->prog->num_functions
                 );
 #endif

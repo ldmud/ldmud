@@ -130,7 +130,7 @@ int order(string str)
 /*
  * Make this global, and only initialized once.
  */
-string * chat_str, * function, * type, * match;
+string * chat_str, * action, * type, * match;
 
 void start_player() {
     if(!player) {
@@ -148,18 +148,18 @@ void start_player() {
 	player->set_hp(100);
 	player->set_wc(12);
 	move_object(player, "room/pub2");
-	if (!function) {
-	    function = allocate(2);
+	if (!action) {
+	    action = allocate(2);
 	    type = allocate(2);
 	    match = allocate(2);
-	    function[0] = "got_play";
+	    action[0] = "got_play";
 	    type[0] = "says:";
 	    match[0] = " play";
-	    function[1] = "make_move";
+	    action[1] = "make_move";
 	    type[1] = "PISS";
 	    match[1] = " OFF";
 	}
-	player->set_match(this_object(), function, type, match);
+	player->set_match(this_object(), action, type, match);
 	if (!chat_str) {
 	    chat_str = allocate(5);
 	    chat_str[0] = "Go player says: Hm. This is tricky!\n";

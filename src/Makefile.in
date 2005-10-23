@@ -36,18 +36,26 @@ ERQ_DIR= @libexecdir@
 #PROFIL=-p -DMARK
 #PROFIL=-pg
 PROFIL=
-#Enable warnings from the compiler, if wanted.
-WARN= # no warning options - will work with all compilers :-)
-#WARN= -Wall -Wshadow
-#WARN= -Wall -Wshadow -Wparentheses # gcc settings
-#
+
+# Enable warnings from the compiler, if wanted.
+NO_WARN= # no warning options - will work with all compilers :-)
+GCC_WARN= -Wall -Wshadow -Wparentheses # gcc settings
+CFG_WARN= @WCFLAGS@ # Warn options discovered by configure
+
+WARN= ${CFG_WARN}
+
+
 # Optimization and source level debugging options.
 # adding a -fomit-frame-pointer on the NeXT (gcc version 1.93 (68k, MIT syntax))
 # will corrupt the driver.
-#OPTIMIZE = @OCFLAGS@ # high optimization
-OPTIMIZE= @MCFLAGS@ # medium optimization
-#OPTIMIZE = @LCFLAGS@ # minimal optimization
-#OPTIMIZE= @DCFLAGS@ # no optimization; for frequent recompilations.
+
+HIGH_OPTIMIZE = @OCFLAGS@ # high optimization
+MED_OPTIMIZE= @MCFLAGS@ # medium optimization
+MIN_OPTIMIZE = @LCFLAGS@ # minimal optimization
+NO_OPTIMIZE= @DCFLAGS@ # no optimization; for frequent recompilations.
+
+OPTMIZE= $MED_OPTIMIZE
+
 #
 # Debugging options:
 #   Debugging options should be set in config.h to guarantee a clean
@@ -89,12 +97,12 @@ OBJ = access_check.o actions.o array.o backend.o bitstrings.o call_out.o \
       random.o regexp.o simulate.o simul_efun.o stdstrings.o \
       strfuns.o sprintf.o swap.o wiz_list.o xalloc.o @ALLOCA@ 
 
-driver@EXEEXT@: $(OBJ)
+ldmud@EXEEXT@: $(OBJ)
 	$(CC) @OPTIMIZE_LINKING@ $(LDFLAGS) $(OBJ) -o $@ $(LIBS)
 
-install: driver@EXEEXT@
+install: ldmud@EXEEXT@
 	$(mkinstalldirs) $(BINDIR)
-	$(INSTALL) -c $? $(BINDIR)/driver@EXEEXT@
+	$(INSTALL) -c $? $(BINDIR)/ldmud@EXEEXT@
 
 install-utils:
 	(cd util; $(MAKE) $(MFLAGS) install)
@@ -110,11 +118,11 @@ clean:
 	$(RM) dftables@EXEEXT@ pcre/chartables.c
 	$(RM) stdstrings.c stdstrings.h
 	$(RM) efun_defs.c instrs.h lang.y lang.h lang.c y.output tags TAGS
-	$(RM) driver@EXEEXT@ core mudlib/core mudlib/debug.log lpmud.log
+	$(RM) ldmud@EXEEXT@ core mudlib/core mudlib/debug.log lpmud.log
 	(cd util ; echo "Cleaning in util." ; $(MAKE) clean)
 
 distclean: clean
-	$(RM) driver@EXEEXT@ config.status machine.h Makefile config.cache config.log
+	$(RM) ldmud@EXEEXT@ config.status machine.h Makefile config.cache config.log
 	$(RM) config.h config.status config.status.old
 	$(RM) util/Makefile util/erq/Makefile util/xerq/Makefile
 

@@ -4,7 +4,7 @@ object harry;
 int count;
 string * chat_str;	/* This variable is only initialized once. */
 string * a_chat_str;
-string * function, * type, * match;
+string * action, * type, * match;
 
 void start_harry();
 
@@ -50,37 +50,37 @@ void start_harry() {
 	    a_chat_str[6] = "Harry says: Bastard\n";
 	    a_chat_str[7] = "Harry says: You big brute!\n";
 
-	    function = allocate(12);
+	    action = allocate(12);
 	    type = allocate(12);
 	    match = allocate(12);
 
-	    function[0] = "why_did";
+	    action[0] = "why_did";
 	    type[0] = "sells";
 	    type[1] = "attack";
 	    type[2] = "left";
 	    match[2] = "the game";
 	    type[3] = "takes";
 	    type[4] = "drops";
-	    function[5] = "how_does_it_feel";
+	    action[5] = "how_does_it_feel";
 	    type[5] = "is now level";
-	    function[6] = "smiles";
+	    action[6] = "smiles";
 	    type[6] = "smiles";
 	    match[6] = " happily.";
-	    function[7] = "say_hello";
+	    action[7] = "say_hello";
 	    type[7] = "arrives";
-	    function[8] = "test_say";
+	    action[8] = "test_say";
 	    type[8] = "says:";
 	    type[9] = "tells you:";
-	    function[10] = "follow";
+	    action[10] = "follow";
 	    type[10] = "leaves";
-	    function[11] = "gives";
+	    action[11] = "gives";
 	    type[11] = "gives";
 	}
 	harry = clone_object("obj/monster");
 	/* Reuse the same arrays. */
 	harry->load_chat(2, chat_str);
 	harry->load_a_chat(20, a_chat_str);
-	harry->set_match(this_object(), function, type, match);
+	harry->set_match(this_object(), action, type, match);
 	harry->set_name("harry");
 	harry->set_alias("fjant");
 	harry->set_short("Harry the affectionate");

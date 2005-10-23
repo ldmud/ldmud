@@ -666,7 +666,6 @@ int     set_is_wizard(object, int default: F_CONST1);
 #ifdef USE_DEPRECATED
 
         /* Functions only used in compatibility mode.
-         * When running in native mode, both are invisible.
          */
 
 int     transfer(object, object|string) "replace by a simul-efun";

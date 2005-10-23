@@ -7,7 +7,7 @@ object beggar;
 /*
  * Make these arrays global, so they only have to be initialized once.
  */
-string *chat_str, *a_chat_str, *function, *type, *match;
+string *chat_str, *a_chat_str, *action, *type, *match;
 
 void extra_reset() {
     no_castle_flag = 1;
@@ -29,14 +29,14 @@ void extra_reset() {
 	beggar->set_long("A really filthy looking poor beggar.\n");
 	beggar->set_hp(30);
 	move_object(beggar, this_object());
-	if (!function) {
-	    function = allocate(1);
+	if (!action) {
+	    action = allocate(1);
 	    type = allocate(1);
 	    match = allocate(1);
-	    function[0] = "give_beggar";
+	    action[0] = "give_beggar";
 	    type[0] = "gives";
 	}
-	beggar->set_match(this_object(), function, type, match);
+	beggar->set_match(this_object(), action, type, match);
 	if (!chat_str) {
 	    chat_str = allocate(3);
 	    chat_str[0] =

@@ -1,6 +1,16 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+03-Dec-2002 (Lars Duening)  (3.3.318)
+  - (Makefile) Driver executable renamed from 'driver' to 'ldmud'.
+  - (configure, Makefile) The configure script now tries to figure out
+      on its own which warning options the compiler supports.
+  - (comm.c, erq.h) The erq callbacks can now take the returned
+      data as a string instead of an array (suggested by Dafire).
+  - (mud/lp-245) Edward S. Marshall found all uses of the new keyword
+      'function' in the old mudlib and replaced them by something
+      less offensive to the parser (thanks!).
+
 30-Nov-2002 (Lars Duening)  (3.3.317)
   - (comm.c) Fiona provided a number of bugfixes for CHARMODE - thanks!
 

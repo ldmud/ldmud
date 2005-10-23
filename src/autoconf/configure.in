@@ -1402,15 +1402,38 @@ if test $lp_cv_prop_strtol_const_charp = yes; then
   AC_DEFINE(STRTOL_CONST_CHARP)
 fi
 
+# --- Check for compiler options ---
 
 tcomp='${CC-cc} ${CFLAGS} ${TESTFLAG} -o conftest conftest.c >/dev/null 2>&1'
 tcomp2='${CC-cc} ${CFLAGS} ${TESTFLAG} -o conftest conftest.c 2>&1'
 tcomp3='${CC-cc} ${CFLAGS} ${TESTFLAG} -c conftest.c >/dev/null 2>&1'
+
 cat > conftest.c <<EOF
 #include <stdio.h>
+#include <math.h>
 double d = 4.5;
-main() { printf("hello world\n"); }
+int main(void) { printf("hello world\n"); return 0; }
 EOF
+
+AC_MSG_CHECKING(warning CFLAGS)
+changequote(,)dnl
+CFLAGS=
+for TESTFLAG in -Wall -Wparentheses -Wshadow; do
+  if eval $tcomp; then
+    # The option is recognized, but if it generates warnings on the
+    # above correct program, we still can't use it. So check for that.
+    if echo `eval $tcomp2` | egrep '[a-z]' >/dev/null; then
+      :
+      # Success means 'we got output' here :-(
+    else
+        CFLAGS="$CFLAGS $TESTFLAG"
+    fi
+  fi
+done
+changequote([,])dnl
+WCFLAGS=$CFLAGS
+AC_MSG_RESULT($WCFLAGS)
+
 AC_MSG_CHECKING(low optimization CFLAGS)
 changequote(,)dnl
 for TESTFLAG in -O; do
@@ -1547,6 +1570,7 @@ OPTIMIZE_LINKING=''
 if ${CC-cc} $OFLAGS -o conftest conftest.c ; then
   OPTIMIZE_LINKING='$(OPTIMIZE)'
 fi
+
 rm -f conftest.c
 
 if test $ac_cv_lib_socket_main = "yes"; then
@@ -1782,6 +1806,7 @@ fi
 
 dnl
 
+AC_SUBST(WCFLAGS)
 AC_SUBST(OCFLAGS)
 AC_SUBST(LCFLAGS)
 AC_SUBST(MCFLAGS)

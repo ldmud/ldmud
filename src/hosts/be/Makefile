@@ -32,7 +32,7 @@
 #
 # <target> is one of the following targets:
 #
-#  driver:     create executable for the selected platform
+#  ldmud:      create executable for the selected platform
 #  all:        create executables for all platforms
 #  clean:      delete all object files of the selected platform
 #                and all unmodified source files.
@@ -44,7 +44,7 @@
 #  depend:     update the dependency information in this file
 #  dependall:  update the dependency in all known Makefiles.
 #
-# If no <target> is given, 'driver' is assumed.
+# If no <target> is given, 'ldmud' is assumed.
 #--------------------------------------------------------
 
 #--------------------------------------------------------
@@ -52,7 +52,7 @@
 #--------------------------------------------------------
 
 # The name of the application.
-    IMG_NAME = driver
+    IMG_NAME = ldmud
 
 # General mud directory, by default containing all other directories.
     prefix= /boot/home/mud

@@ -90,12 +90,12 @@ OBJ = access_check.o actions.o array.o backend.o bitstrings.o call_out.o \
       random.o regexp.o simulate.o simul_efun.o stdstrings.o \
       strfuns.o sprintf.o swap.o wiz_list.o xalloc.o 
 
-driver: $(OBJ)
+ldmud: $(OBJ)
 	$(CC) $(OPTIMIZE) $(LDFLAGS) $(OBJ) -o $@ $(LIBS)
 
-install: driver
+install: ldmud
 	$(mkinstalldirs) $(BINDIR)
-	$(INSTALL) -c $? $(BINDIR)/driver
+	$(INSTALL) -c $? $(BINDIR)/ldmud
 
 install-utils:
 	(cd util; $(MAKE) $(MFLAGS) install)
@@ -111,11 +111,11 @@ clean:
 	$(RM) dftables@EXEEXT@ pcre/chartables.c
 	$(RM) stdstrings.c stdstrings.h
 	$(RM) efun_defs.c instrs.h lang.y lang.h lang.c y.output tags TAGS
-	$(RM) driver core mudlib/core mudlib/debug.log lpmud.log driver
+	$(RM) ldmud core mudlib/core mudlib/debug.log lpmud.log
 	(cd util ; echo "Cleaning in util." ; $(MAKE) clean)
 
 distclean: clean
-	$(RM) driver config.status machine.h Makefile config.cache config.log
+	$(RM) ldmud config.status machine.h Makefile config.cache config.log
 	$(RM) config.h config.status config.status.old
 	$(RM) util/Makefile util/erq/Makefile util/xerq/Makefile
 

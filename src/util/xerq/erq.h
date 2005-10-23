@@ -22,6 +22,12 @@
 #define ERQ_RLOOKUPV6  12  /* Lookup name/ip6 */
 #endif
 
+/* Additional service request type flags evaluated by efun send_erq().
+ * The ERQ itself won't get to see it.
+ */
+
+#define ERQ_CB_STRING  (1 << 31)  /* Callback closure takes a string arg */
+
 
 /* answers from ERQ_EXECUTE / ERQ_FORK */
 
