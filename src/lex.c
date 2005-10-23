@@ -197,6 +197,25 @@ static Mempool lexpool = NULL;
    */
 
 /*-------------------------------------------------------------------------*/
+/* The lexer can take data from either a file or a string buffer.
+ * The handling is unified using the struct source_s structure.
+ * TODO: Use this source similar to auto-include to expand macros in the
+ * TODO:: the compile. This would make it easier to find errors caused
+ * TODO:: by macro replacements.
+ */
+
+typedef struct source_s
+{
+    int        fd;       /* Filedescriptor or -1 */
+    string_t * str;      /* The source string (referenced), or NULL */
+    size_t     current;  /* Current position in .str */
+} source_t;
+
+static source_t yyin;
+  /* Current input source.
+   */
+
+/*-------------------------------------------------------------------------*/
 /* The lexer uses a combined file-input/macro-expansion buffer
  * called defbuf[] of length <defbuf_len>. Within this buffer, the last
  * MAXLINE bytes are reserved as (initial) file-input buffer, its beginning
@@ -242,10 +261,6 @@ static Mempool lexpool = NULL;
  * inserted into the input stream like a macro.
 #endif
  */
-
-static int yyin_des;
-  /* Filedescriptor of the file currently read.
-   */
 
 static char *defbuf = NULL;
   /* The combined input/expansion buffer.
@@ -400,7 +415,7 @@ static struct incstate
 {
     struct incstate * next;
 
-    int         yyin_des;       /* The file's filedescriptor */
+    source_t    yyin;           /* The current input source */
     int         line;           /* Current line */
     char      * file;           /* Filename */
     ptrdiff_t   linebufoffset;  /* Position of linebufstart */
@@ -1827,10 +1842,37 @@ realloc_defbuf (void)
 } /* realloc_defbuf() */
 
 /*-------------------------------------------------------------------------*/
+static void
+set_input_source (int fd, string_t * str)
+
+/* Set the current input source to <fd>/<str>.
+ * If <str> is given, it will be referenced.
+ */
+
+{
+    yyin.fd = fd;
+    yyin.str = str ? ref_mstring(str) : NULL;
+    yyin.current = 0;
+} /* set_input_source() */
+
+/*-------------------------------------------------------------------------*/
+static void
+close_input_source (void)
+
+/* Close the current input source: a file is closed, a string is deallocated
+ */
+
+{
+    if (yyin.fd != -1)    close(yyin.fd);         yyin.fd = -1;
+    if (yyin.str != NULL) free_mstring(yyin.str); yyin.str = NULL;
+    yyin.current = 0;
+} /* close_input_source() */
+
+/*-------------------------------------------------------------------------*/
 static /* NO inline */ char *
 _myfilbuf (void)
 
-/* Read the next MAXLINE bytes from the inputfile <yyin_des> and store
+/* Read the next MAXLINE bytes from the input source <yyin> and store
  * them in the input-buffer. If there were the beginning of an incomplete
  * line left in the buffer, they are copied right before linebufstart.
  * The end of the last complete line in the buffer is marked with a '\0'
@@ -1868,7 +1910,18 @@ _myfilbuf (void)
 
     /* Read the next block of data */
     p = linebufstart; /* == linebufend - MAXLINE */
-    i = read(yyin_des, p, MAXLINE);
+    if (yyin.fd != -1)
+        i = read(yyin.fd, p, MAXLINE);
+    else
+    {
+        i = mstrsize(yyin.str) - yyin.current;
+
+        if (i > MAXLINE)
+            i = MAXLINE;
+
+        memcpy(p, get_txt(yyin.str)+yyin.current, i);
+        yyin.current += i;
+    }
 
     if (i < MAXLINE)
     {
@@ -2153,6 +2206,101 @@ handle_cond (Bool c)
 }
 
 /*-------------------------------------------------------------------------*/
+static Bool
+start_new_include (int fd, string_t * str
+                  , char * name, char * name_ext, char delim)
+
+/* The lexer is about to read data from an included source (either file
+ * <fd> or string <str> which will be referenced) - handle setting up the
+ * include information. <name> is the name of the file to be read, <name_ext>
+ * is NULL or a string to add to <name> as " (<name_ext>)", <delim> is the
+ * delimiter ('"', '>' or ')') of the include filename.
+ *
+ * Return TRUE on success, FALSE if something failed.
+ */
+
+{
+    struct incstate *is, *ip;
+    size_t namelen;
+    int inc_depth;
+    ptrdiff_t linebufoffset;
+
+    /* Prepare defbuf for a (nested) include */
+    linebufoffset = linebufstart - &defbuf[defbuf_len];
+    if (outp - defbuf < 3*MAXLINE)
+    {
+        realloc_defbuf();
+        /* linebufstart is invalid now */
+        if (outp - defbuf < 2*MAXLINE)
+        {
+            lexerror("Maximum total buffer size exceeded");
+            return MY_FALSE;
+        }
+    }
+
+    /* Copy the current state, but don't put it on the stack
+     * yet in case we run into an error further down.
+     */
+    is = mempool_alloc(lexpool, sizeof(struct incstate));
+    if (!is) {
+        lexerror("Out of memory");
+        return MY_FALSE;
+    }
+
+    is->yyin = yyin;
+    is->line = current_line;
+    is->file = current_file;
+    is->linebufoffset = linebufoffset;
+    is->saved_char = saved_char;
+    is->next = inctop;
+    is->pragma_strict_types = pragma_strict_types;
+
+    /* Copy the new filename into current_file */
+
+    namelen = strlen(name);
+    if (name_ext != NULL)
+        namelen += 3 + strlen(name_ext);
+
+    current_file = xalloc(namelen+1);
+    if (!current_file)
+    {
+        current_file = is->file;
+        xfree(is);
+        lexerror("Out of memory");
+        return MY_FALSE;
+    }
+    strcpy(current_file, name);
+    if (name_ext)
+    {
+        strcat(current_file, " (");
+        strcat(current_file, name_ext);
+        strcat(current_file, ")");
+    }
+
+    /* Now it is save to put the saved state onto the stack*/
+    inctop = is;
+
+    /* Compute the include depth and store the include information */
+    for (inc_depth = 0, ip = inctop; ip; ip = ip->next)
+        inc_depth++;
+
+    if (name_ext)
+        inctop->inc_offset = store_include_info(name_ext, current_file, delim, inc_depth);
+    else
+        inctop->inc_offset = store_include_info(name, current_file, delim, inc_depth);
+
+    /* Initialise the rest of the lexer state */
+    pragma_strict_types = PRAGMA_WEAK_TYPES;
+    instrs[F_CALL_OTHER].ret_type = TYPE_ANY;
+    current_line = 0;
+    linebufend   = outp - 1; /* allow trailing zero */
+    linebufstart = linebufend - MAXLINE;
+    *(outp = linebufend) = '\0';
+    set_input_source(fd, str);
+    _myfilbuf();
+} /* start_new_include() */
+
+/*-------------------------------------------------------------------------*/
 static void
 add_auto_include (const char * obj_file, const char *cur_file, Bool sys_include)
 
@@ -2200,18 +2348,9 @@ add_auto_include (const char * obj_file, const char *cur_file, Bool sys_include)
 
     if (auto_include_string != NULL)
     {
-        /* Add the auto include string and prefix it with a newline
-         * for proper recognition of #directives.
-         */
-        char * tmp;
-
-        tmp = get_txt(auto_include_string);
-        add_input(tmp);
-        add_input("\n");  /* Remember that add_input() is a LIFO */
-
-        /* Count the number of lines of the added string */
-        for (current_line--; *tmp
-            ; current_line -= *tmp++ == '\n') NOOP;
+        /* The auto include string is handled like a normal include */
+        (void)start_new_include(-1, auto_include_string
+                               , current_file, "auto include", ')');
     }
 } /* add_auto_include() */
 
@@ -2335,7 +2474,7 @@ merge (char *name, mp_int namelen, char *deststart)
 
 /*-------------------------------------------------------------------------*/
 static int
-inc_open (char *buf, char *name, mp_int namelen, char delim)
+open_include_file (char *buf, char *name, mp_int namelen, char delim)
 
 /* Open the include file <name> (length <namelen>) and return the file
  * descriptor. On failure, generate an error message and return -1.
@@ -2513,8 +2652,8 @@ inc_open (char *buf, char *name, mp_int namelen, char delim)
         push_c_string(inter_sp, current_file);
         if (driver_hook[H_INCLUDE_DIRS].x.closure_type == CLOSURE_LAMBDA)
         {
-            free_object(driver_hook[H_INCLUDE_DIRS].u.lambda->ob, "inc_open");
-            driver_hook[H_INCLUDE_DIRS].u.lambda->ob = ref_object(current_object, "inc_open");
+            free_object(driver_hook[H_INCLUDE_DIRS].u.lambda->ob, "open_include_file");
+            driver_hook[H_INCLUDE_DIRS].u.lambda->ob = ref_object(current_object, "open_include_file");
         }
         svp = secure_apply_lambda(&driver_hook[H_INCLUDE_DIRS], 2);
 
@@ -2548,7 +2687,7 @@ inc_open (char *buf, char *name, mp_int namelen, char delim)
 
     /* File not found */
     return -1;
-} /* inc_open() */
+} /* open_include_file() */
 
 /*-------------------------------------------------------------------------*/
 #ifdef USE_NEW_INLINES
@@ -2580,7 +2719,6 @@ handle_include (char *name)
     char  delim;     /* Filename end-delimiter ('"' or '>'). */
     char *old_outp;  /* Save the original outp */
     Bool  in_buffer = MY_FALSE; /* True if macro was expanded */
-    ptrdiff_t linebufoffset;  /* Position of current linebufstart */
     char  buf[INC_OPEN_BUFSIZE];
 
 #if 0
@@ -2738,75 +2876,13 @@ handle_include (char *name)
     outp = old_outp;  /* restore outp */
     *p = '\0';        /* mark the end of the filename */
 
-    /* Prepare defbuf for a (nested) include */
-    linebufoffset = linebufstart - &defbuf[defbuf_len];
-    if (outp - defbuf < 3*MAXLINE)
-    {
-        realloc_defbuf();
-        /* linebufstart is invalid now */
-        if (outp - defbuf < 2*MAXLINE)
-        {
-            lexerror("Maximum total buffer size exceeded");
-            return;
-        }
-    }
-
     /* Open the include file, put the current lexer state onto
      * the incstack, and set up for the new file.
      */
-    if ((fd = inc_open(buf, name, p - name, delim)) >= 0)
+    if ((fd = open_include_file(buf, name, p - name, delim)) >= 0)
     {
-        struct incstate *is, *ip;
-        int inc_depth;
-
-        /* Copy the current state, but don't put it on the stack
-         * yet in case we run into an error further down.
-         */
-        is = mempool_alloc(lexpool, sizeof(struct incstate));
-        if (!is) {
-            lexerror("Out of memory");
+        if (!start_new_include(fd, NULL, buf, NULL, delim))
             return;
-        }
-
-        is->yyin_des = yyin_des;
-        is->line = current_line;
-        is->file = current_file;
-        is->linebufoffset = linebufoffset;
-        is->saved_char = saved_char;
-        is->next = inctop;
-        is->pragma_strict_types = pragma_strict_types;
-
-        /* Copy the new filename into current_file */
-        current_file = xalloc(strlen(buf)+1);
-        if (!current_file)
-        {
-            current_file = is->file;
-            xfree(is);
-            lexerror("Out of memory");
-            return;
-        }
-        strcpy(current_file, buf);
-
-        /* Now it is save to put the saved state onto the stack*/
-        inctop = is;
-
-        /* Compute the include depth and store the include information */
-        for (inc_depth = 0, ip = inctop; ip; ip = ip->next)
-            inc_depth++;
-
-        inctop->inc_offset = store_include_info(name, current_file, delim, inc_depth);
-
-        /* Initialise the rest of the lexer state */
-        pragma_strict_types = PRAGMA_WEAK_TYPES;
-        instrs[F_CALL_OTHER].ret_type = TYPE_ANY;
-        instrs[F_CALL_DIRECT].ret_type = TYPE_ANY;
-        current_line = 0;
-        linebufend   = outp - 1; /* allow trailing zero */
-        linebufstart = linebufend - MAXLINE;
-        *(outp = linebufend) = '\0';
-        yyin_des = fd;
-        _myfilbuf();
-
         add_auto_include(object_file, current_file, delim != '"');
     }
     else
@@ -3615,25 +3691,40 @@ yylex1 (void)
                     , /* PRAGMA_STRICT_TYPES: */ TYPE_UNKNOWN };
 
                 struct incstate *p;
+                Bool was_string_source = (yyin.fd == -1);
 
                 p = inctop;
 
                 /* End the lexing of the included file */
-                close(yyin_des);
+                close_input_source();
                 xfree(current_file);
                 nexpands = 0;
-
                 store_include_end(p->inc_offset, p->line);
 
                 /* Restore the previous state */
                 current_file = p->file;
-                current_line = p->line + 1;
+                current_line = p->line;
+                if (!was_string_source)
+                    current_line++;
+                else
+                {
+                    /* 'string' includes are supposed to be inline
+                     * so correct the line number information to take out
+                     * the assumed newlines.
+                     * This has to be done after store_include_end()
+                     * since that function may remove all line number
+                     * information since the start of the include.
+                     */
+                    current_line -= 1;
+                    store_line_number_backward(1);
+                }
+
                 pragma_strict_types = p->pragma_strict_types;
                 instrs[F_CALL_OTHER].ret_type =
                     call_other_return_types[pragma_strict_types];
                 instrs[F_CALL_DIRECT].ret_type =
                     call_other_return_types[pragma_strict_types];
-                yyin_des = p->yyin_des;
+                yyin = p->yyin;
                 saved_char = p->saved_char;
                 inctop = p->next;
                 *linebufend = '\n';
@@ -5300,7 +5391,7 @@ start_new_file (int fd)
 
     free_defines();
 
-    yyin_des = fd;
+    set_input_source(fd, NULL);
 
     if (!defbuf_len)
     {
@@ -5349,10 +5440,10 @@ end_new_file (void)
     {
         struct incstate *p;
         p = inctop;
-        close(yyin_des);
+        close_input_source();
         xfree(current_file);
         current_file = p->file;
-        yyin_des = p->yyin_des;
+        yyin = p->yyin;
         inctop = p->next;
     }
 

@@ -28,12 +28,10 @@
  * keywords %if, %elif, %else and %endif; mainly to activate the proper
  * parsing rules for INITIALIZATION_BY___INIT.
  *---------------------------------------------------------------------------
- * To compile a file, open it to yield a filedescriptor 'fd', then call the
- * functions
+ * A compile file, set its filename into <current_file>, open it to yield a
+ * filedescriptor 'fd', then call
  *
- *     start_new_file(fd); : lex.c
- *     compile_file();     : prolang.y
- *     end_new_file();     : lex.c
+ *     compile_file(fd);
  *
  * then close the file again. The compiled program is 'returned' in
  * the global compiled_prog - on error, this variable is returned as NULL.
@@ -15134,8 +15132,12 @@ store_line_number_backward (int offset)
 mp_uint
 store_include_info (char *name, char * filename, char delim, int depth)
 
-/* The lexer is going to include file <filename> from an directive
- * nameing <name> using <delim>iter. This will be include depth <depth>.
+/* The lexer is going to include <name>, which can be the filename given
+ * in an #include directive, or a descriptive name for a different source.
+ * The full (file)name of the source as seen by the lexer is <filename>.
+ * This will be include depth <depth>.
+ * <delim> is either '"' or '>' if this include is from a file, or ')'
+ * if it's a different source.
  *
  * Result is the offset of the include information in the mem_block.
  * It is to be considered a handle and has to be passed to
@@ -15189,7 +15191,8 @@ store_include_info (char *name, char * filename, char delim, int depth)
         }
         else
         {
-            *tmp = delim == '"' ? delim : '<';
+            *tmp = delim == '"' ? delim 
+                                : (delim == '>' ? '<' : '(');
             strcpy(tmp+1, name);
             tmp[len+1] = delim;
             tmp[len+2] = '\0';
@@ -15282,35 +15285,18 @@ store_include_end (mp_uint inc_offset, int include_line)
         }
 
         inc->depth = -inc->depth;
-
-        /* If we return to the auto_include_string, include_line has been
-         * negative, and hence stored_lines became negative.  However,
-         * actually, the line number information has been unwinded to 0.  */
-        if (stored_lines < 0)
-            stored_lines = 0;
     }
     else
     {
         /* Store the include end and correct the linenumber */
         
         byte_to_mem_block(A_LINENUMBERS, LI_INCLUDE_END);
-        /* Since LI_INCLUDE advances the line number by one, this is even more
-         * tricky to accomodate correctly in the auto_include string.
-         * By using a fake line number relocation, we decrease the line number
-         * by two, then we advance it by one empty line.
-         */
-        if (stored_lines < 1)
-        {
-            stored_lines = 0;
-            byte_to_mem_block(A_LINENUMBERS, LI_RELOCATED + 1);
-            byte_to_mem_block(A_LINENUMBERS, 256 - 1);
-        }
     }
 } /* store_include_end() */
 
 /*-------------------------------------------------------------------------*/
 static void
-prolog(void)
+prolog (void)
 
 /* Initialize the compiler environment prior to a compile.
  */
@@ -16122,18 +16108,20 @@ epilog (void)
 
 /*-------------------------------------------------------------------------*/
 void
-compile_file(void)
+compile_file (int fd)
 
 /* Compile an LPC file. See the head comment for instructions.
  */
 
 {
     prolog();
+    start_new_file(fd);
     yyparse();
     /* If the parse failed, either num_parse_error != 0
      * or inherit_file != NULL here.
      */
     epilog();
+    end_new_file();
 } /* compile_file() */
 
 /*-------------------------------------------------------------------------*/

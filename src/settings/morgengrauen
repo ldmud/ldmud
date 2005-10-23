@@ -3,7 +3,8 @@
 # Settings for the Morgengrauen mudlib.
 #
 # If the environment variable DEBUG is set to a non-empty string, the
-# driver is configured to use short intervals for reset, swap and cleanup.
+# driver is configured to use short intervals for reset, swap and cleanup
+# and with a larger array size limit.
 #
 # configure will strip this part from the script.
 
@@ -31,13 +32,18 @@ else
 fi
 
 with_portno=23
-with_max_cost=10000000
+with_max_cost=1500000
 with_catch_reserved_cost=4000
 with_master_reserved_cost=1024
 with_swap_file=/home/mud/mud/swapfiles/SwapFile
 
-with_max_array_size=100000
+if test "x$DEBUG" = "x"; then
+    with_max_array_size=10000
+# with_max_mapping_size=30000 ?
+else
+    with_max_array_size=100000
 # with_max_mapping_size=300000 ?
+fi
 with_max_players=225
 
 with_reserved_user_size=8500000

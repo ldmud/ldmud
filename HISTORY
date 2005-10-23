@@ -95,7 +95,7 @@ For a detailed list of all changes see the file CHANGELOG.
            regular expression code, or the PCRE package (default).
 
 
-27-Oct-2002 (Lars Duening) -- Release 3.2.9
+29-Oct-2002 (Lars Duening) -- Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -233,6 +233,7 @@ For a detailed list of all changes see the file CHANGELOG.
            pending.
        + sscanf(): the format '%s%d' failed to parse 'ab1cd' correctly.
        + to_string(): Can handle operator closures now.
+       + unquote(): Unquoting symbols no longer adds a quote level.
 
     - New efuns:
        + blueprint(): Return the blueprint object.
@@ -431,6 +432,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + Bugfix: The '::' operator did not recognize the separate namespaces
            of variables and functions: void foo(string id) { ::id(id); }
            lead to a syntax error.
+       + Bugfix: Using auto-includes no longer generate wrong line numbers
+           in error messages.
 
     - Runtime:
        + Attempts to set a single string character to 0 now raise
@@ -525,6 +528,8 @@ For a detailed list of all changes see the file CHANGELOG.
            destructed objects in the file <mudlib>/DEST_OBJ_DUMP.
        + Character conversions are now done with regards to the locale
            selected by the LANG environment variable.
+       + The xerq now sends an ERQ_OK message when a queued write
+           is finally completed.
 
 
 20-Aug-2000 (Lars Duening) -- Release 3.2.8

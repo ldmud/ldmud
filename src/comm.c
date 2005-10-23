@@ -1043,8 +1043,10 @@ initialize_host_ip_number (const char *hname, const char * haddr)
                           , sizeof(host_ip_addr)))
             {
                 if (errno == EADDRINUSE) {
-                    fprintf(stderr, "%s UDP Socket already bound!\n", time_stamp());
-                    debug_message("%s UDP Socket already bound!\n", time_stamp());
+                    fprintf(stderr, "%s UDP port %d already bound!\n"
+                                  , time_stamp(), udp_port);
+                    debug_message("%s UDP port %d already bound!\n"
+                                  , time_stamp(), udp_port);
                     if (host_ip_addr.sin_port) {
                         host_ip_addr.sin_port = 0;
                         continue;
@@ -1166,8 +1168,10 @@ prepare_ipc(void)
             }
             if (bind(sos[i], (struct sockaddr *)&host_ip_addr, sizeof host_ip_addr) == -1) {
                 if (errno == EADDRINUSE) {
-                    fprintf(stderr, "%s Socket already bound!\n", time_stamp());
-                    debug_message("%s Socket already bound!\n", time_stamp());
+                    fprintf(stderr, "%s Port %d already bound!\n"
+                                  , time_stamp(), port_numbers[i]);
+                    debug_message("%s Port %d already bound!\n"
+                                 , time_stamp(), port_numbers[i]);
                     exit(errno);
                 } else {
                     perror("bind");
@@ -6765,11 +6769,12 @@ f_query_input_pending (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_find_input_to (svalue_t *sp)
+v_find_input_to (svalue_t *sp, int num_arg)
 
 /* EFUN: find_input_to()
  *
  *   int find_input_to (object player, string|closure|object fun)
+ *   int find_input_to (object player, object ob, string fun)
  *
  * Find the input_to most recently added to the interactive <player> object
  * matching the <fun> argument:
@@ -6777,6 +6782,8 @@ f_find_input_to (svalue_t *sp)
  *  - <fun> is an object: the object the input_to function is bound to has
  *                        to match
  *  - <fun> is a closure: the input_to closure has to match.
+ * If both <ob> and <fun> are specified, both the object and the function name
+ * have to match.
  * 
  * Return -1 if not found, or the position in the input_to stack (0 being
  * _least_ recently added input_to).
@@ -6786,7 +6793,25 @@ f_find_input_to (svalue_t *sp)
     svalue_t *arg;  /* Pointer to the arguments of the efun */
     int       rc;   /* Resultvalue */
 
-    arg = sp - 1;
+    arg = sp - num_arg + 1;
+
+    if (num_arg > 2)
+    {
+        if (arg[1].type == T_OBJECT && num_arg > 2 && arg[2].type != T_STRING)
+        {
+            vefun_bad_arg(3, sp);
+            /* NOTREACHED */
+            return NULL;
+        }
+
+        if (arg[1].type != T_OBJECT
+           )
+        {
+            vefun_bad_arg(2, sp);
+            /* NOTREACHED */
+            return NULL;
+        }
+    }
 
     /* Process the command, terminating out when possible */
     do {
@@ -6822,8 +6847,19 @@ f_find_input_to (svalue_t *sp)
                 break;
                 
             case T_OBJECT:
-                if (callback_object(&(it->fun)) == arg[1].u.ob)
-                    found = MY_TRUE;
+                if (num_arg > 2)
+                {
+                    if (callback_object(&(it->fun)) == arg[1].u.ob
+                     && !it->fun.is_lambda
+                     && it->fun.function.named.name == arg[2].u.str
+                       )
+                        found = MY_TRUE;
+                }
+                else
+                {
+                    if (callback_object(&(it->fun)) == arg[1].u.ob)
+                        found = MY_TRUE;
+                }
                 break;
 
             case T_CLOSURE:
@@ -6855,7 +6891,7 @@ f_find_input_to (svalue_t *sp)
     } while (0);
 
     /* Return the result */
-    sp = pop_n_elems(2, sp);
+    sp = pop_n_elems(num_arg, sp);
     sp++;
     put_number(sp, rc);
 
@@ -6870,6 +6906,7 @@ v_remove_input_to (svalue_t *sp, int num_arg)
  *
  *   int remove_input_to (object player)
  *   int remove_input_to (object player, string|closure|object fun)
+ *   int remove_input_to (object player, object ob, string fun)
  *
  * Remove a pending input_to from the interactive <player> object.
  * If the optional <fun> is not given, the most recently added input_to
@@ -6881,6 +6918,8 @@ v_remove_input_to (svalue_t *sp, int num_arg)
  *  - <fun> is an object: the object the input_to function is bound to has
  *                        to match
  *  - <fun> is a closure: the input_to closure has to match.
+ * If both <ob> and <fun> are specified, both the object and the function name
+ * have to match.
  * 
  * Return 1 on success, or 0 on failure (no input_to found, object is not
  * interactive or has no input_to pending).
@@ -6892,6 +6931,23 @@ v_remove_input_to (svalue_t *sp, int num_arg)
 
     /* Get the arguments */
     arg = sp - num_arg + 1;
+
+    if (num_arg > 2)
+    {
+        if (arg[1].type == T_OBJECT && arg[2].type != T_STRING)
+        {
+            vefun_bad_arg(3, sp);
+            /* NOTREACHED */
+            return NULL;
+        }
+        if (arg[1].type != T_OBJECT)
+        {
+            vefun_bad_arg(2, sp);
+            /* NOTREACHED */
+            return NULL;
+        }
+    }
+
 
     /* Process the command, bailing out whenever necessary */
     do {
@@ -6941,8 +6997,19 @@ v_remove_input_to (svalue_t *sp, int num_arg)
                 break;
                 
             case T_OBJECT:
-                if (callback_object(&(it->fun)) == arg[1].u.ob)
-                    found = MY_TRUE;
+                if (num_arg > 2)
+                {
+                    if (callback_object(&(it->fun)) == arg[1].u.ob
+                     && !it->fun.is_lambda
+                     && it->fun.function.named.name == arg[2].u.str
+                       )
+                        found = MY_TRUE;
+                }
+                else
+                {
+                    if (callback_object(&(it->fun)) == arg[1].u.ob)
+                        found = MY_TRUE;
+                }
                 break;
 
             case T_CLOSURE:

@@ -1144,7 +1144,10 @@ v_regmatch (svalue_t *sp, int num_arg)
              */
             {
                 size_t new_start;
-                new_start = mstrsize(result->item[0].u.str);
+                if (result->item[0].type == T_STRING)
+                    new_start = mstrsize(result->item[0].u.str);
+                else
+                    new_start = 0;
                 if (new_start == 0)
                     new_start++;
                 put_number(&(result->item[num_matches]), (long)(startpos+new_start));

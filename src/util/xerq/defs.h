@@ -104,6 +104,7 @@ struct equeue_s
     equeue_t *next;
     int       pos;    /* index of next byte in buf[] to write */
     int       len;    /* remaining length to write */
+    int32     handle; /* message handle for send-ok replys */
     char      buf[1]; /* allocated big enough to hold the data */
 };
 
@@ -218,8 +219,8 @@ extern void reply1(int32, const void *, int32);
 extern void reply1keep(int32, const void *, int32);
 extern void replyn(int32, int, int, ...);
 extern void write1(void *, int);
-extern void add_to_queue(equeue_t **, char *, int);
-extern int flush_queue(equeue_t **, int);
+extern void add_to_queue(equeue_t **, char *, int, int32);
+extern int flush_queue(equeue_t **, int, int);
 extern void add_retry(void (*func)(char *, int), char *mesg, int len, int t);
 
 extern void erq_rlookup(char *, int);

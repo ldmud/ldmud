@@ -80,7 +80,7 @@ free_socket (socket_t *sp)
 
 /*-------------------------------------------------------------------------*/
 void
-add_to_queue (equeue_t **qpp, char *data, int len)
+add_to_queue (equeue_t **qpp, char *data, int len, int32 hand)
 
 /* Add the message <data> of <len> bytes to the end of queue <qpp>.
  */
@@ -94,6 +94,7 @@ add_to_queue (equeue_t **qpp, char *data, int len)
     new->len = len;
     new->pos = 0;
     new->next = 0;
+    new->handle = hand;
     memcpy(&new->buf, data, len);
     while (*qpp)
         qpp = &(*qpp)->next;
@@ -102,7 +103,7 @@ add_to_queue (equeue_t **qpp, char *data, int len)
 
 /*-------------------------------------------------------------------------*/
 int
-flush_queue (equeue_t **qpp, int fd)
+flush_queue (equeue_t **qpp, int fd, int reply_handle)
 
 /* Try to write all pending data from queue <qpp> to socket <fd>.
  * Return -1 if an error occured, and 0 if the queue could be emptied.
@@ -131,6 +132,10 @@ flush_queue (equeue_t **qpp, int fd)
             break;
         }
         XPRINTF((stderr, "%s   Freeing queue entry %p.\n", time_stamp(), qp));
+        if (reply_handle) {
+            char r_ok[] = { ERQ_OK, 0 };
+            reply1(qp->handle, r_ok, sizeof(r_ok));
+        }
         next = qp->next;
         free(qp);
         qp = next;
@@ -252,7 +257,7 @@ read_socket (socket_t *sp, int rw)
                    , time_stamp(), sp, sp->type, rw));
 
     if (sp->queue)
-        flush_queue(&sp->queue, sp->fd);
+        flush_queue(&sp->queue, sp->fd, 1);
 
     switch(sp->type)
     {
@@ -516,17 +521,15 @@ erq_send (char *mesg, int msglen)
     {
         XPRINTF((stderr, "%s   Queue remaining data: %p:%d\n"
                        , time_stamp(), mesg+num, msglen-num));
-        add_to_queue(&sp->queue, mesg+num, msglen-num);
-/*
+        add_to_queue(&sp->queue, mesg+num, msglen-num, get_handle(mesg));
         num=htonl(num);
-        replyn(get_handle(mesg), 0, 2,
+        replyn(get_handle(mesg), 1, 2,
             (char[]) { ERQ_E_INCOMPLETE }, 1,
             (char *)&num, 4);
-*/
         return;
     }
 
-    reply_errno(sp->handle);
+    reply_errno(get_handle(mesg));
     if (   errno != EWOULDBLOCK
 #if EWOULDBLOCK!=EAGAIN
         && errno != EAGAIN

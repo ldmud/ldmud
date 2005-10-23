@@ -14,7 +14,7 @@ DESCRIPTION
 
         #echo
                 the rest of the line is printed to the error output
-                (stderr), thus can be caputered into a log file
+                (stderr), thus can be captured into a log file
 
         #pragma
                 see the separate man page

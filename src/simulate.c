@@ -1692,14 +1692,11 @@ load_object (const char *lname, Bool create_super, int depth, namechain_t *chain
         }
         FCOUNT_COMP(fname);
 
-        current_file = fname;
-
-        /* The file name is needed before start_new_file(), in case there is
+        /* The file name is needed before compile_file(), in case there is
          * an initial 'line too long' error.
          */
-        start_new_file(fd);
-        compile_file();
-        end_new_file();
+        current_file = fname;
+        compile_file(fd);
         if (comp_flag)
         {
             if (NULL == inherit_file)

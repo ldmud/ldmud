@@ -348,7 +348,7 @@ main(int argc, char *argv[])
         if (FD_ISSET(1, &write_fds))
         {
             XPRINTF((stderr, "%s stdout_queue ready for flush.\n", time_stamp()));
-            flush_queue(&stdout_queue, 1);
+            flush_queue(&stdout_queue, 1, 0);
         }
 
         /* Check for retries */
@@ -780,7 +780,7 @@ writen (int fd, char *mesg, int len, struct equeue_s **qpp)
         return 0;
 
     XPRINTF((stderr, "%s   Queuing data %p:%d\n", time_stamp(), mesg, len));
-    add_to_queue(qpp, mesg, len);
+    add_to_queue(qpp, mesg, len, 0);
     return l;
 } /* writen() */
 

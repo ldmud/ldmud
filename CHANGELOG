@@ -1,6 +1,25 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+29-Oct-2002 (Lars Duening)  (3.3.287)
+  - (comm, func_spec) find_input_to() and remove_input_to() can now
+      match on both object and string name.
+  - (comm.c) Improved the 'already bound' error messages to list
+      the port number.
+  - (util/xerq) If the xerq couldn't send all data from a ERQ_SEND request
+      immediately and thus returned a ERQ_E_INCOMPLETE, it will follow it
+      up with a ERQ_OK message to the same handle later once all the pending
+      data has been send (provided by Fiona, thanks!)
+  - (util/xerq/lpc) Replaced the socketd with the Wunderland daemon
+      (thanks!).
+  - (lex.c, prolang, simulate.c) auto-includes are now handled like
+      normal includes (instead of just placing the text into the textbuffer
+      and fudging the current_line variable), correcting a source of false
+      linenumber informations.
+  - (efuns.c) regmatch( "a", "b*", RE_MATCH_SUBS ) crashed the driver because
+      the code tried to determine the length of the non-existing first match
+      (reported by Zonk).
+
 27-Oct-2002 (Lars Duening)  (3.3.286)
   - (smalloc.c) Added a very primitive safeguard against interleaving
       calls to the allocator - I suspect that this is the root cause

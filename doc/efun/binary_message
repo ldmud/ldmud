@@ -22,7 +22,7 @@ DESCRIPTION
         The idea behind the flag settings is that sending command
         codes for colours and other things needs to bypass the allowed
         charset filters, but isn't important enough to waste bandwith
-        on a synchronous trasmission.
+        on a synchronous transmission.
 
 HISTORY
         Introduced in 3.2.1@40.
