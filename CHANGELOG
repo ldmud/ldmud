@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+01-Sep-2002 (Lars Duening)  (3.3.239)
+  - (mstrings.c) The string statistics are off - added 'DEBUG: SSTAT'
+       diagnostics when that happens.
+
 30-Aug-2002 (Lars Duening)  (3.3.238)
   - (efuns.c, lex.c, make_func.y) Support for international characters
        was broken (thanks, Oskar!).

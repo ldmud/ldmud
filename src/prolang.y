@@ -3334,7 +3334,9 @@ def:  type optional_star L_IDENTIFIER  /* Function definition or prototype */
               insert_inline_fun_now = MY_TRUE;
       }
 
+%ifdef USE_STRUCTS
     | struct_decl
+%endif /* USE_STRUCTS */
     | inheritance 
     | default_visibility
 ; /* def */
