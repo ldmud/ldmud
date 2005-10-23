@@ -20,7 +20,7 @@ extern char *_crypt(char *, char *);
 extern int ioctl(int, ...); /* should be in <ioctl.h> */
 #endif
 
-#if defined(USING_CYGWIN) && !defined(__CYGWIN32__)
+#if defined(CYGWIN) && !defined(__CYGWIN32__)
 extern int gethostname(char *, int);
 #endif
 

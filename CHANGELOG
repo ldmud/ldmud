@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+07-Nov-2002 (Lars Duening)  (3.3.293)
+  - (configure.in) The tests regarding which libraries are needed suffered
+      from a disabling typo (reported by Nostradamus).
+  - (ed.c) Added a safety checks to uses of P_FNAME - in case it's NULL
+      (reported by Dafire).
+
 07-Nov-2002 (Lars Duening)  (3.3.292)
   - (closure.c) If a lfun-closure is left danging by a replace_program(),
       it is now converted into an alien-lfun closure pointing to

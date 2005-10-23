@@ -1065,6 +1065,16 @@ getfn (Bool writeflg)
     if (*inptr == NL)
     {
         P_NOFNAME = TRUE;
+
+        if (!P_FNAME)
+        {
+            /* I have no idea how this can happen, but it did.
+             * So be save.
+             */
+            add_message("bad file name\n");
+            return NULL;
+        }
+
         file = alloc_mstring(1+mstrsize(P_FNAME));
         if (!file)
         {
@@ -2750,7 +2760,12 @@ docmd (Bool glob)
         fptr = getfn(MY_FALSE);
 
         if (P_NOFNAME)
-            add_message("%s\n", get_txt(P_FNAME));
+        {
+            if (P_FNAME)
+                add_message("%s\n", get_txt(P_FNAME));
+            else
+                add_message("<no file>\n");
+        }
         else
         {
             if (fptr == NULL)
@@ -3472,7 +3487,7 @@ save_ed_buffer (void)
 
     (void)O_SET_INTERACTIVE(save, command_giver);
     ED_BUFFER = EXTERN_ED_BUFFER;
-    push_ref_string(inter_sp, P_FNAME);
+    push_ref_string(inter_sp, P_FNAME ? P_FNAME : STR_EMPTY);
     stmp = apply_master(STR_GET_ED_FNAME,1);
     if (save)
     {

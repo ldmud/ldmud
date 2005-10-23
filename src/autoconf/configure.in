@@ -541,7 +541,7 @@ int main(void)
     lp_cv_need_lib_resolv=no,
     lp_cv_need_lib_resolv=yes
 ))
-if test "lp_cv_need_lib_resolv" = "yes"; then
+if test "$lp_cv_need_lib_resolv" = "yes"; then
     AC_CHECK_LIB(resolv,main, LIBS="$LIBS -lresolv")
 fi
 
@@ -568,7 +568,7 @@ int main(void)
         lp_cv_need_lib_crypto=no,
         lp_cv_need_lib_crypto=yes
     ))
-    if test "lp_cv_need_lib_crypto" = "yes"; then
+    if test "$lp_cv_need_lib_crypto" = "yes"; then
         AC_CHECK_LIB(crypto,main, LIBS="$LIBS -lcrypto")
         AC_CHECK_LIB(crypt,main, LIBS="$LIBS -lcrypt")
     fi
@@ -666,7 +666,7 @@ int main(void)
             lp_cv_need_lib_inet6=no,
             lp_cv_need_lib_inet6=yes
         ))
-        if test "lp_cv_need_lib_inet6" = "yes"; then
+        if test "$lp_cv_need_lib_inet6" = "yes"; then
             AC_CHECK_LIB(inet6,main, LIBS="$LIBS -linet6")
         fi
     fi
@@ -715,7 +715,7 @@ int main(void)
             lp_cv_need_lib_pthread=no,
             lp_cv_need_lib_pthread=yes
         ))
-        if test "lp_cv_need_lib_pthread" = "yes"; then
+        if test "$lp_cv_need_lib_pthread" = "yes"; then
             AC_CHECK_LIB(pthread,main, LIBS="$LIBS -lpthread")
         fi
     fi
@@ -834,7 +834,7 @@ int main(void)
           lp_cv_need_lib_z=no,
           lp_cv_need_lib_z=yes
       ))
-      if test "lp_cv_need_lib_z" = "yes"; then
+      if test "$lp_cv_need_lib_z" = "yes"; then
           AC_CHECK_LIB(z,main, PKGLIBS="$PKGLIBS -lz")
       fi
 
@@ -855,7 +855,7 @@ int main(void)
           lp_cv_need_lib_nsl=no,
           lp_cv_need_lib_nsl=yes
       ))
-      if test "lp_cv_need_lib_nsl" = "yes"; then
+      if test "$lp_cv_need_lib_nsl" = "yes"; then
           AC_CHECK_LIB(nsl,main, PKGLIBS="$PKGLIBS -lnsl")
       fi
 

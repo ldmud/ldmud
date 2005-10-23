@@ -7537,7 +7537,7 @@ fi
 fi
 echo "$as_me:$LINENO: result: $lp_cv_need_lib_resolv" >&5
 echo "${ECHO_T}$lp_cv_need_lib_resolv" >&6
-if test "lp_cv_need_lib_resolv" = "yes"; then
+if test "$lp_cv_need_lib_resolv" = "yes"; then
     echo "$as_me:$LINENO: checking for main in -lresolv" >&5
 echo $ECHO_N "checking for main in -lresolv... $ECHO_C" >&6
 if test "${ac_cv_lib_resolv_main+set}" = set; then
@@ -7715,7 +7715,7 @@ fi
 fi
 echo "$as_me:$LINENO: result: $lp_cv_need_lib_crypto" >&5
 echo "${ECHO_T}$lp_cv_need_lib_crypto" >&6
-    if test "lp_cv_need_lib_crypto" = "yes"; then
+    if test "$lp_cv_need_lib_crypto" = "yes"; then
         echo "$as_me:$LINENO: checking for main in -lcrypto" >&5
 echo $ECHO_N "checking for main in -lcrypto... $ECHO_C" >&6
 if test "${ac_cv_lib_crypto_main+set}" = set; then
@@ -8555,7 +8555,7 @@ fi
 fi
 echo "$as_me:$LINENO: result: $lp_cv_need_lib_inet6" >&5
 echo "${ECHO_T}$lp_cv_need_lib_inet6" >&6
-        if test "lp_cv_need_lib_inet6" = "yes"; then
+        if test "$lp_cv_need_lib_inet6" = "yes"; then
             echo "$as_me:$LINENO: checking for main in -linet6" >&5
 echo $ECHO_N "checking for main in -linet6... $ECHO_C" >&6
 if test "${ac_cv_lib_inet6_main+set}" = set; then
@@ -8728,7 +8728,7 @@ fi
 fi
 echo "$as_me:$LINENO: result: $lp_cv_need_lib_pthread" >&5
 echo "${ECHO_T}$lp_cv_need_lib_pthread" >&6
-        if test "lp_cv_need_lib_pthread" = "yes"; then
+        if test "$lp_cv_need_lib_pthread" = "yes"; then
             echo "$as_me:$LINENO: checking for main in -lpthread" >&5
 echo $ECHO_N "checking for main in -lpthread... $ECHO_C" >&6
 if test "${ac_cv_lib_pthread_main+set}" = set; then
@@ -9194,7 +9194,7 @@ fi
 fi
 echo "$as_me:$LINENO: result: $lp_cv_need_lib_z" >&5
 echo "${ECHO_T}$lp_cv_need_lib_z" >&6
-      if test "lp_cv_need_lib_z" = "yes"; then
+      if test "$lp_cv_need_lib_z" = "yes"; then
           echo "$as_me:$LINENO: checking for main in -lz" >&5
 echo $ECHO_N "checking for main in -lz... $ECHO_C" >&6
 if test "${ac_cv_lib_z_main+set}" = set; then
@@ -9296,7 +9296,7 @@ fi
 fi
 echo "$as_me:$LINENO: result: $lp_cv_need_lib_nsl" >&5
 echo "${ECHO_T}$lp_cv_need_lib_nsl" >&6
-      if test "lp_cv_need_lib_nsl" = "yes"; then
+      if test "$lp_cv_need_lib_nsl" = "yes"; then
           echo "$as_me:$LINENO: checking for main in -lnsl" >&5
 echo $ECHO_N "checking for main in -lnsl... $ECHO_C" >&6
 if test "${ac_cv_lib_nsl_main+set}" = set; then
