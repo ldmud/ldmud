@@ -769,6 +769,15 @@ static const_list_t *member_currently_initialized;
 
 %endif /* INITIALIZATION_BY___INIT */
 
+static fulltype_t def_function_returntype;
+static ident_t *  def_function_ident;
+static int        def_function_num_args;
+  /* Globals to keep the state while a function is parsed:
+   *   _returntype: the returntype
+   *   _ident:      the function's identifier.
+   *   _num_args:   number of formal arguments.
+   */
+
 static mem_block_t type_of_arguments;
   /* The vartypes of arguments when calling functions must be saved,
    * to be used afterwards for checking. And because function calls
@@ -1011,6 +1020,9 @@ static void copy_functions(program_t *, fulltype_t type);
 #ifdef USE_STRUCTS
 static void copy_structs(program_t *, fulltype_t, int);
 #endif /* USE_STRUCTS */
+#ifdef USE_NEW_INLINES
+static void new_inline_closure (void);
+#endif /* USE_NEW_INLINES */
 static void fix_function_inherit_indices(program_t *);
 static void fix_variable_index_offsets(program_t *);
 
@@ -1413,7 +1425,7 @@ get_type_name (fulltype_t type)
     strcat(buff, type_name[type]);
 
 #ifdef USE_STRUCTS
-    if  (type == TYPE_STRUCT)
+    if  (type == TYPE_STRUCT && sec_type_info > 0)
     {
         strcat(buff, " ");
         strcat(buff, get_txt(STRUCT_DEF(sec_type_info).name));
@@ -1522,16 +1534,16 @@ compatible_types (fulltype_t t1, fulltype_t t2, Bool is_assign)
         id1 = GET_SEC_TYPE_INFO(t1);
         id2 = GET_SEC_TYPE_INFO(t2);
 
-        while (id2 >= 0 && id1 != id2)
+        while (id2 > 0 && id1 != id2)
         {
-            id2 = STRUCT_DEF(id2).base;
+            id2 = STRUCT_DEF(id2-1).base;
         }
 
         /* If the base structs match, just pretend that t2 is the
          * same struct as t1. This will make the following tests
          * work as normal.
          */
-        if (id2 >= 0)
+        if (id2 > 0)
             t2 = (t2 & ~SEC_TYPE_MASK)
                | MAKE_SEC_TYPE_INFO(id1);
     }
@@ -2313,9 +2325,14 @@ check_for_context_local (ident_t *ident)
            ident = redeclare_local(ident, TYPE_ANY, block_depth);
        }
        else
-           ident = add_context_name( ident
-                                   , full_type_of_locals[ident->u.local.num] 
-                                   , ident->u.local.num);
+       {
+           fulltype_t type;
+
+           type = FULL_LOCAL_TYPE(current_inline->full_local_type_start
+                                  + ident->u.local.num
+                                 );
+           ident = add_context_name( ident, type, ident->u.local.num);
+       }
     }
 
     return ident;
@@ -2980,6 +2997,318 @@ verify_declared (ident_t *p)
     return r;
 } /* verify_declared() */
 
+/*-------------------------------------------------------------------------*/
+static void
+store_function_header ( p_int start
+                      , string_t * name, fulltype_t returntype
+                      , int num_args, int num_vars
+                      )
+
+/* Store a function header into the program block at address <start>.
+ * The caller has to make sure that there is enough space.
+ */
+
+{
+    bytecode_p p;
+
+    p = &(PROGRAM_BLOCK[start]);
+
+    /* FUNCTION_NAME */
+    memcpy(p, &name, sizeof name);
+    p += sizeof name;
+    (void)ref_mstring(name);
+
+    /* FUNCTION_TYPE */
+#if defined(USE_STRUCTS)
+    STORE_SHORT(p, returntype);
+#else
+    *p++ = returntype;
+#endif
+
+    /* FUNCTION_NUM_ARGS */
+    if (returntype & TYPE_MOD_XVARARGS)
+      *p++ = num_args | ~0x7f;
+    else
+      *p++ = num_args;
+
+    /* FUNCTION_NUM_VARS */
+    *p   = num_vars;
+} /* store_function_header() */
+
+/*-------------------------------------------------------------------------*/
+static void
+def_function_typecheck (fulltype_t returntype, ident_t * ident
+#ifdef USE_NEW_INLINES
+                       , Bool is_inline
+#endif /* USE_NEW_INLINES */
+                       )
+
+/* Called after parsing the '<type> <functionname>' part of a function
+ * definition, this function performs the typecheck, makes sure that
+ * the function name is put into the list of globals, and initialises
+ * the block scoping.
+ *
+ * If <is_inline> is TRUE, the function to be compiled is an inline closure,
+ * which requires a slightly different handling. This function is called
+ * after 'func <type>' has been parsed, and is provided with a synthetic
+ * function name.
+ */
+
+{
+#ifdef USE_NEW_INLINES
+    if (is_inline)
+    {
+        new_inline_closure();
+        enter_block_scope(); /* Scope for context */
+        enter_block_scope(); /* Argument scope */
+    }
+    else
+    {
+#endif /* USE_NEW_INLINES */
+        use_local_scopes = pragma_use_local_scopes;
+        block_depth = 1;
+        init_scope(block_depth);
+#ifdef USE_NEW_INLINES
+    }
+#endif /* USE_NEW_INLINES */
+
+    if (!(returntype & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
+               | TYPE_MOD_PROTECTED | TYPE_MOD_STATIC)))
+    {
+        returntype |= default_funmod;
+    }
+
+    /* Require exact types? */
+    if (returntype & TYPE_MOD_MASK)
+    {
+        exact_types = returntype;
+    }
+    else
+    {
+        if (pragma_strict_types != PRAGMA_WEAK_TYPES)
+            yyerror("\"#pragma strict_types\" requires type of function");
+        exact_types = 0;
+    }
+
+    if (returntype & TYPE_MOD_NOSAVE)
+    {
+        yyerror("can't declare a function as nosave");
+        returntype &= ~TYPE_MOD_NOSAVE;
+    }
+
+    if (ident->type == I_TYPE_UNKNOWN)
+    {
+        /* prevent freeing by exotic name clashes */
+        ident->type = I_TYPE_GLOBAL;
+        ident->u.global.variable  = I_GLOBAL_VARIABLE_OTHER;
+        ident->u.global.efun      = I_GLOBAL_EFUN_OTHER;
+        ident->u.global.sim_efun  = I_GLOBAL_SEFUN_OTHER;
+        ident->u.global.function  = I_GLOBAL_FUNCTION_VAR;
+#ifdef USE_STRUCTS
+        ident->u.global.struct_id = I_GLOBAL_STRUCT_NONE;
+#endif /* USE_STRUCTS */
+        ident->next_all = all_globals;
+        all_globals = ident;
+    }
+
+    /* Store the data */
+#ifdef USE_NEW_INLINES
+    if (is_inline)
+    {
+        current_inline->ident = ident;
+        current_inline->returntype = returntype;
+    }
+    else
+    {
+#endif /* USE_NEW_INLINES */
+        def_function_returntype = returntype;
+        def_function_ident = ident;
+#ifdef USE_NEW_INLINES
+    }
+#endif /* USE_NEW_INLINES */
+} /* def_function_typecheck() */
+
+/*-------------------------------------------------------------------------*/
+static void
+def_function_prototype (int num_args
+#ifdef USE_NEW_INLINES
+                       , Bool is_inline
+#endif /* USE_NEW_INLINES */
+                       )
+
+/* Called after parsing '<type> <name> ( <args> ) of a function definition,
+ * this function creates the function prototype entry.
+ *
+ * If <is_inline> is TRUE, the function to be compiled is an inline closure,
+ * which requires a slightly different handling. This function is called
+ * after 'func <type> <arguments> <context>' has been parsed.
+ */
+
+{
+    ident_t * ident;
+    fulltype_t returntype;
+    int fun;
+
+#ifdef USE_NEW_INLINES
+    if (is_inline)
+    {
+        ident = current_inline->ident;
+        returntype = current_inline->returntype;
+    }
+    else
+#endif /* USE_NEW_INLINES */
+    {
+        ident = def_function_ident;
+        returntype = def_function_returntype;
+    }
+
+    /* We got the complete prototype: define it */
+    
+    if ( current_number_of_locals
+     && (full_type_of_locals[current_number_of_locals-1]
+         & TYPE_MOD_VARARGS)
+       )
+    {
+        /* The last argument has to allow an array. */
+        vartype_t *t;
+
+        returntype |= TYPE_MOD_XVARARGS;
+
+        t = type_of_locals + (current_number_of_locals-1);
+        if (!(*t & TYPE_MOD_POINTER)
+         && (*t & TYPE_MOD_RMASK) != TYPE_ANY
+           )
+        {
+            if ((*t & TYPE_MOD_RMASK) != TYPE_UNKNOWN)
+                yyerror(
+                  "varargs parameter must be declared array or mixed");
+            /* Keep the visibility, but change the type to
+             * '&any'
+             */
+            *t &= ~TYPE_MOD_RMASK;
+            *t |= TYPE_ANY;
+        }
+    }
+
+    /* Define a prototype. If it is a real function, then the
+     * prototype will be updated below.
+     */
+    fun = define_new_function( MY_FALSE, ident, num_args, 0, 0
+                             , NAME_UNDEFINED|NAME_PROTOTYPE
+                             , returntype);
+
+    /* Store the data */
+#ifdef USE_NEW_INLINES
+    if (is_inline)
+    {
+        current_inline->returntype = returntype;
+        current_inline->num_args = num_args;
+        current_inline->function = fun;
+    }
+    else
+#endif /* USE_NEW_INLINES */
+    {
+        def_function_returntype = returntype;
+        def_function_num_args = num_args;
+    }
+} /* def_function_prototype() */
+
+/*-------------------------------------------------------------------------*/
+static void
+def_function_complete ( p_int body_start
+#ifdef USE_NEW_INLINES
+                      , Bool is_inline
+#endif /* USE_NEW_INLINES */
+                      )
+
+/* Called after completely parsing a function definition,
+ * this function updates the function header and closes all scopes..
+ * Argument is the program index where the space for the function header
+ * was made, or -1 if there was no body.
+ *
+ * If <is_inline> is TRUE, the function to be compiled is an inline closure,
+ * which requires a slightly different handling. This function is called
+ * after the complete closure has been parsed.
+ */
+
+{
+    ident_t    * ident;
+    fulltype_t   returntype;
+    int          num_args;
+
+#ifdef USE_NEW_INLINES
+    if (is_inline)
+    {
+        ident = current_inline->ident;
+        returntype = current_inline->returntype;
+        num_args = current_inline->num_args;
+    }
+    else
+#endif /* USE_NEW_INLINES */
+    {
+        ident = def_function_ident;
+        returntype = def_function_returntype;
+        num_args = def_function_num_args;
+    }
+
+    if (body_start < 0)
+    {
+        /* function_body was a ';' -> prototype
+         * Just norm the visibility flags unless it is a prototype
+         * for an already inherited function.
+         */
+
+        funflag_t *flagp;
+
+        flagp = (funflag_t *)(&FUNCTION(ident->u.global.function)->flags);
+        if (!(*flagp & NAME_INHERITED))
+        {
+            *flagp |= returntype
+                      & (*flagp & TYPE_MOD_PUBLIC
+                        ? (TYPE_MOD_NO_MASK)
+                        : (TYPE_MOD_NO_MASK|TYPE_MOD_PRIVATE
+                          |TYPE_MOD_STATIC|TYPE_MOD_PROTECTED
+                          |TYPE_MOD_PUBLIC)
+                        );
+        }
+    }
+    else
+    {
+        /* function_body was a block: generate the
+         * function header and update the ident-table entry.
+         */
+
+        int num_vars = max_number_of_locals - num_args
+                                            + max_break_stack_need;
+
+        store_function_header( body_start
+                             , ident->name
+                             , returntype
+                             , num_args
+                             , num_vars
+                             );
+
+        define_new_function(MY_TRUE, ident
+                           , num_args
+                           , num_vars
+                           , body_start + FUNCTION_PRE_HDR_SIZE
+                           , 0, returntype);
+
+        ins_f_code(F_RETURN0); /* catch a missing return */
+    }
+
+    /* Clean up for normal functions.
+     * Inline closures need the information for some more processing.
+     */
+#ifdef USE_NEW_INLINES
+    if (!is_inline)
+#endif /* USE_NEW_INLINES */
+    {
+        free_all_local_names();
+        block_depth = 0;
+    }
+
+} /* def_function_complete() */
 
 /* =============================   STRUCTS   ============================= */
 
@@ -3008,13 +3337,13 @@ define_new_struct ( Bool proto, ident_t *p, funflag_t flags)
     struct_def_t sdef;
     
     /* If this is a redeclaration, check for consistency. */
-    if (p->type == I_TYPE_GLOBAL && (num = p->u.global.struct_id) >= 0
+    if (p->type == I_TYPE_GLOBAL && (num = p->u.global.struct_id) > 0
      && !(flags & NAME_HIDDEN)
       )
     {
         struct_def_t *pdef;
 
-        pdef = &STRUCT_DEF(num);
+        pdef = &STRUCT_DEF(num-1);
 
         /* Check if the visibility is conserved.
          */
@@ -3076,7 +3405,7 @@ define_new_struct ( Bool proto, ident_t *p, funflag_t flags)
     sdef.flags       = proto ? (flags | NAME_PROTOTYPE)
                              : (flags & ~NAME_PROTOTYPE);
 
-    num = STRUCT_COUNT;
+    num = STRUCT_COUNT+1;
 
     if (p->type != I_TYPE_GLOBAL)
     {
@@ -3124,9 +3453,9 @@ find_struct ( string_t * name )
     ident_t * p;
 
     p = find_shared_identifier(get_txt(name), I_TYPE_GLOBAL, 0);
-    if (p == NULL || p->u.global.struct_id < 0)
+    if (p == NULL || p->u.global.struct_id <= 0)
         return -1;
-    if (STRUCT_DEF(p->u.global.struct_id).flags & NAME_HIDDEN)
+    if (STRUCT_DEF(p->u.global.struct_id-1).flags & NAME_HIDDEN)
         return -1;
     return p->u.global.struct_id;
 } /* find_struct() */
@@ -3163,7 +3492,7 @@ static void
 add_struct_member ( string_t *name, vartype_t type, int from_struct )
 
 /* Add a new member <name> with type <type> to the most recently defined
- * struct. If <from_struct> is >= 0, it is the index of the struct from
+ * struct. If <from_struct> is > 0, it is the index of the struct from
  * which the member is inherited.
  * Raise an error if a member of the same name already exists.
  */
@@ -3172,7 +3501,7 @@ add_struct_member ( string_t *name, vartype_t type, int from_struct )
     struct_def_t    *pdef;
     struct_member_t  member;
 
-    pdef = &STRUCT_DEF(current_struct);
+    pdef = &STRUCT_DEF(current_struct-1);
 
     if (pdef->num_members != 0)
     {
@@ -3193,7 +3522,7 @@ add_struct_member ( string_t *name, vartype_t type, int from_struct )
                     yyerrorf("Duplicate member '%s' in struct '%s' "
                              "inherited from struct '%s'"
                             , get_txt(name), get_txt(pdef->name)
-                            , get_txt(STRUCT_DEF(from_struct).name));
+                            , get_txt(STRUCT_DEF(from_struct-1).name));
                 return;
             }
         }
@@ -3661,12 +3990,6 @@ prepare_inline_closure (fulltype_t returntype)
  * closure structure and block scope.
  *
  * If the name can't be generated, FALSE is returned, otherwise TRUE.
- *
- * TODO: This function shares a lot of code with the generic function
- * TODO:: setup. To do this, use entry#0 for gathering the normal
- * TODO:: function information, and entries #1.. for the actual inlines.
- * TODO:: Or use a handful of globals, and save the in the closure entries
- * TODO:: as needed.
  */
 
 {
@@ -3705,63 +4028,14 @@ prepare_inline_closure (fulltype_t returntype)
 
     ident = make_shared_identifier(name, I_TYPE_UNKNOWN, 0);
 
+    def_function_typecheck(returntype, ident, MY_TRUE);
 #ifdef DEBUG_INLINES
 printf("DEBUG: New inline closure name: '%s'\n", name);
-#endif /* DEBUG_INLINES */
-
-    new_inline_closure();
-    enter_block_scope(); /* Scope for the context */
-    enter_block_scope(); /* Argument scope */
-
-#ifdef DEBUG_INLINES
 printf("DEBUG:   current_inline->depth: %d\n", current_inline->block_depth);
 printf("DEBUG:           context depth: %d\n", current_inline->block_depth+1);
 printf("DEBUG:               arg depth: %d\n", current_inline->block_depth+2);
 printf("DEBUG:           current depth: %d\n", block_depth);
 #endif /* DEBUG_INLINES */
-
-    if (!(returntype & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
-                          | TYPE_MOD_PROTECTED | TYPE_MOD_STATIC)))
-    {
-        returntype |= default_funmod;
-    }
-
-    /* Require exact types? */
-    if (returntype & TYPE_MOD_MASK)
-    {
-        exact_types = returntype;
-    }
-    else
-    {
-        if (pragma_strict_types != PRAGMA_WEAK_TYPES)
-            yyerror("\"#pragma strict_types\" requires type of function");
-        exact_types = 0;
-    }
-
-    if (returntype & TYPE_MOD_NOSAVE)
-    {
-        yyerror("can't declare a function as nosave");
-        returntype &= ~TYPE_MOD_NOSAVE;
-    }
-
-    if (ident->type == I_TYPE_UNKNOWN)
-    {
-        /* prevent freeing by exotic name clashes */
-        ident->type = I_TYPE_GLOBAL;
-        ident->u.global.variable  = I_GLOBAL_VARIABLE_OTHER;
-        ident->u.global.efun      = I_GLOBAL_EFUN_OTHER;
-        ident->u.global.sim_efun  = I_GLOBAL_SEFUN_OTHER;
-        ident->u.global.function  = I_GLOBAL_FUNCTION_VAR;
-#ifdef USE_STRUCTS
-        ident->u.global.struct_id = I_GLOBAL_STRUCT_NONE;
-#endif /* USE_STRUCTS */
-        ident->next_all = all_globals;
-        all_globals = ident;
-    }
-
-    /* Store the data in the inline_closure_t */
-    current_inline->ident = ident;
-    current_inline->returntype = returntype;
 
     return MY_TRUE;
 } /* prepare_inline_closure() */
@@ -3787,54 +4061,18 @@ inline_closure_prototype (int num_args)
 #ifdef DEBUG_INLINES
 printf("DEBUG: inline_closure_prototype(%d)\n", num_args);
 #endif /* DEBUG_INLINES */
-    if ( current_number_of_locals
-     && (full_type_of_locals[current_number_of_locals-1]
-         & TYPE_MOD_VARARGS)
-       )
-    {
-%line
-        /* The last argument has to allow an array. */
-        vartype_t *t;
-
-        current_inline->returntype |= TYPE_MOD_XVARARGS;
-
-        t = type_of_locals + (current_number_of_locals-1);
-        if (!(*t & TYPE_MOD_POINTER)
-         && (*t & TYPE_MOD_RMASK) != TYPE_ANY
-           )
-        {
-            if ((*t & TYPE_MOD_RMASK) != TYPE_UNKNOWN)
-                yyerror(
-                  "varargs parameter must be declared array or mixed");
-            /* Keep the visibility, but change the type to
-             * '&any'
-             */
-            *t &= ~TYPE_MOD_RMASK;
-            *t |= TYPE_ANY;
-        }
-    }
+    def_function_prototype(num_args, MY_TRUE);
 
 #ifdef DEBUG_INLINES
 printf("DEBUG:   current_inline->depth: %d: %d\n", current_inline->block_depth, block_scope[current_inline->block_depth-1].num_locals);
 printf("DEBUG:           context depth: %d: %d\n", current_inline->block_depth+1, block_scope[current_inline->block_depth+1-1].num_locals);
 printf("DEBUG:               arg depth: %d: %d\n", current_inline->block_depth+2, block_scope[current_inline->block_depth+2-1].num_locals);
 printf("DEBUG:           current depth: %d: %d\n", block_depth, block_scope[block_depth].num_locals);
-#endif /* DEBUG_INLINES */
-
-    /* Define the prototype.
-     */
-    current_inline->num_args = num_args;
-    current_inline->function
-      = define_new_function(MY_FALSE, current_inline->ident, num_args, 0, 0
-                           , NAME_UNDEFINED|NAME_PROTOTYPE
-                           , current_inline->returntype);
-#ifdef DEBUG_INLINES
 printf("DEBUG:   Function index: %d\n", current_inline->function);
 #endif /* DEBUG_INLINES */
 
     /* A function with code: align the function and
      * make space for the function header.
-     * Result is the address of the FUNCTION_NAME space.
      */
     current_inline->end = CURRENT_PROGRAM_SIZE;
 #ifdef DEBUG_INLINES
@@ -3877,11 +4115,6 @@ complete_inline_closure ( void )
 
 {
     p_int start, li_start;
-    bytecode_p p;
-    int num_args;
-    string_t * name;
-%line
-
 #ifdef DEBUG_INLINES
 printf("DEBUG: Generate inline closure function:\n");
 #endif /* DEBUG_INLINES */
@@ -3897,8 +4130,6 @@ printf("DEBUG: Generate inline closure function:\n");
 
     start = current_inline->start;
     li_start = current_inline->li_start;
-    name = current_inline->ident->name;
-    num_args = current_inline->num_args;
 
 #ifdef DEBUG_INLINES
 printf("DEBUG:   current_inline->depth: %d: %d\n", current_inline->block_depth, block_scope[current_inline->block_depth-1].num_locals);
@@ -3909,47 +4140,8 @@ printf("DEBUG:           current depth: %d: %d\n", block_depth, block_scope[bloc
 
     /* Generate the function header and update the ident-table entry.
      */
+    def_function_complete(start, MY_TRUE);
 
-    p = &(PROGRAM_BLOCK[start]);
-
-    /* FUNCTION_NAME */
-    memcpy(p, &name, sizeof name);
-    p += sizeof name;
-    (void)ref_mstring(name);
-#ifdef DEBUG_INLINES
-printf("DEBUG:   Name: '%s'\n", get_txt(name));
-#endif /* DEBUG_INLINES */
-    /* FUNCTION_TYPE */
-#if defined(USE_STRUCTS)
-    STORE_SHORT(p, current_inline->returntype);
-#else
-    *p++ = current_inline->returntype;
-#endif
-
-    /* FUNCTION_NUM_ARGS */
-    if (current_inline->returntype & TYPE_MOD_XVARARGS)
-      *p++ = num_args | ~0x7f;
-    else
-      *p++ = num_args;
-#ifdef DEBUG_INLINES
-printf("DEBUG:   Args: %d\n", num_args);
-#endif /* DEBUG_INLINES */
-
-    /* FUNCTION_NUM_VARS */
-#ifdef DEBUG_INLINES
-printf("DEBUG:   Stack: %d\n", max_number_of_locals - num_args + max_break_stack_need);
-#endif /* DEBUG_INLINES */
-    *p = max_number_of_locals - num_args + max_break_stack_need;
-
-    define_new_function(MY_TRUE, current_inline->ident, num_args
-                       , max_number_of_locals - num_args + max_break_stack_need
-                       , start + FUNCTION_PRE_HDR_SIZE, 0
-                       , current_inline->returntype);
-
-    ins_f_code(F_RETURN0); /* catch a missing return */
-#ifdef DEBUG_INLINES
-printf("DEBUG:  -> F_RETURN0\n");
-#endif /* DEBUG_INLINES */
     current_inline->length = CURRENT_PROGRAM_SIZE - start;
 
     store_line_number_info();
@@ -4925,7 +5117,7 @@ program:
 
 possible_semi_colon:
       /* empty */
-    | ';' { yywarn("Extra ';'. Ignored."); };
+    | ';' { yywarn("Extra ';' ignored"); };
 
 note_start: { $$.start = CURRENT_PROGRAM_SIZE; };
 
@@ -4941,160 +5133,31 @@ note_start: { $$.start = CURRENT_PROGRAM_SIZE; };
 def:  type optional_star L_IDENTIFIER  /* Function definition or prototype */
 
       {
-          use_local_scopes = pragma_use_local_scopes;
-          block_depth = 1;
-          init_scope(block_depth);
-
-          if (!($1 & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
-                     | TYPE_MOD_PROTECTED | TYPE_MOD_STATIC)))
-          {
-              $1 |= default_funmod;
-          }
-
-          $2 |= $1; /* $2 is now the complete type */
-
-          /* Require exact types? */
-          if ($1 & TYPE_MOD_MASK)
-          {
-              exact_types = $2;
-          }
-          else
-          {
-              if (pragma_strict_types != PRAGMA_WEAK_TYPES)
-                  yyerror("\"#pragma strict_types\" requires type of function");
-              exact_types = 0;
-          }
-
-          if ($1 & TYPE_MOD_NOSAVE)
-          {
-              yyerror("can't declare a function as nosave");
-              $1 &= ~TYPE_MOD_NOSAVE;
-          }
-
-          if ($3->type == I_TYPE_UNKNOWN)
-          {
-              /* prevent freeing by exotic name clashes */
-              ident_t *p = $3;
-              p->type = I_TYPE_GLOBAL;
-              p->u.global.variable  = I_GLOBAL_VARIABLE_OTHER;
-              p->u.global.efun      = I_GLOBAL_EFUN_OTHER;
-              p->u.global.sim_efun  = I_GLOBAL_SEFUN_OTHER;
-              p->u.global.function  = I_GLOBAL_FUNCTION_VAR;
-#ifdef USE_STRUCTS
-              p->u.global.struct_id = I_GLOBAL_STRUCT_NONE;
-#endif /* USE_STRUCTS */
-              p->next_all = all_globals;
-              all_globals = p;
-          }
+#ifdef USE_NEW_INLINES
+          def_function_typecheck($1|$2, $3, MY_FALSE);
+#else /* USE_NEW_INLINES */
+          def_function_typecheck($1|$2, $3);
+#endif /* USE_NEW_INLINES */
       }
       
       '(' argument ')'
       
       {
-          /* We got the complete prototype: define it */
-          
-          if ( current_number_of_locals
-           && (full_type_of_locals[current_number_of_locals-1]
-               & TYPE_MOD_VARARGS)
-             )
-          {
-%line
-              /* The last argument has to allow an array. */
-              vartype_t *t;
-
-              $2 |= TYPE_MOD_XVARARGS;
-
-              t = type_of_locals + (current_number_of_locals-1);
-              if (!(*t & TYPE_MOD_POINTER)
-               && (*t & TYPE_MOD_RMASK) != TYPE_ANY
-                 )
-              {
-                  if ((*t & TYPE_MOD_RMASK) != TYPE_UNKNOWN)
-                      yyerror(
-                        "varargs parameter must be declared array or mixed");
-                  /* Keep the visibility, but change the type to
-                   * '&any'
-                   */
-                  *t &= ~TYPE_MOD_RMASK;
-                  *t |= TYPE_ANY;
-              }
-          }
-
-          /* Define a prototype. If it is a real function, then the
-           * prototype will be updated below.
-           */
-          define_new_function(MY_FALSE, $3, $6, 0, 0,
-                              NAME_UNDEFINED|NAME_PROTOTYPE, $2);
+#ifdef USE_NEW_INLINES
+          def_function_prototype($6, MY_FALSE);
+#else /* USE_NEW_INLINES */
+          def_function_prototype($6);
+#endif /* USE_NEW_INLINES */
       }
 
       function_body
 
       {
-          /* The function is complete */
-          
-          p_int start;
-          bytecode_p p;
-%line
-          if ( (start = $9) < 0)
-          {
-              /* function_body was a ';' -> prototype
-               * Just norm the visibility flags unless it is a prototype
-               * for an already inherited function.
-               */
-
-              funflag_t *flagp;
-
-              flagp = (funflag_t *)(&FUNCTION($3->u.global.function)->flags);
-              if (!(*flagp & NAME_INHERITED))
-              {
-                  *flagp |= $1 & (*flagp & TYPE_MOD_PUBLIC
-                                  ? (TYPE_MOD_NO_MASK)
-                                  : (TYPE_MOD_NO_MASK|TYPE_MOD_PRIVATE
-                                    |TYPE_MOD_STATIC|TYPE_MOD_PROTECTED
-                                    |TYPE_MOD_PUBLIC)
-                                  );
-              }
-          }
-          else
-          {
-              /* function_body was a block: generate the
-               * function header and update the ident-table entry.
-               */
-
-              p = &(PROGRAM_BLOCK[start]);
-
-              /* FUNCTION_NAME */
-              memcpy(p, &$3->name, sizeof $3->name);
-              p += sizeof $3->name;
-              (void)ref_mstring($3->name);
-
-              /* FUNCTION_TYPE */
-#if defined(USE_STRUCTS)
-              STORE_SHORT(p, $2);
-#else
-              *p++ = $2;
-#endif
-
-              /* FUNCTION_NUM_ARGS */
-              if ($2 & TYPE_MOD_XVARARGS)
-                *p++ = $6 | ~0x7f;
-              else
-                *p++ = $6;
-
-              /* FUNCTION_NUM_VARS */
-              *p   = max_number_of_locals - $6 + max_break_stack_need;
-
-              define_new_function(MY_TRUE, $3, $6, max_number_of_locals - $6+
-                      max_break_stack_need,
-                      start + FUNCTION_PRE_HDR_SIZE, 0, $2);
-
-              ins_f_code(F_RETURN0); /* catch a missing return */
-          }
-
-          /* Clean up */
-          free_all_local_names();
-          
-          block_depth = 0;
+#ifdef USE_NEW_INLINES
+          def_function_complete($9, MY_FALSE);
+#else /* USE_NEW_INLINES */
+          def_function_complete($9);
+#endif /* USE_NEW_INLINES */
 
 #ifndef USE_NEW_INLINES
           if (first_inline_fun)
@@ -5190,7 +5253,6 @@ printf("DEBUG: After inline_opt_context: program size %ld\n", CURRENT_PROGRAM_SI
               YYACCEPT;
       }
 
-
       block
 
       {
@@ -5234,7 +5296,7 @@ printf("DEBUG: Before comma_expr: program size %ld\n", CURRENT_PROGRAM_SIZE);
 #endif /* DEBUG_INLINES */
       }
       
-      inline_expr_body
+      statements inline_comma_expr
 
       L_END_INLINE
 
@@ -5242,8 +5304,6 @@ printf("DEBUG: Before comma_expr: program size %ld\n", CURRENT_PROGRAM_SIZE);
 #ifdef DEBUG_INLINES
 printf("DEBUG: After L_END_INLINE: program size %ld\n", CURRENT_PROGRAM_SIZE);
 #endif /* DEBUG_INLINES */
-         ins_f_code(F_RETURN);
-
          $$.start = current_inline->end;
          $$.code = -1;
          $$.type = TYPE_CLOSURE;
@@ -5314,15 +5374,14 @@ context_decl:
 ; /* context_decl */
 
 
-inline_expr_body:
-      /* While the body of an (: :) closure is just a comma_expr, we need
-       * to do some more work in order to sync properly after errors caused
-       * bu people using statements in the closure.
-       * If we didn't, the parser would become complete confused.
-       */
-      comma_expr { }
-    | error statements 
-; /* inline_expr_body */
+inline_comma_expr:
+      /* Empty: nothing to do */
+    | comma_expr
+      {
+          /* Add a F_RETURN to complete the statement */
+          ins_f_code(F_RETURN);
+      }
+; /* inline_comma_expr */
 
 %endif /* USE_NEW_INLINES */
 
@@ -5373,11 +5432,11 @@ opt_base_struct:
               while (p != NULL && p->type != I_TYPE_GLOBAL)
                   p = p->inferior;
 
-              if (p == NULL || (num = p->u.global.struct_id) < 0)
+              if (p == NULL || (num = p->u.global.struct_id) <= 0)
               {
                   yyerrorf("Unknown base struct '%s'", get_txt($2->name));
               }
-              else if (STRUCT_DEF(num).flags & NAME_PROTOTYPE)
+              else if (STRUCT_DEF(num-1).flags & NAME_PROTOTYPE)
               {
                   yyerrorf("Undefined base struct '%s'", get_txt($2->name));
               }
@@ -5385,7 +5444,7 @@ opt_base_struct:
               {
                   struct_def_t *pdef;
 
-                  pdef = &STRUCT_DEF(num);
+                  pdef = &STRUCT_DEF(num-1);
                   if (pdef->num_members > 0)
                   {
                       int count;
@@ -5702,8 +5761,8 @@ inheritance:
 #ifdef USE_STRUCTS
               /* Fix up the struct inherit indices */
               {
-                  int left = STRUCT_COUNT - inherit.struct_index_offset;
-                  struct_def_t *pdef = &STRUCT_DEF(inherit.struct_index_offset);
+                  int left = STRUCT_COUNT - inherit.struct_index_offset + 1;
+                  struct_def_t *pdef = &STRUCT_DEF(inherit.struct_index_offset-1);
 
                   for (; left > 0; left--, pdef++)
                       pdef->inh = INHERIT_COUNT;
@@ -6317,11 +6376,11 @@ if (current_inline && current_inline->parse_context) printf("DEBUG: inline conte
 
           if ($2 != F_ASSIGN)
           {
-              yyerror("Only plain assignments allowed here.");
+              yyerror("Only plain assignments allowed here");
           }
 
           if (type2 & TYPE_MOD_REFERENCE)
-              yyerror("Can't trace reference assignments.");
+              yyerror("Can't trace reference assignments");
 
           /* If we're parsing a context variable, just leave the
            * value on the stack for the context_closure instruction.
@@ -7146,11 +7205,11 @@ expr_decl:
 
           if ($2 != F_ASSIGN)
           {
-              yyerror("Only plain assignments allowed here.");
+              yyerror("Only plain assignments allowed here");
           }
 
           if (type2 & TYPE_MOD_REFERENCE)
-              yyerror("Can't trace reference assignments.");
+              yyerror("Can't trace reference assignments");
 
           /* Add the bytecode to create the lvalue and do the
            * assignment.
@@ -9711,7 +9770,7 @@ expr4:
           /* Generate a literal struct */
 
           int num = $<number>5;
-          struct_def_t *pdef = &(STRUCT_DEF(num));
+          struct_def_t *pdef = &(STRUCT_DEF(num-1));
 
           if ($7.length > STRUCT_MAX_MEMBERS || $7.length > pdef->num_members)
           {
@@ -9760,7 +9819,7 @@ expr4:
           else
           {
               int num;
-              struct_def_t * pdef = &(STRUCT_DEF(GET_SEC_TYPE_INFO($1.type)));
+              struct_def_t * pdef = &(STRUCT_DEF(GET_SEC_TYPE_INFO($1.type)-1));
 
               num = find_struct_member(pdef, $3);
               if (num < 0)
@@ -9798,7 +9857,7 @@ expr4:
           else
           {
               int num;
-              struct_def_t * pdef = &(STRUCT_DEF(GET_SEC_TYPE_INFO($3.type)));
+              struct_def_t * pdef = &(STRUCT_DEF(GET_SEC_TYPE_INFO($3.type)-1));
 
               num = find_struct_member(pdef, $5);
               if (num < 0)
@@ -10592,7 +10651,7 @@ lvalue:
           }
           else
           {
-              struct_def_t * pdef = &(STRUCT_DEF(GET_SEC_TYPE_INFO($1.type)));
+              struct_def_t * pdef = &(STRUCT_DEF(GET_SEC_TYPE_INFO($1.type)-1));
 
               num = find_struct_member(pdef, $3);
               if (num < 0)
@@ -12730,7 +12789,7 @@ lvalue_list:
           else
           {
               int num;
-              struct_def_t * pdef = &(STRUCT_DEF(GET_SEC_TYPE_INFO($3.type)));
+              struct_def_t * pdef = &(STRUCT_DEF(GET_SEC_TYPE_INFO($3.type)-1));
 
               num = find_struct_member(pdef, $5);
               if (num < 0)
@@ -12914,7 +12973,7 @@ struct_constant:
       {
           /* Generate a literal struct */
 
-          struct_def_t * pdef = &(STRUCT_DEF($<struct_const_init>5.id));
+          struct_def_t * pdef = &(STRUCT_DEF($<struct_const_init>5.id-1));
           svalue_t     * svp = $<struct_const_init>5.initialized;
 
           if ($6.length > STRUCT_MAX_MEMBERS || $6.length > pdef->num_members)
@@ -13459,29 +13518,22 @@ transfer_init_control (void)
          */
          
         CURRENT_PROGRAM_SIZE = align(CURRENT_PROGRAM_SIZE);
-          /* Must happen before PREPARE_INSERT()! */
-        {
-            string_t *name;
-            PREPARE_INSERT(FUNCTION_HDR_SIZE);
+          /* Must happen before store_function_header() */
+        realloc_a_program(FUNCTION_HDR_SIZE);
 
-            name = ref_mstring(STR_VARINIT);
-            memcpy(__PREPARE_INSERT__p , (char *)&name, sizeof name);
-            __PREPARE_INSERT__p += sizeof(name);
-#ifdef USE_STRUCTS
-            add_short(TYPE_ANY);  /* FUNCTION_TYPE */
-#else
-            add_byte(TYPE_ANY);  /* FUNCTION_TYPE */
-#endif /* USE_STRUCTS */
-            add_byte(0);         /* FUNCTION_NUM_ARGS */
-            add_byte(0);         /* FUNCTION_NUM_VARS */
-            first_initializer_start =   CURRENT_PROGRAM_SIZE
-                                      + FUNCTION_PRE_HDR_SIZE;
-            CURRENT_PROGRAM_SIZE += FUNCTION_HDR_SIZE;
-        }
+        store_function_header( CURRENT_PROGRAM_SIZE
+                             , STR_VARINIT
+                             , TYPE_ANY
+                             , 0 /* num_args */
+                             , 0 /* num_vars */
+                             );
+        first_initializer_start =   CURRENT_PROGRAM_SIZE
+                                  + FUNCTION_PRE_HDR_SIZE;
+        CURRENT_PROGRAM_SIZE += FUNCTION_HDR_SIZE;
     }
     else if ((p_int)(CURRENT_PROGRAM_SIZE - 2) == last_initializer_end)
     {
-        /* The news INIT fragment directly follows the old one, so
+        /* The new INIT fragment directly follows the old one, so
          * just overwrite the JUMP instruction of the last.
          */
         mem_block[A_PROGRAM].current_size -= 3;
@@ -13930,17 +13982,17 @@ copy_structs (program_t *from, fulltype_t flags, int offset)
 
         /* Duplicate definition? */
         id = find_struct(pdef->name);
-        if (!(f & NAME_HIDDEN) && id >= 0)
+        if (!(f & NAME_HIDDEN) && id > 0)
         {
-            /* We have a class with this name. Check if we just
+            /* We have a struct with this name. Check if we just
              * inherited it again, or if it's a name clash.
              */
-            if (STRUCT_DEF(id).prog != pdef->prog)
+            if (STRUCT_DEF(id-1).prog != pdef->prog)
             {
                 yyerrorf("struct '%s' multiply inherited from '%s' "
                          "and '%s'"
-                        , get_txt(STRUCT_DEF(id).name)
-                        , get_txt(INHERIT(STRUCT_DEF(id).inh).prog->name)
+                        , get_txt(STRUCT_DEF(id-1).name)
+                        , get_txt(INHERIT(STRUCT_DEF(id-1).inh).prog->name)
                         , get_txt(from->name)
                         );
             }
@@ -13955,8 +14007,8 @@ copy_structs (program_t *from, fulltype_t flags, int offset)
 
         current_struct = define_new_struct( MY_FALSE, p, f);
 
-        STRUCT_DEF(current_struct).prog = pdef->prog;
-        STRUCT_DEF(current_struct).base += offset;
+        STRUCT_DEF(current_struct-1).prog = pdef->prog;
+        STRUCT_DEF(current_struct-1).base += offset;
 
         /* Now copy the members */
         if (!(f & NAME_HIDDEN))

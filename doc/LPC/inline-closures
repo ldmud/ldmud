@@ -4,7 +4,7 @@ CONCEPT
 SYNTAX
         function <returntype> ( <arguments> ) : <context> { <code> }
 
-        (: <expr>, ... , <expr> :)
+        (: <statements> ; <expr>, ... , <expr> :)
 
 
 DESCRIPTION
@@ -89,16 +89,22 @@ DESCRIPTION
         
 
         The special (: :) form is meant for simple expressions (and
-        MudOS compatibility). It is the shorthand form for
+        MudOS compatibility). The form
+        
+          (: <statements> ; <expr>, ..., <expr> :)
+          
+        is the shorthand notation for
 
-          function { return <expr>, ..., <expr>; }
+          function { <statements>; return <expr>, ..., <expr>; }
 
         For example the two statements
 
           sort_array(arr, function { return $1 < $2; } )
           sort_array(arr, (: $1 < $2 :) )
         
-        do the same.
+        do the same. The example also demonstrates that both the <statements>
+        and the <expr> part in this form are optional.
+
 
 
 NOTES
@@ -108,14 +114,11 @@ NOTES
         ('(: :)' syntax only, no context variables) for backwards
         compatibility.
 
-        The old inline closures allowed not just expressions within
-        the (: :), but alternatively statements as well (for example
-        '(: return 1; :)' ). This is no longer supported.
-
 HISTORY
         LDMud 3.2.7 implemented the older, restricted form of inline
         closures.
         LDMud 3.3.271 implemented the full form of inline closures.
+        LDMud 3.3.275 re-allowed statements in the (: :) form.
 
 SEE ALSO
         closures-abstract(LPC), closures-example(LPC), closure_guide(LPC)

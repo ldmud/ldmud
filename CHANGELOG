@@ -1,6 +1,19 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+06-Oct-2002 (Lars Duening)  (3.3.275)
+  - (prolang.y) New inlines: found a way to implement the old (: expr; :)
+       form, and corrected an error where the type of context variables
+       wasn't copied properly, but instead a random value was used.
+  - (interpret.c) The sanity check for proper stack usage was still
+       incompatible with the new multibyte efun instructions (reported
+       by Dafire).
+  - (prolang.y) Structure IDs are now counted up from 1 instead of 0,
+       so that efun argument type errors can print id #0 as "just struct"
+       (reported by Dafire).
+  - (prolang.y) Straightened out the functions for function generation to
+       reduce duplicated code.
+
 06-Oct-2002 (Lars Duening)  (3.3.274)
   - (prolang.y) New inlines: Improved the error handling for the (::) form:
        the parser now recovers gracefully if statements are used instead

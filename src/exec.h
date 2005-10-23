@@ -533,6 +533,9 @@ struct inherit_s
  * in an array of these structures; this includes all inherited structs.
  * The information about the struct members are stored in a separate
  * array.
+ *
+ * Structures are internally identified by an ID number, counting from
+ * 1 upwards (not from 0!). 
  */
 
 struct struct_def_s
@@ -547,7 +550,7 @@ struct struct_def_s
                               */
     unsigned short num_members;  /* Number of data members */
     unsigned short members;  /* Index into program_t.struct_members[] */
-    short          base;     /* Index of the base struct, or -1 if none */
+    short          base;     /* ID of the base struct, or -1 if none */
     funflag_t      flags;    /* Visibility */
 };
 

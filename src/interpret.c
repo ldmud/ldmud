@@ -675,7 +675,7 @@ svalue_t last_indexing_protector = { T_NUMBER };
 
 #ifdef OPCPROF
 
-#define MAXOPC 0x280
+#define MAXOPC (LAST_INSTRUCTION_CODE)
   /* Number of different instructions to trace.
    */
 
@@ -6869,6 +6869,9 @@ eval_instruction (bytecode_p first_instruction
        */
     int num_arg;      /* Number of arguments given to the current instr */
     int instruction;  /* The current instruction code */
+    int full_instr;   /* The full instruction code; including any additional
+                       * code bytes (e.g. for efuns)
+                       */
 #ifdef DEBUG
     svalue_t *expected_stack; /* Expected stack at the instr end */
 #endif
@@ -7000,25 +7003,29 @@ eval_instruction (bytecode_p first_instruction
 again:
     /* Get the next instruction and increment the pc */
 
-    instruction = LOAD_CODE(pc);
-      /* If this a xcode, the second byte will be added later */
+    full_instr = instruction = LOAD_CODE(pc);
+    if (full_instr == F_EFUN0)
+        full_instr = GET_CODE(pc) + EFUN0_OFFSET;
+    else if (full_instr == F_EFUN1)
+        full_instr = GET_CODE(pc) + EFUN1_OFFSET;
+    else if (full_instr == F_EFUN2)
+        full_instr = GET_CODE(pc) + EFUN2_OFFSET;
+    else if (full_instr == F_EFUN3)
+        full_instr = GET_CODE(pc) + EFUN3_OFFSET;
+    else if (full_instr == F_EFUN4)
+        full_instr = GET_CODE(pc) + EFUN4_OFFSET;
+    else if (full_instr == F_EFUNV)
+        full_instr = GET_CODE(pc) + EFUNV_OFFSET;
 
 #if 0
-    printf("DEBUG: %p (%p):", pc-1, sp);
-    if (instruction == F_EFUN0)
-        printf(" %3d %s %s\n", GET_CODE(pc)+EFUN0_OFFSET, get_f_name(instruction), get_f_name(GET_CODE(pc)+EFUN0_OFFSET));
-    else if (instruction == F_EFUN1)
-        printf(" %3d %s %s\n", GET_CODE(pc)+EFUN1_OFFSET, get_f_name(instruction), get_f_name(GET_CODE(pc)+EFUN1_OFFSET));
-    else if (instruction == F_EFUN2)
-        printf(" %3d %s %s\n", GET_CODE(pc)+EFUN2_OFFSET, get_f_name(instruction), get_f_name(GET_CODE(pc)+EFUN2_OFFSET));
-    else if (instruction == F_EFUN3)
-        printf(" %3d %s %s\n", GET_CODE(pc)+EFUN3_OFFSET, get_f_name(instruction), get_f_name(GET_CODE(pc)+EFUN3_OFFSET));
-    else if (instruction == F_EFUN4)
-        printf(" %3d %s %s\n", GET_CODE(pc)+EFUN4_OFFSET, get_f_name(instruction), get_f_name(GET_CODE(pc)+EFUN4_OFFSET));
-    else if (instruction == F_EFUNV)
-        printf(" %3d %s %s\n", GET_CODE(pc)+EFUNV_OFFSET, get_f_name(instruction), get_f_name(GET_CODE(pc)+EFUNV_OFFSET));
+    if (full_instr != instruction)
+        printf("DEBUG: %p (%p): %3d %s %s\n"
+              , pc-1, sp
+              , full_instr, get_f_name(instruction), get_f_name(full_instr));
     else
-        printf(" %3d %s\n", instruction, get_f_name(instruction));
+        printf("DEBUG: %p (%p): %3d %s\n"
+              , pc-1, sp
+              , full_instr, get_f_name(full_instr));
     fflush(stdout);
 #endif
 
@@ -7049,7 +7056,7 @@ again:
 #   endif
 
 #   ifdef OPCPROF
-        opcount[instruction]++;
+        opcount[full_instr]++;
 #   endif
 
     /* If requested, trace the instruction.
@@ -7060,7 +7067,7 @@ again:
         if (!++traceing_recursion)
         {
             inter_sp = sp;
-            do_trace("Exec ", get_f_name(instruction), "\n");
+            do_trace("Exec ", get_f_name(full_instr), "\n");
             instruction = EXTRACT_UCHAR(pc-1);
         }
         traceing_recursion--;
@@ -7103,6 +7110,9 @@ again:
 
     /* Get the expected number of arguments and determined the expected
      * stack setting.
+     * Note that the code deliberately looks at instruction and not
+     * full_instr, as all multibyte instructions do not store the number
+     * of arguments in code.
      */
     if (instrs[instruction].min_arg != instrs[instruction].max_arg
      && instruction != F_CALL_OTHER
@@ -7123,12 +7133,12 @@ again:
     if (num_arg != -1 && !use_ap)
     {
         expected_stack = sp - num_arg +
-            ( instrs[instruction].ret_type == TYPE_VOID ? 0 : 1 );
+            ( instrs[full_instr].ret_type == TYPE_VOID ? 0 : 1 );
     }
     else if (use_ap)
     {
         expected_stack = ap -
-            ( instrs[instruction].ret_type == TYPE_VOID ? 1 : 0 );
+            ( instrs[full_instr].ret_type == TYPE_VOID ? 1 : 0 );
     }
     else
     {
