@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+27-Nov-2002 (Lars Duening)  (3.3.312)
+  - (object.c) Efun transfer() was still incorrect. Funny though that
+      nobody noticed it before :-) (reported by Nostradamus).
+
 27-Nov-2002 (Lars Duening)  (3.3.311)
   - (comm.c) The correction of the threads racing condition unfortunately
       introduced a deadlock - Gawain found and fixed it (thanks!).

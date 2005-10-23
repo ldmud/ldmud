@@ -4623,7 +4623,8 @@ f_transfer (svalue_t *sp)
         if (from && from->super && !(from->flags & O_ENABLE_COMMANDS))
         {
             ret = sapply(STR_CANPUTGET, from, 0);
-            if (!ret || (ret->type != T_NUMBER && ret->u.number != 1)
+            if (!ret
+             || (ret->type == T_NUMBER && ret->u.number == 0)
              || (from->flags & O_DESTRUCTED))
             {
                 result = 3;
@@ -4644,8 +4645,10 @@ f_transfer (svalue_t *sp)
             }
 
             ret = sapply(STR_CANPUTGET, to, 0);
-            if (!ret || (ret->type != T_NUMBER && ret->u.number != 0)
-             || (to->flags & O_DESTRUCTED) || (ob->flags & O_DESTRUCTED))
+            if (!ret
+             || (ret->type == T_NUMBER && ret->u.number == 0)
+             || (to->flags & O_DESTRUCTED)
+             || (ob->flags & O_DESTRUCTED))
             {
                 result = 5;
                 break;
@@ -4657,7 +4660,8 @@ f_transfer (svalue_t *sp)
         if (to->flags & O_ENABLE_COMMANDS)
         {
             ret = sapply(STR_GET, ob, 0);
-            if (!ret || (ret->type == T_NUMBER && ret->u.number == 0)
+            if (!ret
+             || (ret->type == T_NUMBER && ret->u.number == 0)
              || (ob->flags & O_DESTRUCTED))
             {
                 result = 6;
