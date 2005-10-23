@@ -21,12 +21,12 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 289)
-(Parent-Version lpmud 3-3 288)
-(Version-Log "Improved the telnet negotiation handling.")
+(Project-Version lpmud 3-3 290)
+(Parent-Version lpmud 3-3 289)
+(Version-Log "Oops, accidentally removed the TELOPT_EOR handling.")
 (New-Version-Log
 "")
-(Checkin-Time "Thu, 31 Oct 2002 18:55:56 -0700")
+(Checkin-Time "Sat, 02 Nov 2002 00:37:07 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -62,7 +62,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.49 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.352 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.353 644))
   (HISTORY (lpmud/f/49_HISTORY 1.282 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.18 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -128,7 +128,7 @@
   (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.22 644))
   (src/closure.h (lpmud/f/44_closure.h 1.7.1.11 644))
   (src/closure.c (lpmud/d/4_closure.c 1.41.1.46 644))
-  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.30 644))
+  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.31 644))
   (src/comm.h (lpmud/d/3_comm.h 1.26.1.29 644))
   (src/driver.h (lpmud/f/36_driver.h 1.15.1.20 644))
   (src/dumpstat.h (lpmud/f/35_dumpstat.h 1.8 644))
@@ -485,7 +485,7 @@
   (src/bugs/b-020916-files/registry.o (lpmud/b/b/38_registry.o 1.1 644) :no-keywords)
   (src/bugs/b-020916-files/debugger.h (lpmud/b/b/39_debugger.h 1.1 644) :no-keywords)
 
-  (src/bugs/f-summary (lpmud/c/37_f-summary 1.39.1.84 644) :no-keywords)
+  (src/bugs/f-summary (lpmud/c/37_f-summary 1.39.1.85 644) :no-keywords)
   (src/bugs/f-981027-0 (lpmud/g/29_f-981027-0 1.2 644) :no-keywords)
   (src/bugs/f-981027-1 (lpmud/g/28_f-981027-1 1.2 644) :no-keywords)
   (src/bugs/f-981027-2 (lpmud/g/27_f-981027-2 1.2 644) :no-keywords)
@@ -539,7 +539,7 @@
   (src/bugs/f-981229-06 (lpmud/j/15_f-981229-0 1.1 644) :no-keywords)
   (src/bugs/f-981229-02 (lpmud/j/19_f-981229-0 1.1 644) :no-keywords)
   (src/bugs/f-981226-2 (lpmud/j/22_f-981226-2 1.2 644) :no-keywords)
-  (src/bugs/f-981226-1 (lpmud/j/23_f-981226-1 1.4 644) :no-keywords)
+  (src/bugs/f-981226-1 (lpmud/j/23_f-981226-1 1.5 644) :no-keywords)
   (src/bugs/f-981226-0 (lpmud/j/24_f-981226-0 1.1 644) :no-keywords)
   (src/bugs/f-990214 (lpmud/j/46_f-990214 1.1 644) :no-keywords)
   (src/bugs/f-990211 (lpmud/j/47_f-990211 1.1 644) :no-keywords)
@@ -671,7 +671,7 @@
   (src/bugs/f-011213-0 (lpmud/q/6_f-011213-0 1.1 644) :no-keywords)
   (src/bugs/f-011213-1 (lpmud/q/7_f-011213-1 1.1 644) :no-keywords)
   (src/bugs/f-011215 (lpmud/u/19_f-011215 1.1 644) :no-keywords)
-  (src/bugs/f-011229-0 (lpmud/q/23_f-011229-0 1.1 644) :no-keywords)
+  (src/bugs/f-011229-0 (lpmud/q/23_f-011229-0 1.2 644) :no-keywords)
   (src/bugs/f-011229-1 (lpmud/q/24_f-011229-1 1.1 644) :no-keywords)
   (src/bugs/f-011230 (lpmud/q/25_f-011230 1.1 644) :no-keywords)
   (src/bugs/f-020127 (lpmud/q/32_f-020127 1.1 644) :no-keywords)
@@ -730,7 +730,9 @@
   (src/bugs/p-011012 (lpmud/n/50_p-011012 1.4 644) :no-keywords)
   (src/bugs/p-020810 (lpmud/a/b/3_p-020810 1.2 644) :no-keywords)
   (src/bugs/p-020810-1 (lpmud/a/b/4_p-020810-1 1.1 644) :no-keywords)
-  (src/bugs/p-020912 (lpmud/a/b/21_p-020912 1.2 644) :no-keywords)
+  (src/bugs/p-020912 (lpmud/a/b/21_p-020912 1.3 644) :no-keywords)
+  (src/bugs/p-021021 (lpmud/b/b/49_p-021021 1.1 644) :no-keywords)
+  (src/bugs/p-021031 (lpmud/b/b/50_p-021031 1.1 644) :no-keywords)
 
   ; Solved bugs and requests.
   (src/done/README (lpmud/h/22_README 1.1 644) :no-keywords)
@@ -1224,7 +1226,7 @@
   (doc/hook/print_prompt (lpmud/a/b/48_print_prom 1.1 644))
   (doc/hook/reset (lpmud/a/b/49_reset 1.2 644))
   (doc/hook/send_notify_fail (lpmud/a/b/50_send_notif 1.1 644))
-  (doc/hook/telnet_neg (lpmud/a/b/51_telnet_neg 1.2 644))
+  (doc/hook/telnet_neg (lpmud/a/b/51_telnet_neg 1.3 644))
 
   (doc/LPC/alists (lpmud/c/51_alists 1.5 644))
   (doc/LPC/arrays (lpmud/r/13_arrays 1.4 644))

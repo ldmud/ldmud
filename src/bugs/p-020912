@@ -4,7 +4,7 @@ Date: 2002-09-12
 Type: Patch
 State: New
 Driver: 3.2.9-dev.248
-See also: f-981226-1, f-991104-0
+See also: f-981226-1, f-991104-0, p-021021
 
 UDP is not handled, hardly documented, modelled after MudOS, but stable.
 

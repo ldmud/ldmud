@@ -4523,6 +4523,11 @@ init_telopts (void)
     telopts_will[TELOPT_BINARY] = reply_h_telnet_neg;
     telopts_wont[TELOPT_BINARY] = reply_h_telnet_neg;
 
+    telopts_do[TELOPT_EOR] = reply_h_telnet_neg;
+    telopts_dont[TELOPT_EOR] = reply_h_telnet_neg;
+    telopts_will[TELOPT_EOR] = reply_h_telnet_neg;
+    telopts_wont[TELOPT_EOR] = reply_h_telnet_neg;
+
     /* Tinyfugue can do bad things to your health */
     telopts_do[EOR] = reply_h_telnet_neg;
     telopts_dont[EOR] = reply_h_telnet_neg;

@@ -1,6 +1,9 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+01-Nov-2002 (Lars Duening)  (3.3.290)
+  - (comm.c) *blush* Deleted TELOPT_EOR handling by act of stupidity..
+
 31-Oct-2002 (Lars Duening)  (3.3.289)
   - (comm.c) Added TELOPT_BINARY to the telnet negotiations forwarded
       to H_TELNET_NEG (suggested by Fiona).

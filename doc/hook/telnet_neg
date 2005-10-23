@@ -17,20 +17,22 @@ DESCRIPTION
         The hook is called whenever the driver receives a demand for
         option negotiation for:
 
-            TELOPT_NAWS:     window size
-            TELOPT_TTYPE:    terminal type
-            TELOPT_TM:       timing mark
-            TELOPT_NEWENV:
-            TELOPT_ENVIRON:
-            TELOPT_XDISPLOC:
-            TELOPT_TSPEED:
-            TELOPT_BINARY:   binary data, needed for non-ASCII charsets
-            TELOPT_EOR:      used by TinyFugue
+            SB:               Suboption negotiation
+            TELOPT_LINEMODE:  linemode
+            TELOPT_NAWS:      window size
+            TELOPT_TTYPE:     terminal type
+            TELOPT_TM:        timing mark
+            TELOPT_NEWENV:    remote environment variables
+            TELOPT_ENVIRON:   remote environment variables
+            TELOPT_XDISPLOC:  remote X display address
+            TELOPT_TSPEED:    terminal speed
+            TELOPT_BINARY:    binary data, needed for non-ASCII charsets
+            TELOPT_EOR:       TinyFugue prompt marker (together with EOR)
 
-            TELOPT_COMPRESS:  MCP specific
-            TELOPT_COMPRESS2: MCP specific
-            TELOPT_MSP:       MCP specific
-            TELOPT_MXP:       MCP specific
+            TELOPT_COMPRESS:  Mud Compression Protocol
+            TELOPT_COMPRESS2: Mud Compression Protocol
+            TELOPT_MSP:       Mud Sound Protocol
+            TELOPT_MXP:       Mud Extension Protocol
 
         The hook has then to perform the negotiation using the efun
         binary_message().

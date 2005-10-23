@@ -106,6 +106,7 @@ f-011029: Efun copy_object()
 f-011119: New Standardnotation for callbacks
 f-011207: Linenumbers for functionlist()
 f-011229-0: Add support for PostgreSQL
+p-021031: Postgres-SQL Patch
 f-011229-1: Add support for Berkeley DB
 f-011230: Implement seeded randoms
 f-020127: Bitstring efuns for shifting and copying
@@ -117,6 +118,7 @@ f-020331: Efun this_function()
 f-020404: New efun strreplace()
 f-020507-2: Slicing mappings
 p-020912: TCP socket support a la MudOS
+p-021021: Socket support
 
 
 Language
