@@ -1,6 +1,15 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+15-Sep-2002 (Lars Duening)  (3.3.254)
+  - (mapping.c) Accidentally broke the mapping functionality with the
+       new svalue_cmp()/svalue_eq() functions.
+  - (prolang.y) If a wildcarded super call couldn't be resolved, a
+       spurious arg-frame was left on the stack (reported by Dafire).
+  - (prolang.y) The LPC compiler didn't check addition was attempted
+       on known structs. Vice versa, the type checking on assignment
+       was too strict (reported by Bardioc).
+
 13-Sep-2002 (Lars Duening)  (3.3.253)
   - (interpret.c, prolang.y) Removed compiler warnings.
   - (array, mapping.c, pkg-alists.c, i-svalue_cmp.h) Exported the

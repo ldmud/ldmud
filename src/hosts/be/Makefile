@@ -149,16 +149,16 @@ endif
 # $Format: "ifeq ($ReleaseType$, pre)"$
 ifeq (dev, pre)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 253
+  SETVERFLAGS += d 254
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-pre.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-pre.253
+  VSTRING = 3.3.0-pre.254
 endif
 # $Format: "ifeq ($ReleaseType$, dev)"$
 ifeq (dev, dev)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 253
+  SETVERFLAGS += d 254
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-dev.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-dev.253
+  VSTRING = 3.3.0-dev.254
 endif
 
 else
@@ -166,12 +166,12 @@ else
 # --- Development Versions ---
 
 # $Format: "SETVERFLAGS = -app $ReleaseMajor$ $ReleaseMinor$ $ProjectMinorVersion$"$
-SETVERFLAGS = -app 3 3 253
+SETVERFLAGS = -app 3 3 254
 
 # $Format: "  SETVERFLAGS += f"$
   SETVERFLAGS += f
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ProjectMinorVersion$"$
-  VSTRING = 3.3.253
+  VSTRING = 3.3.254
 
 endif
 
@@ -464,11 +464,11 @@ $(OBJ)/actions.o : ../mudlib/sys/driver_hook.h ../mudlib/sys/commands.h \
     closure.h backend.h array.h actions.h typedefs.h driver.h strfuns.h \
     instrs.h main.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
-$(OBJ)/array.o : xalloc.h wiz_list.h swap.h svalue.h simulate.h \
-    stdstrings.h object.h mstrings.h mregex.h mempools.h mapping.h main.h \
-    interpret.h closure.h backend.h array.h my-alloca.h typedefs.h driver.h \
-    strfuns.h sent.h exec.h instrs.h regexp.h pcre/pcre.h port.h config.h \
-    hosts/unix.h hosts/be/be.h machine.h
+$(OBJ)/array.o : i-svalue_cmp.h xalloc.h wiz_list.h swap.h svalue.h \
+    simulate.h stdstrings.h object.h mstrings.h mregex.h mempools.h \
+    mapping.h main.h interpret.h closure.h backend.h array.h my-alloca.h \
+    typedefs.h driver.h strfuns.h sent.h exec.h instrs.h regexp.h \
+    pcre/pcre.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/backend.o : ../mudlib/sys/debug_message.h \
     ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h swap.h svalue.h \
@@ -488,11 +488,11 @@ $(OBJ)/call_out.o : ../mudlib/sys/debug_info.h xalloc.h wiz_list.h swap.h \
     actions.h call_out.h typedefs.h driver.h sent.h instrs.h port.h \
     config.h hosts/unix.h hosts/be/be.h machine.h
 
-$(OBJ)/closure.o : xalloc.h switch.h swap.h svalue.h stdstrings.h \
-    simul_efun.h simulate.h prolang.h object.h mstrings.h main.h lex.h \
-    lang.h interpret.h instrs.h exec.h backend.h array.h closure.h \
-    my-alloca.h typedefs.h driver.h ptrtable.h strfuns.h sent.h port.h \
-    config.h hosts/unix.h hosts/be/be.h machine.h
+$(OBJ)/closure.o : i-svalue_cmp.h xalloc.h switch.h swap.h svalue.h \
+    stdstrings.h simul_efun.h simulate.h prolang.h object.h mstrings.h \
+    main.h lex.h lang.h interpret.h instrs.h exec.h backend.h array.h \
+    closure.h my-alloca.h typedefs.h driver.h ptrtable.h strfuns.h sent.h \
+    port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/comm.o : util/erq/erq.h ../mudlib/sys/input_to.h \
     ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h swap.h svalue.h \
@@ -566,10 +566,11 @@ $(OBJ)/main.o : xalloc.h wiz_list.h swap.h svalue.h stdstrings.h \
     driver.h ptrtable.h exec.h strfuns.h sent.h instrs.h regexp.h port.h \
     config.h hosts/unix.h hosts/be/be.h machine.h
 
-$(OBJ)/mapping.o : xalloc.h wiz_list.h svalue.h smalloc.h simulate.h \
-    object.h mstrings.h main.h interpret.h gcollect.h closure.h backend.h \
-    array.h mapping.h my-alloca.h typedefs.h driver.h strfuns.h sent.h \
-    exec.h instrs.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
+$(OBJ)/mapping.o : i-svalue_cmp.h xalloc.h wiz_list.h svalue.h smalloc.h \
+    simulate.h object.h mstrings.h main.h interpret.h gcollect.h closure.h \
+    backend.h array.h mapping.h my-alloca.h typedefs.h driver.h strfuns.h \
+    sent.h exec.h instrs.h port.h config.h hosts/unix.h hosts/be/be.h \
+    machine.h
 
 $(OBJ)/md5.o : strfuns.h md5.h machine.h typedefs.h driver.h port.h \
     config.h hosts/unix.h hosts/be/be.h
@@ -626,10 +627,10 @@ $(OBJ)/parser.o : lang.c ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h \
 $(OBJ)/dftables.o : pcre/maketables.c pcre/internal.h pcre/pcre.h \
     pcre/config.h
 
-$(OBJ)/pkg-alists.o : xalloc.h svalue.h simulate.h mstrings.h main.h \
-    interpret.h array.h my-alloca.h pkg-alists.h typedefs.h driver.h \
-    strfuns.h sent.h exec.h instrs.h port.h config.h hosts/unix.h \
-    hosts/be/be.h machine.h
+$(OBJ)/pkg-alists.o : i-svalue_cmp.h xalloc.h svalue.h simulate.h \
+    mstrings.h main.h interpret.h array.h my-alloca.h pkg-alists.h \
+    typedefs.h driver.h closure.h strfuns.h sent.h exec.h instrs.h port.h \
+    config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/pkg-mysql.o : xalloc.h svalue.h simulate.h mstrings.h interpret.h \
     array.h pkg-mysql.h my-alloca.h typedefs.h driver.h strfuns.h sent.h \

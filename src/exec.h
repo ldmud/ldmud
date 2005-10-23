@@ -216,6 +216,13 @@ typedef uint32          fulltype_t;  /* Full: type and visibility */
 #define TYPE_MOD_POINTER    0x0010  /* Pointer to a basic type */
 #define TYPE_MOD_REFERENCE  0x0020  /* Reference to a type */
 
+/* Macros to check a vartype_t/fulltype_t for a certain primary type.
+ */
+
+#define IS_TYPE_STRUCT(t) \
+  (((t) & (PRIMARY_TYPE_MASK|TYPE_MOD_POINTER|TYPE_MOD_REFERENCE)) == TYPE_STRUCT)
+
+
 /* Macros to set and extract the secondary type information */
 #define MAKE_SEC_TYPE_INFO(x) (((vartype_t)(x) & 0x3FF) << 6)
 #define GET_SEC_TYPE_INFO(x) (((vartype_t)(x) >> 6) & 0x3FF)

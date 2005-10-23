@@ -40,14 +40,20 @@ svalue_cmp (svalue_t *left, svalue_t *right)
 {
     register int d;
 
-    /* Avoid a numeric overflow by first comparing the values halfed. */
     if ( 0 != (d = left->type - right->type) ) return d;
 
     if (left->type == T_CLOSURE)
         return closure_cmp(left, right);
 
+    if (left->type == T_STRING)
+    {
+        return mstrcmp(left->u.str, right->u.str);
+    }
+
+    /* Avoid a numeric overflow by first comparing the values halfed. */
     if ( 0 != (d = (left->u.number >> 1) - (right->u.number >> 1)) ) return d;
     if ( 0 != (d = left->u.number - right->u.number) ) return d;
+
     switch (left->type)
     {
     case T_FLOAT:
@@ -63,7 +69,8 @@ svalue_cmp (svalue_t *left, svalue_t *right)
 static INLINE int
 svalue_eq (svalue_t *left, svalue_t *right)
 
-/* Compare *left and *right, return 0 if equal, and -1 if not.
+/* Compare *left and *right, return 0 if equal, and -1 if not (this
+ * is to keep in line with the svalue_cmp() return values).
  *
  * See also svalue_cmp() for the general version.
  */

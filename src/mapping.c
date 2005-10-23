@@ -40,11 +40,13 @@
  * with fast operation. Both the hashed and the condensed part may
  * be absent.
  *
- * The key values are sorted in principle by (.type, .u.number >> 1,
- * .x.generic), with the exception of closures which have their own sorting
- * order within their .type. For values which don't have a secondary
- * information, x.generic is set to .u.number << 1 - which also makes sure
- * that the lowest bit of T_NUMBERs is considered.
+ * The key values are sorted according to svalue_cmp(), that is in principle
+ * by (.type, .u.number >> 1, .x.generic), with the exception of closures and
+ * strings which have their own sorting order within their .type.
+ *
+ * Since the x.generic information is also used to generate the hash value for
+ * hashing, for values which don't have a secondary information, x.generic is
+ * set to .u.number << 1.
  *
  * The mapping_cond_t block holds mapping entries in sorted order.
  * Deleted entries are signified by a T_INVALID key value and can appear
@@ -880,6 +882,8 @@ static INLINE mp_int
 mhash (svalue_t * svp)
 
 /* Compute and return the hash value for svalue *<svp>.
+ * The function requires that x.generic is valid even for types without
+ * a secondary type information.
  */
 
 {
@@ -921,7 +925,7 @@ find_map_entry ( mapping_t *m, svalue_t *map_index
  *
  * Sideeffect: if <map_index> is an unshared string, it is made shared.
  *   Also, <map_index>.x.generic information is generated for types
- *   which usually have none.
+ *   which usually have none (required for hashing).
  */
 
 {
@@ -935,7 +939,7 @@ find_map_entry ( mapping_t *m, svalue_t *map_index
     }
 
     /* Generate secondary information for types which usually
-     * have none.
+     * have none (required for hashing).
      */
     if (map_index->type == T_STRING
      || (   map_index->type != T_CLOSURE
@@ -1023,7 +1027,7 @@ find_map_entry ( mapping_t *m, svalue_t *map_index
 
         for (mc = hm->chains[idx]; mc != NULL; mc = mc->next)
         {
-            if (svalue_eq(&(mc->data[0]), map_index))
+            if (!svalue_eq(&(mc->data[0]), map_index))
             {
                 /* Found it */
                 *ppChain = mc;
@@ -1056,7 +1060,7 @@ _get_map_lvalue (mapping_t *m, svalue_t *map_index
  *
  * Sideeffect: if <map_index> is an unshared string, it is made shared.
  *   Also, <map_index>.x.generic information is generated for types
- *   which usually have none.
+ *   which usually have none (required for hashing).
  *
  * For easier use, mapping.h defines the following macros:
  *   get_map_value(m,x)            -> _get_map_lvalue(m,x,false,true)
@@ -1375,7 +1379,7 @@ remove_mapping (mapping_t *m, svalue_t *map_index)
  *
  * Sideeffect: if <map_index> is an unshared string, it is made shared.
  *   Also, <map_index>.x.generic information is generated for types
- *   which usually have none.
+ *   which usually have none (required for hashing).
  */
 
 {

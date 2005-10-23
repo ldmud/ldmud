@@ -7135,8 +7135,7 @@ expr0:
 
 #ifdef USE_STRUCTS
           /* Special checks for struct assignments */
-          if ((type1 & PRIMARY_TYPE_MASK) == T_STRUCT
-           || (type2 & PRIMARY_TYPE_MASK) == T_STRUCT
+          if (IS_TYPE_STRUCT(type1) || IS_TYPE_STRUCT(type2)
              )
           {
               restype = type1;
@@ -7648,8 +7647,9 @@ expr0:
       expr0
       {
           /* Type checks of this case are complicated, therefore
-           * we'll do them at run-time.
-           * Here we just try to fold "string" + "string".
+           * we'll do almost all of them at run-time.
+           * Here we just try to fold "string" + "string", and
+           * disallow additions of structs.
            */
 
           mp_uint current_size;
@@ -7741,6 +7741,12 @@ expr0:
               else if (($1.type == TYPE_NUMBER || $1.type == TYPE_ANY)
                     && $4.type == TYPE_FLOAT)
                   $$.type = TYPE_FLOAT;
+#ifdef USE_STRUCTS
+              else if (IS_TYPE_STRUCT($1.type) || IS_TYPE_STRUCT($4.type))
+                  yyerrorf("Bad arguments to '+': %s"
+                          , get_two_types($1.type, $4.type)
+                          );
+#endif /* USE_STRUCTS */
           }
       } /* '+' */
 
@@ -10273,434 +10279,443 @@ function_call:
                * is taken for SIMUL_EFUN_VARARG */
               yyerrorf("Too many arguments to function");
 
-          if ( (simul_efun = $<function_call_head>2.simul_efun) >= 0)
-          {
-              /* SIMUL EFUN */
+          do {
+              /* The function processing is in a big do...while(0)
+               * block so we can exit out of it prematurely and
+               * still get the required arg-frame handling
+               * afterwards
+               */
 
-              PREPARE_INSERT(5)
-
-              function_t *funp;
-
-              funp = &simul_efunp[simul_efun];
-
-              if (funp->num_arg != SIMUL_EFUN_VARARGS
-               && !(funp->flags & TYPE_MOD_XVARARGS))
+              if ( (simul_efun = $<function_call_head>2.simul_efun) >= 0)
               {
-                  if ($4 > funp->num_arg)
-                      yyerrorf("Too many arguments to simul_efun %s"
-                              , get_txt(funp->name));
+                  /* SIMUL EFUN */
 
-                  if ($4 < funp->num_arg && !has_ellipsis)
+                  PREPARE_INSERT(5)
+
+                  function_t *funp;
+
+                  funp = &simul_efunp[simul_efun];
+
+                  if (funp->num_arg != SIMUL_EFUN_VARARGS
+                   && !(funp->flags & TYPE_MOD_XVARARGS))
                   {
-                      if (pragma_pedantic)
-                          yyerrorf("Missing arguments to simul_efun %s"
+                      if ($4 > funp->num_arg)
+                          yyerrorf("Too many arguments to simul_efun %s"
                                   , get_txt(funp->name));
-                      else
+
+                      if ($4 < funp->num_arg && !has_ellipsis)
                       {
-                          yywarnf("Missing arguments to simul_efun %s"
-                                 , get_txt(funp->name));
-                          ap_needed = MY_TRUE;
+                          if (pragma_pedantic)
+                              yyerrorf("Missing arguments to simul_efun %s"
+                                      , get_txt(funp->name));
+                          else
+                          {
+                              yywarnf("Missing arguments to simul_efun %s"
+                                     , get_txt(funp->name));
+                              ap_needed = MY_TRUE;
+                          }
                       }
+
                   }
 
-              }
+                  if (funp->num_arg == SIMUL_EFUN_VARARGS
+                   || (funp->flags & TYPE_MOD_XVARARGS)
+                   || has_ellipsis)
+                      ap_needed = MY_TRUE;
 
-              if (funp->num_arg == SIMUL_EFUN_VARARGS
-               || (funp->flags & TYPE_MOD_XVARARGS)
-               || has_ellipsis)
-                  ap_needed = MY_TRUE;
-
-              if (simul_efun & ~0xff)
-              {
-                  /* call-other: the number of arguments will be
-                   * corrected at runtime.
-                   */
-                  add_f_code(F_CALL_DIRECT);
-                  CURRENT_PROGRAM_SIZE++;
-                  ap_needed = MY_TRUE;
-              }
-              else
-              {
-                  /* Direct call */
-
-                  if (ap_needed)
+                  if (simul_efun & ~0xff)
                   {
-                      add_f_code(F_USE_ARG_FRAME);
+                      /* call-other: the number of arguments will be
+                       * corrected at runtime.
+                       */
+                      add_f_code(F_CALL_DIRECT);
                       CURRENT_PROGRAM_SIZE++;
-                  }
-                  add_f_code(F_SIMUL_EFUN);
-                  add_byte(simul_efun);
-                  CURRENT_PROGRAM_SIZE += 2;
-              }
-              $$.type = funp->type & TYPE_MOD_MASK;
-          } /* if (simul-efun) */
-
-          else if ($1.super ? !efun_override
-                            : (f = defined_function($1.real)) >= 0
-                  )
-          {
-              /* LFUN or INHERITED LFUN */
-
-              PREPARE_INSERT(6)
-
-              function_t *funp;
-              function_t  inherited_function;
-
-              ap_needed = MY_TRUE;
-
-              if ($1.super)
-              {
-                  /* Inherited lfun: check its existance and call it */
-
-                  program_t *super_prog;
-                  int ix;
-
-                  ix = insert_inherited( $1.super, $1.real->name
-                                       , &super_prog, &inherited_function
-                                       , $4, (bytecode_p)__PREPARE_INSERT__p
-                                       );
-
-                  if ($1.real->type == I_TYPE_UNKNOWN)
-                  {
-                      free_shared_identifier($1.real);
-                  }
-
-                  if (ix < 0)
-                  {
-                      switch(ix) {
-                      case INHERITED_NOT_FOUND:
-                          yyerror("function not defined by inheritance as specified");
-                          break;
-                      case INHERITED_WILDCARDED_ARGS:
-                          yyerror("wildcarded call to inherited function can't pass arguments");
-                          break;
-                      case INHERITED_WILDCARDED_NOT_FOUND:
-                          /* Not an error, but we can't do argument
-                           * checks either.
-                           */
-                          break;
-                      default:
-                          fatal("Unknown return code %d from insert_inherited()\n", ix);
-                          break;
-                      }
-
-                      $$.type = TYPE_ANY;
-                      if ($1.super)
-                          yfree($1.super);
-                      pop_arg_stack($4);  /* Argument types no longer needed */
-                      break; /* TODO: this assumes a switch by byacc */
-                  }
-
-                  /* Find the argument types */
-                  if (super_prog
-                   && NULL != (arg_types = super_prog->argument_types))
-                  {
-                      first_arg = super_prog->type_start[ix];
+                      ap_needed = MY_TRUE;
                   }
                   else
                   {
-                      first_arg = INDEX_START_NONE;
+                      /* Direct call */
+
+                      if (ap_needed)
+                      {
+                          add_f_code(F_USE_ARG_FRAME);
+                          CURRENT_PROGRAM_SIZE++;
+                      }
+                      add_f_code(F_SIMUL_EFUN);
+                      add_byte(simul_efun);
+                      CURRENT_PROGRAM_SIZE += 2;
                   }
-                  
-                  funp = &inherited_function;
+                  $$.type = funp->type & TYPE_MOD_MASK;
+              } /* if (simul-efun) */
+
+              else if ($1.super ? !efun_override
+                                : (f = defined_function($1.real)) >= 0
+                      )
+              {
+                  /* LFUN or INHERITED LFUN */
+
+                  PREPARE_INSERT(6)
+
+                  function_t *funp;
+                  function_t  inherited_function;
+
+                  ap_needed = MY_TRUE;
+
+                  if ($1.super)
+                  {
+                      /* Inherited lfun: check its existance and call it */
+
+                      program_t *super_prog;
+                      int ix;
+
+                      ix = insert_inherited( $1.super, $1.real->name
+                                           , &super_prog, &inherited_function
+                                           , $4, (bytecode_p)__PREPARE_INSERT__p
+                                           );
+
+                      if ($1.real->type == I_TYPE_UNKNOWN)
+                      {
+                          free_shared_identifier($1.real);
+                      }
+
+                      if (ix < 0)
+                      {
+                          switch(ix) {
+                          case INHERITED_NOT_FOUND:
+                              yyerror("function not defined by inheritance as specified");
+                              break;
+                          case INHERITED_WILDCARDED_ARGS:
+                              yyerror("wildcarded call to inherited function can't pass arguments");
+                              break;
+                          case INHERITED_WILDCARDED_NOT_FOUND:
+                              ap_needed = MY_FALSE;
+                              /* Not an error, but we can't do argument
+                               * checks either.
+                               */
+                              break;
+                          default:
+                              fatal("Unknown return code %d from insert_inherited()\n", ix);
+                              break;
+                          }
+
+                          $$.type = TYPE_ANY;
+                          if ($1.super)
+                              yfree($1.super);
+                          pop_arg_stack($4);  /* Argument types no longer needed */
+                          break; /* Out of do..while(0) */
+                      }
+
+                      /* Find the argument types */
+                      if (super_prog
+                       && NULL != (arg_types = super_prog->argument_types))
+                      {
+                          first_arg = super_prog->type_start[ix];
+                      }
+                      else
+                      {
+                          first_arg = INDEX_START_NONE;
+                      }
+                      
+                      funp = &inherited_function;
+                  }
+                  else
+                  {
+                      /* Normal lfun in this program */
+
+                      ap_needed = MY_TRUE;
+                      add_f_code(F_CALL_FUNCTION);
+                      add_short(f);
+                      funp = FUNCTION(f);
+                      arg_types = (vartype_t *)mem_block[A_ARGUMENT_TYPES].block;
+                      first_arg = ARGUMENT_INDEX(f);
+                      CURRENT_PROGRAM_SIZE += 3;
+                  }
+
+                  /* Verify that the function has been defined already.
+                   * For inherited functions this is a no-brainer.
+                   */
+                  if (funp->flags & (NAME_UNDEFINED|NAME_HIDDEN))
+                  {
+                      if ( !(funp->flags & (NAME_PROTOTYPE|NAME_INHERITED))
+                       && exact_types )
+                      {
+                          yyerrorf("Function %.50s undefined", get_txt(funp->name));
+                      }
+                      else if ((funp->flags
+                                & (NAME_UNDEFINED|NAME_PROTOTYPE|NAME_HIDDEN))
+                               == NAME_HIDDEN)
+                      {
+                          yyerrorf("Function %.50s is private", get_txt(funp->name));
+                      }
+                  }
+
+                  $$.type = funp->type & TYPE_MOD_MASK; /* Result type */
+
+                  /* Check number of arguments.
+                   */
+                  if (funp->num_arg != $4
+                   && !(funp->flags & TYPE_MOD_VARARGS)
+                   && (first_arg != INDEX_START_NONE)
+                   && exact_types
+                   && !has_ellipsis)
+                  {
+                      if (funp->num_arg-1 > $4 || !(funp->flags & TYPE_MOD_XVARARGS))
+                        yyerrorf("Wrong number of arguments to %.60s: "
+                                 "expected %ld, got %ld"
+                                , get_txt($1.real->name)
+                                , (long)funp->num_arg, (long)$4);
+                  }
+
+                  /* Check the argument types.
+                   */
+                  if (exact_types && first_arg != INDEX_START_NONE)
+                  {
+                      int i;
+                      vartype_t *argp;
+                      int num_arg, anum_arg;
+
+                      if ( 0 != (num_arg = funp->num_arg) )
+                      {
+                          /* There are arguments to check */
+
+                          int argno; /* Argument number for error message */
+
+                          if (funp->flags & TYPE_MOD_XVARARGS)
+                              num_arg--; /* last argument is checked separately */
+
+                          if (num_arg > (anum_arg = $4) )
+                              num_arg = anum_arg;
+
+                          arg_types += first_arg;
+                          argp = get_argument_types_start(anum_arg);
+
+                          for (argno = 1, i = num_arg; --i >= 0; argno++)
+                          {
+                              fulltype_t tmp1, tmp2;
+
+                              tmp1 = *argp++ & TYPE_MOD_RMASK;
+                              tmp2 = *arg_types++ & TYPE_MOD_MASK;
+                              if (!REDEFINED_TYPE(tmp1, tmp2))
+                              {
+                                  yyerrorf("Bad type for argument %d of %s %s",
+                                    argno,
+                                    get_txt(funp->name),
+                                    get_two_types(tmp2, tmp1));
+                              }
+                          } /* for (all args) */
+
+                          if (funp->flags & TYPE_MOD_XVARARGS)
+                          {
+                              fulltype_t tmp1, tmp2;
+                              /* varargs argument is either a pointer type or mixed */
+                              tmp2 = *arg_types & TYPE_MOD_MASK;
+                              tmp2 &= ~TYPE_MOD_POINTER;
+                              for (i = anum_arg - num_arg; --i >=0; )
+                              {
+                                  tmp1 = *argp++ & TYPE_MOD_RMASK;
+                                  if (!MASKED_TYPE(tmp1,tmp2))
+                                  {
+                                      yyerrorf("Bad type for argument %d of %s %s",
+                                          anum_arg - i,
+                                          get_txt(funp->name),
+                                          get_two_types(tmp2, tmp1));
+                                  }
+                              }
+                          } /* if (xvarargs) */
+
+                      } /* if (has args) */
+                  } /* if (check types) */
+              } /* if (inherited lfun) */
+
+              else if ( (f = lookup_predef($1.real)) != -1 )
+              {
+                  /* EFUN */
+
+                  PREPARE_INSERT(8)
+
+                  fulltype_t *argp;
+                  int min, max, def, num_arg;
+                  int f2;
+
+                  /* Get the information from the efun table */
+                  min = instrs[f].min_arg;
+                  max = instrs[f].max_arg;
+                  def = instrs[f].Default;
+                  $$.type = instrs[f].ret_type;
+                  argp = &efun_arg_types[instrs[f].arg_index];
+
+                  num_arg = $4;
+
+                  /* Check and/or complete number of arguments */
+                  if (def && num_arg == min-1 && !has_ellipsis)
+                  {
+                      /* Default argument */
+                      add_f_code(def);
+                      CURRENT_PROGRAM_SIZE++;
+                      max--;
+                      min--;
+                  }
+                  else if (num_arg < min
+                        && !has_ellipsis
+                        && (   (f2 = proxy_efun(f, num_arg)) < 0
+                            || (f = f2, MY_FALSE) )
+                           )
+                  {
+                      /* Not enough args, and no proxy_efun to replace this */
+                      yyerrorf("Too few arguments to %s", instrs[f].name);
+                  }
+                  else if (num_arg > max && max != -1)
+                  {
+                      yyerrorf("Too many arguments to %s", instrs[f].name);
+                      pop_arg_stack (num_arg - max);
+                      $4 -= num_arg - max; /* Don't forget this for the final pop */
+                      num_arg = max;
+                  }
+
+                  /* Check the types of the arguments
+                   */
+                  if (max != -1 && exact_types && num_arg)
+                  {
+                      int        argn;
+                      vartype_t *aargp;
+
+                      aargp = get_argument_types_start(num_arg);
+
+                      /* Loop over all arguments and compare each given
+                       * type against all allowed types in efun_arg_types()
+                       */
+                      for (argn = 0; argn < num_arg; argn++)
+                      {
+                          fulltype_t tmp1, tmp2;
+                          fulltype_t *beginArgp = argp;
+
+                          tmp1 = *aargp++ & TYPE_MOD_MASK;
+                          for (;;)
+                          {
+                              if ( !(tmp2 = *argp) )
+                              {
+                                  /* Possible types for this arg exhausted */
+                                  efun_argument_error(argn+1, f, beginArgp
+                                                     , aargp[-1]);
+                                  break;
+                              }
+                              argp++;
+
+                              /* break if types are compatible; take care to
+                               * handle references correctly
+                               */
+                              if (tmp1 == tmp2)
+                                  break;
+
+                              if ((tmp1 &
+                                     ~(TYPE_MOD_POINTER|TYPE_MOD_REFERENCE)) ==
+                                    TYPE_ANY)
+                              {
+                                  if (tmp1 & TYPE_MOD_POINTER & ~tmp2)
+                                  {
+                                      if ((tmp2 & ~TYPE_MOD_REFERENCE) !=
+                                            TYPE_ANY)
+                                      {
+                                          continue;
+                                      }
+                                  }
+                                  if ( !( (tmp1 ^ tmp2) & TYPE_MOD_REFERENCE) )
+                                      break;
+                              }
+                              else if ((tmp2 &
+                                     ~(TYPE_MOD_POINTER|TYPE_MOD_REFERENCE)) ==
+                                    TYPE_ANY)
+                              {
+                                  if (tmp2 & TYPE_MOD_POINTER & ~tmp1)
+                                      continue;
+                                  if ( !( (tmp1 ^ tmp2) & TYPE_MOD_REFERENCE) )
+                                      break;
+                              }
+                          } /* end for (efun_arg_types) */
+
+                          /* Advance argp to point to the allowed argtypes
+                           * of the next arg.
+                           */
+                          while(*argp++) NOOP;
+                      } /* for (all args) */
+                  } /* if (check arguments) */
+
+                  /* If the function takes a variable number of arguments
+                   * the ap is needed and evaluated automatically.
+                   * If the function takes a fixed number of arguments, but
+                   * the ellipsis has been used, the ap is needed but not
+                   * evaluated automatically.
+                   */
+                  if (max != min)
+                  {
+                      ap_needed = MY_TRUE;
+                  }
+                  else if (has_ellipsis)
+                  {
+                      ap_needed = MY_TRUE;
+                      add_byte(F_USE_ARG_FRAME);
+                      CURRENT_PROGRAM_SIZE++;
+                  }
+
+                  /* Alias for an efun? */
+                  if (f > LAST_INSTRUCTION_CODE)
+                      f = efun_aliases[f-LAST_INSTRUCTION_CODE-1];
+
+                  if (instrs[f].prefix)
+                  {
+                      /* This efun needs a prefix byte */
+                      add_byte(instrs[f].prefix);
+                      CURRENT_PROGRAM_SIZE++;
+                  }
+                  add_byte(instrs[f].opcode);
+                  CURRENT_PROGRAM_SIZE++;
+
+                  /* If the efun doesn't return a value, fake a 0.
+                   * This is especially important is ap_needed, as the
+                   * restore_arg_frame expects a result on the stack.
+                   */
+                  if ( instrs[f].ret_type == TYPE_VOID )
+                  {
+                      last_expression = mem_block[A_PROGRAM].current_size;
+                      add_f_code(F_CONST0);
+                      CURRENT_PROGRAM_SIZE++;
+                  }
+              } /* efun */
+
+              else if (efun_override)
+              {
+                  yyerrorf("Unknown efun: %s", get_txt($1.real->name));
+                  $$.type = TYPE_ANY;
               }
               else
               {
-                  /* Normal lfun in this program */
+                  /* There is no such function, but maybe it's defined later,
+                   * maybe it's resolved through (cross-)inheritance.
+                   * epilog() will take care of it.
+                   */
+                  PREPARE_INSERT(4)
 
+                  function_t *funp;
+      
+                  f = define_new_function(MY_FALSE,
+                      $1.real, 0, 0, 0, NAME_UNDEFINED, TYPE_UNKNOWN
+                  );
                   ap_needed = MY_TRUE;
                   add_f_code(F_CALL_FUNCTION);
                   add_short(f);
-                  funp = FUNCTION(f);
-                  arg_types = (vartype_t *)mem_block[A_ARGUMENT_TYPES].block;
-                  first_arg = ARGUMENT_INDEX(f);
                   CURRENT_PROGRAM_SIZE += 3;
-              }
-
-              /* Verify that the function has been defined already.
-               * For inherited functions this is a no-brainer.
-               */
-              if (funp->flags & (NAME_UNDEFINED|NAME_HIDDEN))
-              {
-                  if ( !(funp->flags & (NAME_PROTOTYPE|NAME_INHERITED))
-                   && exact_types )
+                  funp = FUNCTION(f);
+                  if (exact_types)
                   {
-                      yyerrorf("Function %.50s undefined", get_txt(funp->name));
+                      yyerrorf("Undefined function '%.50s'", get_txt($1.real->name));
                   }
-                  else if ((funp->flags
-                            & (NAME_UNDEFINED|NAME_PROTOTYPE|NAME_HIDDEN))
-                           == NAME_HIDDEN)
+                  else if (pragma_pedantic)
                   {
-                      yyerrorf("Function %.50s is private", get_txt(funp->name));
+                      yywarnf("Undefined function '%.50s'", get_txt($1.real->name));
                   }
+                  $$.type = TYPE_ANY;  /* Just a guess */
               }
-
-              $$.type = funp->type & TYPE_MOD_MASK; /* Result type */
-
-              /* Check number of arguments.
-               */
-              if (funp->num_arg != $4
-               && !(funp->flags & TYPE_MOD_VARARGS)
-               && (first_arg != INDEX_START_NONE)
-               && exact_types
-               && !has_ellipsis)
-              {
-                  if (funp->num_arg-1 > $4 || !(funp->flags & TYPE_MOD_XVARARGS))
-                    yyerrorf("Wrong number of arguments to %.60s: "
-                             "expected %ld, got %ld"
-                            , get_txt($1.real->name)
-                            , (long)funp->num_arg, (long)$4);
-              }
-
-              /* Check the argument types.
-               */
-              if (exact_types && first_arg != INDEX_START_NONE)
-              {
-                  int i;
-                  vartype_t *argp;
-                  int num_arg, anum_arg;
-
-                  if ( 0 != (num_arg = funp->num_arg) )
-                  {
-                      /* There are arguments to check */
-
-                      int argno; /* Argument number for error message */
-
-                      if (funp->flags & TYPE_MOD_XVARARGS)
-                          num_arg--; /* last argument is checked separately */
-
-                      if (num_arg > (anum_arg = $4) )
-                          num_arg = anum_arg;
-
-                      arg_types += first_arg;
-                      argp = get_argument_types_start(anum_arg);
-
-                      for (argno = 1, i = num_arg; --i >= 0; argno++)
-                      {
-                          fulltype_t tmp1, tmp2;
-
-                          tmp1 = *argp++ & TYPE_MOD_RMASK;
-                          tmp2 = *arg_types++ & TYPE_MOD_MASK;
-                          if (!REDEFINED_TYPE(tmp1, tmp2))
-                          {
-                              yyerrorf("Bad type for argument %d of %s %s",
-                                argno,
-                                get_txt(funp->name),
-                                get_two_types(tmp2, tmp1));
-                          }
-                      } /* for (all args) */
-
-                      if (funp->flags & TYPE_MOD_XVARARGS)
-                      {
-                          fulltype_t tmp1, tmp2;
-                          /* varargs argument is either a pointer type or mixed */
-                          tmp2 = *arg_types & TYPE_MOD_MASK;
-                          tmp2 &= ~TYPE_MOD_POINTER;
-                          for (i = anum_arg - num_arg; --i >=0; )
-                          {
-                              tmp1 = *argp++ & TYPE_MOD_RMASK;
-                              if (!MASKED_TYPE(tmp1,tmp2))
-                              {
-                                  yyerrorf("Bad type for argument %d of %s %s",
-                                      anum_arg - i,
-                                      get_txt(funp->name),
-                                      get_two_types(tmp2, tmp1));
-                              }
-                          }
-                      } /* if (xvarargs) */
-
-                  } /* if (has args) */
-              } /* if (check types) */
-          } /* if (inherited lfun) */
-
-          else if ( (f = lookup_predef($1.real)) != -1 )
-          {
-              /* EFUN */
-
-              PREPARE_INSERT(8)
-
-              fulltype_t *argp;
-              int min, max, def, num_arg;
-              int f2;
-
-              /* Get the information from the efun table */
-              min = instrs[f].min_arg;
-              max = instrs[f].max_arg;
-              def = instrs[f].Default;
-              $$.type = instrs[f].ret_type;
-              argp = &efun_arg_types[instrs[f].arg_index];
-
-              num_arg = $4;
-
-              /* Check and/or complete number of arguments */
-              if (def && num_arg == min-1 && !has_ellipsis)
-              {
-                  /* Default argument */
-                  add_f_code(def);
-                  CURRENT_PROGRAM_SIZE++;
-                  max--;
-                  min--;
-              }
-              else if (num_arg < min
-                    && !has_ellipsis
-                    && (   (f2 = proxy_efun(f, num_arg)) < 0
-                        || (f = f2, MY_FALSE) )
-                       )
-              {
-                  /* Not enough args, and no proxy_efun to replace this */
-                  yyerrorf("Too few arguments to %s", instrs[f].name);
-              }
-              else if (num_arg > max && max != -1)
-              {
-                  yyerrorf("Too many arguments to %s", instrs[f].name);
-                  pop_arg_stack (num_arg - max);
-                  $4 -= num_arg - max; /* Don't forget this for the final pop */
-                  num_arg = max;
-              }
-
-              /* Check the types of the arguments
-               */
-              if (max != -1 && exact_types && num_arg)
-              {
-                  int        argn;
-                  vartype_t *aargp;
-
-                  aargp = get_argument_types_start(num_arg);
-
-                  /* Loop over all arguments and compare each given
-                   * type against all allowed types in efun_arg_types()
-                   */
-                  for (argn = 0; argn < num_arg; argn++)
-                  {
-                      fulltype_t tmp1, tmp2;
-                      fulltype_t *beginArgp = argp;
-
-                      tmp1 = *aargp++ & TYPE_MOD_MASK;
-                      for (;;)
-                      {
-                          if ( !(tmp2 = *argp) )
-                          {
-                              /* Possible types for this arg exhausted */
-                              efun_argument_error(argn+1, f, beginArgp
-                                                 , aargp[-1]);
-                              break;
-                          }
-                          argp++;
-
-                          /* break if types are compatible; take care to
-                           * handle references correctly
-                           */
-                          if (tmp1 == tmp2)
-                              break;
-
-                          if ((tmp1 &
-                                 ~(TYPE_MOD_POINTER|TYPE_MOD_REFERENCE)) ==
-                                TYPE_ANY)
-                          {
-                              if (tmp1 & TYPE_MOD_POINTER & ~tmp2)
-                              {
-                                  if ((tmp2 & ~TYPE_MOD_REFERENCE) !=
-                                        TYPE_ANY)
-                                  {
-                                      continue;
-                                  }
-                              }
-                              if ( !( (tmp1 ^ tmp2) & TYPE_MOD_REFERENCE) )
-                                  break;
-                          }
-                          else if ((tmp2 &
-                                 ~(TYPE_MOD_POINTER|TYPE_MOD_REFERENCE)) ==
-                                TYPE_ANY)
-                          {
-                              if (tmp2 & TYPE_MOD_POINTER & ~tmp1)
-                                  continue;
-                              if ( !( (tmp1 ^ tmp2) & TYPE_MOD_REFERENCE) )
-                                  break;
-                          }
-                      } /* end for (efun_arg_types) */
-
-                      /* Advance argp to point to the allowed argtypes
-                       * of the next arg.
-                       */
-                      while(*argp++) NOOP;
-                  } /* for (all args) */
-              } /* if (check arguments) */
-
-              /* If the function takes a variable number of arguments
-               * the ap is needed and evaluated automatically.
-               * If the function takes a fixed number of arguments, but
-               * the ellipsis has been used, the ap is needed but not
-               * evaluated automatically.
-               */
-              if (max != min)
-              {
-                  ap_needed = MY_TRUE;
-              }
-              else if (has_ellipsis)
-              {
-                  ap_needed = MY_TRUE;
-                  add_byte(F_USE_ARG_FRAME);
-                  CURRENT_PROGRAM_SIZE++;
-              }
-
-              /* Alias for an efun? */
-              if (f > LAST_INSTRUCTION_CODE)
-                  f = efun_aliases[f-LAST_INSTRUCTION_CODE-1];
-
-              if (instrs[f].prefix)
-              {
-                  /* This efun needs a prefix byte */
-                  add_byte(instrs[f].prefix);
-                  CURRENT_PROGRAM_SIZE++;
-              }
-              add_byte(instrs[f].opcode);
-              CURRENT_PROGRAM_SIZE++;
-
-              /* If the efun doesn't return a value, fake a 0.
-               * This is especially important is ap_needed, as the
-               * restore_arg_frame expects a result on the stack.
-               */
-              if ( instrs[f].ret_type == TYPE_VOID )
-              {
-                  last_expression = mem_block[A_PROGRAM].current_size;
-                  add_f_code(F_CONST0);
-                  CURRENT_PROGRAM_SIZE++;
-              }
-          } /* efun */
-
-          else if (efun_override)
-          {
-              yyerrorf("Unknown efun: %s", get_txt($1.real->name));
-              $$.type = TYPE_ANY;
-          }
-          else
-          {
-              /* There is no such function, but maybe it's defined later,
-               * maybe it's resolved through (cross-)inheritance.
-               * epilog() will take care of it.
-               */
-              PREPARE_INSERT(4)
-
-              function_t *funp;
-  
-              f = define_new_function(MY_FALSE,
-                  $1.real, 0, 0, 0, NAME_UNDEFINED, TYPE_UNKNOWN
-              );
-              ap_needed = MY_TRUE;
-              add_f_code(F_CALL_FUNCTION);
-              add_short(f);
-              CURRENT_PROGRAM_SIZE += 3;
-              funp = FUNCTION(f);
-              if (exact_types)
-              {
-                  yyerrorf("Undefined function '%.50s'", get_txt($1.real->name));
-              }
-              else if (pragma_pedantic)
-              {
-                  yywarnf("Undefined function '%.50s'", get_txt($1.real->name));
-              }
-              $$.type = TYPE_ANY;  /* Just a guess */
-          }
+          } while (0); /* Function handling */
 
           /* Do the post processing of the arg frame handling */
           if (ap_needed)
@@ -12593,6 +12608,7 @@ insert_inherited (char *super_name, string_t *real_name
         }
         return found_ix;
     } /* if (foundp) */
+
 
     /* Inherit not found, maybe it's a wildcarded call */
     if (strpbrk(super_name, "*?"))
