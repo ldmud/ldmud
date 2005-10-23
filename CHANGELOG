@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+02-Sep-2002 (Lars Duening)  (3.3.241)
+  - (mstrings.c) The SSTAT diagnostic produced far too much output; but
+       since the test run in OSB gave me a first clue, I can now search
+       with less brute force.
+
 02-Sep-2002 (Lars Duening)  (3.3.240)
   - (prolang.y) Added a missing %endif (thanks, Guandalug!)
 

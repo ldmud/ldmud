@@ -20,12 +20,12 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 240)
-(Parent-Version lpmud 3-3 239)
-(Version-Log "Added a missing %endif in prolang.y .")
+(Project-Version lpmud 3-3 241)
+(Parent-Version lpmud 3-3 240)
+(Version-Log "Reduced the SSTAT diagnostics.")
 (New-Version-Log
 "")
-(Checkin-Time "Mon, 02 Sep 2002 08:55:45 -0600")
+(Checkin-Time "Mon, 02 Sep 2002 10:54:10 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -61,7 +61,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.7 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.44 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.303 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.304 644))
   (HISTORY (lpmud/f/49_HISTORY 1.267 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.16 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -159,7 +159,7 @@
   (src/mregex.h (lpmud/e/29_rxcache.h 1.7.1.10 644))
   (src/mregex.c (lpmud/e/30_rxcache.c 1.11.1.21 644))
   (src/mstrings.h (lpmud/i/35_mstrings.h 1.17 644))
-  (src/mstrings.c (lpmud/i/36_mstrings.c 1.21.1.10 644))
+  (src/mstrings.c (lpmud/i/36_mstrings.c 1.21.1.11 644))
   (src/my-alloca.h (lpmud/f/29_my-alloca. 1.3.1.2 644))
   (src/my-rusage.h (lpmud/f/28_my-rusage. 1.7 644))
   (src/object.h (lpmud/44_object.h 1.34.1.16 644))

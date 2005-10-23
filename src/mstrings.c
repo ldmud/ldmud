@@ -98,6 +98,9 @@
 
 #include "../mudlib/sys/debug_info.h"
 
+/* DEBUG: Define this to trace the string allocations */
+/* #define SSTAT */
+
 /*-------------------------------------------------------------------------*/
 
 /* Hash function, adapted to our table size.
@@ -339,9 +342,11 @@ make_new_tabled (const char * const pTxt, size_t size, int idx MTRACE_DECL)
         msize = mstr_mem_size(string);
         mstr_used++;
         mstr_used_size += msize;
+#ifdef SSTAT
+printf("DEBUG: SSTAT %d: tabled %lu:%lu + (%lu:%lu) = %lu:%lu\n", __LINE__, mstr_tabled, mstr_tabled_size, 1, msize, mstr_tabled+1, mstr_tabled_size+msize);
+#endif
         mstr_tabled++;
         mstr_tabled_size += msize;
-if (mstr_tabled > mstr_used || mstr_tabled_size > mstr_used_size) printf("DEBUG: SSTAT %d: used %lu:%lu, tabled %lu:%lu, mem_size %lu, size %lu\n", __LINE__, mstr_used, mstr_used_size, mstr_tabled, mstr_tabled_size, msize, string->str->size);
     }
 
     return string;
@@ -396,7 +401,6 @@ mstring_alloc_string (size_t iSize MTRACE_DECL)
         mstr_used_size += msize;
         mstr_untabled++;
         mstr_untabled_size += msize;
-if (mstr_untabled > mstr_used || mstr_untabled_size > mstr_used_size) printf("DEBUG: SSTAT %d: used %lu:%lu, untabled %lu:%lu, mem_size %lu, size %lu\n", __LINE__, mstr_used, mstr_used_size, mstr_untabled, mstr_untabled_size, msize, string->str->size);
     }
 
     return string;
@@ -662,7 +666,9 @@ mstring_table_inplace (string_t * pStr MTRACE_DECL)
         mstr_used_size += msize;
         mstr_tabled++;
         mstr_tabled_size += msize;
-if (mstr_tabled > mstr_used || mstr_tabled_size > mstr_used_size) printf("DEBUG: SSTAT %d: used %lu:%lu, tabled %lu:%lu, mem_size %lu, size %lu\n", __LINE__, mstr_used, mstr_used_size, mstr_tabled, mstr_tabled_size, msize, string->str->size);
+#ifdef SSTAT
+printf("DEBUG: SSTAT %d: tabled %lu:%lu + (%lu:%lu) = %lu:%lu\n", __LINE__, mstr_tabled, mstr_tabled_size, 1, msize, mstr_tabled+1, mstr_tabled_size+msize);
+#endif
     }
     else
     {
@@ -685,10 +691,8 @@ if (mstr_tabled > mstr_used || mstr_tabled_size > mstr_used_size) printf("DEBUG:
 
     mstr_itabled++;
     mstr_itabled_size += msize;
-if (mstr_itabled > mstr_used || mstr_itabled_size > mstr_used_size) printf("DEBUG: SSTAT %d: used %lu:%lu, itabled %lu:%lu, mem_size %lu, size %lu\n", __LINE__, mstr_used, mstr_used_size, mstr_itabled, mstr_itabled_size, msize, string->str->size);
     mstr_untabled--;
     mstr_untabled_size -= msize;
-if (mstr_untabled > mstr_used || mstr_untabled_size > mstr_used_size) printf("DEBUG: SSTAT %d: used %lu:%lu, untabled %lu:%lu, mem_size %lu, size %lu\n", __LINE__, mstr_used, mstr_used_size, mstr_untabled, mstr_untabled_size, msize, string->str->size);
 
     /* That's all */
 
@@ -854,7 +858,9 @@ mstring_free (string_t *s)
 
         mstr_tabled--;
         mstr_tabled_size -= msize;
-if (mstr_tabled > mstr_used || mstr_tabled_size > mstr_used_size) printf("DEBUG: SSTAT %d: used %lu:%lu, tabled %lu:%lu, mem_size %lu, size %lu\n", __LINE__, mstr_used, mstr_used_size, mstr_tabled, mstr_tabled_size, msize, s->str->size);
+#ifdef SSTAT
+printf("DEBUG: SSTAT %d: tabled %lu:%lu - (%lu:%lu) = %lu:%lu\n", __LINE__, mstr_tabled, mstr_tabled_size, 1, msize, mstr_tabled-1, mstr_tabled_size-msize);
+#endif
 
         idx = StrHash(s->str->txt, mstrsize(s));
         if (NULL == move_to_head(s, idx))
@@ -874,11 +880,10 @@ if (mstr_tabled > mstr_used || mstr_tabled_size > mstr_used_size) printf("DEBUG:
     }
     else if (s->link == NULL)
     {
-        /* A free string */
+        /* An untabled string */
 
         mstr_untabled--;
         mstr_untabled_size -= msize;
-if (mstr_untabled > mstr_used || mstr_untabled_size > mstr_used_size) printf("DEBUG: SSTAT %d: used %lu:%lu, untabled %lu:%lu, mem_size %lu, size %lu\n", __LINE__, mstr_used, mstr_used_size, mstr_untabled, mstr_untabled_size, msize, s->str->size);
 
         xfree(s->str);
         xfree(s);
@@ -889,7 +894,6 @@ if (mstr_untabled > mstr_used || mstr_untabled_size > mstr_used_size) printf("DE
 
         mstr_itabled--;
         mstr_itabled_size -= msize;
-if (mstr_itabled > mstr_used || mstr_itabled_size > mstr_used_size) printf("DEBUG: SSTAT %d: used %lu:%lu, itabled %lu:%lu, mem_size %lu, size %lu\n", __LINE__, mstr_used, mstr_used_size, mstr_itabled, mstr_itabled_size, msize, s->str->size);
 
         free_mstring(s->link);
         xfree(s);
