@@ -657,7 +657,7 @@ int transfer(object item, object dest)
 
     if (living(dest))
     {
-        if (item->get() || !item)
+        if (!item->get() || !item)
             return 6;
     }
 

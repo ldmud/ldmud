@@ -87,8 +87,11 @@ extern int errno;
 #if !defined(STDC_HEADERS) && defined(HAVE_MEMORY_H)
 #    include <memory.h>
 #endif
+#if 0
+/* TODO: Obsoleted by limits.h+floats.h - remove this and the config check */
 #ifdef HAVE_VALUES_H
 #    include <values.h>
+#endif
 #endif
 #ifdef HAVE_STDLIB_H
 #    include <stdlib.h>

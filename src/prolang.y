@@ -5778,10 +5778,10 @@ inheritance:
               fix_function_inherit_indices(ob->prog);
 
 #ifdef USE_STRUCTS
-              /* Fix up the struct inherit indices */
+              /* Fix up the .inherit indices of the inherited structs */
               {
-                  int left = STRUCT_COUNT - inherit.struct_index_offset + 1;
-                  struct_def_t *pdef = &STRUCT_DEF(inherit.struct_index_offset-1);
+                  int left = STRUCT_COUNT - inherit.struct_index_offset;
+                  struct_def_t *pdef = &STRUCT_DEF(inherit.struct_index_offset);
 
                   for (; left > 0; left--, pdef++)
                       pdef->inh = INHERIT_COUNT;

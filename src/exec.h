@@ -203,19 +203,19 @@ typedef uint32          fulltype_t;  /* Full: type and visibility */
 #define MAKE_SEC_TYPE_INFO(x) (((vartype_t)(x) & 0x3FF) << 6)
 #define GET_SEC_TYPE_INFO(x) (((vartype_t)(x) >> 6) & 0x3FF)
 
-#define MAX_SEC_TYPE_INFO  (0x400)
+#define MAX_SEC_TYPE_INFO  (0x0400)
   /* Max value of secondary type info
    */
 
-#define PRIMARY_TYPE_MASK      (0xF)
+#define PRIMARY_TYPE_MASK  (0x0F)
   /* Mask for the primary type info (sans modifiers)
    */
 
-#define SEC_TYPE_MASK      (0xFFC0)
+#define SEC_TYPE_MASK      (0x0FFC0)
   /* Mask for the secondary type info
    */
 
-#define TYPE_MOD_MASK   0x0000ffff
+#define TYPE_MOD_MASK   (0x0000ffff)
   /* Mask for basic type and flags.
    */
 

@@ -693,7 +693,7 @@ svalue_to_string ( fmt_state_t *st
         if (!size)
         {
 #ifdef USE_STRUCTS
-            if (obj->type == T_POINTER)
+            if (obj->type != T_STRUCT)
                 stradd(st, &str, "({ })");
             else /* T_STRUCT */
                 stradd(st, &str, "(< >)");
@@ -712,7 +712,7 @@ svalue_to_string ( fmt_state_t *st
                 prec->id_number = st->pointer_id++;
                 
 #ifdef USE_STRUCTS
-                if (obj->type == T_POINTER)
+                if (obj->type != T_STRUCT)
                     stradd(st, &str, "({ /* #");
                 else /* T_STRUCT */
                 {
@@ -744,7 +744,7 @@ svalue_to_string ( fmt_state_t *st
                 stradd(st, &str, "\n");
                 add_indent(st, &str, indent);
 #ifdef USE_STRUCTS
-                if (obj->type == T_POINTER)
+                if (obj->type != T_STRUCT)
                     stradd(st, &str, "})");
                 else /* T_STRUCT */
                     stradd(st, &str, ">)");
@@ -756,7 +756,7 @@ svalue_to_string ( fmt_state_t *st
             {
                 /* Recursion! */
 #ifdef USE_STRUCTS
-                if (obj->type == T_POINTER)
+                if (obj->type != T_STRUCT)
                 {
                     stradd(st, &str, "({ #");
                     numadd(st, &str, prec->id_number);

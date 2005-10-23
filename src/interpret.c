@@ -12200,18 +12200,14 @@ again:
 
     CASE(F_FLATTEN_XARG);           /* --- flatten_xarg        --- */
       {
-        /* Take the value at sp and if it is an array (or struct), put
+        /* Take the value at sp and if it is an array, put
          * the array's contents onto the stack in its place. Other values stay
          * as they are.
          * This code is used in conjunction with save/restore/use_arg_frame
          * to implement flexible varargs.
          */
 
-        if (sp->type == T_POINTER
-#ifdef USE_STRUCTS
-         || sp->type == T_STRUCT
-#endif
-           )
+        if (sp->type == T_POINTER)
         {
             /* The argument is an array: flatten it */
 
@@ -18860,11 +18856,7 @@ v_apply (svalue_t *sp, int num_arg)
         return sp;
     }
 
-    if (sp->type == T_POINTER
-#ifdef USE_STRUCTS
-     || sp->type == T_STRUCT
-#endif /* USE_STRUCTS */
-       )
+    if (sp->type == T_POINTER)
     {
         /* The last argument is an array: flatten it */
 

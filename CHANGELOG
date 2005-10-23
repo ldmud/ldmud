@@ -1,6 +1,21 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+09-Oct-2002 (Lars Duening)
+  - (prolang.y) When processing inherited structs, the code overwrote
+       random memory - especially when there weren't any structs to
+       process (reported by Bardioc).
+  - (port.h) No longer includes <values.h> which has been obsoleted
+       by <limits.h> and <float.h>.
+  - (config.h, driver.h) Removed the compilation warning when YYDEBUG
+       was not defined.
+
+08-Oct-2002 (Lars Duening)
+  - (sprintf.c) Printing a quoted array accidentally used the struct-printing
+       code (reported by Dafire).
+  - (interpret.c) structs are not flattened in apply() or with '...'
+       (suggested by Zonk).
+
 08-Oct-2002 (Lars Duening)  (3.3.279)
   - (prolang.y) Gah, forgot to remove a debug output.
 

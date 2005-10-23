@@ -4719,6 +4719,7 @@ f_transfer (svalue_t *sp)
 #endif /* USE_DEPRECATED */
 
 /*=========================================================================*/
+
 /*                        Save/Restore an Object                           */
 
 /*

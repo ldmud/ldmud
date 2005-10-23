@@ -64,8 +64,7 @@
 
 #include "../mudlib/sys/driver_hook.h"
 
-/* TODO: Use get_host_name() instead of gethostname()
- * TODO: Implement the # and ## operators.
+/* TODO: Implement the # and ## operators.
  * TODO: New predefs' __BASENAME__, __FUNCTION__.
  * TODO: #define macro(a,b,...) -> ... is assigned to __VA_ARGS__ (see oncoming
  * TODO:: C standard).

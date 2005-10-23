@@ -27,6 +27,14 @@
 /*----------------------------------------------------------------*/
 /* Verify some of the definitions in config.h */
 
+/* Make sure that YYDEBUG is defined to 1 - just being defined
+ * is not sufficient.
+ */
+#if defined(YYDEBUG)
+#  undef YYDEBUG
+#  define YYDEBUG 1
+#endif
+
 #if !defined(MALLOC_smalloc) && !defined(MALLOC_sysmalloc)
 #  define MALLOC_smalloc
 #endif

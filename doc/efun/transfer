@@ -78,7 +78,7 @@ REPLACEMENT
 
             if (living(dest))
             {
-                if (item->get() || !item)
+                if (!item->get() || !item)
                     return 6;
             }
 
