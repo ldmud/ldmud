@@ -1,6 +1,15 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+19-Sep-2002 (Lars Duening)  (3.3.262)
+  - (etc/lpc-mode.el) LPC mode for EMACS, by Vivek Dasmohapatra.
+  - (func_spec) The spec for set_modify_command() excluded that the
+       efun could take '0' as argment (reported by Kent!)
+  - (object.c) Efun inherit_list(): the tagging of virtual inherits
+       didn't work (reported by Dafire).
+  - (prolang.y) The test for duplicate toplevel inherits got confused
+       when virtual inherits occured (reported by Zonk via Dafire).
+
 18-Sep-2002 (Lars Duening)  (3.3.261)
   - (func_spec, interpret, simulate) Added the infrastructure to create
        context closures, and to access the context variables. Now we

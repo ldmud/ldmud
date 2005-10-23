@@ -4742,6 +4742,14 @@ inheritance:
               {
                   if (inheritp->prog == ob->prog)
                   {
+                      /* Check for duplicate toplevel inherit.
+                       * Since the check for duplicate virtual inherits
+                       * may change the inherit_depth, this test must
+                       * come first
+                       */
+                      if (inheritp->inherit_depth == 1)
+                          duplicate_toplevel = MY_TRUE;
+
                       /* Check for duplicate virtual inherit */
                       if (($1[1] & TYPE_MOD_VIRTUAL)
                        && !(inheritp->variable_index_offset & NON_VIRTUAL_OFFSET_TAG)
@@ -4752,9 +4760,6 @@ inheritance:
                           inheritp->inherit_depth = 1;
                       }
 
-                      /* Check for duplicate toplevel inherit */
-                      if (inheritp->inherit_depth == 1)
-                          duplicate_toplevel = MY_TRUE;
                   }
               }
               if  (duplicate_toplevel)

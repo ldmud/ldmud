@@ -585,7 +585,7 @@ mixed   query_notify_fail(int default: F_CONST0);
 string  query_verb(int default: F_CONST0);
 int     remove_action(string, object default: F_THIS_PLAYER);
 void    set_this_player(null|object);
-object  set_modify_command(object|string default: F_THIS_OBJECT);
+object  set_modify_command(null|object|string default: F_THIS_OBJECT);
 
 
         /* uids and euids */

@@ -279,7 +279,7 @@ void reset_all()
             #'m_delete,
             #'m_indices,
             #'m_reallocate,
-            #'m_sizeof,
+//            #'m_sizeof,
             #'m_values,
             #'make_shared_string,
             #'map,

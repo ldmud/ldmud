@@ -2286,6 +2286,7 @@ v_inherit_list (svalue_t *sp, int num_arg)
                 end = end->next;
                 end->next = NULL;
                 end->prog = inheritp->prog;
+                end->virtual = (inheritp->inherit_type == INHERIT_TYPE_VIRTUAL);
 
                 /* Handle the tree-based information */
                 end->parent = next;
