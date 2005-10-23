@@ -291,6 +291,12 @@ struct efun_shadow_s
    * things.
    */
 
+/* Values for %type <number> foreach_expr
+ */
+#define FOREACH_LOOP  0  /* Normal foreach loop value */
+#define FOREACH_REF   1  /* Referenced foreach loop value */
+#define FOREACH_RANGE 2  /* Integer range as loop value */
+
 /*-------------------------------------------------------------------------*/
 /* The generated information (code and otherwise) is kept in several
  * memory areas, each of which can grow dynamically and independent
@@ -4142,9 +4148,9 @@ free_const_list_svalue (svalue_t *svp)
   /* Index number of the local variable */
 
 %type <number> foreach_expr
-  /* 0: Normal foreach loop value.
-   * 1: Referenced foreach loop value.
-   * 2: Integer range as loop value.
+  /* FOREACH_LOOP  (0) Normal foreach loop value
+   * FOREACH_REF   (1) Referenced foreach loop value
+   * FOREACH_RANGE (2) Integer range as loop value
    */
 
 %type <number> foreach_vars
@@ -6263,7 +6269,7 @@ for_expr:
  *       CLEAR_LOCALS                          CLEAR_LOCALS
  *       PUSH_(LOCAL_)LVALUE <var1>            <expr>
  *       ...                                   POP_VALUE
- *       PUSH_(LOCAL_)LVALUE <varn>
+ *       PUSH_(LOCAL_)LVALUE <varn>           [POP_VALUE for integer ranges]
  *       <expr>
  *       FOREACH(_REF) <numargs> c
  *    l: <body>
@@ -6320,11 +6326,11 @@ foreach:
            */
           switch ($7)
           {
-          case 0:
+          case FOREACH_LOOP:
               ins_f_code(F_FOREACH); break;
-          case 1:
+          case FOREACH_REF:
               ins_f_code(F_FOREACH_REF); break;
-          case 2:
+          case FOREACH_RANGE:
               ins_f_code(F_FOREACH_RANGE); break;
           default:
               yyerrorf("Unknown foreach_expr type %ld.\n", (long)$7);
@@ -6376,6 +6382,11 @@ foreach:
               CURRENT_PROGRAM_SIZE = current;
               ins_f_code(F_POP_VALUE);
               current++;
+              if ($7 == FOREACH_RANGE)
+              {
+                  ins_f_code(F_POP_VALUE);
+                  current++;
+              }
           }
 
           else /* Create the full statement */
@@ -6536,7 +6547,7 @@ foreach_expr:
               type_error("Expression for foreach() of wrong type", $1.type);
           }
 
-          $$ = gen_refs ? 1 : 0;
+          $$ = gen_refs ? FOREACH_REF : FOREACH_LOOP;
       }
 
     | expr0 L_RANGE expr0
@@ -6574,7 +6585,7 @@ foreach_expr:
               type_error("Expression for foreach() of wrong type", $3.type);
           }
 
-          $$ = 2;
+          $$ = FOREACH_RANGE;
       }
 ; /* foreach_expr */
 

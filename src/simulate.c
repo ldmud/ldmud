@@ -547,7 +547,9 @@ fatal (const char *fmt, ...)
 
     /* Prevent double fatal. */
     if (in_fatal)
+    {
         dump_core();
+    }
     in_fatal = MY_TRUE;
 
     ts = time_stamp();

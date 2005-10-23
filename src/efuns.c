@@ -5515,6 +5515,9 @@ f_deep_copy (svalue_t *sp)
 
     case T_QUOTED_ARRAY:
     case T_POINTER:
+#ifdef USE_STRUCTS
+    case T_STRUCT:
+#endif /* USE_STRUCTS */
       {
         vector_t *old;
 

@@ -181,6 +181,7 @@ f-020321: Deactivate sefun (when loading the master or on pragma)
 p-020810: Hyperborea patches for ANSI support
 f-020825: Quote special chars in the source text error messages
 f-020918: Generic function call operator
+f-020921: Automatic member initialisation for structs
 
 
 Runtime

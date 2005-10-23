@@ -194,9 +194,11 @@ main (int argc, char **argv)
 /* The main function. Nuff said. */
 
 {
-    int i;
+    int i, rc;
     char *p;
     sigset_t set;
+
+    rc = 0;
 
     /* On some systems, SIGALRM is sometimes blocked.
      * The reasons are unknown, but this seems to be the cure.
@@ -219,310 +221,328 @@ main (int argc, char **argv)
     random_seed = (uint32)current_time;
     seed_random(random_seed);
 
-    dummy_current_object_for_loads = NULL_object;
+    do {
+        dummy_current_object_for_loads = NULL_object;
 #ifdef DEBUG
-    if (dummy_current_object_for_loads.user)
-    {
-        fprintf(stderr, "Assigning NULL_object does not clear the target.\n");
-        exit(1);
-    }
+        if (dummy_current_object_for_loads.user)
+        {
+            fprintf(stderr, "Assigning NULL_object does not clear the target.\n");
+            rc = 1;
+            break;
+        }
 #endif
-    dummy_current_object_for_loads.ref = 1;
-    dummy_current_object_for_loads.user = &default_wizlist_entry;
+        dummy_current_object_for_loads.ref = 1;
+        dummy_current_object_for_loads.user = &default_wizlist_entry;
 
 #ifdef STRICT_EUIDS
-    strict_euids = MY_TRUE;
+        strict_euids = MY_TRUE;
 #endif
 
-    /* Check the definition of the INPUT_ESCAPE character */
 #ifdef INPUT_ESCAPE
-    if (strlen(INPUT_ESCAPE) < 1)
-    {
-        fprintf(stderr, "Bad definition of INPUT_ESCAPE: string is empty.\n");
-        exit(1);
-    }
-    if (strlen(INPUT_ESCAPE) > 1)
-    {
-        fprintf(stderr, "Bad definition of INPUT_ESCAPE: "
-                        "'%s' contains more than one character.\n"
-                      , INPUT_ESCAPE);
-        exit(1);
-    }
-    input_escape = INPUT_ESCAPE[0];
+        /* Check the definition of the INPUT_ESCAPE character */
+        if (strlen(INPUT_ESCAPE) < 1)
+        {
+            fprintf(stderr, "Bad definition of INPUT_ESCAPE: string is empty.\n");
+            rc = 1;
+            break;
+        }
+        if (strlen(INPUT_ESCAPE) > 1)
+        {
+            fprintf(stderr, "Bad definition of INPUT_ESCAPE: "
+                            "'%s' contains more than one character.\n"
+                          , INPUT_ESCAPE);
+            rc = 1;
+            break;
+        }
+        input_escape = INPUT_ESCAPE[0];
 #endif
 
-    /*
-     * Check that the definition of EXTRACT_UCHAR() is correct.
-     */
-    p = (char *)&i;
-    *p = -10;
-    if (EXTRACT_UCHAR(p) != 0x100 - 10) {
-        fprintf(stderr, "Bad definition of EXTRACT_UCHAR().\n");
-        exit(1);
-    }
+        /*
+         * Check that the definition of EXTRACT_UCHAR() is correct.
+         */
+        p = (char *)&i;
+        *p = -10;
+        if (EXTRACT_UCHAR(p) != 0x100 - 10) {
+            fprintf(stderr, "Bad definition of EXTRACT_UCHAR().\n");
+            rc = 1;
+            break;
+        }
 
-    init_rusage();
+        init_rusage();
 #ifdef HOST_DEPENDENT_INIT
-    HOST_DEPENDENT_INIT
+        HOST_DEPENDENT_INIT
 #endif
 
-    /* Select a sensible default for the wizlist file.
-     * This must be done before the parsing of the arguments so
-     * that the name can be removed by commandline option.
-     */
 #ifdef WIZLIST_FILE
-    if ('\0' == wizlist_name[0])
-    {
-        name_wizlist_file(WIZLIST_FILE);
-    }
+        /* Select a sensible default for the wizlist file.
+         * This must be done before the parsing of the arguments so
+         * that the name can be removed by commandline option.
+         */
+        if ('\0' == wizlist_name[0])
+        {
+            name_wizlist_file(WIZLIST_FILE);
+        }
 #endif
 
-    /* First scan of the arguments.
-     * This evaluates everything but the 'f' arguments.
-     */
-    if (getargs(argc, argv, eval_arg))
-      exit(1);
+        /* First scan of the arguments.
+         * This evaluates everything but the 'f' arguments.
+         */
+        if (getargs(argc, argv, eval_arg))
+        {
+            rc = 1;
+            break;
+        }
 
-    /* Change to the mudlib dir early so that the debug.log file
-     * is opened in the right place.
-     * If a mudlib dir has been given by command option, we are already
-     * in it.
-     */
-    if (!new_mudlib && chdir(MUD_LIB) == -1) {
-        printf("%s Bad mudlib directory: %s\n", time_stamp(), MUD_LIB);
-        exit(1);
-    }
+        /* Change to the mudlib dir early so that the debug.log file
+         * is opened in the right place.
+         * If a mudlib dir has been given by command option, we are already
+         * in it.
+         */
+        if (!new_mudlib && chdir(MUD_LIB) == -1) {
+            printf("%s Bad mudlib directory: %s\n", time_stamp(), MUD_LIB);
+            rc = 1;
+            break;
+        }
 
-    /* If the name of the debug log file hasn't been set, use a sensible
-     * default and make it available in the macro __DEBUG_LOG__. This must
-     * happen before the first debug_message().
-     */
+        /* If the name of the debug log file hasn't been set, use a sensible
+         * default and make it available in the macro __DEBUG_LOG__. This must
+         * happen before the first debug_message().
+         */
 
-    if  (!debug_file)
-    {
-        char buf[MAXHOSTNAMELEN+40];
-        char * name;
-        struct lpc_predef_s *tmp;
+        if  (!debug_file)
+        {
+            char buf[MAXHOSTNAMELEN+40];
+            char * name;
+            struct lpc_predef_s *tmp;
 
-        if (compat_mode)
-            strcpy(buf, "__DEBUG_LOG__=\"");
-        else
-            strcpy(buf, "__DEBUG_LOG__=\"/");
-        name = buf + strlen(buf);
-        sprintf(name, "%s.debug.log", query_host_name());
-        debug_file = strdup(name);
-        strcat(name, "\"");
+            if (compat_mode)
+                strcpy(buf, "__DEBUG_LOG__=\"");
+            else
+                strcpy(buf, "__DEBUG_LOG__=\"/");
+            name = buf + strlen(buf);
+            sprintf(name, "%s.debug.log", query_host_name());
+            debug_file = strdup(name);
+            strcat(name, "\"");
 
-        tmp = (struct lpc_predef_s *) xalloc(sizeof(struct lpc_predef_s));
-        tmp->flag = string_copy(buf);
-        tmp->next = lpc_predefs;
-        lpc_predefs = tmp;
-    }
+            tmp = (struct lpc_predef_s *) xalloc(sizeof(struct lpc_predef_s));
+            tmp->flag = string_copy(buf);
+            tmp->next = lpc_predefs;
+            lpc_predefs = tmp;
+        }
 
-    printf("%s LDMud %s" LOCAL_LEVEL " (" PROJ_VERSION ")\n"
-          , time_stamp(), IS_RELEASE() ? GAME_VERSION : LONG_VERSION
-          );
-    debug_message("%s LDMud %s" LOCAL_LEVEL " (" PROJ_VERSION ")\n"
-          , time_stamp(), IS_RELEASE() ? GAME_VERSION : LONG_VERSION
-          );
-      /* This also assures the existance of the fd for the debug log */
+        printf("%s LDMud %s" LOCAL_LEVEL " (" PROJ_VERSION ")\n"
+              , time_stamp(), IS_RELEASE() ? GAME_VERSION : LONG_VERSION
+              );
+        debug_message("%s LDMud %s" LOCAL_LEVEL " (" PROJ_VERSION ")\n"
+              , time_stamp(), IS_RELEASE() ? GAME_VERSION : LONG_VERSION
+              );
+          /* This also assures the existance of the fd for the debug log */
 
 
-    if (numports < 1) /* then use the default port */
-        numports = 1;
+        if (numports < 1) /* then use the default port */
+            numports = 1;
 
-    init_driver_hooks();
-    reserve_memory();
-    init_otable();
-    for (i = 0; i < (int)(sizeof consts / sizeof consts[0]); i++)
-        consts[i] = exp(- i / 900.0);
-    mstring_init(); /* Also initializes the standard strings */
+        init_driver_hooks();
+        reserve_memory();
+        init_otable();
+        for (i = 0; i < (int)(sizeof consts / sizeof consts[0]); i++)
+            consts[i] = exp(- i / 900.0);
+        mstring_init(); /* Also initializes the standard strings */
 
-    printf("%s Random seed: 0x%lx\n"
-          , time_stamp(), (unsigned long)random_seed);
-    debug_message("%s Random seed: 0x%lx\n"
-                 , time_stamp(), (unsigned long)random_seed);
+        printf("%s Random seed: 0x%lx\n"
+              , time_stamp(), (unsigned long)random_seed);
+        debug_message("%s Random seed: 0x%lx\n"
+                     , time_stamp(), (unsigned long)random_seed);
 
-    /* If the master_name hasn't been set, select a sensible default */
-    if ('\0' == master_name[0])
-    {
+        /* If the master_name hasn't been set, select a sensible default */
+        if ('\0' == master_name[0])
+        {
 #ifdef MASTER_NAME
-        strcpy(master_name, MASTER_NAME);
+            strcpy(master_name, MASTER_NAME);
 #elif defined(COMPAT_MODE)
-        strcpy(master_name, COMPAT_MASTER);
+            strcpy(master_name, COMPAT_MASTER);
 #else
-        strcpy(master_name, PLAIN_MASTER);
+            strcpy(master_name, PLAIN_MASTER);
 #endif
-    }
-
-    /* Make sure the name of the master object is sensible.
-     * This is important for modules like the lexer which
-     * use it directly.
-     *
-     * We also need a copy of the master name as string_t (for
-     * this the strings module has to be initialized).
-     */
-    {
-        const char *pName = make_name_sane(master_name, MY_FALSE);
-        if (pName)
-            strcpy(master_name, pName);
-        master_name_str = new_tabled(master_name);
-        if (!master_name_str)
-        {
-            printf("%s Out of memory for master object name (%lu bytes).\n"
-                  , time_stamp()
-                  , (unsigned long)strlen(master_name));
-            exit(1);
         }
-    }
 
-    reset_machine(MY_TRUE); /* Cold reset the machine */
-    init_lexer();
-      /* The lexer needs the master_name, but also the VM 
-       * to throw errors.
-       */
+        /* Make sure the name of the master object is sensible.
+         * This is important for modules like the lexer which
+         * use it directly.
+         *
+         * We also need a copy of the master name as string_t (for
+         * this the strings module has to be initialized).
+         */
+        {
+            const char *pName = make_name_sane(master_name, MY_FALSE);
+            if (pName)
+                strcpy(master_name, pName);
+            master_name_str = new_tabled(master_name);
+            if (!master_name_str)
+            {
+                printf("%s Out of memory for master object name (%lu bytes).\n"
+                      , time_stamp()
+                      , (unsigned long)strlen(master_name));
+                rc = 1;
+                break;
+            }
+        }
 
-    RESET_LIMITS;
-    CLEAR_EVAL_COST;
-    {
-        char path[MAXPATHLEN+1];
+        reset_machine(MY_TRUE); /* Cold reset the machine */
+        init_lexer();
+          /* The lexer needs the master_name, but also the VM 
+           * to throw errors.
+           */
+
+        RESET_LIMITS;
+        CLEAR_EVAL_COST;
+        {
+            char path[MAXPATHLEN+1];
 #ifdef HAVE_GETCWD
-        if (!getcwd(path, sizeof(path) ))
+            if (!getcwd(path, sizeof(path) ))
 #else
-        if (!getwd(path))
+            if (!getwd(path))
 #endif
-        {
-            perror("get(c)wd failed");
-            fatal("must be able to obtain current directory name\n");
+            {
+                perror("get(c)wd failed");
+                fatal("must be able to obtain current directory name\n");
+            }
+            mud_lib = string_copy(path);
         }
-        mud_lib = string_copy(path);
-    }
 
 #ifdef ERQ_DEMON
-    /* Make sure that erq_file contains a complete absolute pathname. */
+        /* Make sure that erq_file contains a complete absolute pathname. */
 
-    if (!erq_file)
-    {
-        erq_file = malloc(strlen(BINDIR)+6);
         if (!erq_file)
         {
-            fatal("Out of memory for erq pathname (%lu bytes).\n"
-                 , (unsigned long)strlen(BINDIR)+6);
-        }
-        strcpy(erq_file, BINDIR);
+            erq_file = malloc(strlen(BINDIR)+6);
+            if (!erq_file)
+            {
+                fatal("Out of memory for erq pathname (%lu bytes).\n"
+                     , (unsigned long)strlen(BINDIR)+6);
+            }
+            strcpy(erq_file, BINDIR);
 #ifndef MSDOS_FS
-        strcat(erq_file, "/erq");
+            strcat(erq_file, "/erq");
 #else
-        strcat(erq_file, "\\erq");
+            strcat(erq_file, "\\erq");
 #endif
-    }
-    else if (*erq_file != '/')
-    {
-        char * tmp;
-        tmp = malloc(strlen(BINDIR)+1+strlen(erq_file)+1);
-        if (!tmp)
+        }
+        else if (*erq_file != '/')
         {
-            fatal("Out of memory for erq pathname (%lu bytes).\n"
-                 , (unsigned long)(strlen(BINDIR)+2+strlen(erq_file)));
-        }
-        strcpy(tmp, BINDIR);
+            char * tmp;
+            tmp = malloc(strlen(BINDIR)+1+strlen(erq_file)+1);
+            if (!tmp)
+            {
+                fatal("Out of memory for erq pathname (%lu bytes).\n"
+                     , (unsigned long)(strlen(BINDIR)+2+strlen(erq_file)));
+            }
+            strcpy(tmp, BINDIR);
 #ifndef MSDOS_FS
-        strcat(tmp, "/");
+            strcat(tmp, "/");
 #else
-        strcat(tmp, "\\");
+            strcat(tmp, "\\");
 #endif
-        strcat(tmp, erq_file);
-        free(erq_file);
-        erq_file = tmp;
-    }
-
-    if (!no_erq_demon)
-        start_erq_demon("", 0);
-#endif /* ERQ_DEMON */
-    initialize_host_ip_number();
-
-    (void)signal(SIGFPE, SIG_IGN);
-    current_object = &dummy_current_object_for_loads;
-    if (setjmp(toplevel_context.con.text)) {
-        clear_state();
-        add_message("Anomaly in the fabric of world space.\n");
-    }
-    else
-    {
-        toplevel_context.rt.type = ERROR_RECOVERY_BACKEND;
-        master_ob = get_object(master_name_str);
-    }
-    current_object = master_ob;
-    toplevel_context.rt.type = ERROR_RECOVERY_NONE;
-    if (master_ob == NULL) {
-        printf("%s The file %s must be loadable.\n"
-              , time_stamp(), master_name);
-        exit(1);
-    }
-
-    /* Make sure master_ob is never made a dangling pointer.
-     * Look at apply_master_ob() for more details.
-     */
-    ref_object(master_ob, "main");
-    initialize_master_uid();
-    push_number(inter_sp, 0);
-    callback_master(STR_INAUGURATE, 1);
-    setup_print_block_dispatcher();
-
-    /* Evaluate all the 'f' arguments we received, if any. */
-    while (f_head != NULL)
-    {
-        FData * fdata = f_head;
-
-        f_head = f_head->next;
-        push_c_string(inter_sp, fdata->txt);
-        (void)callback_master(STR_FLAG, 1);
-        free(fdata);
-        if (game_is_being_shut_down) {
-            fprintf(stderr, "%s Shutdown by master object.\n", time_stamp());
-            exit(0);
+            strcat(tmp, erq_file);
+            free(erq_file);
+            erq_file = tmp;
         }
-    }
+
+        if (!no_erq_demon)
+            start_erq_demon("", 0);
+#endif /* ERQ_DEMON */
+        initialize_host_ip_number();
+
+        (void)signal(SIGFPE, SIG_IGN);
+        current_object = &dummy_current_object_for_loads;
+        if (setjmp(toplevel_context.con.text)) {
+            clear_state();
+            add_message("Anomaly in the fabric of world space.\n");
+        }
+        else
+        {
+            toplevel_context.rt.type = ERROR_RECOVERY_BACKEND;
+            master_ob = get_object(master_name_str);
+        }
+        current_object = master_ob;
+        toplevel_context.rt.type = ERROR_RECOVERY_NONE;
+        if (master_ob == NULL) {
+            printf("%s The file %s must be loadable.\n"
+                  , time_stamp(), master_name);
+            rc = 1;
+            break;
+        }
+
+        /* Make sure master_ob is never made a dangling pointer.
+         * Look at apply_master_ob() for more details.
+         */
+        ref_object(master_ob, "main");
+        initialize_master_uid();
+        push_number(inter_sp, 0);
+        callback_master(STR_INAUGURATE, 1);
+        setup_print_block_dispatcher();
+
+        /* Evaluate all the 'f' arguments we received, if any. */
+        while (f_head != NULL)
+        {
+            FData * fdata = f_head;
+
+            f_head = f_head->next;
+            push_c_string(inter_sp, fdata->txt);
+            (void)callback_master(STR_FLAG, 1);
+            free(fdata);
+            if (game_is_being_shut_down) {
+                fprintf(stderr, "%s Shutdown by master object.\n", time_stamp());
+                rc = 0;
+                break;
+            }
+        }
 
 #ifdef DEBUG
-    if (d_flag > 1 && time_to_swap_variables <= 0)
-        check_a_lot_ref_counts_flag = MY_TRUE;
+        if (d_flag > 1 && time_to_swap_variables <= 0)
+            check_a_lot_ref_counts_flag = MY_TRUE;
 #endif
 
-    get_simul_efun_object();
-    if (game_is_being_shut_down)
-        exit(1);
+        get_simul_efun_object();
+        if (game_is_being_shut_down)
+        {
+            rc = 1;
+            break;
+        }
 
-    load_wiz_file();
-    preload_objects(e_flag);
+        load_wiz_file();
+        preload_objects(e_flag);
 
-    /* Start the backend loop. This won't return before
-     * the game shuts down.
-     */
-    backend();
+        /* Start the backend loop. This won't return before
+         * the game shuts down.
+         */
+        backend();
 
-    /* Shutdown the game.
-     */
+        /* Shutdown the game.
+         */
 
-    printf("%s LDMud shutting down.\n", time_stamp());
+        printf("%s LDMud shutting down.\n", time_stamp());
 
-    callback_master(STR_SHUTDOWN, 0);
-    ipc_remove();
-    remove_all_players();
-    handle_newly_destructed_objects();
-      /* Will perform the remove_interactive calls */
-    unlink_swap_file();
+        callback_master(STR_SHUTDOWN, 0);
+        ipc_remove();
+        remove_all_players();
+        handle_newly_destructed_objects();
+          /* Will perform the remove_interactive calls */
+        unlink_swap_file();
 #ifdef DEALLOCATE_MEMORY_AT_SHUTDOWN
-    remove_all_objects();
-    purge_action_sent();
-    purge_shadow_sent();
-    remove_wiz_list();
+        remove_all_objects();
+        purge_action_sent();
+        purge_shadow_sent();
+        remove_wiz_list();
 #if defined(MALLOC_smalloc)
-    dump_malloc_data();
+        dump_malloc_data();
 #endif
 #endif
+    } while(0);
 
-    return 0; /* TODO: There are constants for this */
+    /* Mandatory cleanups */
+
+    return rc; /* TODO: There are constants for this */
 } /* main() */
 
 
@@ -548,7 +568,9 @@ void initialize_master_uid (void)
               , time_stamp(), strict_euids ? "Fatal" : "Warning"
               , get_txt(STR_GET_M_UID), master_name);
         if (strict_euids)
+        {
             exit(1);
+        }
     }
     else
     {

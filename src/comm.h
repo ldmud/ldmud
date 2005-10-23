@@ -88,6 +88,7 @@ struct write_buffer_s
 {
     struct write_buffer_s *next;
     size_t length;
+    int    errorno; /* After writing, the errno */
     char buffer[1 /* .length */ ];
 };
 #endif
@@ -189,12 +190,22 @@ struct interactive_s {
       /* The send buffer. */
 
 #ifdef USE_PTHREAD
+    /* The data exchange with the writer thread happens through two
+     * lists: write_first/write_last hands of data to write to
+     * the thread, written_first receives the written buffers.
+     * Reason for this 2-way exchange is that the writer thread
+     * must not call xfree().
+     * TODO: These two lists + one extra can be combined into
+     * TODO:: one list, plus two roving pointers into it.
+     */
     pthread_mutex_t 	   write_mutex;
     pthread_cond_t	   write_cond;
     pthread_t		   write_thread;
-    struct write_buffer_s *write_first;
+    struct write_buffer_s *write_first;  /* List of buffers to write */
     struct write_buffer_s *write_last;
-    unsigned long         write_size;
+    unsigned long          write_size;
+    struct write_buffer_s *write_current; /* Buffer currently written */
+    struct write_buffer_s *written_first; /* List of written buffers */
 #endif
 };
 
@@ -282,6 +293,10 @@ extern int inet_volume;
 extern void  initialize_host_ip_number(void);
 extern void  prepare_ipc(void);
 extern void  ipc_remove(void);
+extern void interactive_lock (interactive_t *ip);
+extern void interactive_unlock (interactive_t *ip);
+extern void interactive_cleanup (interactive_t *ip);
+extern void comm_cleanup_interactives (void);
 extern void  add_message VARPROT((const char *, ...), printf, 1, 2);
 extern void  flush_all_player_mess(void);
 extern Bool get_message(char *buff);

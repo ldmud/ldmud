@@ -1,0 +1,21 @@
+Short: Automatic member initialisation for structs
+From: Dafire
+Date: 2002-09-21
+Type: Feature
+State: New
+
+Vielleicht wäre es schön wenn man schon member initialisieren könnte...
+z.b. :
+
+struct Test {
+  int a;
+  string b;
+  mixed *c=({});
+};
+
+-------
+This would be possible with another 'internal' function, holding the
+code to setup the struct members. The function would have to be inherited in
+parallel with the struct, which would happen automatically anyway. The struct
+definition would have a flag saying if the  function exists. If yes, any call
+to S_AGGREGATE would also have a reference to the function.

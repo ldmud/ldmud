@@ -1,6 +1,24 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+24-Sep-2002 (Lars Duening)  (3.3.263)
+  - (comm, backend.c, gcollect.c) smalloc is not threadsafe, which
+      caused the implementation of USE_PTHREAD code to trash the
+      memory structures. To solve the problem, all memory allocations
+      and deallocations are done by the main thread.
+  - (gcollect.c) Program strings were counted twice, causing
+      a creeping memory leak.
+  Patches from Guandalug:
+  - (efuns.c) Efun deep_copy() couldn't be used with structs.
+  - (object.c) Efun function_exists(): corrected an error message.
+  - (closure.c) Converting a sefun-closure to a string looked up the
+      name in the efun table instead of the sefun table.
+
+23-Sep-2002 (Lars Duening)
+  - (prolang.y) Using a range foreach() with an empty loop body crashed
+       the driver (reported by Nuutti).
+  - (comm.c) USE_PTHREAD: Restructured the writer_thread() code a bit.
+
 19-Sep-2002 (Lars Duening)  (3.3.262)
   - (etc/lpc-mode.el) LPC mode for EMACS, by Vivek Dasmohapatra.
   - (func_spec) The spec for set_modify_command() excluded that the

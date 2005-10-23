@@ -644,6 +644,7 @@ backend (void)
             trace_level = 0;
             current_object = hide_current;
             wiz_decay();
+            comm_cleanup_interactives();
         }
 
     } /* end of main loop */

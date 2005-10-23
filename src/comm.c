@@ -1115,6 +1115,125 @@ ipc_remove (void)
 } /* ipc_remove() */
 
 /*-------------------------------------------------------------------------*/
+void
+interactive_lock (interactive_t *ip)
+
+/* Lock the interactive <ip> for the current thread.
+ */
+
+{
+#ifdef USE_PTHREAD
+    pthread_mutex_lock(&ip->write_mutex);
+#else
+    ip; /* to avoid a 'unused' warning */
+#endif
+} /* interactive_lock() */
+
+/*-------------------------------------------------------------------------*/
+void
+interactive_unlock (interactive_t *ip)
+
+/* Unlock the interactive <ip>.
+ */
+
+{
+#ifdef USE_PTHREAD
+    pthread_mutex_unlock(&ip->write_mutex);
+#else
+    ip; /* to avoid a 'unused' warning */
+#endif
+} /* interactive_unlock() */
+
+/*-------------------------------------------------------------------------*/
+void
+interactive_cleanup (interactive_t *ip)
+
+/* Free all pending 'written' buffers for the interactive <ip>.
+ * Locking must be handled by the caller.
+ */
+
+{
+#ifdef USE_PTHREAD
+    struct write_buffer_s *tmp;
+
+    for (tmp = ip->written_first; tmp != NULL; tmp = ip->written_first)
+    {
+        ip->written_first = tmp->next;
+        switch (tmp->errorno) {
+          case 0:
+            /* No error happened. */
+            break;
+
+          case EINTR:
+            fprintf(stderr, "%s comm: write EINTR. Message discarded.\n", time_stamp());
+            break;
+
+          case EWOULDBLOCK:
+            fprintf(stderr, "%s comm: write EWOULDBLOCK. Message discarded.\n", time_stamp());
+            break;
+
+          case EMSGSIZE:
+            fprintf(stderr, "%s comm: write EMSGSIZE.\n", time_stamp());
+            break;
+
+          case EINVAL:
+            fprintf(stderr, "%s comm: write EINVAL.\n", time_stamp());
+            break;
+
+          case ENETUNREACH:
+            fprintf(stderr, "%s comm: write ENETUNREACH.\n", time_stamp());
+            break;
+
+          case EHOSTUNREACH:
+            fprintf(stderr, "%s comm: write EHOSTUNREACH.\n", time_stamp());
+            break;
+
+          case EPIPE:
+            fprintf(stderr, "%s comm: write EPIPE detected\n", time_stamp());
+            break;
+
+          default:
+            {
+              int e = tmp->errorno;
+              fprintf(stderr, "%s comm: write: unexpected errno %d\n"
+                            , time_stamp(), e);
+              break;
+            }
+        } /* switch (ip->errorno) */
+
+        xfree(tmp);
+    } /* for (tmp) */
+#else
+    ip; /* to avoid a 'unused' warning */
+#endif
+} /* interactive_cleanup() */
+
+/*-------------------------------------------------------------------------*/
+void
+comm_cleanup_interactives (void)
+
+/* Remove all pending 'written' buffers from all interactive structures.
+ * This function handles the locking.
+ */
+
+{
+#ifdef USE_PTHREAD
+    int i;
+
+    for (i = 0; i < sizeof(all_players)/sizeof(all_players[0]); i++)
+    {
+        interactive_t * ip = all_players[i];
+        if (ip && ip->written_first != NULL)
+        {
+            interactive_lock(ip);
+            interactive_cleanup(ip);
+            interactive_unlock(ip);
+        }
+    }
+#endif
+} /* comm_cleanup_interactives() */
+
+/*-------------------------------------------------------------------------*/
 #ifdef USE_PTHREAD
 #define PTHREAD_WRITE_MAX_SIZE 100000
 
@@ -1163,6 +1282,11 @@ thread_socket_write(SOCKET_T s UNUSED, char *msg, size_t size, interactive_t *ip
         xfree(tmp);
     }
 
+    /* While we have the structure locked, remove pending
+     * written buffers.
+     */
+    interactive_cleanup(ip);
+
     pthread_mutex_unlock(&ip->write_mutex);
     pthread_cond_signal(&ip->write_cond);
 
@@ -1174,7 +1298,8 @@ thread_socket_write(SOCKET_T s UNUSED, char *msg, size_t size, interactive_t *ip
 static void
 writer_thread_cleanup(void *arg)
 
-/* The given thread is canceled - remove all associated data structures.
+/* The given thread is canceled - move all pending buffers into the
+ * written list.
  */
 
 {
@@ -1183,12 +1308,22 @@ writer_thread_cleanup(void *arg)
 
     while (buf)
     {
-	tmp = buf->next;
-	if (buf)
-            xfree(buf);
-	buf = tmp;
+	struct write_buffer_s *next = buf->next;
+        buf->errorno = 0;
+        buf->next = ip->written_first;
+        ip->written_first = buf;
+	buf = next;
     }
-    ip->write_first = NULL;
+    ip->write_first = ip->write_last = NULL;
+
+    if (ip->write_current)
+    {
+	struct write_buffer_s *next = buf->next;
+        ip->write_current->errorno = 0;
+        ip->write_current->next = ip->written_first;
+        ip->written_first = ip->write_current;
+        ip->write_current = NULL;
+    }
 
     fprintf(stderr, "Thread %ld canceled and cleaned up!\n", pthread_self());
 } /* writer_thread_cleanup() */
@@ -1204,10 +1339,10 @@ writer_thread (void *arg)
 
 {
     interactive_t *ip = (interactive_t *) arg;
-    struct write_buffer_s *buf;
+    int oldvalue;
 
-    pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL); /* make us cancelable */
-    pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL);
+    pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &oldvalue); /* make us cancelable */
+    pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, &oldvalue);
     pthread_cleanup_push(writer_thread_cleanup, ip);
       /* MacOS X: pthread_cleanup_push() is a macro which opens a new scope
        * and uses scope-local variable to store the cleanup handler.
@@ -1217,6 +1352,8 @@ writer_thread (void *arg)
 
     while (MY_TRUE)
     {
+        struct write_buffer_s * buf;
+            
 	/* cancellation point */
 	pthread_testcancel();
 
@@ -1227,48 +1364,48 @@ writer_thread (void *arg)
             /* if no first write_buffer -> wait on signal from mainthread */
 	    pthread_cond_wait(&ip->write_cond, &ip->write_mutex);
         }
-	buf = ip->write_first;
-	ip->write_first = buf->next;
-        ip->write_size -= buf->length;
-	pthread_mutex_unlock(&ip->write_mutex);
 
-	/* write the stuff to socket */
-        if ((socket_write(ip->socket, buf->buffer, buf->length)) == -1) 
+        if (ip->write_first)
         {
-            switch (errno) {
-              case EINTR:
-                fprintf(stderr, "%s comm: write EINTR. Message discarded.\n", time_stamp());
-
-              case EWOULDBLOCK:
-                fprintf(stderr, "%s comm: write EWOULDBLOCK. Message discarded.\n", time_stamp());
-
-              case EMSGSIZE:
-                fprintf(stderr, "%s comm: write EMSGSIZE.\n", time_stamp());
-
-              case EINVAL:
-                fprintf(stderr, "%s comm: write EINVAL.\n", time_stamp());
-
-              case ENETUNREACH:
-                fprintf(stderr, "%s comm: write ENETUNREACH.\n", time_stamp());
-
-              case EHOSTUNREACH:
-                fprintf(stderr, "%s comm: write EHOSTUNREACH.\n", time_stamp());
-
-              case EPIPE:
-                fprintf(stderr, "%s comm: write EPIPE detected\n", time_stamp());
-
-              default:
-                {
-                  int e = errno;
-                  fprintf(stderr, "%s comm: write: unknown errno %d\n"
-                                , time_stamp(), e);
-                }
-            } /* switch (errno) */
-        } /* if socket_write() == -1 */
-
-	if (buf)
+            /* We have to move the buffer out of the to-write list,
+             * so that thread_socket_write() won't remove it if the
+             * data limit is reached. On the other hand a GC might
+             * happen while we're still printing, erasing the
+             * written list.
+             */
+            buf = ip->write_first;
+            ip->write_first = buf->next;
+              /* If this was the last buffer, .write_first will become
+               * NULL and the next call to thread_socket_write() will
+               * set both .write_first and .write_last.
+               */
+            ip->write_size -= buf->length;
+            ip->write_current = buf;
+        }
+        else
         {
-	    xfree(buf);
+            buf = NULL;
+        }
+        pthread_mutex_unlock(&ip->write_mutex);
+
+        if (buf)
+        {
+            /* write the stuff to socket */
+            buf->errorno = 0;
+            if ((socket_write(ip->socket, buf->buffer, buf->length)) == -1) 
+            {
+                buf->errorno = errno;
+            } /* if socket_write() == -1 */
+
+            /* Don't xfree(buf) here as smalloc is not threadsafe! */
+            pthread_mutex_lock(&ip->write_mutex);
+
+            ip->write_current = NULL;
+
+            buf->next = ip->written_first;
+            ip->written_first = buf;
+
+            pthread_mutex_unlock(&ip->write_mutex);
         }
     } /* while forever */
 
@@ -2857,8 +2994,9 @@ remove_interactive (object_t *ob, Bool force)
             add_message(message_flush);
         }
 #ifdef USE_PTHREAD
-        /* buffer list is cleaned up by thread */
         pthread_cancel(interactive->write_thread);
+          /* buffer list is returned by thread */
+        interactive_cleanup(interactive);
 #endif
         shutdown(interactive->socket, 2);
         socket_close(interactive->socket);
@@ -3134,6 +3272,8 @@ new_player (SOCKET_T new_socket, struct sockaddr_in *addr, size_t addrlen
     pthread_cond_init(&new_interactive->write_cond, NULL);
     new_interactive->write_first = new_interactive->write_last = NULL;
     new_interactive->write_size = 0;
+    new_interactive->write_current = NULL;
+    new_interactive->written_first = NULL;
     pthread_create(&new_interactive->write_thread, NULL, writer_thread, new_interactive);
     pthread_detach(new_interactive->write_thread);
 #endif
@@ -5415,6 +5555,26 @@ show_comm_status (strbuf_t * sbuf, Bool verbose UNUSED)
             sum += sizeof(*it);
 
         sum += ed_buffer_size(O_GET_EDBUFFER(pl->ob));
+#ifdef USE_PTHREAD
+        {
+            struct write_buffer_s *buf;
+
+            interactive_lock(pl);
+            for (buf = pl->write_first; buf != NULL; buf = buf->next)
+            {
+                sum += sizeof(*buf) - 1 + buf->length;
+            }
+            for (buf = pl->written_first; buf != NULL; buf = buf->next)
+            {
+                sum += sizeof(*buf) - 1 + buf->length;
+            }
+            if ((buf = pl->write_current) != NULL)
+            {
+                sum += sizeof(*buf) - 1 + buf->length;
+            }
+            interactive_unlock(pl);
+        }
+#endif
     }
 
     if (sbuf)

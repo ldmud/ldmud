@@ -1476,13 +1476,13 @@ v_function_exists (svalue_t *sp, int num_arg)
 
         flags = argp[2].u.number;
 
-        if ((flags & ~NAME_HIDDEN) < 0
-         || (flags & ~NAME_HIDDEN) > FEXISTS_ALL
+        if (((flags & ~NAME_HIDDEN) < 0)
+         || ((flags & ~NAME_HIDDEN) > FEXISTS_ALL)
            )
         {
             error("Bad argument 2 to function_exists(): eff. value %ld (sans NAME_HIDDEN) out of range %d..%d .\n"
                  , (long)(flags & ~NAME_HIDDEN)
-                 , FEXISTS_ALL, FEXISTS_LINENO);
+                 , FEXISTS_PROGNAME, FEXISTS_ALL);
             /* NOTREACHED */
             return sp;
         }

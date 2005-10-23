@@ -471,8 +471,6 @@ gc_mark_program_ref (program_t *p)
             str = p->includes[i].name; MARK_MSTRING_REF(str);
             str = p->includes[i].filename; MARK_MSTRING_REF(str);
         }
-
-        MARK_MSTRING_REF(p->name);
     }
     else
     {
@@ -1092,6 +1090,20 @@ garbage_collection(void)
         uncaught_error_trace = NULL;
     }
 
+    /* Lock all interactive structures (in case we're using threads)
+     * and dispose of the written buffers.
+     */
+    for (i = 0 ; i < MAX_PLAYERS; i++)
+    {
+        interactive_t *ip;
+
+        if (all_players[i] == NULL)
+            continue;
+
+        interactive_lock(all_players[i]);
+        interactive_cleanup(all_players[i]);
+    }
+
     remove_destructed_objects(); /* After reducing all object references! */
 
     if (dobj_count != tot_alloc_object)
@@ -1114,6 +1126,8 @@ garbage_collection(void)
         xfree(sh);
     }
 #endif /* CHECK_OBJECT_REF */
+
+
     /* --- Pass 1: clear the M_REF flag in all malloced blocks ---
      */
     clear_M_REF_flags();
@@ -1199,6 +1213,9 @@ garbage_collection(void)
             struct write_buffer_s *pwb;
             for (pwb = all_players[i]->write_first; pwb != NULL; pwb = pwb->next)
                 clear_memory_reference(pwb);
+            if ((pwb = all_players[i]->write_current) != NULL)
+                clear_memory_reference(pwb);
+            /* .written_first has been cleaned upL */
         }
 #endif
 
@@ -1363,6 +1380,9 @@ garbage_collection(void)
             struct write_buffer_s *pwb;
             for (pwb = all_players[i]->write_first; pwb != NULL; pwb = pwb->next)
                 note_ref(pwb);
+            if ((pwb = all_players[i]->write_current) != NULL)
+                note_ref(pwb);
+            /* .written_first has been cleaned upL */
         }
 #endif
 
@@ -1526,6 +1546,19 @@ garbage_collection(void)
         }
     }
 #endif
+
+    /* Lock all interactive structures (in case we're using threads)
+     * and dispose of the written buffers.
+     */
+    for (i = 0 ; i < MAX_PLAYERS; i++)
+    {
+        interactive_t *ip;
+
+        if (all_players[i] == NULL)
+            continue;
+
+        interactive_unlock(all_players[i]);
+    }
 
     /* If the GC log was redirected, close that file and set the
      * logging back to the default file.

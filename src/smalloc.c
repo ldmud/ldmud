@@ -11,6 +11,12 @@
  * It expects small blocks to mostly be temporaries. It expects an equal
  * number of future requests as small block deallocations.
  *
+ * smalloc IS NOT THREADSAFE. And the wrong way of fixing this would be
+ * to wrap all smalloc()/xfree() calls into a mutex. The right way of doing
+ * this would be to allocate a set of management structures for each thread
+ * so that only the calls to system malloc()/sbrk() need to be guarded
+ * by mutexes.
+ *
  * Allocations are measured in 'word_t's which are the same size as void*.
  *
  * For MALLOC_TRACE and MALLOC_LPC_TRACE the allocated blocks are tagged
