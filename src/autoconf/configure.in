@@ -473,13 +473,9 @@ if test $lp_cv_type_ssize_t = yes; then
   AC_DEFINE(HAVE_SSIZE_T)
 fi
 
-AC_CACHE_CHECK(for long long,lp_cv_type_long_long,
-AC_TRY_COMPILE([long long i;],,
-lp_cv_type_long_long=yes,
-lp_cv_type_long_long=no))
-if test $lp_cv_type_long_long = yes; then
+AC_CHECK_SIZEOF(long long) dnl Also checks for the existance
+if test $ac_cv_type_long_long = yes; then
   AC_DEFINE(HAVE_LONG_LONG)
-  AC_CHECK_SIZEOF(long long)
 fi
 
 AC_CACHE_CHECK(for bool,lp_cv_type_bool,
@@ -604,11 +600,12 @@ CFLAGS="$saveflags"
 ))
 if test $lp_cv_has_pthreads = yes; then
   AC_DEFINE(HAS_PTHREADS)
-    if test $enable_use_pthreads = yes; then
-      AC_CHECK_LIB(pthread,main, LIBS="$LIBS -lpthread")
-    fi
-  else
-    enable_use_pthreads=no
+  if test $enable_use_pthreads = yes; then
+    AC_CHECK_LIB(pthread,main, LIBS="$LIBS -lpthread")
+  fi
+else
+  cdef_use_pthreads="#undef"
+  enable_use_pthreads=no
 fi
 
 AC_CACHE_CHECK(for pcre support,lp_cv_has_pcre,

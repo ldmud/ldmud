@@ -12,20 +12,17 @@
 ;; Odd-numbered 'development' releases:
 ;;    <v>-<r>.*: The only branch for version <v>.<r>
 ;;
-;; TODO: Maybe allow to bind the driver ports to a given IP address instead
-;; TODO:: of INADDR_ANY? This would help on systems with more than one address.
-;; TODO: Things to implement: general coloured efuns, inline closures,
-;; TODO::   sockets (p-020912).
+;; TODO: Things to implement: general coloured efuns, sockets (p-020912).
 ;; TODO: One .c-file per efun.
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 283)
-(Parent-Version lpmud 3-3 282)
-(Version-Log "Forgot to remove debugging statements.")
+(Project-Version lpmud 3-3 284)
+(Parent-Version lpmud 3-3 283)
+(Version-Log "Corrected a configuration problem.")
 (New-Version-Log
 "")
-(Checkin-Time "Thu, 10 Oct 2002 22:09:44 -0600")
+(Checkin-Time "Sun, 13 Oct 2002 14:47:46 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -61,20 +58,20 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.48 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.346 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.347 644))
   (HISTORY (lpmud/f/49_HISTORY 1.279 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.17 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
   ;; Configuration
-  (src/configure (lpmud/d/0_configure 1.19.1.59 755))
+  (src/configure (lpmud/d/0_configure 1.19.1.60 755))
   (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.19 644))
   (src/machine.h.in (lpmud/b/9_machine.h. 1.9.1.4 644))
   (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.18 644))
   (src/mkinstalldirs (lpmud/c/4_mkinstalld 1.1 644))
   (src/install-sh (lpmud/c/5_install-sh 1.2 755))
 
-  (src/autoconf/configure.in (lpmud/d/7_configure. 1.20.1.9.1.49 644))
+  (src/autoconf/configure.in (lpmud/d/7_configure. 1.20.1.9.1.50 644))
   (src/autoconf/acconfig.h (lpmud/d/10_acconfig.h 1.6.1.4 644))
 
   (src/settings/README (lpmud/c/22_README 1.14.1.12 644))
@@ -478,7 +475,10 @@
   (src/bugs/b-020425-0 (lpmud/v/39_b-020425-0 1.1 644) :no-keywords)
   (src/bugs/b-020506 (lpmud/v/41_b-020506 1.2 644) :no-keywords)
   (src/bugs/b-020826 (lpmud/a/b/18_b-020826 1.2 644) :no-keywords)
-  (src/bugs/b-020916 (lpmud/b/b/32_b-020916 1.1 644) :no-keywords)
+  (src/bugs/b-020916 (lpmud/b/b/32_b-020916 1.2 644) :no-keywords)
+  (src/bugs/b-020916-files/registry.c (lpmud/b/b/37_registry.c 1.1 644) :no-keywords)
+  (src/bugs/b-020916-files/registry.o (lpmud/b/b/38_registry.o 1.1 644) :no-keywords)
+  (src/bugs/b-020916-files/debugger.h (lpmud/b/b/39_debugger.h 1.1 644) :no-keywords)
 
   (src/bugs/f-summary (lpmud/c/37_f-summary 1.39.1.84 644) :no-keywords)
   (src/bugs/f-981027-0 (lpmud/g/29_f-981027-0 1.2 644) :no-keywords)

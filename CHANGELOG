@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+13-Oct-2002 (Lars Duening)  (3.3.284)
+  - (configure.in) The test for 'long long' was run twice. And if pthreads
+       are not found, USE_PTHREADS is now deactivated (reported by Freaky).
+
 10-Oct-2002 (Lars Duening)  (3.3.282, .283)
   - (object.c) Restoring structs in mappings didn't work (reported by Tomba).
   - (efuns.c, svalue.h, interpret.c) Evaluation cost of  deep_copy() is
