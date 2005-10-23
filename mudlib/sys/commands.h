@@ -27,4 +27,14 @@
 
 #define CMD_SIZE       6
 
+
+/* Indices into the subarrays returned from match_command()
+ */
+#define CMDM_VERB     0
+#define CMDM_ARG      1
+#define CMDM_OBJECT   2
+#define CMDM_FUN      3
+
+#define CMDM_SIZE     4
+
 #endif /* LPC_COMMANDS_H_ */

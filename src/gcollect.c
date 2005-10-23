@@ -80,7 +80,6 @@
 #include "closure.h"
 #include "comm.h"
 #include "ed.h"
-#include "exec.h"
 #include "filestat.h"
 #include "heartbeat.h"
 #include "interpret.h"
@@ -1222,9 +1221,8 @@ garbage_collection(void)
     mstring_clear_refs();
     clear_ref_from_wiz_list();
     clear_ref_from_call_outs();
-#if defined(SUPPLY_PARSE_COMMAND)
+#if defined(USE_PARSE_COMMAND)
     clear_parse_refs();
-    clear_old_parse_refs();
 #endif
     clear_simul_efun_refs();
     clear_interpreter_refs();

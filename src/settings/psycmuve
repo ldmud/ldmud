@@ -99,4 +99,4 @@ enable_erq=xerq
 # and why shouldn't this be done in LPC anyway?
 enable_access_control=no
 
-enable_supply_parse_command=no
+enable_use_parse_command=no

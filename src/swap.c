@@ -89,7 +89,6 @@
 #include "backend.h"
 #include "closure.h"
 #include "comm.h"
-#include "exec.h"
 #include "gcollect.h"
 #include "interpret.h"
 #include "main.h"

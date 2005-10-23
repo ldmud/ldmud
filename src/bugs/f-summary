@@ -247,6 +247,7 @@ f-020331-1: Hook for input_to()
 f-020420-0: Better isolate the error routine calls
 f-020714: Better buffering of data sent to players
 f-020811: Runtime warnings
+f-020916: Memory usage as runtime limit
 
 
 Installation

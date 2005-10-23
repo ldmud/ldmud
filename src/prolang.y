@@ -3836,7 +3836,7 @@ free_const_list_svalue (svalue_t *svp)
 %token L_NOT
 %token L_NUMBER
 %token L_OBJECT
-%ifdef SUPPLY_PARSE_COMMAND
+%ifdef USE_PARSE_COMMAND
 %token L_PARSE_COMMAND
 %endif
 %token L_PRIVATE
@@ -4097,7 +4097,7 @@ free_const_list_svalue (svalue_t *svp)
 %type <lrvalue>      catch sscanf
 %type <lrvalue>      for_init_expr for_expr
 %type <lrvalue>      comma_expr_decl expr_decl
-%ifdef SUPPLY_PARSE_COMMAND
+%ifdef USE_PARSE_COMMAND
 %type <lrvalue>      parse_command
 %endif
 %type <lvalue>       lvalue name_lvalue local_name_lvalue foreach_var_lvalue
@@ -8438,9 +8438,9 @@ expr4:
 %endif /* USE_NEW_INLINES */
     | catch          %prec '~'
     | sscanf         %prec '~'
-%ifdef SUPPLY_PARSE_COMMAND
+%ifdef USE_PARSE_COMMAND
     | parse_command  %prec '~'
-%endif /* SUPPLY_PARSE_COMMAND */
+%endif /* USE_PARSE_COMMAND */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | L_STRING
@@ -11468,7 +11468,7 @@ sscanf:
       }
 ; /* sscanf */
 
-%ifdef SUPPLY_PARSE_COMMAND
+%ifdef USE_PARSE_COMMAND
 parse_command:
       L_PARSE_COMMAND note_start
       '(' expr0 ',' expr0 ',' expr0 lvalue_list ')'
@@ -11480,7 +11480,7 @@ parse_command:
           $$.code = -1;
       }
 ; /* parse_command */
-%endif /* SUPPLY_PARSE_COMMAND */
+%endif /* USE_PARSE_COMMAND */
 
 
 lvalue_list:
@@ -14823,6 +14823,17 @@ compile_file(void)
      */
     epilog();
 } /* compile_file() */
+
+/*-------------------------------------------------------------------------*/
+Bool
+is_undef_function (fun_hdr_p fun)
+
+/* Return TRUE if <fun> points to a referenced but undefined function.
+ */
+
+{
+    return GET_CODE(FUNCTION_CODE(fun)) == F_UNDEF;
+} /* is_undef_function() */
 
 /*-------------------------------------------------------------------------*/
 #if defined( DEBUG ) && defined ( TRACE_CODE )

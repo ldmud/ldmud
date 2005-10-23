@@ -3,11 +3,10 @@
 
 #include "driver.h"
 #include "typedefs.h"
-#include "instrs.h"     /* F_SET_IS_WIZARD, F_PROCESS_STRING */
 
 /* --- Variables --- */
 
-#ifdef F_SET_IS_WIZARD
+#ifdef USE_SET_IS_WIZARD
 extern Bool is_wizard_used;
 #endif
 
@@ -29,7 +28,7 @@ extern svalue_t *f_strstr(svalue_t *);
 extern svalue_t *v_trim(svalue_t *, int num_arg);
 extern svalue_t *f_upper_case(svalue_t *);
 extern svalue_t *v_terminal_colour(svalue_t *, int num_arg);
-#ifdef F_PROCESS_STRING
+#ifdef USE_PROCESS_STRING
 extern svalue_t *f_process_string(svalue_t *sp);  /* optional */
 #endif
 extern int       e_sscanf(int num_arg, svalue_t *sp);

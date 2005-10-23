@@ -19,7 +19,7 @@
  *   object_t {
  *       unsigned short  flags;
  *       p_int           ref;
-#ifdef F_SET_LIGHT
+#ifdef USE_SET_LIGHT
  *       short           total_light;
 #endif
  *       mp_int          time_reset;
@@ -48,7 +48,7 @@
  *
  * The .flags collect some vital information about the object:
  *     O_HEART_BEAT       : the object has a heartbeat
-#ifdef F_SET_IS_WIZARD
+#ifdef USE_SET_IS_WIZARD
  *     O_IS_WIZARD        : the object is a 'wizard' - this bit is set with
  *                          the efun set_is_wizard()
 #endif
@@ -171,10 +171,8 @@
 #include "backend.h"
 #include "closure.h"
 #include "comm.h"
-#include "exec.h"
 #include "filestat.h"
 #include "interpret.h"
-#include "instrs.h"
 #include "main.h"
 #include "mapping.h"
 #include "mempools.h"
@@ -3232,7 +3230,7 @@ f_getuid (svalue_t *sp)
 /*                             INVENTORIES                                 */
 
 /*-------------------------------------------------------------------------*/
-#ifdef F_SET_LIGHT
+#ifdef USE_SET_LIGHT
 
 void
 add_light (object_t *p, int n)
@@ -3249,7 +3247,7 @@ add_light (object_t *p, int n)
         p->total_light += n;
     } while ( NULL != (p = p->super) );
 } /* add_light() */
-#endif
+#endif /* USE_SET_LIGHT */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -3467,7 +3465,7 @@ write_deep_inventory (object_t *first, svalue_t *svp)
 } /* write_deep_inventory() */
 
 /*-------------------------------------------------------------------------*/
-#if !defined(SUPPLY_PARSE_COMMAND)
+#if !defined(USE_PARSE_COMMAND)
 static
 #endif
        vector_t *
@@ -4392,7 +4390,7 @@ v_tell_room (svalue_t *sp, int num_arg)
 } /* v_tell_room() */
 
 /*-------------------------------------------------------------------------*/
-#ifdef F_SET_LIGHT
+#ifdef USE_SET_LIGHT
 
 svalue_t *
 f_set_light (svalue_t *sp)
@@ -4423,7 +4421,7 @@ f_set_light (svalue_t *sp)
     return sp;
 } /* f_set_light() */
 
-#endif
+#endif /* USE_SET_LIGHT */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -4462,7 +4460,7 @@ f_set_environment (svalue_t *sp)
             if (ob == item)
                 error("Can't move object inside itself.\n");
 
-#       ifdef F_SET_LIGHT
+#       ifdef USE_SET_LIGHT
             add_light(dest, item->total_light);
 #       endif
         dest->flags &= ~O_RESET_STATE;
@@ -4483,7 +4481,7 @@ f_set_environment (svalue_t *sp)
         if (item->super->sent)
             remove_action_sent(item, item->super);
 
-#       ifdef F_SET_LIGHT
+#       ifdef USE_SET_LIGHT
             add_light(item->super, - item->total_light);
 #       endif
 
@@ -4525,7 +4523,7 @@ f_set_environment (svalue_t *sp)
 } /* f_set_environment() */
 
 /*-------------------------------------------------------------------------*/
-#ifdef F_TRANSFER
+#ifdef USE_DEPRECATED
 
 svalue_t *
 f_transfer (svalue_t *sp)
@@ -4716,7 +4714,7 @@ f_transfer (svalue_t *sp)
     return sp-1;
 } /* f_transfer() */
 
-#endif /* F_TRANSFER */
+#endif /* USE_DEPRECATED */
 
 /*=========================================================================*/
 /*                        Save/Restore an Object                           */

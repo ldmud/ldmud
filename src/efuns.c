@@ -99,8 +99,8 @@
 #include "closure.h"
 #include "comm.h"
 #include "dumpstat.h"
+#include "exec.h"
 #include "heartbeat.h"
-#include "instrs.h" /* F_SET_IS_WIZARD, F_PROCESS_STRING */
 #include "interpret.h"
 #include "main.h"
 #include "mapping.h"
@@ -133,7 +133,7 @@ static void copy_svalue (svalue_t *dest, svalue_t *, struct pointer_table *);
 
 /*-------------------------------------------------------------------------*/
 
-#ifdef F_SET_IS_WIZARD
+#ifdef USE_SET_IS_WIZARD
 Bool is_wizard_used = MY_FALSE;
   /* TODO: This flag can go when the special commands are gone. */
 #endif
@@ -2404,7 +2404,7 @@ v_terminal_colour (svalue_t *sp, int num_arg)
     return sp;
 } /* v_terminal_colour() */
 
-#ifdef F_PROCESS_STRING
+#ifdef USE_PROCESS_STRING
 /*-------------------------------------------------------------------------*/
 static string_t *
 process_value (const char *str, Bool original)
@@ -2650,7 +2650,7 @@ f_process_string(svalue_t *sp)
     return sp;
 } /* f_process_string() */
 
-#endif /* F_PROCESS_STRING */
+#endif /* USE_PROCESS_STRING */
 
 /*-------------------------------------------------------------------------*/
 /* Structures for sscanf() */
@@ -3924,7 +3924,7 @@ v_object_info (svalue_t *sp, int num_args)
         flags = o->flags;
 
         ST_NUMBER(OIB_HEART_BEAT,        (flags & O_HEART_BEAT) ? 1 : 0);
-#ifdef O_IS_WIZARD
+#ifdef USE_SET_IS_WIZARD
         ST_NUMBER(OIB_IS_WIZARD,         (flags & O_IS_WIZARD) ? 1 : 0);
 #else
         ST_NUMBER(OIB_IS_WIZARD,         0);
@@ -3939,7 +3939,7 @@ v_object_info (svalue_t *sp, int num_args)
         ST_NUMBER(OIB_LAMBDA_REFERENCED, (flags & O_LAMBDA_REFERENCED) ? 1 : 0);
         ST_NUMBER(OIB_SHADOW,            (flags & O_SHADOW) ? 1 : 0);
         ST_NUMBER(OIB_REPLACED,          (flags & O_REPLACED) ? 1 : 0);
-#ifdef F_SET_LIGHT
+#ifdef USE_SET_LIGHT
         ST_NUMBER(OIB_TOTAL_LIGHT,       o->total_light);
 #else
         ST_NUMBER(OIB_TOTAL_LIGHT,       0);
@@ -4208,7 +4208,7 @@ f_present_clone (svalue_t *sp)
 } /* f_present_clone() */
 
 /*-------------------------------------------------------------------------*/
-#ifdef F_SET_IS_WIZARD
+#ifdef USE_SET_IS_WIZARD
 
 svalue_t *
 f_set_is_wizard (svalue_t *sp)
@@ -4247,7 +4247,7 @@ f_set_is_wizard (svalue_t *sp)
     return sp;
 } /* f_set_is_wizard() */
 
-#endif /* F_SET_IS_WIZARD */
+#endif /* USE_SET_IS_WIZARD */
 
 /*-------------------------------------------------------------------------*/
 static svalue_t *
@@ -5072,261 +5072,8 @@ f_to_string (svalue_t *sp)
 
     case T_CLOSURE:
       {
-        /* Convert the various types of closures into a string */
-
-        lambda_t *l = sp->u.lambda;
-        object_t *ob;
-        int ix;
-
-        switch(sp->x.closure_type)
-        {
-
-        case CLOSURE_IDENTIFIER: /* Variable Closure */
-          {
-            /* We need the program resident */
-            if (O_PROG_SWAPPED(l->ob))
-            {
-                l->ob->time_of_ref = current_time;
-                if (load_ob_from_swap(l->ob) < 0)
-                    error("Out of memory.\n");
-            }
-
-#ifndef USE_NEW_INLINES
-            if (l->function.index != VANISHED_VARCLOSURE_INDEX)
-            {
-                /* Get the variable name */
-                put_ref_string(sp
-                 , l->ob->prog->variable_names[l->function.index].name
-                );
-            }
-#else /* USE_NEW_INLINES */
-            if (l->function.var_index != VANISHED_VARCLOSURE_INDEX)
-            {
-                /* Get the variable name */
-                put_ref_string(sp
-                 , l->ob->prog->variable_names[l->function.var_index].name
-                );
-            }
-#endif /* USE_NEW_INLINES */
-            else
-            {
-                /* Variable vanished in a replace_program() */
-                put_ref_string(sp, STR_DANGLING_V_CL);
-            }
-            break;
-          }
-
-        case CLOSURE_LFUN: /* Lfun closure */
-        case CLOSURE_ALIEN_LFUN:
-          {
-            program_t *prog;
-            fun_hdr_p fun;
-            funflag_t flags;
-            string_t *function_name;
-            inherit_t *inheritp;
-
-            if (sp->x.closure_type == CLOSURE_LFUN)
-            {
-                ob = l->ob;
-#ifndef USE_NEW_INLINES
-                ix = l->function.index;
-#else /* USE_NEW_INLINES */
-                ix = l->function.lfun.index;
-#endif /* USE_NEW_INLINES */
-            }
-            else
-            {
-                ob = l->function.alien.ob;
-                ix = l->function.alien.index;
-                /* TODO: ix: After a replace_program, can this index
-                 * TODO:: be negative?
-                 */
-            }
-
-            /* Get the program resident */
-            if (O_PROG_SWAPPED(ob)) {
-                ob->time_of_ref = current_time;
-                if (load_ob_from_swap(ob) < 0)
-                    error("Out of memory\n");
-            }
-
-            /* Find the true definition of the function */
-            prog = ob->prog;
-            flags = prog->functions[ix];
-            while (flags & NAME_INHERITED)
-            {
-                inheritp = &prog->inherit[flags & INHERIT_MASK];
-                ix -= inheritp->function_index_offset;
-                prog = inheritp->prog;
-                flags = prog->functions[ix];
-            }
-
-            /* Copy the function name pointer (a shared string) */
-            fun = prog->program + (flags & FUNSTART_MASK);
-            memcpy(&function_name, FUNCTION_NAMEP(fun)
-                  , sizeof function_name
-            );
-            put_ref_string(sp, function_name);
-            break;
-          }
-
-        case CLOSURE_UNBOUND_LAMBDA: /* Unbound-Lambda Closure */
-        case CLOSURE_PRELIMINARY:    /* Preliminary Lambda Closure */
-          {
-              string_t *rc;
-
-              if (sp->x.closure_type == CLOSURE_PRELIMINARY)
-                  sprintf(buf, "<prelim lambda %p>", l);
-              else
-                  sprintf(buf, "<free lambda %p>", l);
-              memsafe(rc = new_mstring(buf), strlen(buf), "converted lambda");
-              put_string(sp, rc);
-              break;
-          }
-
-        case CLOSURE_LAMBDA:         /* Lambda Closure */
-        case CLOSURE_BOUND_LAMBDA:   /* Bound-Lambda Closure */
-          {
-              string_t *rc;
-
-              if (sp->x.closure_type == CLOSURE_BOUND_LAMBDA)
-                  sprintf(buf, "<bound lambda %p:", l);
-              else
-                  sprintf(buf, "<lambda %p:", l);
-
-              ob = l->ob;
-
-              if (!ob)
-              {
-                  strcat(buf, "{null}>");
-                  memsafe(rc = new_mstring(buf), strlen(buf), "converted lambda");
-              }
-              else
-              {
-                  char *tmp;
-                  size_t len;
-
-                  if (ob->flags & O_DESTRUCTED)
-                      strcat(buf, "{dest}");
-                  len = strlen(buf)+mstrsize(ob->name)+2;
-                  memsafe(rc = alloc_mstring(len), len
-                           , "string-repr of lambda closure");
-                  tmp = get_txt(rc);
-                  strcat(buf, "/");
-                  strcpy(tmp, buf);
-                  strcat(tmp, get_txt(ob->name));
-                  strcat(tmp, ">");
-              }
-
-              put_string(sp, rc);
-              break;
-          }
-
-        default:
-          {
-            int type = sp->x.closure_type;
-
-            if (type >= 0)
-                error("Bad arg 1 to to_string(): closure type %d.\n"
-                     , sp->x.closure_type);
-            else
-            {
-                string_t *rc;
-                switch(type & -0x0800)
-                {
-                case CLOSURE_OPERATOR:
-                  {
-                    char *str = NULL;
-                    switch(type - CLOSURE_OPERATOR)
-                    {
-                    case F_POP_VALUE:
-                        str = ",";
-                        break;
-
-                    case F_BBRANCH_WHEN_NON_ZERO:
-                        str = "do";
-                        break;
-
-                    case F_BBRANCH_WHEN_ZERO:
-                        str = "while";
-                        break;
-
-                    case F_BRANCH:
-                        str = "continue";
-                        break;
-
-                    case F_CSTRING0:
-                        str = "default";
-                        break;
-
-                    case F_BRANCH_WHEN_ZERO:
-                        str = "?";
-                        break;
-
-                    case F_BRANCH_WHEN_NON_ZERO:
-                        str = "?!";
-                        break;
-
-                    case F_RANGE:
-                        str = "[..]";
-                        break;
-
-                    case F_NR_RANGE:
-                        str = "[..<]";
-                        break;
-
-                    case F_RR_RANGE:
-                        str = "[<..<]";
-                        break;
-
-                    case F_RN_RANGE:
-                        str = "[<..]";
-                        break;
-
-                    case F_MAP_INDEX:
-                        str = "[,]";
-                        break;
-
-                    case F_NX_RANGE:
-                        str = "[..";
-                        break;
-
-                    case F_RX_RANGE:
-                        str = "[<..";
-                        break;
-
-                    }
-
-                    if (str)
-                    {
-                        memsafe(rc = new_mstring(str), strlen(str)
-                                 , "string-repr of operator closure");
-                        put_string(sp, rc);
-                        break;
-                    }
-                    type += CLOSURE_EFUN - CLOSURE_OPERATOR;
-                  }
-                /* default action for operators: FALLTHROUGH */
-
-                case CLOSURE_EFUN:
-                    sprintf(buf, "#'%s", instrs[type - CLOSURE_EFUN].name);
-                    memsafe(rc = new_mstring(buf), strlen(buf)
-                           , "string-repr of efun closure");
-                    put_string(sp, rc);
-                    break;
-
-                case CLOSURE_SIMUL_EFUN:
-                    sprintf(buf, "#'<sefun>%s"
-                               , instrs[type - CLOSURE_SIMUL_EFUN].name);
-                    memsafe(rc = new_mstring(buf), strlen(buf)
-                           , "string-repr of sefun closure");
-                    put_string(sp, rc);
-                    break;
-                }
-                break;
-            } /* if (type) */
-          } /* case default */
-        } /* switch(closure_type) */
+        string_t * rc = closure_to_string(sp);
+        put_string(sp, rc);
         break;
       }
 
@@ -6739,7 +6486,7 @@ v_debug_info (svalue_t *sp, int num_arg)
         flags = ob->flags;
         add_message("O_HEART_BEAT      : %s\n",
           flags&O_HEART_BEAT      ?"TRUE":"FALSE");
-#ifdef O_IS_WIZARD
+#ifdef USE_SET_IS_WIZARD
         add_message("O_IS_WIZARD       : %s\n",
           flags&O_IS_WIZARD       ?"TRUE":"FALSE");
 #endif
@@ -6759,7 +6506,7 @@ v_debug_info (svalue_t *sp, int num_arg)
           flags&O_WILL_CLEAN_UP   ?"TRUE":"FALSE");
         add_message("O_REPLACED        : %s\n",
           flags&O_REPLACED        ?"TRUE":"FALSE");
-#ifdef F_SET_LIGHT
+#ifdef USE_SET_LIGHT
         add_message("total light : %d\n", ob->total_light);
 #endif
         add_message("time_reset  : %ld\n", (long)ob->time_reset);

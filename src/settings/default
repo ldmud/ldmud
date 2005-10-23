@@ -251,7 +251,20 @@ with_access_log=access.allow.log
 
 # Enable this if you want the efun parse_command().
 
-enable_supply_parse_command=yes
+enable_use_parse_command=yes
+
+# Enable this if you want the efun set_light() and the simple 2.4.5 light
+# system.
+
+enable_use_set_light=yes
+
+# Enable this if you want the efun set_is_wizard().
+
+enable_use_set_is_wizard=yes
+
+# Enable this if you want the efun process_string().
+
+enable_use_process_string=yes
 
 # Enable INITIALIZATION_BY___INIT if you want all initializations of
 # variables be suspended until the object is created. This variant is

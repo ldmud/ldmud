@@ -1485,8 +1485,17 @@ options (void)
     /* Print the language options, nicely indented. */
     {
         char * optstrings[] = { "" /* have at least one string in here */
-#ifdef SUPPLY_PARSE_COMMAND
+#ifdef USE_PARSE_COMMAND
                               , "parse_command() enabled\n"
+#endif
+#ifdef USE_PROCESS_STRING
+                              , "process_string() enabled\n"
+#endif
+#ifdef USE_SET_LIGHT
+                              , "set_light() enabled\n"
+#endif
+#ifdef USE_SET_IS_WIZARD
+                              , "set_is_wizard() enabled\n"
 #endif
 #ifdef INITIALIZATION_BY___INIT
                               , "initialization by __INIT()\n"

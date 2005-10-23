@@ -1,0 +1,117 @@
+SYNOPSIS
+        Compat mode
+
+        int parse_command (string cmd, object  env, string fmt, mixed &var, ...)
+        int parse_command (string cmd, object* arr, string fmt, mixed &var, ...)
+
+DESCRIPTION
+        parse_command() is basically a spiffed up sscanf operating on
+        word basis and targeted at recognizing object descriptions
+        from command strings.
+
+        The efun takes the command string <cmd> and the object(s)
+        <env>/<arr> and tries to match it against the format string
+        <fmt>. Successfully matched elements are assigned to the
+        variables <var>.... The result from the efun is 1 if the
+        command could be fully matched, and 0 otherwise.
+
+        If the objects are given as a single object <env>, the efun
+        matches against the given object and all objects contained
+        therein. Otherwise, if the objects are given as an array <arr>
+        of objects, the efun matches only against the given objects.
+
+        If <env> is 0, environment(this_player()) is used as default.
+
+        The format string <fmt> consists of words, syntactic markers, and
+        %-directives for the values to parse and return in the variables.
+        A typical example is " 'get' / 'take' %i " or
+        " 'spray' / 'paint' [paint] %i ". The elements in detail are:
+
+           'word': obligatory text
+           [word]: optional text
+           /     : Alternative marker
+           %o    : Single item, object
+           %s    : Any text
+           %w    : Any word
+           %p    : One of a list of prepositions.
+                   If the variable associated with %p is used to pass
+                   a list of words to the efun, the matching will take
+                   only against this list.
+           %l    : non-compat: Living objects
+                   compat: a single living object
+           %i    : Any objects
+           %d    : Number >= 0, or when given textual: 0-99.
+
+        A <word> in this context is any sequence of characters not containing
+        a space. 'living objects' are searched by calls to the (simul)efuns
+        find_player() and find_living(): both functions have to accept a name
+        as argument and return the object for this name, or 0 if there
+        is none.
+
+        The results assigned to the variables by the %-directives are:
+
+           %o : returns an object
+           %s : returns a string of words
+           %w : returns a string of one word
+           %p : if passed empty: a string
+                if passed as array of words: var[0] is the matched word
+           %i : returns an array with the following content:
+                  [0]: int: the count/number recognized in the object spec
+                            > 0: a count (e.g. 'three', '4')
+                            < 0: an ordinal (e.g. 'second', 'third')
+                            = 0: 'all' or a generic plural such as 'apples'
+                  [1..]: object: all(!) objects matching the item description.
+                                 In the <env> form this may be the whole
+                                 recursive inventory of the <env> object.
+                It is up to the caller to interpret the recognized numeral
+                and to apply it on the list of matched objects.
+           %l : non-compat: as %i, except that only living objects are
+                            returned.
+                compat: as %o, except that only a living object is returned.
+
+        %i (and non-compat-%l) match descriptions like 'three red roses',
+        'all nasty bugs' or 'second blue sword'.
+
+        Note: Patterns of type: "%s %w %i" might not work as one would expect.
+        %w will always succeed so the arg corresponding to %s will always be
+        empty.
+
+        The implementation of parse_command() differs between compat
+        mode and non-compat mode drivers mainly in how the efun
+        retrieves the necessary information from the mudlib objects.
+
+
+DESCRIPTION -- compat mode
+
+        To make the efun useful it must have a certain support from the
+        mudlib: it calls a set of functions in objects to get the
+        information it needs to parse a string.
+
+          1. int id (string txt)
+              txt is an object name of the form "adj1 adj2 ... name".
+              The function has to return non-zero if txt is a valid
+              (singular) name for this particular object.
+
+          2. int plural_id (string txt)
+              txt is an object name of the form "adj1 adj2 ... name".
+              The function has to return non-zero if txt is a valid
+              plural name for this particular object.
+
+          3. string adjectiv_id()
+              When parsing commands like "get all red ones", the result
+              from this function is used to construct the text passed
+              to id(); in this example "red <adjectiv_id>". If this
+              function doesn't exist, the last word from the result
+              of short() is used instead.
+
+EXAMPLE
+        object *items;
+        parse_command( "take apple",environment(this_player())
+                     , " 'get' / 'take' %i ",items);
+
+HISTORY
+        LDMud 3.3.258 removed the compat-mode parse_command().
+
+SEE ALSO
+        sscanf(E)
+

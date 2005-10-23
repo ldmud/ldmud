@@ -2,6 +2,11 @@ SYNOPSIS
         void init()
 
 DESCRIPTION
+        The H_MOVE_OBJECT0/1 implement the details of moving objects.
+        In older drivers, init() was called to handle the adding of
+        actions, and a lot of hook implementations still follow this
+        tradition.
+
         The main purpose of this function is to set up the
         add_actions() of an object. Therefore init() will always be
         called when an object moves near another object and one or

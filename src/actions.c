@@ -45,11 +45,8 @@
  *
  * It is possible to stack commands, ie. to execute a command from within
  * a command.
- * TODO: Implement an efun match_command() which takes a command string
- * TODO:: and an object, and returns array of all matching sentences with
- * TODO:: the additional information like verb/argument split, etc.
- * TODO:: This could be used to implement an inventory-independent command
- * TODO:: system.
+ * TODO: Make actions optional on three levels: none, only the sentence
+ * TODO:: management+match_command(), full.
  *---------------------------------------------------------------------------
  */
 
@@ -65,7 +62,6 @@
 #include "comm.h"
 #include "dumpstat.h"
 #include "efuns.h" /* is_wizard_used */
-#include "exec.h"
 #include "interpret.h"
 #include "mapping.h"
 #include "mstrings.h"
@@ -651,7 +647,7 @@ special_parse (char *buff)
  */
 
 {
-#ifdef O_IS_WIZARD
+#ifdef USE_SET_IS_WIZARD
     if (!is_wizard_used || command_giver->flags & O_IS_WIZARD)
 #endif
     {
@@ -1159,7 +1155,7 @@ parse_command (char *buff, Bool from_efun)
 
         /* Command was found */
         if (O_IS_INTERACTIVE(command_giver)
-#ifdef O_IS_WIZARD
+#ifdef USE_SET_IS_WIZARD
             && !(command_giver->flags & O_IS_WIZARD)
 #endif
            )
@@ -1455,21 +1451,17 @@ v_command (svalue_t *sp, int num_arg)
 
 /* EFUN command()
  *
- *   int command(string str)             // native
- *   int command(string str, object ob)  // !native
+ *   int command(string str, object ob)
  *
  * Execute str as a command given directly by the user. Any
- * effects of the command will apply to the current object.
+ * effects of the command will apply to object <ob> (defaults to
+ * the current object if not given).
  *
  * Return value is 0 for failure. Otherwise a numeric value is
  * returned which tells the evaluation cost. Bigger number means
  * higher cost.  The evaluation cost is approximately the number
  * of LPC machine code instructions executed.
  *
- * In native mode, command() can effect only the calling object.
- * If native mode is not enabled, command() can get an optional
- * second arg, that specifies the object that the command is to
- * be applied to.
  * If command() is called on another object, it is not possible
  * to call static functions in this way, to give some protection
  * against illegal forces.
@@ -1532,8 +1524,8 @@ f_execute_command (svalue_t *sp)
  *
  * Low-level access to the command parser: take the <command>, parse
  * it into verb and argument and call the appropriate action added
- * to <origin>. For the execution of the function(s), this_player()
- * is set to player.
+ * to <origin> (read: <origin> is the object 'issuing' the command). For the
+ * execution of the function(s), this_player() is set to <player>.
  *
  * The efun raises a privilege violation ("execute_command", this_object(),
  * origin, command).
@@ -1594,6 +1586,277 @@ f_execute_command (svalue_t *sp)
 
     return argp;
 } /* f_execute_command() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_match_command(svalue_t * sp)
+
+/* EFUN match_command()
+ *
+ *   mixed * execute_command (string command, object origin)
+ *
+ * Take the command <command>, parse it, and return an array of all
+ * matching actions added to <origin> (read: <origin> is the object
+ * 'issuing' the command).
+ *
+ * Each entry in the result array is itself an array of:
+ *   
+ *   string [CMDM_VERB]:   The matched verb.
+ *   string [CMDM_ARG]:    The argument string remaining, or 0 if none.
+ *   object [CMDM_OBJECT]: The object defining the action.
+ *   string [CMDM_FUN]:    The name of the function to call in CMDM_OBJECT,
+ *                         which may be static.
+ *
+ * The efun is useful for both debugging, and for implementing your
+ * own H_COMMAND handling.
+ *
+ * TODO: Export the basic data gathering into a separate function which
+ * TODO:: can then be co-used by parse_command(), removing the need
+ * TODO:: for a SENT_MARKER. It might also remove the need for copying
+ * TODO:: the command buffer.
+ */
+
+{
+    object_t *origin;
+    string_t *cmd;                 /* The given command */
+    char     *cmdbuf;              /* The given command text buffer */
+    string_t *verb;                /* The verb from the command, tabled */
+    char     *p;                   /* handy string pointer */
+    sentence_t *s;                 /* handy sentence pointer */
+    size_t    cmd_length;          /* length of command w/o trailing spaces */
+    size_t    verb_length;         /* length of the verb */
+    vector_t *rc;                  /* Result array */
+
+      /* The found matching actions are kept in a list of these 
+       * structures. References to strings and objects are counted.
+       */
+    struct cmd_s {
+        struct cmd_s *next;
+        string_t     *verb;  /* The verb */
+        string_t     *arg;   /* The arg string, or NULL */
+        string_t     *fun;   /* The function to call */
+        object_t     *ob;    /* The object to call */
+        sentence_t   *s;     /* The sentence */
+    };
+    struct cmd_s *first, *last;
+    struct cmd_s *pcmd;
+    int           num_cmd;   /* Number of matches found */
+    int           i;
+
+    first = last = NULL;
+
+    /* Get the arguments */
+    origin = sp->u.ob;
+    cmd = sp[-1].u.str;
+    cmdbuf = get_txt(cmd);
+
+    /* Strip trailing spaces.
+     */
+    for (p = cmdbuf + mstrsize(cmd) - 1; p >= cmdbuf; p--)
+    {
+       if (*p != ' ')
+            break;
+    }
+
+    if  (p < cmdbuf)
+    {
+        free_svalue(sp); sp--;
+        free_svalue(sp);
+        put_array(sp, allocate_array(0));
+        return sp;
+    }
+
+    cmd_length = p - cmdbuf + 1;
+
+    /* Determine verb length */
+    p = strchr(cmdbuf, ' ');
+    if (p == NULL)
+        verb_length = cmd_length;
+    else
+        verb_length = (size_t)(p - cmdbuf);
+
+    verb = new_n_tabled(cmdbuf, verb_length);
+
+    /* Scan the list of sentences for the saved command giver
+     * and collect the found matches in a list.
+     */
+    num_cmd = 0;
+    for (s = origin->sent; s; s = s->next)
+    {
+        struct cmd_s * new_cmd;
+        action_t *sa;            /* (action_t *)s */
+        unsigned char type;      /* s->type */
+
+        sa = (action_t *)s;
+
+        /* Test the current sentence */
+        if ((type = s->type) == SENT_PLAIN)
+        {
+            if (!mstreq(sa->verb, verb))
+                continue;
+        }
+        else if (type == SENT_SHORT_VERB)
+        {
+            /* The verb may be shortened to a few leading characters,
+             * but not shorter than .short_verb.
+             */
+            size_t len;
+            if (sa->short_verb)
+            {
+                len = mstrsize(verb);
+                if (len < sa->short_verb
+                 || len > mstrsize(sa->verb)
+                 || (   !mstreq(sa->verb, verb)
+                     && strncmp(get_txt(sa->verb), get_txt(verb), len) != 0))
+                    continue;
+            }
+            else
+            {
+                len = mstrsize(sa->verb);
+                if (strncmp(cmdbuf, get_txt(sa->verb), len) != 0)
+                    continue;
+            }
+        }
+        else if (type == SENT_OLD_NO_SPACE || type == SENT_NO_SPACE)
+        {
+            /* The arguments may follow the verb without space,
+             * that means we just have to check if buff[] begins
+             * with sa->verb.
+             */
+            size_t len;
+            len = mstrsize(sa->verb);
+            if (strncmp(cmdbuf, get_txt(sa->verb), len) != 0)
+                continue;
+        }
+        else
+        {
+            /* SENT_MARKER ... due to recursion. Or another SENT_IS_INTERNAL */
+            continue;
+        }
+
+        /*
+         * Now we have found a matching sentence!
+         */
+
+        num_cmd++;
+        memsafe(new_cmd = alloca(sizeof(*new_cmd)), sizeof(*new_cmd)
+               , "temporary buffer");
+
+        new_cmd->next = NULL;
+        new_cmd->s = s;
+        new_cmd->ob = ref_object(sa->ob, "match_command");
+        new_cmd->fun = ref_mstring(sa->function);
+
+        /* Fill in the verb and arg information of the cmd_s structure.
+         */
+        if (s->type == SENT_OLD_NO_SPACE)
+        {
+            new_cmd->verb = ref_mstring(verb);
+            if (cmd_length > mstrsize(sa->verb))
+            {
+                new_cmd->arg = mstr_extract(cmd, mstrsize(sa->verb), cmd_length-1);
+            }
+            else
+            {
+                new_cmd->arg = NULL;
+            }
+        }
+        else if (s->type == SENT_NO_SPACE)
+        {
+            if (cmd_length > mstrsize(sa->verb))
+            {
+                /* We need to cut off the verb right where the
+                 * arguments start.
+                 */
+                size_t len = mstrsize(sa->verb);
+
+                new_cmd->verb = mstr_extract(cmd, 0, len-1);
+                new_cmd->arg = mstr_extract(cmd, len, cmd_length-1);
+            }
+            else
+            {
+                new_cmd->verb = ref_mstring(verb);
+                new_cmd->arg = NULL;
+            }
+        }
+        else if (cmdbuf[verb_length] == ' ')
+        {
+            new_cmd->verb = ref_mstring(verb);
+
+            /* Try to find an earlier action which uses the same
+             * argument and just reference that one.
+             */
+            for (pcmd = first; pcmd != NULL; pcmd = pcmd->next)
+            {
+                if (pcmd->s->type != SENT_OLD_NO_SPACE
+                 && pcmd->s->type != SENT_NO_SPACE
+                 && pcmd->arg != NULL
+                   )
+                {
+                    new_cmd->arg = ref_mstring(pcmd->arg);
+                    break;
+                }
+            }
+
+            if (pcmd == NULL)
+            {
+                /* First time this arg is used */
+                new_cmd->arg = mstr_extract(cmd, verb_length+1, cmd_length-1);
+            }
+        }
+        else
+        {
+            new_cmd->verb = ref_mstring(verb);
+            new_cmd->arg = NULL;
+        }
+
+        /* Insert the command info into the list */
+        if (first == NULL)
+        {
+            first = last = new_cmd;
+        }
+        else
+        {
+            last->next = new_cmd;
+            last = new_cmd;
+        }
+    } /* for(sentences) */
+
+    /* We got the matched commands, now transfer the information
+     * into the result array.
+     */
+    rc = allocate_array(num_cmd);
+    for ( i = 0, pcmd = first
+        ; i < num_cmd && pcmd != NULL
+        ; i++, pcmd = pcmd->next)
+    {
+        vector_t *sub = allocate_array(CMDM_SIZE);
+
+        put_string(&(sub->item[CMDM_VERB]), pcmd->verb);
+        if (pcmd->arg)
+            put_string(&(sub->item[CMDM_ARG]), pcmd->arg);
+        /* else: entry is svalue-0 already */
+        put_string(&(sub->item[CMDM_FUN]), pcmd->fun);
+        put_object(&(sub->item[CMDM_OBJECT]), pcmd->ob);
+
+        put_array(&(rc->item[i]), sub);
+    }
+
+    /* Clean up */
+    free_mstring(verb);
+      /* No need to clean up the references from the list as they
+       * have been transferred into the result array.
+       * And the list itself lives on the stack and is cleaned up
+       * automatically.
+       */
+
+    /* Put the result onto the stack */
+    free_svalue(sp); sp--;
+    free_svalue(sp);
+    put_array(sp, rc);
+
+    return sp;
+} /* f_match_command() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *

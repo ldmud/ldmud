@@ -1,0 +1,18 @@
+CONCEPT
+        driver hooks
+
+DESCRIPTION
+        To allow a greater flexibility of the muds, the gamedrivers
+        since 3.2.1 moved several once hardcoded 'underground'
+        activities from the driver into the mudlib. This includes for
+        example the differences between compat and native mode.
+
+        The hooks are set with the privileged efun set_driver_hook().
+        Some of the hooks are mandatory, some not. Most hooks accept
+        unbound lambda closures as values, some also lfun closures or
+        even strings.
+        The hooks are identified by an ordinal number, for which
+        symbolic names are defined in /sys/driverhooks.h.
+
+SEE ALSO
+        native(C), set_driver_hook(E)

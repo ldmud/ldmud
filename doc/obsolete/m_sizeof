@@ -1,0 +1,16 @@
+REMOVED EFUN
+SYNOPSIS
+        int m_sizeof(mapping map)
+
+DESCRIPTION
+        Returns the number of indices in mapping 'map'.
+        This function is in fact an alias for sizeof().
+
+HISTORY
+        Since LDMud 3.2.9, not available if driver is compiled without
+          USE_DEPRECATED.
+        Removed in LDMud 3.3.
+
+SEE ALSO
+        mappingp(E), mkmapping(E), m_indices(E), m_values(E),
+        m_delete(E), sizeof(E), widthof(E).

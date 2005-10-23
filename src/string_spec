@@ -149,7 +149,9 @@ VALID_SNOOP     "valid_snoop"
 VALID_TRACE     "valid_trace"
 VALID_WRITE     "valid_write"
 
-    /* Compat mode lfuns */
+#ifdef USE_DEPRECATED
+
+    /* Compat mode lfuns used by transfer() */
 
 ADD_WEIGHT      "add_weight"
 CANPUTGET       "can_put_and_get"
@@ -158,8 +160,10 @@ GET             "get"
 QUERY_WEIGHT    "query_weight"
 PREVENT_INSERT  "prevent_insert"
 
+#endif
 
-#ifdef SUPPLY_PARSE_COMMAND
+
+#ifdef USE_PARSE_COMMAND
 
     /* parse_command() lfuns */
 

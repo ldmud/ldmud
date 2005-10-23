@@ -1,4 +1,4 @@
-DEPRECATED
+OPTIONAL
 SYNOPSIS
         int parse_command (string cmd, object  env, string fmt, mixed &var, ...)
         int parse_command (string cmd, object* arr, string fmt, mixed &var, ...)
@@ -18,9 +18,6 @@ DESCRIPTION
         against the given object and all objects contained therein. Otherwise,
         if the objects are given as an array <arr> of objects, the efun
         matches only against the given objects.
-
-        Compat mode only: If <env> is 0, environment(this_player()) is used
-        as default.
 
         The format string <fmt> consists of words, syntactic markers, and
         %-directives for the values to parse and return in the variables.
@@ -76,13 +73,6 @@ DESCRIPTION
         %w will always succeed so the arg corresponding to %s will always be
         empty.
 
-
-        The implementation of parse_command() differs between compat mode
-        and non-compat mode drivers mainly in how the efun retrieves the necessary
-        information from the mudlib objects.
-
-DESCRIPTION -- non-compat mode
-
         To make the efun useful it must have a certain support from the
         mudlib: it calls a set of functions in objects to get the
         information it needs to parse a string.
@@ -129,34 +119,14 @@ DESCRIPTION -- non-compat mode
 
         int parse_command(string, object|object*, string, destargs...)
 
-DESCRIPTION -- compat mode
-
-        To make the efun useful it must have a certain support from the
-        mudlib: it calls a set of functions in objects to get the
-        information it needs to parse a string.
-
-          1. int id (string txt)
-              txt is an object name of the form "adj1 adj2 ... name".
-              The function has to return non-zero if txt is a valid
-              (singular) name for this particular object.
-
-          2. int plural_id (string txt)
-              txt is an object name of the form "adj1 adj2 ... name".
-              The function has to return non-zero if txt is a valid
-              plural name for this particular object.
-
-          3. string adjectiv_id()
-              When parsing commands like "get all red ones", the result
-              from this function is used to construct the text passed
-              to id(); in this example "red <adjectiv_id>". If this
-              function doesn't exist, the last word from the result
-              of short() is used instead.
 
 EXAMPLE
-
         object *items;
         parse_command( "take apple",environment(this_player())
                      , " 'get' / 'take' %i ",items);
+
+HISTORY
+        LDMud 3.3.258 removed the compat-mode parse_command().
 
 SEE ALSO
         sscanf(E)

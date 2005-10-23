@@ -1,0 +1,21 @@
+REMOVED EFUN
+SYNOPSIS
+	void add_xverb(string str)
+
+DESCRIPTION
+	This function is connected to the add_action() function. It
+	will set up the command str to trigger a call to the function
+	set up by the previous call to add_action().
+	
+	add_xverb() differs from add_verb() in that only leading
+	characters of the input line must match with str. It basically
+	is the same as setting flag in add_action().
+
+	[marion Sun Jan 19 1992 Don't use it. This file is retained
+	because of somewhat nostalgic reasons.]
+
+HISTORY
+        Removed in LDMud 3.3, obsoleted by add_action().
+
+SEE ALSO
+	add_action(E), query_verb(E), add_verb(E)

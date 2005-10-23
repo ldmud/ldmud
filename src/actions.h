@@ -38,5 +38,6 @@ extern svalue_t *f_command_stack(svalue_t *sp);
 extern svalue_t *f_set_modify_command(svalue_t *sp);
 extern svalue_t *f_set_this_player(svalue_t *sp);
 extern svalue_t *f_remove_action(svalue_t *sp);
+extern svalue_t *f_match_command(svalue_t * sp);
 
 #endif /* ACTIONS_H__ */

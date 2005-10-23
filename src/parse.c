@@ -3,7 +3,7 @@
  * (C) Copyright 1991 JnA (jna@cd.chalmers.se)
  *
  *---------------------------------------------------------------------------
- * TODO: Remove this efun.
+ * TODO: Improve this efun, make it more general.
  * EFUN parse_command
  *
  *     int parse_command (string cmd, object  env, string fmt, mixed &var, ...)
@@ -165,7 +165,7 @@
 
 #include "driver.h"
 
-#if defined(SUPPLY_PARSE_COMMAND)
+#if defined(USE_PARSE_COMMAND)
 
 #include "typedefs.h"
 
@@ -178,7 +178,6 @@
 #include "actions.h"
 #include "array.h"
 #include "gcollect.h"
-#include "instrs.h"
 #include "interpret.h"
 #include "lex.h"
 #include "main.h"
@@ -1820,7 +1819,7 @@ e_parse_command ( string_t *cmd          /* Command to parse */
     return !fail;
 } /* e_parse_command() */
 
-#endif /* SUPPLY_PARSE_COMMAND */
+#endif /* USE_PARSE_COMMAND */
 
 /***************************************************************************/
 

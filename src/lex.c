@@ -446,7 +446,7 @@ static struct s_reswords reswords[]
    , { "nomask",         L_NO_MASK       }
    , { "nosave",         L_NOSAVE        }
    , { "object",         L_OBJECT        }
-#ifdef SUPPLY_PARSE_COMMAND
+#ifdef USE_PARSE_COMMAND
    , { "parse_command",  L_PARSE_COMMAND }
 #endif
    , { "private",        L_PRIVATE       }
@@ -651,10 +651,12 @@ init_lexer(void)
         if (instrs[n].Default == -1)
             continue;
 
-        /* In native mode, skip certain efuns */
+        /* In !compat mode, skip certain efuns */
         if (!compat_mode
-         && (   n == F_TRANSFER
-             || !strcmp(instrs[n].name, "creator")
+         && (   !strcmp(instrs[n].name, "creator")
+#ifdef USE_DEPRECATED
+             ||  n == F_TRANSFER
+#endif /* USE_DEPRECATED */
             )
            )
             continue;
@@ -1377,7 +1379,7 @@ symbol_efun (string_t *name, svalue_t *sp)
                 case L_SSCANF:
                     code = F_SSCANF;
                     break;
-#ifdef SUPPLY_PARSE_COMMAND
+#ifdef USE_PARSE_COMMAND
                 case L_PARSE_COMMAND:
                     code = F_PARSE_COMMAND;
                     break;
@@ -4402,7 +4404,7 @@ yylex1 (void)
                         case L_RETURN:
                             code = F_RETURN  + CLOSURE_EFUN_OFFS;
                             break;
-#ifdef SUPPLY_PARSE_COMMAND
+#ifdef USE_PARSE_COMMAND
                         case L_PARSE_COMMAND:
                             code = F_PARSE_COMMAND  + CLOSURE_EFUN_OFFS;
                             break;

@@ -30,7 +30,7 @@ enable_use_alists=yes
 enable_use_pcre=no
 with_master_name=secure/master
 
-enable_supply_parse_command=no
+enable_use_parse_command=no
 enable_initialization_by___init=no
 
 enable_malloc_trace=no

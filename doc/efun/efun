@@ -20,10 +20,12 @@ DESCRIPTION
              db_*()
              insert_alist()
              intersect_alist()
+             parse_command()
              process_string()
              rusage()
              set_is_wizard()
              set_light()
+             transfer()
 
          - 'preliminary' or 'experimental'
 

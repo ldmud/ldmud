@@ -30,7 +30,7 @@ with_time_to_reset=2400
 enable_compat_mode=no
 enable_strict_euids=yes
 
-enable_supply_parse_command=no
+enable_use_parse_command=no
 enable_initialization_by___init=yes
 
 enable_malloc_trace=yes

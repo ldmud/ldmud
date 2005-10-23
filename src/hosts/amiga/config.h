@@ -249,11 +249,22 @@
  */
 #define STRICT_EUIDS
 
-/* Define SUPPLY_PARSE_COMMAND if you want the efun parse_command.
- * If you don't need it, better #undef it, lest some new wiz can inadvertly
- * crash your mud or make it leak memory.
+/* Define USE_PARSE_COMMAND if you want the efun parse_command().
  */
-#define SUPPLY_PARSE_COMMAND
+#define USE_PARSE_COMMAND
+
+/* Define USE_SET_LIGHT if you want the efun set_light() and the
+ * simple 2.4.5 light system.
+ */
+#define USE_SET_LIGHT
+
+/* Define USE_SET_IS_WIZARD if you want the efun set_is_wizard().
+ */
+#define USE_SET_IS_WIZARD
+
+/* Define USE_PROCESS_STRING if you want the efun process_string().
+ */
+#define USE_PROCESS_STRING
 
 /* Define INITIALIZATION_BY___INIT if you want all initializations of variables
  * to be suspended till the object is created ( as supposed to initialization

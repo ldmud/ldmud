@@ -1,3 +1,4 @@
+DEPRECATED
 SYNOPSIS
         int get()
 
@@ -9,6 +10,9 @@ DESRIPTION
         get(), and return 1 if ok to pick up.
 
         id() has been called before this to identify the object.
+
+HISTORY
+        Deprecated in LDMud 3.3 as transfer() has been deprecated.
 
 SEE ALSO
         transfer(E), drop(A)

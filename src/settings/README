@@ -1,7 +1,8 @@
 The files in this directory hold collections of option settings, used
 when configuring the driver for compilation. To use the setting <foo>,
 start the configure script with argument --with-setting=<foo> or
-the settings file directly with './settings/<foo>'.
+the settings file directly with './settings/<foo>' (for the latter the
+settings file must be marked as executable).
 
 The provided settings:
 

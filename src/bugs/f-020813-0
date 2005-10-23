@@ -16,4 +16,5 @@ vertraut.
 
 -- It might be done using special const-LVALUEs, but it's almost easier to
 rewrite the  LPC compiler. But the same mechanism could be used for
-'const references' in general.
+'const references' in general, and for opening up variables to inheriting
+classes for read-only access (like Oberon's '+' visibility).

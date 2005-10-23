@@ -3,7 +3,8 @@
 
 #include "driver.h"
 #include "typedefs.h"
-#include "exec.h" /* bytecode_t, bytecode_p */
+
+#include "bytecode.h"
 #ifdef USE_NEW_INLINES
 #include "svalue.h"
 #endif /* USE_NEW_INLINES */
@@ -114,6 +115,7 @@ extern lambda_t *lambda(vector_t *args, svalue_t *block, object_t *origin);
 extern void      free_closure(svalue_t *svp);
 extern void      store_undef_closure (svalue_t *sp);
 extern Bool      is_undef_closure (svalue_t *sp);
+extern string_t * closure_to_string (svalue_t * sp);
 extern svalue_t *v_bind_lambda(svalue_t *sp, int num_arg);
 extern svalue_t *f_lambda(svalue_t *sp);
 extern svalue_t *f_symbol_function(svalue_t *sp);

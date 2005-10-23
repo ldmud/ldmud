@@ -8,7 +8,7 @@ exit 1
 
 # --- The settings
 enable_access_control=no
-enable_supply_parse_command=no
+enable_use_parse_command=no
 with_master_name=kernel/master
 with_portno=6666
 with_swap_file=kernel/.swap

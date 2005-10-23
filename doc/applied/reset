@@ -1,9 +1,14 @@
 SYNOPSIS
         void reset(int arg)        /* compat mode */
-        void reset(void)        /* native mode */
+        void reset(void)           /* native mode */
 
 DESCRIPTION
-        In compat mode, reset() is called with arg 0 after the object
+        The H_RESET hook defines the function or closure to be called
+        when the driver needs to reset an object. In older drivers
+        this was hardwired to the lfun reset(), and a lot of hook
+        implementations still follow this tradition.
+
+        In compat mode, reset() was called with arg 0 after the object
         was compiled, and with arg != 0 every once in a while.        In
         native mode, create() is called after compiling, and reset()
         is called without arguments every once in a while.

@@ -1,3 +1,4 @@
+DEPRECATED
 SYNOPSIS
         int drop(void)
         int drop(int silently)
@@ -16,6 +17,9 @@ DESCRIPTION
 
         Most compat mode LPC libraries to define one argument for
         drop. If silently is true, no messages should be written.
+
+HISTORY
+        Deprecated in LDMud 3.3 as transfer() has been deprecated.
 
 SEE ALSO
         transfer(E)

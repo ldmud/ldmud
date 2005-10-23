@@ -23,7 +23,7 @@ with_input_escape="@"
 enable_erq=erq
 enable_use_mysql=1
 
-enable_supply_parse_command=0
+enable_use_parse_command=0
 enable_compat_mode=no
 enable_strict_euids=no
 enable_use_deprecated=yes

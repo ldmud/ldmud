@@ -2,11 +2,16 @@ SYNOPSIS
         void create()
 
 DESCRIPTION
-        In native mode, this function will be called only once on
-        creation of the object (this is when the object will be loaded
-        or cloned). Inside this function all major initialization can
-        be done. The current user and the previous object are
-        defined but the object has no environment.
+        The H_CREATE_SUPER/_OB/_CLONE hooks define the function or closure
+        to be called when the driver creates a new object. In older
+        drivers this was hardwired to the lfun create(), and a lot of
+        hook implementations still follow this tradition.
+
+        This function will be called only once on creation of the
+        object (this is when the object will be loaded or cloned).
+        Inside this function all major initialization can be done. The
+        current user and the previous object are defined but the
+        object has no environment.
 
 EXAMPLE
         object cloner;

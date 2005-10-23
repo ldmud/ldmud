@@ -8386,7 +8386,7 @@ again:
         break;
     }
 
-#ifdef F_PARSE_COMMAND
+#ifdef USE_PARSE_COMMAND
     CASE(F_PARSE_COMMAND);      /* --- parse_command <numargs> --- */
     {
         /* EFUN parse_command()
@@ -8428,17 +8428,13 @@ again:
         free_mstring(arg[2].u.str);
         arg[2].u.str = str;
 
-        if (compat_mode)
-            i = e_old_parse_command(arg[0].u.str, &arg[1], arg[2].u.str
-                                   , &arg[3], num_arg-3);
-        else
-            i = e_parse_command(arg[0].u.str, &arg[1], arg[2].u.str
-                               , &arg[3], num_arg-3);
+        i = e_parse_command(arg[0].u.str, &arg[1], arg[2].u.str
+                           , &arg[3], num_arg-3);
         pop_n_elems(num_arg);        /* Get rid of all arguments */
         push_number(sp, i ? 1 : 0);      /* Push the result value */
         break;
     }
-#endif /* PARSE_COMMAND */
+#endif /* USE_PARSE_COMMAND */
 
     CASE(F_LOCAL);                  /* --- local <ix>          --- */
 
@@ -16719,18 +16715,6 @@ call_function (program_t *progp, int fx)
     eval_instruction(FUNCTION_CODE(funstart), inter_sp);
     free_svalue(inter_sp--);  /* Throw away the returned result */
 } /* call_function() */
-
-/*-------------------------------------------------------------------------*/
-Bool
-is_undef_function (fun_hdr_p fun)
-
-/* Return TRUE if the function <fun> is referenced, but undefined.
- * It's a small function, but reduces the coupling to instrs.h .
- */
-
-{
-    return GET_CODE(FUNCTION_CODE(fun)) == F_UNDEF;
-} /* is_undef_function() */
 
 /*-------------------------------------------------------------------------*/
 int

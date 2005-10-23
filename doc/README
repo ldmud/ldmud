@@ -12,8 +12,10 @@ DESCRIPTION
 	C for concepts/	general concepts of LPMUD and LPC
 	D for driver/	some info about internal operation of the driver
 	E for efun/	the ``system calls'' of LPC
+        H for hook/     the driver hooks
 	LPC for LPC/	about parts of the LPC language
 	M for master/	lfuns that are applied to the master object only
+        O for obsolete/ docs for features removed from the driver
 
  	This collection does not contain anything about mudlib specific
 	object classes or lfuns, and also not about any simulated
@@ -86,3 +88,4 @@ HISTORY
 
 SEE ALSO
 	efun(E), applied(A), concepts(C), lpc(LPC), master(M), driver(D)
+        obsolete(O)

@@ -5,7 +5,6 @@
 #include "typedefs.h"
 
 #include "sent.h"    /* O_GET_* */
-#include "instrs.h"  /* F_SET_LIGHT, F_TRANSFER */
 
 #ifdef DEBUG
 #include <stdio.h>      /* printf() for refcount tracing */
@@ -20,7 +19,7 @@ struct object_s
 {
     unsigned short flags; /* Bits or'ed together, see below */
     p_int ref;            /* Reference count. */
-#ifdef F_SET_LIGHT
+#ifdef USE_SET_LIGHT
     short total_light;    /* Total light */
 #endif
     mp_int time_reset;    /* Time of next reset, or 0 if none */
@@ -64,8 +63,8 @@ struct object_s
 /* Values of object_t.flags: */
 
 #define O_HEART_BEAT         0x01   /* Does it have an heart beat? */
-#ifdef F_SET_IS_WIZARD
-#define O_IS_WIZARD          0x02   /* Is it a wizard player.c? TODO: Remove me */
+#ifdef USE_SET_IS_WIZARD
+#define O_IS_WIZARD          0x02   /* Is it a wizard player.c? */
 #endif
 #define O_ENABLE_COMMANDS    0x04   /* Can it execute commands? */
 #define O_CLONE              0x08   /* Is it cloned from a master copy? */
@@ -297,7 +296,7 @@ extern svalue_t *f_getuid(svalue_t *sp);
 
 extern svalue_t *v_all_environment(svalue_t *sp, int num_arg);
 extern svalue_t *f_all_inventory(svalue_t *sp);
-#if defined(SUPPLY_PARSE_COMMAND)
+#if defined(USE_PARSE_COMMAND)
 extern vector_t *deep_inventory(object_t *ob, Bool take_top);
   /* needed by parse.c */
 #endif
@@ -310,11 +309,11 @@ extern svalue_t *v_present(svalue_t *sp, int num_arg);
 extern svalue_t *v_say(svalue_t *sp, int num_arg);
 extern svalue_t *v_tell_room(svalue_t *sp, int num_arg);
 extern svalue_t *f_set_environment(svalue_t *sp);
-#ifdef F_TRANSFER
+#ifdef USE_DEPRECATED
 extern svalue_t *f_transfer(svalue_t *svp);
 #endif
 
-#ifdef F_SET_LIGHT
+#ifdef USE_SET_LIGHT
 extern void add_light(object_t *p, int n);
 extern svalue_t *f_set_light(svalue_t *sp);
 #endif

@@ -26,7 +26,7 @@ with_max_array_size=5000
 
 enable_compat_mode=no
 enable_strict_euids=yes
-enable_supply_parse_command=no
+enable_use_parse_command=no
 enable_use_alists=yes
 enable_use_pcre=no
 

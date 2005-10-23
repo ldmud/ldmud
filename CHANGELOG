@@ -1,6 +1,23 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+18-Sep-2002 (Lars Duening)  (3.3.259)
+  - (doc/obsolete/) New directory to hold obsolete manpages - useful
+       when reworking old code (suggested by Coogan).
+  - (func_spec, object, string_spec) Efun transfer() is now officially
+       deprecated.
+  - (doc/hook/) New directory to document the driver hooks
+       one-per-file.
+  - (func_spec, parse, other files) Removed the compat-mode version
+       of parse_command(); the efun itself is now configured over
+       the config option use-parse-command.
+  - (func_spec, configure, other files) Efuns set_is_wizard(),
+       set_light(), and process_string() can now be configured.
+  - (closure, efuns.c, sprintf.c) Streamlined the conversion of closures
+       to strings.
+  - (bytecode.h) New include to reduce dependencies on exec.h .
+  - (func_spec, actions) New efun match_command().
+
 17-Sep-2002 (Lars Duening)  (3.3.258)
   - (bitstrings.c, swap.c, simulate.h) Removed warnings (reported by Dafire).
   - (comm.c) ECONNREFUSED is recognized as error (suggested by Coogan).

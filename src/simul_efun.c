@@ -43,6 +43,7 @@
 #include "mstrings.h"
 #include "object.h"
 #include "ptrtable.h"
+#include "prolang.h" /* is_undef_function() */
 #include "simulate.h"
 #include "stdstrings.h"
 #include "svalue.h"

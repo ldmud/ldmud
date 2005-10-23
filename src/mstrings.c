@@ -1282,7 +1282,7 @@ mstring_repeat (const string_t *base, size_t num MTRACE_DECL)
 string_t *
 mstring_extract (const string_t *str, size_t start, long end MTRACE_DECL)
 
-/* Aliased to: mstr_extract(str,start,len)
+/* Aliased to: mstr_extract(str,start,end)
  *
  * Create and return a new string made of <str>[<start>..<end>].
  * If <end> is negative, the result is made of <str>[<start>..].

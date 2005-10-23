@@ -1,11 +1,13 @@
 SYNOPSIS
-        int|string modify_command(string cmd)
+        int|string <name>(string cmd)
 
 DESCRIPTION
         After set_modify_command(mob) was called for an interactive
         object iob, all commands for that user will be passed to
-        mob->modify_command(), and the return will then be checked for
-        actions.
+        mob-><name>(), and the return will then be checked for
+        actions. The actual name of the lfun to call is specified
+        by the H_MODIFY_COMMAND_FNAME hook - traditionally it's
+        'modify_command'.
 
         If the result is a string, it is the new command to execute
         instead of the given one. Note that it is not possible to
@@ -19,8 +21,6 @@ DESCRIPTION
 HISTORY
         In 3.2.1@109 the name of the lfun to call must be specified
         using the H_MODIFY_COMMAND_FNAME driver hook.
-        'modify_command' in the above text is therefore to read as
-        placeholder for the real name.
 
 
 SEE ALSO

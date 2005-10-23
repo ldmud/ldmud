@@ -47,7 +47,7 @@ with_wizlist_file=no
 enable_access_control=no
 
 # --- Language ---
-enable_supply_parse_command=no
+enable_use_parse_command=no
 enable_use_mysql=no
 enable_use_deprecated=no
 enable_use_pcre=no

@@ -65,7 +65,7 @@
         break
         switch
         sscanf
-#ifdef SUPPLY_PARSE_COMMAND
+#ifdef USE_PARSE_COMMAND
         parse_command
 #endif
         local
@@ -568,6 +568,7 @@ mixed  *command_stack();
 int     command_stack_depth();
 void    disable_commands();
 void    enable_commands();
+mixed * match_command(string, object);
 int     execute_command(string, object, object);
 int     living(null|object);
 int     notify_fail(string|closure);
@@ -595,7 +596,6 @@ string  getuid(object default: F_THIS_OBJECT);
          * When running in native mode, both are invisible.
          */
 
-int     transfer(object, object|string) "replace by a simul-efun";
 string  creator F_GETUID (object);
 
 
@@ -627,27 +627,39 @@ int     db_insert_id(int);
 #endif /* USE_MYSQL */
 
 
-/* The following functions are optional. Comment out the ones not wanted.
- * Beware that some may be used in mudlib 2.4.5.
+/* The following functions are optional and can be configured out.
  */
 
         /* Arrays and Mappings */
 
         /* Strings */
 
+#ifdef USE_PROCESS_STRING
 string  process_string(string);
+#endif
 
         /* Objects */
 
+#ifdef USE_SET_LIGHT
 int     set_light(int);
+#endif
+
+#ifdef USE_SET_IS_WIZARD
 int     set_is_wizard(object, int default: F_CONST1);
+#endif
 
 
         /* Obsolete and deprecated functions */
 
 #ifdef USE_DEPRECATED
 
-#endif /* USE_DEPRECTED */
+        /* Functions only used in compatibility mode.
+         * When running in native mode, both are invisible.
+         */
+
+int     transfer(object, object|string) "replace by a simul-efun";
+
+#endif /* USE_DEPRECATED */
 
 
 /***************************************************************************/

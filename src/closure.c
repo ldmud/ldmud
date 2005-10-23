@@ -3106,7 +3106,7 @@ compile_value (svalue_t *value, int opt_flags)
                     break;
                   }
 
-#ifdef SUPPLY_PARSE_COMMAND
+#ifdef USE_PARSE_COMMAND
                 /* ({#'parse_command, <data>, <fmt>, <data>, <lvalue1>, ..., <lvalueN> })
                  */
                 case F_PARSE_COMMAND:
@@ -4961,6 +4961,286 @@ is_undef_closure (svalue_t *sp)
     return (sp->type == T_CLOSURE)
         && (sp->x.closure_type == F_UNDEF+CLOSURE_EFUN);
 } /* is_undef_closure() */
+
+/*-------------------------------------------------------------------------*/
+string_t *
+closure_to_string (svalue_t * sp)
+
+/* Convert the closure <sp> into a printable string and return it.
+ */
+
+{
+    char buf[1024];
+    string_t *rc;
+    lambda_t *l;
+    object_t *ob;
+    int ix;
+
+    rc = NULL;
+    buf[sizeof(buf)-1] = '\0';
+    strcpy(buf, "#'");
+
+    if (sp->type != T_CLOSURE)
+    {
+        fatal("closure_to_string() called for non-closure value %hd:%hd\n"
+             , sp->type, sp->x.generic
+            );
+        /* NOTREACHED */
+        return NULL;
+    }
+
+    l = sp->u.lambda;
+
+    switch(sp->x.closure_type)
+    {
+
+    case CLOSURE_IDENTIFIER: /* Variable Closure */
+      {
+        if (l->ob->flags & O_DESTRUCTED)
+        {
+            strcat(buf, "<local variable in destructed object>");
+            break;
+        }
+
+#ifndef USE_NEW_INLINES
+        if (l->function.index == VANISHED_VARCLOSURE_INDEX)
+#else /* USE_NEW_INLINES */
+        if (l->function.var_index == VANISHED_VARCLOSURE_INDEX)
+#endif /* USE_NEW_INLINES */
+        {
+            strcat(buf, "<local variable from replaced program>");
+        }
+
+        /* We need the program resident */
+        if (O_PROG_SWAPPED(l->ob))
+        {
+            l->ob->time_of_ref = current_time;
+            if (load_ob_from_swap(l->ob) < 0)
+                error("Out of memory.\n");
+        }
+
+        sprintf(buf, "#'%s->%s"
+                   , get_txt(l->ob->name)
+#ifndef USE_NEW_INLINES
+                   , get_txt(l->ob->prog->variable_names[l->function.index].name)
+#else /* USE_NEW_INLINES */
+                   , get_txt(l->ob->prog->variable_names[l->function.var_index].name)
+#endif /* USE_NEW_INLINES */
+              );
+        break;
+      }
+
+    case CLOSURE_LFUN: /* Lfun closure */
+    case CLOSURE_ALIEN_LFUN:
+      {
+        program_t *prog;
+        fun_hdr_p  fun;
+        funflag_t  flags;
+        string_t  *function_name;
+        inherit_t *inheritp;
+        Bool       is_inherited;
+
+        if (sp->x.closure_type == CLOSURE_LFUN)
+        {
+            ob = l->ob;
+#ifndef USE_NEW_INLINES
+            ix = l->function.index;
+#else /* USE_NEW_INLINES */
+            ix = l->function.lfun.index;
+#endif /* USE_NEW_INLINES */
+        }
+        else
+        {
+            ob = l->function.alien.ob;
+            ix = l->function.alien.index;
+            /* TODO: ix: After a replace_program, can this index
+             * TODO:: be negative?
+             */
+        }
+
+        if (ob->flags & O_DESTRUCTED)
+        {
+            strcat(buf, "<local function in destructed object>");
+            break;
+        }
+
+        /* Get the program resident */
+        if (O_PROG_SWAPPED(ob)) {
+            ob->time_of_ref = current_time;
+            if (load_ob_from_swap(ob) < 0)
+                error("Out of memory\n");
+        }
+
+        /* Find the true definition of the function */
+        prog = ob->prog;
+        flags = prog->functions[ix];
+        is_inherited = MY_FALSE;
+        while (flags & NAME_INHERITED)
+        {
+            is_inherited = MY_TRUE;
+            inheritp = &prog->inherit[flags & INHERIT_MASK];
+            ix -= inheritp->function_index_offset;
+            prog = inheritp->prog;
+            flags = prog->functions[ix];
+        }
+
+        /* Copy the function name pointer (a shared string) */
+        fun = prog->program + (flags & FUNSTART_MASK);
+        memcpy(&function_name, FUNCTION_NAMEP(fun)
+              , sizeof function_name
+        );
+
+        strcat(buf, get_txt(ob->name));
+        if (is_inherited)
+        {
+            size_t len;
+
+            strcat(buf, "(");
+            strcat(buf, get_txt(prog->name));
+            buf[strlen(buf)-2] = '\0'; /* Remove the '.c' after the program name */
+            strcat(buf, ")");
+        }
+        strcat(buf, "->");
+        strcat(buf, get_txt(function_name));
+        break;
+      }
+
+    case CLOSURE_UNBOUND_LAMBDA: /* Unbound-Lambda Closure */
+    case CLOSURE_PRELIMINARY:    /* Preliminary Lambda Closure */
+      {
+          if (sp->x.closure_type == CLOSURE_PRELIMINARY)
+              sprintf(buf, "<prelim lambda %p>", l);
+          else
+              sprintf(buf, "<free lambda %p>", l);
+          break;
+      }
+
+    case CLOSURE_LAMBDA:         /* Lambda Closure */
+    case CLOSURE_BOUND_LAMBDA:   /* Bound-Lambda Closure */
+      {
+          if (sp->x.closure_type == CLOSURE_BOUND_LAMBDA)
+              sprintf(buf, "<bound lambda %p:", l);
+          else
+              sprintf(buf, "<lambda %p:", l);
+
+          ob = l->ob;
+
+          if (!ob)
+          {
+              strcat(buf, "{null}>");
+          }
+          else
+          {
+              if (ob->flags & O_DESTRUCTED)
+                  strcat(buf, "{dest}");
+              strcat(buf, "/");
+              strcat(buf, get_txt(ob->name));
+              strcat(buf, ">");
+          }
+          break;
+      }
+
+    default:
+      {
+        int type = sp->x.closure_type;
+
+        if (type >= 0)
+            error("Bad arg 1 to to_string(): closure type %d.\n"
+                 , sp->x.closure_type);
+        else
+        {
+            string_t *rc;
+            switch(type & -0x0800)
+            {
+            case CLOSURE_OPERATOR:
+              {
+                char *str = NULL;
+                switch(type - CLOSURE_OPERATOR)
+                {
+                case F_POP_VALUE:
+                    str = ",";
+                    break;
+
+                case F_BBRANCH_WHEN_NON_ZERO:
+                    str = "do";
+                    break;
+
+                case F_BBRANCH_WHEN_ZERO:
+                    str = "while";
+                    break;
+
+                case F_BRANCH:
+                    str = "continue";
+                    break;
+
+                case F_CSTRING0:
+                    str = "default";
+                    break;
+
+                case F_BRANCH_WHEN_ZERO:
+                    str = "?";
+                    break;
+
+                case F_BRANCH_WHEN_NON_ZERO:
+                    str = "?!";
+                    break;
+
+                case F_RANGE:
+                    str = "[..]";
+                    break;
+
+                case F_NR_RANGE:
+                    str = "[..<]";
+                    break;
+
+                case F_RR_RANGE:
+                    str = "[<..<]";
+                    break;
+
+                case F_RN_RANGE:
+                    str = "[<..]";
+                    break;
+
+                case F_MAP_INDEX:
+                    str = "[,]";
+                    break;
+
+                case F_NX_RANGE:
+                    str = "[..";
+                    break;
+
+                case F_RX_RANGE:
+                    str = "[<..";
+                    break;
+
+                }
+
+                if (str)
+                {
+                    strcat(buf, str);
+                    break;
+                }
+                type += CLOSURE_EFUN - CLOSURE_OPERATOR;
+              }
+            /* default action for operators: FALLTHROUGH */
+
+            case CLOSURE_EFUN:
+                strcat(buf, instrs[type - CLOSURE_EFUN].name);
+                break;
+
+            case CLOSURE_SIMUL_EFUN:
+                strcat(buf, "<sefun>");
+                strcat(buf, instrs[type - CLOSURE_SIMUL_EFUN].name);
+                break;
+            }
+            break;
+        } /* if (type) */
+      } /* case default */
+    } /* switch(closure_type) */
+
+    memsafe(rc = new_mstring(buf), strlen(buf), "converted lambda");
+    return rc;
+} /* closure_to_string() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *

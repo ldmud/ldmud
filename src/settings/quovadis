@@ -12,7 +12,7 @@ exit 1
 enable_compat_mode=yes
 enable_strict_euids=no
 
-enable_supply_parse_command=yes
+enable_use_parse_command=yes
 enable_initialization_by___init=yes
 enable_use_system_crypt=no
 enable_use_mysql=no

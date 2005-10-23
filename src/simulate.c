@@ -45,7 +45,6 @@
 #include "gcollect.h"
 #include "heartbeat.h"
 #include "interpret.h"
-#include "instrs.h"  /* F_SET_LIGHT */
 #include "lex.h"
 #include "main.h"
 #include "mapping.h"
@@ -2392,7 +2391,7 @@ destruct (object_t *ob)
         if (ob->super->sent)
             remove_action_sent(ob, ob->super);
 
-#       ifdef F_SET_LIGHT
+#       ifdef USE_SET_LIGHT
             add_light(ob->super, - ob->total_light);
 #       endif
 

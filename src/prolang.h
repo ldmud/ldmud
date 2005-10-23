@@ -4,7 +4,7 @@
 #include "driver.h"
 #include "typedefs.h"
 
-#include "exec.h"  /* fulltype_t, vartype_t */
+#include "exec.h"  /* fulltype_t, vartype_t, fun_hdr_p */
 
 /* --- Variables --- */
 extern int yychar;
@@ -33,6 +33,7 @@ extern void store_line_number_backward(int offset);
 extern mp_uint store_include_info(char *name, char *file, char delim, int inc_depth);
 extern void store_include_end(mp_uint inc_offset, int include_line);
 extern void compile_file(void);
+extern Bool is_undef_function (fun_hdr_p fun);
 
 #if defined( DEBUG ) && defined ( TRACE_CODE )
 extern void set_code_window(void);

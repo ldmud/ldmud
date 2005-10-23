@@ -56,7 +56,7 @@ with_access_file=etc/ACCESS.ALLOW
 enable_initialization_by___init=yes
 
 # we do not need those old commands
-enable_supply_parse_command=no
+enable_use_parse_command=no
 
 # its better as getting errors
 enable_dynamic_costs=yes
