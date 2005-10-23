@@ -293,9 +293,15 @@ extern int inet_volume;
 extern void  initialize_host_ip_number(void);
 extern void  prepare_ipc(void);
 extern void  ipc_remove(void);
+#ifdef USE_PTHREAD
 extern void interactive_lock (interactive_t *ip);
 extern void interactive_unlock (interactive_t *ip);
 extern void interactive_cleanup (interactive_t *ip);
+#else
+extern void interactive_lock (interactive_t *ip UNUSED);
+extern void interactive_unlock (interactive_t *ip UNUSED);
+extern void interactive_cleanup (interactive_t *ip UNUSED);
+#endif /* USE_PTHREAD */
 extern void comm_cleanup_interactives (void);
 extern void  add_message VARPROT((const char *, ...), printf, 1, 2);
 extern void  flush_all_player_mess(void);

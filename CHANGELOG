@@ -1,7 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-2%-Sep-2002 (Lars Duening)  (3.3.264)
+25-Sep-2002 (Lars Duening)  (3.3.265)
+  - (comm, gcollect.c) Removed compiler warnings, and a crash
+      in pthreads thread cleanup (reported by Dafire)
+
+25-Sep-2002 (Lars Duening)  (3.3.264)
   - (interpret.c) The LPC tracing code crashed when used with lambda
       closures or with call_resolved() (reported by Nostradamus).
 

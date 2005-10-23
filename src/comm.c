@@ -1125,7 +1125,9 @@ interactive_lock (interactive_t *ip)
 #ifdef USE_PTHREAD
     pthread_mutex_lock(&ip->write_mutex);
 #else
-    ip; /* to avoid a 'unused' warning */
+#  ifdef __MWERKS__
+#      pragma unused(ip)
+#  endif
 #endif
 } /* interactive_lock() */
 
@@ -1140,7 +1142,9 @@ interactive_unlock (interactive_t *ip)
 #ifdef USE_PTHREAD
     pthread_mutex_unlock(&ip->write_mutex);
 #else
-    ip; /* to avoid a 'unused' warning */
+#  ifdef __MWERKS__
+#      pragma unused(ip)
+#  endif
 #endif
 } /* interactive_unlock() */
 
@@ -1204,7 +1208,9 @@ interactive_cleanup (interactive_t *ip)
         xfree(tmp);
     } /* for (tmp) */
 #else
-    ip; /* to avoid a 'unused' warning */
+#  ifdef __MWERKS__
+#      pragma unused(ip)
+#  endif
 #endif
 } /* interactive_cleanup() */
 
@@ -1304,7 +1310,7 @@ writer_thread_cleanup(void *arg)
 
 {
     interactive_t * ip = (interactive_t *) arg;
-    struct write_buffer_s *buf = ip->write_first, *tmp;
+    struct write_buffer_s *buf = ip->write_first;
 
     while (buf)
     {
@@ -1318,14 +1324,13 @@ writer_thread_cleanup(void *arg)
 
     if (ip->write_current)
     {
-	struct write_buffer_s *next = buf->next;
         ip->write_current->errorno = 0;
         ip->write_current->next = ip->written_first;
         ip->written_first = ip->write_current;
         ip->write_current = NULL;
     }
 
-    fprintf(stderr, "Thread %ld canceled and cleaned up!\n", pthread_self());
+    fprintf(stderr, "Thread %ld canceled and cleaned up!\n", (long)pthread_self());
 } /* writer_thread_cleanup() */
 
 /*-------------------------------------------------------------------------*/

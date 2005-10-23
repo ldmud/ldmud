@@ -547,7 +547,7 @@ call_out_status (strbuf_t *sbuf, Bool verbose)
     }
     else
     {
-        strbuf_addf(sbuf, "call out:\t\t\t%8ld %8ld (current length %ld)\n"
+        strbuf_addf(sbuf, "call out:\t\t\t%8ld %9ld (current length %ld)\n"
                    , num_call, num_call * sizeof (struct call), num_callouts);
     }
 

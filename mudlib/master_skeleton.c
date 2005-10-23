@@ -425,6 +425,8 @@ void disconnect (object obj)
 // The connection will be unbound upon return from this call, so
 // for the time of this call, interactive(ob) will still return TRUE
 // even if the actual network connection has already been lost.
+//
+// This method is not called if the object has been destructed already.
 
 
 //---------------------------------------------------------------------------

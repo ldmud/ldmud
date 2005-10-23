@@ -1095,8 +1095,6 @@ garbage_collection(void)
      */
     for (i = 0 ; i < MAX_PLAYERS; i++)
     {
-        interactive_t *ip;
-
         if (all_players[i] == NULL)
             continue;
 
@@ -1552,8 +1550,6 @@ garbage_collection(void)
      */
     for (i = 0 ; i < MAX_PLAYERS; i++)
     {
-        interactive_t *ip;
-
         if (all_players[i] == NULL)
             continue;
 

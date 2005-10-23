@@ -12,6 +12,9 @@ DESCRIPTION
         return TRUE even if the actual network connection has already
         been lost.
 
+        This method is not called if the object has been destructed
+        already.
+
 SEE ALSO
         connect(M), remove_player(M), remove_interactive(E), exec(E),
         interactive(E)

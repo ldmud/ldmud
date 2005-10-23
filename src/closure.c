@@ -5093,8 +5093,6 @@ closure_to_string (svalue_t * sp)
         strcat(buf, get_txt(ob->name));
         if (is_inherited)
         {
-            size_t len;
-
             strcat(buf, "(");
             strcat(buf, get_txt(prog->name));
             buf[strlen(buf)-2] = '\0'; /* Remove the '.c' after the program name */
@@ -5149,12 +5147,12 @@ closure_to_string (svalue_t * sp)
                  , sp->x.closure_type);
         else
         {
-            string_t *rc;
             switch(type & -0x0800)
             {
             case CLOSURE_OPERATOR:
               {
                 char *str = NULL;
+
                 switch(type - CLOSURE_OPERATOR)
                 {
                 case F_POP_VALUE:

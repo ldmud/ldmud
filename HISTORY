@@ -49,7 +49,6 @@ For a detailed list of all changes see the file CHANGELOG.
     - Master Object:
 
     - Fixed Crashers:
-       + LPC tracing with lambda closures or call_resolved().
 
     - Language:
        + Strings can hold all characters, including '\0'.
@@ -94,7 +93,7 @@ For a detailed list of all changes see the file CHANGELOG.
            regular expression code, or the PCRE package (default).
 
 
-15-Sep-2002 (Lars Duening) -- upcoming Release 3.2.9
+25-Sep-2002 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -318,6 +317,7 @@ For a detailed list of all changes see the file CHANGELOG.
        + Calling a self-destructing closure from limited().
        + Runtime errors in a catch occasionally crashed in the traceback
          collection.
+       + LPC tracing with lambda closures or call_resolved().
 
     - Language:
        + New operators '>>>' and '>>>=' for logical right shifts.
