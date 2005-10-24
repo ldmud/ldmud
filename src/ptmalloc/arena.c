@@ -18,7 +18,7 @@
    write to the Free Software Foundation, Inc., 59 Temple Place - Suite 330,
    Boston, MA 02111-1307, USA.  */
 
-/* $Id: arena.c 1.1 Mon, 30 Dec 2002 14:26:32 -0700 lars $ */
+/* $Id$ */
 
 /* Compile-time constants.  */
 

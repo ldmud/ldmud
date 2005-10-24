@@ -9,7 +9,7 @@
  *------------------------------------------------------------------
  */
 
-#include "driver.h"
+#include "config.h"
 
 #ifdef MALLOC_ptmalloc
 

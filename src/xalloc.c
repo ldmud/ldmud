@@ -26,6 +26,7 @@
 #ifdef MALLOC_LPC_TRACE
 #include "exec.h"
 #include "object.h"
+#include "mstrings.h"
 #endif
 
 /*-------------------------------------------------------------------------*/

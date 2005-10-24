@@ -1,6 +1,14 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+06-Jan-2003 (Lars Duening)  (3.3.351)
+  - (ptmalloc.c) Using driver.h instead of config.h leads to compilation
+       errors on some systems (reported by Gawain).
+  - (smalloc.c, configuration) New configuration option --enable-malloc-check
+       to enable simple malloc checks like the magic words in smalloc (enabled
+       by default). The overhead for this is small, but especially in 
+       a development driver this can catch many memory mis-uses.
+
 05-Jan-2003 (Lars Duening)  (3.3.350)
   - (prolang.y) Corrected another struct related refcount error: function
        return types were freed twice (reported by Dafire).

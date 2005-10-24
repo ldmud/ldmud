@@ -24,7 +24,7 @@
   Doug Lea and adapted to multiple threads/arenas by Wolfram Gloger.
 
 * Version ptmalloc2-20011215
-  $Id: malloc.c 1.1 Mon, 30 Dec 2002 14:26:32 -0700 lars $
+  $Id$
   based on:
   VERSION 2.7.1pre1 Sat May 12 07:41:21 2001  Doug Lea  (dl at gee)
 

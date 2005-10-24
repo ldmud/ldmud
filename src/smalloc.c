@@ -19,9 +19,9 @@
  *
  * Allocations are measured in 'word_t's which are the same size as void*.
  *
- * For MALLOC_TRACE and MALLOC_LPC_TRACE the allocated blocks are tagged
- * with magic words. This costs time and memory, but helps greatly in
- * debugging a faulty driver.
+ * For MALLOC_CHECK the allocated blocks are tagged with magic words. This
+ * costs a bit of time and memory, but is a good defense against the most
+ * basic memory misuses.
  *
  * Small blocks are allocations of up to SMALL_BLOCK_MAX*4 Bytes, currently
  * 128 Bytes. Such blocks are initially allocated from large memory blocks,
@@ -159,12 +159,12 @@
 
 #define M_SIZE 0  /* (word_t) Size in word_t, plus some flags */
 
-#ifdef MALLOC_TRACE
+#ifdef MALLOC_CHECK
 #    define M_OVERHEAD (2)
 #    define M_MAGIC  1  /* (word_t) The magic word */
 #else
 #    define M_OVERHEAD (1)
-#endif /* MALLOC_TRACE */
+#endif /* MALLOC_CHECK */
 
 #define M_LINK  M_OVERHEAD   /* (word_t*) Link for the free lists */
 
@@ -221,7 +221,7 @@
 #define M_MASK      0x0fffffff  /* Mask for the size, measured in word_t's */
 
 
-#ifdef MALLOC_TRACE
+#ifdef MALLOC_CHECK
 
 /* The magic words for free and allocated small blocks.
  * Every small block size should get its own magic words, but
@@ -272,7 +272,7 @@ static word_t samagic[]
 #define LFMAGIC 0xdfaff2ee  /* Magic word for free large blocks */
 #define LAMAGIC 0xf460146e  /* Magic word for allocated large blocks */
 
-#endif /* MALLOC_TRACE */
+#endif /* MALLOC_CHECK */
 
 /*-------------------------------------------------------------------------*/
 /* Debugging macros */
@@ -727,7 +727,7 @@ available_memory(void)
     count_up(small_free_stat, size); \
     small_free[SIZE_INDEX_VALUE(size)]++;
 
-#ifdef MALLOC_TRACE
+#ifdef MALLOC_CHECK
 #define MAKE_SMALL_FREE(block,size)  do {\
     MAKE_SMALL_FREE_BASIC(block,size); \
     block[M_MAGIC] = SIZE_MOD_INDEX(sfmagic, size); \
@@ -738,15 +738,15 @@ available_memory(void)
   } while(0)
 #endif
 
-/* Macro MAKE_SMALL_TRACE(block, size)
- * Macro MAKE_SMALL_TRACE_UNCHECKED(block, size)
- * If MALLOC_TRACE is defined, fill in the TRACE information
+/* Macro MAKE_SMALL_CHECK(block, size)
+ * Macro MAKE_SMALL_CHECK_UNCHECKED(block, size)
+ * If MALLOC_CHECK is defined, fill in the CHECK information
  * in the small block <block> of size <size> (in bytes incl overhead).
  * The _UNCHECKED macro is like the basic macro, except that it doesn't
  * check the M_MAGIC word before setting it.
  */
-#ifdef MALLOC_TRACE
-#  define MAKE_SMALL_TRACE(block, size) do { \
+#ifdef MALLOC_CHECK
+#  define MAKE_SMALL_CHECK(block, size) do { \
         if (block[M_MAGIC] != SIZE_MOD_INDEX(sfmagic, size) ) \
         { \
             in_malloc = 0; \
@@ -758,12 +758,12 @@ available_memory(void)
         } \
         block[M_MAGIC] = SIZE_MOD_INDEX(samagic, size); \
       } while(0)
-#  define MAKE_SMALL_TRACE_UNCHECKED(block, size) do { \
+#  define MAKE_SMALL_CHECK_UNCHECKED(block, size) do { \
         block[M_MAGIC] = SIZE_MOD_INDEX(samagic, size); \
       } while(0)
 #else
-#  define MAKE_SMALL_TRACE(block, size) (void)0
-#  define MAKE_SMALL_TRACE_UNCHECKED(block, size) (void)0
+#  define MAKE_SMALL_CHECK(block, size) (void)0
+#  define MAKE_SMALL_CHECK_UNCHECKED(block, size) (void)0
 #endif
 
 /*-------------------------------------------------------------------------*/
@@ -832,7 +832,7 @@ mem_alloc (size_t size)
         count_back(small_free_stat, size);
 
         /* Fill in the header (M_SIZE is already ok) */
-        MAKE_SMALL_TRACE(temp,size);
+        MAKE_SMALL_CHECK(temp,size);
 
         temp += M_OVERHEAD;
 
@@ -906,7 +906,7 @@ mem_alloc (size_t size)
 
                 /* Fill in the header */
                 this[M_SIZE] = wsize | (M_GC_FREE|M_REF);
-                MAKE_SMALL_TRACE_UNCHECKED(this,size);
+                MAKE_SMALL_CHECK_UNCHECKED(this,size);
 
                 this += M_OVERHEAD;
 
@@ -956,7 +956,7 @@ mem_alloc (size_t size)
 
             /* Initialize the header of the new block */
             pt[M_SIZE] = wsize | (M_GC_FREE|M_REF);
-            MAKE_SMALL_TRACE_UNCHECKED(pt, size);
+            MAKE_SMALL_CHECK_UNCHECKED(pt, size);
 
             pt += M_OVERHEAD;
 
@@ -1095,7 +1095,7 @@ mem_alloc (size_t size)
 
     /* Fill in the header of the block */
     *s_size_ptr(next_unused) = size / SINT | (M_GC_FREE|M_REF);
-    MAKE_SMALL_TRACE_UNCHECKED(next_unused, size);
+    MAKE_SMALL_CHECK_UNCHECKED(next_unused, size);
 
     /* Reduce the free size in the small chunk */
     next_unused += size / SINT;
@@ -1145,7 +1145,7 @@ sfree (POINTER ptr)
     count_up(small_free_stat, i * SINT);
     i -=  1 + T_OVERHEAD;
 
-#ifdef MALLOC_TRACE
+#ifdef MALLOC_CHECK
     if (block[M_MAGIC] == sfmagic[i % NELEM(samagic)])
     {
         in_malloc = 0;
@@ -1440,7 +1440,7 @@ remove_from_free_list (word_t *ptr)
 {
     struct free_block *p, *q, *r, *s, *t;
 
-#ifdef MALLOC_TRACE
+#ifdef MALLOC_CHECK
     if (ptr[M_MAGIC] != LFMAGIC)
     {
         in_malloc = 0;
@@ -1780,7 +1780,7 @@ add_to_free_list (word_t *ptr)
      */
 
     fake((do_check_avl(),"add_to_free_list called"));
-#ifdef MALLOC_TRACE
+#ifdef MALLOC_CHECK
     ptr[M_MAGIC] = LFMAGIC;
 #endif
     size = *ptr & M_MASK;
@@ -2359,7 +2359,7 @@ found_fit:
 
     mark_block(ptr);
     fake("built allocated block");
-#ifdef MALLOC_TRACE
+#ifdef MALLOC_CHECK
     ptr[M_MAGIC] = LAMAGIC;
 #endif
     MADVISE(ptr+M_OVERHEAD, orig_size);
@@ -2383,7 +2383,7 @@ large_free (char *ptr)
     size = *p & M_MASK;
     count_back(large_alloc_stat, size);
 
-#ifdef MALLOC_TRACE
+#ifdef MALLOC_CHECK
     if (p[M_MAGIC] == LFMAGIC)
     {
         in_malloc = 0;
@@ -2702,7 +2702,7 @@ mem_test_ref (POINTER p)
 } /* mem_test_ref() */
 
 
-#ifdef MALLOC_TRACE
+#ifdef MALLOC_CHECK
 
 /*-------------------------------------------------------------------------*/
 Bool
@@ -2741,7 +2741,7 @@ mem_is_freed (void *p, p_uint minsize)
     return block[M_MAGIC] != samagic[i % NELEM(samagic)];
 } /* is_freed() */
 
-#endif /* MALLOC_TRACE */
+#endif /* MALLOC_CHECK */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -3331,7 +3331,7 @@ mem_consolidate (void)
                 count_up(small_free_stat, size * SINT);
                 small_free[SMALL_BLOCK_MAX]++;
 
-#ifdef MALLOC_TRACE
+#ifdef MALLOC_CHECK
                 block[M_MAGIC] = SIZE_MOD_INDEX(sfmagic, size * SINT);
 #endif
             }

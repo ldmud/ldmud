@@ -39,18 +39,6 @@
 #  define MALLOC_smalloc
 #endif
 
-#if defined(MALLOC_sysmalloc)
-   /* TODO: Implement allocation tracing for sysmalloc. This
-    * TODO:: would also allow us a generic malloced_size().
-    */
-#  if defined(MALLOC_TRACE)
-#    undef MALLOC_TRACE
-#  endif
-#  if defined(MALLOC_LPC_TRACE)
-#    undef MALLOC_LPC_TRACE
-#  endif
-#endif
-
 /* Do we have full GC support? */
 
 #if defined(MALLOC_smalloc)

@@ -25,7 +25,7 @@
 #endif
 
 /*
-  $Id: malloc.h 1.1 Mon, 30 Dec 2002 14:26:32 -0700 lars $
+  $Id$
   `ptmalloc2', a malloc implementation for multiple threads without
   lock contention, by Wolfram Gloger <wg@malloc.de>.
 

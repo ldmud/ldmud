@@ -1677,14 +1677,18 @@ options (void)
 #else
         , "unknown malloc"
 #endif
+#if defined(MALLOC_CHECK) || defined(MALLOC_TRACE) || defined(MALLOC_LPC_TRACE)
+              " ("
+#if defined(MALLOC_CHECK)
+                " MALLOC_CHECK"
+#endif
 #if defined(MALLOC_TRACE)
-#    if defined(MALLOC_LPC_TRACE)
-              " (trace enabled, lpc-trace enabled)"
-#    else
-              " (trace enabled)"
-#    endif
-#elif defined(MALLOC_LPC_TRACE)
-              " (lpc-trace enabled)"
+                " MALLOC_TRACE"
+#endif
+#if defined(MALLOC_LPC_TRACE)
+                " MALLOC_LPC_TRACE"
+#endif
+              " )"
 #endif
         , RESERVED_USER_SIZE
         , RESERVED_MASTER_SIZE

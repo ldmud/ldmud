@@ -365,6 +365,12 @@
  */
 #define MAX_MALLOCED         0x4000000
 
+/* Define this to annotate all allocations with a magic word to find
+ * simple misuses of memory (like multiple frees).
+ * Supported by: MALLOC_smalloc
+ */
+#define MALLOC_CHECK
+
 /* Define this to annotate all allocations with file:line of the driver
  * source responsible for it.
  * Supported by: MALLOC_smalloc

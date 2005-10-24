@@ -194,6 +194,12 @@ enable_compat_mode=no
 
 with_master_name=secure/master
 
+# Define this to annotate all allocations with a magic word to find
+# simple misuses of memory (like multiple frees).
+# Supported by: MALLOC_smalloc
+
+enable_malloc_check=yes
+
 # Enable this to annotate all allocations with 'file:line' of the
 # driver source allocating it.
 # Supported by: MALLOC_smalloc
