@@ -65,8 +65,15 @@
  * TODO:: from the backend loop to write the data. Also  don't
  * TODO:: immediately discard EWOULDBLOCK-failed messages.
 #endif
+ *
+ * TODO: Fiona says: The telnet code is frustrating. It would be better if
+ * TODO:: the common handling of e.g. TELNET_NAWS is offered by hooks,
+ * TODO:: as the Anarres version of MudOS does. This would mean a rewrite.
  *---------------------------------------------------------------------------
  */
+
+#define SAVE_NOECHO       /* TODO: Define to enable safe NOECHO mode */
+#define SIMULATE_CHARMODE /* TODO: Even linemode clients stay in charmode */
 
 #include "driver.h"
 #include "typedefs.h"
@@ -571,6 +578,9 @@ decode_noecho (char noecho)
     if (noecho & CHARMODE) strcat(buf, "CHARMODE, ");
     if (noecho & NOECHO_ACK) strcat(buf, "NOECHO_ACK, ");
     if (noecho & CHARMODE_ACK) strcat(buf, "CHARMODE_ACK, ");
+#ifdef SAVE_NOECHO
+    if (noecho & NOECHO_DELAYED) strcat(buf, "NOECHO_DELAYED, ");
+#endif
     if (noecho & NOECHO_STALE) strcat(buf, "NOECHO_STALE, ");
     if (noecho & IGNORE_BANG) strcat(buf, "IGNORE_BANG");
     strcat(buf, ")");
@@ -2084,7 +2094,7 @@ reset_input_buffer (interactive_t *ip)
 {
     if (ip->command_start)
     {
-        DTN(("reset input buffer: cmd_start %d, tn_start %d, tn_end %d\n", ip->ob->name,  ip->command_start, ip->tn_start, ip->tn_end));
+        DTN(("reset input buffer: cmd_start %d, tn_start %d, tn_end %d\n", ip->command_start, ip->tn_start, ip->tn_end));
         ip->tn_start -= ip->command_start;
         ip->tn_end -= ip->command_start;
         if (ip->tn_start < 0)
@@ -2865,14 +2875,20 @@ get_message (char *buff)
              * that 'if', because newlines are never combinable and we always
              * start with a new buffer for it!
              *
+#ifndef SIMULATE_CHARMODE
              * TODO: I dont think that it is nessesary to disable charmode if
-             * TODO:: the client refuses to use it. The disadvantage is a
-             * TODO:: confused lpc object (which could not know ot gets
-             * TODO:: linemode-lines). The charmode code does work with
-             * TODO:: clients in linemode.
+             * TODO:: the client refuses to use it. The disadvantage of the
+             * TODO:: present behaviour is a confused lpc object (which could
+             * TODO:: not know if it gets linemode-lines). The charmode code
+             * TODO:: does work with clients in linemode.
+#endif
              */
 
+#ifndef SIMULATE_CHARMODE
             if ((ip->noecho & (CHARMODE_REQ|CHARMODE)) == (CHARMODE_REQ|CHARMODE))
+#else
+            if (ip->noecho & (CHARMODE_REQ|CHARMODE))
+#endif
             {
                 DTN(("CHARMODE_REQ\n"));
                 if (ip->text[0] != input_escape
@@ -2933,7 +2949,7 @@ get_message (char *buff)
                     /* Copy as many characters from the text[] into
                      * the buff[] as possible.
                      */
-                    DTN(("  %d chars ready\n", ip->chars_ready));
+                    DTN(("  %ld chars ready\n", ip->chars_ready));
                     if (end_of_line)
                     {
                         buff[0] = '\n';
@@ -2983,7 +2999,7 @@ get_message (char *buff)
 
                     if (!end_of_line)
                         ip->chars_ready -= destix;
-                    DTN(("  %d chars left ready\n", ip->chars_ready));
+                    DTN(("  %ld chars left ready\n", ip->chars_ready));
                     if (!ip->chars_ready)
                     {
                         /* All the pure data was read, now restore the
@@ -3032,7 +3048,7 @@ get_message (char *buff)
                 }
                 else if (ip->tn_state != TS_READY)
                 {
-                    DT(("'%s'   Escaped input\n", ip->ob->name));
+                    DT(("'%s'   Escaped input\n", get_txt(ip->ob->name)));
                     length = (TN_START_VALID(ip->tn_state)
                               ? ip->tn_start
                               : ip->command_end
@@ -3117,12 +3133,14 @@ get_message (char *buff)
                 }
                 ip->last_time = current_time;
 
+#ifndef SIMULATE_CHARMODE
                 if ((ip->noecho & (CHARMODE_REQ|CHARMODE)) == CHARMODE_REQ)
                 {
-                    DTN(("   clear CHARMODE as it was refused anyway\n", ip->ob->name));
+                    DTN(("   clear CHARMODE as it was refused anyway\n"));
                     ip->noecho &= ~(CHARMODE_REQ|CHARMODE|CHARMODE_ACK);
                     reset_input_buffer(ip);
                 }
+#endif /* SIMULATE_CHARMODE */
 
                 DTN(("--- return with line command ---\n"));
                 return MY_TRUE;
@@ -3646,7 +3664,8 @@ set_noecho (interactive_t *ip, char noecho)
                 if (ip->save_tn_state != TS_INVALID)
                 {
                     DT(("'%s' set_noecho():     0 chars ready, "
-                        "saved state %d\n", ip->ob->name, ip->save_tn_state));
+                        "saved state %d\n", get_txt(ip->ob->name)
+                                          , ip->save_tn_state));
                     ip->chars_ready = 0;
                     ip->tn_state = ip->save_tn_state;
                 }
@@ -3659,6 +3678,9 @@ set_noecho (interactive_t *ip, char noecho)
 
             save = command_giver;
             command_giver = ob;
+#ifdef SAVE_NOECHO
+            ip->noecho &= ~NOECHO_DELAYED;
+#endif
             if (~confirm & old & NOECHO)
             {
                 DTN(("set_noecho():   WONT TELOPT_ECHO\n"));
@@ -3666,8 +3688,21 @@ set_noecho (interactive_t *ip, char noecho)
             }
             else if (confirm & ~old & NOECHO_MASK)
             {
-                DTN(("set_noecho():   WILL TELOPT_ECHO\n"));
-                send_will(TELOPT_ECHO);
+#ifdef SAVE_NOECHO
+                if (confirm & ~old & CHARMODE_MASK)
+                {
+                    ip->noecho |= NOECHO_DELAYED;
+                    ip->noecho &= ~(NOECHO | NOECHO_REQ);
+                    DTN(("set_noecho():   delaying WILL TELOPT_ECHO\n"));
+                }
+                else
+                {
+#endif
+                    DTN(("set_noecho():   WILL TELOPT_ECHO\n"));
+                    send_will(TELOPT_ECHO);
+#ifdef SAVE_NOECHO
+                }
+#endif
             }
             else /* No change in NOECHO mode */ if (confirm & NOECHO)
             {
@@ -4350,8 +4385,10 @@ reply_nil (int option UNUSED)
 static void
 reply_to_do_echo (int option)
 
-/* Send IAC WILL <option> if we were told before to not echo, or
- * send IAC WONT <option> if we are echoing.
+/* Send IAC WONT <option> if we don't want noecho mode.
+ * If we requested WILL ECHO this is the client's reply. Set NOECHO_ACK. Send
+ * no reply.  Send WILL ECHO if we want noecho but where told not to echo
+ * (reactivate noecho mode).
  */
 
 {
@@ -4375,7 +4412,9 @@ reply_to_do_echo (int option)
 static void
 reply_to_dont_echo (int option)
 
-/* Send IAC WONT <option> if we were granted the option before.
+/* If we requested WONT ECHO this is the client's reply. Do nothing.
+ * If client requests us to not echo while we want to, send WONT ECHO and
+ * delete NOECHO flag. The client may turn the option on again later.
  */
 
 {
@@ -4456,7 +4495,21 @@ reply_to_will_sga (int option)
     } else {
         send_dont(option);
     }
-}
+#ifdef SAVE_NOECHO
+    if (ip->noecho & NOECHO_DELAYED)
+    {
+        DT(("'%s' set_noecho():   sending delayed WILL TELOPT_ECHO\n",
+            get_txt(ip->ob->name)));
+        ip->noecho &= ~NOECHO_DELAYED;
+        if (!(ip->noecho & NOECHO_MASK))
+        {
+            send_will(TELOPT_ECHO);
+            ip->noecho |= NOECHO_REQ | NOECHO;
+        }
+        else DT(("'%s'   we don't need to say WILL\n", get_txt(ip->ob->name)));
+    }
+#endif /* SAVE_NOECHO */
+} /* reply_to_will_sga() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -4475,7 +4528,7 @@ reply_to_wont_sga (int option)
             send_dont(option);
         }
         else DTN(("  we don't need to say DONT\n"));
-        DTN(("  noecho: %02x -> %02x\n", ip->ob->name, ip->noecho, (unsigned char)((ip->noecho & ~CHARMODE) | CHARMODE_ACK)));
+        DTN(("  noecho: %02x -> %02x\n", ip->noecho, (unsigned char)((ip->noecho & ~CHARMODE) | CHARMODE_ACK)));
         ip->noecho = (char)((ip->noecho & ~CHARMODE) | CHARMODE_ACK);
           /* Don't reset CHARMODE_REQ here: this WONT can be the answer
            * to the DO SGA we sent before, and the client can still answer
@@ -4591,20 +4644,18 @@ init_telopts (void)
     for (i = NTELOPTS; --i >= 0; ) {
         telopts_do[i] = send_wont;
     }
-    telopts_do[TELOPT_ECHO] = reply_to_do_echo;
     for (i = NTELOPTS; --i >= 0; ) {
         telopts_dont[i] = reply_nil;
     }
-    telopts_dont[TELOPT_ECHO] = reply_to_dont_echo;
     for (i = NTELOPTS; --i >= 0; ) {
         telopts_will[i] = send_dont;
     }
-    telopts_will[TELOPT_SGA] = reply_to_will_sga;
     for (i = NTELOPTS; --i >= 0; ) {
         telopts_wont[i] = reply_nil;
     }
 
-    telopts_wont[TELOPT_SGA] = reply_to_wont_sga;
+    telopts_do[TELOPT_ECHO] = reply_to_do_echo;
+    telopts_dont[TELOPT_ECHO] = reply_to_dont_echo;
 
     telopts_do[TELOPT_TM] = reply_h_telnet_neg;
     telopts_dont[TELOPT_TM] = reply_h_telnet_neg;
@@ -4657,14 +4708,6 @@ init_telopts (void)
     telopts_will[TELOPT_EOR] = reply_h_telnet_neg;
     telopts_wont[TELOPT_EOR] = reply_h_telnet_neg;
 
-    /* TODO: These hooks are never called because there is
-     * TODO:: no IAC DO/DONT/WILL/WONT EOR, just IAC EOR?
-     */
-    telopts_do[EOR] = reply_h_telnet_neg;
-    telopts_dont[EOR] = reply_h_telnet_neg;
-    telopts_will[EOR] = reply_h_telnet_neg;
-    telopts_wont[EOR] = reply_h_telnet_neg;
-
     /* Go Ahead does not make any sense when coupling multiple
      * interactive users. It is debatable if we are sending
      * Go Ahead every time it is appropriate (i.e. , never),
@@ -4680,6 +4723,8 @@ init_telopts (void)
      */
     telopts_do[TELOPT_SGA] = reply_to_do_sga;
     telopts_dont[TELOPT_SGA] = reply_to_dont_sga;
+    telopts_will[TELOPT_SGA] = reply_to_will_sga;
+    telopts_wont[TELOPT_SGA] = reply_to_wont_sga;
 
     /* Mud specific protocols */
 
@@ -5137,7 +5182,7 @@ telnet_neg (interactive_t *ip)
                 svalue_t *svp;
 
                 str = (unsigned char *)&ip->text[ip->tn_start];
-                DTN(("t_n: that is: state TS_SB_IAC got useful SE or SB: neg SB %02x (%d bytes)\n", *str, size));
+                DTN(("t_n: that is: state TS_SB_IAC got useful SE or SB: neg SB %02x (%ld bytes)\n", *str, size));
                 push_number(inter_sp, SB);
                 push_number(inter_sp, *str++);
                 svp = v->item;

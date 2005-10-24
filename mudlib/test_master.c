@@ -25,6 +25,46 @@ void inaugurate_master (int arg)
     set_driver_hook(2, unbound_lambda(({}), "uid"));
     set_driver_hook(3, unbound_lambda(({}), "uid"));
     set_driver_hook(10, "What?\n");
+#ifdef NOECHO
+    set_driver_hook(13, "telnetneg");
+    set_driver_hook(14, "set_noecho");
+#endif
+}
+
+//---------------------------------------------------------------------------
+int old_flag;
+
+void set_noecho(int flag)
+{
+    if (flag & ~old_flag & 1)
+    {
+        write("sending IAC WILL ECHO\n");
+        binary_message(({ 0xff, 0xfb, 0x01 })); // IAC WILL ECHO
+    }
+    else if (old_flag & ~flag & 1)
+    {
+        write("sending IAC WONT ECHO\n");
+        binary_message(({ 0xff, 0xfc, 0x01 })); // IAC WONT ECHO
+    }
+    if (flag & ~old_flag & 2)
+    {
+        write("sending IAC WILL+DO SGA\n");
+        binary_message(({ 0xff, 0xfb, 0x03 })); // IAC WILL SGA
+        binary_message(({ 0xff, 0xfd, 0x03 })); // IAC DO SGA
+    }
+    else if (old_flag & ~flag & 2)
+    {
+        write("sending IAC WONT+DONT SGA\n");
+        binary_message(({ 0xff, 0xfc, 0x03 })); // IAC WONT SGA
+        binary_message(({ 0xff, 0xfe, 0x03 })); // IAC DONT SGA
+    }
+    old_flag = flag;
+} /* set_noecho() */
+
+void telnetneg(int a, int b, int* c)
+{
+    // just ignore, should work with linux telnet
+    printf("got %d %d %O\n", a,b,c);
 }
 
 //---------------------------------------------------------------------------
@@ -118,6 +158,8 @@ static nomask mixed logon ()
     add_action("f_gc", "gc");
     add_action("f_upd", "upd");
     add_action("f_quit", "quit");
+    add_action("f_charmode", "charmode");
+    set_combine_charset("abc");
 
     return 1; // To verify that the connection was accepted.
 }
@@ -183,6 +225,40 @@ void echoline (string text)
     debug_message(sprintf("%O: echoline()\n", this_object()));
     write("You entered: '"+text+"'\n");
 }
+
+//---------------------------------------------------------------------------
+int f_charmode (string arg)
+{
+    write("Entering charmode. Enter 'enough' to stop.\n");
+    input_to("charinput", 2);
+    return 1;
+}
+
+string in;
+
+void charinput(string char)
+{
+    string cmd;
+
+    printf("  Got %O (%s)\n", char
+          , implode(map(to_array(char), #'to_string),","));
+
+    if (!in)
+       in = char;
+    else if (!strlen(char) || char[0] == 13)
+    {
+        cmd = in;
+        in = char[1..];
+    }
+    else
+    {
+        in += char;
+    }
+    if (cmd !="enough")
+        input_to("charinput", 2);
+    else
+        write("Ok.\n");
+} /* charinput() */
 
 //---------------------------------------------------------------------------
 int f_shutdown (string arg)

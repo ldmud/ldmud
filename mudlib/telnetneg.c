@@ -1,5 +1,5 @@
 //
-// Wunderland MUDlib
+// Wunderland Mudlib
 //
 // secure/telnetneg.c  --  Manage telnet negotations
 //
@@ -8,8 +8,8 @@
 // The driver itself is not quite compliant.
 // 
 // $Log: telnetneg.c,v $
-// Revision 1.19  2002/12/03 14:04:42  Fiona
-// forgot 0xff quoting in LM_SLC reply
+// Revision 1.22  2002/12/09 14:45:19  Fiona
+// added explanation on repeated SB TTYPE START
 //
 
 #pragma strict_types
@@ -21,6 +21,8 @@
 #include <thing/properties.h>    // SetProp() proto
 #define NEED_PRIVATE_PROTOTYPES
 #include <telnet.h>
+
+#define GET_ALL_TTYPES
 
 // ******************** Telnet State Machine ********************
 //
@@ -35,6 +37,15 @@
 //
 // The driver communicates with the engine through the H_TELNET_NEG
 // and got_telnet().
+// 
+// Do this in logon() to turn IAC quoting on:
+//   set_connection_charset(({255})*32, 1);
+//
+// Do this in logon() to start telnet negotiation:
+//   set_telnet(WILL, TELOPT_ECHO);
+//   set_telnet(WONT, TELOPT_ECHO);
+// alternatively you could do the following, which is not as robust
+//   set_telnet(WILL, TELOPT_EOR);
 
 nosave mapping ts; // Complete telnet negotation state
 
@@ -403,18 +414,29 @@ mapping transfer_ts(mapping old_ts) {
 
   ts = old_ts;
 
-  // setting is player object based, not connection based :o(
-  set_connection_charset(({255})*32, 1);
   return 0;
 }
 
 // All telnet negotations are sent through this function
 private int send(int* x) {
   string log;
+  int *y, i, j;
+
+  if (x[1] != SB) y = x[3..];
+  else {
+    y = x[3..<3];
+    j = sizeof(y) - 1;
+    for (i = 0; i < j; ++i) { // undo 0xff quoting
+      if (y[i] == IAC && y[i+1] == 0xff) {
+        y[i..i+1] = ({ 0xff });
+        --j;
+      }
+    } 
+  }
 
   log = ts[TS_EXTRA, TSE_LOG];
   if (strlen(log) > 4000) log = "..." + log[<3800..];
-  log += "sent " + telnet_to_text(x[1], x[2], x[1]==SB?x[3..<3]:x[3..]) +"\n";
+  log += "sent " + telnet_to_text(x[1], x[2], y) +"\n";
   ts[TS_EXTRA, TSE_LOG] = log;
 
   return efun::binary_message(x);
@@ -428,7 +450,7 @@ private string telnet_to_text(int command, int option, int* args) {
   d_txt = TELCMD2STRING(IAC) + " " +
     TELCMD2STRING(command) + " " + TELOPT2STRING(option);
   if (args && sizeof(args)) {
-    if (command = SB && option == TELOPT_LINEMODE) {
+    if (command == SB && option == TELOPT_LINEMODE) {
       switch (args[0]) {
         case LM_MODE:
           if (sizeof(args) > 1) {
@@ -473,7 +495,7 @@ private string telnet_to_text(int command, int option, int* args) {
 
     }
 
-    if (command = SB && option != TELOPT_NAWS && option != TELOPT_LINEMODE) {
+    if (command == SB && option != TELOPT_NAWS && option != TELOPT_LINEMODE) {
       d_txt += " " + TELQUAL2STRING(args[0]);
       if (sizeof(args) > 1) d_txt += " (" + 
         implode(map(args[1..], (: sprintf("%02x", $1) :)), ",") + ")";
@@ -505,7 +527,7 @@ private void tel_error(string err) {
 
   log = ts[TS_EXTRA, TSE_LOG];
   if (strlen(log) > 4000) log = "..." + log[<3800..];
-  log += "ERR " + err;
+  log += "ERR " + err + "\n";
   ts[TS_EXTRA, TSE_LOG] = log;
 }
 
@@ -545,16 +567,12 @@ void create() {
 
   set_callback(TELOPT_SGA,      #'neg_sga, #'neg_sga, #'cb_sga, 0);
   set_callback(TELOPT_ECHO,     #'neg_echo, WONT, #'cb_echo, 0);
-
-  // all chars allowed but IAC quoting on
-  set_connection_charset(({255})*32, 1);
-
 }
 
 // Change the NOECHO and CHARMODE state, called indirectly thru input_to()
 void set_noecho(int flag) {
   // Security check needs H_NOECHO to be specified as follows,
-  // with lfun in the driver:
+  // with lfun in the master:
   //
   //   set_driver_hook(H_NOECHO, #'noecho_hook);
   //
@@ -915,28 +933,52 @@ private void sb_ttype(int command, int option, int* optargs) {
   all = ts[option, TS_SB];
   if (!all) {
     all = ({ 0, ({}) });
+    // inform mudlib
     SetProp(P_TTY_TYPE, value);
   }
 
+#ifdef GET_ALL_TTYPES
+  // Clients may provide different terminal types which are synonyms to
+  // the native one (RFC 930). It is also possible to have a client which
+  // switches terminal emulation along with the given (non synonymous)
+  // terminal type names (RFC 1091). All these types are collected if
+  // GET_ALL_TTYPES is defined.
+  //
+  // The drawback is, that the cycling thru all terminal emulations takes
+  // some time, especially on slow links. MS windows 2000's and XP's
+  // telnet have an emulation with key on-off sequences rather that chars.
+  // Commands typed while TTYPE is negotiated may be wrong with that clients.
+ 
   i = member(all[1], value);
   if (i < 0) {
     all[1] += ({ value });
     // get next TTYPE
-    start_sb(WILL, option);
+    if (Q_REMOTE(ts[option, TS_STATE]) == YES) start_sb(WILL, option);
   } else {
     // switch back to first
-    if (++all[0] > 2) {
-      tel_error("could not get initial TTYPE, may be rfc884 client");
-      return;
-    }
     if (i == 0) {
       // ok, initial type re-established
-      ts[TS_EXTRA, TSE_LOG] += "     TTYPE finally set\n";
+      ts[TS_EXTRA, TSE_LOG] += "     TTYPE in client set\n";
       return;
     }
-    start_sb(WILL, option);
+    switch (++all[0]) {
+      case 1:
+        if (Q_REMOTE(ts[option, TS_STATE]) == YES) start_sb(WILL, option);
+        break; // just retry
+      case 2: 
+        tel_error("could not get initial TTYPE, may be rfc930 client");
+        if (value != "vtnt") break;
+        tel_error("trying trick to restart TTYPE list on windows client");
+        set_telnet(DONT, TELOPT_TTYPE);
+        set_telnet(DO, TELOPT_TTYPE);
+        break;
+      case 3:
+        tel_error("giving up on TTYPE");
+        break;
+    }
   }
-      
+#endif
+
   ts[option, TS_SB] = all;
 
   // Some clients cannot answer BINARY correctly. Xterm should be

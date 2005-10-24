@@ -1,7 +1,17 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-05-Dec-2002 (Lars Duening)
+09-Dec-2002 (Lars Duening)  (3.3.323)
+  - (mudlib/telnetneg.c) Updated (thanks, Fiona!)
+  - (mudlib/test_master.c) Added testcode for using charmode (thanks, Fiona!)
+  - (comm) Fiona provided more patches: SAVE_NOECHO, which makes sure that
+      the client can switch to CHARMODE before also setting NOECHO; and
+      SIMULATE_CHARMODE which allows the mudlib to switch to charmode even
+      if the client can do only linemode.
+  - (files.c) Efuns copy_file() and rename() no longer throw errors
+      on failures, but just return a non-0 value (reported by Menaures).
+
+05-Dec-2002 (Lars Duening)  (3.3.322)
   - (config.h, comm, gcollect.c, main.c) Replaced USE_PTHREAD by USE_PTHREADS.
   - (comm.c) Before printing the prompt, current_object is set to NULL
       so that the player's catch_tell() is sure to be able to see the

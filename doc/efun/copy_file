@@ -10,10 +10,13 @@ DESCRIPTION
         the target file to copy the file.
 
         On successfull completion copy_file() will return 0. If any error
-        occurs, 1 is returned, or a runtime is generated.
+        occurs, a non-zero value is returned.
 
 EXAMPLE
         copy_file("/players/wizard/obj.c", "/players/wizard/newobj.c");
+
+HISTORY
+        LDMud 3.2.9 restricted the error behaviour to returning non-0.
 
 SEE ALSO
         mkdir(E), rmdir(E), rm(E), rename(E)

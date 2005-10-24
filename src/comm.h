@@ -232,11 +232,17 @@ struct interactive_s {
  * 'noecho' is a historical misnomer as it actually represents several
  * input modes: echo/noecho, linemode/charmode, and ignore '!' escape.
  * Echo and Charmode additionally distinguish between 'required'
- * and 'granted'.
+ * and 'granted' ('want yes' and 'yes').
  *
- * TODO: I admit that I'm not completely sure what the xxx_REQ, xxx and
- * xxx_ACK really mean - but I'm too tired to find out. Until it
- * becomes important, I simply accept that it works.
+ * xxx_REQ is set when the lib wants this state (independend from telnet state)
+ * xxx     is set when we sent out the appropirate negotiations
+ * xxx_ACK is set when the client agrees
+ *
+ *     xxx   xxx_ACK    telnet state
+ *      0       0        NO
+ *      1       0        WANT YES
+ *      1       1        YES
+ *      0       1        WANT NO (not implemented)
  */
 
 #define CHARMODE_REQ_TO_CHARMODE(x) ((x) << 2)
@@ -288,6 +294,16 @@ struct interactive_s {
    * TODO: We need a _NACK flag, too, for when the negotiation is complete
    * TODO:: but the client refused to go into CHARMODE. For the time being
    * TODO:: we can use (CHARMODE_REQ|CHARMODE) == CHARMODE_REQ as check.
+   */
+#define NOECHO_DELAYED  128
+  /* If NOECHO and CHARMODE is requested, we first try to establish
+   * CHARMODE and set this flag. If CHARMODE is acknoledged we try to
+   * negotiate for NOECHO. This modus operandi is enabled with SAVE_NOECHO.
+   * pro: If the user has a linemode-only client she is not left in
+   *      useless NOECHO mode
+   * con: The NOECHO is delayed by the round trip time for the negotiation
+   *      which could be imense on very slow lines.
+   * TODO: Need to defined SAVE_NOECHO in comm.c for this.
    */
 #define CHARMODE_MASK    (CHARMODE|CHARMODE_ACK)
   /* Mask for active charmode states.

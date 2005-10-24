@@ -17,7 +17,7 @@ DESCRIPTION
         move a directory across filesystems on any system.
 
         On successfull completion rename() will return 0. If any error
-        occurs 1 is returned.
+        occurs, a non-zero value is returned.
 
 EXAMPLE
         rename("/players/wizard/obj.c", "/players/wizard/newobj.c");

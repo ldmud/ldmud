@@ -100,7 +100,7 @@ For a detailed list of all changes see the file CHANGELOG.
            regular expression code, or the PCRE package (default).
 
 
-04-Dec-2002 (Lars Duening) -- Release 3.2.9
+09-Dec-2002 (Lars Duening) -- Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -210,6 +210,8 @@ For a detailed list of all changes see the file CHANGELOG.
            call outs.
        + call_resolved(): Now accepts a destructed object as second parameter
            as it should.
+       + copy_file(), rename(): Just return a non-0 value on errors, but
+           don't throw a runtime error.
        + deep_copy(): Didn't handle quoted arrays properly.
        + filter(), map(): When used on multi-value mappings, the driver did
            not recognize when the called closure kept a reference to the

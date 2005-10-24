@@ -116,21 +116,21 @@ copy_file (const char *from, const char *to, int mode)
 
     if (unlink(to) && errno != ENOENT)
     {
-        error("cannot remove `%s'\n", to);
+        debug_message("copy_file(): cannot remove `%s'\n", to);
         return 1;
     }
 
     ifd = ixopen3(from, O_RDONLY | O_BINARY, 0);
     if (ifd < 0)
     {
-        error("%s: open failed\n", from);
+        debug_message("copy_file(): %s: open failed\n", from);
         return errno;
     }
 
     ofd = ixopen3(to, O_WRONLY | O_CREAT | O_TRUNC | O_BINARY, 0600);
     if (ofd < 0)
     {
-        error("%s: open failed\n", to);
+        debug_message("copy_file(): %s: open failed\n", to);
         close(ifd);
         return 1;
     }
@@ -138,7 +138,7 @@ copy_file (const char *from, const char *to, int mode)
 #ifdef HAVE_FCHMOD
     if (fchmod(ofd, mode))
     {
-        error("%s: fchmod failed\n", to);
+        debug_message("copy_file(): %s: fchmod failed\n", to);
         close(ifd);
         close(ofd);
         unlink(to);
@@ -159,7 +159,7 @@ copy_file (const char *from, const char *to, int mode)
             wrote = write(ofd, bp, len);
             if (wrote < 0)
             {
-                error("%s: write failed\n", to);
+                debug_message("copy_file(): %s: write failed\n", to);
                 close(ifd);
                 close(ofd);
                 unlink(to);
@@ -172,7 +172,7 @@ copy_file (const char *from, const char *to, int mode)
 
     if (len < 0)
     {
-        error("%s: read failed\n", from);
+        debug_message("copy_file(): %s: read failed\n", from);
         close(ifd);
         close(ofd);
         unlink(to);
@@ -181,21 +181,21 @@ copy_file (const char *from, const char *to, int mode)
 
     if (close (ifd) < 0)
     {
-        error("%s: close failed\n", from);
+        debug_message("copy_file(): %s: close failed\n", from);
         close(ofd);
         return 1;
     }
 
     if (close (ofd) < 0)
     {
-        error("%s: close failed\n", to);
+        debug_message("copy_file(): %s: close failed\n", to);
         return 1;
     }
 
 #ifndef HAVE_FCHMOD
     if (chmod (to, mode))
     {
-        error("%s: chmod failed\n", to);
+        debug_message("copy_file(): %s: chmod failed\n", to);
         return 1;
     }
 #endif
@@ -216,7 +216,7 @@ move_file (const char *from, const char *to)
 
     if (lstat(from, &from_stats) != 0)
     {
-        error("%s: lstat failed\n", from);
+        debug_message("move_file(): %s: lstat failed\n", from);
         return 1;
     }
 
@@ -225,13 +225,13 @@ move_file (const char *from, const char *to)
         if (from_stats.st_dev == to_stats.st_dev
           && from_stats.st_ino == to_stats.st_ino)
         {
-            error("'%s' and '%s' are the same file\n", from, to);
+            debug_message("move_file(): '%s' and '%s' are the same file\n", from, to);
             return 1;
         }
 
         if (S_ISDIR (to_stats.st_mode))
         {
-            error("%s: cannot overwrite directory\n", to);
+            debug_message("move_file(): %s: cannot overwrite directory\n", to);
             return 1;
         }
 
@@ -239,7 +239,7 @@ move_file (const char *from, const char *to)
     else if (errno != ENOENT)
     {
         perror("do_move");
-        error("%s: unknown error\n", to);
+        debug_message("move_file(): %s: unknown error\n", to);
         return 1;
     }
 #ifndef RENAME_HANDLES_DIRECTORIES
@@ -263,7 +263,7 @@ move_file (const char *from, const char *to)
 
     if (errno != EXDEV)
     {
-        error("cannot move '%s' to '%s'\n", from, to);
+        debug_message("move_file(): cannot move '%s' to '%s'\n", from, to);
         return 1;
     }
 
@@ -271,7 +271,8 @@ move_file (const char *from, const char *to)
 
     if (!S_ISREG(from_stats.st_mode))
     {
-        error("cannot move '%s' across filesystems: Not a regular file\n", from);
+        debug_message("move_file(): cannot move '%s' across filesystems: "
+                      "Not a regular file\n", from);
         return 1;
     }
 
@@ -280,7 +281,7 @@ move_file (const char *from, const char *to)
 
     if (unlink(from))
     {
-        error("cannot remove '%s'\n", from);
+        debug_message("move_file(): cannot remove '%s'\n", from);
         return 1;
     }
     FCOUNT_DEL(from);
@@ -513,10 +514,11 @@ f_copy_file (svalue_t *sp)
  * for the target name to copy the file.
  *
  * On successfull completion copy_file() will return 0. If any error
- * occurs, 1 is returned, or a runtime is generated.
+ * occurs, a non-0 value is returned.
  *
  * TODO: Add two more args: start, length to implement slicing?
  * TODO:: See f-981229-10 "truncate_file()".
+ * TODO: Return useful error messages.
  */
 
 {
@@ -1408,7 +1410,8 @@ f_rename (svalue_t *sp)
  * You must have write permission for from to rename the file.
  *
  * On successfull completion rename() will return 0. If any error
- * occurs 1 is returned.
+ * occurs, a non-0 value is returned.
+ * TODO: Return useful error messages.
  */
 
 {
