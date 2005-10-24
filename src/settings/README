@@ -33,7 +33,8 @@ The provided settings:
   quovadis:        settings for Quo Vadis
   silberland:      settings for SilberLand
   sticklib:        settings for StickLib
-  theland:         settings for The Land.
+  theland:         settings for The Land
+  traumland:       settings for Traumland
   tubmud:          settings for TubMud
   unitopia:        settings for UNItopia
   wunderland:      settings for WunderLand

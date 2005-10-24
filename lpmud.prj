@@ -37,12 +37,12 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 336)
-(Parent-Version lpmud 3-3 335)
-(Version-Log "Corrected the MAX_MALLOC tracing in xalloc.c")
+(Project-Version lpmud 3-3 337)
+(Parent-Version lpmud 3-3 336)
+(Version-Log "Throw an error if the H_NOTIFY_FAIL hook is missing.")
 (New-Version-Log
 "")
-(Checkin-Time "Wed, 18 Dec 2002 20:11:33 -0700")
+(Checkin-Time "Fri, 20 Dec 2002 21:31:54 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -79,7 +79,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.55 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.399 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.400 644))
   (HISTORY (lpmud/f/49_HISTORY 1.292 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.19 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -95,7 +95,7 @@
   (src/autoconf/configure.in (lpmud/d/7_configure. 1.20.1.9.1.55 644))
   (src/autoconf/acconfig.h (lpmud/d/10_acconfig.h 1.6.1.4 644))
 
-  (src/settings/README (lpmud/c/22_README 1.14.1.12 644))
+  (src/settings/README (lpmud/c/22_README 1.14.1.13 644))
   (src/settings/default (lpmud/c/23_default 1.13.1.5.1.29 744))
   (src/settings/native (lpmud/c/9_native 1.6 744))
   (src/settings/compat (lpmud/c/10_compat 1.7 744))
@@ -123,6 +123,7 @@
   (src/settings/sticklib (lpmud/d/14_sticklib 1.2.1.1.1.4 744))
   (src/settings/theland (lpmud/a/b/12_spin 1.6 744))
   (src/settings/tubmud (lpmud/c/27_tubmud 1.7.1.11 744))
+  (src/settings/traumland (lpmud/c/b/35_traumland 1.1 744))
   (src/settings/unitopia (lpmud/c/7_unitopia 1.6.1.4.1.14 744))
   (src/settings/wunderland (lpmud/d/24_wunderland 1.3.1.7 744))
 
@@ -133,11 +134,11 @@
   (src/access_check.c (lpmud/d/14_access_che 1.15.1.4 644))
   (src/alloca.c (lpmud/d/13_alloca.c 1.10 644))
   (src/actions.h (lpmud/d/11_actions.h 1.6.1.7 644))
-  (src/actions.c (lpmud/d/12_actions.c 1.15.1.38 644))
+  (src/actions.c (lpmud/d/12_actions.c 1.15.1.39 644))
   (src/array.h (lpmud/f/47_array.h 1.18.1.21 644))
   (src/array.c (lpmud/d/12_array.c 1.46.1.47.1.1 644))
   (src/backend.h (lpmud/f/46_backend.h 1.20.1.7 644))
-  (src/backend.c (lpmud/d/6_backend.c 1.68.1.35.1.21 644))
+  (src/backend.c (lpmud/d/6_backend.c 1.68.1.35.1.22 644))
   (src/bitstrings.h (lpmud/i/47_bitstrings 1.3 644))
   (src/bitstrings.c (lpmud/i/48_bitstrings 1.13 644))
   (src/bytecode.h (lpmud/a/b/26_bytecode.h 1.1 644))

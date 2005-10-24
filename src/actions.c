@@ -794,6 +794,19 @@ notify_no_command (char *command, object_t *save_command_giver)
             useHook = MY_FALSE;
         }
     }
+    else /* No H_NOTIFY_FAIL hook set, and no notify_fail() given */
+    {
+        free_svalue(svp); /* remember: this is &error_msg */
+        svp->type = T_INVALID;
+
+        if (error_obj)
+            free_object(error_obj, "notify_no_command");
+        error_obj = NULL;
+
+        error("Missing H_NOTIFY_FAIL hook, and no notify_fail() given.\n");
+        /* NOTREACHED */
+        useHook = MY_FALSE;
+    }
 
     /* If the output has to go through a hook, push the remaining
      * arguments and call the hook.

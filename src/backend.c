@@ -1439,7 +1439,7 @@ f_debug_message (svalue_t *sp)
             if (!(sp->u.number & DMSG_TARGET) || (sp->u.number & DMSG_STDOUT))
                 fputs(pTxt, stdout);
             if (sp->u.number & DMSG_STDERR)
-                fputs("%s", stderr);
+                fputs(pTxt, stderr);
             if (sp->u.number & DMSG_LOGFILE)
                 debug_message("%s", pTxt);
 
