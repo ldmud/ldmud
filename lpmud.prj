@@ -39,12 +39,12 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 342)
-(Parent-Version lpmud 3-3 341)
-(Version-Log "When saving lfun closures, the function name was looked up in the wrong program. ")
+(Project-Version lpmud 3-3 343)
+(Parent-Version lpmud 3-3 342)
+(Version-Log "Added ptmalloc to the allocator choices.")
 (New-Version-Log
 "")
-(Checkin-Time "Sat, 28 Dec 2002 01:47:13 -0700")
+(Checkin-Time "Mon, 30 Dec 2002 14:26:32 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -81,24 +81,24 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.56 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.405 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.292 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.406 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.293 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.19 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
   ;; Configuration
-  (src/configure (lpmud/d/0_configure 1.19.1.65 755))
-  (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.21 644))
+  (src/configure (lpmud/d/0_configure 1.19.1.66 755))
+  (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.22 644))
   (src/machine.h.in (lpmud/b/9_machine.h. 1.9.1.4 644))
-  (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.19.1.5 644))
+  (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.19.1.6 644))
   (src/mkinstalldirs (lpmud/c/4_mkinstalld 1.1 644))
   (src/install-sh (lpmud/c/5_install-sh 1.2 755))
 
-  (src/autoconf/configure.in (lpmud/d/7_configure. 1.20.1.9.1.55 644))
+  (src/autoconf/configure.in (lpmud/d/7_configure. 1.20.1.9.1.56 644))
   (src/autoconf/acconfig.h (lpmud/d/10_acconfig.h 1.6.1.4 644))
 
   (src/settings/README (lpmud/c/22_README 1.14.1.13 644))
-  (src/settings/default (lpmud/c/23_default 1.13.1.5.1.29 744))
+  (src/settings/default (lpmud/c/23_default 1.13.1.5.1.30 744))
   (src/settings/native (lpmud/c/9_native 1.6 744))
   (src/settings/compat (lpmud/c/10_compat 1.7 744))
   (src/settings/alatia (lpmud/j/27_alatia 1.5 744))
@@ -150,7 +150,7 @@
   (src/closure.c (lpmud/d/4_closure.c 1.41.1.47.1.7 644))
   (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.48 644))
   (src/comm.h (lpmud/d/3_comm.h 1.26.1.31 644))
-  (src/driver.h (lpmud/f/36_driver.h 1.15.1.21 644))
+  (src/driver.h (lpmud/f/36_driver.h 1.15.1.22 644))
   (src/dumpstat.h (lpmud/f/35_dumpstat.h 1.8 644))
   (src/dumpstat.c (lpmud/c/34_dumpstat.c 1.20.1.11.1.4 644))
   (src/ed.h (lpmud/f/34_ed.h 1.5.1.6 644))
@@ -173,7 +173,7 @@
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.15.1.2 644))
   (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.40 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.12 644))
-  (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.29 644))
+  (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.30 644))
   (src/mapping.h (lpmud/f/30_mapping.h 1.12.1.14 644))
   (src/mapping.c (lpmud/b/6_mapping.c 1.36.1.55 644))
   (src/md5.h (lpmud/l/18_md5.h 1.2 644))
@@ -228,6 +228,13 @@
   (src/pcre/ChangeLog (lpmud/r/30_ChangeLog 1.1 644))
   (src/pcre/COPYING (lpmud/r/31_COPYING 1.1 644))
   (src/pcre/AUTHORS (lpmud/r/32_AUTHORS 1.1 644))
+  (src/ptmalloc.c (lpmud/c/b/46_ptmalloc.c 1.1 644))
+  (src/ptmalloc/thread-m.h (lpmud/c/b/47_thread-m.h 1.1 644))
+  (src/ptmalloc/malloc.h (lpmud/c/b/48_malloc.h 1.1 644))
+  (src/ptmalloc/malloc.c (lpmud/c/b/49_malloc.c 1.1 644))
+  (src/ptmalloc/hooks.c (lpmud/c/b/50_hooks.c 1.1 644))
+  (src/ptmalloc/config.h (lpmud/c/b/51_config.h 1.1 644))
+  (src/ptmalloc/arena.c (lpmud/d/b/0_arena.c 1.1 644))
   (src/pkg-alists.c (lpmud/l/38_pkg-alists 1.8 644))
   (src/pkg-alists.h (lpmud/l/39_pkg-alists 1.3 644))
   (src/pkg-mysql.c (lpmud/j/1_pkg-mysql. 1.19 644))
@@ -250,9 +257,9 @@
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.31 644))
   (src/simulate.c (lpmud/31_simulate.c 1.88.1.92 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.12 644))
-  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.58 644))
+  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.59 644))
   (src/sysmalloc.h (lpmud/c/b/33_sysmalloc. 1.1 644))
-  (src/sysmalloc.c (lpmud/c/b/34_sysmalloc. 1.1 644))
+  (src/sysmalloc.c (lpmud/c/b/34_sysmalloc. 1.2 644))
   (src/sprintf.h (lpmud/f/15_sprintf.h 1.3.1.4 644))
   (src/sprintf.c (lpmud/28_sprintf.c 1.31.1.47 644))
   (src/strfuns.h (lpmud/b/51_strfuns.h 1.11.1.5 644))
@@ -266,7 +273,8 @@
   (src/wiz_list.h (lpmud/1_wiz_list.h 1.5.1.7 644))
   (src/wiz_list.c (lpmud/2_wiz_list.c 1.13.1.14.1.1 644))
   (src/xalloc.h (lpmud/g/51_xalloc.h 1.17 644))
-  (src/xalloc.c (lpmud/h/0_xalloc.c 1.2.1.15 644))
+  (src/xalloc.c (lpmud/h/0_xalloc.c 1.2.1.16 644))
+  (src/xptmalloc.c (lpmud/d/b/1_xptmalloc. 1.1 644))
 
   ;; Build files
   (src/func_spec (lpmud/c/31_func_spec 1.53.1.45.1.22.1.2 644))
@@ -286,7 +294,7 @@
   (src/hosts/amiga/StartMUD (lpmud/l/42_StartMUD 1.1 644))
   (src/hosts/amiga/README.Amiga.info (lpmud/l/43_README.Ami 1.1 644) :no-keywords)
   (src/hosts/amiga/machine.h (lpmud/c/2_machine.h 1.6.1.3 644))
-  (src/hosts/amiga/config.h (lpmud/c/7_config.h 1.23.1.27 644))
+  (src/hosts/amiga/config.h (lpmud/c/7_config.h 1.23.1.28 644))
   (src/hosts/amiga/README.Amiga (lpmud/c/12_README.Ami 1.4 644))
   (src/hosts/amiga/README (lpmud/c/13_README 1.4 644))
 
@@ -294,10 +302,10 @@
   (src/hosts/be/socketinc.h (lpmud/e/32_socketinc. 1.3 644))
   (src/hosts/be/set-version (lpmud/c/b/10_set-versio 1.1 744))
   (src/hosts/be/machine.h (lpmud/e/33_machine.h 1.14.1.4 644))
-  (src/hosts/be/config.h (lpmud/e/34_config.h 1.32.1.29 644))
+  (src/hosts/be/config.h (lpmud/e/34_config.h 1.32.1.30 644))
   (src/hosts/be/be.h (lpmud/e/35_be.h 1.7 644))
   (src/hosts/be/beyacc (lpmud/i/39_beyacc 1.1 744))
-  (src/hosts/be/Makefile (lpmud/e/37_Makefile 1.60.1.71.1.5 644))
+  (src/hosts/be/Makefile (lpmud/e/37_Makefile 1.60.1.71.1.6 644))
   (src/hosts/be/icon-32x32.raw (lpmud/s/37_icon-32x32 1.1 644) :no-keywords)
   (src/hosts/be/icon-16x16.raw (lpmud/s/38_icon-16x16 1.1 644) :no-keywords)
   (src/hosts/be/driver.rsrc (lpmud/s/39_driver.rsr 1.1 644) :no-keywords)
@@ -310,14 +318,14 @@
 
   ;; Host: OS/2
   (src/hosts/os2/machine.h (lpmud/m/36_machine.h 1.1 644))
-  (src/hosts/os2/Makefile (lpmud/m/37_Makefile 1.26.1.4 644))
+  (src/hosts/os2/Makefile (lpmud/m/37_Makefile 1.26.1.5 644))
 
   ;; Host: Win32
   (src/hosts/win32/tubmud.bmp (lpmud/g/20_tubmud.bmp 1.1 644) :no-keywords)
   (src/hosts/win32/machine.h (lpmud/g/21_machine.h 1.4.1.2 644))
-  (src/hosts/win32/config.h (lpmud/g/22_config.h 1.18.1.25 644))
+  (src/hosts/win32/config.h (lpmud/g/22_config.h 1.18.1.26 644))
   (src/hosts/win32/Readme.rtf (lpmud/g/23_Readme.rtf 1.2.1.1 644))
-  (src/hosts/win32/Makefile (lpmud/g/24_Makefile 1.10.1.18.1.1 644))
+  (src/hosts/win32/Makefile (lpmud/g/24_Makefile 1.10.1.18.1.2 644))
 
   ;; External Packages
   (pkg/README (lpmud/f/25_README 1.8.1.1 644))
@@ -1862,6 +1870,10 @@
   (mud/lp-245/README (lpmud/b/47_README 1.1 644))
   (mud/lp-245/NEWS (lpmud/b/48_NEWS 1.1 644))
   (mud/lp-245/ACCESS.ALLOW (lpmud/b/49_ACCESS.ALL 1.2 644))
+
+;; Files added by populate at Mon, 30 Dec 2002 14:20:44 -0700,
+;; to version 3-3.342(w), by lars:
+
 )
 (Merge-Parents)
 (New-Merge-Parents)

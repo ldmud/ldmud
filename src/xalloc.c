@@ -194,15 +194,19 @@ static void print_block (int d, word_t *block);
  *   #define MEM_ALIGN
  *     the alignment guaranteed by the allocator
  *   #define REPLACE_MALLOC
- *     if the allocator's mem_alloc()/mem_free() can replace the libc
- *     allocation routines (ie. the allocator doesn't use malloc() itself).
- *     The actual replacement is provided by xalloc.
+ *     if the allocator's mem_alloc()/mem_free() can be used to replace the
+ *     libc allocation routines (ie. the allocator doesn't use malloc()
+ *     itself).  The actual replacement is provided by xalloc.
+ *   #define MEM_THREADSAFE
+ *     The allocator is threadsafe.
  */
 
 #if defined(MALLOC_smalloc)
 #  include "smalloc.c"
 #elif defined(MALLOC_sysmalloc)
 #  include "sysmalloc.c"
+#elif defined(MALLOC_ptmalloc)
+#  include "xptmalloc.c"
 #else
 #  error "No allocator specified."
 #endif
@@ -213,6 +217,14 @@ static void print_block (int d, word_t *block);
 #  endif
 #endif
 
+#if defined(USE_PTHREADS) && !defined(MEM_THREADSAFE)
+#    warning ""
+#    warning "-----------------------------------"
+#    warning "PThreads enabled, but the allocator"
+#    warning "is not threadsafe!"
+#    warning "-----------------------------------"
+#    warning ""
+#endif
 /*-------------------------------------------------------------------------*/
 size_t
 xalloced_size (POINTER p
@@ -814,7 +826,7 @@ dump_malloc_trace (int d
 
 /*                     CLIB ALLOCATION FUNCTIONS                           */
 
-#ifdef REPLACE_MALLOC
+#if defined(REPLACE_MALLOC) && defined(SBRK_OK)
 
 /*-------------------------------------------------------------------------*/
 static POINTER

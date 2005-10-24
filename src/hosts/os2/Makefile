@@ -75,7 +75,7 @@ SRC = access_check.c actions.c array.c backend.c bitstrings.c call_out.c \
       interpret.c \
       lex.c main.c mapping.c md5.c mempools.c mregex.c mstrings.c \
       object.c otable.c\
-      parser.c parse.c pkg-alists.c pkg-mysql.c pkg-pcre.c port.c \
+      parser.c parse.c pkg-alists.c pkg-mysql.c pkg-pcre.c ptmalloc.c port.c \
       ptrtable.c \
       random.c regexp.c simulate.c simul_efun.c stdstrings.c \
       strfuns.c sprintf.c swap.c wiz_list.c xalloc.c
@@ -85,7 +85,7 @@ OBJ = access_check.o actions.o array.o backend.o bitstrings.o call_out.o \
       interpret.o \
       lex.o main.o mapping.o md5.o mempools.o mregex.o mstrings.o \
       object.o otable.o \
-      parser.o parse.o pkg-alists.o pkg-mysql.o pkg-pcre.c port.o \
+      parser.o parse.o pkg-alists.o pkg-mysql.o pkg-pcre.c ptmalloc.o port.o \
       ptrtable.o \
       random.o regexp.o simulate.o simul_efun.o stdstrings.o \
       strfuns.o sprintf.o swap.o wiz_list.o xalloc.o 
@@ -352,6 +352,10 @@ pkg-pcre.o : pcre/study.c pcre/maketables.c pcre/get.c pcre/pcre.c \
 port.o : hosts/crypt.c main.h backend.h my-rusage.h driver.h typedefs.h \
     port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
+ptmalloc.o : ptmalloc/malloc.c driver.h ptmalloc/hooks.c ptmalloc/arena.c \
+    ptmalloc/thread-m.h ptmalloc/malloc.h ptmalloc/config.h port.h config.h \
+    hosts/unix.h hosts/be/be.h machine.h
+
 ptrtable.o : simulate.h mempools.h ptrtable.h driver.h svalue.h strfuns.h \
     sent.h bytecode.h typedefs.h port.h config.h hosts/unix.h hosts/be/be.h \
     machine.h
@@ -403,11 +407,11 @@ wiz_list.o : xalloc.h svalue.h stdstrings.h simulate.h object.h mstrings.h \
     strfuns.h sent.h bytecode.h port.h config.h hosts/unix.h hosts/be/be.h \
     machine.h
 
-xalloc.o : sysmalloc.c smalloc.c object.h exec.h simulate.h interpret.h \
-    gcollect.h backend.h xalloc.h driver.h ../mudlib/sys/debug_info.h \
-    svalue.h stdstrings.h mstrings.h sysmalloc.h smalloc.h typedefs.h \
-    sent.h bytecode.h strfuns.h main.h port.h config.h hosts/unix.h \
-    hosts/be/be.h machine.h
+xalloc.o : xptmalloc.c sysmalloc.c smalloc.c object.h exec.h simulate.h \
+    interpret.h gcollect.h backend.h xalloc.h driver.h \
+    ../mudlib/sys/debug_info.h svalue.h stdstrings.h mstrings.h sysmalloc.h \
+    smalloc.h typedefs.h sent.h bytecode.h strfuns.h main.h port.h config.h \
+    hosts/unix.h hosts/be/be.h machine.h
 
 # --- DO NOT MODIFY THIS LINE -- AUTO-DEPENDS PRECEDE ---
 # --- DO NOT MODIFY THIS LINE -- SELECTED AUTO-DEPENDS FOLLOW ---

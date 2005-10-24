@@ -102,6 +102,7 @@ with_time_to_reset=1800 # seconds
 #   MALLOC_smalloc:   Satoria's malloc. Fastest, uses the least memory,
 #                     supports garbage collection.
 #   MALLOC_sysmalloc: the normal system malloc()
+#   MALLOC_ptmalloc:  ptmalloc from www.malloc.de - threadsafe.
 
 with_malloc=smalloc
 

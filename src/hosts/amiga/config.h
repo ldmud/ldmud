@@ -343,6 +343,7 @@
  *   MALLOC_smalloc:   Satoria's malloc. Fastest, uses the least memory,
  *                     supports garbage collection.
  *   MALLOC_sysmalloc: the normal system malloc()
+ *   MALLOC_ptmalloc:  ptmalloc from www.malloc.de - threadsafe.
  */
 
 #define MALLOC_smalloc

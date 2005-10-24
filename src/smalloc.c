@@ -64,14 +64,8 @@
  * Large blocks are stored with boundary tags: the size field without flags
  * is replicated in the last word of the block.
  *
-#if FIT_STYLE_FAST_FIT
  * The free large blocks are stored in an AVL tree for fast retrieval
  * of best fits. The AVL structures are stored in the user area of the blocks.
-#else
- * The free large blocks are stored in a double-linked list with pointers
- * in the begin of the user area. The allocator offers FIRST_FIT and BEST_FIT
- * (and a HYBRID mode), but in fact this system hasn't been used for years.
-#endif
  *
 #ifdef SBRK_OK
  * Memory is allocated from the system with sbrk() and brk(), which puts
@@ -152,22 +146,8 @@
    */
 #define NELEM(a) (sizeof (a) / sizeof (a)[0])
 
-/* Fitstyle: how the large block allocator looks for free blocks:
- */
-
-#define FIT_STYLE_FAST_FIT
-  /* The free blocks are kept in an AVL tree.
-   */
-
 /* #undef DEBUG_AVL */
   /* Define this to debug the AVL tree.
-   */
-
-#define BEST_FIT   0
-#define FIRST_FIT  1
-#define HYBRID     2
-#define fit_style BEST_FIT
-  /* When not using FIT_STYLE_FAST_FIT: the fitstyle.
    */
 
 /* TODO: This assumes a 32-Bit machine */
@@ -368,10 +348,6 @@ static word_t unused_size = 0;
    */
 
 /* --- Large Block variables --- */
-
-#ifndef FIT_STYLE_FAST_FIT
-static word_t *free_list = NULL;
-#endif /* FIT_STYLE_FAST_FIT */
 
 static word_t *heap_start = NULL;
   /* First address on the heap.
@@ -1269,8 +1245,6 @@ mem_realloc (POINTER p, size_t size)
   /* Check if the previous resp. the next block is free.
    */
 
-#ifdef FIT_STYLE_FAST_FIT
-
 /*-------------------------------------------------------------------------*/
 
 /* Extra types and definitions for the AVL routines */
@@ -2038,58 +2012,7 @@ add_to_free_list (word_t *ptr)
         p = p->parent;
     } while ( NULL != (q = p) );
     fake((do_check_avl(),"add_to_free_list successful"));
-}
-
-#else /* FIT_STYLE_FAST_FIT */
-
-/*-------------------------------------------------------------------------*/
-static void
-remove_from_free_list (word_t *ptr)
-
-{
-#ifdef MALLOC_TRACE
-   if (ptr[M_MAGIC] != LFMAGIC)
-    {
-        in_malloc = 0;
-       fatal("remove_from_free_list: block %p magic match failed: "
-             "expected %lx, found %lx\n", ptr, LFMAGIC, ptr[M_MAGIC]);
-    }
-#endif
-   count_back(large_free_stat, *ptr & M_MASK);
-
-   /* Unlink it from the freelist */
-   if (l_prev_ptr(ptr))
-       l_next_ptr(l_prev_ptr(ptr)) = l_next_ptr(ptr);
-   else
-       free_list = l_next_ptr(ptr);
-
-   if (l_next_ptr(ptr))
-       l_prev_ptr(l_next_ptr(ptr)) = l_prev_ptr(ptr);
-} /* remove_from_free_list() */
-
-/*-------------------------------------------------------------------------*/
-static void
-add_to_free_list (word_t *ptr)
-
-/* Add memory block <ptr> to the free list.
- */
-
-{
-    count_up(large_free_stat, *ptr & M_MASK);
-
-#ifdef DEBUG
-    if (free_list && l_prev_ptr(free_list))
-        puts("Free list consistency error.");
-#endif
-
-    l_next_ptr(ptr) = free_list;
-    if (free_list)
-        l_prev_ptr(free_list) = ptr;
-    l_prev_ptr(ptr) = NULL;
-    free_list = ptr;
 } /* add_to_free_list() */
-
-#endif /* FIT_STYLE_FAST_FIT */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -2171,8 +2094,6 @@ retry:
     ptr = NULL;
     if (!force_more)
     {
-
-#ifdef FIT_STYLE_FAST_FIT
 
         /* Find the best fit in the AVL tree */
 
@@ -2265,73 +2186,6 @@ retry:
 
 found_fit:
         ptr -= M_OVERHEAD;
-
-#else /* FIT_STYLE_FAST_FIT */
-
-        /* Search the freelist for the first/best fit */
-
-        word_t best_size;
-        word_t *first, *best;
-#       ifdef LARGE_TRACE
-        word_t search_length = 0;
-#       endif
-
-        first = best = NULL;
-        best_size = M_MASK;
-        ptr = free_list;
-
-        while (ptr)
-        {
-            word_t tempsize;
-
-#           ifdef LARGE_TRACE
-            search_length++;
-#           endif
-
-            /* Perfect fit? */
-            tempsize = *ptr & M_MASK;
-            if (tempsize == size)
-            {
-                best = first = ptr;
-                break;
-                /* always accept perfect fit */
-            }
-
-            /* does it really even fit at all? */
-            if (tempsize > size + SMALL_BLOCK_MAX + T_OVERHEAD)
-            {
-                /* try first fit */
-                if (!first)
-                {
-                    first = ptr;
-                    if (fit_style == FIRST_FIT)
-                        break;
-                    /* just use this one! */
-                }
-
-                /* try best fit */
-                tempsize -= size;
-                if (tempsize > 0 && tempsize <= best_size)
-                {
-                    best = ptr;
-                    best_size = tempsize;
-                }
-            }
-            ptr = l_next_ptr(ptr);
-        } /* end while */
-
-#       ifdef LARGE_TRACE
-        dprintf1(2, "search length %d\n",search_length);
-#       endif
-
-        if (fit_style == BEST_FIT)
-            ptr = best;
-        else
-            ptr = first;
-        /* FIRST_FIT and HYBRID both leave it in first */
-
-#endif /* FIT_STYLE_FAST_FIT */
-
     } /* if (!force_more) */
 
     if (!ptr)

@@ -103,7 +103,7 @@ endif
            interpret.c lex.c main.c mapping.c md5.c mempools.c mregex.c \
            mstrings.c \
            object.c otable.c parser.c parse.c \
-           pkg-alists.c pkg-mysql.c pkg-pcre.c port.c \
+           pkg-alists.c pkg-mysql.c pkg-pcre.c ptmalloc.c port.c \
            ptrtable.c random.c \
            regexp.c simulate.c simul_efun.c stdstrings.c \
            strfuns.c sprintf.c swap.c wiz_list.c xalloc.c
@@ -591,6 +591,10 @@ $(OBJ)/pkg-pcre.o : pcre/study.c pcre/maketables.c pcre/get.c pcre/pcre.c \
 $(OBJ)/port.o : hosts/crypt.c main.h backend.h my-rusage.h driver.h \
     typedefs.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
+$(OBJ)/ptmalloc.o : ptmalloc/malloc.c driver.h ptmalloc/hooks.c \
+    ptmalloc/arena.c ptmalloc/thread-m.h ptmalloc/malloc.h \
+    ptmalloc/config.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
+
 $(OBJ)/ptrtable.o : simulate.h mempools.h ptrtable.h driver.h svalue.h \
     strfuns.h sent.h bytecode.h typedefs.h port.h config.h hosts/unix.h \
     hosts/be/be.h machine.h
@@ -642,8 +646,8 @@ $(OBJ)/wiz_list.o : xalloc.h svalue.h stdstrings.h simulate.h object.h \
     strfuns.h sent.h bytecode.h port.h config.h hosts/unix.h hosts/be/be.h \
     machine.h
 
-$(OBJ)/xalloc.o : sysmalloc.c smalloc.c object.h exec.h simulate.h \
-    interpret.h gcollect.h backend.h xalloc.h driver.h \
+$(OBJ)/xalloc.o : xptmalloc.c sysmalloc.c smalloc.c object.h exec.h \
+    simulate.h interpret.h gcollect.h backend.h xalloc.h driver.h \
     ../mudlib/sys/debug_info.h svalue.h stdstrings.h mstrings.h sysmalloc.h \
     smalloc.h typedefs.h sent.h bytecode.h strfuns.h main.h port.h config.h \
     hosts/unix.h hosts/be/be.h machine.h

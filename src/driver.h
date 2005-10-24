@@ -35,7 +35,7 @@
 #  define YYDEBUG 1
 #endif
 
-#if !defined(MALLOC_smalloc) && !defined(MALLOC_sysmalloc)
+#if !defined(MALLOC_smalloc) && !defined(MALLOC_sysmalloc) && !defined(MALLOC_ptmalloc)
 #  define MALLOC_smalloc
 #endif
 

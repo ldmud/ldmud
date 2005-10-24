@@ -20,6 +20,7 @@
 #define MEM_ALIGN (MALLOC_ALIGN)
 /* #undef REPLACE_MALLOC */
 #define NO_MEM_BLOCK_SIZE
+#define MEM_THREADSAFE
 
 /*-------------------------------------------------------------------------*/
 

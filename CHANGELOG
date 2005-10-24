@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+30-Dec-2002 (Lars Duening)  (3.3.343)
+  - (configure, ptmalloc/, xalloc.c) Gawain adapted the threadsafe
+       ptmalloc2 for use with the driver (GC not supported yet).
+  - (smalloc.c) Removed the code for the double-linked freelist handling
+       of large blocks - nobody was using it anymore.
+
 28-Dec-2002 (Lars Duening)  (3.3.342)
   - (object.c) When saving lfun closures, the function name was looked
        up in the wrong program (reported by Dafire).

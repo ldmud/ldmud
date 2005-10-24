@@ -965,7 +965,7 @@ Optional Packages:
   --with-max-byte-transfer=VALUE      default=50000
   --with-catch-udp-port=VALUE         default=4246
   --with-set-buffer-size-max=VALUE    default=65536
-  --with-malloc=smalloc/sysmalloc     default=smalloc
+  --with-malloc=smalloc/sysmalloc/ptmalloc  default=smalloc
         memory manager to use
   --with-min-malloced=VALUE           default=0
   --with-min-small-malloced=VALUE     default=0

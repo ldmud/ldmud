@@ -1672,17 +1672,19 @@ options (void)
         , "system malloc"
 #elif defined(MALLOC_smalloc)
         , "smalloc"
-#    if defined(MALLOC_TRACE)
-#        if defined(MALLOC_LPC_TRACE)
-                  " (trace enabled, lpc-trace enabled)"
-#        else
-                  " (trace enabled)"
-#        endif
-#    elif defined(MALLOC_LPC_TRACE)
-                  " (lpc-trace enabled)"
-#    endif
+#elif defined(MALLOC_ptmalloc)
+        , "ptmalloc"
 #else
         , "unknown malloc"
+#endif
+#if defined(MALLOC_TRACE)
+#    if defined(MALLOC_LPC_TRACE)
+              " (trace enabled, lpc-trace enabled)"
+#    else
+              " (trace enabled)"
+#    endif
+#elif defined(MALLOC_LPC_TRACE)
+              " (lpc-trace enabled)"
 #endif
         , RESERVED_USER_SIZE
         , RESERVED_MASTER_SIZE
