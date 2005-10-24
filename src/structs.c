@@ -322,7 +322,7 @@ struct_free_empty (struct_t *pStruct)
     if (!pStruct->user)
         fatal("No wizlist pointer for struct");
 
-    if (pStruct->ref > 0)
+    if (pStruct->ref != 0)
         fatal("Struct with %ld refs passed to struct_free().\n"
               , pStruct->ref);
 #endif
@@ -353,7 +353,7 @@ struct_free (struct_t *pStruct)
     if (!pStruct->user)
         fatal("No wizlist pointer for struct");
 
-    if (pStruct->ref > 0)
+    if (pStruct->ref != 0)
         fatal("Struct with %ld refs passed to struct_free().\n"
               , pStruct->ref);
 #endif
@@ -380,7 +380,7 @@ struct_free_type (struct_type_t *pSType)
     if (!pSType)
         fatal("NULL pointer passed to struct_free_type().\n");
 
-    if (pSType->ref > 0)
+    if (pSType->ref != 0)
         fatal("struct typeobject with %ld refs passed to struct_free_type().\n"
              , pSType->ref);
 #endif

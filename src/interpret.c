@@ -3183,7 +3183,6 @@ push_indexed_lvalue (svalue_t *sp, bytecode_p pc)
 {
     svalue_t *i;     /* the index value */
     svalue_t *vec;   /* the indexed vector or mapping */
-    svalue_t *item;  /* the indexed element vec[i] */
 
     /* Get the arguments */
     i = sp;
@@ -3247,6 +3246,7 @@ push_indexed_lvalue (svalue_t *sp, bytecode_p pc)
     if (vec->type == T_MAPPING)
     {
         mapping_t *m;
+        svalue_t *item;
 
         m = vec->u.map;
 
@@ -3433,8 +3433,6 @@ push_protected_indexed_lvalue (svalue_t *sp, bytecode_p pc)
 {
     svalue_t           * i;       /* the index */
     svalue_t           * vec;     /* the vector */
-    svalue_t           * item;    /* the indexed element */
-    struct protected_lvalue * lvalue;  /* the protector */
 
     /* Get the arguments */
     i = sp;
@@ -3445,6 +3443,7 @@ push_protected_indexed_lvalue (svalue_t *sp, bytecode_p pc)
     if (vec->type == T_POINTER)
     {
         svalue_t *item;
+        struct protected_lvalue * lvalue;
 
         item = get_vector_item(vec->u.vec, i, sp, pc);
 
@@ -3464,7 +3463,7 @@ push_protected_indexed_lvalue (svalue_t *sp, bytecode_p pc)
     }
 
 #ifdef USE_STRUCTS
-    /* Index a vector.
+    /* Index a struct.
      */
     if (vec->type == T_STRUCT)
     {
@@ -3496,6 +3495,8 @@ push_protected_indexed_lvalue (svalue_t *sp, bytecode_p pc)
     if (vec->type == T_MAPPING)
     {
         mapping_t *m;
+        svalue_t *item;
+        struct protected_lvalue * lvalue;
 
         m = vec->u.map;
 

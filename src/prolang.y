@@ -15156,11 +15156,18 @@ copy_functions (program_t *from, funflag_t type)
                 tmp_short = ARGTYPE_COUNT;
                 if (fun.num_arg)
                 {
+                    int ix;
+
+                    ix = ARGTYPE_COUNT;
+
                     add_to_mem_block(
                       A_ARGUMENT_TYPES,
                       &from->argument_types[from->type_start[i]],
                       (sizeof (vartype_t)) * fun.num_arg
                     );
+
+                    for ( ; ix < ARGTYPE_COUNT; ix++)
+                        ref_vartype_data(&ARGUMENT_TYPE(ix));
                 }
 
             }
@@ -15412,26 +15419,26 @@ copy_variables (program_t *from, funflag_t type
             {
                 if ( !(from->variables[j].type.typeflags & TYPE_MOD_PRIVATE) )
                 {
-                    fulltype_t vtype = from->variables[j].type;
+                    fulltype_t vartype = from->variables[j].type;
 
-                    vtype.typeflags |= new_type | NAME_INHERITED;
-                    redeclare_variable(p, vtype,
+                    vartype.typeflags |= new_type | NAME_INHERITED;
+                    redeclare_variable(p, vartype,
                                        previous_variable_index_offset + j
                     );
                 }
             }
             else
             {
-                fulltype_t vtype = from->variables[j].type;
+                fulltype_t vartype = from->variables[j].type;
 
-                vtype.typeflags |= new_type 
+                vartype.typeflags |= new_type 
                         | (from->variables[j].type.typeflags & TYPE_MOD_PRIVATE
                            ? (NAME_HIDDEN|NAME_INHERITED)
                            :  NAME_INHERITED
                           )
                 ;
 
-                define_variable(p, vtype
+                define_variable(p, vartype
 %ifndef INITIALIZATION_BY___INIT
                   ,from->variables[j].flags & NAME_INITIALIZED ?
                     copy_svalue(&initializers[j]) : &const0
