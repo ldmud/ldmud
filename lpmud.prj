@@ -12,14 +12,11 @@
 ;; Odd-numbered 'development' releases:
 ;;    <v>-<r>.*: The only branch for version <v>.<r>
 ;;    3-3-structs.*: The 3-3 subbranch for 'struct' re-development,
-;;                   branched off 3-3.294
+;;                   branched off 3-3.294, merged back in in 3-3.344.
 ;;
 ;; TODO: Fast callouts
 ;; TODO: Configurable heartbeat interval a la MudOS
 ;; TODO: Try replacing smalloc with an adjusted ptmalloc, if it makes sense.
-;; TODO:: The malloc-tracing and memory reserves can be handled on xalloc.c
-;; TODO:: level; the GC and fallback-to-malloc() however needs to go into
-;; TODO:: the ptmalloc itself.
 ;; TODO: Alternatively investigate MPS (http://www.ravenbrook.com/project/mps/)
 ;; TODO: general coloured efuns
 ;; TODO:  sockets (p-020912),
@@ -38,12 +35,12 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 344)
-(Parent-Version lpmud 3-3 343)
-(Version-Log "Reworked the struct implementation.")
+(Project-Version lpmud 3-3 345)
+(Parent-Version lpmud 3-3 344)
+(Version-Log "Corrected the xalloc_stat statistics in GCs.")
 (New-Version-Log
 "")
-(Checkin-Time "Thu, 02 Jan 2003 17:33:15 -0700")
+(Checkin-Time "Thu, 02 Jan 2003 17:42:11 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -80,7 +77,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.56 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.407 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.408 644))
   (HISTORY (lpmud/f/49_HISTORY 1.294 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.19 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -256,7 +253,7 @@
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.31 644))
   (src/simulate.c (lpmud/31_simulate.c 1.88.1.93 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.12 644))
-  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.59 644))
+  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.60 644))
   (src/structs.h (lpmud/d/b/5_structs.h 1.1 644))
   (src/structs.c (lpmud/d/b/6_structs.c 1.1 644))
   (src/sysmalloc.h (lpmud/c/b/33_sysmalloc. 1.1 644))
@@ -274,7 +271,7 @@
   (src/wiz_list.h (lpmud/1_wiz_list.h 1.5.1.7.1.1 644))
   (src/wiz_list.c (lpmud/2_wiz_list.c 1.13.1.14.1.2 644))
   (src/xalloc.h (lpmud/g/51_xalloc.h 1.17 644))
-  (src/xalloc.c (lpmud/h/0_xalloc.c 1.2.1.16 644))
+  (src/xalloc.c (lpmud/h/0_xalloc.c 1.2.1.17 644))
   (src/xptmalloc.c (lpmud/d/b/1_xptmalloc. 1.1 644))
 
   ;; Build files

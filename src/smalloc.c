@@ -2855,6 +2855,7 @@ mem_free_unrefed_memory (void)
             word_t size2;
 
             success++;
+            count_back(xalloc_stat, mem_block_size(p+M_OVERHEAD));
 #if defined(MALLOC_TRACE) || defined(MALLOC_LPC_TRACE)
             dprintf1(gcollect_outfd, "freeing large block 0x%x", (p_uint)p);
 #endif
@@ -2907,6 +2908,7 @@ mem_free_unrefed_memory (void)
             {
                 /* Unref'd small blocks are definitely lost */
                 success++;
+                count_back(xalloc_stat, mem_block_size(q+M_OVERHEAD));
                 dprintf2(gcollect_outfd, "freeing small block 0x%x (user 0x%x)"
                         , (p_uint)q, (p_uint)(q+M_OVERHEAD));
 #ifdef MALLOC_TRACE

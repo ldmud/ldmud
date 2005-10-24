@@ -184,6 +184,7 @@ static void print_block (int d, word_t *block);
  *
  *   void mem_free_unrefed_memory()
  *     Free all memory marked as 'unreferenced'.
+ *     This routine also has to accordingly adjust xalloc_stat.
  *
 #ifdef MALLOC_TRACE
  *   static Bool mem_is_freed (POINTER p, size_t minsize)
