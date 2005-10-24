@@ -1,6 +1,18 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+04-Dec-2002 (Lars Duening)  (3.3.321)
+  - (make_func.y, comm.c, main.c, prolang.y) Removed warnings (reported by
+      Coogan).
+  - (comm.c) When logging on a new player, the prompt wasn't printed - in
+      particular the prompt set by input_to(INPUT_PROMPT) (reported by
+      Nostradamus).
+  - (main.c) If the reserved areas can be reallocated, the out_of_memory
+      flag is reset.
+  - (simulate.c) catch() reports an 'out_of_memory' condition only
+      if it was raised during the execution of the guarded code.
+  - (smalloc.c) Changed OVERHEAD to M_OVERHEAD.
+
 03-Dec-2002 (Lars Duening)  (3.3.320)
   - (patch-o-matic) Updated to new executable name.
   - (prolang.y, object.c) The filenames returned by include_list()

@@ -1027,7 +1027,7 @@ stringdef: ID NAME
 
         /* Make sure that the .key is all uppercase */
         for (cp = instr[num_buff].key; *cp != '\0'; cp++)
-            if (isalpha(*cp) && islower(*cp))
+            if (isalpha((unsigned char)*cp) && islower((unsigned char)*cp))
                 *cp = toupper(*cp);
 
         /* Prepare for next string */

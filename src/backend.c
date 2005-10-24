@@ -243,7 +243,7 @@ logon (object_t *ob)
         error("Could not find logon() on the player %s\n", get_txt(ob->name));
     }
     current_object = save;
-}
+} /* logon() */
 
 /*-------------------------------------------------------------------------*/
 static RETSIGTYPE

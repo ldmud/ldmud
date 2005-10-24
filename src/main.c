@@ -642,7 +642,7 @@ void
 reallocate_reserved_areas (void)
 
 /* Try to reallocate the reserved memory areas. If this is possible,
- * a pending slow-shutdown is canceled.
+ * a pending slow-shutdown is canceled and the out_of_memory flag is reset.
  */
 
 {
@@ -679,7 +679,8 @@ reallocate_reserved_areas (void)
         }
     }
     slow_shut_down_to_do = 0;
-}
+    out_of_memory = MY_FALSE;
+} /* reallocate_reserved_areas() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -2485,7 +2486,7 @@ open_arg_file (InputSource ** ppInput, const char * pName)
         Marker *pMarker;
         Bool    endFound, quoted;
 
-        char c = *pData;
+        unsigned char c = (unsigned char)*pData;
 
         if (isascii(c) && (isspace(c) || c == '\r' || c == '\n'))
             continue;
@@ -2538,7 +2539,7 @@ open_arg_file (InputSource ** ppInput, const char * pName)
             ; left++, pData++
             )
         {
-            c = *pData;
+            c = (unsigned char)*pData;
 
             /* Line end always terminates the search */
             if (c == '\r' || c == '\n')

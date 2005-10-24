@@ -109,7 +109,7 @@ static nomask mixed logon ()
     debug_message(sprintf("%O: logon()\n", this_object()));
     write("\nLDMud " __VERSION__ "\n\n----------\n");
     write(debug_info(4,0));
-    write("----------\n\n> ");
+    write("----------\n\n");
     enable_commands();
     add_action("f_help", "help");
     add_action("f_shutdown", "shutdown");

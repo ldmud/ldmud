@@ -324,6 +324,7 @@ catch_instruction ( bytecode_t catch_inst, uint offset
 #define INTER_SP ((svalue_t *)(*i_sp))
 
     Bool rc;
+    volatile Bool old_out_of_memory = out_of_memory;
 
     bytecode_p new_pc;  /* Address of first instruction after the catch() */
 
@@ -399,8 +400,8 @@ catch_instruction ( bytecode_t catch_inst, uint offset
         eval_cost -= CATCH_RESERVED_COST;
         assigned_eval_cost -= CATCH_RESERVED_COST;
 
-        /* If we are out of memory, throw a new error */
-        if (out_of_memory)
+        /* If we ran out of memory, throw a new error */
+        if (!old_out_of_memory && out_of_memory)
         {
             error("(catch) Out of memory detected.\n");
         }

@@ -13234,7 +13234,7 @@ float_constant:
 
 
 const_expr_list:
-      /* empty */           { $$.length = 0; };
+      /* empty */           { $$.length = 0; }
     | const_expr_list2      { $$ = $1; }
     | const_expr_list2 ','  { $$ = $1; }  /* Allow a trailing comma */
 ;

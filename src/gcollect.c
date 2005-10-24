@@ -2063,6 +2063,7 @@ show_array(int d, void *block, int depth)
         int freed;
         wiz_list_t *wl;
 
+        wl = NULL;
         freed = is_freed(block, sizeof(vector_t) );
         if (!freed)
         {

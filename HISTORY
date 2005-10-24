@@ -100,7 +100,7 @@ For a detailed list of all changes see the file CHANGELOG.
            regular expression code, or the PCRE package (default).
 
 
-03-Dec-2002 (Lars Duening) -- Release 3.2.9
+04-Dec-2002 (Lars Duening) -- Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -471,6 +471,7 @@ For a detailed list of all changes see the file CHANGELOG.
        + Lfun closures left danging by a replace_program() are now converted
            into alien-lfun closures, so that the error handler has a chance
            to determine the originating object.
+       + Bugfix: When logging on players, the initial prompt wasn't printed.
        + Bugfix: IPv6 name lookup works again, and also with both xerq and erq.
        + Bugfix: The driver now longer gets a confused when a client like
            TinyFugue refuses to use CHARMODE.

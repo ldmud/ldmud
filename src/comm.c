@@ -306,15 +306,9 @@ static erq_callback_t *free_erq;
 static struct ipentry {
     struct in_addr  addr;  /* The address (only .s_addr is significant) */
     string_t       *name;  /* tabled string with the hostname for <addr> */
-} iptable[IPSIZE]
-#ifdef USE_IPV6
-  = { { { { { 0 } } }, 0}, };
-#else
-  = { { { 0 }, 0}, };
-#endif /* USE_IPV6 */
+} iptable[IPSIZE];
   /* Cache of known names for given IP addresses.
    * It is used as a ringbuffer, indexed by ipcur.
-   * TODO: Null all entries in the table? Std-C should do that automatically.
    * TODO: Instead of a simple circular buffer, the lookup should be
    * TODO:: hashed over the IP address. Worst case would still be O(IPSIZE),
    * TODO:: but best case would be O(1).
@@ -1145,6 +1139,11 @@ prepare_ipc(void)
 {
     length_t tmp;
     int i;
+
+#ifdef ERQ_DEMON
+    /* Initialize the IP name lookup table */
+    memset(iptable, 0, sizeof(iptable));
+#endif
 
     /* Initialize the telnet machine unless mudlib_telopts() already
      * did that.
@@ -3586,6 +3585,7 @@ new_player (SOCKET_T new_socket, struct sockaddr_in *addr, size_t addrlen
     /* TODO: We could pass the retrieved hostname right to login */
 #endif
     logon(ob);
+    print_prompt();
     flush_all_player_mess();
 } /* new_player() */
 
