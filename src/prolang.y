@@ -2117,6 +2117,12 @@ add_local_name (ident_t *ident, fulltype_t type, int depth
  */
 
 {
+    if ((type & PRIMARY_TYPE_MASK) == TYPE_VOID)
+    {
+        yyerrorf( "Illegal to define variable '%s' as type 'void'"
+                , get_txt(ident->name));
+    }
+
     if (current_number_of_locals >= MAX_LOCAL /* size of type recording array */
      || current_number_of_locals >= 256)
         yyerror("Too many local variables");
@@ -2778,6 +2784,12 @@ define_variable (ident_t *name, fulltype_t flags, svalue_t *svp)
     variable_t dummy;
     int n;
 
+    if ((flags & PRIMARY_TYPE_MASK) == TYPE_VOID)
+    {
+        yyerrorf( "Illegal to define variable '%s' as type 'void'"
+                , get_txt(name->name));
+    }
+
     if (name->type != I_TYPE_GLOBAL)
     {
         /* This is the first _GLOBAL use of this identifier:
@@ -2911,6 +2923,12 @@ redeclare_variable (ident_t *name, fulltype_t flags, int n)
  */
 
 {
+    if ((flags & PRIMARY_TYPE_MASK) == TYPE_VOID)
+    {
+        yyerrorf( "Illegal to define variable '%s' as type 'void'"
+                , get_txt(name->name));
+    }
+
     if (name->type != I_TYPE_GLOBAL)
     {
         /* This is the first _GLOBAL use of this identifier:
