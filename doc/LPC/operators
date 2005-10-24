@@ -27,6 +27,8 @@ DESCRIPTION
         var *= expr
         var %= expr
         var /= expr
+        var &&= expr
+        var ||= expr
 
         expr1 ? expr2 : expr3
                         Evaluates 'expr1' and branches according to
@@ -188,7 +190,7 @@ NOTE
         The closure operators are not described here.
 
 HISTORY
-        LDMud 3.2.9 added '>>>' and '>>>='.
+        LDMud 3.2.9 added '>>>', '>>>=', '&&=' and '||='.
         LDMud 3.3 extended '|' and '^' to arrays.
 
 SEE ALSO

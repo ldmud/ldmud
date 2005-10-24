@@ -2448,7 +2448,7 @@ compile_value (svalue_t *value, int opt_flags)
                     break;
 
                 /* ({#'op=, <lvalue>, <expr> })
-                 * with op: *, &, |, ^, <<, >>, >>>, /, %
+                 * with op: *, &, |, ^, <<, >>, >>>, /, %, &&, ||
                  */
                 case F_MULT_EQ:
                 case F_AND_EQ:
@@ -2459,6 +2459,8 @@ compile_value (svalue_t *value, int opt_flags)
                 case F_RSHL_EQ:
                 case F_DIV_EQ:
                 case F_MOD_EQ:
+                case F_LAND_EQ:
+                case F_LOR_EQ:
                     /* This is compiled as:
                      *
                      *   <expr>

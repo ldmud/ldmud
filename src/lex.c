@@ -888,9 +888,11 @@ symbol_operator (char *symbol, char **endp)
  *   #'^=     -> F_XOR_EQ
  *   #'^      -> F_XOR
  *   #'||     -> F_LOR
+ *   #'||=    -> F_LOR_EQ
  *   #'|=     -> F_OR_EQ
  *   #'|      -> F_OR
  *   #'&&     -> F_LAND
+ *   #'&&=    -> F_LAND_EQ
  *   #'&=     -> F_AND_EQ
  *   #'&      -> F_AND
  *   #'~      -> F_COMPL
@@ -1025,7 +1027,13 @@ symbol_operator (char *symbol, char **endp)
         c = *++symbol;
         if (c == '|')
         {
-            ret = F_LOR;
+            if (symbol[1] == '=')
+            {
+                symbol++;
+                ret = F_LOR_EQ;
+            }
+            else
+                ret = F_LOR;
             break;
         }
         else if (c == '=')
@@ -1041,7 +1049,13 @@ symbol_operator (char *symbol, char **endp)
         c = *++symbol;
         if (c == '&')
         {
-            ret = F_LAND;
+            if (symbol[1] == '=')
+            {
+                symbol++;
+                ret = F_LAND_EQ;
+            }
+            else
+                ret = F_LAND;
             break;
         }
         else if (c == '=')
@@ -3833,8 +3847,16 @@ yylex1 (void)
         case '&':
             switch(c = *yyp++)
             {
-            case '&': outp = yyp;
-                      return L_LAND;
+            case '&':
+                switch(c = *yyp++)
+                {
+                case '=': yylval.number = F_LAND_EQ;
+                          outp = yyp;
+                          return L_ASSIGN;
+                default:  yyp--;
+                }
+                outp = yyp;
+                return L_LAND;
             case '=': yylval.number = F_AND_EQ;
                       outp = yyp;
                       return L_ASSIGN;
@@ -3846,8 +3868,16 @@ yylex1 (void)
         case '|':
             switch(c = *yyp++)
             {
-            case '|': outp = yyp;
-                      return L_LOR;
+            case '|':
+                switch(c = *yyp++)
+                {
+                case '=': yylval.number = F_LOR_EQ;
+                          outp = yyp;
+                          return L_ASSIGN;
+                default:  yyp--;
+                }
+                outp = yyp;
+                return L_LOR;
             case '=': yylval.number = F_OR_EQ;
                       outp = yyp;
                       return L_ASSIGN;

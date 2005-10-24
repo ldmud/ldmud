@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+11-Dec-2002 (Lars Duening)  (3.3.324)
+  - (doc/concepts/negotiation, src/wk/) Added some telnet protocol
+    related documentation.
+  - (func_spec, lex.c, prolang.y, interpret.c) New operators '&&=' and
+     '||=' (suggested by Croft).
+
 09-Dec-2002 (Lars Duening)  (3.3.323)
   - (mudlib/telnetneg.c) Updated (thanks, Fiona!)
   - (mudlib/test_master.c) Added testcode for using charmode (thanks, Fiona!)

@@ -12180,6 +12180,93 @@ again:
         break;
     }
 
+    CASE(F_LAND_EQ);                /* --- land_eq             --- */
+    {
+        /* Compute the logical-and of the value designated by lvalue sp[0]
+         * with sp[-1], assign the result to sp[0] and also leave it on the
+         * stack.
+         *
+         * Possible type combinations:
+         *   mixed  && mixed -> mixed
+         */
+
+        svalue_t *argp;
+
+#ifdef DEBUG
+        TYPE_TEST_LEFT(sp, T_LVALUE);
+#endif
+
+        /* Set argp to the actual value designated by sp[0] */
+        for ( argp = sp->u.lvalue
+            ; T_LVALUE == argp->type || T_PROTECTED_LVALUE == argp->type
+            ; argp = argp->u.lvalue)
+            NOOP;
+
+        /* If the base value is 0, just remove the second value from
+         * the stack and put a 0 in its place.
+         */
+        if (argp->type == T_NUMBER && argp->u.number == 0)
+        {
+            free_svalue(sp);
+            sp--;
+            free_svalue(sp);
+            put_number(sp, 0);
+            break;
+        }
+
+        /* Replace sp[0] with a copy of sp[-1], then pop the lvalue
+         * from the stack and return with the replacement value.
+         */
+        assign_svalue(argp, sp-1);
+        free_svalue(sp);
+        sp--;
+
+        break;
+    }
+
+    CASE(F_LOR_EQ);                 /* --- lor_eq              --- */
+    {
+        /* Compute the logical-Or of the value designated by lvalue sp[0]
+         * with sp[-1], assign the result to sp[0] and also leave it on the
+         * stack.
+         *
+         * Possible type combinations:
+         *   mixed  && mixed -> mixed
+         */
+
+        svalue_t *argp;
+
+#ifdef DEBUG
+        TYPE_TEST_LEFT(sp, T_LVALUE);
+#endif
+
+        /* Set argp to the actual value designated by sp[0] */
+        for ( argp = sp->u.lvalue
+            ; T_LVALUE == argp->type || T_PROTECTED_LVALUE == argp->type
+            ; argp = argp->u.lvalue)
+            NOOP;
+
+        /* If the base value is non-0, just remove the second value from
+         * the stack and put a copy of the base value in its place.
+         */
+        if (argp->type != T_NUMBER || argp->u.number != 0)
+        {
+            assign_svalue(sp-1, argp);
+            free_svalue(sp);
+            sp--;
+            break;
+        }
+
+        /* Replace sp[0] with a copy of sp[-1], then pop the lvalue
+         * from the stack and return with the replacement value.
+         */
+        assign_svalue(argp, sp-1);
+        free_svalue(sp);
+        sp--;
+
+        break;
+    }
+
     /* --- Machine internal instructions --- */
 
     CASE(F_POP_VALUE);              /* --- pop_value           --- */

@@ -1,0 +1,1425 @@
+<html>
+
+<head>
+<title>MUD eXtension Protocol </title>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+
+<meta name="GENERATOR" content="Microsoft FrontPage 4.0">
+<link rel="stylesheet" type="text/css" href="../common/master.css">
+</head>
+
+<body bgcolor="#FFFFFF" text="#000000" link="#FF0000" vlink="#0080C0" alink="#FF8080">
+<script language="JavaScript" SRC="/common/js_dynMenuFunctions.js">
+</script>
+<script language="JavaScript">
+<!--
+	var garyMenuData = new Array()
+	var garyMenuNames = new Array()
+	garyMenuData["News"] = new Array()
+	garyMenuNames.push( new Array("News", 12, 14, 95, 80) )
+	garyMenuData["News"].push( new Array("Privacy","/zuggsoft/privacy.htm") )
+	garyMenuData["News"].push( new Array("Press","/zmud/press.htm") )
+	garyMenuData["News"].push( new Array("About us","/zuggsoft/about.htm") )
+	garyMenuData["Products"] = new Array()
+	garyMenuNames.push( new Array("Products", 63, 65, 160, 145) )
+	garyMenuData["Products"].push( new Array("zMUD","/zmud/zmudinfo.htm") )
+	garyMenuData["Products"].push( new Array("zMapper","/zmapper/zmapperinfo.htm") )
+	garyMenuData["Products"].push( new Array("AC Explorer","/ac/ac.asp") )
+	garyMenuData["Products"].push( new Array("zExplorer","/zexplorer/zexplorerinfo.htm") )
+	garyMenuData["Products"].push( new Array("DoctorZ","/doctorz/doctorzinfo.htm") )
+	garyMenuData["Products"].push( new Array("zMUD Developer's Kit","/devkit/devkitinfo.htm") )
+	garyMenuData["Products"].push( new Array("zChat","/zchat/zchatinfo.htm") )
+	garyMenuData["Buy"] = new Array()
+	garyMenuNames.push( new Array("Buy", 147, 149, 160, 145) )
+	garyMenuData["Buy"].push( new Array("zMUD","/zmud/order_zmud.htm") )
+	garyMenuData["Buy"].push( new Array("zMapper","/zmud/order_zmap.htm") )
+	garyMenuData["Buy"].push( new Array("AC Explorer","/zmud/order_ac.htm") )
+	garyMenuData["Buy"].push( new Array("zExplorer","/zmud/order_zexp.htm") )
+	garyMenuData["Buy"].push( new Array("DoctorZ","/doctorz/register.htm") )
+	garyMenuData["Buy"].push( new Array("zMUD Developer's Kit","/zmud/order_devkit.htm") )
+	garyMenuData["Downloads"] = new Array()
+	garyMenuNames.push( new Array("Downloads", 224, 226, 105, 90) )
+	garyMenuData["Downloads"].push( new Array("zMUD","/zmud/down.asp#zMUD") )
+	garyMenuData["Downloads"].push( new Array("zMapper","/zmud/down.asp#zMap") )
+	garyMenuData["Downloads"].push( new Array("AC Explorer","/zmud/down.asp#ACX") )
+	garyMenuData["Downloads"].push( new Array("zExplorer","/zmud/down.asp#ACX") )
+	garyMenuData["Downloads"].push( new Array("DoctorZ","/zmud/down.asp#DoctorZ") )
+	garyMenuData["Support"] = new Array()
+	garyMenuNames.push( new Array("Support", 322, 324, 160, 145) )
+	garyMenuData["Support"].push( new Array("Support Library","/library") )
+	garyMenuData["Support"].push( new Array("Bug reports","/zmud/bugs.htm") )
+	garyMenuData["Support"].push( new Array("Lost Registration code","/zuggsoft/regcode.htm") )	
+	garyMenuData["Support"].push( new Array("Links","/links/links.asp") )
+	garyMenuData["Support"].push( new Array("MUDs","/muds/links.cfm") )
+	garyMenuData["Forums"] = new Array()
+	garyMenuNames.push( new Array("Forums", 396, 398, 120, 105) )
+	garyMenuData["Forums"].push( new Array("zMUD General","/forum/FORUM.asp?FORUM_ID=7&CAT_ID=1&Forum_Title=zMUD+General+Discussion") )
+	garyMenuData["Forums"].push( new Array("zMUD Beta","/forum/FORUM.asp?FORUM_ID=8&CAT_ID=1&Forum_Title=zMUD+Beta+Forum") )
+	garyMenuData["Forums"].push( new Array("zMapper","/forum/FORUM.asp?FORUM_ID=31&CAT_ID=3&Forum_Title=zMapper+Discussion") )
+	garyMenuData["Forums"].push( new Array("AC Explorer","/forum/FORUM.asp?FORUM_ID=13&CAT_ID=3&Forum_Title=AC+Explorer+Discussion") )
+	garyMenuData["Forums"].push( new Array("zExplorer","/forum/FORUM.asp?FORUM_ID=13&CAT_ID=3&Forum_Title=AC+Explorer+Discussion") )
+	garyMenuData["Forums"].push( new Array("DoctorZ","/forum/FORUM.asp?FORUM_ID=12&CAT_ID=3&Forum_Title=DoctorZ+Discussion") )
+	garyMenuData["Forums"].push( new Array("Developers","/forum/FORUM.asp?FORUM_ID=10&CAT_ID=1&Forum_Title=zMUD+Developers") )
+	garyMenuData["Contact"] = new Array()
+	garyMenuNames.push( new Array("Contact", 400, 403, 160, 145) )
+	garyMenuData["Contact"].push( new Array("Feedback","/zuggsoft/feedback.htm") )
+	garyMenuData["Contact"].push( new Array("Bug reports","/zmud/bugs.htm") )
+	garyMenuData["Contact"].push( new Array("Lost Registration code","/zuggsoft/regcode.htm") )	
+	garyMenuData["Contact"].push( new Array("Email","mailto:support@zuggsoft.com") )
+//-->
+</script>
+<script language="JavaScript">
+<!--
+	var gstrBrowserType = null
+	if( document.layers )   gstrBrowserType="Netscape";
+	else if( document.all )	gstrBrowserType="IE";
+	gstrMenuColor = "#F3E9EF"
+	gstrMenuColorOn = "#D2AEC4"
+	gstrBorderColor = "#993366"
+	var strAlignment = "left"
+	if( gstrBrowserType == "Netscape" )
+	{
+		for (var intCnt=0; intCnt<garyMenuNames.length; intCnt++) {
+			if( intCnt == (garyMenuNames.length - 1) ){
+				//All menus are left-aligned except the last menu
+				strAlignment = "right"
+			}
+			//Pass the menu name, the menu left position Netscape, the Netscape width, and the alignment of text in the menu
+			createNetscapeMenu(garyMenuNames[intCnt][0], garyMenuNames[intCnt][1], garyMenuNames[intCnt][3], strAlignment)
+		}
+	}
+	else if( gstrBrowserType == "IE" )
+	{
+		for (var intCnt=0; intCnt<garyMenuNames.length; intCnt++) {
+			if( intCnt == (garyMenuNames.length - 1) ){
+				//All menus are left-aligned except the last menu
+				strAlignment = "right"
+			}
+			//Pass the menu name, the menu left position for IE, the IE width, and the alignment of text in the menu
+			createIEMenu(garyMenuNames[intCnt][0], garyMenuNames[intCnt][2], garyMenuNames[intCnt][4], strAlignment)
+		}
+	}
+//-->
+</script>
+
+<table width="100%" border="0" cellpadding="0">
+  <tr>
+    <td>
+      <table border="0" cellpadding="0" width="100%" background="/common/background.gif">
+<!--
+      <table border="0" cellpadding="0" width="100%" background="/common/pumpbg2.gif">
+-->
+        <tr>
+          <td width="160"><a href="/zuggsoft/zuggsoft.htm" target="_top"><img border="0" src="/common/zs.gif" width="130" height="53"></a> 
+<!--
+          <img border="0" src="/common/flag.gif" width="100" height="55">
+-->
+          </td>
+          <td>
+            <font face="Verdana" size="2" color="#0000FF"><b>Customer&nbsp;driven&nbsp;Internet&nbsp;Software<br>
+            Upgrades&nbsp;are&nbsp;always&nbsp;FREE,&nbsp;FOREVER!</b></font>
+          </td>
+          <td valign="middle" align="right"><font size="-2" face="Arial">
+            [<a href="http://www.mudconnector.com/" target="_blank">The&nbsp;MUD&nbsp;Connector</a>]<br>
+            [<a href="http://www.themudjournal.com/" target="_blank">The&nbsp;MUD&nbsp;Journal</a>]<br>
+            [<a href="http://www.mudcompanion.com/" target="_blank">The&nbsp;MUD&nbsp;Companion</a>]<br>
+            [<a href="http://www.kyndig.com">Kyndig.com</a>]</font></td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td>
+      <table border="0" width="100%" cellpadding="0">
+        <tr>
+          <td width="48" valign="top">
+            <a href="/zuggsoft/whatsnew.htm" onmouseover="showMenu('News')" onmouseout="hideMenu('News')">
+            <img src="/common/newsbutton.gif" width="49" height="21" alt="" border="0"></a></td>
+          <td width="81" valign="top">
+            <a href="/zuggsoft/product.htm" onmouseover="showMenu('Products')" onmouseout="hideMenu('Products')">
+            <img src="/common/productbutton.gif" width="82" height="21" alt="" border="0"></a></td>
+          <td width="74" valign="top">
+            <a href="/zmud/register.htm" onmouseover="showMenu('Buy')" onmouseout="hideMenu('Buy')">
+            <img src="/common/buybutton.gif" width="75" height="21" alt="" border="0"></a></td>
+          <td width="95" valign="top">
+            <a href="/zmud/down.htm" onmouseover="showMenu('Downloads')" onmouseout="hideMenu('Downloads')">
+            <img src="/common/downloadbutton.gif" width="96" height="21" alt="" border="0"></a></td>
+          <td width="71" valign="top">
+            <a href="/library" onmouseover="showMenu('Support')" onmouseout="hideMenu('Support')">
+            <img src="/common/supportbutton.gif" width="72" height="21" alt="" border="0"></a></td>
+          <td width="67" valign="top">
+            <a href="/forum/default.asp" onmouseover="showMenu('Forums')" onmouseout="hideMenu('Forums')">
+            <img src="/common/forumbutton.gif" width="68" height="21" alt="" border="0"></a></td>
+          <td width="93" valign="top">
+            <a href="/zuggsoft/feedback.htm" onmouseover="showMenu('Contact')" onmouseout="hideMenu('Contact')">
+            <img src="/common/contactbutton.gif" width="94" height="21" alt="" border="0"></a></td>
+          <td width="9999" bgcolor="#9C3163" align="right">
+            <font size="-2" face="Arial" color="#FFFFDE">©&nbsp;2002&nbsp;Zugg&nbsp;Software&nbsp;</font>
+          </td>
+        </tr>
+        <noscript>
+          <tr>
+          <td bgcolor="#F5F5F5" width="48">
+            <table border="0" cellpadding="0">
+              <tr><td><font size="1"><a href="/zuggsoft/privacy.htm">Privacy</a></font></td></tr>
+              <tr><td><font size="1"><a href="/zmud/press.htm">Press</a></font></td></tr>
+              <tr><td><font size="1"><a href="/zuggsoft/about.htm">About&nbsp;us</a></font></td></tr>
+              <tr><td><font size="1">&nbsp;</font></td></tr>
+              <tr><td><font size="1">&nbsp;</font></td></tr>
+            </table></td>
+          <td bgcolor="#F5F5F5" width="81">
+            <table border="0" cellpadding="0">
+              <tr><td><font size="1"><a href="/zmud/zmudinfo.htm">zMUD</a></font></td></tr>
+              <tr><td><font size="1"><a href="/zmapper/zmapperinfo.htm">zMapper</a></font></td></tr>
+              <tr><td><font size="1"><a href="/ac/ac.asp">AC&nbsp;Explorer</a></font></td></tr>
+              <tr><td><font size="1"><a href="/zexplorer/zexplorerinfo.htm">zExplorer</a></font></td></tr>
+              <tr><td><font size="1"><a href="/doctorz/doctorzinfo.htm">DoctorZ</a></font></td></tr>
+              <tr><td><font size="1"><a href="/devkit/devkitinfo.htm">Developer's&nbsp;Kit</a></font></td></tr>
+              <tr><td><font size="1"><a href="/zchat/zchatinfo.htm">zChat</a></font></td></tr>
+            </table></td>
+          <td bgcolor="#F5F5F5" width="74">
+            <table border="0" cellpadding="0">
+              <tr><td><font size="1"><a href="/zmud/order_zmud.htm">zMUD</a></font></td></tr>
+              <tr><td><font size="1"><a href="/zmud/order_zmap.htm">zMapper</a>&nbsp;</font></td></tr>
+              <tr><td><font size="1"><a href="/zmud/order_ac.htm">AC&nbsp;Explorer</a></font></td></tr>
+              <tr><td><font size="1"><a href="/zmud/order_zexp.htm">zExplorer</a></font></td></tr>
+              <tr><td><font size="1"><a href="/doctorz/register.htm">DoctorZ</a></font></td></tr>
+              <tr><td><font size="1"><a href="/zmud/order_devkit.htm">Developer's&nbsp;Kit</a></font></td></tr>
+            </table></td>
+          <td bgcolor="#F5F5F5" width="95">
+            <table border="0" cellpadding="0">
+              <tr><td><font size="1"><a href="/zmud/down.asp#zMUD">zMUD</a></font></td></tr>
+              <tr><td><font size="1"><a href="/zmud/down.asp#zMap">zMapper</a></font></td></tr>
+              <tr><td><font size="1"><a href="/zmud/down.asp#ACX">AC&nbsp;Explorer</a></font></td></tr>
+              <tr><td><font size="1"><a href="/zmud/down.asp#ACX">zExplorer</a></font></td></tr>
+              <tr><td><font size="1"><a href="/zmud/down.asp#DoctorZ">DoctorZ</a></font></td></tr>
+              <tr><td><font size="1">&nbsp;</font></td></tr>
+              <tr><td><font size="1">&nbsp;</font></td></tr>
+            </table></td>
+          <td bgcolor="#F5F5F5" width="71">
+            <table border="0" cellpadding="0">
+              <tr><td><font size="1"><a href="/library">Library</a></font></td></tr>
+              <tr><td><font size="1"><a href="/links/links.asp">Links</a></font></td></tr>
+              <tr><td><font size="1"><a href="/muds/links.cfm">MUDs</a></font></td></tr>
+              <tr><td><font size="1">&nbsp;</font></td></tr>
+              <tr><td><font size="1">&nbsp;</font></td></tr>
+            </table></td>
+          <td bgcolor="#F5F5F5" width="67">
+            <table border="0" cellpadding="0">
+              <tr><td><font size="1"><a href="/forum/FORUM.asp?FORUM_ID=7&amp;CAT_ID=1&amp;Forum_Title=zMUD+General+Discussion">zMUD&nbsp;General</a></font></td></tr>
+              <tr><td><font size="1"><a href="/forum/FORUM.asp?FORUM_ID=8&amp;CAT_ID=1&amp;Forum_Title=zMUD+Beta+Forum">zMUD&nbsp;Beta</a></font></td></tr>
+              <tr><td><font size="1"><a href="/forum/FORUM.asp?FORUM_ID=13&amp;CAT_ID=3&amp;Forum_Title=AC+Explorer+Discussion">AC&nbsp;Explorer</a></font></td></tr>
+              <tr><td><font size="1"><a href="/forum/FORUM.asp?FORUM_ID=13&amp;CAT_ID=3&amp;Forum_Title=AC+Explorer+Discussion">zExplorer</a></font></td></tr>
+              <tr><td><font size="1"><a href="/forum/FORUM.asp?FORUM_ID=12&amp;CAT_ID=3&amp;Forum_Title=DoctorZ+Discussion">DoctorZ</a></font></td></tr>
+              <tr><td><font size="1"><a href="/forum/FORUM.asp?FORUM_ID=10&amp;CAT_ID=1&amp;Forum_Title=zMUD+Developers">Developers</a></font></td></tr>
+            </table></td>
+          <td bgcolor="#F5F5F5" width="93">
+            <table border="0" cellpadding="0">
+              <tr><td><font size="1"><a href="/zuggsoft/suggest.cfm">Feedback</a></font></td></tr>
+              <tr><td><font size="1"><a href="/zmud/bugs.cfm">Bug&nbsp;reports</a></font></td></tr>
+              <tr><td><font size="1"><a href="mailto:support@zuggsoft.com">Email</a></font></td></tr>
+              <tr><td><font size="1">&nbsp;</font></td></tr>
+              <tr><td><font size="1">&nbsp;</font></td></tr>
+            </table></td>
+          <td width="9999" bgcolor="#F5F5F5">&nbsp;</td>
+          </tr>
+        </noscript>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td bgcolor="808080" height="2"><img border="0" src="/common/1x1.gif" width="1" height="2"></td>
+  </tr>
+</table>
+
+
+<h1>MUD eXtension Protocol (MXP)</h1>
+
+<p>The MUD eXtension Protocol (MXP) is an open specification for enhancing the
+communication between MUD servers and clients.&nbsp; To contribute to this
+specification, email <a href="mailto:zugg@zuggsoft.com">zugg@zuggsoft.com</a> or
+participate in the <a href="http://www.zuggsoft.com/forums">Developer's Forum</a>
+on www.zuggsoft.com. 
+
+<dl>
+  <dt><img border="0" src="../common/diamond.gif" align="bottom" width="14" height="14">  
+    <a href="#MXP Specification">MXP specification</a></dt>
+  <dt><img border="0" src="../common/diamond.gif" align="bottom" width="14" height="14">
+    <a href="mxplist.htm">List of MUDs with MXP support</a></dt>
+  <dt><img border="0" src="../common/diamond.gif" align="bottom" width="14" height="14">  
+    <a href="mxplist.htm#MUD Clients that support MXP">List of MUD Clients with
+    MXP support</a></dt>
+  <dd><a href="mxpzmud.htm">zMUD Implementation notes</a><br>
+    <a href="http://www.mushclient.com/mxp.htm">MUSHclient Implementation notes</a></dd>
+  <dt>&nbsp;</dt>
+</dl>
+
+<h2><img src="../common/red_bar.gif" width="100%" height="2"><br>
+<a name="MXP Specification">MXP Specification</a> &nbsp;</h2>
+
+<p>Version 0.5 (18-Oct-01)</p>
+
+<h4>Contents</h4>
+
+<blockquote>
+  <dl>
+    <dt><a href="#Introduction">Introduction</a></dt>
+    <dt><a href="#Overview of MXP">Overview of MXP</a></dt>
+    <dt><a href="#MXP Line Tags">MXP Line Tags</a></dt>
+    <dt><a href="#MXP Reference">MXP Reference</a></dt>
+    <dd><a href="#ELEMENT">Elements</a> &lt;!ELEMENT&gt;</dd>
+    <dd><a href="#ATTLIST">Attributes</a> &lt;!ATT&gt;</dd>
+    <dd><a href="#ENTITY">Entities</a> &lt;!ENTITY&gt; &lt;VAR&gt;</dd>
+    <dt><a href="#User-defined Line Tags">User-defined Line Tags</a></dt>
+    <dt><a href="#Tag Properties">Tag Properties</a></dt>
+    <dt>MXP Tags</dt>
+    <dd><a href="#Text Formatting">Text Formatting</a> &lt;B&gt; &lt;I&gt;
+      &lt;U&gt; &lt;S&gt; &lt;H&gt; &lt;COLOR&gt; &lt;FONT&gt;</dd>
+    <dd><a href="#Line Spacing">Line Spacing</a> &lt;NOBR&gt; &lt;P&gt;
+      &lt;BR&gt; &lt;SBR&gt;</dd>
+    <dd><a href="#Links">Links</a>  &lt;SEND&gt; &lt;A&gt; &lt;EXPIRE&gt;</dd>
+    <dd><a href="#Version Control">Version Control</a> &lt;VERSION&gt;
+      &lt;SUPPORT&gt;</dd>
+    <dt>Optional Tags</dt>
+    <dd><a href="#MSP Compatibility">MSP Compatibility</a> &lt;SOUND&gt;
+      &lt;MUSIC&gt;</dd>
+    <dd><a href="#Using Entities">Using Entities</a> &lt;GAUGE&gt; &lt;STAT&gt;</dd>
+    <dd><a href="#Frames">Frames</a> &lt;FRAME&gt;</dd>
+    <dd><a href="#Cursor Control">Cursor Control</a> &lt;DEST&gt;</dd>
+    <dd><a href="#Crosslinking multiple MUD servers">Cross-linking Multiple
+      MUD Servers</a> &lt;RELOCATE&gt; &lt;USER&gt; &lt;PASSWORD&gt;</dd>
+    <dd><a href="#Images">Images</a> &lt;IMAGE&gt;</dd>
+    <dd><a href="#File Filters">File Filters</a> &lt;FILTER&gt;</dd>
+    <dt>Outdated Tags</dt>
+    <dd><a href="#Server-side scripting">Server-side Scripting</a>
+      &lt;SCRIPT&gt;</dd>
+    <dt><a href="#Implementation Details">Implementation Details</a></dt>
+    <dt><a href="#A Detailed Example"><b>A Detailed Example</b></a></dt>
+    <dt><a href="#Conclusions">Conclusions</a></dt>
+  </dl>
+</blockquote>
+
+<h3><a name="Introduction">Introduction</a></h3>
+
+<p>MUD Servers communicate with MUD Clients via the Telnet Protocol.
+&nbsp; While Telnet is the basis of most Internet protocols (FTP, HTML, SMTP, etc), most
+of these protocols enhance Telnet with their own higher-level protocol in order to provide
+more specific and directed features.&nbsp; For example, FTP adds a command language for
+transferring files via the Telnet socket connection.</p>
+
+<p>Traditionally, MUDs have used raw Telnet.&nbsp; MUD sessions have
+been enhanced using standard terminal protocols, such as ANSI and VT100 to add color and
+cursor control.&nbsp; However, there is no higher-level command protocol used by MUDs to
+enhance the game session.&nbsp; The MUD eXtension Protocol (MXP) attempts to fill this gap
+by providing a markup language based loosely upon HTML and XML that allows better communication between the
+MUD Server and Client.</p>
+
+<p>The design goals for MXP are: 
+
+<ol>
+  <li>MXP will be based upon existing standards when possible.</li>
+  <li>MXP will be small and efficient since MUDs send a great deal of text
+    to the client already.</li>
+  <li>MXP will be easy to implement for both the MUD Server and Clients.</li>
+  <li>The MXP specification will be public-domain.</li>
+</ol>
+
+<p>NOTE: The copyright for the MXP protocol
+has been removed by Zugg Software as of MXP version 0.1.&nbsp; Zugg Software
+will still lead the development of MXP, but any MUD client or server is welcome
+to use and extend this specification as desired.&nbsp; Zugg Software will
+coordinate the documentation of MXP in the Developer's Forum at the web site: <a href="http://www.zuggsoft.com">www.zuggsoft.com</a>.&nbsp;
+Send all proposed changes to <a href="mailto:zugg@zuggsoft.com">zugg@zuggsoft.com</a>
+to get them incorporated into this spec.</p>
+
+<h3><a name="Overview of MXP">Overview of MXP</a></h3>
+
+<p>MXP is based loosely on the HTML and XML standards supported by modern web
+browsers.&nbsp; It is only &quot;loosely&quot; based upon these standards
+because MUDs require dynamic, streaming text, rather than the page-oriented view
+of web browsers.&nbsp; Also, the existing standards are needlessly verbose for
+use on a MUD where text efficiency is important.</p>
+
+<p>In addition, there are additional security concerns to worry about
+with MXP.&nbsp; While support for HTML tags within a line is desired, players on a MUD can
+exploit this power and cause problems.&nbsp; Certain HTML functions need to be restricted
+so that MUD players cannot abuse them.&nbsp; For example, while it might be desirable to
+allow players to change the font or color of their chat messages, you would not want to
+allow them to display a large graphics image, or execute script commands on the client of
+other users.&nbsp; MXP handles this by grouping the various tags and commands into secure
+and open categories, and preventing the secure tags from being used by MUD players.</p>
+
+<p>Two additional Client/Server protocols are not discussed in this
+document.&nbsp; The <a href="msp.htm"> MUD Sound Protocol</a> (MSP) is a separate specification, and while MXP
+provides compatibility with MSP, it does not add any additional sound support of its own.&nbsp;</p>
+
+<h3><a name="MXP Line Tags">MXP Line Tags</a></h3>
+
+<p>The core of MXP involves tagging text lines sent by the MUD. &nbsp;
+Each MXP command is marked as either &quot;Open&quot; or
+&quot;Secure&quot;.&nbsp; Lines sent from the MUD are also marked as
+&quot;Open&quot; or &quot;Secure&quot;.&nbsp; On an &quot;Open&quot; MUD Line,
+only &quot;Open&quot; MXP commands are allowed.&nbsp; On a &quot;Secure&quot;
+MUD line, both &quot;Open&quot; and &quot;Secure&quot; MXP tags are
+allowed.&nbsp; Additional &quot;open&quot; tags can also be used to group lines
+from the MUD into channels that the user can easily control on the client.</p>
+
+<p><font color="#0000FF">MUD Server Implementation Note: Be very
+careful when sending Secure lines from the MUD.&nbsp; Be absolutely sure that
+MUD players cannot control the output of a secure line.&nbsp; If a MUD player is
+able to send a secure MXP command, he will be able to cause great damage to
+other MUD players using MXP.</font></p>
+
+<p>To ensure that tags are difficult to send by MUD players, an escape
+sequence, similar to ANSI or VT100 is used:</p>
+
+<pre>&lt;ESC&gt; [ # z</pre>
+
+<p>where # is the tag number to use.&nbsp; Tag numbers are defined as:
+
+<dl>
+  <dt>0&nbsp;&nbsp;&nbsp; open line</dt>
+  <dd>only MXP commands in the &quot;open&quot; category are allowed.</dd>
+  <dt>1&nbsp;&nbsp;&nbsp; secure line (until next newline)</dt>
+  <dd>all tags and commands in MXP are allowed within the line.&nbsp; When a
+    newline is received from the MUD, the mode reverts back to Open mode.</dd>
+  <dt>2&nbsp;&nbsp;&nbsp; locked line (until next newline)</dt>
+  <dd>no MXP or HTML commands are allowed in the line.&nbsp; The line is
+    not parsed for any tags at all.&nbsp; This is useful for &quot;verbatim&quot; text output
+    from the MUD.&nbsp; When a newline is received from the MUD, the mode
+    reverts back to Open mode.</dd>
+</dl>
+
+<p>The following additional modes were added to the v0.4 MXP spec:</p>
+
+<dl>
+  <dt>3&nbsp;&nbsp;&nbsp; reset</dt>
+  <dd>close all open tags.&nbsp; Set mode to Open.&nbsp; Set text color and
+    properties to default.</dd>
+  <dt>4&nbsp;&nbsp;&nbsp; temp secure mode</dt>
+  <dd>set secure mode for the next tag only.&nbsp; Must be immediately followed
+    by a &lt; character to start a tag.&nbsp; Remember to set secure mode when
+    closing the tag also.</dd>
+  <dt>5&nbsp;&nbsp;&nbsp; lock open mode</dt>
+  <dd>set open mode.&nbsp; Mode remains in effect until changed.</dd>
+  <dt>6&nbsp;&nbsp;&nbsp; lock secure mode</dt>
+  <dd>set secure mode.&nbsp; Mode remains in effect until changed.</dd>
+  <dt>7&nbsp;&nbsp;&nbsp; lock locked mode</dt>
+  <dd>set locked mode.&nbsp; Mode remains in effect until changed.</dd>
+</dl>
+
+<p>The following modes are client-specific and were implemented in the v0.3 MXP
+spec by zMUD:</p>
+
+<dl>
+  <dt>10&nbsp;&nbsp;&nbsp; room name</dt>
+  <dd>the line is parsed as the name of a room.&nbsp; Only used by MUDs
+    that only support tagging for the automapper and do not support the full MXP tag set.</dd>
+  <dt>11&nbsp;&nbsp;&nbsp; room description</dt>
+  <dd>the line is parsed as a description of a room.&nbsp; Only used by
+    MUDs that only support tagging for the automapper and do not support the full MXP tag set.</dd>
+  <dt>12&nbsp;&nbsp;&nbsp; room exits</dt>
+  <dd>the line is parsed as an exit line for a room.&nbsp; Only used by
+    MUDs that only support tagging for the automapper and do not support the full MXP tag set.</dd>
+  <dt>19&nbsp;&nbsp;&nbsp; welcome text</dt>
+  <dd>This text is sent from the MUD at the beginning of a session to
+    welcome the user to the MUD.&nbsp; This text is not displayed by the client if a
+    &lt;RELOCATE&gt; command has been used.&nbsp; See the section on Multi-Server MUDs for
+    more details.&nbsp; Same as the &lt;WELCOME&gt; MXP tag.</dd>
+  <dt>&nbsp;</dt>
+  <dt>20-99&nbsp;&nbsp;&nbsp; user-defined</dt>
+  <dd>the line is tagged for a MUD-specific purpose.&nbsp; The tag must
+    have been previously defined using an MXP definition command to tell the client how to
+    handle the line.&nbsp; A common use for these is to tag various chat channels to allow
+    client-side filtering or redirection of the text.</dd>
+</dl>
+
+<p>Note that the tag numbers from 10-19 are reserved for
+automapper usage.&nbsp; MUDs can easily support the automapper by simply tagging lines
+sent to the client using these codes.&nbsp; However, MUDs that fully support the MXP
+spec should mark the automapper information using the MXP tags described later rather than
+just tagging the line.</p>
+
+<p>As with VT100 and ANSI sequences, the tag number is sent as decimal
+text.&nbsp; So, for example, to tag a line as &quot;secure&quot;, the sequence:
+&lt;ESC&gt;[1z is sent from the MUD (where &lt;ESC&gt; is ascii character 27).</p>
+
+<p>When the mode is changed from OPEN mode to any other mode, any unclosed OPEN tags
+(tags that were used while in open mode) are automatically closed.&nbsp; Also,
+when in OPEN mode, any unclosed OPEN tags are automatically closed when a
+newline is received from the MUD.</p>
+
+<p>Note that secure tags are never automatically closed (this is a change from
+the 0.3 spec).&nbsp; Be sure to close your secure tags sent from the MUD, or use
+the Reset mode periodically.</p>
+
+<h3><a name="MXP Reference">MXP Reference</a></h3>
+
+<p>The core of MXP involves &quot;Elements.&quot;&nbsp;
+Elements are like normal HTML tags.&nbsp; For example &lt;B&gt; is an element
+called &quot;B&quot;.&nbsp; It causes text to be bolded.&nbsp; To turn off the
+bold, the &lt;/B&gt; element is used.&nbsp; Each element has a corresponding
+closing element that starts with a /.&nbsp; The exception are Commands.&nbsp;
+Commands are elements that do not require a closing tag.&nbsp; For example, the
+element &lt;BR&gt; causes a line break.&nbsp; No closing tag is needed.<p>Borrowing
+a feature from XML, MXP allows you to define your own elements.&nbsp; This is
+the true power of MXP.&nbsp; By defining your own elements and giving them short
+names, you can cause complex output formatting in only a few short characters.<p>In
+addition to Elements, you can also define &quot;Entities.&quot;&nbsp; Entities
+are like macro string replacements.&nbsp; For example, in HTML, the entity &amp;lt;
+indicates the &lt; or less-than symbol.&nbsp; Since a normal &lt; symbol is
+interpreted as the start of an element tag, you must use &amp;lt; to refer to a
+less-than symbol directly.&nbsp; Entities are accessed by putting a &amp;
+character in front of the entity name, and terminating the name with a ;
+character.&nbsp; All of the standard HTML entities are available in MXP,
+including the &amp;#nnn; entity to insert character /nnn into the text
+stream.&nbsp; Note that nnn values less than 32 are ignored.<p> Of course, like in XML, you can define your own entities in MXP.&nbsp;
+MUD-defined entities work much like server variables.&nbsp; For example, you
+could store the player's hit-points in an entity called &amp;hp;
+
+<p>Here is a list of each MXP command, along with it's purpose
+and abbreviation:
+
+<h4>Elements</h4>
+
+<dl>
+  <dt><a name="ELEMENT">&lt;!ELEMENT&gt;&nbsp;&nbsp;&nbsp;
+    &lt;!EL&gt;</a></dt>
+  <dt>&lt;!ELEMENT element-name [definition]
+    [ATT=attribute-list] [TAG=tag] [FLAG=flags] [OPEN] [DELETE] [EMPTY]&gt;</dt>
+  <dd>&nbsp;</dd>
+  <dd>Used to define a new element (user-defined tag).&nbsp; The name of the tag is
+    specified.&nbsp; To specify a Command element
+    with empty content (such as a simple command tag), add the keyword EMPTY after the name of
+    the tag.&nbsp; For example:</dd>
+</dl>
+
+<blockquote>
+  <pre>&lt;!EL Command EMPTY&gt;</pre>
+</blockquote>
+
+<blockquote>
+  <p>specifies a tag called &lt;Command&gt; which does not require a closing
+  &lt;/Command&gt; since it has no content.</p>
+  <p>The 'Definition' is the optional macro expansion for
+  this element.&nbsp; You can use a list of any text or other MXP commands in
+  this definition.&nbsp; For example, to create a new element called
+  &quot;RED&quot; which colors text red and makes it bold, you would define it
+  as:</p>
+  <pre>&lt;!ELEMENT red '&lt;COLOR red&gt;&lt;B&gt;'&gt;</pre>
+  <p>And then you could use it in your MUD output like this:</p>
+  <pre>&lt;red&gt;This text is bold and red&lt;/red&gt;</pre>
+  <p>The 'Attribute-list' allows you to define arguments or
+  attributes for your element.&nbsp; You can optionally specify the attributes
+  using the &lt;!ATTLIST&gt; MXP command described later, or you can include
+  them in the &lt;!ELEMENT&gt; definition for simplicity.&nbsp; To create an
+  element that would allow you to change the text color, but would default to
+  red, you would do:</p>
+  <pre>&lt;!ELEMENT boldtext '&lt;COLOR &amp;col;&gt;&lt;B&gt;' ATT='col=red'&gt;</pre>
+  <p>Then you could use it on the MUD like this:</p>
+  <pre>&lt;boldtext&gt;This is bold red&lt;/boldtext&gt;
+&lt;boldtext col=blue&gt;This is bold blue text&lt;/boldtext&gt;
+&lt;boldtext blue&gt;This is also bold blue text&lt;/boldtext&gt;</pre>
+  <p>Note that you use an attribute in the element definition
+  by referring to it as an entity.&nbsp; In this case, the temporary entity &amp;col;
+  refers to the color attribute that is passed.&nbsp; The 'col=red' defines the
+  attribute, and gives the default value of 'red'.&nbsp; When the new element is
+  used, the name of the attribute can be omitted if you give the arguments in
+  the same order as the definition.&nbsp; That is how the third example is able
+  to work.</p>
+  <p>The TAG=tag argument allows you to associate an element
+  with a user-defined line tag.&nbsp; This is explained more in a later section.</p>
+  <p>The FLAG=flags argument allows you to assign an internal
+  action to the element.&nbsp; This is explained more in a later section.</p>
+  <p>The OPEN argument sets the defined element to be an
+  &quot;Open&quot; element.&nbsp; By default, elements are created as
+  &quot;Secure&quot; elements.</p>
+  <p>The DELETE argument allows you to delete an element
+  previously defined.</p>
+  <p><font color="#0000FF">Security Note: Elements are marked as to whether they
+  are created by the MUD or created interactively by the user.&nbsp; The user
+  cannot override Secure elements sent from the MUD.&nbsp; The user is only
+  allowed to override Open elements sent from the MUD.</font></p>
+
+</blockquote>
+
+<h4>Attributes</h4>
+
+<dl>
+  <dt><a name="ATTLIST">&lt;!ATTLIST&gt; &lt;!AT&gt;</a></dt>
+  <dt>&lt;!ATTLIST element-name attribute-list&gt;</dt>
+  <dd>&nbsp;</dd>
+  <dd>As described in the previous section, this allows you to add attributes to elements.&nbsp; An attribute list specifies the name of
+    the attribute and an optional default value.&nbsp; In MXP, attribute names can be
+    eliminated from the Element if they are given in the same order that they are defined.&nbsp;</dd>
+  <dd>
+
+<p><font color="#0000FF">Implementation Note (MXP v0.1): Attribute
+lists were changed from the earlier MXP spec.&nbsp; The data type of the
+attributes are no longer specified, since the type is not important to the MUD
+server of client.&nbsp;&nbsp;</font></p>
+
+  </dd>
+</dl>
+
+<blockquote>
+  <dl>
+    <dt>To define attributes, simply list the names of the
+      attributes in the order that you want.&nbsp; To add an optional default,
+      use the syntax =Default after the attribute name.&nbsp; For example the
+      command:</dt>
+  </dl>
+  <pre>&lt;!ATTLIST boldtext 'color=red background=white flags'&gt;</pre>
+  <p>Specifies the attribute list for the 'boldtext'
+  element.&nbsp; The first argument is called 'color' and has a default value of
+  'red'.&nbsp; The second argument is called 'background' and has a default
+  value of 'white'.&nbsp; The third argument is called 'flags' and has no
+  default value.</p>
+  <p>Note that you can specify the attribute list using the
+  ATT='list' argument in the &lt;!ELEMENT&gt; definition.&nbsp; Because of this,
+  there is little use for the &lt;!ATTLIST&gt; command except for modifying the
+  argument list on-the-fly without changing the original definition.</p>
+</blockquote>
+
+<blockquote>
+  <p>For example, here is the full MSP Sound command as defined in MXP:</p>
+</blockquote>
+
+<blockquote>
+  <pre>&lt;!ELEMENT Sound EMPTY&gt;
+&lt;!ATTLIST Sound FName V=100 L=1 P=50 T U&gt;</pre>
+</blockquote>
+
+<blockquote>
+  <p>The full usage of this element would normally be:</p>
+</blockquote>
+
+<blockquote>
+  <pre>&lt;SOUND FName=&quot;ouch.wav&quot; V=50 L=2 P=80 T=&quot;combat&quot; U=&quot;http://www.zuggsoft.com/sounds/&quot;&gt;</pre>
+</blockquote>
+
+<blockquote>
+  <p>But in MXP, the shorthand could be used:</p>
+</blockquote>
+
+<blockquote>
+  <pre>&lt;SOUND &quot;ouch.wav&quot; 50 2 80 &quot;combat&quot; &quot;http://www.zuggsoft.com/sounds/&quot;&gt;</pre>
+</blockquote>
+
+<blockquote>
+  <p>You can omit some parameters using &quot;&quot; to specify the default, or mix
+  attribute names in:</p>
+</blockquote>
+
+<blockquote>
+  <pre>&lt;SOUND &quot;ouch.wav&quot; &quot;&quot; 2 T=&quot;combat&quot;&gt;</pre>
+</blockquote>
+
+<blockquote>
+  <p>would be the same as</p>
+</blockquote>
+
+<blockquote>
+  <pre>&lt;SOUND FName=&quot;ouch.wav&quot; V=100 L=2 T=&quot;combat&quot;&gt;</pre>
+</blockquote>
+
+<blockquote>
+  <p>Note the &quot;&quot; to specify the default for the V attribute.&nbsp; The P and U
+  attributes also take their defaults since they are not specified at all.&nbsp; The T=
+  overrides the parsing and tells MXP that the following value is for the T attribute
+  instead of the P attribute that it was expecting at that position in the element.</p>
+</blockquote>
+
+  <h4>Entities</h4>
+
+<dl>
+  <dt><a name="ENTITY">&lt;!ENTITY&gt;
+    &nbsp;&nbsp;&nbsp; &lt;!EN&gt;</a></dt>
+  <dt>&lt;!ENTITY Name Value [DESC=description] [PRIVATE] [PUBLISH] [DELETE]
+    [ADD] [REMOVE]&gt;</dt>
+  <dd>&nbsp;</dd>
+  <dd>Entities in MXP are used to store information from the MUD (MUD
+    Variables).&nbsp; Once an entity is defined, you can reference it's value
+    using the &amp;Name; syntax.&nbsp; For example:</dd>
+</dl>
+
+<blockquote>
+  <pre>&lt;!ENTITY Version &quot;6.15&quot;&gt;
+The current version of zMUD is &amp;version;</pre>
+</blockquote>
+
+<blockquote>
+  <p>would display:</p>
+</blockquote>
+
+<blockquote>
+  <pre>The current version of zMUD is 6.15</pre>
+</blockquote>
+
+<blockquote>
+  <p>Tags can be included within entities.&nbsp; Unlike in XML, tags can be broken across
+  entities within MXP as long as when all entities on a line from the MUD are expanded, all
+  of the tags are properly closed (or MXP will close the dangling tags for you).&nbsp; So,
+  the following is valid in MXP:</p>
+</blockquote>
+
+<blockquote>
+  <pre>&lt;!ENTITY Start &quot;&lt;em&gt;&quot;&gt;
+&lt;!ENTITY End &quot;&lt;/em&gt;&quot;&gt;
+&amp;Start;This text is emphasized&amp;End;</pre>
+</blockquote>
+
+<blockquote>
+  <p>Also note that as in XML, entities are case sensitive, so &amp;Start; is different than
+  &amp;start;.&nbsp; Unlike XML, entities can be used anywhere in MXP, even within other
+  tags.&nbsp; However, if an external entity has the same name as an attribute, the
+  attribute within a tag takes precedence.</p>
+  <p>All of the default HTML entities are defined in MXP.</p>
+  <p>To delete an entity, use the DELETE argument.&nbsp; Setting an entity to a
+  empty value does not delete it.</p>
+  <p>PRIVATE entities cannot be queried by the MUD client.&nbsp; They are
+  completely hidden.</p>
+  <p>PUBLISH entities can be used by the client to produce a list of MUD Server
+  variables to be access by the player</p>
+  <p>The DESC description is used to give your entity a longer description</p>
+  <p>The ADD argument causes the Value to be added as a new item in a string
+  list.&nbsp; So, it is appended to the existing value of the variable.&nbsp;
+  String lists are values separated by the | character.</p>
+  <p>The REMOVE argument causes the Value to be removed from the existing string
+  list.</p>
+  <p><font color="#0000FF">Security Note: Entities are marked as to whether they
+  are created by the MUD or created interactively by the user.&nbsp; The user
+  cannot override Entites sent from the MUD.&nbsp; The user is only allowed to
+  override user-defined entities.</font></p>
+</blockquote>
+
+<dl>
+  <dt>&lt;<a name="VAR">VAR</a>&gt;
+    &nbsp;&nbsp;&nbsp; &lt;V&gt;</dt>
+  <dt>&lt;VAR Name [DESC=description] [PRIVATE] [PUBLISH] [DELETE] [ADD]
+    [REMOVE]&gt;Value&lt;/VAR&gt;</dt>
+  <dd>&nbsp;</dd>
+  <dd>The &lt;!ENTITY&gt; tag allows the MUD server to set the value of a
+    variable without displaying the value to the user.&nbsp; The &lt;VAR&gt; tag
+    is just like the &lt;!ENTITY&gt; tag, except that the value of the variable
+    is placed between the &lt;VAR&gt; and &lt;/VAR&gt; tags, and this value is
+    displayed to the user.</dd>
+ <blockquote>
+ <pre>Hp: &lt;VAR Hp&gt;100&lt;/Var&gt;</pre>
+</blockquote>
+
+  <dl>
+<dd>would display: &quot;Hp: 100&quot; to the user, and would set the entity hp
+  to 100.</dd>
+</dl>
+
+
+<h3><a name="User-defined Line Tags">User-defined
+Line Tags</a></h3>
+
+<p>As mentioned near the beginning of this spec, a simple escape sequence can be used to
+tag a line.&nbsp; The tags 20-99 are defined by the MUD.&nbsp; The main purpose
+for user-defined line tags is to allow the user to customize how these lines are
+displayed.&nbsp; In particular, if the tag element is Open, the user can change
+the color, gag, or redirect the tagged line.&nbsp; This is useful for various chat
+channels on the MUD.&nbsp; Simply give them a name, and perhaps a default color, and make
+them open to allow the client user to gag them or redirect them to a different frame or
+window.&nbsp; Here is an example of an auction channel that can be controlled by the
+client user:</p>
+
+<pre>&lt;!ELEMENT Auction '&lt;FONT COLOR=red&gt;' TAG=20 OPEN&gt;
+&lt;ESC&gt;[20zA nice shiny sword is being auctioned.
+&lt;Auction&gt;Also, a gold ring is being auctioned.&lt;/Auction&gt;</pre>
+
+<p>This also shows the two different ways the MUD server would then send text on this new
+auction channel.&nbsp; The use of the user-defined tag (&lt;ESC&gt;[20z) sends
+less text to the client, although the regular use of the tag name is easier to
+read and understand.</p>
+
+<p>In both cases, the line is displayed to the user in red, by default.&nbsp;
+However, the user can change the attributes of this tag in the client, allowing
+them to change the color, gag the line, or redirect it to a different window.</p>
+
+<p>Note that if the OPEN tag is left out, the user cannot change how the line is
+displayed.</p>
+
+<h3><a name="Tag Properties">Tag Properties</a></h3>
+
+<p>MUD Clients can define properties tags to be used by the server in !ELEMENT
+definitions.&nbsp; The syntax is FLAG='value'.&nbsp; The following special flags are
+defined in zMUD:
+
+<dl>
+  <dt>RoomName</dt>
+  <dd>The text for the element is parsed by the automapper as the name of a room.</dd>
+  <dt>RoomDesc</dt>
+  <dd>The text for the element is parsed by the automapper as the description of a room.</dd>
+  <dt>RoomExit</dt>
+  <dd>The text for the element is parsed by the automapper as exits for the room</dd>
+  <dt>RoomNum</dt>
+  <dd>The text for the element is parsed by the automapper as a room number</dd>
+  <dt>Prompt</dt>
+  <dd>The text for the element is parsed by as a MUD Prompt</dd>
+  <dt>Set</dt>
+  <dd>The text for the element is stored into the named local variable within
+    the client.&nbsp; For
+    example:</dd>
+</dl>
+
+<blockquote>
+  <pre>&lt;!ELEMENT Hp FLAG=&quot;Set hp&quot;&gt;
+&lt;Hp&gt;100&lt;/Hp&gt;</pre>
+</blockquote>
+
+<blockquote>
+  <p>would set the @hp variable in the user's session to 100.</p>
+</blockquote>
+
+<h2>MXP Tags</h2>
+
+<h3><a name="Text Formatting">Text Formatting</a></h3>
+
+<p><b>NOTE</b>: Only the tags described in this section are OPEN tags.&nbsp; All
+other MXP tags are SECURE tags.</p>
+
+<dl>
+  <dt>&lt;B&gt; &lt;BOLD&gt; &lt;STRONG&gt;</dt>
+  <dd>Render the text using a bold font.&nbsp; Any above tag name can be used
+    for HTML compatibility, although the &lt;B&gt; tag is preferred for MUD
+    usage.</dd>
+  <dd><b>Example</b>: &lt;B&gt;this text is bold&lt;/B&gt;</dd>
+  <dt>&lt;I&gt; &lt;ITALIC&gt; &lt;EM&gt;</dt>
+  <dd>Render the text using an italic font.&nbsp; Any above tag name can be used
+    for HTML compatibility, although the &lt;I&gt; tag is preferred for MUD
+    usage.</dd>
+  <dd><b>Example</b>: &lt;I&gt;this text is italic&lt;/I&gt;</dd>
+  <dt>&lt;U&gt; &lt;UNDERLINE&gt;</dt>
+  <dd>Underline the text.&nbsp; Any above tag name can be used for HTML
+    compatibility, although the &lt;U&gt; tag is preferred for MUD usage.</dd>
+  <dd><b>Example</b>: &lt;U&gt;this text is underlined&lt;/U&gt;</dd>
+  <dt>&lt;S&gt; &lt;STRIKEOUT&gt;</dt>
+  <dd>Strike-out the text.&nbsp; Any above tag name can be used for HTML
+    compatibility, although the &lt;S&gt; tag is preferred for MUD usage.</dd>
+  <dd><b>Example</b>: &lt;S&gt;this text is crossed out&lt;/S&gt;</dd>
+  <dt>&lt;C&gt; &lt;COLOR FORE=foreground [BACK=background]&gt;</dt>
+  <dd>Set the color of the text.&nbsp; If the background color is omitted, the
+    current background color is used.</dd>
+  <dd><b>Example</b>: &lt;C red&gt;This text is red&lt;/C&gt;</dd>
+  <dt>&lt;H&gt; &lt;HIGH&gt;</dt>
+  <dd>Sets the color to a brighter version of the current color.</dd>
+  <dt>&lt;FONT FACE=name [SIZE=size] [COLOR=foreground] [BACK=background]&gt;</dt>
+  <dd>Change the font for the text.&nbsp; You can change the color at the same
+    time instead of using a separate &lt;COLOR&gt; tag.&nbsp; Note that changing
+    the font size can cause display problems on some clients.</dd>
+  <dd><b>Example</b>: &lt;FONT &quot;Times New Roman&quot;&gt;This text is in a
+    fancy font&lt;/FONT&gt;</dd>
+</dl>
+
+<h3><a name="Line Spacing">Line Spacing</a></h3>
+
+<p>Also, unlike HTML, normal spacing still applies to the MUD output in MXP.&nbsp; So,
+anywhere that there is a newline in the MUD output, a new line appears on the client.
+&nbsp; Multiple spaces are not absorbed, but are displayed as sent by the MUD.&nbsp; Tab
+characters can still be used for tab stops, and ANSI and VT100 codes can still be used as
+normal.&nbsp; This provides a very rich output environment for the MUD which has the best
+of both worlds between standard Telnet text and HTML tags.&nbsp;&nbsp;</p>
+
+<dl>
+  <dt>&lt;NOBR&gt;</dt>
+  <dd>
+
+To prevent a line break
+use the &lt;NOBR&gt; tag at the end of the line from the MUD.&nbsp; The next
+newline after the &lt;NOBR&gt; tag is ignored.
+
+  </dd>
+  <dt>&lt;P&gt;</dt>
+  <dd>Mark a paragraph.&nbsp; A paragraph is a set of separate lines sent by the
+    MUD which are recombined into a single line by the client.&nbsp; Basically,
+    all newlines sent from the MUD between the &lt;P&gt; and the &lt;/P&gt; are
+    ignored.&nbsp; To force a line break, use &lt;BR&gt;</dd>
+  <dt>&lt;BR&gt;</dt>
+  <dd>Line break.&nbsp; Forces a line break inside or outside of a
+    paragraph.&nbsp; Note that &lt;BR&gt; is NOT parsed as a newline from the
+    MUD as far as mode changes are concerned.</dd>
+  <dt>&lt;SBR&gt;</dt>
+  <dd>Soft line break.&nbsp; This is displayed as a space character in the
+    client.&nbsp; However, it marks a preferred location on the line for a
+    line-break to occur when word-wrapping the text in the client.</dd>
+  <dt>&amp;nbsp;</dt>
+  <dd>As in HTML, the &amp;nbsp; entity can be used to indicate a non-breaking
+    space character.&nbsp; Text will not be word-wrapped at this space by the
+    client.</dd>
+</dl>
+
+<h3><a name="Links">Links</a></h3>
+
+<dl>
+  <dt>&lt;A href=URL [hint=text] [expire=name]&gt;</dt>
+  <dd>The &lt;A&gt; tag works as it does in HTML to open a web page in the
+    user's web browser.&nbsp; When the mouse hovers over the link, the optional
+    &quot;hint&quot; text is displayed.&nbsp; If the hint text is not given, the
+    URL of the link will be shown in the hint box.&nbsp; The Expire name is used
+    for links that expire.&nbsp; See the &lt;expire&gt; tag for more details.
+
+<p> The http:// URL
+will open the user's external web browser to the specified web page.&nbsp; The telnet://
+URL will open another window for the specified telnet address and port.&nbsp; The
+mailto: URL will open your email client allowing you to send email to the specified
+address.&nbsp;</p>
+
+<p> <b>Example</b>: &lt;A &quot;http://www.zuggsoft.com&gt;Click here for
+zMUD&lt;/A&gt;&nbsp;</p></dd>
+
+  <dt>&lt;SEND [href=command] [hint=text] [prompt] [expire=name]&gt;</dt>
+  <dd>
+Send links allow you to initiate certain actions when a user clicks on linked text.&nbsp; On
+the web, clicking on a link results in opening a new web document.&nbsp; In MXP, links are
+more flexible, and normally will send commands back to the MUD rather than opening
+documents.&nbsp; For example,
+to send the command &quot;buy bread&quot; to the MUD, you would use the syntax:
+
+
+<pre>&lt;send&gt;buy bread&lt;/send&gt;</pre>
+
+<p>The MUD client would display &quot;buy bread&quot; as a link (underlined).&nbsp; If
+the user clicks on this link, the text &quot;buy bread&quot; is sent to the MUD.&nbsp;&nbsp;</p>
+
+<p> You
+can make the text sent by the link and the text displayed to the user different using the
+HREF attribute for the &lt;send&gt; command.&nbsp; You can refer to the text being
+displayed using the entity value of &amp;text;&nbsp; For example, if displaying a list of items to be purchased from the store when the user
+clicks on the item, you could send:</p>
+
+<pre>&lt;send href=&quot;buy bread&quot;&gt;bread&lt;/send&gt;
+&lt;send href=&quot;buy water&quot;&gt;water&lt;/send&gt;</pre>
+
+<p>This would display the text &quot;bread&quot; and &quot;water&quot; and send the
+appropriate &quot;buy&quot; command when they are clicked.&nbsp; To minimize the text sent
+by the MUD in this case, it would be easier to set up your own Element for the store.
+&nbsp; For example:</p>
+
+<pre>&lt;!ELEMENT Item '&lt;send href=&quot;buy &amp;text;&quot;&gt;'&gt;
+&lt;Item&gt;bread&lt;/Item&gt;
+&lt;Item&gt;water&lt;/Item&gt;</pre>
+
+<p>Would display the same list and still send the correct &quot;buy&quot; command to the
+MUD when the item is clicked on.&nbsp; In each case, the &amp;text; entity is
+filled in with the text between the opening &lt;Item&gt; and closing
+&lt;/Item&gt; tags.</p>
+
+<p>Of course, you can omit the HREF= part since the first attribute of &lt;send&gt; is the
+command text.&nbsp; So, the real short form of this example would be:</p>
+
+<pre>&lt;!EL Itm '&lt;send &quot;buy &amp;text;&quot;&gt;'&gt;
+&lt;Itm&gt;bread&lt;/Itm&gt;
+&lt;Itm&gt;water&lt;/Itm&gt;</pre>
+
+<p> (MXP v0.2): You
+can change the mouse-over text of the link using the HINT=&quot;text&quot;
+argument to the SEND tag.</p>
+
+  </dd>
+  <dt><b>  &lt;SEND&gt; menus </b></dt>
+  <dd>
+
+You can create a popup menu of several commands by using a
+string list in the &lt;SEND&gt; command.&nbsp; Simply place a vertical bar |
+character between each command and each hint text.&nbsp; The hint text is used
+for the caption of the popup menu items.&nbsp; When a particular menu item is
+selected by the user, the command is sent to the MUD.&nbsp; If the Hint text
+contains one additional string, it is used as the mouse-over text.&nbsp; For
+example:
+
+
+<pre>&lt;send &quot;command1|command2|command3&quot; hint=&quot;click to see menu|Item 1|Item 2|Item 2&quot;&gt;this is a menu link&lt;/SEND&gt;</pre>
+
+<p>will create a link on the text &quot;this is a menu
+link&quot;.&nbsp; When the mouse is moved over this link, the text &quot;click
+to see menu&quot; will be displayed.&nbsp; If you click on the link, a menu with
+3 items will be displayed.&nbsp; If you select &quot;Item 1&quot;, the
+&quot;Command1&quot; is sent to the MUD.</p>
+
+  </dd>
+  <dt>&lt;SEND&gt; to command line</dt>
+  <dd>To send text to the client's command line instead of sending it directly
+    to the MUD, use the PROMPT argument in the &lt;SEND&gt; tag.&nbsp;<br>
+    <b>Example</b>: &lt;SEND &quot;tell Zugg &quot; PROMPT&gt;Zugg&lt;/SEND&gt;<br>
+    will put the text &quot;tell Zugg &quot; (without the quotes) into the
+    command line when the &quot;Zugg&quot; link is clicked.</dd>
+  <dt>&nbsp;</dt>
+  <dt>&lt;EXPIRE [Name]&gt;</dt>
+  <dd>The &lt;EXPIRE&gt; tag is used to remove links previously displayed with
+    the &lt;A&gt; or &lt;SEND&gt; tags.&nbsp; For example, when moving to a new
+    room, &lt;SEND&gt; links from the previous room description are no longer
+    valid and need to be removed.&nbsp; To accomplish this, you create a Name
+    for the tags that you want removed.&nbsp; Then you specify this name in the
+    &lt;EXPIRE&gt; tag.
+
+<p><b>Example</b>:</p>
+<pre>&lt;SEND EXPIRE=&quot;Exits&quot;&gt;E&lt;/SEND&gt;
+&lt;EXPIRE Exits&gt;</pre>
+<p>will remove all links that used the EXPIRE=&quot;Exits&quot; option in either
+the &lt;SEND&gt; or &lt;A&gt; tags.&nbsp;</p>
+<p>Using &lt;EXPIRE&gt; without any Name argument will expire any &lt;SEND&gt;
+or &lt;A&gt; tags no matter what Expire Name was given, as long as some name was
+given.&nbsp; &lt;SEND&gt; and &lt;A&gt; tags that never specified an Expire Name
+never expire.</p>
+
+</dd>
+</dl>
+<h3><a name="Version Control">Version Control</a></h3>
+
+<dl>
+  <dt>&lt;VERSION&gt;</dt>
+  <dd>
+
+The &lt;VERSION&gt; tag can be sent by the MUD to request the version of
+MXP and the MUD client
+being used.&nbsp; The client sends the version information back to the MUD in
+the format of a SECURE &lt;VERSION&gt; MXP tag.&nbsp; The following syntax is
+sent by the client back to the MUD server:
+
+<pre>&lt;VERSION MXP=mxpversion STYLE=styleversion CLIENT=clientname VERSION=clientversion REGISTERED=yes/no&gt;</pre>
+
+<p>The &quot;mxpversion&quot; is the version of the MXP spec
+implemented by the client.&nbsp; For example, MXP=0.4</p>
+
+<p>The &quot;styleversion&quot; is the current version of the
+optional style sheet.&nbsp; A MUD sets a style-sheet version number by sending
+the &lt;VERSION styleversion&gt; tag to the client.&nbsp; The client caches this
+version information and returns it when requested by a plain &lt;VERSION&gt;
+request.</p>
+
+<p>The &quot;clientname&quot; is the name of the MUD
+client.&nbsp; For example, CLIENT=zmud</p>
+
+<p>The &quot;clientversion&quot; is the version of the MUD
+client.&nbsp; For example, VERSION=6.07</p>
+
+<p>The REGISTERED argument is optional and can be used to
+detect if the player is using a registered version of the client.&nbsp;&nbsp;</p>
+
+<p>Other arguments can be added to this TAG as needed without
+breaking older versions.</p>
+<p>NOTE: The &lt;VERSION&gt; tag is sent back to the MUD as a
+SECURE-tagged line.&nbsp; This means that the MXP command is prefixed by
+&lt;ESC&gt;[1z and followed by a newline.&nbsp; This information makes it easy
+for the MUD to determine that this information was sent by the client and not by
+the player.</p>
+
+  </dd>
+  <dt>&lt;SUPPORT&gt;</dt>
+  <dd>The &lt;SUPPORT&gt; tag can be used to determine exactly which tags are
+    supported by the client.&nbsp; The client returns this information to the
+    MUD in the form of a SECURE &lt;SUPPORTS&gt; tag (notice the spelling
+    difference).
+
+<p>To determine all of the tags supported by the client, just send
+&lt;SUPPORT&gt; with no arguments.&nbsp; An example of the text returned to the
+MUD is:</p>
+<pre>&lt;SUPPORTS +B +I +COLOR&gt;</pre>
+<p>To show that the only MXP tags supported by the client are the &lt;B&gt;,
+&lt;I&gt;, and &lt;COLOR&gt; tags.</p>
+<p>To determine if a specific tag is supported, use it as the argument to the
+&lt;SUPPORT&gt; tag.&nbsp; For example, to determine if the client supports the
+&lt;IMAGE&gt; tag, send &lt;SUPPORT image&gt; and the client will return
+&lt;SUPPORTS +image&gt; if the image tag is supported, or will return
+&lt;SUPPORTS -image&gt; if the tag is not supported.</p>
+<p>You can query an entire list of tags at once by adding them to the tag.&nbsp;
+For example, to query both the IMAGE tag and the FRAME tag, you can send
+&lt;SUPPORT image frame&gt; and the client would return &lt;SUPPORT +image
+-frame&gt; if it supported image but did not support frame.</p>
+<p>You can also query the arguments of a tag.&nbsp; For example, to determine
+the arguments for the &lt;color&gt; tag, use the syntax &lt;SUPPORT
+&quot;color.*&quot;&gt;&nbsp; The * asks for all arguments, and the client
+should send back: &lt;SUPPORTS +color.fore +color.back&gt; to indicate that the
+two arguments supported for the &lt;color&gt; tag are FORE and BACK.&nbsp; To
+query a specific argument, replace * with the argument name.&nbsp; For example:
+&lt;SUPPORT color.fore&gt; would return &lt;SUPPORTS +color.fore&gt;.</p>
+<p>You can mix and match any of these in the list of arguments.&nbsp; For
+example:</p>
+<pre>&lt;SUPPORT &quot;color.*&quot; send.expire image&gt;</pre>
+<p>might return: &lt;SUPPORTS +color.fore +color.back -send.expire -image&gt;</p>
+<p>It is very important to implement the &lt;SUPPORT&gt; tag in your MUD
+server.&nbsp; This is the only way to determine what tags are really supported
+by the client.&nbsp; The MXP version number isn't enough information to
+determine this, and using &lt;SUPPORT&gt; is easier and better defined than
+trying to decide based upon what MUD client is being used.</p>
+
+</dd>
+</dl>
+<h2>Optional Tags</h2>
+
+<p>The tags given in this section may or may not be implemented by MXP
+clients.&nbsp; Use the &lt;SUPPORT&gt; tag to determine if the client implements
+the tag.&nbsp; In general, this section provides ideas for client developers
+interested in extending the MXP concepts, without describing tags that are
+required to be part of the implementation.</p>
+
+<h3>Other <a name="HTML tags">HTML tags</a></h3>
+
+<p>The following additional HTML tags might be supported within MXP:</p>
+
+  <dl>
+    <dd>&lt;H1&gt;&nbsp;&nbsp;&nbsp; Level 1 heading</dd>
+    <dd>&lt;H2&gt;&nbsp;&nbsp;&nbsp; Level 2 heading</dd>
+    <dd>&lt;H3&gt;&nbsp;&nbsp;&nbsp; Level 3 heading</dd>
+    <dd>&lt;H4&gt;&nbsp;&nbsp;&nbsp; Level 4 heading</dd>
+    <dd>&lt;H5&gt;&nbsp;&nbsp;&nbsp; Level 5 heading</dd>
+    <dd>&lt;H6&gt;&nbsp;&nbsp;&nbsp; Level 6 heading</dd>
+    <dd>&lt;HR&gt;&nbsp;&nbsp;&nbsp; Horizontal rule</dd>
+    <dd>&lt;SMALL&gt;&nbsp;&nbsp;&nbsp; Small text</dd>
+    <dd>&lt;TT&gt;&nbsp;&nbsp;&nbsp; Non-proportional font</dd>
+  </dl>
+
+<h3><a name="MSP Compatibility">MSP
+Compatibility</a></h3>
+
+<p>For MSP Compatibility, the &lt;SOUND&gt; and &lt;MUSIC&gt; tags are available in MXP.
+&nbsp; They have the same keyword syntax and the equivalent !!SOUND and !!MUSIC MSP tags.</p>
+
+<h3><a name="Using Entities">Using Entities</a></h3>
+
+<p>The MUD can instruct the client to automatically create a graphical Gauge or
+Status Bar text from MXP entities.</p>
+
+  <dl>
+    <dt>&lt;GAUGE EntityName [Max=EntityName] [Caption=text] [Color=color]&gt;</dt>
+    <dd>
+
+<p>Creates a graphical gauge.&nbsp; The value of the first Entity is used as the
+gauge data.&nbsp; The Max= argument specifies the name of the entity to use for
+the maximum value of the gauge.&nbsp; The Caption= text is optionally displayed
+on the gauge by the client.&nbsp; The Color gives the color of the gauge bar.</p>
+
+    </dd>
+    <dt>&lt;STAT EntityName [Max=EntityName] [Caption=text]&gt;</dt>
+    <dd>
+
+<p>Creates a new Status Bar text on the client.&nbsp; Text is appended to
+current status bar.&nbsp; The value of the entity given by the first EntityName
+is displayed.&nbsp; If the Max= argument is given and the entity named by the
+Max= argument is Published, then the client displays the text as nnn/mmm where
+nnn is the first entity value, and mmm is the Max entity value.</p>
+
+    </dd>
+  </dl>
+
+<h3><a name="Frames">Frames</a></h3>
+
+<p>HTML allows you to define regions of your browser window called frames and can direct a
+separate HTML document to each frame.&nbsp; With MXP, everything needs to be specified
+from the single MUD text stream, so the normal syntax for frames in HTML does not work for
+MXP.&nbsp; </p>
+
+<p>Defining a frame in MXP is similar to HTML, but different enough that you should note
+the syntax.&nbsp; First, the &lt;FRAME&gt; and &lt;FRAMESET&gt; tags are effectively
+combined.&nbsp; Then, instead of a SRC URL link for the frame, the frame is simply given a
+name.</p>
+
+<p>The attributes for the &lt;FRAME&gt; tag are:
+
+<dl>
+  <dt>NAME</dt>
+  <dd>The name of the frame to be used to send text to the frame later in the text stream.</dd>
+  <dt>ALIGN (LEFT|CENTER|RIGHT)</dt>
+  <dd>The alignment of text in the frame.&nbsp; Default is Left.</dd>
+  <dt>PARENT</dt>
+  <dd>The name of the parent frame containing this new frame.&nbsp; If this is omitted, the
+    main MUD window is considered the parent.&nbsp; If &quot;_new&quot; is used as the parent
+    name, a new floating window is created rather than creating a frame within a window.</dd>
+  <dt>LEFT</dt>
+  <dd>The coordinate of the left side of the frame.&nbsp; It can be a percentage (ends in %),
+    a number of character widths (ends in &quot;c&quot;) or a number of pixels.&nbsp; For
+    example, LEFT=&quot;50%&quot; starts the frame halfway across the parent window,
+    LEFT=&quot;5c&quot; starts the frame 5 character spacings (using the width of the
+    character X if it is a proportional font) from the left side of the parent window. &nbsp;
+    LEFT=100 starts the frame 100 pixels from the left edge of the parent window. &nbsp; If a
+    negative number is used, it means the value is relative to the right side of the parent
+    instead of the left.&nbsp; If the parent was &quot;_new&quot; then the values are relative
+    to the entire screen rather than to a parent window.&nbsp; Default is 0.</dd>
+  <dt>TOP</dt>
+  <dd>The coordinate of the top of the frame.&nbsp; Same syntax as LEFT, but the character
+    spacing using the height of the capital X character instead of the width.&nbsp; If a
+    negative value is used, it means the frame is relative to the bottom of the parent instead
+    of the top.&nbsp; Default is 0.</dd>
+  <dt>WIDTH</dt>
+  <dd>The width of the frame.&nbsp; Same syntax as LEFT.&nbsp; Default is 100%. &nbsp;
+    Percentage refers to the amount of window space remaining to the right of the LEFT
+    position.&nbsp; If a negative value is used, the frame is created to the left of the LEFT
+    position.</dd>
+  <dt>HEIGHT</dt>
+  <dd>The height of the frame.&nbsp; Same syntax as TOP.&nbsp; Default is 50%. &nbsp;
+    Percentage refers to the amount of window space remaining below the TOP position. &nbsp;
+    If a negative value is used, the frame is created above the TOP position.</dd>
+  <dt>SCROLLING (yes|no)</dt>
+  <dd>Determines whether the frame is allowed to scroll.&nbsp; The default is yes.</dd>
+  <dt>RESIZE</dt>
+  <dd>Allows the user to resize the frame.&nbsp; Normally frames cannot be resized by the
+    user.</dd>
+</dl>
+
+<p>The frame borders are controlled by the client rather than the server.&nbsp; The server
+should assume that the frames do not have borders.&nbsp; The user can turn on borders in
+order to see the frames and resize them if allowed.</p>
+
+<p>Overlapping frames are not supported and can cause undesired results (overlapping text
+that interferes with the text of the other frame).&nbsp; So, make sure your frames are
+properly located.</p>
+
+<p>Some examples:</p>
+
+<pre>&lt;FRAME Name=&quot;Status&quot; Height=&quot;2c&quot;&gt;</pre>
+
+<p>Creates a two-line high status bar at the top of the current MUD window.</p>
+
+<pre>&lt;FRAME Name=&quot;Map&quot; Left=&quot;-20c&quot; Height=&quot;20c&quot;&gt;</pre>
+
+<p>Creates a frame in the upper-right corner of the MUD window 20 characters wide by 20
+characters high.</p>
+
+<pre>&lt;FRAME &quot;Chat&quot; Height=&quot;10c&quot; RESIZE&gt;</pre>
+
+<p>Creates a resizable frame along the top 10 characters of the current MUD window.</p>
+
+<p>To send text to a particular frame, you use the &lt;DESTINATION&gt; tag (or
+&lt;DEST&gt; for short).&nbsp; For example, to send a status message to the Status frame,
+you would use:</p>
+
+<pre>&lt;DEST Status&gt;This text is sent to the status window&lt;/DEST&gt;</pre>
+
+<h3><a name="Cursor Control">Cursor Control</a></h3>
+
+<p>The &lt;DEST&gt; tag can also be used to position text at a certain position in a
+frame.&nbsp; So, instead of using VT100 or ANSI escape codes to move the cursor, you can
+just use the X and Y attributes of the &lt;DEST&gt; command.&nbsp; If no frame name is
+given, the text is sent to the position on the main MUD window.&nbsp; Note that when text
+in a frame or window scrolls, the text is no longer at the same X or Y position.&nbsp; So,
+for status windows, ensure that you set the frame to be unscrollable.</p>
+
+<pre>&lt;DEST Status X=10 Y=2&gt;100&lt;/DEST&gt;</pre>
+
+<p>Would display the text &quot;100&quot; at the 10 column on the 2nd line of the Status
+frame.</p>
+
+<p>To erase text already in the frame, you can output spaces, or you can use two of the
+erase attributes for the &lt;DEST&gt; tag.&nbsp; The EOL keyword causes the rest of the
+line to be erased after displaying the text.&nbsp; The EOF keyword causes the rest of the
+frame to be erased after displaying the text.&nbsp; You can erase an entire line using the
+Y= parameter with no text.&nbsp; You can erase the entire frame by just omitting any text
+and other keywords.&nbsp; So,</p>
+
+<pre>&lt;DEST Status Y=2 EOL&gt;&lt;/DEST&gt;</pre>
+
+<p>would erase the 2nd line in the status frame, while</p>
+
+<pre>&lt;DEST Status EOF&gt;&lt;/DEST&gt;</pre>
+
+<p>would erase the entire status frame.</p>
+
+<h3><a name="Crosslinking multiple MUD servers">Crosslinking
+multiple MUD servers</a></h3>
+
+<p><font color="#0000FF">Implementation Note (MXP v0.3): The function of the &lt;RELOCATE&gt; command has been changed, and the
+previous &lt;LOGIN&gt; tag has been replaced by &lt;USER&gt; and
+&lt;PASSWORD&gt;.</font></p>
+
+<p>MXP also supports commands that allow multi-server MUD worlds to be built.&nbsp; The
+&lt;RELOCATE&gt; tag closes the current MUD connection and causes a new connect to open on
+a new server.&nbsp; The attributes for this tag are the hostname and port of the new
+connection:</p>
+
+<pre>&lt;RELOCATE new.server.com 1000&gt;</pre>
+
+<p>The optional keyword QUIET can be used to suppress further
+output from the MUD.&nbsp; When the closing &lt;/RELOCATE&gt; tag is used, MUD
+output is resumed.&nbsp; When using the QUIET tag you'll normally put the
+&lt;/RELOCATE&gt; tag after your login sequence to prevent the user from seeing
+the login text.</p>
+
+<p>To automatically log the user into the other server, use
+the &lt;USER&gt; tag to cause the client to send the username, and the
+&lt;PASSWORD&gt; tag to cause the client to send the password.</p>
+
+<p>You can also use &lt;USER&gt; and &lt;PASSWORD&gt; without
+using the &lt;RELOCATE&gt; command.&nbsp; Putting these two tags in your login
+sequence will cause MXP-enabled clients to automatically send the user's name
+and password, instead of relying on client-side scripting for autologin.</p>
+
+<h3><a name="Images">Images</a></h3>
+
+<p>MXP supports an &lt;IMAGE&gt; tag to display inline graphics images.&nbsp; GIF or BMP
+images are supported.&nbsp; Additional image types or encrypted images can be supported
+with MUD-specific Filters as described in the next section.</p>
+
+<p>This is similar to the &lt;IMG&gt; HTML tag but doesn't implement some of the HTML
+options.&nbsp; The &lt;IMAGE&gt; tag is very similar to the &lt;SOUND&gt; tag (or !!SOUND
+command) in MSP.&nbsp; The attributes of the &lt;IMAGE&gt; tag are:
+
+<dl>
+  <dt>FName</dt>
+  <dd>The name of the graphics file to display.</dd>
+  <dt>URL</dt>
+  <dd>The URL of the path for the graphic if it should be downloaded on the fly.&nbsp; This is
+    not recommended for large graphics but is supported to be compatible with the MSP URL
+    parameter for sounds.&nbsp; The classname is appended to the URL, along with the name of
+    the graphics file itself.</dd>
+  <dt>T (type)</dt>
+  <dd>The class for the image.&nbsp; Same as classes used in MSP.</dd>
+  <dt>H (height)</dt>
+  <dd>The height of the image (in pixels, character heights, or percentage).&nbsp; If omitted,
+    the height is computed from the actual image.&nbsp; If the specified height is different
+    from the image, the image is stretched.</dd>
+  <dt>W (width)</dt>
+  <dd>The width of the image.&nbsp; Same syntax as height.</dd>
+  <dt>HSPACE</dt>
+  <dd>Additional space to add before and after the image</dd>
+  <dt>VSPACE</dt>
+  <dd>Additional space to add above and below the image.</dd>
+  <dt>ALIGN (left|right|top|middle|bottom)</dt>
+  <dd>Controls the alignment of the image on the line.&nbsp; For example, if ALIGN=Bottom is
+    used, the rest of the text on the line will align with the bottom of the image.</dd>
+</dl>
+
+<p>Note that when using images, the act as large individual characters as far as the
+client is concern.&nbsp; Text cannot wrap on multiple lines next to an image...an image
+always takes up the entire height of the line.&nbsp; Text wrapping to the next line will
+wrap at the normal left margin of the screen until the graphics image.&nbsp; So, if inline
+graphics are used, you should make them similar in size to the surrounding text line.
+&nbsp; Also remember that the user might be using a different screen font.</p>
+
+<p>The &lt;IMAGE&gt; command is intended to be used with graphic images already loaded to
+the client's disk.&nbsp; Using the URL attribute to download graphics on the fly can cause
+a severe burden to the MUD server.&nbsp; However, even if the URL attribute is used, the
+image file is not downloaded if it already exists on the disk.&nbsp; So, since the image
+is only downloaded once, the MUD server might be able to handle it.&nbsp; Also, as with
+MSP, the downloading will never overwrite an existing file with the same name as a
+security precaution, or allow any absolute path information.&nbsp; The file will be stored
+in a location determined by the client.&nbsp; To update an image to a new version, you
+need to specify a new filename.</p>
+
+<h3><a name="File Filters">File Filters</a></h3>
+
+<p>It is likely that the MUD does not want all of the images stored on the clients disk to
+be viewable until the MUD server requests them.&nbsp; MXP allows the MUD to define it's
+own graphics format and to provide a client plugin module that converts the MUD-specific
+format to a standard GIF or BMP format.&nbsp; To define a filter, use the &lt;FILTER&gt;
+tag, with the SRC attribute to specify the file extension of the MUD-specific format, and
+the DEST attribute to specify the output file extension (default is BMP).&nbsp; The NAME
+attribute gives the name of the plugin to be called, and the optional PROC attribute is a
+numeric parameter that the plugin can use to support multiple conversions as needed.
+&nbsp; So, an example would be:</p>
+
+<pre>&lt;FILTER SRC='gff' DEST='gif' NAME='MyPlugin'&gt;</pre>
+
+<p>This would call the Filter function in the MYPLUGIN plugin module whenever the MUD
+tries to display a .gff file.&nbsp; The .gff file is read into memory and passed to the
+Filter function in the plugin (with PROC=0 in the above example) and expect a .gif format
+output to be returned by the function.&nbsp; Simply provide your plugin for users and
+you can then store proprietary files on the client that are decoded and displayed as
+needed.&nbsp; Note that this same Filter function can also be used to process sound files
+used by MSP.</p>
+
+<h2>Outdated Tags</h2>
+
+<h3><a name="Server-side scripting">Server-side
+scripting</a></h3>
+
+<p>The &lt;SCRIPT&gt; tag is no longer supported in version 0.4 MXP.&nbsp; There
+were too many client-specific security issues involved in this tag.</p>
+
+<h3><a name="Implementation Details">Implementation
+Details</a></h3>
+
+<p>To implement MXP on a MUD server requires some attention.&nbsp; Most important, you
+need some way to activate the MXP text output on the MUD.&nbsp; You don't want to display
+the MXP tags to a user that doesn't have an MXP MUD client.&nbsp; One way to activate MXP
+on your MUD is to simply prompt the user and ask if they want to enable MXP, or provide an
+MXP command on the MUD that toggles MXP text on and off.</p>
+
+<p>If you want to get more sophisticated, you can use the Telnet Option negotiation to
+determine if the client supports MXP.&nbsp; Simple query Telnet option 91 and an MXP
+client will respond that it will handle MXP.&nbsp; You can also use the Telnet option to
+determine if the client supports the MUD Sound Protocol (MXP) or the MUD Compression
+Protocol (MCP). The following Telnet Option
+numbers are used:</p>
+
+<p>86&nbsp;&nbsp;&nbsp; MUD Compression Protocol (see <a href="mcp.htm"> MCP
+spec</a> for details on the difference between option 85 and option 86)<br>
+90&nbsp;&nbsp;&nbsp; MUD Sound Protocol (MSP)<br>
+91&nbsp;&nbsp;&nbsp; MUD eXtension Protocol (MXP)</p>
+
+<p>Although MXP does not support a separate style sheet, you would be best off in your
+implementation if you stored all of your !ELEMENT and !ENTITY definitions in a separate
+file and sent them to the client as part of your welcome message.&nbsp; This would give
+you one place to change your tags on the MUD.&nbsp; The MUD output itself would then use
+these elements.&nbsp; You should try to avoid using MXP commands within the specific room
+output of a MUD and instead encapsulate them into MUD-defined ELEMENTS so that you can
+easily change how your MUD looks and operates.</p>
+
+<h3><a name="A Detailed Example">A Detailed
+Example</a></h3>
+
+<p>Want a more complete example of all of this?&nbsp; I thought so.&nbsp; Here is a basic
+MXP package the you can use on your MUD to handle the most common MUD functions.&nbsp; Go
+through this example line by line with the documentation above and you should be able to
+figure it out.&nbsp; Once you get the hang of it, it is pretty easy.</p>
+
+<pre>&lt;!-- Elements to support the Automapper --&gt;
+&lt;!ELEMENT RName '&lt;FONT COLOR=Red&gt;&lt;B&gt;' FLAG=&quot;RoomName&quot;&gt;
+&lt;!ELEMENT RDesc FLAG='RoomDesc'&gt;
+&lt;!ELEMENT RExits '&lt;FONT COLOR=Blue&gt;' FLAG='RoomExit'&gt;
+&lt;!-- The next element is used to define a room exit link that sends
+the exit direction to the MUD if the user clicks on it --&gt;
+&lt;!ELEMENT Ex '&lt;SEND&gt;'&gt;
+&lt;!ELEMENT Chat '&lt;FONT COLOR=Gray&gt;' OPEN&gt;
+&lt;!ELEMENT Gossip '&lt;FONT COLOR=Cyan&gt;' OPEN&gt;
+&lt;!-- in addition to standard HTML Color specifications, you can use
+color attribute names such as blink --&gt;
+&lt;!ELEMENT ImmChan '&lt;FONT COLOR=Red,Blink&gt;'&gt;
+&lt;!ELEMENT Auction '&lt;FONT COLOR=Purple&gt;' OPEN&gt;
+&lt;!ELEMENT Group '&lt;FONT COLOR=Blue&gt;' OPEN&gt;
+&lt;!-- the next elements deal with the MUD prompt --&gt;
+&lt;!ELEMENT Prompt FLAG=&quot;Prompt&quot;&gt;
+&lt;!ELEMENT Hp FLAG=&quot;Set hp&quot;&gt;
+&lt;!ELEMENT MaxHp FLAG=&quot;Set maxhp&quot;&gt;
+&lt;!ELEMENT Mana FLAG=&quot;Set mana&quot;&gt;
+&lt;!ELEMENT MaxMana FLAG=&quot;Set maxmana&quot;&gt;
+&lt;!-- now the MUD text --&gt;
+&lt;RName&gt;The Main Temple&lt;/RName&gt;
+&lt;RDesc&gt;This is the main hall of the MUD where everyone starts.
+Marble arches lead south into the town, and there is a &lt;i&gt;lovely&lt;/i&gt;
+&lt;send &quot;drink &amp;text;&quot;&gt;fountain&lt;/send&gt; in the center of the temple,&lt;/RDesc&gt;
+&lt;RExits&gt;Exits: &lt;Ex&gt;N&lt;/Ex&gt;, &lt;Ex&gt;S&lt;/Ex&gt;, &lt;Ex&gt;E&lt;/Ex&gt;, &lt;Ex&gt;W&lt;/Ex&gt;&lt;/RExits&gt;
+
+&lt;Prompt&gt;[&lt;Hp&gt;100&lt;/Hp&gt;/&lt;MaxHp&gt;120&lt;/MaxHp&gt;hp &lt;Mana&gt;50&lt;/Mana&gt;/&lt;MaxMana&gt;55&lt;/MaxMana&gt;mana]&lt;/Prompt&gt;</pre>
+
+<p>This would display the following:</p>
+
+<pre><strong><font color="#FF0000">The Main Temple</font></strong>
+This is the main hall of the MUD where everyone starts.
+Marble arches lead south into the town, and there is a <em>lovely</em>
+<u>fountain</u> in the center of the temple.
+<font color="#0000FF">Exits: <u>N</u>, <u>S</u>, <u>E</u>, <u>W</u></font></pre>
+
+<pre>[100/120hp 50/55mana]</pre>
+
+<p>and set the variables @hp, @maxhp, @mana, @maxmana appropriately. Clicking on the
+exit links would send the proper direction to the MUD to move you in that direction.
+&nbsp; It would send the &quot;drink fountain&quot; command if the user clicked on the
+underlined word &quot;fountain&quot;.</p>
+
+<h3><a name="Conclusions">Conclusions</a></h3>
+
+<p>Proper use of MXP can radically improve the normal text-only MUD experience.&nbsp; In
+addition to embedded graphics, you can now better control the font, color, and size of
+text.&nbsp; You can directly control the automapper, allowing it to work perfectly
+on your MUD without fancy parsing.&nbsp; You can define links for users that like to point
+and click with their mouse.&nbsp; You can add pull-down menus to text displayed
+by the MUD to give the user a list of possible commands.&nbsp; The use of MXP will make your MUD stand out among the
+hundreds of other MUDs on the Internet and help breath new life into MUDs and help them
+compete against the more graphical RPGs appearing on the Internet.</p>
+</body>
+</html>
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">

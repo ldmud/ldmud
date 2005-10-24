@@ -3669,6 +3669,7 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
         }
 
         consumed++;
+        pmember = NULL; /* avoids a warning */
         member = find_struct_member(pdef, p->name);
         if (member >= 0)
             pmember = &STRUCT_MEMBER(pdef->members+member);
@@ -8112,6 +8113,11 @@ expr0:
 
               switch($2)
               {
+              case F_LAND_EQ:
+              case F_LOR_EQ:
+                  ok = MY_TRUE;
+                  break;
+
               case F_ADD_EQ:
                   switch(type1)
                   {

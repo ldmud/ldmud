@@ -100,7 +100,7 @@ For a detailed list of all changes see the file CHANGELOG.
            regular expression code, or the PCRE package (default).
 
 
-09-Dec-2002 (Lars Duening) -- Release 3.2.9
+11-Dec-2002 (Lars Duening) -- Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -338,6 +338,7 @@ For a detailed list of all changes see the file CHANGELOG.
 
     - Language:
        + New operators '>>>' and '>>>=' for logical right shifts.
+       + New operators '&&=' and '||=' for logical assignments.
        + New LPC define __LDMUD__ to identify this driver branch.
        + New LPC defines __VERSION_MAJOR__, __VERSION_MINOR__,
          __VERSION_MICRO__, __VERSION_PATCH__ expand to the various parts

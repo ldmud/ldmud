@@ -128,6 +128,8 @@
 "<<="   lsh_eq
 ">>="   rsh_eq
 ">>>="  rshl_eq
+"&&="   land_eq
+"||="   lor_eq
 
 /*---------------------------------------------------------------------------
 /* These values are used by the stack machine, and can not be directly

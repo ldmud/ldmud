@@ -6,6 +6,8 @@ From: Lars
 Date: Tue, 22 Dec 1998 11:57:41 +0100 (MET)
 See also: f-991104-0, p-020912, p-021021
 
+See also: MudOS, Anarres version, regarding the telnet machine.
+
 Ich meine damit, erstmal genau ueberlegen, wie die API aussehen soll
 und nicht einfach die UNIX socket* functions nachbilden, sonder etwas
 LPC bezogenes basteln.

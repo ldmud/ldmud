@@ -2,20 +2,78 @@ CONCEPT
         Telnet Negotiations
 
 DESCRIPTION
-        Telnet negotiations are being used for transmitting status
-        and general informations between telnet-client und server.
-        They are specified in their respective RFCs (Request For
-        Comments) which define the standard-way-to-do-it.
+        The telnet protocol is used to control textbased connections
+        between a client (the 'telnet' program or a mud client) and a
+        server (the game driver). Most of the options offered by the
+        protocol are optional and need to be negotiated between the
+        client and the server.  Consequently, and due to their
+        specialized nature, mud clients don't have to support the full
+        telnet option feature set.
 
-        Check following for the options mentioned herein:
-        RFC 0854 for the telnet protocol specification
-        RFC 0857 for ECHO         /* no, not mentioned here, but used */
-        RFC 1073 for NAWS         /* in Amylaar's windowsize          */
-        RFC 1091 for TERMINAL TYPE
-        RFC 1096 for XDISPLAY LOCATION
-        RFC 1408 for ENVIRON
-        RFC 1184 for LINEMODE
-        RFC 0855 for End Of Record
+        For the server to find out if a client supports the telnet
+        protocol at all, one good approach is to a simple, commonly
+        used telnet command to the client. If the client reacts
+        conform to the protocol (or sends telnet commands itself), the
+        mud can continue to negotiate further options. If the client
+        does not react, the mud can safely refrain from further
+        negotiations.
+
+        The following list is a more or less comprehensive overview of
+        the telnet related RFCs (available for example on
+        http://www.faqs.org/rfcs):
+
+	 RFC Titel                                              rel. Code
+
+	 495 TELNET Protocol Specification
+	 513 Comments on the new TELNET specifications
+	 559 Comments on the new TELNET Protocol and its Implem
+	 595 Some Thoughts in Defense of the TELNET Go-Ahead
+	 596 Second Thoughts on Telnet Go-Ahead
+	 652 Telnet Output Carriage-Return Disposition Option   NAOCRD     10
+	 653 Telnet Output Horizontal Tabstops Option           NAOHTS     11
+	 654 Telnet Output Horizontal Tab Disposition Option    NAOHTD     12
+	 655 Telnet Output Formfeed Disposition Option          NAOFFD     13
+	 656 Telnet Output Vertical Tabstops Option             NAOVTS     14
+	 657 Telnet Output Vertical Tab Disposition Option      NAOVTD     15
+	 658 Telnet Output Linefeed Disposition                 NAOLFD     16
+	 698 Telnet Extended Ascii Option                       X-ASCII    17
+	 727 Telnet Logout Option                               LOGOUT     18
+	 728 A Minor Pitfall in the Telnet Protocol
+	 735 Revised TELNET Byte Macro Option                   BM         19
+	 749 Telnet SUPDUP-OUTPUT Option                        SUPDUP     22
+	 764 Telnet Protocol Specification
+	 779 Telnet SEND-LOCATION Option                        SENDLOC    23
+	 818 The Remote User Telnet Service
+	 854 Telnet Protocol Specification
+	 855 Telnet Option Specifications
+	 856 Telnet Binary Transmission                         BINARY      0
+	 857 Telnet Echo Option                                 ECHO        1
+	 858 Telnet Suppress Go Ahead Option                    SGA         3
+	 859 Telnet Status Option                               STATUS      5
+	 860 Telnet Timing Mark Option                          TM          6
+	 861 Telnet Extended Options - List Option              EXOPL     255
+	 884 Telnet Terminal Type Option                        TTYPE      24
+	 885 Telnet End of Record Option                        EOR        25
+	 930 Telnet Terminal Type Option                        TTYPE      24
+	 933 Output Marking Telnet Option                       OUTMRK     27
+	 946 Telnet Terminal Location Number Option             TTYLOC     28
+	1043 Telnet Data Entry Terminal Option DODIIS Implement DET        20
+	1053 Telnet X.3 PAD Option                              X.3-PAD    30
+	1073 Telnet Window Size Option                          NAWS       31
+	1079 Telnet Terminal Speed Option                       TSPEED     32
+	1080 Telnet Remote Flow Control Option                  FLOWCTRL   33
+	1091 Telnet Terminal-Type Option                        TTYPE      24
+	1096 Telnet X Display Location Option                   XDISPLOC   35
+	1116 Telnet Linemode Option                             LINEMODE   34
+	1143 The Q Method of Implementing TELNET Option Negotia
+	1184 Telnet Linemode Option                             LINEMODE   34
+	1372 Telnet Remote Flow Control Option                  FLOWCTRL   33
+	1408 Telnet Environment Option                          ENVIRON    36
+	1571 Telnet Environment Option Interoperability Issues
+	1572 Telnet Environment Option                          NEWENV     39
+	2066 Telnet Charset Option                              CHARSET    42
+	2217 Telnet Com Port Control Option                     COMPORT    44
+	2877 5250 Telnet Enhancements
 
         All negotiations start with the special character IAC which is
         defined in /usr/include/arpa/telnet.h (or in

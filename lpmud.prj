@@ -30,14 +30,13 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 323)
-(Parent-Version lpmud 3-3 322)
-(Version-Log "Updated the telnetneg module.
-More patches to comm from Fiona.
-Efuns copy_file() and rename() just return non-0 on errors, but don't throw an exception anymore.")
+(Project-Version lpmud 3-3 324)
+(Parent-Version lpmud 3-3 323)
+(Version-Log "Added some documentation.
+New operators '&&=' and '||='.")
 (New-Version-Log
 "")
-(Checkin-Time "Tue, 10 Dec 2002 00:08:45 -0700")
+(Checkin-Time "Wed, 11 Dec 2002 23:17:34 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -59,6 +58,7 @@ Efuns copy_file() and rename() just return non-0 on errors, but don't throw an e
                   "^src/dftables$" "^src/pcre/chartables.c$"
                   "autoconf/autom4te.cache/" "gmon\\.out"
                   "src/util/xerq/erq" "src/util/erq/erq"
+                  "\\.DS_Store"
                   "\\..*\\.swp$" "src/driver" "src/ldmud" "\\.gdb_history" ))
 (Project-Keywords (ReleaseMajor 3)
                   (ReleaseMinor 3)
@@ -73,8 +73,8 @@ Efuns copy_file() and rename() just return non-0 on errors, but don't throw an e
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.53 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.386 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.290 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.387 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.291 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.19 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -138,7 +138,7 @@ Efuns copy_file() and rename() just return non-0 on errors, but don't throw an e
   (src/call_out.h (lpmud/f/45_call_out.h 1.7.1.6 644))
   (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.24 644))
   (src/closure.h (lpmud/f/44_closure.h 1.7.1.15 644))
-  (src/closure.c (lpmud/d/4_closure.c 1.41.1.47.1.5 644))
+  (src/closure.c (lpmud/d/4_closure.c 1.41.1.47.1.6 644))
   (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.46 644))
   (src/comm.h (lpmud/d/3_comm.h 1.26.1.31 644))
   (src/driver.h (lpmud/f/36_driver.h 1.15.1.21 644))
@@ -160,9 +160,9 @@ Efuns copy_file() and rename() just return non-0 on errors, but don't throw an e
   (src/heartbeat.c (lpmud/m/42_heartbeat. 1.18.1.8 644))
   (src/i-svalue_cmp.h (lpmud/a/b/20_i-svalue_c 1.3 644))
   (src/interpret.h (lpmud/b/13_interpret. 1.33.1.35 644))
-  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.6 644))
+  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.7 644))
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.15 644))
-  (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.34 644))
+  (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.35 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.12 644))
   (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.29 644))
   (src/mapping.h (lpmud/f/30_mapping.h 1.12.1.14 644))
@@ -228,7 +228,7 @@ Efuns copy_file() and rename() just return non-0 on errors, but don't throw an e
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.15 644))
   (src/port.c (lpmud/39_port.c 1.17.1.7 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.17 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.8 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.9 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7.1.1 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))
@@ -258,7 +258,7 @@ Efuns copy_file() and rename() just return non-0 on errors, but don't throw an e
   (src/xalloc.c (lpmud/h/0_xalloc.c 1.2.1.10 644))
 
   ;; Build files
-  (src/func_spec (lpmud/c/31_func_spec 1.53.1.45.1.22.1.1 644))
+  (src/func_spec (lpmud/c/31_func_spec 1.53.1.45.1.22.1.2 644))
   (src/string_spec (lpmud/f/6_string_spe 1.14.1.7 644))
   (src/mkfunc.c (lpmud/l/14_mkfunc.c 1.1 644))
   (src/make_func.y (lpmud/b/7_make_func. 1.25.1.30.1.2 644))
@@ -553,7 +553,7 @@ Efuns copy_file() and rename() just return non-0 on errors, but don't throw an e
   (src/bugs/f-981229-06 (lpmud/j/15_f-981229-0 1.1 644) :no-keywords)
   (src/bugs/f-981229-02 (lpmud/j/19_f-981229-0 1.1 644) :no-keywords)
   (src/bugs/f-981226-2 (lpmud/j/22_f-981226-2 1.2 644) :no-keywords)
-  (src/bugs/f-981226-1 (lpmud/j/23_f-981226-1 1.5 644) :no-keywords)
+  (src/bugs/f-981226-1 (lpmud/j/23_f-981226-1 1.6 644) :no-keywords)
   (src/bugs/f-981226-0 (lpmud/j/24_f-981226-0 1.1 644) :no-keywords)
   (src/bugs/f-990214 (lpmud/j/46_f-990214 1.1 644) :no-keywords)
   (src/bugs/f-990211 (lpmud/j/47_f-990211 1.1 644) :no-keywords)
@@ -853,6 +853,10 @@ Efuns copy_file() and rename() just return non-0 on errors, but don't throw an e
   (src/wk/webster.h (lpmud/e/40_webster.h 1.1 644))
   (src/wk/config.h-evermore (lpmud/n/40_config.h-e 1.1 644))
   (src/wk/config.h-finalfrontier (lpmud/v/51_config.h-f 1.1 644))
+  (src/wk/mxp.htm (lpmud/c/b/29_mxp.htm 1.1 644) :no-keywords)
+  (src/wk/mcp2.html (lpmud/c/b/30_mcp2.html 1.1 644) :no-keywords)
+  (src/wk/mccp.htm (lpmud/c/b/31_mccp.htm 1.1 644) :no-keywords)
+  (src/wk/flows.gif (lpmud/c/b/32_flows.gif 1.1 644) :no-keywords)
 
   ;; Documentation
   (doc/README (lpmud/n/4_README 1.1.1.2 644))
@@ -896,7 +900,7 @@ Efuns copy_file() and rename() just return non-0 on errors, but don't throw an e
   (doc/concepts/memory (lpmud/n/35_memory 1.4 644))
   (doc/concepts/mysql (lpmud/f/18_HOWTO 1.1.1.5 644))
   (doc/concepts/native (lpmud/n/36_native 1.9 644))
-  (doc/concepts/negotiation (lpmud/n/37_negotiatio 1.3.1.3 644))
+  (doc/concepts/negotiation (lpmud/n/37_negotiatio 1.3.1.4 644))
   (doc/concepts/objects (lpmud/n/38_objects 1.4 644))
   (doc/concepts/regexp (lpmud/v/29_regexp 1.2 644))
   (doc/concepts/hsregexp (lpmud/v/30_hsregexp 1.3 644))
@@ -1274,7 +1278,7 @@ Efuns copy_file() and rename() just return non-0 on errors, but don't throw an e
   (doc/LPC/lpc (lpmud/r/32_lpc 1.2 644))
   (doc/LPC/mappings (lpmud/l/42_mappings 1.6 644))
   (doc/LPC/modifiers (lpmud/s/48_modifiers 1.8 644))
-  (doc/LPC/operators (lpmud/m/0_operators 1.9.1.9 644))
+  (doc/LPC/operators (lpmud/m/0_operators 1.9.1.10 644))
   (doc/LPC/pragma (lpmud/r/33_pragma 1.10 644))
   (doc/LPC/preprocessor (lpmud/r/34_preprocess 1.5 644))
   (doc/LPC/references (lpmud/c/48_references 1.3 644))
