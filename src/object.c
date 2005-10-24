@@ -527,7 +527,7 @@ do_free_sub_strings (int num_strings,   string_t **strings
     for (i = 0; i < num_strings; i++)
         free_mstring(strings[i]);
 
-    /* Free all variable names */
+    /* Free all variable names and types */
     for (i = num_variables; --i >= 0; )
     {
         free_mstring(variables[i].name);
@@ -648,25 +648,12 @@ _free_prog (program_t *progp, Bool free_all, const char * file, int line
             if ( !(functions[i] & NAME_INHERITED) )
             {
                 string_t *name;
-#ifdef USE_STRUCTS
-                vartype_t vt;
-#endif /* USE_STRUCTS */
-
                 memcpy(
                   &name,
                   FUNCTION_NAMEP(program + (functions[i] & FUNSTART_MASK)),
                   sizeof name
                 );
                 free_mstring(name);
-
-#ifdef USE_STRUCTS
-                memcpy(
-                  &vt,
-                  FUNCTION_TYPEP(program + (functions[i] & FUNSTART_MASK)),
-                  sizeof vt
-                );
-                free_vartype_data(&vt);
-#endif
             }
         }
 

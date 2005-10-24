@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+11-Jan-2002 (Lars Duening)  (3.3.356)
+  - (efuns.c) to_string(struct) didn't print the name of the struct,
+       and leaked memory (reported by Zonk).
+  - (object.c, prolang.y) Corrected another refcount error in struct
+       type instances (reported by Zonk).
+
 08-Jan-2002 (Lars Duening)  (3.3.355)
   - (lex, prolang.y, simul_efun.c) Exported the initialisation of a global
        identifier into a single function, to collect all the values in

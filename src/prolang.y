@@ -3250,6 +3250,45 @@ store_function_header ( p_int start
 
 /*-------------------------------------------------------------------------*/
 static void
+get_function_information (function_t * fun_p, program_t * prog, int ix)
+
+/* Read the function information for function <ix> in program <prog>
+ * (which may be inherited) and store it in *<fun_p>. It is the callers
+ * responsibility to set <fun_p>->flags _before_ calling this function.
+ *
+ * In particular, this function sets these <fun_p> fields: .name, .rtype
+ * .num_args, and it modifies .flags.
+ */
+
+{
+    fun_hdr_p funstart;
+    vartype_t rtype;
+    funflag_t flags;
+
+    /* Find the real function code */
+    while ( (flags = prog->functions[ix]) & NAME_INHERITED)
+    {
+        inherit_t * ip;
+        ip = &prog->inherit[flags & INHERIT_MASK];
+        ix -= ip->function_index_offset;
+        prog = ip->prog;
+    }
+    funstart = &prog->program[flags & FUNSTART_MASK];
+    memcpy(&fun_p->name, FUNCTION_NAMEP(funstart), sizeof fun_p->name);
+    memcpy(&rtype, FUNCTION_TYPEP(funstart), sizeof(rtype));
+    assign_var_to_fulltype(&fun_p->type, rtype);
+    ref_fulltype_data(&fun_p->type);
+    fun_p->num_arg = FUNCTION_NUM_ARGS(funstart) & 0x7f;
+    if (FUNCTION_NUM_ARGS(funstart) & ~0x7f)
+        fun_p->type.typeflags |= TYPE_MOD_XVARARGS;
+    if (FUNCTION_CODE(funstart)[0] == F_UNDEF)
+    {
+        fun_p->flags |= NAME_UNDEFINED;
+    }
+} /* get_function_information() */
+
+/*-------------------------------------------------------------------------*/
+static void
 def_function_typecheck (fulltype_t returntype, ident_t * ident
 #ifdef USE_NEW_INLINES
                        , Bool is_inline
@@ -14377,27 +14416,9 @@ insert_inherited (char *super_name, string_t *real_name
         *super_p = ip->prog;
 
         /* Return a copy of the function structure */
-        fun_p->name = real_name;
         fun_p->flags = flags & ~INHERIT_MASK;
-        {
-            int i2 = found_ix;
-            fun_hdr_p funstart;
-            vartype_t rtype;
-
-            /* Find the real function code */
-            while ( (flags = ip->prog->functions[i2]) & NAME_INHERITED)
-            {
-                ip = &ip->prog->inherit[flags & INHERIT_MASK];
-                i2 -= ip->function_index_offset;
-            }
-            funstart = &ip->prog->program[flags & FUNSTART_MASK];
-            memcpy(&rtype, FUNCTION_TYPEP(funstart), sizeof(rtype));
-            assign_var_to_fulltype(&fun_p->type, rtype);
-            ref_fulltype_data(&fun_p->type);
-            fun_p->num_arg = (FUNCTION_NUM_ARGS(funstart) & 0x7f);
-            if (FUNCTION_NUM_ARGS(funstart) & ~0x7f)
-                fun_p->type.typeflags |= TYPE_MOD_XVARARGS;
-        }
+        get_function_information(fun_p, ip->prog, found_ix);
+        fun_p->name = real_name;
         return found_ix;
     } /* if (ip) */
 
@@ -14514,27 +14535,9 @@ insert_inherited (char *super_name, string_t *real_name
             *super_p = ip->prog;
 
             /* Return a copy of the function structure to the caller */
-            fun_p->name = real_name;
             fun_p->flags = flags & ~INHERIT_MASK;
-            {
-                inherit_t *ip2 = ip;
-                int i2 = i;
-                fun_hdr_p funstart;
-                vartype_t rtype;
-
-                /* Find the real function code */
-                while ( (flags = ip2->prog->functions[i2]) & NAME_INHERITED)
-                {
-                    ip2 = &ip2->prog->inherit[flags & INHERIT_MASK];
-                    i2 -= ip2->function_index_offset;
-                }
-
-                funstart = &ip2->prog->program[flags & FUNSTART_MASK];
-                memcpy(&rtype, FUNCTION_TYPEP(funstart), sizeof(rtype));
-                assign_var_to_fulltype(&fun_p->type, rtype);
-                ref_fulltype_data(&fun_p->type);
-                fun_p->num_arg = FUNCTION_NUM_ARGS(funstart);
-            }
+            get_function_information(fun_p, ip->prog, i);
+            fun_p->name = real_name;
             calls++;
         } /* for() */
 
@@ -14748,11 +14751,7 @@ copy_functions (program_t *from, funflag_t type)
      */
     for (i = 0; i < from->num_functions; i++, fun_p++)
     {
-        program_t *defprog;
-        inherit_t *ip;
-        fun_hdr_p  funstart;
         funflag_t  flags;
-        vartype_t  rtype;
         int i2; /* The index of the real function */
 
         flags = from->functions[i];
@@ -14779,28 +14778,8 @@ copy_functions (program_t *from, funflag_t type)
                 (flags & ~FUNSTART_MASK) | NAME_INHERITED | NAME_HIDDEN;
         }
 
-        /* Look up the defining program for the inherited function */
-        defprog = from;
-        while ( (flags = defprog->functions[i2]) & NAME_INHERITED)
-        {
-            ip = &defprog->inherit[flags & INHERIT_MASK];
-            i2 -= ip->function_index_offset;
-            defprog = ip->prog;
-        }
-
         /* Copy the function information */
-        funstart = &defprog->program[flags & FUNSTART_MASK];
-        memcpy(&fun_p->name, FUNCTION_NAMEP(funstart), sizeof fun_p->name);
-        memcpy(&rtype, FUNCTION_TYPEP(funstart), sizeof(rtype));
-        assign_var_to_fulltype(&fun_p->type, rtype);
-        ref_fulltype_data(&fun_p->type);
-        fun_p->num_arg = FUNCTION_NUM_ARGS(funstart) & 0x7f;
-        if (FUNCTION_NUM_ARGS(funstart) & ~0x7f)
-            fun_p->type.typeflags |= TYPE_MOD_XVARARGS;
-        if (FUNCTION_CODE(funstart)[0] == F_UNDEF)
-        {
-            fun_p->flags |= NAME_UNDEFINED;
-        }
+        get_function_information(fun_p, from, i2);
 
     } /* for (inherited functions) pass 1 */
 

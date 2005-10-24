@@ -5068,7 +5068,8 @@ f_to_string (svalue_t *sp)
         size = strlen(fmt)+mstrsize(name);
 
         memsafe(rc = alloc_mstring(size), size, "converted struct");
-        sprintf(get_txt(rc), fmt, name);
+        sprintf(get_txt(rc), fmt, get_txt(name));
+        free_struct(sp->u.strct);
         put_string(sp, rc);
         break;
       }

@@ -541,6 +541,7 @@ typedef uint32 funflag_t;  /* Function flags */
  *     shared string_t * name_of_function;   (4 Bytes)
 #ifdef USE_STRUCTS
  *     vartype_t         return_type;        (6 Byte)
+ *         References from the return_type are not counted!
 #else
  *     vartype_t         return_type;        (2 Byte)
 #endif
