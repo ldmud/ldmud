@@ -1,9 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+12-Dec-2002 (Lars Duening)  (3.3.325)
+  - (mapping.c) Removed a memory leak: free_empty_mapping() did not
+     clear the refcount.
+
 11-Dec-2002 (Lars Duening)  (3.3.324)
   - (doc/concepts/negotiation, src/wk/) Added some telnet protocol
-    related documentation.
+      related documentation.
   - (func_spec, lex.c, prolang.y, interpret.c) New operators '&&=' and
      '||=' (suggested by Croft).
 

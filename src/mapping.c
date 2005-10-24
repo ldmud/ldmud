@@ -625,6 +625,12 @@ _free_mapping (mapping_t *m, Bool no_data)
 
     num_mappings--;
 
+    m->ref = 0;
+      /* In case of free_empty_mapping(), this is neither guaranteed nor a
+       * precondition, but in case this mapping needs to be entered into the
+       * dirty list the refcount needs to be correct.
+       */
+
     /* Free the condensed data */
     if (m->cond != NULL)
     {
