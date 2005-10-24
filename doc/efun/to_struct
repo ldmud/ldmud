@@ -1,16 +1,20 @@
 SYNOPSIS
-        mixed to_struct(mixed *)
+        mixed to_struct(mixed * data)
+        mixed to_struct(mixed * data, struct template)
         mixed to_struct(struct)
 
 DESCRIPTION
-        The given array is returned as a struct. Structs are returned
-        unchanged.
+        The given array <data> is returned as a struct. If a
+        <template> struct is given, the returned struct is of the same
+        type; without a template, an anonymous struct is returned.
+        Structs are returned unchanged.
 
         Since the returned struct can't be known at compile time, the
         efun is declared to return 'mixed'.
 
 HISTORY
         Introduced in LDMud 3.3.250 .
+        Introduced to LDMud 3.3.344 added the template argument.
 
 SEE ALSO
-        to_array(E), to_string(E)
+        to_array(E), to_string(E), structs(LPC)

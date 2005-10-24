@@ -931,6 +931,7 @@ symbol_operator (const char *symbol, const char **endp)
  *   #'({     -> F_AGGREGATE
  *   #'([     -> F_M_CAGGREGATE
 #ifdef USE_STRUCTS
+ *   #'->     -> F_S_INDEX
  *   #'(<     -> F_S_AGGREGATE
 #endif
  *
@@ -976,6 +977,14 @@ symbol_operator (const char *symbol, const char **endp)
             ret = F_POST_DEC;
             break;
         }
+#ifdef USE_STRUCTS
+        else if (c == '>')
+        {
+            symbol++;
+            ret = F_S_INDEX;
+            break;
+        }
+#endif /* USE_STRUCTS */
         ret = F_SUBTRACT;
         break;
 
@@ -2356,7 +2365,8 @@ start_new_include (int fd, string_t * str
 
     /* Initialise the rest of the lexer state */
     pragma_strict_types = PRAGMA_WEAK_TYPES;
-    instrs[F_CALL_OTHER].ret_type = TYPE_ANY;
+    instrs[F_CALL_OTHER].ret_type.typeflags = TYPE_ANY;
+    instrs[F_CALL_DIRECT].ret_type.typeflags = TYPE_ANY;
     current_line = 0;
     linebufend   = outp - 1; /* allow trailing zero */
     linebufstart = linebufend - MAXLINE;
@@ -3162,22 +3172,22 @@ handle_pragma (char *str)
         else if (strncmp(base, "strict_types", namelen) == 0)
         {
             pragma_strict_types = PRAGMA_STRICT_TYPES;
-            instrs[F_CALL_OTHER].ret_type = TYPE_UNKNOWN;
-            instrs[F_CALL_DIRECT].ret_type = TYPE_UNKNOWN;
+            instrs[F_CALL_OTHER].ret_type.typeflags = TYPE_UNKNOWN;
+            instrs[F_CALL_DIRECT].ret_type.typeflags = TYPE_UNKNOWN;
             validPragma = MY_TRUE;
         }
         else if (strncmp(base, "strong_types", namelen) == 0)
         {
             pragma_strict_types = PRAGMA_STRONG_TYPES;
-            instrs[F_CALL_OTHER].ret_type = TYPE_ANY;
-            instrs[F_CALL_DIRECT].ret_type = TYPE_ANY;
+            instrs[F_CALL_OTHER].ret_type.typeflags = TYPE_ANY;
+            instrs[F_CALL_DIRECT].ret_type.typeflags = TYPE_ANY;
             validPragma = MY_TRUE;
         }
         else if (strncmp(base, "weak_types", namelen) == 0)
         {
             pragma_strict_types = PRAGMA_WEAK_TYPES;
-            instrs[F_CALL_OTHER].ret_type = TYPE_ANY;
-            instrs[F_CALL_DIRECT].ret_type = TYPE_ANY;
+            instrs[F_CALL_OTHER].ret_type.typeflags = TYPE_ANY;
+            instrs[F_CALL_DIRECT].ret_type.typeflags = TYPE_ANY;
             validPragma = MY_TRUE;
         }
         else if (strncmp(base, "save_types", namelen) == 0)
@@ -3789,9 +3799,9 @@ yylex1 (void)
                 }
 
                 pragma_strict_types = p->pragma_strict_types;
-                instrs[F_CALL_OTHER].ret_type =
+                instrs[F_CALL_OTHER].ret_type.typeflags =
                     call_other_return_types[pragma_strict_types];
-                instrs[F_CALL_DIRECT].ret_type =
+                instrs[F_CALL_DIRECT].ret_type.typeflags =
                     call_other_return_types[pragma_strict_types];
                 yyin = p->yyin;
                 saved_char = p->saved_char;
@@ -5447,8 +5457,8 @@ start_new_file (int fd)
     lex_fatal = MY_FALSE;
 
     pragma_strict_types = PRAGMA_WEAK_TYPES;
-    instrs[F_CALL_OTHER].ret_type = TYPE_ANY;
-    instrs[F_CALL_DIRECT].ret_type = TYPE_ANY;
+    instrs[F_CALL_OTHER].ret_type.typeflags = TYPE_ANY;
+    instrs[F_CALL_DIRECT].ret_type.typeflags = TYPE_ANY;
     pragma_use_local_scopes = MY_TRUE;
     pragma_save_types = MY_FALSE;
     pragma_verbose_errors = MY_FALSE;

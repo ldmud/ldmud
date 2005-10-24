@@ -104,6 +104,9 @@
         rindex    binary
         aindex    binary
         map_index ternary
+#ifdef USE_STRUCTS
+        s_index   binary
+#endif /* USE_STRUCTS */
 ".."    range     ternary
 "..<"   nr_range  ternary
 "<.."   rn_range  ternary
@@ -170,9 +173,15 @@
         push_indexed_lvalue
         push_rindexed_lvalue
         push_aindexed_lvalue
+#ifdef USE_STRUCTS
+        push_indexed_s_lvalue
+#endif /* USE_STRUCTS */
         index_lvalue
         rindex_lvalue
         aindex_lvalue
+#ifdef USE_STRUCTS
+        index_s_lvalue
+#endif /* USE_STRUCTS */
         range_lvalue
         nr_range_lvalue
         rn_range_lvalue
@@ -189,9 +198,15 @@
         push_protected_rindexed_lvalue
         push_protected_aindexed_lvalue
         push_protected_indexed_map_lvalue
+#ifdef USE_STRUCTS
+        push_protected_indexed_s_lvalue
+#endif /* USE_STRUCTS */
         protected_index_lvalue
         protected_rindex_lvalue
         protected_aindex_lvalue
+#ifdef USE_STRUCTS
+        protected_index_s_lvalue
+#endif /* USE_STRUCTS */
         protected_range_lvalue
         protected_nr_range_lvalue
         protected_rn_range_lvalue
@@ -329,11 +344,13 @@ int     to_int(int|string|float|closure);
 float   to_float(float|string|int);
 string  to_string(mixed);
 #ifdef USE_STRUCTS
+int     baseof(struct, struct);
 mixed  *to_array(string|mixed*|symbol|quoted_array|struct);
-mixed   to_struct(mixed*|struct);
+mixed   to_struct(mixed*|struct, void|struct);
+mixed  *struct_info(struct, int);
 #else
 mixed  *to_array(string|mixed*|symbol|quoted_array);
-#endif
+#endif /* USE_STRUCTS */
 object  to_object(null|object|string|closure);
 
 mixed   copy(mixed);
@@ -409,7 +426,7 @@ mapping filter_indices(mapping, string|closure,  ...);
 mixed   map(mixed *|mapping|struct, mapping|string|closure, ...);
 #else
 mixed   map(mixed *|mapping, mapping|string|closure, ...);
-#endif
+#endif /* USE_STRUCTS */
 mapping map_indices(mapping, string|closure, ...);
 
 mapping m_allocate(int, int default: F_CONST1);

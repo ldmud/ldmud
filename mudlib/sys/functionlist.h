@@ -15,7 +15,7 @@
 #define TYPE_MOD_XVARARGS   0x00800000  /* accepts optional arguments     */
 #define TYPE_MOD_NOSAVE     0x00400000  /* vars: can't be saved           */
 #define NAME_CROSS_DEFINED  0x00080000 /* function defined from other program */
-#ifdef USE_STRUCTS
+#if defined(__LPC_STRUCTS__) || defined(USE_STRUCTS)
 #define NAME_HIDDEN         0x00020000 /* Not visible for inheritance    */
 #define NAME_PROTOTYPE      0x00010000 /* Defined by a prototype only    */
 #define NAME_UNDEFINED      0x00008000 /* Not defined yet                */

@@ -7,10 +7,6 @@
  *---------------------------------------------------------------------------
  * This file refers to, but does not define 'basic' types like mappings,
  * arrays or lambdas.
-#ifdef USE_STRUCTS
- * TODO: Implement structs as unique type, with the struct id as
- * TODO:: secondary information.
-#endif
  */
 
 #include "driver.h"
@@ -50,12 +46,12 @@ union u {
       /* T_POINTER, T_QUOTED_ARRAY: pointer to the vector structure.
        * T_(PROTECTED_)POINTER_RANGE_LVALUE: the target vector holding
        *   the range.
-#ifdef USE_STRUCTS
-       * T_STRUCT: pointer to the fixed-length vector structure.
-       *           The first element of the vector is a string with
-       *           the unique struct name.
-#endif
        */
+#ifdef USE_STRUCTS
+     struct_t *strct;
+      /* T_STRUCT: pointer to the structure instance.
+       */
+#endif
     mapping_t *map;
       /* T_MAPPING: pointer to the mapping structure.
        * T_PROTECTOR_MAPPING: TODO: ???
@@ -485,10 +481,10 @@ double READ_DOUBLE(struct svalue *svalue_pnt)
     ( (sp)->type = T_POINTER, (sp)->u.vec = arr )
 
 #ifdef USE_STRUCTS
-#define put_ref_struct(sp,arr) \
-    ( (sp)->type = T_STRUCT, (sp)->u.vec = ref_array(arr) )
-#define put_struct(sp,arr) \
-    ( (sp)->type = T_STRUCT, (sp)->u.vec = arr )
+#define put_ref_struct(sp,st) \
+    ( (sp)->type = T_STRUCT, (sp)->u.strct = ref_struct(st) )
+#define put_struct(sp,st) \
+    ( (sp)->type = T_STRUCT, (sp)->u.strct = st )
 #endif /* USE_STRUCTS */
 
 #define put_ref_mapping(sp,val) \
@@ -524,6 +520,13 @@ double READ_DOUBLE(struct svalue *svalue_pnt)
     ( (sp)++, put_ref_array(sp, arr) )
 #define push_array(sp,arr) \
     ( (sp)++, put_array(sp, arr) )
+
+#ifdef USE_STRUCTS
+#define push_ref_struct(sp,st) \
+    ( (sp)++, put_ref_struct(sp, st) )
+#define push_struct(sp,st) \
+    ( (sp)++, put_struct(sp, st) )
+#endif /* USE_STRUCTS */
 
 #define psh_ref_mapping(sp,val) \
     ( (sp)++, put_ref_mapping(sp,val) )

@@ -85,6 +85,9 @@
 #include "simulate.h"
 #include "simul_efun.h"
 #include "stdstrings.h"
+#ifdef USE_STRUCTS
+#include "structs.h"
+#endif /* USE_STRUCTS */
 #include "svalue.h"
 #include "swap.h"
 #include "xalloc.h"
@@ -694,23 +697,13 @@ svalue_to_string ( fmt_state_t *st
       /* FALLTHROUGH */
 
     case T_POINTER:
-#ifdef USE_STRUCTS
-    case T_STRUCT:
-#endif /* USE_STRUCTS */
       {
         size_t size;
 
         size = VEC_SIZE(obj->u.vec);
         if (!size)
         {
-#ifdef USE_STRUCTS
-            if (obj->type != T_STRUCT)
-                stradd(st, &str, "({ })");
-            else /* T_STRUCT */
-                stradd(st, &str, "(< >)");
-#else
             stradd(st, &str, "({ })");
-#endif /* USE_STRUCTS */
         }
         else
         {
@@ -722,72 +715,72 @@ svalue_to_string ( fmt_state_t *st
                 /* New array */
                 prec->id_number = st->pointer_id++;
 
-#ifdef USE_STRUCTS
-                if (obj->type != T_STRUCT)
-                    stradd(st, &str, "({ /* #");
-                else /* T_STRUCT */
-                {
-                    stradd(st, &str, "(<'");
-                    stradd(st, &str, get_txt(obj->u.vec->item->u.str));
-                    stradd(st, &str, "' /* #");
-                }
-#else
                 stradd(st, &str, "({ /* #");
-#endif /* USE_STRUCTS */
                 numadd(st, &str, prec->id_number);
                 stradd(st, &str, ", size: ");
-#ifdef USE_STRUCTS
-                numadd(st, &str, size);
-#else
                 numadd(st, &str, size-1);
-#endif /* USE_STRUCTS */
                 stradd(st, &str, " */\n");
                 for (i = 0; i < size-1; i++)
                 {
-#ifdef USE_STRUCTS
-                    /* Skip the struct name entry */
-                    if (obj->type == T_STRUCT && !i)
-                        continue;
-#endif /* USE_STRUCTS */
                     str = svalue_to_string(st, &(obj->u.vec->item[i]), str, indent+2, MY_TRUE, quoteStrings);
                 }
                 str = svalue_to_string(st, &(obj->u.vec->item[i]), str, indent+2, MY_FALSE, quoteStrings);
                 stradd(st, &str, "\n");
                 add_indent(st, &str, indent);
-#ifdef USE_STRUCTS
-                if (obj->type != T_STRUCT)
-                    stradd(st, &str, "})");
-                else /* T_STRUCT */
-                    stradd(st, &str, ">)");
-#else
                 stradd(st, &str, "})");
-#endif /* USE_STRUCTS */
             }
             else
             {
                 /* Recursion! */
-#ifdef USE_STRUCTS
-                if (obj->type != T_STRUCT)
-                {
-                    stradd(st, &str, "({ #");
-                    numadd(st, &str, prec->id_number);
-                    stradd(st, &str, " })");
-                }
-                else
-                {
-                    stradd(st, &str, "(< #");
-                    numadd(st, &str, prec->id_number);
-                    stradd(st, &str, " >)");
-                }
-#else
                 stradd(st, &str, "({ #");
                 numadd(st, &str, prec->id_number);
                 stradd(st, &str, " })");
-#endif /* USE_STRUCTS */
             }
         }
         break;
       }
+
+#ifdef USE_STRUCTS
+    case T_STRUCT:
+      {
+        struct_t *strct = obj->u.strct;
+        size_t size;
+        struct pointer_record *prec;
+
+        size = struct_size(strct);
+
+        prec = find_add_pointer(st->ptable, strct, MY_TRUE);
+        if (!prec->id_number)
+        {
+            /* New array */
+            prec->id_number = st->pointer_id++;
+            
+            stradd(st, &str, "(<'");
+            stradd(st, &str, get_txt(struct_name(strct)));
+            stradd(st, &str, "' /* #");
+            numadd(st, &str, prec->id_number);
+            stradd(st, &str, ", size: ");
+            numadd(st, &str, size);
+            stradd(st, &str, " */\n");
+            for (i = 0; i < size-1; i++)
+            {
+                str = svalue_to_string(st, &(strct->member[i]), str, indent+2, MY_TRUE, quoteStrings);
+            }
+            str = svalue_to_string(st, &(strct->member[i]), str, indent+2, MY_FALSE, quoteStrings);
+            stradd(st, &str, "\n");
+            add_indent(st, &str, indent);
+            stradd(st, &str, ">)");
+        }
+        else
+        {
+            /* Recursion! */
+            stradd(st, &str, "(< #");
+            numadd(st, &str, prec->id_number);
+            stradd(st, &str, " >)");
+        }
+        break;
+      }
+#endif /* USE_STRUCTS */
 
     case T_MAPPING:
       {

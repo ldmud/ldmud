@@ -232,6 +232,9 @@
 #include "simulate.h"
 #include "simul_efun.h"
 #include "stdstrings.h"
+#ifdef USE_STRUCTS
+#include "structs.h"
+#endif /* USE_STRUCTS */
 #include "svalue.h"
 #include "swap.h"
 #include "switch.h"
@@ -924,10 +927,12 @@ free_protector_svalue (svalue_t *v)
 {
     switch (v->type)
     {
-      case T_POINTER:
 #ifdef USE_STRUCTS
       case T_STRUCT:
+        free_struct(v->u.strct);
+        break;
 #endif /* USE_STRUCTS */
+      case T_POINTER:
         free_array(v->u.vec);
         break;
       case T_MAPPING:
@@ -988,11 +993,14 @@ free_svalue (svalue_t *v)
 
     case T_QUOTED_ARRAY:
     case T_POINTER:
-#ifdef USE_STRUCTS
-    case T_STRUCT:
-#endif /* USE_STRUCTS */
         free_array(v->u.vec);
         break;
+
+#ifdef USE_STRUCTS
+    case T_STRUCT:
+        free_struct(v->u.strct);
+        break;
+#endif /* USE_STRUCTS */
 
     case T_MAPPING:
         free_mapping(v->u.map);
@@ -1238,11 +1246,14 @@ inl_assign_svalue_no_free (svalue_t *to, svalue_t *from)
 
     case T_QUOTED_ARRAY:
     case T_POINTER:
-#ifdef USE_STRUCTS
-    case T_STRUCT:
-#endif /* USE_STRUCTS */
         (void)ref_array(to->u.vec);
         break;
+
+#ifdef USE_STRUCTS
+    case T_STRUCT:
+        (void)ref_struct(to->u.strct);
+        break;
+#endif /* USE_STRUCTS */
 
     case T_SYMBOL:
         (void)ref_mstring(to->u.str);
@@ -1364,11 +1375,14 @@ assign_checked_svalue_no_free (svalue_t *to, svalue_t *from)
 
     case T_QUOTED_ARRAY:
     case T_POINTER:
-#ifdef USE_STRUCTS
-    case T_STRUCT:
-#endif /* USE_STRUCTS */
         (void)ref_array(from->u.vec);
         break;
+
+#ifdef USE_STRUCTS
+    case T_STRUCT:
+        (void)ref_struct(from->u.strct);
+        break;
+#endif /* USE_STRUCTS */
 
     case T_SYMBOL:
         (void)ref_mstring(from->u.str);
@@ -1420,11 +1434,13 @@ assign_from_lvalue:
         break;
       case T_QUOTED_ARRAY:
       case T_POINTER:
-#ifdef USE_STRUCTS
-      case T_STRUCT:
-#endif /* USE_STRUCTS */
         (void)ref_array(from->u.vec);
         break;
+#ifdef USE_STRUCTS
+      case T_STRUCT:
+        (void)ref_struct(from->u.strct);
+        break;
+#endif /* USE_STRUCTS */
       case T_SYMBOL:
         (void)ref_mstring(from->u.str);
         break;
@@ -1515,11 +1531,14 @@ void assign_lrvalue_no_free (svalue_t *to, svalue_t *from)
 
     case T_QUOTED_ARRAY:
     case T_POINTER:
-#ifdef USE_STRUCTS
-    case T_STRUCT:
-#endif /* USE_STRUCTS */
         (void)ref_array(to->u.vec);
         break;
+
+#ifdef USE_STRUCTS
+    case T_STRUCT:
+        (void)ref_struct(to->u.strct);
+        break;
+#endif /* USE_STRUCTS */
 
     case T_SYMBOL:
         (void)ref_mstring(to->u.str);
@@ -1598,9 +1617,6 @@ assign_svalue (svalue_t *dest, svalue_t *v)
 
         case T_QUOTED_ARRAY:
         case T_POINTER:
-#ifdef USE_STRUCTS
-        case T_STRUCT:
-#endif /* USE_STRUCTS */
           {
             vector_t *vec = dest->u.vec;
             assign_svalue_no_free(dest, v);
@@ -1608,6 +1624,17 @@ assign_svalue (svalue_t *dest, svalue_t *v)
             free_array(vec);
             return;
           }
+
+#ifdef USE_STRUCTS
+        case T_STRUCT:
+          {
+            struct_t *strct = dest->u.strct;
+            assign_svalue_no_free(dest, v);
+              /* TODO: leaks strct if out of memory */
+            free_struct(strct);
+            return;
+          }
+#endif /* USE_STRUCTS */
 
         case T_MAPPING:
           {
@@ -1770,11 +1797,14 @@ inl_transfer_svalue (svalue_t *dest, svalue_t *v)
 
         case T_QUOTED_ARRAY:
         case T_POINTER:
-#ifdef USE_STRUCTS
-        case T_STRUCT:
-#endif /* USE_STRUCTS */
             free_array(dest->u.vec);
             break;
+
+#ifdef USE_STRUCTS
+        case T_STRUCT:
+            free_struct(dest->u.strct);
+            break;
+#endif /* USE_STRUCTS */
 
         case T_SYMBOL:
             free_mstring(dest->u.str);
@@ -2755,7 +2785,7 @@ push_referenced_mapping (mapping_t *m)
  *     Return &(*v[i1..i2]), unprotected, using special_lvalue.
  *   protected_range_lvalue(vector|string & v, int i2, int i1)
  *     Return &(*v[i1..i2]), protected.
- *   push_indexed_value(string|vector|mapping v, int|mixed i)
+ *   push_indexed_value(string|vector|mapping|struct v, int|mixed i)
  *     Return v[i].
  *   push_rindexed_value(string|vector v, int i)
  *     Return v[<i].
@@ -2765,10 +2795,384 @@ push_referenced_mapping (mapping_t *m)
 
 /*-------------------------------------------------------------------------*/
 static INLINE svalue_t *
+get_vector_item (vector_t * vec, svalue_t * i, svalue_t *sp, bytecode_p pc)
+
+/* Index vector <vec> with index <i> and return the pointer to the
+ * indexed item.
+ * If the index is invalid, throw an error.
+ */
+
+{
+    int ind;
+    svalue_t * item;
+
+    if (i->type != T_NUMBER)
+    {
+        ERRORF(("Illegal index for []: got %s, expected number.\n"
+               , typename(i->type)
+               ));
+        return NULL;
+    }
+    else
+    {
+        ind = i->u.number;
+        if (ind < 0)
+        {
+            ERROR("Illegal index for []: not a positive number.\n");
+            /* NOTREACHED */
+            return NULL;
+        }
+        if ((size_t)ind >= VEC_SIZE(vec))
+        {
+            ERRORF(("Index for [] out of bounds: %ld, vector size: %lu\n"
+                   , (long)ind, VEC_SIZE(vec)));
+            /* NOTREACHED */
+            return NULL;
+        }
+    }
+
+    /* Compute the indexed element */
+    item = &vec->item[ind];
+    if (destructed_object_ref(item))
+    {
+        free_svalue(item);
+        put_number(item, 0);
+    }
+
+    return item;
+} /* get_vector_item() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE svalue_t *
+get_vector_r_item (vector_t * vec, svalue_t * i, svalue_t *sp, bytecode_p pc)
+
+/* Reverse-index vector <vec> with index <i> and return the pointer to the
+ * indexed item.
+ * If the index is invalid, throw an error.
+ */
+
+{
+    int ind;
+    svalue_t * item;
+
+    if (i->type != T_NUMBER)
+    {
+        ERRORF(("Illegal index for [<]: got %s, expected number.\n"
+               , typename(i->type)
+               ));
+        return NULL;
+    }
+    if ((ind = i->u.number) < 0)
+    {
+        ERROR("Illegal index for [<]: not a positive number.\n");
+        return NULL;
+    }
+    if ( (ind = (mp_int)VEC_SIZE(vec) - ind) < 0
+     ||  ind >= (mp_int)VEC_SIZE(vec)
+       )
+    {
+        ERRORF(("Index out of bounds for [<]: %ld, vector size: %lu.\n"
+               , (long)(i->u.number), VEC_SIZE(vec)));
+        return NULL;
+    }
+
+    /* Compute the indexed element */
+    item = &vec->item[ind];
+    if (destructed_object_ref(item))
+    {
+        free_svalue(item);
+        put_number(item, 0);
+    }
+
+    return item;
+} /* get_vector_r_item() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE svalue_t *
+get_vector_a_item (vector_t * vec, svalue_t * i, svalue_t *sp, bytecode_p pc)
+
+/* Arithmetic-index vector <vec> with index <i> and return the pointer to the
+ * indexed item.
+ * If the index is invalid, throw an error.
+ */
+
+{
+    int ind;
+    svalue_t * item;
+
+    if (i->type != T_NUMBER)
+    {
+        ERRORF(("Illegal index for [>]: got %s, expected number.\n"
+               , typename(i->type)
+               ));
+        return NULL;
+    }
+    if (0 > (ind = i->u.number))
+        ind = (mp_int)VEC_SIZE(vec) + ind;
+    if (ind < 0 || ind >= (mp_int)VEC_SIZE(vec))
+    {
+        ERRORF(("Index out of bounds for [>]: %ld, vector size: %lu.\n"
+               , (long)(i->u.number), VEC_SIZE(vec)));
+        return NULL;
+    }
+
+    /* Compute the indexed element */
+    item = &vec->item[ind];
+    if (destructed_object_ref(item))
+    {
+        free_svalue(item);
+        put_number(item, 0);
+    }
+
+    return item;
+} /* get_vector_a_item() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE char *
+get_string_item (svalue_t * svp, svalue_t * i, Bool make_singular
+                , svalue_t *sp, bytecode_p pc)
+
+/* Index string <svp> with index <i> and return the pointer to the
+ * indexed item.
+ * If <make_singular> is TRUE, <svp> is made an untabled string
+ * with just one reference.
+ * If the index is invalid, throw an error.
+ */
+
+{
+    mp_int ind;
+
+    if (i->type != T_NUMBER)
+    {
+        ERRORF(("Illegal index for []: got %s, expected number.\n"
+               , typename(i->type)
+               ));
+        return NULL;
+    }
+    else
+    {
+        ind = i->u.number;
+        if (ind < 0)
+        {
+            ERROR("Illegal index for []: not a positive number.\n");
+            return NULL;
+        }
+
+        if (ind >= mstrsize(svp->u.str) )
+        {
+            ERRORF(("Index out for [] of bounds: %ld, string length: %ld.\n"
+                   , (long)ind, (long)mstrsize(svp->u.str)));
+            return NULL;
+        }
+    }
+
+    /* If the string is tabled, i.e. not changeable, or has more than
+     * one reference, allocate a new copy which can be changed safely.
+     */
+    if (make_singular && !mstr_singular(svp->u.str))
+    {
+        string_t *p;
+        
+        memsafe(p = dup_mstring(svp->u.str), mstrsize(svp->u.str)
+               , "modifiable string");
+
+        free_mstring(svp->u.str);
+        svp->u.str = p;
+    }
+
+    return &(get_txt(svp->u.str)[ind]);
+} /* get_string_item() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE char *
+get_string_r_item (svalue_t * svp, svalue_t * i, Bool make_singular
+                  , svalue_t *sp, bytecode_p pc)
+
+/* Reverse-Index string <svp> with index <i> and return the pointer to the
+ * indexed item.
+ * If <make_singular> is TRUE, <svp> is made an untabled string
+ * with just one reference.
+ * If the index is invalid, throw an error.
+ */
+
+{
+    mp_int ind;
+
+    if (i->type != T_NUMBER)
+    {
+        ERRORF(("Illegal index for [<]: got %s, expected number.\n"
+               , typename(i->type)
+               ));
+        return NULL;
+    }
+    else
+    {
+        ind = i->u.number;
+        if ((ind = i->u.number) < 0)
+        {
+            ERROR("Illegal index for [<]: not a positive number.\n");
+            return NULL;
+        }
+
+        if ( (ind = (mp_int)mstrsize(svp->u.str) - ind) < 0
+         ||  ind >= (mp_int)mstrsize(svp->u.str)
+           )
+        {
+            ERRORF(("Index out of bounds for [<]: %ld, string length: %ld\n"
+                   , (long) i->u.number, (long)mstrsize(svp->u.str)));
+            return NULL;
+        }
+    }
+
+    /* If the string is tabled, i.e. not changeable, or has more than
+     * one reference, allocate a new copy which can be changed safely.
+     */
+    if (make_singular && !mstr_singular(svp->u.str))
+    {
+        string_t *p;
+        
+        memsafe(p = dup_mstring(svp->u.str), mstrsize(svp->u.str)
+               , "modifiable string");
+
+        free_mstring(svp->u.str);
+        svp->u.str = p;
+    }
+
+    return &(get_txt(svp->u.str)[ind]);
+} /* get_string_r_item() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE char *
+get_string_a_item (svalue_t * svp, svalue_t * i, Bool make_singular
+                  , svalue_t *sp, bytecode_p pc)
+
+/* Arithmetic-Index string <svp> with index <i> and return the pointer to the
+ * indexed item.
+ * If <make_singular> is TRUE, <svp> is made an untabled string
+ * with just one reference.
+ * If the index is invalid, throw an error.
+ */
+
+{
+    mp_int ind;
+
+    if (i->type != T_NUMBER)
+    {
+        ERRORF(("Illegal index for [>]: got %s, expected number.\n"
+               , typename(i->type)
+               ));
+        return NULL;
+    }
+    else
+    {
+        ind = i->u.number;
+
+        if (0 > ind)
+            ind = (mp_int)mstrsize(svp->u.str) + ind;
+        if (ind < 0 || ind >= (mp_int)mstrsize(svp->u.str))
+        {
+            ERRORF(("Index out of bounds for [>]: %ld, string length: %ld\n"
+                   , (long) i->u.number, (long)mstrsize(svp->u.str)));
+            return NULL;
+        }
+    }
+
+    /* If the string is tabled, i.e. not changeable, or has more than
+     * one reference, allocate a new copy which can be changed safely.
+     */
+    if (make_singular && !mstr_singular(svp->u.str))
+    {
+        string_t *p;
+        
+        memsafe(p = dup_mstring(svp->u.str), mstrsize(svp->u.str)
+               , "modifiable string");
+
+        free_mstring(svp->u.str);
+        svp->u.str = p;
+    }
+
+    return &(get_txt(svp->u.str)[ind]);
+} /* get_string_a_item() */
+
+#ifdef USE_STRUCTS
+/*-------------------------------------------------------------------------*/
+static INLINE svalue_t *
+get_struct_item (struct_t * st, svalue_t * i, svalue_t *sp, bytecode_p pc)
+
+/* Index struct <st> with index <i> and return the pointer to the
+ * indexed item.
+ * If the index is invalid, throw an error.
+ */
+
+{
+    int ind;
+    svalue_t * item;
+
+    if (i->type == T_SYMBOL || i->type == T_STRING)
+    {
+        ind = struct_find_member(st->type, i->u.str);
+        if (ind < 0)
+        {
+            ERRORF(("Illegal struct '%s'->(): member '%s' not found.\n"
+                   , get_txt(struct_name(st))
+                   , get_txt(i->u.str)
+                   ));
+            /* NOTREACHED */
+            return NULL;
+        }
+    }
+    else if (i->type != T_NUMBER)
+    {
+        ERRORF(("Illegal struct '%s'->(): got %s, "
+                "expected number/string/symbol.\n"
+               , get_txt(struct_name(st))
+               , typename(i->type)
+               ));
+        return NULL;
+    }
+    else
+    {
+        ind = i->u.number;
+        if (ind < 0)
+        {
+            ERRORF(("Illegal struct '%s'->(): not a positive number.\n"
+                   , get_txt(struct_name(st))
+                  ));
+            /* NOTREACHED */
+            return NULL;
+        }
+        if (ind >= struct_size(st))
+        {
+            ERRORF(("Illegal struct '%s'->: out of bounds: "
+                    "%ld, struct sized: %lu.\n"
+                   , get_txt(struct_name(st))
+                   , (long)ind
+                   , (unsigned long)struct_size(st)
+                  ));
+            /* NOTREACHED */
+            return NULL;
+        }
+    }
+
+    /* Compute the indexed element */
+    item = &st->member[ind];
+    if (destructed_object_ref(item))
+    {
+        free_svalue(item);
+        put_number(item, 0);
+    }
+
+    return item;
+} /* get_struct_item() */
+#endif /* USE_STRUCTS */
+
+/*-------------------------------------------------------------------------*/
+static INLINE svalue_t *
 push_indexed_lvalue (svalue_t *sp, bytecode_p pc)
 
 /* Operator F_PUSH_INDEXED_LVALUE(vector  v=sp[-1], int   i=sp[0])
  * Operator F_PUSH_INDEXED_LVALUE(mapping v=sp[-1], mixed i=sp[0])
+ * Operator F_PUSH_INDEXED_S_LVALUE(struct v=sp[-1], mixed i=sp[0])
  *
  * Compute the lvalue &(v[i]) and push it into the stack. If v has just
  * one ref left, the indexed item is stored in indexing_quickfix and the
@@ -2780,7 +3184,6 @@ push_indexed_lvalue (svalue_t *sp, bytecode_p pc)
     svalue_t *i;     /* the index value */
     svalue_t *vec;   /* the indexed vector or mapping */
     svalue_t *item;  /* the indexed element vec[i] */
-    int ind;              /* numeric value of *i */
 
     /* Get the arguments */
     i = sp;
@@ -2788,43 +3191,11 @@ push_indexed_lvalue (svalue_t *sp, bytecode_p pc)
 
     /* Index a vector.
      */
-    if (vec->type == T_POINTER
-#ifdef USE_STRUCTS
-     || vec->type == T_STRUCT
-#endif /* USE_STRUCTS */
-       )
+    if (vec->type == T_POINTER)
     {
-        if (i->type != T_NUMBER)
-        {
-            ERRORF(("Illegal index for []: got %s, expected number.\n"
-                   , typename(i->type)
-                   ));
-            return NULL;
-        }
-        if ((ind = i->u.number) < 0)
-        {
-            ERROR("Illegal index for []: not a positive number.\n");
-            return NULL;
-        }
-        if ((size_t)ind >= VEC_SIZE(vec->u.vec))
-        {
-#ifdef USE_STRUCTS
-            if (vec->type == T_POINTER)
-                ERRORF(("Index for [] out of bounds: %ld, vector size: %lu\n"
-                       , (long)ind, VEC_SIZE(vec->u.vec)));
-            else
-                ERRORF(("struct member index out of bounds: index %ld, "
-                        "struct size: %lu\n"
-                       , (long)ind, VEC_SIZE(vec->u.vec)));
-#else
-            ERRORF(("Index for [] out of bounds: %ld, vector size: %lu\n"
-                   , (long)ind, VEC_SIZE(vec->u.vec)));
-#endif /* USE_STRUCTS */
-            return NULL;
-        }
+        svalue_t *item;
 
-        /* Compute the indexed element */
-        item = &vec->u.vec->item[ind];
+        item = get_vector_item(vec->u.vec, i, sp, pc);
 
         if (vec->u.vec->ref == 1)
         {
@@ -2842,6 +3213,34 @@ push_indexed_lvalue (svalue_t *sp, bytecode_p pc)
         vec->u.lvalue = item;
         return sp;
     }
+
+#ifdef USE_STRUCTS
+    /* Index a struct.
+     */
+    if (vec->type == T_STRUCT)
+    {
+        struct_t * st = vec->u.strct;
+        svalue_t * item;
+
+        item = get_struct_item(st, i, sp, pc);
+
+        if (st->ref == 1)
+        {
+            /* Rescue the indexed item as st will go away */
+            assign_svalue (&indexing_quickfix, item);
+            item = &indexing_quickfix;
+        }
+
+        /* Remove the arguments from the stack */
+        free_svalue(sp); sp--;
+        free_struct(st);
+
+        /* Return the result */
+        sp->type = T_LVALUE;
+        sp->u.lvalue = item;
+        return sp;
+    }
+#endif /* USE_STRUCTS */
 
     /* Index a mapping
      */
@@ -2905,8 +3304,6 @@ push_rindexed_lvalue (svalue_t *sp, bytecode_p pc)
 {
     svalue_t *i;     /* the index value */
     svalue_t *vec;   /* the vector */
-    svalue_t *item;  /* the indexed item */
-    mp_int ind;           /* the numeric value of *i */
 
     /* Get the arguments */
     i = sp;
@@ -2916,29 +3313,9 @@ push_rindexed_lvalue (svalue_t *sp, bytecode_p pc)
      */
     if (vec->type == T_POINTER)
     {
-        if (i->type != T_NUMBER)
-        {
-            ERRORF(("Illegal index for [<]: got %s, expected number.\n"
-                   , typename(i->type)
-                   ));
-            return NULL;
-        }
-        if ((ind = i->u.number) < 0)
-        {
-            ERROR("Illegal index for [<]: not a positive number.\n");
-            return NULL;
-        }
-        if ( (ind = (mp_int)VEC_SIZE(vec->u.vec) - ind) < 0
-         ||  ind >= (mp_int)VEC_SIZE(vec->u.vec)
-           )
-        {
-            ERRORF(("Index out of bounds for [<]: %ld, vector size: %lu.\n"
-                   , (long)(i->u.number), VEC_SIZE(vec->u.vec)));
-            return NULL;
-        }
+        svalue_t *item;
 
-        /* Compute the indexed item */
-        item = &vec->u.vec->item[ind];
+        item = get_vector_r_item(vec->u.vec, i, sp, pc);
 
         if (vec->u.vec->ref == 1)
         {
@@ -2978,8 +3355,6 @@ push_aindexed_lvalue (svalue_t *sp, bytecode_p pc)
 {
     svalue_t *i;     /* the index value */
     svalue_t *vec;   /* the vector */
-    svalue_t *item;  /* the indexed item */
-    mp_int    ind;   /* the numeric value of *i */
 
     /* Get the arguments */
     i = sp;
@@ -2989,24 +3364,9 @@ push_aindexed_lvalue (svalue_t *sp, bytecode_p pc)
      */
     if (vec->type == T_POINTER)
     {
-        if (i->type != T_NUMBER)
-        {
-            ERRORF(("Illegal index for [>]: got %s, expected number.\n"
-                   , typename(i->type)
-                   ));
-            return NULL;
-        }
-        if (0 > (ind = i->u.number))
-            ind = (mp_int)VEC_SIZE(vec->u.vec) + ind;
-        if (ind < 0 || ind >= (mp_int)VEC_SIZE(vec->u.vec))
-        {
-            ERRORF(("Index out of bounds for [>]: %ld, vector size: %lu.\n"
-                   , (long)(i->u.number), VEC_SIZE(vec->u.vec)));
-            return NULL;
-        }
+        svalue_t *item;
 
-        /* Compute the indexed item */
-        item = &vec->u.vec->item[ind];
+        item = get_vector_a_item(vec->u.vec, i, sp, pc);
 
         if (vec->u.vec->ref == 1)
         {
@@ -3063,8 +3423,8 @@ static INLINE svalue_t *
 push_protected_indexed_lvalue (svalue_t *sp, bytecode_p pc)
 
 /* Op. F_PUSH_PROTECTED_INDEXED_LVALUE(vector  v=sp[-1], int   i=sp[0])
- * Op. F_PUSH_PROTECTED_INDEXED_LVALUE(struct  v=sp[-1], int   i=sp[0])
  * Op. F_PUSH_PROTECTED_INDEXED_LVALUE(mapping v=sp[-1], mixed i=sp[0])
+ * Op. F_PUSH_PROTECTED_INDEXED_S_LVALUE(struct  v=sp[-1], mixed i=sp[0])
  *
  * Compute the lvalue &(v[i]), store it in a struct protected_lvalue, and
  * push the protector as PROTECTED_LVALUE into the stack.
@@ -3075,7 +3435,6 @@ push_protected_indexed_lvalue (svalue_t *sp, bytecode_p pc)
     svalue_t           * vec;     /* the vector */
     svalue_t           * item;    /* the indexed element */
     struct protected_lvalue * lvalue;  /* the protector */
-    int                       ind;     /* numeric value of *i */
 
     /* Get the arguments */
     i = sp;
@@ -3083,45 +3442,14 @@ push_protected_indexed_lvalue (svalue_t *sp, bytecode_p pc)
 
     /* Index a vector.
      */
-    if (vec->type == T_POINTER
-#ifdef USE_STRUCTS
-     || vec->type == T_POINTER
-#endif /* USE_STRUCTS */
-       )
+    if (vec->type == T_POINTER)
     {
-        if (i->type != T_NUMBER)
-        {
-            ERRORF(("Illegal index for []: got %s, expected number.\n"
-                   , typename(i->type)
-                   ));
-            return NULL;
-        }
-        if ((ind = i->u.number) < 0)
-        {
-            ERROR("Illegal index for []: not a positive number.\n");
-            return NULL;
-        }
+        svalue_t *item;
 
-        if ((size_t)ind >= VEC_SIZE(vec->u.vec))
-        {
-#ifdef USE_STRUCTS
-            if (vec->type == T_POINTER)
-                ERRORF(("Index out of bounds for []: %ld, vector size: %lu.\n"
-                       , (long)ind, VEC_SIZE(vec->u.vec)));
-            else
-                ERRORF(("struct member lookup out of bounds: index %ld, "
-                        "struct size: %lu.\n"
-                       , (long)ind, VEC_SIZE(vec->u.vec)));
-#else
-            ERRORF(("Index out of bounds for []: %ld, vector size: %lu.\n"
-                   , (long)ind, VEC_SIZE(vec->u.vec)));
-#endif /* USE_STRUCTS */
-            return NULL;
-        }
+        item = get_vector_item(vec->u.vec, i, sp, pc);
 
         /* Compute the indexed item and set up the protector */
 
-        item = &vec->u.vec->item[ind];
         lvalue = (struct protected_lvalue *)xalloc(sizeof *lvalue);
         lvalue->v.type = T_PROTECTED_LVALUE;
         lvalue->v.u.lvalue = item;
@@ -3134,6 +3462,34 @@ push_protected_indexed_lvalue (svalue_t *sp, bytecode_p pc)
         vec->u.lvalue = &lvalue->v;
         return sp;
     }
+
+#ifdef USE_STRUCTS
+    /* Index a vector.
+     */
+    if (vec->type == T_STRUCT)
+    {
+        struct_t * st = vec->u.strct;
+        svalue_t * item;
+        struct protected_lvalue * lvalue;
+
+        item = get_struct_item(st, i, sp, pc);
+
+        /* Item and set up the protector */
+
+        lvalue = (struct protected_lvalue *)xalloc(sizeof *lvalue);
+        lvalue->v.type = T_PROTECTED_LVALUE;
+        lvalue->v.u.lvalue = item;
+        put_struct(&(lvalue->protector), st);
+          /* The one ref to vec is transferred from *vec */
+
+        /* Remove the arguments and return the result */
+        sp--;
+        free_svalue(sp); /* Was 'i' */
+        sp->type = T_LVALUE;
+        sp->u.lvalue = &lvalue->v;
+        return sp;
+    }
+#endif /* USE_STRUCTS */
 
     /* Index a mapping
      */
@@ -3193,9 +3549,7 @@ push_protected_rindexed_lvalue (svalue_t *sp, bytecode_p pc)
 {
     svalue_t           * i;       /* the index */
     svalue_t           * vec;     /* the vector */
-    svalue_t           * item;    /* the indexed element */
     struct protected_lvalue * lvalue;  /* the protector */
-    mp_int                    ind;     /* numeric value of *i */
 
     /* Get the arguments */
 
@@ -3206,31 +3560,11 @@ push_protected_rindexed_lvalue (svalue_t *sp, bytecode_p pc)
      */
     if (vec->type == T_POINTER)
     {
-        if (i->type != T_NUMBER)
-        {
-            ERRORF(("Illegal index for [<]: got %s, expected number.\n"
-                   , typename(i->type)
-                   ));
-            return NULL;
-        }
-        if ((ind = i->u.number) < 0)
-        {
-            ERROR("Illegal index for [<]: not a positive number.\n");
-            return NULL;
-        }
+        svalue_t *item;
 
-        if ( (ind = (mp_int)VEC_SIZE(vec->u.vec) - ind) < 0
-         ||  ind >= (mp_int)VEC_SIZE(vec->u.vec)
-           )
-        {
-            ERRORF(("Index out of bounds for [<]: %ld, vector size: %lu\n"
-                   , (long) i->u.number, VEC_SIZE(vec->u.vec)));
-            return NULL;
-        }
+        item = get_vector_r_item(vec->u.vec, i, sp, pc);
 
-        /* Compute the indexed element and setup the protector */
-
-        item = &vec->u.vec->item[ind];
+        /* Set up the protector */
 
         lvalue = (struct protected_lvalue *)xalloc(sizeof *lvalue);
         lvalue->v.type = T_PROTECTED_LVALUE;
@@ -3266,9 +3600,7 @@ push_protected_aindexed_lvalue (svalue_t *sp, bytecode_p pc)
 {
     svalue_t           * i;       /* the index */
     svalue_t           * vec;     /* the vector */
-    svalue_t           * item;    /* the indexed element */
     struct protected_lvalue * lvalue;  /* the protector */
-    mp_int                    ind;     /* numeric value of *i */
 
     /* Get the arguments */
 
@@ -3279,25 +3611,11 @@ push_protected_aindexed_lvalue (svalue_t *sp, bytecode_p pc)
      */
     if (vec->type == T_POINTER)
     {
-        if (i->type != T_NUMBER)
-        {
-            ERRORF(("Illegal index for [>]: got %s, expected number.\n"
-                   , typename(i->type)
-                   ));
-            return NULL;
-        }
-        if (0 > (ind = i->u.number))
-            ind = (mp_int)VEC_SIZE(vec->u.vec) + ind;
-        if (ind < 0 || ind >= (mp_int)VEC_SIZE(vec->u.vec))
-        {
-            ERRORF(("Index out of bounds for [>]: %ld, vector size: %lu.\n"
-                   , (long)(i->u.number), VEC_SIZE(vec->u.vec)));
-            return NULL;
-        }
+        svalue_t *item;
 
-        /* Compute the indexed element and setup the protector */
+        item = get_vector_a_item(vec->u.vec, i, sp, pc);
 
-        item = &vec->u.vec->item[ind];
+        /* Setup the protector */
 
         lvalue = (struct protected_lvalue *)xalloc(sizeof *lvalue);
         lvalue->v.type = T_PROTECTED_LVALUE;
@@ -3402,8 +3720,8 @@ static INLINE svalue_t *
 index_lvalue (svalue_t *sp, bytecode_p pc)
 
 /* Operator F_INDEX_LVALUE (string|vector &v=sp[0], int   i=sp[-1])
- *          F_INDEX_LVALUE (struct        &v=sp[0], int   i=sp[-1])
  *          F_INDEX_LVALUE (mapping       &v=sp[0], mixed i=sp[-1])
+ *          F_INDEX_S_LVALUE (struct      &v=sp[0], mixed i=sp[-1])
  *
  * Compute the index &(v[i]) of lvalue <v> and push it into the stack. The
  * computed index is a lvalue itself.
@@ -3415,8 +3733,7 @@ index_lvalue (svalue_t *sp, bytecode_p pc)
 {
     svalue_t *vec;   /* the vector/mapping */
     svalue_t *i;     /* the index */
-    int            ind;   /* numeric value of <i> */
-    short          type;  /* type of <vec> */
+    short     type;  /* type of <vec> */
 
     /* get the arguments */
     vec = sp;
@@ -3431,50 +3748,19 @@ index_lvalue (svalue_t *sp, bytecode_p pc)
 
     /* Index a vector.
      */
-    if (type == T_POINTER
-#ifdef USE_STRUCTS
-     || type == T_STRUCT
-#endif /* USE_STRUCTS */
-       )
+    if (type == T_POINTER)
     {
         vector_t *v = vec->u.vec;
+        svalue_t *item;
 
-        if (i->type != T_NUMBER)
-        {
-            ERRORF(("Illegal index for []: got %s, expected number.\n"
-                   , typename(i->type)
-                   ));
-            return NULL;
-        }
-        if ((ind = i->u.number) < 0)
-        {
-            ERROR("Illegal index for []: not a positive number.\n");
-            return NULL;
-        }
-
-        if ((size_t)ind >= VEC_SIZE(v))
-        {
-#ifdef USE_STRUCTS
-            if (type == T_POINTER)
-                ERRORF(("Index for [] out of bounds: %ld, vector size: %lu\n"
-                       , (long)ind, VEC_SIZE(v)));
-            else
-                ERRORF(("struct member index out of bounds: index %ld, "
-                        "struct size: %lu\n"
-                       , (long)ind, VEC_SIZE(v)));
-#else
-            ERRORF(("Index for [] out of bounds: %ld, vector size: %lu\n"
-                   , (long)ind, VEC_SIZE(v)));
-#endif /* USE_STRUCTS */
-            return NULL;
-        }
+        item = get_vector_item(v, i, sp, pc);
 
         /* Remove the arguments and push the result */
 
         sp = i;
 
         sp->type = T_LVALUE;
-        sp->u.lvalue = &v->item[ind];
+        sp->u.lvalue = item;
         return sp;
     }
 
@@ -3482,39 +3768,9 @@ index_lvalue (svalue_t *sp, bytecode_p pc)
      */
     if (type == T_STRING)
     {
-        if (i->type != T_NUMBER)
-        {
-            ERRORF(("Illegal index for []: got %s, expected number.\n"
-                   , typename(i->type)
-                   ));
-            return NULL;
-        }
-        if ((ind = i->u.number) < 0)
-        {
-            ERROR("Illegal index for []: not a positive number.\n");
-            return NULL;
-        }
+        char * cp;
 
-        if (ind >= mstrsize(vec->u.str) )
-        {
-            ERRORF(("Index out for [] of bounds: %ld, string length: %ld.\n"
-                   , (long)ind, (long)mstrsize(vec->u.str)));
-            return NULL;
-        }
-
-        /* If the string is tabled, i.e. not changeable, or has more than
-         * one reference, allocate a new copy which can be changed safely.
-         */
-        if (!mstr_singular(vec->u.str))
-        {
-            string_t *p;
-
-            memsafe(p = dup_mstring(vec->u.str), mstrsize(vec->u.str)
-                   , "modifiable string");
-
-            free_mstring(vec->u.str);
-            vec->u.str = p;
-        }
+        cp = get_string_item(vec, i, /* make_singular: */ MY_TRUE, sp, pc);
 
         /* Remove the arguments and create and push the result. */
 
@@ -3523,9 +3779,30 @@ index_lvalue (svalue_t *sp, bytecode_p pc)
         sp->type = T_LVALUE;
         sp->u.lvalue = &special_lvalue.v;
         special_lvalue.v.type = T_CHAR_LVALUE;
-        special_lvalue.v.u.charp = &(get_txt(vec->u.str)[ind]);
+        special_lvalue.v.u.charp = cp;
         return sp;
     }
+
+#ifdef USE_STRUCTS
+    /* Index a struct.
+     */
+    if (type == T_STRUCT)
+    {
+        struct_t * st = vec->u.strct;
+        svalue_t * item;
+
+        item = get_struct_item(st, i, sp, pc);
+        
+        /* Remove the arguments and push the result */
+
+        sp--; /* *sp is a T_LVALUE and can be dropped silently  */
+        free_svalue(sp); /* This was 'i' */
+
+        sp->type = T_LVALUE;
+        sp->u.lvalue = item;
+        return sp;
+    }
+#endif /* USE_STRUCTS */
 
     /* Index a mapping.
      */
@@ -3583,25 +3860,11 @@ rindex_lvalue (svalue_t *sp, bytecode_p pc)
 {
     svalue_t *vec;   /* the vector/string */
     svalue_t *i;     /* the index */
-    mp_int         ind;   /* numeric value of <i> */
-    short          type;  /* type of <vec> */
+    short     type;  /* type of <vec> */
 
     /* get the arguments */
     vec = sp;
     i = sp -1;
-
-    if (i->type != T_NUMBER)
-    {
-        ERRORF(("Illegal index for [<]: got %s, expected number.\n"
-               , typename(i->type)
-               ));
-        return NULL;
-    }
-    if ((ind = i->u.number) < 0)
-    {
-        ERROR("Illegal index for [<]: not a positive number.\n");
-        return NULL;
-    }
 
     /* Dereference the initial (and possibly more) lvalue-indirection
      */
@@ -3615,22 +3878,15 @@ rindex_lvalue (svalue_t *sp, bytecode_p pc)
     if (type == T_POINTER)
     {
         vector_t *v = vec->u.vec;
+        svalue_t *item;
 
-
-        if ( (ind = (mp_int)VEC_SIZE(v) - ind) < 0
-         ||  ind >= (mp_int)VEC_SIZE(v)
-           )
-        {
-            ERRORF(("Index out of bounds for [<]: %ld, vector size: %lu\n"
-                   , (long) i->u.number, VEC_SIZE(vec->u.vec)));
-            return NULL;
-        }
+        item = get_vector_r_item(v, i, sp, pc);
 
         /* Remove the arguments and return the result */
 
         sp = i;
         sp->type = T_LVALUE;
-        sp->u.lvalue = &v->item[ind];
+        sp->u.lvalue = item;
         return sp;
     }
 
@@ -3638,28 +3894,9 @@ rindex_lvalue (svalue_t *sp, bytecode_p pc)
      */
     if (type == T_STRING)
     {
-        if ( (ind = (mp_int)mstrsize(vec->u.str) - ind) < 0
-         ||  ind >= (mp_int)mstrsize(vec->u.str)
-           )
-        {
-            ERRORF(("Index out of bounds for [<]: %ld, string length: %ld\n"
-                   , (long) i->u.number, (long)mstrsize(vec->u.str)));
-            return NULL;
-        }
+        char * cp;
 
-        /* If the string is tabled, i.e. not changeable, or has more than
-         * one reference, allocate a new copy which can be changed safely.
-         */
-        if (!mstr_singular(vec->u.str))
-        {
-            string_t *p;
-
-            memsafe(p = dup_mstring(vec->u.str), mstrsize(vec->u.str)
-                   , "modifiable string");
-
-            free_mstring(vec->u.str);
-            vec->u.str = p;
-        }
+        cp = get_string_r_item(vec, i, /* make_singular: */ MY_TRUE, sp, pc);
 
         /* Remove the argument and return the result */
 
@@ -3667,7 +3904,7 @@ rindex_lvalue (svalue_t *sp, bytecode_p pc)
         sp->type = T_LVALUE;
         sp->u.lvalue = &special_lvalue.v;
         special_lvalue.v.type = T_CHAR_LVALUE;
-        special_lvalue.v.u.charp = &(get_txt(vec->u.str)[ind]);
+        special_lvalue.v.u.charp = cp;
         return sp;
     }
 
@@ -3695,21 +3932,11 @@ aindex_lvalue (svalue_t *sp, bytecode_p pc)
 {
     svalue_t *vec;   /* the vector/string */
     svalue_t *i;     /* the index */
-    mp_int         ind;   /* numeric value of <i> */
-    short          type;  /* type of <vec> */
+    short     type;  /* type of <vec> */
 
     /* get the arguments */
     vec = sp;
     i = sp -1;
-
-    if (i->type != T_NUMBER)
-    {
-        ERRORF(("Illegal index for [>]: got %s, expected number.\n"
-               , typename(i->type)
-               ));
-        return NULL;
-    }
-    ind = i->u.number;
 
     /* Dereference the initial (and possibly more) lvalue-indirection
      */
@@ -3723,22 +3950,15 @@ aindex_lvalue (svalue_t *sp, bytecode_p pc)
     if (type == T_POINTER)
     {
         vector_t *v = vec->u.vec;
+        svalue_t *item;
 
-
-        if (0 > ind)
-            ind = (mp_int)VEC_SIZE(vec->u.vec) + ind;
-        if (ind < 0 || ind >= (mp_int)VEC_SIZE(vec->u.vec))
-        {
-            ERRORF(("Index out of bounds for [>]: %ld, vector size: %lu.\n"
-                   , (long)(i->u.number), VEC_SIZE(vec->u.vec)));
-            return NULL;
-        }
+        item = get_vector_a_item(v, i, sp, pc);
 
         /* Remove the arguments and return the result */
 
         sp = i;
         sp->type = T_LVALUE;
-        sp->u.lvalue = &v->item[ind];
+        sp->u.lvalue = item;
         return sp;
     }
 
@@ -3746,28 +3966,9 @@ aindex_lvalue (svalue_t *sp, bytecode_p pc)
      */
     if (type == T_STRING)
     {
-        if (0 > ind)
-            ind = (mp_int)mstrsize(vec->u.str) + ind;
-        if (ind < 0 || ind >= (mp_int)mstrsize(vec->u.str))
-        {
-            ERRORF(("Index out of bounds for [>]: %ld, string length: %ld\n"
-                   , (long) i->u.number, (long)mstrsize(vec->u.str)));
-            return NULL;
-        }
+        char * cp;
 
-        /* If the string is tabled, i.e. not changeable, or has more than
-         * one reference, allocate a new copy which can be changed safely.
-         */
-        if (!mstr_singular(vec->u.str))
-        {
-            string_t *p;
-
-            memsafe(p = dup_mstring(vec->u.str), mstrsize(vec->u.str)
-                   , "modifiable string");
-
-            free_mstring(vec->u.str);
-            vec->u.str = p;
-        }
+        cp = get_string_a_item(vec, i, /* make_singular: */ MY_TRUE, sp, pc);
 
         /* Remove the argument and return the result */
 
@@ -3775,7 +3976,7 @@ aindex_lvalue (svalue_t *sp, bytecode_p pc)
         sp->type = T_LVALUE;
         sp->u.lvalue = &special_lvalue.v;
         special_lvalue.v.type = T_CHAR_LVALUE;
-        special_lvalue.v.u.charp = &(get_txt(vec->u.str)[ind]);
+        special_lvalue.v.u.charp = cp;
         return sp;
     }
 
@@ -3792,8 +3993,8 @@ static INLINE svalue_t *
 protected_index_lvalue (svalue_t *sp, bytecode_p pc)
 
 /* Operator F_PROTECTED_INDEX_LVALUE (string|vector &v=sp[0], int   i=sp[-1])
- *          F_PROTECTED_INDEX_LVALUE (struct        &v=sp[0], int   i=sp[-1])
  *          F_PROTECTED_INDEX_LVALUE (mapping       &v=sp[0], mixed i=sp[-1])
+ *          F_PROTECTED_INDEX_S_LVALUE (struct      &v=sp[0], mixed i=sp[-1])
  *
  * Compute the index &(*v[i]) of lvalue <v>, wrap it into a protector, and push
  * the reference to the protector as PROTECTED_LVALUE onto the stack.
@@ -3808,8 +4009,7 @@ protected_index_lvalue (svalue_t *sp, bytecode_p pc)
 {
     svalue_t *vec;   /* the indexed value */
     svalue_t *i;     /* the index */
-    int            ind;   /* numeric value of <i> */
-    short          type;  /* type of <vec> */
+    short     type;  /* type of <vec> */
 
     /* Get arguments */
     vec = sp->u.lvalue;
@@ -3825,44 +4025,13 @@ protected_index_lvalue (svalue_t *sp, bytecode_p pc)
 
         /* Index a vector.
          */
-        if (type == T_POINTER
-#ifdef USE_STRUCTS
-         || type == T_STRUCT
-#endif /* USE_STRUCTS */
-           )
+        if (type == T_POINTER)
         {
             vector_t *v = vec->u.vec;
             struct protected_lvalue *lvalue;
+            svalue_t *item;
 
-            if (i->type != T_NUMBER)
-            {
-                ERRORF(("Illegal index for []: got %s, expected number.\n"
-                       , typename(i->type)
-                       ));
-                return NULL;
-            }
-            if ((ind = i->u.number) < 0)
-            {
-                ERROR("Illegal index for []: not a positive number.\n");
-                return NULL;
-            }
-
-            if ((size_t)ind >= VEC_SIZE(v))
-            {
-#ifdef USE_STRUCTS
-                if (type == T_POINTER)
-                    ERRORF(("Index for [] out of bounds: %ld, vector size: %lu.\n"
-                           , (long)ind, VEC_SIZE(v)));
-                else
-                    ERRORF(("struct lookup out of bounds: index %ld, "
-                            "struct size: %lu\n"
-                           , (long)ind, VEC_SIZE(vec->u.vec)));
-#else
-                ERRORF(("Index for [] out of bounds: %ld, vector size: %lu.\n"
-                       , (long)ind, VEC_SIZE(v)));
-#endif /* USE_STRUCTS */
-                return NULL;
-            }
+            item = get_vector_item(v, i, sp, pc);
 
             /* Drop the arguments */
             sp = i;
@@ -3871,7 +4040,7 @@ protected_index_lvalue (svalue_t *sp, bytecode_p pc)
 
             lvalue = (struct protected_lvalue *)xalloc(sizeof *lvalue);
             lvalue->v.type = T_PROTECTED_LVALUE;
-            lvalue->v.u.lvalue = &v->item[ind];
+            lvalue->v.u.lvalue = item;
             put_ref_array(&(lvalue->protector), v);
 
             sp->type = T_LVALUE;
@@ -3880,45 +4049,43 @@ protected_index_lvalue (svalue_t *sp, bytecode_p pc)
             return sp;
         }
 
+#ifdef USE_STRUCTS
+        /* Index a struct.
+         */
+        if (type == T_STRUCT)
+        {
+            struct_t * st = vec->u.strct;
+            svalue_t * item;
+            struct protected_lvalue *lvalue;
+
+            item = get_struct_item(st, i, sp, pc);
+
+            /* Drop the arguments */
+            sp--;
+            free_svalue(sp); /* Was 'i' */
+
+            /* Compute and return the result */
+
+            lvalue = (struct protected_lvalue *)xalloc(sizeof *lvalue);
+            lvalue->v.type = T_PROTECTED_LVALUE;
+            lvalue->v.u.lvalue = item;
+            put_ref_struct(&(lvalue->protector), st);
+
+            sp->type = T_LVALUE;
+            sp->u.lvalue = &lvalue->v;
+
+            return sp;
+        }
+#endif /* USE_STRUCTS */
+
         /* Index a string.
          */
         if (type == T_STRING)
         {
             struct protected_char_lvalue *val;
+            char * cp;
 
-            if (i->type != T_NUMBER)
-            {
-                ERRORF(("Illegal index for []: got %s, expected number.\n"
-                       , typename(i->type)
-                       ));
-                return NULL;
-            }
-            if ((ind = i->u.number) < 0)
-            {
-                ERROR("Illegal index for []: not a positive number.\n");
-                return NULL;
-            }
-
-            if (ind > mstrsize(vec->u.str) )
-            {
-                ERRORF(("Index for [] out of bounds: %ld, string length: %ld.\n"
-                       , (long)ind, (long)mstrsize(vec->u.str)));
-                return NULL;
-            }
-
-            /* If the string is tabled, i.e. not changeable, or has more than
-             * one reference, allocate a new copy which can be changed safely.
-             */
-            if (!mstr_singular(vec->u.str))
-            {
-                string_t *p;
-
-                memsafe(p = dup_mstring(vec->u.str), mstrsize(vec->u.str)
-                       , "modifiable string");
-
-                free_mstring(vec->u.str);
-                vec->u.str = p;
-            }
+            cp = get_string_item(vec, i, /* make_singular: */ MY_TRUE, sp, pc);
 
             /* Add another reference to the string to keep it alive while
              * we use it.
@@ -3932,7 +4099,7 @@ protected_index_lvalue (svalue_t *sp, bytecode_p pc)
 
             val = (struct protected_char_lvalue *)xalloc(sizeof *val);
             val->v.type = T_PROTECTED_CHAR_LVALUE;
-            val->v.u.charp = &(get_txt(vec->u.str)[ind]);
+            val->v.u.charp = cp;
             val->lvalue = vec;
             val->start = get_txt(vec->u.str);
             val->protector.type = T_INVALID;
@@ -3999,6 +4166,7 @@ protected_index_lvalue (svalue_t *sp, bytecode_p pc)
         {
             struct protected_lvalue *lvalue;
             struct protected_char_lvalue *val;
+            char * cp;
 
             lvalue = (struct protected_lvalue *)vec;
 
@@ -4025,39 +4193,7 @@ protected_index_lvalue (svalue_t *sp, bytecode_p pc)
 
             vec = lvalue->v.u.lvalue; /* it's a string... */
 
-            if (i->type != T_NUMBER)
-            {
-                ERRORF(("Illegal index for []: got %s, expected number.\n"
-                       , typename(i->type)
-                       ));
-                return NULL;
-            }
-            if ((ind = i->u.number) < 0)
-            {
-                ERROR("Illegal index for []: not a positive number.\n");
-                return NULL;
-            }
-
-            if (ind > mstrsize(vec->u.str) )
-            {
-                ERRORF(("Index for [] out of bounds: %ld, string length: %ld\n"
-                       , (long)ind, (long)mstrsize(vec->u.str)));
-                return NULL;
-            }
-
-            /* If the string is tabled, i.e. not changeable, or has more than
-             * one reference, allocate a new copy which can be changed safely.
-             */
-            if (!mstr_singular(vec->u.str))
-            {
-                string_t *p;
-
-                memsafe(p = dup_mstring(vec->u.str), mstrsize(vec->u.str)
-                       , "modifiable string");
-
-                free_mstring(vec->u.str);
-                vec->u.str = p;
-            }
+            cp = get_string_item(vec, i, /* make_singular: */ MY_TRUE, sp, pc);
 
             /* Add another reference to the string to keep it alive while
              * we use it.
@@ -4067,7 +4203,7 @@ protected_index_lvalue (svalue_t *sp, bytecode_p pc)
             /* Build the protector */
             val = (struct protected_char_lvalue *)xalloc(sizeof *val);
             val->v.type = T_PROTECTED_CHAR_LVALUE;
-            val->v.u.charp = &(get_txt(vec->u.str)[ind]);
+            val->v.u.charp = cp;
             val->lvalue = vec;
             val->start = get_txt(vec->u.str);
 
@@ -4124,25 +4260,11 @@ protected_rindex_lvalue (svalue_t *sp, bytecode_p pc)
 {
     svalue_t *vec;   /* the indexed value */
     svalue_t *i;     /* the index */
-    mp_int         ind;   /* numeric value of <i> */
-    short          type;  /* type of <vec> */
+    short     type;  /* type of <vec> */
 
     /* Get arguments */
     vec = sp->u.lvalue;
     i = sp -1;
-
-    if (i->type != T_NUMBER)
-    {
-        ERRORF(("Illegal index for [<]: got %s, expected number.\n"
-               , typename(i->type)
-               ));
-        return NULL;
-    }
-    if ((ind = i->u.number) < 0)
-    {
-        ERROR("Illegal index for [<]: not a positive number.\n");
-        return NULL;
-    }
 
     /* The loop unravels the (possible) lvalue chain starting at vec.
      * When a non-lvalue is encountered, the indexing takes place
@@ -4158,21 +4280,15 @@ protected_rindex_lvalue (svalue_t *sp, bytecode_p pc)
         {
             vector_t *v = vec->u.vec;
             struct protected_lvalue *lvalue;
+            svalue_t *item;
 
-            if ( (ind = (mp_int)VEC_SIZE(v) - ind) < 0
-             ||  ind >= (mp_int)VEC_SIZE(v)
-               )
-            {
-                ERRORF(("Index for [<] out of bounds: %ld, vector size: %lu\n"
-                       , (long)i->u.number, VEC_SIZE(v)));
-                return NULL;
-            }
+            item = get_vector_r_item(v, i, sp, pc);
 
             /* Create the protector for the result */
 
             lvalue = (struct protected_lvalue *)xalloc(sizeof *lvalue);
             lvalue->v.type = T_PROTECTED_LVALUE;
-            lvalue->v.u.lvalue = &v->item[ind];
+            lvalue->v.u.lvalue = item;
             put_ref_array(&(lvalue->protector), v);
 
             /* Drop the arguments and return the result */
@@ -4189,29 +4305,9 @@ protected_rindex_lvalue (svalue_t *sp, bytecode_p pc)
         if (type == T_STRING)
         {
             struct protected_char_lvalue *val;
+            char * cp;
 
-            if ( (ind = (mp_int)mstrsize(vec->u.str)  - ind) < 0
-             || ind >= (mp_int)mstrsize(vec->u.str)
-               )
-            {
-                ERRORF(("Index for [<] out of bounds: %ld, string length: %ld.\n"
-                       , (long)i->u.number, (long)mstrsize(vec->u.str)));
-                return NULL;
-            }
-
-            /* If the string is tabled, i.e. not changeable, or has more than
-             * one reference, allocate a new copy which can be changed safely.
-             */
-            if (!mstr_singular(vec->u.str))
-            {
-                string_t *p;
-
-                memsafe(p = dup_mstring(vec->u.str), mstrsize(vec->u.str)
-                       , "modifiable string");
-
-                free_mstring(vec->u.str);
-                vec->u.str = p;
-            }
+            cp = get_string_r_item(vec, i, /* make_singular: */ MY_TRUE, sp, pc);
 
             /* Add another reference to the string to keep it alive while
              * we use it.
@@ -4221,7 +4317,7 @@ protected_rindex_lvalue (svalue_t *sp, bytecode_p pc)
             /* Build the protector */
             val = (struct protected_char_lvalue *)xalloc(sizeof *val);
             val->v.type = T_PROTECTED_CHAR_LVALUE;
-            val->v.u.charp = &(get_txt(vec->u.str)[ind]);
+            val->v.u.charp = cp;
             val->lvalue = vec;
             val->start = get_txt(vec->u.str);
             val->protector.type = T_INVALID;
@@ -4250,6 +4346,7 @@ protected_rindex_lvalue (svalue_t *sp, bytecode_p pc)
         {
             struct protected_lvalue *lvalue;
             struct protected_char_lvalue *val;
+            char * cp;
 
             lvalue = (struct protected_lvalue *)vec;
 
@@ -4274,29 +4371,7 @@ protected_rindex_lvalue (svalue_t *sp, bytecode_p pc)
             }
 
             vec = lvalue->v.u.lvalue; /* it's a string... */
-
-            if ( (ind = (mp_int)mstrsize(vec->u.str) - ind) < 0
-             ||  ind >= (mp_int)mstrsize(vec->u.str)
-               )
-            {
-                ERRORF(("Index for [<] out of bounds: %ld, string length: %ld.\n"
-                       , (long)i->u.number, (long)mstrsize(vec->u.str)));
-                return NULL;
-            }
-
-            /* If the string is tabled, i.e. not changeable, or has more than
-             * one reference, allocate a new copy which can be changed safely.
-             */
-            if (!mstr_singular(vec->u.str))
-            {
-                string_t *p;
-
-                memsafe(p = dup_mstring(vec->u.str), mstrsize(vec->u.str)
-                       , "modifiable string");
-
-                free_mstring(vec->u.str);
-                vec->u.str = p;
-            }
+            cp = get_string_r_item(vec, i, /* make_singular: */ MY_TRUE, sp, pc);
 
             /* Add another reference to the string to keep it alive while
              * we use it.
@@ -4306,7 +4381,7 @@ protected_rindex_lvalue (svalue_t *sp, bytecode_p pc)
             /* Build the protector */
             val = (struct protected_char_lvalue *)xalloc(sizeof *val);
             val->v.type = T_PROTECTED_CHAR_LVALUE;
-            val->v.u.charp = &(get_txt(vec->u.str)[ind]);
+            val->v.u.charp = cp;
             val->lvalue = vec;
             val->start = get_txt(vec->u.str);
 
@@ -4363,21 +4438,11 @@ protected_aindex_lvalue (svalue_t *sp, bytecode_p pc)
 {
     svalue_t *vec;   /* the indexed value */
     svalue_t *i;     /* the index */
-    mp_int         ind;   /* numeric value of <i> */
-    short          type;  /* type of <vec> */
+    short     type;  /* type of <vec> */
 
     /* Get arguments */
     vec = sp->u.lvalue;
     i = sp -1;
-
-    if (i->type != T_NUMBER)
-    {
-        ERRORF(("Illegal index for [>]: got %s, expected number.\n"
-               , typename(i->type)
-               ));
-        return NULL;
-    }
-    ind = i->u.number;
 
     /* The loop unravels the (possible) lvalue chain starting at vec.
      * When a non-lvalue is encountered, the indexing takes place
@@ -4393,21 +4458,15 @@ protected_aindex_lvalue (svalue_t *sp, bytecode_p pc)
         {
             vector_t *v = vec->u.vec;
             struct protected_lvalue *lvalue;
+            svalue_t *item;
 
-            if (0 > ind)
-                ind = (mp_int)VEC_SIZE(vec->u.vec) + ind;
-            if (ind < 0 || ind >= (mp_int)VEC_SIZE(vec->u.vec))
-            {
-                ERRORF(("Index out of bounds for [>]: %ld, vector size: %lu.\n"
-                       , (long)(i->u.number), VEC_SIZE(vec->u.vec)));
-                return NULL;
-            }
+            item = get_vector_a_item(v, i, sp, pc);
 
             /* Create the protector for the result */
 
             lvalue = (struct protected_lvalue *)xalloc(sizeof *lvalue);
             lvalue->v.type = T_PROTECTED_LVALUE;
-            lvalue->v.u.lvalue = &v->item[ind];
+            lvalue->v.u.lvalue = item;
             put_ref_array(&(lvalue->protector), v);
 
             /* Drop the arguments and return the result */
@@ -4424,29 +4483,9 @@ protected_aindex_lvalue (svalue_t *sp, bytecode_p pc)
         if (type == T_STRING)
         {
             struct protected_char_lvalue *val;
+            char * cp;
 
-            if (0 > ind)
-                ind = (mp_int)mstrsize(vec->u.str) + ind;
-            if (ind < 0 || ind >= (mp_int)mstrsize(vec->u.str))
-            {
-                ERRORF(("Index out of bounds for [>]: %ld, string length: %ld\n"
-                       , (long) i->u.number, (long)mstrsize(vec->u.str)));
-                return NULL;
-            }
-
-            /* If the string is tabled, i.e. not changeable, or has more than
-             * one reference, allocate a new copy which can be changed safely.
-             */
-            if (!mstr_singular(vec->u.str))
-            {
-                string_t *p;
-
-                memsafe(p = dup_mstring(vec->u.str), mstrsize(vec->u.str)
-                       , "modifiable string");
-
-                free_mstring(vec->u.str);
-                vec->u.str = p;
-            }
+            cp = get_string_a_item(vec, i, /* make_singular: */ MY_TRUE, sp, pc);
 
             /* Add another reference to the string to keep it alive while
              * we use it.
@@ -4456,7 +4495,7 @@ protected_aindex_lvalue (svalue_t *sp, bytecode_p pc)
             /* Build the protector */
             val = (struct protected_char_lvalue *)xalloc(sizeof *val);
             val->v.type = T_PROTECTED_CHAR_LVALUE;
-            val->v.u.charp = &(get_txt(vec->u.str)[ind]);
+            val->v.u.charp = cp;
             val->lvalue = vec;
             val->start = get_txt(vec->u.str);
             val->protector.type = T_INVALID;
@@ -4485,6 +4524,7 @@ protected_aindex_lvalue (svalue_t *sp, bytecode_p pc)
         {
             struct protected_lvalue *lvalue;
             struct protected_char_lvalue *val;
+            char * cp;
 
             lvalue = (struct protected_lvalue *)vec;
 
@@ -4509,29 +4549,7 @@ protected_aindex_lvalue (svalue_t *sp, bytecode_p pc)
             }
 
             vec = lvalue->v.u.lvalue; /* it's a string... */
-
-            if (0 > ind)
-                ind = (mp_int)mstrsize(vec->u.str) + ind;
-            if (ind >= (mp_int)mstrsize(vec->u.str))
-            {
-                ERRORF(("Index out of bounds for [>]: %ld, string length: %ld\n"
-                       , (long) i->u.number, (long)mstrsize(vec->u.str)));
-                return NULL;
-            }
-
-            /* If the string is tabled, i.e. not changeable, or has more than
-             * one reference, allocate a new copy which can be changed safely.
-             */
-            if (!mstr_singular(vec->u.str))
-            {
-                string_t *p;
-
-                memsafe(p = dup_mstring(vec->u.str), mstrsize(vec->u.str)
-                       , "modifiable string");
-
-                free_mstring(vec->u.str);
-                vec->u.str = p;
-            }
+            cp = get_string_a_item(vec, i, /* make_singular: */ MY_TRUE, sp, pc);
 
             /* Add another reference to the string to keep it alive while
              * we use it.
@@ -4541,7 +4559,7 @@ protected_aindex_lvalue (svalue_t *sp, bytecode_p pc)
             /* Build the protector */
             val = (struct protected_char_lvalue *)xalloc(sizeof *val);
             val->v.type = T_PROTECTED_CHAR_LVALUE;
-            val->v.u.charp = &(get_txt(vec->u.str)[ind]);
+            val->v.u.charp = cp;
             val->lvalue = vec;
             val->start = get_txt(vec->u.str);
 
@@ -4950,6 +4968,7 @@ push_indexed_value (svalue_t *sp, bytecode_p pc)
 
 /* Operator F_INDEX (string|vector v=sp[-1], int   i=sp[0])
  *          F_INDEX (mapping       v=sp[-1], mixed i=sp[0])
+ *          F_S_INDEX (struct      v=sp[-1], string|int i=sp[0])
  *
  * Compute the value (v[i]) and push it onto the stack.
  * If the value would be a destructed object, 0 is pushed onto the stack
@@ -4959,7 +4978,6 @@ push_indexed_value (svalue_t *sp, bytecode_p pc)
 {
     svalue_t *vec;  /* the indexed value */
     svalue_t *i;    /* the index */
-    int            ind;  /* numeric value of <i> */
 
     /* Get arguments */
     i = sp;
@@ -4969,74 +4987,28 @@ push_indexed_value (svalue_t *sp, bytecode_p pc)
     {
     case T_STRING:
       {
-        if (i->type != T_NUMBER)
-        {
-            ERRORF(("Illegal index for []: got %s, expected number.\n"
-                   , typename(i->type)
-                   ));
-            return NULL;
-        }
-        if ((ind = i->u.number) < 0)
-        {
-            ERROR("Illegal index for []: not a positive number.\n");
-            return NULL;
-        }
+        int c;
 
-        /* Index the string */
-        if (ind > mstrsize(vec->u.str))
-        {
-            error("Index for [] out of bounds: %ld, string size: %ld.\n"
-                 , (long)ind, (long)mstrsize(vec->u.str));
-        }
-        else
-            ind = get_txt(vec->u.str)[ind];
+        c = *get_string_item(vec, i, /* make_singular: */ MY_FALSE, sp, pc);
 
         /* Drop the args and return the result */
 
         free_string_svalue(vec);
 
         sp = vec; /* == sp-1 */
-        put_number(sp, ind);
+        put_number(sp, c);
 
         return sp;
       }
 
     case T_POINTER:
-#ifdef USE_STRUCTS
-    case T_STRUCT:
-#endif /* USE_STRUCTS */
-        if (i->type != T_NUMBER)
-        {
-            ERRORF(("Illegal index for []: got %s, expected number.\n"
-                   , typename(i->type)
-                   ));
-            return NULL;
-        }
-        if ((ind = i->u.number) < 0)
-        {
-            ERROR("Illegal index for []: not a positive number.\n");
-            return NULL;
-        }
+      {
+        svalue_t *item;
+
+        item = get_vector_item(vec->u.vec, i, sp, pc);
 
         /* Drop the arguments */
         sp = vec; /* == sp-1 */
-
-        if (ind < 0 || (size_t)ind >= VEC_SIZE(vec->u.vec))
-        {
-#ifdef USE_STRUCTS
-            if (vec->type == T_POINTER)
-                ERRORF(("Index for [] out of bounds: %ld, vector size: %lu\n"
-                       , (long)ind, VEC_SIZE(vec->u.vec)));
-            else
-                ERRORF(("struct lookup out of bounds: index %ld, "
-                        "struct size: %lu\n"
-                       , (long)ind, VEC_SIZE(vec->u.vec)));
-#else
-            ERRORF(("Index for [] out of bounds: %ld, vector size: %lu\n"
-                   , (long)ind, VEC_SIZE(vec->u.vec)));
-#endif /* USE_STRUCTS */
-            return NULL;
-        }
 
         /* Assign the indexed element to the sp entry holding vec.
          * Decrement the vector ref manually to optimize the case that
@@ -5044,29 +5016,16 @@ push_indexed_value (svalue_t *sp, bytecode_p pc)
          */
         if (vec->u.vec->ref == 1)
         {
-            svalue_t *p, tmp;
+            svalue_t tmp;
 
             /* Copy the indexed element into <tmp>
              */
-#if !defined(NO_INLINES) && defined(__GNUC__)
-            tmp = const0;
-            /* gcc complains about tmp being clobbered */
-#endif
-            p = &vec->u.vec->item[ind];
-            if (destructed_object_ref(p))
-            {
-                free_svalue(p);
-                put_number(&tmp, 0);
-            }
-            else
-            {
-                tmp = *p;
-            }
+            tmp = *item;
 
             /* Invalidate the old space of the result value and free
              * the vector.
              */
-            p->type = T_INVALID;
+            item->type = T_INVALID;
             free_array(vec->u.vec);
 
             /* Return the result */
@@ -5079,8 +5038,9 @@ push_indexed_value (svalue_t *sp, bytecode_p pc)
         /* The vector continues to live: keep the refcount as it is
          * and just assign the indexed element for the result.
          */
-        assign_checked_svalue_no_free(sp, &vec->u.vec->item[ind]);
+        assign_checked_svalue_no_free(sp, item);
         return sp;
+      }
 
     case T_MAPPING:
       {
@@ -5114,6 +5074,27 @@ push_indexed_value (svalue_t *sp, bytecode_p pc)
         return sp;
       }
 
+#ifdef USE_STRUCTS
+    case T_STRUCT:
+      {
+        struct_t * st = vec->u.strct;
+        svalue_t * item;
+
+        item = get_struct_item(st, i, sp, pc);
+
+        /* Drop the 'i' argument */
+        free_svalue(sp);
+        sp--;
+
+        /* Assign the value */
+        assign_svalue_no_free(sp, item);
+
+        /* Drop the struct reference */
+        free_struct(st);
+        return sp;
+      }
+#endif /* USE_STRUCTS */
+
     default:
         inter_sp = sp;
         inter_pc = pc;
@@ -5139,64 +5120,36 @@ push_rindexed_value (svalue_t *sp, bytecode_p pc)
 {
     svalue_t *vec;  /* the indexed value */
     svalue_t *i;    /* the index */
-    mp_int         ind;  /* numeric value of <i> */
 
     /* Get arguments */
     i = sp;
     vec = sp - 1;
 
-    if (i->type != T_NUMBER)
-    {
-        ERRORF(("Illegal index for [<]: got %s, expected number.\n"
-               , typename(i->type)
-               ));
-        return NULL;
-    }
-    if ((ind = i->u.number) < 0)
-    {
-        ERROR("Illegal index for [<]: not a positive number.\n");
-        return NULL;
-    }
-
     switch (vec->type)
     {
     case T_STRING:
       {
-        /* Index the string */
+        int c;
 
-        if ( (ind = (mp_int)mstrsize(vec->u.str) - ind) < 0)
-        {
-            ind = -1;
-        }
-        else if (ind >= (mp_int)mstrsize(vec->u.str))
-        {
-            ERRORF(("Index for [<] out of bounds: %ld, string size: %lu\n"
-                   , (long)i->u.number, (unsigned long)mstrsize(vec->u.str)));
-            return NULL;
-        }
-        else
-            ind = get_txt(vec->u.str)[ind];
+        c = *get_string_r_item(vec, i, /* make_singular: */ MY_FALSE, sp, pc);
 
         /* Drop the args and return the result */
 
         free_string_svalue(vec);
 
         sp = vec; /* == sp-1 */
-        put_number(sp, ind);
+        put_number(sp, c);
         return sp;
       }
 
     case T_POINTER:
+      {
+        svalue_t *item;
+
+        item = get_vector_r_item(vec->u.vec, i, sp, pc);
+
         /* Drop the arguments */
         sp = vec;
-        if ( (ind = (mp_int)VEC_SIZE(vec->u.vec) - ind) < 0
-         ||  ind >= (mp_int)VEC_SIZE(vec->u.vec)
-           )
-        {
-            ERRORF(("Index for [<] out of bounds: %ld, vector size: %lu\n"
-                   , (long)i->u.number, VEC_SIZE(vec->u.vec)));
-            return NULL;
-        }
 
         /* Assign the indexed element to the sp entry holding vec.
          * Decrement the vector ref manually to optimize the case that
@@ -5204,29 +5157,16 @@ push_rindexed_value (svalue_t *sp, bytecode_p pc)
          */
         if (vec->u.vec->ref == 1)
         {
-            svalue_t *p, tmp;
+            svalue_t tmp;
 
             /* Copy the indexed element into <tmp>
              */
-#if !defined(NO_INLINES) && defined(__GNUC__)
-            tmp = const0;
-            /* gcc complains about tmp being clobbered */
-#endif
-            p = &vec->u.vec->item[ind];
-            if (destructed_object_ref(p))
-            {
-                free_svalue(p);
-                put_number(&tmp, 0);
-            }
-            else
-            {
-                tmp = *p;
-            }
+            tmp = *item;
 
             /* Invalidate the old space of the result value and free
              * the vector.
              */
-            p->type = T_INVALID;
+            item->type = T_INVALID;
             free_array(vec->u.vec);
 
             /* Return the result */
@@ -5239,8 +5179,9 @@ push_rindexed_value (svalue_t *sp, bytecode_p pc)
         /* The vector continues to live: keep the refcount as it is
          * and just assign the indexed element for the result.
          */
-        assign_checked_svalue_no_free(sp, &vec->u.vec->item[ind]);
+        assign_checked_svalue_no_free(sp, item);
         return sp;
+      }
 
     default:
         inter_sp = sp;
@@ -5267,58 +5208,36 @@ push_aindexed_value (svalue_t *sp, bytecode_p pc)
 {
     svalue_t *vec;  /* the indexed value */
     svalue_t *i;    /* the index */
-    mp_int         ind;  /* numeric value of <i> */
 
     /* Get arguments */
     i = sp;
     vec = sp - 1;
 
-    if (i->type != T_NUMBER)
-    {
-        ERRORF(("Illegal index for [>]: got %s, expected number.\n"
-               , typename(i->type)
-               ));
-        return NULL;
-    }
-    ind = i->u.number;
-
     switch (vec->type)
     {
     case T_STRING:
       {
-        /* Index the string */
+        int c;
 
-        if (0 > ind)
-            ind = (mp_int)mstrsize(vec->u.str) + ind;
-        if (ind < 0 || ind >= (mp_int)mstrsize(vec->u.str))
-        {
-            ERRORF(("Index out of bounds for [>]: %ld, string length: %ld\n"
-                   , (long) i->u.number, (long)mstrsize(vec->u.str)));
-            return NULL;
-        }
-
-        ind = get_txt(vec->u.str)[ind];
+        c = *get_string_a_item(vec, i, /* make_singular: */ MY_FALSE, sp, pc);
 
         /* Drop the args and return the result */
 
         free_string_svalue(vec);
 
         sp = vec; /* == sp-1 */
-        put_number(sp, ind);
+        put_number(sp, c);
         return sp;
       }
 
     case T_POINTER:
+      {
+        svalue_t *item;
+
+        item = get_vector_a_item(vec->u.vec, i, sp, pc);
+
         /* Drop the arguments */
         sp = vec;
-        if (0 > (ind = i->u.number))
-            ind = (mp_int)VEC_SIZE(vec->u.vec) + ind;
-        if (ind < 0 || ind >= (mp_int)VEC_SIZE(vec->u.vec))
-        {
-            ERRORF(("Index out of bounds for [>]: %ld, vector size: %lu.\n"
-                   , (long)(i->u.number), VEC_SIZE(vec->u.vec)));
-            return NULL;
-        }
 
         /* Assign the indexed element to the sp entry holding vec.
          * Decrement the vector ref manually to optimize the case that
@@ -5326,29 +5245,16 @@ push_aindexed_value (svalue_t *sp, bytecode_p pc)
          */
         if (vec->u.vec->ref == 1)
         {
-            svalue_t *p, tmp;
+            svalue_t tmp;
 
             /* Copy the indexed element into <tmp>
              */
-#if !defined(NO_INLINES) && defined(__GNUC__)
-            tmp = const0;
-            /* gcc complains about tmp being clobbered */
-#endif
-            p = &vec->u.vec->item[ind];
-            if (destructed_object_ref(p))
-            {
-                free_svalue(p);
-                put_number(&tmp, 0);
-            }
-            else
-            {
-                tmp = *p;
-            }
+            tmp = *item;
 
             /* Invalidate the old space of the result value and free
              * the vector.
              */
-            p->type = T_INVALID;
+            item->type = T_INVALID;
             free_array(vec->u.vec);
 
             /* Return the result */
@@ -5361,8 +5267,9 @@ push_aindexed_value (svalue_t *sp, bytecode_p pc)
         /* The vector continues to live: keep the refcount as it is
          * and just assign the indexed element for the result.
          */
-        assign_checked_svalue_no_free(sp, &vec->u.vec->item[ind]);
+        assign_checked_svalue_no_free(sp, item);
         return sp;
+      }
 
     default:
         inter_sp = sp;
@@ -7191,12 +7098,12 @@ again:
     if (num_arg != -1 && !use_ap)
     {
         expected_stack = sp - num_arg +
-            ( instrs[full_instr].ret_type == TYPE_VOID ? 0 : 1 );
+            ( instrs[full_instr].ret_type.typeflags == TYPE_VOID ? 0 : 1 );
     }
     else if (use_ap)
     {
         expected_stack = ap -
-            ( instrs[full_instr].ret_type == TYPE_VOID ? 1 : 0 );
+            ( instrs[full_instr].ret_type.typeflags == TYPE_VOID ? 1 : 0 );
     }
     else
     {
@@ -10250,9 +10157,9 @@ again:
                 break;
 #ifdef USE_STRUCTS
             case T_STRUCT:
-                i = (sp-1)->u.vec == sp->u.vec;
-                if (!i && VEC_SIZE((sp-1)->u.vec) == 1
-                       && VEC_SIZE(sp->u.vec) == 1
+                i = (sp-1)->u.strct == sp->u.strct;
+                if (!i && struct_size((sp-1)->u.strct) == 0
+                       && struct_size(sp->u.strct) == 0
                    )
                 {
                     i = 1;
@@ -10336,7 +10243,7 @@ again:
                 break;
 #ifdef USE_STRUCTS
             case T_STRUCT:
-                i = (sp-1)->u.vec != sp->u.vec;
+                i = (sp-1)->u.strct != sp->u.strct;
                 break;
 #endif
             case T_OBJECT:
@@ -12723,11 +12630,11 @@ again:
          */
         if (current_prog != current_object->prog
          && inheritp->prog->num_variables
-         && (current_prog->variable_names[inheritp->variable_index_offset
-                                          +inheritp->prog->num_variables-1
-                                         ].flags & TYPE_MOD_VIRTUAL)
-         && !(inheritp->prog->variable_names[inheritp->prog->num_variables-1
-                                            ].flags & TYPE_MOD_VIRTUAL)
+         && (current_prog->variables[inheritp->variable_index_offset
+                                     +inheritp->prog->num_variables-1
+                                    ].type.typeflags & TYPE_MOD_VIRTUAL)
+         && !(inheritp->prog->variables[inheritp->prog->num_variables-1
+                                       ].type.typeflags & TYPE_MOD_VIRTUAL)
            )
         {
             /* Now search for the first virtual inheritance of the program
@@ -12742,9 +12649,9 @@ again:
             {
                 if (inh->prog == inheritp->prog
                  && current_object->prog
-                                  ->variable_names[inh->variable_index_offset
-                                                  +inh->prog->num_variables-1
-                                                  ].flags&TYPE_MOD_VIRTUAL
+                                  ->variables[inh->variable_index_offset
+                                              +inh->prog->num_variables-1
+                                             ].type.typeflags&TYPE_MOD_VIRTUAL
                    )
                     break;
                 inh++;
@@ -12982,9 +12889,35 @@ again:
         sp->u.lvalue = fp + LOAD_UINT8(pc);
         break;
 
+#ifdef USE_STRUCTS
+    CASE(F_PUSH_INDEXED_S_LVALUE); /* --- push_indexed_s_lvalue --- */
+        /* Operator F_PUSH_INDEXED_S_LVALUE(struct v=sp[-1], mixed i=sp[0])
+         *
+         * Compute the lvalue &(v[i]) and push it into the stack. If v has
+         * just one ref left, the indexed item is stored in indexing_quickfix
+         * and the lvalue refers to that variable.
+         */
+
+        {
+            svalue_t * svp = sp-1;
+
+            while (svp->type == T_LVALUE || svp->type == T_PROTECTED_LVALUE)
+                svp = svp->u.lvalue;
+            if (svp->type != T_STRUCT)
+            {
+                ERRORF(("Illegal type to struct->(): %s lvalue, "
+                        "expected struct lvalue.\n"
+                       , typename(svp->type)
+                      ));
+                /* NOTREACHED */
+            }
+        }
+        sp = push_indexed_lvalue(sp, pc);
+        break;
+#endif /* USE_STRUCTS */
+
     CASE(F_PUSH_INDEXED_LVALUE);    /* --- push_indexed_lvalue --- */
         /* Operator F_PUSH_INDEXED_LVALUE(vector  v=sp[-1], int   i=sp[0])
-         * Operator F_PUSH_INDEXED_LVALUE(struct  v=sp[-1], int   i=sp[0])
          * Operator F_PUSH_INDEXED_LVALUE(mapping v=sp[-1], mixed i=sp[0])
          *
          * Compute the lvalue &(v[i]) and push it into the stack. If v has
@@ -12992,6 +12925,22 @@ again:
          * and the lvalue refers to that variable.
          */
 
+#ifdef USE_STRUCTS
+        {
+            svalue_t * svp = sp-1;
+
+            while (svp->type == T_LVALUE || svp->type == T_PROTECTED_LVALUE)
+                svp = svp->u.lvalue;
+            if (svp->type == T_STRUCT)
+            {
+                ERRORF(("Illegal type to []: %s lvalue, "
+                        "expected string/mapping/vector lvalue.\n"
+                       , typename(svp->type)
+                      ));
+                /* NOTREACHED */
+            }
+        }
+#endif /* USE_STRUCTS */
         sp = push_indexed_lvalue(sp, pc);
         break;
 
@@ -13017,9 +12966,34 @@ again:
         sp = push_aindexed_lvalue(sp, pc);
         break;
 
+#ifdef USE_STRUCTS
+    CASE(F_INDEX_S_LVALUE);         /* --- index_s_lvalue     --- */
+        /* Operator F_INDEX_LVALUE (struct        &v=sp[0], int   i=sp[-1])
+         *
+         * Compute the index &(v[i]) of lvalue <v> and push it into the stack.
+         * The computed index is a lvalue itself. 
+         */
+
+        {
+            svalue_t * svp = sp;
+
+            while (svp->type == T_LVALUE || svp->type == T_PROTECTED_LVALUE)
+                svp = svp->u.lvalue;
+            if (svp->type != T_STRUCT)
+            {
+                ERRORF(("Illegal type to struct->(): %s lvalue, "
+                        "expected struct lvalue.\n"
+                       , typename(svp->type)
+                      ));
+                /* NOTREACHED */
+            }
+        }
+        sp = index_lvalue(sp, pc);
+        break;
+#endif /* USE_STRUCTS */
+
     CASE(F_INDEX_LVALUE);           /* --- index_lvalue       --- */
         /* Operator F_INDEX_LVALUE (string|vector &v=sp[0], int   i=sp[-1])
-         *          F_INDEX_LVALUE (struct        &v=sp[0], int   i=sp[-1])
          *          F_INDEX_LVALUE (mapping       &v=sp[0], mixed i=sp[-1])
          *
          * Compute the index &(v[i]) of lvalue <v> and push it into the stack.
@@ -13029,6 +13003,22 @@ again:
          * <special_lvalue>.
          */
 
+#ifdef USE_STRUCTS
+        {
+            svalue_t * svp = sp;
+
+            while (svp->type == T_LVALUE || svp->type == T_PROTECTED_LVALUE)
+                svp = svp->u.lvalue;
+            if (svp->type == T_STRUCT)
+            {
+                ERRORF(("Illegal type to []: %s lvalue, "
+                        "expected string/mapping/vector lvalue.\n"
+                       , typename(svp->type)
+                      ));
+                /* NOTREACHED */
+            }
+        }
+#endif /* USE_STRUCTS */
         sp = index_lvalue(sp, pc);
         break;
 
@@ -13058,9 +13048,28 @@ again:
         sp = aindex_lvalue(sp, pc);
         break;
 
+#ifdef USE_STRUCTS
+    CASE(F_S_INDEX);                /* --- s_index            --- */
+        /* Operator F_S_INDEX (struct v=sp[-1], mixed i=sp[0])
+         *
+         * Compute the value (v->i) and push it onto the stack.  If the value
+         * would be a destructed object, 0 is pushed onto the stack and the
+         * ref to the object is removed from the struct.
+         */
+
+        if ((sp-1)->type != T_STRUCT)
+        {
+            ERRORF(("Illegal type to struct->(): %s, expected struct.\n"
+                   , typename((sp-1)->type)
+                  ));
+            /* NOTREACHED */
+        }
+        sp = push_indexed_value(sp, pc);
+        break;
+#endif /* USE_STRUCTS */
+
     CASE(F_INDEX);                  /* --- index              --- */
         /* Operator F_INDEX (string|vector v=sp[-1], int   i=sp[0])
-         *          F_INDEX (struct        v=sp[-1], int   i=sp[0])
          *          F_INDEX (mapping       v=sp[-1], mixed i=sp[0])
          *
          * Compute the value (v[i]) and push it onto the stack.  If the value
@@ -13070,6 +13079,15 @@ again:
          * Mapping indices may use <indexing_quickfix> for temporary storage.
          */
 
+#ifdef USE_STRUCTS
+        if ((sp-1)->type == T_STRUCT)
+        {
+            ERRORF(("Illegal type to []: %s, expected string/vector/mapping.\n"
+                   , typename((sp-1)->type)
+                  ));
+            /* NOTREACHED */
+        }
+#endif /* USE_STRUCTS */
         sp = push_indexed_value(sp, pc);
         break;
 
@@ -13284,10 +13302,38 @@ again:
         sp = range_lvalue(AR_RANGE, sp);
         break;
 
+#ifdef USE_STRUCTS
+                        /* --- push_protected_indexed_s_lvalue --- */
+    CASE(F_PUSH_PROTECTED_INDEXED_S_LVALUE);
+        /* Op. (struct  v=sp[-1], mixed i=sp[0])
+         *
+         * Compute the lvalue &(v[i]), store it in a struct
+         * protected_lvalue, and push the protector as PROTECTED_LVALUE
+         * into the stack.
+         */
+
+        {
+            svalue_t * svp = sp-1;
+
+            while (svp->type == T_LVALUE || svp->type == T_PROTECTED_LVALUE)
+                svp = svp->u.lvalue;
+            if (svp->type != T_STRUCT)
+            {
+                ERRORF(("Illegal type to struct->(): %s lvalue, "
+                        "expected struct lvalue.\n"
+                       , typename(svp->type)
+                      ));
+                /* NOTREACHED */
+            }
+        }
+        
+        sp = push_protected_indexed_lvalue(sp, pc);
+        break;
+#endif /* USE_STRUCTS */
+
                           /* --- push_protected_indexed_lvalue --- */
     CASE(F_PUSH_PROTECTED_INDEXED_LVALUE);
         /* Op. (vector  v=sp[-1], int   i=sp[0])
-         * Op. (struct  v=sp[-1], int   i=sp[0])
          * Op. (mapping v=sp[-1], mixed i=sp[0])
          *
          * Compute the lvalue &(v[i]), store it in a struct
@@ -13295,6 +13341,15 @@ again:
          * into the stack.
          */
 
+#ifdef USE_STRUCTS
+        if ((sp-1)->type == T_STRUCT)
+        {
+            ERRORF(("Illegal type to []: %s, expected vector/mapping.\n"
+                   , typename((sp-1)->type)
+                  ));
+            /* NOTREACHED */
+        }
+#endif /* USE_STRUCTS */
         sp = push_protected_indexed_lvalue(sp, pc);
         break;
 
@@ -13334,10 +13389,37 @@ again:
         push_protected_indexed_map_lvalue(sp, pc);
         break;
 
+#ifdef USE_STRUCTS
+                               /* --- protected_index_s_lvalue --- */
+    CASE(F_PROTECTED_INDEX_S_LVALUE);
+        /* Operator (struct        &v=sp[0], int   i=sp[-1])
+         *
+         * Compute the index &(*v[i]) of lvalue <v>, wrap it into a
+         * protector, and push the reference to the protector as
+         * PROTECTED_LVALUE onto the stack.
+         */
+
+        {
+            svalue_t * svp = sp;
+
+            while (svp->type == T_LVALUE || svp->type == T_PROTECTED_LVALUE)
+                svp = svp->u.lvalue;
+            if (svp->type != T_STRUCT)
+            {
+                ERRORF(("Illegal type to struct->(): %s lvalue, "
+                        "expected struct lvalue.\n"
+                       , typename(svp->type)
+                      ));
+                /* NOTREACHED */
+            }
+        }
+        sp = protected_index_lvalue(sp, pc);
+        break;
+#endif /* USE_STRUCTS */
+
                                  /* --- protected_index_lvalue --- */
     CASE(F_PROTECTED_INDEX_LVALUE);
         /* Operator (string|vector &v=sp[0], int   i=sp[-1])
-         *          (struct        &v=sp[0], int   i=sp[-1])
          *          (mapping       &v=sp[0], mixed i=sp[-1])
          *
          * Compute the index &(*v[i]) of lvalue <v>, wrap it into a
@@ -13353,6 +13435,15 @@ again:
          * necessary.
          */
 
+#ifdef USE_STRUCTS
+        if ((sp-1)->type == T_STRUCT)
+        {
+            ERRORF(("Illegal type to []: %s, expected string/vector/mapping.\n"
+                   , typename((sp-1)->type)
+                  ));
+            /* NOTREACHED */
+        }
+#endif /* USE_STRUCTS */
         sp = protected_index_lvalue(sp, pc);
         break;
 
@@ -13910,13 +14001,15 @@ again:
 
 #ifdef USE_STRUCTS
     CASE(F_S_AGGREGATE);
-                        /* --- s_aggregate <name> <size> <num> --- */
+                        /* --- s_aggregate <idx> <num> --- */
     CASE(F_S_M_AGGREGATE);
-           /* --- s_m_aggregate <name> <size> <num> <index>... --- */
+           /* --- s_m_aggregate <idx> <num> <index>... --- */
     {
-        /* Create a struct (nominal size <size>) from the <num> values
-         * currently on the stack. The name of the struct is program
-         * string #<short>.
+        /* Create a struct from the <num> values currently on the
+         * stack. The struct can be found at short <idx> in
+         * program.struct_defs[]. If <idx> is negative, the <num>+1th
+         * value on the stack is a struct of the type to be generated
+         * (F_S_AGGREGATE only).
          * For F_S_AGGREGATE, the values on the stack are to be assigned
          * to the struct members in ascending order.
          * For F_S_M_AGGREGATE, the <index>... values give for each
@@ -13924,26 +14017,57 @@ again:
          * This list of indices is given in reverse order, that is the
          * index for the topmost stack value comes first.
          */
-        vector_t * vec;
-        unsigned short name;
-        int size, num_values;
+        struct_t * st;
+        short idx;
+        int num_values;
+        Bool has_template;
         svalue_t * svp;
 
-        LOAD_SHORT(name, pc);
-        size = LOAD_UINT8(pc);
+        LOAD_SHORT(idx, pc);
         num_values = LOAD_UINT8(pc);
+        has_template = MY_FALSE;
 
-        vec = allocate_array(size+1);
-        if  (!vec)
+        if (idx < 0 && instruction == F_S_AGGREGATE)
+        {
+            struct_type_t *pType;
+
+            if ((sp - num_values)->type != T_STRUCT)
+            {
+                ERRORF(("Bad template arg to #'(<: got %s, expected struct\n"
+                       , typename((sp - num_values)->type)
+                      ));
+                /* NOTREACHED */
+            }
+
+            pType = (sp - num_values)->u.strct->type;
+
+            if (num_values > struct_t_size(pType))
+            {
+                ERRORF(("Too many initializers for struct %s: "
+                        "%ld, expected %ld\n"
+                       , get_txt(struct_t_name(pType))
+                       , (long)num_values
+                       , (long)struct_t_size(pType)
+                      ));
+                /* NOTREACHED */
+            }
+            has_template = MY_TRUE;
+            st = struct_new(pType);
+        }
+        else
+        {
+            st = struct_new(current_prog->struct_defs[idx].type);
+        }
+        if  (!st)
             ERROR("Out of memory!\n");
-
-        put_ref_string(vec->item, current_strings[name]);
 
         if (instruction == F_S_AGGREGATE)
         {
-            /* Easy way: just move all the values into the vector */
+            /* Easy way: just move all the values into the struct.
+             * This allows for having less initializers than members.
+             */
 
-            for (svp = vec->item + num_values
+            for ( svp = st->member + num_values - 1
                 ; num_values > 0
                 ; num_values--, svp--, sp--
                 )
@@ -13959,17 +14083,23 @@ again:
             for ( ; num_values > 0 ; num_values--, sp--)
             {
                 ix = LOAD_UINT8(pc);
-                vec->item[ix] = *sp;
+                st->member[ix] = *sp;
             }
+        }
+
+        /* If necessary, remove the template struct */
+        if (has_template)
+        {
+            free_svalue(sp); sp--;
         }
 
         /* Put the struct onto the stack */
         sp++;
-        put_struct(sp, vec);
+        put_struct(sp, st);
 
         break;
    }
-#endif
+#endif /* USE_STRUCTS */
 
     CASE(F_PREVIOUS_OBJECT0);       /* --- previous_object0    --- */
         /* EFUN previous_object(void)
@@ -14193,7 +14323,7 @@ again:
          && arg->type != T_NUMBER
 #ifdef USE_STRUCTS
          && arg->type != T_STRUCT
-#endif
+#endif /* USE_STRUCTS */
          && arg->type != T_MAPPING)
             ERRORF(("foreach() got a %s, requires a (&)string/array/mapping/struct or number.\n"
                    , typename(sp->type)
@@ -14239,11 +14369,7 @@ again:
                 put_string(sp, str);
             }
         }
-        else if (arg->type == T_POINTER
-#ifdef USE_STRUCTS
-              || arg->type == T_STRUCT
-#endif /* USE_STRUCTS */
-                )
+        else if (arg->type == T_POINTER)
         {
             check_for_destr(arg->u.vec);
             count = (p_int)VEC_SIZE(arg->u.vec);
@@ -14261,6 +14387,26 @@ again:
                 put_array(sp, vec);
             }
         }
+#ifdef USE_STRUCTS
+        else if (arg->type == T_STRUCT)
+        {
+            struct_check_for_destr(arg->u.strct);
+            count = (p_int)struct_size(arg->u.strct);
+            vars_required = 1;
+
+            if (gen_refs)
+            {
+                /* Replace the struct-lvalue on the stack by the struct
+                 * itself - we don't need the lvalue any more.
+                 */
+                struct_t * st = arg->u.strct;
+
+                (void)ref_struct(st);
+                free_svalue(sp);
+                put_struct(sp, st);
+            }
+        }
+#endif /* USE_STRUCTS */
         else
         {
             mapping_t *m;
@@ -14486,11 +14632,7 @@ again:
                     lvalue->u.protected_char_lvalue = val;
                 }
             }
-            else if (sp[-2].type == T_POINTER
-#ifdef USE_STRUCTS
-                  || sp[-2].type == T_STRUCT
-#endif /* USE_STRUCTS */
-                    )
+            else if (sp[-2].type == T_POINTER)
             {
                 if (ix >= (p_int)VEC_SIZE(sp[-2].u.vec))
                     break;
@@ -14523,6 +14665,42 @@ again:
                     lvalue->u.lvalue = &prot->v;
                 }
             }
+#ifdef USE_STRUCTS
+            else if (sp[-2].type == T_STRUCT)
+            {
+                if (ix >= (p_int)struct_size(sp[-2].u.strct))
+                    break;
+                    /* Oops, somehow the struct managed to shring while
+                     * we're looping over it.
+                     * We stop processing and continue with the following
+                     * FOREACH_END instruction.
+                     */
+                     
+                if (!gen_refs)
+                {
+                    assign_svalue(lvalue, sp[-2].u.strct->member+ix);
+                }
+                else
+                {
+                    svalue_t * st = sp-2;
+                    svalue_t * item;
+                    struct protected_lvalue * prot;
+
+                    free_svalue(lvalue);
+
+                    /* Compute the indexed item and set up the protector */
+
+                    item = &st->u.strct->member[ix];
+                    prot = (struct protected_lvalue *)xalloc(sizeof *prot);
+                    prot->v.type = T_PROTECTED_LVALUE;
+                    prot->v.u.lvalue = item;
+                    put_ref_struct(&(prot->protector), st->u.strct);
+
+                    lvalue->type = T_LVALUE;
+                    lvalue->u.lvalue = &prot->v;
+                }
+            }
+#endif /* USE_STRUCTS */
             else
                 fatal("foreach() requires a string, array or mapping.\n");
                 /* If this happens, the check in F_FOREACH failed. */
@@ -14620,12 +14798,12 @@ again:
 #ifdef F_JUMP
     CASE(F_JUMP);                   /* --- jump <dest>         --- */
     {
-        /* Jump to the (16-Bit) ushort address <dest> (absolute jump).
+        /* Jump to the (48-Bit) unsigned address <dest> (absolute jump).
          */
 
-        unsigned short dest;
+        unsigned long dest;
 
-        GET_SHORT(dest, pc);
+        GET_3BYTE(dest, pc);
         pc = current_prog->program + dest;
         break;
     }
@@ -14975,17 +15153,23 @@ again:
             break;
         }
 
-#ifdef USE_STRUCTS
-        if (sp->type == T_POINTER || sp->type == T_STRUCT)
-#else
         if (sp->type == T_POINTER)
-#endif /* USE_STRUCTS */
         {
             i = (long)VEC_SIZE(sp->u.vec);
             free_svalue(sp);
             put_number(sp, i);
             break;
         }
+
+#ifdef USE_STRUCTS
+        if (sp->type == T_STRUCT)
+        {
+            i = (long)struct_size(sp->u.strct);
+            free_svalue(sp);
+            put_number(sp, i);
+            break;
+        }
+#endif /* USE_STRUCTS */
 
         if (sp->type == T_MAPPING)
         {
@@ -15562,11 +15746,15 @@ retry_for_shadow:
         apply_cache_hit++;
 #endif
         if (cache[ix].progp
-          /* Static functions may not be called from outside. */
-          && (   !cache[ix].flags
+          /* Static functions may not be called from outside.
+           * Protected functions not even from the inside
+           */
+          && (   !cache[ix].flags /* -> neither static nor protected */
               || b_ign_prot
               || (   !(cache[ix].flags & TYPE_MOD_PROTECTED)
-                  && current_object == ob))
+                  && current_object == ob
+                 ) /* --> static but not protected, and caller is owner */
+             )
            )
         {
             /* the cache will tell us in wich program the function is, and
@@ -16911,7 +17099,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
                 *p++ = instrs[i].opcode;
 
                 /* And finally the return instruction */
-                if ( instrs[i].ret_type == TYPE_VOID )
+                if ( instrs[i].ret_type.typeflags == TYPE_VOID )
                     *p++ = F_RETURN0;
                 else
                     *p++ = F_RETURN;
@@ -17603,6 +17791,8 @@ collect_trace (strbuf_t * sbuf, vector_t ** rvec )
                 goto not_catch;
             last_catch = pc2;
             name = STR_CATCH;
+            if (file)
+                free_mstring(file);
             file = NULL;
             line = 0;
             goto name_computed;
@@ -17699,7 +17889,8 @@ not_catch:  /* The frame does not point at a catch here */
         }
 
         /* Nothing of the above: a normal program */
-        free_mstring(file);
+        if (file)
+            free_mstring(file);
         line = get_line_number(dump_pc, prog, &file);
         memcpy(&name, FUNCTION_NAMEP(p[0].funstart), sizeof name);
 
@@ -17882,7 +18073,7 @@ clear_interpreter_refs (void)
             {
                 ob->ref = 0;
                 ob->prog->ref = 0;
-                clear_inherit_ref(ob->prog);
+                clear_program_ref(ob->prog, MY_FALSE);
             }
         }
     }
@@ -18695,15 +18886,20 @@ count_extra_ref_in_vector (svalue_t *svp, size_t num)
 
         case T_QUOTED_ARRAY:
         case T_POINTER:
-#ifdef USE_STRUCTS
-        case T_STRUCT:
-#endif /* USE_STRUCTS */
             p->u.vec->extra_ref++;
             if (NULL == register_pointer(ptable, p->u.vec) )
                 continue;
             p->u.vec->extra_ref = 1;
             count_extra_ref_in_vector(&p->u.vec->item[0], VEC_SIZE(p->u.vec));
             continue;
+
+#ifdef USE_STRUCTS
+        case T_STRUCT:
+            if (NULL == register_pointer(ptable, p->u.strct) )
+                continue;
+            count_extra_ref_in_vector(&p->u.strct->member[0], struct_size(p->u.strct));
+            continue;
+#endif /* USE_STRUCTS */
 
         case T_MAPPING:
             if (NULL == register_pointer(ptable, p->u.map) ) continue;
@@ -18736,14 +18932,20 @@ check_extra_ref_in_vector (svalue_t *svp, size_t num)
         {
         case T_QUOTED_ARRAY:
         case T_POINTER:
-#ifdef USE_STRUCTS
-        case T_STRUCT:
-#endif /* USE_STRUCTS */
             if (NULL == register_pointer(ptable, p->u.vec) )
                 continue;
             check_extra_ref_in_vector(&p->u.vec->item[0], VEC_SIZE(p->u.vec));
             p->u.vec->extra_ref = 0;
             continue;
+
+#ifdef USE_STRUCTS
+        case T_STRUCT:
+            if (NULL == register_pointer(ptable, p->u.strct) )
+                continue;
+            check_extra_ref_in_vector(&p->u.strct->member[0], struct_size(p->u.strct));
+            p->u.vec->extra_ref = 0;
+            continue;
+#endif /* USE_STRUCTS */
 
         case T_MAPPING:
             if (NULL == register_pointer(ptable, p->u.map) ) continue;

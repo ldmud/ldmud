@@ -54,7 +54,7 @@
  *       than swapping might gain.
  * TODO: Does it?
  *
- *   struct variable_s variable_names[]: an array describing all variables
+ *   struct variable_s variables[]: an array describing all variables
  *       with type and name, inherited or own. When a program is swapped, the
  *       reference counts to these strings are not removed so that the
  *       string literals stay in memory all the time.
@@ -155,21 +155,74 @@
 
 #include "bytecode.h"
 
+
+typedef unsigned short    typeid_t;
+typedef uint32            typeflags_t;
+typedef struct vartype_s  vartype_t;
+typedef struct fulltype_s fulltype_t;
+
+
 /* --- Type Constants ---
  *
  * These constants and types are used to encode types and visibility
  * of variables and functions. They are used by both the compiler and
  * the interpreter.
  *
- * You'll find the "TYPE_MOD_" visibility constants below with the
- * function flags.
+ * Variable/value data types consist of three pieces: 
+ *  - the primary type constant, optionally modified as
+ *      TYPE_MOD_POINTER or TYPE_MOD_REFERENCE;
+ *  - the visibility (see below with the function flags for the constants)
+ *  - the type object pointer (depending on context either counted or not
+ *      counted).
+ *
+ * The pieces show up in these types:
+ *  - vartype:  datatype + type object pointer
+ *  - fulltype: vartype + visibility flags
+ *
+ * TODO: A clean implementation would use just type objects for types.
  */
 
-typedef unsigned short  vartype_t;   /* Basic: just the datatype */
-typedef uint32          fulltype_t;  /* Full: type and visibility */
+/* --- struct vartype_s: Basic type information
+ *
+ * This structure holds the type number, the flags concerning _MOD_POINTER
+ * and _MOD_REFERENCE, and the virtual variable flag (for use in variable_t).
+ * It also holds a pointer to the type object; depending on the context
+ * this reference may be counted or not.
+ */
 
+struct vartype_s {
+    typeid_t        type;
+#ifdef USE_STRUCTS
+    struct_type_t * t_struct;
+      /* For now, only structs have type objects */
+#endif
+};
 
-/* Basic type values */
+/* --- struct fulltype_s: Full type information
+ *
+ * This structure holds the type number and all flags: type modifiers and
+ * visibility.
+ * It also holds a pointer to the type object; depending on the context
+ * this reference may be counted or not.
+ *
+ * We do not reuse vartype_t her even though it logically should be, for
+ * two reasons:
+ *  - the visibility modifier flags expected that type and flags are
+ *    in one single long
+ *  - some compilers would add 2 bytes of padding
+ *
+ * TODO: Move the basic visibility  into the lower bits so we don't have
+ * TODO:: to use a short for .typeflags.
+ */
+struct fulltype_s {
+    typeflags_t     typeflags;
+#ifdef USE_STRUCTS
+    struct_type_t * t_struct;
+      /* For now, only structs have type objects */
+#endif
+};
+
+/* --- Primary type values --- */
 
 #define TYPE_UNKNOWN        0   /* This type must be casted */
 #define TYPE_NUMBER         1
@@ -187,48 +240,11 @@ typedef uint32          fulltype_t;  /* Full: type and visibility */
 
 #define TYPEMAP_SIZE       12   /* Number of types */
 
-/* Flags, or'ed on top of the basic type */
-
-#define TYPE_MOD_POINTER    0x0010  /* Pointer to a basic type */
-#define TYPE_MOD_REFERENCE  0x0020  /* Reference to a type */
-
-/* Macros to check a vartype_t/fulltype_t for a certain primary type.
- */
-
-#define IS_TYPE_STRUCT(t) \
-  (((t) & (PRIMARY_TYPE_MASK|TYPE_MOD_POINTER|TYPE_MOD_REFERENCE)) == TYPE_STRUCT)
-
-
-/* Macros to set and extract the secondary type information */
-#define MAKE_SEC_TYPE_INFO(x) (((vartype_t)(x) & 0x3FF) << 6)
-#define GET_SEC_TYPE_INFO(x) (((vartype_t)(x) >> 6) & 0x3FF)
-
-#define MAX_SEC_TYPE_INFO  (0x0400)
-  /* Max value of secondary type info
-   */
-
-#define PRIMARY_TYPE_MASK  (0x0F)
-  /* Mask for the primary type info (sans modifiers)
-   */
-
-#define SEC_TYPE_MASK      (0x0FFC0)
-  /* Mask for the secondary type info
-   */
-
-#define TYPE_MOD_MASK   (0x0000ffff)
-  /* Mask for basic type and flags.
-   */
-
-/* Other type related defines */
-
-#define STRUCT_MAX_MEMBERS 255
-  /* We allow up to this number of members per struct, so that
-   * we can encode the number of actual members, where needed,
-   * in a single bytecode.
-   */
-
 #else
+
 #define TYPEMAP_SIZE       11   /* Number of types */
+
+#endif /* USE_STRUCTS */
 
 /* Flags, or'ed on top of the basic type */
 
@@ -238,17 +254,143 @@ typedef uint32          fulltype_t;  /* Full: type and visibility */
 #define TYPE_MOD_MASK   0x000000ff
   /* Mask for basic type and flags.
    */
-#endif
+
+
+#define PRIMARY_TYPE_MASK  (0x0F)
+  /* Mask for the primary type info (sans modifiers)
+   */
 
 #define TYPE_MOD_RMASK  (TYPE_MOD_MASK & ~TYPE_MOD_REFERENCE)
   /* Mask to delete TYPE_MOD_REFERENCE and the visibility mods from
    * a type value.
    */
 
+#define TYPEID_MASK (0x0000ffff)
+  /* Mask to mask out just the typeid_t from a typeflags_t.
+   */
+
+#ifdef USE_STRUCTS
+/* Macros to check a type value for a certain primary type.
+ */
+
+#define IS_TYPE_STRUCT(t) \
+  (((t).typeflags & (PRIMARY_TYPE_MASK|TYPE_MOD_POINTER|TYPE_MOD_REFERENCE)) == TYPE_STRUCT)
+
+
+/* Other type related defines */
+
+#define STRUCT_MAX_MEMBERS 255
+  /* We allow up to this number of members per struct, so that
+   * we can encode the number of actual members, where needed,
+   * in a single bytecode.
+   */
+
+#endif
+
 #define VIRTUAL_VAR_TAG 0x4000
   /* Flag set in virtual variables, also interpreted as offset
    * in the variable index for virtual variables.
    */
+
+
+#ifdef USE_STRUCTS
+
+/* void ref_vartype_data(vartype_t *v)
+ *   Add another reference to the data associated with vartype <v>.
+ * 
+ * void ref_fulltype_data(fulltype_t *v)
+ *   Add another reference to the data associated with fulltype <v>.
+ */
+
+#define ref_vartype_data(v) \
+    do{ vartype_t *fvt = v; \
+        if (fvt->t_struct) (void)ref_struct_type(fvt->t_struct);\
+    } while(0)
+
+#define ref_fulltype_data(v) \
+    do{ fulltype_t *fvt = v; \
+        if (fvt->t_struct) (void)ref_struct_type(fvt->t_struct);\
+    } while(0)
+
+
+/* void free_vartype_data(vartype_t *v)
+ *   Free all data associated with vartype <v>.
+ * 
+ * void free_fulltype_data(fulltype_t *v)
+ *   Free all data associated with fulltype <v>.
+ */
+
+#define free_vartype_data(v) \
+    do{ vartype_t *fvt = v; \
+        if (fvt->t_struct) { /* printf("DEBUG: free_vartype(%s) %s %d\n", get_txt(fvt->t_struct->name), __FILE__, __LINE__); */ free_struct_type(fvt->t_struct); }\
+        fvt->t_struct = NULL;\
+    } while(0)
+
+#define free_fulltype_data(v) \
+    do{ fulltype_t *fvt = v; \
+        if (fvt->t_struct) { /* printf("DEBUG: free_fulltype(%s) %s %d\n", get_txt(fvt->t_struct->name), __FILE__, __LINE__); */ free_struct_type(fvt->t_struct); }\
+        fvt->t_struct = NULL;\
+    } while(0)
+
+
+#ifdef GC_SUPPORT
+
+/* void clear_vartype_ref(vartype_t *v)
+ *   Clear all references associated with vartype <v>.
+ * 
+ * void clear_fulltype_ref(fulltype_t *v)
+ *   Clear all references associated with fulltype <v>.
+ */
+
+#define clear_vartype_ref(v) \
+    do{ vartype_t *fvt = v; \
+        if (fvt->t_struct) clear_struct_type_ref(fvt->t_struct);\
+    } while(0)
+
+#define clear_fulltype_ref(v) \
+    do{ fulltype_t *fvt = v; \
+        if (fvt->t_struct) clear_struct_type_ref(fvt->t_struct);\
+    } while(0)
+
+
+/* void count_vartype_ref(vartype_t *v)
+ *   Count all references associated with vartype <v>.
+ * 
+ * void count_fulltype_ref(fulltype_t *v)
+ *   Count all references associated with fulltype <v>.
+ */
+
+#define count_vartype_ref(v) \
+    do{ vartype_t *fvt = v; \
+        if (fvt->t_struct) count_struct_type_ref(fvt->t_struct);\
+    } while(0)
+
+#define count_fulltype_ref(v) \
+    do{ fulltype_t *fvt = v; \
+        if (fvt->t_struct) count_struct_type_ref(fvt->t_struct);\
+    } while(0)
+
+#endif /* GC_SUPPORT */
+
+#else /* !USE_STRUCTS */
+
+#define ref_vartype_data(v) NOOP
+#define ref_fulltype_data(v) NOOP
+
+#define free_vartype_data(v) NOOP
+#define free_fulltype_data(v) NOOP
+
+#ifdef GC_SUPPORT
+
+#define clear_vartype_ref(v) NOOP
+#define clear_fulltype_ref(v) NOOP
+
+#define count_vartype_ref(v) NOOP
+#define count_fulltype_ref(v) NOOP
+
+#endif /* GC_SUPPORT */
+
+#endif /* USE_STRUCTS */
 
 
 /* --- struct instr_s: description of stackmachine instructions ---
@@ -284,7 +426,7 @@ struct instr_s
        *  -1: this whole entry describes an internal stackmachine code,
        *      not a normal efun (an 'operator' in closure lingo).
        */
-    vartype_t ret_type;  /* The return type used by the compiler. */
+    fulltype_t ret_type;  /* The return type used by the compiler. */
     short arg_index;     /* Indexes the efun_arg_types[] arrays. */
     short lpc_arg_index; /* Indexes the efun_lpc_types[] arrays. */
                          /* A '-1' index means that no type information
@@ -309,7 +451,7 @@ struct instr_s
  * lack of a real 'bool' datatype.
  */
 
-typedef fulltype_t funflag_t;  /* Function flags */
+typedef uint32 funflag_t;  /* Function flags */
 
 #define NAME_INHERITED      0x80000000  /* defined by inheritance */
 #define TYPE_MOD_STATIC     0x40000000  /* Static function or variable    */
@@ -398,9 +540,9 @@ typedef fulltype_t funflag_t;  /* Function flags */
  * struct fun_hdr {
  *     shared string_t * name_of_function;   (4 Bytes)
 #ifdef USE_STRUCTS
- *     vartype_t         return_type;        (2 Byte)
+ *     vartype_t         return_type;        (6 Byte)
 #else
- *     byte              return_type;        (1 Byte)
+ *     vartype_t         return_type;        (2 Byte)
 #endif
  * --> byte              number_formal_args; (1 Byte)
  *         Bit 7: set if the function has a 'varargs' argument
@@ -443,23 +585,14 @@ typedef bytecode_p fun_hdr_p;
    */
 
 
-#if defined(USE_STRUCTS)
 #define FUNCTION_NAMEP(p)     ((void *)((char *)p - sizeof(vartype_t) - sizeof(string_t *)))
-#define FUNCTION_TYPE(p)      (*((vartype_t *)((char *)p - sizeof(vartype_t))))
-#else
-#define FUNCTION_NAMEP(p)     ((void *)((char *)p - sizeof(char) - sizeof(string_t *)))
-#define FUNCTION_TYPE(p)      (*((unsigned char *)((char *)p - sizeof(char))))
-#endif
+#define FUNCTION_TYPEP(p)     ((void *)((char *)p - sizeof(vartype_t)))
 #define FUNCTION_NUM_ARGS(p)  EXTRACT_SCHAR((char *)p)
 #define FUNCTION_NUM_VARS(p)  (*((unsigned char *)((char *)p + sizeof(char))))
 #define FUNCTION_CODE(p)      ((bytecode_p)((unsigned char *)p + 2* sizeof(char)))
 #define FUNCTION_FROM_CODE(p) ((fun_hdr_p)((unsigned char *)p - 2* sizeof(char)))
 
-#if defined(USE_STRUCTS)
 #define FUNCTION_PRE_HDR_SIZE (sizeof(string_t*) + sizeof(vartype_t))
-#else
-#define FUNCTION_PRE_HDR_SIZE (sizeof(string_t*) + sizeof(char))
-#endif
   /* Number of function header bytes before the function pointer.
    */
 
@@ -480,10 +613,10 @@ typedef bytecode_p fun_hdr_p;
 struct variable_s
 {
     string_t   *name;   /* Name of the variable (shared string) */
-    fulltype_t  flags;
-      /* Flags and type of the variable.
+    fulltype_t  type;
+      /* Type and visibility of the variable (type object counted).
        * If a variable is inherited virtually, the function flag
-       * TYPE_MOD_VIRTUAL is or'ed on this.
+       * TYPE_MOD_VIRTUAL is or'ed .type.typeflags.
        */
 };
 
@@ -498,12 +631,6 @@ struct variable_s
 struct inherit_s
 {
     program_t *prog;  /* Pointer to the inherited program */
-#ifdef USE_STRUCTS
-    unsigned short struct_index_offset;
-      /* Offset of the inherited program's struct_defs block within the
-       * inheriting program's struct_defs table.
-       */
-#endif /* USE_STRUCTS */
     unsigned short function_index_offset;
       /* Offset of the inherited program's function block within the
        * inheriting program's function block.
@@ -531,36 +658,15 @@ struct inherit_s
  *
  * The information about structs visible in the program are stored
  * in an array of these structures; this includes all inherited structs.
- * The information about the struct members are stored in a separate
- * array.
- *
- * Structures are internally identified by an ID number, counting from
- * 1 upwards (not from 0!).
  */
 
 struct struct_def_s
 {
-    string_t * name;         /* Tabled name of the struct */
-    string_t * unique_name;  /* Tabled unique name of the struct, in the
-                              * form "<name> <prog-name> <prog-id_number>"
-                              */
-    short          inh;      /* If inherited: index into program_t.inherit[]
-                              * -1 if defined in this program
-                              */
-    unsigned short num_members;  /* Number of data members */
-    unsigned short members;  /* Index into program_t.struct_members[] */
-    short          base;     /* ID of the base struct, or -1 if none */
-    funflag_t      flags;    /* Visibility */
-};
-
-
-/* --- struct struct_member: description of one struct member
- */
-
-struct struct_member_s
-{
-    string_t * name;         /* Tabled name of the struct member */
-    vartype_t  type;         /* The type of the member */
+    funflag_t       flags;  /* Visibility */
+    struct_type_t * type;   /* The struct definition itself (counted). */
+    int             inh;    /* -1, or the index of the inherit where this
+                             * struct came from.
+                             */
 };
 #endif /* USE_STRUCTS */
 
@@ -660,7 +766,7 @@ struct program_s
        * to the names of all included files which generated code - these
        * are used when retrieving line numbers.
        */
-    variable_t *variable_names;
+    variable_t *variables;
       /* Array [.num_variables] with the flags, types and names of all
        * variables.
        */
@@ -673,8 +779,6 @@ struct program_s
 #ifdef USE_STRUCTS
     struct_def_t *struct_defs;
       /* Array [.num_structs] of struct descriptors */
-    struct_member_t *struct_members;
-      /* Array [.num_struct_members] of struct member descriptors */
 #endif /* USE_STRUCTS */
 
     unsigned short flags;
@@ -734,8 +838,6 @@ struct program_s
 #ifdef USE_STRUCTS
     unsigned short num_structs;
       /* Number of listed struct definitions */
-    unsigned short num_struct_members;
-      /* Number of listed struct member definitions */
 #endif /* USE_STRUCTS */
 };
 
@@ -788,7 +890,7 @@ struct function_s
         function_t *next;        /* used for mergesort */
     } offset;
     funflag_t     flags;      /* Function flags */
-    vartype_t     type;       /* Return type of function. */
+    fulltype_t    type;       /* Return type of function (counted). */
     unsigned char num_local;  /* Number of local variables */
     unsigned char num_arg;    /* Number of arguments needed. */
 #   define SIMUL_EFUN_VARARGS  0xff  /* Magic num_arg value for varargs */

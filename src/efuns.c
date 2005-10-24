@@ -51,6 +51,9 @@
  *    efun: to_float()
  *    efun: to_string()
  *    efun: to_array()
+#ifdef USE_STRUCTS
+ *    efun: to_struct()
+#endif
  *    efun: to_object()
  *    efun: copy()
  *    efun: deep_copy()
@@ -114,6 +117,9 @@
 #include "stdstrings.h"
 #include "simulate.h"
 #include "strfuns.h"
+#ifdef USE_STRUCTS
+#include "structs.h"
+#endif /* USE_STRUCTS */
 #include "swap.h"
 #include "svalue.h"
 #include "wiz_list.h"
@@ -5056,13 +5062,19 @@ f_to_string (svalue_t *sp)
     case T_STRUCT:
       {
         string_t *rc;
+        string_t *name;
+        size_t    size;
+        const char * fmt = "<struct %s>";
 
-        sprintf(buf, "<struct %p>", sp->u.vec);
-        memsafe(rc = new_mstring(buf), strlen(buf), "converted struct");
+        name = struct_name(sp->u.strct);
+        size = strlen(fmt)+mstrsize(name);
+
+        memsafe(rc = alloc_mstring(size), size, "converted struct");
+        sprintf(get_txt(rc), fmt, name);
         put_string(sp, rc);
         break;
       }
-#endif
+#endif /* USE_STRUCTS */
 
     case T_CLOSURE:
       {
@@ -5140,12 +5152,12 @@ f_to_array (svalue_t *sp)
         vector_t *vec;
         size_t left;
 
-        vec = allocate_array(VEC_SIZE(sp->u.vec)-1);
-        for (left = VEC_SIZE(sp->u.vec)-1; left > 0; left--)
-            assign_svalue_no_free(vec->item+left-1, sp->u.vec->item+left);
-        free_array(sp->u.vec);
-        sp->u.vec = vec;
-        sp->type = T_POINTER;
+        left = struct_size(sp->u.strct);
+        vec = allocate_array(left);
+        while (left-- > 0)
+            assign_svalue_no_free(vec->item+left, sp->u.strct->member+left);
+        free_struct(sp->u.strct);
+        put_array(sp, vec);
         break;
       }
 #endif
@@ -5164,35 +5176,56 @@ f_to_array (svalue_t *sp)
 #ifdef USE_STRUCTS
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_to_struct (svalue_t *sp)
+v_to_struct (svalue_t *sp, int num_arg)
 
 /* EFUN to_struct()
  *
  *   mixed to_struct(mixed *)
+ *   mixed to_struct(mixed *, struct)
  *   mixed to_struct(struct)
  *
- * An array is converted into a struct of the same length.
+ * An array is converted into a struct of the same length. The
+ * returned struct is anonymous, or if a template struct is given, a
+ * struct of the same type.
  * structs are returned unchanged.
  */
 
 {
-    switch (sp->type)
+    svalue_t * argp;
+
+    argp = sp - num_arg + 1;
+    switch (argp->type)
     {
     default:
-        fatal("Bad arg 1 to to_struct(): type %s\n", typename(sp->type));
+        fatal("Bad arg 1 to to_struct(): type %s\n", typename(argp->type));
         break;
     case T_POINTER:
       {
-        vector_t *vec;
+        struct_t *st;
         size_t left;
 
-        vec = allocate_array(VEC_SIZE(sp->u.vec)+1);
-        for (left = VEC_SIZE(sp->u.vec); left > 0; left--)
-            assign_svalue_no_free(vec->item+left, sp->u.vec->item+left-1);
-        put_ref_string(vec->item, STR_ANONYMOUS);
-        free_array(sp->u.vec);
-        sp->u.vec = vec;
-        sp->type = T_STRUCT;
+        if (num_arg > 1)
+        {
+            if (argp[1].type != T_STRUCT)
+                fatal("Bad arg 2 to to_struct(): type %s\n"
+                     , typename(argp[1].type));
+            if (VEC_SIZE(argp->u.vec) > struct_size(argp[1].u.strct))
+            {
+                error("Too many elements for struct %s: %ld, expected %ld\n"
+                     , get_txt(struct_name(argp[1].u.strct))
+                     , VEC_SIZE(argp->u.vec)
+                     , (long)struct_size(argp[1].u.strct)
+                    );
+                /* NOTREACHED */
+            }
+            st = struct_new(argp[1].u.strct->type);
+        }
+        else
+            st = struct_new_anonymous(VEC_SIZE(argp->u.vec));
+        for (left = VEC_SIZE(argp->u.vec); left-- > 0; )
+            assign_svalue_no_free(st->member+left, argp->u.vec->item+left);
+        free_array(argp->u.vec);
+        put_struct(argp, st);
         break;
       }
     case T_STRUCT:
@@ -5200,6 +5233,14 @@ f_to_struct (svalue_t *sp)
         break;
     }
 
+    while (num_arg > 1)
+    {
+        free_svalue(sp);
+        sp--;
+        num_arg--;
+    }
+
+    /* sp is now argp */
     return sp;
 } /* f_to_struct() */
 #endif /* USE_STRUCTS */
@@ -5293,9 +5334,6 @@ f_copy (svalue_t *sp)
 
     case T_QUOTED_ARRAY:
     case T_POINTER:
-#ifdef USE_STRUCTS
-    case T_STRUCT:
-#endif /* USE_STRUCTS */
       {
         vector_t *old, *new;
         size_t size, i;
@@ -5316,6 +5354,30 @@ f_copy (svalue_t *sp)
         }
         break;
       }
+#ifdef USE_STRUCTS
+    case T_STRUCT:
+      {
+        struct_t *old;
+
+        old = sp->u.strct;
+        if (old->ref != 1)
+        {
+            struct_t *new;
+            size_t size, i;
+            size = struct_size(old);
+            DYN_ARRAY_COST(size);
+            new = struct_new(old->type);
+            if (!new)
+                error("(copy) Out of memory: struct '%s' for copy.\n"
+                     , get_txt(struct_name(old)));
+            for (i = 0; i < size; i++)
+                assign_svalue_no_free(&new->member[i], &old->member[i]);
+            free_struct(old);
+            sp->u.strct = new;
+        }
+        break;
+      }
+#endif /* USE_STRUCTS */
     case T_MAPPING:
       {
         mapping_t *old, *new;
@@ -5409,9 +5471,6 @@ copy_svalue (svalue_t *dest, svalue_t *src
 
     case T_QUOTED_ARRAY:
     case T_POINTER:
-#ifdef USE_STRUCTS
-    case T_STRUCT:
-#endif /* USE_STRUCTS */
       {
         struct pointer_record *rec;
         vector_t *old, *new;
@@ -5472,6 +5531,57 @@ copy_svalue (svalue_t *dest, svalue_t *src
         }
         break;
       }
+
+#ifdef USE_STRUCTS
+    case T_STRUCT:
+      {
+        struct pointer_record *rec;
+        struct_t *old, *new;
+        mp_int size, i;
+
+        old = src->u.strct;
+
+        /* Lookup/add this struct to the pointer table */
+        rec = find_add_pointer(ptable, old, MY_TRUE);
+
+        if (rec->ref_count++ < 0) /* New struct */
+        {
+            size = (mp_int)struct_size(old);
+            DYN_ARRAY_COST(size);
+#if defined(DYNAMIC_COSTS)
+            eval_cost += (depth+1) / 10;
+#endif
+
+            /* Create a new array, assign it to dest, and store
+             * it in the table, too.
+             */
+            new = struct_new(old->type);
+            put_struct(dest, new);
+            rec->data = dest;
+
+            /* Copy the values */
+            for (i = 0; i < size; i++)
+            {
+                svalue_t * svp = &old->member[i];
+
+                if (svp->type == T_QUOTED_ARRAY
+                 || svp->type == T_MAPPING
+                 || svp->type == T_POINTER
+                 || svp->type == T_STRUCT
+                   )
+                    copy_svalue(&new->member[i], svp, ptable, depth+1);
+                else
+                    assign_svalue_no_free(&new->member[i], svp);
+            }
+        }
+        else /* shared struct we already encountered */
+        {
+            assign_svalue_no_free(dest, (svalue_t *)rec->data);
+        }
+        break;
+      }
+#endif /* USE_STRUCTS */
+
     case T_MAPPING:
       {
         mapping_t *old, *new;
@@ -5551,9 +5661,6 @@ f_deep_copy (svalue_t *sp)
 
     case T_QUOTED_ARRAY:
     case T_POINTER:
-#ifdef USE_STRUCTS
-    case T_STRUCT:
-#endif /* USE_STRUCTS */
       {
         vector_t *old;
 
@@ -5573,6 +5680,22 @@ f_deep_copy (svalue_t *sp)
         }
         break;
       }
+#ifdef USE_STRUCTS
+    case T_STRUCT:
+      {
+        struct_t *old;
+        svalue_t new;
+
+        old = sp->u.strct;
+        ptable = new_pointer_table();
+        if (!ptable)
+            error("(deep_copy) Out of memory for pointer table.\n");
+        copy_svalue(&new, sp, ptable, 0);
+        transfer_svalue(sp, &new);
+        free_pointer_table(ptable);
+        break;
+      }
+#endif /* USE_STRUCTS */
     case T_MAPPING:
       {
         mapping_t *old;
@@ -5644,7 +5767,7 @@ v_get_type_info (svalue_t *sp, int num_arg)
  * it returns the object the closure function is defined in..
 #ifdef USE_STRUCTS
  * If <arg> is a struct, the <flag> setting 2 lets the efun
- * return the basename of the struct.
+ * return the basic name of the struct.
 #endif
  * For every other <flag> setting, -1 is returned.
  *
@@ -5724,16 +5847,8 @@ v_get_type_info (svalue_t *sp, int num_arg)
     case T_STRUCT:
         if (num_arg == 2 && sp->type == T_NUMBER && sp->u.number == 2)
         {
-            long p;
-            string_t * name;
-
             sp--;
-            name = sp->u.vec->item->u.str;
-            p = mstrchr(name, ' ');
-            if (p <= 0)
-                str = ref_mstring(name);
-            else
-                str = mstr_extract(name, 0, p-1);
+            str = ref_mstring(sp->u.strct->type->unique_name);
             free_svalue(sp);
             put_string(sp, str);
             return sp;
@@ -5741,11 +5856,11 @@ v_get_type_info (svalue_t *sp, int num_arg)
         }
         else if (num_arg == 2)
         {
-            str = ref_mstring(sp[-1].u.vec->item->u.str);
+            str = ref_mstring(struct_name(sp[-1].u.strct));
         }
         else
         {
-            str = ref_mstring(sp->u.vec->item->u.str);
+            str = ref_mstring(struct_name(sp->u.strct));
         }
         break;
 #endif /* USE_STRUCTS */
@@ -5825,7 +5940,11 @@ v_map (svalue_t *sp, int num_arg)
 {
     if (sp[-num_arg+1].type == T_MAPPING)
         return x_map_mapping(sp, num_arg, MY_TRUE);
-    else
+#ifdef USE_STRUCTS
+    else if (sp[-num_arg+1].type == T_STRUCT)
+        return x_map_struct(sp, num_arg);
+#endif /* USE_STRUCTS */
+    else /* T_POINTER */
         return x_map_array(sp, num_arg);
 
 } /* v_map() */
@@ -6280,6 +6399,14 @@ v_debug_info (svalue_t *sp, int num_arg)
  *        int DID_ST_MAPPINGS
  *        int DID_ST_MAPPINGS_SIZE
  *            Number and size of all mappings.
+ *
+ *        int DID_ST_STRUCTS
+ *        int DID_ST_STRUCTS_SIZE
+ *            Number and size of all struct instances.
+ *
+ *        int DID_ST_STRUCT_TYPES
+ *        int DID_ST_STRUCT_TYPES_SIZE
+ *            Number and size of all struct type instances.
  *
  *        int DID_ST_PROGS
  *        int DID_ST_PROGS_SIZE
@@ -6850,6 +6977,9 @@ v_debug_info (svalue_t *sp, int num_arg)
             hbeat_dinfo_status(dinfo_arg, value);
             callout_dinfo_status(dinfo_arg, value);
             string_dinfo_status(dinfo_arg, value);
+#ifdef USE_STRUCTS
+            struct_dinfo_status(dinfo_arg, value);
+#endif /* USE_STRUCTS */
             rxcache_dinfo_status(dinfo_arg, value);
 
             if (value == -1)

@@ -49,7 +49,7 @@ extern svalue_t *f_floor (svalue_t *sp);
 extern svalue_t *f_pow (svalue_t *sp);
 extern svalue_t *f_to_array (svalue_t *sp);
 #ifdef USE_STRUCTS
-extern svalue_t * f_to_struct (svalue_t *sp);
+extern svalue_t * v_to_struct (svalue_t *sp, int num_args);
 #endif
 extern svalue_t *f_to_int (svalue_t *sp);
 extern svalue_t *f_to_float (svalue_t *sp);

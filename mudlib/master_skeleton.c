@@ -829,7 +829,7 @@ int privilege_violation (string op, mixed who, mixed arg, mixed arg2)
 //                       erq-demon by the object <who>.
 //   execute_command   : Execute command string <arg2> for the object <arg>.
 //   input_to          : Object <who> issues an 'ignore-bang'-input_to() for
-//                       commandgiver <arg3>; the exakt flags are <arg4>.
+//                       commandgiver <arg>; the exakt flags are <arg2>.
 //   nomask simul_efun : Attempt to get an efun <arg> via efun:: when it
 //                       is shadowed by a 'nomask'-type simul_efun.
 //   rename_object     : The current object <who> renames object <arg>
@@ -843,8 +843,8 @@ int privilege_violation (string op, mixed who, mixed arg, mixed arg2)
 //   limited:          : Execute <arg> with reduced/changed limits.
 //   set_limits        : Set limits to <arg>.
 //   set_this_object   : Set this_object() to <arg>.
-//   shadow_add_action : Add an action to function <arg4> of object <arg3>
-//                       from the shadow <who> which is shadowing <arg3>.
+//   shadow_add_action : Add an action to function <arg2> of object <arg>
+//                       from the shadow <who> which is shadowing <arg>.
 //   symbol_variable   : Attempt to create symbol of a hidden variable
 //                       of object <arg> with with index <arg2> in the
 //                       objects variable table.

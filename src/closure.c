@@ -163,6 +163,9 @@
 #include "simulate.h"
 #include "simul_efun.h"
 #include "stdstrings.h"
+#ifdef USE_STRUCTS
+#include "structs.h"
+#endif /* USE_STRUCTS */
 #include "svalue.h"
 #include "swap.h"
 #include "switch.h"
@@ -3186,39 +3189,49 @@ compile_value (svalue_t *value, int opt_flags)
                   }
 
 #ifdef USE_STRUCTS
-                /* ({#'(<, <expr1>, ..., <exprN> })
+                /* ({#'(<, <template>, <expr1>, ..., <exprN> })
                  */
                 case F_S_AGGREGATE:
                   {
                     /* This is compiled as:
                      *
+                     *   <template>
                      *   <expr1>
                      *   ...
                      *   <exprN>
-                     *   F_S_AGGREGATE N N
+                     *   F_S_AGGREGATE -1 N
                      */
                     int i, size;
 
-                    size = block_size - 1;
+                    size = block_size - 2;
                     if (size > STRUCT_MAX_MEMBERS)
                     {
                         lambda_error("Too many elements for struct.\n");
                         size = STRUCT_MAX_MEMBERS;
                     }
-                    i = size;
+
+                    if (argp[1].type == T_STRUCT
+                     && struct_size(argp[1].u.strct) < size)
+                    {
+                        lambda_error("Too many elements for struct %s.\n"
+                                    , get_txt(struct_name(argp[1].u.strct))
+                                    );
+                        size = struct_size(argp[1].u.strct);
+                    }
+                    i = size+1;
                     while (--i >= 0)
                     {
                         compile_value(++argp, REF_REJECTED);
                     }
-                    if (current.code_left < 3)
+                    if (current.code_left < 4)
                         realloc_code();
-                    current.code_left -= 3;
+                    current.code_left -= 4;
                     STORE_CODE(current.codep, F_S_AGGREGATE);
-                    STORE_UINT8(current.codep, (unsigned char)size);
+                    STORE_SHORT(current.codep, -1);
                     STORE_UINT8(current.codep, (unsigned char)size);
                     break;
                   }
-#endif
+#endif /* USE_STRUCTS */
 
                 /* ({#'return })
                  * ({#'return, <expr> })
@@ -3752,7 +3765,7 @@ compile_value (svalue_t *value, int opt_flags)
                  * the caller expects one from a void efun. Always
                  * add the CONST0 for void varargs efuns.
                  */
-                if ( instrs[f].ret_type == TYPE_VOID )
+                if ( instrs[f].ret_type.typeflags == TYPE_VOID )
                 {
                     if (f < EFUNV_OFFSET
                      && (opt_flags & (ZERO_ACCEPTED|VOID_ACCEPTED)))
@@ -4188,6 +4201,9 @@ is_lvalue (svalue_t *argp, int index_lvalue)
               case F_INDEX +CLOSURE_EFUN:
               case F_RINDEX+CLOSURE_EFUN:
               case F_AINDEX+CLOSURE_EFUN:
+#ifdef USE_STRUCTS
+              case F_S_INDEX +CLOSURE_EFUN:
+#endif /* USE_STRUCTS */
               case CLOSURE_IDENTIFIER:
                 return MY_TRUE;
             }
@@ -4257,10 +4273,14 @@ compile_lvalue (svalue_t *argp, int flags)
 
             /* ({ #'[, map|array, index [, index] })
              * ({ #'[<, map|array, index })
+             * ({ #'->, struct, index })
              */
             case F_INDEX +CLOSURE_EFUN:
             case F_RINDEX+CLOSURE_EFUN:
             case F_AINDEX+CLOSURE_EFUN:
+#ifdef USE_STRUCTS
+            case F_S_INDEX +CLOSURE_EFUN:
+#endif /* USE_STRUCTS */
                 if (VEC_SIZE(block) == 3)
                 {
                     /* Indexing of an array or normal mapping.
@@ -4282,10 +4302,16 @@ compile_lvalue (svalue_t *argp, int flags)
                                 STORE_CODE(current.codep
                                           , (bytecode_t)
                                             (F_PROTECTED_RINDEX_LVALUE));
-                            else
+                            else if (argp->x.closure_type == F_AINDEX + CLOSURE_EFUN)
                                 STORE_CODE(current.codep
                                           , (bytecode_t)
                                             (F_PROTECTED_AINDEX_LVALUE));
+#ifdef USE_STRUCTS
+                            else if (argp->x.closure_type == F_S_INDEX + CLOSURE_EFUN)
+                                STORE_CODE(current.codep
+                                          , (bytecode_t)
+                                            (F_PROTECTED_INDEX_S_LVALUE));
+#endif /* USE_STRUCTS */
                         } else {
                             current.code_left -= 1;
                             if (argp->x.closure_type == F_INDEX + CLOSURE_EFUN)
@@ -4296,10 +4322,16 @@ compile_lvalue (svalue_t *argp, int flags)
                                 STORE_CODE(current.codep
                                           , (bytecode_t)
                                             (F_RINDEX_LVALUE));
-                            else
+                            else if (argp->x.closure_type == F_AINDEX + CLOSURE_EFUN)
                                 STORE_CODE(current.codep
                                           , (bytecode_t)
                                             (F_AINDEX_LVALUE));
+#ifdef USE_STRUCTS
+                            else if (argp->x.closure_type == F_S_INDEX + CLOSURE_EFUN)
+                                STORE_CODE(current.codep
+                                          , (bytecode_t)
+                                            (F_INDEX_S_LVALUE));
+#endif /* USE_STRUCTS */
                         }
                         return;
                     }
@@ -4318,10 +4350,16 @@ compile_lvalue (svalue_t *argp, int flags)
                             STORE_CODE(current.codep
                                       , (bytecode_t)
                                         (F_PUSH_PROTECTED_RINDEXED_LVALUE));
-                        else
+                        else if (argp->x.closure_type == F_AINDEX + CLOSURE_EFUN)
                             STORE_CODE(current.codep
                                       , (bytecode_t)
                                         (F_PUSH_PROTECTED_AINDEXED_LVALUE));
+#ifdef USE_STRUCTS
+                        else if (argp->x.closure_type == F_S_INDEX + CLOSURE_EFUN)
+                            STORE_CODE(current.codep
+                                      , (bytecode_t)
+                                        (F_PUSH_PROTECTED_INDEXED_S_LVALUE));
+#endif /* USE_STRUCTS */
                     } else {
                         current.code_left -= 1;
                         if (argp->x.closure_type == F_INDEX + CLOSURE_EFUN)
@@ -4332,10 +4370,16 @@ compile_lvalue (svalue_t *argp, int flags)
                             STORE_CODE(current.codep
                                       , (bytecode_t)
                                         (F_PUSH_RINDEXED_LVALUE));
-                        else
+                        else if (argp->x.closure_type == F_AINDEX + CLOSURE_EFUN)
                             STORE_CODE(current.codep
                                       , (bytecode_t)
                                         (F_PUSH_AINDEXED_LVALUE));
+#ifdef USE_STRUCTS
+                        else if (argp->x.closure_type == F_S_INDEX + CLOSURE_EFUN)
+                            STORE_CODE(current.codep
+                                      , (bytecode_t)
+                                        (F_PUSH_INDEXED_S_LVALUE));
+#endif /* USE_STRUCTS */
                     }
                     return;
                 } /* if (VEC_SIZE(block) == 3) */
@@ -4975,7 +5019,7 @@ closure_to_string (svalue_t * sp)
 
         sprintf(buf, "#'%s->%s"
                    , get_txt(l->ob->name)
-                   , get_txt(l->ob->prog->variable_names[l->function.var_index].name)
+                   , get_txt(l->ob->prog->variables[l->function.var_index].name)
               );
         break;
       }
@@ -5520,7 +5564,7 @@ f_symbol_variable (svalue_t *sp)
             return sp;
         }
 
-        if (current_prog->variable_names[n].flags & NAME_HIDDEN)
+        if (current_prog->variables[n].type.typeflags & NAME_HIDDEN)
         {
             if (!privilege_violation(STR_SYMBOL_VARIABLE, sp, sp))
             {
@@ -5561,11 +5605,11 @@ f_symbol_variable (svalue_t *sp)
 
         str = sp->u.str;
         prog = current_prog;
-        var = prog->variable_names;
+        var = prog->variables;
         num_var = prog->num_variables;
         for (n = num_var; --n >= 0; var++)
         {
-            if (var->name == str && !(var->flags & NAME_HIDDEN))
+            if (var->name == str && !(var->type.typeflags & NAME_HIDDEN))
                 break;
         }
         free_mstring(str);

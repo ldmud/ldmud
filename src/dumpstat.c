@@ -24,6 +24,9 @@
 #include "ptrtable.h"
 #include "simulate.h"
 #include "stdstrings.h"
+#ifdef USE_STRUCTS
+#include "structs.h"
+#endif /* USE_STRUCTS */
 #include "svalue.h"
 #include "xalloc.h"
 
@@ -119,9 +122,6 @@ svalue_size (svalue_t *v, mp_int * pTotal)
 
     case T_POINTER:
     case T_QUOTED_ARRAY:
-#ifdef USE_STRUCTS
-    case T_STRUCT:
-#endif
     {
         if (v->u.vec == &null_vector) return 0;
         if (NULL == register_pointer(ptable, v->u.vec) ) return 0;
@@ -134,6 +134,22 @@ svalue_size (svalue_t *v, mp_int * pTotal)
         *pTotal += overhead;
         return (overhead + composite) / v->u.vec->ref;
     }
+
+#ifdef USE_STRUCTS
+    case T_STRUCT:
+    {
+        struct_t *st = v->u.strct;
+        if (NULL == register_pointer(ptable, st) ) return 0;
+        overhead = sizeof *st - sizeof st->member
+                   + sizeof(svalue_t) * struct_size(st);
+        for (i=0; i < (mp_int)struct_size(st); i++) {
+            composite += svalue_size(&st->member[i], &total);
+            *pTotal += total;
+        }
+        *pTotal += overhead;
+        return (overhead + composite) / st->ref;
+    }
+#endif /* USE_STRUCTS */
 
     case T_CLOSURE:
     {

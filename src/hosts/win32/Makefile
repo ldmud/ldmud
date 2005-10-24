@@ -74,13 +74,13 @@ SRC = access_check.c actions.c array.c backend.c call_out.c closure.c comm.c \
       parser.c lex.c main.c mapping.c mempools.c object.c otable.c parse.c \
       pkg-alists.c pkg-mysql.c pkg-pcre.c ptmalloc.c port.c ptrtable.c md5.c \
       random.c regexp.c mregex.c simulate.c simul_efun.c stdstrings.c \
-      stralloc.c strfuns.c sprintf.c swap.c wiz_list.c xalloc.c
+      stralloc.c strfuns.c structs.c sprintf.c swap.c wiz_list.c xalloc.c
 OBJ = access_check.o actions.o array.o backend.o call_out.o closure.o comm.o \
       dumpstat.o ed.o efuns.o gcollect.o hash.o heartbeat.o interpret.o \
       parser.o lex.o main.o mapping.o mempools.o object.o otable.o parse.o \
       pkg-alists.o pkg-mysql.o pkg-pcre.o ptmalloc.o port.o ptrtable.o md5.o\
       random.o regexp.o mregex.o simulate.o simul_efun.o stdstrings.o \
-      stralloc.o strfuns.o sprintf.o swap.o wiz_list.o xalloc.o
+      stralloc.o strfuns.o structs.o sprintf.o swap.o wiz_list.o xalloc.o
 
 ldmud: $(OBJ)
 	$(CC) $(OPTIMIZE) $(LDFLAGS) $(OBJ) -o $@ $(LIBS)

@@ -110,39 +110,48 @@ USAGE
         in the same literal.
 
 
+        It is possible to compute struct lookups at runtime:
+
+            struct Foo bar = ...;
+            string member = "one";
+
+            bar->(member) = 1; // sets bar->one to 1
+            bar->(0) = 1;      // sets bar->one to 1
+
+
 USAGE IN CLOSURES
-         Due to the special nature of structs (see below), it is
-         possible only to create anonymous structs in closures using
-         the operator #'(< :
+        The #'(< operator can be used in lambda closures to create a
+        struct; the type of the struct is given by the 'template'
+        struct passed as first argument. The content of the template
+        struct is irrelevant, so an empty struct suffices. For
+        example, to create an instance of struct Foo:
+        
+            ({ #'(<, (<Foo>), 1, ({ 2 }), (<Bar>) })
 
-           ({ #(<, 1, 2, 3 })
+        The order of the member values is the order in which they
+        appear in the struct definition.
 
-         creates a struct with the three members 1, 2, 3. To access
-         these members within a closure, one has to use the #'[]
-         operator.
+        To access a struct member in a lambda closure, use the #'->
+        operator with the name of the member as double-quoted symbol
+        or literal string:
+
+            ({ #'->, struct-expression, ''one })
+            ({ #'->, struct-expression, "one" })
 
 
 MISCELLANEOUS
-         Currently, structs are mostly a compile-time convenience in
-         that the struct names and member names are available only to
-         the LPC compiler.  At runtime, structs are a special kind of
-         array with a fixed number of elements (which also means that
-         runtime error messages will talk about 'indexing' instead of
-         'member lookup').
+        Internally structs can be identified by the ID string
+        returned from get_type_info(). However, do not rely on
+        a particular format of this string!
 
-         Internally structs can be identified by the ID string
-         returned from get_type_info(). However, do not rely on
-         a particular format of this string!
-
-         Support for structs is signaled by the macro __LPC_STRUCTS__.
-
-         A new implementation of structs is underway, which will
-         make them datatypes on their own.
+        Support for structs is signaled by the macro __LPC_STRUCTS__.
 
 
 HISTORY
         structs were fully implemented first in LDMud 3.3.246.
+        The implementation was revised in LDMud 3.3.344.
 
 
 SEE ALSO
-        mappings(LPC), get_type_info(E)
+        mappings(LPC), get_type_info(E), structp(E), to_mapping(E),
+        to_struct(E), struct_info(E), baseof(E)

@@ -20,34 +20,34 @@ DESCRIPTION
                           informations.
         execute_command   Execute command string <arg2> for the object
                           <arg>.
-        erq               A the request <arg4> is to be send to the
+        erq               A the request <arg2> is to be send to the
                           erq-demon by the object <who>.
         input_to          Object <who> redirects the next input from
-                          commandgiver <arg3>, using <arg4> as value
+                          commandgiver <arg>, using <arg2> as value
                           for the flags. This is used for flag values
                           including the 'no bang' option.
         limited:          Execute <arg> with reduced/changed limits.
         nomask simul_efun Attempt to get an efun <arg> via efun:: when
                           it is shadowed by a nomask type simul_efun.
-        rename_object          The object <who> tries to rename the object
-                          <arg3> to the name <arg4>.
-        send_udp          Send UDP-data to host arg3.
+        rename_object     The object <who> tries to rename the object
+                          <arg> to the name <arg2>.
+        send_udp          Send UDP-data to host <arg>.
         get_extra_wizinfo Get the additional wiz-list info for user
-                          arg3.
+                          <arg>.
         set_extra_wizinfo Set the additional wiz-list info for user
-                          arg3.
+                          <arg>.
         set_extra_wizinfo_size Set the size of the additional user
-                          info in the wiz-list to arg3.
+                          info in the wiz-list to <arg>.
         set_driver_hook   Set hook <arg> to <arg2>.
         set_limits        Set limits to <arg>.
-        set_this_object   Set this_object() to arg3.
-        shadow_add_action Add an action to function <arg4> of object <arg3>
-                          from the shadow <who> which is shadowing <arg3>.
+        set_this_object   Set this_object() to <arg>.
+        shadow_add_action Add an action to function <arg2> of object <arg>
+                          from the shadow <who> which is shadowing <arg>.
         symbol_variable   Attempt to make a symbol from a hidden
-                          inherited variable. arg3 is the object in
-                          question, arg4 the number of the variable in
+                          inherited variable. <arg> is the object in
+                          question, <arg2> the number of the variable in
                           the variable table.
-        wizlist_info          Return an array with all wiz-list
+        wizlist_info      Return an array with all wiz-list
                           information.
 
         call_out_info() can return the arguments to functions and

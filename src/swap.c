@@ -99,6 +99,9 @@
 #include "simul_efun.h"
 #include "stdstrings.h"
 #include "strfuns.h"
+#ifdef USE_STRUCTS
+#include "structs.h"
+#endif /* USE_STRUCTS */
 #include "svalue.h"
 #include "wiz_list.h"
 #include "xalloc.h"
@@ -320,16 +323,15 @@ locate_out (program_t *prog)
     prog->functions      = MAKEOFFSET(uint32*, functions);
     prog->function_names = MAKEOFFSET(unsigned short *, function_names);
     prog->strings        = MAKEOFFSET(string_t**, strings);
-    prog->variable_names = MAKEOFFSET(variable_t *, variable_names);
+    prog->variables      = MAKEOFFSET(variable_t *, variables);
     prog->inherit        = MAKEOFFSET(inherit_t *, inherit);
 #ifdef USE_STRUCTS
     prog->struct_defs    = MAKEOFFSET(struct_def_t *, struct_defs);
-    prog->struct_members = MAKEOFFSET(struct_member_t *, struct_members);
 #endif /* USE_STRUCTS */
     prog->includes       = MAKEOFFSET(include_t *, includes);
     if (prog->type_start)
     {
-        prog->argument_types = MAKEOFFSET(unsigned short *, argument_types);
+        prog->argument_types = MAKEOFFSET(vartype_t *, argument_types);
         prog->type_start = MAKEOFFSET(unsigned short *, type_start);
     }
     return MY_TRUE;
@@ -367,16 +369,15 @@ locate_in (program_t *prog)
     prog->functions      = MAKEPTR(uint32*, functions);
     prog->function_names = MAKEPTR(unsigned short *, function_names);
     prog->strings        = MAKEPTR(string_t**, strings);
-    prog->variable_names = MAKEPTR(variable_t*, variable_names);
+    prog->variables      = MAKEPTR(variable_t*, variables);
     prog->inherit        = MAKEPTR(inherit_t*, inherit);
 #ifdef USE_STRUCTS
     prog->struct_defs    = MAKEPTR(struct_def_t*, struct_defs);
-    prog->struct_members = MAKEPTR(struct_member_t *, struct_members);
 #endif /* USE_STRUCTS */
     prog->includes       = MAKEPTR(include_t*, includes);
     if (prog->type_start)
     {
-        prog->argument_types = MAKEPTR(unsigned short *, argument_types);
+        prog->argument_types = MAKEPTR(vartype_t *, argument_types);
         prog->type_start     = MAKEPTR(unsigned short *, type_start);
     }
 
@@ -830,13 +831,16 @@ swap_svalues (svalue_t *svp, mp_int num, varblock_t *block)
  * QUOTED_ARRAY:
  *    swtype, (ph_int)quotes, (size_t)size, (wiz_list_t*) user, values...
  *
+ * STRUCT:
+ *    swtype, (struct_type_t *)type, (wiz_list_t*)user, values...
+ *
  * MAPPING:
  *    swtype, (p_int)width, (p_int)size, (wiz_list_t*) user, entries...
  *
  * Opaque, NUMBER, FLOAT, OBJECT, CLOSURE
  *    svp->type, svp->x, svp->u
  *
- * Opaque are: contents of alists, empty arrays, arrays or mappings with
+ * Opaque are: contents of alists, empty arrays, structs/arrays/mappings with
  * more than one ref (this also protects against recursive data structures),
  * mappings with closure or object keys.
  */
@@ -912,9 +916,6 @@ swap_svalues (svalue_t *svp, mp_int num, varblock_t *block)
           }
 
         case T_POINTER:
-#ifdef USE_STRUCTS
-        case T_STRUCT:
-#endif
           {
             size_t size;
 
@@ -935,12 +936,33 @@ swap_svalues (svalue_t *svp, mp_int num, varblock_t *block)
             break;
           }
 
+#ifdef USE_STRUCTS
+        case T_STRUCT:
+          {
+            struct_t *st = svp->u.strct;
+            size_t size;
+
+            size = struct_size(st);
+            if (st->ref > 1 || swapping_alist)
+                goto swap_opaque;
+
+            CHECK_SPACE(1 + sizeof(struct_type_t *) + sizeof(wiz_list_t *))
+            *p++ = svp->type | T_MOD_SWAPPED;
+            rest--;
+            ADD_TO_BLOCK(st->type)
+            ADD_TO_BLOCK(st->user)
+            SWAP_SVALUES(st->member, size)
+            swapping_alist = MY_FALSE;
+            break;
+          }
+#endif /* USE_STRUCTS */
+
         case T_QUOTED_ARRAY:
           {
             size_t size;
 
             size = VEC_SIZE(svp->u.vec);
-            if (svp->u.vec->ref > 1 || !size || swapping_alist)
+            if (svp->u.vec->ref > 1 || swapping_alist)
                 goto swap_opaque;
 
             CHECK_SPACE(
@@ -1107,14 +1129,22 @@ free_swapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
             /* FALLTHROUGH */
 
         case T_POINTER | T_MOD_SWAPPED:
-#ifdef USE_STRUCTS
-        case T_STRUCT | T_MOD_SWAPPED:
-#endif
             p += 1 + sizeof(size_t) + sizeof(wiz_list_t *);
             p =
               free_swapped_svalues(svp->u.vec->item, VEC_SIZE(svp->u.vec), p);
             free_empty_vector(svp->u.vec);
             break;
+
+#ifdef USE_STRUCTS
+        case T_STRUCT | T_MOD_SWAPPED:
+          {
+            p += 1 + sizeof(struct_type_t *) + sizeof(wiz_list_t *);
+            p =
+              free_swapped_svalues(svp->u.strct->member, struct_size(svp->u.strct), p);
+            struct_free_empty(svp->u.strct);
+            break;
+          }
+#endif /* USE_STRUCTS */
 
         case T_MAPPING | T_MOD_SWAPPED:
           {
@@ -1175,7 +1205,7 @@ free_swapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
         case T_POINTER:
 #ifdef USE_STRUCTS
         case T_STRUCT:
-#endif
+#endif /* USE_STRUCTS */
         case T_QUOTED_ARRAY:
         case T_MAPPING:
         case T_NUMBER:
@@ -1461,9 +1491,6 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
             /* FALLTHROUGH */
 
         case T_POINTER | T_MOD_SWAPPED:
-#ifdef USE_STRUCTS
-        case T_STRUCT | T_MOD_SWAPPED:
-#endif
           {
             size_t size;
             wiz_list_t *user;
@@ -1499,6 +1526,45 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
 #endif
             break;
           }
+
+#ifdef USE_STRUCTS
+        case T_STRUCT | T_MOD_SWAPPED:
+          {
+            wiz_list_t *user;
+            struct_t *st;
+            struct_type_t *stt;
+
+            memcpy(&stt, p, sizeof stt);
+            p += sizeof stt;
+            memcpy(&user, p, sizeof user);
+            p += sizeof user;
+            current_object->user = user;
+            st = struct_new(stt);
+            svp->u.strct = st;
+            if (!st)
+            {
+                clear_svalues(svp, num + 1);
+                return NULL;
+            }
+            p = read_unswapped_svalues(st->member, struct_size(st), p);
+            if (!p)
+            {
+                clear_svalues(svp + 1, num);
+                return NULL;
+            }
+#ifdef GC_SUPPORT
+            if (gc_status == gcCountRefs)
+            {
+                /* Pretend that this memory block already existing
+                 * in the clear phase.
+                 */
+                clear_memory_reference(st);
+                st->ref = 0;
+            }
+#endif
+            break;
+          }
+#endif /* USE_STRUCTS */
 
         case T_MAPPING | T_MOD_SWAPPED:
           {
@@ -1597,7 +1663,7 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
         case T_POINTER:
 #ifdef USE_STRUCTS
         case T_STRUCT:
-#endif
+#endif /* USE_STRUCTS */
         case T_QUOTED_ARRAY:
         case T_MAPPING:
         case T_NUMBER:

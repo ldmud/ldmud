@@ -33,12 +33,6 @@
  * itself declares just an array of one element, it is task of the user
  * to allocated a big enough memory block.
  *
-#ifdef USE_STRUCTS
- * Arrays are also used to implement structs; in this case the first
- * element in .item contains a T_STRING with the unique name of the
- * struct, and the other elements hold the data.
-#endif
- *
  *
  * Some macros help with the use of vector variables:
  *
@@ -2106,11 +2100,11 @@ x_filter_array (svalue_t *sp, int num_arg)
 svalue_t *
 x_map_array (svalue_t *sp, int num_arg)
 
-/* EFUN map() on arrays and structs
+/* EFUN map() on arrays
  *
- *   mixed * map(mixed *|struct arg, string func, string|object ob, mixed extra...)
- *   mixed * map(mixed *|struct arg, closure cl, mixed extra...)
- *   mixed * map(mixed *|struct arr, mapping map)
+ *   mixed * map(mixed * arg, string func, string|object ob, mixed extra...)
+ *   mixed * map(mixed * arg, closure cl, mixed extra...)
+ *   mixed * map(mixed * arr, mapping map)
  *
  * Map the elements of <arr> through a filter defined by the other
  * arguments, and return an array of the elements returned by the filter.
@@ -2139,6 +2133,8 @@ x_map_array (svalue_t *sp, int num_arg)
     svalue_t   *arg;
     svalue_t   *v, *w, *x;
     mp_int      cnt;
+
+    inter_sp = sp;
 
     arg = sp - num_arg + 1;
 
@@ -2229,7 +2225,7 @@ x_map_array (svalue_t *sp, int num_arg)
      * the arr on the stack with the result.
      */
     free_array(arr);
-    arg->u.vec = res; /* Keep svalue type: T_POINTER or T_STRUCT */
+    arg->u.vec = res; /* Keep svalue type: T_POINTER */
 
     return arg;
 } /* x_map_array () */

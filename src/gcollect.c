@@ -42,8 +42,10 @@
  *     void note_malloced_block_ref(void *p)
  *         Note the reference to memory block <p>.
  *
- *     void clear_inherit_ref(program_t *p)
- *         Clear the refcounts of all inherited programs of <p>.
+ *     void clear_program_ref(program_t *p, Bool clear_ref)
+ *         Clear the refcounts of all inherited programs and other
+ *         data of <p>. If <clear_ref> is TRUE, the refcounts of
+ *         <p> itself and of <p>->name are cleared, too.
  *
  *     void clear_object_ref(object_t *p)
  *         Make sure that the refcounts in object <p> are cleared.
@@ -109,6 +111,9 @@
 #include "simulate.h"
 #include "simul_efun.h"
 #include "stdstrings.h"
+#ifdef USE_STRUCTS
+#include "structs.h"
+#endif /* USE_STRUCTS */
 #include "swap.h"
 #include "wiz_list.h"
 #include "xalloc.h"
@@ -290,15 +295,19 @@ cleanup_vector (svalue_t *svp, size_t num, ptrtable_t * ptable)
 
         case T_POINTER:
         case T_QUOTED_ARRAY:
-#ifdef USE_STRUCTS
-        case T_STRUCT:
-#endif /* USE_STRUCTS */
             /* Don't clean the null vector */
             if (p->u.vec != &null_vector)
             {
                 cleanup_vector(&p->u.vec->item[0], VEC_SIZE(p->u.vec), ptable);
             }
             break;
+
+#ifdef USE_STRUCTS
+        case T_STRUCT:
+            /* Don't clean the null vector */
+            cleanup_vector(&p->u.strct->member[0], struct_size(p->u.strct), ptable);
+            break;
+#endif /* USE_STRUCTS */
 
         case T_MAPPING:
             if (register_pointer(ptable, p->u.map) != NULL)
@@ -587,13 +596,53 @@ void gc_note_malloced_block_ref (void *p) { gc_note_ref(p); }
 
 /*-------------------------------------------------------------------------*/
 void
-clear_inherit_ref (program_t *p)
+clear_program_ref (program_t *p, Bool clear_ref)
 
-/* Clear the refcounts of all inherited programs of <p>.
+/* Clear the refcounts of all inherited programs and other associated
+ * data of of <p> .
+ * If <clear_ref> is TRUE, the refcount of <p> itself and of <p>->name
+ * are cleared, too.
  */
 
 {
     int i;
+
+    if (clear_ref)
+    {
+        p->ref = 0;
+        p->name->info.ref = 0;
+    }
+
+    /* Variables */
+    for (i = p->num_variables; --i >= 0;)
+    {
+        clear_fulltype_ref(&p->variables[i].type);
+    }
+
+    /* Non-inherited functions */
+
+    for (i = p->num_functions; --i >= 0; )
+    {
+        if ( !(p->functions[i] & NAME_INHERITED) )
+        {
+            vartype_t vt;
+
+            memcpy(
+              &vt,
+              FUNCTION_TYPEP(p->program + (p->functions[i] & FUNSTART_MASK)),
+              sizeof vt
+            );
+            clear_vartype_ref(&vt);
+        }
+    }
+
+#ifdef USE_STRUCTS
+    /* struct definitions */
+    for (i = 0; i <p->num_structs; i++)
+    {
+        clear_struct_type_ref(p->struct_defs[i].type);
+    }
+#endif /* USE_STRUCTS */
 
     for (i = 0; i < p->num_inherited; i++)
     {
@@ -605,12 +654,10 @@ clear_inherit_ref (program_t *p)
         p2 = p->inherit[i].prog;
         if (p2->ref)
         {
-            p2->ref = 0;
-            p2->name->info.ref = 0;
-            clear_inherit_ref(p2);
+            clear_program_ref(p2, MY_TRUE);
         }
     }
-} /* clear_inherit_ref() */
+} /* clear_program_ref() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -629,8 +676,6 @@ clear_object_ref (object_t *p)
 #endif
         p->ref = 0;
         p->name->info.ref = 0;
-        p->prog->ref = 0;
-        p->prog->name->info.ref = 0;
 #ifndef NO_BLUEPRINT
         if (p->prog->blueprint
          && (p->prog->blueprint->flags & O_DESTRUCTED)
@@ -643,7 +688,7 @@ clear_object_ref (object_t *p)
             p->prog->blueprint->ref = 0;
         }
 #endif /* !NO_BLUEPRINT */
-        clear_inherit_ref(p->prog);
+        clear_program_ref(p->prog, MY_TRUE);
     }
 } /* clear_object_ref() */
 
@@ -666,7 +711,7 @@ gc_mark_program_ref (program_t *p)
         unsigned char *program = p->program;
         uint32 *functions = p->functions;
         string_t **strings;
-        variable_t *variable_names;
+        variable_t *variables;
 
         if (p->ref++)
         {
@@ -708,6 +753,7 @@ gc_mark_program_ref (program_t *p)
             if ( !(functions[i] & NAME_INHERITED) )
             {
                 string_t *name;
+                vartype_t vt;
 
                 memcpy(
                   &name,
@@ -715,6 +761,13 @@ gc_mark_program_ref (program_t *p)
                   sizeof name
                 );
                 MARK_MSTRING_REF(name);
+
+                memcpy(
+                  &vt,
+                  FUNCTION_TYPEP(program + (functions[i] & FUNSTART_MASK)),
+                  sizeof vt
+                );
+                count_vartype_ref(&vt);
             }
         }
 
@@ -729,9 +782,12 @@ gc_mark_program_ref (program_t *p)
 
         /* Variable names */
 
-        variable_names = p->variable_names;
-        for (i = p->num_variables; --i >= 0; variable_names++)
-            MARK_MSTRING_REF(variable_names->name);
+        variables = p->variables;
+        for (i = p->num_variables; --i >= 0; variables++)
+        {
+            MARK_MSTRING_REF(variables->name);
+            count_fulltype_ref(&variables->type);
+        }
 
         /* Inherited programs */
 
@@ -739,15 +795,11 @@ gc_mark_program_ref (program_t *p)
             mark_program_ref(p->inherit[i].prog);
 
 #ifdef USE_STRUCTS
-        /* struct definitions and members */
+        /* struct definitions */
         for (i = 0; i < p->num_structs; i++)
         {
-            MARK_MSTRING_REF(p->struct_defs[i].name);
-            MARK_MSTRING_REF(p->struct_defs[i].unique_name);
+            count_struct_type_ref(p->struct_defs[i].type);
         }
-
-        for (i = 0; i < p->num_struct_members; i++)
-            MARK_MSTRING_REF(p->struct_members[i].name);
 #endif /* USE_STRUCTS */
 
         /* Included files */
@@ -918,14 +970,17 @@ clear_ref_in_vector (svalue_t *svp, size_t num)
 
         case T_POINTER:
         case T_QUOTED_ARRAY:
-#ifdef USE_STRUCTS
-        case T_STRUCT:
-#endif /* USE_STRUCTS */
             if (!p->u.vec->ref)
                 continue;
             p->u.vec->ref = 0;
             clear_ref_in_vector(&p->u.vec->item[0], VEC_SIZE(p->u.vec));
             continue;
+
+#ifdef USE_STRUCTS
+        case T_STRUCT:
+            count_struct_ref(p->u.strct);
+            continue;
+#endif /* USE_STRUCTS */
 
         case T_MAPPING:
             if (p->u.map->ref)
@@ -998,9 +1053,6 @@ gc_count_ref_in_vector (svalue_t *svp, size_t num
 
         case T_POINTER:
         case T_QUOTED_ARRAY:
-#ifdef USE_STRUCTS
-        case T_STRUCT:
-#endif /* USE_STRUCTS */
             /* Don't use CHECK_REF on the null vector */
             if (p->u.vec != &null_vector && CHECK_REF(p->u.vec))
             {
@@ -1013,6 +1065,12 @@ gc_count_ref_in_vector (svalue_t *svp, size_t num
             }
             p->u.vec->ref++;
             continue;
+
+#ifdef USE_STRUCTS
+        case T_STRUCT:
+            count_struct_ref(p->u.strct);
+            continue;
+#endif /* USE_STRUCTS */
 
         case T_MAPPING:
             if (CHECK_REF(p->u.map))
@@ -1434,6 +1492,7 @@ garbage_collection(void)
 
     for (ob = obj_list; ob; ob = ob->next_all) {
         int was_swapped;
+        Bool clear_prog_ref;
 
         if (d_flag > 4)
         {
@@ -1448,20 +1507,21 @@ garbage_collection(void)
          && (was_swapped = load_ob_from_swap(ob)) & 1)
         {
             /* don't clear the program ref count. It is 1 */
+            clear_prog_ref = MY_FALSE;
         }
         else
         {
             /* Take special care of inherited programs, the associated
              * objects might be destructed.
              */
-            ob->prog->ref = 0;
-            ob->prog->name->info.ref = 0;
+            clear_prog_ref = MY_TRUE;
         }
         if (was_swapped < 0)
             fatal("Totally out of MEMORY in GC: (swapping in '%s')\n"
                  , get_txt(ob->name));
 
-        clear_inherit_ref(ob->prog);
+        clear_program_ref(ob->prog, clear_prog_ref);
+
         ob->ref = 0;
         ob->name->info.ref = 0;
         clear_ref_in_vector(ob->variables, ob->prog->num_variables);
@@ -1549,7 +1609,7 @@ garbage_collection(void)
         }
 
         ob->prog->ref = 0;
-        clear_inherit_ref(ob->prog);
+        clear_program_ref(ob->prog, MY_FALSE);
         ob->ref = 0;
     }
 
@@ -1858,6 +1918,10 @@ garbage_collection(void)
  * The show_ functions are called from xmalloc directly.
  */
 
+#ifdef USE_STRUCTS
+static void show_struct(int d, void *block, int depth);
+#endif /* USE_STRUCTS */
+
 /*-------------------------------------------------------------------------*/
 static void
 show_string (int d, char *block, int depth UNUSED)
@@ -2105,10 +2169,135 @@ show_array(int d, void *block, int depth)
         switch(svp->type)
         {
         case T_POINTER:
+            show_array(d, (char *)svp->u.vec, depth+1);
+            break;
+
 #ifdef USE_STRUCTS
         case T_STRUCT:
+            show_struct(d, (char *)svp->u.strct, depth+1);
+            break;
 #endif /* USE_STRUCTS */
+
+        case T_NUMBER:
+            writed(d, (p_uint)svp->u.number);
+            WRITES(d, "\n");
+            break;
+
+        case T_STRING:
+            if (is_freed(svp->u.str, 1) )
+            {
+                WRITES(d, "String in freed block 0x");
+                write_x(d, (p_uint)((unsigned *)block - SMALLOC_OVERHEAD));
+                WRITES(d, "\n");
+                break;
+            }
+            WRITES(d, "String: ");
+            show_mstring(d, svp->u.str, 0);
+            WRITES(d, "\n");
+            break;
+
+        case T_CLOSURE:
+            if (svp->x.closure_type == CLOSURE_LFUN
+             || svp->x.closure_type == CLOSURE_IDENTIFIER)
+               show_cl_literal(d, (char *)svp->u.lambda, depth);
+            else
+            {
+                WRITES(d, "Closure type ");
+                writed(d, svp->x.closure_type);
+                WRITES(d, "\n");
+            }
+            break;
+
+        case T_OBJECT:
+            show_object(d, (char *)svp->u.ob, 1);
+            break;
+
+        default:
+            WRITES(d, "Svalue type ");writed(d, svp->type);WRITES(d, "\n");
+            break;
+        }
+    }
+} /* show_array() */
+
+#ifdef USE_STRUCTS
+/*-------------------------------------------------------------------------*/
+static void
+show_struct(int d, void *block, int depth)
+
+/* Print the struct at recursion <depth> from memory <block> on
+ * filedescriptor <d>. Recursive printing stops at <depth> == 2.
+ */
+
+{
+    struct_t *a;
+    mp_int i, j;
+    svalue_t *svp;
+    wiz_list_t *user;
+    mp_int a_size;
+
+    a = (struct_t *)block;
+
+    /* Can't use VEC_SIZE() here, as the memory block may have been
+     * partly overwritten by the smalloc pointers already.
+     */
+    a_size = (mp_int)(  malloced_size(a)
+                   - ( SMALLOC_OVERHEAD + 
+                       ( sizeof(struct_t) - sizeof(svalue_t) ) / SIZEOF_CHAR_P 
+                     ) 
+
+                  ) / (sizeof(svalue_t)/SIZEOF_CHAR_P);
+
+    if (depth)
+    {
+        int freed;
+        wiz_list_t *wl;
+
+        freed = is_freed(block, sizeof(vector_t) );
+        if (!freed)
+        {
+            user = a->user;
+            wl = all_wiz;
+            if (user)
+                for ( ; wl && wl != user; wl = wl->next) NOOP;
+        }
+        if (freed || !wl || a_size <= 0
+         || (malloced_size((char *)a) - SMALLOC_OVERHEAD) << 2 !=
+              sizeof(struct_t) + sizeof(svalue_t) * (a_size - 1) )
+        {
+            WRITES(d, "struct in freed block 0x");
+            write_x(d, (p_uint)((unsigned *)block - SMALLOC_OVERHEAD));
+            WRITES(d, "\n");
+            return;
+        }
+    }
+    else
+    {
+        user = a->user;
+    }
+
+    WRITES(d, "struct ");
+    write_x(d, (p_int)a);
+    WRITES(d, " size ");writed(d, (p_uint)a_size);
+    WRITES(d, ", uid: "); show_string(d, user ? get_txt(user->name) : "0", 0);
+    WRITES(d, "\n");
+    if (depth > 2)
+        return;
+
+    i = 32 >> depth;
+    if (i > a_size)
+        i = a_size;
+
+    for (svp = a->member; --i >= 0; svp++)
+    {
+        for (j = depth + 1; --j >= 0;) WRITES(d, " ");
+        switch(svp->type)
+        {
+        case T_POINTER:
             show_array(d, (char *)svp->u.vec, depth+1);
+            break;
+
+        case T_STRUCT:
+            show_struct(d, (char *)svp->u.strct, depth+1);
             break;
 
         case T_NUMBER:
@@ -2149,7 +2338,8 @@ show_array(int d, void *block, int depth)
             break;
         }
     }
-} /* show_array() */
+} /* show_struct() */
+#endif /* USE_STRUCTS */
 
 /*-------------------------------------------------------------------------*/
 void

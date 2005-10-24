@@ -8,5 +8,6 @@ HISTORY
         Introducted in LDMud 3.3.273.
 
 SEE ALSO
-        closurep(E), floatp(E), mappingp(E), objectp(E), intp(E),
-        referencep(E), pointerp(E), stringp(E), symbolp(E), clonep(E)
+        baseof(E), closurep(E), floatp(E), mappingp(E), objectp(E),
+        intp(E), referencep(E), pointerp(E), stringp(E), symbolp(E),
+        clonep(E)

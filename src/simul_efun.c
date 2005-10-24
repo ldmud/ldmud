@@ -320,7 +320,7 @@ get_simul_efun_object (void)
 
             memcpy(  &function_name, FUNCTION_NAMEP(funstart)
                    , sizeof function_name);
-            type = FUNCTION_TYPE(funstart);
+            memcpy(&type, FUNCTION_TYPEP(funstart), sizeof(type));
             num_arg = FUNCTION_NUM_ARGS(funstart) & 0x7f;
             num_locals = FUNCTION_NUM_VARS(funstart);
 
@@ -390,7 +390,10 @@ get_simul_efun_object (void)
             p->u.global.sim_efun = j;
             simul_efunp[j].name  = function_name;
             simul_efunp[j].flags = flags;
-            simul_efunp[j].type  = type;
+            simul_efunp[j].type.typeflags = type.type;
+#ifdef USE_STRUCTS
+            simul_efunp[j].type.t_struct = type.t_struct;
+#endif
 
             /* If possible, make an entry in the simul_efun table */
             if ((size_t)j < SIZE_SEFUN_TABLE)

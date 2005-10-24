@@ -176,6 +176,14 @@ DESCRIPTION
               int DID_ST_MAPPINGS_SIZE
                   Number and size of all mappings.
 
+              int DID_ST_STRUCTS
+              int DID_ST_STRUCTS_SIZE
+                  Number and size of all struct instances.
+
+              int DID_ST_STRUCT_TYPES
+              int DID_ST_STRUCT_TYPES_SIZE
+                  Number and size of all struct type instances.
+
               int DID_ST_PROGS
               int DID_ST_PROGS_SIZE
                   Number and size of all programs.

@@ -112,6 +112,9 @@
 #include "simulate.h"
 #include "simul_efun.h"
 #include "stdstrings.h"
+#ifdef USE_STRUCTS
+#include "structs.h"
+#endif
 #include "svalue.h"
 #include "swap.h"
 #include "switch.h"
@@ -294,6 +297,21 @@ struct efun_shadow_s
    * and -1 otherwise.
    */
 
+#ifdef USE_STRUCTS
+#define set_vartype(t, id, ptr) \
+    ( t.type = (id), t.t_struct = (ptr) )
+#define set_fulltype(t, id, ptr) \
+    ( t.typeflags = (id), t.t_struct = (ptr) )
+#else
+#define set_vartype(t, id, ptr) \
+    ( t.type = (id) )
+#define set_fulltype(t, id, ptr) \
+    ( t.typeflags = (id) )
+#endif
+  /* Set the full/vartype <t> to type(flags) <id> and the struct
+   * typeobject pointer to <ptr>.
+   */
+
 #define NEW_INHERITED_INDEX (0xfffff)
   /* While inserting a new inherit, this marks the newly inherited
    * things.
@@ -352,10 +370,6 @@ enum e_saved_areas {
  , A_STRUCT_DEFS
     /* (struct_def_t) Tabled descriptors of all struct definitions.
      */
-
- , A_STRUCT_MEMBERS
-    /* (struct_member_t) Tabled descriptors of all struct member definitions.
-     */
 #endif /* USE_STRUCTS */
  , NUMPAREAS  /* Number of saved areas */
 };
@@ -381,17 +395,8 @@ enum e_internal_areas {
     * a chain is marked by a negative next-index.
     */
 
- , A_FULL_LOCAL_TYPES
-   /* (fulltype_t) The full types of local and context variables.
-#ifdef USE_NEW_INLINES
-    * For normal functions, only the beginning of the area is used.
-    * The rest is used stack-wise for nested inline closures.
-#endif
-    */
-
  , A_LOCAL_TYPES
-   /* The short type (ie: just the type, no visibility information) of
-    * the local and context variables.
+   /* (fulltype_t) The full types of local and context variables.
 #ifdef USE_NEW_INLINES
     * For normal functions, only the beginning of the area is used.
     * The rest is used stack-wise for nested inline closures.
@@ -410,6 +415,12 @@ enum e_internal_areas {
      */
 %endif /* USE_NEW_INLINES */
 
+#ifdef USE_STRUCTS
+ , A_STRUCT_MEMBERS
+    /* (struct_member_t) While a struct definition is parsed, the member
+     * descriptors are collected here.
+     */
+#endif /* USE_STRUCTS */
  , NUMAREAS  /* Total number of areas */
 };
 
@@ -532,12 +543,12 @@ static mem_block_t mem_block[NUMAREAS];
   /* Return the number of structs encountered so far.
    */
 
-#define STRUCT_MEMBER(n)     ((struct_member_t *)mem_block[A_STRUCT_MEMBERS].block)[n]
+#define STRUCT_MEMBER(n)   ((struct_member_t *)mem_block[A_STRUCT_MEMBERS].block)[n]
   /* Index the struct_member_t <n>.
    */
 
-#define STRUCT_MEMBER_COUNT  (mem_block[A_STRUCT_MEMBERS].current_size / sizeof(struct_member_t))
-  /* Return the number of struct members encountered so far.
+#define STRUCT_MEMBER_COUNT (mem_block[A_STRUCT_MEMBERS].current_size / sizeof(struct_member_t))
+  /* Return the number of struct members stored.
    */
 
 #endif /* USE_STRUCTS */
@@ -558,13 +569,11 @@ static mem_block_t mem_block[NUMAREAS];
   /* Return the total number of include files encountered so far.
    */
 
-#define FULL_LOCAL_TYPE_COUNT  (mem_block[A_FULL_LOCAL_TYPES].current_size / sizeof(fulltype_t))
-#define LOCAL_TYPE_COUNT  (mem_block[A_LOCAL_TYPES].current_size / sizeof(vartype_t))
+#define LOCAL_TYPE_COUNT  (mem_block[A_LOCAL_TYPES].current_size / sizeof(fulltype_t))
   /* Return the total number of types.
    */
 
-#define FULL_LOCAL_TYPE(n) ((fulltype_t *)mem_block[A_FULL_LOCAL_TYPES].block)[n]
-#define LOCAL_TYPE(n) ((vartype_t *)mem_block[A_LOCAL_TYPES].block)[n]
+#define LOCAL_TYPE(n) ((fulltype_t *)mem_block[A_LOCAL_TYPES].block)[n]
   /* Return the local/context var type at index <n>.
    */
 
@@ -656,7 +665,7 @@ struct inline_closure_s
       /* Function index
        */
     fulltype_t returntype;
-      /* The return type.
+      /* The return type (reference counted).
        */
     ident_t * ident;
       /* The ident entry with the function name.
@@ -676,7 +685,7 @@ struct inline_closure_s
       /* Current include state.
        */
     fulltype_t exact_types;
-      /* The enclosing return type setting.
+      /* The enclosing return type setting (reference not counted).
        */
     int block_depth;
       /* Block depth at definition point.
@@ -692,15 +701,12 @@ struct inline_closure_s
       /* Current and max break stack size at definition point.
        */
     mp_uint full_local_type_start;
-    mp_uint local_type_start;
     mp_uint full_context_type_start;
-    mp_uint context_type_start;
       /* Start indices of the local/context variable type information
-       * in A_(FULL_)LOCAL_TYPES.
+       * in A_LOCAL_TYPES.
        */
     mp_uint full_local_type_size;
-    mp_uint local_type_size;
-      /* Current size of the A_(FULL_)LOCAL_TYPES memblocks.
+      /* Current size of the A_LOCAL_TYPES memblocks.
        */
 };
 
@@ -772,7 +778,7 @@ static fulltype_t def_function_returntype;
 static ident_t *  def_function_ident;
 static int        def_function_num_args;
   /* Globals to keep the state while a function is parsed:
-   *   _returntype: the returntype
+   *   _returntype: the returntype (reference counted)
    *   _ident:      the function's identifier.
    *   _num_args:   number of formal arguments.
    */
@@ -785,27 +791,17 @@ static mem_block_t type_of_arguments;
    * but will be reused.
    */
 
-static vartype_t *type_of_locals;
-  /* The short type (ie: just the type, no visibility information) of
-   * the local variables.
-   * Points to a location in mem_block A_LOCAL_TYPES;
-   */
-
-static fulltype_t * full_type_of_locals;
+static fulltype_t * type_of_locals = NULL;
   /* The full types of the local variables.
-   * Points to a location in mem_block A_FULL_LOCAL_TYPES;
+   * Points to a location in mem_block A_LOCAL_TYPES, it is NULL between
+   * compilations.
    */
-
+  
 #ifdef USE_NEW_INLINES
-static vartype_t * type_of_context;
-  /* The short type (ie: just the type, no visibility information) of
-   * the context variables.
-   * Points to a location in mem_block A_LOCAL_TYPES;
-   */
-
-static fulltype_t * full_type_of_context;
+static fulltype_t * type_of_context = NULL;
   /* The full types of the context variables.
-   * Points to a location in mem_block A_FULL_LOCAL_TYPES;
+   * Points to a location in mem_block A_LOCAL_TYPES, it is NULL between
+   * compilations.
    */
 #endif /* USE_NEW_INLINES */
 
@@ -824,15 +820,14 @@ static ident_t *all_locals = NULL;
    * nested block scopes.
    */
 
-       fulltype_t exact_types;
-  /* If 0, don't check nor require argument and function types.
+static fulltype_t exact_types;
+  /* If .typeflags is 0, don't check nor require argument and function types.
    * Otherwise it's the full return type of the function, including
-   * visibility. The lexer reads this variable when scanning an
-   * inline closure.
+   * visibility (reference not counted).
    */
 
-static fulltype_t default_varmod;
-static fulltype_t default_funmod;
+static funflag_t default_varmod;
+static funflag_t default_funmod;
   /* Default visibility modifiers for variables resp. function.
    */
 
@@ -911,12 +906,12 @@ static p_int current_continue_address;
 
 #ifdef USE_STRUCTS
 static int current_struct;
-  /* Index+1 of the current structure to be defined.
+  /* Index of the current structure to be defined.
    */
 #endif /* USE_STRUCTS */
 
 static fulltype_t current_type;
-  /* The current basic type.
+  /* The current basic type (reference not counted).
    */
 
 static p_uint last_expression;
@@ -985,6 +980,42 @@ static Bool got_ellipsis[COMPILER_STACK_SIZE];
    * TODO: This should be dynamic.
    */
 
+#ifdef USE_STRUCTS
+static const fulltype_t Type_Any     = { TYPE_ANY, NULL };
+static const fulltype_t Type_Unknown = { TYPE_UNKNOWN, NULL };
+static const vartype_t  VType_Unknown = { TYPE_UNKNOWN, NULL };
+static const fulltype_t Type_Number  = { TYPE_NUMBER, NULL };
+static const fulltype_t Type_Float   = { TYPE_FLOAT, NULL };
+static const fulltype_t Type_String  = { TYPE_STRING, NULL };
+static const fulltype_t Type_Object  = { TYPE_OBJECT, NULL };
+static const fulltype_t Type_Closure = { TYPE_CLOSURE, NULL };
+static const fulltype_t Type_Mapping = { TYPE_MAPPING, NULL };
+static const fulltype_t Type_Symbol  = { TYPE_SYMBOL, NULL };
+static const fulltype_t Type_Void    = { TYPE_VOID, NULL };
+static const fulltype_t Type_Quoted_Array = { TYPE_QUOTED_ARRAY, NULL };
+static const fulltype_t Type_Ptr_Any = { TYPE_ANY|TYPE_MOD_POINTER, NULL };
+static const fulltype_t Type_Ref_Any = { TYPE_ANY|TYPE_MOD_REFERENCE, NULL };
+static const fulltype_t Type_Ref_Number = { TYPE_NUMBER|TYPE_MOD_REFERENCE, NULL };
+#else
+static const fulltype_t Type_Any     = { TYPE_ANY };
+static const fulltype_t Type_Unknown = { TYPE_UNKNOWN };
+static const vartype_t  VType_Unknown = { TYPE_UNKNOWN };
+static const fulltype_t Type_Number  = { TYPE_NUMBER };
+static const fulltype_t Type_Float   = { TYPE_FLOAT };
+static const fulltype_t Type_String  = { TYPE_STRING };
+static const fulltype_t Type_Object  = { TYPE_OBJECT };
+static const fulltype_t Type_Closure = { TYPE_CLOSURE };
+static const fulltype_t Type_Mapping = { TYPE_MAPPING };
+static const fulltype_t Type_Symbol  = { TYPE_SYMBOL };
+static const fulltype_t Type_Void    = { TYPE_VOID };
+static const fulltype_t Type_Quoted_Array = { TYPE_QUOTED_ARRAY };
+static const fulltype_t Type_Ptr_Any = { TYPE_ANY|TYPE_MOD_POINTER };
+static const fulltype_t Type_Ref_Any = { TYPE_ANY|TYPE_MOD_REFERENCE };
+static const fulltype_t Type_Ref_Number = { TYPE_NUMBER|TYPE_MOD_REFERENCE };
+#endif /* USE_STRUCTS */
+  /* Constants for the known simple types.
+   */
+
 /*-------------------------------------------------------------------------*/
 /* Forward declarations */
 
@@ -1000,24 +1031,14 @@ int yyparse(void);
 %ifdef INITIALIZATION_BY___INIT
 static void add_new_init_jump(void);
 static void transfer_init_control(void);
-#ifdef USE_STRUCTS
-static void copy_variables(program_t *, fulltype_t, int);
-static int copy_functions(program_t *, fulltype_t type, int);
-#else
-static void copy_variables(program_t *, fulltype_t);
-static int copy_functions(program_t *, fulltype_t type);
-#endif
+static void copy_variables(program_t *, funflag_t);
+static int copy_functions(program_t *, funflag_t type);
 %else
-#ifdef USE_STRUCTS
-static void copy_variables(program_t *, fulltype_t, svalue_t *, int);
-static void copy_functions(program_t *, fulltype_t type, int);
-#else
-static void copy_variables(program_t *, fulltype_t, svalue_t *);
-static void copy_functions(program_t *, fulltype_t type);
-#endif
+static void copy_variables(program_t *, funflag_t, svalue_t *);
+static void copy_functions(program_t *, funflag_t type);
 %endif
 #ifdef USE_STRUCTS
-static void copy_structs(program_t *, fulltype_t, int);
+static void copy_structs(program_t *, funflag_t);
 #endif /* USE_STRUCTS */
 #ifdef USE_NEW_INLINES
 static void new_inline_closure (void);
@@ -1298,42 +1319,179 @@ add_to_mem_block (int n, void *data, size_t size)
 /* ==============================   TYPES   ============================== */
 
 /*-------------------------------------------------------------------------*/
-#define BASIC_TYPE(e,t) \
-    ((e) == TYPE_ANY || (e) == (t) || (t) == TYPE_ANY)
+static INLINE void
+assign_full_to_vartype(vartype_t * dest, fulltype_t src)
 
-  /* Return TRUE if <e> and <t> are compatible basic types.
-   */
+/* Assign a fulltype_t variable to a vartype_t variable.
+ */
 
-#define TYPE(e,t) \
-    (   BASIC_TYPE((e) & TYPE_MOD_MASK, (t) & TYPE_MOD_MASK) \
-     || (   ((e) & TYPE_MOD_POINTER) && ((t) & TYPE_MOD_POINTER) \
-         && BASIC_TYPE((e) & (TYPE_MOD_MASK & ~TYPE_MOD_POINTER),\
-                               (t) & (TYPE_MOD_MASK & ~TYPE_MOD_POINTER))\
-        ))
+{
+    dest->type = src.typeflags;
+#ifdef USE_STRUCTS
+    dest->t_struct = src.t_struct;
+#endif
+} /* assign_full_to_vartype() */
 
-  /* Return TRUE if <e> and <t> are compatible basic xor pointer types.
-   */
+/*-------------------------------------------------------------------------*/
+static INLINE void
+assign_var_to_fulltype(fulltype_t * dest, vartype_t src)
 
-#define MASKED_TYPE(e,t) \
-    (   BASIC_TYPE( (e) , (t) ) \
-     || ( (e) == (TYPE_MOD_POINTER|TYPE_ANY) && (t) & TYPE_MOD_POINTER ) \
-     || ( (t) == (TYPE_MOD_POINTER|TYPE_ANY) && (e) & TYPE_MOD_POINTER ) \
-    )
+/* Assign a vartype_t variable to a fulltype_t variable.
+ */
 
-  /* Return TRUE if <e> and <t> are compatible basic types, or if both
-   * are pointer types and one of them is a *ANY.
-   */
+{
+    dest->typeflags = src.type;
+#ifdef USE_STRUCTS
+    dest->t_struct = src.t_struct;
+#endif
+} /* assign_var_to_fulltype() */
 
-#define REDEFINED_TYPE(e,t) \
-    (   BASIC_TYPE( (e), (t) ) \
-     || ( (t) == (TYPE_MOD_POINTER|TYPE_ANY) ) \
-     || ( (e) == (TYPE_MOD_POINTER|TYPE_ANY) ) \
-    )
+/*-------------------------------------------------------------------------*/
+static INLINE Bool
+equal_types (fulltype_t e, fulltype_t t)
 
-  /* Return TRUE if type <t> is a proper redefinition of <e>.
-   * This is the case if <e> and <t> are compatible base types,
-   * or if one of them is *ANY.
-   */
+/* Return TRUE if <e> and <t> are compatible basic types.
+ */
+
+{
+    return (e.typeflags & TYPEID_MASK) == (t.typeflags & TYPEID_MASK)
+#ifdef USE_STRUCTS
+        && e.t_struct == t.t_struct
+#endif
+    ;
+} /* equal_types() */
+
+
+static INLINE Bool
+basic_type (typeflags_t e, typeflags_t t)
+
+/* Return TRUE if <e> and <t> are compatible basic types.
+ */
+
+{
+    e &= TYPEID_MASK;
+    t &= TYPEID_MASK;
+
+    return e == TYPE_ANY
+        || e == t
+        || t == TYPE_ANY
+    ;
+} /* basic_type() */
+
+
+static INLINE Bool
+BASIC_TYPE (fulltype_t e, fulltype_t t)
+
+/* Return TRUE if <e> and <t> are compatible basic types.
+ */
+
+{
+    return basic_type(e.typeflags, t.typeflags);
+} /* BASIC_TYPE() */
+
+
+static INLINE Bool
+TYPE (fulltype_t e, fulltype_t t)
+
+/* Return TRUE if <e> and <t> are compatible basic xor pointer types.
+ */
+
+{
+    typeflags_t ef = e.typeflags & TYPEID_MASK;
+    typeflags_t tf = t.typeflags & TYPEID_MASK;
+
+    return basic_type(ef & TYPE_MOD_MASK, tf & TYPE_MOD_MASK)
+        || (   (ef & TYPE_MOD_POINTER) && (tf & TYPE_MOD_POINTER) 
+            && basic_type( ef & (TYPE_MOD_MASK & ~TYPE_MOD_POINTER)
+                         , tf & (TYPE_MOD_MASK & ~TYPE_MOD_POINTER))
+           )
+    ;
+} /* TYPE() */
+
+
+static INLINE Bool
+vtype (vartype_t e, vartype_t t)
+
+/* Return TRUE if <e> and <t> are compatible basic xor pointer types.
+ */
+
+{
+    fulltype_t et, tt;
+
+    assign_var_to_fulltype(&et, e);
+    assign_var_to_fulltype(&tt, t);
+    return TYPE(et, tt);
+} /* vtype() */
+
+static INLINE Bool
+MASKED_TYPE (fulltype_t e, fulltype_t t)
+
+/* Return TRUE if <e> and <t> are compatible basic types, or if both
+ * are pointer types and one of them is a *ANY.
+ */
+
+{
+    typeflags_t ef = e.typeflags & TYPEID_MASK;
+    typeflags_t tf = t.typeflags & TYPEID_MASK;
+
+    return  basic_type(ef, tf) 
+        || ( ef == (TYPE_MOD_POINTER|TYPE_ANY) && ef & TYPE_MOD_POINTER ) 
+        || ( tf == (TYPE_MOD_POINTER|TYPE_ANY) && ef & TYPE_MOD_POINTER ) 
+    ;
+
+} /* MASKED_TYPE() */
+
+
+static INLINE Bool
+REDEFINED_TYPE (fulltype_t e, fulltype_t t)
+
+/* Return TRUE if type <t> is a proper redefinition of <e>.
+ * This is the case if <e> and <t> are compatible base types,
+ * or if one of them is *ANY.
+ */
+
+{
+    typeflags_t ef = e.typeflags & TYPEID_MASK;
+    typeflags_t tf = t.typeflags & TYPEID_MASK;
+    return basic_type(ef, tf ) 
+        || (tf == (TYPE_MOD_POINTER|TYPE_ANY) ) 
+        || (ef == (TYPE_MOD_POINTER|TYPE_ANY) ) 
+    ;
+} /* REDEFINED_TYPE() */
+
+
+/*-------------------------------------------------------------------------*/
+static char *
+get_f_visibility (funflag_t flags)
+
+/* Return (in a static buffer) a textual representation of the visibility
+ * flags in <flags>.
+ */
+
+{
+    static char buff[100];
+    size_t len;
+
+    buff[0] = '\0';
+    if (flags & TYPE_MOD_STATIC)
+        strcat(buff, "static ");
+    if (flags & TYPE_MOD_NO_MASK)
+        strcat(buff, "nomask ");
+    if (flags & TYPE_MOD_PRIVATE)
+        strcat(buff, "private ");
+    if (flags & TYPE_MOD_PROTECTED)
+        strcat(buff, "protected ");
+    if (flags & TYPE_MOD_PUBLIC)
+        strcat(buff, "public ");
+    if (flags & TYPE_MOD_VARARGS)
+        strcat(buff, "varargs ");
+
+    len = strlen(buff);
+    if (len)
+        buff[len-1] = '\0';
+
+    return buff;
+} /* get_f_visibility() */
 
 /*-------------------------------------------------------------------------*/
 static char *
@@ -1344,28 +1502,7 @@ get_visibility (fulltype_t type)
  */
 
 {
-    static char buff[100];
-    size_t len;
-
-    buff[0] = '\0';
-    if (type & TYPE_MOD_STATIC)
-        strcat(buff, "static ");
-    if (type & TYPE_MOD_NO_MASK)
-        strcat(buff, "nomask ");
-    if (type & TYPE_MOD_PRIVATE)
-        strcat(buff, "private ");
-    if (type & TYPE_MOD_PROTECTED)
-        strcat(buff, "protected ");
-    if (type & TYPE_MOD_PUBLIC)
-        strcat(buff, "public ");
-    if (type & TYPE_MOD_VARARGS)
-        strcat(buff, "varargs ");
-
-    len = strlen(buff);
-    if (len)
-        buff[len-1] = '\0';
-
-    return buff;
+    return get_f_visibility(type.typeflags);
 } /* get_visibility() */
 
 /*-------------------------------------------------------------------------*/
@@ -1380,57 +1517,50 @@ get_type_name (fulltype_t type)
     static char *type_name[] = { "unknown", "int", "string", "void", "object",
                                  "mapping", "float", "mixed", "closure",
                                  "symbol", "quoted_array", "struct" };
-#ifdef USE_STRUCTS
-    int sec_type_info;
-#endif /* USE_STRUCTS */
 
     Bool pointer = MY_FALSE, reference = MY_FALSE;
 
-#ifdef USE_STRUCTS
-    sec_type_info = GET_SEC_TYPE_INFO(type);
-    type &= ~SEC_TYPE_MASK;
-#endif /* USE_STRUCTS */
-
     buff[0] = '\0';
-    if (type & TYPE_MOD_STATIC)
+    if (type.typeflags & TYPE_MOD_STATIC)
         strcat(buff, "static ");
-    if (type & TYPE_MOD_NO_MASK)
+    if (type.typeflags & TYPE_MOD_NO_MASK)
         strcat(buff, "nomask ");
-    if (type & TYPE_MOD_PRIVATE)
+    if (type.typeflags & TYPE_MOD_PRIVATE)
         strcat(buff, "private ");
-    if (type & TYPE_MOD_PROTECTED)
+    if (type.typeflags & TYPE_MOD_PROTECTED)
         strcat(buff, "protected ");
-    if (type & TYPE_MOD_PUBLIC)
+    if (type.typeflags & TYPE_MOD_PUBLIC)
         strcat(buff, "public ");
-    if (type & TYPE_MOD_VARARGS)
+    if (type.typeflags & TYPE_MOD_VARARGS)
         strcat(buff, "varargs ");
 
-    type &= TYPE_MOD_MASK;
+    type.typeflags &= TYPE_MOD_MASK;
 
-    if (type & TYPE_MOD_POINTER)
+    if (type.typeflags & TYPE_MOD_POINTER)
     {
         pointer = MY_TRUE;
-        type &= ~TYPE_MOD_POINTER;
+        type.typeflags &= ~TYPE_MOD_POINTER;
     }
-    if (type & TYPE_MOD_REFERENCE)
+    if (type.typeflags & TYPE_MOD_REFERENCE)
     {
         reference = MY_TRUE;
-        type &= ~TYPE_MOD_REFERENCE;
+        type.typeflags &= ~TYPE_MOD_REFERENCE;
     }
 
-    if (type >= sizeof type_name / sizeof type_name[0])
+    if (type.typeflags >= sizeof type_name / sizeof type_name[0])
         fatal("Bad type %ld: %s line %d\n"
-             , (long)type,  current_file, current_line);
+             , (long)type.typeflags,  current_file, current_line);
 
-    strcat(buff, type_name[type]);
+    strcat(buff, type_name[type.typeflags]);
 
 #ifdef USE_STRUCTS
-    if  (type == TYPE_STRUCT && sec_type_info > 0)
+    if  (type.typeflags == TYPE_STRUCT)
     {
         strcat(buff, " ");
-        strcat(buff, get_txt(STRUCT_DEF(sec_type_info-1).name));
+        strcat(buff, get_txt(type.t_struct->name));
     }
 #endif /* USE_STRUCTS */
+
     if (pointer)
         strcat(buff, " *");
     if (reference)
@@ -1455,6 +1585,22 @@ get_two_types (fulltype_t type1, fulltype_t type2)
     strcat(buff, ")");
     return buff;
 } /* get_two_types() */
+
+#ifdef USE_STRUCTS
+/*-------------------------------------------------------------------------*/
+static char *
+get_two_vtypes (vartype_t type1, vartype_t type2)
+
+/* Return (in a static buffer) the text "(<type1> vs. <type2>)".
+ */
+{
+    fulltype_t ftype1, ftype2;
+
+    assign_var_to_fulltype(&ftype1, type1);
+    assign_var_to_fulltype(&ftype2, type2);
+    return get_two_types(ftype1, ftype2);
+} /* get_two_vtypes() */
+#endif /* USE_STRUCTS */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -1492,7 +1638,7 @@ efun_argument_error(int arg, int instr
     char msg[1024];
 
     msg[0] = '\0';
-    for (; *expected; expected++)
+    for (; expected->typeflags; expected++)
     {
         if (msg[0] != '\0')
             strcat(msg, "/");
@@ -1520,50 +1666,63 @@ compatible_types (fulltype_t t1, fulltype_t t2, Bool is_assign)
  */
 
 {
-    if (t1 == TYPE_UNKNOWN || t2 == TYPE_UNKNOWN)
+    t1.typeflags &= TYPEID_MASK;
+    t2.typeflags &= TYPEID_MASK;
+    if (t1.typeflags == TYPE_UNKNOWN || t2.typeflags == TYPE_UNKNOWN)
         return MY_FALSE;
-    if (t1 == TYPE_ANY || t2 == TYPE_ANY)
+    if (t1.typeflags == TYPE_ANY || t2.typeflags == TYPE_ANY)
         return MY_TRUE;
 
 #ifdef USE_STRUCTS
-    if (is_assign && (t1 & PRIMARY_TYPE_MASK) == T_STRUCT)
+    if (is_assign
+     && (t1.typeflags & PRIMARY_TYPE_MASK) == T_STRUCT
+     && (t2.typeflags & PRIMARY_TYPE_MASK) == T_STRUCT
+       )
     {
-        int id1, id2;
+        struct_type_t * id1, * id2;
 
         /* Check if t1 is a base-struct of t2 */
-        id1 = GET_SEC_TYPE_INFO(t1);
-        id2 = GET_SEC_TYPE_INFO(t2);
+        id1 = t1.t_struct;
+        id2 = t2.t_struct;
 
-        while (id2 > 0 && id1 != id2)
+        while (id2 != NULL && id1 != id2)
         {
-            id2 = STRUCT_DEF(id2-1).base;
+            id2 = id2->base;
         }
 
         /* If the base structs match, just pretend that t2 is the
          * same struct as t1. This will make the following tests
          * work as normal.
          */
-        if (id2 > 0)
-            t2 = (t2 & ~SEC_TYPE_MASK)
-               | MAKE_SEC_TYPE_INFO(id1);
+        if (id2 != NULL)
+            t2.t_struct = id1;
     }
 #endif
 
-    if (t1 == t2)
-        return MY_TRUE;
-
-    if ((t1 & TYPE_MOD_POINTER) && (t2 & TYPE_MOD_POINTER))
+    if (t1.typeflags == t2.typeflags)
     {
-        if ((t1 & TYPE_MOD_MASK) == (TYPE_ANY|TYPE_MOD_POINTER)
-         || (t2 & TYPE_MOD_MASK) == (TYPE_ANY|TYPE_MOD_POINTER))
+#ifdef USE_STRUCTS
+        if (t1.t_struct == t2.t_struct)
+            return MY_TRUE;
+#else
+        return MY_TRUE;
+#endif
+    }
+
+    if ((t1.typeflags & TYPE_MOD_POINTER) && (t2.typeflags & TYPE_MOD_POINTER))
+    {
+        if ((t1.typeflags & TYPE_MOD_MASK) == (TYPE_ANY|TYPE_MOD_POINTER)
+         || (t2.typeflags & TYPE_MOD_MASK) == (TYPE_ANY|TYPE_MOD_POINTER))
             return MY_TRUE;
     }
 
 #ifdef USE_STRUCTS
-    if (is_assign && (t1 & PRIMARY_TYPE_MASK) == T_STRUCT)
+    if (is_assign && (t1.typeflags & PRIMARY_TYPE_MASK) == T_STRUCT)
     {
-        /* Check if t2 is a struct */
-        if ((t2 & PRIMARY_TYPE_MASK) != T_STRUCT)
+        /* Check if t2 is a struct.  If it is, the above
+         * check already made sure that the type matches.
+         */
+        if ((t2.typeflags & PRIMARY_TYPE_MASK) != T_STRUCT)
             return MY_FALSE;
     }
 #endif
@@ -1573,7 +1732,7 @@ compatible_types (fulltype_t t1, fulltype_t t2, Bool is_assign)
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-i_add_arg_type (vartype_t type)
+i_add_arg_type (fulltype_t type, int line)
 
 /* Add another function argument type to the argument type stack.
  */
@@ -1586,11 +1745,11 @@ i_add_arg_type (vartype_t type)
         mbp->max_size *= 2;
         mbp->block = rexalloc((char *)mbp->block, mbp->max_size);
     }
-    *(vartype_t*)(mbp->block + mbp->current_size) = type;
-    mbp->current_size += sizeof type;
+    assign_full_to_vartype((vartype_t*)(mbp->block + mbp->current_size), type);
+    mbp->current_size += sizeof(vartype_t);
 } /* add_arg_type() */
 
-#define add_arg_type(t) i_add_arg_type(t)
+#define add_arg_type(t) i_add_arg_type(t, __LINE__)
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
@@ -1600,7 +1759,15 @@ pop_arg_stack (int n)
  */
 
 {
-    type_of_arguments.current_size -= sizeof (vartype_t) * n;
+    vartype_t * vp;
+
+    vp = (vartype_t*)(type_of_arguments.block + type_of_arguments.current_size);
+    while (n > 0)
+    {
+        type_of_arguments.current_size -= sizeof (vartype_t);
+        n--;
+        vp--;
+    }
 } /* pop_arg_stack() */
 
 /*-------------------------------------------------------------------------*/
@@ -1626,7 +1793,8 @@ check_aggregate_types (int n)
  */
 
 {
-    vartype_t *argp, mask;
+    vartype_t *argp;
+    typeid_t   mask;
 
     argp = (vartype_t *) (type_of_arguments.block +
           (type_of_arguments.current_size -= sizeof (vartype_t) * n) );
@@ -1636,7 +1804,8 @@ check_aggregate_types (int n)
      */
     for (mask = ~TYPE_MOD_REFERENCE; --n >= 0; )
     {
-        mask |= *argp++;
+        mask |= argp->type;
+        argp++;
     }
 
     if (!(~mask & 0xffff))
@@ -1762,6 +1931,23 @@ read_short (mp_uint offset)
     GET_SHORT(l, dest);
     return l;
 } /* read_short() */
+
+%ifdef INITIALIZATION_BY___INIT
+/*-------------------------------------------------------------------------*/
+static void
+upd_jump_offset (mp_uint offset, long l)
+
+/* Store the 3-byte number <l> at <offset> in the A_PROGRAM are in
+ * a fixed byteorder.
+ */
+
+{
+    char *dest;
+
+    dest = mem_block[A_PROGRAM].block + offset;
+    PUT_3BYTE(dest, l);
+} /* upd_jump_offset() */
+%endif /* INTIALIZATION_BY___INIT */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -2056,6 +2242,12 @@ free_all_local_names (void)
         free_shared_identifier(p);
     }
 
+    while (current_number_of_locals > 0 && type_of_locals)
+    {
+        current_number_of_locals--;
+        free_fulltype_data(&type_of_locals[current_number_of_locals]);
+    }
+
     all_locals = NULL;
     current_number_of_locals = 0;
     max_number_of_locals = 0;
@@ -2095,6 +2287,7 @@ free_local_names (int depth)
         all_locals = q->next_all;
         free_shared_identifier(q);
         current_number_of_locals--;
+        free_fulltype_data(&type_of_locals[current_number_of_locals]);
     }
 } /* free_local_names() */
 
@@ -2107,7 +2300,7 @@ add_local_name (ident_t *ident, fulltype_t type, int depth
                )
 
 /* Declare a new local variable <ident> with the type <type> on
- * the scope depth <depth>.
+ * the scope depth <depth>. The references of <type> are NOT adopted.
 #ifndef USE_NEW_INLINES
  * If <may_shadow> is TRUE, the declaration is
  * allowed to shadow a previous one without generating a warning (this is
@@ -2117,7 +2310,7 @@ add_local_name (ident_t *ident, fulltype_t type, int depth
  */
 
 {
-    if ((type & PRIMARY_TYPE_MASK) == TYPE_VOID)
+    if ((type.typeflags & PRIMARY_TYPE_MASK) == TYPE_VOID)
     {
         yyerrorf( "Illegal to define variable '%s' as type 'void'"
                 , get_txt(ident->name));
@@ -2129,6 +2322,8 @@ add_local_name (ident_t *ident, fulltype_t type, int depth
 
     else
     {
+        ref_fulltype_data(&type);
+
         if (ident->type != I_TYPE_UNKNOWN)
         {
             /* We're overlaying some other definition.
@@ -2172,8 +2367,7 @@ if (current_inline && current_inline->block_depth+2 == block_depth && ident->typ
         all_locals = ident;
 
         /* Record the type */
-        type_of_locals[current_number_of_locals] = type;
-        full_type_of_locals[current_number_of_locals++] = type;
+        type_of_locals[current_number_of_locals++] = type;
 
         /* And update the scope information */
         if (current_number_of_locals > max_number_of_locals)
@@ -2188,7 +2382,8 @@ if (current_inline && current_inline->block_depth+2 == block_depth && ident->typ
 static ident_t *
 redeclare_local (ident_t *ident, fulltype_t type, int depth)
 
-/* Redeclare a local name <ident>, to <type> at <depth>.
+/* Redeclare a local name <ident>, to <type> at <depth>; the references
+ * of <type> are NOT adopted (nor freed on error).
  * If this happens on a deeper level, it is legal: the new declaration
  * is added and the new identifier is returned.
  * If it is illegal, an yyerror() is risen and the ident of the older
@@ -2233,7 +2428,8 @@ static ident_t *
 add_context_name (ident_t *ident, fulltype_t type, int num)
 
 /* Declare a new context variable <ident> with the type <type> for the
- * currently compiled inline closure. <num> is -1 for independent context
+ * currently compiled inline closure. The references of <type> are NOT adopted.
+ * <num> is -1 for independent context
  * variables, or the index of the inherited local variable.
  * Return the (adjusted) ident for the new variable.
  */
@@ -2251,10 +2447,13 @@ printf("DEBUG: add_context_name('%s', num %d) depth %d, context %d\n", get_txt(i
     if (block->num_locals >= 256
      || block->num_locals >= MAX_LOCAL /* size of type recording array */
        )
+    {
         yyerror("Too many context variables");
-
+    }
     else
     {
+        ref_fulltype_data(&type);
+
         if (ident->type != I_TYPE_UNKNOWN)
         {
             /* We're overlaying some other definition, but that's ok.
@@ -2292,7 +2491,6 @@ printf("DEBUG: add_context_name('%s', num %d) depth %d, context %d\n", get_txt(i
 
         /* Record the type */
         type_of_context[block->num_locals] = type;
-        full_type_of_context[block->num_locals] = type;
 
         block->num_locals++;
     }
@@ -2328,15 +2526,16 @@ check_for_context_local (ident_t *ident)
        {
            yyerrorf("Can't use context variable '%s' "
                     "across closure boundaries", get_txt(ident->name));
-           ident = redeclare_local(ident, TYPE_ANY, block_depth);
+           ident = redeclare_local(ident, Type_Any, block_depth);
        }
        else
        {
            fulltype_t type;
 
-           type = FULL_LOCAL_TYPE(current_inline->full_local_type_start
-                                  + ident->u.local.num
-                                 );
+           type = LOCAL_TYPE(current_inline->full_local_type_start
+                             + ident->u.local.num
+                            );
+           ref_fulltype_data(&type);
            ident = add_context_name( ident, type, ident->u.local.num);
        }
     }
@@ -2413,7 +2612,7 @@ store_argument_types ( int num_arg )
 
     /* Store the function arguments, if required.
      */
-    if (!exact_types)
+    if (!exact_types.typeflags)
     {
         argument_start_index = INDEX_START_NONE;
     }
@@ -2426,8 +2625,11 @@ store_argument_types ( int num_arg )
         argument_start_index = ARGTYPE_COUNT;
         for (i = 0; i < num_arg; i++)
         {
-            add_to_mem_block(A_ARGUMENT_TYPES, &type_of_locals[i],
-                             sizeof type_of_locals[i]);
+            vartype_t vt;
+
+            assign_full_to_vartype(&vt, type_of_locals[i]);
+            ref_vartype_data(&vt);
+            add_to_mem_block(A_ARGUMENT_TYPES, &vt, sizeof vt);
         }
     }
 
@@ -2441,6 +2643,7 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
 
 /* Define a new function <p> with the characteristics <num_arg>, <num_local>,
  * program <offset>, <flags> and <type>.
+ * The references of <type> are NOT adopted.
  * Result is the number (index) of the function.
  *
  * The function is called whenever a function header (return type, name
@@ -2459,7 +2662,8 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
     function_t fun;
     unsigned short argument_start_index;
 
-    flags |= type & ~TYPE_MOD_MASK; /* Move the visibility-info into flags */
+    /* Move the visibility-info into flags */
+    flags |= type.typeflags & ~TYPE_MOD_MASK;
 
     do {
         function_t *funp;
@@ -2519,7 +2723,7 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
              *
              * 'nomask' functions may not be redefined.
              */
-            if (exact_types && funp->type != TYPE_UNKNOWN)
+            if (exact_types.typeflags && funp->type.typeflags != TYPE_UNKNOWN)
             {
                 fulltype_t t1, t2;
 
@@ -2556,8 +2760,8 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
                            ( TYPE_MOD_NO_MASK \
                            | TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC \
                            | TYPE_MOD_PROTECTED)
-                    fulltype_t f1 = funp->flags;
-                    fulltype_t f2 = flags;
+                    funflag_t f1 = funp->flags;
+                    funflag_t f2 = flags;
 
                     /* Smooth out irrelevant differences */
                     if (f1 & TYPE_MOD_STATIC) f1 |= TYPE_MOD_PROTECTED;
@@ -2569,17 +2773,18 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
                     {
                         char buff[100];
 
-                        strcpy(buff, get_visibility(funp->flags));
+                        t2 = funp->type;
+                        strcpy(buff, get_visibility(t2));
                         yywarnf("Inconsistent declaration of '%s': Visibility changed from '%s' to '%s'"
-                               , get_txt(p->name), buff, get_visibility(flags));
+                               , get_txt(p->name), buff, get_visibility(type));
                     }
 #                   undef TYPE_MOD_VIS
                 }
 
                 /* Check if the 'varargs' attribute is conserved */
 
-                t1 = type & TYPE_MOD_MASK;
-                t2 = funp->type & TYPE_MOD_MASK;
+                t1 = type;       t1.typeflags &= TYPE_MOD_MASK;
+                t2 = funp->type; t2.typeflags &= TYPE_MOD_MASK;
                 if (!MASKED_TYPE(t1, t2))
                 {
                     if (pragma_pedantic)
@@ -2620,8 +2825,10 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
 
                     for (i = 0; i < num_args; i++ )
                     {
-                        t1 = type_of_locals[i] & TYPE_MOD_RMASK;
-                        t2 = argp[i] & TYPE_MOD_MASK;
+                        t1 = type_of_locals[i];
+                        t1.typeflags &= TYPE_MOD_RMASK;
+                        assign_var_to_fulltype(&t2, argp[i]);
+                        t2.typeflags &= TYPE_MOD_MASK;
                         if (!MASKED_TYPE(t1, t2))
                         {
                             args_differ = MY_TRUE;
@@ -2685,7 +2892,9 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
         funp->num_local = num_local;
         funp->flags = flags;
         funp->offset.pc = offset;
+        free_fulltype_data(&funp->type);
         funp->type = type;
+        ref_fulltype_data(&funp->type);
 
         /* That's it */
         return num;
@@ -2703,7 +2912,8 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
     fun.flags     = flags;
     fun.num_arg   = num_arg;
     fun.num_local = num_local; /* will be updated later */
-    fun.type      = type;
+    fun.type      =type;
+    ref_fulltype_data(&fun.type);
 
     num = FUNCTION_COUNT;
 
@@ -2766,22 +2976,24 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
 %ifdef INITIALIZATION_BY___INIT
 
 static void
-define_variable (ident_t *name, fulltype_t flags)
+define_variable (ident_t *name, fulltype_t type)
 
 %else /* then !INITIALIZATION_BY___INIT */
 
 static void
-define_variable (ident_t *name, fulltype_t flags, svalue_t *svp)
+define_variable (ident_t *name, fulltype_t type, svalue_t *svp)
 
 %endif /* INITIALIZATION_BY___INIT */
 
-/* Define a new global variable <name> of type <flags>.
+/* Define a new global variable <name> of type <type>.
+ * The references of <type> are NOT adopted.
  * If !INITIALIZATION_BY___INIT, then <svp> is the initializer for the
  * variable.
  */
 
 {
     variable_t dummy;
+    typeflags_t flags = type.typeflags;
     int n;
 
     if ((flags & PRIMARY_TYPE_MASK) == TYPE_VOID)
@@ -2832,23 +3044,25 @@ define_variable (ident_t *name, fulltype_t flags, svalue_t *svp)
     /* If the variable already exists, make sure that we can redefine it */
     if ( (n = name->u.global.variable) >= 0)
     {
+        typeflags_t vn_flags = VARIABLE(n)->type.typeflags;
+
         /* Visible nomask variables can't be redefined */
-        if ( VARIABLE(n)->flags & TYPE_MOD_NO_MASK && !(flags & NAME_HIDDEN))
+        if ( vn_flags & TYPE_MOD_NO_MASK && !(flags & NAME_HIDDEN))
             yyerrorf( "Illegal to redefine 'nomask' variable '%s'"
                     , get_txt(name->name));
 
         /* We can redefine inherited variables if they are private or hidden,
          * or if one of them is static.
          */
-        if (  (   !(VARIABLE(n)->flags & NAME_INHERITED)
-               || (   !(VARIABLE(n)->flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN))
-                   && !((flags ^ VARIABLE(n)->flags) & TYPE_MOD_STATIC)
+        if (  (   !(vn_flags & NAME_INHERITED)
+               || (   !(vn_flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN))
+                   && !((flags ^ vn_flags) & TYPE_MOD_STATIC)
                   )
               )
             && !(flags & NAME_INHERITED)
            )
         {
-            if (VARIABLE(n)->flags & NAME_INHERITED)
+            if (vn_flags & NAME_INHERITED)
                 yyerrorf("Illegal to redefine inherited variable '%s'"
                         , get_txt(name->name));
             else
@@ -2856,13 +3070,13 @@ define_variable (ident_t *name, fulltype_t flags, svalue_t *svp)
                         , get_txt(name->name));
         }
 
-        if (((flags ^ VARIABLE(n)->flags) & (TYPE_MOD_STATIC|TYPE_MOD_PRIVATE))
+        if (((flags ^ vn_flags) & (TYPE_MOD_STATIC|TYPE_MOD_PRIVATE))
             == TYPE_MOD_STATIC
          && !(flags & NAME_INHERITED)
            )
         {
             yywarnf("Redefining inherited %s variable '%s' with a %s variable"
-                   , (VARIABLE(n)->flags & TYPE_MOD_STATIC)
+                   , (vn_flags & TYPE_MOD_STATIC)
                      ? "nosave" : "non-nosave"
                    , get_txt(name->name)
                    , (flags & TYPE_MOD_STATIC) ? "nosave" : "non-nosave"
@@ -2874,11 +3088,12 @@ define_variable (ident_t *name, fulltype_t flags, svalue_t *svp)
          */
         if (flags & NAME_INHERITED)
         {
-            flags |= ~(VARIABLE(n)->flags) & TYPE_MOD_STATIC;
+            flags |= ~(vn_flags) & TYPE_MOD_STATIC;
         }
         else
         {
-            VARIABLE(n)->flags |=   ~flags & TYPE_MOD_STATIC;
+            vn_flags |=   ~flags & TYPE_MOD_STATIC;
+            VARIABLE(n)->type.typeflags = vn_flags;
         }
     }
 
@@ -2891,8 +3106,11 @@ define_variable (ident_t *name, fulltype_t flags, svalue_t *svp)
         flags ^= TYPE_MOD_NOSAVE;
     }
 
+    type.typeflags = flags;
+
     dummy.name = ref_mstring(name->name);
-    dummy.flags = flags;
+    dummy.type = type;
+    ref_fulltype_data(&dummy.type);
 
     if (flags & TYPE_MOD_VIRTUAL)
     {
@@ -2916,13 +3134,15 @@ define_variable (ident_t *name, fulltype_t flags, svalue_t *svp)
 
 /*-------------------------------------------------------------------------*/
 static void
-redeclare_variable (ident_t *name, fulltype_t flags, int n)
+redeclare_variable (ident_t *name, fulltype_t type, int n)
 
 /* The variable <name> is inherited virtually with number <n>.
- * Redeclare it from its original type to <flags>.
+ * Redeclare it from its original type to <type>.
  */
 
 {
+    typeflags_t flags = type.typeflags;
+
     if (name->type != I_TYPE_GLOBAL)
     {
         /* This is the first _GLOBAL use of this identifier:
@@ -2965,13 +3185,13 @@ redeclare_variable (ident_t *name, fulltype_t flags, int n)
 
     if (name->u.global.variable >= 0 && name->u.global.variable != n)
     {
-        if (VARIABLE(name->u.global.variable)->flags & TYPE_MOD_NO_MASK )
+        if (VARIABLE(name->u.global.variable)->type.typeflags & TYPE_MOD_NO_MASK )
             yyerrorf( "Illegal to redefine 'nomask' variable '%s'"
                     , get_txt(name->name));
     }
-    else if (V_VARIABLE(n)->flags & TYPE_MOD_NO_MASK
-          && !(V_VARIABLE(n)->flags & NAME_HIDDEN)
-          && (V_VARIABLE(n)->flags ^ flags) & TYPE_MOD_STATIC )
+    else if (V_VARIABLE(n)->type.typeflags & TYPE_MOD_NO_MASK
+          && !(V_VARIABLE(n)->type.typeflags & NAME_HIDDEN)
+          && (V_VARIABLE(n)->type.typeflags ^ flags) & TYPE_MOD_STATIC )
     {
         yyerrorf("Illegal to redefine 'nomask' variable \"%s\""
                 , get_txt(name->name));
@@ -2984,8 +3204,12 @@ redeclare_variable (ident_t *name, fulltype_t flags, int n)
         flags ^= TYPE_MOD_NOSAVE;
     }
 
+    type.typeflags = flags;
+
     name->u.global.variable = n;
-    V_VARIABLE(n)->flags = flags;
+    free_fulltype_data(&V_VARIABLE(n)->type);
+    V_VARIABLE(n)->type = type;
+    ref_fulltype_data(&V_VARIABLE(n)->type);
 } /* redeclare_variable() */
 
 /*-------------------------------------------------------------------------*/
@@ -3018,10 +3242,12 @@ store_function_header ( p_int start
 
 /* Store a function header into the program block at address <start>.
  * The caller has to make sure that there is enough space.
+ * The references of <returntype> are adopted.
  */
 
 {
     bytecode_p p;
+    vartype_t  rtype;
 
     p = &(PROGRAM_BLOCK[start]);
 
@@ -3031,14 +3257,12 @@ store_function_header ( p_int start
     (void)ref_mstring(name);
 
     /* FUNCTION_TYPE */
-#if defined(USE_STRUCTS)
-    STORE_SHORT(p, returntype);
-#else
-    *p++ = returntype;
-#endif
+    assign_full_to_vartype(&rtype, returntype);
+    memcpy(p, &rtype, sizeof(rtype));
+    p += sizeof(rtype);
 
     /* FUNCTION_NUM_ARGS */
-    if (returntype & TYPE_MOD_XVARARGS)
+    if (returntype.typeflags & TYPE_MOD_XVARARGS)
       *p++ = num_args | ~0x7f;
     else
       *p++ = num_args;
@@ -3059,6 +3283,8 @@ def_function_typecheck (fulltype_t returntype, ident_t * ident
  * definition, this function performs the typecheck, makes sure that
  * the function name is put into the list of globals, and initialises
  * the block scoping.
+ *
+ * The references of <returntype> are adopted.
  *
  * If <is_inline> is TRUE, the function to be compiled is an inline closure,
  * which requires a slightly different handling. This function is called
@@ -3084,14 +3310,14 @@ def_function_typecheck (fulltype_t returntype, ident_t * ident
     }
 #endif /* USE_NEW_INLINES */
 
-    if (!(returntype & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
-               | TYPE_MOD_PROTECTED | TYPE_MOD_STATIC)))
+    if (!(returntype.typeflags & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
+                                  | TYPE_MOD_PROTECTED | TYPE_MOD_STATIC)))
     {
-        returntype |= default_funmod;
+        returntype.typeflags |= default_funmod;
     }
 
     /* Require exact types? */
-    if (returntype & TYPE_MOD_MASK)
+    if (returntype.typeflags & TYPE_MOD_MASK)
     {
         exact_types = returntype;
     }
@@ -3099,13 +3325,13 @@ def_function_typecheck (fulltype_t returntype, ident_t * ident
     {
         if (pragma_strict_types != PRAGMA_WEAK_TYPES)
             yyerror("\"#pragma strict_types\" requires type of function");
-        exact_types = 0;
+        exact_types.typeflags = 0;
     }
 
-    if (returntype & TYPE_MOD_NOSAVE)
+    if (returntype.typeflags & TYPE_MOD_NOSAVE)
     {
         yyerror("can't declare a function as nosave");
-        returntype &= ~TYPE_MOD_NOSAVE;
+        returntype.typeflags &= ~TYPE_MOD_NOSAVE;
     }
 
     if (ident->type == I_TYPE_UNKNOWN)
@@ -3177,28 +3403,28 @@ def_function_prototype (int num_args
     /* We got the complete prototype: define it */
 
     if ( current_number_of_locals
-     && (full_type_of_locals[current_number_of_locals-1]
+     && (type_of_locals[current_number_of_locals-1].typeflags
          & TYPE_MOD_VARARGS)
        )
     {
         /* The last argument has to allow an array. */
-        vartype_t *t;
+        fulltype_t *t;
 
-        returntype |= TYPE_MOD_XVARARGS;
+        returntype.typeflags |= TYPE_MOD_XVARARGS;
 
         t = type_of_locals + (current_number_of_locals-1);
-        if (!(*t & TYPE_MOD_POINTER)
-         && (*t & TYPE_MOD_RMASK) != TYPE_ANY
+        if (!(t->typeflags & TYPE_MOD_POINTER)
+         && (t->typeflags & TYPE_MOD_RMASK) != TYPE_ANY
            )
         {
-            if ((*t & TYPE_MOD_RMASK) != TYPE_UNKNOWN)
+            if ((t->typeflags & TYPE_MOD_RMASK) != TYPE_UNKNOWN)
                 yyerror(
                   "varargs parameter must be declared array or mixed");
             /* Keep the visibility, but change the type to
              * '&any'
              */
-            *t &= ~TYPE_MOD_RMASK;
-            *t |= TYPE_ANY;
+            t->typeflags &= ~TYPE_MOD_RMASK;
+            t->typeflags |= TYPE_ANY;
         }
     }
 
@@ -3275,7 +3501,7 @@ def_function_complete ( p_int body_start
         flagp = (funflag_t *)(&FUNCTION(ident->u.global.function)->flags);
         if (!(*flagp & NAME_INHERITED))
         {
-            *flagp |= returntype
+            *flagp |= returntype.typeflags
                       & (*flagp & TYPE_MOD_PUBLIC
                         ? (TYPE_MOD_NO_MASK)
                         : (TYPE_MOD_NO_MASK|TYPE_MOD_PRIVATE
@@ -3313,11 +3539,17 @@ def_function_complete ( p_int body_start
      * Inline closures need the information for some more processing.
      */
 #ifdef USE_NEW_INLINES
-    if (!is_inline)
+    if (is_inline)
+    {
+        free_fulltype_data(&current_inline->returntype);
+        /* Keep block_depth and local names */
+    }
+    else
 #endif /* USE_NEW_INLINES */
     {
         free_all_local_names();
         block_depth = 0;
+        free_fulltype_data(&def_function_returntype);
     }
 
 } /* def_function_complete() */
@@ -3334,6 +3566,7 @@ define_new_struct ( Bool proto, ident_t *p, funflag_t flags)
  * declaration; if <proto> is FALSE, the struct is about to be defined.
  *
  * Result is the index (id) of the struct in the struct_defs table.
+ * If the struct would be a duplicate, -1 is returned instead of the index.
  *
  * If a prototype is encountered, the struct definition is stored
  * with an additional visibility flag of NAME_PROTOTYPE.
@@ -3349,13 +3582,13 @@ define_new_struct ( Bool proto, ident_t *p, funflag_t flags)
     struct_def_t sdef;
 
     /* If this is a redeclaration, check for consistency. */
-    if (p->type == I_TYPE_GLOBAL && (num = p->u.global.struct_id) > 0
+    if (p->type == I_TYPE_GLOBAL && (num = p->u.global.struct_id) >= 0
      && !(flags & NAME_HIDDEN)
       )
     {
         struct_def_t *pdef;
 
-        pdef = &STRUCT_DEF(num-1);
+        pdef = &STRUCT_DEF(num);
 
         /* Check if the visibility is conserved.
          */
@@ -3375,9 +3608,10 @@ define_new_struct ( Bool proto, ident_t *p, funflag_t flags)
             {
                 char buff[100];
 
-                strcpy(buff, get_visibility(pdef->flags));
-                yywarnf("Inconsistent declaration of struct %s: Visibility changed from '%s' to '%s'"
-                       , get_txt(p->name), buff, get_visibility(flags));
+                strcpy(buff, get_f_visibility(pdef->flags));
+                yywarnf("Inconsistent declaration of struct %s: "
+                        "Visibility changed from '%s' to '%s'"
+                       , get_txt(p->name), buff, get_f_visibility(flags));
             }
 #           undef TYPE_MOD_VIS
         }
@@ -3393,7 +3627,7 @@ define_new_struct ( Bool proto, ident_t *p, funflag_t flags)
         {
             yyerrorf("Duplicate definition of struct %s"
                     , get_txt(p->name));
-            return num;
+            return -1;
         }
 
         /* At this point, we have in our hands the definition of a
@@ -3408,16 +3642,12 @@ define_new_struct ( Bool proto, ident_t *p, funflag_t flags)
     /* This is a new struct! */
 
     /* Fill in the struct_def_t */
-    sdef.name        = ref_mstring(p->name);
-    sdef.unique_name = NULL;
-    sdef.base        = -1;
-    sdef.inh         = -1;
-    sdef.num_members = 0;
-    sdef.members     = 0;
-    sdef.flags       = proto ? (flags | NAME_PROTOTYPE)
-                             : (flags & ~NAME_PROTOTYPE);
+    sdef.type  = struct_new_prototype(ref_mstring(p->name));
+    sdef.flags = proto ? (flags | NAME_PROTOTYPE)
+                       : (flags & ~NAME_PROTOTYPE);
+    sdef.inh = -1;
 
-    num = STRUCT_COUNT+1;
+    num = STRUCT_COUNT;
 
     if (p->type != I_TYPE_GLOBAL)
     {
@@ -3465,76 +3695,50 @@ find_struct ( string_t * name )
     ident_t * p;
 
     p = find_shared_identifier(get_txt(name), I_TYPE_GLOBAL, 0);
-    if (p == NULL || p->u.global.struct_id <= 0)
+    if (p == NULL || p->u.global.struct_id < 0)
         return -1;
-    if (STRUCT_DEF(p->u.global.struct_id-1).flags & NAME_HIDDEN)
+    if (STRUCT_DEF(p->u.global.struct_id).flags & NAME_HIDDEN)
         return -1;
     return p->u.global.struct_id;
 } /* find_struct() */
 
 /*-------------------------------------------------------------------------*/
-static int
-find_struct_member ( struct_def_t * pdef, string_t * name )
-
-/* Find the struct member <name> for struct <pdef> and return its index.
- * Return -1 if not found.
- */
-
-{
-    int member;
-    struct_member_t * pmember;
-
-    if (pdef->num_members < 1)
-        return -1;
-
-    for (member = 0, pmember = &STRUCT_MEMBER(pdef->members)
-        ; member < pdef->num_members
-        ; member++, pmember++
-        )
-    {
-        if (mstreq(pmember->name, name))
-            return member;
-    }
-
-    return -1;
-} /* find_struct_member() */
-
-/*-------------------------------------------------------------------------*/
 static void
-add_struct_member ( string_t *name, vartype_t type, int from_struct )
+add_struct_member ( string_t *name, vartype_t type
+                  , struct_type_t * from_struct )
 
-/* Add a new member <name> with type <type> to the most recently defined
- * struct. If <from_struct> is > 0, it is the index of the struct from
+/* Add a new member <name> with type <type> to A_STRUCT_MEMBERS for the
+ * to the most recently defined struct <current_struct>.
+ * If <from_struct> is not NULL, it is the type of the struct from
  * which the member is inherited.
  * Raise an error if a member of the same name already exists.
  */
 
 {
-    struct_def_t    *pdef;
-    struct_member_t  member;
+    struct_def_t *pdef;
 
-    pdef = &STRUCT_DEF(current_struct-1);
+    pdef = &STRUCT_DEF(current_struct);
 
-    if (pdef->num_members != 0)
+    if (STRUCT_MEMBER_COUNT != 0)
     {
         /* Not the first member: check if the name already occured */
-        int i, member_idx;
+        int i;
 
-        for (i = pdef->num_members, member_idx = STRUCT_MEMBER_COUNT-1
-            ; i > 0
-            ; i--, member_idx--
-            )
+        for ( i = STRUCT_MEMBER_COUNT-1 ; i >= 0 ; i--)
         {
-            if (mstreq(name, STRUCT_MEMBER(member_idx).name))
+            if (mstreq(name, STRUCT_MEMBER(i).name))
             {
-                if (from_struct < 0)
+                if (from_struct)
                     yyerrorf("Duplicate member '%s' in struct '%s'"
-                            , get_txt(name), get_txt(pdef->name));
+                            , get_txt(name)
+                            , get_txt(struct_t_name(pdef->type))
+                            );
                 else
                     yyerrorf("Duplicate member '%s' in struct '%s' "
                              "inherited from struct '%s'"
-                            , get_txt(name), get_txt(pdef->name)
-                            , get_txt(STRUCT_DEF(from_struct-1).name));
+                            , get_txt(name)
+                            , get_txt(struct_t_name(pdef->type))
+                            , get_txt(from_struct->name));
                 return;
             }
         }
@@ -3542,41 +3746,77 @@ add_struct_member ( string_t *name, vartype_t type, int from_struct )
 
     /* Member is ok: add it */
 
-    if (pdef->num_members == 0)
+    if (STRUCT_MEMBER_COUNT == 0)
     {
         /* First member */
-        pdef->members = STRUCT_MEMBER_COUNT;
-        pdef->base = from_struct;
+        if (from_struct)
+        {
+            pdef->type->base = ref_struct_type(from_struct);
+        }
     }
 
-    if (pdef->num_members == STRUCT_MAX_MEMBERS)
+    if (STRUCT_MEMBER_COUNT == STRUCT_MAX_MEMBERS)
     {
-        yyerrorf("Too many members for struct '%s'", get_txt(pdef->name));
+        yyerrorf("Too many members for struct '%s'"
+                , get_txt(struct_t_name(pdef->type)));
     }
     else
     {
+        struct_member_t member;
+
         member.name = ref_mstring(name);
         member.type = type;
         add_to_mem_block(A_STRUCT_MEMBERS, &member, sizeof member);
-        pdef->num_members++;
     }
 } /* add_struct_member() */
 
 /*-------------------------------------------------------------------------*/
-static fulltype_t
-adjust_struct_id (fulltype_t type, int offset)
+static void
+finish_struct ( const char * unique_name )
 
-/* If type <type> is a struct, adjust its id by <offset>.
- * <type> is of type fulltype_t so as to not lose inheritance flags.
+/* The definition for struct <current_struct> has been parsed completely,
+ * now complete the struct type object with the A_STRUCT_MEMBERS data.
  */
 
 {
-    if ((type & PRIMARY_TYPE_MASK) == TYPE_STRUCT)
-        type = (type & ~SEC_TYPE_MASK)
-             | MAKE_SEC_TYPE_INFO(GET_SEC_TYPE_INFO(type)+offset)
-             ;
-    return type;
-} /* adjust_struct_id() */
+    struct_def_t *pdef;
+    struct_type_t *base;
+    string_t *name;
+
+    pdef = &STRUCT_DEF(current_struct);
+
+    /* Retrieve the .base pointer so that the error handling won't
+     * get confused about it.
+     * Also get a safety copy of the name.
+     */
+    base = pdef->type->base;
+    pdef->type->base = NULL;
+    name = ref_mstring(struct_t_name(pdef->type));
+
+    /* Fill in the prototype */
+    pdef->type = struct_fill_prototype(pdef->type
+                                      , new_tabled(unique_name)
+                                      , base
+                                      , STRUCT_MEMBER_COUNT
+                                      , &STRUCT_MEMBER(0)
+                                      );
+
+    if (pdef->type)
+    {
+        /* Free the safety copies */
+        free_mstring(name);
+    }
+    else
+    {
+        /* Recreate the prototype */
+        pdef->type = struct_new_prototype(name);
+    }
+
+    /* Clear the STRUCT_MEMBER block - the definitions have already
+     * been adopted or cleared by the struct_fill_prototype().
+     */
+    mem_block[A_STRUCT_MEMBERS].current_size = 0;
+} /* finish_struct() */
 
 /*-------------------------------------------------------------------------*/
 static Bool
@@ -3612,19 +3852,20 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
         /* Simplest case: all members assigned by position. */
 
         /* Check the types */
-        if (exact_types && length > 0)
+        if (exact_types.typeflags && length > 0)
         {
-            for (member = 0, pmember = &(STRUCT_MEMBER(pdef->members)), p = list
-                ; member < length
+            for (member = 0, pmember = pdef->type->member, p = list
+                ; member < length && member < struct_t_size(pdef->type)
                 ; member++, pmember++, p = p->next
                 )
             {
-                if (!TYPE(pmember->type, p->type) )
+                if (!vtype(pmember->type, p->type) )
                 {
                     yyerrorf("Type mismatch %s for member '%s' "
                              "in struct '%s'"
-                            , get_two_types(pmember->type, p->type)
-                            , get_txt(pmember->name), get_txt(pdef->name)
+                            , get_two_vtypes(pmember->type, p->type)
+                            , get_txt(pmember->name)
+                            , get_txt(struct_t_name(pdef->type))
                             );
                     got_error = MY_TRUE;
                 }
@@ -3636,8 +3877,7 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
 
         /* The types check out - create the bytecode */
         ins_f_code(F_S_AGGREGATE);
-        ins_short(store_prog_string(ref_mstring(pdef->unique_name)));
-        ins_byte(pdef->num_members);
+        ins_short(pdef - &STRUCT_DEF(0));
         ins_byte(length);
 
         return MY_TRUE;
@@ -3647,12 +3887,12 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
 
     consumed = 0;
 
-    block = xalloc( pdef->num_members * sizeof(*flags)
+    block = xalloc( struct_t_size(pdef->type) * sizeof(*flags)
                   + length * sizeof(*ix));
     flags = (Bool *)block;
-    ix = (int *)((char *)block + pdef->num_members * sizeof(*flags));
+    ix = (int *)((char *)block + struct_t_size(pdef->type) * sizeof(*flags));
 
-    for (i = 0; i < pdef->num_members; i++)
+    for (i = 0; i < struct_t_size(pdef->type); i++)
     {
         flags[i] = MY_FALSE;
     }
@@ -3673,7 +3913,7 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
             {
                 yyerrorf( "Can't mix named and unnamed initializers "
                           "in struct '%s'"
-                        , get_txt(pdef->name)
+                        , get_txt(struct_t_name(pdef->type))
                         );
                 got_error = MY_TRUE;
             }
@@ -3682,14 +3922,15 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
 
         consumed++;
         pmember = NULL; /* avoids a warning */
-        member = find_struct_member(pdef, p->name);
+        member = struct_find_member(pdef->type, p->name);
         if (member >= 0)
-            pmember = &STRUCT_MEMBER(pdef->members+member);
+            pmember = &pdef->type->member[member];
 
         if (member < 0)
         {
             yyerrorf( "No such member '%s' in struct '%s'"
-                    , get_txt(p->name), get_txt(pdef->name)
+                    , get_txt(p->name)
+                    , get_txt(struct_t_name(pdef->type))
                     );
             got_error = MY_TRUE;
         }
@@ -3697,17 +3938,19 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
         {
             yyerrorf( "Multiple initializations of member '%s' "
                       "in struct '%s'"
-                    , get_txt(p->name), get_txt(pdef->name)
+                    , get_txt(p->name)
+                    , get_txt(struct_t_name(pdef->type))
                     );
             got_error = MY_TRUE;
         }
-        else if (exact_types
-              && !TYPE( pmember->type , p->type) )
+        else if (exact_types.typeflags
+              && !vtype( pmember->type , p->type) )
         {
             yyerrorf("Type mismatch %s when initializing member '%s' "
                      "in struct '%s'"
-                    , get_two_types(pmember->type, p->type)
-                    , get_txt(p->name), get_txt(pdef->name)
+                    , get_two_vtypes(pmember->type, p->type)
+                    , get_txt(p->name)
+                    , get_txt(struct_t_name(pdef->type))
                     );
             got_error = MY_TRUE;
         }
@@ -3729,7 +3972,7 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
     if (consumed < length)
     {
         yyerrorf("Too many elements for struct '%s'"
-                , get_txt(pdef->name)
+                , get_txt(struct_t_name(pdef->type))
                 );
         xfree(block);
         return MY_FALSE;
@@ -3747,11 +3990,10 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
 
     /* Finally, create the code */
     ins_f_code(F_S_M_AGGREGATE);
-    ins_short(store_prog_string(ref_mstring(pdef->unique_name)));
-    ins_byte(pdef->num_members);
+    ins_short(pdef - &STRUCT_DEF(0));
     ins_byte(length);
     for (i = length-1; i >= 0; i--)
-        ins_byte(ix[i]+1);
+        ins_byte(ix[i]);
 
     /* Done */
     xfree(block);
@@ -3761,7 +4003,7 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
 #endif /* USE_STRUCTS */
 
 #ifdef USE_NEW_INLINES
-/* ========================   LOCALS and SCOPES   ======================== */
+/* =========================   Inline Closures   =-======================= */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -3793,7 +4035,10 @@ printf("DEBUG: new inline #%d: prev %d\n", INLINE_CLOSURE_COUNT, ict.prev);
     ict.li_length = 0;
     ict.function = -1;
     ict.ident = NULL;
-    ict.returntype = 0;
+    ict.returntype.typeflags = 0;
+#ifdef USE_STRUCTS
+    ict.returntype.t_struct = NULL;
+#endif
     ict.num_args = 0;
     ict.parse_context = MY_FALSE;
     ict.current_line  = current_line;
@@ -3808,30 +4053,25 @@ printf("DEBUG:   start: %ld, depth %d, locals: %d/%d, break: %d/%d\n", CURRENT_P
     ict.max_num_locals       = max_number_of_locals;
     ict.exact_types          = exact_types;
     ict.include_handle       = get_include_handle();
-    ict.local_type_start        = type_of_locals - &(LOCAL_TYPE(0));
-    ict.full_local_type_start   = full_type_of_locals - &(FULL_LOCAL_TYPE(0));
-    ict.context_type_start      = type_of_context - &(LOCAL_TYPE(0));
-    ict.full_context_type_start = full_type_of_context - &(FULL_LOCAL_TYPE(0));
-    ict.local_type_size         = mem_block[A_LOCAL_TYPES].current_size;
-    ict.full_local_type_size    = mem_block[A_FULL_LOCAL_TYPES].current_size;
+    ict.full_local_type_start   = type_of_locals - &(LOCAL_TYPE(0));
+    ict.full_context_type_start = type_of_context - &(LOCAL_TYPE(0));
+    ict.full_local_type_size    = mem_block[A_LOCAL_TYPES].current_size;
 #ifdef DEBUG_INLINES
-printf("DEBUG:   local types: %d/%d, context types: %d/%d\n", ict.local_type_start, ict.full_local_type_start, ict.context_type_start, ict.full_context_type_start);
+printf("DEBUG:   local types: %d, context types: %d\n", ict.full_local_type_start, ict.full_context_type_start);
 #endif /* DEBUG_INLINES */
 
     /* Extend the type memblocks */
     {
         mp_uint type_count = LOCAL_TYPE_COUNT;
-        mp_uint full_type_count = FULL_LOCAL_TYPE_COUNT;
 
-        extend_mem_block(A_LOCAL_TYPES, 2 * MAX_LOCAL * sizeof(vartype_t));
-        extend_mem_block(A_FULL_LOCAL_TYPES, 2 * MAX_LOCAL * sizeof(fulltype_t));
+        extend_mem_block(A_LOCAL_TYPES, 2 * MAX_LOCAL * sizeof(fulltype_t));
+        memset(&LOCAL_TYPE(type_count), 0
+              , (LOCAL_TYPE_COUNT - type_count) * sizeof(fulltype_t));
 
         type_of_context = &(LOCAL_TYPE(type_count));
         type_of_locals = &(LOCAL_TYPE(type_count+MAX_LOCAL));
-        full_type_of_context = &(FULL_LOCAL_TYPE(full_type_count));
-        full_type_of_locals = &(FULL_LOCAL_TYPE(full_type_count+MAX_LOCAL));
 #ifdef DEBUG_INLINES
-printf("DEBUG:   type ptrs: %p/%p, %p/%p\n", type_of_locals, full_type_of_locals, type_of_context, full_type_of_context );
+printf("DEBUG:   type ptrs: %p, %p\n", type_of_locals, type_of_context );
 #endif /* DEBUG_INLINES */
     }
 
@@ -3936,18 +4176,26 @@ printf("DEBUG:   move li data forward: from %ld, length %ld, to %ld\n", start+le
     exact_types              = current_inline->exact_types;
 
 #ifdef DEBUG_INLINES
-printf("DEBUG:   local types: %d/%d, context types: %d/%d\n", current_inline->local_type_start, current_inline->full_local_type_start, current_inline->context_type_start, current_inline->full_context_type_start);
+printf("DEBUG:   local types: %d, context types: %d\n", current_inline->full_local_type_start, current_inline->full_context_type_start);
 #endif /* DEBUG_INLINES */
-    type_of_locals = &(LOCAL_TYPE(current_inline->local_type_start));
-    full_type_of_locals = &(FULL_LOCAL_TYPE(current_inline->full_local_type_start));
-    type_of_context = &(LOCAL_TYPE(current_inline->context_type_start));
-    full_type_of_context = &(FULL_LOCAL_TYPE(current_inline->full_context_type_start));
+    type_of_locals = &(LOCAL_TYPE(current_inline->full_local_type_start));
+    type_of_context = &(LOCAL_TYPE(current_inline->full_context_type_start));
 #ifdef DEBUG_INLINES
-printf("DEBUG:   type ptrs: %p/%p, %p/%p\n", type_of_locals, full_type_of_locals, type_of_context, full_type_of_context );
+printf("DEBUG:   type ptrs: %p, %p\n", type_of_locals, type_of_context );
 #endif /* DEBUG_INLINES */
 
-    mem_block[A_LOCAL_TYPES].current_size = current_inline->local_type_size;
-    mem_block[A_FULL_LOCAL_TYPES].current_size = current_inline->full_local_type_size;
+    /* Drop the local types the closure used */
+    free_fulltype_data(&current_inline->returntype);
+
+    while (mem_block[A_LOCAL_TYPES].current_size
+           > current_inline->full_local_type_size)
+    {
+        mem_block[A_LOCAL_TYPES].current_size -= sizeof(fulltype_t);
+        free_fulltype_data( (fulltype_t*)
+                            (mem_block[A_LOCAL_TYPES].block
+                             + mem_block[A_LOCAL_TYPES].current_size)
+                          );
+    }
 
     /* Remove the structure from the lexical nesting stack */
     if (current_inline->prev == -1)
@@ -4398,26 +4646,48 @@ type_rtoc (svalue_t *svp)
  */
 
 {
+    fulltype_t rc;
+
+    rc.typeflags = TYPE_ANY;
+#ifdef USE_STRUCTS
+    rc.t_struct = NULL;
+#endif
+
     switch (svp->type)
     {
-    case T_NUMBER:       return !svp->u.number ? TYPE_ANY : TYPE_NUMBER;
-    case T_STRING:       return TYPE_STRING;
-    case T_POINTER:      return TYPE_MOD_POINTER | TYPE_ANY;
-    case T_FLOAT:        return TYPE_FLOAT;
-    case T_CLOSURE:      return TYPE_CLOSURE;
-    case T_SYMBOL:       return TYPE_SYMBOL;
-    case T_QUOTED_ARRAY: return TYPE_QUOTED_ARRAY;
-    case T_MAPPING:      return TYPE_MAPPING;
+    case T_NUMBER:       rc.typeflags = !svp->u.number ? TYPE_ANY : TYPE_NUMBER;                         break;
+    case T_STRING:       rc.typeflags = TYPE_STRING; break;
+    case T_POINTER:      rc.typeflags = TYPE_MOD_POINTER | TYPE_ANY; break;
+    case T_FLOAT:        rc.typeflags = TYPE_FLOAT; break;
+    case T_CLOSURE:      rc.typeflags = TYPE_CLOSURE; break;
+    case T_SYMBOL:       rc.typeflags = TYPE_SYMBOL; break;
+    case T_QUOTED_ARRAY: rc.typeflags = TYPE_QUOTED_ARRAY; break;
+    case T_MAPPING:      rc.typeflags = TYPE_MAPPING; break
 #ifdef USE_STRUCTS
-    case T_STRUCT:       return TYPE_STRUCT;
+    case T_STRUCT:       rc.typeflags = TYPE_STRUCT;
+                         rc.t_struct = svp->u.strct->type;
+                         break;
 #endif /* USE_STRUCTS */
     default:
         fatal("Bad svalue type at compile time.\n");
     }
 
-    /* NOTREACHED */
-    return TYPE_ANY;
+    return rc;
 } /* type_rtoc() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE vartype_t
+vtype_rtoc (svalue_t *svp)
+
+/* Return the proper TYPE_ value for the type given by svalue <svp>.
+ */
+
+{
+    vartype_t rc;
+
+    assign_full_to_vartype(&rc, type_rtoc(svp));
+    return rc;
+} /* vtype_rtoc() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE svalue_t *
@@ -4450,9 +4720,9 @@ copy_svalue (svalue_t *svp)
     case T_QUOTED_ARRAY:
 #ifdef USE_STRUCTS
     case T_STRUCT:
-#endif
-        svp->u.vec->ref++;
+        (void)ref_struct(svp->u.strct);
         break;
+#endif
     case T_MAPPING:
         svp->u.map->ref++;
         break;
@@ -4496,11 +4766,11 @@ list_to_vector (size_t length, svalue_t *initialized)
         svp = vec->item;
         do {
             *svp++ = list->val;
+            list = list->next;
 #ifdef USE_STRUCTS
             if (list->member != NULL) /* shouldn't happen here */
                 free_mstring(list->member);
 #endif /* USE_STRUCTS */
-            list = list->next;
             xfree(block);
         } while ( NULL != (block = list) );
     }
@@ -4520,12 +4790,11 @@ list_to_struct (struct_def_t * pdef, int length, svalue_t *initialized)
 
 {
     const_list_t *list;
-    vector_t *vec;
+    struct_t *st;
     void *block;
     const_list_svalue_t *clsv;
 
-    vec = allocate_array(pdef->num_members+1);
-    put_ref_string(vec->item, pdef->unique_name);
+    st = struct_new(pdef->type);
     if (length)
     {
         Bool * flags;    /* Flags which struct members have been set */
@@ -4540,8 +4809,8 @@ list_to_struct (struct_def_t * pdef, int length, svalue_t *initialized)
         consumed = 0;
 
         /* Initialize the flags array */
-        flags = xalloc(pdef->num_members * sizeof(*flags));
-        for (i = 0; i < pdef->num_members; i++)
+        flags = xalloc(struct_t_size(pdef->type) * sizeof(*flags));
+        for (i = 0; i < struct_t_size(pdef->type); i++)
             flags[i] = MY_FALSE;
 
         /* First loop through list: check if there is no mixed initialization.
@@ -4573,7 +4842,7 @@ list_to_struct (struct_def_t * pdef, int length, svalue_t *initialized)
         {
             yyerrorf( "Can't mix named and unnamed initializers "
                       "in struct '%s'"
-                    , get_txt(pdef->name)
+                    , get_txt(struct_t_name(pdef->type))
                     );
         }
 
@@ -4585,33 +4854,36 @@ list_to_struct (struct_def_t * pdef, int length, svalue_t *initialized)
             do {
 
                 consumed++;
-                member = find_struct_member(pdef, list->member);
+                member = struct_find_member(pdef->type, list->member);
                 if (member >= 0)
-                    pmember = &STRUCT_MEMBER(pdef->members+member);
+                    pmember = &pdef->type->member[member]);
 
                 if (member < 0)
                     yyerrorf( "No such member '%s' in struct '%s'"
-                            , get_txt(list->member), get_txt(pdef->name)
+                            , get_txt(list->member)
+                            , get_txt(struct_t_name(pdef->type))
                             );
                 else if (flags[member])
                 {
                     yyerrorf( "Multiple initializations of member '%s' "
                               "in struct '%s'"
-                            , get_txt(list->member), get_txt(pdef->name)
+                            , get_txt(list->member)
+                            , get_txt(struct_t_name(pdef->type))
                             );
                 }
-                else if (exact_types
-                      && !TYPE( pmember->type , type_rtoc(&list->val)) )
+                else if (exact_types.typeflags
+                      && !vtype( pmember->type , type_rtoc(&list->val)) )
                 {
                     yyerrorf("Type mismatch %s when initializing member '%s' "
                              "in struct '%s'"
-                            , get_two_types(pmember->type, type_rtoc(&list->val))
-                            , get_txt(list->member), get_txt(pdef->name)
+                            , get_two_vtypes(pmember->type, type_rtoc(&list->val))
+                            , get_txt(list->member)
+                            , get_txt(struct_t_name(pdef->type))
                             );
                 }
                 else
                 {
-                    vec->item[member+1] = list->val;
+                    st->member[member] = list->val;
                     flags[member] = MY_TRUE;
                 }
 
@@ -4627,26 +4899,27 @@ list_to_struct (struct_def_t * pdef, int length, svalue_t *initialized)
             member = 0;
 
             do {
-                pmember = &STRUCT_MEMBER(pdef->members+member);
+                pmember = &pdef->member[member];
                 consumed++;
-                if (exact_types
-                 && !TYPE( pmember->type , type_rtoc(&list->val)) )
+                if (exact_types.typeflags
+                 && !vtype( pmember->type , type_rtoc(&list->val)) )
                 {
                     yyerrorf("Type mismatch %s when initializing member '%s' "
                              "in struct '%s'"
-                            , get_two_types(pmember->type, type_rtoc(&list->val))
-                            , get_txt(list->member), get_txt(pdef->name)
+                            , get_two_vtypes(pmember->type, type_rtoc(&list->val))
+                            , get_txt(list->member)
+                            , get_txt(struct_t_name(pdef->type))
                             );
                 }
                 else
                 {
-                    vec->item[member+1] = list->val;
+                    st->member[member] = list->val;
                     flags[member] = MY_TRUE;
                 }
 
                 list = list->next;
                 member++;
-            } while (NULL != list && member < pdef->num_members);
+            } while (NULL != list && member < struct_t_size(pdef->type));
         } /* if got_unnamed && !got_named */
 
         xfree(flags); flags = NULL;
@@ -4666,7 +4939,7 @@ list_to_struct (struct_def_t * pdef, int length, svalue_t *initialized)
         /* Test if there were extra elements */
         if (consumed < length)
             yyerrorf("Too many initializers for struct '%s'"
-                    , get_txt(pdef->name)
+                    , get_txt(struct_t_name(pdef->type))
                     );
 
     }
@@ -4801,6 +5074,11 @@ free_const_list_svalue (svalue_t *svp)
 /*-------------------------------------------------------------------------*/
 /* The yacc stack type */
 
+/* Note: vartype_t and fulltype_t references are not counted!
+ * Throughout the compiler fulltype_ts are used even if the values
+ * are not intended to have visibility information.
+ */
+
 %union
 {
 %line
@@ -4829,15 +5107,19 @@ free_const_list_svalue (svalue_t *svp)
       /* L_IDENTIFIER, L_INLINE_FUN: The recognized identifier
        */
 
-    vartype_t type;
-      /* The datatype.
+    typeflags_t typeflags;
+      /* Just the typeflags (reference, pointer, visibility).
+       */
+
+    fulltype_t type;
+      /* The datatype, not intended to have visibility flags.
        */
 
     fulltype_t fulltype;
       /* The fulltype (datatype plus visibility) of entities.
        */
 
-    fulltype_t fulltypes[2];
+    funflag_t inh_flags[2];
       /* Inheritance: [0]: code inheritance qualifiers
        *              [1]: variable inheritance qualifiers
        */
@@ -4864,10 +5146,10 @@ free_const_list_svalue (svalue_t *svp)
 
     struct s_lrvalue
     {
-        vartype_t type;   /* Type of the expression */
-        uint32    start;  /* Startaddress of the instruction */
-        short     code;   /* Alternative instruction */
-        uint32    end;    /* Endaddress+1 of the instruction */
+        fulltype_t type;   /* Type of the expression */
+        uint32     start;  /* Startaddress of the instruction */
+        short      code;   /* Alternative instruction */
+        uint32     end;    /* Endaddress+1 of the instruction */
     }
     lrvalue;
       /* Used for expressions which may return a rvalue or lvalues.
@@ -4882,11 +5164,11 @@ free_const_list_svalue (svalue_t *svp)
 
     struct s_index
     {
-        int       inst;   /* Type of the index */
-        uint32    start;  /* Startaddress of the index */
-        uint32    end;    /* Endaddress+1 of the index */
-        vartype_t type1;  /* Type of index, resp. lower bound */
-        vartype_t type2;  /* Type of other index, resp. upper bound */
+        int        inst;   /* Type of the index */
+        uint32     start;  /* Startaddress of the index */
+        uint32     end;    /* Endaddress+1 of the index */
+        fulltype_t type1;  /* Type of index, resp. lower bound */
+        fulltype_t type2;  /* Type of other index, resp. upper bound */
     }
     index;
       /* This is used to parse and return the indexing operation
@@ -4919,7 +5201,7 @@ free_const_list_svalue (svalue_t *svp)
             bytecode_t simple[2];
         } u;
         unsigned short length;
-        vartype_t type;
+        fulltype_t type;
     } lvalue;
       /* Used in assigns to communicate how an lvalue has to be accessed
        * (by passing on the bytecode to create) and what type it is.
@@ -5016,11 +5298,12 @@ free_const_list_svalue (svalue_t *svp)
 %type <symbol>       L_SYMBOL
 %type <number>       L_QUOTED_AGGREGATE
 %type <ident>        L_IDENTIFIER L_INLINE_FUN L_LOCAL
-%type <fulltype>     optional_star type type_modifier_list type_modifier
+%type <typeflags>    optional_star type_modifier type_modifier_list
+%type <fulltype>     type
 %type <fulltype>     opt_basic_type basic_type
 %type <fulltype>     non_void_type opt_basic_non_void_type basic_non_void_type
-%type <fulltypes>    inheritance_qualifier inheritance_qualifiers
-%type <fulltype>     inheritance_modifier_list inheritance_modifier
+%type <inh_flags>    inheritance_qualifier inheritance_qualifiers
+%type <typeflags>    inheritance_modifier_list inheritance_modifier
 %ifdef USE_NEW_INLINES
 %type <fulltype>     inline_opt_type
 %endif /* USE_NEW_INLINES */
@@ -5048,6 +5331,7 @@ free_const_list_svalue (svalue_t *svp)
 %ifdef USE_STRUCTS
 %type <struct_init_member> struct_init
 %type <struct_init_list>   opt_struct_init opt_struct_init2
+%type <sh_string>    struct_member_name
 %endif /* USE_STRUCTS */
 %type <function_name> function_name
 
@@ -5157,10 +5441,11 @@ note_start: { $$.start = CURRENT_PROGRAM_SIZE; };
 def:  type optional_star L_IDENTIFIER  /* Function definition or prototype */
 
       {
+          $1.typeflags |= $2;
 #ifdef USE_NEW_INLINES
-          def_function_typecheck($1|$2, $3, MY_FALSE);
+          def_function_typecheck($1, $3, MY_FALSE);
 #else /* USE_NEW_INLINES */
-          def_function_typecheck($1|$2, $3);
+          def_function_typecheck($1, $3);
 #endif /* USE_NEW_INLINES */
       }
 
@@ -5193,7 +5478,7 @@ def:  type optional_star L_IDENTIFIER  /* Function definition or prototype */
 
     | type name_list ';' /* Variable definition */
       {
-          if ($1 == 0)
+          if ($1.typeflags == 0)
               yyerror("Missing type");
 #ifndef USE_NEW_INLINES
           if (first_inline_fun)
@@ -5283,7 +5568,7 @@ printf("DEBUG: After inline block: program size %ld\n", CURRENT_PROGRAM_SIZE);
 #endif /* DEBUG_INLINES */
          $$.start = current_inline->end;
          $$.code = -1;
-         $$.type = TYPE_CLOSURE;
+         $$.type = Type_Closure;
 
          complete_inline_closure();
       }
@@ -5297,7 +5582,7 @@ printf("DEBUG: After inline block: program size %ld\n", CURRENT_PROGRAM_SIZE);
 #ifdef DEBUG_INLINES
 printf("DEBUG: After L_BEGIN_INLINE: program size %ld\n", CURRENT_PROGRAM_SIZE);
 #endif /* DEBUG_INLINES */
-          if (!prepare_inline_closure(TYPE_ANY))
+          if (!prepare_inline_closure(Type_Any))
               YYACCEPT;
 
           /* Synthesize $1..$9 as arguments */
@@ -5308,7 +5593,7 @@ printf("DEBUG: After L_BEGIN_INLINE: program size %ld\n", CURRENT_PROGRAM_SIZE);
 
               sprintf(name, "$%d", i);
               ident = make_shared_identifier(name, I_TYPE_UNKNOWN, 0);
-              add_local_name(ident, TYPE_ANY, block_depth);
+              add_local_name(ident, Type_Any, block_depth);
           }
 
           if (!inline_closure_prototype(9))
@@ -5328,7 +5613,7 @@ printf("DEBUG: After L_END_INLINE: program size %ld\n", CURRENT_PROGRAM_SIZE);
 #endif /* DEBUG_INLINES */
          $$.start = current_inline->end;
          $$.code = -1;
-         $$.type = TYPE_CLOSURE;
+         $$.type = Type_Closure;
 
          complete_inline_closure();
       }
@@ -5348,7 +5633,7 @@ inline_opt_args:
 
               sprintf(name, "$%d", i);
               ident = make_shared_identifier(name, I_TYPE_UNKNOWN, 0);
-              add_local_name(ident, TYPE_ANY, block_depth);
+              add_local_name(ident, Type_Any, block_depth);
           }
 
           $$ = 9;
@@ -5362,14 +5647,14 @@ inline_opt_type:
 #ifdef DEBUG_INLINES
           printf("DEBUG: inline_opt_type default: ANY\n");
 #endif /* DEBUG_INLINES */
-          $$ = TYPE_ANY;
+          $$ = Type_Any;
       }
     | basic_type optional_star
       {
 #ifdef DEBUG_INLINES
-          printf("DEBUG: inline_opt_type: %s\n", get_type_name($1|$2));
+          printf("DEBUG: inline_opt_type: %c%s\n", $2 ? '*' : ' ', get_type_name($1));
 #endif /* DEBUG_INLINES */
-          $$ = $1 | $2;
+          set_fulltype($$, $1.typeflags | $2, $1.t_struct);
       }
 ; /* inline_opt_type */
 
@@ -5415,32 +5700,33 @@ inline_comma_expr:
 struct_decl:
       type_modifier_list L_STRUCT L_IDENTIFIER ';'
       {
-          int num;
-          char name[256+MAXPATHLEN];
-
-          num = define_new_struct(MY_TRUE, $3, $1);
-          if (num >= MAX_SEC_TYPE_INFO)
-              yyerror("Too many structs declared");
-
-          sprintf(name, "%s (/%s #%ld)", get_txt($3->name)
-                      , current_file, current_id_number+1);
-          STRUCT_DEF(current_struct-1).unique_name = new_tabled(name);
+          (void)define_new_struct(MY_TRUE, $3, $1);
       }
     | type_modifier_list L_STRUCT L_IDENTIFIER
-      {
-          char name[256+MAXPATHLEN];
+      { 
+          int i;
+
+          /* Free any struct members left over from a previous
+           * struct parse. This should happen only in case
+           * of errors.
+           */
+          for (i = 0; i < STRUCT_MEMBER_COUNT; i++)
+          {
+              free_struct_member_data(&STRUCT_MEMBER(i));
+          }
+          mem_block[A_STRUCT_MEMBERS].current_size = 0;
 
           current_struct = define_new_struct(MY_FALSE, $3, $1);
-          if (current_struct >= MAX_SEC_TYPE_INFO)
-              yyerror("Too many structs declared");
+          if (current_struct < 0)
+              YYACCEPT;
+      }
+      opt_base_struct '{' opt_member_list '}' ';'
+      { 
+          char name[256+MAXPATHLEN];
 
           sprintf(name, "%s (/%s #%ld)", get_txt($3->name)
                       , current_file, current_id_number+1);
-          STRUCT_DEF(current_struct-1).unique_name = new_tabled(name);
-      }
-      opt_base_struct '{' opt_member_list '}' ';'
-      {
-          /* All the work is done by the nonterminals above. */
+          finish_struct(name);
       }
 ; /* struct_decl */
 
@@ -5466,32 +5752,32 @@ opt_base_struct:
               while (p != NULL && p->type != I_TYPE_GLOBAL)
                   p = p->inferior;
 
-              if (p == NULL || (num = p->u.global.struct_id) <= 0)
+              if (p == NULL || (num = p->u.global.struct_id) < 0)
               {
                   yyerrorf("Unknown base struct '%s'", get_txt($2->name));
               }
-              else if (STRUCT_DEF(num-1).flags & NAME_PROTOTYPE)
+              else if (STRUCT_DEF(num).flags & NAME_PROTOTYPE)
               {
                   yyerrorf("Undefined base struct '%s'", get_txt($2->name));
               }
               else
               {
-                  struct_def_t *pdef;
+                  struct_type_t *ptype;
 
-                  pdef = &STRUCT_DEF(num-1);
-                  if (pdef->num_members > 0)
+                  ptype = STRUCT_DEF(num).type;
+                  if (struct_t_size(ptype) > 0)
                   {
                       int count;
                       struct_member_t *member;
 
-                      member = &STRUCT_MEMBER(pdef->members);
-                      count = pdef->num_members;
+                      member = ptype->member;
+                      count = struct_t_size(ptype);
 
                       for ( ; count > 0; count--, member++ )
-                          add_struct_member(member->name, member->type, num);
+                          add_struct_member(member->name, member->type, ptype);
                   }
               }
-          }
+          } /* if type == UNKNOWN */
       }
 ; /* opt_base_struct */
 
@@ -5522,7 +5808,10 @@ member_name_list:
 member_name:
       optional_star L_IDENTIFIER
       {
-          add_struct_member($2->name, current_type | $1, -1);
+          vartype_t type;
+          current_type.typeflags |= $1;
+          assign_full_to_vartype(&type, current_type);
+          add_struct_member($2->name, type, NULL);
           if ($2->type == I_TYPE_UNKNOWN)
               free_shared_identifier($2);
       }
@@ -5691,9 +5980,6 @@ inheritance:
           else
               inherit.inherit_type = INHERIT_TYPE_NORMAL;
           inherit.function_index_offset = FUNCTION_COUNT;
-#ifdef USE_STRUCTS
-          inherit.struct_index_offset = STRUCT_COUNT;
-#endif /* USE_STRUCTS */
           inherit.inherit_depth = 1;
 
           /* If it's a virtual inherit, check if it has been
@@ -5755,16 +6041,11 @@ inheritance:
                */
 
 #ifdef USE_STRUCTS
-              copy_structs(ob->prog, $1[0], inherit.struct_index_offset);
+              copy_structs(ob->prog, $1[0]);
 #endif
 %ifdef INITIALIZATION_BY___INIT
-#ifdef USE_STRUCTS
-              initializer = copy_functions(ob->prog, $1[0], inherit.struct_index_offset);
-              copy_variables(ob->prog, $1[1], inherit.struct_index_offset);
-#else
               initializer = copy_functions(ob->prog, $1[0]);
               copy_variables(ob->prog, $1[1]);
-#endif
 
               if (initializer > -1)
               {
@@ -5780,28 +6061,12 @@ inheritance:
                   add_new_init_jump();
               }
 %else  /* INITIALIZATION_BY___INIT */
-#ifdef USE_STRUCTS
-              copy_functions(ob->prog, $1[0], inherit.struct_index_offset);
-              copy_variables(ob->prog, $1[1], ob->variables, inherit.struct_index_offset);
-#else
               copy_functions(ob->prog, $1[0]);
               copy_variables(ob->prog, $1[1], ob->variables);
-#endif
 %endif /* INITIALIZATION_BY___INIT */
 
               /* Fix up the inherit indices */
               fix_function_inherit_indices(ob->prog);
-
-#ifdef USE_STRUCTS
-              /* Fix up the .inherit indices of the inherited structs */
-              {
-                  int left = STRUCT_COUNT - inherit.struct_index_offset;
-                  struct_def_t *pdef = &STRUCT_DEF(inherit.struct_index_offset);
-
-                  for (; left > 0; left--, pdef++)
-                      pdef->inh = INHERIT_COUNT;
-              }
-#endif /* USE_STRUCTS */
 
               /* Update and store the inherit structure.
                *
@@ -5860,6 +6125,7 @@ inheritance_modifier:
 
 inheritance_modifier_list:
       type_modifier_list
+      { $$ = $1; }
     | inheritance_modifier_list inheritance_modifier type_modifier_list
       { $$ = $1 | $2 | $3; }
 ; /* inheritance_modifier_list */
@@ -5869,19 +6135,19 @@ inheritance_qualifier:
       type optional_star L_IDENTIFIER
       {
           static ident_t    *last_identifier;
-          static fulltype_t  last_modifier;
+          static typeflags_t last_modifier;
 %line
 
           /* The inherit statement must only specify visibility
            * e.g. not "inherit int * foobar"
            */
-          if ($1 & TYPE_MOD_MASK)
+          if ($1.typeflags & TYPE_MOD_MASK)
           {
               yyerror("syntax error");
           }
 
           /* Check if there were any modifiers at all */
-          if ( !($1 & ~TYPE_MOD_MASK) )
+          if ( !($1.typeflags & ~TYPE_MOD_MASK) )
           {
               /* take lookahead into account */
               if ($3 == last_identifier)
@@ -5893,7 +6159,7 @@ inheritance_qualifier:
           }
           else
           {
-              last_modifier = $1 & ~TYPE_MOD_MASK;
+              last_modifier = $1.typeflags & ~TYPE_MOD_MASK;
           }
 
           last_identifier = $3;
@@ -5976,14 +6242,14 @@ optional_star:
 
 type: type_modifier_list opt_basic_type
       {
-          $$ = $1 | $2;
+          set_fulltype($$, $1 | $2.typeflags, $2.t_struct);
           current_type = $$;
       } ;
 
 
 non_void_type: type_modifier_list opt_basic_non_void_type
       {
-          $$ = $1 | $2;
+          set_fulltype($$, $1 | $2.typeflags, $2.t_struct);
           current_type = $$;
       } ;
 
@@ -6006,24 +6272,24 @@ type_modifier:
 
 opt_basic_type:
       basic_type
-    | /* empty */ { $$ = TYPE_UNKNOWN; } ;
+    | /* empty */ { $$ = Type_Unknown; } ;
 
 
 opt_basic_non_void_type:
       basic_non_void_type
-    | /* empty */ { $$ = TYPE_UNKNOWN; } ;
+    | /* empty */ { $$ = Type_Unknown; } ;
 
 
 basic_non_void_type:
-      L_STATUS       { $$ = TYPE_NUMBER;  current_type = $$; }
-    | L_INT          { $$ = TYPE_NUMBER;  current_type = $$; }
-    | L_STRING_DECL  { $$ = TYPE_STRING;  current_type = $$; }
-    | L_OBJECT       { $$ = TYPE_OBJECT;  current_type = $$; }
-    | L_CLOSURE_DECL { $$ = TYPE_CLOSURE; current_type = $$; }
-    | L_SYMBOL_DECL  { $$ = TYPE_SYMBOL;  current_type = $$; }
-    | L_FLOAT_DECL   { $$ = TYPE_FLOAT;   current_type = $$; }
-    | L_MAPPING      { $$ = TYPE_MAPPING; current_type = $$; }
-    | L_MIXED        { $$ = TYPE_ANY;     current_type = $$; }
+      L_STATUS       { $$ = Type_Number; current_type = $$; }
+    | L_INT          { $$ = Type_Number;  current_type = $$; }
+    | L_STRING_DECL  { $$ = Type_String;  current_type = $$; }
+    | L_OBJECT       { $$ = Type_Object;  current_type = $$; }
+    | L_CLOSURE_DECL { $$ = Type_Closure; current_type = $$; }
+    | L_SYMBOL_DECL  { $$ = Type_Symbol;  current_type = $$; }
+    | L_FLOAT_DECL   { $$ = Type_Float;   current_type = $$; }
+    | L_MAPPING      { $$ = Type_Mapping; current_type = $$; }
+    | L_MIXED        { $$ = Type_Any;     current_type = $$; }
 %ifdef USE_STRUCTS
     | L_STRUCT identifier
       {
@@ -6033,10 +6299,13 @@ basic_non_void_type:
           if (num < 0)
           {
               yyerrorf("Unknown struct '%s'", get_txt($2));
-              $$ = TYPE_UNKNOWN;
+              $$ = Type_Unknown;
           }
           else
-              $$ = TYPE_STRUCT | MAKE_SEC_TYPE_INFO(num);
+          {
+              $$.typeflags = TYPE_STRUCT;
+              $$.t_struct = STRUCT_DEF(num).type;
+          }
 
           free_mstring($2);
           current_type = $$;
@@ -6047,14 +6316,14 @@ basic_non_void_type:
 
 basic_type:
       basic_non_void_type
-    | L_VOID         { $$ = TYPE_VOID;    current_type = $$; }
+    | L_VOID         { $$ = Type_Void;    current_type = $$; }
 ; /* basic_type */
 
 
 cast:
       '(' basic_type optional_star ')'
       {
-          $$ = $2 | $3;
+          set_fulltype($$, $2.typeflags | $3, $2.t_struct);
       }
 ;
 
@@ -6062,7 +6331,7 @@ cast:
 decl_cast:
       '(' '{' basic_type optional_star '}' ')'
       {
-          $$ = $3 | $4;
+          set_fulltype($$, $3.typeflags | $4, $3.t_struct);
       }
 ;
 
@@ -6107,22 +6376,25 @@ argument_list:
 new_arg_name:
       non_void_type optional_star L_IDENTIFIER
       {
-          if (exact_types && $1 == 0)
+          if (exact_types.typeflags && $1.typeflags == 0)
           {
               yyerror("Missing type for argument");
 #ifdef USE_NEW_INLINES
-              add_local_name($3, TYPE_ANY, block_depth);
+              add_local_name($3, Type_Any, block_depth);
 #else /* USE_NEW_INLINES */
-              add_local_name($3, TYPE_ANY, block_depth, MY_FALSE);
+              add_local_name($3, Type_Any, block_depth, MY_FALSE);
 #endif /* USE_NEW_INLINES */
                 /* Supress more errors */
           }
           else
           {
+              fulltype_t argtype;
+
+              set_fulltype(argtype, $1.typeflags | $2, $1.t_struct);
 #ifdef USE_NEW_INLINES
-              add_local_name($3, $1 | $2, block_depth);
+              add_local_name($3, argtype, block_depth);
 #else /* USE_NEW_INLINES */
-              add_local_name($3, $1 | $2, block_depth, MY_FALSE);
+              add_local_name($3, argtype, block_depth, MY_FALSE);
 #endif /* USE_NEW_INLINES */
           }
       }
@@ -6148,7 +6420,10 @@ new_arg_name:
               /* However, it is legal for the argument list of an inline
                * closure.
                */
-              redeclare_local($3, $1 | $2, block_depth);
+              fulltype_t argtype;
+
+              set_fulltype(argtype, $1.typeflags | $2, $1.t_struct);
+              redeclare_local($3, argtype, block_depth);
           }
 %endif
       }
@@ -6167,21 +6442,24 @@ new_name:
 %line
           fulltype_t actual_type = current_type;
 
-          if (!(actual_type & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
+          if (!(actual_type.typeflags & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
                               | TYPE_MOD_PROTECTED)))
           {
-              actual_type |= default_varmod;
+              actual_type.typeflags |= default_varmod;
           }
 
-          if (actual_type & TYPE_MOD_VARARGS)
+          if (actual_type.typeflags & TYPE_MOD_VARARGS)
           {
               yyerror("can't declare a variable as varargs");
-              actual_type &= ~TYPE_MOD_VARARGS;
+              actual_type.typeflags &= ~TYPE_MOD_VARARGS;
           }
+
+          actual_type.typeflags |= $1;
+
 %ifdef INITIALIZATION_BY___INIT
-            define_variable($2, actual_type | $1);
+          define_variable($2, actual_type);
 %else /* then !INITIALIZATION_BY___INIT */
-            define_variable($2, actual_type | $1, &const0);
+          define_variable($2, actual_type, &const0);
 %endif
       }
 
@@ -6193,13 +6471,15 @@ new_name:
       {
           fulltype_t actual_type = current_type;
 
-          if (!(actual_type & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
+          if (!(actual_type.typeflags & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
                               | TYPE_MOD_PROTECTED)))
           {
-              actual_type |= default_varmod;
+              actual_type.typeflags |= default_varmod;
           }
 
-          define_variable($2, actual_type | $1);
+          actual_type.typeflags |= $1;
+
+          define_variable($2, actual_type);
           $<number>$ = verify_declared($2); /* Is the var declared? */
           transfer_init_control();          /* Prepare INIT code */
       }
@@ -6207,16 +6487,18 @@ new_name:
       L_ASSIGN expr0
 
       {
+          fulltype_t actual_type = current_type;
+          fulltype_t exprtype = $5.type;
           int i = $<number>3;
           PREPARE_INSERT(4)
 
-          fulltype_t actual_type = current_type;
-
-          if (!(actual_type & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
+          if (!(actual_type.typeflags & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
                               | TYPE_MOD_PROTECTED)))
           {
-              actual_type |= default_varmod;
+              actual_type.typeflags |= default_varmod;
           }
+
+          actual_type.typeflags |= $1;
 
 #ifdef DEBUG
           if (i & VIRTUAL_VAR_TAG)
@@ -6250,10 +6532,11 @@ new_name:
               yyerror("Illegal initialization");
 
           /* Do the types match? */
-          if (!compatible_types((actual_type | $1) & TYPE_MOD_MASK, $5.type, MY_TRUE))
+          actual_type.typeflags &= TYPE_MOD_MASK;
+          if (!compatible_types(actual_type, exprtype, MY_TRUE))
           {
               yyerrorf("Type mismatch %s when initializing %s"
-                      , get_two_types(actual_type | $1, $5.type)
+                      , get_two_types(actual_type, exprtype)
                       , get_txt($2->name));
           }
 
@@ -6275,13 +6558,15 @@ new_name:
           int n;
           fulltype_t actual_type = current_type;
 
-          if (!(actual_type & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
+          if (!(actual_type.typeflags & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
                               | TYPE_MOD_PROTECTED)))
           {
-              actual_type |= default_varmod;
+              actual_type.typeflags |= default_varmod;
           }
 
-          define_variable($2, actual_type | $1 | NAME_INITIALIZED, &const0);
+          actual_type.typeflags |= $1 | NAME_INITIALIZED;
+
+          define_variable($2, actual_type, &const0);
           n = $2->u.global.variable;
           $<initialized>$ = currently_initialized
             = n & VIRTUAL_VAR_TAG ? V_VAR_VALUE(n) : NV_VAR_VALUE(n);
@@ -6301,17 +6586,19 @@ new_name:
 
           fulltype_t actual_type = current_type;
 
-          if (!(actual_type & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
+          if (!(actual_type.typeflags & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
                               | TYPE_MOD_PROTECTED)))
           {
-              actual_type |= default_varmod;
+              actual_type.typeflags |= default_varmod;
           }
+
+          actual_type.typeflags |= $1;
 
           if ($4 != F_ASSIGN)
               yyerror("Illegal initialization");
 
           if (exact_types)
-              if (!TYPE( actual_type | $1 , type_rtoc($<initialized>3)) )
+              if (!TYPE( actual_type, type_rtoc($<initialized>3)) )
               {
                   yyerror("Bad initializer type");
               }
@@ -6393,7 +6680,7 @@ printf("DEBUG: inline context decl: name, program_size %d\n", CURRENT_PROGRAM_SI
       {
           /* We got a "<name> = <expr>" type declaration. */
 
-          vartype_t type2;
+          fulltype_t type2 = $3.type;
 
 %line
 #ifdef USE_NEW_INLINES
@@ -6401,11 +6688,12 @@ printf("DEBUG: inline context decl: name, program_size %d\n", CURRENT_PROGRAM_SI
 if (current_inline && current_inline->parse_context) printf("DEBUG: inline context decl: name = expr, program_size %d\n", CURRENT_PROGRAM_SIZE);
 #endif /* DEBUG_INLINES */
 #endif /* USE_NEW_INLINES */
+          type2.typeflags &= TYPEID_MASK;
+
           /* Check the assignment for validity */
-          type2 = $3.type;
-          if (exact_types && !compatible_types($1.type, type2, MY_TRUE))
+          if (exact_types.typeflags && !compatible_types($1.type, type2, MY_TRUE))
           {
-              yyerrorf("Bad assignment %s", get_two_types($1.type, $3.type));
+              yyerrorf("Bad assignment %s", get_two_types($1.type, type2));
           }
 
           if ($2 != F_ASSIGN)
@@ -6413,7 +6701,7 @@ if (current_inline && current_inline->parse_context) printf("DEBUG: inline conte
               yyerror("Only plain assignments allowed here");
           }
 
-          if (type2 & TYPE_MOD_REFERENCE)
+          if (type2.typeflags & TYPE_MOD_REFERENCE)
               yyerror("Can't trace reference assignments");
 
           /* If we're parsing a context variable, just leave the
@@ -6463,6 +6751,9 @@ new_local_name:
 
           block_scope_t *scope = block_scope + block_depth - 1;
           ident_t *q;
+          fulltype_t actual_type = current_type;
+
+          actual_type.typeflags |= $1;
 
 #ifdef USE_NEW_INLINES
           if (current_inline && current_inline->parse_context)
@@ -6470,13 +6761,13 @@ new_local_name:
 #ifdef DEBUG_INLINES
 printf("DEBUG:   context name '%s'\n", get_txt($2->name));
 #endif /* DEBUG_INLINES */
-              q = add_context_name($2, current_type | $1, -1);
+              q = add_context_name($2, actual_type, -1);
               $$.u.simple[0] = F_PUSH_CONTEXT_LVALUE;
               $$.u.simple[1] = q->u.local.context;
           }
           else
           {
-              q = add_local_name($2, current_type | $1, block_depth);
+              q = add_local_name($2, actual_type, block_depth);
               if (use_local_scopes && scope->num_locals == 1)
               {
                   /* First definition of a local, so insert the
@@ -6492,7 +6783,7 @@ printf("DEBUG:   context name '%s'\n", get_txt($2->name));
               $$.u.simple[1] = q->u.local.num;
           }
 #else /* USE_NEW_INLINES */
-          q = add_local_name($2, current_type | $1, block_depth, MY_FALSE);
+          q = add_local_name($2, actual_type, block_depth, MY_FALSE);
 
           if (use_local_scopes && scope->num_locals == 1)
           {
@@ -6509,7 +6800,7 @@ printf("DEBUG:   context name '%s'\n", get_txt($2->name));
           $$.u.simple[1] = q->u.local.num;
 #endif /* USE_NEW_INLINES */
           $$.length = 0;
-          $$.type = current_type | $1;
+          $$.type = actual_type;
       }
 
     | optional_star L_LOCAL
@@ -6520,6 +6811,9 @@ printf("DEBUG:   context name '%s'\n", get_txt($2->name));
 
           ident_t *q;
           block_scope_t *scope = block_scope + block_depth - 1;
+          fulltype_t actual_type = current_type;
+
+          actual_type.typeflags |= $1;
 
 #ifdef USE_NEW_INLINES
           if (current_inline && current_inline->parse_context)
@@ -6531,13 +6825,13 @@ printf("DEBUG:   context name '%s'\n", get_txt($2->name));
                  yyerrorf("Illegal to redeclare local name '%s'"
                          , get_txt($2->name));
 
-              q = add_context_name($2, current_type | $1, -1);
+              q = add_context_name($2, actual_type, -1);
               $$.u.simple[0] = F_PUSH_CONTEXT_LVALUE;
               $$.u.simple[1] = q->u.local.context;
           }
           else
           {
-              q = redeclare_local($2, current_type | $1, block_depth);
+              q = redeclare_local($2, actual_type, block_depth);
               if (use_local_scopes && scope->num_locals == 1)
               {
                   /* First definition of a local, so insert the
@@ -6553,7 +6847,7 @@ printf("DEBUG:   context name '%s'\n", get_txt($2->name));
               $$.u.simple[1] = q->u.local.num;
           }
 #else /* USE_NEW_INLINES */
-          q = redeclare_local($2, current_type | $1, block_depth);
+          q = redeclare_local($2, actual_type, block_depth);
 
           if (use_local_scopes && scope->num_locals == 1)
           {
@@ -6570,7 +6864,7 @@ printf("DEBUG:   context name '%s'\n", get_txt($2->name));
           $$.u.simple[1] = q->u.local.num;
 #endif /* USE_NEW_INLINES */
           $$.length = 0;
-          $$.type = current_type | $1;
+          $$.type = actual_type;
       }
 ; /* new_local_name */
 
@@ -6669,8 +6963,12 @@ statement:
 return:
       L_RETURN
       {
-          if (exact_types
-           && !BASIC_TYPE(exact_types & TYPE_MOD_MASK, TYPE_VOID))
+          fulltype_t rtype = exact_types;
+
+          rtype.typeflags &= TYPE_MOD_MASK;
+
+          if (exact_types.typeflags
+           && !BASIC_TYPE(rtype, Type_Void))
               type_error("Must return a value for a function declared",
                          exact_types);
           ins_f_code(F_RETURN0);
@@ -6679,23 +6977,27 @@ return:
     | L_RETURN comma_expr
       {
 %line
-          if (exact_types)
+          fulltype_t type2 = $2.type;
+
+          if (exact_types.typeflags)
           {
-              fulltype_t rtype = exact_types & TYPE_MOD_MASK;
+              fulltype_t rtype = exact_types;
+
+              rtype.typeflags &= TYPE_MOD_MASK;
 
               /* More checks, ie. mixed vs non-mixed, would be nice,
                * but the general type tracking is too lacking for it.
                */
-              if (!MASKED_TYPE($2.type, rtype))
+              if (!MASKED_TYPE(type2, rtype))
               {
                   char tmp[100];
-                  strcpy(tmp, get_type_name($2.type));
+                  strcpy(tmp, get_type_name(type2));
                   yyerrorf("Return type not matching: got %s, expected %s"
                          , tmp, get_type_name(rtype));
               }
           }
 
-          if ($2.type & TYPE_MOD_REFERENCE)
+          if (type2.typeflags & TYPE_MOD_REFERENCE)
           {
               yyerror("May not return a reference");
           }
@@ -7228,13 +7530,14 @@ expr_decl:
           /* We got a "int <name> = <expr>" type expression. */
 
           p_int length;
-          vartype_t type2;
+          fulltype_t type2;
 %line
           /* Check the assignment for validity */
           type2 = $3.type;
-          if (exact_types && !compatible_types($1.type, type2, MY_TRUE))
+          if (exact_types.typeflags
+           && !compatible_types($1.type, type2, MY_TRUE))
           {
-              yyerrorf("Bad assignment %s", get_two_types($1.type, $3.type));
+              yyerrorf("Bad assignment %s", get_two_types($1.type, type2));
           }
 
           if ($2 != F_ASSIGN)
@@ -7242,7 +7545,7 @@ expr_decl:
               yyerror("Only plain assignments allowed here");
           }
 
-          if (type2 & TYPE_MOD_REFERENCE)
+          if (type2.typeflags & TYPE_MOD_REFERENCE)
               yyerror("Can't trace reference assignments");
 
           /* Add the bytecode to create the lvalue and do the
@@ -7582,19 +7885,19 @@ foreach_in:
 foreach_expr:
       expr0
       {
-          vartype_t dtype;
-          Bool      gen_refs;
+          fulltype_t dtype;
+          Bool       gen_refs;
 
 %line
-          gen_refs = ($1.type & (~TYPE_MOD_RMASK)) != 0;
-          dtype = $1.type & TYPE_MOD_RMASK;
+          gen_refs = ($1.type.typeflags & (~TYPE_MOD_RMASK)) != 0;
+          set_fulltype(dtype, $1.type.typeflags & TYPE_MOD_RMASK, $1.type.t_struct);
 
-          if (!(dtype & TYPE_MOD_POINTER)
-           && dtype != TYPE_ANY
-           && dtype != TYPE_STRING
-           && dtype != TYPE_MAPPING
-           && (dtype != TYPE_NUMBER || gen_refs)
-           && (exact_types || dtype != TYPE_UNKNOWN)
+          if (!(dtype.typeflags & TYPE_MOD_POINTER)
+           && dtype.typeflags != TYPE_ANY
+           && dtype.typeflags != TYPE_STRING
+           && dtype.typeflags != TYPE_MAPPING
+           && (dtype.typeflags != TYPE_NUMBER || gen_refs)
+           && (exact_types.typeflags || dtype.typeflags != TYPE_UNKNOWN)
              )
           {
               type_error("Expression for foreach() of wrong type", $1.type);
@@ -7605,34 +7908,34 @@ foreach_expr:
 
     | expr0 L_RANGE expr0
       {
-          vartype_t dtype;
+          fulltype_t dtype;
 
 %line
-          if (($1.type & (~TYPE_MOD_RMASK)) != 0)
+          if (($1.type.typeflags & (~TYPE_MOD_RMASK)) != 0)
           {
               type_error("Expression for foreach() of wrong type", $1.type);
           }
 
-          dtype = $1.type & TYPE_MOD_RMASK;
+          set_fulltype(dtype, $1.type.typeflags & TYPE_MOD_RMASK, $1.type.t_struct);
 
-          if (dtype != TYPE_ANY
-           && dtype != TYPE_NUMBER
-           && (exact_types || dtype != TYPE_UNKNOWN)
+          if (dtype.typeflags != TYPE_ANY
+           && dtype.typeflags != TYPE_NUMBER
+           && (exact_types.typeflags || dtype.typeflags != TYPE_UNKNOWN)
              )
           {
               type_error("Expression for foreach() of wrong type", $1.type);
           }
 
-          if (($3.type & (~TYPE_MOD_RMASK)) != 0)
+          if (($3.type.typeflags & (~TYPE_MOD_RMASK)) != 0)
           {
               type_error("Expression for foreach() of wrong type", $3.type);
           }
 
-          dtype = $3.type & TYPE_MOD_RMASK;
+          set_fulltype(dtype, $3.type.typeflags & TYPE_MOD_RMASK, $3.type.t_struct);
 
-          if (dtype != TYPE_ANY
-           && dtype != TYPE_NUMBER
-           && (exact_types || dtype != TYPE_UNKNOWN)
+          if (dtype.typeflags != TYPE_ANY
+           && dtype.typeflags != TYPE_NUMBER
+           && (exact_types.typeflags || dtype.typeflags != TYPE_UNKNOWN)
              )
           {
               type_error("Expression for foreach() of wrong type", $3.type);
@@ -8108,7 +8411,7 @@ expr0:
       lvalue L_ASSIGN expr0 %prec L_ASSIGN
       {
           p_int length;
-          vartype_t type1, type2, restype;
+          fulltype_t type1, type2, restype;
 %line
           $$ = $3;
 
@@ -8117,7 +8420,7 @@ expr0:
           restype = type2; /* Assume normal assignment */
 
           /* Check the validity of the assignment */
-          if (exact_types
+          if (exact_types.typeflags
            && !compatible_types(type1, type2, MY_TRUE)
              )
           {
@@ -8131,16 +8434,17 @@ expr0:
                   break;
 
               case F_ADD_EQ:
-                  switch(type1)
+                  switch(type1.typeflags)
                   {
                   case TYPE_STRING:
-                      if (type2 == TYPE_NUMBER || type2 == TYPE_FLOAT)
+                      if (type2.typeflags == TYPE_NUMBER
+                       || type2.typeflags == TYPE_FLOAT)
                       {
                           ok = MY_TRUE;
                       }
                       break;
                   case TYPE_FLOAT:
-                      if (type2 == TYPE_NUMBER)
+                      if (type2.typeflags == TYPE_NUMBER)
                       {
                           ok = MY_TRUE;
                       }
@@ -8149,10 +8453,10 @@ expr0:
                   break;
 
               case F_SUB_EQ:
-                  switch(type1)
+                  switch(type1.typeflags)
                   {
                   case TYPE_FLOAT:
-                      if (type2 == TYPE_NUMBER)
+                      if (type2.typeflags == TYPE_NUMBER)
                       {
                           ok = MY_TRUE;
                       }
@@ -8161,22 +8465,22 @@ expr0:
                   break;
 
               case F_MULT_EQ:
-                  switch(type1)
+                  switch(type1.typeflags)
                   {
                   case TYPE_STRING:
-                      if (type2 == TYPE_NUMBER)
+                      if (type2.typeflags == TYPE_NUMBER)
                       {
                           ok = MY_TRUE;
                       }
                       break;
                   case TYPE_FLOAT:
-                      if (type2 == TYPE_NUMBER)
+                      if (type2.typeflags == TYPE_NUMBER)
                       {
                           ok = MY_TRUE;
                       }
                       break;
                   default:
-                      if ((type1 & TYPE_MOD_POINTER) && type2 == TYPE_NUMBER)
+                      if ((type1.typeflags & TYPE_MOD_POINTER) && type2.typeflags == TYPE_NUMBER)
                       {
                           ok = MY_TRUE;
                       }
@@ -8184,10 +8488,10 @@ expr0:
                   break;
 
               case F_DIV_EQ:
-                  switch(type1)
+                  switch(type1.typeflags)
                   {
                   case TYPE_FLOAT:
-                      if (type2 == TYPE_NUMBER)
+                      if (type2.typeflags == TYPE_NUMBER)
                       {
                           ok = MY_TRUE;
                       }
@@ -8208,7 +8512,7 @@ expr0:
               restype = type1;
           }
 
-          if (type2 & TYPE_MOD_REFERENCE)
+          if (type2.typeflags & TYPE_MOD_REFERENCE)
               yyerror("Can't trace reference assignments.");
 
 #ifdef USE_STRUCTS
@@ -8258,7 +8562,7 @@ expr0:
       {
           yyerror("Bad assignment: illegal lhs (target)");
           $$ = $3;
-          $$.type = TYPE_ANY;
+          $$.type = Type_Any;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -8321,7 +8625,7 @@ expr0:
            */
           p_int address, old_address;
           int offset;
-          vartype_t type1, type2;
+          fulltype_t type1, type2;
 
           last_expression = -1;
 
@@ -8364,19 +8668,19 @@ expr0:
           $$.end = CURRENT_PROGRAM_SIZE;
           if (!compatible_types(type1, type2, MY_FALSE))
           {
-              $$.type = TYPE_ANY;
-              if ((type1 & TYPE_MOD_POINTER) != 0
-               && (type2 & TYPE_MOD_POINTER) != 0)
-                  $$.type |= TYPE_MOD_POINTER;
+              $$.type = Type_Any;
+              if ((type1.typeflags & TYPE_MOD_POINTER) != 0
+               && (type2.typeflags & TYPE_MOD_POINTER) != 0)
+                  $$.type.typeflags |= TYPE_MOD_POINTER;
               /* TODO: yyinfof("Different types to ?: */
           }
-          else if (type1 == TYPE_ANY)
+          else if (type1.typeflags == TYPE_ANY)
               $$.type = type2;
-          else if (type2 == TYPE_ANY)
+          else if (type2.typeflags == TYPE_ANY)
               $$.type = type1;
-          else if (type1 == (TYPE_MOD_POINTER|TYPE_ANY) )
+          else if (type1.typeflags == (TYPE_MOD_POINTER|TYPE_ANY) )
               $$.type = type2;
-          else if (type2 == (TYPE_MOD_POINTER|TYPE_ANY) )
+          else if (type2.typeflags == (TYPE_MOD_POINTER|TYPE_ANY) )
               $$.type = type1;
           else
               $$.type = type1;
@@ -8446,10 +8750,10 @@ expr0:
           $$.end = CURRENT_PROGRAM_SIZE;
 
           /* Determine the result type */
-          if ($1.type == $4.type)
+          if (equal_types($1.type, $4.type))
               $$.type = $1.type;
           else
-              $$.type = TYPE_ANY;  /* Return type can't be known */
+              $$.type = Type_Any;  /* Return type can't be known */
       } /* LOR */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -8517,10 +8821,10 @@ expr0:
           $$.end = CURRENT_PROGRAM_SIZE;
 
           /* Determine the return type */
-          if ($1.type == $4.type)
+          if (equal_types($1.type, $4.type))
               $$.type = $1.type;
           else
-              $$.type = TYPE_ANY;        /* Return type can't be known */
+              $$.type = Type_Any;        /* Return type can't be known */
        } /* LAND */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -8528,25 +8832,29 @@ expr0:
       {
           $$ = $1;
 
-          if (($1.type | $3.type) & TYPE_MOD_POINTER)
+          if (($1.type.typeflags | $3.type.typeflags) & TYPE_MOD_POINTER)
           {
-              if (exact_types
-               && ($1.type ^ $3.type) & TYPE_MOD_POINTER
+              if (exact_types.typeflags
+               && ($1.type.typeflags ^ $3.type.typeflags) & TYPE_MOD_POINTER
                  )
                   yyerrorf("Incompatible types for arguments to | %s"
                           , get_two_types($1.type, $3.type));
-              if ($1.type == $3.type)
+              if (equal_types($1.type, $3.type))
                   $$.type = $1.type;
               else
-                  $$.type = TYPE_ANY|TYPE_MOD_POINTER;
+              {
+                  $$.type = Type_Ptr_Any;
+              }
           }
           else
           {
-              if (exact_types && !BASIC_TYPE($1.type,TYPE_NUMBER))
+              if (exact_types.typeflags
+               && !BASIC_TYPE($1.type, Type_Number))
                   type_error("Bad argument 1 to |", $1.type);
-              if (exact_types && !BASIC_TYPE($3.type,TYPE_NUMBER))
+              if (exact_types.typeflags
+               && !BASIC_TYPE($3.type, Type_Number))
                   type_error("Bad argument 2 to |", $3.type);
-              $$.type = TYPE_NUMBER;
+              $$.type = Type_Number;
           }
           ins_f_code(F_OR);
 
@@ -8558,25 +8866,25 @@ expr0:
       {
           $$ = $1;
 
-          if (($1.type | $3.type) & TYPE_MOD_POINTER)
+          if (($1.type.typeflags | $3.type.typeflags) & TYPE_MOD_POINTER)
           {
-              if (exact_types
-               && ($1.type ^ $3.type) & TYPE_MOD_POINTER
+              if (exact_types.typeflags
+               && ($1.type.typeflags ^ $3.type.typeflags) & TYPE_MOD_POINTER
                  )
                   yyerrorf("Incompatible types for arguments to | %s"
                           , get_two_types($1.type, $3.type));
-              if ($1.type == $3.type)
+              if (equal_types($1.type, $3.type))
                   $$.type = $1.type;
               else
-                  $$.type = TYPE_ANY|TYPE_MOD_POINTER;
+                  $$.type = Type_Ptr_Any;
           }
           else
           {
-              if (exact_types && !BASIC_TYPE($1.type,TYPE_NUMBER))
+              if (exact_types.typeflags && !BASIC_TYPE($1.type, Type_Number))
                   type_error("Bad argument 1 to ^", $1.type);
-              if (exact_types && !BASIC_TYPE($3.type,TYPE_NUMBER))
+              if (exact_types.typeflags && !BASIC_TYPE($3.type, Type_Number))
                   type_error("Bad argument 2 to ^", $3.type);
-              $$.type = TYPE_NUMBER;
+              $$.type = Type_Number;
           }
           ins_f_code(F_XOR);
 
@@ -8589,66 +8897,72 @@ expr0:
           $$ = $1;
           ins_f_code(F_AND);
           $$.end = CURRENT_PROGRAM_SIZE;
-          $$.type = TYPE_ANY;
+          $$.type = Type_Any;
 
           /* Check the types */
           /* TODO: Implement the typechecks, including result type
            * TODO:: by table lookups.
            */
-          if (exact_types)
+          if (exact_types.typeflags)
           {
-              vartype_t first_type  = $1.type;
-              vartype_t second_type = $3.type;
-              if ( first_type == TYPE_ANY
-               &&  second_type == TYPE_ANY )
+              fulltype_t first_type  = $1.type;
+              fulltype_t second_type = $3.type;
+              if ( first_type.typeflags == TYPE_ANY
+               &&  second_type.typeflags == TYPE_ANY )
               {
                     /* $$ == TYPE_ANY is correct */
               }
-              else if ( (first_type | second_type) & TYPE_MOD_POINTER)
+              else if ( (first_type.typeflags | second_type.typeflags) & TYPE_MOD_POINTER)
               {
-                  if (first_type  == TYPE_NUMBER
-                   || second_type == TYPE_NUMBER)
+                  if (first_type.typeflags  == TYPE_NUMBER
+                   || second_type.typeflags == TYPE_NUMBER)
                   {
                       yyerrorf("Incompatible types for arguments to & %s"
                               , get_two_types(first_type, second_type));
                   }
-                  else if (( !( first_type & TYPE_MOD_POINTER )
-                           || first_type & TYPE_MOD_REFERENCE)
-                        && first_type != TYPE_ANY)
+                  else if (( !( first_type.typeflags & TYPE_MOD_POINTER )
+                           || first_type.typeflags & TYPE_MOD_REFERENCE)
+                        && first_type.typeflags != TYPE_ANY)
                   {
                       type_error("Bad argument 1 to &", first_type );
                   }
-                  else if (( !( second_type & TYPE_MOD_POINTER )
-                           ||   second_type & TYPE_MOD_REFERENCE)
-                        && second_type != TYPE_ANY)
+                  else if (( !( second_type.typeflags & TYPE_MOD_POINTER )
+                           ||   second_type.typeflags & TYPE_MOD_REFERENCE)
+                        && second_type.typeflags != TYPE_ANY)
                   {
                       type_error("Bad argument 2 to &", first_type );
                   }
-                  else if ( !BASIC_TYPE(first_type &~TYPE_MOD_POINTER,
-                                           second_type &~TYPE_MOD_POINTER) )
-                  {
-                      yyerrorf("Incompatible types for arguments to & %s"
-                              , get_two_types(first_type, second_type));
-                  }
-                  else
-                  {
-                      $$.type = TYPE_ANY | TYPE_MOD_POINTER;
+                  else {
+                      fulltype_t f_type = first_type;
+                      fulltype_t s_type = second_type;
+
+                      f_type.typeflags &= ~TYPE_MOD_POINTER;
+                      s_type.typeflags &= ~TYPE_MOD_POINTER;
+                      if ( !BASIC_TYPE(f_type, s_type) )
+                      {
+                          yyerrorf("Incompatible types for arguments to & %s"
+                                  , get_two_types(first_type, second_type));
+                      }
+                      else
+                      {
+                          $$.type = Type_Ptr_Any;
+                      }
                   }
               }
               else
               {
-                  if ( !BASIC_TYPE(first_type ,TYPE_NUMBER)
-                   &&  !BASIC_TYPE(first_type ,TYPE_STRING) )
+                  if ( !BASIC_TYPE(first_type, Type_Number)
+                   &&  !BASIC_TYPE(first_type, Type_String) )
                       type_error("Bad argument 1 to &", first_type );
-                  if ( !BASIC_TYPE(second_type,TYPE_NUMBER)
-                   &&  !BASIC_TYPE(second_type ,TYPE_STRING) )
+                  if ( !BASIC_TYPE(second_type, Type_Number)
+                   &&  !BASIC_TYPE(second_type, Type_String) )
                       type_error("Bad argument 2 to &", second_type);
-                  if ( first_type == TYPE_ANY )
-                      $$.type =   BASIC_TYPE(second_type ,TYPE_NUMBER)
-                                ? TYPE_NUMBER : TYPE_STRING;
+                  if ( first_type.typeflags == TYPE_ANY )
+                      $$.type =   BASIC_TYPE(second_type, Type_Number)
+                                ? Type_Number : Type_String;
                   else
-                      $$.type =   BASIC_TYPE(first_type ,TYPE_NUMBER)
-                                ? TYPE_NUMBER : TYPE_STRING;
+                      $$.type =   BASIC_TYPE(first_type, Type_Number)
+                                ? Type_Number : Type_String;
               }
           } /* end of exact_types code */
       } /* end of '&' code */
@@ -8656,33 +8970,35 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 L_EQ expr0
       {
-          vartype_t t1 = $1.type, t2 = $3.type;
+          fulltype_t t1 = $1.type, t2 = $3.type;
 
           $$ = $1;
-          if (exact_types
-           && t1 != t2 && t1 != TYPE_ANY && t2 != TYPE_ANY
-           && !(t1 == TYPE_NUMBER && t2 == TYPE_FLOAT)
-           && !(t1 == TYPE_FLOAT && t2 == TYPE_NUMBER)
+          if (exact_types.typeflags
+           && !equal_types(t1, t2)
+           && t1.typeflags != TYPE_ANY && t2.typeflags != TYPE_ANY
+           && !(t1.typeflags == TYPE_NUMBER && t2.typeflags == TYPE_FLOAT)
+           && !(t1.typeflags == TYPE_FLOAT && t2.typeflags == TYPE_NUMBER)
              )
           {
               yyerrorf("== always false because of different types %s"
                       , get_two_types($1.type, $3.type));
           }
           ins_f_code(F_EQ);
-          $$.type = TYPE_NUMBER;
+          $$.type = Type_Number;
           $$.end = CURRENT_PROGRAM_SIZE;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 L_NE expr0
       {
-          vartype_t t1 = $1.type, t2 = $3.type;
+          fulltype_t t1 = $1.type, t2 = $3.type;
 
           $$ = $1;
-          if (exact_types
-           && t1 != t2 && t1 != TYPE_ANY && t2 != TYPE_ANY
-           && !(t1 == TYPE_NUMBER && t2 == TYPE_FLOAT)
-           && !(t1 == TYPE_FLOAT && t2 == TYPE_NUMBER)
+          if (exact_types.typeflags
+           && !equal_types(t1, t2)
+           && t1.typeflags != TYPE_ANY && t2.typeflags != TYPE_ANY
+           && !(t1.typeflags == TYPE_NUMBER && t2.typeflags == TYPE_FLOAT)
+           && !(t1.typeflags == TYPE_FLOAT && t2.typeflags == TYPE_NUMBER)
              )
            {
               yyerrorf("!= always true because of different types %s"
@@ -8690,35 +9006,35 @@ expr0:
           }
           ins_f_code(F_NE);
           $$.end = CURRENT_PROGRAM_SIZE;
-          $$.type = TYPE_NUMBER;
+          $$.type = Type_Number;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 '>'  expr0
       {
           $$ = $1;
-          $$.type = TYPE_NUMBER;
+          $$.type = Type_Number;;
           ins_f_code(F_GT);
           $$.end = CURRENT_PROGRAM_SIZE;
       }
     | expr0 L_GE  expr0
       {
           $$ = $1;
-          $$.type = TYPE_NUMBER;
+          $$.type = Type_Number;
           ins_f_code(F_GE);
           $$.end = CURRENT_PROGRAM_SIZE;
       }
     | expr0 '<'  expr0
       {
           $$ = $1;
-          $$.type = TYPE_NUMBER;
+          $$.type = Type_Number;
           ins_f_code(F_LT);
           $$.end = CURRENT_PROGRAM_SIZE;
       }
     | expr0 L_LE  expr0
       {
           $$ = $1;
-          $$.type = TYPE_NUMBER;
+          $$.type = Type_Number;
           ins_f_code(F_LE);
           $$.end = CURRENT_PROGRAM_SIZE;
       }
@@ -8729,13 +9045,13 @@ expr0:
           $$ = $1;
           ins_f_code(F_LSH);
           $$.end = CURRENT_PROGRAM_SIZE;
-          $$.type = TYPE_NUMBER;
-          if (exact_types)
+          $$.type = Type_Number;
+          if (exact_types.typeflags)
           {
-              if (!BASIC_TYPE($1.type, TYPE_NUMBER))
-                  type_error("Bad argument number 1 to '<<'", $1.type);
-              if (!BASIC_TYPE($3.type, TYPE_NUMBER))
-                  type_error("Bad argument number 2 to '<<'", $3.type);
+              if (!BASIC_TYPE($1.type, Type_Number))
+                  type_error("Bad argument 1 to '<<'", $1.type);
+              if (!BASIC_TYPE($3.type, Type_Number))
+                  type_error("Bad argument 2 to '<<'", $3.type);
           }
       }
 
@@ -8744,14 +9060,14 @@ expr0:
       {
           $$ = $1;
           ins_f_code(F_RSH);
-          $$.type = TYPE_NUMBER;
+          $$.type = Type_Number;
           $$.end = CURRENT_PROGRAM_SIZE;
-          if (exact_types)
+          if (exact_types.typeflags)
           {
-              if (!BASIC_TYPE($1.type, TYPE_NUMBER))
-                  type_error("Bad argument number 1 to '>>'", $1.type);
-              if (!BASIC_TYPE($3.type, TYPE_NUMBER))
-                  type_error("Bad argument number 2 to '>>'", $3.type);
+              if (!BASIC_TYPE($1.type, Type_Number))
+                  type_error("Bad argument 1 to '>>'", $1.type);
+              if (!BASIC_TYPE($3.type, Type_Number))
+                  type_error("Bad argument 2 to '>>'", $3.type);
           }
       }
 
@@ -8761,13 +9077,13 @@ expr0:
           $$ = $1;
           ins_byte(F_RSHL);
           $$.end = CURRENT_PROGRAM_SIZE;
-          $$.type = TYPE_NUMBER;
-          if (exact_types)
+          $$.type = Type_Number;
+          if (exact_types.typeflags)
           {
-              if (!BASIC_TYPE($1.type, TYPE_NUMBER))
-                  type_error("Bad argument number 1 to '>>>'", $1.type);
-              if (!BASIC_TYPE($3.type, TYPE_NUMBER))
-                  type_error("Bad argument number 2 to '>>>'", $3.type);
+              if (!BASIC_TYPE($1.type, Type_Number))
+                  type_error("Bad argument 1 to '>>>'", $1.type);
+              if (!BASIC_TYPE($3.type, Type_Number))
+                  type_error("Bad argument 2 to '>>>'", $3.type);
           }
       }
 
@@ -8857,26 +9173,26 @@ expr0:
                   upd_short(current_size - 3, i);
                   CURRENT_PROGRAM_SIZE = current_size - 1;
               }
-              $$.type = TYPE_STRING;
+              $$.type = Type_String;
           }
           else
           {
               /* Just add */
               ins_f_code(F_ADD);
-              $$.type = TYPE_ANY;
-              if ($1.type == $4.type)
+              $$.type = Type_Any;
+              if (equal_types($1.type, $4.type))
                   $$.type = $1.type;
-              else if ($1.type == TYPE_STRING)
-                  $$.type = TYPE_STRING;
-              else if (($1.type == TYPE_NUMBER || $1.type == TYPE_FLOAT)
-                     && $4.type == TYPE_STRING)
-                  $$.type = TYPE_STRING;
-              else if ($1.type == TYPE_FLOAT
-                    && ($4.type == TYPE_NUMBER || $4.type == TYPE_ANY))
-                  $$.type = TYPE_FLOAT;
-              else if (($1.type == TYPE_NUMBER || $1.type == TYPE_ANY)
-                    && $4.type == TYPE_FLOAT)
-                  $$.type = TYPE_FLOAT;
+              else if ($1.type.typeflags == TYPE_STRING)
+                  $$.type = Type_String;
+              else if (($1.type.typeflags == TYPE_NUMBER || $1.type.typeflags == TYPE_FLOAT)
+                     && $4.type.typeflags == TYPE_STRING)
+                  $$.type = Type_String;
+              else if ($1.type.typeflags == TYPE_FLOAT
+                    && ($4.type.typeflags == TYPE_NUMBER || $4.type.typeflags == TYPE_ANY))
+                  $$.type = Type_Float;
+              else if (($1.type.typeflags == TYPE_NUMBER || $1.type.typeflags == TYPE_ANY)
+                    && $4.type.typeflags == TYPE_FLOAT)
+                  $$.type = Type_Float;
 #ifdef USE_STRUCTS
               else if (IS_TYPE_STRUCT($1.type) || IS_TYPE_STRUCT($4.type))
                   yyerrorf("Bad arguments to '+': %s"
@@ -8892,22 +9208,22 @@ expr0:
       {
 %line
           $$ = $1;
-          $$.type = TYPE_ANY;
+          $$.type = Type_Any;
 
-          if (exact_types)
+          if (exact_types.typeflags)
           {
-              vartype_t type1 = $1.type;
-              vartype_t type2 = $3.type;
+              fulltype_t type1 = $1.type;
+              fulltype_t type2 = $3.type;
 
-              if (type1 == type2)
+              if (equal_types(type1, type2))
               {
                   static char matchok[] =
 %typemap TYPE_ANY:1,TYPE_NUMBER:1,TYPE_FLOAT:1,TYPE_MAPPING:1,TYPE_STRING:1
 
-                  if ( type1 & (TYPE_MOD_POINTER|TYPE_MOD_REFERENCE)
-                       ? (type1 & (TYPE_MOD_POINTER|TYPE_MOD_REFERENCE))
+                  if ( type1.typeflags & (TYPE_MOD_POINTER|TYPE_MOD_REFERENCE)
+                       ? (type1.typeflags & (TYPE_MOD_POINTER|TYPE_MOD_REFERENCE))
                          == TYPE_MOD_POINTER
-                       : matchok[type1]
+                       : matchok[type1.typeflags]
                        )
                   {
                       $$.type = type1;
@@ -8917,12 +9233,12 @@ expr0:
                       type_error("Bad arguments to '-'", type1);
                   }
               }
-              else if (   (type1 & (TYPE_MOD_POINTER|TYPE_MOD_REFERENCE))
+              else if (   (type1.typeflags & (TYPE_MOD_POINTER|TYPE_MOD_REFERENCE))
                        == TYPE_MOD_POINTER)
               {
-                  if ((type2 | TYPE_MOD_POINTER) == (TYPE_MOD_POINTER|TYPE_ANY)
-                   || (   type2 & TYPE_MOD_POINTER
-                       && type1 == (TYPE_MOD_POINTER|TYPE_ANY))
+                  if ((type2.typeflags | TYPE_MOD_POINTER) == (TYPE_MOD_POINTER|TYPE_ANY)
+                   || (   type2.typeflags & TYPE_MOD_POINTER
+                       && type1.typeflags == (TYPE_MOD_POINTER|TYPE_ANY))
                      )
                   {
                       $$.type = type1;
@@ -8932,10 +9248,10 @@ expr0:
                       yyerror("Arguments to '-' don't match");
                   }
               }
-              else switch (type1)
+              else switch (type1.typeflags)
               {
               case TYPE_ANY:
-                  switch (type2)
+                  switch (type2.typeflags)
                   {
                   case TYPE_NUMBER:
                       /* number or float -> TYPE_ANY */
@@ -8946,10 +9262,10 @@ expr0:
                       $$.type = type2;
                       break;
                   default:
-                      if ( (type2 & (TYPE_MOD_POINTER|TYPE_MOD_REFERENCE)) ==
+                      if ( (type2.typeflags & (TYPE_MOD_POINTER|TYPE_MOD_REFERENCE)) ==
                              TYPE_MOD_POINTER)
                       {
-                          $$.type = TYPE_ANY | TYPE_MOD_POINTER;
+                          $$.type = Type_Ptr_Any;
                           break;
                       }
                       else
@@ -8961,7 +9277,7 @@ expr0:
                   break;
 
               case TYPE_NUMBER:
-                  if (type2 == TYPE_FLOAT || type2 == TYPE_ANY)
+                  if (type2.typeflags == TYPE_FLOAT || type2.typeflags == TYPE_ANY)
                   {
                       $$.type = type2;
                   }
@@ -8972,9 +9288,9 @@ expr0:
                   break;
 
               case TYPE_FLOAT:
-                  if (type2 == TYPE_NUMBER || type2 == TYPE_ANY)
+                  if (type2.typeflags == TYPE_NUMBER || type2.typeflags == TYPE_ANY)
                   {
-                      $$.type = TYPE_FLOAT;
+                      $$.type = Type_Float;
                   }
                   else
                   {
@@ -8983,9 +9299,9 @@ expr0:
                   break;
 
               case TYPE_STRING:
-                  if (type2 == TYPE_STRING || type2 == TYPE_ANY)
+                  if (type2.typeflags == TYPE_STRING || type2.typeflags == TYPE_ANY)
                   {
-                      $$.type = TYPE_STRING;
+                      $$.type = Type_String;
                   }
                   else
                   {
@@ -8994,7 +9310,7 @@ expr0:
                   break;
 
               case TYPE_MAPPING:
-                  if (type2 == TYPE_ANY)
+                  if (type2.typeflags == TYPE_ANY)
                   {
                       $$.type = type1;
                   }
@@ -9017,25 +9333,25 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 '*' expr0
       {
-          vartype_t type1, type2;
+          fulltype_t type1, type2;
 
           $$ = $1;
 
           type1 = $1.type;
           type2 = $3.type;
 
-          if (exact_types)
+          if (exact_types.typeflags)
           {
-              if (!BASIC_TYPE(type1, TYPE_NUMBER)
-               && type1 != TYPE_FLOAT
-               && type1 != TYPE_STRING
-               && !(type1 & TYPE_MOD_POINTER)
+              if (!BASIC_TYPE(type1, Type_Number)
+               && type1.typeflags != TYPE_FLOAT
+               && type1.typeflags != TYPE_STRING
+               && !(type1.typeflags & TYPE_MOD_POINTER)
                  )
                   type_error("Bad argument number 1 to '*'", type1);
-              if (!BASIC_TYPE(type2, TYPE_NUMBER)
-               && type2 != TYPE_FLOAT
-               && type2 != TYPE_STRING
-               && !(type2 & TYPE_MOD_POINTER)
+              if (!BASIC_TYPE(type2, Type_Number)
+               && type2.typeflags != TYPE_FLOAT
+               && type2.typeflags != TYPE_STRING
+               && !(type2.typeflags & TYPE_MOD_POINTER)
                  )
                   type_error("Bad argument number 2 to '*'", type2);
           }
@@ -9043,76 +9359,76 @@ expr0:
           ins_f_code(F_MULTIPLY);
           $$.end = CURRENT_PROGRAM_SIZE;
 
-          if (type1 == TYPE_FLOAT || type2 == TYPE_FLOAT )
+          if (type1.typeflags == TYPE_FLOAT || type2.typeflags == TYPE_FLOAT )
           {
-              $$.type = TYPE_FLOAT;
+              $$.type = Type_Float;
           }
-          else if (type1 == TYPE_STRING || type2 == TYPE_STRING)
+          else if (type1.typeflags == TYPE_STRING || type2.typeflags == TYPE_STRING)
           {
-              $$.type = TYPE_STRING;
+              $$.type = Type_String;;
           }
-          else if (type1 & TYPE_MOD_POINTER)
+          else if (type1.typeflags & TYPE_MOD_POINTER)
           {
               $$.type = type1;
           }
-          else if (type2 & TYPE_MOD_POINTER)
+          else if (type2.typeflags & TYPE_MOD_POINTER)
           {
               $$.type = type2;
           }
-          else if (type1 == TYPE_ANY || type2 == TYPE_ANY)
+          else if (type1.typeflags == TYPE_ANY || type2.typeflags == TYPE_ANY)
           {
-              $$.type = TYPE_ANY;
+              $$.type = Type_Any;
           }
           else
           {
-              $$.type = TYPE_NUMBER;
+              $$.type = Type_Number;
           }
       } /* '*' */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 '%' expr0
       {
-          if (exact_types)
+          if (exact_types.typeflags)
           {
-              if (!BASIC_TYPE($1.type, TYPE_NUMBER))
+              if (!BASIC_TYPE($1.type, Type_Number))
                   type_error("Bad argument number 1 to '%'", $1.type);
-              if (!BASIC_TYPE($3.type, TYPE_NUMBER))
+              if (!BASIC_TYPE($3.type, Type_Number))
                   type_error("Bad argument number 2 to '%'", $3.type);
           }
 
           $$ = $1;
           ins_f_code(F_MOD);
           $$.end = CURRENT_PROGRAM_SIZE;
-          $$.type = TYPE_NUMBER;
+          $$.type = Type_Number;
       }
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 '/' expr0
       {
-          vartype_t type1, type2;
+          fulltype_t type1, type2;
 
           $$ = $1;
 
           type1 = $1.type;
           type2 = $3.type;
 
-          if (exact_types)
+          if (exact_types.typeflags)
           {
-              if ( !BASIC_TYPE(type1, TYPE_NUMBER) && type1 != TYPE_FLOAT)
+              if ( !BASIC_TYPE(type1, Type_Number) && type1.typeflags != TYPE_FLOAT)
                   type_error("Bad argument number 1 to '/'", type1);
-              if ( !BASIC_TYPE(type2, TYPE_NUMBER) && type2 != TYPE_FLOAT)
+              if ( !BASIC_TYPE(type2, Type_Number) && type2.typeflags != TYPE_FLOAT)
                   type_error("Bad argument number 2 to '/'", type2);
           }
 
           ins_f_code(F_DIVIDE);
           $$.end = CURRENT_PROGRAM_SIZE;
 
-          if (type1 == TYPE_FLOAT || type2 == TYPE_FLOAT )
+          if (type1.typeflags == TYPE_FLOAT || type2.typeflags == TYPE_FLOAT )
           {
-              $$.type = TYPE_FLOAT;
+              $$.type = Type_Float;
           }
           else
           {
-              $$.type = TYPE_NUMBER;
+              $$.type = Type_Number;
           }
       } /* '/' */
 
@@ -9121,10 +9437,10 @@ expr0:
       {
           $$ = $2;
           $$.type = $1;
-          if (exact_types
-           && $2.type != TYPE_ANY
-           && $2.type != TYPE_UNKNOWN
-           && $1 != TYPE_VOID
+          if (exact_types.typeflags
+           && $2.type.typeflags != TYPE_ANY
+           && $2.type.typeflags != TYPE_UNKNOWN
+           && $1.typeflags != TYPE_VOID
              )
               type_error("Casts are only legal for type mixed, or when unknown", $2.type);
       }
@@ -9134,17 +9450,17 @@ expr0:
       {
           $$ = $2;
           $$.type = $1;
-          if ($2.type != TYPE_ANY
-           && $2.type != TYPE_UNKNOWN
-           && $1 != TYPE_VOID
-           && $1 != $2.type
+          if ($2.type.typeflags != TYPE_ANY
+           && $2.type.typeflags != TYPE_UNKNOWN
+           && $1.typeflags != TYPE_VOID
+           && !equal_types($1, $2.type)
              )
           {
-              switch($1)
+              switch($1.typeflags)
               {
               default:
 #ifdef USE_STRUCTS
-                  if (($1 & PRIMARY_TYPE_MASK) == TYPE_STRUCT)
+                  if (IS_TYPE_STRUCT($1))
                       break; /* Do nothing, just adapt the type information */
 #endif /* USE_STRUCTS */
                   type_error("Illegal cast", $1);
@@ -9180,6 +9496,7 @@ expr0:
            * variables here.
            */
 
+          fulltype_t vtype;
           int i;
           PREPARE_INSERT(4)
 %line
@@ -9188,11 +9505,13 @@ expr0:
 
           if (i != -1)
           {
+
               if (i & VIRTUAL_VAR_TAG)
               {
                   add_f_code(F_PUSH_VIRTUAL_VARIABLE_LVALUE);
                   add_byte(i);
-                  i = V_VARIABLE(i)->flags & TYPE_MOD_MASK;
+                  vtype = V_VARIABLE(i)->type;
+                  vtype.typeflags &= TYPE_MOD_MASK;
               }
               else
               {
@@ -9207,14 +9526,15 @@ expr0:
                       add_f_code(F_PUSH_IDENTIFIER_LVALUE);
                       add_byte(i + num_virtual_variables);
                   }
-                  i = NV_VARIABLE(i)->flags & TYPE_MOD_MASK;
+                  vtype = NV_VARIABLE(i)->type;
+                  vtype.typeflags &= TYPE_MOD_MASK;
               }
 
-              if (exact_types
-               && !BASIC_TYPE(i, TYPE_NUMBER)
-               && !BASIC_TYPE(i, TYPE_FLOAT))
+              if (exact_types.typeflags
+               && !BASIC_TYPE(vtype, Type_Number)
+               && !BASIC_TYPE(vtype, Type_Float))
               {
-                  argument_type_error($1.code, i);
+                  argument_type_error($1.code, vtype);
               }
 
               CURRENT_PROGRAM_SIZE += 2;
@@ -9223,6 +9543,8 @@ expr0:
           {
               /* Variable not declared - try to recover */
               YYACCEPT;
+
+              vtype = Type_Any;
           }
 
           last_expression = CURRENT_PROGRAM_SIZE;
@@ -9231,13 +9553,13 @@ expr0:
 
           add_f_code($1.code);
           $$.end = CURRENT_PROGRAM_SIZE;
-          $$.type = i;
+          $$.type = vtype;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | pre_inc_dec L_LOCAL %prec L_INC
       {
-          int i;
+          fulltype_t vtype;
           PREPARE_INSERT(3)
 %line
           $$.start = $1.start;
@@ -9249,13 +9571,13 @@ expr0:
           {
               add_f_code(F_PUSH_CONTEXT_LVALUE);
               add_byte($2->u.local.context);
-              i = type_of_context[$2->u.local.context];
+              vtype = type_of_context[$2->u.local.context];
           }
           else
           {
               add_f_code(F_PUSH_LOCAL_VARIABLE_LVALUE);
               add_byte($2->u.local.num);
-              i = type_of_locals[$2->u.local.num];
+              vtype = type_of_locals[$2->u.local.num];
           }
           CURRENT_PROGRAM_SIZE =
             (last_expression = CURRENT_PROGRAM_SIZE + 2) + 1;
@@ -9264,16 +9586,16 @@ expr0:
           add_byte($2->u.local.num);
           CURRENT_PROGRAM_SIZE =
             (last_expression = CURRENT_PROGRAM_SIZE + 2) + 1;
-          i = type_of_locals[$2->u.local.num];
+          vtype = type_of_locals[$2->u.local.num];
 #endif /* USE_NEW_INLINES */
           add_f_code($1.code);
-          if (exact_types
-           && !BASIC_TYPE(i, TYPE_NUMBER)
-           && !BASIC_TYPE(i, TYPE_FLOAT))
+          if (exact_types.typeflags
+           && !BASIC_TYPE(vtype, Type_Number)
+           && !BASIC_TYPE(vtype, Type_Float))
           {
-              argument_type_error($1.code, i);
+              argument_type_error($1.code, vtype);
           }
-          $$.type = i;
+          $$.type = vtype;
           $$.end = CURRENT_PROGRAM_SIZE;
       }
 
@@ -9282,28 +9604,30 @@ expr0:
       {
           mp_uint current;
           bytecode_p p;
-          int start, restype;
+          int start;
+          fulltype_t restype;
 %line
           $$.start = $1.start;
 
-          if ($3.type1 & TYPE_MOD_REFERENCE)
+          if ($3.type1.typeflags & TYPE_MOD_REFERENCE)
               yyerror("Reference used as index");
 
-          restype = TYPE_ANY;
+          restype = Type_Any;
 
           /* Check the types */
-          if (exact_types)
+          if (exact_types.typeflags)
           {
-              vartype_t type;
+              fulltype_t type;
 
               type = $2.type;
-              if (type & TYPE_MOD_POINTER)
+              type.typeflags &= TYPEID_MASK;
+              if (type.typeflags & TYPE_MOD_POINTER)
               {
-                  if (type != (TYPE_MOD_POINTER|TYPE_ANY)
-                   && type != (TYPE_MOD_POINTER|TYPE_NUMBER) )
+                  if (type.typeflags != (TYPE_MOD_POINTER|TYPE_ANY)
+                   && type.typeflags != (TYPE_MOD_POINTER|TYPE_NUMBER) )
                       argument_type_error($1.code, type);
               }
-              else switch (type)
+              else switch (type.typeflags)
               {
               case TYPE_MAPPING:
                   if ($3.inst == F_INDEX)
@@ -9316,9 +9640,9 @@ expr0:
                       break;
                   /* FALLTHROUGH */
               case TYPE_STRING:
-                  if (!BASIC_TYPE($3.type1, TYPE_NUMBER))
+                  if (!BASIC_TYPE($3.type1, Type_Number))
                       type_error("Bad type of index", $3.type1);
-                  restype = TYPE_NUMBER;
+                  restype = Type_Number;
                   break;
               }
           } /* if (exact_types) */
@@ -9417,17 +9741,18 @@ expr0:
 %line
           $$.start = $1.start;
 
-          if ($4.type & TYPE_MOD_REFERENCE
-           || $6.type & TYPE_MOD_REFERENCE)
+          if ($4.type.typeflags & TYPE_MOD_REFERENCE
+           || $6.type.typeflags & TYPE_MOD_REFERENCE)
               yyerror("Reference used as index");
 
           /* Check the types */
-          if (exact_types)
+          if (exact_types.typeflags)
           {
-              vartype_t type;
+              fulltype_t type;
 
               type = $2.type;
-              switch (type)
+              type.typeflags &= TYPEID_MASK;
+              switch (type.typeflags)
               {
               default:
                   type_error("Bad type to indexed lvalue", type);
@@ -9455,7 +9780,7 @@ expr0:
           last_expression = current + 1;
           CURRENT_PROGRAM_SIZE = current + 2;
           $$.end = CURRENT_PROGRAM_SIZE;
-          $$.type = TYPE_ANY;
+          $$.type = Type_Any;
       } /* pre_inc_dec expr4 [expr0 ',' expr0] */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -9465,7 +9790,7 @@ expr0:
           last_expression = CURRENT_PROGRAM_SIZE;
           ins_f_code(F_NOT);        /* Any type is valid here. */
           $$.end = CURRENT_PROGRAM_SIZE;
-          $$.type = TYPE_NUMBER;
+          $$.type = Type_Number;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -9474,16 +9799,16 @@ expr0:
 %line
           $$ = $2;
           ins_f_code(F_COMPL);
-          if (exact_types && !BASIC_TYPE($2.type, TYPE_NUMBER))
+          if (exact_types.typeflags && !BASIC_TYPE($2.type, Type_Number))
               type_error("Bad argument to ~", $2.type);
           $$.end = CURRENT_PROGRAM_SIZE;
-          $$.type = TYPE_NUMBER;
+          $$.type = Type_Number;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | '-' expr0 %prec '~'
       {
-          vartype_t type;
+          fulltype_t type;
 %line
           $$ = $2;
 
@@ -9520,9 +9845,9 @@ expr0:
           $$.end = CURRENT_PROGRAM_SIZE;
 
           type = $2.type;
-          if (exact_types
-           && !BASIC_TYPE(type, TYPE_NUMBER)
-           && type != TYPE_FLOAT )
+          if (exact_types.typeflags
+           && !BASIC_TYPE(type, Type_Number)
+           && type.typeflags != TYPE_FLOAT )
               type_error("Bad argument to unary '-'", type);
       }
 
@@ -9554,9 +9879,9 @@ expr0:
           $$.end = CURRENT_PROGRAM_SIZE;
 
           /* Check the types */
-          if (exact_types
-           && !BASIC_TYPE($1.type, TYPE_NUMBER)
-           && !BASIC_TYPE($1.type, TYPE_FLOAT)
+          if (exact_types.typeflags
+           && !BASIC_TYPE($1.type, Type_Number)
+           && !BASIC_TYPE($1.type, Type_Float)
              )
               type_error("Bad argument to ++", $1.type);
 
@@ -9592,9 +9917,9 @@ expr0:
           }
 
           /* Check the types */
-          if (exact_types
-           && !BASIC_TYPE($1.type, TYPE_NUMBER)
-           && !BASIC_TYPE($1.type, TYPE_FLOAT)
+          if (exact_types.typeflags
+           && !BASIC_TYPE($1.type, Type_Number)
+           && !BASIC_TYPE($1.type, Type_Float)
              )
               type_error("Bad argument to --", $1.type);
 
@@ -9642,7 +9967,7 @@ expr4:
           p = last_lex_string;
           last_lex_string = NULL;
           $$.start = last_expression = CURRENT_PROGRAM_SIZE;
-          $$.type = TYPE_STRING;
+          $$.type = Type_String;
           $$.code = -1;
 
           string_number = store_prog_string(p);
@@ -9691,28 +10016,28 @@ expr4:
           {
               current++;
               add_f_code(F_CONST0);
-              $$.type = TYPE_ANY;
+              $$.type = Type_Any;
               /* TODO: Introduce a TYPE_NULL instead */
           }
           else if ( number == 1 )
           {
               add_f_code(F_CONST1);
               current++;
-              $$.type = TYPE_NUMBER;
+              $$.type = Type_Number;
           }
           else if ( number >= 0 && number <= 0xff )
           {
               add_f_code(F_CLIT);
               add_byte(number);
               current += 2;
-              $$.type = TYPE_NUMBER;
+              $$.type = Type_Number;
           }
           else
           {
               add_f_code(F_NUMBER);
               memcpy(__PREPARE_INSERT__p, &$1, sizeof $1);
               current += 1 + sizeof (p_int);
-              $$.type = TYPE_NUMBER;
+              $$.type = Type_Number;
           }
           CURRENT_PROGRAM_SIZE = current;
       }
@@ -9727,7 +10052,7 @@ expr4:
           ix = $1.number;
           ins_f_code(F_CLOSURE);
           ins_short(ix);
-          $$.type = TYPE_CLOSURE;
+          $$.type = Type_Closure;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -9755,7 +10080,7 @@ expr4:
                 ins_short(string_number);
                 ins_byte(quotes);
           }
-          $$.type = TYPE_SYMBOL;
+          $$.type = Type_Symbol;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -9770,7 +10095,7 @@ expr4:
           ins_f_code(F_FLOAT);
           ins_long ( SPLIT_DOUBLE( $1, &exponent) );
           ins_short( exponent );
-          $$.type = TYPE_FLOAT;
+          $$.type = Type_Float;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -9797,7 +10122,7 @@ expr4:
           ins_short($4);
           if (max_array_size && $4 > max_array_size)
               yyerror("Illegal array size");
-          $$.type = TYPE_MOD_POINTER | TYPE_ANY;
+          $$.type = Type_Ptr_Any;
           $$.start = $3.start;
           $$.code = -1;
       }
@@ -9821,7 +10146,7 @@ expr4:
           ins_short($3);
           if (max_array_size && $3 > max_array_size)
               yyerror("Illegal array size");
-          $$.type = TYPE_QUOTED_ARRAY;
+          $$.type = Type_Quoted_Array;
           $$.start = $2.start;
           $$.code = -1;
           quotes = $1;
@@ -9844,7 +10169,7 @@ expr4:
       {
           ins_f_code(F_M_ALLOCATE);
 
-          $$.type = TYPE_MAPPING;
+          $$.type = Type_Mapping;
           $$.start = $4.start;
           $$.code = -1;
       }
@@ -9876,7 +10201,7 @@ expr4:
               ins_byte($4[1]);
           }
 
-          $$.type = TYPE_MAPPING;
+          $$.type = Type_Mapping;
           $$.start = $3.start;
           $$.code = -1;
       }
@@ -9886,14 +10211,14 @@ expr4:
     | '(' '<' note_start '>' ')'
       {
           yyerror("Missing identifier for empty struct literal");
-          $$.type = TYPE_UNKNOWN;
+          $$.type = Type_Unknown;
           $$.start = $3.start;
           $$.code = -1;
       }
     | '(' '<' note_start error ')'
       {
           /* Rule allows the parser to resynchronize after errors */
-          $$.type = TYPE_UNKNOWN;
+          $$.type = Type_Unknown;
           $$.start = $3.start;
           $$.code = -1;
       }
@@ -9917,13 +10242,14 @@ expr4:
           /* Generate a literal struct */
 
           int num = $<number>5;
-          struct_def_t *pdef = &(STRUCT_DEF(num-1));
+          struct_def_t *pdef = &(STRUCT_DEF(num));
 
-          if ($7.length > STRUCT_MAX_MEMBERS || $7.length > pdef->num_members)
+          if ($7.length > STRUCT_MAX_MEMBERS
+           || $7.length > struct_t_size(pdef->type))
           {
               /* Too many elements - create an empty struct */
               yyerrorf("Too many elements for literal struct '%s'"
-                      , get_txt(pdef->name));
+                      , get_txt(struct_t_name(pdef->type)));
               CURRENT_PROGRAM_SIZE = $6.start;
               create_struct_literal(pdef, 0, NULL);
           }
@@ -9944,13 +10270,14 @@ expr4:
               xfree(p);
           }
 
-          $$.type = TYPE_STRUCT | MAKE_SEC_TYPE_INFO(num);
+          $$.type.typeflags = TYPE_STRUCT;
+          $$.type.t_struct = pdef->type;
           $$.start = $6.start;
           $$.code = -1;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | expr4 L_ARROW identifier
+    | expr4 L_ARROW struct_member_name
       {
           /* Lookup a struct member */
 
@@ -9958,36 +10285,44 @@ expr4:
           $$.code = -1;
           $$.type = $1.type; /* default */
 
-          if (($1.type & ~SEC_TYPE_MASK) != T_STRUCT)
+          if (!IS_TYPE_STRUCT($1.type))
           {
               yyerrorf("Bad type for struct lookup: %s"
                       , get_type_name($1.type));
           }
-          else
+          else if ($3 != NULL)
           {
               int num;
-              struct_def_t * pdef = &(STRUCT_DEF(GET_SEC_TYPE_INFO($1.type)-1));
+              struct_type_t * ptype = $1.type.t_struct;
 
-              num = find_struct_member(pdef, $3);
+              num = struct_find_member(ptype, $3);
               if (num < 0)
               {
                   yyerrorf("No such member '%s' for struct '%s'"
-                          , get_txt($3), get_txt(pdef->name)
+                          , get_txt($3)
+                          , get_txt(struct_t_name(ptype))
                           );
               }
               else
               {
                   ins_f_code(F_CLIT);
-                  ins_byte(num+1);
-                  ins_f_code(F_INDEX);
-                  $$.type = STRUCT_MEMBER(pdef->members + num).type;
+                  ins_byte(num);
+                  ins_f_code(F_S_INDEX);
+                  assign_var_to_fulltype(&$$.type, ptype->member[num].type);
               }
           }
-          free_mstring($3);
+          else /* Runtime lookup */
+          {
+              ins_f_code(F_S_INDEX);
+              $$.type = Type_Any;
+          }
+
+          if ($3 != NULL)
+              free_mstring($3);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | '&' '(' expr4 L_ARROW identifier ')'
+    | '&' '(' expr4 L_ARROW struct_member_name ')'
 
       {
           /* Create a reference to a struct member */
@@ -9996,37 +10331,49 @@ expr4:
           $$.code = -1;
           $$.type = $3.type; /* default */
 
-          if (($3.type & ~SEC_TYPE_MASK) != T_STRUCT)
+          if (!IS_TYPE_STRUCT($3.type))
           {
               yyerrorf("Bad type for struct lookup: %s"
                       , get_type_name($3.type));
           }
-          else
+          else if ($5 != NULL)
           {
               int num;
-              struct_def_t * pdef = &(STRUCT_DEF(GET_SEC_TYPE_INFO($3.type)-1));
+              struct_type_t * ptype = $3.type.t_struct;
 
-              num = find_struct_member(pdef, $5);
+              num = struct_find_member(ptype, $5);
               if (num < 0)
               {
                   yyerrorf("No such member '%s' for struct '%s'"
-                          , get_txt($5), get_txt(pdef->name)
+                          , get_txt($5)
+                          , get_txt(struct_t_name(ptype))
                           );
               }
               else
               {
                   /* Insert the index code */
                   ins_f_code(F_CLIT);
-                  ins_byte(num+1);
+                  ins_byte(num);
 
                   arrange_protected_lvalue($3.start, $3.code, $3.end,
-                     F_PROTECTED_INDEX_LVALUE
+                     F_PROTECTED_INDEX_S_LVALUE
                   );
-                  $$.type = STRUCT_MEMBER(pdef->members + num).type
-                          | TYPE_MOD_REFERENCE;
+
+                  assign_var_to_fulltype(&$$.type, ptype->member[num].type);
+                  $$.type.typeflags |= TYPE_MOD_REFERENCE;
               }
           }
-          free_mstring($5);
+          else /* Runtime lookup */
+          {
+              arrange_protected_lvalue($3.start, $3.code, $3.end,
+                 F_PROTECTED_INDEX_S_LVALUE
+              );
+
+              $$.type = Type_Ref_Any;
+          }
+
+          if ($5 != NULL)
+              free_mstring($5);
       }
 %endif /* USE_STRUCTS */
 
@@ -10042,27 +10389,28 @@ expr4:
           ins_f_code($2.inst);
 
           /* Check the types */
-          if (exact_types)
+          if (exact_types.typeflags)
           {
-              vartype_t type;
+              fulltype_t type;
 
+              $1.type.typeflags &= TYPEID_MASK;
               $$.type = type = $1.type;
-              if ((type & TYPE_MOD_POINTER) == 0
-               && type != TYPE_ANY && type != TYPE_STRING)
+              if ((type.typeflags & TYPE_MOD_POINTER) == 0
+               && type.typeflags != TYPE_ANY && type.typeflags != TYPE_STRING)
               {
                   type_error("Bad type of argument used for range", type);
-                  $$.type = TYPE_ANY;
+                  $$.type = Type_Any;
               }
               type = $2.type1;
-              if (type != TYPE_ANY && type != TYPE_NUMBER)
+              if (type.typeflags != TYPE_ANY && type.typeflags != TYPE_NUMBER)
                   type_error("Bad type of index", type);
               type = $2.type2;
-              if (type != TYPE_ANY && type != TYPE_NUMBER)
+              if (type.typeflags != TYPE_ANY && type.typeflags != TYPE_NUMBER)
                   type_error("Bad type of index", type);
           }
           else
           {
-              $$.type = TYPE_ANY;
+              $$.type = Type_Any;
           }
       } /* expr4 index_range */
 
@@ -10111,10 +10459,13 @@ expr4:
 
           CURRENT_PROGRAM_SIZE = current + 2;
           if (i == -1)
-              $$.type = TYPE_ANY | TYPE_MOD_REFERENCE;
+              $$.type = Type_Ref_Any;
           else
-              $$.type = (VARIABLE(i)->flags & TYPE_MOD_MASK) |
-                  TYPE_MOD_REFERENCE;
+          {
+              $$.type = VARIABLE(i)->type;
+              $$.type.typeflags = ($$.type.typeflags & TYPE_MOD_MASK)
+                                  | TYPE_MOD_REFERENCE;
+          }
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -10145,20 +10496,23 @@ expr4:
           {
               *p++ = F_PUSH_CONTEXT_LVALUE;
               *p = $2->u.local.context;
-              $$.type = type_of_context[$2->u.local.context] | TYPE_MOD_REFERENCE;
+              $$.type = type_of_context[$2->u.local.context];
+              $$.type.typeflags |= TYPE_MOD_REFERENCE;
           }
           else
           {
               *p++ = F_PUSH_LOCAL_VARIABLE_LVALUE;
               *p = $2->u.local.num;
-              $$.type = type_of_locals[$2->u.local.num] | TYPE_MOD_REFERENCE;
+              $$.type = type_of_locals[$2->u.local.num];
+              $$.type.typeflags |= TYPE_MOD_REFERENCE;
           }
           CURRENT_PROGRAM_SIZE = current + 2;
 #else /* USE_NEW_INLINES */
           *p++ = F_PUSH_LOCAL_VARIABLE_LVALUE;
           *p = $2->u.local.num;
           CURRENT_PROGRAM_SIZE = current + 2;
-          $$.type = type_of_locals[$2->u.local.num] | TYPE_MOD_REFERENCE;
+          $$.type = type_of_locals[$2->u.local.num];
+          $$.type.typeflags |= TYPE_MOD_REFERENCE;
 #endif /* USE_NEW_INLINES */
       }
 
@@ -10184,43 +10538,45 @@ expr4:
           $$.start = $3.start;
           $$.code = -1;
 
-          if ($4.type1 & TYPE_MOD_REFERENCE)
+          if ($4.type1.typeflags & TYPE_MOD_REFERENCE)
                 yyerror("Reference used as index");
 
           /* Compute the result type */
-          if (!exact_types)
+          if (!exact_types.typeflags)
           {
-                $$.type = TYPE_ANY | TYPE_MOD_REFERENCE;
+                $$.type = Type_Ref_Any;
           }
           else
           {
-              vartype_t type;
+              fulltype_t type;
 
               type = $3.type;
-              if (type & TYPE_MOD_POINTER)
+              type.typeflags &= TYPEID_MASK;
+              if (type.typeflags & TYPE_MOD_POINTER)
               {
-                    $$.type = type & ~TYPE_MOD_POINTER;
+                    $$.type = type;
+                    $$.type.typeflags &= ~TYPE_MOD_POINTER;
               }
-              else if (type == TYPE_MAPPING && $4.inst == F_INDEX)
+              else if (type.typeflags == TYPE_MAPPING && $4.inst == F_INDEX)
               {
-                  $4.type1 = TYPE_ANY;
-                  $$.type = TYPE_ANY | TYPE_MOD_REFERENCE;
+                  $4.type1 = Type_Any;
+                  $$.type = Type_Ref_Any;
               }
-              else switch (type)
+              else switch (type.typeflags)
               {
               default:
                   type_error("Bad type to indexed reference", type);
                   /* FALLTHROUGH */
               case TYPE_ANY:
                   if ($4.inst == F_INDEX)
-                      $4.type1 = TYPE_ANY;
-                  $$.type = TYPE_ANY | TYPE_MOD_REFERENCE;
+                      $4.type1 = Type_Any;
+                  $$.type = Type_Ref_Any;
                   break;
               case TYPE_STRING:
-                  $$.type = TYPE_NUMBER | TYPE_MOD_REFERENCE;
+                  $$.type = Type_Ref_Number;
                   break;
               }
-              if (!BASIC_TYPE($4.type1, TYPE_NUMBER))
+              if (!BASIC_TYPE($4.type1, Type_Number))
                   type_error("Bad type of index", $4.type1);
           }
       }
@@ -10233,24 +10589,25 @@ expr4:
 
           $$.start = $3.start;
           $$.code = -1;
-          $$.type = TYPE_ANY | TYPE_MOD_REFERENCE;
+          $$.type = Type_Ref_Any;
           ins_f_code(F_PUSH_PROTECTED_INDEXED_MAP_LVALUE);
 
-          if ($5.type & TYPE_MOD_REFERENCE)
+          if ($5.type.typeflags & TYPE_MOD_REFERENCE)
                 yyerror("Reference used as index");
 
           /* Compute the result type */
-          if (exact_types)
+          if (exact_types.typeflags)
           {
-              vartype_t type;
+              fulltype_t type;
 
               type = $3.type;
-              if (type != TYPE_ANY && type != TYPE_MAPPING)
+              type.typeflags &= TYPEID_MASK;
+              if (type.typeflags != TYPE_ANY && type.typeflags != TYPE_MAPPING)
               {
                   type_error("Bad type to indexed value", type);
               }
               type = $7.type;
-              if (type != TYPE_ANY && type != TYPE_NUMBER)
+              if (type.typeflags != TYPE_ANY && type.typeflags != TYPE_NUMBER)
                   type_error("Bad type of index", type);
           }
       }
@@ -10289,26 +10646,27 @@ expr4:
           $$.code = -1;
 
           /* Compute the result type */
-          if (!exact_types)
+          if (!exact_types.typeflags)
           {
-              $$.type = TYPE_ANY | TYPE_MOD_REFERENCE;
+              $$.type = Type_Ref_Any;
           }
           else
           {
-              vartype_t type;
+              fulltype_t type;
 
+              $3.type.typeflags &= TYPEID_MASK;
               $$.type = type = $3.type;
-              if ((type & TYPE_MOD_POINTER) == 0
-               && type != TYPE_ANY && type != TYPE_STRING)
+              if ((type.typeflags & TYPE_MOD_POINTER) == 0
+               && type.typeflags != TYPE_ANY && type.typeflags != TYPE_STRING)
               {
                   type_error("Bad type of argument used for range", type);
-                  $$.type = TYPE_ANY;
+                  $$.type = Type_Any;
               }
               type = $4.type1;
-              if (type != TYPE_ANY && type != TYPE_NUMBER)
+              if (type.typeflags != TYPE_ANY && type.typeflags != TYPE_NUMBER)
                   type_error("Bad type of index", type);
               type = $4.type2;
-              if (type != TYPE_ANY && type != TYPE_NUMBER)
+              if (type.typeflags != TYPE_ANY && type.typeflags != TYPE_NUMBER)
                   type_error("Bad type of index", type);
           }
       }
@@ -10342,7 +10700,8 @@ expr4:
               $$.code = F_PUSH_VIRTUAL_VARIABLE_LVALUE;
               *p++ = F_VIRTUAL_VARIABLE;
               *p = i;
-              $$.type = V_VARIABLE(i)->flags & TYPE_MOD_MASK;
+              $$.type = V_VARIABLE(i)->type;
+              $$.type.typeflags &= TYPE_MOD_MASK;
           }
           else
           {
@@ -10361,12 +10720,13 @@ expr4:
                   *p++ = F_IDENTIFIER;
                   *p = i + num_virtual_variables;
               }
-              $$.type = NV_VARIABLE(i)->flags & TYPE_MOD_MASK;
+              $$.type = NV_VARIABLE(i)->type;
+              $$.type.typeflags &= TYPE_MOD_MASK;
           }
 
           CURRENT_PROGRAM_SIZE = current + 2;
           if (i == -1)
-              $$.type = TYPE_ANY;
+              $$.type = Type_Any;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -10436,39 +10796,41 @@ expr4:
               ins_f_code(F_AINDEX);
           }
 
-          if ($2.type1 & TYPE_MOD_REFERENCE)
+          if ($2.type1.typeflags & TYPE_MOD_REFERENCE)
               yyerror("Reference used as index");
 
           /* Check and compute the types */
-          if (exact_types)
+          if (exact_types.typeflags)
           {
-              int type;
+              fulltype_t type;
 
               type = $1.type;
-              if (type & TYPE_MOD_POINTER)
+              type.typeflags &= TYPEID_MASK;
+              if (type.typeflags & TYPE_MOD_POINTER)
               {
-                  $$.type = type & ~TYPE_MOD_POINTER;
+                  $$.type = type;
+                  $$.type.typeflags &= ~TYPE_MOD_POINTER;
               }
-              else if (type == TYPE_MAPPING && $2.inst == F_INDEX)
+              else if (type.typeflags == TYPE_MAPPING && $2.inst == F_INDEX)
               {
-                  $2.type1 = TYPE_ANY;
-                  $$.type = TYPE_ANY;
+                  $2.type1 = Type_Any;
+                  $$.type = Type_Any;
               }
-              else switch (type)
+              else switch (type.typeflags)
               {
               default:
                   type_error("Bad type to indexed value", type);
                   /* FALLTHROUGH */
               case TYPE_ANY:
                   if ($2.inst == F_INDEX)
-                      $2.type1 = TYPE_ANY;
-                  $$.type = TYPE_ANY;
+                      $2.type1 = Type_Any;
+                  $$.type = Type_Any;
                   break;
               case TYPE_STRING:
-                  $$.type = TYPE_NUMBER;
+                  $$.type = Type_Number;
                   break;
               }
-              if (!BASIC_TYPE($2.type1, TYPE_NUMBER))
+              if (!BASIC_TYPE($2.type1, Type_Number))
                   type_error("Bad type of index", $2.type1);
           }
       }
@@ -10482,24 +10844,26 @@ expr4:
           $$.start = $1.start;
           $$.end = CURRENT_PROGRAM_SIZE;
           $$.code = F_PUSH_INDEXED_MAP_LVALUE;
-          $$.type = TYPE_ANY;
+          $$.type = Type_Any;
           ins_f_code(F_MAP_INDEX);
 
-          if ($3.type & TYPE_MOD_REFERENCE)
+          if ($3.type.typeflags & TYPE_MOD_REFERENCE)
               yyerror("Reference used as index");
 
           /* Check and compute types */
-          if (exact_types)
+          if (exact_types.typeflags)
           {
-              vartype_t type;
+              fulltype_t type;
 
               type = $1.type;
-              if (type != TYPE_ANY && type != TYPE_MAPPING)
+              type.typeflags &= TYPEID_MASK;
+              if (type.typeflags != TYPE_ANY && type.typeflags != TYPE_MAPPING)
               {
                   type_error("Bad type to indexed value", type);
               }
               type = $5.type;
-              if (type != TYPE_ANY && type != TYPE_NUMBER)
+              type.typeflags &= TYPEID_MASK;
+              if (type.typeflags != TYPE_ANY && type.typeflags != TYPE_NUMBER)
                   type_error("Bad type of index", type);
           }
       }
@@ -10587,44 +10951,46 @@ lvalue:
           CURRENT_PROGRAM_SIZE = start;
           last_expression = -1;
 
-          if ($2.type1 & TYPE_MOD_REFERENCE)
+          if ($2.type1.typeflags & TYPE_MOD_REFERENCE)
               yyerror("Reference used as index");
 
           /* Check and compute types */
-          if (exact_types)
+          if (exact_types.typeflags)
           {
-              vartype_t type;
+              fulltype_t type;
 
               type = $1.type;
-              if (type & TYPE_MOD_POINTER)
+              type.typeflags &= TYPEID_MASK;
+              if (type.typeflags & TYPE_MOD_POINTER)
               {
-                  $$.type = type & ~TYPE_MOD_POINTER;
+                  $$.type = type;
+                  $$.type.typeflags &= ~TYPE_MOD_POINTER;
               }
-              else if (type == TYPE_MAPPING && $2.inst == F_INDEX)
+              else if (type.typeflags == TYPE_MAPPING && $2.inst == F_INDEX)
               {
-                  $2.type1 = TYPE_ANY;
-                  $$.type = TYPE_ANY;
+                  $2.type1 = Type_Any;
+                  $$.type = Type_Any;
               }
-              else switch (type)
+              else switch (type.typeflags)
               {
               default:
                   type_error("Bad type to indexed lvalue", type);
                   /* FALLTHROUGH */
               case TYPE_ANY:
                   if ($2.inst == F_INDEX)
-                      $2.type1 = TYPE_ANY;
-                  $$.type = TYPE_ANY;
+                      $2.type1 = Type_Any;
+                  $$.type = Type_Any;
                   break;
               case TYPE_STRING:
-                  $$.type = TYPE_NUMBER;
+                  $$.type = Type_Number;
                   break;
               }
-              if (!BASIC_TYPE($2.type1, TYPE_NUMBER))
+              if (!BASIC_TYPE($2.type1, Type_Number))
                   type_error("Bad type of index", $2.type1);
           }
           else
           {
-              $$.type = TYPE_ANY;
+              $$.type = Type_Any;
           }
       }
 
@@ -10649,25 +11015,27 @@ lvalue:
 
           $$.length = current + 1 - start;
           $$.u.p = q;
-          $$.type = TYPE_ANY;
+          $$.type = Type_Any;
           CURRENT_PROGRAM_SIZE = start;
           last_expression = -1;
 
-          if ($3.type & TYPE_MOD_REFERENCE)
+          if ($3.type.typeflags & TYPE_MOD_REFERENCE)
               yyerror("Reference used as index");
 
           /* Check and compute types */
-          if (exact_types)
+          if (exact_types.typeflags)
           {
-              vartype_t type;
+              fulltype_t type;
 
               type = $1.type;
-              if (type != TYPE_ANY && type != TYPE_MAPPING)
+              type.typeflags &= TYPEID_MASK;
+              if (type.typeflags != TYPE_ANY && type.typeflags != TYPE_MAPPING)
               {
                   type_error("Bad type to indexed value", type);
               }
               type = $5.type;
-              if (type != TYPE_ANY && type != TYPE_NUMBER)
+              type.typeflags &= TYPEID_MASK;
+              if (type.typeflags != TYPE_ANY && type.typeflags != TYPE_NUMBER)
                   type_error("Bad type of index", type);
           }
       }
@@ -10757,29 +11125,31 @@ lvalue:
           last_expression = -1;
 
           /* Compute and check the types */
-          if (exact_types)
+          if (exact_types.typeflags)
           {
-              vartype_t type;
+              fulltype_t type;
 
+              $1.type.typeflags &= TYPEID_MASK;
               $$.type = type = $1.type;
-              if ((type & TYPE_MOD_POINTER) == 0
-               &&  type != TYPE_ANY && type != TYPE_STRING)
+              if ((type.typeflags & TYPE_MOD_POINTER) == 0
+               &&  type.typeflags != TYPE_ANY
+               &&  type.typeflags != TYPE_STRING)
               {
                   type_error("Bad type of argument used for range", type);
-                  $$.type = TYPE_ANY;
+                  $$.type = Type_Any;
               }
               type = $2.type1;
-              if (type != TYPE_ANY && type != TYPE_NUMBER)
+              if (type.typeflags != TYPE_ANY && type.typeflags != TYPE_NUMBER)
                   type_error("Bad type of index", type);
               type = $2.type2;
-              if (type != TYPE_ANY && type != TYPE_NUMBER)
+              if (type.typeflags != TYPE_ANY && type.typeflags != TYPE_NUMBER)
                   type_error("Bad type of index", type);
           }
       }
 
 %ifdef USE_STRUCTS
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | expr4 L_ARROW identifier
+    | expr4 L_ARROW struct_member_name
       {
           /* Create a struct member lvalue */
 
@@ -10789,33 +11159,37 @@ lvalue:
           /* If the struct lookup is ok, set num and member_type */
 
           num = 0;
-          member_type = TYPE_UNKNOWN;
+          member_type = VType_Unknown;
 
-          if (($1.type & ~SEC_TYPE_MASK) != T_STRUCT)
+          if (!IS_TYPE_STRUCT($1.type))
           {
               yyerrorf("Bad type for struct lookup: %s"
                       , get_type_name($1.type));
           }
-          else
+          else if ($3 != NULL)
           {
-              struct_def_t * pdef = &(STRUCT_DEF(GET_SEC_TYPE_INFO($1.type)-1));
+              struct_type_t * ptype = $1.type.t_struct;
 
-              num = find_struct_member(pdef, $3);
+              num = struct_find_member(ptype, $3);
               if (num < 0)
               {
                   yyerrorf("No such member '%s' for struct '%s'"
-                          , get_txt($3), get_txt(pdef->name)
+                          , get_txt($3)
+                          , get_txt(struct_t_name(ptype))
                           );
               }
               else
               {
-                  member_type = STRUCT_MEMBER(pdef->members + num).type;
+                  member_type = ptype->member[num].type;
               }
-              num++;
+          }
+          else /* Runtime lookup */
+          {
+              assign_full_to_vartype(&member_type, Type_Any);
           }
 
           /* We have to generate some code, so if the struct lookup is
-           * invalid, we just play long and generate code to look up
+           * invalid, we just play along and generate code to look up
            * member #0 in whatever we got.
            */
 
@@ -10823,11 +11197,14 @@ lvalue:
               bytecode_p p, q;
               p_int start, current;
 
-              /* Insert the index code */
-              ins_f_code(F_CLIT);
-              ins_byte(num);
+              if ($3 != NULL)
+              {
+                  /* Insert the index code */
+                  ins_f_code(F_CLIT);
+                  ins_byte(num);
+              }
 
-              /* Generate/add an INDEX_LVALUE */
+              /* Generate/add an INDEX_S_LVALUE */
 
               start = $1.start;
               current = CURRENT_PROGRAM_SIZE;
@@ -10851,7 +11228,7 @@ lvalue:
                           p[end] = $1.code;
                       memcpy(q, p + start2, current - start2);
                       memcpy(q + current - start2, p + start, start2 - start);
-                      q[current - start] = F_INDEX_LVALUE;
+                      q[current - start] = F_INDEX_S_LVALUE;
                   }
                   else
                   {
@@ -10864,7 +11241,7 @@ lvalue:
                       p = q + current - start2;
                       *p++ = $1.code;
                       *p++ = c;
-                      *p = F_INDEX_LVALUE;
+                      *p = F_INDEX_S_LVALUE;
                   }
               }
               else
@@ -10873,7 +11250,7 @@ lvalue:
                    * and add a PUSH_(R)INDEXED_LVALUE
                    */
                   memcpy(q, p + start, current - start);
-                  q[current - start] = F_PUSH_INDEXED_LVALUE;
+                  q[current - start] = F_PUSH_INDEXED_S_LVALUE;
               }
 
               /* This is what we return */
@@ -10883,10 +11260,11 @@ lvalue:
               CURRENT_PROGRAM_SIZE = start;
               last_expression = -1;
 
-              $$.type = member_type;
+              assign_var_to_fulltype(&$$.type, member_type);
           }
 
-          free_mstring($3);
+          if ($3 != NULL)
+              free_mstring($3);
       }
 %endif /* USE_STRUCTS */
 
@@ -10907,9 +11285,10 @@ name_lvalue:
           {
               $$.u.simple[0] = F_PUSH_VIRTUAL_VARIABLE_LVALUE;
               $$.u.simple[1] = i;
-              $$.type = V_VARIABLE(i)->flags & TYPE_MOD_MASK;
+              $$.type = V_VARIABLE(i)->type;
+              $$.type.typeflags &= TYPE_MOD_MASK;
               if (i == -1)
-                  $$.type = TYPE_ANY;
+                  $$.type = Type_Any;
           }
           else
           {
@@ -10922,14 +11301,16 @@ name_lvalue:
                   $$.u.p = q;
                   q[0] = F_PUSH_IDENTIFIER16_LVALUE;
                   PUT_SHORT(q+1, i + num_virtual_variables);
-                  $$.type = NV_VARIABLE(i)->flags & TYPE_MOD_MASK;
+                  $$.type = NV_VARIABLE(i)->type;
+                  $$.type.typeflags &= TYPE_MOD_MASK;
               }
               else
               {
                   $$.u.simple[0] = F_PUSH_IDENTIFIER_LVALUE;
                   $$.u.simple[1] = i + num_virtual_variables;
               }
-              $$.type = NV_VARIABLE(i)->flags & TYPE_MOD_MASK;
+              $$.type = NV_VARIABLE(i)->type;
+              $$.type.typeflags &= TYPE_MOD_MASK;
           }
       }
 
@@ -11037,7 +11418,7 @@ index_range :
           $$.inst  = F_RANGE;
           $$.start = $3.start;
           $$.end   = $3.end;
-          $$.type1 = TYPE_NUMBER;
+          $$.type1 = Type_Number;
           $$.type2 = $3.type;
       }
 
@@ -11074,7 +11455,7 @@ index_range :
           $$.inst  = F_NR_RANGE;
           $$.start = $4.start;
           $$.end   = $4.end;
-          $$.type1 = TYPE_NUMBER;
+          $$.type1 = Type_Number;
           $$.type2 = $4.type;
       }
 
@@ -11111,7 +11492,7 @@ index_range :
           $$.inst  = F_NA_RANGE;
           $$.start = $4.start;
           $$.end   = $4.end;
-          $$.type1 = TYPE_NUMBER;
+          $$.type1 = Type_Number;
           $$.type2 = $4.type;
       }
 
@@ -11212,7 +11593,7 @@ index_range :
           $$.start = $2.start;
           $$.end   = $2.end;
           $$.type1 = $2.type;
-          $$.type2 = TYPE_NUMBER;
+          $$.type2 = Type_Number;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -11226,7 +11607,7 @@ index_range :
           $$.start = $3.start;
           $$.end   = $3.end;
           $$.type1 = $3.type;
-          $$.type2 = TYPE_NUMBER;
+          $$.type2 = Type_Number;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -11240,7 +11621,7 @@ index_range :
           $$.start = $3.start;
           $$.end   = $3.end;
           $$.type1 = $3.type;
-          $$.type2 = TYPE_NUMBER;
+          $$.type2 = Type_Number;
       }
 ; /* index_range */
 
@@ -11269,7 +11650,7 @@ e_expr_list2:
           if (!got_ellipsis[argument_level])
               add_arg_type($1.type);
           else
-              add_arg_type(TYPE_ANY);
+              add_arg_type(Type_Any);
       }
 
     | expr0 L_ELLIPSIS
@@ -11288,7 +11669,7 @@ e_expr_list2:
           if (!got_ellipsis[argument_level])
               add_arg_type($3.type);
           else
-              add_arg_type(TYPE_ANY);
+              add_arg_type(Type_Any);
       }
 
     | e_expr_list2 ',' expr0 L_ELLIPSIS
@@ -11312,7 +11693,7 @@ expr_list3:
           if (!got_ellipsis[argument_level])
               add_arg_type($1.type);
           else
-              add_arg_type(TYPE_ANY);
+              add_arg_type(Type_Any);
       }
 
     | expr0 L_ELLIPSIS
@@ -11331,7 +11712,7 @@ expr_list3:
           if (!got_ellipsis[argument_level])
               add_arg_type($3.type);
           else
-              add_arg_type(TYPE_ANY);
+              add_arg_type(Type_Any);
       }
 
     | e_expr_list2 ',' expr0 L_ELLIPSIS
@@ -11380,6 +11761,37 @@ m_expr_values:
 
 
 %ifdef USE_STRUCTS
+
+/* Rule used to parse a static or dynamic member name in lookups */
+
+struct_member_name:
+      identifier
+      { $$ = $1; }
+
+    | L_STRING L_STRING
+      { fatal("presence of rule should prevent its reduction"); }
+
+    | L_STRING
+      {
+          $$ = last_lex_string; /* Adopt the reference */
+          last_lex_string = NULL;
+      }
+
+    |  '(' expr0 ')'
+      {
+          $$ = NULL;
+          if ($2.type.typeflags != TYPE_STRING
+           && (pragma_strict_types != PRAGMA_WEAK_TYPES
+               || $2.type.typeflags != TYPE_UNKNOWN)
+           && $2.type.typeflags != TYPE_ANY
+           && $2.type.typeflags != TYPE_NUMBER
+              )
+              type_error("Illegal type for struct member name", $2.type);
+      }
+      
+; /* struct_member_name */
+
+
 /* The following rules are used to parse struct literals in expressions */
 
 opt_struct_init:
@@ -11440,12 +11852,12 @@ struct_init:
       identifier ':' expr0
       {
           $$.name = $1;
-          $$.type = $3.type;
+          assign_full_to_vartype(&$$.type, $3.type);
       }
     | expr0
       {
           $$.name = NULL;
-          $$.type = $1.type;
+          assign_full_to_vartype(&$$.type, $1.type);
       }
 ; /* struct_init */
 
@@ -11635,7 +12047,8 @@ function_call:
                       add_byte(simul_efun);
                       CURRENT_PROGRAM_SIZE += 2;
                   }
-                  $$.type = funp->type & TYPE_MOD_MASK;
+                  $$.type = funp->type;
+                  $$.type.typeflags &= TYPE_MOD_MASK;
               } /* if (simul-efun) */
 
               else if ($1.super ? !efun_override
@@ -11688,7 +12101,7 @@ function_call:
                               break;
                           }
 
-                          $$.type = TYPE_ANY;
+                          $$.type = Type_Any;
                           break; /* Out of do..while(0) */
                       }
 
@@ -11724,7 +12137,7 @@ function_call:
                   if (funp->flags & (NAME_UNDEFINED|NAME_HIDDEN))
                   {
                       if ( !(funp->flags & (NAME_PROTOTYPE|NAME_INHERITED))
-                       && exact_types )
+                       && exact_types.typeflags )
                       {
                           yyerrorf("Function %.50s undefined", get_txt(funp->name));
                       }
@@ -11736,14 +12149,15 @@ function_call:
                       }
                   }
 
-                  $$.type = funp->type & TYPE_MOD_MASK; /* Result type */
+                  $$.type = funp->type; /* Result type */
+                  $$.type.typeflags &= TYPE_MOD_MASK;
 
                   /* Check number of arguments.
                    */
                   if (funp->num_arg != $4
                    && !(funp->flags & TYPE_MOD_VARARGS)
                    && (first_arg != INDEX_START_NONE)
-                   && exact_types
+                   && exact_types.typeflags
                    && !has_ellipsis)
                   {
                       if (funp->num_arg-1 > $4 || !(funp->flags & TYPE_MOD_XVARARGS))
@@ -11755,7 +12169,7 @@ function_call:
 
                   /* Check the argument types.
                    */
-                  if (exact_types && first_arg != INDEX_START_NONE)
+                  if (exact_types.typeflags && first_arg != INDEX_START_NONE)
                   {
                       int i;
                       vartype_t *argp;
@@ -11780,8 +12194,14 @@ function_call:
                           {
                               fulltype_t tmp1, tmp2;
 
-                              tmp1 = *argp++ & TYPE_MOD_RMASK;
-                              tmp2 = *arg_types++ & TYPE_MOD_MASK;
+                              assign_var_to_fulltype(&tmp1, *argp);
+                              tmp1.typeflags &= TYPE_MOD_RMASK;
+                              assign_var_to_fulltype(&tmp2, *arg_types);
+                              tmp2.typeflags &= TYPE_MOD_MASK;
+
+                              argp++;
+                              arg_types++;
+
                               if (!REDEFINED_TYPE(tmp1, tmp2))
                               {
                                   yyerrorf("Bad type for argument %d of %s %s",
@@ -11795,11 +12215,16 @@ function_call:
                           {
                               fulltype_t tmp1, tmp2;
                               /* varargs argument is either a pointer type or mixed */
-                              tmp2 = *arg_types & TYPE_MOD_MASK;
-                              tmp2 &= ~TYPE_MOD_POINTER;
+                              assign_var_to_fulltype(&tmp2, *arg_types);
+                              tmp2.typeflags &= TYPE_MOD_MASK;
+                              tmp2.typeflags &= ~TYPE_MOD_POINTER;
+
                               for (i = anum_arg - num_arg; --i >=0; )
                               {
-                                  tmp1 = *argp++ & TYPE_MOD_RMASK;
+                                  assign_var_to_fulltype(&tmp1, *argp);
+                                  tmp1.typeflags &= TYPE_MOD_RMASK;
+                                  argp++;
+
                                   if (!MASKED_TYPE(tmp1,tmp2))
                                   {
                                       yyerrorf("Bad type for argument %d of %s %s",
@@ -11866,7 +12291,7 @@ function_call:
 
                   /* Check the types of the arguments
                    */
-                  if (max != -1 && exact_types && num_arg)
+                  if (max != -1 && exact_types.typeflags && num_arg)
                   {
                       int        argn;
                       vartype_t *aargp;
@@ -11881,50 +12306,52 @@ function_call:
                           fulltype_t tmp1, tmp2;
                           fulltype_t *beginArgp = argp;
 
-                          tmp1 = *aargp++ & TYPE_MOD_MASK;
+                          assign_var_to_fulltype(&tmp1, *aargp); aargp++;
+                          tmp1.typeflags &= TYPE_MOD_MASK;
                           for (;;)
                           {
-                              if ( !(tmp2 = *argp) )
+                              tmp2 = *argp;
+                              argp++;
+                              if ( !tmp2.typeflags )
                               {
                                   /* Possible types for this arg exhausted */
                                   efun_argument_error(argn+1, f, beginArgp
-                                                     , aargp[-1]);
+                                                     , tmp1);
                                   break;
                               }
-                              argp++;
 
                               /* break if types are compatible; take care to
                                * handle references correctly
                                */
-                              if (tmp1 == tmp2
+                              if (equal_types(tmp1, tmp2)
 #ifdef USE_STRUCTS
                                || (IS_TYPE_STRUCT(tmp1) && IS_TYPE_STRUCT(tmp2))
 #endif
                                  )
                                   break;
 
-                              if ((tmp1 &
+                              if ((tmp1.typeflags &
                                      ~(TYPE_MOD_POINTER|TYPE_MOD_REFERENCE)) ==
                                     TYPE_ANY)
                               {
-                                  if (tmp1 & TYPE_MOD_POINTER & ~tmp2)
+                                  if (tmp1.typeflags & TYPE_MOD_POINTER & ~tmp2.typeflags)
                                   {
-                                      if ((tmp2 & ~TYPE_MOD_REFERENCE) !=
+                                      if ((tmp2.typeflags & ~TYPE_MOD_REFERENCE) !=
                                             TYPE_ANY)
                                       {
                                           continue;
                                       }
                                   }
-                                  if ( !( (tmp1 ^ tmp2) & TYPE_MOD_REFERENCE) )
+                                  if ( !( (tmp1.typeflags ^ tmp2.typeflags) & TYPE_MOD_REFERENCE) )
                                       break;
                               }
-                              else if ((tmp2 &
+                              else if ((tmp2.typeflags &
                                      ~(TYPE_MOD_POINTER|TYPE_MOD_REFERENCE)) ==
                                     TYPE_ANY)
                               {
-                                  if (tmp2 & TYPE_MOD_POINTER & ~tmp1)
+                                  if (tmp2.typeflags & TYPE_MOD_POINTER & ~tmp1.typeflags)
                                       continue;
-                                  if ( !( (tmp1 ^ tmp2) & TYPE_MOD_REFERENCE) )
+                                  if ( !( (tmp1.typeflags ^ tmp2.typeflags) & TYPE_MOD_REFERENCE) )
                                       break;
                               }
                           } /* end for (efun_arg_types) */
@@ -11932,7 +12359,7 @@ function_call:
                           /* Advance argp to point to the allowed argtypes
                            * of the next arg.
                            */
-                          while(*argp++) NOOP;
+                          while((argp++)->typeflags) NOOP;
                       } /* for (all args) */
                   } /* if (check arguments) */
 
@@ -11970,7 +12397,7 @@ function_call:
                    * This is especially important is ap_needed, as the
                    * restore_arg_frame expects a result on the stack.
                    */
-                  if ( instrs[f].ret_type == TYPE_VOID )
+                  if ( instrs[f].ret_type.typeflags == TYPE_VOID )
                   {
                       last_expression = mem_block[A_PROGRAM].current_size;
                       add_f_code(F_CONST0);
@@ -11981,7 +12408,7 @@ function_call:
               else if (efun_override)
               {
                   yyerrorf("Unknown efun: %s", get_txt($1.real->name));
-                  $$.type = TYPE_ANY;
+                  $$.type = Type_Any;
               }
               else
               {
@@ -11994,14 +12421,14 @@ function_call:
                   function_t *funp;
 
                   f = define_new_function(MY_FALSE,
-                      $1.real, 0, 0, 0, NAME_UNDEFINED, TYPE_UNKNOWN
+                      $1.real, 0, 0, 0, NAME_UNDEFINED, Type_Unknown
                   );
                   ap_needed = MY_TRUE;
                   add_f_code(F_CALL_FUNCTION);
                   add_short(f);
                   CURRENT_PROGRAM_SIZE += 3;
                   funp = FUNCTION(f);
-                  if (exact_types)
+                  if (exact_types.typeflags)
                   {
                       yyerrorf("Undefined function '%.50s'", get_txt($1.real->name));
                   }
@@ -12009,7 +12436,7 @@ function_call:
                   {
                       yywarnf("Undefined function '%.50s'", get_txt($1.real->name));
                   }
-                  $$.type = TYPE_ANY;  /* Just a guess */
+                  $$.type = Type_Any;  /* Just a guess */
               }
           } while (0); /* Function handling */
 
@@ -12267,7 +12694,8 @@ function_call:
                   add_byte(call_other_sefun);
                   CURRENT_PROGRAM_SIZE += 2;
               }
-              $$.type = funp->type & TYPE_MOD_MASK;
+              $$.type = funp->type;
+              $$.type.typeflags &= TYPE_MOD_MASK;
           }
           else /* true call_other */
           {
@@ -12334,10 +12762,11 @@ call_other_name:
     |  '(' expr0 ')'
       {
           $$ = NULL;
-          if ($2.type != TYPE_STRING
-           && (pragma_strict_types != PRAGMA_WEAK_TYPES || $2.type != TYPE_UNKNOWN)
-           && $2.type != TYPE_ANY)
-              type_error("Illegal type for lfun name", (p_int)$2.type);
+          if ($2.type.typeflags != TYPE_STRING
+           && (pragma_strict_types != PRAGMA_WEAK_TYPES
+               || $2.type.typeflags != TYPE_UNKNOWN)
+           && $2.type.typeflags != TYPE_ANY)
+              type_error("Illegal type for lfun name", $2.type);
       }
 
 ; /* call_other_name */
@@ -12542,9 +12971,10 @@ inline_fun:
            ident_t * save_all_locals;
            int save_current_number_of_locals;
            int save_max_number_of_locals;
-           int save_tol[10], save_ftol[10];
+           fulltype_t save_ftol[10];
            char name[3];
            int num, i;
+           fulltype_t ftype;
 
            /* Save the old locals information */
            save_all_locals = all_locals;
@@ -12564,17 +12994,19 @@ inline_fun:
            for (i = 0; i < 9; i++)
            {
                save_tol[i] = type_of_locals[i];
-               save_ftol[i] = full_type_of_locals[i];
+               save_ftol[i] = type_of_locals[i];
                name[1] = (char)('1' + i);
                add_local_name(make_shared_identifier( name, I_TYPE_UNKNOWN
                                                     , block_depth)
-                             , TYPE_ANY, block_depth, MY_TRUE);
+                             , Type_Any, block_depth, MY_TRUE);
            }
 
            /* Declare the function */
+           ftype = Type_Unknown;
+           ftype.typeflags |= TYPE_MOD_VARARGS | TYPE_MOD_PRIVATE;
            num = define_new_function(MY_FALSE, /* id */ $1, 9, 0, 0
                                     , NAME_UNDEFINED|NAME_PROTOTYPE
-                                    , TYPE_UNKNOWN|TYPE_MOD_VARARGS|TYPE_MOD_PRIVATE
+                                    , ftype
                                     );
 
            /* Restore the old locals information */
@@ -12586,8 +13018,7 @@ inline_fun:
 
            for (i = 0; i < 9; i++)
            {
-               type_of_locals[i] = save_tol[i];
-               full_type_of_locals[i] = save_ftol[i];
+               type_of_locals[i] = save_ftol[i];
            }
 
            /* Insert the call to the lfun closure */
@@ -12682,7 +13113,7 @@ catch:
           ins_f_code(F_RESTORE_ARG_FRAME);
 
           $$.start = start;
-          $$.type  = TYPE_ANY;
+          $$.type  = Type_Any;
           $$.code = -1;
       }
 ; /* catch */
@@ -12723,7 +13154,7 @@ sscanf:
           ins_f_code(F_SSCANF);
           ins_byte($7 + 2);
           $$.start = $2.start;
-          $$.type = TYPE_NUMBER;
+          $$.type = Type_Number;
           $$.code = -1;
       }
 ; /* sscanf */
@@ -12736,7 +13167,7 @@ parse_command:
           ins_f_code(F_PARSE_COMMAND);
           ins_byte($9 + 3);
           $$.start = $2.start;
-          $$.type = TYPE_NUMBER;
+          $$.type = Type_Number;
           $$.code = -1;
       }
 ; /* parse_command */
@@ -12822,21 +13253,22 @@ lvalue_list:
                 F_PROTECTED_AINDEX_LVALUE
               );
 
-          if ($4.type1 & TYPE_MOD_REFERENCE)
+          if ($4.type1.typeflags & TYPE_MOD_REFERENCE)
               yyerror("Reference used as index");
 
-          if (exact_types)
+          if (exact_types.typeflags)
           {
-              vartype_t type;
+              fulltype_t type;
 
               type = $3.type;
-              if ( !(type & TYPE_MOD_POINTER) )
-                 switch (type)
+              type.typeflags &= TYPEID_MASK;
+              if ( !(type.typeflags & TYPE_MOD_POINTER) )
+                 switch (type.typeflags)
                  {
                  case TYPE_MAPPING:
                      if ($4.inst == F_INDEX)
                      {
-                        $4.type1 = TYPE_ANY;
+                        $4.type1 = Type_Any;
                         break;
                      }
                      /* FALLTHROUGH */
@@ -12845,13 +13277,13 @@ lvalue_list:
                      /* FALLTHROUGH */
                  case TYPE_ANY:
                      if ($4.inst == F_INDEX)
-                         $4.type1 = TYPE_ANY;
-                     $4.type1 = TYPE_ANY;
+                         $4.type1 = Type_Any;
+                     $4.type1 = Type_Any;
                      break;
                  case TYPE_STRING:
                      break;
                  }
-                 if (!BASIC_TYPE($4.type1, TYPE_NUMBER))
+                 if (!BASIC_TYPE($4.type1, Type_Number))
                      type_error("Bad type of index", $4.type1);
           }
       }
@@ -12864,21 +13296,23 @@ lvalue_list:
 
           $$ = 1 + $1;
           ins_f_code(F_PUSH_PROTECTED_INDEXED_MAP_LVALUE);
-          if ($5.type & TYPE_MOD_REFERENCE)
+          if ($5.type.typeflags & TYPE_MOD_REFERENCE)
                 yyerror("Reference used as index");
 
           /* Compute and check types */
-          if (exact_types)
+          if (exact_types.typeflags)
           {
-              vartype_t type;
+              fulltype_t type;
 
               type = $3.type;
-              if (type != TYPE_ANY && type != TYPE_MAPPING)
+              type.typeflags &= TYPEID_MASK;
+              if (type.typeflags != TYPE_ANY && type.typeflags != TYPE_MAPPING)
               {
                   type_error("Bad type to indexed value", type);
               }
               type = $7.type;
-              if (type != TYPE_ANY && type != TYPE_NUMBER)
+              type.typeflags &= TYPEID_MASK;
+              if (type.typeflags != TYPE_ANY && type.typeflags != TYPE_NUMBER)
                   type_error("Bad type of index", type);
           }
       }
@@ -12916,62 +13350,74 @@ lvalue_list:
           );
 
           /* Compute and check types */
-          if (exact_types)
+          if (exact_types.typeflags)
           {
-              vartype_t type;
+              fulltype_t type;
 
               type = $3.type;
-              if ((type & TYPE_MOD_POINTER) == 0
-                && type != TYPE_ANY && type != TYPE_STRING)
+              type.typeflags &= TYPEID_MASK;
+              if ((type.typeflags & TYPE_MOD_POINTER) == 0
+                && type.typeflags != TYPE_ANY && type.typeflags != TYPE_STRING)
               {
                   type_error("Bad type of argument used for range", type);
               }
               type = $4.type1;
-              if (type != TYPE_ANY && type != TYPE_NUMBER)
+              type.typeflags &= TYPEID_MASK;
+              if (type.typeflags != TYPE_ANY && type.typeflags != TYPE_NUMBER)
                   type_error("Bad type of index", type);
               type = $4.type2;
-              if (type != TYPE_ANY && type != TYPE_NUMBER)
+              type.typeflags &= TYPEID_MASK;
+              if (type.typeflags != TYPE_ANY && type.typeflags != TYPE_NUMBER)
                   type_error("Bad type of index", type);
           }
       }
 
 %ifdef USE_STRUCTS
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | lvalue_list ',' expr4 L_ARROW identifier
+    | lvalue_list ',' expr4 L_ARROW struct_member_name
       {
           /* Create a reference to a struct member */
 
           $$ = 1 + $1;
 
-          if (($3.type & ~SEC_TYPE_MASK) != T_STRUCT)
+          if (!IS_TYPE_STRUCT($3.type))
           {
               yyerrorf("Bad type for struct lookup: %s"
                       , get_type_name($3.type));
           }
-          else
+          else if ($5 != NULL)
           {
               int num;
-              struct_def_t * pdef = &(STRUCT_DEF(GET_SEC_TYPE_INFO($3.type)-1));
+              struct_type_t * ptype = $3.type.t_struct;
 
-              num = find_struct_member(pdef, $5);
+              num = struct_find_member(ptype, $5);
               if (num < 0)
               {
                   yyerrorf("No such member '%s' for struct '%s'"
-                          , get_txt($5), get_txt(pdef->name)
+                          , get_txt($5)
+                          , get_txt(struct_t_name(ptype))
                           );
               }
               else
               {
                   /* Insert the index code */
                   ins_f_code(F_CLIT);
-                  ins_byte(num+1);
+                  ins_byte(num);
 
                   arrange_protected_lvalue($3.start, $3.code, $3.end,
-                     F_PROTECTED_INDEX_LVALUE
+                     F_PROTECTED_INDEX_S_LVALUE
                   );
               }
           }
-          free_mstring($5);
+          else /* Runtime lookup */
+          {
+              arrange_protected_lvalue($3.start, $3.code, $3.end,
+                 F_PROTECTED_INDEX_S_LVALUE
+              );
+          }
+
+          if ($5 != NULL)
+              free_mstring($5);
       }
 %endif /* USE_STRUCTS */
 
@@ -13135,13 +13581,14 @@ struct_constant:
       {
           /* Generate a literal struct */
 
-          struct_def_t * pdef = &(STRUCT_DEF($<struct_const_init>5.id-1));
+          struct_def_t * pdef = &(STRUCT_DEF($<struct_const_init>5.id));
           svalue_t     * svp = $<struct_const_init>5.initialized;
 
-          if ($6.length > STRUCT_MAX_MEMBERS || $6.length > pdef->num_members)
+          if ($6.length > STRUCT_MAX_MEMBERS
+           || $6.length > struct_t_size(pdef->type))
           {
               yyerrorf("Too many elements for literal struct '%s'"
-                      , get_txt(pdef->name));
+                      , get_txt(struct_t_name(pdef->type)));
               free_svalue(svp);
                 /* Calls free_const_list_svalue() by means of error handler */
               put_number(svp, 0);
@@ -13453,6 +13900,10 @@ arrange_protected_lvalue (p_int start, int code, p_int end, int newcode)
  *     Cases are:
  *         global
  *             IDENTIFIER16 -> PUSH_IDENTIFIER16_LVALUE
+#ifdef USE_STRUCTS
+ *         expr4->x
+ *             S_INDEX      -> PUSH_PROTECTED_INDEXED_S_LVALUE
+#endif
  *         expr4[x]
  *             INDEX        -> PUSH_PROTECTED_INDEXED_LVALUE
  *         expr4[<x]
@@ -13497,8 +13948,12 @@ arrange_protected_lvalue (p_int start, int code, p_int end, int newcode)
  *     Cases accepted by the function:
  *         &(expr4[x]):  F_PROTECTED_INDEX_LVALUE
  *                       -> F_PUSH_PROTECTED_INDEXED_LVALUE;
- *         &(expr4[<x]): F_PROTECTED_INDEX_LVALUE
- *                       -> F_PUSH_PROTECTED_INDEXED_LVALUE;
+ *         &(expr4[<x]): F_PROTECTED_RINDEX_LVALUE
+ *                       -> F_PUSH_PROTECTED_RINDEXED_LVALUE;
+#ifdef USE_STRUCTS
+ *         &(expr4->x):  F_PROTECTED_INDEX_S_LVALUE
+ *                       -> F_PUSH_PROTECTED_INDEXED_S_LVALUE;
+#endif
  *
  * TODO: I am surprised this works at all.
  */
@@ -13545,6 +14000,11 @@ arrange_protected_lvalue (p_int start, int code, p_int end, int newcode)
             /* Adjust the code... */
             switch(code)
             {
+#ifdef USE_STRUCTS
+            case F_PUSH_INDEXED_S_LVALUE:
+                code = F_PUSH_PROTECTED_INDEXED_S_LVALUE;
+                break;
+#endif /* USE_STRUCTS */
             case F_PUSH_INDEXED_LVALUE:
                 code = F_PUSH_PROTECTED_INDEXED_LVALUE;
                 break;
@@ -13607,6 +14067,11 @@ arrange_protected_lvalue (p_int start, int code, p_int end, int newcode)
 
         switch(newcode)
         {
+#ifdef USE_STRUCTS
+        case F_PROTECTED_INDEX_S_LVALUE:
+            newcode = F_PUSH_PROTECTED_INDEXED_S_LVALUE;
+            break;
+#endif /* USE_STRUCTS */
         case F_PROTECTED_INDEX_LVALUE:
             newcode = F_PUSH_PROTECTED_INDEXED_LVALUE;
             break;
@@ -13685,7 +14150,7 @@ transfer_init_control (void)
 
         store_function_header( CURRENT_PROGRAM_SIZE
                              , STR_VARINIT
-                             , TYPE_ANY
+                             , Type_Any
                              , 0 /* num_args */
                              , 0 /* num_vars */
                              );
@@ -13693,19 +14158,19 @@ transfer_init_control (void)
                                   + FUNCTION_PRE_HDR_SIZE;
         CURRENT_PROGRAM_SIZE += FUNCTION_HDR_SIZE;
     }
-    else if ((p_int)(CURRENT_PROGRAM_SIZE - 2) == last_initializer_end)
+    else if ((p_int)(CURRENT_PROGRAM_SIZE - 3) == last_initializer_end)
     {
         /* The new INIT fragment directly follows the old one, so
          * just overwrite the JUMP instruction of the last.
          */
-        mem_block[A_PROGRAM].current_size -= 3;
+        mem_block[A_PROGRAM].current_size -= 4;
     }
     else
     {
         /* Change the address of the last jump after the last
          * initializer to this point.
          */
-        upd_short(last_initializer_end, mem_block[A_PROGRAM].current_size);
+        upd_jump_offset(last_initializer_end, mem_block[A_PROGRAM].current_size);
     }
 } /* transfer_init_control() */
 
@@ -13720,6 +14185,7 @@ add_new_init_jump (void)
 {
     ins_f_code(F_JUMP);
     last_initializer_end = (p_int)mem_block[A_PROGRAM].current_size;
+    ins_byte(0);
     ins_short(0);
 } /* add_new_init_jump() */
 
@@ -13851,9 +14317,10 @@ lookup_inherited (char *super_name, string_t *real_name
             prog2 = ip2->prog;
 
             if ( 0 != (numvar2 = prog2->num_variables)
-             &&  prog1->variable_names[ip2->variable_index_offset+numvar2-1].flags
+             && prog1->variables[ip2->variable_index_offset+numvar2-1
+                                ].type.typeflags
                  & TYPE_MOD_VIRTUAL
-             &&  !(prog2->variable_names[numvar2-1].flags & TYPE_MOD_VIRTUAL) )
+             &&  !(prog2->variables[numvar2-1].type.typeflags & TYPE_MOD_VIRTUAL) )
             {
                 /* The source was virtually inherited - we have to find
                  * the first inheritance of the program.
@@ -13957,6 +14424,7 @@ insert_inherited (char *super_name, string_t *real_name
         {
             int i2 = found_ix;
             fun_hdr_p funstart;
+            vartype_t rtype;
 
             /* Find the real function code */
             while ( (flags = ip->prog->functions[i2]) & NAME_INHERITED)
@@ -13965,10 +14433,12 @@ insert_inherited (char *super_name, string_t *real_name
                 i2 -= ip->function_index_offset;
             }
             funstart = &ip->prog->program[flags & FUNSTART_MASK];
-            fun_p->type = FUNCTION_TYPE(funstart);
+            memcpy(&rtype, FUNCTION_TYPEP(funstart), sizeof(rtype));
+            assign_var_to_fulltype(&fun_p->type, rtype);
+            ref_fulltype_data(&fun_p->type);
             fun_p->num_arg = (FUNCTION_NUM_ARGS(funstart) & 0x7f);
             if (FUNCTION_NUM_ARGS(funstart) & ~0x7f)
-                fun_p->type |= TYPE_MOD_XVARARGS;
+                fun_p->type.typeflags |= TYPE_MOD_XVARARGS;
         }
         return found_ix;
     } /* if (ip) */
@@ -14045,9 +14515,10 @@ insert_inherited (char *super_name, string_t *real_name
                 prog2 = ip2->prog;
 
                 if ( 0 != (numvar2 = prog2->num_variables)
-                 &&  prog1->variable_names[ip2->variable_index_offset+numvar2-1].flags
+                 &&  prog1->variables[ip2->variable_index_offset+numvar2-1
+                                     ].type.typeflags
                      & TYPE_MOD_VIRTUAL
-                 &&  !(prog2->variable_names[numvar2-1].flags & TYPE_MOD_VIRTUAL) )
+                 &&  !(prog2->variables[numvar2-1].type.typeflags & TYPE_MOD_VIRTUAL) )
                 {
                     /* The function was virtually inherited - we have to find
                      * the first inheritance of that program and adjust the
@@ -14091,6 +14562,7 @@ insert_inherited (char *super_name, string_t *real_name
                 inherit_t *ip2 = ip;
                 int i2 = i;
                 fun_hdr_p funstart;
+                vartype_t rtype;
 
                 /* Find the real function code */
                 while ( (flags = ip2->prog->functions[i2]) & NAME_INHERITED)
@@ -14100,7 +14572,9 @@ insert_inherited (char *super_name, string_t *real_name
                 }
 
                 funstart = &ip2->prog->program[flags & FUNSTART_MASK];
-                fun_p->type = FUNCTION_TYPE(funstart);
+                memcpy(&rtype, FUNCTION_TYPEP(funstart), sizeof(rtype));
+                assign_var_to_fulltype(&fun_p->type, rtype);
+                ref_fulltype_data(&fun_p->type);
                 fun_p->num_arg = FUNCTION_NUM_ARGS(funstart);
             }
             calls++;
@@ -14183,28 +14657,23 @@ get_function_id (program_t *progp, int fx)
 /*-------------------------------------------------------------------------*/
 #ifdef USE_STRUCTS
 static void
-copy_structs (program_t *from, fulltype_t flags, int offset)
+copy_structs (program_t *from, funflag_t flags)
 
 /* Copy the struct definitions from program <from> which is inherited
- * with visibility <flags>. <offset> is the struct_index_offset of the
- * inherited program in the struct_defs table.
+ * with visibility <flags>.
  */
 
 {
     int struct_id;
-
-    if (STRUCT_COUNT + from->num_structs >= MAX_SEC_TYPE_INFO)
-    {
-        yyerror("Too many structs declared");
-        return;
-    }
 
     for (struct_id = 0; struct_id < from->num_structs; struct_id++)
     {
         int id;
         ident_t *p;
         struct_def_t *pdef = from->struct_defs + struct_id;
-        fulltype_t f = flags | pdef->flags;
+        funflag_t f;
+        
+        f = flags | pdef->flags;
 
         /* Is this struct visible to us? */
         if (pdef->flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN))
@@ -14213,50 +14682,48 @@ copy_structs (program_t *from, fulltype_t flags, int offset)
         }
 
         /* Duplicate definition? */
-        id = find_struct(pdef->name);
-        if (!(f & NAME_HIDDEN) && id > 0)
+        id = find_struct(struct_t_name(pdef->type));
+        if (!(f & NAME_HIDDEN) && id >= 0)
         {
             /* We have a struct with this name. Check if we just
              * inherited it again, or if it's a name clash.
              */
-            if (!mstreq(STRUCT_DEF(id-1).unique_name, pdef->unique_name))
+            if (STRUCT_DEF(id).type != pdef->type)
             {
-                yyerrorf("struct '%s' multiply inherited from '%s' "
-                         "and '%s'"
-                        , get_txt(STRUCT_DEF(id-1).name)
-                        , get_txt(INHERIT(STRUCT_DEF(id-1).inh).prog->name)
-                        , get_txt(from->name)
-                        );
+                if (STRUCT_DEF(id).inh >= 0)
+                {
+                    inherit_t * pInh = &INHERIT(STRUCT_DEF(id).inh);
+                    yyerrorf("Different structs '%s' inherited from '%s' "
+                             "and from '%s'"
+                            , get_txt(struct_t_name(STRUCT_DEF(id).type))
+                            , get_txt(from->name)
+                            , get_txt(pInh->prog->name)
+                            );
+                }
+                else
+                    yyerrorf("struct '%s' inherited from '%s' differs "
+                             "from existing struct"
+                            , get_txt(struct_t_name(STRUCT_DEF(id).type))
+                            , get_txt(from->name)
+                            );
+                continue;
             }
 
             f |= NAME_HIDDEN;
         }
 
         /* New struct */
-        p = make_global_identifier(get_txt(pdef->name), I_TYPE_GLOBAL);
+        p = make_global_identifier(get_txt(struct_t_name(pdef->type)), I_TYPE_GLOBAL);
         if (p == NULL)
             continue;
 
+        /* Create a new struct entry, then replace the struct prototype
+         * type with the one we inherited.
+         */
         current_struct = define_new_struct( MY_FALSE, p, f);
-
-        STRUCT_DEF(current_struct-1).unique_name = ref_mstring(pdef->unique_name);
-        STRUCT_DEF(current_struct-1).base += offset;
-
-        /* Now copy the members */
-        if (!(f & NAME_HIDDEN))
-        {
-            struct_member_t *pmember;
-            int count;
-
-            for (count = 0, pmember = &(from->struct_members[pdef->members])
-                ; count < pdef->num_members
-                ; count++, pmember++
-                )
-            {
-                add_struct_member( pmember->name
-                                 , adjust_struct_id(pmember->type, offset), -1);
-            }
-        }
+        free_struct_type(STRUCT_DEF(current_struct).type);
+        STRUCT_DEF(current_struct).type = ref_struct_type(pdef->type);
+        STRUCT_DEF(current_struct).inh = INHERIT_COUNT;
     }
 } /* copy_structs() */
 #endif /* USE_STRUCTS */
@@ -14269,19 +14736,13 @@ static
        void
 %endif
 
-copy_functions (program_t *from, fulltype_t type
-#ifdef USE_STRUCTS
-               , int struct_offset
-#endif
-               )
+copy_functions (program_t *from, funflag_t type)
 
 /* The functions of the program <from> are inherited with visibility <type>.
  * Copy all the function definitions into this program, but as UNDEFINED
  * so that they can be redefined in the current program. The epilog()
  * will later update the non-redefined inherited functions and also copy
  * the types.
- * struct arguments and return types  have their struct id adjusted
- * by <struct_offset>.
  *
  * An explicit call to an inherited function will not be
  * done through this entry (because this entry can be replaced by a new
@@ -14333,6 +14794,7 @@ copy_functions (program_t *from, fulltype_t type
         inherit_t *ip;
         fun_hdr_p  funstart;
         funflag_t  flags;
+        vartype_t  rtype;
         int i2; /* The index of the real function */
 
         flags = from->functions[i];
@@ -14371,10 +14833,12 @@ copy_functions (program_t *from, fulltype_t type
         /* Copy the function information */
         funstart = &defprog->program[flags & FUNSTART_MASK];
         memcpy(&fun_p->name, FUNCTION_NAMEP(funstart), sizeof fun_p->name);
-        fun_p->type = FUNCTION_TYPE(funstart);
+        memcpy(&rtype, FUNCTION_TYPEP(funstart), sizeof(rtype));
+        assign_var_to_fulltype(&fun_p->type, rtype);
+        ref_fulltype_data(&fun_p->type);
         fun_p->num_arg = FUNCTION_NUM_ARGS(funstart) & 0x7f;
         if (FUNCTION_NUM_ARGS(funstart) & ~0x7f)
-            fun_p->type |= TYPE_MOD_XVARARGS;
+            fun_p->type.typeflags |= TYPE_MOD_XVARARGS;
         if (FUNCTION_CODE(funstart)[0] == F_UNDEF)
         {
             fun_p->flags |= NAME_UNDEFINED;
@@ -14417,10 +14881,6 @@ copy_functions (program_t *from, fulltype_t type
 
         fun.flags |= type & TYPE_MOD_NO_MASK;
 
-#ifdef USE_STRUCTS
-        fun.type = adjust_struct_id(fun.type, struct_offset);
-#endif /* USE_STRUCTS */
-
         /* Perform a lot of tests and actions for the visibility
          * and definitiability. The switch() allows us to abort
          * easily without using gotos.
@@ -14434,7 +14894,7 @@ copy_functions (program_t *from, fulltype_t type
              * TODO: Find out why it crashes.
              */
             {
-                fulltype_t fflags = fun.flags;
+                funflag_t fflags = fun.flags;
 
                 if ((fflags & (TYPE_MOD_PRIVATE|TYPE_MOD_NO_MASK))
                  == (TYPE_MOD_PRIVATE|TYPE_MOD_NO_MASK)
@@ -14561,7 +15021,7 @@ copy_functions (program_t *from, fulltype_t type
                              * TODO:: developed iteratively from .367
                              * TODO:: through .370. It should be reconsidered,
                              * TODO:: which of course implies a deeper
-                             * TODO:: analysis of the going ons here.
+                             * TODO:: analysis of the going-ons here.
                              */
                             cross_define( OldFunction, &fun
                                         , n - current_func_index );
@@ -14696,25 +15156,11 @@ copy_functions (program_t *from, fulltype_t type
                 tmp_short = ARGTYPE_COUNT;
                 if (fun.num_arg)
                 {
-#ifdef USE_STRUCTS
-                    int count;
-                    vartype_t *arg;
-#endif /* USE_STRUCTS */
                     add_to_mem_block(
                       A_ARGUMENT_TYPES,
                       &from->argument_types[from->type_start[i]],
                       (sizeof (vartype_t)) * fun.num_arg
                     );
-#ifdef USE_STRUCTS
-                    /* If an argument type is a struct, adjust the id */
-                    for (count = 0, arg = &ARGUMENT_TYPE(tmp_short)
-                        ; count < fun.num_arg
-                        ; count++, arg++
-                        )
-                    {
-                        *arg = adjust_struct_id(*arg, struct_offset);
-                    }
-#endif /* USE_STRUCTS */
                 }
 
             }
@@ -14740,18 +15186,14 @@ copy_functions (program_t *from, fulltype_t type
 
 /*-------------------------------------------------------------------------*/
 static void
-copy_variables (program_t *from, fulltype_t type
+copy_variables (program_t *from, funflag_t type
 
 %ifndef INITIALIZATION_BY___INIT
                , svalue_t *initializers
 %endif
-#ifdef USE_STRUCTS
-               , int struct_offset
-#endif
                )
 
-/* Inherit the variables of <from> with visibility <type>; struct variables
- * have their struct id adjusted by <struct_offset>.
+/* Inherit the variables of <from> with visibility <type>.
  * The variables are copied into our program, and it is important that
  * they are stored in the same order with the same index.
  */
@@ -14821,8 +15263,8 @@ copy_variables (program_t *from, fulltype_t type
             /* Has a new virtual variable been introduced in this program?
              */
             if (progp->num_variables
-             && from->variable_names[new_bound-1].flags & TYPE_MOD_VIRTUAL
-             && !(progp->variable_names[progp->num_variables-1].flags
+             && from->variables[new_bound-1].type.typeflags & TYPE_MOD_VIRTUAL
+             && !(progp->variables[progp->num_variables-1].type.typeflags
                   & TYPE_MOD_VIRTUAL)
                )
             {
@@ -14950,42 +15392,48 @@ copy_variables (program_t *from, fulltype_t type
         for (j = last_bound; j < new_bound; j++)
         {
             ident_t *p;
-            fulltype_t new_type;
+            funflag_t new_type;
 
-            p = make_global_identifier(get_txt(from->variable_names[j].name)
+            p = make_global_identifier(get_txt(from->variables[j].name)
                                       , I_TYPE_GLOBAL);
             if (!p)
                 return;
 
-#ifdef USE_STRUCTS
-            new_type = adjust_struct_id(type, struct_offset);
-#else
             new_type = type;
-#endif
 
             /* 'public' variables should not become private when inherited
              * 'private'.
              */
-            if (from->variable_names[j].flags & TYPE_MOD_PUBLIC)
+            if (from->variables[j].type.typeflags & TYPE_MOD_PUBLIC)
                 new_type &= ~TYPE_MOD_PRIVATE;
 
             /* define_variable checks for previous 'nomask' definition. */
             if (previous_variable_index_offset >= 0)
             {
-                if ( !(from->variable_names[j].flags & TYPE_MOD_PRIVATE) )
-                    redeclare_variable(p,
-                      new_type | from->variable_names[j].flags | NAME_INHERITED,
-                      previous_variable_index_offset + j
+                if ( !(from->variables[j].type.typeflags & TYPE_MOD_PRIVATE) )
+                {
+                    fulltype_t vtype = from->variables[j].type;
+
+                    vtype.typeflags |= new_type | NAME_INHERITED;
+                    redeclare_variable(p, vtype,
+                                       previous_variable_index_offset + j
                     );
+                }
             }
             else
             {
-                define_variable(p,
-                  new_type | from->variable_names[j].flags |
-                  (from->variable_names[j].flags & TYPE_MOD_PRIVATE ?
-                    (NAME_HIDDEN|NAME_INHERITED)  :  NAME_INHERITED )
+                fulltype_t vtype = from->variables[j].type;
+
+                vtype.typeflags |= new_type 
+                        | (from->variables[j].type.typeflags & TYPE_MOD_PRIVATE
+                           ? (NAME_HIDDEN|NAME_INHERITED)
+                           :  NAME_INHERITED
+                          )
+                ;
+
+                define_variable(p, vtype
 %ifndef INITIALIZATION_BY___INIT
-                  ,from->variable_names[j].flags & NAME_INITIALIZED ?
+                  ,from->variables[j].flags & NAME_INITIALIZED ?
                     copy_svalue(&initializers[j]) : &const0
 %endif
                 );
@@ -15374,17 +15822,15 @@ prolog (void)
         mem_block[i].max_size = START_BLOCK_SIZE;
     }
 
-    extend_mem_block(A_LOCAL_TYPES, MAX_LOCAL * sizeof(vartype_t));
-    extend_mem_block(A_FULL_LOCAL_TYPES, MAX_LOCAL * sizeof(fulltype_t));
+    extend_mem_block(A_LOCAL_TYPES, MAX_LOCAL * sizeof(fulltype_t));
+    memset(&LOCAL_TYPE(0), 0, LOCAL_TYPE_COUNT * sizeof(fulltype_t));
 
     type_of_locals = &(LOCAL_TYPE(0));
-    full_type_of_locals = &(FULL_LOCAL_TYPE(0));
 #ifdef USE_NEW_INLINES
     type_of_context = type_of_locals;
-    full_type_of_context = full_type_of_locals;
 #endif /* USE_NEW_INLINES */
 #ifdef DEBUG_INLINES
-printf("DEBUG: prolog: type ptrs: %p/%p, %p/%p\n", type_of_locals, full_type_of_locals, type_of_context, full_type_of_context );
+printf("DEBUG: prolog: type ptrs: %p, %p\n", type_of_locals, type_of_context );
 #endif /* DEBUG_INLINES */
 
     stored_lines = 0;
@@ -15395,7 +15841,7 @@ printf("DEBUG: prolog: type ptrs: %p/%p, %p/%p\n", type_of_locals, full_type_of_
     case_state.free_block = NULL;
     case_state.next_free = NULL;
 %ifdef INITIALIZATION_BY___INIT
-    last_initializer_end = -3;
+    last_initializer_end = -4; /* To pass the test in transfer_init_control() */
     variables_initialized = 0;
 %endif
     argument_level = 0;
@@ -15468,6 +15914,14 @@ epilog (void)
 
     free_case_blocks();
 
+%ifdef USE_STRUCTS
+    for (i = 0; i < STRUCT_MEMBER_COUNT; i++)
+    {
+        free_struct_member_data(&STRUCT_MEMBER(i));
+    }
+    mem_block[A_STRUCT_MEMBERS].current_size = 0;
+%endif /* USE_STRUCTS */
+
     /* Append the non-virtual variable block to the virtual ones,
      * and take care of the initializers.
      */
@@ -15505,7 +15959,8 @@ epilog (void)
 
         ip = make_global_identifier(get_txt(STR_VARINIT), I_TYPE_UNKNOWN);
         if (ip)
-            define_new_function(MY_FALSE, ip, 0, 0, first_initializer_start, TYPE_MOD_PROTECTED, 0);
+            define_new_function(MY_FALSE, ip, 0, 0, first_initializer_start
+                               , TYPE_MOD_PROTECTED, Type_Unknown);
 
         /* ref count for ip->name was incremented by transfer_init_control() */
 
@@ -15819,27 +16274,53 @@ epilog (void)
 
 #if 0 && defined(USE_STRUCTS)
 {
-    int count, i;
+    int i, j;
 
+    printf("DEBUG: --- structs in %s ---\n", current_file);
     for (i = 0; i < STRUCT_COUNT; i++)
-        printf("DEBUG: [%d] struct %s: %d members @ %d, inh %d, flags %x\n"
-              , i, get_txt(STRUCT_DEF(i).name)
-              , STRUCT_DEF(i).num_members , STRUCT_DEF(i).members
-              , STRUCT_DEF(i).inh
+    {
+        struct_type_t * ptype;
+        ptype = STRUCT_DEF(i).type;
+        printf("DEBUG: [%d] struct %s: (%s) %d members, base %s, flags %x\n"
+              , i, get_txt(ptype->name)
+              , ptype->unique_name ? get_txt(ptype->unique_name) : "<none>"
+              , ptype->num_members
+              , ptype->base ? get_txt(ptype->base->name) : "<none>"
               , STRUCT_DEF(i).flags
               );
-    printf("\n");
+        fflush(stdout);
+        for (j = 0; j < ptype->num_members; j++)
+        {
+            fulltype_t ftype;
 
-    for (i = 0; i < STRUCT_MEMBER_COUNT; i++)
-        printf("DEBUG: [%d] member %s: %x\n"
-              , i, get_txt(STRUCT_MEMBER(i).name)
-              , STRUCT_MEMBER(i).type
-              );
-    printf("\n");
+            assign_var_to_fulltype(&ftype, ptype->member[j].type);
+            printf("DEBUG:       [%d] member %s: %s\n"
+                  , j, get_txt(ptype->member[j].name)
+                  , get_type_name(ftype)
+                  );
+            fflush(stdout);
+        }
+    }
+    printf("DEBUG: ------\n");
 
 }
 #endif /* USE_STRUCTS */
-        /* One error, don't create anything */
+#ifdef USE_STRUCTS
+        /* Make sure that all structs are defined.
+         * (the actual bail out is below in the check for num_parse_error.
+         */
+        for (i = 0; i < STRUCT_COUNT; i++)
+        {
+            if (STRUCT_DEF(i).flags & NAME_PROTOTYPE)
+            {
+                yyerrorf("struct '%s' defined just as prototype"
+                        , get_txt(struct_t_name(STRUCT_DEF(i).type))
+                        );
+            }
+        }
+#endif
+
+        /* On error, don't create anything */
         if (num_parse_error > 0 || inherit_file)
             break;
 
@@ -15851,6 +16332,10 @@ epilog (void)
 
         if (!pragma_save_types)
         {
+            for (i = 0; i < ARGTYPE_COUNT; i++)
+            {
+                free_vartype_data(&ARGUMENT_TYPE(i));
+            }
             mem_block[A_ARGUMENT_TYPES].current_size = 0;
             mem_block[A_ARGUMENT_INDEX].current_size = 0;
         }
@@ -15951,7 +16436,7 @@ epilog (void)
 
         /* Add the variable descriptions
          */
-        prog->variable_names = (variable_t *)p;
+        prog->variables = (variable_t *)p;
         prog->num_variables = num_variables;
         if (mem_block[A_VIRTUAL_VAR].current_size)
             memcpy(p, mem_block[A_VIRTUAL_VAR].block,
@@ -15987,17 +16472,6 @@ epilog (void)
             prog->struct_defs = NULL;
         }
         p += align(mem_block[A_STRUCT_DEFS].current_size);
-
-        prog->num_struct_members = STRUCT_MEMBER_COUNT;
-        if (prog->num_struct_members)
-        {
-            memcpy(p, mem_block[A_STRUCT_MEMBERS].block,
-                   mem_block[A_STRUCT_MEMBERS].current_size);
-            prog->struct_members = (struct_member_t *)p;
-        } else {
-            prog->struct_members = NULL;
-        }
-        p += align(mem_block[A_STRUCT_MEMBERS].current_size);
 #endif /* USE_STRUCTS */
 
         /* Add the include file information */
@@ -16019,7 +16493,7 @@ epilog (void)
             if (mem_block[A_ARGUMENT_TYPES].current_size)
                 memcpy(p, mem_block[A_ARGUMENT_TYPES].block,
                        mem_block[A_ARGUMENT_TYPES].current_size);
-            prog->argument_types = (unsigned short *)p;
+            prog->argument_types = (vartype_t *)p;
             p += align(mem_block[A_ARGUMENT_TYPES].current_size);
             if (mem_block[A_ARGUMENT_INDEX].current_size)
                 memcpy(p, mem_block[A_ARGUMENT_INDEX].block,
@@ -16065,6 +16539,12 @@ epilog (void)
 
         /* Free the memareas */
 
+        for (i = 0; i < LOCAL_TYPE_COUNT; i++)
+            free_fulltype_data(&LOCAL_TYPE(i));
+
+        for (i = 0; i < FUNCTION_COUNT; i++)
+            free_fulltype_data(&FUNCTION(i)->type);
+
         for (i = 0; i < NUMAREAS; i++)
         {
 %ifndef INITIALIZATION_BY___INIT
@@ -16076,6 +16556,11 @@ epilog (void)
 %endif /* INITIALIZATION_BY___INIT */
             xfree(mem_block[i].block);
         }
+
+        type_of_locals = NULL;
+#ifdef USE_NEW_INLINES
+        type_of_context = NULL;
+#endif /* USE_NEW_INLINES */
 
         /* Reference the program and all inherits, but avoid multiple
          * referencing when an object inherits more than one object
@@ -16104,14 +16589,17 @@ epilog (void)
             free_svalue(&prog_variable_values[i]);
 %endif /* INITIALIZATION_BY___INIT */
 
-        /* Free all function names. */
+        /* Free all function names and type data. */
         functions = (function_t *)mem_block[A_FUNCTIONS].block;
         for (i = num_functions; --i >= 0; functions++)
+        {
             if ( !(functions->flags & (NAME_INHERITED|NAME_UNDEFINED))
              && functions->name )
             {
                 free_mstring(functions->name);
             }
+            free_fulltype_data(&functions->type);
+        }
 
         do_free_sub_strings( num_strings
                            , (string_t **)mem_block[A_STRINGS].block
@@ -16122,16 +16610,27 @@ epilog (void)
 #ifdef USE_STRUCTS
                            , STRUCT_COUNT
                            , (struct_def_t *)mem_block[A_STRUCT_DEFS].block
-                           , STRUCT_MEMBER_COUNT
-                           , (struct_member_t *)mem_block[A_STRUCT_MEMBERS].block
 #endif /* USE_STRUCTS */
                            );
+
+        /* Free the type information */
+        for (i = 0; i < ARGTYPE_COUNT; i++)
+            free_vartype_data(&ARGUMENT_TYPE(i));
+
+        for (i = 0; i < LOCAL_TYPE_COUNT; i++)
+        {
+            free_fulltype_data(&LOCAL_TYPE(i));
+        }
 
         compiled_prog = NULL;
 
         for (i = 0; i < NUMAREAS; i++)
             xfree(mem_block[i].block);
 
+        type_of_locals = NULL;
+#ifdef USE_NEW_INLINES
+        type_of_context = NULL;
+#endif /* USE_NEW_INLINES */
         return;
     }
 

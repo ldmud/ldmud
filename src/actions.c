@@ -566,7 +566,7 @@ call_modify_command (char *buff)
         {
             push_c_string(inter_sp, buff);
             svp = sapply(driver_hook[H_MODIFY_COMMAND_FNAME].u.str, ob, 1);
-            /* !command_giver means that the command_giver has been destructed. */
+            /* !command_giver means that the command_giver has been dested. */
             if (!command_giver)
                 return MY_TRUE;
         }
@@ -1212,7 +1212,7 @@ execute_command (char *str, object_t *ob)
  *
  * This is the main entry point for driver based command parsing.
  * For interactive commands, this is called from the backend loop; for other
- * commands this is called from command_for_object() (ie. the F_COMMAND efun).
+ * commands this is called from v_command().
  *
  * Note that the buffer of <str> may be modified and/or extended by this
  * call.
@@ -1464,6 +1464,7 @@ v_command (svalue_t *sp, int num_arg)
 
 /* EFUN command()
  *
+ *   int command(string str)
  *   int command(string str, object ob)
  *
  * Execute str as a command given directly by the user. Any

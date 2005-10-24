@@ -95,7 +95,14 @@
  *     then increments <p>.
  *
  *   void LOAD_INT32([unsigned] int32 d, bytecode_p p)
- *     Load the (unsigned) in32 'd' stored at <p>, then increment <p>.
+ *   void GET_INT32([unsigned] int32 d, bytecode_p p)
+ *     Load the (unsigned) in32 'd' stored at <p>, the LOAD_ variant
+ *     then increments <p>.
+ *
+ *   void STORE_INT32([unsigned] int32 d, bytecode_p p)
+ *   void PUT_INT32([unsigned] int32 d, bytecode_p p)
+ *     Store the (unsigned) int32 'd' at <p>, the STORE_ variant
+ *     then increments <p>.
  */
 
 #if CHAR_BIT == 8
@@ -155,6 +162,29 @@ typedef bytecode_t    * bytecode_p;
 #define PUT_2BYTE(p,d)  ( ((char *)(p))[0] = ((char *)&(d))[0], \
                           ((char *)(p))[1] = ((char *)&(d))[1] )
 
+#define LOAD_3BYTE(d,p) ( (d) =   ((*(unsigned char *)(p)++) << 16) \
+                                | ((*(unsigned char *)(p)++) <<  8) \
+                                | (*(unsigned char *)(p)++) )
+
+#define GET_3BYTE(d,p) ( (d) =   ((((unsigned char *)(p))[0]) << 16) \
+                               | ((((unsigned char *)(p))[1]) <<  8) \
+                               | (((unsigned char *)(p))[2]) )
+
+#define STORE_3BYTE(p,d) do {\
+                             unsigned char * _q, ** _qq; \
+                             unsigned long _d = (unsigned long)(d); \
+                             _q = (unsigned char *)(p); \
+                             _qq = (unsigned char **)&(p); \
+                             _q[0] = (unsigned char) (_d >> 16) \
+                             _q[1] = (unsigned char) (_d >> 8) \
+                             _q[2] = (unsigned char) (_d) \
+                             *_qq += 3; \
+                         } while(0)
+
+#define PUT_3BYTE(p,d)  ( ((unsigned char *)(p))[0] = (unsigned char)((d) >> 16), \
+                          ((unsigned char *)(p))[1] = (unsigned char)((d) >> 8), \
+                          ((unsigned char *)(p))[2] = (unsigned char)(d) )
+
 #define LOAD_4BYTE(d,p) ( ((char *)&(d))[0] = *(char *)(p)++, \
                           ((char *)&(d))[1] = *(char *)(p)++, \
                           ((char *)&(d))[2] = *(char *)(p)++, \
@@ -186,10 +216,12 @@ typedef bytecode_t    * bytecode_p;
                                RSTORE_2BYTE(p,_us);)
   /* TODO: This assumes sizeof(short) == 2. */
 
-#define LOAD_INT16(d,p) LOAD_2BYTE(d,p)
-#define LOAD_INT32(d,p) LOAD_2BYTE(d,p)
-#define GET_INT32(d,p)  GET_4BYTE(d,p)
-#define PUT_INT32(p,d)  PUT_4BYTE(p,d)
+#define LOAD_INT16(d,p)  LOAD_2BYTE(d,p)
+
+#define LOAD_INT32(d,p)  LOAD_4BYTE(d,p)
+#define GET_INT32(d,p)   GET_4BYTE(d,p)
+#define PUT_INT32(p,d)   PUT_4BYTE(p,d)
+#define STORE_INT32(p,d) STORE_4BYTE(p,d)
 
 #endif
 

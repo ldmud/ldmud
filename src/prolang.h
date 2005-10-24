@@ -15,7 +15,6 @@ extern short hook_type_map[];
 extern string_t *inherit_file;
 extern int num_parse_error;
 extern program_t *compiled_prog;
-extern fulltype_t exact_types;
 
 #ifndef INITIALIZATION_BY___INIT
 extern svalue_t *prog_variable_values;

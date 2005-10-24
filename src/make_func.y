@@ -738,17 +738,31 @@ code:     optional_name ID optional_optype
         check_for_duplicate_instr(f_name, $2, 0);
         instr[num_buff].code_class = current_code_class;
         num_instr[current_code_class]++;
+#ifdef USE_STRUCTS
         if ($3 == 0)
-            sprintf(buff, "{ %s, %s-%s_OFFSET, 0, 0, -1, 0, -1, -1, \"%s\", NULL },\n"
+            sprintf(buff, "{ %s, %s-%s_OFFSET, 0, 0, -1, { 0, NULL } , -1, -1, \"%s\", NULL },\n"
                         , classprefix[instr[num_buff].code_class]
                         , f_name, classtag[instr[num_buff].code_class]
                         , $1);
         else
-            sprintf(buff, "{ %s, %s-%s_OFFSET, %d, %d, 0, TYPE_ANY, -1, -1, \"%s\", NULL },\n"
+            sprintf(buff, "{ %s, %s-%s_OFFSET, %d, %d, 0, { TYPE_ANY, NULL }, -1, -1, \"%s\", NULL },\n"
                         , classprefix[instr[num_buff].code_class]
                         , f_name, classtag[instr[num_buff].code_class]
                         , $3, $3
                         , $1);
+#else
+        if ($3 == 0)
+            sprintf(buff, "{ %s, %s-%s_OFFSET, 0, 0, -1, { 0 } , -1, -1, \"%s\", NULL },\n"
+                        , classprefix[instr[num_buff].code_class]
+                        , f_name, classtag[instr[num_buff].code_class]
+                        , $1);
+        else
+            sprintf(buff, "{ %s, %s-%s_OFFSET, %d, %d, 0, { TYPE_ANY }, -1, -1, \"%s\", NULL },\n"
+                        , classprefix[instr[num_buff].code_class]
+                        , f_name, classtag[instr[num_buff].code_class]
+                        , $3, $3
+                        , $1);
+#endif /* USE_STRUCTS */
         if (strlen(buff) > sizeof buff)
             fatal("Local buffer overflow!\n");
         instr[num_buff].f_name = f_name;
@@ -920,18 +934,33 @@ func: type ID optional_ID '(' arg_list optional_default ')' optional_name ';'
             char * tag;
 
             tag = (code_class == C_EFUN) ? classtag[C_CODE] : classtag[code_class];
-            sprintf(buff, "{ %s, %s-%s_OFFSET, %d, %d, %s, %s, %d, %d, \"%s\""
+#ifdef USE_STRUCTS
+            sprintf(buff, "{ %s, %s-%s_OFFSET, %d, %d, %s, { %s, NULL }, %d, %d, \"%s\""
                         , f_prefix, f_name, tag
                         , unlimit_max ? -1 : max_arg, min_arg
                         , $6, ctype($1), arg_index, lpc_index, $2
                    );
-        }
-        else
-        {
-            sprintf(buff, "{ 0, 0, %d, %d, %s, %s, %d, %d, \"%s\""
+#else
+            sprintf(buff, "{ %s, %s-%s_OFFSET, %d, %d, %s, { %s }, %d, %d, \"%s\""
+                        , f_prefix, f_name, tag
                         , unlimit_max ? -1 : max_arg, min_arg
                         , $6, ctype($1), arg_index, lpc_index, $2
                    );
+#endif /* USE_STRUCTS */
+        }
+        else
+        {
+#ifdef USE_STRUCTS
+            sprintf(buff, "{ 0, 0, %d, %d, %s, { %s, NULL}, %d, %d, \"%s\""
+                        , unlimit_max ? -1 : max_arg, min_arg
+                        , $6, ctype($1), arg_index, lpc_index, $2
+                   );
+#else
+            sprintf(buff, "{ 0, 0, %d, %d, %s, { %s }, %d, %d, \"%s\""
+                        , unlimit_max ? -1 : max_arg, min_arg
+                        , $6, ctype($1), arg_index, lpc_index, $2
+                   );
+#endif /* USE_STRUCTS */
         }
 
         if ($8 != NULL)
@@ -2855,15 +2884,24 @@ create_efun_defs (void)
 " */\n\n"
           );
     fprintf(fpw, "fulltype_t efun_arg_types[] = {\n    /*   0 */ ");
-    for (i = 0; i < last_current_type; i++) {
+    for (i = 0; i < last_current_type; i++)
+    {
         if (arg_types[i] == 0)
         {
-            fprintf(fpw, "0,\n");
+#ifdef USE_STRUCTS
+            fprintf(fpw, "{ 0, NULL },\n");
+#else
+            fprintf(fpw, "{ 0 },\n");
+#endif /* USE_STRUCTS */
             if (i < last_current_type - 1)
                 fprintf(fpw, "    /* %3d */ ", i+1);
         }
         else
-            fprintf(fpw, "%s,", ctype(arg_types[i]));
+#ifdef USE_STRUCTS
+            fprintf(fpw, "{ %s, NULL }, ", ctype(arg_types[i]));
+#else
+            fprintf(fpw, "{ %s }, ", ctype(arg_types[i]));
+#endif /* USE_STRUCTS */
     }
     fprintf(fpw, "};\n\n\n");
 

@@ -1,6 +1,9 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+02-Jan-2003 (Lars Duening)  (3.3.344)
+  - (many files): Improved and reworte the struct implementation.
+
 30-Dec-2002 (Lars Duening)  (3.3.343)
   - (configure, ptmalloc/, xalloc.c) Gawain adapted the threadsafe
        ptmalloc2 for use with the driver (GC not supported yet).

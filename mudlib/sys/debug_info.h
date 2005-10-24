@@ -66,53 +66,58 @@
 #define DID_ST_MAPPINGS           28
 #define DID_ST_MAPPINGS_SIZE      29
 
-#define DID_ST_PROGS              30
-#define DID_ST_PROGS_SIZE         31
+#define DID_ST_STRUCTS            30
+#define DID_ST_STRUCTS_SIZE       31
+#define DID_ST_STRUCT_TYPES       32
+#define DID_ST_STRUCT_TYPES_SIZE  33
 
-#define DID_ST_PROGS_SWAPPED      32
-#define DID_ST_PROGS_SWAP_SIZE    33
+#define DID_ST_PROGS              34
+#define DID_ST_PROGS_SIZE         35
 
-#define DID_ST_USER_RESERVE       34
-#define DID_ST_MASTER_RESERVE     35
-#define DID_ST_SYSTEM_RESERVE     36
+#define DID_ST_PROGS_SWAPPED      36
+#define DID_ST_PROGS_SWAP_SIZE    37
 
-#define DID_ST_ADD_MESSAGE        37
-#define DID_ST_PACKETS            38
-#define DID_ST_PACKET_SIZE        39
+#define DID_ST_USER_RESERVE       38
+#define DID_ST_MASTER_RESERVE     39
+#define DID_ST_SYSTEM_RESERVE     40
 
-#define DID_ST_APPLY              40
-#define DID_ST_APPLY_HITS         41
+#define DID_ST_ADD_MESSAGE        41
+#define DID_ST_PACKETS            42
+#define DID_ST_PACKET_SIZE        43
 
-#define DID_ST_STRINGS            42
-#define DID_ST_STRING_SIZE        43
-#define DID_ST_STR_TABLE_SIZE     44
-#define DID_ST_STR_OVERHEAD       45
-#define DID_ST_STR_IT_OVERHEAD    46
-#define DID_ST_UNTABLED           47
-#define DID_ST_UNTABLED_SIZE      48
-#define DID_ST_ITABLED            49
-#define DID_ST_ITABLED_SIZE       50
-#define DID_ST_TABLED             51
-#define DID_ST_TABLED_SIZE        52
-#define DID_ST_STR_SEARCHES       53
-#define DID_ST_STR_SEARCHLEN      54
-#define DID_ST_STR_SEARCHES_BYVALUE   55
-#define DID_ST_STR_SEARCHLEN_BYVALUE  56
-#define DID_ST_STR_CHAINS         57
-#define DID_ST_STR_ADDED          58
-#define DID_ST_STR_DELETED        59
-#define DID_ST_STR_COLLISIONS     60
-#define DID_ST_STR_FOUND          61
-#define DID_ST_STR_FOUND_BYVALUE  62
+#define DID_ST_APPLY              44
+#define DID_ST_APPLY_HITS         45
 
-#define DID_ST_RX_CACHED          63
-#define DID_ST_RX_TABLE           64
-#define DID_ST_RX_TABLE_SIZE      65
-#define DID_ST_RX_REQUESTS        66
-#define DID_ST_RX_REQ_FOUND       67
-#define DID_ST_RX_REQ_COLL        68
+#define DID_ST_STRINGS            46
+#define DID_ST_STRING_SIZE        47
+#define DID_ST_STR_TABLE_SIZE     48
+#define DID_ST_STR_OVERHEAD       49
+#define DID_ST_STR_IT_OVERHEAD    50
+#define DID_ST_UNTABLED           51
+#define DID_ST_UNTABLED_SIZE      52
+#define DID_ST_ITABLED            53
+#define DID_ST_ITABLED_SIZE       54
+#define DID_ST_TABLED             55
+#define DID_ST_TABLED_SIZE        56
+#define DID_ST_STR_SEARCHES       57
+#define DID_ST_STR_SEARCHLEN      58
+#define DID_ST_STR_SEARCHES_BYVALUE   59
+#define DID_ST_STR_SEARCHLEN_BYVALUE  60
+#define DID_ST_STR_CHAINS         61
+#define DID_ST_STR_ADDED          62
+#define DID_ST_STR_DELETED        63
+#define DID_ST_STR_COLLISIONS     64
+#define DID_ST_STR_FOUND          65
+#define DID_ST_STR_FOUND_BYVALUE  66
 
-#define DID_STATUS_MAX            69 /* Total number of entries */
+#define DID_ST_RX_CACHED          67
+#define DID_ST_RX_TABLE           68
+#define DID_ST_RX_TABLE_SIZE      69
+#define DID_ST_RX_REQUESTS        70
+#define DID_ST_RX_REQ_FOUND       71
+#define DID_ST_RX_REQ_COLL        72
+
+#define DID_STATUS_MAX            73 /* Total number of entries */
 
 
 /* Indices into the array resulting from debug_info(DINFO_DATA, DID_SWAP)
