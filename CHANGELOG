@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+17-Dec-2002 (Lars Duening)  (3.3.334)
+  - (lex, object.c) restore_svalue() did not check if a restored efun was
+      overriden by a nomask simul-efun (reported by Gnomi).
+  - (comm.c) With pthreads, the driver could crash in remove_interactive()
+      when the write_cond was destroyed while the thread was still
+      waiting on it (reported by Lee).
+
 16-Dec-2002 (Lars Duening)  (3.3.333)
   - (object.c) restore_map_size() stumbled over closure entries (reported by
       Jason).

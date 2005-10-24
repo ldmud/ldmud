@@ -1368,15 +1368,19 @@ symbol_resword (ident_t *p)
 
 /*-------------------------------------------------------------------------*/
 void
-symbol_efun_str (const char * str, size_t len, svalue_t *sp)
+symbol_efun_str (const char * str, size_t len, svalue_t *sp, Bool is_efun)
 
-/* This function implements the efun/operator part of efun symbol_function().
+/* This function implements the efun/operator/sefun part of efun
+ * symbol_function().
+ *
  * It is also called by parse_command to lookup the (simul)efuns find_living()
- * and find_player() at runtime.
+ * and find_player() at runtime, and by restore_svalue().
  *
  * The function takes the string <str> of length <len> and looks up the named
- * efun or operator. If the efun/operator is found, the value <sp> is turned
- * into the proper closure value, otherwise it is set to the numeric value 0.
+ * efun, sefun or operator. If the efun/operator is found, the value <sp> is
+ * turned into the proper closure value, otherwise it is set to the numeric
+ * value 0.  If <is_efun> is TRUE, <str> is resolved as an efun even if it
+ * doesn't contain the 'efun::' prefix.
  *
  * inter_sp must be set properly before the call.
  *
@@ -1401,7 +1405,7 @@ symbol_efun_str (const char * str, size_t len, svalue_t *sp)
  */
 
 {
-    Bool efun_override = MY_FALSE;
+    Bool efun_override = is_efun;
 
     /* If the first character is alphanumeric, the string names a function,
      * otherwise an operator.
@@ -1570,7 +1574,7 @@ symbol_efun (string_t *name, svalue_t *sp)
  */
 
 {
-    symbol_efun_str(get_txt(name), mstrsize(name), sp);
+    symbol_efun_str(get_txt(name), mstrsize(name), sp, MY_FALSE);
 } /* symbol_efun() */
 
 /*-------------------------------------------------------------------------*/

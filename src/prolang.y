@@ -13888,10 +13888,14 @@ find_inherited (char *super_name, char *real_name)
     inherit_t *ip;
     funflag_t flags;
     string_t *rname;
+    short     ix;
 
     rname = find_tabled_str(real_name);
 
-    return rname ? lookup_inherited(super_name, rname, &ip, &flags) : -1;
+    ix =  rname ? lookup_inherited(super_name, rname, &ip, &flags) : -1;
+    if (ix >= 0) /* Correct the index for the toplevel program */
+        ix += ip->function_index_offset;
+    return ix;
 } /* find_inherited() */
 
 /*-------------------------------------------------------------------------*/

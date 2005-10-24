@@ -1526,15 +1526,18 @@ writer_thread (void *arg)
         struct write_buffer_s * buf;
 
 	/* cancellation point */
-	pthread_testcancel();
+        pthread_testcancel();
 
-	/* mutex protected getting of first write_buffer */
-	pthread_mutex_lock(&ip->write_mutex);
-	if  (!ip->write_first)
+        /* mutex protected getting of first write_buffer */
+        pthread_mutex_lock(&ip->write_mutex);
+        if  (!ip->write_first)
         {
             /* if no first write_buffer -> wait on signal from mainthread */
-	    pthread_cond_wait(&ip->write_cond, &ip->write_mutex);
+            pthread_cond_wait(&ip->write_cond, &ip->write_mutex);
         }
+
+	/* another cancellation point */
+        pthread_testcancel();
 
         if (ip->write_first)
         {
@@ -3257,7 +3260,13 @@ remove_interactive (object_t *ob, Bool force)
         remove_flush_entry(interactive); /* To be sure */
 
 #ifdef USE_PTHREADS
+        /* Cancel the thread, then in case it is waiting on the
+         * condition, signal the condition as well. This way when
+         * the thread reaches the cancellation point after the
+         * condition, it will stop.
+         */
         pthread_cancel(interactive->write_thread);
++        pthread_cond_signal(&interactive->write_cond);
           /* buffer list is returned by thread */
         interactive_cleanup(interactive);
 #endif

@@ -30,13 +30,20 @@
 ;; TODO: PostgreSQL
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
+;; TODO: Lfun-closures are not inherit-conscious, ie. #'foo::bar doesn't work
+;; TODO:: because the closure stores the index into the top program's
+;; TODO:: function table; it should store the inherit index and the index
+;; TODO:: into the inherited program's function table. This also affects
+;; TODO:: replace-program and the saving/storing of lfun closure values.
+;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 333)
-(Parent-Version lpmud 3-3 332)
-(Version-Log "Restoring mappings with closures didn't work.")
+(Project-Version lpmud 3-3 334)
+(Parent-Version lpmud 3-3 333)
+(Version-Log "Restoring efun closures now checks for nomask sefun overrides.
+Made removing an interactive thread safer.")
 (New-Version-Log
 "")
-(Checkin-Time "Mon, 16 Dec 2002 12:00:15 -0700")
+(Checkin-Time "Wed, 18 Dec 2002 01:19:41 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -72,8 +79,8 @@
   ;; Information about the driver and the distribution in general
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
-  (CREDITS (lpmud/d/22_CREDITS 1.70.1.54 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.396 644))
+  (CREDITS (lpmud/d/22_CREDITS 1.70.1.55 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.397 644))
   (HISTORY (lpmud/f/49_HISTORY 1.292 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.19 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -139,7 +146,7 @@
   (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.24 644))
   (src/closure.h (lpmud/f/44_closure.h 1.7.1.16 644))
   (src/closure.c (lpmud/d/4_closure.c 1.41.1.47.1.7 644))
-  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.47 644))
+  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.48 644))
   (src/comm.h (lpmud/d/3_comm.h 1.26.1.31 644))
   (src/driver.h (lpmud/f/36_driver.h 1.15.1.21 644))
   (src/dumpstat.h (lpmud/f/35_dumpstat.h 1.8 644))
@@ -161,8 +168,8 @@
   (src/i-svalue_cmp.h (lpmud/a/b/20_i-svalue_c 1.3 644))
   (src/interpret.h (lpmud/b/13_interpret. 1.33.1.35 644))
   (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.8 644))
-  (src/lex.h (lpmud/b/11_lex.h 1.16.1.15.1.1 644))
-  (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.37 644))
+  (src/lex.h (lpmud/b/11_lex.h 1.16.1.15.1.2 644))
+  (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.38 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.12 644))
   (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.29 644))
   (src/mapping.h (lpmud/f/30_mapping.h 1.12.1.14 644))
@@ -178,7 +185,7 @@
   (src/my-alloca.h (lpmud/f/29_my-alloca. 1.3.1.2 644))
   (src/my-rusage.h (lpmud/f/28_my-rusage. 1.7 644))
   (src/object.h (lpmud/44_object.h 1.34.1.19 644))
-  (src/object.c (lpmud/45_object.c 1.62.1.88.1.7 644))
+  (src/object.c (lpmud/45_object.c 1.62.1.88.1.8 644))
   (src/otable.h (lpmud/f/27_otable.h 1.8.1.4 644))
   (src/otable.c (lpmud/43_otable.c 1.22.1.6 644))
   (src/parser.c (lpmud/l/13_parser.c 1.1 644))
@@ -228,7 +235,7 @@
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.15 644))
   (src/port.c (lpmud/39_port.c 1.17.1.7 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.17 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.11 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.12 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7.1.1 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))

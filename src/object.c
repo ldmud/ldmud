@@ -5258,13 +5258,13 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
           {
             if (v->u.lambda->function.lfun.ob == current_object)
             {
-                lambda_t *l;
+                lambda_t  *l;
                 program_t *prog;
-                int ix;
-                funflag_t flags;
-                string_t *function_name;
-                char *source, c;
-                object_t *ob;
+                int        ix;
+                funflag_t  flags;
+                string_t  *function_name;
+                char      *source, c;
+                object_t  *ob;
 
                 l = v->u.lambda;
                 ob = l->ob;
@@ -5338,6 +5338,9 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
                     }
                 }
 #endif /* USE_NEW_INLINES */
+                /* TODO: Once we have inherit-conscious lfun closures,
+                 * TODO:: save them as #'l:<inherit>-<name>
+                 */
             }
             else
             {
@@ -6617,7 +6620,7 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
             case 'e': /* An efun closure */
             case 's': /* A sefun closure */
               {
-                symbol_efun_str(name, strlen(name), svp);
+                symbol_efun_str(name, strlen(name), svp, ct == 'e');
                 break;
               }
 
@@ -6705,6 +6708,7 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
               {
                 string_t *str;
                 int i;
+                char *super;
 
 #ifdef USE_NEW_INLINES
                 svalue_t context = const0;
@@ -6723,7 +6727,15 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
                     context_size = VEC_SIZE(context.u.vec);
                 }
 #endif
-                /* If the variable exists, it must exist as shared
+                /* Check if it's an inherited lfun closure */
+                super = strchr(name, '-');
+                if (super)
+                {
+                    *super = '\0';
+                    super++;
+                }
+
+                /* If the function exists, it must exist as shared
                  * string.
                  */
                 str = find_tabled_str(name);
@@ -6733,9 +6745,13 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
                     break; /* switch(ct) */
                 }
 
-                i = find_function(str, current_object->prog);
+                if (super)
+                    i = find_inherited(super, name);
+                else
+                    i = find_function(str, current_object->prog);
 
                 /* If the function exists and is visible, create the closure
+                 * TODO: Handle inherit-conscious closures.
                  */
                 if (i >= 0)
                 {
