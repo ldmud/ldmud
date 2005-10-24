@@ -6754,7 +6754,7 @@ exgetc (void)
             }
             c = (unsigned char)mygetc();
         }
-        else if (c == '\\' && *outp == '\n')
+        else if (c == '\\' && (*outp == '\n' || *outp == '\r'))
         {
             /* Escaped new line: read the next line, strip
              * all comments, and then add the result again
@@ -6764,6 +6764,8 @@ exgetc (void)
             Bool quote;
 
             outp++;
+            if (outp[-1] == '\r' && *outp == '\n')
+                outp++;
             yyp = yytext;
             for(quote = MY_FALSE;;)
             {

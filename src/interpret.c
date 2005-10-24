@@ -3035,7 +3035,12 @@ get_string_r_item (svalue_t * svp, svalue_t * i, Bool make_singular
             return NULL;
         }
 
-        if ( (ind = (mp_int)mstrsize(svp->u.str) - ind) < 0
+        /* Compute the real index. Allow ""[<1]. */
+        ind = (mp_int)mstrsize(svp->u.str) - ind;
+        if (!mstrsize(svp->u.str) && ind == -1)
+            ind = 0;
+
+        if ( ind < 0
          ||  ind > (mp_int)mstrsize(svp->u.str)
            )
         {
@@ -3107,7 +3112,12 @@ get_string_a_item (svalue_t * svp, svalue_t * i, Bool make_singular
         ind = i->u.number;
 
         if (0 > ind)
+        {
+            /* Compute the real index. Allow ""[<1]. */
             ind = (mp_int)mstrsize(svp->u.str) + ind;
+            if (!mstrsize(svp->u.str) && ind == -1)
+                ind = 0;
+        }
         if (ind < 0 || ind > (mp_int)mstrsize(svp->u.str))
         {
             ERRORF(("Index out of bounds for [>]: %ld, string length: %ld\n"

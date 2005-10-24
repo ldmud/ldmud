@@ -158,6 +158,7 @@ f-020507-3: Range operators on 2d mappings
 f-020813-0: const parameter
 f-020813-1: Redesigning arrays and mappings, and lvalues.
 f-020904: Index by value
+f-030515: class variables
 
 
 Compiler

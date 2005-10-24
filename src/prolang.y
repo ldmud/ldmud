@@ -2727,7 +2727,7 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
             {
                 fulltype_t t1, t2;
 
-                if (funp->num_arg != num_arg && !(funp->flags & TYPE_MOD_VARARGS))
+                if (funp->num_arg > num_arg && !(funp->flags & TYPE_MOD_VARARGS))
                     yyerrorf("Incorrect number of arguments in redefinition of '%s'.", get_txt(p->name));
                 else if (funp->num_arg == num_arg
                       && ((funp->flags ^ flags) & TYPE_MOD_XVARARGS)

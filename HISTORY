@@ -104,7 +104,7 @@ For a detailed list of all changes see the file CHANGELOG.
            though it doesn't support GC yet).
 
 
-14-Dec-2002 (Lars Duening) -- Release 3.2.9
+15-Jan-2003 (Lars Duening) -- Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE

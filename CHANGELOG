@@ -1,6 +1,14 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+15-Jan-2002 (Lars Duening)  (3.3.357)
+  - (interpret.c) The 'indexing one past' for strings didn't work
+       with the empty string (reported by Zonk).
+  - (prolang.y) When redefining a function, the redefinition can now
+       have more arguments than the original.
+  - (lex.c) Escaping newlines in #if conditions on Windows didn't
+       work (reported by Zonk)
+
 11-Jan-2002 (Lars Duening)  (3.3.356)
   - (efuns.c) to_string(struct) didn't print the name of the struct,
        and leaked memory (reported by Zonk).

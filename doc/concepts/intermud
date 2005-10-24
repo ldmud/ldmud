@@ -181,6 +181,25 @@ SERVICES
             "DATA"
                 Whatever you wish to say to this person
 
+            Optional emote-tos are handles are also handled as tells, so
+            muds without emote-to support display them as reasonable readable
+            tell message.
+
+            "RCPNT"
+                Name of the player to whom you are talking
+
+            "METHOD"
+                The body of this header may be:
+                "emote"   if the message is an emote
+                "gemote"  if the message is a genitiv emote
+
+            "DATA"
+                The text to be emoted prepended with "*" and appended
+                with "* ". If you display the emote you have to cut the
+                stars off. Muds that do not process emote-tos display the
+                emote as tell message with the stars as indication of
+                the message's emote meaning.
+
         "who"
             List the people that are active on a remote mud. The anwer
             usually contains some active information about the players,
