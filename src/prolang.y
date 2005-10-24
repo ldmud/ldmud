@@ -2923,12 +2923,6 @@ redeclare_variable (ident_t *name, fulltype_t flags, int n)
  */
 
 {
-    if ((flags & PRIMARY_TYPE_MASK) == TYPE_VOID)
-    {
-        yyerrorf( "Illegal to define variable '%s' as type 'void'"
-                , get_txt(name->name));
-    }
-
     if (name->type != I_TYPE_GLOBAL)
     {
         /* This is the first _GLOBAL use of this identifier:

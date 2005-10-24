@@ -1,6 +1,9 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+15-Dec-2002 (Lars Duening)  (3.3.329)
+  - (object.c) Corrected a compilation error (thanks, Dafire and Jason!).
+
 15-Dec-2002 (Lars Duening)  (3.3.328)
   - (prolang.y) It is no longer possible to defined a variable to be
       of type 'void' (reported by Gnomi).

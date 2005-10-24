@@ -5465,8 +5465,9 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
                 rc = MY_FALSE;
             else
             {
-                rc = MY_TRUE; /* Writing a default '0' counts */
                 L_PUTC_PROLOG
+
+                rc = MY_TRUE; /* Writing a default '0' counts */
                 L_PUTC('0');
                 L_PUTC(delimiter);
                 L_PUTC_EPILOG
