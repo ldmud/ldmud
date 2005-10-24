@@ -22,6 +22,7 @@
 ;; TODO: Alternatively investigate MPS (http://www.ravenbrook.com/project/mps/)
 ;; TODO: general coloured efuns
 ;; TODO:  sockets (p-020912),
+;; TODO: use the ITIMER_PROF to detect long executions and print a log
 ;; TODO: state dumps.
 ;; TODO: Syslog
 ;; TODO: One .c-file per efun.
@@ -30,12 +31,12 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 329)
-(Parent-Version lpmud 3-3 328)
-(Version-Log "Corrected a compilation error.")
+(Project-Version lpmud 3-3 330)
+(Parent-Version lpmud 3-3 329)
+(Version-Log "Removed a crasher when the login object destructs itself.")
 (New-Version-Log
 "")
-(Checkin-Time "Sun, 15 Dec 2002 10:17:01 -0700")
+(Checkin-Time "Mon, 16 Dec 2002 03:00:12 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -72,7 +73,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.54 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.392 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.393 644))
   (HISTORY (lpmud/f/49_HISTORY 1.292 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.19 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -138,7 +139,7 @@
   (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.24 644))
   (src/closure.h (lpmud/f/44_closure.h 1.7.1.16 644))
   (src/closure.c (lpmud/d/4_closure.c 1.41.1.47.1.7 644))
-  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.46 644))
+  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.47 644))
   (src/comm.h (lpmud/d/3_comm.h 1.26.1.31 644))
   (src/driver.h (lpmud/f/36_driver.h 1.15.1.21 644))
   (src/dumpstat.h (lpmud/f/35_dumpstat.h 1.8 644))
@@ -1255,7 +1256,7 @@
   (doc/LPC/closures (lpmud/r/15_closures 1.8 644))
   (doc/LPC/closures-abstract (lpmud/c/50_closures 1.4.1.2 644))
   (doc/LPC/closures-example (lpmud/r/16_closures-e 1.8 644))
-  (doc/LPC/closure_guide (lpmud/r/17_closure_gu 1.7.1.4 644))
+  (doc/LPC/closure_guide (lpmud/r/17_closure_gu 1.7.1.5 644))
   (doc/LPC/comments (lpmud/m/35_comments 1.3 644))
   (doc/LPC/do-while (lpmud/r/18_do-while 1.3 644))
   (doc/LPC/ed0 (lpmud/r/19_ed0 1.2 644))

@@ -3603,7 +3603,8 @@ new_player (SOCKET_T new_socket, struct sockaddr_in *addr, size_t addrlen
     /* TODO: We could pass the retrieved hostname right to login */
 #endif
     logon(ob);
-    print_prompt();
+    if (!(ob->flags & O_DESTRUCTED))
+        print_prompt();
     flush_all_player_mess();
 } /* new_player() */
 

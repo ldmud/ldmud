@@ -320,12 +320,12 @@ Table of Contents
           the end there is a single argument, it is used as the else-case
           if no condition returned true.
 
-          lambda(({ 'x }),({ (#'?),            // if
-                             ({ (#'>),'x,5 }), //    (x > 5)
-                             ({ (#'*),'x,2 }), //       result is x * 2;
-                             ({ (#'<),'x,-5 }) // else if (x < -5)
-                             ({ (#'/),'x,2 }), //    result is x/2;
-                             'x                // else result is x;
+          lambda(({ 'x }),({ (#'?),             // if
+                             ({ (#'>),'x,5 }),  //    (x > 5)
+                             ({ (#'*),'x,2 }),  //       result is x * 2;
+                             ({ (#'<),'x,-5 }), // else if (x < -5)
+                             ({ (#'/),'x,2 }),  //    result is x/2;
+                             'x                 // else result is x;
                           }))
 
       #'?! is like the #'? but it negates all conditions after evaluation
