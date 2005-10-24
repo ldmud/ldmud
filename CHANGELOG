@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+03-Jan-2003 (Lars Duening)  (3.3.347)
+  - (smalloc.c) Freeing a small chunk in mem_consolidate() passed the
+       wrong address to sfree() (reported by Nostradamus and Dafire).
+
 03-Jan-2003 (Lars Duening)  (3.3.346)
   - (gcollect.c) The struct display code still used SMALLOC_OVERHEAD.
 

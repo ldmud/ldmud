@@ -3232,7 +3232,7 @@ mem_consolidate (void)
             count_back(small_chunk_stat, (chunk[-M_OVERHEAD] & M_MASK) * SINT);
             count_back(small_chunk_wasted, SINT*M_OVERHEAD+sizeof(word_t*)+wasted_space);
 
-            sfree(chunk+M_OVERHEAD);
+            sfree(chunk);
             chunk = next;
             continue;
         }
