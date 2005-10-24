@@ -2187,7 +2187,7 @@ show_array(int d, void *block, int depth)
             if (is_freed(svp->u.str, 1) )
             {
                 WRITES(d, "String in freed block 0x");
-                write_x(d, (p_uint)((unsigned *)block - SMALLOC_OVERHEAD));
+                write_x(d, (p_uint)((unsigned *)block - xalloc_overhead()));
                 WRITES(d, "\n");
                 break;
             }
@@ -2237,11 +2237,11 @@ show_struct(int d, void *block, int depth)
 
     a = (struct_t *)block;
 
-    /* Can't use VEC_SIZE() here, as the memory block may have been
+    /* Can't use struct_size() here, as the memory block may have been
      * partly overwritten by the smalloc pointers already.
      */
-    a_size = (mp_int)(  malloced_size(a)
-                   - ( SMALLOC_OVERHEAD + 
+    a_size = (mp_int)(  xalloced_size(a)
+                   - ( xalloc_overhead() + 
                        ( sizeof(struct_t) - sizeof(svalue_t) ) / SIZEOF_CHAR_P 
                      ) 
 
@@ -2261,11 +2261,11 @@ show_struct(int d, void *block, int depth)
                 for ( ; wl && wl != user; wl = wl->next) NOOP;
         }
         if (freed || !wl || a_size <= 0
-         || (malloced_size((char *)a) - SMALLOC_OVERHEAD) << 2 !=
+         || (xalloced_size((char *)a) - xalloc_overhead()) << 2 !=
               sizeof(struct_t) + sizeof(svalue_t) * (a_size - 1) )
         {
             WRITES(d, "struct in freed block 0x");
-            write_x(d, (p_uint)((unsigned *)block - SMALLOC_OVERHEAD));
+            write_x(d, (p_uint)((unsigned *)block - xalloc_overhead()));
             WRITES(d, "\n");
             return;
         }
