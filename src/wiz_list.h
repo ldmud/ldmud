@@ -57,7 +57,7 @@ extern svalue_t *f_set_extra_wizinfo_size(svalue_t *sp);
 #ifdef GC_SUPPORT
 extern void clear_ref_from_wiz_list(void);
 extern void count_ref_from_wiz_list(void);
-#endif /* MALLOC_smalloc */
+#endif /* GC_SUPPORT */
 
 #ifdef DEBUG
 extern void count_extra_ref_from_wiz_list(void);

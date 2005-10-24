@@ -1,6 +1,9 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+17-Jan-2002 (Lars Duening)  (3.3.359)
+  - (prolang.h) Corrected a compilation problem when using ptmalloc.
+
 17-Jan-2002 (Lars Duening)  (3.3.358)
   - (ptmalloc) Gawain added GC support to ptmalloc - yay!
   - (configure) New with-malloc setting 'default' selects either smalloc

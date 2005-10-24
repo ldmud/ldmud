@@ -108,11 +108,10 @@ strbuf_grow (strbuf_t *buf, size_t len)
 
     /* Extension of the existing buffer */
 
-    /* Using malloc_increment_size() here is tempting, but somehow
-     * allocates much bigger blocks than needed (or svalue_strlen()
-     * is lying). TODO: Revisit this later.
+    /* Using malloc_increment_size() here is tempting, but
+     * allocated much bigger blocks than needed (or svalue_strlen()
+     * is lying). TODO: With the new memory modules, this should work now.
      * Here is the code for now:
-#ifdef MALLOC_smalloc
     char * new_buf;
     new_buf = malloc_increment_size(buf->buf, new_len - buf->alloc_len);
     if (new_buf)
@@ -120,7 +119,6 @@ strbuf_grow (strbuf_t *buf, size_t len)
         buf->alloc_len = (u_long)new_len;
         return len;
     }
-#endif
      */
 
     buf->buf = rexalloc(buf->buf, new_len);

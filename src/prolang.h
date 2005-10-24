@@ -40,7 +40,7 @@ extern void set_code_window(void);
 extern void show_code_window(void);
 #endif
 
-#ifdef MALLOC_smalloc
+#ifdef GC_SUPPORT
 extern void count_compiler_refs(void);
 #endif
 

@@ -169,7 +169,7 @@ object_t *destructed_objs = NULL;
    * The reference by this list is counted.
    * Objects with only the list reference left are finally freed by
    * the function remove_destructed_objs() called from the backend.
-#ifdef MALLOC_smalloc
+#ifdef GC_SUPPORT
    * They are also freed by a GC.
 #endif
    * TODO: If this turns out to be not soon enough, modify the free_object()
