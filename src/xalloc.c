@@ -363,18 +363,17 @@ xalloc_traced (size_t size MTRACE_DECL)
     
     size += XM_OVERHEAD_SIZE;
 
+#ifndef NO_MEM_BLOCK_SIZE
     {
-        static mp_int total_malloced = 0;
-
         if (max_malloced > 0
-         && (total_malloced += size + sizeof(p_int)) > max_malloced)
+         && (xalloc_stat.size + size + sizeof(p_int)) > max_malloced)
         {
             static const char mess[] = "MAX_MALLOCED limit reached.\n";
             writes(2, mess);
-            total_malloced -= size + sizeof(p_int);
             return NULL;
         }
     }
+#endif
 
     do {
         p = mem_alloc(size);

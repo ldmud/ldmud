@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+18-Dec-2002 (Lars Duening)  (3.3.336)
+  - (xalloc.c) The max_malloced tracing forgot to count down the allocated
+      size on xfree()s (reported by Dafire).
+
 18-Dec-2002 (Lars Duening)  (3.3.335)
   - (object.c) When calling privilege_violation() for restoring efuns,
       the current object is passed as 'who' argument (suggested by Gnomi).
