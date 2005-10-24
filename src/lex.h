@@ -225,7 +225,8 @@ extern unsigned int next_inline_fun;
 /* --- Prototypes --- */
 
 extern void init_lexer(void);
-extern int  symbol_operator(char *symbol, char **endp);
+extern int  symbol_operator(const char *symbol, const char **endp);
+extern void symbol_efun_str(const char *str, size_t len, svalue_t *sp);
 extern void symbol_efun(string_t *name, svalue_t *sp);
 extern ident_t *lookfor_shared_identifier(char *, int, int, Bool);
 #define make_shared_identifier(s,n,d) lookfor_shared_identifier(s,n,d, MY_TRUE)

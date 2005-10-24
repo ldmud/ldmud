@@ -860,7 +860,7 @@ init_lexer(void)
 
 /*-------------------------------------------------------------------------*/
 int
-symbol_operator (char *symbol, char **endp)
+symbol_operator (const char *symbol, const char **endp)
 
 /* Analyse the text starting at <symbol> (which points to the first character
  * after the assumed "#'") if it describes a closure symbol. If yes, return
@@ -1279,16 +1279,104 @@ symbol_operator (char *symbol, char **endp)
 } /* symbol_operator() */
 
 /*-------------------------------------------------------------------------*/
+static INLINE int
+symbol_resword (ident_t *p)
+
+/* This function implements the resword lookup for closures.
+ *
+ * If ident <p> is a reserved word with a closure representation, return
+ * the corresponding instruction code:
+ *
+ *   #'if          -> F_BRANCH_WHEN_ZERO     
+ *   #'do          -> F_BBRANCH_WHEN_NON_ZERO
+ *   #'while       -> F_BBRANCH_WHEN_ZERO    
+ *   #'foreach     -> F_FOREACH              
+ *   #'continue    -> F_BRANCH               
+ *   #'default     -> F_CSTRING0             
+ *   #'switch      -> F_SWITCH               
+ *   #'break       -> F_BREAK                
+ *   #'return      -> F_RETURN               
+ *   #'sscanf      -> F_SSCANF               
+ *   #'catch       -> F_CATCH                
+ *
+ * If ident <p> is not a reserved word, or a word without closure
+ * representation, return 0.
+ */
+
+{
+    int code = 0;
+
+    if (p->type != I_TYPE_RESWORD)
+        return 0;
+
+    switch(p->u.code)
+    {
+    default:
+        /* Unimplemented reserved word */
+        code = 0;
+        break;
+
+    case L_IF:
+        code = F_BRANCH_WHEN_ZERO;
+        break;
+
+    case L_DO:
+        code = F_BBRANCH_WHEN_NON_ZERO;
+        break;
+
+    case L_WHILE:
+        /* the politically correct code was already taken, see above. */
+        code = F_BBRANCH_WHEN_ZERO;
+        break;
+
+    case L_FOREACH:
+        code = F_FOREACH;
+        break;
+
+    case L_CONTINUE:
+        code = F_BRANCH;
+        break;
+
+    case L_DEFAULT:
+        code = F_CSTRING0;
+        break;
+
+    case L_SWITCH:
+        code = F_SWITCH;
+        break;
+    case L_BREAK:
+        code = F_BREAK;
+        break;
+    case L_RETURN:
+        code = F_RETURN;
+        break;
+    case L_SSCANF:
+        code = F_SSCANF;
+        break;
+#ifdef USE_PARSE_COMMAND
+    case L_PARSE_COMMAND:
+        code = F_PARSE_COMMAND;
+        break;
+#endif
+    case L_CATCH:
+        code = F_CATCH;
+        break;
+    }
+
+    return code;
+} /* symbol_resword() */
+
+/*-------------------------------------------------------------------------*/
 void
-symbol_efun (string_t *name, svalue_t *sp)
+symbol_efun_str (const char * str, size_t len, svalue_t *sp)
 
 /* This function implements the efun/operator part of efun symbol_function().
  * It is also called by parse_command to lookup the (simul)efuns find_living()
  * and find_player() at runtime.
  *
- * The function takes the string <name> and looks up the named efun or
- * operator. If the efun/operator is found, the value <sp> is turned into the
- * proper closure value, otherwise it is set to the numeric value 0.
+ * The function takes the string <str> of length <len> and looks up the named
+ * efun or operator. If the efun/operator is found, the value <sp> is turned
+ * into the proper closure value, otherwise it is set to the numeric value 0.
  *
  * inter_sp must be set properly before the call.
  *
@@ -1314,11 +1402,6 @@ symbol_efun (string_t *name, svalue_t *sp)
 
 {
     Bool efun_override = MY_FALSE;
-    char *str;
-    size_t len;
-
-    str = get_txt(name);
-    len = mstrsize(name);
 
     /* If the first character is alphanumeric, the string names a function,
      * otherwise an operator.
@@ -1364,62 +1447,14 @@ symbol_efun (string_t *name, svalue_t *sp)
             /* Is it a reserved word? */
             if (p->type == I_TYPE_RESWORD)
             {
-                int code;
+                int code = symbol_resword(p);
 
-                switch(code = p->u.code)
+                if (!code)
                 {
-                default:
                     /* Unimplemented reserved word */
                     if ( NULL != (p = p->inferior) )
                         continue;
                     goto undefined_function;
-
-                case L_IF:
-                    code = F_BRANCH_WHEN_ZERO;
-                    break;
-
-                case L_DO:
-                    code = F_BBRANCH_WHEN_NON_ZERO;
-                    break;
-
-                case L_WHILE:
-                    /* the politically correct code   /
-                    /  was already taken, see above. */
-                    code = F_BBRANCH_WHEN_ZERO;
-                    break;
-
-                case L_FOREACH:
-                    code = F_FOREACH;
-                    break;
-
-                case L_CONTINUE:
-                    code = F_BRANCH;
-                    break;
-
-                case L_DEFAULT:
-                    code = F_CSTRING0;
-                    break;
-
-                case L_SWITCH:
-                    code = F_SWITCH;
-                    break;
-                case L_BREAK:
-                    code = F_BREAK;
-                    break;
-                case L_RETURN:
-                    code = F_RETURN;
-                    break;
-                case L_SSCANF:
-                    code = F_SSCANF;
-                    break;
-#ifdef USE_PARSE_COMMAND
-                case L_PARSE_COMMAND:
-                    code = F_PARSE_COMMAND;
-                    break;
-#endif
-                case L_CATCH:
-                    code = F_CATCH;
-                    break;
                 }
 
                 /* Got the reserved word: return the closure value */
@@ -1524,6 +1559,18 @@ undefined_function:
         }
         sp->u.ob = ref_object(current_object, "symbol_efun");
     }
+} /* symbol_efun_str() */
+
+/*-------------------------------------------------------------------------*/
+void
+symbol_efun (string_t *name, svalue_t *sp)
+
+/* This function is a wrapper around symbol_efun_str(), taking a regular
+ * string <name> as argument.
+ */
+
+{
+    symbol_efun_str(get_txt(name), mstrsize(name), sp);
 } /* symbol_efun() */
 
 /*-------------------------------------------------------------------------*/
@@ -4532,11 +4579,10 @@ yylex1 (void)
                 {
                     if (p->type == I_TYPE_RESWORD)
                     {
-                        int code;
+                        int code = symbol_resword(p);
 
-                        switch(code = p->u.code)
+                        if (!code)
                         {
-                        default:
                             /* There aren't efuns with reswords as names, and
                              * it is impossible to define local / global vars
                              * or functions with such a name.
@@ -4546,53 +4592,9 @@ yylex1 (void)
                               "No closure associated with reserved word '%s'",
                               get_txt(p->name)
                             );
-                            code = CLOSURE_EFUN_OFFS;
-                            break;
-                        case L_IF:
-                            code = F_BRANCH_WHEN_ZERO+CLOSURE_EFUN_OFFS;
-                            break;
-                        case L_DO:
-                            code =
-                              F_BBRANCH_WHEN_NON_ZERO+CLOSURE_EFUN_OFFS;
-                            break;
-                        case L_WHILE:
-                            /* the politically correct code was already taken,
-                             * see above.
-                             */
-                            code = F_BBRANCH_WHEN_ZERO+CLOSURE_EFUN_OFFS;
-                            break;
-                        case L_FOREACH:
-                            code = F_FOREACH+CLOSURE_EFUN_OFFS;
-                            break;
-                        case L_CONTINUE:
-                            code = F_BRANCH+CLOSURE_EFUN_OFFS;
-                            break;
-                        case L_DEFAULT:
-                            code = F_CSTRING0+CLOSURE_EFUN_OFFS;
-                            /* as bogus as we can possibliy get :-) */
-                            break;
-                        case L_BREAK:
-                            code = F_BREAK  + CLOSURE_EFUN_OFFS;
-                            break;
-                        case L_RETURN:
-                            code = F_RETURN  + CLOSURE_EFUN_OFFS;
-                            break;
-#ifdef USE_PARSE_COMMAND
-                        case L_PARSE_COMMAND:
-                            code = F_PARSE_COMMAND  + CLOSURE_EFUN_OFFS;
-                            break;
-#endif
-                        case L_SSCANF:
-                            code = F_SSCANF  + CLOSURE_EFUN_OFFS;
-                            break;
-                        case L_CATCH:
-                            code = F_CATCH  + CLOSURE_EFUN_OFFS;
-                            break;
-                        case L_SWITCH:
-                            code = F_SWITCH  + CLOSURE_EFUN_OFFS;
-                            break;
                         }
-                        yylval.closure.number = code;
+
+                        yylval.closure.number = code + CLOSURE_EFUN_OFFS;
                         return L_CLOSURE;
                     }
                     if ( !(p = p->inferior) )

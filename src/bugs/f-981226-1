@@ -112,11 +112,9 @@ notwendige Basisarchitektur vorhanden ist.
 > die portnummerraeume von TCP und UDP ueberschneiden.
 > Oder man nimmt als Unique ID einen string mit "tcp:nr" oder "udp:nr".
 
-Wenn ich mich nicht taeusche, kann jeder Port zu einer Zeit nur zu einem
-Socket und Protokoll gehoeren. Evtl. ist es sogar moeglich, ueber einen
-Socket/Port gleichzeitig TCP und UDP zu machen (habs noch nie probiert
-und die TCP/IP-Buecher sind in der Bibliothek) - oder iaW: TCP und UDP
-sind keine Namensraeume an sich.
+Es sit moeglich ueber einen Socket/Port gleichzeitig TCP und UDP zu machen
+(habs noch nie probiert und die TCP/IP-Buecher sind in der Bibliothek) - oder
+iaW: TCP und UDP sind keine Namensraeume an sich.
 
 Eine Unique-ID eruebrigt sich, da der Socket durch das Objekt definiert
 ist. Funktionen wie socket_write() wuerden dann entweder ein

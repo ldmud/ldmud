@@ -4840,6 +4840,87 @@ is_undef_closure (svalue_t *sp)
 } /* is_undef_closure() */
 
 /*-------------------------------------------------------------------------*/
+const char *
+closure_operator_to_string (int type)
+
+/* <type> is the code for a closure operator (the caller has to make sure
+ * of that!).
+ * If <type> denotes one of the non-efun operators, return its textual
+ * presentation as a pointer to a constant string.
+ * Otherwise return NULL - the caller then has to add
+ * (CLOSURE_EFUN-CLOSURE_OPERATOR) to type and interpret it as efun code.
+ */
+
+{
+    const char *str = NULL;
+
+    if ((type & -0x0800) == CLOSURE_OPERATOR)
+    {
+        switch(type - CLOSURE_OPERATOR)
+        {
+        case F_POP_VALUE:
+            str = ",";
+            break;
+
+        case F_BBRANCH_WHEN_NON_ZERO:
+            str = "do";
+            break;
+
+        case F_BBRANCH_WHEN_ZERO:
+            str = "while";
+            break;
+
+        case F_BRANCH:
+            str = "continue";
+            break;
+
+        case F_CSTRING0:
+            str = "default";
+            break;
+
+        case F_BRANCH_WHEN_ZERO:
+            str = "?";
+            break;
+
+        case F_BRANCH_WHEN_NON_ZERO:
+            str = "?!";
+            break;
+
+        case F_RANGE:
+            str = "[..]";
+            break;
+
+        case F_NR_RANGE:
+            str = "[..<]";
+            break;
+
+        case F_RR_RANGE:
+            str = "[<..<]";
+            break;
+
+        case F_RN_RANGE:
+            str = "[<..]";
+            break;
+
+        case F_MAP_INDEX:
+            str = "[,]";
+            break;
+
+        case F_NX_RANGE:
+            str = "[..";
+            break;
+
+        case F_RX_RANGE:
+            str = "[<..";
+            break;
+
+        } /* switch() */
+    } /* if() */
+
+    return str;
+} /* closure_operator_to_string() */
+
+/*-------------------------------------------------------------------------*/
 string_t *
 closure_to_string (svalue_t * sp)
 
@@ -5004,67 +5085,7 @@ closure_to_string (svalue_t * sp)
             {
             case CLOSURE_OPERATOR:
               {
-                char *str = NULL;
-
-                switch(type - CLOSURE_OPERATOR)
-                {
-                case F_POP_VALUE:
-                    str = ",";
-                    break;
-
-                case F_BBRANCH_WHEN_NON_ZERO:
-                    str = "do";
-                    break;
-
-                case F_BBRANCH_WHEN_ZERO:
-                    str = "while";
-                    break;
-
-                case F_BRANCH:
-                    str = "continue";
-                    break;
-
-                case F_CSTRING0:
-                    str = "default";
-                    break;
-
-                case F_BRANCH_WHEN_ZERO:
-                    str = "?";
-                    break;
-
-                case F_BRANCH_WHEN_NON_ZERO:
-                    str = "?!";
-                    break;
-
-                case F_RANGE:
-                    str = "[..]";
-                    break;
-
-                case F_NR_RANGE:
-                    str = "[..<]";
-                    break;
-
-                case F_RR_RANGE:
-                    str = "[<..<]";
-                    break;
-
-                case F_RN_RANGE:
-                    str = "[<..]";
-                    break;
-
-                case F_MAP_INDEX:
-                    str = "[,]";
-                    break;
-
-                case F_NX_RANGE:
-                    str = "[..";
-                    break;
-
-                case F_RX_RANGE:
-                    str = "[<..";
-                    break;
-
-                }
+                const char *str = closure_operator_to_string(type);
 
                 if (str)
                 {

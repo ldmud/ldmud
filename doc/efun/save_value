@@ -15,6 +15,8 @@ DESCRIPTION
 
 HISTORY
         Introduced in LDMud 3.2.8.
+        LDMud 3.2.9 added the saving of non-lambda closures, symbols,
+        and quoted arrays, using a new savefile format version.
 
 SEE ALSO
         restore_value(E), restore_object(E), save_object(E)

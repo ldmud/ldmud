@@ -2466,13 +2466,13 @@ indent (char *buf)
                     }
                     else
                     {
-                        char *end;
+                        const char *end;
 
                         if (symbol_operator(p, &end) < 0)
                         {
                             error("Missing function name after #' in line %d\n");
                         }
-                        p = end;
+                        p = (char *)end;
                     }
                     token = TOKEN;
                     break;

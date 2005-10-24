@@ -173,6 +173,8 @@
 #include "comm.h"
 #include "filestat.h"
 #include "interpret.h"
+#include "instrs.h"
+#include "lex.h"
 #include "main.h"
 #include "mapping.h"
 #include "mempools.h"
@@ -4739,14 +4741,16 @@ f_transfer (svalue_t *sp)
 /* The 'version' of each savefile is given in the first line as
  *   # <version>:<host>
  *
- * <version> is currently 0
+ * <version> is currently 1
+ *    Version 0 didn't allow the saving of non-lambda closures, symbols
+ *    or quoted arrays.
  * <host> is 1 for Atari ST and Amiga, and 0 for everything else.
  *    The difference lies in the handling of float numbers (see datatypes.h).
  */
 
-#define SAVE_OBJECT_VERSION '0'
-#define CURRENT_VERSION 0
-  /* Current version of new save files
+#define SAVE_OBJECT_VERSION '1'
+#define CURRENT_VERSION 1
+  /* Current version of new save files, expressed as char and as int.
    */
 
 #ifdef FLOAT_FORMAT_0
@@ -5101,7 +5105,7 @@ register_mapping_filter (svalue_t *key, svalue_t *data, void *extra)
 {
     int i;
 
-    if (key->type == T_POINTER
+    if (key->type == T_POINTER || key->type == T_QUOTED_ARRAY
 #ifdef USE_STRUCTS
      || key->type == T_STRUCT
 #endif /* USE_STRUCTS */
@@ -5116,7 +5120,7 @@ register_mapping_filter (svalue_t *key, svalue_t *data, void *extra)
 
     for (i = (p_int)extra; --i >= 0; data++)
     {
-        if (data->type == T_POINTER
+        if (data->type == T_POINTER || key->type == T_QUOTED_ARRAY
 #ifdef USE_STRUCTS
          || data->type == T_STRUCT
 #endif /* USE_STRUCTS */
@@ -5168,6 +5172,19 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
         save_string(v->u.str);
         break;
 
+    case T_QUOTED_ARRAY:
+      {
+        L_PUTC_PROLOG
+        char * source, c;
+
+        source = number_buffer;
+        (void)sprintf(source, "#%hd:", v->x.quotes);
+        c = *source++;
+        do L_PUTC(c) while ( '\0' != (c = *source++) );
+        L_PUTC_EPILOG
+        /* FALLTHROUGH to T_POINTER */
+      }
+
     case T_POINTER:
         save_array(v->u.vec, MY_FALSE);
         break;
@@ -5217,9 +5234,251 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
         save_mapping(v->u.map);
         break;
 
+    case T_SYMBOL:
+      {
+        L_PUTC_PROLOG
+        char * source, c;
+
+        source = number_buffer;
+        (void)sprintf(source, "#%hd:", v->x.quotes);
+        c = *source++;
+        do L_PUTC(c) while ( '\0' != (c = *source++) );
+        L_PUTC_EPILOG
+        save_string(v->u.str);
+        break;
+      }
+
+    case T_CLOSURE:
+      {
+        int type;
+
+        switch(type = v->x.closure_type)
+        {
+        case CLOSURE_LFUN:
+          {
+            if (v->u.lambda->function.lfun.ob == current_object)
+            {
+                lambda_t *l;
+                program_t *prog;
+                int ix;
+                funflag_t flags;
+                string_t *function_name;
+                char *source, c;
+                object_t *ob;
+
+                l = v->u.lambda;
+                ob = l->ob;
+                ix = l->function.lfun.index;
+
+                prog = ob->prog;
+                flags = prog->functions[ix];
+                while (flags & NAME_INHERITED)
+                {
+                    inherit_t *inheritp;
+
+                    inheritp = &prog->inherit[flags & INHERIT_MASK];
+                    ix -= inheritp->function_index_offset;
+                    prog = inheritp->prog;
+                    flags = prog->functions[ix];
+                }
+
+                memcpy(&function_name
+                      , FUNCTION_NAMEP(prog->program + (flags & FUNSTART_MASK))
+                      , sizeof function_name
+                      );
+                source = get_txt(function_name);
+
+                {
+                    L_PUTC_PROLOG
+                    L_PUTC('#');
+#ifndef USE_NEW_INLINES
+                    L_PUTC('l');
+#else
+                    if (l->function.lfun.context_size)
+                    {
+                        L_PUTC('c');
+                    }
+                    else
+                    {
+                        L_PUTC('l');
+                    }
+#endif /* USE_NEW_INLINES */
+                    L_PUTC(':');
+                    c = *source++;
+                    do L_PUTC(c) while ( '\0' != (c = *source++) );
+                    L_PUTC_EPILOG
+                }
+
+#ifdef USE_NEW_INLINES
+                if (l->function.lfun.context_size)
+                {
+                    int i;
+                    svalue_t * val;
+
+                    {
+                        L_PUTC_PROLOG
+                        L_PUTC(':');
+                        L_PUTC('(')
+                        L_PUTC('{')
+                        L_PUTC_EPILOG
+                    }
+
+                    for (i = l->function.lfun.context_size
+                        , val = l->context
+                        ; --i >= 0; )
+                    {
+                        (void)save_svalue(val++, ',', MY_FALSE);
+                    }
+
+                    {
+                        L_PUTC_PROLOG
+                        L_PUTC('}')
+                        L_PUTC(')')
+                        L_PUTC_EPILOG
+                    }
+                }
+#endif /* USE_NEW_INLINES */
+            }
+            else
+            {
+                L_PUTC_PROLOG
+                L_PUTC('0');
+                L_PUTC_EPILOG
+            }
+            break;
+          }
+
+        case CLOSURE_IDENTIFIER:
+          {
+            L_PUTC_PROLOG
+            lambda_t *l;
+            char * source, c;
+
+            l = v->u.lambda;
+            if (l->function.var_index == VANISHED_VARCLOSURE_INDEX)
+            {
+                rc = MY_FALSE;
+                break;
+            }
+            if (l->ob->flags & O_DESTRUCTED
+             || l->ob != current_object
+               )
+            {
+                rc = MY_FALSE;
+                break;
+            }
+
+            source = get_txt(l->ob->prog->variable_names[l->function.var_index].name);
+
+            L_PUTC('#');
+            L_PUTC('v');
+            L_PUTC(':');
+            c = *source++;
+            do L_PUTC(c) while ( '\0' != (c = *source++) );
+            
+            L_PUTC_EPILOG
+            break;
+          }
+
+        default:
+            if (type < 0)
+            {
+                switch(type & -0x0800)
+                {
+                case CLOSURE_OPERATOR:
+                  {
+                    const char *s = closure_operator_to_string(type);
+
+                    if (s)
+                    {
+                        L_PUTC_PROLOG
+                        char c;
+
+                        L_PUTC('#');
+                        L_PUTC('e');
+                        L_PUTC(':');
+
+                        c = *s++;
+                        do L_PUTC(c) while ( '\0' != (c = *s++) );
+
+                        L_PUTC_EPILOG
+                        break;
+                    }
+                    type += CLOSURE_EFUN - CLOSURE_OPERATOR;
+                  }
+                /* default action for operators: FALLTHROUGH */
+
+                case CLOSURE_EFUN:
+                  {
+                    L_PUTC_PROLOG
+                    char * source, c;
+
+                    source = instrs[type - CLOSURE_EFUN].name;
+
+                    L_PUTC('#');
+                    L_PUTC('e');
+                    L_PUTC(':');
+
+                    c = *source++;
+                    do L_PUTC(c) while ( '\0' != (c = *source++) );
+
+                    L_PUTC_EPILOG
+                    break;
+                  }
+
+                case CLOSURE_SIMUL_EFUN:
+                  {
+                    L_PUTC_PROLOG
+                    char * source, c;
+
+                    source = get_txt(simul_efunp[type - CLOSURE_SIMUL_EFUN].name);
+
+                    L_PUTC('#');
+                    L_PUTC('s');
+                    L_PUTC(':');
+
+                    c = *source++;
+                    do L_PUTC(c) while ( '\0' != (c = *source++) );
+
+                    L_PUTC_EPILOG
+                    break;
+                  }
+                }
+                break;
+            }
+            else /* type >= 0: one of the lambda closures */
+            {
+                rc = MY_FALSE;
+            }
+            break;
+
+        } /* switch(closure type) */
+
+        /* We come here, we could write the closure */
+        /* 'rc' at this point signifies whether the closure could be written.
+         * If it couldn't, maybe write a default '0', and also adjust rc
+         * to serve as function result.
+         */
+        if (!rc)
+        {
+            if (writable)
+                rc = MY_FALSE;
+            else
+            {
+                rc = MY_TRUE; /* Writing a default '0' counts */
+                L_PUTC_PROLOG
+                L_PUTC('0');
+                L_PUTC(delimiter);
+                L_PUTC_EPILOG
+            }
+            return rc;
+        }
+        break;
+      } /* case T_CLOSURE */
+
     default:
       {
-        /* Objects and closures can't be saved */
+        /* Objects can't be saved */
         if (writable)
             rc = MY_FALSE;
         else
@@ -5303,7 +5562,7 @@ register_array (vector_t *vec)
     v = vec->item;
     for (i = (long)VEC_SIZE(vec); --i >= 0; v++)
     {
-        if (v->type == T_POINTER
+        if (v->type == T_POINTER || v->type == T_QUOTED_ARRAY
 #ifdef USE_STRUCTS
          || v->type == T_STRUCT
 #endif /* USE_STRUCTS */
@@ -5511,7 +5770,7 @@ v_save_object (svalue_t *sp, int numarg)
         if (names->flags & TYPE_MOD_STATIC)
             continue;
 
-        if (v->type == T_POINTER
+        if (v->type == T_POINTER || v->type == T_QUOTED_ARRAY
 #ifdef USE_STRUCTS
          || v->type == T_STRUCT
 #endif /* USE_STRUCTS */
@@ -5704,7 +5963,7 @@ f_save_value (svalue_t *sp)
 
     /* First look at the value for arrays and mappings
      */
-    if (sp->type == T_POINTER
+    if (sp->type == T_POINTER || sp->type == T_QUOTED_ARRAY
 #ifdef USE_STRUCTS
      || sp->type == T_STRUCT
 #endif /* USE_STRUCTS */
@@ -5796,7 +6055,7 @@ restore_map_size (struct rms_parameters *parameters)
  * the size (number of entries) is returned directly.
  * If the mapping text is ill formed, the function returns -1.
  *
- * The function calls itself and restore_array_size() recursively
+ * The function calls itself and restore_size() recursively
  * for embedded arrays and mappings.
  */
 
@@ -5891,6 +6150,24 @@ restore_map_size (struct rms_parameters *parameters)
                 pt++;
                 continue;
             }
+            break;
+          }
+
+        case '#': /* A closure: skip the header and restart this check
+                   * again from the data part.
+                   */
+          { 
+            if (pt[1] == 'c')
+            {
+                pt = strchr(pt, ':');
+                if (!pt)
+                    return -1;
+                pt++;
+            }
+            pt = strchr(pt, ':');
+            if (!pt)
+                return -1;
+            pt++;
             break;
           }
 
@@ -6178,6 +6455,22 @@ restore_size (char **str)
             break;
           }
 
+        case '#': /* A closure: skip the header and restart this check
+                   * again from the data part.
+                   */
+            if (pt[1] == 'c')
+            {
+                pt2 = strchr(pt, ':');
+                if (!pt2)
+                    return -1;
+                pt = &pt2[1];
+            }
+            pt2 = strchr(pt, ':');
+            if (!pt2)
+                return -1;
+            pt = &pt2[1];
+            break;
+
         default:
             pt2 = strchr(pt, ',');
             if (!pt2)
@@ -6281,6 +6574,266 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
 
     switch( *(cp = *pt) )
     {
+    case '#':  /* A closure or quoted thing */
+      {
+        switch(*++cp)
+        {
+
+        case 'e': /* An efun closure */
+        case 's': /* A sefun closure */
+        case 'v': /* A variable closure */
+        case 'c': /* A lfun closure */
+        case 'l': /* A lfun closure */
+          {
+            char ct = *cp;
+            char * name, c;
+
+            /* Parse the name of the closure item */
+            if (*++cp != ':')
+            {
+                *svp = const0;
+                return MY_FALSE;
+            }
+
+            name = ++cp;
+            for(;;)
+            {
+                if ( !(c = *cp++) )
+                {
+                    *svp = const0;
+                    return MY_FALSE;
+                }
+
+                if (c == delimiter || (ct == 'c' && c == ':'))
+                    break;
+            }
+            cp[-1] = '\0'; /* Overwrites the delimiter */
+            *pt = cp;
+
+            /* Create the proper closure */
+            switch (ct)
+            {
+            case 'e': /* An efun closure */
+            case 's': /* A sefun closure */
+              {
+                symbol_efun_str(name, strlen(name), svp);
+                break;
+              }
+
+            case 'v': /* A variable closure */
+              {
+                string_t *str;
+                object_t *ob;
+                variable_t *var;
+                program_t *prog;
+                int num_var;
+                int n;
+                lambda_t *l;
+
+                ob = current_object;
+                if (!current_variables
+                 || !ob->variables
+                 || current_variables < ob->variables
+                 || current_variables >= ob->variables + ob->prog->num_variables)
+                {
+                    /* efun closures are called without changing current_prog
+                     * nor current_variables. This keeps the program scope for
+                     * variables for calls inside this_object(), but would
+                     * give trouble with calling from other ones if it were
+                     * not for this test.
+                     */
+                    current_prog = ob->prog;
+                    current_variables = ob->variables;
+                }
+
+                /* If the variable exists, it must exist as shared
+                 * string.
+                 */
+                str = find_tabled_str(name);
+                if (!str)
+                {
+                    *svp = const0;
+                    break; /* switch(ct) */
+                }
+
+                prog = current_prog;
+                var = prog->variable_names;
+                num_var = prog->num_variables;
+                for (n = num_var; --n >= 0; var++)
+                {
+                    if (mstreq(var->name, str) && !(var->flags & NAME_HIDDEN))
+                        break;
+                }
+                if (n < 0)
+                {
+                    *svp = const0;
+                    break; /* switch(ct) */
+                }
+
+                n = num_var - n - 1;
+#ifndef USE_NEW_INLINES
+                l = xalloc(sizeof *l);
+#else /* USE_NEW_INLINES */
+                l = xalloc(SIZEOF_LAMBDA(0));
+#endif /* USE_NEW_INLINES */
+                if (!l)
+                {
+                    *svp = const0;
+                    break; /* switch(ct) */
+                }
+
+                l->ob = ref_object(current_object, "symbol_variable");
+                l->ref = 1;
+                l->function.var_index = (unsigned short)(n + (current_variables - current_object->variables));
+                svp->type = T_CLOSURE;
+                svp->x.closure_type = CLOSURE_IDENTIFIER;
+                svp->u.lambda = l;
+
+                /* Handle replace_program() */
+                if ( !(current_object->prog->flags & P_REPLACE_ACTIVE)
+                  || !lambda_ref_replace_program(l, svp->x.closure_type, 0, 0, 0) )
+                {
+                    current_object->flags |= O_LAMBDA_REFERENCED;
+                }
+
+                break;
+              }
+
+            case 'c': /* A context closure */
+            case 'l': /* A lfun closure */
+              {
+                string_t *str;
+                int i;
+
+#ifdef USE_NEW_INLINES
+                svalue_t context = const0;
+                size_t context_size = 0;
+
+                if (ct == 'c')
+                {
+                    /* Parse the context information */
+                    if (!restore_svalue(&context, pt, delimiter)
+                     || context.type != T_POINTER
+                       )
+                    {
+                        *svp = const0;
+                        break; /* switch(ct) */
+                    }
+                    context_size = VEC_SIZE(context.u.vec);
+                }
+#endif
+                /* If the variable exists, it must exist as shared
+                 * string.
+                 */
+                str = find_tabled_str(name);
+                if (!str)
+                {
+                    *svp = const0;
+                    break; /* switch(ct) */
+                }
+
+                i = find_function(str, current_object->prog);
+
+                /* If the function exists and is visible, create the closure
+                 */
+                if (i >= 0)
+                {
+                    lambda_t *l;
+                    int j;
+
+#ifndef USE_NEW_INLINES
+                    l = xalloc(sizeof *l);
+#else /* USE_NEW_INLINES */
+                    l = xalloc(SIZEOF_LAMBDA(context_size));
+#endif /* USE_NEW_INLINES */
+                    if (!l)
+                    {
+                        *svp = const0;
+                        break; /* switch(ct) */
+                    }
+
+                    l->ref = 1;
+                    l->ob = ref_object(current_object, "restore_svalue");
+
+                    l->function.lfun.ob
+                      = ref_object(current_object, "restore_svalue");
+                    l->function.lfun.index = (unsigned short)i;
+#ifdef USE_NEW_INLINES
+                    l->function.lfun.context_size = context_size;
+                    if (context_size > 0)
+                    {
+                        for (j = 0; j < context_size; j++)
+                            assign_svalue_no_free(l->context+j, context.u.vec->item+j);
+                        free_array(context.u.vec);
+                    }
+#endif /* USE_NEW_INLINES */
+
+                    svp->type = T_CLOSURE;
+                    svp->x.closure_type = CLOSURE_LFUN;
+                    svp->u.lambda = l;
+
+                    if (!(current_object->prog->flags & P_REPLACE_ACTIVE)
+                     || !lambda_ref_replace_program( l
+                                                   , CLOSURE_LFUN
+                                                   , 0, NULL, NULL)
+                       )
+                    {
+                        current_object->flags |= O_LAMBDA_REFERENCED;
+                    }
+
+                }
+                else
+                {
+                    *svp = const0;
+                }
+                break;
+              }
+
+            default:
+                fatal("Unsupported closure-type '%c'\n", ct);
+                break;
+            }
+
+            return MY_TRUE;
+            break;
+          }
+
+        case '0': case '1': case '2': case '3': case '4':
+        case '5': case '6': case '7': case '8': case '9':
+          {
+            long quotes;
+            char * end;
+            Bool   rc;
+
+            quotes = strtol(cp, &end, 10);
+            if (!end || end == cp || *end != ':')
+            {
+                *svp = const0;
+                return MY_FALSE;
+            }
+            *pt = end+1;
+            rc = restore_svalue(svp, pt, delimiter);
+            if (rc)
+            {
+                svp->x.quotes = (ph_int)quotes;
+                if (svp->type == T_STRING)
+                    svp->type = T_SYMBOL;
+                else if (svp->type == T_POINTER)
+                    svp->type = T_QUOTED_ARRAY;
+                return MY_TRUE;
+            }
+            else
+                return MY_FALSE;
+            break;
+          }
+        
+        default:
+            *svp = const0;
+            return MY_FALSE;
+        }
+
+        break;
+      }
 
     case '\"':  /* A string */
       {

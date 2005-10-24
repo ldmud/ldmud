@@ -20,6 +20,9 @@ DESCRIPTION
         Variables that has the type modifer 'nosave' will not be restored.
         Example: nosave int xxx;
 
+        Lfun, variable and simul_efun closures are restored only if they
+        can be found - if not, they are restored as value '0'.
+
         If inheritance is used, then it might be possible that a
         variable will exist with the same name in more than one place,
         and thus appear in the  save file multiple times. When
@@ -32,6 +35,8 @@ DESCRIPTION
 HISTORY
         Restoring directly from a string was added in LDMud 3.2.8 and
         may be moved in future into a separate efun.
+        LDMud 3.2.9 added the restoring of non-lambda closures, symbols,
+        and quoted arrays, using a new savefile format version.
 
 SEE ALSO
         save_object(E), restore_value(E), valid_read(M)

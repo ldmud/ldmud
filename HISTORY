@@ -100,7 +100,7 @@ For a detailed list of all changes see the file CHANGELOG.
            regular expression code, or the PCRE package (default).
 
 
-11-Dec-2002 (Lars Duening) -- Release 3.2.9
+14-Dec-2002 (Lars Duening) -- Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -184,6 +184,9 @@ For a detailed list of all changes see the file CHANGELOG.
        + replace_program(): If the object alread has closures bound, the
            efun will issue a debug_message() and fail, instead of raising
            a full runtime error.
+       + restore_{object,value}(), save_{object,value}(): Non-lambda
+           closures, symbols and quoted arrays can now be saved and restored.
+           This required a new savefile format, though.
        + sin(), cos(), tan(), atan(), atan2(), log(), exp(), sqrt(), pow():
            Integers are accepted as arguments, too.
        + sizeof(): Now also returns the length of strings.
