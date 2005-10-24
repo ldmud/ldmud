@@ -475,6 +475,9 @@ f_wizlist_info (svalue_t *sp)
  *   int    w[WL_CALL_OUT]    = Reserved for call_out() (unused yet).
  *   int    w[WL_ARRAY_TOTAL] = Total size of arrays in elements.
  *   int    w[WL_MAPPING_TOTAL] = Total size of mappings in elements.
+#ifdef USE_STRUCTS
+ *   int    w[WL_STRUCT_TOTAL] = Total size of mappings in elements.
+#endif
  *   mixed  w[WL_EXTRA]       = Extra wizlist-info if set.
  */
 

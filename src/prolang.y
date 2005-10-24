@@ -4662,7 +4662,7 @@ type_rtoc (svalue_t *svp)
     case T_CLOSURE:      rc.typeflags = TYPE_CLOSURE; break;
     case T_SYMBOL:       rc.typeflags = TYPE_SYMBOL; break;
     case T_QUOTED_ARRAY: rc.typeflags = TYPE_QUOTED_ARRAY; break;
-    case T_MAPPING:      rc.typeflags = TYPE_MAPPING; break
+    case T_MAPPING:      rc.typeflags = TYPE_MAPPING; break;
 #ifdef USE_STRUCTS
     case T_STRUCT:       rc.typeflags = TYPE_STRUCT;
                          rc.t_struct = svp->u.strct->type;
@@ -4856,7 +4856,7 @@ list_to_struct (struct_def_t * pdef, int length, svalue_t *initialized)
                 consumed++;
                 member = struct_find_member(pdef->type, list->member);
                 if (member >= 0)
-                    pmember = &pdef->type->member[member]);
+                    pmember = &pdef->type->member[member];
 
                 if (member < 0)
                     yyerrorf( "No such member '%s' in struct '%s'"
@@ -4872,11 +4872,11 @@ list_to_struct (struct_def_t * pdef, int length, svalue_t *initialized)
                             );
                 }
                 else if (exact_types.typeflags
-                      && !vtype( pmember->type , type_rtoc(&list->val)) )
+                      && !vtype( pmember->type , vtype_rtoc(&list->val)) )
                 {
                     yyerrorf("Type mismatch %s when initializing member '%s' "
                              "in struct '%s'"
-                            , get_two_vtypes(pmember->type, type_rtoc(&list->val))
+                            , get_two_vtypes(pmember->type, vtype_rtoc(&list->val))
                             , get_txt(list->member)
                             , get_txt(struct_t_name(pdef->type))
                             );
@@ -4899,14 +4899,14 @@ list_to_struct (struct_def_t * pdef, int length, svalue_t *initialized)
             member = 0;
 
             do {
-                pmember = &pdef->member[member];
+                pmember = &pdef->type->member[member];
                 consumed++;
                 if (exact_types.typeflags
-                 && !vtype( pmember->type , type_rtoc(&list->val)) )
+                 && !vtype( pmember->type , vtype_rtoc(&list->val)) )
                 {
                     yyerrorf("Type mismatch %s when initializing member '%s' "
                              "in struct '%s'"
-                            , get_two_vtypes(pmember->type, type_rtoc(&list->val))
+                            , get_two_vtypes(pmember->type, vtype_rtoc(&list->val))
                             , get_txt(list->member)
                             , get_txt(struct_t_name(pdef->type))
                             );
@@ -4945,7 +4945,7 @@ list_to_struct (struct_def_t * pdef, int length, svalue_t *initialized)
     }
 
     /* Return the array */
-    put_struct(initialized, vec);
+    put_struct(initialized, st);
 } /* list_to_struct() */
 #endif /* USE_STRUCTS */
 
@@ -6597,7 +6597,7 @@ new_name:
           if ($4 != F_ASSIGN)
               yyerror("Illegal initialization");
 
-          if (exact_types)
+          if (exact_types.typeflags != 0)
               if (!TYPE( actual_type, type_rtoc($<initialized>3)) )
               {
                   yyerror("Bad initializer type");
@@ -9496,7 +9496,7 @@ expr0:
            * variables here.
            */
 
-          fulltype_t vtype;
+          fulltype_t lvtype;
           int i;
           PREPARE_INSERT(4)
 %line
@@ -9510,8 +9510,8 @@ expr0:
               {
                   add_f_code(F_PUSH_VIRTUAL_VARIABLE_LVALUE);
                   add_byte(i);
-                  vtype = V_VARIABLE(i)->type;
-                  vtype.typeflags &= TYPE_MOD_MASK;
+                  lvtype = V_VARIABLE(i)->type;
+                  lvtype.typeflags &= TYPE_MOD_MASK;
               }
               else
               {
@@ -9526,15 +9526,15 @@ expr0:
                       add_f_code(F_PUSH_IDENTIFIER_LVALUE);
                       add_byte(i + num_virtual_variables);
                   }
-                  vtype = NV_VARIABLE(i)->type;
-                  vtype.typeflags &= TYPE_MOD_MASK;
+                  lvtype = NV_VARIABLE(i)->type;
+                  lvtype.typeflags &= TYPE_MOD_MASK;
               }
 
               if (exact_types.typeflags
-               && !BASIC_TYPE(vtype, Type_Number)
-               && !BASIC_TYPE(vtype, Type_Float))
+               && !BASIC_TYPE(lvtype, Type_Number)
+               && !BASIC_TYPE(lvtype, Type_Float))
               {
-                  argument_type_error($1.code, vtype);
+                  argument_type_error($1.code, lvtype);
               }
 
               CURRENT_PROGRAM_SIZE += 2;
@@ -9544,7 +9544,7 @@ expr0:
               /* Variable not declared - try to recover */
               YYACCEPT;
 
-              vtype = Type_Any;
+              lvtype = Type_Any;
           }
 
           last_expression = CURRENT_PROGRAM_SIZE;
@@ -9553,13 +9553,13 @@ expr0:
 
           add_f_code($1.code);
           $$.end = CURRENT_PROGRAM_SIZE;
-          $$.type = vtype;
+          $$.type = lvtype;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | pre_inc_dec L_LOCAL %prec L_INC
       {
-          fulltype_t vtype;
+          fulltype_t lvtype;
           PREPARE_INSERT(3)
 %line
           $$.start = $1.start;
@@ -9571,13 +9571,13 @@ expr0:
           {
               add_f_code(F_PUSH_CONTEXT_LVALUE);
               add_byte($2->u.local.context);
-              vtype = type_of_context[$2->u.local.context];
+              lvtype = type_of_context[$2->u.local.context];
           }
           else
           {
               add_f_code(F_PUSH_LOCAL_VARIABLE_LVALUE);
               add_byte($2->u.local.num);
-              vtype = type_of_locals[$2->u.local.num];
+              lvtype = type_of_locals[$2->u.local.num];
           }
           CURRENT_PROGRAM_SIZE =
             (last_expression = CURRENT_PROGRAM_SIZE + 2) + 1;
@@ -9586,16 +9586,16 @@ expr0:
           add_byte($2->u.local.num);
           CURRENT_PROGRAM_SIZE =
             (last_expression = CURRENT_PROGRAM_SIZE + 2) + 1;
-          vtype = type_of_locals[$2->u.local.num];
+          lvtype = type_of_locals[$2->u.local.num];
 #endif /* USE_NEW_INLINES */
           add_f_code($1.code);
           if (exact_types.typeflags
-           && !BASIC_TYPE(vtype, Type_Number)
-           && !BASIC_TYPE(vtype, Type_Float))
+           && !BASIC_TYPE(lvtype, Type_Number)
+           && !BASIC_TYPE(lvtype, Type_Float))
           {
-              argument_type_error($1.code, vtype);
+              argument_type_error($1.code, lvtype);
           }
-          $$.type = vtype;
+          $$.type = lvtype;
           $$.end = CURRENT_PROGRAM_SIZE;
       }
 
@@ -15440,7 +15440,7 @@ copy_variables (program_t *from, funflag_t type
 
                 define_variable(p, vartype
 %ifndef INITIALIZATION_BY___INIT
-                  ,from->variables[j].flags & NAME_INITIALIZED ?
+                  ,from->variables[j].type.typeflags & NAME_INITIALIZED ?
                     copy_svalue(&initializers[j]) : &const0
 %endif
                 );

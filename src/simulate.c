@@ -1804,8 +1804,7 @@ load_object (const char *lname, Bool create_super, int depth, namechain_t *chain
 #ifdef INITIALIZATION_BY___INIT
     ob = get_empty_object(prog->num_variables);
 #else
-    ob = get_empty_object( prog->num_variables, prog->variable_names
-                         , prog_variable_values);
+    ob = get_empty_object( prog->num_variables, prog->variables, prog_variable_values);
     /* TODO: The initializers should be stored in the program.
      * TODO:: See clone_object() for the reason.
      * TODO:: To implement this efficiently, use special 'const' arrays
@@ -2047,7 +2046,7 @@ clone_object (string_t *str1)
 
     new_ob = get_empty_object(ob->prog->num_variables
 #ifndef INITIALIZATION_BY___INIT
-                             , ob->prog->variable_names
+                             , ob->prog->variables
                              , ob->variables
 #endif
     );

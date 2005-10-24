@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+06-Jan-2003 (Lars Duening)  (3.3.352)
+  - (prolang.y) Removed compiler warnings.
+  - (prolang.y, simulate.c) Removed compiler errors when not using __INIT
+       (reported by Guandalug).
+  - (mudlib/sys/wizlist.h) The wizlist_info() result array was allocated
+       too small (reported by Dafire).
+
 06-Jan-2003 (Lars Duening)  (3.3.351)
   - (ptmalloc.c) Using driver.h instead of config.h leads to compilation
        errors on some systems (reported by Gawain).

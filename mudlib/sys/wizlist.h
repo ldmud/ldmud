@@ -17,13 +17,13 @@
 #define WL_STRUCT_TOTAL   7  /* Structs accounted for */
 #define WL_EXTRA          8  /* Extra Wizinfo, if set */
 
-#define WL_SIZE  8  /* Number of entries */
+#define WL_SIZE  9  /* Number of entries */
 
 #else /* !__LPC_STRUCTS__ */
 
 #define WL_EXTRA          7  /* Extra Wizinfo, if set */
 
-#define WL_SIZE  7  /* Number of entries */
+#define WL_SIZE  8  /* Number of entries */
 
 #endif /* __LPC_STRUCTS__ */
 

@@ -438,7 +438,7 @@ static mp_int last_id = 0;
     for (i = num_var; --i >= 0; )
     {
 #ifndef INITIALIZATION_BY___INIT
-        if (variables[i].flags & NAME_INITIALIZED)
+        if (variables[i].type.typeflags & NAME_INITIALIZED)
         {
             assign_svalue_no_free(&ob_vars[i], &initializers[i]);
         } else
