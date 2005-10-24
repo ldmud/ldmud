@@ -290,6 +290,9 @@ struct_new_anonymous (int num_members)
         pType->member[i].name = new_tabled(buf);
         if (!pType->member[i].name)
         {
+            debug_message("(%s:%d) Out of memory (%lu bytes) for member name\n"
+                         , __FILE__, __LINE__, (unsigned long)strlen(buf)
+                         );
             gotError = MY_TRUE;
             break;
         }
@@ -299,7 +302,7 @@ struct_new_anonymous (int num_members)
 
     if (gotError)
     {
-        struct_free(pStruct);
+        free_struct(pStruct);
         pStruct = NULL;
     }
 
@@ -320,10 +323,10 @@ struct_free_empty (struct_t *pStruct)
         fatal("NULL pointer passed to struct_free_empty().\n");
 
     if (!pStruct->user)
-        fatal("No wizlist pointer for struct");
+        fatal("No wizlist pointer for struct in struct_free_empty().");
 
     if (pStruct->ref != 0)
-        fatal("Struct with %ld refs passed to struct_free().\n"
+        fatal("Struct with %ld refs passed to struct_free_empty().\n"
               , pStruct->ref);
 #endif
 
@@ -351,7 +354,7 @@ struct_free (struct_t *pStruct)
         fatal("NULL pointer passed to struct_free().\n");
 
     if (!pStruct->user)
-        fatal("No wizlist pointer for struct");
+        fatal("No wizlist pointer for struct in struct_free_empty().");
 
     if (pStruct->ref != 0)
         fatal("Struct with %ld refs passed to struct_free().\n"

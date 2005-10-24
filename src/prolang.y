@@ -2912,7 +2912,7 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
     fun.flags     = flags;
     fun.num_arg   = num_arg;
     fun.num_local = num_local; /* will be updated later */
-    fun.type      =type;
+    fun.type      = type;
     ref_fulltype_data(&fun.type);
 
     num = FUNCTION_COUNT;
@@ -3536,20 +3536,20 @@ def_function_complete ( p_int body_start
     }
 
     /* Clean up for normal functions.
-     * Inline closures need the information for some more processing.
+     * Do not free the function returntype - it is still held in A_FUNCTIONS
+     * and freed after the compile.
+     * Inline closures need some of the information for some more processing.
      */
 #ifdef USE_NEW_INLINES
     if (is_inline)
     {
-        free_fulltype_data(&current_inline->returntype);
-        /* Keep block_depth and local names */
+        /* Keep block_depth, and local names */
     }
     else
 #endif /* USE_NEW_INLINES */
     {
         free_all_local_names();
         block_depth = 0;
-        free_fulltype_data(&def_function_returntype);
     }
 
 } /* def_function_complete() */
@@ -16288,14 +16288,16 @@ epilog (void)
     {
         struct_type_t * ptype;
         ptype = STRUCT_DEF(i).type;
-        printf("DEBUG: [%d] struct %s: (%s) %d members, base %s, flags %x\n"
+        printf("DEBUG: [%d] struct %s: (%s) ref %ld, %d members, base %s, flags %lx\n"
               , i, get_txt(ptype->name)
               , ptype->unique_name ? get_txt(ptype->unique_name) : "<none>"
+              , (long)ptype->ref
               , ptype->num_members
               , ptype->base ? get_txt(ptype->base->name) : "<none>"
-              , STRUCT_DEF(i).flags
+              , (long)STRUCT_DEF(i).flags
               );
         fflush(stdout);
+#if 1
         for (j = 0; j < ptype->num_members; j++)
         {
             fulltype_t ftype;
@@ -16307,6 +16309,7 @@ epilog (void)
                   );
             fflush(stdout);
         }
+#endif
     }
     printf("DEBUG: ------\n");
 
@@ -16340,9 +16343,7 @@ epilog (void)
         if (!pragma_save_types)
         {
             for (i = 0; i < ARGTYPE_COUNT; i++)
-            {
                 free_vartype_data(&ARGUMENT_TYPE(i));
-            }
             mem_block[A_ARGUMENT_TYPES].current_size = 0;
             mem_block[A_ARGUMENT_INDEX].current_size = 0;
         }
@@ -16736,4 +16737,3 @@ count_compiler_refs (void)
 /*-------------------------------------------------------------------------*/
 
 /***************************************************************************/
-

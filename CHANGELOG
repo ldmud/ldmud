@@ -1,6 +1,16 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+05-Jan-2003 (Lars Duening)  (3.3.350)
+  - (prolang.y) Corrected another struct related refcount error: function
+       return types were freed twice (reported by Dafire).
+  - (structs.c) Changed a call to struct_free() to free_struct() as the
+       refcount needs to be adjusted properly.
+  - (swap.c) When freeing an empty swapped-out struct, the refcount needed to
+       be adjusted before calling struct_free_empty() (reported by Bardioc).
+  - (make_func.y) When creating type/hookmaps in prolang.y, the linecounting
+       didn't count the map's continuation lines.
+
 04-Jan-2003 (Lars Duening)  (3.3.349)
   - (interpret.c) Many mudlibs index strings happily one past the
        end, which when used with assignments might lead to

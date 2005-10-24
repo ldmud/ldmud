@@ -1704,6 +1704,7 @@ handle_map (char *str, int size, int (* name_to_index)(char *) )
             str = alloca(MAKE_FUNC_MAXLINE + 1);
             if (!fgets(str, MAKE_FUNC_MAXLINE, fpr))
                 break;
+            current_line++;
             if (del)
             {
                 output_del = "\n";
@@ -3233,7 +3234,7 @@ create_lang (void)
             }
             if MATCH("//") {
                 /* c++ - resembling comment */
-                fputs("", fpw);
+                fputs("\n", fpw);
                 continue;
             }
             if (!bPrintedNotice) {
@@ -3249,6 +3250,7 @@ create_lang (void)
 " */\n"
 "\n"
                          , fpw);
+                    fprintf(fpw, "#line %d \"%s\"\n", current_line+1, PRO_LANG);
                     continue;
                 }
             }

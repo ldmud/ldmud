@@ -1141,6 +1141,12 @@ free_swapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
             p += 1 + sizeof(struct_type_t *) + sizeof(wiz_list_t *);
             p =
               free_swapped_svalues(svp->u.strct->member, struct_size(svp->u.strct), p);
+            deref_struct(svp->u.strct);
+              /* struct_free_empty() in DEBUG checks the refcount, so this
+               * single ref needs to be removed. However, if there is more
+               * than one ref, struct_free_empty() will fatal(), which is good
+               * because we're supposed to swap such a struct opaquely.
+               */
             struct_free_empty(svp->u.strct);
             break;
           }

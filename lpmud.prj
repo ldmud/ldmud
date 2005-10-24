@@ -35,12 +35,14 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 349)
-(Parent-Version lpmud 3-3 348)
-(Version-Log "Indexing one past a string end is again allowed, but warned upon.")
+(Project-Version lpmud 3-3 350)
+(Parent-Version lpmud 3-3 349)
+(Version-Log "Corrected a struct related refcount error.
+Corrected another struct refcount error in the swapper.
+Corrected the linecounting in the generated lang.y .")
 (New-Version-Log
 "")
-(Checkin-Time "Sat, 04 Jan 2003 23:10:26 -0700")
+(Checkin-Time "Sun, 05 Jan 2003 22:13:25 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -77,7 +79,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.56 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.412 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.413 644))
   (HISTORY (lpmud/f/49_HISTORY 1.294 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.19 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -240,7 +242,7 @@
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.15 644))
   (src/port.c (lpmud/39_port.c 1.17.1.7 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.17.1.1 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.14 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.15 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7.1.1 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))
@@ -255,7 +257,7 @@
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.12 644))
   (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.61 644))
   (src/structs.h (lpmud/d/b/5_structs.h 1.1 644))
-  (src/structs.c (lpmud/d/b/6_structs.c 1.2 644))
+  (src/structs.c (lpmud/d/b/6_structs.c 1.3 644))
   (src/sysmalloc.h (lpmud/c/b/33_sysmalloc. 1.1 644))
   (src/sysmalloc.c (lpmud/c/b/34_sysmalloc. 1.2 644))
   (src/sprintf.h (lpmud/f/15_sprintf.h 1.3.1.4 644))
@@ -264,7 +266,7 @@
   (src/strfuns.c (lpmud/c/0_strfuns.c 1.9.1.11 644))
   (src/svalue.h (lpmud/f/39_datatypes. 1.34.1.23.1.4 644))
   (src/swap.h (lpmud/f/14_swap.h 1.7.1.3 644))
-  (src/swap.c (lpmud/25_swap.c 1.36.1.41 644))
+  (src/swap.c (lpmud/25_swap.c 1.36.1.42 644))
   (src/switch.h (lpmud/24_switch.h 1.9 644))
   (src/telnet.h (lpmud/22_telnet.h 1.5.1.3 644))
   (src/typedefs.h (lpmud/d/50_typedefs.h 1.12.1.7 644))
@@ -278,7 +280,7 @@
   (src/func_spec (lpmud/c/31_func_spec 1.53.1.45.1.22.1.3 644))
   (src/string_spec (lpmud/f/6_string_spe 1.14.1.7 644))
   (src/mkfunc.c (lpmud/l/14_mkfunc.c 1.1 644))
-  (src/make_func.y (lpmud/b/7_make_func. 1.25.1.30.1.3 644))
+  (src/make_func.y (lpmud/b/7_make_func. 1.25.1.30.1.4 644))
 
   ;; Generic host files
   (src/hosts/README (lpmud/h/10_README 1.2 644))
