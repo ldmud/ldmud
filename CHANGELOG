@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+14-Dec-2002 (Lars Duening)  (3.3.327)
+  - (xalloc, smalloc, sysmalloc, gcollect, dependent files) Cleaned up the
+      allocator interface somewhat, so that the MALLOC_-tracing is now
+      handled by the xalloc layer, and that the GC no longer relies on
+      the internal structures of smalloc.
+
 14-Dec-2002 (Lars Duening)  (3.3.326)
   - (object.c) Efuns save_() and restore_() can now handle non-lambda
       closures, symbols and quoted arrays.  This required a new savefile

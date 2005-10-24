@@ -244,11 +244,11 @@ read_access_file (void)
     /* Free the old datastructures */
     for (aap = all_access_addresses; aap; aap = next_aap) {
         next_aap = aap->next;
-        afree((char *)aap);
+        pfree((char *)aap);
     }
     for (acp = all_access_classes; acp; acp = next_acp) {
         next_acp = acp->next;
-        afree((char *)acp);
+        pfree((char *)acp);
     }
     all_access_classes = NULL;
 
@@ -315,7 +315,7 @@ read_access_file (void)
         if (!i)
             break;
 
-        aap = amalloc(sizeof *aap);
+        aap = pxalloc(sizeof *aap);
         if (!aap)
             break;
         *last = aap;
@@ -401,9 +401,9 @@ read_access_file (void)
             len = strlen(message);
             if (len && message[len-1] == '\n')
                 message[--len] = '\0';
-            acp = amalloc(sizeof *acp - sizeof acp->message + 1 + len);
+            acp = pxalloc(sizeof *acp - sizeof acp->message + 1 + len);
             if (!acp) {
-                afree((char *)aap);
+                pfree((char *)aap);
                 break;
             }
             acp->id = class_id;

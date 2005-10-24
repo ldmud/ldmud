@@ -17,6 +17,7 @@
 #include "closure.h"
 #include "exec.h"
 #include "filestat.h"
+#include "instrs.h"  /* F_RETURN, F_RETURN0 for overhead computation */
 #include "mapping.h"
 #include "mstrings.h"
 #include "object.h"
@@ -25,12 +26,6 @@
 #include "stdstrings.h"
 #include "svalue.h"
 #include "xalloc.h"
-
-#ifdef MALLOC_smalloc
-#  include "smalloc.h" /* malloced_size() */
-#else
-#  include "instrs.h"  /* F_RETURN, F_RETURN0 */
-#endif
 
 /*-------------------------------------------------------------------------*/
 
@@ -130,12 +125,8 @@ svalue_size (svalue_t *v, mp_int * pTotal)
     {
         if (v->u.vec == &null_vector) return 0;
         if (NULL == register_pointer(ptable, v->u.vec) ) return 0;
-#ifdef MALLOC_smalloc
-        overhead = malloced_size(v->u.vec) * sizeof(p_int);
-#else
         overhead = sizeof *v->u.vec - sizeof v->u.vec->item +
           sizeof(svalue_t) * v->u.vec->size + sizeof(char *);
-#endif
         for (i=0; i < (mp_int)VEC_SIZE(v->u.vec); i++) {
             composite += svalue_size(&v->u.vec->item[i], &total);
             *pTotal += total;
@@ -182,9 +173,6 @@ svalue_size (svalue_t *v, mp_int * pTotal)
             num_values = ((svalue_t *)l)[-0xff].u.number;
         svp = (svalue_t *)l - num_values;
         if (NULL == register_pointer(ptable, svp)) return 0;
-#ifdef MALLOC_smalloc
-        overhead = malloced_size(svp) * sizeof(p_int);
-#else
         overhead = sizeof(svalue_t) * num_values + sizeof (char *);
         {
             bytecode_p p = &l->function.code[2];
@@ -202,7 +190,6 @@ svalue_size (svalue_t *v, mp_int * pTotal)
             overhead +=   (p - (bytecode_p)l + (sizeof(bytecode_p) - 1))
                         & ~(sizeof(bytecode_p) - 1);
         }
-#endif
 
         while (--num_values >= 0)
         {

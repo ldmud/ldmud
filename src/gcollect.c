@@ -8,7 +8,7 @@
  * circular array references), but the collector is also a last line of
  * defense against bug-introduced memory leaks.
  *
- * This facility is available only when using the 'smalloc'
+ * This facility is available currently only when using the 'smalloc'
  * memory allocator. When using a different allocator, all garbage_collect()
  * does is freeing as much memory as possible.
  *
@@ -20,7 +20,7 @@
  * are also called from the backend as part of the regular reset/swap/cleanup
  * handling.
  *
-#ifdef MALLOC_smalloc
+#ifdef GC_SUPPORT
  * The garbage collector is a simple mark-and-sweep collector. First, all
  * references (refcounts and memory block markers) are cleared, then in
  * a second pass, all reachable references are recreated (refcounts are
@@ -92,7 +92,7 @@
 #include "filestat.h"
 #include "heartbeat.h"
 #include "interpret.h"
-#if defined(MALLOC_smalloc) && defined(MALLOC_TRACE)
+#if defined(GC_SUPPORT) && defined(MALLOC_TRACE)
 #include "instrs.h" /* Need F_ALLOCATE for setting up print dispatcher */
 #endif
 #include "lex.h"
@@ -108,7 +108,6 @@
 #include "sent.h"
 #include "simulate.h"
 #include "simul_efun.h"
-#include "smalloc.h"
 #include "stdstrings.h"
 #include "swap.h"
 #include "wiz_list.h"
@@ -443,17 +442,17 @@ cleanup_all_objects (void)
 
 /*=========================================================================*/
 
-/*            The real collector - only with smalloc.
+/*            The real collector - only if the allocator allows it.
  */
 
-#if defined(MALLOC_smalloc)
+#if defined(GC_SUPPORT)
 
 #if defined(CHECK_OBJECT_GC_REF) && defined(DUMP_GC_REFS)
 #  error Must define either CHECK_OBJECT_GC_REF or DUMP_GC_REFS.
 #  undef DUMP_GC_REFS
 #endif
 
-#define CLEAR_REF(p) ( ((p_uint *)(p))[-SMALLOC_OVERHEAD] &= ~M_REF )
+#define CLEAR_REF(p) x_clear_ref(p)
   /* Clear the memory block marker for <p>
    */
 
@@ -470,20 +469,20 @@ unsigned long gc_mark_ref(void * p, const char * file, int line)
         dprintf3(gout, "DEBUG: Program %x referenced as something else from %s:%d\n"
                , (p_int)p, (p_int)file, (p_int)line);
     }
-    return ( ((p_uint *)(p))[-SMALLOC_OVERHEAD] |= M_REF );
+    return x_mark_ref(p);
 }
 
 #define MARK_REF(p) gc_mark_ref(p, __FILE__, __LINE__)
-#define MARK_PLAIN_REF(p) ( ((p_uint *)(p))[-SMALLOC_OVERHEAD] |= M_REF )
+#define MARK_PLAIN_REF(p) x_mark_ref(p)
 
 #else
-#define MARK_REF(p) ( ((p_uint *)(p))[-SMALLOC_OVERHEAD] |= M_REF )
+#define MARK_REF(p) x_mark_ref(p)
   /* Set the memory block marker for <p>
    */
 #define MARK_PLAIN_REF(p) MARK_REF(p)
 #endif
 
-#define TEST_REF(p) ( !( ((p_uint *)(p))[-SMALLOC_OVERHEAD] & M_REF ) )
+#define TEST_REF(p) x_test_ref(p)
   /* Check the memory block marker for <p>, return TRUE if _not_ set.
    */
 
@@ -1415,9 +1414,9 @@ garbage_collection(void)
 #endif /* CHECK_OBJECT_REF */
 
 
-    /* --- Pass 1: clear the M_REF flag in all malloced blocks ---
+    /* --- Pass 1: clear the 'referenced' flag in all malloced blocks ---
      */
-    clear_M_REF_flags();
+    mem_clear_ref_flags();
 
     /* --- Pass 2: clear the ref counts ---
      */
@@ -1555,7 +1554,8 @@ garbage_collection(void)
     }
 
 
-    /* --- Pass 3: Compute the ref counts, and set M_REF where appropriate ---
+    /* --- Pass 3: Compute the ref counts, and set the 'referenced' flag where
+     *             appropriate ---
      */
 
     gc_status = gcCountRefs;
@@ -1746,7 +1746,7 @@ garbage_collection(void)
 
     gc_status = gcInactive;
 
-    /* --- Pass 4: remove stralloced strings with M_REF cleared ---
+    /* --- Pass 4: remove unreferenced strings ---
      */
 
     mstring_walk_strings(remove_unreferenced_string);
@@ -1794,7 +1794,7 @@ garbage_collection(void)
     /* --- Pass 6: Release all unused memory ---
      */
 
-    free_unreferenced_memory();
+    mem_free_unrefed_memory();
     reallocate_reserved_areas();
     if (!reserved_user_area)
     {
@@ -1812,7 +1812,7 @@ garbage_collection(void)
     }
 
     /* Reconsolidate the free lists */
-    consolidate_freelists();
+    mem_consolidate();
 
     /* Finally, try to reclaim the reserved areas */
 
@@ -1855,7 +1855,7 @@ garbage_collection(void)
 #if defined(MALLOC_TRACE)
 
 /* Some functions to print the tracing data from the memory blocks.
- * The show_ functions are called from smalloc directly.
+ * The show_ functions are called from xmalloc directly.
  */
 
 /*-------------------------------------------------------------------------*/
@@ -1977,7 +1977,7 @@ show_object (int d, void *block, int depth)
         for (o = obj_list; o && o != ob; o = o->next_all) NOOP;
         if (!o || o->flags & O_DESTRUCTED) {
             WRITES(d, "Destructed object in block 0x");
-            write_x(d, (p_uint)((unsigned *)block - SMALLOC_OVERHEAD));
+            write_x(d, (p_uint)((unsigned *)block - xalloc_overhead()));
             WRITES(d, "\n");
             return;
         }
@@ -2049,14 +2049,14 @@ show_array(int d, void *block, int depth)
     a = (vector_t *)block;
 
     /* Can't use VEC_SIZE() here, as the memory block may have been
-     * partly overwritten by the smalloc pointers already.
+     * partly overwritten by the malloc pointers already.
      */
-    a_size = (mp_int)(  malloced_size(a)
-                   - ( SMALLOC_OVERHEAD +
-                       ( sizeof(vector_t) - sizeof(svalue_t) ) / SIZEOF_CHAR_P
+    a_size = (mp_int)(  xalloced_size(a)
+                   - ( xalloc_overhead() +
+                       ( sizeof(vector_t) - sizeof(svalue_t) ) 
                      )
 
-                  ) / (sizeof(svalue_t)/SIZEOF_CHAR_P);
+                  ) / (sizeof(svalue_t));
 
     if (depth && a != &null_vector)
     {
@@ -2073,11 +2073,11 @@ show_array(int d, void *block, int depth)
                 for ( ; wl && wl != user; wl = wl->next) NOOP;
         }
         if (freed || !wl || a_size <= 0 || a_size > MAX_ARRAY_SIZE
-         || (malloced_size((char *)a) - SMALLOC_OVERHEAD) << 2 !=
+         || xalloced_size((char *)a) - xalloc_overhead() !=
               sizeof(vector_t) + sizeof(svalue_t) * (a_size - 1) )
         {
             WRITES(d, "Array in freed block 0x");
-            write_x(d, (p_uint)((unsigned *)block - SMALLOC_OVERHEAD));
+            write_x(d, (p_uint)((unsigned *)block - xalloc_overhead()));
             WRITES(d, "\n");
             return;
         }
@@ -2120,7 +2120,7 @@ show_array(int d, void *block, int depth)
             if (is_freed(svp->u.str, 1) )
             {
                 WRITES(d, "String in freed block 0x");
-                write_x(d, (p_uint)((unsigned *)block - SMALLOC_OVERHEAD));
+                write_x(d, (p_uint)((unsigned *)block - xalloc_overhead()));
                 WRITES(d, "\n");
                 break;
             }
@@ -2155,13 +2155,13 @@ show_array(int d, void *block, int depth)
 void
 setup_print_block_dispatcher (void)
 
-/* Setup the tracing data dispatcher in smalloc with the show_ functions
+/* Setup the tracing data dispatcher in xmalloc with the show_ functions
  * above. Remember that the data dispatcher works by storing the file
  * and line information of sample allocations. We just have to make sure
  * to cover all possible allocation locations (with the string module and
  * its pervasive inlining this is not easy).
  *
- * This is here because I like to avoid smalloc calling closures, and
+ * This is here because I like to avoid xmalloc calling closures, and
  * gcollect.c is already notorious for including almost every header file
  * anyway.
  */
@@ -2222,11 +2222,11 @@ setup_print_block_dispatcher (void)
 }
 #endif /* MALLOC_TRACE */
 
-#endif /* MALLOC_smalloc */
+#endif /* GC_SUPPORT */
 
 /*=========================================================================*/
 
-/*       Default functions when not using the smalloc allocator
+/*       Default functions when the allocator doesn't support GC.
  */
 
 #if !defined(GC_SUPPORT)

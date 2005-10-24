@@ -59,7 +59,6 @@ extern mapping_t *stale_mappings;
 
 /* --- Prototypes --- */
 
-extern void cleanup_object (object_t * obj, ptrtable_t * ptable);
 extern void clear_memory_reference(void *p);
 extern void clear_inherit_ref(program_t *p);
 extern void clear_object_ref (object_t *p);
@@ -124,6 +123,7 @@ extern time_t time_last_gc;
 
 /* --- Prototypes --- */
 
+extern void cleanup_object (object_t * obj, ptrtable_t * ptable);
 extern void garbage_collection(void);
 extern void setup_print_block_dispatcher(void);
 

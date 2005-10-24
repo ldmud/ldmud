@@ -201,7 +201,6 @@
 #include "mstrings.h"
 #include "object.h"
 #include "simulate.h"
-#include "smalloc.h"
 #include "svalue.h"
 #include "wiz_list.h"
 #include "xalloc.h"

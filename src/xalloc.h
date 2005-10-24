@@ -3,6 +3,9 @@
 
 #include "driver.h"
 
+#include "strfuns.h"
+#include "svalue.h"
+
 /* --- Macros --- */
 
 /* void xallocate(void * dest, size_t size, const char * txt)
@@ -85,10 +88,14 @@ extern mp_int max_malloced;
 extern int stack_direction;
 
 
-/* --- SMalloc --- */
+/* --- Prototypes --- */
 
-#ifdef MALLOC_smalloc
-
+/* TODO: It would be nice to have a 'safe xalloc' which would either return
+ * TODO:: a pointer or throw an Out-of-memory error. Alas, with all the
+ * TODO:: local copies of inter_sp/inter_pc this is not so easy.
+ * TODO: Check what  C99 says about free() and friends; if possible, exchange
+ * TODO:: all POINTER with void*.
+ */
 /* xalloc(): normal allocation
  * xalloc_traced(): allocation with given file/line
  * xalloc_pass(): allocation using MTRACE_PASS as file/line args
@@ -96,76 +103,70 @@ extern int stack_direction;
 
 #if defined(MALLOC_TRACE)
 
-#define xalloc_traced(size, file, line)  smalloc((size), (file), (line))
-#define xalloc(size) smalloc((size), __FILE__, __LINE__)
-
-extern POINTER smalloc(size_t, const char *, int) MALLOC;
-
-#define string_copy_traced(s, file, line) smalloc_string_copy(s, file, line)
-#define string_copy(s) smalloc_string_copy(s, __FILE__ "::string_copy", __LINE__)
-extern char * smalloc_string_copy(const char *, const char *, int) MALLOC;
+#define xalloc(size)   xalloc_traced((size), __FILE__, __LINE__)
+#define pxalloc(size)  pxalloc_traced((size), __FILE__, __LINE__)
 
 #else
 
-#define xalloc_traced(size, file, line) smalloc((size))
-#define xalloc(size)                    smalloc((size))
-
-extern POINTER smalloc(size_t) MALLOC;
+#define xalloc(size)      xalloc_traced(size)
+#define pxalloc(size)     pxalloc_traced(size)
 
 #endif
 
-#define xalloc_pass(size)  smalloc((size) MTRACE_PASS)
+#define xalloc_pass(size) xalloc_traced((size) MTRACE_PASS)
 
-extern POINTER rexalloc(POINTER, size_t);
-extern POINTER amalloc(size_t) MALLOC;
-extern POINTER pxalloc(size_t) MALLOC;
-extern void xfree(POINTER);
-extern void pfree(POINTER);
-extern void afree(POINTER);
+extern size_t  xalloced_size (POINTER p);
+extern size_t  xalloc_overhead (void);
+extern POINTER xalloc_traced(size_t size MTRACE_DECL) MALLOC;
+extern void    xfree(POINTER);
+extern POINTER rexalloc(POINTER, size_t) MALLOC;
+extern POINTER pxalloc_traced(size_t MTRACE_DECL) MALLOC;
+extern void    pfree(POINTER);
+extern void  * malloc_increment_size (void *vp, size_t size);
 
-#endif /* MALLOC_smalloc */
+#ifdef GC_SUPPORT
+extern void x_clear_ref (POINTER p);
+extern int x_mark_ref (POINTER p);
+extern Bool x_test_ref (POINTER p);
+#endif /* GC_SUPPORT */
 
+#ifdef MALLOC_TRACE
+extern void store_print_block_dispatch_info(void *block, void (*func)(int, void *, int) );
+extern int is_freed(void *p, p_uint minsize);
+#endif /* MALLOC_TRACE */
 
-/* --- System malloc() --- */
+#ifdef CHECK_OBJECT_GC_REF
+extern void note_object_allocation_info ( void *block );
+extern void note_program_allocation_info ( void *block );
+extern Bool is_object_allocation ( void *block );
+extern Bool is_program_allocation ( void *block );
+#endif /* CHECK_OBJECT_RC_REF */
 
-#ifdef MALLOC_sysmalloc
+/* Functions directly exported from the allocator: */
 
-#include <stdlib.h>
+extern void mem_dump_data(strbuf_t *sbuf);
+extern void mem_dinfo_data(svalue_t *svp, int value);
+extern void mem_consolidate (void);
 
-extern POINTER xalloc(size_t size) MALLOC;
-
-#if defined(MALLOC_TRACE)
-#  define xalloc_traced(size,  file, line) xalloc((size))
-#  define xalloc_pass(size)  xalloc((size))
-#else
-#  define xalloc_traced(size,  file, line) xalloc((size))
-#  define xalloc_pass(size)  xalloc((size))
-#endif
-
-#define xfree    free
-#define rexalloc realloc
-#define amalloc  xalloc
-#define pxalloc  xalloc
-#define afree    free
-#define pfree    free
-
-#endif /* MALLOC_sysmalloc */
-
+#ifdef GC_SUPPORT
+extern void mem_clear_ref_flags(void);
+extern void mem_free_unrefed_memory(void);
+#endif /* GC_SUPPORT */
 
 /* --- Associated functions --- */
 
+#if defined(MALLOC_TRACE)
+#define string_copy(s) string_copy_traced(s, __FILE__ "::string_copy", __LINE__)
+#else
+#define string_copy(s) string_copy_traced(s)
+#endif
+
+extern char * string_copy_traced(const char *str MTRACE_DECL) MALLOC;
 extern void dump_lpc_trace (int d, void *p);
 extern void dump_malloc_trace (int d, void *adr);
 
 extern void get_stack_direction (void);
 extern void assert_stack_gap(void);
 extern void reserve_memory (void);
-
-#ifndef string_copy
-
-#define string_copy_traced(s, file, line) string_copy(s)
-extern char * string_copy(const char *str) MALLOC;
-
-#endif
 
 #endif /* XALLOC_H__ */

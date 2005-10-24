@@ -113,7 +113,6 @@
 #include "random.h"
 #include "stdstrings.h"
 #include "simulate.h"
-#include "smalloc.h" /* smalloc_dinfo_data() */
 #include "strfuns.h"
 #include "swap.h"
 #include "svalue.h"
@@ -6868,15 +6867,7 @@ v_debug_info (svalue_t *sp, int num_arg)
         case DID_MEMORY:
             PREP(DID_MEMORY_MAX)
 
-#if defined(MALLOC_smalloc)
-            smalloc_dinfo_data(dinfo_arg, value);
-#endif
-#if defined(MALLOC_sysmalloc)
-            if (value == -1)
-                put_ref_string(v->item+DID_MEM_NAME, STR_SYSTEM_MALLOC);
-            else if (value == DID_MEM_NAME)
-                put_ref_string(dinfo_arg, STR_SYSTEM_MALLOC);
-#endif
+            mem_dinfo_data(dinfo_arg, value);
             if (value == -1)
                 put_array(&res, v);
             break;

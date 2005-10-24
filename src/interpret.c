@@ -232,7 +232,6 @@
 #include "simulate.h"
 #include "simul_efun.h"
 #include "stdstrings.h"
-#include "smalloc.h" /* malloc_increment_size() */
 #include "svalue.h"
 #include "swap.h"
 #include "switch.h"
@@ -2389,12 +2388,10 @@ inter_add_array (vector_t *q, vector_t **vpp)
     {
         /* p will be deallocated completely - try to optimize a bit */
 
-#ifdef MALLOC_smalloc
         /* We try to expand the existing memory for p (without moving)
          * instead of allocating a completely new vector.
-         * TODO: We overallocate in anticipation of further additions?
          */
-        d = malloc_increment_size(p, q_size << 1);
+        d = malloc_increment_size(p, q_size * sizeof(svalue_t));
         if ( NULL != d)
         {
             /* We got the additional memory */
@@ -2420,7 +2417,6 @@ inter_add_array (vector_t *q, vector_t **vpp)
                 error("Illegal array size: %ld.\n", (long)(p_size + q_size));
             }
         } else
-#endif
         /* Just allocate a new vector and memcopy p into it. */
         {
             r = allocate_uninit_array((p_int)(p_size + q_size));
@@ -2444,6 +2440,8 @@ inter_add_array (vector_t *q, vector_t **vpp)
             assign_checked_svalue_no_free (d++, s++);
         }
     }
+
+    /* Here 'd' points to the first item to set */
 
     /* Add the values from q. Again, try to optimize */
     s = q->item;

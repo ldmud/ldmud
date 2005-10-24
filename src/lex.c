@@ -1538,7 +1538,7 @@ undefined_function:
     else
     {
         int i;
-        char *end;
+        const char *end;
 
         i = symbol_operator(str, &end);
         /* If there was a valid operator with trailing junk, *end, but i >= 0.
@@ -4509,7 +4509,7 @@ yylex1 (void)
                 {
                     int i;
 
-                    if ((i = symbol_operator(yyp, &outp)) < 0)
+                    if ((i = symbol_operator(yyp, (const char **)&outp)) < 0)
                         yyerror("Missing function name after #'");
                     yylval.closure.number = i + CLOSURE_EFUN_OFFS;
                     return L_CLOSURE;
@@ -6375,7 +6375,7 @@ _expand_define (struct defn *p, ident_t * macro)
                         }
                         else
                         {
-                            char *end;
+                            const char *end;
 
                             if (symbol_operator(r, &end) < 0)
                             {
@@ -6383,7 +6383,7 @@ _expand_define (struct defn *p, ident_t * macro)
                             }
                             strncpy(q, r, (size_t)(end - r));
                             q += end - r;
-                            r = end;
+                            r = (char *)end;
                         }
                     }
                     continue;

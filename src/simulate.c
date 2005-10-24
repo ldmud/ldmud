@@ -55,7 +55,6 @@
 #include "prolang.h"
 #include "sent.h"
 #include "simul_efun.h"
-#include "smalloc.h" /* dump_malloc_data() */
 #include "stdstrings.h"
 #include "strfuns.h"
 #include "swap.h"
@@ -3069,12 +3068,7 @@ status_parse (strbuf_t * sbuf, char * buff)
     }
 
     if (strcmp(buff, "malloc") == 0) {
-#if defined(MALLOC_smalloc)
-        dump_malloc_data(sbuf);
-#endif
-#ifdef MALLOC_sysmalloc
-        strbuf_add(sbuf, "Using system standard malloc.\n");
-#endif
+        mem_dump_data(sbuf);
         return MY_TRUE;
     }
 
