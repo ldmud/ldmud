@@ -328,14 +328,7 @@ get_simul_efun_object (void)
             p = make_shared_identifier(get_txt(function_name), I_TYPE_GLOBAL, 0);
             if (p->type == I_TYPE_UNKNOWN)
             {
-                p->type = I_TYPE_GLOBAL;
-                p->u.global.function = I_GLOBAL_FUNCTION_EFUN;
-                p->u.global.variable = I_GLOBAL_VARIABLE_FUN;
-                p->u.global.efun     = I_GLOBAL_EFUN_OTHER;
-                p->u.global.sim_efun = I_GLOBAL_SEFUN_OTHER;
-#ifdef USE_STRUCTS
-                p->u.global.struct_id = I_GLOBAL_STRUCT_NONE;
-#endif
+                init_global_identifier(p, /* bVariable: */ MY_FALSE);
                 p->next_all = all_simul_efuns;
                 all_simul_efuns = p;
             }

@@ -228,6 +228,7 @@ extern void init_lexer(void);
 extern int  symbol_operator(const char *symbol, const char **endp);
 extern void symbol_efun_str(const char *str, size_t len, svalue_t *sp, Bool is_efun);
 extern void symbol_efun(string_t *name, svalue_t *sp);
+extern void init_global_identifier (ident_t * ident, Bool bVariable);
 extern ident_t *lookfor_shared_identifier(char *, int, int, Bool);
 #define make_shared_identifier(s,n,d) lookfor_shared_identifier(s,n,d, MY_TRUE)
 #define find_shared_identifier(s,n,d) lookfor_shared_identifier(s,n,d, MY_FALSE)

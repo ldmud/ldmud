@@ -2932,14 +2932,7 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
         }
         /* should be I_TYPE_UNKNOWN now. */
 
-        p->type = I_TYPE_GLOBAL;
-        p->u.global.variable  = I_GLOBAL_VARIABLE_OTHER;
-        p->u.global.efun      = I_GLOBAL_EFUN_OTHER;
-        p->u.global.sim_efun  = I_GLOBAL_SEFUN_OTHER;
-#ifdef USE_STRUCTS
-        p->u.global.struct_id = I_GLOBAL_STRUCT_NONE;
-#endif /* USE_STRUCTS */
-
+        init_global_identifier(p, /* bVariable: */ MY_TRUE);
         p->next_all = all_globals;
         all_globals = p;
     }
@@ -3016,15 +3009,7 @@ define_variable (ident_t *name, fulltype_t type, svalue_t *svp)
             name = make_shared_identifier(get_txt(name->name), I_TYPE_GLOBAL, 0);
         }
 
-        name->type = I_TYPE_GLOBAL;
-        name->u.global.function  = I_GLOBAL_FUNCTION_VAR;
-        name->u.global.variable  = I_GLOBAL_VARIABLE_OTHER; /* mark it as 'yet undef' for now */
-        name->u.global.efun      = I_GLOBAL_EFUN_OTHER;
-        name->u.global.sim_efun  = I_GLOBAL_SEFUN_OTHER;
-#ifdef USE_STRUCTS
-        name->u.global.struct_id = I_GLOBAL_STRUCT_NONE;
-#endif /* USE_STRUCTS */
-
+        init_global_identifier(name, /* bVariable: */ MY_TRUE);
         name->next_all = all_globals;
         all_globals = name;
     }
@@ -3150,15 +3135,7 @@ redeclare_variable (ident_t *name, fulltype_t type, int n)
          */
 
         /* I_TYPE_UNKNOWN */
-        name->type = I_TYPE_GLOBAL;
-        name->u.global.function  = I_GLOBAL_FUNCTION_VAR;
-        name->u.global.variable  = I_GLOBAL_VARIABLE_OTHER; /* default: it's hidden */
-        name->u.global.efun      = I_GLOBAL_EFUN_OTHER;
-        name->u.global.sim_efun  = I_GLOBAL_SEFUN_OTHER;
-#ifdef USE_STRUCTS
-        name->u.global.struct_id = I_GLOBAL_STRUCT_NONE;
-#endif /* USE_STRUCTS */
-
+        init_global_identifier(name, /* bVariable: */ MY_TRUE);
         name->next_all = all_globals;
         all_globals = name;
     }
@@ -3337,14 +3314,7 @@ def_function_typecheck (fulltype_t returntype, ident_t * ident
     if (ident->type == I_TYPE_UNKNOWN)
     {
         /* prevent freeing by exotic name clashes */
-        ident->type = I_TYPE_GLOBAL;
-        ident->u.global.variable  = I_GLOBAL_VARIABLE_OTHER;
-        ident->u.global.efun      = I_GLOBAL_EFUN_OTHER;
-        ident->u.global.sim_efun  = I_GLOBAL_SEFUN_OTHER;
-        ident->u.global.function  = I_GLOBAL_FUNCTION_VAR;
-#ifdef USE_STRUCTS
-        ident->u.global.struct_id = I_GLOBAL_STRUCT_NONE;
-#endif /* USE_STRUCTS */
+        init_global_identifier(ident, /* bVariable: */ MY_TRUE);
         ident->next_all = all_globals;
         all_globals = ident;
     }
@@ -3664,13 +3634,7 @@ define_new_struct ( Bool proto, ident_t *p, funflag_t flags)
         }
         /* should be I_TYPE_UNKNOWN now. */
 
-        p->type = I_TYPE_GLOBAL;
-        p->u.global.function  = I_GLOBAL_FUNCTION_EFUN;
-        p->u.global.variable  = I_GLOBAL_VARIABLE_OTHER;
-        p->u.global.efun      = I_GLOBAL_EFUN_OTHER;
-        p->u.global.sim_efun  = I_GLOBAL_SEFUN_OTHER;
-        p->u.global.struct_id = I_GLOBAL_STRUCT_NONE;
-
+        init_global_identifier(p, /* bVariable: */ MY_FALSE);
         p->next_all = all_globals;
         all_globals = p;
     }
@@ -11916,14 +11880,7 @@ function_call:
           {
               /* prevent freeing by exotic name clashes */
               /* also makes life easier below */
-              real_name->type = I_TYPE_GLOBAL;
-              real_name->u.global.function  = I_GLOBAL_FUNCTION_VAR;
-              real_name->u.global.variable  = I_GLOBAL_VARIABLE_OTHER;
-              real_name->u.global.efun      = I_GLOBAL_EFUN_OTHER;
-              real_name->u.global.sim_efun  = I_GLOBAL_SEFUN_OTHER;
-#ifdef USE_STRUCTS
-              real_name->u.global.struct_id = I_GLOBAL_STRUCT_NONE;
-#endif /* USE_STRUCTS */
+              init_global_identifier(real_name, /* bVariable: */ MY_TRUE);
               real_name->next_all = all_globals;
               all_globals = real_name;
           }
@@ -15103,14 +15060,8 @@ copy_functions (program_t *from, funflag_t type)
                  * Just make a new global.
                  */
 
-                p->type = I_TYPE_GLOBAL;
-                p->u.global.variable  = I_GLOBAL_VARIABLE_OTHER;
-                p->u.global.efun      = I_GLOBAL_EFUN_OTHER;
-                p->u.global.sim_efun  = I_GLOBAL_SEFUN_OTHER;
+                init_global_identifier(p, /* bVariable: */ MY_TRUE);
                 p->u.global.function  = current_func_index;
-#ifdef USE_STRUCTS
-                p->u.global.struct_id = I_GLOBAL_STRUCT_NONE;
-#endif /* USE_STRUCTS */
                 p->next_all = all_globals;
                 all_globals = p;
             }
