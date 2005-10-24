@@ -31,12 +31,12 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 330)
-(Parent-Version lpmud 3-3 329)
-(Version-Log "Removed a crasher when the login object destructs itself.")
+(Project-Version lpmud 3-3 331)
+(Parent-Version lpmud 3-3 330)
+(Version-Log "Corrected two small problems in xalloc.c")
 (New-Version-Log
 "")
-(Checkin-Time "Mon, 16 Dec 2002 03:00:12 -0700")
+(Checkin-Time "Mon, 16 Dec 2002 03:17:37 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -73,7 +73,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.54 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.393 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.394 644))
   (HISTORY (lpmud/f/49_HISTORY 1.292 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.19 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -257,7 +257,7 @@
   (src/wiz_list.h (lpmud/1_wiz_list.h 1.5.1.7 644))
   (src/wiz_list.c (lpmud/2_wiz_list.c 1.13.1.14.1.1 644))
   (src/xalloc.h (lpmud/g/51_xalloc.h 1.17 644))
-  (src/xalloc.c (lpmud/h/0_xalloc.c 1.2.1.11 644))
+  (src/xalloc.c (lpmud/h/0_xalloc.c 1.2.1.12 644))
 
   ;; Build files
   (src/func_spec (lpmud/c/31_func_spec 1.53.1.45.1.22.1.2 644))

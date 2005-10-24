@@ -336,7 +336,7 @@ retry_alloc (size_t size MTRACE_DECL)
     going_to_exit = MY_TRUE; /* Prevent recursions */
     writes(2, mess4);
     (void)dump_trace(MY_FALSE, NULL);
-    fatal("Out of memory (%lu bytes)\n", size);
+    fatal("Out of memory (%lu bytes)\n", (unsigned long)size);
     /* NOTREACHED */
     return MY_FALSE;
 } /* retry_alloc() */
@@ -906,7 +906,7 @@ get_block_size (POINTER ptr)
 #if MALLOC_ALIGN > MEM_ALIGN
         while ( !(size = *--q) ) NOOP;
 #endif
-        size = xalloced_size(p) + mem_overhead();
+        size = xalloced_size(q) + mem_overhead();
     }
 
     return size;

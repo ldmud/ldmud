@@ -1,6 +1,9 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+16-Dec-2002 (Lars Duening)  (3.3.331)
+  - (xalloc.c) Corrected two small problems (thanks, Guandalug!)
+
 16-Dec-2002 (Lars Duening)  (3.3.330)
   - (comm.c) If the login object destructed itself in the logon() call,
       the driver crashed in the print_prompt() routine (reported by Jason).
