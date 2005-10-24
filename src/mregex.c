@@ -696,7 +696,8 @@ rx_sub (regexp_t *prog, string_t *source, string_t *subst)
             }
             else
 #ifdef USE_PCRE
-            if (prog->pSubs[2*no] != -1
+            if (no < prog->res
+             && prog->pSubs[2*no] != -1
              && prog->pSubs[2*no+1] != -1
                )
             {
@@ -714,7 +715,8 @@ rx_sub (regexp_t *prog, string_t *source, string_t *subst)
                 }
             }
 #else
-            if (prog->rx->startp[no] != NULL
+            if (no < sizeof(prog->rx->startp) / sizeof(prog->rx->startp[0])
+             && prog->rx->startp[no] != NULL
              && prog->rx->endp[no] != NULL
                )
             {
