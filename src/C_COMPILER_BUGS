@@ -1,4 +1,4 @@
-gcc 3.2 - Cygwin
+gcc 2.9, 3.2 - Cygwin
   Highest optimization creates buggy code when the total size of local
   variables gets too big (>= 8KBytes).
 

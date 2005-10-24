@@ -5711,7 +5711,7 @@ handle_define (char *yyt, Bool quote)
 
     char namebuf[NSIZE];      /* temp buffer for read identifiers */
     char args[NARGS][NSIZE];  /* parsed argument names of function macros */
-#if defined(CYGWIN) && __GNUC__ >= 3 && __GNUC_MINOR__ >= 2
+#if defined(CYGWIN) && __GNUC__ >= 2
     char *mtext;
       /* replacement text, with arguments replaced by the MARKS characters.
        * Under Cygwin and high optimization, the compiler produces faulty
