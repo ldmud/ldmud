@@ -15,6 +15,8 @@
 ;;                   branched off 3-3.294
 ;;
 ;; TODO: Improved structs
+;; TODO: Fast callouts
+;; TODO: Configurable heartbeat interval a la MudOS
 ;; TODO: Try replacing smalloc with an adjusted ptmalloc, if it makes sense.
 ;; TODO:: The malloc-tracing and memory reserves can be handled on xalloc.c
 ;; TODO:: level; the GC and fallback-to-malloc() however needs to go into
@@ -26,7 +28,7 @@
 ;; TODO: state dumps.
 ;; TODO: Syslog
 ;; TODO: One .c-file per efun.
-;; TODO: MCP
+;; TODO: MCP, MCCP (see src/wk/ff-3.3.339-diffs
 ;; TODO: PostgreSQL
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
@@ -37,12 +39,12 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 341)
-(Parent-Version lpmud 3-3 340)
-(Version-Log "Clarified the role of REPLACE_MALLOC in the allocator routines.")
+(Project-Version lpmud 3-3 342)
+(Parent-Version lpmud 3-3 341)
+(Version-Log "When saving lfun closures, the function name was looked up in the wrong program. ")
 (New-Version-Log
 "")
-(Checkin-Time "Tue, 24 Dec 2002 17:48:18 -0700")
+(Checkin-Time "Sat, 28 Dec 2002 01:47:13 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -79,7 +81,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.56 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.404 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.405 644))
   (HISTORY (lpmud/f/49_HISTORY 1.292 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.19 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -185,7 +187,7 @@
   (src/my-alloca.h (lpmud/f/29_my-alloca. 1.3.1.2 644))
   (src/my-rusage.h (lpmud/f/28_my-rusage. 1.7 644))
   (src/object.h (lpmud/44_object.h 1.34.1.19 644))
-  (src/object.c (lpmud/45_object.c 1.62.1.88.1.8 644))
+  (src/object.c (lpmud/45_object.c 1.62.1.88.1.9 644))
   (src/otable.h (lpmud/f/27_otable.h 1.8.1.4 644))
   (src/otable.c (lpmud/43_otable.c 1.22.1.6 644))
   (src/parser.c (lpmud/l/13_parser.c 1.1 644))
@@ -292,7 +294,7 @@
   (src/hosts/be/socketinc.h (lpmud/e/32_socketinc. 1.3 644))
   (src/hosts/be/set-version (lpmud/c/b/10_set-versio 1.1 744))
   (src/hosts/be/machine.h (lpmud/e/33_machine.h 1.14.1.4 644))
-  (src/hosts/be/config.h (lpmud/e/34_config.h 1.32.1.28 644))
+  (src/hosts/be/config.h (lpmud/e/34_config.h 1.32.1.29 644))
   (src/hosts/be/be.h (lpmud/e/35_be.h 1.7 644))
   (src/hosts/be/beyacc (lpmud/i/39_beyacc 1.1 744))
   (src/hosts/be/Makefile (lpmud/e/37_Makefile 1.60.1.71.1.5 644))
@@ -866,6 +868,16 @@
   (src/wk/mcp2.html (lpmud/c/b/30_mcp2.html 1.1 644) :no-keywords)
   (src/wk/mccp.htm (lpmud/c/b/31_mccp.htm 1.1 644) :no-keywords)
   (src/wk/flows.gif (lpmud/c/b/32_flows.gif 1.1 644) :no-keywords)
+  (src/wk/ff-3.3.339-diffs/src/settings/hogwarts (lpmud/c/b/36_hogwarts 1.1 755))
+  (src/wk/ff-3.3.339-diffs/src/settings/ff-test (lpmud/c/b/37_ff-test 1.1 755))
+  (src/wk/ff-3.3.339-diffs/src/pkg-stringcompiler.c (lpmud/c/b/38_pkg-string 1.1 644))
+  (src/wk/ff-3.3.339-diffs/src/pkg-encrypt.c (lpmud/c/b/39_pkg-encryp 1.1 644))
+  (src/wk/ff-3.3.339-diffs/doc/efun/start_mccp_compress (lpmud/c/b/40_start_mccp 1.1 644))
+  (src/wk/ff-3.3.339-diffs/doc/efun/query_mccp_stats (lpmud/c/b/41_query_mccp 1.1 644))
+  (src/wk/ff-3.3.339-diffs/doc/efun/query_mccp (lpmud/c/b/42_query_mccp 1.1 644))
+  (src/wk/ff-3.3.339-diffs/doc/efun/end_mccp_compress (lpmud/c/b/43_end_mccp_c 1.1 644))
+  (src/wk/ff-3.3.339-diffs/doc/concepts/mccp (lpmud/c/b/44_mccp 1.1 644))
+  (src/wk/ff-3.3.339-diffs/diff-33-339-ff (lpmud/c/b/45_diff-33-33 1.1 644))
 
   ;; Documentation
   (doc/README (lpmud/n/4_README 1.1.1.2 644))

@@ -1,0 +1,13 @@
+SYNOPSIS
+        int *query_mccp_stats()
+        int *query_mccp_stats(object player)
+
+DESCRIPTION
+        This efun gives you statistics about current compression
+        of the player. ( default this_player() )
+        You get an array with ({ uncompressed bytes , compressed bytes }).
+        If the connection is not compressed it returns 0.
+        It raises an error on not-interactive objects.
+
+SEE ALSO
+        end_mccp_compress(E), start_mccp_compress(E), query_mccp(E), mccp(C)

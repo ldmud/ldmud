@@ -1,0 +1,11 @@
+SYNOPSIS
+        int start_mccp_compress(int telopt)
+
+DESCRIPTION
+        This efun must be called inside an interactive player and starts
+        compression of the driver -> client traffic immediatly.
+	telopt must be either TELOPT_COMPRESS2 or TELOPT_COMRESS from
+	sys/telnet.h.
+
+SEE ALSO
+        end_mccp_compress(E), query_mccp(E), query_mccp_stats(E), mccp(C)

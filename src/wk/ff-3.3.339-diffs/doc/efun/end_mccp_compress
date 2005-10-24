@@ -1,0 +1,9 @@
+SYNOPSIS
+        int end_mccp_compress()
+
+DESCRIPTION
+        This efun must be called inside an interactive player and stops
+        compression of the driver -> client traffic immediatly.
+
+SEE ALSO
+        start_mccp_compress(E), query_mccp(E), query_mccp_stats(E), mccp(C)

@@ -5256,7 +5256,9 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
         {
         case CLOSURE_LFUN:
           {
-            if (v->u.lambda->function.lfun.ob == current_object)
+            if (v->u.lambda->function.lfun.ob == current_object
+             && v->u.lambda->ob == current_object
+               )
             {
                 lambda_t  *l;
                 program_t *prog;
@@ -5267,7 +5269,7 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
                 object_t  *ob;
 
                 l = v->u.lambda;
-                ob = l->ob;
+                ob = l->function.lfun.ob;
                 ix = l->function.lfun.index;
 
                 prog = ob->prog;
@@ -6756,7 +6758,6 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
                 if (i >= 0)
                 {
                     lambda_t *l;
-                    int j;
 
 #ifndef USE_NEW_INLINES
                     l = xalloc(sizeof *l);
@@ -6779,6 +6780,8 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
                     l->function.lfun.context_size = context_size;
                     if (context_size > 0)
                     {
+                        int j;
+
                         for (j = 0; j < context_size; j++)
                             assign_svalue_no_free(l->context+j, context.u.vec->item+j);
                         free_array(context.u.vec);

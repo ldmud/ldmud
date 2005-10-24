@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+28-Dec-2002 (Lars Duening)  (3.3.342)
+  - (object.c) When saving lfun closures, the function name was looked
+       up in the wrong program (reported by Dafire).
+
 24-Dec-2002 (Lars Duening)  (3.3.341)
   - (xalloc.c) Clarified the role of REPLACE_MALLOC (prompted by Gawain).
 
