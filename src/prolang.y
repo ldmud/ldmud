@@ -15165,10 +15165,10 @@ store_include_info (char *name, char * filename, char delim, int depth)
         char * tmp;
         size_t len;
 
-        /* Add a leading slash to the filename if necessary,
+        /* Make sure that the filename starts with a leading slash,
          * then make it a tabled string and store it.
          */
-        if (!compat_mode && *filename != '/')
+        if (*filename != '/')
         {
             tmp = alloca(strlen(filename)+2);
             if (tmp == NULL)
@@ -15182,8 +15182,6 @@ store_include_info (char *name, char * filename, char delim, int depth)
                 filename = tmp;
             }
         }
-        else if (compat_mode && *filename == '/')
-            filename++;
 
         inc.filename = new_tabled(filename);
         if (inc.filename == NULL)

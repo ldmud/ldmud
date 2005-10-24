@@ -958,7 +958,7 @@ svalue_to_string ( fmt_state_t *st
       stradd(st, &str, ",\n");
 
   return str;
-} /* end of svalue_to_string() */
+} /* svalue_to_string() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -1361,6 +1361,8 @@ static char buff[BUFF_SIZE];         /* For error messages */
         new->next = st->saves;\
         st->saves = new;\
     }
+
+    result = NULL; /* To get rid of a warning */
 
     xallocate(st, sizeof *st, "sprintf() context");
 
@@ -1819,8 +1821,8 @@ static char buff[BUFF_SIZE];         /* For error messages */
                     b->offset = -CLEANSIZ+(p_int)sizeof(sprintf_buffer_t);
                     b->size = CLEANSIZ;
                     b->start = &st->tmp;
-                    svalue_to_string(st, carg, b, 0, MY_FALSE
-                                    , (finfo & INFO_T) == INFO_T_QLPC);
+                    b = svalue_to_string(st, carg, b, 0, MY_FALSE
+                                        , (finfo & INFO_T) == INFO_T_QLPC);
 
                     /* Store the created result in .clean and pass it
                      * to case INFO_T_STRING is 'the' carg.
@@ -2180,7 +2182,6 @@ add_table_now:
         xfree(st->tmp);
 
     /* Copy over the result */
-    result = NULL; /* to avoid a warning */
     if  (st->bpos > 1)
         result = new_n_mstring(st->buff, st->bpos-1);
     else

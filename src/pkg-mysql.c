@@ -169,7 +169,7 @@ remove_dat (db_dat_t *dat)
 
 {
     db_dat_t *tmp, *tmp2;
-    unsigned int i;
+    unsigned int i = 0;
 
     if ( !dat )
         return 0;

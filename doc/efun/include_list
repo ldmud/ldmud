@@ -37,14 +37,16 @@ DESCRIPTION
           then its information will be stored directly in the array.
           If one included file has includes by itself, a subvector will
           be created and stored in the result vector (again in [i+0], with
-          [i+1] and [i+2] being 0). Theese subvectors have the same
+          [i+1] and [i+2] being 0). These subvectors have the same
           structure as the main result vector.
 
         If objects, including <ob>, had been undergone a replace_program(),
         the returned filenames will reflect the actual active program.
 
-        The returned proper filenames always begin with '/' (absolute path),
-        except when the parser runs in COMPAT mode.
+        The returned proper include filenames always begin with '/' (absolute
+        path), even when the parser runs in COMPAT mode. The filename of
+        the object itself however does not begin with a '/' in COMPAT
+        mode.
 
 
 EXAMPLES

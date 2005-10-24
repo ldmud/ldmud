@@ -157,7 +157,7 @@ if [ "X$1" == "X-build" ]; then
   cd ${SRCDIR}src
   make distclean
   ${SRCDIR}src/settings/${SETTINGNAME}
-  make driver utils
+  make ldmud utils
 fi
 
 # if '-install' was given on the commandline, change into the 'real'
@@ -168,5 +168,5 @@ if [ "X$1" == "X-install" ]; then
   cd ${SRCDIR}src
   make distclean
   ${SRCDIR}src/settings/${SETTINGNAME}
-  make driver utils install install-utils
+  make ldmud utils install install-utils
 fi

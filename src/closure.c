@@ -473,8 +473,6 @@ closure_eq (svalue_t * left, svalue_t * right)
     {
         if (left->x.closure_type == CLOSURE_LFUN)
         {
-            unsigned context_size, ix;
-
             i =    (   left->u.lambda->function.lfun.ob
                     == right->u.lambda->function.lfun.ob)
                 && (   left->u.lambda->function.lfun.index
@@ -486,6 +484,8 @@ closure_eq (svalue_t * left, svalue_t * right)
 #ifdef USE_NEW_INLINES
             if (i)
             {
+                unsigned int context_size, ix;
+
                 /* There might be a difference is in the context svalues.
                  * To prevent recursion, hide them while comparing them.
                  */
@@ -4906,11 +4906,8 @@ closure_to_string (svalue_t * sp)
         inherit_t *inheritp;
         Bool       is_inherited;
 
-        if (sp->x.closure_type == CLOSURE_LFUN)
-        {
-            ob = l->function.lfun.ob;
-            ix = l->function.lfun.index;
-        }
+        ob = l->function.lfun.ob;
+        ix = l->function.lfun.index;
 
         if (ob->flags & O_DESTRUCTED)
         {
