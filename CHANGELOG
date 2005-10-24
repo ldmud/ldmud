@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+07-Jan-2003 (Lars Duening)  (3.3.353)
+  - (prolang.y) Corrected another error in non-__INIT initializations
+       (thanks, Guandalug).
+  - (prolang.y) Corrected another refcount error in the struct code
+       (reported by Bardioc).
+
 06-Jan-2003 (Lars Duening)  (3.3.352)
   - (prolang.y) Removed compiler warnings.
   - (prolang.y, simulate.c) Removed compiler errors when not using __INIT

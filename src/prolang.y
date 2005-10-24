@@ -3766,6 +3766,7 @@ add_struct_member ( string_t *name, vartype_t type
 
         member.name = ref_mstring(name);
         member.type = type;
+        ref_vartype_data(&member.type);
         add_to_mem_block(A_STRUCT_MEMBERS, &member, sizeof member);
     }
 } /* add_struct_member() */
@@ -3803,12 +3804,12 @@ finish_struct ( const char * unique_name )
 
     if (pdef->type)
     {
-        /* Free the safety copies */
+        /* Success: Free the safety copies */
         free_mstring(name);
     }
     else
     {
-        /* Recreate the prototype */
+        /* Failure: Recreate the prototype as the old one got deleted */
         pdef->type = struct_new_prototype(name);
     }
 
@@ -4766,11 +4767,11 @@ list_to_vector (size_t length, svalue_t *initialized)
         svp = vec->item;
         do {
             *svp++ = list->val;
-            list = list->next;
 #ifdef USE_STRUCTS
             if (list->member != NULL) /* shouldn't happen here */
                 free_mstring(list->member);
 #endif /* USE_STRUCTS */
+            list = list->next;
             xfree(block);
         } while ( NULL != (block = list) );
     }
@@ -16633,7 +16634,9 @@ epilog (void)
         compiled_prog = NULL;
 
         for (i = 0; i < NUMAREAS; i++)
+        {
             xfree(mem_block[i].block);
+        }
 
         type_of_locals = NULL;
 #ifdef USE_NEW_INLINES

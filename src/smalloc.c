@@ -752,7 +752,7 @@ available_memory(void)
             in_malloc = 0; \
             fatal("allocation from free list for %lu bytes: " \
                   "block %p magic match failed, " \
-                  "expected %lx, found %lx\n" \
+                  "expected %08lx, found %08lx\n" \
                  , (unsigned long) size, block \
                  , SIZE_MOD_INDEX(sfmagic, size), block[M_MAGIC]); \
         } \
@@ -832,7 +832,7 @@ mem_alloc (size_t size)
         count_back(small_free_stat, size);
 
         /* Fill in the header (M_SIZE is already ok) */
-        MAKE_SMALL_CHECK(temp,size);
+        MAKE_SMALL_CHECK(temp, size);
 
         temp += M_OVERHEAD;
 

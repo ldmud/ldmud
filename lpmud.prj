@@ -36,13 +36,13 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 352)
-(Parent-Version lpmud 3-3 351)
-(Version-Log "The wizlist_info() array was allocated too small.
-Removed compiler errors when not using __INIT.")
+(Project-Version lpmud 3-3 353)
+(Parent-Version lpmud 3-3 352)
+(Version-Log "Corrected another error in non-__INIT initializations.
+Corrected another refcount error in the struct code.")
 (New-Version-Log
 "")
-(Checkin-Time "Mon, 06 Jan 2003 10:12:51 -0700")
+(Checkin-Time "Tue, 07 Jan 2003 19:37:09 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -79,7 +79,7 @@ Removed compiler errors when not using __INIT.")
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.56 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.415 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.416 644))
   (HISTORY (lpmud/f/49_HISTORY 1.294 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.19 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -242,7 +242,7 @@ Removed compiler errors when not using __INIT.")
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.15 644))
   (src/port.c (lpmud/39_port.c 1.17.1.7 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.17.1.1 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.16 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.17 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7.1.1 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))
@@ -255,8 +255,8 @@ Removed compiler errors when not using __INIT.")
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.31 644))
   (src/simulate.c (lpmud/31_simulate.c 1.88.1.95 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.12 644))
-  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.62 644))
-  (src/structs.h (lpmud/d/b/5_structs.h 1.1 644))
+  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.63 644))
+  (src/structs.h (lpmud/d/b/5_structs.h 1.2 644))
   (src/structs.c (lpmud/d/b/6_structs.c 1.3 644))
   (src/sysmalloc.h (lpmud/c/b/33_sysmalloc. 1.1 644))
   (src/sysmalloc.c (lpmud/c/b/34_sysmalloc. 1.2 644))

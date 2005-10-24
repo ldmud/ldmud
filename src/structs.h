@@ -28,8 +28,8 @@
 
 struct struct_s
 {
-    p_int           ref;   /* Number of references */
     struct_type_t * type;  /* The type object */
+    p_int           ref;   /* Number of references */
     wiz_list_t    * user;  /* Who made the struct */
     svalue_t        member[1 /* .type->num_members */ ];
       /* The struct member values */
@@ -57,8 +57,8 @@ struct struct_member_s
 
 struct struct_type_s
 {
-    p_int           ref;      /* Number of references to this structure */
     string_t      * name;     /* Tabled name of the struct */
+    p_int           ref;      /* Number of references to this structure */
     string_t      * unique_name;
                               /* Tabled unique name of the struct, in the
                                * form "<name> <prog-name> <prog-id_number>".
