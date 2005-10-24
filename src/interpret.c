@@ -2929,13 +2929,16 @@ get_vector_a_item (vector_t * vec, svalue_t * i, svalue_t *sp, bytecode_p pc)
 
 /*-------------------------------------------------------------------------*/
 static INLINE char *
-get_string_item (svalue_t * svp, svalue_t * i, Bool make_singular
+get_string_item ( svalue_t * svp, svalue_t * i, Bool make_singular
+                , Bool allow_one_past
                 , svalue_t *sp, bytecode_p pc)
 
 /* Index string <svp> with index <i> and return the pointer to the
  * indexed item.
  * If <make_singular> is TRUE, <svp> is made an untabled string
  * with just one reference.
+ * If <allow_one_past> is TRUE, indexing one past the official end
+ * of the string for retrieval purposes is ok. TODO: Remove this.
  * If the index is invalid, throw an error.
  */
 
@@ -2958,11 +2961,26 @@ get_string_item (svalue_t * svp, svalue_t * i, Bool make_singular
             return NULL;
         }
 
-        if (ind >= mstrsize(svp->u.str) )
+        if (ind > mstrsize(svp->u.str) )
         {
             ERRORF(("Index out for [] of bounds: %ld, string length: %ld.\n"
                    , (long)ind, (long)mstrsize(svp->u.str)));
             return NULL;
+        }
+
+        if (ind == mstrsize(svp->u.str))
+        {
+            if (!allow_one_past)
+            {
+                ERRORF(("Index out for [] of bounds: %ld, string length: %ld.\n"
+                       , (long)ind, (long)mstrsize(svp->u.str)));
+                return NULL;
+            }
+            else if (pragma_warn_deprecated)
+                warnf( "Warning: Indexing past string end is deprecated: "
+                       "index %ld, string length: %ld.\n"
+                     , (long)ind, (long)mstrsize(svp->u.str)
+                     );
         }
     }
 
@@ -2986,10 +3004,13 @@ get_string_item (svalue_t * svp, svalue_t * i, Bool make_singular
 /*-------------------------------------------------------------------------*/
 static INLINE char *
 get_string_r_item (svalue_t * svp, svalue_t * i, Bool make_singular
+                  , Bool allow_one_past
                   , svalue_t *sp, bytecode_p pc)
 
 /* Reverse-Index string <svp> with index <i> and return the pointer to the
  * indexed item.
+ * If <allow_one_past> is TRUE, indexing one past the official end
+ * of the string for retrieval purposes is ok. TODO: Remove this.
  * If <make_singular> is TRUE, <svp> is made an untabled string
  * with just one reference.
  * If the index is invalid, throw an error.
@@ -3015,12 +3036,27 @@ get_string_r_item (svalue_t * svp, svalue_t * i, Bool make_singular
         }
 
         if ( (ind = (mp_int)mstrsize(svp->u.str) - ind) < 0
-         ||  ind >= (mp_int)mstrsize(svp->u.str)
+         ||  ind > (mp_int)mstrsize(svp->u.str)
            )
         {
             ERRORF(("Index out of bounds for [<]: %ld, string length: %ld\n"
                    , (long) i->u.number, (long)mstrsize(svp->u.str)));
             return NULL;
+        }
+
+        if (ind == mstrsize(svp->u.str))
+        {
+            if (!allow_one_past)
+            {
+                ERRORF(("Index out for [] of bounds: %ld, string length: %ld.\n"
+                       , (long)ind, (long)mstrsize(svp->u.str)));
+                return NULL;
+            }
+            else if (pragma_warn_deprecated)
+                warnf( "Warning: Indexing past string end is deprecated: "
+                       "index %ld, string length: %ld.\n"
+                     , (long)ind, (long)mstrsize(svp->u.str)
+                     );
         }
     }
 
@@ -3044,10 +3080,13 @@ get_string_r_item (svalue_t * svp, svalue_t * i, Bool make_singular
 /*-------------------------------------------------------------------------*/
 static INLINE char *
 get_string_a_item (svalue_t * svp, svalue_t * i, Bool make_singular
+                  , Bool allow_one_past
                   , svalue_t *sp, bytecode_p pc)
 
 /* Arithmetic-Index string <svp> with index <i> and return the pointer to the
  * indexed item.
+ * If <allow_one_past> is TRUE, indexing one past the official end
+ * of the string for retrieval purposes is ok. TODO: Remove this.
  * If <make_singular> is TRUE, <svp> is made an untabled string
  * with just one reference.
  * If the index is invalid, throw an error.
@@ -3069,11 +3108,26 @@ get_string_a_item (svalue_t * svp, svalue_t * i, Bool make_singular
 
         if (0 > ind)
             ind = (mp_int)mstrsize(svp->u.str) + ind;
-        if (ind < 0 || ind >= (mp_int)mstrsize(svp->u.str))
+        if (ind < 0 || ind > (mp_int)mstrsize(svp->u.str))
         {
             ERRORF(("Index out of bounds for [>]: %ld, string length: %ld\n"
                    , (long) i->u.number, (long)mstrsize(svp->u.str)));
             return NULL;
+        }
+
+        if (ind == mstrsize(svp->u.str))
+        {
+            if (!allow_one_past)
+            {
+                ERRORF(("Index out for [] of bounds: %ld, string length: %ld.\n"
+                       , (long)ind, (long)mstrsize(svp->u.str)));
+                return NULL;
+            }
+            else if (pragma_warn_deprecated)
+                warnf( "Warning: Indexing past string end is deprecated: "
+                       "index %ld, string length: %ld.\n"
+                     , (long)ind, (long)mstrsize(svp->u.str)
+                     );
         }
     }
 
@@ -3771,7 +3825,9 @@ index_lvalue (svalue_t *sp, bytecode_p pc)
     {
         char * cp;
 
-        cp = get_string_item(vec, i, /* make_singular: */ MY_TRUE, sp, pc);
+        cp = get_string_item(vec, i, /* make_singular: */ MY_TRUE
+                            , /* allow_one_past: */ MY_FALSE
+                            , sp, pc);
 
         /* Remove the arguments and create and push the result. */
 
@@ -3897,7 +3953,9 @@ rindex_lvalue (svalue_t *sp, bytecode_p pc)
     {
         char * cp;
 
-        cp = get_string_r_item(vec, i, /* make_singular: */ MY_TRUE, sp, pc);
+        cp = get_string_r_item(vec, i, /* make_singular: */ MY_TRUE
+                              , /* allow_one_past: */ MY_FALSE
+                              , sp, pc);
 
         /* Remove the argument and return the result */
 
@@ -3969,7 +4027,9 @@ aindex_lvalue (svalue_t *sp, bytecode_p pc)
     {
         char * cp;
 
-        cp = get_string_a_item(vec, i, /* make_singular: */ MY_TRUE, sp, pc);
+        cp = get_string_a_item(vec, i, /* make_singular: */ MY_TRUE
+                              , /* allow_one_past: */ MY_FALSE
+                              , sp, pc);
 
         /* Remove the argument and return the result */
 
@@ -4086,7 +4146,9 @@ protected_index_lvalue (svalue_t *sp, bytecode_p pc)
             struct protected_char_lvalue *val;
             char * cp;
 
-            cp = get_string_item(vec, i, /* make_singular: */ MY_TRUE, sp, pc);
+            cp = get_string_item(vec, i, /* make_singular: */ MY_TRUE
+                                , /* allow_one_past: */ MY_FALSE
+                                , sp, pc);
 
             /* Add another reference to the string to keep it alive while
              * we use it.
@@ -4194,7 +4256,9 @@ protected_index_lvalue (svalue_t *sp, bytecode_p pc)
 
             vec = lvalue->v.u.lvalue; /* it's a string... */
 
-            cp = get_string_item(vec, i, /* make_singular: */ MY_TRUE, sp, pc);
+            cp = get_string_item(vec, i, /* make_singular: */ MY_TRUE
+                                , /* allow_one_past: */ MY_FALSE
+                                , sp, pc);
 
             /* Add another reference to the string to keep it alive while
              * we use it.
@@ -4308,7 +4372,9 @@ protected_rindex_lvalue (svalue_t *sp, bytecode_p pc)
             struct protected_char_lvalue *val;
             char * cp;
 
-            cp = get_string_r_item(vec, i, /* make_singular: */ MY_TRUE, sp, pc);
+            cp = get_string_r_item(vec, i, /* make_singular: */ MY_TRUE
+                                  , /* allow_one_past: */ MY_FALSE
+                                  , sp, pc);
 
             /* Add another reference to the string to keep it alive while
              * we use it.
@@ -4372,7 +4438,9 @@ protected_rindex_lvalue (svalue_t *sp, bytecode_p pc)
             }
 
             vec = lvalue->v.u.lvalue; /* it's a string... */
-            cp = get_string_r_item(vec, i, /* make_singular: */ MY_TRUE, sp, pc);
+            cp = get_string_r_item(vec, i, /* make_singular: */ MY_TRUE
+                                  , /* allow_one_past: */ MY_FALSE
+                                  , sp, pc);
 
             /* Add another reference to the string to keep it alive while
              * we use it.
@@ -4486,7 +4554,9 @@ protected_aindex_lvalue (svalue_t *sp, bytecode_p pc)
             struct protected_char_lvalue *val;
             char * cp;
 
-            cp = get_string_a_item(vec, i, /* make_singular: */ MY_TRUE, sp, pc);
+            cp = get_string_a_item(vec, i, /* make_singular: */ MY_TRUE
+                                  , /* allow_one_past: */ MY_FALSE
+                                  , sp, pc);
 
             /* Add another reference to the string to keep it alive while
              * we use it.
@@ -4550,7 +4620,9 @@ protected_aindex_lvalue (svalue_t *sp, bytecode_p pc)
             }
 
             vec = lvalue->v.u.lvalue; /* it's a string... */
-            cp = get_string_a_item(vec, i, /* make_singular: */ MY_TRUE, sp, pc);
+            cp = get_string_a_item(vec, i, /* make_singular: */ MY_TRUE
+                                  , /* allow_one_past: */ MY_FALSE
+                                  , sp, pc);
 
             /* Add another reference to the string to keep it alive while
              * we use it.
@@ -4990,7 +5062,9 @@ push_indexed_value (svalue_t *sp, bytecode_p pc)
       {
         int c;
 
-        c = *get_string_item(vec, i, /* make_singular: */ MY_FALSE, sp, pc);
+        c = *get_string_item(vec, i, /* make_singular: */ MY_FALSE
+                            , /* allow_one_past: */ MY_TRUE
+                            , sp, pc);
 
         /* Drop the args and return the result */
 
@@ -5132,7 +5206,9 @@ push_rindexed_value (svalue_t *sp, bytecode_p pc)
       {
         int c;
 
-        c = *get_string_r_item(vec, i, /* make_singular: */ MY_FALSE, sp, pc);
+        c = *get_string_r_item(vec, i, /* make_singular: */ MY_FALSE
+                              , /* allow_one_past: */ MY_TRUE
+                              , sp, pc);
 
         /* Drop the args and return the result */
 
@@ -5220,7 +5296,9 @@ push_aindexed_value (svalue_t *sp, bytecode_p pc)
       {
         int c;
 
-        c = *get_string_a_item(vec, i, /* make_singular: */ MY_FALSE, sp, pc);
+        c = *get_string_a_item(vec, i, /* make_singular: */ MY_FALSE
+                              , /* allow_one_past: */ MY_TRUE
+                              , sp, pc);
 
         /* Drop the args and return the result */
 

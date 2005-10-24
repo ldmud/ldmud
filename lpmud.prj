@@ -35,12 +35,12 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 348)
-(Parent-Version lpmud 3-3 347)
-(Version-Log "Corrected a crasher in the struct code.")
+(Project-Version lpmud 3-3 349)
+(Parent-Version lpmud 3-3 348)
+(Version-Log "Indexing one past a string end is again allowed, but warned upon.")
 (New-Version-Log
 "")
-(Checkin-Time "Sat, 04 Jan 2003 15:34:10 -0700")
+(Checkin-Time "Sat, 04 Jan 2003 23:10:26 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -77,7 +77,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.56 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.411 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.412 644))
   (HISTORY (lpmud/f/49_HISTORY 1.294 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.19 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -165,7 +165,7 @@
   (src/heartbeat.c (lpmud/m/42_heartbeat. 1.18.1.8 644))
   (src/i-svalue_cmp.h (lpmud/a/b/20_i-svalue_c 1.3 644))
   (src/interpret.h (lpmud/b/13_interpret. 1.33.1.35 644))
-  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.10 644))
+  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.11 644))
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.15.1.2 644))
   (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.41 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.12 644))
@@ -251,7 +251,7 @@
   (src/simul_efun.h (lpmud/f/17_simul_efun 1.5.1.5 644))
   (src/simul_efun.c (lpmud/32_simul_efun 1.20.1.17.1.2 644))
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.31 644))
-  (src/simulate.c (lpmud/31_simulate.c 1.88.1.93 644))
+  (src/simulate.c (lpmud/31_simulate.c 1.88.1.94 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.12 644))
   (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.61 644))
   (src/structs.h (lpmud/d/b/5_structs.h 1.1 644))

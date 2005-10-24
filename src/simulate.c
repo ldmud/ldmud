@@ -1039,7 +1039,7 @@ warnf (char *fmt, ...)
     va_end(va);
 
     debug_message("%s ", ts);
-    debug_message("%s", emsg_buf+1);
+    debug_message("%s", msg_buf);
 
     /* If we have a current_object, determine the program location
      * of the fault.

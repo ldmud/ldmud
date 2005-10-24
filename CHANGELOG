@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+04-Jan-2003 (Lars Duening)  (3.3.349)
+  - (interpret.c) Many mudlibs index strings happily one past the
+       end, which when used with assignments might lead to
+       data structure corruption. Since this faulty idiom is in wide
+       use, I re-allowed it, but now also generate a warning.
+  - (simulate.c) Generating warnings didn't quite work.
+
 04-Jan-2003 (Lars Duening)  (3.3.348)
   - (prolang.y) When inheriting functions with struct arguments,
        the refcount of the struct type instances wasn't incremented
