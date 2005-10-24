@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+18-Dec-2002 (Lars Duening)  (3.3.335)
+  - (object.c) When calling privilege_violation() for restoring efuns,
+      the current object is passed as 'who' argument (suggested by Gnomi).
+
 17-Dec-2002 (Lars Duening)  (3.3.334)
   - (lex, object.c) restore_svalue() did not check if a restored efun was
       overriden by a nomask simul-efun (reported by Gnomi).

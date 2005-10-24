@@ -37,13 +37,12 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 334)
-(Parent-Version lpmud 3-3 333)
-(Version-Log "Restoring efun closures now checks for nomask sefun overrides.
-Made removing an interactive thread safer.")
+(Project-Version lpmud 3-3 335)
+(Parent-Version lpmud 3-3 334)
+(Version-Log "Corrections to restoring closures.")
 (New-Version-Log
 "")
-(Checkin-Time "Wed, 18 Dec 2002 01:19:41 -0700")
+(Checkin-Time "Wed, 18 Dec 2002 20:10:14 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -80,7 +79,7 @@ Made removing an interactive thread safer.")
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.55 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.397 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.398 644))
   (HISTORY (lpmud/f/49_HISTORY 1.292 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.19 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
