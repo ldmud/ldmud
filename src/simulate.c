@@ -1838,9 +1838,7 @@ load_object (const char *lname, Bool create_super, int depth, namechain_t *chain
        * below to work in debugging mode.
        */
 
-#ifndef NO_BLUEPRINT
     prog->blueprint = ref_object(ob, "load_object: blueprint reference");
-#endif /* !NO_BLUEPRINT */
 
     if (!compat_mode)
         name--;  /* Make the leading '/' visible again */
@@ -2266,7 +2264,6 @@ deep_destruct (object_t *ob)
     prog = ob->prog;
     if (prog != NULL)
     {
-#ifndef NO_BLUEPRINT
         int i;
 
         for (i = 0; i < prog->num_inherited; ++i)
@@ -2278,7 +2275,6 @@ deep_destruct (object_t *ob)
                 destruct(iprog->blueprint);
             }
         }
-#endif /* !NO_BLUEPRINT */
     }
 } /* deep_destruct() */
 
@@ -2577,14 +2573,12 @@ remove_object (object_t *ob
     /* If this is a blueprint object, NULL out the pointer in the program
      * to remove the extraneous reference.
      */
-#ifndef NO_BLUEPRINT
     if (ob->prog->blueprint == ob)
     {
         ob->prog->blueprint = NULL;
         remove_prog_swap(ob->prog, MY_TRUE);
         free_object(ob, "remove_object: blueprint reference");
     }
-#endif /* !NO_BLUEPRINT */
 
     /* We must deallocate variables here, not in 'free_object()'.
      * That is because one of the local variables may point to this object,

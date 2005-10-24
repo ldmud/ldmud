@@ -521,11 +521,6 @@
 @cdef_check_object_gc_ref@ CHECK_OBJECT_GC_REF
 #endif
 
-/* Deactivate the tracking of blueprints. This will disable the
- * efuns blueprint(), but probably avoid the object refcount bug.
- */
-@cdef_no_blueprint@ NO_BLUEPRINT
-
 /* Activate total smalloc size consistency check code. This will produce
  * a lot of output in the GC log.
  */

@@ -508,10 +508,6 @@ enable_check_object_ref=no
 # DUMP_GC_REFS.
 enable_check_object_gc_ref=yes
 
-# Deactivate the tracking of blueprints. This will disable the
-# efuns blueprint(), but probably avoid the object refcount bug.
-enable_no_blueprint=no
-
 # Activate total smalloc size consistency check code. This will produce
 # a lot of output in the GC log.
 enable_check_smalloc_total=no

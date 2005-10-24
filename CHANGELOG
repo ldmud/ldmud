@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+07-Jan-2002 (Lars Duening)  (3.3.354)
+  - (several files) Removed the 'no-blueprint' configuration option: there
+       code is stable.
+
 07-Jan-2003 (Lars Duening)  (3.3.353)
   - (prolang.y) Corrected another error in non-__INIT initializations
        (thanks, Guandalug).

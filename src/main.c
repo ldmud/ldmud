@@ -1789,9 +1789,6 @@ options (void)
 #       if defined(CHECK_OBJECT_GC_REF)
                               , "CHECK_OBJECT_GC_REF"
 #       endif
-#       if defined(NO_BLUEPRINT)
-                              , "NO_BLUEPRINT"
-#       endif
 #       if defined(CHECK_SMALLOC_TOTAL)
                               , "CHECK_SMALLOC_TOTAL"
 #       endif

@@ -592,7 +592,6 @@ _free_prog (program_t *progp, Bool free_all, const char * file, int line
     if (progp->ref < 0)
         fatal("Negative ref count for prog ref.\n");
 
-#ifndef NO_BLUEPRINT
     if (free_all && progp->blueprint)
     {
         object_t * blueprint = progp->blueprint;
@@ -611,7 +610,6 @@ _free_prog (program_t *progp, Bool free_all, const char * file, int line
 #endif
         free_object(blueprint, "free_prog");
     }
-#endif /* !NO_BLUEPRINT */
 
     /* Update the statistics */
     total_prog_block_size -= progp->total_size;

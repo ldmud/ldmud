@@ -16374,9 +16374,7 @@ epilog (void)
             yyerrorf("Out of memory: filename '%s'", current_file);
             break;
         }
-#ifndef NO_BLUEPRINT
         prog->blueprint = NULL;
-#endif /* !NO_BLUEPRINT */
         prog->total_size = size;
         prog->ref = 0;
         prog->heart_beat = heart_beat;

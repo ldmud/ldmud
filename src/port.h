@@ -155,7 +155,6 @@ extern int errno;
  *   CHAR_BIT     number of bits in a char, if not defined already.
  *   TODO: Lookup what ISO-C says about this.
  *   MAXPATHLEN   max length of a pathname, if not defined already.
- *   PROT(x)      for portable prototype definitions.
  *   NORETURN     attribute for non-returning functions.
  *   UNUSED       attribute for unused functions and variables.
  *   MALLOC       attribute for malloc()-like functions
@@ -184,13 +183,6 @@ extern int errno;
 #        define MAXPATHLEN 2048
 #    endif
 #endif
-
-#ifdef __STDC__
-/* TODO: Remove PROT */
-#    define PROT(x) x
-#else /* __STDC__ */
-#    define PROT(x) ()
-#endif /* __STDC */
 
 #if defined(__GNUC__) && __GNUC__ >= 2 && (__GNUC_MINOR__ > 6 || __GNUC__ > 2)
 #    define NORETURN __attribute__ ((noreturn))

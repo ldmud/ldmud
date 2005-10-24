@@ -386,7 +386,6 @@ cleanup_object (object_t * obj, ptrtable_t * ptable)
     }
 
 
-#ifndef NO_BLUEPRINT
     /* If the object's program blueprint is destructed, remove that
      * reference.
      */
@@ -398,7 +397,6 @@ cleanup_object (object_t * obj, ptrtable_t * ptable)
         free_object(obj->prog->blueprint, "cleanup object");
         obj->prog->blueprint = NULL;
     }
-#endif
 
     /* Clean up all the variables */
     cleanup_vector(obj->variables, obj->prog->num_variables, ptable);
@@ -676,7 +674,6 @@ clear_object_ref (object_t *p)
 #endif
         p->ref = 0;
         p->name->info.ref = 0;
-#ifndef NO_BLUEPRINT
         if (p->prog->blueprint
          && (p->prog->blueprint->flags & O_DESTRUCTED)
          && p->prog->blueprint->ref
@@ -687,7 +684,6 @@ clear_object_ref (object_t *p)
 #endif
             p->prog->blueprint->ref = 0;
         }
-#endif /* !NO_BLUEPRINT */
         clear_program_ref(p->prog, MY_TRUE);
     }
 } /* clear_object_ref() */
@@ -723,7 +719,6 @@ gc_mark_program_ref (program_t *p)
 
         MARK_MSTRING_REF(p->name);
 
-#ifndef NO_BLUEPRINT
         /* Mark the blueprint object, if any */
         if (p->blueprint)
         {
@@ -741,7 +736,6 @@ gc_mark_program_ref (program_t *p)
                  */
             }
         }
-#endif /* !NO_BLUEPRINT */
 
         if (p->line_numbers)
             note_ref(p->line_numbers);

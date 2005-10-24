@@ -465,11 +465,6 @@
 #    define CHECK_OBJECT_GC_REF
 #endif
 
-/* Deactivate the tracking of blueprints. This will disable the
- * efuns blueprint(), but probably avoid the object refcount bug.
- */
-/* #define NO_BLUEPRINT */
-
 /* Sometimes the GC stumbles over invalid references to memory
  * blocks (namely 'Program referenced as something else'). Define
  * this macro to get a detailed dump of all found references

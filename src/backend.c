@@ -1009,10 +1009,8 @@ static  mp_int num_cleanup; /* Number of objects to data-clean in this
                 push_number(inter_sp, 0);
             else if (O_PROG_SWAPPED(obj))
                 push_number(inter_sp, 1);
-#ifndef NO_BLUEPRINT
             else if (obj->prog->blueprint == obj)
                 push_number(inter_sp, obj->prog->ref - 1);
-#endif /* !NO_BLUEPRINT */
             else
                 push_number(inter_sp, obj->prog->ref);
 
