@@ -21,6 +21,8 @@
 #define USE_TSD_DATA_HACK 1
 #define _REENTRANT 1
 #define USE_DL_PREFIX 1
+#define MALLOC_DEBUG 1
+#define ENABLE_GC_SUPPORT 1
 
 #if defined(__APPLE__)
 #    include <unistd.h>

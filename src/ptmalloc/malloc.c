@@ -24,7 +24,7 @@
   Doug Lea and adapted to multiple threads/arenas by Wolfram Gloger.
 
 * Version ptmalloc2-20011215
-  $Id$
+  $Id: malloc.c,v 1.11 2002/10/07 15:49:44 wg Exp $
   based on:
   VERSION 2.7.1pre1 Sat May 12 07:41:21 2001  Doug Lea  (dl at gee)
 
@@ -121,7 +121,6 @@
 
        The maximum overhead wastage (i.e., number of extra bytes
        allocated than were requested in malloc) is less than or equal
-       to the minimum size, except for requests >= mmap_threshold that
        are serviced via mmap(), where the worst case wastage is 2 *
        sizeof(size_t) bytes plus the remainder from a system page (the
        minimal mmap unit); typically 4096 or 8192 bytes.
@@ -437,6 +436,16 @@ extern "C" {
 #define public_iCOMALLOc dlindependent_comalloc
 #define public_gET_STATe dlget_state
 #define public_sET_STATe dlset_state
+#ifdef ENABLE_GC_SUPPORT
+# define public_mARK_PERm dlmalloc_mark_permanent
+# define public_mARK_COLl dlmalloc_mark_collectable
+# define public_cLEAR_REf dlmalloc_clear_ref
+# define public_mARK_REf  dlmalloc_mark_ref
+# define public_tEST_REf  dlmalloc_test_ref
+# define public_cLEAR_REf_FLAGs 	dlmalloc_clear_ref_flags
+# define public_fREE_UNREFED_MEMORy	dlmalloc_free_unrefed_memory
+# define public_iS_FREEd  dlmalloc_is_freed
+#endif
 #else /* USE_DL_PREFIX */
 #ifdef _LIBC
 
@@ -488,6 +497,16 @@ Void_t *(*__morecore)(ptrdiff_t) = __default_morecore;
 #define public_iCOMALLOc independent_comalloc
 #define public_gET_STATe malloc_get_state
 #define public_sET_STATe malloc_set_state
+#ifdef ENABLE_GC_SUPPORT
+# define public_mARK_PERm malloc_mark_permanent
+# define public_mARK_COLl malloc_mark_collectable
+# define public_cLEAR_REf malloc_clear_ref
+# define public_mARK_REf  malloc_mark_ref
+# define public_tEST_REf  malloc_test_ref
+# define public_cLEAR_REf_FLAGs 	malloc_clear_ref_flags
+# define public_fREE_UNREFED_MEMORy 	malloc_free_unrefed_memory
+# define public_iS_FREEd  malloc_is_freed
+#endif
 #endif /* _LIBC */
 #endif /* USE_DL_PREFIX */
 
@@ -1217,6 +1236,82 @@ int      public_sET_STATe(Void_t*);
 int      public_sET_STATe();
 #endif
 
+#ifdef ENABLE_GC_SUPPORT
+
+/*
+    TODO
+*/
+#if __STD_C
+void 	 public_mARK_PERm(Void_t*);
+#else
+void 	 public_mARK_PERm();
+#endif
+
+/*
+    TODO
+*/
+#if __STD_C
+void 	 public_mARK_COLl(Void_t*);
+#else
+void 	 public_mARK_COLl();
+#endif
+
+/*
+    TODO
+*/
+#if __STD_C
+void public_cLEAR_REf(Void_t *mem);
+#else
+void public_cLEAR_REf(mem) Void_t *mem;
+#endif
+
+/*
+    TODO
+*/
+#if __STD_C
+void public_mARK_REf(Void_t *mem);
+#else
+void public_mARK_REf(mem) Void_t *mem;
+#endif
+
+/*
+    TODO
+*/
+#if __STD_C
+int public_tEST_REf(Void_t *mem);
+#else
+int public_tEST_REf(mem) Void_t *mem;
+#endif
+    
+/*
+    Clear all 'referenced' markers.
+*/
+#if __STD_C
+void public_cLEAR_REf_FLAGs();
+#else
+void public_cLEAR_REf_FLAGs();
+#endif
+    
+/*
+    Free all memory marked as 'unreferenced'.
+*/
+#if __STD_C
+void public_fREE_UNREFED_MEMORy();
+#else
+void public_fREE_UNREFED_MEMORy();
+#endif
+    
+/*
+    Return true if <p> is a free block.
+*/
+#if __STD_C
+int public_iS_FREEd(Void_t *mem, size_t minsize);
+#else
+int public_iS_FREEd(mem, minsize) Void_t *mem; size_t minsize;
+#endif
+
+#endif /* ENABLE_GC_SUPPORT */
+
 #ifdef _LIBC
 /*
   posix_memalign(void **memptr, size_t alignment, size_t size);
@@ -1809,6 +1904,25 @@ nextchunk-> +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /* check for chunk from non-main arena */
 #define chunk_non_main_arena(p) ((p)->size & NON_MAIN_ARENA)
 
+#ifdef ENABLE_GC_SUPPORT
+/* if this chunk is used by the program and it knows yet about it
+   MARK_REF is set by garbage-collector
+   TODO: assumes 32bit machine
+*/
+#define MARK_REF  0x80000000
+
+/*
+    TODO
+*/
+#define MARK_PERM 0x40000000
+
+/*
+  Bits to mask off when extracting size
+  Extended version for gc support, also see below.
+*/
+#define SIZE_BITS (PREV_INUSE|IS_MMAPPED|NON_MAIN_ARENA|MARK_REF|MARK_PERM)
+
+#else /* ENABLE_GC_SUPPORT */
 
 /*
   Bits to mask off when extracting size
@@ -1819,6 +1933,8 @@ nextchunk-> +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
   people extending or adapting this malloc.
 */
 #define SIZE_BITS (PREV_INUSE|IS_MMAPPED|NON_MAIN_ARENA)
+
+#endif /* ENABLE_GC_SUPPORT */
 
 /* Get size, ignoring use bits */
 #define chunksize(p)         ((p)->size & ~(SIZE_BITS))
@@ -2368,7 +2484,11 @@ static void do_check_free_chunk(mstate av, mchunkptr p)
 static void do_check_free_chunk(av, p) mstate av; mchunkptr p;
 #endif
 {
+#ifndef ENABLE_GC_SUPPORT
   INTERNAL_SIZE_T sz = p->size & ~(PREV_INUSE|NON_MAIN_ARENA);
+#else
+  INTERNAL_SIZE_T sz = p->size & ~(PREV_INUSE|NON_MAIN_ARENA|MARK_REF|MARK_PERM);
+#endif
   mchunkptr next = chunk_at_offset(p, sz);
 
   do_check_chunk(av, p);
@@ -2448,8 +2568,11 @@ static void do_check_remalloced_chunk(av, p, s)
 mstate av; mchunkptr p; INTERNAL_SIZE_T s;
 #endif
 {
+#ifndef ENABLE_GC_SUPPORT
   INTERNAL_SIZE_T sz = p->size & ~(PREV_INUSE|NON_MAIN_ARENA);
-
+#else
+  INTERNAL_SIZE_T sz = p->size & ~(PREV_INUSE|NON_MAIN_ARENA|MARK_REF|MARK_PERM);
+#endif
   if (!chunk_is_mmapped(p)) {
     assert(av == arena_for_chunk(p));
     if (chunk_non_main_arena(p))
@@ -2902,8 +3025,9 @@ static Void_t* sYSMALLOc(nb, av) INTERNAL_SIZE_T nb; mstate av;
   }
 
   if (_brk != (char*)(MORECORE_FAILURE)) {
-    if (mp_.sbrk_base == 0)
+    if (mp_.sbrk_base == 0) {
       mp_.sbrk_base = _brk;
+    }
     av->system_mem += size;
 
     /*
@@ -4288,7 +4412,11 @@ static void malloc_consolidate(av) mstate av;
           nextp = p->fd;
 
           /* Slightly streamlined version of consolidation code in free() */
+#ifndef ENABLE_GC_SUPPORT
           size = p->size & ~(PREV_INUSE|NON_MAIN_ARENA);
+#else
+          size = p->size & ~(PREV_INUSE|NON_MAIN_ARENA|MARK_REF|MARK_PERM);
+#endif
           nextchunk = chunk_at_offset(p, size);
           nextsize = chunksize(nextchunk);
 
@@ -5153,6 +5281,136 @@ int mALLOPt(param_number, value) int param_number; int value;
   return res;
 }
 
+#ifdef ENABLE_GC_SUPPORT
+
+/*
+  -------------------- malloc_mark_permanent -----------------------------
+*/
+
+#if __STD_C
+void public_mARK_PERm(Void_t *mem)
+#else
+void public_mARK_PERm(mem) Void_t *mem;
+#endif
+{
+//write(0, "markp\n",6);
+    (mem2chunk(mem)->size) |= MARK_PERM;
+}
+
+/*
+  -------------------- malloc_mark_collectable ----------------------------
+*/
+
+#if __STD_C
+void public_mARK_COLl(Void_t *mem)
+#else
+void public_mARK_COLl(mem) Void_t *mem;
+#endif
+{
+//write(0, "markc\n",6);
+    (mem2chunk(mem)->size) &= ~MARK_PERM;
+}
+
+/*
+  -------------------- malloc_clear_ref -----------------------------------
+*/
+
+/*     Clear, set, test the 'referenced' marker. */
+#if __STD_C
+void public_cLEAR_REf(Void_t *mem)
+#else
+void public_cLEAR_REf(mem) Void_t *mem;
+#endif
+{
+//write(1, "clearref\n",9);
+    (mem2chunk(mem)->size) &= ~MARK_REF;
+}
+
+/*
+  -------------------- malloc_mark_ref ------------------------------------
+*/
+
+#if __STD_C
+void public_mARK_REf(Void_t *mem)
+#else
+void public_mARK_REf(mem) Void_t *mem;
+#endif
+{
+//write(1, "markref\n",8);
+    (mem2chunk(mem)->size) |= MARK_REF;
+}
+
+/*
+  -------------------- malloc_test_ref ------------------------------------
+*/
+
+#if __STD_C
+int public_tEST_REf(Void_t *mem)
+#else
+int public_tEST_REf(mem) Void_t *mem;
+#endif
+{
+//write(1, "testref\n",8);
+    return (mem2chunk(mem)->size & MARK_REF);
+}
+
+/*
+  -------------------- malloc_clear_ref_flags -----------------------------
+*/
+
+/*     Clear all 'referenced' markers. */
+#if __STD_C
+void public_cLEAR_REf_FLAGs()
+#else
+void public_cLEAR_REf_FLAGs()
+#endif
+{
+    mchunkptr chunk = (mchunkptr) mp_.sbrk_base;
+
+    // TODO: check for non contiguous case!
+    do{
+	chunk->size &= ~MARK_REF;
+        chunk = next_chunk(chunk);
+    } while(chunk <= main_arena.top);
+}
+
+/*
+  -------------------- malloc_free_unrefed_memory -------------------------
+*/
+
+/*     Free all memory marked as 'unreferenced'. */
+#if __STD_C
+void public_fREE_UNREFED_MEMORy()
+#else
+void public_fREE_UNREFED_MEMORy()
+#endif
+{
+    mchunkptr chunk = (mchunkptr) mp_.sbrk_base;
+
+    // TODO: check for non contiguous case!
+    do{
+        chunk = next_chunk(chunk);
+    } while(chunk <= main_arena.top);
+
+write(1, "free_unrefed_mem\n",17);
+}
+
+/*
+  -------------------- malloc_is_freed ------------------------------------
+*/
+
+/*     Return true if <p> is a free block. */
+#if __STD_C
+int public_iS_FREEd(Void_t *mem, size_t minsize)
+#else
+int public_iS_FREEd(mem, minsize) Void_t *mem; size_t minsize;
+#endif
+{
+write(1,"is_freed\n",9);
+    return 1;
+}
+
+#endif /* ENABLE_GC_SUPPORT */
 
 /*
   -------------------- Alternative MORECORE functions --------------------

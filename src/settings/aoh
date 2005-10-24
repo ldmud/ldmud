@@ -5,10 +5,10 @@
 # configure will strip this part from the script.
  
 exec ./configure \
---prefix=/home/lars \
---bindir=/home/lars/bin \
---libdir=/home/lars/mudlib \
---libexec=/home/lars/libexec \
+--prefix=/home/ralph \
+--bindir=/home/ralph/bin \
+--libdir=/home/ralph/mudlib \
+--libexec=/home/ralph/libexec \
 --enable-strict-euids \
 --enable-erq=xerq \
 --enable-lpc-nosave \
@@ -19,11 +19,15 @@ exec ./configure \
 --enable-malloc-trace \
 --enable-malloc-lpc-trace \
 --enable-use-system-crypt=no \
---enable-use-pcre=no \
+--enable-use-pcre=yes \
+--enable-use-set-is-wizard=yes \
+--enable-use-parse-command=no \
+--enable-use-set-light=no \
+--enable-use-new-inlines=yes \
 --with-master-name=secure/master \
 --with-time-to-reset=900 \
 --with-portno=2345 \
 --with-udp-port=2347 \
---with-max-cost=2100000 \
+--with-max-cost=3000000 \
 --with-swap-file=LP_SWAP.3 $*
 exit 1

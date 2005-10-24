@@ -119,6 +119,8 @@ Lars Duening thanks:
  - Menaures added the tab character conversion to the editor, and gleefully
      found new ways to crash the driver.
  - Acius donated the LPC implementation of the A* pathfinding algorithm.
+ - Christian Welzel adapted ptmalloc (a threadsafe variant of Doug Lea's
+     allocator) for LDMud and extended it to support garbage collection.
  - for bug reports, critics, fixes, patches and other support:
      Acius (acius@bigfoot.com)
      Alex@TubMud (at16@st-andrews.ac.uk)

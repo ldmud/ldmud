@@ -41,7 +41,7 @@
 
 /* Do we have full GC support? */
 
-#if defined(MALLOC_smalloc)
+#if defined(MALLOC_smalloc) || defined(MALLOC_ptmalloc)
 #  define GC_SUPPORT 1
 #endif
 

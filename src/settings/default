@@ -99,12 +99,14 @@ with_time_to_reset=1800 # seconds
 # --- Memory ---
 
 # Which memory manager to use. Possible defines are
-#   MALLOC_smalloc:   Satoria's malloc. Fastest, uses the least memory,
-#                     supports garbage collection.
-#   MALLOC_sysmalloc: the normal system malloc()
-#   MALLOC_ptmalloc:  ptmalloc from www.malloc.de - threadsafe.
+#   default:   Depending on the setting and support pthreads, either
+#              smalloc or ptmalloc is selected.
+#   smalloc:   Satoria's malloc. Fastest, uses the least memory,
+#              supports garbage collection, not threadsafe.
+#   ptmalloc:  ptmalloc from www.malloc.de, supports GC, threadsafe.
+#   sysmalloc: the normal system malloc()
 
-with_malloc=smalloc
+with_malloc=default
 
 # These three options determine how much memory is held in reserve.
 # There must be enough memory to allow the garbage collector to swap

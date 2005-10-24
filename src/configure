@@ -967,7 +967,7 @@ Optional Packages:
   --with-max-byte-transfer=VALUE      default=50000
   --with-catch-udp-port=VALUE         default=4246
   --with-set-buffer-size-max=VALUE    default=65536
-  --with-malloc=smalloc/sysmalloc/ptmalloc  default=smalloc
+  --with-malloc=default/smalloc/sysmalloc/ptmalloc  default=default
         memory manager to use
   --with-min-malloced=VALUE           default=0
   --with-min-small-malloced=VALUE     default=0
@@ -2015,7 +2015,7 @@ if test "${with_set_buffer_size_max+set}" = set; then
 
 fi;
 
-DEFAULTwith_malloc=smalloc
+DEFAULTwith_malloc=default
 
 # Check whether --with-malloc or --without-malloc was given.
 if test "${with_malloc+set}" = set; then
@@ -2128,6 +2128,18 @@ else
   cdef_use_mysql="#define"
   mysql_path="$enable_use_mysql"
   enable_use_mysql="yes"
+fi
+
+if test "x$with_malloc" = "x" && test "x$DEFAULTwith_malloc" != "x"; then
+  with_malloc=$DEFAULTwith_malloc
+fi
+
+if test "x$with_malloc" = "x" || test "x$with_malloc" = "xdefault"; then
+    if test "x$enable_use_pthreads" = "xyes"; then
+        with_malloc="ptmalloc"
+    else
+        with_malloc="smalloc"
+    fi
 fi
 
 if test "x$enable_access_control" = "x" && test "x$DEFAULTenable_access_control" != "x"; then

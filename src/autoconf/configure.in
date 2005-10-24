@@ -187,7 +187,7 @@ AC_MY_ARG_WITH(rxcache-table,8192,,)
 AC_MY_ARG_WITH(max-byte-transfer,50000,,)
 AC_MY_ARG_WITH(catch-udp-port,4246,,)
 AC_MY_ARG_WITH(set-buffer-size-max,65536,,)
-AC_MY_ARG_WITH(malloc,smalloc,[smalloc/sysmalloc/ptmalloc],[memory manager to use])
+AC_MY_ARG_WITH(malloc,default,[default/smalloc/sysmalloc/ptmalloc],[memory manager to use])
 AC_MY_ARG_WITH(min-malloced,0,,)
 AC_MY_ARG_WITH(min-small-malloced,0,,)
 AC_MY_ARG_WITH(max-malloced,0x4000000,,)
@@ -1804,6 +1804,23 @@ if test "${OSTYPE}" = 'win32'; then
 fi
 
 
+dnl
+dnl --- Postprocessing of settings ---
+dnl
+
+AC_UPDATE_VAR(with_malloc)
+if test "x$with_malloc" = "x" || test "x$with_malloc" = "xdefault"; then
+    if test "x$enable_use_pthreads" = "xyes"; then
+        with_malloc="ptmalloc"
+    else
+        with_malloc="smalloc"
+    fi
+    AC_INT_VAL_FROM_WITH(malloc)
+fi
+
+
+dnl
+dnl Standard Replacements:
 dnl
 
 AC_SUBST(WCFLAGS)

@@ -1,7 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-15-Jan-2002 (Lars Duening)  (3.3.357)
+17-Jan-2002 (Lars Duening)  (3.3.358)
+  - (ptmalloc) Gawain added GC support to ptmalloc - yay!
+  - (configure) New with-malloc setting 'default' selects either smalloc
+       or ptmalloc depending on the support and selection of PThreads.
+
+16-Jan-2002 (Lars Duening)  (3.3.357)
   - (interpret.c) The 'indexing one past' for strings didn't work
        with the empty string (reported by Zonk).
   - (prolang.y) When redefining a function, the redefinition can now
