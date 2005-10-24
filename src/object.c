@@ -6169,7 +6169,7 @@ restore_map_size (struct rms_parameters *parameters)
             if (!pt)
                 return -1;
             pt++;
-            break;
+            continue;
           }
 
         case '-':  /* A negative number */

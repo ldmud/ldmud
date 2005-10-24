@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+16-Dec-2002 (Lars Duening)  (3.3.333)
+  - (object.c) restore_map_size() stumbled over closure entries (reported by
+      Jason).
+
 16-Dec-2002 (Lars Duening)  (3.3.332)
   - (xalloc.c) Corrected a preprocessor conditional (thanks, Gawain!)
 
