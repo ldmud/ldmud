@@ -4,7 +4,7 @@
 #include "driver.h"
 #include "typedefs.h"
 #include <sys/types.h>
-#ifdef USE_PTHREAD
+#ifdef USE_PTHREADS
 #include <pthread.h>
 #endif
 
@@ -101,7 +101,7 @@
  * The instances are kept in a linked list from the interactive_t
  * structure.
  */
-#ifdef USE_PTHREAD
+#ifdef USE_PTHREADS
 struct write_buffer_s
 {
     struct write_buffer_s *next;
@@ -207,7 +207,7 @@ struct interactive_s {
     char message_buf[MAX_SOCKET_PACKET_SIZE];
       /* The send buffer. */
 
-#ifdef USE_PTHREAD
+#ifdef USE_PTHREADS
     /* The data exchange with the writer thread happens through two
      * lists: write_first/write_last hands of data to write to
      * the thread, written_first receives the written buffers.
@@ -314,7 +314,7 @@ extern void initialize_host_name (const char *hname);
 extern void initialize_host_ip_number(const char *, const char *);
 extern void  prepare_ipc(void);
 extern void  ipc_remove(void);
-#ifdef USE_PTHREAD
+#ifdef USE_PTHREADS
 extern void interactive_lock (interactive_t *ip);
 extern void interactive_unlock (interactive_t *ip);
 extern void interactive_cleanup (interactive_t *ip);
@@ -322,7 +322,7 @@ extern void interactive_cleanup (interactive_t *ip);
 extern void interactive_lock (interactive_t *ip UNUSED);
 extern void interactive_unlock (interactive_t *ip UNUSED);
 extern void interactive_cleanup (interactive_t *ip UNUSED);
-#endif /* USE_PTHREAD */
+#endif /* USE_PTHREADS */
 extern void comm_cleanup_interactives (void);
 extern void  add_message VARPROT((const char *, ...), printf, 1, 2);
 extern void  flush_all_player_mess(void);

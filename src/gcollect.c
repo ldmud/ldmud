@@ -1495,7 +1495,7 @@ garbage_collection(void)
         if (all_players[i] == NULL)
             continue;
 
-#ifdef USE_PTHREAD
+#ifdef USE_PTHREADS
         {
             struct write_buffer_s *pwb;
             for (pwb = all_players[i]->write_first; pwb != NULL; pwb = pwb->next)
@@ -1662,7 +1662,7 @@ garbage_collection(void)
 
         note_ref(all_players[i]);
 
-#ifdef USE_PTHREAD
+#ifdef USE_PTHREADS
         {
             struct write_buffer_s *pwb;
             for (pwb = all_players[i]->write_first; pwb != NULL; pwb = pwb->next)

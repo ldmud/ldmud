@@ -54,7 +54,7 @@
  * TODO: The noecho/charmode logic, especially in combination with
  * TODO:: the telnet machine is frustratingly underdocumented.
  *
-#ifdef USE_PTHREAD
+#ifdef USE_PTHREADS
  * The data is not written directly to the sockets, but instead to
  * an intermediate buffer, from which a secondary thread does the actual
  * writing. The buffers are stored in a linked list in the interactive-s
@@ -220,7 +220,7 @@ char *message_flush = NULL;
 
 long pthread_write_max_size = PTHREAD_WRITE_MAX_SIZE;
   /* Amount of data held pending in the pthread fifo queue.
-   * Evaluated only with USE_PTHREAD.
+   * Evaluated only with USE_PTHREADS.
    */
 
 
@@ -469,7 +469,7 @@ static void update_ip_entry(const char *oldname, const char *newname);
 
 #endif /* ERQ_DEMON */
 
-#ifdef USE_PTHREAD
+#ifdef USE_PTHREADS
 static void *writer_thread(void *arg);
 #endif
 
@@ -1205,7 +1205,7 @@ prepare_ipc(void)
             perror("listen");
             exit(1);
         }
-#ifndef USE_PTHREAD
+#ifndef USE_PTHREADS
         set_socket_nonblocking(sos[i]);
 #endif
         set_close_on_exec(sos[i]);
@@ -1261,7 +1261,7 @@ interactive_lock (interactive_t *ip)
  */
 
 {
-#ifdef USE_PTHREAD
+#ifdef USE_PTHREADS
     pthread_mutex_lock(&ip->write_mutex);
 #else
 #  ifdef __MWERKS__
@@ -1278,7 +1278,7 @@ interactive_unlock (interactive_t *ip)
  */
 
 {
-#ifdef USE_PTHREAD
+#ifdef USE_PTHREADS
     pthread_mutex_unlock(&ip->write_mutex);
 #else
 #  ifdef __MWERKS__
@@ -1296,7 +1296,7 @@ interactive_cleanup (interactive_t *ip)
  */
 
 {
-#ifdef USE_PTHREAD
+#ifdef USE_PTHREADS
     struct write_buffer_s *tmp;
 
     for (tmp = ip->written_first; tmp != NULL; tmp = ip->written_first)
@@ -1364,7 +1364,7 @@ comm_cleanup_interactives (void)
  */
 
 {
-#ifdef USE_PTHREAD
+#ifdef USE_PTHREADS
     int i;
 
     for (i = 0; i < sizeof(all_players)/sizeof(all_players[0]); i++)
@@ -1381,7 +1381,7 @@ comm_cleanup_interactives (void)
 } /* comm_cleanup_interactives() */
 
 /*-------------------------------------------------------------------------*/
-#ifdef USE_PTHREAD
+#ifdef USE_PTHREADS
 
 static int
 thread_socket_write(SOCKET_T s UNUSED, char *msg, size_t size, interactive_t *ip)
@@ -1574,7 +1574,7 @@ writer_thread (void *arg)
     pthread_cleanup_pop(0);
 } /* writer_thread() */
 
-#endif /* USE_PTHREAD */
+#endif /* USE_PTHREADS */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -1973,7 +1973,7 @@ if (sending_telnet_command)
 
         for (retries = 6;;) {
 
-#ifdef USE_PTHREAD
+#ifdef USE_PTHREADS
             if ((n = (int)thread_socket_write(ip->socket, ip->message_buf, (size_t)chunk, ip)) != -1)
 #else
             if ((n = (int)socket_write(ip->socket, ip->message_buf, (size_t)chunk)) != -1)
@@ -3045,7 +3045,7 @@ get_message (char *buff)
                     }
                     if (length > ip->chars_ready)
                     {
-#ifdef USE_PTHREAD
+#ifdef USE_PTHREADS
                         thread_socket_write(ip->socket, ip->text + ip->chars_ready
                                     , (size_t)(length - ip->chars_ready), ip);
 #else
@@ -3238,7 +3238,7 @@ remove_interactive (object_t *ob, Bool force)
 
         remove_flush_entry(interactive); /* To be sure */
 
-#ifdef USE_PTHREAD
+#ifdef USE_PTHREADS
         pthread_cancel(interactive->write_thread);
           /* buffer list is returned by thread */
         interactive_cleanup(interactive);
@@ -3269,7 +3269,7 @@ remove_interactive (object_t *ob, Bool force)
         free_object(interactive->modify_command, "remove_interactive");
     }
 
-#ifdef USE_PTHREAD
+#ifdef USE_PTHREADS
     pthread_mutex_destroy(&interactive->write_mutex);
     pthread_cond_destroy(&interactive->write_cond);
 #endif
@@ -3379,7 +3379,7 @@ new_player (SOCKET_T new_socket, struct sockaddr_in *addr, size_t addrlen
 #endif
 
     /* Set some useful socket options */
-#ifndef USE_PTHREAD
+#ifndef USE_PTHREADS
     set_socket_nonblocking(new_socket);
 #endif
     set_close_on_exec(new_socket);
@@ -3514,7 +3514,7 @@ new_player (SOCKET_T new_socket, struct sockaddr_in *addr, size_t addrlen
     new_interactive->next_player_for_flush = NULL;
     new_interactive->previous_player_for_flush = NULL;
 
-#ifdef USE_PTHREAD
+#ifdef USE_PTHREADS
     pthread_mutex_init(&new_interactive->write_mutex, NULL);
     {
         pthread_mutexattr_t mutexattr;
@@ -4008,6 +4008,7 @@ print_prompt_string (string_t *prompt)
         {
             free_svalue(hook);
             put_number(hook, 0);
+            current_object = NULL; /* So that catch_tell() can see it */
             add_message(FMT_STRING, prompt);
             error("H_PRINT_PROMPT for %s was a closure bound to a now-destructed object - hook removed.\n", get_txt(command_giver->name));
             /* NOTREACHED */
@@ -4024,6 +4025,7 @@ print_prompt_string (string_t *prompt)
     }
     else
     {
+        current_object = NULL; /* So that catch_tell() can see it */
         add_message(FMT_STRING, prompt);
     }
 } /* print_prompt_string() */
@@ -4893,7 +4895,7 @@ telnet_neg (interactive_t *ip)
                 if (ip->text[0] == input_escape
                  && ! (find_no_bang(ip) & IGNORE_BANG) )
                 {
-#ifdef USE_PTHREAD
+#ifdef USE_PTHREADS
                     if (to > &ip->text[ip->chars_ready])
                     {
                         thread_socket_write(ip->socket, &ip->text[ip->chars_ready],
@@ -5842,7 +5844,7 @@ show_comm_status (strbuf_t * sbuf, Bool verbose UNUSED)
             sum += sizeof(*it);
 
         sum += ed_buffer_size(O_GET_EDBUFFER(pl->ob));
-#ifdef USE_PTHREAD
+#ifdef USE_PTHREADS
         {
             struct write_buffer_s *buf;
 
@@ -6536,7 +6538,7 @@ f_binary_message (svalue_t *sp)
              */
 
             for (i = 6; i > 0; i--) {
-#ifdef USE_PTHREAD
+#ifdef USE_PTHREADS
                 wrote = (mp_int)thread_socket_write(ip->socket, get_txt(msg)
                                                    , mstrsize(msg), ip);
 #else

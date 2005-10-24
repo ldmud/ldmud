@@ -30,14 +30,13 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 321)
-(Parent-Version lpmud 3-3 320)
-(Version-Log "Removed compiler warnings.
-When logging on a new player, the prompt wasn't printed - in particular the prompt set by input_to(INPUT_PROMPT).
-catch() reports an 'out_of_memory' condition only if it was raised during the execution of the guarded code.")
+(Project-Version lpmud 3-3 322)
+(Parent-Version lpmud 3-3 321)
+(Version-Log "Replaced USE_PTHREAD by USE_PTHREADS.
+Before printing the prompt, current_object is set to NULL so that the player's catch_tell() is sure to be able to see the prompt.")
 (New-Version-Log
 "")
-(Checkin-Time "Wed, 04 Dec 2002 23:01:48 -0700")
+(Checkin-Time "Sat, 07 Dec 2002 00:38:22 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -72,15 +71,15 @@ catch() reports an 'out_of_memory' condition only if it was raised during the ex
   ;; Information about the driver and the distribution in general
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
-  (CREDITS (lpmud/d/22_CREDITS 1.70.1.51 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.384 644))
+  (CREDITS (lpmud/d/22_CREDITS 1.70.1.52 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.385 644))
   (HISTORY (lpmud/f/49_HISTORY 1.289 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.19 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
   ;; Configuration
   (src/configure (lpmud/d/0_configure 1.19.1.65 755))
-  (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.20 644))
+  (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.21 644))
   (src/machine.h.in (lpmud/b/9_machine.h. 1.9.1.4 644))
   (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.19.1.3 644))
   (src/mkinstalldirs (lpmud/c/4_mkinstalld 1.1 644))
@@ -139,8 +138,8 @@ catch() reports an 'out_of_memory' condition only if it was raised during the ex
   (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.24 644))
   (src/closure.h (lpmud/f/44_closure.h 1.7.1.15 644))
   (src/closure.c (lpmud/d/4_closure.c 1.41.1.47.1.5 644))
-  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.44 644))
-  (src/comm.h (lpmud/d/3_comm.h 1.26.1.29 644))
+  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.45 644))
+  (src/comm.h (lpmud/d/3_comm.h 1.26.1.30 644))
   (src/driver.h (lpmud/f/36_driver.h 1.15.1.21 644))
   (src/dumpstat.h (lpmud/f/35_dumpstat.h 1.8 644))
   (src/dumpstat.c (lpmud/c/34_dumpstat.c 1.20.1.11.1.3 644))
@@ -153,7 +152,7 @@ catch() reports an 'out_of_memory' condition only if it was raised during the ex
   (src/files.c (lpmud/i/50_files.c 1.18 644))
   (src/filestat.h (lpmud/f/51_filestat.h 1.7 644))
   (src/gcollect.h (lpmud/f/33_gcollect.h 1.6.1.11 644))
-  (src/gcollect.c (lpmud/c/30_gcollect.c 1.41.1.84 644))
+  (src/gcollect.c (lpmud/c/30_gcollect.c 1.41.1.85 644))
   (src/hash.h (lpmud/f/32_hash.h 1.5 644))
   (src/hash.c (lpmud/c/28_hash.c 1.15 644))
   (src/heartbeat.h (lpmud/m/41_heartbeat. 1.6.1.5 644))
@@ -164,7 +163,7 @@ catch() reports an 'out_of_memory' condition only if it was raised during the ex
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.15 644))
   (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.34 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.12 644))
-  (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.28 644))
+  (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.29 644))
   (src/mapping.h (lpmud/f/30_mapping.h 1.12.1.14 644))
   (src/mapping.c (lpmud/b/6_mapping.c 1.36.1.53 644))
   (src/md5.h (lpmud/l/18_md5.h 1.2 644))
@@ -275,7 +274,7 @@ catch() reports an 'out_of_memory' condition only if it was raised during the ex
   (src/hosts/amiga/StartMUD (lpmud/l/42_StartMUD 1.1 644))
   (src/hosts/amiga/README.Amiga.info (lpmud/l/43_README.Ami 1.1 644) :no-keywords)
   (src/hosts/amiga/machine.h (lpmud/c/2_machine.h 1.6.1.3 644))
-  (src/hosts/amiga/config.h (lpmud/c/7_config.h 1.23.1.26 644))
+  (src/hosts/amiga/config.h (lpmud/c/7_config.h 1.23.1.27 644))
   (src/hosts/amiga/README.Amiga (lpmud/c/12_README.Ami 1.4 644))
   (src/hosts/amiga/README (lpmud/c/13_README 1.4 644))
 
@@ -283,7 +282,7 @@ catch() reports an 'out_of_memory' condition only if it was raised during the ex
   (src/hosts/be/socketinc.h (lpmud/e/32_socketinc. 1.3 644))
   (src/hosts/be/set-version (lpmud/c/b/10_set-versio 1.1 744))
   (src/hosts/be/machine.h (lpmud/e/33_machine.h 1.14.1.4 644))
-  (src/hosts/be/config.h (lpmud/e/34_config.h 1.32.1.27 644))
+  (src/hosts/be/config.h (lpmud/e/34_config.h 1.32.1.28 644))
   (src/hosts/be/be.h (lpmud/e/35_be.h 1.7 644))
   (src/hosts/be/beyacc (lpmud/i/39_beyacc 1.1 744))
   (src/hosts/be/Makefile (lpmud/e/37_Makefile 1.60.1.71.1.3 644))
@@ -304,7 +303,7 @@ catch() reports an 'out_of_memory' condition only if it was raised during the ex
   ;; Host: Win32
   (src/hosts/win32/tubmud.bmp (lpmud/g/20_tubmud.bmp 1.1 644) :no-keywords)
   (src/hosts/win32/machine.h (lpmud/g/21_machine.h 1.4.1.2 644))
-  (src/hosts/win32/config.h (lpmud/g/22_config.h 1.18.1.24 644))
+  (src/hosts/win32/config.h (lpmud/g/22_config.h 1.18.1.25 644))
   (src/hosts/win32/Readme.rtf (lpmud/g/23_Readme.rtf 1.2.1.1 644))
   (src/hosts/win32/Makefile (lpmud/g/24_Makefile 1.10.1.18.1.1 644))
 
@@ -419,8 +418,8 @@ catch() reports an 'out_of_memory' condition only if it was raised during the ex
   (mudlib/erq-tool.c (lpmud/d/31_erq.c 1.1 644))
   (mudlib/simul_efun-dr.c (lpmud/51_simul_efun 1.3 644))
   (mudlib/master_skeleton.c (lpmud/b/2_master_ske 1.27 644))
-  (mudlib/telnet.h (lpmud/c/b/13_telnet.h 1.1 644))
-  (mudlib/telnetneg.c (lpmud/c/b/14_telnetneg. 1.1 644))
+  (mudlib/telnet.h (lpmud/c/b/13_telnet.h 1.2 644))
+  (mudlib/telnetneg.c (lpmud/c/b/14_telnetneg. 1.2 644))
   (mudlib/test_master.c (lpmud/e/39_test_maste 1.10.1.8 644))
   (mudlib/ACCESS.ALLOW (lpmud/b/4_ACCESS.ALL 1.3 644))
 

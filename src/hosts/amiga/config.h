@@ -381,12 +381,12 @@
 #define TOTAL_TRACE_LENGTH      1024
 
 /* If you want to use threads to write the data to the sockets 
- * define USE_PTHREAD. To limit the memory usage of each thread
+ * define USE_PTHREADS. To limit the memory usage of each thread
  * define PTHREAD_WRITE_MAX_SIZE to a value greater than zero.
  * The implementation will discard the oldest not yet written 
  * data blocks to keep memoty usage under the limit.
  */
-#undef USE_PTHREAD
+#undef USE_PTHREADS
 #define PTHREAD_WRITE_MAX_SIZE 100000
 
 /*----------------------------------------------------------------*/

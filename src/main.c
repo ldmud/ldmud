@@ -1196,7 +1196,7 @@ static Option aOptions[]
         "    The maximum number of bytes to be kept pending by the socket write\n"
         "    thread.\n"
         "    Set to 0, an unlimited amount of data can be kept pending.\n"
-#ifndef USE_PTHREAD
+#ifndef USE_PTHREADS
         "    (Ignored since pthreads are not supported)\n"
 #endif
       }
@@ -1499,7 +1499,7 @@ options (void)
   fputs("          mySQL: supported.\n", stdout);
 #endif
 
-#ifdef USE_PTHREAD
+#ifdef USE_PTHREADS
   fputs("       PThreads: supported.\n", stdout);
 #else
   fputs("       PThreads: not supported.\n", stdout);
@@ -1590,9 +1590,9 @@ options (void)
   printf(" Runtime limits: max read file size:     %7d\n"
          "                 max byte read/write:    %7d\n"
          "                 max socket buf size:    %7d\n"
-#if defined(USE_PTHREAD)
+#if defined(USE_PTHREADS)
          "                 max pthread write size: %7d\n"
-#endif /* USE_PTHREAD */
+#endif /* USE_PTHREADS */
          "                 max eval cost:        %9d %s\n"
          "                 catch eval cost:        %7d\n"
          "                 master eval cost:       %7d\n"
@@ -1610,9 +1610,9 @@ options (void)
 #endif
         , READ_FILE_MAX_SIZE, MAX_BYTE_TRANSFER
         , SET_BUFFER_SIZE_MAX
-#if defined(USE_PTHREAD)
+#if defined(USE_PTHREADS)
         , PTHREAD_WRITE_MAX_SIZE
-#endif /* USE_PTHREAD */
+#endif /* USE_PTHREADS */
         , MAX_COST
 #if defined(DYNAMIC_COSTS)
         , "(dynamic)"

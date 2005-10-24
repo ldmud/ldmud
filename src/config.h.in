@@ -39,7 +39,7 @@
  */
 #define MAX_CALLOUTS              @val_max_callouts@
 
-/* When USE_PTHREAD is used, define this to the maximum amount of data
+/* When USE_PTHREADS is used, define this to the maximum amount of data
  * to be held pending for writing.
  * A value of 0 means 'unlimited'.
  */
@@ -163,10 +163,10 @@
 @cdef_use_ipv6@ USE_IPV6
 
 /* If you want to use threads to write the data to the sockets 
- * define USE_PTHREAD.
+ * define USE_PTHREADS.
  */
  
-@cdef_use_pthreads@ USE_PTHREAD
+@cdef_use_pthreads@ USE_PTHREADS
 
  
 
