@@ -1,3 +1,7 @@
+gcc 3.2 - Cygwin
+  Highest optimization creates buggy code when the total size of local
+  variables gets too big (>= 8KBytes).
+
 gcc 3.0
   Optimization option -funroll-all-loops seems to create buggy code.
 

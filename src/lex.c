@@ -5711,11 +5711,28 @@ handle_define (char *yyt, Bool quote)
 
     char namebuf[NSIZE];      /* temp buffer for read identifiers */
     char args[NARGS][NSIZE];  /* parsed argument names of function macros */
+#if defined(CYGWIN) && __GNUC__ >= 3 && __GNUC_MINOR__ >= 2
+    char *mtext;
+      /* replacement text, with arguments replaced by the MARKS characters.
+       * Under Cygwin and high optimization, the compiler produces faulty
+       * code if the mtext[MLEN] definition is used.
+       */
+#else
     char mtext[MLEN];
       /* replacement text, with arguments replaced by the MARKS characters
        */
+#endif
     char *p;                  /* current text pointer */
     char *q;                  /* destination for parsed text */
+
+#if defined(CYGWIN) && __GNUC__ >= 3 && __GNUC_MINOR__ >= 2
+    mtext = alloca(MLEN);
+    if (!mtext)
+    {
+        lexerror("Out of stack memory");
+        return;
+    }
+#endif /* CYGWIN */
 
     p = yyt;
     strcat(p, " "); /* Make sure GETALPHA terminates */

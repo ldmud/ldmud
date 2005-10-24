@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+20-Dec-2002 (Lars Duening)  (3.3.338)
+  - (lex.c) Added a workaround for an optimizer bug in Cygwin 3.2 (reported
+      by Zonk).
+
 20-Dec-2002 (Lars Duening)  (3.3.337)
   - (actions.c) Throw an error if H_NOTIFY_FAIL hook is missing. This also
       prevents the driver from crashing if the H_SEND_NOTIFY hook is
