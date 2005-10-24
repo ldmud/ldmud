@@ -189,7 +189,7 @@ static void print_block (int d, word_t *block);
  *   static Bool mem_is_freed (POINTER p, size_t minsize)
  *     Return true if <p> is a free block.
 #endif
-#endif - GC_SUPPORT
+#endif
  *
  *   #define MEM_ALIGN
  *     the alignment guaranteed by the allocator
@@ -199,7 +199,7 @@ static void print_block (int d, word_t *block);
 
 #if defined(MALLOC_smalloc)
 #  include "smalloc.c"
-#else if defined(MALLOC_sysmalloc)
+#elif defined(MALLOC_sysmalloc)
 #  include "sysmalloc.c"
 #else
 #  error "No allocator specified."
