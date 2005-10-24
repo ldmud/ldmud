@@ -194,7 +194,9 @@ static void print_block (int d, word_t *block);
  *   #define MEM_ALIGN
  *     the alignment guaranteed by the allocator
  *   #define REPLACE_MALLOC
- *     if the allocator can replace the libc allocation routines.
+ *     if the allocator's mem_alloc()/mem_free() can replace the libc
+ *     allocation routines (ie. the allocator doesn't use malloc() itself).
+ *     The actual replacement is provided by xalloc.
  */
 
 #if defined(MALLOC_smalloc)

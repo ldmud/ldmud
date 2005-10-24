@@ -1,6 +1,9 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+24-Dec-2002 (Lars Duening)  (3.3.341)
+  - (xalloc.c) Clarified the role of REPLACE_MALLOC (prompted by Gawain).
+
 24-Dec-2002 (Lars Duening)  (3.3.340)
   - (mregex.c) Efun regreplace() didn't check if for a '\<int>' replacement
       pattern the destinated subexpression match existed (reported by Zonk).
