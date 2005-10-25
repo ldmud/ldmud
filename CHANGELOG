@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+02-Feb-2002 (Lars Duening)  (3.3.385)
+  - (interpret.c) Assignments to multi-level struct references (a->b->c)
+       didn't work (reported by Dafire).
+
 30-Jan-2002 (Lars Duening)  (3.3.384)
   - (simulate.c) Removed a memory leak in the warnf() routine (reported
        by Dafire).

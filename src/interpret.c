@@ -13046,7 +13046,7 @@ again:
          * An negative <idx> accepts any struct.
          */
 
-        sp = check_struct_op(sp, 0, 3, pc);
+        sp = check_struct_op(sp, 0, -2, pc);
         sp = push_indexed_lvalue(sp, pc);
         break;
 #endif /* USE_STRUCTS */
