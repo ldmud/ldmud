@@ -3025,9 +3025,8 @@ static Void_t* sYSMALLOc(nb, av) INTERNAL_SIZE_T nb; mstate av;
   }
 
   if (_brk != (char*)(MORECORE_FAILURE)) {
-    if (mp_.sbrk_base == 0) {
+    if (mp_.sbrk_base == 0)
       mp_.sbrk_base = _brk;
-    }
     av->system_mem += size;
 
     /*
@@ -5365,13 +5364,13 @@ void public_cLEAR_REf_FLAGs()
 void public_cLEAR_REf_FLAGs()
 #endif
 {
-    mchunkptr chunk = (mchunkptr) mp_.sbrk_base;
+    mchunkptr chunk = (mchunkptr) (mp_.sbrk_base + (((INTERNAL_SIZE_T) chunk2mem(mp_.sbrk_base)) & MALLOC_ALIGN_MASK));
 
     // TODO: check for non contiguous case!
     do{
 	chunk->size &= ~MARK_REF;
         chunk = next_chunk(chunk);
-    } while(chunk <= main_arena.top);
+    } while(chunk < main_arena.top);
 }
 
 /*
@@ -5385,13 +5384,12 @@ void public_fREE_UNREFED_MEMORy()
 void public_fREE_UNREFED_MEMORy()
 #endif
 {
-    mchunkptr chunk = (mchunkptr) mp_.sbrk_base;
+    mchunkptr chunk = (mchunkptr) (mp_.sbrk_base + (((INTERNAL_SIZE_T) chunk2mem(mp_.sbrk_base)) & MALLOC_ALIGN_MASK));
 
     // TODO: check for non contiguous case!
     do{
         chunk = next_chunk(chunk);
-    } while(chunk <= main_arena.top);
-
+    } while(chunk < main_arena.top);
 write(1, "free_unrefed_mem\n",17);
 }
 

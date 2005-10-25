@@ -16,7 +16,8 @@ DESCRIPTION
         destruct()ion of other objects, and instead demand call_others
         to a specific lfun in the object to destruct (traditionally
         named "remove"). This will then ensure correct update of e.g.
-        weights, volumes etc.
+        weights, volumes etc. Additionally or instead, the master apply
+        prepare_destruct() can be used for this 'cleanup' functionality.
 
         The interpreter does not really destruct the object
         immediately, but marks it as deleted, removes it from the list
@@ -39,4 +40,4 @@ HISTORY
         Changed in 3.2.7 to accept destructed objects as argument, too.
 
 SEE ALSO
-        clone_object(E), remove(A)
+        clone_object(E), remove(A), prepare_destruct(M)

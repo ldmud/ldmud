@@ -566,11 +566,19 @@ mixed prepare_destruct (object obj)
 //
 // The gamedriver calls this function whenever an object shall be destructed.
 // It expects, that this function cleans the inventory of the object, or
-// the destruct will fail.
+// the destruct will fail. It is also recommended to clean up all
+// shadows on obj at this point.
+//
 // Furthermore, the function could notify the former inventory objects that
 // their holder is under destruction (useful to move players out of rooms which
 // are updated); and it could announce mudwide the destruction(quitting) of
 // players.
+//
+// Another use for this apply is to take care of any other 'cleanup'
+// work needed to be done, like adjusting weights, light levels, and
+// such. Alternatively and traditionally this is done by calling an
+// lfun 'remove()' in the object, which then calls the efun destruct()
+// after performing all the adjustments.
 
 
 //---------------------------------------------------------------------------
