@@ -58,6 +58,9 @@ DESCRIPTION
       __LPC_INLINE_CLOSURES__: defined when the 'real' inline closures
                            are enabled.
 
+    If the driver is compiled for using the MS-DOS filesystem
+    conventions, __MSDOS_FS__ is defined.
+
     If the ERQ is supported, the following macros are defined:
 
       __ERQ_MAX_SEND__  : the max size of the send buffer
@@ -66,7 +69,7 @@ DESCRIPTION
     The following macros are defined if their associated package
     has been compiled into the driver:
 
-      __IPV6__ :      support for IP v 6
+      __IPV6__ :      support for IP v.6
       __MYSQL__ :     support for mySQL
       __ALISTS__:     support for alists
       __PCRE__:       support for PCRE instead of traditional regexps.
@@ -86,6 +89,7 @@ HISTORY
          __INT_MAX__, __INT_MIN__, __FLOAT_MIN__, __FLOAT_MAX__,
         __CATCH_EVAL_COST__, __MASTER_EVAL_COST__, __RESET_TIME__,
         __CLEANUP_TIME__, __DRIVER_LOG__, and __WIZLIST__.
+    3.2.10 added __MSDOS_FS__.
     3.3 made __LPC_NOSAVE__ always defined and added __ALISTS__,
         __LPC_STRUCTS__, __LPC_INLINE_CLOSURES__, and __PCRE__.
 

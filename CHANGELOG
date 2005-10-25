@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+21-Feb-2002 (Lars Duening)  (3.3.397)
+  - (lex.c) Macro __MSDOS_FS__ is defined on systems using the
+       MS-DOS filesystem conventions.
+
 20-Feb-2002 (Lars Duening)  (3.3.396)
   - (mempools, efuns.c) Added the table sizes to the debug_info(DINFO_DATA,
        DID_STATUS) result.
