@@ -6850,7 +6850,7 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
 
     case 'v': /* A variable closure */
       {
-        string_t *str;
+        string_t *s;
         object_t *ob;
         variable_t *var;
         program_t *prog;
@@ -6877,8 +6877,8 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
         /* If the variable exists, it must exist as shared
          * string.
          */
-        str = find_tabled_str(name);
-        if (!str)
+        s = find_tabled_str(name);
+        if (!s)
         {
             *svp = const0;
             break; /* switch(ct) */
@@ -6889,7 +6889,7 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
         num_var = prog->num_variables;
         for (n = num_var; --n >= 0; var++)
         {
-            if (mstreq(var->name, str)
+            if (mstreq(var->name, s)
              && !(var->type.typeflags & NAME_HIDDEN))
                 break;
         }

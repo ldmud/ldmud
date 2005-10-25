@@ -8696,10 +8696,6 @@ void t (void)
 {
     pthread_atfork(0, 0, 0);
 }
-int main(void)
-{
-    return 0;
-}
 
 int
 main ()

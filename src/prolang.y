@@ -2290,7 +2290,7 @@ add_lvalue_code ( struct lvalue_s lv, int instruction)
         {
             yyerrorf("Out of memory: program size %lu"
                     , current_size+2);
-            return FALSE;
+            return MY_FALSE;
         }
         CURRENT_PROGRAM_SIZE = (last_expression = current_size + 2);
         dest = PROGRAM_BLOCK + current_size;
@@ -2301,7 +2301,7 @@ add_lvalue_code ( struct lvalue_s lv, int instruction)
     if (instruction != 0)
        ins_f_code(instruction);
 
-    return TRUE;
+    return MY_TRUE;
 } /* add_lvalue_code() */
 
 /*-------------------------------------------------------------------------*/
