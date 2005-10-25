@@ -2382,6 +2382,7 @@ esbrk (word_t size)
     extern int brk();
 #endif
 
+    mdb_dump_sbrk(size);
     if (!heap_end)
     {
         /* First call: allocate the first fake block */
@@ -2411,6 +2412,7 @@ esbrk (word_t size)
     char *block;
     word_t *p;
 
+    mdb_dump_sbrk(size);
     size += SINT;  /* for the extra fake "allocated" block */
 
     block = malloc(size);

@@ -51,12 +51,12 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 398)
-(Parent-Version lpmud 3-3 397)
-(Version-Log "Corrected a compilation problem.")
+(Project-Version lpmud 3-3 399)
+(Parent-Version lpmud 3-3 398)
+(Version-Log "Added a log for all esbrk() requests.")
 (New-Version-Log
 "")
-(Checkin-Time "Fri, 21 Feb 2003 18:36:53 -0700")
+(Checkin-Time "Sun, 23 Feb 2003 14:35:43 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -93,7 +93,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.58 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.461 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.462 644))
   (HISTORY (lpmud/f/49_HISTORY 1.302 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.19 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -197,7 +197,7 @@
   (src/mregex.h (lpmud/e/29_rxcache.h 1.7.1.10 644))
   (src/mregex.c (lpmud/e/30_rxcache.c 1.11.1.27 644))
   (src/mstrings.h (lpmud/i/35_mstrings.h 1.20 644))
-  (src/mstrings.c (lpmud/i/36_mstrings.c 1.21.1.19 644))
+  (src/mstrings.c (lpmud/i/36_mstrings.c 1.21.1.20 644))
   (src/my-alloca.h (lpmud/f/29_my-alloca. 1.3.1.2 644))
   (src/my-rusage.h (lpmud/f/28_my-rusage. 1.7 644))
   (src/object.h (lpmud/44_object.h 1.34.1.19.1.2 644))
@@ -271,13 +271,13 @@
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.31 644))
   (src/simulate.c (lpmud/31_simulate.c 1.88.1.101 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.14 644))
-  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.70 644))
+  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.71 644))
   (src/structs.h (lpmud/d/b/5_structs.h 1.3 644))
   (src/structs.c (lpmud/d/b/6_structs.c 1.7 644))
   (src/sysmalloc.h (lpmud/c/b/33_sysmalloc. 1.1 644))
   (src/sysmalloc.c (lpmud/c/b/34_sysmalloc. 1.3 644))
   (src/sprintf.h (lpmud/f/15_sprintf.h 1.3.1.4 644))
-  (src/sprintf.c (lpmud/28_sprintf.c 1.31.1.50 644))
+  (src/sprintf.c (lpmud/28_sprintf.c 1.31.1.51 644))
   (src/strfuns.h (lpmud/b/51_strfuns.h 1.11.1.5 644))
   (src/strfuns.c (lpmud/c/0_strfuns.c 1.9.1.12 644))
   (src/svalue.h (lpmud/f/39_datatypes. 1.34.1.23.1.5 644))
@@ -289,7 +289,7 @@
   (src/wiz_list.h (lpmud/1_wiz_list.h 1.5.1.7.1.2 644))
   (src/wiz_list.c (lpmud/2_wiz_list.c 1.13.1.14.1.3 644))
   (src/xalloc.h (lpmud/g/51_xalloc.h 1.18 644))
-  (src/xalloc.c (lpmud/h/0_xalloc.c 1.2.1.20 644))
+  (src/xalloc.c (lpmud/h/0_xalloc.c 1.2.1.21 644))
   ;(src/xptmalloc.c (lpmud/d/b/1_xptmalloc. 1.6 644))
 
   ;; Build files

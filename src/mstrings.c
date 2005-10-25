@@ -1532,8 +1532,8 @@ add_string_status (strbuf_t *sbuf, Bool verbose)
     else
     {
         strbuf_add(sbuf, "\nString handler:\n");
-        strbuf_add(sbuf,   "---------------\t Strings    Bytes (Data+Overhead)\n");
-        strbuf_addf(sbuf,  "Total asked for\t%8lu %8lu (%8lu+%8lu)\n"
+        strbuf_add(sbuf,   "---------------\t  Strings     Bytes (Data+Overhead)\n");
+        strbuf_addf(sbuf,  "Total asked for\t%9lu %9lu (%9lu+%9lu)\n"
                         , mstr_used
                         , mstr_used_size
                         , mstr_used_size
@@ -1541,13 +1541,13 @@ add_string_status (strbuf_t *sbuf, Bool verbose)
                           : 0
                         , mstr_used * STR_OVERHEAD
                         );
-        strbuf_addf(sbuf,  "Total allocated\t%8lu %8lu (%8lu+%8lu)\n"
+        strbuf_addf(sbuf,  "Total allocated\t%9lu %9lu (%9lu+%9lu)\n"
                         , distinct_strings
                         , distinct_size + stringtable_size
                         , distinct_size - distinct_overhead
                         , distinct_overhead + stringtable_size
                         );
-        strbuf_addf(sbuf,  " - tabled\t%8lu %8lu (%8lu+%8lu)\n"
+        strbuf_addf(sbuf,  " - tabled\t%9lu %9lu (%9lu+%9lu)\n"
                         , mstr_tabled
                         , mstr_tabled_size + stringtable_size
                         , mstr_tabled_size
@@ -1555,7 +1555,7 @@ add_string_status (strbuf_t *sbuf, Bool verbose)
                           : 0
                         , mstr_tabled * STR_OVERHEAD + stringtable_size
                         );
-        strbuf_addf(sbuf,  " - ind. tabled\t%8lu %8lu (%8lu+%8lu)\n"
+        strbuf_addf(sbuf,  " - ind. tabled\t%9lu %9lu (%9lu+%9lu)\n"
                         , mstr_itabled
                         , mstr_itabled_size
                         , mstr_itabled_size
@@ -1563,7 +1563,7 @@ add_string_status (strbuf_t *sbuf, Bool verbose)
                           : 0
                         , mstr_itabled * sizeof(string_t)
                         );
-        strbuf_addf(sbuf,  " - untabled\t%8lu %8lu (%8lu+%8lu)\n"
+        strbuf_addf(sbuf,  " - untabled\t%9lu %9lu (%9lu+%9lu)\n"
                         , mstr_untabled
                         , mstr_untabled_size
                         , mstr_untabled_size

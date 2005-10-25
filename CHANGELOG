@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+23-Feb-2002 (Lars Duening)  (3.3.399)
+  - (smalloc.c, xalloc.c) All esbrk() requests are logged on stdout
+       as 'DEBUG: MEM ...' messages. This is to find out why certain
+       muds use so much memory lately.
+
 21-Feb-2002 (Lars Duening)  (3.3.398)
   - (mempools.c) Corrected a compilation problem.
 

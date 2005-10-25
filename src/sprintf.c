@@ -1338,6 +1338,9 @@ static char buff[BUFF_SIZE];         /* For error messages */
 #endif
     string_t     *result;          /* The result string */
     fmt_state_t  *st;              /* The formatting state */
+    volatile fmt_state_t  *vst;    /* A copy of st, stored in a volatile var
+                                    * to survive a longjmp()
+                                    */
     svalue_t     *carg;            /* current arg */
     int           arg;             /* current arg number */
     format_info   finfo;           /* parse formatting info */
@@ -1382,11 +1385,15 @@ static char buff[BUFF_SIZE];         /* For error messages */
     st->csts = NULL;
     st->ptable = NULL;
 
-    if (0 != (err_num = setjmp(st->error_jmp)))
+    vst = st;
+
+    if (0 != (err_num = setjmp(((fmt_state_t*)st)->error_jmp)))
     {
         /* error handling */
         char *err;
         cst  *tcst;
+
+        st = (fmt_state_t*)vst;
 
         if (st->ptable)
             free_pointer_table(st->ptable);
@@ -1516,6 +1523,8 @@ static char buff[BUFF_SIZE];         /* For error messages */
 #endif /* RETURN_ERROR_MESSAGES */
         return result;
     }
+
+    st = (fmt_state_t*)vst;
 
     format_char = 0;
     nelemno = 0;

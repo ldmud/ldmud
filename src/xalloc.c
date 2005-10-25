@@ -29,6 +29,10 @@
 #include "mstrings.h"
 #endif
 
+#if defined(MALLOC_TRACE) || defined(MALLOC_LPC_TRACE)
+#define MEMORY_DEBUG
+#endif
+
 /*-------------------------------------------------------------------------*/
 
 /* Minimum boundary between stack and heap, should be sufficient for
@@ -130,6 +134,49 @@ static t_stat clib_alloc_stat = {0,0};
   /* Number and size of allocations done through the clib emulation
    * functions (incl overhead).
    */
+
+#ifdef MEMORY_DEBUG
+static size_t mdb_size;
+static object_t *mdb_object;
+static const char * mdb_file;
+static int mdb_line;
+static void mdb_dump_sbrk(p_int size)
+{
+#if defined(MALLOC_TRACE)
+#  if defined(MALLOC_LPC_TRACE)
+      dprintf2(1, "DEBUG: MEM sbrk(%d) for %d"
+                , (p_int)size, (p_int)mdb_size
+                );
+      dprintf3(1, " , '%s':%d , obj %s\n"
+                , (p_int)mdb_file, (p_int)mdb_line
+                , (p_int)(mdb_object ? ( mdb_object->name ? get_txt(mdb_object->name) : "<?>"): "<null>")
+                );
+#  else
+      dprintf2(1, "DEBUG: MEM sbrk(%d) for %d"
+                , (p_int)size, (p_int)mdb_size
+                );
+      dprintf1(1, " , '%s':%d\n"
+                , (p_int)mdb_file, (p_int)mdb_line
+                );
+#  endif
+#else
+#  if defined(MALLOC_LPC_TRACE)
+      dprintf2(1, "DEBUG: MEM sbrk(%d) for %d"
+                , (p_int)size, (p_int)mdb_size
+                );
+      dprintf2(1, " , obj %s\n"
+                , (p_int)(mdb_object ? ( mdb_object->name ? get_txt(mdb_object->name) : "<?>"): "<null>")
+                );
+#  else
+      dprintf2(1, "DEBUG: MEM sbrk(%d) for %d\n"
+                , (p_int)size, (p_int)mdb_size
+                );
+#  endif
+#endif /* MALLOC_TRACE */
+} /* mdb_dump_sbrk() */
+#else
+#define mdb_dump_sbrk(size) NOOP
+#endif /* MEMORY_DEBUG */
 
 /*-------------------------------------------------------------------------*/
 /* Forward declarations */
@@ -412,6 +459,16 @@ xalloc_traced (size_t size MTRACE_DECL)
     if (size == 0)
         fatal("Tried to allocate 0 bytes.\n");
     
+#ifdef MEMORY_DEBUG
+    mdb_size = size;
+#ifdef MALLOC_TRACE
+        mdb_file = malloc_trace_file;
+        mdb_line = malloc_trace_line;
+#endif
+#ifdef MALLOC_LPC_TRACE
+        mdb_object = current_object;
+#endif
+#endif /* MEMORY_DEBUG */
     size += XM_OVERHEAD_SIZE;
 
     do {
@@ -547,6 +604,16 @@ rexalloc (POINTER p, size_t size)
     if (going_to_exit) /* A recursive call while we're exiting */
         exit(3);
 
+#ifdef MEMORY_DEBUG
+    mdb_size = size;
+#ifdef MALLOC_TRACE
+        mdb_file = __FILE__;
+        mdb_line = __LINE__;
+#endif
+#ifdef MALLOC_LPC_TRACE
+        mdb_object = current_object;
+#endif
+#endif /* MEMORY_DEBUG */
     size += XM_OVERHEAD_SIZE;
     block = (word_t *)p - XM_OVERHEAD;
 
