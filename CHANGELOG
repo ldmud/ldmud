@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+24-Jan-2002 (Lars Duening)  (3.3.371)
+  - (object.c) save/restore didn't look out for shared closures, which
+       could lead to endless recursions.
+  - (prolang.y) When compiling the context for inline closures, references
+       to local variables (for initialisation) were already redirected
+       into the closure.
+
 23-Jan-2002 (Lars Duening)  (3.3.370)
   - (configure, ptmalloc.c) Not all systems provide pthread_atfork(),
        so configure now checks for it and activates a dummy if

@@ -2532,45 +2532,70 @@ printf("DEBUG: add_context_name('%s', num %d) depth %d, context %d\n", get_txt(i
 
 /*-------------------------------------------------------------------------*/
 static ident_t *
-check_for_context_local (ident_t *ident)
+check_for_context_local (ident_t *ident, fulltype_t * pType)
 
 /* The LPC code uses local variable <ident>. If we're compiling
  * an inline closure, check if it is an inherited local for which
  * no context variable has been created yet. If yes, create the context
  * variable.
- * Return the (possibly updated) ident.
+ * Return the (possibly updated) ident, and store the variables type
+ * in *<pType>.
  */
 
 {
     int depth = ident->u.local.depth;
 
     if (current_inline
-     && depth <= current_inline->block_depth)
+     && depth <= current_inline->block_depth
+       )
     {
         /* This local has been inherited - create the
          * proper context variable.
          */
-       if (ident->u.local.context >= 0
-        || (current_inline->prev != -1
-            && depth <= INLINE_CLOSURE(current_inline->prev).block_depth
-           )
-          )
-       {
-           yyerrorf("Can't use context variable '%s' "
-                    "across closure boundaries", get_txt(ident->name));
-           ident = redeclare_local(ident, Type_Any, block_depth);
-       }
-       else
-       {
-           fulltype_t type;
+        if (ident->u.local.context >= 0)
+        {
+            if (!current_inline->parse_context
+             && current_inline->prev != -1
+             && depth <= INLINE_CLOSURE(current_inline->prev).block_depth
+               )
+            {
+                /* Can't use outer context variables when compiling
+                 * an inline closure body.
+                 */
+                yyerrorf("Can't use context variable '%s' "
+                         "across closure boundaries", get_txt(ident->name));
+                ident = redeclare_local(ident, Type_Any, block_depth);
+                *pType = Type_Any;
+            }
+            else
+            {
+                /* We can use outer context variables when compiling
+                 * an inline closure context.
+                 */
+                *pType = LOCAL_TYPE(current_inline->full_context_type_start
+                                    + ident->u.local.context
+                                   );
+            }
+        }
+        else /* it's a local */
+        {
+            fulltype_t type;
 
-           type = LOCAL_TYPE(current_inline->full_local_type_start
-                             + ident->u.local.num
-                            );
-           ref_fulltype_data(&type);
-           ident = add_context_name( ident, type, ident->u.local.num);
-       }
+            type = LOCAL_TYPE(current_inline->full_local_type_start
+                              + ident->u.local.num
+                             );
+            if (!current_inline->parse_context)
+            {
+                ref_fulltype_data(&type);
+                ident = add_context_name( ident, type, ident->u.local.num);
+            }
+            *pType = type;
+        }
     }
+    else if (ident->u.local.context >= 0)
+        *pType = type_of_context[ident->u.local.context];
+    else
+        *pType = type_of_locals[ident->u.local.num];
 
     return ident;
 } /* check_for_context_local() */
@@ -9733,19 +9758,17 @@ expr0:
           $$.start = $1.start;
 #ifdef USE_NEW_INLINES
 
-          $2 = check_for_context_local($2);
+          $2 = check_for_context_local($2, &lvtype);
 
           if ($2->u.local.context >= 0)
           {
               add_f_code(F_PUSH_CONTEXT_LVALUE);
               add_byte($2->u.local.context);
-              lvtype = type_of_context[$2->u.local.context];
           }
           else
           {
               add_f_code(F_PUSH_LOCAL_VARIABLE_LVALUE);
               add_byte($2->u.local.num);
-              lvtype = type_of_locals[$2->u.local.num];
           }
           CURRENT_PROGRAM_SIZE =
             (last_expression = CURRENT_PROGRAM_SIZE + 2) + 1;
@@ -10722,7 +10745,7 @@ expr4:
           bytecode_p p;
 %line
 #ifdef USE_NEW_INLINES
-          $2 = check_for_context_local($2);
+          $2 = check_for_context_local($2, &$$.type);
 #endif /* USE_NEW_INLINES */
 
           $$.start = current = CURRENT_PROGRAM_SIZE;
@@ -10738,16 +10761,13 @@ expr4:
           {
               *p++ = F_PUSH_CONTEXT_LVALUE;
               *p = $2->u.local.context;
-              $$.type = type_of_context[$2->u.local.context];
-              $$.type.typeflags |= TYPE_MOD_REFERENCE;
           }
           else
           {
               *p++ = F_PUSH_LOCAL_VARIABLE_LVALUE;
               *p = $2->u.local.num;
-              $$.type = type_of_locals[$2->u.local.num];
-              $$.type.typeflags |= TYPE_MOD_REFERENCE;
           }
+          $$.type.typeflags |= TYPE_MOD_REFERENCE;
           CURRENT_PROGRAM_SIZE = current + 2;
 #else /* USE_NEW_INLINES */
           *p++ = F_PUSH_LOCAL_VARIABLE_LVALUE;
@@ -10980,7 +11000,7 @@ expr4:
           bytecode_p p;
 %line
 #ifdef USE_NEW_INLINES
-          $1 = check_for_context_local($1);
+          $1 = check_for_context_local($1, &$$.type);
 #endif /* USE_NEW_INLINES */
 
           $$.start = current = CURRENT_PROGRAM_SIZE;
@@ -10997,13 +11017,11 @@ expr4:
           {
               *p++ = F_CONTEXT_IDENTIFIER;
               *p = $1->u.local.context;
-              $$.type = type_of_context[$1->u.local.context];
           }
           else
           {
               *p++ = F_LOCAL;
               *p = $1->u.local.num;
-              $$.type = type_of_locals[$1->u.local.num];
           }
           CURRENT_PROGRAM_SIZE = current + 2;
 #else /* USE_NEW_INLINES */
@@ -11594,19 +11612,17 @@ name_lvalue:
           /* Generate the lvalue for a local */
 
 #ifdef USE_NEW_INLINES
-          $1 = check_for_context_local($1);
+          $1 = check_for_context_local($1, &$$.type);
 
           if ($1->u.local.context >= 0)
           {
               $$.u.simple[0] = F_PUSH_CONTEXT_LVALUE;
               $$.u.simple[1] = $1->u.local.context;
-              $$.type = type_of_context[$1->u.local.context];
           }
           else
           {
               $$.u.simple[0] = F_PUSH_LOCAL_VARIABLE_LVALUE;
               $$.u.simple[1] = $1->u.local.num;
-              $$.type = type_of_locals[$1->u.local.num];
           }
           $$.length = 0;
 #else /* USE_NEW_INLINES */
@@ -13479,7 +13495,8 @@ lvalue_list:
           /* Push the lvalue for a local variable */
 
 #ifdef USE_NEW_INLINES
-          $3 = check_for_context_local($3);
+          fulltype_t dummy;
+          $3 = check_for_context_local($3, &dummy);
 
           if ($3->u.local.context >= 0)
           {

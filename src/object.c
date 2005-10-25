@@ -4788,12 +4788,7 @@ f_transfer (svalue_t *sp)
 /* Forward Declarations */
 
 static Bool save_svalue(svalue_t *, char, Bool);
-static void save_array(vector_t *);
-#ifdef USE_STRUCTS
-static void save_struct(struct_t *);
-#endif /* USE_STRUCTS */
 static int restore_size(char **str);
-INLINE static Bool restore_array(svalue_t *, char **str);
 static int restore_svalue(svalue_t *, char **, char);
 static void register_svalue(svalue_t *);
 
@@ -5053,7 +5048,7 @@ save_string (string_t *src)
     }
     L_PUTC('\"')
     L_PUTC_EPILOG
-}
+} /* save_string() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -5072,7 +5067,7 @@ save_mapping_filter (svalue_t *key, svalue_t *data, void *extra)
         while (--i >= 0)
             save_svalue(data++, (char)(i ? ';' : ','), MY_FALSE );
     }
-}
+} /* save_mapping_filter() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -5119,35 +5114,360 @@ save_mapping (mapping_t *m)
 
 /*-------------------------------------------------------------------------*/
 static void
-register_mapping_filter (svalue_t *key, svalue_t *data, void *extra)
+save_array (vector_t *v)
 
-/* Callback to register one mapping entry of (p_int)<extra> values.
+/* Encode the array <v> and write it to the write buffer.
  */
 
 {
-    int i;
+    long i;
+    svalue_t *val;
 
-    register_svalue(key);
+    /* Recall the array from the pointer table.
+     * If it is a shared one, there's nothing else to do.
+     */
+    if (recall_pointer(v))
+        return;
 
-    for (i = (p_int)extra; --i >= 0; data++)
+    /* Write the '(<'... */
     {
-        register_svalue(data);
+        L_PUTC_PROLOG
+        L_PUTC('(')
+        L_PUTC('{')
+        L_PUTC_EPILOG
     }
-} /* register_mapping_filter() */
 
+    /* ... the values ... */
+    for (i = (long)VEC_SIZE(v), val = v->item; --i >= 0; )
+    {
+        save_svalue(val++, ',', MY_FALSE);
+    }
+
+    /* ... and the '>)' */
+    {
+        L_PUTC_PROLOG
+        L_PUTC('}')
+        L_PUTC(')')
+        L_PUTC_EPILOG
+    }
+} /* save_array() */
+
+#ifdef USE_STRUCTS
 /*-------------------------------------------------------------------------*/
 static void
-register_mapping (mapping_t *map)
+save_struct (struct_t *st)
 
-/* Register the mapping <map> in the pointer table. If it was not
- * in there, also register all array/mapping values.
+/* Encode the struct <st> and write it to the write buffer.
  */
 
 {
-    if (NULL == register_pointer(ptable, map))
+    long i;
+    svalue_t *val;
+
+    /* Recall the struct from the pointer table.
+     * If it is a shared one, there's nothing else to do.
+     */
+    if (recall_pointer(st))
         return;
-    walk_mapping(map, register_mapping_filter, (void *)(p_int)map->num_values);
-}
+
+    /* Write the '(<'... */
+    {
+        L_PUTC_PROLOG
+        L_PUTC('(')
+        L_PUTC('<')
+        L_PUTC_EPILOG
+    }
+
+    /* The name as fake member */
+    {
+        svalue_t name;
+
+        put_string(&name, struct_name(st));
+        save_svalue(&name, ',', MY_FALSE);
+    }
+
+    /* ... the values ... */
+    for (i = (long)struct_size(st), val = st->member; --i >= 0; )
+    {
+        save_svalue(val++, ',', MY_FALSE);
+    }
+
+    /* ... and the '>)' */
+    {
+        L_PUTC_PROLOG
+        L_PUTC('>')
+        L_PUTC(')')
+        L_PUTC_EPILOG
+    }
+} /* save_struct() */
+#endif /* USE_STRUCTS */
+
+/*-------------------------------------------------------------------------*/
+static Bool
+save_closure (svalue_t *cl, Bool writable)
+
+/* Encode the struct <st> and write it to the write buffer.
+ * If <writable> is false, unwritable closure are written
+ * as '0'. If <writable> is true, unwritable closures are not written at all.
+ *
+ * Return is true if something was written, and false otherwise.
+ */
+
+{
+    Bool rc = MY_TRUE;
+    int type;
+
+    switch(type = cl->x.closure_type)
+    {
+    case CLOSURE_LFUN:
+      {
+        if (recall_pointer(cl->u.lambda))
+            break;
+
+        if (cl->u.lambda->function.lfun.ob == current_object
+         && cl->u.lambda->ob == current_object
+           )
+        {
+            lambda_t  *l;
+            program_t *prog;
+            int        ix;
+            funflag_t  flags;
+            string_t  *function_name;
+            char      *source, c;
+            object_t  *ob;
+
+            l = cl->u.lambda;
+            ob = l->function.lfun.ob;
+            ix = l->function.lfun.index;
+
+            prog = ob->prog;
+            flags = prog->functions[ix];
+            while (flags & NAME_INHERITED)
+            {
+                inherit_t *inheritp;
+
+                inheritp = &prog->inherit[flags & INHERIT_MASK];
+                ix -= inheritp->function_index_offset;
+                prog = inheritp->prog;
+                flags = prog->functions[ix];
+            }
+
+            memcpy(&function_name
+                  , FUNCTION_NAMEP(prog->program + (flags & FUNSTART_MASK))
+                  , sizeof function_name
+                  );
+            source = get_txt(function_name);
+
+            {
+                L_PUTC_PROLOG
+                L_PUTC('#');
+#ifndef USE_NEW_INLINES
+                L_PUTC('l');
+#else
+                if (l->function.lfun.context_size)
+                {
+                    L_PUTC('c');
+                }
+                else
+                {
+                    L_PUTC('l');
+                }
+#endif /* USE_NEW_INLINES */
+                L_PUTC(':');
+                c = *source++;
+                do L_PUTC(c) while ( '\0' != (c = *source++) );
+                L_PUTC_EPILOG
+            }
+
+#ifdef USE_NEW_INLINES
+            if (l->function.lfun.context_size)
+            {
+                int i;
+                svalue_t * val;
+
+                {
+                    L_PUTC_PROLOG
+                    L_PUTC(':');
+                    L_PUTC_EPILOG
+                }
+                /* Save the context size.
+                 * It has to be saved separately because it is needed
+                 * to allocated the lambda structure to the right size
+                 * before the restore of the context can be done.
+                 */
+                {
+                    svalue_t num;
+
+                    put_number(&num, l->function.lfun.context_size);
+                    save_svalue(&num, ':', MY_FALSE);
+                }
+
+                /* Save the actual context */
+                {
+                    L_PUTC_PROLOG
+                    L_PUTC('(')
+                    L_PUTC('{')
+                    L_PUTC_EPILOG
+                }
+
+                for (i = l->function.lfun.context_size
+                    , val = l->context
+                    ; --i >= 0; )
+                {
+                    (void)save_svalue(val++, ',', MY_FALSE);
+                }
+
+                {
+                    L_PUTC_PROLOG
+                    L_PUTC('}')
+                    L_PUTC(')')
+                    L_PUTC_EPILOG
+                }
+            }
+#endif /* USE_NEW_INLINES */
+            /* TODO: Once we have inherit-conscious lfun closures,
+             * TODO:: save them as #'l:<inherit>-<name>
+             */
+        }
+        else
+        {
+            L_PUTC_PROLOG
+            L_PUTC('0');
+            L_PUTC_EPILOG
+        }
+        break;
+      }
+
+    case CLOSURE_IDENTIFIER:
+      {
+        L_PUTC_PROLOG
+        lambda_t *l;
+        char * source, c;
+
+        if (recall_pointer(cl->u.lambda))
+            break;
+
+        l = cl->u.lambda;
+        if (l->function.var_index == VANISHED_VARCLOSURE_INDEX)
+        {
+            rc = MY_FALSE;
+            break;
+        }
+        if (l->ob->flags & O_DESTRUCTED
+         || l->ob != current_object
+           )
+        {
+            rc = MY_FALSE;
+            break;
+        }
+
+        source = get_txt(l->ob->prog->variables[l->function.var_index].name);
+
+        L_PUTC('#');
+        L_PUTC('v');
+        L_PUTC(':');
+        c = *source++;
+        do L_PUTC(c) while ( '\0' != (c = *source++) );
+        
+        L_PUTC_EPILOG
+        break;
+      }
+
+    default:
+        if (type < 0)
+        {
+            switch(type & -0x0800)
+            {
+            case CLOSURE_OPERATOR:
+              {
+                const char *s = closure_operator_to_string(type);
+
+                if (s)
+                {
+                    L_PUTC_PROLOG
+                    char c;
+
+                    L_PUTC('#');
+                    L_PUTC('e');
+                    L_PUTC(':');
+
+                    c = *s++;
+                    do L_PUTC(c) while ( '\0' != (c = *s++) );
+
+                    L_PUTC_EPILOG
+                    break;
+                }
+                type += CLOSURE_EFUN - CLOSURE_OPERATOR;
+              }
+            /* default action for operators: FALLTHROUGH */
+
+            case CLOSURE_EFUN:
+              {
+                L_PUTC_PROLOG
+                char * source, c;
+
+                source = instrs[type - CLOSURE_EFUN].name;
+
+                L_PUTC('#');
+                L_PUTC('e');
+                L_PUTC(':');
+
+                c = *source++;
+                do L_PUTC(c) while ( '\0' != (c = *source++) );
+
+                L_PUTC_EPILOG
+                break;
+              }
+
+            case CLOSURE_SIMUL_EFUN:
+              {
+                L_PUTC_PROLOG
+                char * source, c;
+
+                source = get_txt(simul_efunp[type - CLOSURE_SIMUL_EFUN].name);
+
+                L_PUTC('#');
+                L_PUTC('s');
+                L_PUTC(':');
+
+                c = *source++;
+                do L_PUTC(c) while ( '\0' != (c = *source++) );
+
+                L_PUTC_EPILOG
+                break;
+              }
+            }
+            break;
+        }
+        else /* type >= 0: one of the lambda closures */
+        {
+            rc = MY_FALSE;
+        }
+        break;
+
+    } /* switch(closure type) */
+
+    /* We come here, we could write the closure */
+    /* 'rc' at this point signifies whether the closure could be written.
+     * If it couldn't, maybe write a default '0', and also adjust rc
+     * to serve as function result.
+     */
+    if (!rc)
+    {
+        if (writable)
+            rc = MY_FALSE;
+        else
+        {
+            L_PUTC_PROLOG
+
+            rc = MY_TRUE; /* Writing a default '0' counts */
+            L_PUTC('0');
+            L_PUTC_EPILOG
+        }
+    }
+
+    return rc;
+} /* save_closure() */
 
 /*-------------------------------------------------------------------------*/
 static Bool
@@ -5249,238 +5569,8 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
       }
 
     case T_CLOSURE:
-      {
-        int type;
-
-        switch(type = v->x.closure_type)
-        {
-        case CLOSURE_LFUN:
-          {
-            if (v->u.lambda->function.lfun.ob == current_object
-             && v->u.lambda->ob == current_object
-               )
-            {
-                lambda_t  *l;
-                program_t *prog;
-                int        ix;
-                funflag_t  flags;
-                string_t  *function_name;
-                char      *source, c;
-                object_t  *ob;
-
-                l = v->u.lambda;
-                ob = l->function.lfun.ob;
-                ix = l->function.lfun.index;
-
-                prog = ob->prog;
-                flags = prog->functions[ix];
-                while (flags & NAME_INHERITED)
-                {
-                    inherit_t *inheritp;
-
-                    inheritp = &prog->inherit[flags & INHERIT_MASK];
-                    ix -= inheritp->function_index_offset;
-                    prog = inheritp->prog;
-                    flags = prog->functions[ix];
-                }
-
-                memcpy(&function_name
-                      , FUNCTION_NAMEP(prog->program + (flags & FUNSTART_MASK))
-                      , sizeof function_name
-                      );
-                source = get_txt(function_name);
-
-                {
-                    L_PUTC_PROLOG
-                    L_PUTC('#');
-#ifndef USE_NEW_INLINES
-                    L_PUTC('l');
-#else
-                    if (l->function.lfun.context_size)
-                    {
-                        L_PUTC('c');
-                    }
-                    else
-                    {
-                        L_PUTC('l');
-                    }
-#endif /* USE_NEW_INLINES */
-                    L_PUTC(':');
-                    c = *source++;
-                    do L_PUTC(c) while ( '\0' != (c = *source++) );
-                    L_PUTC_EPILOG
-                }
-
-#ifdef USE_NEW_INLINES
-                if (l->function.lfun.context_size)
-                {
-                    int i;
-                    svalue_t * val;
-
-                    {
-                        L_PUTC_PROLOG
-                        L_PUTC(':');
-                        L_PUTC('(')
-                        L_PUTC('{')
-                        L_PUTC_EPILOG
-                    }
-
-                    for (i = l->function.lfun.context_size
-                        , val = l->context
-                        ; --i >= 0; )
-                    {
-                        (void)save_svalue(val++, ',', MY_FALSE);
-                    }
-
-                    {
-                        L_PUTC_PROLOG
-                        L_PUTC('}')
-                        L_PUTC(')')
-                        L_PUTC_EPILOG
-                    }
-                }
-#endif /* USE_NEW_INLINES */
-                /* TODO: Once we have inherit-conscious lfun closures,
-                 * TODO:: save them as #'l:<inherit>-<name>
-                 */
-            }
-            else
-            {
-                L_PUTC_PROLOG
-                L_PUTC('0');
-                L_PUTC_EPILOG
-            }
-            break;
-          }
-
-        case CLOSURE_IDENTIFIER:
-          {
-            L_PUTC_PROLOG
-            lambda_t *l;
-            char * source, c;
-
-            l = v->u.lambda;
-            if (l->function.var_index == VANISHED_VARCLOSURE_INDEX)
-            {
-                rc = MY_FALSE;
-                break;
-            }
-            if (l->ob->flags & O_DESTRUCTED
-             || l->ob != current_object
-               )
-            {
-                rc = MY_FALSE;
-                break;
-            }
-
-            source = get_txt(l->ob->prog->variables[l->function.var_index].name);
-
-            L_PUTC('#');
-            L_PUTC('v');
-            L_PUTC(':');
-            c = *source++;
-            do L_PUTC(c) while ( '\0' != (c = *source++) );
-            
-            L_PUTC_EPILOG
-            break;
-          }
-
-        default:
-            if (type < 0)
-            {
-                switch(type & -0x0800)
-                {
-                case CLOSURE_OPERATOR:
-                  {
-                    const char *s = closure_operator_to_string(type);
-
-                    if (s)
-                    {
-                        L_PUTC_PROLOG
-                        char c;
-
-                        L_PUTC('#');
-                        L_PUTC('e');
-                        L_PUTC(':');
-
-                        c = *s++;
-                        do L_PUTC(c) while ( '\0' != (c = *s++) );
-
-                        L_PUTC_EPILOG
-                        break;
-                    }
-                    type += CLOSURE_EFUN - CLOSURE_OPERATOR;
-                  }
-                /* default action for operators: FALLTHROUGH */
-
-                case CLOSURE_EFUN:
-                  {
-                    L_PUTC_PROLOG
-                    char * source, c;
-
-                    source = instrs[type - CLOSURE_EFUN].name;
-
-                    L_PUTC('#');
-                    L_PUTC('e');
-                    L_PUTC(':');
-
-                    c = *source++;
-                    do L_PUTC(c) while ( '\0' != (c = *source++) );
-
-                    L_PUTC_EPILOG
-                    break;
-                  }
-
-                case CLOSURE_SIMUL_EFUN:
-                  {
-                    L_PUTC_PROLOG
-                    char * source, c;
-
-                    source = get_txt(simul_efunp[type - CLOSURE_SIMUL_EFUN].name);
-
-                    L_PUTC('#');
-                    L_PUTC('s');
-                    L_PUTC(':');
-
-                    c = *source++;
-                    do L_PUTC(c) while ( '\0' != (c = *source++) );
-
-                    L_PUTC_EPILOG
-                    break;
-                  }
-                }
-                break;
-            }
-            else /* type >= 0: one of the lambda closures */
-            {
-                rc = MY_FALSE;
-            }
-            break;
-
-        } /* switch(closure type) */
-
-        /* We come here, we could write the closure */
-        /* 'rc' at this point signifies whether the closure could be written.
-         * If it couldn't, maybe write a default '0', and also adjust rc
-         * to serve as function result.
-         */
-        if (!rc)
-        {
-            if (writable)
-                rc = MY_FALSE;
-            else
-            {
-                L_PUTC_PROLOG
-
-                rc = MY_TRUE; /* Writing a default '0' counts */
-                L_PUTC('0');
-                L_PUTC(delimiter);
-                L_PUTC_EPILOG
-            }
-            return rc;
-        }
+        rc = save_closure(v, writable);
         break;
-      } /* case T_CLOSURE */
 
     default:
       {
@@ -5503,96 +5593,6 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
 
     return rc;
 }  /* save_svalue() */
-
-/*-------------------------------------------------------------------------*/
-static void
-save_array (vector_t *v)
-
-/* Encode the array <v> and write it to the write buffer.
- */
-
-{
-    long i;
-    svalue_t *val;
-
-    /* Recall the array from the pointer table.
-     * If it is a shared one, there's nothing else to do.
-     */
-    if (recall_pointer(v))
-        return;
-
-    /* Write the '(<'... */
-    {
-        L_PUTC_PROLOG
-        L_PUTC('(')
-        L_PUTC('{')
-        L_PUTC_EPILOG
-    }
-
-    /* ... the values ... */
-    for (i = (long)VEC_SIZE(v), val = v->item; --i >= 0; )
-    {
-        save_svalue(val++, ',', MY_FALSE);
-    }
-
-    /* ... and the '>)' */
-    {
-        L_PUTC_PROLOG
-        L_PUTC('}')
-        L_PUTC(')')
-        L_PUTC_EPILOG
-    }
-} /* save_array() */
-
-#ifdef USE_STRUCTS
-/*-------------------------------------------------------------------------*/
-static void
-save_struct (struct_t *st)
-
-/* Encode the struct <st> and write it to the write buffer.
- */
-
-{
-    long i;
-    svalue_t *val;
-
-    /* Recall the struct from the pointer table.
-     * If it is a shared one, there's nothing else to do.
-     */
-    if (recall_pointer(st))
-        return;
-
-    /* Write the '(<'... */
-    {
-        L_PUTC_PROLOG
-        L_PUTC('(')
-        L_PUTC('<')
-        L_PUTC_EPILOG
-    }
-
-    /* The name as fake member */
-    {
-        svalue_t name;
-
-        put_string(&name, struct_name(st));
-        save_svalue(&name, ',', MY_FALSE);
-    }
-
-    /* ... the values ... */
-    for (i = (long)struct_size(st), val = st->member; --i >= 0; )
-    {
-        save_svalue(val++, ',', MY_FALSE);
-    }
-
-    /* ... and the '>)' */
-    {
-        L_PUTC_PROLOG
-        L_PUTC('>')
-        L_PUTC(')')
-        L_PUTC_EPILOG
-    }
-} /* save_struct() */
-#endif /* USE_STRUCTS */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -5642,6 +5642,84 @@ register_struct (struct_t *st)
 
 /*-------------------------------------------------------------------------*/
 static void
+register_mapping_filter (svalue_t *key, svalue_t *data, void *extra)
+
+/* Callback to register one mapping entry of (p_int)<extra> values.
+ */
+
+{
+    int i;
+
+    register_svalue(key);
+
+    for (i = (p_int)extra; --i >= 0; data++)
+    {
+        register_svalue(data);
+    }
+} /* register_mapping_filter() */
+
+/*-------------------------------------------------------------------------*/
+static void
+register_mapping (mapping_t *map)
+
+/* Register the mapping <map> in the pointer table. If it was not
+ * in there, also register all array/mapping values.
+ */
+
+{
+    if (NULL == register_pointer(ptable, map))
+        return;
+    walk_mapping(map, register_mapping_filter, (void *)(p_int)map->num_values);
+} /* register_mapping() */
+
+/*-------------------------------------------------------------------------*/
+static void
+register_closure (svalue_t *cl)
+
+/* Register closure <cl> in the pointer table. If it was not
+ * in there, also register all associated svalues (if any).
+ */
+
+{
+    int type;
+
+    switch(type = cl->x.closure_type)
+    {
+    case CLOSURE_LFUN:
+    case CLOSURE_IDENTIFIER:
+        if (NULL == register_pointer(ptable, cl->u.lambda))
+            return;
+        break;
+
+    default:
+        /* Operator- or an unsaveable lambda closure */
+        return;
+    }
+
+#ifdef USE_NEW_INLINES
+    if (type == CLOSURE_LFUN
+     && cl->u.lambda->function.lfun.ob == current_object
+     && cl->u.lambda->ob == current_object
+     && cl->u.lambda->function.lfun.context_size
+       )
+    {
+        lambda_t  *l;
+        svalue_t *val;
+        long i;
+
+        l = cl->u.lambda;
+        for (i = l->function.lfun.context_size
+            , val = l->context
+            ; --i >= 0; )
+        {
+            register_svalue(val++);
+        }
+    }
+#endif /* USE_NEW_INLINES */
+} /* register_closure() */
+
+/*-------------------------------------------------------------------------*/
+static void
 register_svalue (svalue_t *svp)
 
 /* If <svp> is a struct, array, or mapping, register it in the pointer
@@ -5663,6 +5741,10 @@ register_svalue (svalue_t *svp)
     else if (svp->type == T_MAPPING)
     {
         register_mapping(svp->u.map);
+    }
+    else if (svp->type == T_CLOSURE)
+    {
+        register_closure(svp);
     }
 } /* register_svalue() */
 
@@ -6565,7 +6647,7 @@ static INLINE Bool
 restore_array (svalue_t *svp, char **str)
 
 /* Restore an array from the text starting at *<str> (which points
- * just after the leading '({'/'(<') and store it into *<svp>.
+ * just after the leading '({' and store it into *<svp>.
  * Return TRUE if the restore was successful, FALSE else (*<svp> is
  * set to const0 in that case).
  * On a successful return, *<str> is set to point after the array text
@@ -6633,7 +6715,7 @@ restore_struct (svalue_t *svp, char **str)
  * just after the leading '(<') and store it into *<svp>.
  * Return TRUE if the restore was successful, FALSE else (*<svp> is
  * set to const0 in that case).
- * On a successful return, *<str> is set to point after the array text
+ * On a successful return, *<str> is set to point after the struct text
  * restored.
  */
 
@@ -6687,7 +6769,7 @@ restore_struct (svalue_t *svp, char **str)
         }
     }
 
-    /* Check for the trailing '})' */
+    /* Check for the trailing '>)' */
 
     pt = *str;
     if (*pt++ != '>' || *pt++ != ')' ) {
@@ -6699,6 +6781,284 @@ restore_struct (svalue_t *svp, char **str)
     return MY_TRUE;
 } /* restore_struct() */
 #endif /* USE_STRUCTS */
+
+/*-------------------------------------------------------------------------*/
+static INLINE Bool
+restore_closure (svalue_t *svp, char **str, char delimiter)
+
+/* Restore a closure from the text starting at *<str> (which points
+ * just after the leading '#') and store it into *<svp>.
+ * Return TRUE if the restore was successful, FALSE else (*<svp> is
+ * set to const0 in that case).
+ * On a successful return, *<str> is set to point after the closure text
+ * restored.
+ */
+
+{
+    char *pt;
+    char ct;
+    char * name;
+
+    pt = *str;
+    switch(ct = *pt)
+    {
+    default:
+        fatal("Unsupported closure-type '%c'\n", ct);
+        break;
+
+    case 'e': /* An efun closure */
+    case 's': /* A sefun closure */
+    case 'v': /* A variable closure */
+    case 'c': /* A lfun closure */
+    case 'l': /* A lfun closure */
+      {
+        char c;
+
+        /* Parse the name of the closure item */
+        if (*++pt != ':')
+        {
+            *svp = const0;
+            return MY_FALSE;
+        }
+
+        name = ++pt;
+        for(;;)
+        {
+            if ( !(c = *pt++) )
+            {
+                *svp = const0;
+                return MY_FALSE;
+            }
+
+            if (c == delimiter || (ct == 'c' && c == ':'))
+                break;
+        }
+        pt[-1] = '\0'; /* Overwrites the delimiter */
+        *str = pt;
+      }
+    } /* switch(ct) */
+
+    /* Create the proper closure */
+    switch (ct)
+    {
+    case 'e': /* An efun closure */
+    case 's': /* A sefun closure */
+      {
+        symbol_efun_str(name, strlen(name), svp, ct == 'e');
+        break;
+      }
+
+    case 'v': /* A variable closure */
+      {
+        string_t *str;
+        object_t *ob;
+        variable_t *var;
+        program_t *prog;
+        int num_var;
+        int n;
+        lambda_t *l;
+
+        ob = current_object;
+        if (!current_variables
+         || !ob->variables
+         || current_variables < ob->variables
+         || current_variables >= ob->variables + ob->prog->num_variables)
+        {
+            /* efun closures are called without changing current_prog
+             * nor current_variables. This keeps the program scope for
+             * variables for calls inside this_object(), but would
+             * give trouble with calling from other ones if it were
+             * not for this test.
+             */
+            current_prog = ob->prog;
+            current_variables = ob->variables;
+        }
+
+        /* If the variable exists, it must exist as shared
+         * string.
+         */
+        str = find_tabled_str(name);
+        if (!str)
+        {
+            *svp = const0;
+            break; /* switch(ct) */
+        }
+
+        prog = current_prog;
+        var = prog->variables;
+        num_var = prog->num_variables;
+        for (n = num_var; --n >= 0; var++)
+        {
+            if (mstreq(var->name, str)
+             && !(var->type.typeflags & NAME_HIDDEN))
+                break;
+        }
+        if (n < 0)
+        {
+            *svp = const0;
+            break; /* switch(ct) */
+        }
+
+        n = num_var - n - 1;
+#ifndef USE_NEW_INLINES
+        l = xalloc(sizeof *l);
+#else /* USE_NEW_INLINES */
+        l = xalloc(SIZEOF_LAMBDA(0));
+#endif /* USE_NEW_INLINES */
+        if (!l)
+        {
+            *svp = const0;
+            break; /* switch(ct) */
+        }
+
+        l->ob = ref_object(current_object, "symbol_variable");
+        l->ref = 1;
+        l->function.var_index = (unsigned short)(n + (current_variables - current_object->variables));
+        svp->type = T_CLOSURE;
+        svp->x.closure_type = CLOSURE_IDENTIFIER;
+        svp->u.lambda = l;
+
+        /* Handle replace_program() */
+        if ( !(current_object->prog->flags & P_REPLACE_ACTIVE)
+          || !lambda_ref_replace_program(l, svp->x.closure_type, 0, 0, 0) )
+        {
+            current_object->flags |= O_LAMBDA_REFERENCED;
+        }
+
+        break;
+      } /* case 'v' */
+
+    case 'c': /* A context closure */
+    case 'l': /* A lfun closure */
+      {
+        string_t *s;
+        int i;
+        char *super;
+
+#ifdef USE_NEW_INLINES
+        size_t context_size = 0;
+
+        if (ct == 'c')
+        {
+            svalue_t num = const0;
+
+            /* Parse the context size information */
+            if (!restore_svalue(&num, str, ':')
+             || num.type != T_NUMBER
+             || num.u.number <= 0
+               )
+            {
+                *svp = const0;
+                break; /* switch(ct) */
+            }
+            context_size = num.u.number;
+        }
+#endif
+        /* Check if it's an inherited lfun closure */
+        super = strchr(name, '-');
+        if (super)
+        {
+            *super = '\0';
+            super++;
+        }
+
+        /* If the function exists, it must exist as shared
+         * string.
+         */
+        s = find_tabled_str(name);
+        if (!s)
+        {
+            *svp = const0;
+            break; /* switch(ct) */
+        }
+
+        if (super)
+            i = find_inherited(super, name);
+        else
+            i = find_function(s, current_object->prog);
+
+        /* If the function exists and is visible, create the closure
+         * TODO: Handle inherit-conscious closures.
+         */
+        if (i >= 0)
+        {
+            lambda_t *l;
+#ifdef USE_NEW_INLINES
+            l = xalloc(SIZEOF_LAMBDA(context_size));
+#else /* USE_NEW_INLINES */
+            l = xalloc(sizeof *l);
+#endif /* USE_NEW_INLINES */
+            if (!l)
+            {
+                *svp = const0;
+                break; /* switch(ct) */
+            }
+
+            /* Note: the *svp must be set up before any context
+             * values are restored, otherwise context values
+             * referring to this very closure will be restored
+             * as '0'.
+             */
+            svp->type = T_CLOSURE;
+            svp->x.closure_type = CLOSURE_LFUN;
+            svp->u.lambda = l;
+
+            l->ref = 1;
+            l->ob = ref_object(current_object, "restore_svalue");
+
+            l->function.lfun.ob
+              = ref_object(current_object, "restore_svalue");
+            l->function.lfun.index = (unsigned short)i;
+#ifdef USE_NEW_INLINES
+            l->function.lfun.context_size = context_size;
+            if (context_size > 0)
+            {
+                svalue_t context = const0;
+                int j;
+
+                /* Parse the context information */
+                if (!restore_svalue(&context, str, delimiter)
+                 || context.type != T_POINTER
+                   )
+                {
+                    l->function.lfun.context_size = 0;
+                    free_svalue(svp);
+                    free_svalue(&context);
+                    *svp = const0;
+                    break; /* switch(ct) */
+                }
+
+                /* Restoring the context gobbled the delimiter, so make
+                 * it visible again.
+                 */
+                *str = *str - 1;
+
+                for (j = 0; j < context_size; j++)
+                    assign_svalue_no_free(l->context+j, context.u.vec->item+j);
+                free_array(context.u.vec);
+            }
+#endif /* USE_NEW_INLINES */
+
+            if (!(current_object->prog->flags & P_REPLACE_ACTIVE)
+             || !lambda_ref_replace_program( l
+                                           , CLOSURE_LFUN
+                                           , 0, NULL, NULL)
+               )
+            {
+                current_object->flags |= O_LAMBDA_REFERENCED;
+            }
+
+        }
+        else /* (i < 0) */
+        {
+            *svp = const0;
+        }
+        break;
+      } /* case 'c', 'l' */
+    } /* switch(ct) */
+
+    return MY_TRUE;
+} /* restore_closure() */
 
 /*-------------------------------------------------------------------------*/
 static Bool
@@ -6719,242 +7079,17 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
     {
     case '#':  /* A closure or quoted thing */
       {
-        switch(*++cp)
+        *pt = ++cp;
+        switch (*cp)
         {
-
         case 'e': /* An efun closure */
         case 's': /* A sefun closure */
         case 'v': /* A variable closure */
         case 'c': /* A lfun closure */
         case 'l': /* A lfun closure */
-          {
-            char ct = *cp;
-            char * name, c;
-
-            /* Parse the name of the closure item */
-            if (*++cp != ':')
-            {
-                *svp = const0;
+            if ( !restore_closure(svp, pt, delimiter) )
                 return MY_FALSE;
-            }
-
-            name = ++cp;
-            for(;;)
-            {
-                if ( !(c = *cp++) )
-                {
-                    *svp = const0;
-                    return MY_FALSE;
-                }
-
-                if (c == delimiter || (ct == 'c' && c == ':'))
-                    break;
-            }
-            cp[-1] = '\0'; /* Overwrites the delimiter */
-            *pt = cp;
-
-            /* Create the proper closure */
-            switch (ct)
-            {
-            case 'e': /* An efun closure */
-            case 's': /* A sefun closure */
-              {
-                symbol_efun_str(name, strlen(name), svp, ct == 'e');
-                break;
-              }
-
-            case 'v': /* A variable closure */
-              {
-                string_t *str;
-                object_t *ob;
-                variable_t *var;
-                program_t *prog;
-                int num_var;
-                int n;
-                lambda_t *l;
-
-                ob = current_object;
-                if (!current_variables
-                 || !ob->variables
-                 || current_variables < ob->variables
-                 || current_variables >= ob->variables + ob->prog->num_variables)
-                {
-                    /* efun closures are called without changing current_prog
-                     * nor current_variables. This keeps the program scope for
-                     * variables for calls inside this_object(), but would
-                     * give trouble with calling from other ones if it were
-                     * not for this test.
-                     */
-                    current_prog = ob->prog;
-                    current_variables = ob->variables;
-                }
-
-                /* If the variable exists, it must exist as shared
-                 * string.
-                 */
-                str = find_tabled_str(name);
-                if (!str)
-                {
-                    *svp = const0;
-                    break; /* switch(ct) */
-                }
-
-                prog = current_prog;
-                var = prog->variables;
-                num_var = prog->num_variables;
-                for (n = num_var; --n >= 0; var++)
-                {
-                    if (mstreq(var->name, str)
-                     && !(var->type.typeflags & NAME_HIDDEN))
-                        break;
-                }
-                if (n < 0)
-                {
-                    *svp = const0;
-                    break; /* switch(ct) */
-                }
-
-                n = num_var - n - 1;
-#ifndef USE_NEW_INLINES
-                l = xalloc(sizeof *l);
-#else /* USE_NEW_INLINES */
-                l = xalloc(SIZEOF_LAMBDA(0));
-#endif /* USE_NEW_INLINES */
-                if (!l)
-                {
-                    *svp = const0;
-                    break; /* switch(ct) */
-                }
-
-                l->ob = ref_object(current_object, "symbol_variable");
-                l->ref = 1;
-                l->function.var_index = (unsigned short)(n + (current_variables - current_object->variables));
-                svp->type = T_CLOSURE;
-                svp->x.closure_type = CLOSURE_IDENTIFIER;
-                svp->u.lambda = l;
-
-                /* Handle replace_program() */
-                if ( !(current_object->prog->flags & P_REPLACE_ACTIVE)
-                  || !lambda_ref_replace_program(l, svp->x.closure_type, 0, 0, 0) )
-                {
-                    current_object->flags |= O_LAMBDA_REFERENCED;
-                }
-
-                break;
-              }
-
-            case 'c': /* A context closure */
-            case 'l': /* A lfun closure */
-              {
-                string_t *str;
-                int i;
-                char *super;
-
-#ifdef USE_NEW_INLINES
-                svalue_t context = const0;
-                size_t context_size = 0;
-
-                if (ct == 'c')
-                {
-                    /* Parse the context information */
-                    if (!restore_svalue(&context, pt, delimiter)
-                     || context.type != T_POINTER
-                       )
-                    {
-                        *svp = const0;
-                        break; /* switch(ct) */
-                    }
-                    context_size = VEC_SIZE(context.u.vec);
-                }
-#endif
-                /* Check if it's an inherited lfun closure */
-                super = strchr(name, '-');
-                if (super)
-                {
-                    *super = '\0';
-                    super++;
-                }
-
-                /* If the function exists, it must exist as shared
-                 * string.
-                 */
-                str = find_tabled_str(name);
-                if (!str)
-                {
-                    *svp = const0;
-                    break; /* switch(ct) */
-                }
-
-                if (super)
-                    i = find_inherited(super, name);
-                else
-                    i = find_function(str, current_object->prog);
-
-                /* If the function exists and is visible, create the closure
-                 * TODO: Handle inherit-conscious closures.
-                 */
-                if (i >= 0)
-                {
-                    lambda_t *l;
-
-#ifndef USE_NEW_INLINES
-                    l = xalloc(sizeof *l);
-#else /* USE_NEW_INLINES */
-                    l = xalloc(SIZEOF_LAMBDA(context_size));
-#endif /* USE_NEW_INLINES */
-                    if (!l)
-                    {
-                        *svp = const0;
-                        break; /* switch(ct) */
-                    }
-
-                    l->ref = 1;
-                    l->ob = ref_object(current_object, "restore_svalue");
-
-                    l->function.lfun.ob
-                      = ref_object(current_object, "restore_svalue");
-                    l->function.lfun.index = (unsigned short)i;
-#ifdef USE_NEW_INLINES
-                    l->function.lfun.context_size = context_size;
-                    if (context_size > 0)
-                    {
-                        int j;
-
-                        for (j = 0; j < context_size; j++)
-                            assign_svalue_no_free(l->context+j, context.u.vec->item+j);
-                        free_array(context.u.vec);
-                    }
-#endif /* USE_NEW_INLINES */
-
-                    svp->type = T_CLOSURE;
-                    svp->x.closure_type = CLOSURE_LFUN;
-                    svp->u.lambda = l;
-
-                    if (!(current_object->prog->flags & P_REPLACE_ACTIVE)
-                     || !lambda_ref_replace_program( l
-                                                   , CLOSURE_LFUN
-                                                   , 0, NULL, NULL)
-                       )
-                    {
-                        current_object->flags |= O_LAMBDA_REFERENCED;
-                    }
-
-                }
-                else
-                {
-                    *svp = const0;
-                }
-                break;
-              }
-
-            default:
-                fatal("Unsupported closure-type '%c'\n", ct);
-                break;
-            }
-
-            return MY_TRUE;
             break;
-          }
 
         case '0': case '1': case '2': case '3': case '4':
         case '5': case '6': case '7': case '8': case '9':
@@ -7129,7 +7264,7 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
         return cp != NULL;
       }
 
-    case '<': /* A shared array, mapping or struct */
+    case '<': /* A shared array, mapping, struct or closure */
       {
         int id;
 
@@ -7142,7 +7277,7 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
         }
 
         /* If a '=' follows, this is the first occurance of this
-         * array/mapping, therefore restore it normally.
+         * shared value, therefore restore it normally.
          */
         if (cp[1] == '=')
         {
@@ -7266,7 +7401,7 @@ old_restore_string (svalue_t *v, char *str)
     }
     *v = const0;
     return MY_FALSE;
-}
+} /* old_restore_string() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
