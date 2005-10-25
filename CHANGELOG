@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+23-Jan-2002 (Lars Duening)  (3.3.368)
+  - (xalloc.c) I confused two function arguments in the implementation
+       of rexalloc() *blush*.
+
 22-Jan-2002 (Lars Duening)  (3.3.367)
   - (prolang.y) The typetracking for assignments to a struct member
        was faulty (reported by Markus).

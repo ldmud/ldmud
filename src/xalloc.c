@@ -552,13 +552,13 @@ rexalloc (POINTER p, size_t size)
 
 #ifndef NO_MEM_BLOCK_SIZE
     old_size = mem_block_size(block);
-    t = malloc_increment_size(block, size - old_size);
+    t = malloc_increment_size(p, size - old_size);
     if (t)
         return p;
 #endif
 
     do {
-        t = mem_realloc(p, size);
+        t = mem_realloc(block, size);
     } while (t == NULL && retry_alloc(size MTRACE_ARG));
 
     if (t)
