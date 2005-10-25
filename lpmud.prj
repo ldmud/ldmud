@@ -52,15 +52,13 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 387)
-(Parent-Version lpmud 3-3 386)
-(Version-Log "debug_info(DINFO_MEMORY) now returns the ptmalloc statistics.
-'break' and 'continue' were incompatible with large programs.
-ptmalloc GC support is alpha-ready, but not yet threadsafe.
-The configuration check for pthread_atfork() was unreliable.")
+(Project-Version lpmud 3-3 388)
+(Parent-Version lpmud 3-3 387)
+(Version-Log "Corrected a fatal error in the break/continue handling.
+Corrected the check for pthread_atfork().")
 (New-Version-Log
 "")
-(Checkin-Time "Fri, 07 Feb 2003 00:11:33 -0700")
+(Checkin-Time "Fri, 07 Feb 2003 14:26:50 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -97,20 +95,20 @@ The configuration check for pthread_atfork() was unreliable.")
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.58 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.450 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.451 644))
   (HISTORY (lpmud/f/49_HISTORY 1.298 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.19 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
   ;; Configuration
-  (src/configure (lpmud/d/0_configure 1.19.1.74 755))
+  (src/configure (lpmud/d/0_configure 1.19.1.75 755))
   (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.25 644))
   (src/machine.h.in (lpmud/b/9_machine.h. 1.9.1.5 644))
   (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.19.1.9 644))
   (src/mkinstalldirs (lpmud/c/4_mkinstalld 1.1 644))
   (src/install-sh (lpmud/c/5_install-sh 1.2 755))
 
-  (src/autoconf/configure.in (lpmud/d/7_configure. 1.20.1.9.1.64 644))
+  (src/autoconf/configure.in (lpmud/d/7_configure. 1.20.1.9.1.65 644))
   (src/autoconf/acconfig.h (lpmud/d/10_acconfig.h 1.6.1.5 644))
 
   (src/settings/README (lpmud/c/22_README 1.14.1.13 644))
@@ -178,7 +176,7 @@ The configuration check for pthread_atfork() was unreliable.")
   (src/files.c (lpmud/i/50_files.c 1.19 644))
   (src/filestat.h (lpmud/f/51_filestat.h 1.7 644))
   (src/gcollect.h (lpmud/f/33_gcollect.h 1.6.1.14 644))
-  (src/gcollect.c (lpmud/c/30_gcollect.c 1.41.1.90 644))
+  (src/gcollect.c (lpmud/c/30_gcollect.c 1.41.1.91 644))
   (src/hash.h (lpmud/f/32_hash.h 1.5 644))
   (src/hash.c (lpmud/c/28_hash.c 1.15 644))
   (src/heartbeat.h (lpmud/m/41_heartbeat. 1.6.1.5 644))
@@ -260,7 +258,7 @@ The configuration check for pthread_atfork() was unreliable.")
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.16 644))
   (src/port.c (lpmud/39_port.c 1.17.1.7 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.17.1.3 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.32 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.33 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7.1.1 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))

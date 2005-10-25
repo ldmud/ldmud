@@ -2241,6 +2241,8 @@ show_struct(int d, void *block, int depth)
     wiz_list_t *user;
     mp_int a_size;
 
+    user = NULL;
+
     a = (struct_t *)block;
 
     /* Can't use struct_size() here, as the memory block may have been
@@ -2258,6 +2260,7 @@ show_struct(int d, void *block, int depth)
         int freed;
         wiz_list_t *wl;
 
+        wl = NULL;
         freed = is_freed(block, sizeof(vector_t) );
         if (!freed)
         {

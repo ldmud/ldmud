@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+07-Feb-2002 (Lars Duening)  (3.3.388)
+  - (prolang.y) Corrected a fatal error in the 'break'/'continue'
+       handling.
+  - (configure) Corrected the check for pthread_atfork().
+
 06-Feb-2002 (Lars Duening)  (3.3.387)
   - (prolang.y) With the increasing program sizes, using 16-Bit offsets
        for the 'break' and 'continue' branches was no longer enough. They

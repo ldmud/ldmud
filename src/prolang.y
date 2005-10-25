@@ -815,6 +815,9 @@ static p_int current_break_address;
    *
    * There are a few special values/flags for this variable:
    */
+#define BREAK_ADDRESS_MASK   0x0003ffff
+  /* Mask for the offset-address part of the variable.
+   */
 #define BREAK_ON_STACK        (0x04000000)
   /* Bitflag: true when the break-address is stored on the break stack,
    * and therefore the BREAK instruction has to be used.
@@ -829,9 +832,6 @@ static p_int current_break_address;
    */
 #define BREAK_DELIMITER       (-0x20000000)
   /* Special value: no break encountered (yet).
-   */
-#define BREAK_MAX             (0x00FFFFFF)
-  /* The largest positive value storable.
    */
 
 static p_int current_continue_address;
@@ -2132,7 +2132,8 @@ fix_branch (int ltoken, p_int dest, p_int loc)
         if ( current_break_address > loc
          && !(current_break_address & (BREAK_ON_STACK|BREAK_DELIMITER) ) )
         {
-            for (i = current_break_address; (j = read_long(i)) > loc; )
+            for (i = current_break_address & BREAK_ADDRESS_MASK
+                ; (j = read_long(i)) > loc; )
             {
                 upd_long(i, j+1);
                 i = j;
@@ -6685,9 +6686,9 @@ statement:
               /* A normal loop break: add the FBRANCH to the list */
 
               ins_f_code(F_FBRANCH);
-              ins_long(current_break_address);
+              ins_long(current_break_address & BREAK_ADDRESS_MASK);
               current_break_address = CURRENT_PROGRAM_SIZE - 4;
-              if (current_break_address > BREAK_MAX)
+              if (current_break_address > BREAK_ADDRESS_MASK)
                   yyerrorf("Compiler limit: (L_BREAK) value too large: %ld"
                           , current_break_address);
           }
@@ -6734,7 +6735,7 @@ statement:
           }
 
           /* In either case, handle the list of continues alike */
-          ins_long(current_continue_address);
+          ins_long(current_continue_address & CONTINUE_ADDRESS_MASK);
           current_continue_address =
                         ( current_continue_address & SWITCH_DEPTH_MASK ) |
                         ( CURRENT_PROGRAM_SIZE - 4 );
