@@ -2991,10 +2991,8 @@ get_string_item ( svalue_t * svp, svalue_t * i, Bool make_singular
     {
         string_t *p;
         
-        memsafe(p = dup_mstring(svp->u.str), mstrsize(svp->u.str)
+        memsafe(p = unshare_mstring(svp->u.str), mstrsize(svp->u.str)
                , "modifiable string");
-
-        free_mstring(svp->u.str);
         svp->u.str = p;
     }
 
@@ -3072,10 +3070,8 @@ get_string_r_item (svalue_t * svp, svalue_t * i, Bool make_singular
     {
         string_t *p;
         
-        memsafe(p = dup_mstring(svp->u.str), mstrsize(svp->u.str)
+        memsafe(p = unshare_mstring(svp->u.str), mstrsize(svp->u.str)
                , "modifiable string");
-
-        free_mstring(svp->u.str);
         svp->u.str = p;
     }
 
@@ -3148,10 +3144,8 @@ get_string_a_item (svalue_t * svp, svalue_t * i, Bool make_singular
     {
         string_t *p;
         
-        memsafe(p = dup_mstring(svp->u.str), mstrsize(svp->u.str)
+        memsafe(p = unshare_mstring(svp->u.str), mstrsize(svp->u.str)
                , "modifiable string");
-
-        free_mstring(svp->u.str);
         svp->u.str = p;
     }
 
@@ -5014,10 +5008,8 @@ protected_range_lvalue (int code, svalue_t *sp)
         {
             string_t *p;
 
-            memsafe(p = dup_mstring(vec->u.str), mstrsize(vec->u.str)
+            memsafe(p = unshare_mstring(vec->u.str), mstrsize(vec->u.str)
                    , "modifiable string");
-
-            free_mstring(vec->u.str);
             vec->u.str = p;
         }
 
@@ -14543,9 +14535,8 @@ again:
                  */
                 if (!mstr_singular(arg->u.str))
                 {
-                    memsafe(str = dup_mstring(arg->u.str), mstrsize(arg->u.str)
+                    memsafe(str = unshare_mstring(arg->u.str), mstrsize(arg->u.str)
                            , "modifiable string");
-                    free_mstring(arg->u.str);
                     arg->u.str = str;
                 }
 

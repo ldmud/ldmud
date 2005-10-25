@@ -704,22 +704,18 @@ mstring_dup (string_t * pStr MTRACE_DECL)
 
 /* Aliased to: dup_mstring(pStr)
  *
- * If <pStr> is a tabled string or an untabled string with more than one
- * reference, create and return a new untabled string with the same text but
- * just one reference. Otherwise, just return <pStr> with one more reference.
+ * Create and return a new untabled string with the same text as <pStr> but
+ * just one reference.
  * If memory runs out, NULL is returned.
  *
  * Purpose is to create an instance of a string which an be freely modified.
+ * See also: mstring_unshare().
  */
 
 {
     string_t *string;
 
-    /* Check for the easy case */
-    if (!pStr->info.tabled && pStr->info.ref == 1 && pStr->link == NULL)
-        return ref_mstring(pStr);
-
-    /* Otherwise create a new untabled string from the tabled one */
+    /* Create a new untabled string from the tabled one */
 
     string = mstring_alloc_string(pStr->str->size MTRACE_PASS);
     if (string)
@@ -729,6 +725,42 @@ mstring_dup (string_t * pStr MTRACE_DECL)
 
     return string;
 } /* mstring_dup() */
+
+/*-------------------------------------------------------------------------*/
+string_t *
+mstring_unshare (string_t * pStr MTRACE_DECL)
+
+/* Aliased to: unshare_mstring(pStr)
+ *
+ * Like mstring_dup(), this function creates and returns an untabled string
+ * with the same text as <pStr>, and with just one reference. In contrast
+ * to mstring_dup(), this function also dereferences <pStr> on success (which
+ * allows it to optimize certain cases).
+ * If memory runs out, NULL is returned.
+ *
+ * Purpose is to create an instance of a string which an be freely modified.
+ */
+
+{
+    string_t *string;
+
+    /* Check for the easy cases where the argument string can be
+     * the result: untabled and just one reference.
+     */
+    if (!pStr->info.tabled && pStr->info.ref == 1 && pStr->link == NULL)
+        return pStr;
+
+    /* Otherwise create a new untabled string from the tabled one */
+
+    string = mstring_alloc_string(pStr->str->size MTRACE_PASS);
+    if (string)
+    {
+        memcpy(string->str->txt,  pStr->str->txt, pStr->str->size);
+        free_mstring(pStr);
+    }
+
+    return string;
+} /* mstring_unshare() */
 
 /*-------------------------------------------------------------------------*/
 string_t *

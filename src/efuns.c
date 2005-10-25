@@ -163,8 +163,7 @@ f_capitalize(svalue_t *sp)
     if (islower((unsigned char)(get_txt(sp->u.str)[0])))
     {
         string_t *new;
-        memsafe(new = dup_mstring(sp->u.str), mstrsize(sp->u.str), "result string");
-        free_mstring(sp->u.str);
+        memsafe(new = unshare_mstring(sp->u.str), mstrsize(sp->u.str), "result string");
         sp->u.str = new;
         get_txt(sp->u.str)[0] = toupper((unsigned char)get_txt(sp->u.str)[0]);
     }
@@ -296,8 +295,7 @@ f_lower_case (svalue_t *sp)
         /* Yes, there is something to change... */
 
         string_t *new;
-        memsafe(new = dup_mstring(sp->u.str), mstrsize(sp->u.str), "result string");
-        free_mstring(sp->u.str);
+        memsafe(new = unshare_mstring(sp->u.str), mstrsize(sp->u.str), "result string");
         sp->u.str = new;
 
         for ( s = get_txt(sp->u.str)+count; count < len; s++, count++)
@@ -1386,8 +1384,7 @@ f_upper_case (svalue_t *sp)
     if (count < len)  /* there are lowercase characters */
     {
         string_t *new;
-        memsafe(new = dup_mstring(sp->u.str), mstrsize(sp->u.str), "result string");
-        free_mstring(sp->u.str);
+        memsafe(new = unshare_mstring(sp->u.str), mstrsize(sp->u.str), "result string");
         sp->u.str = new;
 
         for (s = get_txt(sp->u.str)+count; count < len; s++, count++)

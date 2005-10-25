@@ -73,6 +73,9 @@ HISTORY
         and no_inherit.
         LDMud 3.2.8 added weak_types, pedantic and sloppy.
         LDMud 3.2.9 allowed to specify multiple pragmas in one directive.
+        Starting with LDMud 3.3, #pragma xxx_types in an included file are
+          no longer valid only until the end of the file, but remain active
+          when processing returns to the including file.
 
 SEE ALSO
         inheritance(LPC), initialisation(LPC), objects(C),

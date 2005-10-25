@@ -131,9 +131,8 @@ f_clear_bit (svalue_t *sp)
         return sp;
     }
 
-    memsafe(new = dup_mstring(strp->u.str), mstrsize(strp->u.str)
+    memsafe(new = unshare_mstring(strp->u.str), mstrsize(strp->u.str)
            , "new bitstring");
-    free_mstring(strp->u.str);
     strp->u.str = new;
     str = get_txt(strp->u.str);
 
@@ -179,9 +178,8 @@ f_set_bit (svalue_t *sp)
     {
         string_t *new;
 
-        memsafe(new = dup_mstring(strp->u.str), mstrsize(strp->u.str)
+        memsafe(new = unshare_mstring(strp->u.str), mstrsize(strp->u.str)
                , "new bitstring");
-        free_mstring(strp->u.str);
         strp->u.str = new;
         str = get_txt(strp->u.str);
     }
@@ -300,9 +298,9 @@ binop_bits (svalue_t *sp, int instr)
          */
 
         arg = sp->u.str;
-        memsafe(result = dup_mstring(sp[-1].u.str), mstrsize(sp[-1].u.str)
+        memsafe(result = unshare_mstring(sp[-1].u.str), mstrsize(sp[-1].u.str)
                , "new bitstring");
-        free_mstring(sp[-1].u.str);
+        put_number(sp-1, 0);
     }
     else
     {
@@ -310,9 +308,9 @@ binop_bits (svalue_t *sp, int instr)
          * else: sp is the longer result; sp-1 the shorter argument
          */
         arg = (sp-1)->u.str;
-        memsafe(result = dup_mstring(sp->u.str), mstrsize(sp->u.str)
+        memsafe(result = unshare_mstring(sp->u.str), mstrsize(sp->u.str)
                , "new bitstring");
-        free_mstring(sp->u.str);
+        put_number(sp, 0);
     }
 
     /* Now perform the operation. */
@@ -438,9 +436,8 @@ f_invert_bits (svalue_t *sp)
     /* Get the arguments */
 
     len = (long)mstrsize(sp->u.str);
-    memsafe(new = dup_mstring(sp->u.str), len
+    memsafe(new = unshare_mstring(sp->u.str), len
            , "new bitstring");
-    free_mstring(sp->u.str);
     sp->u.str = new;
     str = get_txt(sp->u.str);
 

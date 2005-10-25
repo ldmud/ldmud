@@ -77,6 +77,7 @@ extern string_t * mstring_new_n_tabled (const char * const pTxt, size_t size MTR
 extern string_t * mstring_make_tabled (string_t * pStr, Bool deref_arg MTRACE_DECL);
 extern string_t * mstring_table_inplace (string_t * pStr MTRACE_DECL);
 extern string_t * mstring_dup (string_t * pStr MTRACE_DECL);
+extern string_t * mstring_unshare (string_t * pStr MTRACE_DECL);
 extern string_t * mstring_resize (string_t * pStr, size_t n MTRACE_DECL);
 extern string_t * mstring_find_tabled (const string_t * pStr);
 extern string_t * mstring_find_tabled_str (const char * const pTxt, size_t size);
@@ -236,6 +237,7 @@ extern void   string_dinfo_status(svalue_t *svp, int value);
 #define make_tabled_from(pStr)   mstring_make_tabled(pStr, MY_FALSE MTRACE_ARG)
 #define table_inplace(pStr)      mstring_table_inplace(pStr MTRACE_ARG)
 #define dup_mstring(pStr)        mstring_dup(pStr MTRACE_ARG)
+#define unshare_mstring(pStr)    mstring_unshare(pStr MTRACE_ARG)
 #define resize_mstring(pStr,n)   mstring_resize(pStr,n MTRACE_ARG)
 #define find_tabled(pStr)          mstring_find_tabled(pStr)
 #define find_tabled_str(pTxt)      mstring_find_tabled_str(pTxt, strlen(pTxt))

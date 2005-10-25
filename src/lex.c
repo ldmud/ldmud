@@ -7173,7 +7173,7 @@ set_inc_list (vector_t *v)
             error("H_INCLUDE_DIRS path ends in single prefix dot\n");
 
         /* Get and store our own copy of the pathname */
-        new = dup_mstring(svp->u.str);
+        new = unshare_mstring(svp->u.str);
         if (!new)
             error("Out of memory\n");
 
