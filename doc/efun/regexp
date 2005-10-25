@@ -14,10 +14,19 @@ DESCRIPTION
 
 EXAMPLE
         string strs;
+        #ifdef __PCRE__
         if (strs = regexp( ({"please, help me Sir John."}),
-                                 "\\<help\\>.*\\<me\\>"))
+                                 "\\bhelp\\b.*\\bme\\b"
+                         ))
+        #else
+        if (strs = regexp( ({"please, help me Sir John."}),
+                                 "\\<help\\>.*\\<me\\>"
+                         ))
+        #endif
+        {
            if (sizeof(strs)
               write("It matches.\n");
+        }
 
         The regular expression will test the given string (which is
         packed into an array) if there is something like "help ... me"

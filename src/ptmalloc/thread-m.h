@@ -183,18 +183,20 @@ static inline int mutex_unlock(mutex_t *m) {
 
 /* Normal pthread mutex.  */
 typedef pthread_mutex_t  mutex_t;
-typedef pthread_rwlock_t rwlock_t;
 
 #define MUTEX_INITIALIZER          PTHREAD_MUTEX_INITIALIZER
 #define mutex_init(m)              pthread_mutex_init(m, NULL)
 #define mutex_lock(m)              pthread_mutex_lock(m)
 #define mutex_trylock(m)           pthread_mutex_trylock(m)
 #define mutex_unlock(m)            pthread_mutex_unlock(m)
+
+#endif /* (__i386__ || __x86_64__) && __GNUC__ && !USE_NO_SPINLOCKS */
+
+/* rw locks */
+typedef pthread_rwlock_t rwlock_t;
 #define mutex_rwlock_init(m)       pthread_rwlock_init(m,NULL)
 #define mutex_rwlock_wrlock(m)     pthread_rwlock_wrlock(m)
 #define mutex_rwlock_unlock(m)     pthread_rwlock_unlock(m)
-
-#endif /* (__i386__ || __x86_64__) && __GNUC__ && !USE_NO_SPINLOCKS */
 
 /* thread specific data */
 #if defined(__sgi) || defined(USE_TSD_DATA_HACK)

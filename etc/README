@@ -3,6 +3,9 @@ Miscellaneous files for the driver:
   icon-32x32.xpm : The 'official' icon for the driver.
   icon-16x16.xpm
 
+  ldmud-16x16.ico : The icon in .ICO format.
+  ldmud-32x32.ico
+
   pb-ldmud.jpg   : A neat 'powered by' button by Elric - some editing required.
   pb-ldmud329.jpg: Another 'powered by' button by Elric.
   PoweredByLDMud.gif: And another nifty butty by Elric.

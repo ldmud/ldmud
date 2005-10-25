@@ -4,20 +4,25 @@ SYNOPSIS
 
 DESCRIPTION
         LDMud supports both the traditional regular expressions as
-        implemented by Henry Spencer, and the Perl-compatible regular
-        expressions by Philip Hazel.  The selection is made at the time the
-        driver is compiled.
+        implemented by Henry Spencer ("HS"), and the Perl-compatible
+        regular expressions by Philip Hazel ("PCRE").  The selection
+        is made at the time the driver is compiled.
 
-        The packages differ in the expressivity of their expressions,
+        When the PCRE package is compiled into the driver, the
+        macro __PCRE__ is defined.
+
+        The packages differ in the expressivity of their expressions
+        (PCRE offering more options that Henry Spencer's package),
         though they both implement the common subset outlined below.
 
-        All regular expression efuns take an additional options parameter,
-        which is a an number composed of bitflags, and is used to modify
-        the exact behaviour of the expression evaluation. In addition,
-        certain efuns may accept additional specific options.
+        All regular expression efuns take an additional options
+        parameter, which is a an number composed of bitflags, and is
+        used to modify the exact behaviour of the expression
+        evaluation. In addition, certain efuns may accept additional
+        specific options.
 
-        For details, refer to the detailed manpages: hsregexp(C) for the
-        Henry Spencer package, pcre(C) for the PCRE package.
+        For details, refer to the detailed manpages: hsregexp(C) for
+        the Henry Spencer package, pcre(C) for the PCRE package.
 
 
 REGULAR EXPRESSION DETAILS
@@ -63,8 +68,20 @@ REGULAR EXPRESSION DETAILS
 
           [^a-z]  does not match any lowercase character.
 
+          \B      not a word boundary
+
           \c      match character c even if it's one of the special
                   characters.
+
+        The following metacharacters or metacharacter combinations implement
+        similar functions in the two regexp packages;
+
+          \b      PCRE: word boundary, also used inconjunction with
+                        \w (any "word" character) and \W (any "non-word"
+                        character).
+
+          \<      HS: Match begin of word.
+          \>      HS: Match end of word.
 
 
 OPTIONS

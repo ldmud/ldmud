@@ -114,7 +114,28 @@ For a detailed list of all changes see the file CHANGELOG.
            initialization.
 
 
-19-Jan-2003 (Lars Duening) -- Release 3.2.9
+07-Feb-2003 (Lars Duening) -- Release 3.2.10
+
+    - Changed efuns:
+
+    - Corrected efuns:
+
+    - New efuns:
+
+    - Master Object:
+
+    - Fixed Crashers:
+      + Using <code>break</code> or <code>continue</code> in large
+          programs caused bytecode corruption.
+
+    - Language:
+
+    - Runtime:
+
+    - Other Changes:
+
+
+02-Feb-2003 (Lars Duening) -- Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE

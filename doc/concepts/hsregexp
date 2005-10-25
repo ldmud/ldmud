@@ -79,6 +79,10 @@ REGULAR EXPRESSION DETAILS
 
 
 NOTES
+        The \< and \> metacharacters from Henry Spencers package
+        are not available in PCRE, but can be emulate with \b,
+        as required, also in conjunction with \W or \w.
+
         In LDMud, backtracks are limited by the EVAL_COST runtime
         limit, to avoid freezing the driver with a match
         like regexp(({"=XX==================="}), "X(.+)+X").
