@@ -61,7 +61,7 @@ struct struct_type_s
     p_int           ref;      /* Number of references to this structure */
     string_t      * unique_name;
                               /* Tabled unique name of the struct, in the
-                               * form "<name> <prog-name> <prog-id_number>".
+                               * form "<name> (<prog-name> #<prog-id_number>)".
                                * It is derived from the program where the
                                * struct is fully defined, it is NULL for
                                * struct prototypes.
@@ -96,6 +96,14 @@ struct struct_type_s
  */
 #define struct_name(t)   ((t)->type->name)
 #define struct_t_name(t) ((t)->name)
+
+
+/* string_t * struct_uname(struct *t)
+ * string_t * struct_t_uname(struct_type_t *t)
+ *   Return an uncounted reference to the unique struct name.
+ */
+#define struct_uname(t)   ((t)->type->unique_name)
+#define struct_t_uname(t) ((t)->unique_name)
 
 
 /* struct_t *ref_struct(struct_t *t)

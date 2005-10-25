@@ -3159,7 +3159,8 @@ check_struct_op (svalue_t * sp, int off_type, int off_value, bytecode_p pc)
 
 /* On the stack are the arguments for a struct indexing operation.
  * In particular: sp[<off_type>]:  the struct type index <idx>
- *                sp[<off_value>]: <off_type> <= 0: the struct value to index.
+ *                sp[<off_value>]:    <off_type> <= 0: the struct value to idx.
+ *                sp[-<off_value>+1]: <off_type> >  0: the struct Lvalue to idx.
  *
  * Check the validity of the indexing operation and thrown an error
  * if invalid.
@@ -3174,6 +3175,7 @@ check_struct_op (svalue_t * sp, int off_type, int off_value, bytecode_p pc)
 
 {
     short s_index;
+    svalue_t * svp;
 
 #ifdef DEBUG
     if (sp[off_type].type != T_NUMBER)
@@ -3200,13 +3202,48 @@ check_struct_op (svalue_t * sp, int off_type, int off_value, bytecode_p pc)
         /* NOTREACHED */
     }
 
+    /* Get the reference to struct svalue to index */
+
+    if (off_value > 0)
+    {
+        svp = &sp[-off_value+1];
+
+        if (svp->type != T_LVALUE && svp->type != T_PROTECTED_LVALUE)
+        {
+            ERRORF(("Illegal type to lvalue struct->(): %s value, "
+                    "expected struct lvalue.\n"
+                   , typename(svp->type)
+                  ));
+            /* NOTREACHED */
+        }
+
+        while (svp->type == T_LVALUE || svp->type == T_PROTECTED_LVALUE)
+            svp = svp->u.lvalue;
+        if (svp->type != T_STRUCT)
+        {
+            if (svp->type == T_NUMBER && !svp->u.number)
+                ERRORF(("Illegal type to lvalue struct->(): number 0, "
+                        "expected struct.\n"
+                      ));
+            else
+                ERRORF(("Illegal type to lvalue struct->(): %s, "
+                        "expected struct.\n"
+                       , typename(svp->type)
+                      ));
+            /* NOTREACHED */
+        }
+    }
+    else
+        svp = &sp[off_value];
+
     /* Check if the struct on the stack is of the correct type */
-    if (s_index >= 0 && off_value <= 0)
+    if (s_index >= 0)
     {
         struct_type_t * pExpected = current_prog->struct_defs[s_index].type;
         struct_type_t * pType;
 
-        for ( pType = sp[off_value].u.strct->type
+        /* Check the struct type */
+        for ( pType = svp->u.strct->type
             ; pType != NULL && pType != pExpected
             ; pType = pType->base
             )
@@ -3214,10 +3251,21 @@ check_struct_op (svalue_t * sp, int off_type, int off_value, bytecode_p pc)
 
         if (pType == NULL)
         {
-            ERRORF(("Illegal type to struct->(): struct %s, "
+            string_t * got_name, * exp_name;
+
+            got_name = struct_uname(svp->u.strct);
+            if (!got_name)
+                got_name = struct_name(svp->u.strct);
+
+            exp_name = struct_t_uname(pExpected);
+            if (!exp_name)
+                exp_name = struct_t_name(pExpected);
+
+            ERRORF(("Illegal type to%s struct->(): struct %s, "
                     "expected struct %s.\n"
-                   , get_txt(struct_name(sp[off_value].u.strct))
-                   , get_txt(struct_t_name(pExpected))
+                   , off_value > 0 ? " lvalue" : ""
+                   , get_txt(got_name)
+                   , get_txt(exp_name)
                   ));
         }
     }
@@ -12998,21 +13046,7 @@ again:
          * An negative <idx> accepts any struct.
          */
 
-        sp = check_struct_op(sp, 0, -2, pc);
-        {
-            svalue_t * svp = sp-1;
-
-            while (svp->type == T_LVALUE || svp->type == T_PROTECTED_LVALUE)
-                svp = svp->u.lvalue;
-            if (svp->type != T_STRUCT)
-            {
-                ERRORF(("Illegal type to struct->(): %s lvalue, "
-                        "expected struct lvalue.\n"
-                       , typename(svp->type)
-                      ));
-                /* NOTREACHED */
-            }
-        }
+        sp = check_struct_op(sp, 0, 3, pc);
         sp = push_indexed_lvalue(sp, pc);
         break;
 #endif /* USE_STRUCTS */
@@ -13080,20 +13114,6 @@ again:
          */
 
         sp = check_struct_op(sp, -1, 1, pc);
-        {
-            svalue_t * svp = sp;
-
-            while (svp->type == T_LVALUE || svp->type == T_PROTECTED_LVALUE)
-                svp = svp->u.lvalue;
-            if (svp->type != T_STRUCT)
-            {
-                ERRORF(("Illegal type to struct->(): %s lvalue, "
-                        "expected struct lvalue.\n"
-                       , typename(svp->type)
-                      ));
-                /* NOTREACHED */
-            }
-        }
         sp = index_lvalue(sp, pc);
         break;
 #endif /* USE_STRUCTS */
@@ -13420,23 +13440,7 @@ again:
          * An negative <idx> accepts any struct.
          */
 
-        sp = check_struct_op(sp, 0, 1, pc);
-
-        {
-            svalue_t * svp = sp-1;
-
-            while (svp->type == T_LVALUE || svp->type == T_PROTECTED_LVALUE)
-                svp = svp->u.lvalue;
-            if (svp->type != T_STRUCT)
-            {
-                ERRORF(("Illegal type to struct->(): %s lvalue, "
-                        "expected struct lvalue.\n"
-                       , typename(svp->type)
-                      ));
-                /* NOTREACHED */
-            }
-        }
-        
+        sp = check_struct_op(sp, 0, 3, pc);
         sp = push_protected_indexed_lvalue(sp, pc);
         break;
 #endif /* USE_STRUCTS */
@@ -13514,21 +13518,6 @@ again:
          */
 
         sp = check_struct_op(sp, -1, 1, pc);
-
-        {
-            svalue_t * svp = sp;
-
-            while (svp->type == T_LVALUE || svp->type == T_PROTECTED_LVALUE)
-                svp = svp->u.lvalue;
-            if (svp->type != T_STRUCT)
-            {
-                ERRORF(("Illegal type to struct->(): %s lvalue, "
-                        "expected struct lvalue.\n"
-                       , typename(svp->type)
-                      ));
-                /* NOTREACHED */
-            }
-        }
         sp = protected_index_lvalue(sp, pc);
         break;
 #endif /* USE_STRUCTS */

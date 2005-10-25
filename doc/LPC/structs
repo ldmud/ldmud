@@ -74,6 +74,8 @@ DEFINITION
 USAGE
         To use a struct, its definition must be visible - either because it
         is defined in the object compiled, or it has been inherited.
+        (Note: #include'ing structs does not what you think it does: in
+        LPC it constructs a new struct type whereever it is included).
 
 
         A variable to hold a struct is defined like this:
@@ -156,10 +158,42 @@ USAGE IN CLOSURES
 
 MISCELLANEOUS
         Internally structs can be identified by the ID string
-        returned from get_type_info(). However, do not rely on
+        returned from get_type_info(). This string contains the name
+        of the struct, the name of the program its type was defined in,
+        and the ID number of the program. However, do not rely on
         a particular format of this string!
 
         Support for structs is signaled by the macro __LPC_STRUCTS__.
+
+
+EXAMPLES
+        Suppose we have two objects: a monster, and a monster
+        coordinate tracker, and we want to use a struct to store the
+        coordinate:
+
+          -- monster_coordinate.c --
+            struct Coordinate { int x; int y; };
+
+          -- monster_tracker.c --
+            inherit "monster_coordinate";
+
+            void track (struct Coordinate coord) { ... }
+
+          -- monster.c --
+            inherit "monster_coordinate";
+
+            int move (..) {
+              ...
+              "monster_tracker"->track( (<Coordinate> my_x, my_y) );
+            }
+
+        Note that using '#include "monster_coordinate.c"' instead of inherit
+        won't work. While the objects would compile, the first call to
+        track() would cause a runtime error of the type 
+
+          Illegal type to struct->(): struct Coordinate (/monster.c #234),
+                                      expected struct Coordinate
+                                      (/monster_tracker.c #552)
 
 
 HISTORY

@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+28-Jan-2002 (Lars Duening)  (3.3.381)
+  - (prolang.y, interpret.c) Improved the error message when a given
+       struct doesn't match the expected struct type.
+  - (prolang.y) The compiler now checks in struct definitions if a
+       given base struct is complete. This also
+       catches 'struct Foo (Foo) { ..  }'.
+
 27-Jan-2002 (Lars Duening)  (3.3.380)
   - (object.c) Restoring a plain lfun-closure no longer worked (reported
        by Bardioc).

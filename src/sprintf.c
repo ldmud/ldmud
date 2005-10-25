@@ -756,7 +756,7 @@ svalue_to_string ( fmt_state_t *st
             prec->id_number = st->pointer_id++;
             
             stradd(st, &str, "(<'");
-            stradd(st, &str, get_txt(struct_name(strct)));
+            stradd(st, &str, get_txt(struct_uname(strct)));
             stradd(st, &str, "' /* #");
             numadd(st, &str, prec->id_number);
             stradd(st, &str, ", size: ");

@@ -935,6 +935,12 @@ static Bool got_ellipsis[COMPILER_STACK_SIZE];
    */
 
 #ifdef USE_STRUCTS
+static char * compiled_file;
+  /* The name of the program to be compiled. While current_file reflects
+   * the name of the source file currently being read, this name is always
+   * the program's name. Set by prolog().
+   */
+
 static const fulltype_t Type_Any     = { TYPE_ANY, NULL };
 static const fulltype_t Type_Unknown = { TYPE_UNKNOWN, NULL };
 static const vartype_t  VType_Unknown = { TYPE_UNKNOWN, NULL };
@@ -5520,7 +5526,7 @@ struct_decl:
           char name[256+MAXPATHLEN];
 
           sprintf(name, "%s (/%s #%ld)", get_txt($3->name)
-                      , current_file, current_id_number+1);
+                      , compiled_file, current_id_number+1);
           finish_struct(name);
       }
 ; /* struct_decl */
@@ -5554,6 +5560,10 @@ opt_base_struct:
               else if (STRUCT_DEF(num).flags & NAME_PROTOTYPE)
               {
                   yyerrorf("Undefined base struct '%s'", get_txt($2->name));
+              }
+              else if (!struct_t_uname(STRUCT_DEF(num).type))
+              {
+                  yyerrorf("Incomplete base struct '%s'", get_txt($2->name));
               }
               else
               {
@@ -15090,6 +15100,9 @@ prolog (void)
 printf("DEBUG: prolog: type ptrs: %p, %p\n", type_of_locals, type_of_context );
 #endif /* DEBUG_INLINES */
 
+#ifdef USE_STRUCTS
+    compiled_file = current_file;
+#endif /* USE_STRUCTS */
     stored_lines = 0;
     stored_bytes = 0;
     last_include_start = -1;
