@@ -52,6 +52,7 @@
 #include "interpret.h"
 #include "lex.h"
 #include "mapping.h"
+#include "mempools.h"
 #include "mregex.h"
 #include "mstrings.h"
 #include "object.h"

@@ -283,6 +283,13 @@ DESCRIPTION
                   Number of requested new regexps which collided with
                   a cached one.
 
+              int DID_ST_MB_FILE
+                  The size of the 'File' memory buffer.
+
+              int DID_ST_MB_SWAP
+                  The size of the 'Swap' memory buffer.
+
+
             <arg2> == DID_SWAP (1): Returns the "status swap" information:
 
                int DID_SW_PROGS
@@ -478,7 +485,8 @@ HISTORY
           DID_ST_OBJECTS_NEWLY_DEST, DID_ST_OBJECTS_DEST, DID_MEM_OVERHEAD,
           DID_MEM_ALLOCATED, DID_MEM_USED, DID_MEM_TOTAL_UNUSED, and
           DID_ST_HBEAT_CALLS_TOTAL stats.
-        LDMud 3.2.10 removed DID_MEM_UNUSED from DINFO_DATA:DID_MEMORY.
+        LDMud 3.2.10 removed DID_MEM_UNUSED from DINFO_DATA:DID_MEMORY;
+          added DID_ST_MB_FILE and DID_ST_MB_SWAP to DINFO_DATA:DID_STATUS.
         LDMud 3.3 replaced the string related DID_ST_ constants according to
         the new string implementation.
         LDMud 3.3.387 added the ptmalloc values for DINFO_DATA:DID_MEMORY.

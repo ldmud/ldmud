@@ -78,7 +78,10 @@
 #include "simulate.h"
 #endif
 #include "strfuns.h"
+#include "svalue.h"
 #include "xalloc.h"
+
+#include "../mudlib/sys/debug_info.h"
 
 /*=========================================================================*/
 /*                         M E M B U F F E R S                             */
@@ -204,6 +207,28 @@ mb_status (strbuf_t * sbuf, Bool verbose)
 #endif
 
 } /* mb_status() */
+
+/*-------------------------------------------------------------------------*/
+void
+mb_dinfo_status (svalue_t *svp, int value)
+
+/* Return the rxcache information for debug_info(DINFO_DATA, DID_STATUS).
+ * <svp> points to the svalue block for the result, this function fills in
+ * the spots for the object table.
+ * If <value> is -1, <svp> points indeed to a value block; other it is
+ * the index of the desired value and <svp> points to a single svalue.
+ */
+
+{
+#define ST_NUMBER(which,code) \
+    if (value == -1) svp[which].u.number = code; \
+    else if (value == which) svp->u.number = code
+
+    ST_NUMBER(DID_ST_MB_FILE, membuffers[mbFile].size);
+    ST_NUMBER(DID_ST_MB_SWAP, membuffers[mbSwap].size);
+
+#undef ST_NUMBER
+} /* mb_dinfo_status() */
 
 /*=========================================================================*/
 /*                           M E M P O O L S                               */

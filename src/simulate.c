@@ -48,6 +48,7 @@
 #include "lex.h"
 #include "main.h"
 #include "mapping.h"
+#include "mempools.h"
 #include "mregex.h"
 #include "mstrings.h"
 #include "object.h"

@@ -107,6 +107,7 @@
 #include "interpret.h"
 #include "main.h"
 #include "mapping.h"
+#include "mempools.h"
 #include "md5.h"
 #include "mregex.h"
 #include "mstrings.h"
@@ -6508,6 +6509,12 @@ v_debug_info (svalue_t *sp, int num_arg)
  *            Number of requested new regexps which collided with
  *            a cached one.
  *
+ *        int DID_ST_MB_FILE
+ *            The size of the 'File' memory buffer.
+ *
+ *        int DID_ST_MB_SWAP
+ *            The size of the 'Swap' memory buffer.
+ *
  *
  *     <arg2> == DID_SWAP (1): Returns the "status swap" information:
  *
@@ -6988,6 +6995,7 @@ v_debug_info (svalue_t *sp, int num_arg)
             struct_dinfo_status(dinfo_arg, value);
 #endif /* USE_STRUCTS */
             rxcache_dinfo_status(dinfo_arg, value);
+            mb_dinfo_status(dinfo_arg, value);
 
             if (value == -1)
                 put_array(&res, v);

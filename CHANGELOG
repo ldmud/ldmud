@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+20-Feb-2002 (Lars Duening)  (3.3.396)
+  - (mempools, efuns.c) Added the table sizes to the debug_info(DINFO_DATA,
+       DID_STATUS) result.
+
 20-Feb-2002 (Lars Duening)  (3.3.395)
   - (mempools, files.c, swap.c, object.c) The file reading efuns (read_file(),
        read_bytes(), restore_()) and the swapper now use a persistent buffer

@@ -117,7 +117,10 @@
 #define DID_ST_RX_REQ_FOUND       71
 #define DID_ST_RX_REQ_COLL        72
 
-#define DID_STATUS_MAX            73 /* Total number of entries */
+#define DID_ST_MB_FILE            73
+#define DID_ST_MB_SWAP            74
+
+#define DID_STATUS_MAX            75 /* Total number of entries */
 
 
 /* Indices into the array resulting from debug_info(DINFO_DATA, DID_SWAP)
