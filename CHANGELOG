@@ -1,7 +1,7 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-25-Jan-2002 (Lars Duening)  (3.3.374)
+25-Jan-2002 (Lars Duening)  (3.3.374+.375)
   - (prolang.y, interpret.c, func_spec) Implemented short-circuit evaluation
        for the operators '&&=' and '||='.
 

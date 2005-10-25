@@ -2517,7 +2517,7 @@ compile_value (svalue_t *value, int opt_flags)
                     mp_int end;      /* The branch target */
                     mp_int offset;   /* The branch offset */
 
-                    if (type == F_LAND_EQ)
+                    if (type - CLOSURE_OPERATOR == F_LAND_EQ)
                     {
                         code = F_LAND;
                         is_and = MY_TRUE;
