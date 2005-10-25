@@ -1878,7 +1878,7 @@ garbage_collection(void)
     }
 
     /* Reconsolidate the free lists */
-    mem_consolidate();
+    mem_consolidate(MY_TRUE);
 
     /* Finally, try to reclaim the reserved areas */
 

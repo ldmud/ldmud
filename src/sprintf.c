@@ -300,6 +300,17 @@ struct fmt_state
 };
 
 /*-------------------------------------------------------------------------*/
+
+static Bool static_fmt_used = MY_FALSE;
+static fmt_state_t static_fmt;
+  /* A reusable instance of fmt_state_t, to avoid repeated re-allocations
+   * (and subsequent large block fragmentation).
+   * Since sprintf() can be used recursively (through master::printf_obj_name)
+   * static_fmt_used acts as mutex. A recursive sprintf() call will then
+   * allocate a temporary fmt_state_t structure.
+   */
+
+/*-------------------------------------------------------------------------*/
 /* Forward declarations */
 
 static sprintf_buffer_t *svalue_to_string(fmt_state_t *
@@ -1357,7 +1368,13 @@ static char buff[BUFF_SIZE];         /* For error messages */
 
     result = NULL; /* To get rid of a warning */
 
-    xallocate(st, sizeof *st, "sprintf() context");
+    if (!static_fmt_used)
+    {
+        st = &static_fmt;
+        static_fmt_used = MY_TRUE;
+    }
+    else
+        xallocate(st, sizeof *st, "sprintf() context");
 
     st->saves = NULL;
     st->clean.u.str = NULL;
@@ -1485,7 +1502,10 @@ static char buff[BUFF_SIZE];         /* For error messages */
         strcat(st->buff, "\n");
 #ifndef RETURN_ERROR_MESSAGES
         strcpy(buff, st->buff);
-        xfree(st);
+        if (st == &static_fmt)
+            static_fmt_used = MY_FALSE;
+        else
+            xfree(st);
         error("%s", buff); /* buff may contain a '%' */
         /* NOTREACHED */
 #else
@@ -2181,7 +2201,11 @@ add_table_now:
         result = ref_mstring(STR_EMPTY);
     if (!result)
         result = ref_mstring(STR_OUT_OF_MEMORY);
-    xfree(st);
+
+    if (st == &static_fmt)
+        static_fmt_used = MY_FALSE;
+    else
+        xfree(st);
 
     /* Done */
     return result;

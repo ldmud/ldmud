@@ -174,13 +174,16 @@ mem_dinfo_data (svalue_t *svp, int value)
 
 /*-------------------------------------------------------------------------*/
 void
-mem_consolidate (void)
+mem_consolidate (Bool force UNUSED)
 
 /* Consolidate the free small blocks, merging them into larger free blocks
  * where possible, and rebuild the free lists.
  */
 
 {
+#   ifdef __MWERKS__
+#      pragma unused(force)
+#   endif
     /* Nothing */
 } /* mem_consolidate() */
 

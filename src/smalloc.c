@@ -24,17 +24,16 @@
  * basic memory misuses.
  *
  * Small blocks are allocations of up to SMALL_BLOCK_MAX*4 Bytes, currently
- * 128 Bytes. Such blocks are initially allocated from large memory blocks,
+ * 64 Bytes. Such blocks are initially allocated from large memory blocks,
  * called "small chunks", of 16 or 32 KByte size.
  * To reduce fragmentation, the initial small chunk (ok, the first small chunk
  * allocated after all arguments have been parsed) is of size
  * min_small_malloced, hopefully chosen to be a large multiple of the typical
  * small chunk size.
- * When a small block is
- * freed, it is entered in a free list for blocks of its size, so that
- * later allocations can use the pre-allocated blocks in the free lists.
- * The free lists use the first word in the "user area" for their link
- * pointers; the small chunks are themselves kept in a list and use their
+ * When a small block is freed, it is entered in a free list for blocks of its
+ * size, so that later allocations can use the pre-allocated blocks in the
+ * free lists.  The free lists use the first word in the "user area" for their
+ * link pointers; the small chunks are themselves kept in a list and use their
  * first word for the list pointer.
  *
  * If a small block can't be allocated from the appropriate free list nor the
@@ -43,6 +42,10 @@
  * for a block large enough to be split. If no such block exists,
  * the allocator then searches the freelists of larger block sizes for
  * a possible split.
+ * TODO: This is much more effective if the small blocks are defragmented
+ * TODO:: lazily. Currently only mem_consolidate() does defragmentation
+ * TODO:: in an expensive stop-and-go manner. Note that 4 Byte allocations
+ * TODO:: are relatively rare and support for them could be dropped.
  *
  * The idea behind this strategy is to improve the reuse of free small block
  * space, at the cost of higher fragmentation. To battle the fragmentation,
@@ -52,11 +55,6 @@
  * than SMALL_BLOCK_MAX*4 Bytes, it is put into the free list of oversized
  * blocks. Additionally, the consolidation returns small chunks which are
  * found to be completely unused to the large memory area.
- *
- * Small chunks are usually allocated directly from the system. Only when
- * the system runs out of memory, the small chunks are allocated from
- * the large block free list, possibly fragmenting the large block area and
- * reducing the locality of memory accesses.
  *
  * Large blocks are allocated from the system - if large allocation is
  * too small (less than 256 KByte), the allocator allocates a 256 KByte
@@ -135,8 +133,12 @@
 
 /* Initialiser macros for the tables */
 
-#define INIT8  0, 0, 0, 0, 0, 0, 0, 0
+#define INIT4  0, 0, 0, 0
+#define INIT4  0, 0, 0, 0
+#define INIT8  INIT4, INIT4
+#define INIT12 INIT8, INIT4
 #define INIT16 INIT8, INIT8
+#define INIT24 INIT16, INIT8
 #define INIT32 INIT16, INIT16
 
 /*-------------------------------------------------------------------------*/
@@ -175,7 +177,7 @@
 
 /* TODO: Use M_LINK in more places */
 
-#define SMALL_BLOCK_MAX (32)
+#define SMALL_BLOCK_MAX (16)
    /* Number of different small block sizes.
     */
 
@@ -183,7 +185,7 @@
    /* Maximum payload size of a small block.
     */
 
-#define INIT_SMALL_BLOCK_MAX INIT32
+#define INIT_SMALL_BLOCK_MAX INIT16
    /* The proper initializer macro for all tables sized SMALL_BLOCK_MAX.
     */
 
@@ -830,6 +832,7 @@ mem_alloc (size_t size)
         /* allocate from the free list */
 
         count_back(small_free_stat, size);
+        small_free[SIZE_INDEX_VALUE(size)]--;
 
         /* Fill in the header (M_SIZE is already ok) */
         MAKE_SMALL_CHECK(temp, size);
@@ -901,7 +904,9 @@ mem_alloc (size_t size)
                     count_up(small_free_stat, rsize * SINT);
                 }
 
-                /* Split off the allocated small block from the end */
+                /* Split off the allocated small block from the end
+                 * The front remains in the freelist
+                 */
                 this += rsize;
 
                 /* Fill in the header */
@@ -948,6 +953,7 @@ mem_alloc (size_t size)
             pt = sfltable[ix];
             count_back(small_free_stat, (ix + T_OVERHEAD + 1) * SINT);
             sfltable[ix] = *(word_t**) (pt+M_OVERHEAD);
+            small_free[ix]--;
 
             /* Split off the unused part as new block */
             split = pt + wsize;
@@ -1172,6 +1178,7 @@ sfree (POINTER ptr)
     *s_next_ptr(block) = sfltable[i];
     sfltable[i] = block;
     small_free[i] += 1;
+    small_count[i] -= 1;
     fake("Freed");
 } /* sfree() */
 
@@ -3021,10 +3028,12 @@ sm_check_malloc_data (const char *file, int line)
 
 /*-------------------------------------------------------------------------*/
 void
-mem_consolidate (void)
+mem_consolidate (Bool force)
 
 /* Consolidate the free small blocks, merging them into larger free blocks
  * where possible, and rebuild the free lists.
+ * If <force> is false, the consolidation is attempted only if the number
+ * of small free blocks is 'big enough'.
  *
  * This method should be called right after a GC. It must not be called
  * during a GC when the M_REF flags are not set.
@@ -3056,6 +3065,13 @@ mem_consolidate (void)
     p_int bdelta = 0; /* Number of blocks merged */
     p_int cfreed = 0; /* Number of small chunks freed */
     p_int bfreed = 0; /* Number of small blocks in the freed chunks */
+    
+    static p_int limit = 1; /* Trigger limit of free small blocks for non-forced
+                             * consolidations.
+                             */
+
+    if (!force && small_free_stat.counter <= limit)
+        return;
 
 #if defined(DEBUG_SMALLOC_ALLOCS)
     {
@@ -3355,11 +3371,30 @@ mem_consolidate (void)
         chunk = *(word_t**)chunk;
     } /* for (small chunks) */
 
+    /* Adapt the trigger limit for the next non-forced consolidation */
+    limit = 2 * small_free_stat.counter;
+
     /* All done. */
-    dprintf3(gcollect_outfd, "%s Consolidation merged %d blocks, "
-                             "freed %d chunks holding "
-                           , (p_int)time_stamp(), bdelta, cfreed);
-    dprintf1(gcollect_outfd, "%d blocks.\n", bfreed);
+    if (force)
+    {
+        dprintf3(gcollect_outfd, "%s Consolidation merged %d blocks, "
+                                 "leaving %d blocks"
+                               , (p_int)time_stamp(), bdelta
+                               , (p_int)small_free_stat.counter);
+        dprintf2(gcollect_outfd, "%freed %d chunks holding d blocks.\n"
+                               , cfreed, bfreed);
+    }
+    else
+    {
+        printf("%s Consolidation merged %ld blocks, leaving %ld blocks, "
+               "freed %ld chunks holding %ld blocks.\n"
+              , time_stamp(), (long)bdelta, (long)small_free_stat.counter
+              , (long)cfreed, (long)bfreed);
+        debug_message("%s Consolidation merged %ld blocks, leaving %ld blocks, "
+                      "freed %ld chunks holding %ld blocks.\n"
+                     , time_stamp(), (long)bdelta, (long)small_free_stat.counter
+                     , (long)cfreed, (long)bfreed);
+    }
 
 #if defined(DEBUG_SMALLOC_ALLOCS)
     {

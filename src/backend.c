@@ -654,12 +654,14 @@ backend (void)
             current_object = hide_current;
             wiz_decay();
             comm_cleanup_interactives();
+
+            mem_consolidate(MY_FALSE);
         }
 
     } /* end of main loop */
 
     /* NOTREACHED */
-}
+} /* backend() */
 
 /*-------------------------------------------------------------------------*/
 
@@ -1124,7 +1126,7 @@ no_clean_up:
 
     /* Restore the error recovery context */
     rt_context = error_recovery_info.rt.last;
-}
+} /* process_objects() */
 
 /*-------------------------------------------------------------------------*/
 void

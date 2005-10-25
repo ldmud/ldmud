@@ -1,6 +1,19 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+16-Feb-2002 (Lars Duening)  (3.3.393)
+  - (smalloc, backend.c, gcollect.c) The smalloc freelist consolidation
+       is now also called from the backend and does its job whenever
+       the number of free small blocks is twice the amount the last
+       consolidation left over.
+  - (smalloc.c) The maximum small block size has been reduced to 64 Bytes:
+       it turned out that the larger sizes aren't deallocated often enough
+       to make the free lists work, which caused unnecessary small chunk
+       allocations.
+  - (sprintf.c) Normal (top-level) sprintf() calls now use a static
+       instance of the fmt_state_t buffer, avoided repeated (de)allocations
+       of that 130KB structure.
+
 16-Feb-2002 (Lars Duening)  (3.3.392)
   - (smalloc.c) Since parsing the min-small-malloc already requires
        a small chunk allocation, the small chunk allocation using the new
