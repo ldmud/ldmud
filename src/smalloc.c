@@ -2614,7 +2614,7 @@ mem_increment_size (void *vp, size_t size)
 {
     char *p = vp;
     word_t *start, *start2, *start3, old_size, next;
-    word_t wsize = size / SINT;
+    word_t wsize = (size + SINT - 1)/ SINT;
 
     malloc_increment_size_calls++;
 

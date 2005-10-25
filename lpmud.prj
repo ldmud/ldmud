@@ -47,13 +47,12 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 381)
-(Parent-Version lpmud 3-3 380)
-(Version-Log "Improved the error message when a struct doesn't match the expected type.
-The compiler now checks if a given base struct is completely defined.")
+(Project-Version lpmud 3-3 382)
+(Parent-Version lpmud 3-3 381)
+(Version-Log "In mem_increment_size(), the internal block size was in most cases computed one word too small.")
 (New-Version-Log
 "")
-(Checkin-Time "Tue, 28 Jan 2003 23:37:41 -0700")
+(Checkin-Time "Wed, 29 Jan 2003 19:30:26 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -90,7 +89,7 @@ The compiler now checks if a given base struct is completely defined.")
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.58 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.444 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.445 644))
   (HISTORY (lpmud/f/49_HISTORY 1.298 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.19 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -266,7 +265,7 @@ The compiler now checks if a given base struct is completely defined.")
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.31 644))
   (src/simulate.c (lpmud/31_simulate.c 1.88.1.98 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.13 644))
-  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.63 644))
+  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.64 644))
   (src/structs.h (lpmud/d/b/5_structs.h 1.3 644))
   (src/structs.c (lpmud/d/b/6_structs.c 1.6 644))
   (src/sysmalloc.h (lpmud/c/b/33_sysmalloc. 1.1 644))
