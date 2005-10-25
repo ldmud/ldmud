@@ -144,12 +144,12 @@ mb_alloc (membuffer_e buf, size_t size)
  */
 
 {
+    void * mem;
+
 #ifdef DEBUG
     if (buf < 0 || buf >= mbMax)
         fatal("mb_alloc: Illegal buf# %d\n", buf);
 #endif
-
-    void * mem;
 
     if (membuffers[buf].size >= size)
         return membuffers[buf].mem;

@@ -7617,7 +7617,8 @@ static int nesting = 0;  /* Used to detect recursive calls */
 #ifdef DEBUG
         if (nesting > 1)
             debug_message("%s: DEBUG: restore_object(%s) nesting %d size %lu\n"
-                         , time_stamp(), name, nesting, (size_t)(st.st_size+1));
+                         , time_stamp(), name, nesting
+                         , (unsigned long)(st.st_size+1));
 #endif
         if (!buff)
         {

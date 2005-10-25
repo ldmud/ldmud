@@ -1643,7 +1643,7 @@ options (void)
         , MAX_USER_TRACE, MAX_TRACE
         , MAX_BITS, MAX_ARRAY_SIZE, MAX_MAPPING_SIZE
         , MAX_CALLOUTS, MAX_PLAYERS
-        , ALLOWED_ED_CMDS /* MAX_CMDS_PER_BEAT is not implemented */
+        , ALLOWED_ED_CMDS
 #ifdef TRACE_CODE
         , TOTAL_TRACE_LENGTH
 #endif

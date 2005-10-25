@@ -1,6 +1,9 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+21-Feb-2002 (Lars Duening)  (3.3.398)
+  - (mempools.c) Corrected a compilation problem.
+
 21-Feb-2002 (Lars Duening)  (3.3.397)
   - (lex.c) Macro __MSDOS_FS__ is defined on systems using the
        MS-DOS filesystem conventions.
