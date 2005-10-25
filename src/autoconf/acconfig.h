@@ -87,8 +87,11 @@
 /* define the erq include file. */
 #undef ERQ_INCLUDE
 
-/* Does the machine offer pthread library? */
+/* Does the machine offer pthreads? */
 #undef HAS_PTHREADS
+
+/* Does the machine offer pthread_atfork()? */
+#undef HAS_PTHREAD_ATFORK
 
 /* Does the machine offer pcre library? (Not that we need it :-) */
 #undef HAS_PCRE

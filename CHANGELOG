@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+23-Jan-2002 (Lars Duening)  (3.3.370)
+  - (configure, ptmalloc.c) Not all systems provide pthread_atfork(),
+       so configure now checks for it and activates a dummy if
+       necessary.
+
 23-Jan-2002 (Lars Duening)  (3.3.369)
   - (structs) Swapping structs during a GC triggered a sanity check
        in error (reported by Bardioc).

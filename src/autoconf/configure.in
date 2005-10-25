@@ -709,9 +709,31 @@ void foo(void)
 ))
 
 if test $lp_cv_has_pthreads = yes; then
+    saveflags="$CFLAGS"
+    CFLAGS="$CFLAGS -I/usr/include"
+
     AC_DEFINE(HAS_PTHREADS)
+    AC_CACHE_CHECK(for pthread_atfork(),lp_cv_has_pthread_atfork,
+        AC_TRY_COMPILE([
+#include <pthread.h>
+void t (void)
+{
+    pthread_atfork(0, 0, 0);
+}
+int main(void)
+{
+    return 0;
+}
+        ],,lp_cv_has_pthread_atfork=yes,
+        lp_cv_has_pthread_atfork=no
+        )
+    )
+    if test $lp_cv_has_pthread_atfork = yes; then
+        AC_DEFINE(HAS_PTHREAD_ATFORK)
+    fi
+
     if test $enable_use_pthreads = yes; then
-        AC_CACHE_CHECK(if -lpthread is needed, lp_cv_need_lib_pthread,
+        AC_CACHE_CHECK(if -lpthread or similar is needed, lp_cv_need_lib_pthread,
             AC_TRY_RUN([
 #include <pthread.h>
 void t (void)
@@ -728,9 +750,20 @@ int main(void)
             lp_cv_need_lib_pthread=yes
         ))
         if test "$lp_cv_need_lib_pthread" = "yes"; then
-            AC_CHECK_LIB(pthread,main, LIBS="$LIBS -lpthread")
+            lp_cv_has_lib_pthread=no
+            AC_CHECK_LIB(pthread,main,
+                         LIBS="$LIBS -lpthread"
+                         lp_cv_has_lib_pthread=yes
+                        )
+            if test "$lp_cv_has_lib_pthread" = "no"; then
+                AC_CHECK_LIB(c_r,main,
+                             LIBS="$LIBS -lc_r"
+                             lp_cv_has_lib_pthread=yes
+                            )
+            fi
         fi
     fi
+    CFLAGS="$saveflags"
 else
     if test $enable_use_pthreads = yes; then
         echo "pthreads not supported - disabling pthreads support."

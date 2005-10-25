@@ -8675,13 +8675,74 @@ echo "$as_me:$LINENO: result: $lp_cv_has_pthreads" >&5
 echo "${ECHO_T}$lp_cv_has_pthreads" >&6
 
 if test $lp_cv_has_pthreads = yes; then
+    saveflags="$CFLAGS"
+    CFLAGS="$CFLAGS -I/usr/include"
+
     cat >>confdefs.h <<\_ACEOF
 #define HAS_PTHREADS 1
 _ACEOF
 
+    echo "$as_me:$LINENO: checking for pthread_atfork()" >&5
+echo $ECHO_N "checking for pthread_atfork()... $ECHO_C" >&6
+if test "${lp_cv_has_pthread_atfork+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  cat >conftest.$ac_ext <<_ACEOF
+#line $LINENO "configure"
+#include "confdefs.h"
+
+#include <pthread.h>
+void t (void)
+{
+    pthread_atfork(0, 0, 0);
+}
+int main(void)
+{
+    return 0;
+}
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext
+if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
+  (eval $ac_compile) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+         { ac_try='test -s conftest.$ac_objext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  lp_cv_has_pthread_atfork=yes
+else
+  echo "$as_me: failed program was:" >&5
+cat conftest.$ac_ext >&5
+lp_cv_has_pthread_atfork=no
+
+fi
+rm -f conftest.$ac_objext conftest.$ac_ext
+
+fi
+echo "$as_me:$LINENO: result: $lp_cv_has_pthread_atfork" >&5
+echo "${ECHO_T}$lp_cv_has_pthread_atfork" >&6
+    if test $lp_cv_has_pthread_atfork = yes; then
+        cat >>confdefs.h <<\_ACEOF
+#define HAS_PTHREAD_ATFORK 1
+_ACEOF
+
+    fi
+
     if test $enable_use_pthreads = yes; then
-        echo "$as_me:$LINENO: checking if -lpthread is needed" >&5
-echo $ECHO_N "checking if -lpthread is needed... $ECHO_C" >&6
+        echo "$as_me:$LINENO: checking if -lpthread or similar is needed" >&5
+echo $ECHO_N "checking if -lpthread or similar is needed... $ECHO_C" >&6
 if test "${lp_cv_need_lib_pthread+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
 else
@@ -8732,6 +8793,7 @@ fi
 echo "$as_me:$LINENO: result: $lp_cv_need_lib_pthread" >&5
 echo "${ECHO_T}$lp_cv_need_lib_pthread" >&6
         if test "$lp_cv_need_lib_pthread" = "yes"; then
+            lp_cv_has_lib_pthread=no
             echo "$as_me:$LINENO: checking for main in -lpthread" >&5
 echo $ECHO_N "checking for main in -lpthread... $ECHO_C" >&6
 if test "${ac_cv_lib_pthread_main+set}" = set; then
@@ -8777,10 +8839,64 @@ echo "$as_me:$LINENO: result: $ac_cv_lib_pthread_main" >&5
 echo "${ECHO_T}$ac_cv_lib_pthread_main" >&6
 if test $ac_cv_lib_pthread_main = yes; then
   LIBS="$LIBS -lpthread"
+                         lp_cv_has_lib_pthread=yes
+
 fi
 
+            if test "$lp_cv_has_lib_pthread" = "no"; then
+                echo "$as_me:$LINENO: checking for main in -lc_r" >&5
+echo $ECHO_N "checking for main in -lc_r... $ECHO_C" >&6
+if test "${ac_cv_lib_c_r_main+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lc_r  $LIBS"
+cat >conftest.$ac_ext <<_ACEOF
+#line $LINENO "configure"
+#include "confdefs.h"
+
+
+int
+main ()
+{
+main ();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+         { ac_try='test -s conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  ac_cv_lib_c_r_main=yes
+else
+  echo "$as_me: failed program was:" >&5
+cat conftest.$ac_ext >&5
+ac_cv_lib_c_r_main=no
+fi
+rm -f conftest.$ac_objext conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+echo "$as_me:$LINENO: result: $ac_cv_lib_c_r_main" >&5
+echo "${ECHO_T}$ac_cv_lib_c_r_main" >&6
+if test $ac_cv_lib_c_r_main = yes; then
+  LIBS="$LIBS -lc_r"
+                             lp_cv_has_lib_pthread=yes
+
+fi
+
+            fi
         fi
     fi
+    CFLAGS="$saveflags"
 else
     if test $enable_use_pthreads = yes; then
         echo "pthreads not supported - disabling pthreads support."

@@ -10,6 +10,7 @@
  */
 
 #include "config.h"
+#include "machine.h"
 
 #ifdef MALLOC_ptmalloc
 
@@ -27,6 +28,10 @@
 #if defined(__APPLE__)
 #    include <unistd.h>
 #    define malloc_getpagesize getpagesize()
+#endif
+
+#if !defined(HAS_PTHREAD_ATFORK)
+#    define pthread_atfork(prepare,parent,child) do {} while(0)
 #endif
 
 #include "ptmalloc/malloc.c"

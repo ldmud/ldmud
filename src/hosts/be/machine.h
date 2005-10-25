@@ -144,6 +144,9 @@
 /* Does the machine offer pthread library? */
 /* #undef HAS_PTHREADS */
 
+/* Does the machine offer pthread_atfork()? */
+/* #undef HAS_PTHREAD_ATFORK */
+
 /* Does the machine offer pcre library? */
 /* #undef HAS_PCRE */
 
