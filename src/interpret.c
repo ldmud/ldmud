@@ -17663,14 +17663,14 @@ int
 get_line_number_if_any (string_t **name)
 
 /* Look up the line number for the current execution address.
- * Result is the line number, and *<namep> is set to the name of the
+ * Result is the line number, and *<name> is set to the name of the
  * source resp. include file.
  *
  * The function recognizes sefun and lambda closures, the latter return
  * the approximate position offset of the offending instruction within
  * the closure.
  *
- * *<namep> may point to an untabled string; and in any case has its
+ * *<name> may point to an untabled string; and in any case has its
  * own reference.
  */
 
@@ -17721,7 +17721,7 @@ get_line_number_if_any (string_t **name)
 
     *name = ref_mstring(STR_EMPTY);
     return 0;
-}
+} /* get_line_number_if_any() */
 
 /*-------------------------------------------------------------------------*/
 string_t *

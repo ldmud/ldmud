@@ -1050,6 +1050,7 @@ warnf (char *fmt, ...)
         debug_message("%s program: %s, object: %s line %ld\n"
                      , ts, get_txt(file), get_txt(curobj->name)
                      , line_number);
+        free_mstring(file);
     }
 
     fflush(stdout);

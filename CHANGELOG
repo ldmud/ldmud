@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+30-Jan-2002 (Lars Duening)  (3.3.384)
+  - (simulate.c) Removed a memory leak in the warnf() routine (reported
+       by Dafire).
+
 29-Jan-2002 (Lars Duening)  (3.3.383)
   - (structs.c, swap.c) Swapping struct values no longer changes the
        refcounts of the referenced type objects. This avoids
