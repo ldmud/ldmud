@@ -7819,7 +7819,11 @@ case: L_CASE case_label ':'
         if ($2.key >= $4.key)
         {
             if ($2.key > $4.key)
+            {
+                yyerrorf("Illegal case range: lower limit %ld > upper limit %ld"
+                        , (long)$2.key, (long)$4.key);
                 break;
+            }
             if ( !(temp = new_case_entry()) )
             {
                 yyerror("Out of memory: new case entry");

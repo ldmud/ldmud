@@ -52,12 +52,12 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 389)
-(Parent-Version lpmud 3-3 388)
-(Version-Log "Corrected a compilation problem on x86 gcc in ptmalloc.")
+(Project-Version lpmud 3-3 390)
+(Parent-Version lpmud 3-3 389)
+(Version-Log "Illegal switch-case ranges '100..50' now generate an error message.")
 (New-Version-Log
 "")
-(Checkin-Time "Sun, 09 Feb 2003 00:27:11 -0700")
+(Checkin-Time "Wed, 12 Feb 2003 19:48:04 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -94,8 +94,8 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.58 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.452 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.299 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.453 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.300 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.19 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -110,7 +110,7 @@
   (src/autoconf/configure.in (lpmud/d/7_configure. 1.20.1.9.1.65 644))
   (src/autoconf/acconfig.h (lpmud/d/10_acconfig.h 1.6.1.5 644))
 
-  (src/settings/README (lpmud/c/22_README 1.14.1.13 644))
+  (src/settings/README (lpmud/c/22_README 1.14.1.14 644))
   (src/settings/default (lpmud/c/23_default 1.13.1.5.1.34 744))
   (src/settings/native (lpmud/c/9_native 1.6 744))
   (src/settings/compat (lpmud/c/10_compat 1.7 744))
@@ -130,6 +130,7 @@
   (src/settings/heaven7 (lpmud/k/22_heaven7 1.5 644))
   (src/settings/hyperborea (lpmud/h/20_hyperborea 1.3 744))
   (src/settings/morgengrauen (lpmud/k/37_morgengrau 1.7 744))
+  (src/settings/lethynna (lpmud/d/b/21_lethynna 1.1 744))
   (src/settings/osb (lpmud/c/8_osb 1.17 744))
   (src/settings/pkmud (lpmud/c/25_pkmud 1.5.1.5 744))
   (src/settings/psycmuve (lpmud/i/42_psycmuve 1.1.1.6 744))
@@ -257,7 +258,7 @@
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.16 644))
   (src/port.c (lpmud/39_port.c 1.17.1.7 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.17.1.3 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.33 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.34 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7.1.1 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))

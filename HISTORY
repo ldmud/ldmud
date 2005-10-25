@@ -114,7 +114,7 @@ For a detailed list of all changes see the file CHANGELOG.
            initialization.
 
 
-07-Feb-2003 (Lars Duening) -- Release 3.2.10
+12-Feb-2003 (Lars Duening) -- Release 3.2.10
 
     - Changed efuns:
 
@@ -125,12 +125,17 @@ For a detailed list of all changes see the file CHANGELOG.
     - Master Object:
 
     - Fixed Crashers:
-      + Using <code>break</code> or <code>continue</code> in large
-          programs caused bytecode corruption.
+       + Using 'break' or 'continue' in large programs caused bytecode
+           corruption.
 
     - Language:
+       + Bugfix: Illegal case ranges like '100..50' now generate
+           an error message.
 
     - Runtime:
+       + Bugfix: The smalloc allocator now re-uses free 'large' memory for
+           small block chunks instead of always allocating them from the
+           system.
 
     - Other Changes:
 

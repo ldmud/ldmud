@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+12-Feb-2002 (Lars Duening)  (3.3.390)
+  - (prolang.y) The illegal switch-case ranges like '100..50' now generate
+       an error message (reported by Menaures).
+
 08-Feb-2002 (Lars Duening)  (3.3.389)
   - (ptmalloc) Corrected a compilation problem on x86 gcc (reported
        by Nostradamus).
