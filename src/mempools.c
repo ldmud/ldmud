@@ -1,8 +1,19 @@
 /*---------------------------------------------------------------------------
- * Gamedriver Mempools: Specialised Memory Allocators.
+ * Specialised Memory Allocators.
  *
  *---------------------------------------------------------------------------
- * Purpose of the memory pools is to provide fast allocation methods for
+ * Memory buffers provide memory for functions which repeatedly allocated
+ * large chunks of temporary memory (restore_object() for example). Instead
+ * of deallocating the memory after its use, the memory buffer keeps it
+ * around for the next time. This way any interim fragmentation of the free
+ * large memory pool won't affect the next use.
+ *
+ * The driver implements a buffer each for dedicated purposes. Each of
+ * these buffers is identified by a number from membuffer_e.
+ *
+ * A GC deallocates all buffers.
+ *---------------------------------------------------------------------------
+ * Purpose of memory pools is to provide fast allocation methods for
  * certain allocation patterns. They are most useful for scratchpad
  * purposes.
  *
@@ -27,7 +38,7 @@
  * TODO:: The last unused pool block is freed only if either another small
  * TODO:: block is freed, or the method flush_free_pool_blocks() (or so)
  * TODO:: is called.
- *---------------------------------------------------------------------------
+ *
  * Memory pools can be made dependant from other pools. This means that
  * whenever the 'superior' pool is reset or deleted, all pools depending
  * on this superior one are also reset or deleted. This is a
@@ -63,7 +74,139 @@
 
 #include "mempools.h"
 #include "gcollect.h"
+#ifdef DEBUG
+#include "simulate.h"
+#endif
+#include "strfuns.h"
 #include "xalloc.h"
+
+/*=========================================================================*/
+/*                         M E M B U F F E R S                             */
+
+/*-------------------------------------------------------------------------*/
+
+/* -- struct membuffer_s: one memory buffer -- */
+
+typedef struct membuffer_s {
+    void * mem;  /* The allocated memory */
+    size_t size;  /* Size of the allocated memory */
+} membuffer_t;
+
+static membuffer_t membuffers[mbMax];
+  /* The memory buffers.
+   */
+
+/*-------------------------------------------------------------------------*/
+void
+mb_init (void)
+
+/* Initialize the memory buffers.
+ */
+
+{
+    int i;
+
+    for (i = 0; i < mbMax; i++)
+    {
+        membuffers[i].mem = NULL;
+        membuffers[i].size = 0;
+    }
+} /* mb_init() */
+
+/*-------------------------------------------------------------------------*/
+void
+mb_release (void)
+
+/* Free all memory buffers.
+ */
+
+{
+    int i;
+
+    for (i = 0; i < mbMax; i++)
+    {
+        if (membuffers[i].mem != NULL)
+            xfree(membuffers[i].mem);
+        membuffers[i].mem = NULL;
+        membuffers[i].size = 0;
+    }
+} /* mb_release() */
+
+/*-------------------------------------------------------------------------*/
+void *
+mb_alloc (membuffer_e buf, size_t size)
+
+/* Allocate 'size' bytes of memory for buffer <buf>.
+ * Returns NULL when out of memory.
+ */
+
+{
+#ifdef DEBUG
+    if (buf < 0 || buf >= mbMax)
+        fatal("mb_alloc: Illegal buf# %d\n", buf);
+#endif
+
+    void * mem;
+
+    if (membuffers[buf].size >= size)
+        return membuffers[buf].mem;
+    
+    if (membuffers[buf].mem != NULL)
+        mem = rexalloc(membuffers[buf].mem, size);
+    else
+        mem = xalloc(size);
+
+    if (mem != NULL)
+    {
+        membuffers[buf].mem = mem;
+        membuffers[buf].size = size;
+    }
+
+    return mem;
+} /* mb_alloc() */
+
+/*-------------------------------------------------------------------------*/
+size_t
+mb_status (strbuf_t * sbuf, Bool verbose)
+
+/* Gather (and optionally print) the statistics from the membuffers.
+ * Return the amount of memory used.
+ */
+
+{
+    size_t res;
+    int i;
+
+    for (i = 0, res = 0; i < mbMax; i++)
+        res += membuffers[i].size;
+
+#if defined(__MWERKS__) && !defined(WARN_ALL)
+#    pragma warn_largeargs off
+#endif
+
+    /* In verbose mode, print the statistics */
+    if (verbose)
+    {
+        strbuf_add(sbuf, "\nMemory Buffers:\n");
+        strbuf_add(sbuf,   "---------------\n");
+        strbuf_addf(sbuf, "File data:    %8lu\n", membuffers[mbFile].size);
+        strbuf_addf(sbuf, "Swap buffer:  %8lu\n", membuffers[mbSwap].size);
+    }
+    else
+    {
+        strbuf_addf(sbuf, "Memory buffers:\t\t\t\t %9lu\n", res);
+    }
+
+    return res;
+
+#if defined(__MWERKS__)
+#    pragma warn_largeargs reset
+#endif
+
+} /* mb_status() */
+
+/*=========================================================================*/
+/*                           M E M P O O L S                               */
 
 /*-------------------------------------------------------------------------*/
 

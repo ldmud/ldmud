@@ -3045,6 +3045,7 @@ status_parse (strbuf_t * sbuf, char * buff)
             strbuf_addf(sbuf, "Other structures\t\t\t %9lu\n", other);
             tot += other;
         }
+        tot += mb_status(sbuf, verbose);
         tot += res;
 
         if (!verbose) {

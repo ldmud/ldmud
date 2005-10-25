@@ -100,6 +100,7 @@
 #include "lex.h"
 #include "main.h"
 #include "mapping.h"
+#include "mempools.h"
 #include "mregex.h"
 #include "mstrings.h"
 #include "object.h"
@@ -1423,6 +1424,7 @@ garbage_collection(void)
     free_action_temporaries();
     remove_stale_player_data();
     remove_stale_call_outs();
+    mb_release();
     free_defines();
     free_all_local_names();
     remove_unknown_identifier();
@@ -2444,6 +2446,7 @@ garbage_collection (void)
     free_action_temporaries();
     remove_stale_player_data();
     remove_stale_call_outs();
+    mb_release();
     free_defines();
     free_all_local_names();
     remove_unknown_identifier();

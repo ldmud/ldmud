@@ -7455,6 +7455,7 @@ f_restore_object (svalue_t *sp)
  */
 
 {
+static int nesting = 0;  /* Used to detect recursive calls */
     int restored_version; /* Formatversion of the saved data */
     char *name;      /* Full name of the file to read */
     char *file;      /* Filename passed, NULL if restoring from a string */
@@ -7485,6 +7486,9 @@ f_restore_object (svalue_t *sp)
       /* List of values for which the variables no longer exist. */
 
 
+    /* Keep track of recursive calls */
+    nesting++;
+
     /* Check if got a filename or the value string itself */
     buff = NULL;
     name = NULL;
@@ -7497,7 +7501,12 @@ f_restore_object (svalue_t *sp)
          * going to modify it a bit.
          */
         len = mstrsize(sp->u.str);
-        xallocate(buff, len+1, "copy of value string");
+        buff = (nesting > 1) ? xalloc(len+1) : mb_alloc(mbFile, len+1);
+        if (buff == NULL)
+        {
+            nesting--;
+            outofmem(len+1, "copy of value string");
+        }
         memcpy(buff, get_txt(sp->u.str), len);
         buff[len] = '\0';
     }
@@ -7513,7 +7522,14 @@ f_restore_object (svalue_t *sp)
     {
         free_svalue(sp);
         put_number(sp, 0);
-        if (buff) xfree(buff);
+        if (buff)
+        {
+            if (nesting > 1)
+                xfree(buff);
+            else
+                mb_free(mbFile);
+        }
+        nesting--;
         return sp;
     }
 
@@ -7521,7 +7537,14 @@ f_restore_object (svalue_t *sp)
     {
         free_svalue(sp);
         put_number(sp, 1);
-        if (buff) xfree(buff);
+        if (buff)
+        {
+            if (nesting > 1)
+                xfree(buff);
+            else
+                mb_free(mbFile);
+        }
+        nesting--;
         return sp;
     }
 
@@ -7536,6 +7559,7 @@ f_restore_object (svalue_t *sp)
         sfile = check_valid_path(sp->u.str, ob, STR_RESTORE_OBJECT, MY_FALSE);
         if (sfile == NULL)
         {
+            nesting--;
             error("Illegal use of restore_object('%s')\n", get_txt(sp->u.str));
             /* NOTREACHED */
             return sp;
@@ -7550,6 +7574,7 @@ f_restore_object (svalue_t *sp)
         if (!name)
         {
             free_mstring(sfile);
+            nesting--;
             error("Stack overflow in restore_object('%s')\n", get_txt(sp->u.str));
             /* NOTREACHED */
             return sp;
@@ -7570,6 +7595,7 @@ f_restore_object (svalue_t *sp)
                 fclose(f);
             free_svalue(sp);
             put_number(sp, 0);
+            nesting--;
             return sp;
         }
         if (st.st_size == 0)
@@ -7577,6 +7603,7 @@ f_restore_object (svalue_t *sp)
             fclose(f);
             free_svalue(sp);
             put_number(sp, 0);
+            nesting--;
             return sp;
         }
         FCOUNT_REST(name);
@@ -7585,10 +7612,17 @@ f_restore_object (svalue_t *sp)
          * can be one single line.
          */
 
-        buff = xalloc((size_t)(st.st_size + 1));
+        buff = (nesting > 1) ? xalloc((size_t)(st.st_size + 1))
+                             : mb_alloc(mbFile, (size_t)(st.st_size+1));
+#ifdef DEBUG
+        if (nesting > 1)
+            debug_message("%s: DEBUG: restore_object(%s) nesting %d size %lu\n"
+                         , time_stamp(), name, nesting, (size_t)(st.st_size+1));
+#endif
         if (!buff)
         {
             fclose(f);
+            nesting--;
             error("(restore) Out of memory (%lu bytes) for linebuffer.\n"
                  , (unsigned long) st.st_size+1);
             /* NOTREACHED */
@@ -7598,7 +7632,7 @@ f_restore_object (svalue_t *sp)
 
     /* Initialise the variables */
 
-    max_shared_restored = 256;
+    max_shared_restored = 64;
     current_shared_restored = 0;
 
     if (shared_restored_values)
@@ -7613,7 +7647,11 @@ f_restore_object (svalue_t *sp)
     {
         if (f)
             fclose(f);
-        xfree(buff);
+        if (nesting > 1)
+            xfree(buff);
+        else
+            mb_free(mbFile);
+        nesting--;
         error("(restore) Out of memory (%lu bytes) for shared values.\n"
              , sizeof(svalue_t)*max_shared_restored);
         /* NOTREACHED */
@@ -7682,7 +7720,11 @@ f_restore_object (svalue_t *sp)
                 while ( NULL != (dp=dp->next) );
 
             free_shared_restored_values();
-            xfree(buff);
+            if (nesting > 1)
+                xfree(buff);
+            else
+                mb_free(mbFile);
+            nesting--;
             if (file)
                 error("Illegal format (version line) when restoring %s "
                       "from %s line %d.\n"
@@ -7759,7 +7801,10 @@ f_restore_object (svalue_t *sp)
                 if (!dp)
                 {
                     free_shared_restored_values();
-                    xfree(buff);
+                    if (nesting > 1)
+                        xfree(buff);
+                    else
+                        mb_free(mbFile);
                     if (f)
                         fclose(f);
                     if (tmp)
@@ -7768,6 +7813,7 @@ f_restore_object (svalue_t *sp)
                             free_svalue(&tmp->v);
                         while (NULL != (tmp = tmp->next));
                     }
+                    nesting--;
                     if (file)
                         error("Stack overflow when restoring %s "
                               "from %s line %d.\n"
@@ -7812,7 +7858,11 @@ f_restore_object (svalue_t *sp)
                 while ( NULL != (dp=dp->next) );
             }
             free_shared_restored_values();
-            xfree(buff);
+            if (nesting > 1)
+                xfree(buff);
+            else
+                mb_free(mbFile);
+            nesting--;
             if (file)
                 error("Illegal format (value string) when restoring %s "
                       "from %s line %d.\n"
@@ -7842,10 +7892,14 @@ f_restore_object (svalue_t *sp)
     if (f)
         fclose(f);
     free_shared_restored_values();
-    xfree(buff);
+    if (nesting > 1)
+        xfree(buff);
+    else
+        mb_free(mbFile);
 
     free_svalue(sp);
     put_number(sp, 1);
+    nesting--;
     return sp;
 } /* f_restore_object() */
 
@@ -7908,7 +7962,7 @@ f_restore_value (svalue_t *sp)
 
     /* Initialise the shared value table */
 
-    max_shared_restored = 256;
+    max_shared_restored = 64;
 
     if (shared_restored_values)
     {

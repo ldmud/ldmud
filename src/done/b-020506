@@ -2,7 +2,7 @@ Short: Small block  statistics wrong in OSB
 Date: Mon, 06 May 2002 12:43:38 -0600
 From: Lars Duening <c-lars.duening@wcom.com>
 Type: Bug
-State: New
+State: Done - corrected in 3.2.10-dev.541, 3.3.394
 Driver: 3.2.9-dev.434, 3.3.276
 
 > malloc                                                                        
@@ -30,3 +30,6 @@ Total storage:        (b+c+d)        5975620 should equal (a)    5975620
 Total small storage:  (f+g+h+i)      3086180 should equal (e)    3086208        
 Total storage in use: (b-g-h-i)      3826596 net available:      2808852        
 Total storage unused: (c+d+g+h+i)    2149024                          
+---
+The problem was in the handling of unused space in the memory consolidation,
+which sometimes was mistaken for an allocated small block.

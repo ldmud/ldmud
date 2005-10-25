@@ -475,17 +475,17 @@ $(OBJ)/efuns.o : ../mudlib/sys/time.h ../mudlib/sys/strings.h \
     hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/files.o : ../mudlib/sys/files.h xalloc.h svalue.h stdstrings.h \
-    simulate.h mstrings.h main.h lex.h interpret.h filestat.h comm.h \
-    array.h files.h my-alloca.h typedefs.h driver.h strfuns.h sent.h \
+    simulate.h mstrings.h mempools.h main.h lex.h interpret.h filestat.h \
+    comm.h array.h files.h my-alloca.h typedefs.h driver.h strfuns.h sent.h \
     bytecode.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/gcollect.o : ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h swap.h \
     structs.h stdstrings.h simul_efun.h simulate.h sent.h ptrtable.h \
-    prolang.h parse.h otable.h object.h mstrings.h mregex.h mapping.h \
-    main.h lex.h instrs.h interpret.h heartbeat.h filestat.h ed.h comm.h \
-    closure.h call_out.h backend.h array.h actions.h gcollect.h typedefs.h \
-    driver.h svalue.h strfuns.h exec.h bytecode.h regexp.h pcre/pcre.h \
-    port.h config.h hosts/unix.h hosts/be/be.h machine.h
+    prolang.h parse.h otable.h object.h mstrings.h mregex.h mempools.h \
+    mapping.h main.h lex.h instrs.h interpret.h heartbeat.h filestat.h ed.h \
+    comm.h closure.h call_out.h backend.h array.h actions.h gcollect.h \
+    typedefs.h driver.h svalue.h strfuns.h exec.h bytecode.h regexp.h \
+    pcre/pcre.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/hash.o : hash.h
 
@@ -525,9 +525,9 @@ $(OBJ)/mapping.o : i-svalue_cmp.h xalloc.h wiz_list.h svalue.h simulate.h \
 $(OBJ)/md5.o : strfuns.h md5.h machine.h typedefs.h driver.h port.h \
     config.h hosts/unix.h hosts/be/be.h
 
-$(OBJ)/mempools.o : xalloc.h gcollect.h mempools.h driver.h svalue.h \
-    strfuns.h typedefs.h port.h config.h hosts/unix.h hosts/be/be.h \
-    machine.h
+$(OBJ)/mempools.o : xalloc.h strfuns.h simulate.h gcollect.h mempools.h \
+    driver.h svalue.h typedefs.h sent.h bytecode.h port.h config.h \
+    hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/mkfunc.o : make_func.c ../mudlib/sys/driver_hook.h hash.h exec.h \
     my-alloca.h driver.h bytecode.h typedefs.h port.h config.h hosts/unix.h \
@@ -640,9 +640,9 @@ $(OBJ)/structs.o : ../mudlib/sys/struct_info.h ../mudlib/sys/debug_info.h \
 
 $(OBJ)/swap.o : ../mudlib/sys/debug_info.h xalloc.h wiz_list.h svalue.h \
     structs.h strfuns.h stdstrings.h simul_efun.h simulate.h random.h \
-    prolang.h otable.h object.h mstrings.h mapping.h main.h interpret.h \
-    gcollect.h comm.h closure.h backend.h array.h swap.h typedefs.h \
-    driver.h exec.h ptrtable.h sent.h bytecode.h port.h config.h \
+    prolang.h otable.h object.h mstrings.h mempools.h mapping.h main.h \
+    interpret.h gcollect.h comm.h closure.h backend.h array.h swap.h \
+    typedefs.h driver.h exec.h ptrtable.h sent.h bytecode.h port.h config.h \
     hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/wiz_list.o : xalloc.h svalue.h stdstrings.h simulate.h object.h \

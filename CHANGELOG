@@ -1,11 +1,18 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+20-Feb-2002 (Lars Duening)  (3.3.395)
+  - (mempools, files.c, swap.c, object.c) The file reading efuns (read_file(),
+       read_bytes(), restore_()) and the swapper now use a persistent buffer
+       to hold the variable data in memory. Goal is to avoid allocations and
+       deallocations of large memory blocks which worsen the memory
+       fragmentation.
+
 18-Feb-2002 (Lars Duening)  (3.3.394)
   - (smalloc, efuns.c) Since smalloc can split up large small blocks and
        handle oversized ones, having the special case of 'unused space' in the
        current small chunk is no longer necessary. This also means that the
-       DID_MEM_UNUSED value from debug_info() no longer exists.
+       DID_MEM_UNUSED value from debug_info() no longer exists (b-020506).
 
 16-Feb-2002 (Lars Duening)  (3.3.393)
   - (smalloc, backend.c, gcollect.c) The smalloc freelist consolidation

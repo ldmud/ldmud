@@ -90,6 +90,7 @@
 #include "interpret.h"
 #include "main.h"
 #include "mapping.h"
+#include "mempools.h"
 #include "mstrings.h"
 #include "object.h"
 #include "otable.h"
@@ -773,10 +774,8 @@ reallocate_block (unsigned char *p, mp_int rest, mp_int count)
 
     /* Allocate the new memory area and copy the data stored so far.
      */
-    if ( !(start2 = xalloc(size2 + sizeof(varblock_t))) )
+    if ( !(start2 = mb_realloc(mbSwap, size2 + sizeof(varblock_t))) )
         return NULL;
-    memcpy(start2, start1, size2 - rest);
-    xfree(start1);
 
     /* Set up the new varblock */
     tmp = (varblock_t *)(start2 + size2);
@@ -1330,7 +1329,7 @@ swap_variables (object_t *ob)
 
     /* Allocate the initial varblock and initialize it
      */
-    start = xalloc(VARBLOCK_STARTSIZE + sizeof(varblock_t));
+    start = mb_alloc(mbSwap, VARBLOCK_STARTSIZE + sizeof(varblock_t));
     if (!start)
         return MY_FALSE;
     block = (varblock_t *)(start + VARBLOCK_STARTSIZE);
@@ -1343,7 +1342,7 @@ swap_variables (object_t *ob)
     if (!block->current)
     {
         /* Oops */
-        xfree(block->start);
+        mb_free(mbSwap);
         return MY_FALSE;
     }
 
@@ -1356,7 +1355,7 @@ swap_variables (object_t *ob)
     swap_num = store_swap_block(block->start, total_size);
     if (swap_num  == -1)
     {
-        xfree(block->start);
+        mb_free(mbSwap);
         return MY_FALSE;
     }
 
@@ -1368,7 +1367,7 @@ swap_variables (object_t *ob)
 
     num_vb_swapped++;
     total_vb_bytes_swapped += total_size - sizeof total_size;
-    xfree(block->start);
+    mb_free(mbSwap);
     xfree(ob->variables);
 #ifdef CHECK_OBJECT_STAT
     if (check_object_stat)
@@ -1825,7 +1824,9 @@ load_ob_from_swap (object_t *ob)
         size = total_size - sizeof total_size;
 
         /* Allocate the memory buffer */
-        if ( !(block = (unsigned char *)xalloc(size)) )
+        block = (unsigned char *) gc_status ? xalloc(size)
+                                            : mb_alloc(mbSwap, size);
+        if ( !block)
             return result | -0x80;
 
         /* Allocate the variable space */
@@ -1833,7 +1834,10 @@ load_ob_from_swap (object_t *ob)
                 sizeof(svalue_t) * ob->prog->num_variables
         )) )
         {
-            xfree(block);
+            if (gc_status)
+                xfree(block);
+            else
+                mb_free(mbSwap);
             return result | -0x80;
         }
 
@@ -1876,7 +1880,7 @@ load_ob_from_swap (object_t *ob)
             }
             else
             {
-                xfree(block);
+                mb_free(mbSwap);
                 swap_free(swap_num);
                 num_vb_swapped--;
                 total_vb_bytes_swapped -= total_size - sizeof total_size;
@@ -1895,7 +1899,10 @@ load_ob_from_swap (object_t *ob)
             }
 #endif
 
-            xfree(block);
+            if (gc_status)
+                xfree(block);
+            else
+                mb_free(mbSwap);
             result |= -0x80;
         }
 

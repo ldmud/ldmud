@@ -3218,7 +3218,7 @@ mem_consolidate (Bool force)
     if (force)
     {
         dprintf3(gcollect_outfd, "%s Consolidation merged %d blocks, "
-                                 "leaving %d blocks"
+                                 "leaving %d blocks, "
                                , (p_int)time_stamp(), bdelta
                                , (p_int)small_free_stat.counter);
         dprintf2(gcollect_outfd, "freed %d chunks holding %d blocks.\n"

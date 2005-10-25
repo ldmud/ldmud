@@ -64,6 +64,7 @@ extern int fchmod PROT((int, int));
 #include "interpret.h"
 #include "lex.h"  /* lex_close() */
 #include "main.h"
+#include "mempools.h"
 #include "mstrings.h"
 #include "simulate.h"
 #include "stdstrings.h"
@@ -1130,7 +1131,7 @@ v_read_bytes (svalue_t *sp, int num_arg)
             break;;
         }
 
-        str = xalloc((size_t)len);
+        str = mb_alloc(mbFile, (size_t)len);
         if (!str) {
             close(f);
             break;
@@ -1141,7 +1142,7 @@ v_read_bytes (svalue_t *sp, int num_arg)
         close(f);
 
         if (size <= 0) {
-            xfree(str);
+            mb_free(mbFile);
             break;
         }
 
@@ -1149,7 +1150,7 @@ v_read_bytes (svalue_t *sp, int num_arg)
          * of the largish buffer itself.
          */
         rc = new_n_mstring(str, size);
-        xfree(str);
+        mb_free(mbFile);
 
     }while(0);
 
@@ -1256,7 +1257,7 @@ v_read_file (svalue_t *sp, int num_arg)
         if (!len) len = size;
 
         /* Get the memory */
-        str = xalloc((size_t)size + 1); /* allow a leading ' ' */
+        str = mb_alloc(mbFile, (size_t)size + 1); /* allow a leading ' ' */
         if (!str) {
             fclose(f);
             free_mstring(file);
@@ -1279,7 +1280,7 @@ v_read_file (svalue_t *sp, int num_arg)
             if ((!size && start > 1) || fread(str, (size_t)size, 1, f) != 1) {
                 fclose(f);
                 f = NULL;
-                xfree(str-1);
+                mb_free(mbFile);
                 break;
             }
             st.st_size -= size;
@@ -1333,7 +1334,7 @@ v_read_file (svalue_t *sp, int num_arg)
 
             if (fread(p2, (size_t)size, 1, f) != 1) {
                 fclose(f);
-                xfree(str-1);
+                mb_free(mbFile);
                 break;
             }
 
@@ -1363,7 +1364,7 @@ v_read_file (svalue_t *sp, int num_arg)
             if ( st.st_size && len > 0) {
                 /* tried to read more than READ_MAX_FILE_SIZE */
                 fclose(f);
-                xfree(str-1);
+                mb_free(mbFile);
                 break;
             }
         }
@@ -1374,7 +1375,7 @@ v_read_file (svalue_t *sp, int num_arg)
          * get rid of the largish buffer itself.
          */
         rc = new_n_mstring(str, p2-str);
-        xfree(str-1);
+        mb_free(mbFile);
         if (!rc)
         {
             free_mstring(file);

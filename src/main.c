@@ -218,6 +218,7 @@ main (int argc, char **argv)
 
     setlocale(LC_CTYPE, ""); /* Use the locale defined in the LANG env var */
     get_stack_direction();
+    mb_init();
     init_interpret();
     rx_init();
 

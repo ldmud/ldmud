@@ -3,7 +3,18 @@
 
 #include <sys/types.h>
 
+#include "typedefs.h" /* strbuf_t */
+
 /* --- Types --- */
+
+/* --- enum membuffer_e: Memory buffer IDs ---
+ */
+
+typedef enum membuffer {
+    mbFile     /* read_file(), restore_(), read_bytes() */
+  , mbSwap     /* Swapper buffer */
+  , mbMax
+} membuffer_e;
 
 /* --- Mempool, struct mempool_s: a memory pool ---
  *
@@ -25,6 +36,15 @@ extern void    mempool_free (Mempool pPool, void * adr);
 extern void    mempool_reset (Mempool pPool);
 extern void    mempool_delete (Mempool pPool);
 extern size_t  mempool_size (Mempool pPool);
+
+extern void   mb_init(void);
+extern void   mb_release(void);
+extern void * mb_alloc(membuffer_e buf, size_t size);
+extern size_t  mb_status (strbuf_t * sbuf, Bool verbose);
+
+#define mb_realloc(buf,size) mb_alloc(buf,size)
+#define mb_free(buf) NOOP
+  /* Use these macros to state the intention in the code! */
 
 #ifdef GC_SUPPORT
 extern void    mempool_clear_refs (Mempool pPool);
