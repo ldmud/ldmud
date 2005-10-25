@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+26-Jan-2002 (Lars Duening)  (3.3.379)
+  - (prolang.y) Corrected a small bug in the code generation for
+       operators &&= and ||=.
+
 26-Jan-2002 (Lars Duening)  (3.3.378)
   - (main, lex, prolang, object, simulate.c, configure) Removed the
        configuration option INITIALIZATION_BY___INIT and changed the driver

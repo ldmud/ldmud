@@ -2248,7 +2248,7 @@ update_lop_branch ( p_uint address, int instruction )
         for (i = offset; --i >= 0; --p )
             *p = p[-3];
         p[-4] = F_DUP;
-        p[-3] = F_LBRANCH_WHEN_ZERO;
+        p[-3] = instruction;
         upd_short(address+1, offset+3);
         if (offset > 0x7ffc)
             yyerror("offset overflow");
