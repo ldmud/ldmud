@@ -2890,14 +2890,12 @@ v_replace_program (svalue_t *sp, int num_arg)
         error("replace_program on simul_efun object\n");
     if (current_object->flags & O_LAMBDA_REFERENCED)
     {
-        /* This was an error(), and should be a proper warning, except
-         * that the driver doesn't have such a thing.
-         */
-        debug_message("%s Object '%s', program '%s': Cannot schedule "
-                      "replace_program() after binding lambda closures.\n"
-                     , time_stamp(), get_txt(current_object->name)
-                     , get_txt(current_prog->name)
-                     );
+        inter_sp = sp;
+        warnf("Object '%s', program '%s': Cannot schedule "
+              "replace_program() after binding lambda closures.\n"
+             , get_txt(current_object->name)
+             , get_txt(current_prog->name)
+             );
         for ( ; num_arg != 0; num_arg--)
         {
             free_svalue(sp);
@@ -2977,7 +2975,7 @@ v_replace_program (svalue_t *sp, int num_arg)
             else
             {
                 free_mstring(sname);
-                error("replacement program '%s' to be inherited\n"
+                error("replacement program '%s' needs to be inherited\n"
                      , get_txt(sp->u.str));
             }
         }
@@ -2999,9 +2997,17 @@ v_replace_program (svalue_t *sp, int num_arg)
         for (i = 0; i < new_prog->num_variables; i++)
         {
             if (new_prog->variables[i].type.typeflags & TYPE_MOD_VIRTUAL)
-                error("replacement program '%s' has virtual variables "
-                      "and is not the first inherited program\n"
-                     , get_txt(new_prog->name));
+            {
+                warnf("Object '%s', program '%s': Cannot schedule "
+                      "replace_program(): "
+                      "replacement program '%s' has virtual variables "
+                      "but is not the first inherited program\n"
+                     , get_txt(current_object->name)
+                     , get_txt(current_prog->name)
+                     , get_txt(new_prog->name)
+                );
+                return sp;
+            }
         }
     }
 

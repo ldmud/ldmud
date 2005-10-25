@@ -104,7 +104,7 @@ For a detailed list of all changes see the file CHANGELOG.
            though it doesn't support GC yet).
 
 
-16-Jan-2003 (Lars Duening) -- Release 3.2.9
+19-Jan-2003 (Lars Duening) -- Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -188,6 +188,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + replace_program(): If the object alread has closures bound, the
            efun will issue a debug_message() and fail, instead of raising
            a full runtime error.
+       + replace_program(): If the replacement program has virtually
+           inherited variables, it must be the first inherited program.
        + restore_{object,value}(), save_{object,value}(): Non-lambda
            closures, symbols and quoted arrays can now be saved and restored.
            This required a new savefile format, though.
