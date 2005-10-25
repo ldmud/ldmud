@@ -314,7 +314,9 @@ void
 struct_free_empty (struct_t *pStruct)
 
 /* Free the struct <pStruct> (which holds no valid svalues) and all referenced
- * data.
+ * data. The refcount of <pStruct> is ignored, as all known callers
+ * take care of it (in particular a swap during GC leaves behind strange
+ * values).
  */
 
 {
@@ -324,10 +326,6 @@ struct_free_empty (struct_t *pStruct)
 
     if (!pStruct->user)
         fatal("No wizlist pointer for struct in struct_free_empty().");
-
-    if (pStruct->ref != 0)
-        fatal("Struct with %ld refs passed to struct_free_empty().\n"
-              , pStruct->ref);
 #endif
 
     num_struct--;

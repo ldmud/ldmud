@@ -213,17 +213,18 @@ mp_int total_bytes_swapfree = 0;
    */
 
 static unsigned char *last_variable_block;
-  /* Recursive swap during a GC: address of the last variable
+  /* Swap during a and by the GC: address of the last variable
    * block to be written.
    */
 
 static mp_int last_variable_swap_num;
-  /* Recursive swap during a GC: swap number of the last variable
+  /* Swap during a and by the GC: swap number of the last variable
    * block to be written.
    */
 
 static char *last_changed_swapped_svalue;
-  /* The last stored svalue free_swapped_svalues() had to change.
+  /* Swap during a and by the GC: The last stored svalue
+   * free_swapped_svalues() had to change.
    */
 
 
@@ -1141,12 +1142,6 @@ free_swapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
             p += 1 + sizeof(struct_type_t *) + sizeof(wiz_list_t *);
             p =
               free_swapped_svalues(svp->u.strct->member, struct_size(svp->u.strct), p);
-            deref_struct(svp->u.strct);
-              /* struct_free_empty() in DEBUG checks the refcount, so this
-               * single ref needs to be removed. However, if there is more
-               * than one ref, struct_free_empty() will fatal(), which is good
-               * because we're supposed to swap such a struct opaquely.
-               */
             struct_free_empty(svp->u.strct);
             break;
           }
@@ -1260,7 +1255,12 @@ swap_variables (object_t *ob)
 
     if (gc_status)
     {
-        /* Complete the previous swap operation */
+        /* During a GC, the swapper is called in close swap-in/swap-out
+         * sequences. To minimized interaction with the allocator,
+         * the swap out only has to check if svalues changed due to
+         * the GC; otherwise it is sufficient to just pretend to swap
+         * out and free the associated memory.
+         */
         num_variables = ob->prog->num_variables;
         last_changed_swapped_svalue = NULL;
         (void)free_swapped_svalues(
@@ -1865,8 +1865,10 @@ load_ob_from_swap (object_t *ob)
 
             if (gc_status)
             {
-                /* Called from within the GC - free later.
-                 * Also keep the swap-block
+                /* During a GC, the swapper is called in close swap-in/swap-out
+                 * sequences. To minimized interaction with the allocator,
+                 * the memory blocks are kept for now, and freed during the
+                 * 'swap out'.
                  */
                 last_variable_block = block;
                 last_variable_swap_num = swap_num;
