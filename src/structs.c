@@ -543,21 +543,24 @@ clear_struct_type_ref (struct_type_t * pSType)
 {
     unsigned short num;
 
-    clear_memory_reference(pSType);
-    if (pSType->member)
-        clear_memory_reference(pSType->member);
-
-    pSType->ref = 0;
-    pSType->name->info.ref = 0;
-    if (pSType->unique_name)
-        pSType->unique_name->info.ref = 0;
-    if (pSType->base)
-        clear_struct_type_ref(pSType->base);
-
-    for (num = struct_t_size(pSType); num-- > 0; )
+    if (pSType->ref != 0)
     {
-        pSType->member[num].name->info.ref = 0;
-        clear_vartype_ref(&pSType->member[num].type);
+        clear_memory_reference(pSType);
+        if (pSType->member)
+            clear_memory_reference(pSType->member);
+
+        pSType->ref = 0;
+        pSType->name->info.ref = 0;
+        if (pSType->unique_name)
+            pSType->unique_name->info.ref = 0;
+        if (pSType->base)
+            clear_struct_type_ref(pSType->base);
+
+        for (num = struct_t_size(pSType); num-- > 0; )
+        {
+            pSType->member[num].name->info.ref = 0;
+            clear_vartype_ref(&pSType->member[num].type);
+        }
     }
 
 } /* clear_struct_type_ref() */
@@ -570,11 +573,14 @@ clear_struct_ref (struct_t * pStruct)
  */
 
 {
-    clear_memory_reference(pStruct);
-    pStruct->ref = 0;
-    clear_struct_type_ref(pStruct->type);
-    if (struct_size(pStruct))
-        clear_ref_in_vector(pStruct->member, struct_size(pStruct));
+    if (pStruct->ref != 0)
+    {
+        clear_memory_reference(pStruct);
+        pStruct->ref = 0;
+        clear_struct_type_ref(pStruct->type);
+        if (struct_size(pStruct))
+            clear_ref_in_vector(pStruct->member, struct_size(pStruct));
+    }
 } /* clear_struct_ref() */
 
 /*-------------------------------------------------------------------------*/
@@ -587,21 +593,25 @@ count_struct_type_ref (struct_type_t * pSType)
 {
     unsigned short num;
 
-    note_malloced_block_ref(pSType);
-    if (pSType->member)
-        note_malloced_block_ref(pSType->member);
-
     pSType->ref++;
-    count_ref_from_string(pSType->name);
-    if (pSType->unique_name)
-        count_ref_from_string(pSType->unique_name);
-    if (pSType->base)
-        count_struct_type_ref(pSType->base);
 
-    for (num = struct_t_size(pSType); num-- > 0; )
+    if (test_memory_reference(pSType))
     {
-        count_ref_from_string(pSType->member[num].name);
-        count_vartype_ref(&pSType->member[num].type);
+        note_malloced_block_ref(pSType);
+        if (pSType->member)
+            note_malloced_block_ref(pSType->member);
+
+        count_ref_from_string(pSType->name);
+        if (pSType->unique_name)
+            count_ref_from_string(pSType->unique_name);
+        if (pSType->base)
+            count_struct_type_ref(pSType->base);
+
+        for (num = struct_t_size(pSType); num-- > 0; )
+        {
+            count_ref_from_string(pSType->member[num].name);
+            count_vartype_ref(&pSType->member[num].type);
+        }
     }
 } /* count_struct_type_ref() */
 
@@ -613,11 +623,14 @@ count_struct_ref (struct_t * pStruct)
  */
 
 {
-    note_malloced_block_ref(pStruct);
     pStruct->ref++;
-    count_struct_type_ref(pStruct->type);
-    if (struct_size(pStruct))
-        count_ref_in_vector(pStruct->member, struct_size(pStruct));
+    if (test_memory_reference(pStruct))
+    {
+        note_malloced_block_ref(pStruct);
+        count_struct_type_ref(pStruct->type);
+        if (struct_size(pStruct))
+            count_ref_in_vector(pStruct->member, struct_size(pStruct));
+    }
 } /* clear_struct_ref() */
 
 #endif /* GC_SUPPORT */

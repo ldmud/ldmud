@@ -1732,7 +1732,7 @@ compatible_types (fulltype_t t1, fulltype_t t2, Bool is_assign)
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-i_add_arg_type (fulltype_t type, int line)
+i_add_arg_type (fulltype_t type)
 
 /* Add another function argument type to the argument type stack.
  */
@@ -1747,9 +1747,9 @@ i_add_arg_type (fulltype_t type, int line)
     }
     assign_full_to_vartype((vartype_t*)(mbp->block + mbp->current_size), type);
     mbp->current_size += sizeof(vartype_t);
-} /* add_arg_type() */
+} /* i_add_arg_type() */
 
-#define add_arg_type(t) i_add_arg_type(t, __LINE__)
+#define add_arg_type(t) i_add_arg_type(t)
 
 /*-------------------------------------------------------------------------*/
 static INLINE void

@@ -36,7 +36,7 @@
  * modules in this, the collector offers a set of primitives to clearing
  * and marking:
  *
- *     void clear_memory_reference(void *p)
+ *     int clear_memory_reference(void *p)
  *         Clear the memory block marker for <p>.
  *
  *     void note_malloced_block_ref(void *p)
@@ -551,7 +551,19 @@ clear_memory_reference (void *p)
 
 {
     CLEAR_REF(p);
-}
+} /* clear_memory_reference() */
+
+/*-------------------------------------------------------------------------*/
+Bool
+test_memory_reference (void *p)
+
+/* Test if the memory block <p> is marked as referenced.
+ * Return TRUE if it is NOT referenced, and FALSE it it is.
+ */
+
+{
+    return TEST_REF(p);
+} /* test_memory_reference() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE void

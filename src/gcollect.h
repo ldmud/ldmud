@@ -62,6 +62,7 @@ extern mapping_t *stale_mappings;
 extern void clear_memory_reference(void *p);
 extern void clear_program_ref(program_t *p, Bool clear_ref);
 extern void clear_object_ref (object_t *p);
+extern Bool test_memory_reference(void *p);
 extern void gc_mark_program_ref(program_t *p);
 extern void gc_reference_destructed_object(object_t *ob);
 #ifdef CHECK_OBJECT_GC_REF

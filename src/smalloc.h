@@ -18,6 +18,10 @@ extern void mem_clear_ref_flags(void);
 extern void mem_free_unrefed_memory(void);
 extern void mem_consolidate (void);
 extern void walk_new_small_malloced( void (*func)(POINTER, long) );
+#ifdef MALLOC_CHECK
+extern Bool mem_is_freed (void *p, p_uint minsize);
+#endif /* MALLOC_CHECK */
+
 #ifdef CHECK_MAPPING_TOTAL
 extern mp_int available_memory(void);
 #endif /* CHECK_MAPPING_TOTAL */
