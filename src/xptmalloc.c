@@ -83,7 +83,11 @@ static void mem_mark_collectable (POINTER p) {
 }
 
 /*     Do whatever consolidation is useful. */
-void mem_consolidate () {
+void mem_consolidate (Bool force UNUSED)
+{
+#   ifdef __MWERKS__
+#      pragma unused(force)
+#   endif
     /* nothing to do here... malloc does it automagically */
 }
 

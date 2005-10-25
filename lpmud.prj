@@ -52,13 +52,12 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 391)
-(Parent-Version lpmud 3-3 390)
-(Version-Log "On 'too deep recursion' errors, print the recursion depth in the error logs.
-First locking code for the ptmalloc-GC.")
+(Project-Version lpmud 3-3 392)
+(Parent-Version lpmud 3-3 391)
+(Version-Log "If min-small-malloc is used, that chunk is also allocated directly from the system.")
 (New-Version-Log
 "")
-(Checkin-Time "Sat, 15 Feb 2003 13:56:58 -0700")
+(Checkin-Time "Sun, 16 Feb 2003 01:58:13 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -95,7 +94,7 @@ First locking code for the ptmalloc-GC.")
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.58 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.454 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.455 644))
   (HISTORY (lpmud/f/49_HISTORY 1.300 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.19 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -273,7 +272,7 @@ First locking code for the ptmalloc-GC.")
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.31 644))
   (src/simulate.c (lpmud/31_simulate.c 1.88.1.99 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.13 644))
-  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.66 644))
+  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.67 644))
   (src/structs.h (lpmud/d/b/5_structs.h 1.3 644))
   (src/structs.c (lpmud/d/b/6_structs.c 1.7 644))
   (src/sysmalloc.h (lpmud/c/b/33_sysmalloc. 1.1 644))
