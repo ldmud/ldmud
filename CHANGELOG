@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+22-Jan-2002 (Lars Duening)  (3.3.366)
+  - (xalloc.c) rexalloc() and malloc_increment_size() didn't update the
+       xalloc_stat statistics, which could lead to a wrap-around of
+       that number. Also, rexalloc() is now first trying a
+       malloc_increment_size().
+
 22-Jan-2002 (Lars Duening)  (3.3.365)
   - (efuns.c) Efun member() crashed when given a struct as second
        argument (reported by Markus).

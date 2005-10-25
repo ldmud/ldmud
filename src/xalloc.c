@@ -114,6 +114,12 @@ static int in_malloc = 0;
    * calls to the allocator, for example by threads.
    */
 
+static int going_to_exit = MY_FALSE;
+  /* When the allocator detected a fatal error, it sets this
+   * variable before starting the fatal() handling in order to
+   * prevent recursions.
+   */
+
 /* --- Statistics --- */
 
 static t_stat xalloc_stat = {0,0};
@@ -273,7 +279,6 @@ retry_alloc (size_t size MTRACE_DECL)
 {
     /* Out of memory - try to recover */
 
-    static Bool going_to_exit = MY_FALSE;
     static char mess1[] =
         "Temporarily out of MEMORY. Freeing user reserve.\n";
     static char mess2[] =
@@ -349,6 +354,7 @@ retry_alloc (size_t size MTRACE_DECL)
     }
 
     /* Totally out of memory: exit */
+    max_malloced = 0; /* Disable the checking for a clean exit */
     going_to_exit = MY_TRUE; /* Prevent recursions */
     writes(2, mess4);
     (void)dump_trace(MY_FALSE, NULL);
@@ -356,6 +362,36 @@ retry_alloc (size_t size MTRACE_DECL)
     /* NOTREACHED */
     return MY_FALSE;
 } /* retry_alloc() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE Bool
+check_max_malloced (void)
+
+/* If max_malloced is set, check if the allocated memory exceeds it.
+ * If not, return FALSE.
+ * If yes, and malloc_privilege < MALLOC_SYSTEM: return TRUE.
+ * If yes, and malloc_privilege == MALLOC_SYSTEM: abort.
+ */
+
+{
+#ifndef NO_MEM_BLOCK_SIZE
+    if (max_malloced > 0 && xalloc_stat.size > max_malloced)
+    {
+        static const char mess[] = "MAX_MALLOCED limit reached.\n";
+        writes(2, mess);
+        if (malloc_privilege < MALLOC_SYSTEM)
+            return MY_TRUE;
+
+        /* Totally out of memory: exit */
+        max_malloced = 0; /* Disable the checking for a clean exit */
+        going_to_exit = MY_TRUE; /* Prevent recursions */
+        (void)dump_trace(MY_FALSE, NULL);
+        fatal("Out of memory.\n");
+        /* NOTREACHED */
+    }
+#endif
+    return MY_FALSE;
+} /* check_max_malloced() */
 
 /*-------------------------------------------------------------------------*/
 POINTER
@@ -369,7 +405,6 @@ xalloc_traced (size_t size MTRACE_DECL)
 
 {
     word_t *p;
-    static int going_to_exit = MY_FALSE;
 
     if (going_to_exit) /* A recursive call while we're exiting */
         exit(3);
@@ -378,18 +413,6 @@ xalloc_traced (size_t size MTRACE_DECL)
         fatal("Tried to allocate 0 bytes.\n");
     
     size += XM_OVERHEAD_SIZE;
-
-#ifndef NO_MEM_BLOCK_SIZE
-    {
-        if (max_malloced > 0
-         && (xalloc_stat.size + size + sizeof(p_int)) > max_malloced)
-        {
-            static const char mess[] = "MAX_MALLOCED limit reached.\n";
-            writes(2, mess);
-            return NULL;
-        }
-    }
-#endif
 
     do {
         p = mem_alloc(size);
@@ -413,6 +436,8 @@ xalloc_traced (size_t size MTRACE_DECL)
     count_up(xalloc_stat, XM_OVERHEAD_SIZE);
 #else
     count_up(xalloc_stat, mem_block_size(p));
+    if (check_max_malloced())
+        return NULL;
 #endif
     return (POINTER)(p + XM_OVERHEAD);
 } /* xalloc_traced() */
@@ -469,28 +494,6 @@ pfree (POINTER p)
 } /* pfree() */
 
 /*-------------------------------------------------------------------------*/
-POINTER
-rexalloc (POINTER p, size_t size)
-
-/* Reallocate block <p> to the new size of <size> and return the pointer.
- * The memory is not aligned and subject to GC.
- */
-
-{
-    word_t *t;
-    p = (word_t *)p - XM_OVERHEAD;
-    size += XM_OVERHEAD_SIZE;
-    do {
-        t = mem_realloc(p, size);
-    } while (t == NULL && retry_alloc(size MTRACE_ARG));
-
-    if (t)
-        t += XM_OVERHEAD;
-    
-    return (POINTER)t;
-} /* rexalloc() */
-
-/*-------------------------------------------------------------------------*/
 void *
 malloc_increment_size (void *vp, size_t size)
 
@@ -499,8 +502,78 @@ malloc_increment_size (void *vp, size_t size)
  * to the start of the block extension.
  */
 {
-    return mem_increment_size((word_t *)vp - XM_OVERHEAD, size);
+    word_t * block = (word_t*)vp - XM_OVERHEAD;
+#ifndef NO_MEM_BLOCK_SIZE
+    size_t old_size;
+#endif
+    void * rc;
+
+    if (going_to_exit) /* A recursive call while we're exiting */
+        exit(3);
+
+#ifndef NO_MEM_BLOCK_SIZE
+    old_size = mem_block_size(block);
+#endif
+
+    rc = mem_increment_size(block, size);
+
+#ifndef NO_MEM_BLOCK_SIZE
+    if (rc != NULL)
+    {
+        count_back(xalloc_stat, old_size);
+        count_up(xalloc_stat, mem_block_size(block));
+        if (check_max_malloced())
+            return NULL;
+    }
+#endif
+
+    return rc;
 } /* malloc_increment_size() */
+
+/*-------------------------------------------------------------------------*/
+POINTER
+rexalloc (POINTER p, size_t size)
+
+/* Reallocate block <p> to the new size of <size> and return the pointer.
+ * The memory is not aligned and subject to GC.
+ */
+
+{
+    word_t *block, *t;
+#ifndef NO_MEM_BLOCK_SIZE
+    size_t old_size;
+#endif
+
+    if (going_to_exit) /* A recursive call while we're exiting */
+        exit(3);
+
+    size += XM_OVERHEAD_SIZE;
+    block = (word_t *)p - XM_OVERHEAD;
+
+#ifndef NO_MEM_BLOCK_SIZE
+    old_size = mem_block_size(block);
+    t = malloc_increment_size(block, size - old_size);
+    if (t)
+        return p;
+#endif
+
+    do {
+        t = mem_realloc(p, size);
+    } while (t == NULL && retry_alloc(size MTRACE_ARG));
+
+    if (t)
+    {
+#ifndef NO_MEM_BLOCK_SIZE
+        count_back(xalloc_stat, old_size);
+        count_up(xalloc_stat, mem_block_size(t));
+        if (check_max_malloced())
+            return NULL;
+#endif
+        t += XM_OVERHEAD;
+    }
+    
+    return (POINTER)t;
+} /* rexalloc() */
 
 /*=========================================================================*/
 
