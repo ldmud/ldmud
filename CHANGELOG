@@ -1,6 +1,16 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+04-Feb-2002 (Lars Duening)  (3.3.386)
+  - (smalloc.c) Small chunks (except for the first one) are now allocated
+       from the large blocks. Reason is that during a consolidation, unused
+       small chunks are returned to the large blocks. Without this change,
+       new small chunks were always allocated directly from the system
+       without re-using the space released to the large blocks, so that
+       over time the process memory usage grew but only a fraction of the
+       memory was in use (reported by Coogan and Dafire, reproduced by
+       Menaures).
+
 02-Feb-2002 (Lars Duening)  (3.3.385)
   - (interpret.c) Assignments to multi-level struct references (a->b->c)
        didn't work (reported by Dafire).

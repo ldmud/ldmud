@@ -1039,9 +1039,12 @@ mem_alloc (size_t size)
             }
         }
 
-        /* Get a new small chunk; if possible, from fresh memory */
+        /* Get a new small chunk.
+         * If this is the first small chunk of all, try to get fresh
+         * memory from the system.
+         */
         next_unused = (word_t*)large_malloc_int(small_chunk_size + sizeof(word_t*)
-                                           , MY_TRUE);
+                                           , last_small_chunk == NULL);
 
         /* If this is the first small chunk allocation, it might fail because
          * the driver was configured with a too big min_small_malloced value.
@@ -1055,7 +1058,7 @@ mem_alloc (size_t size)
                    );
             small_chunk_size = SMALL_CHUNK_SIZE;
             next_unused = (word_t*)large_malloc_int(small_chunk_size+sizeof(word_t*)
-                                               , MY_TRUE);
+                                               , MY_FALSE);
         }
 
         if (next_unused == NULL)
