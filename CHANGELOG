@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+27-Jan-2002 (Lars Duening)  (3.3.380)
+  - (object.c) Restoring a plain lfun-closure no longer worked (reported
+       by Bardioc).
+
 26-Jan-2002 (Lars Duening)  (3.3.379)
   - (prolang.y) Corrected a small bug in the code generation for
        operators &&= and ||=.

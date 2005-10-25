@@ -6809,6 +6809,9 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
     char *pt;
     char ct;
     char * name;
+    char * nameend, name_delim; /* Holds the name delimiter while the name
+                                 * is terminated by '\0' for processing.
+                                 */
 
     pt = *str;
     switch(ct = *pt)
@@ -6844,8 +6847,17 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
             if (c == delimiter || (ct == 'c' && c == ':'))
                 break;
         }
-        pt[-1] = '\0'; /* Overwrites the delimiter */
+
+        /* Save the delimiter, then replace it by '\0' */
+        nameend = pt-1;
+        name_delim = *nameend;
+        pt[-1] = '\0';
+
         *str = pt;
+          /* Note: for non-context closures, str now points one
+           * char too far. For context closures, str now points 
+           * to the first character of the context size value.
+           */
       }
     } /* switch(ct) */
 
@@ -7039,11 +7051,6 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
                     break; /* switch(ct) */
                 }
 
-                /* Restoring the context gobbled the delimiter, so make
-                 * it visible again.
-                 */
-                *str = *str - 1;
-
                 for (j = 0; j < context_size; j++)
                     assign_svalue_no_free(l->context+j, context.u.vec->item+j);
                 free_array(context.u.vec);
@@ -7068,6 +7075,13 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
       } /* case 'c', 'l' */
     } /* switch(ct) */
 
+    /* Regardless of the restored closure, *str at this point
+     * points to the character after the delimiter.
+     * Make the delimiter visible again, and also restore the
+     * 'name' delimiter to its original setting.
+     */
+    *str = *str - 1;
+    *nameend = name_delim;
     return MY_TRUE;
 } /* restore_closure() */
 
