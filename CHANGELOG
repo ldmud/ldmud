@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+19-Jan-2002 (Lars Duening)  (3.3.361)
+  - (object.c) Restricted replace_program() on the first inherited
+       program if that program has virtually inherited variables.
+       See b-030119 for an explanation.
+
 18-Jan-2002 (Lars Duening)  (3.3.360)
   - (ptmalloc) Gawain provided a bugfix and more work towards GC
        support (yes, my previous enthusiasm was premature).

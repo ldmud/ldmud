@@ -44,12 +44,12 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 360)
-(Parent-Version lpmud 3-3 359)
-(Version-Log "ptmalloc bugfix.")
+(Project-Version lpmud 3-3 361)
+(Parent-Version lpmud 3-3 360)
+(Version-Log "Restricted replace_program() when handling virtual inherits.")
 (New-Version-Log
 "")
-(Checkin-Time "Sat, 18 Jan 2003 22:40:33 -0700")
+(Checkin-Time "Sun, 19 Jan 2003 01:36:01 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -86,7 +86,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.57 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.423 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.424 644))
   (HISTORY (lpmud/f/49_HISTORY 1.296 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.19 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -192,7 +192,7 @@
   (src/my-alloca.h (lpmud/f/29_my-alloca. 1.3.1.2 644))
   (src/my-rusage.h (lpmud/f/28_my-rusage. 1.7 644))
   (src/object.h (lpmud/44_object.h 1.34.1.19.1.1 644))
-  (src/object.c (lpmud/45_object.c 1.62.1.88.1.13 644))
+  (src/object.c (lpmud/45_object.c 1.62.1.88.1.14 644))
   (src/otable.h (lpmud/f/27_otable.h 1.8.1.4 644))
   (src/otable.c (lpmud/43_otable.c 1.22.1.6 644))
   (src/parser.c (lpmud/l/13_parser.c 1.1 644))
@@ -503,7 +503,7 @@
   (src/bugs/ferrycode/cog.c (lpmud/u/6_cog.c 1.1 644))
   (src/bugs/ferrycode/carrack.c (lpmud/u/7_carrack.c 1.1 644))
 
-  (src/bugs/b-summary (lpmud/c/34_b-summary 1.47.1.37 644) :no-keywords)
+  (src/bugs/b-summary (lpmud/c/34_b-summary 1.47.1.38 644) :no-keywords)
   (src/bugs/b-990217-1 (lpmud/k/10_b-990217-1 1.3 644) :no-keywords)
   (src/bugs/b-010115-1 (lpmud/k/15_b-010115-1 1.1 644) :no-keywords)
   (src/bugs/b-010410 (lpmud/l/28_b-010410 1.1 644) :no-keywords)
@@ -525,6 +525,7 @@
   (src/bugs/b-020916-files/registry.c (lpmud/b/b/37_registry.c 1.1 644) :no-keywords)
   (src/bugs/b-020916-files/registry.o (lpmud/b/b/38_registry.o 1.1 644) :no-keywords)
   (src/bugs/b-020916-files/debugger.h (lpmud/b/b/39_debugger.h 1.1 644) :no-keywords)
+  (src/bugs/b-030119 (lpmud/d/b/13_b-030119 1.1 644) :no-keywords)
 
   (src/bugs/f-summary (lpmud/c/37_f-summary 1.39.1.87 644) :no-keywords)
   (src/bugs/f-981027-0 (lpmud/g/29_f-981027-0 1.2 644) :no-keywords)
@@ -1151,7 +1152,7 @@
   (doc/efun/random (lpmud/k/15_random 1.5 644))
   (doc/efun/rename (lpmud/p/48_rename 1.5 644))
   (doc/efun/rename_object (lpmud/m/11_rename_obj 1.3.1.2 644))
-  (doc/efun/replace_program (lpmud/p/49_replace_pr 1.3 644))
+  (doc/efun/replace_program (lpmud/p/49_replace_pr 1.4 644))
   (doc/efun/restore_object (lpmud/p/50_restore_ob 1.8 644))
   (doc/efun/restore_value (lpmud/e/12_restore_va 1.3 644))
   (doc/efun/rm (lpmud/p/51_rm 1.2 644))

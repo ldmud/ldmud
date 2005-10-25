@@ -954,7 +954,10 @@ replace_programs (void)
             if (d_flag)
                 debug_message("%s freeing %d variables:\n", time_stamp(), j);
 #endif
-            while (--j >= 0) free_svalue(svp++);
+            while (--j >= 0) 
+            {
+                free_svalue(svp++);
+            }
 #ifdef DEBUG
             if (d_flag)
                 debug_message("%s freed.\n", time_stamp());
@@ -977,7 +980,10 @@ replace_programs (void)
 #endif
 
             /* Deref the remaining non-copied variables */
-            while (--i >= 0) free_svalue(svp++);
+            while (--i >= 0)
+            {
+                free_svalue(svp++);
+            }
 #ifdef DEBUG
             if (d_flag)
                 debug_message("%s freed.\n", time_stamp());
@@ -2971,8 +2977,8 @@ v_replace_program (svalue_t *sp, int num_arg)
             else
             {
                 free_mstring(sname);
-                error("program to replace the current one with has "
-                      "to be inherited\n");
+                error("replacement program '%s' to be inherited\n"
+                     , get_txt(sp->u.str));
             }
         }
 
@@ -2983,7 +2989,23 @@ v_replace_program (svalue_t *sp, int num_arg)
 
     } /* if (num_arg) */
 
-    /* Program found, now create a new replace program entry, or
+    /* Program found, now check if it contains virtual variables.
+     * See b-030119 for an explanation.
+     */
+    if (offsets[0] != 0)
+    {
+        int i;
+
+        for (i = 0; i < new_prog->num_variables; i++)
+        {
+            if (new_prog->variables[i].type.typeflags & TYPE_MOD_VIRTUAL)
+                error("replacement program '%s' has virtual variables "
+                      "and is not the first inherited program\n"
+                     , get_txt(new_prog->name));
+        }
+    }
+
+    /* Program ok, now create a new replace program entry, or
      * change an existing one.
      */
     if (!(curprog->flags & P_REPLACE_ACTIVE)
