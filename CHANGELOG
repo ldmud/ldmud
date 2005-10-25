@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+24-Jan-2002 (Lars Duening)  (3.3.372)
+  - (lex.c) Included #pragma xxx_types settings are no longer restricted
+       to the include file's scope (reported by Gnomi).
+
 24-Jan-2002 (Lars Duening)  (3.3.371)
   - (object.c) save/restore didn't look out for shared closures, which
        could lead to endless recursions.

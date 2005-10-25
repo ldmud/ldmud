@@ -420,7 +420,6 @@ static struct incstate
     char      * file;           /* Filename */
     ptrdiff_t   linebufoffset;  /* Position of linebufstart */
     mp_uint     inc_offset;     /* Handle returned by store_include_info() */
-    int pragma_strict_types;
     char saved_char;
 } *inctop = NULL;
 
@@ -2357,7 +2356,6 @@ start_new_include (int fd, string_t * str
     is->linebufoffset = linebufoffset;
     is->saved_char = saved_char;
     is->next = inctop;
-    is->pragma_strict_types = pragma_strict_types;
 
     /* Copy the new filename into current_file */
 
@@ -2394,9 +2392,6 @@ start_new_include (int fd, string_t * str
         inctop->inc_offset = store_include_info(name, current_file, delim, inc_depth);
 
     /* Initialise the rest of the lexer state */
-    pragma_strict_types = PRAGMA_WEAK_TYPES;
-    instrs[F_CALL_OTHER].ret_type.typeflags = TYPE_ANY;
-    instrs[F_CALL_DIRECT].ret_type.typeflags = TYPE_ANY;
     current_line = 0;
     linebufend   = outp - 1; /* allow trailing zero */
     linebufstart = linebufend - MAXLINE;
@@ -3793,12 +3788,6 @@ yylex1 (void)
                 /* It's the end of an included file: return the previous
                  * file
                  */
-
-                static char call_other_return_types[]
-                  = { /* PRAGMA_WEAK_TYPES:   */ TYPE_ANY
-                    , /* PRAGMA_STRONG_TYPES: */ TYPE_ANY
-                    , /* PRAGMA_STRICT_TYPES: */ TYPE_UNKNOWN };
-
                 struct incstate *p;
                 Bool was_string_source = (yyin.fd == -1);
 
@@ -3828,11 +3817,6 @@ yylex1 (void)
                     store_line_number_backward(1);
                 }
 
-                pragma_strict_types = p->pragma_strict_types;
-                instrs[F_CALL_OTHER].ret_type.typeflags =
-                    call_other_return_types[pragma_strict_types];
-                instrs[F_CALL_DIRECT].ret_type.typeflags =
-                    call_other_return_types[pragma_strict_types];
                 yyin = p->yyin;
                 saved_char = p->saved_char;
                 inctop = p->next;
