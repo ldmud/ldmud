@@ -811,32 +811,35 @@ static p_int current_break_address;
    * variable points to the first offset-part of a series of LBRANCHes
    * which implement the break statement. Stored in every offset-part
    * is the address of the offset of the next LBRANCH in the series. The
-   * last LBRANCH is marked by having a negative offset value.
+   * last FBRANCH is marked by having a negative offset value.
    *
    * There are a few special values/flags for this variable:
    */
-#define BREAK_ON_STACK         0x04000000
+#define BREAK_ON_STACK        (0x04000000)
   /* Bitflag: true when the break-address is stored on the break stack,
    * and therefore the BREAK instruction has to be used.
    */
-#define BREAK_FROM_SWITCH      0x08000000
+#define BREAK_FROM_SWITCH     (0x08000000)
   /* TODO: We are compiling a switch instruction.
    */
-#define CASE_LABELS_ENABLED    0x10000000
+#define CASE_LABELS_ENABLED   (0x10000000)
   /* The "case" and "default" statements are allowed since we're
    * compiling a switch(). This flag is turned off for loops or
    * conditions embedded in a switch().
    */
-#define BREAK_DELIMITER       -0x20000000
+#define BREAK_DELIMITER       (-0x20000000)
   /* Special value: no break encountered (yet).
+   */
+#define BREAK_MAX             (0x00FFFFFF)
+  /* The largest positive value storable.
    */
 
 static p_int current_continue_address;
   /* If != 0, the compiler is in a continue-able environment and this
-   * variable points to the first offset-part of a series of LBRANCHes
+   * variable points to the first offset-part of a series of  FBRANCHes
    * which implement the continue statement. Stored in every offset-part
-   * is the address of the offset of the next LBRANCH in the series. The
-   * last LBRANCH is marked by having a negative offset value.
+   * is the address of the offset of the next FBRANCH in the series. The
+   * last FBRANCH is marked by having a negative offset value.
    *
    * A special case are continues inside a switch, as for these the
    * switch()es have to be terminated too using the BREAK_CONTINUE
@@ -871,7 +874,7 @@ static fulltype_t current_type;
 static p_uint last_expression;
   /* If >= 0, the address of the last instruction which by itself left
    * a value on the stack. If there is no such instruction, the value
-   * is negative.
+   * is (unsigned)-1.
    */
 
 static Bool last_string_is_new;
@@ -1835,12 +1838,18 @@ ins_f_code (unsigned int b)
 
 /*-------------------------------------------------------------------------*/
 static void
-ins_short (short l)
+ins_short (long l)
 
 /* Add the 2-byte number <l> to the A_PROGRAM area in a fixed byteorder.
  */
 
 {
+    short s = (short)l;
+
+    if (l > USHRT_MAX || l < SHRT_MIN)
+        yyerrorf("Compiler error: too large number %lx passed to ins_short()"
+                , l);
+
     if (realloc_a_program(2))
     {
         mp_uint current_size;
@@ -1849,7 +1858,7 @@ ins_short (short l)
         current_size = CURRENT_PROGRAM_SIZE;
         CURRENT_PROGRAM_SIZE = current_size + 2;
         dest = mem_block[A_PROGRAM].block + current_size;
-        PUT_SHORT(dest, l);
+        PUT_SHORT(dest, s);
     }
     else
     {
@@ -1860,7 +1869,7 @@ ins_short (short l)
 
 /*-------------------------------------------------------------------------*/
 static void
-upd_short (mp_uint offset, short l)
+upd_short (mp_uint offset, long l)
 
 /* Store the 2-byte number <l> at <offset> in the A_PROGRAM are in
  * a fixed byteorder.
@@ -1868,9 +1877,14 @@ upd_short (mp_uint offset, short l)
 
 {
     char *dest;
+    short s = (short)l;
+
+    if (l > USHRT_MAX || l < SHRT_MIN)
+        yyerrorf("Compiler error: too large number %ld passed to upd_short()"
+                , l);
 
     dest = mem_block[A_PROGRAM].block + offset;
-    PUT_SHORT(dest, l);
+    PUT_SHORT(dest, s);
 } /* upd_short() */
 
 /*-------------------------------------------------------------------------*/
@@ -1931,6 +1945,37 @@ ins_long (int32 l)
 
 /*-------------------------------------------------------------------------*/
 static void
+upd_long (mp_uint offset, long l)
+
+/* Store the 4-byte number <l> at <offset> in the A_PROGRAM are in
+ * a fixed byteorder.
+ */
+
+{
+    char *dest;
+
+    dest = mem_block[A_PROGRAM].block + offset;
+    PUT_LONG(dest, l);
+} /* upd_long() */
+
+/*-------------------------------------------------------------------------*/
+static long
+read_long (mp_uint offset)
+
+/* Return the 4-byte number stored at <offset> in the A_PROGRAM area.
+ */
+
+{
+    long l;
+    char *dest;
+
+    dest = mem_block[A_PROGRAM].block + offset;
+    GET_LONG(l, dest);
+    return l;
+} /* read_long() */
+
+/*-------------------------------------------------------------------------*/
+static void
 ins_number (long num)
 
 /* Insert code to push number <num> onto the stack.
@@ -1941,7 +1986,9 @@ ins_number (long num)
     if (num == 0)
         ins_f_code(F_CONST0);
     else if (num == 1)
+    {
         ins_f_code(F_CONST1);
+    }
     else if (num == -1)
         ins_f_code(F_NCONST1);
     else if (num >= 0 && num <= 0x0FF)
@@ -2085,9 +2132,9 @@ fix_branch (int ltoken, p_int dest, p_int loc)
         if ( current_break_address > loc
          && !(current_break_address & (BREAK_ON_STACK|BREAK_DELIMITER) ) )
         {
-            for (i = current_break_address; (j = read_short(i)) > loc; )
+            for (i = current_break_address; (j = read_long(i)) > loc; )
             {
-                upd_short(i, j+1);
+                upd_long(i, j+1);
                 i = j;
             }
             current_break_address++;
@@ -2098,9 +2145,9 @@ fix_branch (int ltoken, p_int dest, p_int loc)
          && !(current_continue_address & CONTINUE_DELIMITER ) )
         {
             for(i = current_continue_address & CONTINUE_ADDRESS_MASK;
-              (j=read_short(i)) > loc; )
+              (j=read_long(i)) > loc; )
             {
-                upd_short(i, j+1);
+                upd_long(i, j+1);
                 i = j;
             }
             current_continue_address++;
@@ -2121,7 +2168,8 @@ fix_branch (int ltoken, p_int dest, p_int loc)
         upd_short(loc, offset+2);
 
         if (offset > 0x7ffd)
-            yyerror("offset overflow");
+            yyerrorf("Compiler limit: Too much code to branch over: %ld bytes"
+                    , offset);
 
         return MY_TRUE;
     }
@@ -2173,9 +2221,9 @@ yymove_switch_instructions (int len, p_int blocklen)
          && !(current_continue_address & CONTINUE_DELIMITER ) )
         {
             for(i = current_continue_address & CONTINUE_ADDRESS_MASK;
-              (j=read_short(i)) > switch_pc; )
+              (j=read_long(i)) > switch_pc; )
             {
-                    upd_short(i, j+len);
+                    upd_long(i, j+len);
                     i = j;
             }
             current_continue_address += len;
@@ -2257,7 +2305,8 @@ update_lop_branch ( p_uint address, int instruction )
         p[-3] = instruction;
         upd_short(address+1, offset+3);
         if (offset > 0x7ffc)
-            yyerror("offset overflow");
+            yyerrorf("Compiler limit: Too much code to skip for ||/&&:"
+                     " %ld bytes" , offset);
         p[0]  = F_POP_VALUE;
     }
     else
@@ -6633,11 +6682,14 @@ statement:
           }
           else
           {
-              /* A normal loop break: add the LBRANCH to the list */
+              /* A normal loop break: add the FBRANCH to the list */
 
-              ins_f_code(F_LBRANCH);
-              ins_short(current_break_address);
-              current_break_address = CURRENT_PROGRAM_SIZE - 2;
+              ins_f_code(F_FBRANCH);
+              ins_long(current_break_address);
+              current_break_address = CURRENT_PROGRAM_SIZE - 4;
+              if (current_break_address > BREAK_MAX)
+                  yyerrorf("Compiler limit: (L_BREAK) value too large: %ld"
+                          , current_break_address);
           }
       }
 
@@ -6659,7 +6711,7 @@ statement:
               {
                   ins_f_code(F_BREAKN_CONTINUE);
                   ins_byte(255);
-                  ins_short(2);
+                  ins_long(4);
                   depth -= SWITCH_DEPTH_UNIT*256;
               }
 
@@ -6678,14 +6730,14 @@ statement:
           else
           {
               /* Normal continue */
-              ins_f_code(F_LBRANCH);
+              ins_f_code(F_FBRANCH);
           }
 
           /* In either case, handle the list of continues alike */
-          ins_short(current_continue_address);
+          ins_long(current_continue_address);
           current_continue_address =
                         ( current_continue_address & SWITCH_DEPTH_MASK ) |
-                        ( CURRENT_PROGRAM_SIZE - 2 );
+                        ( CURRENT_PROGRAM_SIZE - 4 );
       }
 ; /* statement */
 
@@ -6835,8 +6887,8 @@ while:
           for ( ; current_continue_address > 0
                 ; current_continue_address = next_addr)
           {
-              next_addr = read_short(current_continue_address);
-              upd_short(current_continue_address,
+              next_addr = read_long(current_continue_address);
+              upd_long(current_continue_address,
                   CURRENT_PROGRAM_SIZE - current_continue_address);
           }
 
@@ -6881,8 +6933,8 @@ while:
           for( ; current_break_address > 0
                ; current_break_address = next_addr)
           {
-              next_addr = read_short(current_break_address);
-              upd_short(current_break_address,
+              next_addr = read_long(current_break_address);
+              upd_long(current_break_address,
                   CURRENT_PROGRAM_SIZE - current_break_address);
           }
 
@@ -6928,8 +6980,8 @@ do:
           for(; current_continue_address > 0
               ; current_continue_address = next_addr)
           {
-              next_addr = read_short(current_continue_address);
-              upd_short(current_continue_address,
+              next_addr = read_long(current_continue_address);
+              upd_long(current_continue_address,
                   current - current_continue_address);
           }
       }
@@ -7001,8 +7053,8 @@ do:
           for (; current_break_address > 0
                ; current_break_address = next_addr)
           {
-              next_addr = read_short(current_break_address);
-              upd_short(current_break_address,
+              next_addr = read_long(current_break_address);
+              upd_long(current_break_address,
                   current - current_break_address);
           }
 
@@ -7032,6 +7084,7 @@ for:
       L_FOR '('
 
       {
+%line
           /* Save the previous environment */
           $<numbers>$[0] = current_continue_address;
           $<numbers>$[1] = current_break_address;
@@ -7045,6 +7098,7 @@ for:
       for_init_expr ';'
 
       {
+%line
           /* Get rid of whatever init_expr computed */
           insert_pop_value();
 
@@ -7156,8 +7210,8 @@ for:
           for (; current_continue_address > 0
                ; current_continue_address = next_addr)
           {
-              next_addr = read_short(current_continue_address);
-              upd_short(current_continue_address,
+              next_addr = read_long(current_continue_address);
+              upd_long(current_continue_address,
                   CURRENT_PROGRAM_SIZE - current_continue_address);
           }
 
@@ -7214,8 +7268,8 @@ for:
           for (; current_break_address > 0
                ; current_break_address = next_addr)
           {
-              next_addr = read_short(current_break_address);
-              upd_short(current_break_address,
+              next_addr = read_long(current_break_address);
+              upd_long(current_break_address,
                   CURRENT_PROGRAM_SIZE - current_break_address);
           }
 
@@ -7440,7 +7494,6 @@ foreach:
                   current++;
               }
           }
-
           else /* Create the full statement */
           {
               /* First patch up the continue statements */
@@ -7448,8 +7501,8 @@ foreach:
               for(; current_continue_address > 0
                   ; current_continue_address = next_addr)
               {
-                  next_addr = read_short(current_continue_address);
-                  upd_short(current_continue_address,
+                  next_addr = read_long(current_continue_address);
+                  upd_long(current_continue_address,
                       current - current_continue_address);
               }
 
@@ -7469,8 +7522,8 @@ foreach:
               for (; current_break_address > 0
                    ; current_break_address = next_addr)
               {
-                  next_addr = read_short(current_break_address);
-                  upd_short(current_break_address,
+                  next_addr = read_long(current_break_address);
+                  upd_long(current_break_address,
                       current - current_break_address);
               }
 

@@ -2353,6 +2353,10 @@ static struct malloc_par mp_;
   optimization at all. (Inlining it in malloc_consolidate is fine though.)
 */
 
+#ifdef ENABLE_GC_SUPPORT
+static rwlock_t gc_lock;
+#endif
+
 #if __STD_C
 static void malloc_init_state(mstate av)
 #else
@@ -3381,6 +3385,9 @@ public_mALLOc(size_t bytes)
   arena_get(ar_ptr, bytes);
   if(!ar_ptr)
     return 0;
+#ifdef ENABLE_GC_SUPPORT
+//  mutex_rwlock_rdlock(&gc_lock);
+#endif
   victim = _int_malloc(ar_ptr, bytes);
   if(!victim) {
     /* Maybe the failure is due to running out of mmapped areas. */
@@ -3404,6 +3411,9 @@ public_mALLOc(size_t bytes)
     (void)mutex_unlock(&ar_ptr->mutex);
   assert(!victim || chunk_is_mmapped(mem2chunk(victim)) ||
 	 ar_ptr == arena_for_chunk(mem2chunk(victim)));
+#ifdef ENABLE_GC_SUPPORT
+//  mutex_rwlock_unlock(&gc_lock);
+#endif
   return victim;
 }
 
@@ -3425,10 +3435,17 @@ public_fREe(Void_t* mem)
 
   p = mem2chunk(mem);
 
+#ifdef ENABLE_GC_SUPPORT
+//  mutex_rwlock_rdlock(&gc_lock);
+#endif
+
 #if HAVE_MMAP
   if (chunk_is_mmapped(p))                       /* release mmapped memory. */
   {
     munmap_chunk(p);
+#ifdef ENABLE_GC_SUPPORT
+//    mutex_rwlock_unlock(&gc_lock);
+#endif
     return;
   }
 #endif
@@ -3446,6 +3463,11 @@ public_fREe(Void_t* mem)
 #endif
   _int_free(ar_ptr, mem);
   (void)mutex_unlock(&ar_ptr->mutex);
+
+#ifdef ENABLE_GC_SUPPORT
+//  mutex_rwlock_unlock(&gc_lock);
+#endif
+
 }
 
 Void_t*
@@ -5292,7 +5314,6 @@ void public_mARK_PERm(Void_t *mem)
 void public_mARK_PERm(mem) Void_t *mem;
 #endif
 {
-//write(0, "markp\n",6);
     (mem2chunk(mem)->size) |= MARK_PERM;
 }
 
@@ -5306,7 +5327,6 @@ void public_mARK_COLl(Void_t *mem)
 void public_mARK_COLl(mem) Void_t *mem;
 #endif
 {
-//write(0, "markc\n",6);
     (mem2chunk(mem)->size) &= ~MARK_PERM;
 }
 
@@ -5321,7 +5341,6 @@ void public_cLEAR_REf(Void_t *mem)
 void public_cLEAR_REf(mem) Void_t *mem;
 #endif
 {
-//write(1, "clearref\n",9);
     (mem2chunk(mem)->size) &= ~MARK_REF;
 }
 
@@ -5335,7 +5354,6 @@ void public_mARK_REf(Void_t *mem)
 void public_mARK_REf(mem) Void_t *mem;
 #endif
 {
-//write(1, "markref\n",8);
     (mem2chunk(mem)->size) |= MARK_REF;
 }
 
@@ -5349,7 +5367,6 @@ int public_tEST_REf(Void_t *mem)
 int public_tEST_REf(mem) Void_t *mem;
 #endif
 {
-//write(1, "testref\n",8);
     return (mem2chunk(mem)->size & MARK_REF);
 }
 
@@ -5367,6 +5384,7 @@ void public_cLEAR_REf_FLAGs()
     mchunkptr chunk = (mchunkptr) (mp_.sbrk_base + (((INTERNAL_SIZE_T) chunk2mem(mp_.sbrk_base)) & MALLOC_ALIGN_MASK));
 
     // TODO: check for non contiguous case!
+    // TODO: check for fenceposts
     do{
 	chunk->size &= ~MARK_REF;
         chunk = next_chunk(chunk);
@@ -5384,13 +5402,50 @@ void public_fREE_UNREFED_MEMORy()
 void public_fREE_UNREFED_MEMORy()
 #endif
 {
+    int i = 0, k=0;
+    int j = 0;
     mchunkptr chunk = (mchunkptr) (mp_.sbrk_base + (((INTERNAL_SIZE_T) chunk2mem(mp_.sbrk_base)) & MALLOC_ALIGN_MASK));
+    mfastbinptr fb;
+    struct malloc_state *arena;
 
+    mutex_rwlock_wrlock(&gc_lock);
+
+    // TODO: public_funs must check for gc_lock
     // TODO: check for non contiguous case!
+    // TODO: check for fenceposts
     do{
+	++j;
+	if(inuse(chunk) && !(chunk->size & MARK_REF) && !(chunk->size & MARK_PERM) 
+	                && !chunk_is_mmapped(chunk) && chunksize(chunk)<request2size(MAX_FAST_SIZE)) {
+	    // if the chunk is marked as inuse, we must check if the chunk is in a 
+	    // fastbin. if it is, do not free it, just ignore it.
+	    int found = 0;
+	    arena = &main_arena;
+	    do {
+		fb = arena->fastbins[fastbin_index(chunksize(chunk))];
+		do {
+		    if(!fb) break; // if the fastbin is empty break here
+		    found = (fb==chunk);
+		} 
+		while(!found && (fb = fb->fd) != 0);
+	    }
+	    while(!found && (arena = arena->next) != &main_arena);
+
+	    ++k;
+	    // if found in fastbins do nothing
+	    // else free it
+	    if(!found) {
+		++i;
+		_int_free(&main_arena, chunk2mem(chunk));
+	    }
+	}
         chunk = next_chunk(chunk);
-    } while(chunk < main_arena.top);
-write(1, "free_unrefed_mem\n",17);
+    } 
+    while(chunk < main_arena.top);
+
+    mutex_rwlock_unlock(&gc_lock);
+
+    printf("to free: %d from free %d from %d\n", i, k, j);
 }
 
 /*
@@ -5404,7 +5459,7 @@ int public_iS_FREEd(Void_t *mem, size_t minsize)
 int public_iS_FREEd(mem, minsize) Void_t *mem; size_t minsize;
 #endif
 {
-write(1,"is_freed\n",9);
+    return !inuse(mem2chunk(mem)) && chunksize(mem2chunk(mem)) >= minsize;
     return 1;
 }
 

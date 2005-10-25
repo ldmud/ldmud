@@ -12463,6 +12463,19 @@ again:
         break;
       }
 
+    CASE(F_FBRANCH);                /* --- fbranch <offset>    --- */
+    {
+        /* Jump by (32-Bit) long <offset> bytes.
+         * The <offset> is counted from its first byte (TODO: Ugh).
+         */
+
+        long offset;
+
+        GET_LONG(offset, pc);
+        pc += offset;
+        break;
+    }
+
     CASE(F_LBRANCH);                /* --- lbranch <offset>    --- */
     {
         /* Jump by (16-Bit) short <offset> bytes.
@@ -14866,7 +14879,7 @@ again:
          * a nested surrounding structure.
          *
          * Pop <num>+1 (uint8) break-levels from the break stack
-         * and jump by (16-Bit) short <offset> bytes, counted from the
+         * and jump by (32-Bit) long <offset> bytes, counted from the
          * first by of <offset>
          */
 
@@ -14880,7 +14893,7 @@ again:
          * surrounding structure.
          *
          * Pop one break-level from the break stack and jump
-         * by (16-Bit) unsigned short <offset> bytes, counted from the
+         * by (32-Bit) unsigned long <offset> bytes, counted from the
          * first by of <offset>
          *
          * Pitfall: the offset is added to the current pc in 16-Bit
@@ -14890,10 +14903,10 @@ again:
          * TODO: Make that a proper signed short.
          */
 
-        /* TODO: uint16 */ unsigned short offset;
+        /* TODO: uint16 */ unsigned long offset;
 
         break_sp += sizeof(svalue_t)/sizeof(*break_sp);
-        GET_SHORT(offset, pc);
+        GET_LONG(offset, pc);
         offset += pc - current_prog->program;
         pc = current_prog->program + offset;
         break;
@@ -14902,7 +14915,7 @@ again:
 #ifdef F_JUMP
     CASE(F_JUMP);                   /* --- jump <dest>         --- */
     {
-        /* Jump to the (48-Bit) unsigned address <dest> (absolute jump).
+        /* Jump to the (24-Bit) unsigned address <dest> (absolute jump).
          */
 
         unsigned long dest;

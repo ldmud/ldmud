@@ -19,7 +19,7 @@
    Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
    02111-1307 USA.  */
 
-/* $Id$
+/* $Id: thread-m.h,v 1.1 2002/01/14 22:24:52 wg Exp $
    One out of _LIBC, USE_PTHREADS, USE_THR or USE_SPROC should be
    defined, otherwise the token NO_THREADS and dummy implementations
    of the macros will be defined.  */
@@ -38,7 +38,8 @@
 typedef pthread_t thread_id;
 
 /* mutex */
-typedef pthread_mutex_t	mutex_t;
+typedef pthread_mutex_t   mutex_t;
+typedef pthread_rwlock_t  rwlock_t;
 
 #define MUTEX_INITIALIZER	PTHREAD_MUTEX_INITIALIZER
 
@@ -56,6 +57,15 @@ typedef pthread_mutex_t	mutex_t;
    (__pthread_mutex_trylock != NULL \
     ? __pthread_mutex_trylock (m) : (*(int *)(m) ? 1 : ((*(int *)(m) = 1), 0)))
 #define mutex_unlock(m)		\
+   (__pthread_mutex_unlock != NULL \
+    ? __pthread_mutex_unlock (m) : (*(int*)(m) = 0))
+#define mutex_rwlock_init(m)		\
+   (__pthread_rwlock_init != NULL \
+    ? __pthread_rwlock_init (m, NULL) : (*(int *)(m) = 0))
+#define mutex_rwlock_wrlock(m)		\
+   (__pthread_mutex_wrlock != NULL \
+    ? __pthread_mutex_wrlock (m) : ((*(int *)(m) = 1), 0))
+#define mutex_rwlock_unlock(m)		\
    (__pthread_mutex_unlock != NULL \
     ? __pthread_mutex_unlock (m) : (*(int*)(m) = 0))
 
@@ -172,13 +182,17 @@ static inline int mutex_unlock(mutex_t *m) {
 #else
 
 /* Normal pthread mutex.  */
-typedef pthread_mutex_t mutex_t;
+typedef pthread_mutex_t  mutex_t;
+typedef pthread_rwlock_t rwlock_t;
 
 #define MUTEX_INITIALIZER          PTHREAD_MUTEX_INITIALIZER
 #define mutex_init(m)              pthread_mutex_init(m, NULL)
 #define mutex_lock(m)              pthread_mutex_lock(m)
 #define mutex_trylock(m)           pthread_mutex_trylock(m)
 #define mutex_unlock(m)            pthread_mutex_unlock(m)
+#define mutex_rwlock_init(m)       pthread_rwlock_init(m,NULL)
+#define mutex_rwlock_wrlock(m)     pthread_rwlock_wrlock(m)
+#define mutex_rwlock_unlock(m)     pthread_rwlock_unlock(m)
 
 #endif /* (__i386__ || __x86_64__) && __GNUC__ && !USE_NO_SPINLOCKS */
 
@@ -279,12 +293,16 @@ typedef int thread_id;
    protected by a mutex async-signal safe, these macros would have to
    be based on atomic test-and-set operations, for example. */
 typedef int mutex_t;
+typedef int rwlock_t;
 
 #define MUTEX_INITIALIZER          0
 #define mutex_init(m)              (*(m) = 0)
 #define mutex_lock(m)              ((*(m) = 1), 0)
 #define mutex_trylock(m)           (*(m) ? 1 : ((*(m) = 1), 0))
 #define mutex_unlock(m)            (*(m) = 0)
+#define mutex_rwlock_init(m)       mutex_init(m)
+#define mutex_rwlock_wrlock(m)     mutex_lock(m)
+#define mutex_rwlock_unlock(m)     mutex_unlock(m)
 
 typedef void *tsd_key_t;
 #define tsd_key_create(key, destr) do {} while(0)

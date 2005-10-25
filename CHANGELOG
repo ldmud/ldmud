@@ -1,6 +1,19 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+06-Feb-2002 (Lars Duening)  (3.3.387)
+  - (prolang.y) With the increasing program sizes, using 16-Bit offsets
+       for the 'break' and 'continue' branches was no longer enough. They
+       might hold the final offsets, but during compilation they stored
+       the absolute address of the next 'break'/'continue', which could
+       exceed 2 Bytes (reported by Alwin).
+  - (prolang.y) Insertions of 2 byte values are now checked for range.
+  - (xptmalloc.c, mudlib/sys/debug_info.h) debug_info(DINFO_MEMORY) now
+       returns the ptmalloc statistics (thanks, Gawain).
+  - (ptmalloc) GC support is now alpha-functional, but not yet
+       threadsafe (thanks, Gawain).
+  - (configure) The check for pthread_atfork() was unreliable.
+
 04-Feb-2002 (Lars Duening)  (3.3.386)
   - (smalloc.c) Small chunks (except for the first one) are now allocated
        from the large blocks. Reason is that during a consolidation, unused

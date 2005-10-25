@@ -1058,7 +1058,7 @@ mem_alloc (size_t size)
                    );
             small_chunk_size = SMALL_CHUNK_SIZE;
             next_unused = (word_t*)large_malloc_int(small_chunk_size+sizeof(word_t*)
-                                               , MY_FALSE);
+                                               , MY_TRUE);
         }
 
         if (next_unused == NULL)

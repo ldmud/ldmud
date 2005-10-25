@@ -336,77 +336,88 @@ DESCRIPTION
             <arg2> == DID_MEMORY (2): Returns the "status malloc" information:
 
                string DID_MEM_NAME
-                   The name of the allocator: "sysmalloc" or "smalloc".
-
-               int DID_MEM_SBRK
-               int DID_MEM_SBRK_SIZE
+                   The name of the allocator: "sysmalloc", "smalloc",
+                   "ptmalloc".
+       
+               int DID_MEM_SBRK          (smalloc)
+               int DID_MEM_SBRK_SIZE     (smalloc, ptmalloc)
                    Number and size of memory blocks requested from the
-                   operating system (smalloc only).
-
-               int DID_MEM_LARGE
-               int DID_MEM_LARGE_SIZE
-               int DID_MEM_LFREE
-               int DID_MEM_LFREE_SIZE
+                   operating system (non-mmapped memory).
+       
+               int DID_MEM_MMAP          (ptmalloc)
+               int DID_MEM_MMAP_SIZE     (ptmalloc)
+                   Number and size of mmapped regions.
+       
+               int DID_MEM_LARGE         (smalloc)
+               int DID_MEM_LARGE_SIZE    (smalloc)
+               int DID_MEM_LFREE         (smalloc)
+               int DID_MEM_LFREE_SIZE    (smalloc)
                    Number and size of large allocated resp. free blocks.
-                   (smalloc only)
-
-               int DID_MEM_LWASTED
-               int DID_MEM_LWASTED_SIZE
+       
+               int DID_MEM_LWASTED       (smalloc)
+               int DID_MEM_LWASTED_SIZE  (smalloc)
                    Number and size of unusable large memory fragments.
-                   (smalloc only).
-
-               int DID_MEM_CHUNK
-               int DID_MEM_CHUNK_SIZE
-                   Number and size of small chunk blocks (smalloc only).
-
-               int DID_MEM_UNUSED
-                   Unused space in the current small chunk block
-                   (smalloc only).
-
-               int DID_MEM_SMALL
-               int DID_MEM_SMALL_SIZE
-               int DID_MEM_SFREE
-               int DID_MEM_SFREE_SIZE
-                   Number and size of small allocated resp. free blocks
-                   (smalloc only).
-
-               int DID_MEM_SWASTED
-               int DID_MEM_SWASTED_SIZE
+       
+               int DID_MEM_FREE_CHUNKS   (ptmalloc)
+                   Number of free chunks.
+       
+               int DID_MEM_FFREE         (ptmalloc)
+               int DID_MEM_FFREE_SIZE    (ptmalloc)
+                   Number of fastbin blocks, size of freed fastbin blocks.
+       
+               int DID_MEM_CHUNK         (smalloc)
+               int DID_MEM_CHUNK_SIZE    (smalloc)
+                   Number and size of small chunk blocks.
+       
+               int DID_MEM_UNUSED        (smalloc)
+                   Unused space in the current small chunk block.
+       
+               int DID_MEM_SMALL         (smalloc)
+               int DID_MEM_SMALL_SIZE    (smalloc)
+               int DID_MEM_SFREE         (smalloc)
+               int DID_MEM_SFREE_SIZE    (smalloc)
+                   Number and size of small allocated resp. free blocks.
+       
+               int DID_MEM_SWASTED       (smalloc)
+               int DID_MEM_SWASTED_SIZE  (smalloc)
                    Number and size of unusably small memory fragments.
-                   (smalloc only).
-
-               int DID_MEM_MINC_CALLS
-               int DID_MEM_MINC_SUCCESS
-               int DID_MEM_MINC_SIZE
+       
+               int DID_MEM_MINC_CALLS    (smalloc)
+               int DID_MEM_MINC_SUCCESS  (smalloc)
+               int DID_MEM_MINC_SIZE     (smalloc)
                    Number of calls to malloc_increment(), the number
                    of successes and the size of memory allocated this
-                   way (smalloc only).
-
-               int DID_MEM_PERM
-               int DID_MEM_PERM_SIZE
-                   Number and size of permanent (non-GCable) allocations
-                   (smalloc only).
-
-               int DID_MEM_CLIB
-               int DID_MEM_CLIB_SIZE
+                   way.
+       
+               int DID_MEM_PERM         (smalloc)
+               int DID_MEM_PERM_SIZE    (smalloc)
+                   Number and size of permanent (non-GCable) allocations.
+       
+               int DID_MEM_CLIB         (smalloc)
+               int DID_MEM_CLIB_SIZE    (smalloc)
                    Number and size of allocations done through the
-                   clib functions (smalloc only with SBRK_OK).
-
-               int DID_MEM_OVERHEAD
-                   Overhead for every allocation (smalloc only).
-
-               int DID_MEM_ALLOCATED
+                   clib functions (if supported by the allocator).
+       
+               int DID_MEM_OVERHEAD     (smalloc, ptmalloc)
+                   Overhead for every allocation.
+       
+               int DID_MEM_ALLOCATED    (smalloc, ptmalloc)
                    The amount of memory currently allocated from the
-                   allocator, including the overhead for the allocator
-                   (smalloc only).
-
-               int DID_MEM_USED
+                   allocator, including the overhead for the allocator.
+       
+               int DID_MEM_MAX_ALLOCATED (ptmalloc)
+                   Maximum total allocated space.
+       
+               int DID_MEM_USED         (smalloc, ptmalloc)
                    The amount of memory currently used for driver data,
-                   excluding the overhead from the allocator (smalloc only).
-
-               int DID_MEM_TOTAL_UNUSED
+                   excluding the overhead from the allocator.
+       
+               int DID_MEM_TOTAL_UNUSED (smalloc, ptmalloc)
                    The amount of memory allocated from the system, but
                    not used by the driver.
+       
+               int DID_MEM_KEEP_COST    (ptmalloc)
+                   Top-most releasable space.
 
 
         DINFO_TRACE (7): Return the call stack 'trace' information as specified
@@ -472,6 +483,8 @@ HISTORY
           DID_ST_HBEAT_CALLS_TOTAL stats.
         LDMud 3.3 replaced the string related DID_ST_ constants according to
         the new string implementation.
+        LDMud 3.3.387 added the ptmalloc values for DINFO_MEMORY.
+
 
 SEE ALSO
         trace(E), traceprefix(E), malloc(D), status(D), dumpallobj(D)

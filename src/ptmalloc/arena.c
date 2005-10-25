@@ -18,7 +18,7 @@
    write to the Free Software Foundation, Inc., 59 Temple Place - Suite 330,
    Boston, MA 02111-1307, USA.  */
 
-/* $Id$ */
+/* $Id: arena.c,v 1.3 2002/11/18 12:32:06 wmglo Exp $ */
 
 /* Compile-time constants.  */
 
@@ -357,6 +357,9 @@ ptmalloc_init __MALLOC_P((void))
 #endif /* !defined NO_THREADS */
   mutex_init(&main_arena.mutex);
   main_arena.next = &main_arena;
+#ifdef ENABLE_GC_SUPPORT
+  mutex_rwlock_init(&gc_lock);
+#endif
 
   mutex_init(&list_lock);
   tsd_key_create(&arena_key, NULL);
