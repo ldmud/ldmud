@@ -3703,8 +3703,19 @@ compile_value (svalue_t *value, int opt_flags)
                  * correct number of arguments.
                  */
                 argp = block->item;
-                if (current.code_left < 6)
+                if (current.code_left < 8)
                     realloc_code();
+
+#ifdef USE_STRUCTS
+                /* The 'efun' #'-> needs a hidden argument
+                 * for the struct type index.
+                 */
+                if (f == F_S_INDEX)
+                {
+                    current.code_left--;
+                    STORE_CODE(current.codep, (bytecode_t)F_NCONST1);
+                }
+#endif /* USE_STRUCTS */
 
                 p = current.codep;
                 if (num_arg < min)
@@ -4288,8 +4299,21 @@ compile_lvalue (svalue_t *argp, int flags)
                     if (is_lvalue(argp+1, flags & USE_INDEX_LVALUE))
                     {
                         compile_value(argp+2, 0);
+
+#ifdef USE_STRUCTS
+                        if (!(flags & PROTECT_LVALUE)
+                         && argp->x.closure_type == F_S_INDEX + CLOSURE_EFUN
+                           )
+                        {
+                            if (current.code_left < 1)
+                                realloc_code();
+                            current.code_left--;
+                            STORE_CODE(current.codep, (bytecode_t) F_NCONST1);
+                        }
+#endif /* USE_STRUCTS */
+
                         compile_lvalue(argp+1, flags & PROTECT_LVALUE);
-                        if (current.code_left < 2)
+                        if (current.code_left < 3)
                             realloc_code();
                         if (flags & PROTECT_LVALUE)
                         {
@@ -4308,9 +4332,13 @@ compile_lvalue (svalue_t *argp, int flags)
                                             (F_PROTECTED_AINDEX_LVALUE));
 #ifdef USE_STRUCTS
                             else if (argp->x.closure_type == F_S_INDEX + CLOSURE_EFUN)
+                            {
+                                current.code_left -= 1;
+                                STORE_CODE(current.codep, (bytecode_t) F_NCONST1);
                                 STORE_CODE(current.codep
                                           , (bytecode_t)
                                             (F_PROTECTED_INDEX_S_LVALUE));
+                            }
 #endif /* USE_STRUCTS */
                         } else {
                             current.code_left -= 1;
@@ -4328,9 +4356,11 @@ compile_lvalue (svalue_t *argp, int flags)
                                             (F_AINDEX_LVALUE));
 #ifdef USE_STRUCTS
                             else if (argp->x.closure_type == F_S_INDEX + CLOSURE_EFUN)
+                            {
                                 STORE_CODE(current.codep
                                           , (bytecode_t)
                                             (F_INDEX_S_LVALUE));
+                            }
 #endif /* USE_STRUCTS */
                         }
                         return;
@@ -4356,9 +4386,13 @@ compile_lvalue (svalue_t *argp, int flags)
                                         (F_PUSH_PROTECTED_AINDEXED_LVALUE));
 #ifdef USE_STRUCTS
                         else if (argp->x.closure_type == F_S_INDEX + CLOSURE_EFUN)
+                        {
+                            current.code_left -= 1;
+                            STORE_CODE(current.codep, (bytecode_t) F_NCONST1);
                             STORE_CODE(current.codep
                                       , (bytecode_t)
                                         (F_PUSH_PROTECTED_INDEXED_S_LVALUE));
+                        }
 #endif /* USE_STRUCTS */
                     } else {
                         current.code_left -= 1;
@@ -4376,9 +4410,13 @@ compile_lvalue (svalue_t *argp, int flags)
                                         (F_PUSH_AINDEXED_LVALUE));
 #ifdef USE_STRUCTS
                         else if (argp->x.closure_type == F_S_INDEX + CLOSURE_EFUN)
+                        {
+                            current.code_left -= 1;
+                            STORE_CODE(current.codep, (bytecode_t) F_NCONST1);
                             STORE_CODE(current.codep
                                       , (bytecode_t)
                                         (F_PUSH_INDEXED_S_LVALUE));
+                        }
 #endif /* USE_STRUCTS */
                     }
                     return;

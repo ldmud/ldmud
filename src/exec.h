@@ -276,6 +276,9 @@ struct fulltype_s {
 #define IS_TYPE_STRUCT(t) \
   (((t).typeflags & (PRIMARY_TYPE_MASK|TYPE_MOD_POINTER|TYPE_MOD_REFERENCE)) == TYPE_STRUCT)
 
+#define IS_TYPE_ANY(t) \
+  (((t).typeflags & (PRIMARY_TYPE_MASK|TYPE_MOD_POINTER|TYPE_MOD_REFERENCE)) == TYPE_ANY)
+
 
 /* Other type related defines */
 

@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+22-Jan-2002 (Lars Duening)  (3.3.365)
+  - (efuns.c) Efun member() crashed when given a struct as second
+       argument (reported by Markus).
+  - (etc/lpc.xml) LPC syntax highlighting for KDE's kate (thanks, Menaures!)
+  - (prolang.y, interpret.c, closure.c) Implemented struct lookups
+       on 'mixed' expressions (suggested by Markus).
+
 19-Jan-2002 (Lars Duening)  (3.3.364)
   - (configure) The '--with-malloc' option didn't quite work (reported
        by Nostradamus).

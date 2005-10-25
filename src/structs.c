@@ -354,7 +354,7 @@ struct_free (struct_t *pStruct)
         fatal("NULL pointer passed to struct_free().\n");
 
     if (!pStruct->user)
-        fatal("No wizlist pointer for struct in struct_free_empty().");
+        fatal("No wizlist pointer for struct in struct_free().");
 
     if (pStruct->ref != 0)
         fatal("Struct with %ld refs passed to struct_free().\n"

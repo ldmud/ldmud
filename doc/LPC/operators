@@ -61,6 +61,10 @@ DESCRIPTION
                         For arrays and strings, the intersection set
                         (all elements resp. characters from expr1 which
                         which are also in the expr2) is computed.
+                        Note: "aab" & "a" -> "aa"
+                         but  ({ 'a','a','b' }) & ({ 'a' }) -> ({ 'a' })
+                        Eventually the array behaviour will be changed
+                        to match the string behaviour.
 
         expr1 == expr2        Compare values. Valid for strings, numbers,
                               objects and closures.

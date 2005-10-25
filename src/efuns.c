@@ -6062,6 +6062,9 @@ f_member (svalue_t *sp)
         case T_MAPPING:
         case T_OBJECT:
         case T_POINTER:
+#ifdef USE_STRUCTS
+        case T_STRUCT:
+#endif /* USE_STRUCTS */
           {
             svalue_t *item;
             short type = sp->type;

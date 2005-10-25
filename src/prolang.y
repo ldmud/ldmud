@@ -1975,6 +1975,38 @@ ins_long (int32 l)
 } /* ins_long() */
 
 /*-------------------------------------------------------------------------*/
+static void
+ins_number (long num)
+
+/* Insert code to push number <num> onto the stack.
+ * The function tries to find the shortest sequence to do so.
+ */
+
+{
+    if (num == 0)
+        ins_f_code(F_CONST0);
+    else if (num == 1)
+        ins_f_code(F_CONST1);
+    else if (num == -1)
+        ins_f_code(F_NCONST1);
+    else if (num >= 0 && num <= 0x0FF)
+    {
+        ins_f_code(F_CLIT);
+        ins_byte((num & 0xFF));
+    }
+    else if (num < 0 && num >= -0x0FF)
+    {
+        ins_f_code(F_NCLIT);
+        ins_byte(((-num) & 0xFF));
+    }
+    else
+    {
+        ins_f_code(F_NUMBER);
+        ins_long(num);
+    }
+} /* ins_number() */
+
+/*-------------------------------------------------------------------------*/
 /* The following macros are used for a speedy codegeneration within bigger
  * functions.
  *
@@ -4004,6 +4036,138 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
 
     return MY_TRUE;
 } /* create_struct_literal() */
+
+/*-------------------------------------------------------------------------*/
+static short
+get_struct_index (struct_type_t * pType)
+
+/* Return the index of struct type <pType> in this program's A_STRUCT_DEFS.
+ * Return -1 if not found.
+ */
+
+{
+    short i;
+
+    for (i = 0; i < STRUCT_COUNT; i++)
+    {
+        if (STRUCT_DEF(i).type == pType)
+            return i;
+    }
+    return -1;
+} /* get_struct_index() */
+
+/*-------------------------------------------------------------------------*/
+static short
+find_struct_by_member (string_t * name, int * pNum)
+
+/* Among the structs known by this program, find the (smallest) one
+ * defining member <name>.
+ * Result:
+ *   >= 0: Index of the struct in A_STRUCT_DEFS, *<pNum> index of the member
+ *   FSM_NO_STRUCT (-1): No struct with such a member
+ *   FSM_AMBIGUOUS (-2): Multiple unrelated structs define the member
+ * In case of the errors, the function also issues a compiler error.
+ */
+
+#define FSM_NO_STRUCT (-1)
+#define FSM_AMBIGUOUS (-2)
+
+{
+    short rc = FSM_NO_STRUCT;
+    struct_def_t * pRC = NULL;
+    int  member = -1;
+    int i;
+
+    for (i = 0; i < STRUCT_COUNT; i++)
+    {
+        int num;
+        struct_def_t * pdef = &STRUCT_DEF(i);
+
+        /* If we already found a struct, check if this one is
+         * a relative. If yes, we can immediately continue
+         * to the next.
+         */
+        if (pRC != NULL)
+        {
+            struct_type_t * pTest;
+
+            for ( pTest = pdef->type
+                ; pTest != NULL && pTest != pRC->type
+                ; pTest = pTest->base
+                )
+              NOOP;
+
+            if (pTest != NULL)
+                continue;
+        }
+
+        /* Lookup the member in this struct. If not found,
+         * continue to the next struct.
+         */
+        num = struct_find_member(pdef->type, name);
+        if (num < 0)
+            continue;
+
+        /* If we already found a struct, check if this one is
+         * a relative.
+         */
+        if (pRC != NULL)
+        {
+            struct_type_t * pTest;
+
+            /* Is the newly found struct a child of the
+             * one we already know? If yes, skip it.
+             */
+            for ( pTest = pdef->type
+                ; pTest != NULL && pTest != pRC->type
+                ; pTest = pTest->base
+                )
+              NOOP;
+
+            if (pTest != NULL)
+                continue;
+
+            /* Is the newly found struct a parent of
+             * the one we already know? If yes, keep it
+             * instead of the one we have; if no, the two
+             * structs are completely unrelated and the
+             * lookup is ambiguous.
+             */
+
+            for ( pTest = pRC->type
+                ; pTest != NULL && pTest != pdef->type
+                ; pTest = pTest->base
+                )
+              NOOP;
+
+            if (pTest == NULL)
+            {
+                yyerrorf("Multiple structs found for member '%s': "
+                         "struct %s, struct %s"
+                        , get_txt(name)
+                        , get_txt(struct_t_name(pRC->type))
+                        , get_txt(struct_t_name(pdef->type))
+                        );
+                *pNum = -1;
+                return FSM_AMBIGUOUS;
+            }
+        } /* if (pRC) */
+
+        /* It's a successful lookup */
+        rc = i;
+        pRC = pdef;
+        member = num;
+    } /* for (all structs) */
+
+    if (rc < 0)
+    {
+        yyerrorf("No struct found for member '%s'", get_txt(name));
+    }
+
+    *pNum = member;
+    return rc;
+} /* find_struct_by_member() */
+
 #endif /* USE_STRUCTS */
 
 #ifdef USE_NEW_INLINES
@@ -6670,7 +6834,7 @@ new_local:
               /* When parsing context variables, the context_closure instruction
                * expects a value on the stack, so just push a 0.
                */
-              ins_f_code(F_CONST0);
+              ins_number(0);
 #ifdef DEBUG_INLINES
 printf("DEBUG: inline context decl: name, program_size %d\n", CURRENT_PROGRAM_SIZE);
 #endif /* DEBUG_INLINES */
@@ -7509,7 +7673,7 @@ for_init_expr:
       /* EMPTY */
       {
           last_expression = mem_block[A_PROGRAM].current_size;
-          ins_f_code(F_CONST1);
+          ins_number(1);
             /* insert_pop_value() will optimize this away */
       }
     | comma_expr_decl
@@ -7592,7 +7756,7 @@ expr_decl:
           p_int length;
 %line
           /* Insert the implied push of number 0 */
-          ins_f_code(F_CONST0);
+          ins_number(0);
 
           /* Add the bytecode to create the lvalue and do the
            * assignment.
@@ -7631,7 +7795,7 @@ for_expr:
       /* EMPTY */
       {
           last_expression = mem_block[A_PROGRAM].current_size;
-          ins_f_code(F_CONST1);
+          ins_number(1);
       }
     | comma_expr
 ; /* for_expr */
@@ -10036,6 +10200,13 @@ expr4:
               current += 2;
               $$.type = Type_Number;
           }
+          else if ( number < 0 && number >= -0x0ff )
+          {
+              add_f_code(F_NCLIT);
+              add_byte(-number);
+              current += 2;
+              $$.type = Type_Number;
+          }
           else
           {
               add_f_code(F_NUMBER);
@@ -10165,7 +10336,7 @@ expr4:
           /* Generate an empty mapping of given width */
 
       {
-          ins_f_code(F_CONST0);
+          ins_number(0);
       }
 
       expr0 ']' ')'
@@ -10284,41 +10455,75 @@ expr4:
     | expr4 L_ARROW struct_member_name
       {
           /* Lookup a struct member */
+          short s_index = -1;
 
           $$.start = $1.start;
           $$.code = -1;
           $$.type = $1.type; /* default */
 
-          if (!IS_TYPE_STRUCT($1.type))
+          if (!IS_TYPE_ANY($1.type) && !IS_TYPE_STRUCT($1.type))
           {
               yyerrorf("Bad type for struct lookup: %s"
                       , get_type_name($1.type));
           }
-          else if ($3 != NULL)
+          else
           {
-              int num;
-              struct_type_t * ptype = $1.type.t_struct;
+              if (IS_TYPE_STRUCT($1.type))
+              {
+                  s_index = get_struct_index($1.type.t_struct);
+                  if (s_index == -1)
+                      yyerrorf("Unknown type: %s\n"
+                              , get_type_name($1.type)
+                              );
+              }
 
-              num = struct_find_member(ptype, $3);
-              if (num < 0)
+              /* At this point: s_index >= 0: $1 is of type struct
+               *                         < 0: $1 is of type mixed
+               */
+          
+              if ($3 != NULL)
               {
-                  yyerrorf("No such member '%s' for struct '%s'"
-                          , get_txt($3)
-                          , get_txt(struct_t_name(ptype))
-                          );
+                  int num;
+                  struct_type_t * ptype = NULL;
+                  
+                  if (s_index >= 0)
+                  {
+                      ptype = $1.type.t_struct;
+
+                      num = struct_find_member(ptype, $3);
+                      if (num < 0)
+                      {
+                          yyerrorf("No such member '%s' for struct '%s'"
+                                  , get_txt($3)
+                                  , get_txt(struct_t_name(ptype))
+                                  );
+                      }
+                  }
+                  else /* $1 is of type mixed */
+                  {
+                      s_index = find_struct_by_member($3, &num);
+                      if (s_index >= 0)
+                          ptype = STRUCT_DEF(s_index).type;
+                  }
+
+                  /* If this is a legal struct lookup, num >= 0 at this point
+                   */
+                  if (num >= 0)
+                  {
+                      ins_number(num);
+                      ins_number(s_index);
+                      ins_f_code(F_S_INDEX);
+                      if (ptype != NULL)
+                          assign_var_to_fulltype(&$$.type
+                                                , ptype->member[num].type);
+                  }
               }
-              else
+              else /* Runtime lookup */
               {
-                  ins_f_code(F_CLIT);
-                  ins_byte(num);
+                  ins_number(s_index);
                   ins_f_code(F_S_INDEX);
-                  assign_var_to_fulltype(&$$.type, ptype->member[num].type);
+                  $$.type = Type_Any;
               }
-          }
-          else /* Runtime lookup */
-          {
-              ins_f_code(F_S_INDEX);
-              $$.type = Type_Any;
           }
 
           if ($3 != NULL)
@@ -10330,50 +10535,83 @@ expr4:
 
       {
           /* Create a reference to a struct member */
+          short s_index = -1;
 
           $$.start = $3.start;
           $$.code = -1;
           $$.type = $3.type; /* default */
 
-          if (!IS_TYPE_STRUCT($3.type))
+          if (!IS_TYPE_ANY($3.type) && !IS_TYPE_STRUCT($3.type))
           {
               yyerrorf("Bad type for struct lookup: %s"
                       , get_type_name($3.type));
           }
-          else if ($5 != NULL)
+          else
           {
-              int num;
-              struct_type_t * ptype = $3.type.t_struct;
-
-              num = struct_find_member(ptype, $5);
-              if (num < 0)
+              if (IS_TYPE_STRUCT($3.type))
               {
-                  yyerrorf("No such member '%s' for struct '%s'"
-                          , get_txt($5)
-                          , get_txt(struct_t_name(ptype))
-                          );
+                  s_index = get_struct_index($3.type.t_struct);
+                  if (s_index == -1)
+                      yyerrorf("Unknown type: %s\n"
+                              , get_type_name($3.type)
+                              );
               }
-              else
-              {
-                  /* Insert the index code */
-                  ins_f_code(F_CLIT);
-                  ins_byte(num);
 
+              /* At this point: s_index >= 0: $1 is of type struct
+               *                         < 0: $1 is of type mixed
+               */
+          
+              if ($5 != NULL)
+              {
+                  int num;
+                  struct_type_t * ptype = NULL;
+                  
+                  if (s_index >= 0)
+                  {
+                      ptype = $3.type.t_struct;
+
+                      num = struct_find_member(ptype, $5);
+                      if (num < 0)
+                      {
+                          yyerrorf("No such member '%s' for struct '%s'"
+                                  , get_txt($5)
+                                  , get_txt(struct_t_name(ptype))
+                                  );
+                      }
+                  }
+                  else /* $3 is of type mixed */
+                  {
+                      s_index = find_struct_by_member($5, &num);
+                      if (s_index >= 0)
+                          ptype = STRUCT_DEF(s_index).type;
+                  }
+
+                  /* If this is a legal struct lookup, num >= 0 at this point
+                   */
+                  if (num >= 0)
+                  {
+                      ins_number(num);
+                      ins_number(s_index);
+                      arrange_protected_lvalue($3.start, $3.code, $3.end,
+                         F_PROTECTED_INDEX_S_LVALUE
+                      );
+                      if (ptype != NULL)
+                      {
+                          assign_var_to_fulltype(&$$.type
+                                                , ptype->member[num].type);
+                          $$.type.typeflags |= TYPE_MOD_REFERENCE;
+                      }
+                  }
+              }
+              else /* Runtime lookup */
+              {
+                  ins_number(s_index);
                   arrange_protected_lvalue($3.start, $3.code, $3.end,
                      F_PROTECTED_INDEX_S_LVALUE
                   );
 
-                  assign_var_to_fulltype(&$$.type, ptype->member[num].type);
-                  $$.type.typeflags |= TYPE_MOD_REFERENCE;
+                  $$.type = Type_Ref_Any;
               }
-          }
-          else /* Runtime lookup */
-          {
-              arrange_protected_lvalue($3.start, $3.code, $3.end,
-                 F_PROTECTED_INDEX_S_LVALUE
-              );
-
-              $$.type = Type_Ref_Any;
           }
 
           if ($5 != NULL)
@@ -11157,6 +11395,7 @@ lvalue:
       {
           /* Create a struct member lvalue */
 
+          short s_index = -1;
           int num;
           vartype_t member_type;
 
@@ -11165,32 +11404,59 @@ lvalue:
           num = 0;
           member_type = VType_Unknown;
 
-          if (!IS_TYPE_STRUCT($1.type))
+          if (!IS_TYPE_ANY($1.type) && !IS_TYPE_STRUCT($1.type))
           {
               yyerrorf("Bad type for struct lookup: %s"
                       , get_type_name($1.type));
           }
-          else if ($3 != NULL)
+          else
           {
-              struct_type_t * ptype = $1.type.t_struct;
+              if (IS_TYPE_STRUCT($1.type))
+              {
+                  s_index = get_struct_index($1.type.t_struct);
+                  if (s_index == -1)
+                      yyerrorf("Unknown type: %s\n"
+                              , get_type_name($1.type)
+                              );
+              }
 
-              num = struct_find_member(ptype, $3);
-              if (num < 0)
+              /* At this point: s_index >= 0: $1 is of type struct
+               *                         < 0: $1 is of type mixed
+               */
+          
+              if ($3 != NULL)
               {
-                  yyerrorf("No such member '%s' for struct '%s'"
-                          , get_txt($3)
-                          , get_txt(struct_t_name(ptype))
-                          );
+                  struct_type_t * ptype = NULL;
+                  
+                  if (s_index >= 0)
+                  {
+                      ptype = $1.type.t_struct;
+
+                      num = struct_find_member(ptype, $3);
+                      if (num < 0)
+                      {
+                          yyerrorf("No such member '%s' for struct '%s'"
+                                  , get_txt($3)
+                                  , get_txt(struct_t_name(ptype))
+                                  );
+                      }
+                  }
+                  else /* $1 is of type mixed */
+                  {
+                      s_index = find_struct_by_member($3, &num);
+                      if (s_index >= 0)
+                      {
+                          ptype = STRUCT_DEF(s_index).type;
+                          member_type = ptype->member[num].type;
+                      }
+                  }
               }
-              else
+              else /* Runtime lookup */
               {
-                  member_type = ptype->member[num].type;
+                  assign_full_to_vartype(&member_type, Type_Any);
               }
           }
-          else /* Runtime lookup */
-          {
-              assign_full_to_vartype(&member_type, Type_Any);
-          }
+
 
           /* We have to generate some code, so if the struct lookup is
            * invalid, we just play along and generate code to look up
@@ -11204,9 +11470,11 @@ lvalue:
               if ($3 != NULL)
               {
                   /* Insert the index code */
-                  ins_f_code(F_CLIT);
-                  ins_byte(num);
+                  ins_number(num);
               }
+
+              /* Insert the struct type index */
+              ins_number(s_index);
 
               /* Generate/add an INDEX_S_LVALUE */
 
@@ -13374,43 +13642,70 @@ lvalue_list:
     | lvalue_list ',' expr4 L_ARROW struct_member_name
       {
           /* Create a reference to a struct member */
+          short s_index = -1;
 
           $$ = 1 + $1;
 
-          if (!IS_TYPE_STRUCT($3.type))
+          if (!IS_TYPE_ANY($3.type) && !IS_TYPE_STRUCT($3.type))
           {
               yyerrorf("Bad type for struct lookup: %s"
                       , get_type_name($3.type));
           }
-          else if ($5 != NULL)
+          else
           {
-              int num;
-              struct_type_t * ptype = $3.type.t_struct;
-
-              num = struct_find_member(ptype, $5);
-              if (num < 0)
+              if (IS_TYPE_STRUCT($3.type))
               {
-                  yyerrorf("No such member '%s' for struct '%s'"
-                          , get_txt($5)
-                          , get_txt(struct_t_name(ptype))
-                          );
+                  s_index = get_struct_index($3.type.t_struct);
+                  if (s_index == -1)
+                      yyerrorf("Unknown type: %s\n"
+                              , get_type_name($3.type)
+                              );
               }
-              else
-              {
-                  /* Insert the index code */
-                  ins_f_code(F_CLIT);
-                  ins_byte(num);
 
+              /* At this point: s_index >= 0: $1 is of type struct
+               *                         < 0: $1 is of type mixed
+               */
+          
+              if ($5 != NULL)
+              {
+                  int num;
+                  
+                  if (s_index >= 0)
+                  {
+                      struct_type_t * ptype = $3.type.t_struct;
+
+                      num = struct_find_member(ptype, $5);
+                      if (num < 0)
+                      {
+                          yyerrorf("No such member '%s' for struct '%s'"
+                                  , get_txt($5)
+                                  , get_txt(struct_t_name(ptype))
+                                  );
+                      }
+                  }
+                  else /* $3 is of type mixed */
+                  {
+                      s_index = find_struct_by_member($5, &num);
+                  }
+
+                  /* If this is a legal struct lookup, num >= 0 at this point
+                   */
+                  if (num >= 0)
+                  {
+                      ins_number(num);
+                      ins_number(s_index);
+                      arrange_protected_lvalue($3.start, $3.code, $3.end,
+                         F_PROTECTED_INDEX_S_LVALUE
+                      );
+                  }
+              }
+              else /* Runtime lookup */
+              {
+                  ins_number(s_index);
                   arrange_protected_lvalue($3.start, $3.code, $3.end,
                      F_PROTECTED_INDEX_S_LVALUE
                   );
               }
-          }
-          else /* Runtime lookup */
-          {
-              arrange_protected_lvalue($3.start, $3.code, $3.end,
-                 F_PROTECTED_INDEX_S_LVALUE
-              );
           }
 
           if ($5 != NULL)
@@ -13860,6 +14155,19 @@ insert_pop_value (void)
         case F_CONST1:
         case F_NCONST1:
             mem_block[A_PROGRAM].current_size = last_expression;
+            break;
+        case F_CLIT:
+        case F_NCLIT:
+        case F_CSTRING0:
+        case F_CSTRING1:
+        case F_CSTRING2:
+            mem_block[A_PROGRAM].current_size = last_expression-1;
+            break;
+        case F_STRING:
+            mem_block[A_PROGRAM].current_size = last_expression-2;
+            break;
+        case F_NUMBER:
+            mem_block[A_PROGRAM].current_size = last_expression-4;
             break;
         default: ins_f_code(F_POP_VALUE);
         }

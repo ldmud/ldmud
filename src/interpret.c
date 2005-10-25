@@ -3161,6 +3161,85 @@ get_string_a_item (svalue_t * svp, svalue_t * i, Bool make_singular
 #ifdef USE_STRUCTS
 /*-------------------------------------------------------------------------*/
 static INLINE svalue_t *
+check_struct_op (svalue_t * sp, int off_type, int off_value, bytecode_p pc)
+
+/* On the stack are the arguments for a struct indexing operation.
+ * In particular: sp[<off_type>]:  the struct type index <idx>
+ *                sp[<off_value>]: <off_type> <= 0: the struct value to index.
+ *
+ * Check the validity of the indexing operation and thrown an error
+ * if invalid.
+ *
+ * <idx> gives the index of the expected struct type - the
+ * operator accepts a struct of this type, or any of its children.
+ * An negative <idx> accepts any struct.
+ *
+ * On success, the <idx> svalue is removed from the stack and the
+ * new stack pointer is returned.
+ */
+
+{
+    short s_index;
+
+#ifdef DEBUG
+    if (sp[off_type].type != T_NUMBER)
+        FATALF(("Illegal struct type value: %s, expected a number.\n"
+               , typename(sp[off_type].type)
+              ));
+    if (sp[off_type].u.number >= 0
+     && sp[off_type].u.number >= current_prog->num_structs)
+    {
+        FATALF(("Too big struct index: %ld, max %hu\n"
+               , (long)sp[off_type].u.number, current_prog->num_structs
+              ));
+    }
+#endif
+
+    /* Get the struct type index */
+    s_index = (short)sp[off_type].u.number;
+
+    if (off_value <= 0 && sp[off_value].type != T_STRUCT)
+    {
+        ERRORF(("Illegal type to struct->(): %s, expected struct.\n"
+               , typename(sp[off_type].type)
+              ));
+        /* NOTREACHED */
+    }
+
+    /* Check if the struct on the stack is of the correct type */
+    if (s_index >= 0 && off_value <= 0)
+    {
+        struct_type_t * pExpected = current_prog->struct_defs[s_index].type;
+        struct_type_t * pType;
+
+        for ( pType = sp[off_value].u.strct->type
+            ; pType != NULL && pType != pExpected
+            ; pType = pType->base
+            )
+          NOOP;
+
+        if (pType == NULL)
+        {
+            ERRORF(("Illegal type to struct->(): struct %s, "
+                    "expected struct %s.\n"
+                   , get_txt(struct_name(sp[off_value].u.strct))
+                   , get_txt(struct_t_name(pExpected))
+                  ));
+        }
+    }
+
+    /* Remove the type index entry from the stack */
+    if (off_type != 0)
+    {
+        for ( ; off_type < 0; off_type++)
+            sp[off_type] = sp[off_type+1];
+    }
+
+    return sp-1;
+} /* check_struct_op() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE svalue_t *
 get_struct_item (struct_t * st, svalue_t * i, svalue_t *sp, bytecode_p pc)
 
 /* Index struct <st> with index <i> and return the pointer to the
@@ -12980,13 +13059,18 @@ again:
 
 #ifdef USE_STRUCTS
     CASE(F_PUSH_INDEXED_S_LVALUE); /* --- push_indexed_s_lvalue --- */
-        /* Operator F_PUSH_INDEXED_S_LVALUE(struct v=sp[-1], mixed i=sp[0])
+        /* Op. (struct v=sp[-2], mixed i=sp[-1], short idx=sp[0])
          *
          * Compute the lvalue &(v[i]) and push it into the stack. If v has
          * just one ref left, the indexed item is stored in indexing_quickfix
          * and the lvalue refers to that variable.
+         *
+         * <idx> gives the index of the expected struct type - the
+         * operator accepts a struct of this type, or any of its children.
+         * An negative <idx> accepts any struct.
          */
 
+        sp = check_struct_op(sp, 0, -2, pc);
         {
             svalue_t * svp = sp-1;
 
@@ -13057,12 +13141,17 @@ again:
 
 #ifdef USE_STRUCTS
     CASE(F_INDEX_S_LVALUE);         /* --- index_s_lvalue     --- */
-        /* Operator F_INDEX_LVALUE (struct        &v=sp[0], int   i=sp[-1])
+        /* Op. (struct &v=sp[0], int i=sp[-2], short * idx=sp[-1])
          *
          * Compute the index &(v[i]) of lvalue <v> and push it into the stack.
          * The computed index is a lvalue itself. 
+         *
+         * <idx> gives the index of the expected struct type - the
+         * operator accepts a struct of this type, or any of its children.
+         * An negative <idx> accepts any struct.
          */
 
+        sp = check_struct_op(sp, -1, 1, pc);
         {
             svalue_t * svp = sp;
 
@@ -13139,20 +13228,18 @@ again:
 
 #ifdef USE_STRUCTS
     CASE(F_S_INDEX);                /* --- s_index            --- */
-        /* Operator F_S_INDEX (struct v=sp[-1], mixed i=sp[0])
+        /* Operator F_S_INDEX (struct v=sp[-2], mixed i=sp[-1], short idx=sp[0])
          *
          * Compute the value (v->i) and push it onto the stack.  If the value
          * would be a destructed object, 0 is pushed onto the stack and the
          * ref to the object is removed from the struct.
+         *
+         * <idx> gives the index of the expected struct type - the
+         * operator accepts a struct of this type, or any of its children.
+         * An negative <idx> accepts any struct.
          */
 
-        if ((sp-1)->type != T_STRUCT)
-        {
-            ERRORF(("Illegal type to struct->(): %s, expected struct.\n"
-                   , typename((sp-1)->type)
-                  ));
-            /* NOTREACHED */
-        }
+        sp = check_struct_op(sp, 0, -2, pc);
         sp = push_indexed_value(sp, pc);
         break;
 #endif /* USE_STRUCTS */
@@ -13394,12 +13481,18 @@ again:
 #ifdef USE_STRUCTS
                         /* --- push_protected_indexed_s_lvalue --- */
     CASE(F_PUSH_PROTECTED_INDEXED_S_LVALUE);
-        /* Op. (struct  v=sp[-1], mixed i=sp[0])
+        /* Op. (struct  v=sp[-2], mixed i=sp[-1], short idx=sp[0])
          *
          * Compute the lvalue &(v[i]), store it in a struct
          * protected_lvalue, and push the protector as PROTECTED_LVALUE
          * into the stack.
+         *
+         * short <idx> gives the index of the expected struct type - the
+         * operator accepts a struct of this type, or any of its children.
+         * An negative <idx> accepts any struct.
          */
+
+        sp = check_struct_op(sp, 0, 1, pc);
 
         {
             svalue_t * svp = sp-1;
@@ -13481,12 +13574,18 @@ again:
 #ifdef USE_STRUCTS
                                /* --- protected_index_s_lvalue --- */
     CASE(F_PROTECTED_INDEX_S_LVALUE);
-        /* Operator (struct        &v=sp[0], int   i=sp[-1])
+        /* Operator (struct &v=sp[0], mixed i=sp[-2], short idx=sp[-1])
          *
          * Compute the index &(*v[i]) of lvalue <v>, wrap it into a
          * protector, and push the reference to the protector as
          * PROTECTED_LVALUE onto the stack.
+         *
+         * short <idx> gives the index of the expected struct type - the
+         * operator accepts a struct of this type, or any of its children.
+         * An negative <idx> accepts any struct.
          */
+
+        sp = check_struct_op(sp, -1, 1, pc);
 
         {
             svalue_t * svp = sp;

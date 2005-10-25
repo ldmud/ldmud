@@ -91,7 +91,6 @@ USAGE
 
             var->one = 1;
 
-
         Literal structs are written using (<>) as delimiters:
 
             (<Foo>)
@@ -117,6 +116,22 @@ USAGE
 
             bar->(member) = 1; // sets bar->one to 1
             bar->(0) = 1;      // sets bar->one to 1
+
+
+        When using struct values held in variables/expressions of type
+        'mixed', the 'mixed' value should to be casted to the struct
+        value. The cast can be omitted if the looked-up member exists
+        in only one struct (and its children) known to the compiler:
+
+            struct Foo { int one; };
+            struct Bar { int two; };
+            struct Baz { int two; };
+            mixed var;
+
+                        var->one  // looks up Foo->one
+            (struct Foo)var->one  // looks up Foo->one
+                        var->two  // ERROR: ambiguous lookup
+            (struct Bar)var->one  // looks up Bar->one
 
 
 USAGE IN CLOSURES
