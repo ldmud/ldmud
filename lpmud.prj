@@ -45,12 +45,12 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 363)
-(Parent-Version lpmud 3-3 362)
-(Version-Log "GC of self-referential structs now longer crashes.")
+(Project-Version lpmud 3-3 364)
+(Parent-Version lpmud 3-3 363)
+(Version-Log "The '--with-malloc' configuration option didn't quite work.")
 (New-Version-Log
 "")
-(Checkin-Time "Sun, 19 Jan 2003 21:07:21 -0700")
+(Checkin-Time "Sun, 19 Jan 2003 22:06:54 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -87,20 +87,20 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.57 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.426 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.427 644))
   (HISTORY (lpmud/f/49_HISTORY 1.297 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.19 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
   ;; Configuration
-  (src/configure (lpmud/d/0_configure 1.19.1.69 755))
+  (src/configure (lpmud/d/0_configure 1.19.1.70 755))
   (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.24 644))
   (src/machine.h.in (lpmud/b/9_machine.h. 1.9.1.4 644))
   (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.19.1.7 644))
   (src/mkinstalldirs (lpmud/c/4_mkinstalld 1.1 644))
   (src/install-sh (lpmud/c/5_install-sh 1.2 755))
 
-  (src/autoconf/configure.in (lpmud/d/7_configure. 1.20.1.9.1.59 644))
+  (src/autoconf/configure.in (lpmud/d/7_configure. 1.20.1.9.1.60 644))
   (src/autoconf/acconfig.h (lpmud/d/10_acconfig.h 1.6.1.4 644))
 
   (src/settings/README (lpmud/c/22_README 1.14.1.13 644))

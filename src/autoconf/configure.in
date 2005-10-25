@@ -47,6 +47,17 @@ AC_UPDATE_VAR(with_[$1])
 val_[$1]="\"$with_[$1]\""]
 )
 
+AC_DEFUN([AC_TEXT_VAL_FROM_WITH],
+[if test "x$with_[$1]" != "x"; then
+  with_[$1]=`echo $with_[$1]|
+changequote(, )dnl
+             sed -e 's/^\([^"]*\)\?.*$/\1/'`
+changequote([, ])dnl
+fi
+AC_UPDATE_VAR(with_[$1])
+val_[$1]="$with_[$1]"]
+)
+
 AC_DEFUN([AC_FORM_HELP],[  --$1[]dnl
 ifelse([$2],,,dnl
 builtin(format,%[]builtin(eval,(len([$1])<32)*(32-len([$1])))s,)  [default=$2])[]dnl
@@ -294,6 +305,8 @@ AC_STRING_VAL_FROM_WITH(wizlist_file)
 AC_STRING_VAL_FROM_WITH(master_name)
 AC_STRING_VAL_FROM_WITH(input_escape)
 
+AC_TEXT_VAL_FROM_WITH(malloc)
+
 AC_INT_VAL_FROM_WITH(pthreads_write_max_size)
 AC_INT_VAL_FROM_WITH(erq_max_reply)
 AC_INT_VAL_FROM_WITH(erq_max_send)
@@ -331,7 +344,6 @@ AC_INT_VAL_FROM_WITH(rxcache_table)
 AC_INT_VAL_FROM_WITH(max_byte_transfer)
 AC_INT_VAL_FROM_WITH(udp_port)
 AC_INT_VAL_FROM_WITH(set_buffer_size_max)
-AC_INT_VAL_FROM_WITH(malloc)
 AC_INT_VAL_FROM_WITH(min_malloced)
 AC_INT_VAL_FROM_WITH(min_small_malloced)
 AC_INT_VAL_FROM_WITH(max_malloced)
@@ -1815,7 +1827,7 @@ if test "x$with_malloc" = "x" || test "x$with_malloc" = "xdefault"; then
     else
         with_malloc="smalloc"
     fi
-    AC_INT_VAL_FROM_WITH(malloc)
+    AC_TEXT_VAL_FROM_WITH(malloc)
 fi
 
 

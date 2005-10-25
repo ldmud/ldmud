@@ -2130,18 +2130,6 @@ else
   enable_use_mysql="yes"
 fi
 
-if test "x$with_malloc" = "x" && test "x$DEFAULTwith_malloc" != "x"; then
-  with_malloc=$DEFAULTwith_malloc
-fi
-
-if test "x$with_malloc" = "x" || test "x$with_malloc" = "xdefault"; then
-    if test "x$enable_use_pthreads" = "xyes"; then
-        with_malloc="ptmalloc"
-    else
-        with_malloc="smalloc"
-    fi
-fi
-
 if test "x$enable_access_control" = "x" && test "x$DEFAULTenable_access_control" != "x"; then
   enable_access_control=$DEFAULTenable_access_control
 fi
@@ -2587,6 +2575,17 @@ fi
 val_input_escape="\"$with_input_escape\""
 
 
+if test "x$with_malloc" != "x"; then
+  with_malloc=`echo $with_malloc|
+             sed -e 's/^\([^"]*\)\?.*$/\1/'`
+fi
+if test "x$with_malloc" = "x" && test "x$DEFAULTwith_malloc" != "x"; then
+  with_malloc=$DEFAULTwith_malloc
+fi
+
+val_malloc="$with_malloc"
+
+
 if test "x$with_pthreads_write_max_size" != "x"; then
   with_pthreads_write_max_size=`echo $with_pthreads_write_max_size|
              sed -e 's/^\(-\?\(0x[0-9a-fA-F]\+\)\?[0-9]*\)[^0-9]\?.*$/\1/'`
@@ -2956,16 +2955,6 @@ if test "x$with_set_buffer_size_max" = "x" && test "x$DEFAULTwith_set_buffer_siz
 fi
 
 val_set_buffer_size_max=$with_set_buffer_size_max
-
-if test "x$with_malloc" != "x"; then
-  with_malloc=`echo $with_malloc|
-             sed -e 's/^\(-\?\(0x[0-9a-fA-F]\+\)\?[0-9]*\)[^0-9]\?.*$/\1/'`
-fi
-if test "x$with_malloc" = "x" && test "x$DEFAULTwith_malloc" != "x"; then
-  with_malloc=$DEFAULTwith_malloc
-fi
-
-val_malloc=$with_malloc
 
 if test "x$with_min_malloced" != "x"; then
   with_min_malloced=`echo $with_min_malloced|
@@ -10928,6 +10917,30 @@ if test "${OSTYPE}" = 'win32'; then
   cat >>confdefs.h <<\_ACEOF
 #define HOST_INCLUDE "hosts/GnuWin32/GnuWin32.h"
 _ACEOF
+
+fi
+
+
+
+if test "x$with_malloc" = "x" && test "x$DEFAULTwith_malloc" != "x"; then
+  with_malloc=$DEFAULTwith_malloc
+fi
+
+if test "x$with_malloc" = "x" || test "x$with_malloc" = "xdefault"; then
+    if test "x$enable_use_pthreads" = "xyes"; then
+        with_malloc="ptmalloc"
+    else
+        with_malloc="smalloc"
+    fi
+    if test "x$with_malloc" != "x"; then
+  with_malloc=`echo $with_malloc|
+             sed -e 's/^\([^"]*\)\?.*$/\1/'`
+fi
+if test "x$with_malloc" = "x" && test "x$DEFAULTwith_malloc" != "x"; then
+  with_malloc=$DEFAULTwith_malloc
+fi
+
+val_malloc="$with_malloc"
 
 fi
 
