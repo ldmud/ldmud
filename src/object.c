@@ -351,29 +351,12 @@ _free_object ( object_t *ob, const char * file, int line)
 } /* _free_object() */
 
 /*-------------------------------------------------------------------------*/
-#ifdef INITIALIZATION_BY___INIT
-
 object_t *
 get_empty_object (int num_var)
 
-#else
-
-object_t *
-get_empty_object ( int num_var
-                 , variable_t *variables
-                 , svalue_t *initializers)
-
-#endif
-
-/* Allocate a new, empty object with <numvar> variables and return it.
+/* Allocate a new, empty object with <numvar> variables (set to 0)
+ * and return it.
  * Return NULL when out of memory.
- *
- * !__INIT: every variable, which is flagged in <variables> as
- *          NAME_INITIALIZED, is set to the corresponding value
- *          in <initializers>. Both <variables> and <initializers>
- *          are arrays of size <num_var>.
- *
- *  __INIT: All variables are set to 0.
  */
 
 {
@@ -437,20 +420,62 @@ static mp_int last_id = 0;
 
     for (i = num_var; --i >= 0; )
     {
-#ifndef INITIALIZATION_BY___INIT
-        if (variables[i].type.typeflags & NAME_INITIALIZED)
-        {
-            assign_svalue_no_free(&ob_vars[i], &initializers[i]);
-        } else
-#endif
-        {
-            ob_vars[i] = const0;
-        }
+        ob_vars[i] = const0;
     }
 
     /* That's it. */
     return ob;
 }  /* get_empty_object() */
+
+/*-------------------------------------------------------------------------*/
+void
+init_object_variables (object_t *ob)
+
+/* The variables of object <ob> are initialized.
+ * First, if <ob> is a clone, all variables marked as !VAR_INITIALIZED are
+ * copied over from the blueprint.
+ * 
+ * Then, for all <ob>, __INIT() is called in <ob> which initializes all
+ * the variables marked as VAR_INITIALIZED in clones, and all variables
+ * in blueprints.
+ */
+
+{
+    /* For clones, copy the shared variable values */
+    if ((ob->flags & O_CLONE))
+    {
+        object_t *bp;
+        int i;
+        variable_t *p_vars;
+        svalue_t *ob_vars, *bp_vars;
+
+        bp = ob->prog->blueprint;
+        if (!bp || bp->flags & O_DESTRUCTED)
+        {
+            if (bp) free_object(bp, "init_object_variables");
+            ob->prog->blueprint = NULL;
+            bp_vars = NULL;
+        }
+        else
+            bp_vars = bp->variables;
+
+        ob_vars = ob->variables;
+        p_vars = ob->prog->variables;
+
+        for (i = ob->prog->num_variables; --i >= 0; )
+        {
+            if (p_vars[i].type.typeflags & VAR_INITIALIZED)
+                continue;
+            if (!bp_vars)
+                error("Can't initialize object '%s': no blueprint.\n"
+                     , get_txt(ob->name));
+            assign_svalue_no_free(&ob_vars[i], &bp_vars[i]);
+        }
+    }
+
+    /* Initialized all other variables programmatically */
+    sapply_ign_prot(STR_VARINIT, ob, 0);
+} /* init_object_variables() */
 
 /*-------------------------------------------------------------------------*/
 #ifdef DEALLOCATE_MEMORY_AT_SHUTDOWN
@@ -787,8 +812,6 @@ reset_object (object_t *ob, int arg)
  * the called function, it is set to a random value between time_to_reset/2
  * and time_to_reset. Upon time of call, the object must not be
  * in the reset table; this function will enter it there.
- * TODO: Change all non-shared strings in shared ones after finishing the
- * TODO:: reset.
  */
 
 {
@@ -796,18 +819,6 @@ reset_object (object_t *ob, int arg)
     if (time_to_reset > 0)
         ob->time_reset = current_time + time_to_reset/2
                          + (mp_int)random_number((uint32)time_to_reset/2);
-
-#ifdef INITIALIZATION_BY___INIT
-
-    /* Initialize the variables first in case of a H_CREATE_* call.
-     */
-    if (arg != H_RESET)
-    {
-        sapply_ign_prot(STR_VARINIT, ob, 0);
-        if (ob->flags & O_DESTRUCTED)
-            return;
-    }
-#endif
 
     if (driver_hook[arg].type == T_CLOSURE)
     {

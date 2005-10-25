@@ -565,9 +565,9 @@ $(OBJ)/parse.o : xalloc.h wiz_list.h svalue.h stdstrings.h simulate.h \
 $(OBJ)/parser.o : lang.c ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h \
     switch.h swap.h svalue.h structs.h stdstrings.h simul_efun.h simulate.h \
     object.h mstrings.h mapping.h main.h lex.h instrs.h interpret.h \
-    gcollect.h exec.h closure.h backend.h array.h lang.h prolang.h \
-    my-alloca.h typedefs.h driver.h strfuns.h ptrtable.h sent.h bytecode.h \
-    port.h config.h hosts/unix.h hosts/be/be.h machine.h
+    gcollect.h exec.h closure.h backend.h array.h prolang.h my-alloca.h \
+    typedefs.h driver.h strfuns.h ptrtable.h sent.h bytecode.h port.h \
+    config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/dftables.o : pcre/maketables.c pcre/internal.h pcre/pcre.h \
     pcre/config.h
@@ -695,7 +695,7 @@ $(OBJ)/object.o : stdstrings.h instrs.h
 
 $(OBJ)/parse.o : stdstrings.h
 
-$(OBJ)/parser.o : lang.c stdstrings.h instrs.h lang.h
+$(OBJ)/parser.o : lang.c stdstrings.h instrs.h
 
 $(OBJ)/simul_efun.o : stdstrings.h
 

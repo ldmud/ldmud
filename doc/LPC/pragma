@@ -23,6 +23,10 @@ DESCRIPTION
         no_shadow: The program can't be shadowed (similar to declaring
                 all functions as 'nomask').
 
+        init_variables: Clone variables are initialized by __INIT().
+        share_variables: Clone variables are initialized from the
+                blueprint.
+
         weak_types: no type checking (this is the default).
         strict_types: all functions must be declared with argument
                 prototypes, and the return values of call_other() must
@@ -49,6 +53,10 @@ DESCRIPTION
                 - failure to pass enough arguments to simul efuns
         sloppy: Turns off pedantic (the default).
 
+        warn_deprecated: Use of deprecated efuns causes the compiler
+                to issue a warning.
+        no_warn_deprecated: Turns off warn_deprecated (the default).
+
         When an object is compiled with type testing (#pragma
         strict_types), all types are saved of the arguments for that
         function during compilation.  If the #pragma save_types is
@@ -73,9 +81,11 @@ HISTORY
         and no_inherit.
         LDMud 3.2.8 added weak_types, pedantic and sloppy.
         LDMud 3.2.9 allowed to specify multiple pragmas in one directive.
+        LDMud 3.2.9 added (no_)warn_deprecated.
         Starting with LDMud 3.3, #pragma xxx_types in an included file are
           no longer valid only until the end of the file, but remain active
           when processing returns to the including file.
+        LDMud 3.3.378 added init_variables, share_variables.
 
 SEE ALSO
         inheritance(LPC), initialisation(LPC), objects(C),

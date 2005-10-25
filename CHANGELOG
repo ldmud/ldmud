@@ -1,6 +1,16 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+26-Jan-2002 (Lars Duening)  (3.3.378)
+  - (main, lex, prolang, object, simulate.c, configure) Removed the
+       configuration option INITIALIZATION_BY___INIT and changed the driver
+       to always use __INIT(). However, the variable sharing between clone
+       and blueprint is now selectable on a per-program basis with the
+       pragmas 'share_variables' and 'init_variables'. The default
+       setting for the pragma can be set with the configuration option
+       --enable-share-variables and with the commandline arguments
+       --share-variables and --init-variables.
+
 26-Jan-2002 (Lars Duening)  (3.3.377)
   - (prolang.y) Removed a compilation problem (reported by Markus).
   - (xptmalloc.c) Removed compiler warnings regarding intentionally

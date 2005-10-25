@@ -53,7 +53,7 @@ with_wizlist_file=no
 with_access_file=etc/ACCESS.ALLOW
 
 # we initialize using the __INIT() function
-enable_initialization_by___init=yes
+enable_share_variables=no
 
 # we do not need those old commands
 enable_use_parse_command=no

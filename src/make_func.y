@@ -141,8 +141,7 @@
  *
  * make_func implements a preprocessor used to generate the LPC compiler
  * lang.y from the file prolang.y . This step is necessary because
- * no known yacc allows to enable or disable rules conditinally, like
- * for INITIALIZATION_BY___INIT.
+ * no known yacc allows to enable or disable rules conditinally.
  *
  * When make_func is run, it first reads the file 'config.h' to determine
  * which defines are used in the compilation of the driver. For this

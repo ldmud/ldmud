@@ -103,6 +103,12 @@
  */
 #define MAX_COST               1000000
 
+/* Define SHARE_VARIABLES if a clone's variables are to be assigned
+ * from the current blueprint's variables. Undefine it if clones
+ * should be initialized by __INIT().
+ */
+#undef SHARE_VARIABLES
+
 /* CATCH_RESERVED_COST is added to the eval cost for the time executing code
  * guarded by a catch() statement, so that an eval_cost-too-big error can
  * still be caught and handled.

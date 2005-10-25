@@ -105,17 +105,6 @@ union u {
        * it has to be referenced by pointer) and let the error_handler()
        * execute the appropriate casts.
        */
-
-#ifndef INITIALIZATION_BY___INIT
-    struct const_list_svalue_s *const_list;
-      /* Used by the LPC compiler only: when initializing global variables
-       * with static arrays, the compiler will collect the array elements
-       * in a list of const_list_ts, while letting the initializer (typed
-       * as T_LVALUE) point to the head structure of that list.
-       * Once complete, the .u.const_list is replaced by the completed .u.vec.
-       */
-#endif
-
 };
 
 /* --- struct svalue_s: the LPC data structure ---

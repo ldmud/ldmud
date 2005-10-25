@@ -267,11 +267,8 @@ extern void _free_object(object_t *);
 #else
 extern void _free_object(object_t *, const char * file, int line);
 #endif
-#ifdef INITIALIZATION_BY___INIT
 extern object_t *get_empty_object(int num_var);
-#else
-extern object_t *get_empty_object(int num_var, variable_t * variables, svalue_t *initialisers);
-#endif
+extern void      init_object_variables (object_t *ob);
 
 extern svalue_t *v_function_exists(svalue_t *sp, int num_arg);
 extern svalue_t *f_functionlist(svalue_t *sp);

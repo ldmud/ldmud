@@ -462,7 +462,7 @@ typedef uint32 funflag_t;  /* Function flags */
 #define TYPE_MOD_PRIVATE    0x10000000  /* Can't be inherited             */
 #define TYPE_MOD_PUBLIC     0x08000000  /* Force inherit through private  */
 #define TYPE_MOD_VARARGS    0x04000000  /* Used for type checking         */
-#define NAME_INITIALIZED    0x04000000  /* only used for variables        */
+#define VAR_INITIALIZED     0x04000000  /* Variable is not shared         */
 #define TYPE_MOD_VIRTUAL    0x02000000  /* can be re- and cross- defined  */
 #define TYPE_MOD_PROTECTED  0x01000000  /* cannot be called externally    */
 #define TYPE_MOD_XVARARGS   0x00800000  /* accepts optional arguments     */
@@ -794,6 +794,9 @@ struct program_s
 #   define P_NO_INHERIT       0x0002 /* Program must not be inherited */
 #   define P_NO_CLONE         0x0004 /* No clones allowed */
 #   define P_NO_SHADOW        0x0008 /* No shadows allowed */
+#   define P_SHARE_VARIABLES  0x0010 /* Clone vars are assigned from 
+                                      * the current blueprint vars.
+                                      */
 
     short heart_beat;
       /* Index of the heart beat function. -1 means no heart beat

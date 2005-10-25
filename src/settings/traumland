@@ -82,7 +82,7 @@ with_access_log=log/sys/access/access.allow.log
 # --- Language ---
 
 enable_supply_parse_command=no
-enable_initialization_by___init=yes
+enable_share_variables=no
 enable_use_system_crypt=yes
 enable_lpc_nosave=yes
 enable_use_mysql=no

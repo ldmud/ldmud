@@ -285,12 +285,11 @@ enable_use_set_is_wizard=yes
 
 enable_use_process_string=yes
 
-# Enable INITIALIZATION_BY___INIT if you want all initializations of
-# variables be suspended until the object is created. This variant is
-# slower and needs extra (hidden) bytecode, but allows you to use functions
-# in the initialisations.
+# Enable SHARE_VARIABLES if a clone's variables are to be assigned
+# from the current blueprint's variables. Undefine it if clones
+# should be initialized by __INIT().
 
-enable_initialization_by___init=yes
+enable_share_variables=no
 
 # Define USE_SYSTEM_CRYPT if you want crypt() to be implemented by your
 # operating system (assuming it offers this function). This makes your

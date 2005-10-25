@@ -1788,10 +1788,6 @@ load_object (const char *lname, Bool create_super, int depth, namechain_t *chain
          * This can happen if rename_object() is used carelessly
          * in the mudlib handler for compiler warnings.
          */
-#ifndef INITIALIZATION_BY___INIT
-        for (i = compiled_prog->num_variables; --i >= 0; )
-            free_svalue(&prog_variable_values[i]);
-#endif
         free_prog(compiled_prog, MY_TRUE);
         load_object_error("Object appeared while it was compiled"
                          , name, chain);
@@ -1801,21 +1797,7 @@ load_object (const char *lname, Bool create_super, int depth, namechain_t *chain
 
     prog = compiled_prog;
 
-#ifdef INITIALIZATION_BY___INIT
     ob = get_empty_object(prog->num_variables);
-#else
-    ob = get_empty_object( prog->num_variables, prog->variables, prog_variable_values);
-    /* TODO: The initializers should be stored in the program.
-     * TODO:: See clone_object() for the reason.
-     * TODO:: To implement this efficiently, use special 'const' arrays
-     * TODO:: and mappings with a copy-on-write strategy: value copies
-     * TODO:: of such arrays are made on assignment (to catch m = ([...]);
-     * TODO:: m_delete(m, ...)) and lvalue/ref computation.
-     */
-    for (i = prog->num_variables; --i >= 0; )
-        free_svalue(&prog_variable_values[i]);
-    xfree(prog_variable_values);
-#endif
 
     if (!ob)
         error("Out of memory for new object '%s'\n", name);
@@ -1881,6 +1863,7 @@ load_object (const char *lname, Bool create_super, int depth, namechain_t *chain
         {
             /* The master object is loaded with no current object */
             current_object = NULL;
+            init_object_variables(ob);
             reset_object(ob, create_super ? H_CREATE_SUPER : H_CREATE_OB);
 
             /* If the master inherits anything -Ugh- we have to have
@@ -1891,6 +1874,7 @@ load_object (const char *lname, Bool create_super, int depth, namechain_t *chain
         else
         {
             current_object = save_current;
+            init_object_variables(ob);
             reset_object(ob, create_super ? H_CREATE_SUPER : H_CREATE_OB);
         }
     }
@@ -1983,12 +1967,29 @@ clone_object (string_t *str1)
     if (ob == NULL)
         return NULL;
 
-    /* If ob is a clone, try finding the blueprint via the load_name */
+    /* If ob is a clone, try finding the blueprint first via the object's
+     * program, then via the load_name.
+     */
     if (ob->flags & O_CLONE)
     {
-        object_t *bp;
+        object_t *bp = NULL;
 
-        bp = get_object(ob->load_name);
+        /* If the object's program hasn't been replaced, it most likely
+         * contains a pointer to the blueprint we're looking for.
+         */
+        if (!(ob->flags & O_REPLACED))
+        {
+            bp = ob->prog->blueprint;
+            if (bp && (bp->flags & O_DESTRUCTED))
+            {
+                free_object(bp, "clone_object");
+                bp = ob->prog->blueprint = NULL;
+            }
+        }
+
+        /* Fallback: find/load the blueprint by the load_name */
+        if (!bp)
+            bp = get_object(ob->load_name);
         if (bp)
             ob = bp;
     }
@@ -2042,16 +2043,7 @@ clone_object (string_t *str1)
 
     /* Got the blueprint - now get a new object */
 
-    new_ob = get_empty_object(ob->prog->num_variables
-#ifndef INITIALIZATION_BY___INIT
-                             , ob->prog->variables
-                             , ob->variables
-#endif
-    );
-    /* TODO: Yeech: the new objects variables are initialised from the
-     * TODO:: template object variables. These values should be stored
-     * TODO:: in the program.
-     */
+    new_ob = get_empty_object(ob->prog->num_variables);
     if (!new_ob)
         error("Out of memory for new clone '%s'\n", get_txt(name));
 
@@ -2090,6 +2082,7 @@ clone_object (string_t *str1)
     push_ref_object(inter_sp, ob, "clone_object");
     push_ref_string(inter_sp, new_ob->name);
     give_uid_to_object(new_ob, H_CLONE_UIDS, 2);
+    init_object_variables(new_ob);
     reset_object(new_ob, H_CREATE_CLONE);
     command_giver = check_object(save_command_giver);
 

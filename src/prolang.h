@@ -15,10 +15,7 @@ extern short hook_type_map[];
 extern string_t *inherit_file;
 extern int num_parse_error;
 extern program_t *compiled_prog;
-
-#ifndef INITIALIZATION_BY___INIT
-extern svalue_t *prog_variable_values;
-#endif
+extern Bool variables_defined;
 
 /* --- Prototypes --- */
 extern int proxy_efun(int, int);

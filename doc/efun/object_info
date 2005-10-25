@@ -99,6 +99,9 @@ DESCRIPTION
                                        cloned.
           int    [OIM_NO_SHADOW]:      1 if the program's functions can't be
                                        shadowed.
+          int    [OIM_SHARE_VARIABLES]:  1 if clones of this program share
+                                       their initial variable values with
+                                       the blueprint.
 
           This call swaps in the program if necessary.
           Note that the OIM_SIZE_xxx entries only give the size spent on
@@ -116,6 +119,8 @@ HISTORY
         LDMud 3.2.9 added the index mechanism, OIM_NUM_INCLUDES,
           OIM_NO_INHERIT, OIM_NO_SHADOW, OIM_NO_CLONE, OIM_SIZE_STRINGS_DATA,
           OIM_SIZE_STRINGS_TOTAL, and OIM_DATA_SIZE_TOTAL to the result
+          of OINFO_MEMORY.
+        LDMud 3.3.378 added the OIM_SHARE_VARIABLES to the result
           of OINFO_MEMORY.
 
 SEE ALSO

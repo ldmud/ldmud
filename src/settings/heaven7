@@ -27,5 +27,5 @@ with_max_bits=1200
 with_reserved_user_size=800000
 with_reserved_master_size=50000
 with_reserved_system_size=100000
-enable_initialization_by___init=no
+enable_share_variables=yes
 

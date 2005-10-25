@@ -36,6 +36,6 @@ enable_use_alists=yes
 enable_use_pcre=no
 
 enable_use_parse_command=no
-enable_initialization_by___init=yes
+enable_share_variables=no
 
 with_max_malloced=0x5000000

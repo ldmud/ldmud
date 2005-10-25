@@ -181,6 +181,10 @@ Bool pragma_warn_deprecated;
   /* True: warn if deprecated efuns are used.
    */
 
+Bool pragma_share_variables;
+  /* TRUE: Share the blueprint's variables with its clones.
+   */
+
 string_t *last_lex_string;
   /* When lexing string literals, this is the (shared) string lexed
    * so far. It is used to pass string values to lang.c and may be
@@ -3280,6 +3284,28 @@ handle_pragma (char *str)
             pragma_warn_deprecated = MY_FALSE;
             validPragma = MY_TRUE;
         }
+        else if (strncmp(base, "share_variables", namelen) == 0)
+        {
+            if (variables_defined)
+            {
+                yywarnf("Can't use #pragma share_variables after defining "
+                        "variables");
+            }
+            else
+                pragma_share_variables = MY_TRUE;
+            validPragma = MY_TRUE;
+        }
+        else if (strncmp(base, "init_variables", namelen) == 0)
+        {
+            if (variables_defined)
+            {
+                yywarnf("Can't use #pragma init_variables after defining "
+                        "variables");
+            }
+            else
+                pragma_share_variables = MY_FALSE;
+            validPragma = MY_TRUE;
+        }
 #if defined( DEBUG ) && defined ( TRACE_CODE )
         else if (strncmp(base, "set_code_window", namelen) == 0)
         {
@@ -5482,6 +5508,7 @@ start_new_file (int fd)
     pragma_pedantic = MY_FALSE;
     pragma_warn_deprecated = MY_FALSE;
     pragma_combine_strings = MY_TRUE;
+    pragma_share_variables = share_variables;
 
     nexpands = 0;
 

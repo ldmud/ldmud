@@ -1,41 +1,83 @@
 CONCEPT
 
-        INITIALIZATION
+        VARIABLE INITIALIZATION
 
 DESCRIPTION
+        Global variables, like their local counterparts, can be defined
+        with an initial value:
 
-        There are two different flavours of initialisations, selectable
-        in config.h :
+            int * a = ({ 3, 4 });
 
-        i)  #undef INITIALIZATION_BY___INIT
-        ------------------------------------
-        Initialisation is done at compile time. This is fast and costs
-        no extra code in the program.
-        Allowed expressions currently include integer literals,
-        string literals, integer operators, string addition, bracketing,
-        array constructors, the empty mapping and structs.
-        When an object with initialised variables is cloned or inherited,
-        all initialised variables are copied from the blueprint.
-        A special application of this feature is to have an initialised
-        non-empty array or a mapping; it will be shared by all clones or
-        inheriting objects unless an assignment to the variable -
-        as opposed to an assignment to an element of the array/mapping -
-        is done in all clones etc.
-        To prevent unauthorised changes in initialised arrays/mappings,
-        you can declare the variables as private or use
-        a nomask reset/create that checks for undesired inheritance.
+        The initialization value can be any legal LPC expression,
+        including function calls. The code for the initializations is
+        collected in a compiler-generated function __INIT() which is
+        called even before the create-hook is applied on the object.
 
-        ii) #define INITIALIZATION_BY___INIT
-        -------------------------------------
-        Creates a function names __INIT() from all variable
-        initialisations and from calls to __INIT() in all inherited
-        objects, and runs this function at object creation time.
-        Any efun can be used in the expressions for variable
-        initialisations, even ones with severe side effects, like
-        destruct() or shutdown().  The code created for __INIT() is
-        a little worse than a medium-skilled lpc-programmer would
-        generate, because it is scattered all over the program.
+        During initialization, blueprints and clones are treated
+        slightly differently:
+
+        Blueprint variables are always all initialized using __INIT().
+
+        For clones the programmer can select whether the clone's
+        variables should also be initialized with __INIT(), or if they
+        should be assigned from the current blueprint values
+        ('shared with the blueprint'). The latter method is useful for
+        example if blueprints and clones shall share arrays or
+        mappings.
+
+        The selection is performed with the two pragmas
+        'init_variables' and 'share_variables'. The status of this
+        pragma at the point of the first variable definition counts,
+        and is applied to all variables in the program.
+
+        The clone initialization method is evaluated per-program, i.e.
+        if an inherited program defines 'share_variables' and the child
+        program doesn't, only the inherited variables are initialized
+        from the blueprint, and all others from __INIT().
+
+        The default setting for the pragma is configured into the
+        driver, but can also be chosen when starting the driver.
+        
+EXAMPLE
+        For the object
+
+          ----------
+          inherit "a";
+          int a = 4;
+          int b;
+          ----------
+
+        the compiler generates these __INIT() functions:
+
+        #pragma share_variables:
+
+            unknown __INIT()
+            {
+                "a"::__INIT();
+                if (clonep(this_object()))
+                    return 1;
+                a = 4;
+                return 1;
+            }
+
+
+        #pragma init_variables:
+
+            unknown __INIT()
+            {
+                "a"::__INIT();
+                a = 4;
+                return 1;
+            }
+
+WARNING
+        Do not call __INIT() yourself, overload, or use it directly in
+        any other way. The implementation of the variable
+        initialization may change at any time.
 
 HISTORY
-        Since LDMud 3.3, order_alist() is no longer accepted without
-          INITIALIZATION_BY___INIT.
+        Before LDMud 3.3.378, the choice between sharing and initializing
+          variables was a fixed configuration choice of the driver.
+
+SEE ALSO
+        pragma(LPC), create(H), invocation(D)

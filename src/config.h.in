@@ -128,6 +128,12 @@
  */
 #define MAX_COST             @val_max_cost@
 
+/* Define SHARE_VARIABLES if a clone's variables are to be assigned
+ * from the current blueprint's variables. Undefine it if clones
+ * should be initialized by __INIT().
+ */
+@cdef_share_variables@ SHARE_VARIABLES
+
 
 /* --- Communication --- */
 
@@ -178,7 +184,6 @@
 
 /* Define COMPAT_MODE if you are using the 2.4.5 mudlib or one of its
  * derivatives.
- * TODO: Make this a runtime option.
  */
 @cdef_compat_mode@ COMPAT_MODE
 
@@ -270,13 +275,6 @@
 /* Define USE_PROCESS_STRING if you want the efun process_string().
  */
 @cdef_use_process_string@ USE_PROCESS_STRING
-
-/* Define INITIALIZATION_BY___INIT if you want all initializations of variables
- * to be suspended till the object is created ( as supposed to initialization
- * at compile time; the latter is more memory efficient for loading and faster
- * at cloning, while the former allows to use efuns, e.g. shutdown().
- */
-@cdef_initialization_by___init@ INITIALIZATION_BY___INIT
 
 /* Define USE_SYSTEM_CRYPT if you want crypt() to be implemented by your
  * operating system (assuming it offers this function). This makes your

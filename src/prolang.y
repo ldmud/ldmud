@@ -25,8 +25,8 @@
  *       driverhook entries are given the value 0.
  *
  * In addition, make_func implements a simple preprocessor using the
- * keywords %if, %elif, %else and %endif; mainly to activate the proper
- * parsing rules for INITIALIZATION_BY___INIT.
+ * keywords %if, %elif, %else and %endif so that parsing rules can be
+ * activated/deactivated from config.h defines.
  *---------------------------------------------------------------------------
  * A compile file, set its filename into <current_file>, open it to yield a
  * filedescriptor 'fd', then call
@@ -43,7 +43,6 @@
  * It is the task of the caller to make sure that the compiler is not called
  * recursively.
  *
-%ifdef INITIALIZATION_BY___INIT
  * If there is any initialization of a global variable, a function '__INIT'
  * is generated with the initialization code. The code is generated in
  * fragments whenever a variable initialization is encountered; the fragments
@@ -53,11 +52,6 @@
  *
  * When inheriting from another object, a call will automatically be made
  * to call __INIT in that code from the current __INIT.
-%else
- * The variable initializers are returned as svalue_t[] in the global
- * variable prog_variable_values. It is the task of the call to free
- * that memory.
-%endif
  *---------------------------------------------------------------------------
  * The compiler is a simple one-pass compiler with immediate code generation.
  * The problem of forward references is solved with various backpatching
@@ -173,11 +167,9 @@ int num_parse_error;
   /* Number of errors in the compile.
    */
 
-%ifndef INITIALIZATION_BY___INIT
-svalue_t *prog_variable_values;
-  /* After epilog(), the variable initializers.
+Bool variables_defined;
+  /* TRUE: Variable definitions have been encountered.
    */
-%endif /* INITIALIZATION_BY___INIT */
 
 /*-------------------------------------------------------------------------*/
 /* Table which hook may be of which type.
@@ -380,15 +372,6 @@ enum e_internal_areas {
      /* (function_t): Function definitions
       */
 
-%ifndef INITIALIZATION_BY___INIT
- , A_VARIABLE_VALUES
-     /* (svalue_t) Initializers for non-virtual variables.
-      */
- , A_VIRTUAL_VAR_VALUES
-     /* (svalue_t) Initializers for virtual variables.
-      */
-%endif
-
  , A_STRING_NEXT
    /* (int) During compilation, the strings in A_STRINGS are organized
     * in a hash table (prog_string_indizes/_tags). The hash chains are
@@ -512,20 +495,6 @@ static mem_block_t mem_block[NUMAREAS];
 #define VARIABLE(n) ((n) & VIRTUAL_VAR_TAG ? V_VARIABLE(n) : NV_VARIABLE(n))
   /* Return the variable_t* for the variable <n>, virtual or not.
    */
-
-%ifndef INITIALIZATION_BY___INIT
-
-#define V_VAR_VALUE(n)  ((svalue_t *)mem_block[A_VARIABLE_VALUES].block + \
-                        (n) - VIRTUAL_VAR_TAG)
-  /* Return the svalue_t* for the initializer of virtual variable <n>
-   * (still including the offset).
-   */
-
-#define NV_VAR_VALUE(n)  ((svalue_t *)mem_block[A_VARIABLE_VALUES].block + (n))
-  /* Return the svalue_t* for the initializer of non-virtual variable <n>.
-   */
-
-%endif
 
 #define INHERIT(n)     ((inherit_t *)mem_block[A_INHERITS].block)[n]
   /* Index the inherit_t <n>.
@@ -743,8 +712,6 @@ static size_t comp_stackp;
   /* Index of the next unused entry in <comp_stack>.
    */
 
-%ifdef INITIALIZATION_BY___INIT
-
 static p_int last_initializer_end;
   /* Address of the argument of the final JUMP instruction of the
    * previous INIT fragment.
@@ -760,20 +727,6 @@ static p_int first_initializer_start;
 static Bool variables_initialized;
   /* TRUE if the code for all variables has been created.
    */
-
-%else
-
-static svalue_t *currently_initialized;
-  /* The variable for which currently the initializer is compiled.
-   */
-
-#ifdef USE_STRUCTS
-static const_list_t *member_currently_initialized;
-  /* The struct member for which currently the initializer is compiled.
-   */
-#endif /* USE_STRUCTS */
-
-%endif /* INITIALIZATION_BY___INIT */
 
 static fulltype_t def_function_returntype;
 static ident_t *  def_function_ident;
@@ -1031,15 +984,10 @@ static int insert_inherited(char *, string_t *, program_t **, function_t *, int,
 #  define INHERITED_WILDCARDED_NOT_FOUND (-3)
 static void store_line_number_relocation(int relocated_from);
 int yyparse(void);
-%ifdef INITIALIZATION_BY___INIT
 static void add_new_init_jump(void);
 static void transfer_init_control(void);
 static void copy_variables(program_t *, funflag_t);
 static int copy_functions(program_t *, funflag_t type);
-%else
-static void copy_variables(program_t *, funflag_t, svalue_t *);
-static void copy_functions(program_t *, funflag_t type);
-%endif
 #ifdef USE_STRUCTS
 static void copy_structs(program_t *, funflag_t);
 #endif /* USE_STRUCTS */
@@ -1935,7 +1883,6 @@ read_short (mp_uint offset)
     return l;
 } /* read_short() */
 
-%ifdef INITIALIZATION_BY___INIT
 /*-------------------------------------------------------------------------*/
 static void
 upd_jump_offset (mp_uint offset, long l)
@@ -1950,7 +1897,6 @@ upd_jump_offset (mp_uint offset, long l)
     dest = mem_block[A_PROGRAM].block + offset;
     PUT_3BYTE(dest, l);
 } /* upd_jump_offset() */
-%endif /* INTIALIZATION_BY___INIT */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -3081,22 +3027,11 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
 } /* define_new_function() */
 
 /*-------------------------------------------------------------------------*/
-%ifdef INITIALIZATION_BY___INIT
-
 static void
 define_variable (ident_t *name, fulltype_t type)
 
-%else /* then !INITIALIZATION_BY___INIT */
-
-static void
-define_variable (ident_t *name, fulltype_t type, svalue_t *svp)
-
-%endif /* INITIALIZATION_BY___INIT */
-
 /* Define a new global variable <name> of type <type>.
  * The references of <type> are NOT adopted.
- * If !INITIALIZATION_BY___INIT, then <svp> is the initializer for the
- * variable.
  */
 
 {
@@ -3217,18 +3152,12 @@ define_variable (ident_t *name, fulltype_t type, svalue_t *svp)
         if (!(flags & NAME_HIDDEN))
             name->u.global.variable = VIRTUAL_VAR_TAG | V_VARIABLE_COUNT;
         add_to_mem_block(A_VIRTUAL_VAR, &dummy, sizeof dummy);
-%ifndef INITIALIZATION_BY___INIT
-        add_to_mem_block(A_VIRTUAL_VAR_VALUES, svp, sizeof *svp);
-%endif /* INITIALIZATION_BY___INIT */
     }
     else
     {
         if (!(flags & NAME_HIDDEN))
             name->u.global.variable = NV_VARIABLE_COUNT;
         add_to_mem_block(A_VARIABLES, &dummy, sizeof dummy);
-%ifndef INITIALIZATION_BY___INIT
-        add_to_mem_block(A_VARIABLE_VALUES, svp, sizeof *svp);
-%endif /* INITIALIZATION_BY___INIT */
     }
 } /* define_variable() */
 
@@ -4885,353 +4814,7 @@ delete_prog_string (void)
 } /* delete_prog_string() */
 
 
-/* ==========================   INITIALIZATION   ========================== */
-
-%ifndef INITIALIZATION_BY___INIT
-
-/*-------------------------------------------------------------------------*/
-static INLINE fulltype_t
-type_rtoc (svalue_t *svp)
-
-/* Return the proper TYPE_ value for the type given by svalue <svp>.
- */
-
-{
-    fulltype_t rc;
-
-    rc.typeflags = TYPE_ANY;
-#ifdef USE_STRUCTS
-    rc.t_struct = NULL;
-#endif
-
-    switch (svp->type)
-    {
-    case T_NUMBER:       rc.typeflags = !svp->u.number ? TYPE_ANY : TYPE_NUMBER;                         break;
-    case T_STRING:       rc.typeflags = TYPE_STRING; break;
-    case T_POINTER:      rc.typeflags = TYPE_MOD_POINTER | TYPE_ANY; break;
-    case T_FLOAT:        rc.typeflags = TYPE_FLOAT; break;
-    case T_CLOSURE:      rc.typeflags = TYPE_CLOSURE; break;
-    case T_SYMBOL:       rc.typeflags = TYPE_SYMBOL; break;
-    case T_QUOTED_ARRAY: rc.typeflags = TYPE_QUOTED_ARRAY; break;
-    case T_MAPPING:      rc.typeflags = TYPE_MAPPING; break;
-#ifdef USE_STRUCTS
-    case T_STRUCT:       rc.typeflags = TYPE_STRUCT;
-                         rc.t_struct = svp->u.strct->type;
-                         break;
-#endif /* USE_STRUCTS */
-    default:
-        fatal("Bad svalue type at compile time.\n");
-    }
-
-    return rc;
-} /* type_rtoc() */
-
-/*-------------------------------------------------------------------------*/
-static INLINE vartype_t
-vtype_rtoc (svalue_t *svp)
-
-/* Return the proper TYPE_ value for the type given by svalue <svp>.
- */
-
-{
-    vartype_t rc;
-
-    assign_full_to_vartype(&rc, type_rtoc(svp));
-    return rc;
-} /* vtype_rtoc() */
-
-/*-------------------------------------------------------------------------*/
-static INLINE svalue_t *
-copy_svalue (svalue_t *svp)
-
-/* Create another reference to the value <svp> and return it.
- * Of course this only works for numbers, floats and shareable svalues
- * like shared strings or arrays.
- * If the <svp> is not shareable, the function will return a reference
- * to the svalue-0.
- *
- * The function is used to store svalues in the initializer table for
- * a program.
- */
-
-{
-    switch (svp->type)
-    {
-    case T_NUMBER:
-    case T_FLOAT:
-        break;
-    case T_STRING:
-        if (!mstr_tabled(svp->u.str))
-            return &const0;
-        /* FALLTHROUGH */
-    case T_SYMBOL:
-        (void)ref_mstring(svp->u.str);
-        break;
-    case T_POINTER:
-    case T_QUOTED_ARRAY:
-#ifdef USE_STRUCTS
-    case T_STRUCT:
-        (void)ref_struct(svp->u.strct);
-        break;
-#endif
-    case T_MAPPING:
-        svp->u.map->ref++;
-        break;
-    case T_CLOSURE:
-        addref_closure(svp, "ass to var");
-        break;
-    default:
-        return &const0;
-    }
-
-    return svp;
-} /* copy_svalue() */
-
-/*-------------------------------------------------------------------------*/
-static void
-list_to_vector (size_t length, svalue_t *initialized)
-
-/* <initialized>.u.lvalue points to a const_list of <length> elements: create
- * a vector from this list, store it in <initialized>.
- */
-
-{
-    const_list_t *list;
-    vector_t *vec;
-    svalue_t *svp;
-    void *block;
-    const_list_svalue_t *clsv;
-
-%line
-    vec = allocate_array(length);
-    if (length)
-    {
-        /* Unravel and copy the constants from the list into the vector
-         */
-        clsv = initialized->u.const_list;
-        list = &clsv->list;
-        block = clsv;
-#ifdef USE_STRUCTS
-        member_currently_initialized = clsv->last_member;
-#endif /* USE_STRUCTS */
-        svp = vec->item;
-        do {
-            *svp++ = list->val;
-#ifdef USE_STRUCTS
-            if (list->member != NULL) /* shouldn't happen here */
-                free_mstring(list->member);
-#endif /* USE_STRUCTS */
-            list = list->next;
-            xfree(block);
-        } while ( NULL != (block = list) );
-    }
-
-    /* Return the array */
-    put_array(initialized, vec);
-} /* list_to_vector() */
-
-#ifdef USE_STRUCTS
-/*-------------------------------------------------------------------------*/
-static void
-list_to_struct (struct_def_t * pdef, int length, svalue_t *initialized)
-
-/* <initialized>.u.lvalue points to a const_list of <length> elements: create
- * a struct matching <pdef> from this list, store it in <initialized>.
- */
-
-{
-    const_list_t *list;
-    struct_t *st;
-    void *block;
-    const_list_svalue_t *clsv;
-
-    st = struct_new(pdef->type);
-    if (length)
-    {
-        Bool * flags;    /* Flags which struct members have been set */
-        Bool   got_named, got_unnamed;
-        Bool   got_error;
-        int    i;
-        int    consumed; /* Number of constants consumed */
-        int    member;   /* Member to set */
-        struct_member_t * pmember;
-
-        clsv = initialized->u.const_list;
-        consumed = 0;
-
-        /* Initialize the flags array */
-        flags = xalloc(struct_t_size(pdef->type) * sizeof(*flags));
-        for (i = 0; i < struct_t_size(pdef->type); i++)
-            flags[i] = MY_FALSE;
-
-        /* First loop through list: check if there is no mixed initialization.
-         */
-        got_error = got_named = got_unnamed = MY_FALSE;
-        list = &clsv->list;
-        do {
-
-            if (list->member != NULL)
-            {
-                if (got_unnamed)
-                {
-                    got_error = MY_TRUE;
-                }
-                got_named = MY_TRUE;
-            }
-            else /* list->member == NULL */
-            {
-                if (got_named)
-                {
-                    got_error = MY_TRUE;
-                }
-                got_unnamed = MY_TRUE;
-            }
-            list = list->next;
-        } while (NULL != list);
-
-        if (got_error)
-        {
-            yyerrorf( "Can't mix named and unnamed initializers "
-                      "in struct '%s'"
-                    , get_txt(struct_t_name(pdef->type))
-                    );
-        }
-
-        if (got_named && !got_unnamed)
-        {
-            /* The one second loop through list: assign the named members
-             */
-            list = &clsv->list;
-            do {
-
-                consumed++;
-                member = struct_find_member(pdef->type, list->member);
-                if (member >= 0)
-                    pmember = &pdef->type->member[member];
-
-                if (member < 0)
-                    yyerrorf( "No such member '%s' in struct '%s'"
-                            , get_txt(list->member)
-                            , get_txt(struct_t_name(pdef->type))
-                            );
-                else if (flags[member])
-                {
-                    yyerrorf( "Multiple initializations of member '%s' "
-                              "in struct '%s'"
-                            , get_txt(list->member)
-                            , get_txt(struct_t_name(pdef->type))
-                            );
-                }
-                else if (exact_types.typeflags
-                      && !vtype( pmember->type , vtype_rtoc(&list->val)) )
-                {
-                    yyerrorf("Type mismatch %s when initializing member '%s' "
-                             "in struct '%s'"
-                            , get_two_vtypes(pmember->type, vtype_rtoc(&list->val))
-                            , get_txt(list->member)
-                            , get_txt(struct_t_name(pdef->type))
-                            );
-                }
-                else
-                {
-                    st->member[member] = list->val;
-                    flags[member] = MY_TRUE;
-                }
-
-                list = list->next;
-            } while (NULL != list);
-        } /* if got_named && !got_unnamed */
-
-        if (got_unnamed && !got_named)
-        {
-            /* The other second loop through list: assign the unnamed members
-             */
-            list = &clsv->list;
-            member = 0;
-
-            do {
-                pmember = &pdef->type->member[member];
-                consumed++;
-                if (exact_types.typeflags
-                 && !vtype( pmember->type , vtype_rtoc(&list->val)) )
-                {
-                    yyerrorf("Type mismatch %s when initializing member '%s' "
-                             "in struct '%s'"
-                            , get_two_vtypes(pmember->type, vtype_rtoc(&list->val))
-                            , get_txt(list->member)
-                            , get_txt(struct_t_name(pdef->type))
-                            );
-                }
-                else
-                {
-                    st->member[member] = list->val;
-                    flags[member] = MY_TRUE;
-                }
-
-                list = list->next;
-                member++;
-            } while (NULL != list && member < struct_t_size(pdef->type));
-        } /* if got_unnamed && !got_named */
-
-        xfree(flags); flags = NULL;
-
-        /* Last loop: deallocate the list
-         */
-        list = &clsv->list;
-        block = clsv;
-        member_currently_initialized = clsv->last_member;
-        do {
-            if (list->member != NULL) /* shouldn't happen here */
-                free_mstring(list->member);
-            list = list->next;
-            xfree(block);
-        } while ( NULL != (block = list) );
-
-        /* Test if there were extra elements */
-        if (consumed < length)
-            yyerrorf("Too many initializers for struct '%s'"
-                    , get_txt(struct_t_name(pdef->type))
-                    );
-
-    }
-
-    /* Return the array */
-    put_struct(initialized, st);
-} /* list_to_struct() */
-#endif /* USE_STRUCTS */
-
-/*-------------------------------------------------------------------------*/
-static void
-free_const_list_svalue (svalue_t *svp)
-
-/* Function used as error-handler for const lists: <svp> is in fact
- * a const_list_svalue_t* and this function deallocates all memory
- * associated with the list.
- */
-
-{
-    const_list_t *list;
-    void *block;
-
-%line
-    list = &((const_list_svalue_t *)svp)->list;
-#ifdef USE_STRUCTS
-    member_currently_initialized = ((const_list_svalue_t *)svp)->last_member;
-#endif /* USE_STRUCTS */
-    block = svp;
-    do {
-        free_svalue(&list->val);
-#ifdef USE_STRUCTS
-        if (list->member != NULL)
-            free_mstring(list->member);
-#endif /* USE_STRUCTS */
-        list = list->next;
-        xfree(block);
-    } while ( NULL != (block = list) );
-} /* free_const_list_svalue() */
-
-%endif /* !INITIALIZATION_BY___INIT */
-
+/*=========================================================================*/
 
 #if defined(__MWERKS__) && !defined(WARN_ALL)
 #    pragma warn_possunwant off
@@ -5507,38 +5090,6 @@ free_const_list_svalue (svalue_t *svp)
        */
 %endif /* USE_STRUCTS */
 
-%ifndef INITIALIZATION_BY___INIT
-
-    struct {
-        p_int                 length;  /* Length of the list */
-        struct const_list_s * l;       /* The list of constants */
-    } const_list;
-      /* Used to hold the constant elements of an array
-       * initializer.
-       */
-
-    struct {
-        int       function;     /* efun index */
-        svalue_t *initialized;  /* svalue to initialize */
-    } const_call_head;
-      /* Used to hold the information of a constant efun call
-       * over the parsing of the arguments.
-       */
-
-    svalue_t svalue;
-      /* Used for constant float initializers: the float value */
-
-%ifdef USE_STRUCTS
-    struct {
-        svalue_t * initialized;  /* svalue currently initialized */
-        int        id;           /* struct id */
-    } struct_const_init;
-      /* Used to hold the information about which type
-       * struct is to be created, and where to store it.
-       */
-%endif /* USE_STRUCTS */
-%endif /* !INITIALIZATION_BY___INIT */
-
 } /* YYSTYPE */
 
 /*-------------------------------------------------------------------------*/
@@ -5586,13 +5137,6 @@ free_const_list_svalue (svalue_t *svp)
 %endif /* USE_STRUCTS */
 %type <function_name> function_name
 
-%ifndef INITIALIZATION_BY___INIT
-%type <svalue>       float_constant
-%type <const_list>   const_expr_list const_expr_list2 const_expr_list3
-%ifdef USE_STRUCTS
-%type <const_list>   opt_const_struct_init opt_const_struct_init2
-%endif /* USE_STRUCTS */
-%endif
 
 /* Special uses of <number> */
 
@@ -6096,16 +5640,10 @@ inheritance:
           object_t *ob;
           inherit_t inherit;
 
-%ifdef INITIALIZATION_BY___INIT
-          int initializer;
-%endif /* INITIALIZATION_BY___INIT */
-
           if (CURRENT_PROGRAM_SIZE
-%ifdef INITIALIZATION_BY___INIT
            && !(((function_t *)(mem_block[A_FUNCTIONS].block+
                          mem_block[A_FUNCTIONS].current_size))[-1].flags &
                          NAME_INHERITED)
-%endif /* INITIALIZATION_BY___INIT */
              )
           {
               yyerror("illegal to inherit after defining functions");
@@ -6284,17 +5822,16 @@ inheritance:
               }
           }
 
-
           if (!(inherit.inherit_type & INHERIT_TYPE_DUPLICATE))
           {
               /* Copy the functions and variables, and take
                * care of the initializer.
                */
+              int initializer;
 
 #ifdef USE_STRUCTS
               copy_structs(ob->prog, $1[0]);
 #endif
-%ifdef INITIALIZATION_BY___INIT
               initializer = copy_functions(ob->prog, $1[0]);
               copy_variables(ob->prog, $1[1]);
 
@@ -6311,10 +5848,6 @@ inheritance:
                   ins_f_code(F_POP_VALUE);
                   add_new_init_jump();
               }
-%else  /* INITIALIZATION_BY___INIT */
-              copy_functions(ob->prog, $1[0]);
-              copy_variables(ob->prog, $1[1], ob->variables);
-%endif /* INITIALIZATION_BY___INIT */
 
               /* Fix up the inherit indices */
               fix_function_inherit_indices(ob->prog);
@@ -6693,6 +6226,8 @@ new_name:
 %line
           fulltype_t actual_type = current_type;
 
+          variables_defined = MY_TRUE;
+
           if (!(actual_type.typeflags & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
                               | TYPE_MOD_PROTECTED)))
           {
@@ -6707,20 +6242,19 @@ new_name:
 
           actual_type.typeflags |= $1;
 
-%ifdef INITIALIZATION_BY___INIT
+          if (!pragma_share_variables)
+              actual_type.typeflags |= VAR_INITIALIZED;
+
           define_variable($2, actual_type);
-%else /* then !INITIALIZATION_BY___INIT */
-          define_variable($2, actual_type, &const0);
-%endif
       }
 
     /* Variable definition with initialization */
 
-%ifdef INITIALIZATION_BY___INIT
-
     | optional_star L_IDENTIFIER
       {
           fulltype_t actual_type = current_type;
+
+          variables_defined = MY_TRUE;
 
           if (!(actual_type.typeflags & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
                               | TYPE_MOD_PROTECTED)))
@@ -6732,7 +6266,24 @@ new_name:
 
           define_variable($2, actual_type);
           $<number>$ = verify_declared($2); /* Is the var declared? */
-          transfer_init_control();          /* Prepare INIT code */
+
+          /* Prepare the init code */
+          transfer_init_control();
+
+          /* If this is the first variable initialization and
+           * pragma_share_variables is in effect, insert
+           * the check for blueprint/clone initialisation:
+           *    if (clonep(this_object())) return 1;
+           */
+          if (!variables_initialized && pragma_share_variables)
+          {
+              ins_f_code(F_THIS_OBJECT);
+              ins_f_code(F_CLONEP);
+              ins_f_code(F_BRANCH_WHEN_ZERO);
+              ins_byte(2);
+              ins_f_code(F_CONST1);
+              ins_f_code(F_RETURN);
+          }
       }
 
       L_ASSIGN expr0
@@ -6763,6 +6314,8 @@ new_name:
           }
 #endif
           variables_initialized = MY_TRUE; /* We have __INIT code */
+          if (!pragma_share_variables)
+              VARIABLE(i)->type.typeflags |= VAR_INITIALIZED;
 
           /* Push the variable reference and create the assignment */
 
@@ -6796,65 +6349,6 @@ new_name:
           CURRENT_PROGRAM_SIZE += 3;
           add_new_init_jump();
       }
-
-%else /* then !INITIALIZATION_BY___INIT */
-
-    | optional_star L_IDENTIFIER
-
-      {
-          /* svalue_constant can contain identifiers, so define the variable
-           * now, lest the identifier could get freed by a name clash.
-           */
-%line
-          int n;
-          fulltype_t actual_type = current_type;
-
-          if (!(actual_type.typeflags & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
-                              | TYPE_MOD_PROTECTED)))
-          {
-              actual_type.typeflags |= default_varmod;
-          }
-
-          actual_type.typeflags |= $1 | NAME_INITIALIZED;
-
-          define_variable($2, actual_type, &const0);
-          n = $2->u.global.variable;
-          $<initialized>$ = currently_initialized
-            = n & VIRTUAL_VAR_TAG ? V_VAR_VALUE(n) : NV_VAR_VALUE(n);
-#ifdef USE_STRUCTS
-          member_currently_initialized = NULL;
-#endif /* USE_STRUCTS */
-      }
-
-      L_ASSIGN svalue_constant
-
-      {
-%line
-          /* The parsing of the svalue_constant assigned the value
-           * to the currently_initialized buffer set above, so
-           * we just have to check the validity.
-           */
-
-          fulltype_t actual_type = current_type;
-
-          if (!(actual_type.typeflags & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
-                              | TYPE_MOD_PROTECTED)))
-          {
-              actual_type.typeflags |= default_varmod;
-          }
-
-          actual_type.typeflags |= $1;
-
-          if ($4 != F_ASSIGN)
-              yyerror("Illegal initialization");
-
-          if (exact_types.typeflags != 0)
-              if (!TYPE( actual_type, type_rtoc($<initialized>3)) )
-              {
-                  yyerror("Bad initializer type");
-              }
-    }
-%endif /* INITIALIZATION_BY___INIT */
 
 ; /* new_name */
 
@@ -13613,395 +13107,6 @@ lvalue_list:
 ; /* lvalue_list */
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-%ifndef INITIALIZATION_BY___INIT
-
-/* svalue_constant parses the constant variable initializers.
- * The generated value is stored in *currently_initialized.
- *
- * The constant initialization may contain function calls, however,
- * so far none are implemented.
- */
-
-svalue_constant:
-      constant_function_call
-    | array_constant
-%ifdef USE_STRUCTS
-    | struct_constant
-%endif /* USE_STRUCTS */
-    | constant
-      {
-          svalue_t *svp = currently_initialized;
-%line
-          put_number(svp, $1);
-      }
-
-    | string_constant
-      {
-          svalue_t *svp = currently_initialized;
-%line
-          put_string(svp, last_string_constant);
-          last_string_constant = NULL;
-      }
-
-    | L_SYMBOL
-      {
-          svalue_t *svp = currently_initialized;
-%line
-          svp->type = T_SYMBOL;
-          svp->x.quotes = $1.quotes;
-          svp->u.str = $1.name;
-      }
-
-    | L_QUOTED_AGGREGATE
-
-      { $<initialized>$ = currently_initialized; }
-
-      const_expr_list '}' ')'
-
-      {
-          svalue_t *svp = $<initialized>2;
-%line
-          list_to_vector($3.length, svp);
-          svp->type = T_QUOTED_ARRAY;
-          svp->x.quotes = $1;
-      }
-
-    | float_constant
-      {
-          *currently_initialized = $1;
-      }
-
-    | L_CLOSURE
-      {
-          p_int ix;
-          svalue_t *svp = currently_initialized;
-%line
-          ix = $1.number;
-          svp->type = T_CLOSURE;
-          if (ix < CLOSURE_EFUN_OFFS)
-          {
-              /* Lfun closure */
-
-              lambda_t *l;
-
-              l = xalloc(sizeof *l);
-              l->ref = 1;
-              l->ob = ref_object(current_object, "closure");
-#ifndef USE_NEW_INLINES
-              l->function.index = ix;
-#else /* USE_NEW_INLINES */
-              l->function.lfun.index = ix;
-              l->function.lfun.context_size = 0;
-#endif /* USE_NEW_INLINES */
-              svp->u.lambda = l;
-              svp->x.closure_type = CLOSURE_PRELIMINARY;
-          }
-          else if (ix >= CLOSURE_SIMUL_EFUN_OFFS)
-          {
-              /* Sefun closure */
-              svp->x.closure_type = (short)ix;
-              svp->u.ob = ref_object(current_object, "closure");
-          }
-          else
-          {
-              /* Efun or operator closure */
-              if (pragma_warn_deprecated
-               && instrs[ix - CLOSURE_EFUN_OFFS].deprecated != NULL)
-                  yywarnf("%s() is deprecated: %s"
-                         , instrs[ix - CLOSURE_EFUN_OFFS].name
-                         , instrs[ix - CLOSURE_EFUN_OFFS].deprecated
-                         );
-
-              svp->x.closure_type
-                = (short)(  instrs[ix - CLOSURE_EFUN_OFFS].Default == -1
-                          ? ix + CLOSURE_OPERATOR-CLOSURE_EFUN
-                          : ix);
-              svp->u.ob = ref_object(current_object, "closure");
-          }
-      }
-
-    | '(' '[' ']' ')'
-      {
-          svalue_t *svp = currently_initialized;
-%line
-          put_mapping(svp, allocate_mapping(0, 1));
-      }
-
-    | '(' '[' ':' constant ']' ')'
-      {
-          svalue_t *svp = currently_initialized;
-%line
-          put_mapping(svp, allocate_mapping(0, $4));
-      }
-; /* svalue_constant */
-
-
-array_constant:
-      '(' '{'
-
-      { $<initialized>$ = currently_initialized; }
-
-      const_expr_list '}' ')'
-
-      {
-%line
-          list_to_vector($4.length, $<initialized>3);
-      }
-; /* array_constant */
-
-
-%ifdef USE_STRUCTS
-struct_constant:
-      '(' '<' identifier '>'
-      {
-          int num;
-
-          num = find_struct($3);
-          if (num < 0)
-          {
-              yyerrorf("Unknown struct '%s'", get_txt($3));
-              YYACCEPT;
-          }
-          $<struct_const_init>$.initialized = currently_initialized;
-          $<struct_const_init>$.id = num;
-          free_mstring($3);
-      }
-      opt_const_struct_init ')'
-      {
-          /* Generate a literal struct */
-
-          struct_def_t * pdef = &(STRUCT_DEF($<struct_const_init>5.id));
-          svalue_t     * svp = $<struct_const_init>5.initialized;
-
-          if ($6.length > STRUCT_MAX_MEMBERS
-           || $6.length > struct_t_size(pdef->type))
-          {
-              yyerrorf("Too many elements for literal struct '%s'"
-                      , get_txt(struct_t_name(pdef->type)));
-              free_svalue(svp);
-                /* Calls free_const_list_svalue() by means of error handler */
-              put_number(svp, 0);
-          }
-          else
-          {
-              list_to_struct(pdef, $6.length, svp);
-          }
-      }
-; /* struct_constant */
-
-/* The following rules are used to parse constant struct literals */
-
-opt_const_struct_init:
-      /* empty */                { $$.length = 0; }
-    | opt_const_struct_init2     { $$ = $1; }
-; /* opt_const_struct_init */
-
-opt_const_struct_init2:
-      /* empty */
-      {
-          /* The end of a const_list (or a const_list with just one
-           * element) - this is the first rule reduced.
-           *
-           * Prepare the const list svalue to return the value.
-           */
-
-          svalue_t *svp;
-          const_list_svalue_t *clsv;
-%line
-          clsv = xalloc(sizeof *clsv);
-          svp = currently_initialized;
-          svp->type = T_LVALUE;
-          svp->u.lvalue = &clsv->head;
-          clsv->head.type = T_ERROR_HANDLER;
-          clsv->head.u.error_handler = free_const_list_svalue;
-          clsv->list.next = NULL;
-          clsv->list.val.type = T_INVALID;
-          clsv->list.member = NULL;
-          clsv->last_member = member_currently_initialized;
-          currently_initialized = &clsv->list.val;
-          member_currently_initialized = &clsv->list;
-          $<const_list>$.l = &clsv->list;
-          $<const_list>$.length = 1;
-      }
-
-      const_struct_init
-
-      { $$ = $<const_list>1; }
-
-    | opt_const_struct_init2
-      {
-          /* One more element to the const_list */
-
-          const_list_t *l;
-%line
-          l = xalloc(sizeof (const_list_t));
-          l->next = NULL;
-          l->val.type = T_INVALID;
-          l->member = NULL;
-          currently_initialized = &l->val;
-          member_currently_initialized = l;
-          $1.l->next = l;
-      }
-
-      ',' const_struct_init
-
-      {
-          $$.l = $1.l->next;
-          $$.length = $1.length+1;
-      }
-; /* opt_const_struct_init2 */
-
-const_struct_init:
-      identifier ':' svalue_constant
-      {
-          member_currently_initialized->member = $1;
-      }
-    | svalue_constant
-      {
-          member_currently_initialized->member = NULL;
-      }
-; /* const_struct_init */
-
-%endif /* USE_STRUCTS */
-
-float_constant:
-      L_FLOAT
-      {
-%line
-          STORE_DOUBLE_USED
-
-          $$.type = T_FLOAT;
-          STORE_DOUBLE(&$$, $1);
-      }
-
-    | '-' float_constant
-      {
-%line
-          STORE_DOUBLE_USED
-          double d;
-
-          d = -READ_DOUBLE(&$2);
-          $$.type = T_FLOAT;
-          STORE_DOUBLE(&$$, d);
-      }
-; /* float_constant */
-
-
-const_expr_list:
-      /* empty */           { $$.length = 0; }
-    | const_expr_list2      { $$ = $1; }
-    | const_expr_list2 ','  { $$ = $1; }  /* Allow a trailing comma */
-;
-
-const_expr_list2:
-
-      /* empty */
-
-      {
-          /* The end of a const_list (or a const_list with just one
-           * element) - this is the first rule reduced.
-           *
-           * Prepare the const list svalue to return the value.
-           */
-
-          svalue_t *svp;
-          const_list_svalue_t *clsv;
-%line
-          clsv = xalloc(sizeof *clsv);
-          svp = currently_initialized;
-          svp->type = T_LVALUE;
-          svp->u.lvalue = &clsv->head;
-          clsv->head.type = T_ERROR_HANDLER;
-          clsv->head.u.error_handler = free_const_list_svalue;
-          clsv->list.next = NULL;
-#ifdef USE_STRUCTS
-          clsv->list.member = NULL;
-          clsv->last_member = member_currently_initialized;
-          member_currently_initialized = NULL;
-#endif /* USE_STRUCTS */
-          clsv->list.val.type = T_INVALID;
-          currently_initialized = &clsv->list.val;
-          $<const_list>$.l = &clsv->list;
-          $<const_list>$.length = 1;
-      }
-
-      svalue_constant
-
-      { $$ = $<const_list>1; }
-
-
-    | const_expr_list2 ','
-      {
-          /* One more element to the const_list */
-
-          const_list_t *l;
-%line
-          l = xalloc(sizeof (const_list_t));
-          l->next = NULL;
-          l->val.type = T_INVALID;
-#ifdef USE_STRUCTS
-          l->member = NULL;
-#endif /* USE_STRUCTS */
-          currently_initialized = &l->val;
-          $1.l->next = l;
-      }
-
-      svalue_constant
-
-      {
-          $$.l = $1.l->next;
-          $$.length = $1.length+1;
-      }
-; /* const_expr_list2 */
-
-
-constant_function_call:
-      L_IDENTIFIER
-      {
-          /* I_TYPE_UNKNOWN must not be overrun by annother one, so
-           * evaluate the identifier now.
-           * We rely on the fact that $1.real->type is either
-           * I_TYPE_UNKNOWN or I_TYPE_GLOBAL here. All others are filtered
-           * by the lexical analysis.
-           */
-
-          $<const_call_head>$.function = $1->u.global.efun;
-          $<const_call_head>$.initialized = currently_initialized;
-          if ($1->type == I_TYPE_UNKNOWN)
-          {
-              free_shared_identifier($1);
-              $<number>$ = -1;
-          }
-      }
-
-      '(' const_expr_list3 ')'
-
-      {
-          svalue_t *svp;
-          const_list_svalue_t *list;
-%line
-          svp = $<const_call_head>2.initialized;
-          list = svp->u.const_list;
-          switch($<const_call_head>2.function)
-          {
-          default:
-              yyerror("Illegal function call in initialization");
-              free_svalue(svp);
-              *svp = const0;
-          }
-      }
-; /* constant_function_call */
-
-
-const_expr_list3:
-      /* empty */       { $$.length =0; $$.l = NULL; }
-    | const_expr_list2  { $$ = $1; }
-; /* const_expr_list3 */
-
-
-%endif /* INITIALIZATION_BY___INIT */
-
-/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 
 %%
 %line
@@ -14372,9 +13477,6 @@ proxy_efun (int function, int num_arg UNUSED)
 } /* proxy_efun() */
 
 /*-------------------------------------------------------------------------*/
-
-%ifdef INITIALIZATION_BY___INIT
-
 static void
 transfer_init_control (void)
 
@@ -14436,8 +13538,6 @@ add_new_init_jump (void)
     ins_byte(0);
     ins_short(0);
 } /* add_new_init_jump() */
-
-%endif /* INITIALIZATION_BY___INIT */
 
 /*-------------------------------------------------------------------------*/
 static short
@@ -14941,13 +14041,7 @@ copy_structs (program_t *from, funflag_t flags)
 #endif /* USE_STRUCTS */
 
 /*-------------------------------------------------------------------------*/
-static
-%ifdef INITIALIZATION_BY___INIT
-       int
-%else
-       void
-%endif
-
+static int
 copy_functions (program_t *from, funflag_t type)
 
 /* The functions of the program <from> are inherited with visibility <type>.
@@ -14961,17 +14055,12 @@ copy_functions (program_t *from, funflag_t type)
  * definition). If an function defined by inheritance is called,
  * this is done with F_CALL_INHERITED
  *
-%ifdef INITIALIZATION_BY___INIT
  * The result is the function index of the inherited __INIT function,
  * or -1 if the inherited program doesn't have an initializer.
-%endif
  */
 
 {
-%ifdef INITIALIZATION_BY___INIT
     int initializer = -1;
-%endif
-
     int i;
     uint32 first_func_index, current_func_index;
     function_t *fun_p;
@@ -14985,11 +14074,7 @@ copy_functions (program_t *from, funflag_t type)
         if (!realloc_mem_block(&mem_block[A_FUNCTIONS],
                           mem_block[A_FUNCTIONS].current_size +
                             from->num_functions * sizeof(function_t)))
-            return
-%ifdef INITIALIZATION_BY___INIT
-                    0
-%endif
-                        ;
+            return 0;
     }
 
     /* The new functions will be stored from here */
@@ -15314,14 +14399,12 @@ copy_functions (program_t *from, funflag_t type)
                 heart_beat = current_func_index;
             }
 
-%ifdef INITIALIZATION_BY___INIT
             /* Recognize the initializer function */
             if (mstreq(fun.name, STR_VARINIT))
             {
                 initializer = i;
                 fun.flags |= NAME_UNDEFINED;
             }
-%endif
         } /* switch() for visibility/redefinability */
 
         /* Copy information about the types of the arguments, if it is
@@ -15368,19 +14451,12 @@ copy_functions (program_t *from, funflag_t type)
         fun_p[i] = fun;
     } /* for (inherited functions), pass 2 */
 
-%ifdef INITIALIZATION_BY___INIT
     return initializer;
-%endif
 } /* copy_functions() */
 
 /*-------------------------------------------------------------------------*/
 static void
-copy_variables (program_t *from, funflag_t type
-
-%ifndef INITIALIZATION_BY___INIT
-               , svalue_t *initializers
-%endif
-               )
+copy_variables (program_t *from, funflag_t type)
 
 /* Inherit the variables of <from> with visibility <type>.
  * The variables are copied into our program, and it is important that
@@ -15396,7 +14472,7 @@ copy_variables (program_t *from, funflag_t type
     int previous_variable_index_offset;
     int from_variable_index_offset;
 
-    type &= ~TYPE_MOD_VARARGS; /* aka NAME_INITIALIZED */
+    type &= ~VAR_INITIALIZED;
 
     /* If this is a virtual inherit, find the first inherit
      * for this program and set the from_variable_index_offset.
@@ -15417,12 +14493,10 @@ copy_variables (program_t *from, funflag_t type
             }
         }
 
-#ifdef INITIALIZATION_BY___INIT
         if (variables_initialized && from_variable_index_offset < 0)
             yyerror(
               "illegal to inherit virtually after initializing variables\n"
             );
-#endif
     }
 
     fun_index_offset = FUNCTION_COUNT - from->num_functions;
@@ -15462,12 +14536,10 @@ copy_variables (program_t *from, funflag_t type
                 funflag_t *flagp;
                 function_t *funp, *funp2;
 
-#ifdef INITIALIZATION_BY___INIT
                 if (variables_initialized)
-                    yyerror(
-"illegal to inherit virtually after initializing variables\n"
+                    yyerror("illegal to inherit virtually after "
+                            "initializing variables\n"
                     );
-#endif
                 inherit = *inheritp;
                 inherit.inherit_type = INHERIT_TYPE_EXTRA;
                 inherit.inherit_depth++;
@@ -15620,12 +14692,7 @@ copy_variables (program_t *from, funflag_t type
                           )
                 ;
 
-                define_variable(p, vartype
-%ifndef INITIALIZATION_BY___INIT
-                  ,from->variables[j].type.typeflags & NAME_INITIALIZED ?
-                    copy_svalue(&initializers[j]) : &const0
-%endif
-                );
+                define_variable(p, vartype);
             }
         } /* end loop through variables */
 
@@ -15983,6 +15050,7 @@ prolog (void)
     type_of_arguments.current_size = 0;
 
     /* Initialize all the globals */
+    variables_defined = MY_FALSE;
     last_expression  = -1;
     compiled_prog    = NULL;  /* NULL means fail to load. */
     heart_beat       = -1;
@@ -16029,10 +15097,8 @@ printf("DEBUG: prolog: type ptrs: %p, %p\n", type_of_locals, type_of_context );
     num_virtual_variables = 0;
     case_state.free_block = NULL;
     case_state.next_free = NULL;
-%ifdef INITIALIZATION_BY___INIT
     last_initializer_end = -4; /* To pass the test in transfer_init_control() */
     variables_initialized = 0;
-%endif
     argument_level = 0;
     got_ellipsis[0] = MY_FALSE;
 
@@ -16126,19 +15192,6 @@ epilog (void)
     );
     mem_block[A_VARIABLES].current_size = 0;
 
-%ifndef INITIALIZATION_BY___INIT
-
-    /* Just add the non-virtual values to the virtual block */
-
-    add_to_mem_block(
-        A_VIRTUAL_VAR_VALUES,
-        mem_block[A_VARIABLE_VALUES].block,
-        mem_block[A_VARIABLE_VALUES].current_size
-    );
-    mem_block[A_VARIABLE_VALUES].current_size = 0;
-
-%else
-
     /* Define the __INIT function, but only if there was any code
      * to initialize.
      */
@@ -16161,8 +15214,6 @@ epilog (void)
         mem_block[A_PROGRAM].block[last_initializer_end-0] =
             F_RETURN;
     } /* if (has initializer) */
-
-%endif /* INITIALIZATION_BY___INIT */
 
     /* Check the string block. We don't have to count the include file names
      * as those won't be accessed from the program code.
@@ -16236,7 +15287,6 @@ epilog (void)
                                          , f->num_local);
                     p = PROGRAM_BLOCK + CURRENT_PROGRAM_SIZE
                         + FUNCTION_HDR_SIZE;
-%ifdef INITIALIZATION_BY___INIT
                     /* If __INIT() is undefined (i.e. there was a prototype, but
                      * no explicit function nor the automagic initialization code,
                      * then a dummy function is generated. This prevents crashes
@@ -16248,11 +15298,8 @@ epilog (void)
                         *p++ = F_CONST1;
                         *p   = F_RETURN;
                     } else {
-%endif
                         *p = F_UNDEF;
-%ifdef INITIALIZATION_BY___INIT
                     }
-%endif
                     CURRENT_PROGRAM_SIZE += FUNCTION_HDR_SIZE + 2;
                 }
             }
@@ -16419,14 +15466,6 @@ epilog (void)
         /* Done: functions are sorted, resolved, etc etc */
     } /* if (parse successful) */
 
-%ifndef INITIALIZATION_BY___INIT
-
-    /* Return the variable initializers to the caller */
-    prog_variable_values =
-      (svalue_t *)mem_block[A_VIRTUAL_VAR_VALUES].block;
-
-%endif /* INITIALIZATION_BY___INIT */
-
     /* Free unneeded memory */
     free_all_local_names();
 
@@ -16563,7 +15602,10 @@ epilog (void)
           ++current_id_number ? current_id_number : renumber_programs();
         prog->flags = (pragma_no_clone ? P_NO_CLONE : 0)
                     | (pragma_no_inherit ? P_NO_INHERIT : 0)
-                    | (pragma_no_shadow ? P_NO_SHADOW : 0);
+                    | (pragma_no_shadow ? P_NO_SHADOW : 0)
+                    | (pragma_share_variables ? P_SHARE_VARIABLES : 0)
+                    ;
+
         prog->load_time = current_time;
 
         total_prog_block_size += prog->total_size + mstrsize(prog->name);
@@ -16735,13 +15777,6 @@ epilog (void)
 
         for (i = 0; i < NUMAREAS; i++)
         {
-%ifndef INITIALIZATION_BY___INIT
-            /* Don't free this, the caller is going to
-             * need them.
-             */
-            if (i == A_VIRTUAL_VAR_VALUES)
-                continue;
-%endif /* INITIALIZATION_BY___INIT */
             xfree(mem_block[i].block);
         }
 
@@ -16771,11 +15806,6 @@ epilog (void)
      */
     {
         function_t *functions;
-
-%ifndef INITIALIZATION_BY___INIT
-        for (i = 0; i < num_variables; i++)
-            free_svalue(&prog_variable_values[i]);
-%endif /* INITIALIZATION_BY___INIT */
 
         /* Free all function names and type data. */
         functions = (function_t *)mem_block[A_FUNCTIONS].block;

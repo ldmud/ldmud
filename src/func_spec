@@ -245,10 +245,7 @@
         end_catch
         break_continue
         breakn_continue
-
-#ifdef INITIALIZATION_BY___INIT
         jump
-#endif
 
 /*---------------------------------------------------------------------------
  * efuns with a single-byte code.

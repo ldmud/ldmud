@@ -4082,6 +4082,7 @@ v_object_info (svalue_t *sp, int num_args)
         ST_NUMBER(OIM_NO_INHERIT, (prog->flags & P_NO_INHERIT) ? 1 : 0);
         ST_NUMBER(OIM_NO_CLONE, (prog->flags & P_NO_CLONE) ? 1 : 0);
         ST_NUMBER(OIM_NO_SHADOW, (prog->flags & P_NO_SHADOW) ? 1 : 0);
+        ST_NUMBER(OIM_SHARE_VARIABLES, (prog->flags & P_SHARE_VARIABLES) ? 1 : 0);
         break;
 
 #undef PREP

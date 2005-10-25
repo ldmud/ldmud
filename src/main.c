@@ -92,7 +92,10 @@ int check_state_level = 0;     /* how of to check the state in the loop */
 Bool check_object_stat = MY_FALSE;
 #endif
 
-Bool strict_euids = MY_FALSE;  /* Enforce use of the euids */
+Bool strict_euids = MY_FALSE;     /* Enforce use of the euids */
+Bool share_variables = MY_FALSE;  /* Clones are initialized from their
+                                   * blueprints.
+                                   */
 
 static uint32 random_seed = 0;  /* The seed for the pseudo-random generator. */
 
@@ -240,6 +243,9 @@ main (int argc, char **argv)
 
 #ifdef STRICT_EUIDS
         strict_euids = MY_TRUE;
+#endif
+#ifdef SHARE_VARIABLES
+        share_variables = MY_TRUE;
 #endif
 
 #ifdef INPUT_ESCAPE
@@ -977,6 +983,8 @@ typedef enum OptNumber {
  , cReserveSystem   /* --reserve-system     */
  , cStrictEuids     /* --strict-euids       */
  , cNoStrictEuids   /* --no-strict-euids    */
+ , cShareVariables    /* --share-variables    */
+ , cNoShareVariables  /* --init-variables     */
  , cSwap            /* -s                   */
  , cSwapTime        /* --swap-time          */
  , cSwapVars        /* --swap-variables     */
@@ -1282,8 +1290,17 @@ static Option aOptions[]
         "    Enforce/don't enforce the proper use of euids.\n"
       }
 
-    , { 0,   "no-strict-euids",    cNoStrictEuids,  MY_FALSE
-      , "  --no-strict-euids\n"
+    , { 0,   "share-variables",    cShareVariables,  MY_FALSE
+      , "  --share-variables\n"
+      , "  --share-variables\n"
+        "  --init-variables\n"
+        "    Select how clones initialize their variables:\n"
+        "      - by sharing the current values of their blueprint\n"
+        "      - by initializing them afresh (using __INIT()).\n"
+      }
+
+    , { 0,   "init-variables",    cNoStrictEuids,  MY_FALSE
+      , "  --init-variables\n"
       , NULL
       }
 
@@ -1556,10 +1573,10 @@ options (void)
 #ifdef USE_SET_IS_WIZARD
                               , "set_is_wizard() enabled\n"
 #endif
-#ifdef INITIALIZATION_BY___INIT
-                              , "initialization by __INIT()\n"
+#ifdef SHARE_VARIABLES
+                              , "clones initialized from blueprint\n"
 #else
-                              , "static initialization\n"
+                              , "clones initialized by __INIT()\n"
 #endif
 #ifdef USE_DEPRECATED
                               , "obsolete and deprecated efuns enabled\n"
@@ -2246,6 +2263,14 @@ eval_arg (int eOption, const char * pValue)
 
     case cNoStrictEuids:
         strict_euids = MY_FALSE;
+        break;
+
+    case cShareVariables:
+        share_variables = MY_TRUE;
+        break;
+
+    case cNoShareVariables:
+        share_variables = MY_FALSE;
         break;
 
 #ifdef GC_SUPPORT

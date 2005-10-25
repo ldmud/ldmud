@@ -31,7 +31,7 @@ enable_compat_mode=no
 enable_strict_euids=yes
 
 enable_use_parse_command=no
-enable_initialization_by___init=yes
+enable_share_variables=no
 
 enable_malloc_trace=yes
 enable_malloc_lpc_trace=yes

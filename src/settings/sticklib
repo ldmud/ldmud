@@ -31,7 +31,7 @@ enable_use_pcre=no
 with_master_name=secure/master
 
 enable_use_parse_command=no
-enable_initialization_by___init=no
+enable_share_variables=yes
 
 enable_malloc_trace=no
 enable_malloc_lpc_trace=no
