@@ -62,6 +62,9 @@ typedef pthread_rwlock_t  rwlock_t;
 #define mutex_rwlock_init(m)		\
    (__pthread_rwlock_init != NULL \
     ? __pthread_rwlock_init (m, NULL) : (*(int *)(m) = 0))
+#define mutex_rwlock_rdlock(m)		\
+   (__pthread_mutex_rdlock != NULL \
+    ? __pthread_mutex_rdlock (m) : ((*(int *)(m) = 1), 0))
 #define mutex_rwlock_wrlock(m)		\
    (__pthread_mutex_wrlock != NULL \
     ? __pthread_mutex_wrlock (m) : ((*(int *)(m) = 1), 0))
@@ -195,6 +198,7 @@ typedef pthread_mutex_t  mutex_t;
 /* rw locks */
 typedef pthread_rwlock_t rwlock_t;
 #define mutex_rwlock_init(m)       pthread_rwlock_init(m,NULL)
+#define mutex_rwlock_rdlock(m)     pthread_rwlock_rdlock(m)
 #define mutex_rwlock_wrlock(m)     pthread_rwlock_wrlock(m)
 #define mutex_rwlock_unlock(m)     pthread_rwlock_unlock(m)
 
@@ -303,6 +307,7 @@ typedef int rwlock_t;
 #define mutex_trylock(m)           (*(m) ? 1 : ((*(m) = 1), 0))
 #define mutex_unlock(m)            (*(m) = 0)
 #define mutex_rwlock_init(m)       mutex_init(m)
+#define mutex_rwlock_rdlock(m)     mutex_lock(m)
 #define mutex_rwlock_wrlock(m)     mutex_lock(m)
 #define mutex_rwlock_unlock(m)     mutex_unlock(m)
 

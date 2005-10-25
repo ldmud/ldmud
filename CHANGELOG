@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+15-Feb-2002 (Lars Duening)  (3.3.391)
+  - (ptmalloc) Gawain provided the first locking code for the GC.
+  - (interpret.c) On 'too deep recursion' errors, also print the depth
+       and recursion limits. This information is somewhat redundant, but
+       makes the error logs easier to read.
+
 12-Feb-2002 (Lars Duening)  (3.3.390)
   - (prolang.y) The illegal switch-case ranges like '100..50' now generate
        an error message (reported by Menaures).

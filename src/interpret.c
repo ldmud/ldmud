@@ -6498,7 +6498,8 @@ push_control_stack ( svalue_t   *sp
     {
         if (!num_error || csp == &CONTROL_STACK[MAX_TRACE-1])
         {
-            ERROR("Too deep recursion.\n");
+            ERRORF(("Too deep recursion: depth %d, limit %d user/%d max.\n"
+                   , csp - CONTROL_STACK + 1, MAX_USER_TRACE, MAX_TRACE));
         }
     }
 

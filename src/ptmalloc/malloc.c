@@ -3386,7 +3386,7 @@ public_mALLOc(size_t bytes)
   if(!ar_ptr)
     return 0;
 #ifdef ENABLE_GC_SUPPORT
-//  mutex_rwlock_rdlock(&gc_lock);
+  mutex_rwlock_rdlock(&gc_lock);
 #endif
   victim = _int_malloc(ar_ptr, bytes);
   if(!victim) {
@@ -3412,7 +3412,7 @@ public_mALLOc(size_t bytes)
   assert(!victim || chunk_is_mmapped(mem2chunk(victim)) ||
 	 ar_ptr == arena_for_chunk(mem2chunk(victim)));
 #ifdef ENABLE_GC_SUPPORT
-//  mutex_rwlock_unlock(&gc_lock);
+  mutex_rwlock_unlock(&gc_lock);
 #endif
   return victim;
 }
@@ -3436,7 +3436,7 @@ public_fREe(Void_t* mem)
   p = mem2chunk(mem);
 
 #ifdef ENABLE_GC_SUPPORT
-//  mutex_rwlock_rdlock(&gc_lock);
+  mutex_rwlock_rdlock(&gc_lock);
 #endif
 
 #if HAVE_MMAP
@@ -3444,7 +3444,7 @@ public_fREe(Void_t* mem)
   {
     munmap_chunk(p);
 #ifdef ENABLE_GC_SUPPORT
-//    mutex_rwlock_unlock(&gc_lock);
+    mutex_rwlock_unlock(&gc_lock);
 #endif
     return;
   }
@@ -3465,7 +3465,7 @@ public_fREe(Void_t* mem)
   (void)mutex_unlock(&ar_ptr->mutex);
 
 #ifdef ENABLE_GC_SUPPORT
-//  mutex_rwlock_unlock(&gc_lock);
+  mutex_rwlock_unlock(&gc_lock);
 #endif
 
 }
