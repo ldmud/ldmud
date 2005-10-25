@@ -52,12 +52,12 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 393)
-(Parent-Version lpmud 3-3 392)
-(Version-Log "Improved the memory handling.")
+(Project-Version lpmud 3-3 394)
+(Parent-Version lpmud 3-3 393)
+(Version-Log "Simplified the small chunk handling.")
 (New-Version-Log
 "")
-(Checkin-Time "Sun, 16 Feb 2003 23:21:50 -0700")
+(Checkin-Time "Tue, 18 Feb 2003 22:50:53 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -94,8 +94,8 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.58 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.456 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.300 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.457 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.301 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.19 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -171,7 +171,7 @@
   (src/ed.h (lpmud/f/34_ed.h 1.5.1.6 644))
   (src/ed.c (lpmud/c/33_ed.c 1.32.1.27 644))
   (src/efuns.h (lpmud/l/20_efuns.h 1.13.1.19.1.1 644))
-  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.65 644))
+  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.66 644))
   (src/exec.h (lpmud/c/32_exec.h 1.34.1.33.1.6 644))
   (src/files.h (lpmud/i/49_files.h 1.2 644))
   (src/files.c (lpmud/i/50_files.c 1.19 644))
@@ -272,7 +272,7 @@
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.31 644))
   (src/simulate.c (lpmud/31_simulate.c 1.88.1.99 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.14 644))
-  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.68 644))
+  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.69 644))
   (src/structs.h (lpmud/d/b/5_structs.h 1.3 644))
   (src/structs.c (lpmud/d/b/6_structs.c 1.7 644))
   (src/sysmalloc.h (lpmud/c/b/33_sysmalloc. 1.1 644))
@@ -432,7 +432,7 @@
 
   ;; Driver-related include files for the mudlib
   (mudlib/sys/commands.h (lpmud/d/15_commands.h 1.3.1.3 644))
-  (mudlib/sys/debug_info.h (lpmud/t/6_debug_info 1.16 644))
+  (mudlib/sys/debug_info.h (lpmud/t/6_debug_info 1.17 644))
   (mudlib/sys/driver_hook.h (lpmud/d/30_driver_hoo 1.2.1.6 644))
   (mudlib/sys/debug_message.h (lpmud/k/8_debug_mess 1.3 644))
   (mudlib/sys/erq.h (lpmud/d/29_erq.h 1.5.1.3 644))
@@ -1037,7 +1037,7 @@
   (doc/efun/db_fetch (lpmud/e/27_db_fetch 1.2.1.3 644))
   (doc/efun/db_handles (lpmud/e/33_db_handles 1.1.1.4 644))
   (doc/efun/db_insert_id (lpmud/l/1_db_insert_ 1.2 644))
-  (doc/efun/debug_info (lpmud/o/22_debug_info 1.23 644))
+  (doc/efun/debug_info (lpmud/o/22_debug_info 1.24 644))
   (doc/efun/debug_message (lpmud/o/23_debug_mess 1.1.1.4 644))
   (doc/efun/deep_copy (lpmud/m/29_deep_copy 1.4 644))
   (doc/efun/deep_inventory (lpmud/o/24_deep_inven 1.3 644))

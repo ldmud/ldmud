@@ -170,20 +170,19 @@
 #define DID_MEM_FFREE_SIZE     (DID_MEM_SFREE_SIZE)
 #define DID_MEM_SWASTED        15
 #define DID_MEM_SWASTED_SIZE   16
-#define DID_MEM_UNUSED         17
-#define DID_MEM_MINC_CALLS     18
+#define DID_MEM_MINC_CALLS     17
 #define DID_MEM_MINC_SUCCESS   19
-#define DID_MEM_MINC_SIZE      20
-#define DID_MEM_PERM           21
-#define DID_MEM_PERM_SIZE      22
-#define DID_MEM_CLIB           23
-#define DID_MEM_CLIB_SIZE      24
-#define DID_MEM_OVERHEAD       25
-#define DID_MEM_ALLOCATED      26
-#define DID_MEM_USED           27
-#define DID_MEM_TOTAL_UNUSED   28
+#define DID_MEM_MINC_SIZE      19
+#define DID_MEM_PERM           20
+#define DID_MEM_PERM_SIZE      21
+#define DID_MEM_CLIB           22
+#define DID_MEM_CLIB_SIZE      23
+#define DID_MEM_OVERHEAD       24
+#define DID_MEM_ALLOCATED      25
+#define DID_MEM_USED           26
+#define DID_MEM_TOTAL_UNUSED   27
 
-#define DID_MEMORY_MAX         29
+#define DID_MEMORY_MAX         28
 
 
 /* Indices into the subarrays resulting from debug_info(DINFO_TRACE, 0)

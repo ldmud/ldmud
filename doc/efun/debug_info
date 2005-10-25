@@ -369,9 +369,6 @@ DESCRIPTION
                int DID_MEM_CHUNK_SIZE    (smalloc)
                    Number and size of small chunk blocks.
        
-               int DID_MEM_UNUSED        (smalloc)
-                   Unused space in the current small chunk block.
-       
                int DID_MEM_SMALL         (smalloc)
                int DID_MEM_SMALL_SIZE    (smalloc)
                int DID_MEM_SFREE         (smalloc)
@@ -481,9 +478,10 @@ HISTORY
           DID_ST_OBJECTS_NEWLY_DEST, DID_ST_OBJECTS_DEST, DID_MEM_OVERHEAD,
           DID_MEM_ALLOCATED, DID_MEM_USED, DID_MEM_TOTAL_UNUSED, and
           DID_ST_HBEAT_CALLS_TOTAL stats.
+        LDMud 3.2.10 removed DID_MEM_UNUSED from DINFO_DATA:DID_MEMORY.
         LDMud 3.3 replaced the string related DID_ST_ constants according to
         the new string implementation.
-        LDMud 3.3.387 added the ptmalloc values for DINFO_MEMORY.
+        LDMud 3.3.387 added the ptmalloc values for DINFO_DATA:DID_MEMORY.
 
 
 SEE ALSO

@@ -6584,9 +6584,6 @@ v_debug_info (svalue_t *sp, int num_arg)
  *        int DID_MEM_CHUNK_SIZE    (smalloc)
  *            Number and size of small chunk blocks.
  *
- *        int DID_MEM_UNUSED        (smalloc)
- *            Unused space in the current small chunk block.
- *
  *        int DID_MEM_SMALL         (smalloc)
  *        int DID_MEM_SMALL_SIZE    (smalloc)
  *        int DID_MEM_SFREE         (smalloc)

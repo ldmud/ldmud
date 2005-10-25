@@ -114,9 +114,11 @@ For a detailed list of all changes see the file CHANGELOG.
            initialization.
 
 
-12-Feb-2003 (Lars Duening) -- Release 3.2.10
+18-Feb-2003 (Lars Duening) -- Release 3.2.10
 
     - Changed efuns:
+       + debug_info(): Removed the DID_MEM_UNUSED value from the DINFO_DATA:
+           DID_MEMORY result.
 
     - Corrected efuns:
 
