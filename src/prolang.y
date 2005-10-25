@@ -96,7 +96,6 @@
 #include <stdarg.h>
 
 #include "prolang.h"
-#include "lang.h"
 
 #include "array.h"
 #include "backend.h"
@@ -1021,6 +1020,8 @@ static const fulltype_t Type_Ref_Number = { TYPE_NUMBER|TYPE_MOD_REFERENCE };
 /*-------------------------------------------------------------------------*/
 /* Forward declarations */
 
+struct lvalue_s; /* Defined within YYSTYPE aka %union */
+static Bool add_lvalue_code ( struct lvalue_s * lv, int instruction);
 static void insert_pop_value(void);
 static void arrange_protected_lvalue(p_int, int, p_int, int);
 static int insert_inherited(char *, string_t *, program_t **, function_t *, int, bytecode_p);
@@ -2257,52 +2258,6 @@ yycerrorl (const char *s1, const char *s2, int line1, int line2)
     sprintf(buff, s2, line1, line2);
     yyerrorf(s1, buff);
 } /* yycerrorl() */
-
-/*-------------------------------------------------------------------------*/
-static Bool
-add_lvalue_code ( struct lvalue_s lv, int instruction)
-
-/* Add the lvalue code held in <lv> to the end of the program.
- * If <instruction> is not zero, it is the code for an instruction
- * to be added after the lvalue code.
- * Return TRUE on success, and FALSE on failure.
- */
-
-{
-    p_int length;
-
-    /* Create the code to push the lvalue */
-    length = lv.length;
-    if (length)
-    {
-        add_to_mem_block(A_PROGRAM, lv.u.p, length);
-        yfree(lv.u.p);
-        last_expression = CURRENT_PROGRAM_SIZE;
-    }
-    else
-    {
-        bytecode_p source, dest;
-        mp_uint current_size;
-
-        source = lv.u.simple;
-        current_size = CURRENT_PROGRAM_SIZE;
-        if (!realloc_a_program(2))
-        {
-            yyerrorf("Out of memory: program size %lu"
-                    , current_size+2);
-            return MY_FALSE;
-        }
-        CURRENT_PROGRAM_SIZE = (last_expression = current_size + 2);
-        dest = PROGRAM_BLOCK + current_size;
-        *dest++ = *source++;
-        *dest++ = *source;
-    }
-
-    if (instruction != 0)
-       ins_f_code(instruction);
-
-    return MY_TRUE;
-} /* add_lvalue_code() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -7009,7 +6964,7 @@ if (current_inline && current_inline->parse_context) printf("DEBUG: inline conte
           if (!current_inline || !current_inline->parse_context)
 #endif /* USE_NEW_INLINES */
           {
-              if (!add_lvalue_code($1, F_VOID_ASSIGN))
+              if (!add_lvalue_code(&$1, F_VOID_ASSIGN))
                   YYACCEPT;
           } /* parsed context var */
       }
@@ -7822,7 +7777,7 @@ expr_decl:
           /* Add the bytecode to create the lvalue and do the
            * assignment.
            */
-          if (!add_lvalue_code($1, $2))
+          if (!add_lvalue_code(&$1, $2))
               YYACCEPT;
       }
 
@@ -7839,7 +7794,7 @@ expr_decl:
           /* Add the bytecode to create the lvalue and do the
            * assignment.
            */
-          if (!add_lvalue_code($1, F_ASSIGN))
+          if (!add_lvalue_code(&$1, F_ASSIGN))
               YYACCEPT;
       }
 ; /* expr_decl */
@@ -8048,7 +8003,7 @@ foreach_var_decl:  /* Generate the code for one lvalue */
            */
 
 %line
-          if (!add_lvalue_code($1, 0))
+          if (!add_lvalue_code(&$1, 0))
               YYACCEPT;
       }
 
@@ -8625,7 +8580,7 @@ expr0:
       {
           if ($2 == F_LAND_EQ || $2 == F_LOR_EQ)
           {
-              if (!add_lvalue_code($1, 0))
+              if (!add_lvalue_code(&$1, 0))
                   YYACCEPT;
 
               /* Add the operator specific code */
@@ -8789,7 +8744,7 @@ expr0:
           }
           else
           {
-              if (!add_lvalue_code($1, $2))
+              if (!add_lvalue_code(&$1, $2))
                   YYACCEPT;
           }
           $$.end = CURRENT_PROGRAM_SIZE;
@@ -10007,7 +9962,7 @@ expr0:
 %line
           /* Create the code to push the lvalue plus POST_INC */
           $$.start = CURRENT_PROGRAM_SIZE;
-          if (!add_lvalue_code($1, F_POST_INC))
+          if (!add_lvalue_code(&$1, F_POST_INC))
               YYACCEPT;
           $$.end = CURRENT_PROGRAM_SIZE;
 
@@ -10028,7 +9983,7 @@ expr0:
           $$.start = CURRENT_PROGRAM_SIZE;
 
           /* Create the code to push the lvalue plus POST_DEC */
-          if (!add_lvalue_code($1, F_POST_DEC))
+          if (!add_lvalue_code(&$1, F_POST_DEC))
               YYACCEPT;
 
           /* Check the types */
@@ -14057,6 +14012,52 @@ const_expr_list3:
 #endif
 
 /*=========================================================================*/
+
+/*-------------------------------------------------------------------------*/
+static Bool
+add_lvalue_code ( struct lvalue_s * lv, int instruction)
+
+/* Add the lvalue code held in * <lv> to the end of the program.
+ * If <instruction> is not zero, it is the code for an instruction
+ * to be added after the lvalue code.
+ * Return TRUE on success, and FALSE on failure.
+ */
+
+{
+    p_int length;
+
+    /* Create the code to push the lvalue */
+    length = lv->length;
+    if (length)
+    {
+        add_to_mem_block(A_PROGRAM, lv->u.p, length);
+        yfree(lv->u.p);
+        last_expression = CURRENT_PROGRAM_SIZE;
+    }
+    else
+    {
+        bytecode_p source, dest;
+        mp_uint current_size;
+
+        source = lv->u.simple;
+        current_size = CURRENT_PROGRAM_SIZE;
+        if (!realloc_a_program(2))
+        {
+            yyerrorf("Out of memory: program size %lu"
+                    , current_size+2);
+            return MY_FALSE;
+        }
+        CURRENT_PROGRAM_SIZE = (last_expression = current_size + 2);
+        dest = PROGRAM_BLOCK + current_size;
+        *dest++ = *source++;
+        *dest++ = *source;
+    }
+
+    if (instruction != 0)
+       ins_f_code(instruction);
+
+    return MY_TRUE;
+} /* add_lvalue_code() */
 
 /*-------------------------------------------------------------------------*/
 static void

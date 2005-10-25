@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+26-Jan-2002 (Lars Duening)  (3.3.377)
+  - (prolang.y) Removed a compilation problem (reported by Markus).
+  - (xptmalloc.c) Removed compiler warnings regarding intentionally
+       unused variables.
+
 26-Jan-2002 (Lars Duening)  (3.3.376)
   - (configure) The check for pthread_atfork() never succeeded (reported by
        Nostradamus).

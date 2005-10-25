@@ -267,4 +267,14 @@ static Bool mem_is_freed (POINTER p, size_t minsize) {
 /* The allocator is threadsafe */
 #define MEM_THREADSAFE
 
+/* Reference a couple of unused variables and functions to avoid
+ * unnecessary warning.
+ */
+void ptmalloc_ref_unused(void)
+{
+    in_malloc = 0;
+    print_block(0, 0);
+    count_up(clib_alloc_stat, 0);
+}
+
 /***************************************************************************/

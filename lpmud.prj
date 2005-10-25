@@ -55,12 +55,12 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 376)
-(Parent-Version lpmud 3-3 375)
-(Version-Log "configure: The check for pthread_atfork() never succeeded.")
+(Project-Version lpmud 3-3 377)
+(Parent-Version lpmud 3-3 376)
+(Version-Log "Removed a compilation problem in prolang.y.")
 (New-Version-Log
 "")
-(Checkin-Time "Sun, 26 Jan 2003 01:24:17 -0700")
+(Checkin-Time "Sun, 26 Jan 2003 16:38:48 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -97,7 +97,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.58 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.439 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.440 644))
   (HISTORY (lpmud/f/49_HISTORY 1.297 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.19 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -260,7 +260,7 @@
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.16 644))
   (src/port.c (lpmud/39_port.c 1.17.1.7 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.17.1.2 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.27 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.28 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7.1.1 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))
@@ -292,7 +292,7 @@
   (src/wiz_list.c (lpmud/2_wiz_list.c 1.13.1.14.1.3 644))
   (src/xalloc.h (lpmud/g/51_xalloc.h 1.17 644))
   (src/xalloc.c (lpmud/h/0_xalloc.c 1.2.1.20 644))
-  (src/xptmalloc.c (lpmud/d/b/1_xptmalloc. 1.3 644))
+  (src/xptmalloc.c (lpmud/d/b/1_xptmalloc. 1.4 644))
 
   ;; Build files
   (src/func_spec (lpmud/c/31_func_spec 1.53.1.45.1.22.1.4 644))
