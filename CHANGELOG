@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+29-Jan-2002 (Lars Duening)  (3.3.383)
+  - (structs.c, swap.c) Swapping struct values no longer changes the
+       refcounts of the referenced type objects. This avoids
+       a racing condition during the GC, and also prevents a typeobject
+       from being freed while swapped-out values still require it
+       (reported by Bardioc).
+
 29-Jan-2002 (Lars Duening)  (3.3.382)
   - (smalloc.c) In mem_increment_size(), the internal size of the
        memoryblock was most cases computed one word too small.

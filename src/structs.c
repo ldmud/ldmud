@@ -314,9 +314,9 @@ void
 struct_free_empty (struct_t *pStruct)
 
 /* Free the struct <pStruct> (which holds no valid svalues) and all referenced
- * data. The refcount of <pStruct> is ignored, as all known callers
- * take care of it (in particular a swap during GC leaves behind strange
- * values).
+ * data. However, the refcount of <pStruct>->type is not changed.
+ * The refcount of <pStruct> is ignored, as all known callers take care
+ * of it (in particular a swap during GC leaves behind strange values).
  */
 
 {
@@ -332,7 +332,7 @@ struct_free_empty (struct_t *pStruct)
     size_struct -= STRUCT_MEMSIZE(pStruct);
     pStruct->user->struct_total -= STRUCT_MEMSIZE(pStruct);
 
-    free_struct_type(pStruct->type);
+    /* Don't free_struct_type(pStruct->type) */
 
     xfree(pStruct);
 } /* struct_free_empty() */
@@ -346,6 +346,7 @@ struct_free (struct_t *pStruct)
 
 {
     unsigned short num;
+    struct_type_t * pSType;
 
 #ifdef DEBUG
     if (!pStruct)
@@ -364,7 +365,9 @@ struct_free (struct_t *pStruct)
         free_svalue(&pStruct->member[num]);
     }
 
-    struct_free_empty(pStruct);
+    pSType = pStruct->type;
+    struct_free_empty(pStruct); /* needs a valid .type */
+    free_struct_type(pSType);
 } /* struct_free() */
 
 /*-------------------------------------------------------------------------*/
