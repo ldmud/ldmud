@@ -12,7 +12,7 @@ DESCRIPTION
                 of adjacent string literals ("foo" "bar" is compiled
                 as "foobar" as well) already done by the preprocessor,
                 the combine_strings will save memory, because the combined
-                strings can be shared betweena blueprint and it's clones,
+                strings can be shared between a blueprint and it's clones,
                 and the strings also have a good chance to be entered
                 into the global shared-string-table.
         no_combine_string: Contrary to combine_strings, may be used to

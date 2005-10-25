@@ -131,6 +131,10 @@
 "<<="   lsh_eq
 ">>="   rsh_eq
 ">>>="  rshl_eq
+
+  /* These two operators don't exist as implemented machine instructions,
+   * but are required as operator-closure values for the closure compiler.
+   */
 "&&="   land_eq
 "||="   lor_eq
 
@@ -141,6 +145,8 @@
 
         pop_value
         dup
+        ldup
+        swap_values
         clear_locals
         save_arg_frame
         restore_arg_frame

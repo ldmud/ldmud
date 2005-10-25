@@ -96,6 +96,7 @@
 #include <stdarg.h>
 
 #include "prolang.h"
+#include "lang.h"
 
 #include "array.h"
 #include "backend.h"
@@ -268,7 +269,7 @@ struct struct_init_s
 };
 #endif /* USE_STRUCTS */
 
-/* --- struct efun_shadow_t: Store info about masked efuns ---
+/* --- struct efun_shadow_s: Store info about masked efuns ---
  *
  * This structure is used when global identifiers shadow efun names.
  */
@@ -278,6 +279,7 @@ struct efun_shadow_s
     efun_shadow_t *next;    /* Linkpointer for the list of shadows */
     ident_t       *shadow;  /* Identifier of the shadow */
 };
+
 
 /*-------------------------------------------------------------------------*/
 /* Macros */
@@ -2255,6 +2257,107 @@ yycerrorl (const char *s1, const char *s2, int line1, int line2)
     sprintf(buff, s2, line1, line2);
     yyerrorf(s1, buff);
 } /* yycerrorl() */
+
+/*-------------------------------------------------------------------------*/
+static Bool
+add_lvalue_code ( struct lvalue_s lv, int instruction)
+
+/* Add the lvalue code held in <lv> to the end of the program.
+ * If <instruction> is not zero, it is the code for an instruction
+ * to be added after the lvalue code.
+ * Return TRUE on success, and FALSE on failure.
+ */
+
+{
+    p_int length;
+
+    /* Create the code to push the lvalue */
+    length = lv.length;
+    if (length)
+    {
+        add_to_mem_block(A_PROGRAM, lv.u.p, length);
+        yfree(lv.u.p);
+        last_expression = CURRENT_PROGRAM_SIZE;
+    }
+    else
+    {
+        bytecode_p source, dest;
+        mp_uint current_size;
+
+        source = lv.u.simple;
+        current_size = CURRENT_PROGRAM_SIZE;
+        if (!realloc_a_program(2))
+        {
+            yyerrorf("Out of memory: program size %lu"
+                    , current_size+2);
+            return FALSE;
+        }
+        CURRENT_PROGRAM_SIZE = (last_expression = current_size + 2);
+        dest = PROGRAM_BLOCK + current_size;
+        *dest++ = *source++;
+        *dest++ = *source;
+    }
+
+    if (instruction != 0)
+       ins_f_code(instruction);
+
+    return TRUE;
+} /* add_lvalue_code() */
+
+/*-------------------------------------------------------------------------*/
+static void
+update_lop_branch ( p_uint address, int instruction )
+
+/* <address> points to the branch offset value of an LAND/LOR operation,
+ * currently set to 0. Update that offset to branch to the current end
+ * of the program.
+ *
+ * If that branch is too long, the code is rewritten:
+ *
+ *     Original:             Rewritten:
+ *
+ *      <expr1>                <expr1>
+ *      LOR/LAND l             DUP
+ *      <expr2>                LBRANCH_<instruction>
+ *   l:                        POP_VALUE
+ *                             <expr2>
+ *                          l:
+ *
+ * The extra DUP compensates the svalue the LBRANCH eats.
+ * The LBRANCH_<instruction> needs to be passed suiting the logical
+ * operator: LBRANCH_WHEN_ZERO for LAND, LBRANCH_WHEN_NON_ZERO for LOR.
+ */
+
+{
+    p_int offset;
+
+    last_expression = -1;
+
+    offset = mem_block[A_PROGRAM].current_size - ( address + 1);
+    if (offset > 0xff)
+    {
+        /* A long branch is needed */
+
+        int i;
+        bytecode_p p;
+
+        ins_short(0);
+        ins_byte(0);
+        p = PROGRAM_BLOCK + mem_block[A_PROGRAM].current_size-1;
+        for (i = offset; --i >= 0; --p )
+            *p = p[-3];
+        p[-4] = F_DUP;
+        p[-3] = F_LBRANCH_WHEN_ZERO;
+        upd_short(address+1, offset+3);
+        if (offset > 0x7ffc)
+            yyerror("offset overflow");
+        p[0]  = F_POP_VALUE;
+    }
+    else
+    {
+        mem_block[A_PROGRAM].block[address] = offset;
+    }
+} /* update_lop_branch() */
 
 /* ========================   LOCALS and SCOPES   ======================== */
 
@@ -5388,7 +5491,7 @@ free_const_list_svalue (svalue_t *svp)
        * index values.
        */
 
-    struct {
+    struct lvalue_s {
         union {
             bytecode_p p;
             bytecode_t simple[2];
@@ -6906,33 +7009,8 @@ if (current_inline && current_inline->parse_context) printf("DEBUG: inline conte
           if (!current_inline || !current_inline->parse_context)
 #endif /* USE_NEW_INLINES */
           {
-              p_int length;
-              length = $1.length;
-              if (length)
-              {
-                  add_to_mem_block(A_PROGRAM, $1.u.p, length+1);
-                  yfree($1.u.p);
-                  last_expression = CURRENT_PROGRAM_SIZE-1;
-                  mem_block[A_PROGRAM].block[last_expression] = F_VOID_ASSIGN;
-              }
-              else
-              {
-                  bytecode_p source, dest;
-                  mp_uint current_size;
-
-                  source = $1.u.simple;
-                  current_size = CURRENT_PROGRAM_SIZE;
-                  if (!realloc_a_program(3))
-                  {
-                      yyerrorf("Out of memory: program size %lu", current_size+3);
-                      YYACCEPT;
-                  }
-                  CURRENT_PROGRAM_SIZE = (last_expression = current_size + 2) + 1;
-                  dest = PROGRAM_BLOCK + current_size;
-                  *dest++ = *source++;
-                  *dest++ = *source;
-                  *dest = F_VOID_ASSIGN;
-              }
+              if (!add_lvalue_code($1, F_VOID_ASSIGN))
+                  YYACCEPT;
           } /* parsed context var */
       }
 ; /* new_local */
@@ -7722,9 +7800,9 @@ expr_decl:
       {
           /* We got a "int <name> = <expr>" type expression. */
 
-          p_int length;
-          fulltype_t type2;
 %line
+          fulltype_t type2;
+
           /* Check the assignment for validity */
           type2 = $3.type;
           if (exact_types.typeflags
@@ -7744,32 +7822,8 @@ expr_decl:
           /* Add the bytecode to create the lvalue and do the
            * assignment.
            */
-          length = $1.length;
-          if (length)
-          {
-              add_to_mem_block(A_PROGRAM, $1.u.p, length+1);
-              yfree($1.u.p);
-              last_expression = CURRENT_PROGRAM_SIZE-1;
-              mem_block[A_PROGRAM].block[last_expression] = $2;
-          }
-          else
-          {
-              bytecode_p source, dest;
-              mp_uint current_size;
-
-              source = $1.u.simple;
-              current_size = CURRENT_PROGRAM_SIZE;
-              if (!realloc_a_program(3))
-              {
-                  yyerrorf("Out of memory: program size %lu", current_size+3);
-                  YYACCEPT;
-              }
-              CURRENT_PROGRAM_SIZE = (last_expression = current_size + 2) + 1;
-              dest = PROGRAM_BLOCK + current_size;
-              *dest++ = *source++;
-              *dest++ = *source;
-              *dest = $2;
-          }
+          if (!add_lvalue_code($1, $2))
+              YYACCEPT;
       }
 
     | local_name_lvalue
@@ -7777,41 +7831,16 @@ expr_decl:
           /* We got a "int <name>" type expression.
            * Compile it as if it was a "int <name> = 0" expression.
            */
-
-          p_int length;
 %line
+
           /* Insert the implied push of number 0 */
           ins_number(0);
 
           /* Add the bytecode to create the lvalue and do the
            * assignment.
            */
-          length = $1.length;
-          if (length)
-          {
-              add_to_mem_block(A_PROGRAM, $1.u.p, length+1);
-              yfree($1.u.p);
-              last_expression = CURRENT_PROGRAM_SIZE-1;
-              mem_block[A_PROGRAM].block[last_expression] =  F_ASSIGN;
-          }
-          else
-          {
-              bytecode_p source, dest;
-              mp_uint current_size;
-
-              source = $1.u.simple;
-              current_size = CURRENT_PROGRAM_SIZE;
-              if (!realloc_a_program(3))
-              {
-                  yyerrorf("Out of memory: program size %lu", current_size+3);
-                  YYACCEPT;
-              }
-              CURRENT_PROGRAM_SIZE = (last_expression = current_size + 2) + 1;
-              dest = PROGRAM_BLOCK + current_size;
-              *dest++ = *source++;
-              *dest++ = *source;
-              *dest = F_ASSIGN;
-          }
+          if (!add_lvalue_code($1, F_ASSIGN))
+              YYACCEPT;
       }
 ; /* expr_decl */
 
@@ -8018,32 +8047,9 @@ foreach_var_decl:  /* Generate the code for one lvalue */
           /* Add the bytecode to create the lvalue, and good is.
            */
 
-          p_int length;
-
 %line
-          length = $1.length;
-          if (length)
-          {
-              add_to_mem_block(A_PROGRAM, $1.u.p, length);
-              yfree($1.u.p);
-          }
-          else
-          {
-              bytecode_p source, dest;
-              mp_uint current_size;
-
-              source = $1.u.simple;
-              current_size = CURRENT_PROGRAM_SIZE;
-              if (!realloc_a_program(2))
-              {
-                  yyerrorf("Out of memory: program size %lu", current_size+2);
-                  YYACCEPT;
-              }
-              CURRENT_PROGRAM_SIZE = current_size + 2;
-              dest = PROGRAM_BLOCK + current_size;
-              *dest++ = *source++;
-              *dest++ = *source;
-          }
+          if (!add_lvalue_code($1, 0))
+              YYACCEPT;
       }
 
 ; /* foreach_var_decl */
@@ -8601,15 +8607,59 @@ comma_expr:
 
 expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-      lvalue L_ASSIGN expr0 %prec L_ASSIGN
+
+      /* Normal assign:               ||= (&&= analog):
+       *
+       *  <expr0>               <lvalue>         <lvalue>
+       *  <lvalue>              LDUP             LDUP
+       *  ASSIGN-operator       LOR l            DUP
+       *                        <expr0>          LBRANCH_WHEN_NON_ZERO l
+       *                    l:  SWAP_VALUES      POP_VALUE
+       *                        ASSIGN           <expr0>
+       *                                      l: SWAP_VALUES
+       *                                          ASSIGN
+       */
+
+      lvalue L_ASSIGN 
+
       {
-          p_int length;
+          if ($2 == F_LAND_EQ || $2 == F_LOR_EQ)
+          {
+              if (!add_lvalue_code($1, 0))
+                  YYACCEPT;
+
+              /* Add the operator specific code */
+
+              if ($2 == F_LAND_EQ)
+              {
+                  /* Insert the LDUP, LAND and remember the position */
+
+                  ins_f_code(F_LDUP);
+                  ins_f_code(F_LAND);
+                  $<address>$ = CURRENT_PROGRAM_SIZE;
+                  ins_byte(0);
+              }
+              else if ($2 == F_LOR_EQ)
+              {
+                  /* Insert the LDUP, LOR and remember the position */
+
+                  ins_f_code(F_LDUP);
+                  ins_f_code(F_LOR);
+                  $<address>$ = CURRENT_PROGRAM_SIZE;
+                  ins_byte(0);
+              }
+          }
+      }
+      
+      expr0 %prec L_ASSIGN
+
+      {
           fulltype_t type1, type2, restype;
 %line
-          $$ = $3;
+          $$ = $4;
 
           type1 = $1.type;
-          type2 = $3.type;
+          type2 = $4.type;
           restype = type2; /* Assume normal assignment */
 
           /* Check the validity of the assignment */
@@ -8719,32 +8769,28 @@ expr0:
           }
 #endif /* USE_STRUCTS */
 
-          /* Create the code to push the lvalue */
-          length = $1.length;
-          if (length)
+          if ($2 == F_LAND_EQ || $2 == F_LOR_EQ)
           {
-              add_to_mem_block(A_PROGRAM, $1.u.p, length+1);
-              yfree($1.u.p);
-              last_expression = CURRENT_PROGRAM_SIZE-1;
-              mem_block[A_PROGRAM].block[last_expression] = $2;
+              /* Update the offset the earlier LAND/LOR instruction */
+
+              if ($2 == F_LAND_EQ)
+              {
+                  update_lop_branch($<address>3, F_LBRANCH_WHEN_ZERO);
+              }
+              else if ($2 == F_LOR_EQ)
+              {
+                  update_lop_branch($<address>3, F_LBRANCH_WHEN_NON_ZERO);
+              }
+
+              /* Insert the SWAP and the ASSIGN */
+
+              ins_f_code(F_SWAP_VALUES);
+              ins_f_code(F_ASSIGN);
           }
           else
           {
-              bytecode_p source, dest;
-              mp_uint current_size;
-
-              source = $1.u.simple;
-              current_size = CURRENT_PROGRAM_SIZE;
-              if (!realloc_a_program(3))
-              {
-                  yyerrorf("Out of memory: program size %lu", current_size+3);
+              if (!add_lvalue_code($1, $2))
                   YYACCEPT;
-              }
-              CURRENT_PROGRAM_SIZE = (last_expression = current_size + 2) + 1;
-              dest = PROGRAM_BLOCK + current_size;
-              *dest++ = *source++;
-              *dest++ = *source;
-              *dest = $2;
           }
           $$.end = CURRENT_PROGRAM_SIZE;
           $$.type = restype;
@@ -8894,50 +8940,7 @@ expr0:
       {
           /* Update the offset the earlier LOR instruction */
 
-          p_int address, offset;
-
-          last_expression = -1;
-          address = $<address>3;
-          offset = mem_block[A_PROGRAM].current_size - ( address + 1);
-          if (offset > 0xff)
-          {
-              /* A long branch is needed:
-               *
-               *    <expr1>
-               *    LOR l
-               *    <expr2>
-               * l:
-               *
-               * is converted to
-               *
-               *    <expr1>
-               *    DUP
-               *    LBRANCH_WHEN_NON_ZERO l
-               *    <expr2>
-               * l:
-               *
-               * The extra DUP compensates the svalue the LBRANCH eats.
-               */
-
-              int i;
-              bytecode_p p;
-
-              ins_short(0);
-              ins_byte(0);
-              p = PROGRAM_BLOCK + mem_block[A_PROGRAM].current_size-1;
-              for (i = offset; --i >= 0; --p )
-                  *p = p[-3];
-              p[-4] = F_DUP;
-              p[-3] = F_LBRANCH_WHEN_NON_ZERO;
-              upd_short(address+1, offset+3);
-              if (offset > 0x7ffc)
-                  yyerror("offset overflow");
-              p[0]  = F_POP_VALUE;
-          }
-          else
-          {
-              mem_block[A_PROGRAM].block[address] = offset;
-          }
+          update_lop_branch($<address>3, F_LBRANCH_WHEN_NON_ZERO);
 
           $$ = $1;
           $$.end = CURRENT_PROGRAM_SIZE;
@@ -8964,51 +8967,7 @@ expr0:
       {
           /* Update the offset the earlier LAND instruction */
 
-          p_int address, offset;
-
-          last_expression = -1;
-
-          address = $<address>3;
-          offset = mem_block[A_PROGRAM].current_size - ( address + 1);
-          if (offset > 0xff)
-          {
-              /* A long branch is needed:
-               *
-               *    <expr1>
-               *    LAND l
-               *    <expr2>
-               * l:
-               *
-               * is converted to
-               *
-               *    <expr1>
-               *    DUP
-               *    LBRANCH_WHEN_ZERO l
-               *    <expr2>
-               * l:
-               *
-               * The extra DUP compensates the svalue the LBRANCH eats.
-               */
-
-              int i;
-              bytecode_p p;
-
-              ins_short(0);
-              ins_byte(0);
-              p = PROGRAM_BLOCK + mem_block[A_PROGRAM].current_size-1;
-              for (i = offset; --i >= 0; --p )
-                  *p = p[-3];
-              p[-4] = F_DUP;
-              p[-3] = F_LBRANCH_WHEN_ZERO;
-              upd_short(address+1, offset+3);
-              if (offset > 0x7ffc)
-                  yyerror("offset overflow");
-              p[0]  = F_POP_VALUE;
-          }
-          else
-          {
-              mem_block[A_PROGRAM].block[address] = offset;
-          }
+          update_lop_branch($<address>3, F_LBRANCH_WHEN_ZERO);
 
           $$ = $1;
           $$.end = CURRENT_PROGRAM_SIZE;
@@ -10048,25 +10007,8 @@ expr0:
 %line
           /* Create the code to push the lvalue plus POST_INC */
           $$.start = CURRENT_PROGRAM_SIZE;
-          if ($1.length)
-          {
-              add_to_mem_block(A_PROGRAM, $1.u.p, $1.length);
-              yfree($1.u.p);
-              last_expression = CURRENT_PROGRAM_SIZE;
-              ins_f_code(F_POST_INC);
-          }
-          else
-          {
-              PREPARE_INSERT(3)
-              bytecode_p source;
-
-              CURRENT_PROGRAM_SIZE =
-                  (last_expression = CURRENT_PROGRAM_SIZE+2) + 1;
-              source = $1.u.simple;
-              add_byte(*source++);
-              add_byte(*source);
-              add_f_code(F_POST_INC);
-          }
+          if (!add_lvalue_code($1, F_POST_INC))
+              YYACCEPT;
           $$.end = CURRENT_PROGRAM_SIZE;
 
           /* Check the types */
@@ -10086,26 +10028,8 @@ expr0:
           $$.start = CURRENT_PROGRAM_SIZE;
 
           /* Create the code to push the lvalue plus POST_DEC */
-          if ($1.length)
-          {
-              add_to_mem_block(A_PROGRAM, $1.u.p, $1.length+1);
-              yfree($1.u.p);
-              mem_block[A_PROGRAM].block[
-                last_expression = CURRENT_PROGRAM_SIZE-1
-              ] = F_POST_DEC;
-          }
-          else
-          {
-              PREPARE_INSERT(3)
-              bytecode_p source;
-
-              CURRENT_PROGRAM_SIZE =
-                (last_expression = CURRENT_PROGRAM_SIZE+2) + 1;
-              source = $1.u.simple;
-              add_byte(*source++);
-              add_byte(*source);
-              add_f_code(F_POST_DEC);
-          }
+          if (!add_lvalue_code($1, F_POST_DEC))
+              YYACCEPT;
 
           /* Check the types */
           if (exact_types.typeflags

@@ -2462,8 +2462,6 @@ compile_value (svalue_t *value, int opt_flags)
                 case F_RSHL_EQ:
                 case F_DIV_EQ:
                 case F_MOD_EQ:
-                case F_LAND_EQ:
-                case F_LOR_EQ:
                     /* This is compiled as:
                      *
                      *   <expr>
@@ -2480,9 +2478,126 @@ compile_value (svalue_t *value, int opt_flags)
                     }
                     compile_value(argp+2, REF_REJECTED);
                     compile_lvalue(argp+1, USE_INDEX_LVALUE);
-                    STORE_CODE(current.codep, (bytecode_t)type);
+                    STORE_CODE(current.codep, (bytecode_t)(type - CLOSURE_OPERATOR));
                     current.code_left--;
                     break;
+
+                /* ({#'op=, <lvalue>, <expr> })
+                 * with op: &&, ||
+                 */
+                case F_LAND_EQ:
+                case F_LOR_EQ:
+                  {
+                    /* This is compiled as:
+                     *
+                     *      <lvalue>
+                     *      LDUP
+                     *      <op> l
+                     *      <expr>
+                     *   l: SWAP_VALUES
+                     *      ASSIGN
+                     *
+                     * respectively for long branches:
+                     *
+                     *      <lvalue>
+                     *      LDUP
+                     *      DUP
+                     *      LBRANCH l
+                     *      POP
+                     *      <expr>
+                     *   l: SWAP_VALUES
+                     *      ASSIGN
+                     */
+
+                    mp_int branchp;
+                      /* The position of the branch/operator instruction.
+                       */
+                    int code;        /* Compiled instruction */
+                    Bool is_and;     /* TRUE if the operator is F_LAND_EQ */
+                    mp_int end;      /* The branch target */
+                    mp_int offset;   /* The branch offset */
+
+                    if (type == F_LAND_EQ)
+                    {
+                        code = F_LAND;
+                        is_and = MY_TRUE;
+                    }
+                    else
+                    {
+                        code = F_LOR;
+                        is_and = MY_FALSE;
+                    }
+
+                    if (block_size != 3)
+                    {
+                        lambda_error(
+                          "Bad number of arguments to #'%s\n",
+                          instrs[type - CLOSURE_OPERATOR].name
+                        );
+                    }
+
+                    compile_lvalue(argp+1, USE_INDEX_LVALUE);
+
+                    if (current.code_left < 3)
+                        realloc_code();
+
+                    current.code_left--;
+                    STORE_CODE(current.codep, (bytecode_t)F_LDUP);
+
+                    branchp = current.code_max - current.code_left;
+                    current.code_left -= 2;
+                    STORE_CODE(current.codep, (bytecode_t)code);
+                    STORE_CODE(current.codep, (bytecode_t)0);
+
+                    compile_value(argp+2, REF_REJECTED);
+
+                    /* Store the correct offsets for the operator/branch
+                     * instruction. If necessary, the short branch is
+                     * converted into long ones.
+                     */
+                    end = current.code_max - current.code_left;
+                      /* The target to jump to */
+                    offset = end - branchp - 2;
+                    if (offset <= 0xff)
+                    {
+                        PUT_UINT8(current.code+branchp+1, (unsigned char)offset);
+                    }
+                    else
+                    {
+                        /* We exceeded the limit of the short offsets.
+                         * Extend the offset into long branch.
+                         */
+
+                        mp_int i;
+                        bytecode_p p;
+
+                        code = is_and ? F_LBRANCH_WHEN_ZERO
+                                      : F_LBRANCH_WHEN_NON_ZERO;
+
+                        /* Prepare the copying of the code */
+                        if (current.code_left < 3)
+                            realloc_code();
+                        current.code_left -= 3;
+                        current.codep += 3;
+                        p = current.code + end + 2;
+                        for (i = offset; --i >= 0; --p )
+                            *p = p[-3];
+                        p[-4] = F_DUP;
+                        p[-3] = code;
+                        offset += 3;
+                        PUT_SHORT((p-2), offset);
+                        if (offset > 0x7fff)
+                            UNIMPLEMENTED;
+                        p[0]  = F_POP_VALUE;
+                    }
+
+                    if (current.code_left < 2)
+                        realloc_code();
+                    current.code_left -= 2;
+                    STORE_CODE(current.codep, (bytecode_t)F_SWAP_VALUES);
+                    STORE_CODE(current.codep, (bytecode_t)F_ASSIGN);
+                    break;
+                  }
 
                 /* ({#'++, <lvalue> })
                  * ({#'--, <lvalue> })

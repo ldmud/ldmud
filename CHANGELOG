@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+25-Jan-2002 (Lars Duening)  (3.3.374)
+  - (prolang.y, interpret.c, func_spec) Implemented short-circuit evaluation
+       for the operators '&&=' and '||='.
+
 25-Jan-2002 (Lars Duening)  (3.3.373)
   - (bitstrings.c, mstrings, efuns.c, interpret.c, lex.c) Corrected a string
        refcount error in and/or/xor_bits() (reported by Markus).

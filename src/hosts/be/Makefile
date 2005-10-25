@@ -565,9 +565,9 @@ $(OBJ)/parse.o : xalloc.h wiz_list.h svalue.h stdstrings.h simulate.h \
 $(OBJ)/parser.o : lang.c ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h \
     switch.h swap.h svalue.h structs.h stdstrings.h simul_efun.h simulate.h \
     object.h mstrings.h mapping.h main.h lex.h instrs.h interpret.h \
-    gcollect.h exec.h closure.h backend.h array.h prolang.h my-alloca.h \
-    typedefs.h driver.h strfuns.h ptrtable.h sent.h bytecode.h port.h \
-    config.h hosts/unix.h hosts/be/be.h machine.h
+    gcollect.h exec.h closure.h backend.h array.h lang.h prolang.h \
+    my-alloca.h typedefs.h driver.h strfuns.h ptrtable.h sent.h bytecode.h \
+    port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/dftables.o : pcre/maketables.c pcre/internal.h pcre/pcre.h \
     pcre/config.h
@@ -590,9 +590,9 @@ $(OBJ)/pkg-pcre.o : pcre/study.c pcre/maketables.c pcre/get.c pcre/pcre.c \
 $(OBJ)/port.o : hosts/crypt.c main.h backend.h my-rusage.h driver.h \
     typedefs.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
-$(OBJ)/ptmalloc.o : ptmalloc/malloc.c driver.h ptmalloc/hooks.c \
+$(OBJ)/ptmalloc.o : ptmalloc/malloc.c machine.h config.h ptmalloc/hooks.c \
     ptmalloc/arena.c ptmalloc/thread-m.h ptmalloc/malloc.h \
-    ptmalloc/config.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
+    ptmalloc/config.h
 
 $(OBJ)/ptrtable.o : simulate.h mempools.h ptrtable.h driver.h svalue.h \
     strfuns.h sent.h bytecode.h typedefs.h port.h config.h hosts/unix.h \
@@ -651,11 +651,11 @@ $(OBJ)/wiz_list.o : xalloc.h svalue.h stdstrings.h simulate.h object.h \
     strfuns.h sent.h bytecode.h port.h config.h hosts/unix.h hosts/be/be.h \
     machine.h
 
-$(OBJ)/xalloc.o : xptmalloc.c sysmalloc.c smalloc.c object.h exec.h \
-    simulate.h interpret.h gcollect.h backend.h xalloc.h driver.h \
-    ../mudlib/sys/debug_info.h svalue.h stdstrings.h mstrings.h sysmalloc.h \
-    smalloc.h typedefs.h sent.h bytecode.h strfuns.h main.h port.h config.h \
-    hosts/unix.h hosts/be/be.h machine.h
+$(OBJ)/xalloc.o : xptmalloc.c sysmalloc.c smalloc.c mstrings.h object.h \
+    exec.h simulate.h interpret.h gcollect.h backend.h xalloc.h driver.h \
+    ../mudlib/sys/debug_info.h ptmalloc/malloc.h svalue.h stdstrings.h \
+    sysmalloc.h smalloc.h typedefs.h sent.h bytecode.h strfuns.h main.h \
+    port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
 # --- DO NOT MODIFY THIS LINE -- AUTO-DEPENDS PRECEDE ---
 # --- DO NOT MODIFY THIS LINE -- SELECTED AUTO-DEPENDS FOLLOW ---
@@ -695,7 +695,7 @@ $(OBJ)/object.o : stdstrings.h instrs.h
 
 $(OBJ)/parse.o : stdstrings.h
 
-$(OBJ)/parser.o : lang.c stdstrings.h instrs.h
+$(OBJ)/parser.o : lang.c stdstrings.h instrs.h lang.h
 
 $(OBJ)/simul_efun.o : stdstrings.h
 
