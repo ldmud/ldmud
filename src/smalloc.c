@@ -40,14 +40,7 @@
  * pre-allocated blocks in the free lists.  The free lists use the first
  * and last word in the "user area" for their link pointers; the small
  * chunks are themselves kept in a list and use their first word for the
- * list pointer. To reduce memory fragmentation, the allocator detects
- * adjacent free small blocks at the time of freeing and merges them.
- *
- * While this defragmentation scheme causes small blocks to change their
- * size often, it does not pay to put off the merging until a later point
- * in time (e.g. when no suitably sized block can be found): tests showed
- * a slow down of the small block allocation/deallocation combo with
- * defragmentation by 4.3% over no defragmentation.
+ * list pointer. Small free blocks are defragmented as described below.
  *
  * If a small block can't be allocated from the appropriate free list nor
  * the small chunk, the system tries two more strategies before allocating
@@ -58,6 +51,13 @@
  * memory not used to satisfy the allocation is entered as new oversized
  * free small block into the appropriate freelist.
  *
+ * To reduce memory fragmentation, the allocator implements a lazy
+ * defragmentation scheme for the small blocks: if checking free lists doesn't
+ * yield a suitable block, the allocator defragments the free lists and tries
+ * again. Only if this second attempt fails, a new small chunk is allocated.
+ * To save time, the defragmentation-on-allocation is terminated if a suitable
+ * block is constructed; a full defragmentation happens only as part
+ * of a garbage collection.
  *
  *  -- Large Blocks --
  *
@@ -838,6 +838,155 @@ void MAKE_SMALL_FREE (word_t *block, word_t bsize)
 #endif
 } /* MAKE_SMALL_FREE() */
 
+/*-------------------------------------------------------------------------*/
+static Bool
+defragment_small_lists (int req)
+
+/* Defragment some or all of the small block free lists.
+ *
+ * req = 0: defragment all of the free lists; result is MY_FALSE.
+ * req > 0: the routine is called from the allocator for a small block
+ *          allocation for <req> words incl overhead. If the defragmentation
+ *          creates a block of a suitable size, the defragmentation
+ *          terminates at that point and the function returns MY_TRUE.  If
+ *          all blocks are defragmented and no suitable block is found, the
+ *          function returns MY_FALSE.
+ */
+
+{
+    word_t split_size = 0;
+      /* Minimum blocksize for a block splittable into the requested
+       * size, incl. overhead in words; 0 for 'none'
+       */
+    int ix;  /* Freelist index */
+    Bool found = MY_FALSE; /* Set to TRUE if a suitable block is found */
+
+    if (req > 0)
+        split_size = req + SMALL_BLOCK_MIN + T_OVERHEAD;
+    else
+        req = 0; /* Just to make sure */
+
+    /* Loop over the freelists, starting at the largest.
+     */
+    for (ix = SMALL_BLOCK_NUM; ix >= 0 && !found; ix--)
+    {
+        word_t *list = NULL;
+          /* Local list of the defragmented blocks, linked through [M_LINK].
+           */
+
+        /* One by one, remove the first block of the current freelist
+         * and try to defragment it. The resulting block is then stored
+         * in the local list.
+         */
+        while (sfltable[ix] != NULL && !found)
+        {
+            Bool merged;
+
+            word_t *block = sfltable[ix];
+            word_t  bsize = block[M_SIZE] & M_MASK;
+
+            UNLINK_SMALL_FREE(block);
+
+            /* Try to merge this free block with the following ones */
+            do {
+                word_t *next;
+
+                merged = MY_FALSE;
+                next = block + bsize;
+                if (next[M_SIZE] & THIS_BLOCK)
+                {
+                    UNLINK_SMALL_FREE(next);
+                    bsize += next[M_SIZE] & M_MASK;
+                    merged = MY_TRUE;
+                }
+
+                if (req > 0 && (bsize == req || bsize >= split_size))
+                    found = MY_TRUE;
+
+            } while (!found && merged);
+
+            /* Try to merge the block with the ones in front of it */
+            while (!found && (block[M_SIZE] & PREV_BLOCK))
+            {
+                word_t *prev;
+
+                /* We use the 'prev' pointer first to get the size of previous
+                 * block, and from there we can determine it's address
+                 */
+                prev = (word_t *)(block[-1]);
+                if ((word_t)prev & 1)
+                    prev = block - block[-2];
+                else
+                    prev = block - (prev[M_SIZE] & M_MASK);
+
+#ifdef DEBUG
+                /* TODO: Remove this test once it's been proven stable */
+                if (!(prev[M_SIZE] & THIS_BLOCK))
+                {
+                    in_malloc = 0;
+                    fatal("Block %p marks previous %p as free, but it isn't.\n"
+                         , block, prev);
+                }
+#endif
+                UNLINK_SMALL_FREE(prev);
+                bsize += prev[M_SIZE] & M_MASK;
+
+                block = prev;
+
+                if (req >= 0 && (bsize == req || bsize >= split_size))
+                    found = MY_TRUE;
+            } /* while() */
+
+            /* Update the block's size and move it into the local list */
+            block[M_SIZE] = bsize;
+            block[M_LINK] = (word_t)list;
+            list = block;
+        } /* while (sfltable[ix]) */
+
+        /* Move the defragmented blocks from list back into their freelist.
+         */
+        while (list != NULL)
+        {
+            word_t * block = list;
+            list = (word_t *)(list[M_LINK]);
+            MAKE_SMALL_FREE(block, block[M_SIZE]);
+        }
+    } /* for (ix = SMALL_BLOCK_NUM..0 && !found) */
+
+    return found;
+} /* defragment_small_lists() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE void
+defragment_small_block (word_t *block)
+
+/* Try to merge the small free block <block> with any following free blocks.
+ * This routine is used by mem_increment_size().
+ */
+
+{
+    word_t  bsize = block[M_SIZE] & M_MASK;
+    Bool merged;
+
+    UNLINK_SMALL_FREE(block);
+
+    /* Try to merge this free block with the following ones */
+    do {
+        word_t *next;
+
+        merged = MY_FALSE;
+        next = block + bsize;
+        if (next[M_SIZE] & THIS_BLOCK)
+        {
+            UNLINK_SMALL_FREE(next);
+            bsize += next[M_SIZE] & M_MASK;
+            merged = MY_TRUE;
+        }
+    } while (merged);
+
+    /* Reinsert the block into the freelists */
+    MAKE_SMALL_FREE(block, bsize);
+} /* defragment_small_block() */
 
 /*-------------------------------------------------------------------------*/
 /* Macro MAKE_SMALL_CHECK(block, size)
@@ -883,6 +1032,7 @@ mem_alloc (size_t size)
 #if defined(HAVE_MADVISE) || defined(DEBUG_SMALLOC_ALLOCS)
     size_t orig_size = size;
 #endif
+    Bool    retry;
 
     assert_stack_gap();
 
@@ -937,151 +1087,176 @@ mem_alloc (size_t size)
     if (small_count[SIZE_INDEX(size)] > small_max[SIZE_INDEX(size)])
         small_max[SIZE_INDEX(size)] = small_count[SIZE_INDEX(size)];
 
-    if ( NULL != (temp = sfltable[SIZE_INDEX(size)]))
-    {
-        /* allocate from the free list */
-
-        UNLINK_SMALL_FREE(temp);
-
-        /* Fill in the header (M_SIZE is already mostly ok) */
-        MAKE_SMALL_CHECK(temp, size);
-        temp[M_SIZE] &= ~THIS_BLOCK;
-        temp[temp[M_SIZE] & M_MASK] &= ~PREV_BLOCK;
-
-        temp += M_OVERHEAD;
-
-        MADVISE(temp, orig_size);
-
-        in_malloc--;
-        return (POINTER)temp;
-    }
-
-    /* There is nothing suitable in the normal free lists - next try
-     * allocating from the oversized block list.
+    /* Try allocating the block from one of the free lists.
+     *
+     * This is done in a loop: if at the first attempt no block can be found,
+     * the small block lists will be defragmented and the allocation attempt
+     * is repeated. If that fails as well, the loop ends and we try to
+     * get a new small chunk.
      */
-    {
-        word_t *this;
-        word_t wsize = size / SINT; /* size incl overhead in words */
 
-        for (this = sfltable[SMALL_BLOCK_NUM] ; this; this = BLOCK_NEXT(this))
+    retry = MY_FALSE;
+    do {
+
+        /* First, check if the free list for this block size has one */
+
+        if ( NULL != (temp = sfltable[SIZE_INDEX(size)]))
         {
-            word_t bsize = *this & M_MASK;
-            word_t rsize = bsize - wsize;
+            /* allocate from the free list */
 
-            /* Make sure that the split leaves a legal block behind */
-            if (bsize < wsize + T_OVERHEAD + SMALL_BLOCK_MIN)
-                continue;
+            UNLINK_SMALL_FREE(temp);
 
-            /* If the split leaves behind a normally sized small
-             * block, move it over to the appropriate free list.
-             * Otherwise, just update the size and magic header fields
-             * but keep this block in the oversized list.
-             */
-            if (rsize <= SMALL_BLOCK_MAX)
+            /* Fill in the header (M_SIZE is already mostly ok) */
+            MAKE_SMALL_CHECK(temp, size);
+            temp[M_SIZE] &= ~THIS_BLOCK;
+            temp[temp[M_SIZE] & M_MASK] &= ~PREV_BLOCK;
+
+            temp += M_OVERHEAD;
+
+            MADVISE(temp, orig_size);
+
+            in_malloc--;
+            return (POINTER)temp;
+        }
+
+        /* There is nothing suitable in the normal free list - next try
+         * allocating from the oversized block list.
+         */
+        {
+            word_t *this;
+            word_t wsize = size / SINT; /* size incl overhead in words */
+
+            for (this = sfltable[SMALL_BLOCK_NUM] ; this; this = BLOCK_NEXT(this))
             {
-                /* Unlink it from this list */
-                UNLINK_SMALL_FREE(this);
+                word_t bsize = *this & M_MASK;
+                word_t rsize = bsize - wsize;
 
-                /* Put it into the real free list */
-                MAKE_SMALL_FREE(this, rsize);
-            }
-            else
-            {
-                /* Just modify the size and move the .prev pointer
-                 * and size field.
+                /* Make sure that the split leaves a legal block behind */
+                if (bsize < wsize + T_OVERHEAD + SMALL_BLOCK_MIN)
+                    continue;
+
+                /* If the split leaves behind a normally sized small
+                 * block, move it over to the appropriate free list.
+                 * Otherwise, just update the size and magic header fields
+                 * but keep this block in the oversized list.
                  */
-                count_back(small_free_stat, bsize * SINT);
+                if (rsize <= SMALL_BLOCK_MAX)
+                {
+                    /* Unlink it from this list */
+                    UNLINK_SMALL_FREE(this);
 
-                this[M_SIZE] &= PREV_BLOCK;
-                this[M_SIZE] |= rsize | (THIS_BLOCK|M_GC_FREE|M_REF);
-                this[M_PLINK(rsize)] = this[M_PLINK(bsize)];
-                this[M_PLINK(rsize)-1] =  rsize;
+                    /* Put it into the real free list */
+                    MAKE_SMALL_FREE(this, rsize);
+                }
+                else
+                {
+                    /* Just modify the size and move the .prev pointer
+                     * and size field.
+                     */
+                    count_back(small_free_stat, bsize * SINT);
+
+                    this[M_SIZE] &= PREV_BLOCK;
+                    this[M_SIZE] |= rsize | (THIS_BLOCK|M_GC_FREE|M_REF);
+                    this[M_PLINK(rsize)] = this[M_PLINK(bsize)];
+                    this[M_PLINK(rsize)-1] =  rsize;
 
 #ifdef MALLOC_CHECK
-                this[M_MAGIC] = sfmagic[SIZE_MOD_INDEX(rsize*SINT, sfmagic)];
+                    this[M_MAGIC] = sfmagic[SIZE_MOD_INDEX(rsize*SINT, sfmagic)];
 #endif
 
-                count_up(small_free_stat, rsize * SINT);
-            }
+                    count_up(small_free_stat, rsize * SINT);
+                }
 
-            /* Split off the allocated small block from the end
-             * The front remains in the freelist.
-             */
-            this += rsize;
+                /* Split off the allocated small block from the end
+                 * The front remains in the freelist.
+                 */
+                this += rsize;
 
-            /* Fill in the header */
-            this[M_SIZE] = wsize | (PREV_BLOCK|M_GC_FREE|M_REF);
-            this[wsize] &= ~PREV_BLOCK;
-            MAKE_SMALL_CHECK_UNCHECKED(this,size);
+                /* Fill in the header */
+                this[M_SIZE] = wsize | (PREV_BLOCK|M_GC_FREE|M_REF);
+                this[wsize] &= ~PREV_BLOCK;
+                MAKE_SMALL_CHECK_UNCHECKED(this,size);
 
-            this += M_OVERHEAD;
+                this += M_OVERHEAD;
 
-            MADVISE(this, orig_size);
+                MADVISE(this, orig_size);
 
 #ifdef DEBUG_SMALLOC_ALLOCS
-            ulog2f("smalloc(%d / %d): Split oversized block "
+                ulog2f("smalloc(%d / %d): Split oversized block "
+                      , orig_size, size);
+                dprintf2( gcollect_outfd, "(%d / %d bytes): left with block of "
+                        , (p_int)(bsize - T_OVERHEAD) * SINT, (p_int)bsize * SINT);
+                dprintf2( gcollect_outfd, "%d / %d bytes.\n"
+                        , (p_int)(rsize - T_OVERHEAD) * SINT
+                        , (p_int)rsize * SINT);
+#endif
+
+                in_malloc--;
+                return (POINTER)this;
+            }
+        } /* allocation from oversized lists */
+
+        /* Next, try splitting off the memory from one of the larger
+         * listed free small blocks.
+         * Search from the largest blocks, and stop when splits
+         * would result in too small blocks.
+         */
+        for ( ix = SMALL_BLOCK_NUM-1
+            ; ix >= SIZE_INDEX(size) + T_OVERHEAD + SMALL_BLOCK_MIN 
+            ; ix--
+            )
+        {
+            word_t *pt, *split;
+            size_t wsize, usize;
+
+            if (!sfltable[ix]) /* No block available */
+                continue;
+
+            wsize = size / SINT; /* size incl. overhead in words */
+
+            /* Remove the block from the free list */
+            pt = sfltable[ix];
+            UNLINK_SMALL_FREE(pt);
+
+            /* Split off the unused part as new block */
+            split = pt + wsize;
+            usize = ix + T_OVERHEAD + SMALL_BLOCK_MIN - wsize;
+            split[M_SIZE] = 0; /* No PREV_BLOCK */
+            MAKE_SMALL_FREE(split, usize);
+
+            /* Initialize the header of the new block */
+            pt[M_SIZE] &= PREV_BLOCK;
+            pt[M_SIZE] = wsize | (M_GC_FREE|M_REF);
+            MAKE_SMALL_CHECK_UNCHECKED(pt, size);
+
+            pt += M_OVERHEAD;
+
+            MADVISE(pt, orig_size);
+
+#ifdef DEBUG_SMALLOC_ALLOCS
+            ulog2f("smalloc(%d / %d): Split block "
                   , orig_size, size);
             dprintf2( gcollect_outfd, "(%d / %d bytes): left with block of "
-                    , (p_int)(bsize - T_OVERHEAD) * SINT, (p_int)bsize * SINT);
+                    , (p_int)(ix - T_OVERHEAD) * SINT, (p_int)ix * SINT);
             dprintf2( gcollect_outfd, "%d / %d bytes.\n"
-                    , (p_int)(rsize - T_OVERHEAD) * SINT
-                    , (p_int)rsize * SINT);
+                    , (p_int)(usize - T_OVERHEAD) * SINT, (p_int)usize * SINT);
 #endif
 
             in_malloc--;
-            return (POINTER)this;
-        }
-    } /* allocation from oversized lists */
+            return (POINTER)pt;
+        } /* allocation from larger blocks */
 
-    /* Next, try splitting off the memory from one of the larger
-     * listed free small blocks.
-     * Search from the largest blocks, and stop when splits
-     * would result in too small blocks.
-     */
-    for ( ix = SMALL_BLOCK_NUM-1
-        ; ix >= SIZE_INDEX(size) + T_OVERHEAD + SMALL_BLOCK_MIN 
-        ; ix--
-        )
-    {
-        word_t *pt, *split;
-        size_t wsize, usize;
-
-        if (!sfltable[ix]) /* No block available */
-            continue;
-
-        wsize = size / SINT; /* size incl. overhead in words */
-
-        /* Remove the block from the free list */
-        pt = sfltable[ix];
-        UNLINK_SMALL_FREE(pt);
-
-        /* Split off the unused part as new block */
-        split = pt + wsize;
-        usize = ix + T_OVERHEAD + SMALL_BLOCK_MIN - wsize;
-        split[M_SIZE] = 0; /* No PREV_BLOCK */
-        MAKE_SMALL_FREE(split, usize);
-
-        /* Initialize the header of the new block */
-        pt[M_SIZE] &= PREV_BLOCK;
-        pt[M_SIZE] = wsize | (M_GC_FREE|M_REF);
-        MAKE_SMALL_CHECK_UNCHECKED(pt, size);
-
-        pt += M_OVERHEAD;
-
-        MADVISE(pt, orig_size);
-
-#ifdef DEBUG_SMALLOC_ALLOCS
-        ulog2f("smalloc(%d / %d): Split block "
-              , orig_size, size);
-        dprintf2( gcollect_outfd, "(%d / %d bytes): left with block of "
-                , (p_int)(ix - T_OVERHEAD) * SINT, (p_int)ix * SINT);
-        dprintf2( gcollect_outfd, "%d / %d bytes.\n"
-                , (p_int)(usize - T_OVERHEAD) * SINT, (p_int)usize * SINT);
-#endif
-
-        in_malloc--;
-        return (POINTER)pt;
-    } /* allocation from larger blocks */
+        /* At this point, there was nothing in the free lists.
+         * If this is the first pass, defragment the memory and try again
+         * (the defragmentation routine returns whether a retry is useful).
+         * If this is the second pass, force retry to be FALSE, thus
+         * terminating the loop.
+         */
+        if (!retry)
+            retry = defragment_small_lists(size / SINT);
+        else
+            retry = MY_FALSE;
+    } while (retry);
 
     /* At this point, we couldn't find a suitable block in the free lists,
      * thus allocate a new small chunk.
@@ -1220,47 +1395,6 @@ sfree (POINTER ptr)
              , block, (unsigned long)(i * SINT), samagic[i], block[M_MAGIC]);
     }
 #endif
-
-    /* Try to merge this free block with the one following */
-    {
-        word_t *next;
-
-        next = block + bsize;
-        if (next[M_SIZE] & THIS_BLOCK)
-        {
-            UNLINK_SMALL_FREE(next);
-            bsize += next[M_SIZE] & M_MASK;
-        }
-    }
-
-    /* Try to merge this free block with the previous one */
-    if  (block[M_SIZE] & PREV_BLOCK)
-    {
-        word_t *prev;
-
-      /* We use the 'prev' pointer first to get the size of previous
-       * block, and from there we can determine it's address
-       */
-        prev = (word_t *)(block[-1]);
-        if ((word_t)prev & 1)
-            prev = block - block[-2];
-        else
-            prev = block - (prev[M_SIZE] & M_MASK);
-
-#ifdef DEBUG
-        /* TODO: Remove this test once it's been proven stable */
-        if (!(prev[M_SIZE] & THIS_BLOCK))
-        {
-            in_malloc = 0;
-            fatal("Block %p marks previous %p as free, but it isn't.\n"
-                 , block, prev);
-        }
-#endif
-        UNLINK_SMALL_FREE(prev);
-        bsize += prev[M_SIZE] & M_MASK;
-
-        block = prev;
-    }
 
     MAKE_SMALL_FREE(block, bsize);
 } /* sfree() */
@@ -2679,8 +2813,6 @@ mem_increment_size (void *vp, size_t size)
 /* Try to extent the allocation block for <vp> to hold <size> more bytes.
  * If this is not possible, return NULL, otherwise return a pointer
  * to the start of the block extension.
- *
- * This only works for large blocks which are followed by a free block.
  */
 
 {
@@ -2703,13 +2835,16 @@ mem_increment_size (void *vp, size_t size)
         
         word_t new_size = (old_size + wsize) * SINT;
 
+        if (old_size + wsize > SMALL_BLOCK_MAX)
+            return NULL; /* New block would be too large */
+
         if (!(next & THIS_BLOCK))
             return NULL; /* no following free block */
 
-        next &= M_MASK;
+        /* Make sure the following free block is as large as possible */
+        defragment_small_block(start2);
 
-        if (old_size + wsize > SMALL_BLOCK_MAX)
-            return NULL; /* New block would be too large */
+        next = start2[M_SIZE] & M_MASK; /* Might have changed */
 
         if (next == wsize)
         {
@@ -3054,17 +3189,20 @@ mem_free_unrefed_memory (void)
 
 /*-------------------------------------------------------------------------*/
 void
-mem_consolidate (Bool force UNUSED)
+mem_consolidate (Bool force)
 
-/* Walk the list of small chunks and free all which are totally unused.
+/* Consolidate the memory.
+ *
+ * If <force> is TRUE, the small free blocks are defragmented first.
+ * Then, the function walks the list of small chunks and free all which are
+ * totally unused.
  */
 
 {
-#   ifdef __MWERKS__
-#       pragma unused(force)
-#   endif
-
     word_t *prev, *this;
+
+    if (force)
+        defragment_small_lists(0);
 
     for (prev = NULL, this = last_small_chunk ; this != NULL ; )
     {

@@ -60,13 +60,12 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 464)
-(Parent-Version lpmud 3-3 463)
-(Version-Log "Improved the detection of libcrypt and libcrypto.
-Added a number of macros to deal with 64-bit machines in bytecode.h")
+(Project-Version lpmud 3-3 465)
+(Parent-Version lpmud 3-3 464)
+(Version-Log "Implemented a lazy defragmentation scheme for small blocks in smalloc.")
 (New-Version-Log
 "")
-(Checkin-Time "Thu, 24 Jul 2003 20:12:22 -0600")
+(Checkin-Time "Fri, 25 Jul 2003 01:32:09 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -104,7 +103,7 @@ Added a number of macros to deal with 64-bit machines in bytecode.h")
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.10 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.67 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.527 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.528 644))
   (HISTORY (lpmud/f/49_HISTORY 1.328 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -285,7 +284,7 @@ Added a number of macros to deal with 64-bit machines in bytecode.h")
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.32 644))
   (src/simulate.c (lpmud/31_simulate.c 1.88.1.111 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.14 644))
-  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.81 644))
+  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.82 644))
   (src/structs.h (lpmud/d/b/5_structs.h 1.4 644))
   (src/structs.c (lpmud/d/b/6_structs.c 1.13 644))
   (src/sysmalloc.h (lpmud/c/b/33_sysmalloc. 1.2 644))
@@ -465,8 +464,8 @@ Added a number of macros to deal with 64-bit machines in bytecode.h")
   ;; Various example and support files
   (mudlib/README (lpmud/d/51_README 1.1.1.7 644))
   (mudlib/astar.c (lpmud/q/22_astar.c 1.3 644))
-  (mudlib/dhrystone.c (lpmud/e/34_dhrystone. 1.1.1.4 644))
-  (mudlib/dhrystone2.c (lpmud/a/b/13_dhrystone2 1.2 644))
+  (mudlib/dhrystone.c (lpmud/e/34_dhrystone. 1.1.1.5 644))
+  (mudlib/dhrystone2.c (lpmud/a/b/13_dhrystone2 1.3 644))
   (mudlib/erq-tool.c (lpmud/d/31_erq.c 1.1 644))
   (mudlib/simul_efun-dr.c (lpmud/51_simul_efun 1.3 644))
   (mudlib/master_skeleton.c (lpmud/b/2_master_ske 1.30 644))

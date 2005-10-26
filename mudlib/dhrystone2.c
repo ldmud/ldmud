@@ -50,7 +50,7 @@ int times() {
   int *ru;
 
   ru = rusage();
-  return 10 * (ru[0] + ru[1]);
+  return ru[0] + ru[1];
 }
 
 //===========================================================================
@@ -73,7 +73,7 @@ int     Ch_1_Glob, Ch_2_Glob;
 mixed  *Arr_1_Glob;
 mixed  *Arr_2_Glob;
 int     Begin_Time, End_Time, User_Time;
-float   Microseconds, Dhrystones_Per_Second;
+float   Milliseconds, Dhrystones_Per_Second;
 
 //===========================================================================
 // Prototypes all functions (including those defined later).
@@ -209,10 +209,10 @@ void main(int Number_Of_Runs) {
     write("Please increase number of runs\n");
     write("\n");
   } else {
-    Microseconds = to_float(User_Time) / Number_Of_Runs;
+    Milliseconds = to_float(User_Time) / Number_Of_Runs;
     Dhrystones_Per_Second = 1000.0 * Number_Of_Runs / User_Time;
-    printf ("Microseconds for one run through Dhrystone: ");
-    printf ("%6.1f \n", Microseconds);
+    printf ("Milliseconds for one run through Dhrystone: ");
+    printf ("%6.1f \n", Milliseconds);
     printf ("Dhrystones per Second:                      ");
     printf ("%6.1f \n", Dhrystones_Per_Second);
   }

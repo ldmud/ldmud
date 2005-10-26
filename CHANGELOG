@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+25-Jul-2003 (Lars Duening)  (3.3.465)
+  - (mudlib/dhrystone.c) The time measurement was off by factor 10.
+  - (smalloc.c) Implemented a lazy defragmentation scheme for the
+       free small blocks.
+
 24-Jul-2003 (Lars Duening)  (3.3.464)
   - (configure) Improved the detection of libcrypt and libcrypto.
   - (bytecode.h, hosts/crypt.c) Added a number of macros to deal with 64-bit
