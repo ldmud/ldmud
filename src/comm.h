@@ -249,7 +249,15 @@ struct interactive_s {
      * must not call xfree().
      * TODO: These two lists + one extra can be combined into
      * TODO:: one list, plus two roving pointers into it.
+     * TODO:: In fact, once ptmalloc is really complete, the buffers
+     * TODO:: can be discarded immediately and the written_first list
+     * TODO:: becomes unnecessary.
      */
+    Bool                   flush_on_cleanup;
+      /* If set to TRUE at the time the thread is cancelled, all remaining
+       * pending data is sent to the socket (which is made non-blocking for
+       * this) as part of the cleanup.
+       */
     pthread_mutex_t        write_mutex;
     pthread_cond_t         write_cond;
     pthread_t              write_thread;

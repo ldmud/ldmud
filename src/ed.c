@@ -203,6 +203,7 @@ struct ed_buffer_s
     int     leading_blanks;    /* Current number of leading blanks when
                                   using autoindentation. */
     int     cur_autoindent;
+    int     lastcmd;           /* The last command */
     string_t *exit_fn;         /* Function to be called when player exits */
                                /* TODO: Make this a callback */
     object_t *exit_ob;         /* Object holding <exit_fn> */
@@ -264,6 +265,7 @@ struct ed_buffer_s
 #define P_LEADBLANKS    (ED_BUFFER->leading_blanks)
 #define P_CUR_AUTOIND   (ED_BUFFER->cur_autoindent)
 #define P_PROMPT        (ED_BUFFER->prompt)
+#define P_LASTCMD       (ED_BUFFER->lastcmd)
 
 
 /*-------------------------------------------------------------------------*/
@@ -2662,7 +2664,7 @@ docmd (Bool glob)
 {
     static char  rhs[MAXPAT];
     regexp_t    *subpat;
-    int          c, err, line3;
+    int          c, err, line3, lastcmd;
     int          apflg, pflag, gflag;
     int          nchng;
     string_t    *fptr;
@@ -2670,7 +2672,9 @@ docmd (Bool glob)
     pflag = FALSE;
     Skip_White_Space;
 
-    c = *inptr++;
+    lastcmd = P_LASTCMD;
+
+    P_LASTCMD = c = *inptr++;
     switch(c)
     {
     case NL:
@@ -3035,7 +3039,10 @@ docmd (Bool glob)
 
         case '+':
         case '\n':
-            dfln = P_CURLN != 1 ? P_CURLN + 1 : 1;
+            if (lastcmd == 'z' || lastcmd == 'Z')
+                dfln = P_CURLN != 1 ? P_CURLN + 1 : 1;
+            else
+                dfln = P_CURLN;
             if (deflt(dfln,dfln) < 0)
                 return ERR;
             if (doprnt(P_LINE1,P_LINE1+21) < 0)
@@ -3069,7 +3076,10 @@ docmd (Bool glob)
 
         case '+':
         case '\n':
-            dfln = P_CURLN != 1 ? P_CURLN + 1 : 1;
+            if (lastcmd == 'z' || lastcmd == 'Z')
+                dfln = P_CURLN != 1 ? P_CURLN + 1 : 1;
+            else
+                dfln = P_CURLN;
             if (deflt(dfln,dfln) < 0)
                 return ERR;
             if (doprnt(P_LINE1,P_LINE1+41) < 0)
@@ -3434,7 +3444,7 @@ ed_cmd (char *str)
         }
         else
         {
-            if((status = docmd(0)) >= 0)
+            if((status = docmd(MY_FALSE)) >= 0)
             {
                 if(status == 1)
                     doprnt(P_CURLN, P_CURLN);

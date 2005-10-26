@@ -1,6 +1,15 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+30-Apr-2002 (Lars Duening)  (3.3.450)
+  - (ed.c) Only consecutive 'z'/'Z' commands do not re-print the current line;
+       a 'z'/'Z' after a different command does (suggested by Elric).
+  - (comm) When using PThreads, destructing an interactive object now
+       flushes all remaining pending data to the socket (suggested by Urv).
+       Additionally, the main thread waits properly for the writer thread to
+       terminate.
+  - (comm.c) When not using MCCP but PThreads, all outputs were doubled.
+
 29-Apr-2002 (Lars Duening)  (3.3.449)
   - (sprintf.c) When printing arrays with '%O', the size was given
        one too small.

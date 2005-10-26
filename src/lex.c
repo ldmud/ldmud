@@ -64,7 +64,8 @@
 
 #include "../mudlib/sys/driver_hook.h"
 
-/* TODO: Implement the # and ## operators.
+/* TODO: Implement the # and ## operators. With this, #define X(a) (a + "a")
+ * TODO:: can be made sane (X(b) -> 'b + "a"' instead of 'b + "b"').
  * TODO: New predefs' __BASENAME__, __FUNCTION__.
  * TODO: #define macro(a,b,...) -> ... is assigned to __VA_ARGS__ (see oncoming
  * TODO:: C standard).

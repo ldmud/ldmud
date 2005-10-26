@@ -799,7 +799,7 @@ set_socket_nonblocking (SOCKET_T new_socket)
 
 #endif /* if !__BEOS__ */
 
-}
+} /* set_socket_nonblocking() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -814,7 +814,7 @@ set_close_on_exec (SOCKET_T new_socket)
 #ifdef HAVE_FCNTL
     fcntl(new_socket, F_SETFD, 1L);
 #endif
-}
+} /* set_close_on_exec() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -842,7 +842,7 @@ set_socket_own (SOCKET_T new_socket)
     }
 #endif
     new_socket = 0; /* Prevent 'not used' warning */
-}
+} /* set_socket_own() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -889,7 +889,6 @@ initialize_host_name (const char *hname)
     if (domain)
         *domain = '\0';
 } /* initialize_host_name() */
-
 
 /*-------------------------------------------------------------------------*/
 void
@@ -1451,6 +1450,72 @@ thread_socket_write( SOCKET_T s UNUSED, char *msg, size_t size
 
 /*-------------------------------------------------------------------------*/
 static void
+thread_write_buf (interactive_t * ip, struct write_buffer_s *buf)
+
+/* Write the buffer <buf> to interactive <ip>, handling MCCP and other
+ * things if necessary.
+ * This function is called from the main write thread as well as the
+ * thread cleanup.
+ */
+
+{
+#ifdef USE_MCCP
+    int length;
+
+    buf->errorno = 0;
+    if (buf->compress)
+    {
+        int status;
+        ip->out_compress->next_in = (unsigned char *) buf->buffer;
+        ip->out_compress->avail_in = buf->length;
+        ip->out_compress->avail_out = COMPRESS_BUF_SIZE -
+          (ip->out_compress->next_out -
+           ip->out_compress_buf);
+        
+        status = deflate(ip->out_compress, Z_SYNC_FLUSH);
+        
+        if (status != Z_OK)
+            debug_message("%s MCCP compression error: %d\n"
+                         , time_stamp(), status);
+        length = ip->out_compress->next_out - ip->out_compress_buf;
+    }
+    
+    if (buf->compress)
+    {
+        if ((socket_write(ip->socket, ip->out_compress_buf, length)) == -1)
+        { 
+            buf->errorno = errno;
+        } /* if socket_write() == -1 */
+        
+        /* we update the compressed buffer here */
+        ip->out_compress->next_out = ip->out_compress_buf;
+    }
+    else
+    {
+        if ((socket_write(ip->socket, buf->buffer, buf->length)) == -1)
+        {
+            buf->errorno = errno;
+        } /* if socket_write() == -1 */
+    }
+
+    if (buf->compress && !buf->compressing)
+    {
+        /* Compression has been turned off for this interactive,
+         * now get rid of all residual data.
+         */
+        end_compress(ip);
+    }
+#else
+    buf->errorno = 0;
+    if ((socket_write(ip->socket, buf->buffer, buf->length)) == -1)
+    {
+        buf->errorno = errno;
+    } /* if socket_write() == -1 */
+#endif /* USE_MCCP */
+} /* thread_write_buf() */
+
+/*-------------------------------------------------------------------------*/
+static void
 writer_thread_cleanup(void *arg)
 
 /* The given thread is canceled - move all pending buffers into the
@@ -1459,25 +1524,32 @@ writer_thread_cleanup(void *arg)
 
 {
     interactive_t * ip = (interactive_t *) arg;
-    struct write_buffer_s *buf = ip->write_first;
+    struct write_buffer_s *buf;
 
+    if (ip->write_current)
+    {
+        if (ip->flush_on_cleanup)
+            thread_write_buf(ip, ip->write_current);
+        else
+            ip->write_current->errorno = 0;
+        ip->write_current->next = ip->written_first;
+        ip->written_first = ip->write_current;
+        ip->write_current = NULL;
+    }
+
+    buf = ip->write_first;
     while (buf)
     {
 	struct write_buffer_s *next = buf->next;
-        buf->errorno = 0;
+        if (ip->flush_on_cleanup)
+            thread_write_buf(ip, buf);
+        else
+            buf->errorno = 0;
         buf->next = ip->written_first;
         ip->written_first = buf;
 	buf = next;
     }
     ip->write_first = ip->write_last = NULL;
-
-    if (ip->write_current)
-    {
-        ip->write_current->errorno = 0;
-        ip->write_current->next = ip->written_first;
-        ip->written_first = ip->write_current;
-        ip->write_current = NULL;
-    }
 
     dprintf1(1, "Thread %d canceled and cleaned up!\n", (long)pthread_self());
 } /* writer_thread_cleanup() */
@@ -1562,67 +1634,7 @@ writer_thread (void *arg)
 
         if (buf)
         {
-            /* write the stuff to socket */
-
-#ifdef USE_MCCP
-            int length;
-#endif /* USE_MCCP */
-
-            buf->errorno = 0;
-            if ((socket_write(ip->socket, buf->buffer, buf->length)) == -1)
-            {
-                buf->errorno = errno;
-            } /* if socket_write() == -1 */
-
-#ifdef USE_MCCP
-            if (buf->compress)
-            {
-                int status;
-                ip->out_compress->next_in = (unsigned char *) buf->buffer;
-                ip->out_compress->avail_in = buf->length;
-                ip->out_compress->avail_out = COMPRESS_BUF_SIZE -
-                  (ip->out_compress->next_out -
-                   ip->out_compress_buf);
-                
-                status = deflate(ip->out_compress, Z_SYNC_FLUSH);
-                
-                if (status != Z_OK)
-                    debug_message("%s MCCP compression error: %d\n"
-                                 , time_stamp(), status);
-                length = ip->out_compress->next_out - ip->out_compress_buf;
-            }
-            
-            if (buf->compress)
-            {
-                if ((socket_write(ip->socket, ip->out_compress_buf, length)) == -1)
-                { 
-                    buf->errorno = errno;
-                } /* if socket_write() == -1 */
-                
-                /* we update the compressed buffer here */
-                ip->out_compress->next_out = ip->out_compress_buf;
-            }
-            else
-            {
-                if ((socket_write(ip->socket, buf->buffer, buf->length)) == -1)
-                {
-                    buf->errorno = errno;
-                } /* if socket_write() == -1 */
-            }
-
-            if (buf->compress && !buf->compressing)
-            {
-                /* Compression has been turned off for this interactive,
-                 * now get rid of all residual data.
-                 */
-                end_compress(ip);
-            }
-#else
-            if ((socket_write(ip->socket, buf->buffer, buf->length)) == -1)
-            {
-                buf->errorno = errno;
-            } /* if socket_write() == -1 */
-#endif /* USE_MCCP */
+            thread_write_buf(ip, buf);
 
             /* Don't xfree(buf) here as smalloc is not threadsafe! */
             pthread_mutex_lock(&ip->write_mutex);
@@ -3385,8 +3397,14 @@ remove_interactive (object_t *ob, Bool force)
          * the thread reaches the cancellation point after the
          * condition, it will stop.
          */
+        if (!force)
+        {
+            set_socket_nonblocking(interactive->socket);
+            interactive->flush_on_cleanup = MY_TRUE;
+        }
         pthread_cancel(interactive->write_thread);
         pthread_cond_signal(&interactive->write_cond);
+        pthread_join(interactive->write_thread, NULL);
           /* buffer list is returned by thread */
         interactive_cleanup(interactive);
 #endif
@@ -3678,6 +3696,7 @@ new_player (SOCKET_T new_socket, struct sockaddr_in *addr, size_t addrlen
     new_interactive->previous_player_for_flush = NULL;
 
 #ifdef USE_PTHREADS
+    new_interactive->flush_on_cleanup = MY_FALSE;
     pthread_mutex_init(&new_interactive->write_mutex, NULL);
     {
         pthread_mutexattr_t mutexattr;
