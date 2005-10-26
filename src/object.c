@@ -7733,7 +7733,9 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
         case 'c': /* A lfun closure */
         case 'l': /* A lfun closure */
             if ( !restore_closure(svp, pt, delimiter) )
+            {
                 return MY_FALSE;
+            }
             break;
 
         case '0': case '1': case '2': case '3': case '4':
@@ -7834,14 +7836,18 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
         case '[':
           {
             if ( !restore_mapping(svp, pt) )
+            {
                 return MY_FALSE;
+            }
             break;
           }
 
         case '{':
           {
             if ( !restore_array(svp, pt) )
+            {
                 return MY_FALSE;
+            }
             break;
           }
 
@@ -7849,7 +7855,9 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
         case '<':
           {
             if ( !restore_struct(svp, pt) )
+            {
                 return MY_FALSE;
+            }
             break;
           }
 #endif /* USE_STRUCTS */

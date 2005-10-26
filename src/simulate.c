@@ -108,7 +108,7 @@ struct give_uid_error_context
 /* --- struct namechain ---
  *
  * This structure is used by load_object() to build the current inheritence
- * tree in the frames on the stack. The information is used to generate
+ * chain in the frames on the stack. The information is used to generate
  * proper error messages.
  */
 

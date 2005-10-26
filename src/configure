@@ -7838,7 +7838,6 @@ fi
 done
 
 
-    echo "LIBS :$LIBS:"
     for lp_lib in crypt crypto; do
         if test "$ac_cv_func_crypt" != "yes" -a "$ac_cv_func__crypt" != "yes"; then
             # Try linking with lib$lp_lib
@@ -7893,7 +7892,6 @@ if test `eval echo '${'$as_ac_Lib'}'` = yes; then
   LIBS="$LIBS -l$lp_lib"
 fi
 
-            echo "LIBS now :$LIBS:"
 
             if test "$SAVE_LIBS" != "$LIBS" ; then
 
@@ -7970,12 +7968,10 @@ done
                 if test "$ac_cv_func_crypt" != "yes" -a "$ac_cv_func__crypt" != "yes"; then
                     # They are not in this library
                     LIBS="$lp_save_libs"
-            echo "LIBS reset :$LIBS:"
                 fi
             fi
         fi
     done
-    echo "LIBS :$LIBS:"
 
 fi
 

@@ -1253,7 +1253,7 @@ mem_alloc (size_t size)
 
             /* Initialize the header of the new block */
             pt[M_SIZE] &= PREV_BLOCK;
-            pt[M_SIZE] = wsize | (M_GC_FREE|M_REF);
+            pt[M_SIZE] |= wsize | (M_GC_FREE|M_REF);
             MAKE_SMALL_CHECK_UNCHECKED(pt, size);
 
             pt += M_OVERHEAD;

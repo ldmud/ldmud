@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+31-Jul-2003 (Lars Duening)  (3.3.469)
+  - (smalloc.c) Splitting of a block from a larger free list failed
+       to preserve the PREV_BLOCK flag in the returned block, causing
+       the defragmentation to malfunction on occasion (Mantis #0000007)
+
 29-Jul-2003 (Lars Duening)  (3.3.468)
   - (smalloc.c) The small-block defragmentation clobbered an important
        flag in some blocks, causing the driver to crash (reported by Bardioc).

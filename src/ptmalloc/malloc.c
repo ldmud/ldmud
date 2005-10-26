@@ -4316,7 +4316,9 @@ _int_malloc(mstate av, size_t bytes)
        Otherwise, relay to handle system-dependent cases
     */
     else
+    {
       return sYSMALLOc(nb, av);
+    }
   }
 }
 

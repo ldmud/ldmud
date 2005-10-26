@@ -604,7 +604,6 @@ fi
 if test "x$enable_use_system_crypt" = "x" || test "x$enable_use_system_crypt" = "xyes"; then
     AC_CHECK_FUNCS(crypt _crypt)
 
-    echo "LIBS :$LIBS:"
     for lp_lib in crypt crypto; do
         if test "$ac_cv_func_crypt" != "yes" -a "$ac_cv_func__crypt" != "yes"; then
             # Try linking with lib$lp_lib
@@ -612,19 +611,16 @@ if test "x$enable_use_system_crypt" = "x" || test "x$enable_use_system_crypt" = 
             unset ac_cv_func__crypt
             lp_save_libs="$LIBS"
             AC_CHECK_LIB($lp_lib,main, LIBS="$LIBS -l$lp_lib")
-            echo "LIBS now :$LIBS:"
 
             if test "$SAVE_LIBS" != "$LIBS" ; then
                 AC_CHECK_FUNCS(crypt _crypt)
                 if test "$ac_cv_func_crypt" != "yes" -a "$ac_cv_func__crypt" != "yes"; then
                     # They are not in this library
                     LIBS="$lp_save_libs"
-            echo "LIBS reset :$LIBS:"
                 fi
             fi
         fi
     done
-    echo "LIBS :$LIBS:"
 
 fi
 
