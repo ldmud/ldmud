@@ -44,6 +44,7 @@ execute (char *buf, int buflen, char *status, int *esockets, int keep_sockets)
     XPRINTF((stderr, "%s execute('%s':%d)\n", time_stamp(), buf, buflen));
 
     quoted = 0;
+    status[0] = ERQ_E_FORKFAIL; /* Good default */
     status[1] = 0;
     if (buflen >= sizeof argbuf)
     {

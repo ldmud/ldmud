@@ -124,7 +124,7 @@ For a detailed list of all changes see the file CHANGELOG.
            available (default is to allow sbrk()).
 
 
-17-Jul-2003 (Lars Duening) -- Release 3.2.10
+22-Jul-2003 (Lars Duening) -- Release 3.2.10
 
     - Changed efuns:
        + debug_info(): Removed the DID_MEM_UNUSED value from the DINFO_DATA:
@@ -153,6 +153,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + m_add(): Fixed a memory leak when existing entries were overwritten.
        + remove_input_to(): The proper noecho state is restored after
            removing a pending input handler.
+       + restore_object(): The function leaked memory when restoring from
+           a MALLOCed string.
 
     - New efuns:
        + m_entry(): Return all values for mapping entry at once.

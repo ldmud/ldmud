@@ -8107,9 +8107,36 @@ static int nesting = 0;  /* Used to detect recursive calls */
     } * dp = NULL;
       /* List of values for which the variables no longer exist. */
 
+#define FREE_BUFF() MACRO( \
+          if (nesting > 1) xfree(buff); else mb_free(mbFile); \
+        )
+      /* Free buff correctly.
+       */
+
 
     /* Keep track of recursive calls */
     nesting++;
+
+    /* No use in restoring a destructed object, or an object
+     * with no variables. Do this check now before we allocate
+     * any memory.
+     */
+    ob = current_object;
+    if (ob->flags & O_DESTRUCTED)
+    {
+        free_svalue(sp);
+        put_number(sp, 0);
+        nesting--;
+        return sp;
+    }
+
+    if (ob->prog->num_variables == 0)
+    {
+        free_svalue(sp);
+        put_number(sp, 1);
+        nesting--;
+        return sp;
+    }
 
     /* Check if got a filename or the value string itself */
     buff = NULL;
@@ -8137,40 +8164,6 @@ static int nesting = 0;  /* Used to detect recursive calls */
         file = get_txt(sp->u.str);
     }
 
-
-    /* No use in restoring a destructed object, or an object
-     * with no variables.
-     */
-    ob = current_object;
-    if (ob->flags & O_DESTRUCTED)
-    {
-        free_svalue(sp);
-        put_number(sp, 0);
-        if (buff)
-        {
-            if (nesting > 1)
-                xfree(buff);
-            else
-                mb_free(mbFile);
-        }
-        nesting--;
-        return sp;
-    }
-
-    if (ob->prog->num_variables == 0)
-    {
-        free_svalue(sp);
-        put_number(sp, 1);
-        if (buff)
-        {
-            if (nesting > 1)
-                xfree(buff);
-            else
-                mb_free(mbFile);
-        }
-        nesting--;
-        return sp;
-    }
 
     /* If restoring from a file, set it up */
 
@@ -8272,10 +8265,7 @@ static int nesting = 0;  /* Used to detect recursive calls */
     {
         if (f)
             fclose(f);
-        if (nesting > 1)
-            xfree(buff);
-        else
-            mb_free(mbFile);
+        FREE_BUFF();
         nesting--;
         error("(restore) Out of memory (%lu bytes) for shared values.\n"
              , sizeof(svalue_t)*max_shared_restored);
@@ -8352,10 +8342,7 @@ static int nesting = 0;  /* Used to detect recursive calls */
                 while ( NULL != (dp=dp->next) );
 
             free_shared_restored_values();
-            if (nesting > 1)
-                xfree(buff);
-            else
-                mb_free(mbFile);
+            FREE_BUFF();
             nesting--;
             if (file)
                 error("Illegal format (version line) when restoring %s "
@@ -8433,10 +8420,7 @@ static int nesting = 0;  /* Used to detect recursive calls */
                 if (!dp)
                 {
                     free_shared_restored_values();
-                    if (nesting > 1)
-                        xfree(buff);
-                    else
-                        mb_free(mbFile);
+                    FREE_BUFF();
                     if (f)
                         fclose(f);
                     if (tmp)
@@ -8490,10 +8474,7 @@ static int nesting = 0;  /* Used to detect recursive calls */
                 while ( NULL != (dp=dp->next) );
             }
             free_shared_restored_values();
-            if (nesting > 1)
-                xfree(buff);
-            else
-                mb_free(mbFile);
+            FREE_BUFF();
             nesting--;
             if (file)
                 error("Illegal format (value string) when restoring %s "
@@ -8524,15 +8505,14 @@ static int nesting = 0;  /* Used to detect recursive calls */
     if (f)
         fclose(f);
     free_shared_restored_values();
-    if (nesting > 1)
-        xfree(buff);
-    else
-        mb_free(mbFile);
+    FREE_BUFF();
 
     free_svalue(sp);
     put_number(sp, 1);
     nesting--;
     return sp;
+
+#undef FREE_BUFF
 } /* f_restore_object() */
 
 /*-------------------------------------------------------------------------*/

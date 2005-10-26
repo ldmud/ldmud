@@ -450,6 +450,7 @@ execute (char *buf, long buflen, char *status, int *sockets)
     int quoted;
 
     quoted = 0;
+    status[0] = ERQ_E_FORKFAIL; /* Good default */
     status[1] = 0;
 
     if (buflen >= sizeof argbuf)

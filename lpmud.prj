@@ -60,12 +60,12 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 462)
-(Parent-Version lpmud 3-3 461)
-(Version-Log "Corrected a flaw in the argument checking of -=.")
+(Project-Version lpmud 3-3 463)
+(Parent-Version lpmud 3-3 462)
+(Version-Log "Corrected compilation errors in sysmalloc.c and ptmalloc/malloc.c")
 (New-Version-Log
 "")
-(Checkin-Time "Mon, 21 Jul 2003 15:40:58 -0600")
+(Checkin-Time "Wed, 23 Jul 2003 21:23:47 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -87,6 +87,7 @@
                   "^src/dftables$" "^src/pcre/chartables.c$"
                   "autoconf/autom4te.cache/" "gmon\\.out"
                   "src/util/xerq/erq" "src/util/erq/erq"
+                  "src/util/indent/indent"
                   "\\.DS_Store"
                   "\\..*\\.swp$" "src/driver" "src/ldmud" "\\.gdb_history" ))
 (Project-Keywords (ReleaseMajor 3)
@@ -102,8 +103,8 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.10 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.67 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.525 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.327 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.526 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.328 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -124,7 +125,7 @@
   (src/settings/compat (lpmud/c/10_compat 1.7 744))
   (src/settings/alatia (lpmud/j/27_alatia 1.5 744))
   (src/settings/aoh (lpmud/q/10_aoh 1.4 744))
-  (src/settings/avalon (lpmud/d/9_avalon 1.3.1.2.1.13 744))
+  (src/settings/avalon (lpmud/d/9_avalon 1.3.1.2.1.14 744))
   (src/settings/bat (lpmud/q/5_bat 1.5 644))
   (src/settings/beutelland (lpmud/n/34_beutelland 1.3 744))
   (src/settings/carledon (lpmud/c/24_carledon 1.3.1.4 744))
@@ -209,7 +210,7 @@
   (src/my-alloca.h (lpmud/f/29_my-alloca. 1.3.1.2 644))
   (src/my-rusage.h (lpmud/f/28_my-rusage. 1.7 644))
   (src/object.h (lpmud/44_object.h 1.34.1.19.1.4 644))
-  (src/object.c (lpmud/45_object.c 1.62.1.88.1.31 644))
+  (src/object.c (lpmud/45_object.c 1.62.1.88.1.32 644))
   (src/otable.h (lpmud/f/27_otable.h 1.8.1.4 644))
   (src/otable.c (lpmud/43_otable.c 1.22.1.6 644))
   (src/parser.c (lpmud/l/13_parser.c 1.1 644))
@@ -253,7 +254,7 @@
   (src/ptmalloc.c (lpmud/c/b/46_ptmalloc.c 1.4 644))
   (src/ptmalloc/thread-m.h (lpmud/c/b/47_thread-m.h 1.6 644) :no-keywords)
   (src/ptmalloc/malloc.h (lpmud/c/b/48_malloc.h 1.1 644) :no-keywords)
-  (src/ptmalloc/malloc.c (lpmud/c/b/49_malloc.c 1.3.1.5 644) :no-keywords)
+  (src/ptmalloc/malloc.c (lpmud/c/b/49_malloc.c 1.3.1.6 644) :no-keywords)
   (src/ptmalloc/hooks.c (lpmud/c/b/50_hooks.c 1.1 644) :no-keywords)
   (src/ptmalloc/config.h (lpmud/c/b/51_config.h 1.1 644))
   (src/ptmalloc/arena.c (lpmud/d/b/1_arena.c 1.2 644) :no-keywords)
@@ -287,7 +288,7 @@
   (src/structs.h (lpmud/d/b/5_structs.h 1.4 644))
   (src/structs.c (lpmud/d/b/6_structs.c 1.13 644))
   (src/sysmalloc.h (lpmud/c/b/33_sysmalloc. 1.2 644))
-  (src/sysmalloc.c (lpmud/c/b/34_sysmalloc. 1.4 644))
+  (src/sysmalloc.c (lpmud/c/b/34_sysmalloc. 1.5 644))
   (src/sprintf.h (lpmud/f/15_sprintf.h 1.3.1.4 644))
   (src/sprintf.c (lpmud/28_sprintf.c 1.31.1.55 644))
   (src/strfuns.h (lpmud/b/51_strfuns.h 1.11.1.6 644))
@@ -387,7 +388,7 @@
 
   (src/util/erq/Makefile.in (lpmud/c/11_Makefile.i 1.1.1.4 644))
   (src/util/erq/erq.h (lpmud/d/26_erq.h 1.1.1.4.1.2 644))
-  (src/util/erq/erq.c (lpmud/d/27_erq.c 1.1.1.8.1.6.1.4.1.2 644))
+  (src/util/erq/erq.c (lpmud/d/27_erq.c 1.1.1.8.1.6.1.4.1.3 644))
 
   (src/util/xerq/socket.c (lpmud/k/21_socket.c 1.9.1.4.1.4 644))
   (src/util/xerq/lpc/www/who.c (lpmud/k/22_who.c 1.2 644))
@@ -403,7 +404,7 @@
   (src/util/xerq/lpc/TODO (lpmud/k/31_TODO 1.1 644))
   (src/util/xerq/lpc/README (lpmud/k/32_README 1.2 644))
   (src/util/xerq/lookup.c (lpmud/k/33_lookup.c 1.4.1.1.1.2 644))
-  (src/util/xerq/execute.c (lpmud/k/34_execute.c 1.5.1.1.1.5 644))
+  (src/util/xerq/execute.c (lpmud/k/34_execute.c 1.5.1.1.1.6 644))
   (src/util/xerq/erq.h (lpmud/k/35_erq.h 1.3.1.2 644))
   (src/util/xerq/erq.c (lpmud/k/36_erq.c 1.8.1.12.1.4 644))
   (src/util/xerq/docs/socketd/socket_write (lpmud/k/38_socket_wri 1.1 644))

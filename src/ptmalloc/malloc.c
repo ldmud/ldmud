@@ -2384,6 +2384,9 @@ static struct malloc_par mp_;
 */
 
 #ifdef ENABLE_GC_SUPPORT
+
+#ifdef USE_PTHREADS
+
 static cond_t gc_lock_cond = COND_INITIALIZER;
 static cond_t gc_free_cond = COND_INITIALIZER;
 static mutex_t gc_lock_mutex = MUTEX_INITIALIZER;
@@ -2402,7 +2405,14 @@ static void unlock_gc() {
     if(gc_lock <= 0) cond_broadcast(&gc_free_cond);
     mutex_unlock(&gc_lock_mutex);
 }
-#endif
+
+#else
+
+#define lock_gc() (void)0
+#define unlock_gc() (void)0
+
+#endif /* USE_PTHREADS */
+#endif /* ENABLE_GC_SUPPORT */
 
 #if __STD_C
 static void malloc_init_state(mstate av)
@@ -5523,10 +5533,12 @@ void public_fREE_UNREFED_MEMORy()
 	return;
     }
 
+#ifdef USE_PTHREADS
     mutex_lock(&gc_lock_mutex);
     if(gc_lock > 0) cond_wait(&gc_free_cond, &gc_lock_mutex) ;
     gc_lock = -1;
     mutex_unlock(&gc_lock_mutex);
+#endif
 
     // TODO: public_funs must check for gc_lock
     do {
@@ -5561,10 +5573,12 @@ void public_fREE_UNREFED_MEMORy()
 
     mTRIm(0);
 
+#ifdef USE_PTHREADS
     mutex_lock(&gc_lock_mutex);
     gc_lock = 0;
     mutex_unlock(&gc_lock_mutex);
     cond_broadcast(&gc_lock_cond);
+#endif
 
     printf("GC: freed: %d\n    candi: %d\n    total: %d\n", i, k, j);
 }

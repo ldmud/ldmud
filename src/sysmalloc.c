@@ -42,10 +42,10 @@ mem_alloc (size_t size)
 
     rc = malloc(size);
 
-    if (heap_start == NULL || (char *)p < heap_start)
-        heap_start = p;
-    if (heap_end == NULL || (char *)p + size > heap_end)
-        heap_end = p + size;
+    if (heap_start == NULL || (char *)rc < heap_start)
+        heap_start = rc;
+    if (heap_end == NULL || (char *)rc + size > heap_end)
+        heap_end = rc + size;
 
     assert_stack_gap();
 
