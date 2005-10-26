@@ -67,7 +67,7 @@
  * The free large blocks are stored in an AVL tree for fast retrieval
  * of best fits. The AVL structures are stored in the user area of the blocks.
  *
-#ifdef SBRK_OK
+#ifdef SBRK_OK && MALLOC_SBRK
  * Memory is allocated from the system with sbrk() and brk(), which puts
  * the whole heap under our control.
  *
@@ -126,7 +126,11 @@
 /* Defines required by the xalloc.c wrapper */
 #define MEM_ALIGN (SIZEOF_CHAR_P)
 #ifdef SBRK_OK
-#  define REPLACE_MALLOC
+#  ifdef MALLOC_SBRK
+#      define REPLACE_MALLOC
+#  else
+#      undef SBRK_OK
+#  endif
 #endif
 
 /* #undef NO_MEM_BLOCK_SIZE */

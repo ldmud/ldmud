@@ -110,6 +110,9 @@ For a detailed list of all changes see the file CHANGELOG.
        + New commandline options '--share-variables' and
            '--init-variables' to defined the default for clone variable
            initialization.
+       + New configuration option '--enable-malloc-sbrk' to selectively allow
+           the memory allocator to use sbrk() instead of malloc() where
+           available (default is to allow sbrk()).
 
 
 07-Mar-2003 (Lars Duening) -- Release 3.2.10

@@ -22,6 +22,7 @@ with_input_escape="@"
 
 enable_erq=erq
 enable_use_mysql=1
+enable_malloc_sbrk=no
 
 enable_use_parse_command=0
 enable_compat_mode=no

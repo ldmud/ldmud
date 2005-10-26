@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+13-Mar-2002 (Lars Duening)  (3.3.420)
+  - (xalloc.c, smalloc.c, configure) New configuration option
+      '--enable-malloc-sbrk' to selectively allow the memory allocator to use
+      sbrk() instead of malloc() where available (default is to allow sbrk()).
+      The idea is to circumvent limitations some system put on sbrk().
+      (suggested by Tomba)
+
 12-Mar-2002 (Lars Duening)  (3.3.419)
   - (mapping.c, gcollect.c) The mapping GC forgot to mark the map-chain
        blocks as referenced (reported by Bardioc).

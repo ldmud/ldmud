@@ -368,6 +368,13 @@
  */
 #define MAX_MALLOCED         0x1000000
 
+/* Define this to let the memory allocator request memory from the system
+ * directly using sbrk() (assuming the system supports it).
+ * If not defined, the memory allocator will use malloc().
+ * Supported by: MALLOC_smalloc
+ */
+#define MALLOC_SBRK
+
 /* Define this to annotate all allocations with a magic word to find
  * simple misuses of memory (like multiple frees).
  * Supported by: MALLOC_smalloc

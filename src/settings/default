@@ -105,16 +105,6 @@ with_time_to_reset=1800 # seconds
 
 # --- Memory ---
 
-# Which memory manager to use. Possible defines are
-#   default:   Depending on the setting and support pthreads, either
-#              smalloc or ptmalloc is selected.
-#   smalloc:   Satoria's malloc. Fastest, uses the least memory,
-#              supports garbage collection, not threadsafe.
-#   ptmalloc:  ptmalloc from www.malloc.de, supports GC, threadsafe.
-#   sysmalloc: the normal system malloc()
-
-with_malloc=default
-
 # These three options determine how much memory is held in reserve.
 # There must be enough memory to allow the garbage collector to swap
 # in all objects one at a time.
@@ -200,6 +190,49 @@ with_erq_max_send=1024
 
 with_optimize=med
 
+# If TRACE_CODE is enable, the driver keeps a log of TOTAL_TRACE_LENGTH
+# most recently execute bytecode instructions.
+
+enable_trace_code=yes
+with_total_trace_length=4096
+
+# Enable these for runtime statistics:
+#    COMM_STAT: number and size of outgoing packets
+#    APPLY_CACHE_STAT: number of hits and misses in the apply cache
+
+enable_comm_stat=yes
+enable_apply_cache_stat=yes
+
+# The name of the swapfile used by the driver to swap out objects (if
+# enabled), relative to the mudlib directory. The driver will append
+# '.<hostname>' to the file.
+
+with_swap_file=LP_SWAP.3
+
+# Enable support for IPv6 (assuming your system supports it).
+
+enable_use_ipv6=no
+
+
+# --- Memory ---
+
+# Which memory manager to use. Possible defines are
+#   default:   Depending on the setting and support pthreads, either
+#              smalloc or ptmalloc is selected.
+#   smalloc:   Satoria's malloc. Fastest, uses the least memory,
+#              supports garbage collection, not threadsafe.
+#   ptmalloc:  ptmalloc from www.malloc.de, supports GC, threadsafe.
+#   sysmalloc: the normal system malloc()
+
+with_malloc=default
+
+# Define this to let the memory allocator request memory from the system
+# directly using sbrk() (assuming the system supports it).
+# If not defined, the memory allocator will use malloc().
+# Supported by: MALLOC_smalloc
+
+enable_malloc_sbrk=yes
+
 # Define this to annotate all allocations with a magic word to find
 # simple misuses of memory (like multiple frees).
 # Supported by: MALLOC_smalloc
@@ -224,30 +257,6 @@ enable_malloc_lpc_trace=no
 # instead of re-using the memory already allocated.
 # Supported by: MALLOC_smalloc
 enable_malloc_sbrk_trace=no
-
-# If TRACE_CODE is enable, the driver keeps a log of TOTAL_TRACE_LENGTH
-# most recently execute bytecode instructions.
-
-enable_trace_code=yes
-with_total_trace_length=4096
-
-# Enable these for runtime statistics:
-#    COMM_STAT: number and size of outgoing packets
-#    APPLY_CACHE_STAT: number of hits and misses in the apply cache
-
-enable_comm_stat=yes
-enable_apply_cache_stat=yes
-
-# The name of the swapfile used by the driver to swap out objects (if
-# enabled), relative to the mudlib directory. The driver will append
-# '.<hostname>' to the file.
-
-with_swap_file=LP_SWAP.3
-
-# Enable support for IPv6 (assuming your system supports it).
-
-enable_use_ipv6=no
-
 
 # --- Wizlist ---
 

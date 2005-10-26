@@ -73,15 +73,6 @@
 
 /* --- Memory --- */
 
-/* Which memory manager to use. Possible defines are
- *   MALLOC_smalloc:   Satoria's malloc. Fastest, uses the least memory,
- *                     supports garbage collection.
- *   MALLOC_sysmalloc: the normal system malloc()
- *   MALLOC_ptmalloc:  ptmalloc from www.malloc.de - threadsafe.
- */
-
-#define MALLOC_@val_malloc@
-
 /* Reserve an extra memory area from malloc(), to free when we run out
  * of memory to get some warning and start Armageddon.
  * If this value is 0, no area will be reserved.
@@ -191,32 +182,6 @@
  */
 #define MASTER_NAME              @val_master_name@
 
-/* Define this to annotate all allocations with a magic word to find
- * simple misuses of memory (like multiple frees).
- * Supported by: MALLOC_smalloc
- */
-@cdef_malloc_check@ MALLOC_CHECK
-
-/* Define this to annotate all allocations with file:line of the driver
- * source responsible for it.
- * Supported by: MALLOC_smalloc
- */
-@cdef_malloc_trace@ MALLOC_TRACE
-
-/* Define this to annotate all allocations with file:line of the lpc program
- * responsible for it.
- * Supported by: MALLOC_smalloc
- */
-@cdef_malloc_lpc_trace@ MALLOC_LPC_TRACE
-
-/* Define this to log all calls to esbrk() (the system memory allocator).
- * Works best if MALLOC_TRACE, or also MALLOC_LPC_TRACE, are defined.
- * This define is useful if your mud keeps growing in total memory size
- * instead of re-using the memory already allocated.
- * Supported by: MALLOC_smalloc
- */
-@cdef_malloc_sbrk_trace@ MALLOC_SBRK_TRACE
-
 /* Trace the most recently executed bytecode instructions?
  */
 @cdef_trace_code@ TRACE_CODE
@@ -238,6 +203,44 @@
  */
 #define SWAP_FILE                 @val_swap_file@
 
+
+/* --- Memory --- */
+
+/* Which memory manager to use. Possible defines are
+ *   MALLOC_smalloc:   Satoria's malloc. Fastest, uses the least memory,
+ *                     supports garbage collection.
+ *   MALLOC_sysmalloc: the normal system malloc()
+ *   MALLOC_ptmalloc:  ptmalloc from www.malloc.de - threadsafe.
+ */
+
+#define MALLOC_@val_malloc@
+
+/* Define this to let the memory allocator request memory from the system
+ * directly using sbrk() (assuming the system supports it).
+ * If not defined, the memory allocator will use malloc().
+ * Supported by: MALLOC_smalloc
+ */
+@cdef_malloc_check@ MALLOC_SBRK
+
+/* Define this to annotate all allocations with file:line of the driver
+ * source responsible for it.
+ * Supported by: MALLOC_smalloc
+ */
+@cdef_malloc_trace@ MALLOC_TRACE
+
+/* Define this to annotate all allocations with file:line of the lpc program
+ * responsible for it.
+ * Supported by: MALLOC_smalloc
+ */
+@cdef_malloc_lpc_trace@ MALLOC_LPC_TRACE
+
+/* Define this to log all calls to esbrk() (the system memory allocator).
+ * Works best if MALLOC_TRACE, or also MALLOC_LPC_TRACE, are defined.
+ * This define is useful if your mud keeps growing in total memory size
+ * instead of re-using the memory already allocated.
+ * Supported by: MALLOC_smalloc
+ */
+@cdef_malloc_sbrk_trace@ MALLOC_SBRK_TRACE
 
 /* --- Wizlist --- */
 
