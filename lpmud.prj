@@ -58,12 +58,12 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 454)
-(Parent-Version lpmud 3-3 453)
-(Version-Log "The error handling takes more care not to produce dangling pointers.")
+(Project-Version lpmud 3-3 455)
+(Parent-Version lpmud 3-3 454)
+(Version-Log "Removed a memory leak in efun printf().")
 (New-Version-Log
 "")
-(Checkin-Time "Wed, 07 May 2003 15:02:16 -0600")
+(Checkin-Time "Wed, 21 May 2003 23:36:23 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -100,7 +100,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.10 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.65 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.517 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.518 644))
   (HISTORY (lpmud/f/49_HISTORY 1.322 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.19 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -135,7 +135,7 @@
   (src/settings/heaven7 (lpmud/k/22_heaven7 1.5 644))
   (src/settings/hyperborea (lpmud/h/20_hyperborea 1.3 744))
   (src/settings/morgengrauen (lpmud/k/37_morgengrau 1.7 744))
-  ;(src/settings/lethynna (lpmud/d/b/21_lethynna 1.1 744))
+  (src/settings/lethynna (lpmud/d/b/0_lethynna 1.1 744))
   (src/settings/lpmud.net (lpmud/e/b/7_lpmud.net 1.1 744))
   (src/settings/osb (lpmud/c/8_osb 1.19 744))
   (src/settings/pkmud (lpmud/c/25_pkmud 1.5.1.5 744))
@@ -254,7 +254,7 @@
   (src/ptmalloc/malloc.c (lpmud/c/b/49_malloc.c 1.3.1.4 644) :no-keywords)
   (src/ptmalloc/hooks.c (lpmud/c/b/50_hooks.c 1.1 644) :no-keywords)
   (src/ptmalloc/config.h (lpmud/c/b/51_config.h 1.1 644))
-  ;(src/ptmalloc/arena.c (lpmud/d/b/0_arena.c 1.1.1.2 644) :no-keywords)
+  (src/ptmalloc/arena.c (lpmud/d/b/1_arena.c 1.1 644) :no-keywords)
   (src/pkg-alists.c (lpmud/l/38_pkg-alists 1.8 644))
   (src/pkg-alists.h (lpmud/l/39_pkg-alists 1.3 644))
   (src/pkg-mccp.h (lpmud/d/b/48_pkg-mccp.h 1.1 644))
@@ -287,7 +287,7 @@
   (src/sysmalloc.h (lpmud/c/b/33_sysmalloc. 1.2 644))
   (src/sysmalloc.c (lpmud/c/b/34_sysmalloc. 1.3 644))
   (src/sprintf.h (lpmud/f/15_sprintf.h 1.3.1.4 644))
-  (src/sprintf.c (lpmud/28_sprintf.c 1.31.1.54 644))
+  (src/sprintf.c (lpmud/28_sprintf.c 1.31.1.55 644))
   (src/strfuns.h (lpmud/b/51_strfuns.h 1.11.1.6 644))
   (src/strfuns.c (lpmud/c/0_strfuns.c 1.9.1.15 644))
   (src/svalue.h (lpmud/f/39_datatypes. 1.34.1.23.1.5 644))
@@ -299,7 +299,7 @@
   (src/wiz_list.c (lpmud/2_wiz_list.c 1.13.1.14.1.4 644))
   (src/xalloc.h (lpmud/g/51_xalloc.h 1.20 644))
   (src/xalloc.c (lpmud/h/0_xalloc.c 1.2.1.31 644))
-  ;(src/xptmalloc.c (lpmud/d/b/1_xptmalloc. 1.6 644))
+  (src/xptmalloc.c (lpmud/d/b/10_xptmalloc. 1.1 644))
 
   ;; Build files
   (src/func_spec (lpmud/c/31_func_spec 1.53.1.45.1.22.1.16 644))
@@ -421,8 +421,8 @@
   (etc/README (lpmud/s/41_README 1.11 644))
   (etc/icon-32x32.xpm (lpmud/s/42_icon-32x32 1.1 644) :no-keywords)
   (etc/icon-16x16.xpm (lpmud/s/43_icon-16x16 1.1 644) :no-keywords)
-  ;(etc/ldmud-16x16.ico (lpmud/d/b/19_ldmud-16x1 1.1 644) :no-keywords)
-  ;(etc/ldmud-32x32.ico (lpmud/d/b/20_ldmud-32x3 1.1 644) :no-keywords)
+  (etc/ldmud-32x32.ico (lpmud/d/b/11_ldmud-32x3 1.1 644) :no-keywords)
+  (etc/ldmud-16x16.ico (lpmud/d/b/12_ldmud-16x1 1.1 644) :no-keywords)
   (etc/pb-ldmud.jpg (lpmud/n/11_pb-ldmud.j 1.1 644) :no-keywords)
   (etc/pb-ldmud329.png (lpmud/v/28_pb-ldmud32 1.1 644) :no-keywords)
   (etc/PoweredByLDMud.gif (lpmud/c/b/24_PoweredByL 1.1 644) :no-keywords)
@@ -432,7 +432,7 @@
   (etc/start_mud (lpmud/m/45_start_mud 1.1 644))
   (etc/mudloop (lpmud/m/46_mudloop 1.1 644))
   (etc/patch-o-matic (lpmud/c/b/8_patch-o-ma 1.2 644))
-  ;(etc/lpc.xml (lpmud/d/b/16_lpc.xml 1.1 644) :no-keywords)
+  (etc/lpc.xml (lpmud/d/b/13_lpc.xml 1.1 644) :no-keywords)
 
   ;; Driver-related include files for the mudlib
   (mudlib/sys/commands.h (lpmud/d/15_commands.h 1.3.1.3 644))
@@ -544,9 +544,9 @@
   (src/bugs/b-020916-files/registry.c (lpmud/b/b/37_registry.c 1.1 644) :no-keywords)
   (src/bugs/b-020916-files/registry.o (lpmud/b/b/38_registry.o 1.1 644) :no-keywords)
   (src/bugs/b-020916-files/debugger.h (lpmud/b/b/39_debugger.h 1.1 644) :no-keywords)
-  ;(src/bugs/b-030119 (lpmud/d/b/13_b-030119 1.1 644) :no-keywords)
+  (src/bugs/b-030119 (lpmud/d/b/14_b-030119 1.1 644) :no-keywords)
 
-  (src/bugs/f-summary (lpmud/c/37_f-summary 1.39.1.89 644) :no-keywords)
+  (src/bugs/f-summary (lpmud/c/37_f-summary 1.39.1.90 644) :no-keywords)
   (src/bugs/f-981027-0 (lpmud/g/29_f-981027-0 1.2 644) :no-keywords)
   (src/bugs/f-981027-1 (lpmud/g/28_f-981027-1 1.2 644) :no-keywords)
   (src/bugs/f-981027-2 (lpmud/g/27_f-981027-2 1.2 644) :no-keywords)
@@ -765,7 +765,7 @@
   (src/bugs/f-020916 (lpmud/a/b/27_f-020916 1.1 644) :no-keywords)
   (src/bugs/f-020918 (lpmud/b/b/25_f-020918 1.1 644) :no-keywords)
   (src/bugs/f-020921 (lpmud/b/b/29_f-020921 1.1 644) :no-keywords)
-  ;(src/bugs/f-030515 (lpmud/d/b/12_f-030515 1.1 644) :no-keywords)
+  (src/bugs/f-030515 (lpmud/d/b/15_f-030515 1.1 644) :no-keywords)
 
   (src/bugs/p-981027-1 (lpmud/g/25_p-981027-1 1.2 644) :no-keywords)
   (src/bugs/doomdark/strutil.c (lpmud/g/31_strutil.c 1.2 644) :no-keywords)
@@ -785,6 +785,7 @@
   (src/bugs/p-020810 (lpmud/a/b/3_p-020810 1.2 644) :no-keywords)
   (src/bugs/p-020912 (lpmud/a/b/21_p-020912 1.3 644) :no-keywords)
   (src/bugs/p-021021 (lpmud/b/b/49_p-021021 1.1 644) :no-keywords)
+  (src/bugs/p-030520 (lpmud/d/b/16_p-030520 1.1 644) :no-keywords)
 
   ; Solved bugs and requests.
   (src/done/README (lpmud/h/22_README 1.1 644) :no-keywords)
@@ -871,8 +872,8 @@
   (src/done/p-010928-0 (lpmud/n/46_p-010928-0 1.2 644) :no-keywords)
   (src/done/p-011012 (lpmud/n/50_p-011012 1.5 644) :no-keywords)
   (src/done/p-020810-1 (lpmud/a/b/4_p-020810-1 1.2 644) :no-keywords)
-  ;(src/done/ff-3.3.325-diffs (lpmud/d/b/15_ff-3.3.325 1.1 644))
-  (src/done/3.3.443-mccp.patch (lpmud/d/b/50_3.3.443-mc 1.1 644))
+  (src/done/ff-3.3.325-diffs (lpmud/d/b/17_ff-3.3.325 1.1 644) :no-keywords)
+  (src/done/3.3.443-mccp.patch (lpmud/d/b/50_3.3.443-mc 1.1 644) :no-keywords)
 
   ;; GCC patches
   (src/gcc/README (lpmud/e/19_README 1.1 644))
@@ -1414,7 +1415,7 @@
   (doc/obsolete/filter_array (lpmud/b/b/9_filter_arr 1.2 644))
   (doc/obsolete/filter_mapping (lpmud/b/b/10_filter_map 1.1 644))
   (doc/obsolete/get_root_uid (lpmud/b/b/11_get_root_u 1.1 644))
-  ;(doc/obsolete/initialisation (lpmud/d/b/18_initialisa 1.1 644))
+  (doc/obsolete/initialisation (lpmud/d/b/18_initialisa 1.1 644))
   (doc/obsolete/m_sizeof (lpmud/b/b/12_m_sizeof 1.1 644))
   (doc/obsolete/map_array (lpmud/b/b/13_map_array 1.2 644))
   (doc/obsolete/map_mapping (lpmud/b/b/14_map_mappin 1.1 644))
@@ -1430,8 +1431,8 @@
   (doc/obsolete/set_auto_include_string (lpmud/b/b/24_set_auto_i 1.1 644))
 
   (doc/other/mxp.htm (lpmud/c/b/29_mxp.htm 1.1 644) :no-keywords)
-  ;(doc/other/msp.htm (lpmud/d/b/10_msp.htm 1.1 644) :no-keywords)
-  ;(doc/other/mcp.htm (lpmud/d/b/11_mcp.htm 1.1 644) :no-keywords)
+  (doc/other/msp.htm (lpmud/d/b/19_msp.htm 1.1 644) :no-keywords)
+  (doc/other/mcp.htm (lpmud/d/b/20_mcp.htm 1.1 644) :no-keywords)
   (doc/other/mcp2.html (lpmud/c/b/30_mcp2.html 1.1 644) :no-keywords)
   (doc/other/flows.gif (lpmud/c/b/32_flows.gif 1.1 644) :no-keywords)
   (doc/other/mccp.htm (lpmud/c/b/31_mccp.htm 1.1 644) :no-keywords)

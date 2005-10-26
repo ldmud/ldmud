@@ -1,0 +1,959 @@
+diff -Bw -du -U 2 --show-c-function orig/Makefile.in patched/Makefile.in
+--- orig/Makefile.in	Tue Jul  4 07:43:45 2000
++++ patched/Makefile.in	Mon Sep  4 09:32:13 2000
+@@ -62,6 +62,7 @@ OPTIMIZE = @OCFLAGS@ # high optimization
+ #   -DDEBUG_TELNET: Activates debug prints in the telnet machine
+ #DEBUG = -DDEBUG -DTRACE_CODE
+-DEBUG = -DDEBUG -DTRACE_CODE -DCHECK_STRINGS # -DKEEP_STRINGS -DDEBUG_TELNET
+-#DEBUG=
++#DEBUG = -DDEBUG -DTRACE_CODE -DCHECK_STRINGS # -DKEEP_STRINGS -DDEBUG_TELNET
++#DEBUG=-DUSE_SSL
++DEBUG=
+ #
+ MPATH=-DMUD_LIB='"$(MUD_LIB)"' -DBINDIR='"$(BINDIR)"' -DERQ_DIR='"$(ERQ_DIR)"'
+@@ -69,7 +70,9 @@ MPATH=-DMUD_LIB='"$(MUD_LIB)"' -DBINDIR=
+ CFLAGS= @EXTRA_CFLAGS@ $(OPTIMIZE) $(DEBUG) $(WARN) $(MPATH) $(PROFIL)
+ #
++#LIBS=-lssl -lcrypto @LIBS@
+ LIBS=@LIBS@
+ #
+-LDFLAGS=@LDFLAGS@
++#LDFLAGS=@LDFLAGS@
++LDFLAGS=-s @LDFLAGS@
+ #
+ #Note that, if you use smalloc with SBRK_OK(which is the default), and
+@@ -87,5 +90,5 @@ OBJ = access_check.o actions.o array.o b
+       dumpstat.o ed.o efuns.o gcollect.o hash.o heartbeat.o interpret.o \
+       lang.o lex.o main.o mapping.o mempools.o object.o otable.o parse.o \
+-      parse_old.o port.o ptrtable.o \
++      decode.o parse_old.o port.o ptrtable.o \
+       random.o regexp.o rxcache.o simulate.o simul_efun.o stdstrings.o \
+       stralloc.o strfuns.o sprintf.o swap.o wiz_list.o xalloc.o @ALLOCA@
+@@ -123,4 +126,12 @@ distclean: clean
+ 	$(RM) util/Makefile util/erq/Makefile util/xerq/Makefile
+ 
++# depend: is missing here
++
++# instead of recompiling everything just touch everything
++# useful when you have made minimal changes in an important
++# file and you are sure you don't need to recompile all dependencies
++fake:
++	make -t
++
+ tags: $(SRC)
+ 	ctags $(SRC)
+@@ -281,5 +292,5 @@ lex.o : efun_defs.c hosts/amiga/socket.h
+     ./hosts/amiga/socket_sim_protos.h hosts/unix.h hosts/be/be.h \
+     hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
+-    ./hosts/amiga/ixfile.h
++    ./hosts/amiga/ixfile.h decode.h
+ 
+ main.o : xalloc.h wiz_list.h swap.h svalue.h stralloc.h stdstrings.h \
+@@ -376,5 +387,5 @@ simulate.o : ../mudlib/sys/rtlimits.h ..
+     driver.h smalloc.h ptrtable.h regexp.h port.h config.h hosts/unix.h \
+     hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
+-    ./hosts/amiga/ixfile.h
++    ./hosts/amiga/ixfile.h decode.h
+ 
+ sprintf.o : xalloc.h swap.h stralloc.h stdstrings.h simul_efun.h simulate.h \
+@@ -487,4 +498,6 @@ wiz_list.o : stdstrings.h instrs.h
+ 
+ xalloc.o : instrs.h
++
++decode.o : ssl.c decode.c decode.h
+ 
+ # --- DO NOT MODIFY THIS LINE -- SELECTED AUTO-DEPENDS PRECEDE ---
+diff -Bw -du -U 2 --show-c-function orig/backend.c patched/backend.c
+--- orig/backend.c	Sat Aug 12 07:26:13 2000
++++ patched/backend.c	Mon Sep  4 09:32:13 2000
+@@ -311,9 +311,4 @@ backend (void)
+      */
+ 
+-    printf("%s Setting up ipc.\n", time_stamp());
+-    fflush(stdout);
+-
+-    prepare_ipc();
+-
+     (void)signal(SIGHUP,  handle_hup);
+     (void)signal(SIGUSR1, handle_usr1);
+@@ -407,6 +402,8 @@ backend (void)
+                 if (time_now - time_last_gc >= 300)
+                 {
++#ifdef DEBUG
+                   sprintf(buf, "%s Garbage collection, slow_shut: %d\n", time_stamp(), slow_shut_down_to_do);
+                   write(1, buf, strlen(buf));
++#endif
+                   command_giver = NULL;
+                   current_object = NULL;
+@@ -415,6 +412,8 @@ backend (void)
+                 else
+                 {
++#ifdef DEBUG
+                   sprintf(buf, "%s No garbage collection, slow_shut: %d\n", time_stamp(), slow_shut_down_to_do);
+                   write(1, buf, strlen(buf));
++#endif
+                   reallocate_reserved_areas();
+                 }
+@@ -429,6 +428,8 @@ backend (void)
+                     slow_shut_down_to_do = 0;
+                     malloc_privilege = MALLOC_MASTER;
++#ifdef DEBUG
+                     sprintf(shut_msg, "%s slow_shut_down(%d)\n", time_stamp(), minutes);
+                     write(1, shut_msg, strlen(shut_msg));
++#endif
+                     push_number(minutes);
+                     apply_master_ob(STR_SLOW_SHUT, 1);
+@@ -538,4 +539,6 @@ backend (void)
+         if (time_to_call_heart_beat)
+         {
++	    extern void check_for_out_connections();
++
+             object_t *hide_current = current_object;
+               /* TODO: Is there any point to this? */
+@@ -545,4 +548,7 @@ backend (void)
+             current_object = NULL;
+ 
++	    /* see if any outgoing net_connects have completed  -lynx */
++	    check_for_out_connections();
++
+             /* Start the next alarm */
+             comm_time_to_call_heart_beat = MY_FALSE;
+@@ -991,4 +997,11 @@ preload_objects (int eflag)
+     free_array(prefiles);
+     toplevel_context.rt.type = ERROR_RECOVERY_NONE;
++
++    /* I have not found a way to tell the master object the preloading
++     * is done and we are ready to hit the streets, so here I introduce
++     * one. I find it very useful, if you agree, please make "preload_done"
++     * a STR_PRELOAD_DONE etc.				-lynx
++     */
++    (void)apply_master_ob("preload_done", 0);
+ }
+ 
+diff -Bw -du -U 2 --show-c-function orig/comm.c patched/comm.c
+--- orig/comm.c	Mon Aug 21 04:37:56 2000
++++ patched/comm.c	Mon Sep  4 09:33:23 2000
+@@ -320,4 +320,9 @@ static struct in_addr host_ip_number;
+   /* This computer's numeric IP address only, used for
+    * the query_host_name() efun. */
++#ifndef USE_IPV6
++# define MY_IP inet_ntoa(host_ip_number)
++#else
++# define MY_IP inet6_ntoa(host_ip_number)
++#endif
+ 
+ static struct sockaddr_in host_ip_addr;
+@@ -336,4 +341,7 @@ static int min_nfds = 0;
+    */
+ 
++static int ip_bound = 0;
++  /* Have we been explicitely bound to an IP, or should we bind INADDR_ANY? */
++
+ /* --- Telnet handling --- */
+ 
+@@ -424,4 +432,14 @@ static char destruct_add_message_format[
+ #define FLAG_PROTO_ERQ  0x2
+ 
++/*-------------------------------------------------------------------------*/
++
++/* for non-blocking net_connect, Junky, Sept 4 93 */
++#define MAX_OUTCONN 5
++struct OutConn {
++	struct sockaddr_in target;
++	object_t *curr_obj;
++	int socket;
++	int active;
++} outconn[MAX_OUTCONN];
+ 
+ /*-------------------------------------------------------------------------*/
+@@ -436,5 +454,5 @@ static void send_do(int);
+ static void send_dont(int);
+ static void remove_flush_entry(interactive_t *ip);
+-static void new_player(SOCKET_T new_socket, struct sockaddr_in *addr, size_t len, int login_port);
++static void new_player(object_t *receiver, SOCKET_T new_socket, struct sockaddr_in *addr, size_t len, int login_port);
+ 
+ #ifdef ERQ_DEMON
+@@ -584,5 +602,5 @@ set_socket_own (SOCKET_T new_socket)
+ /*-------------------------------------------------------------------------*/
+ void
+-initialize_host_ip_number (void)
++initialize_host_ip_number (const char *bind_name)
+ 
+ /* Initialise the globals host_ip_number and host_ip_address.
+@@ -598,11 +616,15 @@ initialize_host_ip_number (void)
+     length_t tmp;
+ 
++    if (bind_name) ip_bound = 1;
++    else {
+     if (gethostname(host_name, sizeof host_name) == -1) {
+         perror("gethostname");
+         exit(1);
+     }
+-    hp = gethostbyname(host_name);
++	bind_name = host_name;
++    }
++    hp = gethostbyname(bind_name);
+     if (!hp) {
+-        fprintf(stderr, "%s gethostbyname: unknown host '%s'.\n", time_stamp(), host_name);
++        fprintf(stderr, "%s gethostbyname: unknown host '%s'.\n", time_stamp(), bind_name);
+         exit(1);
+     }
+@@ -613,7 +635,5 @@ initialize_host_ip_number (void)
+ 
+     /* Initialize domain_name for the lexer */
+-    p = strchr(hp->h_name, '.');
+-    if (p)
+-    {
++    if (strcmp(hp->h_name, MY_IP) && (p = strchr(hp->h_name, '.'))) {
+         p++;
+         domain_name = strdup(p);
+@@ -622,4 +642,6 @@ initialize_host_ip_number (void)
+         domain_name = strdup("unknown");
+ 
++    if (ip_bound) fprintf(stderr, "%s Bound to %s.%s (%s)\n",
++	    time_stamp(), bind_name, domain_name, MY_IP);
+ #ifdef CATCH_UDP_PORT
+     /* Initialize upd at an early stage so that the master object can use
+@@ -628,10 +650,9 @@ initialize_host_ip_number (void)
+     if (udp_port != -1)
+     {
+-        memset(&host_ip_addr.sin_addr, 0, sizeof(host_ip_addr.sin_addr));
+ #ifndef USE_IPV6
+-        host_ip_addr.sin_addr.s_addr = INADDR_ANY;
++	if (!ip_bound) host_ip_addr.sin_addr.s_addr = INADDR_ANY;
+         host_ip_addr.sin_family = AF_INET;
+ #else
+-        host_ip_addr.sin_addr = in6addr_any;
++	if (!ip_bound) host_ip_addr.sin_addr = in6addr_any;
+         host_ip_addr.sin_family = AF_INET6;
+ #endif
+@@ -752,4 +773,11 @@ prepare_ipc(void)
+     int i;
+ 
++#ifdef DEBUG
++    printf("%s Setting up ipc.\n", time_stamp());
++#endif
++
++    /* non blocking net_connect -Junky */
++    for (i=0; i<MAX_OUTCONN; i++) outconn[i].active=0;
++
+     /* Initialize the telnet machine unless mudlib_telopts() already
+      * did that.
+@@ -767,10 +795,9 @@ prepare_ipc(void)
+             /* Real port number */
+ 
+-            memset(&host_ip_addr.sin_addr, 0, sizeof(host_ip_addr.sin_addr));
+ #ifndef USE_IPV6
+-            host_ip_addr.sin_addr.s_addr = INADDR_ANY;
++	    if (!ip_bound) host_ip_addr.sin_addr.s_addr = INADDR_ANY;
+             host_ip_addr.sin_family = AF_INET;
+ #else
+-            host_ip_addr.sin_addr = in6addr_any;
++	    if (!ip_bound) host_ip_addr.sin_addr = in6addr_any;
+             host_ip_addr.sin_family = AF_INET6;
+ #endif
+@@ -789,5 +816,5 @@ prepare_ipc(void)
+             if (bind(sos[i], (struct sockaddr *)&host_ip_addr, sizeof host_ip_addr) == -1) {
+                 if (errno == EADDRINUSE) {
+-                    fprintf(stderr, "%s Socket already bound!\n", time_stamp());
++                    fprintf(stderr, "%s Port %d on %s not available!\n", time_stamp(), port_numbers[i], get_host_ip_number());
+                     debug_message("%s Socket already bound!\n", time_stamp());
+                     exit(errno);
+@@ -846,5 +873,7 @@ ipc_remove (void)
+     int i;
+ 
++#ifdef DEBUG
+     printf("%s Shutting down ipc...\n", time_stamp());
++#endif
+     for (i = 0; i < numports; i++)
+         socket_close(sos[i]);
+@@ -878,6 +907,7 @@ add_message (char *fmt, ...)
+  * as <fmt> string to this function.
+  *
+- * Messages which can't be send (e.g. because the command_giver was
+- * destructed or disconnected) are printed on stdout, preceeded by ']'.
++ * Messages which can't be sent (e.g. because the command_giver was
++ * destructed or disconnected) are printed on stdout, preceeded by ']',
++ * unless undefined.
+  *
+  * If an error other than EINTR occured while sending the data to
+@@ -927,4 +957,5 @@ add_message (char *fmt, ...)
+        )
+     {
++#ifdef DEBUG
+         putchar(']');
+         if ( fmt != message_flush ) {
+@@ -932,4 +963,5 @@ add_message (char *fmt, ...)
+         }
+         fflush(stdout);
++#endif
+         va_end(va);
+         return;
+@@ -974,5 +1006,5 @@ add_message (char *fmt, ...)
+             va_end(va);
+             if (buff[(sizeof buff) - 1])
+-                fatal("To long message!\n");
++                fatal("Message too long!\n");
+             source = buff+1;
+         }
+@@ -1720,5 +1752,5 @@ get_message (char *buff)
+                                               , &length);
+                     if ((int)new_socket != -1)
+-                        new_player(new_socket, &addr, (size_t)length
++                        new_player(NULL, new_socket, &addr, (size_t)length
+                                   , port_numbers[i]);
+                     else if ((int)new_socket == -1
+@@ -2306,5 +2338,6 @@ users (void)
+ /*-------------------------------------------------------------------------*/
+ static void
+-new_player (SOCKET_T new_socket, struct sockaddr_in *addr, size_t addrlen
++new_player (object_t *ob, SOCKET_T new_socket,
++	    struct sockaddr_in *addr, size_t addrlen
+ #if !defined(ACCESS_CONTROL)
+            , int login_port UNUSED
+@@ -2339,5 +2372,4 @@ new_player (SOCKET_T new_socket, struct 
+     int   i;             /* Index of free slot in all_players[] */
+     char *message;       /* Failure message */
+-    object_t *ob;        /* Login object */
+     svalue_t *ret;       /* LPC call results */
+     interactive_t *new_interactive;
+@@ -2478,4 +2510,8 @@ new_player (SOCKET_T new_socket, struct 
+     ref_object(master_ob, "new_player");
+ 
++    if (ob) {
++        /* net_connect already has its object to connect to */
++        if (O_IS_INTERACTIVE(ob)) remove_interactive(ob);
++    } else {
+     /* Call master->connect() and evaluate the result.
+      */
+@@ -2490,4 +2526,5 @@ new_player (SOCKET_T new_socket, struct 
+         return;
+     }
++    }
+     command_giver = master_ob;
+     add_message(message_flush);
+@@ -4338,6 +4375,10 @@ add_ip_entry (long addr, char *name)
+     ix = -1;
+     new_entry = MY_FALSE;
+-    for (i = 0; i < IPSIZE; i++)
++    /* starting from the current point is definitely more efficient! */
++    for (i=ipcur-1; i != ipcur && iptable[i].addr; i--)
+     {
++	if (i < 0)
++	    i += IPSIZE;
++
+         if (iptable[i].addr == addr)
+         {
+@@ -4660,9 +4701,5 @@ get_host_ip_number (void)
+     char buf[20];
+ 
+-#ifndef USE_IPV6
+-    sprintf(buf, "\"%s\"", inet_ntoa(host_ip_number));
+-#else
+-    sprintf(buf, "\"%s\"", inet6_ntoa(host_ip_number));
+-#endif
++    sprintf(buf, "\"%s\"", MY_IP);
+     return string_copy(buf);
+ }
+@@ -5654,4 +5691,114 @@ query_ip_port (svalue_t *sp)
+     put_number(sp, ntohs(addr.sin_port));
+     return sp;
++}
++
++/*-------------------------------------------------------------------------*/
++int net_connect(targetname, targetport) char* targetname; int targetport;
++/*
++ * NEMESIS net_connect extension by snake and lynx 1992,
++ * greatly improved by junky 1993
++ *
++ * this provides for non-blocking TCP connects to remote hosts
++ * elegantly treated in the same way is incoming TCP connections
++ */
++{
++	int d, n, ret;
++	struct hostent *h;
++	struct sockaddr_in target;
++	object_t *user;
++
++	target.sin_port = htons(targetport);
++        /* TODO: Uh-oh, blocking DNS in the execution thread */
++	h = gethostbyname(targetname);
++	target.sin_addr.s_addr = h ? ** (int **) (h -> h_addr_list)
++		: inet_addr(targetname);
++	if (!target.sin_addr.s_addr) return -1;
++	target.sin_family = h ? h -> h_addrtype : AF_INET;
++	d = socket (target.sin_family, SOCK_STREAM, 0);
++	if (d == -1) {
++		perror ("socket");
++		return errno;
++	}
++	/* non-blocking net connect, Junky, Sept 4 93 */
++	fcntl(d, F_SETFL, O_NDELAY);
++	n=1;
++	ioctl(d, FIONBIO, &n);
++	ret = connect(d, (struct sockaddr *) &target, sizeof(target));
++	if (ret == -1) {
++		switch(errno) {
++		case EINPROGRESS: /* no immediate connection - store state */
++			n=0;
++			while (n<MAX_OUTCONN) {
++				if (!outconn[n].active) {
++					outconn[n].socket=d;
++					outconn[n].target=target;
++					outconn[n].curr_obj=current_object;
++					outconn[n].active=1;
++					n=MAX_OUTCONN;
++				}
++				n++;
++			}
++			if (n==MAX_OUTCONN) { /* all descriptors occupied */
++				close(d);
++				return EMFILE;
++			}
++			return 0;
++		default: /* error with connection */
++			close (d);
++			return errno;
++		}
++	}
++	user = command_giver;
++	new_player(current_object, d, &target, sizeof(target), 0);
++	command_giver = user;
++	return 0;
++}
++
++void check_for_out_connections() {
++	int i, ret;
++	object_t *user;
++
++	for (i=0; i<MAX_OUTCONN; i++) {
++		if (!outconn[i].active) continue;
++		ret = connect(outconn[i].socket, (struct sockaddr*) &outconn[i].target,
++			sizeof(outconn[i].target));
++		if (ret == -1) {
++			switch(errno) {
++			case EALREADY: /* still trying */
++				continue;
++			case EISCONN: /* we are connected! */
++				break;
++			default: /* error with connection */
++				if (!outconn[i].curr_obj || 
++					(outconn[i].curr_obj)->flags & O_DESTRUCTED) {
++					/* well, got no connection anyway... */
++				fprintf(stderr, 
++					"net_connect: no connection on destructed object!\n");
++				}
++				else {
++					push_number(-1);
++					// (void) apply(STR_LOGON, outconn[i].curr_obj, 1);
++					logon(outconn[i].curr_obj);
++				}
++				outconn[i].active=0;
++				continue;
++			}
++		}
++		/* connection successful */
++		if (!outconn[i].curr_obj ||
++			(outconn[i].curr_obj)->flags & O_DESTRUCTED) {
++			/* bad luck - should not happen :-( */
++			fprintf(stderr, 
++			    "net_connect: connection on destructed object!\n");
++		}
++		else {
++			user = command_giver;
++
++			new_player(outconn[i].curr_obj, outconn[i].socket,
++			   &outconn[i].target, sizeof(outconn[i].target), 0);
++			command_giver = user;
++		}
++		outconn[i].active=0;
++	}
+ }
+ 
+diff -Bw -du -U 2 --show-c-function orig/comm.h patched/comm.h
+--- orig/comm.h	Mon May  8 03:59:19 2000
++++ patched/comm.h	Mon Sep  4 09:32:13 2000
+@@ -234,5 +234,5 @@ extern int inet_volume;
+ /* --- Prototypes --- */
+ 
+-extern void  initialize_host_ip_number(void);
++extern void  initialize_host_ip_number(const char *bind_name);
+ extern void  prepare_ipc(void);
+ extern void  ipc_remove(void);
+diff -Bw -du -U 2 --show-c-function orig/dumpstat.c patched/dumpstat.c
+--- orig/dumpstat.c	Mon Apr 17 08:42:47 2000
++++ patched/dumpstat.c	Mon Sep  4 09:32:13 2000
+@@ -17,4 +17,5 @@
+ #include "array.h"
+ #include "closure.h"
++#include "comm.h"
+ #include "exec.h"
+ #include "filestat.h"
+@@ -239,4 +240,6 @@ dumpstat(char *fname)
+     FCOUNT_WRITE(fname);
+ 
++    fputs("Ticks\tMem\tRef\tFun Stri Var Ih Flags\tName\tSup Hsh\n", f);
++
+     for (ob = obj_list; ob; ob = ob->next_all)
+     {
+@@ -255,4 +258,7 @@ dumpstat(char *fname)
+             tmp = 0;
+         }
++#if 0
++/* OLD STYLE:
++ *
+         fprintf(f, "%-20s %5ld ref %2ld %s %s ", ob->name,
+                 tmp + (long)data_size(ob) + sizeof (object_t) +
+@@ -262,11 +268,39 @@ dumpstat(char *fname)
+                 ob->super ? ob->super->name : "--"
+         );
++ *
++ * NEW TSV STYLE  -symlynx
++ */
++#endif
+         if (ob->gigaticks)
+-            fprintf(f, " (%lu%09lu)", ob->gigaticks, ob->ticks);
++            fprintf(f, "%lu%09lu", ob->gigaticks, ob->ticks);
+         else
+-            fprintf(f, " (%lu)", ob->ticks);
+-        fprintf(f, " %s\n",
++            fprintf(f, "%lu", ob->ticks);
++        fprintf(f, " %s\t",
+                 swapstrings[(O_PROG_SWAPPED(ob)?1:0) | (O_VAR_SWAPPED(ob)?2:0)]
+         );
++
++        fprintf(f,
++ "%ld\t%ld\tf%02d s%03d v%02d i%01d %s%s%s%s%s%s\t%s\t%s %s\n",
++                tmp + (long)data_size(ob) + sizeof (object_t) +
++                sizeof(p_int) /* smalloc overhead */ ,
++                ob->ref,
++		ob->prog->num_functions,
++		ob->prog->num_strings,
++		ob->prog->num_variables,
++		ob->prog->num_inherited,
++                ob->flags & O_CLONE ? "C" : "",
++                ob->flags & O_REPLACED ? "R" : "",
++                ob->flags & O_HEART_BEAT ? "H" : "",
++                ob->flags & O_ENABLE_COMMANDS ? "E" : "",
++                ob->flags & O_LAMBDA_REFERENCED ? "L" : "",
++                O_PROG_SWAPPED(ob) ? "P" : "",
++		ob->name,
++                ob->super ? ob->super->name : "-",
++                ob->next_hash ? ob->next_hash->name : "-"
++        );
++/* unsinn:
++	fprintf(f, "%c", swap_variables(ob) & MY_TRUE ? '-': 'X');
++	fprintf(f, "%c\n", swap_program(ob) & MY_TRUE ? '-': 'X');
++*/
+     }
+     fclose(f);
+diff -Bw -du -U 2 --show-c-function orig/func_spec patched/func_spec
+--- orig/func_spec	Mon Aug 21 04:37:56 2000
++++ patched/func_spec	Mon Sep  4 09:33:27 2000
+@@ -448,4 +448,5 @@ string  query_ip_name(object default: F_
+ string  query_ip_number(object|mixed &  default: F_THIS_PLAYER);
+ int     query_mud_port(int|object default: F_THIS_PLAYER);
++int	net_connect(string, int default: F_QUERY_IMP_PORT);
+ 
+         /* Driver and System functions */
+@@ -535,5 +536,5 @@ object  query_shadowing(object);
+ object  query_snoop(object);
+ mixed   save_object(void|string);
+-void    remove_interactive(object);
++void    remove_interactive(object default: F_THIS_PLAYER);
+ void    rename_object(object, string);
+ int     restore_object(string);
+diff -Bw -du -U 2 --show-c-function orig/gcollect.c patched/gcollect.c
+--- orig/gcollect.c	Fri Jul 21 07:31:53 2000
++++ patched/gcollect.c	Mon Sep  4 09:32:13 2000
+@@ -1,2 +1,8 @@
++#ifdef DEBUG
++# define D(DO_THIS) DO_THIS
++#else
++# define D(DO_THIS)
++#endif
++
+ /*---------------------------------------------------------------------------
+  * Gamedriver - Garbage Collection
+@@ -896,6 +902,5 @@ garbage_collection(void)
+     /* --- Pass 0: dispose of some unnecessary stuff ---
+      */
+-
+-printf("DEBUG: %s GC start: %ld objects in list, %ld allocated\n", time_stamp(), (long)num_listed_objs, (long)tot_alloc_object); /* TODO: Remove this line */
++D(printf("DEBUG: %s GC start: %ld objects in list, %ld allocated\n", time_stamp(), (long)num_listed_objs, (long)tot_alloc_object);) /* TODO: Remove this line */
+     malloc_privilege = MALLOC_MASTER;
+     RESET_LIMITS;
+@@ -918,5 +923,5 @@ printf("DEBUG: %s GC start: %ld objects 
+     compact_mappings(num_dirty_mappings);
+ 
+-printf("DEBUG: %s GC pass 1: %ld objects in list, %ld allocated\n", time_stamp(), (long)num_listed_objs, (long)tot_alloc_object); /* TODO: Remove this line */
++D(printf("DEBUG: %s GC pass 1: %ld objects in list, %ld allocated\n", time_stamp(), (long)num_listed_objs, (long)tot_alloc_object);) /* TODO: Remove this line */
+     /* --- Pass 1: clear the M_REF flag in all malloced blocks ---
+      */
+@@ -1252,5 +1257,5 @@ printf("DEBUG: %s GC pass 1: %ld objects
+     {
+ #define W(s) write(1,s,strlen(s)) /* DEBUG: */
+-W("DEBUG: GC frees destructed '"); W(ob->name); W("'\n");
++D(W("DEBUG: GC frees destructed '"); W(ob->name); W("'\n");)
+         next_ob = ob->next_all;
+         free_object(ob, "garbage collection");
+@@ -1301,6 +1306,6 @@ W("DEBUG: GC frees destructed '"); W(ob-
+     reallocate_reserved_areas();
+     time_last_gc = time(NULL);
+-printf("DEBUG: %s GC end: %ld objects in list, %ld allocated; %ld destructed removed\n", time_stamp(), (long)num_listed_objs, (long)tot_alloc_object, dobj_count); /* TODO: Remove this line */
+-printf("DEBUG: %s         %ld malloced strings using %ld bytes.\n", time_stamp(), (long)num_alloc_strings, (long)size_alloc_strings); /* TODO: Remove this line */
++D(printf("DEBUG: %s GC end: %ld objects in list, %ld allocated; %ld destructed removed\n", time_stamp(), (long)num_listed_objs, (long)tot_alloc_object, dobj_count);) /* TODO: Remove this line */
++D(printf("DEBUG: %s         %ld malloced strings using %ld bytes.\n", time_stamp(), (long)num_alloc_strings, (long)size_alloc_strings);) /* TODO: Remove this line */
+ }
+ 
+diff -Bw -du -U 2 --show-c-function orig/interpret.c patched/interpret.c
+--- orig/interpret.c	Mon Aug 21 04:37:56 2000
++++ patched/interpret.c	Mon Sep  4 09:33:35 2000
+@@ -18379,4 +18379,19 @@ bad_right: ERRORF(("Bad right type to %s
+           }
+ 
++	XCASE(F_NET_CONNECT);
++	  {
++	      extern int net_connect PROT((char*, int));
++	      char *host = (sp-1)->u.string;
++	      int t = sp->u.number;
++
++	      if (privilege_violation4("net_connect", NULL, host, t, sp)) {
++		  t = net_connect(host, t);
++	      } else {
++		  error("Who are you to connect the nets of the universe?\n");
++	      }
++	      pop_n_elems(2);
++	      push_number(t);
++	  }
++
+         /* --- XEfuns: Driver and System --- */
+ 
+diff -Bw -du -U 2 --show-c-function orig/lex.c patched/lex.c
+--- orig/lex.c	Wed Aug 16 06:06:56 2000
++++ patched/lex.c	Mon Sep  4 09:32:13 2000
+@@ -2,4 +2,9 @@
+  * LPC-Compiler: Preprocessor and Lexical Analysis.
+  *
++#define LEXDEBUG
++#define LEXDEBUG2
++#define LEXDEBUG3
++#define USE_FXOPEN
++ *
+  *---------------------------------------------------------------------------
+  * The lexer is initialised by a call to init_lexer(). This function sets
+@@ -45,4 +50,5 @@
+ #include "closure.h"
+ #include "comm.h"
++#include "decode.h"
+ #include "exec.h"
+ #include "filestat.h"
+@@ -410,4 +416,6 @@ static struct incstate
+     int pragma_strict_types;
+     char saved_char;
++    int		encoding;	/* Compressed or encrypted? */
++    void *	encoding_info;	/* Current state of cipher or suchlike */
+ } *inctop = NULL;
+ 
+@@ -1057,15 +1065,33 @@ _myfilbuf (void)
+     /* Read the next block of data */
+     p = linebufstart; /* == linebufend - MAXLINE */
++#if defined(USE_DES) || defined(USE_GZIP) || defined(USE_SSL)
++    if (encoding > 0) {
++	/* returns true if EOF was encountered */
++	if (fxread(yyin_des, p, &i)) {
++# ifdef LEXDEBUG2
++	    fprintf(stderr, "fxread finished from %s: %d\n", current_file, i);
++# endif
++	    if (i < 0) i = 0;
++	    p += i;
++	    if (p - outp ? p[-1] != '\n' : current_line == 1)
++		*p++ = '\n';
++	    *p++ = EOF;
++	    return outp;
++	}
++# ifdef LEXDEBUG2
++	fprintf(stderr, "fxread from %s: %d\n", current_file, i);
++# endif
++    }
++    else
++#endif
++    {
+     i = read(yyin_des, p, MAXLINE);
+ 
+-    if (i < MAXLINE)
+-    {
++	if (i < MAXLINE) {
++#ifdef LEXDEBUG2
++	    fprintf(stderr, "read finished from %s: %d\n", current_file, i);
++#endif
+         /* End of file or error: put in the final EOF marker */
+-
+-        if (i < 0)
+-        {
+-            i = 0;
+-        }
+-
++	    if (i < 0) i = 0;
+         p += i;
+         if (p - outp ? p[-1] != '\n' : current_line == 1)
+@@ -1074,4 +1100,8 @@ _myfilbuf (void)
+         return outp;
+     }
++#ifdef LEXDEBUG2
++	fprintf(stderr, "read from %s: %d\n", current_file, i);
++#endif
++    }
+ 
+     /* Buffer filled: mark the last line with the '\0' sentinel */
+@@ -1086,4 +1116,8 @@ _myfilbuf (void)
+     saved_char = *p;
+     *p = '\0';
++#ifdef LEXDEBUG3
++    fprintf(stderr, "filbuf from %s(%d:%x): %d - sentinel placed at %d\n",
++	    current_file, encoding, encoding_info, i, p - linebufstart);
++#endif
+ 
+     return outp;
+@@ -1533,7 +1567,11 @@ inc_open (char *buf, char *name, mp_int 
+ 
+             strcpy(buf, cp);
++#ifdef USE_FXOPEN
++            if ( (fd = fxopen(buf, O_RDONLY|O_BINARY)) >= 0 )
++#else
+             if (!stat(buf, &aStat)
+              && S_ISREG(aStat.st_mode)
+              && (fd = ixopen(buf, O_RDONLY|O_BINARY)) >= 0 )
++#endif
+             {
+                 FCOUNT_INCL(buf);
+@@ -1558,7 +1596,11 @@ inc_open (char *buf, char *name, mp_int 
+ 
+         /* Test the file and open it */
++#ifdef USE_FXOPEN
++	if ( (fd = fxopen(buf, O_RDONLY|O_BINARY)) >= 0 )
++#else
+         if (!stat(buf, &aStat)
+          && S_ISREG(aStat.st_mode)
+          && (fd = ixopen(buf, O_RDONLY|O_BINARY)) >= 0)
++#endif
+         {
+             FCOUNT_INCL(buf);
+@@ -1596,7 +1638,11 @@ inc_open (char *buf, char *name, mp_int 
+         {
+             sprintf(buf, "%s%s", inc_list[i].u.string, name);
++#ifdef USE_FXOPEN
++	    if ( (fd = fxopen(buf, O_RDONLY|O_BINARY)) >= 0 )
++#else
+             if (!stat(buf, &aStat)
+              && S_ISREG(aStat.st_mode)
+              && (fd = ixopen(buf, O_RDONLY|O_BINARY)) >= 0 )
++#endif
+             {
+                 FCOUNT_INCL(buf);
+@@ -1634,7 +1680,11 @@ inc_open (char *buf, char *name, mp_int 
+             if (legal_path(buf))
+             {
++#ifdef USE_FXOPEN
++		if ( (fd = fxopen(buf, O_RDONLY|O_BINARY)) >= 0 )
++#else
+                 if (!stat(buf, &aStat)
+                  && S_ISREG(aStat.st_mode)
+                  && (fd = ixopen(buf, O_RDONLY|O_BINARY)) >= 0 )
++#endif
+                 {
+                     FCOUNT_INCL(buf);
+@@ -1867,4 +1917,6 @@ handle_include (char *name)
+         is->next = inctop;
+         is->pragma_strict_types = pragma_strict_types;
++        is->encoding = encoding;
++        is->encoding_info = encoding_info;
+ 
+         /* Copy the new filename into current_file */
+@@ -1890,4 +1942,10 @@ handle_include (char *name)
+         *(outp = linebufend) = '\0';
+         yyin_des = fd;
++#ifdef LEXDEBUG2
++	fprintf(stderr, "include %s: encoding deleted (was: %d)\n",
++		current_file, encoding);
++#endif
++	encoding = ENCODING_UNDEF;
++	encoding_info = NULL;
+         _myfilbuf();
+     }
+@@ -2268,5 +2326,5 @@ yylex1 (void)
+ 
+                 /* End the lexing of the included file */
+-                close(yyin_des);
++                ixclose(yyin_des);
+                 xfree(current_file);
+                 nexpands = 0;
+@@ -2280,4 +2338,10 @@ yylex1 (void)
+                 yyin_des = p->yyin_des;
+                 saved_char = p->saved_char;
++		encoding = p->encoding;
++		encoding_info = p->encoding_info;
++#ifdef LEXDEBUG2
++		fprintf(stderr, "yy/restoring to %s: encoding is %d\n",
++			current_file, encoding);
++#endif
+                 inctop = p->next;
+                 *linebufend = '\n';
+@@ -2328,4 +2392,8 @@ yylex1 (void)
+                 if (!*yyp)
+                 {
++#ifdef LEXDEBUG3
++		    fprintf(stderr, "sentinel encountered at %d of %s\n",
++			    current_line, current_file);
++#endif
+                     outp = yyp;
+                     yyp = _myfilbuf();
+@@ -3820,8 +3888,15 @@ end_new_file (void)
+         struct incstate *p;
+         p = inctop;
+-        close(yyin_des);
++
++        ixclose(yyin_des);
+         xfree(current_file);
+         current_file = p->file;
+         yyin_des = p->yyin_des;
++        encoding = p->encoding;
++        encoding_info = p->encoding_info;
++#ifdef LEXDEBUG2
++	fprintf(stderr, "enf/restoring to %s: encoding is %d\n",
++		current_file, encoding);
++#endif
+         inctop = p->next;
+     }
+diff -Bw -du -U 2 --show-c-function orig/prolang.y patched/prolang.y
+--- orig/prolang.y	Wed Aug 16 06:06:56 2000
++++ patched/prolang.y	Mon Sep  4 09:32:13 2000
+@@ -701,4 +701,5 @@ yyerror (char *str)
+         return;
+     context = lex_error_context();
++    if (!current_file) current_file = "(inline)";
+     fprintf(stderr, "%s %s: %s line %d %s\n"
+                   , time_stamp(), current_file, str, current_line, context);
+diff -Bw -du -U 2 --show-c-function orig/simulate.c patched/simulate.c
+--- orig/simulate.c	Fri Jul 21 07:31:53 2000
++++ patched/simulate.c	Mon Sep  4 09:32:13 2000
+@@ -29,5 +29,4 @@
+ #include <setjmp.h>
+ #include <stdio.h>
+-#include <sys/stat.h>
+ #include <stdarg.h>
+ 
+@@ -90,4 +89,5 @@ extern int fchmod PROT((int, int));
+ #include "closure.h"
+ #include "comm.h"
++#include "decode.h"
+ #include "dumpstat.h"
+ #include "ed.h"
+@@ -1169,8 +1169,8 @@ load_object (const char *lname, Bool cre
+     object_t   *save_command_giver = command_giver;
+     int         i;
+-    struct stat c_st;
+     int         name_length;
+     char       *name; /* Copy of <lname> */
+-    char       *fname; /* Filename for <name> */
++    char       *fname; /* Filename for <name>, kept in while across includes */
++    int		save_enc; /* Same as encoding, but unchanged by includes */
+     program_t  *prog;
+ 
+@@ -1195,5 +1195,5 @@ load_object (const char *lname, Bool cre
+     name_length = strlen(lname);
+     name = alloca(name_length+2);
+-    fname = alloca(name_length+4);
++    fname = alloca(name_length+9);	/* was 4 until i added .c.nsa */
+     if (!name || !fname)
+         fatal("Stack overflow in load_object()");
+@@ -1249,11 +1249,24 @@ load_object (const char *lname, Bool cre
+     }
+ 
++/* fprintf(stderr, "looking for %s - deleting encoding (was: %d)\n",
++	fname, encoding); */
++    encoding = ENCODING_UNDEF;
++
+     /* First check that the c-file exists.
+      */
+     (void)strcpy(fname+name_length, ".c");
+-    if (ixstat(fname, &c_st) == -1)
++
++#ifdef BINARIES
++  /* let's see if we can load the bytecode rightaway --symlynX */
++  if ( (prog = load_binary(fname, depth)) )
+     {
++    if (d_flag > 1) fprintf(stderr, "%s loaded bytecode for %s\n"
++		  , time_stamp(), fname);
++  } else {
++    /* otherwise see if the source code is available */
++#endif
++    if (!fxexists(fname)) {
+         /* The file does not exist - maybe it's a virtual object */
+-
++	/* "virtual object" is a bad name. let's call it a "named clone" */
+         svalue_t *svp;
+ 
+@@ -1303,4 +1316,11 @@ load_object (const char *lname, Bool cre
+     }
+ 
++    /* before we while, lets save the encoding flags, since #include's
++     * will overwrite it. encoding_info does not need to be saved instead,
++     * since we have to reopen the stream. we just need to remember what
++     * kind of a stream it was..
++     */
++    save_enc = encoding;
++
+     /* The compilation loop. It will run until either <name> is loaded
+      * or an error occurs. If the compilation is aborted because an
+@@ -1314,8 +1333,5 @@ load_object (const char *lname, Bool cre
+         /* This can happen after loading an inherited object: */
+         ob = lookup_object_hash((char *)name);
+-        if (ob)
+-        {
+-            return ob;
+-        }
++	if (ob) return ob;
+ 
+         if (comp_flag)
+@@ -1321,20 +1337,15 @@ load_object (const char *lname, Bool cre
+         if (comp_flag)
+             fprintf(stderr, "%s compiling %s ...", time_stamp(), fname);
+-
+         if (current_file)
+-        {
+             error("Compiler is busy.\n");
+-        }
+ 
+-        fd = ixopen(fname, O_RDONLY | O_BINARY);
++	current_file = fname;
++	encoding = save_enc;
++
++	fd = fxopen(fname, O_RDONLY | O_BINARY);
+         if (fd <= 0)
+-        {
+-            perror(fname);
+             error("Could not read the file.\n");
+-        }
+         FCOUNT_COMP(fname);
+ 
+-        current_file = fname;
+-
+         /* The file name is needed before start_new_file(), in case there is
+          * an initial 'line too long' error.
+@@ -1353,5 +1364,5 @@ load_object (const char *lname, Bool cre
+         update_compile_av(total_lines);
+         total_lines = 0;
+-        (void)close(fd);
++	fxclose(fd);
+         current_file = NULL;
+ 
+@@ -1426,4 +1438,8 @@ load_object (const char *lname, Bool cre
+ 
+     prog = compiled_prog;
++#ifdef BINARIES
++    (void) save_binary(prog);
++  }
++#endif
+ 
+ #ifdef INITIALIZATION_BY___INIT

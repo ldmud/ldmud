@@ -1,6 +1,9 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+18-May-2002 (Lars Duening)
+  - (sprintf.c) Removed a memory leak in efun printf() (reported by Dafire).
+
 07-May-2002 (Lars Duening)  (3.3.454)
   - (simulate.c) The error() routine now takes care to zero out all
        pointer variables after freeing the referenced data. This way, if

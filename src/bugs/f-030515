@@ -1,0 +1,10 @@
+Short: class variables
+From: Amylaar
+Date: 2003-05-15
+Type: Feature
+State: New
+
+In sima I have a 'shared' type modifier that causes the svalue itself to be
+stored in the program.
+Of course that goes with stackmachine lvalue codes to push references
+to these values...
