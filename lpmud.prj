@@ -51,14 +51,12 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 407)
-(Parent-Version lpmud 3-3 406)
-(Version-Log "Added some documentation and errorchecks to ptmalloc.
-Removed the CHECK_SMALLOC_TOTAL checking code.
-Added the MALLOC_SBRK_TRACE diagnostic option.")
+(Project-Version lpmud 3-3 408)
+(Parent-Version lpmud 3-3 407)
+(Version-Log "Forgot to update the configure script.")
 (New-Version-Log
 "")
-(Checkin-Time "Sun, 02 Mar 2003 22:18:22 -0700")
+(Checkin-Time "Sun, 02 Mar 2003 22:23:11 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -95,13 +93,13 @@ Added the MALLOC_SBRK_TRACE diagnostic option.")
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.59 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.470 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.471 644))
   (HISTORY (lpmud/f/49_HISTORY 1.305 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.19 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
   ;; Configuration
-  (src/configure (lpmud/d/0_configure 1.19.1.75 755))
+  (src/configure (lpmud/d/0_configure 1.19.1.76 755))
   (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.27 644))
   (src/machine.h.in (lpmud/b/9_machine.h. 1.9.1.5 644))
   (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.19.1.11 644))

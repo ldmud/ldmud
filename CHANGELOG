@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+02-Mar-2002 (Lars Duening)  (3.3.408)
+  - (configure) It would be useful if I actually updated the configure
+       script.
+
 02-Mar-2002 (Lars Duening)  (3.3.407)
   - (ptmalloc.c) Added some documentation and error checks (thanks, Gawain).
   - (configure, smalloc) Removed the CHECK_SMALLOC_TOTAL debugging code -
