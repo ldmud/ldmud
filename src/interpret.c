@@ -10507,8 +10507,9 @@ again:
          *   int    & int    -> int
          *   string & string -> string
          *   vector & vector -> vector
+         *   mapping & vector  -> mapping
+         *   mapping & mapping -> mapping
          *
-         * TODO: Extend this to mappings.
          */
 
         int i;
@@ -10542,8 +10543,17 @@ again:
             break;
         }
 
-        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_STRING|TF_POINTER);
-        TYPE_TEST_EXP_RIGHT(sp, TF_NUMBER|TF_STRING|TF_POINTER);
+        if (sp[-1].type == T_MAPPING
+         && (sp->type == T_POINTER || sp->type == T_MAPPING))
+        {
+            inter_sp = sp - 2;
+            (sp-1)->u.map = map_intersect(sp[-1].u.map, sp);
+            sp--;
+            break;
+        }
+
+        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_STRING|TF_POINTER|TF_MAPPING);
+        TYPE_TEST_EXP_RIGHT(sp, TF_NUMBER|TF_STRING|TF_POINTER|TF_MAPPING);
         ERRORF(("Arguments to & don't match: %s vs %s\n"
                , typename(sp[-1].type), typename(sp->type)
                ));

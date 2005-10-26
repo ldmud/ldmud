@@ -115,7 +115,7 @@ For a detailed list of all changes see the file CHANGELOG.
            available (default is to allow sbrk()).
 
 
-19-Mar-2003 (Lars Duening) -- Release 3.2.10
+20-Mar-2003 (Lars Duening) -- Release 3.2.10
 
     - Changed efuns:
        + debug_info(): Removed the DID_MEM_UNUSED value from the DINFO_DATA:
@@ -133,7 +133,9 @@ For a detailed list of all changes see the file CHANGELOG.
        + m_add(): Fixed a memory leak when existing entries were overwritten.
 
     - New efuns:
+       + m_entry(): Return all values for mapping entry at once.
        + rmember(): Search arrays and strings from the end.
+       + strrstr(): Search a string within a string backwards.
        + variable_exists(): Check the existance of a named variable.
        + variable_list(): Return all variable names of an object.
 
@@ -144,6 +146,7 @@ For a detailed list of all changes see the file CHANGELOG.
            corruption.
 
     - Language:
+       + Operator '&' can intersect mappings with other mappings and arrays.
        + Macro __MSDOS_FS__ is defined on systems using the MS-DOS
            filesystem conventions.
        + Preprocessor symbol __FILENAME_SPACES__ is defined if the driver is

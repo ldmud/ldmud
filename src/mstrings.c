@@ -1029,7 +1029,7 @@ mstring_mstr_n_str ( const string_t * const pStr, size_t start
 
 /* Aliased to: mstrstr(pStr, pTxt)
  *
- * Find the partial string <pTxt> of <len> bytes (which my contain '\0' as
+ * Find the partial string <pTxt> of <len> bytes (which may contain '\0' as
  * part of the data to be found) inside of <pStr> starting at position <start>
  * and return a pointer to the location found.
  * If not found, return NULL.
@@ -1069,6 +1069,49 @@ mstring_mstr_n_str ( const string_t * const pStr, size_t start
             left--;
         }
     }
+
+    return NULL;
+} /* mstring_mstr_n_str() */
+
+/*-------------------------------------------------------------------------*/
+char *
+mstring_mstr_rn_str ( const string_t * const pStr, size_t start
+                   , const char * const pTxt, size_t len)
+
+/* Aliased to: mstrrstr(pStr, pTxt)
+ *
+ * Find the partial string <pTxt> of <len> bytes (which may contain '\0' as
+ * part of the data to be found) inside of <pStr> up to position <start>
+ * and return a pointer to the location found.
+ * If not found, return NULL.
+ */
+
+{
+    char * cp;
+    size_t left;
+    char   first;
+
+    if (start >= mstrsize(pStr))
+        return NULL;
+
+    /* Initialize 'characters remaining' and 'current position' */
+    left = mstrsize(pStr) - start;
+    cp = get_txt(pStr)+start;
+
+    /* Special case: strrstr("text", "") */
+    if (len == 0)
+        return cp;
+
+    first = *pTxt;
+
+    cp++; /* Offset the first decrement */
+    do {
+        cp--;
+        if (*cp == first
+         && 0 == memcmp(cp, pTxt, len)
+           )
+            return cp;
+    } while (cp != get_txt(pStr));
 
     return NULL;
 } /* mstring_mstr_n_str() */

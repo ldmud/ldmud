@@ -5161,7 +5161,7 @@ closure_to_string (svalue_t * sp, Bool compact)
 
         if (l->function.var_index == VANISHED_VARCLOSURE_INDEX)
         {
-            strcat(buf, compact ? "<dest lfun>"
+            strcat(buf, compact ? "<repl lvar>"
                                 : "<local variable from replaced program>");
         }
 

@@ -89,6 +89,7 @@ extern void mstring_free (string_t *s);
 extern string_t * mstring_ref ( string_t * str);
 extern unsigned long mstring_deref ( string_t * str);
 extern char *     mstring_mstr_n_str(const string_t * const pStr, size_t start, const char * const pTxt, size_t len);
+extern char *     mstring_mstr_rn_str(const string_t * const pStr, size_t start, const char * const pTxt, size_t len);
 extern string_t * mstring_add_slash (const string_t *str MTRACE_DECL);
 extern string_t * mstring_del_slash (string_t *str MTRACE_DECL);
 extern string_t * mstring_cvt_progname (const string_t *str MTRACE_DECL);
@@ -245,6 +246,7 @@ extern void   string_dinfo_status(svalue_t *svp, int value);
 #define mstrcmp(pStr1,pStr2)     mstring_compare(pStr1, pStr2)
 #define mstreq(pStr1,pStr2)      mstring_equal(pStr1, pStr2)
 #define mstrstr(pStr,pTxt)       mstring_mstr_n_str(pStr, 0, pTxt, strlen(pTxt))
+#define mstrrstr(pStr,pTxt)      mstring_mstr_rn_str(pStr, mstrsize(pStr)-1, pTxt, strlen(pTxt))
 #define mstr_add(pStr1,pStr2)     mstring_add(pStr1,pStr2 MTRACE_ARG)
 #define mstr_add_txt(pStr1,pTxt2,len) mstring_add_txt(pStr1,pTxt2,len MTRACE_ARG)
 #define mstr_add_to_txt(pTxt1,len,pStr2) mstring_add_to_txt(pTxt1, len, pStr2 MTRACE_ARG)

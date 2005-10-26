@@ -58,6 +58,7 @@ DESCRIPTION
 
         expr1 & expr2        The result is the bitwise and of 'expr1' and
                         'expr2'.
+
                         For arrays and strings, the intersection set
                         (all elements resp. characters from expr1 which
                         which are also in the expr2) is computed.
@@ -65,6 +66,12 @@ DESCRIPTION
                          but  ({ 'a','a','b' }) & ({ 'a' }) -> ({ 'a' })
                         Eventually the array behaviour will be changed
                         to match the string behaviour.
+
+                        Mappings can be intersected with another mapping
+                        or an array. The resulting mapping holds all
+                        those entries from the first array, which are
+                        also mentioned in the second mapping (as index)
+                        resp. in the array.
 
         expr1 == expr2        Compare values. Valid for strings, numbers,
                               objects and closures.
@@ -195,6 +202,7 @@ NOTE
 
 HISTORY
         LDMud 3.2.9 added '>>>', '>>>=', '&&=' and '||='.
+        LDMud 3.2.10 extended '&' to mappings.
         LDMud 3.3 extended '|' and '^' to arrays.
 
 SEE ALSO

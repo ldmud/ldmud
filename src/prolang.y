@@ -8724,6 +8724,17 @@ expr0:
               {
                     /* $$ == TYPE_ANY is correct */
               }
+              else if (first_type.typeflags == TYPE_MAPPING)
+              {
+                  if (second_type.typeflags != TYPE_MAPPING
+                   && !(second_type.typeflags & TYPE_MOD_POINTER)
+                   && second_type.typeflags != TYPE_ANY
+                     )
+                  {
+                      type_error("Bad argument 2 to &", second_type );
+                  }
+                  $$.type = Type_Mapping;
+              }
               else if ( (first_type.typeflags | second_type.typeflags) & TYPE_MOD_POINTER)
               {
                   if (first_type.typeflags  == TYPE_NUMBER

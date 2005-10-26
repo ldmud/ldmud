@@ -25,6 +25,7 @@ extern svalue_t *f_regexplode(svalue_t *sp);
 extern svalue_t* f_regreplace (svalue_t *sp);
 extern svalue_t* v_regmatch (svalue_t *sp, int num_arg);
 extern svalue_t *f_strstr(svalue_t *);
+extern svalue_t *f_strrstr(svalue_t *);
 extern svalue_t *v_trim(svalue_t *, int num_arg);
 extern svalue_t *f_upper_case(svalue_t *);
 extern svalue_t *v_terminal_colour(svalue_t *, int num_arg);

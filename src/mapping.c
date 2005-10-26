@@ -3328,6 +3328,127 @@ subtract_mapping (mapping_t *minuend, mapping_t *subtrahend)
 } /* subtract_mapping() */
 
 /*-------------------------------------------------------------------------*/
+struct map_intersect_s
+{
+    mapping_t * m;   /* Mapping to be intersected */
+    mapping_t * rc;  /* Result mapping */
+};
+
+
+static void
+map_intersect_filter (svalue_t *key, svalue_t *data, void *extra)
+
+/* Auxiliary function to map_intersect():
+ * If <key> is in <extra>->m, add the data to <extra>->rc.
+ */
+
+{
+    mapping_t * m  = ((struct map_intersect_s *)extra)->m;
+    mapping_t * rc = ((struct map_intersect_s *)extra)->rc;
+
+    svalue_t * src;
+
+    src = get_map_value(m, key);
+    if (src != &const0)
+    {
+        int num_values = m->num_values;
+        svalue_t * dest;
+        int j;
+
+        dest = get_map_lvalue(rc, key);
+        if (!dest)
+        {
+            outofmemory("result mapping entry");
+            /* NOTREACHED */
+        }
+        for (j = 0; j < num_values; j++)
+        {
+            assign_svalue(dest+j, src+j);
+        }
+    } /* if found element */
+} /* map_intersect_filter() */
+
+
+mapping_t *
+map_intersect (mapping_t *m, svalue_t * val)
+
+/* Intersect mapping <m> with vector/mapping <val>.
+ *
+ * The result is a new mapping with all those elements of <m> which index
+ * can be found in vector <val>->u.vector resp. as index in mapping
+ * <val>->u.map.
+ *
+ * Called by interpret to implement F_AND.
+ */
+
+{
+    mapping_t *rc = NULL;
+
+    if (val->type == T_POINTER)
+    {
+        vector_t * vec = val->u.vec;
+        size_t     vecsize = VEC_SIZE(vec);
+        int        num_values = m->num_values;
+        size_t     i;
+
+        rc = allocate_mapping(vecsize, num_values);
+        if (!rc)
+        {
+            outofmemory("result mapping");
+            /* NOTREACHED */
+        }
+
+        for (i = 0; i < vecsize; i++)
+        {
+            svalue_t * src;
+
+            src = get_map_value(m, &vec->item[i]);
+            if (src != &const0)
+            {
+                svalue_t * dest;
+                int j;
+
+                dest = get_map_lvalue(rc, &vec->item[i]);
+                if (!dest)
+                {
+                    outofmemory("result mapping entry");
+                    /* NOTREACHED */
+                }
+                for (j = 0; j < num_values; j++)
+                {
+                    assign_svalue(dest+j, src+j);
+                }
+            } /* if found element */
+        } /* for (i) */
+    }
+    else if (val->type == T_MAPPING)
+    {
+        mapping_t              * map = val->u.map;
+        int                      num_values = m->num_values;
+        struct map_intersect_s   data;
+
+        rc = allocate_mapping(MAP_SIZE(map), num_values);
+        if (!rc)
+        {
+            outofmemory("result mapping");
+            /* NOTREACHED */
+        }
+
+        data.m = m;
+        data.rc = rc;
+        walk_mapping(map, map_intersect_filter, &data);
+    }
+    else
+        fatal("(map_intersect) Illegal type to arg2: %d, "
+              "expected array/mapping."
+             , val->type);
+
+    free_mapping(m);
+    free_svalue(val);
+    return rc;
+} /* map_intersect() */
+ 
+/*-------------------------------------------------------------------------*/
 static void
 f_walk_mapping_filter (svalue_t *key, svalue_t *data, void *extra)
 
@@ -3494,7 +3615,7 @@ v_walk_mapping (svalue_t *sp, int num_arg)
     callback_t cb;
     int error_index;
     mapping_t *m;            /* Mapping to walk */
-    int num_values;               /* Number of values per entry */
+    int num_values;          /* Number of values per entry */
     svalue_t *read_pointer;  /* Prepared mapping values */
     mp_int i;
 
@@ -3600,7 +3721,7 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
     mapping_t *m;            /* Mapping to filter */
     int         error_index;
     callback_t  cb;
-    int num_values;               /* Width of the mapping */
+    int num_values;          /* Width of the mapping */
     vector_t *dvec;          /* Values of one key */
     svalue_t *dvec_sp;       /* Stackentry of dvec */
     svalue_t *read_pointer;  /* Prepared mapping values */
@@ -4073,6 +4194,51 @@ v_m_contains (svalue_t *sp, int num_arg)
 
     return sp;
 } /* v_m_contains() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_m_entry (svalue_t *sp)
+
+/* TEFUN m_entry()
+ *
+ *    mixed * m_entry (mapping m, mixed key)
+ *
+ * Query the mapping <m> for key <key> and return all values for this
+ * key as array.
+ * If the mapping does not contain an entry for <key>, svalue-0 is
+ * returned.
+ */
+
+{
+    svalue_t * data;
+    vector_t * rc;
+
+    data = get_map_value(sp[-1].u.map, sp);
+    if (&const0 != data)
+    {
+        int num_values = sp[-1].u.map->num_values;
+        int i;
+
+        rc = allocate_array(num_values);
+
+        for (i = 0; i < num_values; i++)
+        {
+            assign_svalue(rc->item+i, data+i);
+        }
+    }
+    else
+        rc = NULL;
+
+    free_svalue(sp); sp--;
+    free_svalue(sp);
+
+    if (rc)
+        put_array(sp, rc);
+    else
+        put_number(sp, 0);
+
+    return sp;
+} /* f_m_entry() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *

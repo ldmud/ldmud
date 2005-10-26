@@ -1,5 +1,5 @@
 SYNOPSIS
-        mapping m_add(mapping map, mixed key, [mixed data...])
+        mapping m_add (mapping map, mixed key, [mixed data...])
 
 DESCRIPTION
         Add (or replace) an entry with index <key> in mapping <map>.
@@ -24,11 +24,13 @@ EXAMPLES
 
         m = ([ "foo":1;2 ]);
         m_add(m, "bar", 1) --> ([ "foo":1;2, "bar":1;0 ])
+        m_add(m, "baz", ({ 4, 5 })... )
+          --> ([ "foo":1;2, "bar":1;0, "baz":4;5 ])
 
 
 HISTORY
         Introduced in LDMud 3.2.9.
 
 SEE ALSO
-        mappingp(E), mkmapping(E), m_delete(E), m_indices(E), m_values(E),
-        sizeof(E), widthof(E)
+        mappingp(E), mkmapping(E), m_delete(E), m_entry(E), m_indices(E),
+        m_values(E), sizeof(E), widthof(E)

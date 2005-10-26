@@ -7047,7 +7047,12 @@ restore_size (char **str)
             pt2 = strchr(pt, ':');
             if (!pt2)
                 return -1;
-            pt = &pt2[1];
+            pt = &pt2[2];
+              /* 'pt = &pt2[1]' is the logical statement, but
+               * would run afoul the '#e:,' operator closure.
+               * Because every closure has at least one character
+               * following the ':', this solution is safe.
+               */
             break;
 
         default:
@@ -7322,8 +7327,14 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
                 return MY_FALSE;
             }
 
-            if (c == delimiter || (ct == 'c' && c == ':'))
-                break;
+            /* Break at the delimiter, but make sure that it's not
+             * part of an operator closure ('#e:,' for example).
+             */
+            if ((   c == delimiter
+                 && !(pt[-4] == '#' && pt[-3] == 'e' && pt[-2] == ':')
+                )
+             || (ct == 'c' && c == ':')
+               ) break;
         }
 
         /* Save the delimiter, then replace it by '\0' */

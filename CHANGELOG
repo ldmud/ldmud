@@ -1,6 +1,15 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+20-Mar-2002 (Lars Duening)  (3.3.428)
+  - (object.c) Restoring the efun closure "#e:," confused the
+      savefile parser (thanks, Risky).
+  - (func_spec, efuns, mstrings) New efun strrstr().
+  - (mapping, prolang.y) Operator '&' can now intersect mappings with
+      other mappings and arrays.
+  - (func_spec, mapping) New efun m_entry() to return all values for
+      an entry at once.
+
 19-Mar-2002 (Lars Duening)  (3.3.427)
   - (sprintf.c, closure) Modifier '#' used for '%O' and '%Q' produces
       output in a compact format (suggested by Menaures).

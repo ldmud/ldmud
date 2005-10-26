@@ -20,6 +20,7 @@
  *    efun: process_string() (optional)
  *    efun: sscanf()
  *    efun: strstr()
+ *    efun: strrstr()
  *    efun: terminal_colour()
  *    efun: trim()
  *    efun: upper_case()
@@ -1205,7 +1206,7 @@ f_strstr (svalue_t *sp)
  *
  *   int strstr (string str, string str2, int pos)
  *
- * Returns the index of str2 in str searching from position pos.
+ * Returns the index of str2 in str searching from position pos forward.
  * If str2 is not found in str, -1 is returned. The returned
  * index is relativ to the beginning of the string.
  *
@@ -1240,6 +1241,50 @@ f_strstr (svalue_t *sp)
 
     return sp;
 } /* f_strstr() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_strrstr (svalue_t *sp)
+
+/* EFUN strrstr()
+ *
+ *   int strrstr (string str, string str2, int pos)
+ *
+ * Returns the index of str2 in str searching from position pos backward.
+ * If str2 is not found in str, -1 is returned. The returned
+ * index is relativ to the beginning of the string.
+ *
+ * If pos is negativ, it counts from the end of the string.
+ */
+
+{
+    char *found;
+    string_t *base, *pattern;
+    p_int start, rc;
+
+    base = sp[-2].u.str;
+    pattern = sp[-1].u.str;
+
+    if ( 0 != (start = sp->u.number) )
+    {
+        if (start < 0)
+        {
+            start += mstrsize(base);
+            if (start < 0)
+                start = 0;
+        }
+    }
+
+    found = mstring_mstr_rn_str(base, start, get_txt(pattern), mstrsize(pattern));
+    rc = found ? (found - get_txt(base)) : -1;
+
+    sp--;
+    free_svalue(sp--);
+    free_string_svalue(sp); /* Frees base ! */
+    put_number(sp, rc);
+
+    return sp;
+} /* f_strrstr() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
