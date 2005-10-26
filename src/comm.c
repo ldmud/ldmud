@@ -1498,7 +1498,7 @@ thread_write_buf (interactive_t * ip, struct write_buffer_s *buf)
         } /* if socket_write() == -1 */
     }
 
-    if (buf->compress && !buf->compressing)
+    if (buf->compress && !ip->compressing)
     {
         /* Compression has been turned off for this interactive,
          * now get rid of all residual data.
@@ -3711,7 +3711,7 @@ new_player (SOCKET_T new_socket, struct sockaddr_in *addr, size_t addrlen
     new_interactive->write_current = NULL;
     new_interactive->written_first = NULL;
     pthread_create(&new_interactive->write_thread, NULL, writer_thread, new_interactive);
-    pthread_detach(new_interactive->write_thread);
+      /* We pthread_join() on this thread when the connection is closed */
 #endif
 
     /* Add the new interactive structure to the list of users */

@@ -1,6 +1,14 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+03-May-2002 (Lars Duening)  (3.3.451)
+  - (comm.c) When a pthread was cancelled, the flushing of the pending
+       data happened after the socket was already shut down. Reason was that
+       the threads were 'detached' upon creation, disabling the ability
+       of the parent thread to wait for their completion (reported by Urv).
+  - (object.c) The restore_svalue() routine now accepts a CR preceeding
+       a LF as delimiter.
+
 30-Apr-2002 (Lars Duening)  (3.3.450)
   - (ed.c) Only consecutive 'z'/'Z' commands do not re-print the current line;
        a 'z'/'Z' after a different command does (suggested by Elric).

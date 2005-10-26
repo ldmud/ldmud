@@ -735,6 +735,15 @@ error (const char *fmt, ...)
             debug_message("%s ... execution continues.\n", ts);
             printf("%s ... execution continues.\n", ts);
         }
+        else
+        {
+            /* No dump of the backtrace into the log, but we want it
+             * available for debug_info().
+             */
+            if (current_error_trace)
+                free_array(current_error_trace);
+            (void)collect_trace(NULL, &current_error_trace);
+        }
 
         unroll_context_stack();
         longjmp(((struct error_recovery_info *)rt_context)->con.text, 1);

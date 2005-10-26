@@ -7996,6 +7996,8 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
     } /* switch()*/
 
     cp = *pt;
+    if (delimiter == '\n' && *cp == '\r')
+        cp++;
     if (*cp++ != delimiter)
         return MY_FALSE;
     *pt = cp;
