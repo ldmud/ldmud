@@ -173,8 +173,26 @@ static lambda_t *stale_lambda_closures;
 /*            Object clean up
  */
 
-/* Forward declarations */
-static void cleanup_vector (svalue_t *svp, size_t num, ptrtable_t * ptable);
+typedef struct cleanup_s cleanup_t;
+typedef struct cleanup_map_extra_s cleanup_map_extra_t;
+
+
+/* --- struct cleanup: The cleanup context information
+ *
+ * The controlling instance of this struct is passed to all cleanup functions.
+ */
+struct cleanup_s
+{
+    ptrtable_t * ptable;    /* Pointertable to catch loops */
+    Bool         mcompact;  /* TRUE: mappings are forcibly compacted */
+    mapping_t  * mlist;
+      /* List of mappings to compact. The list is linked through
+       * the map->hash->next_dirty field - which makes sense as
+       * mappings without hash field don't need compaction.
+       * The references are counted to prevent premature freeing.
+       */
+};
+
 
 /* --- struct cleanup_map_extra: Info needed to clean up a mapping.
  *
@@ -184,11 +202,57 @@ static void cleanup_vector (svalue_t *svp, size_t num, ptrtable_t * ptable);
 
 struct cleanup_map_extra_s
 {
-    p_int       width;   /* Width of the mapping */
-    ptrtable_t *ptable;  /* Pointertable to catch loops */
+    p_int       width;    /* Width of the mapping */
+    cleanup_t  *context;  /* The cleanup context */
 };
 
-typedef struct cleanup_map_extra_s cleanup_map_extra_t;
+
+/* Forward declarations */
+static void cleanup_vector (svalue_t *svp, size_t num, cleanup_t * context);
+
+/*-------------------------------------------------------------------------*/
+static cleanup_t *
+cleanup_new (Bool mcompact)
+
+/* Create a new cleanup_t context and return it. <mcompact> is the 
+ * .mcompact setting.
+ */
+
+{
+    cleanup_t * rc;
+
+    rc = xalloc(sizeof(*rc));
+    if (rc == NULL)
+    {
+        outofmemory("object cleanup context");
+        return NULL;
+    }
+
+    rc->ptable = new_pointer_table();
+    if (rc->ptable == NULL)
+    {
+        xfree(rc);
+        outofmemory("object cleanup pointertable");
+        return NULL;
+    }
+
+    rc->mcompact = mcompact;
+    rc->mlist = NULL;
+
+    return rc;
+} /* cleanup_new() */
+
+/*-------------------------------------------------------------------------*/
+static void
+cleanup_free (cleanup_t * context)
+
+/* Deallocate the cleanup context <context>.
+ */
+
+{
+    free_pointer_table(context->ptable);
+    xfree(context);
+} /* cleanup_free() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -200,15 +264,15 @@ cleanup_mapping_filter (svalue_t *key, svalue_t *data, void *extra)
 
 {
     cleanup_map_extra_t * pData = (cleanup_map_extra_t*)extra;
-    cleanup_vector(key, 1, pData->ptable);
-    cleanup_vector(data, pData->width, pData->ptable);
+    cleanup_vector(key, 1, pData->context);
+    cleanup_vector(data, pData->width, pData->context);
 } /* cleanup_mapping_filter() */
 
 /*-------------------------------------------------------------------------*/
 static void
-cleanup_closure (svalue_t *csvp, ptrtable_t * ptable)
+cleanup_closure (svalue_t *csvp, cleanup_t * context)
 
-/* Cleanup the closure <csvp>, using <ptable> as pointer table.
+/* Cleanup the closure <csvp>, using <context> as cleanup context.
  * This may change *<csvp> to svalue-0.
  */
 
@@ -227,7 +291,7 @@ cleanup_closure (svalue_t *csvp, ptrtable_t * ptable)
     }
 
     if (!CLOSURE_MALLOCED(type)
-     || register_pointer(ptable, l) == NULL
+     || register_pointer(context->ptable, l) == NULL
        )
         return;
 
@@ -240,7 +304,7 @@ cleanup_closure (svalue_t *csvp, ptrtable_t * ptable)
         if ( (num_values = EXTRACT_UCHAR(l->function.code)) == 0xff)
             num_values = svp[-0x100].u.number;
         svp -= num_values;
-        cleanup_vector(svp, (size_t)num_values, ptable);
+        cleanup_vector(svp, (size_t)num_values, context);
     }
     else if (type == CLOSURE_BOUND_LAMBDA)
     {
@@ -250,24 +314,24 @@ cleanup_closure (svalue_t *csvp, ptrtable_t * ptable)
         dummy.x.closure_type = CLOSURE_UNBOUND_LAMBDA;
         dummy.u.lambda = l->function.lambda;
 
-        cleanup_closure(&dummy, ptable);
+        cleanup_closure(&dummy, context);
     }
 
 #ifdef USE_NEW_INLINES
     if (type == CLOSURE_LFUN && l->function.lfun.context_size != 0)
     {
         unsigned short size = l->function.lfun.context_size;
-        cleanup_vector(l->context, size, ptable);
+        cleanup_vector(l->context, size, context);
     }
 #endif /* USE_NEW_INLINES */
 } /* cleanup_closure() */
 
 /*-------------------------------------------------------------------------*/
 static void
-cleanup_vector (svalue_t *svp, size_t num, ptrtable_t * ptable)
+cleanup_vector (svalue_t *svp, size_t num, cleanup_t * context)
 
 /* Cleanup the <num> svalues in vector/svalue block <svp>.
- * <ptable> is used to keep track which complex values we already
+ * <context> is used to keep track which complex values we already
  * cleaned up.
  */
 
@@ -277,7 +341,7 @@ cleanup_vector (svalue_t *svp, size_t num, ptrtable_t * ptable)
     if (!svp) /* e.g. when called for obj->variables */
         return;
 
-    if (register_pointer(ptable, svp) == NULL) /* already cleaned up */
+    if (register_pointer(context->ptable, svp) == NULL) /* already cleaned up */
         return;
 
     for (p = svp; p < svp+num; p++)
@@ -299,25 +363,35 @@ cleanup_vector (svalue_t *svp, size_t num, ptrtable_t * ptable)
             /* Don't clean the null vector */
             if (p->u.vec != &null_vector)
             {
-                cleanup_vector(&p->u.vec->item[0], VEC_SIZE(p->u.vec), ptable);
+                cleanup_vector(&p->u.vec->item[0], VEC_SIZE(p->u.vec), context);
             }
             break;
 
 #ifdef USE_STRUCTS
         case T_STRUCT:
-            cleanup_vector(&p->u.strct->member[0], struct_size(p->u.strct), ptable);
+            cleanup_vector(&p->u.strct->member[0], struct_size(p->u.strct), context);
             break;
 #endif /* USE_STRUCTS */
 
         case T_MAPPING:
-            if (register_pointer(ptable, p->u.map) != NULL)
+            if (register_pointer(context->ptable, p->u.map) != NULL)
             {
                 cleanup_map_extra_t extra;
 
                 extra.width = p->u.map->num_values;
-                extra.ptable = ptable;
+                extra.context = context;
                 check_map_for_destr(p->u.map);
                 walk_mapping(p->u.map, cleanup_mapping_filter, &extra);
+
+                /* Remember the mapping for later compaction.
+                 * Only 'dirty' mappings need to be listed, as the cleanup
+                 * can't cause a mapping to add a hash part.
+                 */
+                if (p->u.map->hash)
+                {
+                    p->u.map->hash->next_dirty = context->mlist;
+                    context->mlist = ref_mapping(p->u.map);
+                }
             }
             break;
 
@@ -334,21 +408,17 @@ cleanup_vector (svalue_t *svp, size_t num, ptrtable_t * ptable)
             break;
 
         case T_CLOSURE:
-            cleanup_closure(p, ptable);
+            cleanup_closure(p, context);
             break;
         }
     } /* for */
 } /* cleanup_vector() */
 
 /*-------------------------------------------------------------------------*/
-void
-cleanup_object (object_t * obj, ptrtable_t * ptable)
+static void
+cleanup_single_object (object_t * obj, cleanup_t * context)
 
-/* Cleanup object <ob>. If the caller cleans up several objects, he
- * should pass a pointertable <ptable> this function will use to keep
- * track which complex datastructures have already been cleaned.
- * If NULL is passed as <ptable>, the function will create its own
- * pointer table.
+/* Cleanup object <ob> using context <context>.
  *
  * If the object is on the swap, it will be swapped in for the time
  * of the function.
@@ -362,19 +432,7 @@ cleanup_object (object_t * obj, ptrtable_t * ptable)
 #ifndef NEW_CLEANUP
     return;
 #else
-    ptrtable_t * local_ptable = NULL;
     int was_swapped = 0;
-
-    /* Make sure we have a pointer table */
-    if (ptable == NULL)
-    {
-        ptable = local_ptable = new_pointer_table();
-        if (ptable == NULL)
-        {
-            outofmemory("object cleanup pointertable");
-            return;
-        }
-    }
 
     /* Swap in the object if necessary */
     if ((obj->flags & O_SWAPPED)
@@ -399,16 +457,100 @@ cleanup_object (object_t * obj, ptrtable_t * ptable)
     }
 
     /* Clean up all the variables */
-    cleanup_vector(obj->variables, obj->prog->num_variables, ptable);
+    cleanup_vector(obj->variables, obj->prog->num_variables, context);
 
     /* Clean up */
     if (was_swapped)
     {
         swap(obj, was_swapped);
     }
+#endif /* NEW_CLEANUP */
+} /* cleanup_single_object() */
 
-    if (local_ptable != NULL)
-        free_pointer_table(local_ptable);
+/*-------------------------------------------------------------------------*/
+static void
+cleanup_structures (cleanup_t * context)
+
+/* Cleanup the value holding structures of the driver, using context
+ * <context>.
+ *
+ * The structures are:
+ *   - driver hooks
+ *   - wizlist extra entries
+ */
+
+{
+#ifndef NEW_CLEANUP
+    return;
+#else
+    /* Cleanup the wizlist */
+    {
+        wiz_list_t * wiz;
+
+        for (wiz = all_wiz; wiz != NULL; wiz = wiz->next)
+            cleanup_vector(&wiz->extra, 1, context);
+        
+        cleanup_vector(&default_wizlist_entry.extra, 1, context);
+    }
+
+    /* Cleanup the driver hooks */
+    cleanup_vector(driver_hook, NUM_DRIVER_HOOKS, context);
+#endif /* NEW_CLEANUP */
+} /* cleanup_structures() */
+
+/*-------------------------------------------------------------------------*/
+static void
+cleanup_compact_mappings (cleanup_t * context)
+
+/* Compact all mappings listed in the <context>.
+ * This must be the very last action in the cleanup process.
+ */
+
+{
+#ifndef NEW_CLEANUP
+    return;
+#else
+    mapping_t * m;
+
+    for (m = context->mlist; m != NULL; m = context->mlist)
+    {
+        context->mlist = m->hash->next_dirty;
+        compact_mapping(m, context->mcompact);
+        free_mapping(m); /* Might deallocate it fully */
+    }
+#endif /* NEW_CLEANUP */
+} /* cleanup_compact_mappings() */
+
+/*-------------------------------------------------------------------------*/
+void
+cleanup_object (object_t * obj)
+
+/* Cleanup object <ob>, but don't force the mapping compaction.
+ *
+ * If the object is on the swap, it will be swapped in for the time
+ * of the function.
+ *
+ * The function checks all variables of this object for references
+ * to destructed objects and removes them. Also, untabled strings
+ * are made tabled.
+ *
+ * This function is called by the backend.
+ */
+
+{
+#ifndef NEW_CLEANUP
+    return;
+#else
+    cleanup_t * context = NULL;
+
+    context = cleanup_new(MY_FALSE);
+    if (context != NULL)
+    {
+        cleanup_single_object(obj, context);
+        cleanup_structures(context);
+        cleanup_compact_mappings(context);
+        cleanup_free(context);
+    }
 #endif /* NEW_CLEANUP */
 } /* cleanup_object() */
 
@@ -416,7 +558,7 @@ cleanup_object (object_t * obj, ptrtable_t * ptable)
 static void
 cleanup_all_objects (void)
 
-/* Cleanup all objects in the game.
+/* Cleanup all objects in the game, and force the mapping compaction.
  * This function is called by the garbage-collector right at the start.
  */
 
@@ -424,26 +566,20 @@ cleanup_all_objects (void)
 #ifndef NEW_CLEANUP
     return;
 #else
-    ptrtable_t * ptable = NULL;
-    object_t   * ob;
+    cleanup_t * context = NULL;
 
-    /* Make sure we have a pointer table */
-    ptable = new_pointer_table();
-    if (ptable == NULL)
+    context = cleanup_new(MY_TRUE);
+    if (context != NULL)
     {
-        outofmemory("object cleanup pointertable");
-        return;
+        object_t   * ob;
+        for (ob = obj_list; ob; ob = ob->next_all)
+        {
+            cleanup_single_object(ob, context);
+        }
+        cleanup_structures(context);
+        cleanup_compact_mappings(context);
+        cleanup_free(context);
     }
-
-    /* Process the list of all objects */
-
-    for (ob = obj_list; ob; ob = ob->next_all)
-    {
-        cleanup_object(ob, ptable);
-    }
-
-    /* Clean up */
-    free_pointer_table(ptable);
 #endif /* NEW_CLEANUP */
 } /* cleanup_all_objects() */
 
@@ -994,6 +1130,10 @@ clear_ref_in_vector (svalue_t *svp, size_t num)
                 mapping_t *m;
                 p_int num_values;
 
+#ifdef DEBUG
+                if (p->u.map->hash != NULL)
+                    fatal("Mapping %p still has a hash part.\n", p->u.map);
+#endif
                 m = p->u.map;
                 m->ref = 0;
                 num_values = m->num_values;
@@ -1434,8 +1574,7 @@ garbage_collection(void)
     purge_action_sent();
     purge_shadow_sent();
     check_wizlist_for_destr();
-    cleanup_all_objects(); /* creates dirty mappings! */
-    compact_mappings(num_dirty_mappings, MY_TRUE);
+    cleanup_all_objects();
     if (current_error_trace)
     {
         free_array(current_error_trace);
@@ -2472,8 +2611,7 @@ garbage_collection (void)
     purge_action_sent();
     purge_shadow_sent();
     check_wizlist_for_destr();
-    cleanup_all_objects(); /* creates dirty mappings! */
-    compact_mappings(num_dirty_mappings, MY_TRUE);
+    cleanup_all_objects();
     if (current_error_trace)
     {
         free_array(current_error_trace);

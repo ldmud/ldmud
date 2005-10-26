@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+06-Mar-2002 (Lars Duening)  (3.3.413)
+  - (mapping, gcollect, backend) The compaction of dirty mappings is now
+       part of the object cleanup process. This needs some careful handling,
+       but simplifies the mapping code.
+
 05-Mar-2002 (Lars Duening)  (3.3.412)
   - (mempools, alloca.c, array.c, object.c, lex.c, ptrtable.c) The user
        space of a mempool block is now restricted to 256 bytes, to reduce

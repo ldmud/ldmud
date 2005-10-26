@@ -518,10 +518,6 @@ backend (void)
 
             extra_jobs_to_do = MY_FALSE;
 
-            if (num_dirty_mappings) {
-                compact_mappings((num_dirty_mappings+80) >> 5, MY_FALSE);
-                malloc_privilege = MALLOC_USER;
-            }
         } /* if (extra_jobs_to_do */
 
         do_state_check(2, "before get_message()");
@@ -960,7 +956,7 @@ static  mp_int num_cleanup; /* Number of objects to data-clean in this
                                   , time_stamp(), get_txt(obj->name));
 #endif
 
-                cleanup_object(obj, NULL);
+                cleanup_object(obj);
             }
 
             num_cleanup--;

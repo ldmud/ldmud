@@ -64,19 +64,17 @@ typedef p_uint word_t;
 #    define XM_PROG 1  /* (int32) allocating program's id-number */
 #    define XM_PC   2  /* (bytecode_p) inter_pc at the allocation */
 #    ifdef MALLOC_TRACE
-#        define XM_OVERHEAD (6)
+#        define XM_OVERHEAD (5)
 #        define XM_FILE   3  /* (const char*) allocating source file */
 #        define XM_LINE   4  /* (word_t) allocating line in source file */
-#        define XM_MAGIC  5  /* (word_t) The magic word */
 #    else
 #        define XM_OVERHEAD (3)
 #    endif /* MALLOC_TRACE */
 #else /* !MALLOC_LPC_TRACE */
 #    ifdef MALLOC_TRACE
-#        define XM_OVERHEAD (3)
+#        define XM_OVERHEAD (2)
 #        define XM_FILE  0  /* (const char*) allocating source file */
 #        define XM_LINE  1  /* (word_t) allocating line in source file */
-#        define XM_MAGIC 3  /* (word_t) The magic word */
 #    else
 #        define XM_OVERHEAD (0)
 #    endif /* MALLOC_TRACE */

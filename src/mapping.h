@@ -53,9 +53,11 @@ struct mapping_hash_s {
     mp_int        last_used;
       /* Time of the last change (add or delete) to the mapping.
        */
-    mapping_t   * next_dirty;  /* Next dirty mapping in the list */
     p_int         cond_deleted;
       /* Number of entries deleted from the condensed part
+       */
+    mapping_t  *next_dirty;
+      /* Next dirty mapping - for use by the cleanup code
        */
     struct map_chain_s *deleted;
       /* Protector mappings only: list of deleted entries, which are kept
@@ -150,12 +152,13 @@ struct mvf_info
 
 #define ref_mapping(m) ((m)->ref++, (m))
 
-/* void free_mapping(mapping_t *m)
+/* Bool free_mapping(mapping_t *m)
  *   Subtract one ref from mapping <m>, and free the mapping fully if
  *   the refcount reaches zero.
+ *   Return TRUE if the mapping is deallocated, and FALSE if not.
  */
 
-#define free_mapping(m) MACRO( if (--((m)->ref) <= 0) _free_mapping(m, MY_FALSE); )
+#define free_mapping(m) ( (--((m)->ref) <= 0) ? _free_mapping(m, MY_FALSE) : MY_FALSE )
 
 /* p_int deref_mapping(mapping_t *m)
  *   Subtract one ref from mapping <m>, but don't check if it needs to
@@ -173,7 +176,7 @@ extern mp_int num_dirty_mappings;
 
 extern mapping_t *allocate_mapping(mp_int size, mp_int num_values);
 extern mapping_t *allocate_cond_mapping(wiz_list_t * user, mp_int size, mp_int num_values);
-extern void _free_mapping(mapping_t *m, Bool no_data);
+extern Bool _free_mapping(mapping_t *m, Bool no_data);
 #define free_empty_mapping(m) _free_mapping(m, MY_TRUE)
 extern void free_protector_mapping(mapping_t *m);
 extern svalue_t *_get_map_lvalue(mapping_t *m, svalue_t *map_index, Bool need_lvalue, Bool check_size);
@@ -185,7 +188,7 @@ extern mapping_t *resize_mapping(mapping_t *m, mp_int new_width);
 #define copy_mapping(m) resize_mapping((m), (m)->num_values)
 extern mapping_t *add_mapping(mapping_t *m1, mapping_t *m2);
 extern void walk_mapping(mapping_t *m, void (*func)(svalue_t *key, svalue_t *val, void *extra), void *extra);
-extern void compact_mappings(mp_int num, Bool force);
+extern Bool compact_mapping(mapping_t *m, Bool force);
 extern mp_int total_mapping_size(void);
 extern size_t mapping_overhead(mapping_t *m);
 extern void set_mapping_user(mapping_t *m, object_t *owner);

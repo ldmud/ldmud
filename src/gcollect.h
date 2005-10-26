@@ -124,7 +124,7 @@ extern time_t time_last_gc;
 
 /* --- Prototypes --- */
 
-extern void cleanup_object (object_t * obj, ptrtable_t * ptable);
+extern void cleanup_object (object_t * obj);
 extern void garbage_collection(void);
 extern void setup_print_block_dispatcher(void);
 

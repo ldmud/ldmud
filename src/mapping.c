@@ -60,12 +60,10 @@
  * is always a power of 2.
  *
  * All mappings with a mapping_hash_t structure are considered 'dirty'
- * (and vice versa, only 'dirty' mappings have a mapping_hash_t)
- * and kept in a singly-linked list. The backend (or the garbage collector)
- * calls in regular intervals the function compact_mappings(), which
- * traverses the dirty list and 'cleans' the mappings by sorting the
- * hashed entries into the condensed part, removing the hashed part by
- * this.
+ * (and vice versa, only 'dirty' mappings have a mapping_hash_t).
+ * During the regular object cleanup, the backend will find and 'clean'
+ * the dirty mappings by sorting the hashed entries into the condensed part,
+ * removing the hashed part by this.
  *
  * Mappings maintain two refcounts: the main refcount for all references,
  * and in the hash structure a protector refcount for references as
@@ -134,14 +132,13 @@
  *       p_int        cond_deleted;
  *       p_int        ref;
  *       mp_int       last_used;
- *       map_chain_t *deleted;
  *       mapping_t   *next_dirty;
+ *       map_chain_t *deleted;
  *       map_chain_t *chains[ 1 +.mask ];
  *   }
  *
  *   This structure keeps track of the changes to a mapping. Every mapping
- *   with a hash part is considered 'dirty' and kept in the dirty mapping
- *   list. The list is linked through the .next_dirty pointer.
+ *   with a hash part is considered 'dirty'.
  *
  *   New entries to the mapping are kept in the hashtable made up by
  *   .chains[]. There are .mask+1 different chains, with .mask+1 always
@@ -171,6 +168,10 @@
  *   .last_used holds the time (seconds since the epoch) of the last addition
  *   or removal of an entry. It is used by the compaction algorithm to
  *   determine whether the mapping should be compacted or not.
+ *
+ *   The .next_dirty pointer is not used by the mapping module itself,
+ *   but is provided as courtesy for the cleanup code in the GC, to
+ *   avoid additional memory allocations during a low memory situation.
  *
  * -- map_chain_t --
  *
@@ -244,58 +245,12 @@ struct map_chain_s {
 
 /*-------------------------------------------------------------------------*/
 
-#define EMPTY_MAPPING_THRESHOLD 2000
-  /* Number of 'freed' empty mappings allowed in the dirty list
-   * at any time. This way the dirty list can be single-linked only
-   * and still allow fast 'freeing' of unused mappings.
-   * TODO: Make the list doubly-linked - the memory savings are irrelevant.
-   */
-
-static mapping_hash_t dirty_mapping_head_hash;
-  /* Auxiliary structure dirty_mapping_head can reference
-   */
-
-static mapping_t dirty_mapping_head
-  = {
-    /* ref         */ 1,
-    /* user        */ NULL,
-    /* num_values  */ 0,
-    /* num_entries */ 0,
-    /* cond        */ NULL,
-    /* hash        */ &dirty_mapping_head_hash,
-    };
-  /* Head of the list of (potentially) dirty mappings, ie. mappings
-   * with a hash_mapping part.
-   */
-
-static mapping_t *last_dirty_mapping = &dirty_mapping_head;
-  /* Last dirty mapping in the list.
-   */
-
 mp_int num_dirty_mappings = 0;
   /* Number of dirty mappings (excluding the head) in the list.
    */
 
 mp_int num_mappings = 0;
   /* Number of allocated mappings.
-   */
-
-static mp_int empty_mapping_load = 2*(-EMPTY_MAPPING_THRESHOLD);
-  /* The load of the dirty mapping list with empty mappings, computed
-   * as the number of empty dirty mappings minus the number of non-empty
-   * dirty mappings. If the difference reaches EMPTY_MAPPING_THRESHOLD,
-   * the empty mappings are removed by a call to remove_empty_mappings().
-   *
-   * The true value is computed only when needed - for the most time
-   * it is just incremented by 2 whenever a mapping becomes empty+dirty.
-   * This is reason for the negative base value: when the value becomes
-   * positive, it is time to recompute the true value.
-   */
-
-static mp_int empty_mapping_base = 0;
-  /* The number of dirty mappings at the time of the last call
-   * to remove_empty_mappings(). This value is used to compute
-   * the proper value of empty_mapping_load.
    */
 
 mapping_t *stale_mappings;
@@ -307,8 +262,6 @@ mapping_t *stale_mappings;
 
 /*-------------------------------------------------------------------------*/
 /* Forward declarations */
-
-static void remove_empty_mappings (void);
 
 #if 0
 
@@ -434,8 +387,8 @@ get_new_hash ( mapping_t *m, mp_int hash_size)
     /* These members don't really need a default initialisation
      * but it's here to catch bogies.
      */
-    hm->next_dirty = NULL;
     hm->deleted = NULL;
+    hm->next_dirty = NULL;
 
     /* Initialise the hashbuckets (there is at least one) */
     mcp = hm->chains;
@@ -446,27 +399,6 @@ get_new_hash ( mapping_t *m, mp_int hash_size)
 
     return hm;
 } /* get_new_hash() */
-
-/*-------------------------------------------------------------------------*/
-static INLINE void
-new_dirty_mapping (mapping_t *m)
-
-/* This mapping <m> just became dirty - insert it into the dirty
- * mapping list.
- */
-
-{
-    /* With this hash_mapping structure, the mapping counts
-     * as potentially dirty.
-     */
-    last_dirty_mapping->hash->next_dirty = m;
-    last_dirty_mapping = m;
-
-    num_dirty_mappings++;
-
-    /* Inform backend that there is a new mapping to condense */
-    extra_jobs_to_do = MY_TRUE;
-} /* new_dirty_mapping() */
 
 /*-------------------------------------------------------------------------*/
 static mapping_t *
@@ -541,7 +473,7 @@ get_new_mapping ( wiz_list_t * user, mp_int num_values
         /* With this hash_mapping structure, the mapping counts
          * as potentially dirty.
          */
-        new_dirty_mapping(m);
+        num_dirty_mappings++;
     }
 
     /* Initialise the mapping */
@@ -602,13 +534,14 @@ allocate_cond_mapping (wiz_list_t * user, mp_int size, mp_int num_values)
 } /* allocate_cond_mapping() */
 
 /*-------------------------------------------------------------------------*/
-void
+Bool
 _free_mapping (mapping_t *m, Bool no_data)
 
 /* Aliases: free_mapping(m)       -> _free_mapping(m, FALSE)
  *          free_empty_mapping(m) -> _free_mapping(m, TRUE)
  *
  * The mapping and all associated memory is deallocated resp. dereferenced.
+ * Always return TRUE (for use within the free_mapping() macro).
  *
  * If <no_data> is TRUE, all the svalues are assumed to be freed already
  * (the swapper uses this after swapping out a mapping). The function still
@@ -657,14 +590,10 @@ _free_mapping (mapping_t *m, Bool no_data)
         m->cond = NULL;
     }
 
-    /* If there is a hashed part, free that one, but keep the mapping
-     * itself allocated (to not disrupt the dirty-mapping list).
-     * Otherwise, just free the mapping.
-     */
+    /* Free the hashed data */
     if ( NULL != (hm = m->hash) )
     {
         map_chain_t **mcp, *mc, *next;
-        mapping_t *next_dirty;
         int i;
 
 #ifdef DEBUG
@@ -691,148 +620,24 @@ _free_mapping (mapping_t *m, Bool no_data)
             }
         } while (--i);
 
-        /* Replace this hash_mapping with an empty one and
-         * mark the mapping itself as empty.
-         */
-        next_dirty = hm->next_dirty;
         xfree(hm);
 
-        hm = get_new_hash(m, 0);
-        hm->next_dirty = next_dirty;
-        hm->last_used = 0;
-
-        m->hash = hm;
-        m->num_entries = 0;
-
-        /* Count this new empty mapping. If the load becomes positive,
-         * we have freed 200 mappings since the last call to
-         * remove_empty_mappings(). If that happens, call the function
-         * to at least recompute the true _load.
-         *
-         * '+2' in order to offset implicite '-1' caused by
-         * the mere existance of this dirty mapping.
+        /* Since this mapping had a hash, it was counted as 'dirty'.
+         * Update the statistic.
          */
-        if ( (empty_mapping_load += 2) > 0)
-            remove_empty_mappings();
+        num_dirty_mappings--;
     }
-    else
-    {
-        /* No hash: free the base structure.
-         */
 
-        LOG_SUB("free_mapping base", sizeof(*m));
-        m->user->mapping_total -= sizeof(*m);
-        check_total_mapping_size();
-        xfree(m);
-    }
-} /* free_mapping() */
-
-/*-------------------------------------------------------------------------*/
-#ifdef DEBUG
-
-static void
-check_dirty_mapping_list (void)
-
-/* Check the list of dirty mappings for consistency, generating a fatal()
- * error if not.
- */
-
-{
-    int i;
-    mapping_t *m;
-
-    for (m = &dirty_mapping_head, i = num_dirty_mappings; m && --i >= 0; )
-    {
-        m = m->hash->next_dirty;
-    }
-    if (!m)
-        fatal("expected %ld dirty mappings, found only %ld\n"
-             , (long)num_dirty_mappings, (long)num_dirty_mappings - i
-             );
-    if (m != last_dirty_mapping)
-        fatal("last_dirty_mapping not at end of list of %ld dirty mappings\n"
-             , (long)num_dirty_mappings
-             );
-    if (m->hash->next_dirty)
-        fatal("list of %ld dirty mapping list\n"
-             , (long)num_dirty_mappings
-             );
-}
-
-#endif
-
-/*-------------------------------------------------------------------------*/
-static void
-remove_empty_mappings (void)
-
-/* Weight the changes in the number of dirty mappings against
- * the number of empty mappings. If it crosses the threshhold, remove
- * the empty mappings from the list.
- */
-
-{
-    mapping_t **mp, *m, *last;
-    mapping_hash_t *hm;
-
-    /* Since the last call, only empty dirty mappings were counted in
-     * the empty_mapping_load. Offset this with the total number
-     * of dirty mappings in order to get the real load.
-     */
-    empty_mapping_load += empty_mapping_base - num_dirty_mappings;
-    empty_mapping_base = num_dirty_mappings;
-
-    if (empty_mapping_load <= -EMPTY_MAPPING_THRESHOLD)
-        return;
-
-    /* At this point we know that we have EMPTY_MAPPING_THRESHOLD
-     * empty free mappings in the dirty list.
+    /* Free the base structure.
      */
 
-#ifdef DEBUG
-    /* We have stored all these superflous zeroes.
-     * Now check that there is one in the proper place.
-     */
-    if (last_dirty_mapping->hash->next_dirty != 0)
-        fatal("Dirty mapping list not terminated\n");
-#endif
+    LOG_SUB("free_mapping base", sizeof(*m));
+    m->user->mapping_total -= sizeof(*m);
+    check_total_mapping_size();
+    xfree(m);
 
-    last_dirty_mapping->hash->next_dirty = 0;
-
-    /* Walk the dirty mapping list, deallocating pending
-     * empty mappings
-     */
-    last = &dirty_mapping_head;
-    mp = &dirty_mapping_head_hash.next_dirty;
-    m = *mp;
-    do {
-        hm = m->hash;
-        if (!m->ref && !m->num_entries)
-        {
-            LOG_SUB("remove_empty_mappings", (sizeof(*m) + SIZEOF_MH(hm)));
-            m->user->mapping_total -= sizeof(*m) + SIZEOF_MH(hm);
-            check_total_mapping_size();
-            xfree(m);
-            *mp = m = hm->next_dirty;
-            xfree(hm);
-            num_dirty_mappings--;
-            continue;
-        }
-        last = m;
-        mp = &hm->next_dirty;
-        m = *mp;
-    } while (m);
-    last_dirty_mapping = last;
-
-
-    /* Adjust the counters */
-
-    empty_mapping_load = 2*(-EMPTY_MAPPING_THRESHOLD) - empty_mapping_base;
-
-#ifdef DEBUG
-    check_dirty_mapping_list();
-#endif
-
-} /* remove_empty_mappings() */
+    return MY_TRUE;
+} /* _free_mapping() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -1152,7 +957,7 @@ _get_map_lvalue (mapping_t *m, svalue_t *map_index
             return NULL; /* Oops */
         }
         m->hash = hm;
-        new_dirty_mapping(m);
+        num_dirty_mappings++;
 
         /* Now insert the map_chain structure into its chain */
         hm->chains[0] = mc;
@@ -1305,7 +1110,7 @@ check_map_for_destr (mapping_t *m)
                         return;
                     }
                     m->hash = hm;
-                    new_dirty_mapping(m);
+                    num_dirty_mappings++;
                 }
 
                 hm->cond_deleted++;
@@ -1442,7 +1247,7 @@ remove_mapping (mapping_t *m, svalue_t *map_index)
                     return;
                 }
                 m->hash = hm;
-                new_dirty_mapping(m);
+                num_dirty_mappings++;
             }
 
             hm->last_used = current_time;
@@ -1583,7 +1388,6 @@ resize_mapping (mapping_t *m, mp_int new_width)
         hm2->used = hm->used;
         hm2->last_used = current_time;
         hm2->cond_deleted = 0;
-        hm2->next_dirty = NULL;
         hm2->deleted = NULL;
         hm2->ref = 0;
 
@@ -1677,7 +1481,7 @@ resize_mapping (mapping_t *m, mp_int new_width)
      */
 
     if ( NULL != m2->hash )
-        new_dirty_mapping(m2);
+        num_dirty_mappings++;
 
     m2->num_entries = m->num_entries;
 
@@ -2040,16 +1844,18 @@ walk_mapping ( mapping_t *m
 } /* walk_mapping() */
 
 /*-------------------------------------------------------------------------*/
-void
-compact_mappings (mp_int num, Bool force)
+Bool
+compact_mapping (mapping_t *m, Bool force)
 
-/* Compact the first <num> mappings in the dirty-mapping list which may
- * have to satisfy certain conditions.
+/* Compact the mapping <m>.
  *
- * If <force> is TRUE, the first <num> mappings are compacted unconditionally.
- * If <force> is FALSE, the mappings to be compacted have to
- *   - have a .last_used time of TIME_TO_COMPACT or more seconds earlier,
- *   - or have to have at least half of their condensed entries deleted.
+ * If <force> is TRUE, always compact the mapping.
+ * If <force> is FALSE, the mappings is compacted if
+ *   - TIME_TO_COMPACT or more seconds have elapsed since .last_used time.
+ *   - or if at least half of its condensed entries have been deleted.
+ *
+ * Return TRUE if the mapping has been freed altogether in the function
+ * (ie. <m> is now invalid), or FALSE if it still exists.
  *
  * The merger is a two step process: first, all hashed entries are
  * sorted, then the sorted entries are merged with the condensed part.
@@ -2061,12 +1867,35 @@ compact_mappings (mp_int num, Bool force)
  */
 
 {
-    mapping_t *m;     /* The current mapping to compact */
-    mapping_t *prev;  /* The previous dirty mapping, or NULL */
-    mapping_t *this;  /* The next dirty mapping to work */
+    int old_malloc_privilege = malloc_privilege;
+      /* Since it will be set temporarily to MALLOC_SYSTEM */
+
+    mapping_hash_t *hm;
+      /* The hash part of m (guaranteed to exist!) */
+    mapping_cond_t *cm;
+      /* The condensed part of m */
+    int num_values;
+      /* Number of values per entry */
+
+    mapping_t *m2;
+      /* Temporary holder for the compacted result mapping */
+    mapping_cond_t *cm2;
+      /* The new condensed part of the mapping */
+
+    map_chain_t *hook1, *hook2;
+      /* All hashed entries in two long chains.
+       */
+
+    mp_int count1, count2;
+    map_chain_t **mcpp, *mcp, *next;
+    map_chain_t *last_hash;
+      /* Auxiliaries */
+
+    mp_int runlength;
+      /* Current Mergesort partition length */
 
     malloc_privilege = MALLOC_SYSTEM;
-      /* compact_mappings() is called in very low memory situations,
+      /* compact_mappings() may be called in very low memory situations,
        * so it has to be allowed to use the system reserve.
        * Neat sideeffect: all allocations are guaranteed to work (or
        * the driver terminates).
@@ -2081,451 +1910,385 @@ compact_mappings (mp_int num, Bool force)
         last_indexing_protector.type = T_NUMBER;
     }
 
-    /* Restrict num to the number of dirty mappings */
-
-    if (num >= num_dirty_mappings)
-    {
-        num = num_dirty_mappings;
-    }
-    else
-    {
-        extra_jobs_to_do = MY_TRUE;
-    }
-
-    prev = &dirty_mapping_head;
-    this = dirty_mapping_head_hash.next_dirty;
-    while (--num >= 0 && this != NULL)
-    {
-
-        mapping_hash_t *hm;
-          /* The hash part of m (guaranteed to exist!) */
-        mapping_cond_t *cm;
-          /* The condensed part of m */
-        int num_values;
-          /* Number of values per entry */
-
-        mapping_t *m2;
-          /* Temporary holder for the compacted result mapping */
-        mapping_cond_t *cm2;
-          /* The new condensed part of the mapping */
-
-        map_chain_t *hook1, *hook2;
-          /* All hashed entries in two long chains.
-           */
-
-        mp_int count1, count2;
-        map_chain_t **mcpp, *mcp, *next;
-        map_chain_t *last_hash;
-          /* Auxiliaries */
-
-        mp_int runlength;
-          /* Current Mergesort partition length */
-
-        m = this;
-
 #ifdef DEBUG
-        if (!m->user)
-            fatal("No wizlist pointer for mapping\n");
+    if (!m->user)
+        fatal("No wizlist pointer for mapping\n");
 #endif
-        m->ref++; /* prevent freeing while using in case of recursive
-                   * mappings referenced by a deleted value
-                   */
 
-        check_map_for_destr(m);
+    m->ref++; /* prevent freeing while using in case of recursive
+               * mappings referenced by a deleted value
+               */
 
-        hm = m->hash;
-        cm = m->cond;
+    /* Make sure that we remove all destructed entries */
+    check_map_for_destr(m);
 
-        if (hm->ref) {
-            fatal("compact_mappings(): remaining ref count %ld!\n", hm->ref);
-        }
+    hm = m->hash;
+    cm = m->cond;
 
-        /* If this is an empty mapping awaiting deallocation,
-         * just do that (remember that we incremented the refcount!).
+    if (hm && hm->ref) {
+        fatal("compact_mappings(): remaining protector ref count %ld!\n", hm->ref);
+    }
+
+    /* Test if the mapping is dirty at all.
+     */
+    if (!hm)
+    {
+        LOG_SUB("compact_mappings: no hash part", 0);
+        malloc_privilege = old_malloc_privilege;
+        check_total_mapping_size();
+
+        return free_mapping(m);
+    }
+
+    /* If it has a hash part, it has been counted as dirty.
+     * Update the statistic.
+     */
+    num_dirty_mappings--;
+
+    /* Test if the mapping needs compaction at all.
+     * If not, just delete the hash part (if any).
+     */
+    if (!hm->used && !hm->cond_deleted)
+    {
+        LOG_SUB("compact_mappings: no need to", SIZEOF_MH(hm));
+        malloc_privilege = old_malloc_privilege;
+        m->user->mapping_total -= SIZEOF_MH(hm);
+        m->hash = NULL;
+        check_total_mapping_size();
+
+        xfree(hm);
+
+        /* the ref count has been incremented above; on the other
+         * hand, the last real reference might have gone with the
+         * deleted keys. If that is the case, free_mapping() will
+         * deallocate it (since we NULLed out the .hash).
          */
-        if (1 == m->ref && !m->num_entries)
-        {
-            /* Unlink this mapping */
-            num_dirty_mappings--;
-            this = hm->next_dirty;
-            prev->hash->next_dirty = this;
-            if (this == NULL)
-                last_dirty_mapping = prev;
+        return free_mapping(m);
+    }
 
-            LOG_SUB("compact_mappings: empty mapping", sizeof(*m) + SIZEOF_MH(hm));
-            m->user->mapping_total -= sizeof(*m) + SIZEOF_MH(hm);
-            xfree(m);
-            check_total_mapping_size();
-            xfree(hm);
-            empty_mapping_load -= 2;
-            continue;
-        }
-
-        /* Make sure that we remove all destructed entries */
-        check_map_for_destr(m);
-
-        /* Test if the mapping needs compaction at all.
-         * If not, just delete the hash part.
+    if (!force
+     && current_time - hm->last_used < TIME_TO_COMPACT
+     && hm->cond_deleted * 2 < m->num_entries - hm->used
+       )
+    {
+        /* This mapping doesn't qualify for compaction.
          */
-        if (!hm->used && !hm->cond_deleted)
-        {
-            /* Unlink this mapping */
-            num_dirty_mappings--;
-            this = hm->next_dirty;
-            prev->hash->next_dirty = this;
-            if (this == NULL)
-                last_dirty_mapping = prev;
+        malloc_privilege = old_malloc_privilege;
+        return MY_FALSE;
+    }
 
-            LOG_SUB("compact_mappings: no need to", SIZEOF_MH(hm));
-            m->user->mapping_total -= SIZEOF_MH(hm);
-            m->hash = NULL;
-            check_total_mapping_size();
+    /* This mapping can be compacted, and there is something to compact. */
 
-            /* the ref count has been incremented above; on the other
-             * hand, the last real reference might have gone with the
-             * deleted keys. If that is the case, free_mapping() will
-             * deallocate it (since we NULL out the .hash).
-             */
-            free_mapping(m);
+    /* Get the temporary result mapping (we need the condensed block
+     * anyway, and this way it's simple to keep the statistics
+     * straight).
+     */
 
-            xfree(hm);
-            continue;
-        }
+    num_values = m->num_values;
 
-        if (!force
-         && current_time - hm->last_used < TIME_TO_COMPACT
-         && hm->cond_deleted * 2 < m->num_entries - hm->used
-           )
-        {
-            /* This mapping doesn't qualify for compaction,
-             * proceed to the next.
-             */
-            prev = this;
-            this = this->hash->next_dirty;
-            if (this == NULL)
-                last_dirty_mapping = prev;
-            extra_jobs_to_do = MY_TRUE;
-            continue;
-        }
+    m2 = get_new_mapping(m->user, num_values, 0, m->num_entries);
+    cm2 = m2->cond;
 
-        /* This mapping can be compacted: unlink it */
-        num_dirty_mappings--;
-        this = this->hash->next_dirty;
-        prev->hash->next_dirty = this;
-        if (this == NULL)
-            last_dirty_mapping = prev;
-
-        /* Nope, this one needs compaction.
-         * Get the temporary result mapping (we need the condensed block
-         * anyway, and this way it's simple to keep the statistics
-         * straight).
+    if (cm2 != NULL)
+    {
+        /* --- Setup Mergesort ---
+         *
+         * Unravel all hash chains into two chains, dangling from hook1
+         * and hook2.
+         *
+         * The chains differ in length by at most 1 element. Within
+         * the chains, the elements are pairwise sorted.
+         *
+         * In this loop, hook1 is always the next chain to add to,
+         * and last_hash is the first element of the next pair to add.
          */
+        mcpp = hm->chains;
+        count1 = hm->mask;
+        hook1 = hook2 = NULL;
+        last_hash = NULL;
 
-        num_values = m->num_values;
-
-        m2 = get_new_mapping(m->user, num_values, 0, m->num_entries);
-        cm2 = m2->cond;
-
-        if (cm2 != NULL)
-        {
-            /* --- Setup Mergesort ---
-             *
-             * Unravel all hash chains into two chains, dangling from hook1
-             * and hook2.
-             *
-             * The chains differ in length by at most 1 element. Within
-             * the chains, the elements are pairwise sorted.
-             *
-             * In this loop, hook1 is always the next chain to add to,
-             * and last_hash is the first element of the next pair to add.
-             */
-            mcpp = hm->chains;
-            count1 = hm->mask;
-            hook1 = hook2 = NULL;
-            last_hash = NULL;
-
-            do {
-                mcp = *mcpp;
-                *mcpp++ = NULL; /* m no longer owns this chain */
-                while (mcp)
-                {
-                    next = mcp->next;
-
-                    if (last_hash)
-                    {
-                        p_int d = svalue_cmp(&(mcp->data[0]), &(last_hash->data[0]));
-
-                        if (d < 0) {
-                            last_hash->next = hook1;
-                            mcp->next = last_hash;
-                            hook1 = hook2;
-                            hook2 = mcp;
-                        } else {
-                            mcp->next = hook1;
-                            last_hash->next = mcp;
-                            hook1 = hook2;
-                            hook2 = last_hash;
-                        }
-                        last_hash = NULL;
-                    }
-                    else
-                    {
-                        last_hash = mcp;
-                    }
-                    mcp = next;
-                }
-            } while (--count1 >= 0);
-
-            /* Add the remaining odd element */
-            if (last_hash)
+        do {
+            mcp = *mcpp;
+            *mcpp++ = NULL; /* m no longer owns this chain */
+            while (mcp)
             {
-                last_hash->next = hook1;
-                hook1 = last_hash;
-            }
+                next = mcp->next;
 
-
-            /* --- Mergesort the hashed entries ---
-             *
-             * Sort hook1 and hook2 into hook1.
-             */
-            for (runlength = 2; runlength < hm->used; runlength <<= 1)
-            {
-                map_chain_t *out_hook1, *out_hook2, **out1, **out2;
-                  /* The output chains, which serve as input chains in
-                   * the next pass
-                   */
-
-                count1 = hm->used & (runlength-1);
-                count2 = hm->used & runlength;
-                if (!count1)
+                if (last_hash)
                 {
-                    out2 = &out_hook1;
-                    *out2 = hook2;
-                    while (--count2 >= 0) {
-                        out2 = &(*out2)->next;
+                    p_int d = svalue_cmp(&(mcp->data[0]), &(last_hash->data[0]));
+
+                    if (d < 0) {
+                        last_hash->next = hook1;
+                        mcp->next = last_hash;
+                        hook1 = hook2;
+                        hook2 = mcp;
+                    } else {
+                        mcp->next = hook1;
+                        last_hash->next = mcp;
+                        hook1 = hook2;
+                        hook2 = last_hash;
                     }
-                    hook2 = *out2;
-                    count1 = count2 = runlength;
-                    out1 = &out_hook2;
-                }
-                else if (!count2)
-                {
-                    out2 = &out_hook1;
-                    *out2 = hook1;
-                    do {
-                        out2 = &(*out2)->next;
-                    } while (--count1);
-                    hook1 = *out2;
-                    count1 = count2 = runlength;
-                    out1 = &out_hook2;
+                    last_hash = NULL;
                 }
                 else
                 {
-                    out1 = &out_hook1;
-                    out2 = &out_hook2;
+                    last_hash = mcp;
                 }
-
-                while (hook1)
-                {
-                    /* Sort the next runlength elements onto out1 */
-                    while (1) {
-                        p_int d = svalue_cmp(&(hook1->data[0]), &(hook2->data[0]));
-
-                        if (d > 0)
-                        {
-                            *out1 = hook2;
-                            out1 = &hook2->next;
-                            hook2 = *out1;
-                            if (!--count2)
-                            {
-                                *out1 = hook1;
-                                do {
-                                    out1 = &(*out1)->next;
-                                } while (--count1);
-                                hook1 = *out1;
-                                break;
-                            }
-                        }
-                        else
-                        {
-                            *out1 = hook1;
-                            out1 = &hook1->next;
-                            hook1 = *out1;
-                            if (!--count1)
-                            {
-                                *out1 = hook2;
-                                do {
-                                    out1 = &(*out1)->next;
-                                } while (--count2);
-                                hook2 = *out1;
-                                break;
-                            }
-                        }
-                    }
-
-                    /* Now switch the chains */
-                    {
-                        map_chain_t **temp;
-
-                        temp = out1;
-                        out1 = out2;
-                        out2 = temp;
-                    }
-                    count1 = count2 = runlength;
-                }
-
-                /* Terminate the out-chains and set them up
-                 * as next input chains.
-                 */
-                *out1 = NULL;
-                *out2 = NULL;
-                hook1 = out_hook1;
-                hook2 = out_hook2;
+                mcp = next;
             }
-            if (!hook1)
-                hook1 = hook2;
+        } while (--count1 >= 0);
+
+        /* Add the remaining odd element */
+        if (last_hash)
+        {
+            last_hash->next = hook1;
+            hook1 = last_hash;
+        }
 
 
-            /* --- Merge the old condensed part with the sorted lists ---
-             */
+        /* --- Mergesort the hashed entries ---
+         *
+         * Sort hook1 and hook2 into hook1.
+         */
+        for (runlength = 2; runlength < hm->used; runlength <<= 1)
+        {
+            map_chain_t *out_hook1, *out_hook2, **out1, **out2;
+              /* The output chains, which serve as input chains in
+               * the next pass
+               */
+
+            count1 = hm->used & (runlength-1);
+            count2 = hm->used & runlength;
+            if (!count1)
             {
-                size_t src_ix;  /* Index into the old keys */
-                svalue_t *src_key, *src_data;
-                svalue_t *dest_key, *dest_data;
+                out2 = &out_hook1;
+                *out2 = hook2;
+                while (--count2 >= 0) {
+                    out2 = &(*out2)->next;
+                }
+                hook2 = *out2;
+                count1 = count2 = runlength;
+                out1 = &out_hook2;
+            }
+            else if (!count2)
+            {
+                out2 = &out_hook1;
+                *out2 = hook1;
+                do {
+                    out2 = &(*out2)->next;
+                } while (--count1);
+                hook1 = *out2;
+                count1 = count2 = runlength;
+                out1 = &out_hook2;
+            }
+            else
+            {
+                out1 = &out_hook1;
+                out2 = &out_hook2;
+            }
 
-                src_ix = 0;
-                src_key = cm ? &(cm->data[0]) : NULL;
-                src_data = cm ? COND_DATA(cm, 0, num_values) : NULL;
-                dest_key = &(cm2->data[0]);
-                dest_data = COND_DATA(cm2, 0, num_values);
-
-                /* Do the actual merge.
-                 */
-                while (hook1 && cm != NULL && src_ix < cm->size)
-                {
-                    int d;
-
-                    if (src_key->type == T_INVALID)
-                    {
-                        src_ix++;
-                        src_key++;
-                        src_data += num_values;
-                        continue;
-                    }
-
-                    d = svalue_cmp(src_key, &(hook1->data[0]));
+            while (hook1)
+            {
+                /* Sort the next runlength elements onto out1 */
+                while (1) {
+                    p_int d = svalue_cmp(&(hook1->data[0]), &(hook2->data[0]));
 
                     if (d > 0)
                     {
-                        /* Take entry from hook1 */
-
-                        map_chain_t *temp;
-                        svalue_t    *src;
-                        int i;
-
-                        *dest_key++ = hook1->data[0];
-
-                        for (src = &(hook1->data[1]), i = num_values; i > 0; --i)
-                            *dest_data++ = *src++;
-
-                        temp = hook1;
-                        hook1 = temp->next;
-                        free_map_chain(m, temp, MY_TRUE);
+                        *out1 = hook2;
+                        out1 = &hook2->next;
+                        hook2 = *out1;
+                        if (!--count2)
+                        {
+                            *out1 = hook1;
+                            do {
+                                out1 = &(*out1)->next;
+                            } while (--count1);
+                            hook1 = *out1;
+                            break;
+                        }
                     }
                     else
                     {
-                        /* Take entry from the old condensed part */
+                        *out1 = hook1;
+                        out1 = &hook1->next;
+                        hook1 = *out1;
+                        if (!--count1)
+                        {
+                            *out1 = hook2;
+                            do {
+                                out1 = &(*out1)->next;
+                            } while (--count2);
+                            hook2 = *out1;
+                            break;
+                        }
+                    }
+                }
 
+                /* Now switch the chains */
+                {
+                    map_chain_t **temp;
+
+                    temp = out1;
+                    out1 = out2;
+                    out2 = temp;
+                }
+                count1 = count2 = runlength;
+            }
+
+            /* Terminate the out-chains and set them up
+             * as next input chains.
+             */
+            *out1 = NULL;
+            *out2 = NULL;
+            hook1 = out_hook1;
+            hook2 = out_hook2;
+        }
+        if (!hook1)
+            hook1 = hook2;
+
+
+        /* --- Merge the old condensed part with the sorted lists ---
+         */
+        {
+            size_t src_ix;  /* Index into the old keys */
+            svalue_t *src_key, *src_data;
+            svalue_t *dest_key, *dest_data;
+
+            src_ix = 0;
+            src_key = cm ? &(cm->data[0]) : NULL;
+            src_data = cm ? COND_DATA(cm, 0, num_values) : NULL;
+            dest_key = &(cm2->data[0]);
+            dest_data = COND_DATA(cm2, 0, num_values);
+
+            /* Do the actual merge.
+             */
+            while (hook1 && cm != NULL && src_ix < cm->size)
+            {
+                int d;
+
+                if (src_key->type == T_INVALID)
+                {
+                    src_ix++;
+                    src_key++;
+                    src_data += num_values;
+                    continue;
+                }
+
+                d = svalue_cmp(src_key, &(hook1->data[0]));
+
+                if (d > 0)
+                {
+                    /* Take entry from hook1 */
+
+                    map_chain_t *temp;
+                    svalue_t    *src;
+                    int i;
+
+                    *dest_key++ = hook1->data[0];
+
+                    for (src = &(hook1->data[1]), i = num_values; i > 0; --i)
+                        *dest_data++ = *src++;
+
+                    temp = hook1;
+                    hook1 = temp->next;
+                    free_map_chain(m, temp, MY_TRUE);
+                }
+                else
+                {
+                    /* Take entry from the old condensed part */
+
+                    int i;
+
+                    *dest_key++ = *src_key++;
+
+                    for (i = num_values; i > 0; --i)
+                        *dest_data++ = *src_data++;
+
+                    src_ix++;
+                }
+            } /* if (hook1 && src_ix < cm->size) */
+
+            /* Copy any remaining entries from the old condensed part
+             * or the misc_hook1
+             */
+            if (cm != NULL && src_ix < cm->size)
+            {
+                /* Copy from the old condensed part */
+
+                while (src_ix < cm->size)
+                {
+                    if (src_key->type != T_INVALID)
+                    {
                         int i;
 
                         *dest_key++ = *src_key++;
 
                         for (i = num_values; i > 0; --i)
                             *dest_data++ = *src_data++;
-
-                        src_ix++;
                     }
-                } /* if (hook1 && src_ix < cm->size) */
-
-                /* Copy any remaining entries from the old condensed part
-                 * or the misc_hook1
-                 */
-                if (cm != NULL && src_ix < cm->size)
-                {
-                    /* Copy from the old condensed part */
-
-                    while (src_ix < cm->size)
+                    else
                     {
-                        if (src_key->type != T_INVALID)
-                        {
-                            int i;
-
-                            *dest_key++ = *src_key++;
-
-                            for (i = num_values; i > 0; --i)
-                                *dest_data++ = *src_data++;
-                        }
-                        else
-                        {
-                            src_key++;
-                            src_data += num_values;
-                        }
-                        src_ix++;
+                        src_key++;
+                        src_data += num_values;
                     }
+                    src_ix++;
                 }
-                else
+            }
+            else
+            {
+                /* Copy from hook1 */
+
+                while (hook1)
                 {
-                    /* Copy from hook1 */
+                    map_chain_t *temp;
+                    svalue_t    *src;
+                    int i;
 
-                    while (hook1)
-                    {
-                        map_chain_t *temp;
-                        svalue_t    *src;
-                        int i;
+                    *dest_key++ = hook1->data[0];
 
-                        *dest_key++ = hook1->data[0];
+                    for (src = &(hook1->data[1]), i = num_values; i > 0; --i)
+                        *dest_data++ = *src++;
 
-                        for (src = &(hook1->data[1]), i = num_values; i > 0; --i)
-                            *dest_data++ = *src++;
-
-                        temp = hook1;
-                        hook1 = temp->next;
-                        free_map_chain(m, temp, MY_TRUE);
-                    }
+                    temp = hook1;
+                    hook1 = temp->next;
+                    free_map_chain(m, temp, MY_TRUE);
                 }
-            } /* --- End of Merge --- */
-        } /* --- if (cm2 != NULL) --- */
+            }
+        } /* --- End of Merge --- */
+    } /* --- if (cm2 != NULL) --- */
 
-        /* Switch the new key and data blocks from m2 to m, and
-         * vice versa for the old ones. We don't assign the hash block
-         * as we already deleted all the map_chain structures.
-         */
-        m->cond = cm2;
-        m2->cond = cm;
+    /* Switch the new key and data blocks from m2 to m, and
+     * vice versa for the old ones. We don't assign the hash block
+     * as we already deleted all the map_chain structures.
+     */
+    m->cond = cm2;
+    m2->cond = cm;
 
-        m->hash = NULL; /* Since we compacted it away */
+    m->hash = NULL; /* Since we compacted it away */
 
-        LOG_SUB("compact_mappings - remove old hash", SIZEOF_MH(hm));
-        m->user->mapping_total -= SIZEOF_MH(hm);
-        check_total_mapping_size();
-          /* The memorysize for the map_chain_t structure has already been
-           * subtracted.
-           */
+    LOG_SUB("compact_mappings - remove old hash", SIZEOF_MH(hm));
+    malloc_privilege = old_malloc_privilege;
+    m->user->mapping_total -= SIZEOF_MH(hm);
+    check_total_mapping_size();
+      /* The memorysize for the map_chain_t structure has already been
+       * subtracted.
+       */
 
-        free_mapping(m);
-          /* Undo the initial m->ref++; if there was a recursive
-           * reference which is now gone, the mapping will be deallocated
-           * now.
-           */
+    xfree(hm);
 
-        free_empty_mapping(m2);
-          /* Get rid of the temporary mapping and the old cond block.
-           */
+    free_empty_mapping(m2);
+      /* Get rid of the temporary mapping and the old cond block.
+       */
 
-        xfree(hm);
-    } /* while (num >= 0) */
+    return free_mapping(m);
+      /* Undo the initial m->ref++; if there was a recursive
+       * reference which is now gone, the mapping will be deallocated
+       * now.
+       */
 
-} /* compact_mappings() */
+} /* compact_mapping() */
 
 /*-------------------------------------------------------------------------*/
 #ifdef CHECK_MAPPING_TOTAL
