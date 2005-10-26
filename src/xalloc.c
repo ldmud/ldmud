@@ -57,6 +57,9 @@ typedef p_uint word_t;
 /*-------------------------------------------------------------------------*/
 
 /* The extra xalloc header fields.
+ * GC's write_malloc_trace() expects XM_FILE and XM_LINE at the end 
+ * of the header.
+ * TODO: Let the GC use the symbolic constants.
  */
 
 #ifdef MALLOC_LPC_TRACE

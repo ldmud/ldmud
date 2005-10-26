@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+29-Mar-2002 (Lars Duening)  (3.3.434)
+  - (config.h.in) The options MALLOC_CHECK and MALLOC_SBRK got mixed up.
+  - (gcollect.c) The cleanup code didn't remove the program from the swap
+      when it zeroed out a reference to a destructed blueprint. Later GCs
+      then followed this invalid pointer.
+
 27-Mar-2002 (Lars Duening)  (3.3.433)
   - (simulate.c, mapping) Since there is no longer a list of dirty mappings,
       and since the GC can handle dirty mappings, it is no longer feasible

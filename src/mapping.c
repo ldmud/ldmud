@@ -4290,15 +4290,15 @@ v_mkmapping (svalue_t *sp, int num_arg)
  */
 
 {
-    long i, length, num_values;
     mapping_t *m;
-    svalue_t *key;
+
+    m = NULL;
 
 #ifdef USE_STRUCTS
     if (sp[-num_arg+1].type == T_STRUCT)
     {
         struct_t * st;
-        int i;
+        long i, length;
 
         /* Check the arguments and determine the mapping length.
          */
@@ -4308,7 +4308,7 @@ v_mkmapping (svalue_t *sp, int num_arg)
         st = sp->u.strct;
         length = struct_size(st);
 
-        if (max_mapping_size && length * num_arg > max_mapping_size)
+        if (max_mapping_size && length > max_mapping_size)
             error("Illegal mapping size: %ld elements\n", length);
 
         /* Allocate the mapping and assign the values */
@@ -4330,6 +4330,9 @@ v_mkmapping (svalue_t *sp, int num_arg)
 
     if (sp[-num_arg+1].type == T_POINTER)
     {
+        long i, length, num_values;
+        svalue_t *key;
+
         /* Check the arguments and set length to the size of
          * the shortest array.
          */

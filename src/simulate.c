@@ -3172,6 +3172,8 @@ check_valid_path (string_t *path, object_t *caller, string_t* call_fun, Bool wri
  * If the operation is valid, the path to use is returned (always without
  * leading '/', the path "/" will be returned as ".").
  *
+ * The result string has its own reference, but may be <path> again.
+ *
  * If the operation is invalid, NULL is returned.
  */
 

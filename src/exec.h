@@ -89,7 +89,6 @@
  *
  * TODO: If the program_s is allocated separately from the rest,
  * TODO:: we could swap even if a program is used by clones.
- * TODO:: However, find out how often that would be useful.
  *
  *
  * Bytecode
@@ -730,6 +729,8 @@ struct program_s
     object_t       *blueprint;
       /* Counted pointer to the (possibly destructed) blueprint object,
        * or NULL if the blueprint has been destructed in a previous cycle.
+       * Note: Whenever this member is changed, make sure to remove
+       * the program from the swap ('remove_prog_swap(prog, MY_TRUE)').
        */
     int32           id_number;
       /* The id-number is unique among all programs and used to store

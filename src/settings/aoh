@@ -24,6 +24,7 @@ exec ./configure \
 --enable-use-parse-command=no \
 --enable-use-set-light=no \
 --enable-use-new-inlines=yes \
+--enable-opcprof=yes \
 --with-master-name=secure/master \
 --with-time-to-reset=900 \
 --with-portno=2345 \

@@ -502,6 +502,7 @@ cleanup_single_object (object_t * obj, cleanup_t * context)
     {
         free_object(obj->prog->blueprint, "cleanup object");
         obj->prog->blueprint = NULL;
+        remove_prog_swap(obj->prog, MY_TRUE);
     }
 
     /* Clean up all the variables */
@@ -749,9 +750,9 @@ write_malloc_trace (void * p)
  */
 
 {
-    WRITES(gout, ((char **)(p))[-3]);
+    WRITES(gout, ((char **)(p))[-2]);
     WRITES(gout, " ");
-    writed(gout, (int)((p_uint *)(p))[-2]);
+    writed(gout, (int)((p_uint *)(p))[-1]);
     WRITES(gout, "\n");
 } /* write_malloc_trace() */
 
@@ -945,7 +946,7 @@ gc_mark_program_ref (program_t *p)
         {
             dump_malloc_trace(1, p);
             fatal("First reference to program %p '%s', but ref count %ld != 0\n"
-                 , p, get_txt(p->name), (long)p->ref - 1
+                 , p, p->name ? get_txt(p->name) : "<null>", (long)p->ref - 1
                  );
         }
 
@@ -1043,7 +1044,7 @@ gc_mark_program_ref (program_t *p)
         {
             dump_malloc_trace(1, p);
             fatal("Program block %p '%s' referenced as something else\n"
-                 , p, get_txt(p->name));
+                 , p, p->name ? get_txt(p->name) : "<null>");
         }
     }
 } /* gc_mark_program_ref() */
@@ -1081,7 +1082,7 @@ gc_reference_destructed_object (object_t *ob)
             dump_malloc_trace(1, ob);
             fatal("First reference to destructed object %p '%s', "
                   "but ref count %ld != 0\n"
-                 , ob, get_txt(ob->name), (long)ob->ref
+                 , ob, ob->name ? get_txt(ob->name) : "<null>", (long)ob->ref
                  );
         }
 
@@ -1097,7 +1098,7 @@ gc_reference_destructed_object (object_t *ob)
             write_malloc_trace(ob);
             dump_malloc_trace(1, ob);
             fatal("Destructed object %p '%s' referenced as something else\n"
-                 , ob, get_txt(ob->name));
+                 , ob, ob->name ? get_txt(ob->name) : "<null>");
         }
     }
 } /* gc_reference_destructed_object() */
