@@ -124,7 +124,7 @@ For a detailed list of all changes see the file CHANGELOG.
            available (default is to allow sbrk()).
 
 
-25-Jun-2003 (Lars Duening) -- Release 3.2.10
+10-Jul-2003 (Lars Duening) -- Release 3.2.10
 
     - Changed efuns:
        + debug_info(): Removed the DID_MEM_UNUSED value from the DINFO_DATA:
@@ -168,6 +168,8 @@ For a detailed list of all changes see the file CHANGELOG.
            corruption.
        + Function calls by address and global variable accesses are no
            longer possible after set_this_object().
+       + Overflowing the value stack during a secure_apply() could
+           crash the driver in the error recovery.
 
     - Language:
        + catch(; nolog) is now an official feature.

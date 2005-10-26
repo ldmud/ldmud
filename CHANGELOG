@@ -1,16 +1,21 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-27-Jun-2002 (Lars Duening)  (3.3.457)
+10-Jul-2003 (Lars Duening)  (3.3.458)
+  - (interpret.c) When the value stack overflowed during a secure_apply(),
+       the secure_apply_error() routine failed to notice that the stack
+       elements had already been cleared out (reported by Bardioc).
+
+27-Jun-2003 (Lars Duening)  (3.3.457)
   - (xptmalloc.c) Added a heap_start variable so that assert_stack_gap()
        will compile (reported by Dafire).
   - (ptmalloc) Added Gawain's latest changes - thanks!
 
-26-Jun-2002 (Lars Duening)
+26-Jun-2003 (Lars Duening)
   - (interpret.c) Added compile-time check to make sure that MAX_USER_TRACE
        is not larger than MAX_TRACE.
 
-25-Jun-2002 (Lars Duening)  (3.3.456)
+25-Jun-2003 (Lars Duening)  (3.3.456)
   - (xalloc.c) On HP-UX machines, the stack is above the heap and is also
        growing upwards, which the heap/stack check didn't expect. I reworked
        the code to be more generic (reported by Rainer).
@@ -20,17 +25,17 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - (lex.c) Added macro __MAX_MALLOC__ to reflect the MAX_MALLOCED
        parameter (suggested by Coogan).
 
-18-May-2002 (Lars Duening)  (3.3.455)
+18-May-2003 (Lars Duening)  (3.3.455)
   - (sprintf.c) Removed a memory leak in efun printf() (reported by Dafire).
 
-07-May-2002 (Lars Duening)  (3.3.454)
+07-May-2003 (Lars Duening)  (3.3.454)
   - (simulate.c) The error() routine now takes care to zero out all
        pointer variables after freeing the referenced data. This way, if
        a recursive error occurs before the new reference is stored the
        driver won't try to free the same references again (reported by
        Freaky).
 
-05-May-2002 (Lars Duening)  (3.3.453)
+05-May-2003 (Lars Duening)  (3.3.453)
   - (lex.c) Ooops, I forgot that I had commented out the strong type
        pragmas when I experimented with an older mudlib (thanks, Ralph).
   - (ptmalloc/thread-m.h) The constraints for one asm statement operand
@@ -38,13 +43,13 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - (object.c) Made restore_xxx() even more robust towards CRLFs (thanks,
        Holger).
 
-03-May-2002 (Lars Duening)  (3.3.452)
+03-May-2003 (Lars Duening)  (3.3.452)
   - (simulate, interpret, func_spec, prolang.y) Added the new modifier
        'publish' to the catch() directive to have it call
        master::runtime_error() when an error occurs (suggested by
        Menaures).
 
-03-May-2002 (Lars Duening)  (3.3.451)
+03-May-2003 (Lars Duening)  (3.3.451)
   - (comm.c) When a pthread was cancelled, the flushing of the pending
        data happened after the socket was already shut down. Reason was that
        the threads were 'detached' upon creation, disabling the ability
@@ -52,7 +57,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - (object.c) The restore_svalue() routine now accepts a CR preceeding
        a LF as delimiter.
 
-30-Apr-2002 (Lars Duening)  (3.3.450)
+30-Apr-2003 (Lars Duening)  (3.3.450)
   - (ed.c) Only consecutive 'z'/'Z' commands do not re-print the current line;
        a 'z'/'Z' after a different command does (suggested by Elric).
   - (comm) When using PThreads, destructing an interactive object now
@@ -61,60 +66,60 @@ See the file HISTORY for a user-oriented summary of all the changes.
        terminate.
   - (comm.c) When not using MCCP but PThreads, all outputs were doubled.
 
-29-Apr-2002 (Lars Duening)  (3.3.449)
+29-Apr-2003 (Lars Duening)  (3.3.449)
   - (sprintf.c) When printing arrays with '%O', the size was given
        one too small.
   - (mregex.c) PCRE: The string arguments passed to pcre_exec() were wrong, 
        making repeated replacements within on string dangerous (e.g. in ed
        '749,$s!arg!strength!gp') (reported by Elric).
 
-24-Apr-2002 (Lars Duening)  (3.3.448)
+24-Apr-2003 (Lars Duening)  (3.3.448)
   - (interpret.c) If during a call of the type 'funcall(lfun-closure)' the
        object holding the closure was destructed and the closure deallocated,
        int_call_lambda() still read the now-invalid lambda structure after
        the actual call. This could lead to an inconsistency in the
        control stack, depending on the memory contents (reported by Bardioc).
 
-22-Apr-2002 (Lars Duening)  (3.3.447)
+22-Apr-2003 (Lars Duening)  (3.3.447)
   - (pkg-mccp, comm, gcollect.c, configure) Added MCCP support (thanks,
        Dafire!) (p-011012, p-020810-1).
 
-21-Apr-2002 (Lars Duening)  (3.3.446)
+21-Apr-2003 (Lars Duening)  (3.3.446)
   - (pkg-pgsql.c) Corrected a crasher during a GC.
   - (smalloc.c) Corrected the small-free-block statistics.
 
-19-Apr-2002 (Lars Duening)  (3.3.445)
+19-Apr-2003 (Lars Duening)  (3.3.445)
   - (pkg-pgsql, configure, other files) Added PostgreSQL implementation
        based on the code donated by Ctx (thanks!) (f-011229-0).
 
-13-Apr-2002 (Lars Duening)  (3.3.444)
+13-Apr-2003 (Lars Duening)  (3.3.444)
   - (smalloc.c) Removed compilation warnings.
 
-13-Apr-2002 (Lars Duening)  (3.3.443)
+13-Apr-2003 (Lars Duening)  (3.3.443)
   - (func_spec, object) The efuns save_value() and save_object() can now
        create savefiles in the old format as well.
 
-12-Apr-2002 (Lars Duening)  (3.3.442)
+12-Apr-2003 (Lars Duening)  (3.3.442)
   - (xalloc.c) Corrected a compilation error when MALLOC_TRACE was not
        defined.
 
-12-Apr-2002 (Lars Duening)  (3.3.441)
+12-Apr-2003 (Lars Duening)  (3.3.441)
   - (smalloc.c) Adjacent free small blocks are now merged automatically
        as soon as they are detected. This reduces the mem_consolidation()
        call to detecting and freeing totally unused small chunks.
   - (xalloc.c) The block dump of lost blocks now prints a proper hexdump
        instead of just dumping the data as-is.
 
-11-Apr-2002 (Lars Duening)  (3.3.440)
+11-Apr-2003 (Lars Duening)  (3.3.440)
   - (smalloc.c) A bit of code cleanup; and in preparation for the planned
        automatic small block defragmentation introduced 'free' flags for
        small blocks and a minimum payload size.
 
-09-Apr-2002 (Lars Duening)  (3.3.439)
+09-Apr-2003 (Lars Duening)  (3.3.439)
   - (efuns.c, strfuns, func_spec) Efuns filter() and map() can be used on
        strings.
 
-09-Apr-2002 (Lars Duening)  (3.3.438)
+09-Apr-2003 (Lars Duening)  (3.3.438)
   - (heartbeat.c) Removed the pooled allocation of heartbeat structures:
        Muds have spikes of high callout usage, but a low usage over
        the longterm average, so most of the pooled structures are not
@@ -129,41 +134,41 @@ See the file HISTORY for a user-oriented summary of all the changes.
        offer a non-decaying total sum of the evalcosts (suggested by
        Baba).
 
-07-Apr-2002 (Lars Duening)  (3.3.437)
+07-Apr-2003 (Lars Duening)  (3.3.437)
   - (mud/lp-245) Adapted the set_this_object() usage in the master.
   - (actions.c) Efun remove_action() can now remove all actions defined
       by an object (suggested by Menaures).
 
-04-Apr-2002 (Lars Duening)  (3.3.436)
+04-Apr-2003 (Lars Duening)  (3.3.436)
   - (structs.c) When remove_unreferenced_struct() freed the structs, it
       forgot to properly mark the memory blocks as 'allocated', so that
       the final sweep phase of the GC tried to free them again (reported
       by Nostradamus).
 
-30-Mar-2002 (Lars Duening)  (3.3.435)
+30-Mar-2003 (Lars Duening)  (3.3.435)
   - (comm.c) The driver now logs the pathname of the ERQ executable
       it attempts to start.
 
-29-Mar-2002 (Lars Duening)  (3.3.434)
+29-Mar-2003 (Lars Duening)  (3.3.434)
   - (config.h.in) The options MALLOC_CHECK and MALLOC_SBRK got mixed up.
   - (gcollect.c) The cleanup code didn't remove the program from the swap
       when it zeroed out a reference to a destructed blueprint. Later GCs
       then followed this invalid pointer.
 
-27-Mar-2002 (Lars Duening)  (3.3.433)
+27-Mar-2003 (Lars Duening)  (3.3.433)
   - (simulate.c, mapping) Since there is no longer a list of dirty mappings,
       and since the GC can handle dirty mappings, it is no longer feasible
       to keep an accurate count.
   - (efuns.c) to_struct() can now convert mappings to structs.
   - (mapping.c) mkmapping() can now convert structs to mappings.
 
-26-Mar-2002 (Lars Duening)  (3.3.432)
+26-Mar-2003 (Lars Duening)  (3.3.432)
   - (prolang.y) Constrained the switch() grammar to accept just blocks
       as body, not statements (reported by Menaures).
   - (comm.c) After removing a pending input_to, the proper noecho
       state is restored (provided by Ctx).
 
-25-Mar-2002 (Lars Duening)  (3.3.431)
+25-Mar-2003 (Lars Duening)  (3.3.431)
   - (port, simulate.c) Since memmem() is a GNU/Linux extension and buggy
       up to glibc 2.0, the driver now uses its own replacement all the
       time. But I adjusted the argument order to the one used by the
@@ -171,18 +176,18 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - (interpret.c) Function calls by address and global variable accesses
       now check if a set_this_object() is in effect.
 
-24-Mar-2002 (Lars Duening)  (3.3.430)
+24-Mar-2003 (Lars Duening)  (3.3.430)
   - (prolang.y) Assignment to struct members caused a fatal error if
       the struct did not have the named member. The problem was that
       in such a case an invalid type was recorded for the result (reported by
       Dafire).
 
-21-Mar-2002 (Lars Duening)  (3.3.429)
+21-Mar-2003 (Lars Duening)  (3.3.429)
   - (object.c) Shared strings are now saved in the <n> notation as well;
       this is mostly beneficial for saving endless repetitions of the
       same struct name (suggested by Bardioc).
 
-20-Mar-2002 (Lars Duening)  (3.3.428)
+20-Mar-2003 (Lars Duening)  (3.3.428)
   - (object.c) Restoring the efun closure "#e:," confused the
       savefile parser (thanks, Risky).
   - (func_spec, efuns, mstrings) New efun strrstr().
@@ -191,17 +196,17 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - (func_spec, mapping) New efun m_entry() to return all values for
       an entry at once.
 
-19-Mar-2002 (Lars Duening)  (3.3.427)
+19-Mar-2003 (Lars Duening)  (3.3.427)
   - (sprintf.c, closure) Modifier '#' used for '%O' and '%Q' produces
       output in a compact format (suggested by Menaures).
   - (func_spec, efuns) New efun rmember().
 
-19-Mar-2002 (Lars Duening)  (3.3.426)
+19-Mar-2003 (Lars Duening)  (3.3.426)
   - (structs.c, object.c) Saving and restoring struct now also saves
       the defining program's name, so that external restore modules
       can restore the values (reported by Bardioc).
 
-17-Mar-2002 (Lars Duening)  (3.3.425)
+17-Mar-2003 (Lars Duening)  (3.3.425)
   - (backend.c, gcollect.c) Corrections to the cleanup code: removed an
       interaction between the cleanup code and the swapper, which caused an
       incomplete cleanup; made sure that dirty mappings are compacted just
@@ -209,7 +214,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
       through the object list.
   - (call_out.c) Removed a memory leak in remove_call_out()/find_call_out().
 
-17-Mar-2002 (Lars Duening)  (3.3.424)
+17-Mar-2003 (Lars Duening)  (3.3.424)
   - (doc/master) Added missing manpages for the parse_command() support
       (reported by Zonk).
   - (main, simulate.c, configure) New commandline option '--filename-spaces'
@@ -217,39 +222,39 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - (object.c) Shared variable closures were saved without the '<num>=' header
       (reported by Menaures and Fiona).
 
-17-Mar-2002 (Lars Duening)  (3.3.423)
+17-Mar-2003 (Lars Duening)  (3.3.423)
   - (mapping.c) Removed a memory leak.
 
-15-Mar-2002 (Lars Duening)  (3.3.422)
+15-Mar-2003 (Lars Duening)  (3.3.422)
   - (gcollect.c) The NEW_CLEANUP code treated the driver hooks like other
       svalues, which was bad because it caused lambda-closure hooks bound
       to destructed objects to disappear. Since these closures can be re-bound
       on the fly, the cleanup code now does exactly that (reported by
       Nostradamus and Bardioc).
 
-14-Mar-2002 (Lars Duening)  (3.3.421)
+14-Mar-2003 (Lars Duening)  (3.3.421)
   - (driver.h, smalloc.c) Removed a build problem when MALLOC_CHECK
       was not defined, but MALLOC_TRACE was (reported by Nostradamus).
 
-13-Mar-2002 (Lars Duening)  (3.3.420)
+13-Mar-2003 (Lars Duening)  (3.3.420)
   - (xalloc.c, smalloc.c, configure) New configuration option
       '--enable-malloc-sbrk' to selectively allow the memory allocator to use
       sbrk() instead of malloc() where available (default is to allow sbrk()).
       The idea is to circumvent limitations some system put on sbrk().
       (suggested by Tomba)
 
-12-Mar-2002 (Lars Duening)  (3.3.419)
+12-Mar-2003 (Lars Duening)  (3.3.419)
   - (mapping.c, gcollect.c) The mapping GC forgot to mark the map-chain
        blocks as referenced (reported by Bardioc).
 
-11-Mar-2002 (Lars Duening)  (3.3.418)
+11-Mar-2003 (Lars Duening)  (3.3.418)
   - (structs.c) Removed a crasher caused by two uninitialized variables.
   - (mappings, gcollect.c) The GC can now collect mappings with hash
        parts.
   - (ptmalloc.c) More locking code - these should cover almost all
        cases (thanks, Gawain).
 
-10-Mar-2002 (Lars Duening)  (3.3.417)
+10-Mar-2003 (Lars Duening)  (3.3.417)
   - (prolang.y) Corrected the error handling when a struct member was
        duplicated and clashed with an inherited member (reported by
        Guandalug).
@@ -257,7 +262,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
        When a struct-defining program is recompiled, the compiler
        tries to reactivate the struct type objects if possible.
 
-08-Mar-2002 (Lars Duening)  (3.3.416)
+08-Mar-2003 (Lars Duening)  (3.3.416)
   - (swap.c, mapping) The swapper got out of sync when swapping mappings
        with destructed objects as keys. So far it was not a problem because
        mappings got compacted faster than they were swapped, and the swapper
@@ -265,7 +270,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
        in the condensed part. But with the new mapping compaction strategy
        a more thorough test became necessary.
 
-07-Mar-2002 (Lars Duening)  (3.3.415)
+07-Mar-2003 (Lars Duening)  (3.3.415)
   - (configure) New configuration option '--with-optimize' to select
        the optimization level in the generated Makefile: no, low,
        med, or high.
@@ -276,34 +281,34 @@ See the file HISTORY for a user-oriented summary of all the changes.
        by the pooled allocation.
   - (swap.c) Added sanity checks to the variable swapper.
 
-06-Mar-2002 (Lars Duening)  (3.3.414)
+06-Mar-2003 (Lars Duening)  (3.3.414)
   - (dumpstat.c) Corrected build warnings.
   - (mempools, lex.c) Cosmetic changes.
   - (mapping.c) Additional condition for mapping compaction: the number
        of entries in the hash part is equal to or exceeds the number
        of non-deleted condensed entries.
 
-06-Mar-2002 (Lars Duening)  (3.3.413)
+06-Mar-2003 (Lars Duening)  (3.3.413)
   - (mapping, gcollect, backend) The compaction of dirty mappings is now
        part of the object cleanup process. This needs some careful handling,
        but simplifies the mapping code.
 
-05-Mar-2002 (Lars Duening)  (3.3.412)
+05-Mar-2003 (Lars Duening)  (3.3.412)
   - (mempools, alloca.c, array.c, object.c, lex.c, ptrtable.c) The user
        space of a mempool block is now restricted to 256 bytes, to reduce
        fragmentation issues in the large block heap.
 
-05-Mar-2002 (Lars Duening)  (3.3.411)
+05-Mar-2003 (Lars Duening)  (3.3.411)
   - (gcollect.c, object.c) Inserted checks so that the driver doesn't try
        to access the non-existing name of the default wizlist entry (in
        particular the GC) (reported by Bardioc).
 
-03-Mar-2002 (Lars Duening)  (3.3.410)
+03-Mar-2003 (Lars Duening)  (3.3.410)
   - (mapping, backend.c, gcollect.c) Experimental: dirty mappings are
        not compacted immediately, but only after a certain time (for now
        10 minutes) since the last change has elapsed.
 
-03-Mar-2002 (Lars Duening)  (3.3.409)
+03-Mar-2003 (Lars Duening)  (3.3.409)
   - (dumpstat.c) Added the object load time to the OBJ_DUMP data (suggested by
        Menaures).
   - (dumpstat.c) Removed a memory leak in dumpstat() and dumpstat_dest().
@@ -313,11 +318,11 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - (ed.c) Consecutive 'z' or 'Z' commands no longer repeat the previous
        current line (suggested by Menaures).
 
-02-Mar-2002 (Lars Duening)  (3.3.408)
+02-Mar-2003 (Lars Duening)  (3.3.408)
   - (configure) It would be useful if I actually updated the configure
        script.
 
-02-Mar-2002 (Lars Duening)  (3.3.407)
+02-Mar-2003 (Lars Duening)  (3.3.407)
   - (ptmalloc.c) Added some documentation and error checks (thanks, Gawain).
   - (configure, smalloc) Removed the CHECK_SMALLOC_TOTAL debugging code -
        the problem is fixed.
@@ -327,72 +332,72 @@ See the file HISTORY for a user-oriented summary of all the changes.
        in 3.3.399, though the particular string 'DEBUG: MEM ' has been
        dropped from the output.
 
-02-Mar-2002 (Lars Duening)  (3.3.406)
+02-Mar-2003 (Lars Duening)  (3.3.406)
   - (gcollect.c) During the 'clear' phase of the GC, struct member elements
        weren't marked as cleared, which prevented proper counting in the
        'count' phase and caused the referenced memory blocks being deallocated
        prematurely in the 'sweep' phase (reported by Bardioc).
   - (mapping.c) Fixed a memory leak in efun m_add().
 
-01-Mar-2002 (Lars Duening)  (3.3.405)
+01-Mar-2003 (Lars Duening)  (3.3.405)
   - (func_spec, object) New efun variable_exists() and
        variable_list().
 
-27-Feb-2002 (Lars Duening)  (3.3.404)
+27-Feb-2003 (Lars Duening)  (3.3.404)
   - (interpret.c) Improved the error message for when 'mapping[a,b]' is used
        with incorrect types at runtime.
 
-27-Feb-2002 (Lars Duening)  (3.3.403)
+27-Feb-2003 (Lars Duening)  (3.3.403)
   - (gcollect.c, swap.c, mempools) During a the GC a new swap membuffer could
        be allocated and then marked 'unreferenced' by the GC, subsequently
        causing memory corruption as the swapper continued to use it. The
        memory buffers are now held on to during the GC and only freed
        afterwards.
 
-24-Feb-2002 (Lars Duening)  (3.3.402)
+24-Feb-2003 (Lars Duening)  (3.3.402)
   - (strfuns.c) Made the strbuf allocations resilient against out-of-memory
        conditions.
   - (xalloc) rexalloc() now accepts the MALLOC_TRACE information. The
        normal implementation doesn't use it, but they are useful when
        instrumenting the allocator code.
 
-24-Feb-2002 (Lars Duening)  (3.3.401)
+24-Feb-2003 (Lars Duening)  (3.3.401)
   - (interpret.c) With special reference indexing of struct members,
        the struct refcount was decremented once too often.
 
-23-Feb-2002 (Lars Duening)  (3.3.400)
+23-Feb-2003 (Lars Duening)  (3.3.400)
   - (smalloc.c, xalloc.c) Corrected two fatal typos.
 
-23-Feb-2002 (Lars Duening)  (3.3.399)
+23-Feb-2003 (Lars Duening)  (3.3.399)
   - (smalloc.c, xalloc.c) All esbrk() requests are logged on stdout
        as 'DEBUG: MEM ...' messages. This is to find out why certain
        muds use so much memory lately.
 
-21-Feb-2002 (Lars Duening)  (3.3.398)
+21-Feb-2003 (Lars Duening)  (3.3.398)
   - (mempools.c) Corrected a compilation problem.
 
-21-Feb-2002 (Lars Duening)  (3.3.397)
+21-Feb-2003 (Lars Duening)  (3.3.397)
   - (lex.c) Macro __MSDOS_FS__ is defined on systems using the
        MS-DOS filesystem conventions.
 
-20-Feb-2002 (Lars Duening)  (3.3.396)
+20-Feb-2003 (Lars Duening)  (3.3.396)
   - (mempools, efuns.c) Added the table sizes to the debug_info(DINFO_DATA,
        DID_STATUS) result.
 
-20-Feb-2002 (Lars Duening)  (3.3.395)
+20-Feb-2003 (Lars Duening)  (3.3.395)
   - (mempools, files.c, swap.c, object.c) The file reading efuns (read_file(),
        read_bytes(), restore_()) and the swapper now use a persistent buffer
        to hold the variable data in memory. Goal is to avoid allocations and
        deallocations of large memory blocks which worsen the memory
        fragmentation.
 
-18-Feb-2002 (Lars Duening)  (3.3.394)
+18-Feb-2003 (Lars Duening)  (3.3.394)
   - (smalloc, efuns.c) Since smalloc can split up large small blocks and
        handle oversized ones, having the special case of 'unused space' in the
        current small chunk is no longer necessary. This also means that the
        DID_MEM_UNUSED value from debug_info() no longer exists (b-020506).
 
-16-Feb-2002 (Lars Duening)  (3.3.393)
+16-Feb-2003 (Lars Duening)  (3.3.393)
   - (smalloc, backend.c, gcollect.c) The smalloc freelist consolidation
        is now also called from the backend and does its job whenever
        the number of free small blocks is twice the amount the last
@@ -405,31 +410,31 @@ See the file HISTORY for a user-oriented summary of all the changes.
        instance of the fmt_state_t buffer, avoided repeated (de)allocations
        of that 130KB structure.
 
-16-Feb-2002 (Lars Duening)  (3.3.392)
+16-Feb-2003 (Lars Duening)  (3.3.392)
   - (smalloc.c) Since parsing the min-small-malloc already requires
        a small chunk allocation, the small chunk allocation using the new
        chunk size is also forced to go directly to the system.
 
-15-Feb-2002 (Lars Duening)  (3.3.391)
+15-Feb-2003 (Lars Duening)  (3.3.391)
   - (ptmalloc) Gawain provided the first locking code for the GC.
   - (interpret.c) On 'too deep recursion' errors, also print the depth
        and recursion limits. This information is somewhat redundant, but
        makes the error logs easier to read.
 
-12-Feb-2002 (Lars Duening)  (3.3.390)
+12-Feb-2003 (Lars Duening)  (3.3.390)
   - (prolang.y) The illegal switch-case ranges like '100..50' now generate
        an error message (reported by Menaures).
 
-08-Feb-2002 (Lars Duening)  (3.3.389)
+08-Feb-2003 (Lars Duening)  (3.3.389)
   - (ptmalloc) Corrected a compilation problem on x86 gcc (reported
        by Nostradamus).
 
-07-Feb-2002 (Lars Duening)  (3.3.388)
+07-Feb-2003 (Lars Duening)  (3.3.388)
   - (prolang.y) Corrected a fatal error in the 'break'/'continue'
        handling.
   - (configure) Corrected the check for pthread_atfork().
 
-06-Feb-2002 (Lars Duening)  (3.3.387)
+06-Feb-2003 (Lars Duening)  (3.3.387)
   - (prolang.y) With the increasing program sizes, using 16-Bit offsets
        for the 'break' and 'continue' branches was no longer enough. They
        might hold the final offsets, but during compilation they stored
@@ -442,7 +447,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
        threadsafe (thanks, Gawain).
   - (configure) The check for pthread_atfork() was unreliable.
 
-04-Feb-2002 (Lars Duening)  (3.3.386)
+04-Feb-2003 (Lars Duening)  (3.3.386)
   - (smalloc.c) Small chunks (except for the first one) are now allocated
        from the large blocks. Reason is that during a consolidation, unused
        small chunks are returned to the large blocks. Without this change,
@@ -452,41 +457,41 @@ See the file HISTORY for a user-oriented summary of all the changes.
        memory was in use (reported by Coogan and Dafire, reproduced by
        Menaures).
 
-02-Feb-2002 (Lars Duening)  (3.3.385)
+02-Feb-2003 (Lars Duening)  (3.3.385)
   - (interpret.c) Assignments to multi-level struct references (a->b->c)
        didn't work (reported by Dafire).
 
-30-Jan-2002 (Lars Duening)  (3.3.384)
+30-Jan-2003 (Lars Duening)  (3.3.384)
   - (simulate.c) Removed a memory leak in the warnf() routine (reported
        by Dafire).
 
-29-Jan-2002 (Lars Duening)  (3.3.383)
+29-Jan-2003 (Lars Duening)  (3.3.383)
   - (structs.c, swap.c) Swapping struct values no longer changes the
        refcounts of the referenced type objects. This avoids
        a racing condition during the GC, and also prevents a typeobject
        from being freed while swapped-out values still require it
        (reported by Bardioc).
 
-29-Jan-2002 (Lars Duening)  (3.3.382)
+29-Jan-2003 (Lars Duening)  (3.3.382)
   - (smalloc.c) In mem_increment_size(), the internal size of the
        memoryblock was most cases computed one word too small.
 
-28-Jan-2002 (Lars Duening)  (3.3.381)
+28-Jan-2003 (Lars Duening)  (3.3.381)
   - (prolang.y, interpret.c) Improved the error message when a given
        struct doesn't match the expected struct type.
   - (prolang.y) The compiler now checks in struct definitions if a
        given base struct is complete. This also
        catches 'struct Foo (Foo) { ..  }'.
 
-27-Jan-2002 (Lars Duening)  (3.3.380)
+27-Jan-2003 (Lars Duening)  (3.3.380)
   - (object.c) Restoring a plain lfun-closure no longer worked (reported
        by Bardioc).
 
-26-Jan-2002 (Lars Duening)  (3.3.379)
+26-Jan-2003 (Lars Duening)  (3.3.379)
   - (prolang.y) Corrected a small bug in the code generation for
        operators &&= and ||=.
 
-26-Jan-2002 (Lars Duening)  (3.3.378)
+26-Jan-2003 (Lars Duening)  (3.3.378)
   - (main, lex, prolang, object, simulate.c, configure) Removed the
        configuration option INITIALIZATION_BY___INIT and changed the driver
        to always use __INIT(). However, the variable sharing between clone
@@ -496,96 +501,96 @@ See the file HISTORY for a user-oriented summary of all the changes.
        --enable-share-variables and with the commandline arguments
        --share-variables and --init-variables.
 
-26-Jan-2002 (Lars Duening)  (3.3.377)
+26-Jan-2003 (Lars Duening)  (3.3.377)
   - (prolang.y) Removed a compilation problem (reported by Markus).
   - (xptmalloc.c) Removed compiler warnings regarding intentionally
        unused variables.
 
-26-Jan-2002 (Lars Duening)  (3.3.376)
+26-Jan-2003 (Lars Duening)  (3.3.376)
   - (configure) The check for pthread_atfork() never succeeded (reported by
        Nostradamus).
   - (object.c) Removed a compiler warning (reported by Nostradamus).
   - (prolang.y) Removed a compilation problem.
 
-25-Jan-2002 (Lars Duening)  (3.3.374+.375)
+25-Jan-2003 (Lars Duening)  (3.3.374+.375)
   - (prolang.y, interpret.c, func_spec) Implemented short-circuit evaluation
        for the operators '&&=' and '||='.
 
-25-Jan-2002 (Lars Duening)  (3.3.373)
+25-Jan-2003 (Lars Duening)  (3.3.373)
   - (bitstrings.c, mstrings, efuns.c, interpret.c, lex.c) Corrected a string
        refcount error in and/or/xor_bits() (reported by Markus).
 
-24-Jan-2002 (Lars Duening)  (3.3.372)
+24-Jan-2003 (Lars Duening)  (3.3.372)
   - (lex.c) Included #pragma xxx_types settings are no longer restricted
        to the include file's scope (reported by Gnomi).
 
-24-Jan-2002 (Lars Duening)  (3.3.371)
+24-Jan-2003 (Lars Duening)  (3.3.371)
   - (object.c) save/restore didn't look out for shared closures, which
        could lead to endless recursions.
   - (prolang.y) When compiling the context for inline closures, references
        to local variables (for initialisation) were already redirected
        into the closure.
 
-23-Jan-2002 (Lars Duening)  (3.3.370)
+23-Jan-2003 (Lars Duening)  (3.3.370)
   - (configure, ptmalloc.c) Not all systems provide pthread_atfork(),
        so configure now checks for it and activates a dummy if
        necessary.
 
-23-Jan-2002 (Lars Duening)  (3.3.369)
+23-Jan-2003 (Lars Duening)  (3.3.369)
   - (structs) Swapping structs during a GC triggered a sanity check
        in error (reported by Bardioc).
 
-23-Jan-2002 (Lars Duening)  (3.3.368)
+23-Jan-2003 (Lars Duening)  (3.3.368)
   - (xalloc.c) I confused two function arguments in the implementation
        of rexalloc() *blush*.
 
-22-Jan-2002 (Lars Duening)  (3.3.367)
+22-Jan-2003 (Lars Duening)  (3.3.367)
   - (prolang.y) The typetracking for assignments to a struct member
        was faulty (reported by Markus).
 
-22-Jan-2002 (Lars Duening)  (3.3.366)
+22-Jan-2003 (Lars Duening)  (3.3.366)
   - (xalloc.c) rexalloc() and malloc_increment_size() didn't update the
        xalloc_stat statistics, which could lead to a wrap-around of
        that number. Also, rexalloc() is now first trying a
        malloc_increment_size().
 
-22-Jan-2002 (Lars Duening)  (3.3.365)
+22-Jan-2003 (Lars Duening)  (3.3.365)
   - (efuns.c) Efun member() crashed when given a struct as second
        argument (reported by Markus).
   - (etc/lpc.xml) LPC syntax highlighting for KDE's kate (thanks, Menaures!)
   - (prolang.y, interpret.c, closure.c) Implemented struct lookups
        on 'mixed' expressions (suggested by Markus).
 
-19-Jan-2002 (Lars Duening)  (3.3.364)
+19-Jan-2003 (Lars Duening)  (3.3.364)
   - (configure) The '--with-malloc' option didn't quite work (reported
        by Nostradamus).
 
-19-Jan-2002 (Lars Duening)  (3.3.363)
+19-Jan-2003 (Lars Duening)  (3.3.363)
   - (structs.c, gcollect) The GC crashed when encountering self-referential
        structs (reported by Nostradamus).
 
-19-Jan-2002 (Lars Duening)  (3.3.362)
+19-Jan-2003 (Lars Duening)  (3.3.362)
   - (object.c) Changed the error thrown by replace_program() to
        a mere warning.
 
-19-Jan-2002 (Lars Duening)  (3.3.361)
+19-Jan-2003 (Lars Duening)  (3.3.361)
   - (object.c) Restricted replace_program() on the first inherited
        program if that program has virtually inherited variables.
        See b-030119 for an explanation.
 
-18-Jan-2002 (Lars Duening)  (3.3.360)
+18-Jan-2003 (Lars Duening)  (3.3.360)
   - (ptmalloc) Gawain provided a bugfix and more work towards GC
        support (yes, my previous enthusiasm was premature).
 
-17-Jan-2002 (Lars Duening)  (3.3.359)
+17-Jan-2003 (Lars Duening)  (3.3.359)
   - (prolang.h) Corrected a compilation problem when using ptmalloc.
 
-17-Jan-2002 (Lars Duening)  (3.3.358)
+17-Jan-2003 (Lars Duening)  (3.3.358)
   - (ptmalloc) Gawain added GC support to ptmalloc - yay!
   - (configure) New with-malloc setting 'default' selects either smalloc
        or ptmalloc depending on the support and selection of PThreads.
 
-16-Jan-2002 (Lars Duening)  (3.3.357)
+16-Jan-2003 (Lars Duening)  (3.3.357)
   - (interpret.c) The 'indexing one past' for strings didn't work
        with the empty string (reported by Zonk).
   - (prolang.y) When redefining a function, the redefinition can now
@@ -593,18 +598,18 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - (lex.c) Escaping newlines in #if conditions on Windows didn't
        work (reported by Zonk)
 
-11-Jan-2002 (Lars Duening)  (3.3.356)
+11-Jan-2003 (Lars Duening)  (3.3.356)
   - (efuns.c) to_string(struct) didn't print the name of the struct,
        and leaked memory (reported by Zonk).
   - (object.c, prolang.y) Corrected another refcount error in struct
        type instances (reported by Zonk).
 
-08-Jan-2002 (Lars Duening)  (3.3.355)
+08-Jan-2003 (Lars Duening)  (3.3.355)
   - (lex, prolang.y, simul_efun.c) Exported the initialisation of a global
        identifier into a single function, to collect all the values in
        one place.
 
-07-Jan-2002 (Lars Duening)  (3.3.354)
+07-Jan-2003 (Lars Duening)  (3.3.354)
   - (several files) Removed the 'no-blueprint' configuration option: there
        code is stable.
 

@@ -16421,7 +16421,7 @@ apply (string_t *fun, object_t *ob, int num_arg)
 {
     tracedepth = 0;
     return sapply_int(fun, ob, num_arg, MY_FALSE, MY_TRUE);
-}
+} /* apply() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -16459,7 +16459,11 @@ secure_apply_error ( svalue_t *save_sp, struct control_stack *save_csp
         pop_control_stack();
     }
 
-    inter_sp = _pop_n_elems (inter_sp - save_sp, inter_sp);
+    if (inter_sp > save_sp)
+        inter_sp = _pop_n_elems (inter_sp - save_sp, inter_sp);
+        /* Note: On a stack overflow, the stack_overflow() routine
+         * already removed the values from the stack
+         */
 
     if (num_error == 3)
     {

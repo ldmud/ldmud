@@ -126,7 +126,7 @@ clean:
 distclean: clean
 	$(RM) ldmud@EXEEXT@ config.status machine.h Makefile config.cache config.log
 	$(RM) config.h config.status config.status.old
-	$(RM) util/Makefile util/erq/Makefile util/xerq/Makefile
+	$(RM) util/Makefile util/erq/Makefile util/xerq/Makefile util/indent/Makefile
 
 tags: $(SRC)
 	ctags $(SRC)
