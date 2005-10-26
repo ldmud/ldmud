@@ -2384,7 +2384,24 @@ static struct malloc_par mp_;
 */
 
 #ifdef ENABLE_GC_SUPPORT
-static rwlock_t gc_lock;
+static cond_t gc_lock_cond = COND_INITIALIZER;
+static cond_t gc_free_cond = COND_INITIALIZER;
+static mutex_t gc_lock_mutex = MUTEX_INITIALIZER;
+static int gc_lock = 0;
+
+static void lock_gc() {
+    mutex_lock(&gc_lock_mutex);
+    if(gc_lock < 0) cond_wait(&gc_lock_cond, &gc_lock_mutex);
+    ++gc_lock;
+    mutex_unlock(&gc_lock_mutex);
+}
+
+static void unlock_gc() {
+    mutex_lock(&gc_lock_mutex);
+    --gc_lock;
+    if(gc_lock <= 0) cond_broadcast(&gc_free_cond);
+    mutex_unlock(&gc_lock_mutex);
+}
 #endif
 
 #if __STD_C
@@ -3416,7 +3433,7 @@ public_mALLOc(size_t bytes)
   if(!ar_ptr)
     return 0;
 #ifdef ENABLE_GC_SUPPORT
-  mutex_rwlock_rdlock(&gc_lock);
+  lock_gc();
 #endif
   victim = _int_malloc(ar_ptr, bytes);
   if(!victim) {
@@ -3442,7 +3459,7 @@ public_mALLOc(size_t bytes)
   assert(!victim || chunk_is_mmapped(mem2chunk(victim)) ||
 	 ar_ptr == arena_for_chunk(mem2chunk(victim)));
 #ifdef ENABLE_GC_SUPPORT
-  mutex_rwlock_unlock(&gc_lock);
+  unlock_gc();
 #endif
   return victim;
 }
@@ -3466,7 +3483,7 @@ public_fREe(Void_t* mem)
   p = mem2chunk(mem);
 
 #ifdef ENABLE_GC_SUPPORT
-  mutex_rwlock_rdlock(&gc_lock);
+  lock_gc();
 #endif
 
 #if HAVE_MMAP
@@ -3474,7 +3491,7 @@ public_fREe(Void_t* mem)
   {
     munmap_chunk(p);
 #ifdef ENABLE_GC_SUPPORT
-    mutex_rwlock_unlock(&gc_lock);
+    unlock_gc();
 #endif
     return;
   }
@@ -3495,7 +3512,7 @@ public_fREe(Void_t* mem)
   (void)mutex_unlock(&ar_ptr->mutex);
 
 #ifdef ENABLE_GC_SUPPORT
-  mutex_rwlock_unlock(&gc_lock);
+  unlock_gc();
 #endif
 
 }
@@ -3550,7 +3567,7 @@ public_rEALLOc(Void_t* oldmem, size_t bytes)
 #endif
 
 #ifdef ENABLE_GC_SUPPORT
-  mutex_rwlock_rdlock(&gc_lock);
+  lock_gc();
 #endif
 
   ar_ptr = arena_for_chunk(oldp);
@@ -3576,7 +3593,7 @@ public_rEALLOc(Void_t* oldmem, size_t bytes)
   assert(!newp || chunk_is_mmapped(mem2chunk(newp)) ||
 	 ar_ptr == arena_for_chunk(mem2chunk(newp)));
 #ifdef ENABLE_GC_SUPPORT
-  mutex_rwlock_unlock(&gc_lock);
+  unlock_gc();
 #endif
   return newp;
 }
@@ -3603,7 +3620,7 @@ public_mEMALIGn(size_t alignment, size_t bytes)
   if(!ar_ptr)
     return 0;
 #ifdef ENABLE_GC_SUPPORT
-  mutex_rwlock_rdlock(&gc_lock);
+  lock_gc();
 #endif
   p = _int_memalign(ar_ptr, alignment, bytes);
   (void)mutex_unlock(&ar_ptr->mutex);
@@ -3625,7 +3642,7 @@ public_mEMALIGn(size_t alignment, size_t bytes)
     }
   }
 #ifdef ENABLE_GC_SUPPORT
-  mutex_rwlock_unlock(&gc_lock);
+  unlock_gc();
 #endif
   assert(!p || chunk_is_mmapped(mem2chunk(p)) ||
 	 ar_ptr == arena_for_chunk(mem2chunk(p)));
@@ -3644,11 +3661,11 @@ public_vALLOc(size_t bytes)
   if(!ar_ptr)
     return 0;
 #ifdef ENABLE_GC_SUPPORT
-  mutex_rwlock_rdlock(&gc_lock);
+  lock_gc();
 #endif
   p = _int_valloc(ar_ptr, bytes);
 #ifdef ENABLE_GC_SUPPORT
-  mutex_rwlock_unlock(&gc_lock);
+  unlock_gc();
 #endif
   (void)mutex_unlock(&ar_ptr->mutex);
   return p;
@@ -3664,11 +3681,11 @@ public_pVALLOc(size_t bytes)
     ptmalloc_init ();
   arena_get(ar_ptr, bytes + 2*mp_.pagesize + MINSIZE);
 #ifdef ENABLE_GC_SUPPORT
-  mutex_rwlock_rdlock(&gc_lock);
+  lock_gc();
 #endif
   p = _int_pvalloc(ar_ptr, bytes);
 #ifdef ENABLE_GC_SUPPORT
-  mutex_rwlock_unlock(&gc_lock);
+  unlock_gc();
 #endif
   (void)mutex_unlock(&ar_ptr->mutex);
   return p;
@@ -3708,7 +3725,7 @@ public_cALLOc(size_t n, size_t elem_size)
     return 0;
 
 #ifdef ENABLE_GC_SUPPORT
-  mutex_rwlock_rdlock(&gc_lock);
+  lock_gc();
 #endif
 
   /* Check if we hand out the top chunk, in which case there may be no
@@ -3751,7 +3768,7 @@ public_cALLOc(size_t n, size_t elem_size)
     }
     if (mem == 0) {
 #ifdef ENABLE_GC_SUPPORT
-	mutex_rwlock_unlock(&gc_lock);
+	unlock_gc();
 #endif
 	return 0;
     }
@@ -3759,7 +3776,7 @@ public_cALLOc(size_t n, size_t elem_size)
   p = mem2chunk(mem);
 
 #ifdef ENABLE_GC_SUPPORT
-  mutex_rwlock_unlock(&gc_lock);
+  unlock_gc();
 #endif
 
   /* Two optional cases in which clearing not necessary */
@@ -3820,11 +3837,11 @@ public_iCALLOc(size_t n, size_t elem_size, Void_t** chunks)
     return 0;
 
 #ifdef ENABLE_GC_SUPPORT
-  mutex_rwlock_rdlock(&gc_lock);
+  lock_gc();
 #endif
   m = _int_icalloc(ar_ptr, n, elem_size, chunks);
 #ifdef ENABLE_GC_SUPPORT
-  mutex_rwlock_unlock(&gc_lock);
+  unlock_gc();
 #endif
   (void)mutex_unlock(&ar_ptr->mutex);
   return m;
@@ -3841,11 +3858,11 @@ public_iCOMALLOc(size_t n, size_t sizes[], Void_t** chunks)
     return 0;
 
 #ifdef ENABLE_GC_SUPPORT
-  mutex_rwlock_rdlock(&gc_lock);
+  lock_gc();
 #endif
   m = _int_icomalloc(ar_ptr, n, sizes, chunks);
 #ifdef ENABLE_GC_SUPPORT
-  mutex_rwlock_unlock(&gc_lock);
+  unlock_gc();
 #endif
   (void)mutex_unlock(&ar_ptr->mutex);
   return m;
@@ -3867,13 +3884,13 @@ public_mTRIm(size_t s)
   int result;
 
 #ifdef ENABLE_GC_SUPPORT
-  mutex_rwlock_rdlock(&gc_lock);
+  lock_gc();
 #endif
   (void)mutex_lock(&main_arena.mutex);
   result = mTRIm(s);
   (void)mutex_unlock(&main_arena.mutex);
 #ifdef ENABLE_GC_SUPPORT
-  mutex_rwlock_unlock(&gc_lock);
+  unlock_gc();
 #endif
   return result;
 }
@@ -5506,7 +5523,10 @@ void public_fREE_UNREFED_MEMORy()
 	return;
     }
 
-    mutex_rwlock_wrlock(&gc_lock);
+    mutex_lock(&gc_lock_mutex);
+    if(gc_lock > 0) cond_wait(&gc_free_cond, &gc_lock_mutex) ;
+    gc_lock = -1;
+    mutex_unlock(&gc_lock_mutex);
 
     // TODO: public_funs must check for gc_lock
     do {
@@ -5541,7 +5561,10 @@ void public_fREE_UNREFED_MEMORy()
 
     mTRIm(0);
 
-    mutex_rwlock_unlock(&gc_lock);
+    mutex_lock(&gc_lock_mutex);
+    gc_lock = 0;
+    mutex_unlock(&gc_lock_mutex);
+    cond_broadcast(&gc_lock_cond);
 
     printf("GC: freed: %d\n    candi: %d\n    total: %d\n", i, k, j);
 }

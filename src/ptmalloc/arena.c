@@ -357,11 +357,6 @@ ptmalloc_init __MALLOC_P((void))
 #endif /* !defined NO_THREADS */
   mutex_init(&main_arena.mutex);
   main_arena.next = &main_arena;
-#ifdef ENABLE_GC_SUPPORT
-  mutex_rwlock_init(&gc_lock);
-  mutex_rwlock_rdlock(&gc_lock);
-  mutex_rwlock_unlock(&gc_lock);
-#endif
 
   mutex_init(&list_lock);
   tsd_key_create(&arena_key, NULL);

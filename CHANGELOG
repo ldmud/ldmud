@@ -1,6 +1,15 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+27-Jun-2002 (Lars Duening)  (3.3.457)
+  - (xptmalloc.c) Added a heap_start variable so that assert_stack_gap()
+       will compile (reported by Dafire).
+  - (ptmalloc) Added Gawain's latest changes - thanks!
+
+26-Jun-2002 (Lars Duening)
+  - (interpret.c) Added compile-time check to make sure that MAX_USER_TRACE
+       is not larger than MAX_TRACE.
+
 25-Jun-2002 (Lars Duening)  (3.3.456)
   - (xalloc.c) On HP-UX machines, the stack is above the heap and is also
        growing upwards, which the heap/stack check didn't expect. I reworked

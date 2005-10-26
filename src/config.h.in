@@ -374,6 +374,8 @@
 /* Define the maximum call depth for functions.
  * MAX_USER_TRACE is used for for normal program execution, the full
  * MAX_TRACE is only available in error handling.
+ *
+ * MAX_TRACE must be larger than MAX_USER_TRACE (check at compile time).
  */
 #define MAX_USER_TRACE              @val_max_user_trace@
 #define MAX_TRACE                   @val_max_trace@

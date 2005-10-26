@@ -43,3 +43,24 @@ Cygnus gcc for Win32    __CYGWIN32__ resp. __CYGWIN__
 Metrowerks (Be)         __MWERKS__
 EMX gcc for OS/2        __EMX__
 Intel C/C++ Compiler    __INTEL_COMPILER (expands to version, e.g. 500)
+
+-----------------------------------------------------------------------------
+
+von HP-UX haben wills, hier der Output von gcc -E -dM < /dev/null:
+
+#define __hp9000s800__ 1
+#define __unix__ 1
+#define __unix 1
+#define __hppa 1
+#define __hppa__ 1
+#define __hpux 1
+#define __hpux__ 1
+#define __hp9000s700 1
+#define __hp9000s700__ 1
+#define __hp9000s800 1
+#define _ILP32 1
+#define __STDC_HOSTED__ 1
+#define _PA_RISC1_1 1
+#define _HPUX_SOURCE 1
+
+-----------------------------------------------------------------------------

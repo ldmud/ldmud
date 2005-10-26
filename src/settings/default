@@ -421,7 +421,7 @@ with_evaluator_stack_size=2000
 with_max_user_trace=60
 
 # Maximum function call depth during error handling.
-# It must be bigger than MAX_USER_TRACE (TODO: Check this at runtime)
+# It must be bigger than MAX_USER_TRACE (check at compile time).
 
 with_max_trace=65
 

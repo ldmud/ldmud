@@ -572,6 +572,13 @@ svalue_t catch_value = { T_INVALID } ;
    * is executed.
    */
 
+
+#if MAX_USER_TRACE >= MAX_TRACE
+#error MAX_USER_TRACE value must be smaller than MAX_TRACE!
+#endif
+  /* Sanity check for the control stack definition.
+   */
+
 static struct control_stack control_stack_array[MAX_TRACE+2];
 #define CONTROL_STACK (control_stack_array+2)
 struct control_stack *csp;

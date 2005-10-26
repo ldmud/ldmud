@@ -31,8 +31,12 @@ extern void 	dlmalloc_free_unrefed_memory();
 extern int 	dlmalloc_is_freed(POINTER, size_t);
 extern struct mallinfo dlmallinfo();
 
-/* Current end address of the heap. */
 static word_t *heap_end = NULL;
+static word_t *heap_start = NULL;
+  /* Start and end address of the heap - currently always set to NULL,
+   * which disables the assert_stack_gap() logic. Considering that
+   * ptmalloc uses mmap, the logic wouldn't really work anyway.
+   */
 
 #define PT_OVERHEAD (2*sizeof(size_t))
 
