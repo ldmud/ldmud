@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+27-Feb-2002 (Lars Duening)  (3.3.404)
+  - (interpret.c) Improved the error message for when 'mapping[a,b]' is used
+       with incorrect types at runtime.
+
 27-Feb-2002 (Lars Duening)  (3.3.403)
   - (gcollect.c, swap.c, mempools) During a the GC a new swap membuffer could
        be allocated and then marked 'unreferenced' by the GC, subsequently

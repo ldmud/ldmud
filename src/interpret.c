@@ -14295,8 +14295,18 @@ again:
         mp_int n;
         svalue_t *data;
 
-        TYPE_TEST1(sp-2, T_MAPPING)
-        TYPE_TEST3(sp, T_NUMBER)
+        if (sp[-2].type != T_MAPPING)
+        {
+            ERRORF(("(value) Indexing on illegal type: %s, expected mapping.\n"
+                   , typename(sp[-2].type)
+                  ));
+        }
+        if (sp[0].type != T_NUMBER)
+        {
+            ERRORF(("Illegal sub-index type: %s, expected number.\n"
+                   , typename(sp[0].type)
+                  ));
+        }
 
         m = sp[-2].u.map;
         n = sp->u.number;
@@ -14337,8 +14347,18 @@ again:
         mapping_t *m;
         mp_int n;
 
-        TYPE_TEST1(sp-2, T_MAPPING)
-        TYPE_TEST3(sp, T_NUMBER)
+        if (sp[-2].type != T_MAPPING)
+        {
+            ERRORF(("(lvalue) Indexing on illegal type: %s, expected mapping.\n"
+                   , typename(sp[-2].type)
+                  ));
+        }
+        if (sp[0].type != T_NUMBER)
+        {
+            ERRORF(("Illegal sub-index type: %s, expected number.\n"
+                   , typename(sp[0].type)
+                  ));
+        }
 
         m = sp[-2].u.map;
         n = sp->u.number;

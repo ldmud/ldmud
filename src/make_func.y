@@ -94,7 +94,7 @@
  *        in tracedumps instead of the plain <id>.
  *
  *        If the instruction is an operator which can be used as a operator
- *        closure (like +), the optional <op-type> specifies, how many operands
+ *        closure (like +), the optional <op-type> specifies how many operands
  *        the operator takes. <op-type> must be one of the keywords 'unary',
  *        'binary' and 'ternary'.
  *
