@@ -118,6 +118,7 @@ AC_MY_ARG_ENABLE(udp-send,yes,,)
 AC_MY_ARG_ENABLE(use-ipv6,no,,[Enables support for IPv6])
 AC_MY_ARG_ENABLE(use-alists,no,,[Enables alist support])
 AC_MY_ARG_ENABLE(use-mysql,no,,[Enables mySQL support])
+AC_MY_ARG_ENABLE(use-pgsql,no,,[Enables PostgreSQL support])
 AC_MY_ARG_ENABLE(use-pthreads,no,,[enable using of threads for socket writes])
 AC_MY_ARG_ENABLE(use-pcre,yes,,[Enables PCRE instead of traditional regexps])
 AC_MY_ARG_ENABLE(use-deprecated,yes,,[Enables obsolete and deprecated efuns])
@@ -258,6 +259,20 @@ else
   cdef_use_mysql="#define"
   mysql_path="$enable_use_mysql"
   enable_use_mysql="yes"
+fi
+
+AC_UPDATE_VAR(enable_use_pgsql)
+if test "x$enable_use_pgsql" = "x" || test "x$enable_use_pgsql" = "xyes"; then
+  cdef_use_pgsql="#define"
+  pgsql_path=
+  enable_use_pgsql="yes"
+elif test "x$enable_use_pgsql" = "xno"; then
+  cdef_use_pgsql="#undef"
+  pgsql_path=
+else
+  cdef_use_pgsql="#define"
+  pgsql_path="$enable_use_pgsql"
+  enable_use_pgsql="yes"
 fi
 
 AC_CDEF_FROM_ENABLE(access_control)
@@ -571,7 +586,7 @@ fi
 
 if test "x$enable_use_system_crypt" = "x" || test "x$enable_use_system_crypt" = "xyes"; then
     AC_CHECK_FUNCS(crypt _crypt)
-    AC_CACHE_CHECK(if -lcrypt is needed, lp_cv_need_lib_crypto,
+    AC_CACHE_CHECK(if -lcrypt is needed, lp_cv_need_lib_crypt,
         AC_TRY_RUN([
 void t (void)
 {
@@ -587,10 +602,10 @@ int main(void)
     return 0;
 }
         ],
-        lp_cv_need_lib_crypto=no,
-        lp_cv_need_lib_crypto=yes
+        lp_cv_need_lib_crypt=no,
+        lp_cv_need_lib_crypt=yes
     ))
-    if test "$lp_cv_need_lib_crypto" = "yes"; then
+    if test "$lp_cv_need_lib_crypt" = "yes"; then
         AC_CHECK_LIB(crypto,main, LIBS="$LIBS -lcrypto")
         AC_CHECK_LIB(crypt,main, LIBS="$LIBS -lcrypt")
     fi
@@ -601,7 +616,7 @@ fi
 AC_FUNC_ALLOCA
 AC_CHECK_FUNCS(fchmod getrusage bzero memset memcpy memmem strdup strcspn)
 AC_CHECK_FUNCS(strchr strrchr getcwd memmove sysconf gettimeofday wait3 waitpid)
-AC_CHECK_FUNCS(fcntl getdomainname)
+AC_CHECK_FUNCS(fcntl getdomainname poll)
 
 AC_CACHE_CHECK(if inet_ntoa() ok,lp_cv_func_inet_ntoa_ok,
 AC_TRY_RUN([
@@ -802,7 +817,7 @@ pcre_extra foo(void)
 # --- mySQL ---
 
 AC_CACHE_CHECK(for mySQL,lp_cv_has_mysql,
-for TESTPATH in "" "$mysql_path" "$mysql_path/include" "/usr/local/include" "/usr/include" "/usr/lib/mysql"; do
+for TESTPATH in "" "$mysql_path" "$mysql_path/include" "/usr/local/mysql/include" "/usr/local/include" "/usr/include" "/usr/lib/mysql"; do
     saveflags="$CFLAGS"
     if test "x$TESTPATH" != "x"; then
         CFLAGS="$CFLAGS -I$TESTPATH"
@@ -920,6 +935,135 @@ int main(void)
 else
   if test $enable_use_mysql = yes; then
       AC_NOT_AVAILABLE(use-mysql)
+  fi
+fi
+
+# ---
+
+# --- PostgreSQL ---
+
+AC_CACHE_CHECK(for PostgresSQL,lp_cv_has_pgsql,
+for TESTPATH in "" "$pgsql_path" "$pgsql_path/include" "/usr/local/pgsql/include" "/usr/local/include" "/usr/include" "/usr/lib/pgsql"; do
+    saveflags="$CFLAGS"
+    if test "x$TESTPATH" != "x"; then
+        CFLAGS="$CFLAGS -I$TESTPATH"
+    fi
+AC_TRY_COMPILE([
+#include <libpq-fe.h>
+
+PGconn * foo(void)
+{
+    static PGconn * var;
+    
+    return var;
+}
+],,
+lp_cv_has_pgsql=yes
+if test "x$TESTPATH" != "x"; then
+    EXTRA_CFLAGS="-I$TESTPATH $EXTRA_CFLAGS"
+fi
+break;
+,
+lp_cv_has_pgsql=no
+CFLAGS="$saveflags"
+)
+done
+)
+
+# The system has the include files - now search for the libraries.
+if test $lp_cv_has_pgsql = yes; then
+  saveflags="$CFLAGS"
+  AC_DEFINE(HAS_PGSQL)
+
+  if test $enable_use_pgsql = yes; then
+    tmp=""
+
+    AC_CHECK_LIB(pq,main, tmp="$PKGLIBS -lpq")
+
+    if test "x$pgsql_path" == "x"; then
+        unset ac_cv_lib_pq_main
+        if test -d "${pgsql_path}/lib/pgsql"; then
+            CFLAGS="$saveflags -L${pgsql_path}/lib/pgsql"
+            AC_CHECK_LIB(pq,main, tmp="$PKGLIBS -L${pgsql_path}/lib/pgsql -lpq")
+        elif test -d "${pgsql_path}/lib"; then
+            CFLAGS="$saveflags -L${pgsql_path}/lib"
+            AC_CHECK_LIB(pq,main, tmp="$PKGLIBS -L${pgsql_path}/lib -lpq")
+        elif test -d "${pgsql_patch}"; then
+            CFLAGS="$saveflags -L$pgsql_path"
+            AC_CHECK_LIB(pq,main, tmp="$PKGLIBS -L$pgsql_path -lpq")
+        fi
+    fi
+
+    if test "x$tmp" == "x"; then
+        unset ac_cv_lib_pq_main
+        if test -d "/usr/local/pgsql/lib"; then
+            CFLAGS="$saveflags -L/usr/local/pgsql/lib"
+            AC_CHECK_LIB(pq,main, tmp="$PKGLIBS -L/usr/local/pgsql/lib -lpq")
+        fi
+    fi
+
+    if test "x$tmp" == "x"; then
+        echo "libpq library not found - disabling PostgreSQL support"
+        AC_NOT_AVAILABLE(use-pgsql)
+        cdef_use_pgsql="#undef"
+        enable_use_pgsql="no"
+        pgsql_path=
+        lp_cv_has_pgsql="no"
+    else
+        PKGLIBS="$tmp"
+    fi
+  fi
+
+  if test $enable_use_pgsql = yes; then
+      # Some systems need additional libraries
+      savelibs="$LIBS"
+      LIBS="$LIBS $PKGLIBS"
+
+      AC_CACHE_CHECK(if -lssl is needed, lp_cv_need_lib_ssl,
+          AC_TRY_RUN([
+#include <libpq-fe.h>
+void t (void)
+{
+    PQconnectStart("");
+}
+int main(void)
+{
+    return 0;
+}
+          ],
+          lp_cv_need_lib_ssl=no,
+          lp_cv_need_lib_ssl=yes
+      ))
+      if test "$lp_cv_need_lib_ssl" = "yes"; then
+          AC_CHECK_LIB(ssl,main, PKGLIBS="$PKGLIBS -lssl")
+      fi
+
+      AC_CACHE_CHECK(if -lcrypto is needed, lp_cv_need_lib_crypto,
+          AC_TRY_RUN([
+#include <libpq-fe.h>
+void t (void)
+{
+    PQconnectStart("");
+}
+int main(void)
+{
+    return 0;
+}
+          ],
+          lp_cv_need_lib_crypto=no,
+          lp_cv_need_lib_crypto=yes
+      ))
+      if test "$lp_cv_need_lib_crypto" = "yes"; then
+          AC_CHECK_LIB(crypto,main, PKGLIBS="$PKGLIBS -lcrypto")
+      fi
+
+      LIBS="$savelibs"
+  fi
+
+  CFLAGS="$saveflags"
+else
+  if test $enable_use_pgsql = yes; then
+      AC_NOT_AVAILABLE(use-pgsql)
   fi
 fi
 
@@ -1908,6 +2052,7 @@ AC_SUBST(cdef_share_variables)
 AC_SUBST(cdef_use_system_crypt)
 AC_SUBST(cdef_use_ipv6)
 AC_SUBST(cdef_use_mysql)
+AC_SUBST(cdef_use_pgsql)
 AC_SUBST(cdef_use_pthreads)
 AC_SUBST(cdef_use_alists)
 AC_SUBST(cdef_use_pcre)

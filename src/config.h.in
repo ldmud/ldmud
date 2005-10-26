@@ -315,6 +315,11 @@
  */
 @cdef_use_mysql@ USE_MYSQL
 
+/* Define this if you want PostgreSQL support (assuming that your host
+ * actually offers this.
+ */
+@cdef_use_pgsql@ USE_PGSQL
+
 /* Define this if you want alist support.
  */
 @cdef_use_alists@ USE_ALISTS

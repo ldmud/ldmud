@@ -4,7 +4,7 @@
 // Don't take this too serious :-)                               Sven C. Dack
 //===========================================================================
 
-#define Default_Number_Of_Runs 1000
+#define Default_Number_Of_Runs 10000
 
 #pragma strong_types
 

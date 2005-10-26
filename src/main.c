@@ -1573,6 +1573,12 @@ options (void)
   fputs("          mySQL: supported.\n", stdout);
 #endif
 
+#ifndef USE_PGSQL
+  fputs("     PostgreSQL: not supported.\n", stdout);
+#else
+  fputs("     PostgreSQL: supported.\n", stdout);
+#endif
+
 #ifdef USE_PTHREADS
   fputs("       PThreads: supported.\n", stdout);
 #else

@@ -126,6 +126,7 @@
 #include "main.h"
 #include "mstrings.h"
 #include "object.h"
+#include "pkg-pgsql.h"
 #include "sent.h"
 #include "simulate.h"
 #include "stdstrings.h"
@@ -2234,7 +2235,7 @@ get_message (char *buff)
 
 {
     /* State information: */
-    static fd_set readfds;
+    static fd_set readfds, writefds;
       /* List of sockets with pending data.
        * You can ignore a 'could be used uninitialized' warning.
        */
@@ -2278,9 +2279,10 @@ get_message (char *buff)
                * of the sockets, but don't wait.
                */
 
-            /* Set up readfds */
+            /* Set up fd-sets. */
 
             FD_ZERO(&readfds);
+            FD_ZERO(&writefds);
             for (i = 0; i < numports; i++) {
                 FD_SET(sos[i], &readfds);
             } /* for */
@@ -2321,6 +2323,10 @@ get_message (char *buff)
                 FD_SET(udp_s, &readfds);
             }
 
+#ifdef USE_PGSQL
+            pg_setfds(&readfds, &writefds, &nfds);
+#endif
+
             /* select() until time is up or there is data */
 
             for (retries = 6;;)
@@ -2328,7 +2334,7 @@ get_message (char *buff)
                 check_alarm();
                 timeout.tv_sec = twait;
                 timeout.tv_usec = 0;
-                res = socket_select(nfds, &readfds, 0, 0, &timeout);
+                res = socket_select(nfds, &readfds, &writefds, 0, &timeout);
                 if (res == -1)
                 {
                     /* BeOS <= PR2 returns errno -1 instead of EINTR :-( */
@@ -2397,6 +2403,10 @@ get_message (char *buff)
                     urgent_data = MY_TRUE;
                 }
             } /* if (urgent_data) */
+
+#ifdef USE_PGSQL
+            pg_process_all();
+#endif
 
             /* Initialise the user scan */
             CmdsGiven = 0;

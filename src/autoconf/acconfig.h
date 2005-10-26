@@ -84,6 +84,9 @@
 /* Does the machine offer mySQL? */
 #undef HAS_MYSQL
 
+/* Does the machine offer PostgreSQL? */
+#undef HAS_PGSQL
+
 /* define the erq include file. */
 #undef ERQ_INCLUDE
 

@@ -105,7 +105,6 @@ f-011016-0: sprintf() and colour strings
 f-011029: Efun copy_object()
 f-011119: New Standardnotation for callbacks
 f-011207: Linenumbers for functionlist()
-f-011229-0: Add support for PostgreSQL
 f-011229-1: Add support for Berkeley DB
 f-011230: Implement seeded randoms
 f-020127: Bitstring efuns for shifting and copying

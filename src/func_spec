@@ -671,6 +671,16 @@ int     db_insert_id(int);
 #endif /* USE_MYSQL */
 
 
+#ifdef USE_PGSQL  /* PostgreSQL Support */
+
+int      pg_connect(string, string|closure, ...);
+int      pg_pending(object default: F_THIS_OBJECT);
+int      pg_query(string, void|int);
+void     pg_close();
+
+#endif /* USE_PGSQL */
+
+
 /* The following functions are optional and can be configured out.
  */
 

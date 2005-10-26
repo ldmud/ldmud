@@ -187,6 +187,6 @@ HISTORY
         integral driver part in 3.2.9.
 
 SEE ALSO
-        db_affected_rows(E), db_conv_string(E), db_close(E),
+        pgsql(C), db_affected_rows(E), db_conv_string(E), db_close(E),
         db_connect(E), db_exec(E), db_fetch(E), db_handles(E),
         db_insert_id(E), db_coldefs(E), db_error(E)

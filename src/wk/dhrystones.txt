@@ -98,3 +98,38 @@ Vader: PIII/766MHz/768MByte, Beos 5.0, LDMud 3.3.206:
   Gcc 2.95.2, DEBUG, TRACE, MTRACE     433.5     572.4     540.5     517.6
   Gcc 2.95.2, DEBUG, TRACE, malloc     438.6     575.7     549.5     539.1
 
+
+Tarkin: G4/800MHz/1GByte, Mac OS X 10.2.4, LDMud 3.3.444, gcc 3.1:
+
+                                         o0        o1        o2        o4
+  s: -                                 555.6    1100.0    1250.0     909.1
+  s: D                                 476.2     769.2     909.1     909.1
+  s: D, TC                             330.0     588.2     714.3     625.0
+  s: D, TC, MC                         333.3     588.2     625.0     588.2
+  s: D, TC, MC, MT                     322.6     500.0     588.2     588.2
+  s: D, TC, MC, MT, ML                 320.0     530.0     588.2     625.0
+
+  m: -                                 526.3     833.3     909.1     909.1
+  m: D                                 454.5     909.1     769.2     833.3
+  m: D, TC                             322.6     555.6     555.6     588.2
+  m: D, TC, MC                         312.5     555.6     588.2     555.6
+  m: D, TC, MC, MT                     312.5     526.3     526.3     588.2
+  m: D, TC, MC, MT, ML                 333.3     526.3     555.6     555.6
+
+  p: -                                 555.6     909.1     909.1     909.1
+  p: D                                 400.0     769.2     769.2     729.2
+  p: D, TC                             277.8     500.0     526.3     588.2
+  p: D, TC, MC                         263.2     500.0     555.6     526.3
+  p: D, TC, MC, MT                     256.4     454.5     526.3     500.0
+  p: D, TC, MC, MT, ML                 250.0     400.0     416.7     434.8
+
+
+Legend:
+  D: DEBUG
+  TC: TRACE_CODE
+  MC: MALLOC_CHECK
+  MT: MALLOC_TRACE
+  ML: MALLOC_LPC_TRACE
+  m: malloc
+  s: smalloc
+  p: ptmalloc

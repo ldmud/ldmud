@@ -84,6 +84,9 @@
 /* Does the machine offer mySQL? */
 #undef HAS_MYSQL
 
+/* Does the machine offer PostgreSQL? */
+#undef HAS_PGSQL
+
 /* define the erq include file. */
 #undef ERQ_INCLUDE
 
@@ -187,6 +190,9 @@
 
 /* Define to 1 if you have the <netdb.h> header file. */
 #undef HAVE_NETDB_H
+
+/* Define to 1 if you have the `poll' function. */
+#undef HAVE_POLL
 
 /* Define to 1 if you have the <stdint.h> header file. */
 #undef HAVE_STDINT_H

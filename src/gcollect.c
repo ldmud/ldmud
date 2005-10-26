@@ -106,6 +106,7 @@
 #include "object.h"
 #include "otable.h"
 #include "parse.h"
+#include "pkg-pgsql.h"
 #include "prolang.h"
 #include "ptrtable.h"
 #include "sent.h"
@@ -1658,6 +1659,9 @@ garbage_collection(void)
     handle_newly_destructed_objects();
     free_interpreter_temporaries();
     free_action_temporaries();
+#ifdef USE_PGSQL
+    pg_purge_connections();
+#endif /* USE_PGSQL */
     remove_stale_player_data();
     remove_stale_call_outs();
     free_defines();
@@ -1839,6 +1843,10 @@ garbage_collection(void)
 #ifdef USE_STRUCTS
     clear_tabled_struct_refs();
 #endif
+#ifdef USE_PGSQL
+    pg_clear_refs();
+#endif /* USE_PGSQL */
+
     mb_clear_refs();
       /* As this call also covers the swap buffer, it MUST come after
        * processing (and potentially swapping) the objects.
@@ -2038,6 +2046,10 @@ garbage_collection(void)
     count_interpreter_refs();
     count_heart_beat_refs();
     count_rxcache_refs();
+#ifdef USE_PGSQL
+    pg_count_refs();
+#endif /* USE_PGSQL */
+
     mb_note_refs();
 
     if (reserved_user_area)
@@ -2695,6 +2707,9 @@ garbage_collection (void)
     handle_newly_destructed_objects();
     free_interpreter_temporaries();
     free_action_temporaries();
+#ifdef USE_PGSQL
+    pg_purge_connections();
+#endif /* USE_PGSQL */
     remove_stale_player_data();
     remove_stale_call_outs();
     mb_release();

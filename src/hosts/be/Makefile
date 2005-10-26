@@ -103,7 +103,7 @@ endif
            interpret.c lex.c main.c mapping.c md5.c mempools.c mregex.c \
            mstrings.c \
            object.c otable.c parser.c parse.c \
-           pkg-alists.c pkg-mysql.c pkg-pcre.c ptmalloc.c port.c \
+           pkg-alists.c pkg-mysql.c pkg-pcre.c pkg-pgsql.c ptmalloc.c port.c \
            ptrtable.c random.c \
            regexp.c simulate.c simul_efun.c stdstrings.c \
            strfuns.c structs.c sprintf.c swap.c wiz_list.c xalloc.c
@@ -309,9 +309,6 @@ depend-generic: $(SRCS) $(GENSRCS) $(OBJ)
           echo Updating dependencies in Makefile.in.; \
           mkdepend $(SKELETON) -I. $(EXCEPT) -m -p .c:%n.o -fMakefile.in; \
           mkdepend $(SKELETON) $(SELECT) -I. $(EXCEPT) -m -p .c:%n.o -fMakefile.in; \
-          echo Updating dependencies in hosts/os2/Makefile.; \
-          mkdepend $(SKELETON) -I. $(EXCEPT) -m -p .c:%n.o -fhosts/os2/Makefile; \
-          mkdepend $(SKELETON) $(SELECT) -I. $(EXCEPT) -m -p .c:%n.o -fhosts/os2/Makefile; \
         else\
           echo mkdepend utility not available.; \
         fi"
@@ -447,11 +444,11 @@ $(OBJ)/closure.o : i-svalue_cmp.h xalloc.h switch.h swap.h svalue.h \
 
 $(OBJ)/comm.o : util/erq/erq.h ../mudlib/sys/input_to.h \
     ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h swap.h svalue.h \
-    stdstrings.h simulate.h sent.h object.h mstrings.h main.h interpret.h \
-    gcollect.h filestat.h exec.h ed.h closure.h backend.h array.h actions.h \
-    access_check.h comm.h telnet.h my-alloca.h typedefs.h driver.h \
-    strfuns.h bytecode.h config.h port.h hosts/unix.h hosts/be/be.h \
-    machine.h
+    stdstrings.h simulate.h sent.h pkg-pgsql.h object.h mstrings.h main.h \
+    interpret.h gcollect.h filestat.h exec.h ed.h closure.h backend.h \
+    array.h actions.h access_check.h comm.h telnet.h my-alloca.h typedefs.h \
+    driver.h strfuns.h bytecode.h config.h port.h hosts/unix.h \
+    hosts/be/be.h machine.h
 
 $(OBJ)/dumpstat.o : xalloc.h svalue.h structs.h stdstrings.h simulate.h \
     ptrtable.h object.h mstrings.h mapping.h instrs.h filestat.h exec.h \
@@ -481,12 +478,12 @@ $(OBJ)/files.o : ../mudlib/sys/files.h xalloc.h svalue.h stdstrings.h \
 
 $(OBJ)/gcollect.o : ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h swap.h \
     structs.h stdstrings.h simul_efun.h simulate.h sent.h ptrtable.h \
-    prolang.h parse.h otable.h object.h mstrings.h mregex.h mempools.h \
-    mapping.h main.h lex.h instrs.h interpret.h heartbeat.h filestat.h ed.h \
-    comm.h closure.h call_out.h backend.h array.h actions.h gcollect.h \
-    typedefs.h driver.h svalue.h strfuns.h hash.h exec.h bytecode.h \
-    regexp.h pcre/pcre.h port.h config.h hosts/unix.h hosts/be/be.h \
-    machine.h
+    prolang.h pkg-pgsql.h parse.h otable.h object.h mstrings.h mregex.h \
+    mempools.h mapping.h main.h lex.h instrs.h interpret.h heartbeat.h \
+    filestat.h ed.h comm.h closure.h call_out.h backend.h array.h actions.h \
+    gcollect.h typedefs.h driver.h svalue.h strfuns.h hash.h exec.h \
+    bytecode.h regexp.h pcre/pcre.h port.h config.h hosts/unix.h \
+    hosts/be/be.h machine.h
 
 $(OBJ)/hash.o : hash.h
 
@@ -589,6 +586,11 @@ $(OBJ)/pkg-pcre.o : pcre/study.c pcre/maketables.c pcre/get.c pcre/pcre.c \
     pcre/chartables.c svalue.h strfuns.h sent.h bytecode.h typedefs.h \
     pcre/pcre.h port.h config.h pcre/config.h hosts/unix.h hosts/be/be.h \
     machine.h
+
+$(OBJ)/pkg-pgsql.o : ../mudlib/sys/pgsql.h xalloc.h stdstrings.h simulate.h \
+    mstrings.h mapping.h main.h interpret.h gcollect.h array.h actions.h \
+    pkg-pgsql.h my-alloca.h typedefs.h driver.h svalue.h strfuns.h sent.h \
+    bytecode.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/port.o : hosts/crypt.c main.h backend.h my-rusage.h driver.h \
     typedefs.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
@@ -701,6 +703,8 @@ $(OBJ)/object.o : stdstrings.h instrs.h
 $(OBJ)/parse.o : stdstrings.h
 
 $(OBJ)/parser.o : lang.c stdstrings.h instrs.h
+
+$(OBJ)/pkg-pgsql.o : stdstrings.h
 
 $(OBJ)/simul_efun.o : stdstrings.h
 

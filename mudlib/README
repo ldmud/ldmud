@@ -14,6 +14,7 @@ Other files are:
   dhrystone.c      : an implementation of Dhrystone, called by the
                      test_master.
   astar.c          : an implementation of the A* pathfinding algorithm.
+  pgsql.c          : example for using PostgreSQL
 
   uni-crasher/     : A stress test program, see the README in this dir.
 

@@ -342,12 +342,27 @@ enable_lpc_nosave=yes
 #  <path>: mySQL support is compiled in, <path> is added to the link paths
 #          and should be the path to libmysqlclient, 
 #          e.g. enable_use_mysql=/usr/local/lib/mysql .
-#          The include files are searched in /usr/local/include, <path>,
-#          and <path>/include.
+#          The include files are searched in /usr/local/mysql/include,
+#          /usr/local/include, <path>, and <path>/include.
 #          The libraries are searched in the default path, <path>/lib/mysql,
 #          <path>/lib and <path>, in this order.
 
 enable_use_mysql=no
+
+# Enable support for PostgreSQL (assuming your system supports it).
+#
+#  'no'  : PostgreSQL support is not compiled in
+#  'yes' : PostgreSQL support is compiled in, the libmysqlclient is expected
+#          in the normal library search path.
+#  <path>: PostgreSQL support is compiled in, <path> is added to the link paths
+#          and should be the path to libpq, 
+#          e.g. enable_use_syql=/usr/local/pgsql .
+#          The include files are searched in /usr/local/pgsql/include,
+#          /usr/local/include, <path>, and <path>/include.
+#          The libraries are searched in the default path, <path>/lib/pgsql,
+#          <path>/lib, <path>, /usr/local/pgsql/lib, in this order.
+
+enable_use_pgsql=no
 
 # Enable support for alists.
 

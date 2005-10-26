@@ -306,7 +306,7 @@ ac_includes_default="\
 # include <unistd.h>
 #endif"
 
-ac_subst_vars='SHELL PATH_SEPARATOR PACKAGE_NAME PACKAGE_TARNAME PACKAGE_VERSION PACKAGE_STRING PACKAGE_BUGREPORT exec_prefix prefix program_transform_name bindir sbindir libexecdir datadir sysconfdir sharedstatedir localstatedir libdir includedir oldincludedir infodir mandir build_alias host_alias target_alias DEFS ECHO_C ECHO_N ECHO_T LIBS CC CFLAGS LDFLAGS CPPFLAGS ac_ct_CC EXEEXT OBJEXT INSTALL_PROGRAM INSTALL_SCRIPT INSTALL_DATA YACC CPP EGREP ALLOCA val_optimize WCFLAGS OCFLAGS LCFLAGS MCFLAGS DCFLAGS EXTRA_CFLAGS OPTIMIZE_LINKING MOVE_YACC_TAB CLEAN_YACC_TAB YACCTAB CONFIG_SHELL cdef_erq_demon cdef_access_control cdef_access_log cdef_compat_mode cdef_strict_euids cdef_filename_spaces cdef_share_variables cdef_use_system_crypt cdef_use_ipv6 cdef_use_mysql cdef_use_pthreads cdef_use_alists cdef_use_pcre cdef_use_deprecated cdef_use_structs cdef_use_new_inlines cdef_use_set_light cdef_use_set_is_wizard cdef_use_parse_command cdef_use_process_string cdef_comm_stat cdef_trace_code cdef_apply_cache_stat cdef_malloc_sbrk cdef_malloc_check cdef_malloc_trace cdef_malloc_lpc_trace cdef_malloc_sbrk_trace cdef_dynamic_costs cdef_rxcache_table cdef_wizlist_file cdef_opcprof cdef_verbose_opcprof cdef_debug cdef_yydebug cdef_no_inlines cdef_debug_telnet cdef_debug_smalloc_allocs cdef_check_object_stat cdef_check_mapping_total cdef_check_object_ref cdef_check_object_gc_ref cdef_dump_gc_refs val_access_file val_access_log val_erq_max_reply val_erq_max_send val_erq_debug val_pthreads_write_max_size val_read_file_max_size val_time_to_clean_up val_time_to_swap val_time_to_swap_variables val_time_to_reset val_evaluator_stack_size val_max_user_trace val_max_trace val_compiler_stack_size val_max_bits val_portno val_maxnumports val_max_cost val_max_local val_catch_reserved_cost val_master_reserved_cost val_swap_file val_max_array_size val_max_mapping_size val_max_callouts val_max_players val_allowed_ed_cmds val_reserved_user_size val_reserved_master_size val_reserved_system_size val_htable_size val_itable_size val_otable_size val_defmax val_apply_cache_bits val_rxcache_table val_master_name val_input_escape val_max_byte_transfer val_udp_port val_set_buffer_size_max val_malloc val_min_malloced val_min_small_malloced val_max_malloced val_total_trace_length val_wizlist_file erq_sub PKGLIBS ERQ_LIBS LIBOBJS LTLIBOBJS'
+ac_subst_vars='SHELL PATH_SEPARATOR PACKAGE_NAME PACKAGE_TARNAME PACKAGE_VERSION PACKAGE_STRING PACKAGE_BUGREPORT exec_prefix prefix program_transform_name bindir sbindir libexecdir datadir sysconfdir sharedstatedir localstatedir libdir includedir oldincludedir infodir mandir build_alias host_alias target_alias DEFS ECHO_C ECHO_N ECHO_T LIBS CC CFLAGS LDFLAGS CPPFLAGS ac_ct_CC EXEEXT OBJEXT INSTALL_PROGRAM INSTALL_SCRIPT INSTALL_DATA YACC CPP EGREP ALLOCA val_optimize WCFLAGS OCFLAGS LCFLAGS MCFLAGS DCFLAGS EXTRA_CFLAGS OPTIMIZE_LINKING MOVE_YACC_TAB CLEAN_YACC_TAB YACCTAB CONFIG_SHELL cdef_erq_demon cdef_access_control cdef_access_log cdef_compat_mode cdef_strict_euids cdef_filename_spaces cdef_share_variables cdef_use_system_crypt cdef_use_ipv6 cdef_use_mysql cdef_use_pgsql cdef_use_pthreads cdef_use_alists cdef_use_pcre cdef_use_deprecated cdef_use_structs cdef_use_new_inlines cdef_use_set_light cdef_use_set_is_wizard cdef_use_parse_command cdef_use_process_string cdef_comm_stat cdef_trace_code cdef_apply_cache_stat cdef_malloc_sbrk cdef_malloc_check cdef_malloc_trace cdef_malloc_lpc_trace cdef_malloc_sbrk_trace cdef_dynamic_costs cdef_rxcache_table cdef_wizlist_file cdef_opcprof cdef_verbose_opcprof cdef_debug cdef_yydebug cdef_no_inlines cdef_debug_telnet cdef_debug_smalloc_allocs cdef_check_object_stat cdef_check_mapping_total cdef_check_object_ref cdef_check_object_gc_ref cdef_dump_gc_refs val_access_file val_access_log val_erq_max_reply val_erq_max_send val_erq_debug val_pthreads_write_max_size val_read_file_max_size val_time_to_clean_up val_time_to_swap val_time_to_swap_variables val_time_to_reset val_evaluator_stack_size val_max_user_trace val_max_trace val_compiler_stack_size val_max_bits val_portno val_maxnumports val_max_cost val_max_local val_catch_reserved_cost val_master_reserved_cost val_swap_file val_max_array_size val_max_mapping_size val_max_callouts val_max_players val_allowed_ed_cmds val_reserved_user_size val_reserved_master_size val_reserved_system_size val_htable_size val_itable_size val_otable_size val_defmax val_apply_cache_bits val_rxcache_table val_master_name val_input_escape val_max_byte_transfer val_udp_port val_set_buffer_size_max val_malloc val_min_malloced val_min_small_malloced val_max_malloced val_total_trace_length val_wizlist_file erq_sub PKGLIBS ERQ_LIBS LIBOBJS LTLIBOBJS'
 ac_subst_files=''
 
 # Initialize some variables set by options.
@@ -856,6 +856,8 @@ Optional Features:
         Enables alist support
   --enable-use-mysql                  default=disabled
         Enables mySQL support
+  --enable-use-pgsql                  default=disabled
+        Enables PostgreSQL support
   --enable-use-pthreads               default=disabled
         enable using of threads for socket writes
   --enable-use-pcre                   default=enabled
@@ -1465,6 +1467,13 @@ DEFAULTenable_use_mysql=no
 # Check whether --enable-use-mysql or --disable-use-mysql was given.
 if test "${enable_use_mysql+set}" = set; then
   enableval="$enable_use_mysql"
+
+fi;
+
+DEFAULTenable_use_pgsql=no
+# Check whether --enable-use-pgsql or --disable-use-pgsql was given.
+if test "${enable_use_pgsql+set}" = set; then
+  enableval="$enable_use_pgsql"
 
 fi;
 
@@ -2158,6 +2167,23 @@ else
   cdef_use_mysql="#define"
   mysql_path="$enable_use_mysql"
   enable_use_mysql="yes"
+fi
+
+if test "x$enable_use_pgsql" = "x" && test "x$DEFAULTenable_use_pgsql" != "x"; then
+  enable_use_pgsql=$DEFAULTenable_use_pgsql
+fi
+
+if test "x$enable_use_pgsql" = "x" || test "x$enable_use_pgsql" = "xyes"; then
+  cdef_use_pgsql="#define"
+  pgsql_path=
+  enable_use_pgsql="yes"
+elif test "x$enable_use_pgsql" = "xno"; then
+  cdef_use_pgsql="#undef"
+  pgsql_path=
+else
+  cdef_use_pgsql="#define"
+  pgsql_path="$enable_use_pgsql"
+  enable_use_pgsql="yes"
 fi
 
 if test "x$enable_access_control" = "x" && test "x$DEFAULTenable_access_control" != "x"; then
@@ -7729,7 +7755,7 @@ done
 
     echo "$as_me:$LINENO: checking if -lcrypt is needed" >&5
 echo $ECHO_N "checking if -lcrypt is needed... $ECHO_C" >&6
-if test "${lp_cv_need_lib_crypto+set}" = set; then
+if test "${lp_cv_need_lib_crypt+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
 else
   if test "$cross_compiling" = yes; then
@@ -7767,21 +7793,21 @@ if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
   ac_status=$?
   echo "$as_me:$LINENO: \$? = $ac_status" >&5
   (exit $ac_status); }; }; then
-  lp_cv_need_lib_crypto=no
+  lp_cv_need_lib_crypt=no
 else
   echo "$as_me: program exited with status $ac_status" >&5
 echo "$as_me: failed program was:" >&5
 cat conftest.$ac_ext >&5
 ( exit $ac_status )
-lp_cv_need_lib_crypto=yes
+lp_cv_need_lib_crypt=yes
 
 fi
 rm -f core core.* *.core gmon.out bb.out conftest$ac_exeext conftest.$ac_objext conftest.$ac_ext
 fi
 fi
-echo "$as_me:$LINENO: result: $lp_cv_need_lib_crypto" >&5
-echo "${ECHO_T}$lp_cv_need_lib_crypto" >&6
-    if test "$lp_cv_need_lib_crypto" = "yes"; then
+echo "$as_me:$LINENO: result: $lp_cv_need_lib_crypt" >&5
+echo "${ECHO_T}$lp_cv_need_lib_crypt" >&6
+    if test "$lp_cv_need_lib_crypt" = "yes"; then
         echo "$as_me:$LINENO: checking for main in -lcrypto" >&5
 echo $ECHO_N "checking for main in -lcrypto... $ECHO_C" >&6
 if test "${ac_cv_lib_crypto_main+set}" = set; then
@@ -8327,7 +8353,8 @@ done
 
 
 
-for ac_func in fcntl getdomainname
+
+for ac_func in fcntl getdomainname poll
 do
 as_ac_var=`echo "ac_cv_func_$ac_func" | $as_tr_sh`
 echo "$as_me:$LINENO: checking for $ac_func" >&5
@@ -9032,7 +9059,7 @@ echo $ECHO_N "checking for mySQL... $ECHO_C" >&6
 if test "${lp_cv_has_mysql+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
 else
-  for TESTPATH in "" "$mysql_path" "$mysql_path/include" "/usr/local/include" "/usr/include" "/usr/lib/mysql"; do
+  for TESTPATH in "" "$mysql_path" "$mysql_path/include" "/usr/local/mysql/include" "/usr/local/include" "/usr/include" "/usr/lib/mysql"; do
     saveflags="$CFLAGS"
     if test "x$TESTPATH" != "x"; then
         CFLAGS="$CFLAGS -I$TESTPATH"
@@ -9537,6 +9564,573 @@ else
     not_available="use-mysql"
 else
     not_available="$not_available, use-mysql"
+fi
+  fi
+fi
+
+# ---
+
+# --- PostgreSQL ---
+
+echo "$as_me:$LINENO: checking for PostgresSQL" >&5
+echo $ECHO_N "checking for PostgresSQL... $ECHO_C" >&6
+if test "${lp_cv_has_pgsql+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  for TESTPATH in "" "$pgsql_path" "$pgsql_path/include" "/usr/local/pgsql/include" "/usr/local/include" "/usr/include" "/usr/lib/pgsql"; do
+    saveflags="$CFLAGS"
+    if test "x$TESTPATH" != "x"; then
+        CFLAGS="$CFLAGS -I$TESTPATH"
+    fi
+cat >conftest.$ac_ext <<_ACEOF
+#line $LINENO "configure"
+#include "confdefs.h"
+
+#include <libpq-fe.h>
+
+PGconn * foo(void)
+{
+    static PGconn * var;
+
+    return var;
+}
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext
+if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
+  (eval $ac_compile) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+         { ac_try='test -s conftest.$ac_objext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  lp_cv_has_pgsql=yes
+if test "x$TESTPATH" != "x"; then
+    EXTRA_CFLAGS="-I$TESTPATH $EXTRA_CFLAGS"
+fi
+break;
+
+else
+  echo "$as_me: failed program was:" >&5
+cat conftest.$ac_ext >&5
+lp_cv_has_pgsql=no
+CFLAGS="$saveflags"
+
+fi
+rm -f conftest.$ac_objext conftest.$ac_ext
+done
+
+fi
+echo "$as_me:$LINENO: result: $lp_cv_has_pgsql" >&5
+echo "${ECHO_T}$lp_cv_has_pgsql" >&6
+
+# The system has the include files - now search for the libraries.
+if test $lp_cv_has_pgsql = yes; then
+  saveflags="$CFLAGS"
+  cat >>confdefs.h <<\_ACEOF
+#define HAS_PGSQL 1
+_ACEOF
+
+
+  if test $enable_use_pgsql = yes; then
+    tmp=""
+
+    echo "$as_me:$LINENO: checking for main in -lpq" >&5
+echo $ECHO_N "checking for main in -lpq... $ECHO_C" >&6
+if test "${ac_cv_lib_pq_main+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lpq  $LIBS"
+cat >conftest.$ac_ext <<_ACEOF
+#line $LINENO "configure"
+#include "confdefs.h"
+
+
+int
+main ()
+{
+main ();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+         { ac_try='test -s conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  ac_cv_lib_pq_main=yes
+else
+  echo "$as_me: failed program was:" >&5
+cat conftest.$ac_ext >&5
+ac_cv_lib_pq_main=no
+fi
+rm -f conftest.$ac_objext conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+echo "$as_me:$LINENO: result: $ac_cv_lib_pq_main" >&5
+echo "${ECHO_T}$ac_cv_lib_pq_main" >&6
+if test $ac_cv_lib_pq_main = yes; then
+  tmp="$PKGLIBS -lpq"
+fi
+
+
+    if test "x$pgsql_path" == "x"; then
+        unset ac_cv_lib_pq_main
+        if test -d "${pgsql_path}/lib/pgsql"; then
+            CFLAGS="$saveflags -L${pgsql_path}/lib/pgsql"
+            echo "$as_me:$LINENO: checking for main in -lpq" >&5
+echo $ECHO_N "checking for main in -lpq... $ECHO_C" >&6
+if test "${ac_cv_lib_pq_main+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lpq  $LIBS"
+cat >conftest.$ac_ext <<_ACEOF
+#line $LINENO "configure"
+#include "confdefs.h"
+
+
+int
+main ()
+{
+main ();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+         { ac_try='test -s conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  ac_cv_lib_pq_main=yes
+else
+  echo "$as_me: failed program was:" >&5
+cat conftest.$ac_ext >&5
+ac_cv_lib_pq_main=no
+fi
+rm -f conftest.$ac_objext conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+echo "$as_me:$LINENO: result: $ac_cv_lib_pq_main" >&5
+echo "${ECHO_T}$ac_cv_lib_pq_main" >&6
+if test $ac_cv_lib_pq_main = yes; then
+  tmp="$PKGLIBS -L${pgsql_path}/lib/pgsql -lpq"
+fi
+
+        elif test -d "${pgsql_path}/lib"; then
+            CFLAGS="$saveflags -L${pgsql_path}/lib"
+            echo "$as_me:$LINENO: checking for main in -lpq" >&5
+echo $ECHO_N "checking for main in -lpq... $ECHO_C" >&6
+if test "${ac_cv_lib_pq_main+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lpq  $LIBS"
+cat >conftest.$ac_ext <<_ACEOF
+#line $LINENO "configure"
+#include "confdefs.h"
+
+
+int
+main ()
+{
+main ();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+         { ac_try='test -s conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  ac_cv_lib_pq_main=yes
+else
+  echo "$as_me: failed program was:" >&5
+cat conftest.$ac_ext >&5
+ac_cv_lib_pq_main=no
+fi
+rm -f conftest.$ac_objext conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+echo "$as_me:$LINENO: result: $ac_cv_lib_pq_main" >&5
+echo "${ECHO_T}$ac_cv_lib_pq_main" >&6
+if test $ac_cv_lib_pq_main = yes; then
+  tmp="$PKGLIBS -L${pgsql_path}/lib -lpq"
+fi
+
+        elif test -d "${pgsql_patch}"; then
+            CFLAGS="$saveflags -L$pgsql_path"
+            echo "$as_me:$LINENO: checking for main in -lpq" >&5
+echo $ECHO_N "checking for main in -lpq... $ECHO_C" >&6
+if test "${ac_cv_lib_pq_main+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lpq  $LIBS"
+cat >conftest.$ac_ext <<_ACEOF
+#line $LINENO "configure"
+#include "confdefs.h"
+
+
+int
+main ()
+{
+main ();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+         { ac_try='test -s conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  ac_cv_lib_pq_main=yes
+else
+  echo "$as_me: failed program was:" >&5
+cat conftest.$ac_ext >&5
+ac_cv_lib_pq_main=no
+fi
+rm -f conftest.$ac_objext conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+echo "$as_me:$LINENO: result: $ac_cv_lib_pq_main" >&5
+echo "${ECHO_T}$ac_cv_lib_pq_main" >&6
+if test $ac_cv_lib_pq_main = yes; then
+  tmp="$PKGLIBS -L$pgsql_path -lpq"
+fi
+
+        fi
+    fi
+
+    if test "x$tmp" == "x"; then
+        unset ac_cv_lib_pq_main
+        if test -d "/usr/local/pgsql/lib"; then
+            CFLAGS="$saveflags -L/usr/local/pgsql/lib"
+            echo "$as_me:$LINENO: checking for main in -lpq" >&5
+echo $ECHO_N "checking for main in -lpq... $ECHO_C" >&6
+if test "${ac_cv_lib_pq_main+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lpq  $LIBS"
+cat >conftest.$ac_ext <<_ACEOF
+#line $LINENO "configure"
+#include "confdefs.h"
+
+
+int
+main ()
+{
+main ();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+         { ac_try='test -s conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  ac_cv_lib_pq_main=yes
+else
+  echo "$as_me: failed program was:" >&5
+cat conftest.$ac_ext >&5
+ac_cv_lib_pq_main=no
+fi
+rm -f conftest.$ac_objext conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+echo "$as_me:$LINENO: result: $ac_cv_lib_pq_main" >&5
+echo "${ECHO_T}$ac_cv_lib_pq_main" >&6
+if test $ac_cv_lib_pq_main = yes; then
+  tmp="$PKGLIBS -L/usr/local/pgsql/lib -lpq"
+fi
+
+        fi
+    fi
+
+    if test "x$tmp" == "x"; then
+        echo "libpq library not found - disabling PostgreSQL support"
+        if test "x$not_available" = "x"; then
+    not_available="use-pgsql"
+else
+    not_available="$not_available, use-pgsql"
+fi
+        cdef_use_pgsql="#undef"
+        enable_use_pgsql="no"
+        pgsql_path=
+        lp_cv_has_pgsql="no"
+    else
+        PKGLIBS="$tmp"
+    fi
+  fi
+
+  if test $enable_use_pgsql = yes; then
+      # Some systems need additional libraries
+      savelibs="$LIBS"
+      LIBS="$LIBS $PKGLIBS"
+
+      echo "$as_me:$LINENO: checking if -lssl is needed" >&5
+echo $ECHO_N "checking if -lssl is needed... $ECHO_C" >&6
+if test "${lp_cv_need_lib_ssl+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  if test "$cross_compiling" = yes; then
+  { { echo "$as_me:$LINENO: error: cannot run test program while cross compiling" >&5
+echo "$as_me: error: cannot run test program while cross compiling" >&2;}
+   { (exit 1); exit 1; }; }
+else
+  cat >conftest.$ac_ext <<_ACEOF
+#line $LINENO "configure"
+#include "confdefs.h"
+
+#include <libpq-fe.h>
+void t (void)
+{
+    PQconnectStart("");
+}
+int main(void)
+{
+    return 0;
+}
+
+_ACEOF
+rm -f conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } && { ac_try='./conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  lp_cv_need_lib_ssl=no
+else
+  echo "$as_me: program exited with status $ac_status" >&5
+echo "$as_me: failed program was:" >&5
+cat conftest.$ac_ext >&5
+( exit $ac_status )
+lp_cv_need_lib_ssl=yes
+
+fi
+rm -f core core.* *.core gmon.out bb.out conftest$ac_exeext conftest.$ac_objext conftest.$ac_ext
+fi
+fi
+echo "$as_me:$LINENO: result: $lp_cv_need_lib_ssl" >&5
+echo "${ECHO_T}$lp_cv_need_lib_ssl" >&6
+      if test "$lp_cv_need_lib_ssl" = "yes"; then
+          echo "$as_me:$LINENO: checking for main in -lssl" >&5
+echo $ECHO_N "checking for main in -lssl... $ECHO_C" >&6
+if test "${ac_cv_lib_ssl_main+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lssl  $LIBS"
+cat >conftest.$ac_ext <<_ACEOF
+#line $LINENO "configure"
+#include "confdefs.h"
+
+
+int
+main ()
+{
+main ();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+         { ac_try='test -s conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  ac_cv_lib_ssl_main=yes
+else
+  echo "$as_me: failed program was:" >&5
+cat conftest.$ac_ext >&5
+ac_cv_lib_ssl_main=no
+fi
+rm -f conftest.$ac_objext conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+echo "$as_me:$LINENO: result: $ac_cv_lib_ssl_main" >&5
+echo "${ECHO_T}$ac_cv_lib_ssl_main" >&6
+if test $ac_cv_lib_ssl_main = yes; then
+  PKGLIBS="$PKGLIBS -lssl"
+fi
+
+      fi
+
+      echo "$as_me:$LINENO: checking if -lcrypto is needed" >&5
+echo $ECHO_N "checking if -lcrypto is needed... $ECHO_C" >&6
+if test "${lp_cv_need_lib_crypto+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  if test "$cross_compiling" = yes; then
+  { { echo "$as_me:$LINENO: error: cannot run test program while cross compiling" >&5
+echo "$as_me: error: cannot run test program while cross compiling" >&2;}
+   { (exit 1); exit 1; }; }
+else
+  cat >conftest.$ac_ext <<_ACEOF
+#line $LINENO "configure"
+#include "confdefs.h"
+
+#include <libpq-fe.h>
+void t (void)
+{
+    PQconnectStart("");
+}
+int main(void)
+{
+    return 0;
+}
+
+_ACEOF
+rm -f conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } && { ac_try='./conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  lp_cv_need_lib_crypto=no
+else
+  echo "$as_me: program exited with status $ac_status" >&5
+echo "$as_me: failed program was:" >&5
+cat conftest.$ac_ext >&5
+( exit $ac_status )
+lp_cv_need_lib_crypto=yes
+
+fi
+rm -f core core.* *.core gmon.out bb.out conftest$ac_exeext conftest.$ac_objext conftest.$ac_ext
+fi
+fi
+echo "$as_me:$LINENO: result: $lp_cv_need_lib_crypto" >&5
+echo "${ECHO_T}$lp_cv_need_lib_crypto" >&6
+      if test "$lp_cv_need_lib_crypto" = "yes"; then
+          echo "$as_me:$LINENO: checking for main in -lcrypto" >&5
+echo $ECHO_N "checking for main in -lcrypto... $ECHO_C" >&6
+if test "${ac_cv_lib_crypto_main+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lcrypto  $LIBS"
+cat >conftest.$ac_ext <<_ACEOF
+#line $LINENO "configure"
+#include "confdefs.h"
+
+
+int
+main ()
+{
+main ();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+         { ac_try='test -s conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  ac_cv_lib_crypto_main=yes
+else
+  echo "$as_me: failed program was:" >&5
+cat conftest.$ac_ext >&5
+ac_cv_lib_crypto_main=no
+fi
+rm -f conftest.$ac_objext conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+echo "$as_me:$LINENO: result: $ac_cv_lib_crypto_main" >&5
+echo "${ECHO_T}$ac_cv_lib_crypto_main" >&6
+if test $ac_cv_lib_crypto_main = yes; then
+  PKGLIBS="$PKGLIBS -lcrypto"
+fi
+
+      fi
+
+      LIBS="$savelibs"
+  fi
+
+  CFLAGS="$saveflags"
+else
+  if test $enable_use_pgsql = yes; then
+      if test "x$not_available" = "x"; then
+    not_available="use-pgsql"
+else
+    not_available="$not_available, use-pgsql"
 fi
   fi
 fi
@@ -11240,6 +11834,7 @@ fi
 
 
 
+
                                                             ac_config_files="$ac_config_files Makefile config.h util/Makefile util/indent/Makefile util/xerq/Makefile util/erq/Makefile"
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -11869,6 +12464,7 @@ s,@cdef_share_variables@,$cdef_share_variables,;t t
 s,@cdef_use_system_crypt@,$cdef_use_system_crypt,;t t
 s,@cdef_use_ipv6@,$cdef_use_ipv6,;t t
 s,@cdef_use_mysql@,$cdef_use_mysql,;t t
+s,@cdef_use_pgsql@,$cdef_use_pgsql,;t t
 s,@cdef_use_pthreads@,$cdef_use_pthreads,;t t
 s,@cdef_use_alists@,$cdef_use_alists,;t t
 s,@cdef_use_pcre@,$cdef_use_pcre,;t t

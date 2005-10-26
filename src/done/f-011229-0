@@ -1,7 +1,7 @@
 Short: Add support for PostgreSQL
 Date: 2001-12-29
 Type: Feature
-State: New
+State: Done - implemented in 3.3.345
 See also: f-011229-1
 
 See files psql/ for the Ctx' patch.

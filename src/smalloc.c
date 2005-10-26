@@ -403,8 +403,7 @@ static word_t *last_small_chunk = NULL;
 static word_t *sfltable[SMALL_BLOCK_NUM+1] = {INIT_SMALL_BLOCK, 0};
   /* List of free small blocks of the various sizes.
    * The blocks are linked through the first non-header word_t.
-   * The last list is special: it keeps the oversized free blocks created
-   * by mem_consolidate().
+   * The last list is special: it keeps the oversized free blocks.
    */
 
 /* --- Large Block variables --- */
