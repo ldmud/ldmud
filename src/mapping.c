@@ -1077,11 +1077,8 @@ mapping_references_objects (mapping_t *m)
  */
 
 {
-    int             num_values;
     mapping_cond_t *cm;
     mapping_hash_t *hm;
-
-    num_values = m->num_values;
 
     /* Scan the condensed part for object references used as keys.
      */

@@ -19,11 +19,12 @@
  */
 
 #define SI_NAME         0
-#define SI_UNIQUE_NAME  1
-#define SI_BASE         2
-#define SI_MEMBER       3
+#define SI_PROG_NAME    1
+#define SI_PROG_ID      2
+#define SI_BASE         3
+#define SI_MEMBER       4
 
-#define SI_MAX 3  /* Min Number of SI_ result elements */
+#define SI_MAX 5  /* Min Number of SI_ result elements */
 
 /* Indices in the SI_MEMBER arrays
  */

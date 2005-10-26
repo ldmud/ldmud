@@ -3253,11 +3253,11 @@ check_struct_op (svalue_t * sp, int off_type, int off_value, bytecode_p pc)
         {
             string_t * got_name, * exp_name;
 
-            got_name = struct_uname(svp->u.strct);
+            got_name = struct_unique_name(svp->u.strct);
             if (!got_name)
                 got_name = struct_name(svp->u.strct);
 
-            exp_name = struct_t_uname(pExpected);
+            exp_name = struct_t_unique_name(pExpected);
             if (!exp_name)
                 exp_name = struct_t_name(pExpected);
 
@@ -6498,8 +6498,9 @@ push_control_stack ( svalue_t   *sp
     {
         if (!num_error || csp == &CONTROL_STACK[MAX_TRACE-1])
         {
-            ERRORF(("Too deep recursion: depth %d, limit %d user/%d max.\n"
-                   , csp - CONTROL_STACK + 1, MAX_USER_TRACE, MAX_TRACE));
+            ERRORF(("Too deep recursion: depth %ld, limit %d user/%d max.\n"
+                   , (long)(csp - CONTROL_STACK + 1)
+                   , MAX_USER_TRACE, MAX_TRACE));
         }
     }
 

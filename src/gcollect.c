@@ -1290,7 +1290,7 @@ remove_unreferenced_string (string_t *string)
         MSTRING_REFS(string)++;
         free_mstring(string);
     }
-}
+} /* remove_unreferenced_string() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -1744,6 +1744,9 @@ garbage_collection(void)
     clear_interpreter_refs();
     clear_comm_refs();
     clear_rxcache_refs();
+#ifdef USE_STRUCTS
+    clear_tabled_struct_refs();
+#endif
     mb_clear_refs();
       /* As this call also covers the swap buffer, it MUST come after
        * processing (and potentially swapping) the objects.
@@ -1961,9 +1964,12 @@ garbage_collection(void)
 
     gc_status = gcInactive;
 
-    /* --- Pass 4: remove unreferenced strings ---
+    /* --- Pass 4: remove unreferenced strings and struct types ---
      */
 
+#ifdef USE_STRUCTS
+    remove_unreferenced_structs();
+#endif
     mstring_walk_strings(remove_unreferenced_string);
 
     /* --- Pass 5: Release all destructed objects ---

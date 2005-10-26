@@ -50,7 +50,7 @@ static unsigned char T[]
  };
 
 /*-------------------------------------------------------------------------*/
-unsigned short
+whash_t
 whashmem (const char *s, size_t len, int maxn)
 
 /* Hash the first min(<len>,<maxn>) characters of string <s> into a short
@@ -58,7 +58,8 @@ whashmem (const char *s, size_t len, int maxn)
  */
 
 {
-    register unsigned char c, hi, lo;
+    register chash_t hi, lo;
+    register unsigned char c;
     register unsigned char *p = (unsigned char *)s;
     register long i = maxn;
 
@@ -75,13 +76,48 @@ whashmem (const char *s, size_t len, int maxn)
             hi = T[hi ^ c];
             lo = T[lo ^ c];
         }
-        return (unsigned short)((hi << 8) + lo);
+        return (whash_t)((hi << 8) + lo);
     }
     return 0;
 } /* whashmem() */
 
 /*-------------------------------------------------------------------------*/
-unsigned short
+whash_t
+whashmem2 (const char *s, size_t len, int maxn, whash_t initial)
+
+/* Hash the first min(<len>,<maxn>) characters of string <s> into a short
+ * integer and return this hashed value.
+ * The hash value is initialized with <initial>, so that this function
+ * can be used to hash a series of strings into one result.
+ */
+
+{
+    register chash_t hi, lo;
+    register unsigned char c;
+    register unsigned char *p = (unsigned char *)s;
+    register long i = maxn;
+
+    hi = (initial >> 8) & 0xFF;
+    lo = initial & 0xFF;
+
+    if (i > len)
+        i = len;
+
+    if ( i > 0 )
+    {
+        for ( ; --i > 0; )
+        {
+            c = *p++;
+            hi = T[hi ^ c];
+            lo = T[lo ^ c];
+        }
+        return (whash_t)((hi << 8) + lo);
+    }
+    return 0;
+} /* whashmem2() */
+
+/*-------------------------------------------------------------------------*/
+whash_t
 whashstr (const char *s, int maxn)
 
 /* Hash the first <maxn> characters of string <s> into a short integer and
@@ -89,7 +125,8 @@ whashstr (const char *s, int maxn)
  */
 
 {
-    register unsigned char c, hi, lo;
+    register chash_t hi, lo;
+    register unsigned char c;
     register unsigned char *p = (unsigned char *)s;
     register long i = maxn;
 
@@ -101,13 +138,13 @@ whashstr (const char *s, int maxn)
             hi = T[hi ^ c];
             lo = T[lo ^ c];
         }
-        return (unsigned short)((hi << 8) + lo);
+        return (whash_t)((hi << 8) + lo);
     }
     return 0;
 } /* whashstr() */
 
 /*-------------------------------------------------------------------------*/
-unsigned char
+chash_t
 chashstr (const char *s, int maxn)
 
 /* Hash the first <maxn> characters of string <s> into a char-sized integer
@@ -116,7 +153,7 @@ chashstr (const char *s, int maxn)
  */
 
 {
-    register unsigned char h;
+    register chash_t h;
     register unsigned char *p;
     register long i;
     for (h = 0, i = maxn, p = (unsigned char *)s; *p && --i >= 0; p++)

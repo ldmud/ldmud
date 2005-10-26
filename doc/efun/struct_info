@@ -23,7 +23,8 @@ DESCRIPTION
         The elements in the resulting array are:
 
           string [SI_NAME]:        the name of the struct
-          string [SI_UNIQUE_NAME]: the unique name of the struct
+          string [SI_PROG_NAME]:   the name of program defining the struct
+          string [SI_PROG_ID]:     the id of the program defining the struct
           mixed  [SI_BASE]:        0, or the base struct information
           mixed* [SI_MEMBER+0]:    the first member information
           mixed* [SI_MEMBER+n]:    the last member information
@@ -38,6 +39,8 @@ DESCRIPTION
 
 HISTORY
         Introduced in LDMud 3.3.344.
+        LDMud 3.3.417 introduced SI_PROG_NAME and SI_PROG_ID in exchange
+          for SI_UNIQUE_NAME.
 
 SEE ALSO
         structs(LPC)

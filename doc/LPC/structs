@@ -165,6 +165,16 @@ MISCELLANEOUS
 
         Support for structs is signaled by the macro __LPC_STRUCTS__.
 
+        Since structs are tied to the program they are defined in,
+        re-compiling a program creates new struct types which are
+        in principle incompatible to the old ones. However, the LPC
+        compiler checks if the newly compiled structs have the same
+        structure as their older counterparts of the same name
+        (and defining program). If the structures conform, the existing
+        older struct types are used instead of the new ones. This way
+        an accidental of for example /std/types.c doesn't break
+        the whole mud.
+
 
 EXAMPLES
         Suppose we have two objects: a monster, and a monster
@@ -199,6 +209,8 @@ EXAMPLES
 HISTORY
         structs were fully implemented first in LDMud 3.3.246.
         The implementation was revised in LDMud 3.3.344.
+        The reactivation of unchanged structs in object updates was
+        implemented in LDMud 3.3.417.
 
 
 SEE ALSO

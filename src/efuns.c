@@ -5846,9 +5846,10 @@ v_get_type_info (svalue_t *sp, int num_arg)
         if (num_arg == 2 && sp->type == T_NUMBER && sp->u.number == 2)
         {
             sp--;
-            str = ref_mstring(sp->u.strct->type->unique_name);
+
+            str = struct_unique_name(sp->u.strct);
             free_svalue(sp);
-            put_string(sp, str);
+            put_ref_string(sp, str);
             return sp;
             /* NOTREACHED */
         }

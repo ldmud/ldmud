@@ -3831,17 +3831,20 @@ add_struct_member ( string_t *name, vartype_t type
         {
             if (mstreq(name, STRUCT_MEMBER(i).name))
             {
-                if (from_struct)
+                if (pdef->type->base
+                 && pdef->type->base->num_members > i
+                   )
+                    yyerrorf("Duplicate member '%s' in struct '%s', "
+                             "inherited from struct '%s'"
+                            , get_txt(name)
+                            , get_txt(struct_t_name(pdef->type))
+                            , get_txt(struct_t_name(pdef->type->base))
+                            );
+                else
                     yyerrorf("Duplicate member '%s' in struct '%s'"
                             , get_txt(name)
                             , get_txt(struct_t_name(pdef->type))
                             );
-                else
-                    yyerrorf("Duplicate member '%s' in struct '%s' "
-                             "inherited from struct '%s'"
-                            , get_txt(name)
-                            , get_txt(struct_t_name(pdef->type))
-                            , get_txt(from_struct->name));
                 return;
             }
         }
@@ -3876,7 +3879,7 @@ add_struct_member ( string_t *name, vartype_t type
 
 /*-------------------------------------------------------------------------*/
 static void
-finish_struct ( const char * unique_name )
+finish_struct ( const char * prog_name, int32 prog_id)
 
 /* The definition for struct <current_struct> has been parsed completely,
  * now complete the struct type object with the A_STRUCT_MEMBERS data.
@@ -3899,7 +3902,8 @@ finish_struct ( const char * unique_name )
 
     /* Fill in the prototype */
     pdef->type = struct_fill_prototype(pdef->type
-                                      , new_tabled(unique_name)
+                                      , new_tabled(prog_name)
+                                      , prog_id
                                       , base
                                       , STRUCT_MEMBER_COUNT
                                       , &STRUCT_MEMBER(0)
@@ -4235,6 +4239,149 @@ find_struct_by_member (string_t * name, int * pNum)
     *pNum = member;
     return rc;
 } /* find_struct_by_member() */
+
+/*-------------------------------------------------------------------------*/
+static void
+struct_epilog (void)
+
+/* After a successful parse, make sure that all structs are defined,
+ * try to reactive existing structs, and publish the new ones.
+ *
+ * If an error occures, num_parse_error will be incremented.
+ */
+
+{
+    int i;
+
+    /* Check that all structs are defined.
+     */
+    for (i = 0; i < STRUCT_COUNT; i++)
+    {
+        if (STRUCT_DEF(i).flags & NAME_PROTOTYPE)
+        {
+            yyerrorf("struct '%s' defined just as prototype"
+                    , get_txt(struct_t_name(STRUCT_DEF(i).type))
+                    );
+            return;
+        }
+    }
+
+    /* For all structs defined in this program, check if they just
+     * replicate an existing older struct.
+     */
+    for (i = 0; i < STRUCT_COUNT; i++)
+    {
+        struct_type_t *pSType = STRUCT_DEF(i).type;
+        struct_type_t *pOld;
+        int ii;
+
+        if (STRUCT_DEF(i).inh >= 0)
+            continue;
+        
+        pOld = struct_lookup_type(pSType);
+        if (!pOld || !struct_type_equivalent(pSType, pOld))
+            continue;
+
+        /* pOld has the same structure as pSType, so lets
+         * replace the latter with the former.
+         * First in the structs themselves.
+         */
+        for (ii = 0; ii < STRUCT_COUNT; ii++)
+        {
+            if (ii != i)
+                struct_type_update(STRUCT_DEF(ii).type, pSType, pOld); 
+        }
+
+        /* Update variable types */
+
+        for (ii = 0; ii < NV_VARIABLE_COUNT; ii++)
+        {
+            fulltype_t * pType = &NV_VARIABLE(ii)->type;
+
+            if ((pType->typeflags & PRIMARY_TYPE_MASK) == TYPE_STRUCT
+             && pType->t_struct == pSType
+               )
+            {
+                free_struct_type(pType->t_struct);
+                pType->t_struct = ref_struct_type(pOld);
+            }
+        }
+
+        for (ii = 0; ii < V_VARIABLE_COUNT; ii++)
+        {
+            fulltype_t * pType = &V_VARIABLE(ii)->type;
+
+            if ((pType->typeflags & PRIMARY_TYPE_MASK) == TYPE_STRUCT
+             && pType->t_struct == pSType
+               )
+            {
+                free_struct_type(pType->t_struct);
+                pType->t_struct = ref_struct_type(pOld);
+            }
+        }
+
+        /* Update the function return types */
+        {
+            int num_functions = FUNCTION_COUNT;
+            function_t * f = (function_t *)mem_block[A_FUNCTIONS].block;
+
+            for (ii = num_functions; --ii >= 0; f++)
+            {
+                /* Ignore all functions but those actually defined in
+                 * this program.
+                 */
+                if (f->flags & (NAME_INHERITED|NAME_UNDEFINED|NAME_CROSS_DEFINED))
+                    continue;
+
+                if ((f->type.typeflags & PRIMARY_TYPE_MASK) == TYPE_STRUCT
+                 && f->type.t_struct == pSType
+                   )
+                {
+                    vartype_t type;
+                    fun_hdr_p funhdr;
+
+                    free_struct_type(f->type.t_struct);
+                    f->type.t_struct = ref_struct_type(pOld);
+
+                    funhdr = (fun_hdr_p)
+                             &mem_block[A_PROGRAM].block[f->offset.pc];
+                    memcpy(&type, FUNCTION_TYPEP(funhdr), sizeof(type));
+                    type.t_struct = pOld;
+                    memcpy(FUNCTION_TYPEP(funhdr), &type, sizeof(type));
+                }
+            } /* for(ii) */
+        }
+
+        /* Update function argument types */
+
+        for (ii = 0; ii < ARGTYPE_COUNT; ii++)
+        {
+            vartype_t * pType = &ARGUMENT_TYPE(ii);
+
+            if ((pType->type & PRIMARY_TYPE_MASK) == TYPE_STRUCT
+             && pType->t_struct == pSType
+               )
+            {
+                free_struct_type(pType->t_struct);
+                pType->t_struct = ref_struct_type(pOld);
+            }
+        }
+
+        /* And finally, replace the struct in the A_STRUCT memblock */
+        free_struct_type(pSType);
+        STRUCT_DEF(i).type = ref_struct_type(pOld);
+    } /* for(i) */
+
+    /* Publish all struct types defined in this program.
+     * It is safe to publish types twice.
+     */
+    for (i = 0; i < STRUCT_COUNT; i++)
+    {
+        if (STRUCT_DEF(i).inh < 0)
+            struct_publish_type(STRUCT_DEF(i).type);
+    } /* for(i) */
+
+} /* struct_epilog() */
 
 #endif /* USE_STRUCTS */
 
@@ -5573,11 +5720,7 @@ struct_decl:
       }
       opt_base_struct '{' opt_member_list '}' ';'
       { 
-          char name[256+MAXPATHLEN];
-
-          sprintf(name, "%s (/%s #%ld)", get_txt($3->name)
-                      , compiled_file, current_id_number+1);
-          finish_struct(name);
+          finish_struct(compiled_file, current_id_number+1);
       }
 ; /* struct_decl */
 
@@ -5611,7 +5754,7 @@ opt_base_struct:
               {
                   yyerrorf("Undefined base struct '%s'", get_txt($2->name));
               }
-              else if (!struct_t_uname(STRUCT_DEF(num).type))
+              else if (!struct_t_unique_name(STRUCT_DEF(num).type))
               {
                   yyerrorf("Incomplete base struct '%s'", get_txt($2->name));
               }
@@ -15246,6 +15389,16 @@ epilog (void)
         free_struct_member_data(&STRUCT_MEMBER(i));
     }
     mem_block[A_STRUCT_MEMBERS].current_size = 0;
+
+    /* If the parse was successful, Make sure that all structs are defined and
+     * reactivate old structs where possible.
+     * If an error occurs, num_parse_error is incremented and epilog() will
+     * bail out below.
+     */
+    if (!num_parse_error && !inherit_file)
+    {
+        struct_epilog();
+    }
 %endif /* USE_STRUCTS */
 
     /* Append the non-virtual variable block to the virtual ones,
@@ -15580,9 +15733,10 @@ epilog (void)
     {
         struct_type_t * ptype;
         ptype = STRUCT_DEF(i).type;
-        printf("DEBUG: [%d] struct %s: (%s) ref %ld, %d members, base %s, flags %lx\n"
+        printf("DEBUG: [%d] struct %s: (%s #%ld) ref %ld, %d members, base %s, flags %lx\n"
               , i, get_txt(ptype->name)
-              , ptype->unique_name ? get_txt(ptype->unique_name) : "<none>"
+              , ptype->prog_name ? get_txt(ptype->prog_name) : "<none>"
+              , (long)ptype->prog_id
               , (long)ptype->ref
               , ptype->num_members
               , ptype->base ? get_txt(ptype->base->name) : "<none>"
@@ -15607,20 +15761,6 @@ epilog (void)
 
 }
 #endif /* USE_STRUCTS */
-#ifdef USE_STRUCTS
-        /* Make sure that all structs are defined.
-         * (the actual bail out is below in the check for num_parse_error.
-         */
-        for (i = 0; i < STRUCT_COUNT; i++)
-        {
-            if (STRUCT_DEF(i).flags & NAME_PROTOTYPE)
-            {
-                yyerrorf("struct '%s' defined just as prototype"
-                        , get_txt(struct_t_name(STRUCT_DEF(i).type))
-                        );
-            }
-        }
-#endif
 
         /* On error, don't create anything */
         if (num_parse_error > 0 || inherit_file)

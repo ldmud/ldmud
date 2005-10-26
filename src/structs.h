@@ -1,10 +1,6 @@
 #ifndef STRUCTS_H_
 #define STRUCTS_H_ 1
 
-/*------------------------------------------------------------------
- *------------------------------------------------------------------
- */
-
 #include "driver.h"
 
 #ifdef USE_STRUCTS
@@ -12,6 +8,7 @@
 #include "typedefs.h"
 
 #include "exec.h"
+#include "hash.h"
 #include "svalue.h"
 
 /* --- Types --- */
@@ -49,7 +46,9 @@ struct struct_member_s
 /* --- struct struct_type_s: LPC struct typeobject
  *
  * All programs using structs link to these typestructure, as do
- * the struct instances themselves.
+ * the struct instances themselves. The typestructures are organized
+ * in a hash table for lookups, and thus contain the necessary structures
+ * for it.
  *
  * The member descriptors are allocated in a separate block to allow
  * the use of struct prototypes.
@@ -57,18 +56,23 @@ struct struct_member_s
 
 struct struct_type_s
 {
-    string_t      * name;     /* Tabled name of the struct */
-    p_int           ref;      /* Number of references to this structure */
-    string_t      * unique_name;
-                              /* Tabled unique name of the struct, in the
-                               * form "<name> (<prog-name> #<prog-id_number>)".
-                               * It is derived from the program where the
-                               * struct is fully defined, it is NULL for
-                               * struct prototypes.
-                               */
-    struct_type_t * base;     /* Counted link to the base structure,
-                               * or NULL if none
-                               */
+    struct_type_t * next;      /* Next type in hash chain (uncounted) */
+    whash_t         hash;      /* Hash value of this type */
+
+    string_t      * name;      /* Tabled name of the struct */
+    p_int           ref;       /* Number of references to this structure */
+    struct_type_t * base;      /* Counted link to the base structure,
+                                * or NULL if none
+                                */
+    string_t      * prog_name; /* Tabled name of the defining program.
+                                * NULL for struct prototypes.
+                                */
+    int32           prog_id;   /* ID number of the defining program */
+    string_t      * unique_name; /* The unique name of this struct,
+                                  * composed from .name, .prog_name and
+                                  * .prog_id. It is created the first
+                                  * time it is queried.
+                                  */
     unsigned short  num_members;  /* Number of data members */
     struct_member_t * member;
       /* The description of the struct members, including those from the
@@ -98,12 +102,19 @@ struct struct_type_s
 #define struct_t_name(t) ((t)->name)
 
 
-/* string_t * struct_uname(struct *t)
- * string_t * struct_t_uname(struct_type_t *t)
- *   Return an uncounted reference to the unique struct name.
+/* string_t * struct_pname(struct *t)
+ * string_t * struct_t_pname(struct_type_t *t)
+ *   Return an uncounted reference to the struct's prog_name.
  */
-#define struct_uname(t)   ((t)->type->unique_name)
-#define struct_t_uname(t) ((t)->unique_name)
+#define struct_pname(t)   ((t)->type->prog_name)
+#define struct_t_pname(t) ((t)->prog_name)
+
+/* int32 struct_pid(struct *t)
+ * int32 struct_t_pid(struct_type_t *t)
+ *   Return the ID of the struct's definint program.
+ */
+#define struct_pid(t)   ((t)->type->prog_id)
+#define struct_t_pid(t) ((t)->prog_id)
 
 
 /* struct_t *ref_struct(struct_t *t)
@@ -159,12 +170,14 @@ struct struct_type_s
 extern struct_t * struct_new (struct_type_t *pSType);
 extern struct_type_t * struct_new_prototype ( string_t *name );
 extern struct_type_t * struct_fill_prototype ( struct_type_t   *type
-                                             , string_t        *unique_name
+                                             , string_t        *prog_name
+                                             , int32            prog_id
                                              , struct_type_t   *base
                                              , int              num_members
                                              , struct_member_t *member);
 extern struct_type_t * struct_new_type ( string_t        *name
-                                       , string_t        *unique_name
+                                       , string_t        *prog_name
+                                       , int32            prog_id
                                        , struct_type_t   *base
                                        , int              num_members
                                        , struct_member_t *member);
@@ -172,18 +185,28 @@ extern struct_t * struct_new_anonymous (int num_members);
 extern void struct_free_empty (struct_t *pStruct);
 extern void struct_free (struct_t *pStruct);
 extern void struct_free_type (struct_type_t *pSType);
+extern struct_type_t * struct_lookup_type ( struct_type_t * pSType );
+extern void struct_publish_type ( struct_type_t * pSType );
+extern Bool struct_type_equivalent (struct_type_t * pSType1, struct_type_t *pSType2);
+extern void struct_type_update ( struct_type_t * pSType
+                               , struct_type_t * pOld
+                               , struct_type_t * pNew);
 extern struct_type_t * struct_find (string_t *name, program_t * prog);
 extern int struct_find_member ( struct_type_t * ptype, string_t * name );
 extern void struct_check_for_destr ( struct_t * pStruct );
 extern mp_int total_struct_size (strbuf_t *sbuf, Bool verbose);
 extern void   struct_dinfo_status(svalue_t *svp, int value);
+extern string_t * struct_t_unique_name (struct_type_t *pSType);
+#define struct_unique_name(pStruct) struct_t_unique_name(pStruct->type)
 
 #ifdef GC_SUPPORT
 
 extern void clear_struct_type_ref (struct_type_t * pSType);
 extern void clear_struct_ref (struct_t * pStruct);
+extern void clear_tabled_struct_refs (void);
 extern void count_struct_type_ref (struct_type_t * pSType);
 extern void count_struct_ref (struct_t * pStruct);
+extern void remove_unreferenced_structs (void);
 
 #endif /* GC_SUPPORT */
 

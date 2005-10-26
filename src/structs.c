@@ -1,4 +1,123 @@
 /*------------------------------------------------------------------
+ * Struct Implementation
+ *
+ *------------------------------------------------------------------
+ * Structs implement an aggregate type in LPC with a fixed size,
+ * which allows access to its members by their name. The LPC compiler
+ * tries to resolve struct member accesses at compile time, but
+ * a runtime access by name is also possible.
+ *
+ * In contrast to C structs (and in analogy to Oberon-2 RECORDs),
+ * structs allow single inheritance as long as no member names are
+ * duplicated.
+ *
+ * Structs are tied by the program (object) defining them: the LPC
+ * compiler considers two 'struct data' definitions as different, if
+ * they appear in different objects. Consequently the method to
+ * use existing struct definitions is to inherit them.
+ *------------------------------------------------------------------
+ * Structs are implemented by three data structures: struct_type_t,
+ * struct_t, and struct_member_t.
+ *
+ * A struct_type_t defines the structure of a struct, and every
+ * struct instance carries a pointer to the struct_type_t for
+ * identification. Ditto, typetests at runtime are carried out
+ * using the struct_type_t pointers.
+ *
+ * The members descriptions held by a struct_type_t are made up
+ * from struct_member_t instances.
+ *
+ * A struct_t finally is the actual struct instance. The driver
+ * treats it like the other by-reference structures.
+ *
+ * The struct_type_t's are organized in a hash table, using the
+ * struct_type_t's own name and the name of the defining program
+ * as key. The purpose of the hash table is to overcome one disadvantage
+ * of the close bond between structs and their programs: if an object
+ * is re-compiled, all structs in there would be redefined and thus
+ * receive new typeobjects even if their structure didn't change. An
+ * accidental update of a central object like /std/types.c could
+ * break a mud!
+ *
+ * To avoid this, the LPC compiler looks up every newly defined struct
+ * in the hash table, and if it exists, checks the two definitions
+ * for conformity. If they are the same, the newly defined struct type
+ * is deleted, and the old struct type is reactived for the new program.
+ *
+ *
+ * -- struct_type_t --
+ *
+ *   struct_type_t
+ *   {
+ *       struct_type_t * next;
+ *       whash_t         hash;
+ * 
+ *       string_t      * name;
+ *       p_int           ref;
+ *       struct_type_t * base;
+ *       string_t      * prog_name;
+ *       string_t      * unique_name;
+ *       int32           prog_id;
+ *       unsigned short  num_members;
+ *       struct_member_t * member;
+ *   }
+ *
+ *   .next and .hash are used to manage the struct_type_t in the hash
+ *   table. .next is the link pointer, .hash is the hash created from .name
+ *   and .prog_name.
+ *
+ *   .name is the name of the struct.
+ *
+ *   .ref is the number of references to the type. Every struct_t created
+ *   from the type holds one reference; so do the program structures and
+ *   (if used) the program argument type list.
+ *
+ *   .base is a counted pointer to the super-struct, or NULL if this struct
+ *   does not inherit.
+ *
+ *   .prog_name and .prog_id are the name and ID of the program defining the
+ *   struct. They are required to distinguish between identically named
+ *   structs defined in different programs (even different incarnations of
+ *   a program). While a new struct definition is compiled, .prog_name is
+ *   NULL to identify it as incomplete 'prototype'.
+ *
+ *   .unique_name is created only on first request and gives a unique
+ *   name for the struct composed of .name, .prog_name and .prog_id. It
+ *   is used by the driver for diagnostics.
+ *
+ *   .num_members is the number of data members in this struct, including
+ *   inherited members.
+ *
+ *   .member is allocated to hold the .num_member member descriptions
+ *   in the order they appear in the struct.
+ *
+ *
+ * -- struct_type_t --
+ *
+ *   struct_member_s
+ *   {
+ *       string_t * name;
+ *       vartype_t  type;
+ *   }
+ *
+ *   .name is the name of the member, .type it's compile-time type.
+ *
+ *
+ * -- struct_t --
+ *
+ *   struct_s
+ *   {
+ *       struct_type_t * type;
+ *       p_int           ref;
+ *       wiz_list_t    * user;
+ *       svalue_t        member[.type->num_members];
+ *   }
+ *
+ *   .type is the pointer to the struct_type_t for this struct.
+ *   .ref is the number of references to this struct instance.
+ *   .user is the wizlist entry.
+ *   .member are the member values.
+ *
  *------------------------------------------------------------------
  */
 
@@ -48,6 +167,18 @@
 
 /*-------------------------------------------------------------------------*/
 
+static struct_type_t ** table = NULL;
+  /* The hash table of all published struct types.
+   */
+
+static size_t num_types = 0;
+  /* Number of published struct types in the table.
+   */
+
+static size_t table_size = 0;
+  /* Number of buckets in the table.
+   */
+
 /* --- Statistics --- */
 
 static mp_int num_struct = 0;
@@ -59,6 +190,205 @@ static mp_int size_struct = 0;
 static mp_int size_struct_type = 0;
   /* Allocated size of structs and struct typeobjects.
    */
+
+/*-------------------------------------------------------------------------*/
+static INLINE whash_t
+hash2 (string_t * pName, string_t * pProgName)
+
+/* Compute the hash from <pName> combined with <pProgName>.
+ */
+
+{
+    whash_t         hash;
+
+    hash = whashmem(get_txt(pName), mstrsize(pName), 100);
+    hash = whashmem2("\n", 1, 1, hash);
+    hash = whashmem2(get_txt(pProgName), mstrsize(pProgName), 100, hash);
+
+    return hash;
+} /* hash2() */
+
+/*-------------------------------------------------------------------------*/
+static struct_type_t *
+find_by_type (struct_type_t * pSType)
+
+/* Lookup the struct type <pSType> in the hash table. If it's in there,
+ * return its pointer <pSType> and move it to the head of its chain.
+ * If the type is not in the table, return NULL.
+ */
+
+{
+    struct_type_t * this, * prev;
+    size_t          ix;
+
+    if (!table || !table_size)
+        return NULL;
+
+    ix = pSType->hash % table_size;
+
+    prev = NULL;
+    this = table[ix];
+    while (this != NULL)
+    {
+        if (this == pSType)
+        {
+            if (prev != NULL)
+            {
+                prev->next = this->next;
+                this->next = table[ix];
+                table[ix] = this;
+            }
+            break;
+        }
+
+        prev = this;
+        this = this->next;
+    }
+
+    return this;
+} /* find_by_type() */
+
+/*-------------------------------------------------------------------------*/
+static struct_type_t *
+find_by_name (string_t * pName, string_t * pProgName, whash_t  hash)
+
+/* Lookup the struct type named <pName> and defined in program <pProgName>
+ * in the hash table. <hash> is the hash of the two names combined.
+ * If found, move it to the head of its chain and return the type pointer.
+ * If not found, return NULL.
+ *
+ * In either case, *<pHash> is set to the hash value of the entry if != NULL.
+ */
+
+{
+    struct_type_t * this, * prev;
+    size_t          ix;
+
+    if (!table || !table_size)
+        return NULL;
+
+    ix = hash % table_size;
+
+    prev = NULL;
+    this = table[ix];
+    while (this != NULL)
+    {
+        if (this->hash == hash
+         && mstreq(this->name, pName)
+         && mstreq(this->prog_name, pProgName)
+           )
+        {
+            if (prev != NULL)
+            {
+                prev->next = this->next;
+                this->next = table[ix];
+                table[ix] = this;
+            }
+            break;
+        }
+
+        prev = this;
+        this = this->next;
+    }
+
+    return this;
+} /* find_by_name() */
+
+/*-------------------------------------------------------------------------*/
+static void
+add_type (struct_type_t * pSType)
+
+/* Add the struct type <pSType> to the hash table.
+ * The <pSType>->hash must already been computed.
+ */
+
+{
+     size_t ix;
+
+#ifdef DEBUG
+     if (find_by_type(pSType))
+         fatal("struct type %s (%s %ld) already in table.\n"
+              , get_txt(struct_t_name(pSType))
+              , get_txt(struct_t_pname(pSType))
+              , struct_t_pid(pSType)
+              );
+#endif
+
+     if (!table)
+     {
+         memsafe(table = pxalloc(sizeof(*table)), sizeof(*table)
+                , "struct type hash table");
+         table_size = 1;
+         table[0] = pSType;
+         pSType->next = NULL;
+         num_types = 1;
+         return;
+     }
+
+     ix = pSType->hash % table_size;
+     pSType->next = table[ix];
+     table[ix] = pSType;
+
+     num_types++;
+
+     /* If chain lengths grow too much (more than 2 entries per bucket
+      * on average), increase the table size
+      */
+     if (num_types > 2 * table_size && table_size * 2 < MAX_WHASH)
+     {
+         size_t new_size = 2 * table_size;
+         struct_type_t ** table2;
+
+         table2 = pxalloc(new_size * sizeof(*table2));
+         if (table2)
+         { 
+             memset(table2, 0, new_size * sizeof(*table2));
+
+             /* Rehash all existing entries */
+             for (ix = 0; ix < table_size; ix++)
+             {
+                 struct_type_t * this;
+
+                 while (NULL != (this = table[ix]))
+                 {
+                     size_t ix2;
+
+                     table[ix] = this->next;
+                     ix2 = this->hash % new_size;
+
+                     this->next = table2[ix2];
+                     table2[ix2] = this;
+                 }
+             } /* for() */
+
+             pfree(table);
+             table = table2;
+             table_size = new_size;
+         } /* if (table2) */
+     } /* if (check for rehash condition) */
+
+} /* add_type() */
+
+/*-------------------------------------------------------------------------*/
+static void
+remove_type (struct_type_t * pSType)
+
+/* Remove the struct type <pSType> from the hash table, if it's in there.
+ */
+
+{
+     size_t ix;
+
+     if (!find_by_type(pSType))
+         return;
+
+     /* pSType is now at the head of it's chain */
+
+     ix = pSType->hash % table_size;
+     table[ix] = pSType->next;
+
+     num_types--;
+} /* remove_type() */
 
 /*-------------------------------------------------------------------------*/
 struct_t *
@@ -125,7 +455,9 @@ struct_new_prototype ( string_t *name )
     {
         pSType->ref = 1;
         pSType->name = name;
-        pSType->unique_name = NULL;
+        pSType->prog_name = NULL;
+        pSType->hash = 0;
+        pSType->prog_id = 0;
         pSType->num_members = 0;
         pSType->member = NULL;
         pSType->base = NULL;
@@ -144,7 +476,8 @@ struct_new_prototype ( string_t *name )
 /*-------------------------------------------------------------------------*/
 struct_type_t *
 struct_fill_prototype ( struct_type_t   *type
-                      , string_t        *unique_name
+                      , string_t        *prog_name
+                      , int32            prog_id
                       , struct_type_t   *base
                       , int              num_members
                       , struct_member_t *member)
@@ -164,7 +497,7 @@ struct_fill_prototype ( struct_type_t   *type
 #ifdef DEBUG
     if (type == NULL)
         fatal("NULL typeobject pointer passed to struct_fill_prototype().\n");
-    if (type->unique_name != NULL)
+    if (type->prog_name != NULL)
         fatal("Non-prototype typeobject passed to struct_fill_prototype().\n");
 #endif
 
@@ -175,7 +508,10 @@ struct_fill_prototype ( struct_type_t   *type
 
     if (num_members == 0 || pMembers != NULL)
     {
-        type->unique_name = unique_name;
+        type->prog_name = prog_name;
+        type->next = NULL;
+        type->hash = hash2(type->name, type->prog_name);
+        type->prog_id = prog_id;
         type->base = base;
         type->num_members = num_members;
 
@@ -196,7 +532,7 @@ struct_fill_prototype ( struct_type_t   *type
     else
     {
         free_mstring(type->name);
-        free_mstring(unique_name);
+        free_mstring(prog_name);
 
         if (base)
             free_struct_type(base);
@@ -221,7 +557,8 @@ struct_fill_prototype ( struct_type_t   *type
 /*-------------------------------------------------------------------------*/
 struct_type_t *
 struct_new_type ( string_t        *name
-                , string_t        *unique_name
+                , string_t        *prog_name
+                , int32            prog_id
                 , struct_type_t   *base
                 , int              num_members
                 , struct_member_t *member)
@@ -238,10 +575,141 @@ struct_new_type ( string_t        *name
 
     pSType = struct_new_prototype(name);
     if (pSType != NULL)
-        pSType = struct_fill_prototype(pSType, unique_name, base, num_members, member);
+        pSType = struct_fill_prototype(pSType, prog_name, prog_id, base, num_members, member);
 
     return pSType;
 } /* struct_new_type() */
+
+/*-------------------------------------------------------------------------*/
+struct_type_t *
+struct_lookup_type ( struct_type_t * pSType )
+
+/* Lookup the hash table if a struct type with the same name and program
+ * name as <pSType> has been published already.
+ * Return the (uncounted) pointer to the found type, or NULL if not found.
+ */
+
+{
+#ifdef DEBUG
+    if (pSType == NULL)
+        fatal("NULL typeobject pointer passed to struct_lookup_type().\n");
+    if (pSType->prog_name == NULL)
+        fatal("prototype typeobject passed to struct_lookup_type().\n");
+#endif
+
+    return find_by_name(pSType->name, pSType->prog_name, pSType->hash);
+} /* struct_lookup_type() */
+
+/*-------------------------------------------------------------------------*/
+void
+struct_publish_type ( struct_type_t * pSType )
+
+/* Add the struct type <pSType> to the hash table ("publish it"), replacing
+ * an existing entry if necessary.
+ * It is safe to publish the same type multiple times.
+ */
+
+{
+    struct_type_t * old;
+
+#ifdef DEBUG
+    if (pSType == NULL)
+        fatal("NULL typeobject pointer passed to struct_publish_type().\n");
+    if (pSType->prog_name == NULL)
+        fatal("prototype typeobject passed to struct_publish_type().\n");
+#endif
+
+    old = find_by_name(pSType->name, pSType->prog_name, pSType->hash);
+    if (old)
+        remove_type(old);
+    add_type(pSType);
+} /* struct_publish_type() */
+
+/*-------------------------------------------------------------------------*/
+Bool
+struct_type_equivalent (struct_type_t * pSType1, struct_type_t *pSType2)
+
+/* Check if the two types <pSType1> and <pSType2> are of equivalent
+ * shallow structure.
+ */
+
+{
+    int num;
+
+    if (pSType1 == pSType2)
+        return MY_TRUE;
+    if (!mstreq(struct_t_name(pSType1), struct_t_name(pSType2))
+     || !mstreq(struct_t_pname(pSType1), struct_t_pname(pSType2))
+     || pSType1->base != pSType2->base
+       )
+        return MY_FALSE;
+    if (struct_t_pid(pSType1) == struct_t_pid(pSType2))
+        return MY_TRUE;
+
+    /* The basics match, now check the members */
+    if (pSType1->num_members != pSType2->num_members)
+        return MY_FALSE;
+
+    for (num = 0; num < pSType1->num_members; num++)
+    {
+        struct_member_t * pMember1 = &pSType1->member[num];
+        struct_member_t * pMember2 = &pSType2->member[num];
+        if (!mstreq(pMember1->name, pMember2->name)
+         || pMember1->type.type != pMember2->type.type
+           )
+            return MY_FALSE;
+
+        /* For structs members, conformance by name should
+         * be sufficient.
+         */
+        if ((pMember1->type.type & PRIMARY_TYPE_MASK) == TYPE_STRUCT)
+        {
+            if (!mstreq( struct_t_name(pMember1->type.t_struct)
+                       , struct_t_name(pMember2->type.t_struct))
+             || !mstreq( struct_t_pname(pMember1->type.t_struct)
+                       , struct_t_pname(pMember2->type.t_struct))
+               )
+                return MY_FALSE;
+        }
+    }
+
+    return MY_TRUE;
+} /* struct_type_equivalent() */
+
+/*-------------------------------------------------------------------------*/
+void
+struct_type_update ( struct_type_t * pSType
+                   , struct_type_t * pOld
+                   , struct_type_t * pNew)
+
+/* In struct type <pSType>, replace all references to <pOld> by <pNew>.
+ */
+
+{
+    int num;
+
+    if (pOld == pNew)
+        return;
+
+    if (pSType->base == pOld)
+    {
+        free_struct_type(pSType->base);
+        pSType->base = ref_struct_type(pNew);
+    }
+
+    for (num = 0; num < pSType->num_members; num++)
+    {
+        struct_member_t * pMember = &pSType->member[num];
+
+        if ((pMember->type.type & PRIMARY_TYPE_MASK) == TYPE_STRUCT
+         && pMember->type.t_struct == pOld
+           )
+        {
+            free_struct_type(pMember->type.t_struct);
+            pMember->type.t_struct = ref_struct_type(pNew);
+        }
+    }
+} /* struct_type_update() */
 
 /*-------------------------------------------------------------------------*/
 struct_t *
@@ -265,6 +733,7 @@ struct_new_anonymous (int num_members)
     (void) ref_mstring(STR_ANONYMOUS);
     pType = struct_new_type( STR_ANONYMOUS
                            , STR_ANONYMOUS
+                           , 0
                            , NULL, num_members, NULL);
     if (pType == NULL)
         return NULL;
@@ -389,11 +858,15 @@ struct_free_type (struct_type_t *pSType)
              , pSType->ref);
 #endif
 
+    remove_type(pSType); /* In case it was published */
+
     num_struct_type--;
     size_struct_type -=   STRUCT_TYPE_MEMSIZE
                         + STRUCT_TYPE_MEMBER_MEMSIZE(pSType->num_members);
 
     free_mstring(pSType->name);
+    if (pSType->prog_name)
+        free_mstring(pSType->prog_name);
     if (pSType->unique_name)
         free_mstring(pSType->unique_name);
     if (pSType->base)
@@ -529,6 +1002,32 @@ struct_dinfo_status (svalue_t *svp, int value)
 #undef ST_NUMBER
 } /* string_dinfo_status() */
 
+/*-------------------------------------------------------------------------*/
+string_t *
+struct_t_unique_name (struct_type_t *pSType)
+
+/* Also aliased to: struct_unique_name(struct_t *)
+ *
+ * Compose and return the unique name of struct type <pSType>.
+ * The returned string reference is not counted.
+ */
+
+{
+    char name[MAXPATHLEN+256];
+
+    if (pSType->unique_name)
+        return pSType->unique_name;
+
+    sprintf(name, "%s (%s #%ld)"
+                , get_txt(struct_t_name(pSType))
+                , get_txt(struct_t_pname(pSType))
+                , struct_t_pid(pSType)
+           );
+    pSType->unique_name = new_mstring(name);
+
+    return pSType->unique_name;
+} /* struct_t_unique_name() */
+
 /*=========================================================================*/
 /*                           GC SUPPORT                                    */
 
@@ -552,6 +1051,8 @@ clear_struct_type_ref (struct_type_t * pSType)
 
         pSType->ref = 0;
         pSType->name->info.ref = 0;
+        if (pSType->prog_name)
+            pSType->prog_name->info.ref = 0;
         if (pSType->unique_name)
             pSType->unique_name->info.ref = 0;
         if (pSType->base)
@@ -605,6 +1106,8 @@ count_struct_type_ref (struct_type_t * pSType)
             note_malloced_block_ref(pSType->member);
 
         count_ref_from_string(pSType->name);
+        if (pSType->prog_name)
+            count_ref_from_string(pSType->prog_name);
         if (pSType->unique_name)
             count_ref_from_string(pSType->unique_name);
         if (pSType->base)
@@ -636,7 +1139,80 @@ count_struct_ref (struct_t * pStruct)
             count_ref_in_vector(pStruct->member, struct_size(pStruct));
         }
     }
-} /* clear_struct_ref() */
+} /* count_struct_ref() */
+
+/*-------------------------------------------------------------------------*/
+void
+clear_tabled_struct_refs (void)
+
+/* Clear all references held by the struct types in the hash table.
+ */
+
+{
+
+    if (table && table_size)
+    {
+        size_t num;
+
+        for (num = 0; num < table_size; num++)
+        {
+            struct_type_t * pSType;
+            for (pSType = table[num]; pSType != NULL; pSType = pSType->next)
+                clear_struct_type_ref(pSType);
+        }
+    }
+} /* clear_tabled_struct_refs() */
+
+/*-------------------------------------------------------------------------*/
+void
+remove_unreferenced_structs (void)
+
+/* Free all structs in the table which are not marked as referenced.
+ */
+
+{
+    size_t          num;
+
+    if (!table || !table_size)
+        return;
+    
+    for (num = 0; num < table_size; num++)
+    {
+        struct_type_t * this, * prev;
+        for (this = table[num]; this != NULL; )
+        {
+            if (!test_memory_reference(this))
+            {
+                prev = this;
+                this = this->next;
+            }
+            else
+            {
+                struct_type_t * next = this->next;
+                if (prev)
+                    prev->next = next;
+                else
+                    table[num] = next;
+
+                num_types--;
+                
+                /* Now we deallocate the memory for all the struct type
+                 * structure.  We do not deallocate referenced memory such as
+                 * the member names as it already may have been freed.
+                 */
+                num_struct_type--;
+                size_struct_type -= STRUCT_TYPE_MEMBER_MEMSIZE(this->num_members);
+
+                if (this->member)
+                    xfree(this->member);
+                xfree(this);
+
+                this = next;
+            }
+        }
+    } /* for (num) */
+
+} /* remove_unreferenced_structs() */
 
 #endif /* GC_SUPPORT */
 
@@ -845,7 +1421,8 @@ single_struct_info (struct_type_t * st, Bool include_base)
         offset = struct_t_size(st->base);
     rc = allocate_array(struct_t_size(st) - offset + SI_MAX);
     put_ref_string(&rc->item[SI_NAME], struct_t_name(st));
-    put_ref_string(&rc->item[SI_UNIQUE_NAME], st->unique_name);
+    put_ref_string(&rc->item[SI_PROG_NAME], st->prog_name);
+    put_number(&rc->item[SI_PROG_ID], st->prog_id);
     for (i = offset; i < struct_t_size(st); i++)
     {
         vector_t * member;
