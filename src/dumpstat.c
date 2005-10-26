@@ -11,6 +11,10 @@
 #include "typedefs.h"
 
 #include <stdio.h>
+#ifdef HAVE_SYS_TIME_H
+#include <sys/time.h>
+#endif
+#include <time.h>
 
 #include "dumpstat.h"
 #include "array.h"
@@ -321,7 +325,7 @@ dumpstat (string_t *fname)
     for (ob = obj_list; ob; ob = ob->next_all)
     {
         mp_int compsize, totalsize, overhead;
-        char stime[21];
+        char timest[21];
         struct tm *tm;
 
 #ifdef DEBUG
@@ -361,8 +365,8 @@ dumpstat (string_t *fname)
                 swapstrings[(O_PROG_SWAPPED(ob)?1:0) | (O_VAR_SWAPPED(ob)?2:0)]
         );
         tm = localtime((time_t *)&ob->load_time);
-        strftime(stime, sizeof(stime)-1, "%Y.%m.%d-%H:%M:%S", tm);
-        fprintf(f, " %s\n", stime);
+        strftime(timest, sizeof(timest)-1, "%Y.%m.%d-%H:%M:%S", tm);
+        fprintf(f, " %s\n", timest);
     }
     fclose(f);
     free_mstring(fname);

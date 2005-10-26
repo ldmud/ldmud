@@ -72,6 +72,8 @@ BESCHREIBUNG
                      die sinnvollste sein.
         |            Der Wert wird zentriert in das Feld eingefuegt.
                      (Siehe Modifikator n, Feldbreite)
+        $            Blocksatz. Benoetigt eine Feldbreite, funktioniert nur
+                     bei Strings (auch im Spaltenmodus).
         =            Spaltenmodus (siehe unten).
         #            Tabellenmodus (siehe unten).
         @            Arraymodus (siehe unten).

@@ -28,9 +28,9 @@ typedef struct mempool_s * Mempool;
 /* --- Prototypes --- */
 
 extern Mempool new_mempool (size_t iSize);
-extern Mempool new_fifopool (size_t iSize);
+extern Mempool new_lifopool (size_t iSize);
 extern size_t  size_mempool (size_t elemsize);
-extern size_t  size_fifopool (size_t elemsize);
+extern size_t  size_lifopool (size_t elemsize);
 extern void    mempool_depend_on (Mempool pSub, Mempool pSuper);
 extern void *  mempool_alloc (Mempool pPool, size_t iSize);
 extern void    mempool_free (Mempool pPool, void * adr);

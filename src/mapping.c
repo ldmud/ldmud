@@ -65,6 +65,21 @@
  * the dirty mappings by sorting the hashed entries into the condensed part,
  * removing the hashed part by this.
  *
+ * To be compacted, a mapping has to conform to a number of conditions:
+ *  - it has to be at least TIME_TO_COMPACT seconds (typical 10 minutes)
+ *    since the last addition or deletion of an entry
+ *  and either
+ *  - the number of condensed-deleted entries is at least half the capacity
+ *    of the condensed part
+ *  or
+ *  - the number of hashed entries exceeds the number non-deleted condensed
+ *    entries.
+ * The idea is to minimize reallocations of the (potentially large) condensed
+ * block, as it easily runs into fragmentation of the large block heap.
+ *
+ * A garbage collection however compacts all mappings unconditionally.
+ *
+ *
  * Mappings maintain two refcounts: the main refcount for all references,
  * and in the hash structure a protector refcount for references as
  * PROTECTED_MAPPING. The latter references are used for 'dirty' mappings
@@ -1966,9 +1981,13 @@ compact_mapping (mapping_t *m, Bool force)
         return free_mapping(m);
     }
 
+    /* Test the compaction criterium */
     if (!force
-     && current_time - hm->last_used < TIME_TO_COMPACT
-     && hm->cond_deleted * 2 < m->num_entries - hm->used
+     && !(   current_time - hm->last_used >= TIME_TO_COMPACT
+          && (   hm->cond_deleted * 2 >= m->num_entries - hm->used 
+              || hm->used >= m->num_entries - hm->used - hm->cond_deleted
+             )
+         )
        )
     {
         /* This mapping doesn't qualify for compaction.

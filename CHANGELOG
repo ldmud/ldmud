@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+06-Mar-2002 (Lars Duening)  (3.3.414)
+  - (dumpstat.c) Corrected build warnings.
+  - (mempools, lex.c) Cosmetic changes.
+  - (mapping.c) Additional condition for mapping compaction: the number
+       of entries in the hash part is equal to or exceeds the number
+       of non-deleted condensed entries.
+
 06-Mar-2002 (Lars Duening)  (3.3.413)
   - (mapping, gcollect, backend) The compaction of dirty mappings is now
        part of the object cleanup process. This needs some careful handling,

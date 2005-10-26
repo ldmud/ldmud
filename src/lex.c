@@ -648,7 +648,7 @@ init_lexer(void)
     char mtext[MLEN];
 
     /* Allocate enough memory for 20 nested includes/ifs */
-    lexpool = new_fifopool(size_fifopool( sizeof(lpc_ifstate_t)
+    lexpool = new_lifopool(size_lifopool( sizeof(lpc_ifstate_t)
                                          +sizeof(struct incstate)));
     if (!lexpool)
         fatal("Out of memory.\n");
