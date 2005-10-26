@@ -4,7 +4,7 @@ SYNOPSIS
 DESCRIPTION
         Remove the entry with index 'key' from mapping 'map'. The
         changed mapping 'map' is also returned as result.
-        If the mapping does not have an        entry with index 'key',
+        If the mapping does not have an entry with index 'key',
         nothing is changed.
 
 SEE ALSO

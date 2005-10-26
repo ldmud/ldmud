@@ -85,7 +85,7 @@ svalue_eq (svalue_t *left, svalue_t *right)
 
     if (left->type == T_CLOSURE)
     {
-        return closure_eq(left, right);
+        return closure_eq(left, right) ? 0 : -1;
     }
 
     /* All other types have to be equal by address, visible in u.number */

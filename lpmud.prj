@@ -29,6 +29,8 @@
 ;; TODO:: all the setup_callback functions, as the positive values already
 ;; TODO:: signal errors in the arguments.
 ;; TODO: warnf()s should go to the master as well.
+;; TODO: member() should get start position.
+;; TODO: rmember()
 ;; TODO: Modify ed() 'M' command to replace all CRs by LFs. Slightly
 ;; TODO:: complex as it requires breaking up the lines.
 ;; TODO: Like Pike: replace() http://caudium.net/developer/pikeref/ex/replace.html
@@ -59,12 +61,12 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 458)
-(Parent-Version lpmud 3-3 457)
-(Version-Log "Value stack overflows during a secure apply could crash the driver.")
+(Project-Version lpmud 3-3 459)
+(Parent-Version lpmud 3-3 458)
+(Version-Log "Subtracting arrays of closures didn't work correctly.")
 (New-Version-Log
 "")
-(Checkin-Time "Thu, 10 Jul 2003 21:29:29 -0600")
+(Checkin-Time "Thu, 17 Jul 2003 00:00:38 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -100,9 +102,9 @@
   ;; Information about the driver and the distribution in general
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.10 644))
-  (CREDITS (lpmud/d/22_CREDITS 1.70.1.66 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.521 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.324 644))
+  (CREDITS (lpmud/d/22_CREDITS 1.70.1.67 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.522 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.325 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -177,7 +179,7 @@
   (src/ed.h (lpmud/f/34_ed.h 1.5.1.6 644))
   (src/ed.c (lpmud/c/33_ed.c 1.32.1.30 644))
   (src/efuns.h (lpmud/l/20_efuns.h 1.13.1.19.1.3 644))
-  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.74 644))
+  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.75 644))
   (src/exec.h (lpmud/c/32_exec.h 1.34.1.33.1.7 644))
   (src/files.h (lpmud/i/49_files.h 1.2 644))
   (src/files.c (lpmud/i/50_files.c 1.20 644))
@@ -188,9 +190,9 @@
   (src/hash.c (lpmud/c/28_hash.c 1.16 644))
   (src/heartbeat.h (lpmud/m/41_heartbeat. 1.6.1.5 644))
   (src/heartbeat.c (lpmud/m/42_heartbeat. 1.18.1.9 644))
-  (src/i-svalue_cmp.h (lpmud/a/b/20_i-svalue_c 1.3 644))
+  (src/i-svalue_cmp.h (lpmud/a/b/20_i-svalue_c 1.4 644))
   (src/interpret.h (lpmud/b/13_interpret. 1.33.1.37 644))
-  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.34 644))
+  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.35 644))
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.15.1.4 644))
   (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.57 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.16 644))
@@ -1094,7 +1096,7 @@
   (doc/efun/m_add (lpmud/v/33_m_add 1.5 644))
   (doc/efun/m_allocate (lpmud/l/38_m_allocate 1.5 644))
   (doc/efun/m_contains (lpmud/l/50_m_contains 1.3 644))
-  (doc/efun/m_delete (lpmud/c/44_m_delete 1.5 644))
+  (doc/efun/m_delete (lpmud/c/44_m_delete 1.6 644))
   (doc/efun/m_entry (lpmud/d/b/37_m_entry 1.1 644))
   (doc/efun/m_indices (lpmud/c/43_m_indices 1.6 644))
   (doc/efun/m_reallocate (lpmud/l/51_m_realloca 1.3 644))

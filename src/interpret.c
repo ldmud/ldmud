@@ -11307,6 +11307,7 @@ again:
          *   string      - string             -> string
          *   vector      - vector             -> vector
          *   mapping     - mapping            -> mapping
+         * TODO: Allow int - float -> float, equivalent to F_ADD_EQ.
          */
 
         short type2;         /* type and value of sp[-1] */
@@ -11520,7 +11521,7 @@ again:
          *   string      * int                -> string
          *   array       * int                -> array
          *
-         * TODO: Extend this to mappings.
+         * TODO: Extend this to mappings and (int * float -> float).
          */
 
         svalue_t *argp;
@@ -11799,7 +11800,7 @@ again:
          *   int         / int                -> int
          *   float       / (float,int)        -> float
          *
-         * TODO: Extend this to arrays and mappings.
+         * TODO: Extend this to arrays and mappings and (int / float -> float).
          */
 
         svalue_t *argp;

@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+15-Jul-2003 (Lars Duening)  (3.3.459)
+  - (i-svalue_cmp.h) When comparing closures for equality, the result was
+       reveresed (reported by Fantom).
+  - (array.c, interpret.c) Replaced uses of closure_cmp() with closure_eq()
+       where appropriate.
+
 10-Jul-2003 (Lars Duening)  (3.3.458)
   - (interpret.c) When the value stack overflowed during a secure_apply(),
        the secure_apply_error() routine failed to notice that the stack

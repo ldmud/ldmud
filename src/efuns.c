@@ -6283,7 +6283,7 @@ f_member (svalue_t *sp)
             for(item = vec->item; --cnt >= 0; item++)
             {
                 /* TODO: Is this C99 compliant? */
-                if (item->type == type && !closure_cmp(sp, item))
+                if (item->type == type && closure_eq(sp, item))
                     break;
             }
             break;
@@ -6469,7 +6469,7 @@ f_rmember (svalue_t *sp)
             for (item = vec->item+cnt; --cnt >= 0; )
             {
                 item--;
-                if (item->type == type && !closure_cmp(sp, item))
+                if (item->type == type && closure_eq(sp, item))
                     break;
             }
             break;

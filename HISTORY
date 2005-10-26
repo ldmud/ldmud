@@ -124,7 +124,7 @@ For a detailed list of all changes see the file CHANGELOG.
            available (default is to allow sbrk()).
 
 
-10-Jul-2003 (Lars Duening) -- Release 3.2.10
+15-Jul-2003 (Lars Duening) -- Release 3.2.10
 
     - Changed efuns:
        + debug_info(): Removed the DID_MEM_UNUSED value from the DINFO_DATA:
@@ -195,6 +195,8 @@ For a detailed list of all changes see the file CHANGELOG.
            have been deleted, or if the number of hashed entries exceeds
            the number of (non-deleted) condensed entries.
        + A heart-beat error now longer aborts the heartbeat cycle.
+       + Bugfix: Subtracting arrays of closures from each other now actually
+           identifies identical closures.
        + Bugfix: The smalloc allocator now re-uses free 'large' memory for
            small block chunks instead of always allocating them from the
            system.
