@@ -112,13 +112,15 @@ For a detailed list of all changes see the file CHANGELOG.
            initialization.
 
 
-02-Mar-2003 (Lars Duening) -- Release 3.2.10
+03-Mar-2003 (Lars Duening) -- Release 3.2.10
 
     - Changed efuns:
        + debug_info(): Removed the DID_MEM_UNUSED value from the DINFO_DATA:
            DID_MEMORY result.
        + debug_info(): Added the DID_ST_MB_ values to the DINFO_DATA:
            DID_STATUS result.
+       + debug_info(): The DINFO_DATA:"objects" dump also lists the object
+           creation times.
        + function_exists(): now also returns the filename and linenumber
            of a function.
 
@@ -147,6 +149,8 @@ For a detailed list of all changes see the file CHANGELOG.
            system.
 
     - Other Changes:
+       + Editor: Consecutive 'z' or 'Z' commands no longer repeat
+          the previous current line.
        + Configuration option '--enable-malloc-sbrk-trace' to enable
           a log of all system memory requests including the stats of
           the memory allocation request causing it. The intention is

@@ -1,6 +1,16 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+03-Mar-2002 (Lars Duening)  (3.3.409)
+  - (dumpstat.c) Added the object load time to the OBJ_DUMP data (suggested by
+       Menaures).
+  - (dumpstat.c) Removed a memory leak in dumpstat() and dumpstat_dest().
+  - (closure.c) When converting a lfun closure which is bound to a different
+       object than it is defined in ('alien lfun closure'), to a string, the
+       bound object is printed as well as the defining object.
+  - (ed.c) Consecutive 'z' or 'Z' commands no longer repeat the previous
+       current line (suggested by Menaures).
+
 02-Mar-2002 (Lars Duening)  (3.3.408)
   - (configure) It would be useful if I actually updated the configure
        script.

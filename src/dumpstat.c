@@ -312,12 +312,17 @@ dumpstat (string_t *fname)
         return MY_FALSE;
     f = fopen(get_txt(fname), "w");
     if (!f)
+    {
+        free_mstring(fname);
         return MY_FALSE;
+    }
     FCOUNT_WRITE(get_txt(fname));
 
     for (ob = obj_list; ob; ob = ob->next_all)
     {
         mp_int compsize, totalsize, overhead;
+        char stime[21];
+        struct tm *tm;
 
 #ifdef DEBUG
         if (ob->flags & O_DESTRUCTED) /* TODO: Can't happen */
@@ -352,11 +357,19 @@ dumpstat (string_t *fname)
             fprintf(f, " (%lu%09lu)", ob->gigaticks, ob->ticks);
         else
             fprintf(f, " (%lu)", ob->ticks);
-        fprintf(f, " %s\n",
+        fprintf(f, " %s",
                 swapstrings[(O_PROG_SWAPPED(ob)?1:0) | (O_VAR_SWAPPED(ob)?2:0)]
         );
+        fprintf(f, " %s",
+                swapstrings[(O_PROG_SWAPPED(ob)?1:0) | (O_VAR_SWAPPED(ob)?2:0)]
+        );
+        tm = localtime((time_t *)&ob->load_time);
+        strftime(stime, sizeof(stime)-1, "%Y.%m.%d-%H:%M:%S", tm);
+        fprintf(f, " %s\n", stime);
     }
     fclose(f);
+    free_mstring(fname);
+
     return MY_TRUE;
 } /* dumpstat() */
 
@@ -378,7 +391,10 @@ dumpstat_dest(string_t *fname)
         return MY_FALSE;
     f = fopen(get_txt(fname), "w");
     if (!f)
+    {
+        free_mstring(fname);
         return MY_FALSE;
+    }
     FCOUNT_WRITE(get_txt(fname));
 
     for (ob = newly_destructed_objs; ob; ob = ob->next_all)
@@ -405,6 +421,7 @@ dumpstat_dest(string_t *fname)
         );
     }
     fclose(f);
+    free_mstring(fname);
     return MY_TRUE;
 } /* dumpstat_dest() */
 

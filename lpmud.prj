@@ -51,12 +51,15 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 408)
-(Parent-Version lpmud 3-3 407)
-(Version-Log "Forgot to update the configure script.")
+(Project-Version lpmud 3-3 409)
+(Parent-Version lpmud 3-3 408)
+(Version-Log "Added the object load time to OBJ_DUMP.
+Removed a memory leak in dumpstat() and dumpstat_dest().
+Alien-lfun closures are printed as string with their bound object as well.
+ed: Consecutive 'z' or 'Z' no longer repeat the previous current line.")
 (New-Version-Log
 "")
-(Checkin-Time "Sun, 02 Mar 2003 22:23:11 -0700")
+(Checkin-Time "Mon, 03 Mar 2003 13:37:28 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -93,8 +96,8 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.59 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.471 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.305 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.472 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.306 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.19 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -161,14 +164,14 @@
   (src/call_out.h (lpmud/f/45_call_out.h 1.7.1.6 644))
   (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.24 644))
   (src/closure.h (lpmud/f/44_closure.h 1.7.1.16 644))
-  (src/closure.c (lpmud/d/4_closure.c 1.41.1.47.1.11 644))
+  (src/closure.c (lpmud/d/4_closure.c 1.41.1.47.1.12 644))
   (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.48 644))
   (src/comm.h (lpmud/d/3_comm.h 1.26.1.31 644))
   (src/driver.h (lpmud/f/36_driver.h 1.15.1.24 644))
   (src/dumpstat.h (lpmud/f/35_dumpstat.h 1.8 644))
-  (src/dumpstat.c (lpmud/c/34_dumpstat.c 1.20.1.11.1.5 644))
+  (src/dumpstat.c (lpmud/c/34_dumpstat.c 1.20.1.11.1.6 644))
   (src/ed.h (lpmud/f/34_ed.h 1.5.1.6 644))
-  (src/ed.c (lpmud/c/33_ed.c 1.32.1.27 644))
+  (src/ed.c (lpmud/c/33_ed.c 1.32.1.28 644))
   (src/efuns.h (lpmud/l/20_efuns.h 1.13.1.19.1.1 644))
   (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.67 644))
   (src/exec.h (lpmud/c/32_exec.h 1.34.1.33.1.6 644))
@@ -269,9 +272,9 @@
   (src/simul_efun.h (lpmud/f/17_simul_efun 1.5.1.5 644))
   (src/simul_efun.c (lpmud/32_simul_efun 1.20.1.17.1.3 644))
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.31 644))
-  (src/simulate.c (lpmud/31_simulate.c 1.88.1.101 644))
+  (src/simulate.c (lpmud/31_simulate.c 1.88.1.102 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.14 644))
-  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.72 644))
+  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.73 644))
   (src/structs.h (lpmud/d/b/5_structs.h 1.3 644))
   (src/structs.c (lpmud/d/b/6_structs.c 1.8 644))
   (src/sysmalloc.h (lpmud/c/b/33_sysmalloc. 1.1 644))
@@ -289,7 +292,7 @@
   (src/wiz_list.h (lpmud/1_wiz_list.h 1.5.1.7.1.2 644))
   (src/wiz_list.c (lpmud/2_wiz_list.c 1.13.1.14.1.3 644))
   (src/xalloc.h (lpmud/g/51_xalloc.h 1.20 644))
-  (src/xalloc.c (lpmud/h/0_xalloc.c 1.2.1.25 644))
+  (src/xalloc.c (lpmud/h/0_xalloc.c 1.2.1.26 644))
   ;(src/xptmalloc.c (lpmud/d/b/1_xptmalloc. 1.6 644))
 
   ;; Build files
@@ -971,7 +974,7 @@
   (doc/driver/copyright-issue (lpmud/h/11_copyright- 1.2 644))
   (doc/driver/debugmalloc (lpmud/n/42_debugmallo 1.3 644))
   (doc/driver/driver (lpmud/n/43_driver 1.2 644))
-  (doc/driver/dumpallobj (lpmud/n/44_dumpallobj 1.5 644))
+  (doc/driver/dumpallobj (lpmud/n/44_dumpallobj 1.6 644))
   (doc/driver/invocation (lpmud/f/38_invocation 1.14.1.13 644))
   (doc/driver/malloc (lpmud/n/45_malloc 1.3 644))
   (doc/driver/opcdump (lpmud/n/46_opcdump 1.3 644))
@@ -1036,7 +1039,7 @@
   (doc/efun/db_fetch (lpmud/e/27_db_fetch 1.2.1.3 644))
   (doc/efun/db_handles (lpmud/e/33_db_handles 1.1.1.4 644))
   (doc/efun/db_insert_id (lpmud/l/1_db_insert_ 1.2 644))
-  (doc/efun/debug_info (lpmud/o/22_debug_info 1.25 644))
+  (doc/efun/debug_info (lpmud/o/22_debug_info 1.26 644))
   (doc/efun/debug_message (lpmud/o/23_debug_mess 1.1.1.4 644))
   (doc/efun/deep_copy (lpmud/m/29_deep_copy 1.4 644))
   (doc/efun/deep_inventory (lpmud/o/24_deep_inven 1.3 644))

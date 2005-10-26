@@ -1076,7 +1076,7 @@ sfree (POINTER ptr)
     i -=  1 + T_OVERHEAD;
 
 #ifdef MALLOC_CHECK
-    if (block[M_MAGIC] == sfmagic[i % NELEM(samagic)])
+    if (block[M_MAGIC] == sfmagic[i % NELEM(sfmagic)])
     {
         in_malloc = 0;
         fatal("mem_free: block %lx size %lu (user %lx) freed twice\n"

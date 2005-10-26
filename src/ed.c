@@ -3012,52 +3012,72 @@ docmd (Bool glob)
         return ERR;
 
     case 'z':
-        if (deflt(P_CURLN,P_CURLN) < 0)
-            return ERR;
+      {
+        int dfln;
 
         switch(*inptr)
         {
         case '-':
+            dfln = P_CURLN;
+            if (deflt(dfln,dfln) < 0)
+                return ERR;
             if (doprnt(P_LINE1-21,P_LINE1) < 0)
                 return ERR;
             break;
 
         case '.':
+            dfln = P_CURLN;
+            if (deflt(dfln,dfln) < 0)
+                return ERR;
             if (doprnt(P_LINE1-11,P_LINE1+10) < 0)
                 return ERR;
             break;
 
         case '+':
         case '\n':
+            dfln = P_CURLN != 1 ? P_CURLN + 1 : 1;
+            if (deflt(dfln,dfln) < 0)
+                return ERR;
             if (doprnt(P_LINE1,P_LINE1+21) < 0)
                 return ERR;
             break;
         }
         break;
+      }
 
     case 'Z':
-        if (deflt(P_CURLN,P_CURLN) < 0)
-            return(ERR);
+      {
+        int dfln;
 
         switch(*inptr)
         {
         case '-':
+            dfln = P_CURLN;
+            if (deflt(dfln,dfln) < 0)
+                return ERR;
             if (doprnt(P_LINE1-41,P_LINE1) < 0)
                 return ERR;
             break;
 
         case '.':
+            dfln = P_CURLN;
+            if (deflt(dfln,dfln) < 0)
+                return ERR;
             if (doprnt(P_LINE1-21,P_LINE1+20) < 0)
                 return ERR;
             break;
 
         case '+':
         case '\n':
+            dfln = P_CURLN != 1 ? P_CURLN + 1 : 1;
+            if (deflt(dfln,dfln) < 0)
+                return ERR;
             if (doprnt(P_LINE1,P_LINE1+41) < 0)
                 return ERR;
             break;
         }
         break;
+      }
 
     default:
         return ERR;

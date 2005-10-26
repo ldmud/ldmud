@@ -489,6 +489,7 @@ xalloc_traced (size_t size MTRACE_DECL)
         mdb_object = current_object;
 #endif
 #endif /* MALLOC_SBRK_TRACE */
+
     size += XM_OVERHEAD_SIZE;
 
     do {
@@ -652,6 +653,7 @@ rexalloc_traced (POINTER p, size_t size MTRACE_DECL
         mdb_object = current_object;
 #endif
 #endif /* MALLOC_SBRK_TRACE */
+
     size += XM_OVERHEAD_SIZE;
     block = (word_t *)p - XM_OVERHEAD;
 

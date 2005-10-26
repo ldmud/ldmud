@@ -5186,6 +5186,25 @@ closure_to_string (svalue_t * sp)
         inherit_t *inheritp;
         Bool       is_inherited;
 
+        /* For alien lfun closures, prepend the object the closure
+         * is bound to.
+         */
+        if (l->ob != l->function.lfun.ob)
+        {
+            ob = l->function.lfun.ob;
+
+            if (ob->flags & O_DESTRUCTED)
+            {
+                strcat(buf, "[<destructed object>]");
+            }
+            else
+            {
+                strcat(buf, "[");
+                strcat(buf, get_txt(ob->name));
+                strcat(buf, "]");
+            }
+        }
+
         ob = l->function.lfun.ob;
         ix = l->function.lfun.index;
 
@@ -5231,6 +5250,7 @@ closure_to_string (svalue_t * sp)
         }
         strcat(buf, "->");
         strcat(buf, get_txt(function_name));
+        strcat(buf, "()");
         break;
       }
 

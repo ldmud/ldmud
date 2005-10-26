@@ -60,6 +60,7 @@ DESCRIPTION
                    'PROG SWAPPED' if only the program is swapped
                    'VAR SWAPPED' if only the variabes are swapped
                    'SWAPPED' if both program and variables are swapped
+                - the time the object was created
 
              <arg2> == "destructed": dump information about all destructed
                objects.  Default filename is '/DEST_OBJ_DUMP', the
@@ -485,7 +486,8 @@ HISTORY
           DID_ST_OBJECTS_NEWLY_DEST, DID_ST_OBJECTS_DEST, DID_MEM_OVERHEAD,
           DID_MEM_ALLOCATED, DID_MEM_USED, DID_MEM_TOTAL_UNUSED, and
           DID_ST_HBEAT_CALLS_TOTAL stats.
-        LDMud 3.2.10 removed DID_MEM_UNUSED from DINFO_DATA:DID_MEMORY;
+        LDMud 3.2.10 added the object creation time to DINFO_DUMP:"objects",
+          removed DID_MEM_UNUSED from DINFO_DATA:DID_MEMORY;
           added DID_ST_MB_FILE and DID_ST_MB_SWAP to DINFO_DATA:DID_STATUS.
         LDMud 3.3 replaced the string related DID_ST_ constants according to
         the new string implementation.
