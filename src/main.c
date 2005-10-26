@@ -41,6 +41,10 @@
 #include <stdio.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#ifdef HAVE_SYS_TIME_H
+#include <sys/time.h>
+#endif
+#include <time.h>
 
 #include "main.h"
 
@@ -175,6 +179,10 @@ Bool reopen_debug_log = MY_FALSE;
    * the debug.log file.
    */
 
+mp_int boot_time = 0;
+  /* The time() the driver was started.
+   */
+
 /*-------------------------------------------------------------------------*/
 
 /* Forward declarations for the argument parser in the lower half */
@@ -219,6 +227,7 @@ main (int argc, char **argv)
 
     /* Initialisations */
 
+    boot_time = (mp_int)time(NULL);
     setlocale(LC_CTYPE, ""); /* Use the locale defined in the LANG env var */
     get_stack_direction();
     mb_init();

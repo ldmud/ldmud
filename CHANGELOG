@@ -1,6 +1,21 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+09-Apr-2002 (Lars Duening)  (3.3.438)
+  - (heartbeat.c) Removed the pooled allocation of heartbeat structures:
+       Muds have spikes of high callout usage, but a low usage over
+       the longterm average, so most of the pooled structures are not
+       used. This more than makes up for any malloc overhead saved
+       by the pooled allocation.
+  - (heartbeat.c) Errors in a heartbeat execution now longer aborts
+       the whole heartbeat cycle (suggested by Baba).
+  - (efuns.c, main, mudlib/sys/debug_info.h) The boot time is now
+       available through debug_info(DINFO_DATA, DID_STATUS).
+  - (wizlist) The wizlist now accounts the evalcost split into
+       ticks and gigaticks, to be able to handle long uptimes, and also
+       offer a non-decaying total sum of the evalcosts (suggested by
+       Baba).
+
 07-Apr-2002 (Lars Duening)  (3.3.437)
   - (mud/lp-245) Adapted the set_this_object() usage in the master.
   - (actions.c) Efun remove_action() can now remove all actions defined

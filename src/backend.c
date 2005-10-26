@@ -80,6 +80,7 @@
 #define ALARM_TIME  2  /* The granularity of alarm() calls */
 
 /*-------------------------------------------------------------------------*/
+
 mp_int current_time;
   /* The current time, updated every heart beat.
    * TODO: Should be time_t if it is given that time_t is always a skalar.
@@ -621,9 +622,6 @@ backend (void)
          */
         if (time_to_call_heart_beat)
         {
-            object_t *hide_current = current_object;
-              /* TODO: Is there any point to this? */
-
             current_time = get_current_time();
 
             current_object = NULL;
@@ -641,14 +639,13 @@ backend (void)
             do_state_check(2, "after call_out");
 
             /* Reset/cleanup/swap objects.
-             * TODO: Reset and cleanup/swap should be separated.
              */
             process_objects();
             do_state_check(2, "after swap/cleanup/reset");
 
+            /* Other periodic processing */
             command_giver = NULL;
             trace_level = 0;
-            current_object = hide_current;
             wiz_decay();
             comm_cleanup_interactives();
 

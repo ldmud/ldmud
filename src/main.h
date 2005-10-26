@@ -29,6 +29,7 @@ extern char *debug_file;
 extern object_t dummy_current_object_for_loads;
 extern int slow_shut_down_to_do;
 extern Bool reopen_debug_log;
+extern mp_int boot_time;
 
 #ifdef DEBUG
 extern Bool check_a_lot_ref_counts_flag;

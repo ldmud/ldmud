@@ -6772,6 +6772,9 @@ v_debug_info (svalue_t *sp, int num_arg)
  *     <arg2> == DID_STATUS (0): Returns the "status" and "status tables"
  *        information:
  *
+ *        int DID_ST_BOOT_TIME
+ *            The time() when the mud was started.
+ *
  *        int DID_ST_ACTIONS
  *        int DID_ST_ACTIONS_SIZE
  *            Number and size of allocated actions.
@@ -7433,8 +7436,13 @@ v_debug_info (svalue_t *sp, int num_arg)
             }
 
         case DID_STATUS:
+#define ST_NUMBER(which,code) \
+    if (value == -1) dinfo_arg[which].u.number = code; \
+    else if (value == which) dinfo_arg->u.number = code
+
             PREP(DID_STATUS_MAX)
 
+            ST_NUMBER(DID_ST_BOOT_TIME, boot_time);
             dinfo_data_status(dinfo_arg, value);
             otable_dinfo_status(dinfo_arg, value);
             hbeat_dinfo_status(dinfo_arg, value);
@@ -7449,6 +7457,7 @@ v_debug_info (svalue_t *sp, int num_arg)
             if (value == -1)
                 put_array(&res, v);
             break;
+#undef ST_NUMBER
 
         case DID_SWAP:
             PREP(DID_SWAP_MAX)

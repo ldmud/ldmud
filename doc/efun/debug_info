@@ -93,6 +93,9 @@ DESCRIPTION
             <arg2> == DID_STATUS (0): Returns the "status" and "status tables"
             information. Following indices are defined:
 
+              int DID_ST_BOOT_TIME
+                  The time() when the mud was started.
+
               int DID_ST_ACTIONS
               int DID_ST_ACTIONS_SIZE
                   Number and size of allocated actions.
@@ -141,13 +144,12 @@ DESCRIPTION
                   Number of objects with a heartbeat.
 
               int DID_ST_HBEAT_CALLS
-                  Number of heart_beats executed so far.
+                  Number of active heart_beat cycles executed so far
+                  (ie. cycles in which at least one heart_beat() function
+                  was called).
 
               int DID_ST_HBEAT_CALLS_TOTAL
-                  Number of heart_beats calls so far. The difference to
-                  ST_HBEAT_CALLS is that the latter only counts heart beat
-                  calls during which at least one heart beat was actually
-                  executed.
+                  Total number of heart_beats cycles so far.
 
               int DID_ST_HBEAT_SLOTS
               int DID_ST_HBEAT_SIZE
@@ -483,10 +485,11 @@ HISTORY
           DID_MEM_ALLOCATED, DID_MEM_USED, DID_MEM_TOTAL_UNUSED, and
           DID_ST_HBEAT_CALLS_TOTAL stats.
         LDMud 3.2.10 added the object creation time to DINFO_DUMP:"objects",
-          removed DID_MEM_UNUSED from DINFO_DATA:DID_MEMORY;
-          added DID_ST_MB_FILE and DID_ST_MB_SWAP to DINFO_DATA:DID_STATUS;
-          removed DID_ST_CALLOUT_SLOTS from DINFO_DATA:DID_STATUS, and changed
-          the meaning of DID_ST_CALLOUT_SIZE.
+          removed DID_MEM_UNUSED from DINFO_DATA:DID_MEMORY; added
+          DID_ST_BOOT_TIME, DID_ST_MB_FILE and DID_ST_MB_SWAP to
+          DINFO_DATA:DID_STATUS; removed DID_ST_CALLOUT_SLOTS and from
+          DINFO_DATA:DID_STATUS, and changed the meaning of
+          DID_ST_CALLOUT_SIZE and DID_ST_HBEAT_SIZE/_SLOTS.
         LDMud 3.3 replaced the string related DID_ST_ constants according to
         the new string implementation.
         LDMud 3.3.387 added the ptmalloc values for DINFO_DATA:DID_MEMORY.

@@ -119,7 +119,9 @@
 #define DID_ST_MB_FILE            72
 #define DID_ST_MB_SWAP            73
 
-#define DID_STATUS_MAX            74 /* Total number of entries */
+#define DID_ST_BOOT_TIME          74
+
+#define DID_STATUS_MAX            75 /* Total number of entries */
 
 
 /* Indices into the array resulting from debug_info(DINFO_DATA, DID_SWAP)

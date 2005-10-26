@@ -61,12 +61,15 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 437)
-(Parent-Version lpmud 3-3 436)
-(Version-Log "Efun remove_action() can now remove all actions defined by an object.")
+(Project-Version lpmud 3-3 438)
+(Parent-Version lpmud 3-3 437)
+(Version-Log "Removed the pooled allocation for heart_beat structures.
+An error in a heart-beat no longer aborts the heartbeat cycle.
+The boot-time is now available through debug_info().
+Split the wizlist evalcost statistics into ticks and gigaticks, and added a non-decaying evalcost statistic.")
 (New-Version-Log
 "")
-(Checkin-Time "Mon, 07 Apr 2003 20:36:07 -0600")
+(Checkin-Time "Wed, 09 Apr 2003 21:09:27 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -102,9 +105,9 @@
   ;; Information about the driver and the distribution in general
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
-  (CREDITS (lpmud/d/22_CREDITS 1.70.1.61 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.500 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.316 644))
+  (CREDITS (lpmud/d/22_CREDITS 1.70.1.62 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.501 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.317 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.19 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -164,7 +167,7 @@
   (src/array.h (lpmud/f/47_array.h 1.18.1.21 644))
   (src/array.c (lpmud/d/12_array.c 1.46.1.47.1.4 644))
   (src/backend.h (lpmud/f/46_backend.h 1.20.1.7 644))
-  (src/backend.c (lpmud/d/6_backend.c 1.68.1.35.1.27 644))
+  (src/backend.c (lpmud/d/6_backend.c 1.68.1.35.1.28 644))
   (src/bitstrings.h (lpmud/i/47_bitstrings 1.3 644))
   (src/bitstrings.c (lpmud/i/48_bitstrings 1.14 644))
   (src/bytecode.h (lpmud/a/b/26_bytecode.h 1.1.1.2 644))
@@ -180,7 +183,7 @@
   (src/ed.h (lpmud/f/34_ed.h 1.5.1.6 644))
   (src/ed.c (lpmud/c/33_ed.c 1.32.1.28 644))
   (src/efuns.h (lpmud/l/20_efuns.h 1.13.1.19.1.3 644))
-  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.72 644))
+  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.73 644))
   (src/exec.h (lpmud/c/32_exec.h 1.34.1.33.1.7 644))
   (src/files.h (lpmud/i/49_files.h 1.2 644))
   (src/files.c (lpmud/i/50_files.c 1.20 644))
@@ -190,14 +193,14 @@
   (src/hash.h (lpmud/f/32_hash.h 1.6 644))
   (src/hash.c (lpmud/c/28_hash.c 1.16 644))
   (src/heartbeat.h (lpmud/m/41_heartbeat. 1.6.1.5 644))
-  (src/heartbeat.c (lpmud/m/42_heartbeat. 1.18.1.8 644))
+  (src/heartbeat.c (lpmud/m/42_heartbeat. 1.18.1.9 644))
   (src/i-svalue_cmp.h (lpmud/a/b/20_i-svalue_c 1.3 644))
   (src/interpret.h (lpmud/b/13_interpret. 1.33.1.36 644))
-  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.26 644))
+  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.27 644))
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.15.1.4 644))
   (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.52 644))
-  (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.14 644))
-  (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.39 644))
+  (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.15 644))
+  (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.40 644))
   (src/mapping.h (lpmud/f/30_mapping.h 1.12.1.20 644))
   (src/mapping.c (lpmud/b/6_mapping.c 1.36.1.71 644))
   (src/md5.h (lpmud/l/18_md5.h 1.2 644))
@@ -289,17 +292,17 @@
   (src/sprintf.h (lpmud/f/15_sprintf.h 1.3.1.4 644))
   (src/sprintf.c (lpmud/28_sprintf.c 1.31.1.53 644))
   (src/strfuns.h (lpmud/b/51_strfuns.h 1.11.1.5 644))
-  (src/strfuns.c (lpmud/c/0_strfuns.c 1.9.1.13 644))
+  (src/strfuns.c (lpmud/c/0_strfuns.c 1.9.1.14 644))
   (src/svalue.h (lpmud/f/39_datatypes. 1.34.1.23.1.5 644))
   (src/swap.h (lpmud/f/14_swap.h 1.7.1.3 644))
   (src/swap.c (lpmud/25_swap.c 1.36.1.49 644))
   (src/switch.h (lpmud/24_switch.h 1.9 644))
   (src/telnet.h (lpmud/22_telnet.h 1.5.1.3 644))
   (src/typedefs.h (lpmud/d/50_typedefs.h 1.12.1.7 644))
-  (src/wiz_list.h (lpmud/1_wiz_list.h 1.5.1.7.1.2 644))
-  (src/wiz_list.c (lpmud/2_wiz_list.c 1.13.1.14.1.3 644))
+  (src/wiz_list.h (lpmud/1_wiz_list.h 1.5.1.7.1.3 644))
+  (src/wiz_list.c (lpmud/2_wiz_list.c 1.13.1.14.1.4 644))
   (src/xalloc.h (lpmud/g/51_xalloc.h 1.20 644))
-  (src/xalloc.c (lpmud/h/0_xalloc.c 1.2.1.31 644))
+  (src/xalloc.c (lpmud/h/0_xalloc.c 1.2.1.28 644))
   ;(src/xptmalloc.c (lpmud/d/b/1_xptmalloc. 1.6 644))
 
   ;; Build files
@@ -441,7 +444,7 @@
 
   ;; Driver-related include files for the mudlib
   (mudlib/sys/commands.h (lpmud/d/15_commands.h 1.3.1.3 644))
-  (mudlib/sys/debug_info.h (lpmud/t/6_debug_info 1.19 644))
+  (mudlib/sys/debug_info.h (lpmud/t/6_debug_info 1.20 644))
   (mudlib/sys/driver_hook.h (lpmud/d/30_driver_hoo 1.2.1.6 644))
   (mudlib/sys/debug_message.h (lpmud/k/8_debug_mess 1.3 644))
   (mudlib/sys/erq.h (lpmud/d/29_erq.h 1.5.1.3 644))
@@ -459,7 +462,7 @@
   (mudlib/sys/struct_info.h (lpmud/d/b/7_struct_inf 1.2 644))
   (mudlib/sys/time.h (lpmud/n/4_time.h 1.1 644))
   (mudlib/sys/trace.h (lpmud/t/9_trace.h 1.1.1.1 644))
-  (mudlib/sys/wizlist.h (lpmud/46_wizlist.h 1.2.1.2.1.2 644))
+  (mudlib/sys/wizlist.h (lpmud/46_wizlist.h 1.2.1.2.1.3 644))
 
   ;; Various example and support files
   (mudlib/README (lpmud/d/51_README 1.1.1.6 644))
@@ -1046,7 +1049,7 @@
   (doc/efun/db_fetch (lpmud/e/27_db_fetch 1.2.1.3 644))
   (doc/efun/db_handles (lpmud/e/33_db_handles 1.1.1.4 644))
   (doc/efun/db_insert_id (lpmud/l/1_db_insert_ 1.2 644))
-  (doc/efun/debug_info (lpmud/o/22_debug_info 1.27 644))
+  (doc/efun/debug_info (lpmud/o/22_debug_info 1.28 644))
   (doc/efun/debug_message (lpmud/o/23_debug_mess 1.1.1.4 644))
   (doc/efun/deep_copy (lpmud/m/29_deep_copy 1.4 644))
   (doc/efun/deep_inventory (lpmud/o/24_deep_inven 1.3 644))
@@ -1269,7 +1272,7 @@
   (doc/efun/write (lpmud/r/9_write 1.2.1.2 644))
   (doc/efun/write_bytes (lpmud/r/10_write_byte 1.2 644))
   (doc/efun/write_file (lpmud/r/11_write_file 1.4 644))
-  (doc/efun/wizlist_info (lpmud/r/12_wizlist_in 1.2.1.4 644))
+  (doc/efun/wizlist_info (lpmud/r/12_wizlist_in 1.2.1.5 644))
   (doc/efun/xor_bits (lpmud/c/47_xor_bits 1.5 644))
 
   (doc/efun/abs.de (lpmud/s/25_abs.de 1.1 644))
@@ -1733,11 +1736,11 @@
   (mud/lp-245/obj/torch.c (lpmud/y/10_torch.c 1.2 644))
   (mud/lp-245/obj/team.c (lpmud/y/11_team.c 1.2 644))
   (mud/lp-245/obj/stethoscope.c (lpmud/y/12_stethoscop 1.3 644))
-  (mud/lp-245/obj/spare_simul_efun.c (lpmud/y/13_spare_simu 1.12 644))
+  (mud/lp-245/obj/spare_simul_efun.c (lpmud/y/13_spare_simu 1.13 644))
   (mud/lp-245/obj/soul.c (lpmud/y/14_soul.c 1.2 644))
   (mud/lp-245/obj/soft_drink.c (lpmud/y/15_soft_drink 1.3 644))
   (mud/lp-245/obj/sing.c (lpmud/y/16_sing.c 1.2 644))
-  (mud/lp-245/obj/simul_efun.c (lpmud/y/17_simul_efun 1.15 644))
+  (mud/lp-245/obj/simul_efun.c (lpmud/y/17_simul_efun 1.16 644))
   (mud/lp-245/obj/shut.c (lpmud/y/18_shut.c 1.2 644))
   (mud/lp-245/obj/shout_curse.c (lpmud/y/19_shout_curs 1.2 644))
   (mud/lp-245/obj/safe.c (lpmud/y/20_safe.c 1.3 644))

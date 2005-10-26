@@ -698,7 +698,23 @@ static void check_extra_ref_in_vector(svalue_t *svp, size_t num);
 
 #define ASSIGN_EVAL_COST \
     if (current_object->user)\
+    {\
+        unsigned long carry;\
         current_object->user->cost += eval_cost - assigned_eval_cost;\
+        carry = current_object->user->cost / 1000000000;\
+        if (carry)\
+        {\
+            current_object->user->gigacost += carry;\
+            current_object->user->cost %= 1000000000;\
+        }\
+        current_object->user->total_cost += eval_cost - assigned_eval_cost;\
+        carry = current_object->user->total_cost / 1000000000;\
+        if (carry)\
+        {\
+            current_object->user->total_gigacost += carry;\
+            current_object->user->total_cost %= 1000000000;\
+        }\
+    }\
     current_object->ticks += eval_cost - assigned_eval_cost;\
     {\
         unsigned long carry = current_object->ticks / 1000000000;\

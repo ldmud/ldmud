@@ -116,7 +116,7 @@ For a detailed list of all changes see the file CHANGELOG.
            available (default is to allow sbrk()).
 
 
-07-Apr-2003 (Lars Duening) -- Release 3.2.10
+09-Apr-2003 (Lars Duening) -- Release 3.2.10
 
     - Changed efuns:
        + debug_info(): Removed the DID_MEM_UNUSED value from the DINFO_DATA:
@@ -125,12 +125,17 @@ For a detailed list of all changes see the file CHANGELOG.
            DID_STATUS result.
        + debug_info(): The DINFO_DATA:"objects" dump also lists the object
            creation times.
+       + debug_info(): Added DID_ST_BOOT_TIME to the DINFO_DATA:DID_STATUS
+           result.
        + function_exists(): now also returns the filename and linenumber
            of a function.
        + remove_action(): It is now possible to remove all actions
            an object defines.
        + sprintf(), printf(): Modifier '#' for '%O'/'%Q' prints the values
            in a compact format.
+       + wizlist_info(): The evalcost statistic is now split into 'ticks'
+           and 'gigaticks', and a second non-decaying evalcost statistic
+           has been added.
 
     - Corrected efuns:
        + find_call_out(): No longer throws an error when passed an unbound
@@ -171,6 +176,7 @@ For a detailed list of all changes see the file CHANGELOG.
            of a key, and if either more than half of the condensed entries
            have been deleted, or if the number of hashed entries exceeds
            the number of (non-deleted) condensed entries.
+       + A heart-beat error now longer aborts the heartbeat cycle.
        + Bugfix: The smalloc allocator now re-uses free 'large' memory for
            small block chunks instead of always allocating them from the
            system.
