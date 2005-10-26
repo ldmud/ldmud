@@ -608,10 +608,12 @@ rexalloc_traced (POINTER p, size_t size MTRACE_DECL
 
 {
 #ifndef MEMORY_DEBUG
+#ifdef MALLOC_TRACE
 #   ifdef __MWERKS__
 #       pragma unused(malloc_trace_file)
 #       pragma unused(malloc_trace_line)
 #   endif
+#endif /* MALLOC_TRACE */
 #endif /* MEMORY_DEBUG */
 
     word_t *block, *t;

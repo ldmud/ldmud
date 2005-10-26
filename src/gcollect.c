@@ -1417,6 +1417,11 @@ garbage_collection(void)
     out_of_memory = MY_FALSE;
     assert_master_ob_loaded();
     malloc_privilege = MALLOC_SYSTEM;
+
+    /* Recover as much memory from temporaries as possible.
+     * However, don't call mb_release() yet as the swap buffer
+     * is still needed.
+     */
     if (obj_list_replace)
         replace_programs();
     handle_newly_destructed_objects();
@@ -1424,7 +1429,6 @@ garbage_collection(void)
     free_action_temporaries();
     remove_stale_player_data();
     remove_stale_call_outs();
-    mb_release();
     free_defines();
     free_all_local_names();
     remove_unknown_identifier();
@@ -1602,6 +1606,10 @@ garbage_collection(void)
     clear_interpreter_refs();
     clear_comm_refs();
     clear_rxcache_refs();
+    mb_clear_refs();
+      /* As this call also covers the swap buffer, it MUST come after
+       * processing (and potentially swapping) the objects.
+       */
 
     null_vector.ref = 0;
 
@@ -1797,6 +1805,7 @@ garbage_collection(void)
     count_interpreter_refs();
     count_heart_beat_refs();
     count_rxcache_refs();
+    mb_note_refs();
 
     if (reserved_user_area)
         note_ref(reserved_user_area);
@@ -1878,6 +1887,12 @@ garbage_collection(void)
          * but that function was never implemented.
          */
     }
+
+    /* Release the memory from the buffers. Eventually it will be
+     * allocated again, but for now the point is to reduce the amount
+     * of allocated memory.
+     */
+    mb_release();
 
     /* Reconsolidate the free lists */
     mem_consolidate(MY_TRUE);

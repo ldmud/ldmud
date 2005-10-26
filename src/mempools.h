@@ -40,21 +40,23 @@ extern size_t  mempool_size (Mempool pPool);
 extern void   mb_init(void);
 extern void   mb_release(void);
 extern void * mb_alloc(membuffer_e buf, size_t size);
+extern void * mb_realloc(membuffer_e buf, size_t size);
 extern size_t mb_status (strbuf_t * sbuf, Bool verbose);
 extern void   mb_dinfo_status (svalue_t *svp, int value);
 
-#define mb_realloc(buf,size) mb_alloc(buf,size)
 #define mb_free(buf) NOOP
-  /* Use the above macros to reallocate and 'free' the memory.
-   * While they seem redundant, they improve the readability
+  /* Use the above macro to 'free' the memory.
+   * While it may redundant, use of the macro improves the readability
    * of the code!
    */
 
 #ifdef GC_SUPPORT
-extern void    mempool_clear_refs (Mempool pPool);
-extern void    mempool_note_refs (Mempool pPool);
-#endif
+
+extern void mempool_clear_refs (Mempool pPool);
+extern void mempool_note_refs (Mempool pPool);
+extern void mb_clear_refs (void);
+extern void mb_note_refs (void);
+
+#endif /* GC_SUPPORT */
 
 #endif /* MEMPOOLS_H__ */
-
-

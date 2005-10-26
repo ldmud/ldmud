@@ -1282,7 +1282,7 @@ swap_variables (object_t *ob)
                 fatal("I/O error in swap.\n");
             }
         }
-        xfree(last_variable_block);
+        mb_free(mbSwap);
         xfree(ob->variables);
         ob->variables = (svalue_t *)(last_variable_swap_num | 1);
         ob->flags |= O_SWAPPED;
@@ -1824,8 +1824,7 @@ load_ob_from_swap (object_t *ob)
         size = total_size - sizeof total_size;
 
         /* Allocate the memory buffer */
-        block = (unsigned char *) gc_status ? xalloc(size)
-                                            : mb_alloc(mbSwap, size);
+        block = (unsigned char *) mb_alloc(mbSwap, size);
         if ( !block)
             return result | -0x80;
 
@@ -1834,10 +1833,7 @@ load_ob_from_swap (object_t *ob)
                 sizeof(svalue_t) * ob->prog->num_variables
         )) )
         {
-            if (gc_status)
-                xfree(block);
-            else
-                mb_free(mbSwap);
+            mb_free(mbSwap);
             return result | -0x80;
         }
 
@@ -1899,10 +1895,7 @@ load_ob_from_swap (object_t *ob)
             }
 #endif
 
-            if (gc_status)
-                xfree(block);
-            else
-                mb_free(mbSwap);
+            mb_free(mbSwap);
             result |= -0x80;
         }
 

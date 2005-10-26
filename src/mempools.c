@@ -144,6 +144,38 @@ mb_alloc (membuffer_e buf, size_t size)
  */
 
 {
+#ifdef DEBUG
+    if (buf < 0 || buf >= mbMax)
+        fatal("mb_alloc: Illegal buf# %d\n", buf);
+#endif
+
+    if (membuffers[buf].size >= size)
+        return membuffers[buf].mem;
+    
+    if (membuffers[buf].mem != NULL)
+        xfree(membuffers[buf].mem);
+
+    membuffers[buf].mem = xalloc(size);
+
+    if (membuffers[buf].mem != NULL)
+        membuffers[buf].size = size;
+    else
+        membuffers[buf].size = 0;
+
+    return membuffers[buf].mem;
+} /* mb_alloc() */
+
+/*-------------------------------------------------------------------------*/
+void *
+mb_realloc (membuffer_e buf, size_t size)
+
+/* Realloate the memory of buffer <buf> to hold <size> bytes, without
+ * losing the current content, and return the new pointer.
+ * Returns NULL when out of memory (the old memory block will be unaffected
+ * then).
+ */
+
+{
     void * mem;
 
 #ifdef DEBUG
@@ -166,7 +198,46 @@ mb_alloc (membuffer_e buf, size_t size)
     }
 
     return mem;
-} /* mb_alloc() */
+} /* mb_realloc() */
+
+/*-------------------------------------------------------------------------*/
+#ifdef GC_SUPPORT
+
+void
+mb_clear_refs (void)
+
+/* GC Support: Clear the refs of all memory associated with the
+ * memory buffers.
+ */
+
+{
+    int i;
+
+    for (i = 0; i < mbMax; i++)
+    {
+        if (membuffers[i].mem != NULL)
+            clear_memory_reference(membuffers[i].mem);
+    }
+} /* mb_clear_refs() */
+
+void
+mb_note_refs (void)
+
+/* GC Support: Note the refs of all memory associated with the
+ * memory buffers.
+ */
+
+{
+    int i;
+
+    for (i = 0; i < mbMax; i++)
+    {
+        if (membuffers[i].mem != NULL)
+            note_malloced_block_ref(membuffers[i].mem);
+    }
+} /* mb_note_refs() */
+
+#endif /* GC_SUPPORT */
 
 /*-------------------------------------------------------------------------*/
 size_t
