@@ -145,8 +145,8 @@ DESCRIPTION
                         or 'int*'. <var> must be of a specific type
                         for a conversion to take place; if <var> is 'mixed'
                         or unknown, the cast is purely declarative.
-                        Also, if the type of <var> is that of <type>, the
-                        value is not changed.
+                        Also, if the declared type of <var> is that of <type>,
+                        the value is not changed.
 
                         NB. The literal number 0 is of unknown type, as
                         it doubles as 'not initialized' for strings, objects,

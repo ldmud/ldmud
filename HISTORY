@@ -124,7 +124,7 @@ For a detailed list of all changes see the file CHANGELOG.
            available (default is to allow sbrk()).
 
 
-15-Jul-2003 (Lars Duening) -- Release 3.2.10
+17-Jul-2003 (Lars Duening) -- Release 3.2.10
 
     - Changed efuns:
        + debug_info(): Removed the DID_MEM_UNUSED value from the DINFO_DATA:
@@ -183,6 +183,8 @@ For a detailed list of all changes see the file CHANGELOG.
            filesystem conventions.
        + Preprocessor symbol __FILENAME_SPACES__ is defined if the driver is
            instructed to allow spaces in filenames.
+       + Casts with no effect (like casting an int value to int) now
+           generate a warning.
        + Bugfix: Characters with the 8th bit set are now treated as positive
            when entered as literal character constants.
        + Bugfix: Illegal case ranges like '100..50' now generate
@@ -195,6 +197,8 @@ For a detailed list of all changes see the file CHANGELOG.
            have been deleted, or if the number of hashed entries exceeds
            the number of (non-deleted) condensed entries.
        + A heart-beat error now longer aborts the heartbeat cycle.
+       + The operators -=, *= and /= can now operate on <int> x <float>,
+           yielding a <float> result.
        + Bugfix: Subtracting arrays of closures from each other now actually
            identifies identical closures.
        + Bugfix: The smalloc allocator now re-uses free 'large' memory for

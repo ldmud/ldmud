@@ -11304,10 +11304,10 @@ again:
          * Possible type combinations:
          *   int         - int                -> int
          *   float       - (float,int)        -> float
+         *   int         - float              -> float
          *   string      - string             -> string
          *   vector      - vector             -> vector
          *   mapping     - mapping            -> mapping
-         * TODO: Allow int - float -> float, equivalent to F_ADD_EQ.
          */
 
         short type2;         /* type and value of sp[-1] */
@@ -11331,11 +11331,7 @@ again:
         switch (argp->type)
         {
         case T_NUMBER:  /* Subtract from a number */
-            if (type2 != T_NUMBER)
-            {
-                OP_ARG_ERROR(2, TF_NUMBER, type2);
-                /* NOTREACHED */
-            }
+            if (type2 == T_NUMBER)
             {
                 p_int left = argp->u.number;
                 p_int right = u2.number;
@@ -11349,10 +11345,29 @@ again:
                     /* NOTREACHED */
                     break;
                 }
+                sp--;
+                sp->u.number = argp->u.number -= u2.number;
             }
 
-            sp--;
-            sp->u.number = argp->u.number -= u2.number;
+            if (type2 == T_FLOAT)
+            {
+                STORE_DOUBLE_USED
+                double diff;
+
+                diff = (double)(argp->u.number) - READ_DOUBLE(sp);
+                if (diff < (-DBL_MAX) || diff > DBL_MAX)
+                    ERRORF(("Numeric overflow: %ld - %g\n"
+                           , (long)argp->u.number, READ_DOUBLE(sp)));
+                sp--;
+                STORE_DOUBLE(sp, diff);
+                sp->type = T_FLOAT;
+                assign_svalue_no_free(argp, sp);
+                break;
+            }
+
+            /* type2 of the wrong type */
+            OP_ARG_ERROR(2, TF_NUMBER|TF_FLOAT, type2);
+            /* NOTREACHED */
             break;
 
         case T_CHAR_LVALUE:  /* Subtract from a char in a string */
@@ -11518,10 +11533,11 @@ again:
          * Possible type combinations:
          *   int         * int                -> int
          *   float       * (float,int)        -> float
+         *   int         * float              -> float
          *   string      * int                -> string
          *   array       * int                -> array
          *
-         * TODO: Extend this to mappings and (int * float -> float).
+         * TODO: Extend this to mappings.
          */
 
         svalue_t *argp;
@@ -11540,11 +11556,7 @@ again:
         if (argp->type == T_NUMBER)
         {
             sp--;
-            if (sp->type != T_NUMBER)
-            {
-                OP_ARG_ERROR(2, TF_NUMBER, sp->type);
-                /* NOTREACHED */
-            }
+            if (sp->type == T_NUMBER)
             {
                 p_int left = argp->u.number;
                 p_int right = sp->u.number;
@@ -11585,9 +11597,28 @@ again:
                         break;
                     }
                 }
+                sp->u.number = argp->u.number *= sp->u.number;
+                break;
+            } /* type2 == T_NUMBER */
+
+            if (sp->type == T_FLOAT)
+            {
+                STORE_DOUBLE_USED
+                double product;
+
+                product = argp->u.number * READ_DOUBLE(sp);
+                if (product < (-DBL_MAX) || product > DBL_MAX)
+                    ERRORF(("Numeric overflow: %ld * %g\n"
+                           , (long)argp->u.number, READ_DOUBLE(sp)));
+                STORE_DOUBLE(sp, product);
+                sp->type = T_FLOAT;
+                assign_svalue_no_free(argp, sp);
+                break;
             }
-            sp->u.number = argp->u.number *= sp->u.number;
-            break;
+
+            /* Unsupported type2 */
+            OP_ARG_ERROR(2, TF_NUMBER|TF_FLOAT, sp->type);
+            /* NOTREACHED */
         }
 
         if (argp->type == T_CHAR_LVALUE)
@@ -11799,8 +11830,9 @@ again:
          * Possible type combinations:
          *   int         / int                -> int
          *   float       / (float,int)        -> float
+         *   int         - float              -> float
          *
-         * TODO: Extend this to arrays and mappings and (int / float -> float).
+         * TODO: Extend this to arrays and mappings.
          */
 
         svalue_t *argp;
@@ -11819,19 +11851,39 @@ again:
         if (argp->type == T_NUMBER)
         {
             sp--;
-            if (sp->type != T_NUMBER)
+            if (sp->type == T_NUMBER)
             {
-                OP_ARG_ERROR(2, TF_NUMBER, sp->type);
-                /* NOTREACHED */
+                if (sp->u.number == 0)
+                    ERROR("Division by zero\n");
+                if (argp->u.number == PINT_MIN && sp->u.number == -1)
+                    ERRORF(("Numeric overflow: %ld / -1\n"
+                           , (long)argp->u.number
+                           ));
+                sp->u.number = argp->u.number /= sp->u.number;
+                break;
             }
-            if (sp->u.number == 0)
-                ERROR("Division by zero\n");
-            if (argp->u.number == PINT_MIN && sp->u.number == -1)
-                ERRORF(("Numeric overflow: %ld / -1\n"
-                       , (long)argp->u.number
-                       ));
-            sp->u.number = argp->u.number /= sp->u.number;
-            break;
+
+            if (sp->type == T_FLOAT)
+            {
+                double dtmp;
+                STORE_DOUBLE_USED
+
+                dtmp = READ_DOUBLE( sp );
+                if (dtmp == 0.)
+                    ERROR("Division by zero\n");
+                dtmp = (double)argp->u.number / dtmp;
+                if (dtmp < (-DBL_MAX) || dtmp > DBL_MAX)
+                    ERRORF(("Numeric overflow: %ld / %g\n"
+                           , (long)argp->u.number, READ_DOUBLE(sp)));
+                STORE_DOUBLE(sp, dtmp);
+                sp->type = T_FLOAT;
+                assign_svalue_no_free(argp, sp);
+                break;
+            }
+
+            /* Unsupported type2 */
+            OP_ARG_ERROR(2, TF_NUMBER|TF_FLOAT, sp->type);
+            /* NOTREACHED */
         }
 
         if (argp->type == T_CHAR_LVALUE)

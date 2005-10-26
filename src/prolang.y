@@ -9312,6 +9312,9 @@ expr0:
                   break;
               }
           }
+          else
+              yywarnf("Cast without effect %s", get_two_types($1, $2.type));
+
           $$.end = CURRENT_PROGRAM_SIZE;
       }
 

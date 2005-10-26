@@ -61,12 +61,13 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 459)
-(Parent-Version lpmud 3-3 458)
-(Version-Log "Subtracting arrays of closures didn't work correctly.")
+(Project-Version lpmud 3-3 460)
+(Parent-Version lpmud 3-3 459)
+(Version-Log "The operators -=, *= and /= can now operate on int x float and yield a float result.
+Casts without effect generate a warning.")
 (New-Version-Log
 "")
-(Checkin-Time "Thu, 17 Jul 2003 00:00:38 -0600")
+(Checkin-Time "Thu, 17 Jul 2003 01:05:51 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -103,8 +104,8 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.10 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.67 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.522 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.325 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.523 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.326 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -192,7 +193,7 @@
   (src/heartbeat.c (lpmud/m/42_heartbeat. 1.18.1.9 644))
   (src/i-svalue_cmp.h (lpmud/a/b/20_i-svalue_c 1.4 644))
   (src/interpret.h (lpmud/b/13_interpret. 1.33.1.37 644))
-  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.35 644))
+  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.36 644))
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.15.1.4 644))
   (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.57 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.16 644))
@@ -271,7 +272,7 @@
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.18 644))
   (src/port.c (lpmud/39_port.c 1.17.1.9 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.17.1.3 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.41 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.42 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7.1.2 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))
@@ -1347,7 +1348,7 @@
   (doc/LPC/lpc (lpmud/r/32_lpc 1.2 644))
   (doc/LPC/mappings (lpmud/l/42_mappings 1.6 644))
   (doc/LPC/modifiers (lpmud/s/48_modifiers 1.8 644))
-  (doc/LPC/operators (lpmud/m/0_operators 1.9.1.12 644))
+  (doc/LPC/operators (lpmud/m/0_operators 1.9.1.13 644))
   (doc/LPC/pragma (lpmud/r/33_pragma 1.13 644))
   (doc/LPC/preprocessor (lpmud/r/34_preprocess 1.5 644))
   (doc/LPC/references (lpmud/c/48_references 1.3 644))

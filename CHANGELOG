@@ -1,7 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-15-Jul-2003 (Lars Duening)  (3.3.459)
+17-Jul-2003 (Lars Duening)  (3.3.460)
+  - (interpret.c) The operators -=, /= and *= can now operate on 
+       <int> x <float> values, yielding a <float> result.
+  - (prolang.y) Casts with no effect generate a warning.
+
+17-Jul-2003 (Lars Duening)  (3.3.459)
   - (i-svalue_cmp.h) When comparing closures for equality, the result was
        reveresed (reported by Fantom).
   - (array.c, interpret.c) Replaced uses of closure_cmp() with closure_eq()
