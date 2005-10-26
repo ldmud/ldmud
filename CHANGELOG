@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+11-Apr-2002 (Lars Duening)  (3.3.440)
+  - (smalloc.c) A bit of code cleanup; and in preparation for the planned
+       automatic small block defragmentation introduced 'free' flags for
+       small blocks and a minimum payload size.
+
 09-Apr-2002 (Lars Duening)  (3.3.439)
   - (efuns.c, strfuns, func_spec) Efuns filter() and map() can be used on
        strings.

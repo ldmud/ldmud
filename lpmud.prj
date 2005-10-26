@@ -61,12 +61,12 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 439)
-(Parent-Version lpmud 3-3 438)
-(Version-Log "Efuns filter() and map() can now work on strings as well.")
+(Project-Version lpmud 3-3 440)
+(Parent-Version lpmud 3-3 439)
+(Version-Log "Preparations in smalloc for the small block defragmentation.")
 (New-Version-Log
 "")
-(Checkin-Time "Wed, 09 Apr 2003 21:52:05 -0600")
+(Checkin-Time "Fri, 11 Apr 2003 00:51:00 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -103,7 +103,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.62 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.502 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.503 644))
   (HISTORY (lpmud/f/49_HISTORY 1.318 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.19 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -281,7 +281,7 @@
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.31 644))
   (src/simulate.c (lpmud/31_simulate.c 1.88.1.108 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.14 644))
-  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.75 644))
+  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.76 644))
   (src/structs.h (lpmud/d/b/5_structs.h 1.4 644))
   (src/structs.c (lpmud/d/b/6_structs.c 1.12 644))
   (src/sysmalloc.h (lpmud/c/b/33_sysmalloc. 1.1 644))
