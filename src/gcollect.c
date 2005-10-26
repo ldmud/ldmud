@@ -492,8 +492,33 @@ cleanup_structures (cleanup_t * context)
         cleanup_vector(&default_wizlist_entry.extra, 1, context);
     }
 
-    /* Cleanup the driver hooks */
-    cleanup_vector(driver_hook, NUM_DRIVER_HOOKS, context);
+    /* Cleanup the driver hooks.
+     * We have to be careful here to not free the lambda-closure hooks even
+     * if they are bound to destructed objects.
+     */
+    {
+        int i;
+
+        for (i = 0; i < NUM_DRIVER_HOOKS; i++)
+        {
+            if (driver_hook[i].type == T_CLOSURE
+             && (   driver_hook[i].x.closure_type == CLOSURE_LAMBDA
+                 || driver_hook[i].x.closure_type == CLOSURE_BOUND_LAMBDA
+                )
+               )
+            {
+                if (destructed_object_ref(&driver_hook[i]))
+                {
+                    lambda_t * l = driver_hook[i].u.lambda;
+
+                    free_object(l->ob, "cleanup_structures");
+                    l->ob = ref_object(master_ob, "cleanup_structures");
+                }
+            }
+            else
+                cleanup_vector(&driver_hook[i], 1, context);
+        }
+    }
 #endif /* NEW_CLEANUP */
 } /* cleanup_structures() */
 

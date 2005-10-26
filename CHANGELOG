@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+15-Mar-2002 (Lars Duening)  (3.3.422)
+  - (gcollect.c) The NEW_CLEANUP code treated the driver hooks like other
+      svalues, which was bad because it caused lambda-closure hooks bound
+      to destructed objects to disappear. Since these closures can be re-bound
+      on the fly, the cleanup code now does exactly that (reported by
+      Nostradamus and Bardioc).
+
 14-Mar-2002 (Lars Duening)  (3.3.421)
   - (driver.h, smalloc.c) Removed a build problem when MALLOC_CHECK
       was not defined, but MALLOC_TRACE was (reported by Nostradamus).
