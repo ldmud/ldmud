@@ -746,7 +746,7 @@ svalue_to_string ( fmt_state_t *st
                     stradd(st, &str, "({ /* #");
                     numadd(st, &str, prec->id_number);
                     stradd(st, &str, ", size: ");
-                    numadd(st, &str, size-1);
+                    numadd(st, &str, size);
                     stradd(st, &str, " */\n");
                 }
                 for (i = 0; i < size-1; i++)

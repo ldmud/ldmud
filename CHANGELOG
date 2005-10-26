@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+29-Apr-2002 (Lars Duening)  (3.3.449)
+  - (sprintf.c) When printing arrays with '%O', the size was given
+       one too small.
+  - (mregex.c) PCRE: The string arguments passed to pcre_exec() were wrong, 
+       making repeated replacements within on string dangerous (e.g. in ed
+       '749,$s!arg!strength!gp') (reported by Elric).
+
 24-Apr-2002 (Lars Duening)  (3.3.448)
   - (interpret.c) If during a call of the type 'funcall(lfun-closure)' the
        object holding the closure was destructed and the closure deallocated,

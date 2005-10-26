@@ -1901,10 +1901,10 @@ subst (regexp_t *pat, char *sub, Bool gflg, Bool pflag)
             nchngd++;
             if (pflag)
                 doprnt(P_CURLN, P_CURLN);
-        }
-    }
+        } /* if(rc) */
+    } /* for() */
     return (( nchngd == 0 && !gflg ) ? SUB_FAIL : nchngd);
-}
+} /* subst() */
 
 /*-------------------------------------------------------------------------*/
 static void

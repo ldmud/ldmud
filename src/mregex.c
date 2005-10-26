@@ -471,7 +471,7 @@ rx_exec_str (regexp_t *prog, char * string, char * start)
     if (prog->opt & RE_NOTEMPTY) pcre_opt |= PCRE_NOTEMPTY;
 
     rc = pcre_exec( prog->pProg, prog->pHints
-                  , string, strlen(string), start - string, pcre_opt
+                  , start, strlen(start), string - start, pcre_opt
                   , prog->pSubs, prog->num_subs
                   );
     prog->res = rc;

@@ -36,13 +36,16 @@ DESCRIPTION
 
             If <expr> is a array, struct, or string, the values of
             <expr> (in case of the string, the integer values of the
-            characters) are then assigned one after another to <var>
-            and <statement> is execute for every assignment.
+            characters) are then assigned one by one in order of
+            occurence to <var>, and <statement> is executed for every
+            assignment.
 
-            If <expr> is a mapping, the keys are assigned to <var>, and
-            the values for each key are assigned in order to <var2>..<varN>.
-            If there are more values than variable, the extraneous values
-            are ignored.
+            If <expr> is a mapping, the keys are assigned one by one
+            to <var>, and the values for each key are assigned in
+            order to <var2>..<varN>.  If there are more values than
+            variable, the extraneous values are ignored. Due to the
+            nature of mappings, a specific order of the keys can not
+            be guaranteed.
 
             If <expr> evaluates to a reference to an array, mapping, or
             string, the loop will assign references to the values into
