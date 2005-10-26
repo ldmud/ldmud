@@ -2175,8 +2175,11 @@ show_array(int d, void *block, int depth)
 
     WRITES(d, "Array ");
     write_x(d, (p_int)a);
-    WRITES(d, " size ");writed(d, (p_uint)a_size);
-    WRITES(d, ", uid: "); show_string(d, user ? get_txt(user->name) : "0", 0);
+    WRITES(d, " size ");
+    writed(d, (p_uint)a_size);
+    WRITES(d, ", uid: ");
+    show_string(d, user ? (user->name ? get_txt(user->name) : "<null>")
+                        :"0", 0);
     WRITES(d, "\n");
     if (depth > 2)
         return;
@@ -2303,7 +2306,9 @@ show_struct(int d, void *block, int depth)
     WRITES(d, "struct ");
     write_x(d, (p_int)a);
     WRITES(d, " size ");writed(d, (p_uint)a_size);
-    WRITES(d, ", uid: "); show_string(d, user ? get_txt(user->name) : "0", 0);
+    WRITES(d, ", uid: ");
+    show_string(d, user ? (user->name ? get_txt(user->name) : "<null>")
+                        : "0", 0);
     WRITES(d, "\n");
     if (depth > 2)
         return;

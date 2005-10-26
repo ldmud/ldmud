@@ -3183,7 +3183,7 @@ check_valid_path (string_t *path, object_t *caller, string_t* call_fun, Bool wri
     else
         push_number(inter_sp, 0);
 
-    if ( NULL != (eff_user = caller->eff_user) )
+    if ( NULL != (eff_user = caller->eff_user)  && NULL != eff_user->name)
         push_ref_string(inter_sp, eff_user->name);
     else
         push_number(inter_sp, 0);

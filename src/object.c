@@ -3558,7 +3558,7 @@ f_geteuid (svalue_t *sp)
 
      ob = sp->u.ob;
 
-    if (ob->eff_user)
+    if (ob->eff_user && ob->eff_user->name)
     {
         string_t *tmp;
         tmp = ref_mstring(ob->eff_user->name);

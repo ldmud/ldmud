@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+05-Mar-2002 (Lars Duening)  (3.3.411)
+  - (gcollect.c, object.c) Inserted checks so that the driver doesn't try
+       to access the non-existing name of the default wizlist entry (in
+       particular the GC) (reported by Bardioc).
+
 03-Mar-2002 (Lars Duening)  (3.3.410)
   - (mapping, backend.c, gcollect.c) Experimental: dirty mappings are
        not compacted immediately, but only after a certain time (for now
