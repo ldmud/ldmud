@@ -124,7 +124,7 @@ For a detailed list of all changes see the file CHANGELOG.
            available (default is to allow sbrk()).
 
 
-22-Jul-2003 (Lars Duening) -- Release 3.2.10
+28-Jul-2003 (Lars Duening) -- Release 3.2.10
 
     - Changed efuns:
        + debug_info(): Removed the DID_MEM_UNUSED value from the DINFO_DATA:
@@ -172,6 +172,8 @@ For a detailed list of all changes see the file CHANGELOG.
            longer possible after set_this_object().
        + Overflowing the value stack during a secure_apply() could
            crash the driver in the error recovery.
+       + walk_mapping(): If the callback object was destructed
+           before the first call, the efun crashed in the error handling.
 
     - Language:
        + catch(; nolog) is now an official feature.

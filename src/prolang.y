@@ -3440,7 +3440,9 @@ def_function_typecheck (fulltype_t returntype, ident_t * ident
     else
     {
         if (pragma_strict_types != PRAGMA_WEAK_TYPES)
-            yyerror("\"#pragma strict_types\" requires type of function");
+            yyerrorf("\"#pragma %s_types\" requires type of function"
+                    , pragma_strict_types == PRAGMA_STRICT_TYPES
+                      ? "strict" : "strong" );
         exact_types.typeflags = 0;
     }
 

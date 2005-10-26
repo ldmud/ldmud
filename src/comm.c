@@ -3088,6 +3088,7 @@ get_message (char *buff)
                     DTN(("  %ld chars ready\n", ip->chars_ready));
                     if (end_of_line)
                     {
+                        printf("DEBUG: faking NL\n"); fflush(stdout);
                         buff[0] = '\n';
                         destix = 1;
                     }
@@ -3125,7 +3126,7 @@ get_message (char *buff)
                         /* End of line. Reinitialise the telnet machine
                          */
                         DTN(("    end of line: reinit telnet machine\n"));
-                        buff[destix-1] = '\n';
+                        destix--;
                         ip->command_start = 0;
                         ip->tn_state = TS_DATA;
                         telnet_neg(ip);
@@ -5108,6 +5109,8 @@ telnet_neg (interactive_t *ip)
                 return;
             }
             ch = (*from++ & 0xff);
+            DTN(("t_n: (ts_data) processing %02x '%c'\n"
+                , (unsigned char)ch, ch));
             /* FALLTHROUGH */
 
         case TS_DATA: /* --- Copy/interpret plain data --- */
@@ -5173,9 +5176,22 @@ telnet_neg (interactive_t *ip)
                 /* FALLTHROUGH */
 
             case '\0':
+                /* In Charmode, we should return the \0 (as with CR and LF),
+                 * but for the caller the \0 has magical properties.
+                 */
                 goto ts_data;
 
             case '\r':
+                /* In Charmode, we have to return the \r */
+                if (ip->noecho & CHARMODE_REQ
+                 && (   ip->text[0] != input_escape
+                     || find_no_bang(ip) & IGNORE_BANG)
+                   )
+                {
+                    *to++ = (char)ch;
+                    goto ts_data;
+                }
+
                 if (from >= end)
                 {
                     /* This might be a fragmented CR NL, CR NUL, or
@@ -5201,24 +5217,27 @@ telnet_neg (interactive_t *ip)
                     ip->tn_state = TS_READY;
                     ip->command_end = 0;
                     ip->tn_end = (short)(from - first);
-                    /*if ((ip->noecho & (CHARMODE_REQ|CHARMODE)) == (CHARMODE_REQ|CHARMODE) */
-                    if (ip->noecho & CHARMODE_REQ
-                     && (   ip->text[0] != input_escape
-                         || find_no_bang(ip) & IGNORE_BANG))
-                    {
-                        /* In charmode, we need to return the NL.
-                         * We will also append the NUL in case the client
-                         * refused to use charmode, because then get_message()
-                         * will treat the data as if in linemode and expect
-                         * a trailing NUL.
-                         */
-                        *to++ = '\n';
-                    }
+
+                    /* Even in charmode we append the NUL in case the client
+                     * refused to use charmode, because then get_message()
+                     * will treat the data as if in linemode and expect
+                     * a trailing NUL.
+                     */
                     *to = '\0';
                     return;
                 }
 
             case '\n':
+                /* In Charmode, we have to return the \n */
+                if (ip->noecho & CHARMODE_REQ
+                 && (   ip->text[0] != input_escape
+                     || find_no_bang(ip) & IGNORE_BANG)
+                   )
+                {
+                    *to++ = (char)ch;
+                    goto ts_data;
+                }
+
                 ip->gobble_char = '\r';
                 goto full_newline;
             } /* switch(ch) */

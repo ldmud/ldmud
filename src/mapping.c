@@ -3657,7 +3657,7 @@ v_walk_mapping (svalue_t *sp, int num_arg)
 
     read_pointer = walk_mapping_prologue(m, sp, &cb);
     i = read_pointer[-2].u.number;
-    sp++; /* walk_mapping_prologue() pushed one value */
+    inter_sp = ++sp; /* walk_mapping_prologue() pushed one value */
 
     num_values = m->num_values;
 
@@ -3670,7 +3670,7 @@ v_walk_mapping (svalue_t *sp, int num_arg)
         svalue_t *sp2, *data;
 
         if (!callback_object(&cb))
-            error("Object used by walk_mapping destructed");
+            error("Object used by walk_mapping destructed\n");
 
         /* Push the key */
         assign_svalue_no_free( (sp2 = sp+1), read_pointer++ );

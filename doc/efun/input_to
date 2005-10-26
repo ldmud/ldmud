@@ -40,8 +40,7 @@ DESCRIPTION
               has been issued.
 
               Lineends are received exactly as the client sent them:
-              "\n", "\r" followed by "\n", or in case of some Windows
-              clients, just "\r".
+              "\n", "\r" followed by "\n", or just "\r".
 
               Note that the players frontend is free to stay in
               linemode all the time: even if you request a single
@@ -90,6 +89,11 @@ EXAMPLE
         input. If you entered whatever is asked and press RETURN the
         driver will invoke the enter_name() function with the
         string you entered as argument to it.
+
+BUGS
+        In charmode, it is not possible to receive the NUL character
+        and pass it to the mudlib: internally the NUL character has
+        magical properties.
 
 HISTORY
         The meaning of the flag parameter was extended in 3.2.1@93.

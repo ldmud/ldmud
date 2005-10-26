@@ -17,8 +17,9 @@ DESCRIPTION
         To force non-default calls, the efun call_direct_resolved() can
         be used.
 
-        ob can also be an object_name. If a string is passed for ob, and
-        no object with that name does exist, an error occurs.
+        ob can also be an object_name. If a string is passed for ob
+        and an object with that name can't be found or loaded, an
+        error occurs.
 
 HISTORY
         LDMud 3.3.113 introduced the H_DEFAULT_METHOD hook.

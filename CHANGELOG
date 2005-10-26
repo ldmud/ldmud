@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+26-Jul-2003 (Lars Duening)  (3.3.467)
+  - (prolang.y) If a pragma requires a function return type, the error
+       message now names the active pragma in question instead of always
+       'strict_types' (Mantis #0000003)
+  - (comm.c) In charmode, CR and LF are treated as normal data
+       characters (Mantis #0000002).
+
 26-Jul-2003 (Lars Duening)  (3.3.466)
   - (mapping.c) Taking a cue from 3.2.10-594, the number of times a mapping
        is checked for destructed elements has been reduced. This was less of

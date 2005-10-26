@@ -61,12 +61,13 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 466)
-(Parent-Version lpmud 3-3 465)
-(Version-Log "Reduced the computational effort for mapping compaction, in particular the excessive number of calls to check_map_for_destr().")
+(Project-Version lpmud 3-3 467)
+(Parent-Version lpmud 3-3 466)
+(Version-Log "Improved a pragma-related error message in the compiler.
+In charmode, CR and LF are treated as normal data characters.")
 (New-Version-Log
 "")
-(Checkin-Time "Sat, 26 Jul 2003 00:55:33 -0600")
+(Checkin-Time "Mon, 28 Jul 2003 23:05:42 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -104,8 +105,8 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.10 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.67 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.529 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.328 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.530 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.329 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -172,7 +173,7 @@
   (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.26 644))
   (src/closure.h (lpmud/f/44_closure.h 1.7.1.17 644))
   (src/closure.c (lpmud/d/4_closure.c 1.41.1.47.1.16 644))
-  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.56 644))
+  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.57 644))
   (src/comm.h (lpmud/d/3_comm.h 1.26.1.33 644))
   (src/driver.h (lpmud/f/36_driver.h 1.15.1.25 644))
   (src/dumpstat.h (lpmud/f/35_dumpstat.h 1.8 644))
@@ -199,7 +200,7 @@
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.16 644))
   (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.43 644))
   (src/mapping.h (lpmud/f/30_mapping.h 1.12.1.20 644))
-  (src/mapping.c (lpmud/b/6_mapping.c 1.36.1.72 644))
+  (src/mapping.c (lpmud/b/6_mapping.c 1.36.1.73 644))
   (src/md5.h (lpmud/l/18_md5.h 1.2 644))
   (src/md5.c (lpmud/l/19_md5.c 1.6 644))
   (src/mempools.h (lpmud/d/48_mempools.h 1.2.1.8 644))
@@ -272,7 +273,7 @@
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.18 644))
   (src/port.c (lpmud/39_port.c 1.17.1.9 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.17.1.3 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.44 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.45 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7.1.2 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))
@@ -1001,7 +1002,7 @@
   (doc/efun/call_other (lpmud/l/11_call_other 1.6.1.4 644))
   (doc/efun/call_out (lpmud/m/43_call_out 1.3.1.5 644))
   (doc/efun/call_out_info (lpmud/j/50_call_out_i 1.4 644))
-  (doc/efun/call_resolved (lpmud/o/10_call_resol 1.1.1.3 644))
+  (doc/efun/call_resolved (lpmud/o/10_call_resol 1.1.1.4 644))
   (doc/efun/caller_stack (lpmud/l/32_caller_sta 1.6 644))
   (doc/efun/caller_stack_depth (lpmud/l/33_caller_sta 1.3 644))
   (doc/efun/capitalize (lpmud/o/11_capitalize 1.3 644))
@@ -1078,7 +1079,7 @@
   (doc/efun/implode (lpmud/p/2_implode 1.3 644))
   (doc/efun/include_list (lpmud/p/25_include_li 1.5 644))
   (doc/efun/inherit_list (lpmud/p/3_inherit_li 1.7 644))
-  (doc/efun/input_to (lpmud/p/4_input_to 1.8.1.8 644))
+  (doc/efun/input_to (lpmud/p/4_input_to 1.8.1.9 644))
   (doc/efun/input_to_info (lpmud/b/b/44_input_to_i 1.1 644))
   (doc/efun/insert_alist (lpmud/c/45_insert_ali 1.7 644))
   (doc/efun/interactive (lpmud/p/5_interactiv 1.2 644))
@@ -1104,7 +1105,7 @@
   (doc/efun/m_reallocate (lpmud/l/51_m_realloca 1.3 644))
   (doc/efun/m_values (lpmud/c/41_m_values 1.6 644))
   (doc/efun/make_shared_string (lpmud/l/24_make_share 1.2 644))
-  (doc/efun/map (lpmud/l/46_map 1.6.1.6 644))
+  (doc/efun/map (lpmud/l/46_map 1.6.1.7 644))
   (doc/efun/mappingp (lpmud/c/40_mappingp 1.8 644))
   (doc/efun/map_indices (lpmud/m/8_map_indice 1.3.1.2 644))
   (doc/efun/map_objects (lpmud/p/11_map_object 1.1.1.1 644))
