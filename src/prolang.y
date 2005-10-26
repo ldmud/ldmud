@@ -5371,8 +5371,8 @@ delete_prog_string (void)
   /* Number of variables given to foreach
    */
 
-%type <number> opt_catch_mods
-  /* Bitflags for catch() modes: 1: nolog
+%type <number> opt_catch_mods opt_catch_mod_list opt_catch_modifier
+  /* Bitflags for catch() modes: CATCH_FLAG_xxx from simulate.h
    */
 
 /* Special uses of <numbers> */
@@ -12925,7 +12925,8 @@ catch:
           ins_f_code(F_SAVE_ARG_FRAME);
           $<address>$ = CURRENT_PROGRAM_SIZE;
           ins_f_code(F_CATCH);
-          ins_byte(0);
+          ins_byte(0); /* Placeholder for flags */
+          ins_byte(0); /* Placeholder for the jump offset */
       }
 
       '(' comma_expr opt_catch_mods ')'
@@ -12943,12 +12944,12 @@ catch:
           if ($5)
           {
               bytecode_p p;
-              p = PROGRAM_BLOCK + start;
-              *p = F_CATCH_NO_LOG;
+              p = PROGRAM_BLOCK + start + 1;
+              *p = $5 & 0xff;
           }
 
           /* Update the offset field of the CATCH instruction */
-          offset = CURRENT_PROGRAM_SIZE - (start + 2);
+          offset = CURRENT_PROGRAM_SIZE - (start + 3);
           if (offset >= 0x100)
           {
               /* Too big offset, change
@@ -12982,13 +12983,13 @@ catch:
               p[-4] = F_BRANCH ;
               p[-3] = 3;
               p[-2] = F_LBRANCH;
-              upd_short(start + 5, offset+2);
+              upd_short(start + 6, offset+2);
               if (offset > 0x7ffd)
                   yyerror("offset overflow");
           }
           else
           {
-              mem_block[A_PROGRAM].block[start+1] = offset;
+              mem_block[A_PROGRAM].block[start+2] = offset;
           }
 
           /* Restore the argument frame */
@@ -13002,13 +13003,10 @@ catch:
 
 
 opt_catch_mods :
-      ';' identifier
+      ';' opt_catch_mod_list
 
       {
-          if (!mstreq($2, STR_NOLOG))
-              yyerror("Expected keyword 'nolog' in catch()");
-          free_mstring($2);
-          $$ = 1;
+          $$ = $2;
       }
 
     | /* empty */
@@ -13018,6 +13016,34 @@ opt_catch_mods :
       }
 ; /* opt_catch_mods */
 
+
+opt_catch_mod_list :
+      opt_catch_mod_list ',' opt_catch_modifier
+      {
+          $$ = $1 | $3;
+      }
+
+    | opt_catch_modifier
+      {
+          $$ = $1;
+      }
+; /* opt_catch_mod_list */
+
+
+opt_catch_modifier :
+      identifier
+      {
+          $$ = 0;
+
+          if (mstreq($1, STR_NOLOG))
+              $$ = CATCH_FLAG_NOLOG;
+          else if (mstreq($1, STR_PUBLISH))
+              $$ = CATCH_FLAG_PUBLISH;
+          else
+              yyerror("Illegal modifier in catch() - 'nolog' or 'publish'");
+          free_mstring($1);
+      }
+; /* opt_catch_modifier */
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 /* sscanf() and parse_command()

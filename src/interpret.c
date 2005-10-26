@@ -83,8 +83,6 @@
  *      ERROR_RECOVERY_APPLY:    Errors fall back into the secure_apply()
  *                               function used for sensitive applies.
  *      ERROR_RECOVERY_CATCH:    Errors are caught by the catch() construct.
- *      ERROR_RECOVERY_CATCH_NOLOG: Errors are caught by the catch_nolog()
- *                               construct.
  *
  *    The _CATCH contexts differs from the others in that it allows the
  *    continuing execution after the error. In order to achieve this, the
@@ -253,7 +251,7 @@
  * This extension of the struct error_recovery_info (see backend.h)
  * stores the additional information needed to reinitialize the global
  * variables when bailing out of a catch(). The type is always
- * ERROR_RECOVERY_CATCH or ERROR_RECOVERY_CATCH_NOLOG.
+ * ERROR_RECOVERY_CATCH.
  *
  * It is handled by the functions push_, pop_ and pull_error_context().
  */
@@ -264,8 +262,8 @@ struct catch_context
       /* The subclassed recovery info.
        */
     struct control_stack * save_csp;
-    object_t        * save_command_giver;
-    svalue_t        * save_sp;
+    object_t             * save_command_giver;
+    svalue_t             * save_sp;
       /* The saved global values
        */
 };
@@ -6427,12 +6425,11 @@ do_trace_return (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 struct longjump_s *
-push_error_context (svalue_t *sp, bytecode_t catch_inst)
+push_error_context (svalue_t *sp, int catch_flags)
 
 /* Create a catch recovery context, using <sp> as the stackpointer to save,
  * link it into the recovery stack and return the longjmp context struct.
- * The actual type of the catch context is chosen on the actual
- * <catch_inst>ruction (CATCH or CATCH_NO_LOG).
+ * The actual type of the catch context is determined by the <catch_flags>.
  */
 
 {
@@ -6443,9 +6440,8 @@ push_error_context (svalue_t *sp, bytecode_t catch_inst)
     p->save_csp = csp;
     p->save_command_giver = command_giver;
     p->recovery_info.rt.last = rt_context;
-    p->recovery_info.rt.type
-      = (catch_inst == F_CATCH) ? ERROR_RECOVERY_CATCH
-                                : ERROR_RECOVERY_CATCH_NOLOG;
+    p->recovery_info.rt.type = ERROR_RECOVERY_CATCH;
+    p->recovery_info.flags = catch_flags;
     rt_context = (rt_context_t *)&p->recovery_info;
     return &p->recovery_info.con;
 } /* push_error_context() */
@@ -6937,7 +6933,7 @@ check_state (void)
     }
 
     return rc;
-}
+} /* check_state() */
 #endif
 
 /*-------------------------------------------------------------------------*/
@@ -8784,17 +8780,17 @@ again:
         assign_local_svalue_no_free(sp, fp + LOAD_UINT8(pc));
         break;
 
-    CASE(F_CATCH);        /* --- catch <offset> <guarded code> --- */
-    CASE(F_CATCH_NO_LOG); /* --- catch_no_log <offset> <guarded code> --- */
+    CASE(F_CATCH);       /* --- catch <flags> <offset> <guarded code> --- */
     {
         /* catch(...instructions...)
-         * catch_nolog(...instructions...)
          *
          * Execute the instructions (max. uint8 <offset> bytes) following the
          * catch statement. If an error occurs, or a throw() is executed,
          * catch that exception, push the <catch_value> (a global var)
          * onto the stack and continue execution at instruction
          * <pc>+1+<offset>.
+         *
+         * The attributes of the catch are givein as uint8 <flags>.
          *
          * The implementation is such that a control-stack entry is created
          * as if the instructions following catch are called as a subroutine
@@ -8815,6 +8811,10 @@ again:
          */
 
         uint offset;
+        int  flags;
+
+        /* Get the flags */
+        flags = LOAD_UINT8(pc);
 
         /* Get the offset to the next instruction after the CATCH statement.
          */
@@ -8826,7 +8826,7 @@ again:
         inter_fp = fp;
 
         /* Perform the catch() */
-        if (!catch_instruction(instruction, offset
+        if (!catch_instruction(flags, offset
 #ifndef __INTEL_COMPILER
                               , (volatile svalue_t ** volatile) &inter_sp
 #else

@@ -70,7 +70,6 @@
 #endif
         local
         catch
-        catch_no_log
 "++"    inc
 "--"    dec
 "x++"   post_inc

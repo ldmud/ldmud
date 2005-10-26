@@ -124,7 +124,7 @@ extern void push_control_stack(svalue_t *sp, bytecode_p pc, svalue_t *fp, svalue
 extern void push_control_stack(svalue_t *sp, bytecode_p pc, svalue_t *fp);
 #endif /* USE_NEW_INLINES */
 extern void pop_control_stack(void);
-extern struct longjump_s *push_error_context(svalue_t *sp, bytecode_t catch_inst);
+extern struct longjump_s *push_error_context(svalue_t *sp, int catch_flags);
 extern void pop_error_context (void);
 extern svalue_t *pull_error_context (svalue_t *sp);
 extern Bool destructed_object_ref (svalue_t *svp);

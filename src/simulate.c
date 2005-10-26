@@ -300,7 +300,7 @@ static void free_shadow_sent (shadow_t *p);
 
 /*-------------------------------------------------------------------------*/
 Bool
-catch_instruction ( bytecode_t catch_inst, uint offset
+catch_instruction ( int flags, uint offset
                   , volatile svalue_t ** volatile i_sp
                   , bytecode_p i_pc, svalue_t * i_fp
 #ifdef USE_NEW_INLINES
@@ -308,7 +308,7 @@ catch_instruction ( bytecode_t catch_inst, uint offset
 #endif /* USE_NEW_INLINES */
                   )
 
-/* Implement the F_CATCH/F_CATCH_NO_LOG instruction.
+/* Implement the F_CATCH instruction.
  *
  * At the time of call, all important locals from eval_instruction() are
  * have been stored in their global locations.
@@ -371,7 +371,7 @@ catch_instruction ( bytecode_t catch_inst, uint offset
     /* Save some globals on the error stack that must be restored
      * separately after a longjmp, then set the jump.
      */
-    if ( setjmp( push_error_context(INTER_SP, catch_inst)->text ) )
+    if ( setjmp( push_error_context(INTER_SP, flags)->text ) )
     {
         /* A throw() or error occured. We have to restore the
          * control and error stack manually here.
@@ -656,6 +656,9 @@ error (const char *fmt, ...)
     string_t *object_name;
     char     *ts;
     svalue_t *svp;
+    Bool      published_catch;
+      /* TRUE: this is a catch which wants runtime_error to be called
+       */
     Bool      do_save_error;
     string_t *file;                  /* program name */
     string_t *malloced_error;        /* copy of emsg_buf+1 */
@@ -715,14 +718,20 @@ error (const char *fmt, ...)
 
     emsg_buf[0] = '*';  /* all system errors get a * at the start */
 
+    published_catch = MY_FALSE;
+
     if (rt->type >= ERROR_RECOVERY_CATCH)
     {
         /* User catches this error */
 
+        struct error_recovery_info * eri = (struct error_recovery_info *)rt;
+
         put_c_string(&catch_value, emsg_buf);
           /* always reallocate */
 
-        if (rt->type != ERROR_RECOVERY_CATCH_NOLOG)
+        published_catch = (eri->flags & CATCH_FLAG_PUBLISH);
+
+        if (!(eri->flags & CATCH_FLAG_NOLOG))
         {
             /* Even though caught, dump the backtrace - it makes mudlib
              * debugging much easier.
@@ -731,7 +740,7 @@ error (const char *fmt, ...)
             printf("%s Caught error: %s", ts, emsg_buf + 1);
             if (current_error_trace)
                 free_array(current_error_trace);
-            dump_trace(MY_FALSE, &current_error_trace);
+            object_name = dump_trace(MY_FALSE, &current_error_trace);
             debug_message("%s ... execution continues.\n", ts);
             printf("%s ... execution continues.\n", ts);
         }
@@ -742,15 +751,20 @@ error (const char *fmt, ...)
              */
             if (current_error_trace)
                 free_array(current_error_trace);
-            (void)collect_trace(NULL, &current_error_trace);
+            object_name = collect_trace(NULL, &current_error_trace);
         }
 
-        unroll_context_stack();
-        longjmp(((struct error_recovery_info *)rt_context)->con.text, 1);
-        fatal("Catch() longjump failed");
+        if (!published_catch)
+        {
+            unroll_context_stack();
+            longjmp(((struct error_recovery_info *)rt_context)->con.text, 1);
+            fatal("Catch() longjump failed");
+        }
     }
 
-    /* Error not caught by the program */
+    /* Error not caught by the program, or catch() requests the
+     * runtime_error() is to be called.
+     */
 
     num_error++;
     if (num_error > 3)
@@ -798,15 +812,19 @@ error (const char *fmt, ...)
         }
     }
 
-    /* Dump the backtrace */
-    if (uncaught_error_trace)
-        free_array(uncaught_error_trace);
-    if (current_error_trace)
-        free_array(current_error_trace);
+    /* Dump the backtrace (unless already done) */
+    if (!published_catch)
+    {
+        if (uncaught_error_trace)
+            free_array(uncaught_error_trace);
+        if (current_error_trace)
+            free_array(current_error_trace);
 
-    object_name = dump_trace(num_error == 3, &current_error_trace);
-    uncaught_error_trace = ref_array(current_error_trace);
-    fflush(stdout);
+        object_name = dump_trace(num_error == 3, &current_error_trace);
+        if (!published_catch)
+            uncaught_error_trace = ref_array(current_error_trace);
+        fflush(stdout);
+    }
 
     if (rt->type == ERROR_RECOVERY_APPLY)
     {
@@ -842,15 +860,15 @@ error (const char *fmt, ...)
         longjmp(((struct error_recovery_info *)rt_context)->con.text, 1);
     }
 
-    /* Error is not caught at all.
-     *
-     * The stack must be brought in a usable state. After the
-     * call to reset_machine(), all arguments to error() are invalid,
-     * and may not be used any more. The reason is that some strings
-     * may have been on the stack machine stack, and have been deallocated.
+    /* If the error is not caught at all, the stack must be brought in a
+     * usable state. After the call to reset_machine(), all arguments to
+     * error() are invalid, and may not be used any more. The reason is that
+     * some strings may have been on the stack machine stack, and have been
+     * deallocated.
      */
 
-    reset_machine(MY_FALSE);
+    if (!published_catch)
+        reset_machine(MY_FALSE);
 
     if (do_save_error)
     {
@@ -890,8 +908,12 @@ error (const char *fmt, ...)
         object_t *culprit = NULL;
 
 
-        CLEAR_EVAL_COST;
-        RESET_LIMITS;
+        if (!published_catch)
+        {
+            CLEAR_EVAL_COST;
+            RESET_LIMITS;
+        }
+
         push_ref_string(inter_sp, malloced_error);
         a = 1;
         if (curobj)
@@ -967,7 +989,8 @@ error (const char *fmt, ...)
         }
 
         /* Handling errors is expensive! */
-        assigned_eval_cost = eval_cost += MASTER_RESERVED_COST;
+        if (!published_catch)
+            assigned_eval_cost = eval_cost += MASTER_RESERVED_COST;
     }
 
     /* Clean up */
@@ -994,6 +1017,14 @@ error (const char *fmt, ...)
     }
 
     /* Unroll the context stack and find the recovery context to jump to. */
+
+    if (published_catch)
+    {
+        unroll_context_stack();
+        longjmp(((struct error_recovery_info *)rt_context)->con.text, 1);
+        fatal("Catch() longjump failed");
+    }
+
     unroll_context_stack();
     if (rt_context->type != ERROR_RECOVERY_NONE)
         longjmp(((struct error_recovery_info *)rt_context)->con.text, 1);

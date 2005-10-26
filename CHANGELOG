@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+03-May-2002 (Lars Duening)  (3.3.452)
+  - (simulate, interpret, func_spec, prolang.y) Added the new modifier
+       'publish' to the catch() directive to have it call
+       master::runtime_error() when an error occurs (suggested by
+       Menaures).
+
 03-May-2002 (Lars Duening)  (3.3.451)
   - (comm.c) When a pthread was cancelled, the flushing of the pending
        data happened after the socket was already shut down. Reason was that

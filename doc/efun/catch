@@ -1,6 +1,6 @@
 SYNOPSIS
         mixed catch (expr, expr, ...)
-        mixed catch (expr, expr, ... ; nolog)
+        mixed catch (expr, expr, ... ; modifiers)
 
 DESCRIPTION
         Evaluate the expressions. If there is no error, 0 is returned.
@@ -15,8 +15,15 @@ DESCRIPTION
         __CATCH_EVAL_COST__ eval ticks are left, a runtime error will be
         thrown and the expressions will not be executed.
 
-        Normally, the caught error will be logged in the error logs for easier
-        debugging. If the keyword 'nolog' is given, this log is suppressed.
+        The default behaviour of catch() can be changed using modifiers:
+
+          'nolog':   Normally, the caught error will be logged in the
+                     error logs for easier debugging. With this
+                     modifier, the log is suppressed.
+
+          'publish': Normally, master::runtime_error() is not called
+                     for a caught error. This modifier instructs
+                     catch() to call it nevertheless.
 
         Catch is not really an efun, but a compiler directive.
 
@@ -28,7 +35,8 @@ EXAMPLE
 
 HISTORY
         LDMud 3.2.9 introduced the 'nolog' catch() as experimental feature.
-        LDMud 3.3 implemented it as official form.
+        LDMud 3.2.10 implemented 'nolog' as official form and added
+          'publish'.
 
 SEE ALSO
-        throw(E), raise_error(E), predefined(D)
+        throw(E), raise_error(E), predefined(D), runtime_error(M)

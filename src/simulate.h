@@ -64,20 +64,23 @@ struct rt_context_s
    * applies.
    */
 #define ERROR_RECOVERY_CATCH        3
-#define ERROR_RECOVERY_CATCH_NOLOG  4
-  /* Errors are caught in interpret.c by the catch()/catch_nolog() construct.
+  /* Errors are caught in interpret.c by the catch() construct.
    * This is in fact an extended error_recovery_info structure which
    * is allocated on the heap.
-   * _CATCH_NOLOG catches don't log the error in the logfiles and is meant
-   * for objects like wiztools.
+   *
+   * The CATCH context has a number of attributes, expressed by bitflags:
    */
+#define CATCH_FLAG_NOLOG   (0x01)  /* The traceback is not logged */
+#define CATCH_FLAG_PUBLISH (0x02)  /* master::runtime_error() is called
+                                    * despite the error being caught.
+                                    */
+
 
 #define ERROR_RECOVERY_CONTEXT(t) ((t) >= ERROR_RECOVERY_NONE)
   /* True, if rt_context_s.type 't' denotes a error recovery context.
    */
 
-#define ERROR_RECOVERY_CAUGHT(t) (  (t) == ERROR_RECOVERY_CATCH \
-                                 || (t) == ERROR_RECOVERY_CATCH_NOLOG )
+#define ERROR_RECOVERY_CAUGHT(t) ((t) == ERROR_RECOVERY_CATCH)
   /* True, if rt_context_s.type 't' denotes a catch recovery context.
    */
 
@@ -98,13 +101,14 @@ struct longjump_s { jmp_buf text; };
  * For ERROR_RECOVERY_CATCH contexts, the stack element is in fact a larger
  * structure containing the error_recovery_info as first member, with
  * additional members holding the information needed to perform a catch().
- * That structure and its handling routines are local to interpret.c.
+ * That structure and all handling routines are local to interpret.c .
  */
 
 struct error_recovery_info
 {
     rt_context_t      rt;
-    struct longjump_s con;             /* longjmp() information */
+    int               flags;  /* Flags for ERROR_RECOVERY_CATCH. */
+    struct longjump_s con;    /* longjmp() information */
 };
 
 
@@ -210,9 +214,9 @@ extern int master_will_be_updated;
 /* --- Prototypes --- */
 
 #ifndef USE_NEW_INLINES
-extern Bool catch_instruction (bytecode_t catch_inst, uint offset, volatile svalue_t ** volatile i_sp, bytecode_p i_pc, svalue_t * i_fp);
+extern Bool catch_instruction (int flags, uint offset, volatile svalue_t ** volatile i_sp, bytecode_p i_pc, svalue_t * i_fp);
 #else
-extern Bool catch_instruction (bytecode_t catch_inst, uint offset, volatile svalue_t ** volatile i_sp, bytecode_p i_pc, svalue_t * i_fp, svalue_t *i_context);
+extern Bool catch_instruction (int flags, uint offset, volatile svalue_t ** volatile i_sp, bytecode_p i_pc, svalue_t * i_fp, svalue_t *i_context);
 #endif /* USE_NEW_INLINES */
 extern void purge_shadow_sent(void);
 extern void check_shadow_sent (object_t *ob);

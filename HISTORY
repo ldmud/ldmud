@@ -69,7 +69,7 @@ For a detailed list of all changes see the file CHANGELOG.
            the base data.
        + foreach() can loop over an integer expression, implementing a counted
            loop.
-       + 'nosave' and catch(; nolog) are now official features.
+       + 'nosave' is now an official feature.
        + New indexing method '[>]' to index either from the beginning or
            the end, depending on the sign of the index value.
        + If a value of the wrong type is passed to switch(), the driver
@@ -124,7 +124,7 @@ For a detailed list of all changes see the file CHANGELOG.
            available (default is to allow sbrk()).
 
 
-13-Apr-2003 (Lars Duening) -- Release 3.2.10
+03-May-2003 (Lars Duening) -- Release 3.2.10
 
     - Changed efuns:
        + debug_info(): Removed the DID_MEM_UNUSED value from the DINFO_DATA:
@@ -170,6 +170,8 @@ For a detailed list of all changes see the file CHANGELOG.
            longer possible after set_this_object().
 
     - Language:
+       + catch(; nolog) is now an official feature.
+       + New modifier catch(; publish).
        + Constrained the switch() grammar so that only blocks are
            suitable as bodies.
        + Operator '&' can intersect mappings with other mappings and arrays.

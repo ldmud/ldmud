@@ -2998,6 +2998,8 @@ compile_value (svalue_t *value, int opt_flags)
 
                 /* ({#'catch, <body> })
                  * ({#'catch, <body>, 'nolog })
+                 * ({#'catch, <body>, 'publish })
+                 * ({#'catch, <body>, 'nolog, 'publish })
                  */
                 case F_CATCH:
                   {
@@ -3009,22 +3011,33 @@ compile_value (svalue_t *value, int opt_flags)
                      */
 
                     mp_int start, offset;
+                    int flags, i;
                     int void_given;
 
-                    if (block_size != 2 && block_size != 3)
+                    if (block_size != 2 && block_size != 4)
                         lambda_error("Wrong number of arguments to #'catch\n");
 
-                    if (current.code_left < 2)
+                    if (current.code_left < 3)
                         realloc_code();
-                    current.code_left -= 2;
+                    current.code_left -= 3;
 
-                    if (block_size == 2)
-                        STORE_CODE(current.codep, F_CATCH);
-                    else if (argp[2].type != T_SYMBOL
-                     || mstrcmp(argp[2].u.str, STR_NOLOG))
-                        lambda_error("Expected 'nolog as second argument.\n");
-                    else
-                        STORE_CODE(current.codep, F_CATCH_NO_LOG);
+                    STORE_CODE(current.codep, F_CATCH);
+
+                    flags = 0;
+                    for (i = 3; i <= block_size; i++)
+                    {
+                        if (argp[i-1].type == T_SYMBOL
+                         && mstreq(argp[i-1].u.str, STR_NOLOG))
+                            flags |= CATCH_FLAG_NOLOG;
+                        else if (argp[i-1].type == T_SYMBOL
+                         && mstreq(argp[i-1].u.str, STR_PUBLISH))
+                            flags |= CATCH_FLAG_PUBLISH;
+                        else
+                            lambda_error("Expected 'nolog or 'publish as "
+                                         "catch-modifier.\n");
+                    }
+
+                    STORE_UINT8(current.codep, flags);
 
                     STORE_UINT8(current.codep, 0);
                     start = current.code_max - current.code_left;
