@@ -3549,6 +3549,10 @@ public_rEALLOc(Void_t* oldmem, size_t bytes)
   }
 #endif
 
+#ifdef ENABLE_GC_SUPPORT
+  mutex_rwlock_rdlock(&gc_lock);
+#endif
+
   ar_ptr = arena_for_chunk(oldp);
 #if THREAD_STATS
   if(!mutex_trylock(&ar_ptr->mutex))
@@ -3571,6 +3575,9 @@ public_rEALLOc(Void_t* oldmem, size_t bytes)
   (void)mutex_unlock(&ar_ptr->mutex);
   assert(!newp || chunk_is_mmapped(mem2chunk(newp)) ||
 	 ar_ptr == arena_for_chunk(mem2chunk(newp)));
+#ifdef ENABLE_GC_SUPPORT
+  mutex_rwlock_unlock(&gc_lock);
+#endif
   return newp;
 }
 
@@ -3595,6 +3602,9 @@ public_mEMALIGn(size_t alignment, size_t bytes)
   arena_get(ar_ptr, bytes + alignment + MINSIZE);
   if(!ar_ptr)
     return 0;
+#ifdef ENABLE_GC_SUPPORT
+  mutex_rwlock_rdlock(&gc_lock);
+#endif
   p = _int_memalign(ar_ptr, alignment, bytes);
   (void)mutex_unlock(&ar_ptr->mutex);
   if(!p) {
@@ -3614,6 +3624,9 @@ public_mEMALIGn(size_t alignment, size_t bytes)
 #endif
     }
   }
+#ifdef ENABLE_GC_SUPPORT
+  mutex_rwlock_unlock(&gc_lock);
+#endif
   assert(!p || chunk_is_mmapped(mem2chunk(p)) ||
 	 ar_ptr == arena_for_chunk(mem2chunk(p)));
   return p;
@@ -3630,7 +3643,13 @@ public_vALLOc(size_t bytes)
   arena_get(ar_ptr, bytes + mp_.pagesize + MINSIZE);
   if(!ar_ptr)
     return 0;
+#ifdef ENABLE_GC_SUPPORT
+  mutex_rwlock_rdlock(&gc_lock);
+#endif
   p = _int_valloc(ar_ptr, bytes);
+#ifdef ENABLE_GC_SUPPORT
+  mutex_rwlock_unlock(&gc_lock);
+#endif
   (void)mutex_unlock(&ar_ptr->mutex);
   return p;
 }
@@ -3644,7 +3663,13 @@ public_pVALLOc(size_t bytes)
   if(__malloc_initialized < 0)
     ptmalloc_init ();
   arena_get(ar_ptr, bytes + 2*mp_.pagesize + MINSIZE);
+#ifdef ENABLE_GC_SUPPORT
+  mutex_rwlock_rdlock(&gc_lock);
+#endif
   p = _int_pvalloc(ar_ptr, bytes);
+#ifdef ENABLE_GC_SUPPORT
+  mutex_rwlock_unlock(&gc_lock);
+#endif
   (void)mutex_unlock(&ar_ptr->mutex);
   return p;
 }
@@ -3681,6 +3706,10 @@ public_cALLOc(size_t n, size_t elem_size)
   arena_get(av, sz);
   if(!av)
     return 0;
+
+#ifdef ENABLE_GC_SUPPORT
+  mutex_rwlock_rdlock(&gc_lock);
+#endif
 
   /* Check if we hand out the top chunk, in which case there may be no
      need to clear. */
@@ -3720,9 +3749,18 @@ public_cALLOc(size_t n, size_t elem_size)
       }
 #endif
     }
-    if (mem == 0) return 0;
+    if (mem == 0) {
+#ifdef ENABLE_GC_SUPPORT
+	mutex_rwlock_unlock(&gc_lock);
+#endif
+	return 0;
+    }
   }
   p = mem2chunk(mem);
+
+#ifdef ENABLE_GC_SUPPORT
+  mutex_rwlock_unlock(&gc_lock);
+#endif
 
   /* Two optional cases in which clearing not necessary */
 #if HAVE_MMAP
@@ -3781,7 +3819,13 @@ public_iCALLOc(size_t n, size_t elem_size, Void_t** chunks)
   if(!ar_ptr)
     return 0;
 
+#ifdef ENABLE_GC_SUPPORT
+  mutex_rwlock_rdlock(&gc_lock);
+#endif
   m = _int_icalloc(ar_ptr, n, elem_size, chunks);
+#ifdef ENABLE_GC_SUPPORT
+  mutex_rwlock_unlock(&gc_lock);
+#endif
   (void)mutex_unlock(&ar_ptr->mutex);
   return m;
 }
@@ -3796,7 +3840,13 @@ public_iCOMALLOc(size_t n, size_t sizes[], Void_t** chunks)
   if(!ar_ptr)
     return 0;
 
+#ifdef ENABLE_GC_SUPPORT
+  mutex_rwlock_rdlock(&gc_lock);
+#endif
   m = _int_icomalloc(ar_ptr, n, sizes, chunks);
+#ifdef ENABLE_GC_SUPPORT
+  mutex_rwlock_unlock(&gc_lock);
+#endif
   (void)mutex_unlock(&ar_ptr->mutex);
   return m;
 }
@@ -3816,9 +3866,15 @@ public_mTRIm(size_t s)
 {
   int result;
 
+#ifdef ENABLE_GC_SUPPORT
+  mutex_rwlock_rdlock(&gc_lock);
+#endif
   (void)mutex_lock(&main_arena.mutex);
   result = mTRIm(s);
   (void)mutex_unlock(&main_arena.mutex);
+#ifdef ENABLE_GC_SUPPORT
+  mutex_rwlock_unlock(&gc_lock);
+#endif
   return result;
 }
 

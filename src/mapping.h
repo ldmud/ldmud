@@ -26,6 +26,10 @@ struct mapping_s {
     p_int       num_entries;       /* Number of valid entries */
     struct mapping_cond_s * cond;  /* Condensed entries */
     struct mapping_hash_s * hash;  /* Hashed entries */
+    mapping_t  *next;
+      /* Next mapping - for use by the cleanup code and
+       * the garbage collector.
+       */
 };
 
 /* --- struct mapping_hash_s: the hashed index ---
@@ -55,9 +59,6 @@ struct mapping_hash_s {
        */
     p_int         cond_deleted;
       /* Number of entries deleted from the condensed part
-       */
-    mapping_t  *next_dirty;
-      /* Next dirty mapping - for use by the cleanup code
        */
     struct map_chain_s *deleted;
       /* Protector mappings only: list of deleted entries, which are kept

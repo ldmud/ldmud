@@ -2019,7 +2019,7 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
 #ifdef GC_SUPPORT
                     if (gc_status == gcCountRefs)
                     {
-                        /* Pretend that this memory block already existing
+                        /* Pretend that this memory block was already existing
                          * in the clear phase.
                          */
                         clear_memory_reference(m);

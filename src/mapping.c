@@ -102,6 +102,8 @@
  *
  *       mapping_cond_t * cond;
  *       mapping_hash_t * hash;
+ *
+ *       mapping_t      * next;
  *   }
  *
  *   .ref is the number of references, as usual.
@@ -114,9 +116,13 @@
  *   .cond and .hash are the condensed resp. hashed data blocks.
  *   .hash also serves as indicator if the mapping is 'dirty',
  *   and therefore contains all the information about the dirtyness.
- *   During the garbage collection, .hash is used for a temporary list
- *   of mappings with 'stale' keys (ie keys referencing destructed objects
- *   or lambdas).
+ *
+ *   The .next pointer is not used by the mapping module itself,
+ *   but is provided as courtesy for the cleanup code and the GC, to
+ *   avoid additional memory allocations during a low memory situation.
+ *   The cleanup code uses it to keep its list of dirty mappings; the
+ *   GC uses it to keep its list of stale mappings (ie. mappings with
+ *   keys referencing destructed objects).
  *
  * -- mapping_cond_t --
  *
@@ -147,7 +153,6 @@
  *       p_int        cond_deleted;
  *       p_int        ref;
  *       mp_int       last_used;
- *       mapping_t   *next_dirty;
  *       map_chain_t *deleted;
  *       map_chain_t *chains[ 1 +.mask ];
  *   }
@@ -183,10 +188,6 @@
  *   .last_used holds the time (seconds since the epoch) of the last addition
  *   or removal of an entry. It is used by the compaction algorithm to
  *   determine whether the mapping should be compacted or not.
- *
- *   The .next_dirty pointer is not used by the mapping module itself,
- *   but is provided as courtesy for the cleanup code in the GC, to
- *   avoid additional memory allocations during a low memory situation.
  *
  * -- map_chain_t --
  *
@@ -403,7 +404,6 @@ get_new_hash ( mapping_t *m, mp_int hash_size)
      * but it's here to catch bogies.
      */
     hm->deleted = NULL;
-    hm->next_dirty = NULL;
 
     /* Initialise the hashbuckets (there is at least one) */
     mcp = hm->chains;
@@ -495,6 +495,7 @@ get_new_mapping ( wiz_list_t * user, mp_int num_values
 
     m->cond = cm;
     m->hash = hm;
+    m->next = NULL;
     m->num_values = num_values;
     m->num_entries = 0;
     m->ref = 1;
@@ -2664,6 +2665,69 @@ count_mapping_size (mapping_t *m)
 } /* count_mapping_size(void) */
 
 /*-------------------------------------------------------------------------*/
+static void
+handle_destructed_key (svalue_t *key)
+
+/* GC support: <key> has been found to be a key referencing a destructed
+ * object. This function modifies it so that the GC wont choke.
+ */
+
+{
+    if (key->type == T_CLOSURE &&
+        key->x.closure_type == CLOSURE_BOUND_LAMBDA)
+    {
+        /* Avoid changing keys: collapse the bound/unbound combination
+         * into a single lambda closure bound to the destructed
+         * object. This way the GC will treat it correctly.
+         */
+        lambda_t *l = key->u.lambda;
+
+        key->x.closure_type = CLOSURE_LAMBDA;
+        key->u.lambda = l->function.lambda;
+        if (!l->ref)
+        {
+            /* This would have been the first reference to the
+             * lambda closure: add it to the stale list and mark
+             * it as 'stale'.
+             */
+            l->function.lambda->ob = l->ob;
+            l->ref = -1;
+            l->ob = (object_t *)stale_misc_closures;
+            stale_misc_closures = l;
+        }
+        else
+        {
+            /* Closure is already been marked as 'stale': no need
+             * to do anything about it, but but since l->ob is no
+             * longer a valid object, we need to use a known
+             * destructed object as stand-in for remaining lambda.
+             * TODO: Having a type CLOSURE_DESTRUCTED_LAMBDA
+             * TODO:: might be safer? After all,
+             * TODO:: gc_obj_list_destructed might be NULL.
+             */
+#ifdef DEBUG
+            if (gc_obj_list_destructed)
+                fatal("gc_obj_list_destructed is NULL\n");
+#endif
+            l->function.lambda->ob = gc_obj_list_destructed;
+        }
+    }
+    count_ref_in_vector(key, 1);
+    if (key->type == T_CLOSURE)
+    {
+        /* *key has been transformed by count_ref_in_vector()
+         * into an efun closure bound to the master.
+         */
+        key->u.ob->ref--;
+    }
+
+    /* Don't bother freeing the svalues - this is the GC after all,
+     * and freeing them might even confuse the memory allocator.
+     */
+    key->type = T_INVALID;
+} /* handle_destructed_key() */
+
+/*-------------------------------------------------------------------------*/
 void
 count_ref_in_mapping (mapping_t *m)
 
@@ -2696,86 +2760,59 @@ count_ref_in_mapping (mapping_t *m)
             /* This key is a destructed object, resp. is bound to a destructed
              * object. The entry has to be deleted.
              */
-
-            if (key->type == T_CLOSURE &&
-                key->x.closure_type == CLOSURE_BOUND_LAMBDA)
-            {
-                /* Avoid changing keys: collapse the bound/unbound combination
-                 * into a single lambda closure bound to the destructed
-                 * object. This way the GC will treat it correctly.
-                 */
-                lambda_t *l = key->u.lambda;
-
-                key->x.closure_type = CLOSURE_LAMBDA;
-                key->u.lambda = l->function.lambda;
-                if (!l->ref)
-                {
-                    /* This would have been the first reference to the
-                     * lambda closure: add it to the stale list and mark
-                     * it as 'stale'.
-                     */
-                    l->function.lambda->ob = l->ob;
-                    l->ref = -1;
-                    l->ob = (object_t *)stale_misc_closures;
-                    stale_misc_closures = l;
-                }
-                else
-                {
-                    /* Closure is already been marked as 'stale': no need
-                     * to do anything about it, but but since l->ob is no
-                     * longer a valid object, we need to use a known
-                     * destructed object as stand-in for remaining lambda.
-                     * TODO: Having a type CLOSURE_DESTRUCTED_LAMBDA
-                     * TODO:: might be safer? After all,
-                     * TODO:: gc_obj_list_destructed might be NULL.
-                     */
-#ifdef DEBUG
-                    if (gc_obj_list_destructed)
-                        fatal("gc_obj_list_destructed is NULL\n");
-#endif
-                    l->function.lambda->ob = gc_obj_list_destructed;
-                }
-            }
-            count_ref_in_vector(key, 1);
-            if (key->type == T_CLOSURE)
-            {
-                /* *key has been transformed by count_ref_in_vector()
-                 * into an efun closure bound to the master.
-                 */
-                key->u.ob->ref--;
-            }
-
-            /* Don't bother freeing the svalues - this is the GC after all,
-             * and freeing them might even confuse the memory allocator.
-             */
+            handle_destructed_key(key);
             m->num_entries--;
-            key->type = T_INVALID;
 
-            if (!any_destructed)
-            {
-                any_destructed = MY_TRUE;
-                /* Might be a small mapping. Don't malloc, it might get too
-                 * much due to the global scope of garbage_collection.
-                 * Since there was a previous
-                 * compact_mappings(num_dirty_mappings), the hash field is
-                 * known to be NULL.
-                 */
-                m->hash = (mapping_hash_t *)stale_mappings;
-                stale_mappings = m;
-                /* We are going to use free_svalue() later to get rid of the
-                 * data asscoiated with the keys. This data might reference
-                 * mappings with destructed keys... Thus, we must prevent
-                 * free_mapping() to look at the hash field.
-                 */
-                m->ref++;
-                /* Ref for the stale-mapping link. */
-            }
+            any_destructed = MY_TRUE;
         }
         else
         {
             count_ref_in_vector(key, 1);
             count_ref_in_vector(data, num_values);
         }
+    }
+
+    /* Count references by hashed keys and their data.
+     * Take special care of keys referencing destructed objects/lambdas.
+     */
+    size = m->hash ? m->hash->mask+1 : 0;
+    while ( --size >= 0)
+    {
+        map_chain_t * mc = m->hash->chains[size];
+
+        for ( ; mc != NULL; mc = mc->next)
+        {
+            if (destructed_object_ref(mc->data))
+            {
+                /* This key is a destructed object, resp. is bound to a
+                 * destructed object. The entry has to be deleted.
+                 */
+                handle_destructed_key(mc->data);
+
+                any_destructed = MY_TRUE;
+            }
+            else
+            {
+                count_ref_in_vector(mc->data, 1);
+                count_ref_in_vector(mc->data+1, num_values);
+            }
+        }
+    }
+
+    /* If any stale key was found, link the mapping into the 
+     * stale mapping list.
+     */
+    if (any_destructed)
+    {
+        m->next = stale_mappings;
+        stale_mappings = m;
+        /* We are going to use free_svalue() later to get rid of the
+         * data asscoiated with the keys. This data might reference
+         * mappings with destructed keys... Thus, we must prevent
+         * free_mapping() to look at the hash field.
+         */
+        m->ref++;
+        /* Ref for the stale-mapping link. */
     }
 } /* count_ref_in_mapping() */
 
@@ -2796,27 +2833,31 @@ clean_stale_mappings (void)
     for (m = stale_mappings; m; m = next)
     {
         mapping_cond_t *cm;
+        mapping_hash_t *hm;
         size_t size;
+        mp_int num_cond_entries;
         mp_int num_values;
         mp_int i;
 
         /* Unlink from the stale_mapping list */
-        next = (mapping_t *)m->hash;
-        m->hash = NULL;
+        next = m->next;
+        m->next = NULL;
 
         num_values = m->num_values;
         cm = m->cond;
+        hm = m->hash;
 
         /* Try to reallocate a new condensed block */
 
-        if (m->num_entries)
+        num_cond_entries = m->num_entries - (hm ? hm->used : 0);
+        if (num_cond_entries)
         {
             mapping_cond_t *cm2;
             size_t ix;
             svalue_t *src_key, *src_data;
             svalue_t *dest_key, *dest_data;
 
-            size = sizeof(*cm2) + sizeof(svalue_t) * (m->num_entries*(num_values+1) - 1);
+            size = sizeof(*cm2) + sizeof(svalue_t) * (num_cond_entries * (num_values+1) - 1);
             cm2 = xalloc(size);
             if (!cm2)
             {
@@ -2833,7 +2874,7 @@ clean_stale_mappings (void)
                 continue;
             }
 
-            cm2->size = m->num_entries;
+            cm2->size = num_cond_entries;
 
             /* Copy the data */
             for (   ix = 0
@@ -2861,7 +2902,7 @@ clean_stale_mappings (void)
         }
         else
         {
-            /* Mapping is empty - no condensed block needed. */
+            /* No condensed block needed. */
             m->cond = NULL;
         }
 
@@ -2872,6 +2913,49 @@ clean_stale_mappings (void)
             m->user->mapping_total -= SIZEOF_MC(cm, num_values);
             xfree(cm);
         }
+
+        /* Removed all invalid keys from the hash part, if any */
+        if (hm && hm->used)
+        {
+            size_t ix;
+
+            for (ix = 0; ix <= hm->mask; ix++)
+            {
+                map_chain_t * mc, * mcp;
+
+                for (mcp = NULL, mc = hm->chains[ix]; mc != NULL ; )
+                {
+                    if (mc->data[0].type == T_INVALID)
+                    {
+                        /* This key has been marked for deletion,
+                         * now remove it altogether.
+                         */
+                        map_chain_t * this = mc;
+
+                        if (mcp == NULL)
+                        {
+                            hm->chains[ix] = this->next;
+                        }
+                        else
+                        {
+                            mcp->next = this->next;
+                        }
+                        mc = this->next;
+
+                        m->num_entries--;
+                        hm->used--;
+                        m->user->mapping_total -= SIZEOF_MCH(this, num_values);
+                        xfree(this);
+                    }
+                    else
+                    {
+                        /* Valid key - just step forward */
+                        mcp = mc;
+                        mc = mc->next;
+                    }
+                } /* for(mc) */
+            } /* for(ix) */
+        } /* hash part */
 
         check_total_mapping_size();
         free_mapping(m); /* Undo the ref held by the stale-mapping list */

@@ -456,6 +456,7 @@ struct_new_prototype ( string_t *name )
         pSType->ref = 1;
         pSType->name = name;
         pSType->prog_name = NULL;
+        pSType->unique_name = NULL;
         pSType->hash = 0;
         pSType->prog_id = 0;
         pSType->num_members = 0;
@@ -1179,7 +1180,8 @@ remove_unreferenced_structs (void)
     for (num = 0; num < table_size; num++)
     {
         struct_type_t * this, * prev;
-        for (this = table[num]; this != NULL; )
+
+        for (prev = NULL, this = table[num]; this != NULL; )
         {
             if (!test_memory_reference(this))
             {

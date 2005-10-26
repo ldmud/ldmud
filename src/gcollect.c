@@ -187,8 +187,7 @@ struct cleanup_s
     Bool         mcompact;  /* TRUE: mappings are forcibly compacted */
     mapping_t  * mlist;
       /* List of mappings to compact. The list is linked through
-       * the map->hash->next_dirty field - which makes sense as
-       * mappings without hash field don't need compaction.
+       * the map->next field.
        * The references are counted to prevent premature freeing.
        */
 };
@@ -389,7 +388,7 @@ cleanup_vector (svalue_t *svp, size_t num, cleanup_t * context)
                  */
                 if (p->u.map->hash)
                 {
-                    p->u.map->hash->next_dirty = context->mlist;
+                    p->u.map->next = context->mlist;
                     context->mlist = ref_mapping(p->u.map);
                 }
             }
@@ -514,7 +513,7 @@ cleanup_compact_mappings (cleanup_t * context)
 
     for (m = context->mlist; m != NULL; m = context->mlist)
     {
-        context->mlist = m->hash->next_dirty;
+        context->mlist = m->next;
         compact_mapping(m, context->mcompact);
         free_mapping(m); /* Might deallocate it fully */
     }
@@ -1083,7 +1082,7 @@ clear_map_ref_filter (svalue_t *key, svalue_t *data, void *extra)
 {
     clear_ref_in_vector(key, 1);
     clear_ref_in_vector(data, (size_t)extra);
-}
+} /* clear_map_ref_filter() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -1132,7 +1131,9 @@ clear_ref_in_vector (svalue_t *svp, size_t num)
 
 #ifdef DEBUG
                 if (p->u.map->hash != NULL)
-                    fatal("Mapping %p still has a hash part.\n", p->u.map);
+                    dprintf1(gcollect_outfd
+                            , "Mapping %p still has a hash part.\n"
+                            , (p_int)p->u.map);
 #endif
                 m = p->u.map;
                 m->ref = 0;
@@ -1226,7 +1227,10 @@ gc_count_ref_in_vector (svalue_t *svp, size_t num
                 m = p->u.map;
                 if (m->cond)
                     passed_note_ref(m->cond);
-                /* hash mappings have been eleminated at the start */
+                if (m->hash)
+                {
+                    passed_note_ref(m->hash);
+                }
                 count_ref_in_mapping(m);
                 count_mapping_size(m);
             }
