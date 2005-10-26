@@ -51,12 +51,13 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 401)
-(Parent-Version lpmud 3-3 400)
-(Version-Log "Corrected a bug in the struct reference counting.")
+(Project-Version lpmud 3-3 402)
+(Parent-Version lpmud 3-3 401)
+(Version-Log "Made the strbuf routines resilient against out of memory routines.
+Instrumented rexalloc() with the MALLOC_TRACE information for debugging.")
 (New-Version-Log
 "")
-(Checkin-Time "Mon, 24 Feb 2003 23:03:40 -0700")
+(Checkin-Time "Mon, 24 Feb 2003 23:34:06 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -93,7 +94,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.59 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.464 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.465 644))
   (HISTORY (lpmud/f/49_HISTORY 1.302 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.19 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -279,17 +280,17 @@
   (src/sprintf.h (lpmud/f/15_sprintf.h 1.3.1.4 644))
   (src/sprintf.c (lpmud/28_sprintf.c 1.31.1.51 644))
   (src/strfuns.h (lpmud/b/51_strfuns.h 1.11.1.5 644))
-  (src/strfuns.c (lpmud/c/0_strfuns.c 1.9.1.12 644))
+  (src/strfuns.c (lpmud/c/0_strfuns.c 1.9.1.13 644))
   (src/svalue.h (lpmud/f/39_datatypes. 1.34.1.23.1.5 644))
   (src/swap.h (lpmud/f/14_swap.h 1.7.1.3 644))
-  (src/swap.c (lpmud/25_swap.c 1.36.1.46 644))
+  (src/swap.c (lpmud/25_swap.c 1.36.1.45 644))
   (src/switch.h (lpmud/24_switch.h 1.9 644))
   (src/telnet.h (lpmud/22_telnet.h 1.5.1.3 644))
   (src/typedefs.h (lpmud/d/50_typedefs.h 1.12.1.7 644))
   (src/wiz_list.h (lpmud/1_wiz_list.h 1.5.1.7.1.2 644))
   (src/wiz_list.c (lpmud/2_wiz_list.c 1.13.1.14.1.3 644))
-  (src/xalloc.h (lpmud/g/51_xalloc.h 1.18 644))
-  (src/xalloc.c (lpmud/h/0_xalloc.c 1.2.1.22 644))
+  (src/xalloc.h (lpmud/g/51_xalloc.h 1.20 644))
+  (src/xalloc.c (lpmud/h/0_xalloc.c 1.2.1.23 644))
   ;(src/xptmalloc.c (lpmud/d/b/1_xptmalloc. 1.6 644))
 
   ;; Build files

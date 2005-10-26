@@ -591,13 +591,29 @@ malloc_increment_size (void *vp, size_t size)
 
 /*-------------------------------------------------------------------------*/
 POINTER
-rexalloc (POINTER p, size_t size)
+rexalloc_traced (POINTER p, size_t size MTRACE_DECL
+#ifndef MEMORY_DEBUG
+                                                    UNUSED
+#endif /* MEMORY_DEBUG */
+                )
 
 /* Reallocate block <p> to the new size of <size> and return the pointer.
  * The memory is not aligned and subject to GC.
+#ifdef MALLOC_TRACE
+ * The trace arguments are admittedly unused in the function, but come
+ * in handy if the allocation code needs to be instrumented for debugging
+ * purposes.
+#endif
  */
 
 {
+#ifndef MEMORY_DEBUG
+#   ifdef __MWERKS__
+#       pragma unused(malloc_trace_file)
+#       pragma unused(malloc_trace_line)
+#   endif
+#endif /* MEMORY_DEBUG */
+
     word_t *block, *t;
 #ifndef NO_MEM_BLOCK_SIZE
     size_t old_size;
@@ -609,8 +625,8 @@ rexalloc (POINTER p, size_t size)
 #ifdef MEMORY_DEBUG
     mdb_size = size;
 #ifdef MALLOC_TRACE
-        mdb_file = __FILE__;
-        mdb_line = __LINE__;
+        mdb_file = malloc_trace_file;
+        mdb_line = malloc_trace_line;
 #endif
 #ifdef MALLOC_LPC_TRACE
         mdb_object = current_object;

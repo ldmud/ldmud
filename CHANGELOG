@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+24-Feb-2002 (Lars Duening)  (3.3.402)
+  - (strfuns.c) Made the strbuf allocations resilient against out-of-memory
+       conditions.
+  - (xalloc) rexalloc() now accepts the MALLOC_TRACE information. The
+       normal implementation doesn't use it, but they are useful when
+       instrumenting the allocator code.
+
 24-Feb-2002 (Lars Duening)  (3.3.401)
   - (interpret.c) With special reference indexing of struct members,
        the struct refcount was decremented once too often.

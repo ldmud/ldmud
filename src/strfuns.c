@@ -99,7 +99,7 @@ strbuf_grow (strbuf_t *buf, size_t len)
     /* Is this the first allocation? */
     if (!buf->buf)
     {
-        buf->buf = xalloc(new_len);
+        memsafe(buf->buf = xalloc(new_len), new_len, "new strbuf");
         buf->alloc_len = (u_long)new_len;
         buf->length = 0;
         *(buf->buf) = '\0';
@@ -108,20 +108,7 @@ strbuf_grow (strbuf_t *buf, size_t len)
 
     /* Extension of the existing buffer */
 
-    /* Using malloc_increment_size() here is tempting, but
-     * allocated much bigger blocks than needed (or svalue_strlen()
-     * is lying). TODO: With the new memory modules, this should work now.
-     * Here is the code for now:
-    char * new_buf;
-    new_buf = malloc_increment_size(buf->buf, new_len - buf->alloc_len);
-    if (new_buf)
-    {
-        buf->alloc_len = (u_long)new_len;
-        return len;
-    }
-     */
-
-    buf->buf = rexalloc(buf->buf, new_len);
+    memsafe(buf->buf = rexalloc(buf->buf, new_len), new_len, "larger strbuf");
     buf->alloc_len = (u_long)new_len;
     return len;
 } /* strbuf_grow() */
@@ -293,8 +280,14 @@ sort_string (const string_t * p_in, size_t len, long ** pos)
     out = xalloc(len+1);
     tmp = xalloc(len+1);
     if (!out || !tmp)
-        fatal("(sort_string) Out of memory (2 * %lu bytes) for temporaries.\n"
+    {
+        if (out)
+            xfree(out);
+        if (tmp)
+            xfree(tmp);
+        error("(sort_string) Out of memory (2 * %lu bytes) for temporaries.\n"
              , (unsigned long) len+1);
+    }
     out[len] = '\0';
     tmp[len] = '\0';
 
@@ -304,8 +297,18 @@ sort_string (const string_t * p_in, size_t len, long ** pos)
         tmppos = xalloc(len * sizeof(*outpos) + 1);
           /* +1 so that smalloc won't complain when given an empty string */
         if (!outpos || !tmppos)
-            fatal("(sort_string) Out of memory (2 * %lu bytes) for positions.\n"
+        {
+            if (out)
+                xfree(out);
+            if (tmp)
+                xfree(tmp);
+            if (outpos)
+                xfree(outpos);
+            if (tmppos)
+                xfree(tmppos);
+            error("(sort_string) Out of memory (2 * %lu bytes) for positions.\n"
                  , (unsigned long) len*sizeof(*outpos)+1);
+        }
     }
     else
     {
