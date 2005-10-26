@@ -47,6 +47,8 @@ DESCRIPTION
                            driver read the initial WIZLIST information.
                            It is undefined if the driver was configured
                            to not read the information.
+      __MAX_MALLOC__     : the internal upper limit for total memory
+                           usage.
       __INT_MAX__        : the largest integer number
       __INT_MIN__        : the smallest integer number
       __FLOAT_MAX__      : the largest (positive) float number
@@ -92,7 +94,7 @@ HISTORY
          __INT_MAX__, __INT_MIN__, __FLOAT_MIN__, __FLOAT_MAX__,
         __CATCH_EVAL_COST__, __MASTER_EVAL_COST__, __RESET_TIME__,
         __CLEANUP_TIME__, __DRIVER_LOG__, and __WIZLIST__.
-    3.2.10 added __MSDOS_FS__ and __FILENAME_SPACES__.
+    3.2.10 added __MAX_MALLOC__, __MSDOS_FS__ and __FILENAME_SPACES__.
     3.3 made __LPC_NOSAVE__ always defined and added __ALISTS__,
         __MCCP__, __LPC_STRUCTS__, __LPC_INLINE_CLOSURES__, __PGSQL__, and
         __PCRE__.

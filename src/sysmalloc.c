@@ -24,7 +24,10 @@
 
 /*-------------------------------------------------------------------------*/
 
+static char * heap_start = NULL;
 static char * heap_end = NULL;
+  /* The start and end of the heap, as we know it.
+   */
 
 /*-------------------------------------------------------------------------*/
 static inline POINTER
@@ -39,18 +42,13 @@ mem_alloc (size_t size)
 
     rc = malloc(size);
 
-    if (stack_direction > 0)
-    {
-        if (heap_end == NULL || heap_end < (char*)rc)
-            heap_end = rc;
-        assert_stack_gap();
-    }
-    else if (stack_direction < 0)
-    {
-        if (heap_end == NULL || heap_end > (char*)rc + size)
-            heap_end = rc;
-        assert_stack_gap();
-    }
+    if (heap_start == NULL || (char *)p < heap_start)
+        heap_start = p;
+    if (heap_end == NULL || (char *)p + size > heap_end)
+        heap_end = p + size;
+
+    assert_stack_gap();
+
     return rc;
 } /* mem_alloc() */
 

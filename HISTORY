@@ -124,7 +124,7 @@ For a detailed list of all changes see the file CHANGELOG.
            available (default is to allow sbrk()).
 
 
-03-May-2003 (Lars Duening) -- Release 3.2.10
+25-Jun-2003 (Lars Duening) -- Release 3.2.10
 
     - Changed efuns:
        + debug_info(): Removed the DID_MEM_UNUSED value from the DINFO_DATA:
@@ -175,10 +175,14 @@ For a detailed list of all changes see the file CHANGELOG.
        + Constrained the switch() grammar so that only blocks are
            suitable as bodies.
        + Operator '&' can intersect mappings with other mappings and arrays.
+       + Macro __MAX_MALLOC__ is defined to the internal upper limit for
+           total memory usage.
        + Macro __MSDOS_FS__ is defined on systems using the MS-DOS
            filesystem conventions.
        + Preprocessor symbol __FILENAME_SPACES__ is defined if the driver is
            instructed to allow spaces in filenames.
+       + Bugfix: Characters with the 8th bit set are now treated as positive
+           when entered as literal character constants.
        + Bugfix: Illegal case ranges like '100..50' now generate
            an error message.
 

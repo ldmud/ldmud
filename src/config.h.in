@@ -118,6 +118,7 @@
 /* This value gives the upper limit for the total allocated memory
  * (useful for systems with no functioning process limit).
  * A value of 0 means 'unlimited'.
+ * TODO: This should be named 'MAX_MALLOC' - ditto in configure.
  */
 #define MAX_MALLOCED         @val_max_malloced@
 

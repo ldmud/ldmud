@@ -777,6 +777,8 @@ init_lexer(void)
     sprintf(mtext, "%d", ERQ_MAX_REPLY);
     add_permanent_define("__ERQ_MAX_REPLY__", -1, string_copy(mtext), MY_FALSE);
 #endif
+    sprintf(mtext, "%ld", (long)MAX_MALLOCED);
+    add_permanent_define("__MAX_MALLOC__", -1, string_copy(mtext), MY_FALSE);
     sprintf(mtext, "%ld", (long)def_eval_cost);
     add_permanent_define("__MAX_EVAL_COST__", -1, string_copy(mtext), MY_FALSE);
     sprintf(mtext, "%ld", (long)CATCH_RESERVED_COST);
@@ -5207,8 +5209,11 @@ yylex1 (void)
                 return L_SYMBOL;
             }
 
-            /* It's a normal (or escaped) character constant. */
-            yylval.number = c;
+            /* It's a normal (or escaped) character constant.
+             * Make sure that characters with the MSB set appear
+             * as positive numbers.
+             */
+            yylval.number = (unsigned char)c;
             outp = yyp;
             return L_NUMBER;
 

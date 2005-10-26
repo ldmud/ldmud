@@ -2383,9 +2383,9 @@ add_number_to_lvalue (svalue_t *dest, int i, svalue_t *pre, svalue_t *post)
         break;
 
     case T_CHAR_LVALUE:
-        if (pre) put_number(pre, *dest->u.charp);
+        if (pre) put_number(pre, (unsigned char)*dest->u.charp);
         *(dest->u.charp) += i;
-        if (post) put_number(post, *dest->u.charp);
+        if (post) put_number(post, (unsigned char)*dest->u.charp);
         break;
 
     case T_PROTECTED_CHAR_LVALUE:
@@ -2396,8 +2396,8 @@ add_number_to_lvalue (svalue_t *dest, int i, svalue_t *pre, svalue_t *post)
         if (p->lvalue->type == T_STRING
          && get_txt(p->lvalue->u.str) == p->start)
         {
-            if (pre) put_number(pre, *(p->v.u.charp));
-            i = *(p->v.u.charp) += i;
+            if (pre) put_number(pre, (unsigned char)*(p->v.u.charp));
+            i = (unsigned char)(*(p->v.u.charp) += i);
             if (post) put_number(post, i);
         }
         break;
@@ -5221,7 +5221,8 @@ push_indexed_value (svalue_t *sp, bytecode_p pc)
       {
         int c;
 
-        c = *get_string_item(vec, i, /* make_singular: */ MY_FALSE
+        c = (unsigned char)
+            *get_string_item(vec, i, /* make_singular: */ MY_FALSE
                             , /* allow_one_past: */ MY_TRUE
                             , sp, pc);
 
@@ -5365,7 +5366,8 @@ push_rindexed_value (svalue_t *sp, bytecode_p pc)
       {
         int c;
 
-        c = *get_string_r_item(vec, i, /* make_singular: */ MY_FALSE
+        c = (unsigned char)
+            *get_string_r_item(vec, i, /* make_singular: */ MY_FALSE
                               , /* allow_one_past: */ MY_TRUE
                               , sp, pc);
 
@@ -5455,7 +5457,8 @@ push_aindexed_value (svalue_t *sp, bytecode_p pc)
       {
         int c;
 
-        c = *get_string_a_item(vec, i, /* make_singular: */ MY_FALSE
+        c = (unsigned char)
+            *get_string_a_item(vec, i, /* make_singular: */ MY_FALSE
                               , /* allow_one_past: */ MY_TRUE
                               , sp, pc);
 
@@ -9029,7 +9032,8 @@ again:
         }
         else if (svp->type == T_CHAR_LVALUE)
         {
-            put_number(sp,  (*svp->u.charp)++ );
+            put_number(sp,  (unsigned char)(*svp->u.charp) );
+            (*svp->u.charp)++;
             break;
         }
         else if (svp->type == T_LVALUE
@@ -9090,7 +9094,8 @@ again:
         }
         else if (svp->type == T_CHAR_LVALUE)
         {
-            put_number(sp,  (*svp->u.charp)-- );
+            put_number(sp, (unsigned char)(*svp->u.charp) );
+            (*svp->u.charp)--;
             break;
         }
         else if (svp->type == T_LVALUE
@@ -9149,7 +9154,8 @@ again:
         }
         else if (svp->type == T_CHAR_LVALUE)
         {
-            put_number(sp,  ++(*svp->u.charp) );
+            ++(*svp->u.charp);
+            put_number(sp,  (unsigned char)(*svp->u.charp) );
             break;
         }
         else if (svp->type == T_LVALUE
@@ -9208,7 +9214,8 @@ again:
         }
         else if (svp->type == T_CHAR_LVALUE)
         {
-            put_number(sp,  --(*svp->u.charp) );
+            --(*svp->u.charp);
+            put_number(sp,  (unsigned char)(*svp->u.charp) );
             break;
         }
         else if (svp->type == T_LVALUE
@@ -11152,7 +11159,7 @@ again:
         case T_CHAR_LVALUE:  /* Add to a character in a string */
             if (type2 == T_NUMBER)
             {
-                p_int left = *argp->u.charp;
+                p_int left = (unsigned char)*argp->u.charp;
                 p_int right = u2.number;
 
                 if ((left >= 0 && right >= 0 && PINT_MAX - left < right)
@@ -11171,7 +11178,7 @@ again:
                     sp -= 2;
                     goto again;
                 }
-                (--sp)->u.number = *argp->u.charp += u2.number;
+                (--sp)->u.number = (unsigned char)(*argp->u.charp += u2.number);
                 goto again;
             }
             else
@@ -11348,7 +11355,7 @@ again:
             }
 
             {
-                p_int left = *argp->u.charp;
+                p_int left = (unsigned char)*argp->u.charp;
                 p_int right = u2.number;
 
                 if ((left >= 0 && right < 0 && PINT_MAX + right < left)
@@ -11363,7 +11370,7 @@ again:
             }
 
             sp--;
-            sp->u.number = *argp->u.charp -= u2.number;
+            sp->u.number = (unsigned char)(*argp->u.charp -= u2.number);
             break;
 
         case T_STRING:   /* Subtract from a string */
@@ -11584,7 +11591,7 @@ again:
                 /* NOTREACHED */
             }
             {
-                p_int left = *argp->u.charp;
+                p_int left = (unsigned char)*argp->u.charp;
                 p_int right = sp->u.number;
 
                 if (left > 0 && right > 0)
@@ -11624,7 +11631,7 @@ again:
                     }
                 }
             }
-            sp->u.number = *argp->u.charp *= sp->u.number;
+            sp->u.number = (unsigned char)(*argp->u.charp *= sp->u.number);
             break;
         }
 
@@ -11829,7 +11836,7 @@ again:
             }
             if (sp->u.number == 0)
                 ERROR("Division by zero\n");
-            sp->u.number = *argp->u.charp /= sp->u.number;
+            sp->u.number = (unsigned char)(*argp->u.charp /= sp->u.number);
             break;
         }
 
@@ -11925,7 +11932,7 @@ again:
             }
             if (sp->u.number == 0)
                 ERROR("Division by zero\n");
-            sp->u.number = *argp->u.charp %= sp->u.number;
+            sp->u.number = (unsigned char)(*argp->u.charp %= sp->u.number);
             break;
         }
 
@@ -11979,7 +11986,7 @@ again:
                 OP_ARG_ERROR(2, TF_NUMBER, sp->type);
                 /* NOTREACHED */
             }
-            sp->u.number = *argp->u.charp &= sp->u.number;
+            sp->u.number = (unsigned char)(*argp->u.charp &= sp->u.number);
             break;
         }
 
@@ -12076,7 +12083,7 @@ again:
                 OP_ARG_ERROR(2, TF_NUMBER, sp->type);
                 /* NOTREACHED */
             }
-            sp->u.number = *argp->u.charp |= sp->u.number;
+            sp->u.number = (unsigned char)(*argp->u.charp |= sp->u.number);
             break;
         }
 
@@ -12153,7 +12160,7 @@ again:
                 OP_ARG_ERROR(2, TF_NUMBER, sp->type);
                 /* NOTREACHED */
             }
-            sp->u.number = *argp->u.charp ^= sp->u.number;
+            sp->u.number = (unsigned char)(*argp->u.charp ^= sp->u.number);
             break;
         }
 
@@ -12234,7 +12241,7 @@ again:
             }
             i = sp->u.number;
             *argp->u.charp <<= (uint)i > MAX_SHIFT ? MAX_SHIFT : i;
-            sp->u.number = *argp->u.charp;
+            sp->u.number = (unsigned char)(*argp->u.charp);
             break;
         }
 
@@ -12290,7 +12297,7 @@ again:
             }
             i = sp->u.number;
             *argp->u.charp >>= (uint)i > MAX_SHIFT ? MAX_SHIFT : i;
-            sp->u.number = *argp->u.charp;
+            sp->u.number = (unsigned char)(*argp->u.charp);
             break;
         }
 
@@ -12350,7 +12357,7 @@ again:
                 *argp->u.charp = 0;
             else
                 *argp->u.charp = (p_uint)*argp->u.charp >> i;
-            sp->u.number = *argp->u.charp;
+            sp->u.number = (unsigned char)*argp->u.charp;
             break;
         }
 

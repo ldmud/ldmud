@@ -1,7 +1,17 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-18-May-2002 (Lars Duening)
+25-Jun-2002 (Lars Duening)  (3.3.456)
+  - (xalloc.c) On HP-UX machines, the stack is above the heap and is also
+       growing upwards, which the heap/stack check didn't expect. I reworked
+       the code to be more generic (reported by Rainer).
+  - (lex.c, interpret.c) Characters with the 8th bit set are now uniformly
+       treated as positive by the lexer and indexing operations (reported by
+       Oskar).
+  - (lex.c) Added macro __MAX_MALLOC__ to reflect the MAX_MALLOCED
+       parameter (suggested by Coogan).
+
+18-May-2002 (Lars Duening)  (3.3.455)
   - (sprintf.c) Removed a memory leak in efun printf() (reported by Dafire).
 
 07-May-2002 (Lars Duening)  (3.3.454)

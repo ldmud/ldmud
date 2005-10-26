@@ -21,7 +21,7 @@
 ;;--------------------------------------------------------------------------
 ;;
 ;; TODO:  sockets (p-020912, p-021021, f-000814-1, f-981226-1, f-991104-0)
-;; TODO: Fast callouts
+;; TODO: Fast callouts (f-001116, f-010707)
 ;; TODO: Configurable heartbeat interval a la MudOS
 ;; TODO: Closure-Callbacks  (like in call_out()s) should throw an error
 ;; TODO:: when set up with an destructed current object (or no object for
@@ -34,6 +34,7 @@
 ;; TODO: Like Pike: replace() http://caudium.net/developer/pikeref/ex/replace.html
 ;; TODO::  See Zonk's "Wunschzettel"
 ;; TODO: Like Pike: reverse() http://caudium.net/developer/pikeref/ex/reverse.html
+;; TODO: Prototypes with unnamed arguments (current the arg names are required).
 ;; TODO: Put the manpage masters into doxygen format and use that to create the
 ;; TODO::  real manpages from it.
 ;; TODO: Like Pike: `operator()s as lfuns. http://caudium.net/developer/pikeref/
@@ -58,12 +59,14 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 455)
-(Parent-Version lpmud 3-3 454)
-(Version-Log "Removed a memory leak in efun printf().")
+(Project-Version lpmud 3-3 456)
+(Parent-Version lpmud 3-3 455)
+(Version-Log "Improved the stack/heap checking.
+Character constants with the 8th bit set are treated as positive numbers.
+Added macro __MAX_MALLOC__.")
 (New-Version-Log
 "")
-(Checkin-Time "Wed, 21 May 2003 23:36:23 -0600")
+(Checkin-Time "Wed, 25 Jun 2003 22:38:31 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -99,15 +102,15 @@
   ;; Information about the driver and the distribution in general
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.10 644))
-  (CREDITS (lpmud/d/22_CREDITS 1.70.1.65 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.518 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.322 644))
-  (INSTALL (lpmud/d/18_INSTALL 1.11.1.19 644))
+  (CREDITS (lpmud/d/22_CREDITS 1.70.1.66 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.519 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.323 644))
+  (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
   ;; Configuration
   (src/configure (lpmud/d/0_configure 1.19.1.81 755))
-  (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.32 644))
+  (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.33 644))
   (src/machine.h.in (lpmud/b/9_machine.h. 1.9.1.6 644))
   (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.19.1.16 644))
   (src/mkinstalldirs (lpmud/c/4_mkinstalld 1.1 644))
@@ -189,9 +192,9 @@
   (src/heartbeat.c (lpmud/m/42_heartbeat. 1.18.1.9 644))
   (src/i-svalue_cmp.h (lpmud/a/b/20_i-svalue_c 1.3 644))
   (src/interpret.h (lpmud/b/13_interpret. 1.33.1.37 644))
-  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.31 644))
+  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.32 644))
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.15.1.4 644))
-  (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.56 644))
+  (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.57 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.16 644))
   (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.43 644))
   (src/mapping.h (lpmud/f/30_mapping.h 1.12.1.20 644))
@@ -285,7 +288,7 @@
   (src/structs.h (lpmud/d/b/5_structs.h 1.4 644))
   (src/structs.c (lpmud/d/b/6_structs.c 1.13 644))
   (src/sysmalloc.h (lpmud/c/b/33_sysmalloc. 1.2 644))
-  (src/sysmalloc.c (lpmud/c/b/34_sysmalloc. 1.3 644))
+  (src/sysmalloc.c (lpmud/c/b/34_sysmalloc. 1.4 644))
   (src/sprintf.h (lpmud/f/15_sprintf.h 1.3.1.4 644))
   (src/sprintf.c (lpmud/28_sprintf.c 1.31.1.55 644))
   (src/strfuns.h (lpmud/b/51_strfuns.h 1.11.1.6 644))
@@ -298,7 +301,7 @@
   (src/wiz_list.h (lpmud/1_wiz_list.h 1.5.1.7.1.3 644))
   (src/wiz_list.c (lpmud/2_wiz_list.c 1.13.1.14.1.4 644))
   (src/xalloc.h (lpmud/g/51_xalloc.h 1.20 644))
-  (src/xalloc.c (lpmud/h/0_xalloc.c 1.2.1.31 644))
+  (src/xalloc.c (lpmud/h/0_xalloc.c 1.2.1.32 644))
   (src/xptmalloc.c (lpmud/d/b/10_xptmalloc. 1.1 644))
 
   ;; Build files
@@ -968,7 +971,7 @@
   (doc/driver/invocation (lpmud/f/38_invocation 1.14.1.15 644))
   (doc/driver/malloc (lpmud/n/45_malloc 1.3 644))
   (doc/driver/opcdump (lpmud/n/46_opcdump 1.3 644))
-  (doc/driver/predefined (lpmud/h/8_predefined 1.12.1.20 644))
+  (doc/driver/predefined (lpmud/h/8_predefined 1.12.1.21 644))
   (doc/driver/showsmallnewmalloced (lpmud/n/47_showsmalln 1.5 644))
   (doc/driver/status (lpmud/n/48_status 1.3 644))
 

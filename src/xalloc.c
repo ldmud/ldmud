@@ -110,6 +110,8 @@ int stack_direction = 0; /*  0: Unknown stack behaviour
                           * -1: Stack grows downward
                           */
 
+static char * initial_stack = NULL; /* The stack at the start of the program */
+
 static int in_malloc = 0;
   /* >0 when the core code in the allocator is executed.
    * This variable serves as primitive safeguard against re-entrant
@@ -1244,16 +1246,15 @@ get_stack_direction (void)
  */
 
 {
-    static char *addr = NULL;  /* address of first `local', once known */
-    char         local;        /* to get stack address */
+    char local;  /* to get stack address */
 
-    if (addr == NULL)  /* initial call */
+    if (initial_stack == NULL)  /* initial call */
     {
-        addr = &local;
+        initial_stack = &local;
         get_stack_direction ();  /* recurse once */
     }
-    else  /* second entry */
-    if (&local > addr)
+    else  /* recursive call */
+    if (&local > initial_stack)
         stack_direction = 1;    /* stack grew upward */
     else
         stack_direction = -1;   /* stack grew downward */
@@ -1269,7 +1270,9 @@ assert_stack_gap (void)
 
 {
     static enum { Initial, Normal, Error, Fatal } condition = Initial;
+    char * stack_start, * stack_end;
     ptrdiff_t gap;
+    char local; /* used to yield a stack address */
 
     /* Don't check the gap after a Fatal error or if the system is
      * not fully initialised yet.
@@ -1278,60 +1281,65 @@ assert_stack_gap (void)
         return;
 
     /* On the first call, test if checking the gap actually makes sense.
-     * Reason: Some systems like Cygwin put the stack below the heap.
-     * If checking is not necessary, the 'condition' will be set to Fatal.
-     * TODO: Does Cygwin's Heap grow downwards?
+     * If the stack-gap check is not necessary, the 'condition' will be set to
+     * Fatal, otherwise the check will be enabled by setting condition to
+     * 'Normal'.
      */
     if (condition == Initial)
     {
-        condition = Fatal; /* Prevent recursion */
-        if ((char *)heap_end > (char *)&gap)
-        {
-            printf("%s Heap/stack check disabled: heap %p > stack %p\n"
-                  , time_stamp(), heap_end, &gap);
-            debug_message("%s Heap/stack check disabled: heap %p > stack %p\n"
-                  , time_stamp(), heap_end, &gap);
-            /* Leave condition at 'Fatal' */
-            return;
-        }
-
-        /* Yup, we can check the gap */
+        /* Currently there are no limitations on checking the heap/stack gap.
+         */
         condition = Normal;
     }
 
-    /* First check if heap and stack overlap. We do this first to
-     * rule out negative 'gap' values which can be caused by overflows.
-     */
-    gap = 0;
+    /* Determine the stack limits */
     if (stack_direction < 0)
-        gap = (ptrdiff_t)((char *)heap_end >= (char *)&gap);
-    else
-        gap = (ptrdiff_t)((char *)&gap >= (char *)heap_end);
-    if (gap != 0)
     {
-        /* Stack and Heap overlap: irrecoverable failure */
+        stack_start = &local;
+        stack_end = initial_stack;
+    }
+    else
+    {
+        stack_start = initial_stack;
+        stack_end = &local;
+    }
+
+    /* Check if the heap and stack overlap */
+
+    if ((stack_end > (char *)heap_end && stack_start < (char *)heap_end)
+     || (stack_end > (char *)heap_start && stack_start < (char *)heap_start)
+       )
+    {
         if (condition != Fatal)
         {
             condition = Fatal;
-            if (stack_direction < 0)
-                gap = (char *)heap_end - (char *)&gap;
-            else
-                gap = (char *)&gap - (char *)heap_end;
-            fatal("Out of memory: Stack overlaps heap by %ld.\n"
-                 , (long)gap);
+            fatal("Out of memory: Stack (%p..%p) overlaps heap (%p..%p).\n"
+                 , stack_start, stack_end, heap_start, heap_end);
             /* NOTREACHED */
         }
-        return; /* Recursive call during fatal() handling */
+        return; /* else: Recursive call during fatal() handling */
     }
 
-    /* Heap and stack don't overlap - do the normal gap checking.
+    /* Check if the stack grows towards the heap. If it doesn't
+     * we don't have to worry about the gap.
+     */
+    if ((stack_direction > 0) ? (stack_start > (char *)heap_end)
+                              : (stack_end < (char *)heap_start)
+       )
+    {
+        /* No worries about the gap */
+        condition = Normal;
+        return;
+    }
+
+    /* Heap and stack may overlap - do the normal gap checking.
      * Note that on machines with big address spaces the computation
      * may overflow.
      */
     if (stack_direction < 0)
-        gap = (char *)&gap - (char *)heap_end;
+        gap = (char *)stack_start - (char *)heap_end;
     else
-        gap = (char *)heap_end - (char *)&gap;
+        gap = (char *)heap_start - stack_end;
 
     if (gap < 0)
         gap = HEAP_STACK_GAP + 1;
