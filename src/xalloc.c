@@ -839,9 +839,9 @@ print_block (int d, word_t *block)
 
 {
     word_t size;
+    int i;
 
 #ifdef MALLOC_TRACE
-    int i;
     char *file = (char *)block[XM_FILE];
     word_t line = block[XM_LINE];
 
