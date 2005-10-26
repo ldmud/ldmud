@@ -223,6 +223,9 @@
 #include "mstrings.h"
 #include "object.h"
 #include "simulate.h"
+#ifdef USE_STRUCTS
+#include "structs.h"
+#endif /* USE_STRUCTS */
 #include "svalue.h"
 #include "wiz_list.h"
 #include "xalloc.h"
@@ -260,10 +263,6 @@ struct map_chain_s {
 
 
 /*-------------------------------------------------------------------------*/
-
-mp_int num_dirty_mappings = 0;
-  /* Number of dirty mappings.
-   */
 
 mp_int num_mappings = 0;
   /* Number of allocated mappings.
@@ -484,11 +483,6 @@ get_new_mapping ( wiz_list_t * user, mp_int num_values
             xfree(m);
             return NULL;
         }
-
-        /* With this hash_mapping structure, the mapping counts
-         * as potentially dirty.
-         */
-        num_dirty_mappings++;
     }
 
     /* Initialise the mapping */
@@ -637,11 +631,6 @@ _free_mapping (mapping_t *m, Bool no_data)
         } while (--i);
 
         xfree(hm);
-
-        /* Since this mapping had a hash, it was counted as 'dirty'.
-         * Update the statistic.
-         */
-        num_dirty_mappings--;
     }
 
     /* Free the base structure.
@@ -973,7 +962,6 @@ _get_map_lvalue (mapping_t *m, svalue_t *map_index
             return NULL; /* Oops */
         }
         m->hash = hm;
-        num_dirty_mappings++;
 
         /* Now insert the map_chain structure into its chain */
         hm->chains[0] = mc;
@@ -1185,7 +1173,6 @@ check_map_for_destr (mapping_t *m)
                         return;
                     }
                     m->hash = hm;
-                    num_dirty_mappings++;
                 }
 
                 hm->cond_deleted++;
@@ -1322,7 +1309,6 @@ remove_mapping (mapping_t *m, svalue_t *map_index)
                     return;
                 }
                 m->hash = hm;
-                num_dirty_mappings++;
             }
 
             hm->last_used = current_time;
@@ -1554,9 +1540,6 @@ resize_mapping (mapping_t *m, mp_int new_width)
 
     /* --- Finalize the basis structure ---
      */
-
-    if ( NULL != m2->hash )
-        num_dirty_mappings++;
 
     m2->num_entries = m->num_entries;
 
@@ -2014,11 +1997,6 @@ compact_mapping (mapping_t *m, Bool force)
 
         return free_mapping(m);
     }
-
-    /* If it has a hash part, it has been counted as dirty.
-     * Update the statistic.
-     */
-    num_dirty_mappings--;
 
     /* Test if the mapping needs compaction at all.
      * If not, just delete the hash part (if any).
@@ -4302,6 +4280,13 @@ v_mkmapping (svalue_t *sp, int num_arg)
  * arr2...[1], etc. If the arrays are of unequal size, the mapping
  * will only contain as much elements as are in the smallest
  * array.
+ *
+#ifdef USE_STRUCTS
+ *   mapping mkmapping(struct st)
+ *
+ * Return a mapping with all values from struct <st>, indexed by
+ * the struct's member names.
+#endif
  */
 
 {
@@ -4309,50 +4294,94 @@ v_mkmapping (svalue_t *sp, int num_arg)
     mapping_t *m;
     svalue_t *key;
 
-    /* Check the arguments and set length to the size of
-     * the shortest array.
-     */
-    length = LONG_MAX;
-    for (i = -num_arg; ++i <= 0; )
+#ifdef USE_STRUCTS
+    if (sp[-num_arg+1].type == T_STRUCT)
     {
-        if ( sp[i].type != T_POINTER )
-            vefun_arg_error(i+num_arg, T_POINTER, sp[i].type, sp);
-        if (length > (long)VEC_SIZE(sp[i].u.vec))
-            length = (long)VEC_SIZE(sp[i].u.vec);
+        struct_t * st;
+        int i;
+
+        /* Check the arguments and determine the mapping length.
+         */
+        if (num_arg > 1)
+            error("Too many arguments to mkmapping(): expected struct\n");
+
+        st = sp->u.strct;
+        length = struct_size(st);
+
+        if (max_mapping_size && length * num_arg > max_mapping_size)
+            error("Illegal mapping size: %ld elements\n", length);
+
+        /* Allocate the mapping and assign the values */
+        m = allocate_mapping(length, 1);
+        if (!m)
+            error("Out of memory\n");
+
+        for (i = 0; i < length; i++)
+        {
+            svalue_t   key;
+            svalue_t * data;
+
+            put_string(&key, st->type->member[i].name);
+            data = get_map_lvalue_unchecked(m, &key);
+            assign_svalue(data, &st->member[i]);
+        }
+    }
+#endif
+
+    if (sp[-num_arg+1].type == T_POINTER)
+    {
+        /* Check the arguments and set length to the size of
+         * the shortest array.
+         */
+        length = LONG_MAX;
+        for (i = -num_arg; ++i <= 0; )
+        {
+            if ( sp[i].type != T_POINTER )
+                vefun_arg_error(i+num_arg, T_POINTER, sp[i].type, sp);
+            if (length > (long)VEC_SIZE(sp[i].u.vec))
+                length = (long)VEC_SIZE(sp[i].u.vec);
+        }
+
+        if (max_mapping_size && length * num_arg > max_mapping_size)
+            error("Illegal mapping size: %ld elements (%ld x %ld)\n"
+                 , length * num_arg, length, (long)num_arg);
+
+        /* Allocate the mapping */
+        num_values = num_arg - 1;
+        m = allocate_mapping(length, num_values);
+        if (!m)
+            error("Out of memory\n");
+
+        /* Shift key through the first array and assign the values
+         * from the others.
+         */
+        key = &(sp-num_values)->u.vec->item[length];
+        while (--length >= 0)
+        {
+            svalue_t *dest;
+
+            dest = get_map_lvalue_unchecked(m, --key);
+            if (!dest)
+            {
+                outofmemory("new mapping entry");
+                /* NOTREACHED */
+                return NULL;
+            }
+            for (i = -num_values; ++i <= 0; )
+            {
+                /* If a key value appears multiple times, we have to free
+                 * a previous assigned value to avoid a memory leak
+                 */
+                assign_svalue(dest++, &sp[i].u.vec->item[length]);
+            }
+        }
     }
 
-    if (max_mapping_size && length * num_arg > max_mapping_size)
-        error("Illegal mapping size: %ld elements (%ld x %ld)\n"
-             , length * num_arg, length, (long)num_arg);
-
-    /* Allocate the mapping */
-    num_values = num_arg - 1;
-    m = allocate_mapping(length, num_values);
-    if (!m)
-        error("Out of memory\n");
-
-    /* Shift key through the first array and assign the values
-     * from the others.
-     */
-    key = &(sp-num_values)->u.vec->item[length];
-    while (--length >= 0)
+    /* If m is NULL at this point, we got an illegal argument */
+    if (m == NULL)
     {
-        svalue_t *dest;
-
-        dest = get_map_lvalue_unchecked(m, --key);
-        if (!dest)
-        {
-            outofmemory("new mapping entry");
-            /* NOTREACHED */
-            return NULL;
-        }
-        for (i = -num_values; ++i <= 0; )
-        {
-            /* If a key value appears multiple times, we have to free
-             * a previous assigned value to avoid a memory leak
-             */
-            assign_svalue(dest++, &sp[i].u.vec->item[length]);
-        }
+        fatal("Illegal argument to mkmapping(): %s, expected array/struct.\n"
+             , typename(sp[-num_arg+1].type));
     }
 
     /* Clean up the stack and push the result */

@@ -499,12 +499,12 @@ static void *writer_thread(void *arg);
  *
  * struct in6_addr {
  *         union {
- *                 uint32_t u6_addr32[4];
+ *                 u_int32_t u6_addr32[4];
  * #ifdef notyet
- *                 uint64_t u6_addr64[2];
+ *                 u_int64_t u6_addr64[2];
  * #endif
- *                 uint16_t u6_addr16[8];
- *                 uint8_t  u6_addr8[16];
+ *                 u_int16_t u6_addr16[8];
+ *                 u_int8_t  u6_addr8[16];
  *         } u6_addr;
  * };
  * #define s6_addr32       u6_addr.u6_addr32
@@ -6411,7 +6411,7 @@ f_send_udp (svalue_t *sp)
 
         if (hp->h_addrtype == AF_INET)
         {
-            CREATE_IPV6_MAPPED(name.sin_addr, (uint32_t)hp->h_addr_list[0]);
+            CREATE_IPV6_MAPPED(name.sin_addr, (u_int32_t)hp->h_addr_list[0]);
         }
         name.sin_family = AF_INET6;
 #endif /* USE_IPV6 */

@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-17-Mar-2003 (Lars Duening) -- Development Release 3.3
+27-Mar-2003 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -22,6 +22,7 @@ For a detailed list of all changes see the file CHANGELOG.
            possible.
        + garbage_collection(): An optional flag argument allows to change
             the name of the default GC log file.
+       + mkmapping(): Convert structs to mappings, too.
        + process_string(): Spaces are now allowed in function arguments
            and no longer terminate the function specification.
        + regexp(), regexplode(): Optionally take RE interpretation options.

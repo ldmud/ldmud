@@ -7,12 +7,12 @@ DESCRIPTION
 
         It changes the result of this_object() in the using function,
         and the result of previous_object() in functions called in
-        other objects by call_other(). Its effect will remain till
-        there is a return of an external function call, or another
-        call of set_this_object(). While executing code in the master
-        object's program or the primary simul_efun object's program,
-        set_this_object() is granted even if this_object() is altered
-        by set_this_object(). This does not apply to functions
+        other objects by call_other()/apply()/funcall(). Its effect will
+        remain till there is a return of an external function call, or
+        another call of set_this_object(). While executing code in the
+        master object's program or the primary simul_efun object's
+        program, set_this_object() is granted even if this_object() is
+        altered by set_this_object(). This does not apply to functions
         inherited from other programs.
 
         Use it with extreme care to avoid inconsistencies.  After a
@@ -21,9 +21,9 @@ DESCRIPTION
         global variables or calling local functions (except by
         call_other) is illegal and actively prevented.
 
-        Allowed are call_other, map functions, access of local
-        variables (which might hold array pointers to a global array),
-        simple arithmetic and the assignment operators.
+        Allowed are call_other(), map functions, access of local variables
+        (which might hold array pointers to a global array), simple arithmetic
+        and the assignment operators.
 
 HISTORY
         LDMud 3.2.10 actively prevents references to global variables

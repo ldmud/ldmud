@@ -21,7 +21,7 @@
     } else {}
 
 
-/* void outofmem(const char * txt)
+/* void outofmemory(const char * txt)
  *   Throw an 'out of memory' error for an allocation of unknown size with the
  *   description <txt>.
  *

@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+27-Mar-2002 (Lars Duening)  (3.3.433)
+  - (simulate.c, mapping) Since there is no longer a list of dirty mappings,
+      and since the GC can handle dirty mappings, it is no longer feasible
+      to keep an accurate count.
+  - (efuns.c) to_struct() can now convert mappings to structs.
+  - (mapping.c) mkmapping() can now convert structs to mappings.
+
 26-Mar-2002 (Lars Duening)  (3.3.432)
   - (prolang.y) Constrained the switch() grammar to accept just blocks
       as body, not statements (reported by Menaures).

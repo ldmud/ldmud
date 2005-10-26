@@ -5218,18 +5218,80 @@ f_to_array (svalue_t *sp)
 
 #ifdef USE_STRUCTS
 /*-------------------------------------------------------------------------*/
+
+/* -- struct mtos_member_s --
+ *
+ * One entry from the mapping to be transported into the anonymous struct.
+ */
+
+struct mtos_member_s
+{
+    struct mtos_member_s * next;  /* The next entry */
+    string_t * name;              /* The name of the key/member (uncounted) */
+    svalue_t * data;              /* The (first) value */
+};
+
+/* -- struct mtos_data_s --
+ *
+ * Structure to collect the data during the mapping walk when converting
+ * a mapping into an anonymous structure.
+ */
+struct mtos_data_s
+{
+    Mempool                pool;   /* The pool holding the mtos_member_s */
+    struct mtos_member_s * first;  /* List of found members */
+    struct mtos_member_s * last;
+    int                    num;    /* Number of members */
+};
+
+static void
+map_to_struct_filter (svalue_t *key, svalue_t *data, void *extra)
+{
+    struct mtos_data_s * pData = (struct mtos_data_s *)extra;
+
+    if (key->type == T_STRING)
+    {
+        struct mtos_member_s * member;
+
+        member = mempool_alloc(pData->pool, sizeof(*member));
+        if (member != NULL)
+        {
+            member->name = key->u.str;
+            member->data = data;
+            member->next = NULL;
+
+            if (pData->first == NULL)
+            {
+                pData->first = member;
+                pData->last = member;
+            }
+            else
+            {
+                pData->last->next = member;
+                pData->last = member;
+            }
+
+            pData->num++;
+        }
+    }
+} /* map_to_struct_filter() */
+
 svalue_t *
 v_to_struct (svalue_t *sp, int num_arg)
 
 /* EFUN to_struct()
  *
- *   mixed to_struct(mixed *)
- *   mixed to_struct(mixed *, struct)
+ *   mixed to_struct(mixed *|mapping)
+ *   mixed to_struct(mixed *|mapping, struct)
  *   mixed to_struct(struct)
  *
- * An array is converted into a struct of the same length. The
- * returned struct is anonymous, or if a template struct is given, a
+ * An array is converted into a struct of the same length.
+ * A mapping is converted into a struct, using those keys with string
+ * values as member names.
+ *
+ * The returned struct is anonymous, or if a template struct is given, a
  * struct of the same type.
+ *
  * structs are returned unchanged.
  */
 
@@ -5242,6 +5304,7 @@ v_to_struct (svalue_t *sp, int num_arg)
     default:
         fatal("Bad arg 1 to to_struct(): type %s\n", typename(argp->type));
         break;
+
     case T_POINTER:
       {
         struct_t *st;
@@ -5265,12 +5328,164 @@ v_to_struct (svalue_t *sp, int num_arg)
         }
         else
             st = struct_new_anonymous(VEC_SIZE(argp->u.vec));
+
         for (left = VEC_SIZE(argp->u.vec); left-- > 0; )
             assign_svalue_no_free(st->member+left, argp->u.vec->item+left);
         free_array(argp->u.vec);
         put_struct(argp, st);
         break;
       }
+
+    case T_MAPPING:
+      {
+        struct_t  * st;
+        mapping_t * m;
+        int         num_values;
+
+        m = argp->u.map;
+        num_values = m->num_values;
+
+        if (num_arg > 1)
+        {
+            int i;
+
+            if (argp[1].type != T_STRUCT)
+                fatal("Bad arg 2 to to_struct(): type %s\n"
+                     , typename(argp[1].type));
+            if (VEC_SIZE(argp->u.vec) > struct_size(argp[1].u.strct))
+            {
+                error("Too many elements for struct %s: %ld, expected %ld\n"
+                     , get_txt(struct_name(argp[1].u.strct))
+                     , VEC_SIZE(argp->u.vec)
+                     , (long)struct_size(argp[1].u.strct)
+                    );
+                /* NOTREACHED */
+            }
+            st = struct_new(argp[1].u.strct->type);
+
+            /* Now loop over all members and assign the data */
+            for (i  = 0; i < struct_size(st); i++)
+            {
+                svalue_t   key;
+                svalue_t * data;
+
+                put_string(&key, st->type->member[i].name);
+                data = get_map_value(m, &key);
+
+                if (data != &const0)
+                {
+                    /* Copy the data */
+                    if (num_values == 0)
+                        put_number(&st->member[i], 1);
+                    else if (num_values == 1)
+                    {
+                        assign_svalue(&st->member[i], data);
+                    }
+                    else
+                    {
+                        vector_t * vec;
+                        svalue_t * dest;
+                        int        j;
+
+                        vec = allocate_uninit_array(num_values);
+                        if (vec == NULL)
+                        {
+                            struct_free(st);
+                            outofmemory("result data");
+                            /* NOTREACHED */
+                        }
+
+                        dest = vec->item;
+                        for (j = 0; j < num_values; j++)
+                        {
+                            assign_svalue_no_free(dest++, data++);
+                        }
+
+                        put_array(&st->member[i], vec);
+                    } /* if (num_values) */
+                } /* if (has data) */
+            } /* for (all members) */
+        }
+        else
+        {
+            struct mtos_data_s     data;
+            struct mtos_member_s * member;
+            int                    i;
+
+            /* Gather the data from the mapping */
+            data.pool = new_mempool(size_mempool(sizeof(struct mtos_member_s)));
+            if (data.pool == NULL)
+            {
+                outofmemory("memory pool");
+                /* NOTREACHED */
+            }
+            data.num = 0;
+            data.first = data.last = NULL;
+
+            walk_mapping(argp->u.map, map_to_struct_filter, &data);
+
+            /* Get the result struct */
+            st = struct_new_anonymous(data.num);
+            if (st == NULL)
+            {
+                mempool_delete(data.pool);
+                outofmemory("result");
+                /* NOTREACHED */
+            }
+
+            /* Copy the data into the result struct, and also update
+             * the member names.
+             */
+            for ( i = 0, member = data.first
+                ; member != NULL && i < data.num
+                ; i++, member = member->next
+                )
+            {
+                /* Update the member name */
+                free_mstring(st->type->member[i].name);
+                st->type->member[i].name = ref_mstring(member->name);
+
+                /* Copy the data */
+                if (num_values == 0)
+                    put_number(&st->member[i], 1);
+                else if (num_values == 1)
+                {
+                    assign_svalue(&st->member[i], member->data);
+                }
+                else
+                {
+                    vector_t * vec;
+                    svalue_t * src, * dest;
+                    int        j;
+
+                    vec = allocate_uninit_array(num_values);
+                    if (vec == NULL)
+                    {
+                        mempool_delete(data.pool);
+                        struct_free(st);
+                        outofmemory("result data");
+                        /* NOTREACHED */
+                    }
+                    dest = vec->item;
+                    src = member->data;
+                    for (j = 0; j < num_values; j++)
+                    {
+                        assign_svalue_no_free(dest++, src++);
+                    }
+
+                    put_array(&st->member[i], vec);
+                } /* if (num_values) */
+            } /* for (all data) */
+
+            /* Deallocate helper structures */
+            mempool_delete(data.pool);
+        }
+
+        free_mapping(argp->u.map);
+        put_struct(argp, st);
+        break;
+      }
+
     case T_STRUCT:
         /* Good as it is */
         break;

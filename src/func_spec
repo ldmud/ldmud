@@ -350,7 +350,7 @@ string  to_string(mixed);
 #ifdef USE_STRUCTS
 int     baseof(struct, struct);
 mixed  *to_array(string|mixed*|symbol|quoted_array|struct);
-mixed   to_struct(mixed*|struct, void|struct);
+mixed   to_struct(mapping|mixed*|struct, void|struct);
 mixed  *struct_info(struct, int);
 #else
 mixed  *to_array(string|mixed*|symbol|quoted_array);
@@ -442,7 +442,11 @@ mapping m_entry(mapping, mixed);
 mixed  *m_indices(mapping);
 mapping m_reallocate(mapping, int);
 mixed  *m_values(mapping, int default: F_CONST0);
+#ifdef USE_STRUCTS
+mapping mkmapping(mixed *|struct, ...);
+#else
 mapping mkmapping(mixed *, ...);
+#endif
 int     member(mixed *|string|mapping, mixed);
 int     rmember(mixed *|string, mixed);
 mixed  *unmkmapping(mapping);
