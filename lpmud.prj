@@ -61,13 +61,12 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 467)
-(Parent-Version lpmud 3-3 466)
-(Version-Log "Improved a pragma-related error message in the compiler.
-In charmode, CR and LF are treated as normal data characters.")
+(Project-Version lpmud 3-3 468)
+(Parent-Version lpmud 3-3 467)
+(Version-Log "Corrected a crasher in the small-block defragmentation and reduced its overhead.")
 (New-Version-Log
 "")
-(Checkin-Time "Mon, 28 Jul 2003 23:05:42 -0600")
+(Checkin-Time "Tue, 29 Jul 2003 16:27:34 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -105,7 +104,7 @@ In charmode, CR and LF are treated as normal data characters.")
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.10 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.67 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.530 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.531 644))
   (HISTORY (lpmud/f/49_HISTORY 1.329 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -286,7 +285,7 @@ In charmode, CR and LF are treated as normal data characters.")
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.32 644))
   (src/simulate.c (lpmud/31_simulate.c 1.88.1.111 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.14 644))
-  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.82 644))
+  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.83 644))
   (src/structs.h (lpmud/d/b/5_structs.h 1.4 644))
   (src/structs.c (lpmud/d/b/6_structs.c 1.13 644))
   (src/sysmalloc.h (lpmud/c/b/33_sysmalloc. 1.2 644))

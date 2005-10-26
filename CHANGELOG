@@ -1,7 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-26-Jul-2003 (Lars Duening)  (3.3.467)
+29-Jul-2003 (Lars Duening)  (3.3.468)
+  - (smalloc.c) The small-block defragmentation clobbered an important
+       flag in some blocks, causing the driver to crash (reported by Bardioc).
+  - (smalloc.c) Reduced the amount of freelist-linking done for
+       non-defragmentable blocks.
+
+28-Jul-2003 (Lars Duening)  (3.3.467)
   - (prolang.y) If a pragma requires a function return type, the error
        message now names the active pragma in question instead of always
        'strict_types' (Mantis #0000003)

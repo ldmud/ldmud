@@ -790,6 +790,7 @@ UNLINK_SMALL_FREE (word_t * block)
     }
     small_free[ix]--;
     count_back(small_free_stat, bsize * SINT);
+
 } /* UNLINK_SMALL_FREE() */
 
 /*-------------------------------------------------------------------------*/
@@ -873,18 +874,36 @@ defragment_small_lists (int req)
         word_t *list = NULL;
           /* Local list of the defragmented blocks, linked through [M_LINK].
            */
+        word_t *block;
+        word_t *pred;
+          /* <block> is the block currently analysed, <pred> the previously
+           * analyzed block or NULL for the list header.
+           */
 
-        /* One by one, remove the first block of the current freelist
-         * and try to defragment it. The resulting block is then stored
-         * in the local list.
+        /* Walk the current freelist and look for defragmentable blocks.
+         * If one is found, remove it from the freelist, defragment it
+         * and store the result in the local list.
+         * Since the check for defragmentation occurs in both directions,
+         * the defragmentation will never remove blocks from this freelist
+         * which have already been visited.
          */
-        while (sfltable[ix] != NULL && !found)
+        for (block = sfltable[ix], pred = NULL; block != NULL && !found; )
         {
             Bool merged;
-
-            word_t *block = sfltable[ix];
             word_t  bsize = block[M_SIZE] & M_MASK;
 
+            /* Can this block be defragmented? */
+            if ( !((block+bsize)[M_SIZE] & THIS_BLOCK)
+              && !(block[M_SIZE] & PREV_BLOCK)
+               )
+            {
+                /* No, step to the next block */
+                pred = block;
+                block = (word_t *)block[M_LINK];
+                continue;
+            }
+
+            /* Yes: remove it from the freelist */
             UNLINK_SMALL_FREE(block);
 
             /* Try to merge this free block with the following ones */
@@ -937,19 +956,27 @@ defragment_small_lists (int req)
                     found = MY_TRUE;
             } /* while() */
 
-            /* Update the block's size and move it into the local list */
-            block[M_SIZE] = bsize;
+            /* Update the block's size and move it into the local list.
+             * Be careful not to clobber the flags in the size field.
+             */
+            block[M_SIZE] = bsize | (block[M_SIZE] & ~M_MASK);
             block[M_LINK] = (word_t)list;
             list = block;
-        } /* while (sfltable[ix]) */
+
+            /* Step to the next block using the still-value <pred> */
+            if (pred)
+                block = (word_t *)pred[M_LINK];
+            else
+                block = sfltable[ix];
+        } /* for (blocks in freelist) */
 
         /* Move the defragmented blocks from list back into their freelist.
          */
         while (list != NULL)
         {
-            word_t * block = list;
+            block = list;
             list = (word_t *)(list[M_LINK]);
-            MAKE_SMALL_FREE(block, block[M_SIZE]);
+            MAKE_SMALL_FREE(block, block[M_SIZE] & M_MASK);
         }
     } /* for (ix = SMALL_BLOCK_NUM..0 && !found) */
 
