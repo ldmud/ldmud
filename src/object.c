@@ -1090,7 +1090,7 @@ retrieve_replace_program_entry (void)
             return r_ob;
     }
     return NULL;
-}
+} /* retrieve_replace_program_entry() */
 
 /*-------------------------------------------------------------------------*/
 static program_t *

@@ -69,7 +69,7 @@ CFLAGS= @EXTRA_CFLAGS@ $(OPTIMIZE) $(DEBUG) $(WARN) $(MPATH) $(PROFIL)
 #
 LIBS=@LIBS@ @PKGLIBS@
 #
-LDFLAGS=@LDFLAGS@ $(PROFIL)
+LDFLAGS=$(PROFIL) @LDFLAGS@
 #
 #Note that, if you use smalloc with SBRK_OK(which is the default), and
 #don't link statically, it could happen that the system malloc is linked

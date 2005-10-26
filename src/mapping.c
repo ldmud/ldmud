@@ -67,13 +67,20 @@
  *
  * To be compacted, a mapping has to conform to a number of conditions:
  *  - it has to be at least TIME_TO_COMPACT seconds (typical 10 minutes)
+ * either
+ *  - it has to be at least 2*TIME_TO_COMPACT seconds (typical 20 minutes)
  *    since the last addition or deletion of an entry
  *  and either
+ *
+ * or it has been at least TIME_TO_COMPACT seconds since the last change
+ * and either
  *  - the number of condensed-deleted entries is at least half the capacity
  *    of the condensed part
  *  or
+ * or
  *  - the number of hashed entries exceeds the number non-deleted condensed
  *    entries.
+ *
  * The idea is to minimize reallocations of the (potentially large) condensed
  * block, as it easily runs into fragmentation of the large block heap.
  *
@@ -1909,8 +1916,9 @@ compact_mapping (mapping_t *m, Bool force)
  *
  * If <force> is TRUE, always compact the mapping.
  * If <force> is FALSE, the mappings is compacted if
- *   - TIME_TO_COMPACT or more seconds have elapsed since .last_used time.
- *   - or if at least half of its condensed entries have been deleted.
+ *   - have a .last_used time of 2*TIME_TO_COMPACT or more seconds earlier,
+ *   - or have to have at least half of their condensed entries deleted
+ *     and have a .last_used time of TIME_TO_COMPACT or more seconds earlier.
  *
  * Return TRUE if the mapping has been freed altogether in the function
  * (ie. <m> is now invalid), or FALSE if it still exists.
@@ -1927,6 +1935,9 @@ compact_mapping (mapping_t *m, Bool force)
 {
     int old_malloc_privilege = malloc_privilege;
       /* Since it will be set temporarily to MALLOC_SYSTEM */
+
+    Bool checked_map_for_destr = MY_FALSE;
+      /* Flag if check_map_for_destr() has been called. */
 
     mapping_hash_t *hm;
       /* The hash part of m (guaranteed to exist!) */
@@ -1977,25 +1988,62 @@ compact_mapping (mapping_t *m, Bool force)
                * mappings referenced by a deleted value
                */
 
-    /* Make sure that we remove all destructed entries */
-    check_map_for_destr(m);
-
     hm = m->hash;
     cm = m->cond;
 
     if (hm && hm->ref) {
-        fatal("compact_mappings(): remaining protector ref count %ld!\n", hm->ref);
+        fatal("compact_mapping(): remaining protector ref count %ld!\n", hm->ref);
     }
 
     /* Test if the mapping is dirty at all.
      */
     if (!hm)
     {
-        LOG_SUB("compact_mappings: no hash part", 0);
+        check_map_for_destr(m); /* may create a hash part */
+        checked_map_for_destr = MY_TRUE;
+        hm = m->hash;
+        cm = m->cond;
+    }
+
+    if (!hm)
+    {
+        LOG_SUB("compact_mapping(): no hash part", 0);
         malloc_privilege = old_malloc_privilege;
         check_total_mapping_size();
 
         return free_mapping(m);
+    }
+
+    /* Test the compaction criterium.
+     * By testing it before check_map_for_destr(), the size related
+     * criterias might trigger later than desired, but the time criterium
+     * makes sure that we won't miss one.
+     */
+    if (!force
+     && !(   current_time - hm->last_used >= TIME_TO_COMPACT
+          && (   hm->cond_deleted * 2 >= m->num_entries - hm->used 
+              || hm->used >= m->num_entries - hm->used - hm->cond_deleted
+              || current_time - hm->last_used >= 2*TIME_TO_COMPACT
+             )
+         )
+       )
+    {
+        /* This mapping doesn't qualify for compaction.
+         */
+        m->ref--; /* undo the ref increment from above */
+        malloc_privilege = old_malloc_privilege;
+        return MY_FALSE;
+    }
+
+    /* Detect all destructed entries - the compaction algorithm
+     * relies on it.
+     */
+    if (!checked_map_for_destr)
+    {
+        check_map_for_destr(m);
+        checked_map_for_destr = MY_TRUE;
+        hm = m->hash;
+        cm = m->cond;
     }
 
     /* Test if the mapping needs compaction at all.
@@ -2003,7 +2051,7 @@ compact_mapping (mapping_t *m, Bool force)
      */
     if (!hm->used && !hm->cond_deleted)
     {
-        LOG_SUB("compact_mappings: no need to", SIZEOF_MH(hm));
+        LOG_SUB("compact_mapping(): no need to", SIZEOF_MH(hm));
         malloc_privilege = old_malloc_privilege;
         m->user->mapping_total -= SIZEOF_MH(hm);
         m->hash = NULL;
@@ -2017,22 +2065,6 @@ compact_mapping (mapping_t *m, Bool force)
          * deallocate it (since we NULLed out the .hash).
          */
         return free_mapping(m);
-    }
-
-    /* Test the compaction criterium */
-    if (!force
-     && !(   current_time - hm->last_used >= TIME_TO_COMPACT
-          && (   hm->cond_deleted * 2 >= m->num_entries - hm->used 
-              || hm->used >= m->num_entries - hm->used - hm->cond_deleted
-             )
-         )
-       )
-    {
-        /* This mapping doesn't qualify for compaction.
-         */
-        m->ref--; /* undo the ref increment from above */
-        malloc_privilege = old_malloc_privilege;
-        return MY_FALSE;
     }
 
     /* This mapping can be compacted, and there is something to compact. */
@@ -2326,7 +2358,7 @@ compact_mapping (mapping_t *m, Bool force)
 
     m->hash = NULL; /* Since we compacted it away */
 
-    LOG_SUB("compact_mappings - remove old hash", SIZEOF_MH(hm));
+    LOG_SUB("compact_mapping() - remove old hash", SIZEOF_MH(hm));
     malloc_privilege = old_malloc_privilege;
     m->user->mapping_total -= SIZEOF_MH(hm);
     check_total_mapping_size();

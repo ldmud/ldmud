@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+26-Jul-2003 (Lars Duening)  (3.3.466)
+  - (mapping.c) Taking a cue from 3.2.10-594, the number of times a mapping
+       is checked for destructed elements has been reduced. This was less of
+       a problem than in 3.2.10, but still occured far too often,
+  - (mapping.c) The mapping compaction criterium has been extended to
+       guarantee a compaction after 2 * TIME_TO_COMPACT seconds idle time.
+
 25-Jul-2003 (Lars Duening)  (3.3.465)
   - (mudlib/dhrystone.c) The time measurement was off by factor 10.
   - (smalloc.c) Implemented a lazy defragmentation scheme for the
