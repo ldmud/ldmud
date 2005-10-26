@@ -1,6 +1,14 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+08-Mar-2002 (Lars Duening)  (3.3.416)
+  - (swap.c, mapping) The swapper got out of sync when swapping mappings
+       with destructed objects as keys. So far it was not a problem because
+       mappings got compacted faster than they were swapped, and the swapper
+       already refused to swap mappings with objects/closures used as keys
+       in the condensed part. But with the new mapping compaction strategy
+       a more thorough test became necessary.
+
 07-Mar-2002 (Lars Duening)  (3.3.415)
   - (configure) New configuration option '--with-optimize' to select
        the optimization level in the generated Makefile: no, low,

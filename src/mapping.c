@@ -1065,6 +1065,68 @@ _get_map_lvalue (mapping_t *m, svalue_t *map_index
 } /* _get_map_lvalue() */
 
 /*-------------------------------------------------------------------------*/
+Bool
+mapping_references_objects (mapping_t *m)
+
+/* Check if the mapping <m> references objects (directly or through
+ * closures) as keys.
+ * Return TRUE if it does, FALSE if it doesn't.
+ *
+ * The swapper uses this function to determine whether or not to
+ * swap a mapping.
+ */
+
+{
+    int             num_values;
+    mapping_cond_t *cm;
+    mapping_hash_t *hm;
+
+    num_values = m->num_values;
+
+    /* Scan the condensed part for object references used as keys.
+     */
+
+    if (NULL != (cm = m->cond))
+    {
+        size_t ix;
+        svalue_t * entry;
+
+        for (ix = 0, entry = &(cm->data[0]); ix < cm->size; ++ix, ++entry)
+        {
+            if (T_OBJECT == entry->type || T_CLOSURE == entry->type)
+                return MY_TRUE;
+        } /* for (all keys) */
+
+    } /* if (m->cond) */
+
+    /* If it exists, scan the hash part for object references.
+     */
+
+    if ( NULL != (hm = m->hash) )
+    {
+        map_chain_t **mcp, *mc;
+        p_int i;
+
+        /* Walk all chains */
+
+        for (mcp = hm->chains, i = hm->mask + 1; --i >= 0;)
+        {
+            /* Walk this chain */
+
+            for (mc = *mcp++; NULL != mc; mc = mc->next)
+            {
+                svalue_t * entry = &(mc->data[0]);
+
+                if (T_OBJECT == entry->type || T_CLOSURE == entry->type)
+                    return MY_TRUE;
+            } /* walk this chain */
+        } /* walk all chains */
+    } /* if (hash part exists) */
+
+    return MY_FALSE;
+} /* mapping_references_objects() */
+
+/*-------------------------------------------------------------------------*/
 void
 check_map_for_destr (mapping_t *m)
 
