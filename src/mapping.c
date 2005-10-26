@@ -3314,13 +3314,16 @@ struct map_intersect_s
 
 
 static void
-map_intersect_filter (svalue_t *key, svalue_t *data, void *extra)
+map_intersect_filter (svalue_t *key, svalue_t *data UNUSED, void *extra)
 
 /* Auxiliary function to map_intersect():
  * If <key> is in <extra>->m, add the data to <extra>->rc.
  */
 
 {
+#ifdef __MWERKS__
+#    pragma unused(data)
+#endif
     mapping_t * m  = ((struct map_intersect_s *)extra)->m;
     mapping_t * rc = ((struct map_intersect_s *)extra)->rc;
 

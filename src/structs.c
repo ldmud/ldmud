@@ -438,6 +438,8 @@ struct_new (struct_type_t *pSType)
 } /* struct_new() */
 
 /*-------------------------------------------------------------------------*/
+/* DEBUG: */ void * xptype = NULL;
+
 struct_type_t *
 struct_new_prototype ( string_t *name )
 
@@ -451,6 +453,7 @@ struct_new_prototype ( string_t *name )
     struct_type_t * pSType;
 
     pSType = xalloc(STRUCT_TYPE_MEMSIZE);
+/* DEBUG: */ xptype = pSType;
     if (pSType != NULL)
     {
         pSType->ref = 1;
@@ -881,6 +884,7 @@ struct_free_type (struct_type_t *pSType)
     if (pSType->member)
         xfree(pSType->member);
 
+fprintf(stderr, "DEBUG: free type %p\n", pSType);
     xfree(pSType);
 } /* struct_free_type() */
 
@@ -1171,10 +1175,11 @@ void
 remove_unreferenced_structs (void)
 
 /* Free all structs in the table which are not marked as referenced.
+ * This function must be called before freeing all unreferenced strings!
  */
 
 {
-    size_t          num;
+    size_t num;
 
     if (!table || !table_size)
         return;
@@ -1193,6 +1198,8 @@ remove_unreferenced_structs (void)
             else
             {
                 struct_type_t * next = this->next;
+                int i;
+
                 if (prev)
                     prev->next = next;
                 else
@@ -1201,14 +1208,47 @@ remove_unreferenced_structs (void)
                 num_types--;
                 
                 /* Now we deallocate the memory for all the struct type
-                 * structure.  We do not deallocate referenced memory such as
-                 * the member names as it already may have been freed.
+                 * structure.  We rely on the strings (member names) still
+                 * being around - other referenced memory we ignore.
                  */
                 num_struct_type--;
                 size_struct_type -= STRUCT_TYPE_MEMBER_MEMSIZE(this->num_members);
 
+                dprintf2(gcollect_outfd, "struct type %x '%s' was left "
+                                         "unreferenced, freeing now.\n"
+                                       , (p_int) this
+                                       , (p_int) get_txt(this->name)
+                        );
+
+                /* Reference all strings and free them, to avoid unnecessary
+                 * 'string unreferenced' diagnostics.
+                 */
+                count_ref_from_string(this->name);
+                free_mstring(this->name);
+                if (this->prog_name)
+                {
+                    count_ref_from_string(this->prog_name);
+                    free_mstring(this->prog_name);
+                }
+                if (this->unique_name)
+                {
+                    count_ref_from_string(this->unique_name);
+                    free_mstring(this->unique_name);
+                }
+
+                for (i = struct_t_size(this); i-- > 0; )
+                {
+                    count_ref_from_string(this->member[i].name);
+                    free_mstring(this->member[i].name);
+                }
+
+                /* Reference the memory (to update its flags) and free it */
                 if (this->member)
+                {
+                    note_malloced_block_ref(this->member);
                     xfree(this->member);
+                }
+                note_malloced_block_ref(this);
                 xfree(this);
 
                 this = next;

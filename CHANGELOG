@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+04-Apr-2002 (Lars Duening)  (3.3.436)
+  - (structs.c) When remove_unreferenced_struct() freed the structs, it
+      forgot to properly mark the memory blocks as 'allocated', so that
+      the final sweep phase of the GC tried to free them again (reported
+      by Nostradamus).
+
 30-Mar-2002 (Lars Duening)  (3.3.435)
   - (comm.c) The driver now logs the pathname of the ERQ executable
       it attempts to start.
