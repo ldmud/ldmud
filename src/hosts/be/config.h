@@ -321,6 +321,10 @@
  */
 #define USE_PCRE
 
+/* Define this if you want MCCP (Mud Control Compression Protocol).
+ */
+#define USE_MCCP
+
 /* Define this if you want mySQL support (assuming that your host
  * actually offers this.
  */

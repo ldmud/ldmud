@@ -117,6 +117,7 @@ AC_MY_ARG_ENABLE(use-system-crypt,yes,,)
 AC_MY_ARG_ENABLE(udp-send,yes,,)
 AC_MY_ARG_ENABLE(use-ipv6,no,,[Enables support for IPv6])
 AC_MY_ARG_ENABLE(use-alists,no,,[Enables alist support])
+AC_MY_ARG_ENABLE(use-mccp,no,,[Enables MCCP support])
 AC_MY_ARG_ENABLE(use-mysql,no,,[Enables mySQL support])
 AC_MY_ARG_ENABLE(use-pgsql,no,,[Enables PostgreSQL support])
 AC_MY_ARG_ENABLE(use-pthreads,no,,[enable using of threads for socket writes])
@@ -283,6 +284,7 @@ AC_CDEF_FROM_ENABLE(filename_spaces)
 AC_CDEF_FROM_ENABLE(share_variables)
 AC_CDEF_FROM_ENABLE(use_system_crypt)
 AC_CDEF_FROM_ENABLE(use_alists)
+AC_CDEF_FROM_ENABLE(use_mccp)
 AC_CDEF_FROM_ENABLE(use_pcre)
 AC_CDEF_FROM_ENABLE(use_pthreads)
 AC_CDEF_FROM_ENABLE(use_ipv6)
@@ -580,6 +582,21 @@ int main(void)
 ))
 if test "$lp_cv_need_lib_resolv" = "yes"; then
     AC_CHECK_LIB(resolv,main, LIBS="$LIBS -lresolv")
+fi
+
+# --- Check if we need zlib libraries for mccp ---
+
+if test "x$enable_use_mccp" = "x" || test "x$enable_use_mccp" = "xyes"; then
+    tmp=""
+    AC_CHECK_LIB(z,main, tmp="$LIBS -lz")
+    if test "x$tmp" = "x"; then
+        echo "libz library not found - disabling MCCP support"
+        AC_NOT_AVAILABLE(use-mccp)
+        cdef_use_mccp="#undef"
+        enable_use_mccp="no"
+    else
+        LIBS="$tmp"
+    fi
 fi
 
 # --- Check if we need the crypto libraries ---
@@ -2055,6 +2072,7 @@ AC_SUBST(cdef_use_mysql)
 AC_SUBST(cdef_use_pgsql)
 AC_SUBST(cdef_use_pthreads)
 AC_SUBST(cdef_use_alists)
+AC_SUBST(cdef_use_mccp)
 AC_SUBST(cdef_use_pcre)
 AC_SUBST(cdef_use_deprecated)
 AC_SUBST(cdef_use_structs)

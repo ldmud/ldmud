@@ -1561,42 +1561,6 @@ options (void)
   fputs("            ERQ: disabled.\n", stdout);
 #endif
 
-#ifndef USE_IPV6
-  fputs("           IPv6: not supported.\n", stdout);
-#else
-  fputs("           IPv6: supported.\n", stdout);
-#endif
-
-#ifndef USE_MYSQL
-  fputs("          mySQL: not supported.\n", stdout);
-#else
-  fputs("          mySQL: supported.\n", stdout);
-#endif
-
-#ifndef USE_PGSQL
-  fputs("     PostgreSQL: not supported.\n", stdout);
-#else
-  fputs("     PostgreSQL: supported.\n", stdout);
-#endif
-
-#ifdef USE_PTHREADS
-  fputs("       PThreads: supported.\n", stdout);
-#else
-  fputs("       PThreads: not supported.\n", stdout);
-#endif
-
-#ifndef USE_PCRE
-  fputs("        regexps: traditional.\n", stdout);
-#else
-  printf("        regexps: PCRE %d.%d\n", PCRE_MAJOR, PCRE_MINOR);
-#endif
-
-#ifndef USE_ALISTS
-  fputs("         Alists: not supported.\n", stdout);
-#else
-  fputs("         Alists: supported.\n", stdout);
-#endif
-
 #ifndef INPUT_ESCAPE
   fputs("   Input Escape: '!'\n", stdout);
 #else
@@ -1671,6 +1635,46 @@ options (void)
             fputs(optstrings[i], stdout);
         }
     } /* print language options */
+
+    /* Print the package options, nicely indented. */
+    {
+        char * optstrings[] = { "" /* have at least one string in here */
+#ifdef USE_IPV6
+                              , "IPv6 supported\n"
+#endif
+#ifdef USE_MCCP
+                              , "MCCP supported\n"
+#endif
+#ifdef USE_MYSQL
+                              , "mySQL supported\n"
+#endif
+#ifdef USE_PGSQL
+                              , "PostgreSQL supported\n"
+#endif
+#ifdef USE_PTHREADS
+                              , "PThreads supported\n"
+#endif
+#ifdef USE_ALISTS
+                              , "Alists supported\n"
+#endif
+                              };
+        size_t nStrings = sizeof(optstrings) / sizeof(optstrings[0]);
+        size_t i;
+
+        for (i = 1; i < nStrings; i++)
+        {
+            if (1 == i)
+                fputs("       Packages: ", stdout);
+            else
+                fputs("                 ", stdout);
+            fputs(optstrings[i], stdout);
+        }
+    } /* print package options */
+#ifndef USE_PCRE
+  fputs("                 regexps: traditional.\n", stdout);
+#else
+  printf("                 regexps: PCRE %d.%d\n", PCRE_MAJOR, PCRE_MINOR);
+#endif
 
   printf(" Runtime limits: max read file size:     %7d\n"
          "                 max byte read/write:    %7d\n"

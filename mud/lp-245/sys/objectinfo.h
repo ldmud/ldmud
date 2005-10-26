@@ -75,7 +75,8 @@
 #define OIM_NO_CLONE            17
 #define OIM_NO_SHADOW           18
 #define OIM_NUM_INCLUDES        19
+#define OIM_SHARE_VARIABLES     20
 
-#define OIM_MAX 20  /* Number of OIM_ result elements */
+#define OIM_MAX 21  /* Number of OIM_ result elements */
 
 #endif /* LPC_OBJECTINFO_H_ */

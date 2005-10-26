@@ -3,7 +3,6 @@
 
 #ifndef __DRIVER_SOURCE__
 #include "lpctypes.h"
-#endif
 
 #define NAME_INHERITED      0x80000000 /* Defined by inheritance         */
 #define TYPE_MOD_STATIC     0x40000000 /* Static function or variable    */
@@ -16,10 +15,19 @@
 #define TYPE_MOD_XVARARGS   0x00800000  /* accepts optional arguments     */
 #define TYPE_MOD_NOSAVE     0x00400000  /* vars: can't be saved           */
 #define NAME_CROSS_DEFINED  0x00080000 /* function defined from other program */
+#if defined(__LPC_STRUCTS__) || defined(USE_STRUCTS)
+#define NAME_HIDDEN         0x00020000 /* Not visible for inheritance    */
+#define NAME_PROTOTYPE      0x00010000 /* Defined by a prototype only    */
+#define NAME_UNDEFINED      0x00008000 /* Not defined yet                */
+#define NAME_TYPES_LOST     0x00004000 /* inherited, no save_types       */
+#else /* !USE_STRUCTS */
 #define NAME_HIDDEN         0x00000800 /* Not visible for inheritance    */
 #define NAME_PROTOTYPE      0x00000400 /* Defined by a prototype only    */
 #define NAME_UNDEFINED      0x00000200 /* Not defined yet                */
 #define NAME_TYPES_LOST     0x00000100 /* inherited, no save_types       */
+#endif /* USE_STRUCTS */
+
+#endif /* !__DRIVER_SOURCE__ */
 
 /* Return value flag types for functionlist() */
 
@@ -28,6 +36,10 @@
 #define RETURN_FUNCTION_TYPE	0x04
 #define RETURN_FUNCTION_NUMARG	0x08
 #define RETURN_FUNCTION_ARGTYPE 0x10 /* not implemented */
+
+/* Masks of the flag unions allowed for various efuns: */
+#define RETURN_FUNCTION_MASK    0x0f  /* functionlist() */
+#define RETURN_VARIABLE_MASK    0x07  /* variablelist() */
 
 /* Return value flag types for function_exists() */
 

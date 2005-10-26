@@ -57,62 +57,71 @@
 #define DID_ST_HBEAT_AVG_PROC     22
 
 #define DID_ST_CALLOUTS           23
-#define DID_ST_CALLOUT_SLOTS      24
-#define DID_ST_CALLOUT_SIZE       25
+#define DID_ST_CALLOUT_SIZE       24
 
-#define DID_ST_ARRAYS             26
-#define DID_ST_ARRAYS_SIZE        27
+#define DID_ST_ARRAYS             25
+#define DID_ST_ARRAYS_SIZE        26
 
-#define DID_ST_MAPPINGS           28
-#define DID_ST_MAPPINGS_SIZE      29
+#define DID_ST_MAPPINGS           27
+#define DID_ST_MAPPINGS_SIZE      28
 
-#define DID_ST_PROGS              30
-#define DID_ST_PROGS_SIZE         31
+#define DID_ST_STRUCTS            29
+#define DID_ST_STRUCTS_SIZE       30
+#define DID_ST_STRUCT_TYPES       31
+#define DID_ST_STRUCT_TYPES_SIZE  32
 
-#define DID_ST_PROGS_SWAPPED      32
-#define DID_ST_PROGS_SWAP_SIZE    33
+#define DID_ST_PROGS              33
+#define DID_ST_PROGS_SIZE         34
 
-#define DID_ST_USER_RESERVE       34
-#define DID_ST_MASTER_RESERVE     35
-#define DID_ST_SYSTEM_RESERVE     36
+#define DID_ST_PROGS_SWAPPED      35
+#define DID_ST_PROGS_SWAP_SIZE    36
 
-#define DID_ST_ADD_MESSAGE        37
-#define DID_ST_PACKETS            38
-#define DID_ST_PACKET_SIZE        39
+#define DID_ST_USER_RESERVE       37
+#define DID_ST_MASTER_RESERVE     38
+#define DID_ST_SYSTEM_RESERVE     39
 
-#define DID_ST_APPLY              40
-#define DID_ST_APPLY_HITS         41
+#define DID_ST_ADD_MESSAGE        40
+#define DID_ST_PACKETS            41
+#define DID_ST_PACKET_SIZE        42
 
-#define DID_ST_STRINGS            42
-#define DID_ST_STRING_SIZE        43
-#define DID_ST_STR_TABLE_SIZE     44
-#define DID_ST_STR_OVERHEAD       45
-#define DID_ST_STR_IT_OVERHEAD    46
-#define DID_ST_UNTABLED           47
-#define DID_ST_UNTABLED_SIZE      48
-#define DID_ST_ITABLED            49
-#define DID_ST_ITABLED_SIZE       50
-#define DID_ST_TABLED             51
-#define DID_ST_TABLED_SIZE        52
-#define DID_ST_STR_SEARCHES       53
-#define DID_ST_STR_SEARCHLEN      54
-#define DID_ST_STR_SEARCHES_BYVALUE   55
-#define DID_ST_STR_SEARCHLEN_BYVALUE  56
-#define DID_ST_STR_CHAINS         57
-#define DID_ST_STR_ADDED          58
-#define DID_ST_STR_DELETED        59
-#define DID_ST_STR_COLLISIONS     60
-#define DID_ST_STR_FOUND          61
-#define DID_ST_STR_FOUND_BYVALUE  62
+#define DID_ST_APPLY              43
+#define DID_ST_APPLY_HITS         44
 
-#define DID_ST_RX_CACHED          63
-#define DID_ST_RX_TABLE           64
-#define DID_ST_RX_TABLE_SIZE      65
-#define DID_ST_RX_REQUESTS        66
-#define DID_ST_RX_REQ_FOUND       67
-#define DID_ST_RX_REQ_COLL        68
+#define DID_ST_STRINGS            45
+#define DID_ST_STRING_SIZE        46
+#define DID_ST_STR_TABLE_SIZE     47
+#define DID_ST_STR_OVERHEAD       48
+#define DID_ST_STR_IT_OVERHEAD    49
+#define DID_ST_UNTABLED           50
+#define DID_ST_UNTABLED_SIZE      51
+#define DID_ST_ITABLED            52
+#define DID_ST_ITABLED_SIZE       53
+#define DID_ST_TABLED             54
+#define DID_ST_TABLED_SIZE        55
+#define DID_ST_STR_SEARCHES       56
+#define DID_ST_STR_SEARCHLEN      57
+#define DID_ST_STR_SEARCHES_BYVALUE   58
+#define DID_ST_STR_SEARCHLEN_BYVALUE  59
+#define DID_ST_STR_CHAINS         60
+#define DID_ST_STR_ADDED          61
+#define DID_ST_STR_DELETED        62
+#define DID_ST_STR_COLLISIONS     63
+#define DID_ST_STR_FOUND          64
+#define DID_ST_STR_FOUND_BYVALUE  65
 
-#define DID_STATUS_MAX            69 /* Total number of entries */
+#define DID_ST_RX_CACHED          66
+#define DID_ST_RX_TABLE           67
+#define DID_ST_RX_TABLE_SIZE      68
+#define DID_ST_RX_REQUESTS        69
+#define DID_ST_RX_REQ_FOUND       70
+#define DID_ST_RX_REQ_COLL        71
+
+#define DID_ST_MB_FILE            72
+#define DID_ST_MB_SWAP            73
+
+#define DID_ST_BOOT_TIME          74
+
+#define DID_STATUS_MAX            75 /* Total number of entries */
 
 
 /* Indices into the array resulting from debug_info(DINFO_DATA, DID_SWAP)
@@ -146,32 +155,38 @@
 #define DID_MEM_SBRK_SIZE       2
 #define DID_MEM_LARGE           3
 #define DID_MEM_LARGE_SIZE      4
+#define DID_MEM_MMAP            (DID_MEM_LARGE)
+#define DID_MEM_MMAP_SIZE       (DID_MEM_LARGE_SIZE)
 #define DID_MEM_LFREE           5
+#define DID_MEM_FREE_CHUNKS     (DID_MEM_LFREE)
 #define DID_MEM_LFREE_SIZE      6
 #define DID_MEM_LWASTED         7
 #define DID_MEM_LWASTED_SIZE    8
+#define DID_MEM_KEEP_COST       (DID_MEM_LWASTED_SIZE)
 #define DID_MEM_CHUNK           9
 #define DID_MEM_CHUNK_SIZE     10
+#define DID_MEM_MAX_ALLOCATED   (DID_MEM_CHUNK_SIZE)
 #define DID_MEM_SMALL          11
 #define DID_MEM_SMALL_SIZE     12
 #define DID_MEM_SFREE          13
 #define DID_MEM_SFREE_SIZE     14
+#define DID_MEM_FFREE          (DID_MEM_SFREE)
+#define DID_MEM_FFREE_SIZE     (DID_MEM_SFREE_SIZE)
 #define DID_MEM_SWASTED        15
 #define DID_MEM_SWASTED_SIZE   16
-#define DID_MEM_UNUSED         17
-#define DID_MEM_MINC_CALLS     18
+#define DID_MEM_MINC_CALLS     17
 #define DID_MEM_MINC_SUCCESS   19
-#define DID_MEM_MINC_SIZE      20
-#define DID_MEM_PERM           21
-#define DID_MEM_PERM_SIZE      22
-#define DID_MEM_CLIB           23
-#define DID_MEM_CLIB_SIZE      24
-#define DID_MEM_OVERHEAD       25
-#define DID_MEM_ALLOCATED      26
-#define DID_MEM_USED           27
-#define DID_MEM_TOTAL_UNUSED   28
+#define DID_MEM_MINC_SIZE      19
+#define DID_MEM_PERM           20
+#define DID_MEM_PERM_SIZE      21
+#define DID_MEM_CLIB           22
+#define DID_MEM_CLIB_SIZE      23
+#define DID_MEM_OVERHEAD       24
+#define DID_MEM_ALLOCATED      25
+#define DID_MEM_USED           26
+#define DID_MEM_TOTAL_UNUSED   27
 
-#define DID_MEMORY_MAX         29
+#define DID_MEMORY_MAX         28
 
 
 /* Indices into the subarrays resulting from debug_info(DINFO_TRACE, 0)

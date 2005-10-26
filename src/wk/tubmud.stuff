@@ -4,36 +4,6 @@ erstmal umgeschrieben werden ... ansonsten buggt jeder look-Befehl.
 
 
 
-SYNOPSIS
-        varargs mixed apply_function(mixed func, mixed arg, ...);
-
-DESCRIPTION
-        apply_function() is a version of apply() which additionally to
-        closures can call lfuns in objects.
-
-        func can take the following forms:
-        - closure (then the behaviour is the same as of apply())
-        - a string (then this is interpreted as a function name in the
-          calling object and the function is called via call_other())
-        - array where the first element is an object or a file name of
-          an object, the second element is a function name and the
-          remaining elements (if any) are passed to the lfun as
-          arguments via call_other().
-
-        Any other form of func results in no call to any function and
-        func is returned as result.
-
-        If a function is called then all additional arguments given to
-        apply_function() are passed to this function. If the last argument
-        to apply_function() was an array then all its elements are passed
-        as arguments to the function.
-
-SEE ALSO
-        apply(E), call_other(E)
-
-==> Better implement the 'args...' expansion?
-
-
 #if 0 ==> Some look quite special to me
 
 SYNOPSIS

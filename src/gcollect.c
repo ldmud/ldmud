@@ -1988,7 +1988,13 @@ garbage_collection(void)
                 note_ref(pwb);
             /* .written_first has been cleaned upL */
         }
-#endif
+#endif /* USE_PTHREADS */
+#ifdef USE_MCCP
+        if (all_players[i]->out_compress != NULL)
+            note_ref(all_players[i]->out_compress);
+        if (all_players[i]->out_compress_buf != NULL)
+            note_ref(all_players[i]->out_compress_buf);
+#endif /* USE_MCCP */
 
         /* There are no destructed interactives, or interactives
          * referencing destructed objects.

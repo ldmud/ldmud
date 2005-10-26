@@ -792,6 +792,9 @@ init_lexer(void)
 #ifdef USE_IPV6
     add_permanent_define("__IPV6__", -1, string_copy("1"), MY_FALSE);
 #endif
+#ifdef USE_MCCP
+    add_permanent_define("__MCCP__", -1, string_copy("1"), MY_FALSE);
+#endif
 #ifdef USE_MYSQL
     add_permanent_define("__MYSQL__", -1, string_copy("1"), MY_FALSE);
 #endif

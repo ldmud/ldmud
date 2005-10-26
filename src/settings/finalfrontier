@@ -48,6 +48,8 @@ with_portno=7600
 with_udp_port=7610
 
 #----------- Compilation Options ----------
+enable_use_mccp=yes
+
 enable_malloc_trace=yes
 enable_malloc_lpc_trace=yes
 
@@ -71,6 +73,3 @@ with_max_players=200
 with_htable_size=0x10000
 with_otable_size=0x4000
 with_apply_cache_bits=14
-
-
-

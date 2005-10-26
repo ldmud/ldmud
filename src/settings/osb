@@ -27,6 +27,7 @@ enable_malloc_lpc_trace=yes
 
 enable_use_mysql=/usr/local/lib/mysql
 enable_use_pcre=yes
+enable_use_mccp=yes
 
 enable_erq=xerq
 

@@ -73,6 +73,7 @@ DESCRIPTION
       __IPV6__ :      support for IP v.6
       __MYSQL__ :     support for mySQL
       __PGSQL__ :     support for PostgreSQL
+      __MCCP__:       support for MCCP http://www.randomly.org/projects/MCCP
       __ALISTS__:     support for alists
       __PCRE__:       support for PCRE instead of traditional regexps.
       __DEPRECATED__: support for obsolete and deprecated efuns.
@@ -93,7 +94,8 @@ HISTORY
         __CLEANUP_TIME__, __DRIVER_LOG__, and __WIZLIST__.
     3.2.10 added __MSDOS_FS__ and __FILENAME_SPACES__.
     3.3 made __LPC_NOSAVE__ always defined and added __ALISTS__,
-        __LPC_STRUCTS__, __LPC_INLINE_CLOSURES__, __PGSQL__, and __PCRE__.
+        __MCCP__, __LPC_STRUCTS__, __LPC_INLINE_CLOSURES__, __PGSQL__, and
+        __PCRE__.
 
 SEE ALSO
     pragma(LPC), preprocessor(LPC)

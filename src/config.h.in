@@ -310,6 +310,10 @@
  */
 @cdef_use_system_crypt@ USE_SYSTEM_CRYPT
 
+/* Define this if you want MCCP (Mud Control Compression Protocol).
+ */
+@cdef_use_mccp@ USE_MCCP
+
 /* Define this if you want mySQL support (assuming that your host
  * actually offers this.
  */

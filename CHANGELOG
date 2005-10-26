@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+22-Apr-2002 (Lars Duening)  (3.3.447)
+  - (pkg-mccp, comm, gcollect.c, configure) Added MCCP support (thanks,
+       Dafire!) (p-011012, p-020810-1).
+
 21-Apr-2002 (Lars Duening)  (3.3.446)
   - (pkg-pgsql.c) Corrected a crasher during a GC.
   - (smalloc.c) Corrected the small-free-block statistics.

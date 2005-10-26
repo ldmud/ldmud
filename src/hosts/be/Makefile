@@ -103,8 +103,8 @@ endif
            interpret.c lex.c main.c mapping.c md5.c mempools.c mregex.c \
            mstrings.c \
            object.c otable.c parser.c parse.c \
-           pkg-alists.c pkg-mysql.c pkg-pcre.c pkg-pgsql.c ptmalloc.c port.c \
-           ptrtable.c random.c \
+           pkg-alists.c pkg-mccp.c pkg-mysql.c pkg-pcre.c pkg-pgsql.c \
+           ptmalloc.c port.c ptrtable.c random.c \
            regexp.c simulate.c simul_efun.c stdstrings.c \
            strfuns.c structs.c sprintf.c swap.c wiz_list.c xalloc.c
 
@@ -444,11 +444,11 @@ $(OBJ)/closure.o : i-svalue_cmp.h xalloc.h switch.h swap.h svalue.h \
 
 $(OBJ)/comm.o : util/erq/erq.h ../mudlib/sys/input_to.h \
     ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h swap.h svalue.h \
-    stdstrings.h simulate.h sent.h pkg-pgsql.h object.h mstrings.h main.h \
-    interpret.h gcollect.h filestat.h exec.h ed.h closure.h backend.h \
-    array.h actions.h access_check.h comm.h telnet.h my-alloca.h typedefs.h \
-    driver.h strfuns.h bytecode.h config.h port.h hosts/unix.h \
-    hosts/be/be.h machine.h
+    stdstrings.h simulate.h sent.h pkg-pgsql.h pkg-mccp.h object.h \
+    mstrings.h main.h interpret.h gcollect.h filestat.h exec.h ed.h \
+    closure.h backend.h array.h actions.h access_check.h comm.h \
+    ../mudlib/sys/telnet.h my-alloca.h typedefs.h driver.h strfuns.h \
+    bytecode.h config.h port.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/dumpstat.o : xalloc.h svalue.h structs.h stdstrings.h simulate.h \
     ptrtable.h object.h mstrings.h mapping.h instrs.h filestat.h exec.h \
@@ -576,6 +576,11 @@ $(OBJ)/pkg-alists.o : i-svalue_cmp.h xalloc.h svalue.h simulate.h \
     mstrings.h main.h interpret.h array.h my-alloca.h pkg-alists.h \
     typedefs.h driver.h closure.h strfuns.h sent.h bytecode.h port.h \
     config.h hosts/unix.h hosts/be/be.h machine.h
+
+$(OBJ)/pkg-mccp.o : ../mudlib/sys/telnet.h xalloc.h svalue.h object.h \
+    mstrings.h comm.h array.h pkg-mccp.h typedefs.h driver.h strfuns.h \
+    sent.h simulate.h port.h config.h bytecode.h hosts/unix.h hosts/be/be.h \
+    machine.h
 
 $(OBJ)/pkg-mysql.o : xalloc.h svalue.h simulate.h mstrings.h interpret.h \
     array.h pkg-mysql.h my-alloca.h typedefs.h driver.h strfuns.h sent.h \

@@ -643,9 +643,9 @@ string  getuid(object default: F_THIS_OBJECT);
 string  creator F_GETUID (object);
 
 
-        /* Packages */
+        /* --- Packages --- */
 
-#ifdef USE_ALISTS  /* Alists */
+#ifdef USE_ALISTS
 
 mixed   assoc(mixed, mixed *, mixed|void, mixed|void);
 mixed   insert_alist(mixed, mixed, ...);
@@ -655,7 +655,17 @@ mixed  *order_alist(mixed *, void|mixed *, ...);
 #endif /* USE_ALISTS */
 
 
-#ifdef USE_MYSQL  /* mySQL-Support */
+#ifdef USE_MCCP
+
+mixed   query_mccp(object default: F_THIS_PLAYER);
+int    *query_mccp_stats(object default: F_THIS_PLAYER);
+int     start_mccp_compress(int);
+int     end_mccp_compress();
+
+#endif /* USE_MCCP */
+
+
+#ifdef USE_MYSQL
 
 int     db_affected_rows(int);
 string *db_coldefs(int);
@@ -671,7 +681,7 @@ int     db_insert_id(int);
 #endif /* USE_MYSQL */
 
 
-#ifdef USE_PGSQL  /* PostgreSQL Support */
+#ifdef USE_PGSQL
 
 int      pg_connect(string, string|closure, ...);
 int      pg_pending(object default: F_THIS_OBJECT);

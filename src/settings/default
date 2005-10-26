@@ -364,6 +364,10 @@ enable_use_mysql=no
 
 enable_use_pgsql=no
 
+# Enable support for MCCP (Mud Control Compression Protocol).
+
+enable_use_mccp=no
+
 # Enable support for alists.
 
 enable_use_alists=no

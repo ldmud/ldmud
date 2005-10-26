@@ -5,7 +5,10 @@
 #include "typedefs.h"
 #include <sys/types.h>
 #ifdef USE_PTHREADS
-#include <pthread.h>
+#    include <pthread.h>
+#endif
+#ifdef USE_MCCP
+#    include <zlib.h>
 #endif
 
 #include "simulate.h"   /* callback_t for input_to_t */
@@ -91,6 +94,30 @@
 
 #define FMT_BINARY (FMT_STRING+1)
 
+/* --- Telnet Handling --- */
+
+#define SEND_TELNET_COMMAND(TEXT) {\
+        sending_telnet_command = MY_TRUE;\
+        TEXT\
+        sending_telnet_command = MY_FALSE;\
+}
+  /* Use this macro to safely send telnet commands with TEXT
+   */
+
+#ifdef DEBUG_TELNET
+
+#define DT(x) printf("%s TDEBUG: ", time_stamp()); printf x
+#define DTN(x) printf("%s TDEBUG: '%s' ", time_stamp(), get_txt(ip->ob->name)); printf x
+#define DTF(x) printf x
+
+#else
+
+#define DT(x)
+#define DTN(x)
+#define DTF(x)
+
+#endif
+
 /* --- Types --- */
 
 /* --- struct write_buffer_s: async write datastructure
@@ -106,6 +133,7 @@ struct write_buffer_s
 {
     struct write_buffer_s *next;
     size_t length;
+    Bool   compress; /* should the buffer get compressed by mccp? */
     int    errorno; /* After writing, the errno */
     char buffer[1 /* .length */ ];
 };
@@ -206,6 +234,12 @@ struct interactive_s {
 
     char message_buf[MAX_SOCKET_PACKET_SIZE];
       /* The send buffer. */
+
+#ifdef USE_MCCP
+     unsigned char   compressing;     
+     z_stream      * out_compress;    
+     unsigned char * out_compress_buf;
+#endif   
 
 #ifdef USE_PTHREADS
     /* The data exchange with the writer thread happens through two
@@ -311,6 +345,7 @@ struct interactive_s {
 
 /* --- Variables --- */
 
+extern Bool sending_telnet_command;
 extern interactive_t *all_players[MAX_PLAYERS];
 extern int num_player;
 extern char *message_flush;

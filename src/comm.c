@@ -88,7 +88,7 @@
 #include <sys/ioctl.h>
 
 #define TELOPTS
-#include "telnet.h"
+#include "../mudlib/sys/telnet.h"
 
 #ifdef HAVE_NETDB_H
 #    include <netdb.h>
@@ -126,6 +126,7 @@
 #include "main.h"
 #include "mstrings.h"
 #include "object.h"
+#include "pkg-mccp.h"
 #include "pkg-pgsql.h"
 #include "sent.h"
 #include "simulate.h"
@@ -369,31 +370,9 @@ static int min_nfds = 0;
 
 /* --- Telnet handling --- */
 
-#ifdef DEBUG_TELNET
-
-#define DT(x) printf("%s TDEBUG: ", time_stamp()); printf x
-#define DTN(x) printf("%s TDEBUG: '%s' ", time_stamp(), get_txt(ip->ob->name)); printf x
-#define DTF(x) printf x
-
-#else
-
-#define DT(x)
-#define DTN(x)
-#define DTF(x)
-
-#endif
-
-static Bool sending_telnet_command = MY_FALSE;
+Bool sending_telnet_command = MY_FALSE;
   /* Mutex queried in add_message() to hide telnet commands
    * from snoopers and shadows.
-   */
-
-#define SEND_TELNET_COMMAND(TEXT) {\
-        sending_telnet_command = MY_TRUE;\
-        TEXT\
-        sending_telnet_command = MY_FALSE;\
-}
-  /* Use this macro to safely send telnet commands with TEXT
    */
 
 static void (*telopts_do  [NTELOPTS])(int);
@@ -453,6 +432,8 @@ static object_t *first_player_for_flush = NULL;
 /*-------------------------------------------------------------------------*/
 
 /* Forward declarations */
+
+static void mccp_telnet_neg(int);
 
 static void free_input_to(input_to_t *);
 static void telnet_neg(interactive_t *);
@@ -1395,15 +1376,24 @@ comm_cleanup_interactives (void)
 #ifdef USE_PTHREADS
 
 static int
-thread_socket_write(SOCKET_T s UNUSED, char *msg, size_t size, interactive_t *ip)
+thread_socket_write( SOCKET_T s UNUSED, char *msg, size_t size
+                   , interactive_t *ip, Bool docompress
+#ifndef USE_MCCP
+                                                        UNUSED
+#endif /* USE_MCCP */
+                   )
 
 /* Stand in for socket_write(): take the data to be written and append
- * it to the buffer list of <ip>.
+ * it to the buffer list of <ip>. <docompress> denotes the MCCP compression
+ * setting.
  */
 
 {
 #ifdef __MWERKS__
 #    pragma unused(s)
+#    ifndef USE_MCCP
+#        pragma unused(docompress)
+#    endif /* USE_MCCP */
 #endif
 
     struct write_buffer_s *b;
@@ -1415,6 +1405,13 @@ thread_socket_write(SOCKET_T s UNUSED, char *msg, size_t size, interactive_t *ip
     xallocate(b, sizeof(struct write_buffer_s) + size - 1, "thread_socket_write()");
     b->length = size;
     b->next = NULL;
+#ifdef USE_MCCP
+    if (ip->out_compress)   
+        b->compress = docompress;
+    else
+#endif
+        b->compress = 0;
+
 
     memcpy(b->buffer, msg, size);
 
@@ -1566,11 +1563,66 @@ writer_thread (void *arg)
         if (buf)
         {
             /* write the stuff to socket */
+
+#ifdef USE_MCCP
+            int length;
+#endif /* USE_MCCP */
+
             buf->errorno = 0;
             if ((socket_write(ip->socket, buf->buffer, buf->length)) == -1)
             {
                 buf->errorno = errno;
             } /* if socket_write() == -1 */
+
+#ifdef USE_MCCP
+            if (buf->compress)
+            {
+                int status;
+                ip->out_compress->next_in = (unsigned char *) buf->buffer;
+                ip->out_compress->avail_in = buf->length;
+                ip->out_compress->avail_out = COMPRESS_BUF_SIZE -
+                  (ip->out_compress->next_out -
+                   ip->out_compress_buf);
+                
+                status = deflate(ip->out_compress, Z_SYNC_FLUSH);
+                
+                if (status != Z_OK)
+                    debug_message("%s MCCP compression error: %d\n"
+                                 , time_stamp(), status);
+                length = ip->out_compress->next_out - ip->out_compress_buf;
+            }
+            
+            if (buf->compress)
+            {
+                if ((socket_write(ip->socket, ip->out_compress_buf, length)) == -1)
+                { 
+                    buf->errorno = errno;
+                } /* if socket_write() == -1 */
+                
+                /* we update the compressed buffer here */
+                ip->out_compress->next_out = ip->out_compress_buf;
+            }
+            else
+            {
+                if ((socket_write(ip->socket, buf->buffer, buf->length)) == -1)
+                {
+                    buf->errorno = errno;
+                } /* if socket_write() == -1 */
+            }
+
+            if (buf->compress && !buf->compressing)
+            {
+                /* Compression has been turned off for this interactive,
+                 * now get rid of all residual data.
+                 */
+                end_compress(ip);
+            }
+#else
+            if ((socket_write(ip->socket, buf->buffer, buf->length)) == -1)
+            {
+                buf->errorno = errno;
+            } /* if socket_write() == -1 */
+#endif /* USE_MCCP */
 
             /* Don't xfree(buf) here as smalloc is not threadsafe! */
             pthread_mutex_lock(&ip->write_mutex);
@@ -1985,16 +2037,61 @@ if (sending_telnet_command)
 
         /* Write .message_buf[] to the network. */
 
-        for (retries = 6;;) {
+#if !defined(USE_PTHREADS) && defined(USE_MCCP)
+        if (ip->out_compress)
+        {
+            ip->out_compress->next_in = (unsigned char *) ip->message_buf;
+            ip->out_compress->avail_in = chunk;
+            
+            ip->out_compress->avail_out = COMPRESS_BUF_SIZE -
+              (ip->out_compress->next_out -
+               ip->out_compress_buf);
+            
+            {
+              int status = deflate(ip->out_compress, Z_SYNC_FLUSH);
+              
+              if (status != Z_OK)
+                return;
+            }
+            
+            /* ok.. perhaps i should take care that all data in message_buf
+             * is compressed, but i guess there is no chance that 1024 byte
+             * compressed won't fit into the 8192 byte buffer
+             */
+            
+            length = ip->out_compress->next_out - ip->out_compress_buf;
+        }
+#endif /* USE_MCCP && !USE_PTHREADS */
 
-#ifdef USE_PTHREADS
-            if ((n = (int)thread_socket_write(ip->socket, ip->message_buf, (size_t)chunk, ip)) != -1)
-#else
-            if ((n = (int)socket_write(ip->socket, ip->message_buf, (size_t)chunk)) != -1)
-#endif
+        /* now sending the buffer... */
+        
+        for (retries = 6;;)
+        {
+           
+#if defined(USE_PTHREADS)
+
+            if ((n = (int)thread_socket_write(ip->socket, ip->message_buf, (size_t)chunk, ip, MY_TRUE)) != -1)
             {
                 break;
             }
+
+#elif defined(USE_MCCP)
+            if (ip->out_compress) /* here we choose the correct buffer */             
+            {
+                if ((n = (int)socket_write(ip->socket, ip->out_compress_buf, (size_t)length)) != -1)
+                {
+                    break;
+                }
+            }
+            else 
+#endif
+            {
+                if ((n = (int)socket_write(ip->socket, ip->message_buf, (size_t)chunk)) != -1)
+                {
+                    break;
+                }
+            }
+
             switch (errno) {
               case EINTR:
                 if (--retries)
@@ -2054,9 +2151,22 @@ if (sending_telnet_command)
         inet_packets++;
         inet_volume += n;
 #endif
+
+#if defined(USE_MCCP) && !defined(USE_PTHREADS)
+        if (ip->out_compress)
+        {
+            /* we update the compressed buffer here */
+            ip->out_compress->next_out = ip->out_compress_buf + length - n;
+            if (n != length)
+                fprintf(stderr, "%s write socket (compressed): wrote %ld, "
+                                "should be %ld.\n"
+                        , time_stamp(), (long)n, (long)chunk);
+        }
+        else
+#endif
         if (n != chunk)
             fprintf(stderr, "%s write socket: wrote %ld, should be %ld.\n"
-                          , time_stamp(), (long)n, (long)chunk);
+                    , time_stamp(), (long)n, (long)chunk);
 
         /* Continue with the processing of source */
         dest = &ip->message_buf[0];
@@ -3076,7 +3186,7 @@ get_message (char *buff)
                     {
 #ifdef USE_PTHREADS
                         thread_socket_write(ip->socket, ip->text + ip->chars_ready
-                                    , (size_t)(length - ip->chars_ready), ip);
+                                    , (size_t)(length - ip->chars_ready), ip, MY_FALSE);
 #else
                         socket_write(ip->socket, ip->text + ip->chars_ready
                                     , (size_t)(length - ip->chars_ready));
@@ -3276,9 +3386,13 @@ remove_interactive (object_t *ob, Bool force)
          * condition, it will stop.
          */
         pthread_cancel(interactive->write_thread);
-+        pthread_cond_signal(&interactive->write_cond);
+        pthread_cond_signal(&interactive->write_cond);
           /* buffer list is returned by thread */
         interactive_cleanup(interactive);
+#endif
+#ifdef USE_MCCP
+        if (interactive->out_compress)
+            end_compress(interactive);
 #endif
         shutdown(interactive->socket, 2);
         socket_close(interactive->socket);
@@ -3306,6 +3420,12 @@ remove_interactive (object_t *ob, Bool force)
         free_object(interactive->modify_command, "remove_interactive");
     }
 
+#ifdef USE_MCCP
+    if (interactive->out_compress_buf)
+       xfree(interactive->out_compress_buf);
+    if (interactive->out_compress)
+       xfree(interactive->out_compress);
+#endif
 #ifdef USE_PTHREADS
     pthread_mutex_destroy(&interactive->write_mutex);
     pthread_cond_destroy(&interactive->write_cond);
@@ -3513,6 +3633,12 @@ new_player (SOCKET_T new_socket, struct sockaddr_in *addr, size_t addrlen
 
     /* Initialize the rest of the interactive structure */
 
+#ifdef USE_MCCP
+    new_interactive->compressing = 0;
+    new_interactive->out_compress = NULL;
+    new_interactive->out_compress_buf=NULL;
+#endif
+    
     new_interactive->input_to = NULL;
     put_number(&new_interactive->prompt, 0);
     new_interactive->modify_command = NULL;
@@ -4559,7 +4685,40 @@ reply_to_wont_sga (int option)
            * will do Bad Things(tm).
            */
     }
-}
+} /* reply_to_wont_sga() */
+
+/*-------------------------------------------------------------------------*/
+static void
+mccp_telnet_neg (int option)
+{
+    interactive_t *ip = O_GET_INTERACTIVE (command_giver);
+    
+     switch (ip->tn_state)
+     {
+     case TS_WILL:
+         DTF(("MCCP NEG (%d) STATE (WILL)\n", option));
+         break;
+     case TS_WONT:
+         DTF(("MCCP NEG (%d) STATE (WONT)\n", option));
+         break;
+     case TS_DO:
+         DTF(("MCCP NEG (%d) STATE (DO)\n", option));
+#ifdef USE_MCCP
+         if (!ip->compressing)
+             start_compress(ip, option);
+#endif
+         break;
+     case TS_DONT:
+         DTF(("MCCP NEG (%d) STATE (DONT)\n", option));
+#ifdef USE_MCCP
+         if (ip->compressing==option)
+             end_compress(ip);
+#endif
+        break;
+     default:
+         DTF(("MCCP NEG (%d) STATE (%d)\n", option, ip->tn_state));
+     }
+} /* mccp_telnet_neg() */
 
 /*-------------------------------------------------------------------------*/
 static svalue_t *
@@ -4748,15 +4907,15 @@ init_telopts (void)
 
     /* Mud specific protocols */
 
-    telopts_do[TELOPT_COMPRESS] = reply_h_telnet_neg;
-    telopts_dont[TELOPT_COMPRESS] = reply_h_telnet_neg;
-    telopts_will[TELOPT_COMPRESS] = reply_h_telnet_neg;
-    telopts_wont[TELOPT_COMPRESS] = reply_h_telnet_neg;
+    telopts_do[TELOPT_COMPRESS] = mccp_telnet_neg;
+    telopts_dont[TELOPT_COMPRESS] = mccp_telnet_neg;
+    telopts_will[TELOPT_COMPRESS] = mccp_telnet_neg;
+    telopts_wont[TELOPT_COMPRESS] = mccp_telnet_neg;
 
-    telopts_do[TELOPT_COMPRESS2] = reply_h_telnet_neg;
-    telopts_dont[TELOPT_COMPRESS2] = reply_h_telnet_neg;
-    telopts_will[TELOPT_COMPRESS2] = reply_h_telnet_neg;
-    telopts_wont[TELOPT_COMPRESS2] = reply_h_telnet_neg;
+    telopts_do[TELOPT_COMPRESS2] = mccp_telnet_neg;
+    telopts_dont[TELOPT_COMPRESS2] = mccp_telnet_neg;
+    telopts_will[TELOPT_COMPRESS2] = mccp_telnet_neg;
+    telopts_wont[TELOPT_COMPRESS2] = mccp_telnet_neg;
 
     telopts_do[TELOPT_MSP] = reply_h_telnet_neg;
     telopts_dont[TELOPT_MSP] = reply_h_telnet_neg;
@@ -4964,11 +5123,11 @@ telnet_neg (interactive_t *ip)
                     if (to > &ip->text[ip->chars_ready])
                     {
                         thread_socket_write(ip->socket, &ip->text[ip->chars_ready],
-                          (size_t)(to - &ip->text[ip->chars_ready]), ip);
+                          (size_t)(to - &ip->text[ip->chars_ready]), ip, MY_FALSE);
                         ip->chars_ready = to - ip->text;
                     }
                     if (to > first) {
-                        thread_socket_write(ip->socket, "\b \b", 3, ip);
+                        thread_socket_write(ip->socket, "\b \b", 3, ip, MY_FALSE);
                         to--;
                         ip->chars_ready--;
                     }
@@ -6539,6 +6698,11 @@ f_binary_message (svalue_t *sp)
  * codes for colours and other things needs to bypass the allowed
  * charset filters, but isn't important enough to waste bandwith
  * on a synchronous transmission.
+ *
+#ifdef USE_MCCP
+ * If the client uses MCCP compression add_message ist always used
+ * with flushing buffer _after_ the Message.
+#endif
  */
 
 {
@@ -6586,7 +6750,11 @@ f_binary_message (svalue_t *sp)
         save_command_giver = command_giver;
         command_giver = current_object;
 
+#ifdef USE_MCCP
+        if ((sp->u.number & 1)||ip->out_compress)
+#else
         if (sp->u.number & 1)
+#endif
         {
             /* Write before flush... */
 
@@ -6596,8 +6764,13 @@ f_binary_message (svalue_t *sp)
 
             sending_telnet_command = MY_FALSE;
 
+#ifdef USE_MCCP
+            if ((sp->u.number & 2)||ip->out_compress)
+                add_message(message_flush);
+#else
             if (sp->u.number & 2)
                 add_message(message_flush);
+#endif /* USE_MCCP */
             wrote = mstrsize(msg);
         }
         else
@@ -6612,7 +6785,7 @@ f_binary_message (svalue_t *sp)
             for (i = 6; i > 0; i--) {
 #ifdef USE_PTHREADS
                 wrote = (mp_int)thread_socket_write(ip->socket, get_txt(msg)
-                                                   , mstrsize(msg), ip);
+                                                   , mstrsize(msg), ip, MY_TRUE);
 #else
                 wrote = (mp_int)socket_write(ip->socket, get_txt(msg), mstrsize(msg));
 #endif
