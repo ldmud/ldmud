@@ -15,6 +15,9 @@
  * --- Efuns and Operators ---
  *
  * intersect_strings(): Implements '&' and '-' on strings
+ * x_filter_string(): Filter a string through a callback or mapping.
+ * x_map_string(): Map a string through a callback or mapping.
+ *
  *------------------------------------------------------------------
  */
 
@@ -34,7 +37,11 @@
 #include "strfuns.h"
 
 #include "comm.h"
+#include "interpret.h"
+#include "main.h"
+#include "mapping.h"
 #include "mstrings.h"
+#include "object.h"
 #include "simulate.h"
 #include "stdstrings.h"
 #include "svalue.h"
@@ -590,5 +597,318 @@ intersect_strings (const string_t * p_left, const string_t * p_right, Bool bSubt
 } /* intersect_strings() */
 
 /*-------------------------------------------------------------------------*/
+svalue_t *
+x_filter_string (svalue_t *sp, int num_arg)
+
+/* EFUN: filter() for strings.
+ *
+ *   string filter(string arr, string fun, string|object obj, mixed extra, ...)
+ *   string filter(string arr, closure cl, mixed extra, ...)
+ *   string filter(string arr, mapping map)
+ *
+ * Filter the elements of <arr> through a filter defined by the other
+ * arguments, and return an array of those elements, for which the
+ * filter yields non-zero.
+ *
+ * The filter can be a function call:
+ *
+ *    <obj>-><fun>(elem, <extra>...)
+ *
+ * or a mapping query:
+ *
+ *    <map>[elem]
+ *
+ * <obj> can both be an object reference or a filename. If omitted,
+ * this_object() is used (this also works if the third argument is
+ * neither a string nor an object).
+ */
+
+{
+    string_t *rc;     /* Result string */
+    string_t *str;    /* Argument string  */
+    svalue_t *arg;    /* First argument the vm stack */
+    mp_int    slen;   /* Argument string length */
+    char     *src, *dest; /* String text work pointers */
+
+    char     *flags;  /* Flag array, one flag for each element of <str>
+                       * (in reverse order). */
+    mp_int    res;    /* Number of surviving elements */
+
+    res = 0;
+
+    /* Locate the args on the stack, extract the string to filter
+     * and allocate the flags vector.
+     */
+    arg = sp - num_arg + 1;
+
+    str = arg->u.str;
+    slen = (mp_int)mstrsize(str);
+
+    flags = alloca((size_t)slen+1);
+    if (!flags)
+    {
+        error("Stack overflow in filter()");
+        /* NOTREACHED */
+        return sp;
+    }
+
+    /* Every element in flags is associated by index number with an
+     * element in the vector to filter. The filter function is evaluated
+     * for every string character, and the associated flag is set to 0
+     * or 1 according to the result.
+     * At the end, all 1-flagged elements are gathered and copied
+     * into the result string.
+     */
+
+    if (arg[1].type == T_MAPPING)
+    {
+        mp_int cnt;
+
+        /* --- Filter by mapping query --- */
+        mapping_t *m;
+
+        if (num_arg > 2) {
+            inter_sp = sp;
+            error("Too many arguments to filter(array)\n");
+        }
+        m = arg[1].u.map;
+
+        for (src = get_txt(str), cnt = slen; --cnt >= 0; src++)
+        {
+            svalue_t key;
+
+            put_number(&key,  *src);
+            if (get_map_value(m, &key) == &const0)
+            {
+                flags[cnt] = 0;
+                continue;
+            }
+            flags[cnt] = 1;
+            res++;
+        }
+
+        free_svalue(arg+1); /* the mapping */
+        sp = arg;
+
+    } else {
+
+        /* --- Filter by function call --- */
+
+        int         error_index;
+        callback_t  cb;
+        mp_int cnt;
+
+        assign_eval_cost();
+        inter_sp = sp;
+
+        error_index = setup_efun_callback(&cb, arg+1, num_arg-1);
+
+        if (error_index >= 0)
+        {
+            vefun_bad_arg(error_index+2, arg);
+            /* NOTREACHED */
+            return arg;
+        }
+        inter_sp = sp = arg+1;
+        put_callback(sp, &cb);
+
+        /* Loop over all elements in p and call the filter.
+         * w is the current element filtered.
+         */
+        for (src = get_txt(str), cnt = slen; --cnt >= 0; src++)
+        {
+            svalue_t *v;
+
+            flags[cnt] = 0;
+
+            if (current_object->flags & O_DESTRUCTED)
+                continue;
+                /* Don't call the filter anymore, but fill the
+                 * flags array with 0es.
+                 */
+
+            if (!callback_object(&cb))
+            {
+                inter_sp = sp;
+                error("object used by filter(array) destructed");
+            }
+
+            push_number(inter_sp, *src);
+
+            v = apply_callback(&cb, 1);
+            if (!v || (v->type == T_NUMBER && !v->u.number) )
+                continue;
+
+            flags[cnt] = 1;
+            res++;
+        }
+
+        free_callback(&cb);
+    }
+
+    /* flags[] holds the filter results, res is the number of
+     * elements to keep. Now create the result vector.
+     */
+    rc = alloc_mstring(res);
+    if (rc)
+    {
+        for (src = get_txt(str), dest = get_txt(rc), flags = &flags[slen]
+            ; res > 0 ; src++)
+        {
+            if (*--flags)
+            {
+                *dest++ = *src;
+                res--;
+            }
+        }
+    }
+
+    /* Cleanup (everything but the string has been removed already) */
+    free_mstring(str);
+    arg->u.str = rc;
+
+    return arg;
+} /* x_filter_string() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+x_map_string (svalue_t *sp, int num_arg)
+
+/* EFUN map() for strings
+ *
+ *   string map(string arg, string func, string|object ob, mixed extra...)
+ *   string map(string arg, closure cl, mixed extra...)
+ *   string map(string arg, mapping m)
+ *
+ * Call the function <ob>-><func>() resp. the closure <cl> for
+ * every element of the array/struct/mapping/string <arg>, and return a result
+ * made up from the returned values.
+ *
+ * It is also possible to map every entry through a lookup <m>[element]. If
+ * the mapping entry doesn't exist, the original value is kept, otherwise the
+ * result of the mapping lookup.
+ *
+ * Since <arg> is a string, only integer return values are allowed, of which
+ * only the lower 8 bits are considered.
+ *
+ * If <ob> is omitted, or neither an object nor a string, then
+ * this_object() is used.
+ */
+
+{
+    string_t *res;
+    string_t *str;
+    svalue_t *arg;
+    mp_int    len;
+    char     *src, *dest;
+
+    inter_sp = sp;
+
+    arg = sp - num_arg + 1;
+
+    str = arg->u.str;
+    len = (mp_int)mstrsize(str);
+
+    if (arg[1].type == T_MAPPING)
+    {
+        /* --- Map through mapping --- */
+
+        mapping_t *m;
+
+        if (num_arg > 2) {
+            inter_sp = sp;
+            error("Too many arguments to map(string)\n");
+        }
+        m = arg[1].u.map;
+
+        res = alloc_mstring(len);
+        if (!res)
+            error("(map_string) Out of memory: string[%ld] for result\n", len);
+        push_string(inter_sp, res); /* In case of errors */
+
+        for (src = get_txt(str), dest = get_txt(res); --len >= 0; src++, dest++)
+        {
+            svalue_t key, *v;
+
+            put_number(&key, *src);
+            v = get_map_value(m, &key);
+            if (v == &const0)
+                *dest = *src;
+            else
+            {
+                if (v->type != T_NUMBER)
+                {
+                    error("(map_string) Illegal value: %s, expected string\n"
+                         , typename(v->type)
+                         );
+                }
+                *dest = (v->u.number & 0xFF);
+            }
+        }
+
+        free_svalue(arg+1); /* the mapping */
+        sp = arg;
+    }
+    else
+    {
+        /* --- Map through function call --- */
+
+        callback_t  cb;
+        int         error_index;
+
+        error_index = setup_efun_callback(&cb, arg+1, num_arg-1);
+        if (error_index >= 0)
+        {
+            vefun_bad_arg(error_index+2, arg);
+            /* NOTREACHED */
+            return arg;
+        }
+        inter_sp = sp = arg+1;
+        put_callback(sp, &cb);
+        num_arg = 2;
+
+        res = alloc_mstring(len);
+        if (!res)
+            error("(map_string) Out of memory: string[%ld] for result\n", len);
+        push_string(inter_sp, res); /* In case of errors */
+
+        for (src = get_txt(str), dest = get_txt(res); --len >= 0; src++, dest++)
+        {
+            svalue_t *v;
+
+            if (current_object->flags & O_DESTRUCTED)
+                continue;
+
+            if (!callback_object(&cb))
+                error("object used by map(string) destructed");
+
+            push_number(inter_sp, *src);
+
+            v = apply_callback(&cb, 1);
+
+            if (v)
+            {
+                if (v->type != T_NUMBER)
+                {
+                    error("(map_string) Illegal value: %s, expected string\n"
+                         , typename(v->type)
+                         );
+                }
+                *dest = (v->u.number & 0xFF);
+            }
+        }
+
+        free_callback(&cb);
+    }
+
+    /* The arguments have been removed already, now just replace
+     * the arr on the stack with the result.
+     */
+    free_mstring(str);
+    arg->u.str = res; /* Keep svalue type: T_POINTER */
+
+    return arg;
+} /* x_map_string () */
+
 /*====================================================================*/
 

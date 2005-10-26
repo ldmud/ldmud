@@ -5983,8 +5983,12 @@ v_filter (svalue_t *sp, int num_arg)
  *   mixed * filter (mixed *arg, closure cl, mixed extra...)
  *   mixed * filter (mixed *arg, mapping map, mixed extra...)
  *
- *  mapping filter (mapping arg, string fun, string|object ob, mixed extra...)
- *  mapping filter (mapping arg, closure cl, mixed extra...)
+ *   mapping filter (mapping arg, string fun, string|object ob, mixed extra...)
+ *   mapping filter (mapping arg, closure cl, mixed extra...)
+ *
+ *   string filter (string arg, string fun, string|object ob, mixed extra...)
+ *   string filter (string arg, closure cl, mixed extra...)
+ *   string filter (string arg, mapping map, mixed extra...)
  *
  * Call the function <ob>-><fun>() resp. the closure <cl> for
  * every element of the array or mapping <arg>, and return
@@ -5998,6 +6002,8 @@ v_filter (svalue_t *sp, int num_arg)
 {
     if (sp[-num_arg+1].type == T_MAPPING)
         return x_filter_mapping(sp, num_arg, MY_TRUE);
+    else if (sp[-num_arg+1].type == T_STRING)
+        return x_filter_string(sp, num_arg);
     else
         return x_filter_array(sp, num_arg);
 
@@ -6181,6 +6187,7 @@ v_map (svalue_t *sp, int num_arg)
  *
  *   mixed * map(mixed *arg, string func, string|object ob, mixed extra...)
  *   mixed * map(mixed *arg, closure cl, mixed extra...)
+ *   mixed * map(mixed *arg, mapping m)
  *
  *   mixed * map(struct arg, string func, string|object ob, mixed extra...)
  *   mixed * map(struct arg, closure cl, mixed extra...)
@@ -6188,9 +6195,20 @@ v_map (svalue_t *sp, int num_arg)
  *   mapping map(mapping arg, string func, string|object ob, mixed extra...)
  *   mapping map(mapping arg, closure cl, mixed extra...)
  *
+ *   string map(string arg, string func, string|object ob, mixed extra...)
+ *   string map(string arg, closure cl, mixed extra...)
+ *   string map(mixed *arg, mapping m)
+ *
  * Call the function <ob>-><func>() resp. the closure <cl> for
- * every element of the array or mapping <arg>, and return a result
+ * every element of the array/struct/mapping/string <arg>, and return a result
  * made up from the returned values.
+ *
+ * For strings and arrays, it is also possible to map every entry through
+ * a lookup <m>[element]. If the mapping entry doesn't exist, the original
+ * value is kept, otherwise the result of the mapping lookup.
+ *
+ * If <arg> is a string, only integer return values are allowed, of which only
+ * the lower 8 bits are considered.
  *
  * If <ob> is omitted, or neither an object nor a string, then
  * this_object() is used.
@@ -6199,6 +6217,8 @@ v_map (svalue_t *sp, int num_arg)
 {
     if (sp[-num_arg+1].type == T_MAPPING)
         return x_map_mapping(sp, num_arg, MY_TRUE);
+    else if (sp[-num_arg+1].type == T_STRING)
+        return x_map_string(sp, num_arg);
 #ifdef USE_STRUCTS
     else if (sp[-num_arg+1].type == T_STRUCT)
         return x_map_struct(sp, num_arg);

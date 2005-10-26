@@ -1964,7 +1964,8 @@ x_filter_array (svalue_t *sp, int num_arg)
     mp_int    p_size; /* sizeof(*p) */
     vector_t *vec;
     svalue_t *v, *w;
-    char     *flags;  /* Flag array, one flag for each element of <p> */
+    char     *flags;  /* Flag array, one flag for each element of <p>
+                       * (in reverse order) */
     int       res;    /* Number of surviving elements */
     int       cnt;
 
@@ -2001,7 +2002,7 @@ x_filter_array (svalue_t *sp, int num_arg)
 
         if (num_arg > 2) {
             inter_sp = sp;
-            error("Too many arguments to filter_array()\n");
+            error("Too many arguments to filter(array)\n");
         }
         m = arg[1].u.map;
 
@@ -2060,7 +2061,7 @@ x_filter_array (svalue_t *sp, int num_arg)
             if (!callback_object(&cb))
             {
                 inter_sp = sp;
-                error("object used by filter_array destructed");
+                error("object used by filter(array) destructed");
             }
 
             push_svalue(w++);
@@ -2149,7 +2150,7 @@ x_map_array (svalue_t *sp, int num_arg)
 
         if (num_arg > 2) {
             inter_sp = sp;
-            error("Too many arguments to map_array()\n");
+            error("Too many arguments to map(array)\n");
         }
         m = arg[1].u.map;
 
@@ -2206,7 +2207,7 @@ x_map_array (svalue_t *sp, int num_arg)
                 assign_svalue(w, &const0);
 
             if (!callback_object(&cb))
-                error("object used by map_array destructed");
+                error("object used by map(array) destructed");
 
             push_svalue(w);
 

@@ -29,7 +29,10 @@ extern void strbuf_addf(strbuf_t *buf, const char *format, ...);
 extern void strbuf_send(strbuf_t *buf);
 extern void strbuf_store(strbuf_t *buf, svalue_t *svp);
 extern string_t * trim_all_spaces (const string_t * txt);
-extern string_t * intersect_strings (const string_t * left, const string_t * right, Bool bSubtract);
 extern char * xstrncpy(char * dest, const char * src, size_t num);
+
+extern string_t * intersect_strings (const string_t * left, const string_t * right, Bool bSubtract);
+extern svalue_t * x_map_string (svalue_t *sp, int num_arg);
+extern svalue_t * x_filter_string (svalue_t *sp, int num_arg);
 
 #endif /* STRFUNS_H_ */

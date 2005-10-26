@@ -13,34 +13,42 @@ SYNOPSIS
                                             , mixed extra...)
         mapping map(mapping arg, closure cl, mixed extra...)
 
+        string map(string arg, string func, string|object ob
+                                           , mixed extra...)
+        string map(string arg, closure cl, mixed extra...)
+        string map(string arg, mapping m)
+
 
 DESCRIPTION
-        Call the function <ob>-><func>() resp. the closure <cl> for
-        every element of the array, struct or mapping <arg>, and return a result
-        made up from the returned values.
+        Call the function <ob>-><func>() resp. the closure <cl> for every
+        element of the string, array, struct or mapping <arg>, and return a
+        result made up from the returned values.
 
         If <ob> is omitted, or neither a string nor an object, it
         defaults to this_object().
 
-
-        If <arg> is an array or struct, the function will be called with
-        each of the array/struct elements as first parameter, followed by
-        the <extra> arguments. The result of the efun is an array/struct
+        If <arg> is an string, array or struct, the function will be called
+        with each of the array/struct elements as first parameter, followed
+        by the <extra> arguments. The result of the efun is an array/struct
         with all the results returned from the function calls. Thus the
         operation could be described as:
 
           foreach(index) result[index] = ob->func(arg[index], extra...)
 
-        If <arg> is an array/struct, and a mapping is specified instead of
-        a function, the result is an array/struct with the values found in
-        the mapping for the original values, resp. with the original values
-        for which no mapping entry exists. In other words:
+        If <arg> is an string/array/struct, and a mapping is specified
+        instead of a function, the result is an array/struct with the
+        values found in the mapping for the original values, resp. with the
+        original values for which no mapping entry exists. In other words:
 
           foreach(index)
              if (arg[index] exists as key in map)
                  result[index] = map[arg[index]]
              else
                  result[index] = arg[index]
+
+
+        If <arg> is a string, the only allowed replacement values are
+        numbers, of which only the lower 8 bit will be considered.
 
 
         If <arg> is a mapping, the function will be called with
@@ -84,6 +92,7 @@ EXAMPLES
 HISTORY
         Introduced in LDMud 3.2.6, obsoletes map_array().
         LDMud 3.2.8 added the feature of mapping an array through a mapping.
+        LDMud 3.3.439 added mapping of strings.
 
 SEE ALSO
         filter(E), filter_indices(E), map_indices(E), map_objects(E)
