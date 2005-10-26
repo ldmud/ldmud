@@ -13040,7 +13040,8 @@ opt_catch_modifier :
           else if (mstreq($1, STR_PUBLISH))
               $$ = CATCH_FLAG_PUBLISH;
           else
-              yyerror("Illegal modifier in catch() - 'nolog' or 'publish'");
+              yyerror("Illegal modifier in catch() - "
+                      "expected 'nolog' or 'publish'");
           free_mstring($1);
       }
 ; /* opt_catch_modifier */

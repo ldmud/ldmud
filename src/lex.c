@@ -3213,20 +3213,16 @@ handle_pragma (char *str)
         }
         else if (strncmp(base, "strict_types", namelen) == 0)
         {
-#if 0
             pragma_strict_types = PRAGMA_STRICT_TYPES;
             instrs[F_CALL_OTHER].ret_type.typeflags = TYPE_UNKNOWN;
             instrs[F_CALL_DIRECT].ret_type.typeflags = TYPE_UNKNOWN;
-#endif
             validPragma = MY_TRUE;
         }
         else if (strncmp(base, "strong_types", namelen) == 0)
         {
-#if 0
             pragma_strict_types = PRAGMA_STRONG_TYPES;
             instrs[F_CALL_OTHER].ret_type.typeflags = TYPE_ANY;
             instrs[F_CALL_DIRECT].ret_type.typeflags = TYPE_ANY;
-#endif
             validPragma = MY_TRUE;
         }
         else if (strncmp(base, "weak_types", namelen) == 0)

@@ -1,6 +1,14 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+05-May-2002 (Lars Duening)  (3.3.453)
+  - (lex.c) Ooops, I forgot that I had commented out the strong type
+       pragmas when I experimented with an older mudlib (thanks, Ralph).
+  - (ptmalloc/thread-m.h) The constraints for one asm statement operand
+       were wrong (reported by Bardioc).
+  - (object.c) Made restore_xxx() even more robust towards CRLFs (thanks,
+       Holger).
+
 03-May-2002 (Lars Duening)  (3.3.452)
   - (simulate, interpret, func_spec, prolang.y) Added the new modifier
        'publish' to the catch() directive to have it call

@@ -8307,7 +8307,14 @@ static int nesting = 0;  /* Used to detect recursive calls */
         else if (cur[0] == '\0')
             break;
 
-        /* Remember that we have a newline at end of buff! */
+        /* Remember that we have a newline, and maybe even a CRLF at end of
+         * buff!
+         */
+        pt = strchr(cur, '\r');
+        if (pt && pt[1] == '\n') /* Convert a CRLF into a LF */
+            *pt = '\n';
+        pt = NULL;
+
 
         space = strchr(cur, ' ');
         if (!file)

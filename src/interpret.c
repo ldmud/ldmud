@@ -8790,7 +8790,7 @@ again:
          * onto the stack and continue execution at instruction
          * <pc>+1+<offset>.
          *
-         * The attributes of the catch are givein as uint8 <flags>.
+         * The attributes of the catch are given as uint8 <flags>.
          *
          * The implementation is such that a control-stack entry is created
          * as if the instructions following catch are called as a subroutine

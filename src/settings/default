@@ -221,6 +221,11 @@ with_swap_file=LP_SWAP.3
 enable_use_ipv6=no
 
 
+# Enable the use of pthreads for background socket IO.
+
+enable_use_pthreads=no
+
+
 # --- Memory ---
 
 # Which memory manager to use. Possible defines are

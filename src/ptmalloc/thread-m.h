@@ -178,7 +178,7 @@ static inline int mutex_trylock(mutex_t *m) {
 }
 static inline int mutex_unlock(mutex_t *m) {
   m->lock = 0;
-  __asm __volatile ("" : "=m" (m->lock) : "0" (m->lock));
+  __asm __volatile ("" : "=m" (m->lock) : "m" (m->lock));
   return 0;
 }
 
