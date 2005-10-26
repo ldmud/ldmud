@@ -11347,6 +11347,7 @@ again:
                 }
                 sp--;
                 sp->u.number = argp->u.number -= u2.number;
+                break;
             }
 
             if (type2 == T_FLOAT)

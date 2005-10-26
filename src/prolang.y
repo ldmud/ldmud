@@ -6315,6 +6315,7 @@ cast:
 ;
 
 
+/* TODO: Remove decl_casts - they are practically useless */
 decl_cast:
       '(' '{' basic_type optional_star '}' ')'
       {

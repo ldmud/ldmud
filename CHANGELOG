@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+21-Jul-2003 (Lars Duening)  (3.3.462)
+  - (interpret.c) The -= operator didn't work when subtracting an int
+       from an int: a missing break caused it to flag a non-existant
+       argument error.
+
 17-Jul-2003 (Lars Duening)  (3.3.461)
   - (prolang.y) Made the cast checks more informative.
 
