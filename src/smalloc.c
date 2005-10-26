@@ -2382,7 +2382,7 @@ esbrk (word_t size)
     extern int brk();
 #endif
 
-    mdb_dump_sbrk(size);
+    mdb_log_sbrk(size);
     if (!heap_end)
     {
         /* First call: allocate the first fake block */
@@ -2412,7 +2412,7 @@ esbrk (word_t size)
     char *block;
     word_t *p;
 
-    mdb_dump_sbrk(size);
+    mdb_log_sbrk(size);
     size += SINT;  /* for the extra fake "allocated" block */
 
     block = malloc(size);
@@ -2853,90 +2853,6 @@ mem_free_unrefed_memory (void)
 } /* mem_free_unrefed_memory() */
 
 /*-------------------------------------------------------------------------*/
-#ifndef CHECK_SMALLOC_TOTAL
-#define check_malloc_data() NOOP
-#else
-#define check_malloc_data() sm_check_malloc_data(__FILE__, __LINE__)
-
-static void
-sm_check_malloc_data (const char *file, int line)
-
-/* For the status commands and functions: add the smalloc statistic
- * to the buffer <sbuf>.
- */
-
-{
-    t_stat sbrk_st, clib_st, perm_st;
-    t_stat l_alloc, l_free, l_wasted;
-    t_stat s_alloc, s_free, s_wasted, s_chunk;
-    Bool didHeader;
-
-    didHeader = MY_FALSE;
-
-    /* Get a snapshot of the statistics. */
-
-    sbrk_st = sbrk_stat;
-    clib_st = clib_alloc_stat;
-    perm_st = perm_alloc_stat;
-    l_alloc = large_alloc_stat; l_alloc.size *= SINT;
-    l_free = large_free_stat; l_free.size *= SINT;
-    l_wasted = large_wasted_stat;
-    s_alloc = small_alloc_stat;
-    s_free = small_free_stat;
-    s_wasted = small_chunk_wasted;
-    s_chunk = small_chunk_stat;
-
-    dprintf2(gcollect_outfd, "DEBUG: (%s:%d)"
-                           , (p_int)file, (p_int)line);
-
-    dprintf4(gcollect_outfd, " total (alloc %d, free %d, wasted %d) %d "
-           , (p_int)l_alloc.size
-           , (p_int)l_free.size
-           , (p_int)l_wasted.size
-           , (p_int)(l_alloc.size + l_free.size + l_wasted.size)
-           );
-
-    if (l_alloc.size + l_free.size + l_wasted.size != sbrk_st.size)
-        writes(gcollect_outfd, "!=");
-    else
-        writes(gcollect_outfd, "==");
-
-    dprintf1(gcollect_outfd, " sbrk %d\n"
-            , (p_int)sbrk_st.size
-            );
-
-    dprintf2(gcollect_outfd, "DEBUG: (%s:%d)"
-                           , (p_int)file, (p_int)line);
-
-    dprintf4(gcollect_outfd, " small (alloc %d:%d, free %d:%d,"
-           , (p_int)s_alloc.counter
-           , (p_int)s_alloc.size
-           , (p_int)s_free.counter
-           , (p_int)s_free.size
-           );
-    dprintf2(gcollect_outfd, " wasted %d:%d)"
-           , (p_int)s_wasted.counter
-           , (p_int)s_wasted.size
-           );
-    dprintf1(gcollect_outfd, " %d "
-           , (p_int)(s_alloc.size + s_free.size + s_wasted.size)
-           );
-
-    if (s_alloc.size + s_free.size + s_wasted.size != s_chunk.size)
-        writes(gcollect_outfd, "!=");
-    else
-        writes(gcollect_outfd, "==");
-
-    dprintf1(gcollect_outfd, " chunk %d\n"
-           , (p_int)s_chunk.size
-           );
-    if (s_alloc.size + s_free.size + s_wasted.size != s_chunk.size)
-        exit(1);
-
-} /* check_malloc_data() */
-#endif
-
-/*-------------------------------------------------------------------------*/
 void
 mem_consolidate (Bool force)
 
@@ -2960,21 +2876,8 @@ mem_consolidate (Bool force)
 #  define DEB3(s,t1,t2,t3) (void)0
 #endif
 
-#if defined(CHECK_SMALLOC_TOTAL)
-#  define SDEB1(s,t1)       dprintf1(gcollect_outfd, s, (p_int)t1)
-#  define SDEB2(s,t1,t2)    dprintf2(gcollect_outfd, s, (p_int)t1, (p_int)t2)
-#  define SDEB3(s,t1,t2,t3) dprintf3(gcollect_outfd, s, (p_int)t1, (p_int)t2, (p_int)t3)
-#else
-#  define SDEB1(s,t1)       (void)0
-#  define SDEB2(s,t1,t2)    (void)0
-#  define SDEB3(s,t1,t2,t3) (void)0
-#endif
-
     word_t *chunk, *prev_chunk;
     int ix;
-#ifdef CHECK_SMALLOC_TOTAL
-    t_stat s_alloc;
-#endif
     p_int bdelta = 0; /* Number of blocks merged */
     p_int cfreed = 0; /* Number of small chunks freed */
     p_int bfreed = 0; /* Number of small blocks in the freed chunks */
@@ -2985,11 +2888,6 @@ mem_consolidate (Bool force)
 
     if (!force && small_free_stat.counter <= limit)
         return;
-    check_malloc_data();
-#ifdef CHECK_SMALLOC_TOTAL
-    s_alloc.size = 0;
-    s_alloc.counter = 0;
-#endif
 
 #if defined(DEBUG_SMALLOC_ALLOCS)
     {
@@ -3079,9 +2977,6 @@ mem_consolidate (Bool force)
             {
                 DEB1("  Used block %x\n", block);
                 found_ref = MY_TRUE;
-#ifdef CHECK_SMALLOC_TOTAL
-                count_up(s_alloc, (size & M_MASK) * SINT);
-#endif
             }
             else
             {
@@ -3144,10 +3039,6 @@ mem_consolidate (Bool force)
 
             count_back(small_chunk_stat, (chunk[-M_OVERHEAD] & M_MASK) * SINT);
             count_back(small_chunk_wasted, SINT*M_OVERHEAD+sizeof(word_t*));
-#ifdef CHECK_SMALLOC_TOTAL
-            dprintf2(gcollect_outfd, "DEBUG: %d: chunk -= %d\n"
-                    , (p_int)__LINE__, (p_int)((chunk[-M_OVERHEAD] & M_MASK) * SINT));
-#endif
 
             sfree(chunk);
             chunk = next;
@@ -3206,12 +3097,6 @@ mem_consolidate (Bool force)
         prev_chunk = chunk;
         chunk = *(word_t**)chunk;
     } /* for (small chunks) */
-
-#ifdef CHECK_SMALLOC_TOTAL
-    dprintf3(gcollect_outfd, "DEBUG: %d: s_alloc: %d:%d\n"
-            , (p_int)__LINE__, (p_int)s_alloc.counter, (p_int)s_alloc.size);
-#endif
-    check_malloc_data();
 
     /* Adapt the trigger limit for the next non-forced consolidation */
     limit = 2 * small_free_stat.counter;

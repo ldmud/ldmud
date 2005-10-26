@@ -20,8 +20,6 @@ For a detailed list of all changes see the file CHANGELOG.
            as package 'alists'.
        + call_out():  The minimum delay can now be 0, meaning: as soon as
            possible.
-       + function_exists(): now also returns the filename and linenumber
-           of a function.
        + garbage_collection(): An optional flag argument allows to change
             the name of the default GC log file.
        + process_string(): Spaces are now allowed in function arguments
@@ -121,6 +119,8 @@ For a detailed list of all changes see the file CHANGELOG.
            DID_MEMORY result.
        + debug_info(): Added the DID_ST_MB_ values to the DINFO_DATA:
            DID_STATUS result.
+       + function_exists(): now also returns the filename and linenumber
+           of a function.
 
     - Corrected efuns:
        + m_add(): Fixed a memory leak when existing entries were overwritten.
@@ -147,6 +147,10 @@ For a detailed list of all changes see the file CHANGELOG.
            system.
 
     - Other Changes:
+       + Configuration option '--enable-malloc-sbrk-trace' to enable
+          a log of all system memory requests including the stats of
+          the memory allocation request causing it. The intention is
+          to help debugging muds with high system memory usage.
 
 
 02-Feb-2003 (Lars Duening) -- Release 3.2.9

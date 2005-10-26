@@ -34,6 +34,7 @@ enable_share_variables=no
 
 enable_malloc_trace=yes
 enable_malloc_lpc_trace=yes
+enable_malloc_sbrk_trace=yes
 enable_use_mysql=/usr/lib/mysql
 
 with_htable_size=65536

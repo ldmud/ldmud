@@ -214,6 +214,13 @@ enable_malloc_trace=no
 
 enable_malloc_lpc_trace=no
 
+# Define this to log all calls to esbrk() (the system memory allocator).
+# Works best if MALLOC_TRACE, or also MALLOC_LPC_TRACE, are defined.
+# This define is useful if your mud keeps growing in total memory size
+# instead of re-using the memory already allocated.
+# Supported by: MALLOC_smalloc
+enable_malloc_sbrk_trace=no
+
 # If TRACE_CODE is enable, the driver keeps a log of TOTAL_TRACE_LENGTH
 # most recently execute bytecode instructions.
 
@@ -508,10 +515,6 @@ enable_check_object_ref=no
 # No penalty for using.  Requires MALLOC_TRACE to work. Incompatible with
 # DUMP_GC_REFS.
 enable_check_object_gc_ref=yes
-
-# Activate total smalloc size consistency check code. This will produce
-# a lot of output in the GC log.
-enable_check_smalloc_total=no
 
 # Sometimes the GC stumbles over invalid references to memory blocks (namely
 # 'Program referenced as something else'). Define this macro to get a detailed

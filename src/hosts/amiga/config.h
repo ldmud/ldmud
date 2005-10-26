@@ -386,6 +386,12 @@
  */
 #undef MALLOC_LPC_TRACE
 
+/* Define this to log all calls to esbrk() (the system memory allocator).
+ * Works best if MALLOC_TRACE, or also MALLOC_LPC_TRACE, are defined.
+ * Supported by: MALLOC_smalloc
+ */
+#undef MALLOC_SBRK_TRACE
+
 /* Trace the most recently executed bytecode instructions?
  */
 #define TRACE_CODE

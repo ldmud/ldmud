@@ -52,5 +52,4 @@ enable_use_pcre=no
 # --- Compilation Options ---
 enable_malloc_trace=yes
 enable_malloc_lpc_trace=yes
-
-
+enable_malloc_sbrk_trace=yes

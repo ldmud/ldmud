@@ -29,8 +29,6 @@
 #include "mstrings.h"
 #endif
 
-#define MEMORY_DEBUG
-
 /*-------------------------------------------------------------------------*/
 
 /* Minimum boundary between stack and heap, should be sufficient for
@@ -122,6 +120,22 @@ static int going_to_exit = MY_FALSE;
    * prevent recursions.
    */
 
+#ifdef MALLOC_SBRK_TRACE
+
+static size_t mdb_size;
+#    if defined(MALLOC_LPC_TRACE)
+         static object_t *mdb_object;
+#    endif
+#    if defined(MALLOC_TRACE)
+        static const char * mdb_file;
+        static int mdb_line;
+#    endif
+  /* Persistent copy of the latest memory request information,
+   * so that the SBRK_TRACE can print it.
+   */
+
+#endif /* MALLOC_SBRK_TRACE */
+
 /* --- Statistics --- */
 
 static t_stat xalloc_stat = {0,0};
@@ -133,53 +147,6 @@ static t_stat clib_alloc_stat = {0,0};
    * functions (incl overhead).
    */
 
-#ifdef MEMORY_DEBUG
-static size_t mdb_size;
-#if defined(MALLOC_LPC_TRACE)
-static object_t *mdb_object;
-#endif
-#if defined(MALLOC_TRACE)
-static const char * mdb_file;
-static int mdb_line;
-#endif
-static void mdb_dump_sbrk(p_int size)
-{
-#if defined(MALLOC_TRACE)
-#  if defined(MALLOC_LPC_TRACE)
-      dprintf2(1, "DEBUG: MEM sbrk(%d) for %d"
-                , (p_int)size, (p_int)mdb_size
-                );
-      dprintf3(1, " , '%s':%d , obj %s\n"
-                , (p_int)mdb_file, (p_int)mdb_line
-                , (p_int)(mdb_object ? ( mdb_object->name ? get_txt(mdb_object->name) : "<?>"): "<null>")
-                );
-#  else
-      dprintf2(1, "DEBUG: MEM sbrk(%d) for %d"
-                , (p_int)size, (p_int)mdb_size
-                );
-      dprintf2(1, " , '%s':%d\n"
-                , (p_int)mdb_file, (p_int)mdb_line
-                );
-#  endif
-#else
-#  if defined(MALLOC_LPC_TRACE)
-      dprintf2(1, "DEBUG: MEM sbrk(%d) for %d"
-                , (p_int)size, (p_int)mdb_size
-                );
-      dprintf1(1, " , obj %s\n"
-                , (p_int)(mdb_object ? ( mdb_object->name ? get_txt(mdb_object->name) : "<?>"): "<null>")
-                );
-#  else
-      dprintf2(1, "DEBUG: MEM sbrk(%d) for %d\n"
-                , (p_int)size, (p_int)mdb_size
-                );
-#  endif
-#endif /* MALLOC_TRACE */
-} /* mdb_dump_sbrk() */
-#else
-#define mdb_dump_sbrk(size) NOOP
-#endif /* MEMORY_DEBUG */
-
 /*-------------------------------------------------------------------------*/
 /* Forward declarations */
 
@@ -188,6 +155,57 @@ static void write_lpc_trace (int d, word_t *p);
 #endif
 
 static void print_block (int d, word_t *block);
+
+/*-------------------------------------------------------------------------*/
+#ifdef MALLOC_SBRK_TRACE
+
+static void
+mdb_log_sbrk (p_int size)
+
+/* esbrk() log function: esbrk() is called to allocate <size> bytes
+ * from the system. Log this information to stdout together with
+ * the original allocation request size.
+ */
+
+{
+#if defined(MALLOC_TRACE)
+#  if defined(MALLOC_LPC_TRACE)
+      dprintf3(1, "%s esbrk(%d) for %d"
+                , (p_int)current_time_stamp, (p_int)size, (p_int)mdb_size
+                );
+      dprintf3(1, " , '%s':%d , obj %s\n"
+                , (p_int)mdb_file, (p_int)mdb_line
+                , (p_int)(mdb_object ? ( mdb_object->name ? get_txt(mdb_object->name) : "<?>"): "<null>")
+                );
+#  else
+      dprintf3(1, "%s sbrk(%d) for %d"
+                , (p_int)current_time_stamp, (p_int)size, (p_int)mdb_size
+                );
+      dprintf2(1, " , '%s':%d\n"
+                , (p_int)mdb_file, (p_int)mdb_line
+                );
+#  endif
+#else
+#  if defined(MALLOC_LPC_TRACE)
+      dprintf3(1, "%s esbrk(%d) for %d"
+                , (p_int)current_time_stamp, (p_int)size, (p_int)mdb_size
+                );
+      dprintf1(1, " , obj %s\n"
+                , (p_int)(mdb_object ? ( mdb_object->name ? get_txt(mdb_object->name) : "<?>"): "<null>")
+                );
+#  else
+      dprintf3(1, "%s esbrk(%d) for %d\n"
+                , (p_int)current_time_stamp, (p_int)size, (p_int)mdb_size
+                );
+#  endif
+#endif /* MALLOC_TRACE */
+} /* mdb_log_sbrk() */
+
+#else 
+
+#define mdb_log_sbrk(size) NOOP
+
+#endif /* MALLOC_SBRK_TRACE */
 
 /*-------------------------------------------------------------------------*/
 
@@ -461,7 +479,7 @@ xalloc_traced (size_t size MTRACE_DECL)
     if (size == 0)
         fatal("Tried to allocate 0 bytes.\n");
     
-#ifdef MEMORY_DEBUG
+#ifdef MALLOC_SBRK_TRACE
     mdb_size = size;
 #ifdef MALLOC_TRACE
         mdb_file = malloc_trace_file;
@@ -470,7 +488,7 @@ xalloc_traced (size_t size MTRACE_DECL)
 #ifdef MALLOC_LPC_TRACE
         mdb_object = current_object;
 #endif
-#endif /* MEMORY_DEBUG */
+#endif /* MALLOC_SBRK_TRACE */
     size += XM_OVERHEAD_SIZE;
 
     do {
@@ -592,9 +610,9 @@ malloc_increment_size (void *vp, size_t size)
 /*-------------------------------------------------------------------------*/
 POINTER
 rexalloc_traced (POINTER p, size_t size MTRACE_DECL
-#ifndef MEMORY_DEBUG
+#ifndef MALLOC_SBRK_TRACE
                                                     UNUSED
-#endif /* MEMORY_DEBUG */
+#endif /* MALLOC_SBRK_TRACE */
                 )
 
 /* Reallocate block <p> to the new size of <size> and return the pointer.
@@ -607,14 +625,14 @@ rexalloc_traced (POINTER p, size_t size MTRACE_DECL
  */
 
 {
-#ifndef MEMORY_DEBUG
+#ifndef MALLOC_SBRK_TRACE
 #ifdef MALLOC_TRACE
 #   ifdef __MWERKS__
 #       pragma unused(malloc_trace_file)
 #       pragma unused(malloc_trace_line)
 #   endif
 #endif /* MALLOC_TRACE */
-#endif /* MEMORY_DEBUG */
+#endif /* MALLOC_SBRK_TRACE */
 
     word_t *block, *t;
 #ifndef NO_MEM_BLOCK_SIZE
@@ -624,7 +642,7 @@ rexalloc_traced (POINTER p, size_t size MTRACE_DECL
     if (going_to_exit) /* A recursive call while we're exiting */
         exit(3);
 
-#ifdef MEMORY_DEBUG
+#ifdef MALLOC_SBRK_TRACE
     mdb_size = size;
 #ifdef MALLOC_TRACE
         mdb_file = malloc_trace_file;
@@ -633,7 +651,7 @@ rexalloc_traced (POINTER p, size_t size MTRACE_DECL
 #ifdef MALLOC_LPC_TRACE
         mdb_object = current_object;
 #endif
-#endif /* MEMORY_DEBUG */
+#endif /* MALLOC_SBRK_TRACE */
     size += XM_OVERHEAD_SIZE;
     block = (word_t *)p - XM_OVERHEAD;
 

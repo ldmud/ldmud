@@ -445,7 +445,7 @@ extern "C" {
 # define public_cLEAR_REf_FLAGs 	dlmalloc_clear_ref_flags
 # define public_fREE_UNREFED_MEMORy	dlmalloc_free_unrefed_memory
 # define public_iS_FREEd  dlmalloc_is_freed
-#endif
+#endif /* ENABLE_GC_SUPPORT */
 #else /* USE_DL_PREFIX */
 #ifdef _LIBC
 
@@ -506,7 +506,7 @@ Void_t *(*__morecore)(ptrdiff_t) = __default_morecore;
 # define public_cLEAR_REf_FLAGs 	malloc_clear_ref_flags
 # define public_fREE_UNREFED_MEMORy 	malloc_free_unrefed_memory
 # define public_iS_FREEd  malloc_is_freed
-#endif
+#endif /* ENABLE_GC_SUPPORT */
 #endif /* _LIBC */
 #endif /* USE_DL_PREFIX */
 
@@ -1239,7 +1239,10 @@ int      public_sET_STATe();
 #ifdef ENABLE_GC_SUPPORT
 
 /*
-    TODO
+  malloc_mark_perm(Void_t *mem);
+
+  Marks the given memory block as permament,
+  so it will not be freed by gc even it is not marked as referenced.
 */
 #if __STD_C
 void 	 public_mARK_PERm(Void_t*);
@@ -1248,7 +1251,11 @@ void 	 public_mARK_PERm();
 #endif
 
 /*
-    TODO
+  malloc_mark_coll(Void_t *mem);
+  
+  Marks the given memory block as collectable,
+  so it can be freed by gc if it is not marked as referenced.
+  This function is the opposite to malloc_mark_perm().
 */
 #if __STD_C
 void 	 public_mARK_COLl(Void_t*);
@@ -1257,7 +1264,10 @@ void 	 public_mARK_COLl();
 #endif
 
 /*
-    TODO
+  malloc_clear_ref(Void_t *mem);
+  
+  Clears the referenced flag for the given memory block.
+  Used but not referenced memory blocks will be freed by gc.
 */
 #if __STD_C
 void public_cLEAR_REf(Void_t *mem);
@@ -1266,7 +1276,10 @@ void public_cLEAR_REf(mem) Void_t *mem;
 #endif
 
 /*
-    TODO
+  malloc_mark_ref(Void_t *mem);
+  
+  Sets the referenced flag for the given memory block.
+  This block will not be freed by gc.
 */
 #if __STD_C
 void public_mARK_REf(Void_t *mem);
@@ -1275,7 +1288,9 @@ void public_mARK_REf(mem) Void_t *mem;
 #endif
 
 /*
-    TODO
+  malloc_test_ref(Void_t *mem);
+  
+  Tests if the given memory block is marked as referenced.
 */
 #if __STD_C
 int public_tEST_REf(Void_t *mem);
@@ -1284,7 +1299,13 @@ int public_tEST_REf(mem) Void_t *mem;
 #endif
     
 /*
-    Clear all 'referenced' markers.
+  malloc_clear_ref_flags()
+
+  Clears all 'referenced' markers.
+  This is the first step to run a gc.
+  The second step is to mark all known memory blocks (to the app)
+  as referenced (by calls to malloc_mark_ref()). Third (and last)
+  step is to call malloc_free_unrefed_memory().
 */
 #if __STD_C
 void public_cLEAR_REf_FLAGs();
@@ -1293,7 +1314,11 @@ void public_cLEAR_REf_FLAGs();
 #endif
     
 /*
-    Free all memory marked as 'unreferenced'.
+  malloc_free_unrefed_memory();
+
+  Frees all memory marked as 'unreferenced'.
+  This is the third step during gc after malloc_clear_ref_flags()
+  and malloc_mark_ref().
 */
 #if __STD_C
 void public_fREE_UNREFED_MEMORy();
@@ -1302,7 +1327,10 @@ void public_fREE_UNREFED_MEMORy();
 #endif
     
 /*
-    Return true if <p> is a free block.
+  malloc_is_freed(Void_t* mem, size_t minsize);
+
+  Check if block for the allocation <p> is a free block of at least
+  <minsize>. If true return 1, else return 0.
 */
 #if __STD_C
 int public_iS_FREEd(Void_t *mem, size_t minsize);
@@ -1912,7 +1940,9 @@ nextchunk-> +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 #define MARK_REF  0x80000000
 
 /*
-    TODO
+   if the chunk should not be freed by gc even if it is not marked
+   referenced set MARK_PERM. 
+   TODO: assumes 32bit machine
 */
 #define MARK_PERM 0x40000000
 
@@ -5383,9 +5413,14 @@ void public_cLEAR_REf_FLAGs()
 {
     mchunkptr chunk = (mchunkptr) (mp_.sbrk_base + (((INTERNAL_SIZE_T) chunk2mem(mp_.sbrk_base)) & MALLOC_ALIGN_MASK));
 
-    // TODO: check for non contiguous case!
+    // TODO: better check for non contiguous case!
     // TODO: check for fenceposts
-    do{
+    if (!contiguous(&main_arena)) {
+	printf("Memory is not contiguous! GC not supported!\n");
+	return;
+    }
+
+    do {
 	chunk->size &= ~MARK_REF;
         chunk = next_chunk(chunk);
     } while(chunk < main_arena.top);
@@ -5408,12 +5443,17 @@ void public_fREE_UNREFED_MEMORy()
     mfastbinptr fb;
     struct malloc_state *arena;
 
+    // TODO: better check for non contiguous case!
+    // TODO: check for fenceposts
+    if (!contiguous(&main_arena)) {
+	printf("Memory is not contiguous! GC not supported!\n");
+	return;
+    }
+
     mutex_rwlock_wrlock(&gc_lock);
 
     // TODO: public_funs must check for gc_lock
-    // TODO: check for non contiguous case!
-    // TODO: check for fenceposts
-    do{
+    do {
 	++j;
 	if(inuse(chunk) && !(chunk->size & MARK_REF) && !(chunk->size & MARK_PERM) 
 	                && !chunk_is_mmapped(chunk) && chunksize(chunk)<request2size(MAX_FAST_SIZE)) {
@@ -5443,9 +5483,11 @@ void public_fREE_UNREFED_MEMORy()
     } 
     while(chunk < main_arena.top);
 
+    mTRIm(0);
+
     mutex_rwlock_unlock(&gc_lock);
 
-    printf("to free: %d from free %d from %d\n", i, k, j);
+    printf("GC: freed: %d\n    candi: %d\n    total: %d\n", i, k, j);
 }
 
 /*
@@ -5460,7 +5502,6 @@ int public_iS_FREEd(mem, minsize) Void_t *mem; size_t minsize;
 #endif
 {
     return !inuse(mem2chunk(mem)) && chunksize(mem2chunk(mem)) >= minsize;
-    return 1;
 }
 
 #endif /* ENABLE_GC_SUPPORT */

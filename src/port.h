@@ -423,6 +423,7 @@ typedef signed long ssize_t;
  * At last, the functions provided in port.c
  */
 
+extern char current_time_stamp[];
 extern mp_int get_current_time(void);
 extern char * time_string(mp_int);
 extern char * utime_string(mp_int, mp_int);

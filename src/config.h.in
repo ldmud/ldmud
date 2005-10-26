@@ -209,6 +209,14 @@
  */
 @cdef_malloc_lpc_trace@ MALLOC_LPC_TRACE
 
+/* Define this to log all calls to esbrk() (the system memory allocator).
+ * Works best if MALLOC_TRACE, or also MALLOC_LPC_TRACE, are defined.
+ * This define is useful if your mud keeps growing in total memory size
+ * instead of re-using the memory already allocated.
+ * Supported by: MALLOC_smalloc
+ */
+@cdef_malloc_sbrk_trace@ MALLOC_SBRK_TRACE
+
 /* Trace the most recently executed bytecode instructions?
  */
 @cdef_trace_code@ TRACE_CODE
@@ -516,11 +524,6 @@
 #ifdef MALLOC_TRACE
 @cdef_check_object_gc_ref@ CHECK_OBJECT_GC_REF
 #endif
-
-/* Activate total smalloc size consistency check code. This will produce
- * a lot of output in the GC log.
- */
-@cdef_check_smalloc_total@ CHECK_SMALLOC_TOTAL
 
 /* Sometimes the GC stumbles over invalid references to memory
  * blocks (namely 'Program referenced as something else'). Define

@@ -24,6 +24,15 @@
 #include "backend.h"
 #include "main.h"
 
+
+/*-------------------------------------------------------------------------*/
+
+char current_time_stamp[21] = { 0 };
+  /* Static buffer for the last timestamp computed by time_stamp().
+   * This is for use only by those functions which must avoid memory
+   * operations - all other functions should use time_stamp() itself.
+   */
+
 /*-------------------------------------------------------------------------*/
 mp_int
 get_current_time (void)
@@ -70,7 +79,7 @@ get_current_time (void)
     }
     debug_message("Time anomaly, %ld seconds.\n", (long)(last_time - now));
     return last_time;
-}
+} /* get_current_time() */
 
 /*-------------------------------------------------------------------------*/
 char *
@@ -90,7 +99,7 @@ time_string (mp_int t)
         strftime(result, sizeof(result)-1, "%a %b %d %H:%M:%S %Y", tm);
     }
     return result;
-}
+} /* time_string() */
 
 /*-------------------------------------------------------------------------*/
 char *
@@ -114,7 +123,7 @@ utime_string (mp_int t, mp_int ut)
         strftime(result+len+6, sizeof(result)-7-len, " %Y", tm);
     }
     return result;
-}
+} /* utime_string() */
 
 /*-------------------------------------------------------------------------*/
 char *
@@ -122,7 +131,7 @@ time_stamp (void)
 
 /* Return a textual representation of the current time
  * in the form "YYYY.MM.DD HH:MM:SS".
- * Result is a pointer to a static buffer.
+ * Result is a pointer curent_time_stamp[].
  *
  * Putting this function in strfuns is not a good idea, because
  * it is need by almost every module anyway.
@@ -130,18 +139,19 @@ time_stamp (void)
 
 {
     mp_int t;
-    static char result[21];
     struct tm *tm;
-    mp_int last_time = -1;
+
+    static mp_int last_time = -1;
 
     t = get_current_time();
     if (t != last_time)
     {
         last_time = t;
         tm = localtime((time_t *)&t);
-        strftime(result, sizeof(result)-1, "%Y.%m.%d %H:%M:%S", tm);
+        strftime( current_time_stamp, sizeof(current_time_stamp)-1
+                , "%Y.%m.%d %H:%M:%S", tm);
     }
-    return result;
+    return current_time_stamp;
 } /* time_stamp() */
 
 /*-------------------------------------------------------------------------*/

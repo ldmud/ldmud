@@ -1,6 +1,16 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+02-Mar-2002 (Lars Duening)  (3.3.407)
+  - (ptmalloc.c) Added some documentation and error checks (thanks, Gawain).
+  - (configure, smalloc) Removed the CHECK_SMALLOC_TOTAL debugging code -
+       the problem is fixed.
+  - (configure, smalloc) New diagnostic option MALLOC_SBRK_TRACE to enable
+       a log of all esbrk() calls and the stats of the allocation requests
+       causing it. This formalizes the 'DEBUG: MEM ' diagnostics added
+       in 3.3.399, though the particular string 'DEBUG: MEM ' has been
+       dropped from the output.
+
 02-Mar-2002 (Lars Duening)  (3.3.406)
   - (gcollect.c) During the 'clear' phase of the GC, struct member elements
        weren't marked as cleared, which prevented proper counting in the

@@ -39,7 +39,7 @@ EXAMPLES
         function_exists("create", that_object, NAME_HIDDEN|FEXISTS_ALL);
 
 HISTORY
-        LDMud 3.3 broadened the range of returned values and introduced
+        LDMud 3.2.10 broadened the range of returned values and introduced
           the <flags> argument.
 
 SEE ALSO

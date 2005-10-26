@@ -1696,17 +1696,20 @@ options (void)
 #else
         , "unknown malloc"
 #endif
-#if defined(MALLOC_CHECK) || defined(MALLOC_TRACE) || defined(MALLOC_LPC_TRACE)
+#if defined(MALLOC_CHECK) || defined(MALLOC_TRACE) || defined(MALLOC_LPC_TRACE) || defined(MALLOC_SBRK_TRACE)
               " ("
-#if defined(MALLOC_CHECK)
+#    if defined(MALLOC_CHECK)
                 " MALLOC_CHECK"
-#endif
-#if defined(MALLOC_TRACE)
+#    endif
+#    if defined(MALLOC_TRACE)
                 " MALLOC_TRACE"
-#endif
-#if defined(MALLOC_LPC_TRACE)
+#    endif
+#    if defined(MALLOC_LPC_TRACE)
                 " MALLOC_LPC_TRACE"
-#endif
+#    endif
+#    if defined(MALLOC_SBRK_TRACE)
+                " MALLOC_SBRK_TRACE"
+#    endif
               " )"
 #endif
         , RESERVED_USER_SIZE
@@ -1807,9 +1810,6 @@ options (void)
 #       endif
 #       if defined(CHECK_OBJECT_GC_REF)
                               , "CHECK_OBJECT_GC_REF"
-#       endif
-#       if defined(CHECK_SMALLOC_TOTAL)
-                              , "CHECK_SMALLOC_TOTAL"
 #       endif
 #       if defined(DUMP_GC_REFS)
                               , "DUMP_GC_REFS"
