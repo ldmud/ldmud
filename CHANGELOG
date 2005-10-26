@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+21-Apr-2002 (Lars Duening)  (3.3.446)
+  - (pkg-pgsql.c) Corrected a crasher during a GC.
+  - (smalloc.c) Corrected the small-free-block statistics.
+
 19-Apr-2002 (Lars Duening)  (3.3.445)
   - (pkg-pgsql, configure, other files) Added PostgreSQL implementation
        based on the code donated by Ctx (thanks!) (f-011229-0).

@@ -3004,7 +3004,7 @@ get_string_item ( svalue_t * svp, svalue_t * i, Bool make_singular
         {
             if (!allow_one_past)
             {
-                ERRORF(("Index out for [] of bounds: %ld, string length: %ld.\n"
+                ERRORF(("Index out of bounds for []: %ld, string length: %ld.\n"
                        , (long)ind, (long)mstrsize(svp->u.str)));
                 return NULL;
             }

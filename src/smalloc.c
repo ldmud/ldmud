@@ -825,7 +825,7 @@ void MAKE_SMALL_FREE (word_t *block, word_t bsize)
 
     sfltable[ix] = block;
     small_free[ix]++;
-    count_up(small_free_stat, (ix + T_OVERHEAD+SMALL_BLOCK_MIN) * SINT);
+    count_up(small_free_stat, bsize * SINT);
 
 #ifdef MALLOC_CHECK
     block[M_MAGIC] = sfmagic[SIZE_MOD_INDEX(bsize * SINT, sfmagic)];

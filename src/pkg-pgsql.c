@@ -888,20 +888,23 @@ pg_purge_connections (void)
             break;
     }
 
-    prev = head;
-    while (prev->next)
+    if (head)
     {
-        if (prev->next->state != PG_UNCONNECTED
-         && !callback_object(&prev->next->callback)
-           )
+        prev = head;
+        while (prev->next)
         {
-            debug_message("%s PG connection object destructed.\n", time_stamp());
-            pgclose(prev->next);
+            if (prev->next->state != PG_UNCONNECTED
+             && !callback_object(&prev->next->callback)
+               )
+            {
+                debug_message("%s PG connection object destructed.\n", time_stamp());
+                pgclose(prev->next);
+            }
+            if (prev->next->state == PG_UNCONNECTED)
+                dealloc_dbconn(prev->next);
+            else
+                prev = prev->next;
         }
-        if (prev->next->state == PG_UNCONNECTED)
-            dealloc_dbconn(prev->next);
-        else
-            prev = prev->next;
     }
 } /* pg_purge_connections() */
 
