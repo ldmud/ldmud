@@ -193,7 +193,7 @@ palloca (size_t size)
         {
             hp = malloc (sizeof (*hp));
             if (!hp) { fprintf(stderr, "alloca: failed!\n"); return NULL; }
-            hp->pool = new_mempool(1024);
+            hp->pool = new_mempool(size_mempool(1));
             if (!hp->pool)
             {
                 free(hp);
@@ -217,4 +217,3 @@ palloca (size_t size)
 }
 
 /***************************************************************************/
-

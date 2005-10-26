@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+05-Mar-2002 (Lars Duening)  (3.3.412)
+  - (mempools, alloca.c, array.c, object.c, lex.c, ptrtable.c) The user
+       space of a mempool block is now restricted to 256 bytes, to reduce
+       fragmentation issues in the large block heap.
+
 05-Mar-2002 (Lars Duening)  (3.3.411)
   - (gcollect.c, object.c) Inserted checks so that the driver doesn't try
        to access the non-existing name of the default wizlist entry (in

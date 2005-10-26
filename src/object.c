@@ -2411,8 +2411,8 @@ v_include_list (svalue_t *sp, int num_arg)
         Mempool   pool;         /* The memory pool to allocate from */
 
         /* Get the memory pool */
-        memsafe(pool = new_mempool(sizeof(*begin) * 64)
-               , sizeof(*begin) * 64, "memory pool");
+        memsafe(pool = new_mempool(size_mempool(sizeof(*begin)))
+               , size_mempool(sizeof(*begin)), "memory pool");
 
         /* Walk the list of included files and build the tree from it.
          */
@@ -2652,8 +2652,8 @@ v_inherit_list (svalue_t *sp, int num_arg)
         }
 
     /* Get the memory pool */
-    memsafe(pool = new_mempool(sizeof(*begin) * 64)
-           , sizeof(*begin) * 64, "memory pool");
+    memsafe(pool = new_mempool(size_mempool(sizeof(*begin)))
+           , size_mempool(sizeof(*begin)), "memory pool");
 
     /* Perform a breadth search on ob's inherit tree and append the
      * found programs to the iinfo list while counting them.

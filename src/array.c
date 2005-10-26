@@ -2979,7 +2979,7 @@ make_unique (vector_t *arr, string_t *func, svalue_t *skipnum)
      * TODO: Implement an automatic memory-cleanup in case of errors,
      * TODO:: e.g. by adding a dedicated structure on the runtime stack.
      */
-    pool = new_mempool(arr_size * sizeof(*head));
+    pool = new_mempool(size_mempool(sizeof(*head)));
     if (!pool)
         error("(unique_array) Out of memory: (%lu bytes) for mempool\n"
              , arr_size * sizeof(*head));

@@ -353,6 +353,12 @@ struct memblock_s {
     } u;
 };
 
+#define MEMBLOCK_LIMIT (256)
+  /* Maximum size for the userspace of a memory block.
+   * Using blocks larger than this is likely to run into fragmentation
+   * of the large block heap.
+   */
+
 /* --- struct fifo_s: headblock for a fifo-type allocation ---
  *
  * One of these structures, allocated to a multiple of align_t, is
@@ -401,16 +407,52 @@ struct mempool_s {
 };
 
 /*-------------------------------------------------------------------------*/
-size_t
-fifopool_size (size_t elemsize, unsigned int num)
+static INLINE size_t
+size_pool (size_t elemsize, size_t o_size)
 
-/* Return the size for a fifopool suitable to hold <num> object of size
- * <elemsize>, taking into account all the overhead.
+/* Return the userspace size for a memblock suitable to hold objects of
+ * size <elemsize>, taking into account an per-element overhead of <o_size>
+ * and the maximum memblock size.
+ * The result can be passed as 'size' parameter to new_pool() functions.
  */
 
 {
-    return num * (ROUND(elemsize) + SIZEOF_FIFO_T);
-}
+    size_t esize = (ROUND(elemsize) + o_size);
+    unsigned int num;
+
+    num = MEMBLOCK_LIMIT / esize;
+    if (num < 1)
+        num = 1;
+    return num * esize;
+} /* size_pool() */
+
+/*-------------------------------------------------------------------------*/
+size_t
+size_mempool (size_t elemsize)
+
+/* Return the userspace size for a mempool suitable to hold objects of
+ * size <elemsize>, taking into account an per-element overhead of <o_size>
+ * and the maximum memblock size.
+ * The result can be passed as 'size' parameter to new_mempool().
+ */
+
+{
+    return size_pool(elemsize, 0);
+} /* size_mempool() */
+
+/*-------------------------------------------------------------------------*/
+size_t
+size_fifopool (size_t elemsize)
+
+/* Return the userspace size for a fifopool suitable to hold objects of
+ * size <elemsize>, taking into account an per-element overhead of <o_size>
+ * and the maximum memblock size.
+ * The result can be passed as 'size' parameter to new_fifopool().
+ */
+
+{
+    return size_pool(elemsize, SIZEOF_FIFO_T);
+} /* size_fifopool() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE Mempool
