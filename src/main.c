@@ -1086,8 +1086,8 @@ static Option aOptions[]
       , "  --hostaddr <addr>\n"
       , "  --hostaddr <addr>\n"
         "    Use <addr> as address of this machine, instead of what the\n"
-             "system says. In particular this address will be used to open\n"
-             "the driver ports.\n"
+        "    system says. In particular this address will be used to open\n"
+        "    the driver ports.\n"
       }
 
     , { 0,   "compat",             cCompat,         MY_FALSE

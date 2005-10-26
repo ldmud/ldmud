@@ -5286,6 +5286,11 @@ start_erq_demon (const char *suffix, size_t suffixlen)
 
     (void)signal(SIGCLD, SIG_IGN); /* don't create zombie processes */
 
+    printf("%s Attempting to start erq '%s%s'.\n"
+          , time_stamp(), erq_file, suffix);
+    debug_message("%s Attempting to start erq '%s%s'.\n"
+                 , time_stamp(), erq_file, suffix);
+
     if ((pid = fork()) == 0)
     {
         /* Child */
@@ -5303,7 +5308,6 @@ start_erq_demon (const char *suffix, size_t suffixlen)
                 execl((char *)path, "erq", "--forked", 0);
         }
         write(1, "0", 1);  /* indicate failure back to the driver */
-        printf("%s exec of erq demon failed.\n", time_stamp());
         _exit(1);
     }
 
@@ -5319,6 +5323,9 @@ start_erq_demon (const char *suffix, size_t suffixlen)
     read(sockets[1], &c, 1);
     if (c == '0') {
         close(sockets[1]);
+
+        printf("%s Failed to start erq.\n", time_stamp());
+        debug_message("%s Failed to start erq.\n", time_stamp());
         return;
     }
 
@@ -5327,7 +5334,7 @@ start_erq_demon (const char *suffix, size_t suffixlen)
     set_socket_nonblocking(erq_demon);
     if (socket_number(erq_demon) >= min_nfds)
         min_nfds = socket_number(erq_demon)+1;
-}
+} /* start_erq_demon() */
 
 /*-------------------------------------------------------------------------*/
 static void

@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+30-Mar-2002 (Lars Duening)  (3.3.435)
+  - (comm.c) The driver now logs the pathname of the ERQ executable
+      it attempts to start.
+
 29-Mar-2002 (Lars Duening)  (3.3.434)
   - (config.h.in) The options MALLOC_CHECK and MALLOC_SBRK got mixed up.
   - (gcollect.c) The cleanup code didn't remove the program from the swap
