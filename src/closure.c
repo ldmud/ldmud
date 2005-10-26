@@ -5119,9 +5119,10 @@ closure_operator_to_string (int type)
 
 /*-------------------------------------------------------------------------*/
 string_t *
-closure_to_string (svalue_t * sp)
+closure_to_string (svalue_t * sp, Bool compact)
 
 /* Convert the closure <sp> into a printable string and return it.
+ * If <compact> is true, a compact (spaceless) representation is used.
  */
 
 {
@@ -5153,13 +5154,15 @@ closure_to_string (svalue_t * sp)
       {
         if (l->ob->flags & O_DESTRUCTED)
         {
-            strcat(buf, "<local variable in destructed object>");
+            strcat(buf, compact ? "<dest lvar>"
+                                : "<local variable in destructed object>");
             break;
         }
 
         if (l->function.var_index == VANISHED_VARCLOSURE_INDEX)
         {
-            strcat(buf, "<local variable from replaced program>");
+            strcat(buf, compact ? "<dest lfun>"
+                                : "<local variable from replaced program>");
         }
 
         /* We need the program resident */
@@ -5195,7 +5198,7 @@ closure_to_string (svalue_t * sp)
 
             if (ob->flags & O_DESTRUCTED)
             {
-                strcat(buf, "[<destructed object>]");
+                strcat(buf, compact ? "[<dest obj>]" : "[<destructed object>]");
             }
             else
             {
@@ -5210,7 +5213,8 @@ closure_to_string (svalue_t * sp)
 
         if (ob->flags & O_DESTRUCTED)
         {
-            strcat(buf, "<local function in destructed object>");
+            strcat(buf, compact ? "<dest lfun>" 
+                                : "<local function in destructed object>");
             break;
         }
 
@@ -5258,9 +5262,9 @@ closure_to_string (svalue_t * sp)
     case CLOSURE_PRELIMINARY:    /* Preliminary Lambda Closure */
       {
           if (sp->x.closure_type == CLOSURE_PRELIMINARY)
-              sprintf(buf, "<prelim lambda %p>", l);
+              sprintf(buf, compact ? "<pre %p>" : "<prelim lambda %p>", l);
           else
-              sprintf(buf, "<free lambda %p>", l);
+              sprintf(buf, compact ? "<free %p>" : "<free lambda %p>", l);
           break;
       }
 
@@ -5268,9 +5272,9 @@ closure_to_string (svalue_t * sp)
     case CLOSURE_BOUND_LAMBDA:   /* Bound-Lambda Closure */
       {
           if (sp->x.closure_type == CLOSURE_BOUND_LAMBDA)
-              sprintf(buf, "<bound lambda %p:", l);
+              sprintf(buf, compact ? "<bound %p:" : "<bound lambda %p:", l);
           else
-              sprintf(buf, "<lambda %p:", l);
+              sprintf(buf, compact ? "<%p:" : "<lambda %p:", l);
 
           ob = l->ob;
 

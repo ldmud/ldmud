@@ -61,6 +61,7 @@ extern svalue_t *v_filter (svalue_t *sp, int num_arg);
 extern svalue_t *v_get_type_info (svalue_t *sp, int num_arg);
 extern svalue_t *v_map (svalue_t *sp, int num_arg);
 extern svalue_t *f_member (svalue_t *sp);
+extern svalue_t *f_rmember (svalue_t *sp);
 extern svalue_t *v_min (svalue_t *sp, int num_arg);
 extern svalue_t *v_max (svalue_t *sp, int num_arg);
 extern svalue_t *f_sgn (svalue_t *sp);

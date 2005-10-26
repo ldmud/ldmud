@@ -5076,7 +5076,7 @@ f_to_string (svalue_t *sp)
 
     case T_CLOSURE:
       {
-        string_t * rc = closure_to_string(sp);
+        string_t * rc = closure_to_string(sp, MY_FALSE);
         put_string(sp, rc);
         break;
       }
@@ -5958,10 +5958,10 @@ f_member (svalue_t *sp)
  *   int member(mapping m, mixed key)
  *   int member(string s, int elem)
  *
- * For arrays and strings, returns the index of the second arg in
- * the first arg, or -1 if none found. For mappings it checks, if
- * key is present in mapping m and returns 1 if so, 0 if key is
- * not in m.
+ * For arrays and strings, returns the index of the first occurance of
+ * second arg in the first arg, or -1 if none found. For mappings it
+ * checks, if key is present in mapping m and returns 1 if so, 0 if
+ * key is not in m.
  */
 
 {
@@ -6117,7 +6117,7 @@ f_member (svalue_t *sp)
         return sp;
     }
 
-    /* --- Search a string --- */
+    /* --- Search a mapping --- */
 
     if (sp[-1].type == T_MAPPING)
     {
@@ -6135,6 +6135,198 @@ f_member (svalue_t *sp)
     fatal("Bad arg 1 to member(): type %s\n", typename(sp[-1].type));
     return sp;
 } /* f_member() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_rmember (svalue_t *sp)
+
+/* EFUN rmember()
+ *
+ *   int rmember(mixed *array, mixed elem)
+ *   int rmember(string s, int elem)
+ *
+ * For arrays and strings, returns the index of the last occurance of
+ * second arg in the first arg, or -1 if none found
+ */
+
+{
+    /* --- Search an array --- */
+
+    if (sp[-1].type == T_POINTER)
+    {
+        vector_t *vec;
+        union  u       sp_u;
+        long cnt;
+
+        vec = sp[-1].u.vec;
+        cnt = (long)VEC_SIZE(vec);
+        sp_u = sp->u;
+
+        switch(sp->type)
+        {
+        case T_STRING:
+          {
+            string_t *str;
+            svalue_t *item;
+
+            str = sp_u.str;
+            for (item = vec->item+cnt; --cnt >= 0; )
+            {
+                item--;
+                if (item->type == T_STRING
+                 && mstreq(str, item->u.str))
+                    break;
+            }
+            break;
+          }
+
+        case T_CLOSURE:
+          {
+            short type;
+            svalue_t *item;
+
+            type = sp->type;
+            for (item = vec->item+cnt; --cnt >= 0; )
+            {
+                item--;
+                if (item->type == type && !closure_cmp(sp, item))
+                    break;
+            }
+            break;
+          }
+
+        case T_FLOAT:
+        case T_SYMBOL:
+        case T_QUOTED_ARRAY:
+          {
+            short x_generic;
+            short type;
+            svalue_t *item;
+
+            type = sp->type;
+            x_generic = sp->x.generic;
+            for (item = vec->item+cnt; --cnt >= 0; )
+            {
+                item--;
+                /* TODO: Is this C99 compliant? */
+                if (sp_u.str == item->u.str
+                 && x_generic == item->x.generic
+                 && item->type == type)
+                    break;
+            }
+            break;
+          }
+
+        case T_NUMBER:
+            if (!sp_u.number)
+            {
+                /* Search for 0 is special: it also finds destructed
+                 * objects resp. closures on destructed objects (and
+                 * changes them to 0).
+                 */
+
+                svalue_t *item;
+                short type;
+
+                for (item = vec->item+cnt; --cnt >= 0; )
+                {
+                    item--;
+                    if ( (type = item->type) == T_NUMBER)
+                    {
+                        if ( !item->u.number )
+                            break;
+                    }
+                    else if (destructed_object_ref(item))
+                    {
+                        assign_svalue(item, &const0);
+                        break;
+                    }
+                }
+                break;
+            }
+
+            /* FALLTHROUGH */
+
+        case T_MAPPING:
+        case T_OBJECT:
+        case T_POINTER:
+#ifdef USE_STRUCTS
+        case T_STRUCT:
+#endif /* USE_STRUCTS */
+          {
+            svalue_t *item;
+            short type = sp->type;
+
+            for (item = vec->item+cnt; --cnt >= 0; )
+            {
+                item--;
+                /* TODO: Is this C99 compliant? */
+                if (sp_u.number == item->u.number
+                 && item->type == type)
+                    break;
+            }
+            break;
+          }
+
+        default:
+            if (sp->type == T_LVALUE)
+                error("Reference passed to member()\n");
+            fatal("Bad type to member(): %s\n", typename(sp->type));
+        }
+
+        /* cnt is the correct result */
+
+        free_svalue(sp--);
+        free_svalue(sp);
+        put_number(sp, cnt);
+        return sp;
+    }
+
+    /* --- Search a string --- */
+
+    if (sp[-1].type == T_STRING)
+    {
+        string_t *str;
+        ptrdiff_t i;
+
+        if (sp->type != T_NUMBER)
+            efun_arg_error(2, T_NUMBER, sp->type, sp);
+        str = sp[-1].u.str;
+        i = sp->u.number;
+        if ((i & ~0xff) != 0)
+        {
+            i = -1;
+        }
+        else
+        {
+            char * cp, *start, *str2;
+            start = get_txt(str);
+            cp = start + mstrsize(str);
+            str2 = NULL;
+
+            do
+            {
+                cp--;
+                if (*cp == i)
+                {
+                    str2 = cp;
+                    break;
+                }
+            } while (str2 == NULL && cp != start);
+
+            i = str2 ? (str2 - get_txt(str)) : -1;
+        }
+        free_svalue(sp--);
+        free_svalue(sp);
+        put_number(sp, i);
+        return sp;
+    }
+
+    /* Otherwise it's not searchable */
+
+    fatal("Bad arg 1 to rmember(): type %s\n", typename(sp[-1].type));
+    return sp;
+} /* f_rmember() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *

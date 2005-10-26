@@ -115,7 +115,7 @@ For a detailed list of all changes see the file CHANGELOG.
            available (default is to allow sbrk()).
 
 
-17-Mar-2003 (Lars Duening) -- Release 3.2.10
+19-Mar-2003 (Lars Duening) -- Release 3.2.10
 
     - Changed efuns:
        + debug_info(): Removed the DID_MEM_UNUSED value from the DINFO_DATA:
@@ -126,11 +126,14 @@ For a detailed list of all changes see the file CHANGELOG.
            creation times.
        + function_exists(): now also returns the filename and linenumber
            of a function.
+       + sprintf(), printf(): Modifier '#' for '%O'/'%Q' prints the values
+           in a compact format.
 
     - Corrected efuns:
        + m_add(): Fixed a memory leak when existing entries were overwritten.
 
     - New efuns:
+       + rmember(): Search arrays and strings from the end.
        + variable_exists(): Check the existance of a named variable.
        + variable_list(): Return all variable names of an object.
 

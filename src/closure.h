@@ -113,7 +113,7 @@ extern void      free_closure(svalue_t *svp);
 extern void      store_undef_closure (svalue_t *sp);
 extern Bool      is_undef_closure (svalue_t *sp);
 extern const char * closure_operator_to_string (int type);
-extern string_t * closure_to_string (svalue_t * sp);
+extern string_t *closure_to_string (svalue_t * sp, Bool compact);
 extern svalue_t *v_bind_lambda(svalue_t *sp, int num_arg);
 extern svalue_t *f_lambda(svalue_t *sp);
 extern svalue_t *f_symbol_function(svalue_t *sp);

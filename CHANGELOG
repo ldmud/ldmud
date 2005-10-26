@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+19-Mar-2002 (Lars Duening)  (3.3.427)
+  - (sprintf.c, closure) Modifier '#' used for '%O' and '%Q' produces
+      output in a compact format (suggested by Menaures).
+  - (func_spec, efuns) New efun rmember().
+
 19-Mar-2002 (Lars Duening)  (3.3.426)
   - (structs.c, object.c) Saving and restoring struct now also saves
       the defining program's name, so that external restore modules

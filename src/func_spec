@@ -442,6 +442,7 @@ mapping m_reallocate(mapping, int);
 mixed  *m_values(mapping, int default: F_CONST0);
 mapping mkmapping(mixed *, ...);
 int     member(mixed *|string|mapping, mixed);
+int     rmember(mixed *|string, mixed);
 mixed  *unmkmapping(mapping);
 void    walk_mapping(mapping, string|closure, ...);
 int     widthof(null|mapping);
