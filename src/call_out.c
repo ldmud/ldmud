@@ -487,8 +487,10 @@ found:
         }
     } /* if()for() */
 
+    /* Not found */
+    free_svalue(fun);
     put_number(fun, -1);
-}
+} /* find_call_out() */
 
 /*-------------------------------------------------------------------------*/
 size_t
@@ -639,7 +641,7 @@ count_ref_from_call_outs (void)
             }
         }
     }
-}
+} /* count_ref_from_call_outs() */
 
 #endif /* GC_SUPPORT */
 

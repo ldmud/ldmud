@@ -458,11 +458,12 @@ backend (void)
                 {
                   sprintf(buf, "%s Garbage collection req by %s "
                                "(slow_shut to do: %d, "
-                               "time since last gc: %ld)\n"
+                               "time since last gc: %ld\n"
                              , time_stamp()
                              , gc_request == gcEfun ? "efun" : "allocator"
                              , slow_shut_down_to_do
-                             , (long)(time_now - time_last_gc));
+                             , (long)(time_now - time_last_gc)
+                             );
                   write(1, buf, strlen(buf));
                   command_giver = NULL;
                   current_object = NULL;
@@ -934,9 +935,9 @@ static  mp_int num_cleanup; /* Number of objects to data-clean in this
          *
          * For objects with swapped variables or objects in reset state,
          * the variables are cleaned only every time_to_clean_up seconds,
-         * or 3600 * seconds if the time is 0.
+         * or 3600 seconds if the time is 0.
          */
-        if (num_cleanup > 0)
+        if (num_last_processed <= num_cleanup)
         {
             mp_int delay = 0;
 
@@ -958,8 +959,6 @@ static  mp_int num_cleanup; /* Number of objects to data-clean in this
 
                 cleanup_object(obj);
             }
-
-            num_cleanup--;
         }
 
         /* ------ Clean Up ------ */
@@ -1114,6 +1113,29 @@ no_clean_up:
         } /* if (obj can be swapped) */
 
     } /* End of loop */
+
+    /* If we processed the whole object list, but data-cleant only
+     * some of the objects, we have to move forward the head of the
+     * object list by this number of objects. If we didn't, the
+     * next backend loop would data-clean the same <num_cleanup>
+     * objects we cleant in this one.
+     */
+    if (num_last_processed >= num_listed_objs
+     && num_cleanup < num_listed_objs
+       )
+    {
+        while (num_cleanup-- > 0 && obj_list != obj_list_end)
+        {
+            /* Move obj to the end of the list */
+            obj = obj_list;
+            obj_list = obj->next_all;
+            obj_list->prev_all = NULL;
+            obj->next_all = NULL;
+            obj->prev_all = obj_list_end;
+            obj_list_end->next_all = obj;
+            obj_list_end = obj;
+        } /* while(num_cleanup) */
+    }
 
     /* Update the processing averages
      */
@@ -1350,7 +1372,6 @@ v_garbage_collection (svalue_t *sp, int num_arg)
 
     extra_jobs_to_do = MY_TRUE;
     gc_request = gcEfun;
-    time_last_gc = 0;  /* mark it as an 'unconditional' GC */
 
     return sp;
 } /* v_garbage_collection() */

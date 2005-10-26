@@ -81,8 +81,6 @@ For a detailed list of all changes see the file CHANGELOG.
            a pre-program basis to initialize the variables of clone
            from the current values of the corresponding variables in
            the blueprint.
-       + Preprocessor symbol __FILENAME_SPACES__ is defined if the driver is
-           instructed to allow spaces in filenames.
 
     - Runtime:
        + Revamped the string handling to use refcounted strings everywhere.
@@ -115,12 +113,9 @@ For a detailed list of all changes see the file CHANGELOG.
        + New configuration option '--enable-malloc-sbrk' to selectively allow
            the memory allocator to use sbrk() instead of malloc() where
            available (default is to allow sbrk()).
-       + New commandline option '--filename-spaces'/'--no-filename-spaces'
-           to allow or disallow space characters in filenames (default is to
-           disallow them).
 
 
-07-Mar-2003 (Lars Duening) -- Release 3.2.10
+17-Mar-2003 (Lars Duening) -- Release 3.2.10
 
     - Changed efuns:
        + debug_info(): Removed the DID_MEM_UNUSED value from the DINFO_DATA:
@@ -148,6 +143,8 @@ For a detailed list of all changes see the file CHANGELOG.
     - Language:
        + Macro __MSDOS_FS__ is defined on systems using the MS-DOS
            filesystem conventions.
+       + Preprocessor symbol __FILENAME_SPACES__ is defined if the driver is
+           instructed to allow spaces in filenames.
        + Bugfix: Illegal case ranges like '100..50' now generate
            an error message.
 
@@ -170,6 +167,9 @@ For a detailed list of all changes see the file CHANGELOG.
           to help debugging muds with high system memory usage.
        + Configuration option '--with-optimize' to set the optimization
           level in the generated Makefiles.
+       + New commandline option '--filename-spaces'/'--no-filename-spaces'
+           to allow or disallow space characters in filenames (default is to
+           disallow them).
 
 
 02-Feb-2003 (Lars Duening) -- Release 3.2.9

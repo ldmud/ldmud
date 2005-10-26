@@ -291,4 +291,5 @@ DESCRIPTION -- Argument Parser
 HISTORY
     LDMud 3.2.9 added the --max-thread-pending, --hostname,
     --hostaddr, --args and --random-seed options.
+    LDMud 3.2.10 added the --filename-spaces options.
     LDMud 3.3.378 added --share-variables, --init-variables.

@@ -1,13 +1,21 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-17-Mar-2002 (Lars Duening)
-  - (doc/master) Added missing manpages for the parse_command() supportf
+17-Mar-2002 (Lars Duening)  (3.3.425)
+  - (backend.c, gcollect.c) Corrections to the cleanup code: removed an
+      interaction between the cleanup code and the swapper, which caused an
+      incomplete cleanup; made sure that dirty mappings are compacted just
+      once; and made sure that the backend cleanup code actually cycles
+      through the object list.
+  - (call_out.c) Removed a memory leak in remove_call_out()/find_call_out().
+
+17-Mar-2002 (Lars Duening)  (3.3.424)
+  - (doc/master) Added missing manpages for the parse_command() support
       (reported by Zonk).
   - (main, simulate.c, configure) New commandline option '--filename-spaces'
       to allow space characters in filenames (default is to disallow them).
   - (object.c) Shared variable closures were saved without the '<num>=' header
-       (reported by Menaures and Fiona).
+      (reported by Menaures and Fiona).
 
 17-Mar-2002 (Lars Duening)  (3.3.423)
   - (mapping.c) Removed a memory leak.

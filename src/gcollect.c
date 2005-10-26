@@ -183,8 +183,18 @@ typedef struct cleanup_map_extra_s cleanup_map_extra_t;
  */
 struct cleanup_s
 {
-    ptrtable_t * ptable;    /* Pointertable to catch loops */
+    ptrtable_t * ptable;
+      /* Pointertable to catch loops in the variable values.
+       * This table is re-allocated whenever the object cleant up is
+       * swapped, as the swapper can re-use the already listed memory
+       * blocks.
+       */
     Bool         mcompact;  /* TRUE: mappings are forcibly compacted */
+    ptrtable_t * mtable;
+      /* Pointertable of mappings to compact.
+       * This table holds all mappings listed in mlist so that multiple
+       * encounters of the same dirty mapping are easily recognized.
+       */
     mapping_t  * mlist;
       /* List of mappings to compact. The list is linked through
        * the map->next field.
@@ -235,11 +245,42 @@ cleanup_new (Bool mcompact)
         return NULL;
     }
 
+    rc->mtable = new_pointer_table();
+    if (rc->mtable == NULL)
+    {
+        free_pointer_table(rc->ptable);
+        xfree(rc);
+        outofmemory("object cleanup pointertable");
+        return NULL;
+    }
+
     rc->mcompact = mcompact;
     rc->mlist = NULL;
 
     return rc;
 } /* cleanup_new() */
+
+/*-------------------------------------------------------------------------*/
+static Bool
+cleanup_reset (cleanup_t * context)
+
+/* Reallocate the pointertable in the context.
+ * Return TRUE if successful, and FALSE when out of memory.
+ */
+
+{
+    if (context->ptable)
+        free_pointer_table(context->ptable);
+
+    context->ptable = new_pointer_table();
+    if (context->ptable == NULL)
+    {
+        outofmemory("object cleanup pointertable");
+        return MY_FALSE;
+    }
+
+    return MY_TRUE;
+} /* cleanup_reset() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -249,7 +290,9 @@ cleanup_free (cleanup_t * context)
  */
 
 {
-    free_pointer_table(context->ptable);
+    if (context->ptable)
+        free_pointer_table(context->ptable);
+    free_pointer_table(context->mtable);
     xfree(context);
 } /* cleanup_free() */
 
@@ -382,11 +425,14 @@ cleanup_vector (svalue_t *svp, size_t num, cleanup_t * context)
                 check_map_for_destr(p->u.map);
                 walk_mapping(p->u.map, cleanup_mapping_filter, &extra);
 
-                /* Remember the mapping for later compaction.
+                /* Remember the mapping for later compaction (unless
+                 * we have it already).
                  * Only 'dirty' mappings need to be listed, as the cleanup
                  * can't cause a mapping to add a hash part.
                  */
-                if (p->u.map->hash)
+                if (p->u.map->hash
+                 && NULL != register_pointer(context->mtable, p->u.map)
+                  )
                 {
                     p->u.map->next = context->mlist;
                     context->mlist = ref_mapping(p->u.map);
@@ -414,13 +460,16 @@ cleanup_vector (svalue_t *svp, size_t num, cleanup_t * context)
 } /* cleanup_vector() */
 
 /*-------------------------------------------------------------------------*/
-static void
+static Bool
 cleanup_single_object (object_t * obj, cleanup_t * context)
 
 /* Cleanup object <ob> using context <context>.
  *
  * If the object is on the swap, it will be swapped in for the time
  * of the function.
+ *
+ * Return FALSE if the objects was present in memory, and TRUE if it
+ * had to be swapped in.
  *
  * The function checks all variables of this object for references
  * to destructed objects and removes them. Also, untabled strings
@@ -429,7 +478,7 @@ cleanup_single_object (object_t * obj, cleanup_t * context)
 
 {
 #ifndef NEW_CLEANUP
-    return;
+    return MY_FALSE;
 #else
     int was_swapped = 0;
 
@@ -439,7 +488,7 @@ cleanup_single_object (object_t * obj, cleanup_t * context)
     {
         error("(%s:%d) Out of memory swapping in %s\n", __FILE__, __LINE__
              , get_txt(obj->name));
-        return;
+        return MY_FALSE;
     }
 
 
@@ -463,6 +512,8 @@ cleanup_single_object (object_t * obj, cleanup_t * context)
     {
         swap(obj, was_swapped);
     }
+
+    return was_swapped != 0;
 #endif /* NEW_CLEANUP */
 } /* cleanup_single_object() */
 
@@ -570,7 +621,7 @@ cleanup_object (object_t * obj)
     context = cleanup_new(MY_FALSE);
     if (context != NULL)
     {
-        cleanup_single_object(obj, context);
+        (void)cleanup_single_object(obj, context);
         cleanup_structures(context);
         cleanup_compact_mappings(context);
         cleanup_free(context);
@@ -598,7 +649,16 @@ cleanup_all_objects (void)
         object_t   * ob;
         for (ob = obj_list; ob; ob = ob->next_all)
         {
-            cleanup_single_object(ob, context);
+            /* If the object is swapped for the cleanup, throw away
+             * the pointertable afterwards as the memory locations
+             * are no longer unique.
+             */
+            if ( cleanup_single_object(ob, context)
+             && !cleanup_reset(context))
+            {
+                cleanup_free(context);
+                return;
+            }
         }
         cleanup_structures(context);
         cleanup_compact_mappings(context);
@@ -999,9 +1059,9 @@ mark_object_ref (object_t *ob)
 
 {
     MARK_PLAIN_REF(ob); ob->ref++;
-    mark_program_ref(ob->prog);
-    MARK_MSTRING_REF(ob->name);
-    MARK_MSTRING_REF(ob->load_name);
+    if (ob->prog) mark_program_ref(ob->prog);
+    if (ob->name) MARK_MSTRING_REF(ob->name);
+    if (ob->load_name) MARK_MSTRING_REF(ob->load_name);
 } /* mark_object_ref() */
 
 /*-------------------------------------------------------------------------*/
@@ -1155,9 +1215,13 @@ clear_ref_in_vector (svalue_t *svp, size_t num)
                 p_int num_values;
 
 #ifdef DEBUG
+                /* The initial cleanup phase should take care of compacting
+                 * all dirty mappings, however just in case one slips
+                 * through...
+                 */
                 if (p->u.map->hash != NULL)
                     dprintf1(gcollect_outfd
-                            , "Mapping %p still has a hash part.\n"
+                            , "Mapping %x still has a hash part.\n"
                             , (p_int)p->u.map);
 #endif
                 m = p->u.map;
@@ -1392,12 +1456,16 @@ gc_count_ref_in_closure (svalue_t *csvp)
                 if (type == CLOSURE_LFUN)
                 {
                     if (l->function.lfun.ob->flags & O_DESTRUCTED)
+                    {
                         reference_destructed_object(l->function.lfun.ob);
+                    }
                 }
             }
 
             if (ob->flags & O_DESTRUCTED)
+            {
                 reference_destructed_object(ob);
+            }
 
             if (type == CLOSURE_BOUND_LAMBDA)
             {
@@ -2004,11 +2072,6 @@ garbage_collection(void)
     dobj_count = 0;
     for (ob = gc_obj_list_destructed; ob; ob = next_ob)
     {
-#ifdef DEBUG
-        writes(gcollect_outfd, "DEBUG: GC frees destructed '");
-        writes(gcollect_outfd, get_txt(ob->name));
-        writes(gcollect_outfd, "'\n");
-#endif
         next_ob = ob->next_all;
         free_object(ob, "garbage collection");
         dobj_count++;
