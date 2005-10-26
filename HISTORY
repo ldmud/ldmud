@@ -116,7 +116,7 @@ For a detailed list of all changes see the file CHANGELOG.
            available (default is to allow sbrk()).
 
 
-26-Mar-2003 (Lars Duening) -- Release 3.2.10
+07-Apr-2003 (Lars Duening) -- Release 3.2.10
 
     - Changed efuns:
        + debug_info(): Removed the DID_MEM_UNUSED value from the DINFO_DATA:
@@ -127,6 +127,8 @@ For a detailed list of all changes see the file CHANGELOG.
            creation times.
        + function_exists(): now also returns the filename and linenumber
            of a function.
+       + remove_action(): It is now possible to remove all actions
+           an object defines.
        + sprintf(), printf(): Modifier '#' for '%O'/'%Q' prints the values
            in a compact format.
 

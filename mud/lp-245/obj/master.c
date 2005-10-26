@@ -826,6 +826,41 @@ void move_or_destruct(object what, object to)
 }
 
 //---------------------------------------------------------------------------
+private int
+handle_super_compat (object super, object ob)
+
+/* For compat muds: handle the weight handling in the environment for
+ * prepare_destruct().
+ * Return non-0 if an error occured, and 0 if not.
+ */
+
+{
+    if (super)
+    {
+	mixed error;
+	mixed weight;
+
+	set_this_object(ob);
+	if ( living(ob) ) {
+	    if (error = catch(super->exit(ob),0))
+		write("exit"+": "+error);
+	}
+	if ( error = catch((weight = (mixed)ob->query_weight()),0) ) {
+	    write("query_weight"+": "+error);
+            return 1;
+	}
+	if (weight && intp(weight)) {
+	    if (error = catch(super->add_weight(-weight),0)) {
+		write("add_weight"+": "+error);
+                return 1;
+	    }
+	}
+    }
+
+    return 0;
+}
+
+//---------------------------------------------------------------------------
 mixed prepare_destruct (object ob)
 
 // Prepare the destruction of the given object.
@@ -863,29 +898,8 @@ mixed prepare_destruct (object ob)
 
     /* PLAIN: This whole if (super) {...} block is for compat muds only */
     if (super) {
-	mixed error;
-	mixed weight;
-	object me;
-
-	me = this_object();
-	set_this_object(ob);
-	if ( living(ob) ) {
-	    if (error = catch(super->exit(ob),0))
-		write("exit"+": "+error);
-	}
-	if ( error = catch((weight = (mixed)ob->query_weight()),0) ) {
-	    set_this_object(me);
-	    write("query_weight"+": "+error);
+        if (funcall(#'handle_super_compat, super, ob))
             return;
-	}
-	if (weight && intp(weight)) {
-	    if (error = catch(super->add_weight(-weight),0)) {
-		set_this_object(me);
-		write("add_weight"+": "+error);
-                return;
-	    }
-	}
-	set_this_object(me);
     }
     /* PLAIN: end of compat-mud block */
 

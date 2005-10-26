@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+07-Apr-2002 (Lars Duening)  (3.3.437)
+  - (mud/lp-245) Adapted the set_this_object() usage in the master.
+  - (actions.c) Efun remove_action() can now remove all actions defined
+      by an object (suggested by Menaures).
+
 04-Apr-2002 (Lars Duening)  (3.3.436)
   - (structs.c) When remove_unreferenced_struct() freed the structs, it
       forgot to properly mark the memory blocks as 'allocated', so that

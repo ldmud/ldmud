@@ -25,6 +25,29 @@ DESCRIPTION
         (which might hold array pointers to a global array), simple arithmetic
         and the assignment operators.
 
+BUGS
+        It is currently not possible to directly restore the original
+        current object. So instead of writing
+
+          object me = this_object();
+          set_this_object(that);
+          <some code>
+          set_this_object(me);
+          <more code>
+
+        one has to use a workaround:
+
+          private void doit (object that) {
+            set_this_object(that);
+            <some code>
+          }
+
+          funcall(#'doit, that);
+          <more code>
+
+        Some people would consider this a feature.
+
+
 HISTORY
         LDMud 3.2.10 actively prevents references to global variables
         and function calls by address while set_this_object() is in

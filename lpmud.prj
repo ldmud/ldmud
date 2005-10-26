@@ -61,12 +61,12 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 436)
-(Parent-Version lpmud 3-3 435)
-(Version-Log "Corrected a multiple-free in the GC of structs.")
+(Project-Version lpmud 3-3 437)
+(Parent-Version lpmud 3-3 436)
+(Version-Log "Efun remove_action() can now remove all actions defined by an object.")
 (New-Version-Log
 "")
-(Checkin-Time "Fri, 04 Apr 2003 13:50:21 -0700")
+(Checkin-Time "Mon, 07 Apr 2003 20:36:07 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -103,8 +103,8 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.61 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.499 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.315 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.500 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.316 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.19 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -160,7 +160,7 @@
   (src/access_check.c (lpmud/d/14_access_che 1.15.1.4 644))
   (src/alloca.c (lpmud/d/13_alloca.c 1.11 644))
   (src/actions.h (lpmud/d/11_actions.h 1.6.1.7 644))
-  (src/actions.c (lpmud/d/12_actions.c 1.15.1.40 644))
+  (src/actions.c (lpmud/d/12_actions.c 1.15.1.41 644))
   (src/array.h (lpmud/f/47_array.h 1.18.1.21 644))
   (src/array.c (lpmud/d/12_array.c 1.46.1.47.1.4 644))
   (src/backend.h (lpmud/f/46_backend.h 1.20.1.7 644))
@@ -299,11 +299,11 @@
   (src/wiz_list.h (lpmud/1_wiz_list.h 1.5.1.7.1.2 644))
   (src/wiz_list.c (lpmud/2_wiz_list.c 1.13.1.14.1.3 644))
   (src/xalloc.h (lpmud/g/51_xalloc.h 1.20 644))
-  (src/xalloc.c (lpmud/h/0_xalloc.c 1.2.1.28 644))
+  (src/xalloc.c (lpmud/h/0_xalloc.c 1.2.1.31 644))
   ;(src/xptmalloc.c (lpmud/d/b/1_xptmalloc. 1.6 644))
 
   ;; Build files
-  (src/func_spec (lpmud/c/31_func_spec 1.53.1.45.1.22.1.10 644))
+  (src/func_spec (lpmud/c/31_func_spec 1.53.1.45.1.22.1.11 644))
   (src/string_spec (lpmud/f/6_string_spe 1.14.1.8 644))
   (src/mkfunc.c (lpmud/l/14_mkfunc.c 1.1 644))
   (src/make_func.y (lpmud/b/7_make_func. 1.25.1.30.1.6 644))
@@ -1173,7 +1173,7 @@
   (doc/efun/regexplode (lpmud/p/43_regexplode 1.5 644))
   (doc/efun/regmatch (lpmud/v/26_regmatch 1.4 644))
   (doc/efun/regreplace (lpmud/p/44_regreplace 1.9 644))
-  (doc/efun/remove_action (lpmud/p/45_remove_act 1.3 644))
+  (doc/efun/remove_action (lpmud/p/45_remove_act 1.4 644))
   (doc/efun/remove_call_out (lpmud/p/46_remove_cal 1.3 644))
   (doc/efun/remove_input_to (lpmud/o/15_remove_inp 1.3 644))
   (doc/efun/remove_interactive (lpmud/p/47_remove_int 1.3 644))
@@ -1207,7 +1207,7 @@
   (doc/efun/set_modify_command (lpmud/q/17_set_modify 1.2.1.3 644))
   (doc/efun/set_next_reset (lpmud/l/5_set_next_r 1.6 644))
   (doc/efun/set_prompt (lpmud/q/18_set_prompt 1.2.1.1.1.1 644))
-  (doc/efun/set_this_object (lpmud/c/37_set_this_o 1.7 644))
+  (doc/efun/set_this_object (lpmud/c/37_set_this_o 1.8 644))
   (doc/efun/set_this_player (lpmud/m/18_set_this_p 1.3 644))
   (doc/efun/seteuid (lpmud/q/19_seteuid 1.4 644))
   (doc/efun/sgn (lpmud/k/43_sgn 1.2 644))
@@ -1750,7 +1750,7 @@
   (mud/lp-245/obj/monster.talk.c (lpmud/y/27_monster.ta 1.3 644))
   (mud/lp-245/obj/monster.c (lpmud/y/28_monster.c 1.5 644))
   (mud/lp-245/obj/money.c (lpmud/y/29_money.c 1.2 644))
-  (mud/lp-245/obj/master.c (lpmud/y/30_master.c 1.19 644))
+  (mud/lp-245/obj/master.c (lpmud/y/30_master.c 1.20 644))
   (mud/lp-245/obj/marker.c (lpmud/y/31_marker.c 1.2 644))
   (mud/lp-245/obj/mail_reader.c (lpmud/y/32_mail_reade 1.2 644))
   (mud/lp-245/obj/mag_stone.c (lpmud/y/33_mag_stone. 1.3 644))

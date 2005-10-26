@@ -1880,31 +1880,55 @@ f_remove_action (svalue_t *sp)
  *
  *   int remove_action(string verb, object ob)
  *
- * Removes the action for the optional object, default is for
- * this_player().
+ * Remove the first action defined by the current object with command verb
+ * <verb> from <ob> (default is this_player()).
  * Return 1 if the action was found and removed, and 0 else.
+ *
+ *   int remove_action(int flag, object ob)
+ *
+ * if <flag> is non-0, remove all actionsdefined by the current object from
+ * <ob> (default is this_player()).
+ * Return the number of actions removed.
  */
 
 {
-    object_t *ob;
-    string_t *verb;
+    object_t    *ob;
+    string_t    *verb;
     sentence_t **sentp;
-    action_t *s;
+    action_t    *s;
+    int          rc;
 
     /* Get and test the arguments */
 
     ob = sp->u.ob;
 
-    verb = find_tabled(sp[-1].u.str);
-    if (!verb)
-        verb = (string_t *)f_remove_action; /* won't be found */
+    verb = NULL;
+    if (sp[-1].type == T_STRING)
+    {
+        verb = find_tabled(sp[-1].u.str);
+        if (!verb)
+            verb = (string_t *)f_remove_action; /* won't be found */
+    }
+    else if (sp[-1].type == T_NUMBER)
+    {
+        if (sp[-1].u.number != 0)
+            verb = NULL; /* finds all */
+        else
+            verb = (string_t *)f_remove_action; /* won't be found */
+    }
+    else
+    {
+        efun_gen_arg_error(1, sp[-1].type, sp);
+        /* NOTREACHED */
+    }
 
     /* Now search and remove the sentence */
+    rc = 0;
     sentp = &ob->sent;
     ob = current_object;
     while ( NULL != (s = (action_t *)*sentp) )
     {
-        if (s->ob == ob && s->verb == verb)
+        if (s->ob == ob && (!verb || s->verb == verb))
         {
 #ifdef CHECK_OBJECT_REF
             if (sentp == &ob->sent)
@@ -1915,17 +1939,22 @@ f_remove_action (svalue_t *sp)
             *sentp = s->sent.next;
 #endif /* CHECK_OBJECT_REF */
             free_action_sent(s);
-            break;
+            rc++;
+            if (verb != NULL)
+                break;
         }
-        sentp = &s->sent.next;
+        else
+        {
+            sentp = &s->sent.next;
+        }
     }
 
     /* Clean up the stack and push the result */
     free_object_svalue(sp);
     sp--;
-    free_string_svalue(sp);
+    free_svalue(sp);
 
-    put_number(sp, s != 0);
+    put_number(sp, rc);
 
     return sp;
 } /* f_remove_action() */
