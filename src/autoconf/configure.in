@@ -603,29 +603,29 @@ fi
 
 if test "x$enable_use_system_crypt" = "x" || test "x$enable_use_system_crypt" = "xyes"; then
     AC_CHECK_FUNCS(crypt _crypt)
-    AC_CACHE_CHECK(if -lcrypt is needed, lp_cv_need_lib_crypt,
-        AC_TRY_RUN([
-void t (void)
-{
-#ifdef HAS_CRYPT
-    crypt("foo", "bar");
-#endif
-#ifdef HAS__CRYPT
-    _crypt("foo", "bar");
-#endif
-}
-int main(void)
-{
-    return 0;
-}
-        ],
-        lp_cv_need_lib_crypt=no,
-        lp_cv_need_lib_crypt=yes
-    ))
-    if test "$lp_cv_need_lib_crypt" = "yes"; then
-        AC_CHECK_LIB(crypto,main, LIBS="$LIBS -lcrypto")
-        AC_CHECK_LIB(crypt,main, LIBS="$LIBS -lcrypt")
-    fi
+
+    echo "LIBS :$LIBS:"
+    for lp_lib in crypt crypto; do
+        if test "$ac_cv_func_crypt" != "yes" -a "$ac_cv_func__crypt" != "yes"; then
+            # Try linking with lib$lp_lib
+            unset ac_cv_func_crypt
+            unset ac_cv_func__crypt
+            lp_save_libs="$LIBS"
+            AC_CHECK_LIB($lp_lib,main, LIBS="$LIBS -l$lp_lib")
+            echo "LIBS now :$LIBS:"
+
+            if test "$SAVE_LIBS" != "$LIBS" ; then
+                AC_CHECK_FUNCS(crypt _crypt)
+                if test "$ac_cv_func_crypt" != "yes" -a "$ac_cv_func__crypt" != "yes"; then
+                    # They are not in this library
+                    LIBS="$lp_save_libs"
+            echo "LIBS reset :$LIBS:"
+                fi
+            fi
+        fi
+    done
+    echo "LIBS :$LIBS:"
+
 fi
 
 # --- Check for functions ---

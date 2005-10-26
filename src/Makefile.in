@@ -33,7 +33,7 @@ ERQ_DIR= @libexecdir@
 # Typical profiling, warning and optimizing options.
 #   -p -DMARK: together they enable the profiling of VM instructions.
 #   Additional profiling can be activated in config.h .
-#PROFIL=-p -DMARK
+#PROFIL=-pg -DMARK
 #PROFIL=-pg
 PROFIL=
 

@@ -82,12 +82,14 @@
  *   void LOAD_SHORT([unsigned] short d, bytecode_p p)
  *     Load the (unsigned) short 'd' stored at <p>, the LOAD_ variant
  *     then increments <p>.
+ *     TODO: Currently, all SHORTs must be 2 bytes.
  *
  *   void PUT_SHORT (bytecode_p p, [unsigned] short d)
  *   void STORE_SHORT(bytecode_p p, [unsigned] short d)
  *   void RSTORE_SHORT(bytecode_p p, [unsigned] short d)
  *     Store the (unsigned) short <d> into <p>, the STORE_ variant
  *     then increments <p>. The RSTORE_ variant pre-decrements <p>.
+ *     TODO: Currently, all SHORTs must be 2 bytes.
  *
  *   void GET_INT16 ([unsigned] int16 d, bytecode_p p)
  *   void LOAD_INT16([unsigned] int16 d, bytecode_p p)
@@ -98,12 +100,14 @@
  *   void LOAD_LONG([unsigned] long d, bytecode_p p)
  *     Load the (unsigned) long 'd' stored at <p>, the LOAD_ variant
  *     then increments <p>.
+ *     TODO: Currently, all LONGs must be 4 bytes.
  *
  *   void PUT_LONG (bytecode_p p, [unsigned] long d)
  *   void STORE_LONG(bytecode_p p, [unsigned] long d)
  *   void RSTORE_LONG(bytecode_p p, [unsigned] long d)
  *     Store the (unsigned) long <d> into <p>, the STORE_ variant
  *     then increments <p>. The RSTORE_ variant pre-decrements <p>.
+ *     TODO: Currently, all LONGs must be 4 bytes.
  *
  *   void LOAD_INT32([unsigned] int32 d, bytecode_p p)
  *   void GET_INT32([unsigned] int32 d, bytecode_p p)
@@ -217,25 +221,42 @@ typedef bytecode_t    * bytecode_p;
                           ((char *)(p))[3] = ((char *)&(d))[3] )
 
 
-#define GET_SHORT(d,p)    GET_2BYTE(d,p)
-#define LOAD_SHORT(d,p)   LOAD_2BYTE(d,p)
-#define PUT_SHORT(p,d)    MACRO(unsigned short _us = (unsigned short)d; \
-                                PUT_2BYTE(p,_us);)
-#define STORE_SHORT(p,d)  MACRO(unsigned short _us = (unsigned short)d; \
-                               STORE_2BYTE(p,_us);)
-#define RSTORE_SHORT(p,d) MACRO(unsigned short _us = (unsigned short)d; \
-                               RSTORE_2BYTE(p,_us);)
-  /* TODO: The above assumes sizeof(short) == 2. */
+#if SIZEOF_SHORT == 2
+#  define GET_SHORT(d,p)    GET_2BYTE(d,p)
+#  define LOAD_SHORT(d,p)   LOAD_2BYTE(d,p)
+#  define PUT_SHORT(p,d)    MACRO(unsigned short _us = (unsigned short)d; \
+                                  PUT_2BYTE(p,_us);)
+#  define STORE_SHORT(p,d)  MACRO(unsigned short _us = (unsigned short)d; \
+                                 STORE_2BYTE(p,_us);)
+#  define RSTORE_SHORT(p,d) MACRO(unsigned short _us = (unsigned short)d; \
+                                 RSTORE_2BYTE(p,_us);)
+#else
+#  error "Unsupported size of short."
+#endif
 
-#define GET_LONG(d,p)    GET_4BYTE(d,p)
-#define LOAD_LONG(d,p)   LOAD_4BYTE(d,p)
-#define PUT_LONG(p,d)    MACRO(unsigned long _us = (unsigned long)d; \
-                                PUT_4BYTE(p,_us);)
-#define STORE_LONG(p,d)  MACRO(unsigned long _us = (unsigned long)d; \
-                               STORE_4BYTE(p,_us);)
-#define RSTORE_LONG(p,d) MACRO(unsigned long _us = (unsigned long)d; \
-                               RSTORE_4BYTE(p,_us);)
-  /* TODO: The above assumes sizeof(long) == 4. */
+#if SIZEOF_LONG == 4
+#  define GET_LONG(d,p)    GET_4BYTE(d,p)
+#  define LOAD_LONG(d,p)   LOAD_4BYTE(d,p)
+#  define PUT_LONG(p,d)    MACRO(unsigned long _us = (unsigned long)d; \
+                                 PUT_4BYTE(p,_us);)
+#  define STORE_LONG(p,d)  MACRO(unsigned long _us = (unsigned long)d; \
+                                 STORE_4BYTE(p,_us);)
+#  define RSTORE_LONG(p,d) MACRO(unsigned long _us = (unsigned long)d; \
+                                 RSTORE_4BYTE(p,_us);)
+#elif SIZEOF_LONG == 8 && SIZEOF_INT == 4
+#  define GET_LONG(d,p)    MACRO(int _ui; GET_4BYTE(_ui,p); \
+                                 d = _ui;)
+#  define LOAD_LONG(d,p)   MACRO(int _ui; LOAD_4BYTE(_ui,p); \
+                                 d = _ui;)
+#  define PUT_LONG(p,d)    MACRO(unsigned int _ui = (unsigned int)d; \
+                                 PUT_4BYTE(p,_ui);)
+#  define STORE_LONG(p,d)  MACRO(unsigned int _ui = (unsigned int)d; \
+                                 STORE_4BYTE(p,_ui);)
+#  define RSTORE_LONG(p,d) MACRO(unsigned int _ui = (unsigned int)d; \
+                                 RSTORE_4BYTE(p,_ui);)
+#else
+#  error "Unsupported size of long."
+#endif
 
 #define LOAD_INT16(d,p)  LOAD_2BYTE(d,p)
 

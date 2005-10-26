@@ -9,6 +9,7 @@
  *------------------------------------------------------------------
  */
 
+#include "../machine.h"
 #include <stdio.h>
 
 /*--------------------------------------------------------------------*/
@@ -25,9 +26,26 @@ typedef struct des_ks_struct
 #define DES_DECRYPT    0
 
 typedef unsigned char   crypt_uchar;
+
+#if SIZEOF_SHORT == 2
 typedef unsigned short  crypt_ushort;
+#else
+#  error "Unsupported size of short."
+#endif
+
+#if SIZEOF_INT == 4
 typedef unsigned int    crypt_uint;
+#else
+#  error "Unsupported size of int."
+#endif
+
+#if SIZEOF_LONG == 4
 typedef unsigned long   crypt_ulong;
+#elif SIZEOF_INT == 4
+typedef unsigned int    crypt_ulong;
+#else
+#  error "Unsupported size of long."
+#endif
 
 static void body(crypt_ulong *out0, crypt_ulong *out1, des_key_schedule *ks, crypt_ulong Eswap0, crypt_ulong Eswap1);
 

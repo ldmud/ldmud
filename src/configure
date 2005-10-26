@@ -7837,77 +7837,102 @@ _ACEOF
 fi
 done
 
-    echo "$as_me:$LINENO: checking if -lcrypt is needed" >&5
-echo $ECHO_N "checking if -lcrypt is needed... $ECHO_C" >&6
-if test "${lp_cv_need_lib_crypt+set}" = set; then
+
+    echo "LIBS :$LIBS:"
+    for lp_lib in crypt crypto; do
+        if test "$ac_cv_func_crypt" != "yes" -a "$ac_cv_func__crypt" != "yes"; then
+            # Try linking with lib$lp_lib
+            unset ac_cv_func_crypt
+            unset ac_cv_func__crypt
+            lp_save_libs="$LIBS"
+            as_ac_Lib=`echo "ac_cv_lib_$lp_lib''_main" | $as_tr_sh`
+echo "$as_me:$LINENO: checking for main in -l$lp_lib" >&5
+echo $ECHO_N "checking for main in -l$lp_lib... $ECHO_C" >&6
+if eval "test \"\${$as_ac_Lib+set}\" = set"; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
 else
-  if test "$cross_compiling" = yes; then
-  { { echo "$as_me:$LINENO: error: cannot run test program while cross compiling" >&5
-echo "$as_me: error: cannot run test program while cross compiling" >&2;}
-   { (exit 1); exit 1; }; }
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-l$lp_lib  $LIBS"
+cat >conftest.$ac_ext <<_ACEOF
+#line $LINENO "configure"
+#include "confdefs.h"
+
+
+int
+main ()
+{
+main ();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+         { ac_try='test -s conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  eval "$as_ac_Lib=yes"
+else
+  echo "$as_me: failed program was:" >&5
+cat conftest.$ac_ext >&5
+eval "$as_ac_Lib=no"
+fi
+rm -f conftest.$ac_objext conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+echo "$as_me:$LINENO: result: `eval echo '${'$as_ac_Lib'}'`" >&5
+echo "${ECHO_T}`eval echo '${'$as_ac_Lib'}'`" >&6
+if test `eval echo '${'$as_ac_Lib'}'` = yes; then
+  LIBS="$LIBS -l$lp_lib"
+fi
+
+            echo "LIBS now :$LIBS:"
+
+            if test "$SAVE_LIBS" != "$LIBS" ; then
+
+
+for ac_func in crypt _crypt
+do
+as_ac_var=`echo "ac_cv_func_$ac_func" | $as_tr_sh`
+echo "$as_me:$LINENO: checking for $ac_func" >&5
+echo $ECHO_N "checking for $ac_func... $ECHO_C" >&6
+if eval "test \"\${$as_ac_var+set}\" = set"; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
 else
   cat >conftest.$ac_ext <<_ACEOF
 #line $LINENO "configure"
 #include "confdefs.h"
-
-void t (void)
-{
-#ifdef HAS_CRYPT
-    crypt("foo", "bar");
+/* System header to define __stub macros and hopefully few prototypes,
+    which can conflict with char $ac_func (); below.  */
+#include <assert.h>
+/* Override any gcc2 internal prototype to avoid an error.  */
+#ifdef __cplusplus
+extern "C"
 #endif
-#ifdef HAS__CRYPT
-    _crypt("foo", "bar");
-#endif
-}
-int main(void)
-{
-    return 0;
-}
-
-_ACEOF
-rm -f conftest$ac_exeext
-if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
-  (eval $ac_link) 2>&5
-  ac_status=$?
-  echo "$as_me:$LINENO: \$? = $ac_status" >&5
-  (exit $ac_status); } && { ac_try='./conftest$ac_exeext'
-  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
-  (eval $ac_try) 2>&5
-  ac_status=$?
-  echo "$as_me:$LINENO: \$? = $ac_status" >&5
-  (exit $ac_status); }; }; then
-  lp_cv_need_lib_crypt=no
-else
-  echo "$as_me: program exited with status $ac_status" >&5
-echo "$as_me: failed program was:" >&5
-cat conftest.$ac_ext >&5
-( exit $ac_status )
-lp_cv_need_lib_crypt=yes
-
-fi
-rm -f core core.* *.core gmon.out bb.out conftest$ac_exeext conftest.$ac_objext conftest.$ac_ext
-fi
-fi
-echo "$as_me:$LINENO: result: $lp_cv_need_lib_crypt" >&5
-echo "${ECHO_T}$lp_cv_need_lib_crypt" >&6
-    if test "$lp_cv_need_lib_crypt" = "yes"; then
-        echo "$as_me:$LINENO: checking for main in -lcrypto" >&5
-echo $ECHO_N "checking for main in -lcrypto... $ECHO_C" >&6
-if test "${ac_cv_lib_crypto_main+set}" = set; then
-  echo $ECHO_N "(cached) $ECHO_C" >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lcrypto  $LIBS"
-cat >conftest.$ac_ext <<_ACEOF
-#line $LINENO "configure"
-#include "confdefs.h"
-
+/* We use char because int might match the return type of a gcc2
+   builtin and then its argument prototype would still apply.  */
+char $ac_func ();
+char (*f) ();
 
 int
 main ()
 {
-main ();
+/* The GNU C library defines this for functions which it implements
+    to always fail with ENOSYS.  Some functions are actually named
+    something starting with __ and the normal name is an alias.  */
+#if defined (__stub_$ac_func) || defined (__stub___$ac_func)
+choke me
+#else
+f = $ac_func;
+#endif
+
   ;
   return 0;
 }
@@ -7924,69 +7949,34 @@ if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
   ac_status=$?
   echo "$as_me:$LINENO: \$? = $ac_status" >&5
   (exit $ac_status); }; }; then
-  ac_cv_lib_crypto_main=yes
+  eval "$as_ac_var=yes"
 else
   echo "$as_me: failed program was:" >&5
 cat conftest.$ac_ext >&5
-ac_cv_lib_crypto_main=no
+eval "$as_ac_var=no"
 fi
 rm -f conftest.$ac_objext conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
 fi
-echo "$as_me:$LINENO: result: $ac_cv_lib_crypto_main" >&5
-echo "${ECHO_T}$ac_cv_lib_crypto_main" >&6
-if test $ac_cv_lib_crypto_main = yes; then
-  LIBS="$LIBS -lcrypto"
-fi
-
-        echo "$as_me:$LINENO: checking for main in -lcrypt" >&5
-echo $ECHO_N "checking for main in -lcrypt... $ECHO_C" >&6
-if test "${ac_cv_lib_crypt_main+set}" = set; then
-  echo $ECHO_N "(cached) $ECHO_C" >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lcrypt  $LIBS"
-cat >conftest.$ac_ext <<_ACEOF
-#line $LINENO "configure"
-#include "confdefs.h"
-
-
-int
-main ()
-{
-main ();
-  ;
-  return 0;
-}
+echo "$as_me:$LINENO: result: `eval echo '${'$as_ac_var'}'`" >&5
+echo "${ECHO_T}`eval echo '${'$as_ac_var'}'`" >&6
+if test `eval echo '${'$as_ac_var'}'` = yes; then
+  cat >>confdefs.h <<_ACEOF
+#define `echo "HAVE_$ac_func" | $as_tr_cpp` 1
 _ACEOF
-rm -f conftest.$ac_objext conftest$ac_exeext
-if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
-  (eval $ac_link) 2>&5
-  ac_status=$?
-  echo "$as_me:$LINENO: \$? = $ac_status" >&5
-  (exit $ac_status); } &&
-         { ac_try='test -s conftest$ac_exeext'
-  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
-  (eval $ac_try) 2>&5
-  ac_status=$?
-  echo "$as_me:$LINENO: \$? = $ac_status" >&5
-  (exit $ac_status); }; }; then
-  ac_cv_lib_crypt_main=yes
-else
-  echo "$as_me: failed program was:" >&5
-cat conftest.$ac_ext >&5
-ac_cv_lib_crypt_main=no
-fi
-rm -f conftest.$ac_objext conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-echo "$as_me:$LINENO: result: $ac_cv_lib_crypt_main" >&5
-echo "${ECHO_T}$ac_cv_lib_crypt_main" >&6
-if test $ac_cv_lib_crypt_main = yes; then
-  LIBS="$LIBS -lcrypt"
-fi
 
-    fi
+fi
+done
+
+                if test "$ac_cv_func_crypt" != "yes" -a "$ac_cv_func__crypt" != "yes"; then
+                    # They are not in this library
+                    LIBS="$lp_save_libs"
+            echo "LIBS reset :$LIBS:"
+                fi
+            fi
+        fi
+    done
+    echo "LIBS :$LIBS:"
+
 fi
 
 # --- Check for functions ---

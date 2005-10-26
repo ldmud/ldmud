@@ -41,7 +41,13 @@
  * and last word in the "user area" for their link pointers; the small
  * chunks are themselves kept in a list and use their first word for the
  * list pointer. To reduce memory fragmentation, the allocator detects
- * adjacent free small blocks and merges them.
+ * adjacent free small blocks at the time of freeing and merges them.
+ *
+ * While this defragmentation scheme causes small blocks to change their
+ * size often, it does not pay to put off the merging until a later point
+ * in time (e.g. when no suitably sized block can be found): tests showed
+ * a slow down of the small block allocation/deallocation combo with
+ * defragmentation by 4.3% over no defragmentation.
  *
  * If a small block can't be allocated from the appropriate free list nor
  * the small chunk, the system tries two more strategies before allocating

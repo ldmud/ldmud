@@ -60,12 +60,13 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 463)
-(Parent-Version lpmud 3-3 462)
-(Version-Log "Corrected compilation errors in sysmalloc.c and ptmalloc/malloc.c")
+(Project-Version lpmud 3-3 464)
+(Parent-Version lpmud 3-3 463)
+(Version-Log "Improved the detection of libcrypt and libcrypto.
+Added a number of macros to deal with 64-bit machines in bytecode.h")
 (New-Version-Log
 "")
-(Checkin-Time "Wed, 23 Jul 2003 21:23:47 -0600")
+(Checkin-Time "Thu, 24 Jul 2003 20:12:22 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -103,20 +104,20 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.10 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.67 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.526 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.527 644))
   (HISTORY (lpmud/f/49_HISTORY 1.328 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
   ;; Configuration
-  (src/configure (lpmud/d/0_configure 1.19.1.81 755))
+  (src/configure (lpmud/d/0_configure 1.19.1.82 755))
   (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.34 644))
   (src/machine.h.in (lpmud/b/9_machine.h. 1.9.1.6 644))
-  (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.19.1.17 644))
+  (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.19.1.18 644))
   (src/mkinstalldirs (lpmud/c/4_mkinstalld 1.1 644))
   (src/install-sh (lpmud/c/5_install-sh 1.2 755))
 
-  (src/autoconf/configure.in (lpmud/d/7_configure. 1.20.1.9.1.71 644))
+  (src/autoconf/configure.in (lpmud/d/7_configure. 1.20.1.9.1.72 644))
   (src/autoconf/acconfig.h (lpmud/d/10_acconfig.h 1.6.1.6 644))
 
   (src/settings/README (lpmud/c/22_README 1.14.1.15 644))
@@ -166,7 +167,7 @@
   (src/backend.c (lpmud/d/6_backend.c 1.68.1.35.1.28 644))
   (src/bitstrings.h (lpmud/i/47_bitstrings 1.3 644))
   (src/bitstrings.c (lpmud/i/48_bitstrings 1.14 644))
-  (src/bytecode.h (lpmud/a/b/26_bytecode.h 1.1.1.2 644))
+  (src/bytecode.h (lpmud/a/b/26_bytecode.h 1.1.1.3 644))
   (src/call_out.h (lpmud/f/45_call_out.h 1.7.1.6 644))
   (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.26 644))
   (src/closure.h (lpmud/f/44_closure.h 1.7.1.17 644))
@@ -284,7 +285,7 @@
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.32 644))
   (src/simulate.c (lpmud/31_simulate.c 1.88.1.111 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.14 644))
-  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.80 644))
+  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.81 644))
   (src/structs.h (lpmud/d/b/5_structs.h 1.4 644))
   (src/structs.c (lpmud/d/b/6_structs.c 1.13 644))
   (src/sysmalloc.h (lpmud/c/b/33_sysmalloc. 1.2 644))
@@ -312,7 +313,7 @@
 
   ;; Generic host files
   (src/hosts/README (lpmud/h/10_README 1.2 644))
-  (src/hosts/crypt.c (lpmud/b/29_crypt.c 1.6 644))
+  (src/hosts/crypt.c (lpmud/b/29_crypt.c 1.7 644))
   (src/hosts/defines.txt (lpmud/b/28_defines 1.6.1.4 644))
   (src/hosts/unix.h (lpmud/d/37_unix.h 1.11 644))
 
@@ -899,6 +900,7 @@
   (src/wk/tubmud.stuff (lpmud/l/18_tubmud.stu 1.8 644))
   (src/wk/webster.c (lpmud/e/39_webster.c 1.1 644))
   (src/wk/webster.h (lpmud/e/40_webster.h 1.1 644))
+  (src/wk/machine.h-opteron (lpmud/e/b/9_machine.h- 1.1 644))
   (src/wk/ff-3.3.339-diffs/src/settings/hogwarts (lpmud/c/b/36_hogwarts 1.1 755))
   (src/wk/ff-3.3.339-diffs/src/settings/ff-test (lpmud/c/b/37_ff-test 1.1 755))
   (src/wk/ff-3.3.339-diffs/src/pkg-stringcompiler.c (lpmud/c/b/38_pkg-string 1.1 644))
