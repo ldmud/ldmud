@@ -5597,11 +5597,11 @@ save_struct (struct_t *st)
         L_PUTC_EPILOG
     }
 
-    /* The name as fake member */
+    /* The unique name (struct_name prog_name #id) as fake member */
     {
-        svalue_t name;
+        svalue_t   name;
 
-        put_string(&name, struct_name(st));
+        put_string(&name, struct_unique_name(st));
         save_svalue(&name, ',', MY_FALSE);
     }
 
@@ -7162,6 +7162,10 @@ restore_struct (svalue_t *svp, char **str)
     /* Get the name of the struct, and from it the type pointer */
     {
         svalue_t name;
+        string_t * struct_name;
+        string_t * prog_name;
+        long pos;
+
         if (!restore_svalue(&name, str, ','))
             return MY_FALSE;
         if (name.type != T_STRING)
@@ -7170,8 +7174,71 @@ restore_struct (svalue_t *svp, char **str)
             return MY_FALSE;
         }
         siz--;
-        stt = struct_find(name.u.str, current_object->prog);
+
+        /* Accept both 'struct_name' and 'struct_name prog_name #id'
+         * as formats.
+         */
+        pos = mstrchr(name.u.str, ' ');
+        if (pos < 0)
+        {
+            struct_name = ref_mstring(name.u.str);
+            prog_name = NULL;
+        }
+        else
+        {
+            long pos2;
+
+            pos2 = mstrchr(name.u.str, '#');
+            if (pos2 < 0)
+            {
+                free_mstring(name.u.str);
+                return MY_FALSE;
+            }
+            struct_name = mstr_extract(name.u.str, 0, pos-1);
+            prog_name = mstr_extract(name.u.str, pos+1, pos2-2);
+            if (!compat_mode)
+            {
+               string_t * tmp;
+               tmp = add_slash(prog_name);
+               if (tmp)
+               {
+                   free_mstring(prog_name);
+                   prog_name = tmp;
+               }
+            }
+        }
         free_mstring(name.u.str);
+
+        /* First, search the struct in the current program.
+         * This allows to move inherited structs between modules without
+         * breaking the savefiles.
+         */
+        stt = struct_find(struct_name, current_object->prog);
+        if (!stt && prog_name != NULL)
+        {
+            do {
+                /* Alternatively try to find the struct by its program name.
+                 */
+                object_t *obj = get_object(prog_name);
+
+                if (!obj)
+                    break;
+
+                if (O_PROG_SWAPPED(obj)
+                 && load_ob_from_swap(obj) < 0
+                   )
+                    break;
+
+                stt = struct_find(struct_name, obj->prog);
+            } while(0);
+        }
+
+        /* Now stt is either NULL or the struct type */
+
+        free_mstring(struct_name);
+        if (prog_name)
+            free_mstring(prog_name);
+
         if (!stt || struct_t_size(stt) != siz)
         {
             return MY_FALSE;
@@ -7922,7 +7989,9 @@ static int nesting = 0;  /* Used to detect recursive calls */
         buff[len] = '\0';
     }
     else
+    {
         file = get_txt(sp->u.str);
+    }
 
 
     /* No use in restoring a destructed object, or an object

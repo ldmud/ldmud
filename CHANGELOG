@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+19-Mar-2002 (Lars Duening)  (3.3.426)
+  - (structs.c, object.c) Saving and restoring struct now also saves
+      the defining program's name, so that external restore modules
+      can restore the values (reported by Bardioc).
+
 17-Mar-2002 (Lars Duening)  (3.3.425)
   - (backend.c, gcollect.c) Corrections to the cleanup code: removed an
       interaction between the cleanup code and the swapper, which caused an

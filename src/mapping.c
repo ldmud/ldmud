@@ -2064,7 +2064,6 @@ compact_mapping (mapping_t *m, Bool force)
      * straight).
      */
 
-dprintf1(gcollect_outfd, "DEBUG: Compacting mapping %x\n", (p_int)m);
     num_values = m->num_values;
 
     m2 = get_new_mapping(m->user, num_values, 0, m->num_entries);

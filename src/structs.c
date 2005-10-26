@@ -1011,6 +1011,8 @@ struct_t_unique_name (struct_type_t *pSType)
  *
  * Compose and return the unique name of struct type <pSType>.
  * The returned string reference is not counted.
+ *
+ * The value save/restore routines rely on the format of this string.
  */
 
 {
@@ -1019,7 +1021,7 @@ struct_t_unique_name (struct_type_t *pSType)
     if (pSType->unique_name)
         return pSType->unique_name;
 
-    sprintf(name, "%s (%s #%ld)"
+    sprintf(name, "%s %s #%ld"
                 , get_txt(struct_t_name(pSType))
                 , get_txt(struct_t_pname(pSType))
                 , struct_t_pid(pSType)
