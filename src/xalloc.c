@@ -13,6 +13,7 @@
 
 #include "driver.h"
 
+#include <ctype.h>
 #include <stddef.h>
 #include <stdio.h>
 
@@ -241,8 +242,9 @@ mdb_log_sbrk (p_int size)
  *   static void mem_mark_collectable (POINTER p)
  *     Mark a block as permanent resp. collectable
  *
- *   void mem_consolidate ()
+ *   void mem_consolidate (bool force)
  *     Do whatever consolidation is useful.
+ *     <force> is true after a GC, and false when called from the backend.
  *
  *   void mem_dump_data (strbuf_t *sbuf)
  *   void mem_dinfo_data (svalue_t *svp, int value)
@@ -855,15 +857,47 @@ print_block (int d, word_t *block)
     }
 #endif
 
-    /* Print a hexdump, but not more than 70 characters */
-    size = mem_block_size(block);
-    if (size > 70)
+    /* Print a hexdump, but not more than 80 bytes */
     {
-        write(d, "\n", 1);
-        return;
+        int limit = 80;
+        char * cp;
+
+        size = mem_block_size(block) - XM_OVERHEAD;
+        cp = (char *)(block + XM_OVERHEAD);
+
+        while (size > 0 && limit > 0)
+        {
+            /* Start of line: print the address */
+            dprintf1(d, "%x:", (p_int)cp);
+
+            /* Print the up to 16 bytes after cp as hex values */
+            for (i = 0; i < 16 && i < size && i < limit; i++)
+                dprintf1(d, " %X", cp[i]);
+
+            /* Align foward to the character interpretation */
+            for (; i < 16; i++)
+                writes(d, "   ");
+
+            writes(d, "  ");
+
+            /* Print the same data as characters */
+            for (i = 0; i < 16 && i < size && i < limit; i++)
+            {
+                if (isprint(cp[i]))
+                    write(d, cp+i, 1);
+                else
+                    writes(d, ".");
+            }
+
+            writes(d, "\n");
+
+            cp += i;
+            size -= i;
+            limit -= i;
+        }
     }
-    write(d, (char *)(block+XM_OVERHEAD), size);
-    write(d, "\n\n", 2);
+
+    writes(d, "\n");
 } /* print_block() */
 
 #endif /* GC_SUPPORT */

@@ -708,7 +708,7 @@ reallocate_reserved_areas (void)
 void
 write_x (int d, p_uint i)
 
-/* Memory safe function to write hexvalue <i> to fd <d>. */
+/* Memory safe function to write 4-byte hexvalue <i> to fd <d>. */
 
 {
     int j;
@@ -720,7 +720,25 @@ write_x (int d, p_uint i)
             c += (char)('a' - ('9' + 1));
         write(d, &c, 1);
     }
-}
+} /* write_x() */
+
+/*-------------------------------------------------------------------------*/
+void
+write_X (int d, unsigned char i)
+
+/* Memory safe function to write 1-byte hexvalue <i> to fd <d>. */
+
+{
+    int j;
+    char c;
+
+    for (j = 2 * sizeof i; --j >= 0; i <<= 4) {
+        c = (char)((i >> (8 * sizeof i - 4) ) + '0');
+        if (c >= '9' + 1)
+            c += (char)('a' - ('9' + 1));
+        write(d, &c, 1);
+    }
+} /* write_X() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -739,7 +757,7 @@ writed (int d, p_uint i)
         write(d, &c, 1);
         j /= 10;
     } while (j > 0);
-}
+} /* writed() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -756,7 +774,8 @@ char *
 dprintf_first (int fd, char *s, p_int a)
 
 /* Write the string <s> up to the next "%"-style argument to <fd>, the
- * write <a> according to the %-formatter. Recognized are %s, %d, and %a.
+ * write <a> according to the %-formatter. Recognized are %s, %d, %c,
+ * %x (4-Byte hex) and %X (a 1-Byte hex).
  * If no %-formatter is present, the whole string is written.
  *
  * Result is a pointer to the remaining string.
@@ -786,6 +805,9 @@ dprintf_first (int fd, char *s, p_int a)
             break;
         case 'x':
             write_x(fd, a);
+            break;
+        case 'X':
+            write_X(fd, (unsigned char)a);
             break;
         }
         return p+2;

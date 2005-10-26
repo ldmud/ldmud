@@ -2125,7 +2125,7 @@ garbage_collection(void)
      */
     mb_release();
 
-    /* Reconsolidate the free lists */
+    /* Allow the memory manager to do some consolidation */
     mem_consolidate(MY_TRUE);
 
     /* Finally, try to reclaim the reserved areas */
@@ -2236,7 +2236,7 @@ show_mstring_data (int d, void *block, int depth UNUSED)
         write(d, block, 50);
         WRITES(d, "\" (truncated)");
     }
-}
+} /* show_mstring_data() */
 
 /*-------------------------------------------------------------------------*/
 static void
