@@ -11053,7 +11053,8 @@ lvalue:
                                   , get_txt(struct_t_name(ptype))
                                   );
                       }
-                      member_type = ptype->member[num].type;
+                      else
+                          member_type = ptype->member[num].type;
                   }
                   else /* $1 is of type mixed */
                   {

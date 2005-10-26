@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+24-Mar-2002 (Lars Duening)  (3.3.430)
+  - (prolang.y) Assignment to struct members caused a fatal error if
+      the struct did not have the named member. The problem was that
+      in such a case an invalid type was recorded for the result (reported by
+      Dafire).
+
 21-Mar-2002 (Lars Duening)  (3.3.429)
   - (object.c) Shared strings are now saved in the <n> notation as well;
       this is mostly beneficial for saving endless repetitions of the

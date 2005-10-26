@@ -22,6 +22,11 @@
 ;;
 ;; TODO: PostgreSQL
 ;; TODO: MCP, MCCP (see src/wk/ff-3.3.339-diffs and ff-3.3.325-diffs)
+;; TODO: Closure-Callbacks  (like in call_out()s) should throw an error
+;; TODO:: when set up with an destructed current object (or no object for
+;; TODO:: unbound_lambdas). This requires symbolic return values from
+;; TODO:: all the setup_callback functions, as the positive values already
+;; TODO:: signal errors in the arguments.
 ;; TODO: Fast callouts
 ;; TODO: Configurable heartbeat interval a la MudOS
 ;; TODO: warnf()s should go to the master as well.
@@ -53,12 +58,12 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 429)
-(Parent-Version lpmud 3-3 428)
-(Version-Log "Shared strings are now saved in the <n>-Notation as well - this is mostly beneficial for the saving of structs.")
+(Project-Version lpmud 3-3 430)
+(Parent-Version lpmud 3-3 429)
+(Version-Log "Corrected a crasher in the typetracking for struct member assignments.")
 (New-Version-Log
 "")
-(Checkin-Time "Fri, 21 Mar 2003 17:14:42 -0700")
+(Checkin-Time "Mon, 24 Mar 2003 23:33:06 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -95,7 +100,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.60 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.492 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.493 644))
   (HISTORY (lpmud/f/49_HISTORY 1.312 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.19 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -260,7 +265,7 @@
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.17 644))
   (src/port.c (lpmud/39_port.c 1.17.1.8 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.17.1.3 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.37 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.38 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7.1.2 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))
@@ -1329,7 +1334,7 @@
   (doc/LPC/ed2 (lpmud/r/21_ed2 1.2 644))
   (doc/LPC/ed3 (lpmud/r/22_ed3 1.2 644))
   (doc/LPC/ed4 (lpmud/r/23_ed4 1.2 644))
-  (doc/LPC/ed5 (lpmud/r/24_ed5 1.3 644))
+  (doc/LPC/ed5 (lpmud/r/24_ed5 1.4 644))
   (doc/LPC/ed6 (lpmud/r/25_ed6 1.2 644))
   (doc/LPC/efuns (lpmud/r/26_efuns 1.3 644))
   (doc/LPC/escape (lpmud/n/9_escape 1.1 644))
