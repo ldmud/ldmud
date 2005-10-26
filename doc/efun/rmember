@@ -1,6 +1,6 @@
 SYNOPSIS
-        int member(mixed *array, mixed elem)
-        int member(string s, int elem)
+        int rmember(mixed *array, mixed elem)
+        int rmember(string s, int elem)
 
 DESCRIPTION
         For arrays and strings, returns the index of the last

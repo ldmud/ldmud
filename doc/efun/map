@@ -76,6 +76,8 @@ DESCRIPTION
         multi-dimensional mappings (mappings with multiple values
         per key, and mappings of arrays) can be treated in the same way.
 
+        Note however that the resulting mapping always has one value
+        per key.
 
         Historical Note: map() used with arrays behaves like map_array(),
         but used with mappings generalises map_indices()!

@@ -183,8 +183,7 @@ For a detailed list of all changes see the file CHANGELOG.
            filesystem conventions.
        + Preprocessor symbol __FILENAME_SPACES__ is defined if the driver is
            instructed to allow spaces in filenames.
-       + Casts with no effect (like casting an int value to int) now
-           generate a warning.
+       + Casts of a value to its own type generate a warning.
        + Bugfix: Characters with the 8th bit set are now treated as positive
            when entered as literal character constants.
        + Bugfix: Illegal case ranges like '100..50' now generate

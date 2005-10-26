@@ -9312,8 +9312,14 @@ expr0:
                   break;
               }
           }
-          else
-              yywarnf("Cast without effect %s", get_two_types($1, $2.type));
+          else if (equal_types($1, $2.type))
+              yywarnf("casting a value to its own type: %s"
+                     , get_type_name($1));
+          else if ($2.type.typeflags != TYPE_UNKNOWN
+                && $2.type.typeflags != TYPE_ANY)
+              yywarnf("cast will not convert the value: %s"
+                     , get_two_types($1, $2.type)
+                  );
 
           $$.end = CURRENT_PROGRAM_SIZE;
       }
