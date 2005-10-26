@@ -3664,11 +3664,11 @@ push_protected_indexed_lvalue (svalue_t *sp, bytecode_p pc)
         lvalue->v.type = T_PROTECTED_LVALUE;
         lvalue->v.u.lvalue = item;
         put_struct(&(lvalue->protector), st);
-          /* The one ref to vec is transferred from *vec */
+          /* The one ref to st is transferred from *vec */
 
         /* Remove the arguments and return the result */
-        sp--;
-        free_svalue(sp); /* Was 'i' */
+        free_svalue(i);
+        sp = vec;
         sp->type = T_LVALUE;
         sp->u.lvalue = &lvalue->v;
         return sp;
@@ -4253,8 +4253,8 @@ protected_index_lvalue (svalue_t *sp, bytecode_p pc)
             item = get_struct_item(st, i, sp, pc);
 
             /* Drop the arguments */
-            sp--;
-            free_svalue(sp); /* Was 'i' */
+            free_svalue(i);
+            sp = i;
 
             /* Compute and return the result */
 
