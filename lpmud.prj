@@ -51,12 +51,12 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 422)
-(Parent-Version lpmud 3-3 421)
-(Version-Log "The new cleanup code causes driver hooks to disappear.")
+(Project-Version lpmud 3-3 423)
+(Parent-Version lpmud 3-3 422)
+(Version-Log "Removed a memory leak in the mapping code.")
 (New-Version-Log
 "")
-(Checkin-Time "Sat, 15 Mar 2003 23:43:52 -0700")
+(Checkin-Time "Mon, 17 Mar 2003 01:10:58 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -93,7 +93,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.59 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.485 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.486 644))
   (HISTORY (lpmud/f/49_HISTORY 1.308 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.19 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -189,7 +189,7 @@
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.13 644))
   (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.37 644))
   (src/mapping.h (lpmud/f/30_mapping.h 1.12.1.18 644))
-  (src/mapping.c (lpmud/b/6_mapping.c 1.36.1.63 644))
+  (src/mapping.c (lpmud/b/6_mapping.c 1.36.1.64 644))
   (src/md5.h (lpmud/l/18_md5.h 1.2 644))
   (src/md5.c (lpmud/l/19_md5.c 1.6 644))
   (src/mempools.h (lpmud/d/48_mempools.h 1.2.1.8 644))
@@ -1129,7 +1129,7 @@
   (doc/efun/order_alist (lpmud/c/38_order_alis 1.7 644))
   (doc/efun/parse_command (lpmud/p/19_parse_comm 1.7 644))
   (doc/efun/pointerp (lpmud/p/20_pointerp 1.4 644))
-  (doc/efun/pow (lpmud/c/46_pow 1.1.1.2 644))
+  (doc/efun/pow (lpmud/c/46_pow 1.1.1.3 644))
   (doc/efun/present (lpmud/p/21_present 1.4 644))
   (doc/efun/present_clone (lpmud/t/11_present_cl 1.4 644))
   (doc/efun/previous_object (lpmud/l/34_previous_o 1.3.1.5 644))

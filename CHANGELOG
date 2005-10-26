@@ -1,6 +1,9 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+17-Mar-2002 (Lars Duening)  (3.3.423)
+  - (mapping.c) Removed a memory leak.
+
 15-Mar-2002 (Lars Duening)  (3.3.422)
   - (gcollect.c) The NEW_CLEANUP code treated the driver hooks like other
       svalues, which was bad because it caused lambda-closure hooks bound

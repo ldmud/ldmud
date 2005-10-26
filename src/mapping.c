@@ -2052,6 +2052,7 @@ compact_mapping (mapping_t *m, Bool force)
     {
         /* This mapping doesn't qualify for compaction.
          */
+        m->ref--; /* undo the ref increment from above */
         malloc_privilege = old_malloc_privilege;
         return MY_FALSE;
     }
