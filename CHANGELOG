@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+14-Mar-2002 (Lars Duening)  (3.3.421)
+  - (driver.h, smalloc.c) Removed a build problem when MALLOC_CHECK
+      was not defined, but MALLOC_TRACE was (reported by Nostradamus).
+
 13-Mar-2002 (Lars Duening)  (3.3.420)
   - (xalloc.c, smalloc.c, configure) New configuration option
       '--enable-malloc-sbrk' to selectively allow the memory allocator to use

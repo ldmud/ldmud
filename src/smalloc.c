@@ -2639,8 +2639,6 @@ mem_test_ref (POINTER p)
 } /* mem_test_ref() */
 
 
-#ifdef MALLOC_CHECK
-
 /*-------------------------------------------------------------------------*/
 Bool
 mem_is_freed (void *p, p_uint minsize)
@@ -2670,15 +2668,19 @@ mem_is_freed (void *p, p_uint minsize)
 
         block2 = block + i;
         return !(*s_size_ptr(block) & THIS_BLOCK)
+#ifdef MALLOC_CHECK
              || block[M_MAGIC] != LAMAGIC
+#endif /* MALLOC_CHECK */
              || !(*block2 & PREV_BLOCK);
     }
 
+#ifdef MALLOC_CHECK
     i -= 1 + M_OVERHEAD;
     return block[M_MAGIC] != samagic[i % NELEM(samagic)];
-} /* is_freed() */
-
+#else
+    return MY_FALSE; /* Play it safe */
 #endif /* MALLOC_CHECK */
+} /* mem_is_freed() */
 
 /*-------------------------------------------------------------------------*/
 void

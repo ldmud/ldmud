@@ -72,6 +72,16 @@
 
 #endif
 
+/* To function properly, MALLOC_(LPC_)TRACE need to be able to
+ * test whether a memory block is free or not. This is reliably implemented
+ * by MALLOC_CHECK.
+ */
+
+#if (defined(MALLOC_TRACE) || defined(MALLOC_LPC_TRACE)) && !defined(MALLOC_CHECK)
+#  define MALLOC_CHECK
+#endif
+
+
 /* This one is for backwards compatibility with old config.hs */
 
 #if defined(NATIVE_MODE) && !defined(STRICT_EUIDS)
