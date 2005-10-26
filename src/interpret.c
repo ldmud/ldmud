@@ -16991,6 +16991,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
       {
         funflag_t flags;
         fun_hdr_p funstart;
+        Bool      extra_frame;
 
         /* Can't call from a destructed object */
         if (l->ob->flags & O_DESTRUCTED)
@@ -17053,6 +17054,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
 
         if (l->ob != l->function.lfun.ob)
         {
+            extra_frame = MY_TRUE;
             csp->extern_call = MY_TRUE;
             csp->funstart = NULL;
 #ifdef USE_NEW_INLINES
@@ -17065,6 +17067,8 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
             csp->num_local_variables = num_arg;
             previous_ob = current_object;
         }
+        else
+            extra_frame = MY_FALSE;
 
         /* Finish the setup of the control frame.
          * This is a real inter-object call.
@@ -17082,8 +17086,12 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
         csp->funstart = funstart;
         eval_instruction(FUNCTION_CODE(funstart), inter_sp);
 
+        /* If l->ob selfdestructs during the call, l might have been
+         * deallocated at this point!
+         */
+
         /* If necessary, remove the second control frame */
-        if (l->ob != l->function.lfun.ob)
+        if (extra_frame)
         {
             current_object = csp->ob;
             previous_ob = csp->prev_ob;

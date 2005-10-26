@@ -884,7 +884,6 @@ struct_free_type (struct_type_t *pSType)
     if (pSType->member)
         xfree(pSType->member);
 
-fprintf(stderr, "DEBUG: free type %p\n", pSType);
     xfree(pSType);
 } /* struct_free_type() */
 

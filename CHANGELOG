@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+24-Apr-2002 (Lars Duening)  (3.3.448)
+  - (interpret.c) If during a call of the type 'funcall(lfun-closure)' the
+       object holding the closure was destructed and the closure deallocated,
+       int_call_lambda() still read the now-invalid lambda structure after
+       the actual call. This could lead to an inconsistency in the
+       control stack, depending on the memory contents (reported by Bardioc).
+
 22-Apr-2002 (Lars Duening)  (3.3.447)
   - (pkg-mccp, comm, gcollect.c, configure) Added MCCP support (thanks,
        Dafire!) (p-011012, p-020810-1).
