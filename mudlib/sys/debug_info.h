@@ -57,70 +57,69 @@
 #define DID_ST_HBEAT_AVG_PROC     22
 
 #define DID_ST_CALLOUTS           23
-#define DID_ST_CALLOUT_SLOTS      24
-#define DID_ST_CALLOUT_SIZE       25
+#define DID_ST_CALLOUT_SIZE       24
 
-#define DID_ST_ARRAYS             26
-#define DID_ST_ARRAYS_SIZE        27
+#define DID_ST_ARRAYS             25
+#define DID_ST_ARRAYS_SIZE        26
 
-#define DID_ST_MAPPINGS           28
-#define DID_ST_MAPPINGS_SIZE      29
+#define DID_ST_MAPPINGS           27
+#define DID_ST_MAPPINGS_SIZE      28
 
-#define DID_ST_STRUCTS            30
-#define DID_ST_STRUCTS_SIZE       31
-#define DID_ST_STRUCT_TYPES       32
-#define DID_ST_STRUCT_TYPES_SIZE  33
+#define DID_ST_STRUCTS            29
+#define DID_ST_STRUCTS_SIZE       30
+#define DID_ST_STRUCT_TYPES       31
+#define DID_ST_STRUCT_TYPES_SIZE  32
 
-#define DID_ST_PROGS              34
-#define DID_ST_PROGS_SIZE         35
+#define DID_ST_PROGS              33
+#define DID_ST_PROGS_SIZE         34
 
-#define DID_ST_PROGS_SWAPPED      36
-#define DID_ST_PROGS_SWAP_SIZE    37
+#define DID_ST_PROGS_SWAPPED      35
+#define DID_ST_PROGS_SWAP_SIZE    36
 
-#define DID_ST_USER_RESERVE       38
-#define DID_ST_MASTER_RESERVE     39
-#define DID_ST_SYSTEM_RESERVE     40
+#define DID_ST_USER_RESERVE       37
+#define DID_ST_MASTER_RESERVE     38
+#define DID_ST_SYSTEM_RESERVE     39
 
-#define DID_ST_ADD_MESSAGE        41
-#define DID_ST_PACKETS            42
-#define DID_ST_PACKET_SIZE        43
+#define DID_ST_ADD_MESSAGE        40
+#define DID_ST_PACKETS            41
+#define DID_ST_PACKET_SIZE        42
 
-#define DID_ST_APPLY              44
-#define DID_ST_APPLY_HITS         45
+#define DID_ST_APPLY              43
+#define DID_ST_APPLY_HITS         44
 
-#define DID_ST_STRINGS            46
-#define DID_ST_STRING_SIZE        47
-#define DID_ST_STR_TABLE_SIZE     48
-#define DID_ST_STR_OVERHEAD       49
-#define DID_ST_STR_IT_OVERHEAD    50
-#define DID_ST_UNTABLED           51
-#define DID_ST_UNTABLED_SIZE      52
-#define DID_ST_ITABLED            53
-#define DID_ST_ITABLED_SIZE       54
-#define DID_ST_TABLED             55
-#define DID_ST_TABLED_SIZE        56
-#define DID_ST_STR_SEARCHES       57
-#define DID_ST_STR_SEARCHLEN      58
-#define DID_ST_STR_SEARCHES_BYVALUE   59
-#define DID_ST_STR_SEARCHLEN_BYVALUE  60
-#define DID_ST_STR_CHAINS         61
-#define DID_ST_STR_ADDED          62
-#define DID_ST_STR_DELETED        63
-#define DID_ST_STR_COLLISIONS     64
-#define DID_ST_STR_FOUND          65
-#define DID_ST_STR_FOUND_BYVALUE  66
+#define DID_ST_STRINGS            45
+#define DID_ST_STRING_SIZE        46
+#define DID_ST_STR_TABLE_SIZE     47
+#define DID_ST_STR_OVERHEAD       48
+#define DID_ST_STR_IT_OVERHEAD    49
+#define DID_ST_UNTABLED           50
+#define DID_ST_UNTABLED_SIZE      51
+#define DID_ST_ITABLED            52
+#define DID_ST_ITABLED_SIZE       53
+#define DID_ST_TABLED             54
+#define DID_ST_TABLED_SIZE        55
+#define DID_ST_STR_SEARCHES       56
+#define DID_ST_STR_SEARCHLEN      57
+#define DID_ST_STR_SEARCHES_BYVALUE   58
+#define DID_ST_STR_SEARCHLEN_BYVALUE  59
+#define DID_ST_STR_CHAINS         60
+#define DID_ST_STR_ADDED          61
+#define DID_ST_STR_DELETED        62
+#define DID_ST_STR_COLLISIONS     63
+#define DID_ST_STR_FOUND          64
+#define DID_ST_STR_FOUND_BYVALUE  65
 
-#define DID_ST_RX_CACHED          67
-#define DID_ST_RX_TABLE           68
-#define DID_ST_RX_TABLE_SIZE      69
-#define DID_ST_RX_REQUESTS        70
-#define DID_ST_RX_REQ_FOUND       71
-#define DID_ST_RX_REQ_COLL        72
+#define DID_ST_RX_CACHED          66
+#define DID_ST_RX_TABLE           67
+#define DID_ST_RX_TABLE_SIZE      68
+#define DID_ST_RX_REQUESTS        69
+#define DID_ST_RX_REQ_FOUND       70
+#define DID_ST_RX_REQ_COLL        71
 
-#define DID_ST_MB_FILE            73
-#define DID_ST_MB_SWAP            74
+#define DID_ST_MB_FILE            72
+#define DID_ST_MB_SWAP            73
 
-#define DID_STATUS_MAX            75 /* Total number of entries */
+#define DID_STATUS_MAX            74 /* Total number of entries */
 
 
 /* Indices into the array resulting from debug_info(DINFO_DATA, DID_SWAP)

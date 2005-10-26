@@ -162,12 +162,8 @@ DESCRIPTION
                   as fraction (0..1.0).
 
               int DID_ST_CALLOUTS
-                  Number of pending call_outs.
-
-              int DID_ST_CALLOUT_SLOTS
               int DID_ST_CALLOUT_SIZE
-                  Number of allocated entries in the call_out table
-                  and its size.
+                  Number and total size of pending call_outs.
 
               int DID_ST_ARRAYS
               int DID_ST_ARRAYS_SIZE
@@ -488,7 +484,9 @@ HISTORY
           DID_ST_HBEAT_CALLS_TOTAL stats.
         LDMud 3.2.10 added the object creation time to DINFO_DUMP:"objects",
           removed DID_MEM_UNUSED from DINFO_DATA:DID_MEMORY;
-          added DID_ST_MB_FILE and DID_ST_MB_SWAP to DINFO_DATA:DID_STATUS.
+          added DID_ST_MB_FILE and DID_ST_MB_SWAP to DINFO_DATA:DID_STATUS;
+          removed DID_ST_CALLOUT_SLOTS from DINFO_DATA:DID_STATUS, and changed
+          the meaning of DID_ST_CALLOUT_SIZE.
         LDMud 3.3 replaced the string related DID_ST_ constants according to
         the new string implementation.
         LDMud 3.3.387 added the ptmalloc values for DINFO_DATA:DID_MEMORY.

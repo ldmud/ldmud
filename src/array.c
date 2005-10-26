@@ -2982,7 +2982,7 @@ make_unique (vector_t *arr, string_t *func, svalue_t *skipnum)
     pool = new_mempool(size_mempool(sizeof(*head)));
     if (!pool)
         error("(unique_array) Out of memory: (%lu bytes) for mempool\n"
-             , arr_size * sizeof(*head));
+             , (unsigned long)arr_size * sizeof(*head));
 
     ref_array(arr);  /* Prevent apply from freeing this */
 

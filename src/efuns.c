@@ -6386,12 +6386,8 @@ v_debug_info (svalue_t *sp, int num_arg)
  *            as fraction (0..1.0).
  *
  *        int DID_ST_CALLOUTS
- *            Number of pending call_outs.
- *
- *        int DID_ST_CALLOUT_SLOTS
  *        int DID_ST_CALLOUT_SIZE
- *            Number of allocated entries in the call_out table
- *            and its size.
+ *            Number and total size of pending call_outs.
  *
  *        int DID_ST_ARRAYS
  *        int DID_ST_ARRAYS_SIZE

@@ -1,6 +1,17 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+07-Mar-2002 (Lars Duening)  (3.3.415)
+  - (configure) New configuration option '--with-optimize' to select
+       the optimization level in the generated Makefile: no, low,
+       med, or high.
+  - (call_out.c) Removed the pooled allocation of callout structures:
+       Muds have spikes of high callout usage, but a low usage over
+       the longterm average, so most of the pooled structures are not
+       used. This more than makes up for any malloc overhead saved
+       by the pooled allocation.
+  - (swap.c) Added sanity checks to the variable swapper.
+
 06-Mar-2002 (Lars Duening)  (3.3.414)
   - (dumpstat.c) Corrected build warnings.
   - (mempools, lex.c) Cosmetic changes.

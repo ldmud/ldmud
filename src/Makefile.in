@@ -51,10 +51,10 @@ WARN= $(CFG_WARN)
 
 HIGH_OPTIMIZE = @OCFLAGS@ # high optimization
 MED_OPTIMIZE= @MCFLAGS@ # medium optimization
-MIN_OPTIMIZE = @LCFLAGS@ # minimal optimization
+LOW_OPTIMIZE = @LCFLAGS@ # minimal optimization
 NO_OPTIMIZE= @DCFLAGS@ # no optimization; for frequent recompilations.
 
-OPTIMIZE= $(MED_OPTIMIZE)
+OPTIMIZE= $(@val_optimize@_OPTIMIZE)
 
 #
 # Debugging options:

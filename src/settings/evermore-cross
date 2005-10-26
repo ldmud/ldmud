@@ -5,7 +5,7 @@
 # configure will strip this part from the script.
 #-------------------------------------------------------------------------
 
-exec ./configure --prefix=/home/evermore/ --bindir=/home/evermore/bin/compat --libdir=/home/evermore/mudlib --libexec=/home/evermore/bin/compat/erq_dir --with-setting=evermore-cross $*
+exec ./configure --prefix=/home/evermore/ --bindir=/home/evermore/bin --libdir=/home/evermore/mudlib --libexec=/home/evermore/bin/erq_dir --with-setting=evermore-cross $*
 exit 1
 
 # --- The actual settings ---
@@ -22,8 +22,8 @@ with_time_to_clean_up=3600
 # we reset every 45 minutes
 with_time_to_reset=2700
 
-# default eval cost maximum is 2 000 000
-with_max_cost=10000000
+# default eval cost maximum is 5 000 000
+with_max_cost=50000000
 
 # default port is telnet
 with_portno=23
@@ -57,6 +57,8 @@ enable_share_variables=no
 
 # we do not need those old commands
 enable_use_parse_command=no
+enable_use_set_light=no
+enable_use_process_string=no
 
 # its better as getting errors
 enable_dynamic_costs=yes
@@ -83,4 +85,12 @@ with_max_local=100
 with_max_user_trace=190
 with_max_trace=200
 
+enable_malloc_trace=yes
+enable_malloc_lpc_trace=yes
+
+with_reserved_user_size=800000
+with_catch_reserved_cost=0xF000
+with_master_reserved_cost=0xF000
 with_max_malloced=0
+
+enable_with_pthreads=no

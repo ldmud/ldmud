@@ -112,7 +112,7 @@ For a detailed list of all changes see the file CHANGELOG.
            initialization.
 
 
-03-Mar-2003 (Lars Duening) -- Release 3.2.10
+07-Mar-2003 (Lars Duening) -- Release 3.2.10
 
     - Changed efuns:
        + debug_info(): Removed the DID_MEM_UNUSED value from the DINFO_DATA:
@@ -144,6 +144,11 @@ For a detailed list of all changes see the file CHANGELOG.
            an error message.
 
     - Runtime:
+       + Mapping are now compacted (apart from a GC) only, if a certain
+           amount of time has elapsed since the last addition/removal
+           of a key, and if either more than half of the condensed entries
+           have been deleted, or if the number of hashed entries exceeds
+           the number of (non-deleted) condensed entries.
        + Bugfix: The smalloc allocator now re-uses free 'large' memory for
            small block chunks instead of always allocating them from the
            system.
@@ -155,6 +160,8 @@ For a detailed list of all changes see the file CHANGELOG.
           a log of all system memory requests including the stats of
           the memory allocation request causing it. The intention is
           to help debugging muds with high system memory usage.
+       + Configuration option '--with-optimize' to set the optimization
+          level in the generated Makefiles.
 
 
 02-Feb-2003 (Lars Duening) -- Release 3.2.9

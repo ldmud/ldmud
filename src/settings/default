@@ -37,6 +37,13 @@ exit 1
 # These options provide default settings for those options which can
 # also be set on the commandline.
 
+# Enable this if you are using a 2.4.5 mudlib or one of its derivates.
+
+enable_compat_mode=no
+
+# The name of the master object.
+
+with_master_name=secure/master
 
 # --- Runtime limits ---
 
@@ -188,13 +195,10 @@ with_erq_max_send=1024
 # To change these options, the config.h must be recreated and the
 # driver recompiled.
 
-# Enable this if you are using a 2.4.5 mudlib or one of its derivates.
+# The optimization level in the generated Makefile
+# Settings: no, low, med, high
 
-enable_compat_mode=no
-
-# The name of the master object.
-
-with_master_name=secure/master
+with_optimize=med
 
 # Define this to annotate all allocations with a magic word to find
 # simple misuses of memory (like multiple frees).

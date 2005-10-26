@@ -8046,7 +8046,7 @@ constant:
           }
           else
           {
-              yyerror("division by zero");
+              yyerror("modulus by zero");
               $$ = 0;
           }
       }

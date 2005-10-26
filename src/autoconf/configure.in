@@ -151,6 +151,8 @@ AC_MY_ARG_ENABLE(check-object-ref,no,,[check object references])
 AC_MY_ARG_ENABLE(check-object-gc-ref,yes,,[check object references in GC])
 AC_MY_ARG_ENABLE(dump-gc-refs,no,,[trace GC references])
 
+AC_MY_ARG_WITH(optimize,med,,[Optimization level: no/low/med/high])
+
 AC_MY_ARG_WITH(access-file,ACCESS.ALLOW,,[access permissions file])
 AC_MY_ARG_WITH(access-log,access.allow.log,,[access log file])
 
@@ -298,6 +300,8 @@ AC_CDEF_FROM_ENABLE(check_object_ref)
 AC_CDEF_FROM_ENABLE(check_object_gc_ref)
 AC_CDEF_FROM_ENABLE(dump_gc_refs)
 
+AC_TEXT_VAL_FROM_WITH(optimize)
+
 AC_STRING_VAL_FROM_WITH(access_file)
 AC_STRING_VAL_FROM_WITH(access_log)
 AC_STRING_VAL_FROM_WITH(swap_file)
@@ -378,6 +382,8 @@ fi
 if test "x$cdef_opcprof" = "x#undef"; then
   cdef_verbose_opcprof="#undef"
 fi
+
+val_optimize=`echo ${val_optimize} | tr '[a-z]' '[A-Z]'`
 
 
 dnl
@@ -1867,6 +1873,7 @@ dnl
 dnl Standard Replacements:
 dnl
 
+AC_SUBST(val_optimize)
 AC_SUBST(WCFLAGS)
 AC_SUBST(OCFLAGS)
 AC_SUBST(LCFLAGS)
