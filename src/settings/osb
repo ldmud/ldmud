@@ -9,10 +9,6 @@ exit 1
 
 # --- The actual settings ---
 
-# Activate total smalloc size consistency check code. This will produce
-# a lot of output in the GC log.
-enable_check_smalloc_total=yes
-
 with_max_local=50
 with_max_cost=1000000
 
@@ -28,7 +24,6 @@ enable_share_variables=no
 enable_use_system_crypt=no
 enable_malloc_trace=yes
 enable_malloc_lpc_trace=yes
-enable_check_smalloc_total=yes
 
 enable_use_mysql=/usr/local/lib/mysql
 enable_use_pcre=yes

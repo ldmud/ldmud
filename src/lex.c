@@ -5765,7 +5765,8 @@ handle_define (char *yyt, Bool quote)
 
     char namebuf[NSIZE];      /* temp buffer for read identifiers */
     char args[NARGS][NSIZE];  /* parsed argument names of function macros */
-#if defined(CYGWIN) && __GNUC__ >= 2
+#if defined(CYGWIN) && __GNUC__ >= 3 && __GNUC_MINOR__ >= 2
+#   define MTEXT_IS_POINTER
     char *mtext;
       /* replacement text, with arguments replaced by the MARKS characters.
        * Under Cygwin and high optimization, the compiler produces faulty
@@ -5775,18 +5776,18 @@ handle_define (char *yyt, Bool quote)
     char mtext[MLEN];
       /* replacement text, with arguments replaced by the MARKS characters
        */
-#endif
+#endif /* CYGWIN and gcc 3.2 or newer */
     char *p;                  /* current text pointer */
     char *q;                  /* destination for parsed text */
 
-#if defined(CYGWIN) && __GNUC__ >= 3 && __GNUC_MINOR__ >= 2
+#if defined(MTEXT_IS_POINTER)
     mtext = alloca(MLEN);
     if (!mtext)
     {
         lexerror("Out of stack memory");
         return;
     }
-#endif /* CYGWIN */
+#endif /* MTEXT_IS_POINTER */
 
     p = yyt;
     strcat(p, " "); /* Make sure GETALPHA terminates */

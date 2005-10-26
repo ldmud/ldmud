@@ -10,8 +10,6 @@
  *
  * The driver implements a buffer each for dedicated purposes. Each of
  * these buffers is identified by a number from membuffer_e.
- *
- * A GC deallocates all buffers.
  *---------------------------------------------------------------------------
  * Purpose of memory pools is to provide fast allocation methods for
  * certain allocation patterns. They are most useful for scratchpad
@@ -23,9 +21,6 @@
  * Fifopools: allocation/deallocation of objects follows (more than less)
  *            a fifo pattern.
  *
- * Note: the GC will deallocate all memory pools.
- * TODO: Implement a clear-ref/mark-ref call for the pools in case somebody
- * TODO:: wants to keep on to a pool for longer.
  * TODO: A small-block pool, to manage lots of small blocks of equal size
  * TODO:: without the overhead of smalloc. Initialized with the block size,
  * TODO:: the number of initial blocks, and the number of blocks each

@@ -1493,7 +1493,7 @@ v_function_exists (svalue_t *sp, int num_arg)
          || ((flags & ~NAME_HIDDEN) > FEXISTS_ALL)
            )
         {
-            error("Bad argument 2 to function_exists(): eff. value %ld (sans NAME_HIDDEN) out of range %d..%d .\n"
+            error("Bad argument 3 to function_exists(): eff. value %ld (sans NAME_HIDDEN) out of range %d..%d .\n"
                  , (long)(flags & ~NAME_HIDDEN)
                  , FEXISTS_PROGNAME, FEXISTS_ALL);
             /* NOTREACHED */
@@ -1652,15 +1652,6 @@ f_functionlist (svalue_t *sp)
  */
 
 {
-#define RETURN_FUNCTION_NAME    0x01
-#define RETURN_FUNCTION_FLAGS   0x02
-#define RETURN_FUNCTION_TYPE    0x04
-#define RETURN_FUNCTION_NUMARG  0x08
-
-#define RETURN_FUNCTION_MASK    0x0f  /* union of all RETURN_FUNCTION_ defs */
-
-#define RETURN_FUNCTION_ARGTYPE 0x10 /* not implemented */
-
     object_t *ob;         /* <ob> argument to list */
     mp_int mode_flags;    /* <flags> argument */
     program_t *prog;      /* <ob>'s program */
@@ -1676,7 +1667,6 @@ f_functionlist (svalue_t *sp)
     vector_t *list;       /* Result vector */
     svalue_t *svp;        /* Last element in list which was filled in. */
     uint32 *fun;          /* Current function under examination */
-    uint32 active_flags;  /* A functions definition status flags */
     program_t *defprog;   /* Program which actually defines *fun */
     uint32 flags;
     unsigned short *ixp;
@@ -1803,8 +1793,10 @@ f_functionlist (svalue_t *sp)
      * the result vector.
      */
 
-    for (i = prog->num_functions, fun += i; --i >= 0; ) {
+    for (i = prog->num_functions, fun = prog->functions + i; --i >= 0; )
+    {
         fun_hdr_p funstart; /* Pointer to function in the executable */
+        uint32 active_flags;  /* A functions definition status flags */
 
         fun--;
 
@@ -1896,14 +1888,430 @@ f_functionlist (svalue_t *sp)
 #undef VISTAG_INVIS
 #undef VISTAG_VIS
 #undef VISTAG_ALL
+} /* f_functionlist() */
 
-#undef RETURN_FUNCTION_NAME
-#undef RETURN_FUNCTION_FLAGS
-#undef RETURN_FUNCTION_TYPE
-#undef RETURN_FUNCTION_NUMARG
-#undef RETURN_FUNCTION_ARGTYPE
-#undef RETURN_FUNCTION_MASK
-} /* f_function_list() */
+/*-------------------------------------------------------------------------*/
+svalue_t *
+v_variable_exists (svalue_t *sp, int num_arg)
+
+/* EXEC variable_exists()
+ *
+ *   string variable_exists (string str [, int flags])
+ *   string variable_exists (string str , object ob, [, int flags])
+ *
+ * Look up a variable <str> in the current object, respectively
+ * in the object <ob>.
+ *
+ * The result is the name of the program the variable is defined in. This can
+ * be either object_name(ob), or the name of an inherited program. If !compat
+ * mode, the returned name always begins with a '/'.
+ *
+ * If <flags> can be passed as NAME_HIDDEN to return information about static
+ * and protected variables in other objects. It is not possible to return
+ * information about private variables.
+ *
+ * If the variable cannot be found (because it doesn't exist or
+ * it is not visible to the caller), the result is 0.
+ */
+
+{
+    string_t *str;
+    svalue_t *argp;
+    object_t *ob;
+    p_int mode_flags;
+
+    /* Evaluate arguments */
+    argp = sp - num_arg + 1;
+
+    ob = NULL;
+    mode_flags = 0;
+
+    if (num_arg < 2)
+    {
+        ob = current_object;
+        mode_flags = 0;
+    }
+
+    if (num_arg >= 2)
+    {
+        if (argp[1].type == T_NUMBER)
+        {
+            ob = current_object;
+            mode_flags = argp[1].u.number;
+
+            if (mode_flags != 0 && mode_flags != NAME_HIDDEN)
+            {
+                error("Bad argument 2 to variable_exists(): "
+                      "value %ld, expected 0 or %d (NAME_HIDDEN).\n"
+                     , (long)mode_flags, NAME_HIDDEN
+                    );
+                /* NOTREACHED */
+                return sp;
+            }
+        }
+        else if (argp[1].type == T_OBJECT)
+        {
+            ob = argp[1].u.ob;
+            mode_flags = 0;
+        }
+    }
+
+    if (num_arg >= 3)
+    {
+        /* The last argument must be a number. On the other
+         * side, we can't have two numbers at once.
+         */
+        if (argp[1].type != T_OBJECT)
+        {
+            error("Bad argument 2 to variable_exists(): "
+                  "got %s, expected object.\n", typename(argp[1].type));
+            /* NOTREACHED */
+            return sp;
+        }
+
+        mode_flags = argp[2].u.number;
+
+        if (mode_flags != 0 && mode_flags != NAME_HIDDEN)
+        {
+            error("Bad argument 3 to variable_exists(): "
+                  "value %ld, expected 0 or %d (NAME_HIDDEN).\n"
+                 , (long)mode_flags, NAME_HIDDEN
+                );
+            /* NOTREACHED */
+            return sp;
+        }
+    }
+
+    /* Make the program resident */
+    if (O_PROG_SWAPPED(ob))
+    {
+        ob->time_of_ref = current_time;
+        if (load_ob_from_swap(ob) < 0)
+            error("Out of memory: unswap object '%s'\n", get_txt(ob->name));
+    }
+
+    /* Get the information */
+    str = NULL;
+
+    do
+    {
+        string_t *shared_name;
+        program_t *progp;
+        int ix;
+        typeflags_t flags;
+
+        shared_name = find_tabled(argp->u.str);
+        if (!shared_name)
+            break;
+
+        progp = ob->prog;
+
+        /* Check if the function exists at all */
+        for (ix = 0; ix < progp->num_variables; ix++)
+        {
+            if (mstreq(shared_name, progp->variables[ix].name))
+                break;
+        }
+
+        if (ix >= progp->num_variables)
+            break;
+
+        /* Is it visible for the caller? */
+        flags = progp->variables[ix].type.typeflags;
+
+        if (!(mode_flags & NAME_HIDDEN)
+         && (   (flags & TYPE_MOD_PRIVATE)
+             || ((flags & TYPE_MOD_PROTECTED) && current_object != ob))
+           )
+            break;
+
+        /* Resolve inheritance */
+        while (flags & NAME_INHERITED)
+        {
+            int ic;
+
+            for (ic = 0; ic < progp->num_inherited; ic++)
+            {
+                inherit_t *ip = &progp->inherit[ic];
+
+                if (ix >= ip->variable_index_offset + ip->prog->num_variables
+                 || ix < ip->variable_index_offset
+                   )
+                    continue;
+                ix -= ip->variable_index_offset;
+                progp = ip->prog;
+                flags = progp->variables[ix].type.typeflags;
+            }
+        }
+
+        /* progp now points to the program which really defines
+         * the variable var.
+         */
+
+        /* We got it. */
+        str = progp->name;
+    } while(0);
+
+    /* Put the result onto the stack */
+    sp = pop_n_elems(num_arg, sp);
+
+    if (str)
+    {
+        string_t *res;
+
+        res = cvt_progname(str);
+        push_string(sp, res);
+    }
+    else
+    {
+        push_number(sp, 0);
+    }
+
+    /* str had no ref on its own */
+
+    return sp;
+} /* v_variable_exists() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_variable_list (svalue_t *sp)
+
+/* EFUN variable_list()
+ *
+ *   mixed *variable_list (object ob, int flags = RETURN_FUNCTION_NAME)
+ *
+ * Return an array with information about <ob>s variables. For every
+ * variable, 1 to 3 values (depending on <flags>) are stored in
+ * the result array conveying in this order:
+ *   - the name of the variable
+ *   - the variable flags (see below)
+ *   - the return type (listed in mudlib/sys/lpctypes.h)
+ *
+ * <ob> may be given as true object or as a filename. In the latter
+ * case, the efun does not try to load the object before proceeding.
+ *
+ * <flags> determines both which information is returned for every
+ * variable, and which variables should be considered at all.
+ * Its value is created by bin-or'ing together following flags from
+ * mudlib/sys/functionlist.h:
+ *
+ *   Control of returned information:
+ *     RETURN_FUNCTION_NAME    include the variable name
+ *     RETURN_FUNCTION_FLAGS   include the variable flags
+ *     RETURN_FUNCTION_TYPE    include the return type
+ *
+ *   Control of listed variables:
+ *     NAME_INHERITED      don't list if defined by inheritance
+ *     TYPE_MOD_NOSAVE     don't list if nosave ('static') variable
+ *     TYPE_MOD_PRIVATE    don't list if private
+ *     TYPE_MOD_PROTECTED  don't list if protected
+ *     NAME_HIDDEN         don't list if not visible through inheritance
+ *
+ * The 'flags' information consists of the bin-or of the list control
+ * flags given above, plus the following:
+ *
+ *     TYPE_MOD_VIRTUAL    variable is inherited virtually
+ *     TYPE_MOD_NO_MASK    variable is nomask
+ *     TYPE_MOD_PUBLIC     variable is public
+ *
+ * All these flags are defined in mudlib/sys/functionlist.h, which
+ * should be copied into an accessible place in the mudlib. The
+ * return types are defined in mudlib/sys/lpctypes.h which also
+ * should be copied into the mudlib.
+ *
+ * TODO: All these defs are in mudlib/sys/functionlist.h and mudlib/sys/lpctypes.h
+ * TODO:: as well as in exec.h and this file. This should be centralized.
+ * TODO:: Maybe write the files on mud startup?
+ * TODO:: Include mudlib/sys/functionlist.h doesn't help because then
+ * TODO:: mkdepend stumbles over the embedded include <sys/lpctypes.h>.
+ */
+
+{
+    object_t *ob;         /* <ob> argument to list */
+    mp_int mode_flags;    /* <flags> argument */
+    program_t *prog;      /* <ob>'s program */
+    unsigned short num_variables;  /* Number of variables to list */
+    char *vis_tags;
+      /* Bitflag array describing the visibility of every variable in prog
+       * in relation to the passed <flags>: */
+#define VISTAG_INVIS '\0'  /* Variable should not be listed */
+#define VISTAG_VIS   '\1'  /* Variable matches the <flags> list criterium */
+#define VISTAG_ALL   '\2'  /* Variable should be listed, no list restrictions */
+#define VISTAG_NAMED '\4'  /* Variable is neither hidden nor private */
+
+    vector_t *list;       /* Result vector */
+    svalue_t *svp;        /* Last element in list which was filled in. */
+    variable_t *var;      /* Current variable under examination */
+    uint32 flags;
+    long i, j;
+
+    inter_sp = sp; /* In case of errors leave a clean stack */
+
+    /* Extract the arguments from the vm stack.
+     */
+    if (sp[-1].type != T_OBJECT)
+    {
+        if (!(ob = find_object(sp[-1].u.str)))
+            error("Object '%s' not found.\n", get_txt(sp[-1].u.str));
+    }
+    else
+        ob = sp[-1].u.ob;
+
+    mode_flags = sp->u.number;
+
+    if (O_PROG_SWAPPED(ob))
+        if (load_ob_from_swap(ob) < 0)
+        {
+            error("Out of memory: unswap object '%s'\n", get_txt(ob->name));
+            /* NOTREACHED */
+            return NULL;
+        }
+
+    prog = ob->prog;
+
+    /* Initialize the vistag[] flag array.
+     */
+    num_variables = prog->num_variables;
+    vis_tags = alloca(num_variables);
+    if (!vis_tags)
+    {
+        error("Stack overflow in variable_list()");
+        /* NOTREACHED */
+        return NULL;
+    }
+
+    /* Preset the visibility. By default, if there is any listing
+     * modifier, the variables are not visible. If there is none, the
+     * variables are visible.
+     */
+    memset(
+      vis_tags,
+      mode_flags &
+      (NAME_HIDDEN|TYPE_MOD_PRIVATE|TYPE_MOD_NOSAVE|TYPE_MOD_PROTECTED|
+       NAME_INHERITED) ?
+        VISTAG_INVIS :
+        VISTAG_ALL  ,
+      num_variables
+    );
+
+    /* Count how many named variables need to be listed in the result.
+     * Flag every variable to list in vistag[].
+     */
+    num_variables = 0;
+
+    /* First, check all variables for which we have a name */
+    flags = mode_flags &
+        (TYPE_MOD_PRIVATE|TYPE_MOD_NOSAVE|TYPE_MOD_PROTECTED|NAME_INHERITED);
+    var = prog->variables;
+    i = prog->num_variables;
+    while ( --i >= 0 ) {
+        if (!(var[i].type.typeflags & flags) )
+        {
+            vis_tags[i] = VISTAG_NAMED|VISTAG_VIS;
+            num_variables++;
+        }
+        else
+        {
+            vis_tags[i] |= VISTAG_NAMED;
+        }
+    }
+
+    /* If the user wants to see the hidden or private variables, we loop
+     * through the full variable table and check all variables not yet
+     * touched by the previous 'named' scan.
+     * TODO: Due to the dedicated 'find hidden name' loop, this shouldn't
+     * TODO:: be necessary, nor the VISTAG_ALL at all.
+     */
+    if ((mode_flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN)) == 0)
+    {
+        var = prog->variables;
+        for (i = prog->num_variables; --i >= 0; )
+        {
+            if (!(vis_tags[i] & VISTAG_NAMED)
+             && !(var[i].type.typeflags & flags)
+               )
+            {
+                vis_tags[i] = VISTAG_VIS;
+                num_variables++;
+            }
+        }
+    }
+
+    /* If <flags> accepts all variables, use the total number of variables
+     * instead of the count computed above.
+     */
+    if ( !(mode_flags &
+           (NAME_HIDDEN|TYPE_MOD_PRIVATE|TYPE_MOD_NOSAVE|TYPE_MOD_PROTECTED|
+            NAME_INHERITED) ) )
+    {
+        num_variables = prog->num_variables;
+    }
+
+    /* Compute the size of the result vector to
+     *  2**(number of RETURN_FUNCTION_ bits set)
+     */
+    for (i = mode_flags & RETURN_VARIABLE_MASK, j = 0; i; i >>= 1) {
+        if (i & 1)
+            j += num_variables;
+    }
+
+    /* Allocate the result vector and set svp to its end
+     */
+    list = allocate_array(j);
+    svp = list->item + j;
+
+    /* Loop backwards through all variables, check their flags if
+     * they are to be listed and store the requested data in
+     * the result vector.
+     */
+
+    for (i = prog->num_variables, var = prog->variables + i; --i >= 0; )
+    {
+        uint32 active_flags;  /* A variable's definition status flags */
+        var--;
+
+        if ((vis_tags[i] & (VISTAG_ALL|VISTAG_VIS)) == VISTAG_INVIS)
+            continue; /* Don't list this one */
+
+        flags = var->type.typeflags;
+
+        active_flags = (flags & ~INHERIT_MASK);
+        if (!(vis_tags[i] & VISTAG_NAMED))
+            active_flags |= NAME_HIDDEN;
+
+        /* Add the data to the result vector as <flags> determines.
+         */
+
+        if (mode_flags & RETURN_FUNCTION_TYPE)
+        {
+            svp--;
+            svp->u.number = var->type.typeflags & TYPE_MOD_MASK;
+        }
+
+        if (mode_flags & RETURN_FUNCTION_FLAGS)
+        {
+            svp--;
+            svp->u.number = (p_int)active_flags;
+        }
+
+        if (mode_flags & RETURN_FUNCTION_NAME) {
+            svp--;
+            put_ref_string(svp, var->name);
+        }
+    } /* for() */
+
+    /* Cleanup and return */
+    free_svalue(sp);
+    sp--;
+    free_svalue(sp);
+
+    put_array(sp, list);
+    return sp;
+
+#undef VISTAG_INVIS
+#undef VISTAG_VIS
+#undef VISTAG_ALL
+} /* f_variable_list() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *

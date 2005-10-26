@@ -272,6 +272,8 @@ extern void      init_object_variables (object_t *ob);
 
 extern svalue_t *v_function_exists(svalue_t *sp, int num_arg);
 extern svalue_t *f_functionlist(svalue_t *sp);
+extern svalue_t *v_variable_exists (svalue_t *sp, int num_arg);
+extern svalue_t *f_variable_list (svalue_t *sp);
 extern svalue_t *v_include_list (svalue_t *sp, int num_arg);
 extern svalue_t *v_inherit_list(svalue_t *sp, int num_arg);
 extern svalue_t *f_load_name(svalue_t *sp);

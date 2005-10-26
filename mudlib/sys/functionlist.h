@@ -27,7 +27,7 @@
 #define NAME_TYPES_LOST     0x00000100 /* inherited, no save_types       */
 #endif /* USE_STRUCTS */
 
-#endif
+#endif /* !__DRIVER_SOURCE__ */
 
 /* Return value flag types for functionlist() */
 
@@ -36,6 +36,10 @@
 #define RETURN_FUNCTION_TYPE	0x04
 #define RETURN_FUNCTION_NUMARG	0x08
 #define RETURN_FUNCTION_ARGTYPE 0x10 /* not implemented */
+
+/* Masks of the flag unions allowed for various efuns: */
+#define RETURN_FUNCTION_MASK    0x0f  /* functionlist() */
+#define RETURN_VARIABLE_MASK    0x07  /* variablelist() */
 
 /* Return value flag types for function_exists() */
 

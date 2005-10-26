@@ -1,10 +1,10 @@
-NAME
+SYNOPSIS
         #include <sys/functionlist.h>
         #include <sys/lpctypes.h>
 
         mixed *functionlist (object ob, int flags = RETURN_FUNCTION_NAME)
 
-SYNOPSIS
+DESCRIPTION
         Return an array with information about <ob>s lfunctions. For every
         function, 1 to 4 values (depending on <flags>) are stored in
         the result array conveying in this order:
@@ -46,4 +46,5 @@ SYNOPSIS
             TYPE_MOD_PUBLIC     function is public
 
 SEE ALSO
-        inherit_list(E), function_exists(E), call_resolved(E)
+        inherit_list(E), function_exists(E), variable_list(E),
+        call_resolved(E)

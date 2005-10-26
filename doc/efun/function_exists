@@ -43,4 +43,4 @@ HISTORY
           the <flags> argument.
 
 SEE ALSO
-        call_other(E), call_resolved(E), functionlist(E)
+        call_other(E), call_resolved(E), functionlist(E), variable_exists(E)

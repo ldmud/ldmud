@@ -482,13 +482,13 @@ void    destruct(null|object);
 int     exec(object, object);
 object  find_object(string);
 mixed  *functionlist(object|string, int default: F_CONST1);
+mixed   function_exists(string, void|int|object, void|int);
 string *include_list(void|object, void|int);
 string *inherit_list(void|object, void|int);
 int     input_to(string|closure, void|int, ...);
 int     interactive(object default: F_THIS_OBJECT);
 string  load_name(null|string|object default: F_THIS_OBJECT);
 object  load_object(string);
-mixed   function_exists(string, void|int|object, void|int);
 mixed  *object_info(object, int, void|int);
 string  object_name(null|object default: F_THIS_OBJECT);
 int     object_time(object default: F_THIS_OBJECT);
@@ -514,6 +514,8 @@ object  shadow(object, int);
 int     snoop(object, void|object);
 void    tell_object(object, string);
 void    unshadow();
+string  variable_exists(string, void|int|object, void|int);
+mixed  *variable_list(object|string, int default: F_CONST1);
 
 
         /* Network IO */

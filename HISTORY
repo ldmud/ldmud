@@ -114,7 +114,7 @@ For a detailed list of all changes see the file CHANGELOG.
            initialization.
 
 
-21-Feb-2003 (Lars Duening) -- Release 3.2.10
+01-Mar-2003 (Lars Duening) -- Release 3.2.10
 
     - Changed efuns:
        + debug_info(): Removed the DID_MEM_UNUSED value from the DINFO_DATA:
@@ -125,6 +125,8 @@ For a detailed list of all changes see the file CHANGELOG.
     - Corrected efuns:
 
     - New efuns:
+       + variable_exists(): Check the existance of a named variable.
+       + variable_list(): Return all variable names of an object.
 
     - Master Object:
 
