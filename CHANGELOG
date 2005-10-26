@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+07-May-2002 (Lars Duening)  (3.3.454)
+  - (simulate.c) The error() routine now takes care to zero out all
+       pointer variables after freeing the referenced data. This way, if
+       a recursive error occurs before the new reference is stored the
+       driver won't try to free the same references again (reported by
+       Freaky).
+
 05-May-2002 (Lars Duening)  (3.3.453)
   - (lex.c) Ooops, I forgot that I had commented out the strong type
        pragmas when I experimented with an older mudlib (thanks, Ralph).

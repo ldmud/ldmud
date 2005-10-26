@@ -133,3 +133,23 @@ Legend:
   m: malloc
   s: smalloc
   p: ptmalloc
+
+
+Dhrystone, 3.2.9.585, Hurrikap (K6 350, 256 MB), Mai 2003:
+ldmud -N -e -m. -Mtest_master.c -s-1 -f dhry -sv-1 6666
+
+  DTSLO          Dhry 1 (stones/s)      Dhry 2 (stones/s)     relativ
+  ----*          566.9 584.1 584.1      853.2 862.1 848.9       105 %
+  -----          540.5 540.5 566.3      837.5 815.7 841.8       100 %
+  *----          400.3 401.9 388.2      571.4 571.4 572.7        72 %
+  -*---           71.5  96.7  73.3       83.6  81.7  87.1        12 %
+  **---           73.7  76.8  74.2       95.4  83.1  82.0        12 %
+  **--*           82.4  74.8  73.9       91.7 100.6  85.6        13 %
+  ****-           93.9  84.7  84.3       78.7 106.8  82.1        12 %
+
+  D = enable-debug
+  T = enable-trace-code
+  S = enable-smalloc-trace
+  L = enable-smalloc-lpc-trace
+  O = with-optimize=high (- = med)
+

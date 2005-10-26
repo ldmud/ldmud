@@ -1723,6 +1723,7 @@ add_message (const char *fmt, ...)
     source = NULL;
     srcstr = NULL;
     srclen = 0;
+    length = 0;
 
     va_start(va, fmt);
 

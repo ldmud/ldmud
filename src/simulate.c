@@ -653,7 +653,7 @@ error (const char *fmt, ...)
 
 {
     rt_context_t *rt;
-    string_t *object_name;
+    string_t *object_name = NULL;
     char     *ts;
     svalue_t *svp;
     Bool      published_catch;
@@ -739,7 +739,10 @@ error (const char *fmt, ...)
             debug_message("%s Caught error: %s", ts, emsg_buf + 1);
             printf("%s Caught error: %s", ts, emsg_buf + 1);
             if (current_error_trace)
+            {
                 free_array(current_error_trace);
+                current_error_trace = NULL;
+            }
             object_name = dump_trace(MY_FALSE, &current_error_trace);
             debug_message("%s ... execution continues.\n", ts);
             printf("%s ... execution continues.\n", ts);
@@ -750,7 +753,10 @@ error (const char *fmt, ...)
              * available for debug_info().
              */
             if (current_error_trace)
+            {
                 free_array(current_error_trace);
+                current_error_trace = NULL;
+            }
             object_name = collect_trace(NULL, &current_error_trace);
         }
 
@@ -816,9 +822,15 @@ error (const char *fmt, ...)
     if (!published_catch)
     {
         if (uncaught_error_trace)
+        {
             free_array(uncaught_error_trace);
+            uncaught_error_trace = NULL;
+        }
         if (current_error_trace)
+        {
             free_array(current_error_trace);
+            current_error_trace = NULL;
+        }
 
         object_name = dump_trace(num_error == 3, &current_error_trace);
         if (!published_catch)
@@ -840,11 +852,18 @@ error (const char *fmt, ...)
             if (malloced_error)
             {
                 free_mstring(malloced_error);
+                malloced_error = NULL;
             }
             if (malloced_file)
+            {
                 free_mstring(malloced_file);
+                malloced_file = NULL;
+            }
             if (malloced_name)
+            {
                 free_mstring(malloced_name);
+                malloced_name = NULL;
+            }
             if (current_error_trace)
             {
                 free_array(current_error_trace);
@@ -997,11 +1016,18 @@ error (const char *fmt, ...)
     if (malloced_error)
     {
         free_mstring(malloced_error);
+        malloced_error = NULL;
     }
     if (malloced_file)
+    {
         free_mstring(malloced_file);
+        malloced_file = NULL;
+    }
     if (malloced_name)
+    {
         free_mstring(malloced_name);
+        malloced_name = NULL;
+    }
 
     num_error--;
 

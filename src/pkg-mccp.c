@@ -64,25 +64,31 @@
 
 /*-------------------------------------------------------------------------*/
 void *
-zlib_alloc (void *opaque, unsigned int items, unsigned int size)
+zlib_alloc (void *opaque UNUSED, unsigned int items, unsigned int size)
 
 /* Callback function for the zlib to allocate an zeroed block of
  * memory.
  */
 
 {
+#ifdef __MWERKS__
+#   pragma unused(opaque)
+#endif
     return calloc (items, size);
 } /* zlib_alloc() */
 
 /*-------------------------------------------------------------------------*/
 void
-zlib_free (void *opaque, void *address)
+zlib_free (void *opaque UNUSED, void *address)
 
 /* Callback function for the zlib to free a block of memory allocated with
  * zlib_alloc().
  */
 
 {
+#ifdef __MWERKS__
+#   pragma unused(opaque)
+#endif
     free (address);
 } /* zlib_free() */
 

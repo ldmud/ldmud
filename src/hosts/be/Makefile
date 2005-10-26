@@ -122,6 +122,9 @@ endif
     CFLAGS += -DMUD_LIB='"$(MUDLIB)"' -DBINDIR='"$(BINDIR)"'
     CFLAGS += -DERQ_DIR='"$(ERQDIR)"'
 
+# Linker flags
+    LDFLAGS += -lz
+
 # Add additional flags if given
 
 ifdef D
