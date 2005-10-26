@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+12-Mar-2002 (Lars Duening)  (3.3.419)
+  - (mapping.c, gcollect.c) The mapping GC forgot to mark the map-chain
+       blocks as referenced (reported by Bardioc).
+
 11-Mar-2002 (Lars Duening)  (3.3.418)
   - (structs.c) Removed a crasher caused by two uninitialized variables.
   - (mappings, gcollect.c) The GC can now collect mappings with hash

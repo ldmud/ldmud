@@ -1225,12 +1225,6 @@ gc_count_ref_in_vector (svalue_t *svp, size_t num
                 mapping_t *m;
 
                 m = p->u.map;
-                if (m->cond)
-                    passed_note_ref(m->cond);
-                if (m->hash)
-                {
-                    passed_note_ref(m->hash);
-                }
                 count_ref_in_mapping(m);
                 count_mapping_size(m);
             }

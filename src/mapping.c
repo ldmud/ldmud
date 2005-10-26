@@ -2732,7 +2732,6 @@ void
 count_ref_in_mapping (mapping_t *m)
 
 /* GC support: Count all references by the mapping <m>.
- * The GC will call this function only for compacted mappings.
  *
  * If the mapping contains keys referencing destructed objects/lambdas,
  * it is added to the list of stale mappings.
@@ -2744,6 +2743,12 @@ count_ref_in_mapping (mapping_t *m)
     Bool any_destructed = MY_FALSE;
 
     num_values = m->num_values;
+
+    /* Mark the blocks as referenced */
+    if (m->cond)
+        note_malloced_block_ref(m->cond);
+    if (m->hash)
+        note_malloced_block_ref(m->hash);
 
     /* Count references by condensed keys and their data.
      * Take special care of keys referencing destructed objects/lambdas.
@@ -2782,6 +2787,7 @@ count_ref_in_mapping (mapping_t *m)
 
         for ( ; mc != NULL; mc = mc->next)
         {
+            note_malloced_block_ref(mc);
             if (destructed_object_ref(mc->data))
             {
                 /* This key is a destructed object, resp. is bound to a
