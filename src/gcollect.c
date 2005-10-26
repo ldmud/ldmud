@@ -1435,7 +1435,7 @@ garbage_collection(void)
     purge_shadow_sent();
     check_wizlist_for_destr();
     cleanup_all_objects(); /* creates dirty mappings! */
-    compact_mappings(num_dirty_mappings);
+    compact_mappings(num_dirty_mappings, MY_TRUE);
     if (current_error_trace)
     {
         free_array(current_error_trace);
@@ -2468,7 +2468,7 @@ garbage_collection (void)
     purge_shadow_sent();
     check_wizlist_for_destr();
     cleanup_all_objects(); /* creates dirty mappings! */
-    compact_mappings(num_dirty_mappings);
+    compact_mappings(num_dirty_mappings, MY_TRUE);
     if (current_error_trace)
     {
         free_array(current_error_trace);

@@ -2915,8 +2915,10 @@ status_parse (strbuf_t * sbuf, char * buff)
                             , num_vb_swapped, total_vb_bytes_swapped / 1024);
             strbuf_addf(sbuf, "Arrays:\t\t\t\t%8ld %9ld\n"
                             , (long)num_arrays, total_array_size() );
-            strbuf_addf(sbuf, "Mappings:\t\t\t%8ld %9ld\n"
-                             , num_mappings, total_mapping_size() );
+            strbuf_addf(sbuf, "Mappings:\t\t\t%8ld %9ld (%ld dirty)\n"
+                            , num_mappings, total_mapping_size()
+                            , num_dirty_mappings
+                            );
             strbuf_addf(sbuf, "Prog blocks:\t\t\t%8ld %9ld (%ld swapped, %ld Kbytes)\n"
                             , total_num_prog_blocks + num_swapped - num_unswapped
                             , total_prog_block_size + total_bytes_swapped

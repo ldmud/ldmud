@@ -50,6 +50,9 @@ struct mapping_hash_s {
       /* Refcount if this mapping is part of a T_PROTECTOR_MAPPING svalue.
        * The value is <= the mappings main refcount.
        */
+    mp_int        last_used;
+      /* Time of the last change (add or delete) to the mapping.
+       */
     mapping_t   * next_dirty;  /* Next dirty mapping in the list */
     p_int         cond_deleted;
       /* Number of entries deleted from the condensed part
@@ -182,7 +185,7 @@ extern mapping_t *resize_mapping(mapping_t *m, mp_int new_width);
 #define copy_mapping(m) resize_mapping((m), (m)->num_values)
 extern mapping_t *add_mapping(mapping_t *m1, mapping_t *m2);
 extern void walk_mapping(mapping_t *m, void (*func)(svalue_t *key, svalue_t *val, void *extra), void *extra);
-extern void compact_mappings(mp_int num);
+extern void compact_mappings(mp_int num, Bool force);
 extern mp_int total_mapping_size(void);
 extern size_t mapping_overhead(mapping_t *m);
 extern void set_mapping_user(mapping_t *m, object_t *owner);

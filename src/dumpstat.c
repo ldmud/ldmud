@@ -360,9 +360,6 @@ dumpstat (string_t *fname)
         fprintf(f, " %s",
                 swapstrings[(O_PROG_SWAPPED(ob)?1:0) | (O_VAR_SWAPPED(ob)?2:0)]
         );
-        fprintf(f, " %s",
-                swapstrings[(O_PROG_SWAPPED(ob)?1:0) | (O_VAR_SWAPPED(ob)?2:0)]
-        );
         tm = localtime((time_t *)&ob->load_time);
         strftime(stime, sizeof(stime)-1, "%Y.%m.%d-%H:%M:%S", tm);
         fprintf(f, " %s\n", stime);

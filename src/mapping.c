@@ -133,6 +133,7 @@
  *       p_int        used;
  *       p_int        cond_deleted;
  *       p_int        ref;
+ *       mp_int       last_used;
  *       map_chain_t *deleted;
  *       mapping_t   *next_dirty;
  *       map_chain_t *chains[ 1 +.mask ];
@@ -166,6 +167,10 @@
  *   is the list of entries deleted from the mapping while the
  *   protection is in effect. If the .ref falls back to 0, all
  *   the pending deletions of the .deleted entries are performed.
+ *
+ *   .last_used holds the time (seconds since the epoch) of the last addition
+ *   or removal of an entry. It is used by the compaction algorithm to
+ *   determine whether the mapping should be compacted or not.
  *
  * -- map_chain_t --
  *
@@ -206,6 +211,11 @@
 #include "xalloc.h"
 
 #include "i-svalue_cmp.h"
+
+#define TIME_TO_COMPACT (600) /* 10 Minutes */
+   /* TODO: Make this configurable.
+    * TODO:: When doing so, also implement the shrinking of the hashtable
+    */
 
 /*-------------------------------------------------------------------------*/
 /* Types */
@@ -419,6 +429,7 @@ get_new_hash ( mapping_t *m, mp_int hash_size)
 
     hm->mask = hash_size;
     hm->used = hm->cond_deleted = hm->ref = 0;
+    hm->last_used = current_time;
 
     /* These members don't really need a default initialisation
      * but it's here to catch bogies.
@@ -688,6 +699,7 @@ _free_mapping (mapping_t *m, Bool no_data)
 
         hm = get_new_hash(m, 0);
         hm->next_dirty = next_dirty;
+        hm->last_used = 0;
 
         m->hash = hm;
         m->num_entries = 0;
@@ -1225,6 +1237,7 @@ _get_map_lvalue (mapping_t *m, svalue_t *map_index
         ; idx--, entry++)
         put_number(entry, 0);
 
+    hm->last_used = current_time;
     hm->used++;
     m->num_entries++;
 
@@ -1432,6 +1445,7 @@ remove_mapping (mapping_t *m, svalue_t *map_index)
                 new_dirty_mapping(m);
             }
 
+            hm->last_used = current_time;
             hm->cond_deleted++;
         }
         else if (mc != NULL && NULL != (hm = m->hash))
@@ -1468,6 +1482,8 @@ remove_mapping (mapping_t *m, svalue_t *map_index)
             {
                 free_map_chain(m, mc, MY_FALSE);
             }
+
+            hm->last_used = current_time;
             hm->used--;
             /* TODO: Reduce the size of the hashtable if the average
              * TODO:: number of entries per chain is <= 1 (or better <= 0.5
@@ -1565,6 +1581,7 @@ resize_mapping (mapping_t *m, mp_int new_width)
 
         hm2->mask = hm->mask;
         hm2->used = hm->used;
+        hm2->last_used = current_time;
         hm2->cond_deleted = 0;
         hm2->next_dirty = NULL;
         hm2->deleted = NULL;
@@ -2024,13 +2041,15 @@ walk_mapping ( mapping_t *m
 
 /*-------------------------------------------------------------------------*/
 void
-compact_mappings (mp_int num)
+compact_mappings (mp_int num, Bool force)
 
-/* Compact the first <num> mappings in the dirty-mapping list.
- * Compaction means: removal of all deleted entries from the condensed
- * and hashed part, merge of all hashed entries into the condensed part,
- * reduction of the memory held by the condensed part to the
- * minimum.
+/* Compact the first <num> mappings in the dirty-mapping list which may
+ * have to satisfy certain conditions.
+ *
+ * If <force> is TRUE, the first <num> mappings are compacted unconditionally.
+ * If <force> is FALSE, the mappings to be compacted have to
+ *   - have a .last_used time of TIME_TO_COMPACT or more seconds earlier,
+ *   - or have to have at least half of their condensed entries deleted.
  *
  * The merger is a two step process: first, all hashed entries are
  * sorted, then the sorted entries are merged with the condensed part.
@@ -2042,7 +2061,9 @@ compact_mappings (mp_int num)
  */
 
 {
-    mapping_t *m;  /* The current mapping to compact */
+    mapping_t *m;     /* The current mapping to compact */
+    mapping_t *prev;  /* The previous dirty mapping, or NULL */
+    mapping_t *this;  /* The next dirty mapping to work */
 
     malloc_privilege = MALLOC_SYSTEM;
       /* compact_mappings() is called in very low memory situations,
@@ -2065,17 +2086,15 @@ compact_mappings (mp_int num)
     if (num >= num_dirty_mappings)
     {
         num = num_dirty_mappings;
-        last_dirty_mapping = &dirty_mapping_head;
     }
     else
     {
         extra_jobs_to_do = MY_TRUE;
     }
 
-    num_dirty_mappings -= num;
-
-    m = dirty_mapping_head_hash.next_dirty;
-    while (--num >= 0)
+    prev = &dirty_mapping_head;
+    this = dirty_mapping_head_hash.next_dirty;
+    while (--num >= 0 && this != NULL)
     {
 
         mapping_hash_t *hm;
@@ -2102,6 +2121,8 @@ compact_mappings (mp_int num)
         mp_int runlength;
           /* Current Mergesort partition length */
 
+        m = this;
+
 #ifdef DEBUG
         if (!m->user)
             fatal("No wizlist pointer for mapping\n");
@@ -2124,11 +2145,17 @@ compact_mappings (mp_int num)
          */
         if (1 == m->ref && !m->num_entries)
         {
+            /* Unlink this mapping */
+            num_dirty_mappings--;
+            this = hm->next_dirty;
+            prev->hash->next_dirty = this;
+            if (this == NULL)
+                last_dirty_mapping = prev;
+
             LOG_SUB("compact_mappings: empty mapping", sizeof(*m) + SIZEOF_MH(hm));
             m->user->mapping_total -= sizeof(*m) + SIZEOF_MH(hm);
             xfree(m);
             check_total_mapping_size();
-            m = hm->next_dirty;
             xfree(hm);
             empty_mapping_load -= 2;
             continue;
@@ -2142,6 +2169,13 @@ compact_mappings (mp_int num)
          */
         if (!hm->used && !hm->cond_deleted)
         {
+            /* Unlink this mapping */
+            num_dirty_mappings--;
+            this = hm->next_dirty;
+            prev->hash->next_dirty = this;
+            if (this == NULL)
+                last_dirty_mapping = prev;
+
             LOG_SUB("compact_mappings: no need to", SIZEOF_MH(hm));
             m->user->mapping_total -= SIZEOF_MH(hm);
             m->hash = NULL;
@@ -2154,10 +2188,32 @@ compact_mappings (mp_int num)
              */
             free_mapping(m);
 
-            m = hm->next_dirty;
             xfree(hm);
             continue;
         }
+
+        if (!force
+         && current_time - hm->last_used < TIME_TO_COMPACT
+         && hm->cond_deleted * 2 < m->num_entries - hm->used
+           )
+        {
+            /* This mapping doesn't qualify for compaction,
+             * proceed to the next.
+             */
+            prev = this;
+            this = this->hash->next_dirty;
+            if (this == NULL)
+                last_dirty_mapping = prev;
+            extra_jobs_to_do = MY_TRUE;
+            continue;
+        }
+
+        /* This mapping can be compacted: unlink it */
+        num_dirty_mappings--;
+        this = this->hash->next_dirty;
+        prev->hash->next_dirty = this;
+        if (this == NULL)
+            last_dirty_mapping = prev;
 
         /* Nope, this one needs compaction.
          * Get the temporary result mapping (we need the condensed block
@@ -2466,16 +2522,8 @@ compact_mappings (mp_int num)
           /* Get rid of the temporary mapping and the old cond block.
            */
 
-        m = hm->next_dirty;
-
         xfree(hm);
     } /* while (num >= 0) */
-
-    /* m is now the first of the remaining uncompacted mappings, or
-     * the head itself if all dirty mappings have been processed.
-     */
-
-    dirty_mapping_head_hash.next_dirty = m;
 
 } /* compact_mappings() */
 

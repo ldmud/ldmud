@@ -519,7 +519,7 @@ backend (void)
             extra_jobs_to_do = MY_FALSE;
 
             if (num_dirty_mappings) {
-                compact_mappings((num_dirty_mappings+80) >> 5);
+                compact_mappings((num_dirty_mappings+80) >> 5, MY_FALSE);
                 malloc_privilege = MALLOC_USER;
             }
         } /* if (extra_jobs_to_do */
