@@ -580,7 +580,9 @@ clear_struct_ref (struct_t * pStruct)
         pStruct->ref = 0;
         clear_struct_type_ref(pStruct->type);
         if (struct_size(pStruct))
+        {
             clear_ref_in_vector(pStruct->member, struct_size(pStruct));
+        }
     }
 } /* clear_struct_ref() */
 
@@ -630,7 +632,9 @@ count_struct_ref (struct_t * pStruct)
         note_malloced_block_ref(pStruct);
         count_struct_type_ref(pStruct->type);
         if (struct_size(pStruct))
+        {
             count_ref_in_vector(pStruct->member, struct_size(pStruct));
+        }
     }
 } /* clear_struct_ref() */
 

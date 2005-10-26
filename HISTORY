@@ -114,7 +114,7 @@ For a detailed list of all changes see the file CHANGELOG.
            initialization.
 
 
-01-Mar-2003 (Lars Duening) -- Release 3.2.10
+02-Mar-2003 (Lars Duening) -- Release 3.2.10
 
     - Changed efuns:
        + debug_info(): Removed the DID_MEM_UNUSED value from the DINFO_DATA:
@@ -123,6 +123,7 @@ For a detailed list of all changes see the file CHANGELOG.
            DID_STATUS result.
 
     - Corrected efuns:
+       + m_add(): Fixed a memory leak when existing entries were overwritten.
 
     - New efuns:
        + variable_exists(): Check the existance of a named variable.

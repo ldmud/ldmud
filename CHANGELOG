@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+02-Mar-2002 (Lars Duening)  (3.3.406)
+  - (gcollect.c) During the 'clear' phase of the GC, struct member elements
+       weren't marked as cleared, which prevented proper counting in the
+       'count' phase and caused the referenced memory blocks being deallocated
+       prematurely in the 'sweep' phase (reported by Bardioc).
+  - (mapping.c) Fixed a memory leak in efun m_add().
+
 01-Mar-2002 (Lars Duening)  (3.3.405)
   - (func_spec, object) New efun variable_exists() and
        variable_list().

@@ -305,7 +305,6 @@ cleanup_vector (svalue_t *svp, size_t num, ptrtable_t * ptable)
 
 #ifdef USE_STRUCTS
         case T_STRUCT:
-            /* Don't clean the null vector */
             cleanup_vector(&p->u.strct->member[0], struct_size(p->u.strct), ptable);
             break;
 #endif /* USE_STRUCTS */
@@ -985,7 +984,7 @@ clear_ref_in_vector (svalue_t *svp, size_t num)
 
 #ifdef USE_STRUCTS
         case T_STRUCT:
-            count_struct_ref(p->u.strct);
+            clear_struct_ref(p->u.strct);
             continue;
 #endif /* USE_STRUCTS */
 

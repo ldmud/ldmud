@@ -3076,7 +3076,7 @@ v_m_add (svalue_t *sp, int num_arg)
         ; num_values--, argp++, entry++
         )
     {
-        transfer_svalue_no_free(entry, argp);
+        transfer_svalue(entry, argp);
         /* And since we take out values from under sp, play it
          * safe:
          */
