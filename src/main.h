@@ -58,6 +58,7 @@ extern void vdebug_message(const char *, va_list);
 
 void reallocate_reserved_areas(void);
 
+extern void write_X (int d, unsigned char i);
 extern void write_x(int d, p_uint i);
 extern void writed(int d, p_uint i);
 extern void writes (int d, const char *s);

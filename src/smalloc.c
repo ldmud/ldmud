@@ -781,7 +781,7 @@ UNLINK_SMALL_FREE (word_t * block)
         word_t * next = BLOCK_NEXT(block);
         if (next)
             next[M_PLINK(next[M_SIZE] & M_MASK)] = (word_t)prev | flag;
-        BLOCK_NEXT(prev) = next;
+        prev[M_LINK] = (word_t) next;
     }
     small_free[ix]--;
     count_back(small_free_stat, bsize * SINT);
@@ -818,7 +818,7 @@ void MAKE_SMALL_FREE (word_t *block, word_t bsize)
     head = sfltable[ix];
     if (head)
         head[M_PLINK(head[M_SIZE] & M_MASK)] = (word_t)block | flag;
-    BLOCK_NEXT(block) = head;
+    block[M_LINK] = (word_t) head;
     block[M_PLINK(bsize)] = (word_t)block | flag;
 
     if (flag)
@@ -989,7 +989,7 @@ mem_alloc (size_t size)
 
                 this[M_SIZE] &= PREV_BLOCK;
                 this[M_SIZE] |= rsize | (THIS_BLOCK|M_GC_FREE|M_REF);
-                BLOCK_PREV(this, rsize) = BLOCK_PREV(this, bsize);
+                this[M_PLINK(rsize)] = this[M_PLINK(bsize)];
                 this[M_PLINK(rsize)-1] =  rsize;
 
 #ifdef MALLOC_CHECK

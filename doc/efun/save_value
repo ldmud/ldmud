@@ -5,8 +5,8 @@ DESCRIPTION
         Encode the <value> into a string suitable for restoration with
         restore_value() and return it.
 
-        In both forms, the optional <format> argument determines the
-        format of the savefile to be written:
+        The optional <format> argument determines the format of the savefile
+        to be written:
 
            -1: use the driver's native format (default).
             0: original format, used by Amylaar LPMud and LDMud <= 3.2.8 .
