@@ -45,6 +45,13 @@ enable_compat_mode=no
 
 with_master_name=secure/master
 
+# Define ALLOW_FILENAME_SPACES if the driver should accept space characters
+# in filenames. If it is not defined, a hardcoded test for space characters
+# is activated.
+
+enable_filename_spaces=no
+
+
 # --- Runtime limits ---
 
 # Maximum size of array. If 0, any size is allowed.

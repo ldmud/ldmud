@@ -110,6 +110,13 @@
  */
 #define MAX_COST               1048576
 
+/* Define ALLOW_FILENAME_SPACES if the driver should accept space characters
+ * in filenames. If it is not defined, a hardcoded test for space characters
+ * is activated.
+ */
+#undef ALLOW_FILENAME_SPACES
+
+
 /* Define SHARE_VARIABLES if a clone's variables are to be assigned
  * from the current blueprint's variables. Undefine it if clones
  * should be initialized by __INIT().

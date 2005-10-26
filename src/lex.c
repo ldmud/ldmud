@@ -724,6 +724,9 @@ init_lexer(void)
         add_permanent_define("__COMPAT_MODE__", -1, string_copy(""), MY_FALSE);
     }
     add_permanent_define("__EUIDS__", -1, string_copy(""), MY_FALSE);
+
+    if (allow_filename_spaces)
+        add_permanent_define("__FILENAME_SPACES__", -1, string_copy(""), MY_FALSE);
     if (strict_euids)
         add_permanent_define("__STRICT_EUIDS__", -1, string_copy(""), MY_FALSE);
 

@@ -178,6 +178,10 @@ DESCRIPTION
         Reserve <size> amount of memory for user/master/system allocations to
         be held until main memory runs out.
 
+      --filename-spaces
+      --no-filename-spaces
+        Allow/disallow the use of spaces in filenames.
+
       --strict-euids
       --no-strict-euids
         Enable/disable the enforced use of euids.

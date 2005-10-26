@@ -1398,7 +1398,9 @@ legal_path (const char *path)
  * TODO: This should go into a 'files' module.
  */
 {
-    if (path == NULL || strchr(path, ' ') || path[0] == '/')
+    if (path == NULL
+     || (!allow_filename_spaces && strchr(path, ' '))
+     || path[0] == '/')
         return MY_FALSE;
 
 #ifdef MSDOS_FS
@@ -1406,7 +1408,7 @@ legal_path (const char *path)
         const char *name;
 
         if (strchr(path,'\\'))
-            return MY_FALSE; /* better save than sorry ... */
+            return MY_FALSE; /* better safe than sorry ... */
         if (strchr(path,':'))
             return MY_FALSE; /* \B: is okay for DOS .. *sigh* */
         name = strrchr(path,'/');
@@ -3239,7 +3241,7 @@ check_valid_path (string_t *path, object_t *caller, string_t* call_fun, Bool wri
 
     /* Push the path onto the VM stack so that error() can free it */
     push_string(inter_sp, path);
-    error("Illegal path %s for %s() by %s\n", get_txt(path), get_txt(call_fun)
+    error("Illegal path '%s' for %s() by %s\n", get_txt(path), get_txt(call_fun)
          , get_txt(caller->name));
     return NULL;
 } /* check_valid_path() */

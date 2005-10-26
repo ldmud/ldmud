@@ -1,6 +1,14 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+17-Mar-2002 (Lars Duening)
+  - (doc/master) Added missing manpages for the parse_command() supportf
+      (reported by Zonk).
+  - (main, simulate.c, configure) New commandline option '--filename-spaces'
+      to allow space characters in filenames (default is to disallow them).
+  - (object.c) Shared variable closures were saved without the '<num>=' header
+       (reported by Menaures and Fiona).
+
 17-Mar-2002 (Lars Duening)  (3.3.423)
   - (mapping.c) Removed a memory leak.
 

@@ -84,9 +84,6 @@ DESCRIPTION
         void flag (string arg)
           Evaluate an argument given as option '-f' to the driver.
 
-        string *define_include_dirs ()
-          Define where the include files are searched.
-
         string *epilog (int eflag)
           Perform final actions before opening the system to users.
 

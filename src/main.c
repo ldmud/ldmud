@@ -98,6 +98,8 @@ Bool share_variables = MY_FALSE;  /* Clones are initialized from their
                                    * blueprints.
                                    */
 
+Bool allow_filename_spaces = MY_FALSE; /* Allow spaces in filenames */
+
 static uint32 random_seed = 0;  /* The seed for the pseudo-random generator. */
 
 static char * hostname = NULL;
@@ -248,6 +250,9 @@ main (int argc, char **argv)
 #endif
 #ifdef SHARE_VARIABLES
         share_variables = MY_TRUE;
+#endif
+#ifdef ALLOW_FILENAME_SPACES
+        allow_filename_spaces = MY_TRUE;
 #endif
 
 #ifdef INPUT_ESCAPE
@@ -958,6 +963,8 @@ typedef enum OptNumber {
  , cDefine          /* --define             */
  , cErq             /* --erq                */
  , cEvalcost        /* --eval-cost          */
+ , cFilenameSpaces   /* --filename-spaces    */
+ , cNoFilenameSpaces /* --no-filename-spaces */
  , cFuncall         /* --funcall            */
  , cMaster          /* --master             */
  , cMudlib          /* --mudlib             */
@@ -1285,11 +1292,28 @@ static Option aOptions[]
       , NULL
       }
 
+    , { 0,   "filename-spaces",    cFilenameSpaces,  MY_FALSE
+      , "  --filename-spaces\n"
+      , "  --filename-spaces\n"
+        "  --no-filename-spaces\n"
+        "    Allow/disallow the use of spaces in filenames.\n"
+      }
+
+    , { 0,   "no-filename-spaces",    cNoFilenameSpaces,  MY_FALSE
+      , "  --no-filename-spaces\n"
+      , NULL
+      }
+
     , { 0,   "strict-euids",       cStrictEuids,    MY_FALSE
       , "  --strict-euids\n"
       , "  --strict-euids\n"
         "  --no-strict-euids\n"
         "    Enforce/don't enforce the proper use of euids.\n"
+      }
+
+    , { 0,   "no-strict-euids",     cNoStrictEuids,    MY_FALSE
+      , "  --no-strict-euids\n"
+      , NULL
       }
 
     , { 0,   "share-variables",    cShareVariables,  MY_FALSE
@@ -1591,6 +1615,11 @@ options (void)
 #endif
 #ifdef USE_NEW_INLINES
                               , "new inline closures enabled\n"
+#endif
+#ifdef ALLOW_FILENAME_SPACES
+                              , "filenames may contain space characters\n"
+#else
+                              , "filenames may not contain space characters\n"
 #endif
                               };
         size_t nStrings = sizeof(optstrings) / sizeof(optstrings[0]);
@@ -2273,6 +2302,14 @@ eval_arg (int eOption, const char * pValue)
 
     case cNoShareVariables:
         share_variables = MY_FALSE;
+        break;
+
+    case cFilenameSpaces:
+        allow_filename_spaces = MY_TRUE;
+        break;
+
+    case cNoFilenameSpaces:
+        allow_filename_spaces = MY_FALSE;
         break;
 
 #ifdef GC_SUPPORT

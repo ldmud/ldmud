@@ -10,7 +10,10 @@ DESCRIPTION
         be used unchanged.
 
         The returned pathname must not contain ``..'', a leading /
-        will be stripped by the interpreter.
+        will be stripped by the interpreter. By default, the returned
+        path must also not contain space characters; if the driver
+        is instructed to allow them, the preprocessor macro
+        __FILENAME_SPACES__ is defined.
 
         Func denotes the efun call or other operation that caused
         valid_write() to be called:

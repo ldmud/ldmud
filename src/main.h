@@ -13,6 +13,7 @@ extern Bool t_flag;
 extern Bool comp_flag;
 extern Bool strict_euids;
 extern Bool share_variables;
+extern Bool allow_filename_spaces;
 extern long time_to_reset;
 extern long time_to_cleanup;
 extern long time_to_swap;

@@ -1017,7 +1017,10 @@ mixed valid_write (string path, string euid, string fun, object caller)
 //   allowed.
 //   You can also return 1 to indicate that the path can be used unchanged.
 //
-// The path finally to be used must not contain spaces or '..'s .
+// The returned pathname must not contain ``..'', a leading / will be stripped
+// by the interpreter. By default, the returned path must also not contain
+// space characters; if the driver is instructed to allow them, the
+// preprocessor macro __FILENAME_SPACES__ is defined.
 //
 // These are the central functions establishing the various file access
 // rights.

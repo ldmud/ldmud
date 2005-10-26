@@ -12,6 +12,7 @@ DESCRIPTION
       COMPAT_FLAG     : defined if the driver runs in compat mode.
       __COMPAT_MODE__ : ditto
       __STRICT_EUIDS__: defined if strict euid usage is enforced.
+      __FILENAME_SPACES__: defined if filenames may contain spaces.
 
       __MASTER_OBJECT__ : the name of the master object (in compat mode
                           without leading '/').
@@ -91,7 +92,8 @@ HISTORY
         __CLEANUP_TIME__, __DRIVER_LOG__, and __WIZLIST__.
     3.2.10 added __MSDOS_FS__.
     3.3 made __LPC_NOSAVE__ always defined and added __ALISTS__,
-        __LPC_STRUCTS__, __LPC_INLINE_CLOSURES__, and __PCRE__.
+        __LPC_STRUCTS__, __LPC_INLINE_CLOSURES__, __FILENAME_SPACES__
+        and __PCRE__.
 
 SEE ALSO
     pragma(LPC), preprocessor(LPC)

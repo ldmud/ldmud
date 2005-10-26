@@ -28,6 +28,8 @@
 ;; TODO: Like Pike: replace() http://caudium.net/developer/pikeref/ex/replace.html
 ;; TODO::  See Zonk's "Wunschzettel"
 ;; TODO: Like Pike: reverse() http://caudium.net/developer/pikeref/ex/reverse.html
+;; TODO: Put the manpage masters into doxygen format and use that to create the
+;; TODO::  real manpages from it.
 ;; TODO: Like Pike: `operator()s as lfuns. http://caudium.net/developer/pikeref/
 ;; TODO: Investigate MPS (http://www.ravenbrook.com/project/mps/)
 ;; TODO: general coloured efuns
@@ -51,12 +53,13 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 423)
-(Parent-Version lpmud 3-3 422)
-(Version-Log "Removed a memory leak in the mapping code.")
+(Project-Version lpmud 3-3 424)
+(Parent-Version lpmud 3-3 423)
+(Version-Log "New commandline option '--filename-spaces'.
+Shared variable closures were saved without the '<num>=' header.")
 (New-Version-Log
 "")
-(Checkin-Time "Mon, 17 Mar 2003 01:10:58 -0700")
+(Checkin-Time "Mon, 17 Mar 2003 12:29:24 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -93,24 +96,24 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.59 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.486 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.308 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.487 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.309 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.19 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
   ;; Configuration
-  (src/configure (lpmud/d/0_configure 1.19.1.78 755))
-  (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.28 644))
+  (src/configure (lpmud/d/0_configure 1.19.1.79 755))
+  (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.29 644))
   (src/machine.h.in (lpmud/b/9_machine.h. 1.9.1.5 644))
   (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.19.1.13 644))
   (src/mkinstalldirs (lpmud/c/4_mkinstalld 1.1 644))
   (src/install-sh (lpmud/c/5_install-sh 1.2 755))
 
-  (src/autoconf/configure.in (lpmud/d/7_configure. 1.20.1.9.1.68 644))
+  (src/autoconf/configure.in (lpmud/d/7_configure. 1.20.1.9.1.69 644))
   (src/autoconf/acconfig.h (lpmud/d/10_acconfig.h 1.6.1.5 644))
 
   (src/settings/README (lpmud/c/22_README 1.14.1.14 644))
-  (src/settings/default (lpmud/c/23_default 1.13.1.5.1.37 744))
+  (src/settings/default (lpmud/c/23_default 1.13.1.5.1.38 744))
   (src/settings/native (lpmud/c/9_native 1.6 744))
   (src/settings/compat (lpmud/c/10_compat 1.7 744))
   (src/settings/alatia (lpmud/j/27_alatia 1.5 744))
@@ -185,9 +188,9 @@
   (src/interpret.h (lpmud/b/13_interpret. 1.33.1.35 644))
   (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.24 644))
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.15.1.4 644))
-  (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.50 644))
-  (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.13 644))
-  (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.37 644))
+  (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.51 644))
+  (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.14 644))
+  (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.38 644))
   (src/mapping.h (lpmud/f/30_mapping.h 1.12.1.18 644))
   (src/mapping.c (lpmud/b/6_mapping.c 1.36.1.64 644))
   (src/md5.h (lpmud/l/18_md5.h 1.2 644))
@@ -201,7 +204,7 @@
   (src/my-alloca.h (lpmud/f/29_my-alloca. 1.3.1.2 644))
   (src/my-rusage.h (lpmud/f/28_my-rusage. 1.7 644))
   (src/object.h (lpmud/44_object.h 1.34.1.19.1.3 644))
-  (src/object.c (lpmud/45_object.c 1.62.1.88.1.24 644))
+  (src/object.c (lpmud/45_object.c 1.62.1.88.1.25 644))
   (src/otable.h (lpmud/f/27_otable.h 1.8.1.4 644))
   (src/otable.c (lpmud/43_otable.c 1.22.1.6 644))
   (src/parser.c (lpmud/l/13_parser.c 1.1 644))
@@ -269,7 +272,7 @@
   (src/simul_efun.h (lpmud/f/17_simul_efun 1.5.1.5 644))
   (src/simul_efun.c (lpmud/32_simul_efun 1.20.1.17.1.3 644))
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.31 644))
-  (src/simulate.c (lpmud/31_simulate.c 1.88.1.104 644))
+  (src/simulate.c (lpmud/31_simulate.c 1.88.1.105 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.14 644))
   (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.75 644))
   (src/structs.h (lpmud/d/b/5_structs.h 1.4 644))
@@ -310,7 +313,7 @@
   (src/hosts/amiga/StartMUD (lpmud/l/42_StartMUD 1.1 644))
   (src/hosts/amiga/README.Amiga.info (lpmud/l/43_README.Ami 1.1 644) :no-keywords)
   (src/hosts/amiga/machine.h (lpmud/c/2_machine.h 1.6.1.3 644))
-  (src/hosts/amiga/config.h (lpmud/c/7_config.h 1.23.1.33 644))
+  (src/hosts/amiga/config.h (lpmud/c/7_config.h 1.23.1.34 644))
   (src/hosts/amiga/README.Amiga (lpmud/c/12_README.Ami 1.4 644))
   (src/hosts/amiga/README (lpmud/c/13_README 1.4 644))
 
@@ -318,7 +321,7 @@
   (src/hosts/be/socketinc.h (lpmud/e/32_socketinc. 1.3 644))
   (src/hosts/be/set-version (lpmud/c/b/10_set-versio 1.1 744))
   (src/hosts/be/machine.h (lpmud/e/33_machine.h 1.14.1.5 644))
-  (src/hosts/be/config.h (lpmud/e/34_config.h 1.32.1.35 644))
+  (src/hosts/be/config.h (lpmud/e/34_config.h 1.32.1.36 644))
   (src/hosts/be/be.h (lpmud/e/35_be.h 1.7 644))
   (src/hosts/be/beyacc (lpmud/i/39_beyacc 1.1 744))
   (src/hosts/be/Makefile (lpmud/e/37_Makefile 1.60.1.71.1.12 644))
@@ -339,7 +342,7 @@
   ;; Host: Win32
   (src/hosts/win32/tubmud.bmp (lpmud/g/20_tubmud.bmp 1.1 644) :no-keywords)
   (src/hosts/win32/machine.h (lpmud/g/21_machine.h 1.4.1.2 644))
-  (src/hosts/win32/config.h (lpmud/g/22_config.h 1.18.1.31 644))
+  (src/hosts/win32/config.h (lpmud/g/22_config.h 1.18.1.32 644))
   (src/hosts/win32/Readme.rtf (lpmud/g/23_Readme.rtf 1.2.1.1 644))
   (src/hosts/win32/Makefile (lpmud/g/24_Makefile 1.10.1.18.1.3 644))
 
@@ -458,7 +461,7 @@
   (mudlib/dhrystone2.c (lpmud/a/b/13_dhrystone2 1.2 644))
   (mudlib/erq-tool.c (lpmud/d/31_erq.c 1.1 644))
   (mudlib/simul_efun-dr.c (lpmud/51_simul_efun 1.3 644))
-  (mudlib/master_skeleton.c (lpmud/b/2_master_ske 1.29 644))
+  (mudlib/master_skeleton.c (lpmud/b/2_master_ske 1.30 644))
   (mudlib/telnet.h (lpmud/c/b/13_telnet.h 1.2 644))
   (mudlib/telnetneg.c (lpmud/c/b/14_telnetneg. 1.3 644))
   (mudlib/test_master.c (lpmud/e/39_test_maste 1.10.1.9 644))
@@ -940,7 +943,7 @@
   (doc/applied/init (lpmud/n/19_init 1.6 644))
   (doc/applied/logon (lpmud/n/20_logon 1.2 644))
   (doc/applied/modify_command (lpmud/n/21_modify_com 1.3 644))
-  (doc/applied/parse_command_adjectiv_id_list (lpmud/n/22_parse_comm 1.3 644))
+  (doc/applied/parse_command_adjectiv_id_list (lpmud/n/22_parse_comm 1.4 644))
   (doc/applied/parse_command_id_list (lpmud/n/23_parse_comm 1.3 644))
   (doc/applied/parse_command_plural_id_list (lpmud/n/24_parse_comm 1.3 644))
   (doc/applied/prevent_insert (lpmud/n/25_prevent_in 1.3 644))
@@ -972,10 +975,10 @@
   (doc/driver/debugmalloc (lpmud/n/42_debugmallo 1.3 644))
   (doc/driver/driver (lpmud/n/43_driver 1.2 644))
   (doc/driver/dumpallobj (lpmud/n/44_dumpallobj 1.6 644))
-  (doc/driver/invocation (lpmud/f/38_invocation 1.14.1.13 644))
+  (doc/driver/invocation (lpmud/f/38_invocation 1.14.1.14 644))
   (doc/driver/malloc (lpmud/n/45_malloc 1.3 644))
   (doc/driver/opcdump (lpmud/n/46_opcdump 1.3 644))
-  (doc/driver/predefined (lpmud/h/8_predefined 1.12.1.16 644))
+  (doc/driver/predefined (lpmud/h/8_predefined 1.12.1.17 644))
   (doc/driver/showsmallnewmalloced (lpmud/n/47_showsmalln 1.5 644))
   (doc/driver/status (lpmud/n/48_status 1.3 644))
 
@@ -1370,10 +1373,13 @@
   (doc/master/log_error (lpmud/s/4_log_error 1.3 644))
   (doc/master/make_path_absolute (lpmud/s/5_make_path_ 1.2 644))
   (doc/master/master (lpmud/s/6_master 1.4 644))
-  (doc/master/master-all (lpmud/s/8_master-all 1.9 644))
+  (doc/master/master-all (lpmud/s/8_master-all 1.10 644))
   (doc/master/notify_shutdown (lpmud/s/9_notify_shu 1.3 644))
-  (doc/master/parse_command_all_word (lpmud/s/10_parse_comm 1.2 644))
-  (doc/master/parse_command_prepos_list (lpmud/s/11_parse_comm 1.2 644))
+  (doc/master/parse_command_all_word (lpmud/s/10_parse_comm 1.3 644))
+  (doc/master/parse_command_prepos_list (lpmud/s/11_parse_comm 1.3 644))
+  (doc/master/parse_command_plural_id_list (lpmud/d/b/27_parse_comm 1.1 644))
+  (doc/master/parse_command_id_list (lpmud/d/b/28_parse_comm 1.1 644))
+  (doc/master/parse_command_adjectiv_id_list (lpmud/d/b/29_parse_comm 1.1 644))
   (doc/master/preload (lpmud/s/12_preload 1.2 644))
   (doc/master/prepare_destruct (lpmud/s/13_prepare_de 1.3 644))
   (doc/master/printf_obj_name (lpmud/m/23_printf_obj 1.2 644))
@@ -1390,11 +1396,11 @@
   (doc/master/stale_erq (lpmud/s/25_stale_erq 1.3 644))
   (doc/master/valid_exec (lpmud/s/26_valid_exec 1.2 644))
   (doc/master/valid_query_snoop (lpmud/s/27_valid_quer 1.3 644))
-  (doc/master/valid_read (lpmud/s/28_valid_read 1.4 644))
+  (doc/master/valid_read (lpmud/s/28_valid_read 1.5 644))
   (doc/master/valid_seteuid (lpmud/s/29_valid_sete 1.2 644))
   (doc/master/valid_snoop (lpmud/s/30_valid_snoo 1.2 644))
   (doc/master/valid_trace (lpmud/c/3_valid_trac 1.1.1.2 644))
-  (doc/master/valid_write (lpmud/s/31_valid_writ 1.8 644))
+  (doc/master/valid_write (lpmud/s/31_valid_writ 1.9 644))
 
   (doc/obsolete/add_verb (lpmud/b/b/0_add_verb 1.2 644))
   (doc/obsolete/add_xverb (lpmud/b/b/1_add_xverb 1.1 644))

@@ -5759,7 +5759,6 @@ save_closure (svalue_t *cl, Bool writable)
 
     case CLOSURE_IDENTIFIER:
       {
-        L_PUTC_PROLOG
         lambda_t *l;
         char * source, c;
 
@@ -5782,13 +5781,17 @@ save_closure (svalue_t *cl, Bool writable)
 
         source = get_txt(l->ob->prog->variables[l->function.var_index].name);
 
-        L_PUTC('#');
-        L_PUTC('v');
-        L_PUTC(':');
-        c = *source++;
-        do L_PUTC(c) while ( '\0' != (c = *source++) );
+        {
+            L_PUTC_PROLOG
+
+            L_PUTC('#');
+            L_PUTC('v');
+            L_PUTC(':');
+            c = *source++;
+            do L_PUTC(c) while ( '\0' != (c = *source++) );
         
-        L_PUTC_EPILOG
+            L_PUTC_EPILOG
+        }
         break;
       }
 

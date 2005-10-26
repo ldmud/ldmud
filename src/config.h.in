@@ -13,6 +13,22 @@
  */
 
 
+/* Define COMPAT_MODE if you are using the 2.4.5 mudlib or one of its
+ * derivatives.
+ */
+@cdef_compat_mode@ COMPAT_MODE
+
+/* The name of the master object.
+ */
+#define MASTER_NAME              @val_master_name@
+
+/* Define ALLOW_FILENAME_SPACES if the driver should accept space characters
+ * in filenames. If it is not defined, a hardcoded test for space characters
+ * is activated.
+ */
+@cdef_filename_spaces@ ALLOW_FILENAME_SPACES
+
+
 /* --- Runtime limits --- */
 
 /* This is the maximum array size allowed for one single array.
@@ -172,15 +188,6 @@
  * To change these options, the config.h must be recreated and the
  * driver recompiled.
  */
-
-/* Define COMPAT_MODE if you are using the 2.4.5 mudlib or one of its
- * derivatives.
- */
-@cdef_compat_mode@ COMPAT_MODE
-
-/* The name of the master object.
- */
-#define MASTER_NAME              @val_master_name@
 
 /* Trace the most recently executed bytecode instructions?
  */
