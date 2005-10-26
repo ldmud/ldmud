@@ -22,14 +22,13 @@
 ;;
 ;; TODO: PostgreSQL
 ;; TODO: MCP, MCCP (see src/wk/ff-3.3.339-diffs and ff-3.3.325-diffs)
+;; TODO: Fast callouts
+;; TODO: Configurable heartbeat interval a la MudOS
 ;; TODO: Closure-Callbacks  (like in call_out()s) should throw an error
 ;; TODO:: when set up with an destructed current object (or no object for
 ;; TODO:: unbound_lambdas). This requires symbolic return values from
 ;; TODO:: all the setup_callback functions, as the positive values already
 ;; TODO:: signal errors in the arguments.
-;; TODO: Replace tmpnam() by mkstemp().
-;; TODO: Fast callouts
-;; TODO: Configurable heartbeat interval a la MudOS
 ;; TODO: warnf()s should go to the master as well.
 ;; TODO: Modify ed() 'M' command to replace all CRs by LFs. Slightly
 ;; TODO:: complex as it requires breaking up the lines.
@@ -61,12 +60,12 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 442)
-(Parent-Version lpmud 3-3 441)
-(Version-Log "Corrected a compilation error.")
+(Project-Version lpmud 3-3 443)
+(Parent-Version lpmud 3-3 442)
+(Version-Log "save_value() and save_object() can now create savefiles in the old format as well.")
 (New-Version-Log
 "")
-(Checkin-Time "Sat, 12 Apr 2003 16:37:23 -0600")
+(Checkin-Time "Sun, 13 Apr 2003 21:12:51 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -103,8 +102,8 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.62 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.505 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.318 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.506 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.319 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.19 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -112,7 +111,7 @@
   (src/configure (lpmud/d/0_configure 1.19.1.79 755))
   (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.30 644))
   (src/machine.h.in (lpmud/b/9_machine.h. 1.9.1.5 644))
-  (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.19.1.13 644))
+  (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.19.1.14 644))
   (src/mkinstalldirs (lpmud/c/4_mkinstalld 1.1 644))
   (src/install-sh (lpmud/c/5_install-sh 1.2 755))
 
@@ -210,8 +209,8 @@
   (src/mstrings.c (lpmud/i/36_mstrings.c 1.21.1.21 644))
   (src/my-alloca.h (lpmud/f/29_my-alloca. 1.3.1.2 644))
   (src/my-rusage.h (lpmud/f/28_my-rusage. 1.7 644))
-  (src/object.h (lpmud/44_object.h 1.34.1.19.1.3 644))
-  (src/object.c (lpmud/45_object.c 1.62.1.88.1.28 644))
+  (src/object.h (lpmud/44_object.h 1.34.1.19.1.4 644))
+  (src/object.c (lpmud/45_object.c 1.62.1.88.1.29 644))
   (src/otable.h (lpmud/f/27_otable.h 1.8.1.4 644))
   (src/otable.c (lpmud/43_otable.c 1.22.1.6 644))
   (src/parser.c (lpmud/l/13_parser.c 1.1 644))
@@ -303,7 +302,7 @@
   ;(src/xptmalloc.c (lpmud/d/b/1_xptmalloc. 1.6 644))
 
   ;; Build files
-  (src/func_spec (lpmud/c/31_func_spec 1.53.1.45.1.22.1.12 644))
+  (src/func_spec (lpmud/c/31_func_spec 1.53.1.45.1.22.1.13 644))
   (src/string_spec (lpmud/f/6_string_spe 1.14.1.8 644))
   (src/mkfunc.c (lpmud/l/14_mkfunc.c 1.1 644))
   (src/make_func.y (lpmud/b/7_make_func. 1.25.1.30.1.6 644))
@@ -331,7 +330,7 @@
   (src/hosts/be/config.h (lpmud/e/34_config.h 1.32.1.36 644))
   (src/hosts/be/be.h (lpmud/e/35_be.h 1.7 644))
   (src/hosts/be/beyacc (lpmud/i/39_beyacc 1.1 744))
-  (src/hosts/be/Makefile (lpmud/e/37_Makefile 1.60.1.71.1.12 644))
+  (src/hosts/be/Makefile (lpmud/e/37_Makefile 1.60.1.71.1.13 644))
   (src/hosts/be/icon-32x32.raw (lpmud/s/37_icon-32x32 1.1 644) :no-keywords)
   (src/hosts/be/icon-16x16.raw (lpmud/s/38_icon-16x16 1.1 644) :no-keywords)
   (src/hosts/be/driver.rsrc (lpmud/s/39_driver.rsr 1.1 644) :no-keywords)
@@ -344,7 +343,7 @@
 
   ;; Host: OS/2
   (src/hosts/os2/machine.h (lpmud/m/36_machine.h 1.1 644))
-  (src/hosts/os2/Makefile (lpmud/m/37_Makefile 1.26.1.11 644))
+  (src/hosts/os2/Makefile (lpmud/m/37_Makefile 1.26.1.12 644))
 
   ;; Host: Win32
   (src/hosts/win32/tubmud.bmp (lpmud/g/20_tubmud.bmp 1.1 644) :no-keywords)
@@ -1183,8 +1182,8 @@
   (doc/efun/rmdir (lpmud/q/0_rmdir 1.2 644))
   (doc/efun/rmember (lpmud/d/b/33_rmember 1.1 644))
   (doc/efun/rusage (lpmud/q/1_rusage 1.3 644))
-  (doc/efun/save_object (lpmud/q/2_save_objec 1.6 644))
-  (doc/efun/save_value (lpmud/e/13_save_value 1.3 644))
+  (doc/efun/save_object (lpmud/q/2_save_objec 1.7 644))
+  (doc/efun/save_value (lpmud/e/13_save_value 1.4 644))
   (doc/efun/say (lpmud/q/3_say 1.6 644))
   (doc/efun/send_erq (lpmud/q/4_send_erq 1.1.1.3 644))
   (doc/efun/send_udp (lpmud/q/5_send_imp 1.2.1.2 644))
@@ -1434,6 +1433,7 @@
   (doc/obsolete/rxcache.doc (lpmud/b/b/22_rxcache.do 1.1 644))
   (doc/obsolete/send_imp (lpmud/b/b/23_send_imp 1.2 644))
   (doc/obsolete/set_auto_include_string (lpmud/b/b/24_set_auto_i 1.1 644))
+
 
   ;; Mudlib Support
   (mud/README (lpmud/t/12_README 1.6.1.4 644))

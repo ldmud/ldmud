@@ -519,10 +519,11 @@ $(OBJ)/main.o : xalloc.h wiz_list.h swap.h svalue.h stdstrings.h \
     typedefs.h driver.h strfuns.h ptrtable.h exec.h sent.h bytecode.h \
     regexp.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
-$(OBJ)/mapping.o : i-svalue_cmp.h xalloc.h wiz_list.h svalue.h simulate.h \
-    object.h mstrings.h main.h interpret.h gcollect.h closure.h backend.h \
-    array.h mapping.h my-alloca.h typedefs.h driver.h strfuns.h sent.h \
-    bytecode.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
+$(OBJ)/mapping.o : i-svalue_cmp.h xalloc.h wiz_list.h svalue.h structs.h \
+    simulate.h object.h mstrings.h main.h interpret.h gcollect.h closure.h \
+    backend.h array.h mapping.h my-alloca.h typedefs.h driver.h strfuns.h \
+    hash.h exec.h sent.h bytecode.h port.h config.h hosts/unix.h \
+    hosts/be/be.h machine.h
 
 $(OBJ)/md5.o : strfuns.h md5.h machine.h typedefs.h driver.h port.h \
     config.h hosts/unix.h hosts/be/be.h
@@ -631,9 +632,10 @@ $(OBJ)/sprintf.o : xalloc.h swap.h svalue.h structs.h stdstrings.h \
 $(OBJ)/stdstrings.o : mstrings.h stdstrings.h typedefs.h driver.h port.h \
     config.h hosts/unix.h hosts/be/be.h machine.h
 
-$(OBJ)/strfuns.o : xalloc.h svalue.h stdstrings.h simulate.h mstrings.h \
-    comm.h strfuns.h my-alloca.h typedefs.h driver.h sent.h bytecode.h \
-    port.h config.h hosts/unix.h hosts/be/be.h machine.h
+$(OBJ)/strfuns.o : xalloc.h svalue.h stdstrings.h simulate.h object.h \
+    mstrings.h mapping.h main.h interpret.h comm.h strfuns.h my-alloca.h \
+    typedefs.h driver.h sent.h bytecode.h port.h config.h hosts/unix.h \
+    hosts/be/be.h machine.h
 
 $(OBJ)/structs.o : ../mudlib/sys/struct_info.h ../mudlib/sys/debug_info.h \
     xalloc.h wiz_list.h stdstrings.h simulate.h object.h mstrings.h \

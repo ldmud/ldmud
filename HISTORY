@@ -120,7 +120,7 @@ For a detailed list of all changes see the file CHANGELOG.
            available (default is to allow sbrk()).
 
 
-09-Apr-2003 (Lars Duening) -- Release 3.2.10
+13-Apr-2003 (Lars Duening) -- Release 3.2.10
 
     - Changed efuns:
        + debug_info(): Removed the DID_MEM_UNUSED value from the DINFO_DATA:
@@ -135,6 +135,8 @@ For a detailed list of all changes see the file CHANGELOG.
            of a function.
        + remove_action(): It is now possible to remove all actions
            an object defines.
+       + save_object(), save_value(): The format of the saved data can
+           be specified with an function argument.
        + sprintf(), printf(): Modifier '#' for '%O'/'%Q' prints the values
            in a compact format.
        + wizlist_info(): The evalcost statistic is now split into 'ticks'

@@ -317,7 +317,7 @@ extern svalue_t *f_set_light(svalue_t *sp);
 #endif
 
 extern svalue_t *v_save_object(svalue_t *sp, int numarg);
-extern svalue_t *f_save_value(svalue_t *sp);
+extern svalue_t *v_save_value(svalue_t *sp, int numarg);
 extern svalue_t *f_restore_object(svalue_t *sp);
 extern svalue_t *f_restore_value(svalue_t *sp);
 

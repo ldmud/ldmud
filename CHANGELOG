@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+13-Apr-2002 (Lars Duening)  (3.3.443)
+  - (func_spec, object) The efuns save_value() and save_object() can now
+       create savefiles in the old format as well.
+
 12-Apr-2002 (Lars Duening)  (3.3.442)
   - (xalloc.c) Corrected a compilation error when MALLOC_TRACE was not
        defined.

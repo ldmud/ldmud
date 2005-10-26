@@ -5217,6 +5217,10 @@ static void register_svalue(svalue_t *);
   /* Size of the read/write buffer.
    */
 
+static int save_version = -1;
+  /* The version of the savefile to write.
+   */
+
 static const char save_file_suffix[] = ".o";
   /* The suffix of the save file, in an array for easier computations.
    * (sizeof() vs. strlen()+1.
@@ -5992,8 +5996,12 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
       }
 
     case T_CLOSURE:
-        rc = save_closure(v, writable);
-        break;
+        if (save_version > 0)
+        {
+            rc = save_closure(v, writable);
+            break;
+        }
+        /* else: FALLTHROUGH */
 
     default:
       {
@@ -6185,8 +6193,8 @@ v_save_object (svalue_t *sp, int numarg)
 
 /* EFUN save_object()
  *
- *   int    save_object (string file)
- *   string save_object ()
+ *   int    save_object (string file, [int version])
+ *   string save_object ([int version])
  *
  * Save the variables of the current object to the file <file> (the suffix
  * ".o" will be appended. Returns 0 if the save file could be created,
@@ -6201,6 +6209,11 @@ v_save_object (svalue_t *sp, int numarg)
  * In the second form, the a string with all variables and values is
  * returned directly, or 0 if an error occurs. This string can be used
  * with restore_object() to restore the variable values.
+ *
+ * In both forms, the optional argument <version> determines the format
+ * of the save file. A value of '-1' creates the format native to the
+ * driver. Currently the formats 0 and 1 are supported.
+ *
  * TODO: "save_object()" looks nice, but maybe call that "save_variables()"?
  */
 
@@ -6238,14 +6251,76 @@ v_save_object (svalue_t *sp, int numarg)
     file = NULL;
     name = NULL;
     tmp_name = NULL;
+    save_version = CURRENT_VERSION;
 
     /* Test the arguments */
-    if (!numarg)
+    switch (numarg)
     {
+    case 0:
         strbuf_zero(&save_string_buffer);
-    }
-    else
-      file = get_txt(sp->u.str);
+        break;
+
+    case 1:
+        if (sp->type == T_STRING)
+        {
+            file = get_txt(sp->u.str);
+        }
+        else if (sp->type == T_NUMBER)
+        {
+            if (sp->u.number < -1 || sp->u.number > CURRENT_VERSION)
+            {
+                error("Illegal value for arg 1 to save_object(): %ld, "
+                      "expected -1..%d\n"
+                     , (long)sp->u.number, CURRENT_VERSION
+                     );
+                /* NOTREACHED */
+                return sp;
+            }
+
+            strbuf_zero(&save_string_buffer);
+            save_version = sp->u.number >= 0 ? sp->u.number
+                                             : CURRENT_VERSION;
+        }
+        else
+        {
+            vefun_gen_arg_error(1, sp->type, sp);
+            /* NOTREACHED */
+            return sp;
+        }
+        break;
+
+    case 2:
+        if (sp[-1].type != T_STRING)
+            vefun_arg_error(1, T_STRING, sp[-1].type, sp);
+        if (sp->type != T_NUMBER)
+            vefun_arg_error(2, T_NUMBER, sp->type, sp);
+
+        file = get_txt(sp[-1].u.str);
+
+        if (sp->u.number < -1 || sp->u.number > CURRENT_VERSION)
+        {
+            error("Illegal value for arg 1 to save_object(): %ld, "
+                  "expected -1..%d\n"
+                 , (long)sp->u.number, CURRENT_VERSION
+                 );
+            /* NOTREACHED */
+            return sp;
+        }
+
+        save_version = sp->u.number >= 0 ? sp->u.number
+                                         : CURRENT_VERSION;
+
+        /* The main code wants sp == filename */
+        sp--;
+        numarg--;
+        break;
+
+    default:
+        fatal("Too many arguments to save_object(): %d, expected 0..2\n"
+             , numarg);
+    } /* switch(numarg) */
+
+    save_object_header[1] = '0' + save_version;
 
     /* No need in saving destructed objects */
 
@@ -6253,14 +6328,14 @@ v_save_object (svalue_t *sp, int numarg)
     if (ob->flags & O_DESTRUCTED)
     {
         if (numarg)
-            free_string_svalue(sp);
-        else
-            sp++;
+            sp = pop_n_elems(numarg, sp);
+        sp++;
         put_number(sp, 0);
         return sp;
     }
 
     /* If saving to a file, get the proper name and open it
+     * The code assumes that sp is the filename argument.
      */
     if (file)
     {
@@ -6432,9 +6507,8 @@ v_save_object (svalue_t *sp, int numarg)
             unlink(tmp_name);
             add_message("Failed to save to file '%s'. Disk could be full.\n", file);
             if (numarg)
-                free_string_svalue(sp);
-            else
-                sp++;
+                sp = pop_n_elems(numarg, sp);
+            sp++;
             put_number(sp, 1);
             return sp;
         }
@@ -6465,7 +6539,8 @@ v_save_object (svalue_t *sp, int numarg)
 #endif
 
         if (numarg)
-            free_string_svalue(sp);
+            sp = pop_n_elems(numarg, sp);
+        sp++;
         put_number(sp, i);
     }
     else
@@ -6474,7 +6549,9 @@ v_save_object (svalue_t *sp, int numarg)
          * data pending in the save_buffer.
          */
 
-        sp++; /* We're returning a result. */
+        if (numarg)
+            sp = pop_n_elems(numarg, sp);
+        sp++; /* for the result */
 
         if (failed)
             put_number(sp, 0); /* Shouldn't happen */
@@ -6514,11 +6591,11 @@ v_save_object (svalue_t *sp, int numarg)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_save_value (svalue_t *sp)
+v_save_value (svalue_t *sp, int numarg)
 
 /* EFUN save_value()
  *
- *   string save_value(mixed value)
+ *   string save_value(mixed value, [int version])
  *
  * Encode the <value> into a string suitable for restoration with
  * restore_value() and return it.
@@ -6527,6 +6604,10 @@ f_save_value (svalue_t *sp)
  * character: the first line describes the format used to save the value in
  * the '#x:y' notation; the second line is the representation of the value
  * itself.
+ *
+ * The optional argument <version> determines the format
+ * of the save file. A value of '-1' creates the format native to the
+ * driver. Currently the formats 0 and 1 are supported.
  */
 
 {
@@ -6555,6 +6636,47 @@ f_save_value (svalue_t *sp)
 
     strbuf_zero(&save_string_buffer);
     save_object_descriptor = -1;
+    save_version = CURRENT_VERSION;
+
+    /* Evaluate the arguments */
+    switch (numarg)
+    {
+    case 1:
+        /* Ok */
+        break;
+
+    case 2:
+        if (sp->type == T_NUMBER)
+        {
+            if (sp->u.number < -1 || sp->u.number > CURRENT_VERSION)
+            {
+                error("Illegal value for arg 1 to save_object(): %ld, "
+                      "expected -1..%d\n"
+                     , (long)sp->u.number, CURRENT_VERSION
+                     );
+                /* NOTREACHED */
+                return sp;
+            }
+
+            save_version = sp->u.number >= 0 ? sp->u.number
+                                                    : CURRENT_VERSION;
+
+            sp--;
+        }
+        else
+        {
+            vefun_gen_arg_error(2, sp->type, sp);
+            /* NOTREACHED */
+            return sp;
+        }
+        break;
+
+    default:
+        fatal("Illegal number of arguments to save_value(): %d, expected 1..2\n"
+             , numarg);
+    } /* switch(numarg) */
+
+    save_value_header[1] = '0' + save_version;
 
     /* First look at the value for arrays and mappings
      */
@@ -6617,7 +6739,7 @@ f_save_value (svalue_t *sp)
     ptable = NULL;
 
     return sp;
-} /* f_save_value() */
+} /* v_save_value() */
 
 /*-------------------------------------------------------------------------*/
 /* Structure used by restore_mapping() and restore_map_size()

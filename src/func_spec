@@ -364,7 +364,7 @@ mixed   get_type_info(mixed, void|int);
 mixed   quote(mixed *|quoted_array|symbol|string);
 mixed   unquote(quoted_array|symbol);
 
-string  save_value(mixed);
+string  save_value(mixed, void|int);
 mixed   restore_value(string);
 
 string  ctime(int*|int default: F_TIME);
@@ -514,7 +514,7 @@ int     remove_input_to(object, void|object|string|closure, void|string);
 void    remove_interactive(object);
 void    rename_object(object, string);
 int     restore_object(string);
-mixed   save_object(void|string);
+mixed   save_object(void|string|int, void|int);
 int     set_next_reset(int);
 void    set_this_object(object);
 object  shadow(object, int);
