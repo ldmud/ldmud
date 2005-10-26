@@ -155,6 +155,37 @@ time_stamp (void)
 } /* time_stamp() */
 
 /*-------------------------------------------------------------------------*/
+char *
+xmemmem ( const char *haystack, size_t haystacklen
+        , const char *needle, size_t needlelen
+        )
+
+/* Find the first occurance of <needle> (of length <needlelen>) in
+ * <haystack> (of <haystacklen> length) and return a pointer to it.
+ * A needle of length 0 is always found at <haystack>.
+ * If not found, return NULL.
+ *
+#ifndef HAVE_MEMMEM
+ * This function is a GNU/Linux extension, but up to and including
+ * glibc 2 it wasn't implemented correctly. Since it is also used
+ * only in the get_dir() implementation, we don't even bother to
+ * use the glibc implementation.
+#endif
+ */
+
+{
+    mp_int i;
+
+    i = (mp_int)(haystacklen - needlelen);
+    if (i >= 0) do {
+        if ( !memcmp(needle, haystack, needlelen) )
+            return (char *)haystack;
+        haystack++;
+    } while (--i >= 0);
+    return 0;
+} /* xmemmem() */
+
+/*-------------------------------------------------------------------------*/
 /* Some UNIX functions which are not supported on all platforms. */
 
 #if defined(__EMX__) || defined(OS2)
@@ -289,25 +320,6 @@ memset (char *s, int c, size_t n)
 }
 
 #endif /* !HAVE_MEMSET */
-
-/*-------------------------------------------------------------------------*/
-#ifndef HAVE_MEMMEM
-
-char *
-memmem (const char *needle, size_t needlelen, const char *haystack, size_t haystacklen)
-{
-    mp_int i;
-
-    i = (mp_int)(haystacklen - needlelen);
-    if (i >= 0) do {
-        if ( !strncmp(needle, haystack, needlelen) )
-            return (char *)haystack;
-        haystack++;
-    } while (--i >= 0);
-    return 0;
-}
-
-#endif /* !HAVE_MEMMEM */
 
 /*-------------------------------------------------------------------------*/
 #if !defined(HAVE_MEMMOVE) && !defined(OVERLAPPING_BCOPY)

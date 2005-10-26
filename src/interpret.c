@@ -734,7 +734,23 @@ init_interpret (void)
 
     for (i = 0; i < CACHE_SIZE; i++)
         cache[i] = invalid_entry;
-}
+} /* init_interpret()*/
+
+/*-------------------------------------------------------------------------*/
+static INLINE Bool
+is_sto_context (void)
+
+/* Return TRUE if the current call context has a set_this_object()
+ * in effect.
+ */
+
+{
+    struct control_stack *p;
+
+    for (p = csp; !p->extern_call; p--) NOOP;
+
+    return (p->extern_call & CS_PRETEND) != 0;
+} /* is_sto_context() */
 
 /*=========================================================================*/
 
@@ -5513,7 +5529,7 @@ m_indices_filter ( svalue_t *key
     svalue_t **svpp = (svalue_t **)extra;
 
     assign_svalue_no_free( (*svpp)++, key );
-}
+} /* m_indices_filter() */
 
 /*-------------------------------------------------------------------------*/
 void m_values_filter ( svalue_t *key UNUSED
@@ -5535,7 +5551,7 @@ void m_values_filter ( svalue_t *key UNUSED
     struct mvf_info * vip = (struct mvf_info *)extra;
 
     assign_svalue_no_free( vip->svp++, data + vip->num);
-}
+} /* m_values_filter() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -5559,10 +5575,9 @@ m_unmake_filter ( svalue_t *key
     for (i = 0; i < vip->width; i++)
         assign_svalue_no_free(vip->svp[i+1].u.vec->item + vip->num, data+i);
     vip->num++;
-}
+} /* m_unmake_filter() */
 
 /*-------------------------------------------------------------------------*/
-#ifdef DEBUG
 static INLINE svalue_t *
 find_value (int num)
 
@@ -5574,18 +5589,25 @@ find_value (int num)
  */
 
 {
-    if (num >= current_object->prog->num_variables) {
+    /* Make sure that we are not calling from a set_this_object()
+     * context.
+     */
+    if (is_sto_context())
+    {
+        error("find_value: Can't execute with "
+              "set_this_object() in effect.\n"
+             );
+    }
+
+#ifdef DEBUG
+    if (num >= current_object->prog->num_variables)
+    {
         fatal("Illegal variable access %d(%d).\n",
             num, current_object->prog->num_variables);
     }
-    return &current_variables[num];
-}
-
-#else
-
-#define find_value(num) (&current_variables[(num)])
-
 #endif
+    return &current_variables[num];
+} /* find_value() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE svalue_t *
@@ -5610,6 +5632,16 @@ find_virtual_value (int num)
     inherit_t *inheritp;
     program_t *progp;
     char *progpp; /* actually a program_t **, but some compilers... */
+
+    /* Make sure that we are not calling from a set_this_object()
+     * context.
+     */
+    if (is_sto_context())
+    {
+        error("find_virtual_value: Can't execute with "
+              "set_this_object() in effect.\n"
+             );
+    }
 
     /* Set inheritp to the inherited program which defines variable <num>
      */
@@ -5643,7 +5675,9 @@ find_virtual_value (int num)
     num += inheritp->variable_index_offset;
 
 #ifdef DEBUG
-    if (!current_object->variables)
+    if (!current_object->variables
+     || num >= current_object->prog->num_variables
+       )
     {
         if (num)
             fatal("%s Fatal: find_virtual_value() on object %p '%s' "
@@ -6962,7 +6996,7 @@ put_default_argument (svalue_t *sp, int instruction)
 /* Evaluate <instruction> and put it's result into *<sp>.
  * This function is used to generate default arguments for efuns at runtime,
  * and therefor implements just the instructions F_CONST0, F_CONST1,
- * F_TIME, F_THIS_OBJECT, and F_THIS_PLAYER.
+ * F_NCONST1, F_TIME, F_THIS_OBJECT, and F_THIS_PLAYER.
  */
 
 {
@@ -6974,6 +7008,10 @@ put_default_argument (svalue_t *sp, int instruction)
 
     case F_CONST1:
         put_number(sp, 1);
+        break;
+
+    case F_NCONST1:
+        put_number(sp, -1);
         break;
 
     case F_TIME:
@@ -12668,6 +12706,16 @@ again:
         funflag_t  flags;     /* the function flags */
         fun_hdr_p  funstart;  /* the actual function (code) */
 
+        /* Make sure that we are not calling from a set_this_object()
+         * context.
+         */
+        if (is_sto_context())
+        {
+            ERROR("call_function: Can't execute with "
+                  "set_this_object() in effect.\n"
+                 );
+        }
+
         /* Get the function's index */
         LOAD_SHORT(func_index, pc);
         func_offset = (unsigned short)(func_index + function_index_offset);
@@ -12676,13 +12724,17 @@ again:
          * been redefined by inheritance, we must look in the last table,
          * which is pointed to by current_object.
          */
-#ifdef DEBUG
+
         if (func_offset >= current_object->prog->num_functions)
+        {
             fatal("call_function: "
-                  "Illegal function index: offset %hu (index %hu), %d functions\n"
+                  "Illegal function index: offset %hu (index %hu), "
+                  "%d functions - current object %s\n"
                  , func_offset, func_index
-                 , current_object->prog->num_functions);
-#endif
+                 , current_object->prog->num_functions
+                 , get_txt(current_object->name)
+                 );
+        }
 
         /* NOT current_prog, which can be an inherited object. */
         flags = current_object->prog->functions[func_offset];
@@ -12763,6 +12815,16 @@ again:
         funflag_t flags;            /* the functions flags */
         fun_hdr_p funstart;         /* the actual function (code) */
         inherit_t *inheritp;        /* the inheritance descriptor */
+
+        /* Make sure that we are not calling from a set_this_object()
+         * context.
+         */
+        if (is_sto_context())
+        {
+            ERROR("call_inherited: Can't execute with "
+                  "set_this_object() in effect.\n"
+                 );
+        }
 
         /* Get the program and function index, and determine the
          * inheritance descriptor
@@ -19642,19 +19704,22 @@ f_set_this_object (svalue_t *sp)
 
 {
 
-    if ((master_ob != NULL && current_variables == master_ob->variables)
-     || (simul_efun_object != NULL && current_variables == simul_efun_object->variables)
-     || privilege_violation(STR_SET_THIS_OBJECT, sp, sp))
+    if (sp->u.ob != current_object)
     {
-        struct control_stack *p;
+        if ((master_ob != NULL && current_variables == master_ob->variables)
+         || (simul_efun_object != NULL && current_variables == simul_efun_object->variables)
+         || privilege_violation(STR_SET_THIS_OBJECT, sp, sp))
+        {
+            struct control_stack *p;
 
-        /* Find the 'extern_call' entry in the call stack which
-         * determined the current this_object().
-         */
-        for (p = csp; !p->extern_call; p--) NOOP;
+            /* Find the 'extern_call' entry in the call stack which
+             * determined the current this_object().
+             */
+            for (p = csp; !p->extern_call; p--) NOOP;
 
-        p->extern_call |= CS_PRETEND;
-        p->pretend_to_be = current_object = sp->u.ob;
+            p->extern_call |= CS_PRETEND;
+            p->pretend_to_be = current_object = sp->u.ob;
+        }
     }
 
     free_svalue(sp);

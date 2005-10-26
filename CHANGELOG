@@ -1,6 +1,14 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+25-Mar-2002 (Lars Duening)  (3.3.431)
+  - (port, simulate.c) Since memmem() is a GNU/Linux extension and buggy
+      up to glibc 2.0, the driver now uses its own replacement all the
+      time. But I adjusted the argument order to the one used by the
+      correct Linux function (reported by Fiona).
+  - (interpret.c) Function calls by address and global variable accesses
+      now check if a set_this_object() is in effect.
+
 24-Mar-2002 (Lars Duening)  (3.3.430)
   - (prolang.y) Assignment to struct members caused a fatal error if
       the struct did not have the named member. The problem was that

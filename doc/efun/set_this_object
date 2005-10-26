@@ -7,7 +7,7 @@ DESCRIPTION
 
         It changes the result of this_object() in the using function,
         and the result of previous_object() in functions called in
-        other objects by call_other().        Its effect will remain till
+        other objects by call_other(). Its effect will remain till
         there is a return of an external function call, or another
         call of set_this_object(). While executing code in the master
         object's program or the primary simul_efun object's program,
@@ -19,19 +19,16 @@ DESCRIPTION
         call of set_this_object(), some LPC-constructs might behave in
         an odd manner, or even crash the system. In particular, using
         global variables or calling local functions (except by
-        call_other) is illegal.
-
-        With the current implementation, global variables can be
-        accessed, but this is not guaranteed to work in subsequent
-        versions.
+        call_other) is illegal and actively prevented.
 
         Allowed are call_other, map functions, access of local
         variables (which might hold array pointers to a global array),
         simple arithmetic and the assignment operators.
 
-BUG
-        After set_this_object(), references to global variables and
-        local function should be actively caught and rejected.
+HISTORY
+        LDMud 3.2.10 actively prevents references to global variables
+        and function calls by address while set_this_object() is in
+        effect.
 
 SEE ALSO
         this_object(E), set_this_player(E)

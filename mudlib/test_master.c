@@ -68,6 +68,19 @@ void telnetneg(int a, int b, int* c)
 }
 
 //---------------------------------------------------------------------------
+string get_simul_efun ()
+
+// Load the simul-efun object "/sefun" if existing and return its pathname.
+
+{
+    object sefun;
+
+    if (!catch(sefun = load_object("/sefun")))
+        return object_name(sefun);
+    return 0;
+}
+
+//---------------------------------------------------------------------------
 string get_master_uid()
 
 // Return the master uid.

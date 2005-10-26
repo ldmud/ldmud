@@ -3874,7 +3874,7 @@ match_string (const char * match, const char * str, mp_int len)
             /* matchlen >= 1 */
             if ((len -= matchlen) >= 0) do
             {
-                if ( !(str2 = memmem(match, matchlen, str, len + matchlen)) )
+                if ( !(str2 = xmemmem(str, len + matchlen, match, matchlen)) )
                     return MY_FALSE;
                 len -= str2 - str;
                 if (match_string(match + matchlen, str2 + matchlen, len))

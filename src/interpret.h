@@ -69,6 +69,8 @@ struct control_stack {
        */
     object_t *pretend_to_be;
       /* After set_this_object(), the this_object imposter.
+       * TODO: This should be mirrored in the current_object global variable,
+       * TODO:: to avoid accesses to wrong functions/variables.
        */
 };
 
