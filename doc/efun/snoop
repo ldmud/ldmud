@@ -9,8 +9,16 @@ DESCRIPTION
         Return 1 on success, -1 if a snooping loop would be caused, 0 for
         any other failure.
 
-        The snoop is checked with the master object for validity.
-        It will also fail if a snoop would result in a recursive snoop action.
+        The snoop is checked with the master object for validity.  It
+        will also fail if a snoop would result in a recursive snoop
+        action.
+
+        <snooper> can be an interactive player, or an object. If it is
+        an interactive player, the snooped text is prepended with a
+        '%' and send directly to the players connection. If <snooper>
+        is an object, the snooped text is sent in two calls to the
+        object's catch_tell() lfun: the first call passes just the
+        "%", the second the actual text.
 
 SEE ALSO
-        query_snoop(E)
+        query_snoop(E), catch_tell(A)

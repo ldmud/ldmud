@@ -18,4 +18,4 @@ DESCRIPTION
 
 SEE ALSO
         enable_commands(E), say(E), tell_object(E), tell_room(E),
-        write(E), catch_msg(A)
+        write(E), snoop(E), catch_msg(A)

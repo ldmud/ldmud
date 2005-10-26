@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+21-Mar-2002 (Lars Duening)  (3.3.429)
+  - (object.c) Shared strings are now saved in the <n> notation as well;
+      this is mostly beneficial for saving endless repetitions of the
+      same struct name (suggested by Bardioc).
+
 20-Mar-2002 (Lars Duening)  (3.3.428)
   - (object.c) Restoring the efun closure "#e:," confused the
       savefile parser (thanks, Risky).

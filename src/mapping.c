@@ -262,7 +262,7 @@ struct map_chain_s {
 /*-------------------------------------------------------------------------*/
 
 mp_int num_dirty_mappings = 0;
-  /* Number of dirty mappings (excluding the head) in the list.
+  /* Number of dirty mappings.
    */
 
 mp_int num_mappings = 0;
@@ -1979,7 +1979,7 @@ compact_mapping (mapping_t *m, Bool force)
     if (last_indexing_protector.type == T_PROTECTOR_MAPPING)
     {
         /* There is a slight chance that free_protector_mapping causes
-         * remove_empty_mappings(), and thus changes num_dirty_mappings.
+         * remove_empty_mappings().
          */
         free_protector_mapping(last_indexing_protector.u.map);
         last_indexing_protector.type = T_NUMBER;

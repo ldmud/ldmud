@@ -5911,7 +5911,8 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
     switch(v->type)
     {
     case T_STRING:
-        save_string(v->u.str);
+        if (!recall_pointer(v->u.str))
+            save_string(v->u.str);
         break;
 
     case T_QUOTED_ARRAY:
@@ -6054,6 +6055,8 @@ register_struct (struct_t *st)
     if (NULL == register_pointer(ptable, st))
         return;
 
+    (void)register_pointer(ptable, struct_unique_name(st));
+
     v = st->member;
     for (i = (long)struct_size(st); --i >= 0; v++)
     {
@@ -6149,25 +6152,31 @@ register_svalue (svalue_t *svp)
  */
 
 {
-    if (svp->type == T_POINTER || svp->type == T_QUOTED_ARRAY)
+    switch (svp->type)
     {
+      case T_STRING:
+        (void)register_pointer(ptable, svp->u.str);
+        break;
+
+      case T_POINTER:
+      case T_QUOTED_ARRAY:
         register_array(svp->u.vec);
-    }
+        break;
+
 #ifdef USE_STRUCTS
-    else if (svp->type == T_STRUCT
-       )
-    {
+      case T_STRUCT:
         register_struct(svp->u.strct);
-    }
+        break;
 #endif /* USE_STRUCTS */
-    else if (svp->type == T_MAPPING)
-    {
+
+      case T_MAPPING:
         register_mapping(svp->u.map);
-    }
-    else if (svp->type == T_CLOSURE)
-    {
+        break;
+
+      case T_CLOSURE:
         register_closure(svp);
-    }
+        break;
+    } /* switch() */
 } /* register_svalue() */
 
 /*-------------------------------------------------------------------------*/
@@ -7778,7 +7787,7 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
         return cp != NULL;
       }
 
-    case '<': /* A shared array, mapping, struct or closure */
+    case '<': /* A shared value */
       {
         int id;
 

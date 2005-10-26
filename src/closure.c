@@ -5322,7 +5322,7 @@ closure_to_string (svalue_t * sp, Bool compact)
                 break;
 
             case CLOSURE_SIMUL_EFUN:
-                strcat(buf, "<sefun>");
+                strcat(buf, "sefun::");
                 strcat(buf, get_txt(simul_efunp[type - CLOSURE_SIMUL_EFUN].name));
                 break;
             }
