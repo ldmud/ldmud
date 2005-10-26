@@ -29,9 +29,7 @@
 #include "mstrings.h"
 #endif
 
-#if defined(MALLOC_TRACE) || defined(MALLOC_LPC_TRACE)
 #define MEMORY_DEBUG
-#endif
 
 /*-------------------------------------------------------------------------*/
 
@@ -137,9 +135,13 @@ static t_stat clib_alloc_stat = {0,0};
 
 #ifdef MEMORY_DEBUG
 static size_t mdb_size;
+#if defined(MALLOC_LPC_TRACE)
 static object_t *mdb_object;
+#endif
+#if defined(MALLOC_TRACE)
 static const char * mdb_file;
 static int mdb_line;
+#endif
 static void mdb_dump_sbrk(p_int size)
 {
 #if defined(MALLOC_TRACE)
@@ -155,7 +157,7 @@ static void mdb_dump_sbrk(p_int size)
       dprintf2(1, "DEBUG: MEM sbrk(%d) for %d"
                 , (p_int)size, (p_int)mdb_size
                 );
-      dprintf1(1, " , '%s':%d\n"
+      dprintf2(1, " , '%s':%d\n"
                 , (p_int)mdb_file, (p_int)mdb_line
                 );
 #  endif
@@ -164,7 +166,7 @@ static void mdb_dump_sbrk(p_int size)
       dprintf2(1, "DEBUG: MEM sbrk(%d) for %d"
                 , (p_int)size, (p_int)mdb_size
                 );
-      dprintf2(1, " , obj %s\n"
+      dprintf1(1, " , obj %s\n"
                 , (p_int)(mdb_object ? ( mdb_object->name ? get_txt(mdb_object->name) : "<?>"): "<null>")
                 );
 #  else
@@ -951,9 +953,10 @@ dump_malloc_trace (int d
     writes(d, "No malloc trace.\n");
 #else
     word_t *p = ((word_t *)adr) - XM_OVERHEAD;
-    word_t size = mem_block_size(p);
 
 #    ifdef MALLOC_TRACE
+        word_t size = mem_block_size(p);
+
         dprintf3(d, " %s %d size 0x%x\n",
                   p[XM_FILE], p[XM_LINE], size
                 );
