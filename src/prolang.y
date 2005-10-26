@@ -7807,18 +7807,23 @@ foreach_expr:
  *
  * Note that the actual switch rule is:
  *
- *   switch: L_SWITCH ( comma_expr ) statement
+ *   switch: L_SWITCH ( comma_expr ) block
  *
  * and that case and default are both just special kinds of statement
- * which mark addresses with in the statement code to which the
+ * which mark addresses within the statement code to which the
  * switch statement may jump.
  *
- * That also means that the code
+ * That also means that in contrast to C the code
  *
  *    switch(x);
  * or switch(x) write("Foo");
  *
- * is syntactically ok, even though it wouldn't do anything.
+ * is syntactically not ok.
+ *
+ * TODO: Since current_break_address is used to indicate an active switch(),
+ * TODO:: the compiler can't compile Duff's device: the inner while() hides
+ * TODO:: active switch(). If that is fixed, we can change the 'block'
+ * TODO:: back to 'statement' in the grammar rule.
  */
 
 switch:
@@ -7865,7 +7870,7 @@ switch:
             current_continue_address += SWITCH_DEPTH_UNIT;
       }
 
-      statement
+      block
 
       {
 %line
@@ -7907,7 +7912,6 @@ switch:
         current_break_stack_need--;
       }
 ; /* switch */
-
 
 case: L_CASE case_label ':'
     {

@@ -115,7 +115,7 @@ For a detailed list of all changes see the file CHANGELOG.
            available (default is to allow sbrk()).
 
 
-25-Mar-2003 (Lars Duening) -- Release 3.2.10
+26-Mar-2003 (Lars Duening) -- Release 3.2.10
 
     - Changed efuns:
        + debug_info(): Removed the DID_MEM_UNUSED value from the DINFO_DATA:
@@ -133,6 +133,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + find_call_out(): No longer throws an error when passed an unbound
            lambda to look for.
        + m_add(): Fixed a memory leak when existing entries were overwritten.
+       + remove_input_to(): The proper noecho state is restored after
+           removing a pending input handler.
 
     - New efuns:
        + m_entry(): Return all values for mapping entry at once.
@@ -150,6 +152,8 @@ For a detailed list of all changes see the file CHANGELOG.
            longer possible after set_this_object().
 
     - Language:
+       + Constrained the switch() grammar so that only blocks are
+           suitable as bodies.
        + Operator '&' can intersect mappings with other mappings and arrays.
        + Macro __MSDOS_FS__ is defined on systems using the MS-DOS
            filesystem conventions.

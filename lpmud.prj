@@ -60,13 +60,13 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 431)
-(Parent-Version lpmud 3-3 430)
-(Version-Log "port's memmem() is now used all the time.
-Function calls by address and global variable accesses are no longer possible after set_this_object().")
+(Project-Version lpmud 3-3 432)
+(Parent-Version lpmud 3-3 431)
+(Version-Log "switch() now accepts only blocks as body, no longer statements.
+remove_input_to() restores the proper noecho state.")
 (New-Version-Log
 "")
-(Checkin-Time "Tue, 25 Mar 2003 23:55:29 -0700")
+(Checkin-Time "Wed, 26 Mar 2003 21:22:27 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -103,8 +103,8 @@ Function calls by address and global variable accesses are no longer possible af
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.8 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.60 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.494 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.313 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.495 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.314 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.19 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -172,7 +172,7 @@ Function calls by address and global variable accesses are no longer possible af
   (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.26 644))
   (src/closure.h (lpmud/f/44_closure.h 1.7.1.17 644))
   (src/closure.c (lpmud/d/4_closure.c 1.41.1.47.1.15 644))
-  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.48 644))
+  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.49 644))
   (src/comm.h (lpmud/d/3_comm.h 1.26.1.31 644))
   (src/driver.h (lpmud/f/36_driver.h 1.15.1.25 644))
   (src/dumpstat.h (lpmud/f/35_dumpstat.h 1.8 644))
@@ -268,7 +268,7 @@ Function calls by address and global variable accesses are no longer possible af
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.18 644))
   (src/port.c (lpmud/39_port.c 1.17.1.9 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.17.1.3 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.38 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.39 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7.1.2 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))
@@ -1358,7 +1358,7 @@ Function calls by address and global variable accesses are no longer possible af
   (doc/LPC/preprocessor (lpmud/r/34_preprocess 1.5 644))
   (doc/LPC/references (lpmud/c/48_references 1.3 644))
   (doc/LPC/structs (lpmud/a/b/16_structs 1.11 644))
-  (doc/LPC/switch (lpmud/c/47_switch 1.6 644))
+  (doc/LPC/switch (lpmud/c/47_switch 1.7 644))
   (doc/LPC/types (lpmud/r/35_types 1.4.1.6 644))
   (doc/LPC/varargs (lpmud/r/36_varargs 1.2 644))
   (doc/LPC/while (lpmud/r/37_while 1.3 644))

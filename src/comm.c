@@ -7144,6 +7144,7 @@ v_remove_input_to (svalue_t *sp, int num_arg)
 {
     svalue_t      *arg;  /* Pointer to the arguments of the efun */
     int            rc;   /* Resultvalue */
+    interactive_t *ip;
 
     /* Get the arguments */
     arg = sp - num_arg + 1;
@@ -7169,7 +7170,6 @@ v_remove_input_to (svalue_t *sp, int num_arg)
     do {
         input_to_t * prev;
         input_to_t    *it;
-        interactive_t *ip;
 
         /* Get the interactive object.
          * If there is none, or if it is closing down or doesn't have
@@ -7260,6 +7260,11 @@ v_remove_input_to (svalue_t *sp, int num_arg)
         /* At this point, nothing worked: failure */
         rc = 0;
     } while (0);
+
+    if (rc)
+    {
+        set_noecho(ip, ip->input_to ? ip->input_to->noecho : ip->noecho);
+    }
 
     /* Return the result */
     sp = pop_n_elems(num_arg, sp);

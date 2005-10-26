@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+26-Mar-2002 (Lars Duening)  (3.3.432)
+  - (prolang.y) Constrained the switch() grammar to accept just blocks
+      as body, not statements (reported by Menaures).
+  - (comm.c) After removing a pending input_to, the proper noecho
+      state is restored (provided by Ctx).
+
 25-Mar-2002 (Lars Duening)  (3.3.431)
   - (port, simulate.c) Since memmem() is a GNU/Linux extension and buggy
       up to glibc 2.0, the driver now uses its own replacement all the
