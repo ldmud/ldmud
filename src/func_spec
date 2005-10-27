@@ -538,8 +538,10 @@ string  query_ip_name(null|object default: F_THIS_PLAYER);
 string  query_ip_number(null|object|mixed &  default: F_THIS_PLAYER);
 int     query_mud_port(int|object default: F_THIS_PLAYER);
 int     set_buffer_size(int);
-void    set_combine_charset(int *|string);
-void    set_connection_charset(int *|string, int default: F_CONST1);
+mixed   get_combine_charset(int);
+void    set_combine_charset(int *|string|null);
+mixed   get_connection_charset(int);
+void    set_connection_charset(int *|string|null, int default: F_CONST1);
 mixed   set_prompt(string|closure|int, object default: F_THIS_PLAYER);
 
 void    write(mixed);

@@ -1782,7 +1782,10 @@ load_object (const char *lname, Bool create_super, int depth, namechain_t *chain
             if (NULL == inherit_file)
                 fprintf(stderr, " done\n");
             else
+            {
+            printf("DEBUG ... needs inherit\n");
                 fprintf(stderr, " needs inherit\n");
+            }
         }
 
         update_compile_av(total_lines);

@@ -63,12 +63,16 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 485)
-(Parent-Version lpmud 3-3 484)
-(Version-Log "Printing a 0-member struct with '%O' crashed the driver.")
+(Project-Version lpmud 3-3 486)
+(Parent-Version lpmud 3-3 485)
+(Version-Log "The driver crashed when a private lfun shadowing a public sefun was virtually inherited twice in parallel.
+Corrected the hash-mapping protection in walk_mapping().
+Allowed set_{connection,combine}_charset() to re-establish the default charsets.
+New efuns get_combine_charset() and get_combine_charset().
+Experimental: limited the number of commands per connection to 10 per second.")
 (New-Version-Log
 "")
-(Checkin-Time "Fri, 12 Sep 2003 19:05:20 -0600")
+(Checkin-Time "Thu, 25 Sep 2003 20:17:21 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -106,8 +110,8 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.10 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.68 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.548 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.331 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.549 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.332 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -174,8 +178,8 @@
   (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.26 644))
   (src/closure.h (lpmud/f/44_closure.h 1.7.1.17 644))
   (src/closure.c (lpmud/d/4_closure.c 1.41.1.47.1.17 644))
-  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.61 644))
-  (src/comm.h (lpmud/d/3_comm.h 1.26.1.35 644))
+  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.62 644))
+  (src/comm.h (lpmud/d/3_comm.h 1.26.1.36 644))
   (src/driver.h (lpmud/f/36_driver.h 1.15.1.25 644))
   (src/dumpstat.h (lpmud/f/35_dumpstat.h 1.8 644))
   (src/dumpstat.c (lpmud/c/34_dumpstat.c 1.20.1.11.1.8 644))
@@ -196,12 +200,12 @@
   (src/i-svalue_cmp.h (lpmud/a/b/20_i-svalue_c 1.4 644))
   (src/interpret.h (lpmud/b/13_interpret. 1.33.1.37 644))
   (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.39 644))
-  (src/lex.h (lpmud/b/11_lex.h 1.16.1.15.1.5 644))
-  (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.61 644))
+  (src/lex.h (lpmud/b/11_lex.h 1.16.1.15.1.6 644))
+  (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.62 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.16 644))
   (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.48 644))
   (src/mapping.h (lpmud/f/30_mapping.h 1.12.1.20 644))
-  (src/mapping.c (lpmud/b/6_mapping.c 1.36.1.74 644))
+  (src/mapping.c (lpmud/b/6_mapping.c 1.36.1.75 644))
   (src/md5.h (lpmud/l/18_md5.h 1.3 644))
   (src/md5.c (lpmud/l/19_md5.c 1.7 644))
   (src/mempools.h (lpmud/d/48_mempools.h 1.2.1.8 644))
@@ -276,7 +280,7 @@
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.18 644))
   (src/port.c (lpmud/39_port.c 1.17.1.9 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.17.1.4 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.48 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.49 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7.1.2 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))
@@ -287,7 +291,7 @@
   (src/simul_efun.h (lpmud/f/17_simul_efun 1.5.1.5 644))
   (src/simul_efun.c (lpmud/32_simul_efun 1.20.1.17.1.3 644))
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.32 644))
-  (src/simulate.c (lpmud/31_simulate.c 1.88.1.115 644))
+  (src/simulate.c (lpmud/31_simulate.c 1.88.1.116 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.14 644))
   (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.87 644))
   (src/structs.h (lpmud/d/b/5_structs.h 1.4 644))
@@ -310,7 +314,7 @@
   (src/xptmalloc.c (lpmud/d/b/10_xptmalloc. 1.2 644))
 
   ;; Build files
-  (src/func_spec (lpmud/c/31_func_spec 1.53.1.45.1.22.1.18 644))
+  (src/func_spec (lpmud/c/31_func_spec 1.53.1.45.1.22.1.19 644))
   (src/string_spec (lpmud/f/6_string_spe 1.14.1.11 644))
   (src/mkfunc.c (lpmud/l/14_mkfunc.c 1.1 644))
   (src/make_func.y (lpmud/b/7_make_func. 1.25.1.30.1.7 644))
@@ -443,6 +447,7 @@
   (etc/lpc.xml (lpmud/d/b/13_lpc.xml 1.2 644) :no-keywords)
 
   ;; Driver-related include files for the mudlib
+  (mudlib/sys/comm.h (lpmud/e/b/23_comm.h 1.1 644))
   (mudlib/sys/commands.h (lpmud/d/15_commands.h 1.3.1.3 644))
   (mudlib/sys/debug_info.h (lpmud/t/6_debug_info 1.21 644))
   (mudlib/sys/driver_hook.h (lpmud/d/30_driver_hoo 1.2.1.6 644))
@@ -1067,6 +1072,8 @@
   (doc/efun/function_exists (lpmud/o/45_function_e 1.3.1.5 644))
   (doc/efun/functionlist (lpmud/o/46_functionli 1.2.1.3 644))
   (doc/efun/garbage_collection (lpmud/o/47_garbage_co 1.5 644))
+  (doc/efun/get_combine_charset (lpmud/e/b/24_get_combin 1.1 644))
+  (doc/efun/get_connection_charset (lpmud/e/b/25_get_connec 1.1 644))
   (doc/efun/get_dir (lpmud/o/48_get_dir 1.3.1.5 644))
   (doc/efun/get_error_file (lpmud/o/49_get_error_ 1.3 644))
   (doc/efun/get_eval_cost (lpmud/m/14_get_eval_c 1.7 644))
@@ -1190,8 +1197,8 @@
   (doc/efun/send_udp (lpmud/q/5_send_imp 1.2.1.2 644))
   (doc/efun/set_bit (lpmud/q/7_set_bit 1.6 644))
   (doc/efun/set_buffer_size (lpmud/q/8_set_buffer 1.2 644))
-  (doc/efun/set_combine_charset (lpmud/f/4_set_combin 1.4 644))
-  (doc/efun/set_connection_charset (lpmud/q/9_set_connec 1.6 644))
+  (doc/efun/set_combine_charset (lpmud/f/4_set_combin 1.5 644))
+  (doc/efun/set_connection_charset (lpmud/q/9_set_connec 1.7 644))
   (doc/efun/set_driver_hook (lpmud/q/10_set_driver 1.8 644))
   (doc/efun/set_environment (lpmud/l/4_set_enviro 1.3 644))
   (doc/efun/set_extra_wizinfo (lpmud/q/11_set_extra_ 1.4 644))
@@ -1490,6 +1497,7 @@
   (mud/lp-245/sys/debug_info.h (lpmud/t/23_debug_info 1.3.1.8 644))
   (mud/lp-245/sys/debug_message.h (lpmud/l/37_debug_mess 1.2 644))
   (mud/lp-245/sys/commands.h (lpmud/d/31_commands.h 1.2.1.2 644))
+  (mud/lp-245/sys/comm.h (lpmud/e/b/26_comm.h 1.1 644))
   (mud/lp-245/secure/master.c (lpmud/j/44_master.c 1.1 644))
   (mud/lp-245/room/yard.c (lpmud/t/24_yard.c 1.3 644))
   (mud/lp-245/room/wiz_hall.c (lpmud/t/25_wiz_hall.c 1.2 644))
@@ -1932,6 +1940,15 @@
   (mud/lp-245/README (lpmud/b/47_README 1.1 644))
   (mud/lp-245/NEWS (lpmud/b/48_NEWS 1.1 644))
   (mud/lp-245/ACCESS.ALLOW (lpmud/b/49_ACCESS.ALL 1.2 644))
+
+  ;; Test cases
+  (test/t-030925/sefun.c (lpmud/e/b/27_sefun.c 1.1 644))
+  (test/t-030925/master.c (lpmud/e/b/28_master.c 1.1 644))
+  (test/t-030925/d.c (lpmud/e/b/29_d.c 1.1 644))
+  (test/t-030925/c.c (lpmud/e/b/30_c.c 1.1 644))
+  (test/t-030925/b2.c (lpmud/e/b/31_b2.c 1.1 644))
+  (test/t-030925/b1.c (lpmud/e/b/32_b1.c 1.1 644))
+  (test/t-030925/a.c (lpmud/e/b/33_a.c 1.1 644))
 )
 (Merge-Parents)
 (New-Merge-Parents)

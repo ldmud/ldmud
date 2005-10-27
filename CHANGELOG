@@ -1,6 +1,27 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+25-Sep-2003 (Lars Duening)  (3.3.486)
+  - (prolang.y, lex) The driver crashed when a private lfun shadowing
+      a public sefun was virtually inherited twice in parallel, because
+      the public sefun inhibited a proper cross-definition of the second
+      lfun instance. The problem was in the either-or assignment of an
+      identifier to either be an lfun or a (s)efun/global var (t-030925).
+  - (mapping.c) When walking over a mapping of width 1, the hash part
+      was not protected; thus deletions from the mapping from within the
+      walk_mapping callback could cause walk_mapping() to pass invalid
+      pointers to the callback on later iterations (reported by Bardioc).
+  - (comm, func_spec) Passing 0 as argument to
+      set_{combine,connection}_charset() re-establishes the default charset.
+  - (comm, func_spec) New efuns get_combine_charset() and
+      get_connection_charset().
+  - (comm) Experimental: limited the number of commands accepted per
+       connection to 10 per second - this is meant as a safety limit for
+       muds making heavy use of charmode connections. If it works out,
+       the feature will be fully fleshed out with commandline arguments
+       and everything (Mantis #0000009).
+
+
 12-Sep-2003 (Lars Duening)  (3.3.485)
   - (sprintf.c) Printing a 0-member struct with '%O' crashed the driver
        (reported by Nostradamus).

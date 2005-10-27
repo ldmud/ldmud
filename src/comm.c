@@ -139,6 +139,7 @@
 #include "wiz_list.h"
 #include "xalloc.h"
 
+#include "../mudlib/sys/comm.h"
 #include "../mudlib/sys/driver_hook.h"
 #include "../mudlib/sys/input_to.h"
 
@@ -228,6 +229,10 @@ char *message_flush = NULL;
   /* Special flush message for add_message().
    * It is a variable instead of a define to keep gcc from complaining about
    * a 'null format string'.
+   */
+
+int maxNumCommands = 10;
+  /* Maximum number of commands (char or line) to execute per second.
    */
 
 long pthread_write_max_size = PTHREAD_WRITE_MAX_SIZE;
@@ -724,6 +729,7 @@ comm_fatal (interactive_t *ip, char *fmt, ...)
       if (ip->snoop_by) fprintf(stderr, " (%s)", get_txt(ip->snoop_by->name));
       putc('\n', stderr);
     fprintf(stderr, "  .last_time:         %ld\n", (long)ip->last_time);
+    fprintf(stderr, "  .numCmds:           %d\n", ip->numCmds);
     fprintf(stderr, "  .trace_level:       %d\n", ip->trace_level);
     fprintf(stderr, "  .trace_prefix:      %p", ip->trace_prefix);
       if (ip->trace_prefix) fprintf(stderr, " '%s'", get_txt(ip->trace_prefix));
@@ -2919,9 +2925,15 @@ get_message (char *buff)
             object_t *snooper;
 
             ip = all_players[NextCmdGiver];
-            if (ip == 0) {
+
+            if (ip == 0)
                 continue;
-            }
+
+            /* Skip players which have reached the maxNumCommands limit
+             * for this second. We let the data accumulate on the socket.
+             */
+            if (ip->last_time == current_time && ip->numCmds >= maxNumCommands)
+                continue;
 
             /* Get the data (if any), at max enough to fill .text[] */
 
@@ -3215,7 +3227,14 @@ get_message (char *buff)
                     trace_level = ip->trace_level;
                     IncCmdGiver;
                     CmdsGiven = 0;
-                    ip->last_time = current_time;
+
+                    if (ip->last_time != current_time)
+                    {
+                        ip->last_time = current_time;
+                        ip->numCmds = 0;
+                    }
+                    else
+                        ip->numCmds++;
 
                     DTN(("--- return with char command %02x '%c' ---\n", buff[0], buff[0]));
 
@@ -3313,7 +3332,14 @@ get_message (char *buff)
                     }
                     command_giver = ip->ob;
                 }
-                ip->last_time = current_time;
+
+                if (ip->last_time != current_time)
+                {
+                    ip->last_time = current_time;
+                    ip->numCmds = 0;
+                }
+                else
+                    ip->numCmds++;
 
 #ifndef SIMULATE_CHARMODE
                 if ((ip->noecho & (CHARMODE_REQ|CHARMODE)) == CHARMODE_REQ)
@@ -3561,6 +3587,32 @@ refresh_access_data(void (*add_entry)(struct sockaddr_in *, int, long*) )
 #endif /* ACCESS_CONTROL */
 
 /*-------------------------------------------------------------------------*/
+static INLINE void
+set_default_conn_charset (char charset[32])
+
+/* Set the default connection charset bitmask in <charset>.
+ */
+
+{
+    memset(charset, 255, 32);
+    charset['\n'/8] &= ~(1 << '\n' % 8);
+    charset['\0'/8] &= ~(1 << '\0' % 8);
+} /* set_default_conn_charset() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE void
+set_default_combine_charset (char charset[32])
+
+/* Set the default combine charset bitmask in <charset>.
+ */
+
+{
+    memset(charset, 0, 32);
+    charset['\n'/8] &= ~(1 << '\n' % 8);
+    charset['\0'/8] &= ~(1 << '\0' % 8);
+} /* set_default_combine_charset() */
+
+/*-------------------------------------------------------------------------*/
 static void
 new_player (SOCKET_T new_socket, struct sockaddr_in *addr, size_t addrlen
 #if !defined(ACCESS_CONTROL)
@@ -3731,13 +3783,12 @@ new_player (SOCKET_T new_socket, struct sockaddr_in *addr, size_t addrlen
     new_interactive->snoop_on = NULL;
     new_interactive->snoop_by = NULL;
     new_interactive->last_time = current_time;
+    new_interactive->numCmds = 0;
     new_interactive->trace_level = 0;
     new_interactive->trace_prefix = NULL;
     new_interactive->message_length = 0;
-    memset(new_interactive->charset, 255, sizeof new_interactive->charset);
-    new_interactive->charset['\n'/8] &= ~(1 << '\n' % 8);
-    new_interactive->charset['\0'/8] &= ~(1 << '\0' % 8);
-    memset(new_interactive->combine_cset, 0, sizeof new_interactive->combine_cset);
+    set_default_conn_charset(new_interactive->charset);
+    set_default_combine_charset(new_interactive->combine_cset);
     new_interactive->text[0] = '\0';
     memcpy(&new_interactive->addr, addr, addrlen);
 #if defined(ACCESS_CONTROL)
@@ -6472,7 +6523,6 @@ f_query_snoop (svalue_t *sp)
 svalue_t *
 f_query_idle (svalue_t *sp)
 
-
 /* EFUN: query_idle()
  *
  *   int query_idle(object ob)
@@ -7784,6 +7834,139 @@ f_query_mud_port (svalue_t *sp)
 } /* f_query_mud_port() */
 
 /*-------------------------------------------------------------------------*/
+static void
+get_charset (svalue_t * sp, p_int mode, char charset[32])
+
+/* Translate the <charset> into an svalue and store it into <sp>:
+ *   <mode> == CHARSET_VECTOR: result is a bitvector array
+ *   <mode> == CHARSET_STRING: result is a string.
+ */
+
+{
+    put_number(sp, 0);
+    switch (mode)
+    {
+    default:
+        fatal("(get_charset): Illegal mode value %ld\n", mode);
+        /* NOTREACHED */
+        break;
+
+    case CHARSET_VECTOR:
+      {
+        vector_t * rc;
+        int i;
+
+        rc = allocate_uninit_array(32);
+        if (!rc)
+        {
+            outofmemory("result array");
+            /* NOTREACHED */
+            break;
+        }
+
+        for (i = 0; i < 32; i++)
+            put_number(rc->item+i, (unsigned char)charset[i]);
+
+        put_array(sp, rc);
+        break;
+      }
+
+    case CHARSET_STRING:
+      {
+        string_t * rc;
+        int length, i;
+
+        /* Count the number of bits set in the charset */
+        for (i = length = 0; i < 32; i++)
+        {
+            char c = charset[i];
+            length +=   ((c & 0x80) ? 1 : 0)
+                      + ((c & 0x40) ? 1 : 0)
+                      + ((c & 0x20) ? 1 : 0)
+                      + ((c & 0x10) ? 1 : 0)
+                      + ((c & 0x08) ? 1 : 0)
+                      + ((c & 0x04) ? 1 : 0)
+                      + ((c & 0x02) ? 1 : 0)
+                      + ((c & 0x01) ? 1 : 0);
+        }
+
+        rc = alloc_mstring(length);
+        if (!rc)
+        {
+            outofmemory("result string");
+            /* NOTREACHED */
+            break;
+        }
+
+        /* Translate the bits into characters */
+        for (i = length = 0; i < 32; i++)
+        {
+            char c = charset[i];
+
+#define TRANSLATE(bitno) \
+            if (c & (1 << bitno)) \
+                get_txt(rc)[length++] = (char)(i * 8 + bitno);
+
+            TRANSLATE(0);
+            TRANSLATE(1);
+            TRANSLATE(2);
+            TRANSLATE(3);
+            TRANSLATE(4);
+            TRANSLATE(5);
+            TRANSLATE(6);
+            TRANSLATE(7);
+#undef TRANSLATE
+        }
+
+        put_string(sp, rc);
+        break;
+      } /* case CHARSET_STRING */
+    } /* switch(mode) */
+} /* get_charset() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_get_combine_charset (svalue_t *sp)
+
+/* EFUN: get_combine_charset()
+ *
+ *   mixed get_combine_charset (int mode)
+ *
+ * Return the combine charset of the current interactive in the form requested
+ * by <mode>:
+ *   <mode> == CHARSET_VECTOR: return as bitvector
+ *   <mode> == CHARSET_STRING: return as string
+ *
+ * The bitvector is interpreted as an array of 8-bit-values and might
+ * contain up to 32 elements. Character n is "combinable"
+ * if sizeof(bitvector) > n/8 && bitvector[n/8] & (1 << n%8) .
+ *
+ * If there is no current interactive, the function returns 0. 
+ */
+
+{
+    p_int mode;
+    interactive_t *ip;
+
+    mode = sp->u.number;
+    if (mode != CHARSET_VECTOR && mode != CHARSET_STRING)
+    {
+        error("Bad arg 1 to get_combine_charset(): %ld, "
+              "expected CHARSET_VECTOR (%d) or CHARSET_STRING (%d)\n"
+             , (long) mode, CHARSET_VECTOR, CHARSET_STRING);
+        /* NOTREACHED */
+        return sp;
+    }
+
+    if (current_interactive && O_SET_INTERACTIVE(ip, current_interactive))
+        get_charset(sp, mode, ip->combine_cset);
+    else
+        put_number(sp, 0);
+
+    return sp;
+} /* f_get_combine_charset() */
+
+/*-------------------------------------------------------------------------*/
 svalue_t *
 f_set_combine_charset (svalue_t *sp)
 
@@ -7791,6 +7974,7 @@ f_set_combine_charset (svalue_t *sp)
  *
  *   void set_combine_charset (int* bitvector)
  *   void set_combine_charset (string chars)
+ *   void set_combine_charset (0)
  *
  * Set the set of characters which can be combined into a single string
  * when received en-bloc in charmode from the current interactive user.
@@ -7801,7 +7985,8 @@ f_set_combine_charset (svalue_t *sp)
  * The newline '\n' and the NUL character '\0' are always non-combinable.
  *
  * The charset can be given either directly as a string, or indirectly
- * as a bitvector.
+ * as a bitvector. If the charset is given as the number 0, the default
+ * charset is re-established.
  *
  * The bitvector is interpreted as an array of 8-bit-values and might
  * contain up to 32 elements. Character n is "combinable"
@@ -7823,9 +8008,13 @@ f_set_combine_charset (svalue_t *sp)
         return sp;
     }
 
-    if (command_giver && O_SET_INTERACTIVE(ip, command_giver))
+    if (current_interactive && O_SET_INTERACTIVE(ip, current_interactive))
     {
-        if (sp->type == T_STRING)
+        if (sp->type == T_NUMBER)
+        {
+            set_default_combine_charset(ip->combine_cset);
+        }
+        else if (sp->type == T_STRING)
         {
             memset(ip->combine_cset, 0, sizeof ip->combine_cset);
             for ( i = mstrsize(sp->u.str), p = get_txt(sp->u.str)
@@ -7856,19 +8045,74 @@ f_set_combine_charset (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
+f_get_connection_charset (svalue_t *sp)
+
+/* EFUN: get_connection_charset()
+ *
+ *   mixed get_connection_charset (int mode)
+ *
+ * Return the combine charset of the current interactive in the form requested
+ * by <mode>:
+ *   <mode> == CHARSET_VECTOR: return as bitvector
+ *   <mode> == CHARSET_STRING: return as string
+ *
+ * Alternatively, the status of the IAC quoting can be returned:
+ *   <mode> == CHARSET_QUOTE_IAC: return 0 if IACs are not quoted,
+ *                                return 1 if they are.
+ *
+ * The bitvector is interpreted as an array of 8-bit-values and might
+ * contain up to 32 elements. Character n is "combinable"
+ * if sizeof(bitvector) > n/8 && bitvector[n/8] & (1 << n%8) .
+ *
+ * If there is no current interactive, the function returns 0. 
+ */
+
+{
+    p_int mode;
+    interactive_t *ip;
+
+    mode = sp->u.number;
+    if (mode != CHARSET_VECTOR && mode != CHARSET_STRING
+     && mode != CHARSET_QUOTE_IAC)
+    {
+        error("Bad arg 1 to get_connection_charset(): %ld, "
+              "expected CHARSET_VECTOR (%d), _STRING (%d), "
+              "or _QUOTE_IAC (%d)\n"
+             , (long) mode, CHARSET_VECTOR, CHARSET_STRING, CHARSET_QUOTE_IAC);
+        /* NOTREACHED */
+        return sp;
+    }
+
+    if (current_interactive && O_SET_INTERACTIVE(ip, current_interactive))
+    {
+        if (mode == CHARSET_QUOTE_IAC)
+            put_number(sp, ip->quote_iac != 0);
+        else
+            get_charset(sp, mode, ip->charset);
+    }
+    else
+        put_number(sp, 0);
+
+    return sp;
+} /* f_get_connection_charset() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
 f_set_connection_charset (svalue_t *sp)
 
 /* EFUN: set_connection_charset()
  *
  *   void set_connection_charset (int* bitvector, int quote_iac)
  *   void set_connection_charset (string charset, int quote_iac)
+ *   void set_connection_charset (0, int quote_iac)
  *
  * Set the set of characters that can be output to the interactive user
  * (this does not apply to binary_message() ). The function must be called
  * by the interactive user object itself.
  *
  * The charset can be given either directly as a string, or indirectly
- * as a bitvector.
+ * as a bitvector. If the charset is given as 0, the default connection
+ * charset is re-established.
  *
  * The bitvector is interpreted as an array of 8-bit-values and might
  * contain up to 32 elements. Character n is allowed to be output
@@ -7898,7 +8142,11 @@ f_set_connection_charset (svalue_t *sp)
 
     if (O_SET_INTERACTIVE(ip, current_object))
     {
-        if (sp[-1].type == T_STRING)
+        if (sp[-1].type == T_NUMBER)
+        {
+            set_default_conn_charset(ip->charset);
+        }
+        else if (sp[-1].type == T_STRING)
         {
             memset(ip->charset, 0, sizeof ip->charset);
             for ( i = mstrsize((sp-1)->u.str), p = get_txt(sp[-1].u.str)

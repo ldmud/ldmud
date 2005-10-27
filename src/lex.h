@@ -159,7 +159,7 @@ struct ident_s
         struct {             /*   Global identifier: */
             short function;
               /* >= 0: lfun: Index number of the lfun in den function table,
-               * < 0: -2: efun/sefun, -1: gvar
+               * < 0: Undefined
                */
             short variable;
               /* >= 0: variable: Index number in the variable table.
@@ -169,11 +169,11 @@ struct ident_s
                */
             short efun;
               /* efun: Index in instrs[], negative else
-               * < 0: -1: lfun/gvar/sefun
+               * < 0: -1: gvar/sefun
                */
             short sim_efun;
               /* simul-efun: Index in simul_efun[], negative else
-               * < 0: -1: efun/lfun/gvar
+               * < 0: -1: efun/gvar
                */
 #ifdef USE_STRUCTS
             short struct_id;
@@ -206,8 +206,7 @@ struct ident_s
 
 /* ident_t.global magic values */
 
-#define I_GLOBAL_FUNCTION_VAR    (-1)
-#define I_GLOBAL_FUNCTION_EFUN   (-2)
+#define I_GLOBAL_FUNCTION_OTHER  (-1)
 #define I_GLOBAL_VARIABLE_OTHER  (-1)
 #define I_GLOBAL_VARIABLE_FUN    (-2)
 #define I_GLOBAL_EFUN_OTHER      (-1)

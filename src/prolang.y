@@ -3122,7 +3122,9 @@ define_variable (ident_t *name, fulltype_t type)
         name->next_all = all_globals;
         all_globals = name;
     }
-    else if (name->u.global.function == I_GLOBAL_FUNCTION_EFUN)
+    else if (name->u.global.function == I_GLOBAL_FUNCTION_OTHER
+          && name->u.global.efun >= 0
+            )
     {
         /* The previous _GLOBAL use is the permanent efun definition:
          * mark the efun as shadowed.
@@ -3242,7 +3244,9 @@ redeclare_variable (ident_t *name, fulltype_t type, int n)
         name->next_all = all_globals;
         all_globals = name;
     }
-    else if (name->u.global.function == I_GLOBAL_FUNCTION_EFUN)
+    else if (name->u.global.function == I_GLOBAL_FUNCTION_OTHER
+          && name->u.global.efun >= 0
+            )
     {
         /* The previous _GLOBAL use is the permanent efun definition:
          * mark the efun as shadowed.
@@ -3378,6 +3382,7 @@ get_function_information (function_t * fun_p, program_t * prog, int ix)
     }
     funstart = &prog->program[flags & FUNSTART_MASK];
     memcpy(&fun_p->name, FUNCTION_NAMEP(funstart), sizeof fun_p->name);
+
     memcpy(&rtype, FUNCTION_TYPEP(funstart), sizeof(rtype));
     assign_var_to_fulltype(&fun_p->type, rtype);
     ref_fulltype_data(&fun_p->type);
@@ -14463,7 +14468,14 @@ copy_functions (program_t *from, funflag_t type)
 
                 int32 n; /* existing function index */
 
-                if ( (n = p->u.global.function) >= 0)
+                n = p->u.global.function;
+
+                /* If the identifier is (also) an lfun, handle it, even if
+                 * it's overloaded by something else as well. If we didn't
+                 * subsequent inheritors would receive illegal function
+                 * start offsets.
+                 */
+                if ( n >= 0)
                 {
                     /* Already inherited from somewhere else.
                      * Don't try to resolve cross-references inside the
@@ -14599,9 +14611,10 @@ copy_functions (program_t *from, funflag_t type)
                         p->u.global.function = current_func_index;
                     }
                 }
-                else /* n < 0: not an lfun */
+
+                /* Handle the non-lfun aspects of the identifier */
                 {
-                    if (n != I_GLOBAL_FUNCTION_EFUN
+                    if ((n != I_GLOBAL_FUNCTION_OTHER || p->u.global.efun < 0)
                      || (fun.flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN)) == 0
                      || (fun.flags & (NAME_UNDEFINED)) != 0
                        )
@@ -14610,7 +14623,7 @@ copy_functions (program_t *from, funflag_t type)
                          * a (simul-)efun.
                          */
 
-                        if (n == I_GLOBAL_FUNCTION_EFUN)
+                        if (p->u.global.efun >= 0)
                         {
                             /* This inherited function shadows an efun */
 
@@ -15771,7 +15784,7 @@ epilog (void)
 
         for (t = all_efun_shadows; NULL != (s = t); )
         {
-            s->shadow->u.global.function = I_GLOBAL_FUNCTION_EFUN;
+            s->shadow->u.global.function = I_GLOBAL_FUNCTION_OTHER;
             s->shadow->u.global.variable = I_GLOBAL_VARIABLE_FUN;
             t = s->next;
             xfree(s);
@@ -15820,7 +15833,7 @@ epilog (void)
     printf("DEBUG: ------\n");
 
 }
-#endif /* USE_STRUCTS */
+#endif /* 0 && USE_STRUCTS */
 
         /* On error, don't create anything */
         if (num_parse_error > 0 || inherit_file)

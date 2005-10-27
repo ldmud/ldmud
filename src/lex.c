@@ -1700,16 +1700,11 @@ init_global_identifier (ident_t * ident, Bool bVariable)
 
 {
     ident->type = I_TYPE_GLOBAL;
+    ident->u.global.function  = I_GLOBAL_FUNCTION_OTHER;
     if (bVariable)
-    {
-        ident->u.global.function  = I_GLOBAL_FUNCTION_VAR;
         ident->u.global.variable  = I_GLOBAL_VARIABLE_OTHER;
-    }
     else
-    {
-        ident->u.global.function = I_GLOBAL_FUNCTION_EFUN;
         ident->u.global.variable = I_GLOBAL_VARIABLE_FUN;
-    }
     ident->u.global.efun     = I_GLOBAL_EFUN_OTHER;
     ident->u.global.sim_efun = I_GLOBAL_SEFUN_OTHER;
 #ifdef USE_STRUCTS

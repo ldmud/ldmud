@@ -3580,7 +3580,7 @@ walk_mapping_prologue (mapping_t *m, svalue_t *sp, callback_t *cb)
     svalue_t *write_pointer, *read_pointer;
 
     if ( NULL != (hm = m->hash) ) {
-        if (m->num_values == 1)
+        if (m->num_values == 0)
         {
             hm = NULL; /* Flag: no values per key */
         }

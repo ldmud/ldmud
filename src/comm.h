@@ -196,6 +196,8 @@ struct interactive_s {
     interactive_t *snoop_on;    /* whom we're snooping */
     object_t *snoop_by;         /* by whom we're snooped */
     mp_int last_time;           /* Time of last command executed */
+    int    numCmds;             /* Number of commands executed with the same
+                                 * .last_time */
     int trace_level;            /* Trace flags. 0 means no tracing */
     string_t *trace_prefix;     /* Trace only objects which have this string
                                    as name prefix. NULL traces everything. */
@@ -441,7 +443,9 @@ extern svalue_t *v_find_input_to (svalue_t *sp, int num_arg);
 extern svalue_t *v_remove_input_to (svalue_t *sp, int num_arg);
 extern svalue_t *f_input_to_info (svalue_t *sp);
 extern svalue_t *f_set_buffer_size(svalue_t *sp);
+extern svalue_t *f_get_combine_charset(svalue_t *sp);
 extern svalue_t *f_set_combine_charset(svalue_t *sp);
+extern svalue_t *f_get_connection_charset(svalue_t *sp);
 extern svalue_t *f_set_connection_charset(svalue_t *sp);
 extern svalue_t *f_set_prompt(svalue_t *sp);
 extern svalue_t *v_snoop(svalue_t *sp, int num_arg);

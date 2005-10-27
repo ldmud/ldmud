@@ -129,7 +129,7 @@ For a detailed list of all changes see the file CHANGELOG.
            x509 key- and certfile for the TLS package.
 
 
-09-Aug-2003 (Lars Duening) -- Release 3.2.10
+25-Sep-2003 (Lars Duening) -- Release 3.2.10
 
     - Changed efuns:
        + debug_info(): Removed the DID_MEM_UNUSED value from the DINFO_DATA:
@@ -146,6 +146,8 @@ For a detailed list of all changes see the file CHANGELOG.
            an object defines.
        + save_object(), save_value(): The format of the saved data can
            be specified with an function argument.
+       + set_connection_charset(), set_combine_charset(): Passing 0 as
+           argument re-establishes the default charset.
        + sprintf(), printf(): Modifier '#' for '%O'/'%Q' prints the values
            in a compact format.
        + wizlist_info(): The evalcost statistic is now split into 'ticks'
@@ -164,6 +166,8 @@ For a detailed list of all changes see the file CHANGELOG.
     - New efuns:
        + m_entry(): Return all values for mapping entry at once.
        + rmember(): Search arrays and strings from the end.
+       + get_combine_charset(), get_connection_charset(): Query the
+           combine resp. connection charset.
        + strrstr(): Search a string within a string backwards.
        + variable_exists(): Check the existance of a named variable.
        + variable_list(): Return all variable names of an object.
