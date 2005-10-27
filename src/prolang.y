@@ -10184,6 +10184,8 @@ expr4:
                   ins_f_code(F_S_INDEX);
                   $$.type = Type_Any;
               }
+
+              $$.end = CURRENT_PROGRAM_SIZE-1;
           }
 
           if ($3 != NULL)
@@ -10208,6 +10210,20 @@ expr4:
           }
           else
           {
+              /* '&(struct->member->member)' generates a simple
+               * F_S_INDEX for the first lookup instead of a suitable
+               * lvalue lookup. I don't understand the lvalue generation
+               * well enough to correct the generated code, so for now
+               * I restrict the lookup to one level.
+               */
+              if ($3.end != 0
+               && F_S_INDEX == mem_block[A_PROGRAM].block[$3.end]
+                 )
+              {
+                  yyerror("Implementation restriction: Only a single struct "
+                          "member lookup allowed inside a &()");
+              }
+
               if (IS_TYPE_STRUCT($3.type))
               {
                   s_index = get_struct_index($3.type.t_struct);
@@ -10272,6 +10288,8 @@ expr4:
 
                   $$.type = Type_Ref_Any;
               }
+
+              $$.end = CURRENT_PROGRAM_SIZE-1;
           }
 
           if ($5 != NULL)

@@ -3183,8 +3183,8 @@ check_struct_op (svalue_t * sp, int off_type, int off_value, bytecode_p pc)
 
 /* On the stack are the arguments for a struct indexing operation.
  * In particular: sp[<off_type>]:  the struct type index <idx>
- *                sp[<off_value>]:    <off_type> <= 0: the struct value to idx.
- *                sp[-<off_value>+1]: <off_type> >  0: the struct Lvalue to idx.
+ *               sp[<off_value>]:    <off_value> <= 0: the struct value to idx.
+ *               sp[-<off_value>+1]: <off_value> >  0: the struct Lvalue to idx.
  *
  * Check the validity of the indexing operation and thrown an error
  * if invalid.
