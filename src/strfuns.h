@@ -28,6 +28,8 @@ extern void strbuf_addc(strbuf_t *buf, const char ch);
 extern void strbuf_addf(strbuf_t *buf, const char *format, ...);
 extern void strbuf_send(strbuf_t *buf);
 extern void strbuf_store(strbuf_t *buf, svalue_t *svp);
+extern void strbuf_copy (strbuf_t *buf, char *cbuf);
+#define strbuf_length(sbuf) ((sbuf)->length)
 extern string_t * trim_all_spaces (const string_t * txt);
 extern char * xstrncpy(char * dest, const char * src, size_t num);
 

@@ -402,6 +402,58 @@ mstring_alloc_string (size_t iSize MTRACE_DECL)
 
 /*-------------------------------------------------------------------------*/
 string_t *
+mstring_realloc_string (string_t *string, size_t iSize MTRACE_DECL)
+
+/* Aliased to: realloc_mstring(string, iSize)
+ *
+ * Change the space of the <string> to <iSize> characters, keeping
+ * the old content as far as possible. Return the pointer to the
+ * <string> on success, or NULL if memory runs out.
+ *
+ * The string must not be tabled.
+ */
+
+{
+    string_data_t *sdata;
+    size_t         old_msize;
+
+    if (string->info.tabled)
+    {
+        fatal("mstring_realloc_string: String %p (%s) must not be tabled.\n"
+             , string, string->str ? string->str->txt : "<null>"
+             );
+    }
+
+    old_msize = mstr_mem_size(string);
+
+    /* Get the memory */
+
+    if (string->str)
+        sdata = rexalloc_pass(string->str,  iSize + sizeof(*sdata));
+    else
+        sdata = xalloc_pass(iSize + sizeof(*sdata));
+    if (!sdata)
+        return NULL;
+
+    /* Set up the structure */
+    sdata->size = iSize;
+    sdata->txt[iSize] = '\0';
+
+    string->str = sdata;
+
+    {
+        size_t msize;
+
+        msize = mstr_mem_size(string);
+        mstr_used_size += msize - old_msize;
+        mstr_untabled_size += msize - old_msize;
+    }
+
+    return string;
+} /* mstring_realloc_string() */
+
+/*-------------------------------------------------------------------------*/
+string_t *
 mstring_new_string (const char * const pTxt MTRACE_DECL)
 
 /* Aliased to: new_mstring(pTxt)
@@ -1247,6 +1299,45 @@ mstring_add (const string_t *left, const string_t *right MTRACE_DECL)
     }
     return tmp;
 } /* mstring_add() */
+
+/*-------------------------------------------------------------------------*/
+string_t *
+mstring_append (string_t *left, const string_t *right MTRACE_DECL)
+
+/* Aliased to: mstr_append(left,right)
+ *
+ * If <left> is singular (ie. untabled with only one reference):
+ * Append the data from <right> to the string <left>, and return the
+ * modified <left> with an additional reference.
+ *
+ * If <left> is not singular:
+ * Create and return a new string with the data of <left> concatenated
+ * with the data of <right>.
+ * The result string is untabled and has one reference,
+ * the old strings <left> and <right> are not changed.
+ *
+ * If memory runs out, NULL is returned.
+ */
+
+{
+    size_t lleft, lright;
+
+    if (!mstr_singular(left))
+        return mstring_add(left, right MTRACE_PASS);
+
+    lleft = mstrsize(left);
+    lright = mstrsize(right);
+    left = mstring_realloc_string(left, lleft+lright MTRACE_PASS);
+    if (left)
+    {
+        char * txt;
+
+        txt = get_txt(left);
+        memcpy(get_txt(left)+lleft, get_txt(right), lright);
+        ref_mstring(left);
+    }
+    return left;
+} /* mstring_append() */
 
 /*-------------------------------------------------------------------------*/
 string_t *

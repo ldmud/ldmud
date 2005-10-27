@@ -361,7 +361,7 @@ struct memblock_s {
     } u;
 };
 
-#define MEMBLOCK_LIMIT (256)
+#define MEMBLOCK_LIMIT (128)
   /* Maximum size for the userspace of a memory block.
    * Using blocks larger than this is likely to run into fragmentation
    * of the large block heap.

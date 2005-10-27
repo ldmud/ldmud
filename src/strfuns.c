@@ -11,6 +11,9 @@
  *   construction of a string.
  * TODO: I am afraid the handling of length in _grow() itself and
  * TODO:: its calls is a bit too far on the conservative side.
+ * TODO: Rewrite the strbuf_t to use a scatter-gather storing
+ * TODO:: of data, to avoid allocations of large buffers (this happens
+ * TODO:: when doing save/restore on large objects).
  *
  * --- Efuns and Operators ---
  *
@@ -267,6 +270,21 @@ strbuf_store (strbuf_t *buf, svalue_t *svp)
     buf->length = 0;
     buf->alloc_len = 0;
 } /* strbuf_store() */
+
+/*--------------------------------------------------------------------*/
+void
+strbuf_copy (strbuf_t *buf, char *cbuf)
+
+/* Copy the string collected in <buf>, which may be the null string "",
+ * into the buffer <cbuf> which must have been allocated by the caller
+ * to a suitable size. The copied string will be terminated with a '\0'.
+ */
+
+{
+    if (buf->buf && buf->length)
+        memcpy(cbuf, buf->buf, buf->length);
+    cbuf[buf->length] = '\0';
+} /* strbuf_copy() */
 
 /*--------------------------------------------------------------------*/
 char *

@@ -1552,11 +1552,11 @@ load_object_error(const char *msg, const char *name, namechain_t *chain)
     strbuf_add(&sbuf, ".\n");
 
     /* Make a local copy of the message so as not to leak memory */
-    buf = alloca(strlen(sbuf.buf)+1);
+    buf = alloca(strbuf_length(&sbuf)+1);
     if (!buf)
         error("Out of stack memory (%lu bytes)\n"
              , (unsigned long) strlen(sbuf.buf)+1);
-    strcpy(buf, sbuf.buf);
+    strbuf_copy(&sbuf, buf);
     strbuf_free(&sbuf);
 
     fprintf(stderr, "%s %s", time_stamp(), buf);

@@ -7242,7 +7242,7 @@ cond_get_exp (int priority, svalue_t *svp)
             {
                 string_t *str;
 
-                str = mstr_add(svp->u.str, sv2.u.str);
+                str = mstr_append(svp->u.str, sv2.u.str);
                 free_string_svalue(svp);
                 free_string_svalue(&sv2);
                 svp->u.str = str;

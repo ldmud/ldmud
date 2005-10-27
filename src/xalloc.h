@@ -99,6 +99,8 @@ extern int stack_direction;
 /* xalloc(): normal allocation
  * xalloc_traced(): allocation with given file/line
  * xalloc_pass(): allocation using MTRACE_PASS as file/line args
+ *
+ * Ditto for rexalloc().
  */
 
 #if defined(MALLOC_TRACE)
@@ -115,7 +117,8 @@ extern int stack_direction;
 
 #endif
 
-#define xalloc_pass(size) xalloc_traced((size) MTRACE_PASS)
+#define xalloc_pass(size)       xalloc_traced((size) MTRACE_PASS)
+#define rexalloc_pass(old,size) rexalloc_traced((old),(size) MTRACE_PASS)
 
 extern size_t  xalloced_size (POINTER p);
 extern size_t  xalloc_overhead (void);

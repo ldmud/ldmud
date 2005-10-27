@@ -1,6 +1,20 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+27-Feb-2004 (Lars Duening)  (3.3.503)
+  - (strfuns, simulate.c) Added a function to make a c-string copy
+       of a strbuf.
+  - (mempools.c) Reduced the ideal size of a pool block to 128 bytes - 
+       hopefully this reduces some of the fragmentation issues.
+  - (mstrings, interpret.c) When adding strings (operators '+' and
+       '+='), the driver tries to extend the left-hand string when
+       possible, instead of allocating a new string. When creating
+       large strings, this hopefully improves the reduces the allocations
+       of new string buffers.
+  - (interpret.c) inl_transfer_svalue() no longer makes untabled
+       strings tabled. Originally the driver did this for volatile strings
+       at this point, which no longer exist.
+
 23-Feb-2004 (Lars Duening)  (3.3.502)
   - (actions.c) If the H_COMMAND lfun is not found in an object, the
        driver now throws an error instead of crashing (reported by Urv).

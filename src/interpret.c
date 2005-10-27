@@ -1801,7 +1801,7 @@ inl_transfer_svalue (svalue_t *dest, svalue_t *v)
  * assignment. <v> will be invalid after the call.
  *
  * If <dest> is a lvalue, <v> will be moved into the svalue referenced
- * to by <dest>. If <v> is a volatile string, it is made shared.
+ * to by <dest>.
  *
  * TODO: Test if copying this function into F_VOID_ASSIGN case speeds up
  * TODO:: the interpreter.
@@ -1912,21 +1912,8 @@ inl_transfer_svalue (svalue_t *dest, svalue_t *v)
         break;
     } /* end for */
 
-    /* Transfer the value, making volatile strings shared */
-    if (v->type == T_STRING && !mstr_tabled(v->u.str))
-    {
-        put_string(dest, make_tabled_from(v->u.str));
-        if (dest->u.str)
-        {
-            free_mstring(v->u.str);
-        }
-        else
-            dest->u.str = v->u.str;
-    }
-    else
-    {
-        *dest = *v;
-    }
+    /* Transfer the value */
+    *dest = *v;
 
     /* Protection against endless reference loops */
     if (dest->type == T_LVALUE || dest->type == T_PROTECTED_LVALUE)
@@ -9357,7 +9344,7 @@ again:
                 right = sp->u.str;
 
                 DYN_STRING_COST(mstrsize(left) + mstrsize(right))
-                res = mstr_add(left, right);
+                res = mstr_append(left, right);
                 if (!res)
                     ERRORF(("Out of memory (%lu bytes)\n"
                            , (unsigned long) mstrsize(left) + mstrsize(right)
@@ -11021,7 +11008,7 @@ again:
 
                 len = mstrsize(left) + mstrsize(right);
                 DYN_STRING_COST(len)
-                new_string = mstr_add(left, right);
+                new_string = mstr_append(left, right);
                 if (!new_string)
                     ERRORF(("Out of memory (%lu bytes)\n"
                            , (unsigned long) len
