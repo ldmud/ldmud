@@ -127,6 +127,8 @@
 
 #include "structs.h"
 
+#include <stdio.h>
+
 #include "array.h"
 #include "exec.h"
 #include "gcollect.h"

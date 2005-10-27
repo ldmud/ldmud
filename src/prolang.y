@@ -1850,7 +1850,7 @@ ins_short (long l)
 {
     short s = (short)l;
 
-    if (l > USHRT_MAX || l < SHRT_MIN)
+    if (l > (long)USHRT_MAX || l < SHRT_MIN)
         yyerrorf("Compiler error: too large number %lx passed to ins_short()"
                 , l);
 
@@ -1883,7 +1883,7 @@ upd_short (mp_uint offset, long l)
     char *dest;
     short s = (short)l;
 
-    if (l > USHRT_MAX || l < SHRT_MIN)
+    if (l > (long)USHRT_MAX || l < SHRT_MIN)
         yyerrorf("Compiler error: too large number %ld passed to upd_short()"
                 , l);
 

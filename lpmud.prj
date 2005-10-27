@@ -63,18 +63,18 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 505)
-(Parent-Version lpmud 3-3 504)
+(Project-Version lpmud 3-3 506)
+(Parent-Version lpmud 3-3 505)
 (Version-Log "
-  - (func_spec) The result type of m_entry() was specified as 'mapping'
-       instead of the correct 'mixed *' (thanks, Heiko!).
-  - (random.c) Updated the Mersenne twister to the version with improved
-       initialization (thanks, Fini, for the link).
+  - (prolang.y) Corrected range check regarding short integers (thanks,
+       Gnomi).
+  - (comm.c, pkg-mccp.c, mregex.c, structs.c) Removed warnings (thanks,
+       Andre!).
 ")
 (New-Version-Log
 ""
 )
-(Checkin-Time "Tue, 30 Mar 2004 21:53:32 -0700")
+(Checkin-Time "Wed, 31 Mar 2004 21:06:09 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -112,7 +112,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.70 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.568 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.569 644))
   (HISTORY (lpmud/f/49_HISTORY 1.340 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -181,7 +181,7 @@
   (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.26 644))
   (src/closure.h (lpmud/f/44_closure.h 1.7.1.17 644))
   (src/closure.c (lpmud/d/4_closure.c 1.41.1.47.1.17 644))
-  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.73 644))
+  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.74 644))
   (src/comm.h (lpmud/d/3_comm.h 1.26.1.38 644))
   (src/driver.h (lpmud/f/36_driver.h 1.15.1.25 644))
   (src/dumpstat.h (lpmud/f/35_dumpstat.h 1.8 644))
@@ -214,7 +214,7 @@
   (src/mempools.h (lpmud/d/48_mempools.h 1.2.1.8 644))
   (src/mempools.c (lpmud/d/49_mempools.c 1.2.1.15 644))
   (src/mregex.h (lpmud/e/29_rxcache.h 1.7.1.10 644))
-  (src/mregex.c (lpmud/e/30_rxcache.c 1.11.1.28 644))
+  (src/mregex.c (lpmud/e/30_rxcache.c 1.11.1.29 644))
   (src/mstrings.h (lpmud/i/35_mstrings.h 1.23 644))
   (src/mstrings.c (lpmud/i/36_mstrings.c 1.21.1.24 644))
   (src/my-alloca.h (lpmud/f/29_my-alloca. 1.3.1.2 644))
@@ -271,7 +271,7 @@
   (src/pkg-alists.c (lpmud/l/38_pkg-alists 1.9 644))
   (src/pkg-alists.h (lpmud/l/39_pkg-alists 1.3 644))
   (src/pkg-mccp.h (lpmud/d/b/48_pkg-mccp.h 1.1 644))
-  (src/pkg-mccp.c (lpmud/d/b/49_pkg-mccp.c 1.3 644))
+  (src/pkg-mccp.c (lpmud/d/b/49_pkg-mccp.c 1.4 644))
   (src/pkg-mysql.c (lpmud/j/1_pkg-mysql. 1.21 644))
   (src/pkg-mysql.h (lpmud/j/2_pkg-mysql. 1.5 644))
   (src/pkg-odbc.h (lpmud/e/b/43_pkg-odbc.h 1.1 644))
@@ -285,7 +285,7 @@
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.18 644))
   (src/port.c (lpmud/39_port.c 1.17.1.9 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.17.1.4 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.53 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.54 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7.1.2 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))
@@ -300,7 +300,7 @@
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.14 644))
   (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.87 644))
   (src/structs.h (lpmud/d/b/5_structs.h 1.4 644))
-  (src/structs.c (lpmud/d/b/6_structs.c 1.14 644))
+  (src/structs.c (lpmud/d/b/6_structs.c 1.15 644))
   (src/sysmalloc.h (lpmud/c/b/33_sysmalloc. 1.2 644))
   (src/sysmalloc.c (lpmud/c/b/34_sysmalloc. 1.5 644))
   (src/sprintf.h (lpmud/f/15_sprintf.h 1.3.1.4 644))
@@ -1373,7 +1373,7 @@
   (doc/LPC/lfuns (lpmud/r/31_lfuns 1.3 644))
   (doc/LPC/lpc (lpmud/r/32_lpc 1.2 644))
   (doc/LPC/mappings (lpmud/l/42_mappings 1.6 644))
-  (doc/LPC/modifiers (lpmud/s/48_modifiers 1.8 644))
+  (doc/LPC/modifiers (lpmud/s/48_modifiers 1.9 644))
   (doc/LPC/operators (lpmud/m/0_operators 1.9.1.13 644))
   (doc/LPC/pragma (lpmud/r/33_pragma 1.14 644))
   (doc/LPC/preprocessor (lpmud/r/34_preprocess 1.5 644))

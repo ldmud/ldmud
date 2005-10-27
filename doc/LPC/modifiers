@@ -8,8 +8,8 @@ DESCRIPTION
         To use a modifier just prepend it to the declaration. If several
         modifiers are to be used their order does not matter:
 
-        private int bar;                      // example for a variable
-        static nomask int foo() { return 3; } // example for a function
+        private int bar;                         // example for a variable
+        protected nomask int foo() { return 3; } // example for a function
 
         For functions:
         ~~~~~~~~~~~~~~
@@ -99,7 +99,7 @@ DESCRIPTION
         private functions inherit "complex/room";
 
         To redeclare a function or a variable declared public in the
-        inherited object to be private or static is not possible.
+        inherited object to be private or protected is not possible.
 
         There also exists a modifier explicitly for the inherit statement:
 

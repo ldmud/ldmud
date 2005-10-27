@@ -505,7 +505,7 @@ rx_num_matches (regexp_t *prog)
 #ifdef USE_PCRE
     return prog->res >= 1 ? prog->res : 0;
 #else
-    int num, i;
+    p_uint num, i;
 
     for (num = 0, i = 0
         ; i < sizeof(prog->rx->startp) / sizeof(prog->rx->startp[0])
@@ -563,7 +563,7 @@ rx_get_match_n (regexp_t *prog, string_t * str, int n, size_t * start, size_t * 
     }
 #else
     if (n < 0
-     || n >= sizeof(prog->rx->startp) / sizeof(prog->rx->startp[0])
+     || n >= (int)(sizeof(prog->rx->startp) / sizeof(prog->rx->startp[0]))
      || prog->rx->startp[n] == NULL
      || prog->rx->endp[n] == NULL
        )
@@ -715,7 +715,7 @@ rx_sub (regexp_t *prog, string_t *source, string_t *subst)
                 }
             }
 #else
-            if (no < sizeof(prog->rx->startp) / sizeof(prog->rx->startp[0])
+            if (no < (int)(sizeof(prog->rx->startp) / sizeof(prog->rx->startp[0]))
              && prog->rx->startp[no] != NULL
              && prog->rx->endp[no] != NULL
                )

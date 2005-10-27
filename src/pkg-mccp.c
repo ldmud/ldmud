@@ -20,6 +20,7 @@
 #include "typedefs.h"
 
 #include <errno.h>
+#include <stdio.h>
 #include <zlib.h>
 
 #ifdef SOCKET_INC

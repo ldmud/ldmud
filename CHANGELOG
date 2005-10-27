@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+31-Mar-2004 (Lars Duening)  (3.2.10-dev.620)
+  - (prolang.y) Corrected range check regarding short integers (thanks,
+       Gnomi).
+  - (comm.c, pkg-mccp.c, mregex.c, structs.c) Removed warnings (thanks,
+       Andre!).
+
 30-Mar-2004 (Lars Duening)  (3.3.505)
   - (func_spec) The result type of m_entry() was specified as 'mapping'
        instead of the correct 'mixed *' (thanks, Heiko!).

@@ -8681,7 +8681,7 @@ f_net_connect (svalue_t *sp)
          * TODO:: data in the background.
          */
         h = gethostbyname(host);
-        target.sin_addr.s_addr = h ? ** (int **) (h -> h_addr_list)
+        target.sin_addr.s_addr = h ? ** (uint32 **) (h -> h_addr_list)
                                    : inet_addr(host);
         if (!target.sin_addr.s_addr)
         {
