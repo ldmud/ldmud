@@ -948,7 +948,7 @@ static  mp_int num_cleanup; /* Number of objects to data-clean in this
                 delay = time_to_cleanup ? time_to_cleanup : 3600;
             }
 
-            if (delay && delay <= time_since_ref)
+            if (!delay || delay <= time_since_ref)
             {
 #ifdef DEBUG
                 if (d_flag)

@@ -56,8 +56,9 @@
  * yield a suitable block, the allocator defragments the free lists and tries
  * again. Only if this second attempt fails, a new small chunk is allocated.
  * To save time, the defragmentation-on-allocation is terminated if a suitable
- * block is constructed; a full defragmentation happens only as part
- * of a garbage collection.
+ * block is can be constructed (but not before the current list under
+ * examination has been fully defragmented); a full defragmentation happens
+ * only as part of a garbage collection.
  *
  * Obviously the defragmenter can eat up a lot of time when the free lists
  * get long, especially since most blocks can't be defragmented. So as an

@@ -12,8 +12,8 @@
  * TODO:: (hash header:key:values) tuples and stored in a pool.
  * TODO:: The 'compacted' part of the mapping would obviously go away,
  * TODO:: and all indexing would be done through hash table.
- * TODO:: The pool is not absolutely required, but would increase locality
- * TODO:: and reduce overhead if MALLOC_TRACE is in effect.
+ * TODO:: The pool is not absolutely required, but would reduce overhead if
+ * TODO:: MALLOC_TRACE is in effect.
  *
  * Mappings, or 'associative arrays', are similar to normal arrays, with
  * the principal difference that they can use every value to index their
@@ -66,20 +66,15 @@
  * removing the hashed part by this.
  *
  * To be compacted, a mapping has to conform to a number of conditions:
- *  - it has to be at least TIME_TO_COMPACT seconds (typical 10 minutes)
- * either
- *  - it has to be at least 2*TIME_TO_COMPACT seconds (typical 20 minutes)
+ *  - it has been at least TIME_TO_COMPACT seconds (typical 10 minutes)
  *    since the last addition or deletion of an entry
- *  and either
- *
- * or it has been at least TIME_TO_COMPACT seconds since the last change
- * and either
- *  - the number of condensed-deleted entries is at least half the capacity
- *    of the condensed part
- *  or
- * or
- *  - the number of hashed entries exceeds the number non-deleted condensed
- *    entries.
+ * and
+ *     - it was to be at least 2*TIME_TO_COMPACT seconds (typical 20 minutes)
+ *       since the last addition or deletion of an entry
+ *  or - the number of condensed-deleted entries is at least half the capacity
+ *       of the condensed part
+ *  or - the number of hashed entries exceeds the number non-deleted condensed
+ *       entries.
  *
  * The idea is to minimize reallocations of the (potentially large) condensed
  * block, as it easily runs into fragmentation of the large block heap.

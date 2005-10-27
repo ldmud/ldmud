@@ -592,7 +592,8 @@ cleanup_compact_mappings (cleanup_t * context)
     for (m = context->mlist; m != NULL; m = context->mlist)
     {
         context->mlist = m->next;
-        compact_mapping(m, context->mcompact);
+        if (m->ref > 1)
+            compact_mapping(m, context->mcompact);
         free_mapping(m); /* Might deallocate it fully */
     }
 #endif /* NEW_CLEANUP */
