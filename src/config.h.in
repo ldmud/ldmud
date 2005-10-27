@@ -335,7 +335,7 @@
 
 /* Define this if you want to allow call_other()s on arrays of objects.
  */
-@cdef_use_array_calls@ USE_ARRAY_CALLS
+@cdef_lpc_array_calls@ USE_ARRAY_CALLS
 
 /* Define this if you want PCRE instead of traditional regexps.
  */

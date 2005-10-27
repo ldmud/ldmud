@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+27-Sep-2003 (Lars Duening)  (3.3.489)
+  - (autoconf) Renamed the option enable-use-array-calls to
+      enable-lpc-array-calls, as it's a language option and not a package.
+
 27-Sep-2003 (Lars Duening)  (3.3.488)
   - (efuns.c) Added a third argument to debug_info(DINFO_OBJLIST) to return
        multiple objects.

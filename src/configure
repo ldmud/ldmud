@@ -306,7 +306,7 @@ ac_includes_default="\
 # include <unistd.h>
 #endif"
 
-ac_subst_vars='SHELL PATH_SEPARATOR PACKAGE_NAME PACKAGE_TARNAME PACKAGE_VERSION PACKAGE_STRING PACKAGE_BUGREPORT exec_prefix prefix program_transform_name bindir sbindir libexecdir datadir sysconfdir sharedstatedir localstatedir libdir includedir oldincludedir infodir mandir build_alias host_alias target_alias DEFS ECHO_C ECHO_N ECHO_T LIBS CC CFLAGS LDFLAGS CPPFLAGS ac_ct_CC EXEEXT OBJEXT INSTALL_PROGRAM INSTALL_SCRIPT INSTALL_DATA YACC CPP EGREP ALLOCA val_optimize WCFLAGS OCFLAGS LCFLAGS MCFLAGS DCFLAGS EXTRA_CFLAGS OPTIMIZE_LINKING MOVE_YACC_TAB CLEAN_YACC_TAB YACCTAB CONFIG_SHELL cdef_erq_demon cdef_access_control cdef_access_log cdef_compat_mode cdef_strict_euids cdef_filename_spaces cdef_share_variables cdef_use_system_crypt cdef_use_ipv6 cdef_use_mysql cdef_use_pgsql cdef_use_pthreads cdef_use_alists cdef_use_array_calls cdef_use_mccp cdef_use_pcre cdef_use_deprecated cdef_use_structs cdef_use_tls cdef_use_new_inlines cdef_use_set_light cdef_use_set_is_wizard cdef_use_parse_command cdef_use_process_string cdef_comm_stat cdef_trace_code cdef_apply_cache_stat cdef_malloc_sbrk cdef_malloc_check cdef_malloc_trace cdef_malloc_lpc_trace cdef_malloc_sbrk_trace cdef_dynamic_costs cdef_rxcache_table cdef_wizlist_file cdef_opcprof cdef_verbose_opcprof cdef_debug cdef_yydebug cdef_no_inlines cdef_debug_telnet cdef_debug_smalloc_allocs cdef_check_object_stat cdef_check_mapping_total cdef_check_object_ref cdef_check_object_gc_ref cdef_dump_gc_refs val_access_file val_access_log val_erq_max_reply val_erq_max_send val_erq_debug val_pthreads_write_max_size val_read_file_max_size val_time_to_clean_up val_time_to_swap val_time_to_swap_variables val_time_to_reset val_evaluator_stack_size val_max_user_trace val_max_trace val_compiler_stack_size val_max_bits val_portno val_maxnumports val_max_cost val_max_local val_catch_reserved_cost val_master_reserved_cost val_swap_file val_max_array_size val_max_mapping_size val_max_callouts val_max_players val_allowed_ed_cmds val_reserved_user_size val_reserved_master_size val_reserved_system_size val_htable_size val_itable_size val_otable_size val_defmax val_apply_cache_bits val_rxcache_table val_master_name val_input_escape val_max_byte_transfer val_udp_port val_set_buffer_size_max val_malloc val_min_malloced val_min_small_malloced val_max_malloced val_total_trace_length val_wizlist_file erq_sub PKGLIBS ERQ_LIBS LIBOBJS LTLIBOBJS'
+ac_subst_vars='SHELL PATH_SEPARATOR PACKAGE_NAME PACKAGE_TARNAME PACKAGE_VERSION PACKAGE_STRING PACKAGE_BUGREPORT exec_prefix prefix program_transform_name bindir sbindir libexecdir datadir sysconfdir sharedstatedir localstatedir libdir includedir oldincludedir infodir mandir build_alias host_alias target_alias DEFS ECHO_C ECHO_N ECHO_T LIBS CC CFLAGS LDFLAGS CPPFLAGS ac_ct_CC EXEEXT OBJEXT INSTALL_PROGRAM INSTALL_SCRIPT INSTALL_DATA YACC CPP EGREP ALLOCA val_optimize WCFLAGS OCFLAGS LCFLAGS MCFLAGS DCFLAGS EXTRA_CFLAGS OPTIMIZE_LINKING MOVE_YACC_TAB CLEAN_YACC_TAB YACCTAB CONFIG_SHELL cdef_erq_demon cdef_access_control cdef_access_log cdef_compat_mode cdef_strict_euids cdef_filename_spaces cdef_share_variables cdef_use_system_crypt cdef_use_ipv6 cdef_use_mysql cdef_use_pgsql cdef_use_pthreads cdef_use_alists cdef_use_mccp cdef_use_pcre cdef_use_deprecated cdef_use_structs cdef_use_tls cdef_use_new_inlines cdef_use_set_light cdef_use_set_is_wizard cdef_use_parse_command cdef_use_process_string cdef_lpc_array_calls cdef_comm_stat cdef_trace_code cdef_apply_cache_stat cdef_malloc_sbrk cdef_malloc_check cdef_malloc_trace cdef_malloc_lpc_trace cdef_malloc_sbrk_trace cdef_dynamic_costs cdef_rxcache_table cdef_wizlist_file cdef_opcprof cdef_verbose_opcprof cdef_debug cdef_yydebug cdef_no_inlines cdef_debug_telnet cdef_debug_smalloc_allocs cdef_check_object_stat cdef_check_mapping_total cdef_check_object_ref cdef_check_object_gc_ref cdef_dump_gc_refs val_access_file val_access_log val_erq_max_reply val_erq_max_send val_erq_debug val_pthreads_write_max_size val_read_file_max_size val_time_to_clean_up val_time_to_swap val_time_to_swap_variables val_time_to_reset val_evaluator_stack_size val_max_user_trace val_max_trace val_compiler_stack_size val_max_bits val_portno val_maxnumports val_max_cost val_max_local val_catch_reserved_cost val_master_reserved_cost val_swap_file val_max_array_size val_max_mapping_size val_max_callouts val_max_players val_allowed_ed_cmds val_reserved_user_size val_reserved_master_size val_reserved_system_size val_htable_size val_itable_size val_otable_size val_defmax val_apply_cache_bits val_rxcache_table val_master_name val_input_escape val_max_byte_transfer val_udp_port val_set_buffer_size_max val_malloc val_min_malloced val_min_small_malloced val_max_malloced val_total_trace_length val_wizlist_file erq_sub PKGLIBS ERQ_LIBS LIBOBJS LTLIBOBJS'
 ac_subst_files=''
 
 # Initialize some variables set by options.
@@ -854,8 +854,6 @@ Optional Features:
         Enables support for IPv6
   --enable-use-alists                 default=disabled
         Enables alist support
-  --enable-use-array-calls            default=enabled
-        Enables call_others on arrays of objects
   --enable-use-mccp                   default=disabled
         Enables MCCP support
   --enable-use-mysql                  default=disabled
@@ -882,6 +880,8 @@ Optional Features:
         Enables efun parse_command()
   --enable-use-process-string         default=enabled
         Enables efun process_string()
+  --enable-lpc-array-calls            default=enabled
+        Enables call_others on arrays of objects
   --enable-comm-stat                  default=enabled
   --enable-apply-cache_stat           default=enabled
   --enable-malloc-sbrk                default=enabled
@@ -1469,13 +1469,6 @@ if test "${enable_use_alists+set}" = set; then
 
 fi;
 
-DEFAULTenable_use_array_calls=yes
-# Check whether --enable-use-array-calls or --disable-use-array-calls was given.
-if test "${enable_use_array_calls+set}" = set; then
-  enableval="$enable_use_array_calls"
-
-fi;
-
 DEFAULTenable_use_mccp=no
 # Check whether --enable-use-mccp or --disable-use-mccp was given.
 if test "${enable_use_mccp+set}" = set; then
@@ -1564,6 +1557,13 @@ DEFAULTenable_use_process_string=yes
 # Check whether --enable-use-process-string or --disable-use-process-string was given.
 if test "${enable_use_process_string+set}" = set; then
   enableval="$enable_use_process_string"
+
+fi;
+
+DEFAULTenable_lpc_array_calls=yes
+# Check whether --enable-lpc-array-calls or --disable-lpc-array-calls was given.
+if test "${enable_lpc_array_calls+set}" = set; then
+  enableval="$enable_lpc_array_calls"
 
 fi;
 
@@ -2310,16 +2310,6 @@ else
   cdef_use_alists="#undef"
 fi
 
-if test "x$enable_use_array_calls" = "x" && test "x$DEFAULTenable_use_array_calls" != "x"; then
-  enable_use_array_calls=$DEFAULTenable_use_array_calls
-fi
-
-if test "x$enable_use_array_calls" = "xyes"; then
-  cdef_use_array_calls="#define"
-else
-  cdef_use_array_calls="#undef"
-fi
-
 if test "x$enable_use_mccp" = "x" && test "x$DEFAULTenable_use_mccp" != "x"; then
   enable_use_mccp=$DEFAULTenable_use_mccp
 fi
@@ -2438,6 +2428,16 @@ if test "x$enable_use_process_string" = "xyes"; then
   cdef_use_process_string="#define"
 else
   cdef_use_process_string="#undef"
+fi
+
+if test "x$enable_lpc_array_calls" = "x" && test "x$DEFAULTenable_lpc_array_calls" != "x"; then
+  enable_lpc_array_calls=$DEFAULTenable_lpc_array_calls
+fi
+
+if test "x$enable_lpc_array_calls" = "xyes"; then
+  cdef_lpc_array_calls="#define"
+else
+  cdef_lpc_array_calls="#undef"
 fi
 
 if test "x$enable_comm_stat" = "x" && test "x$DEFAULTenable_comm_stat" != "x"; then
@@ -13174,7 +13174,6 @@ s,@cdef_use_mysql@,$cdef_use_mysql,;t t
 s,@cdef_use_pgsql@,$cdef_use_pgsql,;t t
 s,@cdef_use_pthreads@,$cdef_use_pthreads,;t t
 s,@cdef_use_alists@,$cdef_use_alists,;t t
-s,@cdef_use_array_calls@,$cdef_use_array_calls,;t t
 s,@cdef_use_mccp@,$cdef_use_mccp,;t t
 s,@cdef_use_pcre@,$cdef_use_pcre,;t t
 s,@cdef_use_deprecated@,$cdef_use_deprecated,;t t
@@ -13185,6 +13184,7 @@ s,@cdef_use_set_light@,$cdef_use_set_light,;t t
 s,@cdef_use_set_is_wizard@,$cdef_use_set_is_wizard,;t t
 s,@cdef_use_parse_command@,$cdef_use_parse_command,;t t
 s,@cdef_use_process_string@,$cdef_use_process_string,;t t
+s,@cdef_lpc_array_calls@,$cdef_lpc_array_calls,;t t
 s,@cdef_comm_stat@,$cdef_comm_stat,;t t
 s,@cdef_trace_code@,$cdef_trace_code,;t t
 s,@cdef_apply_cache_stat@,$cdef_apply_cache_stat,;t t
