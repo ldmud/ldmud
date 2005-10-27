@@ -8418,6 +8418,18 @@ expr0:
                   }
                   break;
 
+              case F_AND_EQ:
+                  switch(type1.typeflags)
+                  {
+                  case TYPE_MAPPING:
+                      if (type2.typeflags & TYPE_MOD_POINTER)
+                      {
+                          ok = MY_TRUE;
+                      }
+                      break;
+                  }
+                  break;
+
               } /* switch(assign op) */
 
               if (!ok)

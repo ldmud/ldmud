@@ -5582,7 +5582,7 @@ void public_fREE_UNREFED_MEMORy()
     cond_broadcast(&gc_lock_cond);
 #endif
 
-    printf("GC: freed: %d\n    candi: %d\n    total: %d\n", i, k, j);
+    printf("DEBUG: GC: freed: %d\n    candi: %d\n    total: %d\n", i, k, j);
 }
 
 /*

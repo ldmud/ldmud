@@ -3389,7 +3389,7 @@ map_intersect (mapping_t *m, svalue_t * val)
  *
  * The result is a new mapping with all those elements of <m> which index
  * can be found in vector <val>->u.vector resp. as index in mapping
- * <val>->u.map.
+ * <val>->u.map. Both <m> and <val> are freed on return.
  *
  * Called by interpret to implement F_AND.
  */

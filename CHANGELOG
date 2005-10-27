@@ -1,7 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-31-Mar-2004 (Lars Duening)  (3.2.10-dev.620)
+01-Apr-2004 (Lars Duening)  (3.3.507)
+  - (prolang.y, interpret.c) Implemented <mapping> &= <mapping>,
+       <mapping> &= <vector> (Bug #0000042).
+  - (interpret.c) get_line_number(): Increased the buffersize for the
+       program names (Bug #0000040).
+
+31-Mar-2004 (Lars Duening)  (3.3.506)
   - (prolang.y) Corrected range check regarding short integers (thanks,
        Gnomi).
   - (comm.c, pkg-mccp.c, mregex.c, structs.c) Removed warnings (thanks,

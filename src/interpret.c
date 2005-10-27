@@ -12061,6 +12061,31 @@ again:
             break;
         }
 
+        if (argp->type == T_MAPPING)
+        {
+            /* Intersect a mapping */
+
+            mapping_t *result;
+
+            if (sp[-1].type != T_POINTER && sp[-1].type != T_MAPPING)
+            {
+                OP_ARG_ERROR(2, TF_MAPPING|TF_POINTER, sp[-1].type);
+                /* NOTREACHED */
+            }
+
+            inter_sp = sp;
+
+            result = map_intersect(argp->u.map, sp-1);
+
+            put_mapping(argp, result);
+
+            free_svalue(sp);
+            sp--;
+
+            put_ref_mapping(sp, result);
+            break;
+        }
+
         if (argp->type == T_STRING)
         {
             string_t * result;
@@ -12094,8 +12119,6 @@ again:
          * Possible type combinations:
          *   int   | int   -> int
          *   array | array -> array
-         *
-         * TODO: Extend this to arrays.
          */
 
         svalue_t *argp;
@@ -17845,16 +17868,21 @@ get_line_number (bytecode_p p, program_t *progp, string_t **namep)
     {
         /* The code was included */
 
-        static char namebuf[80];
+        string_t * namebuf;
 
-        if (mstrsize(inctop->name) + mstrsize(progp->name) < sizeof(namebuf) - 3)
+        namebuf = alloc_mstring(mstrsize(inctop->name) + mstrsize(progp->name)
+                                                       + 3);
+        if (namebuf)
         {
-            sprintf(namebuf, "%s (%s)"
+            sprintf(get_txt(namebuf), "%s (%s)"
                            , get_txt(progp->name), get_txt(inctop->name));
-            memsafe(*namep = new_mstring(namebuf), strlen(namebuf), "filename");
+            *namep = namebuf;
         }
         else
+        {
+            /* No memory for the new string - improvise */
             *namep = ref_mstring(inctop->name);
+        }
 
         /* Free the include stack structures */
         do {

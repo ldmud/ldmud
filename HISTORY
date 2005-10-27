@@ -138,7 +138,7 @@ For a detailed list of all changes see the file CHANGELOG.
            x509 key- and certfile for the TLS package.
 
 
-28-Mar-2004 (Lars Duening) -- Release 3.2.10
+01-Apr-2004 (Lars Duening) -- Release 3.2.10
 
     - Changed efuns:
        + debug_info(): Removed the DID_MEM_UNUSED value from the DINFO_DATA:
@@ -242,6 +242,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + A heart-beat error now longer aborts the heartbeat cycle.
        + The operators -=, *= and /= can now operate on <int> x <float>,
            yielding a <float> result.
+       + <mapping> &= <mapping>, <mapping> &= <vector> implemented.
+       + Allowed longer program names in backtraces.
        + Bugfix: Subtracting arrays of closures from each other now actually
            identifies identical closures.
        + Bugfix: The smalloc allocator now re-uses free 'large' memory for
