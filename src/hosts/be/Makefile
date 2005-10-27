@@ -412,8 +412,9 @@ $(OBJ)/access_check.o : xalloc.h filestat.h comm.h access_check.h driver.h \
 $(OBJ)/actions.o : ../mudlib/sys/driver_hook.h ../mudlib/sys/commands.h \
     xalloc.h wiz_list.h svalue.h simulate.h sent.h stdstrings.h object.h \
     mstrings.h mapping.h interpret.h efuns.h dumpstat.h comm.h closure.h \
-    backend.h array.h actions.h typedefs.h driver.h strfuns.h bytecode.h \
-    pkg-tls.h main.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
+    backend.h array.h actions.h my-alloca.h typedefs.h driver.h strfuns.h \
+    bytecode.h pkg-tls.h main.h port.h config.h hosts/unix.h hosts/be/be.h \
+    machine.h
 
 $(OBJ)/array.o : i-svalue_cmp.h xalloc.h wiz_list.h swap.h svalue.h \
     simulate.h stdstrings.h object.h mstrings.h mregex.h mempools.h \

@@ -1059,6 +1059,7 @@ mixed valid_write (string path, string euid, string fun, object caller)
 //   rename_from         (for each the old name of a rename())
 //   rename_to           (for the new name of a rename())
 //   mkdir
+//   memdump
 //   objdump
 //   opcdump
 //   save_object

@@ -9691,10 +9691,66 @@ fi
 echo "$as_me:$LINENO: result: $lp_cv_has_iconv" >&5
 echo "${ECHO_T}$lp_cv_has_iconv" >&6
 
-# The system has the include files - now search for the libraries.
+# The system has the include files - now perform further checks
 if test "x$lp_cv_has_iconv" = "xyes"; then
     saveflags="$CFLAGS"
     tmp=""
+
+    # Some systems define iconv() to take a non-const 'char**' as first arg.
+    echo "$as_me:$LINENO: checking if iconv takes a non-const char**" >&5
+echo $ECHO_N "checking if iconv takes a non-const char**... $ECHO_C" >&6
+if test "${lp_cv_has_iconv_nonconst_in+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  CFLAGS="$CFLAGS -I/usr/include -I/usr/local/include"
+        cat >conftest.$ac_ext <<_ACEOF
+#line $LINENO "configure"
+#include "confdefs.h"
+
+#include <stdlib.h>
+#include <iconv.h>
+
+int foo(void)
+{
+    const char * in;
+
+    return iconv(NULL, &in, NULL, NULL, NULL);
+}
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext
+if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
+  (eval $ac_compile) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+         { ac_try='test -s conftest.$ac_objext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  lp_cv_has_iconv_nonconst_in=no
+else
+  echo "$as_me: failed program was:" >&5
+cat conftest.$ac_ext >&5
+lp_cv_has_iconv_nonconst_in=yes
+        CFLAGS="$saveflags"
+
+fi
+rm -f conftest.$ac_objext conftest.$ac_ext
+fi
+echo "$as_me:$LINENO: result: $lp_cv_has_iconv_nonconst_in" >&5
+echo "${ECHO_T}$lp_cv_has_iconv_nonconst_in" >&6
+
+    # Search the libraries
 
     echo "$as_me:$LINENO: checking for main in -liconv" >&5
 echo $ECHO_N "checking for main in -liconv... $ECHO_C" >&6
@@ -9808,6 +9864,13 @@ fi
 if test "x$lp_cv_has_iconv" = "xyes"; then
   cat >>confdefs.h <<\_ACEOF
 #define HAS_ICONV 1
+_ACEOF
+
+fi
+
+if test "x$lp_cv_has_iconv_nonconst_in" = "xyes"; then
+  cat >>confdefs.h <<\_ACEOF
+#define HAS_ICONV_NONCONST_IN 1
 _ACEOF
 
 fi
@@ -12428,7 +12491,7 @@ cat > conftest.y <<EOF
 all: 'a';
 %%
 int main(){ return 0; }
-void yyerror(){}
+int yyerror(){}
 int yylex(){ return 0; }
 EOF
 rm -f y.tab.c y_tab.c
@@ -12463,7 +12526,7 @@ cat > conftest.y <<EOF
 all: 'a';
 %%
 int main(){ return 0; }
-void yyerror(){}
+int yyerror(){}
 int yylex(){ return 0; }
 EOF
 rm -f y.tab.c y_tab.c

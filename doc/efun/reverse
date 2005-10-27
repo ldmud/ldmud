@@ -1,24 +1,30 @@
 SYNOPSIS
-        string reverse (string arg)
+        inti    reverse (int arg)
+        string  reverse (string arg)
         mixed * reverse (mixed * arg)
         mixed * reverse (mixed * & arg)
 
 DESCRIPTION
         Reverse the content of array or string <arg> and return the result.
+        If <arg> is an integer, the bits in the integer are reversed.
+
         If called in the reference variant, the argument array itself
         is reversed and then returned.
 
 EXAMPLES
+        reverse (0x306a) - return 0x560c0000
+
         reverse ("test") - return "tset"
 
-        mixed * a = ({ 1, 2 });
-        reverse(a)  - returns ({ 2, 1 }), leaves a unchanged.
-        reverse(&a) - returns ({ 2, 1 }), sets a to ({ 2, 1 })
+        mixed * arr = ({ 1, 2 });
+        reverse(arr)  - returns ({ 2, 1 }), leaves arr unchanged.
+        reverse(&arr) - returns ({ 2, 1 }), sets arr to ({ 2, 1 })
 
 BUGS
         Reference ranges like reverse(&(a[1..2])) are not supported.
 
 HISTORY
         Introduced in LDMud 3.3.529.
+        LDMud 3.3.532 added the reversal of bits in an integer.
 
 SEE ALSO

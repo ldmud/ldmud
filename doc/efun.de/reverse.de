@@ -1,16 +1,20 @@
 SYNOPSIS
-        string reverse (string arg)
+        inti    reverse (int arg)
+        string  reverse (string arg)
         mixed * reverse (mixed * arg)
         mixed * reverse (mixed * & arg)
 
 DESCRIPTION
         Kehrt die Reihenfolge des Inhaltes von Array oder String <arg>
         um und liefert den neuen Wert als Resultat.
+        Ist <arg> eine Zahl, wird die Reihenfolge der Bits in <arg> umgekehrt.
 
         Wenn in der Referenz-Variante verwendet, wird das Argumentarray selber
         invertiert und auch zurueckgegeben.
 
 EXAMPLES
+        reverse (0x306a) - return 0x560c0000
+
         reverse ("test") - return "tset"
 
         mixed * a = ({ 1, 2 });
@@ -22,5 +26,6 @@ BUGS
 
 GESCHICHTE
         Eingefuehrt in LDMud 3.3.529.
+        LDMud 3.3.532 fuegte die Bitumkehr von Zahlen ein.
 
 SEE ALSO

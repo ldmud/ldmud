@@ -53,6 +53,7 @@
 #include "driver.h"
 #include "typedefs.h"
 
+#include "my-alloca.h"
 #include <stddef.h>
 
 #include "actions.h"

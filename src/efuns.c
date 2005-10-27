@@ -6732,12 +6732,14 @@ f_reverse(svalue_t *sp)
 
 /* EFUN reverse()
  *
- *    mixed reverse(string)
- *    mixed reverse(mixed *)
- *    mixed reverse(mixed * &)
+ *    int    reverse(int)
+ *    string reverse(string)
+ *    mixed* reverse(mixed *)
+ *    mixed* reverse(mixed * &)
  *
  * Reverse the order of the elements in the array or string, and return
- * the result.
+ * the result. If the argument is an integer, the bits in the integer
+ * are reversed.
  *
  * Note that in the reference variant, the given array is reversed in-place.
  */
@@ -6776,7 +6778,79 @@ f_reverse(svalue_t *sp)
         put_array(sp, vec);
     }
 
-    if (sp->type == T_STRING)
+    if (sp->type == T_NUMBER)
+    {
+        p_int res;
+
+        /* Try to use a fast bit swapping algorithm.
+         * The slow fallback default is a loop swapping bit-by-bit.
+         */
+
+#if SIZEOF_PINT == 8
+
+        res = sp->u.number;
+
+        res =   ((res & 0xaaaaaaaaaaaaaaaa) >> 1)
+              | ((res & 0x5555555555555555) << 1);
+	res =   ((res & 0xcccccccccccccccc) >> 2)
+              | ((res & 0x3333333333333333) << 2);
+	res =   ((res & 0xf0f0f0f0f0f0f0f0) >> 4)
+              | ((res & 0x0f0f0f0f0f0f0f0f) << 4);
+	res =   ((res & 0xff00ff00ff00ff00) >> 8)
+              | ((res & 0x00ff00ff00ff00ff) << 8);
+	res =   ((res & 0xffff0000ffff0000) >> 16)
+              | ((res & 0x0000ffff0000ffff) << 16);
+	res = (res >> 32) | (res << 32);
+
+#elif SIZEOF_PINT == 4
+
+        res = sp->u.number;
+
+        res = ((res & 0xaaaaaaaa) >> 1) | ((res & 0x55555555) << 1);
+	res = ((res & 0xcccccccc) >> 2) | ((res & 0x33333333) << 2);
+	res = ((res & 0xf0f0f0f0) >> 4) | ((res & 0x0f0f0f0f) << 4);
+	res = ((res & 0xff00ff00) >> 8) | ((res & 0x00ff00ff) << 8);
+	res = (res >> 16) | (res << 16);
+
+#else
+
+        unsigned char * from, * to;
+        int num;
+
+        from = (unsigned char *)&sp->u.number;
+        to = (unsigned char *)&res + sizeof(res) - 1;
+
+        for (num = sizeof(res); num > 0; num--, from++, to--)
+        {
+            unsigned char ch = *from;
+
+#  if CHAR_BIT == 8
+#           warning "Efun reverse() uses a slow bit swapping algorithm."
+            ch = (((ch & 0xaa) >> 1) | ((ch & 0x55) << 1));
+            ch = (((ch & 0xcc) >> 2) | ((ch & 0x33) << 2));
+            *to = ((ch >> 4) | (ch << 4));
+#  else
+#           warning "Efun reverse() uses the slowest bit swapping algorithm."
+            unsigned char tch = 0;
+            unsigned char f_mask, t_mask;
+            int bits;
+
+            f_mask = 0x01;
+            t_mask = 0x01 << (CHAR_BIT-1);
+
+            for (bits = CHAR_BIT; bits > 0; bits--, f_mask <<= 1, t_mask >>=1)
+            {
+                tch |= (ch & f_mask) ? t_mask : 0;
+            }
+
+            *to = tch;
+#  endif
+        }
+#endif /* SIZEOF_PINT selection */
+
+        put_number(sp, res);
+    }
+    else if (sp->type == T_STRING)
     {
         size_t len = mstrsize(sp->u.str);
 

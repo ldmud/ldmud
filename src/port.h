@@ -251,6 +251,8 @@ extern int errno;
  */
 
 /* p_int : an integer that has the same size as a pointer */
+#define SIZEOF_PINT SIZEOF_CHAR_P
+
 #if SIZEOF_LONG == SIZEOF_CHAR_P
      typedef long                p_int;
      typedef unsigned long       p_uint;

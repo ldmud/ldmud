@@ -11365,11 +11365,11 @@ again:
                 STORE_DOUBLE_USED
                 double diff;
 
+                sp--;
                 diff = (double)(argp->u.number) - READ_DOUBLE(sp);
                 if (diff < (-DBL_MAX) || diff > DBL_MAX)
                     ERRORF(("Numeric overflow: %ld - %g\n"
                            , (long)argp->u.number, READ_DOUBLE(sp)));
-                sp--;
                 STORE_DOUBLE(sp, diff);
                 sp->type = T_FLOAT;
                 assign_svalue_no_free(argp, sp);

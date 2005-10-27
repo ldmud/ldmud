@@ -1,7 +1,17 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-24-Apr-2004 (Lars Duening)
+26-Apr-2004 (Lars Duening)  (3.3.532)
+  - (actions.c) Added missing include.
+  - (configure) Corrected bison recognition under AIX/Visual Age 6.
+  - (configure) Test if iconv() takes a non-const char** as input string.
+  - (random.c) Adapted for AIX/Visual Age 6.
+  - (interpret.c) <int> -= <float> subtracted a random number (reported by
+       Acius).
+  - (efuns.c, port.h) Efun reverse() can bit-reverse integers.
+  - (etc/lpc.xml) Menaures provided a new version.
+
+24-Apr-2004 (Lars Duening)  (3.3.531)
   - (smalloc.c) Corrected the permanent block allocation statistics.
   - (func_spec) Deprecated efun make_shared_string().
   - (func_spec, strfuns) New efun convert_charset() (thanks, Philip).

@@ -155,12 +155,12 @@ lang.y: mkfunc@EXEEXT@ prolang.y config.h
 	$(RM) lang.y
 	./mkfunc@EXEEXT@ lang
 
-efun_defs.c instrs.h: func_spec mkfunc@EXEEXT@ config.h
+efun_defs.c instrs.h: func_spec mkfunc@EXEEXT@ config.h machine.h
 	$(RM) instrs.h
 	$(RM) efun_defs.c
 	./mkfunc@EXEEXT@ instrs
 
-stdstrings.c stdstrings.h: string_spec mkfunc@EXEEXT@ config.h
+stdstrings.c stdstrings.h: string_spec mkfunc@EXEEXT@ config.h machine.h
 	$(RM) stdstrings.c
 	$(RM) stdstrings.h
 	./mkfunc@EXEEXT@ strings
@@ -221,8 +221,8 @@ access_check.o : xalloc.h filestat.h comm.h access_check.h driver.h \
 actions.o : ../mudlib/sys/driver_hook.h ../mudlib/sys/commands.h xalloc.h \
     wiz_list.h svalue.h simulate.h sent.h stdstrings.h object.h mstrings.h \
     mapping.h interpret.h efuns.h dumpstat.h comm.h closure.h backend.h \
-    array.h actions.h typedefs.h driver.h strfuns.h bytecode.h pkg-tls.h \
-    main.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
+    array.h actions.h my-alloca.h typedefs.h driver.h strfuns.h bytecode.h \
+    pkg-tls.h main.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
 array.o : i-svalue_cmp.h xalloc.h wiz_list.h swap.h svalue.h simulate.h \
     stdstrings.h object.h mstrings.h mregex.h mempools.h mapping.h main.h \

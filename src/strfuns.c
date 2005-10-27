@@ -386,6 +386,12 @@ f_convert_charset (svalue_t *sp)
     
     string_t *from_cs, *to_cs, *in_str, *out_str;
 
+#if HAS_ICONV_NONCONST_IN
+#   define ICONV_IN_CAST (char**)
+#else
+#   define ICONV_IN_CAST
+#endif
+
     const char *pIn; /* Input string pointer */
     size_t in_len;   /* Input length */
     size_t in_left;  /* Input length left */
@@ -431,7 +437,7 @@ f_convert_charset (svalue_t *sp)
     {
         size_t rc;
 
-        rc = iconv(context, &pIn, &in_left, &pOut, &out_left);
+        rc = iconv(context, ICONV_IN_CAST &pIn, &in_left, &pOut, &out_left);
         if (rc == (size_t)-1)
         {
             if (errno == E2BIG)

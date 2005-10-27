@@ -241,8 +241,11 @@ seed_random (uint32 seed)
 /* Initialize the generator */
 
 {
-    unsigned long init[4]={ seed & 0xFFF, (seed >>= 8) & 0xFFF,
-      (seed >>= 8) & 0xFFF, (seed >>= 8) & 0xFFF };
+    unsigned long init[4];
+    init[0] = seed & 0xFFF;
+    init[1] = (seed >>= 8) & 0xFFF;
+    init[2] = (seed >>= 8) & 0xFFF;
+    init[3] = (seed >>= 8) & 0xFFF;
     init_by_array(init, 4);
 } /* seed_random() */
 

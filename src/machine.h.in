@@ -84,6 +84,9 @@
 /* Does the machine offer iconv? */
 #undef HAS_ICONV
 
+/* Does the machine's iconv take a non-const 'char**' as first arg? */
+#undef HAS_ICONV_NONCONST_IN
+
 /* Does the machine offer mySQL? */
 #undef HAS_MYSQL
 

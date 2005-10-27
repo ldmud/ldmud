@@ -984,11 +984,31 @@ iconv_t * foo(void)
     CFLAGS="$saveflags"
 ))
 
-# The system has the include files - now search for the libraries.
+# The system has the include files - now perform further checks
 if test "x$lp_cv_has_iconv" = "xyes"; then
     saveflags="$CFLAGS"
     tmp=""
    
+    # Some systems define iconv() to take a non-const 'char**' as first arg.
+    AC_CACHE_CHECK(if iconv takes a non-const char**,lp_cv_has_iconv_nonconst_in,
+        CFLAGS="$CFLAGS -I/usr/include -I/usr/local/include"
+        AC_TRY_COMPILE([
+#include <stdlib.h>
+#include <iconv.h>
+
+int foo(void)
+{
+    const char * in;
+
+    return iconv(NULL, &in, NULL, NULL, NULL);
+}
+        ],,lp_cv_has_iconv_nonconst_in=no,
+        lp_cv_has_iconv_nonconst_in=yes
+        CFLAGS="$saveflags"
+    ))
+
+    # Search the libraries
+
     AC_CHECK_LIB(iconv,main, tmp="$PKGLIBS -liconv")
 
     if test "x$tmp" = "x"; then
@@ -1008,6 +1028,10 @@ fi
 
 if test "x$lp_cv_has_iconv" = "xyes"; then
   AC_DEFINE(HAS_ICONV)
+fi
+
+if test "x$lp_cv_has_iconv_nonconst_in" = "xyes"; then
+  AC_DEFINE(HAS_ICONV_NONCONST_IN)
 fi
 
 # --- mySQL ---
@@ -2038,7 +2062,7 @@ cat > conftest.y <<EOF
 all: 'a';
 %%
 int main(){ return 0; }
-void yyerror(){}
+int yyerror(){}
 int yylex(){ return 0; }
 EOF
 rm -f y.tab.c y_tab.c
@@ -2070,7 +2094,7 @@ cat > conftest.y <<EOF
 all: 'a';
 %%
 int main(){ return 0; }
-void yyerror(){}
+int yyerror(){}
 int yylex(){ return 0; }
 EOF
 rm -f y.tab.c y_tab.c
