@@ -1,0 +1,56 @@
+From: Robert Treml
+Date: 2003-10-02
+Short: ODBC
+Type: Patch
+State: New
+See also: pkg-odbc.[ch]
+
+Here is the source of the ODBC package. It might be a bit chaotic since it
+was the first C project i did after years and my first ODBC project ever.
+
+Installing it should be quite simple:
+1) getting and installing an ODBC driver manager and ODBC drivers for the
+used databases
+
+I used the unixODBC driver manager (http://www.unixodbc.org/) which comes
+with the required .h files and lib to access ODBC datasources and the
+standard ODBC drivers for Postgres and MySQL which can be found on the
+according web pages.
+
+2) adding the .[ch] files and the odbc lib to the make file
+
+3) adding the efuns to the func_spec file:
+int     sql_odbc_enabled();
+mapping sql_odbc_datasources();
+int    *sql_handles();
+int     sql_connect(string, ...);
+int     sql_close(int);
+int     sql_exec(int, string);
+int     sql_affected_rows(int);
+string *sql_column_names(int);
+mixed   sql_fetch(int, ...);
+string  sql_error(int);
+
+4) complie & run
+
+I used the mysql package as template and implemented its functionality
+using ODBC. The ODBC functions should behave like the existing MySQL
+functions with some small differences:
+sql_fetch now supports a second optional parameter describing
+the way the fetched data is returned.
+0, default: The data is returned as an array
+1: The data is returned as a mapping with the column name as key.
+
+There is no function that covers the functionality of db_conv_string. 
+This function could be implemented as a simul_efun.
+
+Actually i did some basic testing using a Postgres DB on the
+same server (unix) and a MySQL DB on a different server (Win2k) and
+everything seemed to work.
+As soon as i have some more time i'll test an Oracle and a filebased ODBC
+driver.
+
+Awaiting you comments
+thx,
+ Robert
+

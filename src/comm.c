@@ -1367,7 +1367,7 @@ comm_cleanup_interactives (void)
 
 {
 #ifdef USE_PTHREADS
-    int i;
+    size_t i;
 
     for (i = 0; i < sizeof(all_players)/sizeof(all_players[0]); i++)
     {
@@ -1439,7 +1439,7 @@ thread_socket_write( SOCKET_T s UNUSED, char *msg, size_t size
      * the maximum.
      */
     while (pthread_write_max_size != 0
-        && ip->write_size >= pthread_write_max_size)
+        && ip->write_size >= (unsigned long)pthread_write_max_size)
     {
         struct write_buffer_s *tmp = ip->write_first;
         ip->write_first = tmp->next;

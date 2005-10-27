@@ -2731,7 +2731,7 @@ static void do_check_malloc_state(mstate av)
 
   max_fast_bin = fastbin_index(av->max_fast);
 
-  for (i = 0; i < NFASTBINS; ++i) {
+  for (i = 0; i < (int)NFASTBINS; ++i) {
     p = av->fastbins[i];
 
     /* all bins past max_fast are empty */
@@ -2743,7 +2743,7 @@ static void do_check_malloc_state(mstate av)
       do_check_inuse_chunk(av, p);
       total += chunksize(p);
       /* chunk belongs in this bin */
-      assert(fastbin_index(chunksize(p)) == i);
+      assert(fastbin_index(chunksize(p)) == (unsigned long)i);
       p = p->fd;
     }
   }
@@ -2775,7 +2775,7 @@ static void do_check_malloc_state(mstate av)
       if (i >= 2) {
         /* chunk belongs in bin */
         idx = bin_index(size);
-        assert(idx == i);
+        assert(idx == (unsigned long)i);
         /* lists are sorted */
         if ((unsigned long) size >= (unsigned long)(FIRST_SORTED_BIN_SIZE)) {
 	  assert(p->bk == b ||
@@ -3746,7 +3746,7 @@ public_cALLOc(size_t n, size_t elem_size)
 #if MORECORE_CLEARS < 2
   /* Only newly allocated memory is guaranteed to be cleared.  */
   if (av == &main_arena &&
-      oldtopsize < mp_.sbrk_base + av->max_system_mem - (char *)oldtop)
+      oldtopsize < (INTERNAL_SIZE_T)(mp_.sbrk_base + av->max_system_mem - (char *)oldtop))
     oldtopsize = (mp_.sbrk_base + av->max_system_mem - (char *)oldtop);
 #endif
 #endif
@@ -5264,7 +5264,7 @@ struct mallinfo mALLINFo(mstate av)
   nfastblocks = 0;
   fastavail = 0;
 
-  for (i = 0; i < NFASTBINS; ++i) {
+  for (i = 0; i < (int)NFASTBINS; ++i) {
     for (p = av->fastbins[i]; p != 0; p = p->fd) {
       ++nfastblocks;
       fastavail += chunksize(p);

@@ -7753,71 +7753,6 @@ fi
 
 fi
 
-# --- Check if we need zlib libraries for mccp ---
-
-if test "x$enable_use_mccp" = "x" || test "x$enable_use_mccp" = "xyes"; then
-    tmp=""
-    echo "$as_me:$LINENO: checking for main in -lz" >&5
-echo $ECHO_N "checking for main in -lz... $ECHO_C" >&6
-if test "${ac_cv_lib_z_main+set}" = set; then
-  echo $ECHO_N "(cached) $ECHO_C" >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lz  $LIBS"
-cat >conftest.$ac_ext <<_ACEOF
-#line $LINENO "configure"
-#include "confdefs.h"
-
-
-int
-main ()
-{
-main ();
-  ;
-  return 0;
-}
-_ACEOF
-rm -f conftest.$ac_objext conftest$ac_exeext
-if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
-  (eval $ac_link) 2>&5
-  ac_status=$?
-  echo "$as_me:$LINENO: \$? = $ac_status" >&5
-  (exit $ac_status); } &&
-         { ac_try='test -s conftest$ac_exeext'
-  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
-  (eval $ac_try) 2>&5
-  ac_status=$?
-  echo "$as_me:$LINENO: \$? = $ac_status" >&5
-  (exit $ac_status); }; }; then
-  ac_cv_lib_z_main=yes
-else
-  echo "$as_me: failed program was:" >&5
-cat conftest.$ac_ext >&5
-ac_cv_lib_z_main=no
-fi
-rm -f conftest.$ac_objext conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-echo "$as_me:$LINENO: result: $ac_cv_lib_z_main" >&5
-echo "${ECHO_T}$ac_cv_lib_z_main" >&6
-if test $ac_cv_lib_z_main = yes; then
-  tmp="$LIBS -lz"
-fi
-
-    if test "x$tmp" = "x"; then
-        echo "libz library not found - disabling MCCP support"
-        if test "x$not_available" = "x"; then
-    not_available="use-mccp"
-else
-    not_available="$not_available, use-mccp"
-fi
-        cdef_use_mccp="#undef"
-        enable_use_mccp="no"
-    else
-        LIBS="$tmp"
-    fi
-fi
-
 # --- Check if we need the crypto libraries ---
 
 if test "x$enable_use_system_crypt" = "x" || test "x$enable_use_system_crypt" = "xyes"; then
@@ -9650,6 +9585,8 @@ echo "${ECHO_T}$lp_cv_has_pcre" >&6
 
 # Note: Some compilers don't have /usr/local/include in their standard
 # searchpath.
+# Note: Some systems require zlib together with mysqlclient, but don't
+# like it if -lz precedes the -lmysqlclient in the link command.
 
 echo "$as_me:$LINENO: checking for mySQL" >&5
 echo $ECHO_N "checking for mySQL... $ECHO_C" >&6
@@ -10837,6 +10774,74 @@ fi
       cdef_use_pgsql="#undef"
       enable_use_pgsql=no
   fi
+fi
+
+# --- Check if we need zlib libraries for mccp ---
+
+if test "x$enable_use_mccp" = "x" || test "x$enable_use_mccp" = "xyes"; then
+    tmp=""
+    echo "$as_me:$LINENO: checking for main in -lz" >&5
+echo $ECHO_N "checking for main in -lz... $ECHO_C" >&6
+if test "${ac_cv_lib_z_main+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lz  $LIBS"
+cat >conftest.$ac_ext <<_ACEOF
+#line $LINENO "configure"
+#include "confdefs.h"
+
+
+int
+main ()
+{
+main ();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+         { ac_try='test -s conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  ac_cv_lib_z_main=yes
+else
+  echo "$as_me: failed program was:" >&5
+cat conftest.$ac_ext >&5
+ac_cv_lib_z_main=no
+fi
+rm -f conftest.$ac_objext conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+echo "$as_me:$LINENO: result: $ac_cv_lib_z_main" >&5
+echo "${ECHO_T}$ac_cv_lib_z_main" >&6
+if test $ac_cv_lib_z_main = yes; then
+  tmp="$LIBS -lz"
+fi
+
+    if test "x$tmp" = "x"; then
+        echo "libz library not found - disabling MCCP support"
+        if test "x$not_available" = "x"; then
+    not_available="use-mccp"
+else
+    not_available="$not_available, use-mccp"
+fi
+        cdef_use_mccp="#undef"
+        enable_use_mccp="no"
+    else
+        if test "$lp_cv_need_lib_z" = "no"; then
+            PKGLIBS="$PKGLIBS -lz"
+            # Otherwise '-lz' was already been added.
+        fi
+    fi
 fi
 
 # ---

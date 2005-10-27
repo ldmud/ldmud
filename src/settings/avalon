@@ -47,4 +47,8 @@ with_max_mapping_size=120000
 with_max_byte_transfer=100000
 with_read_file_max_size=100000
 
-with_optmize=high
+with_optmize=medium
+
+enable_use_mccp=yes
+enable_use_pcre=yes
+

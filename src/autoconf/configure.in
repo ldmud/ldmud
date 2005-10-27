@@ -602,21 +602,6 @@ if test "$lp_cv_need_lib_resolv" = "yes"; then
     AC_CHECK_LIB(resolv,main, LIBS="$LIBS -lresolv")
 fi
 
-# --- Check if we need zlib libraries for mccp ---
-
-if test "x$enable_use_mccp" = "x" || test "x$enable_use_mccp" = "xyes"; then
-    tmp=""
-    AC_CHECK_LIB(z,main, tmp="$LIBS -lz")
-    if test "x$tmp" = "x"; then
-        echo "libz library not found - disabling MCCP support"
-        AC_NOT_AVAILABLE(use-mccp)
-        cdef_use_mccp="#undef"
-        enable_use_mccp="no"
-    else
-        LIBS="$tmp"
-    fi
-fi
-
 # --- Check if we need the crypto libraries ---
 
 if test "x$enable_use_system_crypt" = "x" || test "x$enable_use_system_crypt" = "xyes"; then
@@ -983,6 +968,8 @@ pcre_extra foo(void)
 
 # Note: Some compilers don't have /usr/local/include in their standard
 # searchpath.
+# Note: Some systems require zlib together with mysqlclient, but don't
+# like it if -lz precedes the -lmysqlclient in the link command.
 
 AC_CACHE_CHECK(for mySQL,lp_cv_has_mysql,
 for TESTPATH in "" "${mysql_path}/include" "${mysql_path}" "/usr/local/mysql/include" "/usr/lib/mysql" "/usr/local/include"; do
@@ -1248,6 +1235,24 @@ else
       cdef_use_pgsql="#undef"
       enable_use_pgsql=no
   fi
+fi
+
+# --- Check if we need zlib libraries for mccp ---
+
+if test "x$enable_use_mccp" = "x" || test "x$enable_use_mccp" = "xyes"; then
+    tmp=""
+    AC_CHECK_LIB(z,main, tmp="$LIBS -lz")
+    if test "x$tmp" = "x"; then
+        echo "libz library not found - disabling MCCP support"
+        AC_NOT_AVAILABLE(use-mccp)
+        cdef_use_mccp="#undef"
+        enable_use_mccp="no"
+    else
+        if test "$lp_cv_need_lib_z" = "no"; then
+            PKGLIBS="$PKGLIBS -lz"
+            # Otherwise '-lz' was already been added.
+        fi
+    fi
 fi
 
 # ---

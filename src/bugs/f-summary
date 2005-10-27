@@ -117,6 +117,7 @@ f-020404: New efun strreplace()
 f-020507-2: Slicing mappings
 p-020912: TCP socket support a la MudOS
 p-021021: Socket support
+p-031002: ODBC
 
 
 Language

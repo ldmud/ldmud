@@ -801,7 +801,7 @@ store_print_block_dispatch_info (void *block
     int i;
 
     i = num_dispatched_types++;
-    if (i >= (int)sizeof(dispatch_table)/sizeof(dispatch_table[0]))
+    if (i >= (int)(sizeof(dispatch_table)/sizeof(dispatch_table[0])))
     {
         writes(2, "dispatch_table for print_block() to small\n");
         return;

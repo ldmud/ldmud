@@ -1,6 +1,16 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+15-Oct-2003 (Lars Duening)  (3.3.492)
+  - (configure) Made sure that -lz always follows the -lmysqlclient,
+       as some system apparently can't resolve all backward references
+       (reported by Alwin).
+
+02-Oct-2003 (Lars Duening)
+  - (comm.c, mempools.c, ptmalloc, xalloc.c) Removed signed/unsigned
+       compiler warnings (thanks, Ralph).
+  - (pkg-odbc, p-031002) Added, but not yet processed (thanks, Robert!).
+
 30-Sep-2003 (Lars Duening)  (3.3.491)
   - (comm.c) The maxNumCmds setting was defaulted to 0 instead of -1
        (reported by Bardioc).
@@ -11,6 +21,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - (lex.c) The macros __RESET_TIME__ and __CLEANUP_TIME__ always used
        the configured values, ignoring commandline overrides (reported
        by Ralph).
+  - (interpret.c, func_spec) New efun master() to return the master object.
 
 28-Sep-2003 (Lars Duening)  (3.3.490)
   - (comm.c) Removed a crasher from set_max_commands() (thanks, Ralph!).

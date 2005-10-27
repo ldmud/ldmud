@@ -817,7 +817,7 @@ mempool_free (Mempool pPool, void * adr)
     {
         while (pBlock->pNext != NULL
             &&    pBlock->pMark - (char*)&(pBlock->u)
-               >= (ptrdiff_t)pPool->iAllocSize - SIZEOF_LIFO_T)
+               >= (ptrdiff_t)(pPool->iAllocSize - SIZEOF_LIFO_T))
         {
             pPool->pBlocks = pBlock->pNext;
             pBlock->pNext = pPool->pFree;
