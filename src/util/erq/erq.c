@@ -1023,13 +1023,13 @@ start_subserver (long server_num, long seed)
             header[8] = CHILD_FREE;
             memcpy(header+9, buf, 4); /* copy address */
             hp = gethostbyaddr(buf, 4, AF_INET);
-            if (!hp && errno == TRY_AGAIN)
+            if (!hp && h_errno == TRY_AGAIN)
             {
                 /* DNS needs a bit more time */
                 sleep(3);
                 hp = gethostbyaddr(buf, 4, AF_INET);
             }
-            if (!hp && errno == TRY_AGAIN)
+            if (!hp && h_errno == TRY_AGAIN)
             {
                 /* DNS needs a even more time */
                 sleep(7);
@@ -1068,7 +1068,7 @@ start_subserver (long server_num, long seed)
             fprintf(stderr, "%s: ERQ_LOOKUP '%s'\n", time_stamp(), buf);
 #endif
             hp = gethostbyname(buf);
-            if (!hp && errno == TRY_AGAIN)
+            if (!hp && h_errno == TRY_AGAIN)
             {
 #if ERQ_DEBUG > 2
                  fprintf(stderr, "%s: ERQ_LOOKUP '%s': trying again in 3 sec.\n", time_stamp(), buf);
@@ -1077,7 +1077,7 @@ start_subserver (long server_num, long seed)
                 sleep(3);
                 hp = gethostbyname(buf);
             }
-            if (!hp && errno == TRY_AGAIN)
+            if (!hp && h_errno == TRY_AGAIN)
             {
 #if ERQ_DEBUG > 2
                  fprintf(stderr, "%s: ERQ_LOOKUP '%s': trying again in 7 sec.\n", time_stamp(), buf);

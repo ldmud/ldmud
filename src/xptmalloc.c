@@ -6,6 +6,10 @@
  * ptmalloc2 was adapted to ldmud by Christian Welzel (www.camlann.de)
  *---------------------------------------------------------------------------
  * This allocator supports REPLACE_MALLOC.
+ *   Note: when using pthreads and GC_SUPPORT under *BSD, malloc()
+ *     is called before the synchronisation data structures are available.
+ *     This would cause a deadlock in the call to gc_lock(), therefore
+ *     under *BSD the REPLACE_MALLOC feature is disabled.
  * This allocator is threadsafe.
  */
 
@@ -195,8 +199,13 @@ static Bool mem_is_freed (POINTER p, size_t minsize) {
 //#define MEM_ALIGN (2*(sizeof(size_t)))
 #define MEM_ALIGN (2*SIZEOF_INT)
 
-/*     if the allocator can replace the libc allocation routines. */
+/* If the allocator can replace the libc allocation routines.
+ * See above for the *BSD situation.
+ */
+
+#if !defined(__FreeBSD__) && !defined(__NetBSD__) && !defined(__OpenBSD__)
 #define REPLACE_MALLOC
+#endif
 
 /* The allocator is threadsafe */
 #define MEM_THREADSAFE

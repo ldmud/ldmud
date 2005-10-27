@@ -63,26 +63,24 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 512)
-(Parent-Version lpmud 3-3 511)
+(Project-Version lpmud 3-3 513)
+(Parent-Version lpmud 3-3 512)
 (Version-Log "
-  - (efuns.c) The cost calculation for efun clones() forgot to take the
-       number of checked objects into account.
-  - (configure, sprintf.c) trunc() is a C-99 library function; if not
-       available, the driver uses ceil()/floor() instead.
-  - (mudlib/dns_resolve.c) Example simul-efun for doing non-blocking
-       DNS lookups (thanks, Tobias & Arne!)
-  - (doc/efun.de) Added the german efun manpages from Unitopia (thanks,
-       Tiberian!)
-  - (util/erq/erq.c) Corrected the ERQ_LOOKUP so that the passed-in hostnames
-       are properly null-terminated (thanks, LynX).
-  - (util/erq/xerq.c) ERQ_LOOKUPs are tried again only if the DNS indicates
-       that it is useful.
+  - (comm.c) Corrected a compilation error when TELNET_DEBUG is defined
+       (thanks, Tobias).
+  - (comm.c) Using input_to() without a command_giver crashed the
+        driver.
+  - (erq/erq.c, xerq/lookup.c) Well, TRY_AGAIN is a h_errno result,
+       not errno (thanks, Tobias).
+  - (xptmalloc.c) Under *BSD when using pthreads and GC support, malloc()
+       is used before the pthread structures are available. For this
+       reason, REPLACE_MALLOC is disabled under *BSD (for simplicity in
+       all cases).
 ")
 (New-Version-Log
 ""
 )
-(Checkin-Time "Fri, 09 Apr 2004 21:43:59 -0600")
+(Checkin-Time "Sun, 11 Apr 2004 00:33:21 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -120,7 +118,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.72 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.575 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.576 644))
   (HISTORY (lpmud/f/49_HISTORY 1.343 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -189,7 +187,7 @@
   (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.26 644))
   (src/closure.h (lpmud/f/44_closure.h 1.7.1.17 644))
   (src/closure.c (lpmud/d/4_closure.c 1.41.1.47.1.17 644))
-  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.76 644))
+  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.77 644))
   (src/comm.h (lpmud/d/3_comm.h 1.26.1.39 644))
   (src/driver.h (lpmud/f/36_driver.h 1.15.1.25 644))
   (src/dumpstat.h (lpmud/f/35_dumpstat.h 1.8 644))
@@ -324,7 +322,7 @@
   (src/wiz_list.c (lpmud/2_wiz_list.c 1.13.1.14.1.4 644))
   (src/xalloc.h (lpmud/g/51_xalloc.h 1.21 644))
   (src/xalloc.c (lpmud/h/0_xalloc.c 1.2.1.35 644))
-  (src/xptmalloc.c (lpmud/d/b/10_xptmalloc. 1.2 644))
+  (src/xptmalloc.c (lpmud/d/b/10_xptmalloc. 1.3 644))
 
   ;; Build files
   (src/func_spec (lpmud/c/31_func_spec 1.53.1.45.1.22.1.24 644))
@@ -410,7 +408,7 @@
 
   (src/util/erq/Makefile.in (lpmud/c/11_Makefile.i 1.1.1.5 644))
   (src/util/erq/erq.h (lpmud/d/26_erq.h 1.1.1.4.1.2 644))
-  (src/util/erq/erq.c (lpmud/d/27_erq.c 1.1.1.8.1.6.1.4.1.5 644))
+  (src/util/erq/erq.c (lpmud/d/27_erq.c 1.1.1.8.1.6.1.4.1.6 644))
 
   (src/util/xerq/socket.c (lpmud/k/21_socket.c 1.9.1.4.1.5 644))
   (src/util/xerq/lpc/www/who.c (lpmud/k/22_who.c 1.2 644))
@@ -425,7 +423,7 @@
   (src/util/xerq/lpc/_ifinger.c (lpmud/k/30__ifinger.c 1.2 644))
   (src/util/xerq/lpc/TODO (lpmud/k/31_TODO 1.1 644))
   (src/util/xerq/lpc/README (lpmud/k/32_README 1.2 644))
-  (src/util/xerq/lookup.c (lpmud/k/33_lookup.c 1.4.1.1.1.3 644))
+  (src/util/xerq/lookup.c (lpmud/k/33_lookup.c 1.4.1.1.1.4 644))
   (src/util/xerq/execute.c (lpmud/k/34_execute.c 1.5.1.1.1.6 644))
   (src/util/xerq/erq.h (lpmud/k/35_erq.h 1.3.1.2 644))
   (src/util/xerq/erq.c (lpmud/k/36_erq.c 1.8.1.12.1.4 644))
@@ -2220,10 +2218,6 @@
   (test/t-030925/b2.c (lpmud/e/b/31_b2.c 1.1 644))
   (test/t-030925/b1.c (lpmud/e/b/32_b1.c 1.1 644))
   (test/t-030925/a.c (lpmud/e/b/33_a.c 1.1 644))
-
-;; Files added by populate at Fri, 09 Apr 2004 21:15:58 -0600,
-;; to version 3-3.511(w), by lars:
-
 )
 (Merge-Parents)
 (New-Merge-Parents)

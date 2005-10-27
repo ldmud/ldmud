@@ -94,7 +94,7 @@ erq_lookup(char *mesg, int len)
 
     XPRINTF((stderr, "%s lookup '%s'\n", time_stamp(), msg+9));
     hp = gethostbyname(msg+9);
-    if (!hp && msg[8] == ERQ_LOOKUP && errno == TRY_AGAIN)
+    if (!hp && msg[8] == ERQ_LOOKUP && h_errno == TRY_AGAIN)
     {
         XPRINTF((stderr, "%s   Retry in 5 seconds.\n", time_stamp()));
         mesg[8]++; /* No second retry */

@@ -2022,8 +2022,8 @@ if (sending_telnet_command)
 {
     char *cp;
     long left;
-    printf("%s TDEBUG: '%s' Sending telnet (%d bytes): "
-          , time_stamp(), get_txt(ip->ob->name), strlen(source));
+    printf("%s TDEBUG: '%s' Sending telnet (%lu bytes): "
+          , time_stamp(), get_txt(ip->ob->name), (unsigned long) strlen(source));
     for (cp = source, left = srclen; left > 0; cp++, left--)
         printf(" %02x", (unsigned char)*cp);
     printf("\n");
@@ -3935,7 +3935,7 @@ set_noecho (interactive_t *ip, char noecho)
 
     if (!ip->tn_enabled)
     {
-        DTN(("'%s' set_noecho(%02x) old %02x: TN disabled\n"
+        DTN(("set_noecho(%02x) old %02x: TN disabled\n"
             , noecho, ip->noecho));
     }
 
@@ -7309,7 +7309,8 @@ v_input_to (svalue_t *sp, int num_arg)
     {
         interactive_t *ip;
 
-        if (O_SET_INTERACTIVE(ip, command_giver)
+        if (command_giver != NULL
+         && O_SET_INTERACTIVE(ip, command_giver)
          && !ip->tn_enabled
          && (iflags & (INPUT_NOECHO|INPUT_CHARMODE))
            )

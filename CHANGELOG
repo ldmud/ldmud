@@ -1,6 +1,18 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+10-Apr-2004 (Lars Duening)  (3.3.513)
+  - (comm.c) Corrected a compilation error when TELNET_DEBUG is defined
+       (thanks, Tobias).
+  - (comm.c) Using input_to() without a command_giver crashed the
+        driver.
+  - (erq/erq.c, xerq/lookup.c) Well, TRY_AGAIN is a h_errno result,
+       not errno (thanks, Tobias).
+  - (xptmalloc.c) Under *BSD when using pthreads and GC support, malloc()
+       is used before the pthread structures are available. For this
+       reason, REPLACE_MALLOC is disabled under *BSD (for simplicity in
+       all cases).
+
 09-Apr-2004 (Lars Duening)  (3.3.512)
   - (efuns.c) The cost calculation for efun clones() forgot to take the
        number of checked objects into account.
