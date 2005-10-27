@@ -33,6 +33,9 @@ extern void strbuf_copy (strbuf_t *buf, char *cbuf);
 extern string_t * trim_all_spaces (const string_t * txt);
 extern char * xstrncpy(char * dest, const char * src, size_t num);
 
+#ifdef HAS_ICONV
+extern svalue_t * f_convert_charset (svalue_t *sp); 
+#endif
 extern string_t * intersect_strings (const string_t * left, const string_t * right, Bool bSubtract);
 extern svalue_t * x_map_string (svalue_t *sp, int num_arg);
 extern svalue_t * x_filter_string (svalue_t *sp, int num_arg);

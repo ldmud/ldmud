@@ -9638,6 +9638,180 @@ fi
 echo "$as_me:$LINENO: result: $lp_cv_has_pcre" >&5
 echo "${ECHO_T}$lp_cv_has_pcre" >&6
 
+# --- iconv ---
+
+echo "$as_me:$LINENO: checking for iconv" >&5
+echo $ECHO_N "checking for iconv... $ECHO_C" >&6
+if test "${lp_cv_has_iconv+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  saveflags="$CFLAGS"
+    CFLAGS="$CFLAGS -I/usr/include -I/usr/local/include"
+    cat >conftest.$ac_ext <<_ACEOF
+#line $LINENO "configure"
+#include "confdefs.h"
+
+#include <iconv.h>
+
+iconv_t * foo(void)
+{
+    return 0;
+}
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext
+if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
+  (eval $ac_compile) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+         { ac_try='test -s conftest.$ac_objext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  lp_cv_has_iconv=yes
+else
+  echo "$as_me: failed program was:" >&5
+cat conftest.$ac_ext >&5
+lp_cv_has_iconv=no
+    CFLAGS="$saveflags"
+
+fi
+rm -f conftest.$ac_objext conftest.$ac_ext
+fi
+echo "$as_me:$LINENO: result: $lp_cv_has_iconv" >&5
+echo "${ECHO_T}$lp_cv_has_iconv" >&6
+
+# The system has the include files - now search for the libraries.
+if test "x$lp_cv_has_iconv" = "xyes"; then
+    saveflags="$CFLAGS"
+    tmp=""
+
+    echo "$as_me:$LINENO: checking for main in -liconv" >&5
+echo $ECHO_N "checking for main in -liconv... $ECHO_C" >&6
+if test "${ac_cv_lib_iconv_main+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-liconv  $LIBS"
+cat >conftest.$ac_ext <<_ACEOF
+#line $LINENO "configure"
+#include "confdefs.h"
+
+
+int
+main ()
+{
+main ();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+         { ac_try='test -s conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  ac_cv_lib_iconv_main=yes
+else
+  echo "$as_me: failed program was:" >&5
+cat conftest.$ac_ext >&5
+ac_cv_lib_iconv_main=no
+fi
+rm -f conftest.$ac_objext conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+echo "$as_me:$LINENO: result: $ac_cv_lib_iconv_main" >&5
+echo "${ECHO_T}$ac_cv_lib_iconv_main" >&6
+if test $ac_cv_lib_iconv_main = yes; then
+  tmp="$PKGLIBS -liconv"
+fi
+
+
+    if test "x$tmp" = "x"; then
+        CFLAGS="$saveflags -L/usr/local/lib"
+        echo "$as_me:$LINENO: checking for main in -llibiconv" >&5
+echo $ECHO_N "checking for main in -llibiconv... $ECHO_C" >&6
+if test "${ac_cv_lib_libiconv_main+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-llibiconv  $LIBS"
+cat >conftest.$ac_ext <<_ACEOF
+#line $LINENO "configure"
+#include "confdefs.h"
+
+
+int
+main ()
+{
+main ();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+         { ac_try='test -s conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  ac_cv_lib_libiconv_main=yes
+else
+  echo "$as_me: failed program was:" >&5
+cat conftest.$ac_ext >&5
+ac_cv_lib_libiconv_main=no
+fi
+rm -f conftest.$ac_objext conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+echo "$as_me:$LINENO: result: $ac_cv_lib_libiconv_main" >&5
+echo "${ECHO_T}$ac_cv_lib_libiconv_main" >&6
+if test $ac_cv_lib_libiconv_main = yes; then
+  tmp="$PKGLIBS -L/usr/local/lib -liconv"
+fi
+
+    fi
+
+    if test "x$tmp" = "x"; then
+        echo "iconv library not found."
+        lp_cv_has_iconv="no"
+    else
+        PKGLIBS="$tmp"
+    fi
+
+    CFLAGS="$saveflags"
+fi
+
+if test "x$lp_cv_has_iconv" = "xyes"; then
+  cat >>confdefs.h <<\_ACEOF
+#define HAS_ICONV 1
+_ACEOF
+
+fi
+
 # --- mySQL ---
 
 # Note: Some compilers don't have /usr/local/include in their standard

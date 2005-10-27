@@ -1673,6 +1673,9 @@ options (void)
 #ifdef USE_NEW_INLINES
                               , "new inline closures enabled\n"
 #endif
+#ifdef HAS_ICONV
+                              , "convert_charset() via iconv available\n"
+#endif
 #ifdef ALLOW_FILENAME_SPACES
                               , "filenames may contain space characters\n"
 #else

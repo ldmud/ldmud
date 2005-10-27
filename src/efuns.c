@@ -7245,6 +7245,8 @@ v_debug_info (svalue_t *sp, int num_arg)
  *        int DID_MEM_LFREE         (smalloc)
  *        int DID_MEM_LFREE_SIZE    (smalloc)
  *            Number and size of large allocated resp. free blocks.
+ *            smalloc: The large allocated blocks include the
+ *            small chunk blocks.
  *
  *        int DID_MEM_LWASTED       (smalloc)
  *        int DID_MEM_LWASTED_SIZE  (smalloc)

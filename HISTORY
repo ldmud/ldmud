@@ -29,6 +29,7 @@ For a detailed list of all changes see the file CHANGELOG.
        + garbage_collection(): An optional flag argument allows to change
             the name of the default GC log file.
        + map(): The efun can now map strings as well.
+       + make_shared_string(): Deprecated.
        + mkmapping(): Convert structs to mappings, too.
        + process_string(): Spaces are now allowed in function arguments
            and no longer terminate the function specification.
@@ -52,6 +53,7 @@ For a detailed list of all changes see the file CHANGELOG.
        + baseof(): Test the relation between two structs.
        + call_direct(), call_direct_resolved(): To perform calls which
            are not resolved by a default method.
+       + convert_charset(): Convert a string between character sets.
        + match_command(): Find all matching actions for a command.
        + md5_crypt(): Compute an Apache-compatible password encryption using
            the MD5 message digest algorithm.

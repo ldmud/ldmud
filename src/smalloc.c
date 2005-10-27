@@ -564,7 +564,7 @@ mem_mark_permanent (POINTER p)
 
 {
     word_t * q = (word_t *)p;
-    if (q[-M_OVERHEAD] & ~M_GC_FREE)
+    if (q[-M_OVERHEAD] & M_GC_FREE)
     {
         q[-M_OVERHEAD] &= ~M_GC_FREE;
         count_up(perm_alloc_stat, (q[-M_OVERHEAD] & M_MASK)*SINT);
@@ -581,7 +581,7 @@ mem_mark_collectable (POINTER p)
 
 {
     word_t * q = (word_t *)p;
-    if (!(q[-M_OVERHEAD] & ~M_GC_FREE))
+    if (!(q[-M_OVERHEAD] & M_GC_FREE))
     {
         q[-M_OVERHEAD] |= (M_REF|M_GC_FREE);
         count_back(perm_alloc_stat, (q[-M_OVERHEAD] & M_MASK)*SINT);
@@ -1492,6 +1492,8 @@ sfree (POINTER ptr)
 
     if (!ptr)
         return;
+
+    mem_mark_collectable(ptr);
 
     /* Get the real block address and size */
     block = (word_t *) ptr;
@@ -2816,7 +2818,7 @@ esbrk (word_t size)
 
     char *block;
     word_t *p;    /* start of the fake block */
-    const int overhead = M_OVERHEAD + XM_OVERHEAD;
+    const int overhead = T_OVERHEAD;
 
     mdb_log_sbrk(size);
     size += overhead * SINT;  /* for the extra fake "allocated" block */

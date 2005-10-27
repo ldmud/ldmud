@@ -34,6 +34,8 @@ DESCRIPTION
 
          - 'deprecated' or 'obsolete'
 
+             make_shared_string()
+
            These efuns should no longer be used, they are merely provided
            for backwards compatibility:
 

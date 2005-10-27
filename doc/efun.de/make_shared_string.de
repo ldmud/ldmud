@@ -1,13 +1,19 @@
+VERALTET
 SYNOPSIS
-        string make_shared_strin(string str);
+        string make_shared_string(string str);
 
 BESCHREIBUNG
-        Fuegt <str> in die Liste der gemeinsam verwendeten String des Spiels
+        Fuegt <str> in die Tabelle der gemeinsam verwendeten String des Spiels
         ein.
 
         Wenn ein String von mehreren Variablen / Objekten verwendet wird,
         spart dies Speicher. Keys von Alists und Mappings sind immer gemeinsam
         verwendete Strings.
+
+        In LDMud 3.3 ist diese Funktion nicht laenger nuetzlich: Strings
+        werden sowieso so weit wie moeglich gemeinsam verwendet, und der
+        Driver wandelt untablierte Strings nach einiger Zeit automatisch in
+        tablierte Strings um um
 
 BUGS
         Ein besseres Stringhandling im Driver sollte diese Efun ueberfluessig
@@ -15,3 +21,4 @@ BUGS
 
 AENDERUNGEN
         Eingefuehrt in LDMud 3.2.6, auf Vorschlag von TubMud.
+        Veraltet seit LDMud 3.3 .

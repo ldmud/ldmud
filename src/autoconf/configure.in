@@ -967,6 +967,49 @@ pcre_extra foo(void)
     CFLAGS="$saveflags"
 ))
 
+# --- iconv ---
+
+AC_CACHE_CHECK(for iconv,lp_cv_has_iconv,
+    saveflags="$CFLAGS"
+    CFLAGS="$CFLAGS -I/usr/include -I/usr/local/include"
+    AC_TRY_COMPILE([
+#include <iconv.h>
+
+iconv_t * foo(void)
+{
+    return 0;
+}
+    ],,lp_cv_has_iconv=yes,
+    lp_cv_has_iconv=no
+    CFLAGS="$saveflags"
+))
+
+# The system has the include files - now search for the libraries.
+if test "x$lp_cv_has_iconv" = "xyes"; then
+    saveflags="$CFLAGS"
+    tmp=""
+   
+    AC_CHECK_LIB(iconv,main, tmp="$PKGLIBS -liconv")
+
+    if test "x$tmp" = "x"; then
+        CFLAGS="$saveflags -L/usr/local/lib"
+        AC_CHECK_LIB(libiconv,main, tmp="$PKGLIBS -L/usr/local/lib -liconv")
+    fi
+
+    if test "x$tmp" = "x"; then
+        echo "iconv library not found."
+        lp_cv_has_iconv="no"
+    else
+        PKGLIBS="$tmp"
+    fi
+
+    CFLAGS="$saveflags"
+fi
+
+if test "x$lp_cv_has_iconv" = "xyes"; then
+  AC_DEFINE(HAS_ICONV)
+fi
+
 # --- mySQL ---
 
 # Note: Some compilers don't have /usr/local/include in their standard

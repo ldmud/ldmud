@@ -11,13 +11,13 @@
  * should create:
  *
  *   make_func instrs
- *     creates efun_defs.c and instrs.h, reads config.h and func_spec.
+ *     creates efun_defs.c and instrs.h, reads machine.h, config.h and func_spec.
  *
  *   make_func lang
- *     creates lang.y from prolang.y, reads config.h.
+ *     creates lang.y from prolang.y, reads machine.h and config.h.
  *
  *   make_func strings
- *     creates stdstrings.[ch], reads config.h and string_spec.
+ *     creates stdstrings.[ch], reads machine.h, config.h and string_spec.
  *
  * The calls are described in detail below.
  *---------------------------------------------------------------------------
@@ -45,13 +45,13 @@
  *   - the instruction codes for the tabled efuns are consecutive
  *   - the instruction codes for all tabled varargs efuns are consecutive.
  *
- * When make_func is run, it first reads the file 'config.h' to determine
- * which defines are used in the compilation of the driver. For this
- * make_func implements a simple C preprocessor, capable of numeric
- * expressions and simple macro expansions (no function macros), which
- * also allows the use of C-like block comments. With the knowledge of
- * the defines, make_func then reads the file 'func_spec'
- * with the information about the codes and efuns.
+ * When make_func is run, it first reads the files 'machine.h' and
+ * 'config.h' to determine which defines are used in the compilation of the
+ * driver. For this make_func implements a simple C preprocessor, capable
+ * of numeric expressions and simple macro expansions (no function macros),
+ * which also allows the use of C-like block comments. With the knowledge
+ * of the defines, make_func then reads the file 'func_spec' with the
+ * information about the codes and efuns.
  *
  * From this information, make_func generates these files:
  *   efun_defs.c
@@ -143,12 +143,11 @@
  * lang.y from the file prolang.y . This step is necessary because
  * no known yacc allows to enable or disable rules conditinally.
  *
- * When make_func is run, it first reads the file 'config.h' to determine
- * which defines are used in the compilation of the driver. For this
- * make_func implements a simple C preprocessor, capable of numeric
- * expressions and simple macro expansions (no function macros), which
- * also allows the use of C-like block comments. It also performs
- * a short test with the configured yacc to test its limitations.
+ * When make_func is run, it first reads the files 'machine.h' and
+ * 'config.h' to determine which defines are used in the compilation of the
+ * driver. For this make_func implements a simple C preprocessor, capable
+ * of numeric expressions and simple macro expansions (no function macros),
+ * which also allows the use of C-like block comments.
  *
  * From this information, make_func generates this file:
  *  lang.y
@@ -229,6 +228,10 @@
 
 #define CONFIG       "config.h"
   /* The configuration file.
+   */
+
+#define MACHINE      "machine.h"
+  /* The machine configuration file.
    */
 
 #define PRO_LANG     "prolang.y"
@@ -1077,7 +1080,7 @@ stringdef: ID NAME
 
 /*                            L E X E R                                    */
 
-/* The Lexer is used to parse CONFIG, FUNC_SPEC and STRING_SPEC,
+/* The Lexer is used to parse CONFIG, MACHINE, FUNC_SPEC and STRING_SPEC,
  * and to create THE_LANG from PRO_LANG.
  */
 
@@ -1152,7 +1155,7 @@ static int current_line;
   /* Number of the current line.
    */
 
-static char *current_file;
+static const char *current_file;
   /* Name of the current file.
    */
 
@@ -2534,9 +2537,10 @@ efuncmp (int i, int j)
 
 /*-------------------------------------------------------------------------*/
 static void
-read_config (void)
+read_config_file (char *fname)
 
-/* Read the file CONFIG to learn about the defines used by the gamedriver.
+/* Read the config file <fname> to learn about the defines used by the
+ * gamedriver.
  */
 
 {
@@ -2544,36 +2548,18 @@ read_config (void)
     char line_buffer[MAKE_FUNC_MAXLINE + 1];
     char defbuf[MAKE_FUNC_MAXLINE + 1];
 
-    /* Some predefined macros */
-
-#ifdef AMIGA
-    add_define("AMIGA",-1,"");
-#endif
-#ifdef __BEOS__
-    add_define("__BEOS__", -1, "");
-#endif
-#ifdef DEBUG
-    add_define("DEBUG", -1, "");
-#endif
-#ifdef HAVE_GETRUSAGE
-    add_define("HAVE_GETRUSAGE",-1,"");
-#endif
-#ifdef TRACE_CODE
-    add_define("TRACE_CODE",-1,"");
-#endif
-
-    /* --- Read in CONFIG to see what defines are used by the gamedriver ---
+    /* --- Read in the file to see what defines are used by the gamedriver ---
      */
 
     outp = defbuf + sizeof(defbuf) - 1;
-    if ((fpr = fopen(CONFIG, "r")) == 0)
+    if ((fpr = fopen(fname, "r")) == 0)
     {
-       perror(CONFIG);
+       perror(fname);
        fflush(stdout);
        exit(1);
     }
     current_line = 0;
-    current_file = CONFIG;
+    current_file = fname;
 
 #define MATCH(str) (isspace((unsigned char)line_buffer[1+(match_tmp=strlen(str))]) &&\
                         strncmp(str, line_buffer+1, match_tmp) == 0)
@@ -2614,7 +2600,7 @@ read_config (void)
         if ( !MATCH("define") ) {
             continue;
         }
-        /* CONFIG is trusted to be syntactically correct. After all, it was
+        /* <name> is trusted to be syntactically correct. After all, it was
          * included by the source of this program.
          */
         {
@@ -2643,6 +2629,21 @@ read_config (void)
 
 #undef MATCH
 
+} /* read_config() */
+
+/*-------------------------------------------------------------------------*/
+static void
+read_config (void)
+
+/* Read the file CONFIG to learn about the defines used by the gamedriver.
+ */
+
+{
+    /* --- Read in CONFIG to see what defines are used by the gamedriver ---
+     */
+
+    read_config_file(CONFIG);
+
     /* Sanity check on some of those USE_ defines: undefine
      * those which are not supported on the host system.
      */
@@ -2668,6 +2669,38 @@ read_config (void)
         }
     }
 } /* read_config() */
+
+/*-------------------------------------------------------------------------*/
+static void
+read_machine (void)
+
+/* Read the file MACHINE to learn about the defines used by the machine.
+ */
+
+{
+    /* Some predefined macros */
+
+#ifdef AMIGA
+    add_define("AMIGA",-1,"");
+#endif
+#ifdef __BEOS__
+    add_define("__BEOS__", -1, "");
+#endif
+#ifdef DEBUG
+    add_define("DEBUG", -1, "");
+#endif
+#ifdef HAVE_GETRUSAGE
+    add_define("HAVE_GETRUSAGE",-1,"");
+#endif
+#ifdef TRACE_CODE
+    add_define("TRACE_CODE",-1,"");
+#endif
+
+    /* --- Read in MACHINE to see what defines are used by the gamedriver ---
+     */
+    read_config_file(MACHINE);
+
+} /* read_machine() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -3431,6 +3464,7 @@ main (int argc, char ** argv)
     }
 
     /* --- Read the config files --- */
+    read_machine();
     read_config();
     if (action == MakeInstrs)
         read_func_spec();

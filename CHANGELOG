@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+24-Apr-2004 (Lars Duening)
+  - (smalloc.c) Corrected the permanent block allocation statistics.
+  - (func_spec) Deprecated efun make_shared_string().
+  - (func_spec, strfuns) New efun convert_charset() (thanks, Philip).
+
 24-Apr-2004 (Lars Duening)  (3.3.530)
   - (xalloc.c, smalloc.c) Changed the memory dump output format so that all the
        important information is on one line. Also increased the size of

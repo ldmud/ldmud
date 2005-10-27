@@ -2,6 +2,7 @@
  * String Management
  *
  *---------------------------------------------------------------------------
+ * TODO:: Optimize for short strings to reduce overhead?
  * To reduce the memory used for string storage, the driver implements
  * string sharing: for every string the driver keeps track in a refcount
  * how many users it has. If the refcount falls back to 0, the string can

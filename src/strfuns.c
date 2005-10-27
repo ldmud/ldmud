@@ -17,6 +17,7 @@
  *
  * --- Efuns and Operators ---
  *
+ * f_convert_charset(): Convert charsets using iconv().
  * intersect_strings(): Implements '&' and '-' on strings
  * x_filter_string(): Filter a string through a callback or mapping.
  * x_map_string(): Map a string through a callback or mapping.
@@ -36,6 +37,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
+#ifdef HAS_ICONV
+#include <iconv.h>
+#endif
 
 #include "strfuns.h"
 
@@ -360,6 +364,210 @@ trim_all_spaces (const string_t * txt)
 /*====================================================================*/
 
 /*                          EFUNS                                     */
+
+/*--------------------------------------------------------------------*/
+#ifdef HAS_ICONV
+
+svalue_t *
+f_convert_charset (svalue_t *sp)
+
+/* EFUN convert_charset()
+ *
+ *   string convert_charset(string str, string from_cs, string to_cs)
+ *
+ * Convert the string <str> from charset <from_cs> to charset <to_cs>
+ * and return the converted string.
+ *
+ * The efun is only available on systems with libiconv.
+ */
+
+{
+    iconv_t context;
+    
+    string_t *from_cs, *to_cs, *in_str, *out_str;
+
+    const char *pIn; /* Input string pointer */
+    size_t in_len;   /* Input length */
+    size_t in_left;  /* Input length left */
+
+    char * out_buf;  /* Output buffer */
+    size_t out_size; /* Size of the output buffer */
+    size_t out_left; /* Size left in output buffer */
+    char  *pOut;     /* Output string pointer */
+
+    in_str = sp[-2].u.str;
+    from_cs = sp[-1].u.str;
+    to_cs = sp->u.str;
+
+    /* Allocate a temporary output string */
+    pIn = get_txt(in_str);
+    in_len = mstrsize(in_str);
+    in_left = in_len;
+
+    out_size = in_len > 65536 ? (in_len + 33) : (2 * in_len);
+    out_left = out_size;
+
+    xallocate(out_buf, out_size, "iconv buffer");
+    pOut = out_buf;
+
+    /* Open the iconv context */
+    context = iconv_open(get_txt(from_cs), get_txt(to_cs));
+    if (context == (iconv_t) -1)
+    {
+        xfree(out_buf);
+
+        if (errno == EINVAL)
+            error("convert_charset(): Conversion '%s' -> '%s' not supported.\n"
+                 , get_txt(from_cs), get_txt(to_cs)
+                );
+        else
+            error("convert_charset(): Error %d.\n", errno);
+        /* NOTREACHED */
+        return sp;
+    }
+
+    /* Convert the string, reallocating the output buffer where necessary */
+    while (in_left)
+    {
+        size_t rc;
+
+        rc = iconv(context, &pIn, &in_left, &pOut, &out_left);
+        if (rc == (size_t)-1)
+        {
+            if (errno == E2BIG)
+            {
+                /* Reallocate output buffer */
+                size_t newsize;
+                char * tmp;
+
+                newsize = out_size + (in_len > 128 ? in_len : 128);
+                tmp = rexalloc(out_buf, newsize);
+                if (!tmp)
+                {
+                    iconv_close(context);
+                    xfree(out_buf);
+                    outofmem(newsize, "iconv buffer");
+                    /* NOTREACHED */
+                    return sp;
+                }
+                out_buf = tmp;
+                pOut = out_buf + out_size;
+                out_left = newsize - out_size;
+                out_size = newsize;
+
+                continue;
+            }
+
+            /* Other error: clean up */
+            iconv_close(context);
+            xfree(out_buf);
+
+            if (errno == EILSEQ)
+            {
+                error("convert_charset(): Invalid character sequence at index %ld\n", (long)(pIn - get_txt(in_str)));
+                /* NOTREACHED */
+                return sp;
+            }
+
+            if (errno == EINVAL)
+            {
+                error("convert_charset(): Incomplete character sequence at index %ld\n", (long)(pIn - get_txt(in_str)));
+                /* NOTREACHED */
+                return sp;
+            }
+
+            error("convert_charset(): Error %d at index %ld\n"
+                 , errno, (long)(pIn - get_txt(in_str))
+                 );
+            /* NOTREACHED */
+            return sp;
+        } /* if (rc < 0) */
+    } /* while (in_left) */
+
+    /* While the actual conversion is complete, the output stream may now
+     * be in a non-base state. Add the necessary epilogue to get back
+     * to the base state.
+     */
+    while(1)
+    {
+        size_t rc;
+        rc = iconv(context, NULL, NULL, &pOut, &out_left);
+        if (rc == (size_t)-1)
+        {
+            if (errno == E2BIG)
+            {
+                /* Reallocate output buffer */
+                size_t newsize;
+                char * tmp;
+
+                newsize = out_size + (in_len > 128 ? in_len : 128);
+                tmp = rexalloc(out_buf, newsize);
+                if (!tmp)
+                {
+                    iconv_close(context);
+                    xfree(out_buf);
+                    outofmem(newsize, "iconv buffer");
+                    /* NOTREACHED */
+                    return sp;
+                }
+                out_buf = tmp;
+                pOut = out_buf + out_size;
+                out_left = newsize - out_size;
+                out_size = newsize;
+
+                continue;
+            }
+
+            /* Other error: clean up */
+            iconv_close(context);
+            xfree(out_buf);
+
+            if (errno == EILSEQ)
+            {
+                error("convert_charset(): Invalid character sequence at index %ld\n", (long)(pIn - get_txt(in_str)));
+                /* NOTREACHED */
+                return sp;
+            }
+
+            if (errno == EINVAL)
+            {
+                error("convert_charset(): Incomplete character sequence at index %ld\n", (long)(pIn - get_txt(in_str)));
+                /* NOTREACHED */
+                return sp;
+            }
+
+            error("convert_charset(): Error %d at index %ld\n"
+                 , errno, (long)(pIn - get_txt(in_str))
+                 );
+            /* NOTREACHED */
+            return sp;
+        } /* if (rc < 0) */
+
+        /* At this point, the iconv() succeeded: we're done */
+        break;
+    } /* while(1) */
+    
+    iconv_close(context);
+
+    /* Get the return string and prepare the return arguments */
+    out_str = new_n_mstring(out_buf, out_size - out_left);
+    xfree(out_buf);
+    if (!out_str)
+    {
+        outofmem(out_size - out_left, "convert_charset() result");
+        /* NOTREACHED */
+        return sp;
+    }
+
+    free_string_svalue(sp--);
+    free_string_svalue(sp--);
+    free_string_svalue(sp);
+    put_string(sp, out_str);
+    
+    return sp;
+} /* f_convert_charset() */
+
+#endif /* HAS_ICONV */
 
 /*--------------------------------------------------------------------*/
 static char *
