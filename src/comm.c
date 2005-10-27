@@ -8644,6 +8644,7 @@ f_net_connect (svalue_t *sp)
         {
             if (errno == EINPROGRESS)
             {
+                Bool stored = MY_FALSE;
                 for (n = 0; n < MAX_OUTCONN; n++)
                 {
                     if (!outconn[n].active)
@@ -8653,13 +8654,17 @@ f_net_connect (svalue_t *sp)
                         outconn[n].curr_obj = ref_object(current_object, "net_conect");
                         outconn[n].active = MY_TRUE;
                         rc = 0;
+                        stored = MY_TRUE;
                         break;
                     }
                 }
 
-                /* all descriptors occupied */
-                close(d);
-                rc = EMFILE;
+                if (!stored)
+                {
+                    /* all descriptors occupied */
+                    close(d);
+                    rc = EMFILE;
+                }
             }
             else
             {

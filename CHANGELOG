@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+19-Dec-2003 (Lars Duening)  (3.3.498)
+  - (comm) When a connection can't be opened immediately with net_connect(),
+       the socket was closed prematurely (reported by LynX).
+
 14-Dec-2003 (Lars Duening)  (3.3.497)
   - (comm) When opening a connection with net_connect(), printing of
        the prompt clobbered the current_object, causing a crash.
