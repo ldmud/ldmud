@@ -8631,9 +8631,18 @@ f_restore_value (svalue_t *sp)
         return sp; /* flow control hint */
     }
 
+    free_shared_restored_values();
+
+    if (*p != '\0')
+    {
+        error("Illegal format when restoring a value: extraneous characters "
+              "at the end.\n");
+        /* NOTREACHED */
+        return sp; /* flow control hint */
+    }
+
     /* Restore complete - now clean up and return the result */
 
-    free_shared_restored_values();
     inter_sp = --sp;
     free_string_svalue(sp);
     *sp = sp[1];

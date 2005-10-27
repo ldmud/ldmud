@@ -575,6 +575,7 @@ fi
 
 AC_CHECK_LIB(m,main)
 AC_CHECK_LIB(socket,main)
+AC_CHECK_LIB(nsl,main)
 
 ERQ_LIBS="$LIBS"
 

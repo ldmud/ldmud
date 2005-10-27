@@ -9339,8 +9339,10 @@ expr0:
           else if (pragma_warn_empty_casts)
           {
               if (equal_types($1, $2.type))
-                  yywarnf("casting a value to its own type: %s"
-                         , get_type_name($1));
+              {   if ($2.type.typeflags != TYPE_ANY)
+                      yywarnf("casting a value to its own type: %s"
+                             , get_type_name($1));
+              }
               else if ($2.type.typeflags != TYPE_UNKNOWN
                     && $2.type.typeflags != TYPE_ANY)
                   yywarnf("cast will not convert the value: %s"

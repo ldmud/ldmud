@@ -58,7 +58,8 @@ DESCRIPTION
         no_warn_deprecated: Turns off warn_deprecated (the default).
 
         warn_empty_casts: A cast of a value to its own type generates
-                a warning (the default).
+                a warning (the default). Exception are casts to type
+                'mixed'.
         no_warn_empty_casts: Turns off warn_empty_casts.
 
         When an object is compiled with type testing (#pragma

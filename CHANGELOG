@@ -1,11 +1,19 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+04-Apr-2004 (Lars Duening)  (3.3.508)
+  - (object.c) restore_value() now checks for and rejects extraneous
+       characters after the '\n' delimiting the value string (Bug #0000039).
+  - (prolang.y) Casts to type 'mixed' are exempted from generating
+       an "empty cast" warning (Bug #0000041).
+  - (configure) The configuration now checks for libnsl as standard
+       system library - it is needed for ERQ on Solaris (Bug #0000012).
+
 01-Apr-2004 (Lars Duening)  (3.3.507)
   - (prolang.y, interpret.c) Implemented <mapping> &= <mapping>,
        <mapping> &= <vector> (Bug #0000042).
-  - (interpret.c) get_line_number(): Increased the buffersize for the
-       program names (Bug #0000040).
+  - (interpret.c) get_line_number(): Program names in the traceback
+       can be arbitrarily long (Bug #0000040).
 
 31-Mar-2004 (Lars Duening)  (3.3.506)
   - (prolang.y) Corrected range check regarding short integers (thanks,
