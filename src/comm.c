@@ -3764,6 +3764,15 @@ new_player ( object_t *ob, SOCKET_T new_socket
         return;
     }
 
+    if (ob && O_IS_INTERACTIVE(ob))
+    {
+        /* The caller provided an object to connect to. But since
+         * it is already interactive, we have to terminate that
+         * old connection.
+         */
+        remove_interactive(ob, MY_FALSE);
+    }
+
     /* Link the interactive to the master */
 
     assert_shadow_sent(master_ob);
@@ -3847,15 +3856,10 @@ new_player ( object_t *ob, SOCKET_T new_socket
 
     current_interactive = master_ob;
 
-    if (ob)
+    if (!ob)
     {
-        /* The caller provided an object to connect to */
-        if (O_IS_INTERACTIVE(ob))
-            remove_interactive(ob, MY_FALSE);
-    }
-    else
-    {
-        /* Call master->connect() and evaluate the result.
+        /* The caller did not provide an object to connect to.
+         * Call master->connect() and evaluate the result.
          */
         ret = callback_master(STR_CONNECT, 0);
         if (new_interactive != O_GET_INTERACTIVE(master_ob))
@@ -4375,6 +4379,8 @@ print_prompt (void)
 {
     interactive_t *ip;
     svalue_t *prompt = NULL;
+    object_t * save_current = current_object;
+    object_t * save_previous = previous_ob;
     Bool usingDefaultPrompt = MY_FALSE;
 
 #ifdef DEBUG
@@ -4452,6 +4458,9 @@ print_prompt (void)
          */
         print_prompt_string(STR_DEFAULT_PROMPT);
     }
+
+    current_object = save_current;
+    previous_ob = save_previous;
 } /* print_prompt() */
 
 /*-------------------------------------------------------------------------*/
@@ -8663,6 +8672,7 @@ f_net_connect (svalue_t *sp)
         }
 
         user = command_giver;
+        inter_sp = sp;
         new_player(current_object, d, &target, sizeof(target), 0);
         command_giver = user;
         rc = 0;

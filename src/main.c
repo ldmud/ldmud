@@ -823,6 +823,12 @@ dprintf_first (int fd, char *s, p_int a)
         case 's':
             write(fd, (char *)a, strlen((char*)a));
             break;
+        case 'c':
+          {
+            char c = (char)a;
+            write(fd, (char *)&c, 1);
+            break;
+          }
         case 'd':
             writed(fd, a);
             break;
