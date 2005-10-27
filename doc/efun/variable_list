@@ -32,6 +32,7 @@ DESCRIPTION
 
           Control of listed variables:
             NAME_INHERITED      don't list if defined by inheritance
+            TYPE_MOD_STATIC ==
             TYPE_MOD_NOSAVE     don't list if nosave ('static') variable
             TYPE_MOD_PRIVATE    don't list if private
             TYPE_MOD_PROTECTED  don't list if protected

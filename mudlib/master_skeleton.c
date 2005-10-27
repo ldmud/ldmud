@@ -839,6 +839,8 @@ int privilege_violation (string op, mixed who, mixed arg, mixed arg2)
 //   execute_command   : Execute command string <arg2> for the object <arg>.
 //   input_to          : Object <who> issues an 'ignore-bang'-input_to() for
 //                       commandgiver <arg>; the exakt flags are <arg2>.
+//   net_connect       : Attempt to open a connection to host <arg>,
+//                        port <arg2>.
 //   nomask simul_efun : Attempt to get an efun <arg> via efun:: when it
 //                       is shadowed by a 'nomask'-type simul_efun.
 //   rename_object     : The current object <who> renames object <arg>

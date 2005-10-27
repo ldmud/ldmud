@@ -435,6 +435,19 @@ static object_t *first_player_for_flush = NULL;
 
 /*-------------------------------------------------------------------------*/
 
+/* Outgoing connections in-progress */
+
+#define MAX_OUTCONN 5 /* TODO: Move this into config.h */
+
+struct OutConn {
+	struct sockaddr_in   target;   /* Address connected to (allocated) */
+	object_t           * curr_obj; /* Associated object */
+	int socket;                    /* Socket on our side */
+	Bool active;                   /* TRUE: this entry is used */
+} outconn[MAX_OUTCONN];
+
+/*-------------------------------------------------------------------------*/
+
 /* Forward declarations */
 
 static void mccp_telnet_neg(int);
@@ -446,7 +459,7 @@ static void send_wont(int);
 static void send_do(int);
 static void send_dont(int);
 static void remove_flush_entry(interactive_t *ip);
-static void new_player(SOCKET_T new_socket, struct sockaddr_in *addr, size_t len, int login_port);
+static void new_player(object_t *receiver, SOCKET_T new_socket, struct sockaddr_in *addr, size_t len, int login_port);
 
 #ifdef ERQ_DEMON
 
@@ -1146,6 +1159,9 @@ prepare_ipc(void)
     /* Initialize the IP name lookup table */
     memset(iptable, 0, sizeof(iptable));
 #endif
+
+    for (i = 0; i < MAX_OUTCONN; i++)
+        outconn[i].active = MY_FALSE;
 
     /* Initialize the telnet machine unless mudlib_telopts() already
      * did that.
@@ -2827,7 +2843,7 @@ get_message (char *buff)
                     new_socket = accept(sos[i], (struct sockaddr *)&addr
                                               , &length);
                     if ((int)new_socket != -1)
-                        new_player(new_socket, &addr, (size_t)length
+                        new_player( NULL, new_socket, &addr, (size_t)length
                                   , port_numbers[i]);
                     else if ((int)new_socket == -1
                       && errno != EWOULDBLOCK && errno != EINTR
@@ -3613,7 +3629,8 @@ set_default_combine_charset (char charset[32])
 
 /*-------------------------------------------------------------------------*/
 static void
-new_player (SOCKET_T new_socket, struct sockaddr_in *addr, size_t addrlen
+new_player ( object_t *ob, SOCKET_T new_socket
+           , struct sockaddr_in *addr, size_t addrlen
 #if !defined(ACCESS_CONTROL)
            , int login_port UNUSED
 #else
@@ -3626,13 +3643,18 @@ new_player (SOCKET_T new_socket, struct sockaddr_in *addr, size_t addrlen
  *
  * Called when get_message() detects a new connection on one of the
  * login ports, this function checks if the user may access the mud.
- * If yes, a new interactive structure is generated and bound to the
- * master, then master->connect() is called. This call is expected
- * to return an object and the interactive structure is rebound to
- * this object. Finally, logon() is called in this object. Alternatively,
- * master->connect() may exec() the connection away from the master,
- * in which case no further action will be taken after the return
- * from that call.
+ *
+ * If yes and <ob> is NULL, a new interactive structure is generated and
+ * bound to the master, then master->connect() is called. This call is
+ * expected to return an object and the interactive structure is rebound to
+ * that object.
+ * If yes and <ob> is an object, a new interactive structure is generated
+ * and bound to <ob>
+ *
+ * Finally, logon() is called in the newly-interactive object.
+ * Alternatively if no <ob> is given, master->connect() may exec() the
+ * connection away from the master, in which case no further action will be
+ * taken after the return from that call.
  *
  * If the connection can't be accepted for some reason, a failure
  * message will be send back to the user and the socket will be
@@ -3646,7 +3668,6 @@ new_player (SOCKET_T new_socket, struct sockaddr_in *addr, size_t addrlen
 
     int   i;             /* Index of free slot in all_players[] */
     char *message;       /* Failure message */
-    object_t *ob;        /* Login object */
     svalue_t *ret;       /* LPC call results */
     interactive_t *new_interactive;
                          /* The new interactive structure */
@@ -3826,22 +3847,32 @@ new_player (SOCKET_T new_socket, struct sockaddr_in *addr, size_t addrlen
 
     current_interactive = master_ob;
 
-    /* Call master->connect() and evaluate the result.
-     */
-    ret = callback_master(STR_CONNECT, 0);
-    if (new_interactive != O_GET_INTERACTIVE(master_ob))
-        return;
-    if (ret == NULL
-     || ret->type != T_OBJECT
-     || (ob = ret->u.ob, O_IS_INTERACTIVE(ob)))
+    if (ob)
     {
-        remove_interactive(master_ob, MY_FALSE);
-        return;
+        /* The caller provided an object to connect to */
+        if (O_IS_INTERACTIVE(ob))
+            remove_interactive(ob, MY_FALSE);
     }
-    command_giver = master_ob;
-    add_message(message_flush);
+    else
+    {
+        /* Call master->connect() and evaluate the result.
+         */
+        ret = callback_master(STR_CONNECT, 0);
+        if (new_interactive != O_GET_INTERACTIVE(master_ob))
+            return;
+        if (ret == NULL
+         || ret->type != T_OBJECT
+         || (ob = ret->u.ob, O_IS_INTERACTIVE(ob)))
+        {
+            remove_interactive(master_ob, MY_FALSE);
+            return;
+        }
+        command_giver = master_ob;
+        add_message(message_flush);
+    }
 
-    /* There was an non-interactive object returned from connect().
+    /* ob is now a non-interactive object, either passed in from the caller
+     * or returned from connect().
      * Relink the interactive from the master to this as the user object.
      */
 
@@ -6266,14 +6297,24 @@ clear_comm_refs (void)
  */
 
 {
-#ifdef ERQ_DEMON
     int i;
+
+    for (i = 0; i < MAX_OUTCONN; i++)
+    {
+        if (outconn[i].active)
+        {
+            if (outconn[i].curr_obj)
+                clear_object_ref(outconn[i].curr_obj);
+        }
+    }
+
+#ifdef ERQ_DEMON
     for (i = sizeof (pending_erq) / sizeof (*pending_erq); --i >= 0;)
     {
         clear_ref_in_vector(&pending_erq[i].fun, 1);
     }
 #endif /* ERQ_DEMON */
-}
+} /* clear_comm_refs() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -6281,10 +6322,25 @@ count_comm_refs (void)
 
 /* GC support: count any ref the module has.
  */
+
 {
-#ifdef ERQ_DEMON
     int i;
 
+    for (i = 0; i < MAX_OUTCONN; i++)
+    {
+        if (outconn[i].active)
+        {
+            if (outconn[i].curr_obj)
+            {
+                svalue_t sv;
+
+                put_object(&sv, outconn[i].curr_obj);
+                count_ref_in_vector(&sv, 1);
+            }
+        }
+    }
+
+#ifdef ERQ_DEMON
     for(i = 0; i < IPSIZE; i++) {
         if (iptable[i].name)
             count_ref_from_string(iptable[i].name);
@@ -6295,7 +6351,7 @@ count_comm_refs (void)
         count_ref_in_vector(&pending_erq[i].fun, 1);
     }
 #endif /* ERQ_DEMON */
-}
+} /* count_comm_refs() */
 
 #endif /* GC_SUPPORT */
 
@@ -8434,5 +8490,189 @@ f_set_max_commands (svalue_t *sp)
     free_svalue(sp--);
     return sp;
 } /* f_set_max_commands() */
+
+/*-------------------------------------------------------------------------*/
+void
+check_for_out_connections (void)
+
+/* Check the list of pending outgoing connections if the connections
+ * are still pending.
+ * Activate those who succeeded, remove those which failed.
+ *
+ * To be called regularily from the backend.
+ */
+
+{
+    int i, ret;
+    object_t *user;
+
+    for (i = 0; i < MAX_OUTCONN; i++)
+    {
+        if (!outconn[i].active)
+            continue;
+
+        if (!outconn[i].curr_obj) /* shouldn't happen */
+        {
+            close(outconn[i].socket);
+            outconn[i].active = 0;
+            continue;
+        }
+
+        if (outconn[i].curr_obj && (outconn[i].curr_obj->flags & O_DESTRUCTED))
+        {
+            close(outconn[i].socket);
+            free_object(outconn[i].curr_obj, "net_connect");
+            outconn[i].active = 0;
+            continue;
+        }
+
+        ret = connect(outconn[i].socket, (struct sockaddr*) &outconn[i].target
+                     , sizeof(outconn[i].target));
+        if (ret == -1)
+        {
+            switch(errno)
+            {
+            case EALREADY: /* still trying */
+                continue;
+            case EISCONN: /* we are connected! */
+                break;
+            default: /* error with connection */
+                push_number(inter_sp, -1);
+                // (void) apply(STR_LOGON, outconn[i].curr_obj, 1);
+                logon(outconn[i].curr_obj);
+
+                outconn[i].active = 0;
+                free_object(outconn[i].curr_obj, "net_connect");
+                close(outconn[i].socket);
+
+                continue;
+            }
+        }
+
+        /* connection successful */
+        user = command_giver;
+
+        new_player( outconn[i].curr_obj, outconn[i].socket
+                  , &outconn[i].target, sizeof(outconn[i].target), 0);
+        command_giver = user;
+
+        free_object(outconn[i].curr_obj, "net_connect");
+        outconn[i].active = MY_FALSE;
+    }
+} /* check_for_out_connections() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_net_connect (svalue_t *sp)
+
+/* EFUN net_connect()
+ *   
+ *   int net_connect(string host, int port)
+ *
+ * Open a non-blocking TCP network connection to <host> and <port>.
+ * On success, the connection is bound to the current object and the
+ * lfun logon() is called in the object.
+ *
+ * If the connection can't be established immediately, the efun returns
+ * 'success' and the driver will check in the background for the progress
+ * of the connection. When it is established, logon() will be called in
+ * the object. If the connection fails, logon(-1) will be called in the
+ * object.
+ *
+ * The efun raises a privilege violation ("net_connect", host, port).
+ *
+ * Return 0 on success, and a Unix ERRNO on failure.
+ */
+
+{
+    char * host;
+    int    port;
+    int    rc;
+
+    /* get the arguments */
+    
+    host = get_txt(sp[-1].u.str);
+    port = sp->u.number;
+
+    if (!privilege_violation4(STR_NET_CONNECT, NULL, sp[-1].u.str, port, sp))
+    {
+        sp = pop_n_elems(2, sp);
+        push_number(sp, -1);
+        return sp;
+    }
+
+    /* Try the connection */
+    rc = 0;
+    do{
+        int d, n, ret;
+        struct hostent *h;
+        struct sockaddr_in target;
+        object_t *user;
+
+        target.sin_port = htons(port);
+        /* TODO: Uh-oh, blocking DNS in the execution thread */
+        h = gethostbyname(host);
+        target.sin_addr.s_addr = h ? ** (int **) (h -> h_addr_list)
+                                   : inet_addr(host);
+        if (!target.sin_addr.s_addr)
+        {
+            rc = -1;
+            break;
+        }
+
+        target.sin_family = h ? h -> h_addrtype : AF_INET;
+        d = socket (target.sin_family, SOCK_STREAM, 0);
+        if (d == -1) {
+            perror ("socket");
+            rc = errno;
+            break;
+        }
+
+        set_socket_nonblocking(d);
+
+        ret = connect(d, (struct sockaddr *) &target, sizeof(target));
+        if (ret == -1)
+        {
+            if (errno == EINPROGRESS)
+            {
+                for (n = 0; n < MAX_OUTCONN; n++)
+                {
+                    if (!outconn[n].active)
+                    {
+                        outconn[n].socket = d;
+                        outconn[n].target = target;
+                        outconn[n].curr_obj = ref_object(current_object, "net_conect");
+                        outconn[n].active = MY_TRUE;
+                        rc = 0;
+                        break;
+                    }
+                }
+
+                /* all descriptors occupied */
+                close(d);
+                rc = EMFILE;
+            }
+            else
+            {
+                /* error with connection */
+                perror("net_connect");
+                close (d);
+                rc = errno;
+                break;
+            }
+        }
+
+        user = command_giver;
+        new_player(current_object, d, &target, sizeof(target), 0);
+        command_giver = user;
+        rc = 0;
+    }while(0);
+
+    /* Return the result */
+    sp = pop_n_elems(2, sp);
+    push_number(sp, rc);
+
+    return sp;
+} /* f_net_connect() */
 
 /***************************************************************************/

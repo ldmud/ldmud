@@ -418,6 +418,7 @@ extern svalue_t *f_send_erq(svalue_t *sp);
 
 extern size_t show_comm_status (strbuf_t * sbuf, Bool verbose);
 extern void remove_stale_player_data (void);
+extern void check_for_out_connections (void);
 
 #ifdef GC_SUPPORT
 extern void  clear_comm_refs(void);
@@ -456,6 +457,7 @@ extern svalue_t *v_snoop(svalue_t *sp, int num_arg);
 extern svalue_t *f_users(svalue_t *sp);
 extern svalue_t *f_get_max_commands (svalue_t *sp);
 extern svalue_t *f_set_max_commands (svalue_t *sp);
+extern svalue_t * f_net_connect (svalue_t *sp);
 
 #if defined(ACCESS_CONTROL)
 extern void refresh_access_data(void (*add_entry)(struct sockaddr_in *, int, long*) );

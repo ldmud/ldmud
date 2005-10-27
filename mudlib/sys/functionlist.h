@@ -10,10 +10,13 @@
 #define TYPE_MOD_PRIVATE    0x10000000 /* Can't be inherited             */
 #define TYPE_MOD_PUBLIC     0x08000000 /* Force inherit through private  */
 #define TYPE_MOD_VARARGS    0x04000000 /* Used for type checking         */
-#define TYPE_MOD_VIRTUAL    0x02000000  /* can be re- and cross- defined  */
+#define TYPE_MOD_VIRTUAL    0x02000000  /* can be re- and cross- defined */
 #define TYPE_MOD_PROTECTED  0x01000000 /* cannot be called externally    */
-#define TYPE_MOD_XVARARGS   0x00800000  /* accepts optional arguments     */
-#define TYPE_MOD_NOSAVE     0x00400000  /* vars: can't be saved           */
+#define TYPE_MOD_XVARARGS   0x00800000  /* accepts optional arguments    */
+#define TYPE_MOD_NOSAVE     TYPE_MOD_STATIC  /* vars: can't be saved     */
+  /* Internally TYPE_MOD_NOSAVE is 0x00400000, but that never leaves
+   * the compiler.
+   */
 #define NAME_CROSS_DEFINED  0x00080000 /* function defined from other program */
 #if defined(__LPC_STRUCTS__) || defined(USE_STRUCTS)
 #define NAME_HIDDEN         0x00020000 /* Not visible for inheritance    */

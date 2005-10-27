@@ -138,7 +138,7 @@ For a detailed list of all changes see the file CHANGELOG.
            x509 key- and certfile for the TLS package.
 
 
-30-Sep-2003 (Lars Duening) -- Release 3.2.10
+20-Nov-2003 (Lars Duening) -- Release 3.2.10
 
     - Changed efuns:
        + debug_info(): Removed the DID_MEM_UNUSED value from the DINFO_DATA:
@@ -179,6 +179,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - New efuns:
        + master(): Return the current master object.
        + m_entry(): Return all values for mapping entry at once.
+       + net_connect(): Open a TCP connection.
        + rmember(): Search arrays and strings from the end.
        + get_combine_charset(), get_connection_charset(): Query the
            combine resp. connection charset.

@@ -431,6 +431,8 @@ backend (void)
          * Do the extra jobs, if any.
          */
 
+        check_for_out_connections();
+
         if (extra_jobs_to_do) {
 
             current_interactive = NULL;

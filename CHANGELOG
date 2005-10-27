@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+21-Nov-2003 (Lars Duening)  (3.3.496)
+  - (comm) Added new efun net_connect() (thanks, LynX!)
+  - (object.c, sys/functionlist.h) Efun variable_list() didn't properly
+       filter for static variables.
+
 18-Nov-2003 (Lars Duening)  (3.3.495)
   - (mudlib/telnetneg.c, xerq/lpc/socketd.c) New versions from Fiona (thanks!)
   - (sprintf.c) When printing floats with %O/%Q, they are always printed

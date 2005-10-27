@@ -1672,6 +1672,9 @@ f_functionlist (svalue_t *sp)
     unsigned short *ixp;
     long i, j;
 
+#define FILTERFLAGS (NAME_HIDDEN|TYPE_MOD_PRIVATE|TYPE_MOD_STATIC|TYPE_MOD_PROTECTED|NAME_INHERITED)
+
+
     inter_sp = sp; /* In case of errors leave a clean stack */
 
     /* Extract the arguments from the vm stack.
@@ -1711,15 +1714,8 @@ f_functionlist (svalue_t *sp)
      * modifier, the functions are not visible. If there is none, the functions
      * are visible.
      */
-    memset(
-      vis_tags,
-      mode_flags &
-      (NAME_HIDDEN|TYPE_MOD_PRIVATE|TYPE_MOD_STATIC|TYPE_MOD_PROTECTED|
-       NAME_INHERITED) ?
-        VISTAG_INVIS :
-        VISTAG_ALL  ,
-      num_functions
-    );
+    memset( vis_tags, (mode_flags & FILTERFLAGS) ? VISTAG_INVIS : VISTAG_ALL
+          , num_functions);
 
     /* Count how many named functions need to be listed in the result.
      * Flag every function to list in vistag[].
@@ -1727,8 +1723,7 @@ f_functionlist (svalue_t *sp)
     num_functions = 0;
 
     /* First, check all functions for which we have a name */
-    flags = mode_flags &
-        (TYPE_MOD_PRIVATE|TYPE_MOD_STATIC|TYPE_MOD_PROTECTED|NAME_INHERITED);
+    flags = mode_flags & (FILTERFLAGS ^ NAME_HIDDEN);
     fun = prog->functions;
     j = prog->num_function_names;
     for (ixp = prog->function_names + j; --j >= 0; ) {
@@ -1768,9 +1763,7 @@ f_functionlist (svalue_t *sp)
     /* If <flags> accepts all functions, use the total number of functions
      * instead of the count computed above.
      */
-    if ( !(mode_flags &
-           (NAME_HIDDEN|TYPE_MOD_PRIVATE|TYPE_MOD_STATIC|TYPE_MOD_PROTECTED|
-            NAME_INHERITED) ) )
+    if ( !(mode_flags & FILTERFLAGS))
     {
         num_functions = prog->num_functions;
     }
@@ -1888,6 +1881,9 @@ f_functionlist (svalue_t *sp)
 #undef VISTAG_INVIS
 #undef VISTAG_VIS
 #undef VISTAG_ALL
+#undef VISTAG_NAMED
+
+#undef FILTERFLAGS
 } /* f_functionlist() */
 
 /*-------------------------------------------------------------------------*/
@@ -2107,7 +2103,8 @@ f_variable_list (svalue_t *sp)
  *
  *   Control of listed variables:
  *     NAME_INHERITED      don't list if defined by inheritance
- *     TYPE_MOD_NOSAVE     don't list if nosave ('static') variable
+ *     TYPE_MOD_NOSAVE ==
+ *     TYPE_MOD_STATIC     don't list if nosave ('static') variable
  *     TYPE_MOD_PRIVATE    don't list if private
  *     TYPE_MOD_PROTECTED  don't list if protected
  *     NAME_HIDDEN         don't list if not visible through inheritance
@@ -2143,6 +2140,8 @@ f_variable_list (svalue_t *sp)
 #define VISTAG_VIS   '\1'  /* Variable matches the <flags> list criterium */
 #define VISTAG_ALL   '\2'  /* Variable should be listed, no list restrictions */
 #define VISTAG_NAMED '\4'  /* Variable is neither hidden nor private */
+
+#define FILTERFLAGS (NAME_HIDDEN|TYPE_MOD_PRIVATE|TYPE_MOD_STATIC|TYPE_MOD_PROTECTED|NAME_INHERITED)
 
     vector_t *list;       /* Result vector */
     svalue_t *svp;        /* Last element in list which was filled in. */
@@ -2203,15 +2202,8 @@ f_variable_list (svalue_t *sp)
      * modifier, the variables are not visible. If there is none, the
      * variables are visible.
      */
-    memset(
-      vis_tags,
-      mode_flags &
-      (NAME_HIDDEN|TYPE_MOD_PRIVATE|TYPE_MOD_NOSAVE|TYPE_MOD_PROTECTED|
-       NAME_INHERITED) ?
-        VISTAG_INVIS :
-        VISTAG_ALL  ,
-      num_variables
-    );
+    memset( vis_tags, (mode_flags & FILTERFLAGS) ? VISTAG_INVIS : VISTAG_ALL
+          , num_variables);
 
     /* Count how many named variables need to be listed in the result.
      * Flag every variable to list in vistag[].
@@ -2219,8 +2211,7 @@ f_variable_list (svalue_t *sp)
     num_variables = 0;
 
     /* First, check all variables for which we have a name */
-    flags = mode_flags &
-        (TYPE_MOD_PRIVATE|TYPE_MOD_NOSAVE|TYPE_MOD_PROTECTED|NAME_INHERITED);
+    flags = mode_flags & (FILTERFLAGS ^ NAME_HIDDEN);
     var = prog->variables;
     i = prog->num_variables;
     while ( --i >= 0 ) {
@@ -2259,9 +2250,7 @@ f_variable_list (svalue_t *sp)
     /* If <flags> accepts all variables, use the total number of variables
      * instead of the count computed above.
      */
-    if ( !(mode_flags &
-           (NAME_HIDDEN|TYPE_MOD_PRIVATE|TYPE_MOD_NOSAVE|TYPE_MOD_PROTECTED|
-            NAME_INHERITED) ) )
+    if ( !(mode_flags & FILTERFLAGS))
     {
         num_variables = prog->num_variables;
     }
@@ -2336,6 +2325,9 @@ f_variable_list (svalue_t *sp)
 #undef VISTAG_INVIS
 #undef VISTAG_VIS
 #undef VISTAG_ALL
+#undef VISTAG_NAMED
+
+#undef FILTERFLAGS
 } /* f_variable_list() */
 
 /*-------------------------------------------------------------------------*/

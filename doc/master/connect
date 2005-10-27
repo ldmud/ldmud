@@ -13,4 +13,5 @@ DESCRIPTION
         indicate success.
 
 SEE ALSO
-        logon(A), disconnect(M), interactive(E), exec(E)
+        logon(A), disconnect(M), interactive(E), exec(E),
+        net_connect(E)
