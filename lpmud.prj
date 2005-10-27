@@ -63,13 +63,13 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 499)
-(Parent-Version lpmud 3-3 498)
-(Version-Log "Corrected net_connect(): Errors during the LPC logon handling are now handled.")
+(Project-Version lpmud 3-3 500)
+(Parent-Version lpmud 3-3 499)
+(Version-Log "Corrected the queueing of data sent over xerq sockets.")
 (New-Version-Log
 ""
 )
-(Checkin-Time "Sun, 22 Feb 2004 21:35:39 -0700")
+(Checkin-Time "Tue, 24 Feb 2004 22:11:31 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -107,7 +107,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.10 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.70 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.562 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.563 644))
   (HISTORY (lpmud/f/49_HISTORY 1.338 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -398,7 +398,7 @@
   (src/util/erq/erq.h (lpmud/d/26_erq.h 1.1.1.4.1.2 644))
   (src/util/erq/erq.c (lpmud/d/27_erq.c 1.1.1.8.1.6.1.4.1.3 644))
 
-  (src/util/xerq/socket.c (lpmud/k/21_socket.c 1.9.1.4.1.4 644))
+  (src/util/xerq/socket.c (lpmud/k/21_socket.c 1.9.1.4.1.5 644))
   (src/util/xerq/lpc/www/who.c (lpmud/k/22_who.c 1.2 644))
   (src/util/xerq/lpc/www/finger.c (lpmud/k/23_finger.c 1.1 644))
   (src/util/xerq/lpc/udp.c (lpmud/k/24_udp.c 1.1 644))

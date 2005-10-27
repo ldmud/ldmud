@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+24-Feb-2004 (Lars Duening)  (3.3.500)
+  - (xerq/socket.c) When sending data over a congested socket, the
+       queued data included the last successfully sent bytes
+       (thanks, Fantom!).
+
 22-Feb-2004 (Lars Duening)  (3.3.499)
   - (comm) The net_connect() handling wasn't prepared for errors during the
        LPC logon, occasionally re-trying the logon endlessly (reported 
