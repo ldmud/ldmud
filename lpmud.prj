@@ -63,20 +63,17 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 521)
-(Parent-Version lpmud 3-3 520)
+(Project-Version lpmud 3-3 522)
+(Parent-Version lpmud 3-3 521)
 (Version-Log "
-  - (prolang.y, func_spec, interpret.c) The default return inserted for
-       value returning functions (in case the programmer forgets about
-       it) now generates a runtime warning so that such code can be found
-       and corrected. This applies only for functions with specified return
-       type - old type functions don't generate a warning (suggested by
-       Heiko).
+  - (interpret.c) F_RETURN now takes care to undo a pending SAVE_ARG_FRAME.
+       This situation can happen in a closure like ({#'sprintf, \"%O\",
+       ({#'return, 1 }) }) (reported by Risky).
 ")
 (New-Version-Log
 ""
 )
-(Checkin-Time "Sun, 18 Apr 2004 10:45:35 -0600")
+(Checkin-Time "Sun, 18 Apr 2004 15:41:27 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -114,7 +111,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.73 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.584 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.585 644))
   (HISTORY (lpmud/f/49_HISTORY 1.346 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -204,7 +201,7 @@
   (src/heartbeat.c (lpmud/m/42_heartbeat. 1.18.1.9 644))
   (src/i-svalue_cmp.h (lpmud/a/b/20_i-svalue_c 1.4 644))
   (src/interpret.h (lpmud/b/13_interpret. 1.33.1.37 644))
-  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.49 644))
+  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.50 644))
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.15.1.7 644))
   (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.65 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.16 644))

@@ -8017,9 +8017,10 @@ again:
          * is left here.
          */
 
-        svalue_t *svp; /* Save of current sp */
+        svalue_t *pResult;  /* Return value on stack */
+        svalue_t *efp = fp+csp->num_local_variables; /* Expected end of frame */
 
-        svp = sp;
+        pResult = sp;
 
         /* Remove any intermediate error contexts */
         while (csp->catch_call)
@@ -8028,21 +8029,34 @@ again:
             pop_error_context();
         }
 
+        /* The caller might have a yet-unterminated SAVE_ARG_FRAME in
+         * effect (this can happen in lambda closures, when the subclosure
+         * to compute an efun argument executes a #'return) - undo them.
+         */
+        
+        while (ap && ap > efp)
+        {
+            while (sp > ap)
+                free_svalue(--sp);
+            sp = ap-1;
+            ap = sp->u.lvalue;
+        }
+
         /* Deallocate frame, but not the result value.
          */
 #ifdef DEBUG
-        if (fp + csp->num_local_variables > sp)
+        if (efp > sp)
             fatal("Bad stack at F_RETURN, %ld values too low\n"
-                 , (long)((fp + csp->num_local_variables) - sp));
-        else if (fp + csp->num_local_variables < sp)
+                 , (long)(efp - sp));
+        else if (efp < sp)
             fatal("Bad stack at F_RETURN, %ld values too high\n"
-                 , (long)(sp - (fp + csp->num_local_variables)));
+                 , (long)(sp - efp));
 #endif
         while (sp != fp)
         {
             free_svalue(--sp);
         }
-        *sp = *svp;
+        *sp = *pResult;
 
         /* Restore the previous execution context */
         if ( NULL != (current_prog = csp->prog) ) /* is 0 when we reach the bottom */
