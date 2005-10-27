@@ -1269,7 +1269,7 @@ free_symbols (void)
     /* Clean up the memory for the case blocks */
     if (switch_initialized)
     {
-        if (current_file)
+        if (current_loc.file)
         {
             case_state.free_block = save_case_free_block;
             case_state.next_free  = save_case_next_free;
@@ -3511,7 +3511,7 @@ compile_value (svalue_t *value, int opt_flags)
                     if (!switch_initialized)
                     {
                         switch_initialized = MY_TRUE;
-                        if (current_file)
+                        if (current_loc.file)
                         {
                             /* lambda() is called while the LPC compiler
                              * was busy compiling a switch(), maybe from

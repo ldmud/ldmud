@@ -12,10 +12,11 @@ DESCRIPTION
         Semi-mandatory hook specifying the directories where <>-type
         include files are searched (this includes ""-includes not
         found as specified).  Hook setting may be any closure or a
-        string array.
-
-        If not set, only ""-type includes may be used in LPC
+        string array. If not set, only ""-type includes may be used in LPC
         programs.
+
+        The hook is called only if a call to master::include_file()
+        does not return a usable filename.
 
         If the hook setting is a string array, it has to contain the
         path names of those directories where <>-type includes are to
@@ -34,4 +35,4 @@ DESCRIPTION
 HISTORY
 
 SEE ALSO
-        hooks(C), auto_include(H)
+        hooks(C), auto_include(H), include_file(M)

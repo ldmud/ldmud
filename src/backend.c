@@ -178,7 +178,7 @@ clear_state (void)
  */
 
 {
-    current_file = NULL;
+    current_loc.file = NULL;
     current_object = NULL;
     command_giver = NULL;
     current_interactive = NULL;

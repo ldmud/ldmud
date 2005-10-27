@@ -22,8 +22,11 @@ DESCRIPTION
 
           else: The include directive is not legal.
 
+        If the function does not generate a valid pathname, the driver
+        will next try to resolve the include using the H_INCLUDE_DIRS hook.
+
 HISTORY
         Introduced in LDMud 3.2.8.
 
 SEE ALSO
-        hooks(C), inherit_file(M)
+        hooks(C), inherit_file(M), include_dirs(H)

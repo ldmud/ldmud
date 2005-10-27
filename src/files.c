@@ -1713,7 +1713,7 @@ f_write_file (svalue_t *sp)
             if ((errno == EMFILE
   #ifdef ENFILE
                  || errno == ENFILE
-                ) && current_file
+                ) && current_loc.file
   #endif
               ) {
                 /* We are called from within the compiler, probably to write

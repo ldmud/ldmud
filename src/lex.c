@@ -127,8 +127,8 @@
 
 /*-------------------------------------------------------------------------*/
 
-int current_line;
-  /* Number of the current line.
+source_loc_t current_loc;
+  /* The current compilation location.
    */
 
 int total_lines;
@@ -136,11 +136,7 @@ int total_lines;
    * compiled lines/s)
    */
 
-char *current_file;
-  /* Name of the file currently compiled.
-   */
-
-static char *object_file;
+static const char *object_file;
   /* Name of the file for which the lexer was originally called.
    */
 
@@ -195,6 +191,10 @@ string_t *last_lex_string;
 struct lpc_predef_s *lpc_predefs = NULL;
   /* List of macros predefined by other parts of the driver, especially from
    * main.c for the '-D' commandline option.
+   */
+
+static source_file_t * src_file_list = NULL;
+  /* List of source_file structures during a compile.
    */
 
 static Mempool lexpool = NULL;
@@ -420,12 +420,11 @@ static struct incstate
 {
     struct incstate * next;
 
-    source_t    yyin;           /* The current input source */
-    int         line;           /* Current line */
-    char      * file;           /* Filename */
-    ptrdiff_t   linebufoffset;  /* Position of linebufstart */
-    mp_uint     inc_offset;     /* Handle returned by store_include_info() */
-    char saved_char;
+    source_t     yyin;           /* The current input source */
+    source_loc_t loc;            /* Current source location */
+    ptrdiff_t    linebufoffset;  /* Position of linebufstart */
+    mp_uint      inc_offset;     /* Handle returned by store_include_info() */
+    char         saved_char;
 } *inctop = NULL;
 
 /*-------------------------------------------------------------------------*/
@@ -594,7 +593,7 @@ static char optab2[]
 static INLINE int number(long);
 static INLINE int string(char *, size_t);
 static void handle_define(char *, Bool);
-static void add_define(char *, short, char *);
+static void add_define(char *, short, char *, source_loc_t);
 static void add_permanent_define(char *, short, void *, Bool);
 static Bool expand_define(void);
 static Bool _expand_define(struct defn*, ident_t*);
@@ -653,6 +652,10 @@ init_lexer(void)
                                          +sizeof(struct incstate)));
     if (!lexpool)
         fatal("Out of memory.\n");
+
+    current_loc.file = NULL;
+    current_loc.line = 0;
+
 
     /* Clear the table of identifiers */
     for (i = 0; i < ITABLE_SIZE; i++)
@@ -1605,6 +1608,80 @@ symbol_efun (string_t *name, svalue_t *sp)
 } /* symbol_efun() */
 
 /*-------------------------------------------------------------------------*/
+source_file_t *
+new_source_file (const char * name, source_loc_t * parent)
+
+/* Create a new source_file structure for file <name>.
+ *
+ * If <name> is non-NULL, a new string is allocated and the content of <name>
+ * is copied. If <name> is NULL, the caller has to set the filename in
+ * the returned structure.
+ *
+ * If <parent> is non-NULL, it denotes the parent file location this source was
+ * included from.
+ *
+ * Result is the new structure, or NULL if out of memory.
+ *
+ * Once allocated, the structure can be removed only through the general
+ * cleanup routined cleanup_source_files().
+ */
+
+{
+    source_file_t * rc;
+
+    rc = xalloc(sizeof(*rc));
+    if (!rc)
+        return NULL;
+    if (name)
+    {
+        rc->name = string_copy(name);
+        if (!rc->name)
+        {
+            xfree(rc);
+            return NULL;
+        }
+    }
+    else
+        rc->name = NULL;
+    
+    if (parent)
+        rc->parent = *parent;
+    else
+    {
+        rc->parent.file = NULL;
+        rc->parent.line = 0;
+    }
+
+    rc->next = src_file_list;
+    src_file_list = rc;
+
+    return rc;
+} /* new_source_file() */
+
+/*-------------------------------------------------------------------------*/
+static void
+cleanup_source_files (void)
+
+/* Deallocate all listed source_file structures.
+ */
+
+{
+    source_file_t * this;
+
+    while ((this = src_file_list) != NULL)
+    {
+        src_file_list = this->next;
+
+        if (this->name)
+            xfree(this->name);
+        xfree(this);
+    }
+
+    current_loc.file = NULL;
+    current_loc.line = 0;
+} /* cleanup_source_files() */
+
+/*-------------------------------------------------------------------------*/
 void
 init_global_identifier (ident_t * ident, Bool bVariable)
 
@@ -2061,7 +2138,7 @@ _myfilbuf (void)
         }
 
         p += i;
-        if (p - outp ? p[-1] != '\n' : current_line == 1)
+        if (p - outp ? p[-1] != '\n' : current_loc.line == 1)
             *p++ = '\n';
         *p++ = CHAR_EOF;
         return outp;
@@ -2214,7 +2291,7 @@ skip_to (char *token, char *atoken)
     p = outp;
 
     for (nest = 0; ; ) {
-        current_line++;
+        current_loc.line++;
         total_lines++;
         c = *p++;
 
@@ -2277,7 +2354,7 @@ skip_to (char *token, char *atoken)
                     else if (strcmp(q, "elif") == 0)
                     {
                         /* Morph the 'elif' into '#if' and reparse it */
-                        current_line--;
+                        current_loc.line--;
                         total_lines--;
                         q[0] = nl;
                         q[1] = '#';
@@ -2293,7 +2370,7 @@ skip_to (char *token, char *atoken)
             if (c == CHAR_EOF)
             {
                 outp = p - 2;
-                current_line--;
+                current_loc.line--;
                 total_lines--;
                 lexerror("Unexpected end of file while skipping");
                 return MY_TRUE;
@@ -2331,7 +2408,7 @@ handle_cond (Bool c)
         iftop = p;
         p->state = c ? EXPECT_ELSE : EXPECT_ENDIF;
     }
-}
+} /* handle_cond() */
 
 /*-------------------------------------------------------------------------*/
 static Bool
@@ -2349,6 +2426,7 @@ start_new_include (int fd, string_t * str
 
 {
     struct incstate *is, *ip;
+    source_file_t * src_file;
     size_t namelen;
     int inc_depth;
     ptrdiff_t linebufoffset;
@@ -2375,33 +2453,40 @@ start_new_include (int fd, string_t * str
         return MY_FALSE;
     }
 
+    src_file = new_source_file(NULL, &current_loc);
+    if (!src_file)
+    {
+        mempool_free(lexpool, is);
+        lexerror("Out of memory");
+        return MY_FALSE;
+    }
+
     is->yyin = yyin;
-    is->line = current_line;
-    is->file = current_file;
+    is->loc = current_loc;
     is->linebufoffset = linebufoffset;
     is->saved_char = saved_char;
     is->next = inctop;
 
-    /* Copy the new filename into current_file */
+
+    /* Copy the new filename into src_file */
 
     namelen = strlen(name);
     if (name_ext != NULL)
         namelen += 3 + strlen(name_ext);
 
-    current_file = xalloc(namelen+1);
-    if (!current_file)
+    src_file->name = xalloc(namelen+1);
+    if (!src_file->name)
     {
-        current_file = is->file;
-        xfree(is);
+        mempool_free(lexpool, is);
         lexerror("Out of memory");
         return MY_FALSE;
     }
-    strcpy(current_file, name);
+    strcpy(src_file->name, name);
     if (name_ext)
     {
-        strcat(current_file, " (");
-        strcat(current_file, name_ext);
-        strcat(current_file, ")");
+        strcat(src_file->name, " (");
+        strcat(src_file->name, name_ext);
+        strcat(src_file->name, ")");
     }
 
     /* Now it is save to put the saved state onto the stack*/
@@ -2412,12 +2497,13 @@ start_new_include (int fd, string_t * str
         inc_depth++;
 
     if (name_ext)
-        inctop->inc_offset = store_include_info(name_ext, current_file, delim, inc_depth);
+        inctop->inc_offset = store_include_info(name_ext, src_file->name, delim, inc_depth);
     else
-        inctop->inc_offset = store_include_info(name, current_file, delim, inc_depth);
+        inctop->inc_offset = store_include_info(name, src_file->name, delim, inc_depth);
 
     /* Initialise the rest of the lexer state */
-    current_line = 0;
+    current_loc.file = src_file;
+    current_loc.line = 0;
     linebufend   = outp - 1; /* allow trailing zero */
     linebufstart = linebufend - MAXLINE;
     *(outp = linebufend) = '\0';
@@ -2438,7 +2524,7 @@ add_auto_include (const char * obj_file, const char *cur_file, Bool sys_include)
  * opened, otherwise <cur_file> is an included file. In the latter case,
  * flag <sys_include> purveys if it was a <>-type include.
  *
- * The global <current_line> must be valid and will be modified.
+ * The global <current_loc.line> must be valid and will be modified.
  */
 
 {
@@ -2476,10 +2562,10 @@ add_auto_include (const char * obj_file, const char *cur_file, Bool sys_include)
     if (auto_include_string != NULL)
     {
         /* The auto include string is handled like a normal include */
-        current_line++; /* Make sure to restore to line 1 */
+        current_loc.line++; /* Make sure to restore to line 1 */
         (void)start_new_include(-1, auto_include_string
-                               , current_file, "auto include", ')');
-        current_line++; /* Make sure to start at line 1 */
+                               , current_loc.file->name, "auto include", ')');
+        current_loc.line++; /* Make sure to start at line 1 */
     }
 } /* add_auto_include() */
 
@@ -2521,7 +2607,7 @@ merge (char *name, mp_int namelen, char *deststart)
         char *cp, *dp;
 
         dest = (dp = deststart) - 1;
-        for (cp = current_file; *cp; *dp++ = *cp++)
+        for (cp = current_loc.file->name; *cp; *dp++ = *cp++)
         {
             if (*cp == '/')
                 dest = dp;
@@ -2638,13 +2724,13 @@ open_include_file (char *buf, char *name, mp_int namelen, char delim)
         if (!compat_mode)
         {
             char * filename;
-            filename = alloca(strlen(current_file)+2);
+            filename = alloca(strlen(current_loc.file->name)+2);
             *filename = '/';
-            strcpy(filename+1, current_file);
+            strcpy(filename+1, current_loc.file->name);
             push_c_string(inter_sp, filename);
         }
         else
-            push_c_string(inter_sp, current_file);
+            push_c_string(inter_sp, current_loc.file->name);
 
         push_number(inter_sp, (delim == '"') ? 0 : 1);
         res = apply_master(STR_INCLUDE_FILE, 3);
@@ -2704,7 +2790,7 @@ open_include_file (char *buf, char *name, mp_int namelen, char delim)
 
     if (delim == '"') /* It's a "-include */
     {
-        /* Merge the <name> with the <current_file> name. */
+        /* Merge the <name> with the current filename. */
         merge(name, namelen, buf);
 
         /* Test the file and open it */
@@ -2778,7 +2864,7 @@ open_include_file (char *buf, char *name, mp_int namelen, char delim)
 
         /* Setup and call the closure */
         push_c_string(inter_sp, name);
-        push_c_string(inter_sp, current_file);
+        push_c_string(inter_sp, current_loc.file->name);
         if (driver_hook[H_INCLUDE_DIRS].x.closure_type == CLOSURE_LAMBDA)
         {
             free_object(driver_hook[H_INCLUDE_DIRS].u.lambda->ob, "open_include_file");
@@ -3012,7 +3098,7 @@ handle_include (char *name)
     {
         if (!start_new_include(fd, NULL, buf, NULL, delim))
             return;
-        add_auto_include(object_file, current_file, delim != '"');
+        add_auto_include(object_file, current_loc.file->name, delim != '"');
     }
     else
     {
@@ -3046,7 +3132,7 @@ skip_comment (void)
                     lexerror("End of file (or 0x01 character) in a comment");
                     return;
                 }
-                current_line++;
+                current_loc.line++;
                 if (!c)
                 {
                     outp = p;
@@ -3073,7 +3159,7 @@ skip_comment (void)
                     lexerror("End of file (or 0x01 character) in a comment");
                     return;
                 }
-                current_line++;
+                current_loc.line++;
                 if (!c)
                 {
                     outp = p;
@@ -3112,7 +3198,7 @@ skip_pp_comment (char *p)
         if (c == '\n')
         {
             store_line_number_info();
-            current_line++;
+            current_loc.line++;
             if (p[-2] == '\\')
             {
                 if (!*p)
@@ -3158,7 +3244,7 @@ deltrail (char *sp)
             p++;
         *p = '\0';
     }
-}
+} /* deltrail() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -3215,7 +3301,7 @@ handle_pragma (char *str)
             {
                 debug_message("Warning: Empty #pragma"
                               ": file %s, line %d\n"
-                             , current_file, current_line);
+                             , current_loc.file->name, current_loc.line);
             }
             validPragma = MY_TRUE; /* Since we already issued a warning */
         }
@@ -3365,7 +3451,7 @@ handle_pragma (char *str)
                 {
                     debug_message("Warning: Missing comma between #pragma options"
                                   ": file %s, line %d\n"
-                                 , current_file, current_line);
+                                 , current_loc.file->name, current_loc.line);
                 }
             }
 
@@ -3395,7 +3481,7 @@ handle_pragma (char *str)
             else
             {
                 debug_message("Warning: Unknown #pragma '%.*s': file %s, line %d\n"
-                             , (int)namelen, base, current_file, current_line);
+                             , (int)namelen, base, current_loc.file->name, current_loc.line);
             }
         }
 
@@ -3415,7 +3501,7 @@ number (long i)
 #endif
     yylval.number = i;
     return L_NUMBER;
-}
+} /* number() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE char *
@@ -3803,7 +3889,7 @@ yylex1 (void)
         struct inline_fun * fun;
         char buf[80];
 
-        sprintf(buf, "#line %d\n", current_line);
+        sprintf(buf, "#line %d\n", current_loc.line);
         insert_inline_fun_now = MY_FALSE;
         while (first_inline_fun)
         {
@@ -3842,15 +3928,13 @@ yylex1 (void)
 
                 /* End the lexing of the included file */
                 close_input_source();
-                xfree(current_file);
                 nexpands = 0;
-                store_include_end(p->inc_offset, p->line);
+                store_include_end(p->inc_offset, p->loc.line);
 
                 /* Restore the previous state */
-                current_file = p->file;
-                current_line = p->line;
+                current_loc = p->loc;
                 if (!was_string_source)
-                    current_line++;
+                    current_loc.line++;
                 else
                 {
                     /* 'string' includes are supposed to be inline
@@ -3860,7 +3944,7 @@ yylex1 (void)
                      * since that function may remove all line number
                      * information since the start of the include.
                      */
-                    current_line -= 1;
+                    current_loc.line -= 1;
                     store_line_number_backward(1);
                 }
 
@@ -3909,7 +3993,7 @@ yylex1 (void)
             {
                 store_line_number_info();
                 nexpands = 0;
-                current_line++;
+                current_loc.line++;
                 total_lines++;
                 if (!*yyp)
                 {
@@ -4176,7 +4260,7 @@ yylex1 (void)
                 int first_line;  /* For error messages */
                 char *start;
 
-                first_line = current_line;
+                first_line = current_loc.line;
 
                 /* Allocate new function list element */
                 if (!first_inline_fun)
@@ -4208,8 +4292,8 @@ yylex1 (void)
                  */
                 do
                 {
-                    sprintf(name, "__inline_%s_%d_%04x", current_file
-                                 , current_line, next_inline_fun++);
+                    sprintf(name, "__inline_%s_%d_%04x", current_loc.file->name
+                                 , current_loc.line, next_inline_fun++);
 
                     /* Convert all non-alnums to '_' */
                     for (start = name; *start != '\0'; start++)
@@ -4230,7 +4314,7 @@ yylex1 (void)
                  * For now we insert a 'return' which we might 'space out'
                  * later.
                  */
-                strbuf_addf(textbuf, "\n#line %d\n", current_line-1);
+                strbuf_addf(textbuf, "\n#line %d\n", current_loc.line-1);
                 strbuf_addf(textbuf,
                              "private nomask varargs mixed %s "
                              "(mixed $1, mixed $2, mixed $3,"
@@ -4253,7 +4337,7 @@ yylex1 (void)
                     switch (*yyp++)
                     {
                     case CHAR_EOF:
-                        current_line = first_line;
+                        current_loc.line = first_line;
                         yyerror("Unexpected end of file in (: .. :)");
                         return -1;
 
@@ -4302,7 +4386,7 @@ yylex1 (void)
                         {
                             int this_line;
 
-                            this_line = current_line;
+                            this_line = current_loc.line;
                             strbuf_addn(textbuf, start, (size_t)(yyp-start-1));
                             outp = yyp;
                             skip_comment();
@@ -4311,7 +4395,7 @@ yylex1 (void)
                                 return -1;
 
                             start = yyp;
-                            while (this_line++ < current_line)
+                            while (this_line++ < current_loc.line)
                                 strbuf_addc(textbuf, '\n');
 
                             continue;
@@ -4321,12 +4405,12 @@ yylex1 (void)
                         {
                             int this_line;
 
-                            this_line = current_line;
+                            this_line = current_loc.line;
                             strbuf_addn(textbuf, start, (size_t)(yyp-start-1));
                             yyp = skip_pp_comment(yyp);
 
                             start = yyp;
-                            while (this_line++ < current_line)
+                            while (this_line++ < current_loc.line)
                                 strbuf_addc(textbuf, '\n');
 
                             continue;
@@ -4336,7 +4420,7 @@ yylex1 (void)
                     case '\n':
                         store_line_number_info();
                         nexpands = 0;
-                        current_line++;
+                        current_loc.line++;
                         total_lines++;
                         if (!*yyp)
                         {
@@ -4439,7 +4523,7 @@ yylex1 (void)
                             if (c == CHAR_EOF)
                             {
                                 /* Just in case... */
-                                current_line = first_line;
+                                current_loc.line = first_line;
                                 lexerror("Unexpected end of file "
                                          "(or 0x01 character) in string.\n");
                                 return -1;
@@ -4450,7 +4534,7 @@ yylex1 (void)
                                 {
                                     store_line_number_info();
                                     nexpands = 0;
-                                    current_line++;
+                                    current_loc.line++;
                                     total_lines++;
                                     if (!*yyp)
                                     {
@@ -4705,7 +4789,7 @@ yylex1 (void)
                     svalue_t *res;
 
                     push_ref_string(inter_sp, STR_NOMASK_SIMUL_EFUN);
-                    push_c_string(inter_sp, current_file);
+                    push_c_string(inter_sp, current_loc.file->name);
                     push_ref_string(inter_sp, p->name);
                     res = apply_master(STR_PRIVILEGE, 3);
                     if (!res || res->type != T_NUMBER || res->u.number < 0)
@@ -4850,7 +4934,7 @@ yylex1 (void)
                         else if (c2 == '/')
                         {
                             outp = skip_pp_comment(outp);
-                            current_line--;
+                            current_loc.line--;
                             c = '\n';
                         }
                         else
@@ -5100,9 +5184,9 @@ yylex1 (void)
                     new_line = strtol(sp, &end, 0);
                     if (end == sp || *end != '\0')
                         yyerror("Unrecognised #line directive");
-                    if (new_line < current_line)
-                        store_line_number_backward(current_line - new_line);
-                    current_line = new_line - 1;
+                    if (new_line < current_loc.line)
+                        store_line_number_backward(current_loc.line - new_line);
+                    current_loc.line = new_line - 1;
                 }
                 else
                 {
@@ -5111,7 +5195,7 @@ yylex1 (void)
 
                 store_line_number_info();
                 nexpands = 0;
-                current_line++;
+                current_loc.line++;
                 total_lines++;
                 yyp = outp;
                 if (lex_fatal)
@@ -5279,7 +5363,7 @@ yylex1 (void)
                     case '\n':
                         /* \<lf> and \<lf><cr> are ignored */
                         store_line_number_info();
-                        current_line++;
+                        current_loc.line++;
                         total_lines++;
                         if (*p == CHAR_EOF )
                         {
@@ -5493,17 +5577,21 @@ yylex (void)
 
 /*-------------------------------------------------------------------------*/
 void
-start_new_file (int fd)
+start_new_file (int fd, const char * fname)
 
-/* Start the compilation/lexing of the lpc file opened on file <fd>.
+/* Start the compilation/lexing of the lpc file opened on file <fd> with
+ * name <fname>.
  * This must not be called for included files.
- * The global <current_file> contains the name of the file to be compiled.
  */
 
 {
-    object_file = current_file;
+    object_file = fname;
 
+    cleanup_source_files();
     free_defines();
+
+    current_loc.file = new_source_file(fname, NULL);
+    current_loc.line = 1; /* already used in first _myfilbuf() */
 
     set_input_source(fd, NULL);
 
@@ -5515,7 +5603,6 @@ start_new_file (int fd)
 
     *(outp = linebufend = (linebufstart = defbuf + DEFMAX) + MAXLINE) = '\0';
 
-    current_line = 1; /* already used in _myfilbuf() */
     _myfilbuf();
 
     lex_fatal = MY_FALSE;
@@ -5557,13 +5644,13 @@ end_new_file (void)
         struct incstate *p;
         p = inctop;
         close_input_source();
-        xfree(current_file);
-        current_file = p->file;
         yyin = p->yyin;
         inctop = p->next;
     }
 
     iftop = NULL;
+
+    cleanup_source_files();
 
     mempool_reset(lexpool);
       /* Deallocates all incstates and ifstates at once */
@@ -5671,7 +5758,7 @@ cmygetc (void)
             else if (gobble('/'))
             {
                 outp = skip_pp_comment(outp);
-                current_line--;
+                current_loc.line--;
                 return '\n';
             }
             else
@@ -5714,7 +5801,7 @@ refill (Bool quote)
             else if (gobble('/'))
             {
                 outp = skip_pp_comment(outp);
-                current_line--;
+                current_loc.line--;
                 c = '\n';
             }
         }
@@ -5746,11 +5833,11 @@ refill (Bool quote)
     *p = '\0';
 
     nexpands = 0;
-    current_line++;
+    current_loc.line++;
     store_line_number_info();
 
     return quote;
-}
+} /* refill() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -5784,6 +5871,7 @@ handle_define (char *yyt, Bool quote)
 #define SKIPWHITE while(lexwhite(*p)) p++
 
 
+    source_loc_t loc;         /* Location of the #define */
     char namebuf[NSIZE];      /* temp buffer for read identifiers */
     char args[NARGS][NSIZE];  /* parsed argument names of function macros */
 #if defined(CYGWIN) && __GNUC__ >= 3 && __GNUC_MINOR__ >= 2
@@ -5800,6 +5888,8 @@ handle_define (char *yyt, Bool quote)
 #endif /* CYGWIN and gcc 3.2 or newer */
     char *p;                  /* current text pointer */
     char *q;                  /* destination for parsed text */
+
+    loc = current_loc;
 
 #if defined(MTEXT_IS_POINTER)
     mtext = alloca(MLEN);
@@ -5965,7 +6055,7 @@ handle_define (char *yyt, Bool quote)
 
         /* Terminate the text and add the macro */
         *--q = '\0';
-        add_define(namebuf, arg, mtext);
+        add_define(namebuf, arg, mtext, loc);
     }
     else
     {
@@ -6015,7 +6105,7 @@ handle_define (char *yyt, Bool quote)
 
         /* Terminate the text and add the macro */
         *--q = '\0';
-        add_define(namebuf, -1, mtext);
+        add_define(namebuf, -1, mtext, loc);
     }
 
 #undef GETALPHA
@@ -6025,12 +6115,12 @@ handle_define (char *yyt, Bool quote)
 
 /*-------------------------------------------------------------------------*/
 static void
-add_define (char *name, short nargs, char *exps)
+add_define (char *name, short nargs, char *exps, source_loc_t loc)
 
 /* Add a new macro definition for macro <name> with <nargs> arguments
  * and the replacement text <exps>. The positions where the arguments
  * are to be put into <exps> have to be marked with the MARKS character
- * as described elsewhere.
+ * as described elsewhere. The macro is defined at <loc> in the source.
  *
  * The new macro is stored in the ident_table[] and also put into
  * the list of all_defines.
@@ -6055,12 +6145,20 @@ add_define (char *name, short nargs, char *exps)
      */
     if (p->type != I_TYPE_UNKNOWN)
     {
-        char buf[200+NSIZE];
+        char buf[200+NSIZE+MAXPATHLEN];
 
-        if (current_line <= 0)
+        if (current_loc.line <= 0)
             sprintf(buf, "(in auto include text) Redefinition of #define %s", name);
         else
             sprintf(buf, "Redefinition of #define %s", name);
+
+        if (p->u.define.loc.file != NULL)
+        {
+            char * add = &buf[strlen(buf)];
+
+            sprintf(add, " (from %s line %d)"
+                   , p->u.define.loc.file->name, p->u.define.loc.line);
+        }
 
         if (nargs != p->u.define.nargs
          || p->u.define.special
@@ -6091,6 +6189,7 @@ add_define (char *name, short nargs, char *exps)
             return;
         }
         strcpy(p->u.define.exps.str, exps);
+        p->u.define.loc = loc;
 
         p->next_all = all_defines;
         all_defines = p;
@@ -6141,7 +6240,7 @@ add_permanent_define (char *name, short nargs, void *exps, Bool special)
          || p->u.define.special
          || strcmp(exps,p->u.define.exps.str) != 0)
         {
-            error("Redefinition of #define %s\n", name);
+            error("Redefinition of permanent #define %s\n", name);
         }
         return;
     }
@@ -6158,6 +6257,8 @@ add_permanent_define (char *name, short nargs, void *exps, Bool special)
         p->u.define.exps.str = (char *)exps;
     else
         p->u.define.exps.fun = (defn_fun)exps;
+    p->u.define.loc.file = NULL;
+    p->u.define.loc.line = 0;
     p->next_all = permanent_defines;
     permanent_defines = p;
 } /* add_permanent_define() */
@@ -6274,7 +6375,7 @@ expand_define (void)
         return MY_FALSE;
     }
     return _expand_define(&p->u.define, p);
-}
+} /* expand_define() */
 
 /*-------------------------------------------------------------------------*/
 static Bool
@@ -6301,7 +6402,7 @@ _expand_define (struct defn *p, ident_t * macro)
         if (c == '\n') {\
             myfilbuf();\
             store_line_number_info();\
-            current_line++;\
+            current_loc.line++;\
             total_lines++;\
         } else break;\
     }
@@ -6552,7 +6653,7 @@ _expand_define (struct defn *p, ident_t * macro)
                         if (c == '\n')  /* nope! This wracks consistency! */
                         {
                             store_line_number_info();
-                            current_line++;
+                            current_loc.line++;
                             total_lines++;
                             if (!*r)
                             {
@@ -6575,7 +6676,7 @@ _expand_define (struct defn *p, ident_t * macro)
                     /* Next line.
                      */
                     store_line_number_info();
-                    current_line++;
+                    current_loc.line++;
                     total_lines++;
                     *q++ = ' ';
                     if (!*r) {
@@ -6816,7 +6917,7 @@ exgetc (void)
                         c=(unsigned char)mygetc();
                     } else if (c2 == '/') {
                         outp = skip_pp_comment(outp);
-                        current_line--;
+                        current_loc.line--;
                         c = '\n';
                     } else {
                         --outp;
@@ -6829,7 +6930,7 @@ exgetc (void)
                 }
             }
             *yyp = '\0';
-            current_line++;
+            current_loc.line++;
             total_lines++;
             add_input(yytext);
             nexpands = 0;
@@ -6915,7 +7016,7 @@ cond_get_exp (int priority, svalue_t *svp)
                     c = *p++;
                     if (c == '\n')
                     {
-                        current_line++;
+                        current_loc.line++;
                         *--p = '"';
                         break;
                     }
@@ -7251,13 +7352,13 @@ get_current_file (char ** args UNUSED)
 #endif
     char *buf;
 
-    buf = xalloc(strlen(current_file)+4);
+    buf = xalloc(strlen(current_loc.file->name)+4);
     if (!buf)
         return NULL;
     if (compat_mode)
-        sprintf(buf, "\"%s\"", current_file);
+        sprintf(buf, "\"%s\"", current_loc.file->name);
     else
-        sprintf(buf, "\"/%s\"", current_file);
+        sprintf(buf, "\"/%s\"", current_loc.file->name);
     return buf;
 } /* get_current_file() */
 
@@ -7276,16 +7377,16 @@ get_current_dir (char ** args UNUSED)
     char *buf;
     int len;
 
-    buf = current_file + strlen(current_file);
-    while (*(--buf) != '/' && buf >= current_file) NOOP;
-    len = (buf - current_file) + 1;
+    buf = current_loc.file->name + strlen(current_loc.file->name);
+    while (*(--buf) != '/' && buf >= current_loc.file->name) NOOP;
+    len = (buf - current_loc.file->name) + 1;
     buf = xalloc(len + 4);
     if (!buf)
         return NULL;
     if (compat_mode)
-        sprintf(buf, "\"%.*s\"", len, current_file);
+        sprintf(buf, "\"%.*s\"", len, current_loc.file->name);
     else
-        sprintf(buf, "\"/%.*s\"", len, current_file);
+        sprintf(buf, "\"/%.*s\"", len, current_loc.file->name);
     return buf;
 } /* get_current_dir() */
 
@@ -7306,16 +7407,16 @@ get_sub_path (char ** args)
     sscanf(*args, "%d", &rm);
     if (rm < 0)
         rm = 0;
-    buf = current_file + strlen(current_file);
-    while (rm >= 0 && buf >= current_file)
+    buf = current_loc.file->name + strlen(current_loc.file->name);
+    while (rm >= 0 && buf >= current_loc.file->name)
         if (*(--buf) == '/')
             rm--;
-    len = (buf - current_file) + 1;
+    len = (buf - current_loc.file->name) + 1;
     buf = alloca(len + 4);
     if (compat_mode)
-        sprintf(buf, "\"%.*s\"", len, current_file);
+        sprintf(buf, "\"%.*s\"", len, current_loc.file->name);
     else
-        sprintf(buf, "\"/%.*s\"", len, current_file);
+        sprintf(buf, "\"/%.*s\"", len, current_loc.file->name);
     add_input(buf);
     return NULL;
 } /* get_sub_path() */
@@ -7336,7 +7437,7 @@ get_current_line (char ** args UNUSED)
     buf = xalloc(12);
     if (!buf)
         return NULL;
-    sprintf(buf, "%d", current_line);
+    sprintf(buf, "%d", current_loc.line);
     return buf;
 } /* get_current_line() */
 
@@ -7666,7 +7767,7 @@ f_expand_define (svalue_t *sp)
     /* If we are compiling, lookup the given name and store
      * the expansion in res.
      */
-    if (current_file && outp > defbuf && outp <= &defbuf[defbuf_len])
+    if (current_loc.file->name && outp > defbuf && outp <= &defbuf[defbuf_len])
     {
         myungetc('\n');
         end = outp;

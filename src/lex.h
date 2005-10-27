@@ -9,6 +9,47 @@
 
 /* --- Types --- */
 
+typedef struct source_file_s source_file_t; /* forward */
+
+/* --- struct source_loc_s: location within a source file ---
+ *
+ * This structure is used to identify the location of lexical elements
+ * in the input source. The pointers contained use their validity after
+ * a compilation has finished.
+ */
+
+typedef struct source_loc_s
+{
+    source_file_t * file;  /* The source file, if any, or NULL */
+    int             line;  /* The source line */
+} source_loc_t;
+
+
+/* --- struct source_file_s: a source file ---
+ *
+ * This structure is used to describe a source file used in the compilation.
+ * The embedded source_loc_t structure references the file this particular
+ * source file was included from.
+ *
+ * Together the structures form a tree, describing the include structure
+ * of the compiled program. With the end of the compilation, all contained
+ * pointers become invalid.
+ *
+ * The structures are additionally linked together into a singly linked list
+ * in order of allocation; the list is used by the lexer to deallocate the
+ * tree.
+ */
+
+struct source_file_s
+{
+    source_file_t * next;    /* next source_file structure, or NULL */
+    char          * name;    /* Allocated: the name of the file */
+    source_loc_t    parent;  /* the file this source was included from;
+                              * or NULL if none.
+                              */
+};
+
+
 /* --- struct lpc_predef_s: predefined preprocessor macros ---
  *
  * The structures are used in a list to store macro definitions
@@ -75,9 +116,13 @@ struct defn
         char    *str;  /*   given as tabled literal (.special is false) */
         defn_fun fun;  /*   return by fun() (.special is true) */
     } exps;
-    short nargs;       /* Number of arguments, 0 for non-function macros */
-    SBool permanent;   /* true: permanent define */
-    SBool special;     /* true: <fun> returns the replacement text */
+    short        nargs;       /* Number of arguments, 0 for non-function macros
+                               */
+    SBool        permanent;   /* true: permanent define */
+    SBool        special;     /* true: <fun> returns the replacement text */
+    source_loc_t loc;         /* location of the definition,
+                               * NULL for predefined macros.
+                               */
 };
 
 
@@ -194,9 +239,8 @@ struct inline_fun
 /* --- Variables --- */
 
 extern struct lpc_predef_s * lpc_predefs;
-extern int current_line;
 extern int total_lines;
-extern char *current_file;
+extern source_loc_t current_loc;
 extern int pragma_strict_types;
 extern Bool pragma_use_local_scopes;
 extern Bool pragma_save_types;
@@ -238,7 +282,7 @@ extern void free_shared_identifier(ident_t*);
 extern int yylex(void);
 extern void end_new_file(void);
 extern void lex_close(char *msg);
-extern void start_new_file(int fd);
+extern void start_new_file(int fd, const char * fname);
 extern char *get_f_name(int n);
 extern void free_defines(void);
 extern size_t show_lexer_status (strbuf_t * sbuf, Bool verbose);

@@ -1759,10 +1759,10 @@ load_object (const char *lname, Bool create_super, int depth, namechain_t *chain
         if (comp_flag)
             fprintf(stderr, "%s compiling %s ...", time_stamp(), fname);
 
-        if (current_file)
+        if (current_loc.file)
         {
             error("Can't load '%s': compiler is busy with '%s'.\n"
-                 , name, current_file);
+                 , name, current_loc.file->name);
         }
 
         fd = ixopen(fname, O_RDONLY | O_BINARY);
@@ -1776,8 +1776,7 @@ load_object (const char *lname, Bool create_super, int depth, namechain_t *chain
         /* The file name is needed before compile_file(), in case there is
          * an initial 'line too long' error.
          */
-        current_file = fname;
-        compile_file(fd);
+        compile_file(fd, fname);
         if (comp_flag)
         {
             if (NULL == inherit_file)
@@ -1789,7 +1788,6 @@ load_object (const char *lname, Bool create_super, int depth, namechain_t *chain
         update_compile_av(total_lines);
         total_lines = 0;
         (void)close(fd);
-        current_file = NULL;
 
         /* If there is no inherited file to compile, we can
          * end the loop here.

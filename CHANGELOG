@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+19-Aug-2003 (Lars Duening)  (3.3.480)
+  - (lex, prolang.y, files.c, simulate.c, backend.c, closure.c) Redefinition
+      of LPC preprocessor macros now list the file and line of the original
+      definition (suggest by Bardioc).
+
 14-Aug-2003 (Lars Duening)  (3.3.479)
   - (smalloc.c, debug_info.h) Added small block defragmentation
       statistics.

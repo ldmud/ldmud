@@ -28,10 +28,9 @@
  * keywords %if, %elif, %else and %endif so that parsing rules can be
  * activated/deactivated from config.h defines.
  *---------------------------------------------------------------------------
- * A compile file, set its filename into <current_file>, open it to yield a
- * filedescriptor 'fd', then call
+ * To compile a file, open the file  to yield a filedescriptor 'fd', then call
  *
- *     compile_file(fd);
+ *     compile_file(fd, <filename>);
  *
  * then close the file again. The compiled program is 'returned' in
  * the global compiled_prog - on error, this variable is returned as NULL.
@@ -938,8 +937,8 @@ static Bool got_ellipsis[COMPILER_STACK_SIZE];
    */
 
 #ifdef USE_STRUCTS
-static char * compiled_file;
-  /* The name of the program to be compiled. While current_file reflects
+static const char * compiled_file;
+  /* The name of the program to be compiled. While current_loc.file reflects
    * the name of the source file currently being read, this name is always
    * the program's name. Set by prolog().
    */
@@ -1023,15 +1022,17 @@ yyerror (const char *str)
         return;
     context = lex_error_context();
     fprintf(stderr, "%s %s line %d: %s%s.\n"
-                  , time_stamp(), current_file, current_line, str, context);
+                  , time_stamp(), current_loc.file->name, current_loc.line
+                  , str, context);
     /* TODO: lex should implement a function get_include_stack() which
      * TODO:: returns an svalue-array with the current include stack.
      * TODO:: This could be printed, and also passed to parse_error().
      */
     fflush(stderr);
-    parse_error(MY_FALSE, current_file, current_line, str, context);
+    parse_error(MY_FALSE, current_loc.file->name, current_loc.line
+               , str, context);
     if (num_parse_error == 0)
-        save_error(str, current_file, current_line);
+        save_error(str, current_loc.file->name, current_loc.line);
     num_parse_error++;
 } /* yyerror() */
 
@@ -1067,15 +1068,17 @@ yywarn (const char *str)
 
     context = lex_error_context();
     fprintf(stderr, "%s %s line %d: Warning: %s%s.\n"
-                  , time_stamp(), current_file, current_line, str, context);
+                  , time_stamp(), current_loc.file->name, current_loc.line
+                  , str, context);
     /* TODO: lex should implement a function get_include_stack() which
      * TODO:: returns an svalue-array with the current include stack.
      * TODO:: This could be printed, and also passed to parse_error().
      */
     fflush(stderr);
-    parse_error(MY_TRUE, current_file, current_line, str, context);
+    parse_error(MY_TRUE, current_loc.file->name, current_loc.line
+               , str, context);
     if (master_ob && num_parse_error == 0)
-        save_error(str, current_file, current_line);
+        save_error(str, current_loc.file->name, current_loc.line);
     /* TODO: Introduce a 'master_is_loading' flag to prevent this call while
      * TODO:: the master is inactive.
      */
@@ -1509,7 +1512,7 @@ get_type_name (fulltype_t type)
 
     if (type.typeflags >= sizeof type_name / sizeof type_name[0])
         fatal("Bad type %ld: %s line %d\n"
-             , (long)type.typeflags,  current_file, current_line);
+             , (long)type.typeflags,  current_loc.file->name, current_loc.line);
 
     strcat(buff, type_name[type.typeflags]);
 
@@ -4426,7 +4429,7 @@ printf("DEBUG: new inline #%d: prev %d\n", INLINE_CLOSURE_COUNT, ict.prev);
 #endif
     ict.num_args = 0;
     ict.parse_context = MY_FALSE;
-    ict.current_line  = current_line;
+    ict.current_line  = current_loc.line;
 
 #ifdef DEBUG_INLINES
 printf("DEBUG:   start: %ld, depth %d, locals: %d/%d, break: %d/%d\n", CURRENT_PROGRAM_SIZE, block_depth, current_number_of_locals, max_number_of_locals, current_break_stack_need, max_break_stack_need);
@@ -4617,8 +4620,8 @@ printf("DEBUG:   #%d: start %ld, length %ld, function %d: new start %ld\n", ix, 
                             , ict->length);
 
             store_line_number_info();
-            if (current_line > ict->current_line)
-                store_line_number_backward(current_line - ict->current_line);
+            if (current_loc.line > ict->current_line)
+                store_line_number_backward(current_loc.line - ict->current_line);
 #ifdef DEBUG_INLINES
 printf("DEBUG:        li_start %ld, li_length %ld, new li_start %ld\n", ict->li_start, ict->li_length, LINENUMBER_SIZE);
 #endif /* DEBUG_INLINES */
@@ -4661,8 +4664,8 @@ prepare_inline_closure (fulltype_t returntype)
     {
         char * start;
 
-        sprintf(name, "__inline_%s_%d_#%04x", current_file
-                     , current_line, inline_closure_id++);
+        sprintf(name, "__inline_%s_%d_#%04x", current_loc.file->name
+                     , current_loc.line, inline_closure_id++);
 
         /* Convert all non-alnums (but '#') to '_' */
         for (start = name; *start != '\0'; start++)
@@ -5885,13 +5888,13 @@ inheritance:
               if (!compat_mode)
               {
                   char * filename;
-                  filename = alloca(strlen(current_file)+2);
+                  filename = alloca(strlen(current_loc.file->name)+2);
                   *filename = '/';
-                  strcpy(filename+1, current_file);
+                  strcpy(filename+1, current_loc.file->name);
                   push_c_string(inter_sp, filename);
               }
               else
-                  push_c_string(inter_sp, current_file);
+                  push_c_string(inter_sp, current_loc.file->name);
 
               res = apply_master(STR_INHERIT_FILE, 2);
 
@@ -7001,7 +7004,7 @@ while:
           /* Save the code as 'expression' */
           $<expression>$.p = expression;
           $<expression>$.length = length;
-          $<expression>$.line = current_line;
+          $<expression>$.line = current_loc.line;
 
           /* Restart codegeneration for the body where we began */
           CURRENT_PROGRAM_SIZE = addr;
@@ -7043,7 +7046,7 @@ while:
           offset = fix_branch( F_LBRANCH, CURRENT_PROGRAM_SIZE, addr);
 
           /* Add the condition code to the program */
-          if ($<expression>6.line != current_line)
+          if ($<expression>6.line != current_loc.line)
               store_line_number_info();
           add_to_mem_block(A_PROGRAM, $<expression>6.p, $<expression>6.length+2);
           yfree($<expression>6.p);
@@ -7071,7 +7074,7 @@ while:
               mem_block[A_PROGRAM].block[CURRENT_PROGRAM_SIZE-1] = -offset;
           }
 
-          if ($<expression>6.line != current_line)
+          if ($<expression>6.line != current_loc.line)
               store_line_number_relocation($<expression>6.line);
 
           /* Now that we have the end of the while(), we can finish
@@ -7291,7 +7294,7 @@ for:
           /* Save the codeblock on the stack */
           $<expression>$.p = expression;
           $<expression>$.length = length;
-          $<expression>$.line = current_line;
+          $<expression>$.line = current_loc.line;
 
           /* Restart codegeneration from here */
           CURRENT_PROGRAM_SIZE = start;
@@ -7318,7 +7321,7 @@ for:
                     , mem_block[A_PROGRAM].block + $<number>6
                     , length );
           $<expression>$.length = length;
-          $<expression>$.line = current_line;
+          $<expression>$.line = current_loc.line;
 
           /* Restart the codegeneration for the body */
           CURRENT_PROGRAM_SIZE = $<number>6;
@@ -7362,8 +7365,8 @@ for:
                   CURRENT_PROGRAM_SIZE - current_continue_address);
           }
 
-          if ( $<expression>9.line != current_line
-           || (    $<expression>12.line != current_line
+          if ( $<expression>9.line != current_loc.line
+           || (    $<expression>12.line != current_loc.line
                 && $<expression>12.length)
              )
               store_line_number_info();
@@ -7407,7 +7410,7 @@ for:
               mem_block[A_PROGRAM].block[CURRENT_PROGRAM_SIZE-1] = -offset;
           }
 
-          if ($<expression>9.line != current_line)
+          if ($<expression>9.line != current_loc.line)
               store_line_number_relocation($<expression>9.line);
 
           /* Now complete the break instructions.
@@ -7942,7 +7945,7 @@ case: L_CASE case_label ':'
             case_state.zero = temp;
         }
         temp->addr = mem_block[A_PROGRAM].current_size - switch_pc;
-        temp->line = current_line;
+        temp->line = current_loc.line;
     }
 
     | L_CASE case_label L_RANGE case_label ':'
@@ -7981,7 +7984,7 @@ case: L_CASE case_label ':'
             }
             temp->key = $2.key;
             temp->addr = CURRENT_PROGRAM_SIZE - switch_pc;
-            temp->line = current_line;
+            temp->line = current_loc.line;
         }
 
         /* Get and fill in the two case entries */
@@ -7993,7 +7996,7 @@ case: L_CASE case_label ':'
         }
         temp->key = $2.key;
         temp->addr = 1; /* marks the lower bound of the range */
-        temp->line = current_line;
+        temp->line = current_loc.line;
 
         if ( !(temp = new_case_entry()) ) {
             yyerror("Out of memory: new case entry");
@@ -12730,7 +12733,7 @@ function_name:
               svalue_t *res;
 
               push_ref_string(inter_sp, STR_NOMASK_SIMUL_EFUN);
-              push_c_string(inter_sp, current_file);
+              push_c_string(inter_sp, current_loc.file->name);
               push_ref_string(inter_sp, $3->name);
               res = apply_master(STR_PRIVILEGE, 3);
               if (!res || res->type != T_NUMBER || res->u.number < 0)
@@ -12787,7 +12790,7 @@ function_name:
               svalue_t *res;
 
               push_ref_string(inter_sp, STR_NOMASK_SIMUL_EFUN);
-              push_c_string(inter_sp, current_file);
+              push_c_string(inter_sp, current_loc.file->name);
               push_ref_string(inter_sp, lvar->name);
               res = apply_master(STR_PRIVILEGE, 3);
               if (!res || res->type != T_NUMBER || res->u.number < 0)
@@ -14490,7 +14493,7 @@ copy_functions (program_t *from, funflag_t type)
                              */
                             yywarnf(
                                 "Misplaced prototype for %s in %s\n"
-                                , get_txt(fun.name), current_file
+                                , get_txt(fun.name), current_loc.file->name
                             );
                             cross_define( &fun, OldFunction
                                         , current_func_index - n );
@@ -15043,22 +15046,22 @@ store_line_number_info (void)
 
     /* Less than 8 bytes code in 2..9 lines */
     if (offset <= 8
-     && current_line - stored_lines >= 2 && current_line - stored_lines <= 9)
+     && current_loc.line - stored_lines >= 2 && current_loc.line - stored_lines <= 9)
     {
-        c = offset + 8*(current_line - stored_lines) + 47;
+        c = offset + 8*(current_loc.line - stored_lines) + 47;
           /* == (lineincr+6) << 3 | (codesize-1) */
         byte_to_mem_block(A_LINENUMBERS, c);
-        stored_lines = current_line;
+        stored_lines = current_loc.line;
         return;
     }
 
     /* Use up the excessive amounts of lines */
     stored_lines++;
-    while (stored_lines < current_line)
+    while (stored_lines < current_loc.line)
     {
         int lines;
 
-        lines = current_line - stored_lines;
+        lines = current_loc.line - stored_lines;
         if (lines > LI_MAXEMPTY)
             lines = LI_MAXEMPTY;
         stored_lines += lines;
@@ -15088,10 +15091,10 @@ store_line_number_relocation (int relocated_from)
 {
     int save_current, offset;
 
-    save_current = current_line;
+    save_current = current_loc.line;
     stored_lines -= 2;
-    current_line = stored_lines+1;
-    offset = current_line - relocated_from;
+    current_loc.line = stored_lines+1;
+    offset = current_loc.line - relocated_from;
     if (offset >= LI_SMALL_REL)
     {
         byte_to_mem_block(A_LINENUMBERS, LI_L_RELOCATED);
@@ -15105,7 +15108,7 @@ store_line_number_relocation (int relocated_from)
         byte_to_mem_block(A_LINENUMBERS, LI_RELOCATED + offset);
     }
     store_line_number_info();
-    current_line = save_current;
+    current_loc.line = save_current;
 } /* store_line_number_relocation() */
 
 /*-------------------------------------------------------------------------*/
@@ -15228,11 +15231,11 @@ store_include_info (char *name, char * filename, char delim, int depth)
         stored_lines++;  /* don't count the #include line */
 
         /* Use up the amounts of lines collected */
-        while (stored_lines < current_line)
+        while (stored_lines < current_loc.line)
         {
             int lines;
 
-            lines = current_line - stored_lines;
+            lines = current_loc.line - stored_lines;
             if (lines > LI_MAXEMPTY) lines = LI_MAXEMPTY;
             stored_lines += lines;
             byte_to_mem_block(A_LINENUMBERS, 256 - lines);
@@ -15298,9 +15301,10 @@ store_include_end (mp_uint inc_offset, int include_line)
 
 /*-------------------------------------------------------------------------*/
 static void
-prolog (void)
+prolog (const char * fname)
 
 /* Initialize the compiler environment prior to a compile.
+ * <fname> is the name of the top LPC file to be compiled.
  */
 
 {
@@ -15357,7 +15361,7 @@ printf("DEBUG: prolog: type ptrs: %p, %p\n", type_of_locals, type_of_context );
 #endif /* DEBUG_INLINES */
 
 #ifdef USE_STRUCTS
-    compiled_file = current_file;
+    compiled_file = fname;
 #endif /* USE_STRUCTS */
     stored_lines = 0;
     stored_bytes = 0;
@@ -15783,7 +15787,7 @@ epilog (void)
 {
     int i, j;
 
-    printf("DEBUG: --- structs in %s ---\n", current_file);
+    printf("DEBUG: --- structs in %s ---\n", current_loc.file->name);
     for (i = 0; i < STRUCT_COUNT; i++)
     {
         struct_type_t * ptype;
@@ -15854,10 +15858,10 @@ epilog (void)
         *prog = NULL_program;
 
         /* Set up the program structure */
-        if ( !(prog->name = new_mstring(current_file)) )
+        if ( !(prog->name = new_mstring(current_loc.file->name)) )
         {
             xfree(prog);
-            yyerrorf("Out of memory: filename '%s'", current_file);
+            yyerrorf("Out of memory: filename '%s'", current_loc.file->name);
             break;
         }
         prog->blueprint = NULL;
@@ -16125,14 +16129,14 @@ epilog (void)
 
 /*-------------------------------------------------------------------------*/
 void
-compile_file (int fd)
+compile_file (int fd, const char * fname)
 
 /* Compile an LPC file. See the head comment for instructions.
  */
 
 {
-    prolog();
-    start_new_file(fd);
+    prolog(fname);
+    start_new_file(fd, fname);
     yyparse();
     /* If the parse failed, either num_parse_error != 0
      * or inherit_file != NULL here.
