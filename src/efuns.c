@@ -6041,7 +6041,7 @@ v_get_type_info (svalue_t *sp, int num_arg)
  * The secondary information is:
  *   - for mappings the width, ie the number of data items per key.
  *   - for symbols and quoted arrays the number of quotes.
- *   - for closures, the (internal) closure type.
+ *   - for closures, the (internal) closure type, as defined in <lpctypes.h>
  *   - for strings 0 for shared strings, and non-0 for others.
 #ifdef USE_STRUCTS
  *   - for structs, the unique name of the struct is returned.

@@ -87,11 +87,13 @@ USAGE
             void fun (struct Foo arg)
 
 
-        A struct member is accessed using the -> operator:
+        Just writing 'struct Foo var' however does not _create_ a struct,
+        it just creates a variable capable of holding one. To assign a value
+        to the variable upon creation, assign it with a struct value, either
+        from another variable or from a literal struct:
 
-            struct Foo var = ...;
+            struct Foo var = (<Foo>);
 
-            var->one = 1;
 
         Literal structs are written using (<>) as delimiters:
 
@@ -109,6 +111,13 @@ USAGE
 
         It is not possible to use both named and unnamed initializers
         in the same literal.
+
+
+        A struct member is accessed using the -> operator:
+
+            struct Foo var = ...;
+
+            var->one = 1;
 
 
         It is possible to compute struct lookups at runtime:

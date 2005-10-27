@@ -63,24 +63,18 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 513)
-(Parent-Version lpmud 3-3 512)
+(Project-Version lpmud 3-3 514)
+(Parent-Version lpmud 3-3 513)
 (Version-Log "
-  - (comm.c) Corrected a compilation error when TELNET_DEBUG is defined
-       (thanks, Tobias).
-  - (comm.c) Using input_to() without a command_giver crashed the
-        driver.
-  - (erq/erq.c, xerq/lookup.c) Well, TRY_AGAIN is a h_errno result,
-       not errno (thanks, Tobias).
-  - (xptmalloc.c) Under *BSD when using pthreads and GC support, malloc()
-       is used before the pthread structures are available. For this
-       reason, REPLACE_MALLOC is disabled under *BSD (for simplicity in
-       all cases).
+  - (svalue.h) Reserved CLOSURE typecode 1 (used to be CLOSURE_ALIEN_LFUN) for
+        future use, so that the other closure typecode have the same value as
+        in 3.2 (suggested by Sebastion).
+  - (mudlib/sys/lpctypes.h) Added symbolic defines for the closure typecodes.
 ")
 (New-Version-Log
 ""
 )
-(Checkin-Time "Sun, 11 Apr 2004 00:33:21 -0600")
+(Checkin-Time "Sun, 11 Apr 2004 21:46:58 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -118,7 +112,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.72 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.576 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.577 644))
   (HISTORY (lpmud/f/49_HISTORY 1.343 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -195,7 +189,7 @@
   (src/ed.h (lpmud/f/34_ed.h 1.5.1.6 644))
   (src/ed.c (lpmud/c/33_ed.c 1.32.1.31 644))
   (src/efuns.h (lpmud/l/20_efuns.h 1.13.1.19.1.3 644))
-  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.80 644))
+  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.81 644))
   (src/exec.h (lpmud/c/32_exec.h 1.34.1.33.1.7 644))
   (src/files.h (lpmud/i/49_files.h 1.2 644))
   (src/files.c (lpmud/i/50_files.c 1.23 644))
@@ -313,7 +307,7 @@
   (src/sprintf.c (lpmud/28_sprintf.c 1.31.1.60 644))
   (src/strfuns.h (lpmud/b/51_strfuns.h 1.11.1.7 644))
   (src/strfuns.c (lpmud/c/0_strfuns.c 1.9.1.16 644))
-  (src/svalue.h (lpmud/f/39_datatypes. 1.34.1.23.1.6 644))
+  (src/svalue.h (lpmud/f/39_datatypes. 1.34.1.23.1.7 644))
   (src/swap.h (lpmud/f/14_swap.h 1.7.1.3 644))
   (src/swap.c (lpmud/25_swap.c 1.36.1.50 644))
   (src/switch.h (lpmud/24_switch.h 1.9 644))
@@ -470,7 +464,7 @@
   (mudlib/sys/inherit_list.h (lpmud/p/18_inherit_li 1.1 644))
   (mudlib/sys/functionlist.h (lpmud/49_functionli 1.4.1.9.1.4 644))
   (mudlib/sys/input_to.h (lpmud/t/8_input_to.h 1.1.1.2 644))
-  (mudlib/sys/lpctypes.h (lpmud/48_lpctypes.h 1.2.1.7 644))
+  (mudlib/sys/lpctypes.h (lpmud/48_lpctypes.h 1.2.1.8 644))
   (mudlib/sys/objectinfo.h (lpmud/m/20_objectinfo 1.7.1.7 644))
   (mudlib/sys/pgsql.h (lpmud/d/b/41_pgsql.h 1.1 644))
   (mudlib/sys/regexp.h (lpmud/t/25_regexp.h 1.2 644))
@@ -1019,7 +1013,7 @@
   (doc/efun/call_direct (lpmud/n/51_call_direc 1.3 644))
   (doc/efun/call_direct_resolved (lpmud/o/0_call_direc 1.1 644))
   (doc/efun/call_other (lpmud/l/11_call_other 1.6.1.5 644))
-  (doc/efun/call_out (lpmud/m/43_call_out 1.3.1.5 644))
+  (doc/efun/call_out (lpmud/m/43_call_out 1.3.1.6 644))
   (doc/efun/call_out_info (lpmud/j/50_call_out_i 1.4 644))
   (doc/efun/call_resolved (lpmud/o/10_call_resol 1.1.1.4 644))
   (doc/efun/caller_stack (lpmud/l/32_caller_sta 1.6 644))
@@ -1094,7 +1088,7 @@
   (doc/efun/get_eval_cost (lpmud/m/14_get_eval_c 1.7 644))
   (doc/efun/get_extra_wizinfo (lpmud/o/50_get_extra_ 1.4 644))
   (doc/efun/get_max_commands (lpmud/e/b/39_get_max_co 1.1 644))
-  (doc/efun/get_type_info (lpmud/o/51_get_type_i 1.12 644))
+  (doc/efun/get_type_info (lpmud/o/51_get_type_i 1.13 644))
   (doc/efun/geteuid (lpmud/p/0_geteuid 1.3 644))
   (doc/efun/getuid (lpmud/p/1_getuid 1.3 644))
   (doc/efun/gmtime (lpmud/n/7_gmtime 1.2 644))
@@ -1486,7 +1480,7 @@
   (doc/efun.de/gmtime.de (lpmud/i/b/25_gmtime.de 1.1 640))
   (doc/efun.de/getuid.de (lpmud/i/b/26_getuid.de 1.1 640))
   (doc/efun.de/geteuid.de (lpmud/i/b/27_geteuid.de 1.1 640))
-  (doc/efun.de/get_type_info.de (lpmud/i/b/28_get_type_i 1.1 640))
+  (doc/efun.de/get_type_info.de (lpmud/i/b/28_get_type_i 1.2 640))
   (doc/efun.de/get_max_commands.de (lpmud/i/b/29_get_max_co 1.1 640))
   (doc/efun.de/get_extra_wizinfo.de (lpmud/i/b/30_get_extra_ 1.1 640))
   (doc/efun.de/get_eval_cost.de (lpmud/i/b/31_get_eval_c 1.1 640))
@@ -1635,7 +1629,7 @@
   (doc/LPC/pragma (lpmud/r/33_pragma 1.15 644))
   (doc/LPC/preprocessor (lpmud/r/34_preprocess 1.5 644))
   (doc/LPC/references (lpmud/c/48_references 1.3 644))
-  (doc/LPC/structs (lpmud/a/b/16_structs 1.11 644))
+  (doc/LPC/structs (lpmud/a/b/16_structs 1.12 644))
   (doc/LPC/switch (lpmud/c/47_switch 1.7 644))
   (doc/LPC/types (lpmud/r/35_types 1.4.1.6 644))
   (doc/LPC/varargs (lpmud/r/36_varargs 1.2 644))

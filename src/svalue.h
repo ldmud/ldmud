@@ -255,14 +255,19 @@ struct svalue_s
    */
 
 #define CLOSURE_LFUN            0  /* lfun in an object */
-#define CLOSURE_IDENTIFIER      1  /* variable in this object */
 
-#define CLOSURE_PRELIMINARY     2
+    /* Code 1 was used for ALIEN_LFUNs - some mudlibs however rely on the
+     * old code values.
+     */
+
+#define CLOSURE_IDENTIFIER      2  /* variable in this object */
+
+#define CLOSURE_PRELIMINARY     3
     /* Efun closure used in a static initialization */
 
-#define CLOSURE_BOUND_LAMBDA    3  /* Bound unbound-lambda closure */
-#define CLOSURE_LAMBDA          4  /* normal lambda closure */
-#define CLOSURE_UNBOUND_LAMBDA  5  /* unbound lambda closure. */
+#define CLOSURE_BOUND_LAMBDA    4  /* Bound unbound-lambda closure */
+#define CLOSURE_LAMBDA          5  /* normal lambda closure */
+#define CLOSURE_UNBOUND_LAMBDA  6  /* unbound lambda closure. */
 
 
 #define CLOSURE_IDENTIFIER_OFFS 0xe800

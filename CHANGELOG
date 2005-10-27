@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+11-Apr-2004 (Lars Duening)  (3.3.514)
+  - (svalue.h) Reserved CLOSURE typecode 1 (used to be CLOSURE_ALIEN_LFUN) for
+        future use, so that the other closure typecode have the same value as
+        in 3.2 (suggested by Sebastion).
+  - (mudlib/sys/lpctypes.h) Added symbolic defines for the closure typecodes.
+
 10-Apr-2004 (Lars Duening)  (3.3.513)
   - (comm.c) Corrected a compilation error when TELNET_DEBUG is defined
        (thanks, Tobias).

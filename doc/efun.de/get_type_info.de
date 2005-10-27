@@ -24,7 +24,8 @@ BESCHREIBUNG
         beinhalten:
           - fuer Mappings deren Breite, also die Anzahl Datenwerte pro Key.
           - fuer Symbole und gequotete Arrays die Anzahl Quotes.
-          - fuer Closures den (internen) Typ der Closure.
+          - fuer Closures den (internen) Typ der Closure, wie in <lpctypes.h>
+            definiert.
           - fuer gemeinsam verwendete Strings 0, ungleich 0 fuer andere Strings
           - -1 fuer alle anderen Datentypen
 

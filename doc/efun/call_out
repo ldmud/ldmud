@@ -12,9 +12,9 @@ DESCRIPTION
         possible to use say() or write() which rely on a current
         user to be something useful.
 
-        call_out() can only call functions which are publicly accessible,
-        i.e. "public" and "static" functions. "private" and "protected"
-        functions can't be called.
+        call_out() can only call functions by name <fun> which are publicly
+        accessible, i.e. "public" and "static" functions. "private" and
+        "protected" functions can't be called.
 
         If <fun> does not define a publicly accessible function, the
         efun will call the H_DEFAULT_METHOD hook if set.
