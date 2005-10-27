@@ -3508,7 +3508,7 @@ push_indexed_lvalue (svalue_t *sp, bytecode_p pc)
     /* Illegal type to index */
     inter_sp = sp;
     inter_pc = pc;
-    error("(lvalue)Indexing on illegal type '%s'.\n", typename(vec->type));
+    error("(lvalue1)Indexing on illegal type '%s'.\n", typename(vec->type));
     return sp;
 } /* push_indexed_lvalue() */
 
@@ -3559,7 +3559,7 @@ push_rindexed_lvalue (svalue_t *sp, bytecode_p pc)
     /* Indexing on illegal type */
     inter_sp = sp;
     inter_pc = pc;
-    error("(lvalue)Indexing on illegal type '%s'.\n", typename(vec->type));
+    error("(lvalue2)Indexing on illegal type '%s'.\n", typename(vec->type));
     return NULL;
 } /* push_rindexed_lvalue() */
 
@@ -3610,7 +3610,7 @@ push_aindexed_lvalue (svalue_t *sp, bytecode_p pc)
     /* Indexing on illegal type */
     inter_sp = sp;
     inter_pc = pc;
-    error("(lvalue)Indexing on illegal type '%s'.\n", typename(vec->type));
+    error("(lvalue3)Indexing on illegal type '%s'.\n", typename(vec->type));
     return NULL;
 } /* push_aindexed_lvalue() */
 
@@ -3755,7 +3755,7 @@ push_protected_indexed_lvalue (svalue_t *sp, bytecode_p pc)
 
     inter_sp = sp;
     inter_pc = pc;
-    error("(lvalue)Indexing on illegal type '%s'.\n", typename(vec->type));
+    error("(lvalue4)Indexing on illegal type '%s'.\n", typename(vec->type));
     return NULL;
 } /* push_protected_indexed_lvalue() */
 
@@ -3806,7 +3806,7 @@ push_protected_rindexed_lvalue (svalue_t *sp, bytecode_p pc)
 
     inter_sp = sp;
     inter_pc = pc;
-    error("(lvalue)Indexing on illegal type '%s'.\n", typename(vec->type));
+    error("(lvalue5)Indexing on illegal type '%s'.\n", typename(vec->type));
     return NULL;
 } /* push_protected_rindexed_lvalue() */
 
@@ -3857,7 +3857,7 @@ push_protected_aindexed_lvalue (svalue_t *sp, bytecode_p pc)
 
     inter_sp = sp;
     inter_pc = pc;
-    error("(lvalue)Indexing on illegal type '%s'.\n", typename(vec->type));
+    error("(lvalue6)Indexing on illegal type '%s'.\n", typename(vec->type));
     return NULL;
 } /* push_protected_aindexed_lvalue() */
 
@@ -3934,7 +3934,7 @@ push_protected_indexed_map_lvalue (svalue_t *sp, bytecode_p pc)
 
     inter_sp = sp;
     inter_pc = pc;
-    error("(lvalue)Indexing on illegal type '%s'.\n", typename(vec->type));
+    error("(lvalue7)Indexing on illegal type '%s'.\n", typename(vec->type));
     return NULL;
 } /* push_protected_indexed_map_lvalue() */
 
@@ -4065,7 +4065,7 @@ index_lvalue (svalue_t *sp, bytecode_p pc)
 
     inter_sp = sp;
     inter_pc = pc;
-    error("(lvalue)Indexing on illegal type '%s'.\n", typename(type));
+    error("(lvalue8)Indexing on illegal type '%s'.\n", typename(type));
     return NULL;
 } /* index_lvalue() */
 
@@ -4139,7 +4139,7 @@ rindex_lvalue (svalue_t *sp, bytecode_p pc)
 
     inter_sp = sp;
     inter_pc = pc;
-    error("(lvalue)Indexing on illegal type '%s'.\n", typename(type));
+    error("(lvalue9)Indexing on illegal type '%s'.\n", typename(type));
     return NULL;
 } /* rindex_lvalue() */
 
@@ -4213,7 +4213,7 @@ aindex_lvalue (svalue_t *sp, bytecode_p pc)
 
     inter_sp = sp;
     inter_pc = pc;
-    error("(lvalue)Indexing on illegal type '%s'.\n", typename(type));
+    error("(lvalue10)Indexing on illegal type '%s'.\n", typename(type));
     return NULL;
 } /* aindex_lvalue() */
 
@@ -4466,7 +4466,7 @@ protected_index_lvalue (svalue_t *sp, bytecode_p pc)
         /* Indexing on illegal type */
         inter_sp = sp;
         inter_pc = pc;
-        error("(lvalue)Indexing on illegal type '%s'.\n", typename(type));
+        error("(lvalue11)Indexing on illegal type '%s'.\n", typename(type));
         return NULL;
     } /* for(ever) */
 
@@ -4648,7 +4648,7 @@ protected_rindex_lvalue (svalue_t *sp, bytecode_p pc)
         /* Indexing on illegal type */
         inter_sp = sp;
         inter_pc = pc;
-        error("(lvalue)Indexing on illegal type '%s'.\n", typename(type));
+        error("(lvalue12)Indexing on illegal type '%s'.\n", typename(type));
         return NULL;
     } /* for(ever) */
 
@@ -4830,7 +4830,7 @@ protected_aindex_lvalue (svalue_t *sp, bytecode_p pc)
         /* Indexing on illegal type */
         inter_sp = sp;
         inter_pc = pc;
-        error("(lvalue)Indexing on illegal type '%s'.\n", typename(type));
+        error("(lvalue13)Indexing on illegal type '%s'.\n", typename(type));
         return NULL;
     } /* for(ever) */
 

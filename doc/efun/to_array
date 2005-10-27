@@ -9,7 +9,9 @@ SYNOPSIS
 
 DESCRIPTION
         Strings and symbols are converted to an int array that
-        consists of the args characters.
+        consists of the args characters. Note that the string "12" will be
+        converted to the array ({ 33, 34 }), and not ({ 33, 34, 0 }) (the
+        LDMud versions prior to 3.3 returned the latter array).
 
         Quoted arrays are ``dequoted'', and arrays are left as they
         are.

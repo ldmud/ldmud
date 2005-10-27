@@ -8264,12 +8264,6 @@ static int nesting = 0;  /* Used to detect recursive calls */
 
         buff = (nesting > 1) ? xalloc((size_t)(st.st_size + 1))
                              : mb_alloc(mbFile, (size_t)(st.st_size+1));
-#ifdef DEBUG
-        if (nesting > 1)
-            debug_message("%s: DEBUG: restore_object(%s) nesting %d size %lu\n"
-                         , time_stamp(), name, nesting
-                         , (unsigned long)(st.st_size+1));
-#endif
         if (!buff)
         {
             fclose(f);

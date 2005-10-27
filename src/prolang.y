@@ -10618,7 +10618,6 @@ expr4:
 #endif /* USE_NEW_INLINES */
 
           $$.start = current = CURRENT_PROGRAM_SIZE;
-          $$.code = F_PUSH_LOCAL_VARIABLE_LVALUE;
           $$.end = 0;
           if (!realloc_a_program(2))
           {
@@ -10629,11 +10628,13 @@ expr4:
 #ifdef USE_NEW_INLINES
           if ($1->u.local.context >= 0)
           {
+              $$.code = F_PUSH_CONTEXT_LVALUE;
               *p++ = F_CONTEXT_IDENTIFIER;
               *p = $1->u.local.context;
           }
           else
           {
+              $$.code = F_PUSH_LOCAL_VARIABLE_LVALUE;
               *p++ = F_LOCAL;
               *p = $1->u.local.num;
           }
