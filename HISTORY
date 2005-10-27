@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-30-Oct-2003 (Lars Duening) -- Development Release 3.3
+18-Nov-2003 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -34,6 +34,8 @@ For a detailed list of all changes see the file CHANGELOG.
            delimiters from the result.
        + send_erq(): ERQ callback closures can now accept the data as
            a string instead of an array.
+       + sprintf(), printf(): Formats %O and %Q print floats always
+           with a decimal point.
        + transfer(): Available (in compat mode) only when USE_DEPRECATED
            is in effect.
        + wizlist_info(): Added the number of mappings to the result.

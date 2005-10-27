@@ -6,10 +6,13 @@
 // This telnet implementation is 'unconditionally compliant'
 // to RFC 1143 and so follows all rules of the telnet protocol RFC 854.
 // The driver itself is not quite compliant.
+//
+// Find the newest version of this file at
+//   http://wl.mud.de/mud/doc/wwwstd/standardobjekte.html
 // 
 // $Log: telnetneg.c,v $
-// Revision 1.22  2002/12/09 14:45:19  Fiona
-// added explanation on repeated SB TTYPE START
+// Revision 1.25  2003/07/07 07:08:52  Fiona
+// LM_SLC more save against protocol violations
 //
 
 #pragma strict_types
@@ -543,7 +546,7 @@ private void tel_error(string err) {
 //
 // Here is defined how the mud will act in the negotiation.
 
-int* tm_t;
+nosave int* tm_t;
 
 void create() {
   if (!ts) {
@@ -1037,7 +1040,7 @@ private void sb_env(int command, int option, int* optargs) {
       ++j;
       continue;
     }
-    if (optargs[j] < ENV_USERVAR) {
+    if (optargs[j] <= ENV_USERVAR) {
       if (i != j) {
         s = to_string(filter(optargs[i..j-1], #'>=, ' '));
         if (strlen(s) != j-i)
@@ -1205,7 +1208,7 @@ private void sb_line(int command, int option, int* optargs) {
         // We dont want any of the session control keys (Synch - Susp)
         // Everything else is just acknoledged
         optargs = optargs[1..];
-        j = sizeof(optargs);
+        j = sizeof(optargs) - 3;
         for (i = 0; i < j; i+=3) {
           if (optargs[i+1] & SLC_ACK) {
             m_add(ts[option, TS_SB][LM_SLC], optargs[i],

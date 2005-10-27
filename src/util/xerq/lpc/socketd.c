@@ -12,9 +12,12 @@
 // Inspired by the Msg modul from Sriram Srinivasan
 // Mudmode conversion based on code from Skylight (pli@shell.portal.com)
 //
+// Find the newest version of this file at
+//   http://wl.mud.de/mud/doc/wwwstd/standardobjekte.html
+//
 // $Log: socketd.c,v $
-// Revision 1.11  2002/10/22 11:37:20  Fiona
-// improved blocking management
+// Revision 1.13  2003/10/29 12:06:51  Fiona
+// Corrected debugging problem with ldmud 3.3 (Alwin@Avalon)
 //
 
 /*****
@@ -803,7 +806,8 @@ static void flush(int ufd) {
 static string to_mudmode(mixed data) {
   int num, i, len;
 
-  data = save_value(data)[5..<2];
+  // use save_value(data)[5..<2] with pre 3.2.10 drivers
+  data = save_value(data, 0)[5..<2];
   len = strlen(data);
 
   for (i=0; i<len; i++) {
@@ -1090,13 +1094,14 @@ object _debug(int on) {
   return debugger = this_interactive();
 }
 
-static void debug(varargs mixed* x) {
+static void debug(varargs mixed* xx) {
   string txt;
-  mixed y;
+  mixed y, x;
   int i;
 
   if (!debugger) return;
 
+  x = xx + ({}); // strange behavior in 3.3's foreach
   if (stringp(x[0])) {
     txt = x[0];
     x = x[1..];

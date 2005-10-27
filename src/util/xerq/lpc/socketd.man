@@ -1,13 +1,7 @@
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org /TR/REC-html401/loose.dtd">
-<HTML><HEAD><META HTTP-EQUIV="Content-Type" CONTENT="text/html; CHARSET=iso-8859-1"><TITLE>sockets(WL)</TITLE><META HTTP-EQUIV="content-type" CONTENT="text/html; charset=iso-8859-1"></HEAD>
-<BODY BGCOLOR="#FFFFFF">
-<H2 ALIGN="CENTER">Documentation for sockets and the socket daemon</H2>
-<TABLE ALIGN="CENTER" BORDER="0"><TR><TD><PRE>
+CONCEPT
+        Sockets and the socket daemon
 
-<B>CONCEPT</B>
-        Sockets and the socket daemon (provided by Wunderland)
-
-<B>DESCRIPTION</B>
+DESCRIPTION
         If you want to connect to another computer on the internet
         you would like to use sockets. Sockets are not part of the
         driver so there has to be someting in the lib. Here it
@@ -30,9 +24,9 @@
         a socket object. All further handling is done by that
         object:
 
-          #include &lt;daemon/socket.h&gt;
+          #include <daemon/socket.h>
 
-          sock_ob = (object) SOCKETD-&gt;New(...);
+          sock_ob = (object) SOCKETD->New(...);
 
         The full prototype of New() is as follows:
         object New(int type, string host, int port, closure cb, int opts)
@@ -241,10 +235,10 @@
 
           socket = New(TCP_OPEN)
             callback SOCKET_READY
-          socket-&gt;Write("hello\n")
+          socket->Write("hello\n")
             callback SOCKET_WRITTEN 1
             callback SOCKET_READ, "hi you\n"
-          socket-&gt;Close()
+          socket->Close()
             callback SOCKET_CLOSE
 
         * incoming connection
@@ -252,37 +246,33 @@
           socket = New(TCP_LISTEN)
             callback SOCKET_READY
             callback SOCKET_ACCEPT
-          sock_2 = socket-&gt;Accept()
+          sock_2 = socket->Accept()
             callbac2 SOCKET_READY
-          sock_2-&gt;Write("hello\n")
+          sock_2->Write("hello\n")
             callbac2 SOCKET_WRITTEN 1
             callback SOCKET_ACCEPT                (but we ignore that)
             callbac2 SOCKET_READ, "hi you\n"
-          sock_2-&gt;Write("bye\n");
-          sock_2-&gt;Close();
-          socket-&gt;Close();
+          sock_2->Write("bye\n");
+          sock_2->Close();
+          socket->Close();
             callbac2 SOCKET_WRITTEN 1             (see the callbacks are
             callbac2 SOCKET_CLOSE                  asynchronous)
             callback SOCKET_CLOSE
 
-          We could have done sock_3 = socket-&gt;Accept() after the second
+          We could have done sock_3 = socket->Accept() after the second
           SOCKET_ACCEPT to handle to connections at a time.
 
         * UDP connection
 
           socket = New(UDP)
             callback SOCKET_READY
-          socket-&gt;Send("whos there", host1, port1);
+          socket->Send("whos there", host1, port1);
             callback SOCKET_WRITTEN 1
-          socket-&gt;Send("and there?\n\n", host2, port2);
+          socket->Send("and there?\n\n", host2, port2);
             callback SOCKET_WRITTEN 1
             callback SOCKET_READ, "hi you\n", host1, port1
-          socket-&gt;Close()
+          socket->Close()
             callback SOCKET_CLOSE
 
-<B>SEE ALSO</B>
+SEE ALSO
         erq(C)
-
-</PRE></TD></TR></TABLE>
-</BODY>
-</HTML>

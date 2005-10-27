@@ -604,8 +604,13 @@ svalue_to_string ( fmt_state_t *st
     case T_FLOAT:
       {
         char s[200]; /* TODO: Might be too small */
+        double d;
 
-        sprintf(s, "%g", READ_DOUBLE(obj) );
+        d = READ_DOUBLE(obj);
+        if (trunc(d) == d)
+            sprintf(s, "%g.0", d );
+        else
+            sprintf(s, "%g", d );
         stradd(st, &str, s);
         break;
       }

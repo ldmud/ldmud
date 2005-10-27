@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+18-Nov-2003 (Lars Duening)  (3.3.495)
+  - (mudlib/telnetneg.c, xerq/lpc/socketd.c) New versions from Fiona (thanks!)
+  - (sprintf.c) When printing floats with %O/%Q, they are always printed
+       with a decimal point (suggested by Fiona).
+
 30-Oct-2003 (Lars Duening)  (3.3.494)
   - (prolang.y) When creating a foreach() instruction, don't get confused
        by visibility flags in the variable type. Before, a 'varargs mixed *'
