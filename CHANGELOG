@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+13-Apr-2004 (Lars Duening)  (3.3.516)
+  - (func_spec, prolang.y, interpret.c) I had to back out the recent change
+       as it interfered with the use of bitflags. We need a proper unsigned
+       type for this kind of thing.
+
 12-Apr-2004 (Lars Duening)  (3.3.515)
   - (mud/heaven7, settings/heaven7) Heaven7 v4 runs natively on LDMud 3.2 .
   - (func_spec, prolang.y, interpret.c) Constant integer numbers exceeding the
