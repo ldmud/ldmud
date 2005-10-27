@@ -405,11 +405,24 @@ f_convert_charset (svalue_t *sp)
     from_cs = sp[-1].u.str;
     to_cs = sp->u.str;
 
-    /* Allocate a temporary output string */
     pIn = get_txt(in_str);
     in_len = mstrsize(in_str);
     in_left = in_len;
 
+    /* If the input string is empty, we can return immediately
+     * (and in fact must since the allocator will balk at allocating 0 bytes)
+     */
+    if (!in_len)
+    {
+        sp -= 2;
+        free_string_svalue(sp);
+        free_string_svalue(sp+1);
+        put_string(sp, sp[2].u.str);
+
+        return sp;
+    }
+
+    /* Allocate a temporary output string */
     out_size = in_len > 65536 ? (in_len + 33) : (2 * in_len);
     out_left = out_size;
 

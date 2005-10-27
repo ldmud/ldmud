@@ -9305,7 +9305,7 @@ if test "${lp_cv_has_pthreads+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
 else
   saveflags="$CFLAGS"
-    CFLAGS="$CFLAGS -I/usr/include"
+    CFLAGS="$CFLAGS"
     cat >conftest.$ac_ext <<_ACEOF
 #line $LINENO "configure"
 #include "confdefs.h"
@@ -9352,7 +9352,7 @@ echo "${ECHO_T}$lp_cv_has_pthreads" >&6
 
 if test $lp_cv_has_pthreads = yes; then
     saveflags="$CFLAGS"
-    CFLAGS="$CFLAGS -I/usr/include"
+    CFLAGS="$CFLAGS"
 
     cat >>confdefs.h <<\_ACEOF
 #define HAS_PTHREADS 1
@@ -9593,7 +9593,6 @@ if test "${lp_cv_has_pcre+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
 else
   saveflags="$CFLAGS"
-    CFLAGS="$CFLAGS -I/usr/include"
     cat >conftest.$ac_ext <<_ACEOF
 #line $LINENO "configure"
 #include "confdefs.h"
@@ -9640,14 +9639,17 @@ echo "${ECHO_T}$lp_cv_has_pcre" >&6
 
 # --- iconv ---
 
-echo "$as_me:$LINENO: checking for iconv" >&5
-echo $ECHO_N "checking for iconv... $ECHO_C" >&6
+echo "$as_me:$LINENO: checking for mySQL" >&5
+echo $ECHO_N "checking for mySQL... $ECHO_C" >&6
 if test "${lp_cv_has_iconv+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
 else
-  saveflags="$CFLAGS"
-    CFLAGS="$CFLAGS -I/usr/include -I/usr/local/include"
-    cat >conftest.$ac_ext <<_ACEOF
+  for TESTPATH in "" "/usr/local/include"; do
+    saveflags="$CFLAGS"
+    if test "x$TESTPATH" != "x"; then
+        CFLAGS="-I$TESTPATH $saveflags"
+    fi
+cat >conftest.$ac_ext <<_ACEOF
 #line $LINENO "configure"
 #include "confdefs.h"
 
@@ -9657,6 +9659,58 @@ iconv_t * foo(void)
 {
     return 0;
 }
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext
+if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
+  (eval $ac_compile) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+         { ac_try='test -s conftest.$ac_objext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  lp_cv_has_iconv=yes
+if test "x$TESTPATH" != "x"; then
+    EXTRA_CFLAGS="-I$TESTPATH $EXTRA_CFLAGS"
+fi
+break;
+
+else
+  echo "$as_me: failed program was:" >&5
+cat conftest.$ac_ext >&5
+lp_cv_has_iconv=no
+CFLAGS="$saveflags"
+
+fi
+rm -f conftest.$ac_objext conftest.$ac_ext
+done
+
+fi
+echo "$as_me:$LINENO: result: $lp_cv_has_iconv" >&5
+echo "${ECHO_T}$lp_cv_has_iconv" >&6
+
+echo "$as_me:$LINENO: checking for iconv" >&5
+echo $ECHO_N "checking for iconv... $ECHO_C" >&6
+if test "${lp_cv_has_iconv+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  saveflags="$CFLAGS"
+    CFLAGS="$CFLAGS $EXTRA_CFLAGS"
+    cat >conftest.$ac_ext <<_ACEOF
+#line $LINENO "configure"
+#include "confdefs.h"
+
 
 int
 main ()
@@ -9694,19 +9748,14 @@ echo "${ECHO_T}$lp_cv_has_iconv" >&6
 # The system has the include files - now perform further checks
 if test "x$lp_cv_has_iconv" = "xyes"; then
     saveflags="$CFLAGS"
-    tmp=""
 
     # Some systems define iconv() to take a non-const 'char**' as first arg.
     echo "$as_me:$LINENO: checking if iconv takes a non-const char**" >&5
 echo $ECHO_N "checking if iconv takes a non-const char**... $ECHO_C" >&6
-if test "${lp_cv_has_iconv_nonconst_in+set}" = set; then
-  echo $ECHO_N "(cached) $ECHO_C" >&6
-else
-  CFLAGS="$CFLAGS -I/usr/include -I/usr/local/include"
-        cat >conftest.$ac_ext <<_ACEOF
-#line $LINENO "configure"
-#include "confdefs.h"
 
+    CFLAGS="$CFLAGS $EXTRA_CFLAGS"
+    tcomp2='${CC-cc} ${CFLAGS} -o conftest.o -c conftest.c 2>&1'
+    cat > conftest.c <<EOF
 #include <stdlib.h>
 #include <iconv.h>
 
@@ -9716,43 +9765,79 @@ int foo(void)
 
     return iconv(NULL, &in, NULL, NULL, NULL);
 }
+EOF
 
-int
-main ()
+
+    if echo `eval $tcomp2` | egrep '[a-z]' >/dev/null; then
+      # Success means 'we got output' here :-(
+        lp_cv_has_iconv_nonconst_in=yes
+    else
+        lp_cv_has_iconv_nonconst_in=no
+    fi
+    CFLAGS="$saveflags"
+
+
+    echo "$as_me:$LINENO: result: $lp_cv_has_iconv_nonconst_in" >&5
+echo "${ECHO_T}$lp_cv_has_iconv_nonconst_in" >&6
+
+    # Does the system need to link in libiconv?
+    echo "$as_me:$LINENO: checking if -liconv is needed" >&5
+echo $ECHO_N "checking if -liconv is needed... $ECHO_C" >&6
+if test "${lp_cv_need_lib_iconv+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  if test "$cross_compiling" = yes; then
+  { { echo "$as_me:$LINENO: error: cannot run test program while cross compiling" >&5
+echo "$as_me: error: cannot run test program while cross compiling" >&2;}
+   { (exit 1); exit 1; }; }
+else
+  cat >conftest.$ac_ext <<_ACEOF
+#line $LINENO "configure"
+#include "confdefs.h"
+
+#include <stdlib.h>
+#include <iconv.h>
+int t (void)
 {
-
-  ;
-  return 0;
+    return iconv(NULL, NULL, NULL, NULL, NULL);
 }
+int main(void)
+{
+    return 0;
+}
+
 _ACEOF
-rm -f conftest.$ac_objext
-if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
-  (eval $ac_compile) 2>&5
+rm -f conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>&5
   ac_status=$?
   echo "$as_me:$LINENO: \$? = $ac_status" >&5
-  (exit $ac_status); } &&
-         { ac_try='test -s conftest.$ac_objext'
+  (exit $ac_status); } && { ac_try='./conftest$ac_exeext'
   { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
   (eval $ac_try) 2>&5
   ac_status=$?
   echo "$as_me:$LINENO: \$? = $ac_status" >&5
   (exit $ac_status); }; }; then
-  lp_cv_has_iconv_nonconst_in=no
+  lp_cv_need_lib_iconv=no
 else
-  echo "$as_me: failed program was:" >&5
+  echo "$as_me: program exited with status $ac_status" >&5
+echo "$as_me: failed program was:" >&5
 cat conftest.$ac_ext >&5
-lp_cv_has_iconv_nonconst_in=yes
-        CFLAGS="$saveflags"
+( exit $ac_status )
+lp_cv_need_lib_iconv=yes
 
 fi
-rm -f conftest.$ac_objext conftest.$ac_ext
+rm -f core core.* *.core gmon.out bb.out conftest$ac_exeext conftest.$ac_objext conftest.$ac_ext
 fi
-echo "$as_me:$LINENO: result: $lp_cv_has_iconv_nonconst_in" >&5
-echo "${ECHO_T}$lp_cv_has_iconv_nonconst_in" >&6
+fi
+echo "$as_me:$LINENO: result: $lp_cv_need_lib_iconv" >&5
+echo "${ECHO_T}$lp_cv_need_lib_iconv" >&6
+    if test "$lp_cv_need_lib_iconv" = "yes"; then
+        # Search the libraries
 
-    # Search the libraries
+        tmp=""
 
-    echo "$as_me:$LINENO: checking for main in -liconv" >&5
+        echo "$as_me:$LINENO: checking for main in -liconv" >&5
 echo $ECHO_N "checking for main in -liconv... $ECHO_C" >&6
 if test "${ac_cv_lib_iconv_main+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
@@ -9800,15 +9885,15 @@ if test $ac_cv_lib_iconv_main = yes; then
 fi
 
 
-    if test "x$tmp" = "x"; then
-        CFLAGS="$saveflags -L/usr/local/lib"
-        echo "$as_me:$LINENO: checking for main in -llibiconv" >&5
-echo $ECHO_N "checking for main in -llibiconv... $ECHO_C" >&6
-if test "${ac_cv_lib_libiconv_main+set}" = set; then
+        if test "x$tmp" = "x"; then
+            CFLAGS="$saveflags -L/usr/local/lib"
+            echo "$as_me:$LINENO: checking for main in -liconv" >&5
+echo $ECHO_N "checking for main in -liconv... $ECHO_C" >&6
+if test "${ac_cv_lib_iconv_main+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
 else
   ac_check_lib_save_LIBS=$LIBS
-LIBS="-llibiconv  $LIBS"
+LIBS="-liconv  $LIBS"
 cat >conftest.$ac_ext <<_ACEOF
 #line $LINENO "configure"
 #include "confdefs.h"
@@ -9834,31 +9919,32 @@ if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
   ac_status=$?
   echo "$as_me:$LINENO: \$? = $ac_status" >&5
   (exit $ac_status); }; }; then
-  ac_cv_lib_libiconv_main=yes
+  ac_cv_lib_iconv_main=yes
 else
   echo "$as_me: failed program was:" >&5
 cat conftest.$ac_ext >&5
-ac_cv_lib_libiconv_main=no
+ac_cv_lib_iconv_main=no
 fi
 rm -f conftest.$ac_objext conftest$ac_exeext conftest.$ac_ext
 LIBS=$ac_check_lib_save_LIBS
 fi
-echo "$as_me:$LINENO: result: $ac_cv_lib_libiconv_main" >&5
-echo "${ECHO_T}$ac_cv_lib_libiconv_main" >&6
-if test $ac_cv_lib_libiconv_main = yes; then
+echo "$as_me:$LINENO: result: $ac_cv_lib_iconv_main" >&5
+echo "${ECHO_T}$ac_cv_lib_iconv_main" >&6
+if test $ac_cv_lib_iconv_main = yes; then
   tmp="$PKGLIBS -L/usr/local/lib -liconv"
 fi
 
-    fi
+        fi
 
-    if test "x$tmp" = "x"; then
-        echo "iconv library not found."
-        lp_cv_has_iconv="no"
-    else
-        PKGLIBS="$tmp"
-    fi
+        if test "x$tmp" = "x"; then
+            echo "iconv library not found."
+            lp_cv_has_iconv="no"
+        else
+            PKGLIBS="$tmp"
+        fi
 
-    CFLAGS="$saveflags"
+        CFLAGS="$saveflags"
+    fi
 fi
 
 if test "x$lp_cv_has_iconv" = "xyes"; then
@@ -9890,7 +9976,7 @@ else
   for TESTPATH in "" "${mysql_path}/include" "${mysql_path}" "/usr/local/mysql/include" "/usr/lib/mysql" "/usr/local/include"; do
     saveflags="$CFLAGS"
     if test "x$TESTPATH" != "x"; then
-        CFLAGS="-I$TESTPATH $CFLAGS"
+        CFLAGS="-I$TESTPATH $saveflags"
     fi
 cat >conftest.$ac_ext <<_ACEOF
 #line $LINENO "configure"
@@ -10562,7 +10648,7 @@ else
   for TESTPATH in "" "$pgsql_path" "$pgsql_path/include" "/usr/local/pgsql/include" "/usr/local/include/pgsql" "/usr/include/pgsql" "/usr/lib/pgsql" "/usr/local/include"; do
     saveflags="$CFLAGS"
     if test "x$TESTPATH" != "x"; then
-        CFLAGS="$CFLAGS -I$TESTPATH"
+        CFLAGS="$saveflags -I$TESTPATH"
     fi
 cat >conftest.$ac_ext <<_ACEOF
 #line $LINENO "configure"
@@ -12385,7 +12471,7 @@ done
 # -print-libgcc-filename to test for gcc.
 TESTFLAG='-print-libgcc-filename -O3 -fno-inline-functions'
 if eval $tcomp; then
-  if echo `eval $tcomp2` | egrep 'uUn(recognized|known) oOption' >/dev/null; then
+  if echo `eval $tcomp2` | egrep '[uU]n(recognized|known) [oO]ption' >/dev/null; then
     :
   else
     if eval $tcomp; then
@@ -12413,19 +12499,21 @@ for TESTFLAG in -O4 -O3 -O2 -O; do
     fi
   fi
 done
-for TESTFLAG in -qstrict -qipa -ipo; do
-  if eval $tcomp; then
-    if echo `eval $tcomp2` | egrep '[uU]n(recognized|known) [oO]ption' >/dev/null; then
-      :
-      #the [e]grep option -v will not give a failure exit status on the atari
-    else
-      if eval $tcomp; then
-        CFLAGS="$CFLAGS $TESTFLAG"
-        break
+if test "$ac_cv_c_compiler_gnu" = "no"; then
+  for TESTFLAG in -qstrict -qipa -ipo; do
+    if eval $tcomp; then
+      if echo `eval $tcomp2` | egrep '[uU]n(recognized|known) [oO]ption' >/dev/null; then
+        :
+        #the [e]grep option -v will not give a failure exit status on the atari
+      else
+        if eval $tcomp; then
+          CFLAGS="$CFLAGS $TESTFLAG"
+          break
+        fi
       fi
     fi
-  fi
-done
+  done
+fi
 # -funroll-all-loops causes some versions of gcc to produce buggy code
 for TESTFLAG in -fomit-frame-pointer; do
   if eval $tcomp; then

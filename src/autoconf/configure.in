@@ -873,7 +873,7 @@ fi
 
 AC_CACHE_CHECK(for pthreads support,lp_cv_has_pthreads,
     saveflags="$CFLAGS"
-    CFLAGS="$CFLAGS -I/usr/include"
+    CFLAGS="$CFLAGS"
     AC_TRY_COMPILE([
 #include <pthread.h>
 
@@ -888,7 +888,7 @@ void foo(void)
 
 if test $lp_cv_has_pthreads = yes; then
     saveflags="$CFLAGS"
-    CFLAGS="$CFLAGS -I/usr/include"
+    CFLAGS="$CFLAGS"
 
     AC_DEFINE(HAS_PTHREADS)
 
@@ -954,7 +954,6 @@ fi
 
 AC_CACHE_CHECK(for pcre support,lp_cv_has_pcre,
     saveflags="$CFLAGS"
-    CFLAGS="$CFLAGS -I/usr/include"
     AC_TRY_COMPILE([
 #include <pcre.h>
 
@@ -969,16 +968,36 @@ pcre_extra foo(void)
 
 # --- iconv ---
 
-AC_CACHE_CHECK(for iconv,lp_cv_has_iconv,
+AC_CACHE_CHECK(for mySQL,lp_cv_has_iconv,
+for TESTPATH in "" "/usr/local/include"; do
     saveflags="$CFLAGS"
-    CFLAGS="$CFLAGS -I/usr/include -I/usr/local/include"
-    AC_TRY_COMPILE([
+    if test "x$TESTPATH" != "x"; then
+        CFLAGS="-I$TESTPATH $saveflags"
+    fi
+AC_TRY_COMPILE([
 #include <iconv.h>
 
 iconv_t * foo(void)
 {
     return 0;
 }
+],,
+lp_cv_has_iconv=yes
+if test "x$TESTPATH" != "x"; then
+    EXTRA_CFLAGS="-I$TESTPATH $EXTRA_CFLAGS"
+fi
+break;
+,
+lp_cv_has_iconv=no
+CFLAGS="$saveflags"
+)
+done
+)
+
+AC_CACHE_CHECK(for iconv,lp_cv_has_iconv,
+    saveflags="$CFLAGS"
+    CFLAGS="$CFLAGS $EXTRA_CFLAGS"
+    AC_TRY_COMPILE([
     ],,lp_cv_has_iconv=yes,
     lp_cv_has_iconv=no
     CFLAGS="$saveflags"
@@ -987,12 +1006,13 @@ iconv_t * foo(void)
 # The system has the include files - now perform further checks
 if test "x$lp_cv_has_iconv" = "xyes"; then
     saveflags="$CFLAGS"
-    tmp=""
    
     # Some systems define iconv() to take a non-const 'char**' as first arg.
-    AC_CACHE_CHECK(if iconv takes a non-const char**,lp_cv_has_iconv_nonconst_in,
-        CFLAGS="$CFLAGS -I/usr/include -I/usr/local/include"
-        AC_TRY_COMPILE([
+    AC_MSG_CHECKING(if iconv takes a non-const char**)
+
+    CFLAGS="$CFLAGS $EXTRA_CFLAGS"
+    tcomp2='${CC-cc} ${CFLAGS} -o conftest.o -c conftest.c 2>&1'
+    cat > conftest.c <<EOF
 #include <stdlib.h>
 #include <iconv.h>
 
@@ -1002,28 +1022,60 @@ int foo(void)
 
     return iconv(NULL, &in, NULL, NULL, NULL);
 }
-        ],,lp_cv_has_iconv_nonconst_in=no,
+EOF
+
+    changequote(,)dnl
+
+    if echo `eval $tcomp2` | egrep '[a-z]' >/dev/null; then
+      # Success means 'we got output' here :-(
         lp_cv_has_iconv_nonconst_in=yes
-        CFLAGS="$saveflags"
-    ))
-
-    # Search the libraries
-
-    AC_CHECK_LIB(iconv,main, tmp="$PKGLIBS -liconv")
-
-    if test "x$tmp" = "x"; then
-        CFLAGS="$saveflags -L/usr/local/lib"
-        AC_CHECK_LIB(libiconv,main, tmp="$PKGLIBS -L/usr/local/lib -liconv")
-    fi
-
-    if test "x$tmp" = "x"; then
-        echo "iconv library not found."
-        lp_cv_has_iconv="no"
     else
-        PKGLIBS="$tmp"
+        lp_cv_has_iconv_nonconst_in=no
     fi
-
     CFLAGS="$saveflags"
+
+    changequote([,])dnl
+
+    AC_MSG_RESULT($lp_cv_has_iconv_nonconst_in)
+
+    # Does the system need to link in libiconv?
+    AC_CACHE_CHECK(if -liconv is needed, lp_cv_need_lib_iconv,
+        AC_TRY_RUN([
+#include <stdlib.h>
+#include <iconv.h>
+int t (void)
+{
+    return iconv(NULL, NULL, NULL, NULL, NULL);
+}
+int main(void)
+{
+    return 0;
+}
+        ],
+        lp_cv_need_lib_iconv=no,
+        lp_cv_need_lib_iconv=yes
+    ))
+    if test "$lp_cv_need_lib_iconv" = "yes"; then
+        # Search the libraries
+
+        tmp=""
+
+        AC_CHECK_LIB(iconv,main, tmp="$PKGLIBS -liconv")
+
+        if test "x$tmp" = "x"; then
+            CFLAGS="$saveflags -L/usr/local/lib"
+            AC_CHECK_LIB(iconv,main, tmp="$PKGLIBS -L/usr/local/lib -liconv")
+        fi
+
+        if test "x$tmp" = "x"; then
+            echo "iconv library not found."
+            lp_cv_has_iconv="no"
+        else
+            PKGLIBS="$tmp"
+        fi
+
+        CFLAGS="$saveflags"
+    fi
 fi
 
 if test "x$lp_cv_has_iconv" = "xyes"; then
@@ -1045,7 +1097,7 @@ AC_CACHE_CHECK(for mySQL,lp_cv_has_mysql,
 for TESTPATH in "" "${mysql_path}/include" "${mysql_path}" "/usr/local/mysql/include" "/usr/lib/mysql" "/usr/local/include"; do
     saveflags="$CFLAGS"
     if test "x$TESTPATH" != "x"; then
-        CFLAGS="-I$TESTPATH $CFLAGS"
+        CFLAGS="-I$TESTPATH $saveflags"
     fi
 AC_TRY_COMPILE([
 #include <sys/types.h>
@@ -1187,7 +1239,7 @@ AC_CACHE_CHECK(for PostgresSQL,lp_cv_has_pgsql,
 for TESTPATH in "" "$pgsql_path" "$pgsql_path/include" "/usr/local/pgsql/include" "/usr/local/include/pgsql" "/usr/include/pgsql" "/usr/lib/pgsql" "/usr/local/include"; do
     saveflags="$CFLAGS"
     if test "x$TESTPATH" != "x"; then
-        CFLAGS="$CFLAGS -I$TESTPATH"
+        CFLAGS="$saveflags -I$TESTPATH"
     fi
 AC_TRY_COMPILE([
 #include <libpq-fe.h>
@@ -1960,7 +2012,6 @@ for TESTFLAG in -qmaxmem=97204; do
     fi
   fi
 done
-changequote([,])dnl
 for TESTFLAG in -g -fstrength-reduce -fno-force-mem -fno-force-addr -fomit-default-branch; do
   if eval $tcomp; then
     OPTFLAGS="$OPTFLAGS $TESTFLAG"
@@ -1981,6 +2032,7 @@ if eval $tcomp; then
     fi
   fi
 fi
+changequote([,])dnl
 MCFLAGS=$CFLAGS
 AC_MSG_RESULT($MCFLAGS)
 
@@ -1999,19 +2051,21 @@ for TESTFLAG in -O4 -O3 -O2 -O; do
     fi
   fi
 done
-for TESTFLAG in -qstrict -qipa -ipo; do
-  if eval $tcomp; then
-    if echo `eval $tcomp2` | egrep '[uU]n(recognized|known) [oO]ption' >/dev/null; then
-      :
-      #the [e]grep option -v will not give a failure exit status on the atari
-    else
-      if eval $tcomp; then
-        CFLAGS="$CFLAGS $TESTFLAG"
-        break
+if test "$ac_cv_c_compiler_gnu" = "no"; then
+  for TESTFLAG in -qstrict -qipa -ipo; do
+    if eval $tcomp; then
+      if echo `eval $tcomp2` | egrep '[uU]n(recognized|known) [oO]ption' >/dev/null; then
+        :
+        #the [e]grep option -v will not give a failure exit status on the atari
+      else
+        if eval $tcomp; then
+          CFLAGS="$CFLAGS $TESTFLAG"
+          break
+        fi
       fi
     fi
-  fi
-done
+  done
+fi
 changequote([,])dnl
 # -funroll-all-loops causes some versions of gcc to produce buggy code
 for TESTFLAG in -fomit-frame-pointer; do

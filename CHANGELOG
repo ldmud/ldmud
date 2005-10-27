@@ -1,6 +1,15 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+27-Apr-2004 (Lars Duening)  (3.3.535)
+  - (strfuns.c) Efun convert_charset() crashed when given an empty
+       input string (reported by Ralph).
+  - (configure) When checking for iconv, the script now first checks
+       if -liconv is actually needed before looking for the libraries
+       (reported by Philipp).
+  - (configure) Made the test for non-const in parameter to iconv()
+       more reliable ... I hope (reported by Ralph).
+
 27-Apr-2004 (Lars Duening)  (3.3.534)
   - (smalloc.c, config.h, efuns.c) If multiple large blocks of the same
        size are freed, an AVL node is created just for the first one of these
