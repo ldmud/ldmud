@@ -199,9 +199,9 @@ void tls_global_init (void)
 
 #ifdef HAS_OPENSSL
 
-    printf("%s TLS: x509 keyfile '%s', certfile '%s'\n"
+    printf("%s TLS: (OpenSSL) x509 keyfile '%s', certfile '%s'\n"
           , time_stamp(), keyfile, certfile);
-    debug_message("%s TLS: Keyfile '%s', Certfile '%s'\n"
+    debug_message("%s TLS: (OpenSSL) Keyfile '%s', Certfile '%s'\n"
                  , time_stamp(), keyfile, certfile);
 
     SSL_load_error_strings();
@@ -337,9 +337,9 @@ ssl_init_err:
 
     gnutls_certificate_allocate_credentials(&x509_cred);
 
-    printf("%s TLS: x509 keyfile '%s', certfile '%s'\n"
+    printf("%s TLS: (GnuTLS) x509 keyfile '%s', certfile '%s'\n"
           , time_stamp(), keyfile, certfile);
-    debug_message("%s TLS: Keyfile '%s', Certfile '%s'\n"
+    debug_message("%s TLS: (GnuTLS) Keyfile '%s', Certfile '%s'\n"
                  , time_stamp(), keyfile, certfile);
 
     f = gnutls_certificate_set_x509_key_file(x509_cred, certfile, keyfile, GNUTLS_X509_FMT_PEM);

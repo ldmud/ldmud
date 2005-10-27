@@ -378,6 +378,12 @@ main (int argc, char **argv)
               );
           /* This also assures the existance of the fd for the debug log */
 
+        reserve_memory();
+        mstring_init();
+          /* Also initializes the standard strings, which may be required
+           * early on should an error happen.
+           */
+
 #ifdef USE_TLS
         tls_global_init();
 #endif
@@ -386,11 +392,9 @@ main (int argc, char **argv)
             numports = 1;
 
         init_driver_hooks();
-        reserve_memory();
         init_otable();
         for (i = 0; i < (int)(sizeof consts / sizeof consts[0]); i++)
             consts[i] = exp(- i / 900.0);
-        mstring_init(); /* Also initializes the standard strings */
 
         printf("%s Random seed: 0x%lx\n"
               , time_stamp(), (unsigned long)random_seed);
@@ -1710,7 +1714,15 @@ options (void)
                               , "Alists supported\n"
 #endif
 #ifdef USE_TLS
-                              , "TLS supported (x509 key: '"
+                              , "TLS supported ("
+#  if defined(HAS_OPENSSL)
+                                               "OpenSSL"
+#  elif defined(HAS_GNUTLS)
+                                               "GnuTLS"
+#  else
+                                               "<unknown>"
+#  endif
+                                               ", x509 key: '"
                                   TLS_DEFAULT_KEYFILE "', cert: '"
                                   TLS_DEFAULT_CERTFILE "')\n"
 #endif

@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+23-Apr-2004 (Lars Duening)  (3.3.528)
+  - (main.c) The standard strings are initialized earlier in the startup
+       process so that a memory error doesn't cause a coredump.
+
 22-Apr-2004 (Lars Duening)  (3.3.527)
   - (efuns.c) Forgot an '#include <fcntl.h>'.
 

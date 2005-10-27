@@ -3,18 +3,25 @@
 # Settings for the OSB mudlib.
 #
 # configure will strip this part from the script.
- 
+#
+#
+#--enable-use-pthreads=yes \
+#--with-malloc=ptmalloc \
+export EXTRA_CFLAGS="-mcpu=pentium4 -march=pentium4"
+
 exec ./configure \
---prefix=/home/ralph \
---bindir=/home/ralph/bin \
---libdir=/home/ralph/mudlib \
---libexec=/home/ralph/libexec \
+--prefix=/home/mud \
+--bindir=/home/mud/bin \
+--libdir=/home/mud/mudlib \
+--libexec=/home/mud/libexec \
 --enable-strict-euids \
 --enable-erq=xerq \
 --enable-lpc-nosave \
 --enable-use-alists \
---enable-use-mysql \
 --enable-use-deprecated=no \
+--enable-use-pgsql=yes \
+--enable-use-mysql=yes \
+--enable-use-mccp=yes \
 --enable-dynamic-costs=yes \
 --enable-malloc-trace \
 --enable-malloc-lpc-trace \
@@ -25,10 +32,19 @@ exec ./configure \
 --enable-use-set-light=no \
 --enable-use-new-inlines=yes \
 --enable-opcprof=yes \
+--enable-filename-spaces=yes \
+--enable-use-tls=ssl \
+--with-optimize=high \
+--with-time-to-swap=0 \
+--with-time-to-swap-variables=0 \
+--with-otable-size=8192 \
+--with-htable-size=32768 \
+--with-apply-cache-bits=14 \
 --with-master-name=secure/master \
 --with-time-to-reset=900 \
 --with-portno=2345 \
 --with-udp-port=2347 \
 --with-max-cost=3000000 \
---with-swap-file=LP_SWAP.3 $*
+--without-wizlist-file \
+--with-swap-file=AoH $*
 exit 1

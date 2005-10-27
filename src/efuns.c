@@ -433,7 +433,7 @@ f_sha1 (svalue_t *sp)
  *
  *   string sha1(string arg)
  *
- * Create and return a MD5 message digest from the string <arg>.
+ * Create and return a SHA1 message digest from the string <arg>.
  */
 
 {
