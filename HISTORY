@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-08-Aug-2003 (Lars Duening) -- Development Release 3.3
+09-Aug-2003 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -120,14 +120,16 @@ For a detailed list of all changes see the file CHANGELOG.
        + The threadsafe ptmalloc is now available as allocator choice (
            though it doesn't support GC yet).
        + New commandline options '--share-variables' and
-           '--init-variables' to defined the default for clone variable
+           '--init-variables' to define the default for clone variable
            initialization.
        + New configuration option '--enable-malloc-sbrk' to selectively allow
            the memory allocator to use sbrk() instead of malloc() where
            available (default is to allow sbrk()).
+       + New commandline options '--tls-key' and '--tls-cert' to define the
+           x509 key- and certfile for the TLS package.
 
 
-28-Jul-2003 (Lars Duening) -- Release 3.2.10
+09-Aug-2003 (Lars Duening) -- Release 3.2.10
 
     - Changed efuns:
        + debug_info(): Removed the DID_MEM_UNUSED value from the DINFO_DATA:
@@ -177,6 +179,7 @@ For a detailed list of all changes see the file CHANGELOG.
            crash the driver in the error recovery.
        + walk_mapping(): If the callback object was destructed
            before the first call, the efun crashed in the error handling.
+       + Swapping of volatile strings could crash the driver.
 
     - Language:
        + catch(; nolog) is now an official feature.

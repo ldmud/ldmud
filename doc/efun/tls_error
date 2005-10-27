@@ -1,3 +1,4 @@
+PRELIMINARY
 SYNOPSIS
         string tls_error(int errorno)
 

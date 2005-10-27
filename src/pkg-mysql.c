@@ -26,6 +26,7 @@
 #include "my-alloca.h"
 #include <stddef.h>
 #include <string.h>
+#include <stdio.h>
 
 #include <mysql/mysql.h>
 #include <mysql/errmsg.h>

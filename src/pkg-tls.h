@@ -8,6 +8,16 @@
 #include <gnutls/gnutls.h>
 #include "typedefs.h"
 
+/* --- Macros --- */
+
+#define TLS_DEFAULT_KEYFILE  "key.pem"
+#define TLS_DEFAULT_CERTFILE "cert.pem"
+
+/* --- Variables --- */
+
+extern char * tls_keyfile;
+extern char * tls_certfile;
+
 /* --- Prototypes --- */
 
 extern void tls_global_init(void);

@@ -1,3 +1,4 @@
+PRELIMINARY
 SYNOPSIS
         int tls_query_connection_state(object ob)
 

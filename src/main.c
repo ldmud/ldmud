@@ -223,6 +223,10 @@ main (int argc, char **argv)
 
     rc = 0;
 
+    printf("%s LDMud %s" LOCAL_LEVEL " (" PROJ_VERSION ")\n"
+          , time_stamp(), IS_RELEASE() ? GAME_VERSION : LONG_VERSION
+          );
+
     /* On some systems, SIGALRM is sometimes blocked.
      * The reasons are unknown, but this seems to be the cure.
      */
@@ -245,10 +249,6 @@ main (int argc, char **argv)
     current_time = get_current_time();
     random_seed = (uint32)current_time;
     seed_random(random_seed);
-
-#ifdef USE_TLS
-    tls_global_init();
-#endif
 
     do {
         dummy_current_object_for_loads = NULL_object;
@@ -370,14 +370,14 @@ main (int argc, char **argv)
             lpc_predefs = tmp;
         }
 
-        printf("%s LDMud %s" LOCAL_LEVEL " (" PROJ_VERSION ")\n"
-              , time_stamp(), IS_RELEASE() ? GAME_VERSION : LONG_VERSION
-              );
         debug_message("%s LDMud %s" LOCAL_LEVEL " (" PROJ_VERSION ")\n"
               , time_stamp(), IS_RELEASE() ? GAME_VERSION : LONG_VERSION
               );
           /* This also assures the existance of the fd for the debug log */
 
+#ifdef USE_TLS
+        tls_global_init();
+#endif
 
         if (numports < 1) /* then use the default port */
             numports = 1;
@@ -1055,6 +1055,10 @@ typedef enum OptNumber {
 #ifdef GC_SUPPORT
  , cGcollectFD      /* --gcollect-outfd     */
 #endif
+#ifdef USE_TLS
+ , cTLSkey          /* --tls-key            */
+ , cTLScert         /* --tls-cert           */
+#endif
 #ifdef DEBUG
  , cCheckRefs       /* --check-refcounts    */
  , cCheckState      /* --check-state        */
@@ -1381,6 +1385,22 @@ static Option aOptions[]
       , NULL
       }
 
+#ifdef USE_TLS
+    , { 0,   "tls-key",               cTLSkey,            MY_TRUE
+      , "  --tls-key <pathname>\n"
+      , "  --tls-key <pathname>\n"
+        "    Use <pathname> as the x509 keyfile, default is '" TLS_DEFAULT_KEYFILE "'.\n"
+        "    If relative, <pathname> is interpreted relative to <mudlib>.\n"
+      }
+
+    , { 0,   "tls-cert",              cTLScert,           MY_TRUE
+      , "  --tls-cert <pathname>\n"
+      , "  --tls-cert <pathname>\n"
+        "    Use <pathname> as the x509 certfile, default is '" TLS_DEFAULT_CERTFILE "'.\n"
+        "    If relative, <pathname> is interpreted relative to <mudlib>.\n"
+      }
+#endif /* USE_TLS */
+
     , { 0,   "wizlist-file",       cWizlistFile,    MY_TRUE
       , "  --wizlist-file <filename>\n"
       , "  --wizlist-file <filename>\n"
@@ -1678,7 +1698,9 @@ options (void)
                               , "Alists supported\n"
 #endif
 #ifdef USE_TLS
-                              , "TLS supported\n"
+                              , "TLS supported (x509 key: '"
+                                  TLS_DEFAULT_KEYFILE "', cert: '"
+                                  TLS_DEFAULT_CERTFILE "')\n"
 #endif
                               };
         size_t nStrings = sizeof(optstrings) / sizeof(optstrings[0]);
@@ -2375,6 +2397,20 @@ eval_arg (int eOption, const char * pValue)
     case cNoFilenameSpaces:
         allow_filename_spaces = MY_FALSE;
         break;
+
+#ifdef USE_TLS
+    case cTLSkey:
+        if (tls_keyfile != NULL)
+            free(tls_keyfile);
+        tls_keyfile = strdup(pValue);
+        break;
+
+    case cTLScert:
+        if (tls_certfile != NULL)
+            free(tls_certfile);
+        tls_certfile = strdup(pValue);
+        break;
+#endif
 
 #ifdef GC_SUPPORT
     case cGcollectFD:

@@ -9,6 +9,7 @@
 
 #ifdef USE_TLS
 
+#include <stdio.h>
 #include <gnutls/gnutls.h>
 
 #include "pkg-tls.h"
@@ -28,11 +29,18 @@
 
 #define DH_BITS 1024
 
-#define KEYFILE "key.pem"
-#define CERTFILE "cert.pem"
-
 /*-------------------------------------------------------------------------*/
 /* Variables */
+
+char * tls_keyfile = NULL;
+char * tls_certfile = NULL;
+  /* The filenames of the x509 key and cert file, set by the argument
+   * parser. If not set, the package will use defaults.
+   */
+
+static Bool tls_available = MY_FALSE;
+  /* Set to TRUE when the TLS layer has been initialised successfully.
+   */
 
 static gnutls_certificate_server_credentials x509_cred;
   /* The x509 credentials. */
@@ -45,6 +53,7 @@ static void
 initialize_tls_session (gnutls_session *session)
 
 /* Initialise a TLS <session>.
+ * tls_available must be TRUE.
  */
 
 {
@@ -72,6 +81,8 @@ generate_dh_params (void)
  * <dh_params>.  They are for use with DHE kx algorithms. These should be
  * discarded and regenerated once a day, once a week or once a month. Depends
  * on the security requirements.
+ *
+ * tls_available must be TRUE.
  */
 
 {
@@ -95,21 +106,35 @@ void tls_global_init (void)
 
 {
     int f;
+    char * keyfile = tls_keyfile ? tls_keyfile : TLS_DEFAULT_KEYFILE;
+    char * certfile = tls_certfile ? tls_certfile : TLS_DEFAULT_CERTFILE;
 
     gnutls_global_init();
 
     gnutls_certificate_allocate_credentials(&x509_cred);
 
-    f = gnutls_certificate_set_x509_key_file(x509_cred, CERTFILE, KEYFILE, GNUTLS_X509_FMT_PEM);
+    printf("%s TLS: x509 keyfile '%s', certfile '%s'\n"
+          , time_stamp(), keyfile, certfile);
+    debug_message("%s TLS: Keyfile '%s', Certfile '%s'\n"
+                 , time_stamp(), keyfile, certfile);
+
+    f = gnutls_certificate_set_x509_key_file(x509_cred, certfile, keyfile, GNUTLS_X509_FMT_PEM);
     if (f < 0)
     {
 	printf("%s TLS: Error setting x509 keyfile: %s\n"
               , time_stamp(), gnutls_strerror(f));
+	debug_message("%s TLS: Error setting x509 keyfile: %s\n"
+                     , time_stamp(), gnutls_strerror(f));
+    }
+    else
+    {
+        generate_dh_params();
+
+        gnutls_certificate_set_dh_params( x509_cred, dh_params);
+
+        tls_available = MY_TRUE;
     }
 
-    generate_dh_params();
-
-    gnutls_certificate_set_dh_params( x509_cred, dh_params);
 } /* tls_global_init() */
 
 /*-------------------------------------------------------------------------*/
@@ -120,7 +145,10 @@ tls_global_deinit (void)
  */
 
 {
-    gnutls_certificate_free_credentials(x509_cred);
+    if (tls_available)
+    {
+        gnutls_certificate_free_credentials(x509_cred);
+    }
 
     gnutls_global_deinit();
 } /* tls_global_deinit() */
@@ -201,6 +229,9 @@ f_tls_init_connection (svalue_t *sp)
     if (!O_SET_INTERACTIVE(ip, sp->u.ob))
         error("Bad arg 1 to tls_init_connection(): "
               "object not interactive.\n");
+
+    if (!tls_available)
+        error("tls_init_connection(): TLS layer hasn't been initialized.\n");
 
     free_svalue(sp);
 

@@ -1,3 +1,4 @@
+PRELIMINARY
 SYNOPSIS
         #include <sys/ tls.h>
         int *tls_query_connection_info (object ob)

@@ -1,3 +1,4 @@
+PRELIMINARY
 SYNOPSIS
         void tls_deinit_connection(object ob)
 

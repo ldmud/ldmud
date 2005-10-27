@@ -308,7 +308,9 @@ object  this_player();
         /* Technical efuns */
 
 /* void break_point(); */
-/* void swap(object); */
+#if 0
+void swap(object);
+#endif
 
         /* Obsolete and deprecated functions */
 

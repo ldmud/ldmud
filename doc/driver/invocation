@@ -195,6 +195,14 @@ DESCRIPTION
       --pidfile <filename>\n"
         Write the pid of the driver process into <filename>.\n"
 
+      --tls-key <pathname>
+          Use <pathname> as the x509 keyfile, default is 'key.pem'.
+          If relative, <pathname> is interpreted relative to <mudlib>.
+
+      --tls-cert <pathname>
+         Use <pathname> as the x509 certfile, default is 'cert.pem'.
+         If relative, <pathname> is interpreted relative to <mudlib>.
+
       --wizlist-file <filename>
       --no-wizlist-file
         Read and save the wizlist in the named file (always interpreted
@@ -290,6 +298,7 @@ DESCRIPTION -- Argument Parser
 
 HISTORY
     LDMud 3.2.9 added the --max-thread-pending, --hostname,
-    --hostaddr, --args and --random-seed options.
+      --hostaddr, --args and --random-seed options.
     LDMud 3.2.10 added the --filename-spaces options.
     LDMud 3.3.378 added --share-variables, --init-variables.
+    LDMud 3.3.475 added --tls-key, --tle-cert.
