@@ -803,17 +803,22 @@ svalue_to_string ( fmt_state_t *st
                 numadd(st, &str, prec->id_number);
                 stradd(st, &str, ", size: ");
                 numadd(st, &str, size);
-                stradd(st, &str, " */\n");
+                stradd(st, &str, " */");
             }
-            for (i = 0; (size_t)i < size-1; i++)
+            if (size)
             {
-                str = svalue_to_string(st, &(strct->member[i]), str, indent+2, MY_TRUE, quoteStrings, compact);
-            }
-            str = svalue_to_string(st, &(strct->member[i]), str, indent+2, MY_FALSE, quoteStrings, compact);
-            if (!compact)
-            {
-                stradd(st, &str, "\n");
-                add_indent(st, &str, indent);
+                if (!compact)
+                    stradd(st, &str, "\n");
+                for (i = 0; (size_t)i < size-1; i++)
+                {
+                    str = svalue_to_string(st, &(strct->member[i]), str, indent+2, MY_TRUE, quoteStrings, compact);
+                }
+                str = svalue_to_string(st, &(strct->member[i]), str, indent+2, MY_FALSE, quoteStrings, compact);
+                if (!compact)
+                {
+                    stradd(st, &str, "\n");
+                    add_indent(st, &str, indent);
+                }
             }
             stradd(st, &str, ">)");
         }

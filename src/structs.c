@@ -438,8 +438,6 @@ struct_new (struct_type_t *pSType)
 } /* struct_new() */
 
 /*-------------------------------------------------------------------------*/
-/* DEBUG: */ void * xptype = NULL;
-
 struct_type_t *
 struct_new_prototype ( string_t *name )
 
@@ -453,7 +451,6 @@ struct_new_prototype ( string_t *name )
     struct_type_t * pSType;
 
     pSType = xalloc(STRUCT_TYPE_MEMSIZE);
-/* DEBUG: */ xptype = pSType;
     if (pSType != NULL)
     {
         pSType->ref = 1;
