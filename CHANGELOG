@@ -1,6 +1,16 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+30-Oct-2003 (Lars Duening)  (3.3.494)
+  - (prolang.y) When creating a foreach() instruction, don't get confused
+       by visibility flags in the variable type. Before, a 'varargs mixed *'
+       function parameter was errorneously recognized as reference
+       (reported by Alwin and Fiona).
+  - (prolang.y) When removing an unnecessary F_SAVE_ARG_FRAME from a
+       functioncall, also update the last_expression value. Before,
+       a F_CONST0 pushed in place of a void-functions return value
+       was never optimized out.
+
 17-Oct-2003 (Lars Duening)  (3.3.493)
   - (comm.c) Efun query_ip_number(): the return of the full socket
        address in a reference argument didn't work (thanks, Nostradamus).

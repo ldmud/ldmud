@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-25-Sep-2003 (Lars Duening) -- Development Release 3.3
+30-Oct-2003 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -98,6 +98,8 @@ For a detailed list of all changes see the file CHANGELOG.
            a pre-program basis to initialize the variables of clone
            from the current values of the corresponding variables in
            the blueprint.
+       + Bugfix: The type recognition of the variables for a foreach()
+           no longer gets confused by visibility flags.
 
     - Runtime:
        + Revamped the string handling to use refcounted strings everywhere.

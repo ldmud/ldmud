@@ -7755,7 +7755,7 @@ foreach_expr:
           Bool       gen_refs;
 
 %line
-          gen_refs = ($1.type.typeflags & (~TYPE_MOD_RMASK)) != 0;
+          gen_refs = ($1.type.typeflags & TYPE_MOD_MASK & (~TYPE_MOD_RMASK)) != 0;
           set_fulltype(dtype, $1.type.typeflags & TYPE_MOD_RMASK, $1.type.t_struct);
 
           if (!(dtype.typeflags & TYPE_MOD_POINTER)
@@ -12375,6 +12375,7 @@ function_call:
               }
 
               CURRENT_PROGRAM_SIZE--;
+              last_expression--;
           }
 
           argument_level--;

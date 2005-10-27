@@ -14599,7 +14599,7 @@ again:
          */
         if (gen_refs && sp->type != T_LVALUE)
         {
-            ERRORF(("foreach() got a %s, requires a &(string/array/mapping).\n"
+            ERRORF(("foreach() got a %s, expected a &(string/array/mapping).\n"
                    , typename(sp->type)
                    ));
         }
@@ -14621,12 +14621,12 @@ again:
          && arg->type != T_STRUCT
 #endif /* USE_STRUCTS */
          && arg->type != T_MAPPING)
-            ERRORF(("foreach() got a %s, requires a (&)string/array/mapping/struct or number.\n"
+            ERRORF(("foreach() got a %s, expected a (&)string/array/mapping/struct or number.\n"
                    , typename(sp->type)
                    ));
 
         if (gen_refs && arg->type == T_NUMBER)
-            ERROR("foreach() got a &number, requires a (&)string/array/mapping/struct or number.\n"
+            ERROR("foreach() got a &number, expected a (&)string/array/mapping/struct or number.\n"
                    );
 
         /* Find out how many variables we require */
@@ -14755,7 +14755,7 @@ again:
         {
             free_svalue(sp); sp--;
             if (sp->type != T_NUMBER)
-                ERRORF(("foreach() got a %s, requires a number for lower range bound.\n"
+                ERRORF(("foreach() got a %s, expected a number for lower range bound.\n"
                        , typename(sp->type)
                        ));
             start = sp->u.number;
