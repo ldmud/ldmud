@@ -9629,12 +9629,15 @@ echo "${ECHO_T}$lp_cv_has_pcre" >&6
 
 # --- mySQL ---
 
+# Note: Some compilers don't have /usr/local/include in their standard
+# searchpath.
+
 echo "$as_me:$LINENO: checking for mySQL" >&5
 echo $ECHO_N "checking for mySQL... $ECHO_C" >&6
 if test "${lp_cv_has_mysql+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
 else
-  for TESTPATH in "" "${mysql_path}/include" "${mysql_path}" "/usr/local/mysql/include" "/usr/lib/mysql"; do
+  for TESTPATH in "" "${mysql_path}/include" "${mysql_path}" "/usr/local/mysql/include" "/usr/lib/mysql" "/usr/local/include"; do
     saveflags="$CFLAGS"
     if test "x$TESTPATH" != "x"; then
         CFLAGS="-I$TESTPATH $CFLAGS"
@@ -10249,12 +10252,15 @@ fi
 
 # --- PostgreSQL ---
 
+# Note: Some compilers don't have /usr/local/include in their standard
+# searchpath.
+
 echo "$as_me:$LINENO: checking for PostgresSQL" >&5
 echo $ECHO_N "checking for PostgresSQL... $ECHO_C" >&6
 if test "${lp_cv_has_pgsql+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
 else
-  for TESTPATH in "" "$pgsql_path" "$pgsql_path/include" "/usr/local/pgsql/include" "/usr/local/include/pgsql" "/usr/include/pgsql" "/usr/lib/pgsql"; do
+  for TESTPATH in "" "$pgsql_path" "$pgsql_path/include" "/usr/local/pgsql/include" "/usr/local/include/pgsql" "/usr/include/pgsql" "/usr/lib/pgsql" "/usr/local/include"; do
     saveflags="$CFLAGS"
     if test "x$TESTPATH" != "x"; then
         CFLAGS="$CFLAGS -I$TESTPATH"

@@ -979,8 +979,11 @@ pcre_extra foo(void)
 
 # --- mySQL ---
 
+# Note: Some compilers don't have /usr/local/include in their standard
+# searchpath.
+
 AC_CACHE_CHECK(for mySQL,lp_cv_has_mysql,
-for TESTPATH in "" "${mysql_path}/include" "${mysql_path}" "/usr/local/mysql/include" "/usr/lib/mysql"; do
+for TESTPATH in "" "${mysql_path}/include" "${mysql_path}" "/usr/local/mysql/include" "/usr/lib/mysql" "/usr/local/include"; do
     saveflags="$CFLAGS"
     if test "x$TESTPATH" != "x"; then
         CFLAGS="-I$TESTPATH $CFLAGS"
@@ -1115,8 +1118,11 @@ fi
 
 # --- PostgreSQL ---
 
+# Note: Some compilers don't have /usr/local/include in their standard
+# searchpath.
+
 AC_CACHE_CHECK(for PostgresSQL,lp_cv_has_pgsql,
-for TESTPATH in "" "$pgsql_path" "$pgsql_path/include" "/usr/local/pgsql/include" "/usr/local/include/pgsql" "/usr/include/pgsql" "/usr/lib/pgsql"; do
+for TESTPATH in "" "$pgsql_path" "$pgsql_path/include" "/usr/local/pgsql/include" "/usr/local/include/pgsql" "/usr/include/pgsql" "/usr/lib/pgsql" "/usr/local/include"; do
     saveflags="$CFLAGS"
     if test "x$TESTPATH" != "x"; then
         CFLAGS="$CFLAGS -I$TESTPATH"

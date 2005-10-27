@@ -7768,7 +7768,8 @@ f_expand_define (svalue_t *sp)
     /* If we are compiling, lookup the given name and store
      * the expansion in res.
      */
-    if (current_loc.file->name && outp > defbuf && outp <= &defbuf[defbuf_len])
+    if (current_loc.file  && current_loc.file->name
+     && outp > defbuf && outp <= &defbuf[defbuf_len])
     {
         myungetc('\n');
         end = outp;

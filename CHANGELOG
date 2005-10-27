@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+24-Aug-2003 (Lars Duening)  (3.3.483)
+  - (lex.c) Removed a crasher.
+  - (configure) Improved the mySQL/PostgreSQL recognition: on some machines,
+      /usr/local/include is not in the standard search path :-(
+
 21-Aug-2003 (Lars Duening)  (3.3.482)
   - (configure) Improved the PostgreSQL recognition.
   - (make_func.y, actions.c, array.c, backend.c, bitstrings.c, comm.c,
