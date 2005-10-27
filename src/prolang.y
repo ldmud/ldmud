@@ -1520,7 +1520,8 @@ get_type_name (fulltype_t type)
     if  (type.typeflags == TYPE_STRUCT)
     {
         strcat(buff, " ");
-        strcat(buff, get_txt(type.t_struct->name));
+        if (type.t_struct)
+            strcat(buff, get_txt(type.t_struct->name));
     }
 #endif /* USE_STRUCTS */
 

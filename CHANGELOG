@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+22-Feb-2004 (Lars Duening)  (3.3.501)
+  - (prolang.y) Corrected a crasher when printing type of incomplete
+       structures (thanks, Alwin!)
+
 24-Feb-2004 (Lars Duening)  (3.3.500)
   - (xerq/socket.c) When sending data over a congested socket, the
        queued data included the last successfully sent bytes

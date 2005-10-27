@@ -16,6 +16,15 @@ DESCRIPTION
 
         Return 0 on success, and a Unix ERRNO on failure.
 
+BUGS
+        A non-blocking connect() doesn't imply a non-blocking
+        forward name resolution. If you provide a hostname instead
+        of an IP address to connect to, the driver will block until
+        the name is resolved. This may be an issue, depending on how
+        fast your nameserver replies. Non-blocking forward DNS
+        resolution can currently only be achieved using ERQ_LOOKUP.
+
+
 HISTORY
         First version 1992 by Snake and LynX for Nemesis.
         Improved 1993 by Junky.

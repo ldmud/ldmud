@@ -1983,7 +1983,7 @@ shortusage (void)
 
   version();
   fputs("\n"
-"Usage: driver [options] [<portnumber>...]\n"
+"Usage: ldmud [options] [<portnumber>...]\n"
 "\nOptions are:\n"
 "\n"
        , stdout);
@@ -2004,7 +2004,7 @@ usage (void)
 
   version();
   fputs("\n"
-"Usage: driver [options] [<portnumber>...]\n"
+"Usage: ldmud [options] [<portnumber>...]\n"
 "\nOptions are:\n"
        , stdout);
 
@@ -2532,7 +2532,7 @@ eval_arg (int eOption, const char * pValue)
 
     default:
         /* This shouldn't happen. */
-        fprintf(stderr, "%s driver: (eval_arg) Internal error, eOption is %d\n"
+        fprintf(stderr, "%s ldmud: (eval_arg) Internal error, eOption is %d\n"
                       , time_stamp(), eOption);
         return hrError;
     } /* switch */
@@ -2574,7 +2574,7 @@ open_arg_file (InputSource ** ppInput, const char * pName)
         if (!strcmp(pSrc->name, pName))
         {
             fprintf(stderr
-                   , "driver: Recursion in nested argument files: %s\n"
+                   , "ldmud: Recursion in nested argument files: %s\n"
                    , pName);
             for (pSrc = *ppInput; pSrc && pSrc->name != NULL; pSrc = pSrc->next)
                 fprintf(stderr, "          included by %s\n", pSrc->name);
@@ -2590,7 +2590,7 @@ open_arg_file (InputSource ** ppInput, const char * pName)
     {
         int err = errno;
         fprintf( stderr
-               , "driver: Can't open argument file '%s' for reading: (%d) %s\n"
+               , "ldmud: Can't open argument file '%s' for reading: (%d) %s\n"
                , pName, err, strerror(err)
                );
         return MY_FALSE;
@@ -2602,7 +2602,7 @@ open_arg_file (InputSource ** ppInput, const char * pName)
     {
         int err = errno;
         fprintf( stderr
-               , "driver: Can't stat argument file '%s': (%d) %s\n"
+               , "ldmud: Can't stat argument file '%s': (%d) %s\n"
                , pName, err, strerror(err)
                );
         fclose(f);
@@ -2619,7 +2619,7 @@ open_arg_file (InputSource ** ppInput, const char * pName)
         if (pSrc == NULL)
         {
             fprintf( stderr
-                   , "driver: Out of memory reading argument file '%s'\n"
+                   , "ldmud: Out of memory reading argument file '%s'\n"
                    , pName
                    );
             fclose(f);
@@ -2641,7 +2641,7 @@ open_arg_file (InputSource ** ppInput, const char * pName)
         {
             int err = errno;
             fprintf( stderr
-                   , "driver: Error reading argument file '%s': (%d) %s\n"
+                   , "ldmud: Error reading argument file '%s': (%d) %s\n"
                    , pName, err, strerror(err)
                    );
             free(pSrc);
@@ -2694,7 +2694,7 @@ open_arg_file (InputSource ** ppInput, const char * pName)
         if (pMarker == NULL)
         {
             fprintf( stderr
-                   , "driver: Out of memory reading argument file '%s'\n"
+                   , "ldmud: Out of memory reading argument file '%s'\n"
                    , pName
                    );
             free(pSrc);
@@ -2726,7 +2726,7 @@ open_arg_file (InputSource ** ppInput, const char * pName)
                 if (quoted)
                 {
                     fprintf( stderr
-                           , "driver: Error in argument file '%s': "
+                           , "ldmud: Error in argument file '%s': "
                              "Quoted string spans more than one line.\n"
                            , pName
                            );
@@ -2755,7 +2755,7 @@ open_arg_file (InputSource ** ppInput, const char * pName)
         if (!endFound && quoted)
         {
             fprintf( stderr
-                   , "driver: Error in argument file '%s': "
+                   , "ldmud: Error in argument file '%s': "
                      "Unexpected end of file in quoted string.\n"
                    , pName
                    );
@@ -2775,7 +2775,7 @@ open_arg_file (InputSource ** ppInput, const char * pName)
     if (pSrc->argc == 0)
     {
         fprintf( stderr
-               , "driver: Warning: Argument file '%s' contained no data.\n"
+               , "ldmud: Warning: Argument file '%s' contained no data.\n"
                , pName);
         /* We will setup an empty InputSource - no need to abort argument
          * parsing because of this.
@@ -2789,7 +2789,7 @@ open_arg_file (InputSource ** ppInput, const char * pName)
         if (pSrc->argv == NULL)
         {
             fprintf( stderr
-                   , "driver: Out of memory reading argument file '%s'\n"
+                   , "ldmud: Out of memory reading argument file '%s'\n"
                    , pName
                    );
             free(pSrc);
@@ -2866,7 +2866,7 @@ getargs (int argc, char ** argv, int (*opt_eval)(int, const char *) )
   pInput = malloc(sizeof(*pInput));
   if (!pInput)
   {
-      fputs("driver: Out of memory.\n", stderr);
+      fputs("ldmud: Out of memory.\n", stderr);
       return 1;
   }
   pInput->argc = argc-1;
@@ -2992,9 +2992,9 @@ getargs (int argc, char ** argv, int (*opt_eval)(int, const char *) )
           if (cUnknown == eOption)
           {
             if (pInput->name != NULL)
-                fprintf(stderr, "driver: (%s) Unknown option '", pInput->name);
+                fprintf(stderr, "ldmud: (%s) Unknown option '", pInput->name);
             else
-                fputs("driver: Unknown option '", stderr);
+                fputs("ldmud: Unknown option '", stderr);
             if (bShort)
               fprintf(stderr, "-%c", *pArg);
             else
@@ -3016,7 +3016,7 @@ getargs (int argc, char ** argv, int (*opt_eval)(int, const char *) )
           /* Signal an error if pValue is still NULL or if it's empty. */
           if (bTakesValue && (pValue == NULL || !strlen(pValue)))
           {
-            fputs("driver: Option '", stderr);
+            fputs("ldmud: Option '", stderr);
             if (bShort)
               putc((unsigned char)(aOptions[iOption].cOption), stderr);
             else

@@ -8676,7 +8676,10 @@ f_net_connect (svalue_t *sp)
         /* Attempt the connection */
 
         target.sin_port = htons(port);
-        /* TODO: Uh-oh, blocking DNS in the execution thread */
+        /* TODO: Uh-oh, blocking DNS in the execution thread.
+         * TODO:: Better would be to start an ERQ lookup and fill in the
+         * TODO:: data in the background.
+         */
         h = gethostbyname(host);
         target.sin_addr.s_addr = h ? ** (int **) (h -> h_addr_list)
                                    : inet_addr(host);
