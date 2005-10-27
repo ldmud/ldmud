@@ -8991,8 +8991,8 @@ fi
         fi
 
         if test "x$lp_cv_need_lib_crypto" != "xno"; then
-              echo "$as_me:$LINENO: checking if -lcrypto is needed" >&5
-echo $ECHO_N "checking if -lcrypto is needed... $ECHO_C" >&6
+              echo "$as_me:$LINENO: checking if -lcrypto is needed for SSL" >&5
+echo $ECHO_N "checking if -lcrypto is needed for SSL... $ECHO_C" >&6
 if test "${lp_cv_need_lib_crypto+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
 else
@@ -10240,6 +10240,8 @@ else
 else
     not_available="$not_available, use-mysql"
 fi
+      cdef_use_mysql="#undef"
+      enable_use_mysql=no
   fi
 fi
 
@@ -10807,6 +10809,8 @@ else
 else
     not_available="$not_available, use-pgsql"
 fi
+      cdef_use_pgsql="#undef"
+      enable_use_pgsql=no
   fi
 fi
 

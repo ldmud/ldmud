@@ -1106,6 +1106,8 @@ int main(void)
 else
   if test $enable_use_mysql = yes; then
       AC_NOT_AVAILABLE(use-mysql)
+      cdef_use_mysql="#undef"
+      enable_use_mysql=no
   fi
 fi
 
@@ -1235,6 +1237,8 @@ int main(void)
 else
   if test $enable_use_pgsql = yes; then
       AC_NOT_AVAILABLE(use-pgsql)
+      cdef_use_pgsql="#undef"
+      enable_use_pgsql=no
   fi
 fi
 

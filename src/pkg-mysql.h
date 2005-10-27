@@ -6,6 +6,10 @@
 
 #ifdef USE_MYSQL
 
+#ifndef HAS_MYSQL
+#error "pkg-mysql configured even though the machine doesn't support mySQL."
+#endif
+
 /* --- Prototypes --- */
 
 extern Bool pkg_mysql_init (void);

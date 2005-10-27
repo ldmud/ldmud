@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+20-Aug-2003 (Lars Duening)  (3.3.481)
+  - (configure, pkg-mysql.h, pkg-pgsql.h) If mySQL/PostgreSQL are configured
+      but not existant, the compilation will fail with a suitable error
+      message. Also the configure script tries harder to not let this happen
+      (Mantis #0000013).
+
 19-Aug-2003 (Lars Duening)  (3.3.480)
   - (lex, prolang.y, files.c, simulate.c, backend.c, closure.c) Redefinition
       of LPC preprocessor macros now list the file and line of the original

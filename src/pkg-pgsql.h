@@ -5,6 +5,10 @@
 
 #ifdef USE_PGSQL
 
+#ifndef HAS_PGSQL
+#error "pkg-mysql configured even though the machine doesn't support mySQL."
+#endif
+
 #include <unistd.h>
 #include "typedefs.h"
 
