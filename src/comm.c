@@ -1575,7 +1575,7 @@ thread_write_buf (interactive_t * ip, struct write_buffer_s *buf)
         /* Compression has been turned off for this interactive,
          * now get rid of all residual data.
          */
-        end_compress(ip);
+        end_compress(ip, MY_FALSE);
     }
 #else /* USE_MCCP */
     buf->errorno = 0;
@@ -4938,7 +4938,7 @@ mccp_telnet_neg (int option)
          DTF(("MCCP NEG (%d) STATE (DONT)\n", option));
 #ifdef USE_MCCP
          if (ip->compressing==option)
-             end_compress(ip);
+             end_compress(ip, MY_FALSE);
 #endif
         break;
      default:

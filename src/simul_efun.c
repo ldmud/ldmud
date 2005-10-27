@@ -246,7 +246,7 @@ assert_simul_efun_object (void)
 
     num_fun = ob->prog->num_function_names;
     if (num_fun == 0)
-        return NULL;
+        return MY_TRUE;
     if (!simul_efunp)
     {
         simul_efunp = xalloc(sizeof (function_t) * num_fun);

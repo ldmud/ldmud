@@ -348,7 +348,7 @@ f_end_mccp_compress (svalue_t * sp)
     ip->compressing = 0; /* Signal the writer to stop compressing */
     retval = 0;
 #else
-    retval = end_compress(ip);
+    retval = end_compress(ip, MY_FALSE);
 #endif
 
     sp++;

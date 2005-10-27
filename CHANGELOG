@@ -1,6 +1,9 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+14-May-2004 (Lars Duening)  (3.3.546)
+  - (comm.c, simul_efun.c) Corrected compilation errors (thanks, Ralph!)
+
 13-May-2004 (Lars Duening)  (3.3.545)
   - (comm.c, pkg-mccp) A MCCP connection can now be terminated by force from
        the driver.
