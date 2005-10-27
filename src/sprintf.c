@@ -1976,7 +1976,7 @@ static char buff[BUFF_SIZE];         /* For error messages */
                             (*temp)->d.col = get_txt(carg->u.str);
                             (*temp)->pad = pad;
                             (*temp)->size = fs;
-                            (*temp)->pres = (pres) ? (int)pres : fs;
+                            (*temp)->pres = (pres) ? (int)pres : (int)fs;
                             (*temp)->info = finfo;
                             (*temp)->start = st->bpos - st->line_start;
 

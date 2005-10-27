@@ -21,7 +21,8 @@ DESCRIPTION
         Example: nosave int xxx;
 
         Lfun, variable and simul_efun closures are restored only if they
-        can be found - if not, they are restored as value '0'.
+        can be found (this excludes closures of private lfuns as well) - if
+        not, they are restored as value '0'.
 
         If inheritance is used, then it might be possible that a
         variable will exist with the same name in more than one place,

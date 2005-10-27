@@ -1,4 +1,6 @@
 SYNOPSIS
+        #include <sys/commands.h>
+
         mixed *query_actions(object ob, mixed mask_or_verb)
 
 DESCRIPTION
@@ -9,12 +11,12 @@ DESCRIPTION
         zero if the living object "ob" cannot use the verb. If the
         second argument is a bitmask, query_actions() will return a
         flat array containing information on all verbs added to ob.
-        The second argument is optional (default is the bitmask 1).
-                1:  the verb
-                2:  type
-                4:  short_verb
-                8:  object
-                16: function
+        The second argument is optional (default is QA_VERB).
+            QA_VERB       ( 1):  the verb
+            QA_TYPE       ( 2):  type
+            QA_SHORT_VERB ( 4):  short_verb
+            QA_OBJECT     ( 8):  object
+            QA_FUNCTION   (16): function
 
         "type" is one of the values defined in <sent.h> (/sys/sent.h)
         (which is provided with the parser source).

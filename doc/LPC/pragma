@@ -57,6 +57,10 @@ DESCRIPTION
                 to issue a warning.
         no_warn_deprecated: Turns off warn_deprecated (the default).
 
+        warn_empty_casts: A cast of a value to its own type generates
+                a warning (the default).
+        no_warn_empty_casts: Turns off warn_empty_casts.
+
         When an object is compiled with type testing (#pragma
         strict_types), all types are saved of the arguments for that
         function during compilation.  If the #pragma save_types is
@@ -82,7 +86,8 @@ HISTORY
         LDMud 3.2.8 added weak_types, pedantic and sloppy.
         LDMud 3.2.9 allowed to specify multiple pragmas in one directive.
         LDMud 3.2.9 added (no_)warn_deprecated.
-        Starting with LDMud 3.3, #pragma xxx_types in an included file are
+        LDMud 3.2.10 added (no_)warn_empty_casts.
+        Starting with LDMud 3.2.10, #pragma xxx_types in an included file are
           no longer valid only until the end of the file, but remain active
           when processing returns to the including file.
         LDMud 3.3.378 added init_variables, share_variables.

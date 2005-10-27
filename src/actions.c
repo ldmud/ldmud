@@ -2058,7 +2058,7 @@ e_get_all_actions (object_t *ob, int mask)
 
         sa = (action_t *)s;
 
-        if (mask & 1)
+        if (mask & QA_VERB)
         {
             string_t * str;
             if ( NULL != (str = sa->verb) ) {
@@ -2066,22 +2066,22 @@ e_get_all_actions (object_t *ob, int mask)
             }
             p++;
         }
-        if (mask & 2)
+        if (mask & QA_TYPE)
         {
             p->u.number = s->type;
             p++;
         }
-        if (mask & 4)
+        if (mask & QA_SHORT_VERB)
         {
             p->u.number = sa->short_verb;
             p++;
         }
-        if (mask & 8)
+        if (mask & QA_OBJECT)
         {
             put_ref_object(p, sa->ob, "get_action");
             p++;
         }
-        if (mask & 16)
+        if (mask & QA_FUNCTION)
         {
             put_ref_string(p, sa->function);
             p++;
@@ -2158,12 +2158,12 @@ f_query_actions (svalue_t *sp)
  * zero if the living object "ob" cannot use the verb. If the
  * second argument is a bitmask, query_actions() will return a
  * flat array containing information on all verbs added to ob.
- * The second argument is optional (default is the bitmask 1).
- *      1:  the verb
- *      2:  type
- *      4:  short_verb
- *      8:  object
- *     16: function
+ * The second argument is optional (default is QA_VERB).
+ *     QA_VERB       ( 1):  the verb
+ *     QA_TYPE       ( 2):  type
+ *     QA_SHORT_VERB ( 4):  short_verb
+ *     QA_OBJECT     ( 8):  object
+ *     QA_FUNCTION   (16): function
  *
  * "type" is one of the values defined in <sent.h> (/sys/sent.h)
  * (which is provided with the parser source).

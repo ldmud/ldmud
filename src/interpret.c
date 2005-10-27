@@ -15500,6 +15500,7 @@ again:
          * given directly or as a string (i.e. its file name). If it is given
          * by a string and the object does not exist yet, it will be loaded.
          *
+#ifdef USE_ARRAY_CALLS
          *     unknown * call_other(object|string *ob, string str, mixed arg, ...)
          *     unknown * ob->fun(mixed arg, ...)
          *
@@ -15508,6 +15509,7 @@ again:
          * Every object can be given directly or as a string (i.e. its file name).
          * If it is given by a string and the object does not exist yet, it will
          * be loaded.
+#endif
          *
          * The difference between call_other() and call_direct()
          * is that the latter does not allow the evaluation of default
@@ -15530,9 +15532,17 @@ again:
         /* Test the arguments */
         if (arg[0].type != T_OBJECT
          && arg[0].type != T_STRING
+#ifdef USE_ARRAY_CALLS
          && arg[0].type != T_POINTER
+#endif /* USE_ARRAY_CALLS */
            )
+        {
+#ifdef USE_ARRAY_CALLS
             RAISE_ARG_ERROR(1, TF_OBJECT|TF_STRING|TF_POINTER, arg[0].type);
+#else
+            RAISE_ARG_ERROR(1, TF_OBJECT|TF_STRING, arg[0].type);
+#endif /* USE_ARRAY_CALLS */
+        }
 
         TYPE_TEST2(arg+1, T_STRING)
         if (get_txt(arg[1].u.str)[0] == ':')
@@ -15549,7 +15559,9 @@ again:
             break;
         }
 
+#ifdef USE_ARRAY_CALLS
         if (arg[0].type != T_POINTER)
+#endif /* USE_ARRAY_CALLS */
         {
             /* --- The normal call other to a single object --- */
 
@@ -15602,6 +15614,7 @@ again:
             free_svalue(--sp);  /* Remove old arguments to call_other */
             *sp = *arg;         /* Re-insert function result */
         }
+#ifdef USE_ARRAY_CALLS
         else
         {
             /* --- The other call other to an array of objects --- */
@@ -15729,6 +15742,7 @@ again:
              */
             free_string_svalue(sp); sp--;
         }
+#endif /* USE_ARRAY_CALLS */
 
         break;
     }

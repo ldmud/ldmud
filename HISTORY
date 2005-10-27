@@ -134,7 +134,7 @@ For a detailed list of all changes see the file CHANGELOG.
            x509 key- and certfile for the TLS package.
 
 
-25-Sep-2003 (Lars Duening) -- Release 3.2.10
+27-Sep-2003 (Lars Duening) -- Release 3.2.10
 
     - Changed efuns:
        + debug_info(): Removed the DID_MEM_UNUSED value from the DINFO_DATA:
@@ -145,6 +145,8 @@ For a detailed list of all changes see the file CHANGELOG.
            creation times.
        + debug_info(): Added DID_ST_BOOT_TIME to the DINFO_DATA:DID_STATUS
            result.
+       + debug_info(): Added a third argument to DINFO_OBJLIST to return
+           multiple objects.
        + function_exists(): now also returns the filename and linenumber
            of a function.
        + remove_action(): It is now possible to remove all actions
@@ -167,12 +169,18 @@ For a detailed list of all changes see the file CHANGELOG.
            removing a pending input handler.
        + restore_object(): The function leaked memory when restoring from
            a MALLOCed string.
+       + to_array(): When converting a string, the characters are treated
+           as unsigned.
 
     - New efuns:
        + m_entry(): Return all values for mapping entry at once.
        + rmember(): Search arrays and strings from the end.
        + get_combine_charset(), get_connection_charset(): Query the
            combine resp. connection charset.
+       + get_max_commands(): Query the allowed command rate of an
+           interactive object.
+       + set_max_commands(): Set the allowed command rate of an
+           interactive object.
        + strrstr(): Search a string within a string backwards.
        + variable_exists(): Check the existance of a named variable.
        + variable_list(): Return all variable names of an object.
@@ -202,7 +210,13 @@ For a detailed list of all changes see the file CHANGELOG.
            filesystem conventions.
        + Preprocessor symbol __FILENAME_SPACES__ is defined if the driver is
            instructed to allow spaces in filenames.
-       + Casts of a value to its own type generate a warning.
+       + A cast of a value to its own type, or a cast not resulting in a
+           conversion operation generates a warning. The pragma
+           no_warn_empty_casts can turn this warning off.
+       + The strong_types/strict_types pragmas now persist beyond the
+           end of an include file (as does every other pragma).
+       + call_other()s on arrays of objects is now configurable; if enabled,
+           the macro __LPC_ARRAY_CALLS__ is defined.
        + Bugfix: Characters with the 8th bit set are now treated as positive
            when entered as literal character constants.
        + Bugfix: Illegal case ranges like '100..50' now generate

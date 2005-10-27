@@ -361,7 +361,7 @@ v_insert_alist (svalue_t *sp, int num_arg)
     for (i = 1; i < listsize; i++)
     {
         if (list->item[i].type != T_POINTER
-         || VEC_SIZE(list->item[i].u.vec) != keynum)
+         || (size_t)VEC_SIZE(list->item[i].u.vec) != keynum)
         {
             error("Type or size mismatch of the data arrays.\n");
             /* NOTREACHED */
@@ -379,7 +379,7 @@ v_insert_alist (svalue_t *sp, int num_arg)
         }
         else
         {
-            if (VEC_SIZE(sp[-1].u.vec) != (size_t)listsize)
+            if (VEC_SIZE(sp[-1].u.vec) != listsize)
             {
                 error("Size mismatch of the data arrays: "
                       "vec size %ld, list size %ld.\n"
@@ -598,7 +598,7 @@ v_order_alist (svalue_t *sp, int num_arg)
     for (i = 0; i < listsize; i++)
     {
         if (args[i].type != T_POINTER
-         || VEC_SIZE(args[i].u.vec) != keynum)
+         || (size_t)VEC_SIZE(args[i].u.vec) != keynum)
         {
             error("bad data array %d in call to order_alist\n",i);
         }

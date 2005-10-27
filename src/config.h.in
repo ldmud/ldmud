@@ -333,6 +333,10 @@
  */
 @cdef_use_alists@ USE_ALISTS
 
+/* Define this if you want to allow call_other()s on arrays of objects.
+ */
+@cdef_use_array_calls@ USE_ARRAY_CALLS
+
 /* Define this if you want PCRE instead of traditional regexps.
  */
 @cdef_use_pcre@ USE_PCRE

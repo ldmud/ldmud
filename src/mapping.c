@@ -2936,7 +2936,7 @@ clean_stale_mappings (void)
         {
             size_t ix;
 
-            for (ix = 0; ix <= hm->mask; ix++)
+            for (ix = 0; ix <= (size_t)hm->mask; ix++)
             {
                 map_chain_t * mc, * mcp;
 

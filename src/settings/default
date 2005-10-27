@@ -388,6 +388,10 @@ enable_use_tls=no
 
 enable_use_alists=no
 
+# Enable call_other()s on arrays of objects.
+
+enable_use_array_calls=yes
+
 # Enable PCRE instead of traditional regexps
 
 enable_use_pcre=yes

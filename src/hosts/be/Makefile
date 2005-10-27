@@ -447,13 +447,12 @@ $(OBJ)/closure.o : i-svalue_cmp.h xalloc.h switch.h swap.h svalue.h \
     sent.h bytecode.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/comm.o : util/erq/erq.h ../mudlib/sys/input_to.h \
-    ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h swap.h svalue.h \
-    stdstrings.h simulate.h sent.h pkg-pgsql.h pkg-mccp.h object.h \
-    mstrings.h main.h interpret.h gcollect.h filestat.h exec.h ed.h \
-    closure.h backend.h array.h actions.h access_check.h comm.h \
+    ../mudlib/sys/driver_hook.h ../mudlib/sys/comm.h xalloc.h wiz_list.h \
+    swap.h svalue.h stdstrings.h simulate.h sent.h pkg-tls.h pkg-pgsql.h \
+    pkg-mccp.h object.h mstrings.h main.h interpret.h gcollect.h filestat.h \
+    exec.h ed.h closure.h backend.h array.h actions.h access_check.h comm.h \
     ../mudlib/sys/telnet.h my-alloca.h typedefs.h driver.h strfuns.h \
-    bytecode.h config.h pkg-tls.h port.h hosts/unix.h hosts/be/be.h \
-    machine.h
+    bytecode.h config.h port.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/dumpstat.o : xalloc.h svalue.h structs.h stdstrings.h simulate.h \
     ptrtable.h object.h mstrings.h mapping.h instrs.h filestat.h exec.h \
@@ -608,9 +607,10 @@ $(OBJ)/pkg-pgsql.o : ../mudlib/sys/pgsql.h xalloc.h stdstrings.h simulate.h \
     pkg-pgsql.h my-alloca.h typedefs.h driver.h svalue.h strfuns.h sent.h \
     bytecode.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
-$(OBJ)/pkg-tls.o : xalloc.h svalue.h object.h mstrings.h main.h comm.h \
-    array.h pkg-tls.h driver.h strfuns.h typedefs.h sent.h simulate.h \
-    port.h config.h bytecode.h hosts/unix.h hosts/be/be.h machine.h
+$(OBJ)/pkg-tls.o : ../mudlib/sys/tls.h xalloc.h svalue.h object.h \
+    mstrings.h main.h interpret.h comm.h array.h actions.h pkg-tls.h \
+    driver.h strfuns.h typedefs.h sent.h bytecode.h simulate.h port.h \
+    config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/port.o : hosts/crypt.c main.h backend.h my-rusage.h driver.h \
     machine.h typedefs.h port.h config.h hosts/unix.h hosts/be/be.h

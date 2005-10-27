@@ -182,6 +182,10 @@ Bool pragma_share_variables;
   /* TRUE: Share the blueprint's variables with its clones.
    */
 
+Bool pragma_warn_empty_casts;
+  /* True: warn if a type is casted to itself.
+   */
+
 string_t *last_lex_string;
   /* When lexing string literals, this is the (shared) string lexed
    * so far. It is used to pass string values to lang.c and may be
@@ -822,6 +826,9 @@ init_lexer(void)
 #endif
 #ifdef USE_NEW_INLINES
     add_permanent_define("__LPC_INLINE_CLOSURES__", -1, string_copy("1"), MY_FALSE);
+#endif
+#ifdef USE_ARRAY_CALLS
+    add_permanent_define("__LPC_ARRAY_CALLS__", -1, string_copy("1"), MY_FALSE);
 #endif
 #ifdef USE_PTHREADS
     add_permanent_define("__PTHREADS__", -1, string_copy("1"), MY_FALSE);
@@ -3386,6 +3393,16 @@ handle_pragma (char *str)
             pragma_warn_deprecated = MY_FALSE;
             validPragma = MY_TRUE;
         }
+        else if (strncmp(base, "warn_empty_casts", namelen) == 0)
+        {
+            pragma_warn_empty_casts = MY_TRUE;
+            validPragma = MY_TRUE;
+        }
+        else if (strncmp(base, "no_warn_empty_casts", namelen) == 0)
+        {
+            pragma_warn_empty_casts = MY_FALSE;
+            validPragma = MY_TRUE;
+        }
         else if (strncmp(base, "share_variables", namelen) == 0)
         {
             if (variables_defined)
@@ -5614,6 +5631,7 @@ start_new_file (int fd, const char * fname)
     pragma_no_shadow = MY_FALSE;
     pragma_pedantic = MY_FALSE;
     pragma_warn_deprecated = MY_FALSE;
+    pragma_warn_empty_casts = MY_TRUE;
     pragma_combine_strings = MY_TRUE;
     pragma_share_variables = share_variables;
 

@@ -2733,7 +2733,7 @@ f_transpose_array (svalue_t *sp)
         z = y->u.vec->item;
 
         c = b;
-        if (VEC_SIZE(y->u.vec) < (size_t)b
+        if (VEC_SIZE(y->u.vec) < b
          && !(c = (mp_int)VEC_SIZE(y->u.vec)) )
                 continue;
 

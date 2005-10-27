@@ -848,6 +848,8 @@ int privilege_violation (string op, mixed who, mixed arg, mixed arg2)
 //   set_extra_wizinfo_size : Set the size of the additional wizard info
 //                       in the wiz-list to <arg>.
 //   set_driver_hook   : Set hook <arg> to <arg2>.
+//   set_max_commands  : Set the max. number of commands interactive
+//                       object <arg> can issue per second to <arg2>.
 //   limited:          : Execute <arg> with reduced/changed limits.
 //   set_limits        : Set limits to <arg>.
 //   set_this_object   : Set this_object() to <arg>.

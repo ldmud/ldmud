@@ -5164,7 +5164,8 @@ f_to_array (svalue_t *sp)
 
 {
     vector_t *v;
-    char *s, ch;
+    char *s;
+    unsigned char ch;
     svalue_t *svp;
     p_int len;
 
@@ -5182,7 +5183,7 @@ f_to_array (svalue_t *sp)
         s = get_txt(sp->u.str);
         svp = v->item;
         while (len-- > 0) {
-            ch = *s++;
+            ch = (unsigned char)*s++;
             put_number(svp, ch);
             svp++;
         }
@@ -6746,11 +6747,18 @@ v_debug_info (svalue_t *sp, int num_arg)
  *     variables, inherited files, object size etc. will be printed about the
  *     specified object, and 0 returned.
  *
- * DINFO_OBJLIST (2): Objects from the global object list are returned.  If
- *     the optional second arg is omitted, the first element (numbered 0)
- *     is returned. If the second arg is a number n, the n'th element of the
- *     object list returned. If the second arg is an object, it's successor
- *     in the object list is returned.
+ * DINFO_OBJLIST (2): Objects from the global object list are
+ *     returned.  If the optional <arg2> is omitted, the first
+ *     element(s) (numbered 0) is returned. If the <arg2> is a
+ *     number n, the n'th element(s) of the object list returned. If the
+ *     <arg2> is an object, it's successor(s) in the object list is
+ *     returned.
+ *     The optional <arg3> specifies the maximum number of objects
+ *     returned. If it's 0, a single object is returned. If it is
+ *     a positive number m, an array with at max 'm' objects is
+ *     returned. This way, by passing __INT_MAX__ as <arg3> it is
+ *     possible to create an array of all objects in the game
+ *     (given a suitable maximum array size).
  *
  * DINFO_MALLOC: Equivalent to typing ``malloc'' at the command line.
  *     No second arg must be given. Returns 0.
@@ -7328,32 +7336,74 @@ v_debug_info (svalue_t *sp, int num_arg)
       {
         /* Get the first/next object in the object list */
 
-        int i;
+        int i, m;
         ob = obj_list;
         i = 0;
+        m = 0;
 
+        if (num_arg > 2)
+        {
+            if (arg[2].type != T_NUMBER)
+                vefun_exp_arg_error(3, (1 << T_NUMBER)
+                                     , arg[2].type, sp);
+            m = arg[2].u.number;
+            if (m < 0)
+                error("Bad arg3 to debug_info(DINFO_OBJLIST): %ld, "
+                      "expected a number >= 0.\n"
+                     , (long)m);
+        }
+ 
         if (num_arg > 1)
         {
-            if (num_arg > 2)
-                error("bad number of arguments to debug_info\n");
-
-            if (sp->type == T_NUMBER)
+            if (arg[1].type == T_NUMBER)
             {
-                i = sp->u.number;
+                i = arg[1].u.number;
             }
             else
             {
-                if (sp->type != T_OBJECT)
+                if (arg[1].type != T_OBJECT)
                     vefun_exp_arg_error(2, (1 << T_OBJECT)|(1 << T_NUMBER)
-                                         , sp->type, sp);
-                ob = sp->u.ob;
+                                         , arg[1].type, sp);
+                ob = arg[1].u.ob;
                 i = 1;
             }
         }
 
         while (ob && --i >= 0) ob = ob->next_all;
         if (ob)
-            put_ref_object(&res, ob, "debug_info");
+        {
+            if (m < 1)
+                put_ref_object(&res, ob, "debug_info");
+            else
+            {
+                /* Caller expects an array of at max m objects. */
+                object_t * obj_start = ob;
+                size_t len;
+                vector_t * rc;
+
+                /* First count how many objects we have. */
+                for (len = 0; ob && len < (size_t)m; len++, ob = ob->next_all)
+                    NOOP;
+
+                rc = allocate_uninit_array(len);
+                if (!rc)
+                    outofmemory("result array");
+
+                /* Now transfer all the objects into the array. */
+                for ( len = 0, ob = obj_start
+                    ; ob && len < (size_t)m
+                    ; len++, ob = ob->next_all)
+                    put_ref_object(rc->item+len, ob, "debug_info");
+
+                put_array(&res, rc);
+            }
+        }
+        else if (m > 0)
+        {
+            /* No object found, but caller expects an array */
+            put_array(&res, allocate_array(0));
+        }
+        /* else: no object found, and no array expected: just return 0 */
         break;
       }
 

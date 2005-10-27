@@ -21,7 +21,16 @@ DESCRIPTION
             element (numbered 0) is returned. If the second arg is a
             number n, the n'th element of the object list returned. If the
             second arg is an object, it's successor in the object list is
-            returned.
+            returned.  If the optional <arg2> is omitted, the first
+            element(s) (numbered 0) is returned. If the <arg2> is a
+            number n, the n'th element(s) of the object list returned. If the
+            <arg2> is an object, it's successor(s) in the object list is
+            The optional <arg3> specifies the maximum number of objects
+            returned. If it's 0, a single object is returned. If it is
+            a positive number m, an array with at max 'm' objects is
+            returned. This way, by passing __INT_MAX__ as <arg3> it is
+            possible to create an array of all objects in the game
+            (given a suitable maximum array size).
 
         DINFO_MALLOC (3): Equivalent to typing ``malloc'' at the command
             line. No second arg must be given. Returns 0.
@@ -509,7 +518,8 @@ HISTORY
           removed DID_MEM_UNUSED from DINFO_DATA:DID_MEMORY; added
           DID_ST_BOOT_TIME, DID_ST_MB_FILE and DID_ST_MB_SWAP to
           DINFO_DATA:DID_STATUS; removed DID_ST_CALLOUT_SLOTS and from
-          DINFO_DATA:DID_STATUS, and changed the meaning of
+          DINFO_DATA:DID_STATUS; added the third argument to
+          DINFO_OBJLIST, and changed the meaning of
           DID_ST_CALLOUT_SIZE and DID_ST_HBEAT_SIZE/_SLOTS.
         LDMud 3.3 replaced the string related DID_ST_ constants according to
           the new string implementation.

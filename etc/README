@@ -11,8 +11,9 @@ Miscellaneous files for the driver:
   PoweredByLDMud.gif: And another nifty butty by Elric.
                    
   lpc-mode.el : LPC mode for EMACS, by Vivek Dasmohapatra <vivek@etla.org>
-
   lpc.xml     : LPC syntax highlighting for Kate, by <Andreas.Klauer@epost.de>
+  lpc.vim     : LPC syntax highlighting for vim, maintained by Shizhu
+                  Pan <poet@mudbuilder.net>
 
   patch-o-matic: A bash script to automatically up/downgrade the driver
                  with the latest patches from the bearnip.com website.

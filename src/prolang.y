@@ -5712,7 +5712,7 @@ struct_decl:
       }
     | type_modifier_list L_STRUCT L_IDENTIFIER
       { 
-          int i;
+          size_t i;
 
           /* Free any struct members left over from a previous
            * struct parse. This should happen only in case
@@ -9323,14 +9323,17 @@ expr0:
                   break;
               }
           }
-          else if (equal_types($1, $2.type))
-              yywarnf("casting a value to its own type: %s"
-                     , get_type_name($1));
-          else if ($2.type.typeflags != TYPE_UNKNOWN
-                && $2.type.typeflags != TYPE_ANY)
-              yywarnf("cast will not convert the value: %s"
-                     , get_two_types($1, $2.type)
-                  );
+          else if (pragma_warn_empty_casts)
+          {
+              if (equal_types($1, $2.type))
+                  yywarnf("casting a value to its own type: %s"
+                         , get_type_name($1));
+              else if ($2.type.typeflags != TYPE_UNKNOWN
+                    && $2.type.typeflags != TYPE_ANY)
+                  yywarnf("cast will not convert the value: %s"
+                         , get_two_types($1, $2.type)
+                      );
+          }
 
           $$.end = CURRENT_PROGRAM_SIZE;
       }
@@ -9937,7 +9940,7 @@ expr4:
 
           ins_f_code(F_AGGREGATE);
           ins_short($4);
-          if (max_array_size && $4 > max_array_size)
+          if (max_array_size && $4 > (p_int)max_array_size)
               yyerror("Illegal array size");
           $$.type = Type_Ptr_Any;
           $$.start = $3.start;
@@ -9961,7 +9964,7 @@ expr4:
 
           ins_f_code(F_AGGREGATE);
           ins_short($3);
-          if (max_array_size && $3 > max_array_size)
+          if (max_array_size && $3 > (p_int)max_array_size)
               yyerror("Illegal array size");
           $$.type = Type_Quoted_Array;
           $$.start = $2.start;

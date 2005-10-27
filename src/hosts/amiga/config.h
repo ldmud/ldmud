@@ -331,6 +331,10 @@
 
 #define USE_ALISTS
 
+/* Define this if you want to allow call_other()s on arrays of objects.
+ */
+#define USE_ARRAY_CALLS
+
 /* Define this if you want PCRE instead of traditional regexps.
  */
 

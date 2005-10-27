@@ -11,12 +11,16 @@ DESCRIPTION
         the argument(s) <arg...>. Result is the value returned from
         the called function (or 0 for non-existing or void functions).
 
-        If <ob> is given as an array of objects, the function is called
-        with the same arguments in all the given objects. The single
-        results are collected in an array and yield the final result.
-        Array elements can be objects or the names of existing objects;
-        destructed objects and 0s will yield a '0' as result, but don't
-        cause an error.
+        Optionally the driver can be configured to accept an array of
+        objects as <ob>: the function is called with the same
+        arguments in all the given objects.  The single results are
+        collected in an array and yield the final result.  Array
+        elements can be objects or the names of existing objects;
+        destructed objects and 0s will yield a '0' as result, but
+        don't cause an error.
+
+        If the array-calling mode is available, the macro
+        __LPC_ARRAY_CALLS__ is defined.
 
         The object(s) can be given directly or via a string (i.e. its
         object_name). If it is given by a string and the object does not
@@ -88,6 +92,7 @@ HISTORY
            called "y";
          - a simul_efun call_other() also catches ->() calls.
          - call_other can be applied on arrays of objects.
+        LDMud 3.2.10 made the call on arrays of objects configurable.
 
         LDMud 3.3.113 introduced the H_DEFAULT_METHOD hook.
 

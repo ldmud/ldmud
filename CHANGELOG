@@ -1,6 +1,25 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+27-Sep-2003 (Lars Duening)  (3.3.488)
+  - (efuns.c) Added a third argument to debug_info(DINFO_OBJLIST) to return
+       multiple objects.
+  - (comm, func_spec) New efuns set_max_commands(), get_max_commands()
+       to control the number of commands allowed per second on a
+       per-connection basis.
+  - (svalue.h) Added macro put_float() to store floats into a svalue.
+  - (lex, prolang.y) Pragma (no_)warn_empty_casts allows to turn off
+       the warnings about ineffective casts.
+  - (etc/lpc.vim) LPC syntax highlighting for vim (submitted by Coogan).
+  - (autoconf, interpret.c, main.c, lex.c) The call_other() on arrays of
+       objects is now configurable; if enabled, __LPC_ARRAY_CALLS__ is
+       defined.
+  - (mudlib/sys/commands.h) Added defines for the query_action() bitflags.
+  - (array.c, mapping.c, pkg-alists.c, sprintf.c, xalloc.c, prolang.y)
+       Removed a couple of signed/unsigned warnings (thanks, Ralph!).
+  - (efuns.c) to_array(string) now treats the string characters as unsigned
+       (reported by Fiona).
+
 27-Sep-2003 (Lars Duening)  (3.3.487)
   - (prolang.y) Corrected some subtleties in the lfun/efun classification
       of functions, revealed by the recent change.
@@ -25,7 +44,6 @@ See the file HISTORY for a user-oriented summary of all the changes.
        muds making heavy use of charmode connections. If it works out,
        the feature will be fully fleshed out with commandline arguments
        and everything (Mantis #0000009).
-
 
 12-Sep-2003 (Lars Duening)  (3.3.485)
   - (sprintf.c) Printing a 0-member struct with '%O' crashed the driver
@@ -2193,7 +2211,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
 
 15-Feb-2002 (Lars Duening)
     - (simul_efun.c) simul-efuns shadowing real efuns were not properly
-        discarded, making it impossible to reactive them (which in a 
+        discarded, making it impossible to reactivate them (which in a 
         way was lucky as it made it possible to find the call_other bug).
     - (interpret.c) The error handling for a secure call did not
         properly roll back the control stack, leaking any closure

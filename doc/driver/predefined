@@ -60,6 +60,7 @@ DESCRIPTION
                            will always be defined.
       __LPC_INLINE_CLOSURES__: defined when the 'real' inline closures
                            are enabled.
+      __LPC_ARRAY_CALLS__: call_other()s on arrays of objects enabled.
 
     If the driver is compiled for using the MS-DOS filesystem
     conventions, __MSDOS_FS__ is defined.
@@ -96,7 +97,8 @@ HISTORY
          __INT_MAX__, __INT_MIN__, __FLOAT_MIN__, __FLOAT_MAX__,
         __CATCH_EVAL_COST__, __MASTER_EVAL_COST__, __RESET_TIME__,
         __CLEANUP_TIME__, __DRIVER_LOG__, and __WIZLIST__.
-    3.2.10 added __MAX_MALLOC__, __MSDOS_FS__ and __FILENAME_SPACES__.
+    3.2.10 added __MAX_MALLOC__, __MSDOS_FS__, __LPC_ARRAY_CALLS__
+        and __FILENAME_SPACES__.
     3.3 made __LPC_NOSAVE__ always defined and added __ALISTS__,
         __MCCP__, __LPC_STRUCTS__, __LPC_INLINE_CLOSURES__, __PGSQL__,
         __PTHREADS__, __TLS__ and __PCRE__.

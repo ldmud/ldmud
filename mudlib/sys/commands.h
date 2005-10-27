@@ -15,6 +15,16 @@
 #define AA_IMM_ARGS 3  /* VERB must start with <verb>,
                         * args do include extra characters */
 
+/* Bitflags accepted by  query_actions(object ob, int mask)
+ */
+
+#define QA_VERB         1
+#define QA_TYPE         2
+#define QA_SHORT_VERB   4
+#define QA_OBJECT       8
+#define QA_FUNCTION    16
+
+
 /* Indices in the arrays returned from command_stack()
  */
 

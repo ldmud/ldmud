@@ -801,7 +801,7 @@ store_print_block_dispatch_info (void *block
     int i;
 
     i = num_dispatched_types++;
-    if (i >= sizeof(dispatch_table)/sizeof(dispatch_table[0]))
+    if (i >= (int)sizeof(dispatch_table)/sizeof(dispatch_table[0]))
     {
         writes(2, "dispatch_table for print_block() to small\n");
         return;
@@ -886,7 +886,7 @@ print_block (int d, word_t *block)
             /* Print the same data as characters */
             for (i = 0; i < 16 && i < (int)size && i < limit; i++)
             {
-                if (isprint(cp[i]))
+                if (isprint((unsigned char)cp[i]))
                     write(d, cp+i, 1);
                 else
                     writes(d, ".");

@@ -231,10 +231,6 @@ char *message_flush = NULL;
    * a 'null format string'.
    */
 
-int maxNumCommands = 10;
-  /* Maximum number of commands (char or line) to execute per second.
-   */
-
 long pthread_write_max_size = PTHREAD_WRITE_MAX_SIZE;
   /* Amount of data held pending in the pthread fifo queue.
    * Evaluated only with USE_PTHREADS.
@@ -729,7 +725,8 @@ comm_fatal (interactive_t *ip, char *fmt, ...)
       if (ip->snoop_by) fprintf(stderr, " (%s)", get_txt(ip->snoop_by->name));
       putc('\n', stderr);
     fprintf(stderr, "  .last_time:         %ld\n", (long)ip->last_time);
-    fprintf(stderr, "  .numCmds:           %d\n", ip->numCmds);
+    fprintf(stderr, "  .numCmds:           %ld\n", ip->numCmds);
+    fprintf(stderr, "  .maxNumCmds:        %ld\n", ip->maxNumCmds);
     fprintf(stderr, "  .trace_level:       %d\n", ip->trace_level);
     fprintf(stderr, "  .trace_prefix:      %p", ip->trace_prefix);
       if (ip->trace_prefix) fprintf(stderr, " '%s'", get_txt(ip->trace_prefix));
@@ -2929,10 +2926,12 @@ get_message (char *buff)
             if (ip == 0)
                 continue;
 
-            /* Skip players which have reached the maxNumCommands limit
+            /* Skip players which have reached the ip->maxNumCmds limit
              * for this second. We let the data accumulate on the socket.
              */
-            if (ip->last_time == current_time && ip->numCmds >= maxNumCommands)
+            if (ip->last_time == current_time
+             && ip->maxNumCmds >= 0
+             && ip->numCmds >= ip->maxNumCmds)
                 continue;
 
             /* Get the data (if any), at max enough to fill .text[] */
@@ -3784,6 +3783,7 @@ new_player (SOCKET_T new_socket, struct sockaddr_in *addr, size_t addrlen
     new_interactive->snoop_by = NULL;
     new_interactive->last_time = current_time;
     new_interactive->numCmds = 0;
+    new_interactive->maxNumCmds = 0;
     new_interactive->trace_level = 0;
     new_interactive->trace_prefix = NULL;
     new_interactive->message_length = 0;
@@ -7928,7 +7928,7 @@ get_charset (svalue_t * sp, p_int mode, char charset[32])
 svalue_t *
 f_get_combine_charset (svalue_t *sp)
 
-/* EFUN: get_combine_charset()
+/* TEFUN: get_combine_charset()
  *
  *   mixed get_combine_charset (int mode)
  *
@@ -8047,7 +8047,7 @@ f_set_combine_charset (svalue_t *sp)
 svalue_t *
 f_get_connection_charset (svalue_t *sp)
 
-/* EFUN: get_connection_charset()
+/* TEFUN: get_connection_charset()
  *
  *   mixed get_connection_charset (int mode)
  *
@@ -8365,5 +8365,74 @@ f_query_udp_port (svalue_t *sp)
 
     return sp;
 } /* f_query_udp_port() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_get_max_commands (svalue_t *sp)
+
+/* TEFUN: get_max_commands()
+ *
+ *   int get_max_commands ()
+ *   int get_max_commands (object obj)
+ *
+ * Return the max number of commands (read: line resp. char inputs) the
+ * interactive <obj> (default is the current interactive) is allowed to
+ * execute per second. A negative result means 'unlimited'.
+ * For non-interactive objects the result is 0.
+ */
+
+{
+    p_int rc;
+    interactive_t *ip;
+
+    rc = 0;
+    if (O_SET_INTERACTIVE(ip, sp->u.ob))
+        rc = ip->maxNumCmds;
+
+    free_svalue(sp);
+    put_number(sp, rc);
+
+    return sp;
+} /* f_get_max_commands() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_set_max_commands (svalue_t *sp)
+
+/* TEFUN: set_max_commands()
+ *
+ *   void set_max_commands (int num)
+ *   void set_max_commands (int num, object obj)
+ *
+ * Set the max number of commands (read: line resp. char inputs) the
+ * interactive <obj> (default is the current interactive) is allowed to
+ * execute per second to <num>. A negative result means 'unlimited'.
+ * For non-interactive objects the function raises an error.
+ *
+ * The function raises a privilege_violation ("set_max_commands", obj, num).
+ * If the privilege is denied, the call is ignored.
+ */
+
+{
+    p_int num;
+    interactive_t *ip;
+
+    num = sp[-1].u.number;
+    if (num < 0)
+        num = -1;
+
+    if (!O_SET_INTERACTIVE(ip, sp->u.ob))
+    {
+        error("Bad arg 2 to set_max_commands(): Object is not interactive.\n");
+        /* NOTREACHED */
+    }
+
+    if (privilege_violation4(STR_SET_MAX_CMDS, sp->u.ob, NULL, num, sp))
+        ip->maxNumCmds = num;
+
+    free_svalue(sp--);
+    free_svalue(sp);
+    return sp;
+} /* f_set_max_commands() */
 
 /***************************************************************************/
