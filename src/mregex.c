@@ -800,6 +800,7 @@ rx_free (regexp_t * expr)
     }
 #endif
 #ifdef USE_PCRE
+    if (expr->pSubs) xfree(expr->pSubs);
     if (expr->pHints) xfree(expr->pHints);
     xfree(expr->pProg);
 #else

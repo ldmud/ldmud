@@ -383,8 +383,10 @@ string|string * get_simul_efun ()
 // simul_efun objects to call simul_efuns that are not present in the
 // main simul_efun object. This allows to remove simul_efuns at runtime
 // without getting errors from old compiled programs that still use the
-// obsolete simul_efuns. A side use of this mechanism is to provide
-// a 'spare' simul_efun object in case the normal one fails to load.
+// obsolete simul_efuns.
+//
+// The additional simul-efun objects can not serve as backups for
+// the primary one!
 //
 // If the game depends on the simul_efun object, and none could be loaded,
 // an immediate shutdown should occur.

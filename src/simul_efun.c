@@ -228,7 +228,7 @@ get_simul_efun_object (void)
                , time_stamp(), get_txt(simul_efun_file_name));
         fprintf(stderr, "%s The function get_simul_efun() in the master must load it.\n"
                , time_stamp());
-        exit(1); /* TODO: Use the proper constant here */
+        return NULL;
     }
     if (O_PROG_SWAPPED(ob) && load_ob_from_swap(ob) < 0)
     {

@@ -14060,7 +14060,7 @@ again:
             inter_pc = pc;
             if ( !(ob = get_simul_efun_object()) )
             {
-                error("Couldn't load simul_efun object\n");
+                error("Couldn't load simul_efun object.\n");
             }
         }
 
@@ -14113,9 +14113,10 @@ again:
             break;
         }
 
-        /* The simul_efun was discarded meanwhile and not recreated
-         * - call it the old fashioned way with apply() in case it exists
-         * in a slightly different form.
+        /* At this point the simul_efun was discarded meanwhile and
+         * not recreated.
+         * Call the function the old fashioned way with apply() in case it
+         * exists in a slightly different form.
          */
         inter_sp = sp;
         inter_pc = pc;

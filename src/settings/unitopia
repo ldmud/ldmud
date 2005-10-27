@@ -34,6 +34,7 @@ with_max_cost=450000
 # --- Communication ---
 with_portno=3333
 with_udp_port=3335
+enable_use_mccp=yes
 
 #----------- Compilation Options ----------
 enable_malloc_trace=yes
