@@ -465,7 +465,7 @@ pgresult (dbconn_t *pgconn, PGresult *res)
             mapping_t *map;
 
             if (max_mapping_size
-             && (nfields * (ntuples + 1)) > max_mapping_size)
+             && (nfields * (ntuples + 1)) > (p_int)max_mapping_size)
             {
                 PQclear(res);
                 dequeue(pgconn);
@@ -502,7 +502,8 @@ pgresult (dbconn_t *pgconn, PGresult *res)
             svalue_t * entry;
 
             if (max_array_size
-             && ((ntuples >= max_array_size) || (nfields >= max_array_size))
+             && (   (ntuples >= (p_int)max_array_size)
+                 || (nfields >= (p_int)max_array_size))
                )
             {
                 PQclear(res);

@@ -448,7 +448,7 @@ check_max_malloced (void)
 
 {
 #ifndef NO_MEM_BLOCK_SIZE
-    if (max_malloced > 0 && xalloc_stat.size > max_malloced)
+    if (max_malloced > 0 && (mp_int)xalloc_stat.size > max_malloced)
     {
         static const char mess[] = "MAX_MALLOCED limit reached.\n";
         writes(2, mess);
@@ -874,7 +874,7 @@ print_block (int d, word_t *block)
             dprintf1(d, "%x:", (p_int)cp);
 
             /* Print the up to 16 bytes after cp as hex values */
-            for (i = 0; i < 16 && i < size && i < limit; i++)
+            for (i = 0; i < 16 && i < (int)size && i < limit; i++)
                 dprintf1(d, " %X", cp[i]);
 
             /* Align foward to the character interpretation */
@@ -884,7 +884,7 @@ print_block (int d, word_t *block)
             writes(d, "  ");
 
             /* Print the same data as characters */
-            for (i = 0; i < 16 && i < size && i < limit; i++)
+            for (i = 0; i < 16 && i < (int)size && i < limit; i++)
             {
                 if (isprint(cp[i]))
                     write(d, cp+i, 1);

@@ -61,7 +61,7 @@ whashmem (const char *s, size_t len, int maxn)
     register chash_t hi, lo;
     register unsigned char c;
     register unsigned char *p = (unsigned char *)s;
-    register long i = maxn;
+    register size_t i = maxn;
 
     if (i > len)
         i = len;
@@ -95,7 +95,7 @@ whashmem2 (const char *s, size_t len, int maxn, whash_t initial)
     register chash_t hi, lo;
     register unsigned char c;
     register unsigned char *p = (unsigned char *)s;
-    register long i = maxn;
+    register size_t i = maxn;
 
     hi = (initial >> 8) & 0xFF;
     lo = initial & 0xFF;

@@ -2730,7 +2730,7 @@ get_message (char *buff)
                         rest = msglen - 8;
                         if ((uint32)handle < MAX_PENDING_ERQ
                          && pending_erq[handle].fun.type != T_INVALID
-                         && (   rest <= max_array_size
+                         && (   rest <= (mp_int)max_array_size
                              || !max_array_size
                              || pending_erq[handle].string_arg
                             )
@@ -5457,7 +5457,7 @@ telnet_neg (interactive_t *ip)
                 state = TS_SB;
                 goto change_state;
             } else if ((ch == SE || ch == SB)
-                && (  (size = (to - first) - ip->tn_start - 1) <= max_array_size
+                && (  (size = (to - first) - ip->tn_start - 1) <= (mp_int)max_array_size
                     || !max_array_size)
                 && size >= 0
                 && (current_object = ip->ob,  v = allocate_array(size)) )
@@ -6702,7 +6702,7 @@ f_send_udp (svalue_t *sp)
         /* Send the message. */
 #ifndef SENDTO_BROKEN
         if (sendto(udp_s, msg, msglen, 0,
-               (struct sockaddr *)&name, sizeof(name)) != msglen)
+               (struct sockaddr *)&name, sizeof(name)) != (int)msglen)
 #endif
             break;
         ret = 1;

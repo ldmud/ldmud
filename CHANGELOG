@@ -1,6 +1,14 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+21-Aug-2003 (Lars Duening)  (3.3.482)
+  - (configure) Improved the PostgreSQL recognition.
+  - (make_func.y, actions.c, array.c, backend.c, bitstrings.c, comm.c,
+     efuns.c, files.c, hash.c, interpret.c, lex.c, main.c, mapping.c,
+     mempools.c, mstrings.c, object.c, prolang.y, parse.c, pkg-pgsql.c,
+     simulate.c, sprintf.c, smalloc.c, xalloc.c) Removed signed/unsigned
+       compiler warnings.
+
 20-Aug-2003 (Lars Duening)  (3.3.481)
   - (configure, pkg-mysql.h, pkg-pgsql.h) If mySQL/PostgreSQL are configured
       but not existant, the compilation will fail with a suitable error

@@ -228,7 +228,7 @@ f_test_bit (svalue_t *sp)
         error("test_bit: negative bit number: %ld\n", (long)bitnum);
 
     len = mstrsize(sp[-1].u.str);
-    if (bitnum/6 >= len)
+    if ((size_t)bitnum/6 >= len)
     {
         sp--;
         free_string_svalue(sp);
@@ -539,7 +539,7 @@ f_next_bit (svalue_t *sp)
     /* Now search for the next bit */
     found = -1;
 
-    while (found < 0 && search < len)
+    while (found < 0 && (long)search < len)
     {
         int c = str[search] - ' ';
 

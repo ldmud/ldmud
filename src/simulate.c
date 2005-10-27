@@ -1405,7 +1405,7 @@ make_name_sane (const char *pName, Bool addSlash)
     /* addSlash or not: from now points to the first non-'/' */
 
     /* Copy the name into buf, doing the other operations */
-    for (; '\0' != *from && (to - buf) < sizeof(buf)
+    for (; '\0' != *from && (size_t)(to - buf) < sizeof(buf)
          ; from++, to++)
     {
         if ('/' == *from)
@@ -3046,7 +3046,7 @@ status_parse (strbuf_t * sbuf, char * buff)
 #else
             for (count = 0, ob = obj_list; ob != NULL; ob = ob->next_all)
                 count++;
-            if (count != num_listed_objs)
+            if (count != (long)num_listed_objs)
             {
                 debug_message("DEBUG: num_listed_objs mismatch: listed %ld, counted %ld\n"
                              , (long)num_listed_objs, count);

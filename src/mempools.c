@@ -71,6 +71,7 @@
 #include "driver.h"
 
 #include <assert.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <sys/types.h>
 
@@ -614,7 +615,7 @@ alloc_from_pool (Mempool pPool, size_t iSize)
      */
 
     pBlock = pPool->pBlocks;
-    if (iSize > pBlock->pMark - pBlock->u.data)
+    if ((ptrdiff_t)iSize > pBlock->pMark - pBlock->u.data)
     {
         pBlock = xalloc(  sizeof(*pBlock)-sizeof(pBlock->u)
                         + pPool->iAllocSize);
@@ -691,7 +692,7 @@ alloc_from_lifo (Mempool pPool, size_t iSize)
      * memory left, a new one is allocated.
      */
     pBlock = pPool->pBlocks;
-    if (iSize > pBlock->pMark - pBlock->u.data)
+    if ((ptrdiff_t)iSize > pBlock->pMark - pBlock->u.data)
     {
         /* If there are blocks in the freelist, use those first;
          * otherwise allocate a new one.
@@ -816,7 +817,7 @@ mempool_free (Mempool pPool, void * adr)
     {
         while (pBlock->pNext != NULL
             &&    pBlock->pMark - (char*)&(pBlock->u)
-               >= pPool->iAllocSize - SIZEOF_LIFO_T)
+               >= (ptrdiff_t)pPool->iAllocSize - SIZEOF_LIFO_T)
         {
             pPool->pBlocks = pBlock->pNext;
             pBlock->pNext = pPool->pFree;

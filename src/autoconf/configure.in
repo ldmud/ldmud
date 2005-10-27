@@ -1116,7 +1116,7 @@ fi
 # --- PostgreSQL ---
 
 AC_CACHE_CHECK(for PostgresSQL,lp_cv_has_pgsql,
-for TESTPATH in "" "$pgsql_path" "$pgsql_path/include" "/usr/local/pgsql/include" "/usr/local/include" "/usr/include" "/usr/lib/pgsql"; do
+for TESTPATH in "" "$pgsql_path" "$pgsql_path/include" "/usr/local/pgsql/include" "/usr/local/include/pgsql" "/usr/include/pgsql" "/usr/lib/pgsql"; do
     saveflags="$CFLAGS"
     if test "x$TESTPATH" != "x"; then
         CFLAGS="$CFLAGS -I$TESTPATH"

@@ -920,13 +920,13 @@ get_array_order (vector_t * vec )
             size_t  start;  /* Index of the next position to set */
 
             /* Initialise the sorted[] array */
-            for (start = 0; start < keynum; start++)
+            for (start = 0; (mp_int)start < keynum; start++)
                 sorted[start] = (ptrdiff_t)start;
 
             /* Outer loop: walk start through the array, being the position
              * where the next highest element has to go.
              */
-            for (start = 0; start < keynum-1; start++)
+            for (start = 0; (mp_int)start < keynum-1; start++)
             {
                 size_t    max_idx;  /* Index (in sorted[]) of the current max */
                 svalue_t *max;      /* Pointer to the current max svalue */
@@ -936,7 +936,7 @@ get_array_order (vector_t * vec )
                 max_idx = start;
                 max = vec->item + sorted[start];
 
-                for (test_idx = start+1; test_idx < keynum; test_idx++)
+                for (test_idx = start+1; (mp_int)test_idx < keynum; test_idx++)
                 {
                     svalue_t *test = vec->item + sorted[test_idx];
 

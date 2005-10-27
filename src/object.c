@@ -4216,7 +4216,7 @@ object_present_in (string_t *str, object_t *ob)
         }
     }
 
-    if (length != mstrsize(str))
+    if ((size_t)length != mstrsize(str))
     {
         memsafe(sitem = new_n_mstring(item, length), length, "id string");
     }
@@ -7025,7 +7025,7 @@ restore_mapping (svalue_t *svp, char **str)
         return MY_FALSE;
     }
 
-    if (max_mapping_size && siz * (1+tmp_par.num_values) > max_mapping_size)
+    if (max_mapping_size && siz * (1+tmp_par.num_values) > (p_int)max_mapping_size)
     {
         *svp = const0;
         free_shared_restored_values();
@@ -7253,7 +7253,7 @@ restore_array (svalue_t *svp, char **str)
         return MY_FALSE;
     }
 
-    if (max_array_size && siz > max_array_size)
+    if (max_array_size && siz > (p_int)max_array_size)
     {
         *svp = const0;
         free_shared_restored_values();
@@ -7696,7 +7696,7 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
                     break; /* switch(ct) */
                 }
 
-                for (j = 0; j < context_size; j++)
+                for (j = 0; (size_t)j < context_size; j++)
                     assign_svalue_no_free(l->context+j, context.u.vec->item+j);
                 free_array(context.u.vec);
             }

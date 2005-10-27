@@ -1211,7 +1211,7 @@ realloc_mem_block (mem_block_t *mbp, mp_int size)
     max_size = mbp->max_size;
     do {
         max_size *= 2;
-    } while (size > max_size);
+    } while ((mp_uint)size > max_size);
 
     p = rexalloc(mbp->block, max_size);
     if (!p)
@@ -4125,7 +4125,7 @@ get_struct_index (struct_type_t * pType)
 {
     short i;
 
-    for (i = 0; i < STRUCT_COUNT; i++)
+    for (i = 0; (size_t)i < STRUCT_COUNT; i++)
     {
         if (STRUCT_DEF(i).type == pType)
             return i;
@@ -4155,7 +4155,7 @@ find_struct_by_member (string_t * name, int * pNum)
     int  member = -1;
     int i;
 
-    for (i = 0; i < STRUCT_COUNT; i++)
+    for (i = 0; (size_t)i < STRUCT_COUNT; i++)
     {
         int num;
         struct_def_t * pdef = &STRUCT_DEF(i);
@@ -4260,7 +4260,7 @@ struct_epilog (void)
 
     /* Check that all structs are defined.
      */
-    for (i = 0; i < STRUCT_COUNT; i++)
+    for (i = 0; (size_t)i < STRUCT_COUNT; i++)
     {
         if (STRUCT_DEF(i).flags & NAME_PROTOTYPE)
         {
@@ -4274,7 +4274,7 @@ struct_epilog (void)
     /* For all structs defined in this program, check if they just
      * replicate an existing older struct.
      */
-    for (i = 0; i < STRUCT_COUNT; i++)
+    for (i = 0; (size_t)i < STRUCT_COUNT; i++)
     {
         struct_type_t *pSType = STRUCT_DEF(i).type;
         struct_type_t *pOld;
@@ -4291,7 +4291,7 @@ struct_epilog (void)
          * replace the latter with the former.
          * First in the structs themselves.
          */
-        for (ii = 0; ii < STRUCT_COUNT; ii++)
+        for (ii = 0; (size_t)ii < STRUCT_COUNT; ii++)
         {
             if (ii != i)
                 struct_type_update(STRUCT_DEF(ii).type, pSType, pOld); 
@@ -4299,7 +4299,7 @@ struct_epilog (void)
 
         /* Update variable types */
 
-        for (ii = 0; ii < NV_VARIABLE_COUNT; ii++)
+        for (ii = 0; (size_t)ii < NV_VARIABLE_COUNT; ii++)
         {
             fulltype_t * pType = &NV_VARIABLE(ii)->type;
 
@@ -4312,7 +4312,7 @@ struct_epilog (void)
             }
         }
 
-        for (ii = 0; ii < V_VARIABLE_COUNT; ii++)
+        for (ii = 0; (size_t)ii < V_VARIABLE_COUNT; ii++)
         {
             fulltype_t * pType = &V_VARIABLE(ii)->type;
 
@@ -4359,7 +4359,7 @@ struct_epilog (void)
 
         /* Update function argument types */
 
-        for (ii = 0; ii < ARGTYPE_COUNT; ii++)
+        for (ii = 0; (size_t)ii < ARGTYPE_COUNT; ii++)
         {
             vartype_t * pType = &ARGUMENT_TYPE(ii);
 
@@ -4380,7 +4380,7 @@ struct_epilog (void)
     /* Publish all struct types defined in this program.
      * It is safe to publish types twice.
      */
-    for (i = 0; i < STRUCT_COUNT; i++)
+    for (i = 0; (size_t)i < STRUCT_COUNT; i++)
     {
         if (STRUCT_DEF(i).inh < 0)
             struct_publish_type(STRUCT_DEF(i).type);
@@ -4606,7 +4606,7 @@ insert_pending_inline_closures (void)
 if (INLINE_CLOSURE_COUNT != 0) printf("DEBUG: insert_inline_closures(): %d pending\n", INLINE_CLOSURE_COUNT);
 #endif /* DEBUG_INLINES */
 
-    for (ix = 0; ix < INLINE_CLOSURE_COUNT; ix++)
+    for (ix = 0; (size_t)ix < INLINE_CLOSURE_COUNT; ix++)
     {
         inline_closure_t * ict = &(INLINE_CLOSURE(ix));
 #ifdef DEBUG_INLINES
@@ -7621,7 +7621,7 @@ foreach:
            * has side effects or not, otherwise we could try to
            * remove it, too.
            */
-          if (addr == current)
+          if (addr == (p_int)current)
           {
               p_int expr_addr;  /* Address of the expr0 */
               p_int start_addr; /* Address of the first PUSH_LOCAL_LVALUE */
@@ -14700,7 +14700,7 @@ copy_functions (program_t *from, funflag_t type)
                       (sizeof (vartype_t)) * fun.num_arg
                     );
 
-                    for ( ; ix < ARGTYPE_COUNT; ix++)
+                    for ( ; (size_t)ix < ARGTYPE_COUNT; ix++)
                         ref_vartype_data(&ARGUMENT_TYPE(ix));
                 }
 
@@ -15443,7 +15443,7 @@ epilog (void)
     free_case_blocks();
 
 %ifdef USE_STRUCTS
-    for (i = 0; i < STRUCT_MEMBER_COUNT; i++)
+    for (i = 0; (size_t)i < STRUCT_MEMBER_COUNT; i++)
     {
         free_struct_member_data(&STRUCT_MEMBER(i));
     }
@@ -15833,7 +15833,7 @@ epilog (void)
 
         if (!pragma_save_types)
         {
-            for (i = 0; i < ARGTYPE_COUNT; i++)
+            for (i = 0; (size_t)i < ARGTYPE_COUNT; i++)
                 free_vartype_data(&ARGUMENT_TYPE(i));
             mem_block[A_ARGUMENT_TYPES].current_size = 0;
             mem_block[A_ARGUMENT_INDEX].current_size = 0;
@@ -16039,10 +16039,10 @@ epilog (void)
 
         /* Free the memareas */
 
-        for (i = 0; i < LOCAL_TYPE_COUNT; i++)
+        for (i = 0; (size_t)i < LOCAL_TYPE_COUNT; i++)
             free_fulltype_data(&LOCAL_TYPE(i));
 
-        for (i = 0; i < FUNCTION_COUNT; i++)
+        for (i = 0; (size_t)i < FUNCTION_COUNT; i++)
             free_fulltype_data(&FUNCTION(i)->type);
 
         for (i = 0; i < NUMAREAS; i++)
@@ -16102,10 +16102,10 @@ epilog (void)
                            );
 
         /* Free the type information */
-        for (i = 0; i < ARGTYPE_COUNT; i++)
+        for (i = 0; (size_t)i < ARGTYPE_COUNT; i++)
             free_vartype_data(&ARGUMENT_TYPE(i));
 
-        for (i = 0; i < LOCAL_TYPE_COUNT; i++)
+        for (i = 0; (size_t)i < LOCAL_TYPE_COUNT; i++)
         {
             free_fulltype_data(&LOCAL_TYPE(i));
         }

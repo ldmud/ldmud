@@ -3,7 +3,8 @@ SYNOPSIS
         int remove_call_out(closure fun)
 
 DESCRIPTION
-        Remove next pending call-out for function fun in this object.
+        Remove next pending call-out for function <fun> in the current
+        object, resp. the next pending call-out for closure <fun>.
         The time left is returned.
 
         -1 is returned if there were no call-outs pending to this

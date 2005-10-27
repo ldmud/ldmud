@@ -932,12 +932,12 @@ _get_map_lvalue (mapping_t *m, svalue_t *map_index
         mp_int msize;
 
         msize = (mp_int)MAP_TOTAL_SIZE(m);
-        if (msize >= max_mapping_size)
+        if (msize >= (mp_int)max_mapping_size)
         {
             check_map_for_destr(m);
             msize = (mp_int)MAP_TOTAL_SIZE(m);
         }
-        if (msize >= max_mapping_size)
+        if (msize >= (mp_int)max_mapping_size)
         {
             error("Illegal mapping size: %ld elements (%ld x %ld)\n"
                  , msize+1, (long)MAP_SIZE(m), (long)m->num_values);
@@ -1764,7 +1764,7 @@ add_mapping (mapping_t *m1, mapping_t *m2)
         m3->num_entries = num_entries;
         m3->hash->cond_deleted = cm3size - num_entries;
 
-        for ( ; num_entries < cm3size; num_entries++)
+        for ( ; (p_int)num_entries < cm3size; num_entries++)
         {
             int i;
 
@@ -3007,7 +3007,7 @@ f_m_allocate (svalue_t *sp)
         error("Illegal mapping width: %ld\n", sp->u.number);
 
     if (max_mapping_size
-     && sp[-1].u.number * (1 + sp->u.number) > max_mapping_size)
+     && sp[-1].u.number * (1 + sp->u.number) > (p_int)max_mapping_size)
         error("Illegal mapping size: %ld elements (%ld x %ld).\n"
              , sp[-1].u.number * (1+sp->u.number)
              , sp[-1].u.number, sp->u.number);
@@ -4343,7 +4343,7 @@ v_mkmapping (svalue_t *sp, int num_arg)
         st = sp->u.strct;
         length = struct_size(st);
 
-        if (max_mapping_size && length > max_mapping_size)
+        if (max_mapping_size && length > (p_int)max_mapping_size)
             error("Illegal mapping size: %ld elements\n", length);
 
         /* Allocate the mapping and assign the values */
@@ -4380,7 +4380,7 @@ v_mkmapping (svalue_t *sp, int num_arg)
                 length = (long)VEC_SIZE(sp[i].u.vec);
         }
 
-        if (max_mapping_size && length * num_arg > max_mapping_size)
+        if (max_mapping_size && length * num_arg > (p_int)max_mapping_size)
             error("Illegal mapping size: %ld elements (%ld x %ld)\n"
                  , length * num_arg, length, (long)num_arg);
 

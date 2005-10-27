@@ -2859,7 +2859,7 @@ get_vector_item (vector_t * vec, svalue_t * i, svalue_t *sp, bytecode_p pc)
             /* NOTREACHED */
             return NULL;
         }
-        if ((size_t)ind >= VEC_SIZE(vec))
+        if (ind >= VEC_SIZE(vec))
         {
             ERRORF(("Index for [] out of bounds: %ld, vector size: %lu\n"
                    , (long)ind, VEC_SIZE(vec)));
@@ -2998,14 +2998,14 @@ get_string_item ( svalue_t * svp, svalue_t * i, Bool make_singular
             return NULL;
         }
 
-        if (ind > mstrsize(svp->u.str) )
+        if (ind > (mp_int)mstrsize(svp->u.str) )
         {
             ERRORF(("Index out for [] of bounds: %ld, string length: %ld.\n"
                    , (long)ind, (long)mstrsize(svp->u.str)));
             return NULL;
         }
 
-        if (ind == mstrsize(svp->u.str))
+        if (ind == (mp_int)mstrsize(svp->u.str))
         {
             if (!allow_one_past)
             {
@@ -3084,7 +3084,7 @@ get_string_r_item (svalue_t * svp, svalue_t * i, Bool make_singular
             return NULL;
         }
 
-        if (ind == mstrsize(svp->u.str))
+        if (ind == (mp_int)mstrsize(svp->u.str))
         {
             if (!allow_one_past)
             {
@@ -3158,7 +3158,7 @@ get_string_a_item (svalue_t * svp, svalue_t * i, Bool make_singular
             return NULL;
         }
 
-        if (ind == mstrsize(svp->u.str))
+        if (ind == (mp_int)mstrsize(svp->u.str))
         {
             if (!allow_one_past)
             {
@@ -5791,7 +5791,7 @@ typename_inline (int type)
     type &= ~(T_MOD_SWAPPED);
 
     if (type < 0
-     || type >= sizeof(svalue_typename)/sizeof(svalue_typename[0])
+     || (size_t)type >= sizeof(svalue_typename)/sizeof(svalue_typename[0])
        )
         fatal("Unknown typevalue %d\n", type);
 
@@ -9575,10 +9575,10 @@ again:
             }
             pop_n_elems(2);
             push_mapping(sp, m);
-            if (max_mapping_size && MAP_TOTAL_SIZE(m) > max_mapping_size)
+            if (max_mapping_size && MAP_TOTAL_SIZE(m) > (p_int)max_mapping_size)
             {
                 check_map_for_destr(m);
-                if (max_mapping_size && MAP_TOTAL_SIZE(m) > max_mapping_size)
+                if (max_mapping_size && MAP_TOTAL_SIZE(m) > (p_int)max_mapping_size)
                     ERRORF(("Illegal mapping size: %ld elements (%ld x %ld)\n"
                            , MAP_TOTAL_SIZE(m), MAP_SIZE(m), m->num_values));
             }
@@ -11207,10 +11207,10 @@ again:
                 add_to_mapping(argp->u.map, u2.map);
                 sp -= 2;
                 free_mapping(u2.map);
-                if (max_mapping_size && MAP_TOTAL_SIZE(argp->u.map) > max_mapping_size)
+                if (max_mapping_size && MAP_TOTAL_SIZE(argp->u.map) > (p_int)max_mapping_size)
                 {
                     check_map_for_destr(argp->u.map);
-                    if (max_mapping_size && MAP_TOTAL_SIZE(argp->u.map) > max_mapping_size)
+                    if (max_mapping_size && MAP_TOTAL_SIZE(argp->u.map) > (p_int)max_mapping_size)
                         ERRORF(("Illegal mapping size: %ld elements "
                                 "(%ld x %ld)\n"
                                , MAP_TOTAL_SIZE(argp->u.map)
@@ -12287,7 +12287,7 @@ again:
                 /* NOTREACHED */
             }
             i = sp->u.number;
-            argp->u.number <<= (uint)i > MAX_SHIFT ? MAX_SHIFT : i;
+            argp->u.number <<= (uint)i > MAX_SHIFT ? (int)MAX_SHIFT : i;
             sp->u.number = argp->u.number;
             break;
         }
@@ -12301,7 +12301,7 @@ again:
                 /* NOTREACHED */
             }
             i = sp->u.number;
-            *argp->u.charp <<= (uint)i > MAX_SHIFT ? MAX_SHIFT : i;
+            *argp->u.charp <<= (uint)i > MAX_SHIFT ? (int)MAX_SHIFT : i;
             sp->u.number = (unsigned char)(*argp->u.charp);
             break;
         }
@@ -12343,7 +12343,7 @@ again:
                 /* NOTREACHED */
             }
             i = sp->u.number;
-            argp->u.number >>= (uint)i > MAX_SHIFT ? (MAX_SHIFT+1) : i;
+            argp->u.number >>= (uint)i > MAX_SHIFT ? (int)(MAX_SHIFT+1) : i;
             sp->u.number = argp->u.number;
             break;
         }
@@ -12357,7 +12357,7 @@ again:
                 /* NOTREACHED */
             }
             i = sp->u.number;
-            *argp->u.charp >>= (uint)i > MAX_SHIFT ? MAX_SHIFT : i;
+            *argp->u.charp >>= (uint)i > MAX_SHIFT ? (int)MAX_SHIFT : i;
             sp->u.number = (unsigned char)(*argp->u.charp);
             break;
         }
@@ -14238,7 +14238,7 @@ again:
             num_values = num[1];
         }
 
-        if (max_mapping_size && i * (1+num_values) > max_mapping_size)
+        if (max_mapping_size && i * (1+num_values) > (p_int)max_mapping_size)
             ERRORF(("Illegal mapping size: %ld elements (%ld x %ld)\n"
                    , (long)(i * (1+num_values)), (long)i, (long)num_values));
 

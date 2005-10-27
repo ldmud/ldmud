@@ -934,7 +934,7 @@ static  mp_int num_cleanup; /* Number of objects to data-clean in this
          * the variables are cleaned only every time_to_clean_up seconds,
          * or 3600 seconds if the time is 0.
          */
-        if (num_last_processed <= num_cleanup)
+        if ((mp_int)num_last_processed <= num_cleanup)
         {
             mp_int delay = 0;
 
@@ -1118,7 +1118,7 @@ no_clean_up:
      * objects we cleant in this one.
      */
     if (num_last_processed >= num_listed_objs
-     && num_cleanup < num_listed_objs
+     && num_cleanup < (mp_int)num_listed_objs
        )
     {
         while (num_cleanup-- > 0 && obj_list != obj_list_end)
@@ -1200,7 +1200,7 @@ preload_objects (int eflag)
     /* Loop through the prefiles array, calling master->preload()
      * for every string in it.
      */
-    while ((ix = ++ix0) < num_prefiles) {
+    while ((size_t)(ix = ++ix0) < num_prefiles) {
         if (prefiles->item[ix].type != T_STRING)
             continue;
 

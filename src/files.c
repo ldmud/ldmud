@@ -885,7 +885,7 @@ f_get_dir (svalue_t *sp)
                     continue;
             }
             count += nqueries;
-            if (max_array_size && count >= max_array_size)
+            if (max_array_size && count >= (long)max_array_size)
                 break;
         }
 

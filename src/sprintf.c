@@ -749,7 +749,7 @@ svalue_to_string ( fmt_state_t *st
                     numadd(st, &str, size);
                     stradd(st, &str, " */\n");
                 }
-                for (i = 0; i < size-1; i++)
+                for (i = 0; (size_t)i < size-1; i++)
                 {
                     str = svalue_to_string(st, &(obj->u.vec->item[i]), str, indent+2, MY_TRUE, quoteStrings, compact);
                 }
@@ -805,7 +805,7 @@ svalue_to_string ( fmt_state_t *st
                 numadd(st, &str, size);
                 stradd(st, &str, " */\n");
             }
-            for (i = 0; i < size-1; i++)
+            for (i = 0; (size_t)i < size-1; i++)
             {
                 str = svalue_to_string(st, &(strct->member[i]), str, indent+2, MY_TRUE, quoteStrings, compact);
             }
@@ -999,7 +999,7 @@ svalue_to_string ( fmt_state_t *st
                     numadd(st, &str, size);
                     stradd(st, &str, " */\n");
                 }
-                for (i = 0; i < size-1; i++)
+                for (i = 0; (size_t)i < size-1; i++)
                     str = svalue_to_string(st, &(obj->u.vec->item[i]), str, indent+2, MY_TRUE, quoteStrings, compact);
                 str = svalue_to_string(st, &(obj->u.vec->item[i]), str, indent+2, MY_FALSE, quoteStrings, compact);
                 if (!compact)
@@ -1159,7 +1159,7 @@ add_aligned ( fmt_state_t *st
     size_t sppos;
     Bool is_space_pad;
 
-    if (fs < len)
+    if ((size_t)fs < len)
         fs = len;
 
     sppos = 0;
@@ -1236,7 +1236,7 @@ add_column (fmt_state_t *st, cst **column)
     /* Set done to the actual number of characters to copy.
      */
     length = COL->pres;
-    if ((COL->info & INFO_A) == INFO_A_JUSTIFY && length > COL->size)
+    if ((COL->info & INFO_A) == INFO_A_JUSTIFY && length > (mp_int)COL->size)
         length = COL->size;
     for (p = COL_D; length && *p && *p !='\n'; p++, length--) NOOP;
     done = p - COL_D;
@@ -1271,7 +1271,7 @@ add_column (fmt_state_t *st, cst **column)
 
                     length = COL->pres;
                     if ((COL->info & INFO_A) == INFO_A_JUSTIFY
-                     && length > COL->size)
+                     && length > (mp_int)COL->size)
                         length = COL->size;
                     for ( p2 = p+1, length--
                         ; length && *p2 && *p2 !='\n' && *p2 != ' '
@@ -1756,7 +1756,7 @@ static char buff[BUFF_SIZE];         /* For error messages */
                                     ERROR(ERR_INVALID_STAR);
                                 if ((int)(fs = carg->u.number) < 0)
                                 {
-                                    if (fs == PINT_MIN)
+                                    if (fs == (unsigned int)PINT_MIN)
                                         fs = PINT_MAX;
                                     else
                                         fs = -fs;
@@ -1971,7 +1971,7 @@ static char buff[BUFF_SIZE];         /* For error messages */
                             (*temp)->d.col = get_txt(carg->u.str);
                             (*temp)->pad = pad;
                             (*temp)->size = fs;
-                            (*temp)->pres = (pres) ? pres : fs;
+                            (*temp)->pres = (pres) ? (int)pres : fs;
                             (*temp)->info = finfo;
                             (*temp)->start = st->bpos - st->line_start;
 
@@ -2248,7 +2248,7 @@ add_table_now:
                 if (!(finfo & INFO_ARRAY))
                     break;
 
-                if (nelemno >= VEC_SIZE((argv+arg)->u.vec))
+                if (nelemno >= (size_t)VEC_SIZE((argv+arg)->u.vec))
                     break;
 
                 carg = (argv+arg)->u.vec->item+nelemno++;

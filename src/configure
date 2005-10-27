@@ -10254,7 +10254,7 @@ echo $ECHO_N "checking for PostgresSQL... $ECHO_C" >&6
 if test "${lp_cv_has_pgsql+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
 else
-  for TESTPATH in "" "$pgsql_path" "$pgsql_path/include" "/usr/local/pgsql/include" "/usr/local/include" "/usr/include" "/usr/lib/pgsql"; do
+  for TESTPATH in "" "$pgsql_path" "$pgsql_path/include" "/usr/local/pgsql/include" "/usr/local/include/pgsql" "/usr/include/pgsql" "/usr/lib/pgsql"; do
     saveflags="$CFLAGS"
     if test "x$TESTPATH" != "x"; then
         CFLAGS="$CFLAGS -I$TESTPATH"

@@ -991,7 +991,7 @@ defragment_small_lists (int req)
                     defrag_blocks_merged++;
                 }
 
-                if (req > 0 && (bsize == req || bsize >= split_size))
+                if (req > 0 && (bsize == (word_t)req || bsize >= split_size))
                     found = MY_TRUE;
 
             } while (merged);
@@ -1028,7 +1028,7 @@ defragment_small_lists (int req)
 
                 defrag_blocks_merged++;
 
-                if (req >= 0 && (bsize == req || bsize >= split_size))
+                if (req >= 0 && (bsize == (word_t)req || bsize >= split_size))
                     found = MY_TRUE;
             } /* while() */
 
@@ -1328,7 +1328,7 @@ mem_alloc (size_t size)
          * would result in too small blocks.
          */
         for ( ix = SMALL_BLOCK_NUM-1
-            ; ix >= SIZE_INDEX(size) + T_OVERHEAD + SMALL_BLOCK_MIN 
+            ; ix >= (int)(SIZE_INDEX(size) + T_OVERHEAD + SMALL_BLOCK_MIN) 
             ; ix--
             )
         {
@@ -2581,7 +2581,7 @@ found_fit:
         {
             if (max_malloced > 0
              && (mp_int)(sbrk_stat.size + chunk_size) > max_malloced
-             && (    sbrk_stat.size + (heap_start ? 0 : SINT) >= max_malloced
+             && (    (mp_int)(sbrk_stat.size + (heap_start ? 0 : SINT)) >= max_malloced
                  || (chunk_size = max_malloced - sbrk_stat.size
                                                - (heap_start?0:SINT) )
                      < block_size

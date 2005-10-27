@@ -1979,7 +1979,7 @@ shortusage (void)
 "\n"
        , stdout);
 
-  for (i = 0; i < sizeof(aOptions) / sizeof(aOptions[0]); i++)
+  for (i = 0; (size_t)i < sizeof(aOptions) / sizeof(aOptions[0]); i++)
       if (aOptions[i].pSHelp != NULL)
           fputs(aOptions[i].pSHelp, stdout);
 } /* shortusage() */
@@ -1999,7 +1999,7 @@ usage (void)
 "\nOptions are:\n"
        , stdout);
 
-  for (i = 0; i < sizeof(aOptions) / sizeof(aOptions[0]); i++)
+  for (i = 0; (size_t)i < sizeof(aOptions) / sizeof(aOptions[0]); i++)
   {
       if (aOptions[i].pLHelp != NULL)
       {
@@ -2941,7 +2941,7 @@ getargs (int argc, char ** argv, int (*opt_eval)(int, const char *) )
         {
           if (bShort) /* search the short option */
           {
-            for (iOption = 0; iOption < sizeof(aOptions) / sizeof(aOptions[0]); iOption++)
+            for (iOption = 0; (size_t)iOption < sizeof(aOptions) / sizeof(aOptions[0]); iOption++)
             {
               if (*pArg == aOptions[iOption].cOption)
               {
@@ -2969,7 +2969,7 @@ getargs (int argc, char ** argv, int (*opt_eval)(int, const char *) )
           }
           else  /* search the long option */
           {
-            for (iOption = 0; iOption < sizeof(aOptions) / sizeof(aOptions[0]); iOption++)
+            for (iOption = 0; (size_t)iOption < sizeof(aOptions) / sizeof(aOptions[0]); iOption++)
               if (aOptions[iOption].pOption != NULL
                && iArglen == strlen(aOptions[iOption].pOption)
                && !strncasecmp(pArg, aOptions[iOption].pOption, iArglen))

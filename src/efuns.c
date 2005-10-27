@@ -629,7 +629,7 @@ f_regexplode (svalue_t *sp)
     else
         arraysize = 2 * num_match + 1;
 
-    if (max_array_size && arraysize > max_array_size-1 ) {
+    if (max_array_size && arraysize > (long)max_array_size-1 ) {
         free_regexp(reg);
         inter_sp = sp;
         error("Illegal array size");
@@ -1101,7 +1101,7 @@ v_regmatch (svalue_t *sp, int num_arg)
             int num_matches = rx_num_matches(reg);
             int i;
 
-            if (max_array_size && num_matches+1 > max_array_size-1 ) {
+            if (max_array_size && num_matches+1 > (long)max_array_size-1 ) {
                 free_regexp(reg);
                 inter_sp = sp;
                 error("Illegal array size: %d", num_matches+1);
@@ -2115,7 +2115,7 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
             p_int l = lens[i];   /* Length of current part */
             char *p = parts[i];  /* Current part */
 
-            if (pt - tmpmem + ((l < 0) ? -l : l) >= tmpmem_size)
+            if (pt - tmpmem + ((l < 0) ? -l : l) >= (ptrdiff_t)tmpmem_size)
             {
                 error("Partial string '%s' too long (%ld+%ld >= %ld).\n"
                      , p
@@ -2633,7 +2633,7 @@ f_process_string(svalue_t *sp)
     push_array(inter_sp, vec); /* automatic free in case of errors */
 
     for ( ch_last = MY_FALSE, changed = MY_FALSE, il = 1
-        ; (size_t)il < VEC_SIZE(vec)
+        ; il < VEC_SIZE(vec)
         ; il++)
     {
         string_t *p0, *p2;

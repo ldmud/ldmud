@@ -2834,7 +2834,7 @@ open_include_file (char *buf, char *name, mp_int namelen, char delim)
 
         /* Search all include dirs specified.
          */
-        for (i = 0; i < inc_list_size; i++)
+        for (i = 0; (size_t)i < inc_list_size; i++)
         {
             char * iname;
             sprintf(buf, "%s%s", get_txt(inc_list[i].u.str), name);
@@ -3603,7 +3603,7 @@ parse_numeric_escape (char * cp, unsigned char * p_char)
             yywarn("Character constant used with no valid digits");
             return NULL;
         }
-        while (lexdigit(c = *cp++) && c < '0'+base && --num_digits > 0)
+        while (lexdigit(c = *cp++) && c < (char)('0'+base) && --num_digits > 0)
               l = l * base + (c - '0');
     }
 
@@ -3712,7 +3712,8 @@ parse_number (char * cp, unsigned long * p_num)
     /* Parse a normal number from here */
 
     l = c - '0';
-    while (lexdigit(c = *cp++) && c < '0'+base) l = l * base + (c - '0');
+    while (lexdigit(c = *cp++) && c < (char)('0'+base))
+        l = l * base + (c - '0');
 
     *p_num = l;
     return cp-1;
@@ -5999,7 +6000,7 @@ handle_define (char *yyt, Bool quote)
                     for (n = 0; n < arg; n++)
                     {
                         l = strlen(args[n]);
-                        if (l == idlen && strncmp(args[n], ids, l) == 0)
+                        if (l == (size_t)idlen && strncmp(args[n], ids, l) == 0)
                         {
                             q -= idlen;
                             *q++ = (char)MARKS;
@@ -7188,7 +7189,7 @@ cond_get_exp (int priority, svalue_t *svp)
               case BMINUS : value -= value2;                break;
               case LSHIFT : if ((uint)value2 > MAX_SHIFT) value = 0;
                             else value <<= value2; break;
-              case RSHIFT : value >>= (uint)value2 > MAX_SHIFT ? MAX_SHIFT : value2;
+              case RSHIFT : value >>= (uint)value2 > MAX_SHIFT ? (int)MAX_SHIFT : value2;
                             break;
               case LESS   : value = value <  value2;        break;
               case LEQ    : value = value <= value2;        break;
@@ -7290,7 +7291,7 @@ set_inc_list (vector_t *v)
     /* Count and test the passed pathnames */
 
     svp = v->item;
-    for (i = 0, max = 0; i < VEC_SIZE(v); i++, svp++)
+    for (i = 0, max = 0; i < (size_t)VEC_SIZE(v); i++, svp++)
     {
         string_t *new;
         if (svp->type != T_STRING)
@@ -7697,7 +7698,7 @@ lex_error_context (void)
         ssize_t left;
 
         left = linebufend - outp;
-        if (left > sizeof(buf) - 3 - len)
+        if (left > (ssize_t)sizeof(buf) - 3 - len)
             left = sizeof(buf) - 3 - len;
         if (left < 1)
             buf[0] = '\0';
