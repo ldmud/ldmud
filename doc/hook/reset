@@ -11,7 +11,7 @@ SYNOPSIS
 DESCRIPTION
         Optional hook to reset an object.
         Hook setting can be unbound lambda closures, or the name of
-        the function to call in the object.
+        the function (static or public) to call in the object.
 
         If the hook is a closure, it is bound to the object to be
         reset and called with no argument.
@@ -32,6 +32,7 @@ DESCRIPTION
         has been used since the last reset.
 
 HISTORY
+        LDMud 3.2.10 allowed static functions to be given by name.
 
 SEE ALSO
         hooks(C)

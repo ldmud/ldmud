@@ -63,20 +63,22 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 508)
-(Parent-Version lpmud 3-3 507)
+(Project-Version lpmud 3-3 509)
+(Parent-Version lpmud 3-3 508)
 (Version-Log "
-- (object.c) restore_value() now checks for and rejects extraneous
-       characters after the 'n' delimiting the value string (Bug #0000039).
-  - (prolang.y) Casts to type 'mixed' are exempted from generating
-       an \"empty cast\" warning (Bug #0000041).
-  - (configure) The configuration now checks for libnsl as standard
-       system library - it is needed for ERQ on Solaris (Bug #0000012).
+  - (object.c) function_exists() and variable_exists() now check if the
+       object is destructed, instead of crashing (Bug #0000038).
+  - (files.c, backend.c, object.c) Added missing include for SunOS 4.1 (reported
+       by Coogan).
+  - (configure, main.c) strtoul() is not available on the older machines,
+       this is now checked by configure (reported by Coogan).
+  - (object.c) If H_RESET/H_CREATE_* are defined by name, static functions
+       are found as well (suggested by Daniel).
 ")
 (New-Version-Log
 ""
 )
-(Checkin-Time "Sat, 03 Apr 2004 15:29:38 -0700")
+(Checkin-Time "Sat, 03 Apr 2004 17:57:39 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -114,20 +116,20 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.70 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.571 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.341 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.572 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.342 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
   ;; Configuration
-  (src/configure (lpmud/d/0_configure 1.19.1.95 755))
+  (src/configure (lpmud/d/0_configure 1.19.1.96 755))
   (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.37 644))
-  (src/machine.h.in (lpmud/b/9_machine.h. 1.9.1.8 644))
+  (src/machine.h.in (lpmud/b/9_machine.h. 1.9.1.9 644))
   (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.19.1.22 644))
   (src/mkinstalldirs (lpmud/c/4_mkinstalld 1.1 644))
   (src/install-sh (lpmud/c/5_install-sh 1.2 755))
 
-  (src/autoconf/configure.in (lpmud/d/7_configure. 1.20.1.9.1.85 644))
+  (src/autoconf/configure.in (lpmud/d/7_configure. 1.20.1.9.1.86 644))
   (src/autoconf/acconfig.h (lpmud/d/10_acconfig.h 1.6.1.8 644))
 
   (src/settings/README (lpmud/c/22_README 1.14.1.16 644))
@@ -194,7 +196,7 @@
   (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.79 644))
   (src/exec.h (lpmud/c/32_exec.h 1.34.1.33.1.7 644))
   (src/files.h (lpmud/i/49_files.h 1.2 644))
-  (src/files.c (lpmud/i/50_files.c 1.22 644))
+  (src/files.c (lpmud/i/50_files.c 1.23 644))
   (src/filestat.h (lpmud/f/51_filestat.h 1.7 644))
   (src/gcollect.h (lpmud/f/33_gcollect.h 1.6.1.15 644))
   (src/gcollect.c (lpmud/c/30_gcollect.c 1.41.1.108 644))
@@ -208,7 +210,7 @@
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.15.1.7 644))
   (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.65 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.16 644))
-  (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.51 644))
+  (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.52 644))
   (src/mapping.h (lpmud/f/30_mapping.h 1.12.1.20 644))
   (src/mapping.c (lpmud/b/6_mapping.c 1.36.1.77 644))
   (src/md5.h (lpmud/l/18_md5.h 1.3 644))
@@ -222,7 +224,7 @@
   (src/my-alloca.h (lpmud/f/29_my-alloca. 1.3.1.2 644))
   (src/my-rusage.h (lpmud/f/28_my-rusage. 1.7 644))
   (src/object.h (lpmud/44_object.h 1.34.1.19.1.4 644))
-  (src/object.c (lpmud/45_object.c 1.62.1.88.1.40 644))
+  (src/object.c (lpmud/45_object.c 1.62.1.88.1.41 644))
   (src/otable.h (lpmud/f/27_otable.h 1.8.1.4 644))
   (src/otable.c (lpmud/43_otable.c 1.22.1.6 644))
   (src/parser.c (lpmud/l/13_parser.c 1.1 644))
@@ -1326,9 +1328,9 @@
   (doc/hook/clean_up (lpmud/a/b/30_clean_up 1.1 644))
   (doc/hook/clone_uids (lpmud/a/b/31_clone_uids 1.1 644))
   (doc/hook/command (lpmud/a/b/32_command 1.1 644))
-  (doc/hook/create_clone (lpmud/a/b/33_create_clo 1.1 644))
-  (doc/hook/create_ob (lpmud/a/b/34_create_ob 1.1 644))
-  (doc/hook/create_super (lpmud/a/b/35_create_sup 1.1 644))
+  (doc/hook/create_clone (lpmud/a/b/33_create_clo 1.2 644))
+  (doc/hook/create_ob (lpmud/a/b/34_create_ob 1.2 644))
+  (doc/hook/create_super (lpmud/a/b/35_create_sup 1.2 644))
   (doc/hook/default_method (lpmud/a/b/36_default_me 1.2 644))
   (doc/hook/default_prompt (lpmud/a/b/37_default_pr 1.1 644))
   (doc/hook/erq_stop (lpmud/a/b/38_erq_stop 1.1 644))
@@ -1342,7 +1344,7 @@
   (doc/hook/no_ipc_slot (lpmud/a/b/46_no_ipc_slo 1.1 644))
   (doc/hook/notify_fail (lpmud/a/b/47_notify_fai 1.1 644))
   (doc/hook/print_prompt (lpmud/a/b/48_print_prom 1.1 644))
-  (doc/hook/reset (lpmud/a/b/49_reset 1.2 644))
+  (doc/hook/reset (lpmud/a/b/49_reset 1.3 644))
   (doc/hook/send_notify_fail (lpmud/a/b/50_send_notif 1.1 644))
   (doc/hook/telnet_neg (lpmud/a/b/51_telnet_neg 1.4 644))
 

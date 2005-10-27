@@ -161,6 +161,7 @@
 #include "my-alloca.h"
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <string.h>
 #include <stdio.h>
 #include <fcntl.h>
 
@@ -862,7 +863,8 @@ reset_object (object_t *ob, int arg)
             previous_ob = current_object = ob;
 
         push_number(inter_sp, arg == H_RESET);
-        if (!sapply(driver_hook[arg].u.str, ob, 1) && arg == H_RESET)
+        if (!sapply_ign_prot(driver_hook[arg].u.str, ob, 1)
+         && arg == H_RESET)
             ob->time_reset = 0;
     }
 
@@ -1501,6 +1503,13 @@ v_function_exists (svalue_t *sp, int num_arg)
         }
     }
 
+    if (ob->flags & O_DESTRUCTED)
+    {
+        error("Bad argument to function_exists(): Object is destructed.\n");
+        /* NOTREACHED */
+        return sp;
+    }
+
     /* Get the information */
     prog_name = NULL;
     str = function_exists(argp->u.str, ob, (flags & NAME_HIDDEN)
@@ -1978,6 +1987,14 @@ v_variable_exists (svalue_t *sp, int num_arg)
         }
     }
 
+
+    if (ob->flags & O_DESTRUCTED)
+    {
+        error("Bad argument to variable_exists(): Object is destructed.\n");
+        /* NOTREACHED */
+        return sp;
+    }
+ 
     /* Make the program resident */
     if (O_PROG_SWAPPED(ob))
     {

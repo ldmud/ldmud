@@ -1,7 +1,17 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-04-Apr-2004 (Lars Duening)  (3.3.508)
+03-Apr-2004 (Lars Duening)  (3.3.509)
+  - (object.c) function_exists() and variable_exists() now check if the
+       object is destructed, instead of crashing (Bug #0000038).
+  - (files.c,  backend.c, object.c) Added missing include for SunOS 4.1
+       (reported by Coogan).
+  - (configure, main.c) strtoul() is not available on the older machines,
+       this is now checked by configure (reported by Coogan).
+  - (object.c) If H_RESET/H_CREATE_* are defined by name, static functions
+       are found as well (suggested by Daniel).
+
+03-Apr-2004 (Lars Duening)  (3.3.508)
   - (object.c) restore_value() now checks for and rejects extraneous
        characters after the '\n' delimiting the value string (Bug #0000039).
   - (prolang.y) Casts to type 'mixed' are exempted from generating

@@ -635,7 +635,7 @@ fi
 AC_FUNC_ALLOCA
 AC_CHECK_FUNCS(fchmod getrusage bzero memset memcpy memmem strdup strcspn)
 AC_CHECK_FUNCS(strchr strrchr getcwd memmove sysconf gettimeofday wait3 waitpid)
-AC_CHECK_FUNCS(fcntl getdomainname poll)
+AC_CHECK_FUNCS(fcntl getdomainname poll strtoul)
 
 AC_CACHE_CHECK(if inet_ntoa() ok,lp_cv_func_inet_ntoa_ok,
 AC_TRY_RUN([

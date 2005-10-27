@@ -138,7 +138,7 @@ For a detailed list of all changes see the file CHANGELOG.
            x509 key- and certfile for the TLS package.
 
 
-01-Apr-2004 (Lars Duening) -- Release 3.2.10
+03-Apr-2004 (Lars Duening) -- Release 3.2.10
 
     - Changed efuns:
        + debug_info(): Removed the DID_MEM_UNUSED value from the DINFO_DATA:
@@ -205,6 +205,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + Swapping of volatile strings could crash the driver.
        + H_COMMAND specifying an lfun by name which doesn't exist
            in the interactive object.
+       + Using function_exists() or variable_exists() on a destructed
+           object.
        + Editor: 'Z' given at the end of a file followed by two 'd'
            corrupted the internal text storage, which sometimes
            caused crashes.
@@ -244,6 +246,8 @@ For a detailed list of all changes see the file CHANGELOG.
            yielding a <float> result.
        + <mapping> &= <mapping>, <mapping> &= <vector> implemented.
        + Allowed longer program names in backtraces.
+       + If the H_RESET/H_CREATE_* hooks are defined by name, static
+           functions are found as well.
        + Bugfix: Subtracting arrays of closures from each other now actually
            identifies identical closures.
        + Bugfix: The smalloc allocator now re-uses free 'large' memory for

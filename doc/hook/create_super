@@ -13,7 +13,7 @@ DESCRIPTION
         Optional hooks to initialize a blueprint which is loaded by
         inheritance after creation.
         Hook setting can be unbound lambda closures, or the name of
-        the function to call in the object.
+        the function (static or public) to call in the object.
 
         If the hook is a closure expecting an argument, it is bound
         to the current object and called with the created object as
@@ -29,6 +29,7 @@ DESCRIPTION
         is ignored.
 
 HISTORY
+        LDMud 3.2.10 allowed static functions to be given by name.
 
 SEE ALSO
         hooks(C), create_ob(H), create_clone(H)

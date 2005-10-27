@@ -2349,7 +2349,11 @@ eval_arg (int eOption, const char * pValue)
         break;
 
     case cRandomSeed:
+#ifdef HAVE_STRTOUL
         random_seed = strtoul(pValue, (char **)0, 0);
+#else
+        random_seed = (uint32)strtol(pValue, (char **)0, 0);
+#endif
         seed_random(random_seed);
         break;
 
