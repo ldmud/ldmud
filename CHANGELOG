@@ -1,6 +1,22 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+13-May-2004 (Lars Duening)  (3.3.545)
+  - (comm.c, pkg-mccp) A MCCP connection can now be terminated by force from
+       the driver.
+  - (comm.c, gcollect.c ) USE_PTHREADS: The memory allocations/deallocations
+       for the background thread are done using malloc()/free().
+  - (configure, smalloc.c) USE_PTHREADS: With threads, smalloc no longer
+       attempts to replace malloc() and friends. This way we can
+       use smalloc() for main-thread allocations, and fall back on system
+       malloc() for sub-thread allocations. In extension, smalloc is again
+       the default allocator even if pthreads are enabled.
+  - (configure) If pthreads are not requested, don't add the lib to
+       link (but still check if it's available).
+  - (simul_efun, main.c, interpret.c) Corrected the re-load of the simul
+       efun object so that returning 0 from master::get_simul_efun() again
+       signals working without such an object.
+
 12-May-2004 (Lars Duening)  (3.3.544)
   - (array.c) My apologies to all involved: I messed up the callback
        handling for unique_array() in 3.3.39 (reported by Ralph and Urv).

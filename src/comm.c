@@ -1396,7 +1396,7 @@ interactive_cleanup (interactive_t *ip)
             }
         } /* switch (ip->errorno) */
 
-        xfree(tmp);
+        free(tmp);
     } /* for (tmp) */
 #else
 #  ifdef __MWERKS__
@@ -1460,7 +1460,10 @@ thread_socket_write( SOCKET_T s UNUSED, char *msg, size_t size
         return 0;
 
     /* Get a new buffer for the data to be written */
-    xallocate(b, sizeof(struct write_buffer_s) + size - 1, "thread_socket_write()");
+    b = malloc(sizeof(struct write_buffer_s) + size - 1);
+    if (!b)
+        outofmem(sizeof(struct write_buffer_s) + size - 1, "thread_socket_write()");
+
     b->length = size;
     b->next = NULL;
 #ifdef USE_MCCP
@@ -1492,7 +1495,7 @@ thread_socket_write( SOCKET_T s UNUSED, char *msg, size_t size
         struct write_buffer_s *tmp = ip->write_first;
         ip->write_first = tmp->next;
         ip->write_size -= tmp->length;
-        xfree(tmp);
+        free(tmp);
     }
 
     /* While we have the structure locked, remove pending
@@ -1710,11 +1713,17 @@ writer_thread (void *arg)
         {
             thread_write_buf(ip, buf);
 
-            /* Don't xfree(buf) here as smalloc is not threadsafe! */
             pthread_mutex_lock(&ip->write_mutex);
 
             ip->write_current = NULL;
 
+            /* Originally we didn't free(buf) here because smalloc
+             * wasn't threadsafe. We use malloc() now for the buffers,
+             * so it would be safe now, but since the code to clean up
+             * the buffers is already in the main thread, we keep it that
+             * way. It makes for nicer diagnostic messages for failed
+             * writes anyway.
+             */
             buf->next = ip->written_first;
             ip->written_first = buf;
 
@@ -3545,7 +3554,7 @@ remove_interactive (object_t *ob, Bool force)
 #endif
 #ifdef USE_MCCP
         if (interactive->out_compress)
-            end_compress(interactive);
+            end_compress(interactive, force);
 #endif
 #ifdef USE_TLS
         tls_deinit_connection(interactive);

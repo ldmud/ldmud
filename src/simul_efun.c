@@ -171,11 +171,17 @@ invalidate_simul_efuns (void)
 } /* invalidate_simul_efuns() */
 
 /*-------------------------------------------------------------------------*/
-object_t *
-get_simul_efun_object (void)
+Bool
+assert_simul_efun_object (void)
 
 /* (Re)load the simul_efun object and extract all information we need.
- * Result is a copy of the simul_efun_object pointer, or NULL on failure.
+ * Result is TRUE if either the simul_efun object could be loaded, or if
+ * master::get_simul_efun() did not return a string/string vector to
+ * name the simul efun object. The result is FALSE if master::get_simul_efun()
+ * specified a simul efun object, which couldn't be found.
+ *
+ * In other words: after calling assert_simul_efun_object(), the caller
+ * still has to check if simul_efun_object is NULL.
  *
  * At the time of call, simul_efun_object must be NULL.
  */
@@ -197,7 +203,7 @@ get_simul_efun_object (void)
     if (svp == NULL)
     {
         printf("%s No simul_efun\n", time_stamp());
-        return NULL;
+        return MY_TRUE;
     }
 
     if (svp->type == T_POINTER)
@@ -211,7 +217,7 @@ get_simul_efun_object (void)
     if (svp->type != T_STRING)
     {
         printf("%s No simul_efun\n", time_stamp());
-        return NULL;
+        return MY_TRUE;
     }
 
     /* Make the (primary) simul_efun name */
@@ -228,13 +234,13 @@ get_simul_efun_object (void)
                , time_stamp(), get_txt(simul_efun_file_name));
         fprintf(stderr, "%s The function get_simul_efun() in the master must load it.\n"
                , time_stamp());
-        return NULL;
+        return MY_FALSE;
     }
     if (O_PROG_SWAPPED(ob) && load_ob_from_swap(ob) < 0)
     {
         fprintf(stderr, "%s Out of memory (unswap object '%s') ==> "
                         "No simul_efun\n", time_stamp(), get_txt(ob->name));
-        return NULL;
+        return MY_TRUE;
     }
     reference_prog( (simul_efun_program = ob->prog), "get_simul_efun");
 
@@ -413,7 +419,7 @@ get_simul_efun_object (void)
     total_simul_efun = num_fun;
     simul_efun_object = ob;
 
-    return ob;
+    return MY_TRUE;
 } /* get_simul_efun_object() */
 
 /*-------------------------------------------------------------------------*/

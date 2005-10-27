@@ -873,6 +873,8 @@ fi
 
 AC_CACHE_CHECK(for pthreads support,lp_cv_has_pthreads,
     saveflags="$CFLAGS"
+    savelibs="$LIBS"
+
     CFLAGS="$CFLAGS"
     AC_TRY_COMPILE([
 #include <pthread.h>
@@ -888,7 +890,7 @@ void foo(void)
 
 if test $lp_cv_has_pthreads = yes; then
     saveflags="$CFLAGS"
-    CFLAGS="$CFLAGS"
+    savelibs="$LIBS"
 
     AC_DEFINE(HAS_PTHREADS)
 
@@ -911,12 +913,12 @@ int main(void)
     if test "$lp_cv_need_lib_pthread" = "yes"; then
         lp_cv_has_lib_pthread=no
         AC_CHECK_LIB(pthread,main,
-                     LIBS="$LIBS -lpthread"
+                     LIBS="$savelibs -lpthread"
                      lp_cv_has_lib_pthread=yes
                     )
         if test "$lp_cv_has_lib_pthread" = "no"; then
             AC_CHECK_LIB(c_r,main,
-                         LIBS="$LIBS -lc_r"
+                         LIBS="$savelibs -lc_r"
                          lp_cv_has_lib_pthread=yes
                         )
         fi
@@ -941,6 +943,11 @@ int main (void) {
     fi
 
     CFLAGS="$saveflags"
+
+    if test $enable_use_pthreads = no; then
+        LIBS="$savelibs"
+    fi
+
 else
     if test $enable_use_pthreads = yes; then
         echo "pthreads not supported - disabling pthreads support."
@@ -2324,11 +2331,7 @@ dnl
 
 AC_UPDATE_VAR(with_malloc)
 if test "x$with_malloc" = "x" || test "x$with_malloc" = "xdefault"; then
-    if test "x$enable_use_pthreads" = "xyes"; then
-        with_malloc="ptmalloc"
-    else
-        with_malloc="smalloc"
-    fi
+    with_malloc="smalloc"
     AC_TEXT_VAL_FROM_WITH(malloc)
 fi
 

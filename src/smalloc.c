@@ -202,14 +202,25 @@
 #include "../mudlib/sys/debug_info.h"
 
 /* Defines required by the xalloc.c wrapper */
+
 #define MEM_ALIGN (SIZEOF_CHAR_P)
-#ifdef SBRK_OK
+
+/* If possible, request memory using sbrk(). But if using pthreads, do
+ * not replace malloc() with our routines, even if the system allows it,
+ * as smalloc is not threadsafe.
+ */
+
+#if defined(SBRK_OK)
 #  ifdef MALLOC_SBRK
-#      define REPLACE_MALLOC
+#      if !defined(USE_PTHREADS)
+#          define REPLACE_MALLOC
+#      endif
 #  else
 #      undef SBRK_OK
 #  endif
 #endif
+
+#define MEM_MAIN_THREADSAFE
 
 /* #undef NO_MEM_BLOCK_SIZE */
 

@@ -560,7 +560,7 @@ main (int argc, char **argv)
             check_a_lot_ref_counts_flag = MY_TRUE;
 #endif
 
-        if (!get_simul_efun_object())
+        if (!assert_simul_efun_object())
         {
             rc = 1;
             break;

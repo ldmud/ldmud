@@ -36,7 +36,7 @@ extern simul_efun_table_t simul_efun_table[];
 /* --- Prototypes --- */
 
 extern void invalidate_simul_efuns (void);
-extern object_t *get_simul_efun_object(void);
+extern Bool assert_simul_efun_object(void);
 extern string_t *query_simul_efun_file_name(void);
 
 #ifdef GC_SUPPORT

@@ -215,9 +215,10 @@ process_compressed (interactive_t * ip)
 
 /*-------------------------------------------------------------------------*/
 Bool
-end_compress (interactive_t * ip)
+end_compress (interactive_t * ip, Bool force)
 
-/* Cleanly shut down compression on <ip>.
+/* Cleanly shut down compression on <ip>. If <force> is TRUE, the compression
+ * will be forcefully shut down even if this incurs a data loss.
  * Return TRUE on success.
  */
 
@@ -231,11 +232,11 @@ end_compress (interactive_t * ip)
     ip->out_compress->next_in = dummy;
     
     /* No terminating signature is needed - receiver will get Z_STREAM_END */
-    if (deflate (ip->out_compress, Z_FINISH) != Z_STREAM_END)
+    if (deflate (ip->out_compress, Z_FINISH) != Z_STREAM_END && !force)
         return MY_FALSE;
    
     /* try to send any residual data */
-    if (!process_compressed (ip))
+    if (!process_compressed (ip) && !force)
         return MY_FALSE;
      
     /* reset compression values */

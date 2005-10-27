@@ -282,8 +282,10 @@ mdb_log_sbrk (p_int size)
  *     if the allocator's mem_alloc()/mem_free() can be used to replace the
  *     libc allocation routines (ie. the allocator doesn't use malloc()
  *     itself).  The actual replacement is provided by xalloc.
+ *   #define MEM_MAIN_THREADSAFE
+ *     The allocator is safe to use from the main thread.
  *   #define MEM_THREADSAFE
- *     The allocator is threadsafe.
+ *     The allocator is altogether threadsafe.
  */
 
 #if defined(MALLOC_smalloc)
@@ -302,7 +304,7 @@ mdb_log_sbrk (p_int size)
 #  endif
 #endif
 
-#if defined(USE_PTHREADS) && !defined(MEM_THREADSAFE)
+#if defined(USE_PTHREADS) && !defined(MEM_THREADSAFE) && !defined(MEM_MAIN_THREADSAFE)
 #    warning ""
 #    warning "-----------------------------------"
 #    warning "PThreads enabled, but the allocator"

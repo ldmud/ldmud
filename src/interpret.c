@@ -14058,7 +14058,9 @@ again:
         {
             inter_sp = sp;
             inter_pc = pc;
-            if ( !(ob = get_simul_efun_object()) )
+            if (!assert_simul_efun_object()
+             || !(ob = simul_efun_object)
+               )
             {
                 error("Couldn't load simul_efun object.\n");
             }
@@ -17450,7 +17452,10 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
             if ( !(ob = simul_efun_object) )
             {
                 /* inter_sp == sp */
-                if ( !(ob = get_simul_efun_object()) ) {
+                if (!assert_simul_efun_object()
+                 || !(ob = simul_efun_object)
+                   )
+                {
                     csp->extern_call = MY_TRUE;
                     error("Couldn't load simul_efun object\n");
                     /* NOTREACHED */

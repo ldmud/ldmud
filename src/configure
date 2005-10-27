@@ -9305,6 +9305,8 @@ if test "${lp_cv_has_pthreads+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
 else
   saveflags="$CFLAGS"
+    savelibs="$LIBS"
+
     CFLAGS="$CFLAGS"
     cat >conftest.$ac_ext <<_ACEOF
 #line $LINENO "configure"
@@ -9352,7 +9354,7 @@ echo "${ECHO_T}$lp_cv_has_pthreads" >&6
 
 if test $lp_cv_has_pthreads = yes; then
     saveflags="$CFLAGS"
-    CFLAGS="$CFLAGS"
+    savelibs="$LIBS"
 
     cat >>confdefs.h <<\_ACEOF
 #define HAS_PTHREADS 1
@@ -9456,7 +9458,7 @@ fi
 echo "$as_me:$LINENO: result: $ac_cv_lib_pthread_main" >&5
 echo "${ECHO_T}$ac_cv_lib_pthread_main" >&6
 if test $ac_cv_lib_pthread_main = yes; then
-  LIBS="$LIBS -lpthread"
+  LIBS="$savelibs -lpthread"
                      lp_cv_has_lib_pthread=yes
 
 fi
@@ -9506,7 +9508,7 @@ fi
 echo "$as_me:$LINENO: result: $ac_cv_lib_c_r_main" >&5
 echo "${ECHO_T}$ac_cv_lib_c_r_main" >&6
 if test $ac_cv_lib_c_r_main = yes; then
-  LIBS="$LIBS -lc_r"
+  LIBS="$savelibs -lc_r"
                          lp_cv_has_lib_pthread=yes
 
 fi
@@ -9572,6 +9574,11 @@ _ACEOF
     fi
 
     CFLAGS="$saveflags"
+
+    if test $enable_use_pthreads = no; then
+        LIBS="$savelibs"
+    fi
+
 else
     if test $enable_use_pthreads = yes; then
         echo "pthreads not supported - disabling pthreads support."
@@ -12839,11 +12846,7 @@ if test "x$with_malloc" = "x" && test "x$DEFAULTwith_malloc" != "x"; then
 fi
 
 if test "x$with_malloc" = "x" || test "x$with_malloc" = "xdefault"; then
-    if test "x$enable_use_pthreads" = "xyes"; then
-        with_malloc="ptmalloc"
-    else
-        with_malloc="smalloc"
-    fi
+    with_malloc="smalloc"
     if test "x$with_malloc" != "x"; then
   with_malloc=`echo $with_malloc|
              sed -e 's/^\([^"]*\)\?.*$/\1/'`
