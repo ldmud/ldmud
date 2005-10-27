@@ -117,6 +117,11 @@ For a detailed list of all changes see the file CHANGELOG.
        + The driver regularly checks the variables of all objects
           for references to destructed objects and removes them; it is
           therefore no longer necessary to "clean" mappings by hand.
+       + The default return inserted for value returning functions (in case
+           the programmer forgets about it) now generates a runtime warning so
+           that such code can be found and corrected. This applies only for
+           functions with specified return type - old type functions don't
+           generate a warning.
 
     - Other Changes:
        + The input escape character can be configured at compile time to

@@ -1,6 +1,14 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+18-Apr-2004 (Lars Duening)  (3.3.521)
+  - (prolang.y, func_spec, interpret.c) The default return inserted for
+       value returning functions (in case the programmer forgets about
+       it) now generates a runtime warning so that such code can be found
+       and corrected. This applies only for functions with specified return
+       type - old type functions don't generate a warning (suggested by
+       Heiko).
+
 15-Apr-2004 (Lars Duening)  (3.3.520)
   - (func_spec, array, simulate) Efun unique_array() can now use
        a closure as separator function, and also pass extra arguments

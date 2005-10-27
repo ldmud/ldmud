@@ -7995,6 +7995,15 @@ again:
         break;
     }
 
+    CASE(F_DEFAULT_RETURN);         /* --- default_return      --- */
+        /* Inserted at the end of value-returning function, this instruction
+         * provides a default 'return 0' in case the programmer forgot about
+         * it. The instruction also prints a warning so that the code can be
+         * corrected.
+         */
+        warnf("Missing 'return <value>' statement.\n");
+        /* FALLTHROUGH */
+
     CASE(F_RETURN0);                /* --- return0             --- */
         /* Return from the function with result value 0.
          */

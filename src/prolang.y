@@ -3652,7 +3652,19 @@ def_function_complete ( p_int body_start
                            , body_start + FUNCTION_PRE_HDR_SIZE
                            , 0, returntype);
 
-        ins_f_code(F_RETURN0); /* catch a missing return */
+        /* Catch a missing return */
+        if ((returntype.typeflags & PRIMARY_TYPE_MASK) != TYPE_VOID
+         && (   (returntype.typeflags & PRIMARY_TYPE_MASK) != TYPE_UNKNOWN
+             || pragma_strict_types
+            )
+           )
+        {
+            ins_f_code(F_DEFAULT_RETURN);
+        }
+        else
+        {
+            ins_f_code(F_RETURN0);
+        }
     }
 
     /* Clean up for normal functions.

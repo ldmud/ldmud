@@ -63,17 +63,20 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 520)
-(Parent-Version lpmud 3-3 519)
+(Project-Version lpmud 3-3 521)
+(Parent-Version lpmud 3-3 520)
 (Version-Log "
-  - (func_spec, array, simulate) Efun unique_array() can now use
-       a closure as separator function, and also pass extra arguments
-       (suggested by Shinarae).
+  - (prolang.y, func_spec, interpret.c) The default return inserted for
+       value returning functions (in case the programmer forgets about
+       it) now generates a runtime warning so that such code can be found
+       and corrected. This applies only for functions with specified return
+       type - old type functions don't generate a warning (suggested by
+       Heiko).
 ")
 (New-Version-Log
 ""
 )
-(Checkin-Time "Thu, 15 Apr 2004 22:27:56 -0600")
+(Checkin-Time "Sun, 18 Apr 2004 10:45:35 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -111,8 +114,8 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.73 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.583 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.345 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.584 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.346 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -201,7 +204,7 @@
   (src/heartbeat.c (lpmud/m/42_heartbeat. 1.18.1.9 644))
   (src/i-svalue_cmp.h (lpmud/a/b/20_i-svalue_c 1.4 644))
   (src/interpret.h (lpmud/b/13_interpret. 1.33.1.37 644))
-  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.48 644))
+  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.49 644))
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.15.1.7 644))
   (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.65 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.16 644))
@@ -284,7 +287,7 @@
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.18 644))
   (src/port.c (lpmud/39_port.c 1.17.1.9 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.17.1.4 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.59 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.60 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7.1.2 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))
@@ -318,7 +321,7 @@
   (src/xptmalloc.c (lpmud/d/b/10_xptmalloc. 1.3 644))
 
   ;; Build files
-  (src/func_spec (lpmud/c/31_func_spec 1.53.1.45.1.22.1.27 644))
+  (src/func_spec (lpmud/c/31_func_spec 1.53.1.45.1.22.1.28 644))
   (src/string_spec (lpmud/f/6_string_spe 1.14.1.14 644))
   (src/mkfunc.c (lpmud/l/14_mkfunc.c 1.1 644))
   (src/make_func.y (lpmud/b/7_make_func. 1.25.1.30.1.7 644))

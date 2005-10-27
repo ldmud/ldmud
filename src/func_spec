@@ -62,6 +62,7 @@
         symbol
         return
         return0
+        default_return
         break
         switch
         sscanf
