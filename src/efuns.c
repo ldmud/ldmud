@@ -87,6 +87,7 @@
 #include "my-alloca.h"
 #include "my-rusage.h"
 #include <ctype.h>
+#include <fcntl.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
@@ -6829,11 +6830,16 @@ v_debug_info (svalue_t *sp, int num_arg)
  *       will always return 0.
  *
  *     <arg2> == "memory": dump a list of all allocated memory blocks (if
- *       the allocator supports this). Default filename is '/MEMORY_DUMP', the
- *       valid_write() will read 'memdump' for the function. If the allocator
- *       doesn't support memory dumps, this call will always return 0.
- *       This works best if the allocator is compiled with MALLOC_TRACE
- *       and/or MALLOC_LPC_TRACE.
+ *       the allocator supports this).
+ *       Default filename is '/MEMORY_DUMP', the valid_write()
+ *       will read 'memdump' for the function, and the new data
+ *       will be appended to the end of the file.
+ *
+ *       If the allocator doesn't support memory dumps, this call will
+ *       always return 0, and nothing will be written.
+ *
+ *       This works best if the allocator is compiled with
+ *       MALLOC_TRACE and/or MALLOC_LPC_TRACE.
  *
  * DINFO_DATA (6): Return raw information about an aspect of
  *     the driver specified by <arg2>. The result of the function

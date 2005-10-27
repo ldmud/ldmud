@@ -89,11 +89,16 @@ DESCRIPTION
             <arg2> == "memory": dump a list of all allocated memory
               blocks (if the allocator supports this).
               Default filename is '/MEMORY_DUMP', the valid_write()
-              will read 'memdump' for the function. If the allocator
-              doesn't support memory dumps, this call will always
-              return 0.
+              will read 'memdump' for the function, and the new data
+              will be appended to the end of the file.
+
+              If the allocator doesn't support memory dumps, this call will
+              always return 0, and nothing will be written.
+
               This works best if the allocator is compiled with
               MALLOC_TRACE and/or MALLOC_LPC_TRACE.
+
+              NOTE: Make sure that this option can't be abused!
  
 
 

@@ -63,17 +63,15 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 526)
-(Parent-Version lpmud 3-3 525)
+(Project-Version lpmud 3-3 527)
+(Parent-Version lpmud 3-3 526)
 (Version-Log "
-  - (smalloc.c, xalloc.c, efuns.c) debug_info(DINFO_DUMP, \"memory\")
-       dumps a list of all allocated memory blocks into the file
-       <mudlib>/MEMORY_DUMP, if the allocator supports this.
+  - (efuns.c) Forgot an '#include <fcntl.h>'.
 ")
 (New-Version-Log
 ""
 )
-(Checkin-Time "Thu, 22 Apr 2004 23:42:28 -0600")
+(Checkin-Time "Fri, 23 Apr 2004 07:22:00 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -111,7 +109,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.75 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.589 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.590 644))
   (HISTORY (lpmud/f/49_HISTORY 1.348 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -188,7 +186,7 @@
   (src/ed.h (lpmud/f/34_ed.h 1.5.1.6 644))
   (src/ed.c (lpmud/c/33_ed.c 1.32.1.31 644))
   (src/efuns.h (lpmud/l/20_efuns.h 1.13.1.19.1.4 644))
-  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.83 644))
+  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.84 644))
   (src/exec.h (lpmud/c/32_exec.h 1.34.1.33.1.7 644))
   (src/files.h (lpmud/i/49_files.h 1.2 644))
   (src/files.c (lpmud/i/50_files.c 1.24 644))
@@ -1049,7 +1047,7 @@
   (doc/efun/db_fetch (lpmud/e/27_db_fetch 1.2.1.3 644))
   (doc/efun/db_handles (lpmud/e/33_db_handles 1.1.1.4 644))
   (doc/efun/db_insert_id (lpmud/l/1_db_insert_ 1.2 644))
-  (doc/efun/debug_info (lpmud/o/22_debug_info 1.32 644))
+  (doc/efun/debug_info (lpmud/o/22_debug_info 1.33 644))
   (doc/efun/debug_message (lpmud/o/23_debug_mess 1.1.1.5 644))
   (doc/efun/deep_copy (lpmud/m/29_deep_copy 1.4 644))
   (doc/efun/deep_inventory (lpmud/o/24_deep_inven 1.3 644))
@@ -1527,7 +1525,7 @@
   (doc/efun.de/deep_inventory.de (lpmud/j/b/10_deep_inven 1.1 640))
   (doc/efun.de/deep_copy.de (lpmud/j/b/11_deep_copy. 1.1 640))
   (doc/efun.de/debug_message.de (lpmud/j/b/12_debug_mess 1.1 640))
-  (doc/efun.de/debug_info.de (lpmud/j/b/13_debug_info 1.2 640))
+  (doc/efun.de/debug_info.de (lpmud/j/b/13_debug_info 1.3 640))
   (doc/efun.de/ctime.de (lpmud/j/b/14_ctime.de 1.1 640))
   (doc/efun.de/crypt.de (lpmud/j/b/15_crypt.de 1.2 640))
   (doc/efun.de/count_bits.de (lpmud/j/b/16_count_bits 1.1 640))

@@ -1,12 +1,15 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-21-Apr-2004 (Lars Duening)  (3.3.526)
+22-Apr-2004 (Lars Duening)  (3.3.527)
+  - (efuns.c) Forgot an '#include <fcntl.h>'.
+
+22-Apr-2004 (Lars Duening)  (3.3.526)
   - (smalloc.c, xalloc.c, efuns.c) debug_info(DINFO_DUMP, "memory")
        dumps a list of all allocated memory blocks into the file
        <mudlib>/MEMORY_DUMP, if the allocator supports this.
 
-21-Apr-2004 (Lars Duening)  (3.3.525)
+22-Apr-2004 (Lars Duening)  (3.3.525)
   - (sha1) The files were still in DOS fileformat, which causes some
        compilers to choke on the multi-line macro definitions.
   - (backend.c) Active objects were never cleant up.
