@@ -1,6 +1,14 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+06-Apr-2004 (Lars Duening)  (3.3.511)
+  - (comm.c) With telnet disabled, an input_to() can still pretend to
+       switch from line- to charmode.
+
+04-Apr-2004 (Lars Duening)
+  - (erq.c) Retry name-lookups only if the DNS subsystem said so (thanks,
+      Tobias!).
+
 03-Apr-2004 (Lars Duening)  (3.3.510)
   - (func_spec, comm, string_spec) New efun enable_telnet() to disable/enable
        telnet support.

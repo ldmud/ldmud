@@ -63,7 +63,7 @@
  *   free and used blocks. For the price of a larger swap file the
  *   fragmentation and search times are lower.
  *
- *   The swapper always extends the file for a new block until the more
+ *   The swapper extends the file for new blocks until more
  *   than half of the swap file is unused. At that point the swapper
  *   starts recycling the free blocks as in the compact mode, but only
  *   until the free blocks occupy only 1/4th of the swap file - then

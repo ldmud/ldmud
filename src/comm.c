@@ -3937,7 +3937,6 @@ set_noecho (interactive_t *ip, char noecho)
     {
         DTN(("'%s' set_noecho(%02x) old %02x: TN disabled\n"
             , noecho, ip->noecho));
-        return;
     }
 
     old = ip->noecho;
@@ -3956,8 +3955,9 @@ set_noecho (interactive_t *ip, char noecho)
     ip->noecho = confirm;
 
     confirm |= NOECHO_ACKSHIFT(confirm);
-    if ((confirm ^ old) & (NOECHO_MASK|CHARMODE_MASK) )
+    if (((confirm ^ old) & (NOECHO_MASK|CHARMODE_MASK)) && ip->tn_enabled )
     {
+        DTN(("set_noecho(): Mode changes\n"));
         ob = ip->ob;
         if (driver_hook[H_NOECHO].type == T_STRING
          || driver_hook[H_NOECHO].type == T_CLOSURE

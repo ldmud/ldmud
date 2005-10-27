@@ -1003,7 +1003,7 @@ start_subserver (long server_num, long seed)
             header[8] = CHILD_FREE;
             memcpy(header+9, buf, 4); /* copy address */
             hp = gethostbyaddr(buf, 4, AF_INET);
-            if (!hp)
+            if (!hp && errno == TRY_AGAIN)
             {
                 /* DNS needs a bit more time */
                 sleep(5);
@@ -1038,7 +1038,7 @@ start_subserver (long server_num, long seed)
             header[8] = CHILD_FREE;
             memcpy(header+9, buf, strlen(buf)); /* copy address */
             hp = gethostbyname(buf);
-            if (!hp)
+            if (!hp && errno == TRY_AGAIN)
             {
                 /* DNS needs more time */
                 sleep(5);
