@@ -792,9 +792,9 @@ init_lexer(void)
     add_permanent_define("__CATCH_EVAL_COST__", -1, string_copy(mtext), MY_FALSE);
     sprintf(mtext, "%ld", (long)MASTER_RESERVED_COST);
     add_permanent_define("__MASTER_EVAL_COST__", -1, string_copy(mtext), MY_FALSE);
-    sprintf(mtext, "%ld", (long)TIME_TO_RESET);
+    sprintf(mtext, "%ld", (long)time_to_reset);
     add_permanent_define("__RESET_TIME__", -1, string_copy(mtext), MY_FALSE);
-    sprintf(mtext, "%ld", (long)TIME_TO_CLEAN_UP);
+    sprintf(mtext, "%ld", (long)time_to_cleanup);
     add_permanent_define("__CLEANUP_TIME__", -1, string_copy(mtext), MY_FALSE);
 #ifdef MSDOS_FS
     add_permanent_define("__MSDOS_FS__", -1, string_copy("1"), MY_FALSE);

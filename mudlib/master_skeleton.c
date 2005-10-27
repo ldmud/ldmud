@@ -404,7 +404,8 @@ object connect ()
 // Result:
 //   An login object the requested connection should be bound to.
 //
-// Note that the connection is not bound yet!
+// Note that the connection is at this time bound to the master object,
+// and will be re-bound to the returned object.
 //
 // The gamedriver will call the lfun 'logon()' in the login object after
 // binding the connection to it. That lfun has to return !=0 to succeed.

@@ -29,9 +29,13 @@ EXAMPLE
             object obj;
 
             ...
-            set_max_commands(100, obj);
+            set_max_commands(100);
             return obj;
         }
+
+        Upon return from the the function, the connection with its
+        modified max_commands will be rebound from the master object
+        to the returned object.
 
 
 SEE ALSO

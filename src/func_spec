@@ -301,6 +301,7 @@ int     extern_call();
 
         /* Objects */
 
+object  master(int default: F_CONST0);
 object  this_interactive();
 object  this_object();
 object  this_player();

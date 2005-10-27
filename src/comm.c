@@ -3748,7 +3748,7 @@ new_player (SOCKET_T new_socket, struct sockaddr_in *addr, size_t addrlen
     assert_shadow_sent(master_ob);
     O_GET_INTERACTIVE(master_ob) = new_interactive;
     master_ob->flags |= O_ONCE_INTERACTIVE;
-    new_interactive->ob = master_ob;
+    new_interactive->ob = ref_object(master_ob, "new_player");
 
     /* Initialize the rest of the interactive structure */
 
@@ -3783,7 +3783,7 @@ new_player (SOCKET_T new_socket, struct sockaddr_in *addr, size_t addrlen
     new_interactive->snoop_by = NULL;
     new_interactive->last_time = current_time;
     new_interactive->numCmds = 0;
-    new_interactive->maxNumCmds = 0;
+    new_interactive->maxNumCmds = -1;
     new_interactive->trace_level = 0;
     new_interactive->trace_prefix = NULL;
     new_interactive->message_length = 0;
@@ -3824,8 +3824,7 @@ new_player (SOCKET_T new_socket, struct sockaddr_in *addr, size_t addrlen
         max_player = i;
     num_player++;
 
-    /* The player object has one extra reference. */
-    ref_object(master_ob, "new_player");
+    current_interactive = master_ob;
 
     /* Call master->connect() and evaluate the result.
      */
@@ -3849,17 +3848,16 @@ new_player (SOCKET_T new_socket, struct sockaddr_in *addr, size_t addrlen
     O_GET_INTERACTIVE(master_ob) = NULL;
     master_ob->flags &= ~O_ONCE_INTERACTIVE;
     check_shadow_sent(master_ob);
+    free_object(master_ob, "new_player");
 
     assert_shadow_sent(ob);
     O_GET_INTERACTIVE(ob) = new_interactive;
-    new_interactive->ob = ob;
+    new_interactive->ob = ref_object(ob, "new_player");
     ob->flags |= O_ONCE_INTERACTIVE;
-
-    free_object(master_ob, "new_player");
 
     /* Prepare to call logon() in the new user object.
      */
-    command_giver = ref_object(ob, "new_player");
+    command_giver = ob;
     current_interactive = ob;
     if (new_interactive->snoop_on)
     {

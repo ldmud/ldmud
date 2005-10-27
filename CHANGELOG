@@ -1,6 +1,17 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+30-Sep-2003 (Lars Duening)  (3.3.491)
+  - (comm.c) The maxNumCmds setting was defaulted to 0 instead of -1
+       (reported by Bardioc).
+  - (comm.c, master_skeleton.c) Officially documented that a new
+       interactive connection is bound to the master at the time
+       of master::connect(), and adjusted the set_max_commands
+       manpage accordingly.
+  - (lex.c) The macros __RESET_TIME__ and __CLEANUP_TIME__ always used
+       the configured values, ignoring commandline overrides (reported
+       by Ralph).
+
 28-Sep-2003 (Lars Duening)  (3.3.490)
   - (comm.c) Removed a crasher from set_max_commands() (thanks, Ralph!).
 

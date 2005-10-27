@@ -15770,6 +15770,32 @@ again:
 
     /* --- Efuns: Objects --- */
 
+    CASE(F_MASTER);                 /* --- master              --- */
+      {
+        /* EFUN master()
+         *
+         *   object master(int dont_load)
+         *
+         * Return the master object. If <dont_load> is false, the
+         * function first makes sure that the master object exists.
+         * If <dont_load> is true, the function just returns the current
+         * master object, or 0 if the current master has been destructed.
+         */
+
+        TYPE_TEST1(sp, T_NUMBER)
+
+        if (! sp->u.number)
+            assert_master_ob_loaded();
+
+        free_svalue(sp);
+
+        if (master_ob)
+            put_ref_object(sp, master_ob, "master");
+        else
+            put_number(sp, 0);
+        break;
+     }
+
     CASE(F_THIS_INTERACTIVE);       /* --- this_interactive    --- */
         /* EFUN this_interactive()
          *
