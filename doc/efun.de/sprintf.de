@@ -35,6 +35,7 @@ BESCHREIBUNG
         'c'        integer        als ASCII-Zeichen
         'd' 'i'    integer        Dezimalschreibweise
         'o'        integer        Oktalschreibweise
+        'b' 'B'    integer        Binaerschreibweise
         'x' 'X'    integer        Hexadezimalschreibweise
         'e' 'E'    float          Exponentialschreibweise
         'f' 'F'    float          Gleitkommadarstellung

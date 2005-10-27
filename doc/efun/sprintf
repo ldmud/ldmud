@@ -16,6 +16,8 @@ DESCRIPTION
           "d" : the argument is an integer to be included in decimal
                 representation.
           "i" : same as "d".
+          "b" : the argument is an integer to be included in binary
+                representation.
           "o" : the argument is an integer to be included in octal
                 representation.
           "x" : the argument is an integer to be included in hexadecimal
@@ -183,7 +185,7 @@ HISTORY
           leading 0s in the field size modifier, clarified the interaction
           between the padding and newlines, and added the '$' formatter for
           justified printing of strings.
-        LDMud 3.2.10 added modifier '#' for '%O'/'%Q'.
+        LDMud 3.2.10 added modifier '#' for '%O'/'%Q' and the datatype '%b'.
 
 SEE ALSO
         printf(E), terminal_colour(E)

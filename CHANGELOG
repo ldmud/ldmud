@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+13-Apr-2004 (Lars Duening)  (3.3.517)
+  - (sprintf.c) Format '%b' to print a number in binary notation (supplied
+       by Ralph - thanks!).
+
 13-Apr-2004 (Lars Duening)  (3.3.516)
   - (func_spec, prolang.y, interpret.c) I had to back out the recent change
        as it interfered with the use of bitflags. We need a proper unsigned

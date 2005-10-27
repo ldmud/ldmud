@@ -15,6 +15,8 @@
  *  "s"   the argument is a string.
  *  "d"   the integer arg is printed in decimal.
  *  "i"   as d.
+ *  "b"   the integer arg is printed in binary (negative numbers in 2's
+ *        compliment)
  *  "c"   the integer arg is to be printed as a character.
  *  "o"   the integer arg is printed in octal.
  *  "x"   the integer arg is printed in hex.
@@ -108,9 +110,10 @@
  *                                0001 : error type not found;
  *                                0010 : percent sign, null argument;
  *                                0011 : LPC datatype;
- *                                0100 : string;
- *                                0101 : integer;
- *                                0110 : float
+ *                                0100 : LPC datatype, quoted;
+ *                                0101 : string;
+ *                                0110 : integer
+ *                                0111 : float
  *   00000000 00xx0000 : alignment INFO_A:
  *                                00 : right;
  *                                01 : centre;
@@ -1822,6 +1825,8 @@ static char buff[BUFF_SIZE];         /* For error messages */
                 case 'd':
                 case 'c':
                 case 'o':
+                case 'b':
+                case 'B':
                 case 'x':
                 case 'X':
                     format_char = format_str[fpos];
@@ -2163,10 +2168,50 @@ add_table_now:
 
                 case INFO_T_INT:
                 case INFO_T_FLOAT:
-                  {
                     /* We 'cheat' by using the systems sprintf() to format
-                     * the number.
+                     * the number in most of the formats.
                      */
+                  if ((finfo & INFO_T ) == INFO_T_INT
+                   && (format_char == 'b' || format_char == 'B')
+                     )
+                  {
+                    /* Dummy for finding most significant bit */
+                    int signi = 0;
+                    /* The driver has 32 bit integers (NOTE: only on Intel ?) */
+                    int isize = 32;
+                    char temp[33];
+                    int tmpl;
+                    
+                    memset(temp, '\0', 33);
+                    
+                    if (carg->type != T_NUMBER)
+                    {
+                        ERROR1(ERR_INCORRECT_ARG, format_char);
+                    }
+                    /* Calculate binary representation (2's compliment) */
+                    while ( --isize > -1 )
+                    {
+                       if ( ( carg->u.number & ( 1 << isize ) ) != 0 )
+                       {
+                          signi = 1;
+                          strcat( temp, "1" );
+                       }
+                       else if ( signi )
+                          strcat( temp, "0" );
+                    }
+                    tmpl = strlen(temp);
+                    if ((size_t)tmpl >= sizeof(temp))
+                        fatal("Local buffer overflow in sprintf() for int.\n");
+                    if (pres && tmpl > pres)
+                        tmpl = pres; /* well.... */
+                    if ((unsigned int)tmpl < fs)
+                        add_aligned(st, temp, tmpl, pad, fs, finfo);
+                    else
+                        ADD_STRN(temp, tmpl)
+                    break;
+                  }
+                  else
+                  {
                     char cheat[6];  /* Synthesized format for sprintf() */
                     char temp[1024];
                       /* The buffer must be big enough to hold the biggest float

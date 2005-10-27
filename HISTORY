@@ -136,7 +136,7 @@ For a detailed list of all changes see the file CHANGELOG.
            x509 key- and certfile for the TLS package.
 
 
-03-Apr-2004 (Lars Duening) -- Release 3.2.10
+13-Apr-2004 (Lars Duening) -- Release 3.2.10
 
     - Changed efuns:
        + debug_info(): Removed the DID_MEM_UNUSED value from the DINFO_DATA:
@@ -159,6 +159,8 @@ For a detailed list of all changes see the file CHANGELOG.
            argument re-establishes the default charset.
        + sprintf(), printf(): Modifier '#' for '%O'/'%Q' prints the values
            in a compact format.
+       + sprintf(), printf(): Format specifier '%b' prints a number
+           in binary notation.
        + wizlist_info(): The evalcost statistic is now split into 'ticks'
            and 'gigaticks', and a second non-decaying evalcost statistic
            has been added.
