@@ -545,9 +545,16 @@ f_tls_init_connection (svalue_t *sp)
             break;
         }
         
-        if ((n = SSL_do_handshake(session)) < 0)
+        do {
+            if ((n = SSL_do_handshake(session)) < 0)
+                ret = SSL_get_error(session, n);
+            else
+                ret = 0;
+        } while (SSL_ERROR_WANT_READ == ret || SSL_ERROR_WANT_WRITE == ret);
+
+        if (ret)
         {
-            ret = - SSL_get_error(session, n);
+            ret = -ret;
             SSL_free(session);
             break;
         }
@@ -563,7 +570,9 @@ f_tls_init_connection (svalue_t *sp)
 
     initialize_tls_session(&ip->tls_session);
     gnutls_transport_set_ptr(ip->tls_session, (gnutls_transport_ptr)(ip->socket));
-    ret = gnutls_handshake(ip->tls_session);
+    do {
+        ret = gnutls_handshake(ip->tls_session);
+    } while (GNUTLS_E_AGAIN == ret || GNUTLS_E_INTERRUPTED == ret);
     if (ret < 0)
     {
 	gnutls_deinit(ip->tls_session);

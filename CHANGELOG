@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+28-Apr-2004 (Lars Duening)  (3.3.536)
+  - (etc/patch-o-matic, settings/forgottendreams) Updated with the latest
+       version (thanks, Andre!)
+  - (pkg-tls.c) The TLS handshake() is retried when it failed with
+       an E_AGAIN or E_INTERRUPTED for GnuTLS, or WANT_READ/WANT_WRITE
+       for OpenSSL (thanks, Fippo!) (Bug #0000054)
+
 27-Apr-2004 (Lars Duening)  (3.3.535)
   - (strfuns.c) Efun convert_charset() crashed when given an empty
        input string (reported by Ralph).

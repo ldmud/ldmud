@@ -62,21 +62,19 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 535)
-(Parent-Version lpmud 3-3 534)
+(Project-Version lpmud 3-3 536)
+(Parent-Version lpmud 3-3 535)
 (Version-Log "
-  - (strfuns.c) Efun convert_charset() crashed when given an empty
-       input string (reported by Ralph).
-  - (configure) When checking for iconv, the script now first checks
-       if -liconv is actually needed before looking for the libraries
-       (reported by Philipp).
-  - (configure) Made the test for non-const in parameter to iconv()
-       more reliable ... I hope (reported by Ralph).
+  - (etc/patch-o-matic, settings/forgottendreams) Updated with the latest
+       version (thanks, Andre!)
+  - (pkg-tls.c) The TLS handshake() is retried when it failed with
+       an E_AGAIN or E_INTERRUPTED for GnuTLS, or WANT_READ/WANT_WRITE
+       for OpenSSL (thanks, Fippo!) (Bug #0000054)
 ")
 (New-Version-Log
 ""
 )
-(Checkin-Time "Tue, 27 Apr 2004 21:57:59 -0600")
+(Checkin-Time "Wed, 28 Apr 2004 22:53:34 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -114,7 +112,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.76 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.598 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.599 644))
   (HISTORY (lpmud/f/49_HISTORY 1.351 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -145,7 +143,7 @@
   (src/settings/eotl (lpmud/g/40_eotl 1.2.1.6 744))
   (src/settings/evermore (lpmud/e/31_evermore 1.1.1.9 744))
   (src/settings/finalfrontier (lpmud/i/29_finalfront 1.1.1.6 744))
-  (src/settings/forgottendreams (lpmud/h/2_forgottend 1.2.1.8 744))
+  (src/settings/forgottendreams (lpmud/h/2_forgottend 1.2.1.9 744))
   (src/settings/gestrandet (lpmud/e/b/51_gestrandet 1.1 744))
   (src/settings/heaven7 (lpmud/k/22_heaven7 1.7 644))
   (src/settings/hyperborea (lpmud/h/20_hyperborea 1.3 744))
@@ -283,7 +281,7 @@
   (src/pkg-pgsql.c (lpmud/d/b/39_pkg-pgsql. 1.3 644))
   (src/pkg-pgsql.h (lpmud/d/b/40_pkg-pgsql. 1.2 644))
   (src/pkg-tls.h (lpmud/e/b/10_pkg-tls.h 1.5 644))
-  (src/pkg-tls.c (lpmud/e/b/11_pkg-tls.c 1.6 644))
+  (src/pkg-tls.c (lpmud/e/b/11_pkg-tls.c 1.7 644))
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.19 644))
   (src/port.c (lpmud/39_port.c 1.17.1.9 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.17.1.4 644))
@@ -454,7 +452,7 @@
   (etc/startmud.pl (lpmud/m/27_startmud.p 1.2 744) :no-keywords)
   (etc/start_mud (lpmud/m/45_start_mud 1.1 644))
   (etc/mudloop (lpmud/m/46_mudloop 1.1 644))
-  (etc/patch-o-matic (lpmud/c/b/8_patch-o-ma 1.2 644))
+  (etc/patch-o-matic (lpmud/c/b/8_patch-o-ma 1.3 644))
 
   ;; Driver-related include files for the mudlib
   (mudlib/sys/comm.h (lpmud/e/b/23_comm.h 1.1 644))

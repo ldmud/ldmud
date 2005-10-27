@@ -24,18 +24,20 @@ MUDDOCDIR=${HOME}/mudlib/doc/man/
 WGETPARAMS="-q"
 
 # Name of the setting used to configure the driver
-SETTINGNAME=forgottendreams
+SETTINGNAME=<yourmudsettingshere>
 
 # Driver-Branch dependent settings:
 
 # a) Development-branch (3.3)
-
 # Where are the patches to be found?
 DIFFSOURCE="http://www.bearnip.com/ftp/mud/ldmud-33/"
 # what's the prefix/suffix of the diff-files?
 # diff-file-name is build as prefix-<oldver>-<newver>.suffix
 DIFFPREFIX="diff-33-"
 DIFFSUFFIX=".gz"
+# What's the maximum number of versions possibly upgraded in one
+# step? For development, this can be up to 3
+MAX_STEP=3
 
 # b) Current branch (3.2)
 # # Where are the patches to be found?
@@ -44,6 +46,9 @@ DIFFSUFFIX=".gz"
 # # diff-file-name is build as prefix-<oldver>-<newver>.suffix
 # DIFFPREFIX="diff-32dev"
 # DIFFSUFFIX=".gz"
+# # What's the maximum number of versions possibly upgraded in one
+# # step? For the current branch this ought to be just 1
+# MAX_STEP 1
 
 ###################################################################
 #
@@ -51,8 +56,8 @@ DIFFSUFFIX=".gz"
 
 # 
 # Find the driver's current version and calculate the name of the
-# diff-file we need. in 'reverse' mode we need (current-1)-(current),
-# and (current)-(current+1) otherwise 
+# diff-file we need. in 'reverse' mode we need (current-i)-(current),
+# and (current)-(current+i) otherwise. i ranges from 1 to MAX_STEP
 #
 function get_cur_version()
 {
@@ -60,11 +65,11 @@ function get_cur_version()
            cut -d' ' -f4 | cut -d')' -f1`
 
   if [ "X$1" == "Xreverse" ]; then
-    OLD_VER=$((CURRENT-1))
+    OLD_VER=$((CURRENT-$2))
     NEW_VER=$CURRENT
   else
     OLD_VER=$CURRENT
-    NEW_VER=$((CURRENT+1))
+    NEW_VER=$((CURRENT+$2))
   fi  
   
   DIFF=${DIFFPREFIX}${OLD_VER}-${NEW_VER}${DIFFSUFFIX}
@@ -99,7 +104,9 @@ function apply_patch()
     # Copy new manpages and other stuff to the mud-directory
     cd ${SRCDIR}doc/
     for file in `find . -mtime -1 -type f`; do
-      cp $file ${MUDDOCDIR}$file > /dev/null
+      if [ -d ${MUDDOCDIR}$(dirname $file) ]; then 
+        cp $file ${MUDDOCDIR}$file > /dev/null
+      fi
     done
     return 1
   fi
@@ -110,6 +117,8 @@ function apply_patch()
 
 # Main function:
 
+CHANGED=0
+
 if [ "x$1" == "x-help" ]; then
   echo 'Usage: patch-o-matic [-reverse] [-build|-install]'
   exit 0
@@ -119,34 +128,52 @@ if [ "X$1" == "X-reverse" ]; then
   # if '-reverse' is given, downgrade the driver one version
   # (useful for debugging)
   shift;
-  get_cur_version "reverse"
-  apply_patch "-R -p1"
 
-  if [ $?==1 ]; then
-    echo "LDMud backpatched to version $OLD_VER"
-  else
-    echo "Missing patch, version $CURRENT unchanged"
-  fi
+  step=$MAX_STEP
+  while (true); do
+    get_cur_version "reverse" $step
+    apply_patch "-R -p1"
+
+    if [ $?==1 ]; then
+      echo "LDMud backpatched to version $OLD_VER"
+    else
+      if [ $step -eq 1 ]; then
+        echo "Missing patch, version $CURRENT unchanged"
+        break;
+      else
+        step=$((step-1))
+      fi
+    fi
+  done
 else
+  step=$MAX_STEP
   # otherwise repeat attempt to upgrade the driver until
   # we don't find any new patches any more
-  CHANGED=0
   while (true); do
 
-    get_cur_version "forward"
+    get_cur_version "forward" $step
     apply_patch "-p1"
 
     if [ $? -eq 2 ]; then
-      if [ $CHANGED -eq 1 ]; then
-        echo "LDMud patched to version $CURRENT"
+      if [ $step -eq 1 ]; then
+        if [ $CHANGED -eq 1 ]; then
+          echo "LDMud patched to version $CURRENT"
+        else
+          echo "No patch available, version $CURRENT is unchanged."
+        fi
+        break
       else
-        echo "No patch available, version $CURRENT is unchanged."
+        step=$((step-1))
       fi
-      break
     else
       CHANGED=1
+      step=$MAX_STEP
     fi
   done
+fi
+
+if [ $CHANGED != 1 -a "X$2" != "X-force" ]; then
+  exit 0
 fi
 
 # if '-build' was given on the commandline, change into the 'real'

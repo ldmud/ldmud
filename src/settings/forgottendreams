@@ -12,11 +12,15 @@ enable_erq=erq
 enable_compat_mode=no
 enable_strict_euids=yes
 enable_use_parse_command=no
-enable_share_variables=yes
+enable_share_variables=no
 enable_use_mysql=yes
+enable_use_mccp=yes
 enable_use_alists=yes
 enable_lpc_nosave=yes
 enable_use_deprecated=no
+enable_use_set_light=no
+enable_use_process_string=no
+enable_debug=no
 enable_dynamic_costs=yes
 enable_use_pcre=no
 
