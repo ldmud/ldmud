@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+13-Apr-2004 (Lars Duening)  (3.3.518)
+  - (sprintf.c) Made the code portable to non-32-bit machines.
+  - (test/t-040413) Added a testcase for two struct lookup issues.
+
 13-Apr-2004 (Lars Duening)  (3.3.517)
   - (sprintf.c) Format '%b' to print a number in binary notation (supplied
        by Ralph - thanks!).

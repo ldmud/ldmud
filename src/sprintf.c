@@ -2177,12 +2177,11 @@ add_table_now:
                   {
                     /* Dummy for finding most significant bit */
                     int signi = 0;
-                    /* The driver has 32 bit integers (NOTE: only on Intel ?) */
-                    int isize = 32;
-                    char temp[33];
+                    int isize = sizeof(carg->u.number) * CHAR_BIT;
+                    char temp[sizeof(carg->u.number) * CHAR_BIT + 1];
                     int tmpl;
                     
-                    memset(temp, '\0', 33);
+                    memset(temp, '\0', sizeof(temp));
                     
                     if (carg->type != T_NUMBER)
                     {
