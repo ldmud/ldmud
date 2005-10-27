@@ -1013,12 +1013,15 @@ if test $lp_cv_has_mysql = yes; then
     tmp=""
 
     if test "x$mysql_path" = "x"; then
-        if test -d "/usr/local/mysql/lib"; then
+        if test -d "/usr/local/mysql/lib/mysql"; then
+            CFLAGS="$saveflags -L/usr/local/mysql/lib/mysql"
+            AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -L/usr/local/mysql/lib/mysql -lmysqlclient")
+        elif test -d "/usr/local/mysql/lib"; then
             CFLAGS="$saveflags -L/usr/local/mysql/lib"
             AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -L/usr/local/mysql/lib -lmysqlclient")
         elif test -d "/usr/local/lib"; then
             CFLAGS="$saveflags -L/usr/local/lib"
-            AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -L/usr/local/mysql/lib -lmysqlclient")
+            AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -L/usr/local/lib -lmysqlclient")
         else
             AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -lmysqlclient")
         fi

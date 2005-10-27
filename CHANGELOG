@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+20-Apr-2004 (Lars Duening)  (3.3.524)
+  - (configure) The MySQL libraries are now also search in
+       /usr/local/lib/mysql/lib (can happen on older installations on Mac
+       OS-X). Also, when the libraries were found in /usr/local/lib, the
+       script still added /usr/local/mysql/lib to the link command.
+  - (mudlib/sys/lpctypes.h) Corrected a typo.
+
 18-Apr-2004 (Lars Duening)  (3.3.523)
   - (func_spec, sha1, efuns) New efun sha1() (provided by Fippo -
        thanks!).

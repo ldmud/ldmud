@@ -1007,8 +1007,13 @@ parse_command (char *buff, Bool from_efun)
 #endif
 
         /* If the function is static and not defined by current object,
-         * then it will fail. If this is called directly from player input,
-         * then we set current_object so that static functions are allowed.
+         * then the call will fail.
+         *
+         * If this command is called directly from player input (and not
+         * from the command() efun), then we can allow static functions.
+         * For this, we set current_object (which is NULL in this case)
+         * to the object defining the function.
+         *
          * current_object is reset just after the call to apply().
          */
         if (current_object == NULL)

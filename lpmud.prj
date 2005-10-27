@@ -63,18 +63,19 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 523)
-(Parent-Version lpmud 3-3 522)
+(Project-Version lpmud 3-3 524)
+(Parent-Version lpmud 3-3 523)
 (Version-Log "
-  - (func_spec, sha1, efuns) New efun sha1() (provided by Fippo -
-       thanks!).
-  - (func_spec, files.c) Efun write_file() can now be instructed to
-        delete the file first (suggested by Pulami).
+  - (configure) The MySQL libraries are now also search in
+       /usr/local/lib/mysql/lib (can happen on older installations on Mac
+       OS-X). Also, when the libraries were found in /usr/local/lib, the
+       script still added /usr/local/mysql/lib to the link command.
+  - (mudlib/sys/lpctypes.h) Corrected a typo.
 ")
 (New-Version-Log
 ""
 )
-(Checkin-Time "Sun, 18 Apr 2004 23:41:53 -0600")
+(Checkin-Time "Tue, 20 Apr 2004 21:46:18 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -112,20 +113,20 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.74 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.586 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.587 644))
   (HISTORY (lpmud/f/49_HISTORY 1.347 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
   ;; Configuration
-  (src/configure (lpmud/d/0_configure 1.19.1.97 755))
+  (src/configure (lpmud/d/0_configure 1.19.1.98 755))
   (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.37 644))
   (src/machine.h.in (lpmud/b/9_machine.h. 1.9.1.10 644))
   (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.19.1.23 644))
   (src/mkinstalldirs (lpmud/c/4_mkinstalld 1.1 644))
   (src/install-sh (lpmud/c/5_install-sh 1.2 755))
 
-  (src/autoconf/configure.in (lpmud/d/7_configure. 1.20.1.9.1.87 644))
+  (src/autoconf/configure.in (lpmud/d/7_configure. 1.20.1.9.1.88 644))
   (src/autoconf/acconfig.h (lpmud/d/10_acconfig.h 1.6.1.8 644))
 
   (src/settings/README (lpmud/c/22_README 1.14.1.16 644))
@@ -169,7 +170,7 @@
   (src/access_check.c (lpmud/d/14_access_che 1.15.1.5 644))
   (src/alloca.c (lpmud/d/13_alloca.c 1.11 644))
   (src/actions.h (lpmud/d/11_actions.h 1.6.1.7 644))
-  (src/actions.c (lpmud/d/12_actions.c 1.15.1.44 644))
+  (src/actions.c (lpmud/d/12_actions.c 1.15.1.45 644))
   (src/array.h (lpmud/f/47_array.h 1.18.1.22 644))
   (src/array.c (lpmud/d/12_array.c 1.46.1.47.1.8 644))
   (src/backend.h (lpmud/f/46_backend.h 1.20.1.7 644))
@@ -466,7 +467,7 @@
   (mudlib/sys/inherit_list.h (lpmud/p/18_inherit_li 1.1 644))
   (mudlib/sys/functionlist.h (lpmud/49_functionli 1.4.1.9.1.4 644))
   (mudlib/sys/input_to.h (lpmud/t/8_input_to.h 1.1.1.2 644))
-  (mudlib/sys/lpctypes.h (lpmud/48_lpctypes.h 1.2.1.8 644))
+  (mudlib/sys/lpctypes.h (lpmud/48_lpctypes.h 1.2.1.9 644))
   (mudlib/sys/objectinfo.h (lpmud/m/20_objectinfo 1.7.1.7 644))
   (mudlib/sys/pgsql.h (lpmud/d/b/41_pgsql.h 1.1 644))
   (mudlib/sys/regexp.h (lpmud/t/25_regexp.h 1.2 644))
@@ -948,7 +949,7 @@
   (doc/applied/get (lpmud/n/16_get 1.3 644))
   (doc/applied/heart_beat (lpmud/n/17_heart_beat 1.5 644))
   (doc/applied/id (lpmud/n/18_id 1.5 644))
-  (doc/applied/init (lpmud/n/19_init 1.6 644))
+  (doc/applied/init (lpmud/n/19_init 1.7 644))
   (doc/applied/logon (lpmud/n/20_logon 1.3 644))
   (doc/applied/modify_command (lpmud/n/21_modify_com 1.3 644))
   (doc/applied/parse_command_adjectiv_id_list (lpmud/n/22_parse_comm 1.4 644))
@@ -1226,7 +1227,7 @@
   (doc/efun/set_next_reset (lpmud/l/5_set_next_r 1.6 644))
   (doc/efun/set_prompt (lpmud/q/18_set_prompt 1.2.1.1.1.1 644))
   (doc/efun/set_this_object (lpmud/c/37_set_this_o 1.8 644))
-  (doc/efun/set_this_player (lpmud/m/18_set_this_p 1.3 644))
+  (doc/efun/set_this_player (lpmud/m/18_set_this_p 1.4 644))
   (doc/efun/seteuid (lpmud/q/19_seteuid 1.5 644))
   (doc/efun/sgn (lpmud/k/43_sgn 1.2 644))
   (doc/efun/sha1 (lpmud/t/b/35_sha1 1.1 644))

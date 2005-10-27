@@ -9722,7 +9722,56 @@ _ACEOF
     tmp=""
 
     if test "x$mysql_path" = "x"; then
-        if test -d "/usr/local/mysql/lib"; then
+        if test -d "/usr/local/mysql/lib/mysql"; then
+            CFLAGS="$saveflags -L/usr/local/mysql/lib/mysql"
+            echo "$as_me:$LINENO: checking for main in -lmysqlclient" >&5
+echo $ECHO_N "checking for main in -lmysqlclient... $ECHO_C" >&6
+if test "${ac_cv_lib_mysqlclient_main+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lmysqlclient  $LIBS"
+cat >conftest.$ac_ext <<_ACEOF
+#line $LINENO "configure"
+#include "confdefs.h"
+
+
+int
+main ()
+{
+main ();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+         { ac_try='test -s conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  ac_cv_lib_mysqlclient_main=yes
+else
+  echo "$as_me: failed program was:" >&5
+cat conftest.$ac_ext >&5
+ac_cv_lib_mysqlclient_main=no
+fi
+rm -f conftest.$ac_objext conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+echo "$as_me:$LINENO: result: $ac_cv_lib_mysqlclient_main" >&5
+echo "${ECHO_T}$ac_cv_lib_mysqlclient_main" >&6
+if test $ac_cv_lib_mysqlclient_main = yes; then
+  tmp="$PKGLIBS -L/usr/local/mysql/lib/mysql -lmysqlclient"
+fi
+
+        elif test -d "/usr/local/mysql/lib"; then
             CFLAGS="$saveflags -L/usr/local/mysql/lib"
             echo "$as_me:$LINENO: checking for main in -lmysqlclient" >&5
 echo $ECHO_N "checking for main in -lmysqlclient... $ECHO_C" >&6
@@ -9817,7 +9866,7 @@ fi
 echo "$as_me:$LINENO: result: $ac_cv_lib_mysqlclient_main" >&5
 echo "${ECHO_T}$ac_cv_lib_mysqlclient_main" >&6
 if test $ac_cv_lib_mysqlclient_main = yes; then
-  tmp="$PKGLIBS -L/usr/local/mysql/lib -lmysqlclient"
+  tmp="$PKGLIBS -L/usr/local/lib -lmysqlclient"
 fi
 
         else
