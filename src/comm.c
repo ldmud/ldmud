@@ -8431,7 +8431,7 @@ f_set_max_commands (svalue_t *sp)
         ip->maxNumCmds = num;
 
     free_svalue(sp--);
-    free_svalue(sp);
+    free_svalue(sp--);
     return sp;
 } /* f_set_max_commands() */
 
