@@ -1,6 +1,15 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+27-Apr-2004 (Lars Duening)  (3.3.534)
+  - (smalloc.c, config.h, efuns.c) If multiple large blocks of the same
+       size are freed, an AVL node is created just for the first one of these
+       blocks. The other blocks are held in a double-linked list hanging
+       off the AVL node. For now, this feature is activated by
+       the macro USE_AVL_FREELIST in config.h. Practive will show if
+       the ratio of free blocks to AVL nodes is large enough to make
+       this useful. (Bug #0000053)
+
 27-Apr-2004 (Lars Duening)  (3.3.533)
   - (strfuns.c) Efun convert_charset(): The parameters to iconv_open() were
       reversed.

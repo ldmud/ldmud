@@ -82,6 +82,17 @@
  * The free large blocks are stored in an AVL tree for fast retrieval
  * of best fits. The AVL structures are stored in the user area of the blocks.
  *
+#ifdef USE_AVL_FREELIST
+ * An AVL node is created for every distinct size of a large free block;
+ * if additional blocks of the same size are freed, they are kept in
+ * a double-linked list hanging of the node. Intention of this setup
+ * is to decrease the size of the AVL tree (and thus increase the
+ * locality large block lookups) in the case of multiple blocks of the
+ * same size.
+#else
+ * A new AVL node is created for every free large block.
+#endif
+ *
 #ifdef SBRK_OK && MALLOC_SBRK
  * Memory is allocated from the system with sbrk() and brk(), which puts
  * the whole heap under our control.
@@ -534,6 +545,12 @@ static long malloc_increment_size_total = 0;
   /* Total memory allocated through to malloc_increment_size().
    */
 
+#ifdef USE_AVL_FREELIST
+static long num_avl_nodes = 0;
+  /* Number of nodes in the AVL tree managing the large free blocks.
+   */
+#endif /* USE_AVL_FREELIST */
+
 /*-------------------------------------------------------------------------*/
 /* Forward declarations */
 
@@ -661,6 +678,10 @@ mem_dump_data (strbuf_t *sbuf)
     strbuf_addf(sbuf, "clib allocations:       n/a               n/a\n");
 #endif
     strbuf_add(sbuf, "\n");
+#ifdef USE_AVL_FREELIST
+    strbuf_addf(sbuf, "AVL nodes:         %8d                 -\n", num_avl_nodes);
+    strbuf_add(sbuf, "\n");
+#endif /* USE_AVL_FREELIST */
 
     strbuf_addf(sbuf,
       "malloc_increment_size: calls %ld success %ld total %ld\n\n",
@@ -763,6 +784,11 @@ mem_dinfo_data (svalue_t *svp, int value)
     ST_NUMBER(DID_MEM_DEFRAG_BLOCKS_INSPECTED, defrag_blocks_inspected);
     ST_NUMBER(DID_MEM_DEFRAG_BLOCKS_MERGED, defrag_blocks_merged);
     ST_NUMBER(DID_MEM_DEFRAG_BLOCKS_RESULT, defrag_blocks_result);
+#ifdef USE_AVL_FREELIST
+    ST_NUMBER(DID_MEM_AVL_NODES, num_avl_nodes);
+#else
+    ST_NUMBER(DID_MEM_AVL_NODES, large_free_stat.counter);
+#endif /* USE_AVL_FREELIST */
 
 #undef ST_NUMBER
 } /* mem_dinfo_data() */
@@ -1622,6 +1648,12 @@ mem_realloc (POINTER p, size_t size)
 struct free_block
 {
     word_t size;
+#ifdef USE_AVL_FREELIST
+    struct free_block * prev; /* prev free block in freelist
+                               * NULL for the AVL node
+                               */
+    struct free_block * next; /* next free block in freelist */
+#endif /* USE_AVL_FREELIST */
     struct free_block *parent, *left, *right;
     balance_t balance;
     short align_dummy;
@@ -1633,10 +1665,18 @@ struct free_block
 extern struct free_block dummy2;  /* forward */
 
 static struct free_block dummy =
-        { /*size*/0, /*parent*/&dummy2, /*left*/0, /*right*/0, /*balance*/0 };
+        { /* size */ 0
+#ifdef USE_AVL_FREELIST
+        , /* prev */ 0, /* next */ 0
+#endif /* USE_AVL_FREELIST */
+        , /* parent */ &dummy2, /* left */ 0, /* right */ 0, /* balance */ 0 };
 
        struct free_block dummy2 =
-        { /*size*/0, /*parent*/0, /*left*/&dummy, /*right*/0, /*balance*/-1 };
+        { /* size */ 0
+#ifdef USE_AVL_FREELIST
+        , /* prev */ 0, /* next */ 0
+#endif /* USE_AVL_FREELIST */
+        , /* parent */ 0, /* left */ &dummy, /* right */ 0, /* balance */ -1 };
 
 static struct free_block *free_tree = &dummy2;
 
@@ -1812,6 +1852,50 @@ remove_from_free_list (word_t *ptr)
 #endif
     p = (struct free_block *)(ptr+M_OVERHEAD);
     count_back(large_free_stat, p->size);
+#ifdef USE_AVL_FREELIST
+    /* Unlink from AVL freelist */
+    if (p->prev) p->prev->next = p->next;
+    if (p->next) p->next->prev = p->prev;
+
+    /* If the block is not the AVL node itself, we're done */
+    if (p->prev)
+        return;
+
+    /* This is the AVL node itself, but if there is another block free of
+     * the same size, just transfer over the node.
+     */
+    if (p->next)
+    {
+        struct free_block *next = p->next;
+
+        if (p == free_tree)
+            free_tree = p->next;
+        else
+        {
+#ifdef DEBUG
+            if (!p->parent)
+            {
+                fatal("(remove_from_free_list) Node %p (size %d) has neither a parent nor is it the AVL tree root.\n", p, p->size);
+            }
+#endif
+            if (p->parent->left == p)
+                p->parent->left = p->next;
+            else
+                p->parent->right = p->next;
+        }
+
+        /* We must not clobber p->next->next when copying the node! */
+        p->next = next->next;
+        *next = *p;
+
+        return;
+    }
+
+    /* It's the AVL itself, and there is no other free block of the same
+     * size: remove the node from the tree.
+     */
+    num_avl_nodes--;
+#endif /* USE_AVL_FREELIST */
 #ifdef DEBUG_AVL
     dprintf1(2, "node:%x\n",(p_uint)p);
     dprintf1(2, "size:%d\n",p->size);
@@ -2136,16 +2220,44 @@ add_to_free_list (word_t *ptr)
 #ifdef DEBUG_AVL
     dprintf1(2, "size:%d\n",size);
 #endif
-    q = (struct free_block *)size; /* this assignment is a hint for register
-                                    * choice */
+    q = (struct free_block *)size; /* this assignment is just a hint for
+                                    * register choice
+                                    */
     r = (struct free_block *)(ptr+M_OVERHEAD);
     count_up(large_free_stat, size);
+
+    r->size    = size;
+    r->parent  = NULL;
+    r->left    = 0;
+    r->right   = 0;
+    r->balance = 0;
+#ifdef USE_AVL_FREELIST
+    r->prev = NULL;
+    r->next = NULL;
+#endif /* USE_AVL_FREELIST */
+
     q = free_tree;
     for ( ; ; /*p = q*/) {
-        p = (struct free_block *)q;
+        p = q;
 #ifdef DEBUG_AVL
         dprintf1(2, "checked node size %d\n",p->size);
 #endif
+
+#ifdef USE_AVL_FREELIST
+        if (size == p->size)
+        {
+            /* We can attach the block to an existing node */
+            r->next = p->next;
+            r->prev = p;
+
+            if (r->next)
+                r->next->prev = r;
+            p->next = r;
+
+            return;
+        }
+        else
+#endif /* USE_AVL_FREELIST */
         if (size < p->size) {
             if ( NULL != (q = p->left) ) {
                 continue;
@@ -2162,13 +2274,13 @@ add_to_free_list (word_t *ptr)
             break;
         }
     }
-    r->size    = size;
+
+    /* new leaf */
     r->parent  = p;
-    r->left    = 0;
-    r->right   = 0;
-    r->balance = 0;
+#ifdef USE_AVL_FREELIST
+    num_avl_nodes++;
+#endif /* USE_AVL_FREELIST */
 #ifdef DEBUG_AVL
-    /* built new leaf */
     dprintf1(2, "p->balance:%d\n",p->balance);
 #endif
     do {
@@ -2632,6 +2744,19 @@ found_fit:
     } /* end of creating a new chunk */
 
     /* ptr is now a pointer to a free block in the free list */
+
+#ifdef USE_AVL_FREELIST
+
+    /* If there is more than one free block for this size, take
+     * the first block from the freelist to avoid copying around
+     * the AVL node information.
+     */
+    {
+        struct free_block *p = (struct free_block *)(ptr + M_OVERHEAD);
+        if (p->next)
+            ptr = ((word_t *)(p->next)) - M_OVERHEAD;
+    }
+#endif
 
     remove_from_free_list(ptr);
     real_size = *ptr & M_MASK;

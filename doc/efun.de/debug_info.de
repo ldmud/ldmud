@@ -336,6 +336,12 @@ BESCHREIBUNG
                   - int DID_MEM_TOTAL_UNUSED
                         Der Speicher, der vom System zur Verfuegung gestellt,
                         aber vom Treiber nicht benoetigt wird.
+                  - int DID_MEM_AVL_NODES          (smalloc)
+                        Anzahl der AVL-Knoten, die zur Verwaltung der
+                        freien grossen Speicherbloecke verwendet werden
+                        (nur smalloc). Dieser Wert kann in Zukunft
+                        wieder verschwinden.
+
 
         DINFO_TRACE    (7): Liefert die 'trace' Information aus dem
             Call Stack entsprechend der Spezifikation in <arg2>. Das Resultat
@@ -408,9 +414,8 @@ AENDERUNGEN
             fuegte das dritte Argument zu DINFO_OBJLIST hinzu, und veraenderte
             die Bedeutung von DID_ST_CALLOUT_SIZE und DID_ST_HBEAT_SIZE
             bzw. _SLOTS.
-
-ANMERKUNG
-        Diese Funktion ist geschuetzt und macht deshalb gar nix
+        LDMud 3.3.533 fuegte DID_MEM_AVL_NODES zu DINFO_DATA:DID_MEMORY
+            hinzu.
 
 SIEHE AUCH
         trace(E), traceprefix(E), malloc(D), status(D), dumpallobj(D)

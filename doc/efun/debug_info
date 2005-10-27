@@ -467,6 +467,10 @@ DESCRIPTION
               int DID_MEM_BLOCKS_RESULT      (smalloc)
                   Number of defragmented blocks (ie. merge results).
 
+              int DID_MEM_AVL_NODES          (smalloc)
+                  Number of AVL nodes used to manage the large free
+                  blocks. This value might go away again.
+
 
 
         DINFO_TRACE (7): Return the call stack 'trace' information as specified
@@ -543,6 +547,7 @@ HISTORY
         LDMud 3.3.479 added the DID_MEM_DEFRAG_ values
           for DINFO_DATA:DID_MEMORY.
         LDMud 3.3.526 added DINFO_DUMP:"memory".
+        LDMud 3.3.533 added DID_MEM_AVL_NODES for DINFO_DATA:DID_MEMORY.
 
 
 SEE ALSO

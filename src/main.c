@@ -1959,6 +1959,9 @@ options (void)
 #       if defined(NEW_CLEANUP)
                               , "NEW_CLEANUP"
 #       endif
+#       if defined(USE_AVL_FREELIST)
+                              , "USE_AVL_FREELIST"
+#       endif
                               };
         size_t nStrings = sizeof(optstrings) / sizeof(optstrings[0]);
         size_t iInitial = strlen(optstrings[0]);

@@ -7404,6 +7404,11 @@ v_debug_info (svalue_t *sp, int num_arg)
  *        int DID_MEM_BLOCKS_RESULT      (smalloc)
  *            Number of defragmented blocks (ie. merge results).
  *
+#ifdef USE_AVL_FREELIST
+ *        int DID_MEM_AVL_NODES          (smalloc)
+ *            Number AVL nodes (used to manage large free blocks).
+#endif
+ *
  *
  * DINFO_TRACE (7): Return the call stack 'trace' information as specified
  *     by <arg2>. The result of the function is either an array (format

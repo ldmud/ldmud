@@ -191,8 +191,9 @@
 #define DID_MEM_DEFRAG_BLOCKS_INSPECTED  31
 #define DID_MEM_DEFRAG_BLOCKS_MERGED     32
 #define DID_MEM_DEFRAG_BLOCKS_RESULT     33
+#define DID_MEM_AVL_NODES      34
 
-#define DID_MEMORY_MAX         34
+#define DID_MEMORY_MAX         35
 
 
 /* Indices into the subarrays resulting from debug_info(DINFO_TRACE, 0)
