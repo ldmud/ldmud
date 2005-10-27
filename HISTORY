@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-09-Aug-2003 (Lars Duening) -- Development Release 3.3
+25-Sep-2003 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -63,6 +63,11 @@ For a detailed list of all changes see the file CHANGELOG.
     - Master Object:
 
     - Fixed Crashers:
+       + The driver crashed when a private lfun shadowing
+         a public sefun was virtually inherited twice in parallel.
+       + When walking over a mapping of width 1, deletions from the mapping
+         from within the walk_mapping callback could cause walk_mapping() to
+         pass invalid pointers to the callback on later iterations.
 
     - Language:
        + Strings can hold all characters, including '\0'.

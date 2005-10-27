@@ -1783,7 +1783,6 @@ load_object (const char *lname, Bool create_super, int depth, namechain_t *chain
                 fprintf(stderr, " done\n");
             else
             {
-            printf("DEBUG ... needs inherit\n");
                 fprintf(stderr, " needs inherit\n");
             }
         }

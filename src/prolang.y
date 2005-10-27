@@ -3123,7 +3123,7 @@ define_variable (ident_t *name, fulltype_t type)
         all_globals = name;
     }
     else if (name->u.global.function == I_GLOBAL_FUNCTION_OTHER
-          && name->u.global.efun >= 0
+          && (name->u.global.efun >= 0 || name->u.global.sim_efun >= 0)
             )
     {
         /* The previous _GLOBAL use is the permanent efun definition:
@@ -3245,7 +3245,7 @@ redeclare_variable (ident_t *name, fulltype_t type, int n)
         all_globals = name;
     }
     else if (name->u.global.function == I_GLOBAL_FUNCTION_OTHER
-          && name->u.global.efun >= 0
+          && (name->u.global.efun >= 0 || name->u.global.sim_efun >= 0)
             )
     {
         /* The previous _GLOBAL use is the permanent efun definition:
@@ -14623,7 +14623,7 @@ copy_functions (program_t *from, funflag_t type)
                          * a (simul-)efun.
                          */
 
-                        if (p->u.global.efun >= 0)
+                        if (p->u.global.efun >= 0 || p->u.global.sim_efun >= 0)
                         {
                             /* This inherited function shadows an efun */
 
@@ -14641,9 +14641,11 @@ copy_functions (program_t *from, funflag_t type)
                         }
 
                         /* Update the symbol table entry to point
-                         * to the newly read function.
+                         * to the newly read function, unless of course
+                         * the code above already took care of that change.
                          */
-                        p->u.global.function = current_func_index;
+                        if (p->u.global.function < 0)
+                            p->u.global.function = current_func_index;
                     }
                     /* else: inherited private defined function must not hide
                      * the (simul-)efun and is thusly not added to

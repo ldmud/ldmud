@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+27-Sep-2003 (Lars Duening)  (3.3.487)
+  - (prolang.y) Corrected some subtleties in the lfun/efun classification
+      of functions, revealed by the recent change.
+  - (simul_efun.c) The __INIT() function is no longer visible as simul-efun.
+
 25-Sep-2003 (Lars Duening)  (3.3.486)
   - (prolang.y, lex) The driver crashed when a private lfun shadowing
       a public sefun was virtually inherited twice in parallel, because

@@ -310,6 +310,17 @@ get_simul_efun_object (void)
             flags |= NAME_UNDEFINED;
         }
 
+        /* If the function is __INIT, pretend it's a private function */
+        if ( !(flags & (TYPE_MOD_STATIC|TYPE_MOD_PRIVATE|NAME_UNDEFINED)) )
+        {
+            string_t *function_name;
+
+            memcpy(  &function_name, FUNCTION_NAMEP(funstart)
+                   , sizeof function_name);
+            if (mstreq(function_name, STR_VARINIT))
+                flags |= TYPE_MOD_PRIVATE;
+        }
+
         /* If the function is indeed visible, get its information */
         if ( !(flags & (TYPE_MOD_STATIC|TYPE_MOD_PRIVATE|NAME_UNDEFINED)) )
         {

@@ -63,16 +63,13 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 486)
-(Parent-Version lpmud 3-3 485)
-(Version-Log "The driver crashed when a private lfun shadowing a public sefun was virtually inherited twice in parallel.
-Corrected the hash-mapping protection in walk_mapping().
-Allowed set_{connection,combine}_charset() to re-establish the default charsets.
-New efuns get_combine_charset() and get_combine_charset().
-Experimental: limited the number of commands per connection to 10 per second.")
+(Project-Version lpmud 3-3 487)
+(Parent-Version lpmud 3-3 486)
+(Version-Log "Corrections to the last change in the LPC compiler regarding the functions.
+__INIT() is no longer visible as simul-efun.")
 (New-Version-Log
 "")
-(Checkin-Time "Thu, 25 Sep 2003 20:17:21 -0600")
+(Checkin-Time "Sat, 27 Sep 2003 14:25:31 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -110,8 +107,8 @@ Experimental: limited the number of commands per connection to 10 per second.")
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.10 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.68 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.549 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.332 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.550 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.333 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -280,7 +277,7 @@ Experimental: limited the number of commands per connection to 10 per second.")
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.18 644))
   (src/port.c (lpmud/39_port.c 1.17.1.9 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.17.1.4 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.49 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.50 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7.1.2 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))
@@ -289,9 +286,9 @@ Experimental: limited the number of commands per connection to 10 per second.")
   (src/regexp.c (lpmud/36_regexp.c 1.17.1.4.1.11 644))
   (src/sent.h (lpmud/33_sent.h 1.11.1.4 644))
   (src/simul_efun.h (lpmud/f/17_simul_efun 1.5.1.5 644))
-  (src/simul_efun.c (lpmud/32_simul_efun 1.20.1.17.1.3 644))
+  (src/simul_efun.c (lpmud/32_simul_efun 1.20.1.17.1.4 644))
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.32 644))
-  (src/simulate.c (lpmud/31_simulate.c 1.88.1.116 644))
+  (src/simulate.c (lpmud/31_simulate.c 1.88.1.117 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.14 644))
   (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.87 644))
   (src/structs.h (lpmud/d/b/5_structs.h 1.4 644))
@@ -1219,7 +1216,7 @@ Experimental: limited the number of commands per connection to 10 per second.")
   (doc/efun/sin (lpmud/q/23_sin 1.1.1.2 644))
   (doc/efun/sizeof (lpmud/l/39_sizeof 1.3.1.4 644))
   (doc/efun/slice_array (lpmud/q/24_slice_arra 1.3 644))
-  (doc/efun/snoop (lpmud/q/25_snoop 1.6 644))
+  (doc/efun/snoop (lpmud/q/25_snoop 1.7 644))
   (doc/efun/sort_array (lpmud/c/36_sort_array 1.6.1.1 644))
   (doc/efun/sprintf (lpmud/c/35_sprintf 1.3.1.16 644))
   (doc/efun/sqrt (lpmud/q/26_sqrt 1.1.1.2 644))

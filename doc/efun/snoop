@@ -18,7 +18,8 @@ DESCRIPTION
         '%' and send directly to the players connection. If <snooper>
         is an object, the snooped text is sent in two calls to the
         object's catch_tell() lfun: the first call passes just the
-        "%", the second the actual text.
+        "%" (plus the prompt if the object changed it), the second the
+        actual text.
 
 SEE ALSO
         query_snoop(E), catch_tell(A)
