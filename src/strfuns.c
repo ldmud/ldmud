@@ -417,7 +417,7 @@ f_convert_charset (svalue_t *sp)
     pOut = out_buf;
 
     /* Open the iconv context */
-    context = iconv_open(get_txt(from_cs), get_txt(to_cs));
+    context = iconv_open(get_txt(to_cs), get_txt(from_cs));
     if (context == (iconv_t) -1)
     {
         xfree(out_buf);

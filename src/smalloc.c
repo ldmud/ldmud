@@ -442,13 +442,6 @@ static word_t *heap_end = NULL;
   /* Current end address of the heap.
    */
 
-#ifndef SBRK_OK
-static int overlap;
-  /* How much extra memory esbrk() could recycle from joining
-   * the new allocation with the old one.
-   */
-#endif
-
 /* --- Statistics --- */
 
 static long small_count[SMALL_BLOCK_NUM] = {INIT_SMALL_BLOCK};
@@ -544,7 +537,7 @@ static long malloc_increment_size_total = 0;
 /*-------------------------------------------------------------------------*/
 /* Forward declarations */
 
-static char *esbrk(word_t);
+static char *esbrk(word_t, size_t * pExtra);
 
 static char *large_malloc(word_t, Bool);
 #define large_malloc_int(size, force_m) large_malloc(size, force_m)
@@ -2539,6 +2532,7 @@ found_fit:
         /* No match, allocate more memory */
 
         word_t chunk_size, block_size;
+        size_t extra = 0; /* extra memory allocated by esbrk() */
 
         block_size = size*SINT;
 
@@ -2603,7 +2597,7 @@ found_fit:
             }
             else
             {
-                ptr = (word_t *)esbrk(chunk_size);
+                ptr = (word_t *)esbrk(chunk_size, &extra);
             }
         }
 
@@ -2628,9 +2622,7 @@ found_fit:
 
         /* Enough of the scary words - we got our memory block */
 
-#ifndef SBRK_OK
-        chunk_size += overlap;
-#endif /* SBRK_OK */
+        chunk_size += extra;
         block_size = chunk_size / SINT;
 
         /* configure header info on chunk */
@@ -2766,9 +2758,12 @@ large_free (char *ptr)
 
 /*-------------------------------------------------------------------------*/
 static char *
-esbrk (word_t size)
+esbrk (word_t size, size_t * pExtra)
 
 /* Allocate a block of <size> bytes from the system and return its pointer.
+ * If esbrk() allocated a larger block, the difference to <size> is
+ * returned in *<pExtra>.
+ *
 #ifdef SBRK_OK
  * It is system dependent how sbrk() aligns data, so we simpy use brk()
  * to insure that we have enough.
@@ -2791,11 +2786,12 @@ esbrk (word_t size)
 #endif
 
     mdb_log_sbrk(size);
+    *pExtra = 0;
     if (!heap_end)
     {
         /* First call: allocate the first fake block */
         heap_start = heap_end = (word_t *)sbrk(0);
-        if (!esbrk(SINT))
+        if (!esbrk(SINT, pExtra))
         {
             in_malloc = 0;
             fatal("Couldn't malloc anything\n");
@@ -2819,13 +2815,21 @@ esbrk (word_t size)
     char *block;
     word_t *p;    /* start of the fake block */
     const int overhead = T_OVERHEAD;
+    size_t overlap = 0;
+      /* How much extra memory esbrk() could recycle from joining
+       * the new allocation with the old one.
+       */
+
 
     mdb_log_sbrk(size);
     size += overhead * SINT;  /* for the extra fake "allocated" block */
 
     block = malloc(size);
     if (!block)
+    {
+        *pExtra = 0;
         return NULL;
+    }
     assert_stack_gap();
 
     /* p points to the start of the fake allocated block used
@@ -2958,6 +2962,8 @@ esbrk (word_t size)
 
     count_up(sbrk_stat, size);
     count_up(large_wasted_stat, overhead * SINT);
+
+    *pExtra = overlap;
     return block;
 #endif /* !SBRK_OK */
 } /* esbrk() */

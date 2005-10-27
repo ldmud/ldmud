@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+27-Apr-2004 (Lars Duening)  (3.3.533)
+  - (strfuns.c) Efun convert_charset(): The parameters to iconv_open() were
+      reversed.
+  - (smalloc.c) If esbrk() can allocated more memory than asked, the
+      difference is now returned in a pointer-argument instead of
+      a global variable - much easier to understand this way.
+
 26-Apr-2004 (Lars Duening)  (3.3.532)
   - (actions.c) Added missing include.
   - (configure) Corrected bison recognition under AIX/Visual Age 6.

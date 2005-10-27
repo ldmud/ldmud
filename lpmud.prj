@@ -62,22 +62,19 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 532)
-(Parent-Version lpmud 3-3 531)
+(Project-Version lpmud 3-3 533)
+(Parent-Version lpmud 3-3 532)
 (Version-Log "
-  - (actions.c) Added missing include.
-  - (configure) Corrected bison recognition under AIX/Visual Age 6.
-  - (configure) Test if iconv() takes a non-const char** as input string.
-  - (random.c) Adapted for AIX/Visual Age 6.
-  - (interpret.c) <int> -= <float> subtracted a random number (reported by
-       Acius).
-  - (efuns.c, port.h) Efun reverse() can bit-reverse integers.
-  - (etc/lpc.xml) Menaures provided a new version.
+  - (strfuns.c) Efun convert_charset(): The parameters to iconv_open() were
+      reversed.
+  - (smalloc.c) If esbrk() can allocated more memory than asked, the
+      difference is now returned in a pointer-argument instead of
+      a global variable - much easier to understand this way.
 ")
 (New-Version-Log
 ""
 )
-(Checkin-Time "Mon, 26 Apr 2004 19:49:51 -0600")
+(Checkin-Time "Tue, 27 Apr 2004 07:27:33 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -115,7 +112,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.76 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.595 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.596 644))
   (HISTORY (lpmud/f/49_HISTORY 1.351 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -303,13 +300,13 @@
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.33 644))
   (src/simulate.c (lpmud/31_simulate.c 1.88.1.120 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.14 644))
-  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.91 644))
+  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.92 644))
   (src/sysmalloc.h (lpmud/c/b/33_sysmalloc. 1.2 644))
   (src/sysmalloc.c (lpmud/c/b/34_sysmalloc. 1.6 644))
   (src/sprintf.h (lpmud/f/15_sprintf.h 1.3.1.4 644))
   (src/sprintf.c (lpmud/28_sprintf.c 1.31.1.62 644))
   (src/strfuns.h (lpmud/b/51_strfuns.h 1.11.1.8 644))
-  (src/strfuns.c (lpmud/c/0_strfuns.c 1.9.1.18 644))
+  (src/strfuns.c (lpmud/c/0_strfuns.c 1.9.1.19 644))
   (src/structs.h (lpmud/d/b/5_structs.h 1.4 644))
   (src/structs.c (lpmud/d/b/6_structs.c 1.15 644))
   (src/svalue.h (lpmud/f/39_datatypes. 1.34.1.23.1.7 644))
