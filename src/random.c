@@ -1,158 +1,250 @@
 /*---------------------------------------------------------------------------
- * Gamedriver: Random Generator
+ * Gamedriver: Random Generator 'Mersenne Twister'
  *
- * Copyright (C) 1997 Makoto Matsumoto and Takuji Nishimura.
- *    When you use this, send an e-mail to <matumoto@math.keio.ac.jp> with
- *     an appropriate reference to your work.
+ * A C-program for MT19937, with initialization improved 2002/2/10.
+ * Coded by Takuji Nishimura and Makoto Matsumoto.
+ * This is a faster version by taking Shawn Cokus's optimization,
+ * Matthe Bellew's simplification, Isaku Wada's real version.
  *
- * High-speed implementation by Shawn J. Cokus who appreciates a copy
- *    of the above mail (<Cokus@math.washington.edu>).
+ * Before using, initialize the state by using init_genrand(seed)  
+ * or init_by_array(init_key, key_length).
  *
- * This library is free software; you can redistribute it and/or modify it
- * under the terms of the GNU Library General Public License as published by
- * the Free Software Foundation (either version 2 of the License or, at your
- * option, any later version).  This library is distributed in the hope that
- * it will be useful, but WITHOUT ANY WARRANTY, without even the implied
- * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See
- * the GNU Library General Public License for more details.  You should have
- * received a copy of the GNU Library General Public License along with this
- * library; if not, write to the Free Software Foundation, Inc., 59 Temple
- * Place, Suite 330, Boston, MA 02111-1307, USA.
- *---------------------------------------------------------------------------
- * This is the ``Mersenne Twister'' random number generator MT19937, which
- * generates pseudorandom integers uniformly distributed in 0..(2^32 - 1)
- * starting from any odd seed in 0..(2^32 - 1).  This version is a recode
- * by Shawn Cokus (Cokus@math.washington.edu) on March 8, 1998 of a version by
- * Takuji Nishimura (who had suggestions from Topher Cooper and Marc Rieffel in
- * July-August 1997).
+ * Copyright (C) 1997 - 2002, Makoto Matsumoto and Takuji Nishimura,
+ * All rights reserved.                          
  *
- * Effectiveness of the recoding (on Goedel2.math.washington.edu, a DEC Alpha
- * running OSF/1) using GCC -O3 as a compiler: before recoding: 51.6 sec. to
- * generate 300 million random numbers; after recoding: 24.0 sec. for the same
- * (i.e., 46.5% of original time), so speed is now about 12.5 million random
- * number generations per second on this machine.
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
  *
- * According to the URL <http: *www.math.keio.ac.jp/~matumoto/emt.html>
- * (and paraphrasing a bit in places), the Mersenne Twister is ``designed
- * with consideration of the flaws of various existing generators,'' has
- * a period of 2^19937 - 1, gives a sequence that is 623-dimensionally
- * equidistributed, and ``has passed many stringent tests, including the
- * die-hard test of G. Marsaglia and the load test of P. Hellekalek and
- * S. Wegenkittl.''  It is efficient in memory usage (typically using 2506
- * to 5012 bytes of static data, depending on data type sizes, and the code
- * is quite short as well).  It generates random numbers in batches of 624
- * at a time, so the caching and pipelining of modern systems is exploited.
- * It is also divide- and mod-free.
+ *   1. Redistributions of source code must retain the above copyright
+ *      notice, this list of conditions and the following disclaimer.
+ *
+ *   2. Redistributions in binary form must reproduce the above copyright
+ *      notice, this list of conditions and the following disclaimer in the
+ *      documentation and/or other materials provided with the distribution.
+ *
+ *   3. The names of its contributors may not be used to endorse or promote 
+ *      products derived from this software without specific prior written 
+ *      permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Any feedback is very welcome.
+ * http://www.math.keio.ac.jp/matumoto/emt.html
+ * email: matumoto@math.keio.ac.jp
  *---------------------------------------------------------------------------
  */
 
 #include "driver.h"
-
 #include "random.h"
 
-/* uint32 must be an unsigned integer type capable of holding at least 32
- * bits; exactly 32 should be fastest, but 64 is better on an Alpha with
- * GCC at -O3 optimization so try your options and see what's best for you
- */
+/* Period parameters */  
+#define N 624
+#define M 397
+#define MATRIX_A 0x9908b0dfUL   /* constant vector a */
+#define UMASK 0x80000000UL /* most significant w-r bits */
+#define LMASK 0x7fffffffUL /* least significant r bits */
+#define MIXBITS(u,v) ( ((u) & UMASK) | ((v) & LMASK) )
+#define TWIST(u,v) ((MIXBITS(u,v) >> 1) ^ ((v)&1UL ? MATRIX_A : 0UL))
 
-/*-------------------------------------------------------------------------*/
+static unsigned long state[N]; /* the array for the state vector  */
+static int left = 1;
+static int initf = 0;
+static unsigned long *next;
 
-#define N              (624)                 /* length of state vector */
-#define M              (397)                 /* a period parameter */
-#define K              (0x9908B0DFU)         /* a magic constant */
-#define hiBit(u)       ((u) & 0x80000000U)   /* mask all but highest   bit of u */
-#define loBit(u)       ((u) & 0x00000001U)   /* mask all but lowest    bit of u */
-#define loBits(u)      ((u) & 0x7FFFFFFFU)   /* mask     the highest   bit of u */
-#define mixBits(u, v)  (hiBit(u)|loBits(v))  /* move hi bit of u to hi bit of v */
+/* initializes state[N] with a seed */
+void init_genrand(unsigned long s)
+{
+    int j;
+    state[0]= s & 0xffffffffUL;
+    for (j=1; j<N; j++) {
+        state[j] = (1812433253UL * (state[j-1] ^ (state[j-1] >> 30)) + j); 
+        /* See Knuth TAOCP Vol2. 3rd Ed. P.106 for multiplier. */
+        /* In the previous versions, MSBs of the seed affect   */
+        /* only MSBs of the array state[].                        */
+        /* 2002/01/09 modified by Makoto Matsumoto             */
+        state[j] &= 0xffffffffUL;  /* for >32 bit machines */
+    }
+    left = 1; initf = 1;
+}
 
-static uint32   state[N+1];      /* state vector + 1 extra to not violate ANSI C */
-static uint32   *next;           /* next random value is computed from here */
-static int      left = -1;       /* can *next++ this many times before reloading */
+/* initialize by an array with array-length */
+/* init_key is the array for initializing keys */
+/* key_length is its length */
+/* slight change for C++, 2004/2/26 */
+void init_by_array(unsigned long init_key[], int key_length)
+{
+    int i, j, k;
+    init_genrand(19650218UL);
+    i=1; j=0;
+    k = (N>key_length ? N : key_length);
+    for (; k; k--) {
+        state[i] = (state[i] ^ ((state[i-1] ^ (state[i-1] >> 30)) * 1664525UL))
+          + init_key[j] + j; /* non linear */
+        state[i] &= 0xffffffffUL; /* for WORDSIZE > 32 machines */
+        i++; j++;
+        if (i>=N) { state[0] = state[N-1]; i=1; }
+        if (j>=key_length) j=0;
+    }
+    for (k=N-1; k; k--) {
+        state[i] = (state[i] ^ ((state[i-1] ^ (state[i-1] >> 30)) * 1566083941UL))
+          - i; /* non linear */
+        state[i] &= 0xffffffffUL; /* for WORDSIZE > 32 machines */
+        i++;
+        if (i>=N) { state[0] = state[N-1]; i=1; }
+    }
 
+    state[0] = 0x80000000UL; /* MSB is 1; assuring non-zero initial array */ 
+    left = 1; initf = 1;
+}
+
+static void next_state(void)
+{
+    unsigned long *p=state;
+    int j;
+
+    /* if init_genrand() has not been called, */
+    /* a default initial seed is used         */
+    if (initf==0) init_genrand(5489UL);
+
+    left = N;
+    next = state;
+    
+    for (j=N-M+1; --j; p++) 
+        *p = p[M] ^ TWIST(p[0], p[1]);
+
+    for (j=M; --j; p++) 
+        *p = p[M-N] ^ TWIST(p[0], p[1]);
+
+    *p = p[M-N] ^ TWIST(p[0], state[0]);
+}
+
+/* generates a random number on [0,0xffffffff]-interval */
+unsigned long genrand_int32(void)
+{
+    unsigned long y;
+
+    if (--left == 0) next_state();
+    y = *next++;
+
+    /* Tempering */
+    y ^= (y >> 11);
+    y ^= (y << 7) & 0x9d2c5680UL;
+    y ^= (y << 15) & 0xefc60000UL;
+    y ^= (y >> 18);
+
+    return y;
+}
+
+#if 0
+
+/** LDMud doesn't use the following functions - yet. **/
+
+/* generates a random number on [0,0x7fffffff]-interval */
+long genrand_int31(void)
+{
+    unsigned long y;
+
+    if (--left == 0) next_state();
+    y = *next++;
+
+    /* Tempering */
+    y ^= (y >> 11);
+    y ^= (y << 7) & 0x9d2c5680UL;
+    y ^= (y << 15) & 0xefc60000UL;
+    y ^= (y >> 18);
+
+    return (long)(y>>1);
+}
+
+/* generates a random number on [0,1]-real-interval */
+double genrand_real1(void)
+{
+    unsigned long y;
+
+    if (--left == 0) next_state();
+    y = *next++;
+
+    /* Tempering */
+    y ^= (y >> 11);
+    y ^= (y << 7) & 0x9d2c5680UL;
+    y ^= (y << 15) & 0xefc60000UL;
+    y ^= (y >> 18);
+
+    return (double)y * (1.0/4294967295.0); 
+    /* divided by 2^32-1 */ 
+}
+
+/* generates a random number on [0,1)-real-interval */
+double genrand_real2(void)
+{
+    unsigned long y;
+
+    if (--left == 0) next_state();
+    y = *next++;
+
+    /* Tempering */
+    y ^= (y >> 11);
+    y ^= (y << 7) & 0x9d2c5680UL;
+    y ^= (y << 15) & 0xefc60000UL;
+    y ^= (y >> 18);
+
+    return (double)y * (1.0/4294967296.0); 
+    /* divided by 2^32 */
+}
+
+/* generates a random number on (0,1)-real-interval */
+double genrand_real3(void)
+{
+    unsigned long y;
+
+    if (--left == 0) next_state();
+    y = *next++;
+
+    /* Tempering */
+    y ^= (y >> 11);
+    y ^= (y << 7) & 0x9d2c5680UL;
+    y ^= (y << 15) & 0xefc60000UL;
+    y ^= (y >> 18);
+
+    return ((double)y + 0.5) * (1.0/4294967296.0); 
+    /* divided by 2^32 */
+}
+
+/* generates a random number on [0,1) with 53-bit resolution*/
+double genrand_res53(void) 
+{ 
+    unsigned long a=genrand_int32()>>5, b=genrand_int32()>>6; 
+    return(a*67108864.0+b)*(1.0/9007199254740992.0); 
+} 
+/* These real versions are due to Isaku Wada, 2002/01/09 added */
+
+#endif
+
+/*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+/*                     Driver interface functions                          */
 
 /*-------------------------------------------------------------------------*/
 void
 seed_random (uint32 seed)
 
-/* We initialize state[0..(N-1)] via the generator
- *
- *   x_new = (69069 * x_old) mod 2^32
- *
- * from Line 15 of Table 1, p. 106, Sec. 3.3.4 of Knuth's
- * _The Art of Computer Programming_, Volume 2, 3rd ed.
- *
- * Notes (SJC): I do not know what the initial state requirements
- * of the Mersenne Twister are, but it seems this seeding generator
- * could be better.  It achieves the maximum period for its modulus
- * (2^30) iff x_initial is odd (p. 20-21, Sec. 3.2.1.2, Knuth); if
- * x_initial can be even, you have sequences like 0, 0, 0, ...;
- * 2^31, 2^31, 2^31, ...; 2^30, 2^30, 2^30, ...; 2^29, 2^29 + 2^31,
- * 2^29, 2^29 + 2^31, ..., etc. so I force seed to be odd below.
- *
- * Even if x_initial is odd, if x_initial is 1 mod 4 then
- *
- *   the          lowest bit of x is always 1,
- *   the  next-to-lowest bit of x is always 0,
- *   the 2nd-from-lowest bit of x alternates      ... 0 1 0 1 0 1 0 1 ... ,
- *   the 3rd-from-lowest bit of x 4-cycles        ... 0 1 1 0 0 1 1 0 ... ,
- *   the 4th-from-lowest bit of x has the 8-cycle ... 0 0 0 1 1 1 1 0 ... ,
- *    ...
- *
- * and if x_initial is 3 mod 4 then
- *
- *   the          lowest bit of x is always 1,
- *   the  next-to-lowest bit of x is always 1,
- *   the 2nd-from-lowest bit of x alternates      ... 0 1 0 1 0 1 0 1 ... ,
- *   the 3rd-from-lowest bit of x 4-cycles        ... 0 0 1 1 0 0 1 1 ... ,
- *   the 4th-from-lowest bit of x has the 8-cycle ... 0 0 1 1 1 1 0 0 ... ,
- *    ...
- *
- * The generator's potency (min. s>=0 with (69069-1)^s = 0 mod 2^32) is
- * 16, which seems to be alright by p. 25, Sec. 3.2.1.3 of Knuth.  It
- * also does well in the dimension 2..5 spectral tests, but it could be
- * better in dimension 6 (Line 15, Table 1, p. 106, Sec. 3.3.4, Knuth).
- *
- * Note that the random number user does not see the values generated
- * here directly since reloadMT() will always munge them first, so maybe
- * none of all of this matters.  In fact, the seed values made here could
- * even be extra-special desirable if the Mersenne Twister theory says
- * so-- that's why the only change I made is to restrict to odd seeds.
- */
+/* Initialize the generator */
 
 {
-
-    register uint32 x = (seed | 1U) & 0xFFFFFFFFU, *s = state;
-    register int    j;
-
-    for(left=0, *s++=x, j=N; --j; *s++ = (x*=69069U) & 0xFFFFFFFFU) NOOP;
-}
-
-/*-------------------------------------------------------------------------*/
-static
-mp_uint reloadMT (void)
-
-{
-    register uint32 *p0=state, *p2=state+2, *pM=state+M, s0, s1;
-    register int    j;
-
-    if(left < -1)
-        seed_random(4357U);
-
-    left=N-1, next=state+1;
-
-    for(s0=state[0], s1=state[1], j=N-M+1; --j; s0=s1, s1=*p2++)
-        *p0++ = *pM++ ^ (mixBits(s0, s1) >> 1) ^ (loBit(s1) ? K : 0U);
-
-    for(pM=state, j=M; --j; s0=s1, s1=*p2++)
-        *p0++ = *pM++ ^ (mixBits(s0, s1) >> 1) ^ (loBit(s1) ? K : 0U);
-
-    s1=state[0], *p0 = *pM ^ (mixBits(s0, s1) >> 1) ^ (loBit(s1) ? K : 0U);
-    s1 ^= (s1 >> 11);
-    s1 ^= (s1 <<  7) & 0x9D2C5680U;
-    s1 ^= (s1 << 15) & 0xEFC60000U;
-    return(s1 ^ (s1 >> 18));
-}
-
+    unsigned long init[4]={ seed & 0xFFF, (seed >>= 8) & 0xFFF,
+      (seed >>= 8) & 0xFFF, (seed >>= 8) & 0xFFF };
+    init_by_array(init, 4);
+} /* seed_random() */
 
 /*-------------------------------------------------------------------------*/
 uint32
@@ -160,51 +252,20 @@ random_number (uint32 n)
 
 /* Return a random number in the range 0..n-1.
  *
- * The key return an evenly distributed random number in
- * the given range is not to use the low bits of the raw random
- * number, as these are distressingly non-random.
- * The C-FAQ 13.16 gives a solution ('rc / (RANDOM_MAX / n + 1)'), which
- * unfortunately doesn't work too well for large ranges.
+ * The MT FAQ suggests:
+ *  If the application is not sensitive to the rounding off error, then please
+ *  multiply N to [0,1)-real uniform random numbers and take the integer part
+ *  (this is sufficient for most applications).
+ *
  */
 
 {
-#define RANDOM_MAX 0xFFFFFFFFU
-
-    uint32 y, rc;
-#if !defined(HAVE_LONG_LONG) || SIZEOF_CHAR_P != 4
-    uint32 rmax;
-
-    rmax = (RANDOM_MAX / (n+1)) * n;
-      /* rmax = 0 if n >= RANDOM_MAX */
-
-    do {
-#endif
-
-    if(--left < 0)
-        rc = reloadMT();
-    else
-    {
-        y  = *next++;
-        y ^= (y >> 11);
-        y ^= (y <<  7) & 0x9D2C5680U;
-        y ^= (y << 15) & 0xEFC60000U;
-        rc = (y ^ (y >> 18));
-    }
-
-#if defined(HAVE_LONG_LONG) && SIZEOF_CHAR_P == 4
-    return (uint32)
-           ((unsigned long long)rc * (unsigned long long)n
-                                    >> sizeof(uint32) * CHAR_BIT);
-#else
-    } while (rmax && rc > rmax);
-
-    if (!rmax)
-        return rc;
-    if (rmax / n < rc && rmax / n > 0)
-        return rc / (rmax / n);
-    return (rc * n) / rmax;
-#endif
-}
+  return genrand_int32() * (1.0/4294967296.0) * n;
+  /*
+   * Since most compilers compute the constant when it is compiled, so this
+   * code runs with the same speed with the standard C codes, and portability
+   * and readability are better.
+   */
+} /* random_number() */
 
 /***************************************************************************/
-

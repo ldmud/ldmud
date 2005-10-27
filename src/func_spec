@@ -440,7 +440,7 @@ mapping m_allocate(int, int default: F_CONST1);
 int     m_contains(mixed & | mapping, mixed & | mixed, ...);
 mapping m_add(mapping, mixed, ...);
 mapping m_delete(mapping, mixed);
-mapping m_entry(mapping, mixed);
+mixed * m_entry(mapping, mixed);
 mixed  *m_indices(mapping);
 mapping m_reallocate(mapping, int);
 mixed  *m_values(mapping, int default: F_CONST0);

@@ -63,21 +63,18 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 504)
-(Parent-Version lpmud 3-3 503)
+(Project-Version lpmud 3-3 505)
+(Parent-Version lpmud 3-3 504)
 (Version-Log "
-  - (mstrings, interpret.c) Extended the string-appending scheme
-       to addition of numbers to strings.
-  - (ed.c) The 'Q'/'q' commands no longer clear the buffer before
-       checking if the command was legal (Bug #0000046).
-  - (ed.c) Corrected the doprnt() function so that the current line
-       is never out of range (this could happen when giving 'Z' while
-       at the end of the file). (Bug #0000045)
+  - (func_spec) The result type of m_entry() was specified as 'mapping'
+       instead of the correct 'mixed *' (thanks, Heiko!).
+  - (random.c) Updated the Mersenne twister to the version with improved
+       initialization (thanks, Fini, for the link).
 ")
 (New-Version-Log
 ""
 )
-(Checkin-Time "Sun, 28 Mar 2004 01:12:19 -0700")
+(Checkin-Time "Tue, 30 Mar 2004 21:53:32 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -113,9 +110,9 @@
 
   ;; Information about the driver and the distribution in general
   (README (lpmud/n/0_README 1.4.1.1 644))
-  (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.10 644))
+  (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.70 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.567 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.568 644))
   (HISTORY (lpmud/f/49_HISTORY 1.340 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -162,7 +159,7 @@
   (src/settings/theland (lpmud/a/b/12_spin 1.6 744))
   (src/settings/tubmud (lpmud/c/27_tubmud 1.7.1.13 744))
   (src/settings/traumland (lpmud/c/b/35_traumland 1.2 744))
-  (src/settings/unitopia (lpmud/c/7_unitopia 1.6.1.4.1.14 744))
+  (src/settings/unitopia (lpmud/c/7_unitopia 1.6.1.4.1.15 744))
   (src/settings/wunderland (lpmud/d/24_wunderland 1.3.1.9 744))
 
   (src/C_COMPILER_BUGS (lpmud/d/21_C_COMPILER 1.6.1.2.1.4 644))
@@ -292,7 +289,7 @@
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7.1.2 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))
-  (src/random.c (lpmud/d/28_random.c 1.12 644))
+  (src/random.c (lpmud/d/28_random.c 1.13 644))
   (src/regexp.h (lpmud/35_regexp.h 1.11.1.5 644))
   (src/regexp.c (lpmud/36_regexp.c 1.17.1.4.1.11 644))
   (src/sent.h (lpmud/33_sent.h 1.11.1.4 644))
@@ -322,7 +319,7 @@
   (src/xptmalloc.c (lpmud/d/b/10_xptmalloc. 1.2 644))
 
   ;; Build files
-  (src/func_spec (lpmud/c/31_func_spec 1.53.1.45.1.22.1.22 644))
+  (src/func_spec (lpmud/c/31_func_spec 1.53.1.45.1.22.1.23 644))
   (src/string_spec (lpmud/f/6_string_spe 1.14.1.13 644))
   (src/mkfunc.c (lpmud/l/14_mkfunc.c 1.1 644))
   (src/make_func.y (lpmud/b/7_make_func. 1.25.1.30.1.7 644))
@@ -1227,7 +1224,7 @@
   (doc/efun/set_prompt (lpmud/q/18_set_prompt 1.2.1.1.1.1 644))
   (doc/efun/set_this_object (lpmud/c/37_set_this_o 1.8 644))
   (doc/efun/set_this_player (lpmud/m/18_set_this_p 1.3 644))
-  (doc/efun/seteuid (lpmud/q/19_seteuid 1.4 644))
+  (doc/efun/seteuid (lpmud/q/19_seteuid 1.5 644))
   (doc/efun/sgn (lpmud/k/43_sgn 1.2 644))
   (doc/efun/shadow (lpmud/q/20_shadow 1.5 644))
   (doc/efun/shutdown (lpmud/q/22_shutdown 1.2 644))

@@ -7,6 +7,9 @@ DESCRIPTION
         installations it can always be set to the current uid of the
         object, to the uid of the creator of the object file, or to 0.
 
+        Result is 0 the euid could not be changed, and non-0 if it
+        was changed.
+
         When this value is 0, the current object's uid can be changed
         by export_uid(), and only then.
 
@@ -18,4 +21,5 @@ HISTORY
         Since 3.2.7, this efun is always available.
 
 SEE ALSO
-        export_uid(E), getuid(E), geteuid(E), native(C)
+        export_uid(E), getuid(E), geteuid(E), native(C),
+        valid_seteuid(M)

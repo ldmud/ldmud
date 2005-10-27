@@ -1,7 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-27-Feb-2004 (Lars Duening)  (3.3.504)
+30-Mar-2004 (Lars Duening)  (3.3.505)
+  - (func_spec) The result type of m_entry() was specified as 'mapping'
+       instead of the correct 'mixed *' (thanks, Heiko!).
+  - (random.c) Updated the Mersenne twister to the version with improved
+       initialization (thanks, Fini, for the link).
+
+27-Mar-2004 (Lars Duening)  (3.3.504)
   - (mstrings, interpret.c) Extended the string-appending scheme
        to addition of numbers to strings.
   - (ed.c) The 'Q'/'q' commands no longer clear the buffer before
@@ -10,7 +16,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
        is never out of range (this could happen when giving 'Z' while
        at the end of the file). (Bug #0000045)
 
-27-Feb-2004 (Lars Duening)  (3.3.503)
+27-Mar-2004 (Lars Duening)  (3.3.503)
   - (strfuns, simulate.c) Added a function to make a c-string copy
        of a strbuf.
   - (mempools.c) Reduced the ideal size of a pool block to 128 bytes - 
@@ -24,14 +30,14 @@ See the file HISTORY for a user-oriented summary of all the changes.
        strings tabled. Originally the driver did this for volatile strings
        at this point, which no longer exist.
 
-23-Feb-2004 (Lars Duening)  (3.3.502)
+23-Mar-2004 (Lars Duening)  (3.3.502)
   - (actions.c) If the H_COMMAND lfun is not found in an object, the
        driver now throws an error instead of crashing (reported by Urv).
 
-22-Feb-2004 (Lars Duening)  (3.3.501)
+22-Mar-2004 (Lars Duening)  (3.3.501)
   - (prolang.y) Corrected a crasher when printing type of incomplete
        structures (as they are used to store the efun type specifications)
-       (thanks, Alwin!)
+       (thanks, Alwin!) (Bug #0000043)
 
 24-Feb-2004 (Lars Duening)  (3.3.500)
   - (xerq/socket.c) When sending data over a congested socket, the
