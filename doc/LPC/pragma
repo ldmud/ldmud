@@ -62,6 +62,15 @@ DESCRIPTION
                 'mixed'.
         no_warn_empty_casts: Turns off warn_empty_casts.
 
+        warn_missing_return: Warn if a value-returning function is missing
+                a return statement (the default). If possible, the driver
+                will try to detect this at compile time; otherwise a runtime
+                warning will be generated when the function is executed.
+                The check applies only to functions with a declared return
+                type other than 'void'.
+        no_warn_missing_return: Turn off warn_missing_return.
+
+
         When an object is compiled with type testing (#pragma
         strict_types), all types are saved of the arguments for that
         function during compilation.  If the #pragma save_types is
@@ -92,6 +101,7 @@ HISTORY
           no longer valid only until the end of the file, but remain active
           when processing returns to the including file.
         LDMud 3.3.378 added init_variables, share_variables.
+        LDMud 3.3.357 added (no_)warn_missing_return.
 
 SEE ALSO
         inheritance(LPC), initialisation(LPC), objects(C),

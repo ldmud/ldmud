@@ -144,6 +144,11 @@ Bool pragma_use_local_scopes;
   /* True: treat all local scopes as one.
    */
 
+Bool pragma_warn_missing_return;
+  /* True: generate a runtime warning if a value-returning function
+   * does end with an explicit return statement.
+   */
+
 Bool pragma_strict_types;
   /* Type enforcing mode: PRAGMA_WEAK_TYPES, PRAGMA_STRONG_TYPES
    * and PRAGMA_STRICT_TYPES.
@@ -3383,6 +3388,16 @@ handle_pragma (char *str)
             pragma_use_local_scopes = MY_TRUE;
             validPragma = MY_TRUE;
         }
+        else if (strncmp(base, "warn_missing_return", namelen) == 0)
+        {
+            pragma_warn_missing_return = MY_TRUE;
+            validPragma = MY_TRUE;
+        }
+        else if (strncmp(base, "no_warn_missing_return", namelen) == 0)
+        {
+            pragma_warn_missing_return = MY_FALSE;
+            validPragma = MY_TRUE;
+        }
         else if (strncmp(base, "warn_deprecated", namelen) == 0)
         {
             pragma_warn_deprecated = MY_TRUE;
@@ -5630,6 +5645,7 @@ start_new_file (int fd, const char * fname)
     pragma_no_inherit = MY_FALSE;
     pragma_no_shadow = MY_FALSE;
     pragma_pedantic = MY_FALSE;
+    pragma_warn_missing_return = MY_TRUE;
     pragma_warn_deprecated = MY_FALSE;
     pragma_warn_empty_casts = MY_TRUE;
     pragma_combine_strings = MY_TRUE;

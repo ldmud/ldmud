@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-26-Apr-2004 (Lars Duening) -- Development Release 3.3
+30-Apr-2004 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -125,11 +125,12 @@ For a detailed list of all changes see the file CHANGELOG.
        + The driver regularly checks the variables of all objects
           for references to destructed objects and removes them; it is
           therefore no longer necessary to "clean" mappings by hand.
-       + The default return inserted for value returning functions (in case
-           the programmer forgets about it) now generates a runtime warning so
-           that such code can be found and corrected. This applies only for
-           functions with specified return type - old type functions don't
-           generate a warning.
+       + The driver can now warn about missing return statements for value
+           returning functions (this applies only for functions with a
+           specified return type). If possible the driver tries to detect this
+           situation at compile time, but also inserts a special 'return'
+           bytecode to catch certain pathological cases at runtime.
+           The check can be controlled the pragma '(no_)warn_missing_return'.
 
     - Other Changes:
        + The input escape character can be configured at compile time to

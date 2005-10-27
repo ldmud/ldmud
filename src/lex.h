@@ -249,6 +249,7 @@ extern Bool pragma_no_clone;
 extern Bool pragma_no_inherit;
 extern Bool pragma_no_shadow;
 extern Bool pragma_pedantic;
+extern Bool pragma_warn_missing_return;
 extern Bool pragma_warn_deprecated;
 extern Bool pragma_warn_empty_casts;
 extern Bool pragma_share_variables;

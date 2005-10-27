@@ -3652,14 +3652,42 @@ def_function_complete ( p_int body_start
                            , body_start + FUNCTION_PRE_HDR_SIZE
                            , 0, returntype);
 
-        /* Catch a missing return */
+        /* Catch a missing return if the function has a return type */
         if ((returntype.typeflags & PRIMARY_TYPE_MASK) != TYPE_VOID
          && (   (returntype.typeflags & PRIMARY_TYPE_MASK) != TYPE_UNKNOWN
              || pragma_strict_types
             )
            )
         {
-            ins_f_code(F_DEFAULT_RETURN);
+            /* Check if the previous instruction is a RETURN */
+            bytecode_t last = PROGRAM_BLOCK[CURRENT_PROGRAM_SIZE-1];
+
+            if (F_RETURN == last || F_RETURN0 == last)
+            {
+                /* Good, the last instruction seems to be a 'return'.
+                 * But just in case we're looking at the data field
+                 * of a different opcode or a conditional return: insert a
+                 * proper default return as well.
+                 */
+                if (pragma_warn_missing_return)
+                    ins_f_code(F_DEFAULT_RETURN);
+                else
+                    ins_f_code(F_RETURN0);
+            }
+            else
+            {
+                /* There is no 'return' here: most likely it is missing
+                 * altogether.
+                 * If warn_missing_return is enabled, issue the warning,
+                 * but always insert a normal F_RETURN0: with the pragma
+                 * active it's no use to warn again at runtime, and without
+                 * the pragma no warning is desired anyway.
+                 */
+                if (pragma_warn_missing_return)
+                    yywarnf("Missing 'return <value>' statement");
+
+                ins_f_code(F_RETURN0);
+            }
         }
         else
         {
@@ -12923,6 +12951,7 @@ inline_fun:
            ident_t * save_all_locals;
            int save_current_number_of_locals;
            int save_max_number_of_locals;
+           fulltype_t save_tol[10];
            fulltype_t save_ftol[10];
            char name[3];
            int num, i;
@@ -12979,7 +13008,7 @@ inline_fun:
            $$.code = -1;
            ins_f_code(F_CLOSURE);
            ins_short(num);
-           $$.type = TYPE_CLOSURE;
+           $$.type = Type_Closure;
       }
 ; /* inline_fun */
 

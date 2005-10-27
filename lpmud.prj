@@ -62,19 +62,22 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 536)
-(Parent-Version lpmud 3-3 535)
+(Project-Version lpmud 3-3 537)
+(Parent-Version lpmud 3-3 536)
 (Version-Log "
-  - (etc/patch-o-matic, settings/forgottendreams) Updated with the latest
-       version (thanks, Andre!)
-  - (pkg-tls.c) The TLS handshake() is retried when it failed with
-       an E_AGAIN or E_INTERRUPTED for GnuTLS, or WANT_READ/WANT_WRITE
-       for OpenSSL (thanks, Fippo!) (Bug #0000054)
+  - (lex, prolang.y) The pragma '(no_)warn_missing_return' controls whether
+       the driver checks for missing return statements or not; by default
+       the check is enable.
+  - (prolang.y) If the driver can detect at compile time that a return
+       statement is missing, a compile time warning is emitted and the
+       code uses the normal F_RETURN0 as default return.
+  - (prolang.y) Corrected compilation errors when NEW_INLINES was not
+       defined (Bug #0000056)
 ")
 (New-Version-Log
 ""
 )
-(Checkin-Time "Wed, 28 Apr 2004 22:53:34 -0600")
+(Checkin-Time "Fri, 30 Apr 2004 22:04:23 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -112,8 +115,8 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.76 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.599 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.351 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.600 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.352 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -203,8 +206,8 @@
   (src/i-svalue_cmp.h (lpmud/a/b/20_i-svalue_c 1.4 644))
   (src/interpret.h (lpmud/b/13_interpret. 1.33.1.37 644))
   (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.51 644))
-  (src/lex.h (lpmud/b/11_lex.h 1.16.1.15.1.7 644))
-  (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.65 644))
+  (src/lex.h (lpmud/b/11_lex.h 1.16.1.15.1.8 644))
+  (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.66 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.16 644))
   (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.55 644))
   (src/mapping.h (lpmud/f/30_mapping.h 1.12.1.20 644))
@@ -285,7 +288,7 @@
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.19 644))
   (src/port.c (lpmud/39_port.c 1.17.1.9 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.17.1.4 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.60 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.61 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7.1.2 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))
@@ -1657,7 +1660,7 @@
   (doc/LPC/mappings (lpmud/l/42_mappings 1.6 644))
   (doc/LPC/modifiers (lpmud/s/48_modifiers 1.9 644))
   (doc/LPC/operators (lpmud/m/0_operators 1.9.1.13 644))
-  (doc/LPC/pragma (lpmud/r/33_pragma 1.15 644))
+  (doc/LPC/pragma (lpmud/r/33_pragma 1.16 644))
   (doc/LPC/preprocessor (lpmud/r/34_preprocess 1.5 644))
   (doc/LPC/references (lpmud/c/48_references 1.3 644))
   (doc/LPC/structs (lpmud/a/b/16_structs 1.12 644))

@@ -1,6 +1,17 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+
+30-Apr-2004 (Lars Duening)  (3.3.537)
+  - (lex, prolang.y) The pragma '(no_)warn_missing_return' controls whether
+       the driver checks for missing return statements or not; by default
+       the check is enable.
+  - (prolang.y) If the driver can detect at compile time that a return
+       statement is missing, a compile time warning is emitted and the
+       code uses the normal F_RETURN0 as default return.
+  - (prolang.y) Corrected compilation errors when NEW_INLINES was not
+       defined (Bug #0000056)
+
 28-Apr-2004 (Lars Duening)  (3.3.536)
   - (etc/patch-o-matic, settings/forgottendreams) Updated with the latest
        version (thanks, Andre!)
