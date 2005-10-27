@@ -3003,14 +3003,17 @@ make_unique (vector_t *arr, callback_t *cb, svalue_t *skipnum)
          && !destructed_object_ref(&(arr->item[cnt]))
            )
         {
-            if (cb->is_lambda)
+            /* It's usually done the other way around, but not here: if
+             * it's a closure, we pass the object analyzed; otherwise we
+             * change the object the callback is bound to to call the
+             * discriminator function in it.
+             */
+            if (!cb->is_lambda)
                 callback_change_object(cb, arr->item[cnt].u.ob);
             else
-            {
                 push_ref_object(inter_sp, arr->item[cnt].u.ob, "unique_array");
-            }
 
-            v = apply_callback(cb, cb->is_lambda ? 0 : 1);
+            v = apply_callback(cb, cb->is_lambda ? 1 : 0);
             if (v && !sameval(v, skipnum))
                 ant = put_in(pool, &head, v, &(arr->item[cnt]));
         }

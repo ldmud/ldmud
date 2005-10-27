@@ -62,17 +62,16 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 543)
-(Parent-Version lpmud 3-3 542)
+(Project-Version lpmud 3-3 544)
+(Parent-Version lpmud 3-3 543)
 (Version-Log "
-  - (main.c, simul_efun.c) If the simul-efun object can't be reloaded at
-       runtime, don't terminate the driver (reported by Bardioc).
-  - (mregex.c) Corrected a memory leak when using PCRE (reported by Alwin).
+  - (array.c) My apologies to all involved: I messed up the callback
+       handling for unique_array() in 3.3.39 (reported by Ralph and Urv).
 ")
 (New-Version-Log
 ""
 )
-(Checkin-Time "Tue, 11 May 2004 21:29:44 -0600")
+(Checkin-Time "Wed, 12 May 2004 21:14:49 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -110,7 +109,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.76 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.606 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.607 644))
   (HISTORY (lpmud/f/49_HISTORY 1.352 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -119,7 +118,7 @@
   (src/configure (lpmud/d/0_configure 1.19.1.101 755))
   (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.37 644))
   (src/machine.h.in (lpmud/b/9_machine.h. 1.9.1.12 644))
-  (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.19.1.24 644))
+  (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.19.1.25 644))
   (src/mkinstalldirs (lpmud/c/4_mkinstalld 1.1 644))
   (src/install-sh (lpmud/c/5_install-sh 1.2 755))
 
@@ -169,7 +168,7 @@
   (src/actions.h (lpmud/d/11_actions.h 1.6.1.7 644))
   (src/actions.c (lpmud/d/12_actions.c 1.15.1.46 644))
   (src/array.h (lpmud/f/47_array.h 1.18.1.22 644))
-  (src/array.c (lpmud/d/12_array.c 1.46.1.47.1.11 644))
+  (src/array.c (lpmud/d/12_array.c 1.46.1.47.1.12 644))
   (src/backend.h (lpmud/f/46_backend.h 1.20.1.7 644))
   (src/backend.c (lpmud/d/6_backend.c 1.68.1.35.1.33 644))
   (src/bitstrings.h (lpmud/i/47_bitstrings 1.3 644))
@@ -347,7 +346,7 @@
   (src/hosts/be/config.h (lpmud/e/34_config.h 1.32.1.39 644))
   (src/hosts/be/be.h (lpmud/e/35_be.h 1.7 644))
   (src/hosts/be/beyacc (lpmud/i/39_beyacc 1.1 744))
-  (src/hosts/be/Makefile (lpmud/e/37_Makefile 1.60.1.71.1.21 644))
+  (src/hosts/be/Makefile (lpmud/e/37_Makefile 1.60.1.71.1.22 644))
   (src/hosts/be/icon-32x32.raw (lpmud/s/37_icon-32x32 1.1 644) :no-keywords)
   (src/hosts/be/icon-16x16.raw (lpmud/s/38_icon-16x16 1.1 644) :no-keywords)
   (src/hosts/be/driver.rsrc (lpmud/s/39_driver.rsr 1.1 644) :no-keywords)
