@@ -185,8 +185,14 @@
 #define DID_MEM_ALLOCATED      25
 #define DID_MEM_USED           26
 #define DID_MEM_TOTAL_UNUSED   27
+#define DID_MEM_DEFRAG_CALLS             28
+#define DID_MEM_DEFRAG_CALLS_REQ         29
+#define DID_MEM_DEFRAG_REQ_SUCCESS       30
+#define DID_MEM_DEFRAG_BLOCKS_INSPECTED  31
+#define DID_MEM_DEFRAG_BLOCKS_MERGED     32
+#define DID_MEM_DEFRAG_BLOCKS_RESULT     33
 
-#define DID_MEMORY_MAX         28
+#define DID_MEMORY_MAX         34
 
 
 /* Indices into the subarrays resulting from debug_info(DINFO_TRACE, 0)

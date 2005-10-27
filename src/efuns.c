@@ -7110,6 +7110,27 @@ v_debug_info (svalue_t *sp, int num_arg)
  *        int DID_MEM_KEEP_COST    (ptmalloc)
  *            Top-most releasable space.
  *
+ *        int DID_MEM_DEFRAG_CALLS       (smalloc)
+ *            Total number of calls to defragment_small_lists().
+ *
+ *        int DID_MEM_DEFRAG_CALLS_REQ   (smalloc)
+ *            Number of calls to defragment_small_lists() with a
+ *            desired size.
+ *
+ *        int DID_MEM_DEFRAG_REQ_SUCCESS (smalloc)
+ *            Number of times, a defragmentation for a desired
+ *            size was successful.
+ *
+ *        int DID_MEM_BLOCKS_INSPECTED   (smalloc)
+ *            Number of blocks inspected during defragmentations.
+ *
+ *        int DID_MEM_BLOCKS_MERGED      (smalloc)
+ *            Number of blocks merged during defragmentations.
+ *
+ *        int DID_MEM_BLOCKS_RESULT      (smalloc)
+ *            Number of defragmented blocks (ie. merge results).
+ *
+ *
  * DINFO_TRACE (7): Return the call stack 'trace' information as specified
  *     by <arg2>. The result of the function is either an array (format
  *     explained below), or a printable string. Omitting <arg2> defaults

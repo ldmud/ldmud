@@ -499,6 +499,30 @@ static t_stat perm_alloc_stat = {0,0};
    * figure is a subset of {small,large}_alloc_stat.
    */
 
+static long defrag_calls_total = 0;
+  /* Total number of calls to defragment_small_lists().
+   */
+
+static long defrag_calls_req = 0;
+  /* Number of calls to defragment_small_lists() with a desired size.
+   */
+
+static long defrag_req_success = 0;
+  /* Number of times, a defragmentation for a desired size was successful.
+   */
+
+static long defrag_blocks_inspected = 0;
+  /* Number of blocks inspected during defragmentations.
+   */
+
+static long defrag_blocks_merged = 0;
+  /* Number of blocks merged during defragmentations.
+   */
+
+static long defrag_blocks_result = 0;
+  /* Number of defragmented blocks (ie. merge results).
+   */
+
 static long malloc_increment_size_calls = 0;
   /* Number of calls to malloc_increment_size().
    */
@@ -664,9 +688,16 @@ mem_dump_data (strbuf_t *sbuf)
                  - xalloc_st.counter * XM_OVERHEAD_SIZE
                );
     strbuf_addf(sbuf
-               , "Total storage unused: (c+d+g+h)   %10lu\n"
+               , "Total storage unused: (c+d+g+h)   %10lu\n\n"
                , l_free.size + l_wasted.size
                  + s_free.size + s_wasted.size
+               );
+
+    strbuf_addf(sbuf,
+      "Defragmentation: %lu calls (%lu for size: %lu successful)\n"
+      "                 %lu blocks inspected: %lu merged yielding %lu blocks\n"
+    , defrag_calls_total, defrag_calls_req, defrag_req_success
+    , defrag_blocks_inspected, defrag_blocks_merged, defrag_blocks_result
                );
 } /* mem_dump_data() */
 
@@ -727,6 +758,13 @@ mem_dinfo_data (svalue_t *svp, int value)
                                     + small_free_stat.size
                                     + small_chunk_wasted.size
              );
+    ST_NUMBER(DID_MEM_DEFRAG_CALLS, defrag_calls_total);
+    ST_NUMBER(DID_MEM_DEFRAG_CALLS_REQ, defrag_calls_req);
+    ST_NUMBER(DID_MEM_DEFRAG_REQ_SUCCESS, defrag_req_success);
+    ST_NUMBER(DID_MEM_DEFRAG_BLOCKS_INSPECTED, defrag_blocks_inspected);
+    ST_NUMBER(DID_MEM_DEFRAG_BLOCKS_MERGED, defrag_blocks_merged);
+    ST_NUMBER(DID_MEM_DEFRAG_BLOCKS_RESULT, defrag_blocks_result);
+
 #undef ST_NUMBER
 } /* mem_dinfo_data() */
 
@@ -876,8 +914,13 @@ defragment_small_lists (int req)
     int ix;  /* Freelist index */
     Bool found = MY_FALSE; /* Set to TRUE if a suitable block is found */
 
+    defrag_calls_total++;
+
     if (req > 0)
+    {
         split_size = req + SMALL_BLOCK_MIN + T_OVERHEAD;
+        defrag_calls_req++;
+    }
     else
         req = 0; /* Just to make sure */
 
@@ -912,6 +955,8 @@ defragment_small_lists (int req)
             Bool   merged;
             word_t bsize = block[M_SIZE] & M_MASK;
 
+            defrag_blocks_inspected++;
+
             /* Can this block be defragmented? */
             if ( !((block+bsize)[M_SIZE] & THIS_BLOCK)
               && !(block[M_SIZE] & PREV_BLOCK)
@@ -933,6 +978,8 @@ defragment_small_lists (int req)
             do {
                 word_t *next;
 
+                defrag_blocks_inspected++;
+
                 merged = MY_FALSE;
                 next = block + bsize;
                 if (next[M_SIZE] & THIS_BLOCK)
@@ -940,6 +987,8 @@ defragment_small_lists (int req)
                     UNLINK_SMALL_FREE(next);
                     bsize += next[M_SIZE] & M_MASK;
                     merged = MY_TRUE;
+
+                    defrag_blocks_merged++;
                 }
 
                 if (req > 0 && (bsize == req || bsize >= split_size))
@@ -951,6 +1000,8 @@ defragment_small_lists (int req)
             while ((block[M_SIZE] & PREV_BLOCK))
             {
                 word_t *prev;
+
+                defrag_blocks_inspected++;
 
                 /* We use the 'prev' pointer first to get the size of previous
                  * block, and from there we can determine it's address
@@ -975,6 +1026,8 @@ defragment_small_lists (int req)
 
                 block = prev;
 
+                defrag_blocks_merged++;
+
                 if (req >= 0 && (bsize == req || bsize >= split_size))
                     found = MY_TRUE;
             } /* while() */
@@ -985,6 +1038,8 @@ defragment_small_lists (int req)
             block[M_SIZE] = bsize | (block[M_SIZE] & ~M_MASK);
             block[M_LINK] = (word_t)list;
             list = block;
+
+            defrag_blocks_result++;
 
             /* Step to the next block using the still-value <pred> */
             if (pred)
@@ -1010,6 +1065,9 @@ defragment_small_lists (int req)
         }
     } /* for (ix = SMALL_BLOCK_NUM..0 && !found) */
 
+    if (found)
+        defrag_req_success++;
+
     return found;
 } /* defragment_small_lists() */
 
@@ -1024,12 +1082,17 @@ defragment_small_block (word_t *block)
 {
     word_t  bsize = block[M_SIZE] & M_MASK;
     Bool merged;
+    Bool defragged;
+
+    defragged = MY_FALSE;
 
     UNLINK_SMALL_FREE(block);
 
     /* Try to merge this free block with the following ones */
     do {
         word_t *next;
+
+        defrag_blocks_inspected++;
 
         merged = MY_FALSE;
         next = block + bsize;
@@ -1038,8 +1101,14 @@ defragment_small_block (word_t *block)
             UNLINK_SMALL_FREE(next);
             bsize += next[M_SIZE] & M_MASK;
             merged = MY_TRUE;
+            defragged = MY_TRUE;
+
+            defrag_blocks_inspected++;
         }
     } while (merged);
+
+    if (defragged)
+        defrag_blocks_result++;
 
     /* Reinsert the block into the freelists */
     MAKE_SMALL_FREE(block, bsize);

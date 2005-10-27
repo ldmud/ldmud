@@ -422,6 +422,27 @@ DESCRIPTION
                int DID_MEM_KEEP_COST    (ptmalloc)
                    Top-most releasable space.
 
+              int DID_MEM_DEFRAG_CALLS       (smalloc)
+                  Total number of calls to defragment_small_lists().
+
+              int DID_MEM_DEFRAG_CALLS_REQ   (smalloc)
+                  Number of calls to defragment_small_lists() with a
+                  desired size.
+
+              int DID_MEM_DEFRAG_REQ_SUCCESS (smalloc)
+                  Number of times, a defragmentation for a desired
+                  size was successful.
+
+              int DID_MEM_BLOCKS_INSPECTED   (smalloc)
+                  Number of blocks inspected during defragmentations.
+
+              int DID_MEM_BLOCKS_MERGED      (smalloc)
+                  Number of blocks merged during defragmentations.
+
+              int DID_MEM_BLOCKS_RESULT      (smalloc)
+                  Number of defragmented blocks (ie. merge results).
+
+
 
         DINFO_TRACE (7): Return the call stack 'trace' information as specified
             by <arg2>. The result of the function is either an array (format
@@ -491,8 +512,10 @@ HISTORY
           DINFO_DATA:DID_STATUS, and changed the meaning of
           DID_ST_CALLOUT_SIZE and DID_ST_HBEAT_SIZE/_SLOTS.
         LDMud 3.3 replaced the string related DID_ST_ constants according to
-        the new string implementation.
+          the new string implementation.
         LDMud 3.3.387 added the ptmalloc values for DINFO_DATA:DID_MEMORY.
+        LDMud 3.3.479 added the DID_MEM_DEFRAG_ values
+          for DINFO_DATA:DID_MEMORY.
 
 
 SEE ALSO
