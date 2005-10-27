@@ -9369,7 +9369,7 @@ again:
                     FATAL("Buffer overflow in F_ADD: int number too big.\n");
                 len = mstrsize(left)+strlen(buff);
                 DYN_STRING_COST(len)
-                res = mstr_add_txt(left, buff, strlen(buff));
+                res = mstr_append_txt(left, buff, strlen(buff));
                 if (!res)
                     ERRORF(("Out of memory (%lu bytes)\n"
                            , (unsigned long) len
@@ -9392,7 +9392,7 @@ again:
                     FATAL("Buffer overflow in F_ADD: float number too big.\n");
                 len = mstrsize(left)+strlen(buff);
                 DYN_STRING_COST(len)
-                res = mstr_add_txt(left, buff, strlen(buff));
+                res = mstr_append_txt(left, buff, strlen(buff));
                 if (!res)
                     ERRORF(("Out of memory (%lu bytes)\n"
                            , (unsigned long) len
@@ -11027,7 +11027,7 @@ again:
                     FATAL("Buffer overflow in F_ADD_EQ: int number too big.\n");
                 len = mstrsize(argp->u.str)+strlen(buff);
                 DYN_STRING_COST(len)
-                new_string = mstr_add_txt(argp->u.str, buff, strlen(buff));
+                new_string = mstr_append_txt(argp->u.str, buff, strlen(buff));
                 if (!new_string)
                     ERRORF(("Out of memory (%lu bytes)\n"
                            , (unsigned long) len
@@ -11045,7 +11045,7 @@ again:
                     FATAL("Buffer overflow in F_ADD_EQ: float number too big.\n");
                 len = mstrsize(argp->u.str) + strlen(buff);
                 DYN_STRING_COST(len)
-                new_string = mstr_add_txt(argp->u.str, buff, strlen(buff));
+                new_string = mstr_append_txt(argp->u.str, buff, strlen(buff));
                 if (!new_string)
                     ERRORF(("Out of memory (%lu bytes).\n", (unsigned long)len));
                 sp -= 2;

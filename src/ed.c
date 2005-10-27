@@ -243,7 +243,6 @@ struct ed_buffer_s
 #define P_MARK          (ED_BUFFER->mark)
 #define P_OLDPAT        (ED_BUFFER->oldpat)
 #define P_LINE0         (ED_BUFFER->Line0)
-#define P_LINE0         (ED_BUFFER->Line0)
 #define P_CURLN         (ED_BUFFER->CurLn)
 #define P_CURPTR        (ED_BUFFER->CurPtr)
 #define P_LASTLN        (ED_BUFFER->LastLn)
@@ -715,7 +714,7 @@ doprnt (int from, int to)
     from = (from < 1) ? 1 : from;
     to = (to > P_LASTLN) ? P_LASTLN : to;
 
-    if (to != 0)
+    if (to != 0 && from <= P_LASTLN)
     {
         _setCurLn( from );
         while( P_CURLN <= to )
@@ -2885,10 +2884,12 @@ docmd (Bool glob)
             return CHANGED;
         /*FALL THROUGH*/
     case 'Q':
+        if (*inptr != NL || glob)
+            return ERR;
         clrbuf();
         if (*inptr == NL && P_NLINES == 0 && !glob)
             return EOF;
-        else
+        else /* Just in case clrbuf() fails */
             return ERR;
 
     case 'r':

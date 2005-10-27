@@ -138,7 +138,7 @@ For a detailed list of all changes see the file CHANGELOG.
            x509 key- and certfile for the TLS package.
 
 
-23-Mar-2004 (Lars Duening) -- Release 3.2.10
+28-Mar-2004 (Lars Duening) -- Release 3.2.10
 
     - Changed efuns:
        + debug_info(): Removed the DID_MEM_UNUSED value from the DINFO_DATA:
@@ -205,6 +205,9 @@ For a detailed list of all changes see the file CHANGELOG.
        + Swapping of volatile strings could crash the driver.
        + H_COMMAND specifying an lfun by name which doesn't exist
            in the interactive object.
+       + Editor: 'Z' given at the end of a file followed by two 'd'
+           corrupted the internal text storage, which sometimes
+           caused crashes.
 
     - Language:
        + catch(; nolog) is now an official feature.
@@ -248,6 +251,8 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
        + Editor: Consecutive 'z' or 'Z' commands no longer repeat
           the previous current line.
+       + Editor: Faulty commands 'quit'/'Quit' are caught before
+          the text buffer is cleared.
        + Configuration option '--enable-malloc-sbrk-trace' to enable
           a log of all system memory requests including the stats of
           the memory allocation request causing it. The intention is

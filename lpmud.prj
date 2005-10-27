@@ -63,26 +63,21 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 503)
-(Parent-Version lpmud 3-3 502)
+(Project-Version lpmud 3-3 504)
+(Parent-Version lpmud 3-3 503)
 (Version-Log "
-  - (strfuns, simulate.c) Added a function to make a c-string copy
-       of a strbuf.
-  - (mempools.c) Reduced the ideal size of a pool block to 128 bytes - 
-       hopefully this reduces some of the fragmentation issues.
-  - (mstrings, interpret.c) When adding strings (operators '+' and
-       '+='), the driver tries to extend the left-hand string when
-       possible, instead of allocating a new string. When creating
-       large strings, this hopefully improves the reduces the allocations
-       of new string buffers.
-  - (interpret.c) inl_transfer_svalue() no longer makes untabled
-       strings tabled. Originally the driver did this for volatile strings
-       at this point, which no longer exist.
+  - (mstrings, interpret.c) Extended the string-appending scheme
+       to addition of numbers to strings.
+  - (ed.c) The 'Q'/'q' commands no longer clear the buffer before
+       checking if the command was legal (Bug #0000046).
+  - (ed.c) Corrected the doprnt() function so that the current line
+       is never out of range (this could happen when giving 'Z' while
+       at the end of the file). (Bug #0000045)
 ")
 (New-Version-Log
 ""
 )
-(Checkin-Time "Sat, 27 Mar 2004 23:56:45 -0700")
+(Checkin-Time "Sun, 28 Mar 2004 01:12:19 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -120,8 +115,8 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.10 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.70 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.566 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.339 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.567 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.340 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -195,7 +190,7 @@
   (src/dumpstat.h (lpmud/f/35_dumpstat.h 1.8 644))
   (src/dumpstat.c (lpmud/c/34_dumpstat.c 1.20.1.11.1.8 644))
   (src/ed.h (lpmud/f/34_ed.h 1.5.1.6 644))
-  (src/ed.c (lpmud/c/33_ed.c 1.32.1.30 644))
+  (src/ed.c (lpmud/c/33_ed.c 1.32.1.31 644))
   (src/efuns.h (lpmud/l/20_efuns.h 1.13.1.19.1.3 644))
   (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.79 644))
   (src/exec.h (lpmud/c/32_exec.h 1.34.1.33.1.7 644))
@@ -210,7 +205,7 @@
   (src/heartbeat.c (lpmud/m/42_heartbeat. 1.18.1.9 644))
   (src/i-svalue_cmp.h (lpmud/a/b/20_i-svalue_c 1.4 644))
   (src/interpret.h (lpmud/b/13_interpret. 1.33.1.37 644))
-  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.43 644))
+  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.44 644))
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.15.1.7 644))
   (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.65 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.16 644))
@@ -223,8 +218,8 @@
   (src/mempools.c (lpmud/d/49_mempools.c 1.2.1.15 644))
   (src/mregex.h (lpmud/e/29_rxcache.h 1.7.1.10 644))
   (src/mregex.c (lpmud/e/30_rxcache.c 1.11.1.28 644))
-  (src/mstrings.h (lpmud/i/35_mstrings.h 1.22 644))
-  (src/mstrings.c (lpmud/i/36_mstrings.c 1.21.1.23 644))
+  (src/mstrings.h (lpmud/i/35_mstrings.h 1.23 644))
+  (src/mstrings.c (lpmud/i/36_mstrings.c 1.21.1.24 644))
   (src/my-alloca.h (lpmud/f/29_my-alloca. 1.3.1.2 644))
   (src/my-rusage.h (lpmud/f/28_my-rusage. 1.7 644))
   (src/object.h (lpmud/44_object.h 1.34.1.19.1.4 644))

@@ -1,6 +1,15 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+27-Feb-2004 (Lars Duening)  (3.3.504)
+  - (mstrings, interpret.c) Extended the string-appending scheme
+       to addition of numbers to strings.
+  - (ed.c) The 'Q'/'q' commands no longer clear the buffer before
+       checking if the command was legal (Bug #0000046).
+  - (ed.c) Corrected the doprnt() function so that the current line
+       is never out of range (this could happen when giving 'Z' while
+       at the end of the file). (Bug #0000045)
+
 27-Feb-2004 (Lars Duening)  (3.3.503)
   - (strfuns, simulate.c) Added a function to make a c-string copy
        of a strbuf.

@@ -98,6 +98,7 @@ extern string_t * mstring_add (const string_t *left, const string_t *right MTRAC
 extern string_t * mstring_add_txt (const string_t *left, const char *right, size_t len MTRACE_DECL);
 extern string_t * mstring_add_to_txt (const char *left, size_t len, const string_t *right MTRACE_DECL);
 extern string_t * mstring_append (string_t *left, const string_t *right MTRACE_DECL);
+extern string_t * mstring_append_txt (string_t *left, const char *right, size_t len MTRACE_DECL);
 extern string_t * mstring_repeat(const string_t *base, size_t num MTRACE_DECL);
 extern string_t * mstring_extract (const string_t *str, size_t start, long end MTRACE_DECL);
 extern long       mstring_chr (const string_t *p, char c);
@@ -253,6 +254,7 @@ extern void   string_dinfo_status(svalue_t *svp, int value);
 #define mstr_add(pStr1,pStr2)     mstring_add(pStr1,pStr2 MTRACE_ARG)
 #define mstr_append(pStr1,pStr2)  mstring_append(pStr1,pStr2 MTRACE_ARG)
 #define mstr_add_txt(pStr1,pTxt2,len) mstring_add_txt(pStr1,pTxt2,len MTRACE_ARG)
+#define mstr_append_txt(pStr1,pTxt2,len) mstring_append_txt(pStr1,pTxt2,len MTRACE_ARG)
 #define mstr_add_to_txt(pTxt1,len,pStr2) mstring_add_to_txt(pTxt1, len, pStr2 MTRACE_ARG)
 #define mstr_repeat(pStr,num)    mstring_repeat(pStr,num MTRACE_ARG)
 #define mstr_extract(pStr,start,end) mstring_extract (pStr,start,end MTRACE_ARG)

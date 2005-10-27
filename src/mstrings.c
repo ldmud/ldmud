@@ -1371,6 +1371,44 @@ mstring_add_txt (const string_t *left, const char *right, size_t len MTRACE_DECL
 
 /*-------------------------------------------------------------------------*/
 string_t *
+mstring_append_txt (string_t *left, const char *right, size_t len MTRACE_DECL)
+
+/* Aliased to: mstr_append_txt(left,right,len)
+ *
+ * If <left> is singular (ie. untabled with only one reference):
+ * Append the <len> bytes of data in buffer <right> to the string <left>, and
+ * return the modified <left> with an additional reference.
+ *
+ * If <left> is not singular:
+ * Create and return a new string with the data of <left> concatenated
+ * with the <len> bytes of data in buffer <right>.
+ * The result string is untabled and has one reference,
+ * the old string <left> is not changed.
+ *
+ * If memory runs out, NULL is returned.
+ */
+
+{
+    size_t lleft;
+
+    if (!mstr_singular(left))
+        return mstring_add_txt(left, right, len MTRACE_PASS);
+
+    lleft = mstrsize(left);
+    left = mstring_realloc_string(left, lleft+len MTRACE_PASS);
+    if (left)
+    {
+        char * txt;
+
+        txt = get_txt(left);
+        memcpy(get_txt(left)+lleft, right, len);
+        ref_mstring(left);
+    }
+    return left;
+} /* mstring_append_txt() */
+
+/*-------------------------------------------------------------------------*/
+string_t *
 mstring_add_to_txt (const char *left, size_t len, const string_t *right MTRACE_DECL)
 
 /* Aliased to: mstr_add_to_txt(left,len,right)
