@@ -1,0 +1,30 @@
+SYNOPSIS
+        int cat(string path, int start, int num);
+
+BESCHREIBUNG
+        Listet die Datei, die unter <path> gefunden wird.
+
+        In den meisten Installationen sind ".." oder Leerzeichen in <path>
+        unzulaessig. Dieses Kommando haengt normalerweise mit dem "cat"
+        Kommando fuer Goetter zusammen. Es wird auch von "hilfe" verwendet.
+        Die optionalen Argumente <start> und <num> bezeichnen die erste Zeile,
+        die ausgelesen wird, und die Anzahl Zeilen, die ausgelesen werden.
+        Werden diese Argumente nicht angegeben, wird die gesamte Datei von
+        Beginn weg ausgegeben.
+
+        Die totale Anzahl Zeilen ist durch ein Systemlimit beschraenkt, das
+        normalerweise bei 50 Zeilen liegt.
+
+        cat() liefert die Anzahl ausgegebener Zeilen bei Erfolg, 0 wenn
+        <pfad> nicht gefunden werden kann oder keine Zeilen ausgegeben
+        werden koennen (weil <start> z.B. groesser ist als die Laenge der
+        Datei).
+
+BEISPIEL
+        cat("/doc/efun/cat", 5, 9);
+
+        Das gibt die Datei "/doc/efun/cat" aus, beginnend mit Zeile 5 bis und
+        mit Zeile 13.
+
+SIEHE AUCH
+        get_dir(E), filze_size(E), read_file(E), read_bytes(E), valid_read(M)

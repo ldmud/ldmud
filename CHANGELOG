@@ -1,6 +1,20 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+09-Apr-2004 (Lars Duening)  (3.3.512)
+  - (efuns.c) The cost calculation for efun clones() forgot to take the
+       number of checked objects into account.
+  - (configure, sprintf.c) trunc() is a C-99 library function; if not
+       available, the driver uses ceil()/floor() instead.
+  - (mudlib/dns_resolve.c) Example simul-efun for doing non-blocking
+       DNS lookups (thanks, Tobias & Arne!)
+  - (doc/efun.de) Added the german efun manpages from Unitopia (thanks,
+       Tiberian!)
+  - (util/erq/erq.c) Corrected the ERQ_LOOKUP so that the passed-in hostnames
+       are properly null-terminated (thanks, LynX).
+  - (util/erq/xerq.c) ERQ_LOOKUPs are tried again only if the DNS indicates
+       that it is useful.
+
 06-Apr-2004 (Lars Duening)  (3.3.511)
   - (comm.c) With telnet disabled, an input_to() can still pretend to
        switch from line- to charmode.

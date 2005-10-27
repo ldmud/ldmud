@@ -15,6 +15,7 @@ Other files are:
                      test_master.
   astar.c          : an implementation of the A* pathfinding algorithm.
   pgsql.c          : example for using PostgreSQL
+  dns_resolve.c    : a simul-efun for non-block DNS lookups
 
   uni-crasher/     : A stress test program, see the README in this dir.
 

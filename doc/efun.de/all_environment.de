@@ -1,12 +1,22 @@
 SYNOPSIS
-        object *all_inventory()
-        object *all_inventory(object ob)
+        object *all_environment();
+        object *all_environment(object ob);
 
 BESCHREIBUNG
-        Liefert ein Feld (Array) mit allen Objekten, die sich im Objekt ob
-        befinden (bzw. in this_object(), sofern kein Argument angegeben
-        wurde).
+        Gibt ein Array mit allen Umgebungen des Objekts <ob> zurueck.
+        Wenn <ob> nicht angegeben wird, wird standardmaessig this_object()
+        verwendet.
+
+        Wenn <o> keine Umgebung hat oder zerstoert wurde, wird 0 zurueck
+        gegeben.
+
+BEISPIEL
+        Wenn <ob> ein Zuendholz in einer Schachtel in einer Truhe in einem
+        Raum ist, so liefert all_environment(ob) das Array
+        ({ Schachtel, Truhe, Raum }) zurueck.
+
+AENDERUNGEN
+        Eingefuehrt in LDMud 3.2.6. Ein Vorschlag von TubMud.
 
 SIEHE AUCH
-        first_inventory(E), next_inventory(E), deep_inventory(E),
-        all_environment(E), environment(E)
+        environment(E), all_inventory(E)

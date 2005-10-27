@@ -12,6 +12,7 @@ DESCRIPTION
 	C for concepts/   general concepts of LPMUD and LPC
 	D for driver/     some info about internal operation of the driver
 	E for efun/       the ``system calls'' of LPC
+              efun.de/    german translations of the efun/ manpages.
         H for hook/       the driver hooks
 	LPC for LPC/      about parts of the LPC language
 	M for master/     lfuns that are applied to the master object only

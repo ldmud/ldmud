@@ -1,0 +1,16 @@
+GESCHUETZT
+SYNOPSIS
+        string query_ip_name(object ob);
+
+BESCHREIBUNG
+        Liefert den IP-Namen des Users <ob> oder des aktuellen Benutzers, wenn
+        <ob> nicht angegeben wurde. Der IP-Name wird durch den asynchronen
+        Prozess hname ermittelt. Wenn der IP-Name nicht ermittelt werden kann,
+        liefert query_ip_name() die IP-Nummer zurueck.
+
+ANMERKUNG
+        DIESE FUNKTION IST GESCHUETZT.
+        Deshalb liefert sie immer "leider.nicht.mehr.verfuegbar".
+
+SIEHE AUCH
+        query_ip_number(E)

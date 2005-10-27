@@ -3801,6 +3801,8 @@ v_clones (svalue_t *sp, int num_arg)
     /* Loop through the object list */
     for (ob = obj_list; ob; ob = ob->next_all)
     {
+        checked++;
+
         if ((ob->flags & (O_DESTRUCTED|O_CLONE)) == O_CLONE
          && ob->load_name == name
          && (!mintime || ob->load_time > mintime

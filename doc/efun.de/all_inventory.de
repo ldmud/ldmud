@@ -1,8 +1,12 @@
 SYNOPSIS
-        float asin(float)
+        object *all_inventory()
+        object *all_inventory(object ob)
 
 BESCHREIBUNG
-        Liefert der Arkussinus des Argumentes.
+        Liefert ein Feld (Array) mit allen Objekten, die sich im Objekt ob
+        befinden (bzw. in this_object(), sofern kein Argument angegeben
+        wurde).
 
 SIEHE AUCH
-        sin(E), cos(E), acos(E), tan(E), atan(E), atan2(E)
+        first_inventory(E), next_inventory(E), deep_inventory(E),
+        all_environment(E), environment(E)

@@ -607,7 +607,11 @@ svalue_to_string ( fmt_state_t *st
         double d;
 
         d = READ_DOUBLE(obj);
+#ifdef HAVE_TRUNC
         if (trunc(d) == d)
+#else
+        if ((d >= 0.0 ? floor(d) : ceil(d)) == d)
+#endif
             sprintf(s, "%g.0", d );
         else
             sprintf(s, "%g", d );

@@ -1,37 +1,43 @@
 SYNOPSIS
-        void call_out(string fun, int delay, mixed arg, ...)
-        void call_out(closure cl, int delay, mixed arg, ...)
+        void call_out(string fun, int delay, mixed arg, ...);
+        void call_out(closure cl, int delay, mixed arg, ...);
 
 BESCHREIBUNG
-        Ein Aufruf einer Funktion fun im aktuellen Objekt, oder der
-        Closure cl. Der Aufruf geschieht zeitverzoegert mit der
-        Parameterliste arg. Die Zeitverzoegerung wird in delay
-        Sekunden angegeben. Die minimale Verzoegerung betraegt eine
-        Sekunde. 
+        Ruft zeitverzoegert die Funktion <fun> im aktuellen Objekt oder
+        die Closure <cl> auf. Der Aufruf erfolgt in <delay> Sekunden.
+        Die Funktion / Closure wird mit den <arg> Argumenten aufgerufen.
+        <delay> kann groesser oder gleich 0 sein.
 
-        call_out() speichert den this_player(). So ist es auch
-        moeglich Funktionen wie write() und say() zu benutzen, die
-        darauf vertrauen.
+        call_out() merkt sich den aktuellen User und ruft die Funktion
+        entsprechend auf. call_out() kann nur Funktionen aufrufen, die
+        oeffentlich zugaenglich sind, das heisst "public" und "static"
+        deklarierte Funtionen. "private" und "protected" deklarierte
+        Funktionen koennen nicht aufgerufen werden.
 
-        Per call_out() koennen nur Funktionen mit der Funktionssicherheit
-        "public" oder "static" aufgerufen werden. "private" oder "protected"
-        deklarierte Funktionen koennen nicht aufgerufen werden.
+        Die Ausfuehrung von call_out()s erfordert einen einfachen (nicht
+        zu aufwendigen) Schutz gegen Rabbits: die Evalkosten aller
+        gleichzeitig anstehenden call_out()s werden auf einer pro-UID-Basis
+        summiert. Uebersteigt die Summe ein vorgegebenes Maximum, wird
+        ein Fehler 'too long evaluation' erzeugt, und es werden alle
+        call_out()s des betreffenden Benutzers, die zur gleichen Zeit
+        faellig werden, entfernt.
 
-        Die Ausfuehrungskosten (evals) aller call_out()s fuer eine UID
-        werden aufsummiert und loesen einen "too long evaluation" Fehler
-        aus, wenn die aufsummierten Kosten das Maximum uebersteigen.
-        In diesem Fall werden die noch ausstehenden call_outs()s verworfen.
-
-BEISPIEL
+BEISPIELE
         call_out("RefreshMe", 10);
 
-        Dieses Statement ruft die Funktion RefreshMe() in 10 Sekunden
-        ohne irgendwelche Parameter auf. Diese Funktion kann sich dann
-        selbst wieder per call_out() aufrufen, so dass eine Schleife
-        (keine Rekursion) entsteht und kann verwendet werden, um in einem
-        Objekt einen gewissen Zustand herzustellen.
-        Achtung, call_outs werden in einer linearen Liste gespeichert und
-        sind so etwas "teuer" fuer den Treiber.
+        Dies ruft die Funktion RefreshMe() nach Ablauf von 10 Sekunden ohne
+        irgendwelche Argumente auf. Die Funktion RefresMe() kann dann
+        wiederum selbst call_out()s starten, auch auf sich selbst, was
+        einen Loop erzeug (keine Rekurison). Mit einem solchen Loop koennen
+        Anweisungen in einem Objekt in regelmaessigen Zeitintervallen
+        ausgefuehrt werden. Es ist allerdings zu beachten, dass call_out()s
+        in einer linearen Liste gespeichert werden, und deshalb ziemlich
+        rechenaufwendig fuer den Treiber sind.
+
+        Und JA: selbst-replizierende call_out()s, bei denen jeder call_out()
+        selbst zwei oder mehr call_out()s in einem Loop erzeugt (so genannte
+        Rabbits) verlangsamen das Mud ungemein und koennen es sogar zum
+        Crash bringen. Kein Grund, es selbst auszuprobieren.
 
 SIEHE AUCH
         remove_call_out(E), call_out_info(E), find_call_out(E),

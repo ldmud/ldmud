@@ -982,10 +982,30 @@ start_subserver (long server_num, long seed)
         
         if (msglen > 0)
         {
-            num = readn(0, buf, msglen);
-            if (num != msglen) {
-                fprintf(stderr, "%s Read %ld, should be %ld\n", time_stamp(), num, msglen);
-                break;
+            if (msglen > sizeof(buf))
+            {
+                /* Prevent a buffer overflow */
+                fprintf(stderr, "%s ERROR: Read %ld > buffer size %ld\n", time_stamp(), msglen, sizeof(buf));
+                num = readn(0, buf, sizeof(buf));
+
+                /* Discard the rest of the input from the channel */
+                msglen -= num;
+                while (msglen > 0)
+                {
+                    char tmp[256];
+                    num = readn(0, tmp, sizeof(tmp));
+                    msglen -= num;
+                }
+
+                msglen = sizeof(buf); /* Pretent this was all */
+            }
+            else
+            {
+                num = readn(0, buf, msglen);
+                if (num != msglen) {
+                    fprintf(stderr, "%s Read %ld, should be %ld\n", time_stamp(), num, msglen);
+                    break;
+                }
             }
         }
 
@@ -1006,7 +1026,13 @@ start_subserver (long server_num, long seed)
             if (!hp && errno == TRY_AGAIN)
             {
                 /* DNS needs a bit more time */
-                sleep(5);
+                sleep(3);
+                hp = gethostbyaddr(buf, 4, AF_INET);
+            }
+            if (!hp && errno == TRY_AGAIN)
+            {
+                /* DNS needs a even more time */
+                sleep(7);
                 hp = gethostbyaddr(buf, 4, AF_INET);
             }
             
@@ -1036,16 +1062,41 @@ start_subserver (long server_num, long seed)
 
             /* handle stays in header[4..7] */
             header[8] = CHILD_FREE;
-            memcpy(header+9, buf, strlen(buf)); /* copy address */
+            memcpy(header+9, buf, msglen); /* copy address */
+            buf[msglen] = '\0'; /* Make sure the string is terminated */
+#if ERQ_DEBUG > 3
+            fprintf(stderr, "%s: ERQ_LOOKUP '%s'\n", time_stamp(), buf);
+#endif
             hp = gethostbyname(buf);
             if (!hp && errno == TRY_AGAIN)
             {
+#if ERQ_DEBUG > 2
+                 fprintf(stderr, "%s: ERQ_LOOKUP '%s': trying again in 3 sec.\n", time_stamp(), buf);
+#endif
                 /* DNS needs more time */
-                sleep(5);
+                sleep(3);
+                hp = gethostbyname(buf);
+            }
+            if (!hp && errno == TRY_AGAIN)
+            {
+#if ERQ_DEBUG > 2
+                 fprintf(stderr, "%s: ERQ_LOOKUP '%s': trying again in 7 sec.\n", time_stamp(), buf);
+#endif
+                /* DNS needs even more time */
+                sleep(7);
                 hp = gethostbyname(buf);
             }
             if (hp)
             {
+#if ERQ_DEBUG > 3
+                 fprintf(stderr, "%s: ERQ_LOOKUP '%s' -> %d.%d.%d.%d\n"
+                        , time_stamp(), buf
+                        , hp->h_addr[0] & 255
+                        , hp->h_addr[1] & 255
+                        , hp->h_addr[2] & 255
+                        , hp->h_addr[3] & 255
+                     );
+#endif
                 /* Send the name and the address */
                 msglen = 4;
                 write_32(header, msglen + 8);
