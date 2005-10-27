@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+13-Aug-2003 (Lars Duening)  (3.3.477)
+  - (pkg-tls) Added the program initialisation/de-initialisation code for
+      OpenSSL.
+
 09-Aug-2003 (Lars Duening)  (3.3.476)
   - (configure) The configuration script now looks for OpenSSL before
       GnuTLS. However, TLS support using OpenSSL is not implemented yet.

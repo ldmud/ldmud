@@ -1,7 +1,6 @@
 /*------------------------------------------------------------------
- * Wrapper for the gnutls modules.
+ * Wrapper for the gnutls resp. OpenSSL module.
  *
- * Compile the tls modules into one file, but only if USE_TLS is defined.
  *------------------------------------------------------------------
  */
 
@@ -10,7 +9,12 @@
 #ifdef USE_TLS
 
 #include <stdio.h>
-#include <gnutls/gnutls.h>
+
+#if defined(HAS_OPENSSL)
+#  include <openssl/ssl.h>
+#elif defined(HAS_GNUTLS)
+#  include <gnutls/gnutls.h>
+#endif
 
 #include "pkg-tls.h"
 
@@ -42,11 +46,110 @@ static Bool tls_available = MY_FALSE;
   /* Set to TRUE when the TLS layer has been initialised successfully.
    */
 
+#ifdef HAS_OPENSSL
+
+static SSL_CTX * context = NULL;
+  /* The SSL program context. */
+
+static DH *dhe1024 = NULL;
+  /* The Diffie-Hellmann parameters. */
+
+#elif defined(HAS_GNUTLS)
+
 static gnutls_certificate_server_credentials x509_cred;
   /* The x509 credentials. */
 
 static gnutls_dh_params dh_params;
   /* The Diffie-Hellmann parameters */
+
+#endif /* SSL Package */
+
+#ifdef HAS_OPENSSL
+
+/*-------------------------------------------------------------------------*/
+static int
+no_passphrase_callback (char * buf, int num, int w, void *arg)
+
+/* OpenSSL: Empty method to hinder OpenSSL from asking for passphrases.
+ */
+{
+    return -1;
+} /* no_passphrase_callback() */
+
+/*-------------------------------------------------------------------------*/
+static Bool
+tls_set_dhe1024 (void)
+
+/* Set the Diffie-Hellmann parameters.
+ * Return MY_TRUE on success, and MY_FALSE on error.
+ */
+
+{
+    int i;
+    DSA *dsaparams;
+    DH *dhparams;
+    const char *seed[] = { ";-)  :-(  :-)  :-(  ",
+                           ";-)  :-(  :-)  :-(  ",
+                           "Random String no. 12",
+                           ";-)  :-(  :-)  :-(  ",
+                           "hackers have even mo", /* from jargon file */
+                         };
+    unsigned char seedbuf[20];
+
+    RAND_bytes((unsigned char *) &i, sizeof i);
+
+    /* Make sure that i is non-negative - pick one of the provided seeds */
+    if (i < 0)
+        i = -1;
+    if (i < 0) /* happens if i == MININT */
+        i = 0;
+
+    i %= sizeof seed / sizeof seed[0];
+    assert(strlen(seed[i]) == 20);
+    memcpy(seedbuf, seed[i], 20);
+    dsaparams = DSA_generate_parameters(1024, seedbuf, 20, NULL, NULL, 0, NULL);
+
+    if (dsaparams == NULL)
+        return MY_FALSE;
+
+    dhparams = DSA_dup_DH(dsaparams);
+    DSA_free(dsaparams);
+    if (dhparams == NULL)
+        return MY_FALSE;
+
+    tls_dhe1024 = dhparams;
+
+    return MY_TRUE;
+} /* set_dhe1024() */
+                                                  
+#elif defined(HAS_GNUTLS)
+
+/*-------------------------------------------------------------------------*/
+static int
+generate_dh_params (void)
+
+/* GnuTLS: Generate Diffie Hellman parameters and store them in the global
+ * <dh_params>.  They are for use with DHE kx algorithms. These should be
+ * discarded and regenerated once a day, once a week or once a month. Depends
+ * on the security requirements.
+ *
+ * tls_available must be TRUE.
+ */
+
+{
+    gnutls_datum prime, generator;
+
+    gnutls_dh_params_init( &dh_params);
+    gnutls_dh_params_generate( &prime, &generator, DH_BITS);
+    gnutls_dh_params_set( dh_params, prime, generator, DH_BITS);
+
+    free( prime.data);
+    free( generator.data);
+
+    return 0;
+} /* generate_dh_params() */
+
+#endif /* SSL Package */ 
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -74,40 +177,149 @@ initialize_tls_session (gnutls_session *session)
 } /* initialize_tls_session() */
 
 /*-------------------------------------------------------------------------*/
-static int
-generate_dh_params (void)
-
-/* Generate Diffie Hellman parameters and store them in the global
- * <dh_params>.  They are for use with DHE kx algorithms. These should be
- * discarded and regenerated once a day, once a week or once a month. Depends
- * on the security requirements.
- *
- * tls_available must be TRUE.
- */
-
-{
-    gnutls_datum prime, generator;
-
-    gnutls_dh_params_init( &dh_params);
-    gnutls_dh_params_generate( &prime, &generator, DH_BITS);
-    gnutls_dh_params_set( dh_params, prime, generator, DH_BITS);
-
-    free( prime.data);
-    free( generator.data);
-
-    return 0;
-} /* generate_dh_params() */
-
-/*-------------------------------------------------------------------------*/
 void tls_global_init (void)
 
 /* Initialise the TLS package; to be called once at program startup.
  */
 
 {
-    int f;
     char * keyfile = tls_keyfile ? tls_keyfile : TLS_DEFAULT_KEYFILE;
     char * certfile = tls_certfile ? tls_certfile : TLS_DEFAULT_CERTFILE;
+
+#ifdef HAS_OPENSSL
+
+    printf("%s TLS: x509 keyfile '%s', certfile '%s'\n"
+          , time_stamp(), keyfile, certfile);
+    debug_message("%s TLS: Keyfile '%s', Certfile '%s'\n"
+                 , time_stamp(), keyfile, certfile);
+
+    SSL_load_error_strings();
+    if (!SSL_library_init())
+    {
+	printf("%s TLS: Initialising the SSL library failed.\n"
+              , time_stamp());
+	debug_message("%s TLS: Initialising the SSL library failed.\n"
+                     , time_stamp());
+        return;
+    }
+
+    /* SSL uses the rand(3) generator from libcrypto(), which needs
+     * to be seeded.
+     */
+    {
+        struct {
+            struct utsname uname;
+            int uname_1;
+            int uname_2;
+            uid_t uid;
+            uid_t euid;
+            gid_t gid;
+            gid_t egid;
+        } data1;
+
+        struct {
+            pid_t pid;
+            time_t time;
+            void *stack;
+        } data2;
+
+        data1.uname_1 = uname(&data1.uname);
+        data1.uname_2 = errno; /* Let's hope that uname fails randomly :-) */
+
+        data1.uid = getuid();
+        data1.euid = geteuid();
+        data1.gid = getgid();
+        data1.egid = getegid();
+
+        RAND_seed((const void *)&data1, sizeof data1);
+
+        data2.pid = getpid();
+        data2.time = time(NULL);
+        data2.stack = (void *)&data2;
+
+        RAND_seed((const void *)&data2, sizeof data2);
+    }
+
+    context = SSL_CTX_new (SSLv23_server_method());
+    if (!context)
+    {
+	printf("%s TLS: Can't get SSL context:\n"
+              , time_stamp());
+	debug_message("%s TLS: Can't get SSL context:\n"
+                     , time_stamp());
+        
+        goto ssl_init_err;
+    }
+
+    SSL_CTX_set_default_passwd_cb(context, no_passphrase_callback);
+    SSL_CTX_set_mode(context, SSL_MODE_ENABLE_PARTIAL_WRITE);
+
+    if (!SSL_CTX_use_PrivateKey_file(context, keyfile, SSL_FILETYPE_PEM))
+    {
+	printf("%s TLS: Error setting x509 keyfile:\n"
+              , time_stamp());
+	debug_message("%s TLS: Error setting x509 keyfile:\n"
+              , time_stamp());
+        goto ssl_init_err;
+    }
+
+    if (!SSL_CTX_use_certificate_chain(context, certfile))
+    {
+	printf("%s TLS: Error setting x509 certfile:\n"
+              , time_stamp());
+	debug_message("%s TLS: Error setting x509 certfile:\n"
+              , time_stamp());
+        goto ssl_init_err;
+    }
+
+    if (!set_dhe1024()
+     || !SSL_CTX_set_tmp_dh(context, dhe1024)
+       )
+    {
+	printf("%s TLS: Error setting Diffie-Hellmann parameters:\n"
+              , time_stamp());
+	debug_message("%s TLS: Error setting Diffie-Hellmann parameters:\n"
+              , time_stamp());
+        goto ssl_init_err;
+    }
+
+    /* Avoid small subgroup attacks */
+    SSL_CTX_set_options(context, SSL_OP_SINGLE_DH_USE);
+
+    /* OpenSSL successfully initialised */
+    tls_available = MY_TRUE;
+    return;
+
+    /* General error handling for the initialisation */
+ssl_init_err:
+    {
+        unsigned long err;
+
+        while (0 != (err = ERR_get_error()))
+        {
+            char * errstring = ERR_error_string(err, NULL);
+            printf("%s TLS: SSL error: %s.\n"
+                  , time_stamp(), errstring);
+            debug_message("%s TLS: SSL error: .\n"
+                         , time_stamp(), errstring);
+        }
+
+        if (dhe1024 != NULL)
+        {
+            DH_free(dhe1024);
+            dhe1024 = NULL;
+        }
+        if (context != NULL)
+        {
+            SSL_CTX_free(context);
+            context = NULL;
+        }
+        return;
+    }
+
+#elif defined(HAS_GNUTLS)
+
+    int f;
 
     gnutls_global_init();
 
@@ -134,6 +346,7 @@ void tls_global_init (void)
 
         tls_available = MY_TRUE;
     }
+#endif /* SSL Package */
 
 } /* tls_global_init() */
 
@@ -145,12 +358,28 @@ tls_global_deinit (void)
  */
 
 {
+#ifdef HAS_OPENSSL
+
+    if (dhe1024 != NULL)
+    {
+        DH_free(dhe1024);
+        dhe1024 = NULL;
+    }
+    if (context != NULL)
+    {
+        SSL_CTX_free(context);
+        context = NULL;
+    }
+
+#elif defined(HAS_GNUTLS)
+
     if (tls_available)
     {
         gnutls_certificate_free_credentials(x509_cred);
     }
 
     gnutls_global_deinit();
+#endif /* SSL Package */
 } /* tls_global_deinit() */
 
 /*-------------------------------------------------------------------------*/

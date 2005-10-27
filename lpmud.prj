@@ -63,12 +63,12 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 476)
-(Parent-Version lpmud 3-3 475)
-(Version-Log "The configuration script now looks for OpenSSL as well as GnuTLS.")
+(Project-Version lpmud 3-3 477)
+(Parent-Version lpmud 3-3 476)
+(Version-Log "Added the program init/de-init code for OpenSSL.")
 (New-Version-Log
 "")
-(Checkin-Time "Sat, 09 Aug 2003 22:45:35 -0600")
+(Checkin-Time "Wed, 13 Aug 2003 00:29:14 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -106,7 +106,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.10 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.68 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.539 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.540 644))
   (HISTORY (lpmud/f/49_HISTORY 1.331 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -271,8 +271,8 @@
   (src/pkg-pcre.c (lpmud/q/48_pcre-pcre. 1.5 644))
   (src/pkg-pgsql.c (lpmud/d/b/39_pkg-pgsql. 1.2 644))
   (src/pkg-pgsql.h (lpmud/d/b/40_pkg-pgsql. 1.1 644))
-  (src/pkg-tls.h (lpmud/e/b/10_pkg-tls.h 1.3 644))
-  (src/pkg-tls.c (lpmud/e/b/11_pkg-tls.c 1.3 644))
+  (src/pkg-tls.h (lpmud/e/b/10_pkg-tls.h 1.4 644))
+  (src/pkg-tls.c (lpmud/e/b/11_pkg-tls.c 1.4 644))
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.18 644))
   (src/port.c (lpmud/39_port.c 1.17.1.9 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.17.1.3 644))
