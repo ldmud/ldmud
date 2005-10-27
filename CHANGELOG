@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+12-Apr-2004 (Lars Duening)  (3.3.515)
+  - (mud/heaven7, settings/heaven7) Heaven7 v4 runs natively on LDMud 3.2 .
+  - (func_spec, prolang.y, interpret.c) Constant integer numbers exceeding the
+        allowed range cause runtime errors (reported by Ralph).
+
 11-Apr-2004 (Lars Duening)  (3.3.514)
   - (svalue.h) Reserved CLOSURE typecode 1 (used to be CLOSURE_ALIEN_LFUN) for
         future use, so that the other closure typecode have the same value as

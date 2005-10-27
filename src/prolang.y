@@ -2005,10 +2005,15 @@ ins_number (long num)
         ins_f_code(F_NCLIT);
         ins_byte(((-num) & 0xFF));
     }
-    else
+    else if (num >= 0)
     {
         ins_f_code(F_NUMBER);
         ins_long(num);
+    }
+    else
+    {
+        ins_f_code(F_NNUMBER);
+        ins_long(-num);
     }
 } /* ins_number() */
 
@@ -8219,7 +8224,13 @@ constant:
           }
       }
     | '(' constant ')' { $$ = $2; }
-    | '-'   constant %prec '~' { $$ = -$2; }
+    | '-'   constant %prec '~'
+      {
+          if ($2 > PINT_MIN && $2 <= PINT_MAX)
+              $$ = -$2;
+          else 
+              yyerrorf("Numeric overflow: - (%ld)\n", $2);
+      }
     | L_NOT constant { $$ = !$2; }
     | '~'   constant { $$ = ~$2; }
     | L_NUMBER
@@ -9693,13 +9704,8 @@ expr0:
            && mem_block[A_PROGRAM].block[last_expression] ==
                 F_NUMBER )
           {
-              p_int number;
-
-              memcpy(&number, &(mem_block[A_PROGRAM].block[last_expression+1])
-                    , sizeof(number));
-              number = -number;
-              memcpy(&(mem_block[A_PROGRAM].block[last_expression+1]), &number
-                    , sizeof(number));
+              mem_block[A_PROGRAM].block[last_expression] =
+                F_NNUMBER;
           }
           else
           {
@@ -9831,7 +9837,16 @@ expr4:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | L_NUMBER
       {
-          /* Store a number */
+          /* Store a number
+           *
+           * The number returned by the lexer is always positive - negative
+           * numbers are created by issuing F_NUMBER <abs value> first, and
+           * then changing the opcode to F_NNUMBER in the negation production.
+           *
+           * However, in the case of '-2147483648' (or whatever happens to be
+           * MIN_INT on the machine) the number in L_NUMBER appears negative
+           * when looked at as long, so ins_number() is of no use to use here.
+           */
 
           p_int current;
           p_int number;
@@ -9860,15 +9875,10 @@ expr4:
               current += 2;
               $$.type = Type_Number;
           }
-          else if ( number < 0 && number >= -0x0ff )
-          {
-              add_f_code(F_NCLIT);
-              add_byte(-number);
-              current += 2;
-              $$.type = Type_Number;
-          }
           else
           {
+              if ((unsigned long)number > (unsigned long)PINT_MAX+1UL)
+                  yyerrorf("Numeric overflow: %lu\n", number);
               add_f_code(F_NUMBER);
               memcpy(__PREPARE_INSERT__p, &$1, sizeof $1);
               current += 1 + sizeof (p_int);
@@ -13509,6 +13519,7 @@ insert_pop_value (void)
             mem_block[A_PROGRAM].current_size = last_expression-2;
             break;
         case F_NUMBER:
+        case F_NNUMBER:
             mem_block[A_PROGRAM].current_size = last_expression-4;
             break;
         default: ins_f_code(F_POP_VALUE);
@@ -13585,7 +13596,7 @@ arrange_protected_lvalue (p_int start, int code, p_int end, int newcode)
  *     to be appended to the program.
  *
  *     Cases where this code is generated:
- *         F_STRING, F_NUMBER, F_CLOSURE, F_FLOAT, F_SYMBOL,
+ *         F_STRING, F_NUMBER, F_NNUMBER, F_CLOSURE, F_FLOAT, F_SYMBOL,
  *         (expr0), ({ expr,... }), '({ expr,... }), ([...]),
  *         x[a..b], x[<a..b], x[a..<b], x[<a..<b], x[a..], x[<a..],
  *         &global, &local, &(expr4[x]), &(expr4[<x]), &(expr4[x,y]),

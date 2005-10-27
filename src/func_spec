@@ -52,6 +52,7 @@
         cstring2
         cstring3
         number
+        nnumber
         const0
         const1
         nconst1

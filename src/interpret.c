@@ -7792,6 +7792,38 @@ again:
         sp->type = T_NUMBER;
         memcpy(&sp->u.number, pc, sizeof sp->u.number);
         pc += sizeof sp->u.number;
+        if (sp->u.number < 0)
+        {
+            ERRORF(("Numeric overflow: %lu\n", (unsigned long)sp->u.number));
+            /* NOTREACHED */
+            break;
+        }
+        break;
+    }
+
+    CASE(F_NNUMBER);                /* --- nnumber <num>       --- */
+    {
+        /* Push the number -<num> onto the stack.
+         * <num> is a p_int stored in the host format.
+         * See also the F_CONSTx functions.
+         * We have a separate F_NNUMBER instruction instead of just
+         * using F_NUMBER with a negative host number in order to
+         * provide range checking while being able to handle INT_MIN.
+         * TODO: It should be rewritten to use the LOAD_ macros (but
+         * TODO:: then the compiler needs to use them, too.
+         *
+         */
+        sp++;
+        sp->type = T_NUMBER;
+        memcpy(&sp->u.number, pc, sizeof sp->u.number);
+        pc += sizeof sp->u.number;
+        sp->u.number = - sp->u.number;
+        if (sp->u.number > 0)
+        {
+            ERRORF(("Numeric overflow: %lu\n", (unsigned long)(-sp->u.number)));
+            /* NOTREACHED */
+            break;
+        }
         break;
     }
 

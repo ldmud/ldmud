@@ -23,7 +23,7 @@ with mudwho support, and b) how a mud can run in both compat and plain mode.
 
 The following muds run natively on LDMud:
 
-  OSB - 0.2.528 (LDMud 3.2.9)
+  OSB (LDMud 3.3)
     <URL:telnet://osb.lpmud.com:4242>
     <URL:ftp://osb.lpmud.com:4243/pub/lib/>
 
@@ -34,13 +34,13 @@ The following muds run natively on LDMud:
     <URL:telnet://rag.com:2222>
     <URL:http://www.rag.com/>
 
+  Heaven7 v4  (LDMud 3.2.9)
+    <URL:http://www.heaven7mud.org/>
+
 TODO: Complete this list (Tubmud, PK-Mud, Unitopia, etc)
 
 
 Support exists for these muds:
-
-  Heaven7 3.1.1  (LDMud 3.2.9-dev.255)
-    <URL:http://users.hunterlink.net.au/~demrh/heaven7/>
 
   MorgenGrauen 3.2.6  (LDMUD 3.2.9-dev.287)
     <URL:ftp://mg.mud.de/>
