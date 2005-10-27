@@ -240,7 +240,7 @@ logon (object_t *ob)
     current_object = ob;
     ret = apply(STR_LOGON, ob, 0);
     if (ret == 0) {
-        add_message("prog %s:\n", get_txt(ob->name));
+        /* add_message("prog %s:\n", get_txt(ob->name)); */
         error("Could not find logon() on the player %s\n", get_txt(ob->name));
     }
     current_object = save;

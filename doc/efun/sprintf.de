@@ -32,6 +32,7 @@ BESCHREIBUNG
         folgenden Zeichen (Argumenttyp-Kennzeichner):
         Zeichen    Argumenttyp    Bemerkung
         's'        string
+        'c'        integer        als ASCII-Zeichen
         'd' 'i'    integer        Dezimalschreibweise
         'o'        integer        Oktalschreibweise
         'x' 'X'    integer        Hexadezimalschreibweise

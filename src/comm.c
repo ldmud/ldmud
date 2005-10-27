@@ -439,11 +439,21 @@ static object_t *first_player_for_flush = NULL;
 
 #define MAX_OUTCONN 5 /* TODO: Move this into config.h */
 
+typedef enum {
+      ocNotUsed    /* Entry not used */
+    , ocUsed       /* Entry holds pending connection */
+    , ocLoggingOn  /* Entry is doing the LPC logon protocol.
+                    * This value should not appear outside of
+                    * check_for_out_connections(), if it does, it
+                    * means that LPC logon threw an error.
+                    */
+} OutConnStatus;
+
 struct OutConn {
-	struct sockaddr_in   target;   /* Address connected to (allocated) */
-	object_t           * curr_obj; /* Associated object */
-	int socket;                    /* Socket on our side */
-	Bool active;                   /* TRUE: this entry is used */
+    struct sockaddr_in   target;   /* Address connected to (allocated) */
+    object_t           * curr_obj; /* Associated object */
+    int                  socket;   /* Socket on our side */
+    OutConnStatus        status;   /* Status of this entry */
 } outconn[MAX_OUTCONN];
 
 /*-------------------------------------------------------------------------*/
@@ -1161,7 +1171,7 @@ prepare_ipc(void)
 #endif
 
     for (i = 0; i < MAX_OUTCONN; i++)
-        outconn[i].active = MY_FALSE;
+        outconn[i].status = ocNotUsed;
 
     /* Initialize the telnet machine unless mudlib_telopts() already
      * did that.
@@ -5887,7 +5897,8 @@ send_erq (int handle, int request, const char *arg, size_t arglen)
         return MY_FALSE;
 
     /* Try to send the pending data */
-    if (erq_pending_len) {
+    if (erq_pending_len)
+    {
         wrote = socket_write(erq_demon, pending, erq_pending_len);
         if (wrote > 0) {
             pending += wrote;
@@ -5916,7 +5927,7 @@ send_erq (int handle, int request, const char *arg, size_t arglen)
     }
 
     return MY_TRUE;
-}
+} /* send_erq() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -6310,7 +6321,7 @@ clear_comm_refs (void)
 
     for (i = 0; i < MAX_OUTCONN; i++)
     {
-        if (outconn[i].active)
+        if (outconn[i].status != ocNotUsed)
         {
             if (outconn[i].curr_obj)
                 clear_object_ref(outconn[i].curr_obj);
@@ -6337,7 +6348,7 @@ count_comm_refs (void)
 
     for (i = 0; i < MAX_OUTCONN; i++)
     {
-        if (outconn[i].active)
+        if (outconn[i].status != ocNotUsed)
         {
             if (outconn[i].curr_obj)
             {
@@ -8517,21 +8528,43 @@ check_for_out_connections (void)
 
     for (i = 0; i < MAX_OUTCONN; i++)
     {
-        if (!outconn[i].active)
+        if (outconn[i].status == ocNotUsed)
             continue;
 
         if (!outconn[i].curr_obj) /* shouldn't happen */
         {
-            close(outconn[i].socket);
-            outconn[i].active = 0;
+            socket_close(outconn[i].socket);
+            outconn[i].status = ocNotUsed;
+            continue;
+        }
+
+        if (outconn[i].status == ocLoggingOn)
+        {
+            /* LPC logon threw an error - clean up */
+            debug_message("%s Error in net_connect(): logon "
+                          "object '%s' threw an error.\n"
+                         , time_stamp()
+                         , outconn[i].curr_obj
+                           ? get_txt(outconn[i].curr_obj->name)
+                           : "<null>"
+                         );
+
+            outconn[i].status = ocNotUsed;
+            if (outconn[i].curr_obj)
+            {
+                if (O_IS_INTERACTIVE(outconn[i].curr_obj))
+                    remove_interactive(outconn[i].curr_obj, MY_FALSE);
+                free_object(outconn[i].curr_obj, "net_connect");
+            }
+            socket_close(outconn[i].socket);
             continue;
         }
 
         if (outconn[i].curr_obj && (outconn[i].curr_obj->flags & O_DESTRUCTED))
         {
-            close(outconn[i].socket);
+            socket_close(outconn[i].socket);
             free_object(outconn[i].curr_obj, "net_connect");
-            outconn[i].active = 0;
+            outconn[i].status = ocNotUsed;
             continue;
         }
 
@@ -8545,28 +8578,31 @@ check_for_out_connections (void)
                 continue;
             case EISCONN: /* we are connected! */
                 break;
-            default: /* error with connection */
+            default:
+                /* Error with connection, call logon() with the failure flag
+                 */
+                outconn[i].status = ocLoggingOn;
                 push_number(inter_sp, -1);
-                // (void) apply(STR_LOGON, outconn[i].curr_obj, 1);
                 logon(outconn[i].curr_obj);
 
-                outconn[i].active = 0;
+                outconn[i].status = ocNotUsed;
                 free_object(outconn[i].curr_obj, "net_connect");
-                close(outconn[i].socket);
+                socket_close(outconn[i].socket);
 
                 continue;
             }
         }
 
         /* connection successful */
-        user = command_giver;
+        outconn[i].status = ocLoggingOn;
 
+        user = command_giver;
         new_player( outconn[i].curr_obj, outconn[i].socket
                   , &outconn[i].target, sizeof(outconn[i].target), 0);
         command_giver = user;
 
         free_object(outconn[i].curr_obj, "net_connect");
-        outconn[i].active = MY_FALSE;
+        outconn[i].status = ocNotUsed;
     }
 } /* check_for_out_connections() */
 
@@ -8618,6 +8654,27 @@ f_net_connect (svalue_t *sp)
         struct sockaddr_in target;
         object_t *user;
 
+        /* Find a place to store the pending connection,
+         * store the index in n
+         */
+        Bool stored = MY_FALSE;
+        for (n = 0; n < MAX_OUTCONN; n++)
+        {
+            if (outconn[n].status == ocNotUsed)
+            {
+                stored = MY_TRUE;
+                break;
+            }
+        }
+
+        if (!stored)
+        {
+            rc = EMFILE;
+            break;
+        }
+
+        /* Attempt the connection */
+
         target.sin_port = htons(port);
         /* TODO: Uh-oh, blocking DNS in the execution thread */
         h = gethostbyname(host);
@@ -8640,47 +8697,45 @@ f_net_connect (svalue_t *sp)
         set_socket_nonblocking(d);
 
         ret = connect(d, (struct sockaddr *) &target, sizeof(target));
-        if (ret == -1)
+        if (ret == -1 && errno != EINPROGRESS)
         {
-            if (errno == EINPROGRESS)
-            {
-                Bool stored = MY_FALSE;
-                for (n = 0; n < MAX_OUTCONN; n++)
-                {
-                    if (!outconn[n].active)
-                    {
-                        outconn[n].socket = d;
-                        outconn[n].target = target;
-                        outconn[n].curr_obj = ref_object(current_object, "net_conect");
-                        outconn[n].active = MY_TRUE;
-                        rc = 0;
-                        stored = MY_TRUE;
-                        break;
-                    }
-                }
-
-                if (!stored)
-                {
-                    /* all descriptors occupied */
-                    close(d);
-                    rc = EMFILE;
-                }
-            }
-            else
-            {
-                /* error with connection */
-                perror("net_connect");
-                close (d);
-                rc = errno;
-                break;
-            }
+            /* error with connection */
+            perror("net_connect");
+            socket_close(d);
+            rc = errno;
+            break;
         }
+
+        rc = 0;
+
+        /* Store the connection in the outconn[] table even if
+         * we can complete it immediately. For the reason see below.
+         */
+        outconn[n].socket = d;
+        outconn[n].target = target;
+        outconn[n].curr_obj = ref_object(current_object, "net_conect");
+
+        if (errno == EINPROGRESS)
+        {
+            /* Can't complete right now */
+            outconn[n].status = ocUsed;
+            break;
+        }
+
+        /* Attempt the logon. By setting the outconn[].status to
+         * ocLoggingOn, any subsequent call to check_for_out_connections()
+         * will clean up for  us.
+         */
+        outconn[n].status = ocLoggingOn;
 
         user = command_giver;
         inter_sp = sp;
         new_player(current_object, d, &target, sizeof(target), 0);
         command_giver = user;
-        rc = 0;
+
+        /* All done - clean up */
+        outconn[n].status = ocNotUsed;
+        free_object(outconn[n].curr_obj, "net_connect");
     }while(0);
 
     /* Return the result */

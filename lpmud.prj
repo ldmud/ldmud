@@ -63,13 +63,13 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 498)
-(Parent-Version lpmud 3-3 497)
-(Version-Log "Corrected net_connect(): if a connection couldn't be opened immediately, the socket was closed prematurely.")
+(Project-Version lpmud 3-3 499)
+(Parent-Version lpmud 3-3 498)
+(Version-Log "Corrected net_connect(): Errors during the LPC logon handling are now handled.")
 (New-Version-Log
 ""
 )
-(Checkin-Time "Fri, 19 Dec 2003 21:01:12 -0700")
+(Checkin-Time "Sun, 22 Feb 2004 21:35:39 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -92,7 +92,7 @@
                   "autoconf/autom4te.cache/" "gmon\\.out"
                   "src/util/xerq/erq" "src/util/erq/erq"
                   "src/util/indent/indent"
-                  "\\.DS_Store"
+                  "\\.DS_Store" "src/erq" "src/xerq"
                   "\\..*\\.swp$" "src/driver" "src/ldmud" "\\.gdb_history" ))
 (Project-Keywords (ReleaseMajor 3)
                   (ReleaseMinor 3)
@@ -107,7 +107,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.10 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.70 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.561 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.562 644))
   (HISTORY (lpmud/f/49_HISTORY 1.338 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -146,7 +146,7 @@
   (src/settings/lpmud.net (lpmud/e/b/7_lpmud.net 1.1 744))
   (src/settings/osb (lpmud/c/8_osb 1.19 744))
   (src/settings/pkmud (lpmud/c/25_pkmud 1.5.1.5 744))
-  (src/settings/psycmuve (lpmud/i/42_psycmuve 1.1.1.7 744))
+  (src/settings/psycmuve (lpmud/i/42_psycmuve 1.1.1.8 744))
   (src/settings/quovadis (lpmud/h/12_quovadis 1.1.1.7 744))
   (src/settings/silberland (lpmud/c/26_silberland 1.4.1.5 744))
   (src/settings/sticklib (lpmud/d/14_sticklib 1.2.1.1.1.5 744))
@@ -167,7 +167,7 @@
   (src/array.h (lpmud/f/47_array.h 1.18.1.21 644))
   (src/array.c (lpmud/d/12_array.c 1.46.1.47.1.7 644))
   (src/backend.h (lpmud/f/46_backend.h 1.20.1.7 644))
-  (src/backend.c (lpmud/d/6_backend.c 1.68.1.35.1.31 644))
+  (src/backend.c (lpmud/d/6_backend.c 1.68.1.35.1.32 644))
   (src/bitstrings.h (lpmud/i/47_bitstrings 1.3 644))
   (src/bitstrings.c (lpmud/i/48_bitstrings 1.15 644))
   (src/bytecode.h (lpmud/a/b/26_bytecode.h 1.1.1.3 644))
@@ -175,7 +175,7 @@
   (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.26 644))
   (src/closure.h (lpmud/f/44_closure.h 1.7.1.17 644))
   (src/closure.c (lpmud/d/4_closure.c 1.41.1.47.1.17 644))
-  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.70 644))
+  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.71 644))
   (src/comm.h (lpmud/d/3_comm.h 1.26.1.38 644))
   (src/driver.h (lpmud/f/36_driver.h 1.15.1.25 644))
   (src/dumpstat.h (lpmud/f/35_dumpstat.h 1.8 644))
@@ -951,7 +951,7 @@
   (doc/applied/reset (lpmud/n/30_reset 1.4 644))
 
   (doc/concepts/concepts (lpmud/n/31_concepts 1.2 644))
-  (doc/concepts/erq (lpmud/n/32_erq 1.9 644))
+  (doc/concepts/erq (lpmud/n/32_erq 1.10 644))
   (doc/concepts/files (lpmud/n/33_files 1.2 644))
   (doc/concepts/hooks (lpmud/h/9_hooks 1.10.1.17 644))
   (doc/concepts/imp (lpmud/n/34_imp 1.4 644))
@@ -1007,6 +1007,7 @@
   (doc/efun/call_direct_resolved (lpmud/o/0_call_direc 1.1 644))
   (doc/efun/call_other (lpmud/l/11_call_other 1.6.1.5 644))
   (doc/efun/call_out (lpmud/m/43_call_out 1.3.1.5 644))
+  (doc/efun/call_out.de (lpmud/e/b/49_call_out.d 1.1 644))
   (doc/efun/call_out_info (lpmud/j/50_call_out_i 1.4 644))
   (doc/efun/call_resolved (lpmud/o/10_call_resol 1.1.1.4 644))
   (doc/efun/caller_stack (lpmud/l/32_caller_sta 1.6 644))
@@ -1308,7 +1309,7 @@
   (doc/efun/regreplace.de (lpmud/l/35_regreplace 1.2 644))
   (doc/efun/sgn.de (lpmud/s/34_sgn.de 1.1 644))
   (doc/efun/sin.de (lpmud/s/35_sin.de 1.1 644))
-  (doc/efun/sprintf.de (lpmud/l/36_sprintf.de 1.5 644))
+  (doc/efun/sprintf.de (lpmud/l/36_sprintf.de 1.6 644))
   (doc/efun/stringp.de (lpmud/t/5_stringp.de 1.1 644))
   (doc/efun/symbolp.de (lpmud/t/6_symbolp.de 1.1 644))
   (doc/efun/tan.de (lpmud/s/36_tan.de 1.1 644))

@@ -47,9 +47,7 @@ with_portno=4404
 with_set_buffer_size_max=65536
 
 # the PSYC port
-with_catch_udp_port=4404
-enable_catch_udp_port=yes
-enable_udp_send=yes
+with_udp_port=4404
 
 #-- RUNTIME LIMITS
 # currently we consider a psycmuve a friendly environment
