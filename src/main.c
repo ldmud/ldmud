@@ -74,6 +74,10 @@
 #include "wiz_list.h"
 #include "xalloc.h"
 
+#ifdef USE_MYSQL
+#include "pkg-mysql.h"
+#endif
+
 /*-------------------------------------------------------------------------*/
 
 #define PLAIN_MASTER "secure/master"
@@ -384,6 +388,14 @@ main (int argc, char **argv)
               , time_stamp(), (unsigned long)random_seed);
         debug_message("%s Random seed: 0x%lx\n"
                      , time_stamp(), (unsigned long)random_seed);
+
+#ifdef USE_MYSQL
+        if (!pkg_mysql_init())
+        {
+            rc = 1;
+            break;
+        }
+#endif
 
         /* If the master_name hasn't been set, select a sensible default */
         if ('\0' == master_name[0])

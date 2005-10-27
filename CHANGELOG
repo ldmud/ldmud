@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+07-Aug-2003 (Lars Duening)  (3.3.471)
+  - (configure, pkg-mysql, main.c) Improved the recognition of mySQL when
+       there's more than one mySQL installation. Additionally the pkg-mysql
+       checks that the mysqlclient library is consistent with the header
+       files (reported by Craig Venz).
+
 05-Jul-2003 (Lars Duening)  (3.3.470)
   - (smalloc.c) Reduced the computational overhead of the small block
        defragmentation: since only newly freed blocks offer opportunities

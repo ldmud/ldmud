@@ -417,8 +417,8 @@ AC_PROG_CC
 # configure at all, we fudge the CFLAGS a bit.
 
 save_cflags=$CFLAGS
-echo "For this test, I use '-g' instead of '$CFLAGS' as compiler flags."
 CFLAGS="-g"
+echo "For this test, '$CFLAGS' instead of '$save_cflags' is used as compiler flags."
 
 AC_CACHE_CHECK([gcc/assembler float/branch incompatibility, e.g. on AIX],
 lp_cv_sys_float_branch_incompatible,
@@ -830,10 +830,10 @@ pcre_extra foo(void)
 # --- mySQL ---
 
 AC_CACHE_CHECK(for mySQL,lp_cv_has_mysql,
-for TESTPATH in "" "$mysql_path" "$mysql_path/include" "/usr/local/mysql/include" "/usr/local/include" "/usr/include" "/usr/lib/mysql"; do
+for TESTPATH in "" "${mysql_path}/include" "${mysql_path}" "/usr/local/mysql/include" "/usr/lib/mysql"; do
     saveflags="$CFLAGS"
     if test "x$TESTPATH" != "x"; then
-        CFLAGS="$CFLAGS -I$TESTPATH"
+        CFLAGS="-I$TESTPATH $CFLAGS"
     fi
 AC_TRY_COMPILE([
 #include <sys/types.h>
@@ -865,11 +865,19 @@ if test $lp_cv_has_mysql = yes; then
   AC_DEFINE(HAS_MYSQL)
 
   if test $enable_use_mysql = yes; then
-    if test "x$mysql_path" = "x"; then
-        AC_CHECK_LIB(mysqlclient,main, PKGLIBS="$PKGLIBS -lmysqlclient")
-    else
-        tmp=""
+    tmp=""
 
+    if test "x$mysql_path" = "x"; then
+        if test -d "/usr/local/mysql/lib"; then
+            CFLAGS="$saveflags -L/usr/local/mysql/lib"
+            AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -L/usr/local/mysql/lib -lmysqlclient")
+        elif test -d "/usr/local/lib"; then
+            CFLAGS="$saveflags -L/usr/local/lib"
+            AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -L/usr/local/mysql/lib -lmysqlclient")
+        else
+            AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -lmysqlclient")
+        fi
+    else
         if test -d "${mysql_path}/lib/mysql"; then
             CFLAGS="$saveflags -L${mysql_path}/lib/mysql"
             AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -L${mysql_path}/lib/mysql -lmysqlclient")
@@ -880,17 +888,17 @@ if test $lp_cv_has_mysql = yes; then
             CFLAGS="$saveflags -L$mysql_path"
             AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -L$mysql_path -lmysqlclient")
         fi
+    fi
 
-        if test "x$tmp" = "x"; then
-            echo "mysqlclient library not found - disabling mySQL support"
-            AC_NOT_AVAILABLE(use-mysql)
-            cdef_use_mysql="#undef"
-            enable_use_mysql="no"
-            mysql_path=
-            lp_cv_has_mysql="no"
-        else
-            PKGLIBS="$tmp"
-        fi
+    if test "x$tmp" = "x"; then
+        echo "mysqlclient library not found - disabling mySQL support"
+        AC_NOT_AVAILABLE(use-mysql)
+        cdef_use_mysql="#undef"
+        enable_use_mysql="no"
+        mysql_path=
+        lp_cv_has_mysql="no"
+    else
+        PKGLIBS="$tmp"
     fi
   fi
 
