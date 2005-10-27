@@ -272,9 +272,10 @@ mp_int num_mappings = 0;
 
 mapping_t *stale_mappings;
   /* During a garbage collection, this is a list of mappings with
-   * keys referencing destructed objects/lambdas. Since during this
-   * phase all mappings are compacted, the list is linked through
-   * the .hash pointers.
+   * keys referencing destructed objects/lambdas, linked through
+   * the .next pointers. Since th GC performs a global cleanup first,
+   * this list is normally empty, but having it increases the robustness
+   * of the GC.
    */
 
 /*-------------------------------------------------------------------------*/

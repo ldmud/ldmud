@@ -4535,18 +4535,11 @@ f_set_driver_hook (svalue_t *sp)
                  , n, (unsigned long)hook_type_map[n]
                  , efun_arg_typename(hook_type_map[n]));
 
-        if ( NULL != (str = make_tabled_from(sp->u.str)) )
-        {
-            put_string(driver_hook + n, str);
-            free_svalue(sp);
-            if (n == H_NOECHO)
-                mudlib_telopts();
-        }
-        else
-        {
-            error("Out of memory (%lu bytes) for driver hook\n"
-                 , (unsigned long) mstrsize(sp->u.str));
-        }
+        str = make_tabled_from(sp->u.str);
+        put_string(driver_hook + n, str);
+        free_svalue(sp);
+        if (n == H_NOECHO)
+            mudlib_telopts();
         break;
       }
 

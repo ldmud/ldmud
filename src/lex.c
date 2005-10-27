@@ -3837,11 +3837,6 @@ add_lex_string (char *str, size_t slen)
     }
     free_mstring(last_lex_string);
     last_lex_string = make_tabled(new);
-    if (!last_lex_string)
-    {
-        lexerrorf("Out of memory for string concatenation (%lu bytes)"
-                , (unsigned long)len1+slen);
-    }
 } /* add_lex_string() */
 
 /*-------------------------------------------------------------------------*/

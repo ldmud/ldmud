@@ -34,4 +34,4 @@ DESCRIPTION
 
 SEE ALSO
         clean_up(A), heart_beat(A), call_out(E), create(A), __INIT(A),
-        hooks(C), initialisation(M), native(C)
+        reset(H), hooks(C), initialisation(M), native(C)

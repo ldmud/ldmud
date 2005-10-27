@@ -847,8 +847,8 @@ reset_object (object_t *ob, int arg)
             call_lambda(&driver_hook[arg], 0);
         }
 
-        /* If the call returned a number, use it as the current
-         * reset interval
+        /* If the call returned a non-zero number, use it as the current
+         * reset interval, overwriting the default set above.
          */
         if (inter_sp->type == T_NUMBER && inter_sp->u.number)
             ob->time_reset = (inter_sp->u.number > 0)

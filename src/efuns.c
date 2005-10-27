@@ -329,7 +329,7 @@ f_make_shared_string (svalue_t *sp)
  */
 
 {
-    memsafe(sp->u.str = make_tabled(sp->u.str), mstrsize(sp->u.str), "result string");
+    sp->u.str = make_tabled(sp->u.str);
 
     return sp;
 } /* f_make_shared_string() */
@@ -6677,8 +6677,7 @@ f_quote (svalue_t *sp)
         break;
 
     case T_STRING:
-        memsafe(sp->u.str = make_tabled(sp->u.str), mstrsize(sp->u.str)
-               , "tabled symbol string");
+        sp->u.str = make_tabled(sp->u.str);
         sp->type = T_SYMBOL;
         sp->x.quotes = 1;
         break;

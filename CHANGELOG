@@ -1,6 +1,19 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+06-May-2004 (Lars Duening)  (3.3.539)
+  - (array.c) Using name-based callbacks for unique_array() crashed
+       the driver (reported by Ralph).
+   - (mstrings.c) Modified mstring_make_tabled() and mstring_table_inplace()
+        so that the strings are always tabled in-place (using indirectly
+        tabled strings if necessary). This allows to table a string without
+        allocating any extra memory.
+   - (interpret.c) Assigning or transferring a string no longer makes
+        the string tabled (that's what we have refcounts in them for).
+   - (comm.c, efuns.c, gcollect.c, interpret.c, simulate.c) Adapted to the
+        no-failure versions of mstring_make_tabled().
+   - (doc/concepts/inheritance) Shiny new doc from Lynx (thanks!).
+
 02-May-2004 (Lars Duening)  (3.3.538)
   - (pkg-tls.c) tls_query_connection() returns FALSE on non-interactive
        objects instead of raising an error (suggested by Lynx).

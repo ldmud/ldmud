@@ -61,7 +61,6 @@
  *   .tabled is FALSE, .link points to the corresponding string_t
  *   structure in the hash table (this counts as one reference),
  *   and .str = .link->str.
- * TODO: Are these needed?
  *
  * In all cases .str points to the string_data_t for this string.
  *
@@ -73,9 +72,7 @@
  *  - string_t's can take advantage of smallocs fast small block
  *    allocator.
  *  - untabled strings can easily be made (indirectly) tabled even
- *    if they have many active refs pending.
- * TODO: If indirectly tabled strings are not used, think about merging
- * TODO:: string_data_t and string_t.
+ *    if they have many active refs pending and/or are of large size.
  * TODO: Distinguish between the allocated size of a string and the
  * TODO:: used size. To use this efficiently, functions like mstr_insert()...
  * TODO:: might become necessary.
@@ -570,19 +567,14 @@ mstring_new_n_tabled (const char * const pTxt, size_t size MTRACE_DECL)
 string_t *
 mstring_make_tabled (string_t * pStr, Bool deref_arg MTRACE_DECL)
 
-/* Aliased to: make_tabled(pStr), make_tabled_from(pStr)
+/* Aliased to: make_tabled(pStr)      : deref_arg = MY_TRUE
+ *             make_tabled_from(pStr) : deref_arg = MY_FALSE
  *
- * Take the string <pStr> and create resp. find a tabled instance of it.
- * Return the counted reference to the tabled instance, and, if <deref_arg>
+ * Take the string <pStr> and convert it into an tabled string if not already
+ * tabled (see mstring_table_inplace()).
+ * Return the counted reference to the _directly_ tabled instance (pStr might
+ * be converted into an indirectly tabled string), and, if <deref_arg>
  * is TRUE, dereference the <pStr> once.
- *
- * The usage should be obvious:
- *   make_tabled() to convert a given string into a tabled one
- *   make_tabled_from() to get a new tabled 'copy' of a given string
- *     without losing the original.
- *
- * If memory runs out, NULL is returned (but, with <deref_arg> set, the
- * original string is still dereferenced).
  */
 
 {
@@ -590,69 +582,26 @@ mstring_make_tabled (string_t * pStr, Bool deref_arg MTRACE_DECL)
     size_t    size;
     string_t *string;
 
-    /* If the string is already tabled directly, our work is done */
+    /* Table the string one way or the other, always succeeds */
+    mstring_table_inplace(pStr MTRACE_PASS);
+
     if (pStr->info.tabled)
     {
+        /* The string is now tabled directly, our work is done */
         if (!deref_arg)
             (void)ref_mstring(pStr);
-        return pStr;
-    }
-
-    /* If the string is tabled indirectly, return the directly tabled
-     * instance.
-     */
-    if (pStr->link != NULL)
-    {
-        string = ref_mstring(pStr->link); /* Must come first! */
-        if (deref_arg) free_mstring(pStr);
-        return string;
-    }
-
-    /* Check if there already is a copy of this string tabled */
-
-    size = pStr->str->size;
-    idx = StrHash(pStr->str->txt, size);
-
-    string = find_and_move(pStr->str->txt, size, idx);
-    if (string)
-    {
-        string = ref_mstring(string);
-        if (deref_arg) free_mstring(pStr);
-        return string;
-    }
-
-    /* Create a completely new tabled string from the old one */
-
-    if (pStr->info.ref == 1 && deref_arg)
-    {
-        size_t msize;
-
-        /* We can simply reuse the string_t we already have */
-
-        mstr_added++;
-        if (NULL == stringtable[idx])
-            mstr_chains++;
-        else
-            mstr_collisions++;
-
         string = pStr;
-        string->info.tabled = MY_TRUE;
-        string->link = stringtable[idx];
-        stringtable[idx] = string;
-
-        msize = mstr_mem_size(string);
-        mstr_tabled++;
-        mstr_tabled_size += msize;
-        mstr_untabled--;
-        mstr_untabled_size -= msize;
     }
     else
     {
-        /* We need a completely new tabled string */
-
-        string = make_new_tabled(pStr->str->txt, size, idx MTRACE_PASS);
-        if (deref_arg) free_mstring(pStr);
+        /* The string is tabled indirectly, return the directly tabled
+         * instance.
+         */
+        string = ref_mstring(pStr->link); /* Must come first! */
+        if (deref_arg) free_mstring(pStr); /* Might delete *pStr */
     }
+
+    /* That's all */
 
     return string;
 } /* mstring_make_tabled() */
@@ -663,11 +612,13 @@ mstring_table_inplace (string_t * pStr MTRACE_DECL)
 
 /* Aliased to: table_inplace(pStr)
  *
- * If <pStr> is an untabled string, it is morphed into an indirectly tabled
- * one.
+ * If <pStr> is an untabled string, it is morphed into an tabled one.
+ * If the string does not yet exist in the string table, the result
+ * will be a directly tabled string, otherwise an indirectly tabled one.
  *
  * Result is <pStr>, the refcount doesn't change.
- * If memory runs out, NULL is returned.
+ *
+ * Also used by mstring_make_tabled().
  */
 
 {
@@ -692,21 +643,10 @@ mstring_table_inplace (string_t * pStr MTRACE_DECL)
 
     if (!string)
     {
-        /* No: create a new string structure, table it,
-         * and then give it pStr's string_data pointer.
+        /* No: change the given string structure into a directly
+         * tabled one and link it into the string table.
          */
-        string = xalloc_pass(sizeof(*string));
-        if (!string)
-        {
-            return NULL;
-        }
-
-        string->str = pStr->str;
-        string->info.tabled = MY_TRUE;
-        string->info.ref = 1;
-          /* An uninitialized memory read at this point is ok: it's because
-           * the bitfield is initialized in parts.
-           */
+        pStr->info.tabled = MY_TRUE;
 
         mstr_added++;
         if (NULL == stringtable[idx])
@@ -714,11 +654,9 @@ mstring_table_inplace (string_t * pStr MTRACE_DECL)
         else
             mstr_collisions++;
 
-        string->link = stringtable[idx];
-        stringtable[idx] = string;
+        pStr->link = stringtable[idx];
+        stringtable[idx] = pStr;
 
-        mstr_used++;
-        mstr_used_size += msize;
         mstr_tabled++;
         mstr_tabled_size += msize;
     }
@@ -730,19 +668,17 @@ mstring_table_inplace (string_t * pStr MTRACE_DECL)
         ref_mstring(string);  /* Increments statistics */
         xfree(pStr->str);
         pStr->str = string->str;
+
+        /* Complete the morphing of pStr into an indirectly tabled
+         * string.
+         */
+
+        pStr->link = string;
+
+        mstr_itabled++;
+        mstr_itabled_size += msize;
     }
 
-    /* string is now the directly tabled string, and both string
-     * and pStr share the same string_data structure.
-     *
-     * Complete the morphing of pStr into an indirectly tabled
-     * string.
-     */
-
-    pStr->link = string;
-
-    mstr_itabled++;
-    mstr_itabled_size += msize;
     mstr_untabled--;
     mstr_untabled_size -= msize;
 

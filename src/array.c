@@ -3079,21 +3079,23 @@ v_unique_array (svalue_t *sp, int num_arg)
 {
     vector_t *res;
     svalue_t *argp = sp - num_arg + 1;
+    callback_t  cb; /* must persist until the end of the function */
 
     check_for_destr(argp->u.vec);
 
     /* Sort out the arguments */
     if (num_arg == 2)
     {
-        /* Just the callback function name on the stack */
+        /* Just the callback function name on the stack: add the default
+         * 'skip' value
+         */
         sp++;
         put_number(sp, 0);
     }
-    else
+
     {
         /* Extract the callback information from the stack */
         int         error_index;
-        callback_t  cb;
 
         assign_eval_cost();
         inter_sp = sp;

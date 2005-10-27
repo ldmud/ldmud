@@ -3663,10 +3663,6 @@ compile_value (svalue_t *value, int opt_flags)
                                 no_string = MY_FALSE;
                                 put_string(&stmp
                                           , make_tabled_from(labels->u.str));
-                                if (!stmp.u.str)
-                                    lambda_error("Out of memory (%lu bytes) "
-                                                 "for string\n"
-                                                , (unsigned long) mstrsize(labels->u.str));
                                 *--current.valuep = stmp;
 
                                 l->key = (p_int)stmp.u.str;

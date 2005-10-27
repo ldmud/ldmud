@@ -443,14 +443,7 @@ cleanup_vector (svalue_t *svp, size_t num, cleanup_t * context)
 
         case T_STRING:
             if (!mstr_tabled(p->u.str))
-            {
-                string_t * str = make_tabled_from(p->u.str);
-                if (str != NULL)
-                {
-                    free_mstring(p->u.str);
-                    p->u.str = str;
-                }
-            }
+                p->u.str = make_tabled(p->u.str);
             break;
 
         case T_CLOSURE:

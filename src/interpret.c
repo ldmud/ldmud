@@ -1543,23 +1543,7 @@ void assign_lrvalue_no_free (svalue_t *to, svalue_t *from)
     switch(from->type)
     {
     case T_STRING:
-        if (mstr_tabled(to->u.str))
-        {
-            (void)ref_mstring(to->u.str);
-        }
-        else
-        {
-            to->u.str = make_tabled_from(from->u.str);
-            if (!to->u.str)
-            {
-                to->u.str = ref_mstring(from->u.str);
-            }
-            else
-            {
-                free_mstring(from->u.str);
-                from->u.str = ref_mstring(to->u.str);
-            }
-        }
+        (void)ref_mstring(to->u.str);
         break;
 
     case T_OBJECT:
@@ -1755,28 +1739,14 @@ assign_svalue (svalue_t *dest, svalue_t *v)
 static INLINE void
 inl_transfer_svalue_no_free (svalue_t *dest, svalue_t *v)
 
-/* Move the value <v> into <dest>. If <v> is an unshared string, it
- * is made shared.
+/* Move the value <v> into <dest>.
  *
  * <dest> is assumed to be invalid before the call, <v> is invalid after.
  */
 
 {
-    /* If <v> is a string, share it */
-    if (v->type == T_STRING && !mstr_tabled(v->u.str))
-    {
-        put_string(dest, make_tabled_from(v->u.str));
-        if (dest->u.str)
-        {
-            free_mstring(v->u.str);
-        }
-        else
-            dest->u.str = v->u.str;
-    }
-    else /* just copy the data */
-    {
-        *dest = *v;
-    }
+    /* Copy the data */
+    *dest = *v;
 
     /* Protection against endless reference loops */
     if (dest->type == T_LVALUE || dest->type == T_PROTECTED_LVALUE)
@@ -9880,9 +9850,6 @@ again:
                            )
                         {
                             put_string(to, make_tabled_from(from->u.str));
-                            if (!to->u.str)
-                                ERRORF(("Out of memory (%lu bytes).\n"
-                                       , (unsigned long)mstrsize(from->u.str)));
                         }
                         else
                             assign_svalue_no_free(to, from);
@@ -10007,9 +9974,6 @@ again:
                            )
                         {
                             put_string(to, make_tabled_from(from->u.str));
-                            if (!to->u.str)
-                                ERRORF(("Out of memory (%lu bytes).\n"
-                                       , (unsigned long)mstrsize(from->u.str)));
                         }
                         else
                             assign_svalue_no_free(to, from);
@@ -11803,9 +11767,6 @@ again:
                        )
                     {
                         put_string(to, make_tabled_from(from->u.str));
-                        if (!to->u.str)
-                            ERRORF(("Out of memory (%lu bytes).\n"
-                                   , (unsigned long)mstrsize(from->u.str)));
                     }
                     else
                         assign_svalue_no_free(to, from);
