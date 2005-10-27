@@ -147,6 +147,9 @@
 /* Does the machine offer GnuTLS? */
 /* #undef HAS_GNUTLS */
 
+/* Does the machine offer OpenSSL/SSL? */
+/* #undef HAS_OPENSSL */
+
 /* Does the machine offer pthread library? */
 /* #undef HAS_PTHREADS */
 

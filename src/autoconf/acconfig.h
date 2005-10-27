@@ -90,6 +90,9 @@
 /* Does the machine offer GnuTLS? */
 #undef HAS_GNUTLS
 
+/* Does the machine offer OpenSSL/SSL? */
+#undef HAS_OPENSSL
+
 /* define the erq include file. */
 #undef ERQ_INCLUDE
 

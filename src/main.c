@@ -223,10 +223,6 @@ main (int argc, char **argv)
 
     rc = 0;
 
-    printf("%s LDMud %s" LOCAL_LEVEL " (" PROJ_VERSION ")\n"
-          , time_stamp(), IS_RELEASE() ? GAME_VERSION : LONG_VERSION
-          );
-
     /* On some systems, SIGALRM is sometimes blocked.
      * The reasons are unknown, but this seems to be the cure.
      */
@@ -327,6 +323,13 @@ main (int argc, char **argv)
             rc = 1;
             break;
         }
+
+        /* Print the driver tag line to stdout. The output to the debug.log
+         * will follow when we opened it.
+         */
+        printf("%s LDMud %s" LOCAL_LEVEL " (" PROJ_VERSION ")\n"
+              , time_stamp(), IS_RELEASE() ? GAME_VERSION : LONG_VERSION
+              );
 
         /* Setup comm::host_name, so that we can open the debug.log file
          * with the proper name. We do the complete setup later.

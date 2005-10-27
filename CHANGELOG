@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+09-Aug-2003 (Lars Duening)  (3.3.476)
+  - (configure) The configuration script now looks for OpenSSL before
+      GnuTLS. However, TLS support using OpenSSL is not implemented yet.
+
 09-Aug-2003 (Lars Duening)  (3.3.475)
   - (main.c, pkg-tls) The x509 key and certfile can now be specifed
       on the commandline with '--tls-key' and '--tls-cert'.

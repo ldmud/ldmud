@@ -869,7 +869,7 @@ Optional Features:
   --enable-use-structs                default=enabled
         Enables structs
   --enable-use-tls                    default=disabled
-        Enables Transport Layer Security over Telnet
+        Enables Transport Layer Security over Telnet: no/gnu/ssl/yes
   --enable-use-new-inlines            default=enabled
         Enables new inline syntax
   --enable-use-set-light              default=enabled
@@ -2202,6 +2202,23 @@ else
   cdef_use_pgsql="#define"
   pgsql_path="$enable_use_pgsql"
   enable_use_pgsql="yes"
+fi
+
+if test "x$enable_use_tls" = "x" && test "x$DEFAULTenable_use_tls" != "x"; then
+  enable_use_tls=$DEFAULTenable_use_tls
+fi
+
+if test "x$enable_use_tls" = "x" || test "x$enable_use_tls" = "xyes"; then
+  cdef_use_tls="#define"
+  tls_package="any"
+  enable_use_tls="yes"
+elif test "x$enable_use_tls" = "xno"; then
+  cdef_use_tls="#undef"
+  tls_package="any"
+else
+  cdef_use_tls="#define"
+  tls_package="$enable_use_tls"
+  enable_use_tls="yes"
 fi
 
 if test "x$enable_access_control" = "x" && test "x$DEFAULTenable_access_control" != "x"; then
@@ -8802,23 +8819,201 @@ fi
 
 # --- TLS ---
 
-echo "$as_me:$LINENO: checking for GnuTLS support" >&5
+has_tls=no
+savelibs="$LIBS"
+
+# Check for OpenSSL unless not desired
+
+if test "$tls_package" = "any" -o "$tls_package" = "ssl"; then
+
+    echo "$as_me:$LINENO: checking for OpenSSL support" >&5
+echo $ECHO_N "checking for OpenSSL support... $ECHO_C" >&6
+if test "${lp_cv_has_openssl+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  cat >conftest.$ac_ext <<_ACEOF
+#line $LINENO "configure"
+#include "confdefs.h"
+
+    #include <openssl/ssl.h>
+
+    void foo(void)
+    {
+        int i = SSL_MAX_SSL_SESSION_ID_LENGTH;
+    }
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext
+if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
+  (eval $ac_compile) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+         { ac_try='test -s conftest.$ac_objext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  lp_cv_has_openssl=yes
+else
+  echo "$as_me: failed program was:" >&5
+cat conftest.$ac_ext >&5
+lp_cv_has_openssl=no
+
+fi
+rm -f conftest.$ac_objext conftest.$ac_ext
+fi
+echo "$as_me:$LINENO: result: $lp_cv_has_openssl" >&5
+echo "${ECHO_T}$lp_cv_has_openssl" >&6
+
+    if test $lp_cv_has_openssl = yes; then
+        has_tls=yes
+        tls_package=ssl
+        cat >>confdefs.h <<\_ACEOF
+#define HAS_OPENSSL 1
+_ACEOF
+
+
+        echo "$as_me:$LINENO: checking if -lssl or similar is needed" >&5
+echo $ECHO_N "checking if -lssl or similar is needed... $ECHO_C" >&6
+if test "${lp_cv_need_lib_ssl+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  if test "$cross_compiling" = yes; then
+  { { echo "$as_me:$LINENO: error: cannot run test program while cross compiling" >&5
+echo "$as_me: error: cannot run test program while cross compiling" >&2;}
+   { (exit 1); exit 1; }; }
+else
+  cat >conftest.$ac_ext <<_ACEOF
+#line $LINENO "configure"
+#include "confdefs.h"
+
+    #include <openssl/ssl.h>
+    void t (void)
+    {
+        SSL_library_init();
+    }
+    int main(void)
+    {
+        return 0;
+    }
+
+_ACEOF
+rm -f conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } && { ac_try='./conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  lp_cv_need_lib_ssl=no
+else
+  echo "$as_me: program exited with status $ac_status" >&5
+echo "$as_me: failed program was:" >&5
+cat conftest.$ac_ext >&5
+( exit $ac_status )
+lp_cv_need_lib_ssl=yes
+
+fi
+rm -f core core.* *.core gmon.out bb.out conftest$ac_exeext conftest.$ac_objext conftest.$ac_ext
+fi
+fi
+echo "$as_me:$LINENO: result: $lp_cv_need_lib_ssl" >&5
+echo "${ECHO_T}$lp_cv_need_lib_ssl" >&6
+        if test "$lp_cv_need_lib_ssl" = "yes"; then
+            lp_cv_has_lib_ssl=no
+            echo "$as_me:$LINENO: checking for SSL_library_init in -lssl" >&5
+echo $ECHO_N "checking for SSL_library_init in -lssl... $ECHO_C" >&6
+if test "${ac_cv_lib_ssl_SSL_library_init+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lssl  $LIBS"
+cat >conftest.$ac_ext <<_ACEOF
+#line $LINENO "configure"
+#include "confdefs.h"
+
+/* Override any gcc2 internal prototype to avoid an error.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+/* We use char because int might match the return type of a gcc2
+   builtin and then its argument prototype would still apply.  */
+char SSL_library_init ();
+int
+main ()
+{
+SSL_library_init ();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+         { ac_try='test -s conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  ac_cv_lib_ssl_SSL_library_init=yes
+else
+  echo "$as_me: failed program was:" >&5
+cat conftest.$ac_ext >&5
+ac_cv_lib_ssl_SSL_library_init=no
+fi
+rm -f conftest.$ac_objext conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+echo "$as_me:$LINENO: result: $ac_cv_lib_ssl_SSL_library_init" >&5
+echo "${ECHO_T}$ac_cv_lib_ssl_SSL_library_init" >&6
+if test $ac_cv_lib_ssl_SSL_library_init = yes; then
+  LIBS="$LIBS -lssl"
+                         lp_cv_has_lib_ssl=yes
+
+fi
+
+        fi
+    else
+        has_tls=no
+    fi
+fi
+
+# Check for GnuTLS unless not desired
+
+if test "$tls_package" = "any" -o "$tls_package" = "gnu"; then
+
+    echo "$as_me:$LINENO: checking for GnuTLS support" >&5
 echo $ECHO_N "checking for GnuTLS support... $ECHO_C" >&6
 if test "${lp_cv_has_gnutls+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
 else
-  saveflags="$CFLAGS"
-    CFLAGS="$CFLAGS -I/usr/include"
-    cat >conftest.$ac_ext <<_ACEOF
+  cat >conftest.$ac_ext <<_ACEOF
 #line $LINENO "configure"
 #include "confdefs.h"
 
-#include <gnutls/gnutls.h>
+    #include <gnutls/gnutls.h>
 
-void foo(void)
-{
-    int i = GNUTLS_CIPHER_RIJNDAEL_256_CBC;
-}
+    void foo(void)
+    {
+        int i = GNUTLS_CIPHER_RIJNDAEL_256_CBC;
+    }
 
 int
 main ()
@@ -8845,7 +9040,6 @@ else
   echo "$as_me: failed program was:" >&5
 cat conftest.$ac_ext >&5
 lp_cv_has_gnutls=no
-    CFLAGS="$saveflags"
 
 fi
 rm -f conftest.$ac_objext conftest.$ac_ext
@@ -8853,16 +9047,15 @@ fi
 echo "$as_me:$LINENO: result: $lp_cv_has_gnutls" >&5
 echo "${ECHO_T}$lp_cv_has_gnutls" >&6
 
-if test $lp_cv_has_gnutls = yes; then
-    saveflags="$CFLAGS"
-    CFLAGS="$CFLAGS -I/usr/include"
-
-    cat >>confdefs.h <<\_ACEOF
+    if test $lp_cv_has_gnutls = yes; then
+        has_tls=yes
+        tls_package=gnu
+        cat >>confdefs.h <<\_ACEOF
 #define HAS_GNUTLS 1
 _ACEOF
 
 
-    echo "$as_me:$LINENO: checking if -lgnutls or similar is needed" >&5
+        echo "$as_me:$LINENO: checking if -lgnutls or similar is needed" >&5
 echo $ECHO_N "checking if -lgnutls or similar is needed... $ECHO_C" >&6
 if test "${lp_cv_need_lib_gnutls+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
@@ -8876,16 +9069,16 @@ else
 #line $LINENO "configure"
 #include "confdefs.h"
 
-#include <gnutls.h>
-void t (void)
-{
-    gnutls_global_init();
-    gnutls_global_deinit();
-}
-int main(void)
-{
-    return 0;
-}
+    #include <gnutls/gnutls.h>
+    void t (void)
+    {
+        gnutls_global_init();
+        gnutls_global_deinit();
+    }
+    int main(void)
+    {
+        return 0;
+    }
 
 _ACEOF
 rm -f conftest$ac_exeext
@@ -8913,9 +9106,9 @@ fi
 fi
 echo "$as_me:$LINENO: result: $lp_cv_need_lib_gnutls" >&5
 echo "${ECHO_T}$lp_cv_need_lib_gnutls" >&6
-    if test "$lp_cv_need_lib_gnutls" = "yes"; then
-        lp_cv_has_lib_gnutls=no
-        echo "$as_me:$LINENO: checking for gnutls_global_init in -lgnutls" >&5
+        if test "$lp_cv_need_lib_gnutls" = "yes"; then
+            lp_cv_has_lib_gnutls=no
+            echo "$as_me:$LINENO: checking for gnutls_global_init in -lgnutls" >&5
 echo $ECHO_N "checking for gnutls_global_init in -lgnutls... $ECHO_C" >&6
 if test "${ac_cv_lib_gnutls_gnutls_global_init+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
@@ -8966,12 +9159,19 @@ echo "$as_me:$LINENO: result: $ac_cv_lib_gnutls_gnutls_global_init" >&5
 echo "${ECHO_T}$ac_cv_lib_gnutls_gnutls_global_init" >&6
 if test $ac_cv_lib_gnutls_gnutls_global_init = yes; then
   LIBS="$LIBS -lgnutls"
-                     lp_cv_has_lib_gnutls=yes
+                         lp_cv_has_lib_gnutls=yes
 
 fi
 
+        fi
+    else
+        has_tls=no
     fi
-else
+fi
+
+# Evaluate the results of the checks
+
+if test "$has_tls" = no; then
     if test $enable_use_tls = yes; then
         echo "TLS not supported - disabling TLS support."
         if test "x$not_available" = "x"; then
@@ -8982,6 +9182,7 @@ fi
     fi
     cdef_use_tls="#undef"
     enable_use_tls=no
+    LIBS="$savelibs"
 fi
 
 # --- PThreads ---

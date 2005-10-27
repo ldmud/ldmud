@@ -374,6 +374,13 @@ enable_use_pgsql=no
 enable_use_mccp=no
 
 # Enable support for TLS (Transport Layer Security).
+#
+#  'no': TLS support is not compiled it
+#  'gnu': TLS support using GnuTLS is compiled in if found.
+#  'ssl': TLS support using OpenSSL is compiled in if found.
+#  'yes': TLS support using either OpenSSL or GnuTLS is compiled in if found.
+#         The configuration script looks first for OpenSSL, then GnuTLS.
+#         If both are available, OpenSSL is used.
 
 enable_use_tls=no
 

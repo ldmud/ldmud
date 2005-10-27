@@ -5,6 +5,10 @@
 
 #ifdef USE_TLS
 
+#if defined(HAS_OPENSSL)
+#  error "TLS support using OpenSSL is not implemented yet."
+#endif
+
 #include <gnutls/gnutls.h>
 #include "typedefs.h"
 

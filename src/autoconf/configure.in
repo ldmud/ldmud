@@ -124,7 +124,7 @@ AC_MY_ARG_ENABLE(use-pthreads,no,,[enable using of threads for socket writes])
 AC_MY_ARG_ENABLE(use-pcre,yes,,[Enables PCRE instead of traditional regexps])
 AC_MY_ARG_ENABLE(use-deprecated,yes,,[Enables obsolete and deprecated efuns])
 AC_MY_ARG_ENABLE(use-structs,yes,,[Enables structs])
-AC_MY_ARG_ENABLE(use-tls,no,,[Enables Transport Layer Security over Telnet])
+AC_MY_ARG_ENABLE(use-tls,no,,[Enables Transport Layer Security over Telnet: no/gnu/ssl/yes])
 AC_MY_ARG_ENABLE(use-new-inlines,yes,,[Enables new inline syntax])
 AC_MY_ARG_ENABLE(use-set-light,yes,,[Enables efun set_light()])
 AC_MY_ARG_ENABLE(use-set-is-wizard,yes,,[Enables efun set_is_wizard()])
@@ -275,6 +275,20 @@ else
   cdef_use_pgsql="#define"
   pgsql_path="$enable_use_pgsql"
   enable_use_pgsql="yes"
+fi
+
+AC_UPDATE_VAR(enable_use_tls)
+if test "x$enable_use_tls" = "x" || test "x$enable_use_tls" = "xyes"; then
+  cdef_use_tls="#define"
+  tls_package="any"
+  enable_use_tls="yes"
+elif test "x$enable_use_tls" = "xno"; then
+  cdef_use_tls="#undef"
+  tls_package="any"
+else
+  cdef_use_tls="#define"
+  tls_package="$enable_use_tls"
+  enable_use_tls="yes"
 fi
 
 AC_CDEF_FROM_ENABLE(access_control)
@@ -733,57 +747,116 @@ fi
 
 # --- TLS ---
 
-AC_CACHE_CHECK(for GnuTLS support,lp_cv_has_gnutls,
-    saveflags="$CFLAGS"
-    CFLAGS="$CFLAGS -I/usr/include"
-    AC_TRY_COMPILE([
-#include <gnutls/gnutls.h>
+has_tls=no
+savelibs="$LIBS"
 
-void foo(void)
-{
-    int i = GNUTLS_CIPHER_RIJNDAEL_256_CBC;
-}
-    ],,lp_cv_has_gnutls=yes,
-    lp_cv_has_gnutls=no
-    CFLAGS="$saveflags"
-))
+# Check for OpenSSL unless not desired
 
-if test $lp_cv_has_gnutls = yes; then
-    saveflags="$CFLAGS"
-    CFLAGS="$CFLAGS -I/usr/include"
+if test "$tls_package" = "any" -o "$tls_package" = "ssl"; then
 
-    AC_DEFINE(HAS_GNUTLS)
+    AC_CACHE_CHECK(for OpenSSL support,lp_cv_has_openssl,
+        AC_TRY_COMPILE([
+    #include <openssl/ssl.h>
 
-    AC_CACHE_CHECK(if -lgnutls or similar is needed, lp_cv_need_lib_gnutls,
-        AC_TRY_RUN([
-#include <gnutls.h>
-void t (void)
-{
-    gnutls_global_init();
-    gnutls_global_deinit();
-}
-int main(void)
-{
-    return 0;
-}
-        ],
-        lp_cv_need_lib_gnutls=no,
-        lp_cv_need_lib_gnutls=yes
+    void foo(void)
+    {
+        int i = SSL_MAX_SSL_SESSION_ID_LENGTH;
+    }
+        ],,lp_cv_has_openssl=yes,
+        lp_cv_has_openssl=no
     ))
-    if test "$lp_cv_need_lib_gnutls" = "yes"; then
-        lp_cv_has_lib_gnutls=no
-        AC_CHECK_LIB(gnutls,gnutls_global_init,
-                     LIBS="$LIBS -lgnutls"
-                     lp_cv_has_lib_gnutls=yes
-                    )
+
+    if test $lp_cv_has_openssl = yes; then
+        has_tls=yes
+        tls_package=ssl
+        AC_DEFINE(HAS_OPENSSL)
+
+        AC_CACHE_CHECK(if -lssl or similar is needed, lp_cv_need_lib_ssl,
+            AC_TRY_RUN([
+    #include <openssl/ssl.h>
+    void t (void)
+    {
+        SSL_library_init();
+    }
+    int main(void)
+    {
+        return 0;
+    }
+            ],
+            lp_cv_need_lib_ssl=no,
+            lp_cv_need_lib_ssl=yes
+        ))
+        if test "$lp_cv_need_lib_ssl" = "yes"; then
+            lp_cv_has_lib_ssl=no
+            AC_CHECK_LIB(ssl,SSL_library_init,
+                         LIBS="$LIBS -lssl"
+                         lp_cv_has_lib_ssl=yes
+                        )
+        fi
+    else
+        has_tls=no
     fi
-else
+fi
+
+# Check for GnuTLS unless not desired
+
+if test "$tls_package" = "any" -o "$tls_package" = "gnu"; then
+
+    AC_CACHE_CHECK(for GnuTLS support,lp_cv_has_gnutls,
+        AC_TRY_COMPILE([
+    #include <gnutls/gnutls.h>
+
+    void foo(void)
+    {
+        int i = GNUTLS_CIPHER_RIJNDAEL_256_CBC;
+    }
+        ],,lp_cv_has_gnutls=yes,
+        lp_cv_has_gnutls=no
+    ))
+
+    if test $lp_cv_has_gnutls = yes; then
+        has_tls=yes
+        tls_package=gnu
+        AC_DEFINE(HAS_GNUTLS)
+
+        AC_CACHE_CHECK(if -lgnutls or similar is needed, lp_cv_need_lib_gnutls,
+            AC_TRY_RUN([
+    #include <gnutls/gnutls.h>
+    void t (void)
+    {
+        gnutls_global_init();
+        gnutls_global_deinit();
+    }
+    int main(void)
+    {
+        return 0;
+    }
+            ],
+            lp_cv_need_lib_gnutls=no,
+            lp_cv_need_lib_gnutls=yes
+        ))
+        if test "$lp_cv_need_lib_gnutls" = "yes"; then
+            lp_cv_has_lib_gnutls=no
+            AC_CHECK_LIB(gnutls,gnutls_global_init,
+                         LIBS="$LIBS -lgnutls"
+                         lp_cv_has_lib_gnutls=yes
+                        )
+        fi
+    else
+        has_tls=no
+    fi
+fi
+
+# Evaluate the results of the checks
+
+if test "$has_tls" = no; then
     if test $enable_use_tls = yes; then
         echo "TLS not supported - disabling TLS support."
         AC_NOT_AVAILABLE(use-tls)
     fi
     cdef_use_tls="#undef"
     enable_use_tls=no
+    LIBS="$savelibs"
 fi
 
 # --- PThreads ---
