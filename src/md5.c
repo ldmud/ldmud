@@ -170,7 +170,7 @@ static unsigned char PADDING[64] = {
 
 /*--------------------------------------------------------------------*/
 void
-MD5Init (MD5_CTX *context)
+MD5Init (M_MD5_CTX *context)
 
 /* MD5 initialization. Begins an MD5 operation, writing a new context.
  */
@@ -186,7 +186,7 @@ MD5Init (MD5_CTX *context)
 
 /*--------------------------------------------------------------------*/
 void
-MD5Update (MD5_CTX *context, unsigned char *input, unsigned int inputLen)
+MD5Update (M_MD5_CTX *context, unsigned char *input, unsigned int inputLen)
 
 /* MD5 block update operation. Continues an MD5 message-digest
  * operation, processing another message block, and updating the
@@ -229,7 +229,7 @@ MD5Update (MD5_CTX *context, unsigned char *input, unsigned int inputLen)
 
 /*--------------------------------------------------------------------*/
 void
-MD5Final (MD5_CTX *context, unsigned char digest[16])
+MD5Final (M_MD5_CTX *context, unsigned char digest[16])
 
 /* MD5 finalization. Ends an MD5 message-digest operation, writing the
  * the message digest and zeroizing the context.
@@ -466,7 +466,7 @@ MD5Encode(unsigned char *pw,
     unsigned int sl;
     int pl;
     unsigned int pwlen;
-    MD5_CTX ctx, ctx1;
+    M_MD5_CTX ctx, ctx1;
     unsigned long l;
 
     /*

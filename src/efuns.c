@@ -342,7 +342,7 @@ f_md5 (svalue_t *sp)
  */
 
 {
-    MD5_CTX context;
+    M_MD5_CTX context;
     string_t *s_digest;
     unsigned char *digest, d[17];
     int i;

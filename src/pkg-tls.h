@@ -13,6 +13,18 @@
 
 #include "typedefs.h"
 
+/* --- Types --- */
+
+#ifdef HAS_OPENSSL
+
+typedef SSL*           tls_session_t;
+
+#elif defined(HAS_GNUTLS)
+
+typedef gnutls_session tls_session_t;
+
+#endif /* SSL Package */
+
 /* --- Macros --- */
 
 #define TLS_DEFAULT_KEYFILE  "key.pem"
@@ -29,6 +41,7 @@ extern void tls_global_init(void);
 extern void tls_global_deinit(void);
 extern int tls_read(interactive_t *ip, char *buffer, int length);
 extern int tls_write(interactive_t *ip, char *buffer, int length);
+extern void tls_deinit_connection (interactive_t *ip);
 
 extern svalue_t *f_tls_init_connection(svalue_t *sp);
 extern svalue_t *f_tls_deinit_connection(svalue_t *sp);

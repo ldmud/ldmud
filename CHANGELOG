@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+14-Aug-2003 (Lars Duening)  (3.3.478)
+  - (pkg-tls, comm, md5, configure) Added the OpenSSL support. It's probably
+      buggy as heck as I had to copy&paste from OpenSSL demo programs due
+      to lack of documentation.
+
 13-Aug-2003 (Lars Duening)  (3.3.477)
   - (pkg-tls) Added the program initialisation/de-initialisation code for
       OpenSSL.

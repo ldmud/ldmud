@@ -10,11 +10,11 @@ DESCRIPTION
         returns an array that contains some parameters of <ob>'s
         connection:
 
-          int [TLS_CIPHER]: the cipher used
-          int [TLS_COMP]:   the compression used
-          int [TLS_KX]:     the key-exchange used
-          int [TLS_MAC]:    the digest algorithm used
-          int [TLS_PROT]:   the protocol used
+          int|string [TLS_CIPHER]: the cipher used
+          int        [TLS_COMP]:   the compression used
+          int        [TLS_KX]:     the key-exchange used
+          int        [TLS_MAC]:    the digest algorithm used
+          int|string [TLS_PROT]:   the protocol used
 
         To translate these numbers into strings, <tls.h> offers a
         number of macros:

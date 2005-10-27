@@ -270,8 +270,8 @@ struct interactive_s {
 #endif
 
 #ifdef USE_TLS
-    gnutls_session 	   tls_session;
-    Bool		   tls_inited;
+    tls_session_t          tls_session;
+    Bool                   tls_inited;
 #endif
 };
 

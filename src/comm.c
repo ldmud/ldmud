@@ -3459,6 +3459,9 @@ remove_interactive (object_t *ob, Bool force)
         if (interactive->out_compress)
             end_compress(interactive);
 #endif
+#ifdef USE_TLS
+        tls_deinit_connection(interactive);
+#endif
         shutdown(interactive->socket, 2);
         socket_close(interactive->socket);
     } /* if (erq or user) */

@@ -8820,7 +8820,6 @@ fi
 # --- TLS ---
 
 has_tls=no
-savelibs="$LIBS"
 
 # Check for OpenSSL unless not desired
 
@@ -8984,12 +8983,115 @@ fi
 echo "$as_me:$LINENO: result: $ac_cv_lib_ssl_SSL_library_init" >&5
 echo "${ECHO_T}$ac_cv_lib_ssl_SSL_library_init" >&6
 if test $ac_cv_lib_ssl_SSL_library_init = yes; then
-  LIBS="$LIBS -lssl"
+  PKGLIBS="$PKGLIBS -lssl"
                          lp_cv_has_lib_ssl=yes
 
 fi
 
         fi
+
+        if test "x$lp_cv_need_lib_crypto" != "xno"; then
+              echo "$as_me:$LINENO: checking if -lcrypto is needed" >&5
+echo $ECHO_N "checking if -lcrypto is needed... $ECHO_C" >&6
+if test "${lp_cv_need_lib_crypto+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  if test "$cross_compiling" = yes; then
+  { { echo "$as_me:$LINENO: error: cannot run test program while cross compiling" >&5
+echo "$as_me: error: cannot run test program while cross compiling" >&2;}
+   { (exit 1); exit 1; }; }
+else
+  cat >conftest.$ac_ext <<_ACEOF
+#line $LINENO "configure"
+#include "confdefs.h"
+
+#include <openssl/ssl.h>
+void t (void)
+{
+    DH *dhe1024 = NULL;
+    DH_free(dhe1024);
+}
+int main(void)
+{
+    return 0;
+}
+
+_ACEOF
+rm -f conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } && { ac_try='./conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  lp_cv_need_lib_crypto=no
+else
+  echo "$as_me: program exited with status $ac_status" >&5
+echo "$as_me: failed program was:" >&5
+cat conftest.$ac_ext >&5
+( exit $ac_status )
+lp_cv_need_lib_crypto=yes
+
+fi
+rm -f core core.* *.core gmon.out bb.out conftest$ac_exeext conftest.$ac_objext conftest.$ac_ext
+fi
+fi
+echo "$as_me:$LINENO: result: $lp_cv_need_lib_crypto" >&5
+echo "${ECHO_T}$lp_cv_need_lib_crypto" >&6
+              if test "$lp_cv_need_lib_crypto" = "yes"; then
+                  echo "$as_me:$LINENO: checking for main in -lcrypto" >&5
+echo $ECHO_N "checking for main in -lcrypto... $ECHO_C" >&6
+if test "${ac_cv_lib_crypto_main+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lcrypto  $LIBS"
+cat >conftest.$ac_ext <<_ACEOF
+#line $LINENO "configure"
+#include "confdefs.h"
+
+
+int
+main ()
+{
+main ();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+         { ac_try='test -s conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  ac_cv_lib_crypto_main=yes
+else
+  echo "$as_me: failed program was:" >&5
+cat conftest.$ac_ext >&5
+ac_cv_lib_crypto_main=no
+fi
+rm -f conftest.$ac_objext conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+echo "$as_me:$LINENO: result: $ac_cv_lib_crypto_main" >&5
+echo "${ECHO_T}$ac_cv_lib_crypto_main" >&6
+if test $ac_cv_lib_crypto_main = yes; then
+  PKGLIBS="$PKGLIBS -lcrypto"
+fi
+
+              fi
+      fi
     else
         has_tls=no
     fi
@@ -9158,7 +9260,7 @@ fi
 echo "$as_me:$LINENO: result: $ac_cv_lib_gnutls_gnutls_global_init" >&5
 echo "${ECHO_T}$ac_cv_lib_gnutls_gnutls_global_init" >&6
 if test $ac_cv_lib_gnutls_gnutls_global_init = yes; then
-  LIBS="$LIBS -lgnutls"
+  PKGLIBS="$PKGLIBS -lgnutls"
                          lp_cv_has_lib_gnutls=yes
 
 fi
@@ -9182,7 +9284,6 @@ fi
     fi
     cdef_use_tls="#undef"
     enable_use_tls=no
-    LIBS="$savelibs"
 fi
 
 # --- PThreads ---

@@ -21,11 +21,11 @@ typedef struct {
     unsigned long int state[4];  /* state (ABCD) */
     unsigned long int count[2];  /* number of bits, modulo 2^64 (lsb first) */
     unsigned char buffer[64];    /* input buffer */
-} MD5_CTX;
+} M_MD5_CTX;
 
-extern void MD5Init(MD5_CTX *);
-extern void MD5Update(MD5_CTX *, unsigned char *, unsigned int);
-extern void MD5Final(MD5_CTX *, unsigned char [16]);
+extern void MD5Init(M_MD5_CTX *);
+extern void MD5Update(M_MD5_CTX *, unsigned char *, unsigned int);
+extern void MD5Final(M_MD5_CTX *, unsigned char [16]);
 
 /* The following function is from Apache */
 

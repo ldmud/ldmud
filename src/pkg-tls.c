@@ -1,6 +1,10 @@
 /*------------------------------------------------------------------
  * Wrapper for the gnutls resp. OpenSSL module.
  *
+#ifdef HAS_OPENSSL
+ * The OpenSSL implementation was based on the easy_tls.c demo
+ * and probably doesn't work, due to lack of usable documentation.
+#endif
  *------------------------------------------------------------------
  */
 
@@ -12,6 +16,10 @@
 
 #if defined(HAS_OPENSSL)
 #  include <openssl/ssl.h>
+#  include <openssl/rand.h>
+#  include <openssl/err.h>
+#  include <openssl/x509.h>
+#  include <sys/utsname.h>
 #elif defined(HAS_GNUTLS)
 #  include <gnutls/gnutls.h>
 #endif
@@ -21,6 +29,7 @@
 #include "actions.h"
 #include "array.h"
 #include "comm.h"
+#include "interpret.h"
 #include "main.h"
 #include "mstrings.h"
 #include "object.h"
@@ -78,7 +87,7 @@ no_passphrase_callback (char * buf, int num, int w, void *arg)
 
 /*-------------------------------------------------------------------------*/
 static Bool
-tls_set_dhe1024 (void)
+set_dhe1024 (void)
 
 /* Set the Diffie-Hellmann parameters.
  * Return MY_TRUE on success, and MY_FALSE on error.
@@ -96,6 +105,9 @@ tls_set_dhe1024 (void)
                          };
     unsigned char seedbuf[20];
 
+    if (dhe1024 != NULL)
+        return MY_TRUE;
+
     RAND_bytes((unsigned char *) &i, sizeof i);
 
     /* Make sure that i is non-negative - pick one of the provided seeds */
@@ -105,7 +117,6 @@ tls_set_dhe1024 (void)
         i = 0;
 
     i %= sizeof seed / sizeof seed[0];
-    assert(strlen(seed[i]) == 20);
     memcpy(seedbuf, seed[i], 20);
     dsaparams = DSA_generate_parameters(1024, seedbuf, 20, NULL, NULL, 0, NULL);
 
@@ -117,7 +128,7 @@ tls_set_dhe1024 (void)
     if (dhparams == NULL)
         return MY_FALSE;
 
-    tls_dhe1024 = dhparams;
+    dhe1024 = dhparams;
 
     return MY_TRUE;
 } /* set_dhe1024() */
@@ -149,13 +160,11 @@ generate_dh_params (void)
     return 0;
 } /* generate_dh_params() */
 
-#endif /* SSL Package */ 
-
 /*-------------------------------------------------------------------------*/
 static void
 initialize_tls_session (gnutls_session *session)
 
-/* Initialise a TLS <session>.
+/* GnuTLS: Initialise a TLS <session>.
  * tls_available must be TRUE.
  */
 
@@ -175,6 +184,8 @@ initialize_tls_session (gnutls_session *session)
 
     gnutls_dh_set_prime_bits( *session, DH_BITS);
 } /* initialize_tls_session() */
+
+#endif /* SSL Package */ 
 
 /*-------------------------------------------------------------------------*/
 void tls_global_init (void)
@@ -263,7 +274,7 @@ void tls_global_init (void)
         goto ssl_init_err;
     }
 
-    if (!SSL_CTX_use_certificate_chain(context, certfile))
+    if (!SSL_CTX_use_certificate_file(context, certfile, SSL_FILETYPE_PEM))
     {
 	printf("%s TLS: Error setting x509 certfile:\n"
               , time_stamp());
@@ -298,9 +309,9 @@ ssl_init_err:
         while (0 != (err = ERR_get_error()))
         {
             char * errstring = ERR_error_string(err, NULL);
-            printf("%s TLS: SSL error: %s.\n"
+            printf("%s TLS: SSL %s.\n"
                   , time_stamp(), errstring);
-            debug_message("%s TLS: SSL error: .\n"
+            debug_message("%s TLS: SSL %s.\n"
                          , time_stamp(), errstring);
         }
 
@@ -309,6 +320,7 @@ ssl_init_err:
             DH_free(dhe1024);
             dhe1024 = NULL;
         }
+
         if (context != NULL)
         {
             SSL_CTX_free(context);
@@ -395,13 +407,29 @@ tls_read (interactive_t *ip, char *buffer, int length)
 {
     int ret;
 
+#ifdef HAS_OPENSSL
+
+    ret = SSL_read(ip->tls_session, buffer, length);
+    if (ret == 0)
+    {
+        tls_deinit_connection(ip);
+    }
+    else if (ret < 0)
+    {
+        ret = SSL_get_error(ip->tls_session, ret);
+	debug_message("%s TLS: Received corrupted data (%d). "
+                      "Closing the connection.\n"
+                     , time_stamp(), ret);
+        tls_deinit_connection(ip);
+    }
+
+#elif defined(HAS_GNUTLS)
+
     ret = gnutls_record_recv( ip->tls_session, buffer, length);
 
     if (ret == 0)
     {
-	gnutls_bye(ip->tls_session, GNUTLS_SHUT_WR);
-	gnutls_deinit(ip->tls_session);
-	ip->tls_inited = MY_FALSE;
+        tls_deinit_connection(ip);
     }
     else if (ret < 0)
     {
@@ -412,6 +440,8 @@ tls_read (interactive_t *ip, char *buffer, int length)
 	gnutls_deinit(ip->tls_session);
 	ip->tls_inited = MY_FALSE;
     }
+#endif /* SSL Package */
+
     return ret;
 } /* tls_read() */
 
@@ -427,13 +457,31 @@ tls_write (interactive_t *ip, char *buffer, int length)
 {
     int ret;
 
+#ifdef HAS_OPENSSL
+
+    ret = SSL_write(ip->tls_session, buffer, length);
+    if (ret == 0)
+    {
+        tls_deinit_connection(ip);
+    }
+    else if (ret < 0)
+    {
+        ret = SSL_get_error(ip->tls_session, ret);
+	debug_message("%s TLS: Sending data failed (%d). "
+                      "Closing the connection.\n"
+                     , time_stamp(), ret);
+        tls_deinit_connection(ip);
+    }
+
+#elif defined(HAS_GNUTLS)
+
     ret = gnutls_record_send( ip->tls_session, buffer, length );
     if (ret < 0)
     {
-	gnutls_bye(ip->tls_session, GNUTLS_SHUT_WR);
-	gnutls_deinit(ip->tls_session);
-	ip->tls_inited = MY_FALSE;
+        tls_deinit_connection(ip);
     }
+#endif /* SSL Package */
+
     return ret;
 } /* tls_write() */
 
@@ -452,7 +500,7 @@ f_tls_init_connection (svalue_t *sp)
  */
 
 {
-    int ret;
+    long ret;
     interactive_t *ip;
 
     if (!O_SET_INTERACTIVE(ip, sp->u.ob))
@@ -462,6 +510,10 @@ f_tls_init_connection (svalue_t *sp)
     if (!tls_available)
         error("tls_init_connection(): TLS layer hasn't been initialized.\n");
 
+    if (ip->tls_inited)
+        error("tls_init_connection(): Interactive already has a secure "
+              "connection.\n");
+
     free_svalue(sp);
 
     {
@@ -470,6 +522,44 @@ f_tls_init_connection (svalue_t *sp)
         add_message(message_flush);
         command_giver = save_c_g;
     }
+
+#ifdef HAS_OPENSSL
+
+    ret = 0;
+
+    do {
+        int n;
+
+        SSL * session = SSL_new(context);
+
+        if (session == NULL)
+        {
+            ret = - ERR_get_error();
+            break;
+        }
+
+        if (!SSL_set_fd(session, ip->socket))
+        {
+            SSL_free(session);
+            ret = - ERR_get_error();
+            break;
+        }
+        
+        if ((n = SSL_do_handshake(session)) < 0)
+        {
+            ret = - SSL_get_error(session, n);
+            SSL_free(session);
+            break;
+        }
+
+        /* TODO: Check SSL_in_init() at this place? */
+        ip->tls_session = session;
+        ip->tls_inited = MY_TRUE;
+    } while(0);
+
+    put_number(sp, ret);
+
+#elif defined(HAS_GNUTLS)
 
     initialize_tls_session(&ip->tls_session);
     gnutls_transport_set_ptr(ip->tls_session, (gnutls_transport_ptr)(ip->socket));
@@ -483,10 +573,43 @@ f_tls_init_connection (svalue_t *sp)
     else
     {
 	ip->tls_inited = MY_TRUE;
-	put_number(sp, 1);
+	put_number(sp, 0);
     }
+
+#endif /* SSL Package */
+
     return sp;
 } /* f_tls_init_connection() */
+
+/*-------------------------------------------------------------------------*/
+void
+tls_deinit_connection (interactive_t *ip)
+
+/* Close the TLS connection for the interactive <ip> if there is one.
+ */
+
+{
+#ifdef HAS_OPENSSL
+
+    if (ip->tls_inited)
+    {
+        SSL_shutdown(ip->tls_session);
+        SSL_free(ip->tls_session);
+        ip->tls_session = NULL;
+    }
+
+#elif defined(HAS_GNUTLS)
+
+    if (ip->tls_inited)
+    {
+        gnutls_bye( ip->tls_session, GNUTLS_SHUT_WR);
+        gnutls_deinit(ip->tls_session);
+    }
+
+#endif /* SSL Package */
+
+    ip->tls_inited = MY_FALSE;
+} /* tls_deinit_connection() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -508,10 +631,7 @@ f_tls_deinit_connection(svalue_t *sp)
         error("Bad arg 1 to tls_deinit_connection(): "
               "object not interactive.\n");
 
-    gnutls_bye( ip->tls_session, GNUTLS_SHUT_WR);
-    gnutls_deinit(ip->tls_session);
-
-    ip->tls_inited = MY_FALSE;
+    tls_deinit_connection(ip);
 
     free_svalue(sp);
     put_number(sp, 1);
@@ -535,7 +655,15 @@ f_tls_error(svalue_t *sp)
     const char *text;
     int err = sp->u.number;
 
+#ifdef HAS_OPENSSL
+
+    text = ERR_error_string(-err, NULL);
+
+#elif defined(HAS_GNUTLS)
+
     text = gnutls_strerror(err);
+
+#endif /* SSL Package */
 
     if (text)
     {
@@ -590,11 +718,11 @@ f_tls_query_connection_info (svalue_t *sp)
  * If <ob> has a TLS connection, tls_query_connection_info() returns an array
  * that contains some parameters of <ob>'s connection:
  *
- *    int [TLS_CIPHER]: the cipher used
- *    int [TLS_COMP]:   the compression used
- *    int [TLS_KX]:     the key-exchange used
- *    int [TLS_MAC]:    the digest algorithm used
- *    int [TLS_PROT]:   the protocol used
+ *    int|string [TLS_CIPHER]: the cipher used
+ *    int        [TLS_COMP]:   the compression used
+ *    int        [TLS_KX]:     the key-exchange used
+ *    int        [TLS_MAC]:    the digest algorithm used
+ *    int|string [TLS_PROT]:   the protocol used
  *
  * To translate these numbers into strings, <tls.h> offers a number of macros:
  *
@@ -619,6 +747,15 @@ f_tls_query_connection_info (svalue_t *sp)
     {
         vector_t * rc;
         rc = allocate_array(TLS_INFO_MAX);
+#ifdef HAS_OPENSSL
+        put_c_string(&(rc->item[TLS_CIPHER])
+                    , SSL_get_cipher(ip->tls_session));
+	put_number(&(rc->item[TLS_COMP]), 0);
+	put_number(&(rc->item[TLS_KX]), 0);
+	put_number(&(rc->item[TLS_MAC]), 0);
+        put_c_string(&(rc->item[TLS_PROT])
+                    , SSL_get_version(ip->tls_session));
+#elif defined(HAS_GNUTLS)
         put_number(&(rc->item[TLS_CIPHER])
                   , gnutls_cipher_get(ip->tls_session));
 	put_number(&(rc->item[TLS_COMP])
@@ -629,6 +766,7 @@ f_tls_query_connection_info (svalue_t *sp)
                   , gnutls_mac_get(ip->tls_session));
 	put_number(&(rc->item[TLS_PROT])
                   , gnutls_protocol_get_version(ip->tls_session));
+#endif /* SSL Package */
         put_array(sp, rc);
     }
     else
