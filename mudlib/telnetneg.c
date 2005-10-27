@@ -23,7 +23,7 @@
 #define NEED_PROTOTYPES
 #include <thing/properties.h>    // SetProp() proto
 #define NEED_PRIVATE_PROTOTYPES
-#include <telnet.h>
+#include <telnetneg.h>
 
 #define GET_ALL_TTYPES
 

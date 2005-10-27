@@ -695,6 +695,7 @@ comm_fatal (interactive_t *ip, char *fmt, ...)
     fprintf(stderr, "  .msg_discarded:     %02x\n", (unsigned char)ip->msg_discarded);
     fprintf(stderr, "  .set_input_to:      %02x\n", (unsigned char)ip->set_input_to);
     fprintf(stderr, "  .closing:           %02x\n", (unsigned char)ip->closing);
+    fprintf(stderr, "  .tn_enabled:        %02x\n", (unsigned char)ip->tn_enabled);
     fprintf(stderr, "  .do_close:          %02x", (unsigned char)ip->do_close);
       if (ip->do_close & (FLAG_DO_CLOSE|FLAG_PROTO_ERQ)) fprintf(stderr, " (");
       if (ip->do_close & FLAG_DO_CLOSE) fprintf(stderr, "DO_CLOSE");
@@ -1898,7 +1899,7 @@ add_message (const char *fmt, ...)
             va_end(va);
             if (buff[(sizeof buff) - 1])
             {
-                comm_fatal(ip, "To long message!\n");
+                comm_fatal(ip, "Message too long!\n");
                 return;
             }
             source = buff+1;
@@ -3806,6 +3807,7 @@ new_player ( object_t *ob, SOCKET_T new_socket
     new_interactive->msg_discarded = MY_FALSE;
     new_interactive->set_input_to = MY_FALSE;
     new_interactive->closing = MY_FALSE;
+    new_interactive->tn_enabled = MY_TRUE;
     new_interactive->do_close = 0;
     new_interactive->noecho = 0;
     new_interactive->gobble_char = 0;
@@ -3930,6 +3932,13 @@ set_noecho (interactive_t *ip, char noecho)
 {
     char old, confirm;
     object_t *ob;
+
+    if (!ip->tn_enabled)
+    {
+        DTN(("'%s' set_noecho(%02x) old %02x: TN disabled\n"
+            , noecho, ip->noecho));
+        return;
+    }
 
     old = ip->noecho;
 
@@ -5272,11 +5281,15 @@ telnet_neg (interactive_t *ip)
             {
             case IAC:
             new_iac:
-                  state = TS_IAC;
+                  if (ip->tn_enabled)
+                  {
+                      state = TS_IAC;
         change_state:
-                  DTN(("t_n: new state %d\n", state));
-                  ip->tn_state = (char)state;
-                  continue;
+                      DTN(("t_n: new state %d\n", state));
+                      ip->tn_state = (char)state;
+                      continue;
+                  }
+                  /* FALLTHROUGH if !tn_enabled */
 
             case '\b':        /* Backspace */
             case 0x7f:        /* Delete */
@@ -5285,55 +5298,61 @@ telnet_neg (interactive_t *ip)
                  * so far and add a rubout sequence ('\b \b').
                  * In Charmode with unescaped input, just pass it on to
                  * the mudlib.
+                 *
+                 * If telnet is disabled, fallthrough to the general
+                 * data handling.
                  */
-                if ( !(ip->noecho & CHARMODE_REQ) )
+                if (ip->tn_enabled)
                 {
-                    if (to > first)
-                        to--;
-                    goto ts_data;
-                }
+                    if ( !(ip->noecho & CHARMODE_REQ) )
+                    {
+                        if (to > first)
+                            to--;
+                        goto ts_data;
+                    }
 
-                if (ip->text[0] == input_escape
-                 && ! (find_no_bang(ip) & IGNORE_BANG) )
-                {
+                    if (ip->text[0] == input_escape
+                     && ! (find_no_bang(ip) & IGNORE_BANG) )
+                    {
 #ifdef USE_PTHREADS
-                    if (to > &ip->text[ip->chars_ready])
-                    {
-                        thread_socket_write(ip->socket, &ip->text[ip->chars_ready],
-                          (size_t)(to - &ip->text[ip->chars_ready]), ip, MY_FALSE);
-                        ip->chars_ready = to - ip->text;
-                    }
-                    if (to > first) {
-                        thread_socket_write(ip->socket, "\b \b", 3, ip, MY_FALSE);
-                        to--;
-                        ip->chars_ready--;
-                    }
+                        if (to > &ip->text[ip->chars_ready])
+                        {
+                            thread_socket_write(ip->socket, &ip->text[ip->chars_ready],
+                              (size_t)(to - &ip->text[ip->chars_ready]), ip, MY_FALSE);
+                            ip->chars_ready = to - ip->text;
+                        }
+                        if (to > first) {
+                            thread_socket_write(ip->socket, "\b \b", 3, ip, MY_FALSE);
+                            to--;
+                            ip->chars_ready--;
+                        }
 #else
-                    if (to > &ip->text[ip->chars_ready])
-                    {
+                        if (to > &ip->text[ip->chars_ready])
+                        {
 #ifdef USE_TLS
-                        if (ip->tls_inited)
-                            tls_write(ip, &ip->text[ip->chars_ready]
-                                     , (size_t)(to - &ip->text[ip->chars_ready]));
-                        else
+                            if (ip->tls_inited)
+                                tls_write(ip, &ip->text[ip->chars_ready]
+                                         , (size_t)(to - &ip->text[ip->chars_ready]));
+                            else
 #endif
-                            socket_write(ip->socket, &ip->text[ip->chars_ready],
-                              (size_t)(to - &ip->text[ip->chars_ready]));
-                        ip->chars_ready = to - ip->text;
-                    }
-                    if (to > first) {
+                                socket_write(ip->socket, &ip->text[ip->chars_ready],
+                                  (size_t)(to - &ip->text[ip->chars_ready]));
+                            ip->chars_ready = to - ip->text;
+                        }
+                        if (to > first) {
 #ifdef USE_TLS
-                        if (ip->tls_inited)
-                            tls_write(ip, "\b \b", 3);
-                        else
+                            if (ip->tls_inited)
+                                tls_write(ip, "\b \b", 3);
+                            else
 #endif
-                            socket_write(ip->socket, "\b \b", 3);
-                        to--;
-                        ip->chars_ready--;
+                                socket_write(ip->socket, "\b \b", 3);
+                            to--;
+                            ip->chars_ready--;
+                        }
+#endif
+                        goto ts_data;
                     }
-#endif
-                    goto ts_data;
-                }
+                } /* if (ip->tn_enabled) */
                 /* FALLTHROUGH */
 
             default:
@@ -5347,10 +5366,14 @@ telnet_neg (interactive_t *ip)
                 goto ts_data;
 
             case '\r':
-                /* In Charmode, we have to return the \r */
-                if (ip->noecho & CHARMODE_REQ
-                 && (   ip->text[0] != input_escape
-                     || find_no_bang(ip) & IGNORE_BANG)
+                /* In Charmode or with telnet disabled, we have to return
+                 * the \r
+                 */
+                if (!ip->tn_enabled
+                 || (ip->noecho & CHARMODE_REQ
+                     && (   ip->text[0] != input_escape
+                         || find_no_bang(ip) & IGNORE_BANG)
+                    )
                    )
                 {
                     *to++ = (char)ch;
@@ -5393,10 +5416,14 @@ telnet_neg (interactive_t *ip)
                 }
 
             case '\n':
-                /* In Charmode, we have to return the \n */
-                if (ip->noecho & CHARMODE_REQ
-                 && (   ip->text[0] != input_escape
-                     || find_no_bang(ip) & IGNORE_BANG)
+                /* In Charmode or with telnet disabled, we have to return
+                 * the \n
+                 */
+                if (!ip->tn_enabled
+                 || (ip->noecho & CHARMODE_REQ
+                     && (   ip->text[0] != input_escape
+                         || find_no_bang(ip) & IGNORE_BANG)
+                    )
                    )
                 {
                     *to++ = (char)ch;
@@ -7279,6 +7306,21 @@ v_input_to (svalue_t *sp, int num_arg)
         extra_arg = arg + 2;
     }
 
+    {
+        interactive_t *ip;
+
+        if (O_SET_INTERACTIVE(ip, command_giver)
+         && !ip->tn_enabled
+         && (iflags & (INPUT_NOECHO|INPUT_CHARMODE))
+           )
+        {
+            warnf("input_to() noecho/charmode flags ignored for object '%s' "
+                  "with telnet disabled.\n"
+                 , get_txt(command_giver->name)
+                 );
+        }
+    }
+
     /* Setup the flags required for 'noecho' */
     flags =   ((iflags & INPUT_NOECHO)      ? NOECHO_REQ   : 0)
             | ((iflags & INPUT_CHARMODE)    ? CHARMODE_REQ : 0)
@@ -8511,6 +8553,61 @@ f_set_max_commands (svalue_t *sp)
     return sp;
 } /* f_set_max_commands() */
 
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_enable_telnet (svalue_t *sp)
+
+/* TEFUN: enable_telnet()
+ *
+ *   int enable_telnet (int num)
+ *   int enable_telnet (int num, object obj)
+ *
+ * Enable or disable the telnet machine for the interactive object <obj>.
+ * Return the previous state of the telnet machine as result.
+ *
+ * <num> > 0 : enable telnet machine (default)
+ *       = 0 : disable telnet machine
+ *       < 0 : just query the current state of the telnet machine.
+ * <obj> : the interactive object, default is the current interactive.
+ *         For non-interactive objects the function raises an error.
+ *
+ * The function raises a privilege_violation ("enable_telnet", obj, num)
+ * if <num> is >= 0. If the privilege is denied, the call is ignored.
+ *
+ * WARNING: Careless use of this efun can cause great confusion for both
+ * driver and clients!
+ */
+
+{
+    p_int num;
+    p_int rc;
+    interactive_t *ip;
+
+    num = sp[-1].u.number;
+    if (num < 0)
+        num = -1;
+
+    if (!O_SET_INTERACTIVE(ip, sp->u.ob))
+    {
+        error("Bad arg 2 to enable_telnet(): Object '%s' is not interactive.\n"
+             , get_txt(sp->u.ob->name)
+             );
+        /* NOTREACHED */
+        return sp; /* flow control hint */
+    }
+
+    rc = (ip->tn_enabled != 0);
+    if (num >= 0
+     && privilege_violation4(STR_ENABLE_TELNET, sp->u.ob, NULL, num, sp))
+        ip->tn_enabled = (num != 0);
+
+    free_svalue(sp--);
+    free_svalue(sp);
+
+    put_number(sp, rc);
+    return sp;
+} /* f_enable_telnet() */
+ 
 /*-------------------------------------------------------------------------*/
 void
 check_for_out_connections (void)

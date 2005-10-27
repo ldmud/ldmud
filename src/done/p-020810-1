@@ -2,7 +2,7 @@ Short: Threads for MCCP
 From: Gawain
 Date: 2002-08-10
 Type: Patch
-State: Done - implemented in 3.3.447
+State: Done - implemented in 3.3.447, 3.2.10-dev.625
 See also: p-011012
 
 Note: The actual threads implementation differs from what was used here.

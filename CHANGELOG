@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+03-Apr-2004 (Lars Duening)  (3.3.510)
+  - (func_spec, comm, string_spec) New efun enable_telnet() to disable/enable
+       telnet support.
+
 03-Apr-2004 (Lars Duening)  (3.3.509)
   - (object.c) function_exists() and variable_exists() now check if the
        object is destructed, instead of crashing (Bug #0000038).

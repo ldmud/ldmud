@@ -16,7 +16,7 @@ DESCRIPTION
         __MCCP__ is defined in that case.
 
 HISTORY
-        Added in LDMud 3.3.447.
+        Added in LDMud 3.3.447, backported to LDMud 3.2.10.
 
 SEE ALSO
         end_mccp_compress(E), start_mccp_compress(E), query_mccp(E), mccp(C)

@@ -836,6 +836,7 @@ int privilege_violation (string op, mixed who, mixed arg, mixed arg2)
 //   call_out_info     : Return an array with all call_out informations.
 //   erq               : A the request <arg2> is to be send to the
 //                       erq-demon by the object <who>.
+//   enable_telnet     : Enable/disable telnet (<arg2>) for object <arg>.
 //   execute_command   : Execute command string <arg2> for the object <arg>.
 //   input_to          : Object <who> issues an 'ignore-bang'-input_to() for
 //                       commandgiver <arg>; the exakt flags are <arg2>.

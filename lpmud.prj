@@ -63,22 +63,16 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 509)
-(Parent-Version lpmud 3-3 508)
+(Project-Version lpmud 3-3 510)
+(Parent-Version lpmud 3-3 509)
 (Version-Log "
-  - (object.c) function_exists() and variable_exists() now check if the
-       object is destructed, instead of crashing (Bug #0000038).
-  - (files.c, backend.c, object.c) Added missing include for SunOS 4.1 (reported
-       by Coogan).
-  - (configure, main.c) strtoul() is not available on the older machines,
-       this is now checked by configure (reported by Coogan).
-  - (object.c) If H_RESET/H_CREATE_* are defined by name, static functions
-       are found as well (suggested by Daniel).
+  - (func_spec, comm) New efun enable_telnet() to disable/enable telnet
+       support.
 ")
 (New-Version-Log
 ""
 )
-(Checkin-Time "Sat, 03 Apr 2004 17:57:39 -0700")
+(Checkin-Time "Sat, 03 Apr 2004 22:14:00 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -116,8 +110,8 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.70 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.572 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.342 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.573 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.343 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -185,8 +179,8 @@
   (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.26 644))
   (src/closure.h (lpmud/f/44_closure.h 1.7.1.17 644))
   (src/closure.c (lpmud/d/4_closure.c 1.41.1.47.1.17 644))
-  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.74 644))
-  (src/comm.h (lpmud/d/3_comm.h 1.26.1.38 644))
+  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.75 644))
+  (src/comm.h (lpmud/d/3_comm.h 1.26.1.39 644))
   (src/driver.h (lpmud/f/36_driver.h 1.15.1.25 644))
   (src/dumpstat.h (lpmud/f/35_dumpstat.h 1.8 644))
   (src/dumpstat.c (lpmud/c/34_dumpstat.c 1.20.1.11.1.8 644))
@@ -275,7 +269,7 @@
   (src/pkg-alists.c (lpmud/l/38_pkg-alists 1.9 644))
   (src/pkg-alists.h (lpmud/l/39_pkg-alists 1.3 644))
   (src/pkg-mccp.h (lpmud/d/b/48_pkg-mccp.h 1.1 644))
-  (src/pkg-mccp.c (lpmud/d/b/49_pkg-mccp.c 1.4 644))
+  (src/pkg-mccp.c (lpmud/d/b/49_pkg-mccp.c 1.5 644))
   (src/pkg-mysql.c (lpmud/j/1_pkg-mysql. 1.21 644))
   (src/pkg-mysql.h (lpmud/j/2_pkg-mysql. 1.5 644))
   (src/pkg-odbc.h (lpmud/e/b/43_pkg-odbc.h 1.1 644))
@@ -323,8 +317,8 @@
   (src/xptmalloc.c (lpmud/d/b/10_xptmalloc. 1.2 644))
 
   ;; Build files
-  (src/func_spec (lpmud/c/31_func_spec 1.53.1.45.1.22.1.23 644))
-  (src/string_spec (lpmud/f/6_string_spe 1.14.1.13 644))
+  (src/func_spec (lpmud/c/31_func_spec 1.53.1.45.1.22.1.24 644))
+  (src/string_spec (lpmud/f/6_string_spe 1.14.1.14 644))
   (src/mkfunc.c (lpmud/l/14_mkfunc.c 1.1 644))
   (src/make_func.y (lpmud/b/7_make_func. 1.25.1.30.1.7 644))
 
@@ -489,10 +483,10 @@
   (mudlib/dhrystone2.c (lpmud/a/b/13_dhrystone2 1.3 644))
   (mudlib/erq-tool.c (lpmud/d/31_erq.c 1.1 644))
   (mudlib/simul_efun-dr.c (lpmud/51_simul_efun 1.3 644))
-  (mudlib/master_skeleton.c (lpmud/b/2_master_ske 1.34 644))
+  (mudlib/master_skeleton.c (lpmud/b/2_master_ske 1.35 644))
   (mudlib/pgsql.c (lpmud/d/b/42_pgsql.c 1.1 644))
-  (mudlib/telnet.h (lpmud/c/b/13_telnet.h 1.2 644))
-  (mudlib/telnetneg.c (lpmud/c/b/14_telnetneg. 1.4 644))
+  (mudlib/telnetneg.h (lpmud/c/b/13_telnet.h 1.2 644))
+  (mudlib/telnetneg.c (lpmud/c/b/14_telnetneg. 1.5 644))
   (mudlib/test_master.c (lpmud/e/39_test_maste 1.10.1.10 644))
   (mudlib/ACCESS.ALLOW (lpmud/b/4_ACCESS.ALL 1.3 644))
 
@@ -895,8 +889,8 @@
 
   (src/done/p-990901 (lpmud/e/10_p-990901 1.2.1.1 644) :no-keywords)
   (src/done/p-010928-0 (lpmud/n/46_p-010928-0 1.2 644) :no-keywords)
-  (src/done/p-011012 (lpmud/n/50_p-011012 1.5 644) :no-keywords)
-  (src/done/p-020810-1 (lpmud/a/b/4_p-020810-1 1.2 644) :no-keywords)
+  (src/done/p-011012 (lpmud/n/50_p-011012 1.6 644) :no-keywords)
+  (src/done/p-020810-1 (lpmud/a/b/4_p-020810-1 1.3 644) :no-keywords)
   (src/done/ff-3.3.325-diffs (lpmud/d/b/17_ff-3.3.325 1.1 644) :no-keywords)
   (src/done/3.3.443-mccp.patch (lpmud/d/b/50_3.3.443-mc 1.1 644) :no-keywords)
 
@@ -967,7 +961,7 @@
   (doc/concepts/imp (lpmud/n/34_imp 1.4 644))
   (doc/concepts/intermud (lpmud/m/48_intermud 1.7 644))
   (doc/concepts/intermud.basic (lpmud/m/49_intermud.b 1.3 644))
-  (doc/concepts/mccp (lpmud/d/b/51_mccp 1.1 644))
+  (doc/concepts/mccp (lpmud/d/b/51_mccp 1.2 644))
   (doc/concepts/memory (lpmud/n/35_memory 1.4 644))
   (doc/concepts/mysql (lpmud/f/18_HOWTO 1.1.1.6 644))
   (doc/concepts/native (lpmud/n/36_native 1.9 644))
@@ -1061,7 +1055,8 @@
   (doc/efun/ed (lpmud/o/27_ed 1.3 644))
   (doc/efun/efun (lpmud/o/28_efun 1.8 644))
   (doc/efun/enable_commands (lpmud/o/29_enable_com 1.1.1.3 644))
-  (doc/efun/end_mccp_compress (lpmud/e/b/0_end_mccp_c 1.1 644))
+  (doc/efun/enable_telnet (lpmud/f/b/8_enable_tel 1.1 644))
+  (doc/efun/end_mccp_compress (lpmud/e/b/0_end_mccp_c 1.2 644))
   (doc/efun/environment (lpmud/l/28_environmen 1.5 644))
   (doc/efun/exec (lpmud/h/43_exec 1.1.1.3 644))
   (doc/efun/execute_command (lpmud/d/28_execute_co 1.5 644))
@@ -1174,14 +1169,14 @@
   (doc/efun/query_ip_number (lpmud/p/31_query_ip_n 1.2 644))
   (doc/efun/query_limits (lpmud/d/35_query_limi 1.5 644))
   (doc/efun/query_load_average (lpmud/p/32_query_load 1.3 644))
-  (doc/efun/query_mccp (lpmud/e/b/1_query_mccp 1.1 644))
-  (doc/efun/query_mccp_stats (lpmud/e/b/2_query_mccp 1.1 644))
+  (doc/efun/query_mccp (lpmud/e/b/1_query_mccp 1.2 644))
+  (doc/efun/query_mccp_stats (lpmud/e/b/2_query_mccp 1.2 644))
+  (doc/efun/query_mud_port (lpmud/g/7_query_mud_ 1.3.1.2 644))
   (doc/efun/query_notify_fail (lpmud/d/19_query_noti 1.3 644))
   (doc/efun/query_once_interactive (lpmud/p/33_query_once 1.2 644))
   (doc/efun/query_shadowing (lpmud/p/34_query_shad 1.2 644))
   (doc/efun/query_snoop (lpmud/p/35_query_snoo 1.2 644))
   (doc/efun/query_verb (lpmud/p/36_query_verb 1.6 644))
-  (doc/efun/query_mud_port (lpmud/g/7_query_mud_ 1.3.1.2 644))
   (doc/efun/quote (lpmud/p/37_quote 1.3 644))
   (doc/efun/raise_error (lpmud/p/38_raise_erro 1.2 644))
   (doc/efun/read_bytes (lpmud/p/39_read_bytes 1.2 644))
@@ -1240,7 +1235,7 @@
   (doc/efun/sprintf (lpmud/c/35_sprintf 1.3.1.16 644))
   (doc/efun/sqrt (lpmud/q/26_sqrt 1.1.1.2 644))
   (doc/efun/sscanf (lpmud/q/27_sscanf 1.6 644))
-  (doc/efun/start_mccp_compress (lpmud/e/b/3_start_mccp 1.1 644))
+  (doc/efun/start_mccp_compress (lpmud/e/b/3_start_mccp 1.2 644))
   (doc/efun/stringp (lpmud/q/28_stringp 1.4 644))
   (doc/efun/strlen (lpmud/q/29_strlen 1.2 644))
   (doc/efun/strstr (lpmud/q/30_strstr 1.6 644))
@@ -1418,7 +1413,7 @@
   (doc/master/preload (lpmud/s/12_preload 1.2 644))
   (doc/master/prepare_destruct (lpmud/s/13_prepare_de 1.3 644))
   (doc/master/printf_obj_name (lpmud/m/23_printf_obj 1.2 644))
-  (doc/master/privilege_violation (lpmud/s/14_privilege_ 1.4.1.10 644))
+  (doc/master/privilege_violation (lpmud/s/14_privilege_ 1.4.1.11 644))
   (doc/master/query_allow_shadow (lpmud/s/15_query_allo 1.2 644))
   (doc/master/quota_demon (lpmud/s/17_quota_demo 1.2 644))
   (doc/master/reactivate_destructed_master (lpmud/s/18_reactivate 1.2 644))

@@ -175,6 +175,7 @@ struct interactive_s {
     CBool msg_discarded;        /* True if an earlier msg had been discarded */
     CBool set_input_to;         /* True if input_to was set in this cycle */
     CBool closing;              /* True when closing this socket. */
+    CBool tn_enabled;           /* True: telnet machine enabled */
     char do_close;              /* Bitflags: Close this down; Proto-ERQ. */
     char noecho;                /* Input mode bitflags */
 
@@ -457,7 +458,8 @@ extern svalue_t *v_snoop(svalue_t *sp, int num_arg);
 extern svalue_t *f_users(svalue_t *sp);
 extern svalue_t *f_get_max_commands (svalue_t *sp);
 extern svalue_t *f_set_max_commands (svalue_t *sp);
-extern svalue_t * f_net_connect (svalue_t *sp);
+extern svalue_t *f_enable_telnet (svalue_t *sp);
+extern svalue_t *f_net_connect (svalue_t *sp);
 
 #if defined(ACCESS_CONTROL)
 extern void refresh_access_data(void (*add_entry)(struct sockaddr_in *, int, long*) );

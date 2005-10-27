@@ -47,8 +47,6 @@ For a detailed list of all changes see the file CHANGELOG.
        + call_direct(), call_direct_resolved(): To perform calls which
            are not resolved by a default method.
        + match_command(): Find all matching actions for a command.
-       + start_mccp_compress(), end_mccp_compress(), query_mccp(),
-         query_mccp_stats(): Optional: MCCP support.
        + md5_crypt(): Compute an Apache-compatible password encryption using
            the MD5 message digest algorithm.
        + pg_connect(), pg_query(), pg_pending(), pg_close():
@@ -177,8 +175,12 @@ For a detailed list of all changes see the file CHANGELOG.
            as unsigned.
 
     - New efuns:
+       + enable_telnet(): Enable or disable telnet for an interactive
+           object.
        + master(): Return the current master object.
        + m_entry(): Return all values for mapping entry at once.
+       + start_mccp_compress(), end_mccp_compress(), query_mccp(),
+         query_mccp_stats(): Optional: MCCP support.
        + net_connect(): Open a TCP connection.
        + rmember(): Search arrays and strings from the end.
        + get_combine_charset(), get_connection_charset(): Query the

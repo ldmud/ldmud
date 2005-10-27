@@ -146,7 +146,7 @@ start_compress (interactive_t * ip, unsigned char telopt)
     }
     else
     {
-        printf("Bad teleoption %d passed", telopt);
+        printf("Bad teloption %d passed", telopt);
         xfree(ip->out_compress_buf);
         xfree(s);
         return MY_FALSE;
@@ -299,6 +299,12 @@ f_start_mccp_compress (svalue_t * sp)
         return sp;
     }
     
+    if (!ip->tn_enabled)
+    {
+        error("start_mccp_compress() called for object with telnet disabled.\n");
+        return sp;
+    }
+
     free_svalue(sp);
     retval = start_compress(ip, mccpver);
     put_number(sp, retval);
@@ -331,6 +337,12 @@ f_end_mccp_compress (svalue_t * sp)
         return sp;
     }
     
+    if (!ip->tn_enabled)
+    {
+        error("end_mccp_compress() called for object with telnet disabled.\n");
+        return sp;
+    }
+
 #ifdef USE_PTHREADS
     ip->compressing = 0; /* Signal the writer to stop compressing */
     retval = 0;
