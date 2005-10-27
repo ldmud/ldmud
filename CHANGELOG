@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+05-Jul-2003 (Lars Duening)  (3.3.470)
+  - (smalloc.c) Reduced the computational overhead of the small block
+       defragmentation: since only newly freed blocks offer opportunities
+       for defragmentation, only those are checked.
+  - (object.c) Saving an object in the old format ('0') still used the
+       shared value syntax for strings (reported by Bardioc).
+
 31-Jul-2003 (Lars Duening)  (3.3.469)
   - (smalloc.c) Splitting of a block from a larger free list failed
        to preserve the PREV_BLOCK flag in the returned block, causing

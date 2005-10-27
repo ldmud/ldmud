@@ -5915,7 +5915,7 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
     switch(v->type)
     {
     case T_STRING:
-        if (!recall_pointer(v->u.str))
+        if (save_version < 1 || !recall_pointer(v->u.str))
             save_string(v->u.str);
         break;
 

@@ -59,6 +59,17 @@
  * block is constructed; a full defragmentation happens only as part
  * of a garbage collection.
  *
+ * Obviously the defragmenter can eat up a lot of time when the free lists
+ * get long, especially since most blocks can't be defragmented. So as an
+ * optimization the defragmenter sets the M_DEFRAG flag in each block it
+ * visited and decided as non-defragmentable. Newly freed blocks don't have
+ * this flag set and are also entered at the head of their free list; this way
+ * the defragmenter can stop scanning a free list as soon as it reaches the
+ * first block flagged to be non-defragmentable. And while it is possible
+ * that a flagged block changes to be defragmentable after all, this can
+ * happen only if another block is newly freed, and the defragmenter is
+ * guaranteed to find that one.
+ *
  *  -- Large Blocks --
  *
  * Large blocks are allocated from the system - if large allocation is
@@ -111,7 +122,9 @@
  *               large: set if this block is allocated
  *   PREV_BLOCK: small: set if the previous block is not allocated
  *               large: set if the previous block is allocated
- *   M_GC_FREE : set if the GC may free this block if found lost
+ *   M_GC_FREE : set in allocated blocks if the GC may free this block if
+ *               found lost
+ *   M_DEFRAG  : set in small free blocks which can't be defragmented further
  *   M_REF     : set if this block is referenced (used during a GC)
  *
  * Because of the PREV_BLOCK flag, all chunk allocations (either the
@@ -299,6 +312,7 @@
 #define THIS_BLOCK  0x40000000  /* This block is allocated */
 #define M_REF       0x20000000  /* Block is referenced */
 #define M_GC_FREE   0x10000000  /* GC may free this block */
+#define M_DEFRAG    (M_GC_FREE) /* Non-defragmentable small block */
 #define M_MASK      0x0fffffff  /* Mask for the size, measured in word_t's */
 
 
@@ -817,7 +831,7 @@ void MAKE_SMALL_FREE (word_t *block, word_t bsize)
         flag = 1;
     }
 
-    block[M_SIZE] = bsize | (THIS_BLOCK|M_GC_FREE|M_REF)
+    block[M_SIZE] = bsize | (THIS_BLOCK|M_REF)
                           | (block[M_SIZE] & PREV_BLOCK);
     block[bsize] |= PREV_BLOCK;
 
@@ -883,21 +897,30 @@ defragment_small_lists (int req)
         /* Walk the current freelist and look for defragmentable blocks.
          * If one is found, remove it from the freelist, defragment it
          * and store the result in the local list.
-         * Since the check for defragmentation occurs in both directions,
-         * the defragmentation will never remove blocks from this freelist
-         * which have already been visited.
+         * Since the check for defragmentation occurs on both sides of
+         * the free block, the defragmentation will never remove blocks from
+         * this freelist which have already been visited.
+         *
+         * It is important that the loop is not terminated before the end
+         * of the section of newly freed blocks (M_DEFRAG not set) is reached,
+         * as the loop sets the M_DEFRAG flag as it goes along.
          */
-        for (block = sfltable[ix], pred = NULL; block != NULL && !found; )
+        for (block = sfltable[ix], pred = NULL
+            ; block != NULL && !(block[M_SIZE] & M_DEFRAG)
+            ; )
         {
-            Bool merged;
-            word_t  bsize = block[M_SIZE] & M_MASK;
+            Bool   merged;
+            word_t bsize = block[M_SIZE] & M_MASK;
 
             /* Can this block be defragmented? */
             if ( !((block+bsize)[M_SIZE] & THIS_BLOCK)
               && !(block[M_SIZE] & PREV_BLOCK)
                )
             {
-                /* No, step to the next block */
+                /* No: flag this block as non-defragmentable and step to the
+                 * next block.
+                 */
+                block[M_SIZE] |= M_DEFRAG;
                 pred = block;
                 block = (word_t *)block[M_LINK];
                 continue;
@@ -922,10 +945,10 @@ defragment_small_lists (int req)
                 if (req > 0 && (bsize == req || bsize >= split_size))
                     found = MY_TRUE;
 
-            } while (!found && merged);
+            } while (merged);
 
             /* Try to merge the block with the ones in front of it */
-            while (!found && (block[M_SIZE] & PREV_BLOCK))
+            while ((block[M_SIZE] & PREV_BLOCK))
             {
                 word_t *prev;
 
@@ -977,6 +1000,13 @@ defragment_small_lists (int req)
             block = list;
             list = (word_t *)(list[M_LINK]);
             MAKE_SMALL_FREE(block, block[M_SIZE] & M_MASK);
+              /* As we move down the small block array, and the defragged
+               * blocks are sorted into a list already visited, setting
+               * the M_DEFRAG flag would be possible here.
+               * However, by not setting it we make the algorithm a bit
+               * more robust, and lose only a few cycles the next time
+               * around.
+               */
         }
     } /* for (ix = SMALL_BLOCK_NUM..0 && !found) */
 
