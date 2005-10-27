@@ -1,11 +1,11 @@
 SYNOPSIS
-        int privilege_violation(string op, mixed who, mixed arg3, mixed arg4)
+        int privilege_violation(string op, mixed who, mixed arg, mixed arg2)
 
 DESCRIPTION
         Validate the execution of a privileged operation.
         op denotes the requested operation, who is the object
-        requesting the operation (file_name or object pointer), arg3
-        and arg4 are additional arguments, depending on the operation.
+        requesting the operation (file_name or object pointer), <arg>
+        and <arg2> are additional arguments, depending on the operation.
 
         The function should return >0 to grant the privilege, 0 to
         indicate that the caller was probably misleaded and the error
@@ -14,9 +14,9 @@ DESCRIPTION
 
         The privileged operations are:
         attach_erq_demon  Attach the erq demon to object <arg> with
-                          flag <args>.
-        bind_lambda          Bind a lambda-closure to object arg3.
-        call_out_info          Return an array with all call_out
+                          flag <arg2>.
+        bind_lambda       Bind a lambda-closure to object <arg>.
+        call_out_info     Return an array with all call_out
                           informations.
         execute_command   Execute command string <arg2> for the object
                           <arg>.
@@ -47,6 +47,8 @@ DESCRIPTION
                           inherited variable. <arg> is the object in
                           question, <arg2> the number of the variable in
                           the variable table.
+        variable_list     An attempt to return the variable values of object
+                          <arg> is made from a different object <who>.
         wizlist_info      Return an array with all wiz-list
                           information.
 
@@ -63,6 +65,11 @@ DESCRIPTION
         wizlist and should therefore be restricted to admins.
         All other operations are potential sources for direct security
         breaches - any use of them should be scrutinized closely.
+
+
+HISTORY
+        LDMud 3.2.10 added the "variable_list" violation.
+
 
 SEE ALSO
         send_erq(E), set_this_object(E), rename_object(E),

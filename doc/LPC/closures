@@ -105,7 +105,7 @@ DESCRIPTION
                 ({ #'do, loopbody1, ..., loopbodyN, loopcond, loopresult })
 
         will evaluate the loopbodies until loopcond evaluates to 0 and
-        then return the value of loopresult. Symbols my be used as
+        then return the value of loopresult. Symbols may be used as
         variables, of course.
 
                 ({ #'while, loopcond, loopresult, loopbody1, ..., loopbodyN })
@@ -124,16 +124,16 @@ DESCRIPTION
         a) How do I write down an array within a lambda closure to
            avoid interpretation as a subclosure?
 
-           ({ #'member_array, 'x, ({ "abc", "xyz }) }) will obviously
+           ({ #'member_array, 'x, ({ "abc", "xyz" }) }) will obviously
            result in an error as soon as lambda() tries to interpret
            "abc" as a closure operator. The solution is to quote the
-           array, as in: ({ #'member_array, 'x, '({ "abc", "xyz }) }).
+           array, as in: ({ #'member_array, 'x, '({ "abc", "xyz" }) }).
            Applying lambda() to this will not result in an error.
            Instead, the quote will be stripped from the array and the
            result regarded as a normal array literal. The same can be
            achieved by using the efun quote(), e.g.:
 
-           ({ #'member_array, 'x, quote( ({ "abc", "xyz }) ) })
+           ({ #'member_array, 'x, quote( ({ "abc", "xyz" }) ) })
 
         b) Isn't it a security risk to pass, say, a closure to the
            master object which then evaluates it with all the

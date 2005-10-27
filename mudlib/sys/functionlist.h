@@ -29,17 +29,28 @@
 
 #endif /* !__DRIVER_SOURCE__ */
 
-/* Return value flag types for functionlist() */
+
+/* Return value flag types for functionlist() and variable_list() */
 
 #define RETURN_FUNCTION_NAME	0x01
 #define RETURN_FUNCTION_FLAGS	0x02
 #define RETURN_FUNCTION_TYPE	0x04
+
+
+/* Additional return value flag types for functionlist() */
+
 #define RETURN_FUNCTION_NUMARG	0x08
 #define RETURN_FUNCTION_ARGTYPE 0x10 /* not implemented */
 
+
+/* Additional return value flag types for variable_list() */
+
+#define RETURN_VARIABLE_VALUE	0x08
+
+
 /* Masks of the flag unions allowed for various efuns: */
 #define RETURN_FUNCTION_MASK    0x0f  /* functionlist() */
-#define RETURN_VARIABLE_MASK    0x07  /* variablelist() */
+#define RETURN_VARIABLE_MASK    0x0f  /* variable_list() */
 
 /* Return value flag types for function_exists() */
 

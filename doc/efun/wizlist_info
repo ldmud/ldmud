@@ -1,5 +1,5 @@
 SYNOPSIS
-        #include <wizlist.h>
+        #include <sys/wizlist.h>
 
         mixed *wizlist_info()
 

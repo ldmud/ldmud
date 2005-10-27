@@ -2081,14 +2081,18 @@ f_variable_list (svalue_t *sp)
  *   mixed *variable_list (object ob, int flags = RETURN_FUNCTION_NAME)
  *
  * Return an array with information about <ob>s variables. For every
- * variable, 1 to 3 values (depending on <flags>) are stored in
+ * variable, 1 to 4 values (depending on <flags>) are stored in
  * the result array conveying in this order:
  *   - the name of the variable
  *   - the variable flags (see below)
  *   - the return type (listed in mudlib/sys/lpctypes.h)
+ *   - the value of the variable
  *
  * <ob> may be given as true object or as a filename. In the latter
  * case, the efun does not try to load the object before proceeding.
+ *
+ * If <ob> is not the current object and the value of the variable is
+ * requested, a privilege_violation ("variable_list", <ob>) occurs.
  *
  * <flags> determines both which information is returned for every
  * variable, and which variables should be considered at all.
@@ -2099,6 +2103,7 @@ f_variable_list (svalue_t *sp)
  *     RETURN_FUNCTION_NAME    include the variable name
  *     RETURN_FUNCTION_FLAGS   include the variable flags
  *     RETURN_FUNCTION_TYPE    include the return type
+ *     RETURN_VARIABLE_VALUE   include the variable value
  *
  *   Control of listed variables:
  *     NAME_INHERITED      don't list if defined by inheritance
@@ -2158,6 +2163,20 @@ f_variable_list (svalue_t *sp)
         ob = sp[-1].u.ob;
 
     mode_flags = sp->u.number;
+
+    if (ob != current_object && (mode_flags & RETURN_VARIABLE_VALUE))
+    {
+        assert_master_ob_loaded();
+        if (privilege_violation(STR_VARIABLE_LIST, sp-1, sp) <= 0)
+        {
+            free_svalue(sp);
+            sp--;
+            free_svalue(sp);
+            sp->type = T_NUMBER;
+            sp->u.number = 0;
+            return sp;
+        }
+    }
 
     if (O_PROG_SWAPPED(ob))
         if (load_ob_from_swap(ob) < 0)
@@ -2281,6 +2300,12 @@ f_variable_list (svalue_t *sp)
 
         /* Add the data to the result vector as <flags> determines.
          */
+
+        if (mode_flags & RETURN_VARIABLE_VALUE)
+        {
+            svp--;
+            assign_svalue_no_free(svp, &ob->variables[i]);
+        }
 
         if (mode_flags & RETURN_FUNCTION_TYPE)
         {

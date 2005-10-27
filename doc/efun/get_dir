@@ -1,5 +1,5 @@
 SYNOPSIS
-        #include <files.h>
+        #include <sys/files.h>
 
         string *get_dir(string str)
         string *get_dir(string str, int mask)

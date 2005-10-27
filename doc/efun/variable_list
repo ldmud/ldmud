@@ -11,9 +11,13 @@ DESCRIPTION
           - the name of the variable
           - the variable flags (see below)
           - the return type (listed in mudlib/sys/lpctypes.h)
+          - the value of the variable
 
         <ob> may be given as true object or as a filename. In the latter
         case, the efun does not try to load the object before proceeding.
+
+        If <ob> is not the current object and the value of the variable is
+        requested, a privilege_violation ("variable_list", <ob>) occurs.
 
         <flags> determines both which information is returned for every
         variable, and which variables should be considered at all.
@@ -24,6 +28,7 @@ DESCRIPTION
             RETURN_FUNCTION_NAME    include the variable name
             RETURN_FUNCTION_FLAGS   include the variable flags
             RETURN_FUNCTION_TYPE    include the return type
+            RETURN_VARIABLE_VALUE   include the variable value
 
           Control of listed variables:
             NAME_INHERITED      don't list if defined by inheritance

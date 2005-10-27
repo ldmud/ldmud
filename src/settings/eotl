@@ -4,7 +4,7 @@
 #
 # configure will strip this part from the script.
 
-exec ./configure --prefix=/home/m/u/mud --libdir=/home/m/u/mud/mudlib --libexecdir=/home/m/u/mud/erq --with-setting=eotl $*
+exec ./configure --prefix=/home/mud --libdir=/home/mud/mudlib --libexecdir=/home/mud/erq --with-setting=eotl $*
 exit 1
 
 # --- The actual settings ---

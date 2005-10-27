@@ -833,7 +833,7 @@ int privilege_violation (string op, mixed who, mixed arg, mixed arg2)
 //   attach_erq_demon  : Attach the erq demon to object <arg> with flag <arg2>.
 //   bind_lambda       : Bind a lambda-closure to object <arg>.
 //   call_out_info     : Return an array with all call_out informations.
-//   erq               : A the request <arg4> is to be send to the
+//   erq               : A the request <arg2> is to be send to the
 //                       erq-demon by the object <who>.
 //   execute_command   : Execute command string <arg2> for the object <arg>.
 //   input_to          : Object <who> issues an 'ignore-bang'-input_to() for
@@ -856,6 +856,8 @@ int privilege_violation (string op, mixed who, mixed arg, mixed arg2)
 //   symbol_variable   : Attempt to create symbol of a hidden variable
 //                       of object <arg> with with index <arg2> in the
 //                       objects variable table.
+//   variable_list     : An attempt to return the variable values of object
+//                        <arg> is made from a different object <who>.
 //   wizlist_info      : Return an array with all wiz-list information.
 //
 // call_out_info can return the arguments to functions and lambda closures
