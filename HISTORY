@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-18-Nov-2003 (Lars Duening) -- Development Release 3.3
+15-Apr-2004 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -38,6 +38,8 @@ For a detailed list of all changes see the file CHANGELOG.
            with a decimal point.
        + transfer(): Available (in compat mode) only when USE_DEPRECATED
            is in effect.
+       + unique_array(): The separator function can now be a closure,
+           and can also be given extra arguments.
        + wizlist_info(): Added the number of mappings to the result.
 
     - Corrected efuns:

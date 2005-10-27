@@ -389,7 +389,8 @@ void
 check_for_destr (vector_t *v)
 
 /* Check the vector <v> for destructed objects and closures on destructed
- * objects and replace them with svalue 0s. Subvectors are not checked, though.
+ * objects and replace them with svalue 0s. Subvectors are not checked,
+ * though.
  *
  * This function is used by certain efuns (parse_command(), unique_array(),
  * map_array()) to make sure that the data passed to the efuns is valid,
@@ -2863,7 +2864,7 @@ sameval (svalue_t *arg1, svalue_t *arg2)
         return arg1->u.ob == arg2->u.ob;
     } else
         return 0;
-}
+} /* sameval() */
 
 
 /*-------------------------------------------------------------------------*/
@@ -2944,12 +2945,12 @@ put_in (Mempool pool, struct unique **ulist
     *ulist = llink;
 
     return cnt+1;
-}
+} /* put_in() */
 
 
 /*-------------------------------------------------------------------------*/
 static vector_t *
-make_unique (vector_t *arr, string_t *func, svalue_t *skipnum)
+make_unique (vector_t *arr, callback_t *cb, svalue_t *skipnum)
 
 /* The actual implementation of efun unique_array();
  *
@@ -2992,11 +2993,27 @@ make_unique (vector_t *arr, string_t *func, svalue_t *skipnum)
      */
     ant = 0;
     for (cnt = 0; cnt < arr_size; cnt++)
-        if (arr->item[cnt].type == T_OBJECT) {
-            v = apply(func,arr->item[cnt].u.ob, 0);
+    {
+        if (current_object->flags & O_DESTRUCTED)
+            break;
+            /* Don't call the filters anymore */
+
+        if (arr->item[cnt].type == T_OBJECT
+         && !destructed_object_ref(&(arr->item[cnt]))
+           )
+        {
+            if (!cb->is_lambda)
+                callback_change_object(cb, arr->item[cnt].u.ob);
+            else
+            {
+                push_ref_object(inter_sp, arr->item[cnt].u.ob, "unique_array");
+            }
+
+            v = apply_callback(cb, cb->is_lambda ? 1 : 0);
             if (v && !sameval(v, skipnum))
                 ant = put_in(pool, &head, v, &(arr->item[cnt]));
         }
+    }
 
     deref_array(arr); /* Undo the protection from above */
 
@@ -3033,28 +3050,80 @@ make_unique (vector_t *arr, string_t *func, svalue_t *skipnum)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_unique_array (svalue_t *sp)
+v_unique_array (svalue_t *sp, int num_arg)
 
 /* EFUN unique_array()
  *
- *   mixed unique_array(object *obarr, string seperator)
- *   mixed unique_array(object *obarr, string seperator, mixed skip)
+ *   mixed unique_array(object *obarr, string|closure fun)
+ *   mixed unique_array(object *obarr, string|closure fun, mixed skip)
+ *   mixed unique_array(object *obarr, string|closure fun, mixed extra..., mixed skip)
  *
  * Groups objects together for which the separator function
  * returns the same value. obarr should be an array of objects,
- * other types are ignored. The separator function is called only
- * once in each object in obarr. If no separator function is
- * given, 0 is used instead of a return value.
- * If a 3rd argument is given and this argument matches the
- * return value of the separator function this object will not be
- * included in the returned array.
+ * other types are ignored.
+ *
+ * If the separator function is defined by name, it is searched and called
+ * in the objects from <obarr>. If <extra> arguments are given, they are
+ * passed to the function as arguments.
+ *
+ * If the separator function is defined as a closure, it will be passed
+ * the objects from <obarr> as first argument, with the <extra> arguments
+ * (if any) passed following.
+ *
+ * If the <skip> argument is given (it is required when <extra> arguments
+ * are to be used), and the return value from the separator function call
+ * matches this value, the object in question will _not_ be included in the
+ * returned array. Default value for <skip> is the number 0.
  */
 
 {
     vector_t *res;
+    svalue_t *argp = sp - num_arg + 1;
 
-    check_for_destr((sp-2)->u.vec);
-    res = make_unique((sp-2)->u.vec, (sp-1)->u.str, sp);
+    check_for_destr(argp->u.vec);
+
+    /* Sort out the arguments */
+    if (num_arg == 2)
+    {
+        /* Just the callback function name on the stack */
+        sp++;
+        put_number(sp, 0);
+    }
+    else
+    {
+        /* Extract the callback information from the stack */
+        int         error_index;
+        callback_t  cb;
+
+        assign_eval_cost();
+        inter_sp = sp;
+
+        error_index = setup_efun_callback_noobj(&cb, argp+1, num_arg-2);
+
+        if (error_index >= 0)
+        {
+            /* The callback values have already been removed, now
+             * make sure that the 'skip' value isn't left out either
+             */
+            transfer_svalue_no_free(argp+1, sp);
+            inter_sp = sp = argp+1;
+            vefun_bad_arg(error_index+2, argp+1);
+            /* NOTREACHED */
+            return argp;
+        }
+
+        /* Callback creation successful, now setup the stack */
+        put_callback(argp+1, &cb);
+        transfer_svalue_no_free(argp+2, sp);
+
+        inter_sp = sp = argp+2;
+    }
+
+    /* At this point:       argp[0]: the vector
+     *                      argp[1]: the callback structure
+     *                sp -> argp[2]: the skip value
+     */
+    res = make_unique(argp->u.vec, argp[1].u.cb, argp+2);
 
     /* Clean up the stack and push the result */
     free_svalue(sp--);
@@ -3067,7 +3136,7 @@ f_unique_array (svalue_t *sp)
         put_number(sp, 0);
 
     return sp;
-} /* f_unique_array() */
+} /* v_unique_array() */
 
 /***************************************************************************/
 

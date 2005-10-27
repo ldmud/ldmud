@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+15-Apr-2004 (Lars Duening)  (3.3.520)
+  - (func_spec, array, simulate) Efun unique_array() can now use
+       a closure as separator function, and also pass extra arguments
+       (suggested by Shinarae).
+
 14-Apr-2004 (Lars Duening)  (3.3.519)
   - (prolang.y) I had to restrict '&(struct->member)' to a single level
        of member lookup because the compiler generated invalid code.

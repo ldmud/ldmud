@@ -1,18 +1,49 @@
 SYNOPSIS
-        mixed unique_array(object *obj, string separator);
-        mixed unique_array(object *obj, string separator, mixed skip);
+        mixed unique_array(object *obj, string|closure fun)
+        mixed unique_array(object *obj, string|closure fun, mixed skip)
+        mixed unique_array(object *obj, string|closure fun, mixed extra...
+                                      , mixed skip)
 
 BESCHREIBUNG
-        Gruppiert alle Objekte aus <*obj>, fuer die die Funktion <separator>
-        den gleichen Wert liefert. Wenn <*obj> etwas anderes als Objekte
-        enthaelt, werden diese ignoriert. Die Funktion <separator> wird
-        in jedem Objekt in <*obj> nur einmal aufgerufen. Wenn kein <separator>
-        angegeben ist, wird 0 verwendet.
+        Groups objects together for which the separator function returns the
+        same value. obarr should be an array of objects, other types are
+        ignored.
+        
+        If the separator function is defined by name, it is searched and
+        called in the objects from <obarr>. If <extra> arguments are given,
+        they are passed to the function as arguments.
+        
+        If the separator function is defined as a closure, it will be passed
+        the objects from <obarr> as first argument, with the <extra> arguments
+        (if any) passed following.
+        
+        If the <skip> argument is given (it is required when <extra> arguments
+        are to be used), and the return value from the separator function call
+        matches this value, the object in question will _not_ be included in
+        the returned array. Default value for <skip> is the number 0.
 
-        Wird ein Argument <skip> angegeben, und entspricht <skip> dem
+        The returned array is an array of arrays of objects in the form:
+
+        Gruppiert alle Objekte aus <*obj>, fuer die die Funktion <fun>
+        den gleichen Wert liefert. Wenn <*obj> etwas anderes als Objekte
+        enthaelt, werden diese ignoriert.
+        
+        Ist die Funktion mit Namen angegeben, wird sie in jedem Objekt
+        in <*obj> einmal aufgerufen. Wurden <extra> Argumente
+        gegeben, werden diese an die Funktion bei jedem Aufruf als
+        Parameter uebergeben.
+
+        Ist die Funktion als Closure angegeben, wird sie fuer jedes Objekt
+        in <*obj> einmal aufgerufen, wobei das Objekt als erstes Argument
+        uebergeben wird, gefolgt von etwaiigen <extra> Argumenten.
+
+        Wird ein Argument <skip> angegeben (bei Verwendung von <extra>
+        Argumenten muss dies geschehen), und entspricht <skip> dem
         Resultat von <separator> fuer ein Element aus <*obj>, so wird
         dieses Element nicht in das Resultat von unique_array()
-        uebernommen. Das Resultat von unique_array() hat die Form:
+        uebernommen.
+        
+        Das Resultat von unique_array() hat die Form:
 
             ({ ({same1:1, same1:2, ... same1:n}),
                ({same2:1, same2:2, ... same2:n}),

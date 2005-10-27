@@ -1,8 +1,8 @@
 #!/bin/sh
 #
 # $Author: lars $
-# $Revision: 1.6 $
-# $Date: Mon, 12 Apr 2004 22:24:42 -0600 $
+# $Revision: 1.7 $
+# $Date: Thu, 15 Apr 2004 22:27:56 -0600 $
 # 
 # Purpose: This is the settings file to use when compiling LDMud for H7.
 # 
@@ -10,7 +10,7 @@
 #
 # configure will strip this part from the script.
 
-exec ./configure --prefix=/heaven7 --with-setting=h7_settings $*
+exec ./configure --prefix=/heaven7 --with-setting=heaven7 $*
 exit 1
 
 

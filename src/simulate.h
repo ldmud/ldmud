@@ -224,12 +224,15 @@ extern void assert_shadow_sent (object_t *ob);
 extern void init_empty_callback (callback_t *cb);
 extern int  setup_function_callback(callback_t *cb, object_t* ob, string_t *fun, int nargs, svalue_t * args, Bool use_lvalues);
 extern int  setup_closure_callback(callback_t *cb, svalue_t *cl, int nargs, svalue_t * args, Bool use_lvalues);
-extern int  setup_efun_callback ( callback_t *cb, svalue_t *args, int nargs);
+extern int  setup_efun_callback_base ( callback_t *cb, svalue_t *args, int nargs, Bool bNoObj);
+#define setup_efun_callback(cb,args,nargs)       setup_efun_callback_base(cb,args,nargs,MY_FALSE)
+#define setup_efun_callback_noobj(cb,args,nargs) setup_efun_callback_base(cb,args,nargs,MY_TRUE)
 extern void free_callback (callback_t *cb);
 extern svalue_t *execute_callback (callback_t *cb, int nargs, Bool keep, Bool toplevel);
 #define apply_callback(cb,nargs)   execute_callback(cb,nargs,MY_TRUE,MY_FALSE)
 #define backend_callback(cb,nargs) execute_callback(cb,nargs,MY_FALSE,MY_TRUE)
 extern object_t *callback_object(callback_t *cb);
+extern void callback_change_object (callback_t *cb, object_t *obj);
 #ifdef DEBUG
 extern void count_callback_extra_refs (callback_t *cb);
 #endif

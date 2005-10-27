@@ -3548,7 +3548,8 @@ setup_closure_callback ( callback_t *cb, svalue_t *cl
 
 /*-------------------------------------------------------------------------*/
 int
-setup_efun_callback ( callback_t *cb, svalue_t *args, int nargs)
+setup_efun_callback_base ( callback_t *cb, svalue_t *args, int nargs
+                         , Bool bNoObj)
 
 /* Setup the empty/uninitialized callback <cb> with the <nargs>
  * values starting at <args>. This function is used to implement the
@@ -3556,11 +3557,15 @@ setup_efun_callback ( callback_t *cb, svalue_t *args, int nargs)
  *
  *   (string fun)
  *   (string fun, mixed extra, ...) TODO: This form is UGLY!
- *   (string fun, string|object obj, mixed extra, ...)
  *   (closure cl, mixed extra, ...)
  *
+ * If bNoObj is FALSE (the usual case), this form is also allowed:
+ *
+ *   (string fun, string|object obj, mixed extra, ...)
+ *
  * If the first argument is a string and the second neither an object
- * nor a string, this_object() is used as object specification.
+ * nor a string, this_object() is used as object specification. Ditto
+ * if bNoObj is used.
  *
  * All arguments are adopted (taken away from the caller). Protected lvalues
  * like &(i[0]) are not allowed as 'extra' arguments.
@@ -3568,6 +3573,14 @@ setup_efun_callback ( callback_t *cb, svalue_t *args, int nargs)
  * Result is -1 on success, or, when encountering an illegal argument,
  * the index of the faulty argument (but even then all caller arguments
  * have been transferred or freed).
+ *
+ * This function is #defined to two macros:
+ *
+ *   setup_efun_callback(cb,args,nargs) -> bNoObj == FALSE
+ *   setup_efun_callback_noobj(cb,args,nargs) -> bNoObj == TRUE
+ *
+ * TODO: The no-object feature is to support old-fashioned efun
+ * TODO:: unique_array().
  */
 
 {
@@ -3588,21 +3601,29 @@ setup_efun_callback ( callback_t *cb, svalue_t *args, int nargs)
 
         if (nargs > 1)
         {
-            if (args[1].type == T_OBJECT)
+            if (bNoObj)
             {
-                ob = args[1].u.ob;
-                first_arg = 2;
-            }
-            else if (args[1].type == T_STRING)
-            {
-                ob = get_object(args[1].u.str);
-                first_arg = 2;
+                ob = current_object;
+                first_arg = 1;
             }
             else
             {
-                /* TODO: It would be better to throw an error here */
-                ob = current_object;
-                first_arg = 1;
+                if (args[1].type == T_OBJECT)
+                {
+                    ob = args[1].u.ob;
+                    first_arg = 2;
+                }
+                else if (args[1].type == T_STRING)
+                {
+                    ob = get_object(args[1].u.str);
+                    first_arg = 2;
+                }
+                else
+                {
+                    /* TODO: It would be better to throw an error here */
+                    ob = current_object;
+                    first_arg = 1;
+                }
             }
         }
         else
@@ -3640,6 +3661,30 @@ setup_efun_callback ( callback_t *cb, svalue_t *args, int nargs)
 
     return error_index;
 } /* setup_efun_callback() */
+
+/*-------------------------------------------------------------------------*/
+void
+callback_change_object (callback_t *cb, object_t *obj)
+
+/* Change the object the callback is bound to, if it is a function callback.
+ * A new reference is added to <obj>.
+ */
+
+{
+    object_t *old;
+    if (cb->is_lambda)
+    {
+        fatal("callback_change_object(): Must not be called with a closure callback.");
+        /* NOTREACHED */
+        return;
+    }
+    
+    old = cb->function.named.ob;
+    cb->function.named.ob = ref_object(obj, "callback");
+
+    if (old)
+        free_object(old, "callback");
+} /* callback_change_object() */
 
 /*-------------------------------------------------------------------------*/
 object_t *
