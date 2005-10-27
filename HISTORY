@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-22-Apr-2004 (Lars Duening) -- Development Release 3.3
+24-Apr-2004 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -59,6 +59,7 @@ For a detailed list of all changes see the file CHANGELOG.
            Optional: PostgreSQL support.
        + regmatch(): To match a string against a regexp and optionally retrieve
            the match results for subexpressions.
+       + reverse():  Reverse the content of a string or array.
        + sha1(): Compute the SHA1 message digest.
        + struct_info(): Return information about a struct.
        + structp(): Predicate efun to detect structs.

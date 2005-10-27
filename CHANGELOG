@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+24-Apr-2004 (Lars Duening)  (3.3.529)
+  - (comm.c) Integrated Uwe's patch to open IPv6 connections with
+       net_connect() (thanks!).
+  - (efun.de/) A few more manpage translations.
+  - (func_spec, efuns) New efun reverse() (provided by Ralph, thanks!)
+       (f-000113-1, f-990714-7, f-990203-15)
+
 23-Apr-2004 (Lars Duening)  (3.3.528)
   - (main.c) The standard strings are initialized earlier in the startup
        process so that a memory error doesn't cause a coredump.

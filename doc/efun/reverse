@@ -1,0 +1,24 @@
+SYNOPSIS
+        string reverse (string arg)
+        mixed * reverse (mixed * arg)
+        mixed * reverse (mixed * & arg)
+
+DESCRIPTION
+        Reverse the content of array or string <arg> and return the result.
+        If called in the reference variant, the argument array itself
+        is reversed and then returned.
+
+EXAMPLES
+        reverse ("test") - return "tset"
+
+        mixed * a = ({ 1, 2 });
+        reverse(a)  - returns ({ 2, 1 }), leaves a unchanged.
+        reverse(&a) - returns ({ 2, 1 }), sets a to ({ 2, 1 })
+
+BUGS
+        Reference ranges like reverse(&(a[1..2])) are not supported.
+
+HISTORY
+        Introduced in LDMud 3.3.529.
+
+SEE ALSO

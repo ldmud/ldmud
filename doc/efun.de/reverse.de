@@ -1,0 +1,26 @@
+SYNOPSIS
+        string reverse (string arg)
+        mixed * reverse (mixed * arg)
+        mixed * reverse (mixed * & arg)
+
+DESCRIPTION
+        Kehrt die Reihenfolge des Inhaltes von Array oder String <arg>
+        um und liefert den neuen Wert als Resultat.
+
+        Wenn in der Referenz-Variante verwendet, wird das Argumentarray selber
+        invertiert und auch zurueckgegeben.
+
+EXAMPLES
+        reverse ("test") - return "tset"
+
+        mixed * a = ({ 1, 2 });
+        reverse(a)  - returns ({ 2, 1 }), a ist unveraendert.
+        reverse(&a) - returns ({ 2, 1 }), a ist nun ({ 2, 1 })
+
+BUGS
+        Referenz-Teilarrays wie reverse(&(a[1..2])) sind nicht unterstuetzt.
+
+GESCHICHTE
+        Eingefuehrt in LDMud 3.3.529.
+
+SEE ALSO

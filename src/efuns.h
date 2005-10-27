@@ -66,6 +66,7 @@ extern svalue_t *f_member (svalue_t *sp);
 extern svalue_t *f_rmember (svalue_t *sp);
 extern svalue_t *v_min (svalue_t *sp, int num_arg);
 extern svalue_t *v_max (svalue_t *sp, int num_arg);
+extern svalue_t *f_reverse(svalue_t *sp);
 extern svalue_t *f_sgn (svalue_t *sp);
 extern svalue_t *f_quote (svalue_t *sp);
 extern svalue_t *f_unquote (svalue_t *sp);

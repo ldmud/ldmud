@@ -65,6 +65,7 @@
  *    efun: member()
  *    efun: min()
  *    efun: max()
+ *    efun: reverse()
  *    efun: sgn()
  *    efun: quote()
  *
@@ -6724,6 +6725,142 @@ f_unquote (svalue_t *sp)
 
     return sp;
 } /* f_unquote() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_reverse(svalue_t *sp)
+
+/* EFUN reverse()
+ *
+ *    mixed reverse(string)
+ *    mixed reverse(mixed *)
+ *    mixed reverse(mixed * &)
+ *
+ * Reverse the order of the elements in the array or string, and return
+ * the result.
+ *
+ * Note that in the reference variant, the given array is reversed in-place.
+ */
+
+{
+    Bool changeInPlace = MY_FALSE;
+
+    /* If the argument is passed in by reference, make sure that it is
+     * an array, note the fact, and place it directly into the stack.
+     * TODO: Allow protected ranges here.
+     */
+    if (sp->type == T_LVALUE || sp->type == T_PROTECTED_LVALUE)
+    {
+        svalue_t * svp = sp;
+        vector_t * vec = NULL;
+
+        while (svp->type == T_LVALUE || svp->type == T_PROTECTED_LVALUE)
+        {
+            svp = svp->u.lvalue;
+        }
+
+        if (svp->type != T_POINTER)
+        {
+            inter_sp = sp;
+            error("Bad arg 1 to reverse(): got '%s &', "
+                  "expected 'string/mixed */mixed * &'.\n"
+                 , typename(svp->type));
+            /* NOTREACHED */
+            return sp;
+        }
+
+        changeInPlace = MY_TRUE;
+
+        vec = ref_array(svp->u.vec);
+        free_svalue(sp);
+        put_array(sp, vec);
+    }
+
+    if (sp->type == T_STRING)
+    {
+        size_t len = mstrsize(sp->u.str);
+
+        /* If the length of the string is less than 2, there nothing to do */
+        if (len > 1)
+        {
+            char *h, *str;
+            string_t *res;
+
+            memsafe(res = alloc_mstring(len), len, "reversed string");
+            h = get_txt(res);
+            h += len - 1;
+            str = get_txt(sp->u.str);
+
+            while (len--)
+                *h-- = *str++;
+            free_string_svalue(sp);
+            put_string(sp, res);
+        }
+    }
+    else if (sp->type == T_POINTER)
+    {
+        mp_int v_size;
+        vector_t *vec = NULL;
+
+        /* If we change in place, the 'new' vector is the old one
+         * with just one reference added. Same if the vector has only
+         * one reference to begin with, or is the null vector.
+         */
+        if (changeInPlace
+         || sp->u.vec->ref == 1
+         || sp->u.vec == &null_vector)
+        {
+            vec = ref_array(sp->u.vec);
+        }
+        else
+        {
+            vector_t *old;
+            size_t size, i;
+
+            old = sp->u.vec;
+            size = VEC_SIZE(old);
+            vec = allocate_uninit_array((int)size);
+            if (!vec)
+                error("(reverse) Out of memory: array[%lu] for copy.\n"
+                     , (unsigned long) size);
+            for (i = 0; i < size; i++)
+                assign_svalue_no_free(&vec->item[i], &old->item[i]);
+        }
+
+        /* If the length of the array is less than 2, there nothing to do */
+        if ((v_size = (mp_int)VEC_SIZE(vec)) > 1)
+        {
+            mp_int half, i;
+
+            DYN_ARRAY_COST(v_size);
+
+            i = 0;
+            half = v_size / 2;
+            while (i < half)
+            {
+                svalue_t tmp;
+                tmp   = *(vec->item + i);
+                *(vec->item + i) = *(vec->item + (v_size - 1) - i);
+                *(vec->item + (v_size - 1) - i) = tmp;
+                i++;
+            }
+        }
+
+        /* Replace the old array by the new one. */
+        free_svalue(sp);
+        put_array(sp, vec);
+    }
+    else
+    {
+        inter_sp = sp;
+        error("Bad arg 1 to reverse(): got '%s &', "
+              "expected 'string/mixed */mixed * &'.\n"
+             , typename(sp->type));
+        /* NOTREACHED */
+        return sp;
+    }
+    return sp;
+} /* f_reverse() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *

@@ -23,8 +23,6 @@ f-990217-4: strcount(): counts occurances of pattern in text
 f-990714-0: quote_string(), unquote_string()
 f-990203-13: explode(): behaviour of explode("", whatever)
 p-990204-1: walk_array(): equivalent to walk_mapping()
-f-990203-15: invert_array(): inverts the order of an array
-f-990714-7: turn_array(): reverse an array or string.
 f-990716:   Lots of array efuns, with simul-efun code.
 f-990714-1: invert_mapping(): reverse mapping
 f-990203-22: member_values(): inverse mapping lookup
@@ -65,7 +63,6 @@ f-981229-15: set_environment(): third arg specifying where in the list
 f-990203-10: shutdown(), garbage_collection() should be privileged
 f-990211:   top(): statistics efun
 f-990424-1: call_out(): uses handles in parallel to names.
-f-000113-1: LDmud: efun reverse()
 f-000113-2: More file efuns
 f-000207: Finalfrontier efuns
 f-000214-2: Add mappings to wizlist info

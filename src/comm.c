@@ -481,6 +481,7 @@ static string_t * lookup_ip_entry (struct in_addr addr, Bool useErq);
 static void add_ip_entry(struct in_addr addr, const char *name);
 #ifdef USE_IPV6
 static void update_ip_entry(const char *oldname, const char *newname);
+static int open_ipv6_conn(const char *hostname, const unsigned short int port);
 #endif
 
 #endif /* ERQ_DEMON */
@@ -492,12 +493,32 @@ static void *writer_thread(void *arg);
 #ifdef USE_IPV6
 
 /*-------------------------------------------------------------------------*/
-#ifndef CREATE_IPV6_MAPPED  /* not defined on AIX 4.3 */
+
+/* Not every IPv6 supporting platform has all the defines (like AIX 4.3) */
+
+#ifndef IPV6_ADDR_SCOPE_GLOBAL
+#  define IPV6_ADDR_SCOPE_GLOBAL 0x0e
+#endif
+
+#ifndef s6_addr8
+#  define s6_addr8  __u6_addr.__u6_addr8
+#endif
+
+#ifndef s6_addr16
+#  define s6_addr16 __u6_addr.__u6_addr16
+#endif
+
+#ifndef s6_addr32
+#  define s6_addr32 __u6_addr.__u6_addr32
+#endif
+
+#ifndef CREATE_IPV6_MAPPED
 
 #define CREATE_IPV6_MAPPED(v6,v4) \
     ((v6).s6_addr32[0] = 0, \
      (v6).s6_addr32[1] = 0, \
      (v6).s6_addr32[2] = 0x0000ffff, \
+     (v6).s6_addr32[2] = 0xffff0000, \
      (v6).s6_addr32[3] = v4 )
 
 #endif
@@ -6133,7 +6154,88 @@ update_ip_entry (const char *oldname, const char *newname)
     }
 } /* update_ip_entry() */
 
+/*-------------------------------------------------------------------------*/
+static int
+open_ipv6_conn(const char *hostname, const unsigned short int port)
+
+/* Create a non-blocking IPv6/IPv4 tcp connnection to the given
+ * <hostname>:<port>. The <hostname> is first interpreted as IPv6
+ * address, and if that fails, as IPv4 address.
+ *
+ * Result is the socket (with the connnection possibly still in process
+ * of being opened), or -1 on a failure.
+ *
+ * WARNING: Not threadsafe!
+ */
+
+{
+    int sock;
+    int con = 0;
+    int fd_flags;
+#ifdef __BEOS__
+    const int bos = 1;
 #endif
+    struct hostent *h;
+    struct protoent *p;
+    struct sockaddr_in6 addr;
+
+    p = getprotobyname("TCP");
+    if(!p) return -1;
+
+    sock = socket(AF_INET6, SOCK_STREAM, p->p_proto);
+    if(sock == -1)
+    {
+        perror("socket");
+        return -1;
+    }
+    endprotoent();
+#ifdef __BEOS__
+    if (setsockopt(sock, SOL_SOCKET, SO_NONBLOCK, &bos, sizeof(bos)))
+#else
+        fd_flags = fcntl(sock, F_GETFL, 0);
+#  if defined(O_NONBLOCK)
+    fd_flags |= O_NONBLOCK;
+#  elif defined(O_NDELAY)
+    fd_flags |= O_NDELAY;
+#  elif defined(FNDELAY)
+    fd_flags |= O_FNDELAY;
+#  endif
+    if (fcntl(sock, F_SETFL, fd_flags) == -1)
+#endif
+    {
+        perror("setsockopt/fcntl");
+        close(sock);
+        return -1;
+    }
+    addr.sin6_port=htons(port);
+    addr.sin6_family=AF_INET6;
+    addr.sin6_flowinfo=0;
+    addr.sin6_scope_id=IPV6_ADDR_SCOPE_GLOBAL;
+
+    h = gethostbyname2(hostname, AF_INET6);
+    if(h)
+    {
+        memcpy(&addr.sin6_addr, h->h_addr, h->h_length);
+        con = connect(sock, (struct sockaddr *) &addr, sizeof(addr));
+        perror("con");
+    }
+    else if(!h || (con && con != EINPROGRESS))
+    {
+        h = gethostbyname2(hostname, AF_INET);
+        if(h)
+        {
+            CREATE_IPV6_MAPPED(addr.sin6_addr, *((u_int32_t *)h->h_addr_list[0]));
+            con = connect(sock, (struct sockaddr *) &addr, sizeof(addr));
+        }
+    }
+    endhostent();
+ 
+    return (!con || (con == -1 && errno == EINPROGRESS))
+           ? sock
+           : (close(sock),-1);
+} /* open_ipv6_conn() */
+
+#endif /* USE_IPV6 */
 
 /*-------------------------------------------------------------------------*/
 static string_t *
@@ -8748,6 +8850,9 @@ f_net_connect (svalue_t *sp)
     rc = 0;
     do{
         int d, n, ret;
+
+#ifndef USE_IPV6
+
         struct hostent *h;
         struct sockaddr_in target;
         object_t *user;
@@ -8798,6 +8903,9 @@ f_net_connect (svalue_t *sp)
         set_socket_nonblocking(d);
 
         ret = connect(d, (struct sockaddr *) &target, sizeof(target));
+#else
+	d = ret = open_ipv6_conn(host, port);
+#endif
         if (ret == -1 && errno != EINPROGRESS)
         {
             /* error with connection */

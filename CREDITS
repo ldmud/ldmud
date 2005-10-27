@@ -109,7 +109,7 @@ Lars Duening thanks:
      the autoconf mechanism up to date.
  - Ron Koerner (ron.koerner@gmx.de, Righ@FinalFrontier) provided the
      initial implementation of inline closures modelled after MudOS' syntax.
- - Uwe (mai94cch@studserv.uni-leipzig.de) provided the basic IPv6 support.
+ - Uwe (uwe@6bone.informatik.uni-leipzig.de) provided the basic IPv6 support.
  - Mark Daniel Reidel (Karm@Nightfall) did the first implementation of
      the mySQL efuns.
  - Dennis VanHoey (devanhoe@usol.com) did the compiling and testing for the

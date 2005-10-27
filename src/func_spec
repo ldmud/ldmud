@@ -342,6 +342,7 @@ float   sqrt(int|float);
 float   ceil(int|float);
 float   floor(int|float);
 float   pow(int|float,int|float);
+mixed   reverse(string|mixed *|mixed *&);
 
 mixed   max(mixed|mixed*, ...);
 mixed   min(mixed|mixed*, ...);
