@@ -13,6 +13,7 @@
 
 #include "pkg-tls.h"
 
+#include "actions.h"
 #include "array.h"
 #include "comm.h"
 #include "main.h"
@@ -20,6 +21,8 @@
 #include "object.h"
 #include "svalue.h"
 #include "xalloc.h"
+
+#include "../mudlib/sys/tls.h"
 
 /*-------------------------------------------------------------------------*/
 
@@ -209,7 +212,7 @@ f_tls_init_connection (svalue_t *sp)
     }
 
     initialize_tls_session(&ip->tls_session);
-    gnutls_transport_set_ptr(ip->tls_session, ip->socket);
+    gnutls_transport_set_ptr(ip->tls_session, (gnutls_transport_ptr)(ip->socket));
     ret = gnutls_handshake(ip->tls_session);
     if (ret < 0)
     {
@@ -345,7 +348,6 @@ f_tls_query_connection_info (svalue_t *sp)
 
 {
     interactive_t *ip;
-    vector_t *a;
 
     if (!O_SET_INTERACTIVE(ip, sp->u.ob))
         error("Bad arg 1 to tls_query_connection_info(): "
