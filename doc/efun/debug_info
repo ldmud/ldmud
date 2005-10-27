@@ -86,6 +86,15 @@ DESCRIPTION
               Default filename is '/OPC_DUMP', the valid_write() will read
               'opcdump' for the function.
 
+            <arg2> == "memory": dump a list of all allocated memory
+              blocks (if the allocator supports this).
+              Default filename is '/MEMORY_DUMP', the valid_write()
+              will read 'memdump' for the function. If the allocator
+              doesn't support memory dumps, this call will always
+              return 0.
+              This works best if the allocator is compiled with
+              MALLOC_TRACE and/or MALLOC_LPC_TRACE.
+ 
 
 
         DINFO_DATA (6): Return raw information about an aspect of
@@ -526,6 +535,7 @@ HISTORY
         LDMud 3.3.387 added the ptmalloc values for DINFO_DATA:DID_MEMORY.
         LDMud 3.3.479 added the DID_MEM_DEFRAG_ values
           for DINFO_DATA:DID_MEMORY.
+        LDMud 3.3.526 added DINFO_DUMP:"memory".
 
 
 SEE ALSO

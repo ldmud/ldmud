@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-18-Apr-2004 (Lars Duening) -- Development Release 3.3
+22-Apr-2004 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -20,6 +20,9 @@ For a detailed list of all changes see the file CHANGELOG.
            as package 'alists'.
        + call_out():  The minimum delay can now be 0, meaning: as soon as
            possible.
+       + debug_info(): Option DINFO_DUMP:"memory" to dump a list of
+           all allocated memory blocks (currently supported just by
+           smalloc).
        + filter(): The efun can now filter strings as well.
        + function_exists(): now also returns the filename and
            linenumber of a function.

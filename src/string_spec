@@ -19,12 +19,15 @@ CL_OBJ_DESTR      "Object the closure was bound to has been destructed"
 CRPATTERN         "\015$"
 DANGLING_V_CL     "dangling var closure"
 DEFAULT_PROMPT    "> "
+DESTRUCTED        "destructed"
 EFUN              "efun"
 EFUN_CLOSURE      "<efun closure>"
 FATAL_ERROR       "Fatal Error"
 FUNCTIONS         "functions"
 HEART_BEAT        "heart_beat"
 IN                "in"
+MEMORY            "memory"
+MEMDUMP           "memdump"
 NEWLINE           "\n"
 NONAME            "NONAME"
 NO_PROG_TRACE     "No program to trace."
@@ -34,6 +37,9 @@ PUBLISH           "publish"
 OBJDUMP_FNAME     "/OBJ_DUMP"
 DESTOBJDUMP_FNAME "/DEST_OBJ_DUMP"
 OPCDUMP_FNAME     "/OPC_DUMP"
+MEMDUMP_FNAME     "/MEMORY_DUMP"
+OBJECTS           "objects"
+OPCODES           "opcodes"
 OUT_OF_MEMORY     "(s)sprintf() error: Out of memory.\n"
 PERCENT           "%"
 PERCENT_S         "%s"
@@ -208,9 +214,11 @@ PC_SHEEP        "sheep"
 #endif /* SUPPLY_PARSE_COMMAND */
 
 #ifdef USE_PGSQL
+
 PGCONNECT	"pgconnect"
 PG_RESET_FAILED "Reset failed, connection aborted."
 SUCCESS         "success"
+
 #endif
 
 /***************************************************************************/

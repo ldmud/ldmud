@@ -171,6 +171,20 @@ mem_dinfo_data (svalue_t *svp, int value)
 
 
 /*-------------------------------------------------------------------------*/
+Bool
+mem_dump_memory (int fd)
+
+/* Print the location, size, and (if available) the TRACE information
+ * of all memory blocks to file <fd>, and return TRUE.
+ * If the allocator doesn't support this operation, print nothing
+ * and return FALSE.
+ */
+
+{
+    return MY_FALSE;
+} /* mem_dump_memory() */
+
+/*-------------------------------------------------------------------------*/
 void
 mem_consolidate (Bool force UNUSED)
 

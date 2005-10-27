@@ -186,6 +186,23 @@ void mem_free_unrefed_memory() {
     dlmalloc_free_unrefed_memory();
 }
 
+/*-------------------------------------------------------------------------*/
+Bool
+mem_dump_memory (int fd)
+
+/* Print the location, size, and (if available) the TRACE information
+ * of all memory blocks to file <fd>, and return TRUE.
+ * If the allocator doesn't support this operation, print nothing
+ * and return FALSE.
+ *
+ * If <fd> is -1, just return TRUE or FALSE (this is used to check if
+ * the allocator supports memory dumps).
+ */
+
+{
+    return MY_FALSE;
+} /* mem_dump_memory() */
+
 #ifdef MALLOC_TRACE
 /*     Return true if <p> is a free block. */
 static Bool mem_is_freed (POINTER p, size_t minsize) {

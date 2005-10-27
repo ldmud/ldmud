@@ -202,7 +202,7 @@ object_t *master_ob = NULL;
   /* The master object.
    */
 
-object_t *current_object;
+object_t *current_object = NULL;
   /* The object interpreting a function.
    */
 

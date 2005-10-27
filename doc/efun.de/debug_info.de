@@ -88,6 +88,16 @@ BESCHREIBUNG
                 opcodes. Standardmaessig wird in die Datei /OPC_DUMP
                 geschrieben. valid_write() wird 'opcdump' uebergeben.
 
+            <arg2> == "memory": liefert eine Liste aller allokierten
+                Speicherbloecke.  Standardmaessig wird in die Datei /MEMORY_DUMP
+                geschrieben. valid_write() wird 'memdump' uebergeben.
+                Wenn der Allokator einen Speicherabzug nicht
+                unterstuetzt, wird keine Datei geschrieben und immer 0
+                zurueckgegeben.
+                Diese Funktion ist am nuetzlichsten wenn der Allokator
+                mit MALLOC_TRACE und MALLOC_LPC_TRACE kompiliert
+                wurde.
+
         DINFO_DATA    (6): Liefert Rohdaten ueber gewisse, durch <arg2>
             spezifizierte Aspekte des Treibers. Das Resultat der Funktion ist
             ein Array mit der Information oder 0, falls <arg2> keinen

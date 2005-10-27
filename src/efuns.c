@@ -6828,6 +6828,13 @@ v_debug_info (svalue_t *sp, int num_arg)
  *       the function. If the driver is compiled without OPCPROF, this call
  *       will always return 0.
  *
+ *     <arg2> == "memory": dump a list of all allocated memory blocks (if
+ *       the allocator supports this). Default filename is '/MEMORY_DUMP', the
+ *       valid_write() will read 'memdump' for the function. If the allocator
+ *       doesn't support memory dumps, this call will always return 0.
+ *       This works best if the allocator is compiled with MALLOC_TRACE
+ *       and/or MALLOC_LPC_TRACE.
+ *
  * DINFO_DATA (6): Return raw information about an aspect of
  *     the driver specified by <arg2>. The result of the function
  *     is an array with the information, or 0 for unsupported values
@@ -7503,23 +7510,55 @@ v_debug_info (svalue_t *sp, int num_arg)
             fname = sp->u.str;
         }
 
-        if (!strcmp(get_txt(arg[1].u.str), "objects"))
+        if (mstreq(arg[1].u.str, STR_OBJECTS))
         {
             res.u.number = dumpstat(fname ? fname : STR_OBJDUMP_FNAME) ? 1 : 0;
             break;
         }
 
-        if (!strcmp(get_txt(arg[1].u.str), "destructed"))
+        if (mstreq(arg[1].u.str, STR_DESTRUCTED))
         {
             res.u.number = dumpstat_dest(fname ? fname : STR_DESTOBJDUMP_FNAME) ? 1 : 0;
             break;
         }
 
-        if (!strcmp(get_txt(arg[1].u.str), "opcodes"))
+        if (mstreq(arg[1].u.str, STR_OPCODES))
         {
 #ifdef OPCPROF
             res.u.number = opcdump(fname ? fname : STR_OPCDUMP) ? 1 : 0;
 #endif
+            break;
+        }
+
+        if (mstreq(arg[1].u.str, STR_MEMORY))
+        {
+            if (mem_dump_memory(-1))
+            {
+                int fd;
+
+                if (!fname)
+                    fname = STR_MEMDUMP_FNAME;
+                fname = check_valid_path(fname, current_object, STR_MEMDUMP, MY_TRUE);
+                if (fname)
+                {
+                    fd = open(get_txt(fname), O_CREAT|O_APPEND|O_WRONLY, 0664);
+                    if (fd < 0)
+                    {
+                        perror("open memdump file");
+                    }
+                    else
+                    {
+                        writes(fd, "------------------------------------"
+                                   "--------------\n");
+                        dprintf1(fd, "Date: %s\n", (p_int)time_stamp());
+                        res.u.number = mem_dump_memory(fd) ? 1 : 0;
+                        writes(fd, "\n");
+                        close(fd);
+                    }
+
+                    free_mstring(fname);
+                }
+            }
             break;
         }
 

@@ -2810,17 +2810,31 @@ esbrk (word_t size)
 #else  /* not SBRK_OK */
 
     char *block;
-    word_t *p;
+    word_t *p;    /* start of the fake block */
+    const int overhead = M_OVERHEAD + XM_OVERHEAD;
 
     mdb_log_sbrk(size);
-    size += SINT;  /* for the extra fake "allocated" block */
+    size += overhead * SINT;  /* for the extra fake "allocated" block */
 
     block = malloc(size);
     if (!block)
         return NULL;
     assert_stack_gap();
 
-    p = (word_t *)(block + size) - 1;
+    /* p points to the start of the fake allocated block used
+     * as sentinel/bridge
+     */
+    p = (word_t *)(block + size) - overhead;
+
+#ifdef MALLOC_TRACE
+    p[M_OVERHEAD+XM_FILE] = (word_t)"sentinel/bridge";
+    p[M_OVERHEAD+XM_LINE] = 0;
+#endif
+#ifdef MALLOC_LPC_TRACE
+    p[M_OVERHEAD+XM_OBJ] = 0;
+    p[M_OVERHEAD+XM_PROG] = 0;
+    p[M_OVERHEAD+XM_PC] = 0;
+#endif
 
     if (!heap_end)
     {
@@ -2828,7 +2842,7 @@ esbrk (word_t size)
         heap_start = (word_t*)block;
         heap_end = (word_t*)(block + size);
         *(word_t *)block = PREV_BLOCK;
-        *p = THIS_BLOCK; /* no M_GC_FREE */
+        p[M_SIZE] = THIS_BLOCK | overhead; /* no M_GC_FREE */
         overlap = 0;
     }
     else
@@ -2842,14 +2856,14 @@ esbrk (word_t size)
             if (block + size == (char *)heap_start)
             {
                 /* We can join with the existing heap */
-                p[1] &= ~PREV_BLOCK;
+                p[overhead] &= ~PREV_BLOCK;
                 overlap = SINT;
-                count_back(large_wasted_stat, SINT);
+                count_back(large_wasted_stat, overlap);
             }
             else
             {
                 /* Separate from the heap */
-                *p = THIS_BLOCK | (heap_start - p); /* no M_GC_FREE */
+                p[M_SIZE] = THIS_BLOCK | (heap_start - p); /* no M_GC_FREE */
                 overlap = 0;
             }
 
@@ -2859,21 +2873,21 @@ esbrk (word_t size)
         {
             /* New block after the known heap */
 
-            *p = THIS_BLOCK; /* no M_GC_FREE */
+            p[M_SIZE] = THIS_BLOCK | overhead; /* no M_GC_FREE */
             if (block == (char *)heap_end)
             {
                 /* We can join with the existing heap */
                 heap_end = (word_t *)(block + size);
-                block -= SINT;
-                overlap = SINT;
-                count_back(large_wasted_stat, SINT);
+                block -= overhead;
+                overlap = overhead * SINT;
+                count_back(large_wasted_stat, overlap);
             }
             else
             {
                 /* Separate from the heap */
-                p = (word_t *)heap_end - 1;
-                *p =   (*p & (PREV_BLOCK|THIS_BLOCK|M_GC_FREE))
-                     | ((word_t *)block - p);
+                p = (word_t *)heap_end - overhead;
+                p[M_SIZE] = (p[M_SIZE] & (PREV_BLOCK|THIS_BLOCK|M_GC_FREE))
+                            | ((word_t *)block - p);
                 heap_end = (word_t *)(block + size);
                 *(word_t *)block = PREV_BLOCK;
                 overlap = 0;
@@ -2896,38 +2910,47 @@ esbrk (word_t size)
             } while (next < (word_t *)block);
             overlap = 0;
 
-            if ((word_t *)block == prev + 1)
+            if ((word_t *)block == prev + overhead)
             {
                 /* Our block directly follows the one we found */
-                block -= SINT;
-                overlap += SINT;
-                count_back(large_wasted_stat, SINT);
+                block -= overhead;
+                overlap += overhead * SINT;
+                count_back(large_wasted_stat, overhead * SINT);
             }
             else
             {
                 /* We have to create a new bridge block */
-                *prev = (*prev & (PREV_BLOCK|THIS_BLOCK|M_GC_FREE))
-                      | ((word_t*)block - prev);
+                prev[M_SIZE] = (prev[M_SIZE] & (PREV_BLOCK|THIS_BLOCK|M_GC_FREE))
+                               | ((word_t*)block - prev);
+#ifdef MALLOC_TRACE
+                prev[M_OVERHEAD+XM_FILE] = (word_t)"block";
+                prev[M_OVERHEAD+XM_LINE] = 0;
+#endif
+#ifdef MALLOC_LPC_TRACE
+                prev[M_OVERHEAD+XM_OBJ] = 0;
+                prev[M_OVERHEAD+XM_PROG] = 0;
+                prev[M_OVERHEAD+XM_PC] = 0;
+#endif
                 *(word_t *)block = PREV_BLOCK;
             }
 
-            if (next - p == 1)
+            if (next - p == overhead)
             {
                 /* Our block directly preceedes the next one */
                 *next &= ~PREV_BLOCK;
-                overlap += SINT;
-                count_back(large_wasted_stat, SINT);
+                overlap += overhead * SINT;
+                count_back(large_wasted_stat, overhead * SINT);
             }
             else
             {
                 /* We have to create a new bridge block */
-                *p = THIS_BLOCK | (next - p); /* no M_GC_FREE */
+                p[M_SIZE] = THIS_BLOCK | (next - p); /* no M_GC_FREE */
             }
         }
     }
 
     count_up(sbrk_stat, size);
-    count_up(large_wasted_stat, SINT);
+    count_up(large_wasted_stat, overhead * SINT);
     return block;
 #endif /* !SBRK_OK */
 } /* esbrk() */
@@ -3156,14 +3179,15 @@ mem_clear_ref_flags (void)
     int i;
 
     /* Clear the large blocks */
-    last = heap_end - 1;
+    last = heap_end - M_OVERHEAD - XM_OVERHEAD;
     for (p = heap_start; p < last; )
     {
         *p &= ~M_REF;
         if (p + (*p & M_MASK) > heap_end)
         {
             in_malloc = 0;
-            fatal("pointer larger than brk()\n");
+            fatal("pointer larger than brk: %p + %lx = %p > %p\n"
+                  , p, *p & M_MASK, p + (*p + M_MASK), last);
         }
         p += *p & M_MASK;
     }
@@ -3228,7 +3252,7 @@ mem_free_unrefed_memory (void)
     mp_int success = 0;
 
     /* Scan the heap for lost large blocks */
-    last = heap_end - 1;
+    last = heap_end - M_OVERHEAD - XM_OVERHEAD;
     for (p = heap_start; p < last; )
     {
         word_t size;
@@ -3313,6 +3337,128 @@ mem_free_unrefed_memory (void)
         dprintf1(gcollect_outfd, "%d small blocks freed\n", success);
     }
 } /* mem_free_unrefed_memory() */
+
+/*-------------------------------------------------------------------------*/
+Bool
+mem_dump_memory (int fd)
+
+/* Print the location, size, and (if available) the TRACE information
+ * of all memory blocks to file <fd>, and return TRUE.
+ * If the allocator doesn't support this operation, print nothing
+ * and return FALSE.
+ *
+ * If <fd> is -1, just return TRUE or FALSE (this is used to check if
+ * the allocator supports memory dumps).
+ */
+
+{
+    word_t *p, *q, *last;
+
+    if (fd < 0)
+        return MY_TRUE;
+
+    writes(fd, "\n--- Large Blocks\n");
+
+    /* Dump the heap blocks */
+    last = heap_end - M_OVERHEAD - XM_OVERHEAD;
+    for (p = heap_start; p < last; )
+    {
+        word_t size;
+
+        size = *p;
+        if ( size & THIS_BLOCK )
+        {
+            Bool isSmallChunk = MY_FALSE;
+
+            dprintf3(fd, "0x%x .. 0x%x size 0x%x "
+                       , (p_uint)p, (p_uint)(p + (size&M_MASK)) - 1
+                       , (p_uint)(size & M_MASK)
+                       );
+            for (q = last_small_chunk; q && !isSmallChunk; q = *(word_t**)q)
+            {
+                isSmallChunk = (q - M_OVERHEAD == p);
+            }
+
+            if (isSmallChunk)
+                writes(fd, ": small chunk\n");
+            else
+            {
+#ifdef MALLOC_TRACE
+                if (p[XM_FILE+M_OVERHEAD])
+                    dprintf2(fd, ": %s %d\n"
+                               , p[XM_FILE+M_OVERHEAD], p[XM_LINE+M_OVERHEAD]
+                    );
+                else
+#endif
+                writes(fd, "\n");
+#ifdef MALLOC_LPC_TRACE
+                if (p[M_OVERHEAD + XM_OBJ])
+                    write_lpc_trace(fd, p + M_OVERHEAD);
+#endif
+            }
+        }
+        p += size & M_MASK;
+    }
+
+    /* Dump the small chunks and their small blocks.
+     */
+    for (p = last_small_chunk; p; p = *(word_t**)p)
+    {
+        word_t *end;
+
+        end = p - M_OVERHEAD + (p[-M_OVERHEAD] & M_MASK);
+
+        {
+            word_t size;
+
+            q = p - M_OVERHEAD;
+            size = *q;
+
+            dprintf3(fd, "\n--- Small Chunk: 0x%x .. 0x%x size 0x%x\n"
+                       , (p_uint)q, (p_uint)(q + (size&M_MASK)) - 1
+                       , (p_uint)(size & M_MASK)
+                       );
+            /* No trace information for small chunks */
+        }
+
+        for (q = p+1; q < end; )
+        {
+            word_t size = *q;
+
+            if (!(*q & THIS_BLOCK))
+            {
+                dprintf3(fd, "0x%x .. 0x%x size 0x%x "
+                           , (p_uint)q, (p_uint)(q + (size&M_MASK)) - 1
+                           , (p_uint)(size & M_MASK)
+                           );
+
+                /* The sentinel blocks in a small chunk consist of just
+                 * the size byte - don't try to dump those.
+                 */
+                if ((size & M_MASK) > M_OVERHEAD)
+                {
+#ifdef MALLOC_TRACE
+                    if (q[XM_FILE+M_OVERHEAD])
+                        dprintf2(fd, ": %s %d\n"
+                                   , q[XM_FILE+M_OVERHEAD], q[XM_LINE+M_OVERHEAD]
+                        );
+                    else
+#endif
+                    writes(fd, "\n");
+#ifdef MALLOC_LPC_TRACE
+                    if (q[M_OVERHEAD + XM_OBJ])
+                        write_lpc_trace(fd, q + M_OVERHEAD);
+#endif
+                }
+                else
+                    writes(fd, "\n");
+            }
+            q += size & M_MASK;
+        }
+    }
+
+    return MY_TRUE;
+} /* mem_dump_memory() */
 
 /*-------------------------------------------------------------------------*/
 void

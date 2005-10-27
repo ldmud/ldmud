@@ -252,6 +252,11 @@ mdb_log_sbrk (p_int size)
  *   void mem_dinfo_data (svalue_t *svp, int value)
  *     Return the statistics data.
  *
+ *   Bool mem_dump_memory (int fd)
+ *     Dump the memory layout to <fd>, or return FALSE.
+ *     If <fd> is -1, just return TRUE or FALSE (this is used to check if
+ *     the allocator supports memory dumps).
+ *
 #ifdef GC_SUPPORT
  *   static void mem_clear_ref (POINTER p)
  *   static void mem_mark_ref (POINTER p)
@@ -925,7 +930,7 @@ write_lpc_trace (int d, word_t *p)
     /* Try to find the object which allocated this block */
     if ( NULL != (obj = (object_t *)p[XM_OBJ]) )
     {
-        writes(d, "By object: ");
+        writes(d, "  By object: ");
         if (obj->flags & O_DESTRUCTED)
             writes(d, "(destructed) ");
         for (o = obj_list; o && o != obj; o = o->next_all) NOOP;
@@ -935,7 +940,7 @@ write_lpc_trace (int d, word_t *p)
             writes(d, get_txt(o->name)); /* TODO: If this cores, it has to go again */
     }
     else
-        writes(d, "No object.");
+        writes(d, "  No object.");
     writes(d, "\n");
 
     /* Try to find the program which allocated this block */
@@ -944,7 +949,7 @@ write_lpc_trace (int d, word_t *p)
         pc = NULL;
         prog = NULL;
 
-        writes(d, "By program: ");
+        writes(d, "  By program: ");
         for ( o = obj_list
             ;    o
               && !(o->flags & O_DESTRUCTED)

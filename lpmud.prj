@@ -63,19 +63,17 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 525)
-(Parent-Version lpmud 3-3 524)
+(Project-Version lpmud 3-3 526)
+(Parent-Version lpmud 3-3 525)
 (Version-Log "
-  - (sha1) The files were still in DOS fileformat, which causes some
-       compilers to choke on the multi-line macro definitions.
-  - (backend.c) Active objects were never cleant up.
-  - (gcollect.c) During object cleanup, mappings with just one reference
-       left are not cleant up, as they will be freed immediately.
+  - (smalloc.c, xalloc.c, efuns.c) debug_info(DINFO_DUMP, \"memory\")
+       dumps a list of all allocated memory blocks into the file
+       <mudlib>/MEMORY_DUMP, if the allocator supports this.
 ")
 (New-Version-Log
 ""
 )
-(Checkin-Time "Thu, 22 Apr 2004 20:49:47 -0600")
+(Checkin-Time "Thu, 22 Apr 2004 23:42:28 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -113,8 +111,8 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.75 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.588 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.347 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.589 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.348 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -190,7 +188,7 @@
   (src/ed.h (lpmud/f/34_ed.h 1.5.1.6 644))
   (src/ed.c (lpmud/c/33_ed.c 1.32.1.31 644))
   (src/efuns.h (lpmud/l/20_efuns.h 1.13.1.19.1.4 644))
-  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.82 644))
+  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.83 644))
   (src/exec.h (lpmud/c/32_exec.h 1.34.1.33.1.7 644))
   (src/files.h (lpmud/i/49_files.h 1.2 644))
   (src/files.c (lpmud/i/50_files.c 1.24 644))
@@ -299,11 +297,11 @@
   (src/simul_efun.h (lpmud/f/17_simul_efun 1.5.1.5 644))
   (src/simul_efun.c (lpmud/32_simul_efun 1.20.1.17.1.4 644))
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.33 644))
-  (src/simulate.c (lpmud/31_simulate.c 1.88.1.119 644))
+  (src/simulate.c (lpmud/31_simulate.c 1.88.1.120 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.14 644))
-  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.88 644))
+  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.89 644))
   (src/sysmalloc.h (lpmud/c/b/33_sysmalloc. 1.2 644))
-  (src/sysmalloc.c (lpmud/c/b/34_sysmalloc. 1.5 644))
+  (src/sysmalloc.c (lpmud/c/b/34_sysmalloc. 1.6 644))
   (src/sprintf.h (lpmud/f/15_sprintf.h 1.3.1.4 644))
   (src/sprintf.c (lpmud/28_sprintf.c 1.31.1.62 644))
   (src/strfuns.h (lpmud/b/51_strfuns.h 1.11.1.7 644))
@@ -317,13 +315,13 @@
   (src/typedefs.h (lpmud/d/50_typedefs.h 1.12.1.7 644))
   (src/wiz_list.h (lpmud/1_wiz_list.h 1.5.1.7.1.3 644))
   (src/wiz_list.c (lpmud/2_wiz_list.c 1.13.1.14.1.4 644))
-  (src/xalloc.h (lpmud/g/51_xalloc.h 1.21 644))
-  (src/xalloc.c (lpmud/h/0_xalloc.c 1.2.1.35 644))
-  (src/xptmalloc.c (lpmud/d/b/10_xptmalloc. 1.3 644))
+  (src/xalloc.h (lpmud/g/51_xalloc.h 1.22 644))
+  (src/xalloc.c (lpmud/h/0_xalloc.c 1.2.1.36 644))
+  (src/xptmalloc.c (lpmud/d/b/10_xptmalloc. 1.4 644))
 
   ;; Build files
   (src/func_spec (lpmud/c/31_func_spec 1.53.1.45.1.22.1.29 644))
-  (src/string_spec (lpmud/f/6_string_spe 1.14.1.14 644))
+  (src/string_spec (lpmud/f/6_string_spe 1.14.1.15 644))
   (src/mkfunc.c (lpmud/l/14_mkfunc.c 1.1 644))
   (src/make_func.y (lpmud/b/7_make_func. 1.25.1.30.1.7 644))
 
@@ -1051,7 +1049,7 @@
   (doc/efun/db_fetch (lpmud/e/27_db_fetch 1.2.1.3 644))
   (doc/efun/db_handles (lpmud/e/33_db_handles 1.1.1.4 644))
   (doc/efun/db_insert_id (lpmud/l/1_db_insert_ 1.2 644))
-  (doc/efun/debug_info (lpmud/o/22_debug_info 1.31 644))
+  (doc/efun/debug_info (lpmud/o/22_debug_info 1.32 644))
   (doc/efun/debug_message (lpmud/o/23_debug_mess 1.1.1.5 644))
   (doc/efun/deep_copy (lpmud/m/29_deep_copy 1.4 644))
   (doc/efun/deep_inventory (lpmud/o/24_deep_inven 1.3 644))
@@ -1529,7 +1527,7 @@
   (doc/efun.de/deep_inventory.de (lpmud/j/b/10_deep_inven 1.1 640))
   (doc/efun.de/deep_copy.de (lpmud/j/b/11_deep_copy. 1.1 640))
   (doc/efun.de/debug_message.de (lpmud/j/b/12_debug_mess 1.1 640))
-  (doc/efun.de/debug_info.de (lpmud/j/b/13_debug_info 1.1 640))
+  (doc/efun.de/debug_info.de (lpmud/j/b/13_debug_info 1.2 640))
   (doc/efun.de/ctime.de (lpmud/j/b/14_ctime.de 1.1 640))
   (doc/efun.de/crypt.de (lpmud/j/b/15_crypt.de 1.2 640))
   (doc/efun.de/count_bits.de (lpmud/j/b/16_count_bits 1.1 640))
@@ -1689,7 +1687,7 @@
   (doc/master/valid_seteuid (lpmud/s/29_valid_sete 1.2 644))
   (doc/master/valid_snoop (lpmud/s/30_valid_snoo 1.2 644))
   (doc/master/valid_trace (lpmud/c/3_valid_trac 1.1.1.2 644))
-  (doc/master/valid_write (lpmud/s/31_valid_writ 1.9 644))
+  (doc/master/valid_write (lpmud/s/31_valid_writ 1.10 644))
 
   (doc/obsolete/add_verb (lpmud/b/b/0_add_verb 1.2 644))
   (doc/obsolete/add_xverb (lpmud/b/b/1_add_xverb 1.1 644))

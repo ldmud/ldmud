@@ -24,6 +24,7 @@ DESCRIPTION
           ed_start (whenever the builtin ed tries to write to a file),
           garbage_collection
           mkdir,
+          memdump
           objdump
           opcdump
           remove_file (efun rm()),
@@ -45,6 +46,7 @@ HISTORY
         LDMud 3.2.8 adds operation "copy_file", and replaces "do_rename"
         by "rename_from" and "rename_to".
         LDMud 3.2.9 adds operation "garbage_collection".
+        LDMud 3.3.526 adds operation "memdump".
 
 SEE ALSO
         valid_read(M), make_path_absolute(M)
