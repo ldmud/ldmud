@@ -397,6 +397,7 @@ string *regexp(string *, string, int default: F_CONST0);
 string *regexplode(string, string, int default: F_CONST0);
 string  regreplace(string,string,closure|string,int);
 mixed   regmatch(string,string, void|int, void|int);
+string  sha1(string);
 void    printf(string, ...);
 string  sprintf(string, ...);
 int     strstr(string, string, int default: F_CONST0);
@@ -574,7 +575,7 @@ int     rm(string);
 int     rmdir(string);
 int     tail(string);
 int     write_bytes(string, int, string);
-int     write_file(string, string);
+int     write_file(string, string, int default: F_CONST0);
 
 
         /* Driver and System functions */

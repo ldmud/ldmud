@@ -1,9 +1,14 @@
 SYNOPSIS
         int write_file(string file, string str);
+        int write_file(string file, string str, int flags);
 
 BESCHREIBUNG
         Haengt den String <str> an die Datei <file> an. Liefert 1 bei Erfolg,
         0 bei Misserfolg.
+
+        If <flags> = 1, dann wird die Datei vor dem eigentlichen
+        Schreiben geloescht; das 'anhaengen' wird so effektiv ein
+        'ueberschreiben'. Defaultwert fuer <flags> ist 0.
 
 SIEHE AUCH
         file_size(E), cat(E), write_bytes(E), read_file(E), rm(E)

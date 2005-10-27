@@ -18,6 +18,7 @@
  *    efun: regexplode()
  *    efun: regreplace()
  *    efun: process_string() (optional)
+ *    efun: sha()
  *    efun: sscanf()
  *    efun: strstr()
  *    efun: strrstr()
@@ -116,6 +117,7 @@
 #include "otable.h"
 #include "ptrtable.h"
 #include "random.h"
+#include "sha1.h"
 #include "stdstrings.h"
 #include "simulate.h"
 #include "strfuns.h"
@@ -421,6 +423,42 @@ f_md5_crypt(svalue_t *sp)
 
     return sp;
 } /* f_md5_crypt() */
+
+/*--------------------------------------------------------------------*/
+svalue_t *
+f_sha1 (svalue_t *sp)
+
+/* EFUN: sha1()
+ *
+ *   string sha1(string arg)
+ *
+ * Create and return a MD5 message digest from the string <arg>.
+ */
+
+{
+    SHA1Context context;
+    string_t *s_digest;
+    unsigned char *digest, d[SHA1HashSize + 1];
+    int i;
+
+    memsafe(s_digest = alloc_mstring(2 * SHA1HashSize)
+           , 2 & SHA1HashSize, "sha1 encryption result");
+    digest = (unsigned char *)get_txt(s_digest);
+
+    SHA1Reset(&context);
+    SHA1Input(&context, (unsigned char *)get_txt(sp->u.str), mstrsize(sp->u.str));
+    SHA1Result(&context, d);
+
+    d[SHA1HashSize + 1]='\0';
+
+    for (i = 0; i < SHA1HashSize; i++)
+        sprintf((char *)digest+2*i, "%02x", d[i]);
+
+    free_string_svalue(sp);
+    put_string(sp, s_digest);
+
+    return sp;
+} /* f_sha1() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *

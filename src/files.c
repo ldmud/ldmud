@@ -1689,10 +1689,13 @@ f_write_file (svalue_t *sp)
 
 /* EFUN write_file()
  *
- *   int write_file(string file, string str)
+ *   int write_file(string file, string str, int flags = 0)
  *
- * Append the string str to the file file. Returns 1 for success
+ * Append the string str to the file <file>. Returns 1 for success
  * and 0 if any failure occured.
+ *
+ * If <flags> is 1, the file is first removed; thus effectively
+ * changing the 'append' into an 'overwrite'.
  */
 
 {
@@ -1705,9 +1708,16 @@ f_write_file (svalue_t *sp)
     do {
         FILE *f;
 
-        file = check_valid_path(sp[-1].u.str, current_object, STR_WRITE_FILE, MY_TRUE);
+        file = check_valid_path(sp[-2].u.str, current_object, STR_WRITE_FILE, MY_TRUE);
         if (!file)
             break;
+
+        if (sp->u.number & 1)
+            if (remove(get_txt(file)))
+            {
+                perror("write_file (remove)");
+                error("Could not remove %s: errno %d.\n", get_txt(file), errno);
+            }
 
         f = fopen(get_txt(file), "a");
         if (f == NULL) {
@@ -1762,7 +1772,7 @@ f_write_file (svalue_t *sp)
             }
         }
         FCOUNT_WRITE(get_txt(file));
-        fwrite(get_txt(sp->u.str), mstrsize(sp->u.str), 1, f);
+        fwrite(get_txt(sp[-1].u.str), mstrsize(sp[-1].u.str), 1, f);
         fclose(f);
         rc = 1;
     } while(0);
@@ -1770,6 +1780,7 @@ f_write_file (svalue_t *sp)
     if (file)
         free_mstring(file);
 
+    free_svalue(sp--);
     free_svalue(sp--);
     free_svalue(sp);
     put_number(sp, rc);

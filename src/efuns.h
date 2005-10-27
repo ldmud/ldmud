@@ -20,6 +20,7 @@ extern svalue_t *f_lower_case(svalue_t *);
 extern svalue_t *f_make_shared_string(svalue_t *);
 extern svalue_t *f_md5(svalue_t *);
 extern svalue_t *f_md5_crypt(svalue_t *sp);
+extern svalue_t *f_sha(svalue_t *);
 extern svalue_t *f_regexp(svalue_t *);
 extern svalue_t *f_regexplode(svalue_t *sp);
 extern svalue_t* f_regreplace (svalue_t *sp);

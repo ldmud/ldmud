@@ -1,0 +1,13 @@
+SYNOPSIS
+        string sha1(string arg)
+
+BESCHREIBUNG
+        Berechne den SHA1 Digest von string <arg> und gebe ihn zurueck.
+
+BEISPIEL
+        string s;
+
+        s = sha1("Hello, world!");
+
+SIEHE AUCH
+        crypt(E), md5(E)

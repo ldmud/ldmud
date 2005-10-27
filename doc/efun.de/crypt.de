@@ -13,4 +13,4 @@ BESCHREIBUNG
         bietet input_to() ein spezielles Flag.
 
 SIEHE AUCH
-        md5(E), input_to(E)
+        md5_crypt(E), md5(E), sha1(E), input_to(E)

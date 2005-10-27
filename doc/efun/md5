@@ -1,5 +1,4 @@
 SYNOPSIS
-
         string md5(string arg)
 
 DESCRIPTION
@@ -14,4 +13,4 @@ HISTORY
         Introduced in LDMud 3.2.9
 
 SEE ALSO
-        crypt(E), md5_crypt(E)
+        crypt(E), md5_crypt(E), sha1(E)

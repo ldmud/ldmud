@@ -105,7 +105,7 @@ endif
            object.c otable.c parser.c parse.c \
            pkg-alists.c pkg-mccp.c pkg-mysql.c pkg-pcre.c pkg-pgsql.c \
            pkg-tls.c ptmalloc.c port.c ptrtable.c random.c \
-           regexp.c simulate.c simul_efun.c stdstrings.c \
+           regexp.c sha1.c simulate.c simul_efun.c stdstrings.c \
            strfuns.c structs.c sprintf.c swap.c wiz_list.c xalloc.c
 
 # Generated source files (overlaps with of SRCS) which need to be
@@ -468,7 +468,7 @@ $(OBJ)/ed.o : ../mudlib/sys/regexp.h xalloc.h svalue.h stdstrings.h \
 $(OBJ)/efuns.o : ../mudlib/sys/time.h ../mudlib/sys/strings.h \
     ../mudlib/sys/regexp.h ../mudlib/sys/objectinfo.h \
     ../mudlib/sys/debug_info.h xalloc.h wiz_list.h svalue.h swap.h \
-    structs.h strfuns.h simulate.h stdstrings.h random.h ptrtable.h \
+    structs.h strfuns.h simulate.h stdstrings.h sha1.h random.h ptrtable.h \
     otable.h object.h mstrings.h mregex.h md5.h mempools.h mapping.h main.h \
     interpret.h heartbeat.h exec.h dumpstat.h comm.h closure.h call_out.h \
     backend.h array.h actions.h efuns.h my-rusage.h my-alloca.h typedefs.h \
@@ -629,6 +629,8 @@ $(OBJ)/random.o : random.h driver.h port.h config.h hosts/unix.h \
 $(OBJ)/regexp.o : main.h xalloc.h simulate.h interpret.h regexp.h driver.h \
     typedefs.h svalue.h strfuns.h sent.h bytecode.h port.h config.h \
     hosts/unix.h hosts/be/be.h machine.h
+
+$(OBJ)/sha1.o : sha1.h
 
 $(OBJ)/simul_efun.o : xalloc.h swap.h svalue.h stdstrings.h simulate.h \
     prolang.h ptrtable.h object.h mstrings.h lex.h interpret.h gcollect.h \

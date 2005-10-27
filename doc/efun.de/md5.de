@@ -1,0 +1,13 @@
+SYNOPSIS
+        string md5(string arg)
+
+BESCHREIBUNG
+        Berechne den MD5 Digest von string <arg> und gebe ihn zurueck.
+
+BEISPIEL
+        string s;
+
+        s = md5("Hello, world!");
+
+SIEHE AUCH
+        crypt(E), md5_crypt(E), sha1(E)

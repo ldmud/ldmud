@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+18-Apr-2004 (Lars Duening)  (3.3.523)
+  - (func_spec, sha1, efuns) New efun sha1() (provided by Fippo -
+       thanks!).
+  - (func_spec, files.c) Efun write_file() can now be instructed to
+        delete the file first (suggested by Pulami).
+
 18-Apr-2004 (Lars Duening)  (3.3.522)
   - (interpret.c) F_RETURN now takes care to undo a pending SAVE_ARG_FRAME.
        This situation can happen in a closure like ({#'sprintf, "%O",

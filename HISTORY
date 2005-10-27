@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-15-Apr-2004 (Lars Duening) -- Development Release 3.3
+18-Apr-2004 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -41,6 +41,7 @@ For a detailed list of all changes see the file CHANGELOG.
        + unique_array(): The separator function can now be a closure,
            and can also be given extra arguments.
        + wizlist_info(): Added the number of mappings to the result.
+       + write_file(): Allowed to remove the file before writing.
 
     - Corrected efuns:
 
@@ -55,6 +56,7 @@ For a detailed list of all changes see the file CHANGELOG.
            Optional: PostgreSQL support.
        + regmatch(): To match a string against a regexp and optionally retrieve
            the match results for subexpressions.
+       + sha1(): Compute the SHA1 message digest.
        + struct_info(): Return information about a struct.
        + structp(): Predicate efun to detect structs.
        + tls_query_connection_state(), tls_query_connection_info(),
