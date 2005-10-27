@@ -4,7 +4,8 @@ SYNOPSIS
         int *tls_query_connection_info (object ob)
 
 DESCRIPTION
-        If <ob> does not have a TLS connection, the efun returns 0.
+        If <ob> does not have a TLS connection, or if <ob> is
+        not interactive, the efun returns 0.
 
         If <ob> has a TLS connection, tls_query_connection_info()
         returns an array that contains some parameters of <ob>'s

@@ -699,16 +699,16 @@ f_tls_query_connection_state (svalue_t *sp)
  *
  * tls_query_connection_state() returns TRUE if <ob>'s connection
  * is TLS secured, FALSE otherwise.
+ * Returns FALSE for non-interactive objects.
  */
 
 {
     interactive_t *ip;
+    Bool rc;
 
-    if (!O_SET_INTERACTIVE(ip, sp->u.ob))
-        error("Bad arg 1 to tls_deinit_connection_state(): "
-              "object not interactive.\n");
+    rc = O_SET_INTERACTIVE(ip, sp->u.ob) ? ip->tls_inited : MY_FALSE;
     free_svalue(sp);
-    put_number(sp, ip->tls_inited);
+    put_number(sp, rc);
     return sp;
 } /* f_tls_query_connection_state() */
 

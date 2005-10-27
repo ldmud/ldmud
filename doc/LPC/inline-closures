@@ -114,6 +114,9 @@ NOTES
         ('(: :)' syntax only, no context variables) for backwards
         compatibility.
 
+        Inline closures are not to be confused with inline functions
+        known from other languages.
+
 HISTORY
         LDMud 3.2.7 implemented the older, restricted form of inline
         closures.

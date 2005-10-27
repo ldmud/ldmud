@@ -508,7 +508,7 @@ with_rxcache_table=8192
 # Define this to enable LPC structs.
 enable_use_structs=yes
 
-# Define this to enable the new inline function syntax.
+# Define this to enable the new inline closure syntax.
 enable_use_new_inlines=yes
 
 

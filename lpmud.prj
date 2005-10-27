@@ -62,22 +62,16 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 537)
-(Parent-Version lpmud 3-3 536)
+(Project-Version lpmud 3-3 538)
+(Parent-Version lpmud 3-3 537)
 (Version-Log "
-  - (lex, prolang.y) The pragma '(no_)warn_missing_return' controls whether
-       the driver checks for missing return statements or not; by default
-       the check is enable.
-  - (prolang.y) If the driver can detect at compile time that a return
-       statement is missing, a compile time warning is emitted and the
-       code uses the normal F_RETURN0 as default return.
-  - (prolang.y) Corrected compilation errors when NEW_INLINES was not
-       defined (Bug #0000056)
+  - (pkg-tls.c) tls_query_connection() returns FALSE on non-interactive
+       objects instead of raising an error (suggested by Lynx).
 ")
 (New-Version-Log
 ""
 )
-(Checkin-Time "Fri, 30 Apr 2004 22:04:23 -0600")
+(Checkin-Time "Sun, 02 May 2004 20:45:11 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -115,7 +109,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.76 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.600 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.601 644))
   (HISTORY (lpmud/f/49_HISTORY 1.352 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -132,7 +126,7 @@
   (src/autoconf/acconfig.h (lpmud/d/10_acconfig.h 1.6.1.10 644))
 
   (src/settings/README (lpmud/c/22_README 1.14.1.16 644))
-  (src/settings/default (lpmud/c/23_default 1.13.1.5.1.46 744))
+  (src/settings/default (lpmud/c/23_default 1.13.1.5.1.47 744))
   (src/settings/native (lpmud/c/9_native 1.6 744))
   (src/settings/compat (lpmud/c/10_compat 1.7 744))
   (src/settings/alatia (lpmud/j/27_alatia 1.5 744))
@@ -284,7 +278,7 @@
   (src/pkg-pgsql.c (lpmud/d/b/39_pkg-pgsql. 1.3 644))
   (src/pkg-pgsql.h (lpmud/d/b/40_pkg-pgsql. 1.2 644))
   (src/pkg-tls.h (lpmud/e/b/10_pkg-tls.h 1.5 644))
-  (src/pkg-tls.c (lpmud/e/b/11_pkg-tls.c 1.7 644))
+  (src/pkg-tls.c (lpmud/e/b/11_pkg-tls.c 1.8 644))
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.19 644))
   (src/port.c (lpmud/39_port.c 1.17.1.9 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.17.1.4 644))
@@ -1269,7 +1263,7 @@
   (doc/efun/tls_deinit_connection (lpmud/e/b/14_tls_deinit 1.2 644))
   (doc/efun/tls_error (lpmud/e/b/15_tls_error 1.2 644))
   (doc/efun/tls_init_connection (lpmud/e/b/16_tls_init_c 1.2 644))
-  (doc/efun/tls_query_connection_info (lpmud/e/b/17_tls_query_ 1.3 644))
+  (doc/efun/tls_query_connection_info (lpmud/e/b/17_tls_query_ 1.4 644))
   (doc/efun/tls_query_connection_state (lpmud/e/b/18_tls_query_ 1.2 644))
   (doc/efun/to_array (lpmud/q/45_to_array 1.7 644))
   (doc/efun/to_float (lpmud/q/46_to_float 1.4 644))
@@ -1654,7 +1648,7 @@
   (doc/LPC/inherit (lpmud/r/29_inherit 1.2 644))
   (doc/LPC/inheritance (lpmud/r/30_inheritanc 1.2 644))
   (doc/LPC/initialisation (lpmud/c/49_initialisa 1.4 644))
-  (doc/LPC/inline-closures (lpmud/b/b/30_inline-clo 1.6 644))
+  (doc/LPC/inline-closures (lpmud/b/b/30_inline-clo 1.7 644))
   (doc/LPC/lfuns (lpmud/r/31_lfuns 1.3 644))
   (doc/LPC/lpc (lpmud/r/32_lpc 1.2 644))
   (doc/LPC/mappings (lpmud/l/42_mappings 1.6 644))
