@@ -1239,7 +1239,15 @@ execute_command (char *str, object_t *ob)
 
         push_c_string(inter_sp, str);
         svp = sapply_ign_prot(driver_hook[H_COMMAND].u.str, ob, 1);
-        res = (svp->type != T_NUMBER) || (svp->u.number != 0);
+        if (!svp)
+        {
+            error("Can't find H_COMMAND lfun '%s' in object '%s'.\n"
+                 , get_txt(driver_hook[H_COMMAND].u.str), get_txt(ob->name)
+                 );
+            res = 0;
+        }
+        else
+            res = (svp->type != T_NUMBER) || (svp->u.number != 0);
     }
     else if (driver_hook[H_COMMAND].type == T_CLOSURE)
     {

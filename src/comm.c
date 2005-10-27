@@ -5678,7 +5678,7 @@ start_erq_demon (const char *suffix, size_t suffixlen)
             if (erq_args)
                 execv((char *)path, erq_args);
             else
-                execl((char *)path, "erq", "--forked", 0);
+                execl((char *)path, "erq", "--forked", (char*)0);
         }
         write(1, "0", 1);  /* indicate failure back to the driver */
         _exit(1);

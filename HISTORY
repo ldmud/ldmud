@@ -138,7 +138,7 @@ For a detailed list of all changes see the file CHANGELOG.
            x509 key- and certfile for the TLS package.
 
 
-20-Nov-2003 (Lars Duening) -- Release 3.2.10
+23-Mar-2004 (Lars Duening) -- Release 3.2.10
 
     - Changed efuns:
        + debug_info(): Removed the DID_MEM_UNUSED value from the DINFO_DATA:
@@ -203,6 +203,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + walk_mapping(): If the callback object was destructed
            before the first call, the efun crashed in the error handling.
        + Swapping of volatile strings could crash the driver.
+       + H_COMMAND specifying an lfun by name which doesn't exist
+           in the interactive object.
 
     - Language:
        + catch(; nolog) is now an official feature.
