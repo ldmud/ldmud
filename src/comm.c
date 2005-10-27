@@ -748,7 +748,12 @@ comm_fatal (interactive_t *ip, char *fmt, ...)
     fprintf(stderr, "------\n");
 
     /* Disconnect the user */
-    socket_write(ip->socket, msg, strlen(msg));
+#ifdef USE_TLS
+    if(ip->tls_inited)
+	tls_write(ip, msg, strlen(msg));
+    else
+#endif
+        socket_write(ip->socket, msg, strlen(msg));
     remove_interactive(ip->ob, MY_TRUE);
 
     /* Unset mutex */
@@ -1479,10 +1484,14 @@ thread_write_buf (interactive_t * ip, struct write_buffer_s *buf)
                          , time_stamp(), status);
         length = ip->out_compress->next_out - ip->out_compress_buf;
     }
-    
     if (buf->compress)
     {
-        if ((socket_write(ip->socket, ip->out_compress_buf, length)) == -1)
+#ifdef USE_TLS
+        if ((!ip->tls_inited ? socket_write(ip->socket, ip->out_compress_buf, length)
+			     : tls_write(ip, ip->out_compress_buf, length)) == -1)
+#else
+        if (socket_write(ip->socket, ip->out_compress_buf, length) == -1)
+#endif
         { 
             buf->errorno = errno;
         } /* if socket_write() == -1 */
@@ -1492,12 +1501,16 @@ thread_write_buf (interactive_t * ip, struct write_buffer_s *buf)
     }
     else
     {
-        if ((socket_write(ip->socket, buf->buffer, buf->length)) == -1)
+#ifdef USE_TLS
+        if ((!ip->tls_inited ? socket_write(ip->socket, buf->buffer, buf->length)
+			     : tls_write(ip, buf->buffer, buf->length)) == -1)
+#else
+        if (socket_write(ip->socket, buf->buffer, buf->length) == -1)
+#endif
         {
             buf->errorno = errno;
         } /* if socket_write() == -1 */
     }
-
     if (buf->compress && !ip->compressing)
     {
         /* Compression has been turned off for this interactive,
@@ -1505,9 +1518,14 @@ thread_write_buf (interactive_t * ip, struct write_buffer_s *buf)
          */
         end_compress(ip);
     }
-#else
+#else /* USE_MCCP */
     buf->errorno = 0;
-    if ((socket_write(ip->socket, buf->buffer, buf->length)) == -1)
+#ifdef USE_TLS
+    if ((!ip->tls_inited ? socket_write(ip->socket, buf->buffer, buf->length)
+			 : tls_write(ip, buf->buffer, buf->length)) == -1)
+#else
+    if (socket_write(ip->socket, buf->buffer, buf->length) == -1)
+#endif
     {
         buf->errorno = errno;
     } /* if socket_write() == -1 */
@@ -1551,7 +1569,6 @@ writer_thread_cleanup(void *arg)
     }
     ip->write_first = ip->write_last = NULL;
 
-    dprintf1(1, "Thread %d canceled and cleaned up!\n", (long)pthread_self());
 } /* writer_thread_cleanup() */
 
 /*-------------------------------------------------------------------------*/
@@ -2091,20 +2108,33 @@ if (sending_telnet_command)
 #elif defined(USE_MCCP)
             if (ip->out_compress) /* here we choose the correct buffer */             
             {
+#ifdef USE_TLS
+                if ((n = (!ip->tls_inited ?
+			  (int)socket_write(ip->socket, ip->out_compress_buf, (size_t)length):
+			  (int)tls_write(ip, ip->out_compress_buf, (size_t)length))) != -1)
+#else
                 if ((n = (int)socket_write(ip->socket, ip->out_compress_buf, (size_t)length)) != -1)
+#endif
                 {
                     break;
                 }
             }
             else 
 #endif
+#if !defined(USE_PTHREADS)
             {
+#ifdef USE_TLS
+                if ((n = (!ip->tls_inited ? 
+			  (int)socket_write(ip->socket, ip->message_buf, (size_t)chunk):
+			  (int)tls_write(ip, ip->message_buf, (size_t)chunk))) != -1)
+#else
                 if ((n = (int)socket_write(ip->socket, ip->message_buf, (size_t)chunk)) != -1)
+#endif
                 {
                     break;
                 }
             }
-
+#endif
             switch (errno) {
               case EINTR:
                 if (--retries)
@@ -2897,7 +2927,12 @@ get_message (char *buff)
 
                 l = MAX_TEXT - ip->text_end;
 
-                l = socket_read(ip->socket, ip->text + ip->text_end, (size_t)l);
+#ifdef USE_TLS
+		if(ip->tls_inited)
+		    l = tls_read(ip, ip->text + ip->text_end, (size_t)l);
+		else
+#endif
+                    l = socket_read(ip->socket, ip->text + ip->text_end, (size_t)l);
                 if (l == -1) {
                     if (errno == ENETUNREACH) {
                         debug_message("%s Net unreachable detected.\n"
@@ -3202,8 +3237,15 @@ get_message (char *buff)
                         thread_socket_write(ip->socket, ip->text + ip->chars_ready
                                     , (size_t)(length - ip->chars_ready), ip, MY_FALSE);
 #else
+#if USE_TLS
+			if(ip->tls_inited)
+                        tls_write(ip, ip->text + ip->chars_ready
+                                    , (size_t)(length - ip->chars_ready));
+			else
+#else
                         socket_write(ip->socket, ip->text + ip->chars_ready
                                     , (size_t)(length - ip->chars_ready));
+#endif /* USE_TLS */
 #endif
                         ip->chars_ready = length;
                     }
@@ -3658,7 +3700,9 @@ new_player (SOCKET_T new_socket, struct sockaddr_in *addr, size_t addrlen
     new_interactive->out_compress = NULL;
     new_interactive->out_compress_buf=NULL;
 #endif
-    
+#ifdef USE_TLS
+    new_interactive->tls_inited = MY_FALSE;
+#endif
     new_interactive->input_to = NULL;
     put_number(&new_interactive->prompt, 0);
     new_interactive->modify_command = NULL;
@@ -4947,6 +4991,11 @@ init_telopts (void)
     telopts_dont[TELOPT_MXP] = reply_h_telnet_neg;
     telopts_will[TELOPT_MXP] = reply_h_telnet_neg;
     telopts_wont[TELOPT_MXP] = reply_h_telnet_neg;
+
+    telopts_do[TELOPT_STARTTLS] = reply_h_telnet_neg;
+    telopts_dont[TELOPT_STARTTLS] = reply_h_telnet_neg;
+    telopts_will[TELOPT_STARTTLS] = reply_h_telnet_neg;
+    telopts_wont[TELOPT_STARTTLS] = reply_h_telnet_neg;
 } /* init_telopts() */
 
 /*-------------------------------------------------------------------------*/
@@ -5157,11 +5206,22 @@ telnet_neg (interactive_t *ip)
 #else
                     if (to > &ip->text[ip->chars_ready])
                     {
+#ifdef USE_TLS
+			if(ip->inited)
+                    	    tls_write(ip, &ip->text[ip->chars_ready],
+                              (size_t)(to - &ip->text[ip->chars_ready]));
+			else
+#endif
                         socket_write(ip->socket, &ip->text[ip->chars_ready],
                           (size_t)(to - &ip->text[ip->chars_ready]));
                         ip->chars_ready = to - ip->text;
                     }
                     if (to > first) {
+#ifdef USE_TLS
+			if(ip->inited)
+                    	    tls_write(ip, "\b \b", 3);
+			else
+#endif
                         socket_write(ip->socket, "\b \b", 3);
                         to--;
                         ip->chars_ready--;
@@ -6826,6 +6886,11 @@ f_binary_message (svalue_t *sp)
                 wrote = (mp_int)thread_socket_write(ip->socket, get_txt(msg)
                                                    , mstrsize(msg), ip, MY_TRUE);
 #else
+#ifdef USE_TLS
+		if(ip->tls_inited)
+            	    wrote = (mp_int)tls_write(ip, get_txt(msg), mstrsize(msg));
+		else
+#endif /* USE_TLS */
                 wrote = (mp_int)socket_write(ip->socket, get_txt(msg), mstrsize(msg));
 #endif
                 if (wrote != -1 || errno != EINTR || i != 1)

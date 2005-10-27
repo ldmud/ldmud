@@ -141,6 +141,12 @@
 /* Does the machine offer mySQL? */
 /* #undef HAS_MYSQL */
 
+/* Does the machine offer PostgreSQL? */
+/* #undef HAS_PGSQL */
+
+/* Does the machine offer GnuTLS? */
+/* #undef HAS_GNUTLS */
+
 /* Does the machine offer pthread library? */
 /* #undef HAS_PTHREADS */
 

@@ -315,6 +315,10 @@
  */
 @cdef_use_mccp@ USE_MCCP
 
+/* Define this if you want TLS (Transport Layer Security) over Telnet.
+ */
+@cdef_use_tls@ USE_TLS
+
 /* Define this if you want mySQL support (assuming that your host
  * actually offers this.
  */

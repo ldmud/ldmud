@@ -13,6 +13,7 @@
 
 #include "simulate.h"   /* callback_t for input_to_t */
 #include "svalue.h"
+#include "pkg-tls.h"
 
 /* TODO: Make the following a separate "my-socket.h" include, also
  * TODO:: to be used in access_check.h instead of comm.h.
@@ -266,6 +267,11 @@ struct interactive_s {
     unsigned long          write_size;
     struct write_buffer_s *write_current; /* Buffer currently written */
     struct write_buffer_s *written_first; /* List of written buffers */
+#endif
+
+#ifdef USE_TLS
+    gnutls_session 	   tls_session;
+    Bool		   tls_inited;
 #endif
 };
 

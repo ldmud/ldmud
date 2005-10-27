@@ -340,6 +340,10 @@
  */
 #define USE_MCCP
 
+/* Define this if you want TLS (Transport Layer Security) over Telnet.
+ */
+#undef USE_TLS
+
 /* Define this if you want mySQL support (assuming that your host
  * actually offers this.
  */

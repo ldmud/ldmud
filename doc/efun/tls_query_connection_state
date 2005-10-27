@@ -1,0 +1,10 @@
+SYNOPSIS
+        int tls_query_connection_state(object ob)
+
+DESCRIPTION
+        tls_query_connection_state() returns TRUE if <ob>'s connection
+        is TLS secured, FALSE otherwise.
+
+SEE ALSO
+	tls_init_connection(E), tls_deinit_connection(E), tls_error(E), 
+	tls_query_connection_info(E)

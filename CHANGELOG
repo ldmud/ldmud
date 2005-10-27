@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+08-Aug-2003 (Lars Duening)  (3.3.473)
+  - (lex.c) Symbol __PTHREADS__ is defined if the driver is compiled
+       for pthreads (suggested by Gawain).
+  - (configure, pkg-tls) Added TLS support (using GnuTLS) - thanks,
+       Gawain!
+
 07-Aug-2003 (Lars Duening)  (3.3.472)
   - (doc/) Corrected a number of typos (thanks, Casey!)
   - (object.c) The efun variable_list() can now return variable values

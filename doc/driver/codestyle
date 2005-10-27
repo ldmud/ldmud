@@ -10,7 +10,10 @@
     The guidelines have a strong emphasis on code layout and commenting,
     stemming from the fact that proper layout and comments gave the
     incentive for LDMud in the first place. Right now, 50% of all lines
-    are comments, and that is a Good Thing.
+    are comments, and that has been proven to be a Good Thing.
+
+    Any reader of the "real programmers don't write comments"-school
+    of thought is asked to take his or her incompetence elsewhere.
 
 
 Language
@@ -53,13 +56,13 @@ Style
         #define HEADERNAME_H 1
           ...
         #endif /* HEADERNAME_H */
-    construct. To use a module, its headerfile must be included - no 'extern'
-    declarations.
+    construct. To use a module, its headerfile must be included - no random
+    'extern' declarations.
 
-    Every module must include "drivers.h" which in turn includes the
+    Every module must include "driver.h" which in turn includes the
     portability headers and provides common defines.
 
-    Use the driver provided types and macros like Bool or p_int.
+    Use the driver-provided types and macros like Bool or p_int.
 
     Code should be written defensively and readable. This is not the IOCCC.
 
@@ -114,6 +117,10 @@ Style
 
         static int
         function_name ( arg1 , arg2)
+
+        /* Twiddle <arg1> with <arg2> and return the result.
+         */
+
         {
             ....
         } /* function_name() */
@@ -237,5 +244,4 @@ Commenting
         } /* add_bouncer() */
 
         /**********************************************************/
-
 

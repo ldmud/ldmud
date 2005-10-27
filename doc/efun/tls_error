@@ -1,0 +1,10 @@
+SYNOPSIS
+        string tls_error(int errorno)
+
+DESCRIPTION
+        tls_error() returns a string describing the error behind the
+        error number errorno.
+
+SEE ALSO
+        tls_init_connection(E), tls_deinit_connection(E), 
+        tls_query_connection_state(E), tls_query_connection_info(E)

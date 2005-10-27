@@ -373,6 +373,10 @@ enable_use_pgsql=no
 
 enable_use_mccp=no
 
+# Enable support for TLS (Transport Layer Security).
+
+enable_use_tls=no
+
 # Enable support for alists.
 
 enable_use_alists=no

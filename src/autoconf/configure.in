@@ -124,6 +124,7 @@ AC_MY_ARG_ENABLE(use-pthreads,no,,[enable using of threads for socket writes])
 AC_MY_ARG_ENABLE(use-pcre,yes,,[Enables PCRE instead of traditional regexps])
 AC_MY_ARG_ENABLE(use-deprecated,yes,,[Enables obsolete and deprecated efuns])
 AC_MY_ARG_ENABLE(use-structs,yes,,[Enables structs])
+AC_MY_ARG_ENABLE(use-tls,no,,[Enables Transport Layer Security over Telnet])
 AC_MY_ARG_ENABLE(use-new-inlines,yes,,[Enables new inline syntax])
 AC_MY_ARG_ENABLE(use-set-light,yes,,[Enables efun set_light()])
 AC_MY_ARG_ENABLE(use-set-is-wizard,yes,,[Enables efun set_is_wizard()])
@@ -290,6 +291,7 @@ AC_CDEF_FROM_ENABLE(use_pthreads)
 AC_CDEF_FROM_ENABLE(use_ipv6)
 AC_CDEF_FROM_ENABLE(use_deprecated)
 AC_CDEF_FROM_ENABLE(use_structs)
+AC_CDEF_FROM_ENABLE(use_tls)
 AC_CDEF_FROM_ENABLE(use_new_inlines)
 AC_CDEF_FROM_ENABLE(use_set_light)
 AC_CDEF_FROM_ENABLE(use_set_is_wizard)
@@ -727,6 +729,61 @@ else
     fi
     cdef_use_ipv6="#undef"
     enable_use_ipv6=no
+fi
+
+# --- TLS ---
+
+AC_CACHE_CHECK(for GnuTLS support,lp_cv_has_gnutls,
+    saveflags="$CFLAGS"
+    CFLAGS="$CFLAGS -I/usr/include"
+    AC_TRY_COMPILE([
+#include <gnutls/gnutls.h>
+
+void foo(void)
+{
+    int i = GNUTLS_CIPHER_RIJNDAEL_256_CBC;
+}
+    ],,lp_cv_has_gnutls=yes,
+    lp_cv_has_gnutls=no
+    CFLAGS="$saveflags"
+))
+
+if test $lp_cv_has_gnutls = yes; then
+    saveflags="$CFLAGS"
+    CFLAGS="$CFLAGS -I/usr/include"
+
+    AC_DEFINE(HAS_GNUTLS)
+
+    AC_CACHE_CHECK(if -lgnutls or similar is needed, lp_cv_need_lib_gnutls,
+        AC_TRY_RUN([
+#include <gnutls.h>
+void t (void)
+{
+    gnutls_global_init();
+    gnutls_global_deinit();
+}
+int main(void)
+{
+    return 0;
+}
+        ],
+        lp_cv_need_lib_gnutls=no,
+        lp_cv_need_lib_gnutls=yes
+    ))
+    if test "$lp_cv_need_lib_gnutls" = "yes"; then
+        lp_cv_has_lib_gnutls=no
+        AC_CHECK_LIB(gnutls,gnutls_global_init,
+                     LIBS="$LIBS -lgnutls"
+                     lp_cv_has_lib_gnutls=yes
+                    )
+    fi
+else
+    if test $enable_use_tls = yes; then
+        echo "TLS not supported - disabling TLS support."
+        AC_NOT_AVAILABLE(use-tls)
+    fi
+    cdef_use_tls="#undef"
+    enable_use_tls=no
 fi
 
 # --- PThreads ---
@@ -2080,6 +2137,7 @@ AC_SUBST(cdef_use_mccp)
 AC_SUBST(cdef_use_pcre)
 AC_SUBST(cdef_use_deprecated)
 AC_SUBST(cdef_use_structs)
+AC_SUBST(cdef_use_tls)
 AC_SUBST(cdef_use_new_inlines)
 AC_SUBST(cdef_use_set_light)
 AC_SUBST(cdef_use_set_is_wizard)

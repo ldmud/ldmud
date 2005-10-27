@@ -103,6 +103,7 @@ char *telcmds[] = {
 #define  TELOPT_AUTHENTICATION 37       /* authentication */
 #define  TELOPT_ENCRYPT       38        /* authentication */
 #define	 TELOPT_NEWENV        39        /* Environment opt for Port ID */
+#define  TELOPT_STARTTLS      46        /* Transport Layer Security */
 
 /* Inofficial, mud specific telnet options */
 #define  TELOPT_COMPRESS      85        /* Mud Compression Protocol, v.1 */
@@ -128,7 +129,7 @@ char *telopts[NTELOPTS]
    , "TSPEED", "LFLOW", "LINEMODE", "XDISPLOC"
    , "ENVIRON", "AUTH", "ENCRYPT", "NEWENV"
    , "TELOPT 40", "TELOPT 41", "TELOPT 42", "TELOPT 43"
-   , "TELOPT 44", "TELOPT 45", "TELOPT 46", "TELOPT 47"
+   , "TELOPT 44", "TELOPT 45", "STARTTLS", "TELOPT 47"
    , "TELOPT 48", "TELOPT 49", "TELOPT 50", "TELOPT 51"
    , "TELOPT 52", "TELOPT 53", "TELOPT 54", "TELOPT 55"
    , "TELOPT 56", "TELOPT 57", "TELOPT 58", "TELOPT 59"

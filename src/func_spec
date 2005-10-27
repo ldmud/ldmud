@@ -689,6 +689,15 @@ void     pg_close();
 
 #endif /* USE_PGSQL */
 
+#ifdef USE_TLS
+
+int     tls_query_connection_state(object default: F_THIS_OBJECT);
+int    *tls_query_connection_info(object default: F_THIS_OBJECT);
+int     tls_init_connection(object default: F_THIS_OBJECT);
+void    tls_deinit_connection(object default: F_THIS_OBJECT);
+string  tls_error(int);
+
+#endif /* USE_TLS */
 
 /* The following functions are optional and can be configured out.
  */

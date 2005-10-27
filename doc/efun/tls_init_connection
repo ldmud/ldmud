@@ -1,0 +1,12 @@
+SYNOPSIS
+        int tls_init_connection(object ob)
+
+DESCRIPTION
+        tls_init_connection() tries to start a TLS secured connection to 
+        the interactive object <ob> (or this_object() if <ob> is not given).
+        Returns an error (<0) if not successful. Try tls_error() to get
+        an useful description of the error.
+
+SEE ALSO
+        tls_deinit_connection(E), tls_error(E), tls_query_connection_state(E),
+        tls_query_connection_info(E)

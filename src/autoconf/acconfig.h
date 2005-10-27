@@ -87,6 +87,9 @@
 /* Does the machine offer PostgreSQL? */
 #undef HAS_PGSQL
 
+/* Does the machine offer GnuTLS? */
+#undef HAS_GNUTLS
+
 /* define the erq include file. */
 #undef ERQ_INCLUDE
 

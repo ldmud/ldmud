@@ -53,6 +53,9 @@
 #include "mstrings.h"
 #include "object.h"
 #include "otable.h"
+#ifdef USE_TLS
+#include "pkg-tls.h"
+#endif
 #include "prolang.h"
 #include "sent.h"
 #include "simul_efun.h"
@@ -586,6 +589,11 @@ fatal (const char *fmt, ...)
     /* Before shutting down, try to inform the game about it */
     push_ref_string(inter_sp, STR_FATAL_ERROR);
     callback_master(STR_SHUTDOWN, 1);
+
+    /* Mandatory cleanups */
+#ifdef USE_TLS
+    tls_global_deinit();
+#endif
 
     /* Dump core and exit */
     dump_core();

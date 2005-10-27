@@ -65,6 +65,7 @@
 #ifdef USE_PCRE
 #include "pcre/pcre.h"
 #endif
+#include "pkg-tls.h"
 #include "random.h"
 #include "simulate.h"
 #include "simul_efun.h"
@@ -244,6 +245,10 @@ main (int argc, char **argv)
     current_time = get_current_time();
     random_seed = (uint32)current_time;
     seed_random(random_seed);
+
+#ifdef USE_TLS
+    tls_global_init();
+#endif
 
     do {
         dummy_current_object_for_loads = NULL_object;
@@ -585,7 +590,10 @@ main (int argc, char **argv)
 #endif
     } while(0);
 
-    /* Mandatory cleanups */
+    /* Mandatory cleanups - see also simulate::fatal() */
+#ifdef USE_TLS
+    tls_global_deinit();
+#endif
 
     return rc; /* TODO: There are constants for this */
 } /* main() */
@@ -1668,6 +1676,9 @@ options (void)
 #endif
 #ifdef USE_ALISTS
                               , "Alists supported\n"
+#endif
+#ifdef USE_TLS
+                              , "TLS supported\n"
 #endif
                               };
         size_t nStrings = sizeof(optstrings) / sizeof(optstrings[0]);

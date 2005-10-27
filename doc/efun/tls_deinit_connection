@@ -1,0 +1,11 @@
+SYNOPSIS
+        void tls_deinit_connection(object ob)
+
+DESCRIPTION
+        tls_deinit_connection() shuts down a TLS connection to
+        the interactive object <ob> (or this_object() if <ob> is not
+        given) but the connection is not closed.
+
+SEE ALSO
+        tls_init_connection(E), tls_error(E), tls_query_connection_state(E),
+        tls_query_connection_info(E)

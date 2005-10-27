@@ -820,6 +820,12 @@ init_lexer(void)
 #ifdef USE_NEW_INLINES
     add_permanent_define("__LPC_INLINE_CLOSURES__", -1, string_copy("1"), MY_FALSE);
 #endif
+#ifdef USE_PTHREADS
+    add_permanent_define("__PTHREADS__", -1, string_copy("1"), MY_FALSE);
+#endif
+#ifdef USE_TLS
+    add_permanent_define("__TLS__", -1, string_copy("1"), MY_FALSE);
+#endif
     if (wizlist_name[0] != '\0')
     {
         if (compat_mode)
