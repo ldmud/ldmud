@@ -1,3 +1,15 @@
+gcc version 2.9-aix51-020209:
+  make_func.y::read_func_spec() a too large fprintf() statement
+  causes the compiler to generated faulty code on the assignment which
+  causes the mkfunc program to crash. Splitting the print statement
+  into two solved the problem.
+
+Visual Age C 6.0, AIX 5.2:
+  make_func.y::read_func_spec() the particularly sized fprintf() statement
+  causes the compiler to generated faulty code on the following assignment,
+  which in turn causes the mkfunc program to generate faulty data. Splitting
+  the print statement into two solved the problem.
+
 gcc 2.9, 3.2 - Cygwin
   Highest optimization creates buggy code when the total size of local
   variables gets too big (>= 8KBytes).

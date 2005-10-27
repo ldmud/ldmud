@@ -78,7 +78,7 @@ typedef struct RxHashEntry {
 
     string_t * pString;  /* Generator string, a counted tabled string
                           * NULL if unused */
-    p_uint     hString;  /* Hash of pString */
+    whash_t    hString;  /* Hash of pString */
     size_t     size;     /* Size of regexp expressions for statistics */
 } RxHashEntry;
 
@@ -233,7 +233,7 @@ rx_compile (string_t * expr, int opt, Bool from_ed)
 #endif
 
 #ifdef RXCACHE_TABLE
-    p_uint hExpr;
+    whash_t hExpr;
     int h;
     RxHashEntry *pHash;
 #endif
@@ -258,7 +258,7 @@ rx_compile (string_t * expr, int opt, Bool from_ed)
 #ifdef RXCACHE_TABLE
     iNumXRequests++;
 
-    hExpr = whashmem(get_txt(expr), mstrsize(expr), 100);
+    hExpr = mstr_get_hash(expr);
     h = RxStrHash(hExpr);
     pHash = xtable[h];
 
@@ -367,7 +367,7 @@ rx_compile (string_t * expr, int opt, Bool from_ed)
 #else
 
     /* Wrap up the new regular expression and enter it into the table */
-    expr = make_tabled_from(expr);
+    expr = make_tabled_from(expr); /* for faster comparisons */
 
     if (NULL != pHash)
     {

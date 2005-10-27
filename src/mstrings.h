@@ -4,6 +4,8 @@
 #include "driver.h"
 #include "typedefs.h"
 
+#include "hash.h"
+
 /* --- Types --- */
 
 /* --- struct string_data_s : String text structure ---
@@ -19,8 +21,9 @@
 
 struct string_data_s
 {
-    size_t size;    /* Length of the string */
-    char   txt[1];  /* In fact .size characters plus one '\0' */
+    size_t  size;    /* Length of the string */
+    whash_t hash;    /* 0, or the hash of the string */
+    char    txt[1];  /* In fact .size characters plus one '\0' */
       /* The string text follows here */
 };
 
@@ -69,6 +72,7 @@ extern mp_uint mstr_used_size;
 /* --- Prototypes --- */
 
 extern void mstring_init (void);
+extern whash_t    mstring_get_hash (const string_t * pStr);
 extern string_t * mstring_alloc_string (size_t iSize MTRACE_DECL);
 extern string_t * mstring_realloc_string (string_t *string, size_t iSize MTRACE_DECL);
 extern string_t * mstring_new_string (const char * const pTxt MTRACE_DECL);
@@ -117,6 +121,22 @@ extern void   string_dinfo_status(svalue_t *svp, int value);
 
 
 /* --- Inline functions and macros --- */
+
+#define mstr_mem_size(s) \
+    (sizeof(string_t) + sizeof(string_data_t) + (s)->str->size)
+
+  /* size_t mstr_mem_size(string_t * s)
+   *   The amount of memory used to hold all this strings' data.
+   *   Used only to keep the statistics up to date.
+   */
+
+#define mstr_hash(s) \
+    ( s->str->hash )
+
+  /* whash_t mstr_hash(string_t * s)
+   *   Return the hash value of string <s>, which is 0 if the
+   *   hash hasn't been computed yet.
+   */
 
 #define mstr_mem_size(s) \
     (sizeof(string_t) + sizeof(string_data_t) + (s)->str->size)
@@ -247,6 +267,7 @@ extern void   string_dinfo_status(svalue_t *svp, int value);
 #define find_tabled(pStr)          mstring_find_tabled(pStr)
 #define find_tabled_str(pTxt)      mstring_find_tabled_str(pTxt, strlen(pTxt))
 #define find_tabled_str_n(pTxt,n)  mstring_find_tabled_str(pTxt,n)
+#define mstr_get_hash(s)         mstring_get_hash(s)
 #define mstrcmp(pStr1,pStr2)     mstring_compare(pStr1, pStr2)
 #define mstreq(pStr1,pStr2)      mstring_equal(pStr1, pStr2)
 #define mstrstr(pStr,pTxt)       mstring_mstr_n_str(pStr, 0, pTxt, strlen(pTxt))

@@ -785,8 +785,9 @@ add_array (vector_t *p, vector_t *q)
 static INLINE void
 sanitize_array (vector_t * vec)
 
-/* In the given array, make all strings shared, and replace destructed
+/* In the given array, make all strings directly tabled, and replace destructed
  * object references by svalue 0s.
+ * Used for example in preparation for ordering the array.
  */
 
 {

@@ -3499,7 +3499,7 @@ setup_function_callback ( callback_t *cb, object_t * ob, string_t * fun
     int error_index;
 
     cb->is_lambda = MY_FALSE;
-    cb->function.named.name = make_tabled_from(fun);
+    cb->function.named.name = make_tabled_from(fun); /* for faster apply()s */
     cb->function.named.ob = ref_object(ob, "callback");
 
     error_index = setup_callback_args(cb, nargs, args, allow_prot_lvalues);
@@ -4535,7 +4535,7 @@ f_set_driver_hook (svalue_t *sp)
                  , n, (unsigned long)hook_type_map[n]
                  , efun_arg_typename(hook_type_map[n]));
 
-        str = make_tabled_from(sp->u.str);
+        str = make_tabled_from(sp->u.str); /* for faster apply()s */
         put_string(driver_hook + n, str);
         free_svalue(sp);
         if (n == H_NOECHO)

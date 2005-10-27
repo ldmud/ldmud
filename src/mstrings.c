@@ -28,10 +28,15 @@
  *
  *    struct string_data_s
  *    {
- *        size_t size;            Length of the string
- *        char   txt[1.. .size];
- *        char   null             Gratuituous terminator
+ *        size_t  size;            Length of the string
+ *        whash_t hash;            0, or the hash of the string
+ *        char    txt[1.. .size];
+ *        char    null             Gratuituous terminator
  *    }
+ *
+ * The hash of the string is computed on-demand. Should the string hash
+ * to value 0, the value 0x8000 is used instead - this way the usual
+ * calculation (hash % tablesize) won't be affected.
  *
  * This structure is hardly ever used by other parts of the driver
  * directly; the 'string' datatype is instead represented by
@@ -98,13 +103,13 @@
 
 /*-------------------------------------------------------------------------*/
 
-/* Hash function, adapted to our table size.
+/* Adapt a hash value to our table size.
  */
 
 #if !( (HTABLE_SIZE) & (HTABLE_SIZE)-1 )
-#    define StrHash(s,siz) (whashmem((s), siz, 100) & ((HTABLE_SIZE)-1))
+#    define HashToIndex(h) ((h) & ((HTABLE_SIZE)-1))
 #else
-#    define StrHash(s,siz) (whashmem((s), siz, 100) % HTABLE_SIZE)
+#    define HashToIndex(h) ((h) % HTABLE_SIZE)
 #endif
 
 /*-------------------------------------------------------------------------*/
@@ -194,17 +199,66 @@ static mp_uint mstr_found = 0;
    */
 
 /*-------------------------------------------------------------------------*/
-static INLINE string_t *
-find_and_move (const char * const s, size_t size, int idx)
+static INLINE whash_t
+hash_string (const char * const s, size_t size)
 
-/* If <s> is a tabled string of length <size> in the stringtable[<idx>]
- * chain: find it, move it to the head of the chain and return its string_t*.
+/* Compute the hash for string <s> of length <size> and return it.
+ * The result will always be non-zero.
+ */
+
+{
+    whash_t hash;
+
+    hash = whashmem(s, size, 256);
+    if (!hash)
+        hash = 1 << (sizeof (hash) * CHAR_BIT - 1);
+    return hash;
+} /* hash_string() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE whash_t
+get_hash (const string_t * pStr)
+
+/* Return the hash of string <pStr>, computing it if necessary.
+ */
+
+{
+    string_data_t *sdata = pStr->str;
+
+    if (!sdata->hash)
+        sdata->hash = hash_string(sdata->txt, sdata->size);
+
+    return sdata->hash;
+} /* get_hash() */
+
+/*-------------------------------------------------------------------------*/
+whash_t
+mstring_get_hash (const string_t * pStr)
+
+/* Aliased to: mstr_get_hash()
+ *
+ * Return the hash value of <pStr>, computing it if necessary.
+ */
+
+{
+    return get_hash(pStr);
+} /* mstring_get_hash() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE string_t *
+find_and_move (const char * const s, size_t size, whash_t hash)
+
+/* If <s> is a tabled string of length <size> and <hash> in the related
+ * stringtable chain: find it, move it to the head of the chain and return its
+ * string_t*.
  *
  * If <s> is not tabled, return NULL.
  */
 
 {
     string_t *prev, *rover;
+
+    int idx = HashToIndex(hash);
 
     mstr_searches_byvalue++;
 
@@ -214,6 +268,7 @@ find_and_move (const char * const s, size_t size, int idx)
         ;    rover != NULL
           && get_txt(rover) != s
           && !(   size == mstrsize(rover)
+               && hash == get_hash(rover)
                && 0 == memcmp(get_txt(rover), s, size)
               )
         ; prev = rover, rover = rover->link
@@ -279,14 +334,13 @@ move_to_head (string_t *s, int idx)
 
 /*-------------------------------------------------------------------------*/
 static INLINE string_t *
-make_new_tabled (const char * const pTxt, size_t size, int idx MTRACE_DECL)
+make_new_tabled (const char * const pTxt, size_t size, whash_t hash MTRACE_DECL)
 
-/* Helper function for mstring_new_tabled(), mstring_new_n_tabled(),
- * and mstring_make_tabled().
+/* Helper function for mstring_new_tabled() and mstring_new_n_tabled().
  *
  * Create a new tabled string by copying the data string <pTxt> of length
- * <size> and return it counting the result as one reference. The string
- * MUST NOT yet exist in the table.
+ * <size> and <hash> and return it counting the result as one reference. The
+ * string MUST NOT yet exist in the table.
  *
  * If memory runs out, NULL is returned.
  */
@@ -294,6 +348,7 @@ make_new_tabled (const char * const pTxt, size_t size, int idx MTRACE_DECL)
 {
     string_data_t *sdata;
     string_t      *string;
+    int            idx = HashToIndex(hash);
 
     /* Get the memory for a new one */
 
@@ -312,6 +367,7 @@ make_new_tabled (const char * const pTxt, size_t size, int idx MTRACE_DECL)
     /* Set up the structures and table the string */
 
     sdata->size = size;
+    sdata->hash = hash;
     memcpy(sdata->txt, pTxt, size);
     sdata->txt[size] = '\0';
 
@@ -376,6 +432,7 @@ mstring_alloc_string (size_t iSize MTRACE_DECL)
 
     /* Set up the structures */
     sdata->size = iSize;
+    sdata->hash = 0;
     sdata->txt[iSize] = '\0';
     string->link = NULL;
     string->str = sdata;
@@ -435,6 +492,7 @@ mstring_realloc_string (string_t *string, size_t iSize MTRACE_DECL)
 
     /* Set up the structure */
     sdata->size = iSize;
+    sdata->hash = 0;
     sdata->txt[iSize] = '\0';
 
     string->str = sdata;
@@ -515,22 +573,22 @@ mstring_new_tabled (const char * const pTxt MTRACE_DECL)
  */
 
 {
-    int        idx;
+    whash_t    hash;
     size_t     size;
     string_t * string;
 
     size = strlen(pTxt);
-    idx = StrHash(pTxt, size);
+    hash = hash_string(pTxt, size);
 
     /* Check if the string has already been tabled */
-    string = find_and_move(pTxt, size, idx);
+    string = find_and_move(pTxt, size, hash);
     if (string)
     {
         return ref_mstring(string);
     }
 
     /* No: create a new one */
-    return make_new_tabled(pTxt, size, idx MTRACE_PASS);
+    return make_new_tabled(pTxt, size, hash MTRACE_PASS);
 } /* mstring_new_tabled() */
 
 /*-------------------------------------------------------------------------*/
@@ -547,20 +605,20 @@ mstring_new_n_tabled (const char * const pTxt, size_t size MTRACE_DECL)
  */
 
 {
-    int        idx;
+    whash_t    hash;
     string_t * string;
 
-    idx = StrHash(pTxt, size);
+    hash = hash_string(pTxt, size);
 
     /* Check if the string has already been tabled */
-    string = find_and_move(pTxt, size, idx);
+    string = find_and_move(pTxt, size, hash);
     if (string)
     {
         return ref_mstring(string);
     }
 
     /* No: create a new one */
-    return make_new_tabled(pTxt, size, idx MTRACE_PASS);
+    return make_new_tabled(pTxt, size, hash MTRACE_PASS);
 } /* mstring_new_n_tabled() */
 
 /*-------------------------------------------------------------------------*/
@@ -578,16 +636,14 @@ mstring_make_tabled (string_t * pStr, Bool deref_arg MTRACE_DECL)
  */
 
 {
-    int       idx;
-    size_t    size;
     string_t *string;
 
-    /* Table the string one way or the other, always succeeds */
+    /* Table the string one way or the other (always succeeds) */
     mstring_table_inplace(pStr MTRACE_PASS);
 
     if (pStr->info.tabled)
     {
-        /* The string is now tabled directly, our work is done */
+        /* The string is tabled directly, our work is done */
         if (!deref_arg)
             (void)ref_mstring(pStr);
         string = pStr;
@@ -623,6 +679,7 @@ mstring_table_inplace (string_t * pStr MTRACE_DECL)
 
 {
     string_t *string;
+    whash_t    hash;
     int        idx;
     size_t     size;
     size_t     msize;
@@ -636,10 +693,11 @@ mstring_table_inplace (string_t * pStr MTRACE_DECL)
     /* Get or create the tabled string for this untabled one */
 
     size = pStr->str->size;
-    idx = StrHash(pStr->str->txt, size);
+    hash = get_hash(pStr);
+    idx = HashToIndex(hash);
 
     /* Check if the string has already been tabled */
-    string = find_and_move(pStr->str->txt, size, idx);
+    string = find_and_move(pStr->str->txt, size, hash);
 
     if (!string)
     {
@@ -709,6 +767,7 @@ mstring_dup (string_t * pStr MTRACE_DECL)
     string = mstring_alloc_string(pStr->str->size MTRACE_PASS);
     if (string)
     {
+        string->str->hash = pStr->str->hash;
         memcpy(string->str->txt,  pStr->str->txt, pStr->str->size);
     }
 
@@ -744,6 +803,7 @@ mstring_unshare (string_t * pStr MTRACE_DECL)
     string = mstring_alloc_string(pStr->str->size MTRACE_PASS);
     if (string)
     {
+        string->str->hash = pStr->str->hash;
         memcpy(string->str->txt,  pStr->str->txt, pStr->str->size);
         free_mstring(pStr);
     }
@@ -802,8 +862,8 @@ mstring_find_tabled (const string_t * pStr)
  */
 
 {
-    int    idx;
-    size_t size;
+    whash_t hash;
+    size_t  size;
 
     /* If pStr is tabled, our work is done */
     if (pStr->info.tabled)
@@ -816,9 +876,9 @@ mstring_find_tabled (const string_t * pStr)
     /* Worst case: an untabled string we have to look for */
 
     size = mstrsize(pStr);
-    idx = StrHash(pStr->str->txt, size);
+    hash = get_hash(pStr);
 
-    return find_and_move(pStr->str->txt, size, idx);
+    return find_and_move(pStr->str->txt, size, hash);
 } /* mstring_find_tabled() */
 
 /*-------------------------------------------------------------------------*/
@@ -835,11 +895,11 @@ mstring_find_tabled_str (const char * const pTxt, size_t size)
  */
 
 {
-    int idx;
+    whash_t hash;
 
-    idx = StrHash(pTxt, size);
+    hash = hash_string(pTxt, size);
 
-    return find_and_move(pTxt, size, idx);
+    return find_and_move(pTxt, size, hash);
 } /* mstring_find_tabled_str() */
 
 /*-------------------------------------------------------------------------*/
@@ -879,7 +939,7 @@ mstring_free (string_t *s)
         mstr_tabled--;
         mstr_tabled_size -= msize;
 
-        idx = StrHash(s->str->txt, mstrsize(s));
+        idx = HashToIndex(get_hash(s));
         if (NULL == move_to_head(s, idx))
         {
             fatal("String %p (%s) doesn't hash to the same spot.\n"
@@ -965,6 +1025,11 @@ mstring_equal(const string_t * const pStr1, const string_t * const pStr2)
     if (mstr_i_tabled(pStr1) && mstr_d_tabled(pStr2) && pStr1->link == pStr2)
         return MY_TRUE;
     if (mstrsize(pStr1) != mstrsize(pStr2))
+        return MY_FALSE;
+    if (mstr_hash(pStr1) != 0
+     && mstr_hash(pStr2) != 0
+     && mstr_hash(pStr1) != mstr_hash(pStr2)
+       )
         return MY_FALSE;
 
     return (memcmp(get_txt(pStr1), get_txt(pStr2), mstrsize(pStr1)) == 0);
@@ -1680,10 +1745,10 @@ add_string_status (strbuf_t *sbuf, Bool verbose)
                           : 0
                         , mstr_untabled * STR_OVERHEAD
                         );
-        strbuf_addf(sbuf, "\nSpace required / total string bytes: "
+        strbuf_addf(sbuf, "\nSpace required / naive string implementation: "
                           "%lu%% with, %lu%% without overhead.\n"
                         , ((distinct_size + stringtable_size) * 100L)
-                          / (mstr_used_size)
+                          / (mstr_used_size - mstr_used * sizeof(string_t))
                         , ((distinct_size + stringtable_size
                                           - distinct_overhead) * 100L)
                           / (mstr_used_size - mstr_used * STR_OVERHEAD)

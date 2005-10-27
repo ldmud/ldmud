@@ -9838,21 +9838,12 @@ again:
                     svalue_t *from, *to;
 
                     /* Seed result[] with one copy of the array.
-                     * To save memory we make sure that all strings
-                     * are made shared.
                      */
                     for ( from = sp->u.vec->item, to = result->item, left = len
                         ; left
                         ; from++, to++, left--)
                     {
-                        if (from->type == T_STRING
-                         && !mstr_tabled(from->u.str)
-                           )
-                        {
-                            put_string(to, make_tabled_from(from->u.str));
-                        }
-                        else
-                            assign_svalue_no_free(to, from);
+                        assign_svalue_no_free(to, from);
                     } /* for() seed */
 
                     /* Now fill the remainder of the vector with
@@ -9962,21 +9953,12 @@ again:
                     svalue_t *from, *to;
 
                     /* Seed result[] with one copy of the array.
-                     * To save memory we make sure that all strings
-                     * are made shared.
                      */
                     for ( from = sp[-1].u.vec->item, to = result->item, left = len
                         ; left
                         ; from++, to++, left--)
                     {
-                        if (from->type == T_STRING
-                         && !mstr_tabled(from->u.str)
-                           )
-                        {
-                            put_string(to, make_tabled_from(from->u.str));
-                        }
-                        else
-                            assign_svalue_no_free(to, from);
+                        assign_svalue_no_free(to, from);
                     } /* for() seed */
 
                     /* Now fill the remainder of the vector with
@@ -11755,21 +11737,12 @@ again:
                 svalue_t *from, *to;
 
                 /* Seed result[] with one copy of the array.
-                 * To save memory we make sure that all strings
-                 * are made shared.
                  */
                 for ( from = argp->u.vec->item, to = result->item, left = len
                     ; left
                     ; from++, to++, left--)
                 {
-                    if (from->type == T_STRING
-                     && !mstr_tabled(from->u.str)
-                       )
-                    {
-                        put_string(to, make_tabled_from(from->u.str));
-                    }
-                    else
-                        assign_svalue_no_free(to, from);
+                    assign_svalue_no_free(to, from);
                 } /* for() seed */
 
                 /* Now fill the remainder of the vector with
@@ -19980,6 +19953,7 @@ f_traceprefix (svalue_t *sp)
                 if (sp->type == T_STRING)
                 {
                     ip->trace_prefix = make_tabled_from(sp->u.str);
+                      /* tabled for faster comparisons */
                 }
                 else
                     ip->trace_prefix = NULL;

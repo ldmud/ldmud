@@ -752,8 +752,8 @@ find_map_entry ( mapping_t *m, svalue_t *map_index
  *
  * If the key is not found, NULL is returned.
  *
- * Sideeffect: if <map_index> is an unshared string, it is made shared.
- *   Also, <map_index>.x.generic information is generated for types
+ * Sideeffect: if <map_index> is an untabled string, it is made directy
+ *   tabled. Also, <map_index>.x.generic information is generated for types
  *   which usually have none (required for hashing).
  */
 
@@ -762,7 +762,7 @@ find_map_entry ( mapping_t *m, svalue_t *map_index
     *ppChain = NULL;
 
     /* If the key is a string, make it tabled */
-    if (map_index->type == T_STRING && !mstr_tabled(map_index->u.str))
+    if (map_index->type == T_STRING && !mstr_d_tabled(map_index->u.str))
     {
         map_index->u.str = make_tabled(map_index->u.str);
     }

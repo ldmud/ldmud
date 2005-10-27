@@ -2740,15 +2740,25 @@ read_func_spec (void)
 "Primary codes:        %3d\n"
 "Primary efuns:        %3d\n"
 "Tabled efuns:         %3d (%d + %d + %d + %d + %d)\n"
-"Tabled vararg efuns:  %3d\n"
            , num_instr[C_CODE]
            , num_instr[C_EFUN]
            , num_instr[C_EFUN0]+num_instr[C_EFUN1]+num_instr[C_EFUN2]
                                +num_instr[C_EFUN3]+num_instr[C_EFUN4]
            , num_instr[C_EFUN0], num_instr[C_EFUN1], num_instr[C_EFUN2]
            , num_instr[C_EFUN3], num_instr[C_EFUN4]
+        );
+    fprintf(stderr,
+"Tabled vararg efuns:  %3d\n"
            , num_instr[C_EFUNV]
-    );
+        );
+        /* Combining the two print statements into one triggers bugs on
+         * AIX 5.2:
+         *   Visual Age C 6.0 compiles the for() assignment 'i = C_CODE+1'
+         *     such that i is assigned a large number (12298).
+         *   gcc 2.9 generates code for the same assignment which causes
+         *     the mkfunc program to segfault.
+         * The bugs could not be reproduced with a simple test program.
+         */
 
     /* Compute the code offsets.
      * This means that instr_offset[C_ALIAS] is also the
@@ -2756,7 +2766,9 @@ read_func_spec (void)
      */
     instr_offset[C_CODE] = 0;
     for (i = C_CODE+1; i < C_TOTAL; i++)
+    {
         instr_offset[i] = instr_offset[i-1] + num_instr[i-1];
+    }
 
     /* Check if the code ranges has been exhausted
      */

@@ -62,25 +62,24 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 539)
-(Parent-Version lpmud 3-3 538)
+(Project-Version lpmud 3-3 540)
+(Parent-Version lpmud 3-3 539)
 (Version-Log "
-  - (array.c) Using name-based callbacks for unique_array() crashed
-       the driver (reported by Ralph).
-   - (mstrings.c) Modified mstring_make_tabled() and mstring_table_inplace()
-        so that the strings are always tabled in-place (using indirectly
-        tabled strings if necessary). This allows to table a string without
-        allocating any extra memory.
-   - (interpret.c) Assigning or transferring a string no longer makes
-        the string tabled (that's what we have refcounts in them for).
-   - (comm.c, efuns.c, gcollect.c, interpret.c, simulate.c) Adapted to the
-        no-failure versions of mstring_make_tabled().
-   - (doc/concepts/inheritance) Shiny new doc from Lynx (thanks!).
+  - (make_func.y) Worked around a bug in the codegeneration on AIX 5.2 for
+       both Visual Age C 6 and gcc 2.9.
+  - (mapping.c) When looking up string keys, the code only checked if the
+       string was tabled, not if it was directly tabled.
+  - (mstrings) The hash of a string is now stored with the string data
+       and computed on demand. Especially for lookups of strings in the
+       string table this should give some advantages.
+  - (mregex.c, otable.c) Make use of new mstring hash functions.
+  - (interpret.c) When multiplying an array, string elements are now
+       longer made tabled.
 ")
 (New-Version-Log
 ""
 )
-(Checkin-Time "Thu, 06 May 2004 21:34:25 -0600")
+(Checkin-Time "Sat, 08 May 2004 12:06:22 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -118,7 +117,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.76 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.602 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.603 644))
   (HISTORY (lpmud/f/49_HISTORY 1.352 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -168,7 +167,7 @@
   (src/settings/unitopia (lpmud/c/7_unitopia 1.6.1.4.1.15 744))
   (src/settings/wunderland (lpmud/d/24_wunderland 1.3.1.9 744))
 
-  (src/C_COMPILER_BUGS (lpmud/d/21_C_COMPILER 1.6.1.2.1.4 644))
+  (src/C_COMPILER_BUGS (lpmud/d/21_C_COMPILER 1.6.1.2.1.5 644))
 
   ;; Source files
   (src/access_check.h (lpmud/f/48_access_che 1.4 644))
@@ -177,7 +176,7 @@
   (src/actions.h (lpmud/d/11_actions.h 1.6.1.7 644))
   (src/actions.c (lpmud/d/12_actions.c 1.15.1.46 644))
   (src/array.h (lpmud/f/47_array.h 1.18.1.22 644))
-  (src/array.c (lpmud/d/12_array.c 1.46.1.47.1.9 644))
+  (src/array.c (lpmud/d/12_array.c 1.46.1.47.1.10 644))
   (src/backend.h (lpmud/f/46_backend.h 1.20.1.7 644))
   (src/backend.c (lpmud/d/6_backend.c 1.68.1.35.1.33 644))
   (src/bitstrings.h (lpmud/i/47_bitstrings 1.3 644))
@@ -208,27 +207,27 @@
   (src/heartbeat.c (lpmud/m/42_heartbeat. 1.18.1.9 644))
   (src/i-svalue_cmp.h (lpmud/a/b/20_i-svalue_c 1.4 644))
   (src/interpret.h (lpmud/b/13_interpret. 1.33.1.37 644))
-  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.52 644))
+  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.53 644))
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.15.1.8 644))
   (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.67 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.16 644))
   (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.55 644))
   (src/mapping.h (lpmud/f/30_mapping.h 1.12.1.20 644))
-  (src/mapping.c (lpmud/b/6_mapping.c 1.36.1.79 644))
+  (src/mapping.c (lpmud/b/6_mapping.c 1.36.1.80 644))
   (src/md5.h (lpmud/l/18_md5.h 1.3 644))
   (src/md5.c (lpmud/l/19_md5.c 1.7 644))
   (src/mempools.h (lpmud/d/48_mempools.h 1.2.1.8 644))
   (src/mempools.c (lpmud/d/49_mempools.c 1.2.1.15 644))
   (src/mregex.h (lpmud/e/29_rxcache.h 1.7.1.10 644))
-  (src/mregex.c (lpmud/e/30_rxcache.c 1.11.1.29 644))
-  (src/mstrings.h (lpmud/i/35_mstrings.h 1.23 644))
-  (src/mstrings.c (lpmud/i/36_mstrings.c 1.21.1.26 644))
+  (src/mregex.c (lpmud/e/30_rxcache.c 1.11.1.30 644))
+  (src/mstrings.h (lpmud/i/35_mstrings.h 1.24 644))
+  (src/mstrings.c (lpmud/i/36_mstrings.c 1.21.1.27 644))
   (src/my-alloca.h (lpmud/f/29_my-alloca. 1.3.1.2 644))
   (src/my-rusage.h (lpmud/f/28_my-rusage. 1.7 644))
   (src/object.h (lpmud/44_object.h 1.34.1.19.1.4 644))
   (src/object.c (lpmud/45_object.c 1.62.1.88.1.42 644))
   (src/otable.h (lpmud/f/27_otable.h 1.8.1.4 644))
-  (src/otable.c (lpmud/43_otable.c 1.22.1.6 644))
+  (src/otable.c (lpmud/43_otable.c 1.22.1.7 644))
   (src/parser.c (lpmud/l/13_parser.c 1.1 644))
   (src/parse.h (lpmud/f/26_parse.h 1.7.1.2.1.4 644))
   (src/parse.c (lpmud/42_parse.c 1.26.1.15 644))
@@ -304,7 +303,7 @@
   (src/simul_efun.h (lpmud/f/17_simul_efun 1.5.1.5 644))
   (src/simul_efun.c (lpmud/32_simul_efun 1.20.1.17.1.4 644))
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.33 644))
-  (src/simulate.c (lpmud/31_simulate.c 1.88.1.121 644))
+  (src/simulate.c (lpmud/31_simulate.c 1.88.1.122 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.14 644))
   (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.93 644))
   (src/sysmalloc.h (lpmud/c/b/33_sysmalloc. 1.2 644))
@@ -330,7 +329,7 @@
   (src/func_spec (lpmud/c/31_func_spec 1.53.1.45.1.22.1.32 644))
   (src/string_spec (lpmud/f/6_string_spe 1.14.1.15 644))
   (src/mkfunc.c (lpmud/l/14_mkfunc.c 1.1 644))
-  (src/make_func.y (lpmud/b/7_make_func. 1.25.1.30.1.8 644))
+  (src/make_func.y (lpmud/b/7_make_func. 1.25.1.30.1.9 644))
 
   ;; Generic host files
   (src/hosts/README (lpmud/h/10_README 1.2 644))

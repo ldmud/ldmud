@@ -50,9 +50,11 @@
 /*-------------------------------------------------------------------------*/
 
 #if !( (OTABLE_SIZE) & (OTABLE_SIZE)-1 )
-#    define ObjHash(s,len) (whashmem(s, 100, len) & ((OTABLE_SIZE)-1) )
+#    define ObjHash(s)        (mstr_get_hash(s) & ((OTABLE_SIZE)-1) )
+#    define ObjHashStr(s,len) (whashmem(s, 100, len) & ((OTABLE_SIZE)-1) )
 #else
-#    define ObjHash(s,len) (whashmem(s, 100, len) % OTABLE_SIZE)
+#    define ObjHash(s)        (mstr_get_hash(s) % OTABLE_SIZE)
+#    define ObjHashStr(s,len) (whashmem(s, 100, len) % OTABLE_SIZE)
 #endif
 /* Hash the string <s> and compute the appropriate table index
  */
@@ -91,7 +93,7 @@ find_obj_n (string_t *s)
 {
     object_t * curr, *prev;
 
-    int h = ObjHash(get_txt(s),mstrsize(s));
+    int h = ObjHash(s);
 
     curr = obj_table[h];
     prev = NULL;
@@ -135,7 +137,7 @@ find_obj_n_str (const char *s)
 {
     object_t * curr, *prev;
 
-    int h = ObjHash(s,strlen(s));
+    int h = ObjHashStr(s,strlen(s));
 
     curr = obj_table[h];
     prev = NULL;
@@ -177,7 +179,7 @@ enter_object_hash (object_t *ob)
 #ifdef DEBUG
     object_t * s;
 #endif
-    int h = ObjHash(get_txt(ob->name), mstrsize(ob->name));
+    int h = ObjHash(ob->name);
 
 #ifdef DEBUG
     s = find_obj_n(ob->name);
@@ -209,7 +211,7 @@ remove_object_hash (object_t *ob)
 
 {
     object_t * s;
-    int h = ObjHash(get_txt(ob->name), mstrsize(ob->name));
+    int h = ObjHash(ob->name);
 
     s = find_obj_n(ob->name);
 
