@@ -62,24 +62,21 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 540)
-(Parent-Version lpmud 3-3 539)
+(Project-Version lpmud 3-3 541)
+(Parent-Version lpmud 3-3 540)
 (Version-Log "
-  - (make_func.y) Worked around a bug in the codegeneration on AIX 5.2 for
-       both Visual Age C 6 and gcc 2.9.
-  - (mapping.c) When looking up string keys, the code only checked if the
-       string was tabled, not if it was directly tabled.
-  - (mstrings) The hash of a string is now stored with the string data
-       and computed on demand. Especially for lookups of strings in the
-       string table this should give some advantages.
-  - (mregex.c, otable.c) Make use of new mstring hash functions.
-  - (interpret.c) When multiplying an array, string elements are now
-       longer made tabled.
+  - (mstrings) mstr_get_hash() macro now first checks if the hash has
+       already been computed before calling the slower mstring_get_hash()
+       function.
+  - (pkg-tls, comm, func_spec, gcollect.c) tls_init_connection() is now
+       able to set up the TLS connection in the background, optionally
+       calling a callback function once the attempt fails or succeeds
+       finally.
 ")
 (New-Version-Log
 ""
 )
-(Checkin-Time "Sat, 08 May 2004 12:06:22 -0600")
+(Checkin-Time "Sun, 09 May 2004 21:59:24 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -117,7 +114,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.76 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.603 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.604 644))
   (HISTORY (lpmud/f/49_HISTORY 1.352 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -176,7 +173,7 @@
   (src/actions.h (lpmud/d/11_actions.h 1.6.1.7 644))
   (src/actions.c (lpmud/d/12_actions.c 1.15.1.46 644))
   (src/array.h (lpmud/f/47_array.h 1.18.1.22 644))
-  (src/array.c (lpmud/d/12_array.c 1.46.1.47.1.10 644))
+  (src/array.c (lpmud/d/12_array.c 1.46.1.47.1.11 644))
   (src/backend.h (lpmud/f/46_backend.h 1.20.1.7 644))
   (src/backend.c (lpmud/d/6_backend.c 1.68.1.35.1.33 644))
   (src/bitstrings.h (lpmud/i/47_bitstrings 1.3 644))
@@ -186,8 +183,8 @@
   (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.26 644))
   (src/closure.h (lpmud/f/44_closure.h 1.7.1.17 644))
   (src/closure.c (lpmud/d/4_closure.c 1.41.1.47.1.18 644))
-  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.78 644))
-  (src/comm.h (lpmud/d/3_comm.h 1.26.1.39 644))
+  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.79 644))
+  (src/comm.h (lpmud/d/3_comm.h 1.26.1.40 644))
   (src/driver.h (lpmud/f/36_driver.h 1.15.1.25 644))
   (src/dumpstat.h (lpmud/f/35_dumpstat.h 1.8 644))
   (src/dumpstat.c (lpmud/c/34_dumpstat.c 1.20.1.11.1.8 644))
@@ -200,7 +197,7 @@
   (src/files.c (lpmud/i/50_files.c 1.24 644))
   (src/filestat.h (lpmud/f/51_filestat.h 1.7 644))
   (src/gcollect.h (lpmud/f/33_gcollect.h 1.6.1.15 644))
-  (src/gcollect.c (lpmud/c/30_gcollect.c 1.41.1.110 644))
+  (src/gcollect.c (lpmud/c/30_gcollect.c 1.41.1.111 644))
   (src/hash.h (lpmud/f/32_hash.h 1.6 644))
   (src/hash.c (lpmud/c/28_hash.c 1.17 644))
   (src/heartbeat.h (lpmud/m/41_heartbeat. 1.6.1.5 644))
@@ -220,7 +217,7 @@
   (src/mempools.c (lpmud/d/49_mempools.c 1.2.1.15 644))
   (src/mregex.h (lpmud/e/29_rxcache.h 1.7.1.10 644))
   (src/mregex.c (lpmud/e/30_rxcache.c 1.11.1.30 644))
-  (src/mstrings.h (lpmud/i/35_mstrings.h 1.24 644))
+  (src/mstrings.h (lpmud/i/35_mstrings.h 1.25 644))
   (src/mstrings.c (lpmud/i/36_mstrings.c 1.21.1.27 644))
   (src/my-alloca.h (lpmud/f/29_my-alloca. 1.3.1.2 644))
   (src/my-rusage.h (lpmud/f/28_my-rusage. 1.7 644))
@@ -285,8 +282,8 @@
   (src/pkg-pcre.c (lpmud/q/48_pcre-pcre. 1.5 644))
   (src/pkg-pgsql.c (lpmud/d/b/39_pkg-pgsql. 1.3 644))
   (src/pkg-pgsql.h (lpmud/d/b/40_pkg-pgsql. 1.2 644))
-  (src/pkg-tls.h (lpmud/e/b/10_pkg-tls.h 1.5 644))
-  (src/pkg-tls.c (lpmud/e/b/11_pkg-tls.c 1.8 644))
+  (src/pkg-tls.h (lpmud/e/b/10_pkg-tls.h 1.6 644))
+  (src/pkg-tls.c (lpmud/e/b/11_pkg-tls.c 1.9 644))
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.19 644))
   (src/port.c (lpmud/39_port.c 1.17.1.9 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.17.1.4 644))
@@ -303,7 +300,7 @@
   (src/simul_efun.h (lpmud/f/17_simul_efun 1.5.1.5 644))
   (src/simul_efun.c (lpmud/32_simul_efun 1.20.1.17.1.4 644))
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.33 644))
-  (src/simulate.c (lpmud/31_simulate.c 1.88.1.122 644))
+  (src/simulate.c (lpmud/31_simulate.c 1.88.1.123 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.14 644))
   (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.93 644))
   (src/sysmalloc.h (lpmud/c/b/33_sysmalloc. 1.2 644))
@@ -326,7 +323,7 @@
   (src/xptmalloc.c (lpmud/d/b/10_xptmalloc. 1.4 644))
 
   ;; Build files
-  (src/func_spec (lpmud/c/31_func_spec 1.53.1.45.1.22.1.32 644))
+  (src/func_spec (lpmud/c/31_func_spec 1.53.1.45.1.22.1.33 644))
   (src/string_spec (lpmud/f/6_string_spe 1.14.1.15 644))
   (src/mkfunc.c (lpmud/l/14_mkfunc.c 1.1 644))
   (src/make_func.y (lpmud/b/7_make_func. 1.25.1.30.1.9 644))
@@ -1271,9 +1268,9 @@
   (doc/efun/time (lpmud/q/44_time 1.1.1.5 644))
   (doc/efun/tls_deinit_connection (lpmud/e/b/14_tls_deinit 1.2 644))
   (doc/efun/tls_error (lpmud/e/b/15_tls_error 1.2 644))
-  (doc/efun/tls_init_connection (lpmud/e/b/16_tls_init_c 1.2 644))
-  (doc/efun/tls_query_connection_info (lpmud/e/b/17_tls_query_ 1.4 644))
-  (doc/efun/tls_query_connection_state (lpmud/e/b/18_tls_query_ 1.2 644))
+  (doc/efun/tls_init_connection (lpmud/e/b/16_tls_init_c 1.3 644))
+  (doc/efun/tls_query_connection_info (lpmud/e/b/17_tls_query_ 1.5 644))
+  (doc/efun/tls_query_connection_state (lpmud/e/b/18_tls_query_ 1.3 644))
   (doc/efun/to_array (lpmud/q/45_to_array 1.7 644))
   (doc/efun/to_float (lpmud/q/46_to_float 1.4 644))
   (doc/efun/to_int (lpmud/q/47_to_int 1.7 644))

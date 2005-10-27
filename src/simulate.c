@@ -3579,8 +3579,8 @@ setup_efun_callback_base ( callback_t *cb, svalue_t *args, int nargs
  *   setup_efun_callback(cb,args,nargs) -> bNoObj == FALSE
  *   setup_efun_callback_noobj(cb,args,nargs) -> bNoObj == TRUE
  *
- * TODO: The no-object feature is to support old-fashioned efun
- * TODO:: unique_array().
+ * The no-object feature is to support old-fashioned efun
+ * unique_array().
  */
 
 {

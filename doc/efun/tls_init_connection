@@ -1,12 +1,26 @@
 PRELIMINARY
 SYNOPSIS
         int tls_init_connection(object ob)
+        int tls_init_connection(object ob, string fun, string|object ob, mixed extra...)
+        int tls_init_connection(object ob, closure fun, mixed extra...)
 
 DESCRIPTION
         tls_init_connection() tries to start a TLS secured connection to 
         the interactive object <ob> (or this_object() if <ob> is not given).
-        Returns an error (<0) if not successful. Try tls_error() to get
-        an useful description of the error.
+
+        Result:
+          errorcode < 0: unsuccessful, use tls_error() to get an useful
+                         description of the error
+             number > 0: the secure connection is still being set up in the
+                          background
+            number == 0: the secure connection is active.
+        
+        If the callback <fun>/<fun>:<ob> is specified, it will be called
+        once the fate of the secure connection has been determined. The
+        first argument will be the return code from the handshake
+        (errorcode < 0 on failure, or 0 on success), followed by any
+        <extra> arguments. If <fun> is a closure, it will also be bound to
+        <ob>.
 
 SEE ALSO
         tls_deinit_connection(E), tls_error(E), tls_query_connection_state(E),

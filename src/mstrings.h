@@ -131,7 +131,7 @@ extern void   string_dinfo_status(svalue_t *svp, int value);
    */
 
 #define mstr_hash(s) \
-    ( s->str->hash )
+    ( (s)->str->hash )
 
   /* whash_t mstr_hash(string_t * s)
    *   Return the hash value of string <s>, which is 0 if the
@@ -267,7 +267,7 @@ extern void   string_dinfo_status(svalue_t *svp, int value);
 #define find_tabled(pStr)          mstring_find_tabled(pStr)
 #define find_tabled_str(pTxt)      mstring_find_tabled_str(pTxt, strlen(pTxt))
 #define find_tabled_str_n(pTxt,n)  mstring_find_tabled_str(pTxt,n)
-#define mstr_get_hash(s)         mstring_get_hash(s)
+#define mstr_get_hash(s)         ((s)->str->hash ? (s)->str->hash : mstring_get_hash(s))
 #define mstrcmp(pStr1,pStr2)     mstring_compare(pStr1, pStr2)
 #define mstreq(pStr1,pStr2)      mstring_equal(pStr1, pStr2)
 #define mstrstr(pStr,pTxt)       mstring_mstr_n_str(pStr, 0, pTxt, strlen(pTxt))

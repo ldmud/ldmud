@@ -3003,14 +3003,14 @@ make_unique (vector_t *arr, callback_t *cb, svalue_t *skipnum)
          && !destructed_object_ref(&(arr->item[cnt]))
            )
         {
-            if (!cb->is_lambda)
+            if (cb->is_lambda)
                 callback_change_object(cb, arr->item[cnt].u.ob);
             else
             {
                 push_ref_object(inter_sp, arr->item[cnt].u.ob, "unique_array");
             }
 
-            v = apply_callback(cb, cb->is_lambda ? 1 : 0);
+            v = apply_callback(cb, cb->is_lambda ? 0 : 1);
             if (v && !sameval(v, skipnum))
                 ant = put_in(pool, &head, v, &(arr->item[cnt]));
         }

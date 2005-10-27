@@ -1,6 +1,15 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+09-May-2004 (Lars Duening)  (3.3.541)
+  - (mstrings) mstr_get_hash() macro now first checks if the hash has
+       already been computed before calling the slower mstring_get_hash()
+       function.
+  - (pkg-tls, comm, func_spec, gcollect.c) tls_init_connection() is now
+       able to set up the TLS connection in the background, optionally
+       calling a callback function once the attempt fails or succeeds
+       finally.
+
 08-May-2004 (Lars Duening)  (3.3.540)
   - (make_func.y) Worked around a bug in the codegeneration on AIX 5.2 for
        both Visual Age C 6 and gcc 2.9.

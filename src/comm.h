@@ -278,7 +278,11 @@ struct interactive_s {
 
 #ifdef USE_TLS
     tls_session_t          tls_session;
-    Bool                   tls_inited;
+    int                    tls_status;
+#     define TLS_INACTIVE     0  /* Session is not secure */
+#     define TLS_HANDSHAKING  1  /* TLS is being negotiated */
+#     define TLS_ACTIVE       2  /* Session is secure */
+    callback_t            *tls_cb;
 #endif
 };
 

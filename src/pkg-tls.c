@@ -438,7 +438,7 @@ tls_read (interactive_t *ip, char *buffer, int length)
                      , time_stamp(), ret);
 	gnutls_bye(ip->tls_session, GNUTLS_SHUT_WR);
 	gnutls_deinit(ip->tls_session);
-	ip->tls_inited = MY_FALSE;
+	ip->tls_status = TLS_INACTIVE;
     }
 #endif /* SSL Package */
 
@@ -486,49 +486,211 @@ tls_write (interactive_t *ip, char *buffer, int length)
 } /* tls_write() */
 
 /*-------------------------------------------------------------------------*/
-svalue_t *
-f_tls_init_connection (svalue_t *sp)
+int
+tls_continue_handshake (interactive_t *ip)
 
-/* EFUN tls_init_connection()
+/* Continue the TLS initialisation handshake for interactive <ip>.
+ * Return a negative error code if the connection can not be set up.
+ * Return 0 if the connection is still begin set up.
+ * Return 1 if the connection is now active (or if no secure connection
+ * had been requested).
  *
- *      int tls_init_connection(object ob)
- *
- * tls_init_connection() tries to start a TLS secured connection to the
- * interactive object <ob> (or this_object() if <ob> is not given).  Returns
- * an error (< 0) if not successful. Try tls_error() to get an useful
- * description of the error.
+ * If a callback is set for <ip> and connection comes out of the handshaking
+ * state, it will be called with the result code.
  */
 
 {
-    long ret;
-    interactive_t *ip;
+    int ret;
 
-    if (!O_SET_INTERACTIVE(ip, sp->u.ob))
-        error("Bad arg 1 to tls_init_connection(): "
-              "object not interactive.\n");
+    if (ip->tls_status != TLS_HANDSHAKING)
+        return 1;
+
+    ret = 1;
+
+#ifdef HAS_OPENSSL
+
+    {
+        int n;
+
+        if ((n = SSL_do_handshake(ip->tls_session)) < 0)
+            ret = SSL_get_error(ip->tls_session, n);
+        else
+            ret = 0;
+
+        if (ret != SSL_ERROR_WANT_READ && ret != SSL_ERROR_WANT_WRITE)
+        {
+            if (ret != 0)
+            {
+                /* Setup failed */
+                SSL_free(ip->tls_session);
+                ip->tls_session = NULL;
+                ip->tls_status = TLS_INACTIVE;
+                ret = - ret;
+            }
+            else
+            {
+                /* Setup finished */
+                /* TODO: Check SSL_in_init() at this place? */
+                ip->tls_status = TLS_ACTIVE;
+                ret = 1;
+            }
+        }
+        else
+            ret = 0;
+    }
+
+#elif defined(HAS_GNUTLS)
+
+    ret = gnutls_handshake(ip->tls_session);
+
+    if (ret != GNUTLS_E_AGAIN && ret != GNUTLS_E_INTERRUPTED)
+    {
+        if (ret < 0)
+        {
+            /* Setup failed */
+            gnutls_deinit(ip->tls_session);
+            ip->tls_session = NULL;
+            ip->tls_status = TLS_INACTIVE;
+        }
+        else
+        {
+            /* Setup finished */
+            ip->tls_status = TLS_ACTIVE;
+            ret = 1;
+        }
+    }
+    else
+        ret = 0;
+
+#endif /* SSL Package */
+
+    /* If the connection is no longer in handshake, execute the callback */
+    if (ip->tls_cb != NULL && ret != 0)
+    {
+        callback_t *cb = ip->tls_cb;
+
+        if (cb->is_lambda)
+            callback_change_object(cb, ip->ob);
+        else
+            push_ref_object(inter_sp, ip->ob, "tls_handshake");
+
+        push_number(inter_sp, ret ? ret : 0);
+
+        (void)apply_callback(cb, cb->is_lambda ? 1 : 2);
+
+        free_callback(cb);
+        xfree(cb);
+        ip->tls_cb = NULL;
+    }
+
+    return ret;
+} /* tls_continue_handshake() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+v_tls_init_connection (svalue_t *sp, int num_arg)
+
+/* EFUN tls_init_connection()
+ *
+ *   int tls_init_connection(object ob)
+ *   int tls_init_connection(object ob, string fun, string|object ob, mixed extra...)
+ *   int tls_init_connection(object ob, closure fun, mixed extra...)
+ *
+ * tls_init_connection() tries to start a TLS secured connection to the
+ * interactive object <ob> (or this_object() if <ob> is not given).
+ * Result:
+ *   errorcode < 0: unsuccessful, use tls_error() to get an useful
+ *                  description of the error
+ *      number > 0: the secure connection is still being set up in the
+ *                   background
+ *     number == 0: the secure connection is active.
+ *
+ * If the callback <fun>/<fun>:<ob> is specified, it will be called once
+ * the fate of the secure connection has been determined. The first argument
+ * will be the return code from the handshake (errorcode < 0 on failure,
+ * or 0 on success), followed by any <extra> arguments. If <fun> is a closure,
+ * it will also be bound to <ob>.
+ */
+
+{
+    svalue_t * argp = sp - num_arg + 1;
+    long ret;
+    object_t * obj;
+    interactive_t *ip;
 
     if (!tls_available)
         error("tls_init_connection(): TLS layer hasn't been initialized.\n");
 
-    if (ip->tls_inited)
+    if (num_arg > 0)
+    {
+        obj = argp->u.ob;
+        put_number(argp, 0); /* remove obj reference from the stack */
+    }
+    else
+    {
+        obj = ref_object(current_object, "tls_init_connection");
+    }
+
+    if (!O_SET_INTERACTIVE(ip, obj))
+    {
+        free_object(obj, "tls_init_connection");
+        error("Bad arg 1 to tls_init_connection(): "
+              "object not interactive.\n");
+    }
+
+    free_object(obj, "tls_init_connection");
+      /* ip has another reference to obj, so this is safe to do */
+
+    if (ip->tls_status != TLS_INACTIVE)
         error("tls_init_connection(): Interactive already has a secure "
               "connection.\n");
 
-    free_svalue(sp);
+    /* Extract the callback information from the stack */
+    if (num_arg > 1)
+    {
+        /* Extract the callback information from the stack */
+        int error_index;
+        callback_t * cb;
+
+        inter_sp = sp;
+
+        memsafe(cb = xalloc(sizeof *cb) , sizeof *cb , "callback structure");
+
+        assign_eval_cost();
+
+        error_index = setup_efun_callback(ip->tls_cb, argp+1, num_arg-1);
+
+        if (error_index >= 0)
+        {
+            /* The callback values have already been removed. */
+            
+            xfree(cb);
+            inter_sp = sp = argp;
+            vefun_bad_arg(error_index+2, argp);
+            /* NOTREACHED */
+            return argp;
+        }
+
+        /* Callback creation successful */
+        ip->tls_cb = cb;
+
+        inter_sp = sp = argp;
+    }
+
+    /* Flush the connection */
 
     {
         object_t * save_c_g = command_giver;
-        command_giver = sp->u.ob;
+        command_giver = obj;
         add_message(message_flush);
         command_giver = save_c_g;
     }
 
-#ifdef HAS_OPENSSL
-
     ret = 0;
 
     do {
-        int n;
+
+#ifdef HAS_OPENSSL
 
         SSL * session = SSL_new(context);
 
@@ -544,49 +706,28 @@ f_tls_init_connection (svalue_t *sp)
             ret = - ERR_get_error();
             break;
         }
-        
-        do {
-            if ((n = SSL_do_handshake(session)) < 0)
-                ret = SSL_get_error(session, n);
-            else
-                ret = 0;
-        } while (SSL_ERROR_WANT_READ == ret || SSL_ERROR_WANT_WRITE == ret);
 
-        if (ret)
-        {
-            ret = -ret;
-            SSL_free(session);
-            break;
-        }
-
-        /* TODO: Check SSL_in_init() at this place? */
         ip->tls_session = session;
-        ip->tls_inited = MY_TRUE;
-    } while(0);
-
-    put_number(sp, ret);
-
+        
 #elif defined(HAS_GNUTLS)
 
-    initialize_tls_session(&ip->tls_session);
-    gnutls_transport_set_ptr(ip->tls_session, (gnutls_transport_ptr)(ip->socket));
-    do {
-        ret = gnutls_handshake(ip->tls_session);
-    } while (GNUTLS_E_AGAIN == ret || GNUTLS_E_INTERRUPTED == ret);
-    if (ret < 0)
-    {
-	gnutls_deinit(ip->tls_session);
-	ip->tls_inited = MY_FALSE;
-	put_number(sp, ret);
-    }
-    else
-    {
-	ip->tls_inited = MY_TRUE;
-	put_number(sp, 0);
-    }
+        initialize_tls_session(&ip->tls_session);
+        gnutls_transport_set_ptr(ip->tls_session, (gnutls_transport_ptr)(ip->socket));
 
 #endif /* SSL Package */
 
+        ip->tls_status = TLS_HANDSHAKING;
+        ret = tls_continue_handshake(ip);
+
+        /* Adjust the return value of tls_continue_handshake() */
+        if (ret == 1)
+            ret = 0;
+        else if (ret == 0)
+            ret = 1;
+
+    } while(0);
+
+    put_number(sp, ret);
     return sp;
 } /* f_tls_init_connection() */
 
@@ -600,7 +741,7 @@ tls_deinit_connection (interactive_t *ip)
 {
 #ifdef HAS_OPENSSL
 
-    if (ip->tls_inited)
+    if (ip->tls_status != TLS_INACTIVE)
     {
         SSL_shutdown(ip->tls_session);
         SSL_free(ip->tls_session);
@@ -609,7 +750,7 @@ tls_deinit_connection (interactive_t *ip)
 
 #elif defined(HAS_GNUTLS)
 
-    if (ip->tls_inited)
+    if (ip->tls_status != TLS_INACTIVE)
     {
         gnutls_bye( ip->tls_session, GNUTLS_SHUT_WR);
         gnutls_deinit(ip->tls_session);
@@ -617,7 +758,13 @@ tls_deinit_connection (interactive_t *ip)
 
 #endif /* SSL Package */
 
-    ip->tls_inited = MY_FALSE;
+    if (ip->tls_cb != NULL)
+    {
+        free_callback(ip->tls_cb);
+        xfree(ip->tls_cb);
+        ip->tls_cb = NULL;
+    }
+    ip->tls_status = TLS_INACTIVE;
 } /* tls_deinit_connection() */
 
 /*-------------------------------------------------------------------------*/
@@ -697,16 +844,24 @@ f_tls_query_connection_state (svalue_t *sp)
  *
  *      int tls_query_connection_state(object ob)
  *
- * tls_query_connection_state() returns TRUE if <ob>'s connection
- * is TLS secured, FALSE otherwise.
- * Returns FALSE for non-interactive objects.
+ * tls_query_connection_state() returns a positive number if <ob>'s connection
+ * is TLS secured, 0 if it's unsecured, and a negative number if the
+ * TLS connection setup is still being set-up.
+ * Returns 0 for non-interactive objects.
  */
 
 {
     interactive_t *ip;
     Bool rc;
 
-    rc = O_SET_INTERACTIVE(ip, sp->u.ob) ? ip->tls_inited : MY_FALSE;
+    if (!O_SET_INTERACTIVE(ip, sp->u.ob))
+        rc = 0;
+    else if (ip->tls_status == TLS_HANDSHAKING)
+        rc = -1;
+    else if (ip->tls_status == TLS_INACTIVE)
+        rc = 0;
+    else
+        rc = 1;
     free_svalue(sp);
     put_number(sp, rc);
     return sp;
@@ -722,7 +877,8 @@ f_tls_query_connection_info (svalue_t *sp)
  *       #include <sys/ tls.h>
  *       int *tls_query_connection_info (object ob)
  *
- * If <ob> does not have a TLS connection, the efun returns 0.
+ * If <ob> does not have a TLS connection, or if the TLS connection is
+ * still being set up, the efun returns 0.
  *
  * If <ob> has a TLS connection, tls_query_connection_info() returns an array
  * that contains some parameters of <ob>'s connection:
@@ -746,13 +902,7 @@ f_tls_query_connection_info (svalue_t *sp)
 {
     interactive_t *ip;
 
-    if (!O_SET_INTERACTIVE(ip, sp->u.ob))
-        error("Bad arg 1 to tls_query_connection_info(): "
-              "object not interactive.\n");
-
-    free_svalue(sp);
-
-    if (ip->tls_inited)
+    if (O_SET_INTERACTIVE(ip, sp->u.ob) && ip->tls_status == TLS_ACTIVE)
     {
         vector_t * rc;
         rc = allocate_array(TLS_INFO_MAX);
@@ -776,10 +926,12 @@ f_tls_query_connection_info (svalue_t *sp)
 	put_number(&(rc->item[TLS_PROT])
                   , gnutls_protocol_get_version(ip->tls_session));
 #endif /* SSL Package */
+        free_svalue(sp);
         put_array(sp, rc);
     }
     else
     {
+        free_svalue(sp);
         put_number(sp, 0);
     }
 
