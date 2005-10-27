@@ -620,6 +620,8 @@ if test "x$enable_use_system_crypt" = "x" || test "x$enable_use_system_crypt" = 
                 if test "$ac_cv_func_crypt" != "yes" -a "$ac_cv_func__crypt" != "yes"; then
                     # They are not in this library
                     LIBS="$lp_save_libs"
+                else
+                    eval "lp_cv_need_lib_${lp_lib}=yes"
                 fi
             fi
         fi
@@ -780,7 +782,7 @@ if test "$tls_package" = "any" -o "$tls_package" = "ssl"; then
                         )
         fi
 
-        if test "x$lp_cv_need_lib_crypto" != "xno"; then
+        if test "x$lp_cv_need_lib_crypto" != "xyes"; then
               AC_CACHE_CHECK(if -lcrypto is needed for SSL, lp_cv_need_lib_crypto,
                   AC_TRY_RUN([
 #include <openssl/ssl.h>
@@ -1206,8 +1208,9 @@ int main(void)
           AC_CHECK_LIB(ssl,main, PKGLIBS="$PKGLIBS -lssl")
       fi
 
-      AC_CACHE_CHECK(if -lcrypto is needed, lp_cv_need_lib_crypto,
-          AC_TRY_RUN([
+      if test "x$lp_cv_need_lib_crypto" != "xyes"; then
+          AC_CACHE_CHECK(if -lcrypto is needed, lp_cv_need_lib_crypto,
+              AC_TRY_RUN([
 #include <libpq-fe.h>
 void t (void)
 {
@@ -1217,12 +1220,13 @@ int main(void)
 {
     return 0;
 }
-          ],
-          lp_cv_need_lib_crypto=no,
-          lp_cv_need_lib_crypto=yes
-      ))
-      if test "$lp_cv_need_lib_crypto" = "yes"; then
-          AC_CHECK_LIB(crypto,main, PKGLIBS="$PKGLIBS -lcrypto")
+              ],
+              lp_cv_need_lib_crypto=no,
+              lp_cv_need_lib_crypto=yes
+          ))
+          if test "$lp_cv_need_lib_crypto" = "yes"; then
+              AC_CHECK_LIB(crypto,main, PKGLIBS="$PKGLIBS -lcrypto")
+          fi
       fi
 
       LIBS="$savelibs"
@@ -1240,18 +1244,17 @@ fi
 # --- Check if we need zlib libraries for mccp ---
 
 if test "x$enable_use_mccp" = "x" || test "x$enable_use_mccp" = "xyes"; then
-    tmp=""
-    AC_CHECK_LIB(z,main, tmp="$LIBS -lz")
-    if test "x$tmp" = "x"; then
+    if test "$lp_cv_need_lib_z" != "yes"; then
+        AC_CHECK_LIB(z,main,
+                     PKGLIBS="$PKGLIBS -lz"
+                     lp_cv_need_lib_z="yes"
+        )
+    fi
+    if test "$lp_cv_need_lib_z" != "yes"; then
         echo "libz library not found - disabling MCCP support"
         AC_NOT_AVAILABLE(use-mccp)
         cdef_use_mccp="#undef"
         enable_use_mccp="no"
-    else
-        if test "$lp_cv_need_lib_z" = "no"; then
-            PKGLIBS="$PKGLIBS -lz"
-            # Otherwise '-lz' was already been added.
-        fi
     fi
 fi
 

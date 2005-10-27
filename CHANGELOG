@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+17-Oct-2003 (Lars Duening)  (3.3.493)
+  - (comm.c) Efun query_ip_number(): the return of the full socket
+       address in a reference argument didn't work (thanks, Nostradamus).
+  - (configure) More corrections to the detection of -lcrypto and -lz
+       (reported by Jaroslaw).
+
 15-Oct-2003 (Lars Duening)  (3.3.492)
   - (configure) Made sure that -lz always follows the -lmysqlclient,
        as some system apparently can't resolve all backward references

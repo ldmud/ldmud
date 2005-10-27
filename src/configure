@@ -7958,6 +7958,8 @@ done
                 if test "$ac_cv_func_crypt" != "yes" -a "$ac_cv_func__crypt" != "yes"; then
                     # They are not in this library
                     LIBS="$lp_save_libs"
+                else
+                    eval "lp_cv_need_lib_${lp_lib}=yes"
                 fi
             fi
         fi
@@ -8944,7 +8946,7 @@ fi
 
         fi
 
-        if test "x$lp_cv_need_lib_crypto" != "xno"; then
+        if test "x$lp_cv_need_lib_crypto" != "xyes"; then
               echo "$as_me:$LINENO: checking if -lcrypto is needed for SSL" >&5
 echo $ECHO_N "checking if -lcrypto is needed for SSL... $ECHO_C" >&6
 if test "${lp_cv_need_lib_crypto+set}" = set; then
@@ -10660,7 +10662,8 @@ fi
 
       fi
 
-      echo "$as_me:$LINENO: checking if -lcrypto is needed" >&5
+      if test "x$lp_cv_need_lib_crypto" != "xyes"; then
+          echo "$as_me:$LINENO: checking if -lcrypto is needed" >&5
 echo $ECHO_N "checking if -lcrypto is needed... $ECHO_C" >&6
 if test "${lp_cv_need_lib_crypto+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
@@ -10710,8 +10713,8 @@ fi
 fi
 echo "$as_me:$LINENO: result: $lp_cv_need_lib_crypto" >&5
 echo "${ECHO_T}$lp_cv_need_lib_crypto" >&6
-      if test "$lp_cv_need_lib_crypto" = "yes"; then
-          echo "$as_me:$LINENO: checking for main in -lcrypto" >&5
+          if test "$lp_cv_need_lib_crypto" = "yes"; then
+              echo "$as_me:$LINENO: checking for main in -lcrypto" >&5
 echo $ECHO_N "checking for main in -lcrypto... $ECHO_C" >&6
 if test "${ac_cv_lib_crypto_main+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
@@ -10758,6 +10761,7 @@ if test $ac_cv_lib_crypto_main = yes; then
   PKGLIBS="$PKGLIBS -lcrypto"
 fi
 
+          fi
       fi
 
       LIBS="$savelibs"
@@ -10779,8 +10783,8 @@ fi
 # --- Check if we need zlib libraries for mccp ---
 
 if test "x$enable_use_mccp" = "x" || test "x$enable_use_mccp" = "xyes"; then
-    tmp=""
-    echo "$as_me:$LINENO: checking for main in -lz" >&5
+    if test "$lp_cv_need_lib_z" != "yes"; then
+        echo "$as_me:$LINENO: checking for main in -lz" >&5
 echo $ECHO_N "checking for main in -lz... $ECHO_C" >&6
 if test "${ac_cv_lib_z_main+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
@@ -10824,10 +10828,13 @@ fi
 echo "$as_me:$LINENO: result: $ac_cv_lib_z_main" >&5
 echo "${ECHO_T}$ac_cv_lib_z_main" >&6
 if test $ac_cv_lib_z_main = yes; then
-  tmp="$LIBS -lz"
+  PKGLIBS="$PKGLIBS -lz"
+                     lp_cv_need_lib_z="yes"
+
 fi
 
-    if test "x$tmp" = "x"; then
+    fi
+    if test "$lp_cv_need_lib_z" != "yes"; then
         echo "libz library not found - disabling MCCP support"
         if test "x$not_available" = "x"; then
     not_available="use-mccp"
@@ -10836,11 +10843,6 @@ else
 fi
         cdef_use_mccp="#undef"
         enable_use_mccp="no"
-    else
-        if test "$lp_cv_need_lib_z" = "no"; then
-            PKGLIBS="$PKGLIBS -lz"
-            # Otherwise '-lz' was already been added.
-        fi
     fi
 fi
 

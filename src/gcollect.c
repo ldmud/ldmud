@@ -2379,7 +2379,7 @@ show_array(int d, void *block, int depth)
     vector_t *a;
     mp_int i, j;
     svalue_t *svp;
-    wiz_list_t *user;
+    wiz_list_t *user = NULL;
     mp_int a_size;
 
     a = (vector_t *)block;

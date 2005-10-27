@@ -6390,6 +6390,8 @@ query_ip_name (svalue_t *sp, Bool lookup)
         {
             assign_svalue(sp, &const0);
         }
+
+        return sp;
     }
 
     /* If the hostname is requested and we indeed have it in our table,
