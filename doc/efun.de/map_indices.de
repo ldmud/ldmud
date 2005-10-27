@@ -28,12 +28,6 @@ BEISPIEL
 AENDERUNGEN
         In LDMud 3.2.6 umbenannt von map_mapping() und durch map() ergaenzt.
 
-ANMERKUNG
-        DIESE FUNKTION IST VERALTET.
-        Die gleiche Funktionalitaet (und mehr) bietet map(), wobei man da
-        aber beachten muss, dass map() der Funktion/Closure alle Werte
-        des Mappings vor den <extra> Parametern uebergibt.
-
 SIEHE AUCH
         map(E), filter(E), filter_indices(E), walk_mappin(E), member(E),
         m_contains(E)

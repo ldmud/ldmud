@@ -24,8 +24,5 @@ ANMERKUNG
         Komplexitaet: O(lg(n) + a*n) fuer n gleich der Anzahl der Keys und
         eine sehr kleine Konstante s (fuer Blockverschiebungen).
 
-        DIESE FUNKTION IST VERALTET.
-        Besser und einfacher zu bedienen sind Mappings.
-
 SIEHE AUCH
         alists(LPC), assoc(E), order_alist(E)

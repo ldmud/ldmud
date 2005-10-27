@@ -33,8 +33,5 @@ BEISPIEL
 AENDERUNGEN
         Eingefuehrt in 3.2.1@61.
 
-ANMERKUNG
-        Diese Funktion ist geschuetzt und erzeugt bei Benutzung einen Fehler.
-
 SIEHE AUCH
         send_erq(E), erq(C)

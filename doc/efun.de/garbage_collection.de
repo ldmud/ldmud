@@ -21,8 +21,5 @@ BESCHREIBUNG
 AENDERUNGEN
         LDMud 3.2.9 fuehte neu das Argument <filename> ein.
 
-ANMERKUNG
-        Diese Funktion ist geschuetzt und macht deshalb gar nix.
-
 SIEHE AUCH
         rusage(E), valid_write(M)

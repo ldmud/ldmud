@@ -33,10 +33,6 @@ AENDERUNGEN
         Seit LDMud 3.2.9 ist die Funktion nur noch verfuegbar, wenn der Driver
             mit USE_DEPRECATED kompiliert wurde.
 
-ANMERKUNG
-        DIESE FUNKTION IST VERALTET.
-        Die gleiche Funktionalitaet bietet object_name().
-
 SIEHE AUCH
         clone_object(E), load_name(E), load_object(E), find_object(E),
         program_name(E), rename_object(E), object_name(E)

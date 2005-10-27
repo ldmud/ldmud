@@ -12,8 +12,5 @@ BESCHREIBUNG
         den Namen des Eintrags in der Wizlist, der gelesen werden soll.
         Ist <wiz> 0, wird der Standardeintrag aus der Wizlist genommen.
 
-ANMERKUNG
-        Diese Funktion ist geschuetzt und erzeugt bei Benutzung einen Fehler.
-
 SIEHE AUCH
         wizlist_info(E), set_extra_wizinfo(E)

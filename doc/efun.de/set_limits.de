@@ -35,8 +35,5 @@ BEISPIELE
 AENDERUNGEN
         Eingefuehrt in LDMud 3.2.7.
 
-ANMERKUNG
-        Diese Funktion ist geschuetzt und erzeugt bei Benutzung einen Fehler.
-
 SIEHE AUCH
         limited(E), query_limits(E)

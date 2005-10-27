@@ -16,8 +16,5 @@ GESCHCIHTE
         Seit LDMud 3.2.9 ist diese Efun nur noch verfuegbar, wenn der Treiber
             mit USE_DEPRECATED kompiliert wurde.
 
-ANMERKUNG
-        Diese Funktion ist geschuetzt und macht deshalb gar nix.
-
 SIEHE AUCH
         remove(A), init(A), move_object(E), transfer(E), hooks(C), native(C)

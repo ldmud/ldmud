@@ -34,9 +34,5 @@ BEISPIEL
 AENDERUNGEN
         Eingefuehrt in LDMud 3.2.9.
 
-ANMERKUNGEN
-        In UNItopia wird normalerweise nicht mit der GMT gerechnet.
-        Es wird empfohlen, stattdessen timearray() zu nutzen.
-
 SIEHE AUCH
     ctime(E), localtime(E), time(E), utime(E), timearray(E)

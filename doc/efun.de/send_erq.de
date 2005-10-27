@@ -24,8 +24,5 @@ AENDERUNGEN
         Eingefuehrt in 3.2.1@61.
         Geschuetzt in 3.2.1@84
 
-ANMERKUNG
-        Diese Funktion ist geschuetzt und erzeugt bei Benutzung einen Fehler.
-
 SIEHE AUCH
         attach_erq_demon(E), erq(C)

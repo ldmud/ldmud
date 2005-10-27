@@ -13,9 +13,6 @@ BESCHREIBUNG
         In der traditionellen Implemenierung war <item> im Compat Modus auf
         das aufrufende Objekt beschraenkt.
 
-ANMERKUNG
-        Diese Funktion ist geschuetzt und macht deshalb gar nix.
-
 SIEHE AUCH
         remove(A), init(A), transfer(E), native(C), hooks(C),
         set_environment(E)

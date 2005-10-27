@@ -28,11 +28,5 @@ BEISPIELE
         write( ({"blubb"}) );
         Dies erzeugt "<ARRAY>".
 
-ANMERKUNGEN
-        DIESE FUNKTION IST VERALTET UND SOLLTE NICHT MEHR GENUTZT WERDEN.
-        Stattdessen gibt es die Lfun send_message_to, welche mit this_player()
-        als ersten Parameter dieselbe Funktionalitaet bietet. Es sollte in
-        dem Objekt aufgerufen werden, welches der Ursprung der Meldung ist.
-
 SIEHE AUCH
         say(E), tell_object(E), tell_room(E), catch_tell(A)

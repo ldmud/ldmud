@@ -20,9 +20,5 @@ BEISPIEL
 AENDERUNGEN
         Eingefuehrt in LDMud 3.2.1@93.
 
-ANMERKUNG
-        Diese Funktion kann nur vom Master in speziellen Situationen genutzt
-        werden und ist deshalb fuer die Programmierung im Mud nicht hilfreich.
-
 SIEHE AUCH
         hooks(C), runtime_error(M)

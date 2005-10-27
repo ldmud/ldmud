@@ -32,8 +32,5 @@ BESCHREIBUNG
 AENDERUNGEN
         Eingefuehrt in 3.2.1@40.
 
-ANMERKUNG
-        Diese Funktion ist geschuetzt und macht deshalb gar nix.
-
 SIEHE AUCH
         set_connection_charset(E)

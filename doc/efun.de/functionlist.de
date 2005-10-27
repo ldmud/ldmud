@@ -50,9 +50,6 @@ BESCHREIBUNG
             TYPE_MOD_NOMASK     die Funktion ist nomask deklariert
             TYPE_MOD_PUBLIC     die Funktion ist public deklariert
 
-ANMERKUNG
-            Diese Funktion ist geschuetzt und macht deshalb garnix.
-
 SIEHE AUCH
         inherit_list(E), function_exists(E), variable_list(E),
         call_resolved(E)

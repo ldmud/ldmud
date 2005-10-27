@@ -5,6 +5,3 @@ SYNOPSIS
 BESCHREIBUNG
         Lagert ein Objekt aus. Diese Efun ist nur fuer systeminternes
         Debugging und kann einen Absturz verursachen.
-
-ANMERKUNG
-        Diese Funktion ist geschuetzt und macht deshalb gar nix.

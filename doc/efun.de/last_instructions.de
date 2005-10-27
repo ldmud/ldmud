@@ -24,8 +24,5 @@ BESCHREIBUNG
         Es gibt ein vorkonfiguriertes oberes Limit, wie viele Instruktionen
         zurueckverfolgt werden koennen.
 
-ANMERKUNG
-        Diese Funktion ist geschuetzt und macht deshalb gar nix.
-
 SIEHE AUCH
         debug_message(E)

@@ -26,8 +26,6 @@ AENDERUNGEN
             Treiber USE_DEPRECATED gesetzt ist.
 
 ANMERKUNG
-        Diese Funktion ist geschuetzt und erzeugt bei Benutzung einen Fehler.
-
         Auf manchen Systemen wird ein fehlgeschlagener Versuch von send_udp()
         nicht registriert, bis das naechste send_udp() aufgerufen wird.
         Das spaetere send_udp() kann in diesem Fall 0 zurueck liefern, obwohl

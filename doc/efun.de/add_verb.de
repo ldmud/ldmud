@@ -14,9 +14,5 @@ BESCHREIBUNG
         [marion Sun Jan 19 1992 Don't use it. This file is retained
         because of somewhat nostalgic reasons.]
 
-ANMERKUNG
-        DIESE FUNKTION IST VERALTET.
-        Man kann das Verb gleich bei add_action() mit angeben.
-
 SIEHE AUCH
         add_action(E), query_verb(E), add_xverb(E), remove_action(E)

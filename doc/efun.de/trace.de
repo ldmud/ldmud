@@ -50,8 +50,5 @@ BEISPIEL
 AENDERUNGEN
         LDMud 3.2.9 uebergibt auch <traceflags> an valid_trace()
 
-ANMERKUNG
-        Diese Funktion ist geschuetzt und erzeugt bei Benutzung einen Fehler.
-
 SIEHE AUCH
         traceprefix(E)

@@ -27,9 +27,8 @@ AENDERUNGEN
         Eingefuehrt in LDMud 3.2.7.
         LDMud 3.2.8 fuegte den CMD_FAILOBJ Eintrag hinzu.
 
-ANMERKUNGEN
+ANMERKUNG
         Jeder der Eintraege im Array kann 0 sein.
-        Diese Funktion ist geschuetzt und macht deshalb gar nix.
 
 SIEHE AUCH
         command(E), command_stack_depth(E), notify_fail(E)

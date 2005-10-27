@@ -43,7 +43,3 @@ AENDERUNGEN
         Seit LDMud 3.2.6 abgeloest von filter().
         Seit LDMud 3.2.9 ist die Funktion nur noch verfuegbar, wenn der
             Treiber mit USE_DEPRECATED kompiliert wurde.
-
-ANMERKUNG
-        DIESE FUNKTION IST VERALTET.
-        Die gleiche Funktionalitaet (und mehr) bietet filter().

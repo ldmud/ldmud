@@ -36,8 +36,5 @@ BEISPIEL
 AENDERUNGEN
         LDMud 3.2.9 fuehrte den Austauschprozess fuer this_interactive() ein.
 
-ANMERKUNG
-        Diese Funktion ist geschuetzt und erzeugt bei Benutzung einen Fehler.
-
 SIEHE AUCH
         connect(M), disconnect(M), logon(A), interactive(E)

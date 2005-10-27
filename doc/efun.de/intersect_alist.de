@@ -10,10 +10,6 @@ BESCHREIBUNG
 BEISPIEL
         new_list = intersect_alist(list1, list2);
 
-ANMERKUNG
-        DIESE FUNKTION IST VERALTET.
-        Besser und einfacher zu bedienen sind Mapings.
-
 SIEHE AUCH
         filter_array(E), assoc(E), insert_alist(E), map_array(E),
         member_array(E), order_alist(E), sort_array(E), unique_array(E)

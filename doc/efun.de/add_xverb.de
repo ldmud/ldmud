@@ -12,10 +12,5 @@ BESCHREIBUNG
         uebereinstimmen muessen. Das entspricht im Wesentlichen einer
         add_action() mit gesetzen Flag.
 
-ANMERKUNGEN
-        DIESE FUNKTION IST VERALTET!
-        Man kann das Verb gleich bei add_action() mit dem Flag AA_NOSPACE mit
-        angeben.
-
 SIEHE AUCH
         add_action(E), query_verb(E), add_verb(E)

@@ -1,37 +1,39 @@
 SYNOPSIS
         #include <sys/time.h>
 
-        int * localtime(int clock)
-        int * localtime(int* uclock)
+        int *localtime(int clock);
+        int *localtime(int *uclock);
 
 BESCHREIBUNG
-        Das Argument <clock> wird als Anzahl der Sekunden seit 1.1.1970, 0
-        Uhr, interpretiert und in die Ortszeit umgewandelt. Diese wird dann in
-        einer huebschen Struktur zurueckgegeben. Ist <clock> nicht angegeben,
-        wird die aktuelle Zeit von time() verwendet.
+        Interpretiert das Argument <clock> als Anzahl Sekunden seit dem
+        01. Januar 1970, 00:00:00, und gibt die Zeit in Lokalzeit in einer
+        sauberen Struktur zurueck. Wird <clock> nicht angegeben, wird
+        standardmaessig time() verwendet.
 
-        Alternativ kann ein Array von zwei Zahlen angegeben werden: die erste
-        Zahl ist <clock> wie oben, die zweite ist die Anzahl der Mikrosekunden
-        in der aktuellen Sekunde.
+        Alternativ kann auch ein Array von zwei Zahlen als Argument angegeben
+        werden. Das erste Element wird interpretiert wie <clock>, das zweite
+        Argument enthaelt die vergangenen Mikrosekunden in dieser Sekunde und
+        wird ignoriert.
 
-        Das Resultat ist ein Array von Zahlen:
+        Das Resultat ist ein Array mit folgenden Elementen:
 
-          int TM_SEC   (0) : Sekunden (0..59)
-          int TM_MIN   (1) : Minuten (0..59)
-          int TM_HOUR  (2) : Stunden (0..23)
-          int TM_MDAY  (3) : Monatstag (1..31)
-          int TM_MON   (4) : Monat (0..11)
-          int TM_YEAR  (5) : Jahr (e.g.  2001)
-          int TM_WDAY  (6) : Wochentag (Sunday = 0)
-          int TM_YDAY  (7) : Tag im Jahr (0..365)
-          int TM_ISDST (8) : TRUE: Sommerzeit aktiv
+            int TM_SEC    (0):  Sekunde in der Minute (0..59)
+            int TM_MIN    (1):  Minute in der Stunde (0..59)
+            int TM_HOUR   (2):  Stunde des Tages (0..23)
+            int TM_MDAY   (3):  Tag im Monat (1..31)
+            int TM_MON    (4):  Monat des Jahres (0..11)
+            int TM_YEAR   (5):  Jahr (z.B. 2001)
+            int TM_WDAY   (6):  Wochentag (0..6, Sonntag = 0)
+            int TM_YDAY   (7):  Tag im Jahr (0..365)
+            inz TM_ISDST  (8):  TRUE: Daylight Saving Time
 
 BEISPIEL
+        printf("Today is %s\n", ({ "Sonntag", "Montag", "Dienstag",
+            "Mittwoch", "Donnerstag", "Freitag", "Samstag"})
+            [localtime()[TM_WDAY]]);
 
-        printf("Today is %s\n"
-              , ({ "Sunday", "Monday", "Tuesday", "Wednesday"
-                 , "Thursday", "Friday", "Saturday"
-                })[localtime()[TM_WDAY]]);
+AENDERUNGEN
+        Eingefuehrt in LDMud 3.2.9
 
 SIEHE AUCH
-        ctime(E), gmtime(E), time(E), utime(E)
+    ctime(E), gmtime(E), time(E), utime(E)

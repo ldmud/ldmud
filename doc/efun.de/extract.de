@@ -8,9 +8,5 @@ BESCHREIBUNG
         Dies ist die alte Schreibweise fuer str[from..to] und wird nur aus
         historischen Gruenden (hysterical raisins) unterstuetzt.
 
-ANMERKUNG
-        DIESE FUNKTION IST VERALTET.
-        Die gleiche Funktionalitaet bietet str[from..] bzw. str[from..to].
-
 SIEHE AUCH
         [](E)

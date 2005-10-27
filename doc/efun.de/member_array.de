@@ -16,10 +16,5 @@ GESCHICHTE
         Seit LDMued 3.2.9 ist member_array() nur noch verfuegbar, wenn der
             Treiber mit USE_DEPRECATED kompiliert wurde.
 
-ANMERKUNGEN
-        DIESE FUNKTION IST VERALTET.
-        Die gleiche Funktionalitaet (und mehr) bietet member(). Allerdings
-        muss man bei member() die Parameter vertauschen.
-
 VERGLEICHE
         member(E), alists(LPC), mappings(LPC), assoc(E), slice_array(E)

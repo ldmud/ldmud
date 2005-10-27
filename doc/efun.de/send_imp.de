@@ -29,10 +29,5 @@ AENDERUNGEN
             die Apply Namen. Die alte Version ist verfuegbar, wenn im
             Treiber USE_DEPRECATED gesetzt ist.
 
-ANMERKUNG
-        Diese Funktion ist geschuetzt und erzeugt bei Benutzung einen Fehler.
-        AUSSERDEM IST DIESE FUNKTION VERALTET.
-        Die gleiche Funktionalitaet bietet send_udp()
-
 SIEHE AUCH
         query_udp_port(E), receive_udp(M)

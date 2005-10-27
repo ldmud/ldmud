@@ -27,9 +27,5 @@ BESCHREIBUNG
         passt. Diese Form der Suche ist deshalb vorwiegend fuer
         multidimensionale Alists geeignet.
 
-ANMERKUNG
-        DIESE FUNKTION IST VERALTET.
-        Besser und einfacher zu bedienen sind Mappings.
-
 SIEHE AUCH
         alists(LPC), insert_alist(E), order_alist(E)

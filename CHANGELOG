@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+10-May-2004 (Lars Duening)  (3.3.542)
+  - (mstrings.c) Since the purpose of mstring_unshare() and mstring_dup()
+       is to create modifiable string copies, the .hash value is set
+       to 0 in the new strings.
+  - (doc/efun.de) Updated (thanks, Menaures!)
+
 09-May-2004 (Lars Duening)  (3.3.541)
   - (mstrings) mstr_get_hash() macro now first checks if the hash has
        already been computed before calling the slower mstring_get_hash()

@@ -31,8 +31,5 @@ AENDERUNGEN
         LDMud 3.2.10 ergaenzte die Efun mit der Moeglichkeit, den
             Standardzeichensatz wieder herzustellen.
 
-ANMERKUNG
-        Diese Funktion ist geschuetzt und macht deshalb gar nix.
-
 SIEHE AUCH
         get_connection_charset(E), get_combined_charset(E), binary_message(E)

@@ -10,8 +10,5 @@ BESCHREIBUNG
 AENDERUNGEN
         Eingefuehrt in 3.2@55.
 
-ANMERKUNG
-        Diese Funktion ist geschuetzt und erzeugt bei Benutzung einen Fehler.
-
 SIEHE AUCH
         creator(E), object_name(E), load_name(E)

@@ -34,8 +34,5 @@ BEISPIEL
 AENDERUNGEN
         Ab LDMud 3.2.9 wird das Argument <prefix> an valid_trace() uebergeben.
 
-ANMERKUNG
-        Diese Funktion ist geschuetzt und erzeugt bei Benutzung einen Fehler.
-
 SIEHE AUCH
         trace(E)

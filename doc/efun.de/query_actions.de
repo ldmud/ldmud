@@ -33,8 +33,5 @@ BESCHREIBUNG
             negativer Wert   das Verb muss nur in den ersten -<wert> Zeichen
                              uebereinstimmen.
 
-ANMERKUNG
-        Diese Funktion ist geschuetzt und macht deshalb gar nix.
-
 SIEHE AUCH
         add_action(E), init(A)

@@ -27,8 +27,5 @@ AENDERUNGEN
         Eingefuehrt in LDMud 3.2.1.
         LDMud 3.2.6 fuehrte die 0 als moeglichen Parameter ein.
 
-ANMERKUNG
-        Diese Funktion ist geschuetzt und macht deshalb gar nix.
-
 SIEHE AUCH
         set_this_object(E), this_player(E)

@@ -123,10 +123,5 @@ AENDERUNGEN
         Seit LDMud 3.2.8 koenne sich Objekte dank #pragma no_shadow gezielt
             davor schuetzen, einen Shadow uebergeworfen zu bekommen.
 
-ANMERKUNG
-        Diese Funktion sollte in Unitopia nicht genutzt werden, um einem
-        Objekt einen Shadow ueberzuwerfen (also mit flag != 0). Dafuer
-        gibt es die LFun init_shadow().
-
 SIEHE AUCH
         query_shadowing(E), unshadow(E), query_allow_shadow(M)

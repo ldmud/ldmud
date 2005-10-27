@@ -17,9 +17,5 @@ AENDERUNGEN
             Hook H_AUTO_INCLUDE. Diese alte Version ist nur verfuegbar,
             wenn der Treiber mit USE_DEPRECATED kompiliert wurde.
 
-ANMERKUNG
-        DIESE FUNKTION IST VERALTET.
-        Diese Funktion ist geschuetzt und erzeugt bei Benutzung einen Fehler.
-
 SIEHE AUCH
         set_driver_hoock(E), privilege_violation(E), pragma(LPC), master(M)

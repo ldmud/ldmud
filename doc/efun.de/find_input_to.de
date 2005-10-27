@@ -21,10 +21,6 @@ BESCHREIBUNG
 AENDERUNGEN
         Eingefuehrt in LDMud 3.2.9
 
-ANMERKUNG
-        Diese Funktion ist in der Regel wirkungslos, da input_to()-Funktionen
-        aufgrund der Umlautkonvertierung nicht direkt angemeldet werden.
-
 SIEHE AUCH
         input_to(E), input_to_info(E), remove_input_to(E),
         query_input_pending(E)

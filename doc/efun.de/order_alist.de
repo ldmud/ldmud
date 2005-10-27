@@ -31,10 +31,6 @@ BESCHREIBUNG
         Keys muessen vom Typ Integer, String oder Object sein. Die Typen
         koennen auch gemischt sein.
 
-ANMERKUNG
-        DIESE FUNKTION IST VERALTET.
-        Besser und einfach zu bedienen sind Mappings.
-
 SIEHE AUCH
         alists(LPC), mappings(LPC), insert_alist(E), assoc(E),
         transpose_array(E)

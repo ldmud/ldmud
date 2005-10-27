@@ -9,7 +9,3 @@ BESCHREIBUNG
 AENDERUNGEN
         Seit LDMud 3.2.9 ist m_sizeof() nur noch verfuegbar, wenn der Treiber
             mit USE_DEPRECATED kompiliert wurde.
-
-ANMERKUNG
-        DIESE FUNKTION IST VERALTET.
-        Die gleiche Funktionalitaet bietet sizeof().

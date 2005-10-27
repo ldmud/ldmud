@@ -56,8 +56,5 @@ BESCHREIBUNG
 AENDERUNGEN
         Eingefuehrt in LDMud 3.2.10
 
-ANMERKUNG
-        Diese Funktion ist geschuetzt und macht deshalb gar nix.
-
 SIEHE AUCH
         inherit_list(E), functionlist(E), variable_exists(E)

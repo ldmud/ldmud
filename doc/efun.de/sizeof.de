@@ -14,9 +14,6 @@ BESCHREIBUNG
 AENDERUNGEN
         LDMud 3.2.9 fuehrte Strings als moegliche Attribute ein.
 
-ANMERKUNG
-        Diese Efun ist identisch mit m_sizeof(), jene allerdings ist veraltet.
-
 SIEHE AUCH
         strlen(E), allocate(E), pointerp(E), mappingp(E), m_allocate(E),
         widthof(E)

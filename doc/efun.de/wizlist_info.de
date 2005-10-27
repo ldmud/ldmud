@@ -34,9 +34,6 @@ AENDERUNGEN
             um laengern Uptimes gerecht zu werden. Ausserdem wurde
             WL_TOTAL_COST und WL_TOTAL_GIGACOST eingefuehrt.
 
-ANMERKUNG
-        Diese Funktion ist geschuetzt und erzeugt bei Benutzung einen Fehler.
-
 SIEHE AUCH
         privilege_violaton(M), set_extra_wizinfo_size(E),
         get_extra_wizinfo(E), set_extra_wizinfo(E)

@@ -27,8 +27,5 @@ AENDERUNGEN
             angewendet werden.
         Seit 3.2.7 werden Kommandi gestapelt.
 
-ANMERKUNG
-        Diese Funktion ist geschuetzt und macht deshalb gar nix.
-
 SIEHE AUCH
         command_stac(E), notify_fail(E), enable_commands(E), get_eval_cost(E)

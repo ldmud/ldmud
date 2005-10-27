@@ -124,8 +124,5 @@ AENDERUNGEN
             OIM_SIZE_STRINGS_DATA, OIM_SIZE_STRINGS_TOTAL, und
             OIM_DATA_SIZE_TOTAL
 
-ANMERKUNG
-        Diese Funktion ist geschuetzt und macht deshalb gar nix.
-
 SIEHE AUCH
         debug_info(E)

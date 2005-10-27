@@ -7,8 +7,5 @@ BESCHREIBUNG
         Userobjekt aufgerufen werden. Die Funktion prueft die Integritaet des
         Stacks und faehrt den Driver herunter, falls sie Schaeden feststellt.
 
-ANMERKUNG
-        Diese Funktion ist geschuetzt und macht deshalb gar nix.
-
 SIEHE AUCH
         shutdown(E), swap(E)

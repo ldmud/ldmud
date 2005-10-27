@@ -40,10 +40,5 @@ BEISPIELE
                 tell_room(environment(this_player()), "Hallo Welt!\n");
             }
 
-ANMERKUNG
-        DIESE FUNKTION IST VERALTET UND SOLLTE NICHT MEHR GENUTZT WERDEN!
-        Stattdessen gibt es die Lfun send_message(), welche im Raum <obj>
-        aufgerufen dieselbe Funktionalitaet bietet.
-
 SIEHE AUCH
         write(E), say(E), tell_object(E), catch_tell(A), catch_msg(A)

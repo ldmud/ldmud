@@ -34,11 +34,5 @@ BEISPIEL
                 ...
             }
 
-ANMERKUNG
-        DIESE FUNKTION IST VERALTET UND SOLLTE NICHT MEHR GENUTZT WERDEN!
-        Stattdessen gibt es die Lfun send_message_to(), welche dieselbe
-        Funktionalitaet bietet. Es sollte in dem Objekt aufgerufen werden,
-        welches der Ursprung der Meldung ist.
-
 SIEHE AUCH
         write(E), say(E), catch_tell(A)

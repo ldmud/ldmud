@@ -21,8 +21,5 @@ BESCHREIBUNG
 
         Die Funktion verursacht eine Schutzverletzung.
 
-ANMERKUNG
-        Diese Funktion ist geschuetzt und erzeugt bei Benutzung einen Fehler.
-
 SIEHE AUCH
         get_extra_wizifno(E), set_extra_wizinfo_size(E), wizlist_info(E)

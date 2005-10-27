@@ -755,7 +755,9 @@ mstring_dup (string_t * pStr MTRACE_DECL)
  * just one reference.
  * If memory runs out, NULL is returned.
  *
- * Purpose is to create an instance of a string which an be freely modified.
+ * Purpose is to create an instance of a string which an be freely modified
+ * (which is why .hash is cleared).
+ *
  * See also: mstring_unshare().
  */
 
@@ -767,7 +769,6 @@ mstring_dup (string_t * pStr MTRACE_DECL)
     string = mstring_alloc_string(pStr->str->size MTRACE_PASS);
     if (string)
     {
-        string->str->hash = pStr->str->hash;
         memcpy(string->str->txt,  pStr->str->txt, pStr->str->size);
     }
 
@@ -786,7 +787,8 @@ mstring_unshare (string_t * pStr MTRACE_DECL)
  * allows it to optimize certain cases).
  * If memory runs out, NULL is returned.
  *
- * Purpose is to create an instance of a string which an be freely modified.
+ * Purpose is to create an instance of a string which an be freely modified
+ * (which is why .hash is cleared).
  */
 
 {
@@ -796,14 +798,16 @@ mstring_unshare (string_t * pStr MTRACE_DECL)
      * the result: untabled and just one reference.
      */
     if (!pStr->info.tabled && pStr->info.ref == 1 && pStr->link == NULL)
+    {
+        pStr->str->hash = 0;
         return pStr;
+    }
 
     /* Otherwise create a new untabled string from the tabled one */
 
     string = mstring_alloc_string(pStr->str->size MTRACE_PASS);
     if (string)
     {
-        string->str->hash = pStr->str->hash;
         memcpy(string->str->txt,  pStr->str->txt, pStr->str->size);
         free_mstring(pStr);
     }
@@ -830,7 +834,10 @@ mstring_resize (string_t * pStr, size_t newlen MTRACE_DECL)
     /* Check for the easy case */
     if (!pStr->info.tabled && pStr->info.ref == 1 && pStr->link == NULL
      && pStr->str->size == newlen)
+    {
+        pStr->str->hash = 0;
         return pStr;
+    }
 
     /* Otherwise create a new untabled string from the tabled one */
 

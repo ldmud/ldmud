@@ -8,9 +8,5 @@ BESCHREIBUNG
         Prozess hname ermittelt. Wenn der IP-Name nicht ermittelt werden kann,
         liefert query_ip_name() die IP-Nummer zurueck.
 
-ANMERKUNG
-        DIESE FUNKTION IST GESCHUETZT.
-        Deshalb liefert sie immer "leider.nicht.mehr.verfuegbar".
-
 SIEHE AUCH
         query_ip_number(E)

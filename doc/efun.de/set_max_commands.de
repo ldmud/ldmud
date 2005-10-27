@@ -39,8 +39,5 @@ BEISPIEL
         veraenderten max_commands vom Masterobjekt zurueck zum zurueck
         gelieferten Objekt <obj>.
 
-ANMERKUNG
-        Diese Funktion ist geschuetzt und erzeug bei Benutzung einen Fehler.
-
 SIEHE AUCH
         privilege_violation(M)x

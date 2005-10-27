@@ -44,10 +44,6 @@ AENDERUNGEN
         Seit LDMud 3.2.9 nur noch verfuegbar, wenn der Treiber mit
             USE_DEPRECATED kompiliert wurde.
 
-ANMERKUNG
-        DIESE FUNKTION IST VERALTET.
-        Die gleiche Funktionalitaet (und mehr) bietet map().
-
 SIEHE AUCH
         filter(E), filter_objects(E), assoc(E), intersect_alist(E),
         insert_alist(E), map(E), map_objects(E), member(E),

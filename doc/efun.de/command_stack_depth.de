@@ -9,8 +9,5 @@ BESCHREIBUNG
 AENDERUNGEN
         Eingefuehrt in LDMud 3.2.7.
 
-ANMERKUNGEN
-        Diese Funktion ist geschuetzt und macht deshalb gar nix.
-
 SIEHE AUCH
         command(E), command_stack(E)

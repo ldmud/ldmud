@@ -22,12 +22,6 @@ AENDERUNGEN
         In LDMud 3.2.6 umbenannt aus filter_mapping() und verallgemeinert in
             der Efun filter().
 
-ANMERKUNG
-        DIESE FUNKTION IST VERALTET.
-        Die gleiche Funktionalitaet (und mehr) bietet filter(),
-        wobei man da aber beachten muss, dass filter der Funktion/Closure
-        auch die Werte des Mappings vor den extra Parametern uebergibt.
-
 SIEHE AUCH
         filter(E), map(E), map_indices(E), walk_mapping(E), member(E),
         m_contains(E)

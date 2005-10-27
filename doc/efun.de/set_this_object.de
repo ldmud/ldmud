@@ -56,8 +56,5 @@ AENDERUNGEN
         LDMud 3.2.10 verhindert aktiv die Referenz auf globale Variablen und
             Funktionsaufrufe nach Adresse, waehren set_this_object() gilt.
 
-ANMERKUNG
-        Diese Funktion ist geschuetzt und erzeugt bei Benutzung einen Fehler.
-
 SIEHE AUCH
         this_object(E), set_this_player(E)

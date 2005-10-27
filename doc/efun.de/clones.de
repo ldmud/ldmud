@@ -36,8 +36,3 @@ BEISPIEL
 AENDERUNGEN
         Eingefuehrt in LDMud 3.2.8.
         LDMud 3.2.9 fuehrte die dynamischen Kosten ein.
-
-ANMERKUNGEN
-        DIESE FUNKTION SOLLTE NUR ZU DEBUGGINGZWECKEN GENUTZT WERDEN.
-        Diese Funktion ist SEHR rechenaufwendig und sollte daher nur zum
-        Zwecke der Fehlerfindung eingesetzt werden.

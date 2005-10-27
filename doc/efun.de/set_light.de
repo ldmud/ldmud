@@ -16,8 +16,3 @@ BUGS
         Diese Verarbeitung von Licht durch den Parser fuehrt in den meisten
         Faellen zu unerwuenschten Ergebnissen. So fuehrt eine Kerze, die man
         in einen Safe stellt dazu, dass der Safe zu leuchten beginnt.
-
-ANMERKUNG
-        DIESE FUNKTION IST VERALTET UND SOLLTE NICHT MEHR VERWENDET WERDEN.
-        Stattdessen gibt es die Lfun set_own_light(), welche die Helligkeit
-        eines Objektes setzt.

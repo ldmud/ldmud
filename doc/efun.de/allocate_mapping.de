@@ -24,10 +24,5 @@ AENDERUNGEN
         Seit 3.2.9 ist die Funktion nicht mehr verfuegbar, wenn der Treiber
             nicht mit USE_DEPRECATED kompiliert wurde.
 
-ANMERKUNG
-        DIESE FUNKTION IST VERALTET.
-        Stattdessen soll m_allocate() verwendet werden, es verhaelt sich
-        haargenau wie diese Funktion.
-
 SIEHE AUCH
         mappings(LPC), walk_mapping(E), get_type_info(E)

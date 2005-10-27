@@ -10,9 +10,5 @@ BESCHREIBUNG
 AENDERUNGEN
         Diese Funktion wurde durch copy() abgeloest.
 
-ANMERKUNG
-        DIESE FUNKTION IST VERALTET.
-        Die gleiche Funktionalitaet bietet copy().
-
 SIEHE AUCH
         mappings(LPC), copy(E)
