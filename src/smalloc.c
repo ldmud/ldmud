@@ -409,7 +409,12 @@ static size_t smalloc_size;
 
 /* --- Small Block variables --- */
 
-static word_t small_chunk_size = SMALL_CHUNK_SIZE;
+#define DEFAULT_INITIAL_SC_SIZE (3 * SMALL_CHUNK_SIZE)
+  /* The default initial size of a small chunk. Currently the driver
+   * uses somewhat over 2*SMALL_CHUNK_SIZE for it's own tables.
+   */
+
+static word_t small_chunk_size = DEFAULT_INITIAL_SC_SIZE;
   /* The size of a small chunk. Usually SMALL_CHUNK_SIZE, the first
    * small chunk of all can be allocated of min_small_malloced size;
    * the allocator will then reset the value to SMALL_CHUNK_SIZE.
@@ -3276,7 +3281,7 @@ mem_free_unrefed_memory (void)
             );
 #endif
 #ifdef MALLOC_LPC_TRACE
-            write_lpc_trace(gcollect_outfd, p + M_OVERHEAD);
+            write_lpc_trace(gcollect_outfd, p + M_OVERHEAD, MY_FALSE);
 #endif
             print_block(gcollect_outfd, p + M_OVERHEAD);
             size2 = p[size & M_MASK];
@@ -3322,7 +3327,7 @@ mem_free_unrefed_memory (void)
 #endif
                 writes(gcollect_outfd, "\n");
 #ifdef MALLOC_LPC_TRACE
-                write_lpc_trace(gcollect_outfd, q + M_OVERHEAD);
+                write_lpc_trace(gcollect_outfd, q + M_OVERHEAD, MY_FALSE);
 #endif
                 print_block(gcollect_outfd, q + M_OVERHEAD);
 
@@ -3370,9 +3375,10 @@ mem_dump_memory (int fd)
         {
             Bool isSmallChunk = MY_FALSE;
 
-            dprintf3(fd, "0x%x .. 0x%x size 0x%x "
+            dprintf4(fd, "%x .. %x %s size %x "
                        , (p_uint)p, (p_uint)(p + (size&M_MASK)) - 1
-                       , (p_uint)(size & M_MASK)
+                       , (p_uint)((size & M_GC_FREE) ? " " : "P")
+                       , (p_uint)(size & M_MASK) * SINT
                        );
             for (q = last_small_chunk; q && !isSmallChunk; q = *(word_t**)q)
             {
@@ -3385,16 +3391,21 @@ mem_dump_memory (int fd)
             {
 #ifdef MALLOC_TRACE
                 if (p[XM_FILE+M_OVERHEAD])
-                    dprintf2(fd, ": %s %d\n"
+                    dprintf2(fd, ": %s %d "
                                , p[XM_FILE+M_OVERHEAD], p[XM_LINE+M_OVERHEAD]
                     );
                 else
+                    writes(fd, ": - -");
 #endif
-                writes(fd, "\n");
 #ifdef MALLOC_LPC_TRACE
                 if (p[M_OVERHEAD + XM_OBJ])
-                    write_lpc_trace(fd, p + M_OVERHEAD);
+                {
+                    writes(fd, ": ");
+                    write_lpc_trace(fd, p + M_OVERHEAD, MY_TRUE);
+                }
+                else
 #endif
+                    writes(fd, "\n");
             }
         }
         p += size & M_MASK;
@@ -3414,9 +3425,10 @@ mem_dump_memory (int fd)
             q = p - M_OVERHEAD;
             size = *q;
 
-            dprintf3(fd, "\n--- Small Chunk: 0x%x .. 0x%x size 0x%x\n"
+            dprintf4(fd, "\n--- Small Chunk: %x .. %x %s size %x\n"
                        , (p_uint)q, (p_uint)(q + (size&M_MASK)) - 1
-                       , (p_uint)(size & M_MASK)
+                       , (p_uint)((size & M_GC_FREE) ? " " : "P")
+                       , (p_uint)(size & M_MASK) * SINT
                        );
             /* No trace information for small chunks */
         }
@@ -3427,9 +3439,10 @@ mem_dump_memory (int fd)
 
             if (!(*q & THIS_BLOCK))
             {
-                dprintf3(fd, "0x%x .. 0x%x size 0x%x "
+                dprintf4(fd, "%x .. %x %s size %x "
                            , (p_uint)q, (p_uint)(q + (size&M_MASK)) - 1
-                           , (p_uint)(size & M_MASK)
+                       , (p_uint)((size & M_GC_FREE) ? " " : "P")
+                           , (p_uint)(size & M_MASK) * SINT
                            );
 
                 /* The sentinel blocks in a small chunk consist of just
@@ -3439,16 +3452,21 @@ mem_dump_memory (int fd)
                 {
 #ifdef MALLOC_TRACE
                     if (q[XM_FILE+M_OVERHEAD])
-                        dprintf2(fd, ": %s %d\n"
+                        dprintf2(fd, ": %s %d "
                                    , q[XM_FILE+M_OVERHEAD], q[XM_LINE+M_OVERHEAD]
                         );
                     else
+                        writes(fd, ": - - ");
 #endif
-                    writes(fd, "\n");
 #ifdef MALLOC_LPC_TRACE
                     if (q[M_OVERHEAD + XM_OBJ])
-                        write_lpc_trace(fd, q + M_OVERHEAD);
+                    {
+                        writes(fd, ": ");
+                        write_lpc_trace(fd, q + M_OVERHEAD, MY_TRUE);
+                    }
+                    else
 #endif
+                        writes(fd, "\n");
                 }
                 else
                     writes(fd, "\n");

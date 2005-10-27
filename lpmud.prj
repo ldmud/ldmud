@@ -63,19 +63,16 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 529)
-(Parent-Version lpmud 3-3 528)
+(Project-Version lpmud 3-3 530)
+(Parent-Version lpmud 3-3 529)
 (Version-Log "
-  - (comm.c) Integrated Uwe's patch to open IPv6 connections with
-       net_connect() (thanks!).
-  - (efun.de/) A few more manpage translations.
-  - (func_spec, efuns) New efun reverse() (provided by Ralph, thanks!)
-       (f-000113-1, f-990714-7, f-990203-15)
+  - (smalloc.c) Changed the memory dump output format so that all the
+       important information is on one line.
 ")
 (New-Version-Log
 ""
 )
-(Checkin-Time "Sat, 24 Apr 2004 15:54:21 -0600")
+(Checkin-Time "Sat, 24 Apr 2004 16:49:02 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -113,7 +110,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.76 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.592 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.593 644))
   (HISTORY (lpmud/f/49_HISTORY 1.349 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -301,7 +298,7 @@
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.33 644))
   (src/simulate.c (lpmud/31_simulate.c 1.88.1.120 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.14 644))
-  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.89 644))
+  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.90 644))
   (src/sysmalloc.h (lpmud/c/b/33_sysmalloc. 1.2 644))
   (src/sysmalloc.c (lpmud/c/b/34_sysmalloc. 1.6 644))
   (src/sprintf.h (lpmud/f/15_sprintf.h 1.3.1.4 644))
@@ -318,7 +315,7 @@
   (src/wiz_list.h (lpmud/1_wiz_list.h 1.5.1.7.1.3 644))
   (src/wiz_list.c (lpmud/2_wiz_list.c 1.13.1.14.1.4 644))
   (src/xalloc.h (lpmud/g/51_xalloc.h 1.22 644))
-  (src/xalloc.c (lpmud/h/0_xalloc.c 1.2.1.36 644))
+  (src/xalloc.c (lpmud/h/0_xalloc.c 1.2.1.37 644))
   (src/xptmalloc.c (lpmud/d/b/10_xptmalloc. 1.4 644))
 
   ;; Build files

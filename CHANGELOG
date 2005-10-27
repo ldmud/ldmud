@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+24-Apr-2004 (Lars Duening)  (3.3.530)
+  - (xalloc.c, smalloc.c) Changed the memory dump output format so that all the
+       important information is on one line. Also increased the size of
+       the initial small chunk so that all the driver's own tables fit
+       into it.
+
 24-Apr-2004 (Lars Duening)  (3.3.529)
   - (comm.c) Integrated Uwe's patch to open IPv6 connections with
        net_connect() (thanks!).

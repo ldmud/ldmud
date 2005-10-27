@@ -155,7 +155,7 @@ static t_stat clib_alloc_stat = {0,0};
 /* Forward declarations */
 
 #ifdef MALLOC_LPC_TRACE
-static void write_lpc_trace (int d, word_t *p);
+static void write_lpc_trace (int d, word_t *p, int oneline);
 #endif
 
 static void print_block (int d, word_t *block);
@@ -914,10 +914,11 @@ print_block (int d, word_t *block)
 #ifdef MALLOC_LPC_TRACE
 
 static void
-write_lpc_trace (int d, word_t *p)
+write_lpc_trace (int d, word_t *p, int oneline)
 
 /* Write the object and program which allocated the memory block <p>
  * onto file <d>.
+ * if <oneline> is true, all information is printed in one line.
  */
 
 {
@@ -928,20 +929,39 @@ write_lpc_trace (int d, word_t *p)
     int32 id;
 
     /* Try to find the object which allocated this block */
-    if ( NULL != (obj = (object_t *)p[XM_OBJ]) )
+    if (!oneline)
     {
-        writes(d, "  By object: ");
-        if (obj->flags & O_DESTRUCTED)
-            writes(d, "(destructed) ");
-        for (o = obj_list; o && o != obj; o = o->next_all) NOOP;
-        if (!o)
-            writes(d, "(not in list) ");
-        else if (o->name)
-            writes(d, get_txt(o->name)); /* TODO: If this cores, it has to go again */
+        if ( NULL != (obj = (object_t *)p[XM_OBJ]) )
+        {
+            writes(d, "  By object: ");
+            if (obj->flags & O_DESTRUCTED)
+                writes(d, "(destructed) ");
+            for (o = obj_list; o && o != obj; o = o->next_all) NOOP;
+            if (!o)
+                writes(d, "(not in list) ");
+            else if (o->name)
+                writes(d, get_txt(o->name)); /* TODO: If this cores, it has to go again */
+        }
+        else
+            writes(d, "  No object.");
+        writes(d, "\n");
     }
     else
-        writes(d, "  No object.");
-    writes(d, "\n");
+    {
+        if ( NULL != (obj = (object_t *)p[XM_OBJ]) )
+        {
+            for (o = obj_list; o && o != obj; o = o->next_all) NOOP;
+            if (!o || !o->name)
+                writes(d, "?");
+            else
+                writes(d, get_txt(o->name)); /* TODO: If this cores, it has to go again */
+
+            if (obj->flags & O_DESTRUCTED)
+                writes(d, " (destructed)");
+        }
+        else
+            writes(d, "-");
+    }
 
     /* Try to find the program which allocated this block */
     if ( 0 != (id = p[XM_PROG]) )
@@ -949,7 +969,6 @@ write_lpc_trace (int d, word_t *p)
         pc = NULL;
         prog = NULL;
 
-        writes(d, "  By program: ");
         for ( o = obj_list
             ;    o
               && !(o->flags & O_DESTRUCTED)
@@ -970,16 +989,27 @@ write_lpc_trace (int d, word_t *p)
             string_t *file;
 
             line = get_line_number(pc, prog, &file);
-            dprintf2(d, "%s line:%d\n", (p_int)get_txt(file), line);
+            if (!oneline)
+            {
+                dprintf2(d, "  By program: %s line:%d\n", (p_int)get_txt(file), line);
+            }
+            else
+            {
+                dprintf2(d, " , %s %d", (p_int)get_txt(file), line);
+            }
 
             if (file)
                 free_mstring(file);
         }
         else
         {
-            writes(d, "Not found at old address.\n");
+            if (!oneline)
+                writes(d, "  By program: Not found at old address.\n");
         }
     }
+
+    if (oneline)
+        writes(d, "\n");
 } /* write_lpc_trace() */
 
 #endif /* MALLOC_LPC_TRACE */
@@ -1002,7 +1032,7 @@ dump_lpc_trace (int d
 
 {
 #if defined(MALLOC_LPC_TRACE)
-    write_lpc_trace(d, ((word_t *)p) - XM_OVERHEAD);
+    write_lpc_trace(d, ((word_t *)p) - XM_OVERHEAD, MY_FALSE);
 #else
 #   ifdef __MWERKS__
 #       pragma unused(p)
@@ -1043,7 +1073,7 @@ dump_malloc_trace (int d
                 );
 #    endif
 #    ifdef MALLOC_LPC_TRACE
-        write_lpc_trace(d, p);
+        write_lpc_trace(d, p, MY_FALSE);
 #    endif
 #endif
 } /* dump_malloc_trace() */
