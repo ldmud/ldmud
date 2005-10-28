@@ -60,16 +60,19 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 567)
-(Parent-Version lpmud 3-3 566)
+(Project-Version lpmud 3-3 568)
+(Parent-Version lpmud 3-3 567)
 (Version-Log "
-  - (comm.c) Improved the check for input_to() bitflags on an object with
-       telnet disabled so that only changes in the mode are warned about.
+  - (doc/efun/previous_object) Corrected to reflect actual behaviour (Bug
+    #0000073).
+  - (lex.c) The symbol __MAX_MALLOC__ is set to what is actually set
+       in the global 'max_malloced' and not just the configuration
+       value MAX_MALLLOCED (Bug #00069).
 ")
 (New-Version-Log
 ""
 )
-(Checkin-Time "Tue, 29 Jun 2004 22:26:37 -0600")
+(Checkin-Time "Thu, 01 Jul 2004 23:21:28 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -107,7 +110,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.76 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.630 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.631 644))
   (HISTORY (lpmud/f/49_HISTORY 1.362 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -197,9 +200,9 @@
   (src/heartbeat.c (lpmud/m/42_heartbeat. 1.18.1.9 644))
   (src/i-svalue_cmp.h (lpmud/a/b/20_i-svalue_c 1.4 644))
   (src/interpret.h (lpmud/b/13_interpret. 1.33.1.38 644))
-  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.59 644))
+  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.60 644))
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.15.1.8 644))
-  (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.67 644))
+  (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.68 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.17 644))
   (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.59 644))
   (src/mapping.h (lpmud/f/30_mapping.h 1.12.1.20 644))
@@ -1158,7 +1161,7 @@
   (doc/efun/pow (lpmud/c/46_pow 1.1.1.3 644))
   (doc/efun/present (lpmud/p/21_present 1.4 644))
   (doc/efun/present_clone (lpmud/t/11_present_cl 1.4 644))
-  (doc/efun/previous_object (lpmud/l/34_previous_o 1.3.1.5 644))
+  (doc/efun/previous_object (lpmud/l/34_previous_o 1.3.1.6 644))
   (doc/efun/printf (lpmud/p/22_printf 1.4 644))
   (doc/efun/process_string (lpmud/p/23_process_st 1.6 644))
   (doc/efun/program_name (lpmud/m/10_program_na 1.6 644))
@@ -1428,7 +1431,7 @@
   (doc/efun.de/program_name.de (lpmud/h/b/19_program_na 1.1 640))
   (doc/efun.de/process_string.de (lpmud/h/b/20_process_st 1.1 640))
   (doc/efun.de/printf.de (lpmud/h/b/21_printf.de 1.1 640))
-  (doc/efun.de/previous_object.de (lpmud/h/b/22_previous_o 1.1 640))
+  (doc/efun.de/previous_object.de (lpmud/h/b/22_previous_o 1.2 640))
   (doc/efun.de/present_clone.de (lpmud/h/b/23_present_cl 1.1 640))
   (doc/efun.de/present.de (lpmud/h/b/24_present.de 1.1 640))
   (doc/efun.de/pow.de (lpmud/h/b/25_pow.de 1.1 640))

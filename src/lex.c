@@ -789,7 +789,7 @@ init_lexer(void)
     sprintf(mtext, "%d", ERQ_MAX_REPLY);
     add_permanent_define("__ERQ_MAX_REPLY__", -1, string_copy(mtext), MY_FALSE);
 #endif
-    sprintf(mtext, "%ld", (long)MAX_MALLOCED);
+    sprintf(mtext, "%ld", (long)max_malloced);
     add_permanent_define("__MAX_MALLOC__", -1, string_copy(mtext), MY_FALSE);
     sprintf(mtext, "%ld", (long)def_eval_cost);
     add_permanent_define("__MAX_EVAL_COST__", -1, string_copy(mtext), MY_FALSE);

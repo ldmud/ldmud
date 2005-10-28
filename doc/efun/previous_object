@@ -9,12 +9,13 @@ DESCRIPTION
 
         If the optional arg is given, the call_other()s are followed
         back i times (i.e. previous_object(2) returns the caller of
-        the caller). 0 <= i <= caller_stack_depth()-1
+        the caller): 1 <= i < caller_stack_depth(). If <i> is less than 1, the
+        first previous object is returned.
 
         There is an important special case: in functions called by
         the gamedriver in reaction to some external event (e.g. commands
         added by add_action), previous_object() will return this_object(),
-        but previous_object(0) will return 0.
+        but previous_object(1) will return 0.
 
 EXAMPLE
         int security() {
@@ -25,7 +26,7 @@ EXAMPLE
            else return 1;
            return 0;
         }
-        void high_sensible_func() {
+        void highly_sensible_func() {
            if(!security())
               return;
            ...
@@ -34,6 +35,10 @@ EXAMPLE
         This example shows how we can check if the last call to a
         function of the current object is secure or if we should abort
         execution.
+
+BUGS
+        Values of i < 1 are treated as if i == 1 was passed - this is
+        historic.
 
 SEE ALSO
         call_other(E), this_object(E), this_player(E),

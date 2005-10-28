@@ -19014,12 +19014,13 @@ f_previous_object (svalue_t *sp)
  *
  * Follow back the last <i> call_other()s and return the calling
  * object (i.e. previous_object(2) returns the caller of the
- * caller). It must hold 0 <= i < caller_stack_depth().
+ * caller). It must hold 1 <= i < caller_stack_depth().
+ * Any value of i < 1 is treated as i == 1.
  *
  * There is an important special case: in functions called by the
  * gamedriver in reaction to some external event (e.g. commands
  * added by add_action), previous_object() will return
- * this_object(), but previous_object(0) will return 0.
+ * this_object(), but previous_object(1) will return 0.
  */
 
 {
