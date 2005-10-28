@@ -7127,6 +7127,7 @@ f_binary_message (svalue_t *sp)
         {
             if (svp->type != T_NUMBER)
             {
+                free_mstring(msg);
                 error("Bad arg 1 to binary_message(): got %s*, "
                       "expected string/int*.\n", typename(svp->type));
                 /* NOTREACHED */
@@ -7491,6 +7492,7 @@ v_input_to (svalue_t *sp, int num_arg)
     {
         if (num_arg <= 2)
         {
+            free_input_to(it);
             error("Missing prompt argument to input_to().\n");
             /* NOTREACHED */
         }

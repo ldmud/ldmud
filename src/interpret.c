@@ -2391,13 +2391,6 @@ inter_add_array (vector_t *q, vector_t **vpp)
 
     p = *vpp;
 
-    inter_sp -= 2;
-
-    /* Out of memory might result in some memory leaks. Better that freeing
-     * arrays with 0 ref count, or indigestion in garbage_collection() .
-     * It will simply give some more debugging output...
-     */
-
     /* *vpp could be in the summands, thus don't free p / q before
      * assigning.
      * On the other hand, with an uninitialized array, we musn't assign
@@ -2407,6 +2400,27 @@ inter_add_array (vector_t *q, vector_t **vpp)
     p_size = VEC_SIZE(p);
     q_size = VEC_SIZE(q);
     s = p->item;
+
+    /* Check the result size for legality - this leaves the code below
+     * to deal just with out of memory conditions.
+     */
+
+    if (max_array_size && p_size + q_size > max_array_size)
+    {
+        error("Illegal array size: %ld.\n", (long)(p_size + q_size));
+    }
+
+    /* The optimized array-adding will transfer elements around, rendering
+     * the arrays on the stack inconsistent. Thus any out-of-memory
+     * error must not attempt to free them - leaking them is the lesser
+     * evil in this situation.
+     */
+    inter_sp -= 2;
+
+    /* Out of memory might result in some memory leaks. Better that freeing
+     * arrays with 0 ref count, or indigestion in garbage_collection() .
+     * It will simply give some more debugging output...
+     */
 
     /* Allocate the result vector and copy p into it.
      */
@@ -2428,23 +2442,10 @@ inter_add_array (vector_t *q, vector_t **vpp)
             r->user->size_array -= p_size;
             r->user = current_object->user;
             r->user->size_array += p_size + q_size;
-
-            if (max_array_size && p_size + q_size > max_array_size)
-            {
-                /* Oops, overflow - invalidate everything */
-                *vpp = allocate_array(0);
-                d = r->item + p_size;
-                for (cnt = (mp_int)q_size; --cnt >=0; )
-                {
-                    d[cnt].type = T_INVALID;
-                }
-                free_array(r);
-                free_array(q);
-                error("Illegal array size: %ld.\n", (long)(p_size + q_size));
-            }
         } else
         /* Just allocate a new vector and memcopy p into it. */
         {
+printf("DEBUG: can't increase vector size\n");
             r = allocate_uninit_array((p_int)(p_size + q_size));
             deref_array(p);
             d = r->item;
@@ -2459,6 +2460,7 @@ inter_add_array (vector_t *q, vector_t **vpp)
         /* p must survive: allocate a new vector and assign the values
          * from p.
          */
+printf("DEBUG: p must survive\n");
         r = allocate_uninit_array((p_int)(p_size + q_size));
         deref_array(p);
         d = r->item;
@@ -10683,6 +10685,8 @@ again:
         else if ((sp-1)->type == T_POINTER)
         {
             TYPE_TEST_RIGHT(sp, T_POINTER);
+            inter_sp = sp;
+            inter_pc = pc;
             sp--;
             sp->u.vec = join_array(sp->u.vec, (sp+1)->u.vec);
         }
@@ -12200,11 +12204,12 @@ again:
                 OP_ARG_ERROR(2, TF_POINTER, sp[-1].type);
                 /* NOTREACHED */
             }
-            inter_sp = sp - 2;
+            inter_sp = sp;
+            inter_pc = pc;
             vec1 = argp->u.vec;
             vec2 = sp[-1].u.vec;
-            argp->type = T_NUMBER;
             vec1 = join_array(vec1, vec2);
+              // The new vec1 may be one of the original vec1 or vec2
             put_ref_array(argp, vec1);
             sp--;
             sp->u.vec = argp->u.vec;

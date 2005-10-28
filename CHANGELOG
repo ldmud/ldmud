@@ -1,6 +1,19 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+21-Jul-2004 (Lars Duening)  (3.3.577)
+  - (array.c, interpret.c) Removed a number of memory leaks caused by
+       runtime errors during array operations which exceeded the max
+       array size (Bug #0000096).
+  - (comm.c) If input_to() wasn't given a valid prompt, it leaked
+       the memory for the internal input-to structure (Bug #0000096).
+  - (comm.c) If input_to() was given an array of non-ints, it leaked
+       the memory for the internal message string (Bug #0000096).
+  - (bitstrings.c) The bitstring operators would leak the memory for
+       the result if encountering an invalid bitpattern (Bug #0000096).
+  - (files.c) If tail() couldnt' find the file, it didn't free the
+       string with the pathname (Bug #0000096).
+
 16-Jul-2004 (Lars Duening)  (3.3.576)
   - (interpret.c) When printing a warning during the creation of in inline
        closure, the global stack pointer was one too low (thanks, Gnomi)

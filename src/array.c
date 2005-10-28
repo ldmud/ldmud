@@ -82,7 +82,7 @@
 /*-------------------------------------------------------------------------*/
 
 #define ALLOC_VECTOR(nelem) \
-      (nelem >= (SSIZE_MAX - sizeof(vector_t)) / sizeof(svalue_t)) \
+      ((size_t)nelem >= (SSIZE_MAX - sizeof(vector_t)) / sizeof(svalue_t)) \
       ? NULL \
       : (vector_t *)xalloc_pass(sizeof(vector_t) + \
                                 sizeof(svalue_t) * (nelem - 1))
@@ -1391,6 +1391,12 @@ subtract_array (vector_t *minuend, vector_t *subtrahend)
         return minuend;
     }
 
+    if (max_array_size && result_size > max_array_size)
+    {
+        xfree(flags);
+        error("Illegal array size: %ld.\n", result_size);
+    }
+
     result = allocate_array(result_size);
 
     /* Copy the elements to keep from minuend into result.
@@ -1468,6 +1474,12 @@ intersect_array (vector_t *vec1, vector_t *vec2)
         xfree(flags);
         free_array(vec2);
         return vec1;
+    }
+
+    if (max_array_size && result_size > max_array_size)
+    {
+        xfree(flags);
+        error("Illegal array size: %ld.\n", result_size);
     }
 
     result = allocate_array(result_size);
@@ -1557,6 +1569,12 @@ join_array (vector_t *vec1, vector_t *vec2)
         return vec1;
     }
 
+    if (max_array_size && result_size+vec1_size > max_array_size)
+    {
+        xfree(flags);
+        error("Illegal array size: %ld.\n", result_size+vec1_size);
+    }
+
     result = allocate_array(vec1_size+result_size);
 
     /* Copy the elements to keep from vec1 into result.
@@ -1641,6 +1659,12 @@ symmetric_diff_array (vector_t *vec1, vector_t *vec2)
     {
         if (!flags[i])
             result_size++;
+    }
+
+    if (max_array_size && result_size > max_array_size)
+    {
+        xfree(flags);
+        error("Illegal array size: %ld.\n", result_size);
     }
 
     result = allocate_array(result_size);

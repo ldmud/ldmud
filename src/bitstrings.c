@@ -326,6 +326,8 @@ binop_bits (svalue_t *sp, int instr)
         c1 = restxt[arg_len];
         c2 = argtxt[arg_len];
         if (c1 > 0x3f + ' ' || c1 < ' ')
+        {
+            free_mstring(result);
             error("Illegal bit pattern in %s character %d\n"
                    , instr == INSTR_OR_BITS
                      ?  "or_bits()"
@@ -336,7 +338,10 @@ binop_bits (svalue_t *sp, int instr)
                             : "unknown"
                        ))
                    , (int)c1);
+        }
         if (c2 > 0x3f + ' ' || c2 < ' ')
+        {
+            free_mstring(result);
             error("Illegal bit pattern in %s character %d\n"
                    , instr == INSTR_OR_BITS
                      ?  "or_bits()"
@@ -347,6 +352,7 @@ binop_bits (svalue_t *sp, int instr)
                             : "unknown"
                        ))
                    , (int)c2);
+        }
         if (instr == INSTR_AND_BITS)
             restxt[arg_len] = (char)((c1-' ') & (c2-' ')) + ' ';
         else if (instr == INSTR_OR_BITS)

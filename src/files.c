@@ -1556,12 +1556,12 @@ f_tail (svalue_t *sp)
 
 {
     int rc;
+    string_t *path = NULL;
 
     rc = 0;
 
     do {
         char buff[1000];
-        string_t *path;
         FILE *f;
         struct stat st;
         int offset;
@@ -1596,9 +1596,11 @@ f_tail (svalue_t *sp)
             add_message("%s", buff);
         }
         fclose(f);
-        free_mstring(path);
         rc = 1;
     }while(0);
+
+    if (path)
+        free_mstring(path);
 
     free_svalue(sp);
     put_number(sp, rc);
