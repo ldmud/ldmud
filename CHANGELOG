@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+29-Jun-2004 (Lars Duening)  (3.3.567)
+  - (comm.c) Improved the check for input_to() bitflags on an object with
+       telnet disabled so that only changes in the mode are warned about.
+
 21-Jun-2004 (Lars Duening)  (3.3.566)
   - (xalloc)  The memory reserves were allocated with xalloc(), but freed
        with mem_free() - not good (reported by Heiko).

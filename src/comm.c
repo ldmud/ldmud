@@ -7451,10 +7451,19 @@ v_input_to (svalue_t *sp, int num_arg)
         if (command_giver != NULL
          && O_SET_INTERACTIVE(ip, command_giver)
          && !ip->tn_enabled
-         && (iflags & (INPUT_NOECHO|INPUT_CHARMODE))
            )
+
+        if (!(iflags & INPUT_NOECHO) != !(ip->noecho & NOECHO_MASK))
         {
-            warnf("input_to() noecho/charmode flags ignored for object '%s' "
+            warnf("input_to(): Change in NOECHO mode ignored for object '%s' "
+                  "with telnet disabled.\n"
+                 , get_txt(command_giver->name)
+                 );
+        }
+
+        if (!(iflags & INPUT_CHARMODE) != !(ip->noecho & CHARMODE_MASK))
+        {
+            warnf("input_to(): Change in CHARMODE mode ignored for object '%s' "
                   "with telnet disabled.\n"
                  , get_txt(command_giver->name)
                  );
