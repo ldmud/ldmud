@@ -60,16 +60,16 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 611)
-(Parent-Version lpmud 3-3 610)
+(Project-Version lpmud 3-3 612)
+(Parent-Version lpmud 3-3 611)
 (Version-Log "
-  - (efuns.c, lex) Efun to_int() now supports the '0x', '0b', and '0o'
-       bases (suggested by Steve Goucher).
+  - (pkg-alists.c) Efun insert_alist() no longer returned the insertion
+       position for keys not yet in a key array (reported by Bardioc).
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Thu, 11 Nov 2004 21:49:48 -0700")
+(Checkin-Time "Sat, 13 Nov 2004 01:27:49 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -107,7 +107,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.83 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.674 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.675 644))
   (HISTORY (lpmud/f/49_HISTORY 1.381 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -311,7 +311,7 @@
   (src/ptmalloc/hooks.c (lpmud/c/b/50_hooks.c 1.2 644) :no-keywords)
   (src/ptmalloc/config.h (lpmud/c/b/51_config.h 1.1 644))
   (src/ptmalloc/arena.c (lpmud/d/b/1_arena.c 1.2 644) :no-keywords)
-  (src/pkg-alists.c (lpmud/l/38_pkg-alists 1.9 644))
+  (src/pkg-alists.c (lpmud/l/38_pkg-alists 1.10 644))
   (src/pkg-alists.h (lpmud/l/39_pkg-alists 1.3 644))
   (src/pkg-mccp.h (lpmud/d/b/48_pkg-mccp.h 1.2 644))
   (src/pkg-mccp.c (lpmud/d/b/49_pkg-mccp.c 1.10 644))

@@ -215,8 +215,8 @@ insert_alist (svalue_t *key, svalue_t * /* TODO: bool */ key_data, vector_t *lis
  *    array as necessary to fill the alist <list>.
  *    Result is a fresh copy of the modified alist.
  *
- * 2. Lookup a <key> in the alist <list> and return its index+1. The
- *    result is 0 if the key is not found.
+ * 2. Lookup a <key> in the alist <list> and return its index. If the key
+ *    is not found, return  the position at which it would be inserted.
  *    <key_data> must be NULL, <key> points to the svalue to be looked
  *    up, and <list> points to an alist with at least the key vector.
  *
@@ -248,7 +248,7 @@ insert_alist (svalue_t *key, svalue_t * /* TODO: bool */ key_data, vector_t *lis
     /* If its just a lookup: return the result.
      */
     if (key_data == NULL) {
-         put_number(&stmp, ix < 0 ? 0 : ix+1);
+         put_number(&stmp, ix < 0 ? -ix-1 : ix);
          return &stmp;
     }
 

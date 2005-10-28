@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+12-Oct-2004 (Lars Duening)  (3.3.612)
+  - (pkg-alists.c) Efun insert_alist() no longer returned the insertion
+       position for keys not yet in a key array (reported by Bardioc).
+
 11-Oct-2004 (Lars Duening)  (3.3.611)
   - (efuns.c, lex) Efun to_int() now supports the '0x', '0b', and '0o'
        bases (suggested by Steve Goucher).
