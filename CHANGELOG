@@ -1,6 +1,14 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+08-Aug-2004 (Lars Duening)  (3.3.584)
+  - (simulate.c) When printing a load-object error with a long filename,
+       the message is limited to the length of the error message buffer (Bug
+       #0000109).
+  - (simulate, xalloc.c) The length of the error message and error format
+       buffer are now given by two macros, to facilitate easier adaptation
+       of depending program segments.
+
 01-Aug-2004 (Lars Duening)  (3.3.583)
   - (backend.c) If the garbage_collection() couldn't open a passed file,
        the filename was leaked (reported by xtian).

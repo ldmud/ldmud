@@ -439,6 +439,33 @@ DESCRIPTION
         this, the conversion of a mapping into an alist could
         be done by to_array().
 
+  15. Dirty Mappings
+
+  'Dirty mappings' are nothing the LPC programmer directly is involved
+  with, however, as it relates to the way mappings are implemented
+  internally by the gamedriver. However, as this term shows up in
+  various driver statistics, it is explained here.
+
+  There are two fundamental approaches to implement mappings:
+
+    1. Store all data entries in an array-like structure, in sorted order. 
+    2. Store all data in a hashtable, each entry allocaed separately.
+
+  Method 1 is very space efficient, as it doesn't need much overhead
+  per entry; however, insertions and deletions of entries are
+  relatively slow as all other entries need to be moved.     
+  Method 2 is very fast as nothing needs to be moved in memory,
+  however it has a large overhead.
+
+  The gamedriver uses a hybrid method: at the basis is a mapping
+  implementation based on arrays. However the driver uses a hash table
+  in addition to handle all the ongoing insertions and deletions.
+  Every once in a while, the contents of the hash table are sorted
+  into the base array, reasoning that any entry surviving for longer
+  time in the hash table is worth keeping in a more space-efficient
+  manner. 'Dirty' mappings are such mappings with both an array and a
+  hash part, 'clean' mappings are those with just an array part.
+
 HISTORY
         The ([:width ]) notation was added in LDMud 3.2.9/3.3.208 .
 

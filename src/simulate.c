@@ -235,7 +235,7 @@ int num_warning = 0;
   /* Number of recursive calls to warnf().
    */
 
-static char emsg_buf[10000];
+static char emsg_buf[ERROR_BUF_LEN];
   /* The buffer for the error message to be created.
    */
 
@@ -712,7 +712,7 @@ error (const char *fmt, ...)
     string_t *malloced_file = NULL;  /* copy of program name */
     string_t *malloced_name = NULL;  /* copy of the object name */
     object_t *curobj = NULL;         /* Verified current object */
-    char      fixed_fmt[2000];
+    char      fixed_fmt[ERROR_FMT_LEN];
       /* Note: When changing this buffer, also change the HEAP_STACK_GAP
        * limit in xalloc.c!
        */
@@ -1638,7 +1638,7 @@ load_object_error(const char *msg, const char *name, namechain_t *chain)
     strbuf_free(&sbuf);
 
     fprintf(stderr, "%s %s", time_stamp(), buf);
-    error("%.*s", (int)strlen(buf), buf);
+    error("%.*s", MIN(ERROR_BUF_LEN - 200, (int)strlen(buf)), buf);
 } /* load_object_error() */
 
 /*-------------------------------------------------------------------------*/

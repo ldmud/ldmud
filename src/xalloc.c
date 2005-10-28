@@ -38,7 +38,7 @@
  * gap is no longer checked except for true overlap with the heap.
  */
 
-#define HEAP_STACK_GAP (20480)
+#define HEAP_STACK_GAP (10 * ERROR_FMT_LEN)
 
 
 /* A counter type for statistics and its functions.

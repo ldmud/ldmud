@@ -174,6 +174,14 @@ extern void update_object_sent(object_t *obj, sentence_t *new_sent);
   /* (Re)Initialize the runtime limits from the given default values.
    */
 
+#define ERROR_BUF_LEN 10240
+  /* Length of the fixed buffer for error messages.
+   */
+
+#define ERROR_FMT_LEN 2048
+  /* Length of the fixed buffer for error message formats.
+   */
+
 /* --- Variables --- */
 
 extern struct error_recovery_info toplevel_context;

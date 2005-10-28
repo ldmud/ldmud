@@ -170,7 +170,7 @@ For a detailed list of all changes see the file CHANGELOG.
            x509 key- and certfile for the TLS package.
 
 
-29-Jul-2004 (Lars Duening) -- Release 3.2.11
+08-Aug-2004 (Lars Duening) -- Release 3.2.11
 
     - Changed efuns:
 
@@ -195,6 +195,9 @@ For a detailed list of all changes see the file CHANGELOG.
        + to_array('symbol) caused a crash.
        + An error in save_{object, value}() followed by a GC left
          behind an invalid pointer.
+       + Error while loading an object with a too-long filename.
+       + Restoring non-existing (simul-)efun closures created illegal
+         closure values.
 
     - Language:
        + The macros __FLOAT_MIN__ and __FLOAT_MAX__ gave a too-small range.

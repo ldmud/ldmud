@@ -10,7 +10,7 @@ BESCHREIBUNG
         Die Operatoren im Format-String <fmt> haben eines der folgenden
         Formate:
 
-            %[!|~][<size>[, <minmatch>]]<type>
+            %[!|~][<size>[. <minmatch>]]<type>
 
         <type> kann folgendes sein:
             d: meldet eine Zahl
