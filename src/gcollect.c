@@ -1670,6 +1670,7 @@ garbage_collection(void)
     if (obj_list_replace)
         replace_programs();
     handle_newly_destructed_objects();
+    free_save_object_buffers();
     free_interpreter_temporaries();
     free_action_temporaries();
 #ifdef USE_PGSQL
@@ -2730,6 +2731,7 @@ garbage_collection (void)
 {
     assert_master_ob_loaded();
     handle_newly_destructed_objects();
+    free_save_object_buffers();
     free_interpreter_temporaries();
     free_action_temporaries();
 #ifdef USE_PGSQL

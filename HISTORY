@@ -170,7 +170,7 @@ For a detailed list of all changes see the file CHANGELOG.
            x509 key- and certfile for the TLS package.
 
 
-24-Jul-2004 (Lars Duening) -- Release 3.2.11
+25-Jul-2004 (Lars Duening) -- Release 3.2.11
 
     - Changed efuns:
 
@@ -190,6 +190,11 @@ For a detailed list of all changes see the file CHANGELOG.
          limits.
        + Warnings printed during the generation of a closure crashed the
          driver.
+       + The traceback generation was limited by the array limits, and thus
+         could throw an error again.
+       + to_array('symbol) caused a crash.
+       + An error in save_{object, value}() followed by a GC left
+         behind an invalid pointer.
 
     - Language:
 
@@ -200,6 +205,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + Corrected a number of memory leaks in runtime errors.
        + An error during a call-out causes all pending call-outs for the
          same user in the same cycle to be re-scheduled to the next cycle.
+       + If an ERQ callback accepts an array, the numbers in the array
+         are all positive in the range 0..255.
 
     - Other Changes:
 

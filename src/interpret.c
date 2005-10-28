@@ -3173,19 +3173,18 @@ check_struct_op (svalue_t * sp, int off_type, int off_value, bytecode_p pc)
     short s_index;
     svalue_t * svp;
 
-#ifdef DEBUG
+    /* These two errors can happen with careless funcall(#'->)s */
     if (sp[off_type].type != T_NUMBER)
-        FATALF(("Illegal struct type value: %s, expected a number.\n"
+        ERRORF(("Illegal struct type value: %s, expected a number.\n"
                , typename(sp[off_type].type)
               ));
     if (sp[off_type].u.number >= 0
      && sp[off_type].u.number >= current_prog->num_structs)
     {
-        FATALF(("Too big struct index: %ld, max %hu\n"
+        ERRORF(("Too big struct index: %ld, max %hu\n"
                , (long)sp[off_type].u.number, current_prog->num_structs
               ));
     }
-#endif
 
     /* Get the struct type index */
     s_index = (short)sp[off_type].u.number;
@@ -18063,7 +18062,7 @@ collect_trace (strbuf_t * sbuf, vector_t ** rvec )
         var = alloca(sizeof(*var)); \
         if (!var) \
             error("Stack overflow in collect_trace()"); \
-        var->vec = allocate_array(TRACE_MAX); \
+        var->vec = allocate_array_unlimited(TRACE_MAX); \
         var->next = NULL; \
         if (!first_entry) \
             first_entry = last_entry = var; \
@@ -18090,7 +18089,7 @@ collect_trace (strbuf_t * sbuf, vector_t ** rvec )
         {
             vector_t * vec;
 
-            vec = allocate_array(1);
+            vec = allocate_array_unlimited(1);
             put_ref_string(vec->item, STR_NO_PROG_TRACE);
             *rvec = vec;
         }
@@ -18105,7 +18104,7 @@ collect_trace (strbuf_t * sbuf, vector_t ** rvec )
         {
             vector_t * vec;
 
-            vec = allocate_array(1);
+            vec = allocate_array_unlimited(1);
             put_ref_string(vec->item, STR_NO_TRACE);
             *rvec = vec;
         }
@@ -18333,7 +18332,7 @@ name_computed: /* Jump target from the catch detection */
         vector_t * vec;
         size_t ix;
 
-        vec = allocate_array(num_entries+1);
+        vec = allocate_array_unlimited(num_entries+1);
 
         if (ret)
             put_ref_string(vec->item, ret);

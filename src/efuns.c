@@ -5229,7 +5229,7 @@ f_to_array (svalue_t *sp)
             put_number(svp, ch);
             svp++;
         }
-        free_string_svalue(sp);
+        free_svalue(sp);
         put_array(sp, v);
         break;
 #ifdef USE_STRUCTS

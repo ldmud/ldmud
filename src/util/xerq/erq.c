@@ -343,6 +343,7 @@ main(int argc, char *argv[])
 #if ERQ_DEBUG > 0
             int myerrno = errno;
             fprintf(stderr, "%s select() errno = %d", time_stamp(), errno);
+            errno = myerrno;
             perror(" ");
 #endif
             continue;

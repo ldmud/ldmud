@@ -5318,6 +5318,8 @@ static const char save_file_suffix[] = ".o";
 
 static struct pointer_table *ptable = NULL;
   /* The pointer_table used to register all arrays and mappings.
+   * If an error happens during the save, this table probably won't
+   * be deallocated.
    */
 
 static char number_buffer[36];
@@ -5373,6 +5375,20 @@ static svalue_t *shared_restored_values = NULL;
 static long max_shared_restored;
   /* Current size of shared_restored_values.
    */
+
+/*-------------------------------------------------------------------------*/
+void
+free_save_object_buffers(void)
+
+/* Deallocate all lingering buffers from previous save operations, preferably
+ * before the GC does it.
+ */
+
+{
+    if (ptable)
+        free_pointer_table(ptable);
+    ptable = NULL;
+} /* free_save_object_buffers() */
 
 /*-------------------------------------------------------------------------*/
 /* Macros */
@@ -6524,7 +6540,7 @@ v_save_object (svalue_t *sp, int numarg)
 
     if (ptable)
     {
-        debug_message("(save_object) Freeing lost pointertable\n");
+        debug_message("%s (save_object) Freeing lost pointertable\n", time_stamp());
         free_pointer_table(ptable);
     }
 
@@ -6536,7 +6552,7 @@ v_save_object (svalue_t *sp, int numarg)
             close(f);
             unlink(tmp_name);
         }
-        error("(save_object) Out of memory for pointer table.\n");
+        error("%s (save_object) Out of memory for pointer table.\n", time_stamp());
         /* NOTREACHED */
         return sp;
     }
@@ -6725,13 +6741,13 @@ v_save_value (svalue_t *sp, int numarg)
     /* Set up the globals */
     if (ptable)
     {
-        debug_message("(save_value) Freeing lost pointer table.\n");
+        debug_message("%s (save_value) Freeing lost pointer table.\n", time_stamp());
         free_pointer_table(ptable);
     }
     ptable = new_pointer_table();
     if (!ptable)
     {
-        error("(save_value) Out of memory for pointer table.\n");
+        error("%s (save_value) Out of memory for pointer table.\n", time_stamp());
         return sp; /* flow control hint */
     }
 

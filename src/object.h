@@ -321,4 +321,6 @@ extern svalue_t *v_save_value(svalue_t *sp, int numarg);
 extern svalue_t *f_restore_object(svalue_t *sp);
 extern svalue_t *f_restore_value(svalue_t *sp);
 
+extern void free_save_object_buffers(void);
+
 #endif /* OBJECT_H__ */

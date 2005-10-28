@@ -1,6 +1,20 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+25-Jul-2004 (Lars Duening)  (3.3.580)
+  - (interpret.c) If the struct lookup operator receives arguments of
+       the wrong type, it just throws an error instead of crashing the
+       driver, as this can happen with careless funcall(#'->)s (Bug #0000097).
+  - (efuns.c) to_array('symbol) crashed the driver because it tried to
+       free the symbol as a string (Bug #0000097).
+  - (interpret.c) The trace collection into an array now uses unlimited
+       arrays, otherwise a too-small limit would cause the driver
+       to enter an endless error loop (Bug #0000097).
+  - (object, gcollect.c) If a save_{object,value} failed and thus
+       left a pointer table behind, a following GC would free the table
+       without resetting the pointer. The next save_{object, value} would
+       then use the freed memory (Bug #0000097).
+
 25-Jul-2004 (Lars Duening)  (3.3.579)
   - (xerq/erq.c) If select() in the main loop was interrupted by a signal,
        the ERQ still proceeded to evaluate the fd-sets.
