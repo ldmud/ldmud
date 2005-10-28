@@ -4203,7 +4203,7 @@ compile_value (svalue_t *value, int opt_flags)
                 {
                     STORE_CODE(current.codep, F_CALL_INHERITED);
                     STORE_SHORT(current.codep, l->function.lfun.index);
-                    STORE_SHORT(current.codep, l->function.lfun.inhIndex);
+                    STORE_SHORT(current.codep, l->function.lfun.inhIndex-1);
                     current.code_left -= 5;
                 }
                 else

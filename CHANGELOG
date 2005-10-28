@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+26-Nov-2004 (Lars Duening)  (3.3.618)
+  - (closure.c) Calls to explicitely inherited lfun closures weren't compiled
+       correctly in lambda()s (Bug #0000145).
+
 25-Nov-2004 (Lars Duening)  (3.3.617)
   - (prolang.y) When the new inline closures were disabled, the LPC compiler
        produced incomplete code for the inline closure constants, and
