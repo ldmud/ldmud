@@ -74,6 +74,10 @@ extern int fchmod PROT((int, int));
 
 #include "../mudlib/sys/files.h"
 
+/* TODO: The move/copy code is a derivate of the GNU fileutils. Rewrite
+ * TODO:: it, replace it by the BSD code, or put the driver under the GPL.
+ */
+
 /*-------------------------------------------------------------------------*/
 static Bool
 isdir (const char *path)

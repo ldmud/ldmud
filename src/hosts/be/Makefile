@@ -473,8 +473,8 @@ $(OBJ)/efuns.o : ../mudlib/sys/time.h ../mudlib/sys/strings.h \
     otable.h object.h mstrings.h mregex.h md5.h mempools.h mapping.h main.h \
     interpret.h heartbeat.h exec.h dumpstat.h comm.h closure.h call_out.h \
     backend.h array.h actions.h efuns.h my-rusage.h my-alloca.h typedefs.h \
-    driver.h hash.h sent.h bytecode.h regexp.h pcre/pcre.h pkg-tls.h port.h \
-    config.h hosts/unix.h hosts/be/be.h machine.h
+    driver.h hash.h sent.h bytecode.h my-stdint.h regexp.h pcre/pcre.h \
+    pkg-tls.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/files.o : ../mudlib/sys/files.h xalloc.h svalue.h stdstrings.h \
     simulate.h mstrings.h mempools.h main.h lex.h interpret.h filestat.h \
@@ -631,7 +631,8 @@ $(OBJ)/regexp.o : main.h xalloc.h simulate.h interpret.h regexp.h driver.h \
     typedefs.h svalue.h strfuns.h sent.h bytecode.h port.h config.h \
     hosts/unix.h hosts/be/be.h machine.h
 
-$(OBJ)/sha1.o : sha1.h
+$(OBJ)/sha1.o : sha1.h my-stdint.h driver.h port.h config.h hosts/unix.h \
+    hosts/be/be.h machine.h
 
 $(OBJ)/simul_efun.o : xalloc.h swap.h svalue.h stdstrings.h simulate.h \
     prolang.h ptrtable.h object.h mstrings.h lex.h interpret.h gcollect.h \
