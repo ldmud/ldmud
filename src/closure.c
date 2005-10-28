@@ -3000,6 +3000,7 @@ compile_value (svalue_t *value, int opt_flags)
                  * ({#'catch, <body>, 'nolog })
                  * ({#'catch, <body>, 'publish })
                  * ({#'catch, <body>, 'nolog, 'publish })
+                 * ({#'catch, <body>, 'nolog, 'publish, 'reserve, <expr> })
                  */
                 case F_CATCH:
                   {
@@ -3014,14 +3015,8 @@ compile_value (svalue_t *value, int opt_flags)
                     int flags, i;
                     int void_given;
 
-                    if (block_size != 2 && block_size != 4)
+                    if (block_size < 2 && block_size > 6)
                         lambda_error("Wrong number of arguments to #'catch\n");
-
-                    if (current.code_left < 3)
-                        realloc_code();
-                    current.code_left -= 3;
-
-                    STORE_CODE(current.codep, F_CATCH);
 
                     flags = 0;
                     for (i = 3; i <= block_size; i++)
@@ -3032,10 +3027,29 @@ compile_value (svalue_t *value, int opt_flags)
                         else if (argp[i-1].type == T_SYMBOL
                          && mstreq(argp[i-1].u.str, STR_PUBLISH))
                             flags |= CATCH_FLAG_PUBLISH;
+                        else if (argp[i-1].type == T_SYMBOL
+                         && mstreq(argp[i-1].u.str, STR_RESERVE)
+                                 )
+                        {
+                            if (i > block_size)
+                                lambda_error("Missing expression for 'reserve "
+                                             "catch-modifier.\n");
+                            flags |= CATCH_FLAG_RESERVE;
+                            if (compile_value(argp+i, 0) & VOID_GIVEN)
+                                lambda_error("Expression for 'reserve "
+                                             "doesn't return a value.\n");
+                            i++;
+                        }
                         else
-                            lambda_error("Expected 'nolog or 'publish as "
-                                         "catch-modifier.\n");
+                            lambda_error("Expected 'nolog, 'publish or "
+                                         "'reserve as catch-modifier.\n");
                     }
+
+                    if (current.code_left < 3)
+                        realloc_code();
+                    current.code_left -= 3;
+
+                    STORE_CODE(current.codep, F_CATCH);
 
                     STORE_UINT8(current.codep, flags);
 

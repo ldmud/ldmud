@@ -8781,6 +8781,9 @@ again:
          * <pc>+1+<offset>.
          *
          * The attributes of the catch are given as uint8 <flags>.
+         * If CATCH_FLAG_RESERVE is set, the top most stack value denotes
+         * the eval cost to reserve for the catch handling - it is removed
+         * from the stack before continuing.
          *
          * The implementation is such that a control-stack entry is created
          * as if the instructions following catch are called as a subroutine
@@ -8802,10 +8805,36 @@ again:
 
         uint offset;
         int  flags;
+        int32 reserve_cost = CATCH_RESERVED_COST;
 
         /* Get the flags */
         flags = LOAD_UINT8(pc);
 
+        if (flags & CATCH_FLAG_RESERVE)
+        {
+            if (sp->type != T_NUMBER)
+            {
+                ERRORF(("Illegal 'reserve' type for catch(): got %s, expected number.\n"
+                       , typename(sp->type)
+                       ));
+            }
+
+            if (sp->u.number <= 0)
+            {
+                ERRORF(("Illegal 'reserve' value for catch(): got %ld, expected a positive value.\n"
+                       , sp->u.number
+                       ));
+            }
+
+            if (sp->u.number < MASTER_RESERVED_COST * 2)
+                ERRORF(("Illegal 'reserve' value for catch(): got %ld, "
+                        "required are at least %ld.\n"
+                       , sp->u.number
+                       , MASTER_RESERVED_COST * 2
+                       ));
+            reserve_cost = sp->u.number;
+            sp--;
+        }
         /* Get the offset to the next instruction after the CATCH statement.
          */
         offset = LOAD_UINT8(pc);
@@ -8823,6 +8852,7 @@ again:
                               , (svalue_t ** volatile) &inter_sp
 #endif
                               , inter_pc, inter_fp
+                              , reserve_cost
 #ifdef USE_NEW_INLINES
                               , inter_context
 #endif /* USE_NEW_INLINES */

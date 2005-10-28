@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-24-May-2004 (Lars Duening) -- Development Release 3.3
+25-May-2004 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -15,6 +15,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + catch(): If there is not enough time left (less than
            __CATCH_EVAL_COST__), this is thrown as an error from inside
            the catch instead of causing the catch to return 0.
+       + catch(): Modifier 'reserve <expr>' can be used to specify a computing
+           reserve different from __CATCH_EVAL_COST__.
        + copy(), deep_copy(), get_type_info(), to_array(), to_string():
            Added struct support.
        + add_action(): Historical usage with just one argument no longer

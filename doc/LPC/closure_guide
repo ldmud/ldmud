@@ -515,9 +515,9 @@ Table of Contents
            returns 0.
 
       #'catch executes the closure given as argument, but catches any
-           runtime error (see catch(E)). Optionally the symbols 'nolog
-           and 'publish may be given as additional arguments to modify
-           the behaviour of the catch.
+           runtime error (see catch(E)). Optionally the symbols 'nolog,
+           'publish and 'reserve may be given as additional arguments to
+           modify the behaviour of the catch.
 
       #'sscanf acts similar to how a funcall would, but passes the third
            and following arguments as lvalues, that is, values which can

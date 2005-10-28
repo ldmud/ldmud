@@ -60,23 +60,18 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 559)
-(Parent-Version lpmud 3-3 558)
+(Project-Version lpmud 3-3 560)
+(Parent-Version lpmud 3-3 559)
 (Version-Log "
-  - (prolang.y) The compiler emits warnings if the functions defined by
-       two inherits collide in their visibility. If this produces too
-       much output, we will have to control this by a pragma. (suggested 
-       by Bardioc).
-  - (simulate.c) If a catch() doesn't have enough eval time left
-       (less than CATCH_EVAL_COST), this is thrown as an error from inside
-       the catch instead of causing the catch to return 0. (suggested
+  - (prolang.y, interpret.c, simulate, string_spec, closure.c) Added
+       modifier 'reserve' to the catch() instruction in order to
+       specify the reserved amount of eval ticks at runtime (suggested
        by Menaures).
-  - (efuns.c) Removed compiler warnings (thanks, Guandalug!)
 ")
 (New-Version-Log
 ""
 )
-(Checkin-Time "Mon, 24 May 2004 19:50:07 -0600")
+(Checkin-Time "Tue, 25 May 2004 21:32:18 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -114,14 +109,14 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.76 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.622 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.357 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.623 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.358 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
   ;; Configuration
   (src/configure (lpmud/d/0_configure 1.19.1.106 755))
-  (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.38 644))
+  (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.39 644))
   (src/machine.h.in (lpmud/b/9_machine.h. 1.9.1.13 644))
   (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.19.1.26 644))
   (src/mkinstalldirs (lpmud/c/4_mkinstalld 1.1 644))
@@ -131,7 +126,7 @@
   (src/autoconf/acconfig.h (lpmud/d/10_acconfig.h 1.6.1.11 644))
 
   (src/settings/README (lpmud/c/22_README 1.14.1.16 644))
-  (src/settings/default (lpmud/c/23_default 1.13.1.5.1.47 744))
+  (src/settings/default (lpmud/c/23_default 1.13.1.5.1.48 744))
   (src/settings/native (lpmud/c/9_native 1.6 744))
   (src/settings/compat (lpmud/c/10_compat 1.7 744))
   (src/settings/alatia (lpmud/j/27_alatia 1.5 744))
@@ -182,7 +177,7 @@
   (src/call_out.h (lpmud/f/45_call_out.h 1.7.1.6 644))
   (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.26 644))
   (src/closure.h (lpmud/f/44_closure.h 1.7.1.18 644))
-  (src/closure.c (lpmud/d/4_closure.c 1.41.1.47.1.19 644))
+  (src/closure.c (lpmud/d/4_closure.c 1.41.1.47.1.20 644))
   (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.82 644))
   (src/comm.h (lpmud/d/3_comm.h 1.26.1.40 644))
   (src/driver.h (lpmud/f/36_driver.h 1.15.1.25 644))
@@ -204,7 +199,7 @@
   (src/heartbeat.c (lpmud/m/42_heartbeat. 1.18.1.9 644))
   (src/i-svalue_cmp.h (lpmud/a/b/20_i-svalue_c 1.4 644))
   (src/interpret.h (lpmud/b/13_interpret. 1.33.1.37 644))
-  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.55 644))
+  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.56 644))
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.15.1.8 644))
   (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.67 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.16 644))
@@ -288,7 +283,7 @@
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.19 644))
   (src/port.c (lpmud/39_port.c 1.17.1.9 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.17.1.4 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.62 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.63 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7.1.2 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))
@@ -300,8 +295,8 @@
   (src/sha1.c (lpmud/t/b/34_sha1.c 1.2 644))
   (src/simul_efun.h (lpmud/f/17_simul_efun 1.5.1.6 644))
   (src/simul_efun.c (lpmud/32_simul_efun 1.20.1.17.1.7 644))
-  (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.34 644))
-  (src/simulate.c (lpmud/31_simulate.c 1.88.1.125 644))
+  (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.35 644))
+  (src/simulate.c (lpmud/31_simulate.c 1.88.1.126 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.14 644))
   (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.96 644))
   (src/sysmalloc.h (lpmud/c/b/33_sysmalloc. 1.2 644))
@@ -325,7 +320,7 @@
 
   ;; Build files
   (src/func_spec (lpmud/c/31_func_spec 1.53.1.45.1.22.1.35 644))
-  (src/string_spec (lpmud/f/6_string_spe 1.14.1.16 644))
+  (src/string_spec (lpmud/f/6_string_spe 1.14.1.17 644))
   (src/mkfunc.c (lpmud/l/14_mkfunc.c 1.1 644))
   (src/make_func.y (lpmud/b/7_make_func. 1.25.1.30.1.11 644))
 
@@ -1027,7 +1022,7 @@
   (doc/efun/caller_stack_depth (lpmud/l/33_caller_sta 1.3 644))
   (doc/efun/capitalize (lpmud/o/11_capitalize 1.3 644))
   (doc/efun/cat (lpmud/o/12_cat 1.3 644))
-  (doc/efun/catch (lpmud/o/13_catch 1.1.1.7 644))
+  (doc/efun/catch (lpmud/o/13_catch 1.1.1.8 644))
   (doc/efun/ceil (lpmud/c/40_ceil 1.3 644))
   (doc/efun/clear_bit (lpmud/o/15_clear_bit 1.6 644))
   (doc/efun/closurep (lpmud/o/16_closurep 1.4 644))
@@ -1576,7 +1571,7 @@
   (doc/efun.de/clone_object.de (lpmud/j/b/25_clone_obje 1.1 640))
   (doc/efun.de/clear_bit.de (lpmud/j/b/26_clear_bit. 1.1 640))
   (doc/efun.de/ceil.de (lpmud/j/b/27_ceil.de 1.1 640))
-  (doc/efun.de/catch.de (lpmud/j/b/28_catch.de 1.2 640))
+  (doc/efun.de/catch.de (lpmud/j/b/28_catch.de 1.3 640))
   (doc/efun.de/cat.de (lpmud/j/b/29_cat.de 1.1 640))
   (doc/efun.de/capitalize.de (lpmud/j/b/30_capitalize 1.1 640))
   (doc/efun.de/caller_stack_depth.de (lpmud/j/b/31_caller_sta 1.1 640))
@@ -1635,9 +1630,9 @@
   (doc/LPC/arrays (lpmud/r/13_arrays 1.5 644))
   (doc/LPC/block (lpmud/r/14_block 1.9 644))
   (doc/LPC/closures (lpmud/r/15_closures 1.9 644))
-  (doc/LPC/closures-abstract (lpmud/c/50_closures 1.4.1.3 644))
+  (doc/LPC/closures-abstract (lpmud/c/50_closures 1.4.1.4 644))
   (doc/LPC/closures-example (lpmud/r/16_closures-e 1.8 644))
-  (doc/LPC/closure_guide (lpmud/r/17_closure_gu 1.7.1.7 644))
+  (doc/LPC/closure_guide (lpmud/r/17_closure_gu 1.7.1.8 644))
   (doc/LPC/comments (lpmud/m/35_comments 1.3 644))
   (doc/LPC/do-while (lpmud/r/18_do-while 1.3 644))
   (doc/LPC/ed0 (lpmud/r/19_ed0 1.2 644))

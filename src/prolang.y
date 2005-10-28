@@ -2320,6 +2320,37 @@ update_lop_branch ( p_uint address, int instruction )
     }
 } /* update_lop_branch() */
 
+/*-------------------------------------------------------------------------*/
+static void
+shuffle_code (p_uint start1, p_uint start2, p_uint end)
+
+/* Reverse the order of the program blocks [start1..start2[ and [start2..end[
+ */
+
+{
+    p_uint len1 = start2 - start1;
+    p_uint len2 = end - start2;
+
+    bytecode_p pStart1 = PROGRAM_BLOCK + start1;
+    bytecode_p pStart2 = PROGRAM_BLOCK + start2;
+
+    bytecode_p * pTmp;
+
+    if (!len1 || !len2)
+        return;
+
+    pTmp = xalloc(len1);
+    if (!pTmp)
+    {
+        yyerror("(shuffle_code) Out of memory");
+        return;
+    }
+    memmove(pTmp, pStart1, len1);
+    memmove(pStart1, pStart2, len2);
+    memmove(pStart1+len2, pTmp, len1);
+    xfree(pTmp);
+} /* shuffle_code() */
+
 /* ========================   LOCALS and SCOPES   ======================== */
 
 /*-------------------------------------------------------------------------*/
@@ -13028,23 +13059,37 @@ catch:
           ins_byte(0); /* Placeholder for the jump offset */
       }
 
-      '(' comma_expr opt_catch_mods ')'
+      '(' comma_expr note_start opt_catch_mods ')'
 
       {
 %line
-          p_int start, offset;
+          p_int origstart, start, modstart, offset;
+          p_int flags = $6;
+
+          /* Get the address of the CATCH instruction
+           * and of the modifications
+           */
+          origstart = start = $<address>2;
+          modstart = $5.start;
+
+          /* If there were code creating modifiers, move their code
+           * before the F_CATCH (currently only 'reserve' does that).
+           * We need to do this before we add the END_CATCH.
+           */
+          if (flags & CATCH_FLAG_RESERVE)
+          {
+              shuffle_code(start, modstart, CURRENT_PROGRAM_SIZE);
+              start += CURRENT_PROGRAM_SIZE - modstart;
+          }
 
           ins_f_code(F_END_CATCH);
 
-          /* Get the address of the CATCH instruction */
-          start = $<address>2;
-
           /* Modify the instruction if necessary */
-          if ($5)
+          if (flags)
           {
               bytecode_p p;
               p = PROGRAM_BLOCK + start + 1;
-              *p = $5 & 0xff;
+              *p = flags & 0xff;
           }
 
           /* Update the offset field of the CATCH instruction */
@@ -13094,7 +13139,7 @@ catch:
           /* Restore the argument frame */
           ins_f_code(F_RESTORE_ARG_FRAME);
 
-          $$.start = start;
+          $$.start = origstart;
           $$.type  = Type_Any;
           $$.code = -1;
       }
@@ -13119,6 +13164,12 @@ opt_catch_mods :
 opt_catch_mod_list :
       opt_catch_mod_list ',' opt_catch_modifier
       {
+          if ($1 & $3 & CATCH_FLAG_RESERVE)
+          {
+              /* On multiple 'reserve's, use only the first one */
+              yywarnf("Multiple 'reserve' modifiers in catch()");
+              insert_pop_value();
+          }
           $$ = $1 | $3;
       }
 
@@ -13138,9 +13189,44 @@ opt_catch_modifier :
               $$ = CATCH_FLAG_NOLOG;
           else if (mstreq($1, STR_PUBLISH))
               $$ = CATCH_FLAG_PUBLISH;
+          else if (mstreq($1, STR_RESERVE))
+              yyerrorf("Bad 'reserve' modifier in catch(): missing expression");
           else
-              yyerror("Illegal modifier in catch() - "
-                      "expected 'nolog' or 'publish'");
+              yyerrorf("Illegal modifier '%s' in catch() - "
+                      "expected 'nolog', 'publish' or 'reserve <expr>'"
+                      , get_txt($1)
+                      );
+          free_mstring($1);
+      }
+    | identifier expr0
+      {
+          $$ = 0;
+
+          if (mstreq($1, STR_NOLOG)
+           || mstreq($1, STR_PUBLISH)
+             )
+          {
+              yyerrorf("Bad modifier '%s' in catch(): no expression allowed"
+                      , get_txt($1)
+                      );
+          }
+          else if (mstreq($1, STR_RESERVE))
+          {
+              if ($2.type.typeflags != TYPE_NUMBER
+               && $2.type.typeflags != TYPE_UNKNOWN
+               && $2.type.typeflags != TYPE_ANY
+                 )
+                  yyerrorf("Bad 'reserve' expression type to catch(): %s, "
+                           "expected int"
+                          , get_type_name($2.type)
+                          );
+              $$ = CATCH_FLAG_RESERVE;
+          }
+          else
+              yyerrorf("Illegal modifier '%s' in catch() - "
+                      "expected 'nolog', 'publish' or 'reserve <expr>'"
+                      , get_txt($1)
+                      );
           free_mstring($1);
       }
 ; /* opt_catch_modifier */

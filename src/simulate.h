@@ -74,6 +74,12 @@ struct rt_context_s
 #define CATCH_FLAG_PUBLISH (0x02)  /* master::runtime_error() is called
                                     * despite the error being caught.
                                     */
+  /* The following flags are used only by the bytecode interpreter
+   * to set up the instruction.
+   */
+#define CATCH_FLAG_RESERVE (0x04)  /* The amount of ticks to keep in reserve
+                                    * is given on the stack.
+                                    */
 
 
 #define ERROR_RECOVERY_CONTEXT(t) ((t) >= ERROR_RECOVERY_NONE)
@@ -215,9 +221,9 @@ extern int master_will_be_updated;
 /* --- Prototypes --- */
 
 #ifndef USE_NEW_INLINES
-extern Bool catch_instruction (int flags, uint offset, volatile svalue_t ** volatile i_sp, bytecode_p i_pc, svalue_t * i_fp);
+extern Bool catch_instruction (int flags, uint offset, volatile svalue_t ** volatile i_sp, bytecode_p i_pc, svalue_t * i_fp, int32 reserve_cost);
 #else
-extern Bool catch_instruction (int flags, uint offset, volatile svalue_t ** volatile i_sp, bytecode_p i_pc, svalue_t * i_fp, svalue_t *i_context);
+extern Bool catch_instruction (int flags, uint offset, volatile svalue_t ** volatile i_sp, bytecode_p i_pc, svalue_t * i_fp, int32 reserve_cost, svalue_t *i_context);
 #endif /* USE_NEW_INLINES */
 extern void purge_shadow_sent(void);
 extern void check_shadow_sent (object_t *ob);

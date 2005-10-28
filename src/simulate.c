@@ -310,6 +310,7 @@ Bool
 catch_instruction ( int flags, uint offset
                   , volatile svalue_t ** volatile i_sp
                   , bytecode_p i_pc, svalue_t * i_fp
+                  , int32 reserve_cost
 #ifdef USE_NEW_INLINES
                   , svalue_t * i_context
 #endif /* USE_NEW_INLINES */
@@ -392,8 +393,8 @@ catch_instruction ( int flags, uint offset
         *i_sp = (volatile svalue_t *)sp;
 
         /* Restore the old eval costs */
-        eval_cost -= CATCH_RESERVED_COST;
-        assigned_eval_cost -= CATCH_RESERVED_COST;
+        eval_cost -= reserve_cost;
+        assigned_eval_cost -= reserve_cost;
 
         /* If we ran out of memory, throw a new error */
         if (!old_out_of_memory && out_of_memory)
@@ -409,17 +410,17 @@ catch_instruction ( int flags, uint offset
         /* Increase the eval_cost for the duration of the catch so that
          * there is enough time left to handle an eval-too-big error.
          */
-        if (max_eval_cost && eval_cost + CATCH_RESERVED_COST >= max_eval_cost)
+        if (max_eval_cost && eval_cost + reserve_cost >= max_eval_cost)
         {
             error("Not enough eval time left for catch(): required %ld, available %ld\n"
-                 , (long)CATCH_RESERVED_COST, (long)(max_eval_cost - eval_cost)
+                 , (long)reserve_cost, (long)(max_eval_cost - eval_cost)
                  );
             /* NOTREACHED */
             return MY_TRUE;
         }
 
-        eval_cost += CATCH_RESERVED_COST;
-        assigned_eval_cost += CATCH_RESERVED_COST;
+        eval_cost += reserve_cost;
+        assigned_eval_cost += reserve_cost;
 
         /* Recursively call the interpreter */
         rc = eval_instruction(i_pc, INTER_SP);
@@ -437,8 +438,8 @@ catch_instruction ( int flags, uint offset
             push_number(inter_sp, 0);
         }
 
-        eval_cost -= CATCH_RESERVED_COST;
-        assigned_eval_cost -= CATCH_RESERVED_COST;
+        eval_cost -= reserve_cost;
+        assigned_eval_cost -= reserve_cost;
     }
 
     return rc;

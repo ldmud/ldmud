@@ -16,7 +16,8 @@ BESCHREIBUNG
         __CATCH_EVAL_COST__ Rechenticks uebrig sind, wird ein Laufzeitfehler
         RTE innerhalb von catch() erzeugt (und somit wie jeder andere
         Fehler abgefangen) und es werden keine Ausdruecke <expr> aus catch()
-        ausgewertet.
+        ausgewertet. Der Modifikator 'reserve' kann verwendet werden,
+        einen anderen Wert fuer die Reserve anzugeben.
 
         Das Verhalten von catch() kann durch <modifiers> veraendert werden:
 
@@ -27,6 +28,10 @@ BESCHREIBUNG
                         Fehler innerhalb eines catch() nicht aufgerufen. Mit
                         diesem <modifier> wird runtime_error() trotzdem
                         aufgerufen.
+            'reserve <expr>': <expr> muss eine ganzen Zahl groesser 0
+                        ergeben, welche dann als Rechenreserve anstelle
+                        von __CATCH_EVAL_COST__ verwendet wird. Das Minimum
+                        ist 2 * __MASTER_EVAL_COST__ .
 
         Catch ist nicht im eigentlichen Sinne eine Efun, sondern eine Compiler
         Anweisung.
@@ -44,6 +49,7 @@ AENDERUNGEN
             zudem 'publish' ein.
         LDMud 3.3.559 verlegte den Test auf verbleibende Rechenticks in die
             vom catch() umschlossenen Ausfuehrung.
+        LDMud 3.3.560 fuegte den Modifikator 'reserve' ein.
 
 SIEHE AUCH
         throw(E), raise_error(E), predefined(D), runtime_error(M)
