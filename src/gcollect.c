@@ -2703,9 +2703,9 @@ setup_print_block_dispatcher (void)
 
     current_object = master_ob;
 #ifdef USE_NEW_INLINES
-    closure_literal(&tmp_closure, 0, 0);
+    closure_literal(&tmp_closure, 0, 0, 0);
 #else
-    closure_literal(&tmp_closure, 0);
+    closure_literal(&tmp_closure, 0, 0);
 #endif /* USE_NEW_INLINES */
     store_print_block_dispatch_info(tmp_closure.u.lambda, show_cl_literal);
     free_svalue(&tmp_closure);

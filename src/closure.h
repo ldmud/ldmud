@@ -49,6 +49,11 @@ struct lambda_s
             object_t       *ob;          /* Originating object */
             unsigned short index;        /* Index in the object's function
                                           * table */
+            unsigned short inhIndex;     /* 0, or (1 + inheritance index)
+                                          * for closure referencing
+                                          * inherited functions (even if
+                                          * overloaded).
+                                          */
             unsigned short context_size; /* Number of context vars */
         } lfun;
 
@@ -104,9 +109,9 @@ extern Bool      lambda_ref_replace_program(lambda_t *l, int type, p_int size, v
 extern void      set_closure_user(svalue_t *svp, object_t *owner);
 extern void      replace_program_lambda_adjust(replace_ob_t *r_ob);
 #ifndef USE_NEW_INLINES
-extern void      closure_literal(svalue_t *dest, int ix);
+extern void      closure_literal(svalue_t *dest, int ix, unsigned short inhIndex);
 #else /* USE_NEW_INLINES */
-extern void      closure_literal(svalue_t *dest, int ix, unsigned short num);
+extern void      closure_literal(svalue_t *dest, int ix, unsigned short inhIndex, unsigned short num);
 #endif /* USE_NEW_INLINES */
 extern lambda_t *lambda(vector_t *args, svalue_t *block, object_t *origin);
 extern void      free_closure(svalue_t *svp);

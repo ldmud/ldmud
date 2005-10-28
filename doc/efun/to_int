@@ -9,8 +9,9 @@ SYNOPSIS
 DESCRIPTION
         Floats are truncated to integer values, strings with leadings
         digits are converted to integers up to the first non-digit.
-        lfun-closures are converted into their function index,
-        variable closure are converted into their variable index.
+        lfun-closures are converted into their function index (not adjusted
+        for inheritance), variable closure are converted into their variable
+        index.
         Integers are just returned.
 
         Regarding floats, it is important to keep rounding effects

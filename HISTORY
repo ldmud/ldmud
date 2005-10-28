@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-16-Sep-2004 (Lars Duening) -- Development Release 3.3
+24-Nov-2004 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -126,6 +126,8 @@ For a detailed list of all changes see the file CHANGELOG.
            the blueprint.
        + If the function definitions in two inherits differ in their
            visibility, the compiler emits a warning.
+       + Implemented closures explicitely referencing inherited functions
+           ("#'super::fun").
        + Bugfix: The type recognition of the variables for a foreach()
            no longer gets confused by visibility flags.
 

@@ -5794,19 +5794,31 @@ save_closure (svalue_t *cl, Bool writable)
          && cl->u.lambda->ob == current_object
            )
         {
-            lambda_t  *l;
-            program_t *prog;
-            int        ix;
-            funflag_t  flags;
-            string_t  *function_name;
-            char      *source, c;
-            object_t  *ob;
+            lambda_t       *l;
+            program_t      *prog;
+            program_t      *inhProg = 0;
+            int             ix;
+            unsigned short  inhIndex;
+            funflag_t       flags;
+            string_t       *function_name;
+            char           *source, c;
+            object_t       *ob;
 
             l = cl->u.lambda;
             ob = l->function.lfun.ob;
             ix = l->function.lfun.index;
+            inhIndex = l->function.lfun.inhIndex;
 
             prog = ob->prog;
+
+            if (inhIndex)
+            {
+                inherit_t *inheritp;
+
+                inheritp = &prog->inherit[inhIndex-1];
+                inhProg = prog = inheritp->prog;
+            }
+
             flags = prog->functions[ix];
             while (flags & NAME_INHERITED)
             {
@@ -5843,6 +5855,19 @@ save_closure (svalue_t *cl, Bool writable)
                 c = *source++;
                 do L_PUTC(c) while ( '\0' != (c = *source++) );
                 L_PUTC_EPILOG
+            }
+
+            /* For inherited lfun closures, add the '-<inheritname>' */
+            if (l->function.lfun.inhIndex)
+            {
+                string_t * progName = del_dotc(inhProg->name);
+                L_PUTC_PROLOG
+                source = get_txt(progName);
+                L_PUTC('-');
+                c = *source++;
+                do L_PUTC(c) while ( '\0' != (c = *source++) );
+                L_PUTC_EPILOG
+                free_mstring(progName);
             }
 
 #ifdef USE_NEW_INLINES
@@ -5891,9 +5916,6 @@ save_closure (svalue_t *cl, Bool writable)
                 }
             }
 #endif /* USE_NEW_INLINES */
-            /* TODO: Once we have inherit-conscious lfun closures,
-             * TODO:: save them as #'l:<inherit>-<name>
-             */
         }
         else
         {
@@ -7774,6 +7796,7 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
         string_t *s;
         int i;
         char *super;
+        unsigned short inhIndex;
 
 #ifdef USE_NEW_INLINES
         size_t context_size = 0;
@@ -7812,13 +7835,18 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
             break; /* switch(ct) */
         }
 
+        inhIndex = 0;
         if (super)
-            i = find_inherited(super, name);
+        {
+            i = find_inherited_function(super, name, &inhIndex);
+            inhIndex++;
+        }
         else
+        {
             i = find_function(s, current_object->prog);
+        }
 
-        /* If the function exists and is visible, create the closure
-         * TODO: Handle inherit-conscious closures.
+        /* If the function exists and is visible, create the closure.
          */
         if (i >= 0)
         {
@@ -7849,6 +7877,7 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
             l->function.lfun.ob
               = ref_object(current_object, "restore_svalue");
             l->function.lfun.index = (unsigned short)i;
+            l->function.lfun.inhIndex = inhIndex;
 #ifdef USE_NEW_INLINES
             l->function.lfun.context_size = context_size;
             if (context_size > 0)

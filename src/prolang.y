@@ -5262,9 +5262,13 @@ delete_prog_string (void)
 
     struct {
         p_int number;
+        unsigned short inhIndex;
     } closure;
       /* A closure (#'xxx). The .number determines the exact
        * nature of the closure.
+       * For lfun closures, an inhIndex > 0 determines the
+       * (inheritance index + 1) of a direct reference to an
+       * inherited closure.
        */
 
     struct {
@@ -10090,15 +10094,17 @@ expr4:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | L_CLOSURE
       {
-          int ix;
+          int ix, inhIndex;
 
           $$.start = CURRENT_PROGRAM_SIZE;
           $$.code = -1;
           if (!pragma_warn_deprecated)
               ins_byte(F_NO_WARN_DEPRECATED);
           ix = $1.number;
+          inhIndex = $1.inhIndex;
           ins_f_code(F_CLOSURE);
           ins_short(ix);
+          ins_short(inhIndex);
           $$.type = Type_Closure;
       }
 
@@ -14283,13 +14289,20 @@ lookup_inherited (char *super_name, string_t *real_name
 
 /*-------------------------------------------------------------------------*/
 short
-find_inherited (char *super_name, char *real_name)
+find_inherited_function ( const char * super_name
+                        , const char * real_name
+                        , unsigned short * pInherit
+                        )
 
 /* Lookup an inherited function <super_name>::<real_name> and return
- * it's function index. Return -1 if not found.
+ * it's function index as result, and the inheritance index in *<pInherit>.
+ * Return -1 if not found.
+ *
+ * The returned function index is not adjusted for the compiled program's
+ * function table.
  *
  * This function is called by the lexer to resolve #'<inherited_fun> closures,
- * so both strings are not shared.
+ * and by restore_value()/restore_object() to restore closure values.
  *
  * <super_name> can be an empty string or the (partial) name of one
  * of the inherits.
@@ -14297,17 +14310,19 @@ find_inherited (char *super_name, char *real_name)
 
 {
     inherit_t *ip;
-    funflag_t flags;
     string_t *rname;
+    funflag_t flags;
     short     ix;
 
     rname = find_tabled_str(real_name);
 
     ix =  rname ? lookup_inherited(super_name, rname, &ip, &flags) : -1;
-    if (ix >= 0) /* Correct the index for the toplevel program */
-        ix += ip->function_index_offset;
+    if (ix >= 0) /* Also return the inherit index. */
+        *pInherit = ip - (inherit_t *)mem_block[A_INHERITS].block;
+    else
+        *pInherit = 0;
     return ix;
-} /* find_inherited() */
+} /* find_inherited_function() */
 
 /*-------------------------------------------------------------------------*/
 static int

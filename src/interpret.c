@@ -6623,6 +6623,127 @@ pop_control_stack (void)
 } /* pop_control_stack() */
 
 /*-------------------------------------------------------------------------*/
+static INLINE inherit_t *
+adjust_variable_offsets ( const inherit_t * inheritp
+                        , const program_t * prog
+                        , const object_t  * obj
+                        )
+
+/* If we do an explicit call into a virtually inherited base class we
+ * have to find the first instance of the inherited variables.
+ * This cannot be done at compile time because it depends on the
+ * _object_ (i.e. the runtime environment) in which the program
+ * is running.
+ *
+ * <inheritp> is the intended target for the call, <prog> is the
+ * currently running program, <obj> is the currently used object.
+ * The result is either NULL if no adjustment is required (then the caller
+ * has to use the original <inheritp> passed in), or the pointer to the
+ * inheritance structure to be used.
+ *
+ * TODO: A better compiler might do some backpatching and at least
+ * TODO:: leave hints where the variables are, so that we can omit
+ * TODO:: the explicite search. Or some load-time patching.
+ */
+{
+    inherit_t * inh = NULL;
+
+    if (prog != obj->prog
+     && inheritp->prog->num_variables
+     && (prog->variables[inheritp->variable_index_offset
+                         +inheritp->prog->num_variables-1
+                        ].type.typeflags & TYPE_MOD_VIRTUAL)
+     && !(inheritp->prog->variables[inheritp->prog->num_variables-1
+                                   ].type.typeflags & TYPE_MOD_VIRTUAL)
+       )
+    {
+        /* Now search for the first virtual inheritance of the program
+         * in the inherit list of the topmost program.
+         * Don't get confused by normal inherits, though.
+         */
+
+        int i = obj->prog->num_inherited;
+        inh = obj->prog->inherit;
+
+        while (i)
+        {
+            if (inh->prog == inheritp->prog
+             && obj->prog->variables[inh->variable_index_offset
+                                     +inh->prog->num_variables-1
+                                    ].type.typeflags&TYPE_MOD_VIRTUAL
+               )
+                break;
+            inh++;
+            i--;
+        }
+
+        /* i should always be != 0 here, with inh pointing the the
+         * inherit structure we're looking for.
+         */
+
+#ifdef DEBUG
+        if (!i)
+        {
+            char *ts;
+            ts = time_stamp();
+            fprintf(stderr,
+                    "%s Adjusting variable offsets because of virtual "
+                        "inheritance for call\n"
+                    "%s from %s into %s (topmost program %s) FAILED.\n"
+                    "%s Please check the inherit tree and report it.\n"
+                   , ts, ts
+                   , get_txt(prog->name)
+                   , get_txt(inheritp->prog->name)
+                   , get_txt(obj->prog->name)
+                   , ts);
+            inh = NULL;
+        }
+#endif
+    }
+
+    return NULL;
+} /* adjust_variable_offsets() */
+
+/*-------------------------------------------------------------------------*/
+static inherit_t *
+setup_inherited_call (unsigned short inhIndex)
+
+/* Setup the global variables for a call to an explicitly inherited
+ * function, inherited from <inhIndex>. Result is the pointer to the
+ * inherit structure.
+ */
+
+{
+    inherit_t * inheritp = &current_prog->inherit[inhIndex];
+
+    /* If we do an explicit call into a virtually inherited base class we
+     * have to find the first instance of the inherited variables.
+     * This cannot be done at compile time because it depends on the
+     * _object_ (i.e. the runtime environment) in which current_prog
+     * is running.
+     */
+    {
+        inherit_t * inh;
+
+        inh = adjust_variable_offsets(inheritp, current_prog, current_object);
+        if (inh)
+        {
+            /* Found a virtual base class, so un-adjust the offsets. */
+            inheritp = inh;
+            current_variables = current_object->variables;
+            function_index_offset = 0;
+        }
+    }
+
+    /* Set the current program to the inherited program so that the
+     * caller can search for the function.
+     */
+    current_prog = inheritp->prog;
+
+    return inheritp;
+} /* setup_inherited_call() */
+
+/*-------------------------------------------------------------------------*/
 static INLINE funflag_t
 setup_new_frame1 (int fx, int fun_ix_offs, int var_ix_offs)
 
@@ -6642,6 +6763,7 @@ setup_new_frame1 (int fx, int fun_ix_offs, int var_ix_offs)
     funflag_t flags;
 
     progp = current_prog;
+
     flags = progp->functions[fx];
 
     /* Handle a cross-define.
@@ -6851,16 +6973,27 @@ setup_new_frame2 (fun_hdr_p funstart, svalue_t *sp
 
 /*-------------------------------------------------------------------------*/
 static funflag_t
-setup_new_frame (int fx)
+setup_new_frame (int fx, unsigned short inhIndex)
 
 /* Setup a call for function <fx> in the current program.
+ * If <inhIndex> is not 0, it is the (inheritance index + 1) of the 
+ * inherited function to call.
  * Result are the flags for the function.
  */
 
 {
     funflag_t flags;
 
-    flags = setup_new_frame1(fx, 0, 0);
+    if (inhIndex)
+    {
+        inherit_t * inheritp = setup_inherited_call(inhIndex-1);
+        flags = setup_new_frame1(fx, inheritp->function_index_offset
+                                   , inheritp->variable_index_offset
+                                );
+    }
+    else
+        flags = setup_new_frame1(fx, 0, 0);
+
     inter_sp = setup_new_frame2(
       current_prog->program + (flags & FUNSTART_MASK), inter_sp, MY_FALSE
       , MY_FALSE
@@ -7912,13 +8045,15 @@ again:
         break;
     }
 
-    CASE(F_CLOSURE);                /* --- closure <ix>        --- */
+    CASE(F_CLOSURE);            /* --- closure <ix> <inhIndex> --- */
 #ifdef USE_NEW_INLINES
     CASE(F_CONTEXT_CLOSURE); /* --- context_closure <ix> <num> --- */
 #endif /* USE_NEW_INLINES */
     {
-        /* Push the closure value <ix> onto the stack.
-         * <ix> is a uint16, stored low byte first.
+        /* Push the closure value <ix> and <inhIndex> onto the stack.
+         * Both <ix> and <inhIndex> are uint16, stored low byte first.
+         *
+         * For <ix>:
          * Values 0xf000..0xffff are efun and simul-efun symbols, the others
          * are operators and literals.
          * Simul-efun symbols (0xf800..0xffff) and true efun symbolx (0xf000..
@@ -7927,6 +8062,10 @@ again:
          * Operator symbols (0xf000..0xf7ff for which instrs[].Default == -1)
          * are moved into their 0xe800..0xefff range, then made signed and
          * stored.
+         *
+         * For <inhIndex>:
+         * If not 0 for lfun closures, it is the (inheritance index + 1)
+         * of the directly referenced inherited function.
 #ifdef USE_NEW_INLINES
          *
          * If it is a context closure, the context is sized to and initialized
@@ -7936,6 +8075,7 @@ again:
 
         /* TODO: uint16 */ unsigned short tmp_ushort;
         /* TODO: int32 */ int ix;
+        /* TODO: uint16 */ unsigned short inhIndex;
 #ifdef USE_NEW_INLINES
         unsigned short context_size;
 #endif /* USE_NEW_INLINES */
@@ -7943,9 +8083,15 @@ again:
         LOAD_SHORT(tmp_ushort, pc);
 #ifdef USE_NEW_INLINES
         if (instruction == F_CONTEXT_CLOSURE)
+        {
             LOAD_SHORT(context_size, pc);
+            inhIndex = 0;
+        }
         else
+        {
             context_size = 0;
+            LOAD_SHORT(inhIndex, pc);
+        }
 #endif /* USE_NEW_INLINES */
 
         ix = tmp_ushort;
@@ -7955,9 +8101,9 @@ again:
             inter_sp = sp;
             inter_pc = pc;
 #ifndef USE_NEW_INLINES
-            closure_literal(sp, ix);
+            closure_literal(sp, ix, inhIndex);
 #else /* USE_NEW_INLINES */
-            closure_literal(sp, ix, context_size);
+            closure_literal(sp, ix, inhIndex, context_size);
 #endif /* USE_NEW_INLINES */
             /* If out of memory, this will set sp to svalue-0 and
              * throw an error.
@@ -12994,9 +13140,8 @@ again:
         LOAD_SHORT(prog_index, pc);
         LOAD_SHORT(func_index, pc);
 
-        inheritp = &current_prog->inherit[prog_index];
-
 #ifdef DEBUG
+        inheritp = &current_prog->inherit[prog_index];
         if (func_index >= inheritp->prog->num_functions)
         {
             fatal("call_inherited: Illegal function index: "
@@ -13012,77 +13157,7 @@ again:
         push_control_stack(sp, pc, fp);
 #endif /* USE_NEW_INLINES */
 
-        /* If we do an explicit call into a virtually inherited base class we
-         * have to find the first instance of the inherited variables.
-         * This cannot be done at compile time because it depends on the
-         * _object_ (i.e. the runtime environment) in which current_prog
-         * is running.
-         * TODO: A better compiler might do some backpatching and at least
-         * TODO:: leave hints where the variables are, so that we can omit
-         * TODO:: the explicite search. Or some load-time patching.
-         */
-        if (current_prog != current_object->prog
-         && inheritp->prog->num_variables
-         && (current_prog->variables[inheritp->variable_index_offset
-                                     +inheritp->prog->num_variables-1
-                                    ].type.typeflags & TYPE_MOD_VIRTUAL)
-         && !(inheritp->prog->variables[inheritp->prog->num_variables-1
-                                       ].type.typeflags & TYPE_MOD_VIRTUAL)
-           )
-        {
-            /* Now search for the first virtual inheritance of the program
-             * in the inherit list of the topmost program.
-             * Don't get confused by normal inherits, though.
-             */
-
-            int i = current_object->prog->num_inherited;
-            inherit_t *inh = current_object->prog->inherit;
-
-            while (i)
-            {
-                if (inh->prog == inheritp->prog
-                 && current_object->prog
-                                  ->variables[inh->variable_index_offset
-                                              +inh->prog->num_variables-1
-                                             ].type.typeflags&TYPE_MOD_VIRTUAL
-                   )
-                    break;
-                inh++;
-                i--;
-            }
-
-            if (i)
-            {
-                /* found, so adjust the inheritp and the offsets
-                 * to start with
-                 */
-                inheritp = inh;
-                current_variables = current_object->variables;
-                function_index_offset = 0;
-            }
-#ifdef DEBUG
-            else { /* this shouldn't happen! */
-                char *ts;
-                ts = time_stamp();
-                fprintf(stderr,
-                        "%s Adjusting variable offsets because of virtual "
-                            "inheritance for call\n"
-                        "%s from %s into %s (topmost program %s) FAILED.\n"
-                        "%s Please check the inherit tree and report it.\n"
-                       , ts, ts
-                       , get_txt(current_prog->name)
-                       , get_txt(inheritp->prog->name)
-                       , get_txt(current_object->prog->name)
-                       , ts);
-            }
-#endif
-        }
-
-        /* Set the current program to the inherited program _after_
-         * the control stack push, since there is where we search for
-         * the function.
-         */
-        current_prog = inheritp->prog;
+        inheritp = setup_inherited_call(prog_index);
 
         /* Search for the function definition and determine the offsets.
          */
@@ -17288,7 +17363,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
         current_object = l->function.lfun.ob;
         current_prog = current_object->prog;
         /* inter_sp == sp */
-        flags = setup_new_frame(l->function.lfun.index);
+        flags = setup_new_frame(l->function.lfun.index, l->function.lfun.inhIndex);
 #ifdef USE_NEW_INLINES
         if (l->function.lfun.context_size > 0)
             inter_context = l->context;
@@ -17736,7 +17811,7 @@ call_function (program_t *progp, int fx)
 #endif
     csp->num_local_variables = 0;
     current_prog = progp;
-    flags = setup_new_frame(fx);
+    flags = setup_new_frame(fx, 0);
     funstart = current_prog->program + (flags & FUNSTART_MASK);
     csp->funstart = funstart;
     previous_ob = current_object;

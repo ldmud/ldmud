@@ -3933,8 +3933,8 @@ yylex1 (void)
  *   L_NUMBER:  yylval.number is the parsed whole number or char constant.
  *   L_FLOAT:   yylval.float_number is the parsed float number.
  *   L_STRING:  last_lex_string is the (tabled) parsed string literal.
- *   L_CLOSURE: yylval.closure.number identifies the closure. See the
- *              source for which value means what (it's a bit longish).
+ *   L_CLOSURE: yylval.closure.number/.inhIndex identifies the closure. See
+ *              the source for which value means what (it's a bit longish).
  *   L_QUOTED_AGGREGATE: yylval.number is the number of quotes
  *   L_SYMBOL:  yylval.symbol.name is the (shared) name of the symbol,
  *              yylval.symbol.quotes the number of quotes.
@@ -4740,6 +4740,7 @@ yylex1 (void)
                     if ((i = symbol_operator(yyp, (const char **)&outp)) < 0)
                         yyerror("Missing function name after #'");
                     yylval.closure.number = i + CLOSURE_EFUN_OFFS;
+                    yylval.closure.inhIndex = 0;
                     return L_CLOSURE;
                 }
 
@@ -4773,10 +4774,12 @@ yylex1 (void)
                 if (super_name != NULL)
                 {
                     short ix;
+                    unsigned short inhIndex;
 
                     *yyp = '\0'; /* c holds the char at this place */
                     *(wordstart-2) = '\0';
-                    ix = find_inherited(super_name, wordstart);
+                    ix = find_inherited_function(super_name, wordstart, &inhIndex);
+                    inhIndex++;
                     if (ix < 0)
                     {
                         yyerrorf("Undefined function: %.50s::%.50s"
@@ -4787,6 +4790,7 @@ yylex1 (void)
                     *(wordstart-2) = ':';
 
                     yylval.closure.number = ix;
+                    yylval.closure.inhIndex = inhIndex;
                     return L_CLOSURE;
                 }
 
@@ -4823,6 +4827,7 @@ yylex1 (void)
                         }
 
                         yylval.closure.number = code + CLOSURE_EFUN_OFFS;
+                        yylval.closure.inhIndex = 0;
                         return L_CLOSURE;
                     }
                     if ( !(p = p->inferior) )
@@ -4839,6 +4844,7 @@ yylex1 (void)
                     yyerrorf("Undefined function: %.50s", wordstart);
                     *yyp = c;
                     yylval.closure.number = CLOSURE_EFUN_OFFS;
+                    yylval.closure.inhIndex = 0;
                     return L_CLOSURE;
                 }
 
@@ -4889,6 +4895,7 @@ yylex1 (void)
                  *
                  * The switch() serves just as a simple try... environment.
                  */
+                yylval.closure.inhIndex = 0;
                 switch(0) { default:
                     if (!efun_override)
                     {
