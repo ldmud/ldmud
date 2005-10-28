@@ -28,7 +28,6 @@
 ;; TODO:: unbound_lambdas). This requires symbolic return values from
 ;; TODO:: all the setup_callback functions, as the positive values already
 ;; TODO:: signal errors in the arguments.
-;; TODO: member() should get start position.
 ;; TODO: "*"::function() should be able to take parameters
 ;; TODO: set_wizlist_score() to manually add name:score pairs to the wizlist,
 ;; TODO:: to be used to read the WIZLIST file from the mudlib.
@@ -61,16 +60,16 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 555)
-(Parent-Version lpmud 3-3 554)
+(Project-Version lpmud 3-3 556)
+(Parent-Version lpmud 3-3 555)
 (Version-Log "
-  - (smalloc.c) With USE_AVL_FREELIST, the AVL tree could develop cycles -
-       corrected that (reported by Ralph).
+  - (efuns, func_spec) The efuns member() and rmember() can take a
+       start position.
 ")
 (New-Version-Log
 ""
 )
-(Checkin-Time "Sun, 23 May 2004 00:16:42 -0600")
+(Checkin-Time "Sun, 23 May 2004 01:08:21 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -108,8 +107,8 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.76 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.618 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.355 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.619 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.356 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -184,8 +183,8 @@
   (src/dumpstat.c (lpmud/c/34_dumpstat.c 1.20.1.11.1.8 644))
   (src/ed.h (lpmud/f/34_ed.h 1.5.1.6 644))
   (src/ed.c (lpmud/c/33_ed.c 1.32.1.31 644))
-  (src/efuns.h (lpmud/l/20_efuns.h 1.13.1.19.1.5 644))
-  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.92 644))
+  (src/efuns.h (lpmud/l/20_efuns.h 1.13.1.19.1.6 644))
+  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.93 644))
   (src/exec.h (lpmud/c/32_exec.h 1.34.1.33.1.7 644))
   (src/files.h (lpmud/i/49_files.h 1.2 644))
   (src/files.c (lpmud/i/50_files.c 1.25 644))
@@ -318,7 +317,7 @@
   (src/xptmalloc.c (lpmud/d/b/10_xptmalloc. 1.4 644))
 
   ;; Build files
-  (src/func_spec (lpmud/c/31_func_spec 1.53.1.45.1.22.1.34 644))
+  (src/func_spec (lpmud/c/31_func_spec 1.53.1.45.1.22.1.35 644))
   (src/string_spec (lpmud/f/6_string_spe 1.14.1.16 644))
   (src/mkfunc.c (lpmud/l/14_mkfunc.c 1.1 644))
   (src/make_func.y (lpmud/b/7_make_func. 1.25.1.30.1.11 644))
@@ -1133,7 +1132,7 @@
   (doc/efun/max (lpmud/k/41_max 1.2 644))
   (doc/efun/md5 (lpmud/l/20_md5_encryp 1.3 644))
   (doc/efun/md5_crypt (lpmud/n/47_md5_crypt 1.2 644))
-  (doc/efun/member (lpmud/p/12_member 1.5 644))
+  (doc/efun/member (lpmud/p/12_member 1.6 644))
   (doc/efun/min (lpmud/k/42_min 1.2 644))
   (doc/efun/mkdir (lpmud/p/14_mkdir 1.3 644))
   (doc/efun/mkmapping (lpmud/c/39_mkmapping 1.8 644))
@@ -1203,7 +1202,7 @@
   (doc/efun/reverse (lpmud/u/b/11_reverse 1.2 644))
   (doc/efun/rm (lpmud/p/51_rm 1.2 644))
   (doc/efun/rmdir (lpmud/q/0_rmdir 1.2 644))
-  (doc/efun/rmember (lpmud/d/b/33_rmember 1.2 644))
+  (doc/efun/rmember (lpmud/d/b/33_rmember 1.3 644))
   (doc/efun/rusage (lpmud/q/1_rusage 1.3 644))
   (doc/efun/save_object (lpmud/q/2_save_objec 1.7 644))
   (doc/efun/save_value (lpmud/e/13_save_value 1.5 644))
@@ -1383,7 +1382,7 @@
   (doc/efun.de/save_value.de (lpmud/g/b/32_save_value 1.1 640))
   (doc/efun.de/save_object.de (lpmud/g/b/33_save_objec 1.1 640))
   (doc/efun.de/rusage.de (lpmud/g/b/34_rusage.de 1.1 640))
-  (doc/efun.de/rmember.de (lpmud/g/b/35_rmember.de 1.1 640))
+  (doc/efun.de/rmember.de (lpmud/g/b/35_rmember.de 1.2 640))
   (doc/efun.de/rmdir.de (lpmud/g/b/36_rmdir.de 1.1 640))
   (doc/efun.de/rm.de (lpmud/g/b/37_rm.de 1.1 640))
   (doc/efun.de/reverse.de (lpmud/u/b/14_reverse.de 1.2 644))
@@ -1449,7 +1448,7 @@
   (doc/efun.de/mkdir.de (lpmud/h/b/37_mkdir.de 1.1 640))
   (doc/efun.de/min.de (lpmud/h/b/38_min.de 1.1 640))
   (doc/efun.de/member_array.de (lpmud/h/b/39_member_arr 1.2 640))
-  (doc/efun.de/member.de (lpmud/h/b/40_member.de 1.1 640))
+  (doc/efun.de/member.de (lpmud/h/b/40_member.de 1.2 640))
   (doc/efun.de/md5_crypt.de (lpmud/t/b/37_md5_crypt. 1.1 644))
   (doc/efun.de/md5.de (lpmud/t/b/38_md5.de 1.2 644))
   (doc/efun.de/max.de (lpmud/h/b/41_max.de 1.1 640))

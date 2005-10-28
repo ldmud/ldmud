@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-21-May-2004 (Lars Duening) -- Development Release 3.3
+23-May-2004 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -34,6 +34,8 @@ For a detailed list of all changes see the file CHANGELOG.
             context closure can be returned.
        + map(): The efun can now map strings as well.
        + make_shared_string(): Deprecated.
+       + member(), rmember(): The start position for the search can be
+            specified.
        + mkmapping(): Convert structs to mappings, too.
        + process_string(): Spaces are now allowed in function arguments
            and no longer terminate the function specification.

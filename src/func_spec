@@ -455,8 +455,8 @@ mapping mkmapping(mixed *|struct, ...);
 #else
 mapping mkmapping(mixed *, ...);
 #endif
-int     member(mixed *|string|mapping, mixed);
-int     rmember(mixed *|string, mixed);
+int     member(mixed *|string|mapping, mixed, void|int);
+int     rmember(mixed *|string, mixed, void|int);
 mixed  *unmkmapping(mapping);
 void    walk_mapping(mapping, string|closure, ...);
 int     widthof(null|mapping);

@@ -6304,21 +6304,43 @@ v_map (svalue_t *sp, int num_arg)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_member (svalue_t *sp)
+v_member (svalue_t *sp, int num_arg)
 
 /* EFUN member()
  *
- *   int member(mixed *array, mixed elem)
+ *   int member(mixed *array, mixed elem, [int start])
  *   int member(mapping m, mixed key)
- *   int member(string s, int elem)
+ *   int member(string s, int elem, [int start])
  *
  * For arrays and strings, returns the index of the first occurance of
- * second arg in the first arg, or -1 if none found. For mappings it
- * checks, if key is present in mapping m and returns 1 if so, 0 if
- * key is not in m.
+ * second arg in the first arg, or -1 if none found. If <start> is
+ * given and non-negative, the search starts at that position. A start
+ * position beyond the end of the string or array will cause the efun
+ * to return -1.
+ *
+ * For mappings it checks, if key is present in mapping m and returns
+ * 1 if so, 0 if key is not in m.
  */
 
 {
+    p_int startpos = 0;
+    Bool hasStart = MY_FALSE;
+    if (num_arg > 2)
+    {
+        startpos = sp->u.number;
+        sp--;
+        hasStart = MY_TRUE;
+        num_arg--;
+    }
+
+    if (hasStart && startpos < 0)
+    {
+        error("Illegal arg 3 to member(): %ld, expected positive number.\n"
+             , startpos);
+        /* NOTREACHED */
+        return sp;
+    }
+
     /* --- Search an array --- */
 
     if (sp[-1].type == T_POINTER)
@@ -6331,113 +6353,120 @@ f_member (svalue_t *sp)
         cnt = (long)VEC_SIZE(vec);
         sp_u = sp->u;
 
-        switch(sp->type)
+        if (hasStart && startpos >= cnt)
+            cnt = -1;
+        else
         {
-        case T_STRING:
-          {
-            string_t *str;
-            svalue_t *item;
+            cnt -= startpos;
 
-            str = sp_u.str;
-            for(item = vec->item; --cnt >= 0; item++)
+            switch(sp->type)
             {
-                if (item->type == T_STRING
-                 && mstreq(str, item->u.str))
-                    break;
-            }
-            break;
-          }
-
-        case T_CLOSURE:
-          {
-            short type;
-            svalue_t *item;
-
-            type = sp->type;
-            for(item = vec->item; --cnt >= 0; item++)
-            {
-                /* TODO: Is this C99 compliant? */
-                if (item->type == type && closure_eq(sp, item))
-                    break;
-            }
-            break;
-          }
-
-        case T_FLOAT:
-        case T_SYMBOL:
-        case T_QUOTED_ARRAY:
-          {
-            short x_generic;
-            short type;
-            svalue_t *item;
-
-            type = sp->type;
-            x_generic = sp->x.generic;
-            for(item = vec->item; --cnt >= 0; item++)
-            {
-                /* TODO: Is this C99 compliant? */
-                if (sp_u.str == item->u.str
-                 && x_generic == item->x.generic
-                 && item->type == type)
-                    break;
-            }
-            break;
-          }
-
-        case T_NUMBER:
-            if (!sp_u.number)
-            {
-                /* Search for 0 is special: it also finds destructed
-                 * objects resp. closures on destructed objects (and
-                 * changes them to 0).
-                 */
-
+            case T_STRING:
+              {
+                string_t *str;
                 svalue_t *item;
-                short type;
 
-                for (item = vec->item; --cnt >= 0; item++)
+                str = sp_u.str;
+                for(item = vec->item + startpos; --cnt >= 0; item++)
                 {
-                    if ( (type = item->type) == T_NUMBER)
-                    {
-                        if ( !item->u.number )
-                            break;
-                    }
-                    else if (destructed_object_ref(item))
-                    {
-                        assign_svalue(item, &const0);
+                    if (item->type == T_STRING
+                     && mstreq(str, item->u.str))
                         break;
-                    }
                 }
                 break;
-            }
+              }
 
-            /* FALLTHROUGH */
+            case T_CLOSURE:
+              {
+                short type;
+                svalue_t *item;
 
-        case T_MAPPING:
-        case T_OBJECT:
-        case T_POINTER:
-#ifdef USE_STRUCTS
-        case T_STRUCT:
-#endif /* USE_STRUCTS */
-          {
-            svalue_t *item;
-            short type = sp->type;
+                type = sp->type;
+                for(item = vec->item + startpos; --cnt >= 0; item++)
+                {
+                    /* TODO: Is this C99 compliant? */
+                    if (item->type == type && closure_eq(sp, item))
+                        break;
+                }
+                break;
+              }
 
-            for (item = vec->item; --cnt >= 0; item++)
-            {
-                /* TODO: Is this C99 compliant? */
-                if (sp_u.number == item->u.number
-                 && item->type == type)
+            case T_FLOAT:
+            case T_SYMBOL:
+            case T_QUOTED_ARRAY:
+              {
+                short x_generic;
+                short type;
+                svalue_t *item;
+
+                type = sp->type;
+                x_generic = sp->x.generic;
+                for(item = vec->item + startpos; --cnt >= 0; item++)
+                {
+                    /* TODO: Is this C99 compliant? */
+                    if (sp_u.str == item->u.str
+                     && x_generic == item->x.generic
+                     && item->type == type)
+                        break;
+                }
+                break;
+              }
+
+            case T_NUMBER:
+                if (!sp_u.number)
+                {
+                    /* Search for 0 is special: it also finds destructed
+                     * objects resp. closures on destructed objects (and
+                     * changes them to 0).
+                     */
+
+                    svalue_t *item;
+                    short type;
+
+                    for (item = vec->item + startpos; --cnt >= 0; item++)
+                    {
+                        if ( (type = item->type) == T_NUMBER)
+                        {
+                            if ( !item->u.number )
+                                break;
+                        }
+                        else if (destructed_object_ref(item))
+                        {
+                            assign_svalue(item, &const0);
+                            break;
+                        }
+                    }
                     break;
-            }
-            break;
-          }
+                }
 
-        default:
-            if (sp->type == T_LVALUE)
-                error("Reference passed to member()\n");
-            fatal("Bad type to member(): %s\n", typename(sp->type));
-        }
+                /* FALLTHROUGH */
+
+            case T_MAPPING:
+            case T_OBJECT:
+            case T_POINTER:
+#ifdef USE_STRUCTS
+            case T_STRUCT:
+#endif /* USE_STRUCTS */
+              {
+                svalue_t *item;
+                short type = sp->type;
+
+                for (item = vec->item + startpos; --cnt >= 0; item++)
+                {
+                    /* TODO: Is this C99 compliant? */
+                    if (sp_u.number == item->u.number
+                     && item->type == type)
+                        break;
+                }
+                break;
+              }
+
+            default:
+                if (sp->type == T_LVALUE)
+                    error("Reference passed to member()\n");
+                fatal("Bad type to member(): %s\n", typename(sp->type));
+            }
+        } /* if (startpos in range) */
 
         if (cnt >= 0)
         {
@@ -6462,9 +6491,16 @@ f_member (svalue_t *sp)
         if (sp->type != T_NUMBER)
             efun_arg_error(2, T_NUMBER, sp->type, sp);
         str = sp[-1].u.str;
-        i = sp->u.number;
-        str2 = (i & ~0xff) ? NULL : memchr(get_txt(str), i, mstrsize(str));
-        i = str2 ? (str2 - get_txt(str)) : -1;
+        
+        if (hasStart && startpos >= mstrsize(str))
+            i = -1;
+        else
+        {
+            i = sp->u.number;
+            str2 = (i & ~0xff) ? NULL
+                               : memchr(get_txt(str)+startpos, i, mstrsize(str)-startpos);
+            i = str2 ? (str2 - get_txt(str)) : -1;
+        }
         free_svalue(sp--);
         free_svalue(sp);
         put_number(sp, i);
@@ -6476,6 +6512,14 @@ f_member (svalue_t *sp)
     if (sp[-1].type == T_MAPPING)
     {
         int i;
+
+        if (hasStart)
+        {
+            error("Illegal arg 3 to member(): searching a mapping doesn't "
+                  "take a start position.\n");
+            /* NOTREACHED */
+            return sp;
+        }
 
         i = get_map_value(sp[-1].u.map, sp) != &const0;
         free_svalue(sp--);
@@ -6492,18 +6536,38 @@ f_member (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_rmember (svalue_t *sp)
+v_rmember (svalue_t *sp, int num_arg)
 
 /* EFUN rmember()
  *
- *   int rmember(mixed *array, mixed elem)
- *   int rmember(string s, int elem)
+ *   int rmember(mixed *array, mixed elem [, int startpos])
+ *   int rmember(string s, int elem [, int startpos])
  *
  * For arrays and strings, returns the index of the last occurance of
  * second arg in the first arg, or -1 if none found
+ * If <start> is given and non-negative, the search starts at that
+ * position.
  */
 
 {
+    p_int startpos = 0;
+    Bool hasStart = MY_FALSE;
+    if (num_arg > 2)
+    {
+        startpos = sp->u.number;
+        sp--;
+        hasStart = MY_TRUE;
+        num_arg--;
+    }
+
+    if (hasStart && startpos < 0)
+    {
+        error("Illegal arg 3 to rmember(): %ld, expected positive number.\n"
+             , startpos);
+        /* NOTREACHED */
+        return sp;
+    }
+
     /* --- Search an array --- */
 
     if (sp[-1].type == T_POINTER)
@@ -6515,6 +6579,9 @@ f_rmember (svalue_t *sp)
         vec = sp[-1].u.vec;
         cnt = (long)VEC_SIZE(vec);
         sp_u = sp->u;
+
+        if (hasStart && startpos < cnt)
+            cnt = startpos;
 
         switch(sp->type)
         {
@@ -6626,7 +6693,7 @@ f_rmember (svalue_t *sp)
             if (sp->type == T_LVALUE)
                 error("Reference passed to member()\n");
             fatal("Bad type to member(): %s\n", typename(sp->type));
-        }
+        } /* if (startpos in range) */
 
         /* cnt is the correct result */
 
@@ -6646,6 +6713,8 @@ f_rmember (svalue_t *sp)
         if (sp->type != T_NUMBER)
             efun_arg_error(2, T_NUMBER, sp->type, sp);
         str = sp[-1].u.str;
+        if (!hasStart || startpos >= mstrsize(str))
+            startpos = mstrsize(str);
         i = sp->u.number;
         if ((i & ~0xff) != 0)
         {
@@ -6655,7 +6724,7 @@ f_rmember (svalue_t *sp)
         {
             char * cp, *start, *str2;
             start = get_txt(str);
-            cp = start + mstrsize(str);
+            cp = start + startpos;
             str2 = NULL;
 
             do

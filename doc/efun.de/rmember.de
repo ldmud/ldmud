@@ -1,14 +1,20 @@
 SYNOPSIS
-        int rmember(mixed *array, mixed elem);
-        int rmember(string str, int elem);
+        int rmember(mixed *array, mixed elem [, int start]);
+        int rmember(string str, int elem [, int start]);
 
 BESCHREIBUNG
         Liefert fuer Arrays und Strings den Index des letzten Auftretens des
         Arguments <elem> im Array <*array>  bzw. im String <str>. Wenn <elem>
         nicht gefunden wird, liefert die Funktion -1 zurueck.
 
+        Ist <start> als Zahl >= 0 gegeben, beginnt die Suche ab der
+        angegebenen Position. Eine Startposition groesser als die
+        Laenge des Strings/Arrays liefert stets das Resultat -1.
+
+
 AENDERUNGEN
         Eingefuehrt in LDMud 3.2.10.
+        LDMud 3.3.556 fuegte den <start>-Parameter hinzu.
 
 SIEHE AUCH
         member(E)
