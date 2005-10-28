@@ -16,8 +16,8 @@
 //   http://wl.mud.de/mud/doc/wwwstd/standardobjekte.html
 //
 // $Log: socketd.c,v $
-// Revision 1.13  2003/10/29 12:06:51  Fiona
-// Corrected debugging problem with ldmud 3.3 (Alwin@Avalon)
+// Revision 1.15  2004/11/10 07:25:06  Fiona
+// Fixed warning problem with 3.3 in State() (Joseph Graham, Lars Duening)
 //
 
 /*****
@@ -151,7 +151,7 @@ public int Write(mixed data) {
     data = to_mudmode(data);
     data = to_array(data)[0..strlen(data)-1];
     size = sizeof(data);
-    data = ({ (size & 0xff000000) >> 24, (size & 0xff0000) >> 16,
+    data = ({ (size & 0x7f000000) >> 24, (size & 0xff0000) >> 16,
               (size & 0xff00) >> 8, size & 0xff }) + data;
   } else {
     if (!stringp(data) && !pointerp(data))
@@ -197,7 +197,7 @@ public int Close() {
 public mixed* State() {
   mixed* data;
   if (!so_check("State")) return 0;
-  map(sockets, (: if ($1 == $3) $4 = copy($2); :), so_fd, &data);
+  map(sockets, (: if ($1 == $3) $4 = copy($2); return 0; :), so_fd, &data);
   data[S_TICKET] = copy(data[S_TICKET]);
   data[S_WAIT_DATA] = 0; // not visible for user
   return data;

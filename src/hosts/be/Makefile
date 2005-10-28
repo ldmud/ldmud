@@ -470,10 +470,10 @@ $(OBJ)/efuns.o : ../mudlib/sys/time.h ../mudlib/sys/strings.h \
     ../mudlib/sys/debug_info.h xalloc.h wiz_list.h svalue.h swap.h \
     structs.h strfuns.h simulate.h stdstrings.h sha1.h random.h ptrtable.h \
     otable.h object.h mstrings.h mregex.h md5.h mempools.h mapping.h main.h \
-    interpret.h heartbeat.h exec.h dumpstat.h comm.h closure.h call_out.h \
-    backend.h array.h actions.h efuns.h my-rusage.h my-alloca.h typedefs.h \
-    driver.h hash.h sent.h bytecode.h my-stdint.h pkg-tls.h port.h config.h \
-    hosts/unix.h hosts/be/be.h machine.h
+    lex.h interpret.h heartbeat.h exec.h dumpstat.h comm.h closure.h \
+    call_out.h backend.h array.h actions.h efuns.h my-rusage.h my-alloca.h \
+    typedefs.h driver.h hash.h sent.h bytecode.h my-stdint.h pkg-tls.h \
+    port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/files.o : ../mudlib/sys/files.h xalloc.h svalue.h stdstrings.h \
     simulate.h mstrings.h mempools.h main.h lex.h interpret.h filestat.h \

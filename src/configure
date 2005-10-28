@@ -962,7 +962,7 @@ Optional Packages:
   --with-max-cost=VALUE               default=1000000
   --with-catch-reserved-cost=VALUE    default=2000
   --with-master-reserved-cost=VALUE   default=0x200
-  --with-swap-file=VALUE              default=LP_SWAP.3
+  --with-swap-file=VALUE              default=LP_SWAP
         name of the swap file
   --with-max-array-size=VALUE         default=3000
         max number of array elements
@@ -1962,7 +1962,7 @@ if test "${with_master_reserved_cost+set}" = set; then
 
 fi;
 
-DEFAULTwith_swap_file=LP_SWAP.3
+DEFAULTwith_swap_file=LP_SWAP
 
 # Check whether --with-swap-file or --without-swap-file was given.
 if test "${with_swap_file+set}" = set; then

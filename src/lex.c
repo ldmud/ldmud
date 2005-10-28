@@ -3674,6 +3674,8 @@ parse_number (char * cp, unsigned long * p_num)
  *
  * The parsed number is stored in *<p_num>, the function returns the pointer
  * to the first character after the number.
+ *
+ * The function is also available to the other parts of the driver.
  */
 
 {
@@ -3763,6 +3765,10 @@ parse_number (char * cp, unsigned long * p_num)
     return cp-1;
 
 } /* parse_number() */
+
+char *
+lex_parse_number (char * cp, unsigned long * p_num)
+  { return parse_number(cp, p_num); }
 
 /*-------------------------------------------------------------------------*/
 static INLINE char *

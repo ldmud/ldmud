@@ -175,7 +175,7 @@ For a detailed list of all changes see the file CHANGELOG.
            x509 key- and certfile for the TLS package.
 
 
-30-Oct-2004 (Lars Duening) -- Release 3.2.11
+11-Nov-2004 (Lars Duening) -- Release 3.2.11
 
     - Changed efuns:
        + input_to(): New flag INPUT_NO_TELNET to modify the INPUT_CHARMODE
@@ -183,6 +183,7 @@ For a detailed list of all changes see the file CHANGELOG.
        + present(): The argument form (str, n) allows for ids with embedded
            numbers.
        + shutdown(): Added an argument to set the process exit code.
+       + to_int(): The base prefixes '0x', '0o' and '0b' are supported.
 
     - Corrected efuns:
        + save_object(): Matching the documentation, the efun really removes

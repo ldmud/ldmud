@@ -60,16 +60,16 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 610)
-(Parent-Version lpmud 3-3 609)
+(Project-Version lpmud 3-3 611)
+(Parent-Version lpmud 3-3 610)
 (Version-Log "
-  - (func_spec, object.c) Introduced the (str, n) form for efun present()
-    (Bug #0000134).
+  - (efuns.c, lex) Efun to_int() now supports the '0x', '0b', and '0o'
+       bases (suggested by Steve Goucher).
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Sat, 30 Oct 2004 23:57:02 -0600")
+(Checkin-Time "Thu, 11 Nov 2004 21:49:48 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -107,20 +107,20 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.83 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.673 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.380 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.674 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.381 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
   ;; Configuration
-  (src/configure (lpmud/d/0_configure 1.19.1.108 755))
+  (src/configure (lpmud/d/0_configure 1.19.1.109 755))
   (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.43 644))
   (src/machine.h.in (lpmud/b/9_machine.h. 1.9.1.13 644))
-  (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.19.1.32 644))
+  (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.19.1.33 644))
   (src/mkinstalldirs (lpmud/c/4_mkinstalld 1.1 644))
   (src/install-sh (lpmud/c/5_install-sh 1.2 755))
 
-  (src/autoconf/configure.in (lpmud/d/7_configure. 1.20.1.9.1.98 644))
+  (src/autoconf/configure.in (lpmud/d/7_configure. 1.20.1.9.1.99 644))
   (src/autoconf/acconfig.h (lpmud/d/10_acconfig.h 1.6.1.12 644))
 
   (src/settings/README (lpmud/c/22_README 1.14.1.16 644))
@@ -184,7 +184,7 @@
   (src/ed.h (lpmud/f/34_ed.h 1.5.1.6 644))
   (src/ed.c (lpmud/c/33_ed.c 1.32.1.35 644))
   (src/efuns.h (lpmud/l/20_efuns.h 1.13.1.19.1.6 644))
-  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.100 644))
+  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.101 644))
   (src/exec.h (lpmud/c/32_exec.h 1.34.1.33.1.7 644))
   (src/files.h (lpmud/i/49_files.h 1.2 644))
   (src/files.c (lpmud/i/50_files.c 1.26 644))
@@ -198,10 +198,10 @@
   (src/i-svalue_cmp.h (lpmud/a/b/20_i-svalue_c 1.4 644))
   (src/interpret.h (lpmud/b/13_interpret. 1.33.1.39 644))
   (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.72 644))
-  (src/lex.h (lpmud/b/11_lex.h 1.16.1.15.1.10 644))
-  (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.71 644))
+  (src/lex.h (lpmud/b/11_lex.h 1.16.1.15.1.11 644))
+  (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.72 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.19 644))
-  (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.66 644))
+  (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.67 644))
   (src/mapping.h (lpmud/f/30_mapping.h 1.12.1.20 644))
   (src/mapping.c (lpmud/b/6_mapping.c 1.36.1.81 644))
   (src/md5.h (lpmud/l/18_md5.h 1.3 644))
@@ -392,7 +392,7 @@
   (src/hosts/be/config.h (lpmud/e/34_config.h 1.32.1.40 644))
   (src/hosts/be/be.h (lpmud/e/35_be.h 1.7 644))
   (src/hosts/be/beyacc (lpmud/i/39_beyacc 1.1 744))
-  (src/hosts/be/Makefile (lpmud/e/37_Makefile 1.60.1.71.1.27 644))
+  (src/hosts/be/Makefile (lpmud/e/37_Makefile 1.60.1.71.1.28 644))
   (src/hosts/be/icon-32x32.raw (lpmud/s/37_icon-32x32 1.1 644) :no-keywords)
   (src/hosts/be/icon-16x16.raw (lpmud/s/38_icon-16x16 1.1 644) :no-keywords)
   (src/hosts/be/driver.rsrc (lpmud/s/39_driver.rsr 1.1 644) :no-keywords)
@@ -455,7 +455,7 @@
   (src/util/xerq/lpc/udp.c (lpmud/k/24_udp.c 1.1 644))
   (src/util/xerq/lpc/telnet_ob.c (lpmud/k/25_telnet_ob. 1.1 644))
   (src/util/xerq/lpc/socketd.man (lpmud/e/b/46_socketd.ma 1.1 644))
-  (src/util/xerq/lpc/socketd.c (lpmud/k/26_socketd.c 1.2.1.2 644))
+  (src/util/xerq/lpc/socketd.c (lpmud/k/26_socketd.c 1.2.1.3 644))
   (src/util/xerq/lpc/socket.h (lpmud/k/27_socket.h 1.1.1.1 644))
   (src/util/xerq/lpc/httpd.c (lpmud/k/28_httpd.c 1.1 644))
   (src/util/xerq/lpc/_telnet.c (lpmud/k/29__telnet.c 1.1 644))
@@ -1317,7 +1317,7 @@
   (doc/efun/tls_query_connection_state (lpmud/e/b/18_tls_query_ 1.3 644))
   (doc/efun/to_array (lpmud/q/45_to_array 1.7 644))
   (doc/efun/to_float (lpmud/q/46_to_float 1.4 644))
-  (doc/efun/to_int (lpmud/q/47_to_int 1.7 644))
+  (doc/efun/to_int (lpmud/q/47_to_int 1.8 644))
   (doc/efun/to_object (lpmud/q/48_to_object 1.3.1.3 644))
   (doc/efun/to_string (lpmud/q/49_to_string 1.9 644))
   (doc/efun/to_struct (lpmud/a/b/17_to_struct 1.1.1.2 644))

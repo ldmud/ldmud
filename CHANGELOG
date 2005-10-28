@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+11-Oct-2004 (Lars Duening)  (3.3.611)
+  - (efuns.c, lex) Efun to_int() now supports the '0x', '0b', and '0o'
+       bases (suggested by Steve Goucher).
+
 30-Oct-2004 (Lars Duening)  (3.3.610)
   - (func_spec, object.c) Introduced the (str, n) form for efun present()
     (Bug #0000134).

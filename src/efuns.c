@@ -109,6 +109,7 @@
 #include "exec.h"
 #include "heartbeat.h"
 #include "interpret.h"
+#include "lex.h"
 #include "main.h"
 #include "mapping.h"
 #include "mempools.h"
@@ -4962,7 +4963,7 @@ f_to_int (svalue_t *sp)
  */
 
 {
-    int n;
+    p_int n;
 
     switch(sp->type)
     {
@@ -4982,9 +4983,30 @@ f_to_int (svalue_t *sp)
       }
 
     case T_STRING:
-        n = strtol(get_txt(sp->u.str), NULL, 10);
+      {
+        unsigned long num = 0;
+        char * end;
+        char * cp = get_txt(sp->u.str);
+        Bool hasMinus = MY_FALSE;
+
+        /* Check if the number begins with a '-' */
+        while (*cp && isspace(*cp)) cp++;
+        if (*cp == '-')
+        {
+            hasMinus = MY_TRUE;
+            cp++;
+        }
+
+        end = lex_parse_number(cp, &num);
+        if (end != cp && num <= PINT_MAX)
+        {
+            n = (p_int)num;
+            if (hasMinus)
+                n = -n;
+        }
         free_string_svalue(sp);
         break;
+      }
 
     case T_CLOSURE:
         if (sp->x.closure_type == CLOSURE_IDENTIFIER)

@@ -1287,7 +1287,7 @@ static Option aOptions[]
     , { 0,   "swap-file",          cSwapFile,       MY_TRUE
       , "  -s f<name> | --swap-file <name>\n"
       , "  -s f<name> | --swap-file <name>\n"
-        "    Swap into file <name> instead of LP_SWAP.<host> .\n"
+        "    Swap into file <name> instead of " SWAP_FILE ".<host> .\n"
       }
 
     , { 0,   "swap-compact",       cSwapCompact,    MY_FALSE

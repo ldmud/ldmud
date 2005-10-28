@@ -292,6 +292,7 @@ extern void set_inc_list(vector_t *v);
 extern void remove_unknown_identifier(void);
 extern char *lex_error_context(void);
 extern svalue_t *f_expand_define(svalue_t *sp);
+extern char * lex_parse_number (char * cp, unsigned long * p_num);
 #ifdef USE_NEW_INLINES
 extern void * get_include_handle (void);
 #endif /* USE_NEW_INLINES */
