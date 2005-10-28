@@ -4,9 +4,12 @@ SYNOPSIS
 DESCRIPTION
         Reads lines from file.
         If <start> is not given or 0, the file is read from the
-        beginning, else from the numbered line on.
+        beginning, else the efun skips the given number of lines and
+        starts reading from the next one.
+
         If <number> is not given or 0, the whole file is read, else
         just the given amount of lines.
+
         If <start> would be outside the actual size of the file, 0 is
         returned instead of a string.
 

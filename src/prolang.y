@@ -3740,10 +3740,14 @@ def_function_complete ( p_int body_start
             )
            )
         {
-            /* Check if the previous instruction is a RETURN */
+            /* Check if the previous instruction is a RETURN, or
+             * at least a non-continuing instruction.
+             */
             bytecode_t last = PROGRAM_BLOCK[CURRENT_PROGRAM_SIZE-1];
 
-            if (F_RETURN == last || F_RETURN0 == last)
+            if (F_RETURN == last || F_RETURN0 == last
+             || F_RAISE_ERROR == last || F_THROW == last
+               )
             {
                 /* Good, the last instruction seems to be a 'return'.
                  * But just in case we're looking at the data field

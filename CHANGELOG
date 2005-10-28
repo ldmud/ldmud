@@ -1,6 +1,20 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+14-Jul-2004 (Lars Duening)  (3.3.575)
+  - (prolang.y) The 'missing return' warning is no longer triggered if
+       a function ends with raise_error() or throw().
+  - (comm.c) Efun input_to(): the check for a change in the CHARMODE mode
+       did not properly check if the command_giver was valid - this could
+       cause a segfault if input_to() was used without an interactive (Bug
+       #0000090).
+  - (smalloc.c) If the allocation exceeds the numerical limits and the
+       allocation is not in MALLOC_SYSTEM mode, a simple diagnostic is printed
+       and the allocation fails. This way, an " "*MAX_INT won't crash
+       the mud. (Bug #0000086)
+  - (array.c) The array allocation now checks if the size of the requested
+       array exceeds the numerical limits (part of Bug #0000091)
+
 13-Jul-2004 (Lars Duening)  (3.3.574)
   - (prolang.y) The 'public foo() shadows private bar()' warning no longer
        warns about the __INIT() function (Bug #0000085).

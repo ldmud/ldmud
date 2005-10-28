@@ -82,11 +82,14 @@
 /*-------------------------------------------------------------------------*/
 
 #define ALLOC_VECTOR(nelem) \
-      (vector_t *)xalloc_pass(sizeof(vector_t) + \
-                              sizeof(svalue_t) * (nelem - 1))
+      (nelem >= (SSIZE_MAX - sizeof(vector_t)) / sizeof(svalue_t)) \
+      ? NULL \
+      : (vector_t *)xalloc_pass(sizeof(vector_t) + \
+                                sizeof(svalue_t) * (nelem - 1))
 
 /* ALLOC_VECTOR(size,file,line): Allocate dynamically the memory for
  *    a vector of <size> elements.
+ * TODO: Use SIZET_MAX instead of SSIZE_MAX, see port.h
  */
 
 /*-------------------------------------------------------------------------*/

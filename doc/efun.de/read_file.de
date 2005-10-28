@@ -3,9 +3,10 @@ SYNOPSIS
 
 BESCHREIBUNG
         Liest Zeilen aus einem File <file>. Wenn <start> angegeben ist und
-        nicht 0, wird von der entsprechenden Zeile an gelesen, sonstn vom
-        Beginn des Files. Wenn <anzahl> nicht angegeben oder 0 ist, wird
-        das gesamte File gelesen, sonst nur <anzahl> Zeilen.
+        nicht 0, wird gegebene Anzahl an Zeilen uebersprungen und von der
+        naechsten an gelesen; ist <start> 0 oder nicht angegeben, wird vom
+        Beginn des Files gelesen. Wenn <anzahl> nicht angegeben oder 0 ist,
+        wird das gesamte File gelesen, sonst nur <anzahl> Zeilen.
 
         Wenn <start> ausserhalb der Groesse des Files liegt, liefert
         read_file() 0 zurureck anstelle eines Strings.

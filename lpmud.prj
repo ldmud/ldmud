@@ -60,27 +60,26 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 574)
-(Parent-Version lpmud 3-3 573)
+(Project-Version lpmud 3-3 575)
+(Parent-Version lpmud 3-3 574)
 (Version-Log "
-  - (prolang.y) The 'public foo() shadows private bar()' warning no longer
-       warns about the __INIT() function (Bug #0000085).
-  - (efuns.c) Removed a memory leak in ctime( <vector> ) (Bug #0000087).
-  - (simulate.c) In catch(), the check if there are enough evals left
-       was done before the reserve had been added to the eval cost. Since
-       the handling for this case was changed to a runtime error, this
-       caused the error handler to subtract a reserve which wasn't there,
-       in the process messing up eval cost handling (Bug #0000088).
-  - (simulate.c) The restoration of eval limits didn't handle the case
-       of a fixed eval cost (USE_EVAL_COST > 0) correctly if the process had
-       used more than the given amount: the total eval cost was set to the
-       given amount, instead of adding the amount to the previous eval cost
-       value (Bug #0000077).
+  - (prolang.y) The 'missing return' warning is no longer triggered if
+       a function ends with raise_error() or throw().
+  - (comm.c) Efun input_to(): the check for a change in the CHARMODE mode
+       did not properly check if the command_giver was valid - this could
+       cause a segfault if input_to() was used without an interactive (Bug
+       #0000090).
+  - (smalloc.c) If the allocation exceeds the numerical limits and the
+       allocation is not in MALLOC_SYSTEM mode, a simple diagnostic is printed
+       and the allocation fails. This way, an \" \"*MAX_INT won't crash
+       the mud. (Bug #0000086)
+  - (array.c) The array allocation now checks if the size of the requested
+       array exceeds the numerical limits (part of Bug #0000091)
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Tue, 13 Jul 2004 22:53:58 -0600")
+(Checkin-Time "Wed, 14 Jul 2004 23:41:28 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -118,8 +117,8 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.77 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.637 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.365 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.638 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.366 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -177,7 +176,7 @@
   (src/actions.h (lpmud/d/11_actions.h 1.6.1.7 644))
   (src/actions.c (lpmud/d/12_actions.c 1.15.1.48 644))
   (src/array.h (lpmud/f/47_array.h 1.18.1.22 644))
-  (src/array.c (lpmud/d/12_array.c 1.46.1.47.1.12 644))
+  (src/array.c (lpmud/d/12_array.c 1.46.1.47.1.13 644))
   (src/backend.h (lpmud/f/46_backend.h 1.20.1.7 644))
   (src/backend.c (lpmud/d/6_backend.c 1.68.1.35.1.35 644))
   (src/bitstrings.h (lpmud/i/47_bitstrings 1.3 644))
@@ -187,7 +186,7 @@
   (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.26 644))
   (src/closure.h (lpmud/f/44_closure.h 1.7.1.18 644))
   (src/closure.c (lpmud/d/4_closure.c 1.41.1.47.1.20 644))
-  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.87 644))
+  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.88 644))
   (src/comm.h (lpmud/d/3_comm.h 1.26.1.40 644))
   (src/driver.h (lpmud/f/36_driver.h 1.15.1.25 644))
   (src/dumpstat.h (lpmud/f/35_dumpstat.h 1.8 644))
@@ -214,7 +213,7 @@
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.17 644))
   (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.60 644))
   (src/mapping.h (lpmud/f/30_mapping.h 1.12.1.20 644))
-  (src/mapping.c (lpmud/b/6_mapping.c 1.36.1.80 644))
+  (src/mapping.c (lpmud/b/6_mapping.c 1.36.1.81 644))
   (src/md5.h (lpmud/l/18_md5.h 1.3 644))
   (src/md5.c (lpmud/l/19_md5.c 1.7 644))
   (src/mempools.h (lpmud/d/48_mempools.h 1.2.1.8 644))
@@ -339,7 +338,7 @@
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.20 644))
   (src/port.c (lpmud/39_port.c 1.17.1.9 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.17.1.4 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.65 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.66 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7.1.2 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))
@@ -354,7 +353,7 @@
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.36 644))
   (src/simulate.c (lpmud/31_simulate.c 1.88.1.129 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.14 644))
-  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.97 644))
+  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.98 644))
   (src/sysmalloc.h (lpmud/c/b/33_sysmalloc. 1.2 644))
   (src/sysmalloc.c (lpmud/c/b/34_sysmalloc. 1.6 644))
   (src/sprintf.h (lpmud/f/15_sprintf.h 1.3.1.4 644))
@@ -1242,7 +1241,7 @@
   (doc/efun/quote (lpmud/p/37_quote 1.3 644))
   (doc/efun/raise_error (lpmud/p/38_raise_erro 1.2 644))
   (doc/efun/read_bytes (lpmud/p/39_read_bytes 1.2 644))
-  (doc/efun/read_file (lpmud/p/40_read_file 1.2 644))
+  (doc/efun/read_file (lpmud/p/40_read_file 1.3 644))
   (doc/efun/referencep (lpmud/p/41_referencep 1.7 644))
   (doc/efun/regexp (lpmud/p/42_regexp 1.1.1.8 644))
   (doc/efun/regexplode (lpmud/p/43_regexplode 1.5 644))
@@ -1458,7 +1457,7 @@
   (doc/efun.de/regexplode.de (lpmud/g/b/47_regexplode 1.1 640))
   (doc/efun.de/regexp.de (lpmud/u/b/38_regexp.de 1.1 640))
   (doc/efun.de/referencep.de (lpmud/t/4_referencep 1.1 644))
-  (doc/efun.de/read_file.de (lpmud/g/b/48_read_file. 1.1 640))
+  (doc/efun.de/read_file.de (lpmud/g/b/48_read_file. 1.2 640))
   (doc/efun.de/read_bytes.de (lpmud/g/b/49_read_bytes 1.1 640))
   (doc/efun.de/random.de (lpmud/g/b/50_random.de 1.1 640))
   (doc/efun.de/raise_error.de (lpmud/g/b/51_raise_erro 1.1 640))

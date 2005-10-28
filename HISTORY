@@ -170,7 +170,7 @@ For a detailed list of all changes see the file CHANGELOG.
            x509 key- and certfile for the TLS package.
 
 
-12-Jul-2004 (Lars Duening) -- Release 3.2.11
+14-Jul-2004 (Lars Duening) -- Release 3.2.11
 
     - Changed efuns:
 
@@ -184,6 +184,10 @@ For a detailed list of all changes see the file CHANGELOG.
 
     - Fixed Crashers:
        + A shadow executing remove_action(1, shadowee).
+       + A too-large allocation (like in " "*MAX_INT) no longer crashes the
+         mud unless done in SYSTEM allocation mode.
+       + Allocating an array enough elements to exceed the internal numeric
+         limits.
 
     - Language:
 

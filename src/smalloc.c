@@ -1214,7 +1214,10 @@ mem_alloc (size_t size)
        )
     {
         in_malloc = 0;
-        fatal("Malloc size exceeds numerical limit.\n");
+        if (malloc_privilege == MALLOC_SYSTEM)
+            fatal("Malloc size exceeds numerical limit.\n");
+        debug_message("Malloc size exceeds numerical limit.\n");
+        return NULL;
     }
 
     if (in_malloc++)

@@ -2997,26 +2997,30 @@ f_m_allocate (svalue_t *sp)
  */
 
 {
-    if (sp[-1].u.number < 0)
-        error("Illegal mapping size: %ld\n", sp[-1].u.number);
-    if (sp->u.number < 0)
-        error("Illegal mapping width: %ld\n", sp->u.number);
+    p_int size = sp[-1].u.number;
+    p_int width = sp[0].u.number;
+
+    if (size < 0)
+        error("Illegal mapping size: %ld\n", size);
+    if (width < 0)
+        error("Illegal mapping width: %ld\n", width);
 
     if (max_mapping_size
-     && sp[-1].u.number * (1 + sp->u.number) > (p_int)max_mapping_size)
+     && size * (1 + width) > (p_int)max_mapping_size)
         error("Illegal mapping size: %ld elements (%ld x %ld).\n"
-             , sp[-1].u.number * (1+sp->u.number)
-             , sp[-1].u.number, sp->u.number);
+             , size * (1+width)
+             , size, width);
 
     sp--;
 
-    if (!(sp->u.map = allocate_mapping(sp->u.number, sp[1].u.number)))
+    if (!(sp->u.map = allocate_mapping(size, width)))
     {
         sp++;
         /* sp points to a number-typed svalue, so freeing won't
          * be a problem.
          */
-        error("Out of memory\n");
+        error("Out of memory for mapping[%ld,%ld].\n", size, width);
+        /* NOTREACHED */
     }
     sp->type = T_MAPPING;
 
