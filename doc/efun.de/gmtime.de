@@ -35,4 +35,4 @@ AENDERUNGEN
         Eingefuehrt in LDMud 3.2.9.
 
 SIEHE AUCH
-    ctime(E), localtime(E), time(E), utime(E), timearray(E)
+    ctime(E), localtime(E), time(E), utime(E)

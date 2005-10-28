@@ -28,4 +28,4 @@ AENDERUNGEN
         Seit 3.2.7 werden Kommandi gestapelt.
 
 SIEHE AUCH
-        command_stac(E), notify_fail(E), enable_commands(E), get_eval_cost(E)
+        command_stack(E), notify_fail(E), enable_commands(E), get_eval_cost(E)

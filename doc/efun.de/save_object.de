@@ -6,7 +6,7 @@ BESCHREIBUNG
         Codiert die speicherbaren Variablen des aktuellen Objekts in einen
         String.
 
-        In der ersten Form wir der String in die Date <name> geschrieben. Eine
+        In der ersten Form wir der String in die Datei <name> geschrieben. Eine
         Endung ".c" in <name> wird entfernt, dafuer kann eine Endung ".o"
         durch das Masterobjekt angefuegt werden, waehrend der Ueberpruefung
         durch valid_read(). Die Efun save_object() liefert 0, wenn die

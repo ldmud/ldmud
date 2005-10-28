@@ -3,7 +3,7 @@ SYNOPSIS
         int query_mccp()
         int query_mccp(object player)
 
-SIEHE AUCH
+BESCHREIBUNG
         Diese Funktion gibt zurueck, ob <player> Netzwerkdatenkompression
         verwendet oder nicht (default is this_player() ).
 

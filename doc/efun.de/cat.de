@@ -27,4 +27,4 @@ BEISPIEL
         mit Zeile 13.
 
 SIEHE AUCH
-        get_dir(E), filze_size(E), read_file(E), read_bytes(E), valid_read(M)
+        get_dir(E), file_size(E), read_file(E), read_bytes(E), valid_read(M)

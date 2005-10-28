@@ -42,4 +42,4 @@ AENDERUNGEN
             Standard wiederherzustellen.
 
 SIEHE AUCH
-        get_combine_charset(E), input_to(E), set_connect_charset(E)
+        get_combine_charset(E), input_to(E), set_connection_charset(E)

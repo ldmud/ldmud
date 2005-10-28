@@ -95,6 +95,6 @@ HISTORY
         Added in LDMud 3.3.447, backported to LDMud 3.2.10.
 
 SEE ALSO
-        start_mysql_compress(E), end_mysql_compress(E), query_mccp(E),
+        start_mccp_compress(E), end_mccp_compress(E), query_mccp(E),
         query_mccp_stats(object player)
 

@@ -18,4 +18,4 @@ AENDERUNGEN
             wenn der Treiber mit USE_DEPRECATED kompiliert wurde.
 
 SIEHE AUCH
-        set_driver_hoock(E), privilege_violation(E), pragma(LPC), master(M)
+        set_driver_hook(E), privilege_violation(M), pragma(LPC), master(M)

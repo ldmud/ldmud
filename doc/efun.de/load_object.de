@@ -20,4 +20,4 @@ AENDERUNGEN
         Eingefuehrt in LDMud 3.2.6.
 
 SIEHE AUCH
-        clone_object(E), touch(E)
+        clone_object(E)

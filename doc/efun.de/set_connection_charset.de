@@ -32,4 +32,4 @@ AENDERUNGEN
             Standardzeichensatz wieder herzustellen.
 
 SIEHE AUCH
-        get_connection_charset(E), get_combined_charset(E), binary_message(E)
+        get_connection_charset(E), get_combine_charset(E), binary_message(E)

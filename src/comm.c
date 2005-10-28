@@ -481,7 +481,7 @@ static string_t * lookup_ip_entry (struct in_addr addr, Bool useErq);
 static void add_ip_entry(struct in_addr addr, const char *name);
 #ifdef USE_IPV6
 static void update_ip_entry(const char *oldname, const char *newname);
-static int open_ipv6_conn(const char *hostname, const unsigned short int port);
+static int open_ipv6_conn(const char *hostname, const unsigned short int port, struct sockaddr_in *pTarget);
 #endif
 
 #endif /* ERQ_DEMON */
@@ -6187,7 +6187,8 @@ update_ip_entry (const char *oldname, const char *newname)
 
 /*-------------------------------------------------------------------------*/
 static int
-open_ipv6_conn(const char *hostname, const unsigned short int port)
+open_ipv6_conn( const char *hostname, const unsigned short int port
+              , struct sockaddr_in * pTarget)
 
 /* Create a non-blocking IPv6/IPv4 tcp connnection to the given
  * <hostname>:<port>. The <hostname> is first interpreted as IPv6
@@ -6195,6 +6196,8 @@ open_ipv6_conn(const char *hostname, const unsigned short int port)
  *
  * Result is the socket (with the connnection possibly still in process
  * of being opened), or -1 on a failure.
+ *
+ * The completed sockaddr_in is passed back in *<pTarget> as well.
  *
  * WARNING: Not threadsafe!
  */
@@ -6260,6 +6263,9 @@ open_ipv6_conn(const char *hostname, const unsigned short int port)
         }
     }
     endhostent();
+
+    if (pTarget)
+        memcpy(pTarget, &addr, sizeof(*pTarget));
  
     return (!con || (con == -1 && errno == EINPROGRESS))
            ? sock
@@ -8881,12 +8887,14 @@ f_net_connect (svalue_t *sp)
     rc = 0;
     do{
         int d, n, ret;
+        object_t *user;
+        struct sockaddr_in target;
 
 #ifndef USE_IPV6
 
         struct hostent *h;
-        struct sockaddr_in target;
-        object_t *user;
+
+#endif
 
         /* Find a place to store the pending connection,
          * store the index in n
@@ -8906,6 +8914,8 @@ f_net_connect (svalue_t *sp)
             rc = EMFILE;
             break;
         }
+
+#ifndef USE_IPV6
 
         /* Attempt the connection */
 
@@ -8935,7 +8945,7 @@ f_net_connect (svalue_t *sp)
 
         ret = connect(d, (struct sockaddr *) &target, sizeof(target));
 #else
-	d = ret = open_ipv6_conn(host, port);
+	d = ret = open_ipv6_conn(host, port, &target);
 #endif
         if (ret == -1 && errno != EINPROGRESS)
         {
@@ -8964,7 +8974,7 @@ f_net_connect (svalue_t *sp)
 
         /* Attempt the logon. By setting the outconn[].status to
          * ocLoggingOn, any subsequent call to check_for_out_connections()
-         * will clean up for  us.
+         * will clean up for us.
          */
         outconn[n].status = ocLoggingOn;
 

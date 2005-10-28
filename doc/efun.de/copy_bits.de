@@ -38,4 +38,4 @@ AENDERUNGEN
 
 SIEHE AUCH
         clear_bit(E), set_bit(E), test_bit(E), next_bit(E), last_bit(E),
-        count_bits(E), or_bits(E), xor_bits(E), invert_bits(E), and_bit(E)
+        count_bits(E), or_bits(E), xor_bits(E), invert_bits(E), and_bits(E)

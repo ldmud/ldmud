@@ -47,5 +47,5 @@ HISTORY
         Before 3.2.1, the function was hardwired to the lfun clean_up().
 
 SEE ALSO
-        reset(A), heart_beat(A), call_out(A), destruct(E), remove(A),
+        reset(A), heart_beat(A), call_out(E), destruct(E), remove(A),
         hooks(C)

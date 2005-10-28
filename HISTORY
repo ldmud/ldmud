@@ -170,6 +170,27 @@ For a detailed list of all changes see the file CHANGELOG.
            x509 key- and certfile for the TLS package.
 
 
+14-May-2004 (Lars Duening) -- Release 3.2.11
+
+    - Changed efuns:
+       + save_object(): Matching the documentation, the efun really removes
+           a trailing '.c' from the filename.
+
+    - Corrected efuns:
+
+    - New efuns:
+
+    - Master Object:
+
+    - Fixed Crashers:
+
+    - Language:
+
+    - Runtime:
+
+    - Other Changes:
+
+
 13-Apr-2004 (Lars Duening) -- Release 3.2.10
 
     - Changed efuns:

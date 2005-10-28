@@ -98,6 +98,7 @@ extern char *     mstring_mstr_rn_str(const string_t * const pStr, size_t start,
 extern string_t * mstring_add_slash (const string_t *str MTRACE_DECL);
 extern string_t * mstring_del_slash (string_t *str MTRACE_DECL);
 extern string_t * mstring_cvt_progname (const string_t *str MTRACE_DECL);
+extern string_t * mstring_del_dotc (const string_t *str MTRACE_DECL);
 extern string_t * mstring_add (const string_t *left, const string_t *right MTRACE_DECL);
 extern string_t * mstring_add_txt (const string_t *left, const char *right, size_t len MTRACE_DECL);
 extern string_t * mstring_add_to_txt (const char *left, size_t len, const string_t *right MTRACE_DECL);
@@ -281,6 +282,7 @@ extern void   string_dinfo_status(svalue_t *svp, int value);
 #define mstr_extract(pStr,start,end) mstring_extract (pStr,start,end MTRACE_ARG)
 #define add_slash(pStr)          mstring_add_slash(pStr MTRACE_ARG)
 #define del_slash(pStr)          mstring_del_slash(pStr MTRACE_ARG)
+#define del_dotc(pStr)           mstring_del_dotc(pStr MTRACE_ARG)
 #define cvt_progname(pStr)       mstring_cvt_progname(pStr MTRACE_ARG)
 #define mstrchr(pStr,c)          mstring_chr(pStr, c)
 #define mstrprefixed(pStr1, pStr2) mstring_prefixed(pStr1, pStr2)

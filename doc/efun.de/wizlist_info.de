@@ -35,5 +35,5 @@ AENDERUNGEN
             WL_TOTAL_COST und WL_TOTAL_GIGACOST eingefuehrt.
 
 SIEHE AUCH
-        privilege_violaton(M), set_extra_wizinfo_size(E),
+        privilege_violation(M), set_extra_wizinfo_size(E),
         get_extra_wizinfo(E), set_extra_wizinfo(E)

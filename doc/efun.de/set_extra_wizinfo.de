@@ -22,4 +22,4 @@ BESCHREIBUNG
         Die Funktion verursacht eine Schutzverletzung.
 
 SIEHE AUCH
-        get_extra_wizifno(E), set_extra_wizinfo_size(E), wizlist_info(E)
+        get_extra_wizinfo(E), set_extra_wizinfo_size(E), wizlist_info(E)

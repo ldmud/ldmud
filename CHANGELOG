@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+14-May-2004 (Lars Duening)  (3.3.565)
+  - (doc/) Corrected a number of German manpages.
+  - (comm.c) net_connect() didn't compile with IPv6 (reported by Fini).
+  - (mstrings, object.c) Contradicting the documentation, save_object()
+       did not strip a trailing '.c' from the given filename (reported by
+       Niflheim@Unitopia) (Bug #00000067).
+
 30-May-2004 (Lars Duening)  (3.3.564)
   - (interpret.c) Calling privilege_violation() with only three arguments
        accidentally instructed the interpreter to pass four (reported

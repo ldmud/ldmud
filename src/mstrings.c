@@ -1231,6 +1231,42 @@ mstring_del_slash (string_t *str MTRACE_DECL)
 
 /*-------------------------------------------------------------------------*/
 string_t *
+mstring_del_dotc (const string_t *str MTRACE_DECL)
+
+/* Aliased to: del_dotc(str)
+ *
+ * If <str> ends in a trailing ".c", create a new untabled string without
+ * the suffix and return it. Otherwise return a new reference to <str>.
+ *
+ * If memory runs out, NULL is returned.
+ */
+
+{
+    string_t *tmp;
+    size_t len;
+    char * txt, *p;
+
+    txt = get_txt(str);
+    len = mstrsize(str);
+
+    p = strrchr(txt, '.');
+
+    if (p && (size_t)(p - txt) + 2 == len && p[1] == 'c')
+        len = (size_t)(p - txt);
+    else
+        return ref_mstring(str);
+
+    tmp = mstring_alloc_string(len MTRACE_PASS);
+    if (tmp)
+    {
+        memcpy(get_txt(tmp), txt, len);
+    }
+
+    return tmp;
+} /* mstring_del_dotc() */
+
+/*-------------------------------------------------------------------------*/
+string_t *
 mstring_cvt_progname (const string_t *str MTRACE_DECL)
 
 /* Aliased to: cvt_progname(str)

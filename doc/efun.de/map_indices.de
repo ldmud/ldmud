@@ -29,5 +29,5 @@ AENDERUNGEN
         In LDMud 3.2.6 umbenannt von map_mapping() und durch map() ergaenzt.
 
 SIEHE AUCH
-        map(E), filter(E), filter_indices(E), walk_mappin(E), member(E),
+        map(E), filter(E), filter_indices(E), walk_mapping(E), member(E),
         m_contains(E)

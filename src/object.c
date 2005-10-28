@@ -6443,6 +6443,15 @@ v_save_object (svalue_t *sp, int numarg)
             return sp;
         }
 
+        /* Remove any trailing '.c' */
+        {
+            string_t *tmp = del_dotc(sfile);
+            if (!tmp)
+                outofmem(mstrsize(sfile), "filename");
+            free_mstring(sfile);
+            sfile = tmp;
+        }
+
 
         /* Create the final and the temporary filename */
 
