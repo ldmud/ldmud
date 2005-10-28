@@ -7594,11 +7594,13 @@ v_input_to (svalue_t *sp, int num_arg)
                                              );
         free_string_svalue(arg);
     }
-    else
+    else if (arg[0].type == T_CLOSURE)
         error_index = setup_closure_callback(&(it->fun), arg
                                             , extra, extra_arg
                                             , MY_TRUE
                                             );
+    else
+        error_index = 1;
 
     if (error_index >= 0)
     {
@@ -7608,8 +7610,8 @@ v_input_to (svalue_t *sp, int num_arg)
         return arg-1;
     }
 
-    /* There is a chance that the privilege_violation() method destructed
-     * the object the callback is bound to - return as if the call was denied.
+    /* At this point the call back should be bound to an existing object - but
+     * as a sanity check we test it.
      */
     if (NULL == callback_object(&(it->fun)))
     {
