@@ -48,6 +48,7 @@
 #include "gcollect.h"
 #include "hash.h"
 #include "interpret.h"
+#include "main.h"
 #include "mstrings.h"
 #include "pkg-pcre.h"
 #include "regexp.h"
@@ -418,7 +419,7 @@ rx_compile_pcre (string_t * expr, int opt, Bool from_ed, regdata_t * rdata)
                 add_message("pcre: %s\n", error_message(rc, RE_PCRE));
             else
                 error("pcre: %s\n", error_message(rc, RE_PCRE));
-            return NULL;
+            return 0;
         }
         num_subs = 3 * (num_subs+1);
     }
@@ -602,7 +603,12 @@ rx_compile (string_t * expr, int opt, Bool from_ed)
 
     /* Determine for which package to compile */
     if (!(opt & RE_PACKAGE_MASK))
-        opt |= driver_hook[H_REGEXP_PACKAGE].u.number;
+    {
+        if (driver_hook[H_REGEXP_PACKAGE].u.number)
+            opt |= driver_hook[H_REGEXP_PACKAGE].u.number;
+        else
+            opt |= regex_package;
+    }
 
     if (!(opt & RE_PACKAGE_MASK))
     {

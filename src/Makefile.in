@@ -324,13 +324,12 @@ lex.o : efun_defs.c ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h \
     bytecode.h pkg-tls.h port.h config.h hosts/unix.h hosts/be/be.h \
     machine.h
 
-main.o : ../mudlib/sys/regexp.h ../mudlib/sys/driver_hook.h pkg-mysql.h \
-    xalloc.h wiz_list.h swap.h svalue.h stdstrings.h simul_efun.h \
-    simulate.h random.h pkg-tls.h patchlevel.h otable.h object.h mstrings.h \
-    mregex.h mempools.h mapping.h lex.h interpret.h gcollect.h filestat.h \
-    comm.h array.h backend.h main.h my-alloca.h typedefs.h driver.h \
-    strfuns.h ptrtable.h exec.h sent.h bytecode.h hash.h port.h config.h \
-    hosts/unix.h hosts/be/be.h machine.h
+main.o : ../mudlib/sys/regexp.h pkg-mysql.h xalloc.h wiz_list.h swap.h \
+    svalue.h stdstrings.h simul_efun.h simulate.h random.h pkg-tls.h \
+    patchlevel.h otable.h object.h mstrings.h mregex.h mempools.h mapping.h \
+    lex.h interpret.h gcollect.h filestat.h comm.h array.h backend.h main.h \
+    my-alloca.h typedefs.h driver.h strfuns.h ptrtable.h exec.h sent.h \
+    bytecode.h hash.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
 mapping.o : i-svalue_cmp.h xalloc.h wiz_list.h svalue.h structs.h \
     simulate.h object.h mstrings.h main.h interpret.h gcollect.h closure.h \
@@ -351,9 +350,9 @@ mkfunc.o : make_func.c ../mudlib/sys/driver_hook.h hash.h exec.h \
 
 mregex.o : ../mudlib/sys/regexp.h ../mudlib/sys/driver_hook.h \
     ../mudlib/sys/debug_info.h xalloc.h svalue.h strfuns.h simulate.h \
-    regexp.h pkg-pcre.h mstrings.h interpret.h hash.h gcollect.h comm.h \
-    mregex.h driver.h typedefs.h sent.h bytecode.h pcre/pcre.h pkg-tls.h \
-    port.h config.h hosts/unix.h hosts/be/be.h machine.h
+    regexp.h pkg-pcre.h mstrings.h main.h interpret.h hash.h gcollect.h \
+    comm.h mregex.h driver.h typedefs.h sent.h bytecode.h pcre/pcre.h \
+    pkg-tls.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
 mstrings.o : ../mudlib/sys/debug_info.h xalloc.h svalue.h strfuns.h \
     stdstrings.h simulate.h main.h hash.h gcollect.h mstrings.h driver.h \

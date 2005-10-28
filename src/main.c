@@ -76,7 +76,6 @@
 #include "pkg-mysql.h"
 #endif
 
-#include "../mudlib/sys/driver_hook.h"
 #include "../mudlib/sys/regexp.h"
 
 /*-------------------------------------------------------------------------*/
@@ -155,6 +154,15 @@ Bool compat_mode = MY_FALSE; /* Plain mode */
 #else
 Bool compat_mode = MY_TRUE;  /* Compat mode */
 #endif
+
+#ifdef USE_PCRE
+p_int regex_package = RE_PCRE;
+#else
+p_int regex_package = RE_TRADITIONAL;
+#endif
+  /* The default regex package to use, expressed as one of the
+   * acknowledged bitflags.
+   */
 
 /* -- Other Global Variables -- */
 svalue_t const0, const1;
@@ -2183,9 +2191,9 @@ eval_arg (int eOption, const char * pValue)
 
     case cRegexp:
         if (!strcasecmp(pValue, "pcre"))
-            put_number(driver_hook+H_REGEXP_PACKAGE, RE_PCRE);
+            regex_package = RE_PCRE;
         else if (!strcasecmp(pValue, "traditional"))
-            put_number(driver_hook+H_REGEXP_PACKAGE, RE_TRADITIONAL);
+            regex_package = RE_TRADITIONAL;
         else
             fprintf(stderr, "Unknown regexp package '%s' ignored.\n", pValue);
         break;

@@ -4011,13 +4011,6 @@ init_driver_hooks()
     {
         put_number(driver_hook + i, 0);
     }
-
-#ifdef USE_PCRE
-    put_number(driver_hook + H_REGEXP_PACKAGE, RE_PCRE);
-#else
-    put_number(driver_hook + H_REGEXP_PACKAGE, RE_TRADITIONAL);
-#endif
-
 } /* init_driver_hooks() */
 
 /*-------------------------------------------------------------------------*/
@@ -4619,18 +4612,12 @@ f_set_driver_hook (svalue_t *sp)
     switch(sp->type)
     {
     case T_NUMBER:
-        if (n != H_REGEXP_PACKAGE)
+        if (sp->u.number == 0)
         {
-            if (sp->u.number != 0)
-            {
-                error("Bad value for hook %ld: got number, expected %s or 0.\n"
-                     , n
-                     , efun_arg_typename(hook_type_map[n]));
-            }
             put_number(driver_hook + n, 0);
             break;
         }
-        else
+        else if (n == H_REGEXP_PACKAGE)
         {
             if (sp->u.number != RE_PCRE
              && sp->u.number != RE_TRADITIONAL
@@ -4644,6 +4631,13 @@ f_set_driver_hook (svalue_t *sp)
                 break;
             }
             goto default_test;
+        }
+        else
+        {
+            error("Bad value for hook %ld: got number, expected %s or 0.\n"
+                 , n
+                 , efun_arg_typename(hook_type_map[n]));
+            break;
         }
         break;
 

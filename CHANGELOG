@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+07-Sep-2004 (Lars Duening)  (3.3.5987)
+  - (main, mregex.c, simulate.c) The H_REGEXP_PACKAGE hook can now accept
+       the value 0 to fall back onto the package defined by the commandline
+       arguments/configuration.
+
 06-Sep-2004 (Lars Duening)  (3.3.597)
   - (ed.c, lex.c, mregex) Removed USE_PCRE remnants which among other things
        disrupted compilation (Bug #0000126).

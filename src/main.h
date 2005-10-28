@@ -46,6 +46,7 @@ extern int numports;
 extern int udp_port;
 
 extern Bool compat_mode;
+extern p_int regex_package;
 
 extern char input_escape;
 
