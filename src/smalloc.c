@@ -1450,8 +1450,7 @@ mem_alloc (size_t size)
 
     if (size == 0)
     {
-        in_malloc = 0;
-        fatal("Malloc size = 0.\n");
+        size++;
     }
 
     /* TODO: For the following test, see SIZET_limits in port.h */

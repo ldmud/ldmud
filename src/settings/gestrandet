@@ -4,11 +4,11 @@
 #
 # configure will strip this part from the script.
 
-exec ./configure --prefix=/home/gestrandet/mud/ --with-setting=gestrandet $*
+exec ./configure --prefix=/home/urv/mud/ --libdir=/home/urv/mud/lib/gestrandet --with-setting=gestrandet $*
 exit 1
 
 # --- The actual settings ---
-with_swap_file=etc/SWAP_FILE
+# with_swap_file=/etc/SWAP_FILE
 
 # --- Runtime limits ---
 with_read_file_max_size=100000
@@ -50,7 +50,7 @@ enable_access_control=no
 
 # --- Language ---
 enable_supply_parse_command=no
-enable_use_mysql=no
+enable_use_mysql=yes
 enable_use_deprecated=no
 
 # --- Runtime limits ---

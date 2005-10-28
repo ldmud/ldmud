@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+24-Oct-2004 (Lars Duening)  (3.3.608)
+  - (backend.c) Reduced the frequence of data-cleanup such that at least
+      time_to_clean_up seconds (or 3600 seconds) must have passed since
+      the last reference.
+  - (smalloc.c) smalloc now supports allocations of 0 byte length (needed
+      to replace malloc()).
+
 14-Oct-2004 (Lars Duening)  (3.3.607)
   - (comm.c) The NOECHO hook call specified only two arguments when
       three were required (reported by Bardio and Steve G.).

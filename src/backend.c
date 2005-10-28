@@ -934,23 +934,15 @@ static  mp_int num_cleanup; /* Number of objects to data-clean in this
         /* Objects are processed at a rate suitable to cover
          * all listed objects in one hour; but at least one per call.
          *
-         * For objects with swapped variables or objects in reset state,
-         * the variables are cleaned only every time_to_clean_up seconds,
-         * or 3600 seconds if the time is 0.
+         * The actual cleanup however is not undertaken unless
+         * time_to_clean_up seconds have passed until the last reference (or
+         * 3600 seconds if the time is 0).
          */
         if ((mp_int)num_last_processed <= num_cleanup)
         {
-            mp_int delay = 0;
+            mp_int delay = time_to_cleanup ? time_to_cleanup : 3600;
 
-            /* For inactive objects, determine the delay time */
-            if (((obj->flags & O_RESET_STATE) && !bResetCalled)
-             || ((obj->flags & O_SWAPPED) && O_VAR_SWAPPED(obj))
-               )
-            {
-                delay = time_to_cleanup ? time_to_cleanup : 3600;
-            }
-
-            if (!delay || delay <= time_since_ref)
+            if (delay <= time_since_ref)
             {
 #ifdef DEBUG
                 if (d_flag)
