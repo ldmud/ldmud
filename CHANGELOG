@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+10-Jul-2004 (Lars Duening)  (3.3.571)
+  - (interpret.c) The tracedepth was always increased, but only decreased
+       when traceing was active (#0000070)
+
 10-Jul-2004 (Lars Duening)  (3.3.570)
   - (pcre/) PCRE no longer directly changes the EVAL_COST, instead the
        MATCH_LIMIT option is used to limit the execution of backtracking

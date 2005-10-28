@@ -170,7 +170,7 @@ For a detailed list of all changes see the file CHANGELOG.
            x509 key- and certfile for the TLS package.
 
 
-14-May-2004 (Lars Duening) -- Release 3.2.11
+10-Jul-2004 (Lars Duening) -- Release 3.2.11
 
     - Changed efuns:
 
@@ -187,6 +187,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - Language:
 
     - Runtime:
+       + The tracedepth wasn't calculated correctly.
 
     - Other Changes:
 

@@ -6406,8 +6406,6 @@ do_trace_return (svalue_t *sp)
  */
 
 {
-    tracedepth--; /* We leave this level */
-
     if (!++traceing_recursion || !TRACE_IS_INTERACTIVE())
     {
         if (trace_test(TRACE_RETURN))
@@ -8083,6 +8081,8 @@ again:
             free_closure(&current_lambda);
         current_lambda = csp->lambda;
 
+        tracedepth--; /* We leave this level */
+
         if (csp->extern_call)
         {
             /* eval_instruction() must be left - setup the globals */
@@ -8092,6 +8092,7 @@ again:
             previous_ob = csp->prev_ob;
             inter_pc = csp->pc;
             inter_fp = csp->fp;
+
             if (trace_level)
             {
                 do_trace_return(sp);
