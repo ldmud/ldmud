@@ -165,6 +165,16 @@ struct replace_ob_s
 
 #endif
 
+/* object_t *ref_valid_object(object_t *o, char *from)
+ *   Add another ref to object <o> from function <from> if <o>
+ *   is not a destructed object or the NULL pointer.
+ *   Return <o>, or NULL if <o> is destructed.
+ */
+
+#define ref_valid_object(o,from) \
+    ( ((o) && !((o)->flags & O_DESTRUCTED)) \
+      ? ref_object(o,from) : NULL)
+
 /* void free_object(object_t *o, char *)
  *   Subtract one ref from object <o> from function <o>, and free the
  *   object fully if the refcount reaches zero.

@@ -34,6 +34,15 @@ struct lambda_s
       /* Object the closure is bound to (for bound UNBOUND_LAMBDAs just
        * during the execution of the lambda).
        */
+
+    object_t   *prog_ob;
+    ptrdiff_t   prog_pc;
+      /* Blueprint object and relative for the program creating this closure,
+       * or NULL. Since this information is error reporting purposes only,
+       * the lambda keeps a closure to the blueprint and not the program
+       * itself to not get in the way of swapping or otherwise.
+       */
+
     union               /* Closure information: */
     {
         unsigned short var_index;
@@ -119,6 +128,7 @@ extern Bool      is_undef_closure (svalue_t *sp);
 extern void      closure_lookup_lfun_prog ( lambda_t * l , program_t ** pProg , string_t ** pName , Bool * pIsInherited);
 extern const char * closure_operator_to_string (int type);
 extern const char * closure_efun_to_string (int type);
+extern string_t * closure_location (lambda_t *l);
 extern string_t *closure_to_string (svalue_t * sp, Bool compact);
 extern svalue_t *v_bind_lambda(svalue_t *sp, int num_arg);
 extern svalue_t *f_lambda(svalue_t *sp);

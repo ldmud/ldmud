@@ -119,8 +119,30 @@ EXAMPLE
 
         This sequence will queue two input_tos: the input first goes
         to enter_firstname(); and when this function is done
-        (including any input_to()s on its own), the next input will
-        go to enter_lastname().
+        (including any non-INPUT_APPEND input_to()s on its own), the next
+        input will go to enter_lastname().
+
+
+        Note that the list of input_tos is treated as a flat list:
+
+        void func() {
+          ..
+          input_to("func1");
+          input_to("func2", INPUT_APPEND);
+        }
+
+        void func1() {
+          ..
+          input_to("func3", INPUT_APPEND);
+        }
+
+        void func2() { ... }
+        void func3() { ... }
+
+        This code will result in the functions being called in the order
+        func(), func1(), func2(), func3(); and not func(), func1(), func3(),
+        func2().
+          
 
 BUGS
         In charmode, it is not possible to receive the NUL character
@@ -134,7 +156,7 @@ HISTORY
         Since LDMud 3.2.8 the function can be given as a closure.
         LDMud 3.2.9/3.3.125 introduced the INPUT_PROMPT flag and argument.
         LDMud 3.2.11/3.3.593 added the INPUT_NO_TELNET flag.
-        LDMud 3.2.11/3.3.593 added the INPUT_APPEND flag.
+        LDMud 3.2.11/3.3.637 added the INPUT_APPEND flag.
         LDMud 3.3 changed the handling of newline sequences in charmode
           to verbatim passing. Earlier drivers passed an empty string
           instead.

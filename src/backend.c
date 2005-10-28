@@ -574,7 +574,7 @@ backend (void)
 
             if (buff[0] == input_escape
              && buff[1] != '\0'
-/* DEBUG:              && command_giver->super */
+             && command_giver->super
                )
             {
                 if(!call_function_interactive(ip, buff)) {

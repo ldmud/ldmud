@@ -10,9 +10,14 @@ DESCRIPTION
 
 EXAMPLES
         mapping m = ([ "foo":1;2;3, "bar":4;5;6, "baz":7;8;9 ])
-        m_values(m)     --> returns ({ 1, 4, 7 })
-        m_values(m, 0)  --> returns ({ 1, 4, 7 })
-        m_values(m, 1)  --> returns ({ 2, 8, 9 })
+        m_values(m)     --> returns ({ 1, 4, 7 }) or some permutation thereof
+        m_values(m, 0)  --> returns ({ 1, 4, 7 }) (ditto)
+        m_values(m, 1)  --> returns ({ 2, 8, 9 }) (ditto)
+
+        Note that exact order of the values in the resulting arrays is not
+        specified, and may vary after any change to the mapping. The only
+        guarantee given is that if m_indices() and m_values() are taken at the
+        same time, the order of both results is identical.
 
 SEE ALSO
         mappingp(E), mkmapping(E), m_indices(E), m_add(E), m_delete(E),

@@ -78,6 +78,10 @@
  *    allocator.
  *  - untabled strings can easily be made (indirectly) tabled even
  *    if they have many active refs pending and/or are of large size.
+ * TODO: Make functions mstr_append() resilient to receiving NULL
+ * TODO:: pointers as args. This way stuff like rc =
+ * TODO:: mstr_append(rc,...) will always work and we need to check
+ * TODO:: for rc != NULL only at the end.
  * TODO: Distinguish between the allocated size of a string and the
  * TODO:: used size. To use this efficiently, functions like mstr_insert()...
  * TODO:: might become necessary.

@@ -1073,6 +1073,17 @@ closure_literal (svalue_t *dest, int ix, unsigned short inhIndex, unsigned short
     }
 
     l->ref = 1;
+    if (current_prog)
+    {
+        l->prog_ob = ref_valid_object(current_prog->blueprint, "closure_literal");
+        l->prog_pc = inter_pc - current_prog->program;
+    }
+    else
+    {
+        l->prog_ob = NULL;
+        l->prog_pc = 0;
+    }
+
     prog = current_object->prog;
 
     /* If the object's program will be replaced, store the closure
@@ -4964,6 +4975,16 @@ lambda (vector_t *args, svalue_t *block, object_t *origin)
     l0 += values_size;
     l = (lambda_t *)l0;
     l->ref = 1;
+    if (current_prog)
+    {
+        l->prog_ob = ref_valid_object(current_prog->blueprint, "closure_literal");
+        l->prog_pc = inter_pc - current_prog->program;
+    }
+    else
+    {
+        l->prog_ob = NULL;
+        l->prog_pc = 0;
+    }
     memcpy(l->function.code, current.code, (size_t)code_size);
 
     /* Fix number of constant values */
@@ -5025,6 +5046,9 @@ free_closure (svalue_t *svp)
     l = svp->u.lambda;
     if (--l->ref)
         return;
+
+    if (l->prog_ob)
+        free_object(l->prog_ob, "free_closure");
 
     if (CLOSURE_HAS_CODE(type))
     {
@@ -5310,6 +5334,56 @@ closure_efun_to_string (int type)
 
 /*-------------------------------------------------------------------------*/
 string_t *
+closure_location (lambda_t *l)
+
+/* Return the location the lambda structure <l> was created as
+ * the string 'from <filename> line <number>".
+ */
+
+{
+    string_t * rc = NULL;
+
+    if (l && l->prog_ob && !(l->prog_ob->flags & O_DESTRUCTED))
+    {
+        char buf[20];
+        string_t   * name = NULL;
+        int          lineno;
+
+        if (l->prog_ob->flags & O_SWAPPED)
+        {
+            if (load_ob_from_swap(l->prog_ob) < 0)
+                error("Out of memory\n");
+        }
+
+        lineno = get_line_number( l->prog_ob->prog->program + l->prog_pc
+                                , l->prog_ob->prog
+                                , &name
+                                );
+        sprintf(buf, "%d", lineno);
+
+        do {
+            rc = mstr_append(STR_FROM, name);
+            if (!rc) break;
+
+            rc = mstr_append(rc, STR_LINE);
+            if (!rc) break;
+            free_mstring(rc);
+
+            rc = mstr_append_txt(rc, buf,  strlen(buf));
+            if (!rc) break;
+            free_mstring(rc);
+
+        } while(0);
+    }
+
+    if (!rc)
+        rc = ref_mstring(STR_EMPTY);
+
+    return rc;
+} /* closure_location() */
+
+/*-------------------------------------------------------------------------*/
+string_t *
 closure_to_string (svalue_t * sp, Bool compact)
 
 /* Convert the closure <sp> into a printable string and return it.
@@ -5335,13 +5409,16 @@ closure_to_string (svalue_t * sp, Bool compact)
         return NULL;
     }
 
-    l = sp->u.lambda;
+    l = NULL;
+      /* Will be set to valid pointer if the closure has a lambda_t structure.
+       */
 
     switch(sp->x.closure_type)
     {
 
     case CLOSURE_IDENTIFIER: /* Variable Closure */
       {
+        l = sp->u.lambda;
         if (l->ob->flags & O_DESTRUCTED)
         {
             strcat(buf, compact ? "<dest lvar>"
@@ -5375,6 +5452,8 @@ closure_to_string (svalue_t * sp, Bool compact)
         program_t *prog;
         string_t  *function_name;
         Bool       is_inherited;
+
+        l = sp->u.lambda;
 
         /* For alien lfun closures, prepend the object the closure
          * is bound to.
@@ -5421,36 +5500,40 @@ closure_to_string (svalue_t * sp, Bool compact)
     case CLOSURE_UNBOUND_LAMBDA: /* Unbound-Lambda Closure */
     case CLOSURE_PRELIMINARY:    /* Preliminary Lambda Closure */
       {
-          if (sp->x.closure_type == CLOSURE_PRELIMINARY)
-              sprintf(buf, compact ? "<pre %p>" : "<prelim lambda %p>", l);
-          else
-              sprintf(buf, compact ? "<free %p>" : "<free lambda %p>", l);
-          break;
+        l = sp->u.lambda;
+
+        if (sp->x.closure_type == CLOSURE_PRELIMINARY)
+            sprintf(buf, compact ? "<pre %p>" : "<prelim lambda %p>", l);
+        else
+            sprintf(buf, compact ? "<free %p>" : "<free lambda %p>", l);
+        break;
       }
 
     case CLOSURE_LAMBDA:         /* Lambda Closure */
     case CLOSURE_BOUND_LAMBDA:   /* Bound-Lambda Closure */
       {
-          if (sp->x.closure_type == CLOSURE_BOUND_LAMBDA)
-              sprintf(buf, compact ? "<bound %p:" : "<bound lambda %p:", l);
-          else
-              sprintf(buf, compact ? "<%p:" : "<lambda %p:", l);
+        l = sp->u.lambda;
 
-          ob = l->ob;
+        if (sp->x.closure_type == CLOSURE_BOUND_LAMBDA)
+            sprintf(buf, compact ? "<bound %p:" : "<bound lambda %p:", l);
+        else
+            sprintf(buf, compact ? "<%p:" : "<lambda %p:", l);
 
-          if (!ob)
-          {
-              strcat(buf, "{null}>");
-          }
-          else
-          {
-              if (ob->flags & O_DESTRUCTED)
-                  strcat(buf, "{dest}");
-              strcat(buf, "/");
-              strcat(buf, get_txt(ob->name));
-              strcat(buf, ">");
-          }
-          break;
+        ob = l->ob;
+
+        if (!ob)
+        {
+            strcat(buf, "{null}>");
+        }
+        else
+        {
+            if (ob->flags & O_DESTRUCTED)
+                strcat(buf, "{dest}");
+            strcat(buf, "/");
+            strcat(buf, get_txt(ob->name));
+            strcat(buf, ">");
+        }
+        break;
       }
 
     default:
@@ -5501,6 +5584,29 @@ closure_to_string (svalue_t * sp, Bool compact)
     } /* switch(closure_type) */
 
     memsafe(rc = new_mstring(buf), strlen(buf), "converted lambda");
+
+    /* If it's a closure with a lambda structure, we can determine
+     * where it was created.
+     */
+    if (l && l->prog_ob && !(l->prog_ob->flags & O_DESTRUCTED))
+    {
+        string_t * rc2 = closure_location(l);
+        string_t * rc3;
+
+        /* Final step: append the created string rc2 to the original
+         * string rc such that an out of memory condition won't
+         * destroy rc itself.
+         */
+        rc3 = mstr_append(rc, rc2);
+        if (rc3)
+        {
+            free_mstring(rc);
+            rc = rc3;
+        }
+
+        free_mstring(rc2);
+    }
+
     return rc;
 } /* closure_to_string() */
 

@@ -4346,7 +4346,8 @@ call_function_interactive (interactive_t *i, char *str)
 
 /*-------------------------------------------------------------------------*/
 static Bool
-set_call (object_t *ob, input_to_t *it, char noecho, Bool local_change, Bool append)
+set_call ( object_t *ob, input_to_t *it, char noecho
+         , Bool local_change, Bool append)
 
 /* Set a a new input_to <it> with the flags <noecho> (mainly really NOECHO,
  * but also IGNORE_BANG or not) to the interactive object <ob>.

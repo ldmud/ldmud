@@ -23,12 +23,11 @@ BESCHREIBUNG
         Liste der bereits anhaengigen input_tos angehaengt (siehe
         BEISPIELE).
 
-        Wenn input_to() mehr als einmal pro Funktion aufgerufen wird,
-        wird nur das erste input_to() beruecksichtigt. Wird andererseits
-        waehrend einem laufenden input_to() (mittels "!" am Zeilenanfang)
-        eine neue Funktion aufgerufen, die wiederum ein input_to() enthaelt,
-        wird das urspruengliche input_to() so lange unterbrochen, bis das
-        neue input_to() abgearbeitet wurde, anschliessend wird es wieder aktiv.
+        Wird andererseits waehrend einem laufenden input_to() (mittels "!" am
+        Zeilenanfang) eine neue Funktion aufgerufen, die wiederum ein
+        input_to() enthaelt, wird das urspruengliche input_to() so lange
+        unterbrochen, bis das neue input_to() abgearbeitet wurde,
+        anschliessend wird es wieder aktiv.
 
         Das optionale <flag> kann ein binaeres Oder (|) der folgenden
         Werte sein:
@@ -124,8 +123,8 @@ BEISPIEL
 
         Diese Sequenze erzeugt zwei input_tos: Eingaben gehen zuerst
         an enter_firstname(); und wenn diese Funktion fertig ist
-        (einschliesslich etwaiger eigener input_tos), geht die
-        naechste Eingabe an enter_lastname().
+        (einschliesslich etwaiger eigener non-INPUT_APPEND input_tos), geht
+        die naechste Eingabe an enter_lastname().
 
 AENDERUNGEN
         Die Bedeutung von <flag> wurde in 3.2.1@93 erweitert.

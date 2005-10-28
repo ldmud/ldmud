@@ -18200,10 +18200,26 @@ get_line_number_if_any (string_t **name)
          || csp->funstart > PROGRAM_END(*current_prog))
         {
             static char name_buffer[24];
+            string_t * location, *tmp;
+            lambda_t * l;
 
             sprintf(name_buffer, "<lambda 0x%6lx>", (long)csp->funstart);
             memsafe(*name = new_mstring(name_buffer), strlen(name_buffer)
                    , "lambda name");
+            l = NULL;
+            l = (lambda_t *)((unsigned long)(csp->funstart)
+                             - ((char *)&(l->function.code) - (char *)l)
+                             - 1
+                            );
+            location = closure_location(l);
+
+            tmp = mstr_append(*name, location);
+            if (tmp)
+            {
+                free_mstring(*name);
+                *name = tmp;
+            }
+            free_mstring(location);
             return inter_pc - csp->funstart - 2;
         }
         return get_line_number(inter_pc, current_prog, name);

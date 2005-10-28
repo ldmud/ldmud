@@ -341,6 +341,17 @@ cleanup_closure (svalue_t *csvp, cleanup_t * context)
        )
         return;
 
+    /* If the creating program has been destructed, zero out the reference.
+     */
+    if (CLOSURE_MALLOCED(type)
+     && l->prog_ob
+     && (l->prog_ob->flags & O_DESTRUCTED))
+    {
+        free_object(l->prog_ob, "cleanup_closure");
+        l->prog_ob = NULL;
+        l->prog_pc = 0;
+    }
+
     if (CLOSURE_HAS_CODE(type))
     {
         mp_int num_values;
@@ -1504,6 +1515,21 @@ gc_count_ref_in_closure (svalue_t *csvp)
 
     /* Count the references in the code of the closure */
 
+    if (l->prog_ob)
+    {
+        if (l->prog_ob->flags & O_DESTRUCTED)
+        {
+            reference_destructed_object(l->prog_ob);
+            l->prog_ob = NULL;
+            l->prog_pc = 0;
+        }
+        else
+        {
+             /* Object exists: count reference */
+            l->prog_ob->ref++;
+        }
+    }
+
     if (CLOSURE_HAS_CODE(type))
     {
         mp_int num_values;
@@ -1552,6 +1578,9 @@ clear_ref_in_closure (lambda_t *l, ph_int type)
  */
 
 {
+    if (l->prog_ob)
+        clear_object_ref(l->prog_ob);
+
     if (CLOSURE_HAS_CODE(type))
     {
         mp_int num_values;

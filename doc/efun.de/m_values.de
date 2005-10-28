@@ -9,9 +9,15 @@ BESCHREIBUNG
 
 BEISPIELE
         mapping m = ([ "bla":1;2;3 , "fasel":4;5;6 , "schnack":7;8;9 ]);
-        m_values(m)    -> liefert ({ 1 , 4 , 7 })
-        m_values(m, 0) -> liefert ({ 1 , 4 , 7 })
-        m_values(m, 1) -> liefert ({ 2 , 5 , 8 })
+        m_values(m)    -> liefert ({ 1 , 4 , 7 }) (uU. permutiert)
+        m_values(m, 0) -> liefert ({ 1 , 4 , 7 }) (ditto)
+        m_values(m, 1) -> liefert ({ 2 , 5 , 8 }) (ditto)
+
+        Die genaue Reihenfolge der Werte im Ergebnisarray ist nicht
+        vorhersagbar, und kann sich mit jeder Aenderung am Mapping aendern.
+        Garantiert ist lediglich, dass die Ergebnisse von m_indices() und
+        m_values(), wenn sie zur selben Zeit bestimmt werden, dieselbe
+        Reihenfolge aufweisen.
 
 SIEHE AUCH
         mappingp(E), mkmapping(E), m_add(E), m_indices(E), m_delete(E),
