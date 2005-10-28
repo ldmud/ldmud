@@ -62,17 +62,18 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 547)
-(Parent-Version lpmud 3-3 546)
+(Project-Version lpmud 3-3 548)
+(Parent-Version lpmud 3-3 547)
 (Version-Log "
-  - (configure, my-stdint.h, sha1.h) Added a test for and a replacement
-       of the C99 include file stdint.h, which is required by the sha1
-       code (reported by Joseph).
+  - (my-stdint.h) I checked for a subtly wrong define here, causing the
+       compilation to break on Linux (reported by Joseph and Ralph).
+  - (configure, my-stdint.h) FreeBSD doesn't have stdint.h, but it
+       has inttypes.h which serves mostly the same purpose (reported by Joseph).
 ")
 (New-Version-Log
 ""
 )
-(Checkin-Time "Sat, 15 May 2004 23:16:36 -0600")
+(Checkin-Time "Sun, 16 May 2004 12:12:38 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -110,21 +111,21 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.76 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.610 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.611 644))
   (HISTORY (lpmud/f/49_HISTORY 1.352 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
   ;; Configuration
-  (src/configure (lpmud/d/0_configure 1.19.1.103 755))
+  (src/configure (lpmud/d/0_configure 1.19.1.104 755))
   (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.37 644))
-  (src/machine.h.in (lpmud/b/9_machine.h. 1.9.1.12 644))
+  (src/machine.h.in (lpmud/b/9_machine.h. 1.9.1.13 644))
   (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.19.1.26 644))
   (src/mkinstalldirs (lpmud/c/4_mkinstalld 1.1 644))
   (src/install-sh (lpmud/c/5_install-sh 1.2 755))
 
-  (src/autoconf/configure.in (lpmud/d/7_configure. 1.20.1.9.1.93 644))
-  (src/autoconf/acconfig.h (lpmud/d/10_acconfig.h 1.6.1.10 644))
+  (src/autoconf/configure.in (lpmud/d/7_configure. 1.20.1.9.1.94 644))
+  (src/autoconf/acconfig.h (lpmud/d/10_acconfig.h 1.6.1.11 644))
 
   (src/settings/README (lpmud/c/22_README 1.14.1.16 644))
   (src/settings/default (lpmud/c/23_default 1.13.1.5.1.47 744))
@@ -217,7 +218,7 @@
   (src/mstrings.c (lpmud/i/36_mstrings.c 1.21.1.28 644))
   (src/my-alloca.h (lpmud/f/29_my-alloca. 1.3.1.2 644))
   (src/my-rusage.h (lpmud/f/28_my-rusage. 1.7 644))
-  (src/my-stdint.h (lpmud/u/b/39_my-stdint. 1.1 644))
+  (src/my-stdint.h (lpmud/u/b/39_my-stdint. 1.2 644))
   (src/object.h (lpmud/44_object.h 1.34.1.19.1.4 644))
   (src/object.c (lpmud/45_object.c 1.62.1.88.1.42 644))
   (src/otable.h (lpmud/f/27_otable.h 1.8.1.4 644))
@@ -323,7 +324,7 @@
   (src/func_spec (lpmud/c/31_func_spec 1.53.1.45.1.22.1.33 644))
   (src/string_spec (lpmud/f/6_string_spe 1.14.1.15 644))
   (src/mkfunc.c (lpmud/l/14_mkfunc.c 1.1 644))
-  (src/make_func.y (lpmud/b/7_make_func. 1.25.1.30.1.9 644))
+  (src/make_func.y (lpmud/b/7_make_func. 1.25.1.30.1.10 644))
 
   ;; Generic host files
   (src/hosts/README (lpmud/h/10_README 1.2 644))

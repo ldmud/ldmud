@@ -517,7 +517,7 @@ dnl Checking for headers
 AC_CHECK_HEADERS(sys/rusage.h sys/time.h unistd.h stdlib.h libc.h memory.h)
 AC_CHECK_HEADERS(values.h string.h bstring.h netdb.h crypt.h sys/param.h sys/termios.h)
 AC_HEADER_STDC
-AC_CHECK_HEADERS(stdint.h)
+AC_CHECK_HEADERS(stdint.h inttypes.h)
 dnl extra check for <limits.h>; must be there!
 AC_CHECK_HEADERS(limits.h)
 AC_HEADER_DIRENT
@@ -534,6 +534,15 @@ int i = 96/(sizeof(struct ts)-20);
 lp_cv_sys_malloc_align=8,
 lp_cv_sys_malloc_align=4))
 AC_DEFINE_UNQUOTED(MALLOC_ALIGN,$lp_cv_sys_malloc_align)
+
+AC_CACHE_CHECK(for uint32_t and friends,lp_cv_inttypes,
+AC_TRY_COMPILE([#include <sys/types.h>
+uint32_t i;],,
+lp_cv_inttypes=yes,
+lp_cv_inttypes=no))
+if test $lp_cv_inttypes = yes; then
+  AC_DEFINE(HAVE_INTTYPES)
+fi
 
 AC_CACHE_CHECK(for ssize_t,lp_cv_type_ssize_t,
 AC_TRY_COMPILE([#include <sys/types.h>

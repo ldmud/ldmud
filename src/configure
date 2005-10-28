@@ -5097,7 +5097,8 @@ _ACEOF
 fi
 
 
-for ac_header in stdint.h
+
+for ac_header in stdint.h inttypes.h
 do
 as_ac_Header=`echo "ac_cv_header_$ac_header" | $as_tr_sh`
 if eval "test \"\${$as_ac_Header+set}\" = set"; then
@@ -6907,6 +6908,53 @@ cat >>confdefs.h <<_ACEOF
 #define MALLOC_ALIGN $lp_cv_sys_malloc_align
 _ACEOF
 
+
+echo "$as_me:$LINENO: checking for uint32_t and friends" >&5
+echo $ECHO_N "checking for uint32_t and friends... $ECHO_C" >&6
+if test "${lp_cv_inttypes+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  cat >conftest.$ac_ext <<_ACEOF
+#line $LINENO "configure"
+#include "confdefs.h"
+#include <sys/types.h>
+uint32_t i;
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext
+if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
+  (eval $ac_compile) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+         { ac_try='test -s conftest.$ac_objext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  lp_cv_inttypes=yes
+else
+  echo "$as_me: failed program was:" >&5
+cat conftest.$ac_ext >&5
+lp_cv_inttypes=no
+fi
+rm -f conftest.$ac_objext conftest.$ac_ext
+fi
+echo "$as_me:$LINENO: result: $lp_cv_inttypes" >&5
+echo "${ECHO_T}$lp_cv_inttypes" >&6
+if test $lp_cv_inttypes = yes; then
+  cat >>confdefs.h <<\_ACEOF
+#define HAVE_INTTYPES 1
+_ACEOF
+
+fi
 
 echo "$as_me:$LINENO: checking for ssize_t" >&5
 echo $ECHO_N "checking for ssize_t... $ECHO_C" >&6

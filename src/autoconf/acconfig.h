@@ -44,6 +44,9 @@
 
 #define MALLOC_ALIGN 4
 
+/* does the sys/types.h define the uint*_t types? */
+#undef HAVE_INTTYPES
+
 /* does the compiler know of a 'ssize_t' type? */
 #undef HAVE_SSIZE_T
 
