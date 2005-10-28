@@ -11,8 +11,6 @@
 
 #include "driver.h"
 
-#ifdef USE_PCRE
-
 #if defined(USE_BUILTIN_PCRE) || !defined(HAS_PCRE)
 #  include "pcre/pcre.h"
 #  if !defined(USE_BUILTIN_PCRE)
@@ -25,7 +23,5 @@
 /* Error code to be returned if too many backtracks are detected.
  */
 #define RE_ERROR_BACKTRACK PCRE_ERROR_MATCHLIMIT
-
-#endif /* USE_PCRE */
 
 #endif /* PKG_PCRE_H_ */

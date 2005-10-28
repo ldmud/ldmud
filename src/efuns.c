@@ -536,9 +536,10 @@ f_regexp (svalue_t *sp)
                 continue;
             if (rc < 0)
             {
+                const char * emsg = rx_error_message(rc, reg);
                 free_regexp(reg);
                 inter_sp = sp;
-                error("regexp: %s\n", rx_error_message(rc));
+                error("regexp: %s\n", emsg);
                 /* NOTREACHED */
                 return NULL;
             }
@@ -654,9 +655,10 @@ f_regexplode (svalue_t *sp)
 
     if (rc < 0) /* Premature abort on error */
     {
+        const char * emsg = rx_error_message(rc, reg);
         free_regexp(reg);
         inter_sp = sp;
-        error("regexp: %s\n", rx_error_message(rc));
+        error("regexp: %s\n", emsg);
         /* NOTREACHED */
         return NULL;
     }
@@ -943,13 +945,14 @@ f_regreplace (svalue_t *sp)
 
     if (rc < 0) /* Premature abort on error */
     {
+        const char * emsg = rx_error_message(rc, reg);
         free_regexp(reg);
         for (match = matches; match != NULL; match = match->next)
         {
             if (match->sub)
                 free_mstring(match->sub);
         }
-        error("regexp: %s\n", rx_error_message(rc));
+        error("regexp: %s\n", emsg);
         /* NOTREACHED */
         return NULL;
     }
@@ -1126,8 +1129,9 @@ v_regmatch (svalue_t *sp, int num_arg)
     rc = rx_exec(reg, text, startpos);
     if (rc < 0)
     {
+        const char * emsg = rx_error_message(rc, reg);
         free_regexp(reg);
-        error("regexp: %s\n", rx_error_message(rc));
+        error("regexp: %s\n", emsg);
         /* NOTREACHED */
         return NULL;
     }

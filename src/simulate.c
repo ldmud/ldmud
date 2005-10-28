@@ -4623,8 +4623,8 @@ f_set_driver_hook (svalue_t *sp)
         {
             if (sp->u.number != 0)
             {
-                error("Bad value for hook %ld: got number, expected %lx %s or 0.\n"
-                     , n, (unsigned long)hook_type_map[n]
+                error("Bad value for hook %ld: got number, expected %s or 0.\n"
+                     , n
                      , efun_arg_typename(hook_type_map[n]));
             }
             put_number(driver_hook + n, 0);
@@ -4633,11 +4633,11 @@ f_set_driver_hook (svalue_t *sp)
         else
         {
             if (sp->u.number != RE_PCRE
-             || sp->u.number != RE_TRADITIONAL
+             && sp->u.number != RE_TRADITIONAL
                )
             {
-                error("Bad value for hook %ld: got %lx, expected RE_PCRE (%lx) "
-                      "or RE_TRADITIONAL (%lx).\n"
+                error("Bad value for hook %ld: got 0x%lx, expected RE_PCRE (0x%lx) "
+                      "or RE_TRADITIONAL (0x%lx).\n"
                      , n, (long)sp->u.number
                      , (long)RE_PCRE, (long)RE_TRADITIONAL
                      );
@@ -4652,8 +4652,8 @@ f_set_driver_hook (svalue_t *sp)
         string_t *str;
 
         if ( !((1 << T_STRING) & hook_type_map[n]) )
-            error("Bad value for hook %ld: got string, expected %lx %s.\n"
-                 , n, (unsigned long)hook_type_map[n]
+            error("Bad value for hook %ld: got string, expected %s.\n"
+                 , n
                  , efun_arg_typename(hook_type_map[n]));
 
         str = make_tabled_from(sp->u.str); /* for faster apply()s */

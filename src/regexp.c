@@ -40,8 +40,6 @@
 
 #include "driver.h"
 
-#ifndef USE_PCRE
-
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
@@ -1452,5 +1450,3 @@ char           *s2;
 #endif
 
 /***************************************************************************/
-
-#endif /* USE_PCRE */

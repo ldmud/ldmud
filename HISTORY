@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-31-May-2004 (Lars Duening) -- Development Release 3.3
+04-Sep-2004 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -149,6 +149,9 @@ For a detailed list of all changes see the file CHANGELOG.
            The check can be controlled the pragma '(no_)warn_missing_return'.
        + New runtime 'limit' LIMIT_COST to control how much
            a limited execution should cost.
+       + Both the traditional and PCRE regular expressions can be used
+           at runtime, with the selection being made by extra option
+           flags.
 
     - Other Changes:
        + The input escape character can be configured at compile time to

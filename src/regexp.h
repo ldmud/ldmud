@@ -3,7 +3,7 @@
 
 #include "driver.h"
 
-#ifndef USE_PCRE
+#include "pkg-pcre.h" /* for RE_ERROR_BACKTRACK */
 
 #define NSUBEXP  50
   /* Number of allowed () expressions.
@@ -57,8 +57,6 @@ extern int hs_regexec(regexp *prog, char *string, char *start);
 #define RE_NOMATCH          (0)
 #define RE_ERROR_NULL       (-1)
 #define RE_ERROR_CORRUPT    (-2)
-#define RE_ERROR_BACKTRACK  (-3)
-
-#endif /* !USE_PCRE */
+/* RE_ERROR_BACKTRACK is defined in pkg-pcre.h */
 
 #endif /* REGEXP_H_ */

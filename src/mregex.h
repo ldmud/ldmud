@@ -5,11 +5,6 @@
 
 #include "mstrings.h"
 #include "strfuns.h"
-#ifdef USE_PCRE
-#include "pkg-pcre.h"
-#else
-#include "regexp.h"
-#endif
 
 /* --- Types --- */
 
@@ -20,7 +15,7 @@
 /* --- Prototypes --- */
 
 extern void rx_init(void);
-extern const char * rx_error_message (int code);
+extern const char * rx_error_message (int code, const regexp_t * pRegexp);
 extern regexp_t * rx_compile (string_t * expr, int opt, Bool from_ed);
 extern int    rx_exec (regexp_t *pRegexp, string_t * string, size_t start);
 extern int    rx_exec_str (regexp_t *pRegexp, char * string, char * start);

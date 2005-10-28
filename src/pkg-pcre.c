@@ -9,8 +9,6 @@
 
 #include "driver.h"
 
-#if defined(USE_PCRE)
-
 #include "pkg-pcre.h"
 
 #if defined(USE_BUILTIN_PCRE)
@@ -38,4 +36,3 @@
 #include "pcre/study.c"
 
 #endif /* USE_BUILTIN_PCRE */
-#endif /* USE_PCRE */

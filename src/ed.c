@@ -569,7 +569,7 @@ ckglob (void)
                 rc = rx_exec_str(glbpat, lin, lin);
                 if (rc < 0)
                 {
-                    add_message("ed: %s\n", rx_error_message(rc) );
+                    add_message("ed: %s\n", rx_error_message(rc, glbpat) );
                     return ERR;
                 }
 
@@ -983,7 +983,7 @@ find (regexp_t *pat, Bool dir)
         rc = rx_exec_str(pat, line_start, line_start);
         if (rc < 0)
         {
-            add_message("ed: %s\n", rx_error_message(rc) );
+            add_message("ed: %s\n", rx_error_message(rc, pat) );
             return ERR;
         }
         if (rc)
@@ -1026,7 +1026,7 @@ findg (regexp_t *pat, Bool dir)
         rc = rx_exec_str(pat, gettxtl(lin), gettxtl(lin)))
         if (rc < 0)
         {
-            add_message("ed: %s\n", rx_error_message(rc) );
+            add_message("ed: %s\n", rx_error_message(rc, pat) );
             return ERR;
         }
         if (rc > 0)
@@ -1836,7 +1836,7 @@ subst (regexp_t *pat, char *sub, Bool gflg, Bool pflag)
         rc = rx_exec_str(pat, current, start);
         if (rc < 0)
         {
-            add_message("ed: %s\n", rx_error_message(rc) );
+            add_message("ed: %s\n", rx_error_message(rc, pat) );
             return SUB_FAIL;
         }
         if ( rc )
@@ -1888,7 +1888,7 @@ subst (regexp_t *pat, char *sub, Bool gflg, Bool pflag)
 
             if (rc < 0)
             {
-                add_message("ed: %s\n", rx_error_message(rc) );
+                add_message("ed: %s\n", rx_error_message(rc, pat) );
                 return SUB_FAIL;
             }
 

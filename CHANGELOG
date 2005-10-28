@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+04-Sep-2004 (Lars Duening)  (3.3.596)
+  - (mregex, simulate.c, efuns.c) Implemented the concurrent use of both
+       regexp packages.
+
 04-Sep-2004 (Lars Duening)  (3.3.595)
   - (configure, main.c, simulate.c) Added the glue to select a default
        regexp package via commandline option or driver hook. The regexp
