@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+23-Dec-2004 (Lars Duening)  (3.3.637)
+  - (comm.c, sys/input_to.h) The input_to() flag INPUT_APPEND allows
+        to queue input_to()s (suggested by Volker Behr).
+
 23-Dec-2004 (Lars Duening)  (3.3.636)
   - (lex, efuns.c) Another small correction to the number parsing in to_int():
         negative numbers exceeding the limits are properly mapped to INT_MIN,

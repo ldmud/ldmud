@@ -9,6 +9,9 @@
 #define INPUT_NO_TELNET      8  /* Switch into/out of charmode on the driver
                                  * side only.
                                  */
+#define INPUT_APPEND        16  /* Append the input_to to the list of already
+                                 * pending input_to's.
+                                 */
 #define INPUT_IGNORE_BANG  128  /* Disallow the '!' escape */
 
 #endif /* LPC_INPUT_TO_H_ */

@@ -17,6 +17,13 @@ BESCHREIBUNG
         Spieler die Entertaste drueckt.
 
         Wenn input_to() mehr als einmal pro Funktion aufgerufen wird,
+        wird normalerweise nur das erste input_to() beruecksichtigt.
+        Diese Verhalten kann durch die Angabe von INPUT_APPEND
+        modifiziert werden: in diesem Fall wird das input_to() an die
+        Liste der bereits anhaengigen input_tos angehaengt (siehe
+        BEISPIELE).
+
+        Wenn input_to() mehr als einmal pro Funktion aufgerufen wird,
         wird nur das erste input_to() beruecksichtigt. Wird andererseits
         waehrend einem laufenden input_to() (mittels "!" am Zeilenanfang)
         eine neue Funktion aufgerufen, die wiederum ein input_to() enthaelt,
@@ -71,6 +78,10 @@ BESCHREIBUNG
             Argument, sendet aber keine Telnetkommandos zur Anpassung
             des Verhaltens des Clientprogrammes.
 
+        INPUT_APPEND (16):
+            Das input_to() wird an die Liste der bereits anhaengigen
+            input_tos angehaengt.
+
         INPUT_IGNORE_BANG (128):
             Eingaben, die mit ! beginnen, werden NICHT als Kommandi geparset,
             sondern auch als Argument an die Funkion <fun> uebergeben. Die
@@ -103,6 +114,19 @@ BEISPIEL
         der Driver die Funktion enter_name() mit dem eingegebenen String
         als Argument ab.
 
+
+        void func() {
+          ..
+          input_to("enter_firstname");
+          input_to("enter_lastname, INPUT_APPEND);
+          ...
+        }
+
+        Diese Sequenze erzeugt zwei input_tos: Eingaben gehen zuerst
+        an enter_firstname(); und wenn diese Funktion fertig ist
+        (einschliesslich etwaiger eigener input_tos), geht die
+        naechste Eingabe an enter_lastname().
+
 AENDERUNGEN
         Die Bedeutung von <flag> wurde in 3.2.1@93 erweitert.
         Die Limitierung fuer das "stapeln" von input_to()s aus !-Kommandi
@@ -111,6 +135,7 @@ AENDERUNGEN
         LDMud 3.2.9 fuehrte das Flag INPUT_PROMPT samt zugehoerigem Argument
             ein.
         LDMud 3.2.11/3.3.593 fuehrte das INPUT_NO_TELNET Flag ein.
+        LDMud 3.2.11/3.3.637 fuehrte das INPUT_APPEND Flag ein.
 
 BUGS
         Im Zeichenmodus sollten Zeilenumbrueche eigentlich als "\n" zurueck

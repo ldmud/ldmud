@@ -17,12 +17,16 @@ DESCRIPTION
         Note that fun is not called immediately but after pressing the
         RETURN key.
 
-        If input_to() is called more than once in the same execution,
-        only the first call has any effect. On the other hand, if
-        a command given during an input_to() (using the "!" escape)
-        issues its own input_to(), the previous input_to() is suspended
-        until the new input_to() has been handled, then the previous
-        one becomes active again.
+        Usually, if input_to() is called more than once in the same execution,
+        only the first call has any effect. This behaviour can be
+        modified by specifying the INPUT_APPEND flag which will append
+        the given input_to to the already existing input_tos (see
+        EXAMPLES).
+
+        Also, if a command given during an input_to() (using the "!"
+        escape) issues its own input_to(), the previous input_to() is
+        suspended until the new input_to() has been handled, then the
+        previous one becomes active again.
 
         The optional argument <flag> may be a binary-OR ('|') of the
         following option values:
@@ -71,6 +75,10 @@ DESCRIPTION
               it's internal handling of incoming data, but not send out
               any telnet commands to switch the client's behaviour.
 
+          INPUT_APPEND (16):
+              Append the input_to to the list of currently pending input_tos
+              (if any).
+
           INPUT_IGNORE_BANG  (128):
               Input lines starting with '!' (or whatever the input
               escape character was configured to be) will _not_ be parsed as
@@ -101,6 +109,19 @@ EXAMPLE
         driver will invoke the enter_name() function with the
         string you entered as argument to it.
 
+
+        void func() {
+          ..
+          input_to("enter_firstname");
+          input_to("enter_lastname, INPUT_APPEND);
+          ...
+        }
+
+        This sequence will queue two input_tos: the input first goes
+        to enter_firstname(); and when this function is done
+        (including any input_to()s on its own), the next input will
+        go to enter_lastname().
+
 BUGS
         In charmode, it is not possible to receive the NUL character
         and pass it to the mudlib: internally the NUL character has
@@ -113,6 +134,7 @@ HISTORY
         Since LDMud 3.2.8 the function can be given as a closure.
         LDMud 3.2.9/3.3.125 introduced the INPUT_PROMPT flag and argument.
         LDMud 3.2.11/3.3.593 added the INPUT_NO_TELNET flag.
+        LDMud 3.2.11/3.3.593 added the INPUT_APPEND flag.
         LDMud 3.3 changed the handling of newline sequences in charmode
           to verbatim passing. Earlier drivers passed an empty string
           instead.

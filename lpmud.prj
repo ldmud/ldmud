@@ -54,22 +54,16 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 636)
-(Parent-Version lpmud 3-3 635)
+(Project-Version lpmud 3-3 637)
+(Parent-Version lpmud 3-3 636)
 (Version-Log "
-  - (lex, efuns.c) Another small correction to the number parsing in to_int():
-        negative numbers exceeding the limits are properly mapped to INT_MIN,
-        not -INT_MAX. Unfortunately too large negative numbers seen by
-        the LPC compiler are still mapped to -INT_MAX due to the lack
-        of proper overflow handling in the compiler; however, the compiler
-        now emits a warning on these occasions.
-  - (comm.c, pkg-tls.c) More TLS bugfixes by Fippo and Peng (Bug #0000138 and
-        #0000140).
+  - (comm.c, sys/input_to.h) The input_to() flag INPUT_APPEND allows
+        to queue input_to()s (suggested by Volker Behr).
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Thu, 23 Dec 2004 12:22:06 -0700")
+(Checkin-Time "Thu, 23 Dec 2004 21:43:32 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -106,8 +100,8 @@
   ;; Information about the driver and the distribution in general
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.12 644))
-  (CREDITS (lpmud/d/22_CREDITS 1.70.1.83 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.699 644))
+  (CREDITS (lpmud/d/22_CREDITS 1.70.1.84 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.700 644))
   (HISTORY (lpmud/f/49_HISTORY 1.385.1.2 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -169,7 +163,7 @@
   (src/array.h (lpmud/f/47_array.h 1.18.1.22 644))
   (src/array.c (lpmud/d/12_array.c 1.46.1.47.1.18 644))
   (src/backend.h (lpmud/f/46_backend.h 1.20.1.7 644))
-  (src/backend.c (lpmud/d/6_backend.c 1.68.1.35.1.38 644))
+  (src/backend.c (lpmud/d/6_backend.c 1.68.1.35.1.39 644))
   (src/bitstrings.h (lpmud/i/47_bitstrings 1.3 644))
   (src/bitstrings.c (lpmud/i/48_bitstrings 1.16 644))
   (src/bytecode.h (lpmud/a/b/26_bytecode.h 1.1.1.3 644))
@@ -177,7 +171,7 @@
   (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.30 644))
   (src/closure.h (lpmud/f/44_closure.h 1.7.1.22 644))
   (src/closure.c (lpmud/d/4_closure.c 1.41.1.47.1.26 644))
-  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.102 644))
+  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.103 644))
   (src/comm.h (lpmud/d/3_comm.h 1.26.1.41 644))
   (src/driver.h (lpmud/f/36_driver.h 1.15.1.27 644))
   (src/dumpstat.h (lpmud/f/35_dumpstat.h 1.8 644))
@@ -510,7 +504,7 @@
   (mudlib/sys/include_list.h (lpmud/p/26_include_li 1.2 644))
   (mudlib/sys/inherit_list.h (lpmud/p/18_inherit_li 1.1 644))
   (mudlib/sys/functionlist.h (lpmud/49_functionli 1.4.1.9.1.4 644))
-  (mudlib/sys/input_to.h (lpmud/t/8_input_to.h 1.1.1.3 644))
+  (mudlib/sys/input_to.h (lpmud/t/8_input_to.h 1.1.1.4 644))
   (mudlib/sys/lpctypes.h (lpmud/48_lpctypes.h 1.2.1.9 644))
   (mudlib/sys/objectinfo.h (lpmud/m/20_objectinfo 1.7.1.7 644))
   (mudlib/sys/pgsql.h (lpmud/d/b/41_pgsql.h 1.1 644))
@@ -730,7 +724,7 @@
   (doc/efun/implode (lpmud/p/2_implode 1.3 644))
   (doc/efun/include_list (lpmud/p/25_include_li 1.5 644))
   (doc/efun/inherit_list (lpmud/p/3_inherit_li 1.7 644))
-  (doc/efun/input_to (lpmud/p/4_input_to 1.8.1.12 644))
+  (doc/efun/input_to (lpmud/p/4_input_to 1.8.1.13 644))
   (doc/efun/input_to_info (lpmud/b/b/44_input_to_i 1.2 644))
   (doc/efun/insert_alist (lpmud/c/45_insert_ali 1.7 644))
   (doc/efun/interactive (lpmud/p/5_interactiv 1.2 644))
@@ -1122,7 +1116,7 @@
   (doc/efun.de/interactive.de (lpmud/i/b/18_interactiv 1.1 640))
   (doc/efun.de/insert_alist.de (lpmud/i/b/19_insert_ali 1.2 640))
   (doc/efun.de/input_to_info.de (lpmud/i/b/20_input_to_i 1.1 640))
-  (doc/efun.de/input_to.de (lpmud/i/b/21_input_to.d 1.3 640))
+  (doc/efun.de/input_to.de (lpmud/i/b/21_input_to.d 1.4 640))
   (doc/efun.de/inherit_list.de (lpmud/i/b/22_inherit_li 1.1 640))
   (doc/efun.de/include_list.de (lpmud/i/b/23_include_li 1.1 640))
   (doc/efun.de/implode.de (lpmud/s/33_implode.de 1.1 644))

@@ -4346,12 +4346,14 @@ call_function_interactive (interactive_t *i, char *str)
 
 /*-------------------------------------------------------------------------*/
 static Bool
-set_call (object_t *ob, input_to_t *it, char noecho, Bool local_change)
+set_call (object_t *ob, input_to_t *it, char noecho, Bool local_change, Bool append)
 
 /* Set a a new input_to <it> with the flags <noecho> (mainly really NOECHO,
  * but also IGNORE_BANG or not) to the interactive object <ob>.
  * If <local_change> is TRUE, the driver will not send out any telnet
  * commands for CHARMODE/LINEMODE changes.
+ * If <append> is TRUE, the call is appended to the list of existing
+ * input_to's, if any.
  * Return TRUE on success.
  *
  * Called for efun input_to().
@@ -4363,15 +4365,30 @@ set_call (object_t *ob, input_to_t *it, char noecho, Bool local_change)
     if (ob == NULL || it == NULL)
         return MY_FALSE;
     if (!(O_SET_INTERACTIVE(ip, ob))
-     || ip->closing || ip->set_input_to)
+     || ip->closing || (!append && ip->set_input_to))
     {
         return MY_FALSE;
     }
 
     it->noecho = noecho;
     it->local = local_change;
-    it->next = ip->input_to;
-    ip->input_to = it;
+
+    if (!append || ip->input_to == NULL)
+    {
+        it->next = ip->input_to;
+        ip->input_to = it;
+    }
+    else
+    {
+        input_to_t * ptr = ip->input_to;
+
+        while (ptr->next != NULL)
+            ptr = ptr->next;
+
+        ptr->next = it;
+        it->next = NULL;
+    }
+
     ip->set_input_to = MY_TRUE;
 
     if (noecho || ip->noecho)
@@ -7621,7 +7638,9 @@ v_input_to (svalue_t *sp, int num_arg)
     /* Try stetting the input_to. On success, return 1. */
 
     if (set_call( command_giver, it, (char)flags
-                , (iflags & INPUT_NO_TELNET) != 0)
+                , (iflags & INPUT_NO_TELNET) != 0
+                , (iflags & INPUT_APPEND) != 0
+                )
        )
     {
         put_number(arg, 1);
