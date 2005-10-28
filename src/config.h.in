@@ -544,6 +544,12 @@
  */
 #define USE_AVL_FREELIST
 
+/* Order smalloc freelists by address.
+ * TODO: Remove this macro once it is proven stable or if the change
+ * TODO:: didn't bring any advantages..
+ */
+#define SMALLOC_ORDER_FREELISTS
+
 /* Trace changes to the tot_alloc_object and tot_alloc_object_size
  * statistics, in order to find the status bugs (enables commandline
  * option --check-object-stat). Will produce a decent amount of

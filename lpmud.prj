@@ -60,18 +60,18 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 601)
-(Parent-Version lpmud 3-3 600)
+(Project-Version lpmud 3-3 602)
+(Parent-Version lpmud 3-3 601)
 (Version-Log "
-  - (prolang.y, lex) New pragma (no_)warn_function_inconsistent to control
-      the handling of redefined functions which differ in return or argument
-      types. This is intended to easen the adaptation of legacy mudlib
-      code (suggested by Wayne).
+  - (config.h.in, smalloc.c, main.c) New manual config macro
+      SMALLOC_ORDER_FREELISTS instructs smalloc to keep its freelists ordered
+      by block address. This is an experiment to see if the high heap
+      fragmentation can be reduced this way.
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Sun, 12 Sep 2004 18:06:46 -0600")
+(Checkin-Time "Wed, 15 Sep 2004 22:06:26 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -109,14 +109,14 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.81 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.664 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.665 644))
   (HISTORY (lpmud/f/49_HISTORY 1.378 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
   ;; Configuration
   (src/configure (lpmud/d/0_configure 1.19.1.108 755))
-  (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.40 644))
+  (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.41 644))
   (src/machine.h.in (lpmud/b/9_machine.h. 1.9.1.13 644))
   (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.19.1.30 644))
   (src/mkinstalldirs (lpmud/c/4_mkinstalld 1.1 644))
@@ -203,7 +203,7 @@
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.15.1.10 644))
   (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.71 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.19 644))
-  (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.64 644))
+  (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.65 644))
   (src/mapping.h (lpmud/f/30_mapping.h 1.12.1.20 644))
   (src/mapping.c (lpmud/b/6_mapping.c 1.36.1.81 644))
   (src/md5.h (lpmud/l/18_md5.h 1.3 644))
@@ -345,7 +345,7 @@
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.37 644))
   (src/simulate.c (lpmud/31_simulate.c 1.88.1.135 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.14 644))
-  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.99 644))
+  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.100 644))
   (src/sysmalloc.h (lpmud/c/b/33_sysmalloc. 1.2 644))
   (src/sysmalloc.c (lpmud/c/b/34_sysmalloc. 1.6 644))
   (src/sprintf.h (lpmud/f/15_sprintf.h 1.3.1.4 644))

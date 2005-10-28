@@ -1944,6 +1944,9 @@ options (void)
 #       if defined(USE_AVL_FREELIST)
                               , "USE_AVL_FREELIST"
 #       endif
+#       if defined(SMALLOC_ORDER_FREELISTS)
+                              , "SMALLOC_ORDER_FREELISTS"
+#       endif
                               };
         size_t nStrings = sizeof(optstrings) / sizeof(optstrings[0]);
         size_t iInitial = strlen(optstrings[0]);

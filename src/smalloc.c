@@ -41,6 +41,10 @@
  * and last word in the "user area" for their link pointers; the small
  * chunks are themselves kept in a list and use their first word for the
  * list pointer. Small free blocks are defragmented as described below.
+#ifdef SMALLOC_ORDER_FREELISTS
+ * The leading part of the freelist consisting of the non-defragmented blocks
+ * is ordered by the of the blocks. The defragmented blocks are unsorted.
+#endif
  *
  * If a small block can't be allocated from the appropriate free list nor
  * the small chunk, the system tries two more strategies before allocating
@@ -89,6 +93,16 @@
  * is to decrease the size of the AVL tree (and thus increase the
  * locality large block lookups) in the case of multiple blocks of the
  * same size.
+ *
+ * The double-links are not really required, as only the first block on the
+ * freelist or the node itself are selected for allocation, but it's
+ * algorithmically simple to implement, and we have the memory for the
+ * second pointer.
+#ifdef SMALLOC_ORDER_FREELISTS
+ * The freelist is ordered by the starting address of the blocks (with
+ * the likely exception of the block holding the AVL node), in an attempt
+ * to reduce high heap fragmentation.
+#endif
 #else
  * A new AVL node is created for every free large block.
 #endif
@@ -912,15 +926,42 @@ void MAKE_SMALL_FREE (word_t *block, word_t bsize)
     block[bsize] |= PREV_BLOCK;
 
     head = sfltable[ix];
+#ifdef SMALLOC_ORDER_FREELISTS
+    if (!head || head > block || (head[M_SIZE] & M_DEFRAG))
+    {
+        block[M_LINK] = (word_t) head;
+        block[M_PLINK(bsize)] = (word_t)block | flag;
+          /* Let the PLINK point to block itself, to satisfy sanity checks */
+        sfltable[ix] = block;
+    }
+    else
+    {
+        word_t * prev;
+
+        do {
+            prev = head;
+            head = (word_t *)head[M_LINK];
+        } while (head && head < block && !(head[M_SIZE] & M_DEFRAG));
+
+        block[M_LINK] = (word_t) head;
+        block[M_PLINK(bsize)] = (word_t)prev | flag;
+        prev[M_LINK] = (word_t)block;
+    }
+
+    if (head)
+        head[M_PLINK(head[M_SIZE] & M_MASK)] = (word_t)block | flag;
+#else
     if (head)
         head[M_PLINK(head[M_SIZE] & M_MASK)] = (word_t)block | flag;
     block[M_LINK] = (word_t) head;
     block[M_PLINK(bsize)] = (word_t)block | flag;
+      /* Let the PLINK point to block itself, to satisfy sanity checks */
 
     if (flag)
         block[M_PLINK(bsize)-1] = bsize;
 
     sfltable[ix] = block;
+#endif /* SMALLOC_ORDER_FREELISTS */
     small_free[ix]++;
     count_up(small_free_stat, bsize * SINT);
 
@@ -1099,6 +1140,9 @@ defragment_small_lists (int req)
                * However, by not setting it we make the algorithm a bit
                * more robust, and lose only a few cycles the next time
                * around.
+#ifdef SMALLOC_ORDER_FREELISTS
+               * It also simplifies the sorted insertion in MAKE_SMALL_FREE.
+#endif
                */
         }
     } /* for (ix = SMALL_BLOCK_NUM..0 && !found) */
@@ -2279,12 +2323,30 @@ add_to_free_list (word_t *ptr)
         if (size == p->size)
         {
             /* We can attach the block to an existing node */
+#ifdef SMALLOC_ORDER_FREELISTS
+            struct free_block * tail = p;
+
+            /* Find the proper node after which to insert */
+            if (p->next != NULL)
+            {
+                while (tail->next && tail->next < r)
+                    tail = tail->next;
+            }
+
+            r->next = tail->next;
+            r->prev = tail;
+
+            if (r->next)
+                r->next->prev = r;
+            tail->next = r;
+#else
             r->next = p->next;
             r->prev = p;
 
             if (r->next)
                 r->next->prev = r;
             p->next = r;
+#endif /* SMALLOC_ORDER_FREELISTS */
 
             return;
         }

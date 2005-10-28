@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+15-Sep-2004 (Lars Duening)  (3.3.602)
+  - (config.h.in, smalloc.c, main.c) New manual config.h macro
+      SMALLOC_ORDER_FREELISTS instructs smalloc to keep its freelists ordered
+      by block address. This is an experiment to see if the high heap
+      fragmentation can be reduced this way.
+
 12-Sep-2004 (Lars Duening)  (3.3.601)
   - (prolang.y, lex) New pragma (no_)warn_function_inconsistent to control
       the handling of redefined functions which differ in return or argument
