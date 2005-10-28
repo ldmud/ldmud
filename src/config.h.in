@@ -545,8 +545,8 @@
 #define USE_AVL_FREELIST
 
 /* Order smalloc freelists by address.
- * TODO: Remove this macro once it is proven stable or if the change
- * TODO:: didn't bring any advantages..
+ * TODO: Remove if it doesn't help with the fragmentation, as it uses up
+ * TODO:: a small, but measurable amount of time in the allocator.
  */
 #define SMALLOC_ORDER_FREELISTS
 

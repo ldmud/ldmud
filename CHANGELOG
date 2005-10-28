@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+26-Oct-2004 (Lars Duening)  (3.3.609)
+  - (smalloc.c) Ok, ordering the small block freelists was a bad idea - I
+      removed that now. Ordering the large block freelists doesn't seem
+      to make a performance difference, so I keep it in for now.
+
 24-Oct-2004 (Lars Duening)  (3.3.608)
   - (backend.c) Reduced the frequence of data-cleanup such that at least
       time_to_clean_up seconds (or 3600 seconds) must have passed since

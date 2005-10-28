@@ -60,19 +60,17 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 608)
-(Parent-Version lpmud 3-3 607)
+(Project-Version lpmud 3-3 609)
+(Parent-Version lpmud 3-3 608)
 (Version-Log "
-  - (backend.c) Reduced the frequence of data-cleanup such that at least
-      time_to_clean_up seconds (or 3600 seconds) must have passed since
-      the last reference.
-  - (smalloc.c) smalloc now supports allocations of 0 byte length (needed
-      to replace malloc()).
+  - (smalloc.c) Ok, ordering the small block freelists was a bad idea - I
+      removed that now. Ordering the large block freelists doesn't seem
+      to make a performance difference, so I keep it in for now.
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Sun, 24 Oct 2004 20:47:23 -0600")
+(Checkin-Time "Tue, 26 Oct 2004 21:41:15 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -110,14 +108,14 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.83 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.671 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.672 644))
   (HISTORY (lpmud/f/49_HISTORY 1.379 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
   ;; Configuration
   (src/configure (lpmud/d/0_configure 1.19.1.108 755))
-  (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.42 644))
+  (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.43 644))
   (src/machine.h.in (lpmud/b/9_machine.h. 1.9.1.13 644))
   (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.19.1.32 644))
   (src/mkinstalldirs (lpmud/c/4_mkinstalld 1.1 644))
@@ -346,7 +344,7 @@
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.37 644))
   (src/simulate.c (lpmud/31_simulate.c 1.88.1.135 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.14 644))
-  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.103 644))
+  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.104 644))
   (src/sysmalloc.h (lpmud/c/b/33_sysmalloc. 1.2 644))
   (src/sysmalloc.c (lpmud/c/b/34_sysmalloc. 1.7 644))
   (src/sprintf.h (lpmud/f/15_sprintf.h 1.3.1.4 644))
