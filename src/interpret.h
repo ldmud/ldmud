@@ -202,7 +202,6 @@ extern svalue_t *f_last_instructions(svalue_t *sp);
 extern svalue_t *f_set_this_object (svalue_t *sp);
 extern svalue_t *f_trace(svalue_t *sp);
 extern svalue_t *f_traceprefix(svalue_t *sp);
-extern string_t *add_slash (const string_t *str);
 
 #ifdef OPCPROF
 extern Bool opcdump(string_t *fname);

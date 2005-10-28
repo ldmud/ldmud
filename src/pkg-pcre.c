@@ -24,17 +24,6 @@
 #    undef DEBUG
 #endif
 
-/* To detect a pathological case of backtracking, a call to this
- * macro has to be inserted right after the 'bracked failed' diagnosic
- * in match().
- */
-
-#define LDMUD_CHECK_EVAL_COST \
-    eval_cost += 1; \
-    if (EVALUATION_TOO_LONG()) { \
-        RRETURN(RE_ERROR_BACKTRACK); \
-    }
-
 /* PCRE can support UTF8, but right now we can't activate the UTF8 matching
  * mode from our efuns.
  */

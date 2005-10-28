@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+10-Jul-2004 (Lars Duening)  (3.3.570)
+  - (pcre/) PCRE no longer directly changes the EVAL_COST, instead the
+       MATCH_LIMIT option is used to limit the execution of backtracking
+       expressions. Updated the documentation. (Bug #0000075)
+
 08-Jul-2004 (Lars Duening)  (3.3.569)
   - (pcre/) Upgraded PCRE to version 4.5; however, there is additional work
        to be done as PCRE 4.5 offers additional features (Bug #0000075)

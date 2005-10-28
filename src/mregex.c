@@ -44,6 +44,7 @@
 #include "comm.h" /* add_message() */
 #include "gcollect.h"
 #include "hash.h"
+#include "interpret.h"
 #include "mstrings.h"
 #ifdef USE_PCRE
 #include "pkg-pcre.h"
@@ -417,6 +418,7 @@ rx_exec (regexp_t *prog, string_t * string, size_t start)
 #ifdef USE_PCRE
     int rc;
     int pcre_opt;
+    pcre_extra * pHints;    /* Study data */
 
     /* Determine the RE compilation options */
 
@@ -426,7 +428,21 @@ rx_exec (regexp_t *prog, string_t * string, size_t start)
     if (prog->opt & RE_NOTEOL)   pcre_opt |= PCRE_NOTEOL;
     if (prog->opt & RE_NOTEMPTY) pcre_opt |= PCRE_NOTEMPTY;
 
-    rc = pcre_exec( prog->pProg, prog->pHints
+    pHints = prog->pHints;
+    if (pHints && max_eval_cost)
+    {
+        pHints->flags |= PCRE_EXTRA_MATCH_LIMIT;
+        if (max_eval_cost > eval_cost + 1)
+            pHints->match_limit = max_eval_cost - eval_cost - 1;
+        else
+            pHints->match_limit = 1;
+    }
+    else if (pHints)
+    {
+        pHints->flags &= ~PCRE_EXTRA_MATCH_LIMIT;
+    }
+
+    rc = pcre_exec( prog->pProg, pHints
                   , get_txt(string), mstrsize(string), start, pcre_opt
                   , prog->pSubs, prog->num_subs
                   );
@@ -461,6 +477,7 @@ rx_exec_str (regexp_t *prog, char * string, char * start)
 #ifdef USE_PCRE
     int rc;
     int pcre_opt;
+    pcre_extra * pHints;    /* Study data */
 
     /* Determine the RE compilation options */
 
@@ -470,7 +487,21 @@ rx_exec_str (regexp_t *prog, char * string, char * start)
     if (prog->opt & RE_NOTEOL)   pcre_opt |= PCRE_NOTEOL;
     if (prog->opt & RE_NOTEMPTY) pcre_opt |= PCRE_NOTEMPTY;
 
-    rc = pcre_exec( prog->pProg, prog->pHints
+    pHints = prog->pHints;
+    if (pHints && max_eval_cost)
+    {
+        pHints->flags |= PCRE_EXTRA_MATCH_LIMIT;
+        if (max_eval_cost > eval_cost + 1)
+            pHints->match_limit = max_eval_cost - eval_cost - 1;
+        else
+            pHints->match_limit = 1;
+    }
+    else if (pHints)
+    {
+        pHints->flags &= ~PCRE_EXTRA_MATCH_LIMIT;
+    }
+
+    rc = pcre_exec( prog->pProg, pHints
                   , start, strlen(start), string - start, pcre_opt
                   , prog->pSubs, prog->num_subs
                   );

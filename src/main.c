@@ -1705,7 +1705,7 @@ options (void)
 #ifndef USE_PCRE
   fputs("                 regexps: traditional.\n", stdout);
 #else
-  printf("                 regexps: PCRE %d.%d\n", PCRE_MAJOR, PCRE_MINOR);
+  printf("                 regexps: PCRE %d.%d (builtin)\n", PCRE_MAJOR, PCRE_MINOR);
 #endif
 
   printf(" Runtime limits: max read file size:     %7d\n"
