@@ -170,7 +170,7 @@ For a detailed list of all changes see the file CHANGELOG.
            x509 key- and certfile for the TLS package.
 
 
-11-Jul-2004 (Lars Duening) -- Release 3.2.11
+12-Jul-2004 (Lars Duening) -- Release 3.2.11
 
     - Changed efuns:
 
@@ -183,6 +183,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - Master Object:
 
     - Fixed Crashers:
+       + A shadow executing remove_action(1, shadowee).
 
     - Language:
 

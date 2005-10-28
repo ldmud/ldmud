@@ -60,15 +60,17 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 572)
-(Parent-Version lpmud 3-3 571)
+(Project-Version lpmud 3-3 573)
+(Parent-Version lpmud 3-3 572)
 (Version-Log "
-  - (comm.c, actions.c) On a too long message or command, print the
-       first 200 characters as debugging aid (Bug #0000078).
+  - (actions.c) Efun remove_action() didn't check if the sentence under
+       scrutiny is a true verb or a shadow sentence - this caused a crash
+       if a shadow object executed remove_action(1, shadowee) (Bug #0000080).
 ")
-(New-Version-Log ""
+(New-Version-Log 
+""
 )
-(Checkin-Time "Sun, 11 Jul 2004 22:07:43 -0600")
+(Checkin-Time "Mon, 12 Jul 2004 21:44:40 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -106,8 +108,8 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.77 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.635 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.364 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.636 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.365 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -163,7 +165,7 @@
   (src/access_check.c (lpmud/d/14_access_che 1.15.1.5 644))
   (src/alloca.c (lpmud/d/13_alloca.c 1.11 644))
   (src/actions.h (lpmud/d/11_actions.h 1.6.1.7 644))
-  (src/actions.c (lpmud/d/12_actions.c 1.15.1.47 644))
+  (src/actions.c (lpmud/d/12_actions.c 1.15.1.48 644))
   (src/array.h (lpmud/f/47_array.h 1.18.1.22 644))
   (src/array.c (lpmud/d/12_array.c 1.46.1.47.1.12 644))
   (src/backend.h (lpmud/f/46_backend.h 1.20.1.7 644))

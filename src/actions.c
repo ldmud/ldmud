@@ -1900,7 +1900,7 @@ f_remove_action (svalue_t *sp)
  *
  *   int remove_action(int flag, object ob)
  *
- * if <flag> is non-0, remove all actionsdefined by the current object from
+ * if <flag> is non-0, remove all actions defined by the current object from
  * <ob> (default is this_player()).
  * Return the number of actions removed.
  */
@@ -1942,7 +1942,7 @@ f_remove_action (svalue_t *sp)
     ob = current_object;
     while ( NULL != (s = (action_t *)*sentp) )
     {
-        if (s->ob == ob && (!verb || s->verb == verb))
+        if (!SENT_IS_INTERNAL((*sentp)->type) && s->ob == ob && (!verb || s->verb == verb))
         {
 #ifdef CHECK_OBJECT_REF
             if (sentp == &ob->sent)
