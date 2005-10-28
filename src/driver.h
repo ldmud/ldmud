@@ -130,4 +130,11 @@ extern unsigned char _my_ctype[];
 /* A macro to wrap statements */
 #define MACRO(x) do { x ; } while(0)
 
+/* Determine the minimum of two values.
+ * Some systems define this in system includes.
+ */
+#ifndef MIN
+#define MIN(a,b) (((a)<(b))?(a):(b))
+#endif /* MIN */
+
 #endif /* DRIVER_H__ */

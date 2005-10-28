@@ -569,14 +569,10 @@ tls_continue_handshake (interactive_t *ip)
     {
         callback_t *cb = ip->tls_cb;
 
-        if (cb->is_lambda)
-            callback_change_object(cb, ip->ob);
-        else
-            push_ref_object(inter_sp, ip->ob, "tls_handshake");
-
         push_number(inter_sp, ret ? ret : 0);
+        push_ref_object(inter_sp, ip->ob, "tls_handshake");
 
-        (void)apply_callback(cb, cb->is_lambda ? 1 : 2);
+        (void)apply_callback(cb, 2);
 
         free_callback(cb);
         xfree(cb);
@@ -593,7 +589,7 @@ v_tls_init_connection (svalue_t *sp, int num_arg)
 /* EFUN tls_init_connection()
  *
  *   int tls_init_connection(object ob)
- *   int tls_init_connection(object ob, string fun, string|object ob, mixed extra...)
+ *   int tls_init_connection(object ob, string fun, string|object fob, mixed extra...)
  *   int tls_init_connection(object ob, closure fun, mixed extra...)
  *
  * tls_init_connection() tries to start a TLS secured connection to the
@@ -605,11 +601,11 @@ v_tls_init_connection (svalue_t *sp, int num_arg)
  *                   background
  *     number == 0: the secure connection is active.
  *
- * If the callback <fun>/<fun>:<ob> is specified, it will be called once
+ * If the callback <fun>/<fun>:<fob> is specified, it will be called once
  * the fate of the secure connection has been determined. The first argument
  * will be the return code from the handshake (errorcode < 0 on failure,
- * or 0 on success), followed by any <extra> arguments. If <fun> is a closure,
- * it will also be bound to <ob>.
+ * or 0 on success), followed by the interactive object <ob> and any <extra>
+ * arguments.
  */
 
 {
@@ -658,7 +654,7 @@ v_tls_init_connection (svalue_t *sp, int num_arg)
 
         assign_eval_cost();
 
-        error_index = setup_efun_callback(ip->tls_cb, argp+1, num_arg-1);
+        error_index = setup_efun_callback(cb, argp+1, num_arg-1);
 
         if (error_index >= 0)
         {

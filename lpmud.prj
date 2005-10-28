@@ -60,21 +60,16 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 603)
-(Parent-Version lpmud 3-3 602)
+(Project-Version lpmud 3-3 604)
+(Parent-Version lpmud 3-3 603)
 (Version-Log "
-  - (config.h.in, smalloc.c, xalloc, main.c, sysmalloc.c, xptmalloc.c)
-      New manual config.h macro MALLOC_EXT_STATISTICS enables extended
-      block statistics in smalloc. The statistics can be retrieved
-      with debug_info(DINFO_DATA, DID_MEMORY), and are also printed as
-      part of the 'status malloc' command. This is an experiment to
-      see if we can get more information about the small  heap
-      fragmentation this way.
+  - (pkg_tls.c) Corrected the callback handling for tls_init_connection()
+      (Bug #0000131).
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Thu, 16 Sep 2004 22:49:26 -0600")
+(Checkin-Time "Mon, 27 Sep 2004 21:57:55 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -112,7 +107,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.81 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.666 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.667 644))
   (HISTORY (lpmud/f/49_HISTORY 1.379 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -181,9 +176,9 @@
   (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.30 644))
   (src/closure.h (lpmud/f/44_closure.h 1.7.1.19 644))
   (src/closure.c (lpmud/d/4_closure.c 1.41.1.47.1.21 644))
-  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.95 644))
+  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.96 644))
   (src/comm.h (lpmud/d/3_comm.h 1.26.1.41 644))
-  (src/driver.h (lpmud/f/36_driver.h 1.15.1.26 644))
+  (src/driver.h (lpmud/f/36_driver.h 1.15.1.27 644))
   (src/dumpstat.h (lpmud/f/35_dumpstat.h 1.8 644))
   (src/dumpstat.c (lpmud/c/34_dumpstat.c 1.20.1.11.1.8 644))
   (src/ed.h (lpmud/f/34_ed.h 1.5.1.6 644))
@@ -329,7 +324,7 @@
   (src/pkg-pgsql.c (lpmud/d/b/39_pkg-pgsql. 1.3 644))
   (src/pkg-pgsql.h (lpmud/d/b/40_pkg-pgsql. 1.2 644))
   (src/pkg-tls.h (lpmud/e/b/10_pkg-tls.h 1.6 644))
-  (src/pkg-tls.c (lpmud/e/b/11_pkg-tls.c 1.10 644))
+  (src/pkg-tls.c (lpmud/e/b/11_pkg-tls.c 1.11 644))
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.20 644))
   (src/port.c (lpmud/39_port.c 1.17.1.9 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.17.1.4 644))
@@ -1317,7 +1312,7 @@
   (doc/efun/time (lpmud/q/44_time 1.1.1.5 644))
   (doc/efun/tls_deinit_connection (lpmud/e/b/14_tls_deinit 1.2 644))
   (doc/efun/tls_error (lpmud/e/b/15_tls_error 1.2 644))
-  (doc/efun/tls_init_connection (lpmud/e/b/16_tls_init_c 1.3 644))
+  (doc/efun/tls_init_connection (lpmud/e/b/16_tls_init_c 1.4 644))
   (doc/efun/tls_query_connection_info (lpmud/e/b/17_tls_query_ 1.5 644))
   (doc/efun/tls_query_connection_state (lpmud/e/b/18_tls_query_ 1.3 644))
   (doc/efun/to_array (lpmud/q/45_to_array 1.7 644))

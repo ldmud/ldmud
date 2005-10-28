@@ -3217,7 +3217,7 @@ get_message (char *buff)
                     DTN(("  %ld chars ready\n", ip->chars_ready));
                     if (end_of_line)
                     {
-                        printf("DEBUG: faking NL\n"); fflush(stdout);
+                        DTN(("    faking NL\n"));
                         buff[0] = '\n';
                         destix = 1;
                     }
