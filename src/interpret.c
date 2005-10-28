@@ -12858,8 +12858,6 @@ again:
          * Since the function may be redefined through inheritance, the
          * function must be searched in the current_objects program, which
          * might not be the current_program.
-         *
-         * The code is used to implement calls to non-private functions.
          */
 
         unsigned short func_index;   /* function index within program */

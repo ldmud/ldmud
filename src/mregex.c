@@ -502,7 +502,7 @@ rx_compile_data (string_t * expr, int opt, Bool from_ed)
             if (!rx_compile_re(expr, opt, from_ed, &(pHash->base)))
                 return NULL;
         }
-        return ref_regdata((regdata_t *)pHash);
+        return ref_regdata(&(pHash->base));
     }
 #endif
 
@@ -554,7 +554,7 @@ rx_compile_data (string_t * expr, int opt, Bool from_ed)
         iNumXCollisions++;
         iNumXEntries--;
         iXSizeAlloc -= sizeof(*pHash) + pHash->size;
-        free_regdata((regdata_t *)pHash);
+        free_regdata(&(pHash->base));
     }
 
     pHash = xalloc(sizeof(*pHash));
@@ -1092,10 +1092,10 @@ rx_free_subdata (regdata_t * expr)
  */
 
 {
-    if (expr->pSubs) xfree(expr->pSubs);
-    if (expr->pHints) xfree(expr->pHints);
-    xfree(expr->pProg);
-    xfree(expr->rx);
+    if (expr->pSubs)  xfree(expr->pSubs);  expr->pSubs = NULL;
+    if (expr->pHints) xfree(expr->pHints); expr->pHints = NULL;
+    if (expr->pProg)  xfree(expr->pProg);  expr->pProg = NULL;
+    if (expr->rx)     xfree(expr->rx);     expr->rx = NULL;
 } /* rx_free_subdata() */
 
 /*--------------------------------------------------------------------*/
