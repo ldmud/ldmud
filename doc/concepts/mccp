@@ -27,8 +27,8 @@ DESCRIPTION
         
         mccp-efuns:
 
-          start_mysql_compress(int telopt) (only needed with H_NOECHO)
-          end_mysql_compress(int telopt)   (only needed with H_NOECHO)
+          start_mccp_compress(int telopt) (only needed with H_NOECHO)
+          end_mccp_compress(int telopt)   (only needed with H_NOECHO)
           query_mccp(object player)
           query_mccp_stats(object player)
 

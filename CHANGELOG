@@ -1,7 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-14-May-2004 (Lars Duening)  (3.3.565)
+21-Jun-2004 (Lars Duening)  (3.3.566)
+  - (xalloc)  The memory reserves were allocated with xalloc(), but freed
+       with mem_free() - not good (reported by Heiko).
+  - (mstrings) Corrected a compiler error (thanks, Ralph!)
+
+14-Jun-2004 (Lars Duening)  (3.3.565)
   - (doc/) Corrected a number of German manpages.
   - (comm.c) net_connect() didn't compile with IPv6 (reported by Fini).
   - (mstrings, object.c) Contradicting the documentation, save_object()

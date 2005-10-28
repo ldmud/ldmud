@@ -406,7 +406,7 @@ retry_alloc (size_t size MTRACE_DECL)
     extra_jobs_to_do = MY_TRUE;
     if (reserved_user_area)
     {
-        mem_free(reserved_user_area);
+        xfree(reserved_user_area);
         reserved_user_area = NULL;
         writes(2, mess1);
         return MY_TRUE;
@@ -414,14 +414,14 @@ retry_alloc (size_t size MTRACE_DECL)
 
     if (malloc_privilege >= MALLOC_MASTER && reserved_master_area)
     {
-        mem_free(reserved_master_area);
+        xfree(reserved_master_area);
         reserved_master_area = NULL;
         writes(2, mess2);
         return MY_TRUE;
     }
     if (malloc_privilege >= MALLOC_SYSTEM && reserved_system_area)
     {
-        mem_free(reserved_system_area);
+        xfree(reserved_system_area);
         reserved_system_area = 0;
         writes(2, mess3);
         return MY_TRUE;
@@ -1506,6 +1506,51 @@ reserve_memory (void)
         }
     }
 } /* reserve_memory() */
+
+/*-------------------------------------------------------------------------*/
+void
+reallocate_reserved_areas (void)
+
+/* Try to reallocate the reserved memory areas. If this is possible,
+ * a pending slow-shutdown is canceled and the out_of_memory flag is reset.
+ */
+
+{
+    char *p;
+    malloc_privilege = MALLOC_USER;
+    if (reserved_system_size && !reserved_system_area) {
+        if ( !(reserved_system_area = xalloc((size_t)reserved_system_size)) ) {
+            slow_shut_down_to_do = 1;
+            return;
+        }
+        else {
+            p = "Reallocated System reserve.\n";
+            write(1, p, strlen(p));
+        }
+    }
+    if (reserved_master_size && !reserved_master_area) {
+        if ( !(reserved_master_area = xalloc((size_t)reserved_master_size)) ) {
+            slow_shut_down_to_do = 1;
+            return;
+        }
+        else {
+            p = "Reallocated Master reserve.\n";
+            write(1, p, strlen(p));
+        }
+    }
+    if (reserved_user_size && !reserved_user_area) {
+        if ( !(reserved_user_area = xalloc((size_t)reserved_user_size)) ) {
+            slow_shut_down_to_do = 6;
+            return;
+        }
+        else {
+            p = "Reallocated User reserve.\n";
+            write(1, p, strlen(p));
+        }
+    }
+    slow_shut_down_to_do = 0;
+    out_of_memory = MY_FALSE;
+} /* reallocate_reserved_areas() */
 
 /*-------------------------------------------------------------------------*/
 char *

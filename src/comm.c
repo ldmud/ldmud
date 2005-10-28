@@ -8945,7 +8945,7 @@ f_net_connect (svalue_t *sp)
 
         ret = connect(d, (struct sockaddr *) &target, sizeof(target));
 #else
-	d = ret = open_ipv6_conn(host, port, &target);
+        d = ret = open_ipv6_conn(host, port, &target);
 #endif
         if (ret == -1 && errno != EINPROGRESS)
         {

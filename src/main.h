@@ -56,8 +56,6 @@ extern void initialize_master_uid(void);
 extern void debug_message(const char *, ...) FORMATDEBUG(printf, 1, 2);
 extern void vdebug_message(const char *, va_list);
 
-void reallocate_reserved_areas(void);
-
 extern void write_X (int d, unsigned char i);
 extern void write_x(int d, p_uint i);
 extern void writed(int d, p_uint i);

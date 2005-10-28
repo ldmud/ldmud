@@ -1231,7 +1231,7 @@ mstring_del_slash (string_t *str MTRACE_DECL)
 
 /*-------------------------------------------------------------------------*/
 string_t *
-mstring_del_dotc (const string_t *str MTRACE_DECL)
+mstring_del_dotc (string_t *str MTRACE_DECL)
 
 /* Aliased to: del_dotc(str)
  *

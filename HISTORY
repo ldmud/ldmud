@@ -173,10 +173,10 @@ For a detailed list of all changes see the file CHANGELOG.
 14-May-2004 (Lars Duening) -- Release 3.2.11
 
     - Changed efuns:
-       + save_object(): Matching the documentation, the efun really removes
-           a trailing '.c' from the filename.
 
     - Corrected efuns:
+       + save_object(): Matching the documentation, the efun really removes
+           a trailing '.c' from the filename.
 
     - New efuns:
 

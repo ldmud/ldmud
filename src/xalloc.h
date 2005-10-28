@@ -174,5 +174,6 @@ extern void dump_malloc_trace (int d, void *adr);
 extern void get_stack_direction (void);
 extern void assert_stack_gap(void);
 extern void reserve_memory (void);
+extern void reallocate_reserved_areas(void);
 
 #endif /* XALLOC_H__ */

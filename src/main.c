@@ -693,51 +693,6 @@ debug_message(const char *a, ...)
 
 /*-------------------------------------------------------------------------*/
 void
-reallocate_reserved_areas (void)
-
-/* Try to reallocate the reserved memory areas. If this is possible,
- * a pending slow-shutdown is canceled and the out_of_memory flag is reset.
- */
-
-{
-    char *p;
-    malloc_privilege = MALLOC_USER;
-    if (reserved_system_size && !reserved_system_area) {
-        if ( !(reserved_system_area = xalloc((size_t)reserved_system_size)) ) {
-            slow_shut_down_to_do = 1;
-            return;
-        }
-        else {
-            p = "Reallocated System reserve.\n";
-            write(1, p, strlen(p));
-        }
-    }
-    if (reserved_master_size && !reserved_master_area) {
-        if ( !(reserved_master_area = xalloc((size_t)reserved_master_size)) ) {
-            slow_shut_down_to_do = 1;
-            return;
-        }
-        else {
-            p = "Reallocated Master reserve.\n";
-            write(1, p, strlen(p));
-        }
-    }
-    if (reserved_user_size && !reserved_user_area) {
-        if ( !(reserved_user_area = xalloc((size_t)reserved_user_size)) ) {
-            slow_shut_down_to_do = 6;
-            return;
-        }
-        else {
-            p = "Reallocated User reserve.\n";
-            write(1, p, strlen(p));
-        }
-    }
-    slow_shut_down_to_do = 0;
-    out_of_memory = MY_FALSE;
-} /* reallocate_reserved_areas() */
-
-/*-------------------------------------------------------------------------*/
-void
 write_x (int d, p_uint i)
 
 /* Memory safe function to write 4-byte hexvalue <i> to fd <d>. */

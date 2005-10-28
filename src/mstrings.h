@@ -98,7 +98,7 @@ extern char *     mstring_mstr_rn_str(const string_t * const pStr, size_t start,
 extern string_t * mstring_add_slash (const string_t *str MTRACE_DECL);
 extern string_t * mstring_del_slash (string_t *str MTRACE_DECL);
 extern string_t * mstring_cvt_progname (const string_t *str MTRACE_DECL);
-extern string_t * mstring_del_dotc (const string_t *str MTRACE_DECL);
+extern string_t * mstring_del_dotc (string_t *str MTRACE_DECL);
 extern string_t * mstring_add (const string_t *left, const string_t *right MTRACE_DECL);
 extern string_t * mstring_add_txt (const string_t *left, const char *right, size_t len MTRACE_DECL);
 extern string_t * mstring_add_to_txt (const char *left, size_t len, const string_t *right MTRACE_DECL);
