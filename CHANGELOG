@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+11-Jul-2004 (Lars Duening)  (3.3.572)
+  - (comm.c, actions.c) On a too long message or command, print the
+       first 200 characters as debugging aid (Bug #0000078).
+
 10-Jul-2004 (Lars Duening)  (3.3.571)
   - (interpret.c) The tracedepth was always increased, but only decreased
        when traceing was active (#0000070)

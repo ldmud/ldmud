@@ -1522,7 +1522,7 @@ v_command (svalue_t *sp, int num_arg)
 
         len = mstrsize(arg->u.str);
         if (len >= sizeof(buff) - 1)
-            error("Too long command.\n");
+            error("Command too long: '%.200s...'\n", get_txt(arg->u.str));
         strncpy(buff, get_txt(arg[0].u.str), len);
         buff[len] = '\0';
 
@@ -1579,7 +1579,7 @@ f_execute_command (svalue_t *sp)
 
     len = mstrsize(argp->u.str);
     if (len >= sizeof(buf) - 1)
-        error("Too long command.\n");
+        error("Command too long: '%.200s...'\n", get_txt(argp->u.str));
     strncpy(buf, get_txt(argp->u.str), len);
     buf[len+1] = '\0';
 

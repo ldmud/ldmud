@@ -350,10 +350,10 @@ mkfunc.o : make_func.c ../mudlib/sys/driver_hook.h hash.h exec.h \
     hosts/be/be.h machine.h
 
 mregex.o : ../mudlib/sys/regexp.h ../mudlib/sys/debug_info.h xalloc.h \
-    svalue.h strfuns.h simulate.h regexp.h pkg-pcre.h mstrings.h hash.h \
-    gcollect.h comm.h mregex.h driver.h typedefs.h sent.h bytecode.h \
-    pcre/pcre.h pkg-tls.h port.h config.h hosts/unix.h hosts/be/be.h \
-    machine.h
+    svalue.h strfuns.h simulate.h regexp.h pkg-pcre.h mstrings.h \
+    interpret.h hash.h gcollect.h comm.h mregex.h driver.h typedefs.h \
+    sent.h bytecode.h pcre/pcre.h pkg-tls.h port.h config.h hosts/unix.h \
+    hosts/be/be.h machine.h
 
 mstrings.o : ../mudlib/sys/debug_info.h xalloc.h svalue.h strfuns.h \
     stdstrings.h simulate.h main.h hash.h gcollect.h mstrings.h driver.h \

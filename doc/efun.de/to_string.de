@@ -13,8 +13,8 @@ ANMERKUNG
         Zeichencodes. Sie werden bis zur ersten 0 oder bis zum ersten
         nicht-numerischen Eintrag "implodet", je nachdem, was zuerst eintritt.
 
-        Das bedeutet, dass to_string( ({ 33, 34 }) ); "12" liefert, und nicht
-        "({ 33, 34 })"
+        Das bedeutet, dass to_string( ({ 49, 50 }) ); "12" liefert, und nicht
+        "({ 49, 50 })"
 
 BUGS
         Die Cast-Schreibweise funktioniert nur, wenn der genaue Wert von

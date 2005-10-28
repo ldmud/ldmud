@@ -170,7 +170,7 @@ For a detailed list of all changes see the file CHANGELOG.
            x509 key- and certfile for the TLS package.
 
 
-10-Jul-2004 (Lars Duening) -- Release 3.2.11
+11-Jul-2004 (Lars Duening) -- Release 3.2.11
 
     - Changed efuns:
 
@@ -188,6 +188,8 @@ For a detailed list of all changes see the file CHANGELOG.
 
     - Runtime:
        + The tracedepth wasn't calculated correctly.
+       + A 'Command too long' error now also prints the beginning of the
+         offending command as debugging aid.
 
     - Other Changes:
 

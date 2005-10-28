@@ -1934,6 +1934,8 @@ add_message (const char *fmt, ...)
             va_end(va);
             if (buff[(sizeof buff) - 1])
             {
+                debug_message("%s Message too long: '%.200s...'\n"
+                             , time_stamp(), buff);
                 comm_fatal(ip, "Message too long!\n");
                 return;
             }
@@ -3135,7 +3137,7 @@ get_message (char *buff)
              * start with a new buffer for it!
              *
 #ifndef SIMULATE_CHARMODE
-             * TODO: I dont think that it is nessesary to disable charmode if
+             * TODO: I dont think that it is neccesary to disable charmode if
              * TODO:: the client refuses to use it. The disadvantage of the
              * TODO:: present behaviour is a confused lpc object (which could
              * TODO:: not know if it gets linemode-lines). The charmode code

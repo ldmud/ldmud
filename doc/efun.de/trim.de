@@ -23,7 +23,7 @@ BESCHREIBUNG
 
 BEISPIEL
         trim("    1234    ");                       ergibt: "1234"
-        trim("    1234    ", TRIM_RIGHT);           ergibt: "1234"
+        trim("    1234    ", TRIM_RIGHT);           ergibt: "    1234"
         trim("    1234    ", TRIM_BOTH, " 1");      ergibt: "234"
 
 AENDERUNGEN

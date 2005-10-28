@@ -363,11 +363,9 @@ backend (void)
 {
     char buff[MAX_TEXT+4];
         /* Note that the size of buff[] is determined by MAX_TEXT, which
-         * is the max size of the network receive buffer. Iow: no
-         * buffer overruns possible.
+         * is the max size of the network receive buffer. IOW: no
+         * buffer overruns are possible.
          */
-
-
 
     /*
      * Set up.
