@@ -201,6 +201,7 @@ extern object_t *previous_ob;
 extern svalue_t driver_hook[];
 
 extern int num_error;
+extern int num_warning;
 extern string_t *current_error;
 extern string_t *current_error_file;
 extern string_t *current_error_object_name;

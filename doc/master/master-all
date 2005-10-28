@@ -164,6 +164,9 @@ DESCRIPTION
         void runtime_error (string err, string prg, string curobj, int line)
           Announce a runtime error.
 
+        void runtime_warning (string msg, string curobj, string prg, int line)
+          Announce a runtime warning.
+
         -----------------------------------------------------------------
             Security and Permissions
 

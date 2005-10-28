@@ -162,6 +162,7 @@ VALID_SETEUID   "valid_seteuid"
 VALID_SNOOP     "valid_snoop"
 VALID_TRACE     "valid_trace"
 VALID_WRITE     "valid_write"
+WARNING         "runtime_warning"
 
 #ifdef USE_DEPRECATED
 

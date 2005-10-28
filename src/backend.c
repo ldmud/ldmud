@@ -185,6 +185,7 @@ clear_state (void)
     previous_ob = NULL;
     current_prog = NULL;
     reset_machine(MY_FALSE);   /* Pop down the stack. */
+    num_warning = 0;
 }
 
 /*-------------------------------------------------------------------------*/

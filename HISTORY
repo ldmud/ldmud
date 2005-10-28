@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-17-May-2004 (Lars Duening) -- Development Release 3.3
+18-May-2004 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -73,6 +73,7 @@ For a detailed list of all changes see the file CHANGELOG.
        + to_struct(): Convert an array into a struct.
 
     - Master Object:
+       + Function runtime_warning() is called for runtime warnings.
 
     - Fixed Crashers:
        + The driver crashed when a private lfun shadowing

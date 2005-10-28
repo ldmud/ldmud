@@ -51,4 +51,5 @@ HISTORY
 
 
 SEE ALSO
-        log_error(M), heart_beat_error(M), raise_error(E), expand_define(E)
+        log_error(M), heart_beat_error(M), runtime_warning(M),
+        raise_error(E), expand_define(E)

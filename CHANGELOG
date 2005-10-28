@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+18-May-2004 (Lars Duening)  (3.3.551)
+  - (simulate, backend.c, string_spec) Runtime errors are now also passed
+      to the master function runtime_warning().
+
 18-May-2004 (Lars Duening)  (3.3.550)
   - (efuns.c) Bah, forgot the 'MTRACE_ARG' to the call of
       mstring_cvt_progname(), so the file didn't compile when MALLOC_TRACE

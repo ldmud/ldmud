@@ -111,6 +111,9 @@
 // void runtime_error (string err, string prg, string curobj, int line)
 //   Announce a runtime error.
 //
+// void runtime_warning (string msg, string curobj, string prg, int line)
+//   Announce a runtime warning.
+//
 //---------------------------------------------------------------------------
 //     Security and Permissions
 //
@@ -803,6 +806,27 @@ void runtime_error (string err, string prg, string curobj, int line
 //              , err, prg, curobj, line);
 //   }
 
+
+//---------------------------------------------------------------------------
+void runtime_warning (string msg, string curobj, string prg, int line)
+
+// Announce a runtime warning.
+//
+// Arguments:
+//   err    : The warning message.
+//   curobj : The object causing the warning, may be 0.
+//   prg    : The executed program, may be 0.
+//   line   : The line number where the warning occured.
+//
+// This function is to allow the mudlib to handle runtime warnings, for
+// example to log them into a database.
+//
+// Note that <prg> denotes the program actually executed (which might be
+// inherited) whereas <curobj> is just the offending object for which the
+// program was executed.
+// 
+// The driver imposes a limit of three nested warnings, to prevent endless
+// recursions.
 
 
 //===========================================================================

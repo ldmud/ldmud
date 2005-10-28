@@ -230,7 +230,11 @@ int num_error = 0;
   /* Number of recursive calls to error().
    */
 
-static char emsg_buf[2000];
+int num_warning = 0;
+  /* Number of recursive calls to warnf().
+   */
+
+static char emsg_buf[10000];
   /* The buffer for the error message to be created.
    */
 
@@ -673,7 +677,7 @@ error (const char *fmt, ...)
     string_t *malloced_file = NULL;  /* copy of program name */
     string_t *malloced_name = NULL;  /* copy of the object name */
     object_t *curobj = NULL;         /* Verified current object */
-    char      fixed_fmt[10000];
+    char      fixed_fmt[2000];
       /* Note: When changing this buffer, also change the HEAP_STACK_GAP
        * limit in xalloc.c!
        */
@@ -1071,27 +1075,29 @@ void
 warnf (char *fmt, ...)
 
 /* A system runtime warning occured: generate a message from printf-style
- * <fmt> with a timestamp, and print it using debug_message().
+ * <fmt> with a timestamp, and print it using debug_message(). The message
+ * is also passed to master::runtime_warning().
  *
  * Note: Both 'warn' and 'warning' are already taken on some systems.
- * TODO: Extend this to let the mudlib handle warnings.
  * TODO: Add a pwarnf(<prefmt>, <postfmt>,...) function which translates the
  * TODO:: errno into a string and calls error(<prefmt><errmsg><postfmt>, ...).
  */
 
 {
     char     *ts;
-    string_t *file;                  /* program name */
+    string_t *file = NULL;           /* program name */
     object_t *curobj = NULL;         /* Verified current object */
-    char      msg_buf[2000];
+    char      msg_buf[10000];
       /* The buffer for the error message to be created.
        */
-    char      fixed_fmt[10000];
+    char      fixed_fmt[2000];
       /* Note: When changing this buffer, also change the HEAP_STACK_GAP
        * limit in xalloc.c!
        */
     mp_int    line_number = 0;
     va_list   va;
+
+    num_warning++;
 
     ts = time_stamp();
 
@@ -1125,10 +1131,47 @@ warnf (char *fmt, ...)
         debug_message("%s program: %s, object: %s line %ld\n"
                      , ts, get_txt(file), get_txt(curobj->name)
                      , line_number);
-        free_mstring(file);
     }
 
     fflush(stdout);
+
+    if (num_warning < 3)
+    {
+        /* Call master::runtime_warning().
+         */
+
+        object_t * save_cmd = command_giver;
+
+        put_c_string(++inter_sp, msg_buf);
+        if (curobj)
+        {
+            if (compat_mode)
+                push_ref_string(inter_sp, curobj->name);
+            else
+                push_string(inter_sp, add_slash(curobj->name));
+        }
+        else
+            push_number(inter_sp, 0);
+        if (file)
+            push_ref_string(inter_sp, file);
+        else
+            push_number(inter_sp, 0);
+        push_number(inter_sp, line_number);
+
+        apply_master(STR_WARNING, 4);
+        command_giver = save_cmd;
+    }
+    else
+    {
+        if (file)
+            free_mstring(file);
+        error("Too many nested warnings.\n");
+    }
+
+    if (file)
+        free_mstring(file);
+    
+    num_warning--;
 } /* warnf() */
 
 /*-------------------------------------------------------------------------*/
