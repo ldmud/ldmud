@@ -1,11 +1,15 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-27-Sep-2004 (Lars Duening)  (3.3.605)
+29-Sep-2004 (Lars Duening)  (3.3.605)
+  - (smalloc.c) Corrected a bug in the SMALLOC_ORDER_FREELIST code for
+      small blocks: the code forgot to store the block size into the
+      free blocks, which caused the defragment code to do wondrous things
+      (reported by Bardioc).
+
+27-Sep-2004 (Lars Duening)  (3.3.604)
   - (pkg_tls.c) Corrected the callback handling for tls_init_connection()
       (Bug #0000131).
-
-22-Sep-2004 (Lars Duening)  (3.3.604)
   - (driver.h) Added a macro MIN() for those systems which don't have it.
 
 16-Sep-2004 (Lars Duening)  (3.3.603)

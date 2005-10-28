@@ -1081,7 +1081,7 @@ rx_reganch (regexp_t *pRegexp)
         return MY_FALSE;
 
     /* Traditional regexp */
-    return pRegexp->data->rx->reganch != NULL;
+    return pRegexp->data->rx->reganch != 0;
 } /* rx_reganch() */
 
 /*--------------------------------------------------------------------*/

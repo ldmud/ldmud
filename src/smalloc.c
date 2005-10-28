@@ -1149,6 +1149,9 @@ void MAKE_SMALL_FREE (word_t *block, word_t bsize)
 
     if (head)
         head[M_PLINK(head[M_SIZE] & M_MASK)] = (word_t)block | flag;
+
+    if (flag)
+        block[M_PLINK(bsize)-1] = bsize;
 #else
     if (head)
         head[M_PLINK(head[M_SIZE] & M_MASK)] = (word_t)block | flag;
