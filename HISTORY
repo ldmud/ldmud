@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-30-Apr-2004 (Lars Duening) -- Development Release 3.3
+17-May-2004 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -28,6 +28,8 @@ For a detailed list of all changes see the file CHANGELOG.
            linenumber of a function.
        + garbage_collection(): An optional flag argument allows to change
             the name of the default GC log file.
+       + get_type_info(): The name of the defining program of a lfun or
+            context closure can be returned.
        + map(): The efun can now map strings as well.
        + make_shared_string(): Deprecated.
        + mkmapping(): Convert structs to mappings, too.

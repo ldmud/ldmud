@@ -22,6 +22,10 @@ DESCRIPTION
         If <arg> is a struct, the <flag> setting 2 lets the efun
         return the base name of the struct.
 
+        If <arg> is a lfun or context closure, the <flag> setting 3 lets the
+        efun return the name of the program the closure was defined in. For
+        other closures, <flag> setting 3 returns 0.
+
         For every other <flag> setting, -1 is returned.
 
         The secondary information is:
@@ -45,6 +49,7 @@ HISTORY
           the object from a lambda closure or bound-lambda closure.
         In the 3.2 branch, the 'flag' argument could be of any type.
         LDMud 3.3.276 added the secondary information for structs.
+        LDMud 3.3.548 added flag setting '3' for lfun/context closures.
 
 SEE ALSO
         debug_info(E), typeof(E), to_object(E)

@@ -403,6 +403,10 @@ remove_wiz_list (void)
     for (w = all_wiz; w; w = wl)
     {
         free_mstring(w->name);
+        if (w->file_name)
+            free_mstring(w->file_name);
+        if (w->error_message)
+            free_mstring(w->error_message);
         wl = w->next;
         xfree(w);
     }
@@ -806,8 +810,13 @@ clear_ref_from_wiz_list (void)
 {
     wiz_list_t *w;
 
-    for (w = all_wiz; w; w = w->next) {
+    for (w = all_wiz; w; w = w->next)
+    {
         clear_ref_in_vector(&w->extra, 1);
+        if(w->file_name)
+            clear_string_ref(w->file_name);
+        if(w->error_message)
+            clear_string_ref(w->error_message);
     }
     clear_ref_in_vector(&default_wizlist_entry.extra, 1);
 } /* clear_ref_from_wiz_list() */

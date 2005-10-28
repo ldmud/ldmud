@@ -56,6 +56,9 @@
  *     void reference_destructed_object(object_t *ob)
  *         Note the reference to a destructed object <ob>.
  *
+ *     void clear_string_ref(string_t *p)
+ *         Clear the refcount in string <p>.
+ *
  *     void count_ref_from_string(string_t *p);
  *         Count the reference to string <p>.
  *
@@ -822,6 +825,17 @@ void gc_note_malloced_block_ref (void *p) { gc_note_ref(p); }
 
 /*-------------------------------------------------------------------------*/
 void
+clear_string_ref (string_t *p)
+
+/* Clear the references in string <p>
+ */
+
+{
+    p->info.ref = 0;
+} /* clear_string_ref() */
+
+/*-------------------------------------------------------------------------*/
+void
 clear_program_ref (program_t *p, Bool clear_ref)
 
 /* Clear the refcounts of all inherited programs and other associated
@@ -836,7 +850,7 @@ clear_program_ref (program_t *p, Bool clear_ref)
     if (clear_ref)
     {
         p->ref = 0;
-        p->name->info.ref = 0;
+        clear_string_ref(p->name);
     }
 
     /* Variables */
@@ -901,7 +915,7 @@ clear_object_ref (object_t *p)
         p->extra_ref = p->ref;
 #endif
         p->ref = 0;
-        p->name->info.ref = 0;
+        clear_string_ref(p->name);
         if (p->prog->blueprint
          && (p->prog->blueprint->flags & O_DESTRUCTED)
          && p->prog->blueprint->ref
@@ -1189,6 +1203,11 @@ clear_ref_in_vector (svalue_t *svp, size_t num)
              */
             clear_object_ref(p->u.ob);
             continue;
+
+        case T_STRING:
+        case T_SYMBOL:
+            clear_string_ref(p->u.str);
+            break;
 
         case T_POINTER:
         case T_QUOTED_ARRAY:
@@ -1763,7 +1782,7 @@ garbage_collection(void)
         clear_program_ref(ob->prog, clear_prog_ref);
 
         ob->ref = 0;
-        ob->name->info.ref = 0;
+        clear_string_ref(ob->name);
         clear_ref_in_vector(ob->variables, ob->prog->num_variables);
         if (ob->flags & O_SHADOW)
         {

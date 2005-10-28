@@ -18,6 +18,10 @@ BESCHREIBUNG
         lfun closures' ist das das Objekt, in dem die Closure definiert ist,
         nicht das Objekt, an das die Closure gebunden ist.)
 
+        Wenn <arg> eine LFun/Context-Closure enthaelt, so kann get_type_info()
+        den Namen des definierenden Programmes liefern, wenn fuer <flag> 3
+        gesetzt ist. Fur andere Closures wird 0 zurueckgegeben.
+
         Fuer jeden anderen Wert fuer <flag> liefert die Funktion -1.
 
         Die zusaetzlichen Informationen (also der zweite Eintrag des Arrays)
@@ -26,6 +30,7 @@ BESCHREIBUNG
           - fuer Symbole und gequotete Arrays die Anzahl Quotes.
           - fuer Closures den (internen) Typ der Closure.
           - fuer gemeinsam verwendete Strings 0, ungleich 0 fuer andere Strings
+          - fuer structs der eindeutige Identifizierungsstring
           - -1 fuer alle anderen Datentypen
 
 BUGS
@@ -40,6 +45,8 @@ AENDERUNGEN
             von Lamda Closures und gebundenen Lambda Closures.
         Bis und mit 3.2.7 lieferte get_type_info(closure, 2) keine Objekte von
             Efun-, Simul-Efun- oder Operator-Closures.
+        LDMud 3.3.276 fuegte die zusaetzliche Information fuer structs hinzu.
+        LDMud 3.3.548 fuegte Flagwert '3' hinzu.
 
 SIEHE AUCH
         debug_info(E), typeof(E), to_object(E)

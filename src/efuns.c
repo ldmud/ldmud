@@ -6076,6 +6076,10 @@ v_get_type_info (svalue_t *sp, int num_arg)
  * If <arg> is a struct, the <flag> setting 2 lets the efun
  * return the basic name of the struct.
 #endif
+ * If <arg> is a lfun or context closure, the <flag> setting 3 lets the efun
+ * return the name of the program the closure was defined in. For other
+ * closures, <flag> setting 3 returns 0.
+ *
  * For every other <flag> setting, -1 is returned.
  *
  * The secondary information is:
@@ -6145,7 +6149,34 @@ v_get_type_info (svalue_t *sp, int num_arg)
             return sp;
             /* NOTREACHED */
         }
+        if (num_arg == 2 && sp->type == T_NUMBER && sp->u.number == 3)
+        {
+            string_t  *progname = NULL;
+
+            sp--;
+            if (sp->x.closure_type == CLOSURE_LFUN)
+            {
+                program_t *prog;
+                string_t  *function_name;
+                Bool       is_inherited;
+
+                closure_lookup_lfun_prog(sp->u.lambda, &prog, &function_name, &is_inherited);
+
+                memsafe(progname = mstring_cvt_progname(prog->name)
+                       , mstrsize(prog->name)
+                       , "closure program name");
+            }
+
+            free_svalue(sp);
+            if (!progname)
+                put_number(sp, 0);
+            else
+                put_string(sp, progname);
+            return sp;
+            /* NOTREACHED */
+        }
         /* FALLTHROUGH */
+
     case T_SYMBOL:
     case T_QUOTED_ARRAY:
         j = argp->x.generic;

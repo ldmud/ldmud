@@ -5046,6 +5046,66 @@ is_undef_closure (svalue_t *sp)
 } /* is_undef_closure() */
 
 /*-------------------------------------------------------------------------*/
+void
+closure_lookup_lfun_prog ( lambda_t * l
+                         , program_t ** pProg
+                         , string_t ** pName
+                         , Bool * pIsInherited
+                         )
+
+/* For lfun/context closure <l>, lookup the defining program and
+ * function name, and store the pointers (uncounted) in *<pProg>
+ * and *<pName>. If the closure is defined in a program inherited
+ * by <l>->function.lfun.ob, *<pIsInherited> is set to TRUE.
+ *
+ * The results are undefined if called for non-lfun/context closures.
+ *
+ * The function is used by closure_to_string() and the get_type_info()
+ * efun.
+ */
+
+{
+    object_t  *ob;
+    int        ix;
+    program_t *prog;
+    fun_hdr_p  fun;
+    funflag_t  flags;
+    inherit_t *inheritp;
+    Bool       is_inherited;
+
+    ob = l->function.lfun.ob;
+    ix = l->function.lfun.index;
+
+    /* Get the program resident */
+    if (O_PROG_SWAPPED(ob)) {
+        ob->time_of_ref = current_time;
+        if (load_ob_from_swap(ob) < 0)
+            error("Out of memory\n");
+    }
+
+    /* Find the true definition of the function */
+    prog = ob->prog;
+    flags = prog->functions[ix];
+    is_inherited = MY_FALSE;
+    while (flags & NAME_INHERITED)
+    {
+        is_inherited = MY_TRUE;
+        inheritp = &prog->inherit[flags & INHERIT_MASK];
+        ix -= inheritp->function_index_offset;
+        prog = inheritp->prog;
+        flags = prog->functions[ix];
+    }
+
+    /* Copy the function name pointer (a shared string) */
+    fun = prog->program + (flags & FUNSTART_MASK);
+    memcpy(pName, FUNCTION_NAMEP(fun) , sizeof *pName);
+
+    /* Copy the other result values */
+    *pProg = prog;
+    *pIsInherited = is_inherited;
+} /* closure_lookup_lfun_prog() */
+
+/*-------------------------------------------------------------------------*/
 const char *
 closure_operator_to_string (int type)
 
@@ -5139,7 +5199,6 @@ closure_to_string (svalue_t * sp, Bool compact)
     string_t *rc;
     lambda_t *l;
     object_t *ob;
-    int ix;
 
     rc = NULL;
     buf[sizeof(buf)-1] = '\0';
@@ -5192,10 +5251,7 @@ closure_to_string (svalue_t * sp, Bool compact)
     case CLOSURE_LFUN: /* Lfun closure */
       {
         program_t *prog;
-        fun_hdr_p  fun;
-        funflag_t  flags;
         string_t  *function_name;
-        inherit_t *inheritp;
         Bool       is_inherited;
 
         /* For alien lfun closures, prepend the object the closure
@@ -5218,42 +5274,15 @@ closure_to_string (svalue_t * sp, Bool compact)
         }
 
         ob = l->function.lfun.ob;
-        ix = l->function.lfun.index;
+
+        closure_lookup_lfun_prog(l, &prog, &function_name, &is_inherited);
 
         if (ob->flags & O_DESTRUCTED)
-        {
             strcat(buf, compact ? "<dest lfun>" 
                                 : "<local function in destructed object>");
-            break;
-        }
+        else
+            strcat(buf, get_txt(ob->name));
 
-        /* Get the program resident */
-        if (O_PROG_SWAPPED(ob)) {
-            ob->time_of_ref = current_time;
-            if (load_ob_from_swap(ob) < 0)
-                error("Out of memory\n");
-        }
-
-        /* Find the true definition of the function */
-        prog = ob->prog;
-        flags = prog->functions[ix];
-        is_inherited = MY_FALSE;
-        while (flags & NAME_INHERITED)
-        {
-            is_inherited = MY_TRUE;
-            inheritp = &prog->inherit[flags & INHERIT_MASK];
-            ix -= inheritp->function_index_offset;
-            prog = inheritp->prog;
-            flags = prog->functions[ix];
-        }
-
-        /* Copy the function name pointer (a shared string) */
-        fun = prog->program + (flags & FUNSTART_MASK);
-        memcpy(&function_name, FUNCTION_NAMEP(fun)
-              , sizeof function_name
-        );
-
-        strcat(buf, get_txt(ob->name));
         if (is_inherited)
         {
             strcat(buf, "(");

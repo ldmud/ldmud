@@ -514,10 +514,9 @@ yes
 
 dnl Checking for headers
 
+AC_HEADER_STDC
 AC_CHECK_HEADERS(sys/rusage.h sys/time.h unistd.h stdlib.h libc.h memory.h)
 AC_CHECK_HEADERS(values.h string.h bstring.h netdb.h crypt.h sys/param.h sys/termios.h)
-AC_HEADER_STDC
-AC_CHECK_HEADERS(stdint.h inttypes.h)
 dnl extra check for <limits.h>; must be there!
 AC_CHECK_HEADERS(limits.h)
 AC_HEADER_DIRENT

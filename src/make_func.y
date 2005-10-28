@@ -230,7 +230,7 @@
   /* The configuration file.
    */
 
-#define MACHINE_H    "machine.h"
+#define FILE_MACHINE "machine.h"
   /* The machine configuration file.
    */
 
@@ -1080,7 +1080,7 @@ stringdef: ID NAME
 
 /*                            L E X E R                                    */
 
-/* The Lexer is used to parse CONFIG, MACHINE_H, FUNC_SPEC and STRING_SPEC,
+/* The Lexer is used to parse CONFIG, FILE_MACHINE, FUNC_SPEC and STRING_SPEC,
  * and to create THE_LANG from PRO_LANG.
  */
 
@@ -2674,7 +2674,7 @@ read_config (void)
 static void
 read_machine (void)
 
-/* Read the file MACHINE_H to learn about the defines used by the machine.
+/* Read the file FILE_MACHINE to learn about the defines used by the machine.
  */
 
 {
@@ -2696,9 +2696,9 @@ read_machine (void)
     add_define("TRACE_CODE",-1,"");
 #endif
 
-    /* --- Read in MACHINE_H to see what defines are used by the gamedriver ---
+    /* --- Read in FILE_MACHINE to see what defines are used by the gamedriver ---
      */
-    read_config_file(MACHINE_H);
+    read_config_file(FILE_MACHINE);
 
 } /* read_machine() */
 
