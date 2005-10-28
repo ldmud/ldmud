@@ -3682,7 +3682,7 @@ parse_number (char * cp, unsigned long * p_num)
     char c;
     unsigned long l;
     unsigned long base = 10;
-    unsigned long prev_l = 0;
+    unsigned long max_shiftable = ULONG_MAX / base;
     Bool overflow = MY_FALSE;
 
     c = *cp++;
@@ -3710,13 +3710,13 @@ parse_number (char * cp, unsigned long * p_num)
         case 'b': case 'B':
           {
             l = 0;
+            max_shiftable = ULONG_MAX / 2;
             --cp;
             while('0' == (c = *++cp) || '1' == c)
             {
+                overflow = overflow || (l > max_shiftable);
                 l <<= 1;
                 l += c - '0';
-                overflow = overflow || (l <= prev_l);
-                prev_l = l;
             }
 
             *p_num = overflow ? LONG_MAX : l;
@@ -3726,6 +3726,7 @@ parse_number (char * cp, unsigned long * p_num)
         case 'o': case 'O':
             c = '0';
             base = 8;
+            max_shiftable = ULONG_MAX / base;
             break;
 
         default:
@@ -3746,16 +3747,16 @@ parse_number (char * cp, unsigned long * p_num)
         /* strtol() gets the sign bit wrong,
          * strtoul() isn't portable enough.
          */
+        max_shiftable = ULONG_MAX / 16;
         l = 0;
         --cp;
         while(leXdigit(c = *++cp))
         {
+            overflow = overflow || (l > max_shiftable);
             if (c > '9')
                 c = (char)((c & 0xf) + ( '9' + 1 - ('a' & 0xf) ));
             l <<= 4;
             l += c - '0';
-            overflow = overflow || (l <= prev_l);
-            prev_l = l;
         }
         *p_num = overflow ? LONG_MAX : l;
         return cp;
@@ -3763,12 +3764,12 @@ parse_number (char * cp, unsigned long * p_num)
 
     /* Parse a normal number from here */
 
+    max_shiftable = ULONG_MAX / base;
     l = c - '0';
     while (lexdigit(c = *cp++) && c < (char)('0'+base))
     {
+        overflow = overflow || (l > max_shiftable);
         l = l * base + (c - '0');
-        overflow = overflow || (l <= prev_l);
-        prev_l = l;
     }
 
     *p_num = overflow ? LONG_MAX : l;

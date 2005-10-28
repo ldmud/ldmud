@@ -4998,7 +4998,7 @@ f_to_int (svalue_t *sp)
         }
 
         end = lex_parse_number(cp, &num);
-        if (end != cp && num <= PINT_MAX)
+        if (end != cp)
         {
             n = (p_int)num;
             if (hasMinus)

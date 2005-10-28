@@ -11594,7 +11594,10 @@ index_range :
           $3.end++;
 
           if (!pragma_warn_deprecated)
+          {
               ins_byte(F_NO_WARN_DEPRECATED);
+              $3.end++;
+          }
 
           /* Return the data */
 
@@ -11634,7 +11637,10 @@ index_range :
           $4.end++;
 
           if (!pragma_warn_deprecated)
+          {
               ins_byte(F_NO_WARN_DEPRECATED);
+              $4.end++;
+          }
 
           /* Return the data */
 
@@ -11674,7 +11680,10 @@ index_range :
           $4.end++;
 
           if (!pragma_warn_deprecated)
+          {
               ins_byte(F_NO_WARN_DEPRECATED);
+              $4.end++;
+          }
 
           /* Return the data */
 
@@ -11689,7 +11698,10 @@ index_range :
     | '['     expr0 L_RANGE     expr0 ']'
       {
           if (!pragma_warn_deprecated)
+          {
               ins_byte(F_NO_WARN_DEPRECATED);
+              $4.end++;
+          }
 
           $$.inst  = F_RANGE;
           $$.start = $2.start;
@@ -11702,7 +11714,10 @@ index_range :
     | '['     expr0 L_RANGE '<' expr0 ']'
       {
           if (!pragma_warn_deprecated)
+          {
               ins_byte(F_NO_WARN_DEPRECATED);
+              $5.end++;
+          }
 
           $$.inst  = F_NR_RANGE;
           $$.start = $2.start;
@@ -11715,7 +11730,10 @@ index_range :
     | '[' '<' expr0 L_RANGE     expr0 ']'
       {
           if (!pragma_warn_deprecated)
+          {
               ins_byte(F_NO_WARN_DEPRECATED);
+              $5.end++;
+          }
 
           $$.inst  = F_RN_RANGE;
           $$.start = $3.start;
@@ -11728,7 +11746,10 @@ index_range :
     | '[' '<' expr0 L_RANGE '<' expr0 ']'
       {
           if (!pragma_warn_deprecated)
+          {
               ins_byte(F_NO_WARN_DEPRECATED);
+              $6.end++;
+          }
 
           $$.inst  = F_RR_RANGE;
           $$.start = $3.start;
@@ -11741,7 +11762,10 @@ index_range :
     | '['     expr0 L_RANGE '>' expr0 ']'
       {
           if (!pragma_warn_deprecated)
+          {
               ins_byte(F_NO_WARN_DEPRECATED);
+              $5.end++;
+          }
 
           $$.inst  = F_NA_RANGE;
           $$.start = $2.start;
@@ -11754,7 +11778,10 @@ index_range :
     | '[' '>' expr0 L_RANGE     expr0 ']'
       {
           if (!pragma_warn_deprecated)
+          {
               ins_byte(F_NO_WARN_DEPRECATED);
+              $5.end++;
+          }
 
           $$.inst  = F_AN_RANGE;
           $$.start = $3.start;
@@ -11767,7 +11794,10 @@ index_range :
     | '[' '<' expr0 L_RANGE '>' expr0 ']'
       {
           if (!pragma_warn_deprecated)
+          {
               ins_byte(F_NO_WARN_DEPRECATED);
+              $6.end++;
+          }
 
           $$.inst  = F_RA_RANGE;
           $$.start = $3.start;
@@ -11780,7 +11810,10 @@ index_range :
     | '[' '>' expr0 L_RANGE '<' expr0 ']'
       {
           if (!pragma_warn_deprecated)
+          {
               ins_byte(F_NO_WARN_DEPRECATED);
+              $6.end++;
+          }
 
           $$.inst  = F_AR_RANGE;
           $$.start = $3.start;
@@ -11793,7 +11826,10 @@ index_range :
     | '[' '>' expr0 L_RANGE '>' expr0 ']'
       {
           if (!pragma_warn_deprecated)
+          {
               ins_byte(F_NO_WARN_DEPRECATED);
+              $6.end++;
+          }
 
           $$.inst  = F_AA_RANGE;
           $$.start = $3.start;
@@ -11806,7 +11842,10 @@ index_range :
     | '['     expr0 L_RANGE           ']'
       {
           if (!pragma_warn_deprecated)
+          {
               ins_byte(F_NO_WARN_DEPRECATED);
+              $2.end++;
+          }
 
           $$.inst  = F_NX_RANGE;
           $$.start = $2.start;
@@ -11823,7 +11862,10 @@ index_range :
            */
 
           if (!pragma_warn_deprecated)
+          {
               ins_byte(F_NO_WARN_DEPRECATED);
+              $3.end++;
+          }
 
           $$.inst  = F_RX_RANGE;
           $$.start = $3.start;
@@ -11840,7 +11882,10 @@ index_range :
            */
 
           if (!pragma_warn_deprecated)
+          {
               ins_byte(F_NO_WARN_DEPRECATED);
+              $3.end++;
+          }
 
           $$.inst  = F_AX_RANGE;
           $$.start = $3.start;

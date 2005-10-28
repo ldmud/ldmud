@@ -1,6 +1,14 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+22-Dec-2004 (Lars Duening)  (3.3.633)
+  - (prolang.y) The no-warn-deprecated opcodes weren't included in the
+       size calculations for the lvalue indexing shuffling.
+  - (lex.c, efuns.c) The overflow checking in the number parsing routine
+       was overeager, causing Evermore to no longer boot. The checking
+       now really compares against the largest possible number, instead
+       of simply checking the sign (Bug #0000327).
+
 21-Dec-2004 (Lars Duening)  (3.3.632)
   - (lex.c) The number parsing now recognizes overflows and forces these
        numbers to be LONG_MAX (Bug #0000327).
