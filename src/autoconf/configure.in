@@ -121,7 +121,7 @@ AC_MY_ARG_ENABLE(use-mccp,no,,[Enables MCCP support])
 AC_MY_ARG_ENABLE(use-mysql,no,,[Enables mySQL support])
 AC_MY_ARG_ENABLE(use-pgsql,no,,[Enables PostgreSQL support])
 AC_MY_ARG_ENABLE(use-pthreads,no,,[enable using of threads for socket writes])
-AC_MY_ARG_ENABLE(use-pcre,yes,,[Enables PCRE instead of traditional regexps])
+AC_MY_ARG_ENABLE(use-pcre,yes,,[Enables PCRE: no/yes/builtin])
 AC_MY_ARG_ENABLE(use-deprecated,yes,,[Enables obsolete and deprecated efuns])
 AC_MY_ARG_ENABLE(use-structs,yes,,[Enables structs])
 AC_MY_ARG_ENABLE(use-tls,no,,[Enables Transport Layer Security over Telnet: no/gnu/ssl/yes])
@@ -250,6 +250,23 @@ else
   erq_sub=
 fi
 
+AC_UPDATE_VAR(enable_use_pcre)
+if test "x$enable_use_pcre" = "x" || test "x$enable_use_pcre" = "xyes"; then
+  cdef_use_pcre="#define"
+  cdef_use_builtin_pcre="#undef"
+  enable_use_builtin_pcre="no"
+elif test "x$enable_use_pcre" = "xbuiltin"; then
+  cdef_use_pcre="#define"
+  cdef_use_builtin_pcre="#define"
+  enable_use_pcre="yes"
+  enable_use_builtin_pcre="yes"
+else
+  cdef_use_pcre="#undef"
+  cdef_use_builtin_pcre="#undef"
+  enable_use_pcre="no"
+  enable_use_builtin_pcre="no"
+fi
+
 AC_UPDATE_VAR(enable_use_mysql)
 if test "x$enable_use_mysql" = "x" || test "x$enable_use_mysql" = "xyes"; then
   cdef_use_mysql="#define"
@@ -301,7 +318,6 @@ AC_CDEF_FROM_ENABLE(share_variables)
 AC_CDEF_FROM_ENABLE(use_system_crypt)
 AC_CDEF_FROM_ENABLE(use_alists)
 AC_CDEF_FROM_ENABLE(use_mccp)
-AC_CDEF_FROM_ENABLE(use_pcre)
 AC_CDEF_FROM_ENABLE(use_pthreads)
 AC_CDEF_FROM_ENABLE(use_ipv6)
 AC_CDEF_FROM_ENABLE(use_deprecated)
@@ -968,19 +984,41 @@ fi
 
 # --- PCRE ---
 
-AC_CACHE_CHECK(for pcre support,lp_cv_has_pcre,
+lp_cv_has_pcre_lib="no"
+AC_CHECK_LIB(pcre,main, lp_cv_has_pcre_lib="yes")
+
+if test $lp_cv_has_pcre_lib = yes; then
     saveflags="$CFLAGS"
-    AC_TRY_COMPILE([
+    CFLAGS="$CFLAGS -lpcre"
+    AC_CACHE_CHECK(for PCRE usability,lp_cv_has_pcre,
+        AC_TRY_RUN([
 #include <pcre.h>
 
 pcre_extra foo(void)
 {
-    return;
+    pcre_version();
 }
-    ],,lp_cv_has_pcre=yes,
-    lp_cv_has_pcre=no
+int main(void)
+{
+    return 0;
+}
+            ],
+            lp_cv_has_pcre=yes,
+            lp_cv_has_pcre=no
+        ))
     CFLAGS="$saveflags"
-))
+
+    if test $lp_cv_has_pcre = yes; then
+        AC_DEFINE(HAS_PCRE)
+        PKGLIBS="$PKGLIBS -lpcre"
+    else
+        if test $enable_use_pcre = yes -a $enable_use_builtin_pcre = yes ; then
+            echo "PCRE not available in the system - using builtin version."
+            enable_use_builtin_pcre="yes"
+            cdef_use_builtin_pcre="#define"
+        fi
+    fi
+fi
 
 # --- iconv ---
 
@@ -2385,6 +2423,7 @@ AC_SUBST(cdef_use_pthreads)
 AC_SUBST(cdef_use_alists)
 AC_SUBST(cdef_use_mccp)
 AC_SUBST(cdef_use_pcre)
+AC_SUBST(cdef_use_builtin_pcre)
 AC_SUBST(cdef_use_deprecated)
 AC_SUBST(cdef_use_structs)
 AC_SUBST(cdef_use_tls)

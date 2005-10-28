@@ -62,9 +62,6 @@
 #include "object.h"
 #include "otable.h"
 #include "patchlevel.h"
-#ifdef USE_PCRE
-#include "pcre/pcre.h"
-#endif
 #include "pkg-tls.h"
 #include "random.h"
 #include "simulate.h"
@@ -1702,11 +1699,9 @@ options (void)
             fputs(optstrings[i], stdout);
         }
     } /* print package options */
-#ifndef USE_PCRE
-  fputs("                 regexps: traditional.\n", stdout);
-#else
-  printf("                 regexps: PCRE %d.%d (builtin)\n", PCRE_MAJOR, PCRE_MINOR);
-#endif
+  fputs("                 regexps: ", stdout);
+  fputs(rx_version(), stdout);
+  fputs("\n", stdout);
 
   printf(" Runtime limits: max read file size:     %7d\n"
          "                 max byte read/write:    %7d\n"

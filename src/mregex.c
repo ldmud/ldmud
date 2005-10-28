@@ -127,6 +127,26 @@ pcre_xalloc (size_t size)
 #endif /* USE_PCRE */
 
 /*--------------------------------------------------------------------*/
+const char *
+rx_version (void)
+
+/* Return a string with the name and version of the regex package.
+ */
+
+{
+#ifdef USE_PCRE
+         static char buf[40];
+         sprintf(buf, "PCRE %d.%d", PCRE_MAJOR, PCRE_MINOR);
+#    ifdef USE_BUILTIN_PCRE
+         strcat(buf, " (builtin)");
+#    endif
+         return buf;
+#else
+    return "traditional";
+#endif
+} /* rx_version() */
+
+/*--------------------------------------------------------------------*/
 void rx_init(void)
 
 /* Initialise the module. */

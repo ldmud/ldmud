@@ -6,7 +6,7 @@
 #include "mstrings.h"
 #include "strfuns.h"
 #ifdef USE_PCRE
-#include "pcre/pcre.h"
+#include "pkg-pcre.h"
 #else
 #include "regexp.h"
 #endif
@@ -75,6 +75,7 @@ extern void rx_get_match (regexp_t *prog, string_t * str, size_t * start, size_t
 extern void rx_get_match_str (regexp_t *prog, char * str, size_t * start, size_t * end);
 extern Bool rx_get_match_n (regexp_t *prog, string_t * str, int n, size_t * start, size_t * end);
 extern void   rx_free(regexp_t *);
+extern const char * rx_version(void);
 extern size_t rxcache_status(strbuf_t *sbuf, Bool verbose);
 extern void   rxcache_dinfo_status(svalue_t *svp, int value);
 

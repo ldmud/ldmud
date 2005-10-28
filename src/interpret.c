@@ -14153,6 +14153,8 @@ again:
         {
             pop_n_elems(num_arg);
             push_number(sp, 0);
+            WARNF(("Call from destructed object '%s' ignored.\n"
+                  , get_txt(current_object->name)));
             break;
         }
 
@@ -15631,6 +15633,8 @@ again:
         {
             pop_n_elems(num_arg);
             push_number(sp, 0);
+            WARNF(("Call from destructed object '%s' ignored.\n"
+                  , get_txt(current_object->name)));
             break;
         }
 
@@ -19669,6 +19673,9 @@ v_apply (svalue_t *sp, int num_arg)
     {
         sp = _pop_n_elems(num_arg, sp);
         push_number(sp, 0);
+        inter_sp = sp;
+        warnf("Call from destructed object '%s' ignored.\n"
+             , get_txt(current_object->name));
         return sp;
     }
 
@@ -19712,6 +19719,9 @@ v_funcall (svalue_t *sp, int num_arg)
         if (current_object->flags & O_DESTRUCTED) {
             sp = _pop_n_elems(num_arg, sp);
             push_number(sp, 0);
+            inter_sp = sp;
+            warnf("Call from destructed object '%s' ignored.\n"
+                 , get_txt(current_object->name));
             return sp;
         }
 
@@ -19794,6 +19804,9 @@ int_call_resolved (Bool b_use_default, svalue_t *sp, int num_arg)
     {
         sp = _pop_n_elems(num_arg, sp);
         push_number(sp, 0);
+        inter_sp = sp;
+        warnf("Call from destructed object '%s' ignored.\n"
+             , get_txt(current_object->name));
         return sp;
     }
 

@@ -39,6 +39,7 @@
 #  define MALLOC_smalloc
 #endif
 
+
 /* Do we have full GC support? */
 
 #if defined(MALLOC_smalloc) || defined(MALLOC_ptmalloc)

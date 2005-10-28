@@ -341,6 +341,11 @@
  */
 @cdef_use_pcre@ USE_PCRE
 
+/* Define this if you want to use builtin PCRE (ignored when PCRE
+ * is disabled as a whole).
+ */
+@cdef_use_builtin_pcre@ USE_BUILTIN_PCRE
+
 /* Define this if you want the obsolete and deprecated efuns.
  */
 @cdef_use_deprecated@ USE_DEPRECATED

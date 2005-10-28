@@ -340,6 +340,11 @@
 
 #define USE_PCRE
 
+/* Define this if you want to use builtin PCRE (ignored when PCRE
+ * is disabled as a whole).
+ */
+#undef USE_BUILTIN_PCRE
+
 /* Define this if you want MCCP (Mud Control Compression Protocol).
  */
 #define USE_MCCP

@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+22-Aug-2004 (Lars Duening)  (3.3.587)
+  - (interpret.c) Calls from destructed objects to other objects
+       (including simul-efun calls) now elicit a warning (Bug #0000113).
+  - (configure, config.h, mregex, pkg-pcre, main.c) The driver now tries
+       to use the system's PCRE library if available, while offering an
+       override to use the builtin package regardless.
+
 21-Aug-2004 (Lars Duening)  (3.3.586)
   - (interpret.c) If a lambda was executed inside a catch() and threw an
        error, the error routines didn't clean up the protective reference
