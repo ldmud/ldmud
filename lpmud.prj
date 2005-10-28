@@ -60,16 +60,13 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 618)
-(Parent-Version lpmud 3-3 617)
-(Version-Log "
-  - (closure.c) Calls to explicitely inherited lfun closures weren't compiled
-       correctly in lambda()s (Bug #0000145).
-")
+(Project-Version lpmud 3-3 619)
+(Parent-Version lpmud 3-3 618)
+(Version-Log " - (closure.c) The arguments to CALL_INHERITED were given in the wrong order.")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Fri, 26 Nov 2004 14:51:21 -0700")
+(Checkin-Time "Fri, 26 Nov 2004 15:07:06 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -107,7 +104,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.83 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.681 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.682 644))
   (HISTORY (lpmud/f/49_HISTORY 1.384 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -175,7 +172,7 @@
   (src/call_out.h (lpmud/f/45_call_out.h 1.7.1.6 644))
   (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.30 644))
   (src/closure.h (lpmud/f/44_closure.h 1.7.1.21 644))
-  (src/closure.c (lpmud/d/4_closure.c 1.41.1.47.1.24 644))
+  (src/closure.c (lpmud/d/4_closure.c 1.41.1.47.1.25 644))
   (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.98 644))
   (src/comm.h (lpmud/d/3_comm.h 1.26.1.41 644))
   (src/driver.h (lpmud/f/36_driver.h 1.15.1.27 644))
@@ -2297,7 +2294,7 @@
 
   (test/t-041124/master.c (lpmud/c/c/25_master.c 1.1 644))
   (test/t-041124/c.c (lpmud/c/c/26_c.c 1.1 644))
-  (test/t-041124/b.c (lpmud/c/c/27_b.c 1.1 644))
+  (test/t-041124/b.c (lpmud/c/c/27_b.c 1.2 644))
   (test/t-041124/a.c (lpmud/c/c/28_a.c 1.1 755))
 )
 (Merge-Parents)

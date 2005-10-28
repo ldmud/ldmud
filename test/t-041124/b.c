@@ -25,6 +25,10 @@ int main() {
     c::sub();
     debug_message("calling sub()\n");
     sub();
+    debug_message("calling a::sub() via lambda\n");
+    funcall(lambda(0, ({#'a::sub})));
+    debug_message("calling c::sub() via lambda\n");
+    funcall(lambda(0, ({#'c::sub})));
 
     mixed *a = ({ #'a::sub, #'c::sub, #'::sub, #'sub });
     string s = save_value(a);
