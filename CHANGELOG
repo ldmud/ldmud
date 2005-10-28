@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+27-Nov-2004 (Lars Duening)  (3.3.621)
+  - (interpret.c) When calling inherited functions in objects with virtual
+       parents, the function adjusting the offsets always returned NULL
+       instead of the pointer to the parent. This was a fallout from the
+       closure change.
+
 26-Nov-2004 (Lars Duening)  (3.3.620)
   - (Makefile.in, doc/man/ldmud.1) Added the automatic generation of a manpage
        from the drivers '--longhelp' output.

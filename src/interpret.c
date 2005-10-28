@@ -6701,7 +6701,7 @@ adjust_variable_offsets ( const inherit_t * inheritp
 #endif
     }
 
-    return NULL;
+    return inh;
 } /* adjust_variable_offsets() */
 
 /*-------------------------------------------------------------------------*/
@@ -8080,19 +8080,19 @@ again:
         unsigned short context_size;
 #endif /* USE_NEW_INLINES */
 
+        inhIndex = 0;
+        context_size = 0;
         LOAD_SHORT(tmp_ushort, pc);
 #ifdef USE_NEW_INLINES
         if (instruction == F_CONTEXT_CLOSURE)
         {
             LOAD_SHORT(context_size, pc);
-            inhIndex = 0;
         }
         else
         {
-            context_size = 0;
             LOAD_SHORT(inhIndex, pc);
         }
-#else
+#else /* USE_NEW_INLINES */
         LOAD_SHORT(inhIndex, pc);
 #endif /* USE_NEW_INLINES */
 
