@@ -4922,7 +4922,7 @@ range_lvalue (int code, svalue_t *sp)
     }
 
 
-    if (++ind2 < 0 || ind2 > size)
+    if (++ind2 < 0 || ind2 > size+1)
     {
         inter_sp = sp;
         error("Upper range index out of bounds: %ld, size: %ld.\n"
@@ -4961,6 +4961,27 @@ range_lvalue (int code, svalue_t *sp)
         inter_sp = sp;
         error("Lower range index out of bounds: %ld, size: %ld.\n"
              , (long)i->u.number, (long)size);
+        return NULL;
+    }
+
+
+    /* Check the range for consistency */
+
+    if (ind2 < ind1)
+    {
+        inter_sp = sp;
+        error("Range of negative size given: %ld..%ld .\n"
+             , (long)i->u.number, (long)(i+1)->u.number);
+        return NULL;
+    }
+
+    if (ind1 == size) /* again allow appending */
+        ind2 = ind1;
+    else if (ind2 > size)
+    {
+        inter_sp = sp;
+        error("Upper range index out of bounds: %ld, size: %ld.\n"
+             , (long)(i+1)->u.number, (long)size);
         return NULL;
     }
 
@@ -6724,6 +6745,16 @@ setup_inherited_call (unsigned short inhIndex)
 
 {
     inherit_t * inheritp = &current_prog->inherit[inhIndex];
+
+#ifdef DEBUG
+    if (inhIndex >= current_prog->num_inherited)
+        error("(setup_inherited_call): inhIndex %ld > number of inherits %ld "
+              "in program '%s'\n"
+             , (long)inhIndex
+             , (long)current_prog->num_inherited
+             , get_txt(current_prog->name)
+             );
+#endif
 
     /* If we do an explicit call into a virtually inherited base class we
      * have to find the first instance of the inherited variables.
@@ -11090,8 +11121,28 @@ again:
             else
                 i2 = size - sp[0].u.number;
 
+            if (i1 < 0 || i1 >= size)
+            {
+                WARNF(("Lower range limit out of bounds: %ld, size %ld.\n"
+                      , (long)i1, (long)size));
+            }
+
+            if (i2 < 0 || i2 >= size)
+            {
+                WARNF(("Upper range limit out of bounds: %ld, size %ld.\n"
+                      , (long)i2, (long)size));
+            }
+
+            if (i1 > i2)
+            {
+                WARNF(("Range of negative size given: %ld..%ld .\n"
+                      , (long)i1, (long)i2));
+            }
+
             if (i2 >= size)
+            {
                 i2 = size - 1;
+            }
 
             pop_stack();
             pop_stack();

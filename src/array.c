@@ -746,7 +746,7 @@ slice_array (vector_t *p, mp_int from, mp_int to)
     int cnt;
 
     if (from < 0)
-            from = 0;
+        from = 0;
 
     if (to < from)
         return allocate_array(0);

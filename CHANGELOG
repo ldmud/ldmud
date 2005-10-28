@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+18-Dec-2004 (Lars Duening)  (3.3.631)
+  - (interpret.c) Assignments to negative-sized ranges now throw
+       an error; indexing of ranges with out of bounds limits generate
+       warnings (Bug #0000325).
+  - (interpret.c) In DEBUG mode: when setting up an inherited call, check
+       that the given inherit index is sensible.
+
 17-Dec-2004 (Lars Duening)  (3.3.630)
   - (xalloc) Added a new function prexalloc() to re-allocate permanent
        memory.
