@@ -496,9 +496,6 @@ xalloc_traced (size_t size MTRACE_DECL)
     if (going_to_exit) /* A recursive call while we're exiting */
         exit(3);
 
-    if (size == 0)
-        fatal("Tried to allocate 0 bytes.\n");
-    
 #ifdef MALLOC_SBRK_TRACE
     mdb_size = size;
 #ifdef MALLOC_TRACE

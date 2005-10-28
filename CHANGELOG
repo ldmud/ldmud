@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+09-Dec-2004 (Lars Duening)  (3.3.628)
+  - (xalloc.c) Modified xalloc() to accept allocations of size 0 (again as the
+       C standard demands).
+
 07-Dec-2004 (Lars Duening)  (3.3.627)
   - (pkg-tls.c) Added allocation wrapper so that gnutls allocations can 
        be traced using the driver's mechanisms (thanks, Peng!)
