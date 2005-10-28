@@ -5938,10 +5938,9 @@ save_closure (svalue_t *cl, Bool writable)
 
             case CLOSURE_EFUN:
               {
+                const char *source = closure_efun_to_string(type);
                 L_PUTC_PROLOG
-                char * source, c;
-
-                source = instrs[type - CLOSURE_EFUN].name;
+                char c;
 
                 L_PUTC('#');
                 L_PUTC('e');
@@ -6984,6 +6983,8 @@ restore_map_size (struct rms_parameters *parameters)
                    * again from the data part.
                    */
           { 
+            const char * end;
+
             if (pt[1] == 'c')
             {
                 pt = strchr(pt, ':');
@@ -6995,6 +6996,17 @@ restore_map_size (struct rms_parameters *parameters)
             if (!pt)
                 return -1;
             pt++;
+
+            /* Try parsing the closure as operator closure.
+             * If it is, restart the scanning from the end
+             * of the string (which is likely to contain magic
+             * characters like '<' or '-').
+             */
+            if (symbol_operator(pt, &end) >= 0)
+            {
+                pt = (char *)end;
+            }
+
             continue;
           }
 
@@ -7285,6 +7297,9 @@ restore_size (char **str)
         case '#': /* A closure: skip the header and restart this check
                    * again from the data part.
                    */
+          {
+            const char * end;
+
             if (pt[1] == 'c')
             {
                 pt2 = strchr(pt, ':');
@@ -7301,7 +7316,18 @@ restore_size (char **str)
                * Because every closure has at least one character
                * following the ':', this solution is safe.
                */
+
+            /* Try parsing the closure as operator closure.
+             * If it is, restart the scanning from the end
+             * of the string (which is likely to contain magic
+             * characters like '<' or '-').
+             */
+            if (symbol_operator(pt, &end) >= 0)
+            {
+                pt = (char *)end;
+            }
             break;
+          }
 
         default:
             pt2 = strchr(pt, ',');
@@ -7574,7 +7600,7 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
     case 'e': /* An efun closure */
     case 's': /* A sefun closure */
     case 'v': /* A variable closure */
-    case 'c': /* A lfun closure */
+    case 'c': /* A context-lfun closure */
     case 'l': /* A lfun closure */
       {
         char c;

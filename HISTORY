@@ -170,13 +170,15 @@ For a detailed list of all changes see the file CHANGELOG.
            x509 key- and certfile for the TLS package.
 
 
-22-Aug-2004 (Lars Duening) -- Release 3.2.11
+03-Sep-2004 (Lars Duening) -- Release 3.2.11
 
     - Changed efuns:
 
     - Corrected efuns:
        + save_object(): Matching the documentation, the efun really removes
            a trailing '.c' from the filename.
+       + save_{value, object}(), restore_{value, object}(): Some operator
+           closures could not be saved and restored.
 
     - New efuns:
 
@@ -198,6 +200,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + Error while loading an object with a too-long filename.
        + Restoring non-existing (simul-)efun closures created illegal
          closure values.
+       + Specifying a fieldsize or precision beyond the numerical limits
+         in sprintf()/printf().
 
     - Language:
        + The macros __FLOAT_MIN__ and __FLOAT_MAX__ gave a too-small range.

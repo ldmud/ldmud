@@ -2316,25 +2316,29 @@ reset_input_buffer (interactive_t *ip)
 
 /* When returning from CHARMODE to LINEMODE, the input buffer variables
  * need to be reset. This function takes care of it.
+ * Note that there might be additional lines pending between .tn_end and
+ * .text_end.
  */
 
 {
     if (ip->command_start)
     {
-        DTN(("reset input buffer: cmd_start %d, tn_start %d, tn_end %d\n", ip->command_start, ip->tn_start, ip->tn_end));
+        DTN(("reset input buffer: cmd_start %d, tn_start %d, tn_end %d, text_end %d\n", ip->command_start, ip->tn_start, ip->tn_end, ip->text_end));
         ip->tn_start -= ip->command_start;
         ip->tn_end -= ip->command_start;
+        ip->text_end -= ip->command_start;
         if (ip->tn_start < 0)
             ip->tn_start = 0;
-        if (ip->tn_end <= 0)
+        if (ip->tn_end < 0)
             ip->tn_end = 0;
+        if (ip->text_end <= 0)
+            ip->text_end = 0;
         else
         {
             move_memory( ip->text, ip->text + ip->command_start
-                       , ip->tn_end
+                       , ip->text_end
                        );
         }
-        ip->text_end = ip->tn_end;
         if (ip->command_end)
             ip->command_end = ip->tn_end;
         ip->command_start = 0;
@@ -7475,7 +7479,7 @@ v_input_to (svalue_t *sp, int num_arg)
         {
             if (!(iflags & INPUT_NOECHO) != !(ip->noecho & NOECHO_MASK))
             {
-                warnf("input_to(): Change in NOECHO mode ignored for object '%s' "
+                warnf("input_to(): Change in NOECHO mode requested for object '%s' "
                       "with telnet disabled.\n"
                      , get_txt(command_giver->name)
                      );
@@ -7483,7 +7487,7 @@ v_input_to (svalue_t *sp, int num_arg)
 
             if (!(iflags & INPUT_CHARMODE) != !(ip->noecho & CHARMODE_MASK))
             {
-                warnf("input_to(): Change in CHARMODE mode ignored for object '%s' "
+                warnf("input_to(): Change in CHARMODE mode requested for object '%s' "
                       "with telnet disabled.\n"
                      , get_txt(command_giver->name)
                      );

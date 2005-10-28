@@ -30,9 +30,15 @@ BESCHREIBUNG
             Die vom Spieler eingegebene Zeile erzeugt kein Echo und wird auch
             nicht erkannt, wenn der Spieler beobachtet wird.
 
+            Dieser Modus kann nur geaendert werden, wenn telnet enabled ist.
+
         INPUT_CHARMODE (2):
             Die Verbindung zum User wechselt von Zeilen- auf Zeichenmodus. So
             wird nur ein einzelnes Zeichen (!) vom Spieler empfangen.
+
+            Ist telnet disabled, wird lediglich die Interpretation der
+            einkommenden Daten durch den Driver umgeschaltet - das
+            Clientprogramm des Spieler verbleibt im gerade aktiven Modus.
 
             Nachdem die Funktion <fun> ausgefuehrt wurde, wechselt die
             Verbindung zurueck in Zeilenmodus, ausser ein nachfolgendes
@@ -106,4 +112,4 @@ BUGS
 SIEHE AUCH
         call_other(E), sscanf(E), privilege_violation(M),
         set_combine_charset(E), query_input_pending(E), find_input_to(E),
-        input_to_info(E), remove_input_to(E)
+        input_to_info(E), remove_input_to(E), enable_telnet(E)

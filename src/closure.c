@@ -5127,8 +5127,7 @@ closure_operator_to_string (int type)
  * of that!).
  * If <type> denotes one of the non-efun operators, return its textual
  * presentation as a pointer to a constant string.
- * Otherwise return NULL - the caller then has to add
- * (CLOSURE_EFUN-CLOSURE_OPERATOR) to type and interpret it as efun code.
+ * Otherwise return NULL.
  */
 
 {
@@ -5166,6 +5165,47 @@ closure_operator_to_string (int type)
             str = "?!";
             break;
 
+        case F_POST_INC:
+            str = "++";
+            break;
+
+        case F_POST_DEC:
+            str = "--";
+            break;
+
+        } /* switch() */
+    } /* if() */
+
+    return str;
+} /* closure_operator_to_string() */
+
+/*-------------------------------------------------------------------------*/
+const char *
+closure_efun_to_string (int type)
+
+/* <type> is the code for a closure efun (the caller has to make sure
+ * of that!), result is the efun name.
+ * If <type> denotes one of the non-efun operators, return its textual
+ * presentation as a pointer to a constant string.
+ *
+ * Result is NULL if <type> is not an efun.
+ */
+
+{
+    const char *str = NULL;
+
+    if ((type & -0x0800) == CLOSURE_EFUN)
+    {
+        switch(type - CLOSURE_EFUN)
+        {
+        case F_INDEX:
+            str = "[";
+            break;
+
+        case F_RINDEX:
+            str = "[<";
+            break;
+
         case F_RANGE:
             str = "[..]";
             break;
@@ -5194,6 +5234,9 @@ closure_operator_to_string (int type)
             str = "[<..";
             break;
 
+        default:
+            str = instrs[type - CLOSURE_EFUN].name;
+            break;
         } /* switch() */
     } /* if() */
 
@@ -5365,13 +5408,22 @@ closure_to_string (svalue_t * sp, Bool compact)
                     strcat(buf, str);
                     break;
                 }
+
                 type += CLOSURE_EFUN - CLOSURE_OPERATOR;
               }
             /* default action for operators: FALLTHROUGH */
 
             case CLOSURE_EFUN:
-                strcat(buf, instrs[type - CLOSURE_EFUN].name);
-                break;
+              {
+                const char *str = closure_efun_to_string(type);
+
+                if (str)
+                {
+                    strcat(buf, str);
+                    break;
+                }
+              }
+              /* Shouldn't happen: FALLTHROUGH */
 
             case CLOSURE_SIMUL_EFUN:
                 strcat(buf, "sefun::");

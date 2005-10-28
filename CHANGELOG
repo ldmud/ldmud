@@ -1,6 +1,22 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+03-Sep-2004 (Lars Duening)  (3.3.592)
+  - (interpret.c, actions.c, simulate.c) Removed memory leaks (thanks, Gnomi!)
+      (Bug #0000120).
+  - (sprintf.c) Too large fieldsizes or precisions are caught (Bug #0000119).
+  - (closure,  object.c) Some operator closures were saved using the wrong
+       names, making the restoration impossible. Also, restoring closures
+       within arrays wasn't robust enough (Bug #0000118).
+  - (comm.c) Clarified the warnings for input_to modechanges for objects
+       with telnet disabled (Bug #0000124).
+  - (comm.c) When switching out of CHARMODE, the driver accidentally
+       discarded any pending input lines after the current one. (thanks,
+       Gnomi) (Bug #0000123)
+
+01-Sep-2004 (Lars Duening)
+  - (pkg-tls.c) Added a bugfix to the session creation (thanks, Phillipp!)
+
 31-Aug-2004 (Lars Duening)  (3.3.591)
   - (prolang.y) The real correction to the memory corruption problem: it
       happened when an inline closure returned a struct, because the

@@ -1,6 +1,6 @@
 VERALTET
 SYNOPSIS
-        string make_shared_string(string str);
+        string make_shared_string (string str);
 
 BESCHREIBUNG
         Fuegt <str> in die Tabelle der gemeinsam verwendeten String des Spiels

@@ -3735,7 +3735,17 @@ setup_efun_callback_base ( callback_t *cb, svalue_t *args, int nargs
             free_svalue(args+1);
     }
     else
+    {
+        /* We couldn't find anything to call, so we have
+         * to manually prepare the error condition.
+         */
+        int i;
+
+        for (i = 0; i < nargs; i++)
+            free_svalue(args+i);
+
         error_index = 0;
+    }
 
     return error_index;
 } /* setup_efun_callback() */

@@ -184,6 +184,7 @@ typedef unsigned int format_info;
 #define ERR_NULL_PS             0xB     /* pad string is null */
 #define ERR_ARRAY_EXPECTED      0xC     /* array expected */
 #define ERR_NOMEM               0xD     /* Out of memory */
+#define ERR_SIZE_OVERFLOW       0xE     /* Fieldsize/precision numeric overflow */
 
 
 #define ERROR1(e,a)              ERROR((e) | (a)<<16)
@@ -1572,6 +1573,10 @@ static char buff[BUFF_SIZE];         /* For error messages */
         case ERR_NOMEM:
             err = "Out of memory.";
             break;
+
+        case ERR_SIZE_OVERFLOW:
+            err = "Fieldsize or precision too large.";
+            break;
         }
 
         /* Create the error message in buff[] */
@@ -1754,7 +1759,12 @@ static char buff[BUFF_SIZE];         /* For error messages */
                             ; format_str[fpos]>='0' && format_str[fpos]<='9'
                             ; fpos++)
                         {
-                            pres = pres*10 + format_str[fpos] - '0';
+                            int new_pres = pres*10 + format_str[fpos] - '0';
+
+                            if (new_pres < pres) /* Overflow */
+                                ERROR(ERR_SIZE_OVERFLOW);
+
+                            pres = new_pres;
                         }
                     }
                     else /* then is fs (and maybe pres) */
@@ -1792,7 +1802,12 @@ static char buff[BUFF_SIZE];         /* For error messages */
                             ; format_str[fpos] >= '0' && format_str[fpos] <= '9'
                             ; fpos++)
                         {
-                            fs = fs*10 + format_str[fpos] - '0';
+                            int new_fs = fs*10 + format_str[fpos] - '0';
+
+                            if (new_fs < fs) /* Overflow */
+                                ERROR(ERR_SIZE_OVERFLOW);
+
+                            fs = new_fs;
                         }
 
                         if (pres == -2) /* colon */

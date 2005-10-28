@@ -634,7 +634,7 @@ struct inline_closure_s
       /* Function index
        */
     fulltype_t returntype;
-      /* The return type (reference counted).
+      /* The return type (uncounted reference).
        */
     ident_t * ident;
       /* The ident entry with the function name.
@@ -731,7 +731,7 @@ static fulltype_t def_function_returntype;
 static ident_t *  def_function_ident;
 static int        def_function_num_args;
   /* Globals to keep the state while a function is parsed:
-   *   _returntype: the returntype (reference counted)
+   *   _returntype: the returntype (uncounted reference)
    *   _ident:      the function's identifier.
    *   _num_args:   number of formal arguments.
    */

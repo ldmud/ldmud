@@ -23,4 +23,4 @@ HISTORY
         Introduced in LDMud 3.2.10.
 
 SEE ALSO
-        privilege_violation(M)
+        privilege_violation(M), input_to(E)

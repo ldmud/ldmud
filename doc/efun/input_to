@@ -31,9 +31,15 @@ DESCRIPTION
               The line given by the player will not be echoed, and is
               not seen if snooped.
 
+              A change of this mode not possible with telnet disabled.
+
           INPUT_CHARMODE  (2):
               The connection is switched from line- into charmode to
               retrieve a single character(!) from the player.
+
+              Is telnet disabled, then only the handling of the
+              incoming data by the driver is changed - the client
+              program of the player will remain in its current mode.
 
               After execution of <fun>, the connection is switched
               back into linemode unless a subsequent input_to( , 2)
@@ -110,4 +116,4 @@ HISTORY
 SEE ALSO
         privilege_violation(M), set_combine_charset(E),
         query_input_pending(E), find_input_to(E), input_to_info(E),
-        remove_input_to(E)
+        remove_input_to(E), enable_telnet(E)

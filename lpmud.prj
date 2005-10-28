@@ -60,21 +60,25 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 591)
-(Parent-Version lpmud 3-3 590)
+(Project-Version lpmud 3-3 592)
+(Parent-Version lpmud 3-3 591)
 (Version-Log "
-  - (prolang.y) The real correction to the memory corruption problem: it
-      happened when an inline closure returned a struct, because the
-      compiler derefenced the returntype entry during the cleanup even
-      though it was an uncounted reference. The problem however showed
-      up only when the compilation failed and the struct involved was
-      a private struct, because in all other cases the struct had enough
-      references left to survive.
+  - (interpret.c, actions.c, simulate.c) Removed memory leaks (thanks, Gnomi!)
+      (Bug #0000120).
+  - (sprintf.c) Too large fieldsizes or precisions are caught (Bug #0000119).
+  - (closure,  object.c) Some operator closures were saved using the wrong
+       names, making the restoration impossible. Also, restoring closures
+       within arrays wasn't robust enough (Bug #0000118).
+  - (comm.c) Clarified the warnings for input_to modechanges for objects
+       with telnet disabled (Bug #0000124).
+  - (comm.c) When switching out of CHARMODE, the driver accidentally
+       discarded any pending input lines after the current one. (thanks,
+       Gnomi) (Bug #0000123)
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Wed, 01 Sep 2004 00:30:36 -0600")
+(Checkin-Time "Sat, 04 Sep 2004 00:46:54 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -112,8 +116,8 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.79 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.654 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.373 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.655 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.374 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -179,9 +183,9 @@
   (src/bytecode.h (lpmud/a/b/26_bytecode.h 1.1.1.3 644))
   (src/call_out.h (lpmud/f/45_call_out.h 1.7.1.6 644))
   (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.30 644))
-  (src/closure.h (lpmud/f/44_closure.h 1.7.1.18 644))
-  (src/closure.c (lpmud/d/4_closure.c 1.41.1.47.1.20 644))
-  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.92 644))
+  (src/closure.h (lpmud/f/44_closure.h 1.7.1.19 644))
+  (src/closure.c (lpmud/d/4_closure.c 1.41.1.47.1.21 644))
+  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.93 644))
   (src/comm.h (lpmud/d/3_comm.h 1.26.1.40 644))
   (src/driver.h (lpmud/f/36_driver.h 1.15.1.26 644))
   (src/dumpstat.h (lpmud/f/35_dumpstat.h 1.8 644))
@@ -221,7 +225,7 @@
   (src/my-rusage.h (lpmud/f/28_my-rusage. 1.7 644))
   (src/my-stdint.h (lpmud/u/b/39_my-stdint. 1.2 644))
   (src/object.h (lpmud/44_object.h 1.34.1.19.1.6 644))
-  (src/object.c (lpmud/45_object.c 1.62.1.88.1.49 644))
+  (src/object.c (lpmud/45_object.c 1.62.1.88.1.50 644))
   (src/otable.h (lpmud/f/27_otable.h 1.8.1.4 644))
   (src/otable.c (lpmud/43_otable.c 1.22.1.8 644))
   (src/parser.c (lpmud/l/13_parser.c 1.1 644))
@@ -329,11 +333,11 @@
   (src/pkg-pgsql.c (lpmud/d/b/39_pkg-pgsql. 1.3 644))
   (src/pkg-pgsql.h (lpmud/d/b/40_pkg-pgsql. 1.2 644))
   (src/pkg-tls.h (lpmud/e/b/10_pkg-tls.h 1.6 644))
-  (src/pkg-tls.c (lpmud/e/b/11_pkg-tls.c 1.9 644))
+  (src/pkg-tls.c (lpmud/e/b/11_pkg-tls.c 1.10 644))
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.20 644))
   (src/port.c (lpmud/39_port.c 1.17.1.9 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.17.1.4 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.70 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.71 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7.1.2 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))
@@ -346,13 +350,13 @@
   (src/simul_efun.h (lpmud/f/17_simul_efun 1.5.1.6 644))
   (src/simul_efun.c (lpmud/32_simul_efun 1.20.1.17.1.7 644))
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.37 644))
-  (src/simulate.c (lpmud/31_simulate.c 1.88.1.130 644))
+  (src/simulate.c (lpmud/31_simulate.c 1.88.1.131 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.14 644))
   (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.99 644))
   (src/sysmalloc.h (lpmud/c/b/33_sysmalloc. 1.2 644))
   (src/sysmalloc.c (lpmud/c/b/34_sysmalloc. 1.6 644))
   (src/sprintf.h (lpmud/f/15_sprintf.h 1.3.1.4 644))
-  (src/sprintf.c (lpmud/28_sprintf.c 1.31.1.62 644))
+  (src/sprintf.c (lpmud/28_sprintf.c 1.31.1.63 644))
   (src/strfuns.h (lpmud/b/51_strfuns.h 1.11.1.8 644))
   (src/strfuns.c (lpmud/c/0_strfuns.c 1.9.1.20 644))
   (src/structs.h (lpmud/d/b/5_structs.h 1.4 644))
@@ -1112,7 +1116,7 @@
   (doc/efun/ed (lpmud/o/27_ed 1.3 644))
   (doc/efun/efun (lpmud/o/28_efun 1.9 644))
   (doc/efun/enable_commands (lpmud/o/29_enable_com 1.1.1.3 644))
-  (doc/efun/enable_telnet (lpmud/f/b/8_enable_tel 1.1 644))
+  (doc/efun/enable_telnet (lpmud/f/b/8_enable_tel 1.2 644))
   (doc/efun/end_mccp_compress (lpmud/e/b/0_end_mccp_c 1.2 644))
   (doc/efun/environment (lpmud/l/28_environmen 1.5 644))
   (doc/efun/exec (lpmud/h/43_exec 1.1.1.3 644))
@@ -1151,7 +1155,7 @@
   (doc/efun/implode (lpmud/p/2_implode 1.3 644))
   (doc/efun/include_list (lpmud/p/25_include_li 1.5 644))
   (doc/efun/inherit_list (lpmud/p/3_inherit_li 1.7 644))
-  (doc/efun/input_to (lpmud/p/4_input_to 1.8.1.10 644))
+  (doc/efun/input_to (lpmud/p/4_input_to 1.8.1.11 644))
   (doc/efun/input_to_info (lpmud/b/b/44_input_to_i 1.2 644))
   (doc/efun/insert_alist (lpmud/c/45_insert_ali 1.7 644))
   (doc/efun/interactive (lpmud/p/5_interactiv 1.2 644))
@@ -1391,7 +1395,7 @@
   (doc/efun.de/tail.de (lpmud/f/b/46_tail.de 1.1 640))
   (doc/efun.de/symbolp.de (lpmud/t/6_symbolp.de 1.1 644))
   (doc/efun.de/symbol_variable.de (lpmud/f/b/47_symbol_var 1.1 640))
-  (doc/efun.de/symbol_function.de (lpmud/f/b/48_symbol_fun 1.1 640))
+  (doc/efun.de/symbol_function.de (lpmud/f/b/48_symbol_fun 1.2 640))
   (doc/efun.de/swap.de (lpmud/f/b/49_swap.de 1.2 640))
   (doc/efun.de/strstr.de (lpmud/f/b/50_strstr.de 1.1 640))
   (doc/efun.de/strrstr.de (lpmud/f/b/51_strrstr.de 1.1 640))
@@ -1514,7 +1518,7 @@
   (doc/efun.de/map_indices.de (lpmud/h/b/46_map_indice 1.3 640))
   (doc/efun.de/map_array.de (lpmud/h/b/47_map_array. 1.2 640))
   (doc/efun.de/map.de (lpmud/h/b/48_map.de 1.1 640))
-  (doc/efun.de/make_shared_string.de (lpmud/h/b/49_make_share 1.2 640))
+  (doc/efun.de/make_shared_string.de (lpmud/h/b/49_make_share 1.3 640))
   (doc/efun.de/m_values.de (lpmud/h/b/50_m_values.d 1.1 640))
   (doc/efun.de/m_sizeof.de (lpmud/h/b/51_m_sizeof.d 1.2 640))
   (doc/efun.de/m_reallocate.de (lpmud/i/b/0_m_realloca 1.1 640))
@@ -1540,7 +1544,7 @@
   (doc/efun.de/interactive.de (lpmud/i/b/18_interactiv 1.1 640))
   (doc/efun.de/insert_alist.de (lpmud/i/b/19_insert_ali 1.2 640))
   (doc/efun.de/input_to_info.de (lpmud/i/b/20_input_to_i 1.1 640))
-  (doc/efun.de/input_to.de (lpmud/i/b/21_input_to.d 1.1 640))
+  (doc/efun.de/input_to.de (lpmud/i/b/21_input_to.d 1.2 640))
   (doc/efun.de/inherit_list.de (lpmud/i/b/22_inherit_li 1.1 640))
   (doc/efun.de/include_list.de (lpmud/i/b/23_include_li 1.1 640))
   (doc/efun.de/implode.de (lpmud/s/33_implode.de 1.1 644))
@@ -1579,11 +1583,11 @@
   (doc/efun.de/explode.de (lpmud/s/31_explode.de 1.1 644))
   (doc/efun.de/expand_define.de (lpmud/j/b/1_expand_def 1.2 640))
   (doc/efun.de/exp.de (lpmud/j/b/2_exp.de 1.1 640))
-  (doc/efun.de/execute_command.de (lpmud/j/b/3_execute_co 1.2 640))
+  (doc/efun.de/execute_command.de (lpmud/j/b/3_execute_co 1.3 640))
   (doc/efun.de/exec.de (lpmud/j/b/4_exec.de 1.2 640))
   (doc/efun.de/environment.de (lpmud/j/b/5_environmen 1.1 640))
   (doc/efun.de/end_mccp_compress.de (lpmud/u/b/21_end_mccp_c 1.1 644))
-  (doc/efun.de/enable_telnet.de (lpmud/u/b/22_enable_tel 1.1 644))
+  (doc/efun.de/enable_telnet.de (lpmud/u/b/22_enable_tel 1.2 644))
   (doc/efun.de/enable_commands.de (lpmud/j/b/6_enable_com 1.1 640))
   (doc/efun.de/efun.de (lpmud/u/b/23_efun.de 1.2 644))
   (doc/efun.de/efun308.de (lpmud/j/b/7_efun308.de 1.2 640))

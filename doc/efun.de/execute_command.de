@@ -1,6 +1,6 @@
 VORLAEUFIG, GESCHUETZT
 SYNOPSIS
-        execute_command(string command, object origin, object player);
+        int execute_command(string command, object origin, object player);
 
 BESCHREIBUNG
         Diese Funktion bietet Low-Level Zugriff auf den Kommandoparser:
