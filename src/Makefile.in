@@ -31,7 +31,11 @@ BINDIR = @bindir@
 ERQ_DIR= @libexecdir@
 #
 # Typical profiling, warning and optimizing options.
-#   -p -DMARK: together they enable the profiling of VM instructions.
+#   -p -DMARK: together they enable customized profiling of VM instructions.
+#              MARK needs to be defined to a statement taking the
+#              instruction code as parameter; additionally interpret.c will
+#              #include "profile.h" for additional custom declarations.
+#
 #   Additional profiling can be activated in config.h .
 #PROFIL=-pg -DMARK
 #PROFIL=-pg

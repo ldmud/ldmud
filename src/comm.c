@@ -4031,7 +4031,7 @@ set_noecho (interactive_t *ip, char noecho, Bool local_change)
                 push_ref_valid_object(inter_sp, ob, "set_no_echo");
                 push_number(inter_sp,  local_change ? 1 : 0);
                 if (driver_hook[H_NOECHO].type == T_STRING)
-                    secure_apply(driver_hook[H_NOECHO].u.str, ob, 2);
+                    secure_apply(driver_hook[H_NOECHO].u.str, ob, 3);
                 else 
                 {
                     if (driver_hook[H_NOECHO].x.closure_type == CLOSURE_LAMBDA)
@@ -4041,7 +4041,7 @@ set_noecho (interactive_t *ip, char noecho, Bool local_change)
                         driver_hook[H_NOECHO].u.lambda->ob
                           = ref_object(ob, "set_noecho");
                     }
-                    secure_callback_lambda(&driver_hook[H_NOECHO], 2);
+                    secure_callback_lambda(&driver_hook[H_NOECHO], 3);
                 }
                 if (~confirm & old & CHARMODE_MASK)
                 {

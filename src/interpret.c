@@ -202,7 +202,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #ifdef MARK
-#include <profile.h>
+#include "profile.h"
 #endif
 
 #include "interpret.h"

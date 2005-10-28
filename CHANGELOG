@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+14-Oct-2004 (Lars Duening)  (3.3.607)
+  - (comm.c) The NOECHO hook call specified only two arguments when
+      three were required (reported by Bardio and Steve G.).
+
 11-Oct-2004 (Lars Duening)  (3.3.606)
   - (mregex.c) Added a number of NULL pointer checks to the deallocation
       of regular expressions (reported by Bardioc, #0000130, #0000135).
