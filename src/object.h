@@ -295,10 +295,10 @@ extern svalue_t *f_getuid(svalue_t *sp);
 extern svalue_t *v_all_environment(svalue_t *sp, int num_arg);
 extern svalue_t *f_all_inventory(svalue_t *sp);
 #if defined(USE_PARSE_COMMAND)
-extern vector_t *deep_inventory(object_t *ob, Bool take_top);
+extern vector_t *deep_inventory(object_t *ob, Bool take_top, p_int depth);
   /* needed by parse.c */
 #endif
-extern svalue_t *f_deep_inventory(svalue_t *sp);
+extern svalue_t *v_deep_inventory(svalue_t *sp, int num_arg);
 extern svalue_t *v_environment(svalue_t *sp, int num_arg);
 extern svalue_t *f_first_inventory(svalue_t *sp);
 extern svalue_t *f_next_inventory(svalue_t *sp);

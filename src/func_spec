@@ -608,7 +608,7 @@ string  traceprefix(string|int);
 
 object *all_environment(void|null|object);
 object *all_inventory(object default: F_THIS_OBJECT);
-object *deep_inventory(object default: F_THIS_OBJECT);
+object *deep_inventory(void|object, void|int);
 object  environment(void|object|string);
 object  first_inventory(object|string default: F_THIS_OBJECT);
 object  next_inventory(object default: F_THIS_OBJECT);

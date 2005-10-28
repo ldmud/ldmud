@@ -1661,7 +1661,7 @@ e_parse_command ( string_t *cmd          /* Command to parse */
     }
     else if (ob_or_array->type == T_OBJECT)
     {
-        obvec = deep_inventory(ob_or_array->u.ob, /* take_top: */ MY_TRUE);
+        obvec = deep_inventory(ob_or_array->u.ob, /* take_top: */ MY_TRUE, /* depth: */ 0);
     }
     else
     {

@@ -3884,9 +3884,12 @@ f_all_inventory (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 static int
-deep_inventory_size (object_t *ob)
+deep_inventory_size (object_t *first, p_int level, p_int depth)
 
 /* Helper function for deep_inventory()
+ *
+ * <level> is the current inventory level this function is called for,
+ * <depth> is the desired inventory depth (see v_deep_inventory()).
  *
  * Count the size of <ob>'s inventory by counting the contained objects,
  * invoking this function for every object and then returning the sum
@@ -3895,20 +3898,35 @@ deep_inventory_size (object_t *ob)
 
 {
     int n;
+    object_t *ob;
 
     n = 0;
-    do {
-        if (ob->contains)
-            n += deep_inventory_size(ob->contains);
-        n++;
-    } while ( NULL != (ob = ob->next_inv) );
+
+    /* Return immediately if the level exceeds the depth */
+    if (depth != 0 && level > (depth > 0 ? depth : -depth))
+        return 0;
+
+    /* Add the objects of this level if depth allows */
+    if (depth >= 0 || level == -depth)
+    {
+        for (ob = first; ob; ob = ob->next_inv)
+            n++;
+    }
+
+    /* Recurse into the next level if required */
+    if (depth == 0 || (depth > 0 && level < depth) || level < -depth)
+    {
+        for (ob = first; ob; ob = ob->next_inv)
+            if (ob->contains)
+                n += deep_inventory_size(ob->contains, level+1, depth);
+    }
 
     return n;
 } /* deep_inventory_size() */
 
 /*-------------------------------------------------------------------------*/
 static svalue_t *
-write_deep_inventory (object_t *first, svalue_t *svp)
+write_deep_inventory (object_t *first, svalue_t *svp, p_int level, p_int depth)
 
 /* Helper function for deep_inventory()
  *
@@ -3919,6 +3937,9 @@ write_deep_inventory (object_t *first, svalue_t *svp)
  * <svp> has to point into a suitably big area of svalue elements, like
  * a vector.
  *
+ * <level> is the current inventory level this function is called for,
+ * <depth> is the desired inventory depth (see v_deep_inventory()).
+ *
  * Result is the updated <svp>, pointing to the next free svalue element
  * in the storage area.
  */
@@ -3926,17 +3947,29 @@ write_deep_inventory (object_t *first, svalue_t *svp)
 {
     object_t *ob;
 
-    ob = first;
-    do {
-        put_ref_object(svp, ob, "deep_inventory");
-        svp++;
-    } while ( NULL != (ob = ob->next_inv) );
+    /* Return immediately if the level exceeds the depth */
+    if (depth != 0 && level > (depth > 0 ? depth : -depth))
+        return svp;
 
-    ob = first;
-    do {
-        if (ob->contains)
-            svp = write_deep_inventory(ob->contains, svp);
-    } while ( NULL != (ob = ob->next_inv) );
+    /* Add the objects of this level if depth allows */
+    if (depth >= 0 || level == -depth)
+    {
+        ob = first;
+        do {
+            put_ref_object(svp, ob, "deep_inventory");
+            svp++;
+        } while ( NULL != (ob = ob->next_inv) );
+    }
+
+    /* Recurse into the next level if required */
+    if (depth == 0 || (depth > 0 && level < depth) || level < -depth)
+    {
+        ob = first;
+        do {
+            if (ob->contains)
+                svp = write_deep_inventory(ob->contains, svp, level+1, depth);
+        } while ( NULL != (ob = ob->next_inv) );
+    }
 
     return svp;
 } /* write_deep_inventory() */
@@ -3946,14 +3979,17 @@ write_deep_inventory (object_t *first, svalue_t *svp)
 static
 #endif
        vector_t *
-deep_inventory (object_t *ob, Bool take_top)
+deep_inventory (object_t *ob, Bool take_top, p_int depth)
 
 /* Return a vector with the full inventory of <ob>, i.e. all objects contained
  * by <ob> and all deep inventories of those objects, too. The resulting
  * vector is created by a recursive breadth search.
  *
- * If <take_top> is true, <ob> itself is included as first element in the
- * result vector.
+ * If <take_top> is true (and <depth> not negative), <ob> itself is included
+ * as first element in the result vector.
+ *
+ * If <depth> is not 0, it determines the depth up to which the inventory
+ * is searched (see v_deep_inventory()).
  *
  * The function is used for the efuns deep_inventory() and parse_command().
  */
@@ -3964,9 +4000,9 @@ deep_inventory (object_t *ob, Bool take_top)
     int n;                /* Number of elements in dinv */
 
     /* Count the contained objects */
-    n = take_top ? 1 : 0;
+    n = (take_top && depth >= 0) ? 1 : 0;
     if (ob->contains) {
-        n += deep_inventory_size(ob->contains);
+        n += deep_inventory_size(ob->contains, 1, depth);
     }
 
     /* Get the array */
@@ -3974,14 +4010,14 @@ deep_inventory (object_t *ob, Bool take_top)
     svp = dinv->item;
 
     /* Fill in <ob> if desired */
-    if (take_top) {
+    if (take_top && depth >= 0) {
         put_ref_object(svp, ob, "deep_inventory");
         svp++;
     }
 
     /* Fill in the deep inventory */
     if (ob->contains) {
-        write_deep_inventory(ob->contains, svp);
+        write_deep_inventory(ob->contains, svp, 1, depth);
     }
 
     return dinv;
@@ -3989,22 +4025,42 @@ deep_inventory (object_t *ob, Bool take_top)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_deep_inventory (svalue_t *sp)
+v_deep_inventory (svalue_t *sp, int num_arg)
 
 /* EFUN deep_inventory()
  *
  *   object *deep_inventory(void)
  *   object *deep_inventory(object ob)
+ *   object *deep_inventory(object ob, int depth)
  *
  * Returns an array of the objects contained in the inventory of
  * ob (or this_object() if no arg given) and in the inventories
  * of these objects, climbing down recursively.
+ *
+ * If <depth> is given and not 0, the result is limited as follows:
+ *   <depth> > 0: Only the objects in the first <depth> levels of inventory
+ *                are returned.
+ *   <depth> < 0: Only the object in level -<depth> of inventory are returned.
+ * In this, level '1' is the inventory of <ob> itself.
  */
 
 {
     vector_t *vec;
+    p_int depth = 0;
 
-    vec = deep_inventory(sp->u.ob, MY_FALSE);
+    /* Get the depth argument from the stack, if any */
+    if (num_arg > 1)
+    {
+        depth = sp->u.number;
+        sp--;
+    }
+
+    /* If no object was given, push the current object onto the stack */
+    if (num_arg < 1)
+        push_ref_object(sp, current_object, "deep_inventory");
+    inter_sp = sp;
+
+    vec = deep_inventory(sp->u.ob, MY_FALSE, depth);
 
     free_object_svalue(sp);
     put_array(sp, vec);
