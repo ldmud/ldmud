@@ -7524,6 +7524,35 @@ v_input_to (svalue_t *sp, int num_arg)
             | ((iflags & INPUT_IGNORE_BANG) ? IGNORE_BANG  : 0)
           ;
 
+    /* Check the arguments */
+
+    if (iflags & INPUT_PROMPT)
+    {
+        if (num_arg <= 2)
+        {
+            error("Missing prompt argument to input_to().\n");
+            /* NOTREACHED */
+        }
+
+        if (arg[2].type != T_STRING && arg[2].type != T_CLOSURE)
+        {
+            vefun_bad_arg(3, arg-1);
+            /* NOTREACHED */
+        }
+    }
+
+    if ((flags & IGNORE_BANG)
+     && !privilege_violation4(STR_INPUT_TO, command_giver, 0, flags, sp))
+    {
+        do
+        {
+            free_svalue(sp--);
+        } while (--num_arg);
+        
+        put_number(arg, 0); /* arg should equal sp+1 */
+        return arg;
+    }
+
     /* Allocate and setup the input_to structure */
 
     xallocate(it, sizeof *it, "new input_to");
@@ -7534,20 +7563,6 @@ v_input_to (svalue_t *sp, int num_arg)
 
     if (iflags & INPUT_PROMPT)
     {
-        if (num_arg <= 2)
-        {
-            free_input_to(it);
-            error("Missing prompt argument to input_to().\n");
-            /* NOTREACHED */
-        }
-
-        if (arg[2].type != T_STRING && arg[2].type != T_CLOSURE)
-        {
-            free_input_to(it);
-            vefun_bad_arg(3, arg-1);
-            /* NOTREACHED */
-        }
-
         transfer_svalue(&(it->prompt), arg+2);
         extra--;
         extra_arg++;
@@ -7578,21 +7593,14 @@ v_input_to (svalue_t *sp, int num_arg)
         return arg-1;
     }
 
-    /* If the master agrees (only in case of IGNORE_BANG) the
-     * the input_to can be set - return 1.
-     */
+    /* Try stetting the input_to. On success, return 1. */
 
-    sp->type = T_NUMBER;
-    if (!(flags & IGNORE_BANG)
-     || privilege_violation4(STR_INPUT_TO, command_giver, 0, flags, sp))
+    if (set_call( command_giver, it, (char)flags
+                , (iflags & INPUT_NO_TELNET) != 0)
+       )
     {
-        if (set_call( command_giver, it, (char)flags
-                    , (iflags & INPUT_NO_TELNET) != 0)
-           )
-        {
-            put_number(arg, 1);
-            return arg;
-        }
+        put_number(arg, 1);
+        return arg;
     }
 
     /* input_to() was not allowed - return 0. */
