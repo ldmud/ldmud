@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+22-Dec-2004 (Lars Duening)  (3.3.635)
+  - (pkg_tls, func_spec, configure) Incorporated the GNUTLS patches from Peng
+       and Gawain: use the new gnutls parameter generation if available;
+       properly handle threading; don't request a client certificate since we
+       don't need it; and the new fun tls_available() returns whether the
+       TLS package could be initialized or not (Bug #0000082).
+
 22-Dec-2004 (Lars Duening)  (3.3.634)
   - (func_spec, efuns.c) New efun regexp_package() to determine the
        currently active default regexp package.

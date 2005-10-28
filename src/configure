@@ -9938,6 +9938,72 @@ if test $ac_cv_lib_gnutls_gnutls_global_init = yes; then
 fi
 
         fi
+        echo "$as_me:$LINENO: checking gnutls version" >&5
+echo $ECHO_N "checking gnutls version... $ECHO_C" >&6
+if test "${lp_cv_has_gnutls_version+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  savelibs="$LIBS"
+	    LIBS="$PKGLIBS"
+            if test "$cross_compiling" = yes; then
+  { { echo "$as_me:$LINENO: error: cannot run test program while cross compiling
+See \`config.log' for more details." >&5
+echo "$as_me: error: cannot run test program while cross compiling
+See \`config.log' for more details." >&2;}
+   { (exit 1); exit 1; }; }
+else
+  cat >conftest.$ac_ext <<_ACEOF
+#line $LINENO "configure"
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+    #include <gnutls/gnutls.h>
+    void t (void)
+    {
+	gnutls_dh_params dh_params;
+	gnutls_dh_params_generate2( dh_params, 1024);
+    }
+    int main(void)
+    {
+        return 0;
+    }
+
+_ACEOF
+rm -f conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } && { ac_try='./conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  lp_cv_has_gnutls_version=8
+else
+  echo "$as_me: program exited with status $ac_status" >&5
+echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+( exit $ac_status )
+lp_cv_has_gnutls_version=7
+
+fi
+rm -f core core.* *.core gmon.out bb.out conftest$ac_exeext conftest.$ac_objext conftest.$ac_ext
+fi
+fi
+echo "$as_me:$LINENO: result: $lp_cv_has_gnutls_version" >&5
+echo "${ECHO_T}$lp_cv_has_gnutls_version" >&6
+	LIBS="$savelibs"
+	cat >>confdefs.h <<_ACEOF
+#define HAS_GNUTLS_VERSION $lp_cv_has_gnutls_version
+_ACEOF
+
+
     else
         has_tls=no
     fi

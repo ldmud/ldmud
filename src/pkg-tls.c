@@ -9,6 +9,7 @@
  */
 
 #include "driver.h"
+#include "machine.h"
 
 #ifdef USE_TLS
 
@@ -22,6 +23,10 @@
 #  include <sys/utsname.h>
 #elif defined(HAS_GNUTLS)
 #  include <gnutls/gnutls.h>
+#  include <gcrypt.h>
+#  if defined(USE_PTHREADS) && defined(GCRY_THREAD_OPTION_PTHREAD_IMPL)
+     GCRY_THREAD_OPTION_PTHREAD_IMPL;
+#  endif
 #endif
 
 #include "pkg-tls.h"
@@ -148,6 +153,7 @@ generate_dh_params (void)
  */
 
 {
+#if HAS_GNUTLS_VERSION < 8
     gnutls_datum prime, generator;
 
     gnutls_dh_params_init( &dh_params);
@@ -156,7 +162,10 @@ generate_dh_params (void)
 
     free( prime.data);
     free( generator.data);
-
+#else
+    gnutls_dh_params_init( &dh_params);
+    gnutls_dh_params_generate2( dh_params, DH_BITS);
+#endif
     return 0;
 } /* generate_dh_params() */
 
@@ -177,10 +186,6 @@ initialize_tls_session (gnutls_session *session)
     gnutls_set_default_priority( *session);   
 	    
     gnutls_credentials_set( *session, GNUTLS_CRD_CERTIFICATE, x509_cred);
-
-    /* request client certificate if any.
-     */
-    gnutls_certificate_server_set_request( *session, GNUTLS_CERT_REQUEST);
 
     gnutls_dh_set_prime_bits( *session, DH_BITS);
 } /* initialize_tls_session() */
@@ -382,6 +387,10 @@ ssl_init_err:
                                     tls_rexalloc,
                                     tls_xfree);
 
+#  if defined(USE_PTHREADS) && defined(GCRY_THREAD_OPTION_PTHREAD_IMPL)
+    gcry_control (GCRYCTL_SET_THREAD_CBS, &gcry_threads_pthread);
+#endif
+
     gnutls_global_init();
 
     gnutls_certificate_allocate_credentials(&x509_cred);
@@ -401,6 +410,7 @@ ssl_init_err:
     }
     else
     {
+       printf("%s TLS: x509 keyfile and certificate set.\n", time_stamp());
         generate_dh_params();
 
         gnutls_certificate_set_dh_params( x509_cred, dh_params);
@@ -441,6 +451,9 @@ tls_global_deinit (void)
 
     gnutls_global_deinit();
 #endif /* SSL Package */
+
+    tls_available = MY_FALSE;
+
 } /* tls_global_deinit() */
 
 /*-------------------------------------------------------------------------*/
@@ -474,7 +487,9 @@ tls_read (interactive_t *ip, char *buffer, int length)
 
 #elif defined(HAS_GNUTLS)
 
-    ret = gnutls_record_recv( ip->tls_session, buffer, length);
+    do {
+           ret = gnutls_record_recv(ip->tls_session, buffer, length);
+    } while ( ret < 0 && (ret == GNUTLS_E_INTERRUPTED || ret == GNUTLS_E_AGAIN) );
 
     if (ret == 0)
     {
@@ -491,7 +506,7 @@ tls_read (interactive_t *ip, char *buffer, int length)
     }
 #endif /* SSL Package */
 
-    return ret;
+    return (ret < 0 ? -1 : ret);
 } /* tls_read() */
 
 /*-------------------------------------------------------------------------*/
@@ -531,7 +546,7 @@ tls_write (interactive_t *ip, char *buffer, int length)
     }
 #endif /* SSL Package */
 
-    return ret;
+    return (ret<0 ? -1 : ret);
 } /* tls_write() */
 
 /*-------------------------------------------------------------------------*/
@@ -833,6 +848,15 @@ f_tls_deinit_connection(svalue_t *sp)
         error("Bad arg 1 to tls_deinit_connection(): "
               "object not interactive.\n");
 
+    /* Flush the connection */
+
+    {
+        object_t * save_c_g = command_giver;
+        command_giver = sp->u.ob;
+        add_message(message_flush);
+        command_giver = save_c_g;
+    }
+
     tls_deinit_connection(ip);
 
     free_svalue(sp);
@@ -983,6 +1007,24 @@ f_tls_query_connection_info (svalue_t *sp)
 
     return sp;
 } /* tls_query_connection_info() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_tls_available (svalue_t *sp)
+
+/* EFUN tls_available()
+ *
+ *       int tls_available ()
+ *
+ * If the global TLS Initialisation could not been set up, tls_available()
+ * returns 0, otherwise 1.
+ */
+
+{
+  sp++;
+  put_number(sp, tls_available == MY_TRUE ? 1 : 0);
+  return sp;
+} /* f_tls_available() */
 
 #endif /* USE_TLS */
 

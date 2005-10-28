@@ -715,6 +715,7 @@ int    *tls_query_connection_info(object default: F_THIS_OBJECT);
 int     tls_init_connection(void|object, ...);
 void    tls_deinit_connection(object default: F_THIS_OBJECT);
 string  tls_error(int);
+int     tls_available();
 
 #endif /* USE_TLS */
 

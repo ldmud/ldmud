@@ -81,7 +81,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + struct_info(): Return information about a struct.
        + structp(): Predicate efun to detect structs.
        + tls_query_connection_state(), tls_query_connection_info(),
-         tls_init_connection(), tls_deinit_connection(), tls_error():
+         tls_init_connection(), tls_deinit_connection(), tls_error(),
+         tls_available():
            Optional: Support for TLS connections.
        + to_struct(): Convert an array into a struct.
 

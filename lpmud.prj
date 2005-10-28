@@ -54,16 +54,19 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 634)
-(Parent-Version lpmud 3-3 633)
+(Project-Version lpmud 3-3 635)
+(Parent-Version lpmud 3-3 634)
 (Version-Log "
-  - (func_spec, efuns.c) New efun regexp_package() to determine the
-       currently active default regexp package.
+  - (pkg_tls, func_spec, configure) Incorporated the GNUTLS patches from Peng
+       and Gawain: use the new gnutls parameter generation if available;
+       properly handle threading; don't request a client certificate since we
+       don't need it; and the new fun tls_available() returns whether the
+       TLS package could be initialized or not (Bug #0000082).
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Wed, 22 Dec 2004 17:21:22 -0700")
+(Checkin-Time "Wed, 22 Dec 2004 18:04:09 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -101,22 +104,22 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.12 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.83 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.697 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.385.1.1 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.698 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.385.1.2 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
   ;; Configuration
-  (src/configure (lpmud/d/0_configure 1.19.1.109 755))
+  (src/configure (lpmud/d/0_configure 1.19.1.109.1.1 755))
   (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.43 644))
-  (src/machine.h.in (lpmud/b/9_machine.h. 1.9.1.13 644))
+  (src/machine.h.in (lpmud/b/9_machine.h. 1.9.1.14 644))
   (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.19.1.34 644))
   (src/mkinstalldirs (lpmud/c/4_mkinstalld 1.1 644))
   (src/install-sh (lpmud/c/5_install-sh 1.2 755))
   (src/ldmud-man.txt (lpmud/c/c/29_ldmud-man. 1.1 644))
 
-  (src/autoconf/configure.in (lpmud/d/7_configure. 1.20.1.9.1.99 644))
-  (src/autoconf/acconfig.h (lpmud/d/10_acconfig.h 1.6.1.12 644))
+  (src/autoconf/configure.in (lpmud/d/7_configure. 1.20.1.9.1.100 644))
+  (src/autoconf/acconfig.h (lpmud/d/10_acconfig.h 1.6.1.13 644))
 
   (src/settings/README (lpmud/c/22_README 1.14.1.16 644))
   (src/settings/default (lpmud/c/23_default 1.13.1.5.1.50 744))
@@ -318,8 +321,8 @@
   (src/pkg-pcre.c (lpmud/q/48_pcre-pcre. 1.10 644))
   (src/pkg-pgsql.c (lpmud/d/b/39_pkg-pgsql. 1.3 644))
   (src/pkg-pgsql.h (lpmud/d/b/40_pkg-pgsql. 1.2 644))
-  (src/pkg-tls.h (lpmud/e/b/10_pkg-tls.h 1.6 644))
-  (src/pkg-tls.c (lpmud/e/b/11_pkg-tls.c 1.13 644))
+  (src/pkg-tls.h (lpmud/e/b/10_pkg-tls.h 1.7 644))
+  (src/pkg-tls.c (lpmud/e/b/11_pkg-tls.c 1.14 644))
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.20 644))
   (src/port.c (lpmud/39_port.c 1.17.1.9 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.17.1.5 644))
@@ -359,7 +362,7 @@
   (src/xptmalloc.c (lpmud/d/b/10_xptmalloc. 1.5 644))
 
   ;; Build files
-  (src/func_spec (lpmud/c/31_func_spec 1.53.1.45.1.22.1.39.1.1 644))
+  (src/func_spec (lpmud/c/31_func_spec 1.53.1.45.1.22.1.39.1.2 644))
   (src/string_spec (lpmud/f/6_string_spe 1.14.1.17 644))
   (src/mkfunc.c (lpmud/l/14_mkfunc.c 1.1 644))
   (src/make_func.y (lpmud/b/7_make_func. 1.25.1.30.1.12 644))
@@ -889,11 +892,12 @@
   (doc/efun/this_player (lpmud/q/42_this_playe 1.4 644))
   (doc/efun/throw (lpmud/q/43_throw 1.3 644))
   (doc/efun/time (lpmud/q/44_time 1.1.1.5 644))
-  (doc/efun/tls_deinit_connection (lpmud/e/b/14_tls_deinit 1.2 644))
-  (doc/efun/tls_error (lpmud/e/b/15_tls_error 1.2 644))
-  (doc/efun/tls_init_connection (lpmud/e/b/16_tls_init_c 1.4 644))
-  (doc/efun/tls_query_connection_info (lpmud/e/b/17_tls_query_ 1.5 644))
-  (doc/efun/tls_query_connection_state (lpmud/e/b/18_tls_query_ 1.3 644))
+  (doc/efun/tls_available (lpmud/d/c/13_tls_availa 1.1 644))
+  (doc/efun/tls_deinit_connection (lpmud/e/b/14_tls_deinit 1.3 644))
+  (doc/efun/tls_error (lpmud/e/b/15_tls_error 1.3 644))
+  (doc/efun/tls_init_connection (lpmud/e/b/16_tls_init_c 1.5 644))
+  (doc/efun/tls_query_connection_info (lpmud/e/b/17_tls_query_ 1.6 644))
+  (doc/efun/tls_query_connection_state (lpmud/e/b/18_tls_query_ 1.4 644))
   (doc/efun/to_array (lpmud/q/45_to_array 1.7 644))
   (doc/efun/to_float (lpmud/q/46_to_float 1.4 644))
   (doc/efun/to_int (lpmud/q/47_to_int 1.9 644))

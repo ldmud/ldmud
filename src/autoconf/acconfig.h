@@ -101,6 +101,7 @@
 
 /* Does the machine offer GnuTLS? */
 #undef HAS_GNUTLS
+#undef HAS_GNUTLS_VERSION
 
 /* Does the machine offer OpenSSL/SSL? */
 #undef HAS_OPENSSL

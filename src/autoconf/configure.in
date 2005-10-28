@@ -883,6 +883,27 @@ if test "$tls_package" = "any" -o "$tls_package" = "gnu"; then
                          lp_cv_has_lib_gnutls=yes
                         )
         fi
+        AC_CACHE_CHECK(gnutls version, lp_cv_has_gnutls_version,
+	    savelibs="$LIBS"
+	    LIBS="$PKGLIBS"
+            AC_TRY_RUN([
+    #include <gnutls/gnutls.h>
+    void t (void)
+    {
+	gnutls_dh_params dh_params;
+	gnutls_dh_params_generate2( dh_params, 1024);
+    }
+    int main(void)
+    {
+        return 0;
+    }
+            ],
+            lp_cv_has_gnutls_version=8,
+            lp_cv_has_gnutls_version=7
+        ))
+	LIBS="$savelibs"
+	AC_DEFINE_UNQUOTED(HAS_GNUTLS_VERSION, $lp_cv_has_gnutls_version)
+
     else
         has_tls=no
     fi

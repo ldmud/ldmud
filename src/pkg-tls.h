@@ -49,6 +49,7 @@ extern svalue_t *f_tls_deinit_connection(svalue_t *sp);
 extern svalue_t *f_tls_error(svalue_t *sp);
 extern svalue_t *f_tls_query_connection_state(svalue_t *sp);
 extern svalue_t *f_tls_query_connection_info(svalue_t *sp);
+extern svalue_t *f_tls_available (svalue_t *sp);
 
 #endif /* USE_TLS */
 
