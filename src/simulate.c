@@ -418,18 +418,20 @@ catch_instruction ( int flags, uint offset
 
         /* Increase the eval_cost for the duration of the catch so that
          * there is enough time left to handle an eval-too-big error.
+         * Do this before the check as the error handling will subtract
+         * the reserve again.
          */
-        if (max_eval_cost && eval_cost + reserve_cost >= max_eval_cost)
+        eval_cost += reserve_cost;
+        assigned_eval_cost += reserve_cost;
+
+        if (max_eval_cost && eval_cost >= max_eval_cost)
         {
             error("Not enough eval time left for catch(): required %ld, available %ld\n"
-                 , (long)reserve_cost, (long)(max_eval_cost - eval_cost)
+                 , (long)reserve_cost, (long)(max_eval_cost - eval_cost + reserve_cost)
                  );
             /* NOTREACHED */
             return MY_TRUE;
         }
-
-        eval_cost += reserve_cost;
-        assigned_eval_cost += reserve_cost;
 
         /* Recursively call the interpreter */
         rc = eval_instruction(i_pc, INTER_SP);
@@ -501,7 +503,7 @@ restore_limits_context (struct limits_context_s * context)
         int32 elapsed_cost = eval_cost - context->eval_cost; 
 
         if (elapsed_cost > use_eval_cost)
-            assigned_eval_cost = eval_cost = use_eval_cost;
+            assigned_eval_cost = eval_cost = use_eval_cost + context->eval_cost;
         assigned_eval_cost = eval_cost;
     }
     else /* (use_eval_cost < 0) */

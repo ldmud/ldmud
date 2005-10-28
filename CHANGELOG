@@ -1,6 +1,21 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+13-Jul-2004 (Lars Duening)  (3.3.574)
+  - (prolang.y) The 'public foo() shadows private bar()' warning no longer
+       warns about the __INIT() function (Bug #0000085).
+  - (efuns.c) Removed a memory leak in ctime( <vector> ) (Bug #0000087).
+  - (simulate.c) In catch(), the check if there are enough evals left
+       was done before the reserve had been added to the eval cost. Since
+       the handling for this case was changed to a runtime error, this
+       caused the error handler to subtract a reserve which wasn't there,
+       in the process messing up eval cost handling (Bug #0000088).
+  - (simulate.c) The restoration of eval limits didn't handle the case
+       of a fixed eval cost (USE_EVAL_COST > 0) correctly if the process had
+       used more than the given amount: the total eval cost was set to the
+       given amount, instead of adding the amount to the previous eval cost
+       value (Bug #0000077).
+
 12-Jul-2004 (Lars Duening)  (3.3.573)
   - (actions.c) Efun remove_action() didn't check if the sentence under
        scrutiny is a true verb or a shadow sentence - this caused a crash

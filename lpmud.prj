@@ -60,17 +60,27 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 573)
-(Parent-Version lpmud 3-3 572)
+(Project-Version lpmud 3-3 574)
+(Parent-Version lpmud 3-3 573)
 (Version-Log "
-  - (actions.c) Efun remove_action() didn't check if the sentence under
-       scrutiny is a true verb or a shadow sentence - this caused a crash
-       if a shadow object executed remove_action(1, shadowee) (Bug #0000080).
+  - (prolang.y) The 'public foo() shadows private bar()' warning no longer
+       warns about the __INIT() function (Bug #0000085).
+  - (efuns.c) Removed a memory leak in ctime( <vector> ) (Bug #0000087).
+  - (simulate.c) In catch(), the check if there are enough evals left
+       was done before the reserve had been added to the eval cost. Since
+       the handling for this case was changed to a runtime error, this
+       caused the error handler to subtract a reserve which wasn't there,
+       in the process messing up eval cost handling (Bug #0000088).
+  - (simulate.c) The restoration of eval limits didn't handle the case
+       of a fixed eval cost (USE_EVAL_COST > 0) correctly if the process had
+       used more than the given amount: the total eval cost was set to the
+       given amount, instead of adding the amount to the previous eval cost
+       value (Bug #0000077).
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Mon, 12 Jul 2004 21:44:40 -0600")
+(Checkin-Time "Tue, 13 Jul 2004 22:53:58 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -108,7 +118,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.77 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.636 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.637 644))
   (HISTORY (lpmud/f/49_HISTORY 1.365 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -185,7 +195,7 @@
   (src/ed.h (lpmud/f/34_ed.h 1.5.1.6 644))
   (src/ed.c (lpmud/c/33_ed.c 1.32.1.31 644))
   (src/efuns.h (lpmud/l/20_efuns.h 1.13.1.19.1.6 644))
-  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.94 644))
+  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.95 644))
   (src/exec.h (lpmud/c/32_exec.h 1.34.1.33.1.7 644))
   (src/files.h (lpmud/i/49_files.h 1.2 644))
   (src/files.c (lpmud/i/50_files.c 1.25 644))
@@ -329,7 +339,7 @@
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.20 644))
   (src/port.c (lpmud/39_port.c 1.17.1.9 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.17.1.4 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.64 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.65 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7.1.2 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))
@@ -342,7 +352,7 @@
   (src/simul_efun.h (lpmud/f/17_simul_efun 1.5.1.6 644))
   (src/simul_efun.c (lpmud/32_simul_efun 1.20.1.17.1.7 644))
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.36 644))
-  (src/simulate.c (lpmud/31_simulate.c 1.88.1.128 644))
+  (src/simulate.c (lpmud/31_simulate.c 1.88.1.129 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.14 644))
   (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.97 644))
   (src/sysmalloc.h (lpmud/c/b/33_sysmalloc. 1.2 644))

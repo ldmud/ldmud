@@ -8328,6 +8328,7 @@ f_ctime(svalue_t *sp)
     {
         memsafe(rc = new_mstring(ts), strlen(ts), "ctime() result");
     }
+    free_svalue(sp);
     put_string(sp, rc);
     return sp;
 } /* f_ctime() */

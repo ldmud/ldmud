@@ -1777,6 +1777,56 @@ check_aggregate_types (int n)
 } /* check_aggregate_types() */
 
 
+/*-------------------------------------------------------------------------*/
+static INLINE void
+warn_function_shadow ( const string_t *pubProg, const string_t * pubFun
+                     , const string_t *privProg, const string_t * privFun
+                     )
+
+/* Issue a warning that the public function <pubProg>::<pubFun>() shadows the
+ * private function <privProg>::<privFun>().
+ * Both <pubProg> and <privProg> can be NULL.
+ * If the function is __INIT(), no warning is printed.
+ */
+
+{
+    string_t *pubCProg = NULL;
+    string_t *privCProg = NULL;
+
+    if (mstreq(pubFun, STR_VARINIT) && mstreq(privFun, STR_VARINIT))
+        return;
+
+    if (pubProg != NULL)  pubCProg = cvt_progname(pubProg);
+    if (privProg != NULL) privCProg = cvt_progname(privProg);
+
+    if (pubCProg != NULL)
+    {
+        if (privCProg != NULL)
+            yywarnf("public %s::%s() shadows private %s::%s()"
+                  , get_txt(pubCProg), get_txt(pubFun)
+                  , get_txt(privCProg), get_txt(privFun)
+                );
+        else
+            yywarnf("public %s::%s() shadows private %s()"
+                  , get_txt(pubCProg), get_txt(pubFun)
+                  , get_txt(privFun)
+                );
+    }
+    else if (privCProg != NULL)
+        yywarnf("public %s() shadows private %s::%s()"
+              , get_txt(pubFun)
+              , get_txt(privCProg), get_txt(privFun)
+            );
+    else
+        yywarnf("public %s() shadows private %s()"
+              , get_txt(pubFun)
+              , get_txt(privFun)
+            );
+    
+    if (pubCProg != NULL)  free_mstring(pubCProg);
+    if (privCProg != NULL) free_mstring(privCProg);
+} /* warn_function_shadow() */
+
 /* =============================   CODEGEN   ============================= */
 
 /*-------------------------------------------------------------------------*/
@@ -14714,26 +14764,15 @@ copy_functions (program_t *from, funflag_t type)
                             if (OldFunction->flags & TYPE_MOD_PRIVATE)
                             {
                                 string_t * oldFrom = NULL;
-                                string_t * funFrom = cvt_progname(from->name);
 
                                 if (OldFunction->flags & NAME_INHERITED)
                                 {
-                                    oldFrom = cvt_progname(INHERIT(OldFunction->offset.inherit).prog->name);
+                                    oldFrom = INHERIT(OldFunction->offset.inherit).prog->name;
                                 }
 
-                                if (oldFrom != NULL)
-                                    yywarnf("public %s::%s() shadows private %s::%s()"
-                                          , get_txt(funFrom), get_txt(fun.name)
-                                          , get_txt(oldFrom), get_txt(OldFunction->name)
-                                        );
-                                else
-                                    yywarnf("public %s::%s() shadows private %s()"
-                                          , get_txt(funFrom), get_txt(fun.name)
-                                          , get_txt(OldFunction->name)
-                                        );
-
-                                if (oldFrom) free_mstring(oldFrom);
-                                if (funFrom) free_mstring(funFrom);
+                                warn_function_shadow( from->name, fun.name
+                                                    , oldFrom, OldFunction->name
+                                                    );
                             }
 
                             cross_define( &fun, OldFunction
@@ -14760,45 +14799,27 @@ copy_functions (program_t *from, funflag_t type)
                              * private are to be expected.
                              */
                             string_t * oldFrom = NULL;
-                            string_t * funFrom = cvt_progname(from->name);
 
                             if (OldFunction->flags & NAME_INHERITED)
                             {
-                                oldFrom = cvt_progname(INHERIT(OldFunction->offset.inherit).prog->name);
+                                oldFrom = INHERIT(OldFunction->offset.inherit).prog->name;
                             }
 
                             if ((fun.flags & TYPE_MOD_PRIVATE)
                              && !(OldFunction->flags & TYPE_MOD_PRIVATE))
                             {
-                                if (oldFrom != NULL)
-                                    yywarnf("public %s::%s() shadows private %s::%s()"
-                                          , get_txt(oldFrom), get_txt(OldFunction->name)
-                                          , get_txt(funFrom), get_txt(fun.name)
-                                        );
-                                else
-                                    yywarnf("public %s() shadows private %s::%s()"
-                                          , get_txt(OldFunction->name)
-                                          , get_txt(funFrom), get_txt(fun.name)
-                                        );
+                                warn_function_shadow( oldFrom, OldFunction->name
+                                                    , from->name, fun.name
+                                                    );
                             }
                             else if (!(fun.flags & TYPE_MOD_PRIVATE)
                                   && (OldFunction->flags & TYPE_MOD_PRIVATE)
                                 )
                             {
-                                if (oldFrom != NULL)
-                                    yywarnf("public %s::%s() shadows private %s::%s()"
-                                          , get_txt(funFrom), get_txt(fun.name)
-                                          , get_txt(oldFrom), get_txt(OldFunction->name)
-                                        );
-                                else
-                                    yywarnf("public %s::%s() shadows private %s()"
-                                          , get_txt(funFrom), get_txt(fun.name)
-                                          , get_txt(OldFunction->name)
-                                        );
+                                warn_function_shadow( from->name, fun.name
+                                                    , oldFrom, OldFunction->name
+                                                    );
                             }
-
-                            if (oldFrom) free_mstring(oldFrom);
-                            if (funFrom) free_mstring(funFrom);
 
                             cross_define( OldFunction, &fun
                                         , n - current_func_index );
