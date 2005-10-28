@@ -60,18 +60,17 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 560)
-(Parent-Version lpmud 3-3 559)
+(Project-Version lpmud 3-3 561)
+(Parent-Version lpmud 3-3 560)
 (Version-Log "
-  - (prolang.y, interpret.c, simulate, string_spec, closure.c) Added
-       modifier 'reserve' to the catch() instruction in order to
-       specify the reserved amount of eval ticks at runtime (suggested
-       by Menaures).
+  - (prolang.y) The 'public shadows private' warning now checks only
+       for genuinely private functions, not merely hidden ones. This should
+       make the warning more accurate.
 ")
 (New-Version-Log
 ""
 )
-(Checkin-Time "Tue, 25 May 2004 21:32:18 -0600")
+(Checkin-Time "Wed, 26 May 2004 20:17:32 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -109,7 +108,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.76 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.623 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.624 644))
   (HISTORY (lpmud/f/49_HISTORY 1.358 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -283,7 +282,7 @@
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.19 644))
   (src/port.c (lpmud/39_port.c 1.17.1.9 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.17.1.4 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.63 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.64 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7.1.2 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))

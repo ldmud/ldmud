@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+26-May-2004 (Lars Duening)  (3.3.561)
+  - (prolang.y) The 'public shadows private' warning now checks only
+       for genuinely private functions, not merely hidden ones. This should
+       make the warning more accurate.
+
 25-May-2004 (Lars Duening)  (3.3.560)
   - (prolang.y, interpret.c, simulate, string_spec, closure.c) Added
        modifier 'reserve' to the catch() instruction in order to

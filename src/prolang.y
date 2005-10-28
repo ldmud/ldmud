@@ -14711,62 +14711,30 @@ copy_functions (program_t *from, funflag_t type)
                              * inherited one is not, or this one is also nomask:
                              * prefer the inherited one.
                              */
-                            string_t * oldFrom = NULL;
-                            string_t * funFrom = cvt_progname(from->name);
-
-                            if (OldFunction->flags & NAME_INHERITED)
+                            if (OldFunction->flags & TYPE_MOD_PRIVATE)
                             {
-                                oldFrom = cvt_progname(INHERIT(OldFunction->offset.inherit).prog->name);
+                                string_t * oldFrom = NULL;
+                                string_t * funFrom = cvt_progname(from->name);
+
+                                if (OldFunction->flags & NAME_INHERITED)
+                                {
+                                    oldFrom = cvt_progname(INHERIT(OldFunction->offset.inherit).prog->name);
+                                }
+
+                                if (oldFrom != NULL)
+                                    yywarnf("public %s::%s() shadows private %s::%s()"
+                                          , get_txt(funFrom), get_txt(fun.name)
+                                          , get_txt(oldFrom), get_txt(OldFunction->name)
+                                        );
+                                else
+                                    yywarnf("public %s::%s() shadows private %s()"
+                                          , get_txt(funFrom), get_txt(fun.name)
+                                          , get_txt(OldFunction->name)
+                                        );
+
+                                if (oldFrom) free_mstring(oldFrom);
+                                if (funFrom) free_mstring(funFrom);
                             }
-
-                            if (oldFrom != NULL)
-                                yywarnf("public %s::%s() shadows private %s::%s()"
-                                      , get_txt(funFrom), get_txt(fun.name)
-                                      , get_txt(oldFrom), get_txt(OldFunction->name)
-                                    );
-                            else
-                                yywarnf("public %s::%s() shadows private %s()"
-                                      , get_txt(funFrom), get_txt(fun.name)
-                                      , get_txt(OldFunction->name)
-                                    );
-
-                            if (oldFrom) free_mstring(oldFrom);
-                            if (funFrom) free_mstring(funFrom);
-
-                            cross_define( &fun, OldFunction
-                                        , current_func_index - n );
-                            p->u.global.function = current_func_index;
-                        }
-                        else if ((   fun.flags & TYPE_MOD_NO_MASK
-                                  || OldFunction->flags & (NAME_HIDDEN|NAME_UNDEFINED|TYPE_MOD_PROTECTED))
-                              && !(fun.flags & (NAME_HIDDEN|NAME_UNDEFINED))
-                                )
-                        {
-                            /* This function is visible and existing, but the
-                             * inherited one is not, or this one is also nomask:
-                             * prefer the inherited one.
-                             */
-                            string_t * oldFrom = NULL;
-                            string_t * funFrom = cvt_progname(from->name);
-
-                            if (OldFunction->flags & NAME_INHERITED)
-                            {
-                                oldFrom = cvt_progname(INHERIT(OldFunction->offset.inherit).prog->name);
-                            }
-
-                            if (oldFrom != NULL)
-                                yywarnf("public %s::%s() shadows private %s::%s()"
-                                      , get_txt(funFrom), get_txt(OldFunction->name)
-                                      , get_txt(from->name), get_txt(fun.name)
-                                    );
-                            else
-                                yywarnf("public %s() shadows private %s::%s()"
-                                      , get_txt(OldFunction->name)
-                                      , get_txt(funFrom), get_txt(fun.name)
-                                    );
-
-                            if (oldFrom) free_mstring(oldFrom);
-                            if (funFrom) free_mstring(funFrom);
 
                             cross_define( &fun, OldFunction
                                         , current_func_index - n );
@@ -14799,8 +14767,8 @@ copy_functions (program_t *from, funflag_t type)
                                 oldFrom = cvt_progname(INHERIT(OldFunction->offset.inherit).prog->name);
                             }
 
-                            if ((fun.flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN))
-                             && !(OldFunction->flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN)))
+                            if ((fun.flags & TYPE_MOD_PRIVATE)
+                             && !(OldFunction->flags & TYPE_MOD_PRIVATE))
                             {
                                 if (oldFrom != NULL)
                                     yywarnf("public %s::%s() shadows private %s::%s()"
@@ -14813,8 +14781,8 @@ copy_functions (program_t *from, funflag_t type)
                                           , get_txt(funFrom), get_txt(fun.name)
                                         );
                             }
-                            else if (!(fun.flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN))
-                                  && (OldFunction->flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN))
+                            else if (!(fun.flags & TYPE_MOD_PRIVATE)
+                                  && (OldFunction->flags & TYPE_MOD_PRIVATE)
                                 )
                             {
                                 if (oldFrom != NULL)
