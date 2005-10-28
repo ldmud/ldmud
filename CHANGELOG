@@ -1,7 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-07-Sep-2004 (Lars Duening)  (3.3.5987)
+09-Sep-2004 (Lars Duening)  (3.3.599)
+  - (mregex.c) On a collision in the hash table, the regdata_t structure
+       was freed with a call to free_regexp() - not good (Bug #0000128).
+
+07-Sep-2004 (Lars Duening)  (3.3.598)
   - (main, mregex.c, simulate.c) The H_REGEXP_PACKAGE hook can now accept
        the value 0 to fall back onto the package defined by the commandline
        arguments/configuration.

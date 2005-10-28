@@ -60,17 +60,16 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 598)
-(Parent-Version lpmud 3-3 597)
+(Project-Version lpmud 3-3 599)
+(Parent-Version lpmud 3-3 598)
 (Version-Log "
-  - (main, mregex.c, simulate.c) The H_REGEXP_PACKAGE hook can now accept
-       the value 0 to fall back onto the package defined by the commandline
-       arguments/configuration.
+  - (mregex.c) On a collision in the hash table, the regdata_t structure
+       was freed with a call to free_regexp() - not good (Bug #0000128).
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Tue, 07 Sep 2004 20:43:53 -0600")
+(Checkin-Time "Thu, 09 Sep 2004 07:46:23 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -108,7 +107,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.79 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.661 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.662 644))
   (HISTORY (lpmud/f/49_HISTORY 1.376 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -210,7 +209,7 @@
   (src/mempools.h (lpmud/d/48_mempools.h 1.2.1.8 644))
   (src/mempools.c (lpmud/d/49_mempools.c 1.2.1.15 644))
   (src/mregex.h (lpmud/e/29_rxcache.h 1.7.1.15 644))
-  (src/mregex.c (lpmud/e/30_rxcache.c 1.11.1.38 644))
+  (src/mregex.c (lpmud/e/30_rxcache.c 1.11.1.39 644))
   (src/mstrings.h (lpmud/i/35_mstrings.h 1.27 644))
   (src/mstrings.c (lpmud/i/36_mstrings.c 1.21.1.31 644))
   (src/my-alloca.h (lpmud/f/29_my-alloca. 1.3.1.2 644))
@@ -1380,6 +1379,7 @@
   (doc/efun.de/this_player.de (lpmud/f/b/40_this_playe 1.1 640))
   (doc/efun.de/this_object.de (lpmud/f/b/41_this_objec 1.1 640))
   (doc/efun.de/this_interactive.de (lpmud/f/b/42_this_inter 1.1 640))
+  (doc/efun.de/terminal_colour.de (lpmud/c/c/22_terminal_c 1.1 644))
   (doc/efun.de/test_bit.de (lpmud/f/b/43_test_bit.d 1.1 640))
   (doc/efun.de/tell_room.de (lpmud/f/b/44_tell_room. 1.2 640))
   (doc/efun.de/tell_object.de (lpmud/f/b/45_tell_objec 1.2 640))

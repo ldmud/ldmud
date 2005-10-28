@@ -554,7 +554,7 @@ rx_compile_data (string_t * expr, int opt, Bool from_ed)
         iNumXCollisions++;
         iNumXEntries--;
         iXSizeAlloc -= sizeof(*pHash) + pHash->size;
-        free_regexp((regexp_t *)pHash);
+        free_regdata((regdata_t *)pHash);
     }
 
     pHash = xalloc(sizeof(*pHash));
