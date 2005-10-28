@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+16-Jul-2004 (Lars Duening)  (3.3.576)
+  - (interpret.c) When printing a warning during the creation of in inline
+       closure, the global stack pointer was one too low (thanks, Gnomi)
+       (part of Bug #0000091)
+
 14-Jul-2004 (Lars Duening)  (3.3.575)
   - (prolang.y) The 'missing return' warning is no longer triggered if
        a function ends with raise_error() or throw().

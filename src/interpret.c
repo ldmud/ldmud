@@ -312,6 +312,8 @@ struct cache
    * efuns.
    */
 
+#define WARNF(s) do{inter_pc = pc; inter_sp = sp; warnf s ;}while(0)
+#define WARN(s) WARNF((s))
 #define FATALF(s) do{inter_pc = pc; inter_sp = sp; fatal s ;}while(0)
 #define FATAL(s) FATALF((s))
   /* Analogue.
@@ -7970,10 +7972,12 @@ again:
                 /* Efun or operator closure */
                 if (pragma_warn_deprecated
                  && instrs[ix - CLOSURE_EFUN_OFFS].deprecated != NULL)
-                    warnf("Warning: %s() is deprecated: %s\n"
-                         , instrs[ix - CLOSURE_EFUN_OFFS].name
-                         , instrs[ix - CLOSURE_EFUN_OFFS].deprecated
-                         );
+                {
+                    WARNF(("Warning: %s() is deprecated: %s\n"
+                          , instrs[ix - CLOSURE_EFUN_OFFS].name
+                          , instrs[ix - CLOSURE_EFUN_OFFS].deprecated
+                         ));
+                }
 
                 sp->x.closure_type
                   = (short)(  instrs[ix - CLOSURE_EFUN_OFFS].Default == -1
