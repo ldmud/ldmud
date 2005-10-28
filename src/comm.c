@@ -4006,130 +4006,133 @@ set_noecho (interactive_t *ip, char noecho)
     {
         DTN(("set_noecho(): Mode changes\n"));
         ob = ip->ob;
-        if (driver_hook[H_NOECHO].type == T_STRING
-         || driver_hook[H_NOECHO].type == T_CLOSURE
-           )
+        if (!(ob->flags & O_DESTRUCTED))
         {
-            DTN(("set_noecho():   calling H_NOECHO\n"));
-            push_number(inter_sp, noecho);
-            push_ref_valid_object(inter_sp, ob, "set_no_echo");
-            if (driver_hook[H_NOECHO].type == T_STRING)
-                secure_apply(driver_hook[H_NOECHO].u.str, ob, 2);
-            else 
-            {
-                if (driver_hook[H_NOECHO].x.closure_type == CLOSURE_LAMBDA)
-                {
-                    free_object(driver_hook[H_NOECHO].u.lambda->ob
-                               , "set_noecho");
-                    driver_hook[H_NOECHO].u.lambda->ob
-                      = ref_object(ob, "set_noecho");
-                }
-                secure_callback_lambda(&driver_hook[H_NOECHO], 2);
-            }
-            if (~confirm & old & CHARMODE_MASK)
-            {
-                if (ip->save_tn_state != TS_INVALID)
-                {
-                    DT(("'%s' set_noecho():     0 chars ready, "
-                        "saved state %d\n", get_txt(ip->ob->name)
-                                          , ip->save_tn_state));
-                    ip->chars_ready = 0;
-                    ip->tn_state = ip->save_tn_state;
-                }
-                reset_input_buffer(ip);
-            }
-        }
-        else
-        {
-            object_t *save;
-
-            save = command_giver;
-            command_giver = ob;
-#ifdef SAVE_NOECHO
-            ip->noecho &= ~NOECHO_DELAYED;
-#endif
-            if (~confirm & old & NOECHO)
-            {
-                DTN(("set_noecho():   WONT TELOPT_ECHO\n"));
-                send_wont(TELOPT_ECHO);
-            }
-            else if (confirm & ~old & NOECHO_MASK)
-            {
-#ifdef SAVE_NOECHO
-                if (confirm & ~old & CHARMODE_MASK)
-                {
-                    ip->noecho |= NOECHO_DELAYED;
-                    ip->noecho &= ~(NOECHO | NOECHO_REQ);
-                    DTN(("set_noecho():   delaying WILL TELOPT_ECHO\n"));
-                }
-                else
-                {
-#endif
-                    DTN(("set_noecho():   WILL TELOPT_ECHO\n"));
-                    send_will(TELOPT_ECHO);
-#ifdef SAVE_NOECHO
-                }
-#endif
-            }
-            else /* No change in NOECHO mode */ if (confirm & NOECHO)
-            {
-                /* Since we stay in NOECHO mode, we need the ACK flag set. */
-                DTN(("set_noecho():   Staying in NOECHO mode\n"));
-                ip->noecho |= NOECHO_ACKSHIFT(NOECHO);
-            }
-
-            if (ip->supress_go_ahead && !(confirm & (NOECHO|CHARMODE)))
-            {
-                DTN(("set_noecho():   WONT TELOPT_SGA\n"));
-                ip->supress_go_ahead = MY_FALSE;
-                send_wont(TELOPT_SGA);
-            }
-            /* Only using SGA for charmode is supported hardcoded.
-             * To make more sophisticated negotiations, e.g. using LINEMODE,
-             * use the H_NOECHO hook.
-             */
-            if ((~confirm & old & CHARMODE_MASK)
-            ||  ((~confirm & old & NOECHO_STALE) && (old & CHARMODE_MASK))
+            if (driver_hook[H_NOECHO].type == T_STRING
+             || driver_hook[H_NOECHO].type == T_CLOSURE
                )
             {
-                if(~confirm & old & CHARMODE_MASK)
+                DTN(("set_noecho():   calling H_NOECHO\n"));
+                push_number(inter_sp, noecho);
+                push_ref_valid_object(inter_sp, ob, "set_no_echo");
+                if (driver_hook[H_NOECHO].type == T_STRING)
+                    secure_apply(driver_hook[H_NOECHO].u.str, ob, 2);
+                else 
                 {
-                    DTN(("set_noecho():   turn off charmode\n"));
-                    if (old & CHARMODE)
+                    if (driver_hook[H_NOECHO].x.closure_type == CLOSURE_LAMBDA)
                     {
-                        DTN(("set_noecho():     DONT TELOPT_SGA\n"));
-                        send_dont(TELOPT_SGA);
+                        free_object(driver_hook[H_NOECHO].u.lambda->ob
+                                   , "set_noecho");
+                        driver_hook[H_NOECHO].u.lambda->ob
+                          = ref_object(ob, "set_noecho");
                     }
+                    secure_callback_lambda(&driver_hook[H_NOECHO], 2);
+                }
+                if (~confirm & old & CHARMODE_MASK)
+                {
                     if (ip->save_tn_state != TS_INVALID)
                     {
-                        DTN(("set_noecho():     0 chars ready, saved state %d\n", ip->save_tn_state));
+                        DT(("'%s' set_noecho():     0 chars ready, "
+                            "saved state %d\n", get_txt(ip->ob->name)
+                                              , ip->save_tn_state));
                         ip->chars_ready = 0;
                         ip->tn_state = ip->save_tn_state;
                     }
+                    reset_input_buffer(ip);
+                }
+            }
+            else
+            {
+                object_t *save;
+
+                save = command_giver;
+                command_giver = ob;
+#ifdef SAVE_NOECHO
+                ip->noecho &= ~NOECHO_DELAYED;
+#endif
+                if (~confirm & old & NOECHO)
+                {
+                    DTN(("set_noecho():   WONT TELOPT_ECHO\n"));
+                    send_wont(TELOPT_ECHO);
+                }
+                else if (confirm & ~old & NOECHO_MASK)
+                {
+#ifdef SAVE_NOECHO
+                    if (confirm & ~old & CHARMODE_MASK)
+                    {
+                        ip->noecho |= NOECHO_DELAYED;
+                        ip->noecho &= ~(NOECHO | NOECHO_REQ);
+                        DTN(("set_noecho():   delaying WILL TELOPT_ECHO\n"));
+                    }
+                    else
+                    {
+#endif
+                        DTN(("set_noecho():   WILL TELOPT_ECHO\n"));
+                        send_will(TELOPT_ECHO);
+#ifdef SAVE_NOECHO
+                    }
+#endif
+                }
+                else /* No change in NOECHO mode */ if (confirm & NOECHO)
+                {
+                    /* Since we stay in NOECHO mode, we need the ACK flag set. */
+                    DTN(("set_noecho():   Staying in NOECHO mode\n"));
+                    ip->noecho |= NOECHO_ACKSHIFT(NOECHO);
                 }
 
-                reset_input_buffer(ip);
-            }
-            else if (confirm & ~old & CHARMODE_MASK)
-            {
-                DTN(("set_noecho():   turn on charmode\n"));
-                DTN(("set_noecho():     DO+WILL TELOPT_SGA\n"));
-                send_do(TELOPT_SGA);
-                /* some telnet implementations (Windows' telnet is one) mix
-                 * up DO and WILL SGA, thus we send WILL SGA as well.
+                if (ip->supress_go_ahead && !(confirm & (NOECHO|CHARMODE)))
+                {
+                    DTN(("set_noecho():   WONT TELOPT_SGA\n"));
+                    ip->supress_go_ahead = MY_FALSE;
+                    send_wont(TELOPT_SGA);
+                }
+                /* Only using SGA for charmode is supported hardcoded.
+                 * To make more sophisticated negotiations, e.g. using LINEMODE,
+                 * use the H_NOECHO hook.
                  */
-                send_will(TELOPT_SGA);
-                ip->supress_go_ahead = MY_TRUE;
-            }
-            else /* No change in CHARMODE mode */ if (confirm & CHARMODE)
-            {
-                /* Since we stay in CHARMODE mode, we need the ACK flag set. */
-                DTN(("set_noecho():   Staying in CHARMODE mode\n"));
-                ip->noecho |= NOECHO_ACKSHIFT(CHARMODE);
-            }
+                if ((~confirm & old & CHARMODE_MASK)
+                ||  ((~confirm & old & NOECHO_STALE) && (old & CHARMODE_MASK))
+                   )
+                {
+                    if(~confirm & old & CHARMODE_MASK)
+                    {
+                        DTN(("set_noecho():   turn off charmode\n"));
+                        if (old & CHARMODE)
+                        {
+                            DTN(("set_noecho():     DONT TELOPT_SGA\n"));
+                            send_dont(TELOPT_SGA);
+                        }
+                        if (ip->save_tn_state != TS_INVALID)
+                        {
+                            DTN(("set_noecho():     0 chars ready, saved state %d\n", ip->save_tn_state));
+                            ip->chars_ready = 0;
+                            ip->tn_state = ip->save_tn_state;
+                        }
+                    }
 
-            command_giver = save;
-        }
+                    reset_input_buffer(ip);
+                }
+                else if (confirm & ~old & CHARMODE_MASK)
+                {
+                    DTN(("set_noecho():   turn on charmode\n"));
+                    DTN(("set_noecho():     DO+WILL TELOPT_SGA\n"));
+                    send_do(TELOPT_SGA);
+                    /* some telnet implementations (Windows' telnet is one) mix
+                     * up DO and WILL SGA, thus we send WILL SGA as well.
+                     */
+                    send_will(TELOPT_SGA);
+                    ip->supress_go_ahead = MY_TRUE;
+                }
+                else /* No change in CHARMODE mode */ if (confirm & CHARMODE)
+                {
+                    /* Since we stay in CHARMODE mode, we need the ACK flag set. */
+                    DTN(("set_noecho():   Staying in CHARMODE mode\n"));
+                    ip->noecho |= NOECHO_ACKSHIFT(CHARMODE);
+                }
+
+                command_giver = save;
+            }
+        } /* if (!(ob->flags & O_DESTRUCTED)) */
     }
     else
     {
