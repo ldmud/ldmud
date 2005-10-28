@@ -1347,10 +1347,10 @@ v_garbage_collection (svalue_t *sp, int num_arg)
 
         if (fd < 0)
         {
-            /* Store the <path> on the stack to the error handling
+            /* Store the <path> on the stack so the error handling
              * can free it.
              */
-            sp++; put_string(sp, path);
+            inter_sp = ++sp; put_string(sp, path);
             error("Can't open GC log file '%s': errno %d\n"
                   , get_txt(path), errno);
             /* NOTREACHED */

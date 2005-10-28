@@ -1776,7 +1776,7 @@ add_string_status (strbuf_t *sbuf, Bool verbose)
                         , mstr_itabled
                         , mstr_itabled_size
                         , mstr_itabled_size
-                          ? mstr_itabled_size - mstr_tabled * STR_OVERHEAD
+                          ? mstr_itabled_size - mstr_itabled * STR_OVERHEAD
                           : 0
                         , mstr_itabled * sizeof(string_t)
                         );

@@ -60,16 +60,19 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 582)
-(Parent-Version lpmud 3-3 581)
+(Project-Version lpmud 3-3 583)
+(Parent-Version lpmud 3-3 582)
 (Version-Log "
-  - (lex.c) The macros __FLOAT_MIN__ and __FLOAT_MAX__ now reflect
-       the limits for 'double' floats (Bug #0000101).
+  - (backend.c) If the garbage_collection() couldn't open a passed file,
+       the filename was leaked (reported by xtian).
+  - (mstrings.c) Corrected the statistics display for itabled strings.
+  - (smalloc.c) The allocated small block statistics was confused by
+       the mem_increment() feature.
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Thu, 29 Jul 2004 22:01:29 -0600")
+(Checkin-Time "Sun, 01 Aug 2004 22:42:07 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -106,8 +109,8 @@
   ;; Information about the driver and the distribution in general
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
-  (CREDITS (lpmud/d/22_CREDITS 1.70.1.78 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.645 644))
+  (CREDITS (lpmud/d/22_CREDITS 1.70.1.79 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.646 644))
   (HISTORY (lpmud/f/49_HISTORY 1.370 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -168,7 +171,7 @@
   (src/array.h (lpmud/f/47_array.h 1.18.1.22 644))
   (src/array.c (lpmud/d/12_array.c 1.46.1.47.1.14 644))
   (src/backend.h (lpmud/f/46_backend.h 1.20.1.7 644))
-  (src/backend.c (lpmud/d/6_backend.c 1.68.1.35.1.35 644))
+  (src/backend.c (lpmud/d/6_backend.c 1.68.1.35.1.36 644))
   (src/bitstrings.h (lpmud/i/47_bitstrings 1.3 644))
   (src/bitstrings.c (lpmud/i/48_bitstrings 1.16 644))
   (src/bytecode.h (lpmud/a/b/26_bytecode.h 1.1.1.3 644))
@@ -211,7 +214,7 @@
   (src/mregex.h (lpmud/e/29_rxcache.h 1.7.1.10 644))
   (src/mregex.c (lpmud/e/30_rxcache.c 1.11.1.32 644))
   (src/mstrings.h (lpmud/i/35_mstrings.h 1.27 644))
-  (src/mstrings.c (lpmud/i/36_mstrings.c 1.21.1.30 644))
+  (src/mstrings.c (lpmud/i/36_mstrings.c 1.21.1.31 644))
   (src/my-alloca.h (lpmud/f/29_my-alloca. 1.3.1.2 644))
   (src/my-rusage.h (lpmud/f/28_my-rusage. 1.7 644))
   (src/my-stdint.h (lpmud/u/b/39_my-stdint. 1.2 644))
@@ -343,7 +346,7 @@
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.36 644))
   (src/simulate.c (lpmud/31_simulate.c 1.88.1.129 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.14 644))
-  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.98 644))
+  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.99 644))
   (src/sysmalloc.h (lpmud/c/b/33_sysmalloc. 1.2 644))
   (src/sysmalloc.c (lpmud/c/b/34_sysmalloc. 1.6 644))
   (src/sprintf.h (lpmud/f/15_sprintf.h 1.3.1.4 644))

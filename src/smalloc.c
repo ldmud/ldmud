@@ -666,38 +666,38 @@ mem_dump_data (strbuf_t *sbuf)
 #   define dump_stat(str,stat) strbuf_addf(sbuf, str,stat.counter,stat.size)
 
     strbuf_add(sbuf, "Type                   Count      Space (bytes)\n");
-    dump_stat("xallocs:           %8d        %10lu\n\n", xalloc_st);
-    dump_stat("sbrk requests:     %8d        %10lu (a)\n",sbrk_st);
-    dump_stat("large blocks:      %8d        %10lu (b)\n",l_alloc);
+    dump_stat("xallocs:           %8u        %10lu\n\n", xalloc_st);
+    dump_stat("sbrk requests:     %8u        %10lu (a)\n",sbrk_st);
+    dump_stat("large blocks:      %8u        %10lu (b)\n",l_alloc);
     strbuf_addf(sbuf
-               , "large net avail:                   %10d\n"
+               , "large net avail:                   %10ld\n"
                , l_alloc.size - l_alloc.counter * M_OVERHEAD * SINT
                );
-    dump_stat("large free blocks: %8d        %10lu (c)\n",l_free);
-    dump_stat("large wasted:      %8d        %10lu (d)\n\n",l_wasted);
-    dump_stat("small chunks:      %8d        %10lu (e)\n",s_chunk);
-    dump_stat("small blocks:      %8d        %10lu (f)\n",s_alloc);
+    dump_stat("large free blocks: %8u        %10lu (c)\n",l_free);
+    dump_stat("large wasted:      %8u        %10lu (d)\n\n",l_wasted);
+    dump_stat("small chunks:      %8u        %10lu (e)\n",s_chunk);
+    dump_stat("small blocks:      %8u        %10lu (f)\n",s_alloc);
     strbuf_addf(sbuf
                , "small net avail:                   %10d\n"
                , s_alloc.size - s_alloc.counter * M_OVERHEAD * SINT
                );
-    dump_stat("small free blocks: %8d        %10lu (g)\n",s_free);
-    dump_stat("small wasted:      %8d        %10lu (h)\n\n",s_wasted);
+    dump_stat("small free blocks: %8u        %10lu (g)\n",s_free);
+    dump_stat("small wasted:      %8u        %10lu (h)\n\n",s_wasted);
 
-    dump_stat("permanent blocks:  %8d        %10lu\n", perm_st);
+    dump_stat("permanent blocks:  %8u        %10lu\n", perm_st);
 #ifdef SBRK_OK
-    dump_stat("clib allocations:  %8d        %10lu\n", clib_st);
+    dump_stat("clib allocations:  %8u        %10lu\n", clib_st);
 #else
     strbuf_addf(sbuf, "clib allocations:       n/a               n/a\n");
 #endif
     strbuf_add(sbuf, "\n");
 #ifdef USE_AVL_FREELIST
-    strbuf_addf(sbuf, "AVL nodes:         %8d                 -\n", num_avl_nodes);
+    strbuf_addf(sbuf, "AVL nodes:         %8u                 -\n", num_avl_nodes);
     strbuf_add(sbuf, "\n");
 #endif /* USE_AVL_FREELIST */
 
     strbuf_addf(sbuf,
-      "malloc_increment_size: calls %ld success %ld total %ld\n\n",
+      "malloc_increment_size: calls %lu success %lu total %lu\n\n",
       malloc_increment_size_calls,
       malloc_increment_size_success,
       malloc_increment_size_total
@@ -1093,8 +1093,8 @@ defragment_small_lists (int req)
             block = list;
             list = (word_t *)(list[M_LINK]);
             MAKE_SMALL_FREE(block, block[M_SIZE] & M_MASK);
-              /* As we move down the small block array, and the defragged
-               * blocks are sorted into a list already visited, setting
+              /* As we moved down the small block array, and the defragged
+               * blocks already visited have been sorted into a list, setting
                * the M_DEFRAG flag would be possible here.
                * However, by not setting it we make the algorithm a bit
                * more robust, and lose only a few cycles the next time
@@ -2579,8 +2579,7 @@ large_malloc ( word_t size, Bool force_more)
     size_t orig_size = size;
 #endif
 
-    size = (size + SINT*M_OVERHEAD + SINT-1) / SINT; /* plus overhead */
-    count_up(large_alloc_stat, size);
+    size = (size + SINT*M_OVERHEAD + SINT-1) / SINT; /* incl. overhead */
 
 retry:
     ptr = NULL;
@@ -2856,6 +2855,7 @@ found_fit:
     /* The block at ptr is all ours */
 
     mark_block(ptr);
+    count_up(large_alloc_stat, size);
 #ifdef MALLOC_CHECK
     ptr[M_MAGIC] = LAMAGIC;
 #endif
@@ -3188,7 +3188,7 @@ mem_increment_size (void *vp, size_t size)
             malloc_increment_size_success++;
             malloc_increment_size_total += (start2 - start) - M_OVERHEAD;
 
-            count_up(small_alloc_stat,wsize * SINT);
+            count_add(small_alloc_stat, wsize * SINT);
             small_count[SIZE_INDEX(old_size * SINT)] -= 1;
             small_total[SIZE_INDEX(old_size * SINT)] -= 1;
 
@@ -3214,7 +3214,7 @@ mem_increment_size (void *vp, size_t size)
             malloc_increment_size_success++;
             malloc_increment_size_total += (start2 - start) - M_OVERHEAD;
 
-            count_up(small_alloc_stat,wsize * SINT);
+            count_add(small_alloc_stat, wsize * SINT);
             small_count[SIZE_INDEX(old_size * SINT)] -= 1;
             small_total[SIZE_INDEX(old_size * SINT)] -= 1;
 
