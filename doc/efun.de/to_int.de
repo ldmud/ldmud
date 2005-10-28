@@ -16,6 +16,8 @@ BESCHREIBUNG
         Bezueglich Floats ist es wichtig, Rundungseffekte zu beachten:
         to_int(3.1*10.0) ergibt nicht 31, sondern 30, weil intern das
         Resultat der Multiplikation 30.999999 ergibt.
+     
+        Diese Funktion unterstuetzt die Basisprefixe '0x', '0o' und '0b'.
 
 BUGS
         Die Cast-Schreibweise funktioniert nur, wenn der genaue Wert von
@@ -24,6 +26,7 @@ BUGS
 
 AENDERUNGEN
         Eingefuehrt in 3.2.1@2
+        LDMud 3.2.11 fuehrte die Basisprefixe ein.
 
 SIEHE AUCH
         to_string(E), sscanf(E)

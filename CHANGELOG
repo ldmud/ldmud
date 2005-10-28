@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+22-Nov-2004 (Lars Duening)  (3.3.615)
+  - (comm.c) Efun net_connect(): on multihomed machines the created
+       socket is bound to the hostname given with the --hostname option (Bug
+       #0000137).
+
 15-Nov-2004 (Lars Duening)  (3.3.614)
   - (efuns.c) You learn a new thing every day: I never realized that
        strtol() supports "+34" and similar - efun to_int() can now

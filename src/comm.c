@@ -9005,6 +9005,16 @@ f_net_connect (svalue_t *sp)
 
         set_socket_nonblocking(d);
 
+        /* On multihomed machines it is important to bind the socket to
+         * the proper IP address.
+         */
+        ret = bind(d, (struct sockaddr *) &host_ip_addr_template, sizeof(host_ip_addr_template));
+        if (ret == -1) {
+            perror("bind during net_connect");
+            rc = errno;
+            break;
+        } 
+
         ret = connect(d, (struct sockaddr *) &target, sizeof(target));
 #else
         d = ret = open_ipv6_conn(host, port, &target);

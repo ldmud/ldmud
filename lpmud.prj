@@ -60,17 +60,17 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 614)
-(Parent-Version lpmud 3-3 613)
+(Project-Version lpmud 3-3 615)
+(Parent-Version lpmud 3-3 614)
 (Version-Log "
-  - (efuns.c) You learn a new thing every day: I never realized that
-       strtol() supports \"+34\" and similar - efun to_int() can now
-       interpret that again, too (reported by Bardioc).
+  - (comm.c) Efun net_connect(): on multihomed machines the created
+       socket is bound to the hostname given with the --hostname option (Bug
+       #0000137).
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Mon, 15 Nov 2004 07:13:26 -0700")
+(Checkin-Time "Mon, 22 Nov 2004 23:05:45 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -108,8 +108,8 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.83 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.677 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.381 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.678 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.382 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -177,7 +177,7 @@
   (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.30 644))
   (src/closure.h (lpmud/f/44_closure.h 1.7.1.19 644))
   (src/closure.c (lpmud/d/4_closure.c 1.41.1.47.1.21 644))
-  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.97 644))
+  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.98 644))
   (src/comm.h (lpmud/d/3_comm.h 1.26.1.41 644))
   (src/driver.h (lpmud/f/36_driver.h 1.15.1.27 644))
   (src/dumpstat.h (lpmud/f/35_dumpstat.h 1.8 644))
@@ -1372,7 +1372,7 @@
   (doc/efun.de/trace.de (lpmud/f/b/31_trace.de 1.2 640))
   (doc/efun.de/to_string.de (lpmud/f/b/32_to_string. 1.2 640))
   (doc/efun.de/to_object.de (lpmud/f/b/33_to_object. 1.1 640))
-  (doc/efun.de/to_int.de (lpmud/f/b/34_to_int.de 1.1 640))
+  (doc/efun.de/to_int.de (lpmud/f/b/34_to_int.de 1.2 640))
   (doc/efun.de/to_float.de (lpmud/f/b/35_to_float.d 1.1 640))
   (doc/efun.de/to_array.de (lpmud/f/b/36_to_array.d 1.1 640))
   (doc/efun.de/time.de (lpmud/f/b/38_time.de 1.1 640))
