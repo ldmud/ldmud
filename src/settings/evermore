@@ -73,7 +73,7 @@ enable_use_deprecated=no
 enable_use_alists=yes
 
 # we use this but in a special way
-enable_strict_euids=no
+enable_strict_euids=yes
 
 # this is far in the future
 with_max_players=70
@@ -87,8 +87,10 @@ with_max_trace=200
 
 with_optimize=no
 
-enable_malloc_trace=yes
-enable_malloc_lpc_trace=yes
+with_malloc=smalloc
+enable_malloc_trace=no
+enable_malloc_lpc_trace=no
+#enable_malloc_sbrk_trace=no
 
 with_reserved_user_size=800000
 with_catch_reserved_cost=0xF000
@@ -97,3 +99,6 @@ with_max_malloced=0
 
 enable_use_system_crypt=no
 enable_with_pthreads=no
+
+enable_debug=yes
+enable_check_object_gc_ref=no

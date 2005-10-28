@@ -11593,6 +11593,9 @@ index_range :
           CURRENT_PROGRAM_SIZE++;
           $3.end++;
 
+          if (!pragma_warn_deprecated)
+              ins_byte(F_NO_WARN_DEPRECATED);
+
           /* Return the data */
 
           $$.inst  = F_RANGE;
@@ -11629,6 +11632,9 @@ index_range :
           STORE_CODE(mark, F_CONST0);
           CURRENT_PROGRAM_SIZE++;
           $4.end++;
+
+          if (!pragma_warn_deprecated)
+              ins_byte(F_NO_WARN_DEPRECATED);
 
           /* Return the data */
 
@@ -11667,6 +11673,9 @@ index_range :
           CURRENT_PROGRAM_SIZE++;
           $4.end++;
 
+          if (!pragma_warn_deprecated)
+              ins_byte(F_NO_WARN_DEPRECATED);
+
           /* Return the data */
 
           $$.inst  = F_NA_RANGE;
@@ -11679,6 +11688,9 @@ index_range :
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | '['     expr0 L_RANGE     expr0 ']'
       {
+          if (!pragma_warn_deprecated)
+              ins_byte(F_NO_WARN_DEPRECATED);
+
           $$.inst  = F_RANGE;
           $$.start = $2.start;
           $$.end   = $4.end;
@@ -11689,6 +11701,9 @@ index_range :
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | '['     expr0 L_RANGE '<' expr0 ']'
       {
+          if (!pragma_warn_deprecated)
+              ins_byte(F_NO_WARN_DEPRECATED);
+
           $$.inst  = F_NR_RANGE;
           $$.start = $2.start;
           $$.end   = $5.end;
@@ -11699,6 +11714,9 @@ index_range :
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | '[' '<' expr0 L_RANGE     expr0 ']'
       {
+          if (!pragma_warn_deprecated)
+              ins_byte(F_NO_WARN_DEPRECATED);
+
           $$.inst  = F_RN_RANGE;
           $$.start = $3.start;
           $$.end   = $5.end;
@@ -11709,6 +11727,9 @@ index_range :
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | '[' '<' expr0 L_RANGE '<' expr0 ']'
       {
+          if (!pragma_warn_deprecated)
+              ins_byte(F_NO_WARN_DEPRECATED);
+
           $$.inst  = F_RR_RANGE;
           $$.start = $3.start;
           $$.end   = $6.end;
@@ -11719,6 +11740,9 @@ index_range :
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | '['     expr0 L_RANGE '>' expr0 ']'
       {
+          if (!pragma_warn_deprecated)
+              ins_byte(F_NO_WARN_DEPRECATED);
+
           $$.inst  = F_NA_RANGE;
           $$.start = $2.start;
           $$.end   = $5.end;
@@ -11729,6 +11753,9 @@ index_range :
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | '[' '>' expr0 L_RANGE     expr0 ']'
       {
+          if (!pragma_warn_deprecated)
+              ins_byte(F_NO_WARN_DEPRECATED);
+
           $$.inst  = F_AN_RANGE;
           $$.start = $3.start;
           $$.end   = $5.end;
@@ -11739,6 +11766,9 @@ index_range :
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | '[' '<' expr0 L_RANGE '>' expr0 ']'
       {
+          if (!pragma_warn_deprecated)
+              ins_byte(F_NO_WARN_DEPRECATED);
+
           $$.inst  = F_RA_RANGE;
           $$.start = $3.start;
           $$.end   = $6.end;
@@ -11749,6 +11779,9 @@ index_range :
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | '[' '>' expr0 L_RANGE '<' expr0 ']'
       {
+          if (!pragma_warn_deprecated)
+              ins_byte(F_NO_WARN_DEPRECATED);
+
           $$.inst  = F_AR_RANGE;
           $$.start = $3.start;
           $$.end   = $6.end;
@@ -11759,6 +11792,9 @@ index_range :
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | '[' '>' expr0 L_RANGE '>' expr0 ']'
       {
+          if (!pragma_warn_deprecated)
+              ins_byte(F_NO_WARN_DEPRECATED);
+
           $$.inst  = F_AA_RANGE;
           $$.start = $3.start;
           $$.end   = $6.end;
@@ -11769,6 +11805,9 @@ index_range :
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | '['     expr0 L_RANGE           ']'
       {
+          if (!pragma_warn_deprecated)
+              ins_byte(F_NO_WARN_DEPRECATED);
+
           $$.inst  = F_NX_RANGE;
           $$.start = $2.start;
           $$.end   = $2.end;
@@ -11783,6 +11822,9 @@ index_range :
            * We pretend that it's part of the lower bound expr.
            */
 
+          if (!pragma_warn_deprecated)
+              ins_byte(F_NO_WARN_DEPRECATED);
+
           $$.inst  = F_RX_RANGE;
           $$.start = $3.start;
           $$.end   = $3.end;
@@ -11796,6 +11838,9 @@ index_range :
           /* Simulate an expression yielding <1 for the upper bound.
            * We pretend that it's part of the lower bound expr.
            */
+
+          if (!pragma_warn_deprecated)
+              ins_byte(F_NO_WARN_DEPRECATED);
 
           $$.inst  = F_AX_RANGE;
           $$.start = $3.start;

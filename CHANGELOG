@@ -1,6 +1,17 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+21-Dec-2004 (Lars Duening)  (3.3.632)
+  - (lex.c) The number parsing now recognizes overflows and forces these
+       numbers to be LONG_MAX (Bug #0000327).
+  - (mstrings.c) mstring_realloc_string() (used for example to append
+       to strings) didn't check if the string was indirectly tabled,
+       potentially freeing memory which was still in use otherwise
+       (reported by Bardioc).
+  - (settings/evermore) Updated to the latest version.
+  - (prolang.y, interpret.c) The array indexing warnings are now controlled
+       by the warn_deprecated pragma (Bug #0000325).
+
 18-Dec-2004 (Lars Duening)  (3.3.631)
   - (interpret.c) Assignments to negative-sized ranges now throw
        an error; indexing of ranges with out of bounds limits generate

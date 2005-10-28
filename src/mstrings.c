@@ -483,10 +483,25 @@ mstring_realloc_string (string_t *string, size_t iSize MTRACE_DECL)
 
     /* Get the memory */
 
-    if (string->str)
+    if (string->str && !string->link)
         sdata = rexalloc_pass(string->str,  iSize + sizeof(*sdata));
     else
+    {
         sdata = xalloc_pass(iSize + sizeof(*sdata));
+        
+        /* If it's an indirectly tabled string, copy the data over so
+         * as not to destroy the data of the directly tabled instance.
+         */
+        if (string->str && string->link)
+        {
+            memcpy(sdata, string->str, sizeof(*sdata) + string->str->size);
+
+            mstr_untabled++;
+            mstr_untabled_size += old_msize;
+            mstr_itabled--;
+            mstr_itabled_size -= old_msize;
+        }
+    }
     if (!sdata)
         return NULL;
 
@@ -496,6 +511,14 @@ mstring_realloc_string (string_t *string, size_t iSize MTRACE_DECL)
     sdata->txt[iSize] = '\0';
 
     string->str = sdata;
+
+    /* If it was an indirectly tabled string, remove the link. */
+
+    if (string->link)
+    {
+        free_mstring(string->link);
+        string->link = NULL;
+    }
 
     {
         size_t msize;

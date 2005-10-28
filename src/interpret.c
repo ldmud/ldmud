@@ -11121,22 +11121,25 @@ again:
             else
                 i2 = size - sp[0].u.number;
 
-            if (i1 < 0 || i1 >= size)
+            if (!runtime_no_warn_deprecated)
             {
-                WARNF(("Lower range limit out of bounds: %ld, size %ld.\n"
-                      , (long)i1, (long)size));
-            }
+                if (i1 < 0 || i1 >= size)
+                {
+                    WARNF(("Warning: Out-of-bounds lower range limits are deprecated: %ld, size %ld.\n"
+                          , (long)i1, (long)size));
+                }
 
-            if (i2 < 0 || i2 >= size)
-            {
-                WARNF(("Upper range limit out of bounds: %ld, size %ld.\n"
-                      , (long)i2, (long)size));
-            }
+                if (i2 < 0 || i2 >= size)
+                {
+                    WARNF(("Warning: Out-of-bounds upper range limits are deprecated: %ld, size %ld.\n"
+                          , (long)i2, (long)size));
+                }
 
-            if (i1 > i2)
-            {
-                WARNF(("Range of negative size given: %ld..%ld .\n"
-                      , (long)i1, (long)i2));
+                if (i1 > i2)
+                {
+                    WARNF(("Warning: Ranges of negative size are deprecated: %ld..%ld .\n"
+                          , (long)i1, (long)i2));
+                }
             }
 
             if (i2 >= size)

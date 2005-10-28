@@ -3682,6 +3682,8 @@ parse_number (char * cp, unsigned long * p_num)
     char c;
     unsigned long l;
     unsigned long base = 10;
+    unsigned long prev_l = 0;
+    Bool overflow = MY_FALSE;
 
     c = *cp++;
 
@@ -3713,9 +3715,11 @@ parse_number (char * cp, unsigned long * p_num)
             {
                 l <<= 1;
                 l += c - '0';
+                overflow = overflow || (l <= prev_l);
+                prev_l = l;
             }
 
-            *p_num = l;
+            *p_num = overflow ? LONG_MAX : l;
             return cp;
           }
 
@@ -3750,8 +3754,10 @@ parse_number (char * cp, unsigned long * p_num)
                 c = (char)((c & 0xf) + ( '9' + 1 - ('a' & 0xf) ));
             l <<= 4;
             l += c - '0';
+            overflow = overflow || (l <= prev_l);
+            prev_l = l;
         }
-        *p_num = l;
+        *p_num = overflow ? LONG_MAX : l;
         return cp;
     }
 
@@ -3759,9 +3765,13 @@ parse_number (char * cp, unsigned long * p_num)
 
     l = c - '0';
     while (lexdigit(c = *cp++) && c < (char)('0'+base))
+    {
         l = l * base + (c - '0');
+        overflow = overflow || (l <= prev_l);
+        prev_l = l;
+    }
 
-    *p_num = l;
+    *p_num = overflow ? LONG_MAX : l;
     return cp-1;
 
 } /* parse_number() */

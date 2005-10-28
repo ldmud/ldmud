@@ -53,8 +53,8 @@ DESCRIPTION
                 - failure to pass enough arguments to simul efuns
         sloppy: Turns off pedantic (the default).
 
-        warn_deprecated: Use of deprecated efuns causes the compiler
-                to issue a warning.
+        warn_deprecated: Use of deprecated efuns or indexing operations
+                causes the compiler to issue a warning.
         no_warn_deprecated: Turns off warn_deprecated (the default).
 
         warn_empty_casts: A cast of a value to its own type generates

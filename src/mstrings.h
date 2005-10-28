@@ -139,14 +139,6 @@ extern void   string_dinfo_status(svalue_t *svp, int value);
    *   hash hasn't been computed yet.
    */
 
-#define mstr_mem_size(s) \
-    (sizeof(string_t) + sizeof(string_data_t) + (s)->str->size)
-
-  /* size_t mstr_mem_size(string_t * s)
-   *   The amount of memory used to hold all this strings' data.
-   *   Used only to keep the statistics up to date.
-   */
-
 #define mstr_singular(s) \
     (! ((s)->info.tabled || (s)->info.ref != 1) )
   /* Bool mstr_singular(string_t *s)
