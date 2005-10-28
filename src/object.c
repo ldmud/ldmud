@@ -7373,7 +7373,7 @@ restore_struct (svalue_t *svp, char **str)
     struct_t *st;
     struct_type_t *stt;
     char *pt, *end;
-    int siz;
+    int siz, extra;
 
     end = *str;
 
@@ -7386,6 +7386,8 @@ restore_struct (svalue_t *svp, char **str)
     {
         return MY_FALSE;
     }
+    
+    extra = 0;
 
     /* Get the name of the struct, and from it the type pointer */
     {
@@ -7471,7 +7473,10 @@ restore_struct (svalue_t *svp, char **str)
             return MY_FALSE;
 
         if (struct_t_size(stt) < siz)
+        {
+            extra = siz - struct_t_size(stt);
             siz = struct_t_size(stt);
+        }
     }
     /* Allocate the struct */
     st = struct_new(stt);
@@ -7485,6 +7490,20 @@ restore_struct (svalue_t *svp, char **str)
         {
             return MY_FALSE;
         }
+    }
+
+    /* If there are more values in the savefile than the struct
+     * has members, read and ignore the others.
+     */
+    while (extra-- > 0)
+    {
+        svalue_t tmp;
+      
+        if (!restore_svalue(&tmp, str, ','))
+        {
+            return MY_FALSE;
+        }
+        free_svalue(&tmp);
     }
 
     /* Check for the trailing '>)' */
