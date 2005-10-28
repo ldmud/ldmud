@@ -170,7 +170,7 @@ For a detailed list of all changes see the file CHANGELOG.
            x509 key- and certfile for the TLS package.
 
 
-25-Jul-2004 (Lars Duening) -- Release 3.2.11
+29-Jul-2004 (Lars Duening) -- Release 3.2.11
 
     - Changed efuns:
 
@@ -197,6 +197,7 @@ For a detailed list of all changes see the file CHANGELOG.
          behind an invalid pointer.
 
     - Language:
+       + The macros __FLOAT_MIN__ and __FLOAT_MAX__ gave a too-small range.
 
     - Runtime:
        + The tracedepth wasn't calculated correctly.

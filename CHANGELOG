@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+29-Jul-2004 (Lars Duening)  (3.3.582)
+  - (lex.c) The macros __FLOAT_MIN__ and __FLOAT_MAX__ now reflect
+       the limits for 'double' floats (Bug #0000101).
+
 28-Jul-2004 (Lars Duening)  (3.3.581)
   - (call_out.c) When printing the uid for an object with an error, make
        sure that there is an uid to print (reported by Bardioc).
