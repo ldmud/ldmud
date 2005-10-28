@@ -185,6 +185,43 @@ initialize_tls_session (gnutls_session *session)
     gnutls_dh_set_prime_bits( *session, DH_BITS);
 } /* initialize_tls_session() */
 
+/*-------------------------------------------------------------------------*/
+static void *
+tls_xalloc (size_t size)
+
+/* Wrapper function so that (gnu)tls will use the driver's allocator.
+ * The wrapper is required as 'xalloc' itself is a macro.
+ */
+
+{
+    return xalloc(size);
+} /* tls_xalloc() */
+
+/*-------------------------------------------------------------------------*/
+static void *
+tls_rexalloc (void *old, size_t size)
+
+/* Wrapper function so that (gnu)tls will use the driver's allocator.
+ * The wrapper is required as 'rexalloc' itself is a macro.
+ */
+
+{
+    return rexalloc(old, size);
+} /* tls_rexalloc() */
+
+/*-------------------------------------------------------------------------*/
+static void
+tls_xfree (void *p)
+
+/* Wrapper function so that (gnu)tls will use the driver's allocator.
+ * The wrapper is not exactly required for xfree(),  but it keeps things
+ * consistent.
+ */
+
+{
+    return xfree(p);
+} /* tls_xfree() */
+
 #endif /* SSL Package */ 
 
 /*-------------------------------------------------------------------------*/
@@ -332,6 +369,18 @@ ssl_init_err:
 #elif defined(HAS_GNUTLS)
 
     int f;
+
+  
+    /* In order to be able to identify gnutls allocations as such, we redirect
+     * all allocations through the driver's allocator. The wrapper functions
+     * make sure that the allocations are annotated properly with this source
+     * file.
+     */
+    gnutls_global_set_mem_functions(tls_xalloc,
+                                    tls_xalloc,
+                                    NULL,
+                                    tls_rexalloc,
+                                    tls_xfree);
 
     gnutls_global_init();
 

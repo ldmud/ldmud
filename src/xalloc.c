@@ -548,13 +548,16 @@ xfree (POINTER p)
  */
 
 {
-    word_t *q = (word_t*)p - XM_OVERHEAD;
+    if (NULL != p)
+    {
+        word_t *q = (word_t*)p - XM_OVERHEAD;
 #ifdef NO_MEM_BLOCK_SIZE
-    count_back(xalloc_stat, XM_OVERHEAD_SIZE);
+        count_back(xalloc_stat, XM_OVERHEAD_SIZE);
 #else
-    count_back(xalloc_stat, mem_block_size(q));
+        count_back(xalloc_stat, mem_block_size(q));
 #endif
-    mem_free(q);
+        mem_free(q);
+    }
 } /* xfree() */
 
 /*-------------------------------------------------------------------------*/
@@ -662,6 +665,11 @@ rexalloc_traced (POINTER p, size_t size MTRACE_DECL
 
     if (going_to_exit) /* A recursive call while we're exiting */
         exit(3);
+
+    if (!p)
+    {
+        return xalloc_traced(size MTRACE_ARG);
+    }
 
 #ifdef MALLOC_SBRK_TRACE
     mdb_size = size;
