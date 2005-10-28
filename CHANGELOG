@@ -1,6 +1,14 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+25-Jul-2004 (Lars Duening)  (3.3.579)
+  - (xerq/erq.c) If select() in the main loop was interrupted by a signal,
+       the ERQ still proceeded to evaluate the fd-sets.
+  - (xerq/execute.c) The debug logging of the execute parameters didn't
+       work.
+  - (comm.c) If an ERQ callback function accepts an array, the numbers
+       are now all passed on positive (range 0..255).
+
 24-Jul-2004 (Lars Duening)  (3.3.578)
   - (xerq/defs.h) ERQ_DEBUG level wasn't properly translated into
        debug output.

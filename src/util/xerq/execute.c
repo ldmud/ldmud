@@ -52,7 +52,11 @@ execute (char *buf, int buflen, char *status, int *esockets, int keep_sockets)
         return 0;
     }
 
-    /* Split the commandline into words and store them in args[] */
+    /* Split the commandline into words, store them in argbuf, and store
+     * the index pointers in args[].
+     * argp points to the args[] slot for the next word; argp[-1]
+     * is the word currently filled.
+     */
     argp = &args[0];
     *argp++ = p = argbuf;
     while (--buflen >= 0)
@@ -82,8 +86,8 @@ execute (char *buf, int buflen, char *status, int *esockets, int keep_sockets)
             *p++ = '\0';
             *argp++ = p;
             XPRINTF((stderr, "%s   arg[%d]: '%s'\n"
-                           , time_stamp(), argp - args - 1, argp[-1]));
-            if (argp == &args[sizeof args/sizeof args[0]] - 1) {
+                           , time_stamp(), argp - args - 2, argp[-2]));
+            if (argp - args >= sizeof args/sizeof args[0]) {
                 status[0] = ERQ_E_ARGNUMBER;
                 return 0;
             }
@@ -93,6 +97,9 @@ execute (char *buf, int buflen, char *status, int *esockets, int keep_sockets)
     }
     *p++ = '\0';
     *argp++ = 0;
+
+    XPRINTF((stderr, "%s   arg[%d]: '%s'\n"
+                   , time_stamp(), argp - args - 2, argp[-2]));
 
     /* Make sure the command to execute is legal (ie does not try
      * get out of its ERQ_DIR sandbox.
@@ -147,7 +154,7 @@ execute (char *buf, int buflen, char *status, int *esockets, int keep_sockets)
 
             expected = getpid() & 0xff;
             XPRINTF((stderr, "%s Child process waits for go-ahead byte '%02x'.\n"
-                           , time_stamp(), expected));
+                           , time_stamp(), expected & 0xff));
 
             do {
                 num = read(esockets[0], &ch, sizeof(c));
@@ -166,7 +173,7 @@ execute (char *buf, int buflen, char *status, int *esockets, int keep_sockets)
             if (ch != expected)
             {
                 fprintf(stderr, "%s Child received go-ahead byte '%02x', expected '%02x'\n"
-                              , time_stamp(), ch, expected);
+                              , time_stamp(), ch & 0xff, expected & 0xff);
             }
 
             XPRINTF((stderr, "%s Child resumes.\n", time_stamp()));
@@ -398,7 +405,7 @@ erq_execute (char *mesg, int msglen)
         /* Send the GoAhead signal to the child process */
         ga_data = pid & 0xff;
         XPRINTF((stderr, "%s Sending go-ahead byte '%02x' to child.\n"
-                       , time_stamp(), ga_data));
+                       , time_stamp(), ga_data & 0xff));
         fcntl(esockets[1], F_SETFD, 1);
         fcntl(esockets[1], F_SETFL, O_NONBLOCK);
         do {
@@ -410,7 +417,7 @@ erq_execute (char *mesg, int msglen)
             int myerrno = errno;
 
             fprintf(stderr, "%s Couldn't send go-ahead byte '%02x' to child %p, errno %d"
-                          , time_stamp(), ga_data, chp, myerrno);
+                          , time_stamp(), ga_data & 0xff, chp, myerrno);
             errno = myerrno;
             perror(" ");
         }

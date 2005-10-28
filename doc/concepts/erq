@@ -529,7 +529,7 @@ DESCRIPTION
                      char[]                ticket  // the new ticket.
 
           The erq accepts a new connection on an accept-TCP-port, creates
-          an child and ticket for it and returns it's ticket together with
+          an child and ticket for it and returns its ticket together with
           the remote's side <ip>:<port> number (in network byte order).
           Possible exit codes are:
             ERQ_OK          : Operation succeeded.

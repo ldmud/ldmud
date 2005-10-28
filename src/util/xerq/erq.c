@@ -331,18 +331,22 @@ main(int argc, char *argv[])
         in_select = 0; /* don't want sig_child() writing now */
 
 #if ERQ_DEBUG > 1
-        fprintf(stderr, "%s select() returns %d, time() %ld\n"
-                      , time_stamp(), num, (long)time(NULL));
-#endif
-#if ERQ_DEBUG > 0
-        if (num < 0)
         {
             int myerrno = errno;
-            fprintf(stderr, "%s select() errno = %d", time_stamp(), errno);
+            fprintf(stderr, "%s select() returns %d, time() %ld\n"
+                          , time_stamp(), num, (long)time(NULL));
             errno = myerrno;
-            perror(" ");
         }
 #endif
+        if (num < 0)
+        {
+#if ERQ_DEBUG > 0
+            int myerrno = errno;
+            fprintf(stderr, "%s select() errno = %d", time_stamp(), errno);
+            perror(" ");
+#endif
+            continue;
+        }
 
         /* Is stdout ready to write? Then flush the queue. */
         if (FD_ISSET(1, &write_fds))

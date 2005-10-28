@@ -2824,7 +2824,7 @@ get_message (char *buff)
                             }
                             else
                             {
-                                char *cp;
+                                unsigned char *cp;
                                 vector_t *v;
                                 svalue_t *svp;
 
