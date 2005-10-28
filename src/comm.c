@@ -3558,7 +3558,10 @@ remove_interactive (object_t *ob, Bool force)
 #endif
 #ifdef USE_MCCP
         if (interactive->out_compress)
-            end_compress(interactive, force);
+            end_compress(interactive, MY_TRUE);
+            /* Always force the compression end as we won't get
+             * a second chance at it.
+             */
 #endif
 #ifdef USE_TLS
         tls_deinit_connection(interactive);

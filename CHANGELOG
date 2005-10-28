@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+21-Aug-2004 (Lars Duening)  (3.3.586)
+  - (interpret.c) If a lambda was executed inside a catch() and threw an
+       error, the error routines didn't clean up the protective reference
+       held in current_lambda (Bug #0000114).
+  - (efuns.c) to_string(closure) leaked the closure (Bug #0000114).
+  - (ed.c) The 'M' command leaked the regular expression (Bug #0000114).
+
 19-Aug-2004 (Lars Duening)  (3.3.585)
   - (prolang.y, interpret.c, func_spec) Float variables without initializer
        are now properly initialized to float-0 instead of number-0 (reported

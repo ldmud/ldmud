@@ -5164,6 +5164,7 @@ f_to_string (svalue_t *sp)
     case T_CLOSURE:
       {
         string_t * rc = closure_to_string(sp, MY_FALSE);
+        free_svalue(sp);
         put_string(sp, rc);
         break;
       }

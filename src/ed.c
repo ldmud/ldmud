@@ -2829,19 +2829,26 @@ docmd (Bool glob)
         break;
 
     case 'M':
+      {
+        regexp_t * pat;
+
         if (deflt(1, P_LASTLN) < 0)
             return ERR;
         if (*inptr != NL)
             return ERR;
 
-        nchng = subst(rx_compile(STR_CRPATTERN, P_EXCOMPAT ? RE_EXCOMPATIBLE : 0, MY_TRUE), "", 0, 0);
+
+        pat = rx_compile(STR_CRPATTERN, P_EXCOMPAT ? RE_EXCOMPATIBLE : 0, MY_TRUE);
+        nchng = subst(pat, "", 0, 0);
+        free_regexp(pat);
 
         if (nchng < 0)
             return ERR;
         P_FCHANGED = TRUE;
         break;
+      }
 
-      case 'n':
+    case 'n':
         if (P_NFLG)
             P_FLAGS &= ~( NFLG_MASK | LFLG_MASK );
         else
@@ -2851,7 +2858,7 @@ docmd (Bool glob)
                    , P_NFLG?"ON":"OFF", P_LFLG?"ON":"OFF");
         break;
 
-      case 'I':
+    case 'I':
         if (deflt(1, P_LASTLN) < 0)
             return ERR ;
         if (*inptr != NL)
@@ -2864,8 +2871,8 @@ docmd (Bool glob)
             add_message("Done indenting.\n");
         break;
 
-      case 'H':
-      case 'h':
+    case 'H':
+    case 'h':
         print_help(*(inptr++));
         break;
 

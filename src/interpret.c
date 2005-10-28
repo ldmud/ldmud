@@ -6516,6 +6516,14 @@ pull_error_context (svalue_t *sp)
         }
     }
 
+    /* If there was a lambda call, we have to restore current_lambda */
+    for (csp2 = csp; csp2 >p->save_csp; csp2--)
+    {
+        if (current_lambda.type == T_CLOSURE)
+            free_closure(&current_lambda);
+        current_lambda = csp2->lambda;
+    }
+
     /* Restore the global variables and the evaluator stack */
     csp = p->save_csp;
     pop_n_elems(sp - p->save_sp);
