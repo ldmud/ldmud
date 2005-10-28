@@ -6162,7 +6162,7 @@ v_get_type_info (svalue_t *sp, int num_arg)
 
                 closure_lookup_lfun_prog(sp->u.lambda, &prog, &function_name, &is_inherited);
 
-                memsafe(progname = mstring_cvt_progname(prog->name)
+                memsafe(progname = mstring_cvt_progname(prog->name MTRACE_ARG)
                        , mstrsize(prog->name)
                        , "closure program name");
             }

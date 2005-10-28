@@ -62,21 +62,17 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 549)
-(Parent-Version lpmud 3-3 548)
+(Project-Version lpmud 3-3 550)
+(Parent-Version lpmud 3-3 549)
 (Version-Log "
-  - (efuns.c, closure) Efun get_type_info() can now return the name
-       of the defining program for a lfun or context closure (Bug #0000010).
-  - (configure) Removed double checks for stdint.h and inttypes.h .
-  - (wiz_list.c) During a GC, the references for the error filename
-       and message weren't cleared.
-  - (gcollect) In general, string references weren't cleared during the
-       GC (a holdover from when all strings were tabled).
+  - (efuns.c) Bah, forgot the 'MTRACE_ARG' to the call of
+      mstring_cvt_progname(), so the file didn't compile when MALLOC_TRACE
+       was enabled (reported by Ralph).
 ")
 (New-Version-Log
 ""
 )
-(Checkin-Time "Mon, 17 May 2004 19:33:04 -0600")
+(Checkin-Time "Tue, 18 May 2004 07:40:36 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -114,7 +110,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.76 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.612 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.613 644))
   (HISTORY (lpmud/f/49_HISTORY 1.353 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -191,7 +187,7 @@
   (src/ed.h (lpmud/f/34_ed.h 1.5.1.6 644))
   (src/ed.c (lpmud/c/33_ed.c 1.32.1.31 644))
   (src/efuns.h (lpmud/l/20_efuns.h 1.13.1.19.1.5 644))
-  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.91 644))
+  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.92 644))
   (src/exec.h (lpmud/c/32_exec.h 1.34.1.33.1.7 644))
   (src/files.h (lpmud/i/49_files.h 1.2 644))
   (src/files.c (lpmud/i/50_files.c 1.25 644))
