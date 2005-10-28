@@ -224,10 +224,12 @@ end_compress (interactive_t * ip, Bool force)
 
 {
     unsigned char dummy[1];
+    Bool retval;
     
     if (!ip->out_compress)
         return MY_TRUE;
    
+    retval = MY_TRUE;
     ip->out_compress->avail_in = 0;
     ip->out_compress->next_in = dummy;
     
@@ -237,7 +239,11 @@ end_compress (interactive_t * ip, Bool force)
    
     /* try to send any residual data */
     if (!process_compressed (ip) && !force)
-        return MY_FALSE;
+    {
+        printf("%s MCCP-DEBUG: '%s' mccp had error while ending\n"
+              , time_stamp(), ip->ob->name);
+        retval = MY_FALSE;
+    }
      
     /* reset compression values */
     deflateEnd(ip->out_compress);
@@ -250,8 +256,8 @@ end_compress (interactive_t * ip, Bool force)
     printf("%s MCCP-DEBUG: '%s' mccp ended\n"
           , time_stamp(), get_txt(ip->ob->name));
     
-    /* success */
-    return MY_TRUE;
+    /* Finished */
+    return retval;
 } /* end_compress() */
 
 /*=========================================================================*/

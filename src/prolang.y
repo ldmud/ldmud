@@ -6586,6 +6586,69 @@ new_name:
               actual_type.typeflags |= VAR_INITIALIZED;
 
           define_variable($2, actual_type);
+
+          if (!(actual_type.typeflags & TYPE_MOD_POINTER)
+           && (actual_type.typeflags & PRIMARY_TYPE_MASK) == TYPE_FLOAT
+             )
+          {
+              int i = verify_declared($2); /* Is the var declared? */
+
+              /* Prepare the init code */
+              transfer_init_control();
+
+              /* If this is the first variable initialization and
+               * pragma_share_variables is in effect, insert
+               * the check for blueprint/clone initialisation:
+               *    if (clonep(this_object())) return 1;
+               */
+              if (!variables_initialized && pragma_share_variables)
+              {
+                  ins_f_code(F_THIS_OBJECT);
+                  ins_f_code(F_CLONEP);
+                  ins_f_code(F_BRANCH_WHEN_ZERO);
+                  ins_byte(2);
+                  ins_f_code(F_CONST1);
+                  ins_f_code(F_RETURN);
+              }
+
+              PREPARE_INSERT(5)
+
+              add_f_code(F_FCONST0);
+
+#ifdef DEBUG
+              if (i & VIRTUAL_VAR_TAG)
+              {
+                  /* When we want to allow 'late' initializers for
+                   * inherited variables, it must have a distinct syntax,
+                   * lest name clashs remain undetected, making LPC code
+                   * hard to debug.
+                   */
+                  fatal("Newly declared variable is virtual\n");
+              }
+#endif
+              variables_initialized = MY_TRUE; /* We have __INIT code */
+              if (!pragma_share_variables)
+                  VARIABLE(i)->type.typeflags |= VAR_INITIALIZED;
+
+              /* Push the variable reference and create the assignment */
+
+              if (i + num_virtual_variables > 0xff)
+              {
+                  add_f_code(F_PUSH_IDENTIFIER16_LVALUE);
+                  add_short(i + num_virtual_variables);
+                  CURRENT_PROGRAM_SIZE += 1;
+              }
+              else
+              {
+                  add_f_code(F_PUSH_IDENTIFIER_LVALUE);
+                  add_byte(i + num_virtual_variables);
+              }
+
+              /* Ok, assign */
+              add_f_code(F_VOID_ASSIGN);
+              CURRENT_PROGRAM_SIZE += 4;
+              add_new_init_jump();
+          } /* if (float variable) */
       }
 
     /* Variable definition with initialization */
@@ -6744,21 +6807,42 @@ local_name_list:
 new_local:
       new_local_name
       {
-#ifdef USE_NEW_INLINES
+          /* If this is a float variable, we need to insert an appropriate
+           * initializer, as the default svalue-0 is not a valid float value.
+           */
+
+          Bool need_value = MY_FALSE;
 %line
-          if (current_inline && current_inline->parse_context)
-          {
-              /* When parsing context variables, the context_closure instruction
-               * expects a value on the stack, so just push a 0.
-               */
-              ins_number(0);
-#ifdef DEBUG_INLINES
-printf("DEBUG: inline context decl: name, program_size %d\n", CURRENT_PROGRAM_SIZE);
-#endif /* DEBUG_INLINES */
-          }
-#else /* USE_NEW_INLINES */
-          /* Empty action to void the value of new_local_name */
+
+#ifdef USE_NEW_INLINES
+          /* When parsing context variables, the context_closure instruction
+           * expects a value on the stack. If we do a float initialization,
+           * we leave the 0.0 on the stack, otherwise we'll push a 0.
+           * For normal float locals, we'll create the bytecode to assign
+           * the float 0.
+           */
+          need_value = current_inline && current_inline->parse_context;
 #endif /* USE_NEW_INLINES */
+
+          if (!($1.type.typeflags & TYPE_MOD_POINTER)
+           && ($1.type.typeflags & PRIMARY_TYPE_MASK) == TYPE_FLOAT
+             )
+          {
+              ins_f_code(F_FCONST0);
+
+              if (!need_value)
+              {
+                  if (!add_lvalue_code(&$1, F_VOID_ASSIGN))
+                      YYACCEPT;
+              }
+              
+              need_value = MY_FALSE;
+          } /* if (float variable) */
+
+          if (need_value) /* If we still need a value... */
+          {
+              ins_number(0);
+          }
       }
 
     | new_local_name L_ASSIGN expr0

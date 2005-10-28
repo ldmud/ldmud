@@ -57,6 +57,7 @@
         nconst1
         clit
         nclit
+        fconst0
         float
         closure
         symbol

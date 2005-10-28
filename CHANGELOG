@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+19-Aug-2004 (Lars Duening)  (3.3.585)
+  - (prolang.y, interpret.c, func_spec) Float variables without initializer
+       are now properly initialized to float-0 instead of number-0 (reported
+       by Bardioc).
+  - (pkg-mccp.c) When ending a MCCP connection failed due to an error, the
+       zlib datastructures weren't deallocated (Bug #0000111, fix by Alwin).
+
 08-Aug-2004 (Lars Duening)  (3.3.584)
   - (simulate.c) When printing a load-object error with a long filename,
        the message is limited to the length of the error message buffer (Bug

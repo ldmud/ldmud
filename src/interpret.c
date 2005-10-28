@@ -7839,6 +7839,27 @@ again:
         break;
     }
 
+    CASE(F_FCONST0);                /* --- fconst0             --- */
+    {
+        /* Push the float 0.0 onto the stack.
+         * The binary format is the one determined by STORE_DOUBLE in
+         * datatypes.h
+         * TODO: This code makes heavy assumptions about data sizes and
+         * TODO:: layout. E.g. there need not be a 16-Bit integral type
+         * TODO:: available.
+         * TODO: It should be rewritten to use the LOAD_ macros (but
+         * TODO:: then the compiler needs to use them, too.
+         */
+
+        double zero = 0.0;
+        STORE_DOUBLE_USED
+
+        sp++;
+        sp->type = T_FLOAT;
+        STORE_DOUBLE(sp, zero);
+        break;
+    }
+
     CASE(F_FLOAT);                  /* --- float <mant> <exp>  --- */
     {
         /* Push the float build from <mant> (4 bytes) and <exp> (2 bytes)
