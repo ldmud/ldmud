@@ -5610,7 +5610,7 @@ f_to_object (svalue_t *sp)
     case T_CLOSURE:
         n = sp->x.closure_type;
         o = sp->u.ob;
-        if (is_undef_closure(sp))
+        if (is_undef_closure(sp)) /* this shouldn't happen */
             o = NULL;
         else if (CLOSURE_MALLOCED(n))
         {

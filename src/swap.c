@@ -1555,7 +1555,7 @@ free_swapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
             /* the garbage collector replaces closures bound to destructed
              * objects by F_UNDEF
              */
-            if (is_undef_closure(svp))
+            if (is_undef_closure(svp)) /* this shouldn't happen */
             {
               if ( memcmp(p+1, &svp->x, sizeof svp->x)
                 || memcmp(p+1+sizeof svp->x, &svp->u, sizeof svp->u))

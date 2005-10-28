@@ -5096,31 +5096,14 @@ free_closure (svalue_t *svp)
 } /* free_closure() */
 
 /*-------------------------------------------------------------------------*/
-void
-store_undef_closure (svalue_t *sp)
-
-/* Store into <sp> an efun closure to F_UNDEF, referencing the
- * master object. The old value of *sp is overwritten.
- * It is called by the GC to replace closures bound to destructed
- * objects.
- */
-
-{
-    sp->type = T_CLOSURE;
-    sp->x.closure_type = F_UNDEF+CLOSURE_EFUN;
-    sp->u.ob = master_ob;
-    master_ob->ref++;
-#if defined(CHECK_OBJECT_REF) && defined(DEBUG)
-    master_ob->extra_ref++;
-#endif
-} /* store_undef_closure() */
-
-/*-------------------------------------------------------------------------*/
 Bool
 is_undef_closure (svalue_t *sp)
 
 /* Return TRUE if <sp> is an efun closure to F_UNDEF.
  * It's a simple function, but it reduces the couplings to instrs.h .
+ *
+ * With the current way closure svalues are handled, no closure should
+ * be found 'undef', but this check is kept around just in case...
  *
  * Called by swap.c and efuns.c
  */

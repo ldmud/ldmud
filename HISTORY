@@ -237,6 +237,9 @@ For a detailed list of all changes see the file CHANGELOG.
          to float-0 instead of number-0.
        + Calls from destructed objects to other objects (including simul-efun
          calls) elicit a warning.
+       + The garbage collection now zeroes out closures found to be bound to
+         destructed objects. The old behaviour was to change them into 'undef'
+         closures.
 
     - Other Changes:
 

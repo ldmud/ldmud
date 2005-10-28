@@ -1354,7 +1354,7 @@ gc_count_ref_in_vector (svalue_t *svp, size_t num
                 ob = p->u.ob;
                 if (ob->flags & O_DESTRUCTED)
                 {
-                    store_undef_closure(p);
+                    put_number(p, 0);
                     reference_destructed_object(ob);
                 }
                 else
@@ -1440,7 +1440,7 @@ gc_count_ref_in_closure (svalue_t *csvp)
         }
         else
         {
-            store_undef_closure(csvp);
+            put_number(csvp, 0);
         }
         return;
     }
@@ -1489,7 +1489,7 @@ gc_count_ref_in_closure (svalue_t *csvp)
             }
             else
             {
-                store_undef_closure(csvp);
+                put_number(csvp, 0);
             }
         }
         else

@@ -17503,7 +17503,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
         current_variables = current_object->variables;
         current_strings = current_prog->strings;
         eval_instruction(FUNCTION_CODE(funstart), sp);
-        /* The result is on the stack (inter_sp) */
+        /* The result is on the stack (inter_sp). */
         return;
       }
 
@@ -17553,11 +17553,11 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
             {
                 /* The closure was discovered to be bound to a destructed
                  * object and thus disabled.
-                 * TODO: The disabling code could leave the name of the object
-                 * TODO:: somewhere behind.
+                 * This situation should no longer happen - in all situations
+                 * the closure should be zeroed out.
                  */
                 CLEAN_CSP
-                error("Object the closure was bound to has been destructed\n");
+                error("Object the closure was bound to has been destructed (this shouldn't happen)\n");
                 /* NOTREACHED */
                 return;
             }

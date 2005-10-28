@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+11-Dec-2004 (Lars Duening)  (3.3.629)
+  - (gcollect.c) Closures found to be bound to destructed objects are
+       replaced by 0s, not #'undef closures (Bug #0000322).
+  - (closure) The function store_undef_closure() is no longer needed.
+
 09-Dec-2004 (Lars Duening)  (3.3.628)
   - (xalloc.c) Modified xalloc() to accept allocations of size 0 (again as the
        C standard demands).

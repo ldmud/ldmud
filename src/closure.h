@@ -115,7 +115,6 @@ extern void      closure_literal(svalue_t *dest, int ix, unsigned short inhIndex
 #endif /* USE_NEW_INLINES */
 extern lambda_t *lambda(vector_t *args, svalue_t *block, object_t *origin);
 extern void      free_closure(svalue_t *svp);
-extern void      store_undef_closure (svalue_t *sp);
 extern Bool      is_undef_closure (svalue_t *sp);
 extern void      closure_lookup_lfun_prog ( lambda_t * l , program_t ** pProg , string_t ** pName , Bool * pIsInherited);
 extern const char * closure_operator_to_string (int type);
