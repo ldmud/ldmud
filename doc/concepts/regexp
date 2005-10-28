@@ -118,4 +118,4 @@ HISTORY
 
 SEE ALSO
         hsregexp(C), pcre(C), regexp_package(H), regexp(E), regexplode(E),
-        regmatch(E), regreplace(E), invocation(D)
+        regmatch(E), regreplace(E), regexp_package(E), invocation(D)

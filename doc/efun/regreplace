@@ -53,5 +53,5 @@ AUTHOR
         man page.
 
 SEE ALSO
-        regexp(E), regexplode(E), regmatch(E), sscanf(E), trim(E),
-        regexp(C)
+        regexp(E), regexplode(E), regmatch(E), regexp_package(E),
+        sscanf(E), trim(E), regexp(C)

@@ -54,20 +54,16 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 633)
-(Parent-Version lpmud 3-3 632)
+(Project-Version lpmud 3-3 634)
+(Parent-Version lpmud 3-3 633)
 (Version-Log "
-  - (prolang.y) The no-warn-deprecated opcodes weren't included in the
-       size calculations for the lvalue indexing shuffling.
-  - (lex.c, efuns.c) The overflow checking in the number parsing routine
-       was overeager, causing Evermore to no longer boot. The checking
-       now really compares against the largest possible number, instead
-       of simply checking the sign (Bug #0000327).
+  - (func_spec, efuns.c) New efun regexp_package() to determine the
+       currently active default regexp package.
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Wed, 22 Dec 2004 15:20:12 -0700")
+(Checkin-Time "Wed, 22 Dec 2004 17:21:22 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -105,8 +101,8 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.12 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.83 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.696 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.385 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.697 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.385.1.1 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -183,7 +179,7 @@
   (src/ed.h (lpmud/f/34_ed.h 1.5.1.6 644))
   (src/ed.c (lpmud/c/33_ed.c 1.32.1.35 644))
   (src/efuns.h (lpmud/l/20_efuns.h 1.13.1.19.1.6 644))
-  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.104.1.1 644))
+  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.104.1.2 644))
   (src/exec.h (lpmud/c/32_exec.h 1.34.1.33.1.7 644))
   (src/files.h (lpmud/i/49_files.h 1.2 644))
   (src/files.c (lpmud/i/50_files.c 1.26 644))
@@ -363,7 +359,7 @@
   (src/xptmalloc.c (lpmud/d/b/10_xptmalloc. 1.5 644))
 
   ;; Build files
-  (src/func_spec (lpmud/c/31_func_spec 1.53.1.45.1.22.1.39 644))
+  (src/func_spec (lpmud/c/31_func_spec 1.53.1.45.1.22.1.39.1.1 644))
   (src/string_spec (lpmud/f/6_string_spe 1.14.1.17 644))
   (src/mkfunc.c (lpmud/l/14_mkfunc.c 1.1 644))
   (src/make_func.y (lpmud/b/7_make_func. 1.25.1.30.1.12 644))
@@ -601,7 +597,7 @@
   (doc/concepts/native (lpmud/n/36_native 1.9 644))
   (doc/concepts/negotiation (lpmud/n/37_negotiatio 1.3.1.4 644))
   (doc/concepts/objects (lpmud/n/38_objects 1.5 644))
-  (doc/concepts/regexp (lpmud/v/29_regexp 1.4 644))
+  (doc/concepts/regexp (lpmud/v/29_regexp 1.5 644))
   (doc/concepts/hsregexp (lpmud/v/30_hsregexp 1.4 644))
   (doc/concepts/pcre (lpmud/v/31_pcre 1.7 644))
   (doc/concepts/pgsql (lpmud/d/b/43_pgsql 1.1 644))
@@ -816,10 +812,11 @@
   (doc/efun/read_bytes (lpmud/p/39_read_bytes 1.2 644))
   (doc/efun/read_file (lpmud/p/40_read_file 1.3 644))
   (doc/efun/referencep (lpmud/p/41_referencep 1.7 644))
-  (doc/efun/regexp (lpmud/p/42_regexp 1.1.1.8 644))
-  (doc/efun/regexplode (lpmud/p/43_regexplode 1.5 644))
-  (doc/efun/regmatch (lpmud/v/26_regmatch 1.4 644))
-  (doc/efun/regreplace (lpmud/p/44_regreplace 1.9 644))
+  (doc/efun/regexp (lpmud/p/42_regexp 1.1.1.9 644))
+  (doc/efun/regexplode (lpmud/p/43_regexplode 1.6 644))
+  (doc/efun/regmatch (lpmud/v/26_regmatch 1.5 644))
+  (doc/efun/regreplace (lpmud/p/44_regreplace 1.10 644))
+  (doc/efun/regexp_package (lpmud/d/c/12_regexp_pac 1.1 644))
   (doc/efun/remove_action (lpmud/p/45_remove_act 1.4 644))
   (doc/efun/remove_call_out (lpmud/p/46_remove_cal 1.4 644))
   (doc/efun/remove_input_to (lpmud/o/15_remove_inp 1.3 644))

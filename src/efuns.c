@@ -133,6 +133,7 @@
 #include "xalloc.h"
 
 #include "../mudlib/sys/debug_info.h"
+#include "../mudlib/sys/driver_hook.h"
 #include "../mudlib/sys/objectinfo.h"
 #include "../mudlib/sys/regexp.h"
 #include "../mudlib/sys/strings.h"
@@ -462,6 +463,31 @@ f_sha1 (svalue_t *sp)
 
     return sp;
 } /* f_sha1() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_regexp_package (svalue_t *sp)
+
+/* EFUN regexp()
+ *
+ *   int regexp_package()
+ *
+ * Return which regexp package is used by default:
+ *   RE_TRADITIONAL: traditional regexps
+ *   RE_PCRE:        PCRE
+ */
+
+{
+    p_int pkg = 0;
+
+    if (driver_hook[H_REGEXP_PACKAGE].u.number)
+        pkg = driver_hook[H_REGEXP_PACKAGE].u.number;
+    else
+        pkg = regex_package;
+
+    push_number(sp, pkg);
+    return sp;
+} /* f_regexp_package() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *

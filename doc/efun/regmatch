@@ -43,4 +43,4 @@ HISTORY
         return a start position.
 
 SEE ALSO
-        regexplode(E), regreplace(E), regexp(E), regexp(C)
+        regexplode(E), regreplace(E), regexp(E), regexp_package(E), regexp(C)

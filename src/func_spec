@@ -402,6 +402,7 @@ string  md5_crypt(string, string|int default: F_CONST0);
 string *regexp(string *, string, int default: F_CONST0);
 string *regexplode(string, string, int default: F_CONST0);
 string  regreplace(string,string,closure|string,int);
+int     regexp_package();
 mixed   regmatch(string,string, void|int, void|int);
 string  sha1(string);
 void    printf(string, ...);
