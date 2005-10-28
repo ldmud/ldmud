@@ -279,7 +279,7 @@ show_otable_status (strbuf_t * sbuf, Bool verbose)
                    , "Searches/average search length       %ld (%.2f)\n"
                    , obj_searches
                    , (float) obj_probes / (float) obj_searches);
-        strbuf_addf(sbuf, "External lookups succeeded (succeed) %ld (%ld)\n"
+        strbuf_addf(sbuf, "External lookups (succeed)   %ld (%ld)\n"
                    , (long)user_obj_lookups, (long)user_obj_found);
 #if defined(__MWERKS__)
 #    pragma warn_largeargs reset

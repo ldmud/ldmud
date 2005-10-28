@@ -32,9 +32,14 @@
 #define LDMUD_CHECK_EVAL_COST \
     eval_cost += 1; \
     if (EVALUATION_TOO_LONG()) { \
-        md->errorcode = RE_ERROR_BACKTRACK; \
-        return FALSE; \
+        RRETURN(RE_ERROR_BACKTRACK); \
     }
+
+/* PCRE can support UTF8, but right now we can't activate the UTF8 matching
+ * mode from our efuns.
+ */
+
+/* #undef SUPPORT_UTF8 */
 
 #include "pcre/pcre.c"
 #include "pcre/get.c"

@@ -172,7 +172,7 @@ lang.c lang.h: lang.y
 	$(MV) $(YACCTAB)h lang.h
 
 pcre/chartables.c : dftables@EXEEXT@
-	./dftables@EXEEXT@ > pcre/chartables.c
+	./dftables@EXEEXT@ pcre/chartables.c
 
 #--------------------------------------------------------
 # The dependency generation uses the program 'mkdepend' and assumes GNUmake.

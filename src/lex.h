@@ -14,7 +14,7 @@ typedef struct source_file_s source_file_t; /* forward */
 /* --- struct source_loc_s: location within a source file ---
  *
  * This structure is used to identify the location of lexical elements
- * in the input source. The pointers contained use their validity after
+ * in the input source. The pointers contained become invalid after
  * a compilation has finished.
  */
 
@@ -44,7 +44,7 @@ struct source_file_s
 {
     source_file_t * next;    /* next source_file structure, or NULL */
     char          * name;    /* Allocated: the name of the file */
-    source_loc_t    parent;  /* the file this source was included from;
+    source_loc_t    parent;  /* the file/line this source was included from;
                               * or NULL if none.
                               */
 };

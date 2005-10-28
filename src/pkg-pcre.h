@@ -17,7 +17,7 @@
 
 /* Error code to be returned if too many backtracks are detected.
  */
-#define RE_ERROR_BACKTRACK (2 * PCRE_ERROR_NOSUBSTRING)
+#define RE_ERROR_BACKTRACK PCRE_ERROR_MATCHLIMIT
 
 #endif /* USE_PCRE */
 

@@ -1,12 +1,16 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+08-Jul-2004 (Lars Duening)  (3.3.569)
+  - (pcre/) Upgraded PCRE to version 4.5; however, there is additional work
+       to be done as PCRE 4.5 offers additional features (Bug #0000075)
+
 01-Jul-2004 (Lars Duening)  (3.3.568)
   - (doc/efun/previous_object) Corrected to reflect actual behaviour (Bug
-    #0000073).
+       #0000073).
   - (lex.c) The symbol __MAX_MALLOC__ is set to what is actually set
        in the global 'max_malloced' and not just the configuration
-       value MAX_MALLLOCED (Bug #00069).
+       value MAX_MALLLOCED (Bug #0000069).
 
 29-Jun-2004 (Lars Duening)  (3.3.567)
   - (comm.c) Improved the check for input_to() bitflags on an object with

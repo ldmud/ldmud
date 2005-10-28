@@ -9,15 +9,15 @@ BESCHREIBUNG
         liefert previous_object() 0.
 
         Wird das Argument <i> angegeben, so verfolgt previous_object() den
-        Aufruf <i> Stufen zurueck. Zum Beispiel liefert previous_object(2) das
+        Aufruf <i> Stufen zurueck. Zum Beispiel liefert previous_object(1) das
         aufrufende Objekt des aufrufenden Objekts. Fuer <i> muss gelten:
-        1 <= i < call_stack_depth(). Ein Wert <i> < 1 liefert das erste
+        0 <= i < call_stack_depth(). Ein Wert <i> < 0 liefert das erste
         aufrufende Object zurueck.
 
         Es gibt einen wichtigen Spezialfall: in Funktionen, die vom Gamedriver
         auf Grund eines externen Ereignises aufgerufen wurden (zum Beispiel
         Kommandi, die mit add_action() definiert wurden), liefert
-        previous_object() this_object(), previous_object(1) hingegen 0.
+        previous_object() this_object(), previous_object(0) hingegen 0.
 
 BEISPIEL
         int sicherheitscheck()
@@ -41,7 +41,7 @@ BEISPIEL
         Verarbeitung abgebrochen werden sollte.
 
 FEHLER
-        Werte von <i> < 1 werden wie <i> == 1 behandelt - dies ist historisch.
+        Werte von <i> < 0 werden wie <i> == 0 behandelt - dies ist historisch.
 
 SIEHE AUCH
         call_other(E), this_object(E), this_player(E), caller_stack(E),
