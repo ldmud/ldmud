@@ -243,10 +243,7 @@ extern void close_socket(socket_t *);
 
 /* --- Debug Functions --- */
 
-#ifdef XDEBUG
-#   ifndef DEBUG
-#       define DEBUG
-#   endif
+#if ERQ_DEBUG > 1
 #   define XPRINTF(x) fprintf x
 #else
 #   define XPRINTF(x)

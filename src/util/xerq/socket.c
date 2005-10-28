@@ -253,8 +253,8 @@ read_socket (socket_t *sp, int rw)
 
     num = 0;
     
-    XPRINTF((stderr, "%s Read socket %p (type %d) , rw %d\n"
-                   , time_stamp(), sp, sp->type, rw));
+    XPRINTF((stderr, "%s Read socket %p (fd %d, type %d) , rw %d\n"
+                   , time_stamp(), sp, sp->fd, sp->type, rw));
 
     if (sp->queue)
         flush_queue(&sp->queue, sp->fd, 1);
@@ -268,6 +268,8 @@ read_socket (socket_t *sp, int rw)
 
         reply1keep(sp->handle, r, sizeof(r));
         sp->type = SOCKET_WAIT_ACCEPT;
+        XPRINTF((stderr, "%s   Signaling driver to accept connction\n"
+                       , time_stamp() ));
         return 0;
       }
 
@@ -313,12 +315,16 @@ read_socket (socket_t *sp, int rw)
 
             char r[] = { ERQ_OK };
             
+            XPRINTF((stderr, "%s   Socket connected.\n"
+                           , time_stamp() ));
             sp->type = SOCKET_CONNECTED;
             replyn(sp->handle, 1, 2,
                 r, sizeof(r),
                 (char *) &sp->ticket, TICKET_SIZE);
             return 0;
         }
+        XPRINTF((stderr, "%s   Socket not connected yet.\n"
+                       , time_stamp() ));
         /* FALLTHROUGH */
       }
 
@@ -330,6 +336,9 @@ read_socket (socket_t *sp, int rw)
         
         char r_err[] = { ERQ_STDERR };
         char r_out[] = { ERQ_STDOUT };
+
+        XPRINTF((stderr, "%s   Attempting to read data from socket.\n"
+                       , time_stamp() ));
 
         do {
             num = read(sp->fd, buf, ERQ_MAX_REPLY-14);

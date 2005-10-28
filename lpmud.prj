@@ -60,25 +60,24 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 577)
-(Parent-Version lpmud 3-3 576)
+(Project-Version lpmud 3-3 578)
+(Parent-Version lpmud 3-3 577)
 (Version-Log "
-  - (array.c, interpret.c) Removed a number of memory leaks caused by
-       runtime errors during array operations which exceeded the max
-       array size (Bug #0000096).
-  - (comm.c) If input_to() wasn't given a valid prompt, it leaked
-       the memory for the internal input-to structure (Bug #0000096).
-  - (comm.c) If input_to() was given an array of non-ints, it leaked
-       the memory for the internal message string (Bug #0000096).
-  - (bitstrings.c) The bitstring operators would leak the memory for
-       the result if encountering an invalid bitpattern (Bug #0000096).
-  - (files.c) If tail() couldnt' find the file, it didn't free the
-       string with the pathname (Bug #0000096).
+  - (xerq/defs.h) ERQ_DEBUG level wasn't properly translated into
+       debug output.
+  - (xerq/socket.c) Added a few level 2 diagnostics.
+  - (interpret.c) Removed two left-over DEBUG diagnostics (reported
+       by Bardioc).
+  - (comm.c) input_to() didn't properly check its arguments (Bug #0000098).
+  - (call_out.c) If a call-out causes an error, all further call-outs for
+       the same user are re-scheduled to the next cycle. This is mainly
+       meant to stop run-away call-outs causing too-long-evaluations while
+       re-scheduling calls to themselves (Bug #0000095).
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Wed, 21 Jul 2004 23:30:18 -0600")
+(Checkin-Time "Sun, 25 Jul 2004 00:28:23 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -116,8 +115,8 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.77 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.640 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.367 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.641 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.368 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -182,10 +181,10 @@
   (src/bitstrings.c (lpmud/i/48_bitstrings 1.16 644))
   (src/bytecode.h (lpmud/a/b/26_bytecode.h 1.1.1.3 644))
   (src/call_out.h (lpmud/f/45_call_out.h 1.7.1.6 644))
-  (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.26 644))
+  (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.27 644))
   (src/closure.h (lpmud/f/44_closure.h 1.7.1.18 644))
   (src/closure.c (lpmud/d/4_closure.c 1.41.1.47.1.20 644))
-  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.89 644))
+  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.90 644))
   (src/comm.h (lpmud/d/3_comm.h 1.26.1.40 644))
   (src/driver.h (lpmud/f/36_driver.h 1.15.1.25 644))
   (src/dumpstat.h (lpmud/f/35_dumpstat.h 1.8 644))
@@ -206,7 +205,7 @@
   (src/heartbeat.c (lpmud/m/42_heartbeat. 1.18.1.9 644))
   (src/i-svalue_cmp.h (lpmud/a/b/20_i-svalue_c 1.4 644))
   (src/interpret.h (lpmud/b/13_interpret. 1.33.1.39 644))
-  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.63 644))
+  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.64 644))
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.15.1.9 644))
   (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.68 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.17 644))
@@ -458,7 +457,7 @@
   (src/util/erq/erq.h (lpmud/d/26_erq.h 1.1.1.4.1.2 644))
   (src/util/erq/erq.c (lpmud/d/27_erq.c 1.1.1.8.1.6.1.4.1.6 644))
 
-  (src/util/xerq/socket.c (lpmud/k/21_socket.c 1.9.1.4.1.5 644))
+  (src/util/xerq/socket.c (lpmud/k/21_socket.c 1.9.1.4.1.6 644))
   (src/util/xerq/lpc/www/who.c (lpmud/k/22_who.c 1.2 644))
   (src/util/xerq/lpc/www/finger.c (lpmud/k/23_finger.c 1.1 644))
   (src/util/xerq/lpc/udp.c (lpmud/k/24_udp.c 1.1 644))
@@ -474,7 +473,7 @@
   (src/util/xerq/lookup.c (lpmud/k/33_lookup.c 1.4.1.1.1.4 644))
   (src/util/xerq/execute.c (lpmud/k/34_execute.c 1.5.1.1.1.6 644))
   (src/util/xerq/erq.h (lpmud/k/35_erq.h 1.3.1.2 644))
-  (src/util/xerq/erq.c (lpmud/k/36_erq.c 1.8.1.12.1.4 644))
+  (src/util/xerq/erq.c (lpmud/k/36_erq.c 1.8.1.12.1.5 644))
   (src/util/xerq/docs/socketd/socket_write (lpmud/k/38_socket_wri 1.1 644))
   (src/util/xerq/docs/socketd/socket_udp (lpmud/k/39_socket_udp 1.1 644))
   (src/util/xerq/docs/socketd/socket_transfer (lpmud/k/40_socket_tra 1.1 644))
@@ -483,7 +482,7 @@
   (src/util/xerq/docs/socketd/socket_connect (lpmud/k/43_socket_con 1.2 644))
   (src/util/xerq/docs/socketd/socket_address (lpmud/k/44_socket_add 1.1 644))
   (src/util/xerq/docs/socketd/socket_accept (lpmud/k/45_socket_acc 1.1 644))
-  (src/util/xerq/defs.h (lpmud/k/46_defs.h 1.5.1.3.1.6 644))
+  (src/util/xerq/defs.h (lpmud/k/46_defs.h 1.5.1.3.1.7 644))
   (src/util/xerq/README (lpmud/k/47_README 1.3 644))
   (src/util/xerq/Makefile.in (lpmud/k/48_Makefile 1.6.1.7 644))
   (src/util/xerq/DONE (lpmud/k/49_DONE 1.1 644))
@@ -1578,7 +1577,7 @@
   (doc/efun.de/file_name.de (lpmud/i/b/49_file_name. 1.2 640))
   (doc/efun.de/extract.de (lpmud/i/b/50_extract.de 1.2 640))
   (doc/efun.de/extern_call.de (lpmud/i/b/51_extern_cal 1.1 640))
-  (doc/efun.de/export_uid.de (lpmud/j/b/0_export_uid 1.1 640))
+  (doc/efun.de/export_uid.de (lpmud/j/b/0_export_uid 1.2 640))
   (doc/efun.de/explode.de (lpmud/s/31_explode.de 1.1 644))
   (doc/efun.de/expand_define.de (lpmud/j/b/1_expand_def 1.2 640))
   (doc/efun.de/exp.de (lpmud/j/b/2_exp.de 1.1 640))

@@ -7441,8 +7441,22 @@ v_input_to (svalue_t *sp, int num_arg)
     extra = 0;
     extra_arg = arg + 1;
 
+    if (arg[0].type != T_CLOSURE && arg[0].type != T_STRING)
+    {
+        vefun_bad_arg(1, sp);
+        /* NOTREACHED */
+        return NULL;
+    }
+
     if (num_arg > 1)
     {
+        if (arg[1].type != T_NUMBER)
+        {
+            vefun_bad_arg(2, sp);
+            /* NOTREACHED */
+            return NULL;
+        }
+
         iflags = arg[1].u.number;
         extra = num_arg - 2;
         extra_arg = arg + 2;

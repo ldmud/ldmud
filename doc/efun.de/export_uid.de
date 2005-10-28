@@ -3,7 +3,7 @@ SYNOPSIS
 
 BESCHREIBUNG
         Setzt die UID des Objekts <ob> auf die effektive UID (EUID) des
-        aktuellen Objekts. Dies ist nur moeglich, wenn das aktuelle Objekte
+        aktuellen Objekts. Dies ist nur moeglich, wenn das Objekt <ob>
         eine EUID von 0 hat.
 
 AENDERUNGEN

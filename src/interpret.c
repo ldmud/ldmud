@@ -2445,7 +2445,6 @@ inter_add_array (vector_t *q, vector_t **vpp)
         } else
         /* Just allocate a new vector and memcopy p into it. */
         {
-printf("DEBUG: can't increase vector size\n");
             r = allocate_uninit_array((p_int)(p_size + q_size));
             deref_array(p);
             d = r->item;
@@ -2460,7 +2459,6 @@ printf("DEBUG: can't increase vector size\n");
         /* p must survive: allocate a new vector and assign the values
          * from p.
          */
-printf("DEBUG: p must survive\n");
         r = allocate_uninit_array((p_int)(p_size + q_size));
         deref_array(p);
         d = r->item;

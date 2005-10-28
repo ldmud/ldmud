@@ -87,6 +87,40 @@ free_call (struct call *cop)
 } /* free_call() */
 
 /*-------------------------------------------------------------------------*/
+static void
+insert_call (struct call *cop, int delay)
+  
+/* Inser the call_out structure <cop> with the <delay> into the callout
+ * list.
+ */
+
+{
+    struct call   **copp;   /* Auxiliary pointers for list insertion */
+    struct call    *cop2;
+
+    num_callouts++;
+    for (copp = &call_list; NULL != (cop2 = *copp); copp = &cop2->next)
+    {
+        int delta;
+        if ((delta = cop2->delta) >= delay)
+        {
+            cop2->delta -= delay;
+            cop->delta = delay;
+            cop->next = *copp;
+            *copp = cop;
+            return;
+        }
+        delay -= (delta >= 0 ? delta : 0);
+          /* Especially when called from within a call_out, delta may be
+           * negative.
+           */
+    }
+    *copp = cop;
+    cop->delta = delay;
+    cop->next = NULL;
+} /* insert_call() */
+
+/*-------------------------------------------------------------------------*/
 svalue_t *
 v_call_out (svalue_t *sp, int num_arg)
 
@@ -105,8 +139,6 @@ v_call_out (svalue_t *sp, int num_arg)
     svalue_t       *arg;    /* Pointer to efun arguments */
     int             delay;
     struct call    *cop;    /* New callout structure */
-    struct call   **copp;   /* Auxiliary pointers for list insertion */
-    struct call    *cop2;
     int             error_index;
 
     arg = sp - num_arg + 1;
@@ -165,7 +197,6 @@ v_call_out (svalue_t *sp, int num_arg)
     /* We can do the callout.
      */
 
-    num_callouts++;
     cop->command_giver = command_giver; /* save current player context */
     if (command_giver)
         ref_object(command_giver, "f_call_out");  /* Bump its ref */
@@ -178,25 +209,7 @@ v_call_out (svalue_t *sp, int num_arg)
 
     /* Insert the new structure at its proper place in the list */
 
-    for (copp = &call_list; NULL != (cop2 = *copp); copp = &cop2->next)
-    {
-        int delta;
-        if ((delta = cop2->delta) >= delay)
-        {
-            cop2->delta -= delay;
-            cop->delta = delay;
-            cop->next = *copp;
-            *copp = cop;
-            return sp;
-        }
-        delay -= (delta >= 0 ? delta : 0);
-          /* Especially when called from within a call_out, delta may be
-           * negative.
-           */
-    }
-    *copp = cop;
-    cop->delta = delay;
-    cop->next = NULL;
+    insert_call(cop, delay);
 
     return sp;
 } /* v_call_out() */
@@ -263,8 +276,11 @@ call_out (void)
         ob = called_object;
         if (ob)
         {
+            /* Disable the user for this call_out cycle. This is mainly
+             * meant to stop runaway call_outs causing too-long-evaluations.
+             */
             user = ob->user;
-            user->call_out_cost = eval_cost;
+            user->call_out_cost = -1;
         }
         free_call(cop);
     }
@@ -311,10 +327,25 @@ call_out (void)
         if (O_PROG_SWAPPED(ob)
          && load_ob_from_swap(ob) < 0)
         {
-            debug_message("%s: Error in call_out: out of memory: "
+            debug_message("%s Error in call_out: out of memory: "
                           "unswap object '%s'.\n", time_stamp()
                          , get_txt(ob->name));
             free_call(cop);
+            continue;
+        }
+
+        /* Check if the user has exceeded its eval limit for this cycle.
+         * If yes, reschedule the call_out for one second later.
+         */
+        user = ob->user;
+        if (user->last_call_out == current_time
+         && user->call_out_cost < 0
+           )
+        {
+            debug_message("%s call_out: user '%s' had an error: "
+                          "rescheduling call_out.\n"
+                         , time_stamp(), get_txt(user->name));
+            insert_call(cop, 1);
             continue;
         }
 
@@ -376,7 +407,6 @@ call_out (void)
          */
 
         called_object = current_object = ob;
-        user = ob->user;
         if (user->last_call_out != current_time)
         {
             user->last_call_out = current_time;

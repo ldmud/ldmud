@@ -391,15 +391,15 @@ main(int argc, char *argv[])
 
             if (FD_ISSET(this->fd, &read_fds))
             {
-                XPRINTF((stderr, "%s Socket %p ready for reading.\n"
-                               , time_stamp(), this));
+                XPRINTF((stderr, "%s Socket %p (%d) ready for reading.\n"
+                               , time_stamp(), this, this->fd));
                 rc = read_socket(this, 0);
             }
 
             if (!rc && FD_ISSET(this->fd, &write_fds))
             {
-                XPRINTF((stderr, "%s Socket %p ready for writing.\n"
-                               , time_stamp(), this));
+                XPRINTF((stderr, "%s Socket %p (%d) ready for writing.\n"
+                               , time_stamp(), this, this->fd));
                 (void)read_socket(this, 1);
             }
         }
