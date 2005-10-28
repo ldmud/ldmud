@@ -1,6 +1,17 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+24-May-2004 (Lars Duening)  (3.3.559)
+  - (prolang.y) The compiler emits warnings if the functions defined by
+       two inherits collide in their visibility. If this produces too
+       much output, we will have to control this by a pragma. (suggested 
+       by Bardioc).
+  - (simulate.c) If a catch() doesn't have enough eval time left
+       (less than CATCH_EVAL_COST), this is thrown as an error from inside
+       the catch instead of causing the catch to return 0. (suggested
+       by Menaures).
+  - (efuns.c) Removed compiler warnings (thanks, Guandalug!)
+
 23-May-2004 (Lars Duening)  (3.3.558)
   - (object.c) When restoring structs and the saved data is longer than
        the struct, make sure that the extra values are skipped in the

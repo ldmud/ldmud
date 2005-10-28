@@ -323,8 +323,8 @@ catch_instruction ( int flags, uint offset
  * Result is TRUE on a normal exit (error or not), and FALSE if the
  * guarded code terminated with a 'return' itself;
  *
- * Hard experience showed that it is advantageous to have the setjmp()
- * have its own stackframe, and call the longjmp() from a deeper
+ * Hard experience showed that it is advantageous to have setjmp()
+ * to have its own stackframe, and call the longjmp() from a deeper
  * frame. Additionally it prevents over-optimistic optimizers from
  * removing vital reloads of possibly clobbered local variables after
  * the setjmp().
@@ -341,21 +341,6 @@ catch_instruction ( int flags, uint offset
     /* Compute address of next instruction after the CATCH statement.
      */
     new_pc = i_pc + offset;
-
-    /* Increase the eval_cost for the duration of the catch so that
-     * there is enough time left to handle an eval-too-big error.
-     */
-    if (max_eval_cost && eval_cost + CATCH_RESERVED_COST >= max_eval_cost)
-    {
-        error("Not enough eval time left for catch(): required %ld, available %ld\n"
-             , (long)CATCH_RESERVED_COST, (long)(max_eval_cost - eval_cost)
-             );
-        /* NOTREACHED */
-        return MY_TRUE;
-    }
-
-    eval_cost += CATCH_RESERVED_COST;
-    assigned_eval_cost += CATCH_RESERVED_COST;
 
     /* 'Fake' a subroutine call from <new_pc>
      */
@@ -420,6 +405,21 @@ catch_instruction ( int flags, uint offset
     }
     else
     {
+
+        /* Increase the eval_cost for the duration of the catch so that
+         * there is enough time left to handle an eval-too-big error.
+         */
+        if (max_eval_cost && eval_cost + CATCH_RESERVED_COST >= max_eval_cost)
+        {
+            error("Not enough eval time left for catch(): required %ld, available %ld\n"
+                 , (long)CATCH_RESERVED_COST, (long)(max_eval_cost - eval_cost)
+                 );
+            /* NOTREACHED */
+            return MY_TRUE;
+        }
+
+        eval_cost += CATCH_RESERVED_COST;
+        assigned_eval_cost += CATCH_RESERVED_COST;
 
         /* Recursively call the interpreter */
         rc = eval_instruction(i_pc, INTER_SP);

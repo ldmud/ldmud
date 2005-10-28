@@ -14,7 +14,8 @@ BESCHREIBUNG
 
         Wenn zum Zeitpunkt, zu dem catch() aufgerufen wird, weniger als
         __CATCH_EVAL_COST__ Rechenticks uebrig sind, wird ein Laufzeitfehler
-        RTE erzeugt und es werden keine Ausdruecke <expr> aus catch()
+        RTE innerhalb von catch() erzeugt (und somit wie jeder andere
+        Fehler abgefangen) und es werden keine Ausdruecke <expr> aus catch()
         ausgewertet.
 
         Das Verhalten von catch() kann durch <modifiers> veraendert werden:
@@ -41,6 +42,8 @@ AENDERUNGEN
             ein.
         LDMud 3.2.10 implementierte 'nolog' als offizielle Form und fuehrte
             zudem 'publish' ein.
+        LDMud 3.3.559 verlegte den Test auf verbleibende Rechenticks in die
+            vom catch() umschlossenen Ausfuehrung.
 
 SIEHE AUCH
         throw(E), raise_error(E), predefined(D), runtime_error(M)

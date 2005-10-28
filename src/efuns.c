@@ -6492,7 +6492,7 @@ v_member (svalue_t *sp, int num_arg)
             efun_arg_error(2, T_NUMBER, sp->type, sp);
         str = sp[-1].u.str;
         
-        if (hasStart && startpos >= mstrsize(str))
+        if (hasStart && (size_t)startpos >= mstrsize(str))
             i = -1;
         else
         {
@@ -6713,7 +6713,7 @@ v_rmember (svalue_t *sp, int num_arg)
         if (sp->type != T_NUMBER)
             efun_arg_error(2, T_NUMBER, sp->type, sp);
         str = sp[-1].u.str;
-        if (!hasStart || startpos >= mstrsize(str))
+        if (!hasStart || (size_t)startpos >= mstrsize(str))
             startpos = mstrsize(str);
         i = sp->u.number;
         if ((i & ~0xff) != 0)

@@ -13,7 +13,8 @@ DESCRIPTION
 
         If at the time the catch() is encountered less than
         __CATCH_EVAL_COST__ eval ticks are left, a runtime error will be
-        thrown and the expressions will not be executed.
+        thrown from inside the catch() (and thus caught like every other
+        error) and the expressions will not be executed.
 
         The default behaviour of catch() can be changed using modifiers:
 
@@ -37,6 +38,8 @@ HISTORY
         LDMud 3.2.9 introduced the 'nolog' catch() as experimental feature.
         LDMud 3.2.10 implemented 'nolog' as official form and added
           'publish'.
+        LDMud 3.3.559 moved the check regarding __CATCH_EVAL_COST__ inside
+          the catch().
 
 SEE ALSO
         throw(E), raise_error(E), predefined(D), runtime_error(M)

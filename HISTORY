@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-23-May-2004 (Lars Duening) -- Development Release 3.3
+24-May-2004 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -12,6 +12,9 @@ For a detailed list of all changes see the file CHANGELOG.
          filter_array(), filter_mapping(), m_sizeof(), map_array(),
          map_mapping(), mapping_contains(), member_array(),
          set_auto_include_string().
+       + catch(): If there is not enough time left (less than
+           __CATCH_EVAL_COST__), this is thrown as an error from inside
+           the catch instead of causing the catch to return 0.
        + copy(), deep_copy(), get_type_info(), to_array(), to_string():
            Added struct support.
        + add_action(): Historical usage with just one argument no longer
@@ -115,6 +118,8 @@ For a detailed list of all changes see the file CHANGELOG.
            a pre-program basis to initialize the variables of clone
            from the current values of the corresponding variables in
            the blueprint.
+       + If the function definitions in two inherits differ in their
+           visibility, the compiler emits a warning.
        + Bugfix: The type recognition of the variables for a foreach()
            no longer gets confused by visibility flags.
 

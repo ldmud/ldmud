@@ -14625,6 +14625,28 @@ copy_functions (program_t *from, funflag_t type)
                              * inherited one is not, or this one is also nomask:
                              * prefer the inherited one.
                              */
+                            string_t * oldFrom = NULL;
+                            string_t * funFrom = cvt_progname(from->name);
+
+                            if (OldFunction->flags & NAME_INHERITED)
+                            {
+                                oldFrom = cvt_progname(INHERIT(OldFunction->offset.inherit).prog->name);
+                            }
+
+                            if (oldFrom != NULL)
+                                yywarnf("public %s::%s() shadows private %s::%s()"
+                                      , get_txt(funFrom), get_txt(fun.name)
+                                      , get_txt(oldFrom), get_txt(OldFunction->name)
+                                    );
+                            else
+                                yywarnf("public %s::%s() shadows private %s()"
+                                      , get_txt(funFrom), get_txt(fun.name)
+                                      , get_txt(OldFunction->name)
+                                    );
+
+                            if (oldFrom) free_mstring(oldFrom);
+                            if (funFrom) free_mstring(funFrom);
+
                             cross_define( &fun, OldFunction
                                         , current_func_index - n );
                             p->u.global.function = current_func_index;
@@ -14638,6 +14660,28 @@ copy_functions (program_t *from, funflag_t type)
                              * inherited one is not, or this one is also nomask:
                              * prefer the inherited one.
                              */
+                            string_t * oldFrom = NULL;
+                            string_t * funFrom = cvt_progname(from->name);
+
+                            if (OldFunction->flags & NAME_INHERITED)
+                            {
+                                oldFrom = cvt_progname(INHERIT(OldFunction->offset.inherit).prog->name);
+                            }
+
+                            if (oldFrom != NULL)
+                                yywarnf("public %s::%s() shadows private %s::%s()"
+                                      , get_txt(funFrom), get_txt(OldFunction->name)
+                                      , get_txt(from->name), get_txt(fun.name)
+                                    );
+                            else
+                                yywarnf("public %s() shadows private %s::%s()"
+                                      , get_txt(OldFunction->name)
+                                      , get_txt(funFrom), get_txt(fun.name)
+                                    );
+
+                            if (oldFrom) free_mstring(oldFrom);
+                            if (funFrom) free_mstring(funFrom);
+
                             cross_define( &fun, OldFunction
                                         , current_func_index - n );
                             p->u.global.function = current_func_index;
@@ -14656,6 +14700,52 @@ copy_functions (program_t *from, funflag_t type)
                              * TODO:: which of course implies a deeper
                              * TODO:: analysis of the going-ons here.
                              */
+
+                            /* Warn about private <-> public collisions;
+                             * however public <-> public and private <->
+                             * private are to be expected.
+                             */
+                            string_t * oldFrom = NULL;
+                            string_t * funFrom = cvt_progname(from->name);
+
+                            if (OldFunction->flags & NAME_INHERITED)
+                            {
+                                oldFrom = cvt_progname(INHERIT(OldFunction->offset.inherit).prog->name);
+                            }
+
+                            if ((fun.flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN))
+                             && !(OldFunction->flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN)))
+                            {
+                                if (oldFrom != NULL)
+                                    yywarnf("public %s::%s() shadows private %s::%s()"
+                                          , get_txt(oldFrom), get_txt(OldFunction->name)
+                                          , get_txt(funFrom), get_txt(fun.name)
+                                        );
+                                else
+                                    yywarnf("public %s() shadows private %s::%s()"
+                                          , get_txt(OldFunction->name)
+                                          , get_txt(funFrom), get_txt(fun.name)
+                                        );
+                            }
+                            else if (!(fun.flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN))
+                                  && (OldFunction->flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN))
+                                )
+                            {
+                                if (oldFrom != NULL)
+                                    yywarnf("public %s::%s() shadows private %s::%s()"
+                                          , get_txt(funFrom), get_txt(fun.name)
+                                          , get_txt(oldFrom), get_txt(OldFunction->name)
+                                        );
+                                else
+                                    yywarnf("public %s::%s() shadows private %s()"
+                                          , get_txt(funFrom), get_txt(fun.name)
+                                          , get_txt(OldFunction->name)
+                                        );
+                            }
+
+                            if (oldFrom) free_mstring(oldFrom);
+                            if (funFrom) free_mstring(funFrom);
+
                             cross_define( OldFunction, &fun
                                         , n - current_func_index );
                         }
