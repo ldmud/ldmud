@@ -211,6 +211,8 @@ For a detailed list of all changes see the file CHANGELOG.
 
     - Language:
        + The macros __FLOAT_MIN__ and __FLOAT_MAX__ gave a too-small range.
+       + New pragma (no_)warn_function_inconsistent to control the handling
+         of function redefinitions which differ in return or argument types.
 
     - Runtime:
        + The tracedepth wasn't calculated correctly.

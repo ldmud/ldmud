@@ -149,16 +149,25 @@ Bool pragma_warn_missing_return;
    * does end with an explicit return statement.
    */
 
+Bool pragma_check_overloads;
+  /* TRUE if function redefinitions have to match the originals in their
+   * types. This pragma is meant mainly to ease the adaption of old
+   * mudlibs.
+   */
+
 Bool pragma_strict_types;
   /* Type enforcing mode: PRAGMA_WEAK_TYPES, PRAGMA_STRONG_TYPES
    * and PRAGMA_STRICT_TYPES.
    */
+
 Bool pragma_save_types;
   /* True: save argument types after compilation.
    */
+
 Bool pragma_combine_strings;
   /* True: perform '+'-addition of constant strings at compile time.
    */
+
 Bool pragma_verbose_errors;
   /* True: give info on the context of an error.
    */
@@ -3396,6 +3405,16 @@ handle_pragma (char *str)
             pragma_warn_missing_return = MY_FALSE;
             validPragma = MY_TRUE;
         }
+        else if (strncmp(base, "warn_function_inconsistent", namelen) == 0)
+        {
+            pragma_check_overloads = MY_TRUE;
+            validPragma = MY_TRUE;
+        }
+        else if (strncmp(base, "no_warn_function_inconsistent", namelen) == 0)
+        {
+            pragma_check_overloads = MY_FALSE;
+            validPragma = MY_TRUE;
+        }
         else if (strncmp(base, "warn_deprecated", namelen) == 0)
         {
             pragma_warn_deprecated = MY_TRUE;
@@ -5628,6 +5647,7 @@ start_new_file (int fd, const char * fname)
 
     lex_fatal = MY_FALSE;
 
+    pragma_check_overloads = MY_TRUE;
     pragma_strict_types = PRAGMA_WEAK_TYPES;
     instrs[F_CALL_OTHER].ret_type.typeflags = TYPE_ANY;
     instrs[F_CALL_DIRECT].ret_type.typeflags = TYPE_ANY;

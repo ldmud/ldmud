@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+12-Sep-2004 (Lars Duening)  (3.3.601)
+  - (prolang.y, lex) New pragma (no_)warn_function_inconsistent to control
+      the handling of redefined functions which differ in return or argument
+      types. This is intended to easen the adaptation of legacy mudlib
+      code (suggested by Wayne).
+
 12-Sep-2004 (Lars Duening)  (3.3.600)
   - (prolang.y) When checking the redefinition of inherited variables, do
       allow the redefinition of static inherited variables with other

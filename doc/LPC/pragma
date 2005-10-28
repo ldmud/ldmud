@@ -70,6 +70,17 @@ DESCRIPTION
                 type other than 'void'.
         no_warn_missing_return: Turn off warn_missing_return.
 
+        warn_function_inconsistent: If an inherited function is
+                overloaded with inconsistent return types or arguments,
+                a warning is generated; or if pragma_pedantic is in effect,
+                an error. By default this is active.
+        no_warn_function_inconsistent: An inherited function can
+                be overloaded with inconsistent return types or arguments,
+                as long as pragma_pedantic is not in effect.
+
+                This pragma is meant to easen the adaption of legacy
+                mudlib code - in general one should fix the warnings,
+                not turn them off.
 
         When an object is compiled with type testing (#pragma
         strict_types), all types are saved of the arguments for that
@@ -100,6 +111,7 @@ HISTORY
         Starting with LDMud 3.2.10, #pragma xxx_types in an included file are
           no longer valid only until the end of the file, but remain active
           when processing returns to the including file.
+        LDMud 3.2.11 added (no_)warn_function_inconsistent.
         LDMud 3.3.378 added init_variables, share_variables.
         LDMud 3.3.357 added (no_)warn_missing_return.
 

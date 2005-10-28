@@ -2992,7 +2992,7 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
                 {
                     if (pragma_pedantic)
                         yyerrorf("Inconsistent declaration of '%s': Return type mismatch %s", get_txt(p->name), get_two_types(t2, t1));
-                    else
+                    else if (pragma_check_overloads)
                         yywarnf("Inconsistent declaration of '%s': Return type mismatch %s", get_txt(p->name), get_two_types(t2, t1));
                 }
 
@@ -3040,7 +3040,7 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
                                          "redefinition of '%s': arg %d %s"
                                         , get_txt(p->name), i+1, get_two_types(t1, t2)
                                         );
-                            else
+                            else if (pragma_check_overloads)
                                 yywarnf("Argument type mismatch in "
                                          "redefinition of '%s': arg %d %s"
                                         , get_txt(p->name), i+1, get_two_types(t1, t2)
@@ -16587,3 +16587,5 @@ count_compiler_refs (void)
 /*-------------------------------------------------------------------------*/
 
 /***************************************************************************/
+/* vim: filetype=c
+ */

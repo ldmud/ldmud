@@ -252,6 +252,7 @@ extern Bool pragma_pedantic;
 extern Bool pragma_warn_missing_return;
 extern Bool pragma_warn_deprecated;
 extern Bool pragma_warn_empty_casts;
+extern Bool pragma_check_overloads;
 extern Bool pragma_share_variables;
 extern string_t *last_lex_string;
 extern ident_t *all_efuns;
