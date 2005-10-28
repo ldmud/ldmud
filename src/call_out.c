@@ -344,7 +344,8 @@ call_out (void)
         {
             debug_message("%s call_out: user '%s' had an error: "
                           "rescheduling call_out.\n"
-                         , time_stamp(), get_txt(user->name));
+                         , time_stamp()
+                         , user->name ? get_txt(user->name) : "<null>");
             insert_call(cop, 1);
             continue;
         }

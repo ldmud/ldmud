@@ -60,26 +60,18 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 580)
-(Parent-Version lpmud 3-3 579)
+(Project-Version lpmud 3-3 581)
+(Parent-Version lpmud 3-3 580)
 (Version-Log "
-  - (interpret.c) If the struct lookup operator receives arguments of
-       the wrong type, it just throws an error instead of crashing the
-       driver, as this can happen with careless funcall(#'->)s (Bug #0000097).
-  - (efuns.c) to_array('symbol) crashed the driver because it tried to
-       free the symbol as a string (Bug #0000097).
-  - (interpret.c) The trace collection into an array now uses unlimited
-       arrays, otherwise a too-small limit would cause the driver
-       to enter an endless error loop (Bug #0000097).
-  - (object, gcollect.c) If a save_{object,value} failed and thus
-       left a pointer table behind, a following GC would free the table
-       without resetting the pointer. The next save_{object, value} would
-       then use the freed memory (Bug #0000097).
+  - (call_out.c) When printing the uid for an object with an error, make
+       sure that there is an uid to print (reported by Bardioc).
+  - (mudlib/crashleak.c) Donated by Menaures: a modification of the crasher
+       object, looking for memory leaks.
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Sun, 25 Jul 2004 22:35:34 -0600")
+(Checkin-Time "Wed, 28 Jul 2004 23:26:14 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -116,8 +108,8 @@
   ;; Information about the driver and the distribution in general
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
-  (CREDITS (lpmud/d/22_CREDITS 1.70.1.77 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.643 644))
+  (CREDITS (lpmud/d/22_CREDITS 1.70.1.78 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.644 644))
   (HISTORY (lpmud/f/49_HISTORY 1.369 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -183,7 +175,7 @@
   (src/bitstrings.c (lpmud/i/48_bitstrings 1.16 644))
   (src/bytecode.h (lpmud/a/b/26_bytecode.h 1.1.1.3 644))
   (src/call_out.h (lpmud/f/45_call_out.h 1.7.1.6 644))
-  (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.29 644))
+  (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.30 644))
   (src/closure.h (lpmud/f/44_closure.h 1.7.1.18 644))
   (src/closure.c (lpmud/d/4_closure.c 1.41.1.47.1.20 644))
   (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.91 644))
@@ -226,7 +218,7 @@
   (src/my-rusage.h (lpmud/f/28_my-rusage. 1.7 644))
   (src/my-stdint.h (lpmud/u/b/39_my-stdint. 1.2 644))
   (src/object.h (lpmud/44_object.h 1.34.1.19.1.6 644))
-  (src/object.c (lpmud/45_object.c 1.62.1.88.1.48 644))
+  (src/object.c (lpmud/45_object.c 1.62.1.88.1.49 644))
   (src/otable.h (lpmud/f/27_otable.h 1.8.1.4 644))
   (src/otable.c (lpmud/43_otable.c 1.22.1.8 644))
   (src/parser.c (lpmud/l/13_parser.c 1.1 644))
@@ -550,9 +542,10 @@
   (mudlib/dns_resolve.c (lpmud/f/b/9_dns_resolv 1.1 644))
   (mudlib/query_ip_name.c (lpmud/b/c/18_query_ip_n 1.1 644))
 
-  (mudlib/uni-crasher/README (lpmud/r/36_README 1.1 644))
+  (mudlib/uni-crasher/README (lpmud/r/36_README 1.2 644))
   (mudlib/uni-crasher/crasher.c (lpmud/r/37_crasher.c 1.3 640))
   (mudlib/uni-crasher/secure.inc (lpmud/r/38_secure.inc 1.3 644))
+  (mudlib/uni-crasher/crashleak.c (lpmud/c/c/21_crashleak. 1.1 644))
 
   ;; Bug reports and Feature requests
   (src/bugs/README (lpmud/g/40_README 1.5 644) :no-keywords)

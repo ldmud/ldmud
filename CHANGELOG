@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+28-Jul-2004 (Lars Duening)  (3.3.581)
+  - (call_out.c) When printing the uid for an object with an error, make
+       sure that there is an uid to print (reported by Bardioc).
+  - (mudlib/crashleak.c) Donated by Menaures: a modification of the crasher
+       object, looking for memory leaks (Bug #0000102).
+
 25-Jul-2004 (Lars Duening)  (3.3.580)
   - (interpret.c) If the struct lookup operator receives arguments of
        the wrong type, it just throws an error instead of crashing the

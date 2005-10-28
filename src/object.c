@@ -5377,20 +5377,6 @@ static long max_shared_restored;
    */
 
 /*-------------------------------------------------------------------------*/
-void
-free_save_object_buffers(void)
-
-/* Deallocate all lingering buffers from previous save operations, preferably
- * before the GC does it.
- */
-
-{
-    if (ptable)
-        free_pointer_table(ptable);
-    ptable = NULL;
-} /* free_save_object_buffers() */
-
-/*-------------------------------------------------------------------------*/
 /* Macros */
 
 #define MY_PUTC(ch) {\
@@ -5432,6 +5418,20 @@ free_save_object_buffers(void)
 #define CTRLZ 30
 /* MS-DOS and Windows files sometimes have this character :-(
  */
+
+/*-------------------------------------------------------------------------*/
+void
+free_save_object_buffers(void)
+
+/* Deallocate all lingering buffers from previous save operations, preferably
+ * before the GC does it.
+ */
+
+{
+    if (ptable)
+        free_pointer_table(ptable);
+    ptable = NULL;
+} /* free_save_object_buffers() */
 
 /*-------------------------------------------------------------------------*/
 static char*
@@ -6552,7 +6552,7 @@ v_save_object (svalue_t *sp, int numarg)
             close(f);
             unlink(tmp_name);
         }
-        error("%s (save_object) Out of memory for pointer table.\n", time_stamp());
+        error("(save_object) Out of memory for pointer table.\n");
         /* NOTREACHED */
         return sp;
     }
@@ -6747,7 +6747,7 @@ v_save_value (svalue_t *sp, int numarg)
     ptable = new_pointer_table();
     if (!ptable)
     {
-        error("%s (save_value) Out of memory for pointer table.\n", time_stamp());
+        error("(save_value) Out of memory for pointer table.\n");
         return sp; /* flow control hint */
     }
 
