@@ -4989,11 +4989,11 @@ f_to_int (svalue_t *sp)
         char * cp = get_txt(sp->u.str);
         Bool hasMinus = MY_FALSE;
 
-        /* Check if the number begins with a '-' */
+        /* Check if the number begins with a '-' or '+' */
         while (*cp && isspace(*cp)) cp++;
-        if (*cp == '-')
+        if (*cp == '-' || *cp == '+')
         {
-            hasMinus = MY_TRUE;
+            hasMinus = (*cp == '-');
             cp++;
         }
 

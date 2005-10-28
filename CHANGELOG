@@ -1,12 +1,17 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+15-Nov-2004 (Lars Duening)  (3.3.614)
+  - (efuns.c) You learn a new thing every day: I never realized that
+       strtol() supports "+34" and similar - efun to_int() can now
+       interpret that again, too (reported by Bardioc).
+
 13-Nov-2004 (Lars Duening)  (3.3.613)
   - (lex.c, efuns.c) Embarassing: the number parsing method assumed that the
        string at least started with a digit - this broken to_int().
        (Bug #0000141)
 
-12-Oct-2004 (Lars Duening)  (3.3.612)
+12-Nov-2004 (Lars Duening)  (3.3.612)
   - (pkg-alists.c) Efun insert_alist() no longer returned the insertion
        position for keys not yet in a key array (reported by Bardioc).
 
