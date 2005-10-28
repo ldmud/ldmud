@@ -1,12 +1,18 @@
 SYNOPSIS
         void shutdown()
+        void shutdown(int exit_code)
 
 DESCRIPTION
-        Shutdown the mud. Never use this efun. Instead if you have a
-        need to shutdown the mud use the shutdown command.
-        You may be asking yourself, if you're not supposed
-        to use it why is it here?  Sorry, I cannot answer
-        that.  Its top secret.
+        Shutdown the mud, setting the process result code to
+        <exit_code>, or 0 if not given.
+
+        Never use this efun. Instead if you have a need to shutdown
+        the mud use the shutdown command.  You may be asking yourself,
+        if you're not supposed to use it why is it here?  Sorry, I
+        cannot answer that.  Its top secret.
+
+HISTORY
+        LDMud 3.2.11 introduced the exit code.
 
 SEE ALSO
         break_point(E), swap(E)

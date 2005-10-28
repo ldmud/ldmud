@@ -8265,18 +8265,22 @@ f_shutdown (svalue_t *sp)
 /* EFUN shutdown()
  *
  *   void shutdown()
+ *   void shutdown(int exit_code)
  *
- * Shutdown the mud. Never use this efun. Instead if you have a
- * need to shutdown the mud use the shutdown command.
- * You may be asking yourself, if you're not supposed
- * to use it why is it here?  Sorry, I cannot answer
- * that.  Its top secret.
+ * Shutdown the mud, setting the process result code to
+ * <exit_code>, or 0 if not given.
+ * 
+ * Never use this efun. Instead if you have a need to shutdown
+ * the mud use the shutdown command.  You may be asking yourself,
+ * if you're not supposed to use it why is it here?  Sorry, I
+ * cannot answer that.  Its top secret.
  */
 
 {
     extra_jobs_to_do = MY_TRUE;
     game_is_being_shut_down = MY_TRUE;
-    return sp;
+    exit_code = sp->u.number;
+    return --sp;
 } /* f_shutdown() */
 
 /*-------------------------------------------------------------------------*/

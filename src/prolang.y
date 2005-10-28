@@ -3220,6 +3220,15 @@ define_variable (ident_t *name, fulltype_t type)
         all_efun_shadows = q;
     }
 
+    /* Prepare the new variable_t */
+
+    if (flags & TYPE_MOD_NOSAVE)
+    {
+        /* 'nosave' is internally saved as 'static' (historical reason) */
+        flags |= TYPE_MOD_STATIC;
+        flags ^= TYPE_MOD_NOSAVE;
+    }
+
     /* If the variable already exists, make sure that we can redefine it */
     if ( (n = name->u.global.variable) >= 0)
     {
@@ -3231,11 +3240,11 @@ define_variable (ident_t *name, fulltype_t type)
                     , get_txt(name->name));
 
         /* We can redefine inherited variables if they are private or hidden,
-         * or if one of them is static.
+         * or if at least one of them is static.
          */
         if (  (   !(vn_flags & NAME_INHERITED)
                || (   !(vn_flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN))
-                   && !((flags ^ vn_flags) & TYPE_MOD_STATIC)
+                   && !((flags | vn_flags) & TYPE_MOD_STATIC)
                   )
               )
             && !(flags & NAME_INHERITED)
@@ -3249,7 +3258,7 @@ define_variable (ident_t *name, fulltype_t type)
                         , get_txt(name->name));
         }
 
-        if (((flags ^ vn_flags) & (TYPE_MOD_STATIC|TYPE_MOD_PRIVATE))
+        if (((flags | vn_flags) & (TYPE_MOD_STATIC|TYPE_MOD_PRIVATE))
             == TYPE_MOD_STATIC
          && !(flags & NAME_INHERITED)
            )
@@ -3274,15 +3283,6 @@ define_variable (ident_t *name, fulltype_t type)
             vn_flags |=   ~flags & TYPE_MOD_STATIC;
             VARIABLE(n)->type.typeflags = vn_flags;
         }
-    }
-
-    /* Prepare the new variable_t */
-
-    if (flags & TYPE_MOD_NOSAVE)
-    {
-        /* 'nosave' is internally saved as 'static' (historical reason) */
-        flags |= TYPE_MOD_STATIC;
-        flags ^= TYPE_MOD_NOSAVE;
     }
 
     type.typeflags = flags;
@@ -10094,6 +10094,8 @@ expr4:
 
           $$.start = CURRENT_PROGRAM_SIZE;
           $$.code = -1;
+          if (!pragma_warn_deprecated)
+              ins_byte(F_NO_WARN_DEPRECATED);
           ix = $1.number;
           ins_f_code(F_CLOSURE);
           ins_short(ix);
@@ -11520,6 +11522,12 @@ index_expr :
             $$.start = $2.start;
             $$.end = $2.end;
             $$.type1 = $2.type;
+            if (!pragma_warn_deprecated)
+            {
+                ins_byte(F_NO_WARN_DEPRECATED);
+                $$.end++;
+            }
+
         }
 
     | '[' '<' expr0 ']'
@@ -11528,6 +11536,11 @@ index_expr :
             $$.start = $3.start;
             $$.end = $3.end;
             $$.type1 = $3.type;
+            if (!pragma_warn_deprecated)
+            {
+                ins_byte(F_NO_WARN_DEPRECATED);
+                $$.end++;
+            }
         }
 
     | '[' '>' expr0 ']'
@@ -11536,6 +11549,11 @@ index_expr :
             $$.start = $3.start;
             $$.end = $3.end;
             $$.type1 = $3.type;
+            if (!pragma_warn_deprecated)
+            {
+                ins_byte(F_NO_WARN_DEPRECATED);
+                $$.end++;
+            }
         }
 
 ; /* index_expr */

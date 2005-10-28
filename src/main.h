@@ -50,6 +50,8 @@ extern p_int regex_package;
 
 extern char input_escape;
 
+extern int exit_code;
+
 /* --- Prototypes --- */
 
 extern int main(int argc, char **argv);

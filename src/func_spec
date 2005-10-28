@@ -248,6 +248,7 @@
         break_continue
         breakn_continue
         jump
+        no_warn_deprecated
 
 /*---------------------------------------------------------------------------
  * efuns with a single-byte code.
@@ -600,7 +601,7 @@ mixed  *rusage();
 mixed   limited(closure, ...);
 void    set_limits(int|int*, ...);
 void    set_driver_hook(int, closure|int|string|mapping|string*);
-void    shutdown();
+void    shutdown(int default: F_CONST0);
 int     trace(int);
 string  traceprefix(string|int);
 

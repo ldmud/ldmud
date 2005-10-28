@@ -173,11 +173,12 @@ For a detailed list of all changes see the file CHANGELOG.
            x509 key- and certfile for the TLS package.
 
 
-04-Sep-2004 (Lars Duening) -- Release 3.2.11
+11-Sep-2004 (Lars Duening) -- Release 3.2.11
 
     - Changed efuns:
        + input_to(): New flag INPUT_NO_TELNET to modify the INPUT_CHARMODE
            behaviour.
+       + shutdown(): Added an argument to set the process exit code.
 
     - Corrected efuns:
        + save_object(): Matching the documentation, the efun really removes

@@ -1,6 +1,18 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+12-Sep-2004 (Lars Duening)  (3.3.600)
+  - (prolang.y) When checking the redefinition of inherited variables, do
+      allow the redefinition of static inherited variables with other
+      static variables (it will generated warning, though). Also the
+      equivalency of nosave and static was applied too late (reported by
+      Willem).
+  - (func_spec, efuns.c, main) Added an 'exit code' argument to the shutdown()
+      efun (Bug #0000129).
+  - (func_spec, interpret.c, prolang.y) The pragma warn-deprecated is now
+      expressed through a prefix bytecode where appropriate (Bug #0000059,
+      #0000093).
+
 09-Sep-2004 (Lars Duening)  (3.3.599)
   - (mregex.c) On a collision in the hash table, the regdata_t structure
        was freed with a call to free_regexp() - not good (Bug #0000128).

@@ -196,6 +196,11 @@ mp_int boot_time = 0;
   /* The time() the driver was started.
    */
 
+int exit_code = 0; /* TODO: There are constants for this */
+  /* Exit code from the program, can be changed with the shutdown()
+   * efun.
+   */
+
 /*-------------------------------------------------------------------------*/
 
 /* Forward declarations for the argument parser in the lower half */
@@ -591,6 +596,7 @@ main (int argc, char **argv)
         /* Shutdown the game.
          */
 
+        rc = exit_code;
         printf("%s LDMud shutting down.\n", time_stamp());
 
         callback_master(STR_SHUTDOWN, 0);

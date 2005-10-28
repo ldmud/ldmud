@@ -596,6 +596,13 @@ struct control_stack *csp;
    * way (Standard C disallows indexing before an array).
    */
 
+static Bool runtime_no_warn_deprecated;
+  /* Set to TRUE if the current instruction is not to warn about usage
+   * of deprecated features; reset at the end of the instruction.
+   * This flag is set by the NO_WARN_DEPRECATED instruction, generated
+   * by the bytecode compiler in response to the warn-deprecated pragma.
+   */
+
 #ifdef APPLY_CACHE_STAT
 p_int apply_cache_hit  = 0;
 p_int apply_cache_miss = 0;
@@ -2972,7 +2979,7 @@ get_string_item ( svalue_t * svp, svalue_t * i, Bool make_singular
                        , (long)ind, (long)mstrsize(svp->u.str)));
                 return NULL;
             }
-            else if (pragma_warn_deprecated)
+            else if (!runtime_no_warn_deprecated)
                 warnf( "Warning: Indexing past string end is deprecated: "
                        "index %ld, string length: %ld.\n"
                      , (long)ind, (long)mstrsize(svp->u.str)
@@ -3051,7 +3058,7 @@ get_string_r_item (svalue_t * svp, svalue_t * i, Bool make_singular
                        , (long)ind, (long)mstrsize(svp->u.str)));
                 return NULL;
             }
-            else if (pragma_warn_deprecated)
+            else if (!runtime_no_warn_deprecated)
                 warnf( "Warning: Indexing past string end is deprecated: "
                        "index %ld, string length: %ld.\n"
                      , (long)ind, (long)mstrsize(svp->u.str)
@@ -3125,7 +3132,7 @@ get_string_a_item (svalue_t * svp, svalue_t * i, Bool make_singular
                        , (long)ind, (long)mstrsize(svp->u.str)));
                 return NULL;
             }
-            else if (pragma_warn_deprecated)
+            else if (!runtime_no_warn_deprecated)
                 warnf( "Warning: Indexing past string end is deprecated: "
                        "index %ld, string length: %ld.\n"
                      , (long)ind, (long)mstrsize(svp->u.str)
@@ -7234,6 +7241,7 @@ eval_instruction (bytecode_p first_instruction
     fp = inter_fp;
     ap = inter_fp; /* so that call_lambda() can call us for efun closures */
     use_ap = MY_FALSE;
+    runtime_no_warn_deprecated = MY_FALSE;
     SET_TRACE_EXEC;
 
     /* ------ The evaluation loop ------ */
@@ -7998,7 +8006,7 @@ again:
             else
             {
                 /* Efun or operator closure */
-                if (pragma_warn_deprecated
+                if (!runtime_no_warn_deprecated
                  && instrs[ix - CLOSURE_EFUN_OFFS].deprecated != NULL)
                 {
                     WARNF(("Warning: %s() is deprecated: %s\n"
@@ -15181,6 +15189,16 @@ again:
     }
 #endif /* F_JUMP */
 
+    CASE(F_NO_WARN_DEPRECATED);     /* --- no_warn_deprecated  --- */
+    {
+        /* Set the runtime_no_warn_deprecated flag for the next
+         * instruction.
+         */
+
+        runtime_no_warn_deprecated = MY_TRUE;
+        break;
+    }
+
     /* --- Efuns: Miscellaneous --- */
 
     CASE(F_CLONEP);                 /* --- clonep              --- */
@@ -15981,6 +15999,10 @@ again:
     } /* end of the monumental switch */
 
     /* Instruction executed */
+
+    /* Reset the no-warn-deprecated flag */
+    if (instruction != F_NO_WARN_DEPRECATED)
+        runtime_no_warn_deprecated = MY_FALSE;
 
     /* Even intermediate results could exceed the stack size.
      * We better check for that.
