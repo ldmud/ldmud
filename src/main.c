@@ -1947,6 +1947,9 @@ options (void)
 #       if defined(SMALLOC_ORDER_FREELISTS)
                               , "SMALLOC_ORDER_FREELISTS"
 #       endif
+#       if defined(MALLOC_EXT_STATISTICS)
+                              , "MALLOC_EXT_STATISTICS"
+#       endif
                               };
         size_t nStrings = sizeof(optstrings) / sizeof(optstrings[0]);
         size_t iInitial = strlen(optstrings[0]);
@@ -1964,7 +1967,7 @@ options (void)
                 if (curlen > 78)
                 {
                     printf("\n%*s", (int)iInitial, " ");
-                    curlen = iInitial;
+                    curlen = iInitial + strlen(optstrings[i]) + 2;
                 }
                 fputs(optstrings[i], stdout);
                 if (i < nStrings-1)

@@ -60,18 +60,21 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 602)
-(Parent-Version lpmud 3-3 601)
+(Project-Version lpmud 3-3 603)
+(Parent-Version lpmud 3-3 602)
 (Version-Log "
-  - (config.h.in, smalloc.c, main.c) New manual config macro
-      SMALLOC_ORDER_FREELISTS instructs smalloc to keep its freelists ordered
-      by block address. This is an experiment to see if the high heap
-      fragmentation can be reduced this way.
+  - (config.h.in, smalloc.c, xalloc, main.c, sysmalloc.c, xptmalloc.c)
+      New manual config.h macro MALLOC_EXT_STATISTICS enables extended
+      block statistics in smalloc. The statistics can be retrieved
+      with debug_info(DINFO_DATA, DID_MEMORY), and are also printed as
+      part of the 'status malloc' command. This is an experiment to
+      see if we can get more information about the small  heap
+      fragmentation this way.
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Wed, 15 Sep 2004 22:06:26 -0600")
+(Checkin-Time "Thu, 16 Sep 2004 22:49:26 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -109,16 +112,16 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.81 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.665 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.378 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.666 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.379 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
   ;; Configuration
   (src/configure (lpmud/d/0_configure 1.19.1.108 755))
-  (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.41 644))
+  (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.42 644))
   (src/machine.h.in (lpmud/b/9_machine.h. 1.9.1.13 644))
-  (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.19.1.30 644))
+  (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.19.1.31 644))
   (src/mkinstalldirs (lpmud/c/4_mkinstalld 1.1 644))
   (src/install-sh (lpmud/c/5_install-sh 1.2 755))
 
@@ -170,7 +173,7 @@
   (src/array.h (lpmud/f/47_array.h 1.18.1.22 644))
   (src/array.c (lpmud/d/12_array.c 1.46.1.47.1.16 644))
   (src/backend.h (lpmud/f/46_backend.h 1.20.1.7 644))
-  (src/backend.c (lpmud/d/6_backend.c 1.68.1.35.1.36 644))
+  (src/backend.c (lpmud/d/6_backend.c 1.68.1.35.1.37 644))
   (src/bitstrings.h (lpmud/i/47_bitstrings 1.3 644))
   (src/bitstrings.c (lpmud/i/48_bitstrings 1.16 644))
   (src/bytecode.h (lpmud/a/b/26_bytecode.h 1.1.1.3 644))
@@ -186,7 +189,7 @@
   (src/ed.h (lpmud/f/34_ed.h 1.5.1.6 644))
   (src/ed.c (lpmud/c/33_ed.c 1.32.1.35 644))
   (src/efuns.h (lpmud/l/20_efuns.h 1.13.1.19.1.6 644))
-  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.99 644))
+  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.100 644))
   (src/exec.h (lpmud/c/32_exec.h 1.34.1.33.1.7 644))
   (src/files.h (lpmud/i/49_files.h 1.2 644))
   (src/files.c (lpmud/i/50_files.c 1.26 644))
@@ -203,7 +206,7 @@
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.15.1.10 644))
   (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.71 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.19 644))
-  (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.65 644))
+  (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.66 644))
   (src/mapping.h (lpmud/f/30_mapping.h 1.12.1.20 644))
   (src/mapping.c (lpmud/b/6_mapping.c 1.36.1.81 644))
   (src/md5.h (lpmud/l/18_md5.h 1.3 644))
@@ -345,9 +348,9 @@
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.37 644))
   (src/simulate.c (lpmud/31_simulate.c 1.88.1.135 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.14 644))
-  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.100 644))
+  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.101 644))
   (src/sysmalloc.h (lpmud/c/b/33_sysmalloc. 1.2 644))
-  (src/sysmalloc.c (lpmud/c/b/34_sysmalloc. 1.6 644))
+  (src/sysmalloc.c (lpmud/c/b/34_sysmalloc. 1.7 644))
   (src/sprintf.h (lpmud/f/15_sprintf.h 1.3.1.4 644))
   (src/sprintf.c (lpmud/28_sprintf.c 1.31.1.63 644))
   (src/strfuns.h (lpmud/b/51_strfuns.h 1.11.1.8 644))
@@ -361,9 +364,9 @@
   (src/typedefs.h (lpmud/d/50_typedefs.h 1.12.1.7 644))
   (src/wiz_list.h (lpmud/1_wiz_list.h 1.5.1.7.1.3 644))
   (src/wiz_list.c (lpmud/2_wiz_list.c 1.13.1.14.1.5 644))
-  (src/xalloc.h (lpmud/g/51_xalloc.h 1.23 644))
-  (src/xalloc.c (lpmud/h/0_xalloc.c 1.2.1.40 644))
-  (src/xptmalloc.c (lpmud/d/b/10_xptmalloc. 1.4 644))
+  (src/xalloc.h (lpmud/g/51_xalloc.h 1.24 644))
+  (src/xalloc.c (lpmud/h/0_xalloc.c 1.2.1.41 644))
+  (src/xptmalloc.c (lpmud/d/b/10_xptmalloc. 1.5 644))
 
   ;; Build files
   (src/func_spec (lpmud/c/31_func_spec 1.53.1.45.1.22.1.38 644))
@@ -394,7 +397,7 @@
   (src/hosts/be/config.h (lpmud/e/34_config.h 1.32.1.40 644))
   (src/hosts/be/be.h (lpmud/e/35_be.h 1.7 644))
   (src/hosts/be/beyacc (lpmud/i/39_beyacc 1.1 744))
-  (src/hosts/be/Makefile (lpmud/e/37_Makefile 1.60.1.71.1.26 644))
+  (src/hosts/be/Makefile (lpmud/e/37_Makefile 1.60.1.71.1.27 644))
   (src/hosts/be/icon-32x32.raw (lpmud/s/37_icon-32x32 1.1 644) :no-keywords)
   (src/hosts/be/icon-16x16.raw (lpmud/s/38_icon-16x16 1.1 644) :no-keywords)
   (src/hosts/be/driver.rsrc (lpmud/s/39_driver.rsr 1.1 644) :no-keywords)
@@ -503,7 +506,7 @@
   ;; Driver-related include files for the mudlib
   (mudlib/sys/comm.h (lpmud/e/b/23_comm.h 1.1 644))
   (mudlib/sys/commands.h (lpmud/d/15_commands.h 1.3.1.4 644))
-  (mudlib/sys/debug_info.h (lpmud/t/6_debug_info 1.22 644))
+  (mudlib/sys/debug_info.h (lpmud/t/6_debug_info 1.23 644))
   (mudlib/sys/driver_hook.h (lpmud/d/30_driver_hoo 1.2.1.7 644))
   (mudlib/sys/debug_message.h (lpmud/k/8_debug_mess 1.3 644))
   (mudlib/sys/erq.h (lpmud/d/29_erq.h 1.5.1.3 644))
@@ -1100,7 +1103,7 @@
   (doc/efun/db_fetch (lpmud/e/27_db_fetch 1.2.1.3 644))
   (doc/efun/db_handles (lpmud/e/33_db_handles 1.1.1.4 644))
   (doc/efun/db_insert_id (lpmud/l/1_db_insert_ 1.2 644))
-  (doc/efun/debug_info (lpmud/o/22_debug_info 1.35 644))
+  (doc/efun/debug_info (lpmud/o/22_debug_info 1.36 644))
   (doc/efun/debug_message (lpmud/o/23_debug_mess 1.1.1.5 644))
   (doc/efun/deep_copy (lpmud/m/29_deep_copy 1.4 644))
   (doc/efun/deep_inventory (lpmud/o/24_deep_inven 1.4 644))
@@ -1591,7 +1594,7 @@
   (doc/efun.de/deep_inventory.de (lpmud/j/b/10_deep_inven 1.2 640))
   (doc/efun.de/deep_copy.de (lpmud/j/b/11_deep_copy. 1.1 640))
   (doc/efun.de/debug_message.de (lpmud/j/b/12_debug_mess 1.1 640))
-  (doc/efun.de/debug_info.de (lpmud/j/b/13_debug_info 1.4 640))
+  (doc/efun.de/debug_info.de (lpmud/j/b/13_debug_info 1.5 640))
   (doc/efun.de/db_insert_id.de (lpmud/u/b/24_db_insert_ 1.1 644))
   (doc/efun.de/db_handles.de (lpmud/u/b/25_db_handles 1.1 644))
   (doc/efun.de/db_fetch.de (lpmud/u/b/26_db_fetch.d 1.1 644))

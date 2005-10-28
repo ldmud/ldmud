@@ -1,6 +1,15 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+16-Sep-2004 (Lars Duening)  (3.3.603)
+  - (config.h.in, smalloc.c, xalloc, main.c, sysmalloc.c, xptmalloc.c)
+      New manual config.h macro MALLOC_EXT_STATISTICS enables extended
+      block statistics in smalloc. The statistics can be retrieved
+      with debug_info(DINFO_DATA, DID_MEMORY), and are also printed as
+      part of the 'status malloc' command. This is an experiment to
+      see if we can get more information about the small  heap
+      fragmentation this way.
+
 15-Sep-2004 (Lars Duening)  (3.3.602)
   - (config.h.in, smalloc.c, main.c) New manual config.h macro
       SMALLOC_ORDER_FREELISTS instructs smalloc to keep its freelists ordered

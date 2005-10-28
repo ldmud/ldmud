@@ -7512,7 +7512,42 @@ v_debug_info (svalue_t *sp, int num_arg)
  *        int DID_MEM_AVL_NODES          (smalloc)
  *            Number AVL nodes (used to manage large free blocks).
 #endif
- *
+#ifdef MALLOC_EXT_STATISTICS
+ *        mixed * DID_MEM_EXT_STATISTICS (smalloc)
+ *            If the driver was compiled with extended smalloc
+ *            statistics, they are returned in this entry; if the
+ *            driver was compiled without the statistics, 0 is
+ *            returned.
+ *        
+ *            The array contains NUM+2 entries, where NUM is the
+ *            number of distinct small block sizes. Entry [NUM]
+ *            describes the statistics of oversized small blocks,
+ *            entry [NUM+1] summarizes all small blocks. Each
+ *            entry is an array of these fields:
+ *        
+ *              int DID_MEM_ES_MAX_ALLOC:
+ *                Max number of allocated blocks of this size.
+ *        
+ *              int DID_MEM_ES_CUR_ALLOC:
+ *                Current number of allocated blocks of this size.
+ *        
+ *              int DID_MEM_ES_MAX_FREE:
+ *                Max number of allocated blocks of this size.
+ *        
+ *              int DID_MEM_ES_CUR_FREE:
+ *                Current number of allocated blocks of this size.
+ *        
+ *              float DID_MEM_ES_AVG_XALLOC:
+ *                Number of explicit allocation requests per
+ *                second.
+ *        
+ *              float DID_MEM_ES_AVG_XFREE:
+ *                Number of explicit deallocation requests per
+ *                second.
+ *        
+ *            The allocation/deallocation-per-second statistics do
+ *            not cover internal shuffling of the freelists.
+#endif
  *
  * DINFO_TRACE (7): Return the call stack 'trace' information as specified
  *     by <arg2>. The result of the function is either an array (format

@@ -212,6 +212,10 @@
 #include "mstrings.h"
 #include "stdstrings.h"
 #include "svalue.h"
+#ifdef MALLOC_EXT_STATISTICS
+#include "array.h"
+#include "backend.h"
+#endif /* MALLOC_EXT_STATISTICS */
 
 #include "../mudlib/sys/debug_info.h"
 
@@ -587,6 +591,60 @@ static char *large_malloc(word_t, Bool);
 #define large_malloc_int(size, force_m) large_malloc(size, force_m)
 static void large_free(char *);
 
+#ifdef MALLOC_EXT_STATISTICS
+/*=========================================================================*/
+
+/*                       EXTENDED STATISTICS                               */
+
+/* Extended statistics, giving a better overview about what is allocated
+ * how often.
+ */
+
+/*-------------------------------------------------------------------------*/
+/* --- struct extstat_s: Statistics for one block size
+ */
+typedef struct extstat_s {
+    unsigned long max_alloc;   /* Max number of blocks allocated */
+    unsigned long cur_alloc;   /* Current number of blocks allocated */
+    unsigned long max_free;    /* Max number of free blocks */
+    unsigned long cur_free;    /* Current number of free blocks */
+    unsigned long num_xalloc;  /* Number of xalloc() requests since last avg */
+    unsigned long num_xfree;   /* Number of xfree() requests since last avg */
+    double        savg_xalloc; /* Sum of xalloc() requests/second */
+    double        savg_xfree;  /* Sum of xfree() requests/second */
+      /* On every call to mem_update_stats(), num_x{alloc,free} is averaged
+       * into a number of requests/second and then added to savg_. The
+       * total average is then later calculated using savg_ and the number
+       * of mem_update_stats() calls - this way overflows are avoided.
+       */
+} extstat_t;
+
+static unsigned long num_update_calls = 0;
+  /* Number of mem_update_stats() calls.
+   */
+
+static mp_int last_update_time = 0;
+  /* Timestamp of last call to mem_update_stats().
+   */
+
+#define SIZE_EXTSTATS (SMALL_BLOCK_NUM+2)
+
+static extstat_t extstats[SIZE_EXTSTATS];
+  /* The statistics array. [SMALL_BLOCK_NUM+1] is for the large blocks.
+   */
+
+/*-------------------------------------------------------------------------*/
+static INLINE void
+extstat_update_max (extstat_t * pStat)
+{
+    if (pStat->cur_alloc > pStat->max_alloc)
+        pStat->max_alloc = pStat->cur_alloc;
+    if (pStat->cur_free > pStat->max_free)
+        pStat->max_free = pStat->cur_free;
+}
+
+#endif /* MALLOC_EXT_STATISTICS */
+
 /*=========================================================================*/
 
 /*                       ASSOCIATED ROUTINES                               */
@@ -649,6 +707,40 @@ mem_overhead (void)
 } /* mem_overhead() */
 
 /*-------------------------------------------------------------------------*/
+#ifdef MALLOC_EXT_STATISTICS
+void
+mem_update_stats (void)
+
+/* Update whatever extended statistics the allocator has. Called every
+ * backend cycle or so to allow for the calculation of averages over time.
+ */
+
+{
+    int i;
+    double time_diff;
+
+    if (!last_update_time)
+        last_update_time = boot_time;
+
+    if (current_time <= last_update_time)
+        return;
+
+    time_diff = current_time - last_update_time;
+
+    for (i = 0; i < SIZE_EXTSTATS; ++i)
+    {
+        extstats[i].savg_xalloc += (double)extstats[i].num_xalloc / time_diff;
+        extstats[i].savg_xfree += (double)extstats[i].num_xfree / time_diff;
+        extstats[i].num_xalloc = 0;
+        extstats[i].num_xfree = 0;
+    }
+
+    num_update_calls++;
+    last_update_time = current_time;
+} /* mem_update_stats() */
+#endif /* MALLOC_EXT_STATISTICS */
+
+/*-------------------------------------------------------------------------*/
 void
 mem_dump_data (strbuf_t *sbuf)
 
@@ -660,10 +752,18 @@ mem_dump_data (strbuf_t *sbuf)
     t_stat sbrk_st, clib_st, perm_st, xalloc_st;
     t_stat l_alloc, l_free, l_wasted;
     t_stat s_alloc, s_free, s_wasted, s_chunk;
+#ifdef MALLOC_EXT_STATISTICS
+    int i;
+#endif /* MALLOC_EXT_STATISTICS */
+
 
     /* Get a snapshot of the statistics - strbuf_add() might do further
      * allocations while we're reading them.
      */
+
+#ifdef MALLOC_EXT_STATISTICS
+    mem_update_stats();
+#endif /* MALLOC_EXT_STATISTICS */
 
     sbrk_st = sbrk_stat;
     clib_st = clib_alloc_stat;
@@ -746,6 +846,45 @@ mem_dump_data (strbuf_t *sbuf)
     , defrag_calls_total, defrag_calls_req, defrag_req_success
     , defrag_blocks_inspected, defrag_blocks_merged, defrag_blocks_result
                );
+#ifdef MALLOC_EXT_STATISTICS
+    strbuf_add(sbuf,
+      "\nDetailed Block Statistics:\n\n"
+              );
+    for (i = 0; i < SIZE_EXTSTATS; ++i)
+    {
+        if (i < SMALL_BLOCK_NUM)
+            strbuf_addf(sbuf, "  Size %3u: ", (i + SMALL_BLOCK_MIN) * SINT);
+        else if (i == SMALL_BLOCK_NUM)
+            strbuf_addf(sbuf, "  Oversize: ");
+        else
+            strbuf_addf(sbuf, "  Large:    ");
+#if 0
+        strbuf_addf(sbuf, "Alloc: %6.1lf req/s, %6lu current, %6lu max\n"
+                        , num_update_calls ? extstats[i].savg_xalloc / num_update_calls
+                                           : 0.0
+                        , extstats[i].cur_alloc, extstats[i].max_alloc
+                   );
+        strbuf_addf(sbuf, "            "
+                          "Free:  %6.1lf req/s, %6lu current, %6lu max\n"
+                        , num_update_calls ? extstats[i].savg_xfree / num_update_calls
+                                           : 0.0
+                        , extstats[i].cur_free, extstats[i].max_free
+                   );
+#else
+        strbuf_addf(sbuf, "Alloc: %6.1lf /s - %7lu / %7lu  cur/max\n"
+                        , num_update_calls ? extstats[i].savg_xalloc / num_update_calls
+                                           : 0.0
+                        , extstats[i].cur_alloc, extstats[i].max_alloc
+                   );
+        strbuf_addf(sbuf, "            "
+                          "Free:  %6.1lf /s - %7lu / %7lu  cur/max\n"
+                        , num_update_calls ? extstats[i].savg_xfree / num_update_calls
+                                           : 0.0
+                        , extstats[i].cur_free, extstats[i].max_free
+                   );
+#endif
+    }
+#endif /* MALLOC_EXT_STATISTICS */
 } /* mem_dump_data() */
 
 /*-------------------------------------------------------------------------*/
@@ -816,6 +955,57 @@ mem_dinfo_data (svalue_t *svp, int value)
 #else
     ST_NUMBER(DID_MEM_AVL_NODES, large_free_stat.counter);
 #endif /* USE_AVL_FREELIST */
+#ifdef MALLOC_EXT_STATISTICS
+    do {
+        vector_t * top; /* Array holding the sub vectors */
+        int i;
+        Bool deallocate = MY_FALSE;
+
+        mem_update_stats();
+        top = allocate_array(SMALL_BLOCK_NUM+2);
+        
+        if (!top)
+            break;
+
+        for (i = 0; i < SIZE_EXTSTATS; ++i)
+        {
+            vector_t *sub = allocate_array(DID_MEM_ES_MAX);
+
+            if (!sub)
+            {
+                deallocate = MY_TRUE;
+                break;
+            }
+
+            put_number(&sub->item[DID_MEM_ES_MAX_ALLOC], extstats[i].max_alloc);
+            put_number(&sub->item[DID_MEM_ES_CUR_ALLOC], extstats[i].cur_alloc);
+            put_number(&sub->item[DID_MEM_ES_MAX_FREE], extstats[i].max_free);
+            put_number(&sub->item[DID_MEM_ES_CUR_FREE], extstats[i].cur_free);
+            if (num_update_calls)
+            {
+                put_float(&sub->item[DID_MEM_ES_AVG_XALLOC], extstats[i].savg_xalloc / num_update_calls);
+                put_float(&sub->item[DID_MEM_ES_AVG_XFREE], extstats[i].savg_xfree / num_update_calls);
+            }
+
+            put_array(top->item + i, sub);
+        }
+
+        if (deallocate)
+        {
+            free_array(top);
+            ST_NUMBER(DID_MEM_EXT_STATISTICS, 0);
+        }
+        else
+        {
+            if (value == -1)
+                put_array(svp+DID_MEM_EXT_STATISTICS, top);
+            else if (value == DID_MEM_EXT_STATISTICS)
+                put_array(svp, top);
+        }
+    } while(0);
+#else
+    ST_NUMBER(DID_MEM_EXT_STATISTICS, 0);
+#endif /* MALLOC_EXT_STATISTICS */
 
 #undef ST_NUMBER
 } /* mem_dinfo_data() */
@@ -877,6 +1067,10 @@ UNLINK_SMALL_FREE (word_t * block)
         flag = 1;
     }
 
+#ifdef MALLOC_EXT_STATISTICS
+    extstats[ix].cur_free--;
+#endif /* MALLOC_EXT_STATISTICS */
+
     if (sfltable[ix] == block)
     {
         word_t * head = BLOCK_NEXT(block);
@@ -920,6 +1114,11 @@ void MAKE_SMALL_FREE (word_t *block, word_t bsize)
         ix = SMALL_BLOCK_NUM;
         flag = 1;
     }
+
+#ifdef MALLOC_EXT_STATISTICS
+    extstats[ix].cur_free++;
+    extstat_update_max(extstats + ix);
+#endif /* MALLOC_EXT_STATISTICS */
 
     block[M_SIZE] = bsize | (THIS_BLOCK|M_REF)
                           | (block[M_SIZE] & PREV_BLOCK);
@@ -1294,6 +1493,13 @@ mem_alloc (size_t size)
     count_up(small_alloc_stat,size);
     small_count[SIZE_INDEX(size)] += 1;
     small_total[SIZE_INDEX(size)] += 1;
+#ifdef MALLOC_EXT_STATISTICS
+    extstats[SIZE_INDEX(size)].num_xalloc++;
+    extstats[SIZE_INDEX(size)].cur_alloc++;
+    extstat_update_max(extstats + SIZE_INDEX(size));
+#endif /* MALLOC_EXT_STATISTICS */
+
+
 
     if (small_count[SIZE_INDEX(size)] > small_max[SIZE_INDEX(size)])
         small_max[SIZE_INDEX(size)] = small_count[SIZE_INDEX(size)];
@@ -1593,6 +1799,11 @@ sfree (POINTER ptr)
     i -=  SMALL_BLOCK_MIN + T_OVERHEAD;
 
     small_count[i] -= 1;
+#ifdef MALLOC_EXT_STATISTICS
+    extstats[i].num_xfree++;
+    extstats[i].cur_alloc--;
+#endif /* MALLOC_EXT_STATISTICS */
+
 #ifdef MALLOC_CHECK
     if (block[M_MAGIC] == sfmagic[i % NELEM(sfmagic)])
     {
@@ -1915,6 +2126,9 @@ remove_from_free_list (word_t *ptr)
 #endif
     p = (struct free_block *)(ptr+M_OVERHEAD);
     count_back(large_free_stat, p->size);
+#ifdef MALLOC_EXT_STATISTICS
+    extstats[SMALL_BLOCK_NUM+1].cur_free--;
+#endif /* MALLOC_EXT_STATISTICS */
 #ifdef USE_AVL_FREELIST
     /* Unlink from AVL freelist */
     if (p->prev) p->prev->next = p->next;
@@ -2301,6 +2515,10 @@ add_to_free_list (word_t *ptr)
                                     */
     r = (struct free_block *)(ptr+M_OVERHEAD);
     count_up(large_free_stat, size);
+#ifdef MALLOC_EXT_STATISTICS
+    extstats[SMALL_BLOCK_NUM+1].cur_free++;
+    extstat_update_max(extstats+SMALL_BLOCK_NUM+1);
+#endif /* MALLOC_EXT_STATISTICS */
 
     r->size    = size;
     r->parent  = NULL;
@@ -2918,6 +3136,11 @@ found_fit:
 
     mark_block(ptr);
     count_up(large_alloc_stat, size);
+#ifdef MALLOC_EXT_STATISTICS
+    extstats[SMALL_BLOCK_NUM+1].num_xalloc++;
+    extstats[SMALL_BLOCK_NUM+1].cur_alloc++;
+    extstat_update_max(extstats+SMALL_BLOCK_NUM+1);
+#endif /* MALLOC_EXT_STATISTICS */
 #ifdef MALLOC_CHECK
     ptr[M_MAGIC] = LAMAGIC;
 #endif
@@ -2941,6 +3164,10 @@ large_free (char *ptr)
     p -= M_OVERHEAD;
     size = *p & M_MASK;
     count_back(large_alloc_stat, size);
+#ifdef MALLOC_EXT_STATISTICS
+    extstats[SMALL_BLOCK_NUM+1].num_xfree++;
+    extstats[SMALL_BLOCK_NUM+1].cur_free++;
+#endif /* MALLOC_EXT_STATISTICS */
 
 #ifdef MALLOC_CHECK
     if (p[M_MAGIC] == LFMAGIC)

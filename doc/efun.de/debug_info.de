@@ -341,6 +341,47 @@ BESCHREIBUNG
                         freien grossen Speicherbloecke verwendet werden
                         (nur smalloc). Dieser Wert kann in Zukunft
                         wieder verschwinden.
+                  - mixed * DID_MEM_EXT_STATISTICS (smalloc)
+                        Detaillierte Statistiken des Allokators sofern
+                        diese aktiviert wurden; 0 anderenfalls.
+
+                        Dieser Wert kann in Zukunft wieder verschwinden.
+
+                        Das Array enthaelt NUM+2 Eintraege, wobei NUM
+                        Anzahl der verschiedenen 'kleinen'
+                        Blockgroessen ist. Eintrag [NUM] beschreibt
+                        die uebergrossen 'kleinen' Bloecke, Eintrag
+                        [NUM+1] beschreibt summarisch die 'grossen'
+                        Bloecke. Jeder Eintrag ist ein Array mit
+                        diesen Feldern:
+
+                        int DID_MEM_ES_MAX_ALLOC:
+                          Maximale Anzahl allokierter Bloecke dieser
+                          Groesse.
+
+                        int DID_MEM_ES_CUR_ALLOC:
+                          Derzeitige Anzahl allokierter Bloecke dieser
+                          Groesse.
+                          Current number of allocated blocks of this size.
+
+                        int DID_MEM_ES_MAX_FREE:
+                          Maximale Anzahl freier Bloecke dieser
+                          Groesse.
+
+                        int DID_MEM_ES_CUR_FREE:
+                          Derzeitige Anzahl freier Bloecke dieser
+                          Groesse.
+
+                        float DID_MEM_ES_AVG_XALLOC:
+                          Durchschnittliche Zahl von Allokationen pro
+                          Sekunde.
+
+                        float DID_MEM_ES_AVG_XFREE:
+                          Durchschnittliche Zahl von Deallokationen pro
+                          Sekunde.
+
+                      Die Durchschnittsstatistiken schliessen interne
+                      Umsortierungen der Blocklisten nicht ein.
 
 
         DINFO_TRACE    (7): Liefert die 'trace' Information aus dem
@@ -415,6 +456,8 @@ AENDERUNGEN
             die Bedeutung von DID_ST_CALLOUT_SIZE und DID_ST_HBEAT_SIZE
             bzw. _SLOTS.
         LDMud 3.3.533 fuegte DID_MEM_AVL_NODES zu DINFO_DATA:DID_MEMORY
+            hinzu.
+        LDMud 3.3.603 fuegte DID_MEM_EXT_STATISTICS zu DINFO_DATA:DID_MEMORY
             hinzu.
 
 SIEHE AUCH

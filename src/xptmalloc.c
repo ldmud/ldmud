@@ -99,6 +99,18 @@ void mem_consolidate (Bool force UNUSED)
     /* nothing to do here... malloc does it automagically */
 }
 
+#ifdef MALLOC_EXT_STATISTICS
+/* Update whatever extended statistics the allocator has. Called every
+ * backend cycle or so to allow for the calculation of averages over time.
+ */
+
+void
+mem_update_stats (void)
+{
+    /* Nothing */
+} /* mem_update_stats() */
+#endif /* MALLOC_EXT_STATISTICS */
+
 /* For the status commands and functions: add the ptmalloc statistic
  * to the buffer <sbuf>.
  */

@@ -550,6 +550,11 @@
  */
 #define SMALLOC_ORDER_FREELISTS
 
+/* Collect extended malloc statistics.
+ * TODO: Remove this macro or make it configurable.
+ */
+#define MALLOC_EXT_STATISTICS
+
 /* Trace changes to the tot_alloc_object and tot_alloc_object_size
  * statistics, in order to find the status bugs (enables commandline
  * option --check-object-stat). Will produce a decent amount of

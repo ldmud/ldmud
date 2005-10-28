@@ -192,9 +192,20 @@
 #define DID_MEM_DEFRAG_BLOCKS_MERGED     32
 #define DID_MEM_DEFRAG_BLOCKS_RESULT     33
 #define DID_MEM_AVL_NODES      34
+#define DID_MEM_EXT_STATISTICS 35
 
-#define DID_MEMORY_MAX         35
+#define DID_MEMORY_MAX         36
 
+/* Indices into the subarrays of DID_MEM_EXT_STATISTICS (if given) */
+
+#define DID_MEM_ES_MAX_ALLOC   0
+#define DID_MEM_ES_CUR_ALLOC   1
+#define DID_MEM_ES_MAX_FREE    2
+#define DID_MEM_ES_CUR_FREE    3
+#define DID_MEM_ES_AVG_XALLOC  4
+#define DID_MEM_ES_AVG_XFREE   5
+
+#define DID_MEM_ES_MAX  6
 
 /* Indices into the subarrays resulting from debug_info(DINFO_TRACE, 0)
  */

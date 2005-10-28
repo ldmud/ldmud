@@ -541,6 +541,9 @@ backend (void)
 
             total_player_commands++;
             update_load_av();
+#ifdef MALLOC_EXT_STATISTICS
+            mem_update_stats();
+#endif /* MALLOC_EXT_STATISTICS */
 
             /*
              * Now we have a string from the player. This string can go to

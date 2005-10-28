@@ -257,6 +257,13 @@ mdb_log_sbrk (p_int size)
  *     If <fd> is -1, just return TRUE or FALSE (this is used to check if
  *     the allocator supports memory dumps).
  *
+#ifdef MALLOC_EXT_STATISTICS
+ *   void mem_update_stats (void)
+ *     Update whatever extended statistics are available.
+ *     Called every backend cycle or so to allow for the calculation of
+ *     averages over time.
+ *
+#endif
 #ifdef GC_SUPPORT
  *   static void mem_clear_ref (POINTER p)
  *   static void mem_mark_ref (POINTER p)

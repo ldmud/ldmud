@@ -199,4 +199,18 @@ mem_consolidate (Bool force UNUSED)
     /* Nothing */
 } /* mem_consolidate() */
 
+/*-------------------------------------------------------------------------*/
+#ifdef MALLOC_EXT_STATISTICS
+void
+mem_update_stats (void)
+
+/* Update whatever extended statistics the allocator has. Called every
+ * backend cycle or so to allow for the calculation of averages over time.
+ */
+
+{
+    /* Nothing */
+} /* mem_update_stats() */
+#endif /* MALLOC_EXT_STATISTICS */
+
 /***************************************************************************/

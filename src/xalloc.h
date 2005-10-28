@@ -153,6 +153,9 @@ extern void mem_dump_data(strbuf_t *sbuf);
 extern void mem_dinfo_data(svalue_t *svp, int value);
 extern void mem_consolidate (Bool force);
 extern Bool mem_dump_memory(int fd);
+#ifdef MALLOC_EXT_STATISTICS
+extern void mem_update_stats(void);
+#endif /* MALLOC_EXT_STATISTICS */
 
 #ifdef GC_SUPPORT
 extern void mem_clear_ref_flags(void);
