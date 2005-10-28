@@ -18,10 +18,10 @@
 #define IS_RELEASE() (!strcmp("dev", "rel"))
 
 /* $Format: "#define RELEASE_DATE \"$ProjectDate$\""$ */
-#define RELEASE_DATE "Sun, 30 May 2004 01:12:23 -0600"
+#define RELEASE_DATE "Sun, 30 May 2004 15:19:51 -0600"
 
 /* $Format: "#define PROJ_VERSION \"$ProjectVersion$\""$ */
-#define PROJ_VERSION "3-3.563"
+#define PROJ_VERSION "3-3.564"
 
 #if IS_STABLE
 
@@ -29,15 +29,15 @@
 #define GAME_VERSION "3.3.0"
 
 /* $Format: "#define LONG_VERSION \"$ReleaseVersion$-$ReleaseType$.$ProjectMinorVersion$\""$ */
-#define LONG_VERSION "3.3.0-dev.563"
+#define LONG_VERSION "3.3.0-dev.564"
 
 #else
 
 /* $Format: "#define GAME_VERSION \"$DevelopmentVersion$\""$ */
-#define GAME_VERSION "3.3.563"
+#define GAME_VERSION "3.3.564"
 
 /* $Format: "#define LONG_VERSION \"$DevelopmentVersion$\""$ */
-#define LONG_VERSION "3.3.563"
+#define LONG_VERSION "3.3.564"
 
 #endif
 
@@ -51,7 +51,7 @@
 #define VERSION_MICRO "0"
 
 /* $Format: "#define VERSION_PATCH \"$ProjectMinorVersion$\""$ */
-#define VERSION_PATCH "563"
+#define VERSION_PATCH "564"
 
 /* $Format: "#define LOCAL_LEVEL \"\""$ */
 #define LOCAL_LEVEL ""

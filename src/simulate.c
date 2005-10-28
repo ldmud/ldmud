@@ -4966,13 +4966,17 @@ v_limited (svalue_t * sp, int num_arg)
         return sp;
     }
 
-    /* On the stack, create an array with the parsed limits to pass
-     * to privilege violation.
+    /* Create an array with the parsed limits to pass
+     * to privilege violation and store it in argp[1] so that
+     * it can be cleared in case of an error.
      */
     if (num_arg > 1)
-        sp = pop_n_elems(num_arg-1, sp); /* sp == argp+1 now */
-
-    assign_svalue_no_free(++sp, argp);
+        free_svalue(argp+1);
+    else
+    {
+        push_number(sp, 0);
+        num_arg++;
+    }
 
     vec = create_limits_array(&limits);
     if (!vec)
@@ -4983,13 +4987,11 @@ v_limited (svalue_t * sp, int num_arg)
         /* NOTREACHED */
         return sp;
     }
-    push_array(sp, vec);
-
-    num_arg = 3;
+    put_array(argp+1, vec);
 
     /* If this object is destructed, no extern calls may be done */
     if (current_object->flags & O_DESTRUCTED
-     || !privilege_violation2(STR_LIMITED, argp+1, argp+2, sp)
+     || !privilege_violation2(STR_LIMITED, argp, argp+1, sp)
         )
     {
         sp = pop_n_elems(num_arg, sp);

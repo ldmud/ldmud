@@ -83,7 +83,7 @@ For a detailed list of all changes see the file CHANGELOG.
 
     - Master Object:
        + Function runtime_warning() is called for runtime warnings.
-       + privilege_violation(): For "set_limits" and "limited" the requested
+       + privilege_violation(): For "set_limits" and "limited" the resulting
            limits are passed as argument.
 
     - Fixed Crashers:

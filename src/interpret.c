@@ -6185,6 +6185,7 @@ privilege_violation2 ( string_t *what, svalue_t *arg, svalue_t *arg2
 
 {
     svalue_t *svp;
+    int num_arg = 3;
 
     /* Trusted objects */
     if (current_object == master_ob) return MY_TRUE;
@@ -6199,16 +6200,15 @@ privilege_violation2 ( string_t *what, svalue_t *arg, svalue_t *arg2
     {
         sp++;
         assign_svalue_no_free(sp, arg2);
+        num_arg++;
     }
     inter_sp = sp;
-    svp = apply_master(STR_PRIVILEGE, 4);
+    svp = apply_master(STR_PRIVILEGE, num_arg);
 
     /* Is there a lfun to call? */
     if (!svp || svp->type != T_NUMBER || svp->u.number < 0)
     {
-        inter_sp = sp-3;
-        if (arg2 != NULL)
-            inter_sp--;
+        inter_sp = sp-num_arg;
         error("privilege violation: %s\n", get_txt(what));
         /* TODO: Print full args and types */
     }

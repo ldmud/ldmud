@@ -1733,6 +1733,8 @@ writer_thread (void *arg)
 
     /* Remove the thread cleanup handler */
     pthread_cleanup_pop(0);
+
+    return NULL;
 } /* writer_thread() */
 
 #endif /* USE_PTHREADS */
