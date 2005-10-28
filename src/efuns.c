@@ -5004,6 +5004,9 @@ f_to_int (svalue_t *sp)
             if (hasMinus)
                 n = -n;
         }
+        else
+            n = 0;
+
         free_string_svalue(sp);
         break;
       }

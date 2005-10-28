@@ -3766,9 +3766,32 @@ parse_number (char * cp, unsigned long * p_num)
 
 } /* parse_number() */
 
+/*-------------------------------------------------------------------------*/
 char *
 lex_parse_number (char * cp, unsigned long * p_num)
-  { return parse_number(cp, p_num); }
+
+/* Parse a positive integer number in one of the following formats:
+ *   <decimal>
+ *   0o<octal>
+ *   0x<sedecimal>
+ *   x<sedecimal>
+ *   0b<binary>
+ *
+ * with <cp> pointing to the first character.
+ *
+ * The parsed number is stored in *<p_num>, the function returns the pointer
+ * to the first character after the number.
+ *
+ * If the string is not a number, p_num will be unchanged, and cp will
+ * be returned.
+ */
+
+{
+    char c = *cp;
+    if (isdigit(c) || c == 'X' || c == 'x')
+        return parse_number(cp, p_num);
+    return cp;
+} /* lex_parse_number() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE char *
