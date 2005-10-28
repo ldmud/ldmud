@@ -465,10 +465,7 @@ static const char * svalue_typename[]
 svalue_t *inter_sp;
   /* Points to last valid value on the value stack.
    */
-#ifndef MALLOC_LPC_TRACE
-static
-#endif
-       bytecode_p inter_pc;
+bytecode_p inter_pc;
   /* Next bytecode to interpret.
    */
 

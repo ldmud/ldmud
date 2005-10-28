@@ -345,6 +345,7 @@ static void lambda_error VARPROT((const char *error_str, ...), printf, 1, 2) NOR
 static void free_symbols(void);
 static Bool is_lvalue (svalue_t *argp, int index_lvalue);
 static void compile_lvalue(svalue_t *, int);
+static lambda_t * lambda (vector_t *args, svalue_t *block, object_t *origin);
 
 /*-------------------------------------------------------------------------*/
 static INLINE int
@@ -1027,6 +1028,183 @@ replace_program_lambda_adjust (replace_ob_t *r_ob)
 } /* replace_lambda_program_adjust() */
 
 /*-------------------------------------------------------------------------*/
+void
+closure_init_lambda (lambda_t * l, object_t * obj)
+
+/* Initialize the freshly created lambda <l> to be bound to object <obj>
+ * (if given), and set the other generic fields (.ref, .prog_ob, .prog_pc).
+ */
+
+{
+    l->ref = 1;
+    if (current_prog)
+    {
+        l->prog_ob = ref_valid_object(current_prog->blueprint, "closure_literal");
+        l->prog_pc = inter_pc - current_prog->program;
+    }
+    else
+    {
+        l->prog_ob = NULL;
+        l->prog_pc = 0;
+    }
+
+    if (obj)
+        l->ob = ref_object(obj, "closure");
+    else
+        l->ob = NULL;
+} /* closure_init_lambda() */
+
+/*-------------------------------------------------------------------------*/
+#ifndef USE_NEW_INLINES
+lambda_t *
+closure_new_lambda (object_t * obj)
+#else /* USE_NEW_INLINES */
+lambda_t *
+closure_new_lambda (object_t * obj,  unsigned short context_size)
+#endif /* USE_NEW_INLINES */
+
+/* Create a basic lambda closure structure, suitable to hold <context_size>
+ * context values, and bound to <obj>. The structure has the generic
+ * fields (.ref, .ob, .prog_ob, .prog_pc) initialized.
+ *
+ * The function may raise an error on out of memory.
+ */
+
+{
+    lambda_t *l;
+
+    /* Allocate a new lambda structure */
+#ifndef USE_NEW_INLINES
+    l = xalloc(sizeof(*l));
+#else /* USE_NEW_INLINES */
+    l = xalloc(SIZEOF_LAMBDA(context_size));
+#endif /* USE_NEW_INLINES */
+    if (!l)
+    {
+#ifndef USE_NEW_INLINES
+        outofmem(sizeof(*l), "closure literal");
+#else /* USE_NEW_INLINES */
+        outofmem(SIZEOF_LAMBDA(context_size)
+                , "closure literal");
+#endif /* USE_NEW_INLINES */
+    	/* NOTREACHED */
+    	return NULL;
+    }
+
+    closure_init_lambda(l, obj);
+
+    return l;
+} /* closure_new_lambda() */
+
+/*-------------------------------------------------------------------------*/
+void
+closure_identifier (svalue_t *dest, object_t * obj, int ix)
+
+/* Create a literal variable closure, bound to <obj> and with variable
+ * index <ix>. The caller has to account for any variable offsets before
+ * calling this  function.
+ *
+ * The created closure is stored as new svalue into *<dest>.
+ *
+ * The function may raise an error on out of memory.
+ */
+
+{
+    lambda_t *l;
+
+    /* Allocate an initialise a new lambda structure */
+#ifndef USE_NEW_INLINES
+    l = closure_new_lambda(obj);
+#else /* USE_NEW_INLINES */
+    l = closure_new_lambda(obj, 0);
+#endif /* USE_NEW_INLINES */
+
+    /* If the object's program will be replaced, store the closure
+     * in lambda protector, otherwise mark the object as referenced by
+     * a closure.
+     */
+    if ( !(obj->prog->flags & P_REPLACE_ACTIVE)
+     || !lambda_ref_replace_program( l, CLOSURE_IDENTIFIER
+                                   , 0, NULL, NULL)
+       )
+    {
+        obj->flags |= O_LAMBDA_REFERENCED;
+    }
+
+    dest->x.closure_type = CLOSURE_IDENTIFIER;
+    l->function.var_index = (unsigned short)ix;
+
+    /* Fill in the rest of the lambda and of the result svalue */
+
+    dest->type = T_CLOSURE;
+    dest->u.lambda = l;
+} /* closure_identifier() */
+
+/*-------------------------------------------------------------------------*/
+#ifndef USE_NEW_INLINES
+void
+closure_lfun (svalue_t *dest, object_t *obj, int ix, unsigned short inhIndex)
+#else /* USE_NEW_INLINES */
+void
+closure_lfun (svalue_t *dest, object_t *obj, int ix, unsigned short inhIndex, unsigned short num)
+#endif /* USE_NEW_INLINES */
+
+/* Create a literal lfun closure, bound to the object <obj>. The resulting
+ * svalue is stored in *<dest>.
+ *
+ * The closure is defined by the index <ix>/<inhIndex>, for which the caller
+ * has to make sure that all function offsets are applied before calling
+ * this function. <num> indicates the number context
+ * variables which are initialized to svalue-0.
+ *
+ * The function may raise an error on out of memory.
+ */
+
+{
+    lambda_t *l;
+
+    /* Allocate an initialise a new lambda structure */
+#ifndef USE_NEW_INLINES
+    l = closure_new_lambda(obj);
+#else /* USE_NEW_INLINES */
+    l = closure_new_lambda(obj, num);
+#endif /* USE_NEW_INLINES */
+
+    /* If the object's program will be replaced, store the closure
+     * in lambda protector, otherwise mark the object as referenced by
+     * a closure.
+     */
+    if ( !(obj->prog->flags & P_REPLACE_ACTIVE)
+     || !lambda_ref_replace_program( l, CLOSURE_LFUN
+                                   , 0, NULL, NULL)
+       )
+    {
+        obj->flags |= O_LAMBDA_REFERENCED;
+    }
+
+    dest->x.closure_type = CLOSURE_LFUN;
+
+    l->function.lfun.ob = ref_object(obj, "closure");
+    l->function.lfun.index = (unsigned short)ix;
+    l->function.lfun.inhIndex = inhIndex;
+#ifdef USE_NEW_INLINES
+    l->function.lfun.context_size = num;
+
+    /* Init the context variables */
+    while (num > 0)
+    {
+        num--;
+        put_number(&(l->context[num]), 0);
+    }
+#endif /* USE_NEW_INLINES */
+
+    /* Fill in the rest of the lambda and of the result svalue */
+
+    dest->type = T_CLOSURE;
+    dest->u.lambda = l;
+} /* closure_lfun() */
+
+/*-------------------------------------------------------------------------*/
 #ifndef USE_NEW_INLINES
 void
 closure_literal (svalue_t *dest, int ix, unsigned short inhIndex)
@@ -1049,61 +1227,7 @@ closure_literal (svalue_t *dest, int ix, unsigned short inhIndex, unsigned short
  */
 
 {
-    lambda_t *l;
-    funflag_t flags;
-    program_t *prog;
 
-    /* Allocate an initialise a new lambda structure */
-#ifndef USE_NEW_INLINES
-    l = xalloc(sizeof(*l));
-#else /* USE_NEW_INLINES */
-    l = xalloc(SIZEOF_LAMBDA(ix < CLOSURE_IDENTIFIER_OFFS ? num : 0));
-#endif /* USE_NEW_INLINES */
-    if (!l)
-    {
-    	put_number(dest, 0);
-#ifndef USE_NEW_INLINES
-        outofmem(sizeof(*l), "closure literal");
-#else /* USE_NEW_INLINES */
-        outofmem(SIZEOF_LAMBDA(ix < CLOSURE_IDENTIFIER_OFFS ? num : 0)
-                , "closure literal");
-#endif /* USE_NEW_INLINES */
-    	/* NOTREACHED */
-    	return;
-    }
-
-    l->ref = 1;
-    if (current_prog)
-    {
-        l->prog_ob = ref_valid_object(current_prog->blueprint, "closure_literal");
-        l->prog_pc = inter_pc - current_prog->program;
-    }
-    else
-    {
-        l->prog_ob = NULL;
-        l->prog_pc = 0;
-    }
-
-    prog = current_object->prog;
-
-    /* If the object's program will be replaced, store the closure
-     * in lambda protector, otherwise mark the object as referenced by
-     * a closure.
-     */
-    if ( !(prog->flags & P_REPLACE_ACTIVE)
-     || !lambda_ref_replace_program( l
-                                   , ix >= CLOSURE_IDENTIFIER_OFFS
-                                     ? CLOSURE_IDENTIFIER
-                                     : CLOSURE_LFUN
-                                   , 0, NULL, NULL)
-       )
-    {
-        current_object->flags |= O_LAMBDA_REFERENCED;
-    }
-
-    /* Set ix to the proper index, and dest->x.closure_type to the
-     * proper type.
-     */
     if (ix >= CLOSURE_IDENTIFIER_OFFS)
     {
         ix += - CLOSURE_IDENTIFIER_OFFS
@@ -1112,39 +1236,25 @@ closure_literal (svalue_t *dest, int ix, unsigned short inhIndex, unsigned short
                * index is specified relative to the program which might
                * have been inherited.
                */
-        dest->x.closure_type = CLOSURE_IDENTIFIER;
-        l->function.var_index = (unsigned short)ix;
+        closure_identifier(dest, current_object, ix);
     }
     else /* lfun closure */
     {
+        funflag_t flags;
+
         ix += function_index_offset;
-        flags = prog->functions[ix];
+        flags = current_object->prog->functions[ix];
         if (flags & NAME_CROSS_DEFINED)
         {
             ix += CROSSDEF_NAME_OFFSET(flags);
         }
-        dest->x.closure_type = CLOSURE_LFUN;
 
-        l->function.lfun.ob = ref_object(current_object, "closure");
-        l->function.lfun.index = (unsigned short)ix;
-        l->function.lfun.inhIndex = inhIndex;
-#ifdef USE_NEW_INLINES
-        l->function.lfun.context_size = num;
-
-        /* Init the context variables */
-        while (num > 0)
-        {
-            num--;
-            put_number(&(l->context[num]), 0);
-        }
+#ifndef USE_NEW_INLINES
+        closure_lfun(dest, current_object, ix, inhIndex);
+#else
+        closure_lfun(dest, current_object, ix, inhIndex, num);
 #endif /* USE_NEW_INLINES */
     }
-
-    /* Fill in the rest of the lambda and of the result svalue */
-    l->ob = ref_object(current_object, "closure");
-
-    dest->type = T_CLOSURE;
-    dest->u.lambda = l;
 } /* closure_literal() */
 
 /*-------------------------------------------------------------------------*/
@@ -4847,7 +4957,7 @@ compile_lvalue (svalue_t *argp, int flags)
 } /* compile_lvalue() */
 
 /*-------------------------------------------------------------------------*/
-lambda_t *
+static lambda_t *
 lambda (vector_t *args, svalue_t *block, object_t *origin)
 
 /* Compile a lambda closure with the arguments <args>, an array with symbols,
@@ -4974,17 +5084,8 @@ lambda (vector_t *args, svalue_t *block, object_t *origin)
     memcpy(l0, current.valuep, (size_t)values_size);
     l0 += values_size;
     l = (lambda_t *)l0;
-    l->ref = 1;
-    if (current_prog)
-    {
-        l->prog_ob = ref_valid_object(current_prog->blueprint, "closure_literal");
-        l->prog_pc = inter_pc - current_prog->program;
-    }
-    else
-    {
-        l->prog_ob = NULL;
-        l->prog_pc = 0;
-    }
+    closure_init_lambda(l, origin);
+
     memcpy(l->function.code, current.code, (size_t)code_size);
 
     /* Fix number of constant values */
@@ -5789,7 +5890,6 @@ f_lambda (svalue_t *sp)
 
     /* Create the lambda closure */
     l = lambda(args, sp, current_object);
-    l->ob = ref_object(current_object, "lambda");
 
     /* Clean up the stack and push the result */
     free_svalue(sp--);

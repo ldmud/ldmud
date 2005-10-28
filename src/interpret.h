@@ -94,9 +94,7 @@ struct control_stack {
 extern program_t *current_prog;
 extern int tracedepth;
 extern int trace_level;
-#ifdef MALLOC_LPC_TRACE
 extern bytecode_p inter_pc;
-#endif
 extern struct control_stack *csp;
 extern svalue_t * inter_sp;
 extern int function_index_offset;

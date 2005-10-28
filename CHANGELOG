@@ -1,6 +1,14 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+28-Dec-2004 (Lars Duening)  (3.3.639)
+  - (interpret) inter_pc is now always visible, as it's needed by the
+        closure origination tracking.
+  - (closure) Added functions to create basic closure types, primarily
+        so that other closure creators (like FinalFrontier's stringcompiler)
+        don't have to do it by hand (and break with every change to the
+        closure structure).
+
 27-Dec-2004 (Lars Duening)  (3.3.638)
   - (mudlib/sys/tls.h) Corrected (Bug #0000331)
   - (doc/efun/m_values) Explained the lack of predictable order in the result
