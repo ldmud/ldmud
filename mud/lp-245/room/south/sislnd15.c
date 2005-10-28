@@ -69,4 +69,5 @@ int look(string str)
 "|             that his evil work in this world is not yet over.           |\n"+
 "+-------------------------------------------------------------------------+\n");
 	}
+    return 0;
 }

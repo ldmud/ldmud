@@ -133,6 +133,7 @@ int read(string str) {
 	}
     }
     write("Hm. This should not happen.\n");
+    return 1;
 }
 
 int remove(string str) {
@@ -167,4 +168,5 @@ int remove(string str) {
 	messages = messages + hd + ":\n**\n" + body + "\n**\n";
     }
     write("Hm. This should not happen.\n");
+    return 1;
 }

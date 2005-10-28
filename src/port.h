@@ -389,7 +389,7 @@ typedef signed long ssize_t;
 #endif
 
 #define ixstat   stat
-#define ixopen   ((int(*)(char *, int))open)
+#define ixopen   open
 #define ixopen3  open
 
 

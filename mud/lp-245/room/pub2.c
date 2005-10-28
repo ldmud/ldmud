@@ -204,6 +204,7 @@ int got_play(string str) {
     } else if (sscanf(str, "%s tells you: %s", who, what) == 2) {
 	say("The go player says: what ?\n");
     }
+    return 0;
 }
 
 void show_problem() {

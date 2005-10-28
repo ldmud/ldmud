@@ -21,11 +21,7 @@
  */
 
 #include <stdio.h>
-/* Standard memory allocation routines routines.  */
-#ifndef MSDOS
-char *malloc ();
-char *realloc ();
-#endif
+#include <stdlib.h>
 /* Do the same thing, but abort with an error if out of memory
    (see globs.c).  */
 char *xmalloc ();

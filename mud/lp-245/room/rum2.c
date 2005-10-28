@@ -8,7 +8,11 @@ int go_west() {
     if (!door_open)
 	write("The door is closed.\n");
     if (door_open)
+    {
 	this_player()->move_object("west#room/test");
+        return 1;
+    }
+    return 0;
 }
 
 void init() {

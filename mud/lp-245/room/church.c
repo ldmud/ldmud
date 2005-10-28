@@ -101,6 +101,7 @@ int xyzzy() {
     write("Everything shimmers.\n");
     write("You wake up elsewhere...\n");
     this_player()->move_player("elsewhere#room/test");
+    return 1;
 }
 
 int west() {

@@ -883,9 +883,9 @@ void set_gender(int g) {
     if (g == 0 || g == 1 || g == 2)
         gender = g;
 }
-int set_neuter() { gender = 0; }
-int set_male() { gender = 1; }
-int set_female() { gender = 2; }
+int set_neuter() { return gender = 0; }
+int set_male() { return gender = 1; }
+int set_female() { return gender = 2; }
 
 string query_gender_string() {
     if (!gender)

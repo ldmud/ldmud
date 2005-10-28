@@ -1259,6 +1259,7 @@ int privilege_violation (string op, mixed who, mixed arg, mixed arg2)
       default:
 	return -1; /* Make this violation an error */
     }
+    return 0;
 }
 
 //---------------------------------------------------------------------------
@@ -1314,6 +1315,7 @@ int query_player_level (string what)
     case "error messages":
 	return level >= 20;
     }
+    return 0;
 }
 
 //---------------------------------------------------------------------------
@@ -1343,6 +1345,7 @@ int valid_trace (string what)
     case "traceprefix":
 	return level >= 24;
     }
+    return 0;
 }
 
 //---------------------------------------------------------------------------
@@ -1547,6 +1550,7 @@ mixed valid_read  (string path, string euid, string fun, object caller)
      * recognized, we come here.
      * The default returned zero indicates deny of access.
      */
+    return 0;
 }
 
 //---------------------------------------------------------------------------

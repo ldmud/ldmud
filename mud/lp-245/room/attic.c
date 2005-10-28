@@ -7,7 +7,7 @@ void reset(int arg)
     set_light(1);
 }
 
-string init()
+void init()
 {
     add_action("west", "west");
     add_action("open", "open");

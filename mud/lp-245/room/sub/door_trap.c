@@ -45,7 +45,7 @@ int close(string str) {
     return 1;
 }
 
-int toggle_door() {
+void toggle_door() {
     write("You move the lever.\n");
     say(this_player()->query_name() + " pulled the lever.\n");
     if (west_door_open) {

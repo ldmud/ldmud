@@ -122,6 +122,7 @@ int move(string str) {
 	}
 	i += 2;
     }
+    return 1;
 }
 
 string short() {

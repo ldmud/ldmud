@@ -136,7 +136,7 @@ int get()
     return 1;
 }
 
-int reset(string arg) {
+void reset(string arg) {
     if (!arg)
 	set_light(1);
 }
@@ -326,6 +326,7 @@ int lookplayer(string str) {
 	ob = next_inventory(ob);
 	i += 1;
     }
+    return 0;
 }
 
 int light() {

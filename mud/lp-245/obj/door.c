@@ -413,6 +413,7 @@ object get_key(string type)
 
     ob = next_inventory(ob);
   }
+  return ob;
 }
 
 int this_key(string  str)
