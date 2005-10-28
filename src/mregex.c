@@ -5,7 +5,8 @@
  *------------------------------------------------------------------
  * This module serves as wrapper around optional alternative
  * regular expression implementations. It wraps the unique regexp
- * structures and calls into a unified API.
+ * structures into a ref-counted structure, and lets the API hand
+ * out glorified pointers to this internal structure.
  *
  * Beware! rx_exec() stores result data in the regexp structure, so the
  * same pattern must not be used in two concurrent rx_compile/rx_exec pairs.
@@ -29,6 +30,8 @@
  * TODO:: the strtable.
  * TODO: Use in-table chaining to improve the use of the table space
  * TODO:: and reduce the number of collisions.
+ * TODO: Separate the results out from HS-Regexp, so that the compiled
+ * TODO:: program and the results can be held separate.
  *------------------------------------------------------------------
  */
 
@@ -59,23 +62,40 @@
 #include "../mudlib/sys/debug_info.h"
 #include "../mudlib/sys/regexp.h"
 
-#ifdef RXCACHE_TABLE
-
 /*--------------------------------------------------------------------*/
 
-/* Hash functions, inspired by interpret.c */
-
-#if !( (RXCACHE_TABLE) & (RXCACHE_TABLE)-1 )
-#define RxStrHash(s) ((s) & ((RXCACHE_TABLE)-1))
-#else
-#define RxStrHash(s) ((s) % RXCACHE_TABLE)
+/* --- struct regdata_s: the regexp structure wrapper ---
+ *
+ * This structure wraps the actual regexp structure into a common
+ * format.
+#ifdef RXCACHE_TABLE
+ * The regexp cache embeds this structure into a larger one which
+ * it uses to manage the cached expressions.
 #endif
+ */
 
+typedef struct regdata_s {
+    p_uint        ref;       /* Number of refs */
+    int           opt;       /* Additional options */
+#ifdef USE_PCRE
+    pcre        * pProg;     /* The generated regular expression */
+    pcre_extra  * pHints;    /* Study data */
+    int           num_subs;  /* Number of elements in pSubs */
+    int         * pSubs;     /* Substring offsets + workarea */
+    int           res;       /* Result of last rx_exec() */
+#else
+    regexp * rx;  /* The actual regular expression */
+#endif
+} regdata_t;
 
-/* One expression hashtable entry, derived from regexp_t. */
+#ifdef RXCACHE_TABLE
+
+/* --- struct RxHashEntry: One expression hashtable entry ---
+ * Derived from regexp_i_t
+ */
 
 typedef struct RxHashEntry {
-    regexp_t   base;     /* The base regexp_t structure */
+    regdata_t base;      /* The base regexp_t structure */
 
     string_t * pString;  /* Generator string, a counted tabled string
                           * NULL if unused */
@@ -83,8 +103,25 @@ typedef struct RxHashEntry {
     size_t     size;     /* Size of regexp expressions for statistics */
 } RxHashEntry;
 
+#endif /* RXCHACHE_TABLE */
 
-/* Variables */
+/* --- struct regexp_s: the regexp structure pimpl ---
+ *
+ * This structure is a decorated pointer to the regdata_t structure,
+ * allowing to store unique options and data for shared regexps.
+ */
+
+struct regexp_s {
+    int         opt;   /* Additional options */
+    regdata_t * data;  /* Counted pointer to the internal structure */
+};
+
+/*--------------------------------------------------------------------*/
+
+/* --- Variables --- */
+
+#ifdef RXCACHE_TABLE
+
 static RxHashEntry * xtable[RXCACHE_TABLE];  /* The Expression Hashtable */
 
 /* Expression cache statistics */
@@ -107,6 +144,36 @@ static const char* pcre_malloc_err;
    * condition in the pcre_xalloc() wrapper can get the proper
    * error message.
    */
+
+/*--------------------------------------------------------------------*/
+/* --- Macros --- */
+
+/* regdata_t *ref_regdata(regdata_t *r)
+ *   Add another ref to regdata <r> and return the regdata <r>.
+ */
+
+#define ref_regdata(r) ((r)->ref++, (r))
+
+/* void free_regdata(regdata_t *r)
+ *   Subtract one ref from regdata <r>, and free the regdata fully if
+ *   the refcount reaches zero.
+ */
+
+static void rx_free_data (regdata_t * expr); /* forward */
+
+#define free_regdata(r) MACRO( if (--((r)->ref) <= 0) rx_free_data(r); )
+
+#ifdef RXCACHE_TABLE
+
+/* Hash functions, inspired by interpret.c */
+
+#if !( (RXCACHE_TABLE) & (RXCACHE_TABLE)-1 )
+#define RxStrHash(s) ((s) & ((RXCACHE_TABLE)-1))
+#else
+#define RxStrHash(s) ((s) % RXCACHE_TABLE)
+#endif
+
+#endif /* RXCHACHE_TABLE */
 
 /*--------------------------------------------------------------------*/
 static void *
@@ -221,10 +288,10 @@ rx_error_message (int code
 }  /* rx_error_message() */
 
 /*--------------------------------------------------------------------*/
-regexp_t *
-rx_compile (string_t * expr, int opt, Bool from_ed)
+static regdata_t *
+rx_compile_data (string_t * expr, int opt, Bool from_ed)
 
-/* Compile a regexp structure from the expression <expr>, according
+/* Compile a regdata structure from the expression <expr>, according
  * to the options in <opt>. If <from_ed> is TRUE, the RE is used
  * from the editor, so error messages will be printed directly
  * to the user.
@@ -233,7 +300,7 @@ rx_compile (string_t * expr, int opt, Bool from_ed)
  * else enter the newly compiled structure into the table.
  *
  * The caller gets his own reference to the structure, which he has
- * to free_regexp() after use.
+ * to free_regdata() after use.
  */
 
 {
@@ -294,7 +361,7 @@ rx_compile (string_t * expr, int opt, Bool from_ed)
        )
     {
         iNumXFound++;
-        return ref_regexp((regexp_t *)pHash);
+        return ref_regdata((regdata_t *)pHash);
     }
 #endif
 
@@ -370,9 +437,9 @@ rx_compile (string_t * expr, int opt, Bool from_ed)
 
     /* Wrap up the new regular expression and return it */
     {
-        regexp_t * rc;
+        regdata_t * rc;
 
-        xallocate(rc, sizeof(*rc), "Regexp structure");
+        xallocate(rc, sizeof(*rc), "Regexp data structure");
         rc->ref = 1;
         rc->opt = opt;
 #ifdef USE_PCRE
@@ -380,6 +447,7 @@ rx_compile (string_t * expr, int opt, Bool from_ed)
         rc->pHints = pHints;
         rc->pSubs = pSubs;
         rc->num_subs = num_subs;
+        rc->res = 0;
 #else
         rc->rx = pRegexp;
 #endif
@@ -410,6 +478,7 @@ rx_compile (string_t * expr, int opt, Bool from_ed)
     pHash->base.pHints = pHints;
     pHash->base.pSubs = pSubs;
     pHash->base.num_subs = num_subs;
+    pHash->base.res = 0;
     pHash->size = pcre_malloc_size;
 #else
     pHash->base.rx = pRegexp;
@@ -419,15 +488,52 @@ rx_compile (string_t * expr, int opt, Bool from_ed)
     iNumXEntries++;
     iXSizeAlloc += sizeof(*pHash) + pHash->size;
 
-    return ref_regexp((regexp_t *)pHash);
+    return ref_regdata((regdata_t *)pHash);
 #endif
+} /* rx_compile_data() */
+
+/*--------------------------------------------------------------------*/
+regexp_t *
+rx_compile (string_t * expr, int opt, Bool from_ed)
+
+/* Compile a regexp structure from the expression <expr>, according
+ * to the options in <opt>. If <from_ed> is TRUE, the RE is used
+ * from the editor, so error messages will be printed directly
+ * to the user.
+ *
+ * If possible, take a ready-compiled structure from the hashtable,
+ * else enter the newly compiled structure into the table.
+ *
+ * The caller gets his own unique regexp structure, which he has 
+ * to free_regexp() after use.
+ */
+
+{
+    regdata_t * pData = rx_compile_data(expr, opt, from_ed);
+    regexp_t * pRegexp = NULL;
+
+    if (pData)
+    {
+        pRegexp = xalloc(sizeof(*pRegexp));
+        if (pRegexp == NULL)
+        {
+            free_regdata(pData);
+            outofmem(sizeof(*pRegexp), "regexp structure");
+            return NULL;
+        }
+
+        pRegexp->opt = opt;
+        pRegexp->data = pData;
+    }
+
+    return pRegexp;
 } /* rx_compile() */
 
 /*-------------------------------------------------------------------------*/
 int
-rx_exec (regexp_t *prog, string_t * string, size_t start)
+rx_exec (regexp_t *pRegexp, string_t * string, size_t start)
 
-/* Match the regexp <prog> against the <string>, starting the match
+/* Match the regexp <pRegexp> against the <string>, starting the match
  * at the position <start>.
  *
  * Return a positive number if pattern matched, 0 if it did not match,
@@ -435,6 +541,8 @@ rx_exec (regexp_t *prog, string_t * string, size_t start)
  */
 
 {
+    regdata_t * prog = pRegexp->data;
+
 #ifdef USE_PCRE
     int rc;
     int pcre_opt;
@@ -482,9 +590,9 @@ rx_exec (regexp_t *prog, string_t * string, size_t start)
 
 /*-------------------------------------------------------------------------*/
 int
-rx_exec_str (regexp_t *prog, char * string, char * start)
+rx_exec_str (regexp_t *pRegexp, char * string, char * start)
 
-/* Match the regexp <prog> against the <string> whose real begin
+/* Match the regexp <pRegexp> against the <string> whose real begin
  * is at <start>.
  *
  * Return a positive number if pattern matched, 0 if it did not match,
@@ -494,6 +602,8 @@ rx_exec_str (regexp_t *prog, char * string, char * start)
  */
 
 {
+    regdata_t * prog = pRegexp->data;
+
 #ifdef USE_PCRE
     int rc;
     int pcre_opt;
@@ -541,9 +651,9 @@ rx_exec_str (regexp_t *prog, char * string, char * start)
 
 /*-------------------------------------------------------------------------*/
 int
-rx_num_matches (regexp_t *prog)
+rx_num_matches (regexp_t *pRegexp)
 
-/* After a successful match of <prog>, return the number of matched
+/* After a successful match of <pRegexp>, return the number of matched
  * expressions and parenthesized expressions.
  * In other words: the result is at least 1 (for the fully matched
  * expressions), plus the number of matched '()' sub expressions.
@@ -554,8 +664,9 @@ rx_num_matches (regexp_t *prog)
 
 {
 #ifdef USE_PCRE
-    return prog->res >= 1 ? prog->res : 0;
+    return pRegexp->data->res >= 1 ? pRegexp->data->res : 0;
 #else
+    regdata_t * prog = pRegexp->data;
     p_uint num, i;
 
     for (num = 0, i = 0
@@ -574,9 +685,9 @@ rx_num_matches (regexp_t *prog)
 
 /*-------------------------------------------------------------------------*/
 Bool
-rx_get_match_n (regexp_t *prog, string_t * str, int n, size_t * start, size_t * end)
+rx_get_match_n (regexp_t *pRegexp, string_t * str, int n, size_t * start, size_t * end)
 
-/* After a successful match of <prog> against <str>, store the start
+/* After a successful match of <pRegexp> against <str>, store the start
  * and end position of the match <n> in *<start> and *<end> and retuern TRUE.
  * The end position is in fact the position of the first character after
  * the match.
@@ -590,6 +701,7 @@ rx_get_match_n (regexp_t *prog, string_t * str, int n, size_t * start, size_t * 
 
 {
     Bool rc;
+    regdata_t * prog = pRegexp->data;
 
 #ifdef USE_PCRE
 #ifdef __MWERKS__
@@ -636,14 +748,16 @@ rx_get_match_n (regexp_t *prog, string_t * str, int n, size_t * start, size_t * 
 
 /*-------------------------------------------------------------------------*/
 void
-rx_get_match (regexp_t *prog, string_t * str, size_t * start, size_t * end)
+rx_get_match (regexp_t *pRegexp, string_t * str, size_t * start, size_t * end)
 
-/* After a successful match of <prog> against <str>, return the start
+/* After a successful match of <pRegexp> against <str>, return the start
  * and end position of the match in *<start> and *<end>. The end
  * position is in fact the position of the first character after the match.
  */
 
 {
+    regdata_t * prog = pRegexp->data;
+
 #ifdef USE_PCRE
 #ifdef __MWERKS__
 #    pragma unused(str)
@@ -658,14 +772,16 @@ rx_get_match (regexp_t *prog, string_t * str, size_t * start, size_t * end)
 
 /*-------------------------------------------------------------------------*/
 void
-rx_get_match_str (regexp_t *prog, char * str, size_t * start, size_t * end)
+rx_get_match_str (regexp_t *pRegexp, char * str, size_t * start, size_t * end)
 
-/* After a successful match of <prog> against <str>, return the start
+/* After a successful match of <pRegexp> against <str>, return the start
  * and end position of the match in *<start> and *<end>. The end
  * position is in fact the position of the first character after the match.
  */
 
 {
+    regdata_t * prog = pRegexp->data;
+
 #ifdef USE_PCRE
 #ifdef __MWERKS__
 #    pragma unused(str)
@@ -680,9 +796,9 @@ rx_get_match_str (regexp_t *prog, char * str, size_t * start, size_t * end)
 
 /*-------------------------------------------------------------------------*/
 string_t *
-rx_sub (regexp_t *prog, string_t *source, string_t *subst)
+rx_sub (regexp_t *pRegexp, string_t *source, string_t *subst)
 
-/* <prog> describes a regexp match in string <source>. Take the
+/* <pRegexp> describes a regexp match in string <source>. Take the
  * replacement string <subst> and substitute any matched subparentheses.
  * The result is a new string with one reference.
  *
@@ -693,6 +809,7 @@ rx_sub (regexp_t *prog, string_t *source, string_t *subst)
     Bool   copyPass;   /* Pass indicator */
     size_t len;        /* Computed length of the result */
     string_t * result; /* Result string */
+    regdata_t * prog = pRegexp->data;
 
 #ifndef USE_PCRE
 #ifdef __MWERKS__
@@ -801,9 +918,9 @@ rx_sub (regexp_t *prog, string_t *source, string_t *subst)
 
 /*-------------------------------------------------------------------------*/
 string_t *
-rx_sub_str (regexp_t *prog, char *source, char *subst)
+rx_sub_str (regexp_t *pRegexp, char *source, char *subst)
 
-/* <prog> describes a regexp match in string <source>. Take the
+/* <pRegexp> describes a regexp match in string <source>. Take the
  * replacement string <subst> and substitute any matched subparentheses.
  * The result is a new string with one reference.
  *
@@ -827,17 +944,17 @@ rx_sub_str (regexp_t *prog, char *source, char *subst)
         free_mstring(m_source);
         return NULL;
     }
-    rc = rx_sub(prog, m_source, m_subst);
+    rc = rx_sub(pRegexp, m_source, m_subst);
     free_mstring(m_source);
     free_mstring(m_subst);
     return rc;
 } /* rx_sub_str() */
 
 /*--------------------------------------------------------------------*/
-void
-rx_free (regexp_t * expr)
+static void
+rx_free_data (regdata_t * expr)
 
-/* Deallocate a regexp structure <expr> and all associated data.
+/* Deallocate a regdata structure <expr> and all associated data.
 #ifdef RXCACHE_TABLE
  * <expr> is in fact a RxHashEntry structure.
 #endif
@@ -858,7 +975,19 @@ rx_free (regexp_t * expr)
     xfree(expr->rx);
 #endif
     xfree(expr);
-} /* rx_free() */
+} /* rx_free_data() */
+
+/*--------------------------------------------------------------------*/
+void
+free_regexp (regexp_t * expr)
+
+/* Deallocate a regexp structure <expr> and all associated data.
+ */
+
+{
+    free_regdata(expr->data);
+    xfree(expr);
+} /* free_regexp() */
 
 /*--------------------------------------------------------------------*/
 size_t
@@ -965,7 +1094,19 @@ clear_rxcache_refs (void)
 
 /*--------------------------------------------------------------------*/
 void
-count_regexp_ref (regexp_t * pRegexp)
+clear_regexp_ref (regexp_t * pRegexp)
+
+/* Clear the refcount for <pRegexp>.
+ */
+
+{
+    if (pRegexp)
+        pRegexp->data->ref = 0;
+} /* clear_regexp_ref() */
+
+/*--------------------------------------------------------------------*/
+void
+count_regdata_ref (regdata_t * pRegexp)
 
 /* Mark all memory associated with one regexp structure and count
  * the refs.
@@ -987,7 +1128,21 @@ count_regexp_ref (regexp_t * pRegexp)
     count_ref_from_string(((RxHashEntry *)pRegexp)->pString);
 #endif
     pRegexp->ref++;
-} /* count_rxcache_ref() */
+} /* count_regdata_ref() */
+
+/*--------------------------------------------------------------------*/
+void
+count_regexp_ref (regexp_t * pRegexp)
+
+/* Mark all memory associated with one regexp structure and count
+ * the refs.
+ * This function is called both from rxcache as well as from ed.
+ */
+
+{
+    note_malloced_block_ref(pRegexp);
+    count_regdata_ref(pRegexp->data);
+} /* count_regexp_ref() */
 
 /*--------------------------------------------------------------------*/
 void
@@ -1003,7 +1158,7 @@ count_rxcache_refs (void)
     {
         if (NULL != xtable[i])
         {
-            count_regexp_ref((regexp_t *)xtable[i]);
+            count_regdata_ref((regdata_t *)xtable[i]);
         }
     } /* for (i) */
 #endif

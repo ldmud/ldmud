@@ -7519,9 +7519,9 @@ v_input_to (svalue_t *sp, int num_arg)
     }
 
     /* Setup the flags required for 'noecho' */
-    flags =   ((iflags & INPUT_NOECHO)         ? NOECHO_REQ   : 0)
-            | ((iflags & INPUT_CHARMODE)       ? CHARMODE_REQ : 0)
-            | ((iflags & INPUT_IGNORE_BANG)    ? IGNORE_BANG  : 0)
+    flags =   ((iflags & INPUT_NOECHO)      ? NOECHO_REQ   : 0)
+            | ((iflags & INPUT_CHARMODE)    ? CHARMODE_REQ : 0)
+            | ((iflags & INPUT_IGNORE_BANG) ? IGNORE_BANG  : 0)
           ;
 
     /* Allocate and setup the input_to structure */

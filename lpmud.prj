@@ -60,16 +60,17 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 593)
-(Parent-Version lpmud 3-3 592)
+(Project-Version lpmud 3-3 594)
+(Parent-Version lpmud 3-3 593)
 (Version-Log "
-  - (comm.c, simulate.c) Added new input_to() flag 'INPUT_LOCAL' to switch
-      only the driver side input mode between LINE and CHAR (Bug #0000124).
+  - (mregexp, ed.c) Changed the regexp implementation to use a pImpl
+       idiom - this will allow to use traditional regexps and PCRE
+       in parallel.
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Sat, 04 Sep 2004 13:49:02 -0600")
+(Checkin-Time "Sat, 04 Sep 2004 19:05:52 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -107,7 +108,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.79 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.656 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.657 644))
   (HISTORY (lpmud/f/49_HISTORY 1.375 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -176,13 +177,13 @@
   (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.30 644))
   (src/closure.h (lpmud/f/44_closure.h 1.7.1.19 644))
   (src/closure.c (lpmud/d/4_closure.c 1.41.1.47.1.21 644))
-  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.94 644))
+  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.95 644))
   (src/comm.h (lpmud/d/3_comm.h 1.26.1.41 644))
   (src/driver.h (lpmud/f/36_driver.h 1.15.1.26 644))
   (src/dumpstat.h (lpmud/f/35_dumpstat.h 1.8 644))
   (src/dumpstat.c (lpmud/c/34_dumpstat.c 1.20.1.11.1.8 644))
   (src/ed.h (lpmud/f/34_ed.h 1.5.1.6 644))
-  (src/ed.c (lpmud/c/33_ed.c 1.32.1.32 644))
+  (src/ed.c (lpmud/c/33_ed.c 1.32.1.33 644))
   (src/efuns.h (lpmud/l/20_efuns.h 1.13.1.19.1.6 644))
   (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.97 644))
   (src/exec.h (lpmud/c/32_exec.h 1.34.1.33.1.7 644))
@@ -208,8 +209,8 @@
   (src/md5.c (lpmud/l/19_md5.c 1.7 644))
   (src/mempools.h (lpmud/d/48_mempools.h 1.2.1.8 644))
   (src/mempools.c (lpmud/d/49_mempools.c 1.2.1.15 644))
-  (src/mregex.h (lpmud/e/29_rxcache.h 1.7.1.11 644))
-  (src/mregex.c (lpmud/e/30_rxcache.c 1.11.1.33 644))
+  (src/mregex.h (lpmud/e/29_rxcache.h 1.7.1.12 644))
+  (src/mregex.c (lpmud/e/30_rxcache.c 1.11.1.34 644))
   (src/mstrings.h (lpmud/i/35_mstrings.h 1.27 644))
   (src/mstrings.c (lpmud/i/36_mstrings.c 1.21.1.31 644))
   (src/my-alloca.h (lpmud/f/29_my-alloca. 1.3.1.2 644))

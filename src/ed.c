@@ -3274,8 +3274,7 @@ clear_ed_buffer_refs (ed_buffer_t *b)
     }
 
     /* For the RE cache */
-    if (b->oldpat)
-        b->oldpat->ref = 0;
+    clear_regexp_ref(b->oldpat);
 
     clear_ref_in_vector(&b->prompt, 1);
 }
