@@ -1,15 +1,21 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-23-May-2004 (Lars Duening) (3.3.556)
+23-May-2004 (Lars Duening)  (3.3.557)
+  - (configure) Corrected a typo in the --with-udp-port option (thanks,
+       LynX).
+  - (object.c) When restoring structs, the sizes no longer need to match - 
+       the driver restores as many members by position as possible.
+
+23-May-2004 (Lars Duening)  (3.3.556)
   - (efuns, func_spec) The efuns member() and rmember() can take a
        start position.
 
-22-May-2004 (Lars Duening) (3.3.555)
+22-May-2004 (Lars Duening)  (3.3.555)
   - (smalloc.c) With USE_AVL_FREELIST, the AVL tree could develop cycles -
        corrected that (reported by Ralph).
 
-21-May-2004 (Lars Duening) (3.3.554)
+21-May-2004 (Lars Duening)  (3.3.554)
   - (func_spec, object, parse.c) The result of efun deep_inventory()
        can be restricted to a certain depth (suggested by Urv).
 

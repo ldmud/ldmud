@@ -7467,10 +7467,11 @@ restore_struct (svalue_t *svp, char **str)
         if (prog_name)
             free_mstring(prog_name);
 
-        if (!stt || struct_t_size(stt) != siz)
-        {
+        if (!stt)
             return MY_FALSE;
-        }
+
+        if (struct_t_size(stt) < siz)
+            siz = struct_t_size(stt);
     }
     /* Allocate the struct */
     st = struct_new(stt);

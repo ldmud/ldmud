@@ -954,7 +954,7 @@ Optional Packages:
   --with-compiler-stack-size=VALUE    default=400
   --with-max-bits=VALUE               default=6144
   --with-portno=VALUE                 default=4242
-  --with-udp_port=VALUE               default=4246
+  --with-udp-port=VALUE               default=4246
   --with-maxnumports=VALUE            default=20
   --with-max-cost=VALUE               default=1000000
   --with-catch-reserved-cost=VALUE    default=2000
@@ -1891,7 +1891,7 @@ fi;
 
 DEFAULTwith_udp_port=4246
 
-# Check whether --with-udp_port or --without-udp_port was given.
+# Check whether --with-udp-port or --without-udp-port was given.
 if test "${with_udp_port+set}" = set; then
   withval="$with_udp_port"
 
