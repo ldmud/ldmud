@@ -53,18 +53,17 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 621)
-(Parent-Version lpmud 3-3 620)
+(Project-Version lpmud 3-3 622)
+(Parent-Version lpmud 3-3 621)
 (Version-Log "
-  - (interpret.c) When calling inherited functions in objects with virtual
-       parents, the function adjusting the offsets always returned NULL
-       instead of the pointer to the parent. This was a fallout from the
-       closure change.
+  - (interpret.c) When indexing a string for assignment, the driver failed
+       to duplicate the string, leading to interesting effects if the string
+       was used as mapping key (reported by Andre).
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Sat, 27 Nov 2004 21:48:14 -0700")
+(Checkin-Time "Mon, 29 Nov 2004 22:09:02 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -102,7 +101,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.12 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.83 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.684 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.685 644))
   (HISTORY (lpmud/f/49_HISTORY 1.384 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -193,7 +192,7 @@
   (src/heartbeat.c (lpmud/m/42_heartbeat. 1.18.1.9 644))
   (src/i-svalue_cmp.h (lpmud/a/b/20_i-svalue_c 1.4 644))
   (src/interpret.h (lpmud/b/13_interpret. 1.33.1.39 644))
-  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.75 644))
+  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.76 644))
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.15.1.11 644))
   (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.74 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.19 644))

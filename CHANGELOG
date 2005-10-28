@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+29-Nov-2004 (Lars Duening)  (3.3.622)
+  - (interpret.c) When indexing a string for assignment, the driver failed
+       to duplicate the string, leading to interesting effects if the string
+       was used as mapping key (reported by Andre).
+
 27-Nov-2004 (Lars Duening)  (3.3.621)
   - (interpret.c) When calling inherited functions in objects with virtual
        parents, the function adjusting the offsets always returned NULL

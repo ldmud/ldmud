@@ -2987,10 +2987,13 @@ get_string_item ( svalue_t * svp, svalue_t * i, Bool make_singular
         }
     }
 
-    /* If the string is tabled, i.e. not changeable, or has more than
-     * one reference, allocate a new copy which can be changed safely.
+    /* The basic idea here was to to create a new copy of the string only
+     * if the string is not singular (aka !mstr_singular(svp->u.str)).
+     * Unfortunately local variable lvalues are pushed without counting
+     * the additional reference, so we now have to play it safe and
+     * duplicate the string whenever requested.
      */
-    if (make_singular && !mstr_singular(svp->u.str))
+    if (make_singular)
     {
         string_t *p;
         
@@ -3066,10 +3069,13 @@ get_string_r_item (svalue_t * svp, svalue_t * i, Bool make_singular
         }
     }
 
-    /* If the string is tabled, i.e. not changeable, or has more than
-     * one reference, allocate a new copy which can be changed safely.
+    /* The basic idea here was to to create a new copy of the string only
+     * if the string is not singular (aka !mstr_singular(svp->u.str)).
+     * Unfortunately local variable lvalues are pushed without counting
+     * the additional reference, so we now have to play it safe and
+     * duplicate the string whenever requested.
      */
-    if (make_singular && !mstr_singular(svp->u.str))
+    if (make_singular)
     {
         string_t *p;
         
@@ -3140,10 +3146,13 @@ get_string_a_item (svalue_t * svp, svalue_t * i, Bool make_singular
         }
     }
 
-    /* If the string is tabled, i.e. not changeable, or has more than
-     * one reference, allocate a new copy which can be changed safely.
+    /* The basic idea here was to to create a new copy of the string only
+     * if the string is not singular (aka !mstr_singular(svp->u.str)).
+     * Unfortunately local variable lvalues are pushed without counting
+     * the additional reference, so we now have to play it safe and
+     * duplicate the string whenever requested.
      */
-    if (make_singular && !mstr_singular(svp->u.str))
+    if (make_singular)
     {
         string_t *p;
         
