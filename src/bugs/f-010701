@@ -1,8 +1,0 @@
-Short: On save/restore object, pass full filename to valid_write/read
-From: Lars
-Date: 010701
-Type: Feature
-State: New
-
-restore_object("foo") does not pass "foo.o" to valid_read(), but instead
-just "foo", which confuses some people.

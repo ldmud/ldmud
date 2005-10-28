@@ -1,8 +1,0 @@
-Short: get_dir() should return the full pathname
-From: Zora
-Date: 20000401
-Type: Feature
-State: New
-
-get_dir(,1) should return the full pathname.
-

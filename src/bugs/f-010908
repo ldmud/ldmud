@@ -1,9 +1,0 @@
-Short: caller_stack should include function names
-From: Nathan
-Date: 2001-09-08
-Type: Feature
-State: New
-
-caller_stack() (or a new efun of similar purpose) should also return the
-function names. This would duplicate debug_info(DI_TRACE), but with the twist
-that it'll match the previous_object() data, as in caller_stack().

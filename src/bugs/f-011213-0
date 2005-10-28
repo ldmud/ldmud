@@ -1,8 +1,0 @@
-Short: Lexer should not use magic EOF characters
-From: Lars
-Date: 2001-12-13
-Type: Feature
-State: New
-
-Instead of using a magic EOF character, the lexer should find the end of
-the file in the buffer by length checks.

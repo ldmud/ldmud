@@ -1,8 +1,0 @@
-Short: Make sure that all master calls use leading slashes.
-From: Freaky
-Date: 2001-01-15
-Type: Bug
-State: Acknowledged
-
-All master calls dealing with object names should use leading slashes.
-Maybe implement this only 3.3 and above.

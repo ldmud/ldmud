@@ -1,8 +1,0 @@
-Short: Unused apply catch_msg()
-Date: 990319
-From: Coogan
-Type: Feature
-State: Unclassified
-
-Can the catch_msg() functionality be removed?
-Nobody seems to use it.

@@ -1,8 +1,0 @@
-Short: Driver finds all functions in the master
-Date: 990413
-From: Robert Wetzel
-Type: Feature
-State: Unclassified
-
-Is it possible that the driver finds a function in the master even if it
-is private?

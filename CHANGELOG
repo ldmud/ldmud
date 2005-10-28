@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+26-Nov-2004 (Lars Duening)  (3.3.620)
+  - (Makefile.in, doc/man/ldmud.1) Added the automatic generation of a manpage
+       from the drivers '--longhelp' output.
+  - (src/bugs, src/done, src/wk) Moved the data from these directories
+       into the bugtracker.
+
 26-Nov-2004 (Lars Duening)  (3.3.618, .619)
   - (closure.c) Calls to explicitely inherited lfun closures weren't compiled
        correctly in lambda()s (Bug #0000145).

@@ -30,6 +30,9 @@ BINDIR = @bindir@
 # execute (hopefully) savely. Was formerly defined in config.h!
 ERQ_DIR= @libexecdir@
 #
+# Set MANDIR to the directory where to install the manpages.
+MANDIR= @mandir@
+#
 # Typical profiling, warning and optimizing options.
 #   -p -DMARK: together they enable customized profiling of VM instructions.
 #              MARK needs to be defined to a statement taking the
@@ -103,12 +106,16 @@ OBJ = access_check.o actions.o array.o backend.o bitstrings.o call_out.o \
       random.o regexp.o sha1.o simulate.o simul_efun.o stdstrings.o \
       strfuns.o structs.o sprintf.o swap.o wiz_list.o xalloc.o @ALLOCA@ 
 
-ldmud@EXEEXT@: $(OBJ)
+ldmud@EXEEXT@: $(OBJ) patchlevel.h
 	$(CC) @OPTIMIZE_LINKING@ $(LDFLAGS) $(OBJ) -o $@ $(LIBS)
 
-install: ldmud@EXEEXT@
-	$(mkinstalldirs) $(BINDIR)
-	$(INSTALL) -c $? $(BINDIR)/ldmud@EXEEXT@
+docs: ldmud@EXEEXT@
+	-help2man --name=ldmud -N --help-option=--longhelp --include=ldmud-man.txt --output=../doc/man/ldmud.1 ./ldmud@EXEEXT@
+	
+install: ldmud@EXEEXT@ docs
+	$(mkinstalldirs) $(BINDIR) $(MANDIR)/man1
+	$(INSTALL) -c ldmud@EXEEXT@ $(BINDIR)/ldmud@EXEEXT@
+	$(INSTALL) -c ../doc/man/ldmud.1 $(MANDIR)/man1/ldmud.1
 
 install-utils:
 	(cd util; $(MAKE) $(MFLAGS) install)
@@ -137,6 +144,9 @@ tags: $(SRC)
 
 TAGS: $(SRC)
 	etags $(SRC)
+
+patchlevel.h: ../lpmud.prj
+	-(cd ..; prcs rekey lpmud src/patchlevel.h)
 
 make_func.c: make_func.y
 	$(YACC) make_func.y

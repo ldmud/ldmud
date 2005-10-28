@@ -1,9 +1,0 @@
-Short: configure-with_portno should take a string
-From: Lars
-Date: 000814
-Type: Feature
-State: New
-
-The configure/config.h option 'PORTNO' should take a string of the form
-"<port>{,<port>}" to allow the builtin configuration of multiple ports.
-

@@ -1,9 +1,0 @@
-Short: Use PCRE and traditional regexps in parallel
-From: Lars
-Date: 2002-03-27
-Type: Feature
-State: New
-
-By using a union in the regexp_t, the driver could use both traditional
-regexps and PCRE in parallel. The editor would be hardwired to one of
-them until the editor efun is replaced by an editor object.

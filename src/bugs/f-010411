@@ -1,6 +1,0 @@
-Short: Extend map(),filter(),... for strings.
-Date: 20010411
-From: Fiona
-Type: New
-
-Extend map() et all to take a string instead of an array.

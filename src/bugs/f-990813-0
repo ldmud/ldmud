@@ -1,7 +1,0 @@
-Short: Operator ':=:' for swaps.
-From: Lars
-Type: Feature
-Date: 990813
-
-Use ':=:' to swap left with righthand side (or a Cish modification, as this
-operator stems from Algol-ish languages).

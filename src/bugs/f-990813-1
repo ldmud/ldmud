@@ -1,8 +1,0 @@
-Short: Operator '<=>' for relational comparison.
-From: Lars
-Type: Feature
-Date: 990813
-
-a <=> b === -1 if a < b, 0 if a == b, 1 if a > b
-
-(Used in Perl)

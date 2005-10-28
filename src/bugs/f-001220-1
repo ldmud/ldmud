@@ -1,9 +1,0 @@
-Short: Possible implementation detail of the telnet machine
-From: Lars
-Date: 2000-12-20
-Type: Feature
-State: New
-
-May the interactive structure should also hold more flags: 'tried to switch to
-charmode using method #1', 'succeeded with method #1', 'tried method #2', etc.
-
