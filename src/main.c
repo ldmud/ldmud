@@ -76,6 +76,9 @@
 #include "pkg-mysql.h"
 #endif
 
+#include "../mudlib/sys/driver_hook.h"
+#include "../mudlib/sys/regexp.h"
+
 /*-------------------------------------------------------------------------*/
 
 #define PLAIN_MASTER "secure/master"
@@ -296,6 +299,7 @@ main (int argc, char **argv)
             break;
         }
 
+        init_driver_hooks();
         init_rusage();
 #ifdef HOST_DEPENDENT_INIT
         HOST_DEPENDENT_INIT
@@ -388,7 +392,6 @@ main (int argc, char **argv)
         if (numports < 1) /* then use the default port */
             numports = 1;
 
-        init_driver_hooks();
         init_otable();
         for (i = 0; i < (int)(sizeof consts / sizeof consts[0]); i++)
             consts[i] = exp(- i / 900.0);
@@ -1006,6 +1009,7 @@ typedef enum OptNumber {
  , cNoPreload       /* --no-preload         */
  , cPidFile         /* --pidfile            */
  , cRandomSeed      /* --random-seed        */
+ , cRegexp          /* --regexp             */
  , cResetTime       /* --reset-time         */
  , cReserved        /* -r                   */
  , cReserveUser     /* --reserve-user       */
@@ -1193,6 +1197,11 @@ static Option aOptions[]
       , "  --reset-time <time>\n"
         "    The time in seconds for an object before it is reset.\n"
         "    A time <= 0 disables the reset mechanism.\n"
+      }
+
+    , { 0,   "regexp",             cRegexp,         MY_TRUE
+      , "  --regexp pcre|traditional\n"
+        "    Select the default regexp package.\n"
       }
 
     , { 0,   "max-array",          cMaxArray,       MY_TRUE
@@ -1651,6 +1660,13 @@ options (void)
             fputs(optstrings[i], stdout);
         }
     } /* print language options */
+    fputs("                 default regexps: "
+#ifdef USE_PCRE
+                                            "PCRE\n"
+#else
+                                            "traditional\n"
+#endif
+         , stdout);
 
     /* Print the package options, nicely indented. */
     {
@@ -1690,18 +1706,15 @@ options (void)
         size_t nStrings = sizeof(optstrings) / sizeof(optstrings[0]);
         size_t i;
 
+        fputs("       Packages: PCRE ", stdout);
+        fputs(rx_pcre_version(), stdout);
+        fputs("\n", stdout);
         for (i = 1; i < nStrings; i++)
         {
-            if (1 == i)
-                fputs("       Packages: ", stdout);
-            else
-                fputs("                 ", stdout);
+            fputs("                 ", stdout);
             fputs(optstrings[i], stdout);
         }
     } /* print package options */
-  fputs("                 regexps: ", stdout);
-  fputs(rx_version(), stdout);
-  fputs("\n", stdout);
 
   printf(" Runtime limits: max read file size:     %7d\n"
          "                 max byte read/write:    %7d\n"
@@ -2166,6 +2179,15 @@ eval_arg (int eOption, const char * pValue)
         }
         else
             fprintf(stderr, "Illegal cleanup-time '%s' ignored.\n", pValue);
+        break;
+
+    case cRegexp:
+        if (!strcasecmp(pValue, "pcre"))
+            put_number(driver_hook+H_REGEXP_PACKAGE, RE_PCRE);
+        else if (!strcasecmp(pValue, "traditional"))
+            put_number(driver_hook+H_REGEXP_PACKAGE, RE_TRADITIONAL);
+        else
+            fprintf(stderr, "Unknown regexp package '%s' ignored.\n", pValue);
         break;
 
     case cMaxArray:

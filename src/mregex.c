@@ -195,23 +195,19 @@ pcre_xalloc (size_t size)
 
 /*--------------------------------------------------------------------*/
 const char *
-rx_version (void)
+rx_pcre_version (void)
 
-/* Return a string with the name and version of the regex package.
+/* Return a string with the name and version of the PCRE package.
  */
 
 {
-#ifdef USE_PCRE
-         static char buf[40];
-         sprintf(buf, "PCRE %d.%d", PCRE_MAJOR, PCRE_MINOR);
+    static char buf[40];
+    sprintf(buf, "%d.%d", PCRE_MAJOR, PCRE_MINOR);
 #    ifdef USE_BUILTIN_PCRE
-         strcat(buf, " (builtin)");
+    strcat(buf, " (builtin)");
 #    endif
-         return buf;
-#else
-    return "traditional";
-#endif
-} /* rx_version() */
+    return buf;
+} /* rx_pcre_version() */
 
 /*--------------------------------------------------------------------*/
 void rx_init(void)

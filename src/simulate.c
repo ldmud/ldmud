@@ -72,6 +72,7 @@
 #include "../mudlib/sys/debug_info.h"
 #include "../mudlib/sys/driver_hook.h"
 #include "../mudlib/sys/files.h"
+#include "../mudlib/sys/regexp.h"
 #include "../mudlib/sys/rtlimits.h"
 
 /*-------------------------------------------------------------------------*/
@@ -4010,6 +4011,13 @@ init_driver_hooks()
     {
         put_number(driver_hook + i, 0);
     }
+
+#ifdef USE_PCRE
+    put_number(driver_hook + H_REGEXP_PACKAGE, RE_PCRE);
+#else
+    put_number(driver_hook + H_REGEXP_PACKAGE, RE_TRADITIONAL);
+#endif
+
 } /* init_driver_hooks() */
 
 /*-------------------------------------------------------------------------*/
@@ -4611,7 +4619,32 @@ f_set_driver_hook (svalue_t *sp)
     switch(sp->type)
     {
     case T_NUMBER:
-        put_number(driver_hook + n, 0);
+        if (n != H_REGEXP_PACKAGE)
+        {
+            if (sp->u.number != 0)
+            {
+                error("Bad value for hook %ld: got number, expected %lx %s or 0.\n"
+                     , n, (unsigned long)hook_type_map[n]
+                     , efun_arg_typename(hook_type_map[n]));
+            }
+            put_number(driver_hook + n, 0);
+            break;
+        }
+        else
+        {
+            if (sp->u.number != RE_PCRE
+             || sp->u.number != RE_TRADITIONAL
+               )
+            {
+                error("Bad value for hook %ld: got %lx, expected RE_PCRE (%lx) "
+                      "or RE_TRADITIONAL (%lx).\n"
+                     , n, (long)sp->u.number
+                     , (long)RE_PCRE, (long)RE_TRADITIONAL
+                     );
+                break;
+            }
+            goto default_test;
+        }
         break;
 
     case T_STRING:

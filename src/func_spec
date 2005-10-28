@@ -599,7 +599,7 @@ string  query_load_average();
 mixed  *rusage();
 mixed   limited(closure, ...);
 void    set_limits(int|int*, ...);
-void    set_driver_hook(int, closure|null|string|mapping|string*);
+void    set_driver_hook(int, closure|int|string|mapping|string*);
 void    shutdown();
 int     trace(int);
 string  traceprefix(string|int);

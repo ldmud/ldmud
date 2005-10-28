@@ -112,6 +112,9 @@ DESCRIPTION
         The lfun master->flag() is called with <word> as argument before the
         gamedriver accepts netword connections.
 
+      --regexp pcre | traditional
+        Select the default regexp package.
+
       --max-array <size>
         The maximum number of elements an array can hold.
         Set to 0, arrays of any size are allowed.

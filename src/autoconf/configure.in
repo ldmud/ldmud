@@ -121,7 +121,7 @@ AC_MY_ARG_ENABLE(use-mccp,no,,[Enables MCCP support])
 AC_MY_ARG_ENABLE(use-mysql,no,,[Enables mySQL support])
 AC_MY_ARG_ENABLE(use-pgsql,no,,[Enables PostgreSQL support])
 AC_MY_ARG_ENABLE(use-pthreads,no,,[enable using of threads for socket writes])
-AC_MY_ARG_ENABLE(use-pcre,yes,,[Enables PCRE: no/yes/builtin])
+AC_MY_ARG_ENABLE(use-pcre,yes,,[Enables PCRE: no/yes/builtin/no-builtin])
 AC_MY_ARG_ENABLE(use-deprecated,yes,,[Enables obsolete and deprecated efuns])
 AC_MY_ARG_ENABLE(use-structs,yes,,[Enables structs])
 AC_MY_ARG_ENABLE(use-tls,no,,[Enables Transport Layer Security over Telnet: no/gnu/ssl/yes])
@@ -259,6 +259,11 @@ elif test "x$enable_use_pcre" = "xbuiltin"; then
   cdef_use_pcre="#define"
   cdef_use_builtin_pcre="#define"
   enable_use_pcre="yes"
+  enable_use_builtin_pcre="yes"
+elif test "x$enable_use_pcre" = "xno-builtin"; then
+  cdef_use_pcre="#undef"
+  cdef_use_builtin_pcre="#define"
+  enable_use_pcre="no"
   enable_use_builtin_pcre="yes"
 else
   cdef_use_pcre="#undef"
@@ -1012,7 +1017,7 @@ int main(void)
         AC_DEFINE(HAS_PCRE)
         PKGLIBS="$PKGLIBS -lpcre"
     else
-        if test $enable_use_pcre = yes -a $enable_use_builtin_pcre = yes ; then
+        if test $enable_use_builtin_pcre = no ; then
             echo "PCRE not available in the system - using builtin version."
             enable_use_builtin_pcre="yes"
             cdef_use_builtin_pcre="#define"

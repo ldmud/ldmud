@@ -32,4 +32,11 @@
 
 #define RE_OMIT_DELIM      0x1000  /* Omit the delimiters */
 
+/* Regexp package selection options: */
+
+#define RE_TRADITIONAL     0x04000000
+#define RE_PCRE            0x02000000
+
+#define RE_PACKAGE_MASK    (RE_TRADITIONAL | RE_PCRE)
+
 #endif /* LPC_REGEXP_H_ */

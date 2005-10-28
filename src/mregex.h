@@ -31,7 +31,7 @@ extern void rx_get_match (regexp_t *pRegexp, string_t * str, size_t * start, siz
 extern void rx_get_match_str (regexp_t *pRegexp, char * str, size_t * start, size_t * end);
 extern Bool rx_get_match_n (regexp_t *pRegexp, string_t * str, int n, size_t * start, size_t * end);
 extern void   free_regexp(regexp_t *);
-extern const char * rx_version(void);
+extern const char * rx_pcre_version(void);
 extern size_t rxcache_status(strbuf_t *sbuf, Bool verbose);
 extern void   rxcache_dinfo_status(svalue_t *svp, int value);
 

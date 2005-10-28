@@ -393,10 +393,12 @@ enable_use_alists=no
 enable_lpc_array_calls=yes
 
 # Enable PCRE instead of traditional regexps
-#  'no':      use traditional regexps
-#  'builtin': use the builtin PCRE package
-#  'yes':     use the system's PCRE package if available, otherwise the
-#             the builtin package
+#  'no':         use traditional regexps by default
+#  'no-builtin': use traditional regexps by default, or the builtin PCRE
+#                package if PCRE is requested
+#  'builtin':    use PCRE package by default, using the builtin package
+#  'yes':        use the system's PCRE package if available, otherwise the
+#                the builtin package
 
 enable_use_pcre=yes
 

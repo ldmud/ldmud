@@ -1652,6 +1652,8 @@ name_to_hook(char *name)
         return H_DEFAULT_PROMPT;
     if ( !strcmp(name, "PRINT_PROMPT") )
         return H_PRINT_PROMPT;
+    if ( !strcmp(name, "REGEXP_PACKAGE") )
+        return H_REGEXP_PACKAGE;
     return -1;
 }
 

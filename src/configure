@@ -866,7 +866,7 @@ Optional Features:
   --enable-use-pthreads               default=disabled
         enable using of threads for socket writes
   --enable-use-pcre                   default=enabled
-        Enables PCRE: no/yes/builtin
+        Enables PCRE: no/yes/builtin/no-builtin
   --enable-use-deprecated             default=enabled
         Enables obsolete and deprecated efuns
   --enable-use-structs                default=enabled
@@ -2224,6 +2224,11 @@ elif test "x$enable_use_pcre" = "xbuiltin"; then
   cdef_use_pcre="#define"
   cdef_use_builtin_pcre="#define"
   enable_use_pcre="yes"
+  enable_use_builtin_pcre="yes"
+elif test "x$enable_use_pcre" = "xno-builtin"; then
+  cdef_use_pcre="#undef"
+  cdef_use_builtin_pcre="#define"
+  enable_use_pcre="no"
   enable_use_builtin_pcre="yes"
 else
   cdef_use_pcre="#undef"
@@ -10403,7 +10408,7 @@ _ACEOF
 
         PKGLIBS="$PKGLIBS -lpcre"
     else
-        if test $enable_use_pcre = yes -a $enable_use_builtin_pcre = yes ; then
+        if test $enable_use_builtin_pcre = no ; then
             echo "PCRE not available in the system - using builtin version."
             enable_use_builtin_pcre="yes"
             cdef_use_builtin_pcre="#define"
