@@ -497,12 +497,10 @@ tls_read (interactive_t *ip, char *buffer, int length)
     }
     else if (ret < 0)
     {
-	debug_message("%s TLS: Received corrupted data (%d). "
+	debug_message("%s GnuTLS: Error in receiving data (%s). "
                       "Closing the connection.\n"
-                     , time_stamp(), ret);
-	gnutls_bye(ip->tls_session, GNUTLS_SHUT_WR);
-	gnutls_deinit(ip->tls_session);
-	ip->tls_status = TLS_INACTIVE;
+                     , time_stamp(), gnutls_strerror(ret));
+        tls_deinit_connection(ip);
     }
 #endif /* SSL Package */
 
@@ -542,6 +540,9 @@ tls_write (interactive_t *ip, char *buffer, int length)
     ret = gnutls_record_send( ip->tls_session, buffer, length );
     if (ret < 0)
     {
+	debug_message("%s GnuTLS: Error in sending data (%s). "
+                      "Closing the connection.\n"
+                     , time_stamp(), gnutls_strerror(ret));
         tls_deinit_connection(ip);
     }
 #endif /* SSL Package */
@@ -815,6 +816,7 @@ tls_deinit_connection (interactive_t *ip)
     {
         gnutls_bye( ip->tls_session, GNUTLS_SHUT_WR);
         gnutls_deinit(ip->tls_session);
+        ip->tls_session = NULL;
     }
 
 #endif /* SSL Package */
@@ -859,8 +861,7 @@ f_tls_deinit_connection(svalue_t *sp)
 
     tls_deinit_connection(ip);
 
-    free_svalue(sp);
-    put_number(sp, 1);
+    free_svalue(sp--);
     return sp;
 } /* f_tls_deinit_connection() */
 

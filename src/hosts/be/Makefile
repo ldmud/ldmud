@@ -417,10 +417,10 @@ $(OBJ)/actions.o : ../mudlib/sys/driver_hook.h ../mudlib/sys/commands.h \
     hosts/be/be.h machine.h
 
 $(OBJ)/array.o : i-svalue_cmp.h xalloc.h wiz_list.h swap.h svalue.h \
-    simulate.h stdstrings.h object.h mstrings.h mregex.h mempools.h \
-    mapping.h main.h interpret.h closure.h backend.h array.h my-alloca.h \
-    typedefs.h driver.h strfuns.h sent.h bytecode.h hash.h port.h config.h \
-    hosts/unix.h hosts/be/be.h machine.h
+    simulate.h stdstrings.h object.h mstrings.h mempools.h mapping.h main.h \
+    interpret.h closure.h backend.h array.h my-alloca.h typedefs.h driver.h \
+    strfuns.h sent.h bytecode.h hash.h port.h config.h hosts/unix.h \
+    hosts/be/be.h machine.h
 
 $(OBJ)/backend.o : ../mudlib/sys/debug_message.h \
     ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h swap.h svalue.h \
@@ -467,13 +467,14 @@ $(OBJ)/ed.o : ../mudlib/sys/regexp.h xalloc.h svalue.h stdstrings.h \
 
 $(OBJ)/efuns.o : ../mudlib/sys/time.h ../mudlib/sys/strings.h \
     ../mudlib/sys/regexp.h ../mudlib/sys/objectinfo.h \
-    ../mudlib/sys/debug_info.h xalloc.h wiz_list.h svalue.h swap.h \
-    structs.h strfuns.h simulate.h stdstrings.h sha1.h random.h ptrtable.h \
-    otable.h object.h mstrings.h mregex.h md5.h mempools.h mapping.h main.h \
-    lex.h interpret.h heartbeat.h exec.h dumpstat.h comm.h closure.h \
-    call_out.h backend.h array.h actions.h efuns.h my-rusage.h my-alloca.h \
-    typedefs.h driver.h hash.h sent.h bytecode.h my-stdint.h pkg-tls.h \
-    port.h config.h hosts/unix.h hosts/be/be.h machine.h
+    ../mudlib/sys/driver_hook.h ../mudlib/sys/debug_info.h xalloc.h \
+    wiz_list.h svalue.h swap.h structs.h strfuns.h simulate.h stdstrings.h \
+    sha1.h random.h ptrtable.h otable.h object.h mstrings.h mregex.h md5.h \
+    mempools.h mapping.h main.h lex.h interpret.h heartbeat.h exec.h \
+    dumpstat.h comm.h closure.h call_out.h backend.h array.h actions.h \
+    efuns.h my-rusage.h my-alloca.h typedefs.h driver.h hash.h sent.h \
+    bytecode.h my-stdint.h pkg-tls.h port.h config.h hosts/unix.h \
+    hosts/be/be.h machine.h
 
 $(OBJ)/files.o : ../mudlib/sys/files.h xalloc.h svalue.h stdstrings.h \
     simulate.h mstrings.h mempools.h main.h lex.h interpret.h filestat.h \
@@ -608,8 +609,8 @@ $(OBJ)/pkg-pgsql.o : ../mudlib/sys/pgsql.h xalloc.h stdstrings.h simulate.h \
 
 $(OBJ)/pkg-tls.o : ../mudlib/sys/tls.h xalloc.h svalue.h object.h \
     mstrings.h main.h interpret.h comm.h array.h actions.h pkg-tls.h \
-    driver.h strfuns.h typedefs.h sent.h hash.h bytecode.h simulate.h \
-    port.h config.h hosts/unix.h hosts/be/be.h machine.h
+    machine.h driver.h strfuns.h typedefs.h sent.h hash.h bytecode.h \
+    simulate.h port.h config.h hosts/unix.h hosts/be/be.h
 
 $(OBJ)/port.o : hosts/crypt.c main.h backend.h my-rusage.h driver.h \
     machine.h typedefs.h port.h config.h hosts/unix.h hosts/be/be.h

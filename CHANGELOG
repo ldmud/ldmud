@@ -1,6 +1,16 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+23-Dec-2004 (Lars Duening)  (3.3.636)
+  - (lex, efuns.c) Another small correction to the number parsing in to_int():
+        negative numbers exceeding the limits are properly mapped to INT_MIN,
+        not -INT_MAX. Unfortunately too large negative numbers seen by
+        the LPC compiler are still mapped to -INT_MAX due to the lack
+        of proper overflow handling in the compiler; however, the compiler
+        now emits a warning on these occasions.
+  - (comm.c, pkg-tls.c) More TLS bugfixes by Fippo and Peng (Bug #0000138 and
+        #0000140).
+
 22-Dec-2004 (Lars Duening)  (3.3.635)
   - (pkg_tls, func_spec, configure) Incorporated the GNUTLS patches from Peng
        and Gawain: use the new gnutls parameter generation if available;

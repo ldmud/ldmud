@@ -2998,10 +2998,9 @@ get_message (char *buff)
             /* Special case for setting up a TLS connection: don't
              * attempt IO if the connection is still being set up.
              */
-            if (ip->tls_status == TLS_HANDSHAKING
-             && !tls_continue_handshake(ip)
-               )
+            if (ip->tls_status == TLS_HANDSHAKING)
             {
+                tls_continue_handshake(ip);
                 continue;
             }
 #endif
@@ -3339,14 +3338,13 @@ get_message (char *buff)
                                     , (size_t)(length - ip->chars_ready), ip, MY_FALSE);
 #else
 #ifdef USE_TLS
-                        if (ip->tls_status == TLS_INACTIVE)
+                        if (ip->tls_status != TLS_INACTIVE)
                             tls_write(ip, ip->text + ip->chars_ready
                                         , (size_t)(length - ip->chars_ready));
                         else
-#else
+#endif /* USE_TLS */
                           socket_write(ip->socket, ip->text + ip->chars_ready
                                       , (size_t)(length - ip->chars_ready));
-#endif /* USE_TLS */
 #endif
                         ip->chars_ready = length;
                     }

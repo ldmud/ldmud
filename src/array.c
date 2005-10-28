@@ -67,7 +67,6 @@
 #include "main.h"
 #include "mapping.h"
 #include "mempools.h"
-#include "mregex.h"
 #include "mstrings.h"
 #include "object.h"
 #include "stdstrings.h"

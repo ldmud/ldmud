@@ -1,6 +1,6 @@
 /*------------------------------------------------------------------
  * Regular Expression Wrapper and Cache
- * Written 1998, 2002 by Lars Duening.
+ * Written 1998, 2002, 2004 by Lars Duening.
  * Share and Enjoy!
  *------------------------------------------------------------------
  * This module serves as wrapper around optional alternative

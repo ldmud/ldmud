@@ -3661,7 +3661,7 @@ parse_numeric_escape (char * cp, unsigned char * p_char)
 
 /*-------------------------------------------------------------------------*/
 static INLINE char *
-parse_number (char * cp, unsigned long * p_num)
+parse_number (char * cp, unsigned long * p_num, Bool * p_overflow)
 
 /* Parse a positive integer number in one of the following formats:
  *   <decimal>
@@ -3673,7 +3673,8 @@ parse_number (char * cp, unsigned long * p_num)
  * with <cp> pointing to the first character.
  *
  * The parsed number is stored in *<p_num>, the function returns the pointer
- * to the first character after the number.
+ * to the first character after the number. If the parsed number exceeded
+ * the numerical limits, *<p_overflow> is set to TRUE, otherwise to FALSE.
  *
  * The function is also available to the other parts of the driver.
  */
@@ -3683,8 +3684,8 @@ parse_number (char * cp, unsigned long * p_num)
     unsigned long l;
     unsigned long base = 10;
     unsigned long max_shiftable = ULONG_MAX / base;
-    Bool overflow = MY_FALSE;
 
+    *p_overflow = MY_FALSE;
     c = *cp++;
 
     if ('0' == c)
@@ -3714,12 +3715,12 @@ parse_number (char * cp, unsigned long * p_num)
             --cp;
             while('0' == (c = *++cp) || '1' == c)
             {
-                overflow = overflow || (l > max_shiftable);
+                *p_overflow = *p_overflow || (l > max_shiftable);
                 l <<= 1;
                 l += c - '0';
             }
 
-            *p_num = overflow ? LONG_MAX : l;
+            *p_num = *p_overflow ? LONG_MAX : l;
             return cp;
           }
 
@@ -3752,13 +3753,13 @@ parse_number (char * cp, unsigned long * p_num)
         --cp;
         while(leXdigit(c = *++cp))
         {
-            overflow = overflow || (l > max_shiftable);
+            *p_overflow = *p_overflow || (l > max_shiftable);
             if (c > '9')
                 c = (char)((c & 0xf) + ( '9' + 1 - ('a' & 0xf) ));
             l <<= 4;
             l += c - '0';
         }
-        *p_num = overflow ? LONG_MAX : l;
+        *p_num = *p_overflow ? LONG_MAX : l;
         return cp;
     }
 
@@ -3768,18 +3769,18 @@ parse_number (char * cp, unsigned long * p_num)
     l = c - '0';
     while (lexdigit(c = *cp++) && c < (char)('0'+base))
     {
-        overflow = overflow || (l > max_shiftable);
+        *p_overflow = *p_overflow || (l > max_shiftable);
         l = l * base + (c - '0');
     }
 
-    *p_num = overflow ? LONG_MAX : l;
+    *p_num = *p_overflow ? LONG_MAX : l;
     return cp-1;
 
 } /* parse_number() */
 
 /*-------------------------------------------------------------------------*/
 char *
-lex_parse_number (char * cp, unsigned long * p_num)
+lex_parse_number (char * cp, unsigned long * p_num, Bool * p_overflow)
 
 /* Parse a positive integer number in one of the following formats:
  *   <decimal>
@@ -3791,7 +3792,8 @@ lex_parse_number (char * cp, unsigned long * p_num)
  * with <cp> pointing to the first character.
  *
  * The parsed number is stored in *<p_num>, the function returns the pointer
- * to the first character after the number.
+ * to the first character after the number. If the parsed number exceeded
+ * the numerical limits, *<p_overflow> is set to TRUE, otherwise to FALSE.
  *
  * If the string is not a number, p_num will be unchanged, and cp will
  * be returned.
@@ -3799,8 +3801,13 @@ lex_parse_number (char * cp, unsigned long * p_num)
 
 {
     char c = *cp;
+
+    *p_overflow = MY_FALSE;
+
     if (isdigit(c) || c == 'X' || c == 'x')
-        return parse_number(cp, p_num);
+    {
+        cp = parse_number(cp, p_num, p_overflow);
+    }
     return cp;
 } /* lex_parse_number() */
 
@@ -5494,6 +5501,7 @@ yylex1 (void)
         {
             char *numstart = yyp-1;
             unsigned long l;
+            Bool overflow;
 
             /* Scan ahead to see if this is a float number */
             while (lexdigit(c = *yyp++)) NOOP ;
@@ -5519,7 +5527,11 @@ yylex1 (void)
             }
 
             /* Nope, normal number */
-            yyp = parse_number(numstart, &l);
+            yyp = parse_number(numstart, &l, &overflow);
+            if (overflow)
+            {
+                yywarnf("Number exceeds numeric limits");
+            }
 
             outp = yyp;
             return number((long)l);

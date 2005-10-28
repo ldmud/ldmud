@@ -5014,6 +5014,7 @@ f_to_int (svalue_t *sp)
         char * end;
         char * cp = get_txt(sp->u.str);
         Bool hasMinus = MY_FALSE;
+        Bool overflow;
 
         /* Check if the number begins with a '-' or '+' */
         while (*cp && isspace(*cp)) cp++;
@@ -5023,12 +5024,19 @@ f_to_int (svalue_t *sp)
             cp++;
         }
 
-        end = lex_parse_number(cp, &num);
+        end = lex_parse_number(cp, &num, &overflow);
         if (end != cp)
         {
-            n = (p_int)num;
-            if (hasMinus)
-                n = -n;
+            if (overflow)
+            {
+                n = hasMinus ? PINT_MIN : PINT_MAX;
+            }
+            else
+            {
+                n = (p_int)num;
+                if (hasMinus)
+                    n = -n;
+            }
         }
         else
             n = 0;

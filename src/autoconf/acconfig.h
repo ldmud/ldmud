@@ -115,9 +115,6 @@
 /* Does the machine offer pthread_atfork()? */
 #undef HAS_PTHREAD_ATFORK
 
-/* Does the machine offer pcre library? (Not that we need it :-) */
-#undef HAS_PCRE
-
 /* define the host-specific include file */
 #undef HOST_INCLUDE
 

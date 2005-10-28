@@ -1,5 +1,5 @@
-#ifndef RXCACHE_H_
-#define RXCACHE_H_
+#ifndef MREGEX_H_
+#define MREGEX_H_
 
 #include "driver.h"
 
@@ -38,4 +38,4 @@ extern void clear_regexp_ref(regexp_t *);
 extern void count_regexp_ref(regexp_t *);
 #endif /* if GC_SUPPORT */
 
-#endif /* RXCACHE_H_ */
+#endif /* MREGEX_H_ */
