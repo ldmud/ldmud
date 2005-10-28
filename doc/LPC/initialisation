@@ -47,7 +47,7 @@ EXAMPLE
           int b;
           ----------
 
-        the compiler generates these __INIT() functions:
+        the compiler executes the equivalent of these __INIT() functions:
 
         #pragma share_variables:
 
@@ -55,8 +55,13 @@ EXAMPLE
             {
                 "a"::__INIT();
                 if (clonep(this_object()))
-                    return 1;
-                a = 4;
+                {
+                    a = (blueprint of this_object())->a;
+                }
+                else
+                {
+                    a = 4;
+                }
                 return 1;
             }
 
@@ -69,6 +74,11 @@ EXAMPLE
                 a = 4;
                 return 1;
             }
+
+
+        In either case the variable 'b' (in fact all variables) are
+        set to '0' as part of the loading/cloning process before the
+        driver performs the specific initialisation.
 
 WARNING
         Do not call __INIT() yourself, overload, or use it directly in

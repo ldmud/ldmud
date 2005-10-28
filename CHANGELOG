@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+17-Dec-2004 (Lars Duening)  (3.3.630)
+  - (xalloc) Added a new function prexalloc() to re-allocate permanent
+       memory.
+  - (pkg-tls.c) The allocator for the TLS package of course needs to
+       allocate permanent memory so that the GC won't deallocate
+       the library's memory (Bug #0000323).
+
 11-Dec-2004 (Lars Duening)  (3.3.629)
   - (gcollect.c) Closures found to be bound to destructed objects are
        replaced by 0s, not #'undef closures (Bug #0000322).

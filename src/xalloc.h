@@ -105,15 +105,17 @@ extern int stack_direction;
 
 #if defined(MALLOC_TRACE)
 
-#define xalloc(size)        xalloc_traced((size), __FILE__, __LINE__)
-#define pxalloc(size)       pxalloc_traced((size), __FILE__, __LINE__)
-#define rexalloc(old, size) rexalloc_traced((old), (size), __FILE__, __LINE__)
+#define xalloc(size)         xalloc_traced((size), __FILE__, __LINE__)
+#define pxalloc(size)        pxalloc_traced((size), __FILE__, __LINE__)
+#define rexalloc(old, size)  rexalloc_traced((old), (size), __FILE__, __LINE__)
+#define prexalloc(old, size) prexalloc_traced((old), (size), __FILE__, __LINE__)
 
 #else
 
-#define xalloc(size)        xalloc_traced(size)
-#define pxalloc(size)       pxalloc_traced(size)
-#define rexalloc(old, size) rexalloc_traced((old), (size))
+#define xalloc(size)         xalloc_traced(size)
+#define pxalloc(size)        pxalloc_traced(size)
+#define rexalloc(old, size)  rexalloc_traced((old), (size))
+#define prexalloc(old, size) prexalloc_traced((old), (size))
 
 #endif
 
@@ -126,6 +128,7 @@ extern POINTER xalloc_traced(size_t size MTRACE_DECL) MALLOC;
 extern void    xfree(POINTER);
 extern POINTER rexalloc_traced(POINTER, size_t MTRACE_DECL) MALLOC;
 extern POINTER pxalloc_traced(size_t MTRACE_DECL) MALLOC;
+extern POINTER prexalloc_traced(POINTER, size_t MTRACE_DECL) MALLOC;
 extern void    pfree(POINTER);
 extern void  * malloc_increment_size (void *vp, size_t size);
 

@@ -574,7 +574,7 @@ pxalloc_traced (size_t size MTRACE_DECL)
         mem_mark_permanent((word_t *)temp - XM_OVERHEAD);
     }
     return temp;
-} /* pxalloc() */
+} /* pxalloc_traced() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -590,6 +590,34 @@ pfree (POINTER p)
     }
     xfree(p);
 } /* pfree() */
+
+/*-------------------------------------------------------------------------*/
+POINTER
+prexalloc_traced (POINTER p, size_t size MTRACE_DECL)
+
+/* Reallocate block <p> to the new size of <size> and return the pointer.
+ * The memory is not subject to GC.
+#ifdef MALLOC_TRACE
+ * The trace arguments are admittedly unused in the function, but come
+ * in handy if the allocation code needs to be instrumented for debugging
+ * purposes.
+#endif
+ */
+
+{
+    POINTER temp;
+
+    if (p)
+    {
+        mem_mark_collectable((word_t *)p - XM_OVERHEAD);
+    }
+    temp = rexalloc_traced(p, size MTRACE_PASS);
+    if (temp)
+    {
+        mem_mark_permanent((word_t *)temp - XM_OVERHEAD);
+    }
+    return temp;
+} /* prexalloc_traced() */
 
 /*-------------------------------------------------------------------------*/
 void *

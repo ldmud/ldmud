@@ -190,11 +190,11 @@ static void *
 tls_xalloc (size_t size)
 
 /* Wrapper function so that (gnu)tls will use the driver's allocator.
- * The wrapper is required as 'xalloc' itself is a macro.
+ * The wrapper is required as 'pxalloc' itself is a macro.
  */
 
 {
-    return xalloc(size);
+    return pxalloc(size);
 } /* tls_xalloc() */
 
 /*-------------------------------------------------------------------------*/
@@ -202,11 +202,11 @@ static void *
 tls_rexalloc (void *old, size_t size)
 
 /* Wrapper function so that (gnu)tls will use the driver's allocator.
- * The wrapper is required as 'rexalloc' itself is a macro.
+ * The wrapper is required as 'prexalloc' itself is a macro.
  */
 
 {
-    return rexalloc(old, size);
+    return prexalloc(old, size);
 } /* tls_rexalloc() */
 
 /*-------------------------------------------------------------------------*/
@@ -214,12 +214,12 @@ static void
 tls_xfree (void *p)
 
 /* Wrapper function so that (gnu)tls will use the driver's allocator.
- * The wrapper is not exactly required for xfree(),  but it keeps things
+ * The wrapper is not exactly required for pfree(),  but it keeps things
  * consistent.
  */
 
 {
-    return xfree(p);
+    return pfree(p);
 } /* tls_xfree() */
 
 #endif /* SSL Package */ 
