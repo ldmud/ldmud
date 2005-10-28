@@ -1,8 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+04-Sep-2004 (Lars Duening)  (3.3.593)
+  - (comm.c, simulate.c) Added new input_to() flag 'INPUT_LOCAL' to switch
+      only the driver side input mode between LINE and CHAR (Bug #0000124).
+
 03-Sep-2004 (Lars Duening)  (3.3.592)
-  - (interpret.c, actions.c, simulate.c) Removed memory leaks (thanks, Gnomi!)
+  - (interpret.c, simulate.c) Removed memory leaks (thanks, Gnomi!)
       (Bug #0000120).
   - (sprintf.c) Too large fieldsizes or precisions are caught (Bug #0000119).
   - (closure,  object.c) Some operator closures were saved using the wrong

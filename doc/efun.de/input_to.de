@@ -65,6 +65,12 @@ BESCHREIBUNG
             verwendet. Wenn dieses Argument nicht angegeben (und damit kein
             Propmt definiert) ist, wird kein Prompt ausgegeben.
 
+        INPUT_NO_TELNET (8):
+            Modifiziert das INPUT_CHARMODE Argument: der Driver aendert
+            seine Behandlung von eingehenden Daten entsprechend dem _CHARMODE
+            Argument, sendet aber keine Telnetkommandos zur Anpassung
+            des Verhaltens des Clientprogrammes.
+
         INPUT_IGNORE_BANG (128):
             Eingaben, die mit ! beginnen, werden NICHT als Kommandi geparset,
             sondern auch als Argument an die Funkion <fun> uebergeben. Die
@@ -104,6 +110,7 @@ AENDERUNGEN
         Seit LDMud 3.2.8 kann <fun> in Form einer Closure angegeben werden.
         LDMud 3.2.9 fuehrte das Flag INPUT_PROMPT samt zugehoerigem Argument
             ein.
+        LDMud 3.2.11/3.3.593 fuehrte das INPUT_NO_TELNET Flag ein.
 
 BUGS
         Im Zeichenmodus sollten Zeilenumbrueche eigentlich als "\n" zurueck

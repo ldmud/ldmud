@@ -3430,6 +3430,7 @@ get_message (char *buff)
 #endif /* SIMULATE_CHARMODE */
 
                 DTN(("--- return with line command ---\n"));
+                DTN(("--- '%s'\n", buff));
                 return MY_TRUE;
             } /* if (have a command) */
 
@@ -3980,11 +3981,13 @@ new_player ( object_t *ob, SOCKET_T new_socket
 
 /*-------------------------------------------------------------------------*/
 void
-set_noecho (interactive_t *ip, char noecho)
+set_noecho (interactive_t *ip, char noecho, Bool local_change)
 
 /* Change the input mode <i>->noecho to the given <noecho>, performing all
  * necessary telnet negotiations. If the driverhook H_NOECHO is set,
  * the hook function is expected to do all the negotiations.
+ * If <local_change> is TRUE, the driver will not send out any telnet
+ * commands for CHARMODE/LINEMODE changes.
  */
 
 {
@@ -4001,8 +4004,8 @@ set_noecho (interactive_t *ip, char noecho)
 
     confirm = (char)(
       noecho | CHARMODE_REQ_TO_CHARMODE(noecho & (NOECHO_REQ|CHARMODE_REQ)));
-    DTN(("set_noecho(%02x) old %02x %s\n"
-       , noecho, old, decode_noecho(old)));
+    DTN(("set_noecho(%02x%s) old %02x %s\n"
+       , noecho, local_change ? " local" : "", old, decode_noecho(old)));
     DTN(("  -> confirm: %02x %s\n"
        , confirm, decode_noecho(confirm)));
     DTN(("           -> %02x %s\n"
@@ -4026,6 +4029,7 @@ set_noecho (interactive_t *ip, char noecho)
                 DTN(("set_noecho():   calling H_NOECHO\n"));
                 push_number(inter_sp, noecho);
                 push_ref_valid_object(inter_sp, ob, "set_no_echo");
+                push_number(inter_sp,  local_change ? 1 : 0);
                 if (driver_hook[H_NOECHO].type == T_STRING)
                     secure_apply(driver_hook[H_NOECHO].u.str, ob, 2);
                 else 
@@ -4108,7 +4112,7 @@ set_noecho (interactive_t *ip, char noecho)
                     if(~confirm & old & CHARMODE_MASK)
                     {
                         DTN(("set_noecho():   turn off charmode\n"));
-                        if (old & CHARMODE)
+                        if ((old & CHARMODE) && !local_change)
                         {
                             DTN(("set_noecho():     DONT TELOPT_SGA\n"));
                             send_dont(TELOPT_SGA);
@@ -4126,13 +4130,22 @@ set_noecho (interactive_t *ip, char noecho)
                 else if (confirm & ~old & CHARMODE_MASK)
                 {
                     DTN(("set_noecho():   turn on charmode\n"));
-                    DTN(("set_noecho():     DO+WILL TELOPT_SGA\n"));
-                    send_do(TELOPT_SGA);
-                    /* some telnet implementations (Windows' telnet is one) mix
-                     * up DO and WILL SGA, thus we send WILL SGA as well.
-                     */
-                    send_will(TELOPT_SGA);
-                    ip->supress_go_ahead = MY_TRUE;
+                    if (!local_change)
+                    {
+                        DTN(("set_noecho():     DO+WILL TELOPT_SGA\n"));
+                        send_do(TELOPT_SGA);
+                        /* some telnet implementations (Windows' telnet is one) mix
+                         * up DO and WILL SGA, thus we send WILL SGA as well.
+                         */
+                        send_will(TELOPT_SGA);
+                        ip->supress_go_ahead = MY_TRUE;
+                    }
+                    else
+                        /* Since there won't be any telnet negotiation
+                         * we can assume that CHARMODE is acknowledged.
+                         */
+                        ip->noecho |= NOECHO_ACKSHIFT(CHARMODE);
+
                 }
                 else /* No change in CHARMODE mode */ if (confirm & CHARMODE)
                 {
@@ -4258,7 +4271,8 @@ call_function_interactive (interactive_t *i, char *str)
     if (!ob)
     {
         /* Sorry, the object has selfdestructed ! */
-        set_noecho(i, it->next ? it->next->noecho : 0);
+        set_noecho(i, it->next ? it->next->noecho : 0
+                    , it->next ? it->next->local : MY_FALSE);
         i->input_to = it->next;
         free_input_to(it);
         return MY_FALSE;
@@ -4267,7 +4281,8 @@ call_function_interactive (interactive_t *i, char *str)
     if (O_PROG_SWAPPED(ob)
      && load_ob_from_swap(ob) < 0)
     {
-        set_noecho(i, it->next ? it->next->noecho : 0);
+        set_noecho(i, it->next ? it->next->noecho : 0
+                    , it->next ? it->next->local : MY_FALSE);
         i->input_to = it->next;
         free_input_to(it);
         error("Out of memory: unswap object '%s'.\n", get_txt(ob->name));
@@ -4323,7 +4338,8 @@ call_function_interactive (interactive_t *i, char *str)
 
     if (i->noecho & NOECHO_STALE)
     {
-        set_noecho(i, i->input_to ? i->input_to->noecho : 0);
+        set_noecho(i, i->input_to ? i->input_to->noecho : 0
+                    , i->input_to ? i->input_to->local : MY_FALSE);
     }
 
     /* Done */
@@ -4332,10 +4348,12 @@ call_function_interactive (interactive_t *i, char *str)
 
 /*-------------------------------------------------------------------------*/
 static Bool
-set_call (object_t *ob, input_to_t *it, char noecho)
+set_call (object_t *ob, input_to_t *it, char noecho, Bool local_change)
 
 /* Set a a new input_to <it> with the flags <noecho> (mainly really NOECHO,
  * but also IGNORE_BANG or not) to the interactive object <ob>.
+ * If <local_change> is TRUE, the driver will not send out any telnet
+ * commands for CHARMODE/LINEMODE changes.
  * Return TRUE on success.
  *
  * Called for efun input_to().
@@ -4353,12 +4371,13 @@ set_call (object_t *ob, input_to_t *it, char noecho)
     }
 
     it->noecho = noecho;
+    it->local = local_change;
     it->next = ip->input_to;
     ip->input_to = it;
     ip->set_input_to = MY_TRUE;
 
     if (noecho || ip->noecho)
-        set_noecho(ip, noecho);
+        set_noecho(ip, noecho, local_change);
     return MY_TRUE;
 } /* set_call() */
 
@@ -6389,7 +6408,9 @@ remove_stale_player_data (void)
 
                 if (prev == NULL)
                 {
-                    set_noecho(all_players[i], it->next ? it->next->noecho : 0);
+                    set_noecho(all_players[i]
+                              , it->next ? it->next->noecho : 0
+                              , it->next ? it->next->local : MY_FALSE);
                     all_players[i]->input_to = it->next;
                 }
                 else
@@ -7485,7 +7506,9 @@ v_input_to (svalue_t *sp, int num_arg)
                      );
             }
 
-            if (!(iflags & INPUT_CHARMODE) != !(ip->noecho & CHARMODE_MASK))
+            if (!(iflags & INPUT_CHARMODE) != !(ip->noecho & CHARMODE_MASK)
+             && (iflags & INPUT_NO_TELNET) == 0
+               )
             {
                 warnf("input_to(): Change in CHARMODE mode requested for object '%s' "
                       "with telnet disabled.\n"
@@ -7496,9 +7519,9 @@ v_input_to (svalue_t *sp, int num_arg)
     }
 
     /* Setup the flags required for 'noecho' */
-    flags =   ((iflags & INPUT_NOECHO)      ? NOECHO_REQ   : 0)
-            | ((iflags & INPUT_CHARMODE)    ? CHARMODE_REQ : 0)
-            | ((iflags & INPUT_IGNORE_BANG) ? IGNORE_BANG  : 0)
+    flags =   ((iflags & INPUT_NOECHO)         ? NOECHO_REQ   : 0)
+            | ((iflags & INPUT_CHARMODE)       ? CHARMODE_REQ : 0)
+            | ((iflags & INPUT_IGNORE_BANG)    ? IGNORE_BANG  : 0)
           ;
 
     /* Allocate and setup the input_to structure */
@@ -7563,7 +7586,9 @@ v_input_to (svalue_t *sp, int num_arg)
     if (!(flags & IGNORE_BANG)
      || privilege_violation4(STR_INPUT_TO, command_giver, 0, flags, sp))
     {
-        if (set_call(command_giver, it, (char)flags))
+        if (set_call( command_giver, it, (char)flags
+                    , (iflags & INPUT_NO_TELNET) != 0)
+           )
         {
             put_number(arg, 1);
             return arg;
@@ -7906,7 +7931,9 @@ v_remove_input_to (svalue_t *sp, int num_arg)
 
     if (rc)
     {
-        set_noecho(ip, ip->input_to ? ip->input_to->noecho : ip->noecho);
+        set_noecho(ip, ip->input_to ? ip->input_to->noecho : ip->noecho
+                     , ip->input_to ? ip->input_to->local : MY_FALSE
+                  );
     }
 
     /* Return the result */

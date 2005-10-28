@@ -66,6 +66,11 @@ DESCRIPTION
               prompt for the input. If this flag is not given, and thus
               no prompt specified, nothing will be printed.
 
+          INPUT_NO_TELNET (8):
+              Modifies the INPUT_CHARMODE flag: the driver will switch
+              it's internal handling of incoming data, but not send out
+              any telnet commands to switch the client's behaviour.
+
           INPUT_IGNORE_BANG  (128):
               Input lines starting with '!' (or whatever the input
               escape character was configured to be) will _not_ be parsed as
@@ -107,6 +112,7 @@ HISTORY
         was implemented in LDMud 3.2.8.
         Since LDMud 3.2.8 the function can be given as a closure.
         LDMud 3.2.9/3.3.125 introduced the INPUT_PROMPT flag and argument.
+        LDMud 3.2.11/3.3.593 added the INPUT_NO_TELNET flag.
         LDMud 3.3 changed the handling of newline sequences in charmode
           to verbatim passing. Earlier drivers passed an empty string
           instead.
