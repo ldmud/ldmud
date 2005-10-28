@@ -6591,6 +6591,7 @@ new_name:
            && (actual_type.typeflags & PRIMARY_TYPE_MASK) == TYPE_FLOAT
              )
           {
+              PREPARE_INSERT(5)
               int i = verify_declared($2); /* Is the var declared? */
 
               /* Prepare the init code */
@@ -6610,8 +6611,6 @@ new_name:
                   ins_f_code(F_CONST1);
                   ins_f_code(F_RETURN);
               }
-
-              PREPARE_INSERT(5)
 
               add_f_code(F_FCONST0);
 
