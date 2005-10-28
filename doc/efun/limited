@@ -17,17 +17,18 @@ DESCRIPTION
         the efun is used without any limit specification, all limits are
         supposed to be 'unlimited'.
 
-        The limit settings recognize two special values:
+        The limit settings recognize three special values:
             LIMIT_UNLIMITED: the limit is deactivated
             LIMIT_KEEP:      the former setting is kept
             LIMIT_DEFAULT:   the 'global' default setting is used.
 
-        The efun causes a privilege violation ("limited", current_object,
-        closure).
+        For LIMIT_COST, the special values have these meaning:
+            LIMIT_UNLIMITED: at maximum 1 tick is accounted
+            LIMIT_KEEP:      LIMIT_COST is set to 0
+            LIMIT_DEFAULT:   LIMIT_COST is set to -100
 
-        A special case is the relaxation of the eval_cost limit: in such
-        a case the closure costs only 10 ticks regardless of how many
-        ticks it actually needed.
+        The efun causes a privilege violation ("limited", current_object,
+        fun, limits-array).
 
 EXAMPLES
         limited(#'function)
@@ -43,6 +44,7 @@ EXAMPLES
 
 HISTORY
         Introduced in LDMud 3.2.7.
+        LDMud 3.3.563 introduced LIMIT_COST.
 
 SEE ALSO
         query_limits(E), set_limits(E)

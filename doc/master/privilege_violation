@@ -27,7 +27,8 @@ DESCRIPTION
                           commandgiver <arg>, using <arg2> as value
                           for the flags. This is used for flag values
                           including the 'no bang' option.
-        limited:          Execute <arg> with reduced/changed limits.
+        limited:          Execute <arg> with reduced/changed limits
+                          <arg2> (as return by query_limits()).
         net_connect       Attempt to open a connection to host <arg>,
                           port <arg2>.
         nomask simul_efun Attempt to get an efun <arg> via efun:: when
@@ -42,7 +43,7 @@ DESCRIPTION
         set_extra_wizinfo_size Set the size of the additional user
                           info in the wiz-list to <arg>.
         set_driver_hook   Set hook <arg> to <arg2>.
-        set_limits        Set limits to <arg>.
+        set_limits        Set limits to <arg> (as returned by query_limits()).
         set_max_commands  Set the max. number of commands interactive
                           object <arg> can issue per second to <arg2>.
         set_this_object   Set this_object() to <arg>.
@@ -74,7 +75,9 @@ DESCRIPTION
 
 HISTORY
         LDMud 3.2.10 added the "enable_telnet", "net_connect",
-        "set_max_commands" and "variable_list" violations.
+           "set_max_commands" and "variable_list" violations.
+        LDMud 3.3.563 added the passing of the limits to the "limited"
+           and "set_limits".
 
 
 SEE ALSO

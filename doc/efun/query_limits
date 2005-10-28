@@ -17,8 +17,21 @@ DESCRIPTION
           int[LIMIT_FILE]:    the max number of bytes handled with
                                 one read_file()/write_file() call.
           int[LIMIT_CALLOUTS]: the number of callouts at one time.
+          int[LIMIT_COST]:    how to account the current cost.
 
-        A limit of '0' aka LIMIT_UNLIMITED means 'no limit'.
+        For all limits except LIMIT_COST a limit of '0' aka LIMIT_UNLIMITED
+        means 'no limit'.
+
+        The value for LIMIT_COST has these meanings:
+          
+          value > 0: the execution will cost minimum(<value>, actual cost) .
+
+          value = 0: if the current LIMIT_EVAL is larger than the calling
+                     LIMIT_EVAL, the evaluation will cost only 10; otherwise
+                     the full cost will be accounted.
+
+          value < 0: (-value)% of the current evaluation cost will be
+                     accounted; -100 obviously means 'full cost'.
 
 EXAMPLES
         query_limits()
@@ -30,6 +43,7 @@ EXAMPLES
 HISTORY
         Introduced in LDMud 3.2.7.
         LIMIT_CALLOUTS introduced in LDMud 3.2.9.
+        LIMIT_COST introduced in LDMud 3.3.563.
 
 SEE ALSO
         limited(E), set_limits(E)

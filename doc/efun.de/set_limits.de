@@ -17,8 +17,13 @@ BESCHREIBUNG
             LIMIT_UNLIMITED:    das Limit wird deaktiviert
             LIMIT_KEEP:         die letzte Einstellung wird beibehalten
 
+        Fuer LIMIT_COST, die Spezialwerte haben diese Bedeutung:
+            LIMIT_UNLIMITED: die Ausfuehrung kosten lediglich einen Tick
+            LIMIT_KEEP:      LIMIT_COST wird auf 0 gesetzt
+            LIMIT_DEFAULT:   LIMIT_COST wird auf -100 gesetzt
+
         Die Efun verursacht eine Schutzverletzung ("set_limits",
-        current_object, first).
+        current_object, limits-array).
 
 BEISPIELE
         set_limits( ({ 200000 }) );
@@ -34,6 +39,7 @@ BEISPIELE
 
 AENDERUNGEN
         Eingefuehrt in LDMud 3.2.7.
+        LDMud 3.3.563 fuehrte LIMIT_COST ein.
 
 SIEHE AUCH
         limited(E), query_limits(E)

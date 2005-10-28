@@ -11,13 +11,19 @@ DESCRIPTION
 
         The arguments can be given in two ways: as an array (like the one
         returned from query_limits(), or as a list of tagged values.
-        The limit settings recognize two special values:
+        The limit settings recognize three special values:
 
             LIMIT_UNLIMITED: the limit is deactivated
             LIMIT_KEEP:      the former setting is kept
+            LIMIT_DEFAULT:   the 'global' default setting is used.
+
+        For LIMIT_COST, the special values have these meaning:
+            LIMIT_UNLIMITED: at maximum 1 tick is accounted
+            LIMIT_KEEP:      LIMIT_COST is set to 0
+            LIMIT_DEFAULT:   LIMIT_COST is set to -100
 
         The efun causes a privilege violation ("set_limits", current_object,
-        first
+        limits-array).
 
 EXAMPLES
         set_limits( ({ 200000 }) )
@@ -32,6 +38,7 @@ EXAMPLES
 
 HISTORY
         Introduced in LDMud 3.2.7.
+        LDMud 3.3.563 introduced LIMIT_COST.
 
 SEE ALSO
         limited(E), query_limits(E)

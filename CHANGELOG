@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+31-May-2004 (Lars Duening)  (3.3.563)
+  - (smalloc.c) When using PThreads, don't request memory via sbrk() - on
+       Linux systems this leads to corrupted memory.
+  - (simulate) Added a new runtime limit LIMIT_COST (f-010320).
+  - (interpret, simulate) For limited() and set_limits() the limit
+       values are passed to the privilege_violation call (f-020131-0).
+
 28-May-2004 (Lars Duening)  (3.3.562)
   - (interpret.c, port.h, util/indent/indent_globs.h) Adapted for gcc 3.4.0
       (thanks, Ralph!).

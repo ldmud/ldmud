@@ -6128,15 +6128,47 @@ test_efun_args (int instr, int args, svalue_t *argp)
 /*=========================================================================*/
 /*-------------------------------------------------------------------------*/
 Bool
-privilege_violation (string_t *what, svalue_t *where, svalue_t *sp)
+privilege_violation (string_t *what, svalue_t *arg, svalue_t *sp)
 
 /* Call the mudlib to check for a privilege violation:
  *
- *   master->privilege_violation(what, current_object, where)
+ *   master->privilege_violation(what, current_object, arg)
  *
  * where <what> describes the type of the violation (uncounted string ref),
  * and <where> is the data used in the violation.
  * <sp> is the current stack setting.
+ *
+ * If the apply returns a positive number, the privilege is granted and
+ * the function returns TRUE.
+ * If the apply returns 0, the privilege is gently denied and the function
+ * returns FALSE.
+ * If the apply returns something else, or if the lfun doesn't exist,
+ * an error is raised.
+ *
+ * If the current_object is the master or simul_efun object, this function
+ * immediately returns TRUE.
+ *
+ * <inter_sp> is updated to <sp>, <inter_pc> is assumed to be correct.
+ */
+
+{
+    return privilege_violation2(what, arg, NULL, sp);
+} /* privilege_violation() */
+
+/*-------------------------------------------------------------------------*/
+Bool
+privilege_violation2 ( string_t *what, svalue_t *arg, svalue_t *arg2
+                     , svalue_t *sp)
+
+/* Call the mudlib to check for a privilege violation:
+ *
+ *   master->privilege_violation(what, current_object, arg, arg2)
+ *
+ * where <what> describes the type of the violation (uncounted string ref),
+ * and <arg>, <arg2> is the data used in the violation.
+ * <sp> is the current stack setting.
+ *
+ * <arg2> may be NULL and is then ignored.
  *
  * If the apply returns a positive number, the privilege is granted and
  * the function returns TRUE.
@@ -6162,21 +6194,28 @@ privilege_violation (string_t *what, svalue_t *where, svalue_t *sp)
     push_ref_string(sp, what);
     push_ref_valid_object(sp, current_object, "privilege violation");
     sp++;
-    assign_svalue_no_free(sp, where);
+    assign_svalue_no_free(sp, arg);
+    if (arg2 != NULL)
+    {
+        sp++;
+        assign_svalue_no_free(sp, arg2);
+    }
     inter_sp = sp;
-    svp = apply_master(STR_PRIVILEGE, 3);
+    svp = apply_master(STR_PRIVILEGE, 4);
 
     /* Is there a lfun to call? */
     if (!svp || svp->type != T_NUMBER || svp->u.number < 0)
     {
         inter_sp = sp-3;
+        if (arg2 != NULL)
+            inter_sp--;
         error("privilege violation: %s\n", get_txt(what));
         /* TODO: Print full args and types */
     }
 
     /* Return the result */
     return svp->u.number > 0;
-} /* privilege_violation() */
+} /* privilege_violation2() */
 
 /*-------------------------------------------------------------------------*/
 Bool

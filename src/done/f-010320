@@ -2,7 +2,7 @@ Short: limited() vs resetting of runtime costs
 Date: Thu, 01 Mar 2001 07:46:14 -0700
 From: Lars Duening <lars@bearnip.com>
 Type: Feature
-State: New
+State: Done - implemented in 3.3.563
 
 At the moment, if limited() is used to (un)limit the runtime costs of the 
 executed closure, it does one of two things:

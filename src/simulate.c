@@ -91,6 +91,7 @@ struct limits_context_s
     int32  max_byte;     /* max byte xfer */
     int32  max_file;     /* max file xfer */
     int32  max_callouts; /* max callouts */
+    int32  use_cost;     /* the desired cost of the evaluation */
     int32  eval_cost;    /* the then-current eval costs used */
 };
 
@@ -284,6 +285,14 @@ int32 max_eval_cost = MAX_COST;
    * CLEAR_EVAL_COST uses this value to re-initialize (assigned_)eval_cost.
    */
 
+int32 use_eval_cost = DEF_USE_EVAL_COST;
+  /* How to account for the cost of the current evaluation.
+   * > 0: the cost to use regardless of actual cost.
+   * == 0: use the actual cost if the max_eval limit was less than the
+   *       default; use 10 ticks if it was more.
+   * < 0: use -val% of the actual cost
+   */
+
 int32 def_byte_xfer = MAX_BYTE_TRANSFER;
 int32 max_byte_xfer = MAX_BYTE_TRANSFER;
   /* Maximum number of bytes to read/write in one read/write_bytes() call.
@@ -462,6 +471,7 @@ save_limits_context (struct limits_context_s * context)
     context->eval_cost = eval_cost;
     context->max_byte = max_byte_xfer;
     context->max_file = max_file_xfer;
+    context->use_cost = use_eval_cost;
 } /* save_limits_context() */
 
 /*-------------------------------------------------------------------------*/
@@ -479,9 +489,30 @@ restore_limits_context (struct limits_context_s * context)
 
 {
     assign_eval_cost();
-    if (!max_eval_cost || max_eval_cost > context->max_eval)
+    if (use_eval_cost == 0)
     {
-        assigned_eval_cost = eval_cost = context->eval_cost+10;
+        if (!max_eval_cost || max_eval_cost > context->max_eval)
+        {
+            assigned_eval_cost = eval_cost = context->eval_cost+10;
+        }
+    }
+    else if (use_eval_cost > 0)
+    {
+        int32 elapsed_cost = eval_cost - context->eval_cost; 
+
+        if (elapsed_cost > use_eval_cost)
+            assigned_eval_cost = eval_cost = use_eval_cost;
+        assigned_eval_cost = eval_cost;
+    }
+    else /* (use_eval_cost < 0) */
+    {
+        int32 elapsed_cost = eval_cost - context->eval_cost; 
+        int32 whole_fact = (-use_eval_cost) / 100;
+        int32 fract_fact = (-use_eval_cost) % 100;
+        eval_cost =   context->eval_cost
+                    + elapsed_cost * whole_fact 
+                    + elapsed_cost * fract_fact / 100;
+        assigned_eval_cost = eval_cost;
     }
     max_array_size = context->max_array;
     max_mapping_size = context->max_mapping;
@@ -489,6 +520,7 @@ restore_limits_context (struct limits_context_s * context)
     max_eval_cost = context->max_eval;
     max_byte_xfer = context->max_byte;
     max_file_xfer = context->max_file;
+    use_eval_cost = context->use_cost;
 } /* restore_limits_context() */
 
 /*-------------------------------------------------------------------------*/
@@ -4714,6 +4746,77 @@ f_write (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 static void
+set_single_limit ( struct limits_context_s * result
+                 , int  limit
+                 , svalue_t *svp
+                 )
+
+/* Set the limit #<limit> in *<result> to the value in <svp>.
+ *
+ * If the function encounters illegal limit tags or values, it throws
+ * an error.
+ */
+
+{
+    static char * limitnames[] = { "LIMIT_EVAL", "LIMIT_ARRAY", "LIMIT_MAPPING"
+                                 , "LIMIT_BYTE", "LIMIT_FILE", "LIMIT_COST" };
+
+    p_int val;
+
+    if (svp->type != T_NUMBER)
+        error("Illegal %s value: got a %s, expected a number\n"
+             , limitnames[limit], typename(svp[limit].type));
+
+    val = svp->u.number;
+
+    if (limit == LIMIT_COST)
+    {
+        if (val == LIMIT_DEFAULT)
+            result->use_cost = DEF_USE_EVAL_COST;
+        else if (val != LIMIT_KEEP)
+            result->use_cost = val;
+    }
+    else
+    {
+        if (val >= 0)
+        {
+            switch(limit)
+            {
+            case LIMIT_EVAL:     result->max_eval = val;    break;
+            case LIMIT_ARRAY:    result->max_array = val;   break;
+            case LIMIT_MAPPING:  result->max_mapping = val; break;
+            case LIMIT_BYTE:     result->max_byte = val;    break;
+            case LIMIT_FILE:     result->max_file = val;    break;
+            case LIMIT_CALLOUTS: result->max_callouts = val; break;
+            default: error("Unimplemented limit #%d\n", limit);
+            }
+        }
+        else if (val == LIMIT_DEFAULT)
+        {
+            switch(limit)
+            {
+            case LIMIT_EVAL:     result->max_eval = def_eval_cost;
+                                 break;
+            case LIMIT_ARRAY:    result->max_array = def_array_size;
+                                 break;
+            case LIMIT_MAPPING:  result->max_mapping = def_mapping_size;
+                                 break;
+            case LIMIT_BYTE:     result->max_byte = def_byte_xfer;
+                                 break;
+            case LIMIT_FILE:     result->max_file = def_file_xfer;
+                                 break;
+            case LIMIT_CALLOUTS: result->max_callouts = def_callouts;
+                                 break;
+            default: error("Unimplemented limit #%d\n", limit);
+            }
+        }
+        else if (val != LIMIT_KEEP)
+            error("Illegal %s value: %ld\n", limitnames[limit], val);
+    }
+} /* set_single_limit() */
+
+/*-------------------------------------------------------------------------*/
+static void
 extract_limits ( struct limits_context_s * result
                , svalue_t *svp
                , int  num
@@ -4730,9 +4833,6 @@ extract_limits ( struct limits_context_s * result
  */
 
 {
-    char * limitnames[] = { "LIMIT_EVAL", "LIMIT_ARRAY", "LIMIT_MAPPING"
-                          , "LIMIT_BYTE", "LIMIT_FILE" };
-
     /* Set the defaults (unchanged) limits */
     result->max_eval = max_eval_cost;
     result->max_array = max_array_size;
@@ -4740,53 +4840,15 @@ extract_limits ( struct limits_context_s * result
     result->max_callouts = max_callouts;
     result->max_byte = max_byte_xfer;
     result->max_file = max_file_xfer;
+    result->use_cost = 0;
 
     if (!tagged)
     {
-        p_int val;
         int limit;
 
         for (limit = 0; limit < LIMIT_MAX && limit < num; limit++)
         {
-
-            if (svp[limit].type != T_NUMBER)
-                error("Illegal %s value: got a %s, expected a number\n"
-                     , limitnames[limit], typename(svp[limit].type));
-            val = svp[limit].u.number;
-            if (val >= 0)
-            {
-                switch(limit)
-                {
-                case LIMIT_EVAL:     result->max_eval = val;    break;
-                case LIMIT_ARRAY:    result->max_array = val;   break;
-                case LIMIT_MAPPING:  result->max_mapping = val; break;
-                case LIMIT_BYTE:     result->max_byte = val;    break;
-                case LIMIT_FILE:     result->max_file = val;    break;
-                case LIMIT_CALLOUTS: result->max_callouts = val; break;
-                default: error("Unimplemented limit #%d\n", limit);
-                }
-            }
-            else if (val == LIMIT_DEFAULT)
-            {
-                switch(limit)
-                {
-                case LIMIT_EVAL:     result->max_eval = def_eval_cost;
-                                     break;
-                case LIMIT_ARRAY:    result->max_array = def_array_size;
-                                     break;
-                case LIMIT_MAPPING:  result->max_mapping = def_mapping_size;
-                                     break;
-                case LIMIT_BYTE:     result->max_byte = def_byte_xfer;
-                                     break;
-                case LIMIT_FILE:     result->max_file = def_file_xfer;
-                                     break;
-                case LIMIT_CALLOUTS: result->max_callouts = def_callouts;
-                                     break;
-                default: error("Unimplemented limit #%d\n", limit);
-                }
-            }
-            else if (val != LIMIT_KEEP)
-                error("Illegal %s value: %ld\n", limitnames[limit], val);
+            set_single_limit(result, limit, svp+limit);
         }
     }
     else
@@ -4795,7 +4857,6 @@ extract_limits ( struct limits_context_s * result
 
         for (i = 0; i < num - 1; i += 2)
         {
-            p_int val;
             int limit;
 
             if (svp[i].type != T_NUMBER)
@@ -4805,47 +4866,36 @@ extract_limits ( struct limits_context_s * result
             if (limit < 0 || limit >= LIMIT_MAX)
                 error("Illegal limit tag: %ld\n", (long)limit);
 
-            if (svp[i+1].type != T_NUMBER)
-                error("Illegal %s value: got a %s, expected a number\n"
-                     , limitnames[limit], typename(svp[i+1].type));
-            val = svp[i+1].u.number;
-            if (val >= 0)
-            {
-                switch(limit)
-                {
-                case LIMIT_EVAL:     result->max_eval = val;    break;
-                case LIMIT_ARRAY:    result->max_array = val;   break;
-                case LIMIT_MAPPING:  result->max_mapping = val; break;
-                case LIMIT_BYTE:     result->max_byte = val;    break;
-                case LIMIT_FILE:     result->max_file = val;    break;
-                case LIMIT_CALLOUTS: result->max_callouts = val;    break;
-                default: error("Unimplemented limit #%d\n", limit);
-                }
-            }
-            else if (val == LIMIT_DEFAULT)
-            {
-                switch(limit)
-                {
-                case LIMIT_EVAL:     result->max_eval = def_eval_cost;
-                                     break;
-                case LIMIT_ARRAY:    result->max_array = def_array_size;
-                                     break;
-                case LIMIT_MAPPING:  result->max_mapping = def_mapping_size;
-                                     break;
-                case LIMIT_BYTE:     result->max_byte = def_byte_xfer;
-                                     break;
-                case LIMIT_FILE:     result->max_file = def_file_xfer;
-                                     break;
-                case LIMIT_CALLOUTS: result->max_callouts = def_callouts;
-                                     break;
-                default: error("Unimplemented limit #%d\n", limit);
-                }
-            }
-            else if (val != LIMIT_KEEP)
-                error("Illegal %s value: %ld\n", limitnames[limit], val);
+            set_single_limit(result, limit, svp+i+1);
         }
     }
 } /* extract_limits() */
+
+/*-------------------------------------------------------------------------*/
+static vector_t *
+create_limits_array (struct limits_context_s * rtlimits)
+
+/* Create an array with the values from <rtlimits> and return it.
+ * Return NULL if out of memory.
+ */
+
+{
+    vector_t *vec;
+
+    vec = allocate_uninit_array(LIMIT_MAX);
+    if (vec)
+    {
+        put_number(vec->item+LIMIT_EVAL,     rtlimits->max_eval);
+        put_number(vec->item+LIMIT_ARRAY,    rtlimits->max_array);
+        put_number(vec->item+LIMIT_MAPPING,  rtlimits->max_mapping);
+        put_number(vec->item+LIMIT_BYTE,     rtlimits->max_byte);
+        put_number(vec->item+LIMIT_FILE,     rtlimits->max_file);
+        put_number(vec->item+LIMIT_CALLOUTS, rtlimits->max_callouts);
+        put_number(vec->item+LIMIT_COST,     rtlimits->use_cost);
+    }
+
+    return vec;
+} /* create_limits_array() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -4866,7 +4916,7 @@ v_limited (svalue_t * sp, int num_arg)
  * If the efun is used without any limit specification, all limits
  * are supposed to be 'unlimited'.
  *
- * The limit settings recognize two special values:
+ * The limit settings recognize three special values:
  *     LIMIT_UNLIMITED: the limit is deactivated
  *     LIMIT_KEEP:      the former setting is kept
  *     LIMIT_DEFAULT:   the 'global' default setting is used.
@@ -4876,6 +4926,7 @@ v_limited (svalue_t * sp, int num_arg)
 
 {
     svalue_t *argp;
+    vector_t *vec;
     struct limits_context_s limits;
     int cl_args;
 
@@ -4894,6 +4945,7 @@ v_limited (svalue_t * sp, int num_arg)
         limits.max_callouts = 0;
         limits.max_byte = 0;
         limits.max_file = 0;
+        limits.use_cost = 1; /* smallest we can do */
     }
     else if (argp[1].type == T_POINTER)
     {
@@ -4914,9 +4966,30 @@ v_limited (svalue_t * sp, int num_arg)
         return sp;
     }
 
+    /* On the stack, create an array with the parsed limits to pass
+     * to privilege violation.
+     */
+    if (num_arg > 1)
+        sp = pop_n_elems(num_arg-1, sp); /* sp == argp+1 now */
+
+    assign_svalue_no_free(++sp, argp);
+
+    vec = create_limits_array(&limits);
+    if (!vec)
+    {
+        inter_sp = sp;
+        error("(set_limits) Out of memory: array[%d] for call.\n"
+             , LIMIT_MAX);
+        /* NOTREACHED */
+        return sp;
+    }
+    push_array(sp, vec);
+
+    num_arg = 3;
+
     /* If this object is destructed, no extern calls may be done */
     if (current_object->flags & O_DESTRUCTED
-     || !privilege_violation(STR_LIMITED, argp, sp)
+     || !privilege_violation2(STR_LIMITED, argp+1, argp+2, sp)
         )
     {
         sp = pop_n_elems(num_arg, sp);
@@ -4941,6 +5014,7 @@ v_limited (svalue_t * sp, int num_arg)
         max_byte_xfer = limits.max_byte;
         max_file_xfer = limits.max_file;
         max_callouts = limits.max_callouts;
+        use_eval_cost = limits.use_cost;
 
         assign_eval_cost();
         inter_sp = sp;
@@ -4983,8 +5057,9 @@ v_set_limits (svalue_t * sp, int num_arg)
  *
  * The arguments can be given in two ways: as an array (like the one
  * returned from query_limits(), or as a list of tagged values.
- * The limit settings recognize two special values:
+ * The limit settings recognize three special values:
  *     LIMIT_UNLIMITED: the limit is deactivated
+ *     LIMIT_DEFAULT:   the global setting is used.
  *     LIMIT_KEEP:      the former setting is kept
  *
  * The efun causes a privilege violation ("set_limits", current_object, first
@@ -4994,6 +5069,7 @@ v_set_limits (svalue_t * sp, int num_arg)
 {
     svalue_t *argp;
     struct limits_context_s limits;
+    vector_t *vec;
 
     if (!num_arg)
         error("No arguments given.\n");
@@ -5011,6 +5087,22 @@ v_set_limits (svalue_t * sp, int num_arg)
         /* NOTREACHED */
         return sp;
     }
+
+    /* On the stack, create an array with the parsed limits to pass
+     * to privilege violation.
+     */
+    sp = pop_n_elems(num_arg, sp); /* sp == argp now */
+    vec = create_limits_array(&limits);
+    if (!vec)
+    {
+        inter_sp = sp;
+        error("(set_limits) Out of memory: array[%d] for call.\n"
+             , LIMIT_MAX);
+        /* NOTREACHED */
+        return sp;
+    }
+    push_array(sp, vec);
+    num_arg = 1;
 
     if (privilege_violation(STR_SET_LIMITS, argp, sp))
     {
@@ -5044,8 +5136,9 @@ f_query_limits (svalue_t * sp)
  *   int[LIMIT_MAPPING]: the max number of mapping entries
  *   int[LIMIT_BYTE]:    the max number of bytes for one read/write_bytes()
  *   int[LIMIT_FILE]:    the max number of bytes for one read/write_file()
+ *   int[LIMIT_COST]:    how to account for the evaluation cost
  *
- * A limit of '0' means 'no limit'.
+ * A limit of '0' means 'no limit', except for LIMIT_COST.
  */
 
 {
@@ -5056,8 +5149,12 @@ f_query_limits (svalue_t * sp)
 
     vec = allocate_uninit_array(LIMIT_MAX);
     if (!vec)
+    {
         error("(query_limits) Out of memory: array[%d] for result.\n"
              , LIMIT_MAX);
+        /* NOTREACHED */
+        return sp;
+    }
 
     put_number(vec->item+LIMIT_EVAL,     def ? def_eval_cost : max_eval_cost);
     put_number(vec->item+LIMIT_ARRAY,    def ? def_array_size : max_array_size);
@@ -5065,6 +5162,7 @@ f_query_limits (svalue_t * sp)
     put_number(vec->item+LIMIT_BYTE,     def ? def_byte_xfer : max_byte_xfer);
     put_number(vec->item+LIMIT_FILE,     def ? def_file_xfer : max_file_xfer);
     put_number(vec->item+LIMIT_CALLOUTS, def ? def_callouts : max_callouts);
+    put_number(vec->item+LIMIT_COST,     def ? DEF_USE_EVAL_COST : use_eval_cost);
 
     /* No free_svalue: sp is a number */
     put_array(sp, vec);

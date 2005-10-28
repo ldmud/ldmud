@@ -880,8 +880,9 @@ int privilege_violation (string op, mixed who, mixed arg, mixed arg2)
 //   set_driver_hook   : Set hook <arg> to <arg2>.
 //   set_max_commands  : Set the max. number of commands interactive
 //                       object <arg> can issue per second to <arg2>.
-//   limited:          : Execute <arg> with reduced/changed limits.
-//   set_limits        : Set limits to <arg>.
+//   limited:          : Execute <arg> with reduced/changed limits
+//                       <arg2> (as return by query_limits()).
+//   set_limits        : Set limits to <arg> (as returned by query_limits()).
 //   set_this_object   : Set this_object() to <arg>.
 //   shadow_add_action : Add an action to function <arg2> of object <arg>
 //                       from the shadow <who> which is shadowing <arg>.

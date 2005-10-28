@@ -9,8 +9,9 @@
 #define LIMIT_BYTE     3
 #define LIMIT_FILE     4
 #define LIMIT_CALLOUTS 5
+#define LIMIT_COST     6
 
-#define LIMIT_MAX      6  /* Number of recognized limits */
+#define LIMIT_MAX      7  /* Number of recognized limits */
 
 /* Special limit values */
 

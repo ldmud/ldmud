@@ -1490,8 +1490,8 @@ static Option aOptions[]
 
 #ifdef YYDEBUG
     , { 'y', "yydebug",            cYYDebug,        MY_FALSE
-      , "  --y|--yydebug\n"
-      , "  --y|--yydebug\n"
+      , "  -y|--yydebug\n"
+      , "  -y|--yydebug\n"
         "    Enable debugging of the LPC compiler.\n"
       }
 #endif

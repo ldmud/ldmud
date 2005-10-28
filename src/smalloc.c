@@ -214,6 +214,8 @@
 #  ifdef MALLOC_SBRK
 #      if !defined(USE_PTHREADS)
 #          define REPLACE_MALLOC
+#      else
+#          undef SBRK_OK
 #      endif
 #  else
 #      undef SBRK_OK
