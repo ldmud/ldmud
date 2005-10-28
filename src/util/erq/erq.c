@@ -2052,13 +2052,13 @@ main (int argc, char **argv)
                                     break;
                                 }
                                 memcpy(&host_ip_addr.sin_addr,
-                                  buf+sizeof(union ticket_u), 4);
+                                  buf+sizeof(union ticket_u)+4, 4);
                                 host_ip_addr.sin_family = AF_INET;
                                 memcpy(&host_ip_addr.sin_port,
-                                  buf+sizeof(union ticket_u)+4, 2);
+                                  buf+sizeof(union ticket_u)+8, 2);
                                 num = sendto(child->socket,
-                                        buf+sizeof(union ticket_u)+6,
-                                        msglen - 6, 0,
+                                        buf+sizeof(union ticket_u)+10,
+                                        msglen-10, 0,
                                         (struct sockaddr *)&host_ip_addr,
                                         sizeof(host_ip_addr));
                             }
@@ -2070,7 +2070,8 @@ main (int argc, char **argv)
                                         msglen-4);
                             }
 
-                            if (num != msglen-4)
+                            if (num != msglen
+				- (child->state == CHILD_UDP ? 10 : 4))
                             {
                                 /* Prepare the error message to send back */
                                 if (num < 0)
