@@ -1751,7 +1751,7 @@ main (int argc, char **argv)
                               , (struct sockaddr *)&addr, &length);
 
                 /* Compose and send the UDP-erq message to the driver */
-                replylen = length + 19;
+                replylen = cnt + 19;
                 if (replylen > MAX_REPLY)
                     replylen = MAX_REPLY;
                 write_32(replyheader, replylen);

@@ -3281,7 +3281,9 @@ f_rename_object (svalue_t *sp)
         error("Attempt to rename to existing object '%s'\n", name);
     }
 
-    if (privilege_violation4(STR_RENAME_OBJECT, ob, m_name, 0, sp))
+    if (privilege_violation4(STR_RENAME_OBJECT, ob, m_name, 0, sp)
+     && check_object(ob)
+       )
     {
         remove_object_hash(ob);
         free_mstring(ob->name);

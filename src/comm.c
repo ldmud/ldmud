@@ -7553,6 +7553,21 @@ v_input_to (svalue_t *sp, int num_arg)
         return arg;
     }
 
+    /* There is a chance that the privilege_violation() method destructed
+     * the current object or the command_giver - return as if the call was
+     * denied.
+     */
+    if (!check_object(current_object) || !check_object(command_giver))
+    {
+	do
+	{
+	    free_svalue(sp--);
+	} while (--num_arg);
+	
+	put_number(arg, 0); /* arg should equal sp+1 */
+	return arg;
+    }
+
     /* Allocate and setup the input_to structure */
 
     xallocate(it, sizeof *it, "new input_to");
@@ -7591,6 +7606,16 @@ v_input_to (svalue_t *sp, int num_arg)
         vefun_bad_arg(error_index, arg-1);
         /* NOTREACHED */
         return arg-1;
+    }
+
+    /* There is a chance that the privilege_violation() method destructed
+     * the object the callback is bound to - return as if the call was denied.
+     */
+    if (NULL == callback_object(&(it->fun)))
+    {
+        free_input_to(it);
+	put_number(arg, 0); /* arg should equal sp+1 */
+	return arg;
     }
 
     /* Try stetting the input_to. On success, return 1. */

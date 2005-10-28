@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+03-Dec-2004 (Lars Duening)  (3.3.624)
+  - (erq/erq.c) The erq errorneously assumed a constant data length
+       when receiving UDP packets (thanks, Tobias!)
+  - (comm.c, object.c) The driver didn't check if the privilege_violation()
+       called for input_to() or rename_object() destructed the object
+       in question (Bug #0000316).
+
 30-Nov-2004 (Lars Duening)  (3.3.623)
   - (comm.c) Fixed a memory leak when a no-bank input_to was denied (Bug
        #0000143)
