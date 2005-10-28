@@ -5636,11 +5636,14 @@ save_struct (struct_t *st)
     }
 
     /* The unique name (struct_name prog_name #id) as fake member */
+    if (save_version < 1 || !recall_pointer(struct_unique_name(st)))
     {
-        svalue_t   name;
-
-        put_string(&name, struct_unique_name(st));
-        save_svalue(&name, ',', MY_FALSE);
+        save_string(struct_unique_name(st));
+    }
+    {
+        L_PUTC_PROLOG
+        L_PUTC(',')
+        L_PUTC_EPILOG
     }
 
     /* ... the values ... */
@@ -5949,8 +5952,7 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
     switch(v->type)
     {
     case T_STRING:
-        if (save_version < 1 || !recall_pointer(v->u.str))
-            save_string(v->u.str);
+        save_string(v->u.str);
         break;
 
     case T_QUOTED_ARRAY:

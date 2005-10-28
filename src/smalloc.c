@@ -1270,6 +1270,7 @@ mem_alloc (size_t size)
 
             /* Fill in the header (M_SIZE is already mostly ok) */
             MAKE_SMALL_CHECK(temp, size);
+            temp[M_SIZE] |= (M_GC_FREE|M_REF);
             temp[M_SIZE] &= ~THIS_BLOCK;
             temp[temp[M_SIZE] & M_MASK] &= ~PREV_BLOCK;
 
@@ -1317,8 +1318,8 @@ mem_alloc (size_t size)
                      */
                     count_back(small_free_stat, bsize * SINT);
 
-                    this[M_SIZE] &= PREV_BLOCK;
-                    this[M_SIZE] |= rsize | (THIS_BLOCK|M_GC_FREE|M_REF);
+                    this[M_SIZE] &= (PREV_BLOCK|M_DEFRAG);
+                    this[M_SIZE] |= rsize | (THIS_BLOCK|M_REF);
                     this[M_PLINK(rsize)] = this[M_PLINK(bsize)];
                     this[M_PLINK(rsize)-1] =  rsize;
 
@@ -1886,7 +1887,7 @@ remove_from_free_list (word_t *ptr)
 #ifdef DEBUG
             if (!p->parent)
             {
-                fatal("(remove_from_free_list) Node %p (size %d) has neither a parent nor is it the AVL tree root.\n", p, p->size);
+                fatal("(remove_from_free_list) Node %p (size %ld) has neither a parent nor is it the AVL tree root.\n", p, (long)p->size);
             }
 #endif
             if (p->parent->left == p)

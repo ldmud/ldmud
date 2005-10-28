@@ -533,6 +533,12 @@
  */
 #define NEW_CLEANUP
 
+/* Enable the use of freelists in the smalloc AVL nodes.
+ * TODO: Remove this macro once it is proven stable or if the change
+ * TODO:: didn't bring any advantages..
+ */
+#define USE_AVL_FREELIST
+
 /* Trace changes to the tot_alloc_object and tot_alloc_object_size
  * statistics, in order to find the status bugs (enables commandline
  * option --check-object-stat). Will produce a decent amount of
