@@ -1,8 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+25-Nov-2004 (Lars Duening)  (3.3.617)
+  - (prolang.y) When the new inline closures were disabled, the LPC compiler
+       produced incomplete code for the inline closure constants, and
+       the interpreter didn't interpret it correctly either.
+
 24-Nov-2004 (Lars Duening)  (3.3.616)
-  - (closure, gcollect.c, interpret.c, prolang) Implemented proper
+  - (closure, gcollect.c, interpret.c, object.c prolang) Implemented proper
        closures explicitely referencing inherited functions.
 
 22-Nov-2004 (Lars Duening)  (3.3.615)

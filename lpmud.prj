@@ -60,16 +60,17 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 616)
-(Parent-Version lpmud 3-3 615)
+(Project-Version lpmud 3-3 617)
+(Parent-Version lpmud 3-3 616)
 (Version-Log "
-  - (closure, gcollect.c, interpret.c, prolang) Implemented proper
-       closures explicitely referencing inherited functions.
+  - (prolang.y) When the new inline closures were disabled, the LPC compiler
+       produced incomplete code for the inline closure constants, and
+       the interpreter didn't interpret it correctly either.
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Wed, 24 Nov 2004 21:06:39 -0700")
+(Checkin-Time "Thu, 25 Nov 2004 20:37:41 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -107,8 +108,8 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.83 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.679 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.383 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.680 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.384 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -174,8 +175,8 @@
   (src/bytecode.h (lpmud/a/b/26_bytecode.h 1.1.1.3 644))
   (src/call_out.h (lpmud/f/45_call_out.h 1.7.1.6 644))
   (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.30 644))
-  (src/closure.h (lpmud/f/44_closure.h 1.7.1.20 644))
-  (src/closure.c (lpmud/d/4_closure.c 1.41.1.47.1.22 644))
+  (src/closure.h (lpmud/f/44_closure.h 1.7.1.21 644))
+  (src/closure.c (lpmud/d/4_closure.c 1.41.1.47.1.23 644))
   (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.98 644))
   (src/comm.h (lpmud/d/3_comm.h 1.26.1.41 644))
   (src/driver.h (lpmud/f/36_driver.h 1.15.1.27 644))
@@ -197,7 +198,7 @@
   (src/heartbeat.c (lpmud/m/42_heartbeat. 1.18.1.9 644))
   (src/i-svalue_cmp.h (lpmud/a/b/20_i-svalue_c 1.4 644))
   (src/interpret.h (lpmud/b/13_interpret. 1.33.1.39 644))
-  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.73 644))
+  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.74 644))
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.15.1.11 644))
   (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.74 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.19 644))
@@ -229,7 +230,7 @@
   (src/pcre/pcreposix.h (lpmud/r/1_pcreposix. 1.2 644))
   (src/pcre/pcreposix.c (lpmud/r/2_pcreposix. 1.2 644))
   (src/pcre/pcre.h (lpmud/r/4_pcre.h 1.2 644))
-  (src/pcre/pcre.c (lpmud/r/5_pcre.c 1.4 644))
+  (src/pcre/pcre.c (lpmud/r/5_pcre.c 1.5 644))
   (src/pcre/maketables.c (lpmud/r/6_maketables 1.2 644))
   (src/pcre/internal.h (lpmud/r/7_internal.h 1.3 644))
   (src/pcre/get.c (lpmud/r/8_get.c 1.2 644))
@@ -328,7 +329,7 @@
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.20 644))
   (src/port.c (lpmud/39_port.c 1.17.1.9 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.17.1.5 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.75 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.76 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7.1.2 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))

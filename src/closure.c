@@ -348,7 +348,7 @@ static void compile_lvalue(svalue_t *, int);
 
 /*-------------------------------------------------------------------------*/
 static INLINE int
-function_cmp (string_t *name, program_t *prog, int ix)
+function_cmp (const string_t *name, const program_t *prog, int ix)
 
 /* Compare <name> with the name of function number <ix> in <prog>ram.
  * Result:  0: <name> is equal to the indexed name
@@ -388,7 +388,7 @@ function_cmp (string_t *name, program_t *prog, int ix)
 
 /*-------------------------------------------------------------------------*/
 long
-find_function (string_t *name, program_t *prog)
+find_function (const string_t *name, const program_t *prog)
 
 /* Find the function <name> (a shared string) in the <prog>ram.
  * Result is the index of the function in the functions[] table,

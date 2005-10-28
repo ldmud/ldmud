@@ -8092,6 +8092,8 @@ again:
             context_size = 0;
             LOAD_SHORT(inhIndex, pc);
         }
+#else
+        LOAD_SHORT(inhIndex, pc);
 #endif /* USE_NEW_INLINES */
 
         ix = tmp_ushort;

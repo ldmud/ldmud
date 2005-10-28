@@ -126,8 +126,6 @@ For a detailed list of all changes see the file CHANGELOG.
            the blueprint.
        + If the function definitions in two inherits differ in their
            visibility, the compiler emits a warning.
-       + Implemented closures explicitely referencing inherited functions
-           ("#'super::fun").
        + Bugfix: The type recognition of the variables for a foreach()
            no longer gets confused by visibility flags.
 
@@ -177,7 +175,7 @@ For a detailed list of all changes see the file CHANGELOG.
            x509 key- and certfile for the TLS package.
 
 
-11-Nov-2004 (Lars Duening) -- Release 3.2.11
+24-Nov-2004 (Lars Duening) -- Release 3.2.11
 
     - Changed efuns:
        + input_to(): New flag INPUT_NO_TELNET to modify the INPUT_CHARMODE
@@ -222,6 +220,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + The macros __FLOAT_MIN__ and __FLOAT_MAX__ gave a too-small range.
        + New pragma (no_)warn_function_inconsistent to control the handling
          of function redefinitions which differ in return or argument types.
+       + Implemented closures explicitely referencing inherited functions
+           ("#'super::fun").
 
     - Runtime:
        + The tracedepth wasn't calculated correctly.

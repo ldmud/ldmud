@@ -13202,6 +13202,7 @@ inline_fun:
            $$.code = -1;
            ins_f_code(F_CLOSURE);
            ins_short(num);
+           ins_short(0);
            $$.type = Type_Closure;
       }
 ; /* inline_fun */
@@ -14143,7 +14144,7 @@ add_new_init_jump (void)
 
 /*-------------------------------------------------------------------------*/
 static short
-lookup_inherited (char *super_name, string_t *real_name
+lookup_inherited (const char *super_name, string_t *real_name
                  , inherit_t **pIP, funflag_t *pFlags)
 
 /* Lookup an inherited function <super_name>::<real_name> and return
