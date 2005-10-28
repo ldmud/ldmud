@@ -61,16 +61,16 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 554)
-(Parent-Version lpmud 3-3 553)
+(Project-Version lpmud 3-3 555)
+(Parent-Version lpmud 3-3 554)
 (Version-Log "
-  - (func_spec, object, parse.c) The result of efun deep_inventory()
-       can be restricted to a certain depth (suggested by Urv).
+  - (smalloc.c) With USE_AVL_FREELIST, the AVL tree could develop cycles -
+       corrected that (reported by Ralph).
 ")
 (New-Version-Log
 ""
 )
-(Checkin-Time "Fri, 21 May 2004 23:05:43 -0600")
+(Checkin-Time "Sun, 23 May 2004 00:16:42 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -108,7 +108,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.76 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.617 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.618 644))
   (HISTORY (lpmud/f/49_HISTORY 1.355 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -134,7 +134,7 @@
   (src/settings/bat (lpmud/q/5_bat 1.5 644))
   (src/settings/beutelland (lpmud/n/34_beutelland 1.3 744))
   (src/settings/carledon (lpmud/c/24_carledon 1.3.1.4 744))
-  (src/settings/dragonfire (lpmud/o/14_dragonfire 1.3 755))
+  (src/settings/dragonfire (lpmud/o/14_dragonfire 1.4 755))
   (src/settings/dt2 (lpmud/f/5_dt2 1.1.1.5 744))
   (src/settings/eotl (lpmud/g/40_eotl 1.2.1.6 744))
   (src/settings/evermore (lpmud/e/31_evermore 1.1.1.9 744))
@@ -297,7 +297,7 @@
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.34 644))
   (src/simulate.c (lpmud/31_simulate.c 1.88.1.124 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.14 644))
-  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.95 644))
+  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.96 644))
   (src/sysmalloc.h (lpmud/c/b/33_sysmalloc. 1.2 644))
   (src/sysmalloc.c (lpmud/c/b/34_sysmalloc. 1.6 644))
   (src/sprintf.h (lpmud/f/15_sprintf.h 1.3.1.4 644))

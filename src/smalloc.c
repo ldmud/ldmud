@@ -1660,14 +1660,14 @@ mem_realloc (POINTER p, size_t size)
 struct free_block
 {
     word_t size;
+    struct free_block *parent, *left, *right;
+    balance_t balance;
 #ifdef USE_AVL_FREELIST
     struct free_block * prev; /* prev free block in freelist
                                * NULL for the AVL node
                                */
     struct free_block * next; /* next free block in freelist */
 #endif /* USE_AVL_FREELIST */
-    struct free_block *parent, *left, *right;
-    balance_t balance;
     short align_dummy;
 };
 
@@ -1678,17 +1678,19 @@ extern struct free_block dummy2;  /* forward */
 
 static struct free_block dummy =
         { /* size */ 0
+        , /* parent */ &dummy2, /* left */ 0, /* right */ 0, /* balance */ 0
 #ifdef USE_AVL_FREELIST
         , /* prev */ 0, /* next */ 0
 #endif /* USE_AVL_FREELIST */
-        , /* parent */ &dummy2, /* left */ 0, /* right */ 0, /* balance */ 0 };
+        };
 
        struct free_block dummy2 =
         { /* size */ 0
+        , /* parent */ 0, /* left */ &dummy, /* right */ 0, /* balance */ -1
 #ifdef USE_AVL_FREELIST
         , /* prev */ 0, /* next */ 0
 #endif /* USE_AVL_FREELIST */
-        , /* parent */ 0, /* left */ &dummy, /* right */ 0, /* balance */ -1 };
+        };
 
 static struct free_block *free_tree = &dummy2;
 
@@ -1748,33 +1750,33 @@ check_avl (struct free_block *parent, struct free_block *p)
 
     if (p->balance != right - left || p->balance < -1 || p->balance > 1)
     {
-        writes  (2, "Inconsistency in avl node!\n");
-        dprintf1(2, "node:%x\n",(p_uint)p);
-        dprintf1(2, "size: %d\n", p->size);
-        dprintf1(2, "left node:%x\n",(p_uint)p->left);
-        dprintf1(2, "left  height: %d\n",left );
-        dprintf1(2, "right node:%x\n",(p_uint)p->right);
-        dprintf1(2, "right height: %d\n",right);
-        dprintf1(2, "alleged balance: %d\n",p->balance);
+        writes  (2, "Inconsistency in avl node: invalid balance!\n");
+        dprintf1(2, "  node:%x\n",(p_uint)p);
+        dprintf1(2, "  size: %d\n", p->size);
+        dprintf1(2, "  left node:%x\n",(p_uint)p->left);
+        dprintf1(2, "  left  height: %d\n",left );
+        dprintf1(2, "  right node:%x\n",(p_uint)p->right);
+        dprintf1(2, "  right height: %d\n",right);
+        dprintf1(2, "  alleged balance: %d\n",p->balance);
         inconsistency = MY_TRUE;
     }
 
     if (p->parent != parent)
     {
-        writes  (2, "Inconsistency in avl node!\n");
-        dprintf1(2, "node:%x\n",(p_uint)p);
-        dprintf1(2, "size: %d\n", p->size);
-        dprintf1(2, "parent: %x\n", (p_uint)parent);
-        dprintf1(2, "parent size: %d\n", parent->size);
-        dprintf1(2, "alleged parent: %x\n", (p_uint)p->parent);
-        dprintf1(2, "alleged parent size: %d\n", p->parent->size);
-        dprintf1(2, "left  height: %d\n",left );
-        dprintf1(2, "right height: %d\n",right);
-        dprintf1(2, "alleged balance: %d\n",p->balance);
+        writes  (2, "Inconsistency in avl node: invalid parent!\n");
+        dprintf1(2, "  node:%x\n",(p_uint)p);
+        dprintf1(2, "  size: %d\n", p->size);
+        dprintf1(2, "  parent: %x\n", (p_uint)parent);
+        dprintf1(2, "  parent size: %d\n", parent->size);
+        dprintf1(2, "  alleged parent: %x\n", (p_uint)p->parent);
+        dprintf1(2, "  alleged parent size: %d\n", p->parent->size);
+        dprintf1(2, "  left  height: %d\n",left );
+        dprintf1(2, "  right height: %d\n",right);
+        dprintf1(2, "  alleged balance: %d\n",p->balance);
         inconsistency = MY_TRUE;
     }
     return left > right ? left+1 : right+1;
-} /* debug_avl() */
+} /* check_avl() */
 
 /*-------------------------------------------------------------------------*/
 static int
@@ -1868,12 +1870,11 @@ remove_from_free_list (word_t *ptr)
     /* Unlink from AVL freelist */
     if (p->prev) p->prev->next = p->next;
     if (p->next) p->next->prev = p->prev;
-
     /* If the block is not the AVL node itself, we're done */
     if (p->prev)
         return;
 
-    /* This is the AVL node itself, but if there is another block free of
+    /* <p> is the AVL node itself, but if there is another block free of
      * the same size, just transfer over the node.
      */
     if (p->next)
@@ -1881,7 +1882,15 @@ remove_from_free_list (word_t *ptr)
         struct free_block *next = p->next;
 
         if (p == free_tree)
+        {
+#ifdef DEBUG
+            if (p->parent)
+            {
+                fatal("(remove_from_free_list) Node %p (size %ld) is the AVL tree root, but has a parent\n", p, (long)p->size);
+            }
+#endif
             free_tree = p->next;
+        }
         else
         {
 #ifdef DEBUG
@@ -1899,6 +1908,12 @@ remove_from_free_list (word_t *ptr)
         /* We must not clobber p->next->next when copying the node! */
         p->next = next->next;
         *next = *p;
+
+        /* Now adjust the parent pointer of the sub-nodes to the new
+         * parent node.
+         */
+        if (p->left) p->left->parent = next;
+        if (p->right) p->right->parent = next;
 
         return;
     }
@@ -2268,7 +2283,6 @@ add_to_free_list (word_t *ptr)
 
             return;
         }
-        else
 #endif /* USE_AVL_FREELIST */
         if (size < p->size) {
             if ( NULL != (q = p->left) ) {
@@ -2293,7 +2307,7 @@ add_to_free_list (word_t *ptr)
     num_avl_nodes++;
 #endif /* USE_AVL_FREELIST */
 #ifdef DEBUG_AVL
-    dprintf1(2, "p->balance:%d\n",p->balance);
+    dprintf2(2, "p %x->balance:%d\n",p, p->balance);
 #endif
     do {
         struct free_block *s;
@@ -2303,16 +2317,17 @@ add_to_free_list (word_t *ptr)
 
             if ( !(b = p->balance) ) {
 #ifdef DEBUG_AVL
-                dprintf1(2, "p->size: %d\n", p->size);
-                dprintf1(2, "p->balance: %d\n", p->balance);
-                dprintf1(2, "p->right-h: %d\n", check_avl(p, p->right));
-                dprintf1(2, "p->left -h: %d\n", check_avl(p, p->left ));
-                /* growth propagation from left side */
+                dprintf1(2, "p: %x\n", p);
+                dprintf1(2, "  p->size: %d\n", p->size);
+                dprintf1(2, "  p->balance: %d := -1\n", p->balance);
+                dprintf1(2, "  p->right-h: %d\n", check_avl(p, p->right));
+                dprintf1(2, "  p->left -h: %d\n", check_avl(p, p->left ));
 #endif
+                /* growth propagation from left side */
                 p->balance = -1;
             } else if (b < 0) {
 #ifdef DEBUG_AVL
-                dprintf1(2, "p->balance:%d\n",p->balance);
+                dprintf2(2, "p %x->balance:%d\n",p, p->balance);
 #endif
                 if (r->balance < 0) {
                     /* R-Rotation */
@@ -2395,7 +2410,15 @@ add_to_free_list (word_t *ptr)
         } else /* r == p->right */ {
             balance_t b;
 
-            if ( !(b = p->balance) ) {
+            if ( !(b = p->balance) )
+            {
+#ifdef DEBUG_AVL
+                dprintf1(2, "p: %x\n", p);
+                dprintf1(2, "  p->size: %d\n", p->size);
+                dprintf1(2, "  p->balance: %d += 1\n", p->balance);
+                dprintf1(2, "  p->right-h: %d\n", check_avl(p, p->right));
+                dprintf1(2, "  p->left -h: %d\n", check_avl(p, p->left ));
+#endif
                 /* growth propagation from right side */
                 p->balance++;
             } else if (b > 0) {
@@ -2468,9 +2491,10 @@ add_to_free_list (word_t *ptr)
                 break;
             } else /* p->balance == -1 */ {
 #ifdef DEBUG_AVL
-                dprintf1(2, "p->balance: %d\n", p->balance);
-                dprintf1(2, "p->right-h: %d\n", check_avl(p, p->right));
-                dprintf1(2, "p->left -h: %d\n", check_avl(p, p->left ));
+                dprintf1(2, "p: %x\n", p);
+                dprintf1(2, "  p->balance: %d\n", p->balance);
+                dprintf1(2, "  p->right-h: %d\n", check_avl(p, p->right));
+                dprintf1(2, "  p->left -h: %d\n", check_avl(p, p->left ));
 #endif
                 p->balance = 0;
                 /* growth of right side balanced the node */

@@ -6,11 +6,12 @@
 # --with-malloc=ptmalloc \
 # --enable-share-variables=yes \
 # --enable-use-pthreads=yes \
+# export EXTRA_CFLAGS="-mcpu=k6 -march=k6"
 
-exec ./configure \
+./configure \
 --prefix=/home/lars \
 --bindir=/home/lars/bin \
---libdir=/home/lars/lib \
+--libdir=/home/lars/df-mudlib \
 --libexec=/home/lars/libexec \
 --enable-compat-mode \
 --enable-erq=xerq \
@@ -22,16 +23,30 @@ exec ./configure \
 --enable-use-new-inlines=yes \
 --enable-use-system-crypt=no \
 --enable-use-deprecated=no \
+--enable-malloc-trace=yes \
 --enable-use-pcre=yes \
 --enable-use-alists=yes \
 --enable-use-mysql=yes \
+--enable-use-pgsql=yes \
+--enable-use-mccp=yes \
 --enable-share-variables=no \
+--enable-filename-spaces=yes \
+--enable-malloc-lpc-trace=yes \
+--with-read-file-max-size=200000 \
+--with-max-byte-transfer=200000 \
+--without-wizlist-file \
+--with-optimize=no \
 --with-master-name=secure/master \
 --with-time-to-reset=900 \
---with-portno=4242 \
---with-udp-port=4246 \
+--with-portno=1999 \
+--with-udp-port=2000 \
 --with-max-cost=2100000 \
 --with-max-malloced=0 \
---with-optimize=high \
---with-swap-file=DF_SWAP $*
-exit 1
+--with-min-malloced=0x80000 \
+--with-min-small-malloced=0x80000 \
+--with-otable-size=8192 \
+--with-htable-size=32768 \
+--with-apply-cache-bits=14 \
+--with-time-to-swap=0 \
+--with-time-to-swap-variables=0 \
+--with-swap-file=DF_SWAP
