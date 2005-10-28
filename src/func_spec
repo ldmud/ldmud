@@ -615,7 +615,7 @@ object  environment(void|object|string);
 object  first_inventory(object|string default: F_THIS_OBJECT);
 object  next_inventory(object default: F_THIS_OBJECT);
 void    move_object(object|string, object|string);
-object  present(object|string, void|object);
+object  present(object|string, void|int|object, void|object);
 void    say(string|mixed *, void|object|object *);
 void    set_environment(object, null|object);
 void    tell_room(object|string, string|mixed *, void|object *);

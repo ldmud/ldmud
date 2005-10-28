@@ -1,12 +1,19 @@
 SYNOPSIS
         object present(mixed str)
+        object present(mixed str, int n)
         object present(mixed str, object ob)
+        object present(mixed str, int n, object ob)
 
 DESCRIPTION
         If an object that identifies (*) to the name ``str'' is present
         in the inventory or environment of this_object(), then return
-        it. If "str" has the form "<id> <n>" the <n>-th object matching
-        <id> will be returned.
+        it.
+        
+        If the number <n> is given, the <n>th object matching <str> will be
+        returned. <n> == 0 will return the first matching object.
+
+        If the number <n> is not given, but <str> has the form "<id> <n>" the
+        <n>-th object matching <id> will be returned.
 
         "str" can also be an object, in which case the test is much faster
         and easier.
@@ -35,6 +42,19 @@ DESCRIPTION
         and it's environment and the object is found in the environment
         then it will be the n-th occurence of ``str'' in the environment
         and not in both objects.
+
+EXAMPLES
+        present("chest");
+          --> returns the first 'chest' object in this object.
+
+        present("chest 2")
+          --> returns the second 'chest' object in this object.
+
+        present("chest 2", 1)
+          --> returns the first 'chest 2' object in this object.
+
+HISTORY
+        LDMud 3.2.11/3.3.610 introduced the (str, n) argument form.
 
 SEE ALSO
         move_object(E), environment(E), this_object(E), present_clone(E)

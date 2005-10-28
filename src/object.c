@@ -4247,17 +4247,18 @@ f_move_object (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 static object_t *
-object_present_in (string_t *str, object_t *ob)
+object_present_in (string_t *str, object_t *ob, Bool hasNumber, p_int num)
 
 /* <ob> is the first object in an environment: test all the objects there
  * if they match the id <str>.
- * <str> may be of the form "<id> <num>" - then the <num>th object with
- * this <id> is returned, it it is found.
+ * If <hasNumber> is false, <str> may be of the form "<id> <num>" - then the
+ * <num>th object with this <id> is returned, it it is found.
+ * If <hasNumber> is true, the <num>th object with the given id is returned.
  */
 
 {
     svalue_t *ret;
-    int   count = 0; /* >0: return the <count>th object */
+    p_int count = 0; /* return the <count+1>th object */
     int   length;
     char *p, *item;
     string_t *sitem;
@@ -4265,21 +4266,26 @@ object_present_in (string_t *str, object_t *ob)
     length = mstrsize(str);
     item = get_txt(str);
 
-    /* Check if there is a number in the string.
-     * If yes parse it, and use the remainder as 'the' id string.
-     */
-    p = item + length - 1;
-    if (*p >= '0' && *p <= '9')
+    if (!hasNumber)
     {
-        while(p > item && *p >= '0' && *p <= '9')
-            p--;
-
-        if (p > item && *p == ' ')
+        /* Check if there is a number in the string.
+         * If yes parse it, and use the remainder as 'the' id string.
+         */
+        p = item + length - 1;
+        if (*p >= '0' && *p <= '9')
         {
-            count = atoi(p+1) - 1;
-            length = p - item;
+            while(p > item && *p >= '0' && *p <= '9')
+                p--;
+
+            if (p > item && *p == ' ')
+            {
+                count = atoi(p+1) - 1;
+                length = p - item;
+            }
         }
     }
+    else
+        count = num-1;
 
     if ((size_t)length != mstrsize(str))
     {
@@ -4320,7 +4326,7 @@ object_present_in (string_t *str, object_t *ob)
 
 /*-------------------------------------------------------------------------*/
 static object_t *
-e_object_present (svalue_t *v, object_t *ob)
+e_object_present (svalue_t *v, object_t *ob, Bool hasNumber, p_int num)
 
 /* Implementation of the efun present().
  *
@@ -4359,7 +4365,7 @@ e_object_present (svalue_t *v, object_t *ob)
     }
 
     /* Always search in the object's inventory */
-    ret_ob = object_present_in(v->u.str, ob->contains);
+    ret_ob = object_present_in(v->u.str, ob->contains, hasNumber, num);
     if (ret_ob)
         return ret_ob;
 
@@ -4378,7 +4384,7 @@ e_object_present (svalue_t *v, object_t *ob)
             return ob->super;
 
         /* No, search the other objects here. */
-        return object_present_in(v->u.str, ob->super->contains);
+        return object_present_in(v->u.str, ob->super->contains, hasNumber, num);
     }
 
     /* Not found */
@@ -4392,12 +4398,16 @@ v_present (svalue_t *sp, int num_arg)
 /* EFUN present()
  *
  *   object present(mixed str)
+ *   object present(mixed str, int n)
  *   object present(mixed str, object ob)
+ *   object present(mixed str, int n, object ob)
  *
  * If an object that identifies (*) to the name ``str'' is present
  * in the inventory or environment of this_object (), then return
  * it. If "str" has the form "<id> <n>" the <n>-th object matching
  * <id> will be returned.
+ * it. If "str" has the form "<id> <n>" OR the (str, n) form is used,
+ * the <n>-th object matching <id> will be returned.
  *
  * "str" can also be an object, in which case the test is much faster
  * and easier.
@@ -4410,19 +4420,43 @@ v_present (svalue_t *sp, int num_arg)
 {
     svalue_t *arg;
     object_t *ob;
+    p_int num = 0;
+    Bool hasNumber = MY_FALSE;
 
     arg = sp - num_arg + 1;
 
     /* Get the arguments */
     ob = NULL;
-    if (num_arg > 1)
+    if (num_arg == 3)
     {
-        ob = arg[1].u.ob;
+        ob = arg[2].u.ob;
         free_svalue(sp--);
+        num_arg--;
+    }
+    if (num_arg == 2)
+    {
+        if (arg[1].type == T_NUMBER)
+        {
+            num = arg[1].u.number;
+            hasNumber = MY_TRUE;
+        }
+        else if (arg[1].type == T_OBJECT)
+        {
+            if (ob != NULL)
+            {
+                /* Two objects? No way. */
+                vefun_arg_error(2, T_NUMBER, T_OBJECT, sp);
+                /* NOTREACHED */
+                return sp;
+            }
+            ob = arg[1].u.ob;
+        }
+        free_svalue(sp--);
+        num_arg--;
     }
 
     inter_sp = sp;
-    ob = e_object_present(arg, ob);
+    ob = e_object_present(arg, ob, hasNumber, num);
 
     free_svalue(arg);
     if (ob)

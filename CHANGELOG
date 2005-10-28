@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+30-Oct-2004 (Lars Duening)  (3.3.610)
+  - (func_spec, object.c) Introduced the (str, n) form for efun present()
+    (Bug #0000134).
+
 26-Oct-2004 (Lars Duening)  (3.3.609)
   - (smalloc.c) Ok, ordering the small block freelists was a bad idea - I
       removed that now. Ordering the large block freelists doesn't seem
