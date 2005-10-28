@@ -3490,8 +3490,6 @@ def_function_typecheck (fulltype_t returntype, ident_t * ident
  * the function name is put into the list of globals, and initialises
  * the block scoping.
  *
- * The references of <returntype> are adopted.
- *
  * If <is_inline> is TRUE, the function to be compiled is an inline closure,
  * which requires a slightly different handling. This function is called
  * after 'func <type>' has been parsed, and is provided with a synthetic
@@ -3551,6 +3549,7 @@ def_function_typecheck (fulltype_t returntype, ident_t * ident
     }
 
     /* Store the data */
+    ref_fulltype_data(&returntype);
 #ifdef USE_NEW_INLINES
     if (is_inline)
     {
@@ -6591,7 +6590,6 @@ new_name:
            && (actual_type.typeflags & PRIMARY_TYPE_MASK) == TYPE_FLOAT
              )
           {
-              PREPARE_INSERT(5)
               int i = verify_declared($2); /* Is the var declared? */
 
               /* Prepare the init code */
@@ -6612,41 +6610,46 @@ new_name:
                   ins_f_code(F_RETURN);
               }
 
-              add_f_code(F_FCONST0);
+              {
+                  PREPARE_INSERT(5)
+                    /* Must come after the non-local program code inserts! */
+
+                  add_f_code(F_FCONST0);
 
 #ifdef DEBUG
-              if (i & VIRTUAL_VAR_TAG)
-              {
-                  /* When we want to allow 'late' initializers for
-                   * inherited variables, it must have a distinct syntax,
-                   * lest name clashs remain undetected, making LPC code
-                   * hard to debug.
-                   */
-                  fatal("Newly declared variable is virtual\n");
-              }
+                  if (i & VIRTUAL_VAR_TAG)
+                  {
+                      /* When we want to allow 'late' initializers for
+                       * inherited variables, it must have a distinct syntax,
+                       * lest name clashs remain undetected, making LPC code
+                       * hard to debug.
+                       */
+                      fatal("Newly declared variable is virtual\n");
+                  }
 #endif
-              variables_initialized = MY_TRUE; /* We have __INIT code */
-              if (!pragma_share_variables)
-                  VARIABLE(i)->type.typeflags |= VAR_INITIALIZED;
+                  variables_initialized = MY_TRUE; /* We have __INIT code */
+                  if (!pragma_share_variables)
+                      VARIABLE(i)->type.typeflags |= VAR_INITIALIZED;
 
-              /* Push the variable reference and create the assignment */
+                  /* Push the variable reference and create the assignment */
 
-              if (i + num_virtual_variables > 0xff)
-              {
-                  add_f_code(F_PUSH_IDENTIFIER16_LVALUE);
-                  add_short(i + num_virtual_variables);
-                  CURRENT_PROGRAM_SIZE += 1;
-              }
-              else
-              {
-                  add_f_code(F_PUSH_IDENTIFIER_LVALUE);
-                  add_byte(i + num_virtual_variables);
-              }
+                  if (i + num_virtual_variables > 0xff)
+                  {
+                      add_f_code(F_PUSH_IDENTIFIER16_LVALUE);
+                      add_short(i + num_virtual_variables);
+                      CURRENT_PROGRAM_SIZE += 1;
+                  }
+                  else
+                  {
+                      add_f_code(F_PUSH_IDENTIFIER_LVALUE);
+                      add_byte(i + num_virtual_variables);
+                  }
 
-              /* Ok, assign */
-              add_f_code(F_VOID_ASSIGN);
-              CURRENT_PROGRAM_SIZE += 4;
-              add_new_init_jump();
+                  /* Ok, assign */
+                  add_f_code(F_VOID_ASSIGN);
+                  CURRENT_PROGRAM_SIZE += 4;
+                  add_new_init_jump();
+              } /* PREPARE_INSERT() block */
           } /* if (float variable) */
       }
 

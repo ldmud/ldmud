@@ -1,6 +1,15 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+30-Aug-2004 (Lars Duening)  (3.3.590)
+  - (prolang.y) The move of the PREPARE_INSERT() in the last patch caused
+      the driver to generate faulty bytecode.
+  - (prolang.y) Function definitions didn't count the reference for the
+      returntype, which lead to memory corruption/crashes when handling
+      struct returntypes. Unfortunately now we have a memory leak
+      when structs are used as returntypes - there is something to be said for
+      using C++...  (reported by Bardioc).
+
 23-Aug-2004 (Lars Duening)  (3.3.589)
   - (prolang.y) Removed a C99 construct which broke compilation on C90
       compilers. I hope. (Bug #0000116).
