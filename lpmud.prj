@@ -60,17 +60,15 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 587)
-(Parent-Version lpmud 3-3 586)
+(Project-Version lpmud 3-3 588)
+(Parent-Version lpmud 3-3 587)
 (Version-Log "
-  - (configure, config.h, mregex, pkg-pcre, main.c) The driver now tries
-       to use the system's PCRE library if available, while offering an
-       override to use the builtin package regardless.
+  - (array.c, pkg-mccp.c) Removed compiler warnings (thanks, Andre).
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Sun, 22 Aug 2004 23:02:12 -0600")
+(Checkin-Time "Mon, 23 Aug 2004 08:02:02 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -108,7 +106,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.79 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.650 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.651 644))
   (HISTORY (lpmud/f/49_HISTORY 1.373 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -167,7 +165,7 @@
   (src/actions.h (lpmud/d/11_actions.h 1.6.1.7 644))
   (src/actions.c (lpmud/d/12_actions.c 1.15.1.48 644))
   (src/array.h (lpmud/f/47_array.h 1.18.1.22 644))
-  (src/array.c (lpmud/d/12_array.c 1.46.1.47.1.15 644))
+  (src/array.c (lpmud/d/12_array.c 1.46.1.47.1.16 644))
   (src/backend.h (lpmud/f/46_backend.h 1.20.1.7 644))
   (src/backend.c (lpmud/d/6_backend.c 1.68.1.35.1.36 644))
   (src/bitstrings.h (lpmud/i/47_bitstrings 1.3 644))
@@ -315,7 +313,7 @@
   (src/pkg-alists.c (lpmud/l/38_pkg-alists 1.9 644))
   (src/pkg-alists.h (lpmud/l/39_pkg-alists 1.3 644))
   (src/pkg-mccp.h (lpmud/d/b/48_pkg-mccp.h 1.2 644))
-  (src/pkg-mccp.c (lpmud/d/b/49_pkg-mccp.c 1.9 644))
+  (src/pkg-mccp.c (lpmud/d/b/49_pkg-mccp.c 1.10 644))
   (src/pkg-mysql.c (lpmud/j/1_pkg-mysql. 1.21 644))
   (src/pkg-mysql.h (lpmud/j/2_pkg-mysql. 1.5 644))
   (src/pkg-odbc.h (lpmud/e/b/43_pkg-odbc.h 1.1 644))

@@ -240,7 +240,7 @@ end_compress (interactive_t * ip, Bool force)
     if (!process_compressed (ip) && !force)
     {
         printf("%s MCCP-DEBUG: '%s' mccp had error while ending\n"
-              , time_stamp(), ip->ob->name);
+              , time_stamp(), get_txt(ip->ob->name));
         retval = MY_FALSE;
         /* This is a write error - no sense in trying it again, so
          * get rid of all the buffers anyway.

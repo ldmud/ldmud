@@ -1394,7 +1394,7 @@ subtract_array (vector_t *minuend, vector_t *subtrahend)
     if (max_array_size && result_size > max_array_size)
     {
         xfree(flags);
-        error("Illegal array size: %lu.\n", result_size);
+        error("Illegal array size: %lu.\n", (unsigned long)result_size);
     }
 
     result = allocate_array(result_size);
@@ -1479,7 +1479,7 @@ intersect_array (vector_t *vec1, vector_t *vec2)
     if (max_array_size && result_size > max_array_size)
     {
         xfree(flags);
-        error("Illegal array size: %lu.\n", result_size);
+        error("Illegal array size: %lu.\n", (unsigned long)result_size);
     }
 
     result = allocate_array(result_size);
@@ -1572,7 +1572,7 @@ join_array (vector_t *vec1, vector_t *vec2)
     if (max_array_size && result_size+vec1_size > max_array_size)
     {
         xfree(flags);
-        error("Illegal array size: %lu.\n", result_size+vec1_size);
+        error("Illegal array size: %lu.\n", (unsigned long)(result_size+vec1_size));
     }
 
     result = allocate_array(vec1_size+result_size);
@@ -1664,7 +1664,7 @@ symmetric_diff_array (vector_t *vec1, vector_t *vec2)
     if (max_array_size && result_size > max_array_size)
     {
         xfree(flags);
-        error("Illegal array size: %lu.\n", result_size);
+        error("Illegal array size: %lu.\n", (unsigned long)result_size);
     }
 
     result = allocate_array(result_size);

@@ -1,6 +1,9 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+23-Aug-2004 (Lars Duening)  (3.3.588)
+  - (array.c, pkg-mccp.c) Removed compiler warnings (thanks, Andre).
+
 22-Aug-2004 (Lars Duening)  (3.3.587)
   - (interpret.c) Calls from destructed objects to other objects
        (including simul-efun calls) now elicit a warning (Bug #0000113).
