@@ -1060,6 +1060,24 @@ rx_sub_str (regexp_t *pRegexp, char *source, char *subst)
     return rc;
 } /* rx_sub_str() */
 
+/*-------------------------------------------------------------------------*/
+Bool
+rx_reganch (regexp_t *pRegexp)
+  
+/* If <pRegexp> is a traditional regexp, return TRUE if rx->reganch
+ * is not NULL. If <pRegexp> is a PCRE, always return FALSE.
+ *
+ * Used by ed.c
+ */
+
+{
+    if (pRegexp->opt & RE_PCRE)
+        return MY_FALSE;
+
+    /* Traditional regexp */
+    return pRegexp->data->rx->reganch != NULL;
+} /* rx_reganch() */
+
 /*--------------------------------------------------------------------*/
 static void
 rx_free_subdata (regdata_t * expr)

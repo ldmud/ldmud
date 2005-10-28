@@ -1,7 +1,7 @@
 /*------------------------------------------------------------------
  * Wrapper for the pcre modules.
  *
- * Compile the pcre modules into one file, but only if USE_PCRE is defined.
+ * Compile the pcre modules into one file.
  * To make this possible the pcre/internal.h had to be augmented with
  * protection against multiple inclusion.
  *------------------------------------------------------------------

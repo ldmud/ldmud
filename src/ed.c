@@ -1881,9 +1881,7 @@ subst (regexp_t *pat, char *sub, Bool gflg, Bool pflag)
                 else
                     current = start + mend;
             } while(gflg
-#ifndef USE_PCRE
-                 && !pat->rx->reganch
-#endif
+                 && !rx_reganch(pat)
                  && (rc = rx_exec_str(pat, current, start)) > 0);
 
             if (rc < 0)

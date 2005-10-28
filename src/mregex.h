@@ -21,6 +21,7 @@ extern int    rx_exec (regexp_t *pRegexp, string_t * string, size_t start);
 extern int    rx_exec_str (regexp_t *pRegexp, char * string, char * start);
 extern string_t * rx_sub (regexp_t *pRegexp, string_t *source, string_t *subst);
 extern string_t * rx_sub_str (regexp_t *pRegexp, char *source, char *subst);
+extern Bool rx_reganch (regexp_t * pRegexp);
 extern int rx_num_matches (regexp_t *pRegexp);
 extern void rx_get_match (regexp_t *pRegexp, string_t * str, size_t * start, size_t * end);
 extern void rx_get_match_str (regexp_t *pRegexp, char * str, size_t * start, size_t * end);

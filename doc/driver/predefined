@@ -78,7 +78,7 @@ DESCRIPTION
       __PGSQL__ :     support for PostgreSQL
       __MCCP__:       support for MCCP http://www.randomly.org/projects/MCCP
       __ALISTS__:     support for alists
-      __PCRE__:       support for PCRE instead of traditional regexps.
+      __PCRE__:       support for PCRE (always defined)
       __TLS__:        support for TLS (internal)
       __PTHREADS__:   support for pthreads (internal)
       __DEPRECATED__: support for obsolete and deprecated efuns.
