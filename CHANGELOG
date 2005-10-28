@@ -1,6 +1,15 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+31-Aug-2004 (Lars Duening)  (3.3.591)
+  - (prolang.y) The real correction to the memory corruption problem: it
+      happened when an inline closure returned a struct, because the
+      compiler derefenced the returntype entry during the cleanup even
+      though it was an uncounted reference. The problem however showed
+      up only when the compilation failed and the struct involved was
+      a private struct, because in all other cases the struct had enough
+      references left to survive.
+
 30-Aug-2004 (Lars Duening)  (3.3.590)
   - (prolang.y) The move of the PREPARE_INSERT() in the last patch caused
       the driver to generate faulty bytecode.

@@ -60,21 +60,21 @@
 ;; TODO:: replace-program and the saving/storing of lfun closure values.
 ;; TODO:: Is this desirable anyway?
               
-(Project-Version lpmud 3-3 590)
-(Parent-Version lpmud 3-3 589)
+(Project-Version lpmud 3-3 591)
+(Parent-Version lpmud 3-3 590)
 (Version-Log "
-  - (prolang.y) The move of the PREPARE_INSERT() in the last patch caused
-      the driver to generate faulty bytecode.
-  - (prolang.y) Function definitions didn't count the reference for the
-      returntype, which lead to memory corruption/crashes when handling
-      struct returntypes. Unfortunately now we have a memory leak
-      when structs are used as returntypes - there is something to be said for
-      using C++...  (reported by Bardioc).
+  - (prolang.y) The real correction to the memory corruption problem: it
+      happened when an inline closure returned a struct, because the
+      compiler derefenced the returntype entry during the cleanup even
+      though it was an uncounted reference. The problem however showed
+      up only when the compilation failed and the struct involved was
+      a private struct, because in all other cases the struct had enough
+      references left to survive.
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Mon, 30 Aug 2004 23:21:08 -0600")
+(Checkin-Time "Wed, 01 Sep 2004 00:30:36 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -112,7 +112,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.11 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.79 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.653 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.654 644))
   (HISTORY (lpmud/f/49_HISTORY 1.373 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -333,7 +333,7 @@
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.20 644))
   (src/port.c (lpmud/39_port.c 1.17.1.9 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.17.1.4 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.69 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.70 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7.1.2 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))

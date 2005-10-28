@@ -3549,7 +3549,6 @@ def_function_typecheck (fulltype_t returntype, ident_t * ident
     }
 
     /* Store the data */
-    ref_fulltype_data(&returntype);
 #ifdef USE_NEW_INLINES
     if (is_inline)
     {
@@ -4702,8 +4701,7 @@ printf("DEBUG:   local types: %d, context types: %d\n", current_inline->full_loc
 printf("DEBUG:   type ptrs: %p, %p\n", type_of_locals, type_of_context );
 #endif /* DEBUG_INLINES */
 
-    /* Drop the local types the closure used */
-    free_fulltype_data(&current_inline->returntype);
+    /* Don't free the current_inline->returntype as it's not counted. */
 
     while (mem_block[A_LOCAL_TYPES].current_size
            > current_inline->full_local_type_size)
@@ -16452,7 +16450,9 @@ epilog (void)
 
         /* Free the type information */
         for (i = 0; (size_t)i < ARGTYPE_COUNT; i++)
+        {
             free_vartype_data(&ARGUMENT_TYPE(i));
+        }
 
         for (i = 0; (size_t)i < LOCAL_TYPE_COUNT; i++)
         {
