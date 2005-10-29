@@ -1,4 +1,4 @@
-VERALTET
+ENTFERNT
 SYNOPSIS
         mixed *slice_array(mixed *array, int from, int to);
 
@@ -8,6 +8,9 @@ BESCHREIBUNG
 
         Das ist die alte Notation von arr[from .. to] und wird nur noch aus
         hysterischen Gruenden unterstuetzt.
+
+GESCHICHTE
+        LDMud 3.3 hat die efun entfernt.
 
 SIEHE AUCH
         [](E)

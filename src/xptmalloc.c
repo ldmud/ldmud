@@ -139,6 +139,9 @@ void mem_dump_data (strbuf_t *sbuf) {
 #undef dump_stat
 } /* mem_dump_data() */
 
+void mem_dump_extdata (strbuf_t *sbuf) {
+    strbuf_add(sbuf, "ptmalloc doesn't have extended statistics.\n");
+} /* mem_dump_extdata() */
 
 /* Fill in the data for debug_info(DINFO_DATA, DID_MEMORY) into the
  * svalue-block svp.

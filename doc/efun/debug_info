@@ -36,10 +36,10 @@ DESCRIPTION
             line. No second arg must be given. Returns 0.
 
         DINFO_STATUS (4): Collect the status information of the driver.
-            The optional second arg can be 0, "tables", "swap", "malloc"
-            or any other argument accepted by the actual driver.
-            The result is a printable string with the status information,
-            or 0 if an invalid argument was given.
+            The optional second arg can be 0, "tables", "swap", "malloc",
+            "malloc extstats" or any other argument accepted by the actual
+            driver.  The result is a printable string with the status
+            information, or 0 if an invalid argument was given.
 
         DINFO_DUMP (5): Dump the information specified by <arg2> into the
             filename specified by <arg3>. If <arg3> is omitted, a default

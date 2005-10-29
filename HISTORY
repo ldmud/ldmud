@@ -11,7 +11,7 @@ For a detailed list of all changes see the file CHANGELOG.
          allocate_mapping(), copy_mapping(), efun308(), extract(), file_name(),
          filter_array(), filter_mapping(), m_sizeof(), map_array(),
          map_mapping(), mapping_contains(), member_array(),
-         set_auto_include_string().
+         set_auto_include_string(), slice_array().
        + catch(): If there is not enough time left (less than
            __CATCH_EVAL_COST__), this is thrown as an error from inside
            the catch instead of causing the catch to return 0.

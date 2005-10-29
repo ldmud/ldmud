@@ -1,3 +1,4 @@
+REMOVED EFUN
 SYNOPSIS
         mixed *slice_array(mixed *array, int from, int to)
 
@@ -9,6 +10,9 @@ DESCRIPTION
         only for hysterical raisins.
 
         DO NOT USE THIS EFUN ANYMORE.
+
+HISTORY
+        Removed in LDMud 3.3.
 
 SEE ALSO
         [](E)

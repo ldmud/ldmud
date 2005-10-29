@@ -153,6 +153,7 @@ extern Bool is_program_allocation ( void *block );
 /* Functions directly exported from the allocator: */
 
 extern void mem_dump_data(strbuf_t *sbuf);
+extern void mem_dump_extdata(strbuf_t *sbuf);
 extern void mem_dinfo_data(svalue_t *svp, int value);
 extern void mem_consolidate (Bool force);
 extern Bool mem_dump_memory(int fd);

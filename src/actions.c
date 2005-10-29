@@ -634,6 +634,15 @@ special_parse (char *buff)
             return 1;
         }
 
+        if (strcmp(buff, "malloc extstats") == 0)
+        {
+            strbuf_t sbuf;
+
+            status_parse(&sbuf, "malloc extstats");
+            strbuf_send(&sbuf);
+            return 1;
+        }
+
         if (strcmp(buff, "dumpallobj") == 0) {
 
             if (!current_object)

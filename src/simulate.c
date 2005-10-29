@@ -3205,6 +3205,11 @@ status_parse (strbuf_t * sbuf, char * buff)
         return MY_TRUE;
     }
 
+    if (strcmp(buff, "malloc extstats") == 0) {
+        mem_dump_extdata(sbuf);
+        return MY_TRUE;
+    }
+
     return MY_FALSE;
 } /* status_parse() */
 

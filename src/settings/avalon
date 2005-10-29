@@ -51,3 +51,4 @@ with_optmize=medium
 
 enable_use_mccp=yes
 enable_use_pcre=yes
+enable_use_tls=gnu

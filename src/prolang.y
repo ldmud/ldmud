@@ -14972,7 +14972,7 @@ copy_functions (program_t *from, funflag_t type)
                         {
                             /* This function is visible and existing, but the
                              * inherited one is not, or this one is also nomask:
-                             * prefer the inherited one.
+                             * prefer this one one.
                              */
                             if (OldFunction->flags & TYPE_MOD_PRIVATE)
                             {

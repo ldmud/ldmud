@@ -1,6 +1,15 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+07-Feb-2004 (Lars Duening)  (3.3.668)
+  - (smalloc.c, slaballoc.c) The large block handler is now capable
+      of handling blocks up to 2**32 words. This is especially useful
+      on systems using malloc() instead of sbrk() for core memory
+      allocation (reported by Menaures).
+  - (efuns.c, smalloc.c, slaballoc.c) The extended malloc statistics
+      are now separate from 'status malloc' in 'status malloc extstats'
+      (Bug #0000358).
+
 01-Feb-2004 (Lars Duening)  (3.3.667)
   - (pkg-mccp.c) In start_mccp_compress(), the interactive pointer
       was used before being set. I moved the set&check forward

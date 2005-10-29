@@ -251,6 +251,7 @@ mdb_log_sbrk (p_int size)
  *     <force> is true after a GC, and false when called from the backend.
  *
  *   void mem_dump_data (strbuf_t *sbuf)
+ *   void mem_dump_extdata (strbuf_t *sbuf)
  *   void mem_dinfo_data (svalue_t *svp, int value)
  *     Return the statistics data.
  *

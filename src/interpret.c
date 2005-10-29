@@ -2487,7 +2487,9 @@ inter_add_array (vector_t *q, vector_t **vpp)
         for (cnt = (mp_int)q_size; --cnt >= 0; )
         {
             if (destructed_object_ref(s))
+            {
                 assign_svalue(s, &const0);
+            }
             *d++ = *s++;
         }
         *vpp = r;
