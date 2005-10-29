@@ -2028,9 +2028,6 @@ v_variable_exists (svalue_t *sp, int num_arg)
         int ix;
         typeflags_t flags;
 
-#ifdef EXT_STRING_STATS
-        stNumTabledChecked++;
-#endif /* EXT_STRING_STATS */
         shared_name = find_tabled(argp->u.str);
         if (!shared_name)
             break;
@@ -7786,9 +7783,6 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
         /* If the variable exists, it must exist as shared
          * string.
          */
-#ifdef EXT_STRING_STATS
-        stNumTabledChecked++;
-#endif /* EXT_STRING_STATS */
         s = find_tabled_str(name);
         if (!s)
         {
@@ -7862,9 +7856,6 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
         /* If the function exists, it must exist as shared
          * string.
          */
-#ifdef EXT_STRING_STATS
-        stNumTabledChecked++;
-#endif /* EXT_STRING_STATS */
         s = find_tabled_str(name);
         if (!s)
         {
@@ -8665,9 +8656,6 @@ static int nesting = 0;  /* Used to detect recursive calls */
 
         do { /* A simple try.. environment */
 
-#ifdef EXT_STRING_STATS
-        stNumTabledChecked++;
-#endif /* EXT_STRING_STATS */
             if ( NULL != (var = find_tabled_str(cur)) )
             {
                 /* The name exists in an object somewhere, now check if it

@@ -14277,9 +14277,6 @@ lookup_inherited (const char *super_name, string_t *real_name
     {
         string_t *tmp;
 
-#ifdef EXT_STRING_STATS
-        stNumTabledChecked++;
-#endif /* EXT_STRING_STATS */
         tmp = find_tabled(real_name);
 
 #ifdef DEBUG
@@ -14416,9 +14413,6 @@ find_inherited_function ( const char * super_name
     funflag_t flags;
     short     ix;
 
-#ifdef EXT_STRING_STATS
-        stNumTabledChecked++;
-#endif /* EXT_STRING_STATS */
     rname = find_tabled_str(real_name);
 
     ix =  rname ? lookup_inherited(super_name, rname, &ip, &flags) : -1;

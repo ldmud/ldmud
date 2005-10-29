@@ -11,6 +11,9 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - (configure) When searching for the mysqlclient library in the
        usual places, the configure script forgot to clear out the 
        cache flag.
+  - (smalloc.c) Removed a compilation error when SBRK_OK wasn't defined.
+  - (mstrings, many files) The find-in-table statistics were done
+       incompletely.
 
 19-Oct-2005 (Lars Duening)
   - (pkg-tls.c) tls_check_certificate() now returns the low-level API

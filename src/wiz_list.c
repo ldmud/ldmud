@@ -195,9 +195,6 @@ find_wiz (string_t *name)
 {
     wiz_list_t *wl;
 
-#ifdef EXT_STRING_STATS
-        stNumTabledChecked++;
-#endif /* EXT_STRING_STATS */
     if ( !( name = find_tabled(name) ) )
         return NULL;
 
