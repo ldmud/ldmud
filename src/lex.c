@@ -3933,6 +3933,585 @@ string (char *str, size_t slen)
 
 /*-------------------------------------------------------------------------*/
 static INLINE int
+closure (char *in_yyp)
+
+/* The lexer has found a closure token (#'...), with <in_yyp> pointing
+ * to the quote.  Parse the token into yylval and return the proper
+ * token code.
+ */
+{
+    register char * yyp = in_yyp;
+
+    register char c;
+    ident_t *p;
+    char *wordstart = ++yyp;
+    char *super_name = NULL;
+    Bool efun_override;  /* True if 'efun::' is specified. */
+
+    /* Set yyp to the last character of the functionname
+     * after the #'.
+     */
+    do
+        c = *yyp++;
+    while (isalunum(c));
+    c = *--yyp;
+    /* the assignment is good for the data flow analysis :-} */
+
+    /* Just one character? It must be an operator */
+    if (yyp == wordstart && *yyp != ':')
+    {
+        int i;
+
+        if ((i = symbol_operator(yyp, (const char **)&outp)) < 0)
+            yyerror("Missing function name after #'");
+        yylval.closure.number = i + CLOSURE_EFUN_OFFS;
+        yylval.closure.inhIndex = 0;
+        return L_CLOSURE;
+    }
+
+    /* Test for an inherited function name specification.
+     * If found, set super_name to the inherit name, and
+     * reset wordstart/yyp to point to the name after the '::'.
+     */
+    if (':' == *yyp && ':' == *(yyp+1))
+    {
+        super_name = wordstart;
+        wordstart = yyp += 2;
+        do
+            c = *yyp++;
+        while (isalunum(c));
+        c = *--yyp;
+    }
+
+    /* Test for the 'efun::' override.
+     */
+    efun_override = MY_FALSE;
+    if (super_name != NULL && !strncmp(super_name, "efun::", 6))
+    {
+        efun_override = MY_TRUE;
+        super_name = NULL;
+    }
+
+    outp = yyp;
+
+    /* Lookup the name parsed from the text */
+
+    if (super_name != NULL)
+    {
+        short ix;
+        unsigned short inhIndex;
+
+        *yyp = '\0'; /* c holds the char at this place */
+        *(wordstart-2) = '\0';
+        ix = find_inherited_function(super_name, wordstart, &inhIndex);
+        inhIndex++;
+        if (ix < 0)
+        {
+            yyerrorf("Undefined function: %.50s::%.50s"
+                    , super_name, wordstart);
+            ix = CLOSURE_EFUN_OFFS;
+        }
+        *yyp = c;
+        *(wordstart-2) = ':';
+
+        yylval.closure.number = ix;
+        yylval.closure.inhIndex = inhIndex;
+        return L_CLOSURE;
+    }
+
+    *yyp = '\0'; /* c holds the char at this place */
+    p = make_shared_identifier(wordstart, I_TYPE_GLOBAL, 0);
+    *yyp = c;
+    if (!p) {
+        lexerror("Out of memory");
+        return 0;
+    }
+
+    /* #' can be used only on identifiers with global visibility
+     * or better. Look along the .inferior chain for such an
+     * identifier. If the identifier happens to be a reserved
+     * word, the better for us.
+     */
+    while (p->type > I_TYPE_GLOBAL)
+    {
+        if (p->type == I_TYPE_RESWORD)
+        {
+            int code = symbol_resword(p);
+
+            if (!code)
+            {
+                /* There aren't efuns with reswords as names, and
+                 * it is impossible to define local / global vars
+                 * or functions with such a name.
+                 * Thus, !p->inferior .
+                 */
+                yyerrorf(
+                  "No closure associated with reserved word '%s'",
+                  get_txt(p->name)
+                );
+            }
+
+            yylval.closure.number = code + CLOSURE_EFUN_OFFS;
+            yylval.closure.inhIndex = 0;
+            return L_CLOSURE;
+        }
+        if ( !(p = p->inferior) )
+            break;
+    } /* while (p->type > I_TYPE_GLOBAL */
+
+    /* Did we find a suitable identifier? */
+    if (!p || p->type < I_TYPE_GLOBAL)
+    {
+        if (p && p->type == I_TYPE_UNKNOWN)
+            free_shared_identifier(p);
+        c = *yyp;
+        *yyp = '\0';
+        yyerrorf("Undefined function: %.50s", wordstart);
+        *yyp = c;
+        yylval.closure.number = CLOSURE_EFUN_OFFS;
+        yylval.closure.inhIndex = 0;
+        return L_CLOSURE;
+    }
+
+    /* An attempt to override a nomask simul-efun causes
+     * a privilege violation. If the master decides to allow
+     * this attempt, the efun-override will still be deactivated
+     * (iow: a nomask simul-efun overrules an efun override).
+     */
+    if (efun_override
+     && p->u.global.sim_efun >= 0
+     && simul_efunp[p->u.global.sim_efun].flags & TYPE_MOD_NO_MASK
+     && p->u.global.efun >= 0
+     && master_ob
+     && (!EVALUATION_TOO_LONG())
+       )
+    {
+        svalue_t *res;
+
+        push_ref_string(inter_sp, STR_NOMASK_SIMUL_EFUN);
+        push_c_string(inter_sp, current_loc.file->name);
+        push_ref_string(inter_sp, p->name);
+        res = apply_master(STR_PRIVILEGE, 3);
+        if (!res || res->type != T_NUMBER || res->u.number < 0)
+        {
+            yyerrorf(
+              "Privilege violation: nomask simul_efun %s",
+              get_txt(p->name)
+            );
+            efun_override = MY_FALSE;
+        }
+        else if (!res->u.number)
+        {
+            efun_override = MY_FALSE;
+        }
+    }
+    else if (EVALUATION_TOO_LONG())
+    {
+        yyerrorf("Can't call master::%s for "
+                 "'nomask simul_efun %s': eval cost too big"
+                , get_txt(STR_PRIVILEGE), get_txt(p->name));
+        efun_override = MY_FALSE;
+    }
+
+    /* The code will be L_CLOSURE, now determine the right
+     * closure number to put into yylval.closure.number.
+     * The number is usually the index in the appropriate
+     * table, plus an offset indicating the type of the closure.
+     *
+     * The switch() serves just as a simple try... environment.
+     */
+    yylval.closure.inhIndex = 0;
+    switch(0) { default:
+        if (!efun_override)
+        {
+
+            /* lfun? */
+            if (p->u.global.function >= 0)
+            {
+                int i;
+
+                i = p->u.global.function;
+                yylval.closure.number = i;
+                if (i >= CLOSURE_IDENTIFIER_OFFS)
+                    yyerrorf(
+                      "Too high function index of %s for #'",
+                      get_txt(p->name)
+                    );
+                break;
+            }
+
+            /* simul-efun? */
+            if (p->u.global.sim_efun >= 0) {
+                yylval.closure.number =
+                  p->u.global.sim_efun + CLOSURE_SIMUL_EFUN_OFFS;
+                break;
+            }
+        }
+
+        /* efun? */
+        if (p->u.global.efun >= 0)
+        {
+            yylval.closure.number =
+              p->u.global.efun + CLOSURE_EFUN_OFFS;
+            if (yylval.closure.number >
+                LAST_INSTRUCTION_CODE + CLOSURE_EFUN_OFFS)
+            {
+                yylval.closure.number =
+                  efun_aliases[
+                    yylval.closure.number - CLOSURE_EFUN_OFFS
+                      - LAST_INSTRUCTION_CODE - 1
+                  ] + CLOSURE_EFUN_OFFS;
+            }
+            break;
+        }
+
+        /* object variable? */
+        if (p->u.global.variable >= 0)
+        {
+            if (p->u.global.variable & VIRTUAL_VAR_TAG) {
+                /* Handling this would require an extra coding of
+                 * this closure type, and special treatment in
+                 * replace_program_lambda_adjust() .
+                 */
+                yyerrorf("closure of virtual variable");
+                yylval.closure.number = CLOSURE_IDENTIFIER_OFFS;
+                break;
+            }
+            yylval.closure.number =
+              p->u.global.variable + num_virtual_variables +
+              CLOSURE_IDENTIFIER_OFFS;
+            break;
+        }
+
+        /* None of these all */
+        c = *yyp;
+        *yyp = 0;
+        yyerrorf("Undefined function: %.50s", wordstart);
+        *yyp = c;
+        yylval.closure.number = CLOSURE_EFUN_OFFS;
+
+        break;
+    }
+    return L_CLOSURE;
+} /* closure() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE char *
+handle_preprocessor_statement (char * in_yyp)
+
+/* The lexer has found a preprocessor statement (<newline>#), an <in_yyp>
+ * is pointing to the character after the '#'. Parse the statement and return
+ * the new character pointer.
+ */
+
+{
+    register char * yyp = in_yyp;
+
+    register char c;
+    char *sp = NULL; /* Begin of second word */
+    Bool quote; /* In "" string? */
+    size_t wlen;  /* Length of the preproc keyword */
+    char last;
+      /* Character last read, used to implement \-sequences */
+
+    /* Copy the first/only line of the preprocessor statement
+     * from the input buffer into yytext[] while stripping
+     * comments.
+     */
+
+    /* Skip initial blanks */
+    outp = yyp;
+    yyp = yytext;
+    do {
+        c = mygetc();
+    } while (lexwhite(c));
+
+    wlen = 0;
+    for (quote = MY_FALSE, last = '\0';;)
+    {
+
+        /* Skip comments */
+        while (!quote && c == '/')
+        {
+            char c2;
+
+            if ( (c2 = mygetc()) == '*')
+            {
+                skip_comment();
+                c = mygetc();
+            }
+            else if (c2 == '/')
+            {
+                outp = skip_pp_comment(outp);
+                current_loc.line--;
+                c = '\n';
+            }
+            else
+            {
+                --outp;
+                break;
+            }
+        }
+
+        /* If the last character was '\', take this one as
+         * as it is, else interpret this character.
+         */
+        if (last == '\\')
+            last = '\0';
+        else if (c == '"')
+            quote = !quote;
+        else
+            last = c;
+
+        /* Remember end of the first word in the line */
+        if (!sp && !isalunum(c))
+        {
+            sp = yyp;
+            wlen = yyp - yytext;
+        }
+
+        if (c == '\n')
+        {
+            break;
+        }
+        SAVEC;
+        c = mygetc();
+    }
+
+    /* Terminate the line copied to yytext[] */
+    *yyp = '\0';
+
+    /* Remember the end of the first word.
+     * Let sp point to the next word then.
+     */
+    if (sp)
+    {
+        while(lexwhite(*sp))
+        {
+            sp++;
+        }
+    }
+    else
+    {
+        /* No end found in the copy loop - the next 'word'
+         * will be the terminating '\0'.
+         */
+        sp = yyp;
+        wlen = yyp - yytext;
+    }
+
+    /* Evaluate the preprocessor statement */
+    if (strncmp("include", yytext, wlen) == 0)
+    {
+        /* Calling myfilbuf() before handle_include() is a waste
+         * of time and memory. However, since the include
+         * attempt might fail, we have to call it afterwards
+         * to make sure that the lex can continue.
+         */
+        handle_include(sp);
+        myfilbuf();
+    }
+    else
+    {
+       /* Make sure there is enough data in the buffer. */
+       myfilbuf();
+
+    if (strncmp("define", yytext, wlen) == 0)
+    {
+        if (*sp == '\0')
+            yyerror("Missing definition in #define");
+        else
+            handle_define(sp, quote);
+    }
+    else if (strncmp("if", yytext, wlen) == 0)
+    {
+        int cond;
+        svalue_t sv;
+
+        myungetc('\n');
+        add_input(sp);
+        cond = cond_get_exp(0, &sv);
+        free_svalue(&sv);
+        if (mygetc() != '\n')
+        {
+            yyerror("Condition too complex in #if");
+            while (mygetc() != '\n') NOOP;
+        }
+        else
+            handle_cond(cond);
+    }
+    else if (strncmp("ifdef", yytext, wlen) == 0)
+    {
+        deltrail(sp);
+        handle_cond(lookup_define(sp) != 0);
+    }
+    else if (strncmp("ifndef", yytext, wlen) == 0)
+    {
+        deltrail(sp);
+        handle_cond(lookup_define(sp) == 0);
+    }
+    else if (strncmp("else", yytext, wlen) == 0)
+    {
+        if (*sp != '\0')
+        {
+            if (pragma_pedantic)
+                yyerror("Unrecognized #else (trailing characters)");
+            else
+                yywarn("Unrecognized #else (trailing characters)");
+        }
+
+        if (iftop && iftop->state == EXPECT_ELSE)
+        {
+            lpc_ifstate_t *p = iftop;
+
+            iftop = p->next;
+            mempool_free(lexpool, p);
+            skip_to("endif", NULL);
+        }
+        else
+        {
+            yyerror("Unexpected #else");
+        }
+    }
+    else if (strncmp("elif", yytext, wlen) == 0)
+    {
+        if (iftop && iftop->state == EXPECT_ELSE)
+        {
+            lpc_ifstate_t *p = iftop;
+
+            iftop = p->next;
+            mempool_free(lexpool, p);
+            skip_to("endif", NULL);
+        }
+        else
+        {
+            yyerror("Unexpected #elif");
+        }
+    }
+    else if (strncmp("endif", yytext, wlen) == 0)
+    {
+        if (*sp != '\0')
+        {
+            if (pragma_pedantic)
+                yyerror("Unrecognized #endif (trailing characters)");
+            else
+                yywarn("Unrecognized #endif (trailing characters)");
+        }
+
+        if (iftop
+         && (   iftop->state == EXPECT_ENDIF
+             || iftop->state == EXPECT_ELSE))
+        {
+            lpc_ifstate_t *p = iftop;
+
+            iftop = p->next;
+            mempool_free(lexpool, p);
+        }
+        else
+        {
+            yyerror("Unexpected #endif");
+        }
+    }
+    else if (strncmp("undef", yytext, wlen) == 0)
+    {
+        ident_t *p, **q;
+        int h;
+
+        deltrail(sp);
+
+        /* Lookup identifier <sp> in the ident_table and
+         * remove it there if it is a #define'd identifier.
+         * If it is a permanent define, park the ident
+         * structure in the undefined_permanent_defines list.
+         */
+        h = identhash(sp);
+        for (q = &ident_table[h]; NULL != ( p= *q); q=&p->next)
+        {
+            if (strcmp(sp, get_txt(p->name)))
+                continue;
+
+            if (p->type != I_TYPE_DEFINE) /* failure */
+                break;
+
+            if (!p->u.define.permanent)
+            {
+#if defined(LEXDEBUG)
+                fprintf(stderr, "%s #undef define '%s' %d '%s'\n"
+                       , time_stamp(), get_txt(p->name)
+                       , p->u.define.nargs
+                       , p->u.define.exps.str);
+                fflush(stderr);
+#endif
+                if (p->inferior)
+                {
+                    p->inferior->next = p->next;
+                    *q = p->inferior;
+                }
+                else
+                {
+                    *q = p->next;
+                }
+                xfree(p->u.define.exps.str);
+                free_mstring(p->name);
+                p->name = NULL;
+                    /* mark for later freeing by all_defines */
+                /* success */
+                break;
+           }
+           else
+           {
+                if (p->inferior)
+                {
+                    p->inferior->next = p->next;
+                    *q = p->inferior;
+                }
+                else
+                {
+                    *q = p->next;
+                }
+                p->next = undefined_permanent_defines;
+                undefined_permanent_defines = p;
+                /* success */
+                break;
+            }
+        }
+    }
+    else if (strncmp("echo", yytext, wlen) == 0)
+    {
+        fprintf(stderr, "%s %s\n", time_stamp(), sp);
+    }
+    else if (strncmp("pragma", yytext, wlen) == 0)
+    {
+        handle_pragma(sp);
+    }
+    else if (strncmp("line", yytext, wlen) == 0)
+    {
+        char * end;
+        long new_line;
+
+        deltrail(sp);
+        new_line = strtol(sp, &end, 0);
+        if (end == sp || *end != '\0')
+            yyerror("Unrecognised #line directive");
+        if (new_line < current_loc.line)
+            store_line_number_backward(current_loc.line - new_line);
+        current_loc.line = new_line - 1;
+    }
+    else
+    {
+        yyerror("Unrecognised # directive");
+    }} /* if() { else if () {} } */
+
+    store_line_number_info();
+    nexpands = 0;
+    current_loc.line++;
+    total_lines++;
+
+    return outp;
+} /* handle_preprocessor_statement() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE int
 yylex1 (void)
 
 /* Lex the next lexical element starting from outp and return its code.
@@ -4736,256 +5315,7 @@ yylex1 (void)
             {
                 /* --- #': Closure Symbol --- */
 
-                ident_t *p;
-                char *wordstart = ++yyp;
-                char *super_name = NULL;
-                Bool efun_override;  /* True if 'efun::' is specified. */
-
-                /* Set yyp to the last character of the functionname
-                 * after the #'.
-                 */
-                do
-                    c = *yyp++;
-                while (isalunum(c));
-                c = *--yyp;
-                /* the assignment is good for the data flow analysis :-} */
-
-                /* Just one character? It must be an operator */
-                if (yyp == wordstart && *yyp != ':')
-                {
-                    int i;
-
-                    if ((i = symbol_operator(yyp, (const char **)&outp)) < 0)
-                        yyerror("Missing function name after #'");
-                    yylval.closure.number = i + CLOSURE_EFUN_OFFS;
-                    yylval.closure.inhIndex = 0;
-                    return L_CLOSURE;
-                }
-
-                /* Test for an inherited function name specification.
-                 * If found, set super_name to the inherit name, and
-                 * reset wordstart/yyp to point to the name after the '::'.
-                 */
-                if (':' == *yyp && ':' == *(yyp+1))
-                {
-                    super_name = wordstart;
-                    wordstart = yyp += 2;
-                    do
-                        c = *yyp++;
-                    while (isalunum(c));
-                    c = *--yyp;
-                }
-
-                /* Test for the 'efun::' override.
-                 */
-                efun_override = MY_FALSE;
-                if (super_name != NULL && !strncmp(super_name, "efun::", 6))
-                {
-                    efun_override = MY_TRUE;
-                    super_name = NULL;
-                }
-
-                outp = yyp;
-
-                /* Lookup the name parsed from the text */
-
-                if (super_name != NULL)
-                {
-                    short ix;
-                    unsigned short inhIndex;
-
-                    *yyp = '\0'; /* c holds the char at this place */
-                    *(wordstart-2) = '\0';
-                    ix = find_inherited_function(super_name, wordstart, &inhIndex);
-                    inhIndex++;
-                    if (ix < 0)
-                    {
-                        yyerrorf("Undefined function: %.50s::%.50s"
-                                , super_name, wordstart);
-                        ix = CLOSURE_EFUN_OFFS;
-                    }
-                    *yyp = c;
-                    *(wordstart-2) = ':';
-
-                    yylval.closure.number = ix;
-                    yylval.closure.inhIndex = inhIndex;
-                    return L_CLOSURE;
-                }
-
-                *yyp = '\0'; /* c holds the char at this place */
-                p = make_shared_identifier(wordstart, I_TYPE_GLOBAL, 0);
-                *yyp = c;
-                if (!p) {
-                    lexerror("Out of memory");
-                    return 0;
-                }
-
-                /* #' can be used only on identifiers with global visibility
-                 * or better. Look along the .inferior chain for such an
-                 * identifier. If the identifier happens to be a reserved
-                 * word, the better for us.
-                 */
-                while (p->type > I_TYPE_GLOBAL)
-                {
-                    if (p->type == I_TYPE_RESWORD)
-                    {
-                        int code = symbol_resword(p);
-
-                        if (!code)
-                        {
-                            /* There aren't efuns with reswords as names, and
-                             * it is impossible to define local / global vars
-                             * or functions with such a name.
-                             * Thus, !p->inferior .
-                             */
-                            yyerrorf(
-                              "No closure associated with reserved word '%s'",
-                              get_txt(p->name)
-                            );
-                        }
-
-                        yylval.closure.number = code + CLOSURE_EFUN_OFFS;
-                        yylval.closure.inhIndex = 0;
-                        return L_CLOSURE;
-                    }
-                    if ( !(p = p->inferior) )
-                        break;
-                } /* while (p->type > I_TYPE_GLOBAL */
-
-                /* Did we find a suitable identifier? */
-                if (!p || p->type < I_TYPE_GLOBAL)
-                {
-                    if (p && p->type == I_TYPE_UNKNOWN)
-                        free_shared_identifier(p);
-                    c = *yyp;
-                    *yyp = '\0';
-                    yyerrorf("Undefined function: %.50s", wordstart);
-                    *yyp = c;
-                    yylval.closure.number = CLOSURE_EFUN_OFFS;
-                    yylval.closure.inhIndex = 0;
-                    return L_CLOSURE;
-                }
-
-                /* An attempt to override a nomask simul-efun causes
-                 * a privilege violation. If the master decides to allow
-                 * this attempt, the efun-override will still be deactivated
-                 * (iow: a nomask simul-efun overrules an efun override).
-                 */
-                if (efun_override
-                 && p->u.global.sim_efun >= 0
-                 && simul_efunp[p->u.global.sim_efun].flags & TYPE_MOD_NO_MASK
-                 && p->u.global.efun >= 0
-                 && master_ob
-                 && (!EVALUATION_TOO_LONG())
-                   )
-                {
-                    svalue_t *res;
-
-                    push_ref_string(inter_sp, STR_NOMASK_SIMUL_EFUN);
-                    push_c_string(inter_sp, current_loc.file->name);
-                    push_ref_string(inter_sp, p->name);
-                    res = apply_master(STR_PRIVILEGE, 3);
-                    if (!res || res->type != T_NUMBER || res->u.number < 0)
-                    {
-                        yyerrorf(
-                          "Privilege violation: nomask simul_efun %s",
-                          get_txt(p->name)
-                        );
-                        efun_override = MY_FALSE;
-                    }
-                    else if (!res->u.number)
-                    {
-                        efun_override = MY_FALSE;
-                    }
-                }
-                else if (EVALUATION_TOO_LONG())
-                {
-                    yyerrorf("Can't call master::%s for "
-                             "'nomask simul_efun %s': eval cost too big"
-                            , get_txt(STR_PRIVILEGE), get_txt(p->name));
-                    efun_override = MY_FALSE;
-                }
-
-                /* The code will be L_CLOSURE, now determine the right
-                 * closure number to put into yylval.closure.number.
-                 * The number is usually the index in the appropriate
-                 * table, plus an offset indicating the type of the closure.
-                 *
-                 * The switch() serves just as a simple try... environment.
-                 */
-                yylval.closure.inhIndex = 0;
-                switch(0) { default:
-                    if (!efun_override)
-                    {
-
-                        /* lfun? */
-                        if (p->u.global.function >= 0)
-                        {
-                            int i;
-
-                            i = p->u.global.function;
-                            yylval.closure.number = i;
-                            if (i >= CLOSURE_IDENTIFIER_OFFS)
-                                yyerrorf(
-                                  "Too high function index of %s for #'",
-                                  get_txt(p->name)
-                                );
-                            break;
-                        }
-
-                        /* simul-efun? */
-                        if (p->u.global.sim_efun >= 0) {
-                            yylval.closure.number =
-                              p->u.global.sim_efun + CLOSURE_SIMUL_EFUN_OFFS;
-                            break;
-                        }
-                    }
-
-                    /* efun? */
-                    if (p->u.global.efun >= 0)
-                    {
-                        yylval.closure.number =
-                          p->u.global.efun + CLOSURE_EFUN_OFFS;
-                        if (yylval.closure.number >
-                            LAST_INSTRUCTION_CODE + CLOSURE_EFUN_OFFS)
-                        {
-                            yylval.closure.number =
-                              efun_aliases[
-                                yylval.closure.number - CLOSURE_EFUN_OFFS
-                                  - LAST_INSTRUCTION_CODE - 1
-                              ] + CLOSURE_EFUN_OFFS;
-                        }
-                        break;
-                    }
-
-                    /* object variable? */
-                    if (p->u.global.variable >= 0)
-                    {
-                        if (p->u.global.variable & VIRTUAL_VAR_TAG) {
-                            /* Handling this would require an extra coding of
-                             * this closure type, and special treatment in
-                             * replace_program_lambda_adjust() .
-                             */
-                            yyerrorf("closure of virtual variable");
-                            yylval.closure.number = CLOSURE_IDENTIFIER_OFFS;
-                            break;
-                        }
-                        yylval.closure.number =
-                          p->u.global.variable + num_virtual_variables +
-                          CLOSURE_IDENTIFIER_OFFS;
-                        break;
-                    }
-
-                    /* None of these all */
-                    c = *yyp;
-                    *yyp = 0;
-                    yyerrorf("Undefined function: %.50s", wordstart);
-                    *yyp = c;
-                    yylval.closure.number = CLOSURE_EFUN_OFFS;
-
-                    break;
-                }
-                return L_CLOSURE;
+                return closure(yyp);
 
             } /* if (#') */
 
@@ -4993,305 +5323,7 @@ yylex1 (void)
             {
                 /* --- <newline>#: Preprocessor statement --- */
 
-                char *sp = NULL; /* Begin of second word */
-                Bool quote; /* In "" string? */
-                size_t wlen;  /* Length of the preproc keyword */
-                char last;
-                  /* Character last read, used to implement \-sequences */
-
-                /* Copy the first/only line of the preprocessor statement
-                 * from the input buffer into yytext[] while stripping
-                 * comments.
-                 */
-
-                /* Skip initial blanks */
-                outp = yyp;
-                yyp = yytext;
-                do {
-                    c = mygetc();
-                } while (lexwhite(c));
-
-                wlen = 0;
-                for (quote = MY_FALSE, last = '\0';;)
-                {
-
-                    /* Skip comments */
-                    while (!quote && c == '/')
-                    {
-                        char c2;
-
-                        if ( (c2 = mygetc()) == '*')
-                        {
-                            skip_comment();
-                            c = mygetc();
-                        }
-                        else if (c2 == '/')
-                        {
-                            outp = skip_pp_comment(outp);
-                            current_loc.line--;
-                            c = '\n';
-                        }
-                        else
-                        {
-                            --outp;
-                            break;
-                        }
-                    }
-
-                    /* If the last character was '\', take this one as
-                     * as it is, else interpret this character.
-                     */
-                    if (last == '\\')
-                        last = '\0';
-                    else if (c == '"')
-                        quote = !quote;
-                    else
-                        last = c;
-
-                    /* Remember end of the first word in the line */
-                    if (!sp && !isalunum(c))
-                    {
-                        sp = yyp;
-                        wlen = yyp - yytext;
-                    }
-
-                    if (c == '\n')
-                    {
-                        break;
-                    }
-                    SAVEC;
-                    c = mygetc();
-                }
-
-                /* Terminate the line copied to yytext[] */
-                *yyp = '\0';
-
-                /* Remember the end of the first word.
-                 * Let sp point to the next word then.
-                 */
-                if (sp)
-                {
-                    while(lexwhite(*sp))
-                    {
-                        sp++;
-                    }
-                }
-                else
-                {
-                    /* No end found in the copy loop - the next 'word'
-                     * will be the terminating '\0'.
-                     */
-                    sp = yyp;
-                    wlen = yyp - yytext;
-                }
-
-                /* Evaluate the preprocessor statement */
-                if (strncmp("include", yytext, wlen) == 0)
-                {
-                    /* Calling myfilbuf() before handle_include() is a waste
-                     * of time and memory. However, since the include
-                     * attempt might fail, we have to call it afterwards
-                     * to make sure that the lex can continue.
-                     */
-                    handle_include(sp);
-                    myfilbuf();
-                }
-                else
-                {
-                   /* Make sure there is enough data in the buffer. */
-                   myfilbuf();
-
-                if (strncmp("define", yytext, wlen) == 0)
-                {
-                    if (*sp == '\0')
-                        yyerror("Missing definition in #define");
-                    else
-                        handle_define(sp, quote);
-                }
-                else if (strncmp("if", yytext, wlen) == 0)
-                {
-                    int cond;
-                    svalue_t sv;
-
-                    myungetc('\n');
-                    add_input(sp);
-                    cond = cond_get_exp(0, &sv);
-                    free_svalue(&sv);
-                    if (mygetc() != '\n')
-                    {
-                        yyerror("Condition too complex in #if");
-                        while (mygetc() != '\n') NOOP;
-                    }
-                    else
-                        handle_cond(cond);
-                }
-                else if (strncmp("ifdef", yytext, wlen) == 0)
-                {
-                    deltrail(sp);
-                    handle_cond(lookup_define(sp) != 0);
-                }
-                else if (strncmp("ifndef", yytext, wlen) == 0)
-                {
-                    deltrail(sp);
-                    handle_cond(lookup_define(sp) == 0);
-                }
-                else if (strncmp("else", yytext, wlen) == 0)
-                {
-                    if (*sp != '\0')
-                    {
-                        if (pragma_pedantic)
-                            yyerror("Unrecognized #else (trailing characters)");
-                        else
-                            yywarn("Unrecognized #else (trailing characters)");
-                    }
-
-                    if (iftop && iftop->state == EXPECT_ELSE)
-                    {
-                        lpc_ifstate_t *p = iftop;
-
-                        iftop = p->next;
-                        mempool_free(lexpool, p);
-                        skip_to("endif", NULL);
-                    }
-                    else
-                    {
-                        yyerror("Unexpected #else");
-                    }
-                }
-                else if (strncmp("elif", yytext, wlen) == 0)
-                {
-                    if (iftop && iftop->state == EXPECT_ELSE)
-                    {
-                        lpc_ifstate_t *p = iftop;
-
-                        iftop = p->next;
-                        mempool_free(lexpool, p);
-                        skip_to("endif", NULL);
-                    }
-                    else
-                    {
-                        yyerror("Unexpected #elif");
-                    }
-                }
-                else if (strncmp("endif", yytext, wlen) == 0)
-                {
-                    if (*sp != '\0')
-                    {
-                        if (pragma_pedantic)
-                            yyerror("Unrecognized #endif (trailing characters)");
-                        else
-                            yywarn("Unrecognized #endif (trailing characters)");
-                    }
-
-                    if (iftop
-                     && (   iftop->state == EXPECT_ENDIF
-                         || iftop->state == EXPECT_ELSE))
-                    {
-                        lpc_ifstate_t *p = iftop;
-
-                        iftop = p->next;
-                        mempool_free(lexpool, p);
-                    }
-                    else
-                    {
-                        yyerror("Unexpected #endif");
-                    }
-                }
-                else if (strncmp("undef", yytext, wlen) == 0)
-                {
-                    ident_t *p, **q;
-                    int h;
-
-                    deltrail(sp);
-
-                    /* Lookup identifier <sp> in the ident_table and
-                     * remove it there if it is a #define'd identifier.
-                     * If it is a permanent define, park the ident
-                     * structure in the undefined_permanent_defines list.
-                     */
-                    h = identhash(sp);
-                    for (q = &ident_table[h]; NULL != ( p= *q); q=&p->next)
-                    {
-                        if (strcmp(sp, get_txt(p->name)))
-                            continue;
-
-                        if (p->type != I_TYPE_DEFINE) /* failure */
-                            break;
-
-                        if (!p->u.define.permanent)
-                        {
-#if defined(LEXDEBUG)
-                            fprintf(stderr, "%s #undef define '%s' %d '%s'\n"
-                                   , time_stamp(), get_txt(p->name)
-                                   , p->u.define.nargs
-                                   , p->u.define.exps.str);
-                            fflush(stderr);
-#endif
-                            if (p->inferior)
-                            {
-                                p->inferior->next = p->next;
-                                *q = p->inferior;
-                            }
-                            else
-                            {
-                                *q = p->next;
-                            }
-                            xfree(p->u.define.exps.str);
-                            free_mstring(p->name);
-                            p->name = NULL;
-                                /* mark for later freeing by all_defines */
-                            /* success */
-                            break;
-                       }
-                       else
-                       {
-                            if (p->inferior)
-                            {
-                                p->inferior->next = p->next;
-                                *q = p->inferior;
-                            }
-                            else
-                            {
-                                *q = p->next;
-                            }
-                            p->next = undefined_permanent_defines;
-                            undefined_permanent_defines = p;
-                            /* success */
-                            break;
-                        }
-                    }
-                }
-                else if (strncmp("echo", yytext, wlen) == 0)
-                {
-                    fprintf(stderr, "%s %s\n", time_stamp(), sp);
-                }
-                else if (strncmp("pragma", yytext, wlen) == 0)
-                {
-                    handle_pragma(sp);
-                }
-                else if (strncmp("line", yytext, wlen) == 0)
-                {
-                    char * end;
-                    long new_line;
-
-                    deltrail(sp);
-                    new_line = strtol(sp, &end, 0);
-                    if (end == sp || *end != '\0')
-                        yyerror("Unrecognised #line directive");
-                    if (new_line < current_loc.line)
-                        store_line_number_backward(current_loc.line - new_line);
-                    current_loc.line = new_line - 1;
-                }
-                else
-                {
-                    yyerror("Unrecognised # directive");
-                }} /* if() { else if () {} } */
-
-                store_line_number_info();
-                nexpands = 0;
-                current_loc.line++;
-                total_lines++;
-                yyp = outp;
+                yyp = handle_preprocessor_statement(yyp);
                 if (lex_fatal)
                 {
                     return -1;

@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+31-Dec-2004 (Lars Duening)  (3.3.642)
+  - (lex.c) Factored the handling of preprocessor statements and of
+        closures out of the yylex switch.
+
 29-Dec-2004 (Lars Duening)  (3.3.641)
   - (closure, object.c) The driver internally now uses the closure creation
         functions as well - there were more places where lambdas were
