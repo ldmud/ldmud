@@ -1,6 +1,15 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+09-Feb-2004 (Lars Duening)  (3.3.669)
+  - (object, simulate.c, backend.c) The list of destructed-but-referenced
+      objects is scanned for deallocatable objects only when a flag
+      signals that there actually are candidates. This should reduce
+      the CPU load when destructed objects accumulate.
+  - (mstrings, various files) Added statistics to check how much the
+      shared string table actually helps performance. They are printed
+      in the 'status tables' command.
+
 07-Feb-2004 (Lars Duening)  (3.3.668)
   - (smalloc.c, slaballoc.c) The large block handler is now capable
       of handling blocks up to 2**32 words. This is especially useful

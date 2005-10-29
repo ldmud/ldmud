@@ -8649,6 +8649,9 @@ again:
                  * that twin.
                  */
                 s = (mp_int)find_tabled(sp->u.str);
+#ifdef EXT_STRING_STATS
+        stNumTabledChecked++;
+#endif /* EXT_STRING_STATS */
             }
             else
             {
@@ -16367,6 +16370,9 @@ retry_for_shadow:
     if (!mstr_d_tabled(fun))
     {
         fun = find_tabled(fun);
+#ifdef EXT_STRING_STATS
+        stNumTabledChecked++;
+#endif /* EXT_STRING_STATS */
         if (!fun)
             goto failure2;
     }

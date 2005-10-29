@@ -571,6 +571,11 @@
  */
 #define MALLOC_EXT_STATISTICS
 
+/* Collected statistics about string comparisons.
+ * TODO: Remove this macro after we got our  data.
+ */
+#define EXT_STRING_STATS
+
 /* Trace changes to the tot_alloc_object and tot_alloc_object_size
  * statistics, in order to find the status bugs (enables commandline
  * option --check-object-stat). Will produce a decent amount of

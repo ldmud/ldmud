@@ -2836,10 +2836,15 @@ handle_newly_destructed_objects (void)
 
 /*-------------------------------------------------------------------------*/
 void
-remove_destructed_objects (void)
+remove_destructed_objects (Bool force)
 
 /* Scan the list of destructed objects and free those with no references
  * remaining.
+ * If <force> is FALSE, the call immediately returns if the flag
+ * <dest_last_ref_gone> (in object.c) is FALSE - this flag is set by
+ * free_object() if all but one reference to a destructed object is gone.
+ * If <force> is TRUE, the scan takes place unconditionally (this is used by
+ * the GC).
  */
 
 {
@@ -2848,6 +2853,11 @@ remove_destructed_objects (void)
     object_shadow_t *sh = destructed_obj_shadows;
     object_shadow_t *prev = NULL;
 #endif /* CHECK_OBJECT_REF */
+
+    if (!force && !dest_last_ref_gone)
+        return;
+
+    dest_last_ref_gone = MY_FALSE;
 
     for (ob = destructed_objs; ob != NULL; )
     {

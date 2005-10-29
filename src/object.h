@@ -184,26 +184,34 @@ struct replace_ob_s
 #ifndef DEBUG
 
 #ifndef CHECK_OBJECT_REF
-#  define free_object(o,from) MACRO( if (--((o)->ref) <= 0) _free_object(o); )
+#  define free_object(o,from) MACRO( \
+      if (((o)->flags & O_DESTRUCTED) && (o)->ref == 2) dest_last_ref_gone = MY_TRUE; \
+      if (--((o)->ref) <= 0) dealloc_object(o);\
+   )
 #else
-#  define free_object(o,from) MACRO( if (--((o)->ref) <= 0) _free_object(o, __FILE__, __LINE__); )
+#  define free_object(o,from) MACRO( \
+      if (((o)->flags & O_DESTRUCTED) && (o)->ref == 2) dest_last_ref_gone = MY_TRUE; \
+      if (--((o)->ref) <= 0) dealloc_object(o, __FILE__, __LINE__); \
+   )
 #endif
 
 #else
 
 #ifndef CHECK_OBJECT_REF
 #  define free_object(o,from) MACRO(\
+      if (((o)->flags & O_DESTRUCTED) && (o)->ref == 2) dest_last_ref_gone = MY_TRUE; \
       (o)->ref--;\
       if (d_flag > 1) printf("Sub ref from object %s: %ld (%s)\n"\
                             , get_txt((o)->name), (o)->ref, from);\
-      if ((o)->ref <= 0) _free_object(o); \
+      if ((o)->ref <= 0) dealloc_object(o); \
     )
 #else
 #  define free_object(o,from) MACRO(\
+      if (((o)->flags & O_DESTRUCTED) && (o)->ref == 2) dest_last_ref_gone = MY_TRUE; \
       (o)->ref--;\
       if (d_flag > 1) printf("Sub ref from object %s: %ld (%s)\n"\
                             , get_txt((o)->name), (o)->ref, from);\
-      if ((o)->ref <= 0) _free_object(o, __FILE__, __LINE__); \
+      if ((o)->ref <= 0) dealloc_object(o, __FILE__, __LINE__); \
     )
 #endif
 
@@ -243,12 +251,12 @@ extern replace_ob_t *obj_list_replace;
 extern long tot_alloc_object;
 extern long tot_alloc_object_size;
 extern object_t NULL_object;
+extern Bool dest_last_ref_gone;
 
 
 /* --- Prototypes --- */
 
 extern int32 renumber_programs(void);
-extern void remove_destructed_objects(void);
 extern void tell_object(object_t *, string_t *);
 extern void tell_object_str(object_t *, const char *);
 extern void tell_npc(object_t *, string_t *);
@@ -274,9 +282,9 @@ extern void replace_programs(void);
 extern Bool shadow_catch_message(object_t *ob, const char *str);
 
 #ifndef CHECK_OBJECT_REF
-extern void _free_object(object_t *);
+extern void dealloc_object(object_t *);
 #else
-extern void _free_object(object_t *, const char * file, int line);
+extern void dealloc_object(object_t *, const char * file, int line);
 #endif
 extern object_t *get_empty_object(int num_var);
 extern void      init_object_variables (object_t *ob);

@@ -307,11 +307,15 @@ static INLINE void
 cleanup_stuff (void)
 
 /* Perform a number of clean up operations: replacing programs, freeing
- * driver hooks, and removing destructed object.
+ * driver hooks, and handling newly destructed objects.
  * They are collected in one function so that they can be easily called from
  * various places (backend loop and the process_objects loops); especially
  * since it is not advisable to remove destructed objects before replacing
  * the programs.
+ *
+ * This function does not call remove_destructed_objects() as this
+ * call might become costly, and it is also sufficient to call it in the
+ * context of process_objects() every couple of seconds.
  */
 
 {
@@ -346,10 +350,6 @@ cleanup_stuff (void)
     /* Finish up all newly destructed objects.
      */
     handle_newly_destructed_objects();
-
-    /* Remove all unreferenced destructed objects.
-     */
-    remove_destructed_objects();
 } /* cleanup_stuff() */
 
 /*-------------------------------------------------------------------------*/
@@ -645,6 +645,7 @@ backend (void)
 
             /* Reset/cleanup/swap objects.
              */
+            remove_destructed_objects(MY_FALSE);
             process_objects();
             do_state_check(2, "after swap/cleanup/reset");
 
@@ -962,6 +963,7 @@ static  mp_int num_data_cleanup;
              * doing so.
              */
             cleanup_stuff();
+            remove_destructed_objects(MY_FALSE);
 
             /* Supply a flag to the object that says if this program
              * is inherited by other objects. Cloned objects might as well
@@ -1036,7 +1038,6 @@ no_clean_up:
          */
         if (num_data_cleanup > 0
          && (unsigned long)obj->time_cleanup < (unsigned long)current_time
-         && 0
            )
         {
 #ifdef DEBUG

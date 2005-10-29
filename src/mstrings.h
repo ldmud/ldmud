@@ -69,6 +69,15 @@ struct string_s
 extern mp_uint mstr_used;
 extern mp_uint mstr_used_size;
 
+#ifdef EXT_STRING_STATS
+extern unsigned long stNumEqual;
+extern unsigned long stNumTabledEqual;
+extern unsigned long stNumHashEqual;
+extern unsigned long stNumComp;
+extern unsigned long stNumTabledComp;
+extern unsigned long stNumTabledChecked;
+#endif /* EXT_STRING_STATS */
+
 /* --- Prototypes --- */
 
 extern void mstring_init (void);

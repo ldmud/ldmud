@@ -222,13 +222,21 @@ object_t NULL_object = { 0 };
    * binary zero. Structure assignment otoh works.
    */
 
+Bool dest_last_ref_gone = MY_FALSE;
+  /* This flag is set to TRUE if the second-to-last reference to
+   * a destructed is removed, as this usually means that it can be removed
+   * from the list of destructed objects and deallocated altogether.
+   * The flag is used to avoid unnecessary scans of the list of destructed
+   * objects by the backend in the meantime.
+   */
+
 /*-------------------------------------------------------------------------*/
 #ifndef CHECK_OBJECT_REF
 void
-_free_object (object_t *ob)
+dealloc_object (object_t *ob)
 #else
 void
-_free_object ( object_t *ob, const char * file, int line)
+dealloc_object ( object_t *ob, const char * file, int line)
 #endif
 
 /* Deallocate/dereference all memory and structures held by <ob>.
@@ -352,7 +360,7 @@ _free_object ( object_t *ob, const char * file, int line)
     /* Free the object structure */
     tot_alloc_object--;
     xfree(ob);
-} /* _free_object() */
+} /* dealloc_object() */
 
 /*-------------------------------------------------------------------------*/
 object_t *
@@ -512,7 +520,7 @@ remove_all_objects (void)
         if ( !(ob->flags & O_DESTRUCTED) )
             break;
     }
-    remove_destructed_objects();
+    remove_destructed_objects(MY_TRUE);
 }
 
 #endif
@@ -2019,6 +2027,9 @@ v_variable_exists (svalue_t *sp, int num_arg)
         int ix;
         typeflags_t flags;
 
+#ifdef EXT_STRING_STATS
+        stNumTabledChecked++;
+#endif /* EXT_STRING_STATS */
         shared_name = find_tabled(argp->u.str);
         if (!shared_name)
             break;
@@ -7743,6 +7754,9 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
         /* If the variable exists, it must exist as shared
          * string.
          */
+#ifdef EXT_STRING_STATS
+        stNumTabledChecked++;
+#endif /* EXT_STRING_STATS */
         s = find_tabled_str(name);
         if (!s)
         {
@@ -7816,6 +7830,9 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
         /* If the function exists, it must exist as shared
          * string.
          */
+#ifdef EXT_STRING_STATS
+        stNumTabledChecked++;
+#endif /* EXT_STRING_STATS */
         s = find_tabled_str(name);
         if (!s)
         {
@@ -8617,6 +8634,9 @@ static int nesting = 0;  /* Used to detect recursive calls */
 
         do { /* A simple try.. environment */
 
+#ifdef EXT_STRING_STATS
+        stNumTabledChecked++;
+#endif /* EXT_STRING_STATS */
             if ( NULL != (var = find_tabled_str(cur)) )
             {
                 /* The name exists in an object somewhere, now check if it

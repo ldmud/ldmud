@@ -10,6 +10,9 @@ DESCRIPTION
         Most likely the global initialisation fails due to missing or 
         unreadable key resp. certificate-file.
 
+HISTORY
+        Introduced in LDMud 3.3.474 and following, backported to 3.2.11.
+
 SEE ALSO
         tls_init_connection(E), tls_deinit_connection(E), 
         tls_query_connection_state(E), tls_query_connection_info(E)

@@ -1742,7 +1742,7 @@ garbage_collection(void)
         interactive_cleanup(all_players[i]);
     }
 
-    remove_destructed_objects(); /* After reducing all object references! */
+    remove_destructed_objects(MY_TRUE); /* After reducing all object references! */
 
     if (dobj_count != tot_alloc_object)
     {
@@ -2795,7 +2795,7 @@ garbage_collection (void)
         free_array(uncaught_error_trace);
         uncaught_error_trace = NULL;
     }
-    remove_destructed_objects();
+    remove_destructed_objects(MY_TRUE);
 
     reallocate_reserved_areas();
     time_last_gc = time(NULL);

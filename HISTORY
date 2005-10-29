@@ -88,10 +88,6 @@ For a detailed list of all changes see the file CHANGELOG.
        + sha1(): Compute the SHA1 message digest.
        + struct_info(): Return information about a struct.
        + structp(): Predicate efun to detect structs.
-       + tls_query_connection_state(), tls_query_connection_info(),
-         tls_init_connection(), tls_deinit_connection(), tls_error(),
-         tls_available():
-           Optional: Support for TLS connections.
        + to_struct(): Convert an array into a struct.
 
     - Master Object:
@@ -187,7 +183,7 @@ For a detailed list of all changes see the file CHANGELOG.
            x509 key- and certfile for the TLS package.
 
 
-22-Jan-2004 (Lars Duening) -- Release 3.2.11
+08-Feb-2005 (Lars Duening) -- Release 3.2.11
 
     - Changed efuns:
        + db_*(): mySQL efuns trigger a privilege violation ("mysql", "<efun
@@ -213,6 +209,10 @@ For a detailed list of all changes see the file CHANGELOG.
            closures could not be saved and restored.
 
     - New efuns:
+       + tls_query_connection_state(), tls_query_connection_info(),
+         tls_init_connection(), tls_deinit_connection(), tls_error(),
+         tls_available():
+           Optional: Support for TLS connections.
 
     - Master Object:
 

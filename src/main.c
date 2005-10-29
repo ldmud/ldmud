@@ -1958,6 +1958,9 @@ options (void)
 #       if defined(MALLOC_EXT_STATISTICS)
                               , "MALLOC_EXT_STATISTICS"
 #       endif
+#       if defined(EXT_STRING_STATS)
+                              , "EXT_STRING_STATS"
+#       endif
                               };
         size_t nStrings = sizeof(optstrings) / sizeof(optstrings[0]);
         size_t iInitial = strlen(optstrings[0]);

@@ -66,5 +66,8 @@ USAGE
 BUG
         This manpage might be not quite up to date with the implementation.
 
+HISTORY
+        Introduced in LDMud 3.3.474 and following, backported to 3.2.11.
+
 SEE ALSO
         tls_* efuns

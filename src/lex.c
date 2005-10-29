@@ -6297,9 +6297,9 @@ add_define (char *name, short nargs, char *exps, source_loc_t loc)
         char buf[200+NSIZE+MAXPATHLEN];
 
         if (current_loc.line <= 0)
-            sprintf(buf, "(in auto include text) Redefinition of #define %s", name);
+            sprintf(buf, "(in auto include text) #define %s already defined", name);
         else
-            sprintf(buf, "Redefinition of #define %s", name);
+            sprintf(buf, "#define %s already defined", name);
 
         if (p->u.define.loc.file != NULL)
         {
@@ -6389,7 +6389,7 @@ add_permanent_define (char *name, short nargs, void *exps, Bool special)
          || p->u.define.special
          || strcmp(exps,p->u.define.exps.str) != 0)
         {
-            error("Redefinition of permanent #define %s\n", name);
+            error("Permanent #define %s already defined\n", name);
         }
         return;
     }

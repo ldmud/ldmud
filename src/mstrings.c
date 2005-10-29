@@ -202,6 +202,15 @@ static mp_uint mstr_found = 0;
   /* Number of successful searches in the string table with content comparison.
    */
 
+#ifdef EXT_STRING_STATS
+unsigned long stNumEqual = 0;
+unsigned long stNumHashEqual = 0;
+unsigned long stNumTabledEqual = 0;
+unsigned long stNumComp = 0;
+unsigned long stNumTabledComp = 0;
+unsigned long stNumTabledChecked = 0;
+#endif /* EXT_STRING_STATS */
+
 /*-------------------------------------------------------------------------*/
 static INLINE whash_t
 hash_string (const char * const s, size_t size)
@@ -1052,19 +1061,43 @@ mstring_equal(const string_t * const pStr1, const string_t * const pStr2)
  */
 
 {
+#ifdef EXT_STRING_STATS
+    stNumEqual++;
+#endif /* EXT_STRING_STATS */
     if (pStr1 == pStr2 || get_txt(pStr1) == get_txt(pStr2))
+    {
+#ifdef EXT_STRING_STATS
+        if (mstr_i_tabled(pStr1))
+            stNumTabledEqual++;
+#endif /* EXT_STRING_STATS */
         return MY_TRUE;
+    }
     if (mstr_d_tabled(pStr1) && mstr_i_tabled(pStr2) && pStr2->link == pStr1)
+    {
+#ifdef EXT_STRING_STATS
+        stNumTabledEqual++;
+#endif /* EXT_STRING_STATS */
         return MY_TRUE;
+    }
     if (mstr_i_tabled(pStr1) && mstr_d_tabled(pStr2) && pStr1->link == pStr2)
+    {
+#ifdef EXT_STRING_STATS
+        stNumTabledEqual++;
+#endif /* EXT_STRING_STATS */
         return MY_TRUE;
+    }
     if (mstrsize(pStr1) != mstrsize(pStr2))
         return MY_FALSE;
     if (mstr_hash(pStr1) != 0
      && mstr_hash(pStr2) != 0
      && mstr_hash(pStr1) != mstr_hash(pStr2)
        )
+    {
+#ifdef EXT_STRING_STATS
+        stNumHashEqual++;
+#endif /* EXT_STRING_STATS */
         return MY_FALSE;
+    }
 
     return (memcmp(get_txt(pStr1), get_txt(pStr2), mstrsize(pStr1)) == 0);
 } /* mstring_equal() */
@@ -1084,12 +1117,31 @@ mstring_compare (const string_t * const pStr1, const string_t * const pStr2)
 {
     int rc;
 
+#ifdef EXT_STRING_STATS
+    stNumComp++;
+#endif /* EXT_STRING_STATS */
     if (pStr1 == pStr2 || get_txt(pStr1) == get_txt(pStr2))
+    {
+#ifdef EXT_STRING_STATS
+        if (mstr_i_tabled(pStr1))
+            stNumTabledComp++;
+#endif /* EXT_STRING_STATS */
         return 0;
+    }
     if (mstr_d_tabled(pStr1) && mstr_i_tabled(pStr2) && pStr2->link == pStr1)
+    {
+#ifdef EXT_STRING_STATS
+        stNumTabledComp++;
+#endif /* EXT_STRING_STATS */
         return 0;
+    }
     if (mstr_i_tabled(pStr1) && mstr_d_tabled(pStr2) && pStr1->link == pStr2)
+    {
+#ifdef EXT_STRING_STATS
+        stNumTabledComp++;
+#endif /* EXT_STRING_STATS */
         return 0;
+    }
 
     /* We have to compare two strings by byte.
      * Remember to take the difference in length into account when the
@@ -1847,6 +1899,21 @@ add_string_status (strbuf_t *sbuf, Bool verbose)
                         , 100.0 * (float)mstr_collisions / (float)mstr_added
                         , 100.0 * (float)mstr_collisions / (float)mstr_chains
                         );
+#ifdef EXT_STRING_STATS
+        strbuf_addf(sbuf, "Equality tests: %lu total, %lu by table (%.1f%%), %lu by hash (%.1lf%%)\n"
+                        , stNumEqual, stNumTabledEqual
+                        , stNumEqual ? 100.0 * (stNumTabledEqual/stNumEqual) : 0.0
+                        , stNumHashEqual
+                        , stNumEqual ? 100.0 * (stNumHashEqual/stNumEqual) : 0.0
+                        );
+        strbuf_addf(sbuf, "Comparisons:    %lu total, %lu by table (%.1f%%)\n"
+                        , stNumComp, stNumTabledComp
+                        , stNumComp ? 100.0 * (stNumTabledComp/stNumComp) : 0.0
+                        );
+        strbuf_addf(sbuf, "Table lookups for existence: %lu\n"
+                        , stNumTabledChecked
+                        );
+#endif /* EXT_STRING_STATS */
     }
 
     return stringtable_size + distinct_size;
