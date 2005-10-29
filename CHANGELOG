@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+01-Apr-2005 (Lars Duening)  (3.3.696)
+  - (port.c) Corrected a C99 incompatibility (thanks, Ralph!)
+  - (simulate.c, backend) The commands/s and compiled lines/s statistics
+       are part of the 'status tables' output.
+
 27-Mar-2005 (Lars Duening)  (3.3.695)
   - (patchlevel.h, main.c, lex.c) Simplified the version number handling
        in anticipation of the 3.4 branch.

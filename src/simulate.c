@@ -3091,6 +3091,11 @@ status_parse (strbuf_t * sbuf, char * buff)
                       , stat_total_evalcost.weighted_avg
                       , stat_eval_duration.weighted_avg / 1000000.0
                       );
+            strbuf_addf(sbuf
+                      , "Load: %.2lf cmds/s, %.2lf comp lines/s\n"
+                      , stat_load.weighted_avg
+                      , stat_compile.weighted_avg
+                      );
 
 #ifdef COMM_STAT
             strbuf_add(sbuf, "\nNetwork IO:\n");

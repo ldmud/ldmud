@@ -38,6 +38,8 @@ extern Bool extra_jobs_to_do;
 
 typedef enum { gcDont = 0, gcMalloc, gcEfun } GC_Request;
 extern GC_Request gc_request;
+extern statistic_t stat_load;
+extern statistic_t stat_compile;
 
 extern Bool mud_is_up;
 

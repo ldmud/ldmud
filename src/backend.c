@@ -147,12 +147,12 @@ Bool mud_is_up = MY_FALSE;
    * used by the driver, but can be useful for printf()-style debugging.
    */
 
-static statistic_t stat_load = { 0 };
+statistic_t stat_load = { 0 };
   /* The load average (player commands/second), weighted over the
    * last period of time.
    */
 
-static statistic_t stat_compile = { 0 };
+statistic_t stat_compile = { 0 };
   /* The average of compiled lines/second, weighted over the last period
    * of time.
    */

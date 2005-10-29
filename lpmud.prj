@@ -59,16 +59,17 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 695)
-(Parent-Version lpmud 3-3 694)
+(Project-Version lpmud 3-3 696)
+(Parent-Version lpmud 3-3 695)
 (Version-Log "
-  - (patchlevel.h, main.c, lex.c) Simplified the version number handling
-       in anticipation of the 3.4 branch.
+  - (port.c) Corrected a C99 incompatibility (thanks, Ralph!)
+  - (simulate.c, backend) The commands/s and compiled lines/s statistics
+       are part of the 'status tables' output.
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Sun, 27 Mar 2005 15:48:26 -0700")
+(Checkin-Time "Fri, 01 Apr 2005 21:08:11 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -107,7 +108,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.12 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.86 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.758 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.759 644))
   (HISTORY (lpmud/f/49_HISTORY 1.385.1.22 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.21 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -169,8 +170,8 @@
   (src/actions.c (lpmud/d/12_actions.c 1.15.1.52 644))
   (src/array.h (lpmud/f/47_array.h 1.18.1.22 644))
   (src/array.c (lpmud/d/12_array.c 1.46.1.47.1.22 644))
-  (src/backend.h (lpmud/f/46_backend.h 1.20.1.10 644))
-  (src/backend.c (lpmud/d/6_backend.c 1.68.1.35.1.54 644))
+  (src/backend.h (lpmud/f/46_backend.h 1.20.1.11 644))
+  (src/backend.c (lpmud/d/6_backend.c 1.68.1.35.1.55 644))
   (src/bitstrings.h (lpmud/i/47_bitstrings 1.3 644))
   (src/bitstrings.c (lpmud/i/48_bitstrings 1.16 644))
   (src/bytecode.h (lpmud/a/b/26_bytecode.h 1.1.1.3 644))
@@ -328,7 +329,7 @@
   (src/pkg-tls.h (lpmud/e/b/10_pkg-tls.h 1.8 644))
   (src/pkg-tls.c (lpmud/e/b/11_pkg-tls.c 1.23 644))
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.20 644))
-  (src/port.c (lpmud/39_port.c 1.17.1.9 644))
+  (src/port.c (lpmud/39_port.c 1.17.1.10 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.17.1.6 644))
   (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.65.1.76.1.7 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
@@ -343,7 +344,7 @@
   (src/simul_efun.h (lpmud/f/17_simul_efun 1.5.1.6 644))
   (src/simul_efun.c (lpmud/32_simul_efun 1.20.1.17.1.7 644))
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.41 644))
-  (src/simulate.c (lpmud/31_simulate.c 1.88.1.135.1.18 644))
+  (src/simulate.c (lpmud/31_simulate.c 1.88.1.135.1.19 644))
   (src/slaballoc.h (lpmud/d/c/16_slaballoc. 1.2 644))
   (src/slaballoc.c (lpmud/d/c/17_slaballoc. 1.11 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.16 644))
