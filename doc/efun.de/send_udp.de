@@ -25,6 +25,10 @@ AENDERUNGEN
             die Apply Namen. Die alte Version ist verfuegbar, wenn im
             Treiber USE_DEPRECATED gesetzt ist.
 
+FEHLER
+        Ist <host> ein qualifizierter Hostname (anstelle einer IP Adresse),
+        blockiert die Ausfuehrung fuer die Dauer der Namensaufloesung.
+
 ANMERKUNG
         Auf manchen Systemen wird ein fehlgeschlagener Versuch von send_udp()
         nicht registriert, bis das naechste send_udp() aufgerufen wird.

@@ -43,8 +43,8 @@ USAGE
 	For 2) you have to call tls_init_connection() as first command
 	after the player connected (normally in master_ob->connect())
 
-BUGS
-        So far, only GnuTLS is supported, but not OpenSSL.
+BUG
+        This manpage might be not quite up to date with the implementation.
 
 SEE ALSO
         tls_* efuns

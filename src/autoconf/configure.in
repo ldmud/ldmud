@@ -1222,8 +1222,8 @@ if test $lp_cv_has_mysql = yes; then
             CFLAGS="$saveflags -L/usr/local/lib"
             AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -L/usr/local/lib -lmysqlclient")
         elif test -d "/usr/lib/mysql/lib"; then
-            CFLAGS="$saveflags -L/usr/local/lib"
-            AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -L/usr/local/lib -lmysqlclient")
+            CFLAGS="$saveflags -L/usr/lib/mysql/lib"
+            AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -L/usr/lib/mysql/lib -lmysqlclient")
         else
             AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -lmysqlclient")
         fi

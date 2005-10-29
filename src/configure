@@ -11085,7 +11085,7 @@ if test $ac_cv_lib_mysqlclient_main = yes; then
 fi
 
         elif test -d "/usr/lib/mysql/lib"; then
-            CFLAGS="$saveflags -L/usr/local/lib"
+            CFLAGS="$saveflags -L/usr/lib/mysql/lib"
             echo "$as_me:$LINENO: checking for main in -lmysqlclient" >&5
 echo $ECHO_N "checking for main in -lmysqlclient... $ECHO_C" >&6
 if test "${ac_cv_lib_mysqlclient_main+set}" = set; then
@@ -11135,7 +11135,7 @@ fi
 echo "$as_me:$LINENO: result: $ac_cv_lib_mysqlclient_main" >&5
 echo "${ECHO_T}$ac_cv_lib_mysqlclient_main" >&6
 if test $ac_cv_lib_mysqlclient_main = yes; then
-  tmp="$PKGLIBS -L/usr/local/lib -lmysqlclient"
+  tmp="$PKGLIBS -L/usr/lib/mysql/lib -lmysqlclient"
 fi
 
         else

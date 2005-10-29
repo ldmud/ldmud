@@ -54,15 +54,17 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 649)
-(Parent-Version lpmud 3-3 648)
+(Project-Version lpmud 3-3 650)
+(Parent-Version lpmud 3-3 649)
 (Version-Log "
-  - (configure) Added another path to the search for a mySQL installation.
+  - (doc/efun/send_udp) Added a note about the blocking behaviour of 
+       name lookups.
+  - (configure) The mySQL test was not quite correct.
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Sun, 09 Jan 2005 13:49:04 -0700")
+(Checkin-Time "Sun, 09 Jan 2005 18:00:26 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -100,13 +102,13 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.12 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.85 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.712 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.713 644))
   (HISTORY (lpmud/f/49_HISTORY 1.385.1.9 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.21 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
   ;; Configuration
-  (src/configure (lpmud/d/0_configure 1.19.1.109.1.3 755))
+  (src/configure (lpmud/d/0_configure 1.19.1.109.1.4 755))
   (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.43 644))
   (src/machine.h.in (lpmud/b/9_machine.h. 1.9.1.14 644))
   (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.19.1.34.1.2 644))
@@ -114,7 +116,7 @@
   (src/install-sh (lpmud/c/5_install-sh 1.2 755))
   (src/ldmud-man.txt (lpmud/c/c/29_ldmud-man. 1.1 644))
 
-  (src/autoconf/configure.in (lpmud/d/7_configure. 1.20.1.9.1.102 644))
+  (src/autoconf/configure.in (lpmud/d/7_configure. 1.20.1.9.1.103 644))
   (src/autoconf/acconfig.h (lpmud/d/10_acconfig.h 1.6.1.14 644))
 
   (src/settings/README (lpmud/c/22_README 1.14.1.17 644))
@@ -603,7 +605,7 @@
   (doc/concepts/pgsql (lpmud/d/b/43_pgsql 1.2 644))
   (doc/concepts/rtfm (lpmud/n/39_rtfm 1.1 644))
   (doc/concepts/simul_efun (lpmud/n/40_simul_efun 1.2 644))
-  (doc/concepts/tls (lpmud/e/b/13_tls 1.2 644))
+  (doc/concepts/tls (lpmud/e/b/13_tls 1.3 644))
   (doc/concepts/uids (lpmud/n/41_uids 1.8 644))
 
   (doc/driver/codestyle (lpmud/h/1_codestyle 1.4 644))
@@ -836,7 +838,7 @@
   (doc/efun/save_value (lpmud/e/13_save_value 1.5 644))
   (doc/efun/say (lpmud/q/3_say 1.6 644))
   (doc/efun/send_erq (lpmud/q/4_send_erq 1.1.1.3 644))
-  (doc/efun/send_udp (lpmud/q/5_send_imp 1.2.1.2 644))
+  (doc/efun/send_udp (lpmud/q/5_send_imp 1.2.1.3 644))
   (doc/efun/set_bit (lpmud/q/7_set_bit 1.6 644))
   (doc/efun/set_buffer_size (lpmud/q/8_set_buffer 1.2 644))
   (doc/efun/set_combine_charset (lpmud/f/4_set_combin 1.5 644))
@@ -1005,7 +1007,7 @@
   (doc/efun.de/set_buffer_size.de (lpmud/g/b/25_set_buffer 1.2 640))
   (doc/efun.de/set_bit.de (lpmud/g/b/26_set_bit.de 1.1 640))
   (doc/efun.de/set_auto_include_string.de (lpmud/g/b/27_set_auto_i 1.3 640))
-  (doc/efun.de/send_udp.de (lpmud/g/b/28_send_udp.d 1.2 640))
+  (doc/efun.de/send_udp.de (lpmud/g/b/28_send_udp.d 1.3 640))
   (doc/efun.de/send_imp.de (lpmud/g/b/29_send_imp.d 1.2 640))
   (doc/efun.de/send_erq.de (lpmud/g/b/30_send_erq.d 1.2 640))
   (doc/efun.de/say.de (lpmud/g/b/31_say.de 1.2 640))
