@@ -1,0 +1,8 @@
+object environment(obj)
+object obj;
+
+Return the surrounding object to "obj". If no argument is giving,
+the return the surrounding to the current object.
+The object will dissapear silently without any sign.
+
+See also find_first_inventory(), this_player(), this_object().

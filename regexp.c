@@ -1,4 +1,6 @@
-/* 
+/* $Source: /u/mark/src/pax/RCS/regexp.c,v $
+ *
+ * $Revision: 1.2 $
  *
  * regexp.c - regular expression matching
  *
@@ -33,13 +35,6 @@
  * This version modified by Ian Phillipps to return pointer to terminating
  * NUL on substitution string. [ Temp mail address ex-igp@camcon.co.uk ]
  *
- *	Altered by amylaar to support excompatible option and the
- *      operators \< and >\ . ( 7.Sep. 1991 )
- *
- * regsub altered by amylaar to take an additional parameter specifying
- * maximum number of bytes that can be written to the memory region
- * pointed to by dest
- *
  * 	Beware that some of this code is subtly aware of the way operator
  * 	precedence is structured in regular expressions.  Serious changes in
  * 	regular-expression syntax might require a total rethink.
@@ -51,15 +46,25 @@
  *
  * Sponsored by The USENIX Association for public distribution. 
  *
+ * $Log:	regexp.c,v $
+ * Revision 1.2  89/02/12  10:05:39  mark
+ * 1.2 release fixes
+ * 
+ * Revision 1.1  88/12/23  18:02:32  mark
+ * Initial revision
+ * 
  */
 
 /* Headers */
 
 #include <stdio.h>
 #include <string.h>
-#include <ctype.h>
 #include "regexp.h"
-#include "lint.h" /* for free() */
+
+#ifndef lint
+static char    *Ident = "$Id: regexp.c,v 1.2 89/02/12 10:05:39 mark Exp $";
+#endif
+
 
 /*
  * The "internal use only" fields in regexp.h are present to pass info from
@@ -112,8 +117,6 @@
 #define	NOTHING	9		/* no	Match empty string. */
 #define	STAR	10		/* node	Match this (simple) thing 0 or more
 				 * times. */
-#define WORDSTART 11		/* node matching a start of a word          */
-#define WORDEND 12		/* node matching an end of a word           */
 #define	OPEN	20		/* no	Mark this point in input as start of
 				 * #n. */
  /* OPEN+1 is number 1, etc. */
@@ -159,28 +162,14 @@
  * Utility definitions.
  */
 
-#define SPECIAL 0x100
-#define LBRAC	('('|SPECIAL)
-#define RBRAC	(')'|SPECIAL)
-#define ASTERIX	('*'|SPECIAL)
-#define OR_OP	('|'|SPECIAL)
-#define DOLLAR	('$'|SPECIAL)
-#define DOT	('.'|SPECIAL)
-#define CARET	('^'|SPECIAL)
-#define LSQBRAC ('['|SPECIAL)
-#define RSQBRAC (']'|SPECIAL)
-#define LSHBRAC ('<'|SPECIAL)
-#define RSHBRAC ('>'|SPECIAL)
 #define	FAIL(m)	{ regerror(m); return(NULL); }
-#define	ISMULT(c)	((c) == ASTERIX)
+#define	ISMULT(c)	((c) == '*')
 #define	META	"^$.[()|*\\"
 #ifndef CHARBITS
-#define CHARBITS	0xff
 #define	UCHARAT(p)	((int)*(unsigned char *)(p))
 #else
 #define	UCHARAT(p)	((int)*(p)&CHARBITS)
 #endif
-#define ISWORDPART(c) ( isalnum(c) || (c) == '_' )
 
 /*
  * Flags to be passed up and down.
@@ -193,7 +182,7 @@
 /*
  * Global work variables for regcomp().
  */
-static short   *regparse;	/* Input-scan pointer. */
+static char    *regparse;	/* Input-scan pointer. */
 static int      regnpar;	/* () count. */
 static char     regdummy;
 static char    *regcode;	/* Code-emit pointer; &regdummy = don't. */
@@ -234,64 +223,21 @@ STATIC int      strcspn();
  * Beware that the optimization-preparation code in here knows about some
  * of the structure of the compiled regexp.
  */
-regexp *regcomp(exp,excompat)
+regexp *regcomp(exp)
 char           *exp;
-int		excompat;	/* \( \) operators like in unix ex */
 {
     register regexp *r;
     register char  *scan;
     register char  *longest;
     register int    len;
     int             flags;
-    short	   *exp2,*dest,c;
     extern char    *xalloc();
 
     if (exp == (char *)NULL)
 	FAIL("NULL argument");
 
-    exp2=(short*)xalloc( (strlen(exp)+1) * (sizeof(short[8])/sizeof(char[8])) );
-    for ( scan=exp,dest=exp2; c= *scan++; ) {
-	switch (c) {
-	    case '(':
-	    case ')':
-		*dest++ = excompat ? c : c | SPECIAL;
-		break;
-	    case '.':
-	    case '*':
-	    case '|':
-	    case '$':
-	    case '^':
-	    case '[':
-	    case ']':
-		*dest++ =  c | SPECIAL;
-		break;
-	    case '\\':
-		switch ( c = *scan++ ) {
-		    case '(':
-		    case ')':
-			*dest++ = excompat ? c | SPECIAL : c;
-			break;
-		    case '<':
-		    case '>':
-			*dest++ = c | SPECIAL;
-			break;
-		    case '{':
-		    case '}':
-			FAIL("sorry, unimplemented operator");
-		    case 'b': *dest++ = '\b'; break;
-		    case 't': *dest++ = '\t'; break;
-		    case 'r': *dest++ = '\r'; break;
-		    default:
-			*dest++ = c;
-		}
-		break;
-	    default:
-		*dest++ = c;
-	}
-    }
-    *dest=0;
     /* First pass: determine size, legality. */
-    regparse = exp2;
+    regparse = exp;
     regnpar = 1;
     regsize = 0L;
     regcode = &regdummy;
@@ -309,7 +255,7 @@ int		excompat;	/* \( \) operators like in unix ex */
 	FAIL("out of space");
 
     /* Second pass: emit code. */
-    regparse = exp2;
+    regparse = exp;
     regnpar = 1;
     regcode = r->program;
     regc(MAGIC);
@@ -351,7 +297,6 @@ int		excompat;	/* \( \) operators like in unix ex */
 	    r->regmlen = len;
 	}
     }
-    free((char*)exp2);
     return (r);
 }
 
@@ -397,7 +342,7 @@ int            *flagp;
     if (!(flags & HASWIDTH))
 	*flagp &= ~HASWIDTH;
     *flagp |= flags & SPSTART;
-    while (*regparse == OR_OP) {
+    while (*regparse == '|') {
 	regparse++;
 	br = regbranch(&flags);
 	if (br == (char *)NULL)
@@ -417,10 +362,10 @@ int            *flagp;
 	regoptail(br, ender);
 
     /* Check for proper termination. */
-    if (paren && *regparse++ != RBRAC) {
+    if (paren && *regparse++ != ')') {
 	FAIL("unmatched ()");
     } else if (!paren && *regparse != '\0') {
-	if (*regparse == RBRAC) {
+	if (*regparse == ')') {
 	    FAIL("unmatched ()");
 	} else
 	    FAIL("junk on end");/* "Can't happen". */
@@ -446,7 +391,7 @@ int            *flagp;
 
     ret = regnode(BRANCH);
     chain = (char *)NULL;
-    while (*regparse != '\0' && *regparse != OR_OP && *regparse != RBRAC) {
+    while (*regparse != '\0' && *regparse != '|' && *regparse != ')') {
 	latest = regpiece(&flags);
 	if (latest == (char *)NULL)
 	    return ((char *)NULL);
@@ -475,7 +420,7 @@ static char *regpiece(flagp)
 int            *flagp;
 {
     register char  *ret;
-    register short  op;
+    register char   op;
     /* register char  *nxt; */
     int             flags;
 
@@ -492,9 +437,9 @@ int            *flagp;
 	FAIL("* operand could be empty");
     *flagp = (WORST | SPSTART);
 
-    if (op == ASTERIX && (flags & SIMPLE))
+    if (op == '*' && (flags & SIMPLE))
 	reginsert(STAR, ret);
-    else if (op == ASTERIX) {
+    else if (op == '*') {
 	/* Emit x* as (x&|), where & means "self". */
 	reginsert(BRANCH, ret);	/* Either x */
 	regoptail(ret, regnode(BACK));	/* and loop */
@@ -514,7 +459,8 @@ int            *flagp;
  *
  * Optimization:  gobbles an entire sequence of ordinary characters so that
  * it can turn them into a single node, which is smaller to store and
- * faster to run.
+ * faster to run.  Backslashed characters are exceptions, each becoming a
+ * separate node; the code is simpler that way and it's not worth fixing.
  */
 static char *regatom(flagp)
 int            *flagp;
@@ -525,41 +471,35 @@ int            *flagp;
     *flagp = WORST;		/* Tentatively. */
 
     switch (*regparse++) {
-    case CARET:
+    case '^':
 	ret = regnode(BOL);
 	break;
-    case DOLLAR:
+    case '$':
 	ret = regnode(EOL);
 	break;
-    case DOT:
+    case '.':
 	ret = regnode(ANY);
 	*flagp |= HASWIDTH | SIMPLE;
 	break;
-    case LSHBRAC:
-	ret = regnode(WORDSTART);
-	break;
-    case RSHBRAC:
-	ret = regnode(WORDEND);
-	break;
-    case LSQBRAC:{
+    case '[':{
 	    register int    class;
 	    register int    classend;
 
-	    if (*regparse == CARET) {	/* Complement of range. */
+	    if (*regparse == '^') {	/* Complement of range. */
 		ret = regnode(ANYBUT);
 		regparse++;
 	    } else
 		ret = regnode(ANYOF);
-	    if (*regparse == RSQBRAC || *regparse == '-')
+	    if (*regparse == ']' || *regparse == '-')
 		regc(*regparse++);
-	    while (*regparse != '\0' && *regparse != RSQBRAC) {
+	    while (*regparse != '\0' && *regparse != ']') {
 		if (*regparse == '-') {
 		    regparse++;
-		    if (*regparse == RSQBRAC || *regparse == '\0')
+		    if (*regparse == ']' || *regparse == '\0')
 			regc('-');
 		    else {
-			class = (CHARBITS & *(regparse - 2)) + 1;
-			classend = (CHARBITS & *(regparse));
+			class = UCHARAT(regparse - 2) + 1;
+			classend = UCHARAT(regparse);
 			if (class > classend + 1)
 			    FAIL("invalid [] range");
 			for (; class <= classend; class++)
@@ -570,37 +510,42 @@ int            *flagp;
 		    regc(*regparse++);
 	    }
 	    regc('\0');
-	    if (*regparse != RSQBRAC)
+	    if (*regparse != ']')
 		FAIL("unmatched []");
 	    regparse++;
 	    *flagp |= HASWIDTH | SIMPLE;
 	}
 	break;
-    case LBRAC:
+    case '(':
 	ret = reg(1, &flags);
 	if (ret == (char *)NULL)
 	    return ((char *)NULL);
 	*flagp |= flags & (HASWIDTH | SPSTART);
 	break;
     case '\0':
-    case OR_OP:
-    case RBRAC:
+    case '|':
+    case ')':
 	FAIL("internal urp");	/* Supposed to be caught earlier. */
 	break;
-    case ASTERIX:
+    case '*':
 	FAIL("* follows nothing");
+	break;
+    case '\\':
+	if (*regparse == '\0')
+	    FAIL("trailing \\");
+	ret = regnode(EXACTLY);
+	regc(*regparse++);
+	regc('\0');
+	*flagp |= HASWIDTH | SIMPLE;
 	break;
     default:{
 	    register int    len;
-	    register short  ender;
+	    register char   ender;
 
 	    regparse--;
-	    for (len=0; regparse[len] &&
-	        !(regparse[len]&SPECIAL) && regparse[len] != RSQBRAC; len++) ;
+	    len = strcspn(regparse, META);
 	    if (len <= 0)
-		{
 		FAIL("internal disaster");
-		}
 	    ender = *(regparse + len);
 	    if (len > 1 && ISMULT(ender))
 		len--;		/* Back off clear of * operand. */
@@ -896,20 +841,6 @@ char           *prog;
 	    if (*reginput == '\0')
 		return (0);
 	    reginput++;
-	    break;
-	case WORDSTART:
-	    if (reginput == regbol)
-		break;
-	    if (*reginput == '\0' ||
-	       ISWORDPART( *(reginput-1) ) || !ISWORDPART( *reginput ) )
-		return (0);
-	    break;
-	case WORDEND:
-	    if (*reginput == '\0')
-		break;
-	    if ( reginput == regbol ||
-	       !ISWORDPART( *(reginput-1) ) || ISWORDPART( *reginput ) )
-		return (0);
 	    break;
 	case EXACTLY:{
 		register int    len;
@@ -1331,15 +1262,14 @@ char           *s2;
  */
 #ifdef __STDC__
 
-char *regsub(regexp *prog, char *source, char *dest, int n)
+char *regsub(regexp *prog, char *source, char *dest)
 
 #else
 
-char *regsub(prog, source, dest, n)
+char *regsub(prog, source, dest)
 regexp         *prog;
 char           *source;
 char           *dest;
-int		n;
 
 #endif
 {
@@ -1372,18 +1302,10 @@ int		n;
 	if (no < 0) {		/* Ordinary character. */
 	    if (c == '\\' && (*src == '\\' || *src == '&'))
 		c = *src++;
-	    if (--n < 0) {				/* amylaar */
-		regerror("line too long");
-		return NULL;
-	    }
 	    *dst++ = c;
 	} else if (prog->startp[no] != (char *)NULL && 
 		   prog->endp[no] != (char *)NULL) {
 	    len = prog->endp[no] - prog->startp[no];
-	    if ( (n-=len) < 0 ) {		/* amylaar */
-		regerror("line too long");
-		return NULL;
-	    }
 	    strncpy(dst, prog->startp[no], len);
 	    dst += len;
 	    if (len != 0 && *(dst - 1) == '\0') {	/* strncpy hit NUL. */
@@ -1391,10 +1313,6 @@ int		n;
 		return NULL;
 	    }
 	}
-    }
-    if (--n < 0) {			/* amylaar */
-    	regerror("line too long");
-    	return NULL;
     }
     *dst = '\0';
     return dst;

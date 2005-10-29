@@ -1,0 +1,10 @@
+There is a file obj/monster.c, that can be used to make simple
+monsters. You have to clone it, and call various functions in it,
+to set it up. Look at room/plane1.c to see how a wolf is created.
+
+Also look at obj/monster.c to see how the monster can be configured.
+It is best to use this predefined monster, because very little extra
+memory will be used by clongin monsters.
+
+If you want to give some funny valuable object to the monster, look
+at how the dragon is created and equipped.

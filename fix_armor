@@ -1,0 +1,10 @@
+#!/bin/sh
+#
+# Fix "armour" to "armor" in all of the .c files.
+#
+find mudlib -name '*.c' -exec fgrep -i -s armour {} \; -exec echo Fixing {} \; -exec dofix {} \;
+#
+# Mention those files which should be renamed.
+#
+echo The following files should be renamed:
+find mudlib -name '*[aA]rmour*' -print

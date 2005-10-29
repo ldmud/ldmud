@@ -1,0 +1,5 @@
+void exit()
+
+This function is called in rooms everytime a living object leaves.
+
+See also: lfun/init

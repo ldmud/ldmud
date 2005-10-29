@@ -1,0 +1,11 @@
+# These lines are to make sure that these objects will be there before anyone
+# tries to log in.  Otherwise there will be delays as they load.
+obj/player.c
+obj/soul.c
+obj/wiz_soul.c
+obj/monster.c
+obj/monster.talk.c
+# Here is where players' castles get loaded.  If you load a new castle
+# (such as one you ftp'ed, for example), add a line like this (although
+# without the preceding "#"):
+#players/fred/castle.c

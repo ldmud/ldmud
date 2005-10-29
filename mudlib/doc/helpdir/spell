@@ -1,0 +1,16 @@
+command: any spell
+argument: optional name of a player
+
+Cast a spell. If no argument, then cast spell on current fighting opponent.
+
+Spell		Cost (in spell points)	Damage  Required level to cast
+missile			10		 1-20		 5
+shock			15		 1-30		10
+fireball		20		 1-40		15
+
+You have to have enough experience points to be able to use the spells,
+but then they will work 100 %.
+
+If you cast a spell on an idle player, a fight will start.
+
+See also 'kill'.

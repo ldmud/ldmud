@@ -1,0 +1,3 @@
+void heart_beat()
+
+This function will be called automatically every 3 seconds.

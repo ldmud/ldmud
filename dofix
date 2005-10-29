@@ -1,0 +1,4 @@
+#!/bin/sh
+#
+sed -e '/[aA]rmour/s/rmour/rmor/g' $1 > $1.tmp
+mv $1.tmp $1

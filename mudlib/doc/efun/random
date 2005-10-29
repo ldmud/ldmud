@@ -1,0 +1,4 @@
+int random(n)
+int n;
+
+Return a number in the random range [0 .. n-1].

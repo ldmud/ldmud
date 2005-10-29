@@ -1,0 +1,23 @@
+These are rules for the conduct of wizards.  Anyone who violates these rules
+will have their wizard status removed!  I hate to be this blunt about it,
+but some people are ignoring the rules posted elsewhere.  So read these VERY
+closely:
+1) You are not allowed to help players.  This includes, but is not limited
+to, the following things:
+	Giving them treasures, weapons, armors, money, etc.
+	Telling them where such items or monsters are located.
+	Telling them how strong/beat up/etc. a monster is.
+2) You are not allowed to hurt players.  Again, some examples are:
+	Zapping them.  (Unless they attack you first...)
+	Making echos that make them think something is happening.
+3) You should not build things which do not conform to the rules and
+guidlines specified in /doc/build/RULES, /doc/build/weapons.list,
+/doc/build/amour.list, and so on.
+4) You should not drop stuff in /room/store.  If you need to get rid of a
+bunch of stuff, use "destruct all."
+5) You should not make objects which interfere with the wizard commands.
+For example, do not make objects which don't allow "destruct."
+6) Do not make copies of standard objects like monster.c, weapon.c, and so
+on with asking me, as they take immense amounts of memory.  If it's
+something you think should be in that thing, ask me.  It might already
+actually be there.

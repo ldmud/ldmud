@@ -1,0 +1,20 @@
+These are the rules for a wizard.
+
+1. You may not help other players, even if they lost points due to
+   lost connection. They have to go to the post office and ask Lars,
+   or use bug.
+
+2. Never attack a player or kill him. If a player behaves badly, file
+   the complaint to Drax.
+
+3. Do not make 'deadly' traps. A player must never die because he didn't
+   know what happens in the next room. If some room is very dangerous,
+   make some hint (like the giant footprints beside the giant lair).
+
+4. Never initialize the destination of an object outside your castle. If you
+   make a monster that can walk out of the castle, be sure that it is a
+   very nice monster.
+
+5. Never generate messages that looks like something it isn't (good and precise
+   rule :-). That is, don't try to fool the player that someone says something
+   when it isn't true etc.

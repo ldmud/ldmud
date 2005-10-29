@@ -1,0 +1,13 @@
+There are four levels of wizards: regular, senior, elder, and god.  A player
+in any category above regular can promote (or demote) the people under him.
+You must be a senior wizard in order to sponsor someone.
+
+Also, your levels determine what privileges you have.  Some commands are
+reserved for wizards of higher levels.  Talk to someone above you if you
+think you need them.  These levels are customizable by the game
+administrators.  They are contained in ../../security.h, so normal wizards
+can't see them.
+
+Regular wizards' main job is creating new stuff.  Senior wizards are
+supposed to watch and help their sponsees.  Elder wizards should help with
+the general running of the game, leaving gods for development or the like.

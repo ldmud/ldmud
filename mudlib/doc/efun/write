@@ -1,0 +1,7 @@
+void write(str)
+string str;
+
+Write a message "str" to current player. "str" can also be a number, which
+will be translated to a string.
+
+See also: say(), tell_object(), shout().

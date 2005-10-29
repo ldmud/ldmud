@@ -1,0 +1,19 @@
+The castle you have is just a 'facade'. If you look at the source, you
+will find that it defines an 'enter' command, but won't move the
+player anywhere.
+
+You have to make a hall way or something like that first. Do this by
+copying one of the standard files (se ed4).
+
+Now change the line in your castle.c that says
+
+write("This is a close...");
+
+into
+
+call_other(this_player(), "move_player", "into castle#room/peter/hall.c");
+
+The function "move_player" in the player object will move the player
+to your hall, tell other players around that he goes into the castle.
+
+See std for documentation about using std.h to make simple rooms.

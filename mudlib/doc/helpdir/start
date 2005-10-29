@@ -1,0 +1,22 @@
+Starting out in LP-mud:
+
+OK, basically what you want to do is get experience and gold coins.  You do
+this by solving puzzles, killing monsters, and selling (after finding)
+treasures.
+
+You can move around with normal "e,w,n,s,u,d" types of commands.  There are
+also longer commands, like "get shield", "wear shield", "wield axe", and
+commands that are for specific places or objects like "push button", "open
+safe", "eat cake" and so on.
+
+Killing monsters is a lot easier with a weapon and some armor (and realize
+that you must wield and wear those, respectively).  If the monster doesn't
+attack you first, you can type something like "kill orc" and you'll start
+fighting.
+
+If you get killed, you lose a quarter of your experience, and must go to the
+endoplasmatorium to regenerate.  Try not to have this happen.  Type "help
+wimpy" to get an idea on how to avoid this, and "help dying" for details. Also,
+"score" will tell you how you're doing as far as health, intoxication, etc.
+
+type "help" for a basic list of commands.  Have fun!

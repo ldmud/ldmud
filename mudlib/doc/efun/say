@@ -1,0 +1,13 @@
+void say(str,obj)
+string str;
+object obj;
+
+Send a message "str" to all players in the same object (room).  This
+function is also used by the "say" command.  If the optional second argument
+is given, then "str" is sent to all except that object.
+
+This commands behaves differently if called from a heart_beat(), or otherwise.
+When called from a heart_beat(), the message will reach all players in
+the same environment of the object that calls say().
+
+See also write(), shout(), tell().

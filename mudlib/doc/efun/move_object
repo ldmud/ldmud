@@ -1,0 +1,10 @@
+void move_object(item, dest)
+object item;
+object dest;
+
+Move the object "item" to the object "dest". Currently, both arguments
+can be strings. Usually, 'transfer()' should be used instead of
+'move_object()'.
+
+See also efun/transfer, efun/first_inventory, efun/this_object,
+	 efun/this_player

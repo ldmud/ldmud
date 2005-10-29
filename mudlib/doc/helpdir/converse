@@ -1,0 +1,7 @@
+command: converse
+no arguments.
+
+Stay in conversation mode until stopped by '**'.  It is the equivalent of
+preceding each line you type with "say ".
+
+See also 'say'.

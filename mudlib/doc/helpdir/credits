@@ -1,0 +1,13 @@
+The program was written originally by
+
+Lars Pensj|, April 1990 (lars@myab.se).
+
+Major changes to version 1.4.0-A implemented by James Seidman (a.k.a. Drax,
+jseidman@jarthur.claremont.edu) and Jon Krause (a.k.a. Blackstone,
+jon@jarthur.claremont.edu).
+
+Other credits:
+The regexp package was written made by Henry Spencer.
+The soul was based on the one written by Tommy Finsen.
+The generic weapon object and monster object were written by
+    Jan Herder and Carl Halle'n.

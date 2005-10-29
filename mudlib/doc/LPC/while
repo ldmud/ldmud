@@ -1,0 +1,8 @@
+while(expr) statement;
+
+While 'expr' evaluates to non 0, execute statment.
+
+A 'break' in the 'statement' will terminate the loop. Currently, there is
+no 'continue' (sorry).
+
+There is no 'for' statement either.

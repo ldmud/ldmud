@@ -1,0 +1,12 @@
+int sscanf(str, fmt, var1, var2 ...)
+string str;
+string fmt;
+
+Parse a string "str" using the format "fmt". "fmt" can contain strings
+separated by "%d" and "%s". Every "%d" and "%s" corresponds to one
+of var1, var2...
+"%d" will give a number, and "%s" will give a string.
+
+Number of matched "%d" and "%s" is returned.
+
+See also input_to().

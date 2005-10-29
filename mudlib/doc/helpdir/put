@@ -1,0 +1,7 @@
+command: put
+arguments: object, preposition, object
+
+Put something in or on something else.  Such as "put bottle in bag."
+
+See also 'drop', 'give', and 'get'.
+

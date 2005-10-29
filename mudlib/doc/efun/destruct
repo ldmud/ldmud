@@ -1,0 +1,8 @@
+void destruct(ob)
+object ob;
+
+Completely destroy and remove object "ob". The argument can also be a string.
+After the call to destruct(), no global variables will exist any longer,
+only local, and arguments.
+
+See also clone_object().

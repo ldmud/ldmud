@@ -1,0 +1,11 @@
+Command: update
+Argument: file
+
+Remove the definition of an object. If the object was cloned, all copies
+of it will steill remain. If you also want to destroy the copies, use
+the 'destruct' command.
+
+If it is a room, the room will be destroyed. The next refernce of the room
+will load it again from the file.
+
+See also w/clone, w/destruct, w/load.

@@ -1,90 +1,76 @@
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/dir.h>
-#include <fcntl.h>
-#include <setjmp.h>
 #include <string.h>
 #include <errno.h>
+#include <setjmp.h>
 #include <stdio.h>
-#include <memory.h>
-#if defined(sun)
-#include <alloca.h>
-#endif
-#ifdef M_UNIX
-#include <dirent.h>
-#endif
-
-#include "lint.h"
 #include "config.h"
 #include "stdio.h"
-#include "lang.h"
+#include "lnode.h"
+#include "y.tab.h"
 #include "interpret.h"
 #include "object.h"
 #include "sent.h"
 #include "wiz_list.h"
-#include "exec.h"
-#include "comm.h"
+#include "security.h"
 
 extern int errno;
-extern int comp_flag;
 
-char *inherit_file;
+extern FILE *vpopen();
 
-extern int readlink PROT((char *, char *, int));
-extern int symlink PROT((char *, char *));
-#ifndef MSDOS
-extern int lstat PROT((char *, struct stat *));
-#else
-#define lstat stat
-#endif
-extern int fchmod PROT((int, int));     
-char *last_verb;
+extern void  *xalloc();
 
-extern int special_parse PROT((char *)),
-    set_call PROT((struct object *, struct sentence *, int)),
-    legal_path PROT((char *));
+extern char *string_copy(), *dump_trace(), *check_file_name();
 
-void pre_compile PROT((char *)),
-    remove_interactive PROT((struct object *)),
-    add_light PROT((struct object *, int)),
-    add_action PROT((char *, char *, int)),
-    add_verb PROT((char *, int)),
-    print_local_commands(), ipc_remove(),
-    show_info_about PROT((char *, char *, struct interactive *)),
-    set_snoop PROT((struct object *, struct object *)),
-    print_lnode_status PROT((int)),
-    remove_all_players(), start_new_file PROT((FILE *)), end_new_file(),
-    move_or_destruct PROT((struct object *, struct object *)),
-    load_ob_from_swap PROT((struct object *)), dump_malloc_data(),
-    print_svalue PROT((struct svalue *)),
-    debug_message_value(),
-    destruct2();
+struct value *apply(), *make_number(), *clone_object();
+
+struct sentence *alloc_sentence();
+
+extern int stat(), mkdir(), fork(), wait(), execl(), restore_object(),
+    special_parse(), yyparse(), set_call(), vfork();
+
+extern void error(), print_all(), fatal(), add_message(), free(),
+    pre_compile(), perror(), debug_message(), exit(),
+    parse_command(), remove_interactive(), add_light(), save_object(),
+    do_write(), move_object(), add_action(), debug_message(),
+    add_verb(), remove_sent(), inventory(), look_at_room(),
+    print_local_commands(), ipc_remove(), abort(), alarm(),
+    free_sentence(), tell_object(), show_info_about(), ed_start(), say(),
+    tell_npc(), set_snoop(), tell_room(), add_ref(), print_lnode_status(),
+    remove_all_players(), start_new_file();
 
 extern int d_flag;
 
-struct object *obj_list, *obj_list_destruct, *master_ob;
+struct object *obj_list, *obj_list_destruct;
+extern struct object *find_living_object(), *find_player();
 
-extern struct wiz_list *back_bone_uid;
+extern int current_line;
 
-struct object *current_object;      /* The object interpreting a function. */
-struct object *command_giver;       /* Where the current command came from. */
-struct object *current_interactive; /* The user who caused this execution */
+struct object *current_object;	/* The object interpreting a function. */
+struct object *command_giver;	/* Where the current command came from. */
+
+struct object *find_object();
+static struct object *find_object2();
 
 int num_parse_error;		/* Number of errors in the parser. */
 
 void shutdowngame();
 
-extern void flush_all_player_mess();
+struct value *find_value(p)
+    struct lnode_variable *p;
+{
+    return &current_object->variables[p->number];
+}
 
-struct variable *find_status(str, must_find)
+struct lnode_var_def *find_status(str, must_find)
     char *str;
     int must_find;
 {
-    int i;
+    struct lnode_var_def *p;
 
-    for (i=0; i < current_object->prog->num_variables; i++) {
-	if (strcmp(current_object->prog->variable_names[i].name, str) == 0)
-	    return &current_object->prog->variable_names[i];
+    for (p=current_object->status; p; p = p->next) {
+	if (strcmp(p->name, str) == 0)
+	    return p;
     }
     if (!must_find)
 	return 0;
@@ -93,149 +79,36 @@ struct variable *find_status(str, must_find)
     return 0;
 }
 
-/*
- * Give the correct uid and euid to a created object.
- */
-int give_uid_to_object(ob)
-    struct object *ob;
+void remove_file(path)
+    char *path;
 {
-    struct object *tmp_ob;
-#ifdef COMPAT_MODE
-    char wiz_name[100];
-#else
-    struct svalue *ret;
-    char *creator_name;
-#endif
+    char buff[1000];
+    FILE *f;
 
-    if (master_ob == 0)
-	tmp_ob = ob;
-    else {
-	assert_master_ob_loaded();
-	tmp_ob = master_ob;
-    }
-    
-#ifdef COMPAT_MODE
-    /* Is this object wizard defined ? */
-    if (sscanf(ob->name, "players/%s", wiz_name) == 1) {
-	char *np;
-	np = strchr(wiz_name, '/');
-	if (np)
-	    *np = '\0';
-	ob->user = add_name(wiz_name);
-    } else {
-	ob->user = 0;
-    }
-    ob->eff_user = ob->user;	/* Initial state */
-    return 1;
-#else
-
-    if (!current_object || !current_object->user) {
-	/*
-	 * Only for the master and void object. Note that
-	 * back_bone_uid is not defined when master.c is being loaded.
-	 */
-	ob->user = add_name("NONAME");
-	ob->eff_user = 0;
-	return 1;
-    }
-
-    /*
-     * Ask master.c who the creator of this object is.
-     */
-    push_string(ob->name, STRING_CONSTANT);
-    ret = apply("creator_file", tmp_ob, 1);
-    if (!ret)
-	error("No function 'creator_file' in master.c!\n");
-    if (ret->type != T_STRING) {
-	struct svalue arg;
-	/* This can be the case for objects in /ftp and /open. */
-	arg.type = T_OBJECT;
-	arg.u.ob = ob;
-	destruct_object(&arg);
-	error("Illegal object to load.\n");
-    }
-    creator_name = ret->u.string;
-    /*
-     * Now we are sure that we have a creator name.
-     * Do not call apply() again, because creator_name will be lost !
-     */
-    if (strcmp(current_object->user->name, creator_name) == 0) {
-	/* 
-	 * The loaded object has the same uid as the loader.
-	 */
-	ob->user = current_object->eff_user;
-	ob->eff_user = current_object->eff_user;
-	return 1;
-    }
-
-    if (strcmp(back_bone_uid->name, creator_name) == 0) {
-	/*
-	 * The object is loaded from backbone. This is trusted, so we
-	 * let it inherit the value of eff_user.
-	 */
-	ob->user = current_object->eff_user;
-	ob->eff_user = current_object->eff_user;
-	return 1;
-    }
-
-    /*
-     * The object is not loaded from backbone, nor from 
-     * from the loading objects path. That should be an object
-     * defined by another wizard. It can't be trusted, so we give it the
-     * same uid as the creator. Also give it eff_user 0, which means that
-     * player 'a' can't use objects from player 'b' to load new objects nor
-     * modify files owned by player 'b'.
-     *
-     * If this effect is wanted, player 'b' must let his object do
-     * 'seteuid()' to himself. That is the case for most rooms.
-     */
-    ob->user = add_name(creator_name);
-    ob->eff_user = (struct wiz_list *)0;
-    return 1;
-#endif /* COMPAT_MODE */
+    path = check_file_name(path, 1);
+    if (path == 0)
+        return;
+    if (unlink(path) == -1)
+        add_message("No such file: %s\n", path);
+    return;
 }
 
-/*
- * Load an object definition from file. If the object wants to inherit
- * from an object that is not loaded, discard all, load the inherited object,
- * and reload again.
- *
- * In mudlib3.0 when loading inherited objects, their reset() is not called.
- *
- * Save the command_giver, because reset() in the new object might change
- * it.
- *
- * 
- */
-struct object *load_object(lname, dont_reset)
-    char *lname;
-    int dont_reset;
+struct object *load_object(name)
+    char *name;
 {
     FILE *f;
-    extern int total_lines;
-    extern int approved_object;
-
+/* Why is command giver saved and restored ? */
     struct object *ob, *save_command_giver = command_giver;
-    extern struct program *prog;
+    extern struct lnode *prog, *heart_beat;
     extern char *current_file;
-    struct stat c_st;
-    int name_length;
-    char real_name[200], name[200];
-
-#ifndef COMPAT_MODE
-    if (current_object && current_object->eff_user == 0)
-	error("Can't load objects when no effective user.\n");
-#endif
+    extern int variable_count;
+    struct stat i_st, c_st;
+    int i, name_length;
+    char *real_name;
+    
     /* Truncate possible .c in the object name. */
-    /* Remove leading '/' if any. */
-    while(lname[0] == '/')
-	lname++;
-    strncpy(name, lname, sizeof(name) - 1);
-    name[sizeof name - 1] = '\0';
     name_length = strlen(name);
-    if (name_length > sizeof name - 4)
-	name_length = sizeof name - 4;
-    name[name_length] = '\0';
+    name = string_copy(name);
     if (name[name_length-2] == '.' && name[name_length-1] == 'c') {
 	name[name_length-2] = '\0';
 	name_length -= 2;
@@ -243,218 +116,281 @@ struct object *load_object(lname, dont_reset)
     /*
      * First check that the c-file exists.
      */
+    real_name = (char *)xalloc(name_length + 3);
     (void)strcpy(real_name, name);
     (void)strcat(real_name, ".c");
     if (stat(real_name, &c_st) == -1) {
-	fprintf(stderr, "Could not load descr for %s\n", real_name);
-	error("Failed to load file.\n");
+	free(name);
+	free(real_name);
+	error("Could not load descr for %s\n", real_name);
 	return 0;
     }
     /*
-     * Check if it's a legal name.
+     * Now check if the i-file is newer or nonexisting.
      */
-    if (!legal_path(real_name)) {
-	fprintf(stderr, "Illegal pathname: %s\n", real_name);
-	error("Illegal path name.\n");
-	return 0;
+    real_name[name_length+1] = 'i';
+    if (stat(real_name, &i_st) == -1 || i_st.st_mtime < c_st.st_mtime) {
+	real_name[name_length+1] = 'c';
+	pre_compile(name);
+	real_name[name_length+1] = 'i';
     }
-    if (comp_flag)
-	fprintf(stderr, " compiling %s ...", real_name);
+    if (stat(real_name, &i_st) == -1 || i_st.st_mtime < c_st.st_mtime) {
+        if (command_giver)
+	    add_message("Failed to compile the new file.\n");
+    }
     f = fopen(real_name, "r");
     if (f == 0) {
 	perror(real_name);
+	free(name);
+	free(real_name);
 	error("Could not read the file.\n");
     }
     start_new_file(f);
-    current_file = string_copy(real_name);	/* This one is freed below */
-    compile_file();
-    end_new_file();
-    if (comp_flag)
-        fprintf(stderr, " done\n");
-    update_compile_av(total_lines);
-    total_lines = 0;
+    current_file = string_copy(real_name);
+    current_line = 0;
+    prog = heart_beat = 0;
+    prog_status = 0;
+    variable_count = 0;
+    num_parse_error = 0;
+    (void)yyparse();
     (void)fclose(f);
-    free(current_file);
-    current_file = 0;
-    /* Sorry, can't handle objects without programs yet. */
-    if (inherit_file == 0 && (num_parse_error > 0 || prog == 0)) {
-	if (prog)
-	    free_prog(prog, 1);
-	if (num_parse_error == 0 && prog == 0)
-	    error("No program in object !\n");
-	error("Error in loading object\n");
-    }
-    /*
-     * This is an iterative process. If this object wants to inherit an
-     * unloaded object, then discard current object, load the object to be
-     * inherited and reload the current object again. The global variable
-     * "inherit_file" will be set by lang.y to point to a file name.
-     */
-    if (inherit_file) {
-	char *tmp = inherit_file;
+    if (num_parse_error > 0 || prog == 0) {
+	free(name);
+	free(real_name);
+	free(current_file);
 	if (prog) {
-	    free_prog(prog, 1);
-	    prog = 0;
+	    /*
+	     * Set the reference count to one.
+	     * We don't want to confuse free_prog().
+	     */
+	    add_prog_ref((struct lnode_def *)prog);
+	    free_prog(prog);
 	}
-	if (strcmp(inherit_file, name) == 0) {
-	    free(inherit_file);
-	    inherit_file = 0;
-	    error("Illegal to inherit self.\n");
+	/* The following unlinks are security patches - Drax */
+	if (num_parse_error == 0 && prog == 0) {
+	    unlink(real_name);
+	    error("No program in object !\n");
 	}
-	inherit_file = 0;
-#if 1 /* MUDLIB3_NEED, It's very awkard to have to have a debug3 /JnA */
-#ifdef COMPAT_MODE
-	load_object(tmp, 0);
-#else	
-	load_object(tmp, 1);
-#endif
-#else
-	load_object(tmp, 0);		/* Remove this feature for now */
-#endif
-	free(tmp);
-	ob = load_object(name, dont_reset);
-	return ob;
+	unlink(real_name);
+	error("Error in loading %s\n", real_name);
     }
-    ob = get_empty_object(prog->num_variables);
-    /*
-     * Can we approve of this object ?
-     */
-    if (approved_object || strcmp(prog->name, "std/object.c") == 0)
-	ob->flags |= O_APPROVED;
-    ob->name = string_copy(name);	/* Shared string is no good here */
-    ob->prog = prog;
+    ob = get_empty_object();
+    ob->name = string_copy(name);
+    ob->name_length = strlen(name);
+    /* Is this object wizard defined ? */
+    {
+        char wiz_name[100];
+	if (sscanf(real_name, "players/%s", wiz_name) == 1) {
+	    char *np;
+	    np = strchr(wiz_name, '/');
+	    if (np)
+	        *np = '\0';
+	    ob->wl = add_name(wiz_name);
+	} else {
+	    ob->wl = 0;
+	}
+    }
+    /* Allocate space for local variables. */
+    if (variable_count > 0)
+	ob->variables =
+	    (struct value *)xalloc(variable_count * sizeof (struct value));
+    ob->num_variables = variable_count;
+    /* Initialize variables... */
+    for (i=0; i<variable_count; i++) {
+	ob->variables[i].u.number = 0;
+	ob->variables[i].type = T_NUMBER;
+    }
+    ob->status = prog_status;
+    if (prog) {
+	ob->prog = (struct lnode_def *)prog;
+	add_prog_ref((struct lnode_def *)prog);
+    } else {
+	ob->prog = 0;
+    }
     ob->next_all = obj_list;
     obj_list = ob;
-    enter_object_hash(ob);	/* add name to fast object lookup table */
-
-    if (give_uid_to_object(ob) && !dont_reset)
-	reset_object(ob, 0);
-    if (!(ob->flags & O_DESTRUCTED) && function_exists("clean_up",ob)) {
-	ob->flags |= O_WILL_CLEAN_UP;
-    }
+    ob->heart_beat = heart_beat;
+    ob->reset = 1;
+    (void)apply("reset", ob, 0);
     command_giver = save_command_giver;
-    if (d_flag > 1 && ob)
+    if (d_flag)
 	debug_message("--%s loaded\n", ob->name);
+    free(real_name);
+    free(name);
     return ob;
+}
+struct object *previous_ob;
+
+/*
+ * Call function in another object.
+ * Save the caller object in previous_ob, so some functions can
+ * see who called them.
+ */
+struct value *call_other(obj, name, arg)
+    struct value *obj;
+    char *name;
+    struct value *arg;
+{
+    struct object *ob, *save_command_giver = command_giver,
+	*save_previous_ob = previous_ob;
+    struct value *ret;
+
+    if (obj->type == T_OBJECT)
+	ob = obj->u.ob;
+    else
+	ob = find_object(obj->u.string);
+    if (ob == 0)
+	error("Could not find object %s\n", obj);
+    /*
+     * Test if this really is an existing object.
+     */
+    if (ob->reset == 0)
+	return 0;
+    ob->not_touched = 0;
+    previous_ob = current_object;
+    ret = apply(name, ob, arg);
+    previous_ob = save_previous_ob;
+    command_giver = save_command_giver;
+    if (ret == 0)
+	return &const0;
+    return ret;
+}
+
+struct value *this_player() {
+    struct value *p = alloc_value();
+
+    if (command_giver == 0)
+	return &const0;
+    p->type = T_OBJECT;
+    p->u.ob = command_giver;
+    add_ref(command_giver, "this_player()");
+    return p;
+}
+
+struct value *this_object() {
+    struct value *p = alloc_value();
+
+    p->type = T_OBJECT;
+    p->u.ob = current_object;
+    add_ref(current_object, "this_object()");
+    return p;
+}
+
+struct value *call_local_function(name, arg)
+    char *name;
+    struct value *arg;
+{
+    struct value *ret;
+
+    ret = apply(name, current_object, arg);
+    if (ret == 0)
+	error("Local function %s not found.\n", name);
+    return ret;
 }
 
 char *make_new_name(str)
     char *str;
 {
     static int i;
-    char *p = xalloc(strlen(str) + 10);
+    char *p = (char *)xalloc(strlen(str) + 10);
 
-    (void)sprintf(p, "%s#%d", str, i);
+    (void)sprintf(p, "%s%d/", str, i);
     i++;
     return p;
 }
-    
 
-/*
- * Save the command_giver, because reset() in the new object might change
- * it.
- */
-struct object *clone_object(str1)
+struct value *clone_object(str1)
     char *str1;
 {
     struct object *ob, *new_ob;
-    struct object *save_command_giver = command_giver;
+    struct value *ret;
+    int i;
 
-#ifndef COMPAT_MODE
-    if (current_object && current_object->eff_user == 0)
-	error("Illegal to call clone_object() with effective user 0\n");
-#endif
     ob = find_object(str1);
-    /*
-     * If the object self-destructed...
-     */
+    if (!ob) {
+	if (strcmp(str1, "obj/sing") == 0)
+	    fatal("No singularity.\n");
+	ret = clone_object("obj/sing");
+	if (!ret)
+	    fatal("No singularity.\n");
+	return ret;
+    }
+    if (ob->super || ob->cloned)
+	error("Cloning a used object !\n");
+    ob->reset = 0;
     if (ob == 0)
-	return 0;
-    if (ob->super || (ob->flags & O_CLONE))
-	error("Cloning a bad object !\n");
-    
-    /* We do not want the heart beat to be running for unused copied objects */
-
-    if (ob->flags & O_HEART_BEAT) 
-	(void)set_heart_beat(ob, 0);
-    new_ob = get_empty_object(ob->prog->num_variables);
+	error("Object %s not found\n", str1);
+    new_ob = get_empty_object();
     new_ob->name = make_new_name(ob->name);
-    new_ob->flags |= O_CLONE | ob->flags & ( O_APPROVED | O_WILL_CLEAN_UP ) ;
-#if 0
-    if (ob->flags & O_APPROVED)
-	new_ob->flags |= O_APPROVED;
-#endif
+    new_ob->cloned = 1;
     new_ob->prog = ob->prog;
-    reference_prog (ob->prog, "clone_object");
-#ifdef COMPAT_MODE
-    if (current_object && current_object->user && !ob->user)
-	new_ob->user = current_object->user;
+    if (new_ob->prog)
+	add_prog_ref((struct lnode_def *)(new_ob->prog));
+    if (current_object && current_object->wl && !ob->wl)
+	new_ob->wl = current_object->wl;
     else
-	new_ob->user = ob->user;		/* Possibly a null pointer */
-    new_ob->eff_user = new_ob->user;	/* Init state */
-#else 
-    if (!current_object)
-	fatal("clone_object() from no current_object !\n");
-    
-    give_uid_to_object(new_ob);
-
-#endif
+	new_ob->wl = ob->wl;		/* Possibly a null pointer */
+    new_ob->status = ob->status;
+    new_ob->heart_beat = ob->heart_beat;
     new_ob->next_all = obj_list;
     obj_list = new_ob;
-    enter_object_hash(new_ob);	/* Add name to fast object lookup table */
-    reset_object(new_ob, 0); 
-    command_giver = save_command_giver;
-    /* Never know what can happen ! :-( */
-    if (new_ob->flags & O_DESTRUCTED)
-	return 0;
-    return new_ob;
+    new_ob->num_variables = ob->num_variables;
+    /* Allocate space for local variables. */
+    if (ob->num_variables > 0)
+	new_ob->variables =
+	    (struct value *)xalloc(ob->num_variables * sizeof (struct value));
+    /* Initialize variables... */
+    for (i=0; i<ob->num_variables; i++) {
+	new_ob->variables[i].u.number = 0;
+	new_ob->variables[i].type = T_NUMBER;
+    }
+    new_ob->reset = 1;
+    (void)apply("reset", new_ob, 0);
+    if (d_flag)
+	debug_message("--%s cloned to %s\n", ob->name, new_ob->name);
+    ret = alloc_value();
+    ret->type = T_OBJECT;
+    ret->u.ob = new_ob;
+    add_ref(new_ob, "clone_object");
+    return ret;
 }
 
-struct object *environment(arg)
-    struct svalue *arg;
+struct value *environment(arg)
+    struct value *arg;
 {
+    struct value *ret;
     struct object *ob = current_object;
 
     if (arg && arg->type == T_OBJECT)
 	ob = arg->u.ob;
     else if (arg && arg->type == T_STRING)
 	ob = find_object2(arg->u.string);
-    if (ob == 0 || ob->super == 0 || (ob->flags & O_DESTRUCTED))
-	return 0;
-    if (ob->flags & O_DESTRUCTED)
+    else
+	ob = current_object;
+    if (ob == 0 || ob->super == 0)
+	return &const0;
+    if (ob->destructed)
 	error("environment() off destructed object.\n");
-    return ob->super;
+    ret = alloc_value();
+    ret->type = T_OBJECT;
+    ret->u.ob = ob->super;
+    add_ref(ret->u.ob, "environment");
+    return ret;
 }
 
 /*
  * Execute a command for an object. Copy the command into a
  * new buffer, because 'parse_command()' can modify the command.
- * If the object is not current object, static functions will not
- * be executed. This will prevent forcing players to do illegal things.
- *
- * Return cost of the command executed if success (> 0).
- * When failure, return 0.
  */
-int command_for_object(str, ob)
+void command_for_object(str)
     char *str;
-    struct object *ob;
 {
     char buff[1000];
-    extern int eval_cost;
-    int save_eval_cost = eval_cost - 1000;
+    struct object *ob;
 
-    if (strlen(str) > sizeof(buff) - 1)
-	error("Too long command.\n");
-    if (ob == 0)
-	ob = current_object;
-    else if (ob->flags & O_DESTRUCTED)
-	return 0;
+    ob = current_object;
     strncpy(buff, str, sizeof buff);
-    buff[sizeof buff - 1] = '\0';
-    if (parse_command(buff, ob))
-	return eval_cost - save_eval_cost;
-    else
-	return 0;
+    parse_command(buff, ob);
 }
 
 /*
@@ -467,100 +403,106 @@ int command_for_object(str, ob)
  * inventory of 'ob'. The argument 'ob' will be mandatory, later.
  */
 
-static struct object *object_present2 PROT((char *, struct object *));
+static struct value *object_present2();
 
-struct object *object_present(v, ob)
-    struct svalue *v;
+struct value *object_present(v, ob)
+    struct value *v;
     struct object *ob;
 {
-    struct svalue *ret;
-    struct object *ret_ob;
+    struct value *ret;
     int specific = 0;
 
     if (ob == 0)
 	ob = current_object;
     else
 	specific = 1;
-    if (ob->flags & O_DESTRUCTED)
-	return 0;
     if (v->type == T_OBJECT) {
 	if (specific) {
 	    if (v->u.ob->super == ob)
-		return v->u.ob;
+		return v;
 	    else
-		return 0;
+		return &const0;
 	}
 	if (v->u.ob->super == ob ||
 	    (v->u.ob->super == ob->super && ob->super != 0))
-	    return v->u.ob->super;
-	return 0;
+	    return v;
+	return &const0;
     }
-    ret_ob = object_present2(v->u.string, ob->contains);
-    if (ret_ob)
-	return ret_ob;
+    ret = object_present2(v, ob->contains);
+    if (ret)
+	return ret;
     if (specific)
-	return 0;
+	return &const0;
     if (ob->super) {
-	push_string(v->u.string, STRING_CONSTANT);
-	ret = apply("id", ob->super, 1);
-	if (ob->super->flags & O_DESTRUCTED)
-	    return 0;
-	if (ret && !(ret->type == T_NUMBER && ret->u.number == 0))
-	    return ob->super;
-	return object_present2(v->u.string, ob->super->contains);
+	ret = apply("id", ob->super, v);
+	if (ret && !(ret->type == T_NUMBER && ret->u.number == 0)) {
+	    ret = alloc_value();
+	    ret->type = T_OBJECT;
+	    ret->u.ob = ob->super;
+	    add_ref(ret->u.ob, "present()");
+	    return ret;
+	}
+	return object_present2(v, ob->super->contains);
     }
-    return 0;
+    return &const0;
 }
 
-static struct object *object_present2(str, ob)
-    char *str;
+static struct value *object_present2(v, ob)
+    struct value *v;
     struct object *ob;
 {
-    struct svalue *ret;
-    char *p;
+    struct value *ret;
+    char *p, *tmp;
     int count = 0, length;
-    char *item;
+    struct value item;
 
-    item = string_copy(str);
-    length = strlen(item);
-    p = item + length - 1;
+    item.type = T_STRING;
+    item.u.string = string_copy(v->u.string);
+    length = strlen(item.u.string);
+    p = item.u.string + length - 1;
     if (*p >= '0' && *p <= '9') {
-	while(p > item && *p >= '0' && *p <= '9')
+	while(p > item.u.string && *p >= '0' && *p <= '9')
 	    p--;
-	if (p > item && *p == ' ') {
+	if (p > item.u.string && *p == ' ') {
 	    count = atoi(p+1) - 1;
 	    *p = '\0';
-	    length = p - item;	/* This is never used again ! */
+	    length = p - item.u.string;
 	}
     }
+    /* We need to put the cropped string into v->u.string to pass it to apply */
+    tmp = v->u.string;
+    v->u.string = item.u.string;
     for (; ob; ob = ob->next_inv) {
-	push_string(item, STRING_CONSTANT);
-	ret = apply("id", ob, 1);
-	if (ob->flags & O_DESTRUCTED) {
-	    free(item);
-	    return 0;
-	}
+	ret = apply("id", ob, v);
 	if (ret == 0 || (ret->type == T_NUMBER && ret->u.number == 0))
 	    continue;
 	if (count-- > 0)
 	    continue;
-	free(item);
-	return ob;
+	ret = alloc_value();
+	ret->type = T_OBJECT;
+	ret->u.ob = ob;
+	add_ref(ret->u.ob, "object_present2");
+	v->u.string = tmp;
+	free(item.u.string);
+	return ret;
     }
-    free(item);
+    v->u.string = tmp;
+    free(item.u.string);
     return 0;
 }
 
 /*
  * Remove an object. It is first moved into the destruct list, and
- * not really destructed until later. (see destruct2()).
+ * not really destructed until later. (destruct2()).
  */
 void destruct_object(v)
-    struct svalue *v;
+    struct value *v;
 {
-    struct object *ob, *super;
+    struct object *ob, *inv, *super;
     struct object **pp;
     int removed;
+    struct value *weight, neg_weight;
+    extern struct object *current_reset;
 
     if (v->type == T_OBJECT)
 	ob = v->u.ob;
@@ -569,111 +511,12 @@ void destruct_object(v)
 	if (ob == 0)
 	    error("destruct_object: Could not find %s\n", v->u.string);
     }
-    if (ob->flags & O_DESTRUCTED)
-	return;
-    if (ob->flags & O_SWAPPED)
-	load_ob_from_swap(ob);
-    remove_object_from_stack(ob);
-    /*
-     * If this is the first object being shadowed by another object, then
-     * destruct the whole list of shadows.
-     */
-    if (ob->shadowed && !ob->shadowing) {
-	struct svalue svp;
-	struct object *ob2;
-
-	svp.type = T_OBJECT;
-	for (ob2 = ob->shadowed; ob2; ) {
-	    svp.u.ob = ob2;
-	    ob2 = ob2->shadowed;
-	    svp.u.ob->shadowed = 0;
-	    svp.u.ob->shadowing = 0;
-	    destruct_object(&svp);
-	}
-    }
-    /*
-     * The chain of shadows is a double linked list. Take care to update
-     * it correctly.
-     */
-    if (ob->shadowing)
-	ob->shadowing->shadowed = ob->shadowed;
-    if (ob->shadowed)
-	ob->shadowed->shadowing = ob->shadowing;
-    ob->shadowing = 0;
-    ob->shadowed = 0;
-
-    if (d_flag > 1)
+    if (ob->destructed)
+	error("Destruct destructed object.\n");
+    if (d_flag)
 	debug_message("Destruct object %s (ref %d)\n", ob->name, ob->ref);
-    super = ob->super;
-    if (super) {
-#ifdef COMPAT_MODE
-	struct svalue *weight;
-	/* Call exit in current room, if player or npc not in mudlib 3.0 */
-	if((ob->flags & O_ENABLE_COMMANDS)) {
-	    push_object(ob);
-	    (void)apply("exit",super,1);
-	}
-	weight = apply("query_weight", ob, 0);
-	if (weight && weight->type == T_NUMBER) {
-	    push_number(-weight->u.number);
-	    (void)apply("add_weight", super, 1);
-	}
-#endif
-    }
-    if (super == 0) {
-	/*
-	 * There is nowhere to move the objects.
-	 */
-	struct svalue svp;
-	svp.type = T_OBJECT;
-	while(ob->contains) {
-	    svp.u.ob = ob->contains;
-	    push_object(ob->contains);
-	    /* An error here will not leave destruct() in an inconsistent
-	     * stage.
-	     */
-	    apply_master_ob("destruct_environment_of",1);
-	    if (svp.u.ob == ob->contains)
-		destruct_object(&svp);
-	}
-    } else {
-	while(ob->contains)
-	    move_or_destruct(ob->contains, super);
-    }
-    if ( ob->interactive ) {
-	struct object *save=command_giver;
-
-	command_giver=ob;
-	if (ob->interactive->ed_buffer) {
-	    extern void save_ed_buffer();
-
-	    save_ed_buffer();
-	}
-	flush_all_player_mess();
-	command_giver=save;
-    }
-    set_heart_beat(ob, 0);
-    /*
-     * Remove us out of this current room (if any).
-     * Remove all sentences defined by this object from all objects here.
-     */
-    if (ob->super) {
-	if (ob->super->flags & O_ENABLE_COMMANDS)
-	    remove_sent(ob, ob->super);
-	add_light(ob->super, - ob->total_light);
-	for (pp = &ob->super->contains; *pp;) {
-	    if ((*pp)->flags & O_ENABLE_COMMANDS)
-		remove_sent(ob, *pp);
-	    if (*pp != ob)
-		pp = &(*pp)->next_inv;
-	    else
-		*pp = (*pp)->next_inv;
-	}
-    }
     /*
      * Now remove us out of the list of all objects.
-     * This must be done last, because an error in the above code would
-     * halt execution.
      */
     removed = 0;
     for (pp = &obj_list; *pp; pp = &(*pp)->next_all) {
@@ -681,31 +524,69 @@ void destruct_object(v)
 	    continue;
 	*pp = (*pp)->next_all;
 	removed = 1;
-	remove_object_hash(ob);
 	break;
     }
-    if (!removed)
-        fatal("Failed to delete object.\n");
-    if (ob->living_name)
-	remove_living_name(ob);
+    if (!removed && command_giver)
+        add_message("Failed to delete object.\n");
+    if (ob == current_reset)
+	current_reset = current_reset->next_all;
+    super = ob->super;
+    if (super == 0) {
+	super = find_object("room/void");	/* Take any existing void. */
+    } else {
+	/* Call exit in current room, if player or npc */
+	if(ob->enable_commands) {
+	    struct value room;
+	    room.type = T_OBJECT;
+	    room.u.ob = ob;
+	    apply("exit",super,&room);
+	}
+	weight = apply("query_weight", ob, 0);
+	if (weight && weight->type == T_NUMBER) {
+	    neg_weight.type = T_NUMBER;
+	    neg_weight.u.number = - weight->u.number;
+	    (void)apply("add_weight", super, &neg_weight);
+	}
+    }
+    if (super == 0)
+	fatal("Could not find the void.\n");
+
+    while(ob->contains)
+	move_or_destruct(ob->contains, super);
+    /*
+     * Remove us out of this current room (if any).
+     * Remove all sentences defined by this object from all objects here.
+     */
+    if (ob->super) {
+	if (ob->super->enable_commands)
+	    remove_sent(ob, ob->super);
+	add_light(ob->super, - ob->total_light);
+	for (pp = &ob->super->contains; *pp;) {
+	    if ((*pp)->enable_commands)
+		remove_sent(ob, *pp);
+	    if (*pp != ob)
+		pp = &(*pp)->next_inv;
+	    else
+		*pp = (*pp)->next_inv;
+	}
+    }
     ob->super = 0;
     ob->next_inv = 0;
+    ob->heart_beat = 0;
     ob->contains = 0;
-    ob->flags &= ~O_ENABLE_COMMANDS;
+    ob->enable_commands = 0;
     ob->next_all = obj_list_destruct;
     obj_list_destruct = ob;
-    ob->flags |= O_DESTRUCTED;
+    ob->destructed = 1;
 }
 
 /*
- * This one is called when no program is executing from the main loop.
+ * This one is called when no program is execuiting.
+ * The super pointer is still maintained.
  */
-void destruct2(ob)
+destruct2(ob)
     struct object *ob;
 {
-    if (d_flag > 1) {
-	debug_message("Destruct-2 object %s (ref %d)\n", ob->name, ob->ref);
-    }
     if (ob->interactive)
 	remove_interactive(ob);
     /*
@@ -717,15 +598,19 @@ void destruct2(ob)
      * Just in case the program in this object would continue to
      * execute, change string and object variables into the number 0.
      */
-    if (ob->prog->num_variables > 0) {
+    if (ob->variables) {
 	/*
 	 * Deallocate variables in this object.
 	 * The space of the variables are not deallocated until
 	 * the object structure is freed in free_object().
 	 */
 	int i;
-	for (i=0; i<ob->prog->num_variables; i++) {
-	    free_svalue(&ob->variables[i]);
+	for (i=0; i<ob->num_variables; i++) {
+	    if (ob->variables[i].type == T_STRING) {
+		free(ob->variables[i].u.string);
+	    } else if (ob->variables[i].type == T_OBJECT) {
+		free_object(ob->variables[i].u.ob, "destruct_object var");
+	    }
 	    ob->variables[i].type = T_NUMBER;
 	    ob->variables[i].u.number = 0;
 	}
@@ -733,139 +618,55 @@ void destruct2(ob)
     free_object(ob, "destruct_object");
 }
 
-#ifdef F_CREATE_WIZARD
-/*
- * This is the efun create_wizard(). Create a home dir for a wizard,
- * and other files he may want.
- *
- * The real job is done by the master.c object, so the call could as well
- * have been done to it directly. But, this function remains for
- * compatibility.
- *
- * It should be replaced by a function in simul_efun.c !
- */
-char *create_wizard(owner, domain)
+struct value *create_wizard(owner)
     char *owner;
-    char *domain;
 {
-    struct svalue *ret;
-#if 0
     struct stat st;
+    char name[200], cmd[200];
     FILE *f;
-    char cmd[200], lbuf[128];
-    static char name[200], name2[200];	/* Ugly fix /Lars (static) */
+    struct value *ret;
     struct object *owner_obj;
-#endif
 
-    /*
-     * Let the master object do the job.
-     */
-    push_constant_string(owner);
-    push_constant_string(domain);
-    push_object(current_object);
-    ret = apply_master_ob("master_create_wizard", 3);
-    if (ret && ret->type == T_STRING)
-	return ret->u.string;
-    return 0;
-#if 0
-    /*
-     * Verify that it is a valid call of create_wizard(). This is done
-     * by a function in master.c. It will take the calling object as
-     * argument, and must return a non-zero value.
-     */
-    push_object(current_object);
-    ret = apply_master_ob("verify_create_wizard", 1);
-    if (ret == 0)
-	error("No wizards allowed ! (because no verify_create_wizard() in master.c)\n");
-    if (ret->type == T_NUMBER && ret->u.number == 0)
-	error("Illegal use of create_wizard() !\n");
-
-    /*
-     * Even if the object that called create_wizard() is trusted, we won't
-     * allow it to use funny names for the owner.
-     */
-    if (!legal_path(owner))
-	error("Bad name to create_wizard: %s\n", owner);
-
-    owner_obj = find_living_object(owner, 1);
-    if (owner_obj == 0) {
-	fprintf(stderr,
-		"create_wizard: Could not find living object %s.\n", owner);
+    owner_obj = find_player(owner);
+    if (owner_obj == 0)
+	fatal("create_wizard: Could not find the player %s.\n", owner);
+    if (owner_obj->super == 0 || owner_obj->super->cloned) {
+	struct value v;
+	v.type = T_STRING;
+	v.u.string = 
+	  "There is a crash, the room collapses and the castle disappears.\n";
+	say(&v, 0);
 	return 0;
     }
-
-    /*
-     * Create the path to wizards home directory.
-     */
+    if (stat(PLAYER_DIR, &st) == -1)
+	if (mkdir(PLAYER_DIR, 0777) == -1)
+	    error("Could not mkdir %s\n", PLAYER_DIR);
     (void)sprintf(name, "%s/%s", PLAYER_DIR, owner);
-
-    /*
-     * If we are using domains, make a path to the domain.
-     */
-    if(domain) {
-	(void)sprintf(name2, "%s/%s/%s", DOMAIN_DIR, domain, owner);
-	fprintf(stderr, "name = %s, name2 =  %s\n", name, name2);
-
-	/*
-	 * If the directory already exists, we move it to the domain.
-	 */
-	if (stat(name, &st) == 0) {
-	    if((st.st_mode & S_IFMT) == S_IFDIR) {
-		rename(name, name2);
-	    }
-	} else {
-	    if (mkdir(name2, 0777) == -1) {
-		perror(name2);
-		error("Could not mkdir %s\n", name2);
-	    }
-	}
-    } else {
-	if (stat(name, &st) == 0)
-		error("Player %s already has a castle!\n", owner);
-
-	else
-	    if (mkdir(name, 0777) == -1) {
-		perror(name);
-		error("Could not mkdir %s\n", name);
-	    }
+    if (stat(name, &st) == 0)
+	error("Player %s already has a castle!\n", owner);
+    if (mkdir(name, 0777) == -1) {
+	perror(name);
+	error("Could not mkdir %s\n", name);
     }
-
-    /* add castle */
-    if(domain) {
-	(void)sprintf(name, "%s/%s/common/domain.c", DOMAIN_DIR, domain);
-    } else {
-	(void)sprintf(name, "%s/%s/%s", PLAYER_DIR, owner, "castle.c");
-    }
-    if(stat(name, &st) == 0) {
-	fprintf(stderr, "castle file %s already exists.\n", name);
-    } else {
-	f = fopen(name, "w");
-	if (f == NULL)
-	    error("Could not create a castle file %s!\n", name);
-	(void)fprintf(f, "#define NAME \"%s\"\n", domain ? domain : owner);
-#ifdef CASTLE_ROOM
-	(void)fprintf(f, "#define DEST \"%s\"\n", CASTLE_ROOM);
-#else
-	(void)fprintf(f, "#define DEST \"%s\"\n",
-		      current_object->super->name);
-#endif
-	(void)fclose(f);
-	(void)sprintf(cmd, "cat %s >> %s", DEFAULT_CASTLE, name);
-	(void)system(cmd);
-    }
-    
-    /*
-     * Add this castle name to the list of files to be loaded.
-     */
+    (void)sprintf(name, "%s/%s/%s", PLAYER_DIR, owner, "castle.c");
+    f = fopen(name, "w");
+    if (f == NULL)
+	error("Could not create a castle file %s!\n", name);
+    (void)fprintf(f, "#define NAME \"%s\"\n", owner);
+    (void)fprintf(f, "#define DEST \"%s\"\n", owner_obj->super->name);
+    (void)fclose(f);
+    (void)sprintf(cmd, "cat %s >> %s", DEFAULT_CASTLE, name);
+    (void)system(cmd);
     f = fopen(INIT_FILE, "a");
     if (f == NULL)
 	error("Could not add the new castle to the %s\n", INIT_FILE);
     (void)fprintf(f, "%s\n", name);
     (void)fclose(f);
-    return name;
-#endif
+    ret = alloc_value();
+    ret->type = T_STRING;
+    ret->u.string = string_copy(name);
+    return ret;
 }
-#endif /* F_CREATE_WIZARD */
 
 /*
  * A message from an object will reach
@@ -883,127 +684,74 @@ char *create_wizard(owner, domain)
  * to that object.
  */
 
-void say(v, avoid)
-    struct svalue *v;
-    struct vector *avoid;
+void say(v, avoid_ob)
+    struct value *v;
+    struct object *avoid_ob;
 {
-    extern struct vector *order_alist PROT((struct vector *));
-    struct vector *vtmpp;
-    static struct vector vtmp = { 1, 1,
-#ifdef DEBUG
-	1,
-#endif
-	(struct wiz_list *)NULL,
-	{ { T_POINTER } }
-	};
-
-    extern int assoc PROT((struct svalue *key, struct vector *));
     struct object *ob, *save_command_giver = command_giver;
     struct object *origin;
     char buff[256];
-#define INITIAL_MAX_RECIPIENTS 50
-    int max_recipients = INITIAL_MAX_RECIPIENTS;
-    struct object *first_recipients[INITIAL_MAX_RECIPIENTS];
-    struct object **recipients = first_recipients;
-    struct object **curr_recipient = first_recipients;
-    struct object **last_recipients =
-	&first_recipients[INITIAL_MAX_RECIPIENTS-1];
 
-    struct object *save_again;
-    static struct svalue stmp = { T_OBJECT };
-
-    if (current_object->flags & O_ENABLE_COMMANDS)
+    if (current_object->enable_commands)
 	command_giver = current_object;
-    else if (current_object->shadowing)
-	command_giver = current_object->shadowing;
-    if (command_giver) {
+    if (command_giver)
 	origin = command_giver;
-        if (avoid->item[0].type == T_NUMBER) {
-            avoid->item[0].type = T_OBJECT;
-            avoid->item[0].u.ob = command_giver;
-            add_ref(command_giver, "ass to var");
-        }
-    } else
+    else
 	origin = current_object;
-    vtmp.item[0].u.vec = avoid;
-    vtmpp = order_alist(&vtmp);
-    avoid = vtmpp->item[0].u.vec;
-    if (ob = origin->super) {
-	if (ob->flags & O_ENABLE_COMMANDS || ob->interactive) {
-	    *curr_recipient++ = ob;
-	}
-	for (ob = origin->super->contains; ob; ob = ob->next_inv) {
-            if (ob->flags & O_ENABLE_COMMANDS || ob->interactive) {
-                if (curr_recipient >= last_recipients) {
-                    max_recipients <<= 1;
-                    curr_recipient = (struct object **)
-		      alloca(max_recipients * sizeof(struct object *));
-                    memcpy((char*)curr_recipient, (char*)recipients,
-                      max_recipients * sizeof(struct object *)>>1);
-                    recipients = curr_recipient;
-                    last_recipients = &recipients[max_recipients-1];
-		    curr_recipient += (max_recipients>>1) - 1;
-                }
-                *curr_recipient++ = ob;
-            }
-	}
-    }
-    for (ob = origin->contains; ob; ob = ob->next_inv) {
-	if (ob->flags & O_ENABLE_COMMANDS || ob->interactive) {
-	    if (curr_recipient >= last_recipients) {
-		max_recipients <<= 1;
-		curr_recipient = (struct object **)alloca(max_recipients);
-		memcpy((char*)curr_recipient, (char*)recipients,
-		  max_recipients * sizeof(struct object *)>>1);
-		recipients = curr_recipient;
-		last_recipients = &recipients[max_recipients-1];
-		curr_recipient += (max_recipients>>1) - 1;
-	    }
-	    *curr_recipient++ = ob;
-	}
-    }
-    *curr_recipient = (struct object *)0;
     switch(v->type) {
     case T_STRING:
 	strncpy(buff, v->u.string, sizeof buff);
-	buff[sizeof buff - 1] = '\0';
 	break;
     case T_OBJECT:
 	strncpy(buff, v->u.ob->name, sizeof buff);
-	buff[sizeof buff - 1] = '\0';
 	break;
     case T_NUMBER:
 	sprintf(buff, "%d", v->u.number);
 	break;
-    case T_POINTER:
-	for (curr_recipient = recipients; ob = *curr_recipient++; ) {
-	    extern void push_vector PROT((struct vector *));
-
-	    if (ob->flags & O_DESTRUCTED) continue;
-	    stmp.u.ob = ob;
-	    if (assoc(&stmp, avoid) >= 0) continue;
-	    push_vector(v->u.vec);
-	    push_object(command_giver);
-	    apply("catch_msg", ob, 2);
-	}
-	break;
     default:
 	error("Invalid argument %d to say()\n", v->type);
     }
-    save_again = command_giver;
-    for (curr_recipient = recipients; ob = *curr_recipient++; ) {
-        if (ob->flags & O_DESTRUCTED) continue;
-	stmp.u.ob = ob;
-	if (assoc(&stmp, avoid) >= 0) continue;
+    for (ob = origin->contains; ob; ob = ob->next_inv) {
+	struct object *save_again;
 	if (ob->interactive == 0) {
-	    tell_npc(ob, buff);
+	    if (ob->enable_commands && ob != command_giver && ob != avoid_ob)
+		tell_npc(ob, buff);
 	    continue;
 	}
+	if (ob == save_command_giver || ob == avoid_ob)
+	    continue;
+	save_again = command_giver;
 	command_giver = ob;
 	add_message("%s", buff);
 	command_giver = save_again;
     }
-    free_vector(vtmpp);
+    if (origin->super) {
+	if (origin->super->interactive && origin != command_giver &&
+		origin->super != avoid_ob) {
+	    command_giver = origin->super;
+	    add_message("%s", buff);
+	} else if (origin->super->interactive == 0 &&
+		   origin->super != avoid_ob &&
+		   origin->super->enable_commands && ob != command_giver) {
+	    tell_npc(origin->super, buff);
+	}
+	for (ob = origin->super->contains; ob; ob = ob->next_inv) {
+	    struct object *save_again;
+	    if (ob == avoid_ob)
+		continue;
+	    if (ob->interactive == 0) {
+		if (ob->enable_commands && ob != command_giver)
+		    tell_npc(ob, buff);
+		continue;
+	    }
+	    if (ob == command_giver)
+		continue;
+	    save_again = command_giver;
+	    command_giver = ob;
+	    add_message("%s", buff);
+	    command_giver = save_again;
+	}
+    }
     command_giver = save_command_giver;
 }
 
@@ -1013,10 +761,9 @@ void say(v, avoid)
  * Compare with say().
  */
 
-void tell_room(room, v, avoid)
+void tell_room(room, v)
     struct object *room;
-    struct svalue *v;
-    struct vector *avoid; /* has to be in alist order */
+    struct value *v;
 {
     struct object *ob, *save_command_giver = command_giver;
     char buff[256];
@@ -1024,11 +771,9 @@ void tell_room(room, v, avoid)
     switch(v->type) {
     case T_STRING:
 	strncpy(buff, v->u.string, sizeof buff);
-	buff[sizeof buff - 1] = '\0';
 	break;
     case T_OBJECT:
 	strncpy(buff, v->u.ob->name, sizeof buff);
-	buff[sizeof buff - 1] = '\0';
 	break;
     case T_NUMBER:
 	sprintf(buff, "%d", v->u.number);
@@ -1037,21 +782,9 @@ void tell_room(room, v, avoid)
 	error("Invalid argument %d to tell_room()\n", v->type);
     }
     for (ob = room->contains; ob; ob = ob->next_inv) {
-        int assoc PROT((struct svalue *key, struct vector *));
-	static struct svalue stmp = { T_OBJECT, } ;
-
-	stmp.u.ob = ob;
-	if (assoc(&stmp, avoid) >= 0) continue;
 	if (ob->interactive == 0) {
-	    if (ob->flags & O_ENABLE_COMMANDS) {
-		/*
-		 * We want the monster code to have a correct this_player()
-		 */
-		command_giver = save_command_giver;
+	    if (ob->enable_commands)
 		tell_npc(ob, buff);
-	    }
-	    if (ob->flags & O_DESTRUCTED)
-		break;
 	    continue;
 	}
 	command_giver = ob;
@@ -1064,45 +797,28 @@ void shout_string(str)
     char *str;
 {
     struct object *ob, *save_command_giver = command_giver;
-    FILE *f = 0;
-    char *p;
+    int emergency;
+    struct value *muffled;
 
-    str = string_copy(str);	/* So that we can modify the string */
-    for (p=str; *p; p++) {
-	if ((*p < ' ' || *p > '~') && *p != '\n')
-	    *p = ' ';
-    }
-
-    p = 0;
-#ifdef LOG_SHOUT
-    if (command_giver) {
-	struct svalue *v;
-	v = apply("query_real_name", command_giver, 0);
-	if (v && v->type == T_STRING)
-	    p = v->u.string;
-    } else if (current_object && current_object->user)
-	p = current_object->user->name;
-    if (p)
-	f = fopen("log/SHOUTS", "a");
-    if (f) {
-	fprintf(f, "%s: %s\n", p, str);
-	fclose(f);
-    }
-#endif
+    emergency = (str[0] == '!');
+    if (emergency) str++;
     for (ob = obj_list; ob; ob = ob->next_all) {
-	if (!ob->interactive || ob == save_command_giver || !ob->super)
+	if (ob->interactive == 0 || ob == save_command_giver)
+	    continue;
+	muffled = apply("query_muffled",ob,&const0);
+	if (!emergency && muffled->type == T_NUMBER && muffled->u.number)
 	    continue;
 	command_giver = ob;
 	add_message("%s", str);
     }
     command_giver = save_command_giver;
-    free(str);
 }
 
-struct object *first_inventory(arg)
-    struct svalue *arg;
+struct value *first_inventory(arg)
+    struct value *arg;
 {
     struct object *ob;
+    struct value *ret;
 
     if (arg->type == T_STRING)
 	ob = find_object(arg->u.string);
@@ -1112,304 +828,136 @@ struct object *first_inventory(arg)
 	error("No object to first_inventory()");
     if (ob->contains == 0)
 	return 0;
-    return ob->contains;
+    ret = alloc_value();
+    ret->type = T_OBJECT;
+    ret->u.ob = ob->contains;
+    add_ref(ret->u.ob, "first_inventory");
+    return ret;
+}
+
+struct value *next_inventory(arg)
+    struct value *arg;
+{
+    struct object *ob;
+    struct value *ret;
+
+    if (arg->type == T_STRING)
+	ob = find_object(arg->u.string);
+    else
+	ob = arg->u.ob;
+    if (ob == 0)
+	error("No object to next_inventory()");
+    if (ob->next_inv == 0)
+	return 0;
+    ret = alloc_value();
+    ret->type = T_OBJECT;
+    ret->u.ob = ob->next_inv;
+    add_ref(ret->u.ob, "next_inventory");
+    return ret;
 }
 
 /*
  * This will enable an object to use commands normally only
  * accessible by interactive players.
- * Also check if the player is a wizard. Wizards must not affect the
- * value of the wizlist ranking.
  */
 
-void enable_commands(num)
-    int num;
-{
-    if (current_object->flags & O_DESTRUCTED)
-	return;
-    if (d_flag > 1) {
-	debug_message("Enable commands %s (ref %d)\n",
-	    current_object->name, current_object->ref);
-    }
-    if (num) {
-	current_object->flags |= O_ENABLE_COMMANDS;
-	command_giver = current_object;
-    } else {
-	current_object->flags &= ~O_ENABLE_COMMANDS;
-	command_giver = 0;
-    }
+void enable_commands() {
+    current_object->enable_commands++;
+    command_giver = current_object;
 }
 
 /*
  * Set up a function in this object to be called with the next
  * user input string.
  */
-int input_to(fun, flag)
+struct value *input_to(fun)
     char *fun;
-    int flag;
 {
-    struct sentence *s;
+    struct sentence *s = alloc_sentence();
 
-    if (!command_giver || command_giver->flags & O_DESTRUCTED)
-	return 0;
-    s = alloc_sentence();
-    if (set_call(command_giver, s, flag)) {
-	s->function = make_shared_string(fun);
+    if (set_call(command_giver, s)) {
+	s->function = string_copy(fun);
 	s->ob = current_object;
-	add_ref(current_object, "input_to");
-	return 1;
+	return &const1;
     }
     free_sentence(s);
-    return 0;
+    return &const0;
 }
 
-#define MAX_LINES 50
-
-/*
- * This one is used by qsort in get_dir().
- */
-static int pstrcmp(p1, p2)
-    struct svalue *p1, *p2;
-{
-    return strcmp(p1->u.string, p2->u.string);
-}
-
-/*
- * List files in directory. This function do same as standard list_files did,
- * but instead writing files right away to player this returns an array
- * containing those files. Actually most of code is copied from list_files()
- * function.
- * Differences with list_files:
- *
- *   - file_list("/w"); returns ({ "w" })
- *
- *   - file_list("/w/"); and file_list("/w/."); return contents of directory
- *     "/w"
- *
- *   - file_list("/");, file_list("."); and file_list("/."); return contents
- *     of directory "/"
- */
-struct vector *get_dir(path)
-    char *path;
-{
-    struct vector *v;
-    int i, count = 0;
-    DIR *dirp;
-    int namelen, do_match = 0;
-#if defined(_AIX) || defined(M_UNIX)
-    struct dirent *de;
-#else
-    struct direct *de;
-#endif
-    struct stat st;
-    char *temppath;
-    char *p;
-    char *regexp = 0;
-
-    if (!path)
-	return 0;
-
-#ifdef COMPAT_MODE
-    path = check_file_name(path, 0);
-#else
-    path = check_valid_path(path, current_object->eff_user, "get_dir", 0);
-#endif
-
-    if (path == 0)
-	return 0;
-
-    /*
-     * We need to modify the returned path, and thus to make a
-     * writeable copy.
-     * The path "" needs 2 bytes to store ".\0".
-     */
-    temppath = (char *)alloca(strlen(path)+2);
-    if (strlen(path)<2) {
-	temppath[0]=path[0]?path[0]:'.';
-	temppath[1]='\000';
-	p = temppath;
-    } else {
-	strcpy(temppath, path);
-	/*
-	 * If path ends with '/' or "/." remove it
-	 */
-	if ((p = strrchr(temppath, '/')) == 0)
-	    p = temppath;
-	if (p[0] == '/' && p[1] == '.' && p[2] == '\0' || 
-	    p[0] == '/' && p[1] == '\0')
-	    *p = '\0';
-    }
-
-    if (stat(temppath, &st) < 0) {
-	if (*p == '\0')
-	    return 0;
-	regexp = (char *)alloca(strlen(p)+2);
-	if (p != temppath) {
-	    strcpy(regexp, p + 1);
-	    *p = '\0';
-	} else {
-	    strcpy(regexp, p);
-	    strcpy(temppath, ".");
-	}
-	do_match = 1;
-    } else if (*p != '\0' && strcmp(temppath, ".")) {
-	if (*p == '/' && *(p + 1) != '\0')
-	    p++;
-	v = allocate_array(1);
-	v->item[0].type = T_STRING;
-	v->item[0].string_type = STRING_MALLOC;
-	v->item[0].u.string = string_copy(p);
-	return v;
-    }
-
-    if ((dirp = opendir(temppath)) == 0)
-	return 0;
-
-    /*
-     *  Count files
-     */
-    for (de = readdir(dirp); de; de = readdir(dirp)) {
-#ifdef M_UNIX
-	namelen = strlen(de->d_name);
-#else
-	namelen = de->d_namlen;
-#endif
-	if (!do_match && (strcmp(de->d_name, ".") == 0 ||
-			  strcmp(de->d_name, "..") == 0))
-	    continue;
-	if (do_match && !match_string(regexp, de->d_name))
-	    continue;
-	count++;
-	if ( count >= MAX_ARRAY_SIZE)
-	    break;
-    }
-    /*
-     * Make array and put files on it.
-     */
-    v = allocate_array(count);
-    if (count == 0) {
-	/* This is the easy case :-) */
-	closedir(dirp);
-	return v;
-    }
-    rewinddir(dirp);
-    for(i = 0, de = readdir(dirp); i < count; de = readdir(dirp)) {
-#ifdef M_UNIX
-        namelen = strlen(de->d_name);
-#else
-	namelen = de->d_namlen;
-#endif
-	if (!do_match && (strcmp(de->d_name, ".") == 0 ||
-			  strcmp(de->d_name, "..") == 0))
-	    continue;
-	if (do_match && !match_string(regexp, de->d_name))
-	    continue;
-	de->d_name[namelen] = '\0';
-	v->item[i].type = T_STRING;
-	v->item[i].string_type = STRING_MALLOC;
-	v->item[i].u.string = string_copy(de->d_name);
-	i++;
-    }
-    closedir(dirp);
-    /* Sort the names. */
-    qsort((char *)v->item, count, sizeof v->item[0], pstrcmp);
-    return v;
-}
-
-int tail(path)
+void list_files(path)
     char *path;
 {
     char buff[1000];
     FILE *f;
-    struct stat st;
-    int offset;
- 
-#ifdef COMPAT_MODE
-    path = check_file_name(path, 0);
-#else
-    path = check_valid_path(path, current_object->eff_user, "tail", 0);
-#endif
 
+    if (!path)
+        path = ".";
+    path = check_file_name(path, 0);
     if (path == 0)
-        return 0;
+        return;
+    sprintf(buff, "%s %s", LIST_FILES, path);
+    f = vpopen(buff, "r");
+    if (f == 0)
+	return;
+    while(1) {
+	if (fgets(buff, sizeof buff, f) == 0)
+	    break;
+	add_message("%s", buff);
+    }
+    vpclose(f);
+}
+
+void print_file(path)
+    char *path;
+{
+    char buff[1000];
+    FILE *f;
+
+    path = check_file_name(path, 0);
+    if (path == 0)
+        return;
     f = fopen(path, "r");
     if (f == 0)
-	return 0;
-    if (fstat(fileno(f), &st) == -1)
-	fatal("Could not stat an open file.\n");
-    offset = st.st_size - 54 * 20;
-    if (offset < 0)
-	offset = 0;
-    if (fseek(f, offset, 0) == -1)
-	fatal("Could not seek.\n");
-    /* Throw away the first incomplete line. */
-    if (offset > 0)
-	(void)fgets(buff, sizeof buff, f);
-    while(fgets(buff, sizeof buff, f)) {
+	return;
+    while(1) {
+	if (fgets(buff, sizeof buff, f) == 0)
+	    break;
 	add_message("%s", buff);
     }
     fclose(f);
-    return 1;
 }
 
-int print_file(path, start, len)
-    char *path;
-    int start, len;
-{
-    char buff[1000];
-    FILE *f;
-    int i;
+/* 5/10/90 - version to deal with invisibility */
+void people() {
+    struct object *ob;
+    struct value *player,*invis,*level;
+    int level_of_user;  
+    char name[30];
 
-    if (len < 0)
-	return 0;
-
-#ifdef COMPAT_MODE
-    path = check_file_name(path, 0);
-#else
-    path = check_valid_path(path, current_object->eff_user, "print_file", 0);
-#endif
-
-    if (path == 0)
-        return 0;
-    if (start < 0)
-	return 0;
-    f = fopen(path, "r");
-    if (f == 0)
-	return 0;
-    if (len == 0)
-	len = MAX_LINES;
-    if (len > MAX_LINES)
-	len = MAX_LINES;
-    if (start == 0)
-	start = 1;
-    for (i=1; i < start + len; i++) {
-	if (fgets(buff, sizeof buff, f) == 0)
-	    break;
-	if (i >= start)
-	    add_message("%s", buff);
+    name[0]=0;
+    level= apply("query_level",command_giver,0); 
+    if (level->type = T_NUMBER)  
+        level_of_user = level->u.number;  
+    else  
+        level_of_user = 0; 
+    for (ob = obj_list; ob; ob=ob->next_all) {
+	if (!ob->interactive)
+	    continue;
+	if (!ob->super)
+	    continue;
+	player = apply("query_real_name", ob, 0);
+	if (player == 0 || player->type != T_STRING)
+	    continue;
+        player->u.string[0] -= 32;
+	invis = apply("query_invis",ob,level);
+        if (invis->type != T_NUMBER) continue;
+	if (!(invis->u.number)) strcpy(name,player->u.string);
+	if ((invis->u.number) < 0)
+	    sprintf(name,"(%s)  %d",player->u.string,-invis->u.number);
+	if ((invis->u.number) > 0) strcpy(name,"Someone");
+	if ((invis->u.number) < 100)
+	    show_info_about(name, ob->super->name, ob->interactive);
     }
-    fclose(f);
-    if (i <= start)
-	return 0;
-    if (i == MAX_LINES + start)
-	add_message("*****TRUNCATED****\n");
-    return i-start;
-}
-
-int remove_file(path)
-    char *path;
-{
-#ifdef COMPAT_MODE
-    path = check_file_name(path, 1);
-#else
-    path = check_valid_path(path, current_object->eff_user, "remove_file", 1);
-#endif
-
-    if (path == 0)
-        return 0;
-    if (unlink(path) == -1)
-        return 0;
-    return 1;
 }
 
 void log_file(file, str)
@@ -1417,126 +965,256 @@ void log_file(file, str)
 {
     FILE *f;
     char file_name[100];
-    struct stat st;
 
-    sprintf(file_name, "/log/%s", file);
-#ifdef COMPAT_MODE
-    if (strchr(file, '/') || file[0] == '.' || strlen(file) > 30
-#ifndef MSDOS
-	)
-#else
-	|| !valid_msdos(file))
-#endif
-    error("Illegal file name to log_file(%s)\n", file);
-#else
-    if (!check_valid_path(file_name, current_object->eff_user, "log_file", 1))
-        return;
-#endif
-    if (stat(file_name+1, &st) != -1 && st.st_size > MAX_LOG_SIZE) {
-	char file_name2[sizeof file_name + 4];
-	sprintf(file_name2, "%s.old", file_name+1);
-	rename(file_name+1, file_name2);	/* No panic if failure */
-    }
-    f = fopen(file_name+1, "a");	/* Skip leading '/' */
+    if (strchr(file, '/') || file[0] == '.' || strlen(file) > 30)
+	error("Illegal file name to log_file(%s)\n", file);
+    sprintf(file_name, "log/%s", file);
+    f = fopen(file_name, "a");
     if (f == 0)
 	return;
     fwrite(str, strlen(str), 1, f);
     fclose(f);
 }
 
-void
-print_svalue(arg)
-    struct svalue *arg;
+/*VARARGS1*/
+struct value *call_indirect(fun, arg, arg2, arg3)
+    int fun;
+    int arg, arg2, arg3;
+{
+    struct value *ret;
+    struct object *o1, *o2;
+
+    switch(fun) {
+    case F_WIZLIST:
+        wizlist();
+	break;
+    case F_FIND_OBJECT:
+	o1 = find_object2((char *)arg);
+	if (!o1)
+	    return &const0;
+	ret = alloc_value();
+	ret->type = T_OBJECT;
+	ret->u.ob = o1;
+	add_ref(o1, "F_FIND_OBJECT");
+	return ret;
+    case F_SNOOP:
+	if (arg && ((struct object *)arg)->destructed)
+	     error("snoop() on destructed object.\n");
+	set_snoop(current_object, (struct object *)arg);
+	return 0;
+    case F_SET_HEART_BEAT:
+	current_object->enable_heart_beat = arg;
+	return 0;
+    case F_LOG_FILE:
+	log_file((char *)arg, (char *)arg2);
+	return 0;
+    case F_SHUTDOWN:
+	shutdowngame();
+	return 0;
+    case F_LIVING:
+	if (((struct object *)arg)->destructed)
+	    return &const0;
+	ret = alloc_value();
+	ret->type = T_NUMBER;
+	ret->u.number = ((struct object *)arg)->enable_commands;
+	return ret;
+    case F_ED:
+	if (arg && !legal_path((char *)arg)) {
+	    add_message("Illegal path\n");
+	    return 0;
+	}
+	ed_start((char *)arg);
+	return 0;
+    case F_PEOPLE:
+	people();
+	return 0;
+    case F_TELL_OBJECT:
+	if (((struct object *)arg)->destructed)
+	    error("Tell_object to destructed object./\n");
+	tell_object((struct object *)arg, (char *)arg2);
+	return 0;
+    case F_FIND_LIVING:
+	o1 = find_living_object((char *)arg);
+	if (o1 == 0)
+	    return &const0;
+	ret = alloc_value();
+	ret->type = T_OBJECT;
+	ret->u.ob = o1;
+	add_ref(ret->u.ob, "find_living_object");
+	return ret;
+    case F_FIND_PLAYER:
+	o1 = find_player((char *)arg);
+	if (o1 == 0)
+	    return &const0;
+	ret = alloc_value();
+	ret->type = T_OBJECT;
+	ret->u.ob = o1;
+	add_ref(ret->u.ob, "find_player");
+	return ret;
+    case F_RM:
+	remove_file((char *)arg);
+	return 0;
+    case F_LS:
+	list_files((char *)arg);
+	return 0;
+    case F_CAT:
+	print_file((char *)arg);
+	return 0;
+    case F_INPUT_TO:
+	if (current_object->destructed)
+	     error("input_to() on destructed object.\n");
+	return input_to((char *)arg);
+	break;
+    case F_ENABLE_COMMANDS:
+	enable_commands();
+	return 0;
+    case F_FIRST_INVENTORY:
+	return first_inventory((struct value *)arg);
+    case F_NEXT_INVENTORY:
+	return next_inventory((struct value *)arg);
+    case F_SHOUT:
+	shout_string((char *)arg);
+	return 0;
+    case F_SAY:
+	say((struct value *)arg, (struct object *)arg2);
+	return 0;
+    case F_TELL_ROOM:
+	if (((struct object *)arg)->destructed)
+	    error("tell_room to destructed object.\n");
+	tell_room((struct object *)arg, (struct value *)arg2);
+	return 0;
+    case F_CREATE_WIZARD:
+	return create_wizard((char *)arg);
+    case F_DESTRUCT:
+	destruct_object((struct value *)arg);
+	return 0;
+    case F_SET_LIGHT:
+	add_light(current_object, arg);
+	ret = alloc_value();
+	ret->type = T_NUMBER;
+	o1 = current_object;
+	while(o1->super)
+	    o1 = o1->super;
+	ret->u.number = o1->total_light;
+	return ret;
+    case F_COMMAND:
+	command_for_object((char *)arg);
+	return 0;
+    case F_PRESENT:
+	if (arg2 && ((struct object *)arg2)->destructed)
+	    error("present() on destructed object.\n");
+	return object_present((struct value *)arg, (struct object *)arg2);
+    case F_ENVIRONMENT:
+	return environment((struct value *)arg);
+    case F_SAVE_OBJECT:
+	save_object(current_object, (char *)arg);
+	return 0;
+    case F_RESTORE_OBJECT:
+	ret = alloc_value();
+	ret->type = T_NUMBER;
+	ret->u.number = restore_object(current_object, (char *)arg);
+	return ret;
+    case F_CLONE_OBJECT:
+	return clone_object((char *)arg);
+    case F_FUNCTION:
+	return call_local_function((char *)arg, (struct value *)arg2);
+    case F_CALL_OTHER:
+	return call_other((struct value *)arg, (char *)arg2,
+			  (struct value *)arg3);
+    case F_WRITE:
+	do_write((struct value *)arg);
+	break;
+    case F_MOVE_OBJECT:
+	if (((struct value *)arg)->type == T_OBJECT)
+	    o1 = ((struct value *)arg)->u.ob;
+	else {
+	    o1 = find_object(((struct value *)arg)->u.string);
+	    if (o1 == 0)
+		error("Object %s not found.\n", ((struct value *)arg)->u.string);
+	}
+	if (((struct value *)arg2)->type == T_OBJECT)
+	    o2 = ((struct value *)arg2)->u.ob;
+	else {
+	    o2 = find_object(((struct value *)arg2)->u.string);
+	    if (o2 == 0)
+		error("Object %s not found.\n",((struct value *)arg2)->u.string);
+	}
+	if (((struct object *)o1)->destructed)
+	     error("move_object() of destructed object.\n");
+	if (((struct object *)o2)->destructed)
+	     error("move_object() to destructed object.\n");
+	move_object(o1, o2);
+	break;
+    case F_ADD_ACTION:
+	add_action((char *)arg, (struct value *)arg2);
+	break;
+    case F_ADD_VERB:
+	add_verb((char *)arg);
+	break;
+    case F_THIS_PLAYER:
+	return this_player();
+    case F_THIS_OBJECT:
+	return this_object();
+    default:
+	fatal("Unimplemented hard linked function %d\n", fun);
+	abort();
+    }
+    return 0;
+}
+
+void do_write(arg)
+    struct value *arg;
 {
     if (arg == 0)
 	add_message("<NULL>");
-    else if (arg->type == T_STRING) {
-	if (strlen(arg->u.string) > 9500)	/* Not pretty */
-	    error("Too long string.\n");
-	/* Strings sent to monsters are now delivered */
-	if (command_giver && (command_giver->flags & O_ENABLE_COMMANDS) &&
-	          !command_giver->interactive)
-	    tell_npc(command_giver, arg->u.string);
-	else
-	    add_message("%s", arg->u.string);
-    } else if (arg->type == T_OBJECT)
+    else if (arg->type == T_STRING)
+	add_message("%s", arg->u.string);
+    else if (arg->type == T_OBJECT)
 	add_message("OBJ(%s)", arg->u.ob->name);
     else if (arg->type == T_NUMBER)
 	add_message("%d", arg->u.number);
-    else if (arg->type == T_POINTER)
-	add_message("<ARRAY>");
     else
 	add_message("<UNKNOWN>");
 }
 
-void do_write(arg)
-    struct svalue *arg;
-{
-    struct object *save_command_giver = command_giver;
-    if (command_giver == 0 && current_object->shadowing)
-	command_giver = current_object;
-    if (command_giver) {
-	/* Send the message to the first object in the shadow list */
-	while (command_giver->shadowing)
-	    command_giver = command_giver->shadowing;
-    }
-    print_svalue(arg);
-    command_giver = save_command_giver;
-}
-
-/* Find an object. If not loaded, load it !
- * The object may selfdestruct, which is the only case when 0 will be
- * returned.
- */
+/* Find an object. If not loaded, load it ! */
 
 struct object *find_object(str)
     char *str;
 {
     struct object *ob;
 
-    /* Remove leading '/' if any. */
-    while(str[0] == '/')
-	str++;
     ob = find_object2(str);
     if (ob)
 	return ob;
-    ob = load_object(str, 0);
-    if (ob->flags & O_DESTRUCTED)		/* *sigh* */
-	return 0;
-    if (ob && ob->flags & O_SWAPPED)
-	load_ob_from_swap(ob);
+    ob = load_object(str);
     return ob;
 }
 
-/* Look for a loaded object. Return 0 if non found. */
-struct object *find_object2(str)
+/* Look for an loaded object. */
+static struct object *find_object2(str)
     char *str;
 {
     register struct object *ob;
     register int length;
+    char *name;
 
-    /* Remove leading '/' if any. */
-    while(str[0] == '/')
-	str++;
     /* Truncate possible .c in the object name. */
     length = strlen(str);
-    if (str[length-2] == '.' && str[length-1] == 'c') {
-	/* A new writreable copy of the name is needed. */
-	char *p;
-	p = (char *)alloca(strlen(str)+1);
-	strcpy(p, str);
-	str = p;
-	str[length-2] = '\0';
+    name = string_copy(str);
+    if (name[length-2] == '.' && name[length-1] == 'c') {
+	name[length-2] = '\0';
+	length -= 2;
     }
-    if (ob = lookup_object_hash(str)) {
-	if (ob->flags & O_SWAPPED)
-	    load_ob_from_swap(ob);
-	return ob;
+    for (ob=obj_list; ob; ob = ob->next_all) {
+	if (length == ob->name_length && strcmp(ob->name, name) == 0) {
+	    free(name);
+	    return ob;
+	}
     }
+    free(name);
     return 0;
 }
-
-#if 0
 
 void apply_command(com)
     char *com;
@@ -1556,78 +1234,84 @@ void apply_command(com)
 	add_message("Error apply_command: function %s not found.\n", com);
     }
 }
-#endif /* 0 */
+
+void set_current_room(ob, dest)
+    struct object *ob, *dest;
+{
+    struct object **pp, *p;
+    struct object *save_command_giver = command_giver;
+
+    if (dest == 0)
+	dest = find_object("room/void.c");	/* Get any existing void. */
+    if (dest == 0)
+	fatal("Not even a void !\n");
+    if (ob->enable_commands)
+	command_giver = ob;
+    if (ob->super) {
+	if (!ob->super->destructed) {
+	    struct value v;
+	    v.type = T_OBJECT;
+	    v.u.ob = ob;		/* No need to increment ref count */
+	    (void)apply("exit", ob->super, &v);
+	    add_light(ob->super, - ob->total_light);
+	}
+	remove_sent(ob->super, ob);
+	/*
+	 * Now we link the ob out of its list.
+	 * Remove sentences tied to objects that stays in this room.
+	 */
+	for (pp = &ob->super->contains; *pp;) {
+	    if (*pp == ob)
+		*pp = (*pp)->next_inv;
+	    else {
+		remove_sent(*pp, ob);
+		pp = &(*pp)->next_inv;
+	    }
+	}
+    }
+    ob->next_inv = dest->contains;
+    dest->contains = ob;
+    add_light(dest, ob->total_light);
+    ob->super = dest;
+    if (d_flag)
+	debug_message("--Current room: %s\n", dest->name);
+    (void)apply("init", dest, 0);
+    for (p = dest->contains; p; p = p->next_inv) {
+	if (p == ob)
+	    continue;
+	(void)apply("init", p, 0);
+    }
+    command_giver = save_command_giver;
+}
 
 /*
  * Transfer an object.
- * The object has to be taken from one inventory list and added to another.
- * The main work is to update all command definitions, depending on what is
- * living or not. Note that all objects in the same inventory are affected.
- *
- * There are some boring compatibility to handle. When -o flag is specified,
- * several functions are called in some objects. This is dangerous, as
- * object might self-destruct when called.
  */
 void move_object(item, dest)
     struct object *item, *dest;
 {
-    struct object **pp, *ob, *next_ob;
+    struct object **pp, *ob;
     struct object *save_cmd = command_giver;
 
-#ifndef COMPAT_MODE
-    if (item != current_object)
-	error("Illegal to move other object than this_object()\n");
-#endif
     /* Recursive moves are not allowed. */
     for (ob = dest; ob; ob = ob->super)
 	if (ob == item)
-	    error("Can't move object inside itself.\n");
-    if (item->shadowing)
-	error("Can't move an object that is shadowing.\n");
-
-#if 0 /* Not now /Lars */
-    /*
-     * Objects must have inherited std/object if they are to be allowed to
-     * be moved.
-     */
-#ifndef COMPAT_MODE
-    if (!(item->flags & O_APPROVED) ||
-		    !(dest->flags & O_APPROVED)) {
-	error("Trying to move object where src or dest not inherit std/object\n");
+	    return;
+    item->not_touched = 0;
+    dest->not_touched = 0;
+    if (item->enable_commands) {
+	set_current_room(item, dest);
 	return;
     }
-#endif    
-#endif
-#ifdef COMPAT_MODE
-	/* This is only needed in -o mode. Otherwise, objects can only move
-	 * themselves.
-	 */
-	dest->flags &= ~O_RESET_STATE;
-	item->flags &= ~O_RESET_STATE;
-#endif
-    add_light(dest, item->total_light);
     if (item->super) {
 	int okey = 0;
-		
-	if (item->flags & O_ENABLE_COMMANDS) {
-#ifdef COMPAT_MODE
-		command_giver = item;
-		push_object(item);
-		(void)apply("exit", item->super, 1);
-		if (item->flags & O_DESTRUCTED || dest->flags & O_DESTRUCTED)
-		    return;	/* Give up */
-#endif
-	    remove_sent(item->super, item);
-	}
-	if (item->super->flags & O_ENABLE_COMMANDS)
+	if (item->super->enable_commands)
 	    remove_sent(item, item->super);
 	add_light(item->super, - item->total_light);
 	for (pp = &item->super->contains; *pp;) {
 	    if (*pp != item) {
-		if ((*pp)->flags & O_ENABLE_COMMANDS)
+		if ((*pp)->enable_commands)
 		    remove_sent(item, *pp);
-		if (item->flags & O_ENABLE_COMMANDS)
-		    remove_sent(*pp, item);
 		pp = &(*pp)->next_inv;
 		continue;
 	    }
@@ -1635,64 +1319,30 @@ void move_object(item, dest)
 	    okey = 1;
 	}
 	if (!okey)
-	    fatal("Failed to find object %s in super list of %s.\n",
+	    error("Failed to find object %s in super list of %s.\n",
 		  item->name, item->super->name);
     }
     item->next_inv = dest->contains;
     dest->contains = item;
     item->super = dest;
     /*
-     * Setup the new commands. The order is very important, as commands
-     * in the room should override commands defined by the room.
-     * Beware that init() in the room may have moved 'item' !
-     *
-     * The call of init() should really be done by the object itself
-     * (except in the -o mode). It might be too slow, though :-(
-     */
-    if (item->flags & O_ENABLE_COMMANDS) {
-	command_giver = item;
-	(void)apply("init", dest, 0);
-	if ((dest->flags & O_DESTRUCTED) || item->super != dest) {
-	    command_giver = save_cmd; /* marion */
-	    return;
-	}
-    }
-    /*
      * Run init of the item once for every present player, and
      * for the environment (which can be a player).
      */
-    for (ob = dest->contains; ob; ob=next_ob) {
-	next_ob = ob->next_inv;
-	if (ob == item)
-	    continue;
-	if (ob->flags & O_DESTRUCTED)
-	    error("An object was destructed at call of init()\n");
-	if (ob->flags & O_ENABLE_COMMANDS) {
+    for (ob = dest->contains; ob; ob=ob->next_inv) {
+	if (ob->enable_commands) {
 	    command_giver = ob;
 	    (void)apply("init", item, 0);
-	    if (dest != item->super) {
-		command_giver = save_cmd; /* marion */
-		return;
-	    }
-	}
-	if (item->flags & O_DESTRUCTED) /* marion */
-	    error("The object to be moved was destructed at call of init()\n");
-	if (item->flags & O_ENABLE_COMMANDS) {
-	    command_giver = item;
-	    (void)apply("init", ob, 0);
-	    if (dest != item->super) {
-		command_giver = save_cmd; /* marion */
-		return;
-	    }
 	}
     }
-    if (dest->flags & O_DESTRUCTED) /* marion */
-	error("The destination to move to was destructed at call of init()\n");
-    if (dest->flags & O_ENABLE_COMMANDS) {
+    if (dest->enable_commands) {
 	command_giver = dest;
 	(void)apply("init", item, 0);
     }
     command_giver = save_cmd;
+    add_light(dest, item->total_light);
+    if (d_flag)
+	debug_message("--move_object: %s to %s\n", item->name, dest->name);
 }
 
 /*
@@ -1730,214 +1380,119 @@ struct sentence *alloc_sentence() {
     return p;
 }
 
-#ifdef free
-void free_all_sent() {
-    struct sentence *p;
-    for (;sent_free; sent_free = p) {
-	p = sent_free->next;
-	free(sent_free);
-    }
-}
-#endif
-
 void free_sentence(p)
     struct sentence *p;
 {
     if (p->function)
-	free_string(p->function);
+	free(p->function);
     p->function = 0;
     if (p->verb)
-	free_string(p->verb);
+	free(p->verb);
     p->verb = 0;
     p->next = sent_free;
     sent_free = p;
 }
 
-/*
- * Find the sentence for a command from the player.
- * Return success status.
- */
-int player_parser(buff)
+void player_parser(buff)
     char *buff;
 {
     struct sentence *s;
     char *p;
     int length;
-    struct object *save_current_object = current_object;
-    char verb_copy[100];
 
-    if (d_flag > 1)
+    if (d_flag)
 	debug_message("cmd [%s]: %s\n", command_giver->name, buff);
     /* strip trailing spaces. */
-    for (p = buff + strlen(buff) - 1; p >= buff; p--) {
+    for (p = buff + strlen(buff) - 1; p > buff; p--) {
 	if (*p != ' ')
 	    break;
 	*p = '\0';
     }
     if (buff[0] == '\0')
-	return 0;
+	return;
     if (special_parse(buff))
-	return 1;
+	return;
     p = strchr(buff, ' ');
     if (p == 0)
 	length = strlen(buff);
     else
 	length = p - buff;
-    clear_notify();
     for (s=command_giver->sent; s; s = s->next) {
-	struct svalue *ret;
-	int len;
-	struct object *command_object;
+	struct value *ret;
+	struct value arg;
 	
 	if (s->verb == 0)
-	    error("An 'action' did something, but returned 0 or had an undefined verb.\n");
-	len = strlen(s->verb);
-	if (s->no_space) {
-	    if(strncmp(buff, s->verb,len) != 0)
-		continue;
-	} else if (s->short_verb) {
-	    if (strncmp(s->verb, buff, len) != 0)
-		continue;
-	} else {
-	    if (len != length) continue;
-	    if (strncmp(buff, s->verb, length))
-		continue;
-	}
+	    continue;
+	if (strlen(s->verb) != length)
+	    continue;
+	if (strncmp(buff, s->verb, length) != 0)
+	    continue;
 	/*
 	 * Now we have found a special sentence !
 	 */
-	if (d_flag > 1)
+	if (d_flag)
 	    debug_message("Local command %s on %s\n", s->function, s->ob->name);
-	if (length >= sizeof verb_copy)
-	    len = sizeof verb_copy - 1;
-	else
-	    len = length;
-	strncpy(verb_copy, buff, len);
-	verb_copy[len] = '\0';
-	last_verb = verb_copy;
 	/*
-	 * If the function is static and not defined by current object,
-	 * then it will fail. If this is called directly from player input,
-	 * then we set current_object so that static functions are allowed.
-	 * current_object is reset just after the call to apply().
+	 * If we have a second argument which was not used for id()
+	 * verification, then we send it to the function.
 	 */
-	if (current_object == 0)
-	    current_object = s->ob;
-	/*
-	 * Remember the object, to update score.
-	 */
-	command_object = s->ob;
-	if(s->no_space) {
-	    push_constant_string(&buff[strlen(s->verb)]);
-	    ret = apply(s->function,s->ob, 1);
-	} else if (buff[length] == ' ') {
-	    push_constant_string(&buff[length+1]);
-	    ret = apply(s->function, s->ob, 1);
+	if (buff[length] == ' ') {
+	    arg.type = T_STRING;
+	    arg.u.string = &buff[length+1];
+	    ret = apply(s->function, s->ob, &arg);
 	} else {
 	    ret = apply(s->function, s->ob, 0);
 	}
-	if (current_object->flags & O_DESTRUCTED) {
-	    /* If disable_commands() were called, then there is no
-	     * command_giver any longer.
-	     */
-	    if (command_giver == 0)
-		return 1;
-	    s = command_giver->sent;	/* Restart :-( */
-	}
-	current_object = save_current_object;
-	last_verb = 0;
 	/* If we get fail from the call, it was wrong second argument. */
 	if (ret && ret->type == T_NUMBER && ret->u.number == 0)
 	    continue;
-	if (s && command_object->user && command_giver->interactive &&
-	    !(command_giver->flags & O_IS_WIZARD))
-	{
-	    command_object->user->score++;
-	}
+	if (s->ob->wl && command_giver->interactive)
+	    s->ob->wl->score++;
 	if (ret == 0)
 	    add_message("Error: function %s not found.\n", s->function);
 	break;
     }
-    if (s == 0) {
-	notify_no_command();
-	return 0;
-    }
-    return 1;
+    if (s == 0)
+	add_message("What?\n");
 }
 
-/*
- * Associate a command with function in this object.
- * The optional second argument is the command name. If the command name
- * is not given here, it should be given with add_verb().
- *
- * The optinal third argument is a flag that will state that the verb should
- * only match against leading characters.
- *
- * The object must be near the command giver, so that we ensure that the
- * sentence is removed when the command giver leaves.
- *
- * If the call is from a shadow, make it look like it is really from
- * the shadowed object.
- */
-void add_action(str, cmd, flag)
-    char *str, *cmd;
-    int flag;
+void add_action(str, id)
+    char *str;
+    struct value *id;
 {
     struct sentence *p;
-    struct object *ob;
 
-    if (str[0] == ':')
-	error("Illegal function name: %s\n", str);
-    if (current_object->flags & O_DESTRUCTED)
-	return;
-    ob = current_object;
-    while(ob->shadowing)
-	ob = ob->shadowing;
-    if (command_giver == 0 || (command_giver->flags & O_DESTRUCTED))
-	return;
-    if (ob != command_giver && ob->super != command_giver &&
-	ob->super != command_giver->super && ob != command_giver->super)
-      error("add_action from object that was not present.\n");
-    if (d_flag > 1)
+    if (d_flag)
 	debug_message("--Add action %s\n", str);
-#ifdef COMPAT_MODE
-    if (strcmp(str, "exit") == 0)
-	error("Illegal to define a command to the exit() function.\n");
-#endif
-    p = alloc_sentence();
-    p->function = make_shared_string(str);
-    p->ob = ob;
-    p->next = command_giver->sent;
-    p->short_verb = flag;
-    p->no_space = 0;
-    if (cmd)
-	p->verb = make_shared_string(cmd);
-    else
+    if (command_giver) {
+	p = alloc_sentence();
+	p->function = string_copy(str);
+	p->ob = current_object;
+	p->next = command_giver->sent;
 	p->verb = 0;
-    command_giver->sent = p;
+	command_giver->sent = p;
+    }
+    else
+	yyerror("Add_action called with no command_giver");
 }
 
-void add_verb(str, no_space)
+void add_verb(str)
     char *str;
-    int no_space;
 {
-    if (command_giver == 0 || (command_giver->flags & O_DESTRUCTED))
-	return;
-    if (command_giver->sent == 0)
-	error("No add_action().\n");
-    if (command_giver->sent->verb != 0)
-	error("Tried to set verb again.\n");
-    command_giver->sent->verb = make_shared_string(str);
-    command_giver->sent->no_space = no_space;
-    if (d_flag > 1)
-	debug_message("--Adding verb %s to action %s\n", str,
-		command_giver->sent->function);
+	if (d_flag)
+	    debug_message("--Adding verb %s to action %s\n", str,
+			  command_giver->sent->function);
+	if (command_giver) {
+	    if (command_giver->sent == 0)
+		error("No add_action().\n");
+	    if (command_giver->sent->verb != 0)
+		error("Tried to set verb again.\n");
+	    command_giver->sent->verb = string_copy(str);
+	}
+	else
+	    yyerror("Add_verb called with no command_giver");
 }
 
-/*
- * Remove all commands (sentences) defined by object 'ob' in object
- * 'player'
- */
 void remove_sent(ob, player)
     struct object *ob, *player;
 {
@@ -1946,7 +1501,7 @@ void remove_sent(ob, player)
     for (s= &player->sent; *s;) {
 	struct sentence *tmp;
 	if ((*s)->ob == ob) {
-	    if (d_flag > 1)
+	    if (d_flag)
 		debug_message("--Unlinking sentence %s\n", (*s)->function);
 	    tmp = *s;
 	    *s = tmp->next;
@@ -1956,96 +1511,75 @@ void remove_sent(ob, player)
     }
 }
 
-char debug_parse_buff[50]; /* Used for debugging */
+void display_all_players() {
+    struct object *ob;
+    struct value *ret;
 
-/*
- * Hard coded commands, that will be available to all players. They can not
- * be redefined, so the command name should be something obscure, not likely
- * to be used in the game.
- */
+    for (ob = obj_list; ob; ob = ob->next_all) {
+	if (ob->interactive == 0)
+	    continue;
+	ret = apply("who", ob, &const0);
+	if (ret && ret->type == T_STRING)
+	    add_message("%s.\n", ret->u.string);
+    }
+}
+
 int special_parse(buff)
     char *buff;
 {
-#ifdef DEBUG
-    strncpy(debug_parse_buff, buff, sizeof debug_parse_buff);
-    debug_parse_buff[sizeof debug_parse_buff - 1] = '\0';
-#endif
-    if (strcmp(buff, "malloc") == 0) {
-#if defined(MALLOC_malloc) || defined(MALLOC_smalloc)
-	dump_malloc_data();
-#endif
-#ifdef MALLOC_gmalloc
-	add_message("Using Gnu malloc.\n");
-#endif
-#ifdef MALLOC_sysmalloc
-	add_message("Usage system standard malloc.\n");
-#endif
+    char *tmpbuff;
+    struct value *player;
+
+    if (buff[0] == '#')
+	return 0;
+    if (strcmp(buff, "who") == 0) {
+	display_all_players();
 	return 1;
     }
     if (strcmp(buff, "dumpallobj") == 0) {
-        dumpstat();
+        if (!command_giver) return 0;
+	player = apply("query_level",command_giver,0);
+	if (player->type != T_NUMBER ||
+	    player->u.number < ALL_POWER) return 0;
+        dump_all_objects();
 	return 1;
     }
-#if defined(MALLOC_malloc) || defined(MALLOC_smalloc)
-    if (strcmp(buff, "debugmalloc") == 0) {
-	extern int debugmalloc;
-	debugmalloc = !debugmalloc;
-	if (debugmalloc)
-	    add_message("On.\n");
-	else
-	    add_message("Off.\n");
+    if (strcmp(buff, "status") == 0) {
+	extern int tot_alloc_sentence, tot_alloc_value, tot_alloc_object,
+		   tot_alloc_lnode, num_swapped, total_bytes_swapped,
+		   tot_string_space, tot_alloc_strings;
+	add_message("Sentences:   %5d %6d\n", tot_alloc_sentence,
+	       tot_alloc_sentence * sizeof (struct sentence));
+	add_message("Objects:     %5d %6d (%d swapped, %d Kbyte)\n",
+		    tot_alloc_object,
+		    tot_alloc_object * sizeof (struct object), num_swapped,
+		    total_bytes_swapped / 1024);
+	add_message("Values:      %5d %6d\n\n", tot_alloc_value,
+	       tot_alloc_value * sizeof (struct value));
+	add_message("Strings:          %6d\n", tot_alloc_strings);
+	print_lnode_status(tot_alloc_sentence * sizeof (struct sentence) +
+			   tot_alloc_object * sizeof (struct object) +
+			   tot_alloc_value * sizeof (struct value) +
+			   tot_alloc_strings);
+	add_message("String space saved: %d bytes.\n", tot_string_space);
 	return 1;
     }
-#endif
-    if (strcmp(buff, "status") == 0 || strcmp(buff, "status tables") == 0) {
-	int tot, res, verbose = 0;
-	extern char *reserved_area;
-	extern int tot_alloc_sentence, tot_alloc_object,
-		tot_alloc_object_size, num_swapped, total_bytes_swapped,
-		num_arrays, total_array_size;
-	extern int total_num_prog_blocks, total_prog_block_size;
-#ifdef COMM_STAT
-	extern int add_message_calls,inet_packets,inet_volume;
-#endif
-
-	if (strcmp(buff, "status tables") == 0)
-	    verbose = 1;
-	if (reserved_area)
-	    res = RESERVED_SIZE;
-	else
-	    res = 0;
-#ifdef COMM_STAT
-	if (verbose)
-	    add_message("Calls to add_message: %d   Packets: %d   Average packet size: %f\n\n",add_message_calls,inet_packets,(float)inet_volume/inet_packets);
-#endif
-	if (!verbose) {
-	    add_message("Sentences:\t\t\t%8d %8d\n", tot_alloc_sentence,
-			tot_alloc_sentence * sizeof (struct sentence));
-	    add_message("Objects:\t\t\t%8d %8d\n",
-			tot_alloc_object, tot_alloc_object_size);
-	    add_message("Arrays:\t\t\t\t%8d %8d\n", num_arrays,
-			total_array_size);
-	    add_message("Prog blocks:\t\t\t%8d %8d (%d swapped, %d Kbytes)\n",
-			total_num_prog_blocks, total_prog_block_size,
-			num_swapped, total_bytes_swapped / 1024);
-	    add_message("Memory reserved:\t\t\t %8d\n", res);
-	}
-	if (verbose)
-	    stat_living_objects();
-	tot =		   total_prog_block_size +
-			   total_array_size +
-			   tot_alloc_object_size +
-			   show_otable_status(verbose) +
-			   heart_beat_status(verbose) +
-			   add_string_status(verbose) +
-			   print_call_out_usage(verbose) +
-			   res;
-
-	if (!verbose) {
-	    add_message("\t\t\t\t\t --------\n");
-	    add_message("Total:\t\t\t\t\t %8d\n", tot);
-	}
-	return 1;
+    /* This probably shouldn't be done this way, since buff is only 2000
+       bytes long, and will therefore crash if the input line is over
+       1996 characters long. */
+    if ((*buff == '\'') || (*buff == '"')) {
+        tmpbuff = string_copy(buff);
+	(void)strcpy(buff, "say ");
+	(void)strcpy(buff + 4, tmpbuff + 1);
+	free(tmpbuff);
+	return 0;
+    }
+    if (*buff == ':') {
+	tmpbuff = string_copy(buff);
+	(void)strcpy(buff, "emote ");
+	(void)strcpy(buff + 6, tmpbuff + 1);
+	free(tmpbuff);
+	return 0;
     }
     if (strcmp(buff, "e") == 0) {
 	(void)strcpy(buff, "east");
@@ -2061,6 +1595,22 @@ int special_parse(buff)
     }
     if (strcmp(buff, "n") == 0) {
 	(void)strcpy(buff, "north");
+	return 0;
+    }
+    if (strcmp(buff, "ne") == 0) {
+	(void)strcpy(buff, "northeast");
+	return 0;
+    }
+    if (strcmp(buff, "nw") == 0) {
+	(void)strcpy(buff, "northwest");
+	return 0;
+    }
+    if (strcmp(buff, "se") == 0) {
+	(void)strcpy(buff, "southeast");
+	return 0;
+    }
+    if (strcmp(buff, "sw") == 0) {
+	(void)strcpy(buff, "southwest");
 	return 0;
     }
     if (strcmp(buff, "d") == 0) {
@@ -2104,89 +1654,51 @@ void fatal(fmt, a, b, c, d, e, f, g, h)
     char *fmt;
     int a, b, c, d, e, f, g, h;
 {
-    static int in_fatal = 0;
-    /* Prevent double fatal. */
-    if (in_fatal)
-	abort();
-    in_fatal = 1;
     (void)fprintf(stderr, fmt, a, b, c, d, e, f, g, h);
-    fflush(stderr);
-    if (current_object)
-	(void)fprintf(stderr, "Current object was %s\n",
-		      current_object->name);
+    (void)fprintf(stderr, "Current object was %s\n", current_object->name);
     debug_message(fmt, a, b, c, d, e, f, g, h);
-    if (current_object)
-	debug_message("Current object was %s\n", current_object->name);
+    debug_message("Current object was %s\n", current_object->name);
     debug_message("Dump of variables:\n");
-    (void)dump_trace(1);
+    if (current_object) {
+	struct lnode_var_def *p;
+	for (p=current_object->status; p; p = p->next) {
+	    debug_message("%20s: ", p->name);
+	    debug_message_value(&current_object->variables[p->num_var]);
+	    debug_message("\n");
+	}
+    }
+#ifdef TRACE
+    (void)dump_trace();
+#endif
+    ipc_remove();	/* Shut down the ipc communication. */
     abort();
 }
 
 int num_error = 0;
-
-/*
- * Error() has been "fixed" so that users can catch and throw them.
- * To catch them nicely, we really have to provide decent error information.
- * Hence, all errors that are to be caught
- * (error_recovery_context_exists == 2) construct a string containing
- * the error message, which is returned as the
- * thrown value.  Users can throw their own error values however they choose.
- */
-
-/*
- * This is here because throw constructs its own return value; we dont
- * want to replace it with the system's error string.
- */
-
-void throw_error() {
-    extern int error_recovery_context_exists;
-    extern jmp_buf error_recovery_context;
-    if (error_recovery_context_exists > 1) {
-	longjmp(error_recovery_context, 1);
-	fatal("Throw_error failed!");
-    }
-    error("Throw with no catch.\n");
-}
-
-static char emsg_buf[2000];
 
 /*VARARGS1*/
 void error(fmt, a, b, c, d, e, f, g, h)
     char *fmt;
     int a, b, c, d, e, f, g, h;
 {
+    struct object *dest;
     extern int error_recovery_context_exists;
     extern jmp_buf error_recovery_context;
     extern struct object *current_heart_beat;
-    extern struct svalue catch_value;
     char *object_name;
+#ifdef TRACE
+    extern int trace_depth;
+#endif
 
-    sprintf(emsg_buf+1, fmt, a, b, c, d, e, f, g, h);
-    emsg_buf[0] = '*';	/* all system errors get a * at the start */
-    if (error_recovery_context_exists > 1) { /* user catches this error */
-	struct svalue v;
-	v.type = T_STRING;
-	v.u.string = emsg_buf;
-	v.string_type = STRING_MALLOC;	/* Always reallocate */
-	assign_svalue(&catch_value, &v);
-   	longjmp(error_recovery_context, 1);
-   	fatal("Catch() longjump failed");
-    }
     num_error++;
-    if (num_error > 1)
+    if (num_error > 2)
 	fatal("Too many simultaneous errors.\n");
-    debug_message("%s", emsg_buf+1);
-    if (current_object) {
-	debug_message("program: %s, object: %s line %d\n",
-		    current_prog ? current_prog->name : "",
-		    current_object->name,
-		    get_line_number_if_any());
-	if (current_prog)
-	    save_error(emsg_buf, current_prog->name,
-		       get_line_number_if_any());
-    }
-    object_name = dump_trace(0);
-    fflush(stdout);
+    debug_message(fmt, a, b, c, d, e, f, g, h);
+    if (current_object)
+	debug_message("Current object was %s, line %d\n",
+		      current_object->name, current_line);
+#ifdef TRACE
+    object_name = dump_trace();
     if (object_name) {
 	struct object *ob;
 	ob = find_object2(object_name);
@@ -2198,42 +1710,39 @@ void error(fmt, a, b, c, d, e, f, g, h)
 			object_name);
 	}
     }
-    if (command_giver && command_giver->interactive) {
-	struct svalue *v = 0;
-
-	num_error--;
-	/* 
-	 * The stack must be brought in a usable state. After the
-	 * call to reset_machine(), all arguments to error() are invalid,
-	 * and may not be used any more. The reason is that some strings
-	 * may have been on the stack machine stack, and has been deallocated.
+    trace_depth = 0;
+#endif
+    if (command_giver) {
+	add_message(fmt, a, b, c, d, e, f, g, h);
+	if (current_object)
+	    add_message("Current object was %s, line %d\n",
+			current_object->name, current_line);
+	/*
+	 * If this is a player, send him to the church.  Otherwise, send it to
+	 * the void.  Also make sure we have a church!
 	 */
-	reset_machine (0);
-	push_constant_string("error messages");
-	v = apply_master_ob("query_player_level", 1);
-	num_error++;
-	if (v && v->u.number != 0) {
-	    add_message("%s", emsg_buf+1);
-	    if (current_object)
-		add_message("program: %s, object: %s line %d\n",
-			    current_prog ? current_prog->name : "",
-			    current_object->name,
-			    get_line_number_if_any());
-	} else {
-	    add_message("Your sensitive mind notices a wrongness in the fabric of space.\n");
-	}
+	if (!(command_giver->enable_commands &&
+	     apply("is_player",command_giver,&const0) &&
+	     (dest = find_object("room/church.c"))))
+	    dest = find_object("room/void.c");
+	if (dest == 0)
+	    fatal("Could not find the void room.\n");
+	move_object(command_giver, dest);
     }
     if (current_heart_beat) {
-	set_heart_beat(current_heart_beat, 0);
+        current_heart_beat->heart_beat = 0;
 	debug_message("Heart beat in %s turned off.\n",
 		      current_heart_beat->name);
-	if (current_heart_beat->interactive) {
-	    struct object *save_cmd = command_giver;
-	    command_giver = current_heart_beat;
-	    add_message("Game driver tells you: You have no heart beat !\n");
-	    command_giver = save_cmd;
-	}
 	current_heart_beat = 0;
+    }
+    debug_message("Dump of variables:\n");
+    if (current_object) {
+	struct lnode_var_def *p;
+	for (p=current_object->status; p; p = p->next) {
+	    debug_message("%20s: ", p->name);
+	    debug_message_value(&current_object->variables[p->num_var]);
+	    debug_message("\n");
+	}
     }
     num_error--;
     if (error_recovery_context_exists)
@@ -2241,10 +1750,54 @@ void error(fmt, a, b, c, d, e, f, g, h)
     abort();
 }
 
+#ifdef TRACE
+char *get_current_object_name() {
+    if (current_object == 0)
+	return "NONE";
+    return current_object->name;
+}
+
+char *get_command_giver_name() {
+    if (command_giver == 0)
+	return "NONE";
+    return command_giver->name;
+}
+#endif
+
+void pre_compile(str)
+    char *str;
+{
+    char *c_name, *i_name, buff[1000];
+    FILE *f;
+    int pid;
+
+    if (!legal_path(str))
+	error("Illegal attempt to access %s\n", str);
+    i_name = (char *)xalloc(strlen(str)+3);
+    (void)strcpy(i_name, str);
+    (void)strcat(i_name, ".i");
+    c_name = (char *)xalloc(strlen(str)+3);
+    (void)strcpy(c_name, str);
+    (void)strcat(c_name, ".c");
+    sprintf(buff, "%s %s %s", PRE_COMPILE, c_name, i_name);
+    f = (FILE *)vpopen(buff, "r");
+    if (f == 0) {
+	error("Unable to invoke precompiler!\n");
+	alarm(0);
+    }
+    while(1) {
+	if (fgets(buff, sizeof buff, f) == 0)
+	    break;
+	add_message("%s", buff);
+    }
+    vpclose(f);
+}
+
 /*
- * Check that it is an legal path. No '..' are allowed.
+ * Check that it is an legal path. It must not contain a space
+ * or '..' or begin with '/'.
  */
-int legal_path(path)
+legal_path(path)
     char *path;
 {
     char *p;
@@ -2253,9 +1806,6 @@ int legal_path(path)
 	return 0;
     if (path[0] == '/')
         return 0;
-#ifdef MSDOS
-    if (!valid_msdos(path)) return(0);
-#endif
     for(p = strchr(path, '.'); p; p = strchr(p+1, '.')) {
 	if (p[1] == '.')
 	    return 0;
@@ -2263,26 +1813,23 @@ int legal_path(path)
     return 1;
 }
 
-/*
- * There is an error in a specific file. Ask the game driver to log the
- * message somewhere.
- */
-void smart_log(error_file, line, what)
+smart_log(error_file, line, what)
      char *error_file, *what;
      int line;
 {
-    char buff[500];
+    char buff2[100], buff[100], *p;
+    int n;
 
     if (error_file == 0)
 	return;
-    if (strlen(what) + strlen(error_file) > sizeof buff - 100)
-	what = "...[too long error message]...";
-    if (strlen(what) + strlen(error_file) > sizeof buff - 100)
-	error_file = "...[too long filename]...";
+    n = sscanf(error_file, "players/%s", buff2);
+    if (n != 1)
+        return;
+    p = strchr(buff2, '/');
+    if (p)
+        *p = '\0';
     sprintf(buff, "%s line %d:%s\n", error_file, line, what);
-    push_constant_string(error_file);
-    push_constant_string(buff);
-    apply_master_ob("log_error", 2);
+    log_file(buff2, buff);
 }
 
 /*
@@ -2290,132 +1837,52 @@ void smart_log(error_file, line, what)
  * Also change the name as if the current directory was at the players
  * own directory.
  * This is done by functions in the player object.
- *
- * The master object (master.c) always have permissions to access
- * any file in the mudlib hierarchy, but only inside the mudlib.
- *
- * WARNING: The string returned will (mostly) be deallocated at next
- * call of apply().
  */
-#ifdef COMPAT_MODE
-char debug_check_file[50];
-
 char *check_file_name(file, writeflg)
     char *file;
     int writeflg;
 {
-    struct svalue *ret;
-    char *str;
+    struct value v, *ret;
 
-    if (current_object != master_ob) {
-	if (!command_giver || !command_giver->interactive ||
-	    (command_giver->flags & O_DESTRUCTED))
-	    return 0;
-	push_constant_string(file);
-	if (writeflg)
-	    ret = apply("valid_write", command_giver, 1);
-	else
-	    ret = apply("valid_read",  command_giver, 1);
-	if (command_giver->flags & O_DESTRUCTED)
-	    return 0;
-	if (ret == 0 || ret->type != T_STRING) {
-	    add_message("Bad file name.\n");
-	    return 0;
-	}
-	str = ret->u.string;
-    } else {
-	/* Master object can read/write anywhere ! */
-	if (file[0] == '/')
-	    str = file + 1;
-	else
-	    str = file;
+    if (!command_giver) {
+	yyerror("Check_file_name called with no command_giver");
+	return 0;
     }
-    strncpy(debug_check_file, str, sizeof debug_check_file);
-    debug_check_file[sizeof debug_check_file - 1] = '\0';
-    if (!legal_path(str))
-        error("Illegal path: %s\n", str);
-    /* The string "/" will be converted to "". */
-    if (str[0] == '\0')
-	return ".";
-    return str;
-}
-#endif /* COMPAT_MODE */
-
-/*
- * Check that a path to a file is valid for read or write.
- * This is done by functions in the master object.
- * The path is always treated as an absolute path, and is returned without
- * a leading '/'.
- * If the path was '/', then '.' is returned.
- * The returned string may or may not be residing inside the argument 'path',
- * so don't deallocate arg 'path' until the returned result is used no longer.
- * Otherwise, the returned path is temporarily allocated by apply(), which
- * means it will be dealocated at next apply().
- */
-char *check_valid_path(path, eff_user, call_fun, writeflg)
-    char *path;
-    struct wiz_list *eff_user;
-    char *call_fun;
-    int writeflg;
-{
-    struct svalue *v;
-
-    if (eff_user == 0)
-	return 0;
-    push_string(path, STRING_MALLOC);
-    push_string(eff_user->name, STRING_CONSTANT);
-    push_string(call_fun, STRING_CONSTANT);
+    v.type = T_STRING;
+    v.u.string = file;
+    /*
+     * We don't have to free the string in ret. This is done
+     * by the garbage collection.
+     */
     if (writeflg)
-	v = apply_master_ob("valid_write", 3);
+	ret = apply("valid_write", command_giver, &v);
     else
-	v = apply_master_ob("valid_read", 3);
-    if (v && v->type == T_NUMBER && v->u.number == 0)
+	ret = apply("valid_read",  command_giver, &v);
+    if (!ret || ret->type != T_STRING) {
+	add_message("Bad file name.\n");
 	return 0;
-    if (path[0] == '/')
-	path++;
-    if (path[0] == '\0')
-	path = ".";
-    if (legal_path(path))
-	return path;
-    return 0;
+    }
+    if (!legal_path(ret->u.string)) {
+        add_message("Illegal path\n");
+	return 0;
+    }
+    return ret->u.string;
 }
 
 /*
- * This one is called from HUP.
- */
-int game_is_being_shut_down;
-
-#ifndef _AIX
-void startshutdowngame() {
-    game_is_being_shut_down = 1;
-}
-#else
-void startshutdowngame(int arg) {
-    game_is_being_shut_down = 1;
-}
-#endif
-
-/*
- * This one is called from the command "shutdown".
- * We don't call it directly from HUP, because it is dangerous when being
- * in an interrupt.
+ * This one is called from HUP, and from the command "shutdown".
  */
 void shutdowngame() {
-    shout_string("Game driver shouts: LPmud shutting down immediately.\n");
-    save_wiz_file();
-    ipc_remove();
+    struct value *player;
+
+    if (!command_giver) return ;
+    player = apply("query_level",command_giver,0);
+    if (player->type != T_NUMBER || player->u.number < SHUTDOWN) return; 
+    shout_string("LPmud shutting down immediately.\n");
+    fprintf(stderr, "simulate.c: shutdowngame: LP-mud shut down.\n");
     remove_all_players();
-    unlink_swap_file();
-#ifdef DEALLOCATE_MEMORY_AT_SHUTDOWN
-    remove_all_objects();
-    free_all_sent();
-    remove_wiz_list();
-    dump_malloc_data();
-    find_alloced_data();
-#endif
-#ifdef OPCPROF
-    opcdump();
-#endif
+    ipc_remove();
+    save_wiz_file();
     exit(0);
 }
 
@@ -2425,75 +1892,61 @@ void shutdowngame() {
  * and can_put_and_get() where needed.
  * Return 0 on success, and special code on failure:
  *
- * 1: To heavy for destination.
+ * 1: Too heavy for destination.
  * 2: Can't be dropped.
  * 3: Can't take it out of it's container.
  * 4: The object can't be inserted into bags etc.
  * 5: The destination doesn't allow insertions of objects.
  * 6: The object can't be picked up.
  */
-#ifdef F_TRANSFER
 int transfer_object(ob, to)
     struct object *ob, *to;
 {
-    struct svalue *v_weight, *ret;
-    int weight;
+    struct value *weight, neg_weight, *ret;
     struct object *from = ob->super;
 
     /*
      * Get the weight of the object
      */
-#ifndef COMPAT_MODE
-	error("transfer() not allowed.\n");
-#endif
-    weight = 0;
-    v_weight = apply("query_weight", ob, 0);
-    if (v_weight && v_weight->type == T_NUMBER)
-	weight = v_weight->u.number;
-    if (ob->flags & O_DESTRUCTED)
-	return 3;
+    weight = apply("query_weight", ob, 0);
+    if (weight && weight->type != T_NUMBER)
+	error("Bad type of weight of object in transfer()\n");
     /*
      * If the original place of the object is a living object,
      * then we must call drop() to check that the object can be dropped.
      */
-    if (from && (from->flags & O_ENABLE_COMMANDS)) {
+    if (from && from->enable_commands) {
 	ret = apply("drop", ob, 0);
 	if (ret && (ret->type != T_NUMBER || ret->u.number != 0))
-	    return 2;
-	/* This shold not happen, but we can not trust LPC hackers. :-) */
-	if (ob->flags & O_DESTRUCTED)
 	    return 2;
     }
     /*
      * If 'from' is not a room and not a player, check that we may
      * remove things out of it.
      */
-    if (from && from->super && !(from->flags & O_ENABLE_COMMANDS)) {
+    if (from && from->super && !from->enable_commands) {
 	ret = apply("can_put_and_get", from, 0);
-	if (!ret || (ret->type != T_NUMBER && ret->u.number != 1) ||
-	  (from->flags & O_DESTRUCTED))
+	if (!ret || (ret->type != T_NUMBER && ret->u.number != 1))
 	    return 3;
     }
     /*
      * If the destination is not a room, and not a player,
      * Then we must test 'prevent_insert', and 'can_put_and_get'.
      */
-    if (to->super && !(to->flags & O_ENABLE_COMMANDS)) {
+    if (to->super && to->enable_commands == 0) {
 	ret = apply("prevent_insert", ob, 0);
 	if (ret && (ret->type != T_NUMBER || ret->u.number != 0))
 	    return 4;
 	ret = apply("can_put_and_get", to, 0);
-	if (!ret || (ret->type != T_NUMBER && ret->type != 0) ||
-	  (to->flags & O_DESTRUCTED) || (ob->flags & O_DESTRUCTED))
+	if (!ret || (ret->type != T_NUMBER && ret->type != 0))
 	    return 5;
     }
     /*
      * If the destination is a player, check that he can pick it up.
      */
-    if (to->flags & O_ENABLE_COMMANDS) {
+    if (to->enable_commands) {
 	ret = apply("get", ob, 0);
-	if (!ret || (ret->type == T_NUMBER && ret->u.number == 0) ||
-	  (ob->flags & O_DESTRUCTED))
+	if (!ret || (ret->type == T_NUMBER && ret->u.number == 0))
 	    return 6;
     }
     /*
@@ -2503,384 +1956,44 @@ int transfer_object(ob, to)
 	/*
 	 * Check if the destination can carry that much.
 	 */
-	push_number(weight);
-	ret = apply("add_weight", to, 1);
+	ret = apply("add_weight", to, weight);
 	if (ret && ret->type == T_NUMBER && ret->u.number == 0)
-	    return 1;
-	if (to->flags & O_DESTRUCTED)
 	    return 1;
     }
     /*
      * If it is not a room, correct the weight in the 'from' object.
      */
     if (from && from->super && weight) {
-	push_number(-weight);
-	(void)apply("add_weight", from, 1);
+	neg_weight.type = T_NUMBER;
+	neg_weight.u.number = - weight->u.number;
+	(void)apply("add_weight", from, &neg_weight);
     }
     move_object(ob, to);
     return 0;
 }
-#endif /* F_TRANSFER */
 
 /*
  * Move or destruct one object.
  */
-void move_or_destruct(what, to)
+move_or_destruct(what, to)
     struct object *what, *to;
 {
-    struct svalue v;
-
-#ifdef COMPAT_MODE
+    struct object *super;
     int res;
+    struct value v;
+
     res = transfer_object(what, to);
-    if (res == 0 || (what->flags & O_DESTRUCTED))
+    if (res == 0)
 	return;
     if (res == 1 || res == 4 || res == 5) {
-	if (to->super) {
-	    move_or_destruct(what, to->super);
-	    return;
-	}
+	move_or_destruct(what, to->super);
+	return;
     }
-#else
-    struct svalue *svp;
-    /* This is very dubious, why not just destruct them /JnA 
-        */
-    push_object(to);
-    push_number(1);
-    svp = apply("move", what, 2);
-    if (svp && svp->type == T_NUMBER && svp->u.number == 0)
-	return;
-    if (what->flags & O_DESTRUCTED)
-	return;
-#endif
-    
     /*
-     * Failed to move the object. Then, it is destroyed.
+     * No need to add the reference count of 'what', as this
+     * local 'v' is not deallocated by 'free_all_value()'
      */
     v.type = T_OBJECT;
     v.u.ob = what;
     destruct_object(&v);
 }
-
-/*
- * Call this one when there is only little memory left. It will start
- * Armageddon.
- */
-void slow_shut_down(minutes)
-    int minutes;
-{
-    struct object *ob;
-
-    /*
-     * Swap out objects, and free some memory.
-     */
-    ob = find_object("obj/shut");
-    if (!ob) {
-	struct object *save_current = current_object,
-	              *save_command = command_giver;
-	command_giver = 0;
-	current_object = 0;
-	shout_string("Game driver shouts: Out of memory.\n");
-	command_giver = save_command;
-	current_object = save_current;
-#ifndef _AIX
-        startshutdowngame();
-#else
-        startshutdowngame(1);
-#endif
-	return;
-    }
-    shout_string("Game driver shouts: The memory is getting low !\n");
-    push_number(minutes);
-    (void)apply("shut", ob, 1);
-}
-
-int match_string(match, str)
-    char *match, *str;
-{
-    int i;
-
- again:
-    if (*str == '\0' && *match == '\0')
-	return 1;
-    switch(*match) {
-    case '?':
-	if (*str == '\0')
-	    return 0;
-	str++;
-	match++;
-	goto again;
-    case '*':
-	match++;
-	if (*match == '\0')
-	    return 1;
-	for (i=0; str[i] != '\0'; i++)
-	    if (match_string(match, str+i))
-		return 1;
-	return 0;
-    case '\0':
-	return 0;
-    case '\\':
-	match++;
-	if (*match == '\0')
-	    return 0;
-	/* Fall through ! */
-    default:
-	if (*match == *str) {
-	    match++;
-	    str++;
-	    goto again;
-	}
-	return 0;
-    }
-}
-
-/*
- * Credits for some of the code below goes to Free Software Foundation
- * Copyright (C) 1990 Free Software Foundation, Inc.
- * See the GNU General Public License for more details.
- */
-#ifndef S_ISDIR
-#define	S_ISDIR(m)	(((m)&S_IFMT) == S_IFDIR)
-#endif
-
-#ifndef S_ISREG
-#define	S_ISREG(m)	(((m)&S_IFMT) == S_IFREG)
-#endif
-
-int
-isdir (path)
-     char *path;
-{
-  struct stat stats;
-
-  return stat (path, &stats) == 0 && S_ISDIR (stats.st_mode);
-}
-
-void
-strip_trailing_slashes (path)
-     char *path;
-{
-  int last;
-
-  last = strlen (path) - 1;
-  while (last > 0 && path[last] == '/')
-    path[last--] = '\0';
-}
-
-struct stat to_stats, from_stats;
-
-int
-copy (from, to)
-     char *from, *to;
-{
-  int ifd;
-  int ofd;
-  char buf[1024 * 8];
-  int len;			/* Number of bytes read into `buf'. */
-  
-  if (!S_ISREG (from_stats.st_mode))
-    {
-      error ("cannot move `%s' across filesystems: Not a regular file\n", from);
-      return 1;
-    }
-  
-  if (unlink (to) && errno != ENOENT)
-    {
-      error ("cannot remove `%s'\n", to);
-      return 1;
-    }
-
-  ifd = open (from, O_RDONLY, 0);
-  if (ifd < 0)
-    {
-      error ("%s: open failed\n", from);
-      return errno;
-    }
-  ofd = open (to, O_WRONLY | O_CREAT | O_TRUNC, 0600);
-  if (ofd < 0)
-    {
-      error ("%s: open failed\n", to);
-      close (ifd);
-      return 1;
-    }
-#ifndef FCHMOD_MISSING
-  if (fchmod (ofd, from_stats.st_mode & 0777))
-    {
-      error ("%s: fchmod failed\n", to);
-      close (ifd);
-      close (ofd);
-      unlink (to);
-      return 1;
-    }
-#endif
-  
-  while ((len = read (ifd, buf, sizeof (buf))) > 0)
-    {
-      int wrote = 0;
-      char *bp = buf;
-      
-      do
-	{
-	  wrote = write (ofd, bp, len);
-	  if (wrote < 0)
-	    {
-	      error ("%s: write failed\n", to);
-	      close (ifd);
-	      close (ofd);
-	      unlink (to);
-	      return 1;
-	    }
-	  bp += wrote;
-	  len -= wrote;
-	} while (len > 0);
-    }
-  if (len < 0)
-    {
-      error ("%s: read failed\n", from);
-      close (ifd);
-      close (ofd);
-      unlink (to);
-      return 1;
-    }
-
-  if (close (ifd) < 0)
-    {
-      error ("%s: close failed", from);
-      close (ofd);
-      return 1;
-    }
-  if (close (ofd) < 0)
-    {
-      error ("%s: close failed", to);
-      return 1;
-    }
-  
-#ifdef FCHMOD_MISSING
-  if (chmod (to, from_stats.st_mode & 0777))
-    {
-      error ("%s: chmod failed\n", to);
-      return 1;
-    }
-#endif
-
-  return 0;
-}
-
-/* Move FROM onto TO.  Handles cross-filesystem moves.
-   If TO is a directory, FROM must be also.
-   Return 0 if successful, 1 if an error occurred.  */
-
-int
-do_move (from, to)
-     char *from;
-     char *to;
-{
-  if (lstat (from, &from_stats) != 0)
-    {
-      error ("%s: lstat failed\n", from);
-      return 1;
-    }
-
-  if (lstat (to, &to_stats) == 0)
-    {
-#ifndef MSDOS
-      if (from_stats.st_dev == to_stats.st_dev
-	  && from_stats.st_ino == to_stats.st_ino)
-#else
-      if (same_file(from,to))
-#endif
-	{
-	  error ("`%s' and `%s' are the same file", from, to);
-	  return 1;
-	}
-
-      if (S_ISDIR (to_stats.st_mode))
-	{
-	  error ("%s: cannot overwrite directory", to);
-	  return 1;
-	}
-
-    }
-  else if (errno != ENOENT)
-    {
-      error ("%s: unknown error\n", to);
-      return 1;
-    }
-#ifdef SYSV
-  if (isdir(from)) {
-      char cmd_buf[100];
-      sprintf(cmd_buf, "/usr/lib/mv_dir %s %s", from, to);
-      return system(cmd_buf);
-  } else
-#endif /* SYSV */      
-  if (rename (from, to) == 0)
-    {
-      return 0;
-    }
-
-  if (errno != EXDEV)
-    {
-      error ("cannot move `%s' to `%s'", from, to);
-      return 1;
-    }
-
-  /* rename failed on cross-filesystem link.  Copy the file instead. */
-
-  if (copy (from, to))
-      return 1;
-  
-  if (unlink (from))
-    {
-      error ("cannot remove `%s'", from);
-      return 1;
-    }
-
-  return 0;
-
-}
-    
-/*
- * do_rename is used by the efun rename. It is basically a combination
- * of the unix system call rename and the unix command mv. Please shoot
- * the people at ATT who made Sys V.
- */
-
-#ifdef F_RENAME
-int
-do_rename(fr, t)
-    char *fr, *t;
-{
-    char *from, *to;
-    
-    from = check_valid_path(fr, current_object->eff_user, "do_rename", 1);
-    if(!from)
-	return 1;
-    to = check_valid_path(t, current_object->eff_user, "do_rename", 1);
-    if(!to)
-	return 1;
-    if(!strlen(to) && !strcmp(t, "/")) {
-	to = (char *)alloca(3);
-	sprintf(to, "./");
-    }
-    strip_trailing_slashes (from);
-    if (isdir (to))
-	{
-	    /* Target is a directory; build full target filename. */
-	    char *cp;
-	    char *newto;
-	    
-	    cp = strrchr (from, '/');
-	    if (cp)
-		cp++;
-	    else
-		cp = from;
-	    
-	    newto = (char *) alloca (strlen (to) + 1 + strlen (cp) + 1);
-	    sprintf (newto, "%s/%s", to, cp);
-	    return do_move (from, newto);
-	}
-    else
-	return do_move (from, to);
-}
-#endif /* F_RENAME */

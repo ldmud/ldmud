@@ -1,0 +1,20 @@
+COMMUNICATIONS: say <msg>, shout <msg>, tell <player> <msg>,
+converse, thank <player>, whisper, emergency <msg>
+
+ATMOSPHERE: smile, grin, laugh, sigh, ruffle, bow, cackle, chuckle, applaud,
+blush, bounce, burp, clap, comfort, cough, cry, cuddle, flip, fondle, french,
+frown, gasp, giggle, glare, groan, grope, growl, hiccup, hug, kick, kiss,
+lick, love, moan, nibble, nod, poke, pout, purr, scream, shake, shiver, shrug,
+sing, slap, smirk, snap, sneeze, snicker, sniff, snore, snuggle, spit,
+squeeze, stare, strut, sulk, twiddle, whistle, wiggle, wink, yawn
+
+INFO: score, help, who, i (inventory), describe
+
+FIGHTING: kill <name>, stop (hunting), wear <armor>, remove <armor>
+(MAGIC): missile, shock, fireball (do "help spell" for these)
+
+OTHER: password <old>, bug <msg>, typo <msg>, idea <msg>, save, quit, brief,
+wimpy, give <obj> to <obj>, get <obj>, put <obj> in <obj>, drop <obj>
+
+FOR MORE INFORMATION ON THE GAME: start, concept1, concept2, dying,
+alignment, experience, hitpoints, spellpoints, levels, credits

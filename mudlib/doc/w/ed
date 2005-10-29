@@ -1,0 +1,17 @@
+Command: ed
+Argument: file
+
+Edit the file 'file'. For documentations about how to use 'ed', look
+at /doc/build.
+
+You can leave 'ed' with the command 'q', or 'Q' if the file has been
+modified.
+
+When in 'ed', the prompr will change to ':'.
+
+The file will be searched for in the current directory. 'ed castle.c' will
+edit the castle of the wizard.
+
+A wizard can only edit files in his home directory, and files in /log.
+
+See also w/ls, w/cat

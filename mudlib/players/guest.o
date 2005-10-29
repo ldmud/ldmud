@@ -1,0 +1,54 @@
+other_copy 0
+it 0
+pwd 0
+talker 0
+muffled 0
+description " is not your everyday average wimp to mess with. Looks at what he is carrying! :)"
+power 0
+msghome "goes home"
+save_counter 0
+max_headache 0
+headache 0
+intoxicated 0
+al_title "malicious"
+password2 0
+password "nozksdfDzbCQ"
+title "the simple novice"
+handshake 0
+handshake_data 0
+alignment -59
+current_room "room/plane1"
+auto_load ""
+whimpy 1
+frog 0
+is_invis 0
+age 208352
+spell_dam 0
+spell_cost 0
+spell_name 0
+spell_points 58
+cap_name "Guest"
+hunting_time -39
+hunter 0
+hunted 0
+local_weight 0
+ghost 1
+head_armor 0
+name_of_weapon 0
+weapon_class 3
+alt_attacker_ob 0
+attacker_ob 0
+mmsgin "arrives in a puff of smoke"
+mmsgout "disappears in a puff of smoke"
+experience 397
+max_hp 58
+hit_point 58
+armor_class 0
+level 2
+brief 0
+is_npc 0
+msgout "blows"
+msgin "drifts around"
+name "guest"
+money 0
+time_to_heal 4

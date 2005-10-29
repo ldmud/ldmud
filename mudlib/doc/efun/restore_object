@@ -1,0 +1,8 @@
+int restore_object(name)
+string name;
+
+Restore all values of variables for current object from file "name".
+It is illegal to have '.' or spaces in the name.
+Return true if success.
+
+See also save_object().

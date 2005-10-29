@@ -1,0 +1,7 @@
+command: shout
+argument: a string
+
+The argument will be displayed to all players everywhere.  This costs 20
+spell points.
+
+See also 'converse', 'say', 'emergency.'

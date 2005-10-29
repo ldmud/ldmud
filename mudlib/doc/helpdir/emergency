@@ -1,0 +1,7 @@
+Command: emergency
+argument: a string
+
+This gives the message to *everyone*, including all wizards who have
+messages turned off.  You should only do this in real emergencies, and
+the wizards may fine you, imprison you, or do similar things if you
+abuse it.

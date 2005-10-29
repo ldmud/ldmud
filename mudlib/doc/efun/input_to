@@ -1,0 +1,7 @@
+void input_to(fun)
+string fun;
+
+Enable next line of user input to be sent to the local function "fun" as
+an argument. The input line will not be parsed.
+
+See also call_other(), sscanf().

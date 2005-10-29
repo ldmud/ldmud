@@ -1,0 +1,16 @@
+Searching is done with:
+/hello/
+Find first line in of after current line.
+Just // will repeat the search.
+
+Theere are special characters that can be used in the pattern:
+.	Match any character.
+x*	Match any numbers of x (0 or more).
+[abc]	Match 'a', 'b' or 'c'.
+[0-9]	Match any digit 0 - 9.
+[a-z]	Match any lowercase letter.
+\x	Match 'x' where 'x' can be any character except '(' and ')'.
+
+Example:
+s/ab.d/ABCD/
+Substitute any string 'abcXd' against 'ABCD' where X can be any character.

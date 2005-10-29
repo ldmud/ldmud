@@ -1,0 +1,6 @@
+This directory contains documentation about the language used to program
+objects. I tried to make it as similarr as possible to C, as many people
+know how to program C. I called it LPC, to connect it to the name LPmud.
+
+Programs in an object are compiled into a special tree form, to speed up
+evaluation.

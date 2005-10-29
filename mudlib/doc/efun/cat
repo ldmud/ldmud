@@ -1,0 +1,8 @@
+void cat(path)
+string path;
+
+List the file found at "path". It is not legal to have '.' or spaces
+in the path. This commands is normally connected to the "cat" command
+that wizards have. It is also used by the "help" command.
+
+See also ls().

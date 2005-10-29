@@ -1,0 +1,9 @@
+command: idea
+argument: a string
+
+Store a message describing a change or enhancement to the game.
+The game master will examine it.
+
+All messages are very welcome, so do not hesitate.
+
+See also 'bug', 'typo'.

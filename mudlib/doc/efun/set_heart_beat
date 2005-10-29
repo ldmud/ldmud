@@ -1,0 +1,7 @@
+void set_heart_beat(flag)
+int flag;
+
+Enable or disable heart beat. If the heart beat is not needed for the moment,
+then do disable it. This will reduce system over head.
+
+See also lfun/heart_beat

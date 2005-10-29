@@ -1,0 +1,8 @@
+command: bug
+argument: a string
+
+Store a bug message. The game master will examine it.
+
+All bug messages are very welcome, so do not hesitate.
+
+See also 'typo', 'idea'.

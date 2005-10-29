@@ -1,0 +1,8 @@
+#! /bin/csh
+#We don't want this command to wind up happening at the same time as the
+#entry log, in case we're strapped for memory.  (Especially if we're niced :)
+sleep 100
+while (1)
+sort_level > SORT_LEVEL
+sleep 3735
+end

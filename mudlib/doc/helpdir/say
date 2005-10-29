@@ -1,0 +1,8 @@
+command: say
+argument: a string
+
+The argument will be displayed to all players in the same room.
+You can use either ' or " as an abbreviation, for example:
+> "Do you want to help me kill the giants?
+
+See also 'converse', 'shout'.

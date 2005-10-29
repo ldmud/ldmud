@@ -1,0 +1,5 @@
+string lower_case(str)
+string str;
+
+Convert the all characters in "str" to lower case, and return the
+new string.

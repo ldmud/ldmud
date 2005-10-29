@@ -1,0 +1,7 @@
+object find_living(str)
+string str;
+
+Find first "living" object that answers to the id "str" (by calling
+local id()). A living object is an object that has done "enable_commands()".
+
+See also enable_commands().

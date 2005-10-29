@@ -1,0 +1,19 @@
+Lastest Wizard news 			May 22
+
+Please don't make things that give players easy healing.  Any healing thing
+should be limited to once a reset, and probably not more than a few points.
+Even if it's protected by monsters, remember that after they're killed it's
+unguarded!  If you are unsure whether healing is resonable, ask me first.
+Remember, healing is the major thing that slows people down.  Next person
+who makes too easy of a healing system will lose *major* points on the
+wizlist!
+
+Please do not use set_ep to raise the value or set_hp to lower the strength
+of a monster unless there is a real reason (e.g. lots of magic, etc.) to do
+so.
+
+Everyone MUST read /RULES... or else!  You could lose your wizard privs if
+you don't follow them!
+
+You can now make doors with traps in them.  Read /doc/build/door for more
+information.

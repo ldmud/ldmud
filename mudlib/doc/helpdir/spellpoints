@@ -1,0 +1,15 @@
+SPELL POINTS:  Spell points are used up as you cast spells or use the "tell"
+and "shout" commands.  They regenerate with time, and some magic potions,
+items, etc. may restore them faster (but normal alcohol does not).  When
+using tell and shout, spell points *can* go negative, however you can't use
+those commands if you have negative spell points.
+
+Here are the costs in spell points for certain actions (see also the help
+file "spell"):
+
+missile		10
+shock		15
+fireball	20
+tell		 5
+pose		15
+shout		20

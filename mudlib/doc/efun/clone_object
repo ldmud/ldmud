@@ -1,0 +1,9 @@
+object clone_object(name)
+string name;
+
+Load a new object from definition "name", and give it a new
+unique name. Return the new object.
+The original used for cloning, should not be used in the game, only used for
+cloning.
+
+See also destruct(), move_object().

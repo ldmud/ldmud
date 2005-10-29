@@ -1,0 +1,13 @@
+Command: describe
+argument: a string
+
+This command lets you give a one-line description of yourself which other
+players will see when they look at you.  Your name will automatically be
+prepended and a period appended.  For example, if Fred typed:
+
+> describe is a strong, rugged adventurer
+
+people looking at him would see
+
+Fred is a strong, rugged adventurer.
+

@@ -1,0 +1,7 @@
+void tell_room(ob, str)
+object ob;
+string str;
+
+Send a message "str" to object all objects in the room "ob".
+
+See also efun/write, efun/shout, efun/say, efun/tell_object

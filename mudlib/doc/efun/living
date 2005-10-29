@@ -1,0 +1,5 @@
+int living(ob)
+object ob;
+
+Return true if 'ob' is a living object (that is, enable_commands() has been
+called by 'ob').

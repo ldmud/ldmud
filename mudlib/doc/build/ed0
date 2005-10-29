@@ -1,0 +1,23 @@
+When in 'ed', the prompt is ':'.
+
+Ed has two modes, command mode and insert mode. The insert mode has
+no prompt. You exit the insert mode by typing a single '.' on a line.
+
+All commands have the following syntax:
+
+X,Ycmd
+
+or
+Xcmd
+
+For example:
+
+1,10p
+Will print line 1 to 10.
+1,5d
+Will delete line 1 to 5.
+8p
+Will print line 8.
+A '.' is the "current line". The current line is the last line
+referenced. If you want to print last line + 10 more:
+.,.+10p

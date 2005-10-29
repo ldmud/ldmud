@@ -1,0 +1,6 @@
+command: drop
+argument: an object
+
+Drop something.  Examples are "drop bottle" and "drop all".
+
+See also 'get' and 'put'.

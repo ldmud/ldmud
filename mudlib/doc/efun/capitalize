@@ -1,0 +1,5 @@
+string capitalize(str)
+string str;
+
+Convert the first character in "str" to upper case, and return the
+new string.

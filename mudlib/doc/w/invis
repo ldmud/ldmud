@@ -1,0 +1,15 @@
+Command: invis <arg>
+
+Turn yourself invisible.  Arg determines how invisible you are.  Possible
+numbers are:
+
+10 - No short description, i.e. you don't appear in the room, and can't
+     be seen when you walk around.
+20 - No who, i.e. you don't show up on the who list.
+30 - Someone, i.e. in most things you will show up as "someone."
+40 - Teleportation messages aren't displayed.
+50 - Your actions do not show up.
+60 - No ID, you will not be accessible by your name at all.
+100- You no longer show up on the people list.
+
+(Note that wizards of high levels may be able to override your invisibility.)

@@ -1,0 +1,6 @@
+object first_inventory(ob)
+object ob;
+
+Get the first object in the inventory of "ob".
+
+See also next_inventory().

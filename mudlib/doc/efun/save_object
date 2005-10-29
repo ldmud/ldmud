@@ -1,0 +1,7 @@
+void save_object(name)
+string name;
+
+Save all values of variables of this object in the file "name".
+It is illegal to have '.' or space in the fiel name.
+
+See also restore_object().

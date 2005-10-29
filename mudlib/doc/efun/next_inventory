@@ -1,0 +1,9 @@
+object next_inventory(ob)
+object ob;
+
+Get next object in the same inventory as "ob".
+
+Warning: If the object 'ob' is move by move_object(), then next_inventory()
+will return an object from the new inventory.
+
+See also efun/first_inventory.

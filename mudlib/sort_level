@@ -1,0 +1,18 @@
+#!/bin/sh
+cd players
+echo 'Number of active players: ' `../../count_active *.o`
+echo ""
+echo 'List of top players ' `date`
+echo ""
+echo "Name      Lev Hours"
+echo ""
+egrep '^level |^cap_name |^age ' *.o |\
+sed -e 's/\.o:/ /' -e 's/\"//g' |\
+sort |\
+awk '
+$2=="age" { age = $3; }
+$2=="cap_name" { name = $3; }
+$2=="level" { if ($3 < 20) printf("%-10s %2d %d\n", name, $3, age/30/60);
+	    age = 0; name = "XX"; }' |\
+sort +rn1 +rn2 |\
+head -15

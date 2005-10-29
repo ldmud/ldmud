@@ -1,0 +1,54 @@
+other_copy 0
+it 0
+pwd "/players/drax/"
+talker 0
+muffled 1
+description 0
+power 0
+msghome "goes home, hoping futilely to get some peaceful rest"
+save_counter 0
+max_headache 0
+headache 0
+intoxicated 0
+al_title "white lord"
+password2 0
+password "ynSNjqtJDpjLc"
+title "the Engineer"
+handshake 0
+handshake_data 0
+alignment 1234384770
+current_room "room/vill_green"
+auto_load ""
+whimpy 0
+frog 0
+is_invis 0
+age 194548
+spell_dam 0
+spell_cost 0
+spell_name "fire ball"
+spell_points 210
+cap_name "Drax"
+hunting_time -75
+hunter 0
+hunted 0
+local_weight 0
+ghost 0
+head_armor 0
+name_of_weapon 0
+weapon_class 3
+alt_attacker_ob 0
+attacker_ob 0
+mmsgin "causes his arms to appear, which then assemble the rest of him"
+mmsgout "disassembles himself with his own arms, which then disappear"
+experience 204615144
+max_hp 210
+hit_point 210
+armor_class 0
+level 1000000
+brief 0
+is_npc 0
+msgout "looks hassled and harried and hurries"
+msgin "stumbles in, looking tired and overworked"
+name "drax"
+money 11067481
+time_to_heal 10

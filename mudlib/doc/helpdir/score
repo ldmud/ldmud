@@ -1,0 +1,4 @@
+command: score
+no arguments.
+
+Show current experience points, hit points and spell points.

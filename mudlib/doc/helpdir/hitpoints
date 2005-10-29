@@ -1,0 +1,7 @@
+HIT POINTS:
+This determines how strong you are.  When someone hits you, your hit points
+go down.  If you go below zero, you die (see the help on dying).  Your spell
+points regenerate with time.  They regenerate faster when drunk, and the
+very act of drinking some potent drinks will (in addition to making you
+drunk) restore some points immediately.
+

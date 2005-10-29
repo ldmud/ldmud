@@ -1,0 +1,9 @@
+int set_light(n)
+int n;
+
+An object is by default dark. It can be set to not dark by calling
+set_light(1). The environment will the also get this light.  The returned
+value is the total number of lights in this room.  Note that the value of
+the argument is added to added to the light of the current object.  So if
+you've done a set_light(1) you can then remove that light with a
+set_light(-1).

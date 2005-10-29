@@ -1,0 +1,5 @@
+#include "std.h"
+TWO_EXIT("room/narr_alley", "up",
+	 "room/maze1/maze1", "north",
+	 "Down the well",
+	 "You are down the well. It is wet and slippery.\n", 0)

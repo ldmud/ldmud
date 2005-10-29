@@ -1,0 +1,64 @@
+These are the major changes from standard distribution 1.3.3 to 1.4.0-A (the
+A is for American, to distinguish from the European version):
+
+British spellings have been changed to American, the most obvious example
+being "armour."  This can be changed in existing files with the "fix_armor"
+script.
+
+The pub does not give out physical drinks any more, to prevent any
+possibility of cheating.
+
+There have been numerous spelling and minor bug fixes, much too numerous to
+list here.
+
+The player and soul programs have been rewritten, making them smaller.
+
+A level system has been added for wizards to improve security.  New
+invisibility levels have also been added.  See /doc/w/levels and
+/doc/w/invis for more information.  A "promote" command has been added to
+allow in-game management of levels.
+
+A whole slew of new wizard commands have been added.  Type "help wizard"
+inside the game for a list.  (This help lists only the commands which you
+are of high enough level to perform.)
+
+Cpp is now called through a pipe so that you can see the errors which the
+precompiler returns.  Also, the routine used for opening the pipe is a
+custom one (in vpopen.c) which doesn't glob or use sh for security reasons,
+and which redirects both stdout and stderr.  This routine is also used for
+ls now.
+
+A % (modulus) operator has been added to LPC, along with %=.
+
+A find_player(string) external function has been added to LPC.  This is just
+like find_living() except that it will find only players, not monsters.
+This was done by adding an "is_player()" function to player.c which returns
+1.
+
+The attack routines in living.h now call valid_attack() before allowing the
+object to attack anything.  Valid_attack() routines have been added to
+monster.c, monster.talk.c, and player.c.  The monster ones only allow a
+monster to attack another monster if it has been specifically given
+permission with "set_can_kill," another new routine described in
+doc/build/monster.  Right now, the one for the player does not allow players
+to attack novices, nor does it allow novices to attack other players.
+
+The experience you get for killing monsters depends on your alignment.  The
+bigger the difference in alignments, the bigger the ep bonus.  This
+encourages a more consistent behavior pattern and adds to characterization.
+
+Players can now have 1-line descriptions set with the "describe" command.
+
+Death takes away only 1/4 of your ep.  Also, when you regenerate, it puts
+you to whatever the appropriate level is for the number of ep you have,
+complete with correct title and everything.
+
+New level and alignment titles have been added, and the numbers have been
+tweaked a bit.
+
+Add_alignment in player.c has been modified to make it easier for lower
+level players to build up an alignment.  Rather than losing 1/10 of your
+alignment on each kill, you instead lose your alignment times 2/(30-level).
+
+There are many more little changes, but these cover most of the important
+ones.

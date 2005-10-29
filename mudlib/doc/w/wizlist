@@ -1,0 +1,17 @@
+Command: wizlist
+
+The wizard top score list.
+This is the ONLY purpose of the game: To be on the top of this list.
+Of course, you have to become wizard first.
+
+A wizard get one point for every command he has defined when it is used
+by a player. It is quite easy to cheat, of course, but cheating wizards
+are simply removed from the game (and the list).
+
+When you use commands defined by your objects, you will also get points,
+but this is legal for normal use.
+
+The score decays with 1 % every reset, and is saved and restored from
+file when reboot of game.
+
+See also: w/people

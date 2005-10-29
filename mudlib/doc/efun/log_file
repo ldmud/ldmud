@@ -1,0 +1,6 @@
+void log_file(file, message)
+string file;
+string message;
+
+Write a message to a log file. All log files are in the directory
+mudlib/log. This operation always opens and closes the file.

@@ -1,0 +1,12 @@
+object find_object(name)
+string name;
+
+Find the object specified by the name and return its descriptor.  Note that
+this will only work if the object already exists, and unlike a command such
+as "move_object" it will fail (and return 0) if the specified name has no
+currently loaded object.
+
+Example:
+object portia;
+
+portia = find_object("players/fred/portia.c");

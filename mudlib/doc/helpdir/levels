@@ -1,0 +1,23 @@
+LEVELS:
+Number	Experience	Title
+ 1	      0		the utter novice
+ 2	    250		the simple novice
+ 3	   1000		the lowrank beginner
+ 4	   2000		the medium beginner
+ 5	   3500		the small adventurer	
+ 6	   5000		the experienced adventurer
+ 7	   7500		the expert adventurer
+ 8	  12500		the great adventurer
+ 9	  17500		the myrmidon
+10	  25000		the champion
+11	  40000		the great champion
+12	  60000		the apprentice magician
+13	  80000		the journeyman magician
+14	 100000		the master magician
+15	 130000		the lesser sorcerer
+16	 200000		the sorcerer
+17	 350000		the master sorcerer
+18	 550000		the necromancer
+19	 850000		the greater necromancer
+20	1250000		the apprentice Wizard
+

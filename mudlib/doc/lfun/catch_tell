@@ -1,0 +1,3 @@
+When tell_object() sends a message to a noninteractive player,
+it will get to the function catch_tell(string). This will enable
+communications between NPC's and from a player to an NPC.

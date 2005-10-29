@@ -1,0 +1,7 @@
+object find_player(str)
+string str;
+
+This is like find_living except that it only finds actual players, as
+opposed to monsters.
+
+See also enable_commands().

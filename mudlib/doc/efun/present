@@ -1,0 +1,16 @@
+object present(str, ob)
+string str;
+object ob;
+
+If an object that identifies to the name "str" is present,
+then return it.
+
+'str' can also be an object.
+
+The object is searched for in the inventory of the current object, and
+in the inventory of the environment of the current object.
+
+A second optional argument 'ob' is the environent where the search for the
+'str' is done. Normally 'this_player()' is a good environment.
+
+See also efun/move_object(), efun/environment().

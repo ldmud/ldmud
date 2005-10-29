@@ -1,0 +1,5 @@
+#! /bin/csh
+while (1)
+date >> ENTER
+sleep 1800
+end

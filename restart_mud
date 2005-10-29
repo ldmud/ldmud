@@ -1,0 +1,16 @@
+#! /bin/sh
+#
+# Restart Lpmud a lot of times, in case of a crash.
+#
+cd /usr/users/jseidman/lpmud
+(cd mudlib; csh make_list) &
+(cd mudlib/log; csh time_enter) &
+for i in 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25
+do
+    echo "Restart $i." >> mudlib/lpmud.log
+    date >> mudlib/lpmud.log
+    echo "The game has been up since" > mudlib/UPSINCE
+    date >> mudlib/UPSINCE
+    parse >> mudlib/lpmud.log 2>&1
+    tail mudlib/debug.log >> mudlib/lpmud.log
+done

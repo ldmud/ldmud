@@ -1,0 +1,17 @@
+Changes from 1.4.0-A to 1.4.1-A
+
+Fixed several more bugs.  These constitute the majority of changes.  Among
+others, changes were made to the wizard shutdown and time commands, the
+player describe command, the initial loading routine, the error handling
+routine, and monster.c.  (This list is far from complete.)
+
+Upon an error, players are now moved to the church instead of to the void,
+assuming the game is able to do this.  Everything else still goes to the
+void.
+
+The ability to put traps on doors was added.  See /doc/build/door for details.
+
+The ability to use "stat" has been changed (in the version of security.h
+included here) to allow anyone of CREATE level to use it.  However, living.h
+has been changed so that unless the wizard is of at least STAT level, he
+will not see the monster's current hp, so he can't tip off players.

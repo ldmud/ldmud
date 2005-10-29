@@ -1,0 +1,14 @@
+Variables can have one of four types:
+
+int:	An integer. Normally full 32 bits signed.
+
+status:	A boolean, either 0 or 1.
+
+string:	A string (not pointer to string).
+
+object: Pointer to an object.
+
+
+All uninitialized variables have the value 0. The type of a variable is really
+only a documentation, and has no effect at all on the program !
+A pointer to a destructed object, will also have the value 0.

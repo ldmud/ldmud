@@ -1,0 +1,6 @@
+object this_object()
+
+Return the object pointer of this object. This is not to be confused with the
+internal name of an object, which is used by the "id()" function.
+
+See also: this_player().

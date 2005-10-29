@@ -1,0 +1,36 @@
+Installing LP-mud:
+
+First do a "config.mud inet" since that is the only protocol which works.
+
+Edit config.h and comm.h to be appropriate for your system, changing the
+paths and hostname.  You also need to change the path mentioned in
+restart_mud.  Note that all of the scripts assume that you have . in your
+path.  Otherwise you'll have to edit them all appropriately.
+
+If you're changing from an existing LP-mud, you'll have to change the
+spelling of armour everywhere.  Running "fix_armor" should change it in the
+files, and tell your which files you need to rename.  You'll also need to
+change the wizards' levels.  Read doc/w/levels for more info.
+
+You might want to fiddle with lpmud/security.h and lpmud/mudlib/room/tune.h
+to your own personal taste.
+
+Do "make parse" to make the game.  Then you should be able to just start
+running with a "restart_mud&".
+
+Connect via telnet by typing "telnet <your host> 2000" and make a new
+character.  After you create him, edit the file lpmud/mudlib/players/<name>.o
+and change your level to something over 10000.  You can now use the
+"promote" command to make additional wizards.
+
+You'll probably want to edit lpmud/mudlib/NEWS to reflect your site.  Same
+goes for lpmud/mudlib/WIZNEWS and lpmud/mudlib/NEWSPAPER.  You might also
+change lpmud/mudlib/obj/player.c to change the "This is the HMC LP-mud"
+message that players get when they first connect.
+
+If you have any problems with this distribution, please send mail to
+jseidman@jarthur.claremont.edu.  In any case, please send me mail if you set
+up a version of this LP-mud.  I keep a mailing list of administrators so
+that I can mail out any important notices or bug fixes.  (Note that I mean
+really important.  I won't fill your mailbox with junk.)  Also, I just like
+to look around other LP-muds, so I'd like the addresses of them.

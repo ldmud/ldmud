@@ -1,0 +1,8 @@
+command: typo
+argument: a string
+
+Store a message describing a spelling error. The game master will examine it.
+
+All messages are very welcome, so do not hesitate.
+
+See also 'bug', 'idea'.

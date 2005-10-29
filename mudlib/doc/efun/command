@@ -1,0 +1,7 @@
+void command(str)
+string str;
+
+Execute "str" as a command given directly by the player.
+Any effects of the command will apply to the current object.
+
+See also enable_command().

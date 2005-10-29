@@ -1,0 +1,13 @@
+void enable_commands()
+
+Enable this object to use commands normally accessible to players.
+This also marks the current object as "living".
+Commands defined by 'player.c' will not be accessible, of course.
+
+This function must be called if the object is supposed to interact
+with other players.
+
+Avoid calling this function from other places then reset(), because the
+command_giver will immediately be set to the new object.
+
+See also efun/command, efun/living.

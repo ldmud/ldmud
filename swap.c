@@ -1,261 +1,419 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <stdio.h>
-#ifdef __STDC__
-#include <memory.h>
-#endif
-
-#include "lint.h"
-#include "interpret.h"
 #include "object.h"
+#include "lnode.h"
 #include "config.h"
-#include "exec.h"
 
-/*
- * Swap out programs from objects.
- */
+#define SWAP_SIZE	50000	/* Big enough for most objects. */
+
+extern char *realloc(), *xalloc();
+static void move_prog_to_swap_area();
+static struct lnode *load_prog_swap_area();
+
+static int swap_number = 1;
+
+static char *swap_area;
+static int swap_max_size, swap_size;
 
 int num_swapped;
 int total_bytes_swapped;
-char file_name[100];
 
-FILE *swap_file;		/* The swap file is opened once */
-
-int total_num_prog_blocks, total_prog_block_size;
-
-extern int d_flag;
-
-/*
- * marion - adjust pointers for swap out and later relocate on swap in
- *   program
- *   line_numbers
- *   functions
- *   strings
- *   variable_names
- *   inherit
- *   argument_types
- *   type_start
- */
-int
-locate_out (prog) struct program *prog; {
-    char *p = 0; /* keep cc happy */
-
-    if (!prog) return 0;
-    if (d_flag > 1) {
-	debug_message ("locate_out: %lX %lX %lX %lX %lX %lX %lX %lX\n",
-	    prog->program, prog->line_numbers, prog->functions,
-	    prog->strings, prog->variable_names, prog->inherit,
-	    prog->argument_types, prog->type_start);
-    }
-    prog->program	= &p[prog->program - (char *)prog];
-    prog->line_numbers	= (unsigned short *)
-	&p[(char *)prog->line_numbers - (char *)prog];
-    prog->functions	= (struct function *)
-	&p[(char *)prog->functions - (char *)prog];
-    prog->strings	= (char **)
-	&p[(char *)prog->strings - (char *)prog];
-    prog->variable_names= (struct variable *)
-	&p[(char *)prog->variable_names - (char *)prog];
-    prog->inherit	= (struct inherit *)
-	&p[(char *)prog->inherit - (char *)prog];
-    if (prog->type_start) {
-	prog->argument_types = (unsigned short *)
-	    &p[(char *)prog->argument_types - (char *)prog];
-	prog->type_start = (unsigned short *)
-	    &p[(char *)prog->type_start - (char *)prog];
-    }
-    return 1;
-}
-
-
-/*
- * marion - relocate pointers after swap in
- *   program
- *   line_numbers
- *   functions
- *   strings
- *   variable_names
- *   inherit
- *   argument_types
- *   type_start
- */
-int
-locate_in (prog) struct program *prog; {
-    char *p = (char *)prog;
-
-    if (!prog) return 0;
-    prog->program	= &p[prog->program - (char *)0];
-    prog->line_numbers	= (unsigned short *)
-	&p[(char *)prog->line_numbers - (char *)0];
-    prog->functions	= (struct function *)
-	&p[(char *)prog->functions - (char *)0];
-    prog->strings	= (char **)
-	&p[(char *)prog->strings - (char *)0];
-    prog->variable_names= (struct variable *)
-	&p[(char *)prog->variable_names - (char *)0];
-    prog->inherit	= (struct inherit *)
-	&p[(char *)prog->inherit - (char *)0];
-    if (prog->type_start) {
-	prog->argument_types = (unsigned short *)
-	    &p[(char *)prog->argument_types - (char *)0];
-	prog->type_start     = (unsigned short *)
-	    &p[(char *)prog->type_start - (char *)0];
-    }
-    if (d_flag > 1) {
-	debug_message ("locate_in: %lX %lX %lX %lX %lX %lX %lX\n",
-	    prog->program, prog->line_numbers, prog->functions,
-	    prog->strings, prog->variable_names, prog->inherit,
-	    prog->argument_types, prog->type_start);
-    }
-    return 1;
-}
-
-/*
- * Swap out an object. Only the program is swapped, not the 'struct object'.
- *
- * marion - the swap seems to corrupt the function table
- */
-int swap(ob)
+swap(ob)
     struct object *ob;
 {
-    if (ob->flags & O_DESTRUCTED)
+    char *file;
+    FILE *f;
+
+    if (NUM_RESET_TO_SWAP == 0)
 	return 0;
-    if (d_flag > 1) { /* marion */
-	debug_message("Swap object %s (ref %d)\n", ob->name, ob->ref);
-    }
-    if (swap_file == 0) {
-#ifndef MSDOS
-	char host[50];
-	gethostname(host, sizeof host);
-	sprintf(file_name, "%s.%s", SWAP_FILE, host);
-	swap_file = fopen(file_name, "w+");
-#else
-	swap_file = fopen(strcpy(file_name,"LPMUD.SWAP"),"w+b");
-#endif
-	/* Leave this file pointer open ! */
-	if (swap_file == 0)
-	    return 0;
-    }
-    if (!ob->prog)
-    {
-	fprintf(stderr, "warning:no program in object %s, don't swap it\n",
-		ob->name);
-	/* It's no good freeing a NULL pointer */
+    if (ob->heart_beat && ob->enable_heart_beat)
 	return 0;
-    }
-    if ((ob->flags & O_HEART_BEAT) || (ob->flags & O_CLONE)) {
-	if (d_flag > 1) {
-	    debug_message ("  object not swapped - heart beat or cloned.\n");
-	}
+    if (ob->prog->num_ref > 1)
 	return 0;
-    }
-    if (ob->prog->ref > 1 || ob->interactive) {
-	if (d_flag > 1) {
-	    debug_message ("  object not swapped - inherited or interactive.\n");
-	}
-	return 0;
-    }
-    /*
-     * Has this object already been swapped, and read in again ?
-     * Then it is very easy to swap it out again.
-     */
-    if (ob->swap_num >= 0) {
-	total_bytes_swapped += ob->prog->total_size;
-	free_prog(ob->prog, 0);		/* Do not free the strings */
+    file = xalloc(strlen(SWAP_DIR) + strlen("/LPMUDswapXXXXXXXX") + 1);
+    sprintf(file, "%s/LPMUDswap%d", SWAP_DIR, swap_number++);
+    if (ob->swap_num > 0) {
+	struct stat st;
+	/* There is already a swap file for this object. */
+	free_prog(ob->prog);
 	ob->prog = 0;
-	ob->flags |= O_SWAPPED;
+	ob->swapped = 1;
+	ob->heart_beat = 0;	/* This pointer has to be set up again */
 	num_swapped++;
+	if (stat(file, &st) == -1) {
+	    perror(file);
+	    fatal("Coulnd't stat a swap file.\n");
+	}
+	total_bytes_swapped += st.st_size;
+	free(file);
 	return 1;
     }
-    /*
-     * marion - it is more efficient to write one item the size of the
-     *   program to the file than many items of size one. besides, it's
-     *   much more reasonable, as the fwrite only fails for the whole
-     *   block and not for a part of it.
-     */
-    ob->swap_num = ftell(swap_file);
-    locate_out (ob->prog); /* relocate the internal pointers */
-    if (fwrite((char *)ob->prog, ob->prog->total_size, 1, swap_file) != 1) {
-	debug_message("I/O error in swap.\n");
-	ob->swap_num = -1;
+    f = fopen(file, "w");
+    if (f == 0) {
+	perror(file);
+	debug_message("Couldn't open swap file %s for write\n", file);
+	free(file);
 	return 0;
     }
-    total_bytes_swapped += ob->prog->total_size;
-    num_swapped++;
-    free_prog(ob->prog, 0);	/* Don't free the shared strings */
+    swap_area = xalloc(SWAP_SIZE);
+    swap_size = 0;
+    swap_max_size = SWAP_SIZE;
+    move_prog_to_swap_area(ob->prog);
+    if (fwrite(swap_area, 1, swap_size, f) != swap_size) {
+	debug_message("Error in writing to swap.\n");
+	free(swap_area);
+	free(file);
+	return 0;
+    }
+    total_bytes_swapped += swap_size;
+    fclose(f);
+    free(swap_area);
+    free(file);
+    free_prog(ob->prog);
     ob->prog = 0;
-    ob->flags |= O_SWAPPED;
+    ob->swapped = 1;
+    num_swapped++;
+    ob->swap_num = swap_number - 1;
+    ob->heart_beat = 0;		/* This pointer has to be set up again */
     return 1;
 }
 
-void load_ob_from_swap(ob)
+static void ass_size(s)
+unsigned int s;
+{
+    while(s + swap_size > swap_max_size) {
+	swap_max_size *= 2;
+	swap_area = realloc(swap_area, swap_max_size);
+	if (swap_area == 0)
+	    fatal("swap realloc %d\n", swap_max_size);
+    }
+}
+
+static void move_prog_to_swap_area(p)
+    struct lnode *p;
+{
+    unsigned int s;
+    int beg = swap_size;
+
+    switch(p->line & L_MASK) {
+    case L_SINGLE:
+	s = sizeof(struct lnode_single);
+	ass_size(s);
+	memcpy(swap_area + swap_size, (char *)p, s);
+	swap_size += s;
+	break;
+    case L_NUMBER:
+	s = sizeof(struct lnode_number);
+	ass_size(s);
+	memcpy(swap_area + swap_size, (char *)p, s);
+	swap_size += s;
+	break;
+    case L_NAME:
+	s = sizeof(struct lnode_name);
+	ass_size(s);
+	memcpy(swap_area + swap_size, (char *)p, s);
+	swap_size += s;
+	((struct lnode_name *)(swap_area+beg))->name = (char *)swap_size;
+	s = strlen(((struct lnode_name *)p)->name) + 1;
+	ass_size(s);
+	strcpy(swap_area + swap_size, ((struct lnode_name *)p)->name);
+	swap_size += s;
+	break;
+    case L_1:
+	s = sizeof(struct lnode_1);
+	ass_size(s);
+	memcpy(swap_area + swap_size, (char *)p, s);
+	swap_size += s;
+	if (((struct lnode_1 *)p)->expr) {
+	    ((struct lnode_1 *)(swap_area+beg))->expr =
+		(struct lnode *)swap_size;
+	    move_prog_to_swap_area(((struct lnode_1 *)p)->expr);
+	}
+	break;
+    case L_2:
+	s = sizeof(struct lnode_2);
+	ass_size(s);
+	memcpy(swap_area + swap_size, (char *)p, s);
+	swap_size += s;
+	if (((struct lnode_2 *)p)->expr1) {
+	    ((struct lnode_2 *)(swap_area+beg))->expr1 =
+		(struct lnode *)swap_size;
+	    move_prog_to_swap_area(((struct lnode_2 *)p)->expr1);
+	}
+	if (((struct lnode_2 *)p)->expr2) {
+	    ((struct lnode_2 *)(swap_area+beg))->expr2 =
+		(struct lnode *)swap_size;
+	    move_prog_to_swap_area(((struct lnode_2 *)p)->expr2);
+	}
+	break;
+    case L_3:
+	s = sizeof(struct lnode_3);
+	ass_size(s);
+	memcpy(swap_area + swap_size, (char *)p, s);
+	swap_size += s;
+	if (((struct lnode_3 *)p)->expr1) {
+	    ((struct lnode_3 *)(swap_area+beg))->expr1 =
+		(struct lnode *)swap_size;
+	    move_prog_to_swap_area(((struct lnode_3 *)p)->expr1);
+	}
+	if (((struct lnode_3 *)p)->expr2) {
+	    ((struct lnode_3 *)(swap_area+beg))->expr2 =
+		(struct lnode *)swap_size;
+	    move_prog_to_swap_area(((struct lnode_3 *)p)->expr2);
+	}
+	if (((struct lnode_3 *)p)->expr3) {
+	    ((struct lnode_3 *)(swap_area+beg))->expr3 =
+		(struct lnode *)swap_size;
+	    move_prog_to_swap_area(((struct lnode_3 *)p)->expr3);
+	}
+	break;
+    case L_DEF:
+    {
+	struct lnode_def *dp = (struct lnode_def *)p;
+	s = sizeof(struct lnode_def);
+	ass_size(s);
+	memcpy(swap_area + swap_size, (char *)p, s);
+	swap_size += s;
+	((struct lnode_def *)(swap_area+beg))->name = (char *)swap_size;
+	s = strlen(dp->name) + 1;
+	ass_size(s);
+	strcpy(swap_area + swap_size, dp->name);
+	swap_size += s;
+	((struct lnode_def *)(swap_area+beg))->block =
+	    (struct lnode *)swap_size;
+	move_prog_to_swap_area(dp->block);
+	if (dp->next) {
+	    ((struct lnode_def *)(swap_area+beg))->next =
+		(struct lnode_def *)swap_size;
+	    move_prog_to_swap_area(dp->next);
+	}
+	break;
+    }
+    case L_FUNCALL:
+	s = sizeof (struct lnode_funcall);
+	ass_size(s);
+	memcpy(swap_area + swap_size, (char *)p, s);
+	swap_size += s;
+	((struct lnode_funcall *)(swap_area+beg))->name = (char *)swap_size;
+	s = strlen(((struct lnode_funcall *)p)->name) + 1;
+	ass_size(s);
+	strcpy(swap_area + swap_size, ((struct lnode_funcall *)p)->name);
+	swap_size += s;
+	if (((struct lnode_funcall *)p)->expr) {
+	    ((struct lnode_funcall *)(swap_area+beg))->expr =
+		(struct lnode *)swap_size;
+	    move_prog_to_swap_area(((struct lnode_funcall *)p)->expr);
+	} 
+	break;
+    case L_BLOCK:
+    {
+	struct lnode_block *lb = (struct lnode_block *)p;
+	char *block = lb->block;
+	int i, *block_start;
+	
+	s = sizeof (struct lnode_block);
+	ass_size(s);
+	memcpy(swap_area + swap_size, (char *)p, s);
+	swap_size += s;
+	if (lb->num_nodes) {
+	    block_start = (int *)(swap_area + swap_size);
+	    ((struct lnode_block *)(swap_area+beg))->block =
+		(char *)swap_size;
+	    ass_size(lb->num_nodes * sizeof (int));
+	    swap_size += lb->num_nodes * sizeof (int);
+	}
+	for (i=0; i < lb->num_nodes; i++) {
+	    block_start[i] = swap_size;
+	    move_prog_to_swap_area((struct lnode *)block);
+	    block += lnode_size[((struct lnode *)block)->line >> L_SHIFT];
+	}
+	break;
+    }
+    case L_VAR_DEF:
+    case L_VARIABLE:
+    default:
+	fatal("Bad type in free_sub_part(): 0x%x\n", p->line & L_MASK);
+    }
+}
+
+load_ob_from_swap(ob)
     struct object *ob;
 {
-    extern int errno;
-    struct program tmp_prog;
+    FILE *f;
+    char file[250];
+    struct stat st;
+    char *buffer;
+    struct lnode_def *pr;
 
-    if (ob->swap_num == -1)
-	fatal("Loading not swapped object.\n");
-    if (fseek(swap_file, ob->swap_num, 0) == -1)
-	fatal("Couldn't seek the swap file, errno %d, offset %d.\n",
-	      errno, ob->swap_num);
-    if (d_flag > 1) { /* marion */
-	debug_message("Unswap object %s (ref %d)\n", ob->name, ob->ref);
+    sprintf(file, "%s/LPMUDswap%d", SWAP_DIR, ob->swap_num);
+    f = fopen(file, "r");
+    if (f == 0) {
+	perror(file);
+	fatal("Can't open swap file %s\n", file);
     }
-    /*
-     * The size of the program is unkown, so read first part to
-     * find out.
-     *
-     * marion - again, the read in a block is more efficient
-     */
-    if (fread((char *)&tmp_prog, sizeof tmp_prog, 1, swap_file) != 1) {
+    if (fstat(fileno(f), &st) == -1) {
+	perror(file);
+	fatal("Can't fstat swap file %s\n", file);
+    }
+    buffer = xalloc(st.st_size);
+    if (fread(buffer, 1, st.st_size, f) != st.st_size)
 	fatal("Couldn't read the swap file.\n");
-    }
-    ob->prog = (struct program *)xalloc(tmp_prog.total_size);
-    memcpy((char *)ob->prog, (char *)&tmp_prog, sizeof tmp_prog);
-    fread((char *)ob->prog + sizeof tmp_prog,
-	  tmp_prog.total_size - sizeof tmp_prog, 1, swap_file);
-    /*
-     * to be relocated:
-     *   program
-     *   line_numbers
-     *   functions
-     *   strings
-     *   variable_names
-     *   inherit
-     *	 argument_types
-     *	 type_start
-     */
-    locate_in (ob->prog); /* relocate the internal pointers */
-
-    /* The reference count will already be 1 ! */
-    ob->flags &= ~O_SWAPPED;
-    total_bytes_swapped -= ob->prog->total_size;
+    ob->prog = (struct lnode_def *)load_prog_swap_area(buffer, buffer);
+    add_prog_ref(ob->prog);
+    ob->swapped = 0;
+    free(buffer);
     num_swapped--;
-    total_prog_block_size += ob->prog->total_size;
-    total_num_prog_blocks += 1;
-    if (fseek(swap_file, 0L, 2) == -1) { /* marion - seek back for more swap */
-	fatal("Couldn't seek end the swap file, errno %d.\n", errno);
+    total_bytes_swapped -= st.st_size;
+    /*
+     * Now we have to restore the heart_beat pointer.
+     */
+    for (pr = ob->prog; pr; pr = pr->next) {
+	if (strcmp(pr->name, "heart_beat") == 0) {
+	    ob->heart_beat = (struct lnode *)pr;
+	    break;
+	}
     }
+}
+
+static struct lnode *load_prog_swap_area(base, s)
+    char *base, *s;
+{
+    struct lnode *p = (struct lnode *)s;
+    struct lnode *new, *e1, *e2, *e3;
+
+    switch(p->line & L_MASK) {
+    case L_SINGLE:
+	new = (struct lnode *)alloc_lnode_single(p->type);
+	new->line = p->line;
+	break;
+    case L_NUMBER:
+	new = (struct lnode *)alloc_lnode_number(p->type,
+				   ((struct lnode_number *)p)->number);
+	new->line = p->line;
+	break;
+    case L_NAME:
+	new = (struct lnode *)alloc_lnode_name(p->type,
+	        string_copy((int)(((struct lnode_name *)p)->name) + base));
+	new->line = p->line;
+	break;
+    case L_1:
+	if (((struct lnode_1 *)p)->expr)
+	    e1 = (struct lnode *)load_prog_swap_area(base, base +
+			   (int)((struct lnode_1 *)p)->expr);
+	else
+	    e1 = 0;
+	new = (struct lnode *)alloc_lnode_1(p->type, e1);
+	new->line = p->line;
+	break;
+    case L_2:
+	if (((struct lnode_2 *)p)->expr1)
+	    e1 = load_prog_swap_area(base, base +
+				 (int)((struct lnode_2 *)p)->expr1);
+	else
+	    e1 = 0;
+	if (((struct lnode_2 *)p)->expr2)
+	    e2 = load_prog_swap_area(base, base +
+				 (int)((struct lnode_2 *)p)->expr2);
+	else
+	    e2 = 0;
+	new = (struct lnode *)alloc_lnode_2(p->type, e1, e2);
+	new->line = p->line;
+	break;
+    case L_3:
+	if (((struct lnode_3 *)p)->expr1)
+	    e1 = load_prog_swap_area(base, base +
+				 (int)((struct lnode_3 *)p)->expr1);
+	else
+	    e1 = 0;
+	if (((struct lnode_3 *)p)->expr2)
+	    e2 = load_prog_swap_area(base, base +
+				 (int)((struct lnode_3 *)p)->expr2);
+	else
+	    e2 = 0;
+	if (((struct lnode_3 *)p)->expr3)
+	    e3 = load_prog_swap_area(base, base +
+				 (int)((struct lnode_3 *)p)->expr3);
+	else
+	    e3 = 0;
+	new = (struct lnode *)alloc_lnode_3(p->type, e1, e2, e3);
+	new->line = p->line;
+	break;
+    case L_DEF:
+    {
+	struct lnode_def *dp = (struct lnode_def *)p;
+	e1 = load_prog_swap_area(base, base + (int)dp->block);
+	new = (struct lnode *)alloc_lnode_def(p->type,
+			      string_copy(base + (int)dp->name),
+			      e1, dp->num_var);
+	new->line = p->line;
+	if (dp->next)
+	    ((struct lnode_def *)new)->next =
+		(struct lnode_def *)load_prog_swap_area(base,
+							base + (int)dp->next);
+	break;
+    }
+    case L_FUNCALL:
+	if (((struct lnode_funcall *)p)->expr)
+	    e1 = load_prog_swap_area(base, base +
+				 (int)((struct lnode_funcall *)p)->expr);
+	else
+	    e1 = 0;
+	new = (struct lnode *)alloc_lnode_funcall(p->type,
+	        string_copy(base + (int)((struct lnode_funcall *)p)->name),
+				  e1);
+	new->line = p->line;
+	break;
+    case L_BLOCK:
+    {
+	int size, num, *block_start;
+	char *block, *block2;
+	struct lnode *l;
+	struct lnode_block *lb = (struct lnode_block *)p;
+	extern int tot_lnode_block;
+
+	block_start = (int *)(base + (int)lb->block);
+	for (num = 0, size = 0; num < lb->num_nodes; num++) {
+	    l = load_prog_swap_area(base, base + block_start[num]);
+	    *((struct lnode **)(base + block_start[num])) = l;
+	    size += lnode_size[l->line >> L_SHIFT];
+	}
+	new = (struct lnode *)xalloc(sizeof (struct lnode_block));
+	tot_lnode_block++;
+	block = xalloc(size);
+	((struct lnode_block *)new)->block = block;
+	((struct lnode_block *)new)->num_nodes = lb->num_nodes;
+	new->type = p->type;
+	new->line = p->line;
+	for (num = 0, block2 = block; num < lb->num_nodes; num++) {
+	    int size;
+	    l = (struct lnode *)*(int *)(base + block_start[num]);
+	    size = lnode_size[l->line >> L_SHIFT];
+	    memcpy(block2, (char *)l, size);
+	    block2 += size;
+	    free_lnode(l, 1);	/* Should the second argument be 1 here? */
+	}
+	break;
+    }
+    case L_VAR_DEF:
+    case L_VARIABLE:
+    default:
+	fatal("Bad type in free_sub_part(): 0x%x\n", p->line & L_MASK);
+    }
+    return new;
 }
 
 void remove_swap_file(ob)
     struct object *ob;
 {
-    /* Haven't implemented this yet :-( */
-}
+    char file[250];
 
-/*
- * This one is called at shutdown. Remove the swap file.
- */
-void unlink_swap_file() {
-    if (swap_file == 0)
-	return;
-#ifndef MSDOS
-    unlink(file_name);
-    fclose(swap_file);
-#else
-    fclose(swap_file);
-    unlink(file_name);
-#endif
+    if (!ob->swap_num)
+	fatal("Remove non-existing swap file.\n");
+    sprintf(file, "%s/LPMUDswap%d", SWAP_DIR, ob->swap_num);
+    if (unlink(file) == -1) {
+	perror(file);
+	debug_message("Could not unlink swap file %s\n", file);
+    }
+    ob->swap_num = 0;
 }

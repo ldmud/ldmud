@@ -1,0 +1,8 @@
+void add_verb(str)
+string str;
+
+This function is connected to the "add_action()" function. It will set up
+the command "str" to trigger a call to the function set up by the
+previous call to "add_action()".
+
+See also add_action().

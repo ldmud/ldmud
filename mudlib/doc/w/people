@@ -1,0 +1,10 @@
+Command: people
+
+List fact of all players:
+
+The current name.
+Where they are.
+The identification the player object.
+What internet number they call from.
+
+See also: w/wizlist

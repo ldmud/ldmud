@@ -1,0 +1,10 @@
+command: get
+argument: an object
+
+Get an item.  You can also "get all".  If the thing you want is in something
+else, type "get <object> from <object>" such as "get knife from bag".
+Similarly if you're getting something from a corpse.  You would type
+something like "get coins from corpse" or "get knife from corpse".
+
+See also 'drop', 'give', and 'put'.
+

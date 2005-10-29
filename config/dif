@@ -1,0 +1,135 @@
+*** new/comm1.c	Wed Jan 31 15:17:32 1990
+--- comm1.c	Fri Feb  9 16:38:11 1990
+***************
+*** 4,9 ****
+--- 4,11 ----
+  #include <sys/socket.h>
+  #include <netinet/in.h>
+  #include <arpa/inet.h>
++ #define	TELOPTS
++ #include <arpa/telnet.h>
+  #include <netdb.h>
+  #include <stdio.h>
+  #include <errno.h>
+***************
+*** 238,250 ****
+  		if (p = strchr(buff, '\r'))
+  		    *p = '\0';
+  		strcat(all_players[i]->text, buff);
+! 		if (all_players[i]->snoop_by) {
+  		    command_giver = all_players[i]->snoop_by->ob;
+  		    add_message("%% %s\n", all_players[i]->text);
+  		}
+  		command_giver = all_players[i]->ob;
+  		if (newline) {
+! 		    strcpy(buff, all_players[i]->text);
+  		    all_players[i]->text[0] = '\0';
+  		    return 1;
+  		}
+--- 240,252 ----
+  		if (p = strchr(buff, '\r'))
+  		    *p = '\0';
+  		strcat(all_players[i]->text, buff);
+! 		if (all_players[i]->snoop_by && newline) {
+  		    command_giver = all_players[i]->snoop_by->ob;
+  		    add_message("%% %s\n", all_players[i]->text);
+  		}
+  		command_giver = all_players[i]->ob;
+  		if (newline) {
+! 		    telnet_neg(buff, all_players[i]->text);
+  		    all_players[i]->text[0] = '\0';
+  		    return 1;
+  		}
+***************
+*** 462,465 ****
+--- 460,549 ----
+      on->snoop_by = by;
+      by->snoop_on = on;
+      add_message("Ok.\n");
++ }
++ 
++ #define	TS_DATA		0
++ #define	TS_IAC		1
++ #define	TS_WILL		2
++ #define	TS_WONT		3
++ #define	TS_DO		4
++ #define	TS_DONT		5
++ 
++ telnet_neg(to, from)
++     char *to, *from;
++ {
++     int state = TS_DATA;
++     int ch;
++     char buff[100];
++     char *first = to;
++ 
++     while(1) {
++ 	ch = (*from++ & 0xff);
++ 	switch(state) {
++ 	case TS_DATA:
++ 	    switch(ch) {
++ 	    case IAC:
++ 		state = TS_IAC;
++ 		continue;
++ 	    case '\b':	/* Backspace */
++ 	    case 0x7f:	/* Delete */
++ 		if (to <= first)
++ 		    continue;
++ 		to -= 1;
++ 		continue;
++ 	    default:
++ 		if (ch & 0x80) {
++ 		    debug_message("Tel_neg: 0x%x\n", ch);
++ 		    continue;
++ 		}
++ 		*to++ = ch;
++ 		if (ch == 0)
++ 		    return 0;
++ 		continue;
++ 	    }
++ 	case TS_IAC:
++ 	    switch(ch) {
++ 	    case WILL:
++ 		state = TS_WILL;
++ 		continue;
++ 	    case WONT:
++ 		state = TS_WONT;
++ 		continue;
++ 	    case DO:
++ 		state = TS_DO;
++ 		continue;
++ 	    case DONT:
++ 		state = TS_DONT;
++ 		continue;
++ 	    case DM:
++ 		break;
++ 	    case NOP:
++ 	    case GA:
++ 	    default:
++ 		break;
++ 	    }
++ 	    state = TS_DATA;
++ 	    continue;
++ 	case TS_WILL:
++ 	    debug_message("Will %s\n", telopts[ch]);
++ 	    state = TS_DATA;
++ 	    continue;
++ 	case TS_WONT:
++ 	    debug_message("Wont %s\n", telopts[ch]);
++ 	    state = TS_DATA;
++ 	    continue;
++ 	case TS_DO:
++ 	    debug_message("Do %s\n", telopts[ch]);
++ 	    state = TS_DATA;
++ 	    continue;
++ 	case TS_DONT:
++ 	    debug_message("Dont %s\n", telopts[ch]);
++ 	    state = TS_DATA;
++ 	    continue;
++ 	default:
++ 	    debug_message("Bad state: 0x%x\n", state);
++ 	    state = TS_DATA;
++ 	    continue;
++ 	}
++     }
+  }

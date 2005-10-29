@@ -1,0 +1,5 @@
+This optional command should return a string which identifies a given realm.
+This can be used to identify places where anachronisms should work, places
+between which teleportation shouldn't work, or to otherwise single out
+special areas.  Examples are "tech" for technological anachronisms, "NT" for
+places which teleportation devices should not work to or from, etc.

@@ -1,0 +1,5 @@
+void people()
+
+A function that will list all interactive players, and some info
+about them. This function is normally connected to the "people" command,
+that wizards have.
