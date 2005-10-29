@@ -64,6 +64,8 @@
 
 #define DID_ST_MAPPINGS           27
 #define DID_ST_MAPPINGS_SIZE      28
+#define DID_ST_HYBRID_MAPPINGS    51
+#define DID_ST_HASH_MAPPINGS      54
 
 #define DID_ST_STRUCTS            29
 #define DID_ST_STRUCTS_SIZE       30
@@ -83,45 +85,46 @@
 #define DID_ST_ADD_MESSAGE        40
 #define DID_ST_PACKETS            41
 #define DID_ST_PACKET_SIZE        42
+#define DID_ST_PACKETS_IN         43
+#define DID_ST_PACKET_SIZE_IN     44
 
-#define DID_ST_APPLY              43
-#define DID_ST_APPLY_HITS         44
+#define DID_ST_APPLY              45
+#define DID_ST_APPLY_HITS         46
 
-#define DID_ST_STRINGS            45
-#define DID_ST_STRING_SIZE        46
-#define DID_ST_STR_TABLE_SIZE     47
-#define DID_ST_STR_OVERHEAD       48
-#define DID_ST_STR_IT_OVERHEAD    49
-#define DID_ST_UNTABLED           50
-#define DID_ST_UNTABLED_SIZE      51
-#define DID_ST_ITABLED            52
-#define DID_ST_ITABLED_SIZE       53
-#define DID_ST_TABLED             54
-#define DID_ST_TABLED_SIZE        55
-#define DID_ST_STR_SEARCHES       56
-#define DID_ST_STR_SEARCHLEN      57
-#define DID_ST_STR_SEARCHES_BYVALUE   58
-#define DID_ST_STR_SEARCHLEN_BYVALUE  59
-#define DID_ST_STR_CHAINS         60
-#define DID_ST_STR_ADDED          61
-#define DID_ST_STR_DELETED        62
-#define DID_ST_STR_COLLISIONS     63
-#define DID_ST_STR_FOUND          64
-#define DID_ST_STR_FOUND_BYVALUE  65
+#define DID_ST_STRINGS            47
+#define DID_ST_STRING_SIZE        48
+#define DID_ST_STR_TABLE_SIZE     49
+#define DID_ST_STR_OVERHEAD       50
+#define DID_ST_UNTABLED           52
+#define DID_ST_UNTABLED_SIZE      53
+#define DID_ST_UNUSED54           54 /* UNUSED */
+#define DID_ST_UNUSED55           55 /* UNUSED */
+#define DID_ST_TABLED             56
+#define DID_ST_TABLED_SIZE        57
+#define DID_ST_STR_SEARCHES       58
+#define DID_ST_STR_SEARCHLEN      59
+#define DID_ST_STR_SEARCHES_BYVALUE   60
+#define DID_ST_STR_SEARCHLEN_BYVALUE  61
+#define DID_ST_STR_CHAINS         62
+#define DID_ST_STR_ADDED          63
+#define DID_ST_STR_DELETED        64
+#define DID_ST_STR_COLLISIONS     65
+#define DID_ST_STR_FOUND          66
+#define DID_ST_STR_FOUND_BYVALUE  67
 
-#define DID_ST_RX_CACHED          66
-#define DID_ST_RX_TABLE           67
-#define DID_ST_RX_TABLE_SIZE      68
-#define DID_ST_RX_REQUESTS        69
-#define DID_ST_RX_REQ_FOUND       70
-#define DID_ST_RX_REQ_COLL        71
+#define DID_ST_RX_CACHED          68
+#define DID_ST_RX_TABLE           69
+#define DID_ST_RX_TABLE_SIZE      70
+#define DID_ST_RX_REQUESTS        71
+#define DID_ST_RX_REQ_FOUND       72
+#define DID_ST_RX_REQ_COLL        73
 
-#define DID_ST_MB_FILE            72
-#define DID_ST_MB_SWAP            73
+#define DID_ST_MB_FILE            74
+#define DID_ST_MB_SWAP            75
 
-#define DID_ST_BOOT_TIME          74
+#define DID_ST_BOOT_TIME          76
 
-#define DID_STATUS_MAX            75 /* Total number of entries */
+#define DID_STATUS_MAX            77 /* Total number of entries */
 
 
 /* Indices into the array resulting from debug_info(DINFO_DATA, DID_SWAP)
@@ -165,6 +168,8 @@
 #define DID_MEM_KEEP_COST       (DID_MEM_LWASTED_SIZE)
 #define DID_MEM_CHUNK           9
 #define DID_MEM_CHUNK_SIZE     10
+#define DID_MEM_SLAB            (DID_MEM_CHUNK)
+#define DID_MEM_SLAB_SIZE       (DID_MEM_CHUNK_SIZE)
 #define DID_MEM_MAX_ALLOCATED   (DID_MEM_CHUNK_SIZE)
 #define DID_MEM_SMALL          11
 #define DID_MEM_SMALL_SIZE     12
@@ -174,6 +179,7 @@
 #define DID_MEM_FFREE_SIZE     (DID_MEM_SFREE_SIZE)
 #define DID_MEM_SWASTED        15
 #define DID_MEM_SWASTED_SIZE   16
+#define DID_MEM_SMALL_OVERHEAD_SIZE  (DID_MEM_SWASTED_SIZE)
 #define DID_MEM_MINC_CALLS     17
 #define DID_MEM_MINC_SUCCESS   19
 #define DID_MEM_MINC_SIZE      19
@@ -185,9 +191,32 @@
 #define DID_MEM_ALLOCATED      25
 #define DID_MEM_USED           26
 #define DID_MEM_TOTAL_UNUSED   27
+#define DID_MEM_DEFRAG_CALLS             28
+#define DID_MEM_DEFRAG_CALLS_REQ         29
+#define DID_MEM_SLAB_FREE                 (DID_MEM_DEFRAG_CALLS)
+#define DID_MEM_SLAB_FREE_SIZE            (DID_MEM_DEFRAG_CALLS_REQ)
+#define DID_MEM_DEFRAG_REQ_SUCCESS       30
+#define DID_MEM_DEFRAG_BLOCKS_INSPECTED  31
+#define DID_MEM_DEFRAG_BLOCKS_MERGED     32
+#define DID_MEM_DEFRAG_BLOCKS_RESULT     33
+#define DID_MEM_AVL_NODES      34
+#define DID_MEM_EXT_STATISTICS 35
 
-#define DID_MEMORY_MAX         28
+#define DID_MEMORY_MAX         36
 
+/* Indices into the subarrays of DID_MEM_EXT_STATISTICS (if given) */
+
+#define DID_MEM_ES_MAX_ALLOC   0
+#define DID_MEM_ES_CUR_ALLOC   1
+#define DID_MEM_ES_MAX_FREE    2
+#define DID_MEM_ES_CUR_FREE    3
+#define DID_MEM_ES_AVG_XALLOC  4
+#define DID_MEM_ES_AVG_XFREE   5
+#define DID_MEM_ES_FULL_SLABS  6
+#define DID_MEM_ES_FREE_SLABS  7
+#define DID_MEM_ES_TOTAL_SLABS 8
+
+#define DID_MEM_ES_MAX  9
 
 /* Indices into the subarrays resulting from debug_info(DINFO_TRACE, 0)
  */

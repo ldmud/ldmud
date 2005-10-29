@@ -201,6 +201,27 @@ For a detailed list of all changes see the file CHANGELOG.
            the maxinum number of entries in a mapping.
 
 
+25-Feb-2005 (Lars Duening) -- Release 3.2.12
+
+    - Changed efuns:
+
+    - Corrected efuns:
+      + call_out(), input_to(): Local references are no longer
+          accepted as extra arguments.
+
+    - New efuns:
+
+    - Master Object:
+
+    - Fixed Crashers:
+
+    - Language:
+
+    - Runtime:
+
+    - Other Changes:
+
+
 13-Feb-2005 (Lars Duening) -- Release 3.2.11
 
     - Changed efuns:
@@ -233,8 +254,6 @@ For a detailed list of all changes see the file CHANGELOG.
          tls_init_connection(), tls_deinit_connection(), tls_error(),
          tls_available(), tls_check_certificate():
            Optional: Support for TLS connections.
-
-    - Master Object:
 
     - Fixed Crashers:
        + A shadow executing remove_action(1, shadowee).
@@ -281,8 +300,6 @@ For a detailed list of all changes see the file CHANGELOG.
        + The garbage collection now zeroes out closures found to be bound to
          destructed objects. The old behaviour was to change them into 'undef'
          closures.
-
-    - Other Changes:
 
 
 13-Apr-2004 (Lars Duening) -- Release 3.2.10

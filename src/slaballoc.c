@@ -826,7 +826,7 @@ mem_update_stats (void)
 
         if (extstats[i].num_sm_free)
         {
-            update_statistic(& extstats[i].stat_free, extstats[i].num_sm_free);   
+            update_statistic(& extstats[i].stat_free, extstats[i].num_smf_steps);   
             sum = (double)extstats[i].tot_sm_free;
             extstats[i].tot_sm_free += extstats[i].num_sm_free;
             sum /= (double)extstats[i].tot_sm_free;

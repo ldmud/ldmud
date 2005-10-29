@@ -909,6 +909,13 @@ static Bool did_swap;
         debug_message("%s Error in process_objects().\n", time_stamp());
     }
 
+    /* Don't attempt to cleanup the fixed driver structures if we're
+     * already out of time. But do do it before the regular loop
+     * to ensure that they get cleaned up at least occasionally.
+     */
+    if (!comm_time_to_call_heart_beat)
+        cleanup_driver_structures();
+
     /* The processing loop, runs until either time or objects
      * run short.
      *
@@ -1119,7 +1126,9 @@ no_clean_up:
          * time to clean up (or DEFAULT_CLEANUP_TIME if the stored time
          * is 0).
          */
-        if ((unsigned long)obj->time_cleanup < (unsigned long)current_time)
+        if ( (num_last_data_cleaned == 0 || !comm_time_to_call_heart_beat)
+         && (unsigned long)obj->time_cleanup < (unsigned long)current_time
+           )
         {
 #ifdef DEBUG
             if (d_flag)

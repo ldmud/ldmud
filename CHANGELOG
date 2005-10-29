@@ -1,6 +1,16 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+27-Mar-2005 (Lars Duening)  (3.3.693)
+  - (slaballoc.c) Corrected the free-steps statistics.
+  - (backend.c) The data-cleanup didn't pay attention to the backend
+       timing, occasionally causing the driver to clean up thousands
+       of objects in one cycle.
+  - (gcollect.c) The cleanup of the fixed datastructures (wizlist, driver
+       hooks) did not observe the overall cleanup timing - on muds with
+       lots of data in the default wizlist entry this lead to annoying
+       lags.
+
 25-Mar-2005 (Lars Duening)  (3.3.692)
   - (simulate.c) Modified the callback setup so that efun callbacks
        can take normal lvalues; and timed function/closure callbacks

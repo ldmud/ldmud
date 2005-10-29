@@ -54,17 +54,22 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 692)
-(Parent-Version lpmud 3-3 691)
+(Project-Version lpmud 3-3 693)
+(Parent-Version lpmud 3-3 692)
 (Version-Log "
-  - (simulate.c) Modified the callback setup so that efun callbacks
-       can take normal lvalues; and timed function/closure callbacks
-       take protected lvalues - but not vice versa.
+  - (slaballoc.c) Corrected the free-steps statistics.
+  - (backend.c) The data-cleanup didn't pay attention to the backend
+       timing, occasionally causing the driver to clean up thousands
+       of objects in one cycle.
+  - (gcollect.c) The cleanup of the fixed datastructures (wizlist, driver
+       hooks) did not observe the overall cleanup timing - on muds with
+       lots of data in the default wizlist entry this lead to annoying
+       lags.
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Fri, 25 Mar 2005 22:36:05 -0700")
+(Checkin-Time "Sun, 27 Mar 2005 01:35:56 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -102,8 +107,8 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.12 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.86 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.755 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.385.1.21 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.756 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.385.1.22 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.21 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -165,7 +170,7 @@
   (src/array.h (lpmud/f/47_array.h 1.18.1.22 644))
   (src/array.c (lpmud/d/12_array.c 1.46.1.47.1.22 644))
   (src/backend.h (lpmud/f/46_backend.h 1.20.1.10 644))
-  (src/backend.c (lpmud/d/6_backend.c 1.68.1.35.1.52 644))
+  (src/backend.c (lpmud/d/6_backend.c 1.68.1.35.1.53 644))
   (src/bitstrings.h (lpmud/i/47_bitstrings 1.3 644))
   (src/bitstrings.c (lpmud/i/48_bitstrings 1.16 644))
   (src/bytecode.h (lpmud/a/b/26_bytecode.h 1.1.1.3 644))
@@ -186,8 +191,8 @@
   (src/files.h (lpmud/i/49_files.h 1.2 644))
   (src/files.c (lpmud/i/50_files.c 1.29 644))
   (src/filestat.h (lpmud/f/51_filestat.h 1.7 644))
-  (src/gcollect.h (lpmud/f/33_gcollect.h 1.6.1.17 644))
-  (src/gcollect.c (lpmud/c/30_gcollect.c 1.41.1.116.1.11 644))
+  (src/gcollect.h (lpmud/f/33_gcollect.h 1.6.1.18 644))
+  (src/gcollect.c (lpmud/c/30_gcollect.c 1.41.1.116.1.12 644))
   (src/hash.h (lpmud/f/32_hash.h 1.6 644))
   (src/hash.c (lpmud/c/28_hash.c 1.17 644))
   (src/heartbeat.h (lpmud/m/41_heartbeat. 1.6.1.5 644))
@@ -340,7 +345,7 @@
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.41 644))
   (src/simulate.c (lpmud/31_simulate.c 1.88.1.135.1.18 644))
   (src/slaballoc.h (lpmud/d/c/16_slaballoc. 1.2 644))
-  (src/slaballoc.c (lpmud/d/c/17_slaballoc. 1.10 644))
+  (src/slaballoc.c (lpmud/d/c/17_slaballoc. 1.11 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.16 644))
   (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.114 644))
   (src/sysmalloc.h (lpmud/c/b/33_sysmalloc. 1.2 644))
@@ -1395,26 +1400,26 @@
 
   ;; Mudlib Support: the LP-2.4.5 mudlib
   (mud/lp-245/sys/wizlist.h (lpmud/t/13_wizlist.h 1.2.1.3 644))
-  (mud/lp-245/sys/rtlimits.h (lpmud/g/50_rtlimits.h 1.1.1.2 644))
+  (mud/lp-245/sys/rtlimits.h (lpmud/g/50_rtlimits.h 1.1.1.3 644))
   (mud/lp-245/sys/strings.h (lpmud/d/30_strings.h 1.1.1.1 644))
   (mud/lp-245/sys/telnet.h (lpmud/e/b/4_telnet.h 1.2 644))
   (mud/lp-245/sys/time.h (lpmud/p/19_time.h 1.1 644))
-  (mud/lp-245/sys/tls.h (lpmud/e/b/19_tls.h 1.1 644))
+  (mud/lp-245/sys/tls.h (lpmud/e/b/19_tls.h 1.2 644))
   (mud/lp-245/sys/trace.h (lpmud/t/14_trace.h 1.1.1.1 644))
   (mud/lp-245/sys/sent.h (lpmud/t/15_sent.h 1.1.1.2 644))
-  (mud/lp-245/sys/regexp.h (lpmud/t/27_regexp.h 1.2 644))
+  (mud/lp-245/sys/regexp.h (lpmud/t/27_regexp.h 1.3 644))
   (mud/lp-245/sys/struct_info.h (lpmud/e/b/5_struct_inf 1.1 644))
   (mud/lp-245/sys/pgsql.h (lpmud/e/b/6_pgsql.h 1.1 644))
-  (mud/lp-245/sys/objectinfo.h (lpmud/t/16_objectinfo 1.3.1.6 644))
-  (mud/lp-245/sys/lpctypes.h (lpmud/t/17_lpctypes.h 1.1.1.3 644))
-  (mud/lp-245/sys/input_to.h (lpmud/t/18_input_to.h 1.1.1.1 644))
+  (mud/lp-245/sys/objectinfo.h (lpmud/t/16_objectinfo 1.3.1.7 644))
+  (mud/lp-245/sys/lpctypes.h (lpmud/t/17_lpctypes.h 1.1.1.4 644))
+  (mud/lp-245/sys/input_to.h (lpmud/t/18_input_to.h 1.1.1.2 644))
   (mud/lp-245/sys/include_list.h (lpmud/p/27_include_li 1.2 644))
   (mud/lp-245/sys/inherit_list.h (lpmud/p/20_inherit_li 1.1 644))
-  (mud/lp-245/sys/functionlist.h (lpmud/t/19_functionli 1.2.1.4 644))
-  (mud/lp-245/sys/files.h (lpmud/t/20_files.h 1.1.1.2 644))
+  (mud/lp-245/sys/functionlist.h (lpmud/t/19_functionli 1.2.1.5 644))
+  (mud/lp-245/sys/files.h (lpmud/t/20_files.h 1.1.1.3 644))
   (mud/lp-245/sys/erq.h (lpmud/t/21_erq.h 1.2.1.3 644))
-  (mud/lp-245/sys/driver_hook.h (lpmud/t/22_driver_hoo 1.2.1.3 644))
-  (mud/lp-245/sys/debug_info.h (lpmud/t/23_debug_info 1.3.1.8 644))
+  (mud/lp-245/sys/driver_hook.h (lpmud/t/22_driver_hoo 1.2.1.4 644))
+  (mud/lp-245/sys/debug_info.h (lpmud/t/23_debug_info 1.3.1.9 644))
   (mud/lp-245/sys/debug_message.h (lpmud/l/37_debug_mess 1.2 644))
   (mud/lp-245/sys/commands.h (lpmud/d/31_commands.h 1.2.1.3 644))
   (mud/lp-245/sys/comm.h (lpmud/e/b/26_comm.h 1.1 644))

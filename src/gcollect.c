@@ -194,6 +194,7 @@ struct cleanup_s
        * swapped, as the swapper can re-use the already listed memory
        * blocks.
        */
+    unsigned long numValues; /* Number of values examined. */
     Bool         mcompact;  /* TRUE: mappings are forcibly compacted */
     ptrtable_t * mtable;
       /* Pointertable of mappings to compact.
@@ -261,6 +262,7 @@ cleanup_new (Bool mcompact)
 
     rc->mcompact = mcompact;
     rc->mlist = NULL;
+    rc->numValues = 0;
 
     return rc;
 } /* cleanup_new() */
@@ -404,6 +406,7 @@ cleanup_vector (svalue_t *svp, size_t num, cleanup_t * context)
 
     for (p = svp; p < svp+num; p++)
     {
+        context->numValues++;
         switch(p->type)
         {
         case T_OBJECT:
@@ -490,6 +493,7 @@ cleanup_single_object (object_t * obj, cleanup_t * context)
     return MY_FALSE;
 #else
     int was_swapped = 0;
+/* DEBUG: */ struct timeval t_begin, t_end;
 
     /* Swap in the object if necessary */
     if ((obj->flags & O_SWAPPED)
@@ -629,11 +633,12 @@ cleanup_object (object_t * obj)
 #ifndef NEW_CLEANUP
     return;
 #else
-    cleanup_t * context = NULL;
-    struct timeval t_begin, t_end;
-    Bool didSwap;
-    long        clean_delay = (time_to_cleanup > 0) ? time_to_cleanup
-                                                    : DEFAULT_CLEANUP_TIME;
+    cleanup_t      * context = NULL;
+    struct timeval   t_begin, t_end;
+    Bool             didSwap;
+    unsigned long    numValues = 0;
+    long             clean_delay = (time_to_cleanup > 0) ? time_to_cleanup
+                                                         : DEFAULT_CLEANUP_TIME;
     if (gettimeofday(&t_begin, NULL))
     {
         t_begin.tv_sec = t_begin.tv_usec = 0;
@@ -643,8 +648,8 @@ cleanup_object (object_t * obj)
     if (context != NULL)
     {
         didSwap = cleanup_single_object(obj, context);
-        cleanup_structures(context);
         cleanup_compact_mappings(context);
+        numValues = context->numValues;
         cleanup_free(context);
     }
     obj->time_cleanup = current_time + (9*clean_delay)/10
@@ -653,11 +658,11 @@ cleanup_object (object_t * obj)
     if (t_begin.tv_sec == 0
      || gettimeofday(&t_end, NULL))
     {
-        debug_message("%s Data-Clean: /%s %s\n"
-                     , time_stamp(), get_txt(obj->name)
+        debug_message("%s Data-Clean: %6lu values: /%s %s\n"
+                     , time_stamp(), numValues, get_txt(obj->name)
                      , didSwap ? "(swapped)" : "");
-        printf("%s Data-Clean: /%s %s\n"
-              , time_stamp(), get_txt(obj->name)
+        printf("%s Data-Clean: %6lu values: /%s %s\n"
+              , time_stamp(), numValues, get_txt(obj->name)
               , didSwap ? "(swapped)" : "");
     }
     else
@@ -670,15 +675,17 @@ cleanup_object (object_t * obj)
             t_end.tv_usec += 1000000;
         }
 
-        debug_message("%s Data-Clean: %3ld.%06ld s : /%s%s\n"
+        debug_message("%s Data-Clean: %3ld.%06ld s, %6lu values: /%s%s\n"
                      , time_stamp()
                      , (long)t_end.tv_sec, (long)t_end.tv_usec
+                     , numValues
                      , get_txt(obj->name)
                      , didSwap ? " (swapped)" : ""
                      );
-        printf("%s Data-Clean: %3ld.%06ld s : /%s%s\n"
+        printf("%s Data-Clean: %3ld.%06ld s, %6lu values: /%s%s\n"
               , time_stamp()
               , (long)t_end.tv_sec, (long)t_end.tv_usec
+              , numValues
               , get_txt(obj->name)
               , didSwap ? " (swapped)" : ""
               );
@@ -686,6 +693,85 @@ cleanup_object (object_t * obj)
 
 #endif /* NEW_CLEANUP */
 } /* cleanup_object() */
+
+/*-------------------------------------------------------------------------*/
+void
+cleanup_driver_structures (void)
+
+/* Cleanup the fixed driver structures if it is time.
+ *
+ * The time for the next cleanup is set to a time in the interval
+ * [0.9*time_to_cleanup .. 1.1 * time_to_cleanup] from now (if time_to_cleanup
+ * is 0, DEFAULT_CLEANUP_TIME is assumed).
+ *
+ * This function is called by the backend.
+ */
+
+{
+#ifndef NEW_CLEANUP
+    return;
+#else
+    cleanup_t      * context = NULL;
+    struct timeval   t_begin, t_end;
+    unsigned long    numValues = 0;
+    long             clean_delay = (time_to_cleanup > 0) ? time_to_cleanup
+                                                         : DEFAULT_CLEANUP_TIME;
+static mp_int time_cleanup = 0;
+    /* Time of the next regular cleanup. */
+
+    /* Is it time for the cleanup yet? */
+    if (time_cleanup != 0 && time_cleanup >= current_time)
+        return;
+
+    time_cleanup = current_time + (9*clean_delay)/10
+                                + random_number((2*clean_delay)/10);
+
+    if (gettimeofday(&t_begin, NULL))
+    {
+        t_begin.tv_sec = t_begin.tv_usec = 0;
+    }
+
+    context = cleanup_new(MY_FALSE);
+    if (context != NULL)
+    {
+        cleanup_structures(context);
+        cleanup_compact_mappings(context);
+        numValues = context->numValues;
+        cleanup_free(context);
+    }
+
+    if (t_begin.tv_sec == 0
+     || gettimeofday(&t_end, NULL))
+    {
+        debug_message("%s Data-Clean: %6lu values: Fixed structures\n"
+                     , time_stamp(), numValues);
+        printf("%s Data-Clean: %6lu values: Fixed structures\n"
+              , time_stamp(), numValues);
+    }
+    else
+    {
+        t_end.tv_sec -= t_begin.tv_sec;
+        t_end.tv_usec -= t_begin.tv_usec;
+        if (t_end.tv_usec < 0)
+        {
+            t_end.tv_sec--;
+            t_end.tv_usec += 1000000;
+        }
+
+        debug_message("%s Data-Clean: %3ld.%06ld s, %6lu values: Fixed structures\n"
+                     , time_stamp()
+                     , (long)t_end.tv_sec, (long)t_end.tv_usec
+                     , numValues
+                     );
+        printf("%s Data-Clean: %3ld.%06ld s, %6lu values: Fixed structures\n"
+              , time_stamp()
+              , (long)t_end.tv_sec, (long)t_end.tv_usec
+              , numValues
+              );
+    }
+
+#endif /* NEW_CLEANUP */
+} /* cleanup_driver_structures() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -699,9 +785,10 @@ cleanup_all_objects (void)
 #ifndef NEW_CLEANUP
     return;
 #else
-    cleanup_t * context = NULL;
-    struct timeval t_begin, t_end;
-    long numObjects = 0;
+    cleanup_t      * context = NULL;
+    struct timeval   t_begin, t_end;
+    long             numObjects = 0;
+    unsigned long    numValues = 0;
 
     if (gettimeofday(&t_begin, NULL))
     {
@@ -728,14 +815,15 @@ cleanup_all_objects (void)
         }
         cleanup_structures(context);
         cleanup_compact_mappings(context);
+        numValues = context->numValues;
         cleanup_free(context);
     }
 
     if (t_begin.tv_sec == 0
      || gettimeofday(&t_end, NULL))
     {
-        debug_message("%s Data-Cleaned %ld objects\n", time_stamp(), numObjects);
-        printf("%s Data-Cleaned %ld objects\n", time_stamp(), numObjects);
+        debug_message("%s Data-Cleaned %ld objects: %lu values.\n", time_stamp(), numObjects, numValues);
+        printf("%s Data-Cleaned %ld objects: %lu values.\n", time_stamp(), numObjects, numValues);
     }
     else
     {
@@ -747,11 +835,11 @@ cleanup_all_objects (void)
             t_end.tv_usec += 1000000;
         }
 
-        debug_message("%s Data-Cleaned %ld objects in %ld.%06ld s\n"
-                     , time_stamp(), numObjects
+        debug_message("%s Data-Cleaned %ld objects in %ld.%06ld s, %6lu values.\n"
+                     , time_stamp(), numObjects, numValues
                      , (long)t_end.tv_sec, (long)t_end.tv_usec);
-        printf("%s Data-Cleaned %ld objects in %ld.%06ld s\n"
-              , time_stamp(), numObjects
+        printf("%s Data-Cleaned %ld objects in %ld.%06ld s, %6lu values.\n"
+              , time_stamp(), numObjects, numValues
               , (long)t_end.tv_sec, (long)t_end.tv_usec);
     }
 

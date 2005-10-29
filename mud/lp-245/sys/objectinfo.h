@@ -40,8 +40,9 @@
 #define OIB_LOAD_NAME          22
 #define OIB_NEXT_ALL           23
 #define OIB_PREV_ALL           24
+#define OIB_NEXT_CLEANUP       25
 
-#define OIB_MAX 25  /* Number of OIB_ result elements */
+#define OIB_MAX 26  /* Number of OIB_ result elements */
 
 
 /* Indices in the array resulting from OINFO_POSITION

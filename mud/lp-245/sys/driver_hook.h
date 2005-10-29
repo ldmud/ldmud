@@ -27,8 +27,9 @@
 #define H_DEFAULT_METHOD        20
 #define H_DEFAULT_PROMPT        21
 #define H_PRINT_PROMPT          22
+#define H_REGEXP_PACKAGE        23
 
-#define NUM_DRIVER_HOOKS        23  /* Number of hooks */
+#define NUM_DRIVER_HOOKS        24  /* Number of hooks */
 
 #endif /* LPC_DRIVER_HOOK_ */
 
