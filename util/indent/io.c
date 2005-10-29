@@ -127,7 +127,7 @@ dump_line()
 		fprintf(output, ".*/\n");
 	    }
 	    target_col = compute_code_target();
-	    /* If a line ends in an lparen character, the following
+	    /* If a line ends in an lparen character, the following 
 	       line should not line up with the parenthesis, but
 	       should be indented by the usual amount.  */
 	    if (parser_state_tos->last_token == lparen)
@@ -279,7 +279,7 @@ inhibit_newline:
     paren_target = -parser_state_tos->paren_indents[parser_state_tos->paren_level - 1];
     not_first_line = 1;
     return;
-}
+};
 
 /* Figure out where we should put the code in codebuf.
    Return the column number in spaces.  */
@@ -318,8 +318,8 @@ compute_label_target()
 	: parser_state_tos->ind_level - label_offset + 1;
 }
 
-/* Allocate space for FILENAME, read in the file, and set in_prog and
-   in_prog_pos to point to the buffer.  If any errors occur, report an
+/* Allocate space for FILENAME, read in the file, and set in_prog and 
+   in_prog_pos to point to the buffer.  If any errors occur, report an 
    error message and abort.  */
 void
 read_file(filename)
@@ -401,14 +401,14 @@ read_stdin()
       }
     }
   while (ch != EOF);
-
+  
   in_prog[in_prog_size] = ' ';
   in_prog[in_prog_size+1] = '\n';
   in_prog[in_prog_size+2] = 0;
-  in_prog_pos = in_prog;
+  in_prog_pos = in_prog;  
 }
 
-/* Advance buf_ptr so that it points to the next line of input.  Skip
+/* Advance buf_ptr so that it points to the next line of input.  Skip 
    over indent errors (comments beginning with *INDENT**), ignoring
    them.  Process INDENT ON and INDENT OFF. (Note: the name of this
    function is a historical artifact from before the time that indent
@@ -421,7 +421,7 @@ fill_buffer()
 
   /* Have we found INDENT ON or INDENT OFF ? */
   enum {None,Indent_on,Indent_off} com;
-
+  
   if (bp_save != 0)
     {		/* there is a partly filled input buffer left */
 	buf_ptr = bp_save;	/* dont read anything, just switch buffers */
@@ -438,14 +438,14 @@ fill_buffer()
   buf_ptr = in_prog_pos;
   for (p = buf_ptr; *p && *p++ != '\n';)
     ;
-
+  
   buf_end = p;
   if (!*p)
     had_eof = true;
 
   p = buf_ptr;
   in_prog_pos = buf_end;
-
+  
   while (*p == ' ' || *p == '\t')
     p++;
   if (*p == '/' && p[1] == '*')
@@ -489,38 +489,38 @@ fill_buffer()
 	putc(*p,output);
       while (*p++ != '\n');
     }
-
+      
 }
-
-	
-
+  
+	  
+  
 /*
  * Copyright (C) 1976 by the Board of Trustees of the University of Illinois
- *
+ * 
  * All rights reserved
- *
- *
+ * 
+ * 
  * NAME: pad_output
- *
+ * 
  * FUNCTION: Writes tabs and spaces to move the current column up to the desired
  * position.
- *
+ * 
  * ALGORITHM: Put tabs and/or blanks into pobuf, then write pobuf.
- *
+ * 
  * PARAMETERS: current		integer		The current column target
  * nteger		The desired column
- *
+ * 
  * RETURNS: Integer value of the new column.  (If current >= target, no action is
  * taken, and current is returned.
- *
+ * 
  * GLOBALS: None
- *
+ * 
  * CALLS: write (sys)
- *
+ * 
  * CALLED BY: dump_line
- *
+ * 
  * HISTORY: initial coding 	November 1976	D A Willcox of CAC
- *
+ * 
  */
 pad_output(current, target)	/* writes tabs and blanks (if necessary) to
 				 * get the current output position up to the
@@ -545,27 +545,27 @@ pad_output(current, target)	/* writes tabs and blanks (if necessary) to
 	    putc(' ', output);	/* pad with final blanks */
     }
     return (target);
-}
+};
 
 /*
  * Copyright (C) 1976 by the Board of Trustees of the University of Illinois
- *
+ * 
  * All rights reserved
- *
- *
+ * 
+ * 
  * NAME: count_spaces
- *
+ * 
  * FUNCTION: Find out where printing of a given string will leave the current
  * character position on output.
- *
+ * 
  * ALGORITHM: Run thru input string and add appropriate values to current
  * position.
- *
+ * 
  * RETURNS: Integer value of position after printing "buffer" starting in column
  * "current".
- *
+ * 
  * HISTORY: initial coding 	November 1976	D A Willcox of CAC
- *
+ * 
  */
 int
 count_spaces(current, buffer)
@@ -603,13 +603,13 @@ count_spaces(current, buffer)
 	}			/* end of switch */
     }				/* end of for loop */
     return (cur);
-}
+};
 
 /* Nonzero if we have found an error (not a warning).  */
 int	found_err;
 
-/* Signal an error.  LEVEL is nonzero if it is an error (as opposed to
-   a warning.  MSG is a printf-style format string.  Additional
+/* Signal an error.  LEVEL is nonzero if it is an error (as opposed to 
+   a warning.  MSG is a printf-style format string.  Additional 
    arguments are additional arguments for printf.  */
 diag(level, msg, a, b)
 {
@@ -617,12 +617,12 @@ diag(level, msg, a, b)
 	found_err = 1;
     if (output == stdout) {
 	fprintf(stdout, "/**INDENT** %s@%d: ", level == 0 ? "Warning" : "Error", line_no);
-	fprintf(stdout, (char *)msg, a, b);
+	fprintf(stdout, msg, a, b);
 	fprintf(stdout, " */\n");
     }
     else {
 	fprintf(stderr, "%s: %d: ", in_name, line_no);
-	fprintf(stderr, (char *)msg, a, b);
+	fprintf(stderr, msg, a, b);
 	fprintf(stderr, "\n");
     }
 }
@@ -678,12 +678,12 @@ parsefont(f, s0)
     register char *s = s0;
     int         sizedelta = 0;
     int i;
-
+    
     f->size = 0;
     f->allcaps = 1;
     for (i = 0; i < 4; i++)
       f->font[i] = 0;
-
+    
     while (*s) {
 	if (isdigit(*s))
 	    f->size = f->size * 10 + *s - '0';

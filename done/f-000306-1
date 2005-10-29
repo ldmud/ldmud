@@ -1,8 +1,0 @@
-Short: Modify terminal_colour() to take the delimiter string
-Date: Mon, 28 Feb 2000 18:16:32 -0700
-From: Lars Duening <Lars.Duening@wcom.com>
-Type: Feature
-State: Abeyant.
-
-doc/efun/closures-guide mentions TubMuds /sys/closures.h
-Add new arg to terminal_colour(), giving the delimiter string.

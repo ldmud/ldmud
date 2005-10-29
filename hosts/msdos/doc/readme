@@ -34,7 +34,7 @@ to me what is not working.
 
 
 
-Based on  John Olson's Readme
+Based on  John Olson's Readme 
 ______________________________________________________________
 README of LPmud for MS-DOS         4-NOV-1991, 20-JULY-1994, 1-Aug-1994
 ==========================
@@ -55,7 +55,7 @@ Restrictions
 File names have to obey MS-DOS naming conventions.
 
 Text files which contain CRs aren't processed correctly. CRLFs
-are okay.
+are okay. 
 
 Old style object files which contain the character RS (30dec) aren't
 processed correctly. (This is to work around the CR bug.)
@@ -115,7 +115,7 @@ drivers (see below) and possibly keyboard and disk drivers.
 (The emulator isn't necessary if a co-processor is available
 but this hasn't been tested.)
 
-LPmud files should go to the following directories (on C:):
+LPmud files should go to the following directories (on C:): 
  \LPMUD        LINES, AM32_SRC.ZIP (Source Patches)
  \LPMUD\BIN    AMYLAAR.EXE, EMU387, COMDRV.COM, MUD.BAT
  \LPMUD\DOC    all documentation files
@@ -133,7 +133,7 @@ system will go there.
 If you plan to support connections over serial lines, you have
 to load a communications driver for each port. The following
 command loads a driver for COM2 with local line editing (79
-characters buffer) enabled:
+characters buffer) enabled: 
     \LPMUD\BIN\COMDRV -C2 -E79
 
 In addition to that, \LPMUD\LINES has to be edited to reflect
@@ -166,7 +166,7 @@ While those restrictions rarely affect directory names and
 files which are created by the MUDLIB, they usually cause
 problems with a large number of the files which constitute the
 MUDLIB. Their names and all references to them have to be
-changed to transform a UNIX MUDLIB to an MS-DOS MUDLIB.
+changed to transform a UNIX MUDLIB to an MS-DOS MUDLIB. 
 
 Files which contain CRs without LFs aren't read correctly. To
 work around the most common occurence of isolated CRs, NLs in
@@ -184,16 +184,16 @@ password line.
 
 It is highly recommended that you change the password
 immediately after bringing up the game if you plan to allow
-outside access to the game !
+outside access to the game ! 
 
 
 Running LPmud
 -------------
 
-BEFORE you start LPmud, make sure
-        - you've loaded SHARE.EXE, if you want to allow logins from
-        the serial lines - the communication driver(s)
-        - have \lpmud\bin in your autoexec.bat path.
+BEFORE you start LPmud, make sure 
+        - you've loaded SHARE.EXE, if you want to allow logins from 
+        the serial lines - the communication driver(s) 
+        - have \lpmud\bin in your autoexec.bat path. 
         - edit mud.bat if your default drive is not c:\
 
 To run type 'mud' to run mud.bat
@@ -206,18 +206,18 @@ LPmud shows the login prompt.)
 The following keys are interpreted by the console driver:
 
      F1 ... F10   switch to the respective console
-     Alt-H        ("hangup") disconnects the currently active
-
+     Alt-H        ("hangup") disconnects the currently active     
+         
                   console
-     Alt-S        suspends LPmud and spawns a DOS shell.
-
+     Alt-S        suspends LPmud and spawns a DOS shell.          
+          
                   EXIT returns to LPmud.
 
 The game is shut down with the  'shutdown'  command which can
 be issued by any wizard.
 
 The  people  command shows the connection type in the "IP
-address":
+address": 
     0.0.0.100 to 0.0.0.109  are virtual consoles
     0.0.0.110 to 0.0.0.113  are COM1 ... COM4
 

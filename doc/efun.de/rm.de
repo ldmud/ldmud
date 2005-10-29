@@ -1,9 +1,0 @@
-SYNOPSIS
-        int rm(string file);
-
-BESCHREIBUNG
-        Loescht die Datei <file>. Gibt 0 zurueck, wenn etwas nicht geklappt
-        hat, 1 bei Erfolg.
-
-SIEHE AUCH
-        mkdir(E), rmdir(E), rename(E)

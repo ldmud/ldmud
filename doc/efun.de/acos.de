@@ -1,8 +1,0 @@
-SYNOPSIS
-        float acos(float)
-
-BESCHREIBUNG
-        Liefert der Arkuskosinus des Argumentes.
-
-SIEHE AUCH
-        sin(E), asin(E), cos(E), tan(E), atan(E), atan2(E)

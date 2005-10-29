@@ -3,7 +3,7 @@ Date: 981202
 Type: Bug
 State: Fixed.
 
-Zora@PK-Mud tells you: pk ist grad gecrashed, wegen
+Zora@PK-Mud tells you: pk ist grad gecrashed, wegen 
 regreplace("acc", "a*", "yy",1).
 
 It crashes after several calls (90..100) in smalloc.c with

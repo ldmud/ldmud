@@ -13,7 +13,7 @@ DESCRIPTION
 	Scans through all objects in the mud searching for objects
 	which match pattern with consideration to mask. Found objects
 	are returned in an array. These bytevalues are legal:
-	
+	   
 		   1  ->  object with heart_beat running
 		   4  ->  living object
 		   8  ->  cloned from a master copy

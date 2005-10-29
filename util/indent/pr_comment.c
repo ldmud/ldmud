@@ -67,15 +67,14 @@ pr_comment()
     char       *t_ptr;		/* used for moving string */
     int         unix_comment;	/* tri-state variable used to decide if it is
 				 * a unix-style comment. 0 means only blanks
-				 * since '/ *', 1 means regular style comment, 2
+				 * since /*, 1 means regular style comment, 2
 				 * means unix style comment */
     int         break_delim = comment_delimiter_on_blankline;
     int         l_just_saw_decl = parser_state_tos->just_saw_decl;
-#if 0
-     int         parser_state_tos->last_nl = 0;	/* true iff the last significant thing
+    /*
+     * int         parser_state_tos->last_nl = 0;	/* true iff the last significant thing
      * weve seen is a newline
      */
-#endif
     int         one_liner = 1;	/* true iff this comment is a one-liner */
     adj_max_col = max_col;
     parser_state_tos->just_saw_decl = 0;
@@ -98,7 +97,7 @@ pr_comment()
     else {
 	if (*buf_ptr == '-' || *buf_ptr == '*' || !format_comments) {
 	    parser_state_tos->box_com = true;	/* a comment with a '-' or '*' immediately
-				 * after the '/ *' is assumed to be a boxed
+				 * after the /* is assumed to be a boxed
 				 * comment */
 	    break_delim = 0;
 	}
@@ -152,7 +151,7 @@ pr_comment()
 	    buf_ptr++;
     }
     parser_state_tos->comment_delta = 0;
-    *e_com++ = '/';		/* put '/ *' into buffer */
+    *e_com++ = '/';		/* put '/*' into buffer */
     *e_com++ = '*';
     if (*buf_ptr != ' ' && !parser_state_tos->box_com)
 	*e_com++ = ' ';

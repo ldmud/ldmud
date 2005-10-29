@@ -116,9 +116,9 @@ lexi()
 {
     /* used to walk through the token */
     char *tok;
-
+    
     int         unary_delim;	/* this is set to 1 if the current token
-				 *
+				 * 
 				 * forces a following operator to be unary */
     static enum codes last_code;	/* the last token type returned */
     static int  l_struct;	/* set to 1 if the last token was 'struct' */
@@ -145,7 +145,7 @@ lexi()
 	 * we have a character or number
 	 */
 	register char *j;	/* used for searching thru list of
-				 *
+				 * 
 				 * reserved words */
 	register struct templ *p;
 
@@ -540,7 +540,7 @@ lexi()
     parser_state_tos->last_u_d = unary_delim;
 
     return (code);
-}
+};
 
 /*
  * Add the given keyword to the keyword table, using val as the keyword type

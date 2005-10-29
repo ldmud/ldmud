@@ -61,7 +61,7 @@ enum codes {code_eof = 0,  /* end of file */
 	      sp_nparen, ifstmt, whilestmt,
 	      forstmt, stmt, stmtl, elselit, dolit, dohead, ifhead,
 	      elsehead, period };
-	
+	      
 #define false 0
 #define true  1
 
@@ -218,7 +218,7 @@ GLOBAL int         procnames_start_line;/* if true, the names of procedures
 GLOBAL int         proc_calls_space;	/* If true, procedure calls look like:
 					 * foo(bar) rather than foo (bar) */
 GLOBAL int         format_col1_comments;/* If comments which start in column 1
-					 * are to be magically reformatted */
+					 * are to be magically reformatted
 /* If any comments are to be reformatted */
 GLOBAL int format_comments;
 
@@ -321,10 +321,10 @@ struct parser_state {
 
     /* Pointer to the top of stack of the p_stack, il and cstk arrays. */
     int         tos;
-
+    
     int         box_com;	/* set to true when we are in a "boxed"
 				 * comment. In that case, the first non-blank
-				 * char should be lined up with the / in '/ *' */
+				 * char should be lined up with the / in /* */
     int         comment_delta,
                 n_comment_delta;
     int         cast_mask;	/* indicates which close parens close off

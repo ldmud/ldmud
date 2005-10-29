@@ -9,7 +9,7 @@
  *
  * This facility is active only if ACCESS_CONTROL has been defined in config.h
  * If ACCESS_LOG is defined in config.h, all checks and their results are
- * logged by comm.c in the specified file.
+ * logged by comm1.c in the specified file.
  *
  * The rules are read from the file ACCESS_FILE (defined in config.h,
  * typically "ACCESS.ALLOW") which resides in the mudlib. Every line specifies
@@ -20,16 +20,14 @@
  *
  * The syntax for a rule is (no leading whitespace allowed!):
  *
- *   <ipnum>:[p<port>]:<class>:<max>:<start>:<end>:<text>
- *   <ipnum>:[p<port>]:<class>:<max>:h<hours>:w<days>:m=<text>
+ *   <ipnum>:<class>:<max>:<start>:<end>:<text>
+ *   <ipnum>:<class>:<max>:h<hours>:w<days>:m=<text>
  *
  * where
  *   ipnum:  <byte>.<byte>.<byte>.<byte>, with byte = * or number
  *             There is only loose error checking - specifying an illegal
  *             address will have interesting consequences, but would
  *             most likely cause no error to occur.
- *   port:   the port number to which the connection is made. Omission
- *             means 'any port'.
  *   class:  number
  *   max:    the maximum number of users, a number. The value -1 allows
  *             an unlimited number of users.
@@ -80,14 +78,6 @@
  *
  * The rule file is (re)read whenever the gamedriver detects a change in its
  * timestamp.
- *
- * TODO: Make ACCESS_CONTROL a runtime option, also, when the file is
- * TODO:: missing on driver startup (and just then), allow every access.
- * TODO:: Alternatively, this could be made an
- * TODO:: efun "string|int access_control(file, [interactive])" to be used
- * TODO:: from TODO:: master.c::connect().
- * TODO:: Or a driver hook with the settings "file", ({ "file", "logfile" })
- * TODO:: and #'function(ip-address, port).
  *---------------------------------------------------------------------------
  */
 
@@ -98,18 +88,14 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#ifdef HAVE_SYS_TIME_H
-#include <sys/time.h>
-#endif
 #include <time.h>
 
 #include "access_check.h"
 
 #include "comm.h"
 #include "filestat.h"
-#include "xalloc.h"
 
-#undef DEBUG_ACCESS_CHECK /* define to activate debug output */
+/* #define DEBUG_ACCESS_CHECK */ /* define to activate debug output */
 
 /*-------------------------------------------------------------------------*/
 #define MAX_MESSAGE_LENGTH 256
@@ -119,8 +105,7 @@
  * corresponding class structure.
  */
 static struct access_address {
-    uint32 addr, mask; /* The IP address and a mask for the interesting parts */
-    int32 port;        /* The port number (positive), or -1 for 'any port' */
+    int32 addr, mask;  /* The IP address and a mask for the interesting parts */
     int32 hour_mask;   /* Bitmask: at which times is this rule valid? */
     int32 wday_mask;   /* Bitmask: at which days is this rule valid? */
     struct access_class *class;   /* The corresponding class */
@@ -142,47 +127,34 @@ static time_t last_read_time = 0;
 
 /*-------------------------------------------------------------------------*/
 static struct access_class *
-find_access_class (struct sockaddr_in *full_addr, int port)
+find_access_class (struct sockaddr_in *full_addr)
 
 /* Find and return the class structure for the given IP <full_addr> at
  * the current time. Return NULL if no rule covers the IP at this time.
  */
 
 {
-    uint32 addr;
+    int32 addr;
     struct access_address *aap;
     time_t seconds;
     struct tm *tm_p;
 
-#ifdef DEBUG_ACCESS_CHECK
-    fprintf(stderr, "find_class for '%s':%d\n"
-                  , inet_ntoa(*(struct in_addr*)&full_addr->sin_addr)
-                  , port);
-#endif
-#ifndef USE_IPV6
     addr = full_addr->sin_addr.s_addr;
-#else
-    addr = (uint32) full_addr->sin_addr.s_addr;
-    /* TODO: DANGER: The above cast might break under IPv6 */
-#endif
-    tm_p = NULL;
+    tm_p = 0;
     for (aap = all_access_addresses; aap; aap = aap->next) {
-#ifdef DEBUG_ACCESS_CHECK
-        fprintf(stderr, "  '%s':%ld, %ld %ld\n",
+#if DEBUG_ACCESS_CHECK
+        fprintf(stderr, "'%s', %ld %ld\n",
                 inet_ntoa(*(struct in_addr*)&aap->addr),
-                aap->port,
                 (long)aap->class->max_usage, (long)aap->class->usage);
 #endif
-        if (aap->port >= 0 && aap->port != port)
-            continue;
         if ((aap->addr ^ addr) & aap->mask)
             continue;
         if (aap->wday_mask >= 0) {
             if (!tm_p) {
                 time(&seconds);
                 tm_p = localtime(&seconds);
-#ifdef DEBUG_ACCESS_CHECK
-                fprintf(stderr, "    h:%d w:%d\n", tm_p->tm_hour, tm_p->tm_wday);
+#if DEBUG_ACCESS_CHECK
+                fprintf(stderr, "h:%d w:%d\n", tm_p->tm_hour, tm_p->tm_wday);
 #endif
             }
             if ( !((1 << tm_p->tm_hour) & aap->hour_mask) )
@@ -190,20 +162,14 @@ find_access_class (struct sockaddr_in *full_addr, int port)
             if ( !((1 << tm_p->tm_wday) & aap->wday_mask) )
                 continue;
         }
-#ifdef DEBUG_ACCESS_CHECK
-        fprintf(stderr, "  found\n");
-#endif
         return aap->class;
     }
-#ifdef DEBUG_ACCESS_CHECK
-        fprintf(stderr, "  not found\n");
-#endif
     return NULL;
 }
 
 /*-------------------------------------------------------------------------*/
 static void
-add_access_entry (struct sockaddr_in *full_addr, int login_port, long *idp)
+add_access_entry (struct sockaddr_in *full_addr, long *idp)
 
 /* Find the class structure for <full_addr> and increments its count
  * of users. The id of the class is put into *idp.
@@ -216,7 +182,7 @@ add_access_entry (struct sockaddr_in *full_addr, int login_port, long *idp)
 {
     struct access_class *acp;
 
-    acp = find_access_class(full_addr, login_port);
+    acp = find_access_class(full_addr);
     if (acp) {
         acp->usage++;
         *idp = acp->id;
@@ -244,11 +210,11 @@ read_access_file (void)
     /* Free the old datastructures */
     for (aap = all_access_addresses; aap; aap = next_aap) {
         next_aap = aap->next;
-        afree((char *)aap);
+        free((char *)aap);
     }
     for (acp = all_access_classes; acp; acp = next_acp) {
         next_acp = acp->next;
-        afree((char *)acp);
+        free((char *)acp);
     }
     all_access_classes = NULL;
 
@@ -269,16 +235,16 @@ read_access_file (void)
      * nonsense, but no error message.
      */
     if (infp) for(addr = mask = 0;;) {
-        long max_usage, class_id, port;
-        int first_hour, last_hour, m;
+        long max_usage, class_id;
+        int first_hour, last_hour;
 
         /* Parse the next IP address byte, i.e. everything up to the
          * next . or : .
          */
         addr <<= 8;
         mask <<= 8;
-        m = fscanf(infp, "%9[^.:\n]%[.:]", message, message+12);
-        if (m != 2 || *message == '#')
+        if (fscanf(infp, "%9[^.:\n]%[.:]", message, message+12) != 2 ||
+            *message == '#')
         {
             do {
                 i = fgetc(infp);
@@ -291,18 +257,13 @@ read_access_file (void)
         if (*message != '*') {
             int j;
             j = atoi(message);
-            if ((unsigned int)j > 0xff)
+            if ((unsigned)j > 0xff)
                 break;
             addr += j;
             mask += 0xff;
         }
         if (message[12] == '.') /* Then another byte follows */
             continue;
-
-        /* The ip-number may be followed with a port specification */
-        i = fscanf(infp, "p%ld:", &port);
-        if (!i)
-            port = -1;
 
         /* Parse the time specs next. Start by trying the first (old)
          * format.
@@ -315,13 +276,12 @@ read_access_file (void)
         if (!i)
             break;
 
-        aap = amalloc(sizeof *aap);
+        aap = malloc(sizeof *aap);
         if (!aap)
             break;
         *last = aap;
         aap->addr = htonl(addr);
         aap->mask = htonl(mask);
-        aap->port = port;
         aap->wday_mask = -1; /* Default: valid on every day */
 
         if (i == 4) {            /* Old format */
@@ -335,21 +295,20 @@ read_access_file (void)
             }
         } else if (i == 2) {     /* New format */
             char c, c2[2];
-            int32 *maskp;
 
             for (;;) {
                 c = 'm';
                 fscanf(infp, "%c %1[=]", &c, c2);
-                switch(c)
-                {
-                case 'w':
+                switch(c) {
+                  case 'w':
+                  {
+                    int32 *maskp;
+
                     maskp = &aap->wday_mask;
                     goto get_mask;
-
-                case 'h':
+                  case 'h':
                     maskp = &aap->hour_mask;
-
-                get_mask:
+                  get_mask:
                     mask = 0;
                     do {
                         int j, k;
@@ -372,11 +331,11 @@ read_access_file (void)
                     *maskp = mask;
                     aap->wday_mask &= 0x7f; /* make sure it's not negative */
                     continue;
-
-                default:
+                  }
+                  default:
                     ungetc(c, infp);
                     /* FALLTHROUGH */
-                case 'm':
+                  case 'm':
                     break;
                 } /* switch */
 
@@ -385,9 +344,9 @@ read_access_file (void)
         } /* if (i) */
 
         /* The rest of the line is the message to print.
+         * TODO: A malign ACCESS_FILE can cause a buffer overflow here.
          */
-        fgets(message, sizeof(message)-1, infp);
-        message[sizeof(message) - 1] = '\0';
+        fgets(message, sizeof message, infp);
 
         /* Check if this rule creates a new class. If yes, allocate
          * a new structure and assign message text and usage to it.
@@ -397,13 +356,12 @@ read_access_file (void)
                 break;
         }
         if (!acp) {
-            size_t len;
-            len = strlen(message);
-            if (len && message[len-1] == '\n')
-                message[--len] = '\0';
-            acp = amalloc(sizeof *acp - sizeof acp->message + 1 + len);
+            i = strlen(message);
+            if (message[i-1] == '\n')
+                message[--i] = '\0';
+            acp = malloc(sizeof *acp - sizeof acp->message + 1 + i);
             if (!acp) {
-                afree((char *)aap);
+                free((char *)aap);
                 break;
             }
             acp->id = class_id;
@@ -429,7 +387,7 @@ file_end: /* emergency exit from the loop */
 
 /*-------------------------------------------------------------------------*/
 char *
-allow_host_access (struct sockaddr_in *full_addr, int login_port, long *idp)
+allow_host_access (struct sockaddr_in *full_addr, long *idp)
 
 /* Check if the IP address <full_addr> is allowed access at the current
  * time. Return NULL if access is granted, else an error message.
@@ -452,7 +410,7 @@ allow_host_access (struct sockaddr_in *full_addr, int login_port, long *idp)
         read_access_file();
     }
 
-    acp = find_access_class(full_addr, login_port);
+    acp = find_access_class(full_addr);
     if (acp) {
         if (acp->usage >= acp->max_usage)
             return acp->message;
@@ -474,7 +432,7 @@ release_host_access (long num)
 {
     struct access_class *acp;
 
-#ifdef DEBUG_ACCESS_CHECK
+#if DEBUG_ACCESS_CHECK
     fprintf(stderr, "release_host_access %ld called.\n", num);
 #endif
     for (acp = all_access_classes; acp; acp = acp->next) {

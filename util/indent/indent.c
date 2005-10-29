@@ -67,7 +67,7 @@ main(argc, argv)
        decremented at the beginning of the loop, so it will reach zero
        when the second token after the ')' is read.  */
     int last_token_ends_sp;
-
+    
     int         squest;		/* when this is positive, we have seen a ?
 				 * without the matching : in a <c>?<s>:<s>
 				 * construct */
@@ -96,7 +96,7 @@ main(argc, argv)
     parser_state_tos->paren_indents_size = 1;
     parser_state_tos->paren_indents = (short *) xmalloc
       (parser_state_tos->paren_indents_size * sizeof (short));
-
+    
     parser_state_tos->p_stack[0] = stmt;	/* this is the parser's stack */
     parser_state_tos->last_nl = true;		/* this is true if the last thing scanned was
 				 * a newline */
@@ -288,7 +288,7 @@ main(argc, argv)
                necessary to keep track of the text between the if() and
 	       the start of the statement which follows.  Use save_com
 	       to do so.  */
-	
+	    
 	    switch (type_code) {
 	    case newline:
 		++line_no;
@@ -512,7 +512,7 @@ check_type:
 		    if (token_end > token+1) {
 			*e_code++ = token[0];
 			*e_code++ = token[1];
-		    } else
+		    } else 
 			*e_code++ = token[0];
 		}
 	    else {
@@ -1031,7 +1031,7 @@ check_type:
 		      check_size(code);
 		      *e_code++ = *t_ptr;
 		    }
-		}
+		}    
 	    parser_state_tos->want_blank = true;
 
 	    /* If the token is va_dcl, it appears without a semicolon,
@@ -1200,7 +1200,7 @@ check_type:
 		    (parser_state_tos->paren_indents_size * sizeof (short));
 		  memcpy (new->paren_indents, parser_state_tos->paren_indents,
 			  parser_state_tos->paren_indents_size * sizeof (short));
-		
+		  
 		  new->next = parser_state_tos;
 		  parser_state_tos = new;
 		}
@@ -1230,7 +1230,7 @@ check_type:
 		    memcpy (parser_state_tos, second,
 			    sizeof(struct parser_state));
 		    parser_state_tos->next = second;
-		
+		    
 		    /* Now copy the arrays from the second to top of
 		       stack to the top of stack.  */
 		    /* Since the p_stack, etc. arrays only grow, never
@@ -1291,7 +1291,7 @@ check_type:
 	    break;		/* subsequent processing of the newline
 				 * character will cause the line to be printed */
 
-	case comment:		/* we have gotten a '/ *'  this is a biggie */
+	case comment:		/* we have gotten a /*  this is a biggie */
     proc_comment:
 	    if (flushed_nl) {	/* we should force a broken line here */
 		flushed_nl = false;
@@ -1308,7 +1308,7 @@ check_type:
 	    parser_state_tos->last_token = type_code;
 
       }				/* end of main while (1) loop */
-}
+};
 
 /*
  * copy input file to backup file if in_name is /blah/blah/blah/file, then
@@ -1327,7 +1327,7 @@ bakcopy()
     char *errbuf;
     /* Backup file name.  */
     char *bakfile;
-
+    
     /* construct name of backup file */
     for (p = in_name; *p; p++);	/* skip to end of string */
     while (p > in_name && *p != '/')	/* find last '/' */
@@ -1353,7 +1353,7 @@ bakcopy()
     errbuf = xmalloc(80 + strlen(p));
 
     sprintf(errbuf,"indent: %s",bakfile);
-
+      
     /* copy in_name to backup file */
     bakchn = creat(bakfile, 0600);
     if (bakchn < 0)
@@ -1369,7 +1369,7 @@ bakcopy()
       }
 
     close(bakchn);
-
+    
     /* now the original input file will be the output */
     output = fopen(in_name, "w");
     if (output == 0) {

@@ -1,8 +1,0 @@
-Short: inherits() returns all programs inheriting a given program
-From: Pulami
-Date: 2002-03-10
-Type: Feature
-State: New
-
-Ich f=E4nde eine Efun interessant, die zu einem gegebenen Objekt a alle =
-Objekte liefert, die a inheriten.

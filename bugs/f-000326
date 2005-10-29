@@ -1,9 +1,0 @@
-Short: Allow the use of masks with mkdir()
-Date: 0003026
-From: Krise
-Type: Feature
-State: New
-See also: f-000616
-
-As it says: allow the creation of dirs (or even files?) with an mask
-other than the default 775.

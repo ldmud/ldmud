@@ -226,7 +226,7 @@ mpe@ida.liu.se (Mikael Pettersson) writes:
 >	ldw 0(0,%r19),%r20
 >	ldo 8(%r3),%r19
 >	comb,>>=,n %r20,%r19,L$0003
->	.CALL
+>	.CALL 
 >	bl rml_gc,%r2
 >	nop
 >L$0003
@@ -282,12 +282,12 @@ FRAME_GROWS_DOWNWARD un#defined. Fix appended.
 --- 639,646 ----
   #endif
   }
-
+  
 + int dummy_slotsize;
-+
++ 
   /* Allocate a stack slot of SIZE bytes and return a MEM rtx for it
      with machine mode MODE.
-
+     
 *************** assign_stack_local (mode, size, align)
 *** 654,662 ****
 --- 657,676 ----
@@ -296,7 +296,7 @@ FRAME_GROWS_DOWNWARD un#defined. Fix appended.
   {
 +     return assign_stack_local2(mode, size, align, &dummy_slotsize);
 + }
-+
++ 
 + rtx
 + assign_stack_local2 (mode, size, align, sizep)
 +      enum machine_mode mode;
@@ -308,7 +308,7 @@ FRAME_GROWS_DOWNWARD un#defined. Fix appended.
     int bigend_correction = 0;
     int alignment;
 +   int frame_offset_old;
-
+  
     if (align == 0)
       {
 *************** assign_stack_local (mode, size, align)
@@ -316,7 +316,7 @@ FRAME_GROWS_DOWNWARD un#defined. Fix appended.
 --- 686,697 ----
     else
       alignment = align / BITS_PER_UNIT;
-
+  
 +   /* All space allocated on the frame has to be accounted for in the
 +      allocated slots sizes, combine_temp_slots won't think that adjacent
 +      slots really are adjacent. OTOH, having stack slots start before their
@@ -341,17 +341,17 @@ FRAME_GROWS_DOWNWARD un#defined. Fix appended.
 +     *sizep = size;
 +   }
   #endif
-
+  
     /* On a big-endian machine, if we are allocating more space than we will use,
 *************** assign_stack_local (mode, size, align)
 *** 690,695 ****
 --- 718,724 ----
-
+  
   #ifdef FRAME_GROWS_DOWNWARD
     frame_offset -= size;
 +   *sizep = frame_offset_old - frame_offset;
   #endif
-
+  
     /* If we have already instantiated virtual registers, return the actual
 *************** assign_stack_temp (mode, size, keep)
 *** 832,837 ****
@@ -386,7 +386,7 @@ FRAME_GROWS_DOWNWARD un#defined. Fix appended.
   	      p->rtl_expr = 0;
 - 	      p->next = temp_slots;
 - 	      temp_slots = p;
-
+  
   	      stack_slot_list = gen_rtx (EXPR_LIST, VOIDmode, p->slot,
   					 stack_slot_list);
 --- 885,890 ----
@@ -467,14 +467,14 @@ FRAME_GROWS_DOWNWARD un#defined. Fix appended.
 + 	when splitting a block where last_sizep will point to.
 + 	(combine_temp_slots): When combining for !STACK_GROWS_DOWNWARD,
 + 	make sure the size increase gets into the combined slot.
-+
++ 
 + Tue Aug 29 19:10:53 1995  Richard Kenner  (kenner@vlsi1.ultra.nyu.edu)
 +         * c-common.c (decl_attribute, case A_PACKED): Check is_type first.
 +         (decl_attribute, case A_T_UNION): Likewise.
 +         Don't access TYPE_FIELDS if DECL is zero.
 +         * c-decl.c (finish_struct): If transparent_union attribute
 +         specified, validate it once we finish laying the union out.
-+
++ 
 + Thu Aug 17 21:02:09 1995 J"orn Rennecke (amylaar@meolyon.hanse.de)
 + 	* i386.c (arithmetic_comparison_operator): New function.
 + 	(print_operand) : take into account that overflow flag is not
@@ -483,19 +483,19 @@ FRAME_GROWS_DOWNWARD un#defined. Fix appended.
 + 	arithmetic_comparison_operator to decide if there is an comparison
 + 	that is suitable to be expressed by the condition code from an
 + 	arithmetic operation.
-+
++ 
 + Fri Jul 14 07:34:21 1995  J"orn Rennecke (amylaar@meolyon.hanse.de)
 + 	* c-decl.c(finish_struct): wait with decl_attributes() till
 + 	TYPE_FIELDS (t) is valid.
-+
++ 
 + Thu Jul 13 22:53:04 1995  J"orn Rennecke  (amylaar@meolyon.hanse.de)
 + 	* c-common.c(decl_attributes): bug fix for A_ALIGNED
-+
++ 
 + Sat Jul  8 10:33:59 1995  J"orn Rennecke  (amylaar@meolyon.hanse.de)
 + 	* New optimization option -fomit-default-branch . Most of it
 + 	is in expand_end_case(). Doc in gcc.1
-+
++ 
   Fri Jun 16 06:54:03 1995  Richard Kenner  (kenner@vlsi1.ultra.nyu.edu)
-
+  
   	* alpha.c (alpha_builtin_saveregs): Use ptr_mode and conversions
 

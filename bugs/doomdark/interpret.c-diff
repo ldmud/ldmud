@@ -6,13 +6,13 @@
   	sp = input_to(sp, num_arg);
   	break;
       }
-+
++ 
 + /* Added to support StickLib: */
 +     CASE(F_SUBSTITUTE_STRING);
 +     {
 +         struct svalue *arg;
 +         char *ret;
-+
++ 
 +         arg = sp - 4;
 +         if (arg[0].type != T_STRING)
 +                 goto bad_arg_1;
@@ -30,7 +30,7 @@
 +         }
 +         break;
 +     }
-+
++ 
 + /* ... end of StickLib-extra-func */
   #ifdef F_PARSE_COMMAND
       CASE(F_PARSE_COMMAND);

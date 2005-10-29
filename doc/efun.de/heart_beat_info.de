@@ -1,9 +1,0 @@
-SYNOPSIS
-        object *heart_beat_info()
-
-BESCHREIBUNG
-        Resultat ist ein Array mit allen Objekten, die einen aktiven
-        heart_beat() haben.
-
-SIEHE AUCH
-        set_heart_beat(E), heart_beat(A), call_out_info(E)

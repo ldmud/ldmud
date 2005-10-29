@@ -152,5 +152,4 @@
 extern char *sys_errlist[];
 extern int sys_nerr, errno;
 
-#endif /* SYS_ERRNO_H */
-
+#endif	/* SYS_ERRNO_H */

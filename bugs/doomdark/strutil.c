@@ -18,14 +18,8 @@
 #include <ctype.h>
 
 #include "config.h"
-#include "array.h"
+#include "lint.h"
 #include "interpret.h"
-
-/* When compiling from bugs/doomdark/..., use these includes:
-#include "../../config.h"
-#include "../../array.h"
-#include "../../interpret.h"
- */
 
 /* Routine to replace aliases in a string. Currently considers all
  * strings that do not contain spaces as words This could easily be

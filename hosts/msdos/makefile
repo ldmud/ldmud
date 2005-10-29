@@ -97,7 +97,7 @@ install: driver
 install.utils:
 	(cd util; $(MAKE) $(MFLAGS) install)
 
-utils:
+utils: 
 	(cd util; $(MAKE) $(MFLAGS))
 
 parse: driver
@@ -230,12 +230,12 @@ wiz_list.o : wiz_list.c config.h machine.h lint.h interpret.h object.h \
 #
 
 hosts/msdos/c_msdos.o : hosts/msdos/c_msdos.c hosts/msdos/pcdef.h \
-  hosts/msdos/c_msdos.h
+  hosts/msdos/c_msdos.h 
 
 hosts/msdos/msdos.o : hosts/msdos/msdos.c
 
 hosts/msdos/serial.o : hosts/msdos/serial.c hosts/msdos/pcdef.h \
-  hosts/msdos/c_msdos.h
+  hosts/msdos/c_msdos.h 
 
 hosts/msdos/vcon.o : config.h patchlevel.h hosts/msdos/vcon.c \
   hosts/msdos/pcdef.h hosts/msdos/c_msdos.h hosts/msdos/version.h

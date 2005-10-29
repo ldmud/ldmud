@@ -1,8 +1,0 @@
-Short: Runtime warnings
-From: Lars, Pulami
-Date: 2002-08-11
-Type: Feature
-State: New
-
-Introduce a master-apply for runtime warnings - like "Can't replace program
-after binding closures".

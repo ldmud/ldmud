@@ -1,9 +1,6 @@
 /* machine.h.  Generated automatically by configure.  */
-/* machine.h.in.  Generated automatically from configure.in by autoheader.  */
-
 #ifndef MACHINE_H
 #define MACHINE_H
-
 
 /* Define if using alloca.c.  */
 /* #undef C_ALLOCA */
@@ -12,17 +9,20 @@
    This function is required for alloca.c support on those systems.  */
 /* #undef CRAY_STACKSEG_END */
 
-/* Define if you have alloca, as a function or macro.  */
-#define HAVE_ALLOCA 1
+/* Define if you have dirent.h.  */
+#define DIRENT 1
 
-/* Define if you have <alloca.h> and it should be used (not on Ultrix).  */
-#define HAVE_ALLOCA_H 1
+/* Define if you have alloca.h and it should be used (not Ultrix).  */
+/* #undef HAVE_ALLOCA_H */
 
 /* Define as __inline if that's what the C compiler calls it.  */
 /* #undef inline */
 
+/* Define if you don't have dirent.h, but have ndir.h.  */
+/* #undef NDIR */
+
 /* Define to `int' if <sys/types.h> doesn't define.  */
-/* #undef pid_t */
+#define pid_t int
 
 /* Define as the return type of signal handlers (int or void).  */
 #define RETSIGTYPE void
@@ -33,197 +33,114 @@
 /* If using the C implementation of alloca, define if you know the
    direction of stack growth for your system; otherwise it will be
    automatically deduced at run-time.
- STACK_DIRECTION > 0 => grows toward higher addresses
- STACK_DIRECTION < 0 => grows toward lower addresses
- STACK_DIRECTION = 0 => direction of growth unknown
+	STACK_DIRECTION > 0 => grows toward higher addresses
+	STACK_DIRECTION < 0 => grows toward lower addresses
+	STACK_DIRECTION = 0 => direction of growth unknown
  */
 /* #undef STACK_DIRECTION */
 
 /* Define if you have the ANSI C header files.  */
 #define STDC_HEADERS 1
 
-/* Set in response to the signal handler return type, since not all
- * compilers understand direct definition comparisons
- */
-#define RETSIGTYPE_VOID 1
+/* Define if you don't have dirent.h, but have sys/dir.h.  */
+/* #undef SYSDIR */
 
-/* does the compiler provide inline functions? */
-#define HAS_INLINE 1
+/* Define if you don't have dirent.h, but have sys/ndir.h.  */
+/* #undef SYSNDIR */
 
-/* Is the library function inet_ntoa() compatible with the compiler?
- * TODO: Is there any platform where this is not the case?
- */
-#define INET_NTOA_OK 1
+/* Define if the closedir function returns void instead of int.  */
+/* #undef VOID_CLOSEDIR */
+
+/* Is the library function inet_ntoa() compatible with the compiler ? */
+/* #undef INET_NTOA_OK */
+
+/* The following values must be evaluable by the preprocessor */
+#define SIZEOF_P_INT 4
+#define SIZEOF_INT 4
+#define SIZEOF_LONG 4
 
 /* A mask that allows to extract an unsigned char from a signed */
 #define CHARBIT_MASK 0xff
 
-#define RENAME_HANDLES_DIRECTORIES 1
+/* #undef RENAME_HANDLES_DIRECTORIES */
 
 /* Does the system have a getrusage call?  */
-#define HAVE_GETRUSAGE 1
+/* #define HAVE_GETRUSAGE 1 */
 /* If so, is it restricted to user and system time? */
-/* #undef GETRUSAGE_RESTRICTED */
+/* #define GETRUSAGE_RESTRICTED 1 */
 /* Is it available as a subfunction of syscall() ? */
 /* #undef GETRUSAGE_VIA_SYSCALL */
-/* Can ru_utime / ru_stime be accessed as a timeval with tv_sec and tv_usec ? */
-#define RUSAGE_USEC 1
 
 /* the atari strtol() used to consider characters '9' < c < 'A' to be numeric */
-/* #undef STRTOL_BROKEN */
-
-/* needs the first argument of strtol be declared as const ? */
-#define STRTOL_CONST_CHARP 1
-
-/* Define if you have bcopy, and it handles overlapping ranges correctly. */
-#define OVERLAPPING_BCOPY 1
+#define STRTOL_BROKEN 1
 
 #define MALLOC_ALIGN 4
-
-/* does the compiler know of a 'ssize_t' type? */
-#define HAVE_SSIZE_T 1
-
-/* does the compiler know of a 'long long' type? */
-#define HAVE_LONG_LONG 1
-
-/* does the compiler know of a 'bool' type? */
-/* #undef HAVE_BOOL */
 
 /* what kind of pointer is used by malloc() et al */
 #define POINTER void *
 #define FREE_RETURNS_VOID 1
 
 /* can we define our own malloc() safely? */
-#define SBRK_OK 1
+/* #undef SBRK_OK */
 
 /* The following is needed for smalloc without SBRK_OK to use memory
  * efficiently. smalloc will malloc blocks that are a large power of
  * two, minus EXTERN_MALLOC_OVERHEAD. If you have no idea what number to
  * choose, compile & run util/overhead.c
  */
-#define EXTERN_MALLOC_OVERHEAD 12
+#define EXTERN_MALLOC_OVERHEAD 4
 
 /* How to set a socket non-blocking */
-/* #undef USE_IOCTL_FIONBIO */
-#define USE_FCNTL_O_NDELAY 1
+#define USE_IOCTL_FIONBIO
+/* #undef USE_FCNTL_O_NDELAY */
 /* #undef USE_FCNTL_FNDELAY */
 
-/* Can F_SETOWN be used on a socket? */
-/* #undef USE_FCNTL_SETOWN */
+/* #undef inline */
 
-/* Can SO_OOBINLINE be used on a socket? */
-#define USE_OOBINLINE 1
-
-/* Does the machine offer IPv6? */
-/* #undef HAS_IPV6 */
-
-/* Does the machine offer mySQL? */
-/* #undef HAS_MYSQL */
-
-/* define the erq include file. */
-#define ERQ_INCLUDE "util/erq/erq.h"
-
-/* define the host-specific include file */
-/* #undef HOST_INCLUDE */
-
-/* The number of bytes in a char *.  */
-#define SIZEOF_CHAR_P 4
-
-/* The number of bytes in a int.  */
-#define SIZEOF_INT 4
-
-/* The number of bytes in a long.  */
-#define SIZEOF_LONG 4
-
-/* The number of bytes in a long long.  */
-#define SIZEOF_LONG_LONG 8
-
-/* The number of bytes in a short.  */
-#define SIZEOF_SHORT 2
-
-/* Define if you have the _crypt function.  */
+/* Define if you have _crypt.  */
 /* #undef HAVE__CRYPT */
 
-/* Define if you have the bzero function.  */
+/* Define if you have bzero.  */
 #define HAVE_BZERO 1
 
-/* Define if you have the crypt function.  */
+/* Define if you have crypt.  */
 /* #undef HAVE_CRYPT */
 
-/* Define if you have the fchmod function.  */
+/* Define if you have fchmod.  */
 /* #undef HAVE_FCHMOD */
 
-/* Define if you have the fcntl function.  */
-#define HAVE_FCNTL 1
-
-/* Define if you have the getcwd function.  */
+/* Define if you have getcwd.  */
 #define HAVE_GETCWD 1
 
-/* Define if you have the getdomainname function.  */
-/* #undef HAVE_GETDOMAINNAME */
+/* Define if you have getrusage.  */
+/* #define HAVE_GETRUSAGE 1 */
 
-/* Define if you have the getrusage function.  */
-#define HAVE_GETRUSAGE 1
-
-/* Define if you have the gettimeofday function.  */
-#define HAVE_GETTIMEOFDAY 1
-
-/* Define if you have the memcpy function.  */
+/* Define if you have memcpy.  */
 #define HAVE_MEMCPY 1
 
-/* Define if you have the memmem function.  */
+/* Define if you have memmem.  */
 /* #undef HAVE_MEMMEM */
 
-/* Define if you have the memmove function.  */
-#define HAVE_MEMMOVE 1
-
-/* Define if you have the memset function.  */
+/* Define if you have memset.  */
 #define HAVE_MEMSET 1
 
-/* Define if you have the strchr function.  */
+/* Define if you have strchr.  */
 #define HAVE_STRCHR 1
 
-/* Define if you have the strcspn function.  */
+/* Define if you have strcspn.  */
 #define HAVE_STRCSPN 1
 
-/* Define if you have the strdup function.  */
-#define HAVE_STRDUP 1
-
-/* Define if you have the strrchr function.  */
+/* Define if you have strrchr.  */
 #define HAVE_STRRCHR 1
-
-/* Define if you have the sysconf function.  */
-#define HAVE_SYSCONF 1
-
-/* Define if you have the wait3 function.  */
-/* #undef HAVE_WAIT3 */
-
-/* Define if you have the waitpid function.  */
-#define HAVE_WAITPID 1
 
 /* Define if you have the <bstring.h> header file.  */
 /* #undef HAVE_BSTRING_H */
 
-/* Define if you have the <crypt.h> header file.  */
-#define HAVE_CRYPT_H 1
-
-/* Define if you have the <dirent.h> header file.  */
-#define HAVE_DIRENT_H 1
-
 /* Define if you have the <libc.h> header file.  */
 /* #undef HAVE_LIBC_H */
 
-/* Define if you have the <limits.h> header file.  */
-#define HAVE_LIMITS_H 1
-
 /* Define if you have the <memory.h> header file.  */
 #define HAVE_MEMORY_H 1
-
-/* Define if you have the <ndir.h> header file.  */
-/* #undef HAVE_NDIR_H */
-
-/* Define if you have the <netdb.h> header file.  */
-#define HAVE_NETDB_H 1
 
 /* Define if you have the <stdlib.h> header file.  */
 #define HAVE_STDLIB_H 1
@@ -231,20 +148,8 @@
 /* Define if you have the <string.h> header file.  */
 #define HAVE_STRING_H 1
 
-/* Define if you have the <sys/dir.h> header file.  */
-/* #undef HAVE_SYS_DIR_H */
-
-/* Define if you have the <sys/ndir.h> header file.  */
-/* #undef HAVE_SYS_NDIR_H */
-
-/* Define if you have the <sys/param.h> header file.  */
-#define HAVE_SYS_PARAM_H 1
-
 /* Define if you have the <sys/rusage.h> header file.  */
 /* #undef HAVE_SYS_RUSAGE_H */
-
-/* Define if you have the <sys/termios.h> header file.  */
-#define HAVE_SYS_TERMIOS_H 1
 
 /* Define if you have the <sys/time.h> header file.  */
 #define HAVE_SYS_TIME_H 1
@@ -253,16 +158,26 @@
 #define HAVE_UNISTD_H 1
 
 /* Define if you have the <values.h> header file.  */
-#define HAVE_VALUES_H 1
+/* #undef HAVE_VALUES_H */
+
+/* Define if you have the <CC/osfcn.h> header file.  */
+/* #undef HAVE_CC_OSFCN_H */
 
 /* Define if you have the m library (-lm).  */
-#define HAVE_LIBM 1
+/* #undef HAVE_LIBM */
 
 /* Define if you have the nsl library (-lnsl).  */
 /* #undef HAVE_LIBNSL */
 
 /* Define if you have the socket library (-lsocket).  */
-#define HAVE_LIBSOCKET 1
+/* #undef HAVE_LIBSOCKET */
 
-#endif
+/* Define if you have the ucb library (-lucb).  */
+/* #undef HAVE_LIBUCB */
 
+/* needs the first argument of strtol be declared as const ? */
+#define STRTOL_CONST_CHARP 1
+
+#define HOST_INCLUDE "hosts/os2/os2.h"
+
+#endif /* MACHINE_H */

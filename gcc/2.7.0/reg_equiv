@@ -32,7 +32,7 @@ mpe@ida.liu.se (Mikael Pettersson) writes:
 >extern void *Unify_2eunify(struct rml_state*);
 >extern void *sclam616(struct rml_state*);
 >
->void *sclam617(struct rml_state *rmlState)
+>void *sclam617(struct rml_state *rmlState) 
 >{
 >    void **tmp950 = rmlState->SC;
 >    void *tmp375 = tmp950[1];           /*1a*/
@@ -87,7 +87,7 @@ Here is the relevant section from the code:
          a register used only in one basic block from a MEM.  If so, and the
          MEM remains unchanged for the life of the register, add a REG_EQUIV
          note.  */
-
+         
       note = find_reg_note (insn, REG_EQUIV, NULL_RTX);
 
       if (note == 0 && reg_basic_block[regno] >= 0
@@ -217,7 +217,7 @@ away when the appended patch is applied.
 --- 987,996 ----
   	 insn that set REG is safe.  If so, put a REG_EQUIV note on the
   	 initializing insn.  */
-
+  
 + #if 0
 + /* This is invalid when code gets reordered. Therefore, I temporarily
 +  * disabled this code. Joern Rennecke Tue Sep  5 06:02:24 MET DST 1995
@@ -232,7 +232,7 @@ away when the appended patch is applied.
   	  = gen_rtx (EXPR_LIST, REG_EQUIV, dest,
   		     REG_NOTES (reg_equiv_init_insn[regno]));
 + #endif
-
+  
         /* If this is a register-register copy where SRC is not dead, see if we
   	 can optimize it.  */
 

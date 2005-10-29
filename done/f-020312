@@ -1,9 +1,0 @@
-Short: Filename argument to garbage_collection()
-From: Alwin
-Date: 2002-03-12
-Type: Feature
-State: Done - implemented in 3.2.9
-
-Pass the gc log filename as argument to garbage_collection(). If left out, or
-for automatic GCs, use the default name given on the command line
-

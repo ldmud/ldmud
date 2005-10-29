@@ -1,9 +1,0 @@
-Short: Runtime ERQ Executable directory specification
-Date: Wed, 14 Mar 2001 14:49:05 +0100
-Type: Feature
-State: New
-
-Weiterhin waere es dann auch noch schoen, wenn man das ERQ_DIR als
-Kommandozeilen-Parameter uebergeben koennte. (dazu muesste der Driver
-dem ERQ das als Parameter uebergeben, was aber zu Inkompatibilitaeten
-fuehren wuerde, deswegen wohl eher als future-feature ;)

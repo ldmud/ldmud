@@ -1,5 +1,0 @@
-command: say
-argument: a string
-
-The argument will be displayed to all players in the same room.
-See also 'converse', 'shout'.

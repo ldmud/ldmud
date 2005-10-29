@@ -1,9 +1,6 @@
 #ifndef MACHINE_H
 #define MACHINE_H
 
-#undef AMIGA
-#define AMIGA 1
-
 /* Define if using alloca.c.  */
 /* #undef C_ALLOCA */
 
@@ -37,11 +34,6 @@
 /* Define as the return type of signal handlers (int or void).  */
 #define RETSIGTYPE void
 
-/* Set in response to the signal handler return type, since not all
- * compilers understand direct definition comparisons
- */
-#define RETSIGTYPE_VOID 1
-
 /* Define to `unsigned' if <sys/types.h> doesn't define.  */
 /* #undef size_t */
 
@@ -65,6 +57,9 @@
 
 /* Define if the closedir function returns void instead of int.  */
 /* #undef VOID_CLOSEDIR */
+
+/* Is the library function inet_ntoa() compatible with the compiler ? */
+#define INET_NTOA_OK 1
 
 /* The following values must be evaluable by the preprocessor */
 #define SIZEOF_P_INT 4
@@ -93,6 +88,9 @@
 /* the atari strtol() used to consider characters '9' < c < 'A' to be numeric */
 /* #undef STRTOL_BROKEN */
 
+/* does the libc consider it normal to free a null pointer? */
+/* #undef FREE_NULL_POINTER */
+
 /* needs the first argument of strtol be declared as const ? */
 /* #undef STRTOL_CONST_CHARP */
 
@@ -100,9 +98,6 @@
 /* #undef OVERLAPPING_BCOPY */
 
 #define MALLOC_ALIGN 4
-
-/* does the compiler know of a 'ssize_t' type? */
-/* #undef HAVE_SSIZE_T  */
 
 /* does the compiler know of a 'long long' type? */
 /* #undef HAVE_LONG_LONG */
@@ -127,12 +122,6 @@
 /* #undef USE_FCNTL_O_NDELAY */
 /* #undef USE_FCNTL_FNDELAY */
 
-/* Can F_SETOWN be used on a socket? */
-/* #undef USE_FCNTL_SETOWN */
-
-/* Can SO_OOBINLINE be used on a socket? */
-/* #undef USE_OOBINLINE */
-
 /* #undef inline */
 
 /* Define if you have _crypt.  */
@@ -152,6 +141,9 @@
 
 /* Define if you have getcwd.  */
 #define HAVE_GETCWD 1
+
+/* Define if you have getdomainname */
+#define HAVE_GETDOMAINNAME 1
 
 /* Define if you have getrusage.  */
 #define HAVE_GETRUSAGE 1
@@ -176,9 +168,6 @@
 
 /* Define if you have strcspn.  */
 #define HAVE_STRCSPN 1
-
-/* Define if you have the strdup function.  */
-#define HAVE_STRDUP 1
 
 /* Define if you have strrchr.  */
 #define HAVE_STRRCHR 1
@@ -213,9 +202,6 @@
 /* Define if you have the <string.h> header file.  */
 #define HAVE_STRING_H 1
 
-/* Define if you have the <sys/param.h> header file. */
-/* #undef HAVE_SYS_PARAM_H */
-
 /* Define if you have the <sys/rusage.h> header file.  */
 /* #undef HAVE_SYS_RUSAGE_H */
 
@@ -245,5 +231,7 @@
 
 /* Define if you have the ucb library (-lucb).  */
 /* #undef HAVE_LIBUCB */
+
+#define HOST_INCLUDE "hosts/amiga/amiga.h"
 
 #endif /* MACHINE_H */

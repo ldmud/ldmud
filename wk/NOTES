@@ -1,13 +1,10 @@
- - Use the "Don't stop the Bibop" allocator with GC, in conjuntion with
-   C++.
-
  - NOn-shared strings should be refcounted in order to implement
    copy-on-write. At the moment, the strings are copied with every
    assignment of svalue :-( See MudOS.
 
  - A temporary malloc (scratchpad) to reduce fragementation and
    number of free()s. See MudOS.
-
+   
  - It is tempting to put flags into bitfields (like the flags describing
    lfuns), but that has two disadvantages:
      + Depending on the compiler, the code can be really bad. Some compiler
@@ -23,7 +20,7 @@
        fields are put into the same bits of the whole structure.
        And as this is the only way to get variant packed bitfields without
        any unwanted alignment, the whole idea dies at this point.
-
+   
    Hmm, if the flags are defined as unsigned char, the generated code is good.
    We just have to add a runtime test to see if the layout is ok.
    Test the following on PPC:
@@ -32,7 +29,7 @@ struct {
   unsigned char flag1 : 1;
   unsigned char flag2 : 1;
 } flags;
-
+      
 void foo (void) {
   extern int i;
 
@@ -44,7 +41,7 @@ void foo (void) {
 
 	.file	"xxx.c"
 / GNU C version egcs-2.90.27 980315 (egcs-1.0.2 release) (i386-cygwin32) compiled by GNU C version egcs-2.90.27 980315 (egcs-1.0.2 release).
-/ options passed:
+/ options passed: 
 / options enabled:  -fpeephole -ffunction-cse -fkeep-static-consts
 / -fpcc-struct-return -fsjlj-exceptions -fcommon -fverbose-asm -fgnu-linker
 / -fargument-alias -m80387 -mhard-float -mno-soft-float -mieee-fp

@@ -4,7 +4,7 @@ diff /usr/src/1/driver-3.2.1@130/STACKMACHINE ./STACKMACHINE
 13a14,16
 > Anm. von Sunblade :
 > In dieser Skizze  ist "unten" eine Hoehere addresse !
->
+> 
 16c19
 < Frame pointer->	|	Argument number 0
 ---
@@ -14,7 +14,7 @@ diff /usr/src/1/driver-3.2.1@130/STACKMACHINE ./STACKMACHINE
 < 		v
 ---
 > sp[-1]		|	etc
-> sp[0]		v
+> sp[0]		v 
 Only in .: access_check.o
 Only in .: array.o
 Common subdirectories: /usr/src/1/driver-3.2.1@130/autoconf and ./autoconf
@@ -89,36 +89,36 @@ Only in .: efun_defs.c
 diff /usr/src/1/driver-3.2.1@130/exec.h ./exec.h
 75a76,78
 >        // *** Anm. von mir eingefuegt, da sonst die Variablennamen verlorengehen.
->
->
+>        
+>        
 85a89,100
->
+> 
 >     struct variable *variable_names;
->
+> 
 > // *** Hier stehen die Namen der einzelnenn lokalen Variablen
 > // *** und Parameter drinne.  ACHTUNG !!!!
 > // *** dies Tun sie aber auch NUR in der Struktur des Programmes,
 > // *** in der die Funktion definiert wird. (!!!)
 > // *** d.h. sucht man die lokalen Variablen eines inhertidenen Files,
-> // *** muss man auch die Struktur verwenden, die das Programm
+> // *** muss man auch die Struktur verwenden, die das Programm 
 > // *** des inheriteden Files benutzt. Nicht die Struktur des Programmes,
-> // *** das aus der inheritnace resultiert.
+> // *** das aus der inheritnace resultiert. 
 > //    struct variable *parameter_names;
 117a133,146
->
->    struct function *funktionsdaten; // *** Von Sunblade eingefuegt.
+> 
+>    struct function *funktionsdaten; // *** Von Sunblade eingefuegt. 
 > // *** In dieser Struktur stehen alle Funktionen des aktuellen Programmes.
 > // *** ACHTUNG !
 > // *** Zwar enthalten diese Funktionen auch verweise auf die lokalen Parameter,
-> // *** allerdings koennen diese nur verwendet werden, wenn man auch
+> // *** allerdings koennen diese nur verwendet werden, wenn man auch 
 > // *** DIE betrachtet, die in dem jeweiligen Programm defniert werden.
 > // *** d.h. Informationen ueber lokale Variablen, die inherited werden.
 > // *** sind in dieser Struktur nicht zu finden !
->
+> 
 >    // *** Ich hab keinen Bock weiter zu schaun, ob die Funktionsdaten
 >    // *** noch sonstwo gesichert werden !
 >    // *** (bzw. nach betrachten des Codes bezweifele ich das)
->
+>    
 Only in .: exec.h~
 Only in .: foo
 Only in .: foo.txt
@@ -440,86 +440,86 @@ Only in .: int.c
 Only in .: int.c~
 diff /usr/src/1/driver-3.2.1@130/interpret.c ./interpret.c
 13a14,22
->
+> 
 > /* by Sunblade start */
 > #define NUMLINES 78
 > // *** Anzahl an Spalten, auf die die Ausgabe des Debuggers optimiert wird.
->
+> 
 > #define SHOWLINES 10
 > // *** Anzahl an Zeilen, die von dem Original-Quellcode ausgegeben werden.
 > /* by Sunblade end */
->
+> 
 72a82,143
 > // *** By sunblade
 > // *** is dazu da damit der ganze Quark zum darstellen des LPC-Codes
-> // *** nicht nochmal eingelesen werden muss,
+> // *** nicht nochmal eingelesen werden muss, 
 > // *** wenn er im Speicher is !
 > char *current_cache_file;
-> char *current_cache_data;
+> char *current_cache_data; 
 > int current_cache_line;
 > int current_cache_file_size;
->
+> 
 > int last_displayed_line;
 > char *last_displayed_file;
 > struct displayed_functions *last_displayed_function;
 > struct displayed_functions *first_displayed_function;
->
+> 
 > /* fuers Debuggen */
-> int running_program;
+> int running_program; 
 > // *** == 1, wenn das Programm alaeuft, bis der naechte Breakpoint
 > // *** kommt. Ansonsten == 0.
->
->
->
+> 
+> 
+> 
 > int flags_for_next_line;
-> /* Die Flags, die die Bedinungen fuer die naechste
+> /* Die Flags, die die Bedinungen fuer die naechste 
 >  anzuzeigende Zeile setzen:
 >  * 0 :
 >  *   Alle SMCs anzeigen, die der akutellen Maske entsprechen
->  *
+>  * 
 >  * FLAG_SHOW_IF_BREAKPOINT :
 >  *   Zeile nur anzeigen, wenn auch ein Breakpoint gesetzt ist.
->  *
+>  * 
 >  * FLAG_TRACE_INTO_NEXT_FUNCTION :
 >  *   Gesetzt, wenn in die naechste Funktion reingetract werden soll, die
->  *   "normal" aufgerufen wird. Wird nach dem Aufrufen der Funktion
->  *   automatisch geloescht.
+>  *   "normal" aufgerufen wird. Wird nach dem Aufrufen der Funktion 
+>  *   automatisch geloescht. 
 >  *
->  *
+>  * 
 >  * Auswertung :
 >  * Wenn ein Breakpoint gesetzt ist, auf jeden Fall anzeige.
 >  * Wenn kein Breakpoint, aber im "Auf-Breakpoint-Warten"-Modus, dann raus.
->  *
->  * Ansonsten gilt :
+>  * 
+>  * Ansonsten gilt : 
 >  */
 > #define FLAG_SHOW_IF_BREAKPOINT 1
 > #define FLAG_TRACE_INTO_NEXT_FUNCTION 2
 > #define FLAG_SHOW_THIS_FUNCTION 4
->
->
+> 
+> 
 > #define DEBUGGER_VERSION V0.1b-p0.01
-> #define F_DEBUG_ON 1
+> #define F_DEBUG_ON 1 
 > // *** Wird in der interactive-Strukt eingetragen,
 > // *** wenn man debuggt.
->
+> 
 > int num_breakpoints;
 > struct breakpoint *first_breakpoint;
->
->
+> 
+> 
 > struct breakpoint *breakpoint_exists( int curr_line, char *curr_file );
 > int test_for_debug();
-> void do_lpc_debug( char *my_pc, char *stackinst, char *parm2, char *parm3 );
+> void do_lpc_debug( char *my_pc, char *stackinst, char *parm2, char *parm3 ); 
 > void do_lpc_debug_return ();
 > /* by Sunblade ende */
->
+> 
 101c172,174
 < static void do_trace PROT((char *, char *, char *));
 ---
 > static void do_trace PROT((char *, char *, char *, char *));
 > static void do_line_trace PROT((char *, char *, char *));
->
+> 
 2781a2855
->
+> 
 2816c2890
 < 	do_trace("Call direct ", name, " ");
 ---
@@ -540,7 +540,7 @@ diff /usr/src/1/driver-3.2.1@130/interpret.c ./interpret.c
 > //      memcpy((char *)&funname, funstart - 1 - sizeof funname, sizeof funname);
 > //      do_lpc_debug(0,funname,"Call Direct","");	
 > //     }
->
+>        
 3218c3302,3307
 <     if (++eval_cost >= 0) {
 ---
@@ -548,7 +548,7 @@ diff /usr/src/1/driver-3.2.1@130/interpret.c ./interpret.c
 > 	     {
 > 	      do_lpc_debug(pc,get_f_name(instruction),"Exec ","\n");
 > 	     }
->
+>    
 >    if (++eval_cost >= 0) {
 3223c3312
 < 		    do_trace("Exec ", get_f_name(instruction), "\n");
@@ -584,14 +584,14 @@ diff /usr/src/1/driver-3.2.1@130/interpret.c ./interpret.c
 > //    if (p > PROGRAM_END(*progp))
 > //	fatal("Illegal offset %d in object %s\n", offset, progp->name);
 11525a11623,11927
->
+> 
 > /* Quick & Dirty zum Flags ausgeben ! */
 > char *get_current_function()
 >  {
 >     /* liefert einen Zeiger auf den Namen der aktuellen Funktion zuureck */
 > //  return (char *)(csp->funstart[-5]);
 >  }
->
+>  
 > char *read_lines_from_file( int middleline, char *name )
 >  {
 >     /* Megaquick & Megadirty ! */
@@ -602,57 +602,57 @@ diff /usr/src/1/driver-3.2.1@130/interpret.c ./interpret.c
 >   char tempbuff[10000];
 >   char tempbuff2[1000];
 > //  char *tempstring;
->
+>    
 >   if (SHOWLINES == 0) { return 0; } // *** 0 -> Keine Anzeige.
->
+> 
 >   // *** Wenn die Daten den bereits gespeicherten entsprechen,
->   // *** dann diese recyceln.
->   if ((current_cache_file != 0) && (strcmp(current_cache_file,name) == 0) &&
+>   // *** dann diese recyceln. 
+>   if ((current_cache_file != 0) && (strcmp(current_cache_file,name) == 0) && 
 >      (middleline == current_cache_line))
 >       {
 > 	return current_cache_data;
 >       }
->
+>     
 >  // *** So, das Zeugs ist *nicht* im Cache.
 >  if (current_cache_file != 0)
 >        free(current_cache_file);
 >  if (current_cache_data != 0)
 >       free(current_cache_data);
->
->
+>     
+>     
 >   dateizeiger = fopen(name, "r");
->   if (dateizeiger == NULL) { return 0;
+>   if (dateizeiger == NULL) { return 0; 
 >   }
 >   /* Beschissen Programmiert ! */
 >   /* DRINGENDDST optimieren !!! */
->
+>     
 >    preread = middleline - (SHOWLINES / 2);
->
+>    
 >    lauf2 = 0;
->
+> 
 >     while (preread > 0)
 >       {
 >        lauf2++;
->        fgets(tempbuff,10000,dateizeiger);
+>        fgets(tempbuff,10000,dateizeiger); 
 >        preread--;
 >       }
->
->
+>    
+>     
 >    current_cache_line = middleline;
->    current_cache_data = malloc(10000);
+>    current_cache_data = malloc(10000); 
 > //   tempstring = malloc(10000);
 >    current_cache_file = malloc(strlen(name)+1);
 >    current_cache_data[0] = 0x00; // *** den String entleeren
 >    strcpy(current_cache_file,name);
 >    tempbuff[0] = 0x00;           // *** Den Puffer leeren
->
->
+> 
+>     
 >    for (lauf1 = 0; lauf1 < SHOWLINES;lauf1++)
 >       {
 >        lauf2++;
 >        if (fgets(tempbuff,10000,dateizeiger) != NULL)
 > 	   {
->          if (lauf2 == middleline)
+>          if (lauf2 == middleline) 
 >   	 {
 > 	  if (breakpoint_exists(lauf2,name) != 0)
 > 	      { sprintf(tempbuff2,"%d:B>",lauf2); } else
@@ -671,40 +671,40 @@ diff /usr/src/1/driver-3.2.1@130/interpret.c ./interpret.c
 > // 	strcat(tempstring,tempbuff);
 > 	   }
 >       }
->
+>     
 >    while (fgets(tempbuff,10000,dateizeiger) != NULL)
 >       { lauf2++; }
 >    current_cache_file_size = lauf2;
 >   fclose(dateizeiger);
->    return current_cache_data;
->
+>    return current_cache_data; 
+> 
 >  }
->
->
+> 
+> 
 > #include "debsup.c"
->
+>  
 > void do_lpc_debug_return()
 >  {
 >   struct displayed_functions *tempzeiger;
->   /* Diese Funktion wird aufgerufen, wenn ein Ruecksprung aus einer
+>   /* Diese Funktion wird aufgerufen, wenn ein Ruecksprung aus einer 
 >    * Funktion in eine uebergeordnete geschieht. Ich muss in diesem
 >    * Fall von meinem Funktionsstack den letzen Wert entfernen.
 >    */
 >   if (last_displayed_function == 0)
->    { debug_message("Schwerer Debugger-Fehler ! ICSP-Underflow !\n");
+>    { debug_message("Schwerer Debugger-Fehler ! ICSP-Underflow !\n"); 
 >      return; }
->
+>     
 >  /* Wenn ich nicht von der richtigen Funktion zurueckkomme.... */
 >  /* (hier werden *ALLE* funktionsreturns gesammelt) */
 >   if (last_displayed_function->functioncsp != csp)
 >    { return; }
->
+>     
 >   if (last_displayed_function->prev == 0)
 >    { /* Dies ist das einizige Element in der Kette. */
 >     free(last_displayed_function->in_file);
 >     free(last_displayed_function);
 >     last_displayed_function = 0;
->     first_displayed_function = 0;
+>     first_displayed_function = 0;      
 >    } else
 >    { tempzeiger = last_displayed_function;
 >     /* Das vorletzte Element darauf vorbereiten, das es das letzte ist */
@@ -713,9 +713,9 @@ diff /usr/src/1/driver-3.2.1@130/interpret.c ./interpret.c
 >     free(tempzeiger->in_file);
 >     free(tempzeiger);
 >    }
->
->  }
->
+>    
+>  } 
+> 
 > void do_lpc_debug( char *my_pc, char *stackinst, char *parm2, char *parm3 )
 > {
 >   struct breakpoint *temp_breakpoint;
@@ -735,39 +735,39 @@ diff /usr/src/1/driver-3.2.1@130/interpret.c ./interpret.c
 >   int print_banner;
 >   struct object *old_interactive;
 >   struct function *tempfunktion;
->
+>    
 >   debug_ok = 0;
->
+> 
 >   /* to do : Bei Return diese FUnktion nit mehr aufrufen ! */
 >   if (parm2 != 0) { if (strcmp(parm2,"Return") == 0) { return; } }
->
+>    
 >   if (current_prog == 0) { return; }
->   /* Current_prog kann in seltenen Faellen == 0, werden
+>   /* Current_prog kann in seltenen Faellen == 0, werden 
 >    * allerdings nicht nur innerhalb von HBs. Auf jedenfall ist es dann
 >    * uninetressant was passiert
 >    */
->
+>    
 >   temppointer = &(buf2);
 >   temp2 = get_line_number(my_pc,current_prog, &temppointer);
->
+> 
 >   /* Zu Coredump-Zeweckenn ;) */
 >   sprintf(buf,"Datei : %s    Zeile : %d",current_prog->name,temp2);
 >   debug_message(buf);
->
+>    
 >   temp_breakpoint = breakpoint_exists(temp2,current_prog->name);
->
+>  
 > /*
 >  * Auswertung :
 >  * Wenn ein Breakpoint gesetzt ist, auf jeden Fall anzeige.
 >  * Wenn kein Breakpoint, aber im "Auf-Breakpoint-Warten"-Modus, dann raus.
 >  */
->
+>       
 >   if ((temp_breakpoint != 0))
 >    { // *** Wenn ein Breakpoint in dieser Zeile existiert, und das
->      // *** Programm im running-Modus ist, eine Nachricht ausgeben, das
+>      // *** Programm im running-Modus ist, eine Nachricht ausgeben, das 
 >      // *** ein Breakpoint erreicht wurde.
 >     running_program = 0; // *** Fallback in den single-Step-Modus
->
+>       
 >     add_message("\n\n--- Breakpoint erreicht !!! ---\n");
 >     add_message("Breakpoint Nr. %d, Datei %s, Zeile %d.",
 > 	       temp_breakpoint->number,temp_breakpoint->in_file,temp_breakpoint->line);
@@ -775,18 +775,18 @@ diff /usr/src/1/driver-3.2.1@130/interpret.c ./interpret.c
 >    } else
 >    {
 >     if ((running_program == 1)) { return; }
->
->    /* So. Jetz kommt die Buchhaltung ueber den Funktionenstack.
+>       
+>    /* So. Jetz kommt die Buchhaltung ueber den Funktionenstack. 
 >     * Es ist fuer mich einfacher, selber Buch darueber zu fuehren, als in
 >     * dem Control-Stack nachzuschaun.
 >     */
 >     /* Aha. Das ist die erste Funktion die wir uns anschauen. Auf jeden
->      * Fall diese betrachten.
+>      * Fall diese betrachten. 
 >      */
->
+>       
 >     if (last_displayed_function == 0)
 >      {
->       /* Es ist bis jetz die erste und letzte betrachtete Funktion auf unserem
+>       /* Es ist bis jetz die erste und letzte betrachtete Funktion auf unserem 
 >        * Stack
 >        */
 >       first_displayed_function = malloc(sizeof( struct displayed_functions ));
@@ -797,9 +797,9 @@ diff /usr/src/1/driver-3.2.1@130/interpret.c ./interpret.c
 >       first_displayed_function->next = 0;
 >       first_displayed_function->prev = 0;
 >       first_displayed_function->flags = FLAG_SHOW_THIS_FUNCTION;
-> 	
+> 	  
 >      }
->
+>     
 >     if (last_displayed_function->functioncsp == csp )
 >      {
 >       if ((last_displayed_function->flags & FLAG_SHOW_THIS_FUNCTION) == 0)
@@ -823,91 +823,91 @@ diff /usr/src/1/driver-3.2.1@130/interpret.c ./interpret.c
 >         return;
 >        }
 >      }
->
+>       
 >    }
->
+>    
 > /* Kontrollieren, ob ich in dieser Zeile schoneinmal einen SMC angezeigt habe. */
->  if ((temp2 == last_displayed_line) &&
+>  if ((temp2 == last_displayed_line) &&  
 >      ((last_displayed_file != 0) && (strcmp(temppointer,last_displayed_file) == 0)))
 >    { return; } else
->    {
+>    { 
 >     if (last_displayed_file != 0) { free(last_displayed_file); }
 >     last_displayed_file = malloc(strlen(temppointer)+1);
 >     strcpy(last_displayed_file,temppointer);
 >     last_displayed_line = temp2;
 >    }
->
->  /* Reintracen wird nicht aufgeschoben. Wenn das Ding keine
+>   
+>  /* Reintracen wird nicht aufgeschoben. Wenn das Ding keine 
 >   * Funktion war, wo mein reintracen Wollte, passiert nix.
 >   */
 >  flags_for_next_line = flags_for_next_line & !(FLAG_TRACE_INTO_NEXT_FUNCTION);
->  print_banner = 1;
->  while (!debug_ok)
->   {
->    /* Das Banner ausgeben. Hier kann ruhige getroedelt werden, es wird eh auf
+>  print_banner = 1;   
+>  while (!debug_ok) 
+>   {   
+>    /* Das Banner ausgeben. Hier kann ruhige getroedelt werden, es wird eh auf 
 >     * eine Benutzerinteraktion gewartet... So schnell sieht das niemand !
 >     */
 >    if (print_banner == 1)
 >     {
 >      sprintf(buf,"\n--< Sunblades LPC-Debugger V0.1b-p0.01 : /%s >---%n",current_object->name,&temp);
 >      add_message(buf);
->      if (temp < NUMLINES) { for (lauf1 = 0; lauf1 < (NUMLINES - temp); lauf1++ ) add_message("-"); }
+>      if (temp < NUMLINES) { for (lauf1 = 0; lauf1 < (NUMLINES - temp); lauf1++ ) add_message("-"); }  
 >      add_message("\n");
->
->
+>    
+>    
 >      temp_source_from_file = read_lines_from_file(temp2,temppointer);
 >      add_message(temp_source_from_file);
->
->  		
+>  
+>  		       
 >      sprintf(buf,"--</%s:%s>-<%d/%d>%n",current_prog->name,
 > 	  (char *) (*( (char **) (&csp->funstart[-5]) )),
 > 	  temp2,current_cache_file_size,&temp);
->
+>  
 >     add_message(buf);
 >     if (temp < NUMLINES) { for (lauf1 = 0; lauf1 < (NUMLINES - temp); lauf1++ ) add_message("-"); }
 >     add_message("\n");
 >     add_message(MESSAGE_FLUSH);
 >     print_banner = 0;
 >    }
->
+>    
 >   old_interactive = current_interactive;
 > //  while (!debug_ok)
 >  //    {
 >   add_message("(h=hilfe) ? >");
 >   add_message(MESSAGE_FLUSH);
->
+> 
 >   while ((!get_message(buf,sizeof buf )) && (command_giver = old_interactive)) {}
 >   /* Auf die Eingabe warten ! */
->
+>     
 >   // *** in dem Maindebug steht alles wichtige !	
 > #include "maindebug.c"
 >       	
 >   }
->
+>    
 >   add_message(MESSAGE_FLUSH);
 > }
->
->
->
+> 
+>  
+>  
 11527,11528c11929,11931
 < do_trace(msg, fname, post)
 < char *msg, *fname, *post;
 ---
 > do_trace(msg, fname, post, my_pc)
 > char *msg, *fname, *post, *my_pc;
->
+>  
 11531a11935,11951
 >     struct object *old_interactive;
->
+>    
 >     if (!TRACEHB)
 > 	return;
 >     objname = TRACETST(TRACE_OBJNAME) ? (current_object && current_object->name ? current_object->name : "??")  : "";
 >    sprintf(buf, "*** %d %*s %s %s %s%s", tracedepth, tracedepth, "", msg, objname, fname, post);
 >  // *** hohoho !
 >    debug_message(buf);
->
+>    
 >  //   add_message(buf);
->
+> 
 >  //  add_message(MESSAGE_FLUSH);
 > // do_lpc_debug(my_pc,fname,msg,post);
 > #ifdef DEBUG
@@ -915,33 +915,33 @@ diff /usr/src/1/driver-3.2.1@130/interpret.c ./interpret.c
 > #endif
 > }
 11532a11953,11962
->
+> 
 > static void do_line_trace(msg, fname, post)
 > char *msg, *fname, *post;
 > {
->    // *** Dieses Trace wird verwendet, wenn die Zeilennummern korrekt
->    // *** abgebildet werden koennen.
+>    // *** Dieses Trace wird verwendet, wenn die Zeilennummern korrekt 
+>    // *** abgebildet werden koennen. 
 >     char buf[10000];
 >     char *objname;
 >     struct object *old_interactive;
->
+>    
 11537a11968,11970
->
+> 
 >    add_message(MESSAGE_FLUSH);
 >  do_lpc_debug(0,fname,msg,post);
 11541,11542c11974,11975
 < }
-<
+< 
 ---
-> }
->
+> }  
+>  
 11831a12265,12284
 > /*
 > int test_for_debug()
 >    // *** Return 1 wenn man debuggen soll
 >      {
 > 	struct interactive *wizard;
-> 	if (command_giver)
+> 	if (command_giver) 
 > 	  {
 > 	     wizard = O_GET_INTERACTIVE(command_giver);
 > 	     return (wizard->debug_level & F_DEBUG_ON);
@@ -962,38 +962,38 @@ diff /usr/src/1/driver-3.2.1@130/interpret.c ./interpret.c
 >       (ip->debug_prefix == 0 ||
 >        (current_object && strpref(ip->debug_prefix, current_object->name)));
 > }
->
+>    
 12173a12633,12635
->
+> 
 > #include "debfile.c"
-> 	
+> 	   
 diff /usr/src/1/driver-3.2.1@130/interpret.h ./interpret.h
 6a7,8
->
->
+> 
+> 
 27a30,61
->
+> 
 > // *** by Sunblade, start
 > // Speichert die lokalen funktionen
->
+> 
 > struct sunblades_funktionsretter {
 >   char *name;
 >   int args;
 >   int locals;
 >   struct function *vars_u_params;
 >   struct sunblades_funktionsretter *next;
->
+> 
 >  };
->
+> 
 > struct breakpoint {
 >    int number;
 >    char *in_file;
 >    int line;
 >    uint32 flags; // *** evtl. benoetigte Flags
->
->    struct breakpoint *next;
+>    
+>    struct breakpoint *next; 
 > };
->
+>    
 > struct displayed_functions {
 >   struct control_stack *functioncsp;
 >   int flags;
@@ -1001,9 +1001,9 @@ diff /usr/src/1/driver-3.2.1@130/interpret.h ./interpret.h
 >   struct displayed_functions *next;
 >   struct displayed_functions *prev;
 > };
->
+> 
 > // *** by Sunblade, end
->
+> 
 Only in .: interpret.o
 Only in .: lang.c
 Only in .: lang.c.old
@@ -1073,26 +1073,26 @@ Only in .: parse_old.o
 Only in .: port.o
 diff /usr/src/1/driver-3.2.1@130/prolang.y ./prolang.y
 703a704,707
->
+> 
 >     int lauf1; // ** by Sunblade
 >  struct ident *tempzeiger; // *** by Sunbalde
->
+> 
 772c776,812
 < 	}
 ---
 > 	
 > }
->
->
+> 
+> 
 >            // *** by Sunblade
 >          if (funp->variable_names != 0)
 >           { }
->
->
+> 
+> 
 >        if ((num_local + num_arg) > 0)
 >           {
 >            funp->variable_names = malloc(sizeof(struct variable) * (num_local + num_arg));
->
+> 
 >          // *** Wir haben eine verkette Liste
 >          tempzeiger = all_locals;
 >         lauf1 = 0;
@@ -1113,14 +1113,14 @@ diff /usr/src/1/driver-3.2.1@130/prolang.y ./prolang.y
 >            lauf1++;
 >          }
 >       } else funp->variable_names = 0;
->
+> 
 >   // *** by Sunblade ende
->
->
+> 
+> 
 789a830,867
->
+> 
 >      fun.variable_names = 0;
->
+> 
 >      // *** die Namen der lokalen Variablen eintragen, da sie sonst
 >      // *** verworfen werden.
 >      // *** by Sunblade -> begin
@@ -1130,7 +1130,7 @@ diff /usr/src/1/driver-3.2.1@130/prolang.y ./prolang.y
 >  fun.variable_names = malloc(sizeof(struct variable) * (num_local + num_arg));
 >          // *** Wir haben eine verkette Liste
 >       tempzeiger = all_locals;
->
+> 
 >       lauf1 = 0;
 >       while (tempzeiger != 0)
 >        {
@@ -1140,29 +1140,29 @@ diff /usr/src/1/driver-3.2.1@130/prolang.y ./prolang.y
 >        fun.variable_names[lauf1].flags = 0;
 >     //    fun.variable_names[lauf1].name =
 >   /*
->
+> 
 >                make_shared_string(tempzeiger->name);*/
 >   //          xalloc(strlen(tempzeiger->name)+1);
 >   //      strcpy(fun.variable_names[lauf1].name,tempzeiger->name);
->
+> 
 >          // *** Falls wir das letzte Element haben, dieses kennzeichnen...
 >          if (tempzeiger->next_all == 0)
 >          { fun.variable_names[lauf1].flags = 0xff; }
->
+> 
 >            tempzeiger = tempzeiger->next_all;
 >          lauf1++;
 >         }
 >       } else fun.variable_names = 0;
->
->
->
+> 
+> 
+> 
 5731c5809,5813
 < 	prog->strings = (char **)p;
 ---
 >   prog->funktionsdaten = xalloc( sizeof (struct function ) * num_functions);
 >  memcpy(prog->funktionsdaten,mem_block[A_FUNCTIONS].block, sizeof( struct function) * num_functions);
->
->
+> 
+> 
 >         prog->strings = (char **)p;
 Only in .: random.o
 Only in .: raus

@@ -1,9 +1,0 @@
-Short: privilege_violation("limited") should pass limits
-From: Pulami
-Date: 2002-01-31
-Type: Feature
-State: New
-
-The privilege_violation for limited() should pass the limits themselves
-to the master function, too. Currently that is not possible because of
-the restricted calling pattern for the privilege_violation() function.

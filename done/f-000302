@@ -1,7 +1,0 @@
-From: Lars
-Short: 'static <var>' should be 'nosave <var>'
-Date: 000302
-Type: Feature
-State: Done - implemented in LDMud 3.2.8-dev.170
-
-As MudOS does it

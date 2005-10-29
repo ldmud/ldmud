@@ -1,8 +1,0 @@
-Short: New config value: MAX_MAPPING_SIZE
-Date: 2002-02-23
-From: Menaures
-Type: Feature
-State: New
-
-It would be useful to have a config/runtime limit for the total number of
-elements in a mapping; not just for the number of keys.

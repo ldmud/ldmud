@@ -1,9 +1,0 @@
-SYNOPSIS
-        int caller_stack_depth();
-
-BESCHREIBUNG
-        Liefert die Anzahl previous_object()s im Caller Stack. Dies kann fuer
-        Sicherheitschecks genutzt werden.
-
-SIEHE AUCH
-        caller_stack(E), previous_object(E), call_other(E), call_resolved(E)

@@ -1,47 +1,56 @@
-#ifndef BACKEND_H__
-#define BACKEND_H__ 1
+#ifndef __BACKEND_H__
+#define __BACKEND_H__ 1
 
 #include "driver.h"
-#include "typedefs.h"
-#include "main.h"       /* max_time */
+#include "interpret.h"  /* struct error_recovery_info, struct svalue */
+#include "object.h"     /* struct object */
+
+/* --- Macros --- */
+
+/* Reset the evaluation cost counters back to the maximum.
+ */
+#define CLEAR_EVAL_COST (assigned_eval_cost = eval_cost = initial_eval_cost)
 
 /* --- Variables --- */
 
+extern struct error_recovery_info toplevel_error_recovery_info;
+extern struct error_recovery_info *error_recovery_pointer;
+extern struct object *current_heart_beat;
 extern mp_int current_time;
-extern Bool time_to_call_heart_beat;
-extern volatile Bool comm_time_to_call_heart_beat;
+extern /* TODO: BOOL */ int    time_to_call_heart_beat;
+extern volatile /* TODO: BOOL */ int    comm_time_to_call_heart_beat;
 extern uint32 total_player_commands;
 extern volatile mp_int total_alarms;
-extern uint num_listed_objs;
-extern uint num_last_processed;
-extern long avg_last_processed;
-extern long avg_in_list;
-
-extern Bool extra_jobs_to_do;
-
-typedef enum { gcDont = 0, gcMalloc, gcEfun } GC_Request;
-extern GC_Request gc_request;
-
-extern Bool mud_is_up;
+extern int32  initial_eval_cost;
+extern int32  eval_cost;
+extern int32  assigned_eval_cost;
+extern /* TODO: BOOL */ int    extra_jobs_to_do;
+extern /* TODO: BOOL */ int    garbage_collect_to_do;
 
 /* --- Prototypes --- */
 
 extern void  clear_state (void);
-extern void check_alarm (void);
-extern void  logon (object_t *ob);
+extern void  logon (struct object *ob);
+extern int   parse_command (char *str, struct object *ob);
 extern void  backend (void);
+extern int   set_heart_beat (struct object *ob, int to);
+extern int   heart_beat_status (int /* TODO: BOOL */ verbose);
 extern void  preload_objects (int eflag);
-extern svalue_t *f_debug_message (svalue_t *sp);
+extern struct svalue *f_debug_message (struct svalue *sp);
 ALARM_HANDLER_PROT(catch_alarm);
-extern int   e_write_file (char *file, char *str);
-extern char *e_read_file (char *file, int start, int len);
-extern char *e_read_bytes (char *file, int start, int len);
-extern int   e_write_bytes (char *file, int start, char *str);
-extern long  e_file_size (char *file);
+extern void  remove_destructed_objects (void);
+extern int   write_file (char *file, char *str);
+extern char *read_file (char *file, int start, int len);
+extern char *read_bytes (char *file, int start, int len);
+extern int   write_bytes (char *file, int start, char *str);
+extern int   file_size (char *file);
 extern void  update_compile_av (int lines);
 extern char *query_load_av (void);
-extern svalue_t* f_regreplace (svalue_t *sp);
+extern struct svalue *f_heart_beat_info (struct svalue *sp);
+extern struct svalue* f_regreplace (struct svalue *sp);
 
-/* --- Macros --- */
+#ifdef MALLOC_smalloc
+extern void  count_heart_beat_refs (void);
+#endif
 
-#endif /* BACKEND_H__ */
+#endif /* __BACKEND_H__ */

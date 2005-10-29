@@ -1,9 +1,7 @@
-SYNOPSIS
-        mixed *m_indices(mapping map)
+mixed *
+m_indices(mapping map)
 
-DESCRIPTION
-        Returns an array containing the indices of mapping 'map'.
+Return an array containing the indices of mapping 'map'.
 
-SEE ALSO
-        mappingp(E), mkmapping(E), m_add(E), m_values(E), m_delete(E),
-        sizeof(E), widthof(E), unmkmapping(E)
+See also:
+    mappingp, mkmapping, m_values, m_delete, m_sizeof

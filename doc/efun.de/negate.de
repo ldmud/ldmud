@@ -1,6 +1,0 @@
-SYNOPSIS
-        int negate(int arg);
-        float negate(float arg);
-
-BESCHREIBUNG
-        Liefert den negativen Wert von <arg>.

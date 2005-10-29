@@ -1,8 +1,0 @@
-SYNOPSIS
-        int strlen(string str);
-
-BESCHREIBUNG
-        Liefert die Laenge eines Strings.
-
-SIEHE AUCH
-        sizeof(E), extract(E)

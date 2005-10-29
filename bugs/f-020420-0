@@ -1,7 +1,0 @@
-Short: Better isolate the error routine calls
-From: Lars
-Date: 2002-04-20
-Type: Feature
-State: New
-
-In the calls to the error routines, give the interpreter its own resource environment (at least for the first-level call) to avoid dominoe too-long-evals.

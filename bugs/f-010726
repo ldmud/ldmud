@@ -1,9 +1,0 @@
-Short: Add location to defined identifiers
-From: Freaky
-Date: 2001-7-26
-Type: Feature
-State: New
-
-When warning about redefined identifiers and the like, it would be nice to
-know where the original definition was.
-

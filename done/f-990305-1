@@ -1,7 +1,0 @@
-Short: clone_object() should accept objects
-From: Lars
-Date: 990305
-Type: Feature
-State: Done: implemented.
-
-clone_object(<object>) == clone_object(<load_name of object>)

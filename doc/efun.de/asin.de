@@ -1,8 +1,0 @@
-SYNOPSIS
-        float asin(float)
-
-BESCHREIBUNG
-        Liefert der Arkussinus des Argumentes.
-
-SIEHE AUCH
-        sin(E), cos(E), acos(E), tan(E), atan(E), atan2(E)

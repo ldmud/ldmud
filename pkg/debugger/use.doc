@@ -1,17 +1,17 @@
-                      Wie benutze ich den Debugger ?
+                      Wie benutze ich den Debugger ? 
                   - ein kleiner Leitfaden von Sunblade.
 		-----------------------------------------
 LPC-Debugger von Sunblade (sunblade@sd.mud.de:2050)
-(Daniel von Dincklage, vonDincklage@ozet.de)
+(Daniel von Dincklage, vonDincklage@ozet.de) 
 (patches for 3.2.1@130-Driver)
 
 Schritt 0.
-              UMBEDINGT EINE SICHERHEITSKOPIE DES ALTEN DRIVERS
+              UMBEDINGT EINE SICHERHEITSKOPIE DES ALTEN DRIVERS 
                 UND DES UNGEPATCHTEN QUELLCODES ANLEGEN !!!
 
 Schritt 1.
- Man kopiere ich die Tar.gz-Datei mit den Patches fuer den Debugger und
- wende diese auf die Quelldateien des Drivers an.
+ Man kopiere ich die Tar.gz-Datei mit den Patches fuer den Debugger und 
+ wende diese auf die Quelldateien des Drivers an. 
  ACHTUNG !
  Ich habe es nur mit dem 3.2@130-Driver ausprobiert, ich werde das mal
  demnaechst auf andere Versionen ausdehen.
@@ -23,17 +23,17 @@ Schritt 1.
    ALSO NICHT UND NIEMALS DIESEN DRIVER IN EINEM OFFNEN MUD VERWENDEN !
  ***************************************************************************
 
-Schritt 2.
+Schritt 2. 
  Man kompiliere den gepatchen Driver und probiere ihn aus.
- In dem neuen Driver sind einige Veraenderungen vorgenommen, so das er
+ In dem neuen Driver sind einige Veraenderungen vorgenommen, so das er 
  wohl ein wenig langsamer laeuft und mehr Speicher verbraucht, als der
  Driver ohne die Debugging-Funktionen. Dies liegt v.a. daran, das der
- Debug-Driver die Variablennamen sichern muss, die normalerweise
+ Debug-Driver die Variablennamen sichern muss, die normalerweise 
  "entsorgt" werden koennen.
-
-Schritt 3.
+ 
+Schritt 3. 
  Man kann nun mal den Driver ausprobieren. Dazu nimmt man sich einfach ein
- Objekt seiner Wahl und fuege die Zeile
+ Objekt seiner Wahl und fuege die Zeile 
  debugfile(file_name(this_object())[1..strlen(file_name(this_object()))-1],1);
  ein, und erschaffe das Objekt. Falls der Driver meckert, das die efun
  "debugfile" nicht vorhanden ist, ist wohl was beim Patchen bzw. beim
@@ -70,10 +70,10 @@ Quelltext angezeigt wird. So z.B. hier in der Zeile 33 von
 /w/sunblade/automat.c, die da lautet :
 33: >    bock = 9876543;
 Das " >" hinter der 33 bedeutet schlicht und einfach, das die
-Programmausfuehrung unmittelbar *BEVOR* dieser Zeile steht. Wenn man also nun
-"n" drueckt, (n = naechster Befehl, wird gleich erklaert) wuerde diese
+Programmausfuehrung unmittelbar *BEVOR* dieser Zeile steht. Wenn man also nun 
+"n" drueckt, (n = naechster Befehl, wird gleich erklaert) wuerde diese 
 Anweisung ausgefueht, d.h. in die Variablen bock wuerde der entsprechende Wert
-abgelegt.
+abgelegt. 
 Es gibt aber noch andere Zeichen, so z.B. in der Zeile 36:
 36:B     foo = 12349;
 Das B direkt hinter der Zeilennummer bedeutet, das in dieser Zeile ein sog.
@@ -81,26 +81,26 @@ Breakpoint gesetzt wurde. (Wird ebenfalls gleich erklaert)
 Ansonsten ist nur noch die letzte Zeile der Anzeige von Interesse :
 --</w/sunblade/automat.c:create>-<33/72>--------------------------------------
 In dieser Zeile wird einiges ausgegeben:
-Zum einen die Quelldatei, in der man sich befindet. In diesem Fall ist es
+Zum einen die Quelldatei, in der man sich befindet. In diesem Fall ist es 
 /w/sunblade/automat.c. Sie muss aber nicht umbedingt der Quelldatei
 entsprechen, die man bearbeitet. Wuerde man sich z.B. anschaun, was in der
 Funktion "set_name" (bzw. SetProp(P_NAME, ) ) geschiet, dann wuerde man
 anstattdessen dort den Namen der Inheritdatei sehen, in dem diese Funktion
-deklariert ist.
+deklariert ist. 
 Hinter dem Doppelpunkt sieht man den Namen der aktuellen Funktion, in diesem
 Fall "create". Ansonsten sieht man noch, in welcher Zeile man sich in der
 aktuellen Datei befindet (33) und wieviele Zeilen die aktuelle Datei
 insgesamt besitzt. (72).
 Doch - Was nun ?
-Zunaechst sollte man erstmal "n" (== naechste Instruktion) (+ENTER) druecken
+Zunaechst sollte man erstmal "n" (== naechste Instruktion) (+ENTER) druecken 
 und schaun was passiert -
 Das Programm fuehrt die naechste Instruktion aus und springt eine Zeile
 weiter - Der Quellcode rutscht herunter, der Zeilenmarker steht auf der
-neuen Instruktion.
+neuen Instruktion. 
 Dies ist schon eine sehr nuetzliche Sache, denn mit Hilfe dieser Funktion
 kann man seinem Programm praktisch zusehen, was es tut, Man kann so sehr
 schnell herausfinden, an welchen Stellen es die falschen IF-Zweige nimmt
-etc. Die naechste Funktion die interessant sein koennte ist die "t"
+etc. Die naechste Funktion die interessant sein koennte ist die "t" 
 (== trace into) Funktion. Sie funktioniert allerdings nur, wenn man mit dem
 Programmmarker auf einer Funktion steht, wie hier:
 --< Sunblades LPC-Debugger: w/sunblade/automat#8 >---------------------------
@@ -115,7 +115,7 @@ Programmmarker auf einer Funktion steht, wie hier:
 48:   }
 49:
 --<w/sunblade/automat.c:create>-<44/72>---------------------------------------
-(Fuer alle die sich mit der Lib hier nicht auskennen, set_name setzt den
+(Fuer alle die sich mit der Lib hier nicht auskennen, set_name setzt den 
  Namen des Objektes und ist in diesem Programm inherited)
 Drueckt man hier nun "t", so zeigt der Debugger an, was "innerhalb" der Funktion
 "set_name" passiert :
@@ -132,26 +132,26 @@ Drueckt man hier nun "t", so zeigt der Debugger an, was "innerhalb" der Funktion
 142:  /*
 --<i/item/name.c:set_name>-<137/351>------------------------------------------
 Haette man nur "n" gedrueckt, so waere der Debugger direkt in die Zeile 45 von
-dem "automat"-Programm gesprungen.
+dem "automat"-Programm gesprungen. 
 Man kann nun z.B. solange "n" druecken, bis das Programm mit der Abarbeitung
 der jetztigen Funktion fertig ist. Danach wird zur nomalen "Tagesordnung" des
 Drivers uebergegangen. Wenn man nun in irgendeiner Weise das gedebuggte Objekt
-anspricht, z.B. ess anschaut, dann springt der Debugger sofort wieder an, und
-befindet sich dann in der entsprechenden Funktion des Objektes.
+anspricht, z.B. ess anschaut, dann springt der Debugger sofort wieder an, und 
+befindet sich dann in der entsprechenden Funktion des Objektes. 
 
 Was kann man noch im Debugger alles schickes Tun ?
  - Variablen anschaun :
     Man kann sich mit "i <variablenname>" den Inhalt einer Variablen anschaun.
     Dies geht immer mit globalen Variablen. Lokale Variablen und Parameter
-    stehen natuerlich nur in der Funktion zur Verfuegung, in der sie auch
-    Deklariert worden sind.
+    stehen natuerlich nur in der Funktion zur Verfuegung, in der sie auch 
+    Deklariert worden sind. 
     ACHTUNG !
-    Gibt der Debugger den Wert "0" und als Variablentyp "ZAHL" aus, so kann
+    Gibt der Debugger den Wert "0" und als Variablentyp "ZAHL" aus, so kann 
     dies zwei Bedeutungen haben:
      - Die Zahl 0, wie man sie kennt und mit der man nichts Dividieren kann.
      - Der Wert "uninitialisiert". Das Bedeutet:
        Is in eine Variable nocht *NICHTS* getan worden. D.h. z.B. man hat eine
-       Objektvariable "foo" Deklariert und schaut sie sich an, bevor
+       Objektvariable "foo" Deklariert und schaut sie sich an, bevor 
        man irgendetwas in diese Variable getan hat, dann erhaelt man AUCH
        den Wert 0, Typ ZAHL. Erst wenn man einen Wert in die Variable tut,
        z.B. foo = this_object(), wird der Typ der Variablen auf Objekt
@@ -159,12 +159,12 @@ Was kann man noch im Debugger alles schickes Tun ?
        (Wenn gewuenscht, dann ueberleg ich mir dazu noch was)
  - Funktionenliste/Variablenliste.
     Man kann mit "lv" bzw. "lf" sich eine Liste **aller** Variablen (lv)
-    bzw. Funktionen (lf) des aktuellen Programmes ausgeben lassen.
+    bzw. Funktionen (lf) des aktuellen Programmes ausgeben lassen. 
     ACHTUNG ! Diese sind natuerlich (besonders bei vielen Inherits) recht lang !
     Bei der Funktionenausgabe wird vorher noch ein Flag-Feld ausgegben, das
     so aussieht: [iSN[P|p]Vvp].
     Die einzelnen Flags bedeuten:
-     i -> Die Funktion ist inherited.
+     i -> Die Funktion ist inherited. 
      S -> Die Funktion ist als static deklariert.
      N -> Die Funktion ist no-mask.
  [P|p] -> Entweder ein P (Funktion ist private) oder ein p (FUnktion ist
@@ -173,14 +173,14 @@ Was kann man noch im Debugger alles schickes Tun ?
      v -> Die Funktion ist virtual
      p -> Die Funktion ist protected.
   - Status:
-     Man kann sich mit "s" oder "status" einige Informationen ueber das
+     Man kann sich mit "s" oder "status" einige Informationen ueber das 
      aktuelle Objekt ausgeben lassen. (Hoffentlich selbsterklaerend)
   - Naechste Instruktion:
      Man kann mit "n" oder "next" die aktuelle Funktion abarbeiten.
   - Breakpoint setzen:
      Man kann mit z.B. "b w/sunblade/automat 34" einen Breakpoint setzen.
      Der Debugger haelt dann an, wenn man die Zeile 34 in der angegebenen
-     Datei erreicht.
+     Datei erreicht. 
      (anm. Bitte keine Flames wegen dieser Funktion, die wird gerade
       verbessert ;) )
   - Continue:
@@ -189,20 +189,20 @@ Was kann man noch im Debugger alles schickes Tun ?
   - Trace into:
      Man kann in eine Funktion reinspringen.
   - Funktionsende :
-     Arbeitet die aktuelle Funktion bis zum Ende ab.
+     Arbeitet die aktuelle Funktion bis zum Ende ab. 
+     
+     
 
-
-
-Schritt 4
+Schritt 4 
 Anmerkungen, Anregungen etc....
-Falls irgendjemand eine tolle Idee hat, was der Debugger sonst noch koennen
+Falls irgendjemand eine tolle Idee hat, was der Debugger sonst noch koennen 
 soll (und NICHT auf der Liste unten steht), oder der Debugger nicht ganz so reagiert
 wie er soll, kann mir ja ganz spontan eine Mail schreiben, und zwar an:
  vonDincklage@ozet.de (oder DanielvDincklage@usa.net falls ersteres nit geht)
 
 Ich freue mich ueberigends auch, falls mir jemand schreibt, das der Driver
-coredumpt. Ich werde mich dann *bestimmt* dransetzen...
-Also: Falls das Ding seinen Core durch die Gegend schmeisst, selbigen
+coredumpt. Ich werde mich dann *bestimmt* dransetzen... 
+Also: Falls das Ding seinen Core durch die Gegend schmeisst, selbigen 
 aufheben, und mir drueber schreiben !
 (Ach ja, bitte *NICHT* sofort den Core mitschicken, erst fragen ;)
  Vielleicht is der Bug ja dann schon laengst behoben !)
@@ -221,18 +221,18 @@ Ist fuer die ferne Zukunft geplant:
 
 
 (* (1)) :
-[Kurzerklaerung: Von jedem Objekt das mehrfach im Mud vorhanden is, wird
+[Kurzerklaerung: Von jedem Objekt das mehrfach im Mud vorhanden is, wird 
 eine Masterkopie angelegt, die vielen Objekte, die die
 Spieler dann mithaben, sind dann die Clones. Es wuerde also *EINMAL*
 "/obj/fackel" exisiteren und mehrfach "/obj/fackel#23128" (bzw. mit einer
 jeweils anderen Zahl hinter dem #). Raeume exisiteren (im Normalfall) nur als
-Masterkope. Warum das komplierte System ? Ganz einfach - In der Masterkopie
+Masterkope. Warum das komplierte System ? Ganz einfach - In der Masterkopie 
 speichert man nur den Programmkode, der ja fuer alle Fackeln gleich ist. Die
 einzelnen Fackeln brauchen dann nur noch die Variablen zu speichern, d.h.
 jede "Clone"-Fackel muss dann nur noch z.B. speichern, wie lange sie selber
 noch brennen soll. Den Programmcode kann sie aus der Masterfackel benutzen
-Weitergehende Infos dazu findet sicher irgendwo in der MudLib-Doku, oder
+Weitergehende Infos dazu findet sicher irgendwo in der MudLib-Doku, oder 
 jemanden Fragen der sich mit sowas auskennt !]
 
 
-
+ 

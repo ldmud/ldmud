@@ -1,9 +1,0 @@
-SYNOPSIS
-        object this_interactive();
-
-BESCHREIBUNG
-        Die Funktion gibt das momentane interaktive Objekt zurueck, falls
-        vorhanden, also dasjenige welches "die Entertaste gedrueckt hat".
-
-SIEHE AUCH
-        this_player(E), previous_object(E), interactive(E), living(E)

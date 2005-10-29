@@ -1,21 +1,10 @@
-
-#ifndef MACHINE_H
-#define MACHINE_H
-
-@TOP@
-
-/* Set in response to the signal handler return type, since not all
- * compilers understand direct definition comparisons
- */
-#undef RETSIGTYPE_VOID
-
-/* does the compiler provide inline functions? */
-#undef HAS_INLINE
-
-/* Is the library function inet_ntoa() compatible with the compiler?
- * TODO: Is there any platform where this is not the case?
- */
+/* Is the library function inet_ntoa() compatible with the compiler ? */
 #undef INET_NTOA_OK
+
+/* The following values must be evaluable by the preprocessor */
+#define SIZEOF_P_INT 4
+#define SIZEOF_INT 4
+#define SIZEOF_LONG 4
 
 /* A mask that allows to extract an unsigned char from a signed */
 #define CHARBIT_MASK 0xff
@@ -45,14 +34,8 @@
 
 #define MALLOC_ALIGN 4
 
-/* does the compiler know of a 'ssize_t' type? */
-#undef HAVE_SSIZE_T
-
 /* does the compiler know of a 'long long' type? */
 #undef HAVE_LONG_LONG
-
-/* does the compiler know of a 'bool' type? */
-#undef HAVE_BOOL
 
 /* what kind of pointer is used by malloc() et al */
 #define POINTER *
@@ -73,30 +56,15 @@
 #undef USE_FCNTL_O_NDELAY
 #undef USE_FCNTL_FNDELAY
 
-/* Can F_SETOWN be used on a socket? */
-#undef USE_FCNTL_SETOWN
+#undef inline
 
-/* Can SO_OOBINLINE be used on a socket? */
-#undef USE_OOBINLINE
+/* Define what random number generator to use.
+ * If no one is specified, a probably good one will be used.
+ * possible choices: RANDOM DRAND48 RAND
+ */
+#undef RANDOM
+#undef DRAND48
+#undef RAND
 
-/* Does the machine offer IPv6? */
-#undef HAS_IPV6
-
-/* Does the machine offer mySQL? */
-#undef HAS_MYSQL
-
-/* Does the machine offer pthread library? */
-#undef HAS_PTHREADS
-
-/* Does the machine offer pcre library? */
-#undef HAS_PCRE
-
-/* define the erq include file. */
-#undef ERQ_INCLUDE
-
-/* define the host-specific include file */
-#undef HOST_INCLUDE
-
-@BOTTOM@
-
-#endif
+/* A host specific include file.  */
+#define HOST_INCLUDE "hosts/unix.h"

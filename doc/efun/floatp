@@ -1,9 +1,0 @@
-SYNOPSIS
-        int floatp(mixed)
-
-DESCRIPTION
-        Returns 1 if the arg is a floating point number, 0 else.
-
-SEE ALSO
-        intp(E), mappingp(E), stringp(E), closurep(E), objectp(E),
-        referencep(E), pointerp(E), symbolp(E), clonep(E)

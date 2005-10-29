@@ -1,8 +1,0 @@
-Short: New efun upper_case()
-From: Matthew Julius <julius.2@wright.edu>
-Date: Fri, 08 Jan 1999 16:29:08 -0500
-Type: Feature
-State: Done - implemented in 3.2-dev.53
-
-string upper_case(string)
-

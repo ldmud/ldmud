@@ -1,9 +1,0 @@
-Short:'yield' to convert statements into expressions
-From: Lars
-Date: 2001-03-09
-Type: Feature
-State: New
-
-E.g.
-a = if (foo) { bla; yield 1; }
-    else { if (bar) yield 2; yield 3;}

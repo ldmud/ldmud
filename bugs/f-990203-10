@@ -1,9 +1,0 @@
-Short: shutdown()/ garbage_collection() priviledged
-From: Matthew Julius <julius.2@wright.edu>
-Date: Fri, 08 Jan 1999 16:29:08 -0500
-Type: Feature
-State: Unclassified
-
-Make shutdown() and garbage_collection() call master::privilege_violation().
-
-Note: Most muds solve that with nomask simul-efuns.

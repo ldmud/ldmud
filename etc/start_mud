@@ -1,7 +1,0 @@
-#!/bin/csh
-#
-# Start with 'nohup start_mud'
-
-while (1)
-/mud/bin/mudloop
-end

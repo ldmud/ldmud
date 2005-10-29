@@ -159,4 +159,3 @@ struct msghdr {
 #define	MSG_MAXIOVLEN	16
 
 #endif /* SYS_SOCKET_H */
-

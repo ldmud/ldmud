@@ -1,7 +1,0 @@
-Short: Apply destructed handling
-Date: 981222
-Type: Feature
-State: Unclassified
-From: Lars
-
-Change the 'apply on destructed object' from fatal into runtime error.

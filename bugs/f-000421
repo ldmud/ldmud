@@ -1,9 +1,0 @@
-Short: Expand cat() and tail() to take limits
-From: Cendor
-Date: 000421
-Type: Feature
-State: New
-
-Modify cat() and tail() to take the number of lines to be printed
-(in cat() this also means getting rid of the cut-off).
-

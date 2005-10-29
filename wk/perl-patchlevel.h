@@ -24,7 +24,7 @@
 	     	,NULL
 	     };
 	
-	please change it to
+	please change it to 
 	   *** patchlevel.h.orig	<date here>
 	   --- patchlevel.h	<date here>
 	   *** 41,43 ***
@@ -36,7 +36,7 @@
 	This will prevent patch from choking if someone has previously
 	applied different patches than you.
  */
-/* The following line and terminating '};' are read by perlbug.PL. Don't alter. */
+/* The following line and terminating '};' are read by perlbug.PL. Don't alter. */ 
 static	char	*local_patches[] = {
 	NULL
 	,NULL

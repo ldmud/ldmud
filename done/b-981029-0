@@ -14,7 +14,7 @@ tun, was ich gerne tun wuerde.
 
 > > Ist die Versionsnummer eigentlich mit Amylaar abgesprochen?
 > > Nicht dass es irgendwann zwei Driver mit derselben Versions-Nummer gibt.
->
+> 
 > Noe, weswegen ich das Teil ja auch 'LDMud' genannt habe. Aber das
 > Amylaar nochmal selber einen Patch herausgibt ist sehr unwahrscheinlich.
 
@@ -63,7 +63,7 @@ Vielleicht findest du den Fehler...
 Ciao
 		Freaky
 
---
+-- 
 Frank 'Freaky' Kirschner
 UNItopia Admin                          http://UNItopia.uni-stuttgart.de/
 Freaky@UNItopia.Uni-Stuttgart.DE      telnet://UNItopia.uni-stuttgart.de/
@@ -80,9 +80,9 @@ Lars Duening:
 > > > Ein paar Fragen hab ich doch noch. Ich wuerde gerne den Anfang
 > > > des Callstacks sehen, also die obersten Frames bis hin zum
 > > > Anfang der (fast)Endlosrekursion.
-> >
+> > 
 > > Leider ist das Core unserem naechlichen Aufraeum-Crin zum Opfer gefallen :(
->
+> 
 > Hab ich schon befuerchtet, aber ich wollte wenigstens gefragt haben.
 
 Ok.. ich habe es nochmal geschafft:
@@ -188,7 +188,7 @@ y.tab.c:4861: No such file or directory.
 6944    static char *get_two_types(type1, type2)
 (gdb) up
 #5  0x8083aff in load_object (
-    lname=0xbf81fff8 "d/Doerrland/Sarasande/bambule/bad/araum", dont_reset=0,
+    lname=0xbf81fff8 "d/Doerrland/Sarasande/bambule/bad/araum", dont_reset=0, 
     depth=60) at simulate.c:419
 419         compile_file();
 (gdb) list
@@ -204,7 +204,7 @@ y.tab.c:4861: No such file or directory.
 423         update_compile_av(total_lines);
 (gdb) up
 #6  0x8083c7e in load_object (
-    lname=0xbf820188 "d/Doerrland/Sarasande/bambule/bad/araum", dont_reset=0,
+    lname=0xbf820188 "d/Doerrland/Sarasande/bambule/bad/araum", dont_reset=0, 
     depth=60) at simulate.c:454
 454                 ob = load_object(name, dont_reset, depth);
 (gdb) list
@@ -225,7 +225,7 @@ Was brauchst du sonst noch?
 Ciao
 		Freaky
 
---
+-- 
 Frank 'Freaky' Kirschner
 UNItopia Admin                          http://UNItopia.uni-stuttgart.de/
 Freaky@UNItopia.Uni-Stuttgart.DE      telnet://UNItopia.uni-stuttgart.de/
@@ -240,15 +240,15 @@ Hi,
 Lars Duening:
 > > Lars Duening:
 > > > > Ok.. ich habe es nochmal geschafft:
-> > >
+> > > 
 > > > Was ich jetzt noch gerne wissen wuerde, ist, wie Anfang des Callstacks
 > > > aussieht (in gdb die Frames mit den hohen Nummern), also bis hin zum
 > > > dritten Aufruf von load_object("d/Doerrland..."). Eventuell in diesen
 > > > drei load_object()-Aufrufen noch alle lokalen Variablen, die dir
 > > > interessant erscheinen.
-> >
+> > 
 > > Wie kann ich die callstacks in den Frames anzeigen?
->
+> 
 > Alle Frames zusammen bilden den Callstack, und ich will einfach nur das
 > andere Ende dieses Stacks sehen. Klar jetzt?
 
@@ -314,7 +314,7 @@ string loading(string str)
 Ciao
 		Freaky
 
---
+-- 
 Frank 'Freaky' Kirschner
 UNItopia Admin                          http://UNItopia.uni-stuttgart.de/
 Freaky@UNItopia.Uni-Stuttgart.DE      telnet://UNItopia.uni-stuttgart.de/

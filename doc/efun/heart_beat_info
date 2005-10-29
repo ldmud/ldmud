@@ -1,9 +1,0 @@
-SYNOPSIS
-        object *heart_beat_info()
-
-DESCRIPTION
-        This function returns an array of all objects having their heart
-        beat turned on.
-
-SEE ALSO
-        set_heart_beat(E), heart_beat(A), call_out_info(E)

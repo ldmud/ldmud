@@ -1,8 +1,0 @@
-SYNOPSIS
-        int rmdir(string dir);
-
-BESCHREIBUNG
-        Loescht das Verzeichnis <dir>. Liefert 1 bei Erfolg, 0 bei Misserfolg.
-
-SIEHE AUCH
-        mkdir(E), rm(E), rename(E)

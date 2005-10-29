@@ -1,9 +1,0 @@
-SYNOPSIS
-        int mkdir(string path);
-
-BESCHREIBUNG
-        Erstellt ein Verzeichnis <path> und liefert 1, wenn das Verzeichnis
-        erstellt werden konnte, sonst 0.
-
-SIEHE AUCH
-        rmdir(E), rm(E), get_dir(E), file_size(E)

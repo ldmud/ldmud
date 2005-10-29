@@ -27,11 +27,6 @@
 /* Define as the return type of signal handlers (int or void).  */
 #define RETSIGTYPE void
 
-/* Set in response to the signal handler return type, since not all
- * compilers understand direct definition comparisons
- */
-#define RETSIGTYPE_VOID 1
-
 /* Define to `unsigned' if <sys/types.h> doesn't define.  */
 /* #undef size_t */
 
@@ -70,7 +65,7 @@
 #define CHARBIT_MASK 0xff
 
 /* #undef RENAME_HANDLES_DIRECTORIES */
-		
+		       
 /* Does the system have a getrusage call?  */
 #define HAVE_GETRUSAGE 1
 
@@ -82,6 +77,9 @@
 
 /* the atari strtol() used to consider characters '9' < c < 'A' to be numeric */
 #define STRTOL_BROKEN 1
+
+/* does the libc consider it normal to free a null pointer? */
+/* #undef FREE_NULL_POINTER 1 */
 
 /* needs the first argument of strtol be declared as const ? */
 #define STRTOL_CONST_CHARP 1
@@ -148,9 +146,6 @@
 /* Define if you have strcspn.  */
 #define HAVE_STRCSPN 1
 
-/* Define if you have the strdup function.  */
-#define HAVE_STRDUP 1
-
 /* Define if you have strrchr.  */
 #define HAVE_STRRCHR 1
 
@@ -168,9 +163,6 @@
 
 /* Define if you have the <string.h> header file.  */
 #define HAVE_STRING_H 1
-
-/* Define if you have the <sys/param.h> header file. */
-/* #undef HAVE_SYS_PARAM_H */
 
 /* Define if you have the <sys/rusage.h> header file.  */
 /* #undef HAVE_SYS_RUSAGE_H */
