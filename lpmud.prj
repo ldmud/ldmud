@@ -54,23 +54,17 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 654)
-(Parent-Version lpmud 3-3 653)
+(Project-Version lpmud 3-3 655)
+(Parent-Version lpmud 3-3 654)
 (Version-Log "
-  - (smalloc.c) Small block splits now make sure, that the remaining
-       block has a minimum size. This size is currently configured
-       to 3 words = 12 Bytes, as the driver doesn't need that many
-       of the even smaller blocks.
-  - (object, gcollect.c, backend.c) The data cleanup is now timed
-       independent of the time of the last reference: similar to
-       reset the cleanup takes place in random intervals based
-       on the configured cleanup-time (or one hour if the cleanup-time
-       is 0).
+  - (backend.c) Tweak to the process_objects() loop: the loop now
+       really allows to have a given number of objects being cleant
+       per loop, not just checked for being cleanable.
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Fri, 14 Jan 2005 00:29:27 -0700")
+(Checkin-Time "Fri, 14 Jan 2005 00:59:31 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -108,7 +102,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.12 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.85 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.717 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.718 644))
   (HISTORY (lpmud/f/49_HISTORY 1.385.1.10 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.21 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -117,7 +111,7 @@
   (src/configure (lpmud/d/0_configure 1.19.1.109.1.5 755))
   (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.43 644))
   (src/machine.h.in (lpmud/b/9_machine.h. 1.9.1.14 644))
-  (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.19.1.34.1.2 644))
+  (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.19.1.34.1.3 644))
   (src/mkinstalldirs (lpmud/c/4_mkinstalld 1.1 644))
   (src/install-sh (lpmud/c/5_install-sh 1.2 755))
   (src/ldmud-man.txt (lpmud/c/c/29_ldmud-man. 1.1 644))
@@ -171,7 +165,7 @@
   (src/array.h (lpmud/f/47_array.h 1.18.1.22 644))
   (src/array.c (lpmud/d/12_array.c 1.46.1.47.1.18 644))
   (src/backend.h (lpmud/f/46_backend.h 1.20.1.7 644))
-  (src/backend.c (lpmud/d/6_backend.c 1.68.1.35.1.41 644))
+  (src/backend.c (lpmud/d/6_backend.c 1.68.1.35.1.42 644))
   (src/bitstrings.h (lpmud/i/47_bitstrings 1.3 644))
   (src/bitstrings.c (lpmud/i/48_bitstrings 1.16 644))
   (src/bytecode.h (lpmud/a/b/26_bytecode.h 1.1.1.3 644))
@@ -219,7 +213,7 @@
   (src/my-rusage.h (lpmud/f/28_my-rusage. 1.7 644))
   (src/my-stdint.h (lpmud/u/b/39_my-stdint. 1.2 644))
   (src/object.h (lpmud/44_object.h 1.34.1.19.1.6.1.2 644))
-  (src/object.c (lpmud/45_object.c 1.62.1.88.1.53.1.2 644))
+  (src/object.c (lpmud/45_object.c 1.62.1.88.1.53.1.3 644))
   (src/otable.h (lpmud/f/27_otable.h 1.8.1.4 644))
   (src/otable.c (lpmud/43_otable.c 1.22.1.8 644))
   (src/parser.c (lpmud/l/13_parser.c 1.1 644))
@@ -395,7 +389,7 @@
   (src/hosts/be/config.h (lpmud/e/34_config.h 1.32.1.40 644))
   (src/hosts/be/be.h (lpmud/e/35_be.h 1.7 644))
   (src/hosts/be/beyacc (lpmud/i/39_beyacc 1.1 744))
-  (src/hosts/be/Makefile (lpmud/e/37_Makefile 1.60.1.71.1.30 644))
+  (src/hosts/be/Makefile (lpmud/e/37_Makefile 1.60.1.71.1.31 644))
   (src/hosts/be/icon-32x32.raw (lpmud/s/37_icon-32x32 1.1 644) :no-keywords)
   (src/hosts/be/icon-16x16.raw (lpmud/s/38_icon-16x16 1.1 644) :no-keywords)
   (src/hosts/be/driver.rsrc (lpmud/s/39_driver.rsr 1.1 644) :no-keywords)

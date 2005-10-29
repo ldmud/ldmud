@@ -483,13 +483,13 @@ $(OBJ)/files.o : ../mudlib/sys/files.h xalloc.h svalue.h stdstrings.h \
     machine.h
 
 $(OBJ)/gcollect.o : ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h swap.h \
-    structs.h stdstrings.h simul_efun.h simulate.h sent.h ptrtable.h \
-    prolang.h pkg-pgsql.h parse.h otable.h object.h mstrings.h mregex.h \
-    mempools.h mapping.h main.h lex.h instrs.h interpret.h heartbeat.h \
-    filestat.h ed.h comm.h closure.h call_out.h backend.h array.h actions.h \
-    gcollect.h typedefs.h driver.h svalue.h strfuns.h hash.h exec.h \
-    bytecode.h pkg-tls.h port.h config.h hosts/unix.h hosts/be/be.h \
-    machine.h
+    structs.h stdstrings.h simul_efun.h simulate.h sent.h random.h \
+    ptrtable.h prolang.h pkg-pgsql.h parse.h otable.h object.h mstrings.h \
+    mregex.h mempools.h mapping.h main.h lex.h instrs.h interpret.h \
+    heartbeat.h filestat.h ed.h comm.h closure.h call_out.h backend.h \
+    array.h actions.h gcollect.h typedefs.h driver.h svalue.h strfuns.h \
+    hash.h exec.h bytecode.h pkg-tls.h port.h config.h hosts/unix.h \
+    hosts/be/be.h machine.h
 
 $(OBJ)/hash.o : hash.h
 

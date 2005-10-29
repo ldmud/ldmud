@@ -797,12 +797,11 @@ static Bool did_swap;
    * processed per call, even if there is no time left to begin with.
    */
 
-static  mp_int num_cleanup; /* Number of objects to data-clean in this
-                             * call. It is computed so that all objects
-                             * are cleaned in one hour, but at least
-                             * one per call.
-                             * static so that errors won't clobber it.
-                             */
+static  mp_int num_data_cleanup;
+  /* Number of objects to data-clean in this call. It is computed so that all
+   * objects are cleaned in one hour, but at least one per call.
+   * static so that errors won't clobber it.
+   */
 
     object_t *obj;          /* Current object worked on */
 
@@ -815,9 +814,9 @@ static  mp_int num_cleanup; /* Number of objects to data-clean in this
     did_reset = MY_FALSE;
     did_swap = MY_FALSE;
 
-    num_cleanup = num_listed_objs / (3600 / ALARM_TIME);
-    if (num_cleanup < 1)
-        num_cleanup = 1;
+    num_data_cleanup = num_listed_objs / (3600 / ALARM_TIME);
+    if (num_data_cleanup < 1)
+        num_data_cleanup = 1;
 
     error_recovery_info.rt.last = rt_context;
     error_recovery_info.rt.type = ERROR_RECOVERY_BACKEND;
@@ -930,28 +929,6 @@ static  mp_int num_cleanup; /* Number of objects to data-clean in this
         } /* if (needs reset?) */
 
 
-        /* ------ Data Cleanup ------ */
-
-        /* Objects are processed at a rate suitable to cover
-         * all listed objects in one hour; but at least one per call.
-         *
-         * The actual cleanup however is not undertaken unless
-         * time_to_clean_up seconds have passed until the last reference (or
-         * 3600 seconds if the time is 0).
-         */
-        if ((mp_int)num_last_processed <= num_cleanup
-         && obj->time_cleanup >= current_time
-           )
-        {
-#ifdef DEBUG
-            if (d_flag)
-                fprintf(stderr, "%s DATA CLEANUP %s\n"
-                              , time_stamp(), get_txt(obj->name));
-#endif
-
-            cleanup_object(obj);
-        }
-
         /* ------ Clean Up ------ */
 
         /* If enough time has passed, give the object a chance to self-
@@ -1048,6 +1025,30 @@ no_clean_up:
         }
 
 
+        /* ------ Data Cleanup ------ */
+
+        /* Objects are processed at a rate suitable to cover
+         * all listed objects in one hour; but at least one per call.
+         *
+         * The actual cleanup however is not undertaken unless
+         * time_to_clean_up seconds have passed until the last reference (or
+         * 3600 seconds if the time is 0).
+         */
+        if (num_data_cleanup > 0
+         && (unsigned long)obj->time_cleanup < (unsigned long)current_time
+           )
+        {
+#ifdef DEBUG
+            if (d_flag)
+                fprintf(stderr, "%s DATA CLEANUP %s\n"
+                              , time_stamp(), get_txt(obj->name));
+#endif
+
+            cleanup_object(obj);
+            num_data_cleanup--;
+        }
+
+
         /* ------ Swapping ------ */
 
         /* At last, there is a possibility that the object can be swapped
@@ -1104,29 +1105,6 @@ no_clean_up:
         } /* if (obj can be swapped) */
 
     } /* End of loop */
-
-    /* If we processed the whole object list, but data-cleant only
-     * some of the objects, we have to move forward the head of the
-     * object list by this number of objects. If we didn't, the
-     * next backend loop would data-clean the same <num_cleanup>
-     * objects we cleant in this one.
-     */
-    if (num_last_processed >= num_listed_objs
-     && num_cleanup < (mp_int)num_listed_objs
-       )
-    {
-        while (num_cleanup-- > 0 && obj_list != obj_list_end)
-        {
-            /* Move obj to the end of the list */
-            obj = obj_list;
-            obj_list = obj->next_all;
-            obj_list->prev_all = NULL;
-            obj->next_all = NULL;
-            obj->prev_all = obj_list_end;
-            obj_list_end->next_all = obj;
-            obj_list_end = obj;
-        } /* while(num_cleanup) */
-    }
 
     /* Update the processing averages
      */

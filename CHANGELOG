@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+14-Jan-2004 (Lars Duening)  (3.3.655)
+  - (backend.c) Tweak to the process_objects() loop: the loop now
+       really allows to have a given number of objects being cleant
+       per loop, not just checked for being cleanable.
+
 14-Jan-2004 (Lars Duening)  (3.3.654)
   - (smalloc.c) Small block splits now make sure, that the remaining
        block has a minimum size. This size is currently configured
