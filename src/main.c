@@ -1244,7 +1244,7 @@ static Option aOptions[]
       , "  --max-bytes <size>\n"
         "    The maximum number of bytes one read_bytes()/write_bytes() call\n"
         "    can handle.\n"
-        "    Set to 0, arrays of any size are allowed.\n"
+        "    Set to 0, reads and writes of any size are allowed.\n"
       }
 
     , { 0,   "max-file",           cMaxFile,        MY_TRUE
@@ -1252,7 +1252,7 @@ static Option aOptions[]
       , "  --max-file <size>\n"
         "    The maximum number of bytes one read_file()/write_file() call\n"
         "    can handle.\n"
-        "    Set to 0, arrays of any size are allowed.\n"
+        "    Set to 0, reads and writes of any size are allowed.\n"
       }
 
     , { 0,   "max-thread-pending", cMaxThreadPend,  MY_TRUE

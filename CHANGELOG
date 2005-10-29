@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+04-Jan-2004 (Lars Duening)  (3.3.644)
+  - (main.c, doc/driver/invocation, INSTALL) Corrected the documentation
+        (Bugs #0000333 and #0000335).
+
 31-Dec-2004 (Lars Duening)  (3.3.643)
   - (mapping.c) Corrected the hashing function so that for efun/sefun/operator
         closures the object information is no longer part of the hash. Without

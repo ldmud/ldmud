@@ -79,7 +79,7 @@ Unix or Unix-like system
   include directory (usually 'sys/').
 
   To test the driver, start it with 'ldmud &'. If you see the message
-  'Setting up ipc', the driver is up and accepting connections. Test
+  'LDMud ready for users', the driver is up and accepting connections. Test
   it with 'telnet localhost 4242'.
 
   pthreads:

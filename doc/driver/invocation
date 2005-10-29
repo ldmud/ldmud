@@ -130,12 +130,12 @@ DESCRIPTION
       --max-bytes <size>
         The maximum number of bytes one read_bytes()/write_bytes() call
         can handle.
-        Set to 0, arrays of any size are allowed.
+        Set to 0, reads and writes of any size are allowed.
 
       --max-file <size>
         The maximum number of bytes one read_file()/write_file() call
         can handle.
-        Set to 0, arrays of any size are allowed.
+        Set to 0, reads and writes of any size are allowed.
 
       --max-thread-pending <size>\n"
         The maximum number of bytes to be kept pending by the socket write
