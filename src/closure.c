@@ -5486,13 +5486,14 @@ closure_location (lambda_t *l)
             sprintf(buf, "%d", lineno);
 
             rc = mstr_append(STR_FROM, name);
+            free_mstring(name);
             if (!rc) break;
 
             rc = mstr_append(rc, STR_LINE);
             if (!rc) break;
             free_mstring(rc);
 
-            rc = mstr_append_txt(rc, buf,  strlen(buf));
+            rc = mstr_append_txt(rc, buf, strlen(buf));
             if (!rc) break;
             free_mstring(rc);
 

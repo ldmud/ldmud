@@ -867,7 +867,8 @@ clear_program_ref (program_t *p, Bool clear_ref)
     if (clear_ref)
     {
         p->ref = 0;
-        clear_string_ref(p->name);
+        if (p->name)
+            clear_string_ref(p->name);
     }
 
     /* Variables */
@@ -1922,7 +1923,7 @@ garbage_collection(void)
         if (ob->load_name)
             clear_string_ref(ob->load_name);
         ob->prog->ref = 0;
-        clear_program_ref(ob->prog, MY_FALSE);
+        clear_program_ref(ob->prog, MY_TRUE);
         ob->ref = 0;
     }
 
