@@ -309,7 +309,7 @@ ac_includes_default="\
 # include <unistd.h>
 #endif"
 
-ac_subst_vars='SHELL PATH_SEPARATOR PACKAGE_NAME PACKAGE_TARNAME PACKAGE_VERSION PACKAGE_STRING PACKAGE_BUGREPORT exec_prefix prefix program_transform_name bindir sbindir libexecdir datadir sysconfdir sharedstatedir localstatedir libdir includedir oldincludedir infodir mandir build_alias host_alias target_alias DEFS ECHO_C ECHO_N ECHO_T LIBS CC CFLAGS LDFLAGS CPPFLAGS ac_ct_CC EXEEXT OBJEXT INSTALL_PROGRAM INSTALL_SCRIPT INSTALL_DATA YACC CPP EGREP ALLOCA val_optimize WCFLAGS OCFLAGS LCFLAGS MCFLAGS DCFLAGS EXTRA_CFLAGS OPTIMIZE_LINKING MOVE_YACC_TAB CLEAN_YACC_TAB YACCTAB CONFIG_SHELL cdef_erq_demon cdef_access_control cdef_access_log cdef_compat_mode cdef_strict_euids cdef_filename_spaces cdef_share_variables cdef_use_system_crypt cdef_use_ipv6 cdef_use_mysql cdef_use_pgsql cdef_use_pthreads cdef_use_alists cdef_use_mccp cdef_use_pcre cdef_use_builtin_pcre cdef_use_deprecated cdef_use_structs cdef_use_tls cdef_use_new_inlines cdef_use_set_light cdef_use_set_is_wizard cdef_use_parse_command cdef_use_process_string cdef_lpc_array_calls cdef_comm_stat cdef_trace_code cdef_apply_cache_stat cdef_malloc_sbrk cdef_malloc_check cdef_malloc_trace cdef_malloc_lpc_trace cdef_malloc_sbrk_trace cdef_dynamic_costs cdef_rxcache_table cdef_wizlist_file cdef_opcprof cdef_verbose_opcprof cdef_debug cdef_yydebug cdef_no_inlines cdef_debug_telnet cdef_debug_malloc_allocs cdef_check_object_stat cdef_check_mapping_total cdef_check_object_ref cdef_check_object_gc_ref cdef_dump_gc_refs val_access_file val_access_log val_erq_max_reply val_erq_max_send val_erq_debug val_pthreads_write_max_size val_read_file_max_size val_time_to_clean_up val_time_to_swap val_time_to_swap_variables val_time_to_reset val_evaluator_stack_size val_max_user_trace val_max_trace val_compiler_stack_size val_max_bits val_portno val_maxnumports val_max_cost val_max_local val_catch_reserved_cost val_master_reserved_cost val_swap_file val_max_array_size val_max_mapping_keys val_max_mapping_size val_max_callouts val_max_players val_allowed_ed_cmds val_reserved_user_size val_reserved_master_size val_reserved_system_size val_htable_size val_itable_size val_otable_size val_defmax val_apply_cache_bits val_rxcache_table val_master_name val_input_escape val_max_byte_transfer val_udp_port val_set_buffer_size_max val_malloc val_min_malloced val_min_small_malloced val_max_malloced val_total_trace_length val_wizlist_file erq_sub PKGLIBS ERQ_LIBS LIBOBJS LTLIBOBJS'
+ac_subst_vars='SHELL PATH_SEPARATOR PACKAGE_NAME PACKAGE_TARNAME PACKAGE_VERSION PACKAGE_STRING PACKAGE_BUGREPORT exec_prefix prefix program_transform_name bindir sbindir libexecdir datadir sysconfdir sharedstatedir localstatedir libdir includedir oldincludedir infodir mandir build_alias host_alias target_alias DEFS ECHO_C ECHO_N ECHO_T LIBS CC CFLAGS LDFLAGS CPPFLAGS ac_ct_CC EXEEXT OBJEXT INSTALL_PROGRAM INSTALL_SCRIPT INSTALL_DATA YACC CPP EGREP ALLOCA val_optimize WCFLAGS OCFLAGS LCFLAGS MCFLAGS DCFLAGS EXTRA_CFLAGS OPTIMIZE_LINKING MOVE_YACC_TAB CLEAN_YACC_TAB YACCTAB CONFIG_SHELL cdef_erq_demon cdef_access_control cdef_access_log cdef_compat_mode cdef_strict_euids cdef_filename_spaces cdef_share_variables cdef_use_system_crypt cdef_use_ipv6 cdef_use_mysql cdef_use_pgsql cdef_use_pthreads cdef_use_alists cdef_use_mccp cdef_use_pcre cdef_use_builtin_pcre cdef_use_deprecated cdef_use_structs cdef_use_tls cdef_use_new_inlines cdef_use_set_light cdef_use_set_is_wizard cdef_use_parse_command cdef_use_process_string cdef_lpc_array_calls cdef_comm_stat cdef_trace_code cdef_apply_cache_stat cdef_malloc_sbrk cdef_malloc_check cdef_malloc_trace cdef_malloc_lpc_trace cdef_malloc_sbrk_trace cdef_dynamic_costs cdef_rxcache_table cdef_wizlist_file cdef_synchronous_heart_beat cdef_opcprof cdef_verbose_opcprof cdef_debug cdef_yydebug cdef_no_inlines cdef_debug_telnet cdef_debug_malloc_allocs cdef_check_object_stat cdef_check_mapping_total cdef_check_object_ref cdef_check_object_gc_ref cdef_dump_gc_refs val_access_file val_access_log val_erq_max_reply val_erq_max_send val_erq_debug val_pthreads_write_max_size val_read_file_max_size val_time_to_clean_up val_time_to_swap val_time_to_swap_variables val_time_to_reset val_alarm_time val_heart_beat_interval val_evaluator_stack_size val_max_user_trace val_max_trace val_compiler_stack_size val_max_bits val_portno val_maxnumports val_max_cost val_max_local val_catch_reserved_cost val_master_reserved_cost val_swap_file val_max_array_size val_max_mapping_keys val_max_mapping_size val_max_callouts val_max_players val_allowed_ed_cmds val_reserved_user_size val_reserved_master_size val_reserved_system_size val_htable_size val_itable_size val_otable_size val_defmax val_apply_cache_bits val_rxcache_table val_master_name val_input_escape val_max_byte_transfer val_udp_port val_set_buffer_size_max val_malloc val_min_malloced val_min_small_malloced val_max_malloced val_total_trace_length val_wizlist_file erq_sub PKGLIBS ERQ_LIBS LIBOBJS LTLIBOBJS'
 ac_subst_files=''
 
 # Initialize some variables set by options.
@@ -901,6 +901,8 @@ Optional Features:
   --enable-trace-code                 default=enabled
         trace the most recently executed bytecode
   --enable-rxcache_table              default=enabled
+  --enable-synchronous-heart-beat     default=enabled
+        Do all heart beats at once.
   --enable-opcprof                    default=disabled
         create VM instruction usage statistics
   --enable-verbose-opcprof            default=disabled
@@ -951,6 +953,8 @@ Optional Packages:
   --with-time-to-swap=SECONDS         default=900
   --with-time-to-swap-variables=SECONDS  default=1800
   --with-time-to-reset=SECONDS        default=1800
+  --with-alarm-time=SECONDS           default=2
+  --with-heart-beat-interval=SECONDS  default=2
   --with-evaluator-stack-size=VALUE   default=2000
   --with-max-user-trace=VALUE         default=60
   --with-max-trace=VALUE              default=65
@@ -1673,6 +1677,13 @@ if test "${enable_rxcache_table+set}" = set; then
 
 fi;
 
+DEFAULTenable_synchronous_heart_beat=yes
+# Check whether --enable-synchronous-heart-beat or --disable-synchronous-heart-beat was given.
+if test "${enable_synchronous_heart_beat+set}" = set; then
+  enableval="$enable_synchronous_heart_beat"
+
+fi;
+
 
 DEFAULTenable_opcprof=no
 # Check whether --enable-opcprof or --disable-opcprof was given.
@@ -1873,6 +1884,22 @@ DEFAULTwith_time_to_reset=1800
 # Check whether --with-time-to-reset or --without-time-to-reset was given.
 if test "${with_time_to_reset+set}" = set; then
   withval="$with_time_to_reset"
+
+fi;
+
+DEFAULTwith_alarm_time=2
+
+# Check whether --with-alarm-time or --without-alarm-time was given.
+if test "${with_alarm_time+set}" = set; then
+  withval="$with_alarm_time"
+
+fi;
+
+DEFAULTwith_heart_beat_interval=2
+
+# Check whether --with-heart-beat-interval or --without-heart-beat-interval was given.
+if test "${with_heart_beat_interval+set}" = set; then
+  withval="$with_heart_beat_interval"
 
 fi;
 
@@ -2599,6 +2626,16 @@ else
   cdef_rxcache_table="#undef"
 fi
 
+if test "x$enable_synchronous_heart_beat" = "x" && test "x$DEFAULTenable_synchronous_heart_beat" != "x"; then
+  enable_synchronous_heart_beat=$DEFAULTenable_synchronous_heart_beat
+fi
+
+if test "x$enable_synchronous_heart_beat" = "xyes"; then
+  cdef_synchronous_heart_beat="#define"
+else
+  cdef_synchronous_heart_beat="#undef"
+fi
+
 
 if test "x$enable_opcprof" = "x" && test "x$DEFAULTenable_opcprof" != "x"; then
   enable_opcprof=$DEFAULTenable_opcprof
@@ -2894,6 +2931,26 @@ if test "x$with_time_to_reset" = "x" && test "x$DEFAULTwith_time_to_reset" != "x
 fi
 
 val_time_to_reset=$with_time_to_reset
+
+if test "x$with_alarm_time" != "x"; then
+  with_alarm_time=`echo $with_alarm_time|
+             sed -e 's/^\(-\?\(0x[0-9a-fA-F]\+\)\?[0-9]*\)[^0-9]\?.*$/\1/'`
+fi
+if test "x$with_alarm_time" = "x" && test "x$DEFAULTwith_alarm_time" != "x"; then
+  with_alarm_time=$DEFAULTwith_alarm_time
+fi
+
+val_alarm_time=$with_alarm_time
+
+if test "x$with_heart_beat_interval" != "x"; then
+  with_heart_beat_interval=`echo $with_heart_beat_interval|
+             sed -e 's/^\(-\?\(0x[0-9a-fA-F]\+\)\?[0-9]*\)[^0-9]\?.*$/\1/'`
+fi
+if test "x$with_heart_beat_interval" = "x" && test "x$DEFAULTwith_heart_beat_interval" != "x"; then
+  with_heart_beat_interval=$DEFAULTwith_heart_beat_interval
+fi
+
+val_heart_beat_interval=$with_heart_beat_interval
 
 if test "x$with_evaluator_stack_size" != "x"; then
   with_evaluator_stack_size=`echo $with_evaluator_stack_size|
@@ -14092,6 +14149,9 @@ fi
 
 
 
+
+
+
                                                             ac_config_files="$ac_config_files Makefile config.h util/Makefile util/indent/Makefile util/xerq/Makefile util/erq/Makefile"
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -14770,6 +14830,7 @@ s,@cdef_malloc_sbrk_trace@,$cdef_malloc_sbrk_trace,;t t
 s,@cdef_dynamic_costs@,$cdef_dynamic_costs,;t t
 s,@cdef_rxcache_table@,$cdef_rxcache_table,;t t
 s,@cdef_wizlist_file@,$cdef_wizlist_file,;t t
+s,@cdef_synchronous_heart_beat@,$cdef_synchronous_heart_beat,;t t
 s,@cdef_opcprof@,$cdef_opcprof,;t t
 s,@cdef_verbose_opcprof@,$cdef_verbose_opcprof,;t t
 s,@cdef_debug@,$cdef_debug,;t t
@@ -14793,6 +14854,8 @@ s,@val_time_to_clean_up@,$val_time_to_clean_up,;t t
 s,@val_time_to_swap@,$val_time_to_swap,;t t
 s,@val_time_to_swap_variables@,$val_time_to_swap_variables,;t t
 s,@val_time_to_reset@,$val_time_to_reset,;t t
+s,@val_alarm_time@,$val_alarm_time,;t t
+s,@val_heart_beat_interval@,$val_heart_beat_interval,;t t
 s,@val_evaluator_stack_size@,$val_evaluator_stack_size,;t t
 s,@val_max_user_trace@,$val_max_user_trace,;t t
 s,@val_max_trace@,$val_max_trace,;t t

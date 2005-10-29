@@ -200,7 +200,7 @@ call_heart_beat (void)
         /* Check the time of the last heartbeat to see, if we
          * processed all objects.
          */
-        if (current_time == this->tlast)
+        if (current_time < this->tlast + heart_beat_interval)
             break;
 
         this->tlast = current_time;
@@ -330,30 +330,29 @@ set_heart_beat (object_t *ob, Bool to)
         /* Get a new node */
         new = xalloc(sizeof(*new));
 
-        new->tlast = 0;
+        new->tlast = current_time;
         new->obj = ob;
 
         /* Insert the new node at the proper place in the list */
-        if (!hb_list || ob < hb_list->obj)
+        if (!hb_list || !next_hb || !next_hb->prev)
         {
             new->next = hb_list;
             new->prev = NULL;
             if (hb_list)
                 hb_list->prev = new;
             hb_list = new;
+	    
+	    /* Handle all the other objects first. */
+	    if(!next_hb)
+		next_hb = new->next;
         }
         else
         {
-            struct hb_info *prev = hb_list;
-
-            while (prev->next && ob > prev->next->obj)
-                prev = prev->next;
-
-            new->next= prev->next;
-            new->prev = prev;
-            prev->next = new;
-            if (new->next)
-                new->next->prev = new;
+	    /* Insert it just before next_hb, so this is the last object. */
+            new->next = next_hb;
+            new->prev = next_hb->prev;
+            next_hb->prev->next = new;
+	    next_hb->prev = new;
         }
 
         num_hb_objs++;

@@ -814,6 +814,12 @@ init_lexer(void)
     add_permanent_define("__RESET_TIME__", -1, string_copy(mtext), MY_FALSE);
     sprintf(mtext, "%ld", (long)time_to_cleanup);
     add_permanent_define("__CLEANUP_TIME__", -1, string_copy(mtext), MY_FALSE);
+    sprintf(mtext, "%ld", (long)alarm_time);
+    add_permanent_define("__ALARM_TIME__", -1, string_copy(mtext), MY_FALSE);
+    sprintf(mtext, "%ld", (long)heart_beat_interval);
+    add_permanent_define("__HEART_BEAT_INTERVAL__", -1, string_copy(mtext), MY_FALSE);
+    if (synch_heart_beats)
+        add_permanent_define("__SYNCHRONOUS_HEART_BEAT__", -1, string_copy("1"), MY_FALSE);
 #ifdef MSDOS_FS
     add_permanent_define("__MSDOS_FS__", -1, string_copy("1"), MY_FALSE);
 #endif

@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-20-Feb-2005 (Lars Duening) -- Development Release 3.3
+13-Mar-2005 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -169,6 +169,15 @@ For a detailed list of all changes see the file CHANGELOG.
        + Both the traditional and PCRE regular expressions can be used
            at runtime, with the selection being made by extra option
            flags.
+       + The basic timing granularity and the heartbeat interval time
+           can be configured at compile time and with the commandline options
+           "--alarm-time" and "--heart-interval". The values are available in
+           LPC with the macros __ALARM_TIME__ and __HEART_BEAT_INTERVAL__.
+       + Heartbeats can be executed synchronously (all at the same time as far
+           as granularity allows, regardless of when inside one hb interval
+           they have executed last). The commandline options are
+           "--sync-heart" and "--async-heart"; if enabled, the macro
+           __SYNCHRONOUS_HEART_BEAT__ is defined.
 
     - Other Changes:
        + The input escape character can be configured at compile time to

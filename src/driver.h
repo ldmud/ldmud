@@ -97,6 +97,22 @@
 #  undef CHECK_STRINGS
 #endif
 
+/* The ALARM and HEART_BEAT time need to be at least 1. */
+
+#if !defined(ALARM_TIME)
+#define ALARM_TIME 1
+#elif ALARM_TIME < 1
+#undef ALARM_TIME
+#define ALARM_TIME 1
+#endif
+
+#if !defined(HEART_BEAT_INTERVAL)
+#define HEART_BEAT_INTERVAL 1
+#elif HEART_BEAT_INTERVAL < 1
+#undef HEART_BEAT_INTERVAL
+#define HEART_BEAT_INTERVAL 1
+#endif
+
 /* Define some macros needed in the headers included from ../mudlib/sys */
 
 #ifdef USE_IPV6

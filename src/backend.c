@@ -77,13 +77,13 @@
 
 /*-------------------------------------------------------------------------*/
 
-#define ALARM_TIME  2  /* The granularity of alarm() calls */
-
-/*-------------------------------------------------------------------------*/
-
 mp_int current_time;
   /* The current time, updated every heart beat.
    * TODO: Should be time_t if it is given that time_t is always a skalar.
+   */
+
+mp_int time_of_last_hb = 0;
+  /* For synchronous heart beats: the time of the last beat.
    */
 
 Bool time_to_call_heart_beat;
@@ -387,7 +387,7 @@ backend (void)
         current_time = get_current_time();
         comm_time_to_call_heart_beat = MY_FALSE;
         time_to_call_heart_beat = MY_FALSE;
-        alarm(ALARM_TIME);
+        alarm(alarm_time);
     }
 
     printf("%s LDMud ready for users.\n", time_stamp());
@@ -639,11 +639,17 @@ backend (void)
             /* Start the next alarm */
             comm_time_to_call_heart_beat = MY_FALSE;
             time_to_call_heart_beat = MY_FALSE;
-            alarm(ALARM_TIME);
+            alarm(alarm_time);
 
             /* Do the timed events */
-            do_state_check(2, "before heartbeat");
-            call_heart_beat();
+	    if (!synch_heart_beats
+             || time_of_last_hb + heart_beat_interval >= current_time)
+	    {
+                do_state_check(2, "before heartbeat");
+                call_heart_beat();
+                time_of_last_hb = current_time;
+            }
+
             do_state_check(2, "after heartbeat");
             call_out();
             do_state_check(2, "after call_out");
@@ -738,7 +744,7 @@ void check_alarm (void)
         comm_time_to_call_heart_beat = MY_TRUE;
         time_to_call_heart_beat = MY_TRUE;
         (void)signal(SIGALRM, (RETSIGTYPE(*)(int))catch_alarm);
-        alarm(ALARM_TIME);
+        alarm(alarm_time);
 
         last_alarm_time = curtime; /* Since we just restarted it */
     }

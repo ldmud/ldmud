@@ -139,6 +139,21 @@ with_max_malloced=0x4000000
 with_min_malloced=0
 with_min_small_malloced=0
 
+# The granularity of the timing in seconds. No two timed events can
+# happen faster after each other than this time.
+with_alarm_time=2
+
+# The time to elapse between two heartbeats. If this time is not an
+# even multiple of ALARM_TIME, the next even multiple will be used.
+with_heart_beat_interval=2
+
+# If synchronous heartbeats are enabled, all heartbeats happen at
+# the same time, regardless of when within one ALARM_TIME granule
+# they have been started.
+# If this is disabled, heartbeats are executed as soon as possible (for
+# example some objects would beat on even seconds, others on odd).
+enable_synchronous_heart_beat=yes
+
 # --- Interpreter ---
 
 # If strict-euids is enabled, the driver enforces the (correct) use

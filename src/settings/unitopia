@@ -21,6 +21,9 @@ with_time_to_clean_up=5400
 with_time_to_swap=1800
 with_time_to_swap_variables=3600
 with_time_to_reset=2400
+with_alarm_time=1
+with_heart_beat_interval=2
+enable_synchronous_heart_beat=no
 
 # --- Memory ---
 with_reserved_user_size=0x400000

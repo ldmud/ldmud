@@ -91,6 +91,20 @@
  */
 #define TIME_TO_RESET             @val_time_to_reset@
 
+/* The granularity of alarm() calls.
+ * This is the granularity of the call_outs,
+ * and base granularity of heart_beat, reset und clean_up calls.
+ */
+#define ALARM_TIME                @val_alarm_time@
+
+/* The interval between heart beats.
+ */
+#define HEART_BEAT_INTERVAL       @val_heart_beat_interval@
+
+/* Shall all heart beats happen in the same time frame?
+ * (i.e. only every HEART_BEAT_INTERVAL seconds.)
+ */
+@cdef_synchronous_heart_beat@ SYNCHRONOUS_HEART_BEAT
 
 /* --- Memory --- */
 

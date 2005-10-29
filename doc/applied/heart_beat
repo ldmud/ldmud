@@ -2,7 +2,8 @@ SYNOPSIS
         void heart_beat()
 
 DESCRIPTION
-        This function will be called automatically every 2 seconds.
+        This function will be called automatically every
+        __HEART_BEAT_INTERVAL__ seconds.
         The start and stop of heart beat is controlled by the efun
         set_heart_beat(). Be careful not to have objects with heart
         beat running all the time, as it uses a lot of driver
@@ -35,6 +36,9 @@ EXAMPLE
         We have to use tell_object() because write goes to the current
         user and this can only be the object itself or nobody.
 
+HISTORY
+        LDMud 3.3.687 made the interval time configurable at driver compile
+        time (used to be 2 seconds fixed).
 SEE ALSO
         set_heart_beat(E), call_out(E), enable_commands(E),
         heart_beat_error(M)

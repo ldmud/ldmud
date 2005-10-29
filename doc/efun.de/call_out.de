@@ -6,7 +6,8 @@ BESCHREIBUNG
         Ruft zeitverzoegert die Funktion <fun> im aktuellen Objekt oder
         die Closure <cl> auf. Der Aufruf erfolgt in <delay> Sekunden.
         Die Funktion / Closure wird mit den <arg> Argumenten aufgerufen.
-        <delay> kann groesser oder gleich 0 sein.
+        <delay> kann groesser oder gleich 0 sein, und wird intern auf das
+        naechste Vielfache von __ALARM_TIME__ aufgerundet.
 
         call_out() merkt sich den aktuellen User und ruft die Funktion
         entsprechend auf. call_out() kann nur Funktionen aufrufen, die

@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+13-Mar-2005 (Lars Duening)  (3.3.687)
+  - (main, backend.c, heartbeat.c) The ALARM_TIME and HEART_BEAT_INTERVAL
+        time are now configurable at compile and start time (based on
+        a patch by Gnomi).
+
 12-Mar-2005 (Lars Duening)  (3.3.686)
   - (func_spec, object.c) The efun tell_object() can now take an array,
         mapping, struct or object as second argument, calling catch_msg() in

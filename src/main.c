@@ -127,6 +127,16 @@ long time_to_swap           = TIME_TO_SWAP;
 long time_to_swap_variables = TIME_TO_SWAP_VARIABLES;
   /* A value <= 0 disables the swapping. */
 
+long alarm_time             = ALARM_TIME;
+long heart_beat_interval    = HEART_BEAT_INTERVAL;
+  /* Minimum value is 1. */
+
+#ifdef SYNCHRONOUS_HEART_BEAT
+Bool synch_heart_beats      = MY_TRUE;
+#else
+Bool synch_heart_beats      = MY_FALSE;
+#endif
+
 int port_numbers[MAXNUMPORTS] = { PORTNO };
   /* The login port numbers.
    * Negative numbers are not ports, but the numbers of inherited
@@ -329,8 +339,7 @@ main (int argc, char **argv)
         }
 #endif
 
-        /* First scan of the arguments.
-         * This evaluates everything but the 'f' arguments.
+        /* Scan of the arguments.
          */
         if (getargs(argc, argv, eval_arg))
         {
@@ -994,6 +1003,7 @@ typedef enum OptNumber {
  , cInherited       /* --inherit            */
  , cUdpPort         /* --udp                */
  , cTrace           /* --list-compiles      */
+ , cAlarmTime       /* --alarm-time       */
  , cCleanupTime     /* --cleanup-time       */
  , cCompat          /* --compat             */
  , cNoCompat        /* --no-compat          */
@@ -1007,6 +1017,7 @@ typedef enum OptNumber {
  , cMaster          /* --master             */
  , cMudlib          /* --mudlib             */
  , cDebugFile       /* --debug-file         */
+ , cHBInterval      /* --heart-interval     */
  , cHostname        /* --hostname           */
  , cHostaddr        /* --hostaddr           */
  , cMaxMalloc       /* --max-malloc         */
@@ -1039,6 +1050,8 @@ typedef enum OptNumber {
  , cSwapVars        /* --swap-variables     */
  , cSwapFile        /* --swap-file          */
  , cSwapCompact     /* --swap-compact       */
+ , cSyncHB          /* --sync-heart         */
+ , cASyncHB         /* --async-heart        */
  , cWizlistFile     /* --wizlist-file       */
  , cNoWizlistFile   /* --no-wizlist-file    */
 #ifdef GC_SUPPORT
@@ -1186,6 +1199,30 @@ static Option aOptions[]
       , "  -N|--no-erq\n"
       , "  -N|--no-erq\n"
         "    Don't start the erq demon (if it would be started at all).\n"
+      }
+
+    , { 0,   "alarm-time",         cAlarmTime,    MY_TRUE
+      , "  --alarm-time <time>\n"
+      , "  --alarm-time <time>\n"
+        "    The granularity of call_out()s and heartbeats (minimum: 1).\n"
+      }
+
+    , { 0,   "heart-interval",     cHBInterval,   MY_TRUE
+      , "  --heart-interval <time>\n"
+      , "  --heart-interval <time>\n"
+        "    The time to elapse between two heartbeats (minimum: 1).\n"
+      }
+
+    , { 0,   "sync-heart",         cSyncHB,       MY_FALSE
+      , "  --sync-heart\n"
+      , "  --sync-heart\n"
+        "    All heartbeats are executed at the same time (modulo granularity).\n"
+      }
+
+    , { 0,   "async-heart",        cASyncHB,       MY_FALSE
+      , "  --async-heart\n"
+      , "  --async-heart\n"
+        "    Heartbeats are executed immediately when they are due (modulo granularity).\n"
       }
 
     , { 't', "no-heart",           cNoHeart,        MY_FALSE
@@ -1799,7 +1836,15 @@ options (void)
 
   printf("         Timing: reset:                  %7d s\n"
          "                 clean up:               %7d s\n"
+         "                 alarm interval:         %7d s\n"
+         "                 heartbeat interval:     %7d s %s\n"
         , TIME_TO_RESET, TIME_TO_CLEAN_UP
+        , ALARM_TIME, HEART_BEAT_INTERVAL
+#ifdef SYNCHRONOUS_HEART_BEAT
+        , "(synchronous)"
+#else
+        , ""
+#endif
         );
 
   printf("       Swapping: objects              ");
@@ -2205,6 +2250,40 @@ eval_arg (int eOption, const char * pValue)
 
     case cTrace:
         comp_flag = MY_TRUE;
+        break;
+
+    case cAlarmTime:
+      {
+        long t = atoi(pValue);
+
+        if (t >= 1)
+        {
+            alarm_time = t;
+        }
+        else
+            fprintf(stderr, "Illegal alarm-time '%s' ignored.\n", pValue);
+        break;
+      }
+
+    case cHBInterval:
+      {
+        long t = atoi(pValue);
+
+        if (t >= 1)
+        {
+            heart_beat_interval = t;
+        }
+        else
+            fprintf(stderr, "Illegal heart-interval '%s' ignored.\n", pValue);
+        break;
+      }
+
+    case cSyncHB:
+        synch_heart_beats = MY_TRUE;
+        break;
+
+    case cASyncHB:
+        synch_heart_beats = MY_FALSE;
         break;
 
     case cNoHeart:

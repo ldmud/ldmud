@@ -105,6 +105,19 @@ DESCRIPTION
       -N|--no-erq
         Don't start the erq demon (if it would be started at all).
 
+      --alarm-time <seconds>
+        Set the granularity of call_out() and heartbeat timing. Minimum
+        value is 1.
+
+      --heart-interval <seconds>
+        Set the interval between two heartbeats. Minimum value is 1.
+
+      --sync-heart
+        All heartbeats occur at the same time (modulo granularity).
+      
+      --async-heart
+        Heartbeats occur when they are due (modulo granularity).
+
       -t|--no-heart
         Disable heartbeats and call_outs.
 
