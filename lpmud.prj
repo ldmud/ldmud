@@ -54,18 +54,16 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 652)
-(Parent-Version lpmud 3-3 651)
+(Project-Version lpmud 3-3 653)
+(Parent-Version lpmud 3-3 652)
 (Version-Log "
-  - (mapping.c) Indexing a 0-width mapping returned pointers to memory outside
-       the mapping, causing weird crashes. The solution is to return pointers
-       to the global const1 (when found), or to a local svalue-0 instance
-       (when not found and a lvalue is requested) (Bug #0000341).
+  - (util/xerq/erq.c) The erq didn't check if the calculated timeout
+       for the next select() had become negative. (Bug #0000342).
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Wed, 12 Jan 2005 22:05:59 -0700")
+(Checkin-Time "Thu, 13 Jan 2005 22:52:05 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -103,7 +101,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.12 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.85 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.715 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.716 644))
   (HISTORY (lpmud/f/49_HISTORY 1.385.1.10 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.21 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -201,7 +199,7 @@
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.19 644))
   (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.68 644))
   (src/mapping.h (lpmud/f/30_mapping.h 1.12.1.20 644))
-  (src/mapping.c (lpmud/b/6_mapping.c 1.36.1.83 644))
+  (src/mapping.c (lpmud/b/6_mapping.c 1.36.1.84 644))
   (src/md5.h (lpmud/l/18_md5.h 1.3 644))
   (src/md5.c (lpmud/l/19_md5.c 1.7 644))
   (src/mempools.h (lpmud/d/48_mempools.h 1.2.1.8 644))
@@ -463,7 +461,7 @@
   (src/util/xerq/lookup.c (lpmud/k/33_lookup.c 1.4.1.1.1.4 644))
   (src/util/xerq/execute.c (lpmud/k/34_execute.c 1.5.1.1.1.7 644))
   (src/util/xerq/erq.h (lpmud/k/35_erq.h 1.3.1.2 644))
-  (src/util/xerq/erq.c (lpmud/k/36_erq.c 1.8.1.12.1.7 644))
+  (src/util/xerq/erq.c (lpmud/k/36_erq.c 1.8.1.12.1.8 644))
   (src/util/xerq/docs/socketd/socket_write (lpmud/k/38_socket_wri 1.1 644))
   (src/util/xerq/docs/socketd/socket_udp (lpmud/k/39_socket_udp 1.1 644))
   (src/util/xerq/docs/socketd/socket_transfer (lpmud/k/40_socket_tra 1.1 644))

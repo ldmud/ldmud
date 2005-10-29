@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+13-Jan-2004 (Lars Duening)  (3.3.653)
+  - (util/xerq/erq.c) The erq didn't check if the calculated timeout
+       for the next select() had become negative. (Bug #0000342).
+
 12-Jan-2004 (Lars Duening)  (3.3.652)
   - (mapping.c) Indexing a 0-width mapping returned pointers to memory outside
        the mapping, causing weird crashes. The solution is to return pointers

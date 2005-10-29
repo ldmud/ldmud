@@ -910,7 +910,11 @@ _get_map_lvalue (mapping_t *m, svalue_t *map_index
     mapping_hash_t * hm;
     svalue_t       * entry;
     mp_int           idx;
+
 static svalue_t local_const0;
+  /* Local svalue-0 instance to be returned if a lvalue
+   * for a 0-width was requested.
+   */
 
     entry = find_map_entry(m, map_index, (p_int *)&idx, &mc);
 

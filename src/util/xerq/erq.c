@@ -321,6 +321,9 @@ main(int argc, char *argv[])
             timeout.tv_usec = 0;
             XPRINTF((stderr, "%s Soonest retry_t: in %ld seconds.\n"
                            , time_stamp(), (long)timeout.tv_sec));
+			   
+            if (timeout.tv_sec < 0)
+                timeout.tv_sec = 0;
         }
 
 #if ERQ_DEBUG > 1
@@ -338,19 +341,22 @@ main(int argc, char *argv[])
             errno = myerrno;
         }
 #endif
-        if (num < 0)
-        {
+
 #if ERQ_DEBUG > 0
+        if (num < 0)
+	/* Give an error now, but don't abort this loop,
+	 * because the retries have to be handled first.
+	 */
+        {
             int myerrno = errno;
             fprintf(stderr, "%s select() errno = %d", time_stamp(), errno);
             errno = myerrno;
             perror(" ");
-#endif
-            continue;
         }
-
+#endif
+	
         /* Is stdout ready to write? Then flush the queue. */
-        if (FD_ISSET(1, &write_fds))
+        if (num >= 0 && FD_ISSET(1, &write_fds))
         {
             XPRINTF((stderr, "%s stdout_queue ready for flush.\n", time_stamp()));
             flush_queue(&stdout_queue, 1, 0);
@@ -373,6 +379,10 @@ main(int argc, char *argv[])
                 rtpp = &rtp->next;
             }
         }
+	
+        /* Error in select */
+        if (num < 0)
+            continue;
 
         /* check for input from driver */
         if (FD_ISSET(0, &read_fds))
