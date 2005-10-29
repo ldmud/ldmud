@@ -7196,7 +7196,6 @@ restore_mapping (svalue_t *svp, char **str)
     if (max_mapping_size && siz * (1+tmp_par.num_values) > (p_int)max_mapping_size)
     {
         *svp = const0;
-        free_shared_restored_values();
         error("Illegal mapping size: %ld elements (%ld x %ld).\n"
              , (long int)siz * (1+tmp_par.num_values)
              , (long int)siz
@@ -7210,7 +7209,6 @@ restore_mapping (svalue_t *svp, char **str)
     if (!z)
     {
         *svp = const0;
-        free_shared_restored_values();
         error("(restore) Out of memory: mapping[%u, %u]\n"
              , siz, tmp_par.num_values);
         return MY_FALSE;
@@ -7438,7 +7436,6 @@ restore_array (svalue_t *svp, char **str)
     if (max_array_size && siz > (p_int)max_array_size)
     {
         *svp = const0;
-        free_shared_restored_values();
         error("Illegal array size: %ld.\n", (long int)siz);
         return MY_FALSE;
     }
@@ -8018,7 +8015,6 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
         if (!svp->u.str)
         {
             *svp = const0;
-            free_shared_restored_values();
             error("(restore) Out of memory (%lu bytes) for string.\n"
                  , (unsigned long) strlen(start));
         }
@@ -8157,7 +8153,6 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
                 if (!new)
                 {
                     current_shared_restored--;
-                    free_shared_restored_values();
                     *svp = const0;
                     error("(restore) Out of memory (%lu bytes) for "
                           "%lu shared values.\n"
@@ -8243,7 +8238,6 @@ old_restore_string (svalue_t *v, char *str)
             if (!v->u.str)
             {
                 *v = const0;
-                free_shared_restored_values();
                 error("(restore) Out of memory (%lu bytes) for string\n"
                      , (unsigned long) strlen(str));
             }
@@ -8253,6 +8247,57 @@ old_restore_string (svalue_t *v, char *str)
     *v = const0;
     return MY_FALSE;
 } /* old_restore_string() */
+
+/*-------------------------------------------------------------------------*/
+/* Cleanup structure for restore_object().
+ */
+
+struct discarded {
+    svalue_t v;
+    struct discarded *next;
+};
+
+typedef struct restore_cleanup_s {
+    svalue_t head;        /* The T_ERROR_HANDLER structure */
+    int      * pNesting;  /* The nesting counter */
+    char     * buff;      /* The optional allocated line buffer. */
+    FILE     * f;         /* The optional input file */
+    struct discarded * dp; 
+      /* List of values for which the variables no longer exist. */
+} restore_cleanup_t;
+
+
+static void
+restore_object_cleanup ( svalue_t * arg)
+
+/* The error handler during restore_object cleanup: free all resources
+ * and update the nesting.
+ */
+
+{
+    restore_cleanup_t * data = (restore_cleanup_t *)arg;
+
+    while (data->dp)
+    {
+        struct discarded * next = data->dp->next;
+        free_svalue(&data->dp->v);
+        xfree(data->dp);
+        data->dp = next;
+    }
+
+    if (*data->pNesting > 1)
+        xfree(data->buff);
+    else
+        mb_free(mbFile);
+
+    if (data->f)
+        fclose(data->f);
+
+    (*data->pNesting)--;
+
+    free_shared_restored_values();
+    xfree(arg);
+} /* restore_object_cleanup() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -8305,11 +8350,8 @@ static int nesting = 0;  /* Used to detect recursive calls */
        * the locality of save_object().
        */
 
-    struct discarded {
-        svalue_t v;
-        struct discarded *next;
-    } * dp = NULL;
-      /* List of values for which the variables no longer exist. */
+    restore_cleanup_t * rcp;
+      /* Cleanup structure */
 
 #define FREE_BUFF() MACRO( \
           if (nesting > 1) xfree(buff); else mb_free(mbFile); \
@@ -8471,6 +8513,27 @@ static int nesting = 0;  /* Used to detect recursive calls */
         return sp;
     }
 
+    /* Setup the error cleanup */
+    inter_sp = sp;
+    rcp = xalloc(sizeof(*rcp));
+    if (!rcp)
+    {
+        if (f)
+            fclose(f);
+        FREE_BUFF();
+        nesting--;
+        error("(restore) Out of memory: (%lu bytes) for cleanup structure\n"
+             , (unsigned long)sizeof(*rcp));
+        /* NOTREACHED */
+        return sp;
+    }
+
+    rcp->pNesting = &nesting;
+    rcp->buff = buff;
+    rcp->f = f;
+    rcp->dp = NULL;
+    push_error_handler(restore_object_cleanup, &(rcp->head));
+
     num_var = ob->prog->num_variables;
     var_rest = 0;
     restored_version = -1;
@@ -8532,16 +8595,6 @@ static int nesting = 0;  /* Used to detect recursive calls */
             /* No version line: illegal format.
              * Deallocate what we allocated so far and return.
              */
-            if (f)
-                fclose(f);
-            if (dp)
-                do
-                    free_svalue(&dp->v);
-                while ( NULL != (dp=dp->next) );
-
-            free_shared_restored_values();
-            FREE_BUFF();
-            nesting--;
             if (file)
                 error("Illegal format (version line) when restoring %s "
                       "from %s line %d.\n"
@@ -8613,21 +8666,9 @@ static int nesting = 0;  /* Used to detect recursive calls */
             {
                 struct discarded *tmp;
 
-                tmp = dp;
-                dp = (struct discarded *)alloca(sizeof(struct discarded));
-                if (!dp)
+                tmp = (struct discarded *)xalloc(sizeof(struct discarded));
+                if (!tmp)
                 {
-                    free_shared_restored_values();
-                    FREE_BUFF();
-                    if (f)
-                        fclose(f);
-                    if (tmp)
-                    {
-                        do
-                            free_svalue(&tmp->v);
-                        while (NULL != (tmp = tmp->next));
-                    }
-                    nesting--;
                     if (file)
                         error("Stack overflow when restoring %s "
                               "from %s line %d.\n"
@@ -8639,8 +8680,9 @@ static int nesting = 0;  /* Used to detect recursive calls */
                     return sp;
                 }
 
-                dp->next = tmp;
-                v = &dp->v;
+                tmp->next = rcp->dp;
+                rcp->dp = tmp;
+                v = &tmp->v;
                 v->type = T_NUMBER;
                 break;
             }
@@ -8663,17 +8705,6 @@ static int nesting = 0;  /* Used to detect recursive calls */
 
             /* Whoops, illegal format */
 
-            if (f)
-                fclose(f);
-            if (dp)
-            {
-                do
-                    free_svalue(&dp->v);
-                while ( NULL != (dp=dp->next) );
-            }
-            free_shared_restored_values();
-            FREE_BUFF();
-            nesting--;
             if (file)
                 error("Illegal format (value string) when restoring %s "
                       "from %s line %d.\n"
@@ -8690,30 +8721,31 @@ static int nesting = 0;  /* Used to detect recursive calls */
 
     /* Restore complete - now clean up */
 
-    if (dp)
-    {
-        do
-            free_svalue(&dp->v);
-        while ( NULL != (dp=dp->next) );
-    }
     if (d_flag > 1)
         debug_message("%s Object %s restored from %s.\n"
                      , time_stamp(), get_txt(ob->name)
                      , file ? name : "passed value");
-    if (f)
-        fclose(f);
-    free_shared_restored_values();
-    FREE_BUFF();
 
-    free_svalue(sp);
-    put_number(sp, 1);
-    nesting--;
+    free_svalue(inter_sp--); /* calls the cleanup handler */
+
+    free_svalue(inter_sp);
+    put_number(inter_sp, 1);
     return sp;
 
 #undef FREE_BUFF
 } /* f_restore_object() */
 
 /*-------------------------------------------------------------------------*/
+static void
+restore_value_cleanup ( svalue_t * arg UNUSED)
+
+/* The error handler during restore value cleanup: free all resources.
+ */
+
+{
+    free_shared_restored_values();
+} /* restore_value_cleanup() */
+
 svalue_t *
 f_restore_value (svalue_t *sp)
 
@@ -8727,9 +8759,10 @@ f_restore_value (svalue_t *sp)
  */
 
 {
-    int restored_version; /* Formatversion of the saved data */
-    char *buff;  /* The string to parse */
-    char *p;
+    int        restored_version; /* Formatversion of the saved data */
+    char      *buff;  /* The string to parse */
+    char      *p;
+    svalue_t   rcp; /* T_ERROR_HANDLER value */
 
     /* The restore routines will put \0s into the string, so we
      * need to make a copy of all but malloced strings.
@@ -8794,6 +8827,9 @@ f_restore_value (svalue_t *sp)
     inter_sp = ++sp;
     *sp = const0;
 
+    /* Setup the error cleanup */
+    push_error_handler(restore_value_cleanup, &rcp);
+
     /* Now parse the value in buff[] */
 
     p = buff;
@@ -8804,13 +8840,10 @@ f_restore_value (svalue_t *sp)
     {
         /* Whoops, illegal format */
 
-        free_shared_restored_values();
         error("Illegal format when restoring a value.\n");
         /* NOTREACHED */
         return sp; /* flow control hint */
     }
-
-    free_shared_restored_values();
 
     if (*p != '\0')
     {
@@ -8822,7 +8855,8 @@ f_restore_value (svalue_t *sp)
 
     /* Restore complete - now clean up and return the result */
 
-    inter_sp = --sp;
+    free_svalue(inter_sp--);
+    sp = --inter_sp;
     free_string_svalue(sp);
     *sp = sp[1];
 

@@ -2679,6 +2679,25 @@ push_referenced_mapping (mapping_t *m)
 }
 
 /*-------------------------------------------------------------------------*/
+void
+push_error_handler(void (*errorhandler)(svalue_t *), svalue_t *arg)
+
+/* Push the <errorhandler>() with the argument <arg> as error handler
+ * onto the stack.
+ * This means that a new T_LVALUE is created on the stack, pointing
+ * to <arg>. <arg> itself is setup to be a T_ERROR_HANDLER value.
+ */
+
+{
+    arg->type = T_ERROR_HANDLER;
+    arg->u.error_handler = errorhandler;
+
+    inter_sp++;
+    inter_sp->type = T_LVALUE;
+    inter_sp->u.lvalue = arg;
+} /* push_error_handler() */
+
+/*-------------------------------------------------------------------------*/
 /* Fast version of several functions, must come last so to not disturb
  * the actual definitions:
  */

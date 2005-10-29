@@ -54,16 +54,20 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 657)
-(Parent-Version lpmud 3-3 656)
+(Project-Version lpmud 3-3 658)
+(Parent-Version lpmud 3-3 657)
 (Version-Log "
-  - (array.c) Efun unique_array() no longer leaks memory if aborted
-       by an exception (Bug #0000345).
+  - (interpret, array.c, mapping.c, parse.c, simulate.c, files.c)
+       The new function push_error_handler() simplifies the creation
+       of T_ERROR_HANDLER values.
+  - (object.c) Exceptions during a restore no longer leak values
+       (Bug #0000344).
+  - (smalloc.c) The extended large-free statistics was still off.
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Fri, 14 Jan 2005 22:47:33 -0700")
+(Checkin-Time "Sat, 15 Jan 2005 00:02:33 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -101,7 +105,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.12 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.85 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.720 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.721 644))
   (HISTORY (lpmud/f/49_HISTORY 1.385.1.10 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.21 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -162,7 +166,7 @@
   (src/actions.h (lpmud/d/11_actions.h 1.6.1.7 644))
   (src/actions.c (lpmud/d/12_actions.c 1.15.1.48 644))
   (src/array.h (lpmud/f/47_array.h 1.18.1.22 644))
-  (src/array.c (lpmud/d/12_array.c 1.46.1.47.1.19 644))
+  (src/array.c (lpmud/d/12_array.c 1.46.1.47.1.20 644))
   (src/backend.h (lpmud/f/46_backend.h 1.20.1.7 644))
   (src/backend.c (lpmud/d/6_backend.c 1.68.1.35.1.42 644))
   (src/bitstrings.h (lpmud/i/47_bitstrings 1.3 644))
@@ -183,7 +187,7 @@
   (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.104.1.4 644))
   (src/exec.h (lpmud/c/32_exec.h 1.34.1.33.1.7 644))
   (src/files.h (lpmud/i/49_files.h 1.2 644))
-  (src/files.c (lpmud/i/50_files.c 1.28 644))
+  (src/files.c (lpmud/i/50_files.c 1.29 644))
   (src/filestat.h (lpmud/f/51_filestat.h 1.7 644))
   (src/gcollect.h (lpmud/f/33_gcollect.h 1.6.1.16 644))
   (src/gcollect.c (lpmud/c/30_gcollect.c 1.41.1.116.1.3 644))
@@ -192,14 +196,14 @@
   (src/heartbeat.h (lpmud/m/41_heartbeat. 1.6.1.5 644))
   (src/heartbeat.c (lpmud/m/42_heartbeat. 1.18.1.9 644))
   (src/i-svalue_cmp.h (lpmud/a/b/20_i-svalue_c 1.4 644))
-  (src/interpret.h (lpmud/b/13_interpret. 1.33.1.40 644))
-  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.82 644))
+  (src/interpret.h (lpmud/b/13_interpret. 1.33.1.41 644))
+  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.83 644))
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.15.1.13 644))
   (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.74.1.5 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.19 644))
   (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.68 644))
   (src/mapping.h (lpmud/f/30_mapping.h 1.12.1.20 644))
-  (src/mapping.c (lpmud/b/6_mapping.c 1.36.1.84 644))
+  (src/mapping.c (lpmud/b/6_mapping.c 1.36.1.85 644))
   (src/md5.h (lpmud/l/18_md5.h 1.3 644))
   (src/md5.c (lpmud/l/19_md5.c 1.7 644))
   (src/mempools.h (lpmud/d/48_mempools.h 1.2.1.8 644))
@@ -212,12 +216,12 @@
   (src/my-rusage.h (lpmud/f/28_my-rusage. 1.7 644))
   (src/my-stdint.h (lpmud/u/b/39_my-stdint. 1.2 644))
   (src/object.h (lpmud/44_object.h 1.34.1.19.1.6.1.3 644))
-  (src/object.c (lpmud/45_object.c 1.62.1.88.1.53.1.3 644))
+  (src/object.c (lpmud/45_object.c 1.62.1.88.1.53.1.4 644))
   (src/otable.h (lpmud/f/27_otable.h 1.8.1.4 644))
   (src/otable.c (lpmud/43_otable.c 1.22.1.8 644))
   (src/parser.c (lpmud/l/13_parser.c 1.1 644))
   (src/parse.h (lpmud/f/26_parse.h 1.7.1.2.1.4 644))
-  (src/parse.c (lpmud/42_parse.c 1.26.1.16 644))
+  (src/parse.c (lpmud/42_parse.c 1.26.1.17 644))
   (src/patchlevel.h (lpmud/40_patchlevel 1.22 644))
 
   ;; PCRE
@@ -337,9 +341,9 @@
   (src/simul_efun.h (lpmud/f/17_simul_efun 1.5.1.6 644))
   (src/simul_efun.c (lpmud/32_simul_efun 1.20.1.17.1.7 644))
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.37 644))
-  (src/simulate.c (lpmud/31_simulate.c 1.88.1.135.1.3 644))
+  (src/simulate.c (lpmud/31_simulate.c 1.88.1.135.1.4 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.14 644))
-  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.106 644))
+  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.107 644))
   (src/sysmalloc.h (lpmud/c/b/33_sysmalloc. 1.2 644))
   (src/sysmalloc.c (lpmud/c/b/34_sysmalloc. 1.7 644))
   (src/sprintf.h (lpmud/f/15_sprintf.h 1.3.1.4 644))

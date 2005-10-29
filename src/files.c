@@ -889,13 +889,10 @@ f_get_dir (svalue_t *sp)
 
         /* Prepare the error handler to do clean up.
          */
-        ec.head.type = T_ERROR_HANDLER;
-        ec.head.u.error_handler = get_dir_error_handler;
         ec.dirp = dirp;
         ec.v = NULL;
         inter_sp = sp+1;
-        inter_sp->type = T_LVALUE;
-        inter_sp->u.lvalue = &ec.head;
+        push_error_handler(get_dir_error_handler, &ec.head);
 
         /* Count files
          */

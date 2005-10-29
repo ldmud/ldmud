@@ -3047,13 +3047,10 @@ make_unique (vector_t *arr, callback_t *cb, svalue_t *skipnum)
              , (unsigned long)sizeof(*ucp));
     }
 
-    ucp->head.type = T_ERROR_HANDLER;
-    ucp->head.u.error_handler = make_unique_cleanup;
     ucp->pool = pool;
     ucp->arr = ref_array(arr);  /* Prevent apply from freeing this */
-    inter_sp++;
-    inter_sp->type = T_LVALUE;
-    inter_sp->u.lvalue = &(ucp->head);
+
+    push_error_handler(make_unique_cleanup, &(ucp->head));
 
     /* Build the comb structure.
      */

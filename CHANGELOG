@@ -1,6 +1,14 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+14-Jan-2004 (Lars Duening)  (3.3.658)
+  - (interpret, array.c, mapping.c, parse.c, simulate.c, files.c)
+       The new function push_error_handler() simplifies the creation
+       of T_ERROR_HANDLER values.
+  - (object.c) Exceptions during a restore no longer leak values
+       (Bug #0000344).
+  - (smalloc.c) The extended large-free statistics was still off.
+
 14-Jan-2004 (Lars Duening)  (3.3.657)
   - (array.c) Efun unique_array() no longer leaks memory if aborted
        by an exception (Bug #0000345).

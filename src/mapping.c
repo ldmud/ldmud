@@ -3614,15 +3614,13 @@ walk_mapping_prologue (mapping_t *m, svalue_t *sp, callback_t *cb)
     }
     xallocate(pointers, (m->num_entries * 2 + 4) * sizeof(svalue_t)
                       , "walk_mapping prologue" );
-    pointers[0].type = T_ERROR_HANDLER;
-    pointers[0].u.error_handler = f_walk_mapping_cleanup;
     pointers[1].type = T_CALLBACK;
     pointers[1].u.cb = cb;
     pointers[2].u.number = m->num_entries;
     pointers[3].u.map = m;
     pointers[3].x.generic = hm != NULL;
-    (++sp)->type = T_LVALUE;
-    sp->u.lvalue = pointers;
+    inter_sp = sp;
+    push_error_handler(f_walk_mapping_cleanup, pointers);
     read_pointer = write_pointer = pointers + 4;
     walk_mapping(m, f_walk_mapping_filter, &write_pointer);
     return read_pointer;

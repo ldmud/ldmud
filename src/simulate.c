@@ -1333,12 +1333,8 @@ push_give_uid_error_context (object_t *ob)
         error("Out of memory (%lu bytes) for new object '%s' uids\n"
              , (unsigned long) sizeof(*ecp), get_txt(ob->name));
     }
-    ecp->head.type = T_ERROR_HANDLER;
-    ecp->head.u.error_handler = give_uid_error_handler;
     ecp->new_object = ob;
-    inter_sp++;
-    inter_sp->type = T_LVALUE;
-    inter_sp->u.lvalue = &ecp->head;
+    push_error_handler(give_uid_error_handler, &(ecp->head));
 } /* push_give_uid_error_context() */
 
 /*-------------------------------------------------------------------------*/

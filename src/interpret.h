@@ -184,6 +184,7 @@ extern void int_call_lambda(svalue_t *lsvp, int num_arg, Bool allowRefs);
 extern void free_interpreter_temporaries(void);
 extern void invalidate_apply_low_cache(void);
 extern void push_referenced_mapping(mapping_t *m);
+extern void push_error_handler(void (*errorhandler)(svalue_t *), svalue_t *arg);
 extern void m_indices_filter (svalue_t *key, svalue_t *data, void *extra);
 extern void m_values_filter (svalue_t *key, svalue_t *data, void *extra);
 extern void m_unmake_filter ( svalue_t *key, svalue_t *data, void *extra);

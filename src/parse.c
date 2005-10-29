@@ -1687,11 +1687,7 @@ e_parse_command ( string_t *cmd          /* Command to parse */
     old->previous = gPrevious_context;
     gPrevious_context = old;
 
-    error_handler_addr.u.error_handler = parse_error_handler;
-
-    inter_sp++;
-    inter_sp->type = T_LVALUE;
-    inter_sp->u.lvalue = &error_handler_addr;
+    push_error_handler(parse_error_handler, &error_handler_addr);
 
     /* Make space for the list arrays */
 

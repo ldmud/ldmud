@@ -3018,9 +3018,6 @@ found_fit:
 
     remove_from_free_list(ptr);
     real_size = *ptr & M_MASK;
-#ifdef MALLOC_EXT_STATISTICS
-    extstats[SMALL_BLOCK_NUM+1].cur_free--;
-#endif /* MALLOC_EXT_STATISTICS */
 
     if (real_size - size)
     {
@@ -3071,9 +3068,6 @@ found_fit:
             add_to_free_list(ptr+size);
         }
         build_block(ptr, size);
-#ifdef MALLOC_EXT_STATISTICS
-        extstats[SMALL_BLOCK_NUM+1].cur_free++;
-#endif /* MALLOC_EXT_STATISTICS */
     }
 
     /* The block at ptr is all ours */
@@ -3140,9 +3134,6 @@ large_free (char *ptr)
         remove_from_free_list(p+size);
         size += (*(p+size) & M_MASK);
         *p = (*p & PREV_BLOCK) | size;
-#ifdef MALLOC_EXT_STATISTICS
-        extstats[SMALL_BLOCK_NUM+1].cur_free--;
-#endif /* MALLOC_EXT_STATISTICS */
     }
 
     /* If the previous block is free, coagulate */
@@ -3151,19 +3142,11 @@ large_free (char *ptr)
         remove_from_free_list(l_prev_block(p));
         size += (*l_prev_block(p) & M_MASK);
         p = l_prev_block(p);
-#ifdef MALLOC_EXT_STATISTICS
-        extstats[SMALL_BLOCK_NUM+1].cur_free--;
-#endif /* MALLOC_EXT_STATISTICS */
     }
 
     /* Mark the block as free and add it to the freelist */
     build_block(p, size);
     add_to_free_list(p);
-#ifdef MALLOC_EXT_STATISTICS
-    extstats[SMALL_BLOCK_NUM+1].cur_free++;
-    extstat_update_max(extstats+SMALL_BLOCK_NUM+1);
-#endif /* MALLOC_EXT_STATISTICS */
-
 } /* large_free() */
 
 /*-------------------------------------------------------------------------*/
@@ -3489,9 +3472,6 @@ mem_increment_size (void *vp, size_t size)
         malloc_increment_size_success++;
         malloc_increment_size_total += (start2 - start) - M_OVERHEAD;
         count_add(large_alloc_stat, wsize);
-#ifdef MALLOC_EXT_STATISTICS
-        extstats[SMALL_BLOCK_NUM+1].cur_free--;
-#endif /* MALLOC_EXT_STATISTICS */
 
         return start2;
     }
