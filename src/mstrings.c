@@ -9,10 +9,11 @@
  * be safely deallocated again. On the other hand, if a refcount overflows
  * to 0, the string is considered a constant.
  *
- * To reduce memory usage even further, most strings are held in a
- * table. So, when the creation of a new string is requested, the driver
- * first looks in the table for an already existing instance, before it
- * allocates a new string instance. The table is organized as a hash table
+ * To reduce memory usage even further, strings can be entered into a table.
+ * On the creation of a new string the driver can lookup the table for
+ * an already existing copy and return a reference to a string held therein.
+ * This is used mainly for function names in programs, but also for
+ * mapping keys. The table is organized as a hash table
  * with HTABLE_SIZE entries.
  *
  * Strings are sequences of chars, stored in an array of known size. The
@@ -22,13 +23,17 @@
  * functions; however, this character itself is not counted in the size
  * of the string, and the module itself doesn't rely on it.
  *
- * Strings are managed using two structures: string_data_t and string_t.
+ * Strings are managed using a single structure: string_t.
  *
  * string_data_t holds the raw string data as explained above:
  *
- *    struct string_data_s
+ *    struct string_s
  *    {
- *        size_t  size;            Length of the string
+ *        struct {
+ *            Bool tabled      :  1;
+ *            unsigned int ref : 31;
+ *        } info;
+ *        size_t  size;            Length of the string 
  *        whash_t hash;            0, or the hash of the string
  *        char    txt[1.. .size];
  *        char    null             Gratuituous terminator
@@ -38,46 +43,17 @@
  * to value 0, the value 0x8000 is used instead - this way the usual
  * calculation (hash % tablesize) won't be affected.
  *
- * This structure is hardly ever used by other parts of the driver
- * directly; the 'string' datatype is instead represented by
- * the string_t structure:
- *
- *     struct string_s
- *     {
- *         string_t *link;
- *         struct {
- *             Bool tabled       :  1;
- *             unsigned long ref : 31;
- *         } info;
- *         string_data_t *str;
- *     };
- *
  * This string_t value is the one referenced by svalues and the like.
  * It allows the following string types:
  *
  * Untabled, freely allocated strings:
- *   .tabled is FALSE, .link is NULL.
+ *   .tabled is FALSE
  *
  * Tabled (shared) strings:
- *   .tabled is TRUE, .link is used as link pointer in the hash table.
- *   This .link does not count as reference.
+ *   .tabled is TRUE
+ *   The table structures are external, and the reference from the
+ *   table is not counted.
  *
- * Indirectly tabled strings:
- *   .tabled is FALSE, .link points to the corresponding string_t
- *   structure in the hash table (this counts as one reference),
- *   and .str = .link->str.
- *
- * In all cases .str points to the string_data_t for this string.
- *
- *
- * The distinction between string_data_t and string_t exists for the
- * following reasons:
- *
- *  - svalues do not need to know how the string is implemented.
- *  - string_t's can take advantage of smallocs fast small block
- *    allocator.
- *  - untabled strings can easily be made (indirectly) tabled even
- *    if they have many active refs pending and/or are of large size.
  * TODO: Make functions mstr_append() resilient to receiving NULL
  * TODO:: pointers as args. This way stuff like rc =
  * TODO:: mstr_append(rc,...) will always work and we need to check
@@ -117,8 +93,20 @@
 #endif
 
 /*-------------------------------------------------------------------------*/
+/* The link datastructure used in the hash table.
+ */
 
-static string_t ** stringtable = NULL;
+typedef struct string_link_s string_link_t;
+
+struct string_link_s
+{
+    string_link_t * next;  /* Next entry in hash chain. */
+    string_t      * str;   /* The string itself. */
+};
+
+/*-------------------------------------------------------------------------*/
+
+static string_link_t ** stringtable = NULL;
   /* The hashed string table: an array of pointers to the heads of
    * the string chains.
    */
@@ -158,16 +146,6 @@ static mp_uint mstr_deleted = 0;
 
 static mp_uint mstr_collisions = 0;
   /* Number of collisions when adding a new distinct string.
-   */
-
-static mp_uint mstr_itabled = 0;
-  /* Number of indirectly tabled strings.
-   */
-
-static mp_uint mstr_itabled_size = 0;
-  /* Amount of memory held in itabled strings, of which only
-   * <mstr_itabled> * sizeof(string_t) is not shared with the string
-   * table.
    */
 
 static mp_uint mstr_untabled = 0;
@@ -232,23 +210,21 @@ hash_string (const char * const s, size_t size)
 
 /*-------------------------------------------------------------------------*/
 static INLINE whash_t
-get_hash (const string_t * pStr)
+get_hash (string_t * pStr)
 
 /* Return the hash of string <pStr>, computing it if necessary.
  */
 
 {
-    string_data_t *sdata = pStr->str;
+    if (!pStr->hash)
+        pStr->hash = hash_string(pStr->txt, pStr->size);
 
-    if (!sdata->hash)
-        sdata->hash = hash_string(sdata->txt, sdata->size);
-
-    return sdata->hash;
+    return pStr->hash;
 } /* get_hash() */
 
 /*-------------------------------------------------------------------------*/
 whash_t
-mstring_get_hash (const string_t * pStr)
+mstring_get_hash (string_t * pStr)
 
 /* Aliased to: mstr_get_hash()
  *
@@ -271,7 +247,7 @@ find_and_move (const char * const s, size_t size, whash_t hash)
  */
 
 {
-    string_t *prev, *rover;
+    string_link_t *prev, *rover;
 
     int idx = HashToIndex(hash);
 
@@ -279,14 +255,15 @@ find_and_move (const char * const s, size_t size, whash_t hash)
 
     /* Find the string in the table */
 
+    mstr_searchlen_byvalue++;
     for ( prev = NULL, rover = stringtable[idx]
         ;    rover != NULL
-          && get_txt(rover) != s
-          && !(   size == mstrsize(rover)
-               && hash == get_hash(rover)
-               && 0 == memcmp(get_txt(rover), s, size)
+          && get_txt(rover->str) != s
+          && !(   size == mstrsize(rover->str)
+               && hash == get_hash(rover->str)
+               && 0 == memcmp(get_txt(rover->str), s, size)
               )
-        ; prev = rover, rover = rover->link
+        ; prev = rover, rover = rover->next
         )
         mstr_searchlen_byvalue++;
 
@@ -295,15 +272,15 @@ find_and_move (const char * const s, size_t size, whash_t hash)
      */
     if (rover && prev)
     {
-        prev->link = rover->link;
-        rover->link = stringtable[idx];
+        prev->next = rover->next;
+        rover->next = stringtable[idx];
         stringtable[idx] = rover;
     }
 
     if (rover)
         mstr_found_byvalue++;
 
-    return rover;
+    return rover ? rover->str : NULL;
 } /* find_and_move() */
 
 /*-------------------------------------------------------------------------*/
@@ -316,15 +293,16 @@ move_to_head (string_t *s, int idx)
  */
 
 {
-    string_t *prev, *rover;
+    string_link_t *prev, *rover;
 
     mstr_searches++;
 
     /* Find the string in the table */
 
+    mstr_searchlen++;
     for ( prev = NULL, rover = stringtable[idx]
-        ; rover != NULL && rover != s
-        ; prev = rover, rover = rover->link
+        ; rover != NULL && rover->str != s
+        ; prev = rover, rover = rover->next
         )
     {
         mstr_searchlen++;
@@ -336,15 +314,15 @@ move_to_head (string_t *s, int idx)
 
     if (rover && prev)
     {
-        prev->link = s->link;
-        s->link = stringtable[idx];
-        stringtable[idx] = s;
+        prev->next = rover->next;
+        rover->next = stringtable[idx];
+        stringtable[idx] = rover;
     }
 
     if (rover)
         mstr_found++;
 
-    return rover;
+    return rover ? rover->str : NULL;
 } /* move_to_head() */
 
 /*-------------------------------------------------------------------------*/
@@ -361,32 +339,30 @@ make_new_tabled (const char * const pTxt, size_t size, whash_t hash MTRACE_DECL)
  */
 
 {
-    string_data_t *sdata;
-    string_t      *string;
-    int            idx = HashToIndex(hash);
+    string_t      * string;
+    string_link_t * lnk;
+    int             idx = HashToIndex(hash);
 
     /* Get the memory for a new one */
 
-    sdata = xalloc_pass(size + sizeof(*sdata));
-      /* sizeof(*sdata) includes the extra data byte */
-    if (!sdata)
+    string = xalloc_pass(size + sizeof(*string));
+      /* sizeof(*string) includes the extra data byte */
+    if (!string)
         return NULL;
 
-    string = xalloc_pass(sizeof(*string));
-    if (!string)
+    lnk = xalloc_pass(sizeof(*lnk));
+    if (!lnk)
     {
-        xfree(sdata);
+        xfree(string);
         return NULL;
     }
 
     /* Set up the structures and table the string */
 
-    sdata->size = size;
-    sdata->hash = hash;
-    memcpy(sdata->txt, pTxt, size);
-    sdata->txt[size] = '\0';
-
-    string->str = sdata;
+    string->size = size;
+    string->hash = hash;
+    memcpy(string->txt, pTxt, size);
+    string->txt[size] = '\0';
     string->info.tabled = MY_TRUE;
     string->info.ref = 1;
       /* An uninitialized memory read at this point is ok: it's because
@@ -399,8 +375,9 @@ make_new_tabled (const char * const pTxt, size_t size, whash_t hash MTRACE_DECL)
     else
         mstr_collisions++;
 
-    string->link = stringtable[idx];
-    stringtable[idx] = string;
+    lnk->str = string;
+    lnk->next = stringtable[idx];
+    stringtable[idx] = lnk;
 
     {
         size_t msize;
@@ -429,28 +406,18 @@ mstring_alloc_string (size_t iSize MTRACE_DECL)
  */
 
 {
-    string_data_t *sdata;
-    string_t      *string;
+    string_t *string;
 
     /* Get the memory */
 
-    sdata = xalloc_pass(iSize + sizeof(*sdata));
-    if (!sdata)
-        return NULL;
-
-    string = xalloc_pass(sizeof(*string));
+    string = xalloc_pass(iSize + sizeof(*string));
     if (!string)
-    {
-        xfree(sdata);
         return NULL;
-    }
 
     /* Set up the structures */
-    sdata->size = iSize;
-    sdata->hash = 0;
-    sdata->txt[iSize] = '\0';
-    string->link = NULL;
-    string->str = sdata;
+    string->size = iSize;
+    string->hash = 0;
+    string->txt[iSize] = '\0';
     string->info.tabled = MY_FALSE;
     string->info.ref = 1;
       /* An uninitialized memory read at this point is ok: it's because
@@ -478,19 +445,19 @@ mstring_realloc_string (string_t *string, size_t iSize MTRACE_DECL)
  *
  * Change the space of the <string> to <iSize> characters, keeping
  * the old content as far as possible. Return the pointer to the
- * <string> on success, or NULL if memory runs out.
+ * new string on success, or NULL if memory runs out.
  *
  * The string must not be tabled.
  */
 
 {
-    string_data_t *sdata;
-    size_t         old_msize;
+    string_t *sdata;
+    size_t    old_msize;
 
     if (string->info.tabled)
     {
         fatal("mstring_realloc_string: String %p (%s) must not be tabled.\n"
-             , string, string->str ? string->str->txt : "<null>"
+             , string, string->txt
              );
     }
 
@@ -498,52 +465,24 @@ mstring_realloc_string (string_t *string, size_t iSize MTRACE_DECL)
 
     /* Get the memory */
 
-    if (string->str && !string->link)
-        sdata = rexalloc_pass(string->str,  iSize + sizeof(*sdata));
-    else
-    {
-        sdata = xalloc_pass(iSize + sizeof(*sdata));
-        
-        /* If it's an indirectly tabled string, copy the data over so
-         * as not to destroy the data of the directly tabled instance.
-         */
-        if (string->str && string->link)
-        {
-            memcpy(sdata, string->str, sizeof(*sdata) + string->str->size);
-
-            mstr_untabled++;
-            mstr_untabled_size += old_msize;
-            mstr_itabled--;
-            mstr_itabled_size -= old_msize;
-        }
-    }
+    sdata = rexalloc_pass(string, iSize + sizeof(*sdata));
     if (!sdata)
         return NULL;
 
-    /* Set up the structure */
+    /* Update the structure */
     sdata->size = iSize;
     sdata->hash = 0;
     sdata->txt[iSize] = '\0';
 
-    string->str = sdata;
-
-    /* If it was an indirectly tabled string, remove the link. */
-
-    if (string->link)
-    {
-        free_mstring(string->link);
-        string->link = NULL;
-    }
-
     {
         size_t msize;
 
-        msize = mstr_mem_size(string);
+        msize = mstr_mem_size(sdata);
         mstr_used_size += msize - old_msize;
         mstr_untabled_size += msize - old_msize;
     }
 
-    return string;
+    return sdata;
 } /* mstring_realloc_string() */
 
 /*-------------------------------------------------------------------------*/
@@ -567,7 +506,7 @@ mstring_new_string (const char * const pTxt MTRACE_DECL)
     string = mstring_alloc_string(size MTRACE_PASS);
     if (string && size)
     {
-        memcpy(string->str->txt, pTxt, size);
+        memcpy(string->txt, pTxt, size);
     }
 
     return string;
@@ -591,7 +530,7 @@ mstring_new_n_string (const char * const pTxt, size_t len MTRACE_DECL)
     string = mstring_alloc_string(len MTRACE_PASS);
     if (string && len)
     {
-        memcpy(string->str->txt, pTxt, len);
+        memcpy(string->txt, pTxt, len);
     }
 
     return string;
@@ -660,59 +599,18 @@ mstring_new_n_tabled (const char * const pTxt, size_t size MTRACE_DECL)
 } /* mstring_new_n_tabled() */
 
 /*-------------------------------------------------------------------------*/
-string_t *
-mstring_make_tabled (string_t * pStr, Bool deref_arg MTRACE_DECL)
+static string_t *
+table_string (string_t * pStr MTRACE_DECL)
 
-/* Aliased to: make_tabled(pStr)      : deref_arg = MY_TRUE
- *             make_tabled_from(pStr) : deref_arg = MY_FALSE
+/* Called by: mstring_make_tabled()
  *
- * Take the string <pStr> and convert it into an tabled string if not already
- * tabled (see mstring_table_inplace()).
- * Return the counted reference to the _directly_ tabled instance (pStr might
- * be converted into an indirectly tabled string), and, if <deref_arg>
- * is TRUE, dereference the <pStr> once.
- */
-
-{
-    string_t *string;
-
-    /* Table the string one way or the other (always succeeds) */
-    mstring_table_inplace(pStr MTRACE_PASS);
-
-    if (pStr->info.tabled)
-    {
-        /* The string is tabled directly, our work is done */
-        if (!deref_arg)
-            (void)ref_mstring(pStr);
-        string = pStr;
-    }
-    else
-    {
-        /* The string is tabled indirectly, return the directly tabled
-         * instance.
-         */
-        string = ref_mstring(pStr->link);   /* Must come first! */
-        if (deref_arg) free_mstring(pStr);  /* Might delete *pStr */
-    }
-
-    /* That's all */
-
-    return string;
-} /* mstring_make_tabled() */
-
-/*-------------------------------------------------------------------------*/
-string_t *
-mstring_table_inplace (string_t * pStr MTRACE_DECL)
-
-/* Aliased to: table_inplace(pStr)
+ * Table the string <pStr> and return a pointer to the tabled string.
+ * If <pStr> is already tabled, it will also be the result.
+ * If <pStr> is not tabled, but a string of this content already exist,
+ * the reference to the tabled string will be the result.
+ * Otherwise, <pStr> is added to the table and returned.
  *
- * If <pStr> is an untabled string, it is morphed into an tabled one.
- * If the string does not yet exist in the string table, the result
- * will be a directly tabled string, otherwise an indirectly tabled one.
- *
- * Result is <pStr>, the refcount doesn't change.
- *
- * Also used by mstring_make_tabled().
+ * Return NULL when out of memory.
  */
 
 {
@@ -723,25 +621,30 @@ mstring_table_inplace (string_t * pStr MTRACE_DECL)
     size_t     msize;
 
     /* If the string is already tabled, our work is done */
-    if (pStr->info.tabled || pStr->link != NULL)
+    if (pStr->info.tabled)
         return pStr;
 
     msize = mstr_mem_size(pStr);
 
     /* Get or create the tabled string for this untabled one */
 
-    size = pStr->str->size;
+    size = pStr->size;
     hash = get_hash(pStr);
     idx = HashToIndex(hash);
 
     /* Check if the string has already been tabled */
-    string = find_and_move(pStr->str->txt, size, hash);
+    string = find_and_move(pStr->txt, size, hash);
 
     if (!string)
     {
-        /* No: change the given string structure into a directly
-         * tabled one and link it into the string table.
+        /* No: create a new entry in the table for this string.
          */
+        string_link_t * lnk;
+
+        lnk = xalloc_pass(sizeof(*lnk));
+        if (!lnk)
+            return NULL;
+
         pStr->info.tabled = MY_TRUE;
 
         mstr_added++;
@@ -750,38 +653,53 @@ mstring_table_inplace (string_t * pStr MTRACE_DECL)
         else
             mstr_collisions++;
 
-        pStr->link = stringtable[idx];
-        stringtable[idx] = pStr;
+        lnk->str = pStr;
+        lnk->next = stringtable[idx];
+        stringtable[idx] = lnk;
 
         mstr_tabled++;
         mstr_tabled_size += msize;
+
+        mstr_untabled--;
+        mstr_untabled_size -= msize;
+
+        string = pStr;
     }
-    else
-    {
-        /* Yes: increment the refcount of the found string
-         * and get rid of pStr's string_data.
-         */
-        ref_mstring(string);  /* Increments statistics */
-        xfree(pStr->str);
-        pStr->str = string->str;
-
-        /* Complete the morphing of pStr into an indirectly tabled
-         * string.
-         */
-
-        pStr->link = string;
-
-        mstr_itabled++;
-        mstr_itabled_size += msize;
-    }
-
-    mstr_untabled--;
-    mstr_untabled_size -= msize;
 
     /* That's all */
 
-    return pStr;
-} /* mstring_table_inplace() */
+    return string;
+} /* table_string() */
+
+/*-------------------------------------------------------------------------*/
+string_t *
+mstring_make_tabled (string_t * pStr, Bool deref_arg MTRACE_DECL)
+
+/* Aliased to: make_tabled(pStr)      : deref_arg = MY_TRUE
+ *             make_tabled_from(pStr) : deref_arg = MY_FALSE
+ *
+ * Take the string <pStr> and convert it into an tabled string if not already
+ * tabled.
+ * Return the counted reference to the tabled instance, and, if <deref_arg> is
+ * TRUE, dereference the <pStr> once.
+ *
+ * Return NULL when out of memory.
+ */
+
+{
+    string_t *string;
+
+    /* Table the string one way or the other (always succeeds) */
+    string = table_string(pStr MTRACE_PASS);
+    if (!string)
+        return NULL;
+
+    (void)ref_mstring(string);
+    if (deref_arg)
+        free_mstring(pStr);
+
+    return string;
+} /* mstring_make_tabled() */
 
 /*-------------------------------------------------------------------------*/
 string_t *
@@ -804,10 +722,10 @@ mstring_dup (string_t * pStr MTRACE_DECL)
 
     /* Create a new untabled string from the tabled one */
 
-    string = mstring_alloc_string(pStr->str->size MTRACE_PASS);
+    string = mstring_alloc_string(pStr->size MTRACE_PASS);
     if (string)
     {
-        memcpy(string->str->txt,  pStr->str->txt, pStr->str->size);
+        memcpy(string->txt,  pStr->txt, pStr->size);
     }
 
     return string;
@@ -835,18 +753,18 @@ mstring_unshare (string_t * pStr MTRACE_DECL)
     /* Check for the easy cases where the argument string can be
      * the result: untabled and just one reference.
      */
-    if (!pStr->info.tabled && pStr->info.ref == 1 && pStr->link == NULL)
+    if (!pStr->info.tabled && pStr->info.ref == 1)
     {
-        pStr->str->hash = 0;
+        pStr->hash = 0;
         return pStr;
     }
 
     /* Otherwise create a new untabled string from the tabled one */
 
-    string = mstring_alloc_string(pStr->str->size MTRACE_PASS);
+    string = mstring_alloc_string(pStr->size MTRACE_PASS);
     if (string)
     {
-        memcpy(string->str->txt,  pStr->str->txt, pStr->str->size);
+        memcpy(string->txt,  pStr->txt, pStr->size);
         free_mstring(pStr);
     }
 
@@ -870,10 +788,10 @@ mstring_resize (string_t * pStr, size_t newlen MTRACE_DECL)
     string_t *string;
 
     /* Check for the easy case */
-    if (!pStr->info.tabled && pStr->info.ref == 1 && pStr->link == NULL
-     && pStr->str->size == newlen)
+    if (!pStr->info.tabled && pStr->info.ref == 1
+     && pStr->size == newlen)
     {
-        pStr->str->hash = 0;
+        pStr->hash = 0;
         return pStr;
     }
 
@@ -882,10 +800,10 @@ mstring_resize (string_t * pStr, size_t newlen MTRACE_DECL)
     string = mstring_alloc_string(newlen MTRACE_PASS);
     if (string)
     {
-        if (newlen > pStr->str->size)
-            memcpy(string->str->txt,  pStr->str->txt, pStr->str->size);
+        if (newlen > pStr->size)
+            memcpy(string->txt,  pStr->txt, pStr->size);
         else
-            memcpy(string->str->txt,  pStr->str->txt, newlen);
+            memcpy(string->txt,  pStr->txt, newlen);
     }
 
     free_mstring(pStr);
@@ -895,7 +813,7 @@ mstring_resize (string_t * pStr, size_t newlen MTRACE_DECL)
 
 /*-------------------------------------------------------------------------*/
 string_t *
-mstring_find_tabled (const string_t * pStr)
+mstring_find_tabled (string_t * pStr)
 
 /* Aliased to: find_tabled(pStr)
  *
@@ -919,15 +837,6 @@ mstring_find_tabled (const string_t * pStr)
         return (string_t *)pStr;
     }
 
-    /* If pStr is indirectly tabled, return the tabled instance */
-    if (pStr->link != NULL)
-    {
-#ifdef EXT_STRING_STATS
-        stNumTabledCheckedTable++;
-#endif /* EXT_STRING_STATS */
-        return pStr->link;
-    }
-
     /* Worst case: an untabled string we have to look for */
 
 #ifdef EXT_STRING_STATS
@@ -936,7 +845,7 @@ mstring_find_tabled (const string_t * pStr)
     size = mstrsize(pStr);
     hash = get_hash(pStr);
 
-    return find_and_move(pStr->str->txt, size, hash);
+    return find_and_move(pStr->txt, size, hash);
 } /* mstring_find_tabled() */
 
 /*-------------------------------------------------------------------------*/
@@ -992,7 +901,8 @@ mstring_free (string_t *s)
     {
         /* A tabled string */
 
-        int idx;
+        int             idx;
+        string_link_t * lnk;
 
         mstr_tabled--;
         mstr_tabled_size -= msize;
@@ -1001,38 +911,30 @@ mstring_free (string_t *s)
         if (NULL == move_to_head(s, idx))
         {
             fatal("String %p (%s) doesn't hash to the same spot.\n"
-                 , s, s->str ? s->str->txt : "<null>"
+                 , s, s->txt
                  );
         }
-        stringtable[idx] = s->link;
-        xfree(s->str);
-        xfree(s);
 
-        mstr_deleted++;
+        lnk = stringtable[idx];
+        stringtable[idx] = lnk->next;
+        xfree(lnk);
+
         if (NULL == stringtable[idx])
             mstr_chains--;
+        mstr_deleted++;
 
     }
-    else if (s->link == NULL)
+    else
     {
         /* An untabled string */
 
         mstr_untabled--;
         mstr_untabled_size -= msize;
 
-        xfree(s->str);
-        xfree(s);
     }
-    else
-    {
-        /* An indirectly tabled string */
 
-        mstr_itabled--;
-        mstr_itabled_size -= msize;
-
-        free_mstring(s->link);
-        xfree(s);
-    }
+    /* The deallocation of the string itself is the same in either case. */
+    xfree(s);
 } /* mstring_free() */
 
 /*-------------------------------------------------------------------------*/
@@ -1067,7 +969,7 @@ mstring_deref ( string_t * str)
 
 /*-------------------------------------------------------------------------*/
 Bool
-mstring_equal(const string_t * const pStr1, const string_t * const pStr2)
+mstring_equal(string_t * const pStr1, string_t * const pStr2)
 
 /* Aliased to: mstreq(pStr1, pStr2)
  *
@@ -1087,26 +989,11 @@ mstring_equal(const string_t * const pStr1, const string_t * const pStr2)
 #endif /* EXT_STRING_STATS */
         return MY_TRUE;
     }
-    if (mstr_d_tabled(pStr1) && mstr_i_tabled(pStr2) && pStr2->link == pStr1)
-    {
-#ifdef EXT_STRING_STATS
-        stNumTabledEqual++;
-#endif /* EXT_STRING_STATS */
-        return MY_TRUE;
-    }
-    if (mstr_i_tabled(pStr1) && mstr_d_tabled(pStr2) && pStr1->link == pStr2)
-    {
-#ifdef EXT_STRING_STATS
-        stNumTabledEqual++;
-#endif /* EXT_STRING_STATS */
-        return MY_TRUE;
-    }
+
     if (mstrsize(pStr1) != mstrsize(pStr2))
         return MY_FALSE;
-    if (mstr_hash(pStr1) != 0
-     && mstr_hash(pStr2) != 0
-     && mstr_hash(pStr1) != mstr_hash(pStr2)
-       )
+
+    if (get_hash(pStr1) != get_hash(pStr2))
     {
 #ifdef EXT_STRING_STATS
         stNumHashEqual++;
@@ -1119,7 +1006,7 @@ mstring_equal(const string_t * const pStr1, const string_t * const pStr2)
 
 /*-------------------------------------------------------------------------*/
 int
-mstring_compare (const string_t * const pStr1, const string_t * const pStr2)
+mstring_compare (string_t * const pStr1, string_t * const pStr2)
 
 /* Aliased to: mstrcmp(pStr1, pStr2)
  *
@@ -1135,25 +1022,13 @@ mstring_compare (const string_t * const pStr1, const string_t * const pStr2)
 #ifdef EXT_STRING_STATS
     stNumComp++;
 #endif /* EXT_STRING_STATS */
+
+    /* Compare for direct equality */
     if (pStr1 == pStr2 || get_txt(pStr1) == get_txt(pStr2))
     {
 #ifdef EXT_STRING_STATS
         if (mstr_tabled(pStr1))
             stNumTabledComp++;
-#endif /* EXT_STRING_STATS */
-        return 0;
-    }
-    if (mstr_d_tabled(pStr1) && mstr_i_tabled(pStr2) && pStr2->link == pStr1)
-    {
-#ifdef EXT_STRING_STATS
-        stNumTabledComp++;
-#endif /* EXT_STRING_STATS */
-        return 0;
-    }
-    if (mstr_i_tabled(pStr1) && mstr_d_tabled(pStr2) && pStr1->link == pStr2)
-    {
-#ifdef EXT_STRING_STATS
-        stNumTabledComp++;
 #endif /* EXT_STRING_STATS */
         return 0;
     }
@@ -1178,7 +1053,61 @@ mstring_compare (const string_t * const pStr1, const string_t * const pStr2)
 } /* mstring_compare() */
 
 /*-------------------------------------------------------------------------*/
-char *
+int
+mstring_order (string_t * const pStr1, string_t * const pStr2)
+
+/* Aliased to: mstr_order(pStr1, pStr2)
+ *
+ * Compare the two strings <pStr1> and <pStr2> and return
+ *   -1 if <pStr1> < <pStr2>
+ *    0 if <pStr1> == <pStr2>
+ *   +1 if <pStr1> > <pStr2>
+ *
+ * Other than mstring_compare() this function does not implement
+ * a lexicographic order, but instead a faster hash-centric order.
+ * It is thus more useful for sorted arrays and mapping indices.
+ */
+
+{
+    int rc;
+
+#ifdef EXT_STRING_STATS
+    stNumComp++;
+#endif /* EXT_STRING_STATS */
+
+    /* Compare for direct equality */
+    if (pStr1 == pStr2 || get_txt(pStr1) == get_txt(pStr2))
+    {
+#ifdef EXT_STRING_STATS
+        if (mstr_tabled(pStr1))
+            stNumTabledComp++;
+#endif /* EXT_STRING_STATS */
+        return 0;
+    }
+
+    /* Shorter strings are 'less' than longer strings */
+    {
+        size_t size1 = mstrsize(pStr1);
+        size_t size2 = mstrsize(pStr2);
+        if (size1 != size2)
+            return size1 < size2 ? -1 : 1;
+    }
+
+    /* Strings with a smaller hash also count as 'less'. */
+    {
+        whash_t hash1 = get_hash(pStr1);
+        whash_t hash2 = get_hash(pStr2);
+        if (hash1 != hash2)
+            return  hash1 < hash2 ? -1 : 1;
+    }
+
+    /* Length and hash are identical - we have to compare byte by byte. */
+    rc = memcmp(get_txt(pStr1), get_txt(pStr2), mstrsize(pStr1));
+    return rc;
+} /* mstring_order() */
+
+/*-------------------------------------------------------------------------*/
+const char *
 mstring_mstr_n_str ( const string_t * const pStr, size_t start
                    , const char * const pTxt, size_t len)
 
@@ -1191,7 +1120,7 @@ mstring_mstr_n_str ( const string_t * const pStr, size_t start
  */
 
 {
-    char * cp;
+    const char * cp;
     size_t left;
     char   first;
 
@@ -1210,7 +1139,7 @@ mstring_mstr_n_str ( const string_t * const pStr, size_t start
 
     while (left >= len)
     {
-        char * next;
+        const char * next;
 
         next = memchr(cp, first, left);
         if (NULL == next)
@@ -1229,9 +1158,9 @@ mstring_mstr_n_str ( const string_t * const pStr, size_t start
 } /* mstring_mstr_n_str() */
 
 /*-------------------------------------------------------------------------*/
-char *
+const char *
 mstring_mstr_rn_str ( const string_t * const pStr, size_t start
-                   , const char * const pTxt, size_t len)
+                    , const char * const pTxt, size_t len)
 
 /* Aliased to: mstrrstr(pStr, pTxt)
  *
@@ -1242,7 +1171,7 @@ mstring_mstr_rn_str ( const string_t * const pStr, size_t start
  */
 
 {
-    char * cp;
+    const char * cp;
     size_t left;
     char   first;
 
@@ -1378,7 +1307,8 @@ mstring_cvt_progname (const string_t *str MTRACE_DECL)
 {
     string_t *tmp;
     size_t len;
-    char * txt, *txt2, *p;
+    const char * txt, *p;
+    char *txt2;
 
     txt = get_txt(str);
     len = mstrsize(str);
@@ -1693,7 +1623,7 @@ mstring_prefixed (const string_t *p, const string_t *s)
  */
 
 {
-    char *pp, *ps;
+    const char *pp, *ps;
     size_t lp, ls;
 
     lp = mstrsize(p); pp = get_txt(p);
@@ -1737,11 +1667,11 @@ mstring_init (void)
 {
     int x;
 
-    stringtable = xalloc(sizeof(char *) * HTABLE_SIZE);
+    stringtable = xalloc(sizeof(*stringtable) * HTABLE_SIZE);
 
     if (!stringtable)
         fatal("(mstring_init) Out of memory (%lu bytes) for string table\n"
-             , (unsigned long) sizeof(char*)*HTABLE_SIZE);
+             , (unsigned long) sizeof(*stringtable)*HTABLE_SIZE);
 
     for (x = 0; x < HTABLE_SIZE; x++)
         stringtable[x] = NULL;
@@ -1761,11 +1691,15 @@ mstring_clear_refs (void)
 
 {
     int x;
-    string_t *p;
 
     for (x = 0; x < HTABLE_SIZE; x++)
-        for (p = stringtable[x]; p; p = p->link )
-            p->info.ref = 0;
+    {
+        string_link_t *p;
+        for (p = stringtable[x]; p; p = p->next )
+        {
+            p->str->info.ref = 0;
+        }
+    }
 
 } /* mstring_clear_refs() */
 
@@ -1777,34 +1711,101 @@ mstring_note_refs (void)
  */
 
 {
-    int i;
+    int x;
 
     note_malloced_block_ref(stringtable);
-    for (i = 0; i < SHSTR_NOSTRINGS; i++)
-        count_ref_from_string(shstring[i]);
+    for (x = 0; x < HTABLE_SIZE; x++)
+    {
+        string_link_t *p;
+        for (p = stringtable[x]; p; p = p->next )
+        {
+            note_malloced_block_ref(p);
+        }
+    }
+
+    for (x = 0; x < SHSTR_NOSTRINGS; x++)
+    {
+        count_ref_from_string(shstring[x]);
+    }
 } /* mstring_note_refs() */
 
 /*-------------------------------------------------------------------------*/
 void
-mstring_walk_strings (void (*func) (string_t *))
+mstring_walk_table (void (*func) (string_t *))
 
 /* GC support: Call (*func)(str) for all tabled strings in the string table.
  *
- * Usually the function is "remove_unreferenced_string()" which removes
- * unref'd strings from the table.
+ * Usually the function is "mark_unreferenced_string()" which marks
+ * unref'd strings in the table, followed by a call to mstring_gc_table().
  */
 
 {
     int x;
-    string_t *p, *n;
 
     for (x = 0; x < HTABLE_SIZE; x++)
-        for (n = stringtable[x]; NULL != (p = n); )
+    {
+        string_link_t * p;
+        for (p = stringtable[x]; NULL != p; p = p->next)
         {
-            n = p->link; /* p may be freed by (*func)() . */
-            (*func)(p);
+            (*func)(p->str);
         }
-} /* mstring_walk_strings() */
+    }
+} /* mstring_walk_table() */
+
+/*-------------------------------------------------------------------------*/
+void
+mstring_gc_table (void)
+
+/* GC support: Remove all strings from the table which have a refcount
+ * of 0.
+ *
+ * This can only happen during a GC.
+ */
+
+{
+    int x;
+
+    for (x = 0; x < HTABLE_SIZE; x++)
+    {
+        string_link_t * prev, * next;
+        for (prev = NULL, next = stringtable[x]; next != NULL; )
+        {
+            if (next->str->info.ref == 0)
+            {
+                string_link_t * this = next;
+
+                /* Unlink the string from the table, then free it. */
+                if (prev == NULL)
+                {
+                    stringtable[x] = this->next;
+                    next = this->next;
+                }
+                else
+                {
+                    prev->next = this->next;
+                    next = this->next;
+                }
+
+                mstr_untabled++;
+                mstr_untabled_size += mstr_mem_size(this->str);
+                mstr_tabled--;
+                mstr_tabled_size += mstr_mem_size(this->str);
+                mstr_deleted++;
+
+                this->str->info.ref = 1;
+                this->str->info.tabled = MY_FALSE;
+                free_mstring(this->str);
+                xfree(this);
+            }
+            else
+            {
+                /* Step to next string */
+                prev = next;
+                next = next->next;
+            }
+        }
+    } /* for (x) */
+} /* mstring_gc_table() */
 
 #endif /* GC_SUPPORT */
 
@@ -1817,20 +1818,21 @@ add_string_status (strbuf_t *sbuf, Bool verbose)
  */
 
 {
-#   define STR_OVERHEAD (sizeof(string_t)+sizeof(string_data_t)-1)
+#   define STR_OVERHEAD (sizeof(string_t)+1)
+#   define LINK_OVERHEAD (sizeof(string_link_t))
 
     mp_uint stringtable_size;
     mp_uint distinct_strings;
     mp_uint distinct_size;
     mp_uint distinct_overhead;
+    mp_uint link_overhead;
 
     stringtable_size = HTABLE_SIZE * sizeof(string_t *);
-    distinct_strings = mstr_tabled + mstr_itabled + mstr_untabled;
-    distinct_size = mstr_tabled_size + mstr_untabled_size
-                  + mstr_itabled * sizeof(string_t);
-    distinct_overhead = mstr_tabled * STR_OVERHEAD
-                      + mstr_untabled * STR_OVERHEAD
-                      + mstr_itabled * sizeof(string_t);
+    distinct_strings = mstr_tabled + mstr_untabled;
+    link_overhead = mstr_tabled * LINK_OVERHEAD;
+    distinct_size = mstr_tabled_size + mstr_untabled_size + link_overhead;
+    distinct_overhead = mstr_tabled * (STR_OVERHEAD + LINK_OVERHEAD)
+                      + mstr_untabled * STR_OVERHEAD;
 
     if (!verbose)
     {
@@ -1847,11 +1849,11 @@ add_string_status (strbuf_t *sbuf, Bool verbose)
         strbuf_add(sbuf,   "---------------\t  Strings     Bytes (Data+Overhead)\n");
         strbuf_addf(sbuf,  "Total asked for\t%9lu %9lu (%9lu+%9lu)\n"
                         , mstr_used
-                        , mstr_used_size
+                        , mstr_used_size + link_overhead
                         , mstr_used_size
                           ? mstr_used_size - mstr_used * STR_OVERHEAD
                           : 0
-                        , mstr_used * STR_OVERHEAD
+                        , mstr_used * STR_OVERHEAD + link_overhead
                         );
         strbuf_addf(sbuf,  "Total allocated\t%9lu %9lu (%9lu+%9lu)\n"
                         , distinct_strings
@@ -1861,19 +1863,12 @@ add_string_status (strbuf_t *sbuf, Bool verbose)
                         );
         strbuf_addf(sbuf,  " - tabled\t%9lu %9lu (%9lu+%9lu)\n"
                         , mstr_tabled
-                        , mstr_tabled_size + stringtable_size
+                        , mstr_tabled_size + stringtable_size + link_overhead
                         , mstr_tabled_size
                           ? mstr_tabled_size - mstr_tabled * STR_OVERHEAD
                           : 0
                         , mstr_tabled * STR_OVERHEAD + stringtable_size
-                        );
-        strbuf_addf(sbuf,  " - ind. tabled\t%9lu %9lu (%9lu+%9lu)\n"
-                        , mstr_itabled
-                        , mstr_itabled_size
-                        , mstr_itabled_size
-                          ? mstr_itabled_size - mstr_itabled * STR_OVERHEAD
-                          : 0
-                        , mstr_itabled * sizeof(string_t)
+                                                     + link_overhead
                         );
         strbuf_addf(sbuf,  " - untabled\t%9lu %9lu (%9lu+%9lu)\n"
                         , mstr_untabled
@@ -1883,7 +1878,7 @@ add_string_status (strbuf_t *sbuf, Bool verbose)
                           : 0
                         , mstr_untabled * STR_OVERHEAD
                         );
-        strbuf_addf(sbuf, "\nSpace required / naive string implementation: "
+        strbuf_addf(sbuf, "\nSpace required vs. 'regular C' string implementation: "
                           "%lu%% with, %lu%% without overhead.\n"
                         , ((distinct_size + stringtable_size) * 100L)
                           / (mstr_used_size - mstr_used * sizeof(string_t))
@@ -1901,8 +1896,8 @@ add_string_status (strbuf_t *sbuf, Bool verbose)
                         , mstr_found_byvalue, 100.0 * (float)mstr_found_byvalue / (float)mstr_searches_byvalue
                         , (float)mstr_searchlen_byvalue / (float)mstr_searches_byvalue
                         );
-        strbuf_addf(sbuf, "Hash chains: %lu (%.1f%%)\n"
-                        , mstr_chains
+        strbuf_addf(sbuf, "Hash chains used: %lu of %lu (%.1f%%)\n"
+                        , mstr_chains, HTABLE_SIZE
                         , 100.0 * (float)mstr_chains / (float)HTABLE_SIZE
                         );
         strbuf_addf(sbuf, "Distinct strings added: %lu "
@@ -1959,9 +1954,9 @@ string_dinfo_status (svalue_t *svp, int value)
     ST_NUMBER(DID_ST_STRINGS, mstr_used);
     ST_NUMBER(DID_ST_STRING_SIZE, mstr_used_size);
 
-    ST_NUMBER(DID_ST_STR_TABLE_SIZE, HTABLE_SIZE * sizeof(string_t *));
-    ST_NUMBER(DID_ST_STR_OVERHEAD, sizeof(string_t)+sizeof(string_data_t)-1);
-    ST_NUMBER(DID_ST_STR_IT_OVERHEAD, sizeof(string_t));
+    ST_NUMBER(DID_ST_STR_TABLE_SIZE, HTABLE_SIZE * sizeof(string_t *)
+                                     + mstr_tabled * sizeof(string_link_t*));
+    ST_NUMBER(DID_ST_STR_OVERHEAD, sizeof(string_t)-1);
 
     ST_NUMBER(DID_ST_STR_CHAINS,     mstr_chains);
     ST_NUMBER(DID_ST_STR_ADDED,      mstr_added);
@@ -1970,8 +1965,6 @@ string_dinfo_status (svalue_t *svp, int value)
 
     ST_NUMBER(DID_ST_UNTABLED,      mstr_untabled);
     ST_NUMBER(DID_ST_UNTABLED_SIZE, mstr_untabled_size);
-    ST_NUMBER(DID_ST_ITABLED,       mstr_itabled);
-    ST_NUMBER(DID_ST_ITABLED_SIZE,  mstr_itabled_size);
     ST_NUMBER(DID_ST_TABLED,        mstr_tabled);
     ST_NUMBER(DID_ST_TABLED_SIZE,   mstr_tabled_size);
 

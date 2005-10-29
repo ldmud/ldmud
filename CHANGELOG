@@ -1,6 +1,14 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+21-Feb-2004 (Lars Duening)  (3.3.679)
+  - (mapping.c) get_map_lvalue() didn't correctly check the mapping size:
+       it checked against the current and not the future size (Bug #0000369).
+  - (mapping, simulate.c) Added a statistic for hash and hybrid mappings (for
+       now just the count).
+  - (mstrings, gcollect.c, array.c, closure.c, i-svalue_cmp.h, interpret.c,
+     simulate.c) Simplified the string implementation to reduce the overhead.
+
 21-Feb-2004 (Lars Duening)  (3.3.678)
   - (slaballoc.c, smalloc.c) I hate crashers which don't happen on my machine:
        the merging of the esbrk() result with adjacent free blocks crashed

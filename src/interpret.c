@@ -16379,7 +16379,7 @@ retry_for_shadow:
      * Since function names are always tabled, such a string must exist
      * if the function exists.
      */
-    if (!mstr_d_tabled(fun))
+    if (!mstr_tabled(fun))
     {
         fun = find_tabled(fun);
 #ifdef EXT_STRING_STATS

@@ -185,12 +185,12 @@ struct replace_ob_s
 
 #ifndef CHECK_OBJECT_REF
 #  define free_object(o,from) MACRO( \
-      if (((o)->flags & O_DESTRUCTED) && (o)->ref == 2) dest_last_ref_gone = MY_TRUE; \
+      if ((o)->ref == 2) dest_last_ref_gone = MY_TRUE; \
       if (--((o)->ref) <= 0) dealloc_object(o);\
    )
 #else
 #  define free_object(o,from) MACRO( \
-      if (((o)->flags & O_DESTRUCTED) && (o)->ref == 2) dest_last_ref_gone = MY_TRUE; \
+      if ((o)->ref == 2) dest_last_ref_gone = MY_TRUE; \
       if (--((o)->ref) <= 0) dealloc_object(o, __FILE__, __LINE__); \
    )
 #endif
@@ -199,7 +199,7 @@ struct replace_ob_s
 
 #ifndef CHECK_OBJECT_REF
 #  define free_object(o,from) MACRO(\
-      if (((o)->flags & O_DESTRUCTED) && (o)->ref == 2) dest_last_ref_gone = MY_TRUE; \
+      if ((o)->ref == 2) dest_last_ref_gone = MY_TRUE; \
       (o)->ref--;\
       if (d_flag > 1) printf("Sub ref from object %s: %ld (%s)\n"\
                             , get_txt((o)->name), (o)->ref, from);\
@@ -207,7 +207,7 @@ struct replace_ob_s
     )
 #else
 #  define free_object(o,from) MACRO(\
-      if (((o)->flags & O_DESTRUCTED) && (o)->ref == 2) dest_last_ref_gone = MY_TRUE; \
+      if ((o)->ref == 2) dest_last_ref_gone = MY_TRUE; \
       (o)->ref--;\
       if (d_flag > 1) printf("Sub ref from object %s: %ld (%s)\n"\
                             , get_txt((o)->name), (o)->ref, from);\

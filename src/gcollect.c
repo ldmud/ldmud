@@ -1155,21 +1155,8 @@ gc_MARK_MSTRING_REF (string_t * str)
         {
             /* Refcount overflow */
             dprintf2(gout, "DEBUG: mark string: %x '%s' refcount reaches max!\n"
-                    , (p_int)str, (p_int)str->str->txt);
+                    , (p_int)str, (p_int)str->txt);
         }
-    }
-
-    /* Figure out and reference the secondary blocks */
-
-    if (str->info.tabled || str->link == NULL)
-    {
-        /* A tabled or a free string */
-
-        note_ref(str->str);
-    }
-    else
-    {
-        MARK_MSTRING_REF(str->link);
     }
 } /* gc_MARK_MSTRING_REF(str) */
 
@@ -1391,7 +1378,7 @@ gc_count_ref_in_vector (svalue_t *svp, size_t num
 
 /*-------------------------------------------------------------------------*/
 static void
-remove_unreferenced_string (string_t *string)
+mark_unreferenced_string (string_t *string)
 
 /* If the shared string <string> stored in the memory block <start> is
  * not referenced, it is deallocated.
@@ -1402,15 +1389,13 @@ remove_unreferenced_string (string_t *string)
     {
         dprintf2(gout,
 "tabled string %x '%s' was left unreferenced, freeing now.\n",
-          (p_int) string, (p_int)string->str->txt
+          (p_int) string, (p_int)string->txt
         );
 
         MARK_REF(string);
-        MARK_REF(string->str);
-        MSTRING_REFS(string)++;
-        free_mstring(string);
+        MSTRING_REFS(string) = 0;
     }
-} /* remove_unreferenced_string() */
+} /* mark_unreferenced_string() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -2138,7 +2123,8 @@ garbage_collection(void)
 #ifdef USE_STRUCTS
     remove_unreferenced_structs();
 #endif
-    mstring_walk_strings(remove_unreferenced_string);
+    mstring_walk_table(mark_unreferenced_string);
+    mstring_gc_table();
 
     /* --- Pass 5: Release all destructed objects ---
      *
@@ -2296,9 +2282,9 @@ show_mstring_data (int d, void *block, int depth UNUSED)
 #ifdef __MWERKS__
 #    pragma unused(depth)
 #endif
-    string_data_t *str;
+    string_t *str;
 
-    str = (string_data_t *)block;
+    str = (string_t *)block;
     WRITES(d, "(");
     writed(d, (p_uint)str->size);
     WRITES(d, ")\"");
@@ -2334,16 +2320,12 @@ show_mstring (int d, void *block, int depth)
         if (str->info.tabled)
         {
             WRITES(d, "Tabled string: ");
-            show_mstring_data(d, str->str, depth);
-        }
-        else if (NULL == str->link)
-        {
-            WRITES(d, "Untabled string: ");
-            show_mstring_data(d, str->str, depth);
+            show_mstring_data(d, str, depth);
         }
         else
         {
-            WRITES(d, "Ind. tabled string: <not printing data>");
+            WRITES(d, "Untabled string: ");
+            show_mstring_data(d, str, depth);
         }
         /* TODO: This is how it should be
          * TODO:: show_mstring_data(d, str->str, depth);

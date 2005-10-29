@@ -787,7 +787,7 @@ add_array (vector_t *p, vector_t *q)
 static INLINE void
 sanitize_array (vector_t * vec)
 
-/* In the given array, make all strings directly tabled, and replace destructed
+/* In the given array, make all strings tabled, and replace destructed
  * object references by svalue 0s.
  * Used for example in preparation for ordering the array.
  */
@@ -801,7 +801,7 @@ sanitize_array (vector_t * vec)
     {
         if (inpnt->type == T_STRING)
         {
-            if (!mstr_d_tabled(inpnt->u.str))
+            if (!mstr_tabled(inpnt->u.str))
             {
                 inpnt->u.str = make_tabled(inpnt->u.str);
             }
@@ -1110,7 +1110,7 @@ lookup_key (svalue_t *key, vector_t *vec)
 
     /* If key is a non-shared string, lookup and use the shared copy.
      */
-    if (key->type == T_STRING && !mstr_d_tabled(key->u.str))
+    if (key->type == T_STRING && !mstr_tabled(key->u.str))
     {
         shared_string_key.type = T_STRING;
         if ( !(shared_string_key.u.str = find_tabled(key->u.str)) )
@@ -1733,12 +1733,12 @@ is_ordered (vector_t *v)
     mp_int i;
 
     for (svp = v->item, i = (mp_int)VEC_SIZE(v); --i > 0; svp++) {
-        if (svp->type == T_STRING && !mstr_d_tabled(svp->u.str))
+        if (svp->type == T_STRING && !mstr_tabled(svp->u.str))
             return MY_FALSE;
         if (svalue_cmp(svp, svp+1) > 0)
             return MY_FALSE;
     }
-    if (svp->type == T_STRING && !mstr_d_tabled(svp->u.str))
+    if (svp->type == T_STRING && !mstr_tabled(svp->u.str))
         return MY_FALSE;
 
     return MY_TRUE;

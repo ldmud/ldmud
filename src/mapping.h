@@ -169,6 +169,8 @@ struct mvf_info
 /* --- Variables --- */
 
 extern mp_int num_mappings;
+extern mp_int num_hash_mappings;
+extern mp_int num_dirty_mappings;
 
 /* --- Prototypes --- */
 

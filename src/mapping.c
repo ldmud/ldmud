@@ -270,6 +270,14 @@ mp_int num_mappings = 0;
   /* Number of allocated mappings.
    */
 
+mp_int num_hash_mappings = 0;
+  /* Number of allocated mappings with only a hash part.
+   */
+
+mp_int num_dirty_mappings = 0;
+  /* Number of allocated mappings with a hash and a condensed part.
+   */
+
 mapping_t *stale_mappings;
   /* During a garbage collection, this is a list of mappings with
    * keys referencing destructed objects/lambdas, linked through
@@ -508,6 +516,10 @@ get_new_mapping ( wiz_list_t * user, mp_int num_values
     /* hm has already been counted */
 
     num_mappings++;
+    if (m->cond && m->hash)
+        num_dirty_mappings++;
+    else if (m->hash)
+        num_hash_mappings++;
     check_total_mapping_size();
 
     return m;
@@ -580,6 +592,10 @@ _free_mapping (mapping_t *m, Bool no_data)
 #endif
 
     num_mappings--;
+    if (m->cond && m->hash)
+        num_dirty_mappings--;
+    else if (m->hash)
+        num_hash_mappings--;
 
     m->ref = 0;
       /* In case of free_empty_mapping(), this is neither guaranteed nor a
@@ -601,6 +617,7 @@ _free_mapping (mapping_t *m, Bool no_data)
         check_total_mapping_size();
         xfree(m->cond);
         m->cond = NULL;
+
     }
 
     /* Free the hashed data */
@@ -746,6 +763,7 @@ mhash (svalue_t * svp)
 static svalue_t *
 find_map_entry ( mapping_t *m, svalue_t *map_index
                , p_int * pKeys, map_chain_t ** ppChain
+               , Bool bMakeTabled
                )
 
 /* Index mapping <m> with key value <map_index> and if found, return a pointer
@@ -755,10 +773,11 @@ find_map_entry ( mapping_t *m, svalue_t *map_index
  * to key index; otherwise *<ppChain> will point to the hash map chain entry.
  * The 'not found' values for the two variables are -1 and NULL resp.
  *
+ * If <bMakeTabled> is TRUE and <map_index> is a string, it is made tabled.
+ *
  * If the key is not found, NULL is returned.
  *
- * Sideeffect: if <map_index> is an untabled string, it is made directy
- *   tabled. Also, <map_index>.x.generic information is generated for types
+ * Sideeffect: <map_index>.x.generic information is generated for types
  *   which usually have none (required for hashing).
  */
 
@@ -767,7 +786,8 @@ find_map_entry ( mapping_t *m, svalue_t *map_index
     *ppChain = NULL;
 
     /* If the key is a string, make it tabled */
-    if (map_index->type == T_STRING && !mstr_d_tabled(map_index->u.str))
+    if (map_index->type == T_STRING && !mstr_tabled(map_index->u.str)
+     && bMakeTabled)
     {
         map_index->u.str = make_tabled(map_index->u.str);
     }
@@ -916,7 +936,7 @@ static svalue_t local_const0;
    * for a 0-width was requested.
    */
 
-    entry = find_map_entry(m, map_index, (p_int *)&idx, &mc);
+    entry = find_map_entry(m, map_index, (p_int *)&idx, &mc, need_lvalue);
 
     /* If we found the entry, return the values */
     if (entry != NULL)
@@ -943,18 +963,18 @@ static svalue_t local_const0;
     {
         mp_int msize;
 
-        msize = (mp_int)MAP_TOTAL_SIZE(m);
+        msize = (mp_int)MAP_TOTAL_SIZE(m) + m->num_values + 1;
         if (   (max_mapping_size && msize >= (mp_int)max_mapping_size)
-            || (max_mapping_keys && MAP_SIZE(m) > max_mapping_keys)
+            || (max_mapping_keys && MAP_SIZE(m)+1 > max_mapping_keys)
            )
         {
             check_map_for_destr(m);
-            msize = (mp_int)MAP_TOTAL_SIZE(m);
+            msize = (mp_int)MAP_TOTAL_SIZE(m) + m->num_values + 1;
         }
         if (max_mapping_size && msize >= (mp_int)max_mapping_size)
         {
             error("Illegal mapping size: %ld elements (%ld x %ld)\n"
-                 , msize+1, (long)MAP_SIZE(m), (long)m->num_values);
+                 , msize, (long)MAP_SIZE(m)+1, (long)m->num_values);
             return NULL;
         }
         if (max_mapping_keys && MAP_SIZE(m) >= (mp_int)max_mapping_keys)
@@ -992,6 +1012,11 @@ static svalue_t local_const0;
         /* Now insert the map_chain structure into its chain */
         hm->chains[0] = mc;
         mc->next = NULL;
+
+        if (m->cond)
+            num_dirty_mappings++;
+        else
+            num_hash_mappings++;
     }
     else
     {
@@ -1206,6 +1231,7 @@ check_map_for_destr (mapping_t *m)
                         return;
                     }
                     m->hash = hm;
+                    num_dirty_mappings--;
                 }
 
                 hm->cond_deleted++;
@@ -1308,7 +1334,7 @@ remove_mapping (mapping_t *m, svalue_t *map_index)
 
     num_values = m->num_values;
 
-    entry = find_map_entry(m, map_index, &key_ix, &mc);
+    entry = find_map_entry(m, map_index, &key_ix, &mc, MY_FALSE);
 
     if (NULL != entry)
     {
@@ -2081,6 +2107,11 @@ compact_mapping (mapping_t *m, Bool force)
         malloc_privilege = old_malloc_privilege;
         m->user->mapping_total -= SIZEOF_MH(hm);
         m->hash = NULL;
+
+        if (m->cond)
+            num_dirty_mappings--;
+        else
+            num_hash_mappings--;
         check_total_mapping_size();
 
         xfree(hm);
@@ -2099,6 +2130,11 @@ compact_mapping (mapping_t *m, Bool force)
      * anyway, and this way it's simple to keep the statistics
      * straight).
      */
+
+    if (m->cond && m->hash)
+        num_dirty_mappings--;
+    else if (m->hash)
+        num_hash_mappings--;
 
     num_values = m->num_values;
 

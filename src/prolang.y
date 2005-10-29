@@ -1784,8 +1784,8 @@ check_aggregate_types (int n)
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-warn_function_shadow ( const string_t *pubProg, const string_t * pubFun
-                     , const string_t *privProg, const string_t * privFun
+warn_function_shadow ( const string_t *pubProg,  string_t * pubFun
+                     , const string_t *privProg, string_t * privFun
                      )
 
 /* Issue a warning that the public function <pubProg>::<pubFun>() shadows the
@@ -1798,7 +1798,8 @@ warn_function_shadow ( const string_t *pubProg, const string_t * pubFun
     string_t *pubCProg = NULL;
     string_t *privCProg = NULL;
 
-    if (mstreq(pubFun, STR_VARINIT) && mstreq(privFun, STR_VARINIT))
+    if (mstreq(pubFun, STR_VARINIT)
+     && mstreq(privFun, STR_VARINIT))
         return;
 
     if (pubProg != NULL)  pubCProg = cvt_progname(pubProg);
@@ -8455,9 +8456,9 @@ string_constant:
           add_string_constant();
       }
     | L_STRING L_STRING
-      { fatal("presence of rule should prevent its reduction"); }
+      { fatal("L_STRING LSTRING: presence of rule should prevent its reduction\n"); }
     | string_constant '+' L_STRING L_STRING
-      { fatal("presence of rule should prevent its reduction"); }
+      { fatal("L_STRING LSTRING: presence of rule should prevent its reduction\n"); }
     | '(' string_constant ')'
 ; /* string_constant */
 

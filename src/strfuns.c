@@ -321,7 +321,8 @@ trim_all_spaces (const string_t * txt)
  */
 
 {
-    char * dest, * src;
+    char * dest;
+    const char * src;
     size_t dest_ix, src_ix, srclen;
     string_t * rc;
 
@@ -602,7 +603,7 @@ sort_string (const string_t * p_in, size_t len, long ** pos)
  */
 
 {
-    char   * in;      /* Input string */
+    const char * in;  /* Input string */
     char   * out;     /* Result string */
     long   * outpos;  /* Result position array */
     char   * tmp;     /* Temporary string */
@@ -780,7 +781,8 @@ intersect_strings (const string_t * p_left, const string_t * p_right, Bool bSubt
     size_t   ix_left, ix_right;
     long   * pos;
     CBool  * matches;
-    char   * left, * right, *left_txt, *result_txt;
+    const char * left_txt;
+    char * left, * right, * result_txt;
     string_t *result;
 
     len_left = mstrsize(p_left);

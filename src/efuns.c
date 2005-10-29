@@ -1285,7 +1285,7 @@ f_strstr (svalue_t *sp)
  */
 
 {
-    char *found;
+    const char *found;
     string_t *base, *pattern;
     p_int start, rc;
 
@@ -1329,7 +1329,7 @@ f_strrstr (svalue_t *sp)
  */
 
 {
-    char *found;
+    const char *found;
     string_t *base, *pattern;
     p_int start, rc;
 
@@ -7332,6 +7332,10 @@ v_debug_info (svalue_t *sp, int num_arg)
  *        int DID_ST_MAPPINGS_SIZE
  *            Number and size of all mappings.
  *
+ *        int DID_ST_HYBRID_MAPPINGS
+ *        int DID_ST_HASH_MAPPINGS
+ *            Number of hybrid (hash+condensed) and hash mappings.
+ *
  *        int DID_ST_STRUCTS
  *        int DID_ST_STRUCTS_SIZE
  *            Number and size of all struct instances.
@@ -7379,18 +7383,9 @@ v_debug_info (svalue_t *sp, int num_arg)
  *        int DID_ST_STR_OVERHEAD
  *            Size of the overhead per string.
  *
- *        int DID_ST_STR_IT_OVERHEAD
- *            Size of the additional overhead per indirectly tabled string.
- *
  *        int DID_ST_UNTABLED
  *        int DID_ST_UNTABLED_SIZE
  *            Total number and size of existing untabled strings.
- *
- *        int DID_ST_ITABLED
- *        int DID_ST_ITABLED_SIZE
- *            Total number and size of existing indirectly tabled strings.
- *            Of the memory, only DID_ST_ITABLED * DID_ST_STR_IT_OVERHEAD
- *            is not shared with the tabled strings.
  *
  *        int DID_ST_TABLED
  *        int DID_ST_TABLED_SIZE

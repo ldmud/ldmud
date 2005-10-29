@@ -16,7 +16,7 @@
 static INLINE int
 svalue_cmp (svalue_t *left, svalue_t *right)
 
-/* Array order function.
+/* Order function for sorts.
  *
  * Compare the svalues <left> and <right> and return an integer with the
  * following meaning:
@@ -46,7 +46,7 @@ svalue_cmp (svalue_t *left, svalue_t *right)
 
     if (left->type == T_STRING)
     {
-        return mstrcmp(left->u.str, right->u.str);
+        return mstr_order(left->u.str, right->u.str);
     }
 
     /* Avoid a numeric overflow by first comparing the values halfed. */

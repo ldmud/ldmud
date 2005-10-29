@@ -64,6 +64,8 @@
 
 #define DID_ST_MAPPINGS           27
 #define DID_ST_MAPPINGS_SIZE      28
+#define DID_ST_HYBRID_MAPPINGS    51
+#define DID_ST_HASH_MAPPINGS      54
 
 #define DID_ST_STRUCTS            29
 #define DID_ST_STRUCTS_SIZE       30
@@ -93,11 +95,10 @@
 #define DID_ST_STRING_SIZE        48
 #define DID_ST_STR_TABLE_SIZE     49
 #define DID_ST_STR_OVERHEAD       50
-#define DID_ST_STR_IT_OVERHEAD    51
 #define DID_ST_UNTABLED           52
 #define DID_ST_UNTABLED_SIZE      53
-#define DID_ST_ITABLED            54
-#define DID_ST_ITABLED_SIZE       55
+#define DID_ST_UNUSED54           54 /* UNUSED */
+#define DID_ST_UNUSED55           55 /* UNUSED */
 #define DID_ST_TABLED             56
 #define DID_ST_TABLED_SIZE        57
 #define DID_ST_STR_SEARCHES       58

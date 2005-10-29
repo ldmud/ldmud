@@ -502,9 +502,9 @@ closure_eq (svalue_t * left, svalue_t * right)
 
                 for (ix = 0; i && ix < context_size; ix++)
                 {
-                    i = svalue_cmp( &(left->u.lambda->context[ix])
-                                  , &(right->u.lambda->context[ix])
-                                  );
+                    i = svalue_eq( &(left->u.lambda->context[ix])
+                                 , &(right->u.lambda->context[ix])
+                                 );
                 }
 
                 /* Restore the context size.
@@ -6121,7 +6121,7 @@ f_symbol_variable (svalue_t *sp)
         break;
 
     case T_STRING:  /* Name is given by string */
-        if (!mstr_d_tabled(sp->u.str))
+        if (!mstr_tabled(sp->u.str))
         {
             /* If the variable exists, it must exist as tabled
              * string.

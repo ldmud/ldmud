@@ -3073,8 +3073,9 @@ status_parse (strbuf_t * sbuf, char * buff)
                             , (total_bytes_swapped - total_bytes_unswapped) / 1024);
             strbuf_addf(sbuf, "Arrays:\t\t\t\t%8ld %9ld\n"
                             , (long)num_arrays, total_array_size() );
-            strbuf_addf(sbuf, "Mappings:\t\t\t%8ld %9ld\n"
+            strbuf_addf(sbuf, "Mappings:\t\t\t%8ld %9ld (%ld hybrid, %ld hash)\n"
                             , num_mappings, total_mapping_size()
+                            , num_dirty_mappings, num_hash_mappings
                             );
             strbuf_addf(sbuf, "Memory reserved:\t\t\t %9d\n", res);
         }
@@ -3295,6 +3296,8 @@ dinfo_data_status (svalue_t *svp, int value)
 
     ST_NUMBER(DID_ST_MAPPINGS,       num_mappings);
     ST_NUMBER(DID_ST_MAPPINGS_SIZE,  total_mapping_size());
+    ST_NUMBER(DID_ST_HYBRID_MAPPINGS, num_dirty_mappings);
+    ST_NUMBER(DID_ST_HASH_MAPPINGS,   num_hash_mappings);
 
     ST_NUMBER(DID_ST_PROGS,          total_num_prog_blocks + num_swapped
                                                            - num_unswapped);
