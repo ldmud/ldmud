@@ -54,30 +54,20 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 666)
-(Parent-Version lpmud 3-3 665)
+(Project-Version lpmud 3-3 667)
+(Parent-Version lpmud 3-3 666)
 (Version-Log "
-  - (xalloc.c) Forgot to remove a fatal() used to debug slaballoc (Bug
-       #0000359).
-  - (slaballoc.c) Removed compiler warnings (Bug #0000358).
-  - (mregex.c) Great - Kerberos has a function 'error_message()' in 
-       a global include file (reported by Rajko).
-  - (comm.c) Do not print the prompt to interactives which are currently
-       negotiating a TLS handshake.
-  - (pkg-tls.c) During the execution of a tls-init callback, the callback
-       is protected against premature freeing.
-  - (interpret.c) The range foreach (i: __INT_MIN__ .. __INT_MAX__)
-       now works as well (I added an internal flag for this case to allow one
-       extra pass through the loop (Bug #0000355).
-  - (pkg-mccp.c) With the telnet machine disabled, it is now possible to
-       still use outgoing compression with start_mccp_compression(), assuming
-       a suitable client program is used on the other end (suggested by
-       Philipp).
+  - (pkg-mccp.c) In start_mccp_compress(), the interactive pointer
+      was used before being set. I moved the set&check forward
+       (Bug #0000361).
+  - (pkg-tls.c) The success code passed to the TLS-handshake callback
+      was incorrect: on success, it was passed as '1' instead of '0'
+       (reported by Philipp).
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Mon, 31 Jan 2005 22:17:26 -0700")
+(Checkin-Time "Tue, 01 Feb 2005 07:47:03 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -115,7 +105,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.12 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.85 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.729 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.730 644))
   (HISTORY (lpmud/f/49_HISTORY 1.385.1.13 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.21 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -324,7 +314,7 @@
   (src/pkg-alists.c (lpmud/l/38_pkg-alists 1.10 644))
   (src/pkg-alists.h (lpmud/l/39_pkg-alists 1.3 644))
   (src/pkg-mccp.h (lpmud/d/b/48_pkg-mccp.h 1.2 644))
-  (src/pkg-mccp.c (lpmud/d/b/49_pkg-mccp.c 1.11 644))
+  (src/pkg-mccp.c (lpmud/d/b/49_pkg-mccp.c 1.12 644))
   (src/pkg-mysql.c (lpmud/j/1_pkg-mysql. 1.23 644))
   (src/pkg-mysql.h (lpmud/j/2_pkg-mysql. 1.5 644))
   (src/pkg-odbc.h (lpmud/e/b/43_pkg-odbc.h 1.1 644))
@@ -334,7 +324,7 @@
   (src/pkg-pgsql.c (lpmud/d/b/39_pkg-pgsql. 1.4 644))
   (src/pkg-pgsql.h (lpmud/d/b/40_pkg-pgsql. 1.2 644))
   (src/pkg-tls.h (lpmud/e/b/10_pkg-tls.h 1.7 644))
-  (src/pkg-tls.c (lpmud/e/b/11_pkg-tls.c 1.16 644))
+  (src/pkg-tls.c (lpmud/e/b/11_pkg-tls.c 1.17 644))
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.20 644))
   (src/port.c (lpmud/39_port.c 1.17.1.9 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.17.1.5 644))
@@ -620,7 +610,7 @@
   (doc/concepts/pgsql (lpmud/d/b/43_pgsql 1.2 644))
   (doc/concepts/rtfm (lpmud/n/39_rtfm 1.1 644))
   (doc/concepts/simul_efun (lpmud/n/40_simul_efun 1.2 644))
-  (doc/concepts/tls (lpmud/e/b/13_tls 1.4 644))
+  (doc/concepts/tls (lpmud/e/b/13_tls 1.5 644))
   (doc/concepts/uids (lpmud/n/41_uids 1.8 644))
 
   (doc/driver/codestyle (lpmud/h/1_codestyle 1.4 644))
@@ -909,7 +899,7 @@
   (doc/efun/tls_available (lpmud/d/c/13_tls_availa 1.1 644))
   (doc/efun/tls_deinit_connection (lpmud/e/b/14_tls_deinit 1.4 644))
   (doc/efun/tls_error (lpmud/e/b/15_tls_error 1.3 644))
-  (doc/efun/tls_init_connection (lpmud/e/b/16_tls_init_c 1.6 644))
+  (doc/efun/tls_init_connection (lpmud/e/b/16_tls_init_c 1.7 644))
   (doc/efun/tls_query_connection_info (lpmud/e/b/17_tls_query_ 1.6 644))
   (doc/efun/tls_query_connection_state (lpmud/e/b/18_tls_query_ 1.4 644))
   (doc/efun/to_array (lpmud/q/45_to_array 1.7 644))

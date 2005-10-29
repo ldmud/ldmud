@@ -29,6 +29,9 @@ DESCRIPTION
         this means that the TLS handshake is the first and only thing the
         client gets to see while the handshake is in progress.
 
+        The driver automatically suppresses the printing of the prompt
+        while the TLS handshake is in progress.
+
 SEE ALSO
         tls_deinit_connection(E), tls_error(E), tls_query_connection_state(E),
         tls_query_connection_info(E), tls_available(E)

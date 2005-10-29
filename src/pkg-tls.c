@@ -664,7 +664,7 @@ tls_continue_handshake (interactive_t *ip)
 
         push_error_handler (handle_tls_cb_error, (svalue_t *)handler);
 
-        push_number(inter_sp, ret ? ret : 0);
+        push_number(inter_sp, ret < 0 ? ret : 0);
         push_ref_object(inter_sp, ip->ob, "tls_handshake");
 
         (void)apply_callback(handler->cb, 2);

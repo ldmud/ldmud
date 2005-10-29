@@ -53,6 +53,16 @@ USAGE
             STARTTLS like SMTP or IMAP. tls_init_connection() can be
             called at any time by the interactive object.
 
+            You must not write to the connection after calling this
+            efun until the callback is executed (the prompt will
+            be supressed automatically during this time).
+
+        To test your code, you can use the openssl binary.
+        `openssl s_client -connect host:port' should display your certificate
+        and anything you write after the callback is executed. If you
+        encounter the error message `SSL3_GET_RECORD: wrong version number'
+        you're probably writing to the connection while you should not.
+
 BUG
         This manpage might be not quite up to date with the implementation.
 

@@ -291,6 +291,12 @@ f_start_mccp_compress (svalue_t * sp)
     p_int mccpver;
     int retval;
     
+    if (!O_SET_INTERACTIVE(ip, current_object))
+    {
+        error("start_mccp_compress() called for non-interactive object.\n");
+        return sp;
+    }
+    
     if (!ip->tn_enabled)
         mccpver = -1;
     else
@@ -308,12 +314,6 @@ f_start_mccp_compress (svalue_t * sp)
             /* NOTREACHED */
             return sp;
         }
-    }
-    
-    if (!O_SET_INTERACTIVE(ip, current_object))
-    {
-        error("start_mccp_compress() called for non-interactive object.\n");
-        return sp;
     }
     
 #if 0
