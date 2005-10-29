@@ -719,16 +719,21 @@ mhash (svalue_t * svp)
 {
     mp_int i;
 
-    if (svp->type != T_CLOSURE
-     || (   svp->x.closure_type != CLOSURE_LFUN
-         && svp->x.closure_type != CLOSURE_IDENTIFIER )
-       )
+    if (svp->type != T_CLOSURE)
     {
         i = svp->u.number ^ *SVALUE_FULLTYPE(svp);
     }
-    else
+    else if (CLOSURE_REFERENCES_CODE(svp->x.closure_type))
+    {
+        i = (p_int)(svp->u.lambda) ^ *SVALUE_FULLTYPE(svp);
+    }
+    else if (CLOSURE_MALLOCED(svp->x.closure_type))
     {
         i = (p_int)(svp->u.lambda->ob) ^ *SVALUE_FULLTYPE(svp);
+    }
+    else /* Efun, Simul-Efun, Operator closure */
+    {
+        i = *SVALUE_FULLTYPE(svp);
     }
 
     i = i ^ i >> 16;

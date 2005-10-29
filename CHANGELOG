@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+31-Dec-2004 (Lars Duening)  (3.3.643)
+  - (mapping.c) Corrected the hashing function so that for efun/sefun/operator
+        closures the object information is no longer part of the hash. Without
+        that, mappings treat closure keys differently than the '=='/'!='
+        operators, which is not a good thing.
+
 31-Dec-2004 (Lars Duening)  (3.3.642)
   - (lex.c) Factored the handling of preprocessor statements and of
         closures out of the yylex switch.

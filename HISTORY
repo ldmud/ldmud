@@ -232,6 +232,7 @@ For a detailed list of all changes see the file CHANGELOG.
            ("#'super::fun").
 
     - Runtime:
+       + Closures now work correctly when used as mapping keys.
        + The tracedepth wasn't calculated correctly.
        + A 'Command too long' error now also prints the beginning of the
          offending command as debugging aid.
