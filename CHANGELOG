@@ -1,6 +1,9 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+29-Oct-2005 (Lars Duening)
+  - (pkg-tls.c) The OpenSSL read/writes are now retried when necessary.
+
 19-Oct-2005 (Lars Duening)
   - (pkg-tls.c) tls_check_certificate() now returns the low-level API
       values, and throws an error if the connection is not secure.

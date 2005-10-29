@@ -512,11 +512,15 @@ tls_read (interactive_t *ip, char *buffer, int length)
  */
 
 {
-    int ret;
+    int ret, err;
 
 #ifdef HAS_OPENSSL
 
-    ret = SSL_read(ip->tls_session, buffer, length);
+    do {
+        ret = SSL_read(ip->tls_session, buffer, length);
+    } while  (ret < 0 && (err = SSL_get_error(ip->tls_session, ret))
+              && (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE));
+
     if (ret == 0)
     {
         tls_deinit_connection(ip);
@@ -524,7 +528,7 @@ tls_read (interactive_t *ip, char *buffer, int length)
     else if (ret < 0)
     {
         ret = SSL_get_error(ip->tls_session, ret);
-	debug_message("%s TLS: Received corrupted data (%d). "
+        debug_message("%s TLS: Received corrupted data (%d). "
                       "Closing the connection.\n"
                      , time_stamp(), ret);
         tls_deinit_connection(ip);
@@ -542,7 +546,7 @@ tls_read (interactive_t *ip, char *buffer, int length)
     }
     else if (ret < 0)
     {
-	debug_message("%s GnuTLS: Error in receiving data (%s). "
+        debug_message("%s GnuTLS: Error in receiving data (%s). "
                       "Closing the connection.\n"
                      , time_stamp(), gnutls_strerror(ret));
         tls_deinit_connection(ip);
@@ -562,11 +566,15 @@ tls_write (interactive_t *ip, char *buffer, int length)
  */
 
 {
-    int ret;
+    int ret, err;
 
 #ifdef HAS_OPENSSL
 
-    ret = SSL_write(ip->tls_session, buffer, length);
+    do {
+        ret = SSL_write(ip->tls_session, buffer, length);
+    } while  (ret < 0 && (err = SSL_get_error(ip->tls_session, ret))
+              && (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE));
+
     if (ret == 0)
     {
         tls_deinit_connection(ip);
@@ -574,7 +582,7 @@ tls_write (interactive_t *ip, char *buffer, int length)
     else if (ret < 0)
     {
         ret = SSL_get_error(ip->tls_session, ret);
-	debug_message("%s TLS: Sending data failed (%d). "
+        debug_message("%s TLS: Sending data failed (%d). "
                       "Closing the connection.\n"
                      , time_stamp(), ret);
         tls_deinit_connection(ip);
@@ -585,7 +593,7 @@ tls_write (interactive_t *ip, char *buffer, int length)
     ret = gnutls_record_send( ip->tls_session, buffer, length );
     if (ret < 0)
     {
-	debug_message("%s GnuTLS: Error in sending data (%s). "
+        debug_message("%s GnuTLS: Error in sending data (%s). "
                       "Closing the connection.\n"
                      , time_stamp(), gnutls_strerror(ret));
         tls_deinit_connection(ip);
@@ -840,10 +848,10 @@ v_tls_init_connection (svalue_t *sp, int num_arg)
             ret = - ERR_get_error();
             break;
         }
-	if (ip->outgoing_conn)
-	    SSL_set_connect_state(session);
-	else
-	    SSL_set_accept_state(session);
+        if (ip->outgoing_conn)
+            SSL_set_connect_state(session);
+        else
+            SSL_set_accept_state(session);
         ip->tls_session = session;
         
 #elif defined(HAS_GNUTLS)
@@ -913,48 +921,48 @@ f_tls_check_certificate(svalue_t *sp)
         errorf("tls_check_certificate(): object doesn't have a secure connection.\n");
     else
     {
-	peer = SSL_get_peer_certificate(ip->tls_session);
-	if (peer != NULL)
-	{
-	    int verify_result, i;
-	    char buf[257];
-	    string_t *sha;
-	    unsigned char *shabuf;
-	    
-	    v = allocate_array(12);
-	    verify_result = SSL_get_verify_result(ip->tls_session);
-	    put_number(&(v->item[0]), verify_result);
+        peer = SSL_get_peer_certificate(ip->tls_session);
+        if (peer != NULL)
+        {
+            int verify_result, i;
+            char buf[257];
+            string_t *sha;
+            unsigned char *shabuf;
+            
+            v = allocate_array(12);
+            verify_result = SSL_get_verify_result(ip->tls_session);
+            put_number(&(v->item[0]), verify_result);
 
-	    /* fill the result with various information about 
-	     * subject and issuer, fingerprint, etc
-	     * TODO: this is incomplete
-	     */
-	    subject = X509_get_subject_name(peer);
-	    X509_NAME_get_text_by_NID(subject, NID_commonName, buf, sizeof(buf)-1);
+            /* fill the result with various information about 
+             * subject and issuer, fingerprint, etc
+             * TODO: this is incomplete
+             */
+            subject = X509_get_subject_name(peer);
+            X509_NAME_get_text_by_NID(subject, NID_commonName, buf, sizeof(buf)-1);
             buf[sizeof(buf)-1] = '\0';
-	    put_c_string(&(v->item[1]), buf);
-	    
+            put_c_string(&(v->item[1]), buf);
+            
 #if 0
-	    issuer = X509_get_issuer_name(peer);
+            issuer = X509_get_issuer_name(peer);
 #endif
-	    /* TODO: issued on (preferably seconds since epoch)
-	     */
-	    /* TODO: expires on
-	     */
-	    /* sha1 fingerprint
-	     */
-	    memsafe(sha = alloc_mstring(2 * SHA1HashSize), 
-		    2 & SHA1HashSize, "sha1 hash");
-	    shabuf = (unsigned char *)get_txt(sha);
-	    for (i = 0; i < SHA1HashSize; i++)
-		sprintf((char *)shabuf+2*i, "%02x", peer -> sha1_hash[i]);
-	    put_string(&(v->item[10]), sha);
+            /* TODO: issued on (preferably seconds since epoch)
+             */
+            /* TODO: expires on
+             */
+            /* sha1 fingerprint
+             */
+            memsafe(sha = alloc_mstring(2 * SHA1HashSize), 
+                    2 & SHA1HashSize, "sha1 hash");
+            shabuf = (unsigned char *)get_txt(sha);
+            for (i = 0; i < SHA1HashSize; i++)
+                sprintf((char *)shabuf+2*i, "%02x", peer -> sha1_hash[i]);
+            put_string(&(v->item[10]), sha);
 
-	    /* TODO: md5 fingerprint 
-	     */
+            /* TODO: md5 fingerprint 
+             */
 
-	    X509_free(peer);
-	}
+            X509_free(peer);
+        }
     } /* if (tls active) */
 #elif defined(HAS_GNUTLS)
 printf("DEBUG: sp type %d\n", sp->type);
@@ -1158,21 +1166,21 @@ f_tls_query_connection_info (svalue_t *sp)
 #ifdef HAS_OPENSSL
         put_c_string(&(rc->item[TLS_CIPHER])
                     , SSL_get_cipher(ip->tls_session));
-	put_number(&(rc->item[TLS_COMP]), 0);
-	put_number(&(rc->item[TLS_KX]), 0);
-	put_number(&(rc->item[TLS_MAC]), 0);
+        put_number(&(rc->item[TLS_COMP]), 0);
+        put_number(&(rc->item[TLS_KX]), 0);
+        put_number(&(rc->item[TLS_MAC]), 0);
         put_c_string(&(rc->item[TLS_PROT])
                     , SSL_get_version(ip->tls_session));
 #elif defined(HAS_GNUTLS)
         put_number(&(rc->item[TLS_CIPHER])
                   , gnutls_cipher_get(ip->tls_session));
-	put_number(&(rc->item[TLS_COMP])
+        put_number(&(rc->item[TLS_COMP])
                   , gnutls_compression_get(ip->tls_session));
-	put_number(&(rc->item[TLS_KX])
+        put_number(&(rc->item[TLS_KX])
                   , gnutls_kx_get(ip->tls_session));
-	put_number(&(rc->item[TLS_MAC])
+        put_number(&(rc->item[TLS_MAC])
                   , gnutls_mac_get(ip->tls_session));
-	put_number(&(rc->item[TLS_PROT])
+        put_number(&(rc->item[TLS_PROT])
                   , gnutls_protocol_get_version(ip->tls_session));
 #endif /* SSL Package */
         free_svalue(sp);
