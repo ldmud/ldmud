@@ -1454,12 +1454,12 @@ static Option aOptions[]
       }
     , { 0,      "tls-trustfile",       cTLStrustfile,     MY_TRUE
       , "  --tls-trustfile <pathname>\n"
-      , "    Use <pathname> as the directory where your trusted certificate PEM resides.\n"
+      , "    Use <pathname> as the filename holding your trusted PEM certificates.\n"
         "    If relative, <pathname> is interpreted relative to <mudlib>.\n"
       }
     , { 0,      "tls-trustdirectory",  cTLStrustdir,      MY_TRUE
       , "  --tls-trustdirectory <pathname>\n"
-      , "    Use <pathname> as the directory where your trusted certificates reside,\n"
+      , "    Use <pathname> as the directory where your trusted PEM certificates reside,\n"
         "    default is '" TLS_DEFAULT_TRUSTDIRECTORY "'.\n"
         "    If relative, <pathname> is interpreted relative to <mudlib>.\n"
       }
@@ -2048,6 +2048,9 @@ options (void)
 #       endif
 #       if defined(NEW_CLEANUP)
                               , "NEW_CLEANUP"
+#       endif
+#       if defined(LOG_NEW_CLEANUP)
+                              , "LOG_NEW_CLEANUP"
 #       endif
 #       if defined(USE_AVL_FREELIST)
                               , "USE_AVL_FREELIST"

@@ -125,6 +125,7 @@ AC_MY_ARG_ENABLE(use-pcre,yes,,[Enables PCRE: no/yes/builtin/no-builtin])
 AC_MY_ARG_ENABLE(use-deprecated,yes,,[Enables obsolete and deprecated efuns])
 AC_MY_ARG_ENABLE(use-structs,yes,,[Enables structs])
 AC_MY_ARG_ENABLE(use-tls,no,,[Enables Transport Layer Security over Telnet: no/gnu/ssl/yes])
+AC_MY_ARG_WITH(tls-path,,[Optional location of the TLS include/ and lib/ directory])
 AC_MY_ARG_ENABLE(use-new-inlines,yes,,[Enables new inline syntax])
 AC_MY_ARG_ENABLE(use-set-light,yes,,[Enables efun set_light()])
 AC_MY_ARG_ENABLE(use-set-is-wizard,yes,,[Enables efun set_is_wizard()])
@@ -316,6 +317,14 @@ else
   cdef_use_tls="#define"
   tls_package="$enable_use_tls"
   enable_use_tls="yes"
+fi
+AC_UPDATE_VAR(with_tls_path)
+if test "x$with_tls_path" = "x" -o "x$with_tls_path" = "xno" ; then
+  tls_include_path=""
+  tls_lib_path=""
+else
+  tls_include_path="${with_tls_path}/include"
+  tls_lib_path="${with_tls_path}/lib"
 fi
 
 AC_CDEF_FROM_ENABLE(access_control)
@@ -777,8 +786,23 @@ fi
 
 has_tls=no
 
+saveflags="$CFLAGS"
+saveeflags="$EXTRA_CFLAGS"
+savelibs="$LIBS"
+savepkglibs="$PKGLIBS"
+
 # Check for OpenSSL unless not desired
 # Check for the libraries only if tls is actually enabled.
+
+if test ! "x${tls_include_path}" = "x"; then
+    CFLAGS="$CFLAGS -I${tls_include_path}"
+    EXTRA_CFLAGS="$EXTRA_CFLAGS -I${tls_include_path}"
+fi
+
+if test ! "x${tls_lib_path}" = "x"; then
+    LIBS="$LIBS -L${tls_lib_path}"
+    PKGLIBS="$PKGLIBS -L${tls_lib_path}"
+fi
 
 if test "$tls_package" = "any" -o "$tls_package" = "ssl"; then
 
@@ -931,7 +955,12 @@ if test "$has_tls" = no; then
     fi
     cdef_use_tls="#undef"
     enable_use_tls=no
+    EXTRA_CFLAGS="$saveeflags"
+    PKGLIBS="$savepkglibs"
 fi
+
+CFLAGS="$saveflags"
+LIBS="$savelibs"
 
 # --- PThreads ---
 

@@ -402,6 +402,12 @@ enable_use_mccp=no
 
 enable_use_tls=no
 
+# The optional path to the TLS installation. When set, the configuration
+# script will add {tls_path}/include and {tls_path}/lib to the include resp.
+# library search paths.
+
+with_tls_path=
+
 # Enable support for alists.
 
 enable_use_alists=no

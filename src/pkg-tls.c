@@ -22,7 +22,6 @@
 #  include <sys/utsname.h>
 #elif defined(HAS_GNUTLS)
 #  include <gnutls/gnutls.h>
-#  include <gcrypt.h>
 #  if defined(USE_PTHREADS) && defined(GCRY_THREAD_OPTION_PTHREAD_IMPL)
 #    include <pthread.h>
      GCRY_THREAD_OPTION_PTHREAD_IMPL;
@@ -254,12 +253,33 @@ void tls_global_init (void)
           , time_stamp(), keyfile, certfile);
     debug_message("%s TLS: (OpenSSL) Keyfile '%s', Certfile '%s'\n"
                  , time_stamp(), keyfile, certfile);
-    if (trustfile != NULL || trustdirectory != NULL)
+    if (trustfile != NULL && trustdirectory != NULL)
     {
-        printf("%s TLS: (OpenSSL) trusted x509 certificates from '%s' and '%s'\n"
+        printf("%s TLS: (OpenSSL) trusted x509 certificates from '%s' and directory '%s'.\n"
               , time_stamp(), trustfile, trustdirectory);
-        debug_message("%s TLS: (OpenSSL) trusted x509 certificates from '%s' and '%s'\n"
+        debug_message("%s TLS: (OpenSSL) trusted x509 certificates from '%s' and directory '%s'.\n"
                      , time_stamp(), trustfile, trustdirectory);
+    }
+    else if (trustfile != NULL)
+    {
+        printf("%s TLS: (OpenSSL) trusted x509 certificates from '%s'.\n"
+              , time_stamp(), trustfile);
+        debug_message("%s TLS: (OpenSSL) trusted x509 certificates from '%s'.\n"
+                     , time_stamp(), trustfile);
+    }
+    else if (trustdirectory != NULL)
+    {
+        printf("%s TLS: (OpenSSL) trusted x509 certificates from directory '%s'.\n"
+              , time_stamp(), trustdirectory);
+        debug_message("%s TLS: (OpenSSL) trusted x509 certificates from directory '%s'.\n"
+                     , time_stamp(), trustdirectory);
+    }
+    else
+    {
+        printf("%s TLS: (OpenSSL) Trusted x509 certificates locations not specified.\n"
+              , time_stamp());
+        debug_message("%s TLS: (OpenSSL) trusted x509 certificates locations not specified.\n"
+                     , time_stamp());
     }
 
     SSL_load_error_strings();

@@ -8725,11 +8725,11 @@ static int nesting = 0;  /* Used to detect recursive calls */
                 if (!tmp)
                 {
                     if (file)
-                        errorf("Stack overflow when restoring %s "
+                        errorf("Out of memory when restoring %s "
                               "from %s line %d.\n"
                               , get_txt(current_object->name), name, lineno);
                     else
-                        errorf("Stack overflow when restoring %s.\n"
+                        errorf("Out of memory when restoring %s.\n"
                               , get_txt(current_object->name));
                     /* NOTREACHED */
                     return sp;

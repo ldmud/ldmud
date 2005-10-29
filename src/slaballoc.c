@@ -475,7 +475,7 @@ struct slab_s
                              * TODO:: slabentry_t.
                              */
     mslab_t * prev, * next;  /* Link pointers for slab list. */
-    unsigned short numAllocated;  /* Number of blocks allocated. */
+    unsigned long numAllocated;  /* Number of blocks allocated. */
     word_t * freeList;      /* List of free blocks. */
     word_t   blocks[1];     /* First word of the allocatable memory. */
 };

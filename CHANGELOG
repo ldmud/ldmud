@@ -1,12 +1,23 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-01-Apr-2005 (Lars Duening)  (3.3.671)
+24-Apr-2005 (Lars Duening)  (3.3.699)
+  - (config.h.in, gcollect.c) Added a specific define LOG_NEW_CLEANUP
+      to enable the logging of the automatic cleanup activity. This
+      is useful if the cleanup is suspicious of hogging the CPU.
+  - (main.c, pkg-tls.c) Improved the documentation for the TLS commandline
+      options, removed a crasher when only one of the two cert locations
+      is specified (thanks, Coogan!).
+  - (xalloc.c) Added warning if ptmalloc is used under FreeBSD.
+  - (configure) New configuration parameter '--with-tls-path' allows
+      to specifiy a non-standard location for the TLS installation.
+
+01-Apr-2005 (Lars Duening)  (3.3.698)
   - (pkg-tls.c) Added FreeBSD 5.4 compatibility (thanks, Ralph!).
   - (simulate, many files) Renamed error() to errorf() due to a collision
       with gnutls.h include files under newer compilers.
 
-01-Apr-2005 (Lars Duening)  (3.3.696, .670)
+01-Apr-2005 (Lars Duening)  (3.3.696, .697)
   - (port.c) Corrected a C99 incompatibility (thanks, Ralph!).
   - (simulate.c, backend) The commands/s and compiled lines/s statistics
        are part of the 'status tables' output.

@@ -59,17 +59,23 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 698)
-(Parent-Version lpmud 3-3 697)
+(Project-Version lpmud 3-3 699)
+(Parent-Version lpmud 3-3 698)
 (Version-Log "
-  - (pkg-tls.c) Added FreeBSD 5.4 compatibility (thanks, Ralph!).
-  - (simulate, many files) Renamed error() to errorf() due to a collision
-      with gnutls.h include files under newer compilers.
+  - (config.h.in, gcollect.c) Added a specific define LOG_NEW_CLEANUP
+      to enable the logging of the automatic cleanup activity. This
+      is useful if the cleanup is suspicious of hogging the CPU.
+  - (main.c, pkg-tls.c) Improved the documentation for the TLS commandline
+      options, removed a crasher when only one of the two cert locations
+      is specified (thanks, Coogan!).
+  - (xalloc.c) Added warning if ptmalloc is used under FreeBSD.
+  - (configure) New configuration parameter '--with-tls-path' allows
+      to specifiy a non-standard location for the TLS installation.
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Fri, 01 Apr 2005 21:39:09 -0700")
+(Checkin-Time "Sun, 24 Apr 2005 13:08:21 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -108,25 +114,25 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.12 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.86 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.761 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.762 644))
   (HISTORY (lpmud/f/49_HISTORY 1.385.1.22 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.21 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
   ;; Configuration
-  (src/configure (lpmud/d/0_configure 1.19.1.109.1.10 755))
-  (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.43.1.6 644))
+  (src/configure (lpmud/d/0_configure 1.19.1.109.1.11 755))
+  (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.43.1.7 644))
   (src/machine.h.in (lpmud/b/9_machine.h. 1.9.1.14 644))
   (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.19.1.34.1.6 644))
   (src/mkinstalldirs (lpmud/c/4_mkinstalld 1.1 644))
   (src/install-sh (lpmud/c/5_install-sh 1.2 755))
   (src/ldmud-man.txt (lpmud/c/c/29_ldmud-man. 1.1 644))
 
-  (src/autoconf/configure.in (lpmud/d/7_configure. 1.20.1.9.1.109 644))
+  (src/autoconf/configure.in (lpmud/d/7_configure. 1.20.1.9.1.110 644))
   (src/autoconf/acconfig.h (lpmud/d/10_acconfig.h 1.6.1.14 644))
 
   (src/settings/README (lpmud/c/22_README 1.14.1.17 644))
-  (src/settings/default (lpmud/c/23_default 1.13.1.5.1.54 744))
+  (src/settings/default (lpmud/c/23_default 1.13.1.5.1.55 744))
   (src/settings/native (lpmud/c/9_native 1.6 744))
   (src/settings/compat (lpmud/c/10_compat 1.7 744))
   (src/settings/alatia (lpmud/j/27_alatia 1.6 744))
@@ -193,7 +199,7 @@
   (src/files.c (lpmud/i/50_files.c 1.30 644))
   (src/filestat.h (lpmud/f/51_filestat.h 1.7 644))
   (src/gcollect.h (lpmud/f/33_gcollect.h 1.6.1.18 644))
-  (src/gcollect.c (lpmud/c/30_gcollect.c 1.41.1.116.1.15 644))
+  (src/gcollect.c (lpmud/c/30_gcollect.c 1.41.1.116.1.16 644))
   (src/hash.h (lpmud/f/32_hash.h 1.6 644))
   (src/hash.c (lpmud/c/28_hash.c 1.17 644))
   (src/heartbeat.h (lpmud/m/41_heartbeat. 1.6.1.5 644))
@@ -204,7 +210,7 @@
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.15.1.13 644))
   (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.74.1.10 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.22 644))
-  (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.80 644))
+  (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.81 644))
   (src/mapping.h (lpmud/f/30_mapping.h 1.12.1.22 644))
   (src/mapping.c (lpmud/b/6_mapping.c 1.36.1.91 644))
   (src/md5.h (lpmud/l/18_md5.h 1.3 644))
@@ -219,7 +225,7 @@
   (src/my-rusage.h (lpmud/f/28_my-rusage. 1.7 644))
   (src/my-stdint.h (lpmud/u/b/39_my-stdint. 1.2 644))
   (src/object.h (lpmud/44_object.h 1.34.1.19.1.6.1.6 644))
-  (src/object.c (lpmud/45_object.c 1.62.1.88.1.53.1.9 644))
+  (src/object.c (lpmud/45_object.c 1.62.1.88.1.53.1.10 644))
   (src/otable.h (lpmud/f/27_otable.h 1.8.1.4 644))
   (src/otable.c (lpmud/43_otable.c 1.22.1.8 644))
   (src/parser.c (lpmud/l/13_parser.c 1.1 644))
@@ -327,7 +333,7 @@
   (src/pkg-pgsql.c (lpmud/d/b/39_pkg-pgsql. 1.6 644))
   (src/pkg-pgsql.h (lpmud/d/b/40_pkg-pgsql. 1.2 644))
   (src/pkg-tls.h (lpmud/e/b/10_pkg-tls.h 1.8 644))
-  (src/pkg-tls.c (lpmud/e/b/11_pkg-tls.c 1.24 644))
+  (src/pkg-tls.c (lpmud/e/b/11_pkg-tls.c 1.25 644))
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.20 644))
   (src/port.c (lpmud/39_port.c 1.17.1.10 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.17.1.6 644))
@@ -346,7 +352,7 @@
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.42 644))
   (src/simulate.c (lpmud/31_simulate.c 1.88.1.135.1.20 644))
   (src/slaballoc.h (lpmud/d/c/16_slaballoc. 1.2 644))
-  (src/slaballoc.c (lpmud/d/c/17_slaballoc. 1.11 644))
+  (src/slaballoc.c (lpmud/d/c/17_slaballoc. 1.12 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.16 644))
   (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.114 644))
   (src/sysmalloc.h (lpmud/c/b/33_sysmalloc. 1.2 644))
@@ -365,7 +371,7 @@
   (src/wiz_list.h (lpmud/1_wiz_list.h 1.5.1.7.1.3 644))
   (src/wiz_list.c (lpmud/2_wiz_list.c 1.13.1.14.1.7 644))
   (src/xalloc.h (lpmud/g/51_xalloc.h 1.27 644))
-  (src/xalloc.c (lpmud/h/0_xalloc.c 1.2.1.48 644))
+  (src/xalloc.c (lpmud/h/0_xalloc.c 1.2.1.49 644))
   (src/xptmalloc.c (lpmud/d/b/10_xptmalloc. 1.6 644))
 
   ;; Build files
@@ -611,7 +617,7 @@
   (doc/driver/debugmalloc (lpmud/n/42_debugmallo 1.3 644))
   (doc/driver/driver (lpmud/n/43_driver 1.2 644))
   (doc/driver/dumpallobj (lpmud/n/44_dumpallobj 1.6 644))
-  (doc/driver/invocation (lpmud/f/38_invocation 1.14.1.21 644))
+  (doc/driver/invocation (lpmud/f/38_invocation 1.14.1.22 644))
   (doc/driver/malloc (lpmud/n/45_malloc 1.3 644))
   (doc/driver/opcdump (lpmud/n/46_opcdump 1.3 644))
   (doc/driver/predefined (lpmud/h/8_predefined 1.12.1.26 644))
