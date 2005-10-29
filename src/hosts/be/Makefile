@@ -608,10 +608,10 @@ $(OBJ)/pkg-pgsql.o : ../mudlib/sys/pgsql.h xalloc.h stdstrings.h simulate.h \
     strfuns.h sent.h bytecode.h hash.h exec.h port.h config.h hosts/unix.h \
     hosts/be/be.h machine.h
 
-$(OBJ)/pkg-tls.o : ../mudlib/sys/tls.h xalloc.h svalue.h object.h \
+$(OBJ)/pkg-tls.o : ../mudlib/sys/tls.h sha1.h xalloc.h svalue.h object.h \
     mstrings.h main.h interpret.h comm.h array.h actions.h pkg-tls.h \
-    machine.h driver.h strfuns.h typedefs.h sent.h hash.h bytecode.h \
-    simulate.h port.h config.h hosts/unix.h hosts/be/be.h
+    machine.h driver.h my-stdint.h strfuns.h typedefs.h sent.h hash.h \
+    bytecode.h simulate.h port.h config.h hosts/unix.h hosts/be/be.h
 
 $(OBJ)/port.o : hosts/crypt.c main.h backend.h my-rusage.h driver.h \
     machine.h typedefs.h port.h config.h hosts/unix.h hosts/be/be.h

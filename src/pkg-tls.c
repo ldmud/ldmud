@@ -1,9 +1,8 @@
 /*------------------------------------------------------------------
  * Wrapper for the gnutls resp. OpenSSL module.
  *
-#ifdef HAS_OPENSSL
- * The OpenSSL implementation was based on the easy_tls.c demo
- * and probably doesn't work, due to lack of usable documentation.
+#ifdef HAS_GNUTLS
+ * GNUTLS provides less functionality than OpenSSL
 #endif
  *------------------------------------------------------------------
  */
@@ -40,7 +39,8 @@
 #include "object.h"
 #include "svalue.h"
 #include "xalloc.h"
-
+#include "sha1.h"
+     
 #include "../mudlib/sys/tls.h"
 
 /*-------------------------------------------------------------------------*/
@@ -52,6 +52,8 @@
 
 char * tls_keyfile = NULL;
 char * tls_certfile = NULL;
+char * tls_trustfile = NULL;
+char * tls_trustdirectory = NULL;
   /* The filenames of the x509 key and cert file, set by the argument
    * parser. If not set, the package will use defaults.
    */
@@ -238,6 +240,8 @@ void tls_global_init (void)
 {
     char * keyfile = tls_keyfile ? tls_keyfile : TLS_DEFAULT_KEYFILE;
     char * certfile = tls_certfile ? tls_certfile : TLS_DEFAULT_CERTFILE;
+    char * trustfile = tls_trustfile ? tls_trustfile : NULL;
+    char * trustdirectory = tls_trustdirectory ? tls_trustdirectory : TLS_DEFAULT_TRUSTDIRECTORY;
 
 #ifdef HAS_OPENSSL
 
@@ -245,8 +249,16 @@ void tls_global_init (void)
           , time_stamp(), keyfile, certfile);
     debug_message("%s TLS: (OpenSSL) Keyfile '%s', Certfile '%s'\n"
                  , time_stamp(), keyfile, certfile);
+    if (trustfile != NULL || trustdirectory != NULL)
+    {
+	printf("%s TLS: (OpenSSL) trusted x509 certificates from '%s' and '%s'\n"
+              , time_stamp(), trustfile, trustdirectory);
+	debug_message("%s TLS: (OpenSSL) trusted x509 certificates from '%s' and '%s'\n"
+                     , time_stamp(), trustfile, trustdirectory);
+    }
 
     SSL_load_error_strings();
+    ERR_load_BIO_strings();
     if (!SSL_library_init())
     {
 	printf("%s TLS: Initialising the SSL library failed.\n"
@@ -293,7 +305,7 @@ void tls_global_init (void)
         RAND_seed((const void *)&data2, sizeof data2);
     }
 
-    context = SSL_CTX_new (SSLv23_server_method());
+    context = SSL_CTX_new (SSLv23_method());
     if (!context)
     {
 	printf("%s TLS: Can't get SSL context:\n"
@@ -325,6 +337,14 @@ void tls_global_init (void)
         goto ssl_init_err;
     }
 
+    if (!SSL_CTX_load_verify_locations(context, trustfile, trustdirectory))
+    {
+	printf("%s TLS: Error preparing x509 verification certificates\n",
+	       time_stamp());
+	debug_message("%s TLS: Error preparing x509 verification certificates\n",
+	       time_stamp());
+    }
+    
     if (!set_dhe1024()
      || !SSL_CTX_set_tmp_dh(context, dhe1024)
        )
@@ -795,8 +815,10 @@ v_tls_init_connection (svalue_t *sp, int num_arg)
             ret = - ERR_get_error();
             break;
         }
-
-        SSL_set_accept_state(session);
+	if (ip->outgoing_conn)
+	    SSL_set_connect_state(session);
+	else
+	    SSL_set_accept_state(session);
         ip->tls_session = session;
         
 #elif defined(HAS_GNUTLS)
@@ -820,6 +842,115 @@ v_tls_init_connection (svalue_t *sp, int num_arg)
     put_number(sp, ret);
     return sp;
 } /* f_tls_init_connection() */
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_tls_check_certificate(svalue_t *sp)
+
+/* EFUN tls_check_certificate()
+ *
+ *   mixed *tls_check_certificate()
+ *   mixed *tls_check_certificate(object obj);
+ * 
+ * tls_check_certificate() checks the certificate of the secured
+ * connection bound to <obj> (default is the current object).  If
+ * <obj> is not interactive, or if TLS is not available, an error
+ * is thrown.
+ * 
+ * If <obj> doesn't have a secure connection up and running, the
+ * function returns 0. Otherwise, the result is an array with
+ * these entries:
+ * 
+ *   int [0]      : Result code: 0: The certificate is ok.
+ *                               1: The certificate is not ok.
+ *                               2: The certificate is self-signed.
+ *   string [1]   : Subject
+ *   int    [2..9]: Not used yet.
+ *   string [10]  : SHA-1 Fingerprint
+ *   string [11]  : Not used yet (reserved for MD5 Fingerprint)
+ */
+
+{
+    vector_t *v = NULL;
+#ifdef HAS_OPENSSL
+    X509 *peer;
+    X509_NAME *subject;
+    /* TODO: X509_NAME *issuer; */
+    interactive_t *ip;
+    
+    if (!tls_available)
+        error("tls_init_connection(): TLS layer hasn't been initialized.\n");
+    if (!O_SET_INTERACTIVE(ip, sp->u.ob))
+        error("Bad arg 1 to tls_check_certificate(): "
+              "object not interactive.\n");
+    if (ip->tls_status == TLS_ACTIVE) 
+    {
+	v = allocate_array(12);
+	peer = SSL_get_peer_certificate(ip->tls_session);
+	if (peer != NULL)
+	{
+	    int verify_result, i;
+	    char buf[257];
+	    string_t *sha;
+	    unsigned char *shabuf;
+	    
+	    verify_result = SSL_get_verify_result(ip->tls_session);
+	    switch(verify_result)
+	    {
+	    case X509_V_OK:
+		verify_result = 1;
+		break;
+	    case X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT:
+		verify_result = 2;
+		break;
+	    default:
+		verify_result = 0;
+		break;
+	    }
+	    put_number(&(v->item[0]), verify_result);
+
+	    /* fill the result with various information about 
+	     * subject and issuer, fingerprint, etc
+	     * TODO: this is incomplete
+	     */
+	    subject = X509_get_subject_name(peer);
+	    X509_NAME_get_text_by_NID(subject, NID_commonName, buf, sizeof(buf)-1);
+            buf[sizeof(buf)-1] = '\0';
+	    put_c_string(&(v->item[1]), buf);
+	    
+#if 0
+	    issuer = X509_get_issuer_name(peer);
+#endif
+	    /* TODO: issued on (preferably seconds since epoch)
+	     */
+	    /* TODO: expires on
+	     */
+	    /* sha1 fingerprint
+	     */
+	    memsafe(sha = alloc_mstring(2 * SHA1HashSize), 
+		    2 & SHA1HashSize, "sha1 hash");
+	    shabuf = (unsigned char *)get_txt(sha);
+	    for (i = 0; i < SHA1HashSize; i++)
+		sprintf((char *)shabuf+2*i, "%02x", peer -> sha1_hash[i]);
+	    put_string(&(v->item[10]), sha);
+
+	    /* TODO: md5 fingerprint 
+	     */
+
+	    X509_free(peer);
+	}
+    } /* if (tls active) */
+#elif defined(HAS_GNUTLS)
+    error("%s TLS: GNUTLS does not provide certificate checking yet");
+#endif
+
+    free_svalue(sp);
+
+    if (v != NULL)
+        put_array(sp, v);
+    else
+        put_number(sp, 0);
+    return sp;
+} /* tls_check_certificate() */
 
 /*-------------------------------------------------------------------------*/
 void

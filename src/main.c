@@ -1046,6 +1046,8 @@ typedef enum OptNumber {
 #ifdef USE_TLS
  , cTLSkey          /* --tls-key            */
  , cTLScert         /* --tls-cert           */
+ , cTLStrustdir     /* --tls-trustdirectory */
+ , cTLStrustfile    /* --tls-trustfile      */
 #endif
 #ifdef DEBUG
  , cCheckRefs       /* --check-refcounts    */
@@ -1391,6 +1393,16 @@ static Option aOptions[]
       , "  --tls-cert <pathname>\n"
         "    Use <pathname> as the x509 certfile, default is '" TLS_DEFAULT_CERTFILE "'.\n"
         "    If relative, <pathname> is interpreted relative to <mudlib>.\n"
+      }
+    , { 0,      "tls-trustfile",       cTLStrustfile,     MY_TRUE
+      , "  --tls-trustfile <pathname>\n"
+      , "    Use <pathname> as the directory where your trusted certificate PEM resides.\n"
+	"    If relative, <pathname> is interpreted relative to <mudlib>.\n"
+      }
+    , { 0,      "tls-trustdirectory",  cTLStrustdir,      MY_TRUE
+      , "  --tls-trustdirectory <pathname>\n"
+      , "    Use <pathname> as the directory where your trusted certificates reside '" TLS_DEFAULT_TRUSTDIRECTORY "'.\n"
+	"    If relative, <pathname> is interpreted relative to <mudlib>.\n"
       }
 #endif /* USE_TLS */
 
@@ -2452,6 +2464,16 @@ eval_arg (int eOption, const char * pValue)
             free(tls_certfile);
         tls_certfile = strdup(pValue);
         break;
+    case cTLStrustdir:
+	if (tls_trustdirectory != NULL)
+	    free(tls_trustdirectory);
+	tls_trustdirectory = strdup(pValue);
+	break;
+    case cTLStrustfile:
+	if (tls_trustfile != NULL)
+	    free(tls_trustfile);
+	tls_trustfile = strdup(pValue);
+	break;
 #endif
 
 #ifdef GC_SUPPORT

@@ -206,6 +206,16 @@ DESCRIPTION
          Use <pathname> as the x509 certfile, default is 'cert.pem'.
          If relative, <pathname> is interpreted relative to <mudlib>.
 
+      --tls-trustfile <pathname>
+        Use <pathname> as the directory where your trusted certificate
+        PEM resides.
+        If relative, <pathname> is interpreted relative to <mudlib>.
+      
+      --tls-trustdirectory <pathname>
+        Use <pathname> as the directory where your trusted
+        certificates reside, default is '/etc/ssl/certs'.
+        If relative, <pathname> is interpreted relative to <mudlib>.
+
       --wizlist-file <filename>
       --no-wizlist-file
         Read and save the wizlist in the named file (always interpreted
@@ -304,4 +314,5 @@ HISTORY
       --hostaddr, --args and --random-seed options.
     LDMud 3.2.10 added the --filename-spaces options.
     LDMud 3.3.378 added --share-variables, --init-variables.
-    LDMud 3.3.475 added --tls-key, --tle-cert.
+    LDMud 3.3.475/3.2.11 added --tls-key, --tls-cert.
+    LDMud 3.3.672/3.2.11 added --tls-trustfile, --tls-trustdirectory.

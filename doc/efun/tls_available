@@ -15,4 +15,5 @@ HISTORY
 
 SEE ALSO
         tls_init_connection(E), tls_deinit_connection(E), 
-        tls_query_connection_state(E), tls_query_connection_info(E)
+        tls_query_connection_state(E), tls_query_connection_info(E),
+        tls_check_certificate(E)

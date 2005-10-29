@@ -54,17 +54,15 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 671)
-(Parent-Version lpmud 3-3 670)
+(Project-Version lpmud 3-3 672)
+(Parent-Version lpmud 3-3 671)
 (Version-Log "
-  - (pkg-tls.c) My change was premature.
-  - (mstrings.c) The printing of percent values was missing a conversion
-      to float in order to actually compute the percent values.
+  - (pkg-tls.c) Philip provided a tls_check_certificate() efun.
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Sat, 12 Feb 2005 10:53:54 -0700")
+(Checkin-Time "Sun, 13 Feb 2005 21:13:02 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -102,8 +100,8 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.12 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.85 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.734 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.385.1.16 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.735 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.385.1.17 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.21 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -111,7 +109,7 @@
   (src/configure (lpmud/d/0_configure 1.19.1.109.1.7 755))
   (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.43.1.2 644))
   (src/machine.h.in (lpmud/b/9_machine.h. 1.9.1.14 644))
-  (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.19.1.34.1.4 644))
+  (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.19.1.34.1.5 644))
   (src/mkinstalldirs (lpmud/c/4_mkinstalld 1.1 644))
   (src/install-sh (lpmud/c/5_install-sh 1.2 755))
   (src/ldmud-man.txt (lpmud/c/c/29_ldmud-man. 1.1 644))
@@ -198,7 +196,7 @@
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.15.1.13 644))
   (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.74.1.7 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.19 644))
-  (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.70 644))
+  (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.71 644))
   (src/mapping.h (lpmud/f/30_mapping.h 1.12.1.20 644))
   (src/mapping.c (lpmud/b/6_mapping.c 1.36.1.85 644))
   (src/md5.h (lpmud/l/18_md5.h 1.3 644))
@@ -320,8 +318,8 @@
   (src/pkg-pcre.c (lpmud/q/48_pcre-pcre. 1.10 644))
   (src/pkg-pgsql.c (lpmud/d/b/39_pkg-pgsql. 1.4 644))
   (src/pkg-pgsql.h (lpmud/d/b/40_pkg-pgsql. 1.2 644))
-  (src/pkg-tls.h (lpmud/e/b/10_pkg-tls.h 1.7 644))
-  (src/pkg-tls.c (lpmud/e/b/11_pkg-tls.c 1.19 644))
+  (src/pkg-tls.h (lpmud/e/b/10_pkg-tls.h 1.8 644))
+  (src/pkg-tls.c (lpmud/e/b/11_pkg-tls.c 1.20 644))
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.20 644))
   (src/port.c (lpmud/39_port.c 1.17.1.9 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.17.1.5 644))
@@ -363,7 +361,7 @@
   (src/xptmalloc.c (lpmud/d/b/10_xptmalloc. 1.6 644))
 
   ;; Build files
-  (src/func_spec (lpmud/c/31_func_spec 1.53.1.45.1.22.1.39.1.3 644))
+  (src/func_spec (lpmud/c/31_func_spec 1.53.1.45.1.22.1.39.1.4 644))
   (src/string_spec (lpmud/f/6_string_spe 1.14.1.17.1.3 644))
   (src/mkfunc.c (lpmud/l/14_mkfunc.c 1.1 644))
   (src/make_func.y (lpmud/b/7_make_func. 1.25.1.30.1.12 644))
@@ -391,7 +389,7 @@
   (src/hosts/be/config.h (lpmud/e/34_config.h 1.32.1.40 644))
   (src/hosts/be/be.h (lpmud/e/35_be.h 1.7 644))
   (src/hosts/be/beyacc (lpmud/i/39_beyacc 1.1 744))
-  (src/hosts/be/Makefile (lpmud/e/37_Makefile 1.60.1.71.1.32 644))
+  (src/hosts/be/Makefile (lpmud/e/37_Makefile 1.60.1.71.1.33 644))
   (src/hosts/be/icon-32x32.raw (lpmud/s/37_icon-32x32 1.1 644) :no-keywords)
   (src/hosts/be/icon-16x16.raw (lpmud/s/38_icon-16x16 1.1 644) :no-keywords)
   (src/hosts/be/driver.rsrc (lpmud/s/39_driver.rsr 1.1 644) :no-keywords)
@@ -615,7 +613,7 @@
   (doc/driver/debugmalloc (lpmud/n/42_debugmallo 1.3 644))
   (doc/driver/driver (lpmud/n/43_driver 1.2 644))
   (doc/driver/dumpallobj (lpmud/n/44_dumpallobj 1.6 644))
-  (doc/driver/invocation (lpmud/f/38_invocation 1.14.1.18 644))
+  (doc/driver/invocation (lpmud/f/38_invocation 1.14.1.19 644))
   (doc/driver/malloc (lpmud/n/45_malloc 1.3 644))
   (doc/driver/opcdump (lpmud/n/46_opcdump 1.3 644))
   (doc/driver/predefined (lpmud/h/8_predefined 1.12.1.25 644))
@@ -892,12 +890,13 @@
   (doc/efun/this_player (lpmud/q/42_this_playe 1.4 644))
   (doc/efun/throw (lpmud/q/43_throw 1.3 644))
   (doc/efun/time (lpmud/q/44_time 1.1.1.5 644))
-  (doc/efun/tls_available (lpmud/d/c/13_tls_availa 1.2 644))
-  (doc/efun/tls_deinit_connection (lpmud/e/b/14_tls_deinit 1.5 644))
-  (doc/efun/tls_error (lpmud/e/b/15_tls_error 1.4 644))
-  (doc/efun/tls_init_connection (lpmud/e/b/16_tls_init_c 1.8 644))
-  (doc/efun/tls_query_connection_info (lpmud/e/b/17_tls_query_ 1.7 644))
-  (doc/efun/tls_query_connection_state (lpmud/e/b/18_tls_query_ 1.5 644))
+  (doc/efun/tls_available (lpmud/d/c/13_tls_availa 1.3 644))
+  (doc/efun/tls_check_certificate (lpmud/d/c/29_tls_check_ 1.1 644))
+  (doc/efun/tls_deinit_connection (lpmud/e/b/14_tls_deinit 1.6 644))
+  (doc/efun/tls_error (lpmud/e/b/15_tls_error 1.5 644))
+  (doc/efun/tls_init_connection (lpmud/e/b/16_tls_init_c 1.9 644))
+  (doc/efun/tls_query_connection_info (lpmud/e/b/17_tls_query_ 1.8 644))
+  (doc/efun/tls_query_connection_state (lpmud/e/b/18_tls_query_ 1.6 644))
   (doc/efun/to_array (lpmud/q/45_to_array 1.7 644))
   (doc/efun/to_float (lpmud/q/46_to_float 1.4 644))
   (doc/efun/to_int (lpmud/q/47_to_int 1.9 644))
@@ -1296,7 +1295,7 @@
   (doc/LPC/varargs (lpmud/r/36_varargs 1.2 644))
   (doc/LPC/while (lpmud/r/37_while 1.3 644))
 
-  (doc/man/ldmud.1 (lpmud/c/c/30_ldmud.1 1.1 644))
+  (doc/man/ldmud.1 (lpmud/c/c/30_ldmud.1 1.1.1.1 644))
 
   (doc/master/compile_object (lpmud/r/38_compile_ob 1.2 644))
   (doc/master/connect (lpmud/r/39_connect 1.4 644))

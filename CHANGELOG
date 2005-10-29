@@ -1,6 +1,9 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+13-Feb-2004 (Lars Duening)  (3.3.672)
+  - (pkg-tls.c) Philip provided a tls_check_certificate() efun.
+
 12-Feb-2004 (Lars Duening)  (3.3.671)
   - (pkg-tls.c) My change was premature.
   - (mstrings.c) The printing of percent values was missing a conversion

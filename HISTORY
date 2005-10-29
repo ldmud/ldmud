@@ -185,7 +185,7 @@ For a detailed list of all changes see the file CHANGELOG.
            x509 key- and certfile for the TLS package.
 
 
-08-Feb-2005 (Lars Duening) -- Release 3.2.11
+13-Feb-2005 (Lars Duening) -- Release 3.2.11
 
     - Changed efuns:
        + db_*(): mySQL efuns trigger a privilege violation ("mysql", "<efun
@@ -213,7 +213,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - New efuns:
        + tls_query_connection_state(), tls_query_connection_info(),
          tls_init_connection(), tls_deinit_connection(), tls_error(),
-         tls_available():
+         tls_available(), tls_check_certificate():
            Optional: Support for TLS connections.
 
     - Master Object:
