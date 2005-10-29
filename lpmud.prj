@@ -54,15 +54,17 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 688)
-(Parent-Version lpmud 3-3 687)
+(Project-Version lpmud 3-3 689)
+(Parent-Version lpmud 3-3 688)
 (Version-Log "
-  - (backend.c) The synchronous heartbeat timing wasn't initialised properly.
+  - (backend.c) Improved the synch heartbeat condition expression.
+  - (heartbeat.c) I had forgotten to remove all remnants of an exploratory
+       change.
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Thu, 17 Mar 2005 21:30:22 -0700")
+(Checkin-Time "Fri, 18 Mar 2005 07:19:57 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -100,7 +102,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.12 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.86 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.751 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.752 644))
   (HISTORY (lpmud/f/49_HISTORY 1.385.1.21 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.21 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -163,7 +165,7 @@
   (src/array.h (lpmud/f/47_array.h 1.18.1.22 644))
   (src/array.c (lpmud/d/12_array.c 1.46.1.47.1.22 644))
   (src/backend.h (lpmud/f/46_backend.h 1.20.1.8 644))
-  (src/backend.c (lpmud/d/6_backend.c 1.68.1.35.1.48 644))
+  (src/backend.c (lpmud/d/6_backend.c 1.68.1.35.1.49 644))
   (src/bitstrings.h (lpmud/i/47_bitstrings 1.3 644))
   (src/bitstrings.c (lpmud/i/48_bitstrings 1.16 644))
   (src/bytecode.h (lpmud/a/b/26_bytecode.h 1.1.1.3 644))
@@ -189,7 +191,7 @@
   (src/hash.h (lpmud/f/32_hash.h 1.6 644))
   (src/hash.c (lpmud/c/28_hash.c 1.17 644))
   (src/heartbeat.h (lpmud/m/41_heartbeat. 1.6.1.5 644))
-  (src/heartbeat.c (lpmud/m/42_heartbeat. 1.18.1.11 644))
+  (src/heartbeat.c (lpmud/m/42_heartbeat. 1.18.1.12 644))
   (src/i-svalue_cmp.h (lpmud/a/b/20_i-svalue_c 1.5 644))
   (src/interpret.h (lpmud/b/13_interpret. 1.33.1.41 644))
   (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.92 644))
