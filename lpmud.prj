@@ -54,23 +54,17 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 670)
-(Parent-Version lpmud 3-3 669)
+(Project-Version lpmud 3-3 671)
+(Parent-Version lpmud 3-3 670)
 (Version-Log "
-  - (mstrings.c) The extended string statistics didn't count the tabled
-      comparisons correctly.
-  - (lex.c) New macro __BOOT_TIME__ expands to the time() the driver
-      was booted.
-  - (comm, pkg-tls.c) New interactive_t flag 'outgoing_conn' is TRUE for
-      connections openened by net_connect(). This is used by TLS (OpenSSL)
-      to set the proper state for the session.
-  - (slaballoc.c, smalloc.c) When using brk() for core allocation, the
-      returned memory address was one word too low.
+  - (pkg-tls.c) My change was premature.
+  - (mstrings.c) The printing of percent values was missing a conversion
+      to float in order to actually compute the percent values.
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Sat, 12 Feb 2005 00:29:18 -0700")
+(Checkin-Time "Sat, 12 Feb 2005 10:53:54 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -108,7 +102,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.12 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.85 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.733 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.734 644))
   (HISTORY (lpmud/f/49_HISTORY 1.385.1.16 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.21 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -214,7 +208,7 @@
   (src/mregex.h (lpmud/e/29_rxcache.h 1.7.1.16 644))
   (src/mregex.c (lpmud/e/30_rxcache.c 1.11.1.44 644))
   (src/mstrings.h (lpmud/i/35_mstrings.h 1.29 644))
-  (src/mstrings.c (lpmud/i/36_mstrings.c 1.21.1.36 644))
+  (src/mstrings.c (lpmud/i/36_mstrings.c 1.21.1.37 644))
   (src/my-alloca.h (lpmud/f/29_my-alloca. 1.3.1.2 644))
   (src/my-rusage.h (lpmud/f/28_my-rusage. 1.7 644))
   (src/my-stdint.h (lpmud/u/b/39_my-stdint. 1.2 644))
@@ -327,7 +321,7 @@
   (src/pkg-pgsql.c (lpmud/d/b/39_pkg-pgsql. 1.4 644))
   (src/pkg-pgsql.h (lpmud/d/b/40_pkg-pgsql. 1.2 644))
   (src/pkg-tls.h (lpmud/e/b/10_pkg-tls.h 1.7 644))
-  (src/pkg-tls.c (lpmud/e/b/11_pkg-tls.c 1.18 644))
+  (src/pkg-tls.c (lpmud/e/b/11_pkg-tls.c 1.19 644))
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.20 644))
   (src/port.c (lpmud/39_port.c 1.17.1.9 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.17.1.5 644))

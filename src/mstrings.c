@@ -1909,28 +1909,29 @@ add_string_status (strbuf_t *sbuf, Bool verbose)
                           "- deleted: %lu\n"
                         , mstr_added, mstr_deleted
                         );
-        strbuf_addf(sbuf, "Collisions: %lu (%.1f%% added/%1.f%% chains)\n"
+        strbuf_addf(sbuf, "Collisions: %lu (%.1f%% added)\n"
                         , mstr_collisions
                         , 100.0 * (float)mstr_collisions / (float)mstr_added
-                        , 100.0 * (float)mstr_collisions / (float)mstr_chains
                         );
 #ifdef EXT_STRING_STATS
         strbuf_addf(sbuf, "Equality tests: %lu total, %lu by table (%.1f%%), %lu by hash (%.1lf%%)\n"
                         , stNumEqual, stNumTabledEqual
-                        , stNumEqual ? 100.0 * (stNumTabledEqual/stNumEqual) : 0.0
+                        , stNumEqual ? 100.0 * ((float)stNumTabledEqual/stNumEqual) : 0.0
                         , stNumHashEqual
-                        , stNumEqual ? 100.0 * (stNumHashEqual/stNumEqual) : 0.0
+                        , stNumEqual ? 100.0 * ((float)stNumHashEqual/stNumEqual) : 0.0
                         );
         strbuf_addf(sbuf, "Comparisons:    %lu total, %lu by table (%.1f%%)\n"
                         , stNumComp, stNumTabledComp
-                        , stNumComp ? 100.0 * (stNumTabledComp/stNumComp) : 0.0
+                        , stNumComp ? 100.0 * ((float)stNumTabledComp/stNumComp) : 0.0
                         );
         strbuf_addf(sbuf, "Table lookups for existence: %lu,"
                           " %lu by table (%.1f%%),"
                           " %lu by content (%.1f%%)\n"
                         , stNumTabledChecked
-                        , stNumTabledCheckedTable, stNumTabledChecked ? 100.0 * (stNumTabledCheckedTable/stNumTabledChecked) : 0.0
-                        , stNumTabledCheckedSearch, stNumTabledChecked ? 100.0 * (stNumTabledCheckedSearch/stNumTabledChecked) : 0.0
+                        , stNumTabledCheckedTable
+                        , stNumTabledChecked ? 100.0 * ((float)stNumTabledCheckedTable/stNumTabledChecked) : 0.0
+                        , stNumTabledCheckedSearch
+                        , stNumTabledChecked ? 100.0 * ((float)stNumTabledCheckedSearch/stNumTabledChecked) : 0.0
                         );
 #endif /* EXT_STRING_STATS */
     }

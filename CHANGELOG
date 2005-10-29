@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+12-Feb-2004 (Lars Duening)  (3.3.671)
+  - (pkg-tls.c) My change was premature.
+  - (mstrings.c) The printing of percent values was missing a conversion
+      to float in order to actually compute the percent values.
+
 11-Feb-2004 (Lars Duening)  (3.3.670)
   - (mstrings.c) The extended string statistics didn't count the tabled
       comparisons correctly.
