@@ -1,4 +1,5 @@
-#define DEBUG
+/* #define DEBUG */
+/* #define DEBUG2 */
 #include <sys/types.h>
 #include <errno.h>
 #include <netdb.h>
@@ -99,6 +100,8 @@
 #undef DETACH
 #endif
 
+#undef DETACH
+
 union ticket_u {
     struct ticket_s {
 	long rnd, seq;
@@ -116,6 +119,8 @@ struct child_s {
 	struct {
 	    char handle[4];
 	    union ticket_u ticket;
+	    time_t last_recv;
+	    int bytes_recv;
 	} s;
     } u;
     int state;
@@ -135,6 +140,7 @@ int next_child_index = 0, childs_waited_for = 0;
 VOLATILE int childs_terminated = 0;
 
 fd_set current_fds, readfds;
+fd_set current_fds2, writefds;
 
 int nfds = 2;
 
@@ -336,6 +342,7 @@ int execute(buf, buflen, status, sockets)
 }
 
 void count_sigcld() {
+#ifndef HAVE_WAITPID
     static VOLATILE int calling_signal = 0, call_signal_again = 0;
 
     if (!calling_signal) {
@@ -353,6 +360,7 @@ void count_sigcld() {
     write(2, "child terminated\n", 17);
 #endif
     childs_terminated++;
+#endif
 }
 
 void dispose_child(child)
@@ -361,6 +369,7 @@ void dispose_child(child)
     struct child_s **chp;
 
     FD_CLR(child->socket, &current_fds);
+    FD_CLR(child->socket, &current_fds2);
     close(child->socket);
     if (child->state == CHILD_FREE) {
 	for (chp = &free_childs; *chp != child; chp = &(*chp)->next_free);
@@ -383,6 +392,32 @@ void kill_child(child)
     dispose_child(child);
 }
 
+int free_socket_childs()
+{
+  return !(!child_slots && next_child_index >= MAX_CHILDS);
+}
+
+struct child_s *get_socket_child()
+{
+  struct child_s *child;
+  if ( !(child = child_slots) ) {
+    child = &childs[next_child_index++];
+   } else {
+    child_slots = child->next_all;
+  }
+  return child;
+}
+
+void free_socket_child(struct child_s *child, struct child_s **listp)
+{
+   while (*listp != child)
+     listp = &(*listp)->next_all;
+   *listp = child->next_all;
+   child->next_all = child_slots;
+   child->state = CHILD_FREE;
+   child_slots = child;
+}
+
 int get_subserver() {
     struct child_s *child;
 
@@ -396,7 +431,7 @@ int get_subserver() {
 	int sockets[2];
 	int pid;
 
-	if (!child_slots && next_child_index >= MAX_CHILDS)
+	if (!free_socket_childs())
 	    return -1;
 	if(socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) < 0) {
 	    perror("socketpair");
@@ -408,11 +443,7 @@ int get_subserver() {
 	    close(sockets[1]);
 	    return -1;
 	}
-	if ( !(child = child_slots) ) {
-	    child = &childs[next_child_index++];
-	} else {
-	    child_slots = child->next_all;
-	}
+	child = get_socket_child();
 	if (!pid) {
 	    /* Child */
 	    void start_subserver();
@@ -469,16 +500,42 @@ int main(argc, argv)
 #endif
     randomize_tickets(get_seed());
     FD_ZERO(&current_fds);
+    FD_ZERO(&current_fds2);
     FD_SET(1, &current_fds);
     (void)signal(SIGCLD, (RETSIGTYPE(*)())count_sigcld);
     for(subserver = 0;;) {
-	readfds = current_fds;
-	timeout.tv_sec = TIME_TO_CHECK_CHILDS;
-	timeout.tv_usec = 0;
-#ifdef DEBUG
-	fprintf(stderr, "calling select\n");
+        int still_corked;
+	
+        still_corked = 0;
+        for (next_child = tcp_sockets; (child = next_child); ) {
+	  
+          next_child = child->next_all;
+	  /* Uncork the bottle */
+          if(child->u.s.bytes_recv)
+	   {
+	    if(child->u.s.last_recv + 3 < time((time_t *)NULL))
+	     {
+#ifdef DEBUG2
+              fprintf(stderr,"Uncorking child\n");
 #endif
-	num_ready = select(nfds, &readfds, 0, 0, &timeout);
+	      child->u.s.bytes_recv = 0;
+	      FD_SET(child->socket,&current_fds);
+	     } else still_corked = 1;
+	   }
+	}
+#ifdef DEBUG
+        fprintf(stderr,"still_corked = %d\n",still_corked);
+#endif
+	readfds = current_fds;
+	writefds = current_fds2;
+	timeout.tv_sec = (still_corked ? 3 : TIME_TO_CHECK_CHILDS);
+	timeout.tv_usec = 0;
+
+
+#ifdef DEBUG
+	fprintf(stderr, "calling select (nfds = %d)\n",nfds);
+#endif
+	num_ready = select(nfds, &readfds, &writefds, 0, &timeout);
 #ifdef DEBUG
 	fprintf(stderr, "select returns %d\n", num_ready);
 #endif
@@ -586,8 +643,9 @@ int main(argc, argv)
 	    struct sockaddr_in addr;
 	    int cnt;
 
+            next_child = child->next_all;
 	    s = child->socket;
-	    if (!FD_ISSET(s, &readfds))
+            if (!FD_ISSET(s, &readfds))
 		continue;
 	    length = sizeof addr;
 	    cnt = recvfrom(s, replybuf, sizeof(replybuf), 0, 
@@ -598,7 +656,7 @@ int main(argc, argv)
 	    write_32(replyheader, replylen);
 	    write_32(replyheader+4, ERQ_HANDLE_KEEP_HANDLE);
 	    memcpy(replyheader+8, child->u.s.handle, 4);
-	    replybuf[12] = ERQ_STDOUT;
+	    replyheader[12] = ERQ_STDOUT;
 	    write1(replyheader, 13);
 	    write1(addr.sin_addr.s_addr, 4);
 	    write1(addr.sin_port, 2);
@@ -606,18 +664,114 @@ int main(argc, argv)
 	  }
 #endif
 #ifdef ERQ_OPEN_TCP
-	    for (next_child = tcp_sockets; (child = next_child); ) {
-		s = child->socket;
-		if (!FD_ISSET(s, &readfds))
-		    continue;
-	    }
+
+/* TCPFIX */
+          for (next_child = tcp_sockets; (child = next_child); ) {
+	    int length;
+	    long replylen;
+	    char replyheader[30];
+	    char replybuf[ERQ_BUFSIZE];
+	    int cnt;
+
+            next_child = child->next_all;
+	    s = child->socket;
+	    if (FD_ISSET(s, &writefds))
+	     {
+	       FD_CLR(s,&current_fds2);
+               cnt = recv(s,replybuf,1,MSG_PEEK);
+	       if(cnt < 0 && (errno != EWOULDBLOCK && errno != EAGAIN))
+	        {
+		 replyheader[8] = ERQ_E_UNKNOWN;
+		 replyheader[9] = errno;
+		 replylen = 10;
+		 write_32(replyheader, replylen);
+	         memcpy(replyheader+4, child->u.s.handle, 4);
+	         write1(replyheader, replylen); /* ..and release handle */
+	         FD_CLR(child->socket,&current_fds);
+	         FD_CLR(child->socket,&current_fds2);
+	         close(child->socket);
+		 free_socket_child(child,&tcp_sockets);
+	         break;
+		}
+	       replyheader[12] = ERQ_OK;
+	       write_32(replyheader,17+sizeof(child->u.s.ticket));
+	       write_32(replyheader+4, ERQ_HANDLE_KEEP_HANDLE);
+	       memcpy(replyheader+8, child->u.s.handle, 4);
+	       write_32(replyheader+13,child - &childs[0]);
+	       memcpy(replyheader+17,child->u.s.ticket.c,sizeof(child->u.s.ticket));
+	       write1(replyheader, 17+sizeof(child->u.s.ticket));
+	       break;
+	     } else if (!FD_ISSET(s, &readfds))
+		continue;
+	    cnt = read(s, replybuf, MAX_REPLY-100);
+	    FD_CLR(s,&readfds);
+	    if(cnt <= 0)
+	     {
+	      if(!cnt)
+	       {
+	        replyheader[8] = ERQ_EXITED;
+	        replylen = 9;
+	       } else {
+	        replyheader[8] = ERQ_E_UNKNOWN;
+		replyheader[9] = errno;
+		replylen = 10;
+	       }
+  	      write_32(replyheader, replylen);
+	      memcpy(replyheader+4, child->u.s.handle, 4);
+	      write1(replyheader, replylen); /* ..and release handle */
+	      FD_CLR(child->socket,&current_fds);
+	      FD_CLR(child->socket,&current_fds2);
+	      close(child->socket);
+	      free_socket_child(child,&tcp_sockets);
+	      break;
+	     } else {
+	      length = cnt;
+#if 0
+	      child->u.s.last_recv = time((time_t *)NULL);
+	      child->u.s.bytes_recv += cnt;
+#endif
+	      if(child->u.s.bytes_recv > 4096)
+	       {
+	        /* Cork the bottle. Let the MUD swallow first */
+	        FD_CLR(s,&current_fds);
+#ifdef DEBUG2
+                fprintf(stderr,"Corking child.\n");
+#endif
+	       }
+	      replylen = length + 13;
+	      if (replylen > MAX_REPLY)
+	  	replylen = MAX_REPLY;
+	      write_32(replyheader, replylen);
+	      write_32(replyheader+4, ERQ_HANDLE_KEEP_HANDLE);
+	      memcpy(replyheader+8, child->u.s.handle, 4);
+	      replyheader[12] = ERQ_STDOUT;
+	      write1(replyheader, 13);
+	      write1(replybuf, replylen - 13);
+	     }
+          }
 #endif
 #ifdef ERQ_LISTEN
-	    for (next_child = accept_sockets; (child = next_child); ) {
-		s = child->socket;
-		if (!FD_ISSET(s, &readfds))
-		    continue;
+          for (next_child = accept_sockets; (child = next_child); ) {
+	    int length;
+	    long replylen;
+	    char replyheader[30];
+	    char replybuf[ERQ_BUFSIZE];
+	    int cnt;
+
+            next_child = child->next_all;
+	    s = child->socket;
+	    if (!FD_ISSET(s, &readfds))
+		continue;
+	    FD_CLR(s,&current_fds); /* Connection pending */
+	    {
+	      replylen = 13;
+	      write_32(replyheader, replylen);
+	      write_32(replyheader+4, ERQ_HANDLE_KEEP_HANDLE);
+	      memcpy(replyheader+8, child->u.s.handle, 4);
+	      replyheader[12] = ERQ_STDOUT;
+	      write1(replyheader, replylen);
 	    }
+          }
 #endif
 	}
 	if (subserver < 0) {
@@ -663,7 +817,7 @@ int main(argc, argv)
 		  default:
 		  {
 #ifdef DEBUG
-		    fprintf(stderr, "n: 0x%x nxt: 0x%x state: %d\n",
+		    fprintf(stderr, "Ticket rejected n: 0x%x nxt: 0x%x state: %d\n",
 			n, next_child_index,
 			(unsigned long)n >= (unsigned long)next_child_index ?
 			  0 : childs[n].state);
@@ -697,9 +851,12 @@ int main(argc, argv)
 #if defined(ERQ_OPEN_UDP) || defined(ERQ_LISTEN)
 		  handle_send_on_socket:
 		    if (msglen < sizeof(union ticket_u) ||
-			memcmp(buf, child->u.s.ticket.c,
+			memcmp(buf+4, child->u.s.ticket.c,
 			  sizeof(union ticket_u)))
 		    {
+#ifdef DEBUG
+			fprintf(stderr,"Ticket mismatch. (%d, %d)\n",msglen,sizeof(union ticket_u));
+#endif
 			goto bad_ticket;
 		    }
 		    msglen -= sizeof(union ticket_u);
@@ -726,18 +883,21 @@ int main(argc, argv)
 					sizeof(host_ip_addr));
 			    } else {
 				num = write(child->socket,
-					buf+sizeof(union ticket_u), msglen);
+					buf+sizeof(union ticket_u)+4,
+					msglen-4);
 			    }
-			    if (num != msglen) {
+			    if (num != msglen-4) {
 				if (num < 0) {
 				    switch(errno) {
 				      case EWOULDBLOCK:
 #if EAGAIN != EWOULDBLOCK
 				      case EAGAIN:
 #endif
+					header[3] = 9;
 					header[8] = ERQ_E_WOULDBLOCK;
 					break;
 				      case EPIPE:
+					header[3] = 9;
 					header[8] = ERQ_E_PIPE;
 					break;
 				      case EINTR:
@@ -754,17 +914,19 @@ int main(argc, argv)
 				    write_32(header+9, num);
 				}
 			    } else {
+				header[3] = 9;
 				header[8] = ERQ_OK;
 			    }
 			    break;
 			}
 		    } else { /* header[8] == ERQ_KILL */
+		        FD_CLR(child->socket,&current_fds);
+                        FD_CLR(child->socket,&current_fds2);
+			if(child->state == CHILD_ACCEPT)
+			  shutdown(child->socket,0);
 			close(child->socket);
-			while (*listp != child)
-			    listp = &(*listp)->next_all;
-			*listp = child->next_all;
-			child->next_all = child_slots;
-			child_slots = child;
+			free_socket_child(child,listp);
+                        write_32(header,9);
 			header[8] = ERQ_OK;
 		    }
 		    write1(header, header[3]);
@@ -799,7 +961,7 @@ int main(argc, argv)
 		    host_ip_addr.sin_addr.s_addr = INADDR_ANY;
 		    host_ip_addr.sin_family = AF_INET;
 		    memcpy(&host_ip_addr.sin_port, buf, 2);
-		    if (!child_slots && next_child_index >= MAX_CHILDS) {
+		    if (!free_socket_childs()) {
 			header[8] = ERQ_E_NSLOTS;
 			header[9] = MAX_CHILDS;
 			break;
@@ -827,13 +989,12 @@ int main(argc, argv)
 			header[9] = errno;
 			break;
 		    }
-		    if ( !(child = child_slots) ) {
-			child = &childs[next_child_index++];
-		    } else {
-			child_slots = child->next_all;
-		    }
+		    child = get_socket_child();
 		    child->socket = s;
+		    FD_SET(child->socket,&current_fds);
 		    child->state = CHILD_UDP;
+		    child->next_all = udp_sockets;
+		    udp_sockets = child;
 		    ticket.s.seq +=
 			((get_seed() - ticket.s.seq) & 0x7fffffff) + 1;
 		    ticket.s.rnd = get_ticket();
@@ -845,13 +1006,279 @@ int main(argc, argv)
 		    memcpy(header+8, header+4, 4);
 		    write_32(header+4, ERQ_HANDLE_KEEP_HANDLE);
 		    header[12] = ERQ_OK;
-		    write_32(header+13, child - &child[0]);
+		    write_32(header+13, child - &childs[0]);
 		    memcpy(header+17, ticket.c, sizeof ticket);
 		} while(0);
 		write1(header, header[3]);
 	      }
 	      break;
 #endif /* ERQ_OPEN_UDP */
+#ifdef ERQ_OPEN_TCP
+
+/* TCPFIX */
+	      case ERQ_OPEN_TCP:
+	      {
+		subserver = 0; /* ready for new commands */
+		write_32(header, 10);
+		do {
+		    struct sockaddr_in host_ip_addr;
+		    int tmp;
+
+		    if (msglen != 6) {
+			header[8] = ERQ_E_ARGLENGTH;
+			header[9] = 0;
+			break;
+		    }
+		    host_ip_addr.sin_family = AF_INET;
+		    memcpy(&host_ip_addr.sin_port, buf+4, 2);
+		    memcpy(&host_ip_addr.sin_addr.s_addr, buf, 4);
+
+		    if (!free_socket_childs()) {
+			header[8] = ERQ_E_NSLOTS;
+			header[9] = MAX_CHILDS;
+			break;
+		    }
+		    s = socket(AF_INET, SOCK_STREAM, 0);
+		    if (s < 0) {
+			header[8] = ERQ_E_UNKNOWN;
+			header[9] = errno;
+			break;
+		    }
+		    if((tmp = fcntl(s,F_GETFL,0)) < 0)
+		     {
+		      fprintf(stderr,"fnctl 1\n");
+		      header[8] = ERQ_E_UNKNOWN;
+		      header[9] = errno;
+		      break;
+		     }
+		    
+		    if((tmp = fcntl(s,F_SETFL,tmp | O_NDELAY)) < 0)
+		     {
+		      fprintf(stderr,"fnctl 2\n");
+		      header[8] = ERQ_E_UNKNOWN;
+		      header[9] = errno;
+		      break;
+		     }
+		    
+		    tmp = 1;
+		    if (connect(s, (struct sockaddr *)&host_ip_addr,
+			sizeof host_ip_addr) == -1) 
+		    {
+		      if(errno != EINPROGRESS)
+		       {
+		        header[8] = ERQ_E_UNKNOWN;
+			header[9] = errno;
+			close(s);
+			break;
+		       }
+		    }
+		    child = get_socket_child();
+		    child->socket = s;
+		    FD_SET(child->socket,&current_fds);
+		    FD_SET(child->socket,&current_fds2);
+		    child->state = CHILD_TCP;
+		    child->u.s.bytes_recv = 0;
+		    child->next_all = tcp_sockets;
+		    tcp_sockets = child;
+		    ticket.s.seq +=
+			((get_seed() - ticket.s.seq) & 0x7fffffff) + 1;
+		    ticket.s.rnd = get_ticket();
+		    if (s >= nfds)
+			nfds = s + 1;
+		    memcpy(child->u.s.handle, header+4, 4);
+		    memcpy(child->u.s.ticket.c, ticket.c, sizeof ticket);
+		    header[3] = 17 + sizeof ticket;
+		    memcpy(header+8, header+4, 4);
+		    write_32(header+4, ERQ_HANDLE_KEEP_HANDLE);
+		    header[12] = ERQ_OK;
+		    header[3] = 0;
+		    write_32(header+13, child - &childs[0]);
+		    memcpy(header+17, ticket.c, sizeof ticket);
+		} while(0);
+		if(header[3]) write1(header, header[3]);
+	      }
+	      break;
+#endif /* ERQ_OPEN_TCP */
+#ifdef ERQ_LISTEN
+
+/* TCPFIX */
+	      case ERQ_LISTEN:
+	      {
+		subserver = 0; /* ready for new commands */
+		write_32(header, 10);
+		do {
+		    struct sockaddr_in host_ip_addr;
+		    int tmp;
+
+		    if (msglen != 2) {
+			header[8] = ERQ_E_ARGLENGTH;
+			header[9] = 0;
+			break;
+		    }
+		    host_ip_addr.sin_family = AF_INET;
+		    host_ip_addr.sin_addr.s_addr = INADDR_ANY;
+		    memcpy(&host_ip_addr.sin_port, buf, 2);
+
+		    if (!free_socket_childs()) {
+			header[8] = ERQ_E_NSLOTS;
+			header[9] = MAX_CHILDS;
+			break;
+		    }
+		    s = socket(AF_INET, SOCK_STREAM, 0);
+		    if (s < 0) {
+			header[8] = ERQ_E_UNKNOWN;
+			header[9] = errno;
+			break;
+		    }
+		    if((tmp = fcntl(s,F_GETFL,0)) < 0)
+		     {
+		      fprintf(stderr,"fnctl 1\n");
+		      header[8] = ERQ_E_UNKNOWN;
+		      header[9] = errno;
+		      break;
+		     }
+		    
+		    if((tmp = fcntl(s,F_SETFL,tmp | O_NDELAY)) < 0)
+		     {
+		      fprintf(stderr,"fnctl 2\n");
+		      header[8] = ERQ_E_UNKNOWN;
+		      header[9] = errno;
+		      break;
+		     }
+                    tmp = 1;
+		    if (bind(s, (struct sockaddr *)&host_ip_addr,
+			sizeof host_ip_addr) == -1) 
+		    {
+		     header[8] = ERQ_E_UNKNOWN;
+		     header[9] = errno;
+		     break;
+		    }
+		    if (listen(s,2) < 0) 
+		    {
+		     header[8] = ERQ_E_UNKNOWN;
+		     header[9] = errno;
+		     break;
+		    }
+		    child = get_socket_child();
+		    child->socket = s;
+		    FD_SET(child->socket,&current_fds);
+		    child->state = CHILD_ACCEPT;
+		    child->next_all = accept_sockets;
+		    accept_sockets = child;
+		    ticket.s.seq +=
+			((get_seed() - ticket.s.seq) & 0x7fffffff) + 1;
+		    ticket.s.rnd = get_ticket();
+		    if (s >= nfds)
+			nfds = s + 1;
+		    memcpy(child->u.s.handle, header+4, 4);
+		    memcpy(child->u.s.ticket.c, ticket.c, sizeof ticket);
+		    header[3] = 17 + sizeof ticket;
+		    memcpy(header+8, header+4, 4);
+		    write_32(header+4, ERQ_HANDLE_KEEP_HANDLE);
+		    header[12] = ERQ_OK;
+		    write_32(header+13, child - &childs[0]);
+		    memcpy(header+17, ticket.c, sizeof ticket);
+		} while(0);
+		if(header[3]) write1(header, header[3]);
+	      }
+	      break;
+#endif /* ERQ_LISTEN */
+#ifdef ERQ_ACCEPT
+
+/* TCPFIX */
+	      case ERQ_ACCEPT:
+	      {
+		subserver = 0; /* ready for new commands */
+		write_32(header, 10);
+		do {
+		    struct child_s *parent;
+		    struct sockaddr_in host_ip_addr;
+		    int tmp,n;
+		    long tmp2;
+
+		    if (msglen != sizeof(union ticket_u) + 4) {
+			header[8] = ERQ_E_ARGLENGTH;
+			header[9] = 0;
+			break;
+		    }
+		    n = read_32(buf);
+		    if((unsigned long) n >= (unsigned long) next_child_index)
+		     {
+		      fprintf(stderr,"given: %d, nxt: %d\n",n,next_child_index);
+		      goto accept_bad_ticket;
+		     }
+		    parent = &childs[n];
+		    if(parent->state != CHILD_ACCEPT)
+		     {
+		      fprintf(stderr,"State is %d, should be %d!\n",parent->state,CHILD_ACCEPT);
+		      goto accept_bad_ticket;
+		     }
+		    if(memcmp(buf+4,parent->u.s.ticket.c,sizeof(union ticket_u)))
+		     {
+		      accept_bad_ticket:
+		      fprintf(stderr,"Accept: Ticket mismatch.\n");
+		      header[8] = ERQ_E_TICKET;
+		      header[9] = 0;
+		      break;
+		     }
+		    if (!free_socket_childs()) {
+			header[8] = ERQ_E_NSLOTS;
+			header[9] = MAX_CHILDS;
+			break;
+		    }
+		    tmp = sizeof(host_ip_addr);
+		    s = accept(parent->socket, (struct sockaddr *)
+		      &host_ip_addr, &tmp);
+		    if (s < 0) {
+			header[8] = ERQ_E_UNKNOWN;
+			header[9] = errno;
+			break;
+		    }
+		    if((tmp = fcntl(s,F_GETFL,0)) < 0)
+		     {
+		      fprintf(stderr,"fnctl 1\n");
+		      header[8] = ERQ_E_UNKNOWN;
+		      header[9] = errno;
+		      break;
+		     }
+		    
+		    if((tmp = fcntl(s,F_SETFL,tmp | O_NDELAY)) < 0)
+		     {
+		      fprintf(stderr,"fnctl 2\n");
+		      header[8] = ERQ_E_UNKNOWN;
+		      header[9] = errno;
+		      break;
+		     }
+                    tmp = 1;
+		    child = get_socket_child();
+		    child->socket = s;
+		    /* Socket accepted, wait for more conns */
+		    FD_SET(parent->socket,&current_fds);
+		    FD_SET(child->socket,&current_fds);
+		    child->state = CHILD_TCP;
+		    child->u.s.bytes_recv = 0;
+		    child->next_all = tcp_sockets;
+		    tcp_sockets = child;
+		    ticket.s.seq +=
+			((get_seed() - ticket.s.seq) & 0x7fffffff) + 1;
+		    ticket.s.rnd = get_ticket();
+		    if (s >= nfds)
+			nfds = s + 1;
+		    memcpy(child->u.s.handle, header+4, 4);
+		    memcpy(child->u.s.ticket.c, ticket.c, sizeof ticket);
+		    header[3] = 23 + sizeof ticket;
+		    memcpy(header+8, header+4, 4);
+		    write_32(header+4, ERQ_HANDLE_KEEP_HANDLE);
+		    header[12] = ERQ_OK;
+		    memcpy(header+13, &host_ip_addr.sin_addr.s_addr, 4);
+		    memcpy(header+17, &host_ip_addr.sin_port, 2);
+		    write_32(header+19, child - &childs[0]);
+		    memcpy(header+23, ticket.c, sizeof ticket);
+		} while(0);
+		if(header[3]) write1(header, header[3]);
+	      }
+	      break;
+#endif /* ERQ_ACCEPT */
 	    }
 	}
 	if (subserver < 0)
@@ -888,6 +1315,7 @@ void start_subserver(server_num, seed)
 #endif
     randomize_tickets(seed ^ get_seed());
     FD_ZERO(&readfds);
+    FD_ZERO(&writefds);
     nfds = 1;
     childs_terminated = 0;
     childs_waited_for = 0;
@@ -1030,6 +1458,31 @@ void start_subserver(server_num, seed)
 	    }
 	    break;
 	  }
+#ifdef ERQ_LOOKUP
+	  case ERQ_LOOKUP:
+	  {
+	    struct hostent *hp;
+
+	    /* handle stays in header[4..7] */
+	    header[8] = CHILD_FREE;
+	    memcpy(header+9, buf, strlen(buf)); /* copy address */
+	    hp = gethostbyname(buf);
+	    if (!hp) {
+		sleep(5);
+	        hp = gethostbyname(buf);
+	    }
+	    if (hp) {
+		msglen = 4;
+		write_32(header, msglen + 8);
+		write1(header, 9);
+		write1(hp->h_addr, msglen);
+	    } else {
+		write_32(header, 8);
+		write1(header, 9);
+	    }
+	    break;
+	  }
+#endif
 	  case ERQ_EXECUTE:
 	  {
 	    pid_t pid1, pid2;

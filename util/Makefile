@@ -2,6 +2,7 @@ SUBDIRS = indent make_docs
 SED = sed
 #CFLAGS = -O
 CFLAGS = -g
+CC = gcc
 BINDIR=/user/mud/bin
 
 all:	$(SUBDIRS) fundesc
@@ -12,8 +13,8 @@ $(SUBDIRS): FORCE
 FORCE: install
 
 erq:	erq.c
-#	$(CC) erq.c -lresolv -o erq
-	$(CC) $(CFLAGS) erq.c -o erq
+	$(CC) $(CFLAGS) erq.c -lresolv -o erq
+#	$(CC) $(CFLAGS) -lsocket -lnsl erq.c -o erq
 
 fundesc:
 	$(CC) fundesc.c -o fundesc

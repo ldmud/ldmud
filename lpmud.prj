@@ -6,11 +6,11 @@
 ;;    <v>-<r>-dev.*: The development branch for version <v>.<r>
 ;;    <v>-<r>-rel.*: The release branch for version <v>.<r>
 ;;    <v>-<r>-<p>-pre.*; The pre-releases for beta testing (unused yet).
-(Project-Version lpmud 3-2-rel 1)
+(Project-Version lpmud amylaar 3)
 (Parent-Version lpmud amylaar 2)
-(Version-Log "Last official 3.2.1 release")
+(Version-Log "Amylaar 3.2.1@141 + TubMud ERQ")
 (New-Version-Log "")
-(Checkin-Time "Mon, 02 Nov 1998 22:59:01 +0000")
+(Checkin-Time "Fri, 27 Nov 1998 21:59:07 +0000")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -52,7 +52,7 @@
   (util/hname.c (lpmud/18_hname.c 1.2 644))
   (util/fundesc.c (lpmud/19_fundesc.c 1.1 644))
   (util/fixinclude (lpmud/20_fixinclude 1.1 644))
-  (util/Makefile (lpmud/21_Makefile 1.2 644))
+  (util/Makefile (lpmud/21_Makefile 1.3 644))
   (telnet.h (lpmud/22_telnet.h 1.1 644))
   (sysmalloc.c (lpmud/23_sysmalloc. 1.1 644))
   (switch.h (lpmud/24_switch.h 1.2 644))
@@ -217,8 +217,8 @@
 ;; to version amylaar.1(w), by lars:
 
   (util/indent/wrapper (lpmud/d/25_wrapper 1.1 644))
-  (util/erq.h (lpmud/d/26_erq.h 1.1 644))
-  (util/erq.c (lpmud/d/27_erq.c 1.1 644))
+  (util/erq.h (lpmud/d/26_erq.h 1.2 644))
+  (util/erq.c (lpmud/d/27_erq.c 1.2 644))
   (random.c (lpmud/d/28_random.c 1.1 644))
   (mudlib/sys/erq.h (lpmud/d/29_erq.h 1.1 644))
   (mudlib/sys/driver_hook.h (lpmud/d/30_driver_hoo 1.1 644))
