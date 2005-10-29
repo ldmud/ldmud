@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+25-Mar-2005 (Lars Duening)  (3.3.692)
+  - (simulate.c) Modified the callback setup so that efun callbacks
+       can take normal lvalues; and timed function/closure callbacks
+       take protected lvalues - but not vice versa.
+
 24-Mar-2005 (Lars Duening)  (3.3.691)
   - (gcollect.c) Added a log output for the time it takes to data-clean
        objects.

@@ -205,7 +205,7 @@ update_statistic_avg (statistic_t * pStat, long number)
     double c;
 
     pStat->sum += number;
-    c = avg_consts[1];
+    c = avg_consts[2];
     pStat->weighted_avg = (1 - c) * pStat->weighted_avg + number * c;
 } /* update_statistic_avg() */
 

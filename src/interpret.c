@@ -2616,6 +2616,8 @@ inter_add_array (vector_t *q, vector_t **vpp)
  *     Handle a stack overflow.
  * push_referenced_mapping(m):
  *     Push a mapping onto the stack.
+ * push_error_handler(h)
+ *     Push an errorhandler entry onto the stack.
  */
 
 /*-------------------------------------------------------------------------*/

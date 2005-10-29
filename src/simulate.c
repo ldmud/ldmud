@@ -3515,12 +3515,15 @@ free_callback (callback_t *cb)
 /*-------------------------------------------------------------------------*/
 static INLINE int
 setup_callback_args (callback_t *cb, int nargs, svalue_t * args
-                    , Bool allow_prot_lvalues)
+                    , Bool delayed_callback)
 
 /* Setup the function arguments in the callback <cb> to hold the <nargs>
- * arguments starting from <args>. If <allow_prot_lvalues> is FALSE, no
- * argument may be a protected lvalue. The arguments are transferred into the
- * callback structure.
+ * arguments starting from <args>. If <delayed_callback> is FALSE, 
+ * the callback will happen within the current LPC cycle:  no argument may be
+ * a protected lvalue, but normal lvalues are ok. If TRUE, the callback
+ * will happen at a later time: protected lvalues are ok, but not normal ones.
+ *
+ * The arguments are transferred into the callback structure.
  *
  * Result is -1 on success, or, when encountering an illegal argument,
  * the index of the faulty argument (but even then all caller arguments
@@ -3557,15 +3560,26 @@ setup_callback_args (callback_t *cb, int nargs, svalue_t * args
 
         while (--nargs >= 0)
         {
-            if (!allow_prot_lvalues && args->type == T_LVALUE
-             && (   args->u.lvalue->type == T_PROTECTED_CHAR_LVALUE
-                 || args->u.lvalue->type == T_PROTECTED_STRING_RANGE_LVALUE
-                 || args->u.lvalue->type == T_PROTECTED_POINTER_RANGE_LVALUE
-                 || args->u.lvalue->type == T_PROTECTED_LVALUE
-                )
-               )
+            Bool dontHandle = MY_FALSE;
+
+            if (args->type == T_LVALUE)
             {
-                /* We don't handle protected lvalues - abort the process.
+                /* Check if we are allowed to handle the lvalues. */
+                Bool isProtected
+                  = (   args->u.lvalue->type == T_PROTECTED_CHAR_LVALUE
+                     || args->u.lvalue->type == T_PROTECTED_STRING_RANGE_LVALUE
+                     || args->u.lvalue->type == T_PROTECTED_POINTER_RANGE_LVALUE
+                     || args->u.lvalue->type == T_PROTECTED_LVALUE
+                    );
+
+                dontHandle =    ( delayed_callback && !isProtected)
+                             || (!delayed_callback &&  isProtected)
+                             ;
+            }
+
+            if (dontHandle)
+            {
+                /* We don't handle the lvalue - abort the process.
                  * But to do that, we first have to free all
                  * remaining arguments from the caller.
                  */
@@ -3593,11 +3607,14 @@ setup_callback_args (callback_t *cb, int nargs, svalue_t * args
 /*-------------------------------------------------------------------------*/
 int
 setup_function_callback ( callback_t *cb, object_t * ob, string_t * fun
-                        , int nargs, svalue_t * args, Bool allow_prot_lvalues)
+                        , int nargs, svalue_t * args, Bool delayed_callback)
 
 /* Setup the empty/uninitialized callback <cb> to hold a function
  * call to <ob>:<fun> with the <nargs> arguments starting from <args>.
- * If <allow_prot_lvalues> is FALSE, no argument may be a protected lvalue.
+ * If <delayed_callback> is FALSE, the callback will happen within the current
+ * LPC cycle:  no argument may be a protected lvalue, but normal lvalues are
+ * ok. If TRUE, the callback will happen at a later time: protected lvalues
+ * are ok, but not normal ones.
  *
  * Both <ob> and <fun> are copied from the caller, but the arguments are
  * adopted (taken away from the caller).
@@ -3614,7 +3631,7 @@ setup_function_callback ( callback_t *cb, object_t * ob, string_t * fun
     cb->function.named.name = make_tabled_from(fun); /* for faster apply()s */
     cb->function.named.ob = ref_object(ob, "callback");
 
-    error_index = setup_callback_args(cb, nargs, args, allow_prot_lvalues);
+    error_index = setup_callback_args(cb, nargs, args, delayed_callback);
     if (error_index >= 0)
     {
         free_object(cb->function.named.ob, "callback");
@@ -3629,11 +3646,14 @@ setup_function_callback ( callback_t *cb, object_t * ob, string_t * fun
 /*-------------------------------------------------------------------------*/
 int
 setup_closure_callback ( callback_t *cb, svalue_t *cl
-                       , int nargs, svalue_t * args, Bool allow_prot_lvalues)
+                       , int nargs, svalue_t * args, Bool delayed_callback)
 
 /* Setup the empty/uninitialized callback <cb> to hold a closure
  * call to <cl> with the <nargs> arguments starting from <args>.
- * If <allow_prot_lvalues> is FALSE, no argument may be a protected lvalue.
+ * If <delayed_callback> is FALSE, the callback will happen within the current
+ * LPC cycle:  no argument may be a protected lvalue, but normal lvalues are
+ * ok. If TRUE, the callback will happen at a later time: protected lvalues
+ * are ok, but not normal ones.
  *
  * Both <cl> and the arguments are adopted (taken away from the caller).
  *
@@ -3659,7 +3679,7 @@ setup_closure_callback ( callback_t *cb, svalue_t *cl
     }
     else
     {
-        error_index = setup_callback_args(cb, nargs, args, allow_prot_lvalues);
+        error_index = setup_callback_args(cb, nargs, args, delayed_callback);
         if (error_index >= 0)
         {
             free_svalue(&(cb->function.lambda));

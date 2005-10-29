@@ -54,23 +54,17 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 691)
-(Parent-Version lpmud 3-3 690)
+(Project-Version lpmud 3-3 692)
+(Parent-Version lpmud 3-3 691)
 (Version-Log "
-  - (gcollect.c) Added a log output for the time it takes to data-clean
-       objects.
-  - (config.h.in, slaballoc.c) The sorting of the partial slab freelists
-       is now configurable by hand.
-  - (slaballoc.c) Added weighted-average statistics for number of steps
-       per freed block.
-  - (interpret, backend.c, call_out.c, efuns.c heart_beat.c, simulate.c)
-       Added a statistic (last and time-weighted average) about the total
-       execution ticks and time per LPC thread.
+  - (simulate.c) Modified the callback setup so that efun callbacks
+       can take normal lvalues; and timed function/closure callbacks
+       take protected lvalues - but not vice versa.
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Thu, 24 Mar 2005 23:57:49 -0700")
+(Checkin-Time "Fri, 25 Mar 2005 22:36:05 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -108,7 +102,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.12 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.86 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.754 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.755 644))
   (HISTORY (lpmud/f/49_HISTORY 1.385.1.21 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.21 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -117,7 +111,7 @@
   (src/configure (lpmud/d/0_configure 1.19.1.109.1.10 755))
   (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.43.1.6 644))
   (src/machine.h.in (lpmud/b/9_machine.h. 1.9.1.14 644))
-  (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.19.1.34.1.5 644))
+  (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.19.1.34.1.6 644))
   (src/mkinstalldirs (lpmud/c/4_mkinstalld 1.1 644))
   (src/install-sh (lpmud/c/5_install-sh 1.2 755))
   (src/ldmud-man.txt (lpmud/c/c/29_ldmud-man. 1.1 644))
@@ -171,7 +165,7 @@
   (src/array.h (lpmud/f/47_array.h 1.18.1.22 644))
   (src/array.c (lpmud/d/12_array.c 1.46.1.47.1.22 644))
   (src/backend.h (lpmud/f/46_backend.h 1.20.1.10 644))
-  (src/backend.c (lpmud/d/6_backend.c 1.68.1.35.1.51 644))
+  (src/backend.c (lpmud/d/6_backend.c 1.68.1.35.1.52 644))
   (src/bitstrings.h (lpmud/i/47_bitstrings 1.3 644))
   (src/bitstrings.c (lpmud/i/48_bitstrings 1.16 644))
   (src/bytecode.h (lpmud/a/b/26_bytecode.h 1.1.1.3 644))
@@ -200,7 +194,7 @@
   (src/heartbeat.c (lpmud/m/42_heartbeat. 1.18.1.13 644))
   (src/i-svalue_cmp.h (lpmud/a/b/20_i-svalue_c 1.5 644))
   (src/interpret.h (lpmud/b/13_interpret. 1.33.1.42 644))
-  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.93 644))
+  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.94 644))
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.15.1.13 644))
   (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.74.1.8 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.21 644))
@@ -343,8 +337,8 @@
   (src/sha1.c (lpmud/t/b/34_sha1.c 1.2 644))
   (src/simul_efun.h (lpmud/f/17_simul_efun 1.5.1.6 644))
   (src/simul_efun.c (lpmud/32_simul_efun 1.20.1.17.1.7 644))
-  (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.40 644))
-  (src/simulate.c (lpmud/31_simulate.c 1.88.1.135.1.17 644))
+  (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.41 644))
+  (src/simulate.c (lpmud/31_simulate.c 1.88.1.135.1.18 644))
   (src/slaballoc.h (lpmud/d/c/16_slaballoc. 1.2 644))
   (src/slaballoc.c (lpmud/d/c/17_slaballoc. 1.10 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.16 644))
@@ -397,7 +391,7 @@
   (src/hosts/be/config.h (lpmud/e/34_config.h 1.32.1.40 644))
   (src/hosts/be/be.h (lpmud/e/35_be.h 1.7 644))
   (src/hosts/be/beyacc (lpmud/i/39_beyacc 1.1 744))
-  (src/hosts/be/Makefile (lpmud/e/37_Makefile 1.60.1.71.1.33 644))
+  (src/hosts/be/Makefile (lpmud/e/37_Makefile 1.60.1.71.1.34 644))
   (src/hosts/be/icon-32x32.raw (lpmud/s/37_icon-32x32 1.1 644) :no-keywords)
   (src/hosts/be/icon-16x16.raw (lpmud/s/38_icon-16x16 1.1 644) :no-keywords)
   (src/hosts/be/driver.rsrc (lpmud/s/39_driver.rsr 1.1 644) :no-keywords)

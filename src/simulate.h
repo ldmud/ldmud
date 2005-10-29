@@ -242,8 +242,8 @@ extern Bool catch_instruction (int flags, uint offset, volatile svalue_t ** vola
 extern void check_shadow_sent (object_t *ob);
 extern void assert_shadow_sent (object_t *ob);
 extern void init_empty_callback (callback_t *cb);
-extern int  setup_function_callback(callback_t *cb, object_t* ob, string_t *fun, int nargs, svalue_t * args, Bool use_lvalues);
-extern int  setup_closure_callback(callback_t *cb, svalue_t *cl, int nargs, svalue_t * args, Bool use_lvalues);
+extern int  setup_function_callback(callback_t *cb, object_t* ob, string_t *fun, int nargs, svalue_t * args, Bool delayed_callback);
+extern int  setup_closure_callback(callback_t *cb, svalue_t *cl, int nargs, svalue_t * args, Bool delayed_callback);
 extern int  setup_efun_callback_base ( callback_t *cb, svalue_t *args, int nargs, Bool bNoObj);
 #define setup_efun_callback(cb,args,nargs)       setup_efun_callback_base(cb,args,nargs,MY_FALSE)
 #define setup_efun_callback_noobj(cb,args,nargs) setup_efun_callback_base(cb,args,nargs,MY_TRUE)
