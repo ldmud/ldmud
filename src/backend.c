@@ -772,7 +772,7 @@ process_objects (void)
  *    been used for quite some time, and if it was not reset in this
  *    very round.
  *
- *  - If the object has been data-cleaned for a sufficient time, it
+ *  - If the object hasn't been data-cleaned for a sufficient time, it
  *    will be.
  *
  *  - An object's program and/or its variables will be swapped if it exists
@@ -806,12 +806,6 @@ static Bool did_swap;
    * processed per call, even if there is no time left to begin with.
    */
 
-static  mp_int num_data_cleanup;
-  /* Number of objects to data-clean in this call. It is computed so that all
-   * objects are cleaned in half an hour hour, but at least one per call.
-   * static so that errors won't clobber it.
-   */
-
     object_t *obj;          /* Current object worked on */
 
     struct error_recovery_info error_recovery_info;
@@ -823,10 +817,6 @@ static  mp_int num_data_cleanup;
     num_last_data_cleaned = 0;
     did_reset = MY_FALSE;
     did_swap = MY_FALSE;
-
-    num_data_cleanup = ALARM_TIME * num_listed_objs / 1800;
-    if (num_data_cleanup < 2)
-        num_data_cleanup = 2;
 
     error_recovery_info.rt.last = rt_context;
     error_recovery_info.rt.type = ERROR_RECOVERY_BACKEND;
@@ -1038,16 +1028,11 @@ no_clean_up:
 
         /* ------ Data Cleanup ------ */
 
-        /* Objects are processed at a rate suitable to cover
-         * all listed objects in half an hour; but at least one per call.
-         *
-         * The actual cleanup however is not undertaken unless
-         * time_to_clean_up seconds have passed until the last cleanup (or
-         * 3600 seconds if the time is 0).
+        /* Objects are processed at intervals determined by their
+         * time to clean up (or DEFAULT_CLEANUP_TIME if the stored time
+         * is 0).
          */
-        if (num_data_cleanup > 0
-         && (unsigned long)obj->time_cleanup < (unsigned long)current_time
-           )
+        if ((unsigned long)obj->time_cleanup < (unsigned long)current_time)
         {
 #ifdef DEBUG
             if (d_flag)
@@ -1056,7 +1041,6 @@ no_clean_up:
 #endif
 
             cleanup_object(obj);
-            num_data_cleanup--;
             num_last_data_cleaned++;
         }
 

@@ -25,6 +25,10 @@ extern mapping_t *stale_mappings;
 
 /* --- Macros --- */
 
+#define DEFAULT_CLEANUP_TIME 1800
+/* Default interval for a data-clean of all objects.
+ */
+
 /* void GC_REF_DUMP(type, pointer, txt, function)
  *
  * In order to be able to dump the references found in a GC, the

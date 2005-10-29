@@ -8427,7 +8427,6 @@ static int nesting = 0;  /* Used to detect recursive calls */
         file = get_txt(sp->u.str);
     }
 
-
     /* If restoring from a file, set it up */
 
     if (file)

@@ -619,8 +619,8 @@ cleanup_object (object_t * obj)
  * The function checks all variables of this object for references
  * to destructed objects and removes them. Also, untabled strings
  * are made tabled. The time for the next cleanup is set to 
- * a time in the interval [0.75*time_to_cleanup .. 1.25 * time_to_cleanup]
- * from now (if time_to_cleanup is 0, half an hour is assumed).
+ * a time in the interval [0.9*time_to_cleanup .. 1.1 * time_to_cleanup]
+ * from now (if time_to_cleanup is 0, DEFAULT_CLEANUP_TIME is assumed).
  *
  * This function is called by the backend.
  */
@@ -630,7 +630,8 @@ cleanup_object (object_t * obj)
     return;
 #else
     cleanup_t * context = NULL;
-    long        clean_delay = (time_to_cleanup > 0) ? time_to_cleanup : 1800;
+    long        clean_delay = (time_to_cleanup > 0) ? time_to_cleanup
+                                                    : DEFAULT_CLEANUP_TIME;
 
     context = cleanup_new(MY_FALSE);
     if (context != NULL)
@@ -640,8 +641,8 @@ cleanup_object (object_t * obj)
         cleanup_compact_mappings(context);
         cleanup_free(context);
     }
-    obj->time_cleanup = current_time + (3*clean_delay)/4
-                                     + random_number(clean_delay/2);
+    obj->time_cleanup = current_time + (9*clean_delay)/10
+                                     + random_number((2*clean_delay)/10);
 #endif /* NEW_CLEANUP */
 } /* cleanup_object() */
 

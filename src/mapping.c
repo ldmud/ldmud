@@ -1238,7 +1238,7 @@ check_map_for_destr (mapping_t *m)
                         return;
                     }
                     m->hash = hm;
-                    num_dirty_mappings--;
+                    num_dirty_mappings++;
                 }
 
                 hm->cond_deleted++;
@@ -1375,6 +1375,11 @@ remove_mapping (mapping_t *m, svalue_t *map_index)
                     return;
                 }
                 m->hash = hm;
+
+                if (m->cond)
+                    num_dirty_mappings++;
+                else
+                    num_hash_mappings++;
             }
 
             hm->last_used = current_time;
@@ -1567,6 +1572,10 @@ resize_mapping (mapping_t *m, mp_int new_width)
         LOG_ALLOC("copy_mapping - hash", SIZEOF_MH(hm2), sizeof *hm - sizeof *mcp + sizeof *mcp * size);
         m->user->mapping_total += SIZEOF_MH(hm2);
         check_total_mapping_size();
+        if (m->cond)
+            num_dirty_mappings++;
+        else
+            num_hash_mappings++;
     }
 
 
