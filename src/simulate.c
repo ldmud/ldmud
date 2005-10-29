@@ -3175,27 +3175,18 @@ status_parse (strbuf_t * sbuf, char * buff)
 #endif
 
             strbuf_addf(sbuf, "Objects processed in last cycle: "
-                               "%8ld (%5.1f%% - avg. %5.1f%%)\n"
+                               "%8ld (%5.1lf%% - avg. %5.1lf%%)\n"
                        , (long)num_last_processed
                        , (float)num_last_processed / (float)num_listed_objs * 100.0
-                       , !avg_in_list
-                         ? 0.0
-                         : ((avg_in_list || avg_last_processed > avg_in_list)
-                            ? 100.0
-                            : 100.0 * (float)avg_last_processed / avg_in_list
-                           )
+                       , 100.0 * relate_statistics(stat_last_processed, stat_in_list)
                        );
 #ifdef NEW_CLEANUP
             strbuf_addf(sbuf, "Objects data-cleaned in last cycle: "
-                               "%5ld (%5.1f%% - avg. %5.1f%%)\n"
+                               "%5ld (%5.1lf%% - avg. %5.1lf : %5.1lf%%)\n"
                        , (long)num_last_data_cleaned
-                       , (float)num_last_data_cleaned / (float)num_listed_objs * 100.0
-                       , !avg_in_list
-                         ? 0.0
-                         : ((avg_in_list || avg_last_data_cleaned > avg_in_list)
-                            ? 100.0
-                            : 100.0 * (float)avg_last_data_cleaned / avg_in_list
-                           )
+                       , (double)num_last_data_cleaned / (double)num_listed_objs * 100.0
+                       , stat_last_data_cleaned.weighted_avg
+                       , 100.0 * relate_statistics(stat_last_data_cleaned, stat_in_list)
                        );
 #endif
         }
@@ -3295,14 +3286,7 @@ dinfo_data_status (svalue_t *svp, int value)
     ST_NUMBER(DID_ST_OBJECTS_NEWLY_DEST, num_newly_destructed);
     ST_NUMBER(DID_ST_OBJECTS_DESTRUCTED, num_destructed);
     ST_NUMBER(DID_ST_OBJECTS_PROCESSED, num_last_processed);
-    ST_DOUBLE(DID_ST_OBJECTS_AVG_PROC
-             , !avg_in_list
-               ? 0.0
-               : ((avg_in_list || avg_last_processed > avg_in_list)
-                  ? 1.0
-                  : (double)avg_last_processed / avg_in_list
-                 )
-             );
+    ST_DOUBLE(DID_ST_OBJECTS_AVG_PROC, relate_statistics(stat_last_processed, stat_in_list));
     /* TODO: Maybe add number of objects data cleaned here as well. */
 
     ST_NUMBER(DID_ST_ARRAYS,         num_arrays);

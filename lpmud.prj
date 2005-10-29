@@ -54,17 +54,17 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 689)
-(Parent-Version lpmud 3-3 688)
+(Project-Version lpmud 3-3 690)
+(Parent-Version lpmud 3-3 689)
 (Version-Log "
-  - (backend.c) Improved the synch heartbeat condition expression.
-  - (heartbeat.c) I had forgotten to remove all remnants of an exploratory
-       change.
+  - (backend, main, simulate.c) Updated the last-data-cleaned statistics
+       to be weighted over time; and generalized the statistics implementation
+       in general.
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Fri, 18 Mar 2005 07:19:57 -0700")
+(Checkin-Time "Sun, 20 Mar 2005 16:20:11 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -102,7 +102,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.12 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.86 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.752 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.753 644))
   (HISTORY (lpmud/f/49_HISTORY 1.385.1.21 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.21 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -164,14 +164,14 @@
   (src/actions.c (lpmud/d/12_actions.c 1.15.1.52 644))
   (src/array.h (lpmud/f/47_array.h 1.18.1.22 644))
   (src/array.c (lpmud/d/12_array.c 1.46.1.47.1.22 644))
-  (src/backend.h (lpmud/f/46_backend.h 1.20.1.8 644))
-  (src/backend.c (lpmud/d/6_backend.c 1.68.1.35.1.49 644))
+  (src/backend.h (lpmud/f/46_backend.h 1.20.1.9 644))
+  (src/backend.c (lpmud/d/6_backend.c 1.68.1.35.1.50 644))
   (src/bitstrings.h (lpmud/i/47_bitstrings 1.3 644))
   (src/bitstrings.c (lpmud/i/48_bitstrings 1.16 644))
   (src/bytecode.h (lpmud/a/b/26_bytecode.h 1.1.1.3 644))
   (src/call_out.h (lpmud/f/45_call_out.h 1.7.1.6 644))
   (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.32 644))
-  (src/closure.h (lpmud/f/44_closure.h 1.7.1.22.1.3 644))
+  (src/closure.h (lpmud/f/44_closure.h 1.7.1.22.1.4 644))
   (src/closure.c (lpmud/d/4_closure.c 1.41.1.47.1.26.1.7 644))
   (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.110 644))
   (src/comm.h (lpmud/d/3_comm.h 1.26.1.43 644))
@@ -197,8 +197,8 @@
   (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.92 644))
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.15.1.13 644))
   (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.74.1.8 644))
-  (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.20 644))
-  (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.76 644))
+  (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.21 644))
+  (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.77 644))
   (src/mapping.h (lpmud/f/30_mapping.h 1.12.1.22 644))
   (src/mapping.c (lpmud/b/6_mapping.c 1.36.1.90 644))
   (src/md5.h (lpmud/l/18_md5.h 1.3 644))
@@ -338,7 +338,7 @@
   (src/simul_efun.h (lpmud/f/17_simul_efun 1.5.1.6 644))
   (src/simul_efun.c (lpmud/32_simul_efun 1.20.1.17.1.7 644))
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.40 644))
-  (src/simulate.c (lpmud/31_simulate.c 1.88.1.135.1.15 644))
+  (src/simulate.c (lpmud/31_simulate.c 1.88.1.135.1.16 644))
   (src/slaballoc.h (lpmud/d/c/16_slaballoc. 1.2 644))
   (src/slaballoc.c (lpmud/d/c/17_slaballoc. 1.9 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.16 644))
@@ -355,7 +355,7 @@
   (src/swap.h (lpmud/f/14_swap.h 1.7.1.3 644))
   (src/swap.c (lpmud/25_swap.c 1.36.1.51 644))
   (src/switch.h (lpmud/24_switch.h 1.9 644))
-  (src/typedefs.h (lpmud/d/50_typedefs.h 1.12.1.8 644))
+  (src/typedefs.h (lpmud/d/50_typedefs.h 1.12.1.9 644))
   (src/wiz_list.h (lpmud/1_wiz_list.h 1.5.1.7.1.3 644))
   (src/wiz_list.c (lpmud/2_wiz_list.c 1.13.1.14.1.6 644))
   (src/xalloc.h (lpmud/g/51_xalloc.h 1.26 644))
@@ -543,16 +543,6 @@
   (mudlib/uni-crasher/crasher.c (lpmud/r/37_crasher.c 1.3 640))
   (mudlib/uni-crasher/secure.inc (lpmud/r/38_secure.inc 1.3 644))
   (mudlib/uni-crasher/crashleak.c (lpmud/c/c/21_crashleak. 1.1 644))
-
-  ;; GCC patches
-  (src/gcc/README (lpmud/e/19_README 1.1 644))
-  (src/gcc/2.7.1/strength_reduce (lpmud/e/20_strength_r 1.2 644))
-  (src/gcc/2.7.1/reg_equiv (lpmud/e/21_reg_equiv 1.2 644))
-  (src/gcc/2.7.0/sub_compare (lpmud/e/22_sub_compar 1.2 644))
-  (src/gcc/2.7.0/strength_reduce (lpmud/e/23_strength_r 1.2 644))
-  (src/gcc/2.7.0/stackslot_overlap (lpmud/e/24_stackslot_ 1.2 644))
-  (src/gcc/2.7.0/reg_equiv (lpmud/e/25_reg_equiv 1.2 644))
-  (src/gcc/2.7.0/omit_default_branch (lpmud/e/26_omit_defau 1.2 644))
 
 
   ;; Documentation

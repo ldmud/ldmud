@@ -39,7 +39,7 @@ struct lambda_s
     ptrdiff_t   prog_pc;
       /* Blueprint object and relative for the program creating this closure,
        * or NULL. Since this information is error reporting purposes only,
-       * the lambda keeps a closure to the blueprint and not the program
+       * the lambda keeps a reference to the blueprint and not the program
        * itself to not get in the way of swapping or otherwise.
        */
 

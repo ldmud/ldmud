@@ -178,7 +178,8 @@ p_int regex_package = RE_TRADITIONAL;
 svalue_t const0, const1;
   /* The values 0 and 1 as svalues, mem-copied when needed */
 
-double consts[5];  /* Weight constants used to compute average figures */
+double avg_consts[5];
+  /* Weight constants used to compute average figures */
 
 char *debug_file = NULL;  /* Name of the debug log file. */
 
@@ -415,8 +416,8 @@ main (int argc, char **argv)
             numports = 1;
 
         init_otable();
-        for (i = 0; i < (int)(sizeof consts / sizeof consts[0]); i++)
-            consts[i] = exp(- i / 900.0);
+        for (i = 0; i < (int)(sizeof avg_consts / sizeof avg_consts[0]); i++)
+            avg_consts[i] = exp(- i / 900.0);
 
         printf("%s Random seed: 0x%lx\n"
               , time_stamp(), (unsigned long)random_seed);

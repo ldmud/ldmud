@@ -120,9 +120,9 @@ uint num_last_data_cleaned = 0;
   /* Number of object data-cleaned in last process_objects().
    */
 
-long avg_last_processed = 0;
-long avg_last_data_cleaned = 0;
-long avg_in_list = 0;
+statistic_t stat_last_processed = { 0 };
+statistic_t stat_last_data_cleaned = { 0 };
+statistic_t stat_in_list = { 0 };
   /* Decaying average number of objects processed and objects in the list.
    */
 
@@ -147,12 +147,12 @@ Bool mud_is_up = MY_FALSE;
    * used by the driver, but can be useful for printf()-style debugging.
    */
 
-static double load_av = 0.0;
+static statistic_t stat_load = { 0 };
   /* The load average (player commands/second), weighted over the
    * last period of time.
    */
 
-static double compile_av = 0.0;
+static statistic_t stat_compile = { 0 };
   /* The average of compiled lines/second, weighted over the last period
    * of time.
    */
@@ -167,7 +167,61 @@ static time_t time_last_slow_shut = 0;
 /* --- Forward declarations --- */
 
 static void process_objects(void);
-static void update_load_av (void);
+
+/*-------------------------------------------------------------------------*/
+void
+update_statistic (statistic_t * pStat, long number)
+
+/* Add the <number> to the statistics in <pStat> and update the weighted
+ * average over the last period of time.
+ */
+
+{
+    mp_int n;
+    double c;
+
+    pStat->sum += number;
+    if (current_time == pStat->last_time)
+        return;
+    n = current_time - pStat->last_time;
+    if (n < (int) (sizeof avg_consts / sizeof avg_consts[0]) )
+        c = avg_consts[n];
+    else
+        c = exp(- n / 900.0);
+    pStat->weighted_avg = c * pStat->weighted_avg + pStat->sum * (1 - c) / n;
+    pStat->last_time = current_time;
+    pStat->sum = 0;
+} /* update_statistic() */
+
+/*-------------------------------------------------------------------------*/
+double
+relate_statistics (statistic_t sStat, statistic_t sRef)
+
+/* Express the <sStat>.weighted_avg as a multiple of <sRef>.weighted_avg
+ * and return the factor.
+ */
+
+{
+    if (sRef.weighted_avg == 0.0)
+        return 0.0;
+
+    return sStat.weighted_avg / sRef.weighted_avg;
+} /* relate_statistics() */
+
+/*-------------------------------------------------------------------------*/
+void
+update_compile_av (int lines)
+
+/* Compute the average of compiled lines/second, weighted over the
+ * last period of time.
+ *
+ * The function is called after every compilation and basically sums up
+ * the number of compiled lines in one backend loop.
+ */
+
+{
+    update_statistic(&stat_compile, lines);
+} /* update_compile_av() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -191,7 +245,7 @@ clear_state (void)
     current_prog = NULL;
     reset_machine(MY_FALSE);   /* Pop down the stack. */
     num_warning = 0;
-}
+} /* clear_state() */
 
 /*-------------------------------------------------------------------------*/
 #ifdef DEBUG
@@ -545,7 +599,7 @@ backend (void)
             (void)time_stamp();
 
             total_player_commands++;
-            update_load_av();
+            update_statistic(&stat_load, 1);
 #ifdef MALLOC_EXT_STATISTICS
             mem_update_stats();
 #endif /* MALLOC_EXT_STATISTICS */
@@ -1110,9 +1164,9 @@ no_clean_up:
 
     /* Update the processing averages
      */
-    avg_last_processed += num_last_processed - (avg_last_processed >> 10);
-    avg_last_data_cleaned += num_last_data_cleaned - (avg_last_data_cleaned >> 10);
-    avg_in_list += num_listed_objs - (avg_in_list >> 10);
+    update_statistic(&stat_last_processed, num_last_processed);
+    update_statistic(&stat_last_data_cleaned, num_last_data_cleaned);
+    update_statistic(&stat_in_list, num_listed_objs);
 
     /* Restore the error recovery context */
     rt_context = error_recovery_info.rt.last;
@@ -1188,69 +1242,7 @@ preload_objects (int eflag)
 
     free_array(prefiles);
     toplevel_context.rt.type = ERROR_RECOVERY_NONE;
-}
-
-/*-------------------------------------------------------------------------*/
-static void
-update_load_av (void)
-
-/* Compute the load average (player commands/second), weighted over the
- * last period of time.
- *
- * The function is called after every player command and basically counts
- * how many times it is called in one backend loop.
- */
-
-{
-static int last_time;  /* Time of last backend loop */
-static int acc = 0;    /* Number of calls in this backend loop */
-
-    int n;
-    double c;
-
-    acc++;
-    if (current_time == last_time)
-        return;
-    n = current_time - last_time;
-    if (n < (int) (sizeof consts / sizeof consts[0]) )
-        c = consts[n];
-    else
-        c = exp(- n / 900.0);
-    load_av = c * load_av + acc * (1 - c) / n;
-    last_time = current_time;
-    acc = 0;
-}
-
-/*-------------------------------------------------------------------------*/
-void
-update_compile_av (int lines)
-
-/* Compute the average of compiled lines/second, weighted over the
- * last period of time.
- *
- * The function is called after every compilation and basically sums up
- * the number of compiled lines in one backend loop.
- */
-
-{
-static int last_time;  /* Time of the last backend loop */
-static int acc = 0;    /* Sum of lines for this backend loop */
-
-    int n;
-    double c;
-
-    acc += lines;
-    if (current_time == last_time)
-        return;
-    n = current_time - last_time;
-    if (n < (int) (sizeof consts / sizeof consts[0]) )
-        c = consts[n];
-    else
-        c = exp(- n / 900.0);
-    compile_av = c * compile_av + acc * (1 - c) / n;
-    last_time = current_time;
-    acc = 0;
-}
+} /* preload_objects() */
 
 /*=========================================================================*/
 
@@ -1364,7 +1356,10 @@ f_query_load_average (svalue_t *sp)
 #if defined(__MWERKS__) && !defined(WARN_ALL)
 #    pragma warn_largeargs off
 #endif
-    sprintf(buff, "%.2f cmds/s, %.2f comp lines/s", load_av, compile_av);
+    sprintf(buff, "%.2f cmds/s, %.2f comp lines/s"
+                , stat_load.weighted_avg
+                , stat_compile.weighted_avg
+                );
 #if defined(__MWERKS__)
 #    pragma warn_largeargs reset
 #endif

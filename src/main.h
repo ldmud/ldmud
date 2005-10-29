@@ -22,7 +22,7 @@ extern long alarm_time;
 extern long heart_beat_interval;
 extern Bool synch_heart_beats;
 extern svalue_t const0, const1;
-extern double consts[5];
+extern double avg_consts[5];
 extern char *mud_lib;
 extern char *erq_file;
 extern char **erq_args;

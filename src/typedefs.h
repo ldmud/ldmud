@@ -35,6 +35,7 @@ typedef struct rt_context_s       rt_context_t;       /* backend.h */
 typedef struct sentence_s         sentence_t;         /* sent.h */
 typedef struct shadow_s           shadow_t;           /* sent.h */
 typedef struct simul_efun_table_s simul_efun_table_t; /* simul_efun.h */
+typedef struct statistic_s        statistic_t;        /* backend.h */
 typedef struct string_s           string_t;           /* mstrings.h */
 typedef struct strbuf_s           strbuf_t;           /* strfuns.h */
 #ifdef USE_STRUCTS
