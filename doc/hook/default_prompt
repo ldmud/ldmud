@@ -5,6 +5,7 @@ SYNOPSIS
 
         <value> being:
 
+          string <prompt>
           string <closure>()
 
 DESCRIPTION

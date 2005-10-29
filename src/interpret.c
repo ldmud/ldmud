@@ -14817,7 +14817,11 @@ again:
          * the stack to store its internal status.
          *
          *   sp[0]  -> number 'next':  index of the next value to assign (0).
-         *             x.generic:      false: FOREACH, true: FOREACH_REF
+         *             x.generic:      0: FOREACH, 1: FOREACH_REF
+         *                             2: FOREACH_RANGE with one extra loop
+         *                                (this falls back to FOREACH after
+         *                                 the first encounter of
+         *                                 FOREACH_NEXT).
          *   sp[-1] -> number 'count': number of values left to loop over.
          *             x.generic:      <nargs>, or -<nargs> if the value
          *                             is mapping
@@ -14833,11 +14837,12 @@ again:
         int nargs;
         p_int count, start;
         unsigned short offset;
-        Bool gen_refs, use_range;
+        Bool gen_refs, use_range, do_extra_loop;
         svalue_t * arg;
 
         gen_refs = (instruction == F_FOREACH_REF);
         use_range = (instruction == F_FOREACH_RANGE);
+        do_extra_loop = MY_FALSE;
         start = 0;
 
         nargs = LOAD_UINT8(pc);
@@ -15011,12 +15016,23 @@ again:
             if (count < start)
                 count = 0;
             else
+            {
                 count = count - sp->u.number + 1;
+                if (!count)
+                {
+                    /* Range is __INT_MIN_..__INT_MAX__: for this
+                     * we need to make one more loop than we can count.
+                     */
+                    do_extra_loop = MY_TRUE;
+                }
+            }
         }
 
         /* Push the count and the starting index */
         push_number(sp, count); sp->x.generic = nargs;
-        push_number(sp, start); sp->x.generic = gen_refs;
+        push_number(sp, start); sp->x.generic = do_extra_loop
+                                                ? 2
+                                                : (gen_refs ? 1 : 0);
 
 #ifdef DEBUG
         /* The <nargs> lvalues and our temporaries act as hidden
@@ -15051,13 +15067,23 @@ again:
 
         LOAD_SHORT(offset, pc);
 
-        /* Is there something left to iterate? */
-        if (0 == sp[-1].u.number)
-            break; /* Nope */
-
         ix = sp->u.number;
-        sp->u.number++;
-        sp[-1].u.number--;
+        if (sp->x.generic == 2)
+        {
+            sp->x.generic = 0;
+            /* FOREACH_RANGE with extra loop: don't increment the
+             * 'next' number on this one.
+             */
+        }
+        else
+        {
+            /* Is there something left to iterate? */
+            if (0 == sp[-1].u.number)
+                break; /* Nope */
+
+            sp->u.number++; /* next number */
+        }
+        sp[-1].u.number--; /* decrement loop count */
 
         gen_refs = sp->x.generic;
 

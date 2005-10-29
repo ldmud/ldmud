@@ -279,7 +279,11 @@
 
 #define BLOCK_NEXT(block) ((word_t *)(block[M_LINK]))
    /* The 'next' link of free block <block>, properly typed.
-    * In fully free slab blocks, */
+    */
+
+#define SET_BLOCK_NEXT(block,link) ((block)[M_LINK] = (word_t)(link))
+   /* Set the 'next' link of free blocks.
+    */
 
 #define T_OVERHEAD (M_OVERHEAD + XM_OVERHEAD)
    /* Total overhead: it is used by slaballoc to make smart decisions
@@ -1689,7 +1693,7 @@ sfree (POINTER ptr)
     block[M_MAGIC] = sfmagic[SIZE_MOD_INDEX(slab->size, sfmagic)];
 #endif
 
-    BLOCK_NEXT(block) = slab->freeList;
+    SET_BLOCK_NEXT(block, slab->freeList);
     slab->freeList = block;
     slab->numAllocated--;
 
@@ -1832,14 +1836,6 @@ mem_realloc (POINTER p, size_t size)
     return t;
 } /* mem_realloc() */
 
-#    undef ulog(s)           
-#    undef ulog1f(s,t)         
-#    undef ulog2f(s,t1,t2)     
-#    undef ulog3f(s,t1,t2,t3)  
-#    define ulog(s)             (void)0
-#    define ulog1f(s,t)         (void)0
-#    define ulog2f(s,t1,t2)     (void)0
-#    define ulog3f(s,t1,t2,t3)  (void)0
 
 /*=========================================================================*/
 
@@ -3457,26 +3453,6 @@ mem_increment_size (void *vp, size_t size)
     return NULL;
 } /* mem_increment_size() */
 
-
-#    undef ulog(s)           
-#    undef ulog1f(s,t)         
-#    undef ulog2f(s,t1,t2)     
-#    undef ulog3f(s,t1,t2,t3)  
-#ifdef DEBUG_MALLOC_ALLOCS
-#    define ulog(s) \
-       write(gcollect_outfd, s, strlen(s))
-#    define ulog1f(s,t) \
-       dprintf1(gcollect_outfd, s, (p_int)(t))
-#    define ulog2f(s,t1,t2) \
-       dprintf2(gcollect_outfd, s, (p_int)(t1), (p_int)(t2))
-#    define ulog3f(s,t1,t2,t3) \
-       dprintf3(gcollect_outfd, s, (p_int)(t1), (p_int)(t2), (p_int)(t3))
-#else
-#    define ulog(s)             (void)0
-#    define ulog1f(s,t)         (void)0
-#    define ulog2f(s,t1,t2)     (void)0
-#    define ulog3f(s,t1,t2,t3)  (void)0
-#endif
 
 /*=========================================================================*/
 

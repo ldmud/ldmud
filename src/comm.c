@@ -4445,10 +4445,22 @@ print_prompt_string (string_t *prompt)
  * This function checks if the driver hook H_PRINT_PROMPT is set and in that
  * case passes the string through the set function. If it is not set,
  * the prompt is printed via add_message().
+#ifdef USE_TLS
+ * The prompt is not printed at all if the interactive is currently
+ * negotiating the TLS handshake.
+#endif
  */
 
 {
     svalue_t *hook = &driver_hook[H_PRINT_PROMPT];
+
+#ifdef USE_TLS
+    {
+        interactive_t *ip = O_GET_INTERACTIVE(command_giver);
+        if (NULL != ip && TLS_HANDSHAKING == ip->tls_status)
+            return;
+    }
+#endif /* USE_TLS */
 
     if (hook->type == T_CLOSURE)
     {

@@ -21,6 +21,14 @@ DESCRIPTION
         (errorcode < 0 on failure, or 0 on success), followed by the
         interactive object <ob> and any <extra> arguments.
 
+        If the TLS setup fails, it is not necessary to call
+        tls_deinit_connection().
+
+        IMPORTANT: During the TLS handshake nothing else must be sent
+        to the client! For the most cases (TLS-capable clients logging in)
+        this means that the TLS handshake is the first and only thing the
+        client gets to see while the handshake is in progress.
+
 SEE ALSO
         tls_deinit_connection(E), tls_error(E), tls_query_connection_state(E),
         tls_query_connection_info(E), tls_available(E)

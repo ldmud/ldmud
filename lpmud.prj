@@ -54,18 +54,30 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 665)
-(Parent-Version lpmud 3-3 664)
+(Project-Version lpmud 3-3 666)
+(Parent-Version lpmud 3-3 665)
 (Version-Log "
-  - (interpret.c) foreach(i: x..__INT_MAX__) never executed because
-       of internal overflow. By changing the meaning of the internal 'count'
-       from 'upper limit' to 'iterations left', this overflow was
-       avoided (Bug #0000355).
+  - (xalloc.c) Forgot to remove a fatal() used to debug slaballoc (Bug
+       #0000359).
+  - (slaballoc.c) Removed compiler warnings (Bug #0000358).
+  - (mregex.c) Great - Kerberos has a function 'error_message()' in 
+       a global include file (reported by Rajko).
+  - (comm.c) Do not print the prompt to interactives which are currently
+       negotiating a TLS handshake.
+  - (pkg-tls.c) During the execution of a tls-init callback, the callback
+       is protected against premature freeing.
+  - (interpret.c) The range foreach (i: __INT_MIN__ .. __INT_MAX__)
+       now works as well (I added an internal flag for this case to allow one
+       extra pass through the loop (Bug #0000355).
+  - (pkg-mccp.c) With the telnet machine disabled, it is now possible to
+       still use outgoing compression with start_mccp_compression(), assuming
+       a suitable client program is used on the other end (suggested by
+       Philipp).
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Sun, 30 Jan 2005 22:27:07 -0700")
+(Checkin-Time "Mon, 31 Jan 2005 22:17:26 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -103,7 +115,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.12 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.85 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.728 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.729 644))
   (HISTORY (lpmud/f/49_HISTORY 1.385.1.13 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.21 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -174,7 +186,7 @@
   (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.31 644))
   (src/closure.h (lpmud/f/44_closure.h 1.7.1.22.1.3 644))
   (src/closure.c (lpmud/d/4_closure.c 1.41.1.47.1.26.1.4 644))
-  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.106 644))
+  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.107 644))
   (src/comm.h (lpmud/d/3_comm.h 1.26.1.42 644))
   (src/driver.h (lpmud/f/36_driver.h 1.15.1.28 644))
   (src/dumpstat.h (lpmud/f/35_dumpstat.h 1.8 644))
@@ -195,7 +207,7 @@
   (src/heartbeat.c (lpmud/m/42_heartbeat. 1.18.1.9 644))
   (src/i-svalue_cmp.h (lpmud/a/b/20_i-svalue_c 1.4 644))
   (src/interpret.h (lpmud/b/13_interpret. 1.33.1.41 644))
-  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.85 644))
+  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.86 644))
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.15.1.13 644))
   (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.74.1.5 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.19 644))
@@ -207,7 +219,7 @@
   (src/mempools.h (lpmud/d/48_mempools.h 1.2.1.8 644))
   (src/mempools.c (lpmud/d/49_mempools.c 1.2.1.15 644))
   (src/mregex.h (lpmud/e/29_rxcache.h 1.7.1.16 644))
-  (src/mregex.c (lpmud/e/30_rxcache.c 1.11.1.43 644))
+  (src/mregex.c (lpmud/e/30_rxcache.c 1.11.1.44 644))
   (src/mstrings.h (lpmud/i/35_mstrings.h 1.28 644))
   (src/mstrings.c (lpmud/i/36_mstrings.c 1.21.1.34 644))
   (src/my-alloca.h (lpmud/f/29_my-alloca. 1.3.1.2 644))
@@ -312,7 +324,7 @@
   (src/pkg-alists.c (lpmud/l/38_pkg-alists 1.10 644))
   (src/pkg-alists.h (lpmud/l/39_pkg-alists 1.3 644))
   (src/pkg-mccp.h (lpmud/d/b/48_pkg-mccp.h 1.2 644))
-  (src/pkg-mccp.c (lpmud/d/b/49_pkg-mccp.c 1.10 644))
+  (src/pkg-mccp.c (lpmud/d/b/49_pkg-mccp.c 1.11 644))
   (src/pkg-mysql.c (lpmud/j/1_pkg-mysql. 1.23 644))
   (src/pkg-mysql.h (lpmud/j/2_pkg-mysql. 1.5 644))
   (src/pkg-odbc.h (lpmud/e/b/43_pkg-odbc.h 1.1 644))
@@ -322,7 +334,7 @@
   (src/pkg-pgsql.c (lpmud/d/b/39_pkg-pgsql. 1.4 644))
   (src/pkg-pgsql.h (lpmud/d/b/40_pkg-pgsql. 1.2 644))
   (src/pkg-tls.h (lpmud/e/b/10_pkg-tls.h 1.7 644))
-  (src/pkg-tls.c (lpmud/e/b/11_pkg-tls.c 1.15 644))
+  (src/pkg-tls.c (lpmud/e/b/11_pkg-tls.c 1.16 644))
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.20 644))
   (src/port.c (lpmud/39_port.c 1.17.1.9 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.17.1.5 644))
@@ -341,7 +353,7 @@
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.38 644))
   (src/simulate.c (lpmud/31_simulate.c 1.88.1.135.1.6 644))
   (src/slaballoc.h (lpmud/d/c/16_slaballoc. 1.1 644))
-  (src/slaballoc.c (lpmud/d/c/17_slaballoc. 1.1 644))
+  (src/slaballoc.c (lpmud/d/c/17_slaballoc. 1.2 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.15 644))
   (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.108 644))
   (src/sysmalloc.h (lpmud/c/b/33_sysmalloc. 1.2 644))
@@ -360,7 +372,7 @@
   (src/wiz_list.h (lpmud/1_wiz_list.h 1.5.1.7.1.3 644))
   (src/wiz_list.c (lpmud/2_wiz_list.c 1.13.1.14.1.5 644))
   (src/xalloc.h (lpmud/g/51_xalloc.h 1.25 644))
-  (src/xalloc.c (lpmud/h/0_xalloc.c 1.2.1.45 644))
+  (src/xalloc.c (lpmud/h/0_xalloc.c 1.2.1.46 644))
   (src/xptmalloc.c (lpmud/d/b/10_xptmalloc. 1.5 644))
 
   ;; Build files
@@ -873,7 +885,7 @@
   (doc/efun/sprintf (lpmud/c/35_sprintf 1.3.1.17 644))
   (doc/efun/sqrt (lpmud/q/26_sqrt 1.1.1.2 644))
   (doc/efun/sscanf (lpmud/q/27_sscanf 1.6 644))
-  (doc/efun/start_mccp_compress (lpmud/e/b/3_start_mccp 1.2 644))
+  (doc/efun/start_mccp_compress (lpmud/e/b/3_start_mccp 1.3 644))
   (doc/efun/stringp (lpmud/q/28_stringp 1.4 644))
   (doc/efun/strlen (lpmud/q/29_strlen 1.2 644))
   (doc/efun/strstr (lpmud/q/30_strstr 1.6 644))
@@ -895,9 +907,9 @@
   (doc/efun/throw (lpmud/q/43_throw 1.3 644))
   (doc/efun/time (lpmud/q/44_time 1.1.1.5 644))
   (doc/efun/tls_available (lpmud/d/c/13_tls_availa 1.1 644))
-  (doc/efun/tls_deinit_connection (lpmud/e/b/14_tls_deinit 1.3 644))
+  (doc/efun/tls_deinit_connection (lpmud/e/b/14_tls_deinit 1.4 644))
   (doc/efun/tls_error (lpmud/e/b/15_tls_error 1.3 644))
-  (doc/efun/tls_init_connection (lpmud/e/b/16_tls_init_c 1.5 644))
+  (doc/efun/tls_init_connection (lpmud/e/b/16_tls_init_c 1.6 644))
   (doc/efun/tls_query_connection_info (lpmud/e/b/17_tls_query_ 1.6 644))
   (doc/efun/tls_query_connection_state (lpmud/e/b/18_tls_query_ 1.4 644))
   (doc/efun/to_array (lpmud/q/45_to_array 1.7 644))
@@ -1243,7 +1255,7 @@
   (doc/hook/create_ob (lpmud/a/b/34_create_ob 1.2 644))
   (doc/hook/create_super (lpmud/a/b/35_create_sup 1.2 644))
   (doc/hook/default_method (lpmud/a/b/36_default_me 1.2 644))
-  (doc/hook/default_prompt (lpmud/a/b/37_default_pr 1.1 644))
+  (doc/hook/default_prompt (lpmud/a/b/37_default_pr 1.2 644))
   (doc/hook/erq_stop (lpmud/a/b/38_erq_stop 1.1 644))
   (doc/hook/hook (lpmud/a/b/39_hook 1.1 644))
   (doc/hook/include_dirs (lpmud/a/b/40_include_di 1.2 644))

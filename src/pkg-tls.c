@@ -551,6 +551,28 @@ tls_write (interactive_t *ip, char *buffer, int length)
 } /* tls_write() */
 
 /*-------------------------------------------------------------------------*/
+/* To protect the tls callback during it's execution, it is pushed onto
+ * the stack as an T_ERROR_HANDLER value for guaranteed cleanup.
+ */
+
+typedef struct tls_cb_handler_s
+{
+    svalue_t     val;
+    callback_t * cb;
+} tls_cb_handler_t;
+
+/*-------------------------------------------------------------------------*/
+static void
+handle_tls_cb_error (svalue_t * arg)
+
+{
+    tls_cb_handler_t * data = (tls_cb_handler_t *)arg;
+    free_callback(data->cb);
+    xfree(data->cb);
+    xfree(arg);
+} /* handle_tls_cb_error() */
+
+/*-------------------------------------------------------------------------*/
 int
 tls_continue_handshake (interactive_t *ip)
 
@@ -632,16 +654,22 @@ tls_continue_handshake (interactive_t *ip)
     /* If the connection is no longer in handshake, execute the callback */
     if (ip->tls_cb != NULL && ret != 0)
     {
-        callback_t *cb = ip->tls_cb;
+        tls_cb_handler_t * handler;
+
+        xallocate( handler, sizeof(*handler)
+                 , "TLS: Callback handler protector");
+        handler->cb = ip->tls_cb;
+        ip->tls_cb = NULL;
+            /* Protect the callback during its execution. */
+
+        push_error_handler (handle_tls_cb_error, (svalue_t *)handler);
 
         push_number(inter_sp, ret ? ret : 0);
         push_ref_object(inter_sp, ip->ob, "tls_handshake");
 
-        (void)apply_callback(cb, 2);
+        (void)apply_callback(handler->cb, 2);
 
-        free_callback(cb);
-        xfree(cb);
-        ip->tls_cb = NULL;
+        free_svalue(inter_sp); inter_sp--; /* free the callback */
     }
 
     return ret;

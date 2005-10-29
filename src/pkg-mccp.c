@@ -129,27 +129,30 @@ start_compress (interactive_t * ip, unsigned char telopt)
         return MY_FALSE;
     }
     
-    /* version 1 or 2 support */
-    if (telopt == TELOPT_COMPRESS)
+    if (ip->tn_enabled)
     {
-        DTF (("%s TDEBUG: send IAC SB %02x WILL SE\n", time_stamp (), telopt));
-        SEND_TELNET_COMMAND (add_message ("%c", IAC);
-                             add_message ("%c%c%c%c", SB, telopt, WILL, SE);
-                             add_message (message_flush););
-    }
-    else if (telopt == TELOPT_COMPRESS2)
-    {
-        DTF (("%s TDEBUG: send IAC SB %02x WILL SE\n", time_stamp (), telopt));
-        SEND_TELNET_COMMAND (add_message ("%c", IAC);
-                             add_message ("%c%c%c%c", SB, telopt, IAC, SE);
-                             add_message (message_flush););
-    }
-    else
-    {
-        printf("Bad teloption %d passed", telopt);
-        xfree(ip->out_compress_buf);
-        xfree(s);
-        return MY_FALSE;
+        /* version 1 or 2 support */
+        if (telopt == TELOPT_COMPRESS)
+        {
+            DTF (("%s TDEBUG: send IAC SB %02x WILL SE\n", time_stamp (), telopt));
+            SEND_TELNET_COMMAND (add_message ("%c", IAC);
+                                 add_message ("%c%c%c%c", SB, telopt, WILL, SE);
+                                 add_message (message_flush););
+        }
+        else if (telopt == TELOPT_COMPRESS2)
+        {
+            DTF (("%s TDEBUG: send IAC SB %02x WILL SE\n", time_stamp (), telopt));
+            SEND_TELNET_COMMAND (add_message ("%c", IAC);
+                                 add_message ("%c%c%c%c", SB, telopt, IAC, SE);
+                                 add_message (message_flush););
+        }
+        else
+        {
+            printf("Bad teloption %d passed", telopt);
+            xfree(ip->out_compress_buf);
+            xfree(s);
+            return MY_FALSE;
+        }
     }
     
     ip->compressing = telopt;
@@ -288,18 +291,23 @@ f_start_mccp_compress (svalue_t * sp)
     p_int mccpver;
     int retval;
     
-    mccpver = sp->u.number;
-    
-    if ((mccpver != TELOPT_COMPRESS)
-     && (mccpver != TELOPT_COMPRESS2)
-       )
+    if (!ip->tn_enabled)
+        mccpver = -1;
+    else
     {
-        error("Illegal value to arg 1 of start_mccp_compress(): %ld, "
-              "expected TELOPT_COMPRESS (%d) or TELOPT_COMPRESS2 (%d).\n"
-             , (long)mccpver, TELOPT_COMPRESS, TELOPT_COMPRESS2
-             );
-        /* NOTREACHED */
-        return sp;
+        mccpver = sp->u.number;
+        
+        if ((mccpver != TELOPT_COMPRESS)
+         && (mccpver != TELOPT_COMPRESS2)
+           )
+        {
+            error("Illegal value to arg 1 of start_mccp_compress(): %ld, "
+                  "expected TELOPT_COMPRESS (%d) or TELOPT_COMPRESS2 (%d).\n"
+                 , (long)mccpver, TELOPT_COMPRESS, TELOPT_COMPRESS2
+                 );
+            /* NOTREACHED */
+            return sp;
+        }
     }
     
     if (!O_SET_INTERACTIVE(ip, current_object))
@@ -308,11 +316,13 @@ f_start_mccp_compress (svalue_t * sp)
         return sp;
     }
     
+#if 0
     if (!ip->tn_enabled)
     {
         error("start_mccp_compress() called for object with telnet disabled.\n");
         return sp;
     }
+#endif
 
     free_svalue(sp);
     retval = start_compress(ip, mccpver);
@@ -346,11 +356,13 @@ f_end_mccp_compress (svalue_t * sp)
         return sp;
     }
     
+#if 0
     if (!ip->tn_enabled)
     {
         error("end_mccp_compress() called for object with telnet disabled.\n");
         return sp;
     }
+#endif
 
 #ifdef USE_PTHREADS
     ip->compressing = 0; /* Signal the writer to stop compressing */

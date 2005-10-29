@@ -1,6 +1,24 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+31-Jan-2004 (Lars Duening)  (3.3.666)
+  - (xalloc.c) Forgot to remove a fatal() used to debug slaballoc (Bug
+       #0000359).
+  - (slaballoc.c) Removed compiler warnings (Bug #0000358).
+  - (mregex.c) Great - Kerberos has a function 'error_message()' in 
+       a global include file (reported by Rajko).
+  - (comm.c) Do not print the prompt to interactives which are currently
+       negotiating a TLS handshake.
+  - (pkg-tls.c) During the execution of a tls-init callback, the callback
+       is protected against premature freeing.
+  - (interpret.c) The range foreach (i: __INT_MIN__ .. __INT_MAX__)
+       now works as well (I added an internal flag for this case to allow one
+       extra pass through the loop (Bug #0000355).
+  - (pkg-mccp.c) With the telnet machine disabled, it is now possible to
+       still use outgoing compression with start_mccp_compression(), assuming
+       a suitable client program is used on the other end (suggested by
+       Philipp).
+
 30-Jan-2004 (Lars Duening)  (3.3.665)
   - (interpret.c) foreach(i: x..__INT_MAX__) never executed because
        of internal overflow. By changing the meaning of the internal 'count'

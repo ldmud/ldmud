@@ -410,7 +410,6 @@ retry_alloc (size_t size MTRACE_DECL)
 #endif
     writes(2, mess_nl);
 
-/* DEBUG: */ fatal("DEBUG: Low on memory.\n");
     /* Free the next reserve, the try again */
 
     if (gc_request == gcDont)
