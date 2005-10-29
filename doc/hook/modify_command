@@ -1,7 +1,7 @@
 SYNOPSIS
         #include <sys/driver_hooks.h>
 
-        set_driver_hook(H_RESET, value)
+        set_driver_hook(H_MODIFY_COMMAND, value)
 
         <value> being:
 

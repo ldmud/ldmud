@@ -884,9 +884,11 @@ f_tls_check_certificate(svalue_t *sp)
     
     if (!tls_available)
         error("tls_init_connection(): TLS layer hasn't been initialized.\n");
+
     if (!O_SET_INTERACTIVE(ip, sp->u.ob))
         error("Bad arg 1 to tls_check_certificate(): "
               "object not interactive.\n");
+
     if (ip->tls_status == TLS_ACTIVE) 
     {
 	v = allocate_array(12);
@@ -945,7 +947,8 @@ f_tls_check_certificate(svalue_t *sp)
 	}
     } /* if (tls active) */
 #elif defined(HAS_GNUTLS)
-    error( "%s TLS: GNUTLS does not provide certificate checking yet."
+printf("DEBUG: sp type %d\n", sp->type);
+    error( "%s TLS: Gnu TLS does not provide certificate checking yet."
           , time_stamp());
 #endif
 

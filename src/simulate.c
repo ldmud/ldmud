@@ -3633,16 +3633,29 @@ setup_closure_callback ( callback_t *cb, svalue_t *cl
  */
 
 {
-    int error_index;
+    int error_index = -1;
 
     cb->is_lambda = MY_TRUE;
     transfer_svalue_no_free(&(cb->function.lambda), cl);
 
-    error_index = setup_callback_args(cb, nargs, args, allow_prot_lvalues);
-    if (error_index >= 0)
+    if (cb->function.lambda.x.closure_type == CLOSURE_UNBOUND_LAMBDA
+     || cb->function.lambda.x.closure_type == CLOSURE_PRELIMINARY
+       )
     {
+        /* Uncalleable closure  */
+        error_index = 0;
         free_svalue(&(cb->function.lambda));
         cb->function.lambda.type = T_INVALID;
+    }
+    else
+    {
+        error_index = setup_callback_args(cb, nargs, args, allow_prot_lvalues);
+        if (error_index >= 0)
+        {
+            free_svalue(&(cb->function.lambda));
+            cb->function.lambda.type = T_INVALID;
+            error_index++;
+        }
     }
 
     return error_index;
@@ -3691,8 +3704,6 @@ setup_efun_callback_base ( callback_t *cb, svalue_t *args, int nargs
     if (args[0].type == T_CLOSURE)
     {
         error_index = setup_closure_callback(cb, args, nargs-1, args+1, MY_FALSE);
-        if (error_index >= 0)
-            error_index++;
     }
     else if (args[0].type == T_STRING)
     {
@@ -3852,6 +3863,8 @@ execute_callback (callback_t *cb, int nargs, Bool keep, Bool toplevel)
      || (O_PROG_SWAPPED(ob) && load_ob_from_swap(ob) < 0)
        )
     {
+        while (nargs-- > 0)
+            free_svalue(inter_sp--);
         free_callback(cb);
         return NULL;
     }

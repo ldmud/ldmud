@@ -9468,6 +9468,7 @@ fi
 has_tls=no
 
 # Check for OpenSSL unless not desired
+# Check for the libraries only if tls is actually enabled.
 
 if test "$tls_package" = "any" -o "$tls_package" = "ssl"; then
 
@@ -9532,7 +9533,8 @@ echo "${ECHO_T}$lp_cv_has_openssl" >&6
 _ACEOF
 
 
-        echo "$as_me:$LINENO: checking if -lssl or similar is needed" >&5
+        if test "$enable_use_tls" = "yes"; then
+            echo "$as_me:$LINENO: checking if -lssl or similar is needed" >&5
 echo $ECHO_N "checking if -lssl or similar is needed... $ECHO_C" >&6
 if test "${lp_cv_need_lib_ssl+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
@@ -9589,9 +9591,9 @@ fi
 fi
 echo "$as_me:$LINENO: result: $lp_cv_need_lib_ssl" >&5
 echo "${ECHO_T}$lp_cv_need_lib_ssl" >&6
-        if test "$lp_cv_need_lib_ssl" = "yes"; then
-            lp_cv_has_lib_ssl=no
-            echo "$as_me:$LINENO: checking for SSL_library_init in -lssl" >&5
+            if test "$lp_cv_need_lib_ssl" = "yes"; then
+                lp_cv_has_lib_ssl=no
+                echo "$as_me:$LINENO: checking for SSL_library_init in -lssl" >&5
 echo $ECHO_N "checking for SSL_library_init in -lssl... $ECHO_C" >&6
 if test "${ac_cv_lib_ssl_SSL_library_init+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
@@ -9647,14 +9649,14 @@ echo "$as_me:$LINENO: result: $ac_cv_lib_ssl_SSL_library_init" >&5
 echo "${ECHO_T}$ac_cv_lib_ssl_SSL_library_init" >&6
 if test $ac_cv_lib_ssl_SSL_library_init = yes; then
   PKGLIBS="$PKGLIBS -lssl"
-                         lp_cv_has_lib_ssl=yes
+                             lp_cv_has_lib_ssl=yes
 
 fi
 
-        fi
+            fi
 
-        if test "x$lp_cv_need_lib_crypto" != "xyes"; then
-              echo "$as_me:$LINENO: checking if -lcrypto is needed for SSL" >&5
+            if test "x$lp_cv_need_lib_crypto" != "xyes"; then
+                echo "$as_me:$LINENO: checking if -lcrypto is needed for SSL" >&5
 echo $ECHO_N "checking if -lcrypto is needed for SSL... $ECHO_C" >&6
 if test "${lp_cv_need_lib_crypto+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
@@ -9712,8 +9714,8 @@ fi
 fi
 echo "$as_me:$LINENO: result: $lp_cv_need_lib_crypto" >&5
 echo "${ECHO_T}$lp_cv_need_lib_crypto" >&6
-              if test "$lp_cv_need_lib_crypto" = "yes"; then
-                  echo "$as_me:$LINENO: checking for main in -lcrypto" >&5
+                if test "$lp_cv_need_lib_crypto" = "yes"; then
+                    echo "$as_me:$LINENO: checking for main in -lcrypto" >&5
 echo $ECHO_N "checking for main in -lcrypto... $ECHO_C" >&6
 if test "${ac_cv_lib_crypto_main+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
@@ -9765,8 +9767,9 @@ if test $ac_cv_lib_crypto_main = yes; then
   PKGLIBS="$PKGLIBS -lcrypto"
 fi
 
-              fi
-      fi
+                fi
+            fi
+        fi
     else
         has_tls=no
     fi
@@ -9837,7 +9840,8 @@ echo "${ECHO_T}$lp_cv_has_gnutls" >&6
 _ACEOF
 
 
-        echo "$as_me:$LINENO: checking if -lgnutls or similar is needed" >&5
+        if test "$enable_use_tls" = "yes"; then
+            echo "$as_me:$LINENO: checking if -lgnutls or similar is needed" >&5
 echo $ECHO_N "checking if -lgnutls or similar is needed... $ECHO_C" >&6
 if test "${lp_cv_need_lib_gnutls+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
@@ -9895,9 +9899,9 @@ fi
 fi
 echo "$as_me:$LINENO: result: $lp_cv_need_lib_gnutls" >&5
 echo "${ECHO_T}$lp_cv_need_lib_gnutls" >&6
-        if test "$lp_cv_need_lib_gnutls" = "yes"; then
-            lp_cv_has_lib_gnutls=no
-            echo "$as_me:$LINENO: checking for gnutls_global_init in -lgnutls" >&5
+            if test "$lp_cv_need_lib_gnutls" = "yes"; then
+                lp_cv_has_lib_gnutls=no
+                echo "$as_me:$LINENO: checking for gnutls_global_init in -lgnutls" >&5
 echo $ECHO_N "checking for gnutls_global_init in -lgnutls... $ECHO_C" >&6
 if test "${ac_cv_lib_gnutls_gnutls_global_init+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
@@ -9953,19 +9957,19 @@ echo "$as_me:$LINENO: result: $ac_cv_lib_gnutls_gnutls_global_init" >&5
 echo "${ECHO_T}$ac_cv_lib_gnutls_gnutls_global_init" >&6
 if test $ac_cv_lib_gnutls_gnutls_global_init = yes; then
   PKGLIBS="$PKGLIBS -lgnutls"
-                         lp_cv_has_lib_gnutls=yes
+                             lp_cv_has_lib_gnutls=yes
 
 fi
 
-        fi
-        echo "$as_me:$LINENO: checking gnutls version" >&5
+            fi
+            echo "$as_me:$LINENO: checking gnutls version" >&5
 echo $ECHO_N "checking gnutls version... $ECHO_C" >&6
 if test "${lp_cv_has_gnutls_version+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
 else
   savelibs="$LIBS"
-	    LIBS="$PKGLIBS"
-            if test "$cross_compiling" = yes; then
+                LIBS="$PKGLIBS"
+                if test "$cross_compiling" = yes; then
   { { echo "$as_me:$LINENO: error: cannot run test program while cross compiling
 See \`config.log' for more details." >&5
 echo "$as_me: error: cannot run test program while cross compiling
@@ -10018,11 +10022,12 @@ fi
 fi
 echo "$as_me:$LINENO: result: $lp_cv_has_gnutls_version" >&5
 echo "${ECHO_T}$lp_cv_has_gnutls_version" >&6
-	LIBS="$savelibs"
-	cat >>confdefs.h <<_ACEOF
+            LIBS="$savelibs"
+            cat >>confdefs.h <<_ACEOF
 #define HAS_GNUTLS_VERSION $lp_cv_has_gnutls_version
 _ACEOF
 
+        fi
 
     else
         has_tls=no

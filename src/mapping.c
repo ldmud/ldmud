@@ -736,21 +736,30 @@ mhash (svalue_t * svp)
 {
     mp_int i;
 
-    if (svp->type != T_CLOSURE)
+    switch (svp->type)
     {
+    case T_STRING:
+        i = mstr_get_hash(svp->u.str);
+        break;
+
+    case T_CLOSURE:
+        if (CLOSURE_REFERENCES_CODE(svp->x.closure_type))
+        {
+            i = (p_int)(svp->u.lambda) ^ *SVALUE_FULLTYPE(svp);
+        }
+        else if (CLOSURE_MALLOCED(svp->x.closure_type))
+        {
+            i = (p_int)(svp->u.lambda->ob) ^ *SVALUE_FULLTYPE(svp);
+        }
+        else /* Efun, Simul-Efun, Operator closure */
+        {
+            i = *SVALUE_FULLTYPE(svp);
+        }
+        break;
+
+    default:
         i = svp->u.number ^ *SVALUE_FULLTYPE(svp);
-    }
-    else if (CLOSURE_REFERENCES_CODE(svp->x.closure_type))
-    {
-        i = (p_int)(svp->u.lambda) ^ *SVALUE_FULLTYPE(svp);
-    }
-    else if (CLOSURE_MALLOCED(svp->x.closure_type))
-    {
-        i = (p_int)(svp->u.lambda->ob) ^ *SVALUE_FULLTYPE(svp);
-    }
-    else /* Efun, Simul-Efun, Operator closure */
-    {
-        i = *SVALUE_FULLTYPE(svp);
+        break;
     }
 
     i = i ^ i >> 16;
@@ -795,12 +804,10 @@ find_map_entry ( mapping_t *m, svalue_t *map_index
     /* Generate secondary information for types which usually
      * have none (required for hashing).
      */
-    if (map_index->type == T_STRING
-     || (   map_index->type != T_CLOSURE
-         && map_index->type != T_FLOAT
-         && map_index->type != T_SYMBOL
-         && map_index->type != T_QUOTED_ARRAY
-        )
+    if (map_index->type != T_CLOSURE
+     && map_index->type != T_FLOAT
+     && map_index->type != T_SYMBOL
+     && map_index->type != T_QUOTED_ARRAY
        )
         map_index->x.generic = (short)(map_index->u.number << 1);
 

@@ -1,6 +1,19 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+25-Feb-2004 (Lars Duening)  (3.3.682)
+  - (mapping.c) Indexing a mapping with strings didn't quite work yet: the
+      hash computation didn't take into effect that strings are no longer
+      tabled just to use them as rvalue indices.
+  - (simulate.c) If a callback didn't have a valid object associated with
+      it (e.g. unbound_lambda()s), the code forgot to remove the arguments
+      from the stack (Bug #0000370).
+  - (simulate.c) Uncalleable closures given as callbacks are now detected
+      and cause a runtime error (Bug #0000370).
+  - (simulate.c) A runtime in a regreplace() substitution closure leaked
+      the regexp structure. I changed the whole thing to automatic
+      cleanup (Bug #0000370).
+
 24-Feb-2004 (Lars Duening)  (3.3.681)
   - (mstrings) Re-integrated the stringtable structures into the strings:
       on the whole, the majority of strings will be tabled so reducing

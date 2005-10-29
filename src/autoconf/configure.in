@@ -772,6 +772,7 @@ fi
 has_tls=no
 
 # Check for OpenSSL unless not desired
+# Check for the libraries only if tls is actually enabled.
 
 if test "$tls_package" = "any" -o "$tls_package" = "ssl"; then
 
@@ -792,8 +793,9 @@ if test "$tls_package" = "any" -o "$tls_package" = "ssl"; then
         tls_package=ssl
         AC_DEFINE(HAS_OPENSSL)
 
-        AC_CACHE_CHECK(if -lssl or similar is needed, lp_cv_need_lib_ssl,
-            AC_TRY_RUN([
+        if test "$enable_use_tls" = "yes"; then
+            AC_CACHE_CHECK(if -lssl or similar is needed, lp_cv_need_lib_ssl,
+                AC_TRY_RUN([
     #include <openssl/ssl.h>
     void t (void)
     {
@@ -803,21 +805,21 @@ if test "$tls_package" = "any" -o "$tls_package" = "ssl"; then
     {
         return 0;
     }
-            ],
-            lp_cv_need_lib_ssl=no,
-            lp_cv_need_lib_ssl=yes
-        ))
-        if test "$lp_cv_need_lib_ssl" = "yes"; then
-            lp_cv_has_lib_ssl=no
-            AC_CHECK_LIB(ssl,SSL_library_init,
-                         PKGLIBS="$PKGLIBS -lssl"
-                         lp_cv_has_lib_ssl=yes
-                        )
-        fi
+                ],
+                lp_cv_need_lib_ssl=no,
+                lp_cv_need_lib_ssl=yes
+            ))
+            if test "$lp_cv_need_lib_ssl" = "yes"; then
+                lp_cv_has_lib_ssl=no
+                AC_CHECK_LIB(ssl,SSL_library_init,
+                             PKGLIBS="$PKGLIBS -lssl"
+                             lp_cv_has_lib_ssl=yes
+                            )
+            fi
 
-        if test "x$lp_cv_need_lib_crypto" != "xyes"; then
-              AC_CACHE_CHECK(if -lcrypto is needed for SSL, lp_cv_need_lib_crypto,
-                  AC_TRY_RUN([
+            if test "x$lp_cv_need_lib_crypto" != "xyes"; then
+                AC_CACHE_CHECK(if -lcrypto is needed for SSL, lp_cv_need_lib_crypto,
+                    AC_TRY_RUN([
 #include <openssl/ssl.h>
 void t (void)
 {
@@ -828,14 +830,15 @@ int main(void)
 {
     return 0;
 }
-                  ],
-                  lp_cv_need_lib_crypto=no,
-                  lp_cv_need_lib_crypto=yes
-              ))
-              if test "$lp_cv_need_lib_crypto" = "yes"; then
-                  AC_CHECK_LIB(crypto,main, PKGLIBS="$PKGLIBS -lcrypto")
-              fi
-      fi
+                    ],
+                    lp_cv_need_lib_crypto=no,
+                    lp_cv_need_lib_crypto=yes
+                ))
+                if test "$lp_cv_need_lib_crypto" = "yes"; then
+                    AC_CHECK_LIB(crypto,main, PKGLIBS="$PKGLIBS -lcrypto")
+                fi
+            fi
+        fi
     else
         has_tls=no
     fi
@@ -862,8 +865,9 @@ if test "$tls_package" = "any" -o "$tls_package" = "gnu"; then
         tls_package=gnu
         AC_DEFINE(HAS_GNUTLS)
 
-        AC_CACHE_CHECK(if -lgnutls or similar is needed, lp_cv_need_lib_gnutls,
-            AC_TRY_RUN([
+        if test "$enable_use_tls" = "yes"; then
+            AC_CACHE_CHECK(if -lgnutls or similar is needed, lp_cv_need_lib_gnutls,
+                AC_TRY_RUN([
     #include <gnutls/gnutls.h>
     void t (void)
     {
@@ -874,21 +878,21 @@ if test "$tls_package" = "any" -o "$tls_package" = "gnu"; then
     {
         return 0;
     }
-            ],
-            lp_cv_need_lib_gnutls=no,
-            lp_cv_need_lib_gnutls=yes
-        ))
-        if test "$lp_cv_need_lib_gnutls" = "yes"; then
-            lp_cv_has_lib_gnutls=no
-            AC_CHECK_LIB(gnutls,gnutls_global_init,
-                         PKGLIBS="$PKGLIBS -lgnutls"
-                         lp_cv_has_lib_gnutls=yes
-                        )
-        fi
-        AC_CACHE_CHECK(gnutls version, lp_cv_has_gnutls_version,
-	    savelibs="$LIBS"
-	    LIBS="$PKGLIBS"
-            AC_TRY_RUN([
+                ],
+                lp_cv_need_lib_gnutls=no,
+                lp_cv_need_lib_gnutls=yes
+            ))
+            if test "$lp_cv_need_lib_gnutls" = "yes"; then
+                lp_cv_has_lib_gnutls=no
+                AC_CHECK_LIB(gnutls,gnutls_global_init,
+                             PKGLIBS="$PKGLIBS -lgnutls"
+                             lp_cv_has_lib_gnutls=yes
+                            )
+            fi
+            AC_CACHE_CHECK(gnutls version, lp_cv_has_gnutls_version,
+                savelibs="$LIBS"
+                LIBS="$PKGLIBS"
+                AC_TRY_RUN([
     #include <gnutls/gnutls.h>
     void t (void)
     {
@@ -899,12 +903,13 @@ if test "$tls_package" = "any" -o "$tls_package" = "gnu"; then
     {
         return 0;
     }
-            ],
-            lp_cv_has_gnutls_version=8,
-            lp_cv_has_gnutls_version=7
-        ))
-	LIBS="$savelibs"
-	AC_DEFINE_UNQUOTED(HAS_GNUTLS_VERSION, $lp_cv_has_gnutls_version)
+                ],
+                lp_cv_has_gnutls_version=8,
+                lp_cv_has_gnutls_version=7
+            ))
+            LIBS="$savelibs"
+            AC_DEFINE_UNQUOTED(HAS_GNUTLS_VERSION, $lp_cv_has_gnutls_version)
+        fi
 
     else
         has_tls=no

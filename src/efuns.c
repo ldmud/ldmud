@@ -774,6 +774,47 @@ f_regexplode (svalue_t *sp)
 } /* f_regexplode() */
 
 /*-------------------------------------------------------------------------*/
+/* The found delimiter matches are kept in a list of these structures.
+ */
+struct regreplace_match {
+    size_t start, end;              /* Start and end of the match in text */
+    string_t *sub;                  /* Substituted string (counted ref) */
+    struct regreplace_match *next;  /* Next list element */
+};
+
+/* To facilitate automatic cleanup of the temporary structures in case
+ * of an error, the following structure will be pushed onto the VM stack
+ * as T_ERROR_HANDLER.
+ */
+
+struct regreplace_cleanup_s {
+    svalue_t   head;  /* The link to the error handler function */
+
+    struct regreplace_match *matches;  /* List of matches */
+    regexp_t *reg;                     /* Compiled pattern */
+};
+
+static void
+regreplace_cleanup (svalue_t * arg)
+{
+    struct regreplace_cleanup_s * data = (struct regreplace_cleanup_s *)arg;
+    struct regreplace_match *match;
+
+    free_regexp(data->reg);
+    for (match = data->matches; match != NULL;)
+    {
+        struct regreplace_match * next = match->next;
+
+        if (match->sub)
+            free_mstring(match->sub);
+        xfree(match);
+
+        match = next;
+    }
+    xfree(arg);
+} /* regreplace_cleanup() */
+
+/*-------------------------------------------------------------------------*/
 svalue_t*
 f_regreplace (svalue_t *sp)
 
@@ -798,15 +839,6 @@ f_regreplace (svalue_t *sp)
  */
 
 {
-    /* The found delimiter matches are kept in a list of these
-     * structures which are allocated on the stack.
-     */
-    struct regreplace_match {
-        size_t start, end;              /* Start and end of the match in text */
-        string_t *sub;                  /* Substituted string (counted ref) */
-        struct regreplace_match *next;  /* Next list element */
-    };
-
     int       flags;                   /* RE options */
     string_t *sub = NULL;              /* Replacement string */
     svalue_t *subclosure = NULL;       /* Replacement closure */
@@ -815,13 +847,14 @@ f_regreplace (svalue_t *sp)
     string_t *result;                  /* Result string */
     char     *dst;                     /* Result copy pointer */
     regexp_t *reg;                     /* Compiled pattern */
-    struct regreplace_match *matches;  /* List of matches */
     struct regreplace_match **matchp;  /* Pointer to previous_match.next */
     struct regreplace_match *match;    /* Current match structure */
     int       num_matches;             /* Number of matches */
     int       rc;                      /* Result from rx_exec() */
     size_t    start;                   /* Start position for match */
     size_t    reslen;                  /* Result length */
+
+    struct regreplace_cleanup_s * rcp;
 
     /* Must set inter_sp before call to rx_compile(),
      * because it might call error().
@@ -852,30 +885,31 @@ f_regreplace (svalue_t *sp)
         return sp;
     }
 
+    /* Create the automatic cleanup structure */
+    rcp = xalloc(sizeof(*rcp));
+    if (!rcp)
+    {
+        free_regexp(reg);
+        error("(regreplace) Out of memory: (%lu bytes) for cleanup structure\n"
+             , (unsigned long)sizeof(*rcp));
+    }
+
+    rcp->reg = reg;
+    rcp->matches = NULL;
+
+    push_error_handler(regreplace_cleanup, &(rcp->head));
+
     /* Loop over <text>, repeatedly matching it against the pattern,
      * until all matches have been found and recorded.
      */
     start = 0;
     num_matches = 0;
-    matches = NULL;
-    matchp = &matches;
+    matchp = &(rcp->matches);
     reslen = 0;
     while ((rc = rx_exec(reg, text, start)) > 0)
     {
         eval_cost++;
-        match = alloca(sizeof *match);
-        if (!match)
-        {
-            free_regexp(reg);
-            for (match = matches; match != NULL; match = match->next)
-            {
-                if (match->sub)
-                    free_mstring(match->sub);
-            }
-            error("Stack overflow in regexplode()");
-            /* NOTREACHED */
-            return sp;
-        }
+        xallocate(match, sizeof(*match), "regreplace match structure");
         rx_get_match(reg, text, &(match->start), &(match->end));
         match->sub = NULL;
         match->next = NULL;
@@ -897,12 +931,6 @@ f_regreplace (svalue_t *sp)
                 matched_text = mstr_extract(text, match->start, match->end-1);
                 if (!matched_text)
                 {
-                    free_regexp(reg);
-                    for (match = matches; match != NULL; match = match->next)
-                    {
-                        if (match->sub)
-                            free_mstring(match->sub);
-                    }
                     outofmem((size_t)len, "matched text");
                     /* NOTREACHED */
                     return NULL;
@@ -919,12 +947,6 @@ f_regreplace (svalue_t *sp)
 
             if (apply_return_value.type != T_STRING)
             {
-                free_regexp(reg);
-                for (match = matches; match != NULL; match = match->next)
-                {
-                    if (match->sub)
-                        free_mstring(match->sub);
-                }
                 error("Invalid type for replacement pattern: %s, expected string.\n", typename(apply_return_value.type));
                 /* NOTREACHED */
                 return NULL;
@@ -936,12 +958,6 @@ f_regreplace (svalue_t *sp)
         match->sub = rx_sub(reg, text, sub);
         if (!match->sub)
         {
-            free_regexp(reg);
-            for (match = matches; match != NULL; match = match->next)
-            {
-                if (match->sub)
-                    free_mstring(match->sub);
-            }
             outofmemory("substituted string");
             /* NOTREACHED */
             return NULL;
@@ -973,12 +989,6 @@ f_regreplace (svalue_t *sp)
     if (rc < 0) /* Premature abort on error */
     {
         const char * emsg = rx_error_message(rc, reg);
-        free_regexp(reg);
-        for (match = matches; match != NULL; match = match->next)
-        {
-            if (match->sub)
-                free_mstring(match->sub);
-        }
         error("regexp: %s\n", emsg);
         /* NOTREACHED */
         return NULL;
@@ -991,12 +1001,6 @@ f_regreplace (svalue_t *sp)
     result = alloc_mstring(reslen);
     if (!result)
     {
-        free_regexp(reg);
-        for (match = matches; match != NULL; match = match->next)
-        {
-            if (match->sub)
-                free_mstring(match->sub);
-        }
         outofmem(reslen, "result string");
         /* NOTREACHED */
         return NULL;
@@ -1008,7 +1012,7 @@ f_regreplace (svalue_t *sp)
      */
     dst = get_txt(result);
     start = 0;
-    for (match = matches; match; match = match->next)
+    for (match = rcp->matches; match; match = match->next)
     {
         size_t len;
 
@@ -1044,10 +1048,8 @@ f_regreplace (svalue_t *sp)
     }
 
     /* Cleanup */
-    free_regexp(reg);
-    for (match = matches; match != NULL; match = match->next)
-        if (match->sub)
-            free_mstring(match->sub);
+    free_svalue(sp);
+    sp--;
     free_svalue(sp);
     sp--;
     free_svalue(sp);

@@ -577,7 +577,7 @@ call_modify_command (char *buff)
             string_t * str;
 
 #ifdef EXT_STRING_STATS
-        stNumTabledChecked++;
+            stNumTabledChecked++;
 #endif /* EXT_STRING_STATS */
             if ( NULL != (str = find_tabled_str(buff)) )
             {
