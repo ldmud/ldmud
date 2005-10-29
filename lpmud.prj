@@ -59,18 +59,24 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 707)
-(Parent-Version lpmud 3-3 706)
+(Project-Version lpmud 3-3 708)
+(Parent-Version lpmud 3-3 707)
 (Version-Log "
-  - (gcollect, backend.c) If the number of destructed pending objects
-      exceeds the number of active objects, a cleanup of all objects
-      is triggered. Also, the incremental cleanup in each cycle
-      cleans at least the number of objects destructed in the cycle.
+  - (pkg-pgsql, func_spec) Added new efun pg_conv_string(), courtesy
+      of Philipp.
+  - (efuns.c) Added new flag setting '4' to get_type_info() for closures
+      (Bug #0000392).
+  - (parse.c) Possibly corrected a refcounting bug in handling prepositions
+      (Bug #0000391).
+  - (closure.c) Since the operators #'&, #'|, #'^ and #'! are now considered
+      efuns, the closure compiler skipped the special treatment of these.
+      As an added bonus of the correction, #'| and #'^ can now take
+      an arbitrary number of arguments, too. (Bug #0000391)
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Fri, 10 Jun 2005 22:25:33 -0600")
+(Checkin-Time "Sun, 19 Jun 2005 23:09:27 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -113,9 +119,9 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.12 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.86 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.768.1.2 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.385.1.25 644))
-  (INSTALL (lpmud/d/18_INSTALL 1.11.1.21 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.768.1.3 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.385.1.25.1.1 644))
+  (INSTALL (lpmud/d/18_INSTALL 1.11.1.22 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
   ;; Configuration
@@ -183,7 +189,7 @@
   (src/call_out.h (lpmud/f/45_call_out.h 1.7.1.6 644))
   (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.34 644))
   (src/closure.h (lpmud/f/44_closure.h 1.7.1.22.1.4 644))
-  (src/closure.c (lpmud/d/4_closure.c 1.41.1.47.1.26.1.8 644))
+  (src/closure.c (lpmud/d/4_closure.c 1.41.1.47.1.26.1.9 644))
   (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.112 644))
   (src/comm.h (lpmud/d/3_comm.h 1.26.1.43 644))
   (src/driver.h (lpmud/f/36_driver.h 1.15.1.29 644))
@@ -192,7 +198,7 @@
   (src/ed.h (lpmud/f/34_ed.h 1.5.1.6 644))
   (src/ed.c (lpmud/c/33_ed.c 1.32.1.36 644))
   (src/efuns.h (lpmud/l/20_efuns.h 1.13.1.19.1.6 644))
-  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.104.1.13 644))
+  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.104.1.14 644))
   (src/exec.h (lpmud/c/32_exec.h 1.34.1.33.1.7 644))
   (src/files.h (lpmud/i/49_files.h 1.2 644))
   (src/files.c (lpmud/i/50_files.c 1.30 644))
@@ -224,12 +230,12 @@
   (src/my-rusage.h (lpmud/f/28_my-rusage. 1.7 644))
   (src/my-stdint.h (lpmud/u/b/39_my-stdint. 1.2 644))
   (src/object.h (lpmud/44_object.h 1.34.1.19.1.6.1.6 644))
-  (src/object.c (lpmud/45_object.c 1.62.1.88.1.53.1.12 644))
+  (src/object.c (lpmud/45_object.c 1.62.1.88.1.53.1.13 644))
   (src/otable.h (lpmud/f/27_otable.h 1.8.1.4 644))
   (src/otable.c (lpmud/43_otable.c 1.22.1.8 644))
   (src/parser.c (lpmud/l/13_parser.c 1.1 644))
   (src/parse.h (lpmud/f/26_parse.h 1.7.1.2.1.4 644))
-  (src/parse.c (lpmud/42_parse.c 1.26.1.18 644))
+  (src/parse.c (lpmud/42_parse.c 1.26.1.19 644))
   (src/patchlevel.h (lpmud/40_patchlevel 1.23.1.1 644))
 
   ;; PCRE
@@ -329,8 +335,8 @@
   (src/pkg-odbc.c (lpmud/e/b/44_pkg-odbc.c 1.2 644))
   (src/pkg-pcre.h (lpmud/a/b/7_pkg-pcre.h 1.4 644))
   (src/pkg-pcre.c (lpmud/q/48_pcre-pcre. 1.10 644))
-  (src/pkg-pgsql.c (lpmud/d/b/39_pkg-pgsql. 1.6 644))
-  (src/pkg-pgsql.h (lpmud/d/b/40_pkg-pgsql. 1.2 644))
+  (src/pkg-pgsql.c (lpmud/d/b/39_pkg-pgsql. 1.7 644))
+  (src/pkg-pgsql.h (lpmud/d/b/40_pkg-pgsql. 1.3 644))
   (src/pkg-tls.h (lpmud/e/b/10_pkg-tls.h 1.8 644))
   (src/pkg-tls.c (lpmud/e/b/11_pkg-tls.c 1.25 644))
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.20 644))
@@ -351,7 +357,7 @@
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.42 644))
   (src/simulate.c (lpmud/31_simulate.c 1.88.1.135.1.21 644))
   (src/slaballoc.h (lpmud/d/c/16_slaballoc. 1.2 644))
-  (src/slaballoc.c (lpmud/d/c/17_slaballoc. 1.12 644))
+  (src/slaballoc.c (lpmud/d/c/17_slaballoc. 1.13 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.16 644))
   (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.114 644))
   (src/sysmalloc.h (lpmud/c/b/33_sysmalloc. 1.2 644))
@@ -374,7 +380,7 @@
   (src/xptmalloc.c (lpmud/d/b/10_xptmalloc. 1.6 644))
 
   ;; Build files
-  (src/func_spec (lpmud/c/31_func_spec 1.53.1.45.1.22.1.39.1.5 644))
+  (src/func_spec (lpmud/c/31_func_spec 1.53.1.45.1.22.1.39.1.6 644))
   (src/string_spec (lpmud/f/6_string_spe 1.14.1.17.1.3 644))
   (src/mkfunc.c (lpmud/l/14_mkfunc.c 1.1 644))
   (src/make_func.y (lpmud/b/7_make_func. 1.25.1.30.1.12 644))
@@ -605,7 +611,7 @@
   (doc/concepts/regexp (lpmud/v/29_regexp 1.5 644))
   (doc/concepts/hsregexp (lpmud/v/30_hsregexp 1.4 644))
   (doc/concepts/pcre (lpmud/v/31_pcre 1.7 644))
-  (doc/concepts/pgsql (lpmud/d/b/43_pgsql 1.2 644))
+  (doc/concepts/pgsql (lpmud/d/b/43_pgsql 1.3 644))
   (doc/concepts/rtfm (lpmud/n/39_rtfm 1.1 644))
   (doc/concepts/simul_efun (lpmud/n/40_simul_efun 1.2 644))
   (doc/concepts/tls (lpmud/e/b/13_tls 1.6 644))
@@ -721,7 +727,7 @@
   (doc/efun/get_eval_cost (lpmud/m/14_get_eval_c 1.7 644))
   (doc/efun/get_extra_wizinfo (lpmud/o/50_get_extra_ 1.4 644))
   (doc/efun/get_max_commands (lpmud/e/b/39_get_max_co 1.1 644))
-  (doc/efun/get_type_info (lpmud/o/51_get_type_i 1.14 644))
+  (doc/efun/get_type_info (lpmud/o/51_get_type_i 1.15 644))
   (doc/efun/geteuid (lpmud/p/0_geteuid 1.3 644))
   (doc/efun/getuid (lpmud/p/1_getuid 1.3 644))
   (doc/efun/gmtime (lpmud/n/7_gmtime 1.2 644))
@@ -781,10 +787,11 @@
   (doc/efun/or_bits (lpmud/c/45_or_bits 1.5 644))
   (doc/efun/order_alist (lpmud/c/38_order_alis 1.7 644))
   (doc/efun/parse_command (lpmud/p/19_parse_comm 1.7 644))
-  (doc/efun/pg_query (lpmud/d/b/44_pg_query 1.2 644))
-  (doc/efun/pg_pending (lpmud/d/b/45_pg_pending 1.2 644))
-  (doc/efun/pg_connect (lpmud/d/b/46_pg_connect 1.2 644))
-  (doc/efun/pg_close (lpmud/d/b/47_pg_close 1.2 644))
+  (doc/efun/pg_query (lpmud/d/b/44_pg_query 1.3 644))
+  (doc/efun/pg_pending (lpmud/d/b/45_pg_pending 1.3 644))
+  (doc/efun/pg_connect (lpmud/d/b/46_pg_connect 1.3 644))
+  (doc/efun/pg_conv_string (lpmud/e/c/1_pg_conv_st 1.1 644))
+  (doc/efun/pg_close (lpmud/d/b/47_pg_close 1.3 644))
   (doc/efun/pointerp (lpmud/p/20_pointerp 1.4 644))
   (doc/efun/pow (lpmud/c/46_pow 1.1.1.3 644))
   (doc/efun/present (lpmud/p/21_present 1.5 644))
@@ -1128,7 +1135,7 @@
   (doc/efun.de/gmtime.de (lpmud/i/b/25_gmtime.de 1.3 640))
   (doc/efun.de/getuid.de (lpmud/i/b/26_getuid.de 1.1 640))
   (doc/efun.de/geteuid.de (lpmud/i/b/27_geteuid.de 1.1 640))
-  (doc/efun.de/get_type_info.de (lpmud/i/b/28_get_type_i 1.4 640))
+  (doc/efun.de/get_type_info.de (lpmud/i/b/28_get_type_i 1.5 640))
   (doc/efun.de/get_max_commands.de (lpmud/i/b/29_get_max_co 1.1 640))
   (doc/efun.de/get_extra_wizinfo.de (lpmud/i/b/30_get_extra_ 1.2 640))
   (doc/efun.de/get_eval_cost.de (lpmud/i/b/31_get_eval_c 1.1 640))
@@ -1385,7 +1392,7 @@
   (doc/other/mcp2.html (lpmud/c/b/30_mcp2.html 1.1 644) :no-keywords)
   (doc/other/flows.gif (lpmud/c/b/32_flows.gif 1.1 644) :no-keywords)
   (doc/other/mccp.htm (lpmud/c/b/31_mccp.htm 1.1 644) :no-keywords)
-  (doc/other/dhrystones.txt (lpmud/e/37_dhrystones 1.2.1.8 644))
+  (doc/other/dhrystones.txt (lpmud/e/37_dhrystones 1.2.1.9 644))
 
   ;; Mudlib Support
   (mud/README (lpmud/t/12_README 1.6.1.5 644))

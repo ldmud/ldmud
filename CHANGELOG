@@ -1,6 +1,18 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+19-Jun-2005 (Lars Duening)  (3.3.708)
+  - (pkg-pgsql, func_spec) Added new efun pg_conv_string(), courtesy
+      of Philipp.
+  - (efuns.c) Added new flag setting '4' to get_type_info() for closures
+      (Bug #0000392).
+  - (parse.c) Possibly corrected a refcounting bug in handling prepositions
+      (Bug #0000391).
+  - (closure.c) Since the operators #'&, #'|, #'^ and #'! are now considered
+      efuns, the closure compiler skipped the special treatment of these.
+      As an added bonus of the correction, #'| and #'^ can now take
+      an arbitrary number of arguments, too. (Bug #0000391)
+
 10-Jun-2005 (Lars Duening)  (3.3.707)
   - (gcollect, backend.c) If the number of destructed pending objects
       exceeds the number of active objects, a cleanup of all objects

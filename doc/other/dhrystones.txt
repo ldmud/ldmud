@@ -172,13 +172,6 @@ Tarkin: G4/800MHz/1GByte, Mac OS X 10.3.6, LDMud 3.3.704, gcc 3.3:
   D  -   MC, MT, ML              5736.3    9741.7    9901.0    9496.2
   D, TC, MC, MT, ML              3533.7    6343.2    6727.3    6356.3
 
-Legend:
-  D: DEBUG
-  TC: TRACE_CODE
-  MC: MALLOC_CHECK
-  MT: MALLOC_TRACE
-  ML: MALLOC_LPC_TRACE
-
 
 Tarkin: G4/800MHz/1GByte, Mac OS X 10.4.1, LDMud 3.3.704, gcc 3.3:
 
@@ -198,26 +191,35 @@ Tarkin: G4/800MHz/1GByte, Mac OS X 10.4.1, LDMud 3.3.704, gcc 3.3:
   D  -   MC, MT, ML              5710.0    9842.7   10070.6    9609.4
   D, TC, MC, MT, ML              3413.0    6443.7    6674.9    6368.7
 
-Legend:
-  D: DEBUG
-  TC: TRACE_CODE
-  MC: MALLOC_CHECK
-  MT: MALLOC_TRACE
-  ML: MALLOC_LPC_TRACE
 
 Tarkin: G4/800MHz/1GByte, Mac OS X 10.4.1, LDMud 3.3.704, gcc 4.0:
 
   Dhrystone2 (slaballoc)           o0        o1        o2        o4
-  -                              ......    ......    ......    ......
-  -  -   MC, MT, ML              ......    ......    ......    ......
-  D  -   MC, MT, ML              ......    ......    ......    ......
-  D, TC, MC, MT, ML              ......    ......    ......    ......
+  -                              6628.5   13152.3   13748.9   14111.1
+  -  -   MC, MT, ML              6600.7   12690.5   13477.3   13680.1
+  D  -   MC, MT, ML              5324.9   10787.8   11312.4   10842.2
+  D, TC, MC, MT, ML              3711.7    7029.6    7878.9    8143.8
 
-  Dhrystone. (sysmalloc)
-  -                              ......   .......   .......   .......
-  -  -   MC, MT, ML              ......   .......   .......   .......
-  D  -   MC, MT, ML              ......    ......   .......    ......
-  D, TC, MC, MT, ML              ......    ......    ......    ......
+  Dhrystone2 (sysmalloc)
+  -                              6640.2   12739.3   13642.7   13940.8
+  -  -   MC, MT, ML              6593.5   12335.6   13216.0   13642.2
+  D  -   MC, MT, ML              5324.8   10745.2   11295.3   10799.2
+  D, TC, MC, MT, ML              3712.6    5572.3    7851.8    7878.6
+
+
+Tarkin: G4/800MHz/1GByte, Mac OS X 10.4.1, LDMud 3.2.11, gcc 4.0:
+
+  Dhrystone2 (slaballoc)           o0        o1        o2        o4
+  -                              8391.8   18259.9   19433.1   19711.4
+  -  -   MC, MT, ML              8043.0   16959.6   15923.8   16147.1
+  D  -   MC, MT, ML              4989.4   11398.3   12058.0   12575.8
+  D, TC, MC, MT, ML              3571.2    7129.5    6028.9    6780.2
+
+  Dhrystone2 (sysmalloc)
+  -                              8314.9   17386.2   18553.4   18785.6
+  -  -   MC, MT, ML              8296.5   17311.2   18461.9   18820.6
+  D  -   MC, MT, ML              5111.7   12048.8   13163.8   13357.3
+  D, TC, MC, MT, ML              3498.6    7218.9    6747.8    7380.2
 
 Legend:
   D: DEBUG
@@ -225,6 +227,5 @@ Legend:
   MC: MALLOC_CHECK
   MT: MALLOC_TRACE
   ML: MALLOC_LPC_TRACE
-
 
 

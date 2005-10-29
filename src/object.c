@@ -1450,7 +1450,8 @@ v_function_exists (svalue_t *sp, int num_arg)
 
 {
     string_t *str, *prog_name;
-    uint32 prog_line, flags;
+    uint32 prog_line = 0;
+    uint32 flags;
     svalue_t *argp;
     object_t *ob;
 

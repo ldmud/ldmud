@@ -6178,6 +6178,10 @@ v_get_type_info (svalue_t *sp, int num_arg)
  * return the name of the program the closure was defined in. For other
  * closures, <flag> setting 3 returns 0.
  *
+ * If <arg> is a lfun or context closure, the <flag> setting 4 lets the efun
+ * return the base name of the function (without any program name adorments).
+ * For other closures, <flag> setting 4 returns 0.
+ *
  * For every other <flag> setting, -1 is returned.
  *
  * The secondary information is:
@@ -6199,11 +6203,15 @@ v_get_type_info (svalue_t *sp, int num_arg)
     mp_int i, j;
     string_t *str; /* != NULL: to use instead of j */
     svalue_t *argp;
+    p_int flag = -1;
 
     argp = sp - num_arg + 1;
     i = argp->type;
     j = -1;
     str = NULL;
+
+    if (num_arg == 2 && sp->type == T_NUMBER)
+        flag = sp->u.number;
 
     /* Determine the second return value */
     switch(i)
@@ -6215,7 +6223,7 @@ v_get_type_info (svalue_t *sp, int num_arg)
         j = argp->u.map->num_values;
         break;
     case T_CLOSURE:
-        if (num_arg == 2 && sp->type == T_NUMBER && sp->u.number == 2)
+        if (flag == 2)
         {
             object_t *ob;
 
@@ -6247,7 +6255,7 @@ v_get_type_info (svalue_t *sp, int num_arg)
             return sp;
             /* NOTREACHED */
         }
-        if (num_arg == 2 && sp->type == T_NUMBER && sp->u.number == 3)
+        if (flag == 3)
         {
             string_t  *progname = NULL;
 
@@ -6273,6 +6281,27 @@ v_get_type_info (svalue_t *sp, int num_arg)
             return sp;
             /* NOTREACHED */
         }
+        if (flag == 4)
+        {
+            string_t  *function_name = NULL;
+
+            sp--;
+            if (sp->x.closure_type == CLOSURE_LFUN)
+            {
+                program_t *prog;
+                Bool       is_inherited;
+
+                closure_lookup_lfun_prog(sp->u.lambda, &prog, &function_name, &is_inherited);
+            }
+
+            free_svalue(sp);
+            if (!function_name)
+                put_number(sp, 0);
+            else
+                put_string(sp, function_name);
+            return sp;
+            /* NOTREACHED */
+        }
         /* FALLTHROUGH */
 
     case T_SYMBOL:
@@ -6281,7 +6310,7 @@ v_get_type_info (svalue_t *sp, int num_arg)
         break;
 #ifdef USE_STRUCTS
     case T_STRUCT:
-        if (num_arg == 2 && sp->type == T_NUMBER && sp->u.number == 2)
+        if (flag == 2)
         {
             sp--;
 
@@ -6306,14 +6335,12 @@ v_get_type_info (svalue_t *sp, int num_arg)
     /* Depending on flag, return the proper value */
     if (num_arg == 2)
     {
-        p_int flagvalue = sp->u.number;
-
         free_svalue(sp--);
         free_svalue(sp);
-        if (flagvalue == 2)
-        if (flagvalue != 1) /* 0 or else */
+        if (flag == 2)
+        if (flag != 1) /* 0 or else */
         {
-            if (flagvalue) /* neither 0 nor 1 */
+            if (flag) /* neither 0 nor 1 */
             {
                 j = -1;
             }
