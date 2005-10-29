@@ -643,6 +643,7 @@ backend (void)
 
             /* Do the timed events */
 	    if (!synch_heart_beats
+             || time_of_last_hb == 0
              || time_of_last_hb + heart_beat_interval >= current_time)
 	    {
                 do_state_check(2, "before heartbeat");

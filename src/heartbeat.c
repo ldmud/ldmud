@@ -200,7 +200,8 @@ call_heart_beat (void)
         /* Check the time of the last heartbeat to see, if we
          * processed all objects.
          */
-        if (current_time < this->tlast + heart_beat_interval)
+        if (synch_heart_beats
+         && current_time < this->tlast + heart_beat_interval)
             break;
 
         this->tlast = current_time;

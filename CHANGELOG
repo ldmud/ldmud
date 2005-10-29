@@ -1,6 +1,9 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+17-Mar-2005 (Lars Duening)  (3.3.688)
+  - (backend.c) The synchronous heartbeat timing wasn't initialised properly.
+
 13-Mar-2005 (Lars Duening)  (3.3.687)
   - (main, backend.c, heartbeat.c) The ALARM_TIME and HEART_BEAT_INTERVAL
         time are now configurable at compile and start time (based on

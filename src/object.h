@@ -185,13 +185,15 @@ struct replace_ob_s
 
 #ifndef CHECK_OBJECT_REF
 #  define free_object(o,from) MACRO( \
-      if ((o)->ref == 2) dest_last_ref_gone = MY_TRUE; \
-      if (--((o)->ref) <= 0) dealloc_object(o);\
+      object_t * tmp_ = o; \
+      if (tmp_->ref == 2) dest_last_ref_gone = MY_TRUE; \
+      if (--(tmp_->ref) <= 0) dealloc_object(tmp_);\
    )
 #else
 #  define free_object(o,from) MACRO( \
-      if ((o)->ref == 2) dest_last_ref_gone = MY_TRUE; \
-      if (--((o)->ref) <= 0) dealloc_object(o, __FILE__, __LINE__); \
+      object_t * tmp_ = o; \
+      if (tmp_->ref == 2) dest_last_ref_gone = MY_TRUE; \
+      if (--(tmp_->ref) <= 0) dealloc_object(tmp_, __FILE__, __LINE__); \
    )
 #endif
 
@@ -199,19 +201,21 @@ struct replace_ob_s
 
 #ifndef CHECK_OBJECT_REF
 #  define free_object(o,from) MACRO(\
-      if ((o)->ref == 2) dest_last_ref_gone = MY_TRUE; \
-      (o)->ref--;\
+      object_t * tmp_ = o; \
+      if (tmp_->ref == 2) dest_last_ref_gone = MY_TRUE; \
+      tmp_->ref--;\
       if (d_flag > 1) printf("Sub ref from object %s: %ld (%s)\n"\
-                            , get_txt((o)->name), (o)->ref, from);\
-      if ((o)->ref <= 0) dealloc_object(o); \
+                            , get_txt(tmp_->name), tmp_->ref, from);\
+      if (tmp_->ref <= 0) dealloc_object(tmp_); \
     )
 #else
 #  define free_object(o,from) MACRO(\
-      if ((o)->ref == 2) dest_last_ref_gone = MY_TRUE; \
-      (o)->ref--;\
+      object_t * tmp_ = o; \
+      if (tmp_->ref == 2) dest_last_ref_gone = MY_TRUE; \
+      tmp_->ref--;\
       if (d_flag > 1) printf("Sub ref from object %s: %ld (%s)\n"\
-                            , get_txt((o)->name), (o)->ref, from);\
-      if ((o)->ref <= 0) dealloc_object(o, __FILE__, __LINE__); \
+                            , get_txt(tmp_->name), tmp_->ref, from);\
+      if (tmp_->ref <= 0) dealloc_object(tmp_, __FILE__, __LINE__); \
     )
 #endif
 
@@ -235,7 +239,7 @@ struct replace_ob_s
 #endif
 
 
-#define check_object(o) ((o)&&(o)->flags&O_DESTRUCTED ? NULL :(o))
+#define check_object(o) ((o)&&((o)->flags&O_DESTRUCTED) ? NULL :(o))
 
   /* Return NULL, if object <o> is NULL or destructed,
    * return <o> else.

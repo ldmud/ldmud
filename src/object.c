@@ -3559,7 +3559,7 @@ f_tell_object (svalue_t *sp)
  */
 
 {
-    object_t * ob;
+    object_t * ob = NULL;
     svalue_t *arg = sp - 1;
 
     /* Get the arguments */
