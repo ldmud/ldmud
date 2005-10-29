@@ -2,6 +2,11 @@ This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
 29-Oct-2005 (Lars Duening)
+  - (backend.c) The backend call to cleanup_all_objects() is now
+       controlled with a low/high watermark logic, to prevent
+       repeated calls in consecutive backend cycles: if one cleanup
+       didn't remove enough destructed objects, it is unlikely
+       that immediately following ones will.
   - (pkg-tls.c) The OpenSSL read/writes are now retried when necessary.
 
 19-Oct-2005 (Lars Duening)

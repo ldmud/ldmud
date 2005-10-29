@@ -441,6 +441,11 @@ backend (void)
          * is the max size of the network receive buffer. IOW: no
          * buffer overruns are possible.
          */
+    Bool prevent_object_cleanup;
+        /* Implement a low/high water mark handling for the call to
+         * cleanup_all_objects(), as it turns out that a single
+         * cleanup doesn't always remove enough destructed objects.
+         */
 
     /*
      * Set up.
@@ -472,6 +477,7 @@ backend (void)
      */
     clear_state();
     flush_all_player_mess();
+    prevent_object_cleanup = MY_FALSE;
 
     /*
      * The Loop.
@@ -507,8 +513,19 @@ backend (void)
 
         check_for_out_connections();
 
-        if (num_listed_objs <= num_destructed)
-            cleanup_all_objects();
+        if (prevent_object_cleanup)
+        {
+            if (num_listed_objs >= num_destructed/2)
+                prevent_object_cleanup = MY_FALSE;
+        }
+        else
+        {
+            if (num_listed_objs <= num_destructed)
+            {
+                cleanup_all_objects();
+                prevent_object_cleanup = MY_TRUE;
+            }
+        }
 
         if (extra_jobs_to_do) {
 

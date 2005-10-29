@@ -19,7 +19,7 @@ version_type="dev"
 # A timestamp, to be used by bumpversion and other scripts.
 # It can be used, for example, to 'touch' this file on every build, thus
 # forcing revision control systems to add it on every checkin automatically.
-version_stamp="Sat Oct 29 11:15:05 MDT 2005"
+version_stamp="Sat Oct 29 11:49:41 MDT 2005"
 
 # The version number information
 # $Format: "version_micro=$ReleaseMicro$"$ 
