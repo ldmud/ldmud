@@ -27,6 +27,7 @@ with_max_cost=5000000
 with_swap_file="/tmp/LD_SWAP.1"
 
 with_max_array_size=9000
+with_max_mapping_keys=9000
 with_max_mapping_size=27000
 with_max_players=100
 

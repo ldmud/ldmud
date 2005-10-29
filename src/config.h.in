@@ -36,10 +36,15 @@
  */
 #define MAX_ARRAY_SIZE            @val_max_array_size@
 
-/* This is the maximum array size allowed for one single mapping.
+/* This is the maximum number of entries allowed for a single mapping.
  * If 0, any size is allowed.
  */
-#define MAX_MAPPING_SIZE            @val_max_mapping_size@
+#define MAX_MAPPING_KEYS          @val_max_mapping_keys@
+
+/* This is the maximum number of values held in a single mapping.
+ * If 0, any size is allowed.
+ */
+#define MAX_MAPPING_SIZE          @val_max_mapping_size@
 
 /* Max size of a file allowed to be read by 'read_file()'.
  */

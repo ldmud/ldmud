@@ -56,9 +56,13 @@ enable_filename_spaces=no
 
 # Maximum size of array. If 0, any size is allowed.
 
-with_max_array_size=3000
+with_max_array_size=5000
 
-# Maximum size of mapping. If 0, any size is allowed.
+# Maximum number of entries in a mapping. If 0, any size is allowed.
+
+with_max_mapping_keys=5000
+
+# Maximum number of values in a mapping. If 0, any size is allowed.
 
 with_max_mapping_size=15000
 

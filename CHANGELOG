@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+20-Feb-2004 (Lars Duening)  (3.3.677)
+  - (configure, mapping.c, simulate) It is now possible to determine
+       the max number of mapping entries (keys) in addition to the total
+       mapping size (Bug #0000360).
+  - (main.c) New commandline option '--max-mapping-keys' to determine
+       separately the maximum number of entries in a mapping.
+
 20-Feb-2004 (Lars Duening)  (3.3.676)
   - (smalloc.c) Corrected a crasher in realloc().
   - (smalloc.c, slaballoc.c) New memory allocated with esbrk() is now

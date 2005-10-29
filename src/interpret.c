@@ -9882,12 +9882,16 @@ again:
             }
             pop_n_elems(2);
             push_mapping(sp, m);
-            if (max_mapping_size && MAP_TOTAL_SIZE(m) > (p_int)max_mapping_size)
+            if ((max_mapping_size && MAP_TOTAL_SIZE(m) > (p_int)max_mapping_size)
+             || (max_mapping_keys && MAP_SIZE(m) > (p_int)max_mapping_keys)
+               )
             {
                 check_map_for_destr(m);
                 if (max_mapping_size && MAP_TOTAL_SIZE(m) > (p_int)max_mapping_size)
                     ERRORF(("Illegal mapping size: %ld elements (%ld x %ld)\n"
                            , MAP_TOTAL_SIZE(m), MAP_SIZE(m), m->num_values));
+                if (max_mapping_keys && MAP_SIZE(m) > (p_int)max_mapping_keys)
+                    ERRORF(("Illegal mapping size: %ld entries\n", MAP_SIZE(m)));
             }
             break;
           }
@@ -11517,7 +11521,9 @@ again:
                 add_to_mapping(argp->u.map, u2.map);
                 sp -= 2;
                 free_mapping(u2.map);
-                if (max_mapping_size && MAP_TOTAL_SIZE(argp->u.map) > (p_int)max_mapping_size)
+                if ((max_mapping_size && MAP_TOTAL_SIZE(argp->u.map) > (p_int)max_mapping_size)
+                 || (max_mapping_keys && MAP_SIZE(argp->u.map) > (p_int)max_mapping_keys)
+                  )
                 {
                     check_map_for_destr(argp->u.map);
                     if (max_mapping_size && MAP_TOTAL_SIZE(argp->u.map) > (p_int)max_mapping_size)
@@ -11526,6 +11532,10 @@ again:
                                , MAP_TOTAL_SIZE(argp->u.map)
                                , MAP_SIZE(argp->u.map)
                                , argp->u.map->num_values));
+                    if (max_mapping_keys && MAP_SIZE(argp->u.map) > (p_int)max_mapping_keys)
+                        ERRORF(("Illegal mapping size: %ld entries\n"
+                               , MAP_SIZE(argp->u.map)
+                              ));
                 }
             }
             break;
@@ -14495,6 +14505,8 @@ again:
         if (max_mapping_size && i * (1+num_values) > (p_int)max_mapping_size)
             ERRORF(("Illegal mapping size: %ld elements (%ld x %ld)\n"
                    , (long)(i * (1+num_values)), (long)i, (long)num_values));
+        if (max_mapping_keys && i > (p_int)max_mapping_keys)
+            ERRORF(("Illegal mapping size: %ld entries\n", (long)i));
 
         /* Get the mapping */
         m = allocate_mapping(i, num_values);

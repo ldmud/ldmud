@@ -45,6 +45,7 @@ EXAMPLES
 HISTORY
         Introduced in LDMud 3.2.7.
         LDMud 3.3.563 introduced LIMIT_COST.
+        LDMud 3.3.677 introduced LIMIT_MAPPING_KEYS, LIMIT_MAPPING_SIZE.
 
 SEE ALSO
         query_limits(E), set_limits(E)

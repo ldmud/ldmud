@@ -71,5 +71,6 @@ with_max_cost=20000000
 with_catch_reserved_cost=150000
 
 with_max_array_size=50000
+with_max_mapping_keys=50000
 with_max_mapping_size=150000
 with_max_bits=20000

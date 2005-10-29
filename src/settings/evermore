@@ -12,6 +12,7 @@ exit 1
 
 # we do not want a limit on those sizes
 with_max_array_size=0
+with_max_mapping_keys=0
 with_max_mapping_size=0
 with_read_file_max_size=0
 with_max_byte_transfer=0

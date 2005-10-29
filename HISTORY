@@ -185,6 +185,8 @@ For a detailed list of all changes see the file CHANGELOG.
            available (default is to allow sbrk()).
        + New commandline options '--tls-key' and '--tls-cert' to define the
            x509 key- and certfile for the TLS package.
+       + New commandline option '--max-mapping-keys' to determine separately
+           the maxinum number of entries in a mapping.
 
 
 13-Feb-2005 (Lars Duening) -- Release 3.2.11

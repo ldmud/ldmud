@@ -39,6 +39,7 @@ with_swap_file=/home/mud/mud/swapfiles/SwapFile
 
 if test "x$DEBUG" = "x"; then
     with_max_array_size=10000
+# with_max_mapping_keys=10000 ?
 # with_max_mapping_size=30000 ?
 else
     with_max_array_size=100000

@@ -939,20 +939,27 @@ static svalue_t local_const0;
      */
 
     /* Size limit exceeded? */
-    if (check_size && max_mapping_size)
+    if (check_size && (max_mapping_size || max_mapping_keys))
     {
         mp_int msize;
 
         msize = (mp_int)MAP_TOTAL_SIZE(m);
-        if (msize >= (mp_int)max_mapping_size)
+        if (   (max_mapping_size && msize >= (mp_int)max_mapping_size)
+            || (max_mapping_keys && MAP_SIZE(m) > max_mapping_keys)
+           )
         {
             check_map_for_destr(m);
             msize = (mp_int)MAP_TOTAL_SIZE(m);
         }
-        if (msize >= (mp_int)max_mapping_size)
+        if (max_mapping_size && msize >= (mp_int)max_mapping_size)
         {
             error("Illegal mapping size: %ld elements (%ld x %ld)\n"
                  , msize+1, (long)MAP_SIZE(m), (long)m->num_values);
+            return NULL;
+        }
+        if (max_mapping_keys && MAP_SIZE(m) >= (mp_int)max_mapping_keys)
+        {
+            error("Illegal mapping size: %ld entries\n", msize+1);
             return NULL;
         }
     }
@@ -3034,6 +3041,10 @@ f_m_allocate (svalue_t *sp)
              , size * (1+width)
              , size, width);
 
+    if (max_mapping_keys
+     && size > (p_int)max_mapping_keys)
+        error("Illegal mapping size: %ld entries.\n", size);
+
     sp--;
 
     if (!(sp->u.map = allocate_mapping(size, width)))
@@ -4366,6 +4377,8 @@ v_mkmapping (svalue_t *sp, int num_arg)
 
         if (max_mapping_size && length > (p_int)max_mapping_size)
             error("Illegal mapping size: %ld elements\n", length);
+        if (max_mapping_keys && length > (p_int)max_mapping_keys)
+            error("Illegal mapping size: %ld entries\n", length);
 
         /* Allocate the mapping and assign the values */
         m = allocate_mapping(length, 1);
@@ -4404,6 +4417,8 @@ v_mkmapping (svalue_t *sp, int num_arg)
         if (max_mapping_size && length * num_arg > (p_int)max_mapping_size)
             error("Illegal mapping size: %ld elements (%ld x %ld)\n"
                  , length * num_arg, length, (long)num_arg);
+        if (max_mapping_keys && length > (p_int)max_mapping_keys)
+            error("Illegal mapping size: %ld entries\n", length);
 
         /* Allocate the mapping */
         num_values = num_arg - 1;

@@ -473,6 +473,13 @@ pgresult (dbconn_t *pgconn, PGresult *res)
                 error("Query result exceeded mappingsize limit.\n");
             }
             
+            if (max_mapping_keys && nfields > (p_int)max_mapping_keys)
+            {
+                PQclear(res);
+                dequeue(pgconn);
+                error("Query result exceeded mappingsize limit.\n");
+            }
+            
             map = allocate_mapping(nfields, ntuples);
             if (!map)
             {

@@ -164,6 +164,7 @@ extern void update_object_sent(object_t *obj, sentence_t *new_sent);
 
 #define RESET_LIMITS ( max_array_size = def_array_size \
                      , max_mapping_size = def_mapping_size \
+                     , max_mapping_keys = def_mapping_keys \
                      , max_eval_cost = def_eval_cost \
                      , max_file_xfer = def_file_xfer \
                      , max_byte_xfer = def_byte_xfer \
@@ -189,6 +190,7 @@ extern rt_context_t *rt_context;
 
 extern size_t def_array_size;
 extern size_t def_mapping_size;
+extern size_t def_mapping_keys;
 extern int32  def_eval_cost;
 extern int32  def_file_xfer;
 extern int32  def_byte_xfer;
@@ -197,6 +199,7 @@ extern int32  def_callouts;
 
 extern size_t max_array_size;
 extern size_t max_mapping_size;
+extern size_t max_mapping_keys;
 extern int32  max_eval_cost;
 extern int32  max_file_xfer;
 extern int32  max_byte_xfer;

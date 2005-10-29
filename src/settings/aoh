@@ -48,6 +48,7 @@ exec ./configure \
 --with-max-cost=3000000 \
 --without-wizlist-file \
 --with-max-array-size=0 \
+--with-max-mapping-keys=0 \
 --with-max-mapping-size=0 \
 --with-swap-file=AoH $*
 exit 1

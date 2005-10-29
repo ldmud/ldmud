@@ -55,6 +55,7 @@
 --with-master-reserved-cost=0x200 \
 --with-swap-file=/mud/swapfiles/Mudswapfile \
 --with-max-array-size=5000 \
+--with-max-mapping-keys=5000 \
 --with-max-mapping-size=15000 \
 --with-max-players=60 \
 --with-max-local=50 \

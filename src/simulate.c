@@ -87,7 +87,8 @@ struct limits_context_s
 {
     rt_context_t rt;     /* the rt_context superclass */
     size_t max_array;    /* max array size */
-    size_t max_mapping;  /* max mapping size */
+    size_t max_mapping;  /* max mapping size in values */
+    size_t max_map_keys; /* max mapping size in entries */
     int32  max_eval;     /* max eval cost */
     int32  max_byte;     /* max byte xfer */
     int32  max_file;     /* max file xfer */
@@ -273,6 +274,11 @@ size_t max_array_size = MAX_ARRAY_SIZE;
 size_t def_mapping_size = MAX_MAPPING_SIZE;
 size_t max_mapping_size = MAX_MAPPING_SIZE;
   /* If != 0: the max. number of elements in a mapping.
+   */
+
+size_t def_mapping_keys = MAX_MAPPING_KEYS;
+size_t max_mapping_keys = MAX_MAPPING_KEYS;
+  /* If != 0: the max. number of entries in a mapping.
    */
 
 int32 def_eval_cost = MAX_COST;
@@ -466,6 +472,7 @@ save_limits_context (struct limits_context_s * context)
     context->max_array = max_array_size;
     context->max_callouts = max_callouts;
     context->max_mapping = max_mapping_size;
+    context->max_map_keys = max_mapping_keys;
     context->max_eval = max_eval_cost;
     context->eval_cost = eval_cost;
     context->max_byte = max_byte_xfer;
@@ -515,6 +522,7 @@ restore_limits_context (struct limits_context_s * context)
     }
     max_array_size = context->max_array;
     max_mapping_size = context->max_mapping;
+    max_mapping_keys = context->max_map_keys;
     max_callouts = context->max_callouts;
     max_eval_cost = context->max_eval;
     max_byte_xfer = context->max_byte;
@@ -3209,7 +3217,8 @@ status_parse (strbuf_t * sbuf, char * buff)
 
         if (!verbose) {
             strbuf_add(sbuf, "\t\t\t\t\t ---------\n");
-            strbuf_addf(sbuf, "Total: \t\t\t\t\t %9d\n", tot);
+            strbuf_add(sbuf, "Total:\t\t\t\t\t ");
+            strbuf_addf(sbuf, "%9d\n", tot);
         }
         return MY_TRUE;
     }
@@ -4834,12 +4843,13 @@ set_single_limit ( struct limits_context_s * result
         {
             switch(limit)
             {
-            case LIMIT_EVAL:     result->max_eval = val;    break;
-            case LIMIT_ARRAY:    result->max_array = val;   break;
-            case LIMIT_MAPPING:  result->max_mapping = val; break;
-            case LIMIT_BYTE:     result->max_byte = val;    break;
-            case LIMIT_FILE:     result->max_file = val;    break;
-            case LIMIT_CALLOUTS: result->max_callouts = val; break;
+            case LIMIT_EVAL:          result->max_eval = val;     break;
+            case LIMIT_ARRAY:         result->max_array = val;    break;
+            case LIMIT_MAPPING_KEYS:  result->max_map_keys = val; break;
+            case LIMIT_MAPPING_SIZE:  result->max_mapping = val;  break;
+            case LIMIT_BYTE:          result->max_byte = val;     break;
+            case LIMIT_FILE:          result->max_file = val;     break;
+            case LIMIT_CALLOUTS:      result->max_callouts = val; break;
             default: error("Unimplemented limit #%d\n", limit);
             }
         }
@@ -4851,7 +4861,11 @@ set_single_limit ( struct limits_context_s * result
                                  break;
             case LIMIT_ARRAY:    result->max_array = def_array_size;
                                  break;
-            case LIMIT_MAPPING:  result->max_mapping = def_mapping_size;
+            case LIMIT_MAPPING_KEYS:
+                                 result->max_map_keys = def_mapping_keys;
+                                 break;
+            case LIMIT_MAPPING_SIZE:
+                                 result->max_mapping = def_mapping_size;
                                  break;
             case LIMIT_BYTE:     result->max_byte = def_byte_xfer;
                                  break;
@@ -4889,6 +4903,7 @@ extract_limits ( struct limits_context_s * result
     result->max_eval = max_eval_cost;
     result->max_array = max_array_size;
     result->max_mapping = max_mapping_size;
+    result->max_map_keys = max_mapping_keys;
     result->max_callouts = max_callouts;
     result->max_byte = max_byte_xfer;
     result->max_file = max_file_xfer;
@@ -4939,7 +4954,8 @@ create_limits_array (struct limits_context_s * rtlimits)
     {
         put_number(vec->item+LIMIT_EVAL,     rtlimits->max_eval);
         put_number(vec->item+LIMIT_ARRAY,    rtlimits->max_array);
-        put_number(vec->item+LIMIT_MAPPING,  rtlimits->max_mapping);
+        put_number(vec->item+LIMIT_MAPPING_KEYS,  rtlimits->max_map_keys);
+        put_number(vec->item+LIMIT_MAPPING_SIZE,  rtlimits->max_mapping);
         put_number(vec->item+LIMIT_BYTE,     rtlimits->max_byte);
         put_number(vec->item+LIMIT_FILE,     rtlimits->max_file);
         put_number(vec->item+LIMIT_CALLOUTS, rtlimits->max_callouts);
@@ -4994,6 +5010,7 @@ v_limited (svalue_t * sp, int num_arg)
         limits.max_eval = 0;
         limits.max_array = 0;
         limits.max_mapping = 0;
+        limits.max_map_keys = 0;
         limits.max_callouts = 0;
         limits.max_byte = 0;
         limits.max_file = 0;
@@ -5065,6 +5082,7 @@ v_limited (svalue_t * sp, int num_arg)
            */
         max_array_size = limits.max_array;
         max_mapping_size = limits.max_mapping;
+        max_mapping_keys = limits.max_map_keys;
         max_byte_xfer = limits.max_byte;
         max_file_xfer = limits.max_file;
         max_callouts = limits.max_callouts;
@@ -5164,6 +5182,7 @@ v_set_limits (svalue_t * sp, int num_arg)
         def_eval_cost = limits.max_eval;
         def_array_size = limits.max_array;
         def_mapping_size = limits.max_mapping;
+        def_mapping_keys = limits.max_map_keys;
         def_byte_xfer = limits.max_byte;
         def_file_xfer = limits.max_file;
         def_callouts = limits.max_callouts;
@@ -5187,7 +5206,9 @@ f_query_limits (svalue_t * sp)
  *
  *   int[LIMIT_EVAL]:    the max number of eval costs
  *   int[LIMIT_ARRAY]:   the max number of array entries
- *   int[LIMIT_MAPPING]: the max number of mapping entries
+ *   int[LIMIT_MAPPING_SIZE]: the max number of mapping values
+ *   int[LIMIT_MAPPING_KEYS]: the max number of mapping entries
+ *      (LIMIT_MAPPING is an alias for LIMIT_MAPPING_KEYS)
  *   int[LIMIT_BYTE]:    the max number of bytes for one read/write_bytes()
  *   int[LIMIT_FILE]:    the max number of bytes for one read/write_file()
  *   int[LIMIT_COST]:    how to account for the evaluation cost
@@ -5212,7 +5233,10 @@ f_query_limits (svalue_t * sp)
 
     put_number(vec->item+LIMIT_EVAL,     def ? def_eval_cost : max_eval_cost);
     put_number(vec->item+LIMIT_ARRAY,    def ? def_array_size : max_array_size);
-    put_number(vec->item+LIMIT_MAPPING,  def ? def_mapping_size : max_mapping_size);
+    put_number(vec->item+LIMIT_MAPPING_KEYS
+              , def ? def_mapping_keys : max_mapping_keys);
+    put_number(vec->item+LIMIT_MAPPING_SIZE
+              , def ? def_mapping_size : max_mapping_size);
     put_number(vec->item+LIMIT_BYTE,     def ? def_byte_xfer : max_byte_xfer);
     put_number(vec->item+LIMIT_FILE,     def ? def_file_xfer : max_file_xfer);
     put_number(vec->item+LIMIT_CALLOUTS, def ? def_callouts : max_callouts);

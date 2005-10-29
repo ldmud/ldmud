@@ -123,6 +123,10 @@ DESCRIPTION
         The maximum number of elements a mapping can hold.
         Set to 0, mappings of any size are allowed.
 
+      --max-mapping-keys <size>
+        The maximum number of entries a mapping can hold.
+        Set to 0, mappings of any size are allowed.
+
       --max-callouts <size>
         The maximum number of callouts at one time.
         Set to 0, any number is allowed.
@@ -316,3 +320,4 @@ HISTORY
     LDMud 3.3.378 added --share-variables, --init-variables.
     LDMud 3.3.475/3.2.11 added --tls-key, --tls-cert.
     LDMud 3.3.672/3.2.11 added --tls-trustfile, --tls-trustdirectory.
+    LDMud 3.3.677 added --max-mapping-keys.

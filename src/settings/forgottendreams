@@ -27,5 +27,6 @@ enable_use_pcre=no
 with_master_name=kernel/master
 with_swap_file=LD_SWAP.3
 with_max_array_size=5000
+with_max_mapping_keys=6000
 with_max_mapping_size=30000
 with_max_local=100

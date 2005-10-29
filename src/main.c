@@ -1015,6 +1015,7 @@ typedef enum OptNumber {
  , cMaxCallouts     /* --max-callouts       */
  , cMaxFile         /* --max-file           */
  , cMaxMapping      /* --max-mapping        */
+ , cMaxMappingKeys  /* --max-mapping-keys   */
  , cMaxThreadPend   /* --max-thread-pending */
  , cMinMalloc       /* --min-malloc         */
  , cMinSmallMalloc  /* --min-small-malloc   */
@@ -1238,6 +1239,13 @@ static Option aOptions[]
       , "  --max-mapping <size>\n"
       , "  --max-mapping <size>\n"
         "    The maximum number of elements (keys+values) a mapping can hold.\n"
+        "    Set to 0, mappings of any size are allowed.\n"
+      }
+
+    , { 0,   "max-mapping-keys",   cMaxMappingKeys, MY_TRUE
+      , "  --max-mapping-keys <size>\n"
+      , "  --max-mapping-keys <size>\n"
+        "    The maximum number of entries (keys) a mapping can hold.\n"
         "    Set to 0, mappings of any size are allowed.\n"
       }
 
@@ -1758,6 +1766,7 @@ options (void)
          "                 max bitfield length:    %7d\n"
          "                 max array size:         %7d\n"
          "                 max mapping size:       %7d\n"
+         "                 max mapping keys:       %7d\n"
          "                 max number callouts:    %7d\n"
          "                 max number players:     %7d\n"
          "                 ed cmd/cmd ratio:       %7d:1\n"
@@ -1778,7 +1787,8 @@ options (void)
         , CATCH_RESERVED_COST, MASTER_RESERVED_COST
         , EVALUATOR_STACK_SIZE
         , MAX_USER_TRACE, MAX_TRACE
-        , MAX_BITS, MAX_ARRAY_SIZE, MAX_MAPPING_SIZE
+        , MAX_BITS, MAX_ARRAY_SIZE
+        , MAX_MAPPING_SIZE, MAX_MAPPING_KEYS
         , MAX_CALLOUTS, MAX_PLAYERS
         , ALLOWED_ED_CMDS
 #ifdef TRACE_CODE
@@ -2239,6 +2249,7 @@ eval_arg (int eOption, const char * pValue)
     case cMaxCallouts:
     case cMaxFile:
     case cMaxMapping:
+    case cMaxMappingKeys:
       {
         long val = atoi(pValue);
 
@@ -2246,11 +2257,12 @@ eval_arg (int eOption, const char * pValue)
         {
             switch(eOption)
             {
-            case cMaxArray:    def_array_size = (size_t)val;   break;
-            case cMaxBytes:    def_byte_xfer = val;            break;
-            case cMaxCallouts: def_callouts = val;             break;
-            case cMaxFile:     def_file_xfer = val;            break;
-            case cMaxMapping:  def_mapping_size = (size_t)val; break;
+            case cMaxArray:        def_array_size = (size_t)val;   break;
+            case cMaxBytes:        def_byte_xfer = val;            break;
+            case cMaxCallouts:     def_callouts = val;             break;
+            case cMaxFile:         def_file_xfer = val;            break;
+            case cMaxMapping:      def_mapping_size = (size_t)val; break;
+            case cMaxMappingKeys:  def_mapping_keys = (size_t)val; break;
             }
         }
         else

@@ -11,7 +11,8 @@ exit 1
 # --- Runtime limits ---
 
 with_max_array_size=0x1000
-with_max_mapping_size=0x1000
+with_max_mapping_keys=0x1000
+with_max_mapping_size=0x3000
 with_read_file_max_size=50000
 with_max_byte_transfer=50000
 with_max_callouts=500
