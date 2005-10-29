@@ -787,7 +787,7 @@ notify_no_command (char *command, object_t *save_command_giver)
             free_object(error_obj, "notify_no_command");
         error_obj = NULL;
 
-        error("Missing H_NOTIFY_FAIL hook, and no notify_fail() given.\n");
+        errorf("Missing H_NOTIFY_FAIL hook, and no notify_fail() given.\n");
         /* NOTREACHED */
         useHook = MY_FALSE;
     }
@@ -1102,7 +1102,7 @@ parse_command (char *buff, Bool from_efun)
 
         if (ret == 0)
         {
-            error("function %s not found.\n", get_txt(sa->function));
+            errorf("function %s not found.\n", get_txt(sa->function));
         }
 
         /* Restore the old current_object and command_giver */
@@ -1230,7 +1230,7 @@ execute_command (char *str, object_t *ob)
         svp = sapply_ign_prot(driver_hook[H_COMMAND].u.str, ob, 1);
         if (!svp)
         {
-            error("Can't find H_COMMAND lfun '%s' in object '%s'.\n"
+            errorf("Can't find H_COMMAND lfun '%s' in object '%s'.\n"
                  , get_txt(driver_hook[H_COMMAND].u.str), get_txt(ob->name)
                  );
             res = 0;
@@ -1317,7 +1317,7 @@ e_add_action (svalue_t *func, svalue_t *cmd, int flag)
      && (ob->super == NULL || ob->super != command_giver->super)
        /* above condition includes the check command_giver->super == NULL */
      && ob != command_giver->super)
-        error("add_action from object '%s' that was not present to '%s'.\n"
+        errorf("add_action from object '%s' that was not present to '%s'.\n"
              , get_txt(ob->name), get_txt(command_giver->name));
 
 #ifdef DEBUG
@@ -1327,7 +1327,7 @@ e_add_action (svalue_t *func, svalue_t *cmd, int flag)
 
     /* Sanity checks */
     if (get_txt(func->u.str)[0] == ':')
-        error("Illegal function name: %s\n", get_txt(func->u.str));
+        errorf("Illegal function name: %s\n", get_txt(func->u.str));
 
     if (compat_mode)
     {
@@ -1336,7 +1336,7 @@ e_add_action (svalue_t *func, svalue_t *cmd, int flag)
         if (*s++=='e' && *s++=='x' && *s++=='i' && *s++=='t'
          && (!*s || mstrsize(func->u.str) == 4))
         {
-            error("Illegal to define a command to the exit() function.\n");
+            errorf("Illegal to define a command to the exit() function.\n");
             /* NOTREACHED */
             return MY_TRUE;
         }
@@ -1374,7 +1374,7 @@ e_add_action (svalue_t *func, svalue_t *cmd, int flag)
             if ((size_t)(-flag) >= mstrsize(p->verb))
             {
                 free_action_sent(p);
-                error("Bad arg 3 to add_action(): value %ld larger than verb '%s'.\n"
+                errorf("Bad arg 3 to add_action(): value %ld larger than verb '%s'.\n"
                      , (long)flag, get_txt(p->verb));
                 /* NOTREACHED */
                 return MY_TRUE;
@@ -1388,7 +1388,7 @@ e_add_action (svalue_t *func, svalue_t *cmd, int flag)
         else
         {
             free_action_sent(p);
-            error("Bad arg 3 to add_action(): value %ld too big.\n"
+            errorf("Bad arg 3 to add_action(): value %ld too big.\n"
                  , (long)flag);
             /* NOTREACHED */
             return MY_TRUE;
@@ -1505,7 +1505,7 @@ v_command (svalue_t *sp, int num_arg)
 
         len = mstrsize(arg->u.str);
         if (len >= sizeof(buff) - 1)
-            error("Command too long: '%.200s...'\n", get_txt(arg->u.str));
+            errorf("Command too long: '%.200s...'\n", get_txt(arg->u.str));
         strncpy(buff, get_txt(arg[0].u.str), len);
         buff[len] = '\0';
 
@@ -1562,21 +1562,21 @@ f_execute_command (svalue_t *sp)
 
     len = mstrsize(argp->u.str);
     if (len >= sizeof(buf) - 1)
-        error("Command too long: '%.200s...'\n", get_txt(argp->u.str));
+        errorf("Command too long: '%.200s...'\n", get_txt(argp->u.str));
     strncpy(buf, get_txt(argp->u.str), len);
     buf[len+1] = '\0';
 
     origin = check_object(argp[1].u.ob);
     if (!origin)
-        error("origin '%s' destructed.\n", get_txt(argp[1].u.ob->name));
+        errorf("origin '%s' destructed.\n", get_txt(argp[1].u.ob->name));
     if (!(O_ENABLE_COMMANDS & origin->flags))
-        error("origin '%s' not a living.\n", get_txt(origin->name));
+        errorf("origin '%s' not a living.\n", get_txt(origin->name));
 
     player = check_object(argp[2].u.ob);
     if (!player)
-        error("player '%s' destructed.\n", get_txt(argp[2].u.ob->name));
+        errorf("player '%s' destructed.\n", get_txt(argp[2].u.ob->name));
     if (!(O_ENABLE_COMMANDS & player->flags))
-        error("player '%s' not a living.\n", get_txt(player->name));
+        errorf("player '%s' not a living.\n", get_txt(player->name));
 
     res = MY_FALSE;  /* default result */
 
@@ -2193,7 +2193,7 @@ f_query_actions (svalue_t *sp)
             efun_arg_error(1, T_STRING, arg->type, sp);
         ob = get_object(arg[0].u.str);
         if (!ob)
-            error("query_actions() failed\n");
+            errorf("query_actions() failed\n");
     }
 
     /* Get the actions */
@@ -2461,7 +2461,7 @@ f_set_modify_command (svalue_t *sp)
     if (!(O_SET_INTERACTIVE(ip, current_object))
      || ip->closing)
     {
-        error("set_modify_command in non-interactive object\n");
+        errorf("set_modify_command in non-interactive object\n");
     }
 
     /* Get the old setting */
@@ -2484,7 +2484,7 @@ f_set_modify_command (svalue_t *sp)
     case T_STRING:
         new = get_object(sp->u.str);
         if (!new)
-            error("Object '%s' not found.\n", get_txt(sp->u.str));
+            errorf("Object '%s' not found.\n", get_txt(sp->u.str));
         /* FALLTHROUGH */
 
     case T_OBJECT:
@@ -2500,7 +2500,7 @@ f_set_modify_command (svalue_t *sp)
         else
         {
             if (sp->u.number != -1)
-                error("Bad num arg 1 to set_modify_command(): got %ld, "
+                errorf("Bad num arg 1 to set_modify_command(): got %ld, "
                       "expected 0 or -1\n", sp->u.number);
             if (old) ref_object(old, "set_modify_command");
         }
@@ -2626,7 +2626,7 @@ f_command_stack (svalue_t *sp)
     /* Get the array */
     result = allocate_uninit_array(num);
     if (!result)
-        error("(command_stack) Out of memory: array[%d] for result.\n", num);
+        errorf("(command_stack) Out of memory: array[%d] for result.\n", num);
 
     for ( i = num-1, entry = result->item + num - 1, context = rt_context
         ; i >= 0
@@ -2644,7 +2644,7 @@ f_command_stack (svalue_t *sp)
         /* Create the entry array */
         sub = allocate_array(CMD_SIZE);
         if (!sub)
-            error("(command_stack) Out of memory: array[%d] for entry.\n"
+            errorf("(command_stack) Out of memory: array[%d] for entry.\n"
                  , CMD_SIZE);
 
         put_array(entry, sub);

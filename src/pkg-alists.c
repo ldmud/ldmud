@@ -56,7 +56,7 @@
 #include "interpret.h" /* destructed_object_ref(), error functions */
 #include "main.h"
 #include "mstrings.h"
-#include "simulate.h"  /* error() */
+#include "simulate.h"  /* errorf() */
 #include "svalue.h"
 #include "xalloc.h"
 
@@ -363,7 +363,7 @@ v_insert_alist (svalue_t *sp, int num_arg)
         if (list->item[i].type != T_POINTER
          || (size_t)VEC_SIZE(list->item[i].u.vec) != keynum)
         {
-            error("Type or size mismatch of the data arrays.\n");
+            errorf("Type or size mismatch of the data arrays.\n");
             /* NOTREACHED */
             return sp;
         }
@@ -381,7 +381,7 @@ v_insert_alist (svalue_t *sp, int num_arg)
         {
             if (VEC_SIZE(sp[-1].u.vec) != listsize)
             {
-                error("Size mismatch of the data arrays: "
+                errorf("Size mismatch of the data arrays: "
                       "vec size %ld, list size %ld.\n"
                      , (long)VEC_SIZE(sp[-1].u.vec), (long)listsize
                      );
@@ -395,7 +395,7 @@ v_insert_alist (svalue_t *sp, int num_arg)
     {
         if (num_arg - 1 != listsize)
         {
-            error("Not enough data given: %ld arguments, %ld listsize.\n"
+            errorf("Not enough data given: %ld arguments, %ld listsize.\n"
                  , (long)num_arg - 1, (long)listsize);
             /* NOTREACHED */
             return sp;
@@ -451,7 +451,7 @@ v_assoc (svalue_t *sp, int num_arg)
             if (args[2].type != T_POINTER
              || VEC_SIZE(args[2].u.vec) != VEC_SIZE(keys))
             {
-                error("Number of values in key and data arrays differ.\n");
+                errorf("Number of values in key and data arrays differ.\n");
                 /* NOTREACHED */
                 return sp;
             }
@@ -474,7 +474,7 @@ v_assoc (svalue_t *sp, int num_arg)
             if (args[1].u.vec->item[1].type != T_POINTER
              || VEC_SIZE(args[1].u.vec->item[1].u.vec) != VEC_SIZE(keys))
             {
-                error("Number of values in key and data arrays differ.\n");
+                errorf("Number of values in key and data arrays differ.\n");
                 /* NOTREACHED */
                 return sp;
             }
@@ -489,7 +489,7 @@ v_assoc (svalue_t *sp, int num_arg)
         else if (num_arg == 2) fail_val = &const0;
         else
         {
-            error("too many args to efun assoc\n");
+            errorf("too many args to efun assoc\n");
             /* NOTREACHED */
             return sp;
         }
@@ -600,7 +600,7 @@ v_order_alist (svalue_t *sp, int num_arg)
         if (args[i].type != T_POINTER
          || (size_t)VEC_SIZE(args[i].u.vec) != keynum)
         {
-            error("bad data array %d in call to order_alist\n",i);
+            errorf("bad data array %d in call to order_alist\n",i);
         }
     }
 

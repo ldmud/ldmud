@@ -638,11 +638,11 @@ f_get_extra_wizinfo (svalue_t *sp)
         if (type == T_NUMBER && sp->u.number == 0)
             user = NULL;
         else
-            error("Bad arg 1 to get_extra_wizinfo(): no valid uid given.\n");
+            errorf("Bad arg 1 to get_extra_wizinfo(): no valid uid given.\n");
     }
 
     if (!privilege_violation(STR_GET_EXTRA_WIZINFO, sp, sp))
-        error("Error in get_extra_wizinfo(): privilege violation.\n");
+        errorf("Error in get_extra_wizinfo(): privilege violation.\n");
 
     assign_svalue(sp, user ? &user->extra : &default_wizlist_entry.extra);
 

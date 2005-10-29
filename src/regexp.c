@@ -1354,7 +1354,7 @@ regprop (unsigned char *op)
             p = (char *)NULL;
         }
         else
-            error("corrupted opcode\n");
+            errorf("corrupted opcode\n");
         break;
     }
     if (p != (char *)NULL)

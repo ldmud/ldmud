@@ -98,7 +98,7 @@
 #include "xalloc.h"
 
 /* If this #define is defined then error messages are returned,
- * otherwise error() is called (ie: A "wrongness in the fabric...")
+ * otherwise errorf() is called (ie: A "wrongness in the fabric...")
  */
 #undef RETURN_ERROR_MESSAGES
 
@@ -1420,7 +1420,7 @@ string_print_formatted (char *format_str, int argc, svalue_t *argv)
  *
  * If an error occurs and RETURN_ERROR_MESSAGES is defined, an error
  * will return the error string as result; if R_E_M is undefined, an
- * true error() is raised.
+ * true errorf() is raised.
  */
 
 {
@@ -1608,7 +1608,7 @@ static char buff[BUFF_SIZE];         /* For error messages */
             static_fmt_used = MY_FALSE;
         else
             xfree(st);
-        error("%s", buff); /* buff may contain a '%' */
+        errorf("%s", buff); /* buff may contain a '%' */
         /* NOTREACHED */
 #else
         result = new_mstring(st->buff);

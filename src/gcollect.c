@@ -497,7 +497,7 @@ cleanup_single_object (object_t * obj, cleanup_t * context)
     if ((obj->flags & O_SWAPPED)
      && (was_swapped = load_ob_from_swap(obj)) < 0)
     {
-        error("(%s:%d) Out of memory swapping in %s\n", __FILE__, __LINE__
+        errorf("(%s:%d) Out of memory swapping in %s\n", __FILE__, __LINE__
              , get_txt(obj->name));
         return MY_FALSE;
     }

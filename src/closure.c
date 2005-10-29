@@ -988,7 +988,7 @@ replace_program_lambda_adjust (replace_ob_t *r_ob)
                 lrpp->block.x.closure_type = CLOSURE_UNBOUND_LAMBDA;
                 lrpp->block.u.lambda = l2;
 
-                error("Cannot adjust lambda closure after replace_program(), "
+                errorf("Cannot adjust lambda closure after replace_program(), "
                       "object %s\n", get_txt(r_ob->ob->name));
             }
 
@@ -1335,7 +1335,7 @@ realloc_code (void)
 static void
 lambda_error(const char *error_str, ...)
 
-/* Raise an error(error_str, ...) with 0 or 1 extra argument from within
+/* Raise an errorf(error_str, ...) with 0 or 1 extra argument from within
  * the lambda compiler.
  *
  * The function takes care that all memory is deallocated.
@@ -1361,7 +1361,7 @@ lambda_error(const char *error_str, ...)
 
     /* Now raise the error */
     va_start(va, error_str);
-    error(error_str, va_arg(va, char *)); /* One arg or nothing :-) */
+    errorf(error_str, va_arg(va, char *)); /* One arg or nothing :-) */
     /* TODO: a verror() would be handy here */
     va_end(va);
 } /* lambda_error() */
@@ -1370,7 +1370,7 @@ lambda_error(const char *error_str, ...)
 static void
 lambda_cerror (const char *s)
 
-/* Callback for store_case_labels: raise an error(s) from within the
+/* Callback for store_case_labels: raise an errorf(s) from within the
  * lambda compiler.
  *
  * The function takes care that all memory is deallocated.
@@ -1385,7 +1385,7 @@ static void
 lambda_cerrorl ( const char *s1, const char *s2 UNUSED
                , int line1 UNUSED, int line2 UNUSED)
 
-/* Callback for store_case_labels(): Raise an error(s1) from within the lambda
+/* Callback for store_case_labels(): Raise an errorf(s1) from within the lambda
  * compiler. store_case_labels() also passes line numbers and filename, but
  * when compiling a lambda that information is not very useful.
  *
@@ -5291,7 +5291,7 @@ closure_lookup_lfun_prog ( lambda_t * l
     if (O_PROG_SWAPPED(ob)) {
         ob->time_of_ref = current_time;
         if (load_ob_from_swap(ob) < 0)
-            error("Out of memory\n");
+            errorf("Out of memory\n");
     }
 
     /* Find the true definition of the function */
@@ -5464,7 +5464,7 @@ closure_location (lambda_t *l)
         if (l->prog_ob->flags & O_SWAPPED)
         {
             if (load_ob_from_swap(l->prog_ob) < 0)
-                error("Out of memory\n");
+                errorf("Out of memory\n");
         }
 
         do {
@@ -5553,7 +5553,7 @@ closure_to_string (svalue_t * sp, Bool compact)
         {
             l->ob->time_of_ref = current_time;
             if (load_ob_from_swap(l->ob) < 0)
-                error("Out of memory.\n");
+                errorf("Out of memory.\n");
         }
 
         sprintf(buf, "#'%s->%s"
@@ -5657,7 +5657,7 @@ closure_to_string (svalue_t * sp, Bool compact)
         int type = sp->x.closure_type;
 
         if (type >= 0)
-            error("Bad arg 1 to to_string(): closure type %d.\n"
+            errorf("Bad arg 1 to to_string(): closure type %d.\n"
                  , sp->x.closure_type);
         else
         {
@@ -5781,7 +5781,7 @@ v_bind_lambda (svalue_t *sp, int num_arg)
         free_object(ob, "bind_lambda");
         if (sp[1].type == T_NUMBER)
             break;
-        error("Bad arg 1 to bind_lambda(): unbindable closure\n");
+        errorf("Bad arg 1 to bind_lambda(): unbindable closure\n");
         /* NOTREACHED */
         return sp;
         break;
@@ -5972,7 +5972,7 @@ f_symbol_function (svalue_t *sp)
         }
         ob = get_object(sp->u.str);
         if (!ob)
-            error("Object '%s' not found.\n", get_txt(sp->u.str));
+            errorf("Object '%s' not found.\n", get_txt(sp->u.str));
         free_svalue(sp);
         put_ref_object(sp, ob, "symbol_function");
     }
@@ -5988,7 +5988,7 @@ f_symbol_function (svalue_t *sp)
         if (load_ob_from_swap(ob) < 0)
         {
             inter_sp = sp;
-            error("Out of memory\n");
+            errorf("Out of memory\n");
         }
     }
 

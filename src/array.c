@@ -4,7 +4,7 @@
  *---------------------------------------------------------------------------
  * TODO: Rewrite the low-level functions (like allocate_array()) to return
  * TODO:: failure codes (errno like) instead of throwing errors. In addition,
- * TODO:: provide wrapper functions which do throw error()s, so that every
+ * TODO:: provide wrapper functions which do throw errorf()s, so that every
  * TODO:: caller can handle the errors himself (like the swapper).
  * The structure of an array ("vector") is defined in datatypes.h as this:
  *
@@ -102,9 +102,9 @@ vector_t null_vector = { VEC_HEAD(0), { { T_INVALID } } };
    */
 
 void (*allocate_array_error_handler) (const char *, ...)
-  = error; /* from simulate.c */
+  = errorf; /* from simulate.c */
   /* This handler is called if an allocation fails.
-   * Usually it points to simulate::error(), but the swapper
+   * Usually it points to simulate::errorf(), but the swapper
    * replaces it temporarily with its own dummy handler when
    * swapping in an object.
    */
@@ -117,7 +117,7 @@ _allocate_array(mp_int n MTRACE_DECL)
  * maximum) and return the pointer.
  * The elements are initialised to the svalue 0.
  *
- * If the allocations fails (and error() does return), a 0 pointer
+ * If the allocations fails (and errorf() does return), a 0 pointer
  * may be returned. This is usually only possible when arrays
  * are allocated from the swapper.
  *
@@ -133,7 +133,7 @@ _allocate_array(mp_int n MTRACE_DECL)
     svalue_t *svp;
 
     if (n < 0 || (max_array_size && (size_t)n > max_array_size))
-        error("Illegal array size: %ld.\n", n);
+        errorf("Illegal array size: %ld.\n", n);
 
     if (n == 0) {
         p = ref_array(&null_vector);
@@ -175,7 +175,7 @@ _allocate_array_unlimited(mp_int n MTRACE_DECL)
 /* Allocate an array for <n> elements and return the pointer.
  * The elements are initialised to the svalue 0.
  *
- * If the allocations fails (and error() does return), a 0 pointer
+ * If the allocations fails (and errorf() does return), a 0 pointer
  * may be returned. This is usually only possible when arrays
  * are allocated from the swapper.
  *
@@ -191,7 +191,7 @@ _allocate_array_unlimited(mp_int n MTRACE_DECL)
     svalue_t *svp;
 
     if (n < 0)
-        error("Illegal array size: %ld.\n", n);
+        errorf("Illegal array size: %ld.\n", n);
 
     if (n == 0) {
         p = ref_array(&null_vector);
@@ -234,7 +234,7 @@ _allocate_uninit_array (mp_int n MTRACE_DECL)
 /* Allocate an array for <n> elements (but no more than the current
  * maximum) and return the pointer.
  * The elements are not initialised.
- * If the allocations fails (and error() does return), a 0 pointer
+ * If the allocations fails (and errorf() does return), a 0 pointer
  * may be returned.
  *
  * Allocating an array of size 0 will return a reference to the
@@ -247,7 +247,7 @@ _allocate_uninit_array (mp_int n MTRACE_DECL)
     vector_t *p;
 
     if (n < 0 || (max_array_size && (size_t)n > max_array_size))
-        error("Illegal array size: %ld.\n", n);
+        errorf("Illegal array size: %ld.\n", n);
 
     if (n == 0) {
         p = ref_array(&null_vector);
@@ -689,7 +689,7 @@ arr_implode_string (vector_t *arr, string_t *del MTRACE_DECL)
     result = mstring_alloc_string(size MTRACE_PASS);
     if (!result)
     {
-        /* caller raises the error() */
+        /* caller raises the errorf() */
         return NULL;
     }
     p = get_txt(result);
@@ -972,7 +972,7 @@ get_array_order (vector_t * vec )
                               );
     if (!root)
     {
-        error("Stack overflow in get_array_order()");
+        errorf("Stack overflow in get_array_order()");
         /* NOTREACHED */
         return NULL;
     }
@@ -1179,7 +1179,7 @@ match_arrays (vector_t *vec1, vector_t *vec2)
  * describing those of vec2. Each flag is FALSE if the vector entry
  * is unique, and TRUE if the same value appears in the other vector.
  *
- * When out of memory, an error() is thrown.
+ * When out of memory, an errorf() is thrown.
  */
 
 {
@@ -1393,7 +1393,7 @@ subtract_array (vector_t *minuend, vector_t *subtrahend)
     if (max_array_size && result_size > max_array_size)
     {
         xfree(flags);
-        error("Illegal array size: %lu.\n", (unsigned long)result_size);
+        errorf("Illegal array size: %lu.\n", (unsigned long)result_size);
     }
 
     result = allocate_array(result_size);
@@ -1478,7 +1478,7 @@ intersect_array (vector_t *vec1, vector_t *vec2)
     if (max_array_size && result_size > max_array_size)
     {
         xfree(flags);
-        error("Illegal array size: %lu.\n", (unsigned long)result_size);
+        errorf("Illegal array size: %lu.\n", (unsigned long)result_size);
     }
 
     result = allocate_array(result_size);
@@ -1571,7 +1571,7 @@ join_array (vector_t *vec1, vector_t *vec2)
     if (max_array_size && result_size+vec1_size > max_array_size)
     {
         xfree(flags);
-        error("Illegal array size: %lu.\n", (unsigned long)(result_size+vec1_size));
+        errorf("Illegal array size: %lu.\n", (unsigned long)(result_size+vec1_size));
     }
 
     result = allocate_array(vec1_size+result_size);
@@ -1663,7 +1663,7 @@ symmetric_diff_array (vector_t *vec1, vector_t *vec2)
     if (max_array_size && result_size > max_array_size)
     {
         xfree(flags);
-        error("Illegal array size: %lu.\n", (unsigned long)result_size);
+        errorf("Illegal array size: %lu.\n", (unsigned long)result_size);
     }
 
     result = allocate_array(result_size);
@@ -1821,7 +1821,7 @@ v_allocate (svalue_t *sp, int num_arg)
 
         if (!curpos || !curvec || !sizes)
         {
-            error("Out of stack memory.\n");
+            errorf("Out of stack memory.\n");
             /* NOTREACHED */
         }
 
@@ -1849,7 +1849,7 @@ v_allocate (svalue_t *sp, int num_arg)
 
             if (svp->type != T_NUMBER)
             {
-                error("Bad argument to allocate(): size[%d] is a '%s', "
+                errorf("Bad argument to allocate(): size[%d] is a '%s', "
                       "expected 'int'.\n"
                      , (int)dim, typename(svp->type));
                 /* NOTREACHED */
@@ -1858,14 +1858,14 @@ v_allocate (svalue_t *sp, int num_arg)
             size = svp->u.number;
 
             if (size < 0 || (max_array_size && (size_t)size > max_array_size))
-                error("Illegal array size: %ld\n", (long)size);
+                errorf("Illegal array size: %ld\n", (long)size);
 
             if (size == 0 && dim < num_dim-1)
-                error("Only the last dimension can have empty arrays.\n");
+                errorf("Only the last dimension can have empty arrays.\n");
 
             count *= (size_t)size;
             if (max_array_size && count > max_array_size)
-                error("Illegal total array size: %lu\n", (unsigned long)count);
+                errorf("Illegal total array size: %lu\n", (unsigned long)count);
 
             sizes[dim] = (size_t)size;
             curvec[dim] = NULL;
@@ -2010,7 +2010,7 @@ x_filter_array (svalue_t *sp, int num_arg)
     flags = alloca((size_t)p_size+1);
     if (!flags)
     {
-        error("Stack overflow in filter()");
+        errorf("Stack overflow in filter()");
         /* NOTREACHED */
         return sp;
     }
@@ -2030,7 +2030,7 @@ x_filter_array (svalue_t *sp, int num_arg)
 
         if (num_arg > 2) {
             inter_sp = sp;
-            error("Too many arguments to filter(array)\n");
+            errorf("Too many arguments to filter(array)\n");
         }
         m = arg[1].u.map;
 
@@ -2089,7 +2089,7 @@ x_filter_array (svalue_t *sp, int num_arg)
             if (!callback_object(&cb))
             {
                 inter_sp = sp;
-                error("object used by filter(array) destructed");
+                errorf("object used by filter(array) destructed");
             }
 
             push_svalue(w++);
@@ -2178,13 +2178,13 @@ x_map_array (svalue_t *sp, int num_arg)
 
         if (num_arg > 2) {
             inter_sp = sp;
-            error("Too many arguments to map(array)\n");
+            errorf("Too many arguments to map(array)\n");
         }
         m = arg[1].u.map;
 
         res = allocate_array(cnt);
         if (!res)
-            error("(map_array) Out of memory: array[%ld] for result\n", cnt);
+            errorf("(map_array) Out of memory: array[%ld] for result\n", cnt);
         push_array(inter_sp, res); /* In case of errors */
 
         for (w = arr->item, x = res->item; --cnt >= 0; w++, x++)
@@ -2222,7 +2222,7 @@ x_map_array (svalue_t *sp, int num_arg)
 
         res = allocate_array(cnt);
         if (!res)
-            error("(map_array) Out of memory: array[%ld] for result\n", cnt);
+            errorf("(map_array) Out of memory: array[%ld] for result\n", cnt);
         push_array(inter_sp, res); /* In case of errors */
 
         /* Loop through arr and res, mapping the values from arr */
@@ -2235,7 +2235,7 @@ x_map_array (svalue_t *sp, int num_arg)
                 assign_svalue(w, &const0);
 
             if (!callback_object(&cb))
-                error("object used by map(array) destructed");
+                errorf("object used by map(array) destructed");
 
             push_svalue(w);
 
@@ -2351,7 +2351,7 @@ v_sort_array (svalue_t * sp, int num_arg)
     dest = alloca(size*sizeof(svalue_t));
     if (!source || !dest)
     {
-        error("Stack overflow in sort_array()");
+        errorf("Stack overflow in sort_array()");
         /* NOTREACHED */
         return arg;
     }
@@ -2379,7 +2379,7 @@ v_sort_array (svalue_t * sp, int num_arg)
                 svalue_t *d;
 
                 if (!callback_object(&cb))
-                    error("object used by sort_array destructed");
+                    errorf("object used by sort_array destructed");
 
                 push_svalue(source+index1);
                 push_svalue(source+index2);
@@ -2484,7 +2484,7 @@ v_filter_objects (svalue_t *sp, int num_arg)
         flags = alloca((p_size+1)*sizeof(*flags));
         if (!flags)
         {
-            error("Stack overflow in filter_objects()");
+            errorf("Stack overflow in filter_objects()");
             /* NOTREACHED */
             return NULL;
         }
@@ -2722,7 +2722,7 @@ f_transpose_array (svalue_t *sp)
 
         if (x->type != T_POINTER)
         {
-              error("Bad arg 1 to transpose_array(): not an array of arrays.\n");
+              errorf("Bad arg 1 to transpose_array(): not an array of arrays.\n");
               /* NOTREACHED */
               return sp;
         }
@@ -2931,7 +2931,7 @@ put_in (Mempool pool, struct unique **ulist
             slink = mempool_alloc(pool, sizeof(struct unique));
             if (!slink)
             {
-                error("(unique_array) Out of memory (%lu bytes pooled) "
+                errorf("(unique_array) Out of memory (%lu bytes pooled) "
                       "for comb.\n", (unsigned long)sizeof(struct unique));
                 /* NOTREACHED */
                 return 0;
@@ -2958,7 +2958,7 @@ put_in (Mempool pool, struct unique **ulist
     llink = mempool_alloc(pool, sizeof(struct unique));
     if (!llink)
     {
-        error("(unique_array) Out of memory (%lu bytes pooled) "
+        errorf("(unique_array) Out of memory (%lu bytes pooled) "
               "for comb.\n", (unsigned long)sizeof(struct unique));
         /* NOTREACHED */
         return 0;
@@ -3033,7 +3033,7 @@ make_unique (vector_t *arr, callback_t *cb, svalue_t *skipnum)
      */
     pool = new_mempool(size_mempool(sizeof(*head)));
     if (!pool)
-        error("(unique_array) Out of memory: (%lu bytes) for mempool\n"
+        errorf("(unique_array) Out of memory: (%lu bytes) for mempool\n"
              , (unsigned long)arr_size * sizeof(*head));
 
     /* Create the automatic cleanup structure */
@@ -3041,7 +3041,7 @@ make_unique (vector_t *arr, callback_t *cb, svalue_t *skipnum)
     if (!ucp)
     {
         mempool_delete(pool);
-        error("(unique_array) Out of memory: (%lu bytes) for cleanup structure\n"
+        errorf("(unique_array) Out of memory: (%lu bytes) for cleanup structure\n"
              , (unsigned long)sizeof(*ucp));
     }
 

@@ -116,9 +116,9 @@ f_clear_bit (svalue_t *sp)
     /* Get the arguments */
     bitnum = (size_t)sp->u.number;
     if (sp->u.number < 0)
-        error("clear_bit: negative bit number: %ld\n", (long)sp->u.number);
+        errorf("clear_bit: negative bit number: %ld\n", (long)sp->u.number);
     if (bitnum > MAX_BITS)
-        error("clear_bit: too big bit number: %ld\n", (long)bitnum);
+        errorf("clear_bit: too big bit number: %ld\n", (long)bitnum);
     sp = strp = sp-1;
 
     len = mstrsize(strp->u.str);
@@ -137,7 +137,7 @@ f_clear_bit (svalue_t *sp)
     str = get_txt(strp->u.str);
 
     if (str[ind] > 0x3f + ' ' || str[ind] < ' ')
-        error("Illegal bit pattern in clear_bit character %ld\n", (long)ind);
+        errorf("Illegal bit pattern in clear_bit character %ld\n", (long)ind);
 
     str[ind] = (char)(((str[ind] - ' ') & ~(1 << (bitnum % 6))) + ' ');
 
@@ -166,9 +166,9 @@ f_set_bit (svalue_t *sp)
 
     bitnum = (size_t)sp->u.number;
     if (sp->u.number < 0)
-        error("set_bit: negative bit number: %ld\n", (long)sp->u.number);
+        errorf("set_bit: negative bit number: %ld\n", (long)sp->u.number);
     if (bitnum > MAX_BITS)
-        error("set_bit: too big bit number: %ld\n", (long)bitnum);
+        errorf("set_bit: too big bit number: %ld\n", (long)bitnum);
     sp = strp = sp-1;
 
     len = mstrsize(strp->u.str);
@@ -198,7 +198,7 @@ f_set_bit (svalue_t *sp)
     }
 
     if (str[ind] > 0x3f + ' ' || str[ind] < ' ')
-        error("Illegal bit pattern in set_bit character %ld\n", (long)ind);
+        errorf("Illegal bit pattern in set_bit character %ld\n", (long)ind);
 
     str[ind] = (char)(((str[ind] - ' ') | 1 << (bitnum % 6) ) + ' ');
     sp = strp;
@@ -225,7 +225,7 @@ f_test_bit (svalue_t *sp)
     bitnum = sp->u.number;
 
     if (bitnum < 0)
-        error("test_bit: negative bit number: %ld\n", (long)bitnum);
+        errorf("test_bit: negative bit number: %ld\n", (long)bitnum);
 
     len = mstrsize(sp[-1].u.str);
     if ((size_t)bitnum/6 >= len)
@@ -328,7 +328,7 @@ binop_bits (svalue_t *sp, int instr)
         if (c1 > 0x3f + ' ' || c1 < ' ')
         {
             free_mstring(result);
-            error("Illegal bit pattern in %s character %d\n"
+            errorf("Illegal bit pattern in %s character %d\n"
                    , instr == INSTR_OR_BITS
                      ?  "or_bits()"
                      : (instr == INSTR_AND_BITS
@@ -342,7 +342,7 @@ binop_bits (svalue_t *sp, int instr)
         if (c2 > 0x3f + ' ' || c2 < ' ')
         {
             free_mstring(result);
-            error("Illegal bit pattern in %s character %d\n"
+            errorf("Illegal bit pattern in %s character %d\n"
                    , instr == INSTR_OR_BITS
                      ?  "or_bits()"
                      : (instr == INSTR_AND_BITS
@@ -550,7 +550,7 @@ f_next_bit (svalue_t *sp)
         int c = str[search] - ' ';
 
         if (c < 0 || c > 0x3f)
-            error("Illegal bit pattern in next_bit character %d\n"
+            errorf("Illegal bit pattern in next_bit character %d\n"
                    , c+' ');
         c ^= invert;
 
@@ -604,7 +604,7 @@ f_count_bits (svalue_t *sp)
         int c = *str - ' ';
 
         if (c > 0x3F || c < 0)
-            error("Illegal character in count_bits: %d\n", (int)c + ' ');
+            errorf("Illegal character in count_bits: %d\n", (int)c + ' ');
 
         /* Count the bits in this character */
         count += ( (c & 0x01) )
@@ -906,14 +906,14 @@ v_copy_bits (svalue_t *sp, int num_arg)
     destlen = last_bit(dest)+1;
 
     if (srcstart < 0 && srcstart + srclen < 0)
-        error("Bad argument 3 to copy_bits(): Index %ld is out of range "
+        errorf("Bad argument 3 to copy_bits(): Index %ld is out of range "
               "(last bit: %ld).\n"
              , (long)srcstart, (long)srclen);
     if (srcstart < 0)
         srcstart += srclen;
 
     if (deststart < 0 && deststart + destlen < 0)
-        error("Bad argument 4 to copy_bits(): Index %ld is out of range "
+        errorf("Bad argument 4 to copy_bits(): Index %ld is out of range "
               "(last bit: %ld).\n"
              , (long)deststart, (long)destlen);
     if (deststart < 0)
@@ -922,7 +922,7 @@ v_copy_bits (svalue_t *sp, int num_arg)
     if (!copyall && copylen < 0)
     {
         if (srcstart + copylen < 0)
-            error("Bad argument 5 to copy_bits(): Length %ld out of range "
+            errorf("Bad argument 5 to copy_bits(): Length %ld out of range "
                   "(start index: %ld).\n"
                  , (long)copylen, (long)srcstart);
 
@@ -941,7 +941,7 @@ v_copy_bits (svalue_t *sp, int num_arg)
         {
             int c = *cp - ' ';
             if (c < 0 || c > 0x3f)
-                error("Bad argument 1 to copy_bits(): String contains "
+                errorf("Bad argument 1 to copy_bits(): String contains "
                       "illegal character %d\n", c + ' ');
         }
 
@@ -951,7 +951,7 @@ v_copy_bits (svalue_t *sp, int num_arg)
         {
             int c = *cp - ' ';
             if (c < 0 || c > 0x3f)
-                error("Bad argument 2 to copy_bits(): String contains "
+                errorf("Bad argument 2 to copy_bits(): String contains "
                       "illegal character %d\n", c + ' ');
         }
     }
@@ -969,13 +969,13 @@ v_copy_bits (svalue_t *sp, int num_arg)
                 copylen = 0;
 
             if (PINT_MAX - copylen < deststart)
-                error("copy_bits: result length exceeds numerical limit: "
+                errorf("copy_bits: result length exceeds numerical limit: "
                       "%ld + %ld\n"
                      , (long)deststart, (long)copylen
                      );
             resultlen = deststart + copylen;
             if (resultlen > MAX_BITS || resultlen < 0)
-                error("copy_bits: Result too big: %lu bits\n"
+                errorf("copy_bits: Result too big: %lu bits\n"
                      , (unsigned long)resultlen);
 
             /* Get the result string and store the reference on the stack
@@ -1017,7 +1017,7 @@ v_copy_bits (svalue_t *sp, int num_arg)
             srccopylen = srclen - srcstart;
 
         if (PINT_MAX - copylen < deststart)
-            error("copy_bits: result length exceeds numerical limit: %ld + %ld\n"
+            errorf("copy_bits: result length exceeds numerical limit: %ld + %ld\n"
                  , (long)deststart, (long)copylen
                  );
 
@@ -1026,7 +1026,7 @@ v_copy_bits (svalue_t *sp, int num_arg)
             resultlen = destlen;
 
         if (resultlen > MAX_BITS || resultlen < 0)
-            error("copy_bits: Result too big: %lu bits\n"
+            errorf("copy_bits: Result too big: %lu bits\n"
                  , (unsigned long)resultlen);
 
         destendlen = destlen - (deststart + copylen);

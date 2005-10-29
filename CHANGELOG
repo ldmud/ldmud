@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+01-Apr-2005 (Lars Duening)  (3.3.671)
+  - (pkg-tls.c) Added FreeBSD 5.4 compatibility (thanks, Ralph!).
+  - (simulate, many files) Renamed error() to errorf() due to a collision
+      with gnutls.h include files under newer compilers.
+
 01-Apr-2005 (Lars Duening)  (3.3.696, .670)
   - (port.c) Corrected a C99 incompatibility (thanks, Ralph!).
   - (simulate.c, backend) The commands/s and compiled lines/s statistics

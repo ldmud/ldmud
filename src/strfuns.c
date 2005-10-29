@@ -328,7 +328,7 @@ trim_all_spaces (const string_t * txt)
 
     dest = alloca(mstrsize(txt));
     if (dest == NULL)
-        error("Stack overflow (%ld bytes)\n", (long)mstrsize(txt));
+        errorf("Stack overflow (%ld bytes)\n", (long)mstrsize(txt));
 
     src = get_txt(txt);
     srclen = mstrsize(txt);
@@ -437,11 +437,11 @@ f_convert_charset (svalue_t *sp)
         xfree(out_buf);
 
         if (errno == EINVAL)
-            error("convert_charset(): Conversion '%s' -> '%s' not supported.\n"
+            errorf("convert_charset(): Conversion '%s' -> '%s' not supported.\n"
                  , get_txt(from_cs), get_txt(to_cs)
                 );
         else
-            error("convert_charset(): Error %d.\n", errno);
+            errorf("convert_charset(): Error %d.\n", errno);
         /* NOTREACHED */
         return sp;
     }
@@ -484,19 +484,19 @@ f_convert_charset (svalue_t *sp)
 
             if (errno == EILSEQ)
             {
-                error("convert_charset(): Invalid character sequence at index %ld\n", (long)(pIn - get_txt(in_str)));
+                errorf("convert_charset(): Invalid character sequence at index %ld\n", (long)(pIn - get_txt(in_str)));
                 /* NOTREACHED */
                 return sp;
             }
 
             if (errno == EINVAL)
             {
-                error("convert_charset(): Incomplete character sequence at index %ld\n", (long)(pIn - get_txt(in_str)));
+                errorf("convert_charset(): Incomplete character sequence at index %ld\n", (long)(pIn - get_txt(in_str)));
                 /* NOTREACHED */
                 return sp;
             }
 
-            error("convert_charset(): Error %d at index %ld\n"
+            errorf("convert_charset(): Error %d at index %ld\n"
                  , errno, (long)(pIn - get_txt(in_str))
                  );
             /* NOTREACHED */
@@ -544,19 +544,19 @@ f_convert_charset (svalue_t *sp)
 
             if (errno == EILSEQ)
             {
-                error("convert_charset(): Invalid character sequence at index %ld\n", (long)(pIn - get_txt(in_str)));
+                errorf("convert_charset(): Invalid character sequence at index %ld\n", (long)(pIn - get_txt(in_str)));
                 /* NOTREACHED */
                 return sp;
             }
 
             if (errno == EINVAL)
             {
-                error("convert_charset(): Incomplete character sequence at index %ld\n", (long)(pIn - get_txt(in_str)));
+                errorf("convert_charset(): Incomplete character sequence at index %ld\n", (long)(pIn - get_txt(in_str)));
                 /* NOTREACHED */
                 return sp;
             }
 
-            error("convert_charset(): Error %d at index %ld\n"
+            errorf("convert_charset(): Error %d at index %ld\n"
                  , errno, (long)(pIn - get_txt(in_str))
                  );
             /* NOTREACHED */
@@ -620,7 +620,7 @@ sort_string (const string_t * p_in, size_t len, long ** pos)
             xfree(out);
         if (tmp)
             xfree(tmp);
-        error("(sort_string) Out of memory (2 * %lu bytes) for temporaries.\n"
+        errorf("(sort_string) Out of memory (2 * %lu bytes) for temporaries.\n"
              , (unsigned long) len+1);
     }
     out[len] = '\0';
@@ -641,7 +641,7 @@ sort_string (const string_t * p_in, size_t len, long ** pos)
                 xfree(outpos);
             if (tmppos)
                 xfree(tmppos);
-            error("(sort_string) Out of memory (2 * %lu bytes) for positions.\n"
+            errorf("(sort_string) Out of memory (2 * %lu bytes) for positions.\n"
                  , (unsigned long) len*sizeof(*outpos)+1);
         }
     }
@@ -894,7 +894,7 @@ x_filter_string (svalue_t *sp, int num_arg)
     flags = alloca((size_t)slen+1);
     if (!flags)
     {
-        error("Stack overflow in filter()");
+        errorf("Stack overflow in filter()");
         /* NOTREACHED */
         return sp;
     }
@@ -916,7 +916,7 @@ x_filter_string (svalue_t *sp, int num_arg)
 
         if (num_arg > 2) {
             inter_sp = sp;
-            error("Too many arguments to filter(array)\n");
+            errorf("Too many arguments to filter(array)\n");
         }
         m = arg[1].u.map;
 
@@ -977,7 +977,7 @@ x_filter_string (svalue_t *sp, int num_arg)
             if (!callback_object(&cb))
             {
                 inter_sp = sp;
-                error("object used by filter(array) destructed");
+                errorf("object used by filter(array) destructed");
             }
 
             push_number(inter_sp, *src);
@@ -1064,13 +1064,13 @@ x_map_string (svalue_t *sp, int num_arg)
 
         if (num_arg > 2) {
             inter_sp = sp;
-            error("Too many arguments to map(string)\n");
+            errorf("Too many arguments to map(string)\n");
         }
         m = arg[1].u.map;
 
         res = alloc_mstring(len);
         if (!res)
-            error("(map_string) Out of memory: string[%ld] for result\n", len);
+            errorf("(map_string) Out of memory: string[%ld] for result\n", len);
         push_string(inter_sp, res); /* In case of errors */
 
         for (src = get_txt(str), dest = get_txt(res); --len >= 0; src++, dest++)
@@ -1085,7 +1085,7 @@ x_map_string (svalue_t *sp, int num_arg)
             {
                 if (v->type != T_NUMBER)
                 {
-                    error("(map_string) Illegal value: %s, expected string\n"
+                    errorf("(map_string) Illegal value: %s, expected string\n"
                          , typename(v->type)
                          );
                 }
@@ -1116,7 +1116,7 @@ x_map_string (svalue_t *sp, int num_arg)
 
         res = alloc_mstring(len);
         if (!res)
-            error("(map_string) Out of memory: string[%ld] for result\n", len);
+            errorf("(map_string) Out of memory: string[%ld] for result\n", len);
         push_string(inter_sp, res); /* In case of errors */
 
         for (src = get_txt(str), dest = get_txt(res); --len >= 0; src++, dest++)
@@ -1127,7 +1127,7 @@ x_map_string (svalue_t *sp, int num_arg)
                 continue;
 
             if (!callback_object(&cb))
-                error("object used by map(string) destructed");
+                errorf("object used by map(string) destructed");
 
             push_number(inter_sp, *src);
 
@@ -1137,7 +1137,7 @@ x_map_string (svalue_t *sp, int num_arg)
             {
                 if (v->type != T_NUMBER)
                 {
-                    error("(map_string) Illegal value: %s, expected string\n"
+                    errorf("(map_string) Illegal value: %s, expected string\n"
                          , typename(v->type)
                          );
                 }

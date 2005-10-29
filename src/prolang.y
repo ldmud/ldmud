@@ -11204,7 +11204,7 @@ lvalue:
           case F_RX_RANGE: indexing_code = F_RX_RANGE_LVALUE; break;
           case F_AX_RANGE: indexing_code = F_AX_RANGE_LVALUE; break;
           default:
-              error("Unsupported range type %d %s\n"
+              errorf("Unsupported range type %d %s\n"
                    , $2.inst, get_f_name($2.inst));
           }
 
@@ -13697,7 +13697,7 @@ lvalue_list:
           case F_RX_RANGE: prot_op = F_PROTECTED_RX_RANGE_LVALUE; break;
           case F_AX_RANGE: prot_op = F_PROTECTED_AX_RANGE_LVALUE; break;
           default:
-              error("Unsupported range type %d %s\n"
+              errorf("Unsupported range type %d %s\n"
                    , $4.inst, get_f_name($4.inst));
           }
 

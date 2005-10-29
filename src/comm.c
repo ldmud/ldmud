@@ -4296,7 +4296,7 @@ call_function_interactive (interactive_t *i, char *str)
                     , it->next ? it->next->local : MY_FALSE);
         i->input_to = it->next;
         free_input_to(it);
-        error("Out of memory: unswap object '%s'.\n", get_txt(ob->name));
+        errorf("Out of memory: unswap object '%s'.\n", get_txt(ob->name));
         return MY_FALSE;
     }
 
@@ -4486,7 +4486,7 @@ print_prompt_string (string_t *prompt)
             put_number(hook, 0);
             current_object = NULL; /* So that catch_tell() can see it */
             add_message(FMT_STRING, prompt);
-            error("H_PRINT_PROMPT for %s was a closure bound to a now-destructed object - hook removed.\n", get_txt(command_giver->name));
+            errorf("H_PRINT_PROMPT for %s was a closure bound to a now-destructed object - hook removed.\n", get_txt(command_giver->name));
             /* NOTREACHED */
         }
 
@@ -4567,7 +4567,7 @@ print_prompt (void)
             free_svalue(prompt);
             put_ref_string(prompt, STR_DEFAULT_PROMPT);
             print_prompt_string(prompt->u.str);
-            error("Prompt of %s was a closure bound to a now-destructed object - default prompt restored.\n", get_txt(command_giver->name));
+            errorf("Prompt of %s was a closure bound to a now-destructed object - default prompt restored.\n", get_txt(command_giver->name));
             /* NOTREACHED */
         }
 
@@ -5960,7 +5960,7 @@ f_attach_erq_demon (svalue_t *sp)
         ob = sp[-1].u.ob;
         if (!O_SET_INTERACTIVE(ip, ob))
         {
-            error("Bad arg 1 to attach_erq_demon(): object is not interactive.\n");
+            errorf("Bad arg 1 to attach_erq_demon(): object is not interactive.\n");
             /* NOTREACHED */
             return sp;
         }
@@ -5992,7 +5992,7 @@ f_attach_erq_demon (svalue_t *sp)
     suffix = sp[-1].u.str;
     if (mstrstr(suffix, "/.."))
     {
-        error("Bad arg 1 to attach_erq_demon(): illegal path.\n");
+        errorf("Bad arg 1 to attach_erq_demon(): illegal path.\n");
         /* NOTREACHED */
         return sp;
     }
@@ -6660,7 +6660,7 @@ query_ip_name (svalue_t *sp, Bool lookup)
             svp = svp->u.lvalue;
         if (svp->type != T_OBJECT)
         {
-            error("Bad arg 1 to query_ip_number(): expected object/object&, got %s&.\n"
+            errorf("Bad arg 1 to query_ip_number(): expected object/object&, got %s&.\n"
                  , typename(svp->type));
             /* NOTREACHED */
         }
@@ -6741,7 +6741,7 @@ query_ip_name (svalue_t *sp, Bool lookup)
     if (!str)
     {
         inter_sp = sp - 1;
-        error("Out of memory for IP address\n");
+        errorf("Out of memory for IP address\n");
     }
     put_string(sp, str);
     return sp;
@@ -6855,7 +6855,7 @@ f_query_idle (svalue_t *sp)
     if (!O_IS_INTERACTIVE(ob))
     {
         inter_sp = sp;
-        error("query_idle() of non-interactive object.\n");
+        errorf("query_idle() of non-interactive object.\n");
         return sp;
     }
 
@@ -7024,7 +7024,7 @@ f_send_udp (svalue_t *sp)
             if (!to_host)
             {
                 inter_sp = sp;
-                error("Out of stack (%lu bytes) for host address\n"
+                errorf("Out of stack (%lu bytes) for host address\n"
                      , (unsigned long)(adrlen+1));
                 /* NOTREACHED */
             }
@@ -7107,7 +7107,7 @@ f_set_buffer_size (svalue_t *sp)
 
     if (sp->u.number > SET_BUFFER_SIZE_MAX)
     {
-        error("Bad arg 1 to set_buffer_size(): value %ld exceeds maximum %ld\n"
+        errorf("Bad arg 1 to set_buffer_size(): value %ld exceeds maximum %ld\n"
              , sp->u.number, (long) SET_BUFFER_SIZE_MAX);
         /* NOTREACHED */
         return sp;
@@ -7201,7 +7201,7 @@ f_binary_message (svalue_t *sp)
             if (svp->type != T_NUMBER)
             {
                 free_mstring(msg);
-                error("Bad arg 1 to binary_message(): got %s*, "
+                errorf("Bad arg 1 to binary_message(): got %s*, "
                       "expected string/int*.\n", typename(svp->type));
                 /* NOTREACHED */
                 return sp;
@@ -7359,7 +7359,7 @@ f_exec (svalue_t *sp)
         }
 
         if (!(O_SET_INTERACTIVE(ip, obfrom)))
-            error("Bad argument 2 to exec(): not interactive.\n");
+            errorf("Bad argument 2 to exec(): not interactive.\n");
 
         /* When we have to have an out of memory error, have it before pointers
          * get changed.
@@ -7575,7 +7575,7 @@ v_input_to (svalue_t *sp, int num_arg)
     {
         if (num_arg <= 2)
         {
-            error("Missing prompt argument to input_to().\n");
+            errorf("Missing prompt argument to input_to().\n");
             /* NOTREACHED */
         }
 
@@ -8223,7 +8223,7 @@ f_query_mud_port (svalue_t *sp)
     {
         if (sp->u.number < -1 || sp->u.number >= numports)
         {
-            error("Bad arg 1 to query_mud_port(): value %ld out of range.\n"
+            errorf("Bad arg 1 to query_mud_port(): value %ld out of range.\n"
                  , sp->u.number);
             /* NOTREACHED */
         }
@@ -8362,7 +8362,7 @@ f_get_combine_charset (svalue_t *sp)
     mode = sp->u.number;
     if (mode != CHARSET_VECTOR && mode != CHARSET_STRING)
     {
-        error("Bad arg 1 to get_combine_charset(): %ld, "
+        errorf("Bad arg 1 to get_combine_charset(): %ld, "
               "expected CHARSET_VECTOR (%d) or CHARSET_STRING (%d)\n"
              , (long) mode, CHARSET_VECTOR, CHARSET_STRING);
         /* NOTREACHED */
@@ -8413,7 +8413,7 @@ f_set_combine_charset (svalue_t *sp)
     i = 0;
     if (sp->type == T_POINTER && (i = (mp_int)VEC_SIZE(sp->u.vec)) > 32)
     {
-        error("Bad arg 1 to set_combine_charset(): int[] too long (%ld)\n"
+        errorf("Bad arg 1 to set_combine_charset(): int[] too long (%ld)\n"
              , (long)i);
         /* NOTREACHED */
         return sp;
@@ -8486,7 +8486,7 @@ f_get_connection_charset (svalue_t *sp)
     if (mode != CHARSET_VECTOR && mode != CHARSET_STRING
      && mode != CHARSET_QUOTE_IAC)
     {
-        error("Bad arg 1 to get_connection_charset(): %ld, "
+        errorf("Bad arg 1 to get_connection_charset(): %ld, "
               "expected CHARSET_VECTOR (%d), _STRING (%d), "
               "or _QUOTE_IAC (%d)\n"
              , (long) mode, CHARSET_VECTOR, CHARSET_STRING, CHARSET_QUOTE_IAC);
@@ -8545,7 +8545,7 @@ f_set_connection_charset (svalue_t *sp)
     i = 0;
     if (sp[-1].type == T_POINTER && (i = (mp_int)VEC_SIZE(sp[-1].u.vec)) > 32)
     {
-        error("Bad arg 1 to set_connection_charset(): array too big (%ld)\n"
+        errorf("Bad arg 1 to set_connection_charset(): array too big (%ld)\n"
              , i);
         /* NOTREACHED */
         return sp;
@@ -8620,7 +8620,7 @@ f_set_prompt (svalue_t *sp)
     if (!(O_SET_INTERACTIVE(ip, sp->u.ob))
      || ip->closing)
     {
-        error("Bad arg 2 to set_prompt(): object not interactive.\n");
+        errorf("Bad arg 2 to set_prompt(): object not interactive.\n");
         return sp;
     }
 
@@ -8635,7 +8635,7 @@ f_set_prompt (svalue_t *sp)
         if (sp->type == T_CLOSURE && sp->x.closure_type == CLOSURE_UNBOUND_LAMBDA)
         {
             inter_sp = sp;
-            error("Bad arg 1 for set_prompt(): lambda closure not bound\n");
+            errorf("Bad arg 1 for set_prompt(): lambda closure not bound\n");
             /* NOTREACHED */
         }
 
@@ -8646,7 +8646,7 @@ f_set_prompt (svalue_t *sp)
             if (!str)
             {
                 inter_sp = sp;
-                error("(set_prompt) Out of memory (%lu bytes) for prompt\n"
+                errorf("(set_prompt) Out of memory (%lu bytes) for prompt\n"
                      , (unsigned long) mstrsize(sp->u.str));
             }
             else
@@ -8669,7 +8669,7 @@ f_set_prompt (svalue_t *sp)
             assign_svalue(sp, prompt);
         else
         {
-            error("Bad int arg 1 to set_prompt(): got %ld, expected 0 or -1.\n"
+            errorf("Bad int arg 1 to set_prompt(): got %ld, expected 0 or -1.\n"
                  , sp->u.number);
             /* NOTREACHED */
             return sp;
@@ -8834,7 +8834,7 @@ f_set_max_commands (svalue_t *sp)
 
     if (!O_SET_INTERACTIVE(ip, sp->u.ob))
     {
-        error("Bad arg 2 to set_max_commands(): Object is not interactive.\n");
+        errorf("Bad arg 2 to set_max_commands(): Object is not interactive.\n");
         /* NOTREACHED */
     }
 
@@ -8882,7 +8882,7 @@ f_enable_telnet (svalue_t *sp)
 
     if (!O_SET_INTERACTIVE(ip, sp->u.ob))
     {
-        error("Bad arg 2 to enable_telnet(): Object '%s' is not interactive.\n"
+        errorf("Bad arg 2 to enable_telnet(): Object '%s' is not interactive.\n"
              , get_txt(sp->u.ob->name)
              );
         /* NOTREACHED */

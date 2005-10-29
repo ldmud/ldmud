@@ -1557,7 +1557,7 @@ undefined_function:
             if (!res || res->type != T_NUMBER || res->u.number < 0)
             {
             	/* Override attempt is fatal */
-                error(
+                errorf(
                   "Privilege violation: nomask simul_efun %s\n",
                   get_txt(p->name)
                 );
@@ -6377,7 +6377,7 @@ add_permanent_define (char *name, short nargs, void *exps, Bool special)
     p = make_shared_identifier(name, I_TYPE_DEFINE, 0);
     if (!p)
     {
-        error("Out of memory for permanent macro '%s'\n", name);
+        errorf("Out of memory for permanent macro '%s'\n", name);
     }
 
     /* If such a macro already exists with different meaning,
@@ -6389,7 +6389,7 @@ add_permanent_define (char *name, short nargs, void *exps, Bool special)
          || p->u.define.special
          || strcmp(exps,p->u.define.exps.str) != 0)
         {
-            error("Permanent #define %s already defined\n", name);
+            errorf("Permanent #define %s already defined\n", name);
         }
         return;
     }
@@ -7444,7 +7444,7 @@ set_inc_list (vector_t *v)
         string_t *new;
         if (svp->type != T_STRING)
         {
-            error("H_INCLUDE_DIRS argument has a non-string array element\n");
+            errorf("H_INCLUDE_DIRS argument has a non-string array element\n");
         }
 
         /* Set p to the beginning of the pathname, skipping leading
@@ -7463,21 +7463,21 @@ set_inc_list (vector_t *v)
         /* Is the path legal? */
         if (!legal_path(p))
         {
-            error("H_INCLUDE_DIRS path contains '..'\n");
+            errorf("H_INCLUDE_DIRS path contains '..'\n");
         }
         if (*p == '.' && !p[1])
-            error("H_INCLUDE_DIRS path is a single prefix dot\n");
+            errorf("H_INCLUDE_DIRS path is a single prefix dot\n");
 
         len = (mp_int)strlen(p);
         if (max < len)
             max = len;
         if (len >= 2 && p[len -1] == '.' && p[len - 2] == '/')
-            error("H_INCLUDE_DIRS path ends in single prefix dot\n");
+            errorf("H_INCLUDE_DIRS path ends in single prefix dot\n");
 
         /* Get and store our own copy of the pathname */
         new = unshare_mstring(svp->u.str);
         if (!new)
-            error("Out of memory\n");
+            errorf("Out of memory\n");
 
         put_string(svp, new); /* dup() already freed it */
     }

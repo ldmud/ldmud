@@ -470,14 +470,14 @@ pgresult (dbconn_t *pgconn, PGresult *res)
             {
                 PQclear(res);
                 dequeue(pgconn);
-                error("Query result exceeded mappingsize limit.\n");
+                errorf("Query result exceeded mappingsize limit.\n");
             }
             
             if (max_mapping_keys && nfields > (p_int)max_mapping_keys)
             {
                 PQclear(res);
                 dequeue(pgconn);
-                error("Query result exceeded mappingsize limit.\n");
+                errorf("Query result exceeded mappingsize limit.\n");
             }
             
             map = allocate_mapping(nfields, ntuples);
@@ -516,7 +516,7 @@ pgresult (dbconn_t *pgconn, PGresult *res)
             {
                 PQclear(res);
                 dequeue(pgconn);
-                error("Query result exceeded array limit.\n");
+                errorf("Query result exceeded array limit.\n");
             }
 
             array = allocate_array(ntuples+1);
@@ -943,7 +943,7 @@ Bool check_privilege (const char * efun_name, Bool raise_error, svalue_t * sp)
 
     if (raise_error)
     {
-        error("%s(): Privilege violation.\n", efun_name);
+        errorf("%s(): Privilege violation.\n", efun_name);
         /* NOTREACHED */
     }
 
@@ -1012,7 +1012,7 @@ v_pg_connect (svalue_t *sp, int num_arg)
     if (!cb_object)
     {
         free_callback(&cb);
-        error("pgconnect(): Callback object is destructed.\n");
+        errorf("pgconnect(): Callback object is destructed.\n");
         /* NOTREACHED */
         return arg;
     }
@@ -1027,7 +1027,7 @@ v_pg_connect (svalue_t *sp, int num_arg)
         else
         {
             free_callback(&cb);
-            error("pgconnect(): Already connected\n");
+            errorf("pgconnect(): Already connected\n");
             /* NOTREACHED */
             return arg;
         }
@@ -1116,7 +1116,7 @@ v_pg_query (svalue_t *sp, int numarg)
     
     db = find_current_connection(current_object);
     if (!db)
-        error("pgquery(): not connected\n");
+        errorf("pgquery(): not connected\n");
 
     q = queue(db, get_txt(sp->u.str));
     q->flags = flags;

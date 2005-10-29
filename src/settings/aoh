@@ -1,18 +1,24 @@
 #!/bin/sh
 #
-# Settings for the OSB mudlib.
+# Settings for the AoH mudlib.
 #
 # configure will strip this part from the script.
 #
+# The exported compiler flags are needed on (at least) FreeBSD 5.4
+# (assuming default installpaths are used for the ports)
 #
-# --enable-malloc-sbrk=no \
-export EXTRA_CFLAGS="-mcpu=pentium4 -march=pentium4"
+# Modify the First EXTRA_CFLAGS to match your architecture
+#
+EXTRA_CFLAGS="-mtune=pentium4 -march=pentium4"
+export EXTRA_CFLAGS="$EXTRA_CFLAGS -I/usr/local/include -I/usr/include"
+export LDFLAGS="-L/usr/local/lib -L/usr/local/lib/mysql -L/usr/lib"
+export CPPFLAGS="-I/usr/local/include -I/usr/include"
 
 exec ./configure \
---prefix=/home/mud \
---bindir=/home/mud/bin \
---libdir=/home/mud/mudlib \
---libexec=/home/mud/libexec \
+--prefix=/home/ralph/mud \
+--bindir=/home/ralph/mud/bin \
+--libdir=/home/ralph/mud/mudlib \
+--libexec=/home/ralph/mud/libexec \
 --enable-strict-euids \
 --enable-erq=xerq \
 --enable-lpc-nosave \
@@ -33,6 +39,7 @@ exec ./configure \
 --enable-opcprof=yes \
 --enable-filename-spaces=yes \
 --enable-use-tls=gnu \
+--enable-synchronous-heart-beat=no \
 --enable-use-pthreads=yes \
 --with-malloc=ptmalloc \
 --with-optimize=high \
@@ -48,7 +55,6 @@ exec ./configure \
 --with-max-cost=3000000 \
 --without-wizlist-file \
 --with-max-array-size=0 \
---with-max-mapping-keys=0 \
 --with-max-mapping-size=0 \
 --with-swap-file=AoH $*
 exit 1

@@ -604,7 +604,7 @@ f_copy_file (svalue_t *sp)
 
         if (lstat(fromB, &from_stats) != 0)
         {
-            error("%s: lstat failed\n", fromB);
+            errorf("%s: lstat failed\n", fromB);
             break;
         }
 
@@ -613,13 +613,13 @@ f_copy_file (svalue_t *sp)
             if (from_stats.st_dev == to_stats.st_dev
               && from_stats.st_ino == to_stats.st_ino)
             {
-                error("'%s' and '%s' are the same file\n", fromB, to);
+                errorf("'%s' and '%s' are the same file\n", fromB, to);
                 break;
             }
 
             if (S_ISDIR(to_stats.st_mode))
             {
-                error("%s: cannot overwrite directory\n", to);
+                errorf("%s: cannot overwrite directory\n", to);
                 break;
             }
 
@@ -627,13 +627,13 @@ f_copy_file (svalue_t *sp)
         else if (errno != ENOENT)
         {
             perror("copy_file");
-            error("%s: unknown error\n", to);
+            errorf("%s: unknown error\n", to);
             break;
         }
 
         if (!S_ISREG(from_stats.st_mode))
         {
-            error("cannot copy '%s': Not a regular file\n", fromB);
+            errorf("cannot copy '%s': Not a regular file\n", fromB);
             break;
         }
 
@@ -1297,7 +1297,7 @@ v_read_file (svalue_t *sp, int num_arg)
         if (!str) {
             fclose(f);
             free_mstring(file);
-            error("(read_file) Out of memory (%ld bytes) for buffer\n", size+1);
+            errorf("(read_file) Out of memory (%ld bytes) for buffer\n", size+1);
             /* NOTREACHED */
             break;
         }
@@ -1415,7 +1415,7 @@ v_read_file (svalue_t *sp, int num_arg)
         if (!rc)
         {
             free_mstring(file);
-            error("(read_file) Out of memory for result\n");
+            errorf("(read_file) Out of memory for result\n");
         }
     } while(0);
 
@@ -1753,7 +1753,7 @@ f_write_file (svalue_t *sp)
             if (remove(get_txt(file)))
             {
                 perror("write_file (remove)");
-                error("Could not remove %s: errno %d.\n", get_txt(file), errno);
+                errorf("Could not remove %s: errno %d.\n", get_txt(file), errno);
             }
 
         f = fopen(get_txt(file), "a");
@@ -1787,7 +1787,7 @@ f_write_file (svalue_t *sp)
                     strcpy(buf, emsg);
                     extract_cstr(buf2, file, mstrsize(file)+1);
                     free_mstring(file);
-                    error("Could not open %s for append: (%d) %s.\n"
+                    errorf("Could not open %s for append: (%d) %s.\n"
                          , buf2, err, buf);
                 }
                 else if (buf2)
@@ -1795,14 +1795,14 @@ f_write_file (svalue_t *sp)
                     extract_cstr(buf2, file, mstrsize(file)+1);
                     free_mstring(file);
                     perror("write_file");
-                    error("Could not open %s for append: errno %d.\n"
+                    errorf("Could not open %s for append: errno %d.\n"
                          , buf2, err);
                 }
                 else
                 {
                     free_mstring(file);
                     perror("write_file");
-                    error("Could not open file for append: errno %d.\n"
+                    errorf("Could not open file for append: errno %d.\n"
                          , err);
                 }
                 /* NOTREACHED */

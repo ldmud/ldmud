@@ -16,7 +16,7 @@
 #define ODBC_DEBUG 0 
 
 #define MEM_CHECK( x ) if ( !x ) { \
-                          error( "Out of memory.\n" ); \
+                          errorf( "Out of memory.\n" ); \
                           return( NULL ); \
                        }
 
@@ -343,7 +343,7 @@ f_sql_odbc_datasources( svalue_t * argv, int argc )
 
    err = init_odbc_environment();
    if ( err ) {
-      error( err );
+      errorf( err );
       return( NULL );
    }
    
@@ -371,7 +371,7 @@ f_sql_odbc_datasources( svalue_t * argv, int argc )
 
       free_mapping( map );
 
-      error( (err?err:"Failed to fetch datasource information.\n") );
+      errorf( (err?err:"Failed to fetch datasource information.\n") );
       return( NULL );
    }
 
@@ -479,7 +479,7 @@ f_sql_connect ( svalue_t * argv, int argc )
          database = (argv + pos)->u.string;
          break;
       default:
-         error( "Too many arguments to sql_connect().\n" );
+         errorf( "Too many arguments to sql_connect().\n" );
          return( NULL );
    }
 
@@ -552,7 +552,7 @@ f_sql_close( svalue_t * argv, int argc )
    id = argv->u.number;
 
    if ( !(handle = get_db_connection_by_id( id )) ) {
-      error( "Illegal handle for database.\n" );
+      errorf( "Illegal handle for database.\n" );
 
       return( NULL );
    }
@@ -603,7 +603,7 @@ f_sql_exec( svalue_t * argv, int argc )
 
    if ( !(handle = get_db_connection_by_id( id )) ) {
       pfree( statement );
-      error( "Illegal handle for database.\n" );
+      errorf( "Illegal handle for database.\n" );
       return( NULL );
    }
 
@@ -613,14 +613,14 @@ f_sql_exec( svalue_t * argv, int argc )
       if ( !SQL_SUCCEEDED( ret ) ) {
           //printf( "SQLFreeStmt( handle->hStmt, SQL_UNBIND ) = %d\n", ret );
           pfree( statement );
-          error( extract_diagnostics_info( SQL_HANDLE_STMT, handle->hStmt ) );
+          errorf( extract_diagnostics_info( SQL_HANDLE_STMT, handle->hStmt ) );
           return( NULL );
       }
       ret = SQLFreeHandle( SQL_HANDLE_STMT, handle->hStmt );
       if ( !SQL_SUCCEEDED( ret ) ) {
           //printf( "SQLFreeHandle( SQL_HANDLE_STMT, handle->hStmt ) = %d\n", ret );
           pfree( statement );
-          error( extract_diagnostics_info( SQL_HANDLE_STMT, handle->hStmt ) );
+          errorf( extract_diagnostics_info( SQL_HANDLE_STMT, handle->hStmt ) );
           return( NULL );
       }
    }
@@ -638,7 +638,7 @@ f_sql_exec( svalue_t * argv, int argc )
    ret = SQLAllocHandle( SQL_HANDLE_STMT, handle->hDBCon, &handle->hStmt );
    if ( !SQL_SUCCEEDED( ret ) ) {
       pfree( statement );
-      error( extract_diagnostics_info( SQL_HANDLE_DBC, handle->hDBCon ) );
+      errorf( extract_diagnostics_info( SQL_HANDLE_DBC, handle->hDBCon ) );
 
       return( NULL );
    }
@@ -749,7 +749,7 @@ f_sql_column_names( svalue_t * argv, int argc )
    free_svalue( argv );
 
    if ( !(handle = get_db_connection_by_id( id )) ) {
-      error( "Illegal handle for database.\n" );
+      errorf( "Illegal handle for database.\n" );
 
       return( NULL );
    }
@@ -799,7 +799,7 @@ f_sql_affected_rows( svalue_t * argv, int argc )
    free_svalue( argv );
 
    if ( !(handle = get_db_connection_by_id( id )) ) {
-      error( "Illegal handle for database.\n" );
+      errorf( "Illegal handle for database.\n" );
 
       return( NULL );
    }
@@ -941,12 +941,12 @@ f_sql_fetch( svalue_t * argv, int argc )
          free_svalue( argv );
          break;
       default:
-         error( "Too many arguments to sql_fetch().\n" );
+         errorf( "Too many arguments to sql_fetch().\n" );
          return( NULL );
    }
    
    if ( !(handle = get_db_connection_by_id( id )) ) {
-      error( "Illegal handle for database.\n" );
+      errorf( "Illegal handle for database.\n" );
 
       return( NULL );
    }
@@ -1007,7 +1007,7 @@ f_sql_error( svalue_t * argv, int argc )
    free_svalue( argv );
 
    if ( !(handle = get_db_connection_by_id( id )) ) {
-      error( "Illegal handle for database.\n" );
+      errorf( "Illegal handle for database.\n" );
 
       return( NULL );
    }
@@ -1088,7 +1088,7 @@ raise_critical_sql_exception( hDBC * handle, char * msg )
    if ( handle )
       dispose_db_connection( handle );
    
-   error( ( msg ? msg : "An unknown error occured during the current DB operation.\n" ) );
+   errorf( ( msg ? msg : "An unknown error occured during the current DB operation.\n" ) );
       
    abort();
 }

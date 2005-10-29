@@ -1440,7 +1440,7 @@ assert_stack_gap (void)
     if (condition == Normal)
     {
         condition = Error;
-        error("Out of memory: Gap between stack and heap: %ld.\n"
+        errorf("Out of memory: Gap between stack and heap: %ld.\n"
              , (long)gap);
         /* NOTREACHED */
     }

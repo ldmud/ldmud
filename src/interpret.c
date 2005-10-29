@@ -306,9 +306,9 @@ struct cache
 /*-------------------------------------------------------------------------*/
 /* Macros */
 
-#define ERRORF(s) do{inter_pc = pc; inter_sp = sp; error s ;}while(0)
+#define ERRORF(s) do{inter_pc = pc; inter_sp = sp; errorf s ;}while(0)
 #define ERROR(s) ERRORF((s))
-  /* ERRORF((...)) acts like error(...), except that first the local pc and sp
+  /* ERRORF((...)) acts like errorf(...), except that first the local pc and sp
    * are copied into the global variables.
    * ERROR() is an easier to type form of ERRORF() when your error message
    * is just one string. It will be redefined below for the tabled
@@ -1313,7 +1313,7 @@ check_for_ref_loop (svalue_t * dest)
             if (rover1 == rover2)
             {
                 free_svalue(dest);
-                error("Assignment would create reference loop.\n");
+                errorf("Assignment would create reference loop.\n");
             }
         } while (rover1
              && (rover1->type == T_LVALUE || rover1->type == T_PROTECTED_LVALUE)
@@ -1429,7 +1429,7 @@ inl_copy_svalue_no_free (svalue_t *to, svalue_t *from)
             DYN_MAPPING_COST(MAP_SIZE(old));
             new = copy_mapping(old);
             if (!new)
-                error("Out of memory: mapping[%lu] for copy.\n"
+                errorf("Out of memory: mapping[%lu] for copy.\n"
                      , MAP_SIZE(old));
             free_mapping(old);
             to->u.map = new;
@@ -1448,7 +1448,7 @@ inl_copy_svalue_no_free (svalue_t *to, svalue_t *from)
             DYN_ARRAY_COST(size);
             new = allocate_uninit_array((int)size);
             if (!new)
-                error("Out of memory: array[%lu] for copy.\n"
+                errorf("Out of memory: array[%lu] for copy.\n"
                      , (unsigned long) size);
             for (i = 0; i < size; i++)
                 assign_svalue_no_free( &new->item[i]
@@ -2015,7 +2015,7 @@ transfer_pointer_range (svalue_t *source)
 
 #ifdef NO_NEGATIVE_RANGES
         if (index1 > index2)
-            error("Illegal range [%ld..%ld] for assignment.\n"
+            errorf("Illegal range [%ld..%ld] for assignment.\n"
                  , index1, index2-1
                  );
 #endif /* NO_NEGATIVE_RANGES */
@@ -2131,7 +2131,7 @@ transfer_protected_pointer_range ( struct protected_range_lvalue *dest
 
 #ifdef NO_NEGATIVE_RANGES
         if (index1 > index2)
-            error("Illegal range [%ld..%ld] for assignment.\n"
+            errorf("Illegal range [%ld..%ld] for assignment.\n"
                  , index1, index2-1
                  );
 #endif /* NO_NEGATIVE_RANGES */
@@ -2240,7 +2240,7 @@ assign_string_range (svalue_t *source, Bool do_free)
 
 #ifdef NO_NEGATIVE_RANGES
         if (index1 > index2)
-            error("Illegal range [%ld..%ld] for assignment.\n"
+            errorf("Illegal range [%ld..%ld] for assignment.\n"
                  , index1, index2-1
                  );
 #endif /* NO_NEGATIVE_RANGES */
@@ -2313,7 +2313,7 @@ assign_protected_string_range ( struct protected_range_lvalue *dest
 
 #ifdef NO_NEGATIVE_RANGES
         if (index1 > index2)
-            error("Illegal range [%ld..%ld] for assignment.\n"
+            errorf("Illegal range [%ld..%ld] for assignment.\n"
                  , index1, index2-1
                  );
 #endif /* NO_NEGATIVE_RANGES */
@@ -2393,7 +2393,7 @@ add_number_to_lvalue (svalue_t *dest, int i, svalue_t *pre, svalue_t *post)
     switch (dest->type)
     {
     default:
-        error("Reference to bad type %s to ++/--\n", typename(dest->type));
+        errorf("Reference to bad type %s to ++/--\n", typename(dest->type));
         break;
 
     case T_NUMBER:
@@ -2489,7 +2489,7 @@ inter_add_array (vector_t *q, vector_t **vpp)
 
     if (max_array_size && p_size + q_size > max_array_size)
     {
-        error("Illegal array size: %ld.\n", (long)(p_size + q_size));
+        errorf("Illegal array size: %ld.\n", (long)(p_size + q_size));
     }
 
     /* The optimized array-adding will transfer elements around, rendering
@@ -3580,7 +3580,7 @@ push_indexed_lvalue (svalue_t *sp, bytecode_p pc)
     /* Illegal type to index */
     inter_sp = sp;
     inter_pc = pc;
-    error("(lvalue1)Indexing on illegal type '%s'.\n", typename(vec->type));
+    errorf("(lvalue1)Indexing on illegal type '%s'.\n", typename(vec->type));
     return sp;
 } /* push_indexed_lvalue() */
 
@@ -3631,7 +3631,7 @@ push_rindexed_lvalue (svalue_t *sp, bytecode_p pc)
     /* Indexing on illegal type */
     inter_sp = sp;
     inter_pc = pc;
-    error("(lvalue2)Indexing on illegal type '%s'.\n", typename(vec->type));
+    errorf("(lvalue2)Indexing on illegal type '%s'.\n", typename(vec->type));
     return NULL;
 } /* push_rindexed_lvalue() */
 
@@ -3682,7 +3682,7 @@ push_aindexed_lvalue (svalue_t *sp, bytecode_p pc)
     /* Indexing on illegal type */
     inter_sp = sp;
     inter_pc = pc;
-    error("(lvalue3)Indexing on illegal type '%s'.\n", typename(vec->type));
+    errorf("(lvalue3)Indexing on illegal type '%s'.\n", typename(vec->type));
     return NULL;
 } /* push_aindexed_lvalue() */
 
@@ -3827,7 +3827,7 @@ push_protected_indexed_lvalue (svalue_t *sp, bytecode_p pc)
 
     inter_sp = sp;
     inter_pc = pc;
-    error("(lvalue4)Indexing on illegal type '%s'.\n", typename(vec->type));
+    errorf("(lvalue4)Indexing on illegal type '%s'.\n", typename(vec->type));
     return NULL;
 } /* push_protected_indexed_lvalue() */
 
@@ -3878,7 +3878,7 @@ push_protected_rindexed_lvalue (svalue_t *sp, bytecode_p pc)
 
     inter_sp = sp;
     inter_pc = pc;
-    error("(lvalue5)Indexing on illegal type '%s'.\n", typename(vec->type));
+    errorf("(lvalue5)Indexing on illegal type '%s'.\n", typename(vec->type));
     return NULL;
 } /* push_protected_rindexed_lvalue() */
 
@@ -3929,7 +3929,7 @@ push_protected_aindexed_lvalue (svalue_t *sp, bytecode_p pc)
 
     inter_sp = sp;
     inter_pc = pc;
-    error("(lvalue6)Indexing on illegal type '%s'.\n", typename(vec->type));
+    errorf("(lvalue6)Indexing on illegal type '%s'.\n", typename(vec->type));
     return NULL;
 } /* push_protected_aindexed_lvalue() */
 
@@ -4006,7 +4006,7 @@ push_protected_indexed_map_lvalue (svalue_t *sp, bytecode_p pc)
 
     inter_sp = sp;
     inter_pc = pc;
-    error("(lvalue7)Indexing on illegal type '%s'.\n", typename(vec->type));
+    errorf("(lvalue7)Indexing on illegal type '%s'.\n", typename(vec->type));
     return NULL;
 } /* push_protected_indexed_map_lvalue() */
 
@@ -4137,7 +4137,7 @@ index_lvalue (svalue_t *sp, bytecode_p pc)
 
     inter_sp = sp;
     inter_pc = pc;
-    error("(lvalue8)Indexing on illegal type '%s'.\n", typename(type));
+    errorf("(lvalue8)Indexing on illegal type '%s'.\n", typename(type));
     return NULL;
 } /* index_lvalue() */
 
@@ -4211,7 +4211,7 @@ rindex_lvalue (svalue_t *sp, bytecode_p pc)
 
     inter_sp = sp;
     inter_pc = pc;
-    error("(lvalue9)Indexing on illegal type '%s'.\n", typename(type));
+    errorf("(lvalue9)Indexing on illegal type '%s'.\n", typename(type));
     return NULL;
 } /* rindex_lvalue() */
 
@@ -4285,7 +4285,7 @@ aindex_lvalue (svalue_t *sp, bytecode_p pc)
 
     inter_sp = sp;
     inter_pc = pc;
-    error("(lvalue10)Indexing on illegal type '%s'.\n", typename(type));
+    errorf("(lvalue10)Indexing on illegal type '%s'.\n", typename(type));
     return NULL;
 } /* aindex_lvalue() */
 
@@ -4538,7 +4538,7 @@ protected_index_lvalue (svalue_t *sp, bytecode_p pc)
         /* Indexing on illegal type */
         inter_sp = sp;
         inter_pc = pc;
-        error("(lvalue11)Indexing on illegal type '%s'.\n", typename(type));
+        errorf("(lvalue11)Indexing on illegal type '%s'.\n", typename(type));
         return NULL;
     } /* for(ever) */
 
@@ -4720,7 +4720,7 @@ protected_rindex_lvalue (svalue_t *sp, bytecode_p pc)
         /* Indexing on illegal type */
         inter_sp = sp;
         inter_pc = pc;
-        error("(lvalue12)Indexing on illegal type '%s'.\n", typename(type));
+        errorf("(lvalue12)Indexing on illegal type '%s'.\n", typename(type));
         return NULL;
     } /* for(ever) */
 
@@ -4902,7 +4902,7 @@ protected_aindex_lvalue (svalue_t *sp, bytecode_p pc)
         /* Indexing on illegal type */
         inter_sp = sp;
         inter_pc = pc;
-        error("(lvalue13)Indexing on illegal type '%s'.\n", typename(type));
+        errorf("(lvalue13)Indexing on illegal type '%s'.\n", typename(type));
         return NULL;
     } /* for(ever) */
 
@@ -4962,7 +4962,7 @@ range_lvalue (int code, svalue_t *sp)
 #ifdef DEBUG
     if (sp->type != T_LVALUE) {
         inter_sp = sp;
-        error("wrong type to range_lvalue: got %s, expected lvalue\n"
+        errorf("wrong type to range_lvalue: got %s, expected lvalue\n"
              , typename(sp->type));
         return NULL;
     }
@@ -4989,7 +4989,7 @@ range_lvalue (int code, svalue_t *sp)
         break;
     default:
         inter_sp = sp;
-        error("(lvalue)Range index on illegal type '%s'.\n", typename(type));
+        errorf("(lvalue)Range index on illegal type '%s'.\n", typename(type));
         return NULL;
     }
 
@@ -4998,7 +4998,7 @@ range_lvalue (int code, svalue_t *sp)
     if (i->type != T_NUMBER)
     {
         inter_sp = sp;
-        error("Illegal upper range index: got '%s', expected 'number'.\n"
+        errorf("Illegal upper range index: got '%s', expected 'number'.\n"
              , typename(i->type));
         return NULL;
     }
@@ -5023,7 +5023,7 @@ range_lvalue (int code, svalue_t *sp)
     if (++ind2 < 0 || ind2 > size+1)
     {
         inter_sp = sp;
-        error("Upper range index out of bounds: %ld, size: %ld.\n"
+        errorf("Upper range index out of bounds: %ld, size: %ld.\n"
              , (long)i->u.number, (long)size);
         return NULL;
     }
@@ -5033,7 +5033,7 @@ range_lvalue (int code, svalue_t *sp)
     if ((--i)->type != T_NUMBER)
     {
         inter_sp = sp;
-        error("Illegal lower range index: got %s, expected number.\n"
+        errorf("Illegal lower range index: got %s, expected number.\n"
              , typename(i->type));
         return NULL;
     }
@@ -5057,7 +5057,7 @@ range_lvalue (int code, svalue_t *sp)
     if (ind1 < 0 || ind1 > size)
     {   /* Appending (ind1 == size) is allowed */
         inter_sp = sp;
-        error("Lower range index out of bounds: %ld, size: %ld.\n"
+        errorf("Lower range index out of bounds: %ld, size: %ld.\n"
              , (long)i->u.number, (long)size);
         return NULL;
     }
@@ -5068,7 +5068,7 @@ range_lvalue (int code, svalue_t *sp)
     if (ind2 < ind1)
     {
         inter_sp = sp;
-        error("Range of negative size given: %ld..%ld .\n"
+        errorf("Range of negative size given: %ld..%ld .\n"
              , (long)i->u.number, (long)(i+1)->u.number);
         return NULL;
     }
@@ -5078,7 +5078,7 @@ range_lvalue (int code, svalue_t *sp)
     else if (ind2 > size)
     {
         inter_sp = sp;
-        error("Upper range index out of bounds: %ld, size: %ld.\n"
+        errorf("Upper range index out of bounds: %ld, size: %ld.\n"
              , (long)(i+1)->u.number, (long)size);
         return NULL;
     }
@@ -5141,7 +5141,7 @@ protected_range_lvalue (int code, svalue_t *sp)
     if (sp->type != T_LVALUE)
     {
         inter_sp = sp;
-        error("wrong type to protected_range_lvalue: got %s, expected lvalue\n"
+        errorf("wrong type to protected_range_lvalue: got %s, expected lvalue\n"
              , typename(sp->type));
         return NULL;
     }
@@ -5202,7 +5202,7 @@ protected_range_lvalue (int code, svalue_t *sp)
 
     default:
         inter_sp = sp;
-        error("(lvalue)Range index on illegal type '%s'.\n", typename(type));
+        errorf("(lvalue)Range index on illegal type '%s'.\n", typename(type));
         return NULL;
     }
 
@@ -5211,7 +5211,7 @@ protected_range_lvalue (int code, svalue_t *sp)
     if (i->type != T_NUMBER)
     {
         inter_sp = sp;
-        error("Illegal upper range index: got '%s', expected 'number'.\n"
+        errorf("Illegal upper range index: got '%s', expected 'number'.\n"
              , typename(i->type));
         return NULL;
     }
@@ -5234,7 +5234,7 @@ protected_range_lvalue (int code, svalue_t *sp)
 
     if (++ind2 < 0 || ind2 > size) {
         inter_sp = sp;
-        error("Upper range index out of bounds: %ld, size: %ld.\n"
+        errorf("Upper range index out of bounds: %ld, size: %ld.\n"
              , (long)i->u.number, (long)size);
         return NULL;
     }
@@ -5244,7 +5244,7 @@ protected_range_lvalue (int code, svalue_t *sp)
     if ((--i)->type != T_NUMBER)
     {
         inter_sp = sp;
-        error("Illegal lower range index: got %s, expected number.\n"
+        errorf("Illegal lower range index: got %s, expected number.\n"
              , typename(i->type));
         return NULL;
     }
@@ -5269,7 +5269,7 @@ protected_range_lvalue (int code, svalue_t *sp)
     {
         /* Appending (ind1 == size) is allowed */
         inter_sp = sp;
-        error("Lower range index out of bounds: %ld, size: %ld.\n"
+        errorf("Lower range index out of bounds: %ld, size: %ld.\n"
              , (long)i->u.number, (long)size);
         return NULL;
     }
@@ -5388,7 +5388,7 @@ push_indexed_value (svalue_t *sp, bytecode_p pc)
         {
             inter_sp = sp;
             inter_pc = pc;
-            error("(value)Indexing a mapping of width 0.\n");
+            errorf("(value)Indexing a mapping of width 0.\n");
             return NULL;
         }
 
@@ -5433,7 +5433,7 @@ push_indexed_value (svalue_t *sp, bytecode_p pc)
     default:
         inter_sp = sp;
         inter_pc = pc;
-        error("(value)Indexing on illegal type '%s'.\n", typename(vec->type));
+        errorf("(value)Indexing on illegal type '%s'.\n", typename(vec->type));
         return NULL;
     }
 
@@ -5524,7 +5524,7 @@ push_rindexed_value (svalue_t *sp, bytecode_p pc)
     default:
         inter_sp = sp;
         inter_pc = pc;
-        error("(lvalue)Range index on illegal type '%s'.\n", typename(vec->type));
+        errorf("(lvalue)Range index on illegal type '%s'.\n", typename(vec->type));
         return NULL;
     }
 
@@ -5615,7 +5615,7 @@ push_aindexed_value (svalue_t *sp, bytecode_p pc)
     default:
         inter_sp = sp;
         inter_pc = pc;
-        error("(lvalue)Range index on illegal type '%s'.\n", typename(vec->type));
+        errorf("(lvalue)Range index on illegal type '%s'.\n", typename(vec->type));
         return NULL;
     }
 
@@ -5711,7 +5711,7 @@ find_value (int num)
      */
     if (is_sto_context())
     {
-        error("find_value: Can't execute with "
+        errorf("find_value: Can't execute with "
               "set_this_object() in effect.\n"
              );
     }
@@ -5755,7 +5755,7 @@ find_virtual_value (int num)
      */
     if (is_sto_context())
     {
-        error("find_virtual_value: Can't execute with "
+        errorf("find_virtual_value: Can't execute with "
               "set_this_object() in effect.\n"
              );
     }
@@ -5802,7 +5802,7 @@ find_virtual_value (int num)
                  , time_stamp(), current_object, get_txt(current_object->name)
                  , num);
         else
-            error("%s Error: find_virtual_value() on object %p '%s' "
+            errorf("%s Error: find_virtual_value() on object %p '%s' "
                   "w/o variables, num %d\n"
                  , time_stamp(), current_object, get_txt(current_object->name)
                  , num);
@@ -5989,7 +5989,7 @@ raise_bad_arg (int instr, int arg)
 {
     instr = complete_instruction(instr);
 
-    error("Bad argument %d to %s().\n", arg, get_f_name(instr));
+    errorf("Bad argument %d to %s().\n", arg, get_f_name(instr));
     /* NOTREACHED */
 } /* raise_bad_arg() */
 
@@ -6034,7 +6034,7 @@ raise_arg_error (int instr, int arg, long expected, int got)
     if (!expected)
         expected = efun_lpc_types[instrs[instr].lpc_arg_index];
 
-    error("Bad arg %d to %s(): got '%s', expected '%s'.\n"
+    errorf("Bad arg %d to %s(): got '%s', expected '%s'.\n"
          , arg, get_f_name(instr), typename(got), efun_arg_typename(expected)
          );
     /* NOTREACHED */
@@ -6154,7 +6154,7 @@ code_exp_arg_error (int arg, long expected, int got, bytecode_p pc, svalue_t *sp
 
     instr = complete_instruction(-1);
 
-    error("Bad arg %d to %s: got '%s', expected '%s'.\n"
+    errorf("Bad arg %d to %s: got '%s', expected '%s'.\n"
          , arg, get_f_name(instr), typename(got), efun_arg_typename(expected)
          );
     /* NOTREACHED */
@@ -6204,7 +6204,7 @@ op_exp_arg_error (int arg, long expected, int got, bytecode_p pc, svalue_t *sp)
 
     instr = complete_instruction(-1);
 
-    error("Bad %s arg to %s: got '%s', expected '%s'.\n"
+    errorf("Bad %s arg to %s: got '%s', expected '%s'.\n"
          , arg == 1 ? "left" : "right"
          , get_f_name(instr), typename(got), efun_arg_typename(expected)
          );
@@ -6345,7 +6345,7 @@ privilege_violation2 ( string_t *what, svalue_t *arg, svalue_t *arg2
     if (!svp || svp->type != T_NUMBER || svp->u.number < 0)
     {
         inter_sp = sp-num_arg;
-        error("privilege violation: %s\n", get_txt(what));
+        errorf("privilege violation: %s\n", get_txt(what));
         /* TODO: Print full args and types */
     }
 
@@ -6422,7 +6422,7 @@ privilege_violation4 ( string_t *what,    object_t *whom
     if (!svp || svp->type != T_NUMBER || svp->u.number < 0)
     {
         inter_sp = sp-4;
-        error("privilege violation : %s\n", get_txt(what));
+        errorf("privilege violation : %s\n", get_txt(what));
         /* TODO: Print full args and types */
     }
 
@@ -6846,7 +6846,7 @@ setup_inherited_call (unsigned short inhIndex)
 
 #ifdef DEBUG
     if (inhIndex >= current_prog->num_inherited)
-        error("(setup_inherited_call): inhIndex %ld > number of inherits %ld "
+        errorf("(setup_inherited_call): inhIndex %ld > number of inherits %ld "
               "in program '%s'\n"
              , (long)inhIndex
              , (long)current_prog->num_inherited
@@ -10829,7 +10829,7 @@ again:
                 break;
             default:
                 if (sp->type == T_LVALUE)
-                    error("Reference passed to ==\n");
+                    errorf("Reference passed to ==\n");
                 FATALF(("Illegal type '%s' to ==\n",typename(sp->type)));
                 /* NOTREACHED */
                 return MY_FALSE;
@@ -10906,7 +10906,7 @@ again:
                 break;
             default:
                 if (sp->type == T_LVALUE)
-                    error("Reference passed to !=\n");
+                    errorf("Reference passed to !=\n");
                 FATALF(("Illegal type '%s' to !=\n",typename(sp->type)));
                 /* NOTREACHED */
                 return MY_FALSE;
@@ -12959,7 +12959,7 @@ again:
              */
             if (i + (sp - VALUE_STACK) >= EVALUATOR_STACK_SIZE)
             {
-                error("VM Stack overflow: %ld too high.\n"
+                errorf("VM Stack overflow: %ld too high.\n"
                      , (long)(i + (sp - VALUE_STACK) - EVALUATOR_STACK_SIZE) );
                 /* NOTREACHED */
                 break;
@@ -13375,7 +13375,7 @@ again:
          */
 
         if (inter_context == NULL)
-            error("(eval_instruction) context_identifier: "
+            errorf("(eval_instruction) context_identifier: "
                   "inter_context is NULL\n");
             /* May happen if somebody does a funcall(symbol_function())
              * on the lfun of an context closure.
@@ -13398,7 +13398,7 @@ again:
 
 
         if (inter_context == NULL)
-            error("(eval_instruction) context_identifier16: "
+            errorf("(eval_instruction) context_identifier16: "
                   "inter_context is NULL\n");
             /* May happen if somebody does a funcall(symbol_function())
              * on the lfun of an context closure.
@@ -13417,7 +13417,7 @@ again:
          */
 
         if (inter_context == NULL)
-            error("(eval_instruction) context_identifier: "
+            errorf("(eval_instruction) context_identifier: "
                   "inter_context is NULL\n");
             /* May happen if somebody does a funcall(symbol_function())
              * on the lfun of an context closure.
@@ -13439,7 +13439,7 @@ again:
 
 
         if (inter_context == NULL)
-            error("(eval_instruction) context_identifier: "
+            errorf("(eval_instruction) context_identifier: "
                   "inter_context is NULL\n");
             /* May happen if somebody does a funcall(symbol_function())
              * on the lfun of an context closure.
@@ -14430,7 +14430,7 @@ again:
              || !(ob = simul_efun_object)
                )
             {
-                error("Couldn't load simul_efun object.\n");
+                errorf("Couldn't load simul_efun object.\n");
             }
         }
 
@@ -16436,7 +16436,7 @@ retry_for_shadow:
     if (ob->flags & O_SWAPPED)
     {
         if (load_ob_from_swap(ob) < 0)
-            error("Out of memory\n");
+            errorf("Out of memory\n");
     }
 
     progp = ob->prog;
@@ -16674,7 +16674,7 @@ retry_for_shadow:
 
 failure:
     if (get_txt(fun)[0] == ':')
-        error("Illegal function call\n");
+        errorf("Illegal function call\n");
 
 failure2:
     /* Failure. Deallocate stack. */
@@ -17465,7 +17465,7 @@ void
 int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
 
 /* Call the closure <lsvp> with <num_arg> arguments on the stack. On
- * success, the arguments are replaced with the result, else an error()
+ * success, the arguments are replaced with the result, else an errorf()
  *
  * If <allowRefs> is TRUE, references may be passed as extended varargs
  * ('(varargs mixed *)'). Currently this is used only for simul efuns.
@@ -17514,7 +17514,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
         {
             /* inter_sp == sp */
             CLEAN_CSP
-            error("Object '%s' the closure was bound to has been "
+            errorf("Object '%s' the closure was bound to has been "
                   "destructed\n", get_txt(l->ob->name));
             /* NOTREACHED */
             return;
@@ -17532,7 +17532,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
         {
             /* inter_sp == sp */
             CLEAN_CSP
-            error("Object '%s' holding the closure has been "
+            errorf("Object '%s' holding the closure has been "
                   "destructed\n", get_txt(l->function.lfun.ob->name));
             /* NOTREACHED */
             return;
@@ -17547,7 +17547,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
         {
             /* inter_sp == sp */
             CLEAN_CSP
-            error("Out of memory\n");
+            errorf("Out of memory\n");
             /* NOTREACHED */
             return;
         }
@@ -17624,12 +17624,12 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
 
         CLEAN_CSP  /* no call will be done */
         if (num_arg)
-            error("Arguments passed to variable closure.\n");
+            errorf("Arguments passed to variable closure.\n");
 
         /* Don't use variables in a destructed object */
         if (l->ob->flags & O_DESTRUCTED)
         {
-            error("Object '%s' the closure was bound to has been destructed\n"
+            errorf("Object '%s' the closure was bound to has been destructed\n"
                  , get_txt(l->ob->name));
             /* NOTREACHED */
             return;
@@ -17640,7 +17640,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
              && load_ob_from_swap(l->ob) < 0
            )
         {
-            error("Out of memory.\n");
+            errorf("Out of memory.\n");
             /* NOTREACHED */
             return;
         }
@@ -17648,7 +17648,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
         /* Do we have the variable? */
         if ( (i = (short)l->function.var_index) < 0)
         {
-            error("Variable not inherited\n");
+            errorf("Variable not inherited\n");
             /* NOTREACHED */
             return;
         }
@@ -17687,7 +17687,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
         {
             /* inter_sp == sp */
             CLEAN_CSP
-            error("Object '%s' the closure was bound to has been "
+            errorf("Object '%s' the closure was bound to has been "
                   "destructed\n", get_txt(l->ob->name));
             /* NOTREACHED */
             return;
@@ -17701,7 +17701,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
         {
             /* inter_sp == sp */
             CLEAN_CSP
-            error("Out of memory\n");
+            errorf("Out of memory\n");
             /* NOTREACHED */
             return;
         }
@@ -17743,7 +17743,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
         {
             /* inter_sp == sp */
             CLEAN_CSP
-            error("Object '%s' the closure was bound to has been "
+            errorf("Object '%s' the closure was bound to has been "
                   "destructed\n", get_txt(current_object->name));
             /* NOTREACHED */
             return;
@@ -17755,7 +17755,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
         {
             /* inter_sp == sp */
             CLEAN_CSP
-            error("Out of memory\n");
+            errorf("Out of memory\n");
             /* NOTREACHED */
             return;
         }
@@ -17776,7 +17776,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
                  * the closure should be zeroed out.
                  */
                 CLEAN_CSP
-                error("Object the closure was bound to has been destructed (this shouldn't happen)\n");
+                errorf("Object the closure was bound to has been destructed (this shouldn't happen)\n");
                 /* NOTREACHED */
                 return;
             }
@@ -17832,7 +17832,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
                             csp->extern_call = MY_TRUE;
                             inter_pc = csp->funstart = EFUN_FUNSTART;
                             csp->instruction = i;
-                            error("Too few arguments to %s\n", instrs[i].name);
+                            errorf("Too few arguments to %s\n", instrs[i].name);
                         }
                     }
                 }
@@ -17841,7 +17841,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
                     csp->extern_call = MY_TRUE;
                     inter_pc = csp->funstart = EFUN_FUNSTART;
                     csp->instruction = i;
-                    error("Too many arguments to %s\n", instrs[i].name);
+                    errorf("Too many arguments to %s\n", instrs[i].name);
                 }
 
                 /* Store the instruction code */
@@ -17891,7 +17891,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
                    )
                 {
                     csp->extern_call = MY_TRUE;
-                    error("Couldn't load simul_efun object\n");
+                    errorf("Couldn't load simul_efun object\n");
                     /* NOTREACHED */
                     return;
                 }
@@ -17906,7 +17906,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
     }
 
     CLEAN_CSP
-    error("Uncallable closure\n");
+    errorf("Uncallable closure\n");
     /* NOTREACHED */
     return;
 
@@ -17996,7 +17996,7 @@ call_simul_efun (int code, object_t *ob, int num_arg)
             {
                 if (--i <= 0 || v->type != T_STRING)
                 {
-                    error("Calling a vanished simul_efun\n");
+                    errorf("Calling a vanished simul_efun\n");
                     return;
                 }
                 if ( !(ob = get_object(v->u.str)) )
@@ -18006,7 +18006,7 @@ call_simul_efun (int code, object_t *ob, int num_arg)
             }
             return;
         }
-        error("Calling a vanished simul_efun\n");
+        errorf("Calling a vanished simul_efun\n");
         return;
     }
     /*
@@ -18437,7 +18437,7 @@ collect_trace (strbuf_t * sbuf, vector_t ** rvec )
         struct traceentry * var; \
         var = alloca(sizeof(*var)); \
         if (!var) \
-            error("Stack overflow in collect_trace()"); \
+            errorf("Stack overflow in collect_trace()"); \
         var->vec = allocate_array_unlimited(TRACE_MAX); \
         var->next = NULL; \
         if (!first_entry) \
@@ -19214,7 +19214,7 @@ f_last_instructions (svalue_t *sp)
     /* Test the arguments */
     num_instr = sp[-1].u.number;
     if (num_instr <= 0)
-        error("Illegal number of instructions: %ld.\n", num_instr);
+        errorf("Illegal number of instructions: %ld.\n", num_instr);
 
     sp--;
     inter_sp = sp; /* Out of memory possible */
@@ -19362,7 +19362,7 @@ f_caller_stack (svalue_t *sp)
 #ifdef DEBUG
     if (i < depth)
     {
-        error("Computed stack depth to %d, but found only %d objects\n"
+        errorf("Computed stack depth to %d, but found only %d objects\n"
              , depth, i);
         /* NOTREACHED */
         return sp;
@@ -19906,7 +19906,7 @@ check_a_lot_ref_counts (program_t *search_prog)
  */
 
 #undef ERROR
-#define ERROR(s) {inter_sp = sp; error(s);}
+#define ERROR(s) {inter_sp = sp; errorf(s);}
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -19957,14 +19957,14 @@ v_apply (svalue_t *sp, int num_arg)
         {
         default:
             if ((sp - num_arg + i)->x.closure_type >= 0)
-                error("Uncallable closure in apply().\n");
+                errorf("Uncallable closure in apply().\n");
             /* else: operator/sefun/efun closure: FALLTHROUGH */
         case CLOSURE_LFUN:
         case CLOSURE_LAMBDA:
         case CLOSURE_BOUND_LAMBDA:
             if (num_arg + (sp - VALUE_STACK) < EVALUATOR_STACK_SIZE)
                 break;
-            error("VM Stack overflow: %ld too high.\n"
+            errorf("VM Stack overflow: %ld too high.\n"
                  , (long)(num_arg + (sp - VALUE_STACK) - EVALUATOR_STACK_SIZE) );
             break;
         }
@@ -20134,7 +20134,7 @@ int_call_resolved (Bool b_use_default, svalue_t *sp, int num_arg)
     {
         ob = get_object(arg[1].u.str);
         if (!ob)
-            error("call_resolved() failed: can't get object '%s'.\n"
+            errorf("call_resolved() failed: can't get object '%s'.\n"
                  , get_txt(arg[1].u.str));
     }
 

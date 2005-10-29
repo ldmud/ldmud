@@ -547,7 +547,7 @@ load_lpc_info (size_t ix, object_t *ob)
 
                 tmp = allocate_array((size_t)VEC_SIZE(ret->u.vec));
                 if (!tmp)
-                    error("(parse_command) Out of memory: array[%lu] for "
+                    errorf("(parse_command) Out of memory: array[%lu] for "
                           "plural names.\n"
                          , (unsigned long)VEC_SIZE(ret->u.vec));
                 sing = ret->u.vec;
@@ -1668,7 +1668,7 @@ e_parse_command ( string_t *cmd          /* Command to parse */
         free_array(wvec);
         free_array(patvec);
         xfree(old);
-        error("Bad second argument to parse_command()\n");
+        errorf("Bad second argument to parse_command()\n");
     }
 
     /* Save the previous context and set up the error handler */

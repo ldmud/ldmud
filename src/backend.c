@@ -317,7 +317,7 @@ logon (object_t *ob)
     ret = apply(STR_LOGON, ob, 0);
     if (ret == 0) {
         /* add_message("prog %s:\n", get_txt(ob->name)); */
-        error("Could not find logon() on the player %s\n", get_txt(ob->name));
+        errorf("Could not find logon() on the player %s\n", get_txt(ob->name));
     }
     current_object = save;
 } /* logon() */
@@ -1339,15 +1339,15 @@ v_garbage_collection (svalue_t *sp, int num_arg)
         {
             if (change_default)
             {
-                error("Illegal use of garbage_collection(): "
+                errorf("Illegal use of garbage_collection(): "
                       "No privilege to use file '%s' as default log.\n"
-                     , get_txt(argp[0].u.str));
+                      , get_txt(argp[0].u.str));
             }
             else
             {
-                error("Illegal use of garbage_collection(): "
+                errorf("Illegal use of garbage_collection(): "
                       "No privilege to use file '%s' as default log.\n"
-                     , get_txt(argp[0].u.str));
+                      , get_txt(argp[0].u.str));
             }
             /* NOTREACHED */
             return NULL;
@@ -1364,7 +1364,7 @@ v_garbage_collection (svalue_t *sp, int num_arg)
              * can free it.
              */
             inter_sp = ++sp; put_string(sp, path);
-            error("Can't open GC log file '%s': errno %d\n"
+            errorf("Can't open GC log file '%s': errno %d\n"
                   , get_txt(path), errno);
             /* NOTREACHED */
             return sp;
@@ -1442,7 +1442,7 @@ f_debug_message (svalue_t *sp)
     char   *pTxt;
 
     if ((sp->u.number & ~(DMSG_STDOUT|DMSG_STDERR|DMSG_LOGFILE|DMSG_STAMP)) != 0)
-        error("Argument 2 to debug_message() out of range: %ld, expected 0..15\n"
+        errorf("Argument 2 to debug_message() out of range: %ld, expected 0..15\n"
              , (long)sp->u.number);
 
     slen = (mp_int)mstrsize((sp-1)->u.str);

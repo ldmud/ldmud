@@ -24,6 +24,7 @@
 #  include <gnutls/gnutls.h>
 #  include <gcrypt.h>
 #  if defined(USE_PTHREADS) && defined(GCRY_THREAD_OPTION_PTHREAD_IMPL)
+#    include <pthread.h>
      GCRY_THREAD_OPTION_PTHREAD_IMPL;
 #  endif
 #endif
@@ -732,7 +733,7 @@ v_tls_init_connection (svalue_t *sp, int num_arg)
     interactive_t *ip;
 
     if (!tls_available)
-        error("tls_init_connection(): TLS layer hasn't been initialized.\n");
+        errorf("tls_init_connection(): TLS layer hasn't been initialized.\n");
 
     if (num_arg > 0)
     {
@@ -747,7 +748,7 @@ v_tls_init_connection (svalue_t *sp, int num_arg)
     if (!O_SET_INTERACTIVE(ip, obj))
     {
         free_object(obj, "tls_init_connection");
-        error("Bad arg 1 to tls_init_connection(): "
+        errorf("Bad arg 1 to tls_init_connection(): "
               "object not interactive.\n");
     }
 
@@ -755,7 +756,7 @@ v_tls_init_connection (svalue_t *sp, int num_arg)
       /* ip has another reference to obj, so this is safe to do */
 
     if (ip->tls_status != TLS_INACTIVE)
-        error("tls_init_connection(): Interactive already has a secure "
+        errorf("tls_init_connection(): Interactive already has a secure "
               "connection.\n");
 
     /* Extract the callback information from the stack */
@@ -883,10 +884,10 @@ f_tls_check_certificate(svalue_t *sp)
     interactive_t *ip;
     
     if (!tls_available)
-        error("tls_init_connection(): TLS layer hasn't been initialized.\n");
+        errorf("tls_init_connection(): TLS layer hasn't been initialized.\n");
 
     if (!O_SET_INTERACTIVE(ip, sp->u.ob))
-        error("Bad arg 1 to tls_check_certificate(): "
+        errorf("Bad arg 1 to tls_check_certificate(): "
               "object not interactive.\n");
 
     if (ip->tls_status == TLS_ACTIVE) 
@@ -948,7 +949,7 @@ f_tls_check_certificate(svalue_t *sp)
     } /* if (tls active) */
 #elif defined(HAS_GNUTLS)
 printf("DEBUG: sp type %d\n", sp->type);
-    error( "%s TLS: Gnu TLS does not provide certificate checking yet."
+    errorf( "%s TLS: Gnu TLS does not provide certificate checking yet."
           , time_stamp());
 #endif
 
@@ -1015,7 +1016,7 @@ f_tls_deinit_connection(svalue_t *sp)
     interactive_t *ip;
 
     if (!O_SET_INTERACTIVE(ip, sp->u.ob))
-        error("Bad arg 1 to tls_deinit_connection(): "
+        errorf("Bad arg 1 to tls_deinit_connection(): "
               "object not interactive.\n");
 
     /* Flush the connection */

@@ -334,7 +334,7 @@ rx_compile_re (string_t * expr, int opt, Bool from_ed, regdata_t * rdata)
         if (from_ed)
             add_message("re: %s at offset %d\n", pErrmsg, erridx);
         else
-            error("re: %s at offset %d\n", pErrmsg, erridx);
+            errorf("re: %s at offset %d\n", pErrmsg, erridx);
         return MY_FALSE;
     }
 
@@ -392,7 +392,7 @@ rx_compile_pcre (string_t * expr, int opt, Bool from_ed, regdata_t * rdata)
         if (from_ed)
             add_message("pcre: %s at offset %d\n", pErrmsg, erridx);
         else
-            error("pcre: %s at offset %d\n", pErrmsg, erridx);
+            errorf("pcre: %s at offset %d\n", pErrmsg, erridx);
         return 0;
     }
 
@@ -405,7 +405,7 @@ rx_compile_pcre (string_t * expr, int opt, Bool from_ed, regdata_t * rdata)
         if (from_ed)
             add_message("pcre: %s\n", pErrmsg);
         else
-            error("pcre: %s\n", pErrmsg);
+            errorf("pcre: %s\n", pErrmsg);
         return 0;
     }
 
@@ -420,7 +420,7 @@ rx_compile_pcre (string_t * expr, int opt, Bool from_ed, regdata_t * rdata)
             if (from_ed)
                 add_message("pcre: %s\n", get_error_message(rc, RE_PCRE));
             else
-                error("pcre: %s\n", get_error_message(rc, RE_PCRE));
+                errorf("pcre: %s\n", get_error_message(rc, RE_PCRE));
             return 0;
         }
         num_subs = 3 * (num_subs+1);
@@ -621,7 +621,7 @@ rx_compile (string_t * expr, int opt, Bool from_ed)
         if (from_ed)
             add_message("Missing specification of which regexp package to use.\n");
         else
-            error("Missing specification of which regexp package to use.\n");
+            errorf("Missing specification of which regexp package to use.\n");
         return NULL;
     }
 

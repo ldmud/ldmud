@@ -4,7 +4,7 @@
  *---------------------------------------------------------------------------
  * TODO: Rewrite the low-level functions (like allocate_mapping()) to return
  * TODO:: failure codes (errno like) instead of throwing errors. In addition,
- * TODO:: provide wrapper functions which do throw error()s, so that every
+ * TODO:: provide wrapper functions which do throw errorf()s, so that every
  * TODO:: caller can handle the errors himself (like the swapper).
  *
  * TODO: A better mapping implementation would utilise the to-be-written
@@ -980,13 +980,13 @@ static svalue_t local_const0;
         }
         if (max_mapping_size && msize > (mp_int)max_mapping_size)
         {
-            error("Illegal mapping size: %ld elements (%ld x %ld)\n"
+            errorf("Illegal mapping size: %ld elements (%ld x %ld)\n"
                  , msize, (long)MAP_SIZE(m)+1, (long)m->num_values);
             return NULL;
         }
         if (max_mapping_keys && MAP_SIZE(m) > (mp_int)max_mapping_keys)
         {
-            error("Illegal mapping size: %ld entries\n", msize+1);
+            errorf("Illegal mapping size: %ld entries\n", msize+1);
             return NULL;
         }
     }
@@ -1469,7 +1469,7 @@ resize_mapping (mapping_t *m, mp_int new_width)
              && (SSIZE_MAX - sizeof(map_chain_t)) / new_width < sizeof(svalue_t))
            )
         {
-            error("Mapping width too big (%ld)\n", new_width);
+            errorf("Mapping width too big (%ld)\n", new_width);
             /* NOTREACHED */
             return NULL;
         }
@@ -1671,7 +1671,7 @@ add_mapping (mapping_t *m1, mapping_t *m2)
             return copy_mapping(m1);
         }
 
-        error("Mappings to be added are of different width: %ld vs. %ld\n"
+        errorf("Mappings to be added are of different width: %ld vs. %ld\n"
              , (long)num_values, (long)m2->num_values);
     }
 
@@ -2640,7 +2640,7 @@ set_mapping_user (mapping_t *m, object_t *owner)
     first_hairy = alloca(((m->cond) ? m->cond->size : 1) * sizeof(svalue_t *));
     if (!first_hairy)
     {
-        error("Stack overflow.\n");
+        errorf("Stack overflow.\n");
         /* NOTREACHED */
         return;
     }
@@ -3083,19 +3083,19 @@ f_m_allocate (svalue_t *sp)
     p_int width = sp[0].u.number;
 
     if (size < 0)
-        error("Illegal mapping size: %ld\n", size);
+        errorf("Illegal mapping size: %ld\n", size);
     if (width < 0)
-        error("Illegal mapping width: %ld\n", width);
+        errorf("Illegal mapping width: %ld\n", width);
 
     if (max_mapping_size
      && size * (1 + width) > (p_int)max_mapping_size)
-        error("Illegal mapping size: %ld elements (%ld x %ld).\n"
+        errorf("Illegal mapping size: %ld elements (%ld x %ld).\n"
              , size * (1+width)
              , size, width);
 
     if (max_mapping_keys
      && size > (p_int)max_mapping_keys)
-        error("Illegal mapping size: %ld entries.\n", size);
+        errorf("Illegal mapping size: %ld entries.\n", size);
 
     sp--;
 
@@ -3105,7 +3105,7 @@ f_m_allocate (svalue_t *sp)
         /* sp points to a number-typed svalue, so freeing won't
          * be a problem.
          */
-        error("Out of memory for mapping[%ld,%ld].\n", size, width);
+        errorf("Out of memory for mapping[%ld,%ld].\n", size, width);
         /* NOTREACHED */
     }
     sp->type = T_MAPPING;
@@ -3275,7 +3275,7 @@ f_m_values (svalue_t *sp)
 
     m = sp->u.map;
     if (num < 0 || num >= m->num_values)
-        error("Illegal index %d to m_values(): should be in 0..%ld.\n"
+        errorf("Illegal index %d to m_values(): should be in 0..%ld.\n"
              , num, (long)m->num_values-1);
 
     /* Get the size of the mapping */
@@ -3283,7 +3283,7 @@ f_m_values (svalue_t *sp)
     size = (mp_int)MAP_SIZE(m);
 
     if (size > 0 && m->num_values < 1)
-        error("m_values() applied on mapping with no values.\n");
+        errorf("m_values() applied on mapping with no values.\n");
 
     v = allocate_array(size);
 
@@ -3376,7 +3376,7 @@ add_to_mapping (mapping_t *m1, mapping_t *m2)
         }
         else
         {
-            error("Mappings to be added are of different width: %ld vs. %ld\n"
+            errorf("Mappings to be added are of different width: %ld vs. %ld\n"
                  , (long)m1->num_values, (long)m2->num_values);
             return;
         }
@@ -3754,7 +3754,7 @@ v_walk_mapping (svalue_t *sp, int num_arg)
         svalue_t *sp2, *data;
 
         if (!callback_object(&cb))
-            error("Object used by walk_mapping destructed\n");
+            errorf("Object used by walk_mapping destructed\n");
 
         /* Push the key */
         assign_svalue_no_free( (sp2 = sp+1), read_pointer++ );
@@ -3861,7 +3861,7 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
         {
             inter_sp = sp;
             free_callback(&cb);
-            error("Out of memory\n");
+            errorf("Out of memory\n");
         }
         ++sp;
         put_array(sp, dvec);
@@ -3874,7 +3874,7 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
     if (!m)
     {
         inter_sp = sp + 1;
-        error("Out of memory\n");
+        errorf("Out of memory\n");
     }
     sp += 2;
     put_mapping(sp, m);
@@ -3904,7 +3904,7 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
                 put_number(dvec_sp, 0);
                 inter_sp = sp;
                 free_callback(&cb);
-                error("Out of memory\n");
+                errorf("Out of memory\n");
             }
             else
                 put_array(dvec_sp, dvec);
@@ -3937,7 +3937,7 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
         }
 
         if (!callback_object(&cb))
-            error("Object used by %s destructed"
+            errorf("Object used by %s destructed"
                  , bFull ? "filter" : "filter_mapping");
 
 
@@ -4099,7 +4099,7 @@ x_map_mapping (svalue_t *sp, int num_arg, Bool bFull)
         if (!dvec)
         {
             inter_sp = sp;
-            error("Out of memory\n");
+            errorf("Out of memory\n");
         }
         ++sp;
         put_array(sp, dvec);
@@ -4110,7 +4110,7 @@ x_map_mapping (svalue_t *sp, int num_arg, Bool bFull)
     if (!m)
     {
         inter_sp = sp;
-        error("Out of memory\n");
+        errorf("Out of memory\n");
     }
     ++sp;
     put_mapping(sp, m);
@@ -4137,7 +4137,7 @@ x_map_mapping (svalue_t *sp, int num_arg, Bool bFull)
             {
                 put_number(dvec_sp, 0);
                 inter_sp = sp;
-                error("Out of memory\n");
+                errorf("Out of memory\n");
             }
             else
                 put_array(dvec_sp, dvec);
@@ -4177,7 +4177,7 @@ x_map_mapping (svalue_t *sp, int num_arg, Bool bFull)
         }
 
         if (!callback_object(&cb))
-            error("Object used by %s destructed"
+            errorf("Object used by %s destructed"
                  , bFull ? "map" : "map_mapping");
 
         data = apply_callback(&cb, 1 + bFull);
@@ -4254,7 +4254,7 @@ v_m_contains (svalue_t *sp, int num_arg)
     if (sp[-1].type != T_MAPPING)
         vefun_arg_error(num_arg-1, T_MAPPING, sp[-1].type, sp);
     if (sp[-1].u.map->num_values != num_arg - 2)
-        error("Not enough lvalues: given %ld, required %ld.\n"
+        errorf("Not enough lvalues: given %ld, required %ld.\n"
              , (long)num_arg-2, (long)sp[-1].u.map->num_values);
 
     item = get_map_value(sp[-1].u.map, sp);
@@ -4360,7 +4360,7 @@ f_m_reallocate (svalue_t *sp)
     new_width = sp->u.number;
     if (new_width < 0)
     {
-        error("Illegal width to m_reallocate(): %ld\n", (long)new_width);
+        errorf("Illegal width to m_reallocate(): %ld\n", (long)new_width);
         /* NOTREACHED */
         return sp;
     }
@@ -4374,7 +4374,7 @@ f_m_reallocate (svalue_t *sp)
     new_m = resize_mapping(m, new_width);
     if (!new_m)
     {
-        error("Out of memory.\n");
+        errorf("Out of memory.\n");
         /* NOTREACHED */
         return sp;
     }
@@ -4422,20 +4422,20 @@ v_mkmapping (svalue_t *sp, int num_arg)
         /* Check the arguments and determine the mapping length.
          */
         if (num_arg > 1)
-            error("Too many arguments to mkmapping(): expected struct\n");
+            errorf("Too many arguments to mkmapping(): expected struct\n");
 
         st = sp->u.strct;
         length = struct_size(st);
 
         if (max_mapping_size && length > (p_int)max_mapping_size)
-            error("Illegal mapping size: %ld elements\n", length);
+            errorf("Illegal mapping size: %ld elements\n", length);
         if (max_mapping_keys && length > (p_int)max_mapping_keys)
-            error("Illegal mapping size: %ld entries\n", length);
+            errorf("Illegal mapping size: %ld entries\n", length);
 
         /* Allocate the mapping and assign the values */
         m = allocate_mapping(length, 1);
         if (!m)
-            error("Out of memory\n");
+            errorf("Out of memory\n");
 
         for (i = 0; i < length; i++)
         {
@@ -4467,16 +4467,16 @@ v_mkmapping (svalue_t *sp, int num_arg)
         }
 
         if (max_mapping_size && length * num_arg > (p_int)max_mapping_size)
-            error("Illegal mapping size: %ld elements (%ld x %ld)\n"
+            errorf("Illegal mapping size: %ld elements (%ld x %ld)\n"
                  , length * num_arg, length, (long)num_arg);
         if (max_mapping_keys && length > (p_int)max_mapping_keys)
-            error("Illegal mapping size: %ld entries\n", length);
+            errorf("Illegal mapping size: %ld entries\n", length);
 
         /* Allocate the mapping */
         num_values = num_arg - 1;
         m = allocate_mapping(length, num_values);
         if (!m)
-            error("Out of memory\n");
+            errorf("Out of memory\n");
 
         /* Shift key through the first array and assign the values
          * from the others.

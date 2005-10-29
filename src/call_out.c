@@ -157,7 +157,7 @@ v_call_out (svalue_t *sp, int num_arg)
 
     if (max_callouts && max_callouts <= num_callouts)
     {
-        error("Too many callouts at once (max. %ld).\n", (long)max_callouts);
+        errorf("Too many callouts at once (max. %ld).\n", (long)max_callouts);
         /* NOTREACHED */
     }
 

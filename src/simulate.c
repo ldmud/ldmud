@@ -226,7 +226,7 @@ Bool master_will_be_updated = MY_FALSE;
    */
 
 int num_error = 0;
-  /* Number of recursive calls to error().
+  /* Number of recursive calls to errorf().
    */
 
 int num_warning = 0;
@@ -411,7 +411,7 @@ catch_instruction ( int flags, uint offset
         /* If we ran out of memory, throw a new error */
         if (!old_out_of_memory && out_of_memory)
         {
-            error("(catch) Out of memory detected.\n");
+            errorf("(catch) Out of memory detected.\n");
         }
 
         rc = MY_TRUE;
@@ -429,7 +429,7 @@ catch_instruction ( int flags, uint offset
 
         if (max_eval_cost && eval_cost >= max_eval_cost)
         {
-            error("Not enough eval time left for catch(): required %ld, available %ld\n"
+            errorf("Not enough eval time left for catch(): required %ld, available %ld\n"
                  , (long)reserve_cost, (long)(max_eval_cost - eval_cost + reserve_cost)
                  );
             /* NOTREACHED */
@@ -689,18 +689,18 @@ limit_error_format (char *fixed_fmt, size_t fixed_fmt_len, const char *fmt)
 
 /*-------------------------------------------------------------------------*/
 void
-error (const char *fmt, ...)
+errorf (const char *fmt, ...)
 
 /* A system runtime error occured: generate a message from printf-style
  * <fmt> with a timestamp, and handle it.
  * If the error is caught, just dump the trace on stderr, and jump to the
  * error handler, otherwise call the mudlib's error functions (this may cause
- * recursive calls to error()) and jump back to wherever the current error
+ * recursive calls to errorf()) and jump back to wherever the current error
  * recovery context points to.
  *
  * The runtime context stack is unrolled as far as necessary.
  * TODO: Add a perrorf(<prefmt>, <postfmt>,...) function which translates the
- * TODO:: errno into a string and calls error(<prefmt><errmsg><postfmt>, ...).
+ * TODO:: errno into a string and calls errorf(<prefmt><errmsg><postfmt>, ...).
  */
 
 {
@@ -933,7 +933,7 @@ error (const char *fmt, ...)
 
     /* If the error is not caught at all, the stack must be brought in a
      * usable state. After the call to reset_machine(), all arguments to
-     * error() are invalid, and may not be used any more. The reason is that
+     * errorf() are invalid, and may not be used any more. The reason is that
      * some strings may have been on the stack machine stack, and have been
      * deallocated.
      */
@@ -1108,7 +1108,7 @@ error (const char *fmt, ...)
         longjmp(((struct error_recovery_info *)rt_context)->con.text, 1);
 
     fatal("Can't recover from error (longjmp failed)\n");
-} /* error() */
+} /* errorf() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -1120,7 +1120,7 @@ warnf (char *fmt, ...)
  *
  * Note: Both 'warn' and 'warning' are already taken on some systems.
  * TODO: Add a pwarnf(<prefmt>, <postfmt>,...) function which translates the
- * TODO:: errno into a string and calls error(<prefmt><errmsg><postfmt>, ...).
+ * TODO:: errno into a string and calls errorf(<prefmt><errmsg><postfmt>, ...).
  */
 
 {
@@ -1205,7 +1205,7 @@ warnf (char *fmt, ...)
     {
         if (file)
             free_mstring(file);
-        error("Too many nested warnings.\n");
+        errorf("Too many nested warnings.\n");
     }
 
     if (file)
@@ -1265,7 +1265,7 @@ throw_error()
     }
     free_svalue(&catch_value);
     catch_value.type = T_INVALID;
-    error("Throw with no catch.\n");
+    errorf("Throw with no catch.\n");
 } /* throw_error() */
 
 /*-------------------------------------------------------------------------*/
@@ -1334,7 +1334,7 @@ push_give_uid_error_context (object_t *ob)
     if (!ecp)
     {
         destruct(ob);
-        error("Out of memory (%lu bytes) for new object '%s' uids\n"
+        errorf("Out of memory (%lu bytes) for new object '%s' uids\n"
              , (unsigned long) sizeof(*ecp), get_txt(ob->name));
     }
     ecp->new_object = ob;
@@ -1348,7 +1348,7 @@ give_uid_to_object (object_t *ob, int hook, int numarg)
 /* Object <ob> was just created - call the driver_hook <hook> with <numarg>
  * arguments to give it its uid and euid.
  * Return TRUE on success - on failure, destruct <ob>ject and raise
- * an error; return FALSE in the unlikely case that error() does return.
+ * an error; return FALSE in the unlikely case that errorf() does return.
  */
 
 {
@@ -1431,7 +1431,7 @@ give_uid_to_object (object_t *ob, int hook, int numarg)
     ob->eff_user = ob->user;
     put_object(&arg, ob);
     destruct_object(&arg);
-    error(err);
+    errorf(err);
     /* NOTREACHED */
     return MY_FALSE;
 } /* give_uid_to_object() */
@@ -1598,7 +1598,7 @@ load_object_error(const char *msg, const char *name, namechain_t *chain)
 /* Generate a compilation error message <msg>. If <name> is not NULL,
  * ": '<name>'" is appended to the message. If <chain> is not NULL,
  * " (inherited by <chain...>)" is appended to the message.
- * The message is then printed to stderr and an error() with it is thrown.
+ * The message is then printed to stderr and an errorf() with it is thrown.
  */
 
 {
@@ -1633,13 +1633,13 @@ load_object_error(const char *msg, const char *name, namechain_t *chain)
     /* Make a local copy of the message so as not to leak memory */
     buf = alloca(strbuf_length(&sbuf)+1);
     if (!buf)
-        error("Out of stack memory (%lu bytes)\n"
+        errorf("Out of stack memory (%lu bytes)\n"
              , (unsigned long) strlen(sbuf.buf)+1);
     strbuf_copy(&sbuf, buf);
     strbuf_free(&sbuf);
 
     fprintf(stderr, "%s %s", time_stamp(), buf);
-    error("%.*s", MIN(ERROR_BUF_LEN - 200, (int)strlen(buf)), buf);
+    errorf("%.*s", MIN(ERROR_BUF_LEN - 200, (int)strlen(buf)), buf);
 } /* load_object_error() */
 
 /*-------------------------------------------------------------------------*/
@@ -1716,7 +1716,7 @@ load_object (const char *lname, Bool create_super, int depth
 
     if (strict_euids && current_object && current_object->eff_user == 0
      && current_object->name)
-        error("Can't load objects when no effective user.\n");
+        errorf("Can't load objects when no effective user.\n");
 
     if (master_ob && master_ob->flags & O_DESTRUCTED)
     {
@@ -1733,7 +1733,7 @@ load_object (const char *lname, Bool create_super, int depth
                 /* The master has swapped this object and used up most
                  * memory... strange, but thinkable
                  */
-                error("Out of memory: unswap object '%s'\n", get_txt(ob->name));
+                errorf("Out of memory: unswap object '%s'\n", get_txt(ob->name));
             return ob;
         }
     }
@@ -1843,7 +1843,7 @@ load_object (const char *lname, Bool create_super, int depth
 
         if (current_loc.file)
         {
-            error("Can't load '%s': compiler is busy with '%s'.\n"
+            errorf("Can't load '%s': compiler is busy with '%s'.\n"
                  , name, current_loc.file->name);
         }
 
@@ -1851,7 +1851,7 @@ load_object (const char *lname, Bool create_super, int depth
         if (fd <= 0)
         {
             perror(fname);
-            error("Could not read the file.\n");
+            errorf("Could not read the file.\n");
         }
         FCOUNT_COMP(fname);
 
@@ -1914,7 +1914,7 @@ load_object (const char *lname, Bool create_super, int depth
 
             if (strcmp(pInherited, name) == 0)
             {
-                error("Illegal to inherit self.\n");
+                errorf("Illegal to inherit self.\n");
             }
 
             if (depth >= MAX_LOAD_DEPTH)
@@ -1960,7 +1960,7 @@ load_object (const char *lname, Bool create_super, int depth
     ob = get_empty_object(prog->num_variables);
 
     if (!ob)
-        error("Out of memory for new object '%s'\n", name);
+        errorf("Out of memory for new object '%s'\n", name);
 
     ob->name = new_mstring(name);
 #ifdef CHECK_OBJECT_STAT
@@ -2118,7 +2118,7 @@ clone_object (string_t *str1)
     string_t *name;
 
     if (strict_euids && current_object && current_object->eff_user == NULL)
-        error("Illegal to call clone_object() with effective user 0\n");
+        errorf("Illegal to call clone_object() with effective user 0\n");
 
     ob = get_object(str1);
 
@@ -2155,7 +2155,7 @@ clone_object (string_t *str1)
     }
 
     if (ob->super)
-        error("Cloning a bad object: '%s' is contained in '%s'.\n"
+        errorf("Cloning a bad object: '%s' is contained in '%s'.\n"
              , get_txt(ob->name), get_txt(ob->super->name));
 
     name = ob->name;
@@ -2188,10 +2188,10 @@ clone_object (string_t *str1)
     }
 
     if ((ob->flags & O_SWAPPED) && load_ob_from_swap(ob) < 0)
-        error("Out of memory: unswap object '%s'\n", get_txt(ob->name));
+        errorf("Out of memory: unswap object '%s'\n", get_txt(ob->name));
 
     if (ob->prog->flags & P_NO_CLONE)
-        error("Cloning a bad object: '%s' sets '#pragma no_clone'.\n"
+        errorf("Cloning a bad object: '%s' sets '#pragma no_clone'.\n"
              , get_txt(ob->name));
 
     ob->time_of_ref = current_time;
@@ -2205,7 +2205,7 @@ clone_object (string_t *str1)
 
     new_ob = get_empty_object(ob->prog->num_variables);
     if (!new_ob)
-        error("Out of memory for new clone '%s'\n", get_txt(name));
+        errorf("Out of memory for new clone '%s'\n", get_txt(name));
 
     new_ob->name = make_new_name(name);
 
@@ -2353,7 +2353,7 @@ destruct_object (svalue_t *v)
     {
         ob = find_object(v->u.str);
         if (ob == 0)
-            error("destruct_object: Could not find %s\n", get_txt(v->u.str));
+            errorf("destruct_object: Could not find %s\n", get_txt(v->u.str));
     }
 
     if (ob->flags & O_DESTRUCTED)
@@ -2361,7 +2361,7 @@ destruct_object (svalue_t *v)
 
     if (ob->flags & O_SWAPPED)
         if (load_ob_from_swap(ob) < 0)
-            error("Out of memory: unswap object '%s'\n", get_txt(ob->name));
+            errorf("Out of memory: unswap object '%s'\n", get_txt(ob->name));
 
     if (d_flag)
     {
@@ -2372,17 +2372,17 @@ destruct_object (svalue_t *v)
     push_ref_object(inter_sp, ob, "destruct");
     result = apply_master(STR_PREP_DEST, 1);
     if (!result)
-        error("No prepare_destruct\n");
+        errorf("No prepare_destruct\n");
 
     if (result->type == T_STRING)
-        error(get_txt(result->u.str));
+        errorf(get_txt(result->u.str));
 
     if (result->type != T_NUMBER || result->u.number != 0)
         return;
 
     if (ob->contains)
     {
-        error("Master failed to clean inventory in prepare_destruct\n");
+        errorf("Master failed to clean inventory in prepare_destruct\n");
     }
 
     if (ob->flags & O_SHADOW)
@@ -3431,9 +3431,9 @@ check_valid_path (string_t *path, object_t *caller, string_t* call_fun, Bool wri
         return path;
     }
 
-    /* Push the path onto the VM stack so that error() can free it */
+    /* Push the path onto the VM stack so that errorf() can free it */
     push_string(inter_sp, path);
-    error("Illegal path '%s' for %s() by %s\n", get_txt(path), get_txt(call_fun)
+    errorf("Illegal path '%s' for %s() by %s\n", get_txt(path), get_txt(call_fun)
          , get_txt(caller->name));
     return NULL;
 } /* check_valid_path() */
@@ -4394,12 +4394,12 @@ validate_shadowing (object_t *ob)
 
     if (O_PROG_SWAPPED(ob))
         if (load_ob_from_swap(ob) < 0)
-            error("Out of memory: unswap object '%s'\n", get_txt(ob->name));
+            errorf("Out of memory: unswap object '%s'\n", get_txt(ob->name));
 
     victim = ob->prog;
 
     if (victim->flags & P_NO_SHADOW)
-        error("shadow '%s' on '%s': Can't shadow a 'no_shadow' program.\n"
+        errorf("shadow '%s' on '%s': Can't shadow a 'no_shadow' program.\n"
              , get_txt(cob->name), get_txt(ob->name));
 
     if (cob->flags & O_SHADOW)
@@ -4407,24 +4407,24 @@ validate_shadowing (object_t *ob)
         shadow_t *shadow_sent = O_GET_SHADOW(cob);
 
         if (shadow_sent->shadowing)
-            error("shadow '%s' on '%s': Already shadowing.\n"
+            errorf("shadow '%s' on '%s': Already shadowing.\n"
                  , get_txt(cob->name), get_txt(ob->name));
         if (shadow_sent->shadowed_by)
-            error("shadow '%s' on '%s': Can't shadow when shadowed.\n"
+            errorf("shadow '%s' on '%s': Can't shadow when shadowed.\n"
                  , get_txt(cob->name), get_txt(ob->name));
     }
 
     if (cob->super)
-        error("shadow '%s' on '%s': The shadow resides inside another object ('%s').\n"
+        errorf("shadow '%s' on '%s': The shadow resides inside another object ('%s').\n"
              , get_txt(cob->name), get_txt(ob->name)
              , get_txt(cob->super->name));
 
     if (ob->flags & O_SHADOW && O_GET_SHADOW(ob)->shadowing)
-        error("shadow '%s' on '%s': Can't shadow a shadow.\n"
+        errorf("shadow '%s' on '%s': Can't shadow a shadow.\n"
              , get_txt(cob->name), get_txt(ob->name));
 
     if (ob == cob)
-        error("shadow '%s' on '%s': Can't shadow self.\n"
+        errorf("shadow '%s' on '%s': Can't shadow self.\n"
              , get_txt(cob->name), get_txt(ob->name));
 
     /* Make sure that we don't shadow 'nomask' functions.
@@ -4455,7 +4455,7 @@ validate_shadowing (object_t *ob)
         if ( (j = find_function(name, victim)) >= 0
          && victim->functions[j] & TYPE_MOD_NO_MASK )
         {
-            error("shadow '%s' on '%s': Illegal to shadow 'nomask' function '%s'.\n"
+            errorf("shadow '%s' on '%s': Illegal to shadow 'nomask' function '%s'.\n"
                  , get_txt(ob->name), get_txt(cob->name), get_txt(name));
         }
     }
@@ -4665,7 +4665,7 @@ f_set_driver_hook (svalue_t *sp)
 
     if (n < 0 || n >= NUM_DRIVER_HOOKS)
     {
-        error("Bad hook number: %ld, expected 0..%ld\n"
+        errorf("Bad hook number: %ld, expected 0..%ld\n"
              , n, (long)NUM_DRIVER_HOOKS-1);
         /* NOTREACHED */
         return sp;
@@ -4696,7 +4696,7 @@ f_set_driver_hook (svalue_t *sp)
              && sp->u.number != RE_TRADITIONAL
                )
             {
-                error("Bad value for hook %ld: got 0x%lx, expected RE_PCRE (0x%lx) "
+                errorf("Bad value for hook %ld: got 0x%lx, expected RE_PCRE (0x%lx) "
                       "or RE_TRADITIONAL (0x%lx).\n"
                      , n, (long)sp->u.number
                      , (long)RE_PCRE, (long)RE_TRADITIONAL
@@ -4707,7 +4707,7 @@ f_set_driver_hook (svalue_t *sp)
         }
         else
         {
-            error("Bad value for hook %ld: got number, expected %s or 0.\n"
+            errorf("Bad value for hook %ld: got number, expected %s or 0.\n"
                  , n
                  , efun_arg_typename(hook_type_map[n]));
             break;
@@ -4719,7 +4719,7 @@ f_set_driver_hook (svalue_t *sp)
         string_t *str;
 
         if ( !((1 << T_STRING) & hook_type_map[n]) )
-            error("Bad value for hook %ld: got string, expected %s.\n"
+            errorf("Bad value for hook %ld: got string, expected %s.\n"
                  , n
                  , efun_arg_typename(hook_type_map[n]));
 
@@ -4735,7 +4735,7 @@ f_set_driver_hook (svalue_t *sp)
         if (!sp->u.map->num_values
          ||  sp->u.map->ref != 1 /* add_to_mapping() could zero num_values */)
         {
-            error("Bad value for hook %ld: mapping is empty "
+            errorf("Bad value for hook %ld: mapping is empty "
                   "or has other references.\n", n);
             return sp;
         }
@@ -4775,7 +4775,7 @@ f_set_driver_hook (svalue_t *sp)
         }
         else if (!CLOSURE_IS_LFUN(sp->x.closure_type))
         {
-            error("Bad value for hook %ld: unbound lambda or "
+            errorf("Bad value for hook %ld: unbound lambda or "
                   "lfun closure expected.\n", n);
         }
         /* FALLTHROUGH */
@@ -4784,7 +4784,7 @@ f_set_driver_hook (svalue_t *sp)
 default_test:
         if ( !((1 << sp->type) & hook_type_map[n]) )
         {
-            error("Bad value for hook %ld: got %s, expected %s.\n"
+            errorf("Bad value for hook %ld: got %s, expected %s.\n"
                  , n, typename(sp->type), efun_arg_typename(hook_type_map[n]));
             break; /* flow control hint */
         }
@@ -4876,7 +4876,7 @@ set_single_limit ( struct limits_context_s * result
     p_int val;
 
     if (svp->type != T_NUMBER)
-        error("Illegal %s value: got a %s, expected a number\n"
+        errorf("Illegal %s value: got a %s, expected a number\n"
              , limitnames[limit], typename(svp[limit].type));
 
     val = svp->u.number;
@@ -4901,7 +4901,7 @@ set_single_limit ( struct limits_context_s * result
             case LIMIT_BYTE:          result->max_byte = val;     break;
             case LIMIT_FILE:          result->max_file = val;     break;
             case LIMIT_CALLOUTS:      result->max_callouts = val; break;
-            default: error("Unimplemented limit #%d\n", limit);
+            default: errorf("Unimplemented limit #%d\n", limit);
             }
         }
         else if (val == LIMIT_DEFAULT)
@@ -4924,11 +4924,11 @@ set_single_limit ( struct limits_context_s * result
                                  break;
             case LIMIT_CALLOUTS: result->max_callouts = def_callouts;
                                  break;
-            default: error("Unimplemented limit #%d\n", limit);
+            default: errorf("Unimplemented limit #%d\n", limit);
             }
         }
         else if (val != LIMIT_KEEP)
-            error("Illegal %s value: %ld\n", limitnames[limit], val);
+            errorf("Illegal %s value: %ld\n", limitnames[limit], val);
     }
 } /* set_single_limit() */
 
@@ -4978,11 +4978,11 @@ extract_limits ( struct limits_context_s * result
             int limit;
 
             if (svp[i].type != T_NUMBER)
-                error("Illegal limit value: got a %s, expected a number\n"
+                errorf("Illegal limit value: got a %s, expected a number\n"
                      , typename(svp[i].type));
             limit = (int)svp[i].u.number;
             if (limit < 0 || limit >= LIMIT_MAX)
-                error("Illegal limit tag: %ld\n", (long)limit);
+                errorf("Illegal limit tag: %ld\n", (long)limit);
 
             set_single_limit(result, limit, svp+i+1);
         }
@@ -5050,7 +5050,7 @@ v_limited (svalue_t * sp, int num_arg)
     int cl_args;
 
     if (!num_arg)
-        error("No arguments given.\n");
+        errorf("No arguments given.\n");
 
     argp = sp - num_arg + 1;
     cl_args = 0;
@@ -5081,7 +5081,7 @@ v_limited (svalue_t * sp, int num_arg)
     }
     else
     {
-        error("limited(): Invalid limit specification.\n");
+        errorf("limited(): Invalid limit specification.\n");
         /* NOTREACHED */
         return sp;
     }
@@ -5102,7 +5102,7 @@ v_limited (svalue_t * sp, int num_arg)
     if (!vec)
     {
         inter_sp = sp;
-        error("(set_limits) Out of memory: array[%d] for call.\n"
+        errorf("(set_limits) Out of memory: array[%d] for call.\n"
              , LIMIT_MAX);
         /* NOTREACHED */
         return sp;
@@ -5195,7 +5195,7 @@ v_set_limits (svalue_t * sp, int num_arg)
     vector_t *vec;
 
     if (!num_arg)
-        error("No arguments given.\n");
+        errorf("No arguments given.\n");
 
     argp = sp - num_arg + 1;
 
@@ -5206,7 +5206,7 @@ v_set_limits (svalue_t * sp, int num_arg)
         extract_limits(&limits, argp, num_arg, MY_TRUE);
     else
     {
-        error("set_limits(): Invalid limit specification.\n");
+        errorf("set_limits(): Invalid limit specification.\n");
         /* NOTREACHED */
         return sp;
     }
@@ -5219,7 +5219,7 @@ v_set_limits (svalue_t * sp, int num_arg)
     if (!vec)
     {
         inter_sp = sp;
-        error("(set_limits) Out of memory: array[%d] for call.\n"
+        errorf("(set_limits) Out of memory: array[%d] for call.\n"
              , LIMIT_MAX);
         /* NOTREACHED */
         return sp;
@@ -5276,7 +5276,7 @@ f_query_limits (svalue_t * sp)
     vec = allocate_uninit_array(LIMIT_MAX);
     if (!vec)
     {
-        error("(query_limits) Out of memory: array[%d] for result.\n"
+        errorf("(query_limits) Out of memory: array[%d] for result.\n"
              , LIMIT_MAX);
         /* NOTREACHED */
         return sp;

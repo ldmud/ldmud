@@ -1314,13 +1314,13 @@ x_map_struct (svalue_t *sp, int num_arg)
 
         if (num_arg > 2) {
             inter_sp = sp;
-            error("Too many arguments to map_array()\n");
+            errorf("Too many arguments to map_array()\n");
         }
         m = arg[1].u.map;
 
         res = struct_new(st->type);
         if (!res)
-            error("(map_struct) Out of memory: struct[%ld] for result\n", cnt);
+            errorf("(map_struct) Out of memory: struct[%ld] for result\n", cnt);
         push_struct(inter_sp, res); /* In case of errors */
 
         for (w = st->member, x = res->member; --cnt >= 0; w++, x++)
@@ -1358,7 +1358,7 @@ x_map_struct (svalue_t *sp, int num_arg)
 
         res = struct_new(st->type);
         if (!res)
-            error("(map_struct) Out of memory: struct[%ld] for result\n", cnt);
+            errorf("(map_struct) Out of memory: struct[%ld] for result\n", cnt);
         push_struct(inter_sp, res); /* In case of errors */
 
         /* Loop through arr and res, mapping the values from arr */
@@ -1371,7 +1371,7 @@ x_map_struct (svalue_t *sp, int num_arg)
                 assign_svalue(w, &const0);
 
             if (!callback_object(&cb))
-                error("object used by map_array destructed");
+                errorf("object used by map_array destructed");
 
             push_svalue(w);
 
@@ -1536,7 +1536,7 @@ f_struct_info (svalue_t *sp)
           }
         default:
             free_svalue(&result);
-            error("Bad arg 2 to struct_info(): illegal value %ld\n"
+            errorf("Bad arg 2 to struct_info(): illegal value %ld\n"
                  , sp->u.number);
             /* NOTREACHED */
             return sp;
