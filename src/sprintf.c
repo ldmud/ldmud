@@ -323,7 +323,7 @@ static fmt_state_t static_fmt;
 
 static sprintf_buffer_t *svalue_to_string(fmt_state_t *
                                          , svalue_t *, sprintf_buffer_t *
-                                         , int, Bool, Bool, Bool);
+                                         , int, Bool, Bool, Bool, Bool);
 
 /*-------------------------------------------------------------------------*/
 /* Macros */
@@ -559,11 +559,11 @@ svalue_to_string_filter(svalue_t *key, svalue_t *data, void *extra)
 
     i = locals->num_values;
     locals->spb =
-      svalue_to_string(locals->st, key, locals->spb, locals->indent, !i, locals->quote, locals->compact);
+      svalue_to_string(locals->st, key, locals->spb, locals->indent, !i, locals->quote, locals->compact, MY_FALSE);
     while (--i >= 0)
     {
         stradd(locals->st, &locals->spb, delimiter);
-        locals->spb = svalue_to_string(locals->st, data++, locals->spb, 1, !i, locals->quote, locals->compact);
+        locals->spb = svalue_to_string(locals->st, data++, locals->spb, 1, !i, locals->quote, locals->compact, MY_FALSE);
         delimiter = ";";
     }
 } /* svalue_to_string_filter() */
@@ -573,12 +573,14 @@ static sprintf_buffer_t *
 svalue_to_string ( fmt_state_t *st
                  , svalue_t *obj, sprintf_buffer_t *str
                  , int indent, Bool trailing, Bool quoteStrings
-                 , Bool compact)
+                 , Bool compact, Bool prefixed)
 
 /* Print the value <obj> into the buffer <str> with indentation <indent>.
  * If <trailing> is true, add ",\n" after the printed value.
  * If <qoute> is true, special characters in strings are quoted LPC-style.
  * If <compact> is true, a short output format is used.
+ * If <prefixed> is true, the caller has printed something ahead of this
+ * value, meaning that for the first line no indentation is required.
  *
  * Result is the (updated) string buffer.
  * The function calls itself for recursive values.
@@ -587,7 +589,7 @@ svalue_to_string ( fmt_state_t *st
 {
     mp_int i;
 
-    if (!compact)
+    if (!compact && !prefixed)
         add_indent(st, &str, indent);
 
     switch (obj->type)
@@ -598,7 +600,7 @@ svalue_to_string ( fmt_state_t *st
 
     case T_LVALUE:
         stradd(st, &str, compact ? "l:" : "lvalue: ");
-        str = svalue_to_string(st, obj->u.lvalue, str, indent+2, trailing, quoteStrings, compact);
+        str = svalue_to_string(st, obj->u.lvalue, str, indent+2, trailing, quoteStrings, compact, MY_FALSE);
         break;
 
     case T_NUMBER:
@@ -764,9 +766,9 @@ svalue_to_string ( fmt_state_t *st
                 }
                 for (i = 0; (size_t)i < size-1; i++)
                 {
-                    str = svalue_to_string(st, &(obj->u.vec->item[i]), str, indent+2, MY_TRUE, quoteStrings, compact);
+                    str = svalue_to_string(st, &(obj->u.vec->item[i]), str, indent+2, MY_TRUE, quoteStrings, compact, MY_FALSE);
                 }
-                str = svalue_to_string(st, &(obj->u.vec->item[i]), str, indent+2, MY_FALSE, quoteStrings, compact);
+                str = svalue_to_string(st, &(obj->u.vec->item[i]), str, indent+2, MY_FALSE, quoteStrings, compact, MY_FALSE);
                 if (!compact)
                 {
                     stradd(st, &str, "\n");
@@ -824,9 +826,23 @@ svalue_to_string ( fmt_state_t *st
                     stradd(st, &str, "\n");
                 for (i = 0; (size_t)i < size-1; i++)
                 {
-                    str = svalue_to_string(st, &(strct->member[i]), str, indent+2, MY_TRUE, quoteStrings, compact);
+                    if (!compact)
+                    {
+                        add_indent(st, &str, indent+2);
+                        stradd(st, &str, "/* ");
+                        stradd(st, &str, get_txt(strct->type->member[i].name));
+                        stradd(st, &str, ": */ ");
+                    }
+                    str = svalue_to_string(st, &(strct->member[i]), str, indent+2, MY_TRUE, quoteStrings, compact, !compact);
                 }
-                str = svalue_to_string(st, &(strct->member[i]), str, indent+2, MY_FALSE, quoteStrings, compact);
+                if (!compact)
+                {
+                    add_indent(st, &str, indent+2);
+                    stradd(st, &str, "/* ");
+                    stradd(st, &str, get_txt(strct->type->member[i].name));
+                    stradd(st, &str, ": */ ");
+                }
+                str = svalue_to_string(st, &(strct->member[i]), str, indent+2, MY_FALSE, quoteStrings, compact, !compact);
                 if (!compact)
                 {
                     stradd(st, &str, "\n");
@@ -965,7 +981,7 @@ svalue_to_string ( fmt_state_t *st
   case T_PROTECTED_CHAR_LVALUE:
     {
         stradd(st, &str, compact ? "p char:" : "prot char: ");
-        str = svalue_to_string(st, obj->u.lvalue, str, indent+2, trailing, quoteStrings, compact);
+        str = svalue_to_string(st, obj->u.lvalue, str, indent+2, trailing, quoteStrings, compact, MY_FALSE);
         break;
     }
 
@@ -1018,8 +1034,8 @@ svalue_to_string ( fmt_state_t *st
                     stradd(st, &str, " */\n");
                 }
                 for (i = 0; (size_t)i < size-1; i++)
-                    str = svalue_to_string(st, &(obj->u.vec->item[i]), str, indent+2, MY_TRUE, quoteStrings, compact);
-                str = svalue_to_string(st, &(obj->u.vec->item[i]), str, indent+2, MY_FALSE, quoteStrings, compact);
+                    str = svalue_to_string(st, &(obj->u.vec->item[i]), str, indent+2, MY_TRUE, quoteStrings, compact, MY_FALSE);
+                str = svalue_to_string(st, &(obj->u.vec->item[i]), str, indent+2, MY_FALSE, quoteStrings, compact, MY_FALSE);
                 if (!compact)
                 {
                     stradd(st, &str, "\n");
@@ -1040,7 +1056,7 @@ svalue_to_string ( fmt_state_t *st
 
   case T_PROTECTED_LVALUE:
       stradd(st, &str, compact ? "p l:" : "prot lvalue: ");
-      str = svalue_to_string(st, obj->u.lvalue, str, indent+2, trailing, quoteStrings, compact);
+      str = svalue_to_string(st, obj->u.lvalue, str, indent+2, trailing, quoteStrings, compact, MY_FALSE);
       break;
 
   default:
@@ -1953,6 +1969,7 @@ static char buff[BUFF_SIZE];         /* For error messages */
                     b = svalue_to_string(st, carg, b, 0, MY_FALSE
                                         , (finfo & INFO_T) == INFO_T_QLPC
                                         , (finfo & INFO_TABLE)
+                                        , MY_FALSE
                                         );
                     finfo &= ~INFO_TABLE; /* since we fall through */
 

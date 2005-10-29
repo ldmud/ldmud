@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+14-May-2005 (Lars Duening)  (3.3.702)
+  - (sprintf) Printing structures with "%O" or "%Q" in non-compact
+      mode also prints the names of the structure members (Bug #0000380).
+
 13-May-2005 (Lars Duening)  (3.3.701)
   - (configure) Added a check to see if the system is using a broken iconv
       (part of glibc 2.0-2.2) - this iconv can throw the driver into an
