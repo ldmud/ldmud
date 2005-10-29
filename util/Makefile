@@ -1,30 +1,24 @@
 SUBDIRS = indent make_docs
-SED = sed
-#CFLAGS = -O
-CFLAGS = -g
-CC = gcc
-BINDIR=/user/mud/bin
 
 all:	$(SUBDIRS) fundesc
 
 $(SUBDIRS): FORCE
-	cd $@; $(MAKE)
+	cd $@; make
 
 FORCE: install
 
-erq:	erq.c
-	$(CC) $(CFLAGS) erq.c -lresolv -o erq
-#	$(CC) $(CFLAGS) -lsocket -lnsl erq.c -o erq
+hname:	hname.c
+	$(CC) hname.c -lresolv -o hname
 
 fundesc:
 	$(CC) fundesc.c -o fundesc
 
-install: erq fundesc
-	cp erq $(BINDIR)/erq
+install: hname fundesc
+	cp hname $(BINDIR)/hname
 	cp fundesc $(BINDIR)/fundesc
-#	$(SED) -e "s;MUD_LIB;$(MUD_LIB);" \
-#	-e "s;BINDIR;$(BINDIR);" restart_mud > $(BINDIR)/restart_mud
-#	-chmod 775 $(BINDIR)/restart_mud
+	/bin/sed -e "s;MUD_LIB;$(MUD_LIB);" \
+	-e "s;BINDIR;$(BINDIR);" restart_mud > $(BINDIR)/restart_mud
+	-chmod 775 $(BINDIR)/restart_mud
 	for i in $(SUBDIRS) ;\
 	do \
 	(cd $$i ; echo "Installing in $$i." ;\
@@ -32,7 +26,7 @@ install: erq fundesc
 	done
 
 clean:
-	-rm -f *.o fundesc erq
+	-rm *.o fundesc hname
 	for i in $(SUBDIRS) ;\
 	do \
 	(cd $$i ; echo "Cleaning in $$i." ;\

@@ -1,11 +1,8 @@
 #include <stdio.h>
+#include <string.h>
 
-#define STRALLOC
-#include "stralloc.h"
-
-#ifndef DEBUG
-#define BUG_FREE
-#endif
+#include "config.h"
+#include "lint.h"
 
 /*
  * stralloc.c - string management.
@@ -15,7 +12,7 @@
  * will be deallocated.  add_string increases the ref count if it finds a
  * matching string, or allocates it if it cant.  There is no way to allocate
  * a string of a particular size to fill later (hash wont work!), so you'll
- * have to copy things from a static (or malloced and later freed) buffer -
+ * have to copy things freom a static (or malloced and later freed) buffer -
  * that is, if you want to avoid space leaks...
  *
  * Current overhead:
@@ -37,12 +34,19 @@
  * next element in the chain (which you specify when you call the functions).
  */
 
+#define	MAXSHORT	(1 << (sizeof(short)*8 - 2))
 #define	WORD_ALIGN_BIT	0x3	/* these are 0 for aligned ptrs */
 
-static mp_int num_distinct_strings = 0;
-mp_int bytes_distinct_strings = 0;
-mp_int stralloc_allocd_strings = 0;
-mp_int stralloc_allocd_bytes = 0;
+char * xalloc();
+#ifndef _AIX
+char * strcpy();
+#endif
+
+static int num_distinct_strings = 0;
+int bytes_distinct_strings = 0;
+static int allocd_strings = 0;
+static int allocd_bytes = 0;
+int overhead_bytes = 0;
 static int search_len = 0;
 static int num_str_searches = 0;
 
@@ -53,8 +57,9 @@ static int num_str_searches = 0;
  *				pointer points here
  */
 
-#define NEXT(p) SHSTR_NEXT(p)
-#define REFS(p) SHSTR_REFS(p)
+#define	NEXT(str)	(*(char **)((char *) (str) - sizeof(short)	\
+						   - sizeof(int)))
+#define	REFS(str)	(*(short *)((char *) (str) - sizeof(short)))
 
 /*
  * hash table - list of pointers to heads of string chains.
@@ -65,59 +70,15 @@ static int num_str_searches = 0;
  */
 
 static char ** base_table = 0;
-char *out_of_memory_string;
-char *empty_shared_string;
-extern struct ident *ident_table[ITABLE_SIZE];
 
-void init_shared_strings()
+static void init_strings()
 {
-    int x;
-    base_table = (char **) xalloc(sizeof(char *) * HTABLE_SIZE);
+	int x;
+	base_table = (char **) xalloc(sizeof(char *) * HTABLE_SIZE);
+	overhead_bytes += (sizeof(char *) * HTABLE_SIZE);
 
-    if (!base_table)
-	fatal("Out of memory\n");
-    for (x=0; x<HTABLE_SIZE; x++)
-	base_table[x] = 0;
-    out_of_memory_string = make_shared_string(
-"This string is used as a substitute if allocating another one failed."
-    );
-    empty_shared_string = make_shared_string("");
-}
-
-void clear_shared_string_refs()
-{
-    int x;
-    char *p;
-
-    for (x=0; x<HTABLE_SIZE; x++)
-	for (p = base_table[x]; p; p = NEXT(p) )
-	    REFS(p) = 0;
-}
-
-#ifdef MALLOC_smalloc
-void note_shared_string_table_ref() {
-    note_malloced_block_ref((char *)base_table);
-    count_ref_from_string(out_of_memory_string);
-    count_ref_from_string(empty_shared_string);
-}
-
-void walk_shared_strings(func)
-    void (*func) PROT((char *, char *));
-{
-    int x;
-    char *p, *n;
-
-    for (x=0; x<HTABLE_SIZE; x++)
-	for (n = base_table[x]; p = n; ) {
-	    n = NEXT(p); /* p may be freed by (*func)() . */
-	    (*func)(p-sizeof(short)-sizeof(char *), p);
-	}
-}
-#endif /* MALLOC_smalloc */
-
-static mp_int overhead_bytes() {
-    return (sizeof(char *) * HTABLE_SIZE) +
-      num_distinct_strings * (sizeof(char *) + sizeof(short));
+	for (x=0; x<HTABLE_SIZE; x++)
+		base_table[x] = 0;
 }
 
 /*
@@ -125,13 +86,14 @@ static mp_int overhead_bytes() {
  * stats for different prime numbers, etc.
  */
 
-/* some compilers can't grasp #if BITNUM(HTABLE_SIZE) == 1 */
-/* some compilers can't even grasp #if BITNUM_IS_1(HTABLE_SIZE) *sigh* */
-#if !( (HTABLE_SIZE) & (HTABLE_SIZE)-1 )
-#define StrHash(s) (whashstr((s), 20) & ((HTABLE_SIZE)-1))
-#else
-#define StrHash(s) (whashstr((s), 20) % HTABLE_SIZE)
-#endif
+static int StrHash(s)
+char * s;
+{
+	if (!base_table)
+		init_strings();
+
+	return hashstr(s, 20, HTABLE_SIZE);
+}
 
 /*
  * Looks for a string in the table.  If it finds it, returns a pointer to
@@ -140,16 +102,11 @@ static mp_int overhead_bytes() {
  * pointer on the hash chain into fs_prev.
  */
 
-static int hash_index;	/* to be used by alloc_new_string
-			   without further notice 		  */
-			/* is also used opaque inside free_string */
-
 char * findstring(s)
 char * s;
 {
 	char * curr, *prev;
 	int h = StrHash(s);
-	hash_index = h;
 
 	curr = base_table[h];
 	prev = 0;
@@ -178,37 +135,20 @@ char * s;
  * will have to compact strings...
  */
 
-static INLINE char * alloc_new_string(string)
+static char * alloc_new_string(string)
 char * string;
 {
-	mp_int length;
-	char *s;
-	int h;
+	char * s = xalloc(1 + strlen(string) + sizeof(char *) + sizeof(short));
+	int h = StrHash(string);
 
-	length = strlen(string);
-	s = xalloc(1 + length + sizeof(char *) + sizeof(short));
-	if (!s)
-	    return s;
-	h = hash_index;
 	s += sizeof(char *) + sizeof(short);
 	strcpy(s, string);
-#if 0
 	REFS(s) = 0;
-#endif
 	NEXT(s) = base_table[h];
 	base_table[h] = s;
 	num_distinct_strings++;
-	bytes_distinct_strings +=
-#ifdef MALLOC_smalloc
-	  SMALLOC_OVERHEAD * sizeof(char *) +
-#else
-	  sizeof(char *) +
-#endif
-	    (sizeof(char *) + sizeof(short) +
-	    length + 1 + (sizeof(char *)-1)) & ~(sizeof(char *)-1);
-	REFS(s) = 1;
-	stralloc_allocd_strings++;
-	stralloc_allocd_bytes += shstr_malloced_size(s);
+	bytes_distinct_strings += 4 + (strlen(s) +3) & ~3;
+	overhead_bytes += sizeof(char *) + sizeof(short);
 	return(s);
 }
 
@@ -218,27 +158,13 @@ char * str;
 	char * s;
 
 	s = findstring(str);
-	if (!s) {
-		return alloc_new_string(str);
-	} else {
-	    if (REFS(s))
-		REFS(s)++;
-	}
-	stralloc_allocd_strings++;
-	stralloc_allocd_bytes += shstr_malloced_size(s);
+	if (!s)
+		s = alloc_new_string(str);
+	REFS(s)++;
+	allocd_strings++;
+	allocd_bytes += 4 + (strlen(str) + 3) & ~3;
 	return(s);
 }
-
-INLINE
-void decrement_string_ref(str)
-char *str;
-{
-	stralloc_allocd_strings--;
-	stralloc_allocd_bytes -= shstr_malloced_size(str);
-	if (REFS(str))
-	    REFS(str)--;
-}
-
 
 /*
  * free_string - reduce the ref count on a string.  Various sanity
@@ -255,25 +181,19 @@ char *str;
  * function called on free_string detected errors; things return checked(s).
  */
 
-#ifndef BUG_FREE
 static void checked(s, str) char * s, *str;
 {
 	fprintf(stderr, "%s (\"%s\")\n", s, str);
 	fatal(s); /* brutal - debugging */
 }
-#endif
 
 void free_string(str)
 char * str;
 {
-#ifndef BUG_FREE
-	extern int d_flag;
-#endif
-
 	char * s;
 
-	stralloc_allocd_strings--;
-	stralloc_allocd_bytes -= shstr_malloced_size(str);
+	allocd_strings--;
+	allocd_bytes -= 4 + (strlen(str) + 3) & ~3;
 
 #ifndef	BUG_FREE
 #ifdef	dcheck	/* GNU malloc range check flag */
@@ -285,8 +205,8 @@ char * str;
 #endif /* dcheck */
 #endif
 
-#ifndef	BUG_FREE
 	s = findstring(str); /* moves it to head of table if found */
+#ifndef	BUG_FREE
 	if (!s) {
 	    checked("Free string: not found in string table!", str);
 	    return;
@@ -296,28 +216,23 @@ char * str;
 	    return;
 	}
 
-	if (REFS(s) <= 0 && d_flag) {
-	    fprintf(
-	      stderr,
-	      "Free String: String refs zero or -ve! (\"%s\")\n",
-	      str
-	    );
+	if (REFS(s) <= 0) {
+	    checked("Free String: String refs zero or -ve!", str);
+	    return;
 	}
 #endif	/* BUG_FREE */
 
-	if (!REFS(str) || --REFS(str) > 0) return;
+	if (REFS(s) > MAXSHORT) return;
+	REFS(s)--;
+	if (REFS(s) > 0) return;
 
-	s = findstring(str); /* moves it to head of table if found */
-#ifndef BUG_FREE
 	/* It will be at the head of the hash chain */
-	base_table[StrHash(str)] = NEXT(str);
-#else
-	base_table[hash_index] = NEXT(str);
-#endif
+	base_table[StrHash(str)] = NEXT(s);
 	num_distinct_strings--;
 	/* We know how much overhead malloc has */
-	bytes_distinct_strings -= shstr_malloced_size(str) * sizeof(char *);
-	xfree(str-sizeof(short)-sizeof(char *));
+	bytes_distinct_strings-= 4 + (strlen(s) + 3) & ~3;
+	overhead_bytes -= sizeof(short) + sizeof(char *);
+	free(s-sizeof(short)-sizeof(char *));
 
 	return;
 }
@@ -330,32 +245,19 @@ char * str;
 int add_string_status(verbose)
     int verbose;
 {
-    mp_int net_bytes_distinct_strings, net_allocd_bytes;
-
     if (verbose) {
 	add_message("\nShared string hash table:\n");
 	add_message("-------------------------\t Strings    Bytes\n");
     }
-    net_bytes_distinct_strings = (bytes_distinct_strings &
-	(malloc_size_mask() * sizeof (char *))) -
-      num_distinct_strings * (sizeof(char*) + sizeof(short));
-    add_message("Strings malloced\t\t%8ld %8ld + %ld overhead\n",
-		num_distinct_strings, net_bytes_distinct_strings, overhead_bytes());
+    add_message("Strings malloced\t\t%8d %8d + %d overhead\n",
+		num_distinct_strings, bytes_distinct_strings, overhead_bytes);
     if (verbose) {
-	char print_buff[20];
-
-	stralloc_allocd_bytes &= malloc_size_mask();
-	net_allocd_bytes = (stralloc_allocd_bytes * sizeof(char*)) -
-          stralloc_allocd_strings * (sizeof(char*) + sizeof(short));
-	add_message("Total asked for\t\t\t%8ld %8ld\n",
-		    stralloc_allocd_strings, net_allocd_bytes );
-	add_message("Space actually required/total string bytes %ld%%\n",
-		    (net_bytes_distinct_strings + overhead_bytes())*100L /
-		    	net_allocd_bytes );
-	sprintf(print_buff, " %7.3f\n",
-		    (float)search_len / (float)num_str_searches);
-	add_message("Searches: %d    Average search length:%s\n",
-		    num_str_searches, print_buff);
+	add_message("Total asked for\t\t\t%8d %8d\n",
+		    allocd_strings, allocd_bytes);
+	add_message("Space actually required/total string bytes %d%%\n",
+		    (bytes_distinct_strings + overhead_bytes)*100 / allocd_bytes);
+	add_message("Searches: %d    Average search length: %6.3f\n",
+		    num_str_searches, (double)search_len / num_str_searches);
     }
-    return net_bytes_distinct_strings + overhead_bytes();
+    return(bytes_distinct_strings + overhead_bytes);
 }

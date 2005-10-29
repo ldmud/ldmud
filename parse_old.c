@@ -12,6 +12,7 @@
 */
 
 #include <stdio.h>
+#include <string.h>
 #include <ctype.h>
 #include <time.h>
 #include "lint.h"
@@ -26,7 +27,7 @@
 #define SVALUE struct svalue
 #define LVALUE struct svalue
 
-extern char *string_copy PROT((char *));
+extern char *string_copy PROT((char *)), *xalloc PROT((int));
 extern int o_flag, d_flag; /* for debugging purposes */
 extern SVALUE const0, const1;
 
@@ -34,7 +35,7 @@ extern SVALUE const0, const1;
 extern int tolower PROT((int));
 #endif
 
-#if defined(COMPAT_MODE) && defined(SUPPLY_PARSE_COMMAND)
+#ifdef COMPAT_MODE
 /*****************************************************
 
   This is the parser
@@ -118,7 +119,7 @@ struct altern_objects {
 };
 
 int gDebug=0;
-char gMword[KLUDGELEN];            /* Text inside '' or [] */
+char gMword[KLUDGELEN];            /* Text inom '' och [] */
 char gFword[KLUDGELEN];            /* Temp word gotten by getfirst() */
 struct altern_objects *gOblist;    /* List of accessible objects */
 char gAdjective[4*KLUDGELEN];      /* all adjectives before objname */
@@ -128,7 +129,6 @@ struct altern_objects *gPobjects;  /* List of parsed objects */
 LVALUE *gTxarg;                    /* Argument of LPCvariable to store %s  */
 LVALUE *gForprepos;                /* Save arg* here for findprepos */
 LVALUE *gTopStack;                 /* arg* to arg after my last */
-struct svalue sv_tmp;
 
 #define EP 0          /* End Parse marker */
 #define SI 1          /* %o single item */
@@ -167,7 +167,7 @@ char *lowercase (apa)
 
   bepa = apa;
   while (*bepa) {
-    if ((*bepa>'A') && (*bepa<='Z')) (*bepa)+='a'-'A';
+    if ((*bepa>'A') && (*bepa<'a')) (*bepa)+='a'-'A';
     bepa++;
   }
   return apa;
@@ -267,7 +267,7 @@ void italt_new ()
   while (ao) {
     ao=ao->next;
     free_object(ao2->ao_obj,"parse->italt_new()");
-    xfree((char *)ao2); 
+    free((char *)ao2); 
     ao2=ao;
   }
 }
@@ -347,7 +347,7 @@ int call_obj (fnamn, on, apa)
   struct svalue *ret;
   
   if (gDebug) fprintf(stderr,"Calling %s in %s with %s\n",fnamn,on->name,apa);
-  push_volatile_string(apa);
+  push_constant_string(apa);
   ret = apply(fnamn,on,1);
   if (!ret) return 0;
   if ( ret->type == T_NUMBER) return ret->u.number;
@@ -417,7 +417,7 @@ int matchadjective (adjs)
     else {
       on=ao->ao_obj;
       ret = apply(QSHORTFUNC,on,0);
-      if (ret && ret->type==T_STRING) {
+      if (ret->type==T_STRING) {
 	sp=ret->u.string; sp2=backstrchr(sp,' ');
 	if (sp2) sp=sp2;
 	sprintf(tot,"%s%s",adjs,sp); lowercase(tot);
@@ -693,12 +693,10 @@ int findobject (cmd)
 	if (!ob) if (gDebug) fprintf(stderr,"No object from italt %d\n",s);
 	if (ob) add_ref(ob,"parse_command");
       }
-      sv_tmp.type = T_POINTER;
-      sv_tmp.u.vec = p;
-      transfer_svalue(gCarg->u.lvalue, &sv_tmp);
-#if 0 /* amylaar: the ref count is already set by allocate_array */
+      free_svalue(gCarg->u.lvalue);
+      gCarg->u.lvalue->type = T_POINTER;
+      gCarg->u.lvalue->u.vec = p;
       gCarg->u.lvalue->u.vec->ref++;
-#endif
 
       if (gDebug) fprintf(stderr,"Assign array2\n");
     }
@@ -712,8 +710,6 @@ int findobject (cmd)
 OBJECT *findplay (cmd)
     char **cmd;
 { 
-  extern struct object *find_living_object PROT((char *, int));
-
   OBJECT *pn;
   char w1[KLUDGELEN];
 
@@ -726,10 +722,10 @@ OBJECT *findplay (cmd)
   if (pn) {
     getfirst(cmd); 
     if (gCarg) {
-      sv_tmp.type = T_OBJECT;
-      sv_tmp.u.ob = pn;
+      free_svalue(gCarg->u.lvalue);
+      gCarg->u.lvalue->type = T_OBJECT;
+      gCarg->u.lvalue->u.ob = pn;
       add_ref(pn, "parse_command(%l)");
-      transfer_svalue(gCarg->u.lvalue, &sv_tmp);
     }
   }
   return pn;
@@ -747,7 +743,7 @@ int findword (cmd, v)
   int cnt,m,f;
 
   w = lookfirst(*cmd); lowercase(w); p=v->u.vec;
-  cnt=0; m=VEC_SIZE(p); f= -1;
+  cnt=0; m=p->size; f= -1;
   while (cnt<m) {
     if (p->item[cnt].type == T_STRING) {
       if (strcmp(p->item[cnt].u.string,w)==0) {
@@ -788,10 +784,10 @@ int findprepos (cmd)
     if (strcmp(w,hard_prep[cnt])==0) {
       getfirst(cmd); /* Skip this word */
       if (gCarg) {
-	sv_tmp.type = T_STRING;
-	sv_tmp.x.string_type = STRING_MALLOC;
-	sv_tmp.u.string = string_copy(w);
-	transfer_svalue(gCarg->u.lvalue, &sv_tmp);
+	free_svalue(gCarg->u.lvalue);
+	gCarg->u.lvalue->type = T_STRING;
+	gCarg->u.lvalue->u.string = string_copy(w);
+	gCarg->u.lvalue->string_type = STRING_MALLOC;
 	return 1;
       }
     }
@@ -807,9 +803,10 @@ int findsingle (cmd)
 {
   if (finditem(cmd,0)) {
     if ((itnumalt()==1) && (gCarg)) {
-      sv_tmp.type = T_OBJECT;
-      add_ref( sv_tmp.u.ob=italt(1), "parse_command(%o)" );
-      transfer_svalue(gCarg->u.lvalue, &sv_tmp);
+      free_svalue(gCarg->u.lvalue);
+      gCarg->u.lvalue->type = T_OBJECT;
+      gCarg->u.lvalue->u.ob=italt(1);
+      add_ref(gCarg->u.lvalue->u.ob, "parse_command(%o)");
     }
     return 1;
   }
@@ -838,11 +835,7 @@ int get1ps (parsep, lin, skip)
   case 'p':pt=PP; break;
   case 'd':pt=NUM; break;
   case '\'':sscanf(cod,"'%[^\']",gMword); pt=DTX; break;
-#if 0
   case '[':sscanf(cod,"\[%[^\135]",gMword); pt=OTX; /* 135 is oct for ] */
-#else
-  case '[':sscanf(cod,"\\[%[^]]",gMword); pt=OTX;
-#endif
     if (gMword[strlen(gMword)-1]==']') gMword[strlen(gMword)-1]=0;
     break;
   case '/':pt=ALT; break;
@@ -867,10 +860,10 @@ void addword (d, s)
     strcat(d,s);
   }
   if (gTxarg) {
-    sv_tmp.type = T_STRING;
-    sv_tmp.x.string_type = STRING_MALLOC;
-    sv_tmp.u.string = string_copy(d);
-    transfer_svalue(gTxarg->u.lvalue, &sv_tmp);
+    free_svalue(gTxarg->u.lvalue);
+    gTxarg->u.lvalue->type = T_STRING;
+    gTxarg->u.lvalue->u.string = string_copy(d);
+    gTxarg->u.lvalue->string_type = STRING_MALLOC;
   }
 }
 
@@ -893,14 +886,10 @@ int parse (cs, ob_or_array, ps, dest_args, num_arg)
   txflag,              /* = 1 om vi adderar text till str{ng */
   ptyp;                /* Parsetype %o %i %l %p %s 'word' [word] / %w */
   
-  char *parsep;            /* Parsepattern */
+  char *parsep;             /* Parsepattern */
   char *cmd;               /* Command to be parsed */
   char *ops,*ocs;          /* Temporary parse and command */
   char tx_jp[KLUDGELEN];   /* Fill up string for %s */
-  char *tx_save_parsep;    /* Where to continue parsing when a word was added
-			    * to a string
-			    */
-  char *tx_end_first_pattern;
   LVALUE *l;               /* Argument pointer in dest_args */
   int new_routines();
 
@@ -928,8 +917,8 @@ int parse (cs, ob_or_array, ps, dest_args, num_arg)
     SVALUE *vv;
     int cnt;
     v=ob_or_array->u.vec; italt_new();
-    for (cnt=0;cnt<VEC_SIZE(v);cnt++) {
-      vv = &(v->item[VEC_SIZE(v)-1-cnt]);
+    for (cnt=0;cnt<v->size;cnt++) {
+      vv = &(v->item[v->size-1-cnt]);
       if (vv->type==T_OBJECT) italt_put(vv->u.ob);
     }
     gOblist=gPobjects; gPobjects=0;
@@ -962,7 +951,6 @@ int parse (cs, ob_or_array, ps, dest_args, num_arg)
 
     case TX: /* %s */
       txflag=1; strcpy(tx_jp,""); gTxarg=gCarg; altflag=1; 
-      tx_save_parsep = parsep;
       break;
       
     case DTX: /* 'word' */
@@ -989,9 +977,9 @@ int parse (cs, ob_or_array, ps, dest_args, num_arg)
     case NUM: /* %d */
       if ((altflag=numeric(lookfirst(cmd)))>0) {
 	if (gCarg) {
-	  sv_tmp.type = T_NUMBER;
-	  sv_tmp.u.number = altflag;
-	  transfer_svalue(gCarg->u.lvalue, &sv_tmp);
+	  free_svalue(gCarg->u.lvalue);
+	  gCarg->u.lvalue->type = T_NUMBER;
+	  gCarg->u.lvalue->u.number = altflag;
 	}
 	altflag=1; getfirst(&cmd);
       }
@@ -1001,13 +989,8 @@ int parse (cs, ob_or_array, ps, dest_args, num_arg)
     /* Pattern checked altflag==1 indicates match
     */
     if (altflag) { /* Pattern matched, fetch next and end string input */
-      if (ptyp == TX) {
-        ptyp=get1ps(&parsep,&l,0);
-        tx_end_first_pattern = parsep;
-      } else {
-        ptyp=get1ps(&parsep,&l,0);
-        txflag = -1; /* End string input if not just started */
-      }
+      if (ptyp != TX) txflag = -1; /* End string input if not just started */
+      ptyp=get1ps(&parsep,&l,0);
       while (ptyp == ALT) { /* Skip left over alternatives */
 	ptyp=get1ps(&parsep,&l,1); /* Skip this pattern */
 	ptyp=get1ps(&parsep,&l,0); /* Next real pattern or ALT */
@@ -1020,23 +1003,18 @@ int parse (cs, ob_or_array, ps, dest_args, num_arg)
       a=parsep; try=l;
       tmp=get1ps(&a,&try,0);
       if (tmp == ALT) { 
-	parsep = a;		   /* Skip ALT */
+	ptyp=get1ps(&parsep,&l,0); /* Skip ALT */
 	ptyp=get1ps(&parsep,&l,0); /* Next real pattern or ALT */
       }
       else {
-	if (txflag>=0 && *getfirst(&cmd)) {
-	  /* %s is defined, add word and try pattern again */
-	  addword(tx_jp, gFword);
-	  if (parsep != tx_end_first_pattern) {
-	    parsep = tx_save_parsep;
-	    ptyp = get1ps(&parsep,&l,0);
-	  }
+	if (txflag>=0) { /* %s is defined, add word and try pattern again */
+	  addword(tx_jp,getfirst(&cmd));
 	}
 	else break; /* Impossible to match pattern, exit */
       }
     }
     
-    if (gDebug) fprintf(stderr,"Pattern, after: %d cmd: '%s'\n",ptyp, cmd);
+    if (gDebug) fprintf(stderr,"Pattern, after: %d\n",ptyp);
   } 
 
   /* End of pattern reached, what have got? What is left?
@@ -1051,7 +1029,7 @@ int parse (cs, ob_or_array, ps, dest_args, num_arg)
 
   /* Now clean up our mess, no alloced mem should remain
   */
-  xfree(ocs); xfree(ops);
+  free(ocs); free(ops);
   if (gPobjects) italt_new(); /* Free alternate object list */
   if (gOblist) {
     gPobjects=gOblist; italt_new(); /* Free list of accessible objects */

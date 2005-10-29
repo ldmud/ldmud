@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 
 #include "lint.h"
 #include "config.h"
@@ -14,17 +15,19 @@
  * Note: if you change an object name, you must remove it and reenter it.
  */
 
+char * xalloc();
+
 /*
  * hash table - list of pointers to heads of object chains.
  * Each object in chain has a pointer, next_hash, to the next object.
- * OTABLE_SIZE is in config.h, need not be a prime, probably between
+ * OTABLE_SIZE is in config.h, and should be a prime, probably between
  * 100 and 1000.  You can have a quite small table and still get very good
  * performance!  Our database is 8Meg; we use about 500.
  */
 
 static struct object ** obj_table = 0;
 
-void init_otable()
+static void init_otable()
 {
 	int x;
 	obj_table = (struct object **)
@@ -34,23 +37,18 @@ void init_otable()
 		obj_table[x] = 0;
 }
 
-#ifdef MALLOC_smalloc
-void note_otable_ref() {
-    note_malloced_block_ref((char *)obj_table);
-}
-#endif
-
 /*
  * Object hash function, ripped off from stralloc.c.
  */
 
-/* some compilers can't grasp #if BITNUM(OTABLE_SIZE) == 1 */
-/* some compilers can't even grasp #if BITNUM_IS_1(OTABLE_SIZE) *sigh* */
-#if !( (OTABLE_SIZE) & (OTABLE_SIZE)-1 )
-#define ObjHash(s) (whashstr((s), 100) & ((OTABLE_SIZE)-1) )
-#else
-#define ObjHash(s) (whashstr((s), 100) % OTABLE_SIZE)
-#endif
+static int ObjHash(s)
+char * s;
+{
+	if (!obj_table)
+		init_otable();
+
+	return hashstr(s, 100, OTABLE_SIZE);
+}
 
 /*
  * Looks for obj in table, moves it to head.
@@ -97,12 +95,9 @@ static int objs_in_table = 0;
 void enter_object_hash(ob)
 struct object * ob;
 {
-#ifdef DEBUG
 	struct object * s;
-#endif
 	int h = ObjHash(ob->name);
 
-#ifdef DEBUG
 	s = find_obj_n(ob->name);
 	if (s) {
 	    if (s != ob)
@@ -115,14 +110,16 @@ struct object * ob;
         if (ob->next_hash)
 	    fatal("Object \"%s\" not found in object table but next link not null",
 			ob->name);
-#endif
 	ob->next_hash = obj_table[h];
 	obj_table[h] = ob;
 	objs_in_table++;
 	return;
 }
 
-/* Remove an object from the table */
+/*
+ * Remove an object from the table - generally called when it
+ * is removed from the next_all list - i.e. in destruct.
+ */
 
 void remove_object_hash(ob)
 struct object *ob;
@@ -172,17 +169,16 @@ int show_otable_status(verbose)
     if (verbose) {
 	add_message("\nObject name hash table status:\n");
 	add_message("------------------------------\n");
-	sprintf(sbuf, "%.2f", (float) objs_in_table / (float) OTABLE_SIZE);
+	sprintf(sbuf, "%.2f", objs_in_table / (float) OTABLE_SIZE);
 	add_message("Average hash chain length	           %s\n", sbuf);
-	sprintf(sbuf, "%.2f", (float) obj_probes / (float) obj_searches);
+	sprintf(sbuf, "%.2f", (float)obj_probes / obj_searches);
 	add_message("Searches/average search length       %d (%s)\n",
 		    obj_searches, sbuf);
 	add_message("External lookups succeeded (succeed) %d (%d)\n",
 		    user_obj_lookups, user_obj_found);
     }
-    /* objs_in_table * sizeof(struct object) is already accounted for
-       in tot_alloc_object_size.  */
     add_message("hash table overhead\t\t\t %8d\n",
 		OTABLE_SIZE * sizeof(struct object *));
-    return OTABLE_SIZE * sizeof(struct object *);
+    return (OTABLE_SIZE * sizeof(struct object *) +
+	    objs_in_table * sizeof(struct object));
 }

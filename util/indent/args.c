@@ -35,7 +35,7 @@ int else_endif_col;
 
 extern char *in_name;
 
-char       *getenv();
+char       *getenv(), *index();
 
 /* profile types */
 enum profile {PRO_BOOL, /* boolean */

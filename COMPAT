@@ -9,8 +9,8 @@ config.h).
 
 Changes:
 
-* The efun combine_free_list() was defined when malloc.c (no longer
-  supported nor supplied) was used. It may be called from /room/church.c
+* The efun combine_free_list() is only defined when malloc.c (no longer
+  supported nor supplied) is used. It may be called from /room/church.c
   in the 2.4.5 mudlib. Simply remove the call !
 
 * The file /room/void.c is no longer loaded automatically used. The
@@ -56,16 +56,3 @@ Changes:
   generated.
 
 * The usage of the escape character '\' now works as expected.
-
-* previous_object() will now change it's value when also when an object
-  call_others itself, or an implicit extern function call is made to
-  the current object.
-  To give wizards their current path instead of their home directory as a base
-  for interactive file commands, you have to change the valid_write() in
-  /obj/player .
-  The test for the home-directory based expansion for relative path names was
-  formerly :
-	if (previous_object()) {
-  It should read now :
-	if (previous_object() && previous_object() != this_object()) {
-

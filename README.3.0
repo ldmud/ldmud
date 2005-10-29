@@ -1,0 +1,63 @@
+If you are using 3.0 with an old mudlib (2.4.5 and older), then read
+the file COMPAT for compatibility information.
+
+Read the file INSTALL for information about how to install the game.
+
+Mail bugs or info about problems to lars@cd.chalmers.se.
+
+
+
+Here is some information about 3.0:
+
+Flags accepted by debug:
+
+-c	Print to stdout every time a file is compiled.
+
+-d	Debug information. Prints nothing interesting.
+
+-e	Start without loading any wizard file.
+
+-f'arg' Send 'arg' as argument to function 'flag()' in obj/master.c.
+
+-m'dir' Specify 'dir' as the directory to use as mudlib.
+
+-t	Don't call any heart beats. Makes it easier to debug.
+
+-s'sec'	Delay in seconds before swap
+
+
+If you debug 3.0 internals:
+
+Read the file STACKMACHINE for some
+information about how it works. To debug instruction execution, you have to
+single step execution in the function eval_instruction(). The value on top
+of stack can be accessed by 'sp[0]'. The value before that, is 'sp[-1]' etc.
+
+The first argument to a function is found at 'fp[0]'. The next at 'fp[1]'.
+The local arguments follows immediately after the arguments. If there are
+3 arguments to a function, then the first local variable will be found
+with 'fp[3]'.
+
+The function last_instructions(), will print out the 20 (or so) last executed
+instructions. It is now called automatically at fatal error.
+
+There is a variable 'current_object'. This is the object that is given
+by 'this_object()'. The variable 'current_prog', is a pointer to
+the program current being executed. This is normally the same as
+'current_object->prog->program', but can differ when executing code
+defined by inheritance.
+
+The structure 'struct program' (pointed to by ob->prog) defines program
+information for object 'ob'. It can be shared by several objects (when
+cloned and inherited).
+
+Inheritance by 'a' from 'b' is implemented by copying info from 'b->prog'
+into 'a->prog'. All functions and variables, for example.
+
+There are a lot of comments in the source code. For information
+about the stackmachine, read lang.y and interpret.c.
+
+
+I am also working on better type checkings and requirements.
+
+My mailing address is lars@cd.chalmers.se

@@ -3,7 +3,16 @@
 ** article in CACM 33-6, pp. 677.
 */
 
-static unsigned char T[] = {
+int
+hashstr(s, maxn, hashs)
+char *s;			/* string to hash */
+int maxn;			/* maximum number of chars to consider */
+int hashs;			/* hash table size. */
+{
+    register int h;
+    register unsigned char *p;
+    register int i;
+    static int T[] = {
 	1, 87, 49, 12, 176, 178, 102, 166, 121, 193, 6, 84, 249, 230, 44, 163,
 	14, 197, 213, 181, 161, 85, 218, 80, 64, 239, 24, 226, 236, 142, 38, 200,
 	110, 177, 104, 103, 141, 253, 255, 50, 77, 101, 81, 18, 45, 96, 31, 222,
@@ -22,34 +31,14 @@ static unsigned char T[] = {
 	51, 65, 28, 144, 254, 221, 93, 189, 194, 139, 112, 43, 71, 109, 184, 209,
     };
 
-int
-whashstr(s, maxn)
-char *s;			/* string to hash */
-int maxn;			/* maximum number of chars to consider */
-{
-    register unsigned char c, hi, lo;
-    register unsigned char *p = s;
-    register int i = maxn;
 
-    if (c = *p++) {
-	for (hi = T[c], lo = c + 1; --i && (c = *p++); ) {
-	    hi = T[hi ^ c];
-	    lo = T[lo ^ c];
-	}
-	return (hi << 8) + lo;
-    }
-    return 0;
-}
-
-int
-chashstr(s, maxn)
-char *s;
-int maxn;
-{
-    register unsigned char h;
-    register unsigned char *p;
-    register int i;
-    for(h = 0, i = maxn, p = (unsigned char *)s; *p && --i >= 0; p++)
+    for(h = 0, i = 0, p = (unsigned char *)s; *p && i < maxn; i++, p++)
 	h = T[h ^ *p];
-    return h;
+    if (hashs > 256 && *s) {
+	int oh = h;
+	for(i = 1, p = (unsigned char *)s, h = (*p++ + 1)&0xff; *p && i < maxn; i++, p++)
+	    h = T[h ^ *p];
+	h += (oh << 8);
+    }
+    return h % hashs;		/* With 16 bit ints h has to be made positive first! */
 }

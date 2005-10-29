@@ -24,10 +24,6 @@ void load_doc(char *name, FILE *f);
 #endif
 */
 
-#ifndef S_ISREG
-#define S_ISREG(m)      (((m)&S_IFMT) == S_IFREG)
-#endif
-
 void load_doc(name, f)
     char *name;
     FILE *f;

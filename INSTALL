@@ -1,35 +1,28 @@
-This is a brief description of how to install LPmud 3.2 on a unix host:
+This is a brief description of how to install LPmud 3.0:
 
 Make a directory 'mud', which contains a dir named 'src', 'bin' and 'lib'.
 Move the game driver source (this code) to the src directory.
 
-cd to src. execute ./configure . This will check for a number of site
-specific settings, and can take about a minute or two.
-For NeXT-Step 2.1, supply --with-target=NeXT .
-
 Edit the Makefile, defining where the lib and bin is. Check definitions
-in config.h, most are probably good as they are. The ones that are
-important wrt. which mudlibs can be run are COMPAT_MODE NATIVE_MODE
-OLD_PREVIOUS_OBJECT_BEHAVIOUR OLD_EXPLODE_BEHAVIOUR INITIALIZATION_BY___INIT
-You get the most 2.4.5 compatibility if you define all of these but
-NATIVE_MODE . Likewise, you get the most 3.0 compatibility when you define
-all but COMPAT_MODE. The most interesting configuration is probably not
-to set any of these.
+in config.h, most are probably good as they are. The important one is
+COMPAT_MODE in config.h. It must be defined to be able to use the 2.4.5 mudlib
+or older.
 
 Do 'make install' and 'make install.utils'.
 
-Get a mudlib. One way to do this is to get the source to 2.4.5, which includes
+Get a mudlib. The way to do this is to get the source to 2.4.5, which includes
 a mudlib in the directory 'mudlib'. Copy all those files into your 'lib'
-directory.  To make file access from within the game work properly, you
-have to apply 2.4.5-player.c-diff from src/mudlib to lib/obj/player.c .
+directory.
 
-Copy the file src/mudlib/master.c to lib/obj/master.c (in COMPAT_MODE),
-otherwise to lib/secure/master.c. Copy the file src/mudlib/simul_efun.c
-to where it is supposed to be. That is defined by the function
-get_simul_efun in master.c.
+Copy the file src/master.c to lib/obj/master.c (in COMPAT_MODE), otherwise
+to lib/secure/master.c. Copy the file src/mudlib_simul_efun.c to where
+it is supposed to be. That is defined by the function get_simul_efun in
+master.c. You will need it only if you still want the "old" and out-of-date
+efuns like ls() etc.
 
-Test the game with 'driver &'.
+Test the game with 'driver -o &'.
 
 If you see the message 'Setting up ipc', then you are up and running.
-Test with 'telnet localhost 7680' ; that is, when you change the port
-number in config.h , the changed number does apply.
+Test with 'telnet localhost 3000'.
+
+If you want the game to restart automatically, use 'bin/restart_mud'.

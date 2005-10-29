@@ -1,8 +1,0 @@
-This directory contains patches to gcc. For bug fixes, one or more news
-articles that report a matching bug are included.
-Gcc is licenced under the GPL, thus these patches are so too.
-A copy of the GPL in in ../autoconf/COPYING .
-
-As gcc, these patches are supplied in the hope that they might be useful,
-but they come with NO WARRANTY whatsoever. For more details, look at
-the appropriate paragraphs ( 11. and 12. in version 2) of the GPL.

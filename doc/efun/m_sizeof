@@ -1,7 +1,0 @@
-int
-m_sizeof(mapping map)
-
-Return the number of indices (or values) in mapping 'map'.
-
-See also:
-    mappingp, mkmapping, m_indices, m_values, m_delete

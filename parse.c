@@ -10,6 +10,7 @@
 */
 
 #include <stdio.h>
+#include <string.h>
 #include <ctype.h>
 #include <time.h>
 #include "lint.h"
@@ -17,9 +18,8 @@
 #include "config.h"
 #include "object.h"
 #include "wiz_list.h"
-#include "instrs.h"
 
-extern char *string_copy PROT((char *));
+extern char *string_copy PROT((char *)), *xalloc PROT((int));
 extern int d_flag; /* for debugging purposes */
 extern struct object *previous_ob;
 
@@ -27,46 +27,7 @@ extern struct object *previous_ob;
 extern int tolower PROT((int));
 #endif
 
-#if defined(SUPPLY_PARSE_COMMAND)
-
-struct svalue find_living_closures[2] = { { T_INVALID }, { T_INVALID } };
-
-struct object *find_living_object (name, player)
-    char *name;
-    int player;
-{
-    extern void symbol_efun PROT((struct svalue *));
-
-    extern struct svalue *inter_sp;
-
-    static char *function_names[2] = { "find_living", "find_player"};
-
-    struct svalue *sp, *svp;
-
-    sp = inter_sp;
-    sp++;
-    svp = &find_living_closures[player];
-    if (svp->type == T_INVALID) {
-	sp->type = T_STRING;
-	sp->x.string_type = STRING_SHARED;
-	if ( !(sp->u.string = make_shared_string(function_names[player])) )
-	    error("Out of memory\n");
-	inter_sp = sp;
-	symbol_efun(sp);
-	*svp = *sp;
-	inter_sp = sp - 1;
-    }
-    sp->type = T_STRING;
-    sp->x.string_type = STRING_SHARED;
-    if ( !(sp->u.string = make_shared_string(name)) )
-	error("Out of memory\n");
-    inter_sp = sp;
-    call_lambda(svp, 1);
-    pop_stack();
-    return sp->type != T_OBJECT ? 0 : sp->u.ob;
-}
-
-#if !defined(COMPAT_MODE)
+#ifndef COMPAT_MODE
 /*****************************************************
 
   This is the parser used by the efun parse_command
@@ -353,12 +314,11 @@ void load_lpc_info(ix, ob)
     char *str;
     char *parse_to_plural();
 
-    /* Amylaar: any apply() can result in a self-destruct. */
-    if (!ob|| ob->flags & O_DESTRUCTED)
+    if (!ob)
 	return;
 
     if (gPluid_list && 
-	VEC_SIZE(gPluid_list) > ix && 
+	gPluid_list->size > ix && 
 	gPluid_list->item[ix].type == T_NUMBER &&
 	gPluid_list->item[ix].u.number == 0)
     {
@@ -373,10 +333,9 @@ void load_lpc_info(ix, ob)
     }
 
     if (gId_list && 
-	VEC_SIZE(gId_list) > ix && 
+	gId_list->size > ix && 
 	gId_list->item[ix].type == T_NUMBER &&
-	gId_list->item[ix].u.number == 0 &&
-	!(ob->flags & O_DESTRUCTED) )
+	gId_list->item[ix].u.number == 0)
     {
 	ret = apply(QGET_ID, ob, 0);
 	if (ret && ret->type == T_POINTER)
@@ -384,22 +343,22 @@ void load_lpc_info(ix, ob)
 	    assign_svalue_no_free(&gId_list->item[ix], ret);
 	    if (make_plural)
 	    {
-		tmp = allocate_array(VEC_SIZE(ret->u.vec));
+		tmp = allocate_array(ret->u.vec->size);
 		sing = ret->u.vec;
-		for (il = 0; il < VEC_SIZE(tmp); il++)
+		for (il = 0; il < tmp->size; il++)
 		{
 		    if (sing->item[il].type == T_STRING)
 		    {
 			str = parse_to_plural(sing->item[il].u.string);
 			sval.type = T_STRING;
-			sval.x.string_type = STRING_MALLOC;
-			sval.u.string = str;
-			transfer_svalue_no_free(&tmp->item[il],&sval);
+			sval.string_type = STRING_MALLOC;
+			sval.u.string = string_copy(str);
+			assign_svalue_no_free(&tmp->item[il],&sval);
 		    }
 		}
 		sval.type = T_POINTER;
 		sval.u.vec = tmp;
-		transfer_svalue_no_free(&gPluid_list->item[ix], &sval);
+		assign_svalue_no_free(&gPluid_list->item[ix], &sval);
 	    }
 	}
 	else
@@ -409,10 +368,9 @@ void load_lpc_info(ix, ob)
     }
 
     if (gAdjid_list && 
-	VEC_SIZE(gAdjid_list) > ix && 	
+	gAdjid_list->size > ix && 	
 	gAdjid_list->item[ix].type == T_NUMBER &&
-	gAdjid_list->item[ix].u.number == 0 &&
-	!(ob->flags & O_DESTRUCTED) )
+	gAdjid_list->item[ix].u.number == 0)
     {
 	ret = apply(QGET_ADJID, ob, 0);
 	if (ret && ret->type == T_POINTER)
@@ -420,84 +378,6 @@ void load_lpc_info(ix, ob)
 	else
 	    gAdjid_list->item[ix].u.number = 1;
     }
-}
-
-struct parse_context {
-  struct vector
-    *id,
-    *plid,
-    *adjid,
-    *id_d,
-    *plid_d,
-    *adjid_d,
-    *prepos;
-  char
-    *allword;
-  struct vector
-    *wvec,
-    *patvec,
-    *obvec;
-  struct parse_context
-    *previous_context;
-};
-
-static struct parse_context *gPrevious_context;
-
-void parse_error_handler(arg)
-    struct svalue *arg;
-{
-    struct parse_context *old;
-
-    old = gPrevious_context;
-
-    /* Delete and free the id arrays
-    */
-    if (gId_list) 
-    {
-	free_vector(gId_list);
-    }
-    if (gPluid_list) 
-    {
-	free_vector(gPluid_list);
-    }
-    if (gAdjid_list) 
-    {
-	free_vector(gAdjid_list);
-    }
-    if (gId_list_d) 
-    {
-	free_vector(gId_list_d); 
-    }
-    if (gPluid_list_d) 
-    {
-	free_vector(gPluid_list_d); 
-    }
-    if (gAdjid_list_d) 
-    {
-	free_vector(gAdjid_list_d);
-    }
-    if (gPrepos_list) 
-    {
-	free_vector(gPrepos_list);
-    }
-    if (gAllword)
-	xfree(gAllword);
-
-    gId_list_d 		= old->id_d;
-    gPluid_list_d	= old->plid_d;
-    gAdjid_list_d 	= old->adjid_d;
-    gPrepos_list 	= old->prepos;
-    gId_list 		= old->id;     
-    gPluid_list 	= old->plid; 
-    gAdjid_list 	= old->adjid;
-    gAllword 		= old->allword;
-
-    free_vector(old->wvec);
-    free_vector(old->patvec);
-    free_vector(old->obvec); 
-
-    gPrevious_context = old->previous_context;
-    xfree((char *)old);
 }
 
 /* Main function, called from interpret.c
@@ -526,18 +406,17 @@ int parse (cmd, ob_or_array, pattern, stack_args, num_arg)
     struct svalue 	*stack_args;	/* Pointer to lvalue args on stack */
     int 		num_arg;	/* Number of args on stack */
 {
-    extern struct svalue *inter_sp;
-
-    static struct svalue error_handler_addr = { T_ERROR_HANDLER };
-
     struct vector	*obvec, *patvec, *wvec;
-    struct parse_context *old;
+    struct vector	*old_id, *old_plid, *old_adjid;
+    struct vector	*old_id_d, *old_plid_d, *old_adjid_d, *old_prepos;
+    char		*old_allword;     
     int			pix, cix, six, fail, fword, ocix, fpix;
     struct svalue	*pval;
     void		check_for_destr();    /* In interpret.c */
     struct svalue	*sub_parse();
     struct svalue	*slice_words();
     void		stack_put();
+    struct vector	*deep_inventory();
 
     /*
      * Pattern and commands can not be empty
@@ -545,9 +424,6 @@ int parse (cmd, ob_or_array, pattern, stack_args, num_arg)
     if (!strlen(cmd) || !strlen(pattern))
 	return 0;
 
-    old = (struct parse_context *)xalloc(sizeof *old);
-    if (!old)
-	error("Out of memory\n");
     wvec = explode_string(cmd," ");        /* Array of words in command */
     patvec = explode_string(pattern," ");  /* Array of pattern elements */
 
@@ -559,47 +435,37 @@ int parse (cmd, ob_or_array, pattern, stack_args, num_arg)
     if (!patvec)
 	patvec = allocate_array(0);
 
-    if (ob_or_array->type == T_POINTER) {
-	/* There might be more references to this array, which could cause
-	 * real nightmares if load_lpc_info could change the array.
-	 */
-	check_for_destr(ob_or_array->u.vec);
-	obvec =
-	  slice_array(ob_or_array->u.vec, 0, VEC_SIZE(ob_or_array->u.vec) - 1);
-    } else if (ob_or_array->type == T_OBJECT) {
+    wvec->ref++; 		/* Do not lose these arrays */
+    patvec->ref++;
+
+    if (ob_or_array->type == T_POINTER)
+	obvec = ob_or_array->u.vec;
+    else if (ob_or_array->type == T_OBJECT)
 	obvec = deep_inventory(ob_or_array->u.ob, 1); /* 1 == ob + deepinv */
-    } else {
-	free_vector(wvec);
-	free_vector(patvec);
-	xfree((char *)old);
+    else
+    {
+	obvec = 0;
 	error("Bad second argument to parse_command()\n");
     }
 
-    /* Copy and  make space for id arrays.
-     * Amylaar: Make sure that the state is restored when errors happen in
-     * sapply() from load_lpc_info() . parse_command need be reentrant.
-     */
-    old->id      = gId_list; 
-    old->plid    = gPluid_list; 
-    old->adjid   = gAdjid_list;
-    old->id_d    = gId_list_d; 
-    old->plid_d  = gPluid_list_d; 
-    old->adjid_d = gAdjid_list_d;
-    old->prepos  = gPrepos_list;
-    old->allword = gAllword;
-    old->wvec    = wvec;
-    old->patvec  = patvec;
-    old->obvec   = obvec;
-    old->previous_context = gPrevious_context;
-    gPrevious_context = old;
-    error_handler_addr.u.error_handler = parse_error_handler;
-    inter_sp++;
-    inter_sp->type = T_LVALUE;
-    inter_sp->u.lvalue = &error_handler_addr;
+    check_for_destr(obvec);
 
-    gId_list    = allocate_array(VEC_SIZE(obvec));
-    gPluid_list  = allocate_array(VEC_SIZE(obvec));
-    gAdjid_list = allocate_array(VEC_SIZE(obvec));
+    obvec->ref++;
+
+    /* Copy and  make space for id arrays
+    */
+    old_id      = gId_list; 
+    old_plid    = gPluid_list; 
+    old_adjid   = gAdjid_list;
+    old_id_d      = gId_list_d; 
+    old_plid_d    = gPluid_list_d; 
+    old_adjid_d   = gAdjid_list_d;
+    old_prepos    = gPrepos_list;
+    old_allword   = gAllword;
+
+    gId_list    = allocate_array(obvec->size);
+    gPluid_list  = allocate_array(obvec->size);
+    gAdjid_list = allocate_array(obvec->size);
     
     /* Get the default ids of 'general references' from master object
     */
@@ -637,7 +503,7 @@ int parse (cmd, ob_or_array, pattern, stack_args, num_arg)
 	pval->u.vec->ref++;
     }
     else
-	gPrepos_list = allocate_array(0);
+	gPrepos_list = 0;
 
     pval = apply_master_ob(QGET_ALLWORD,0);
     if (pval && pval->type == T_STRING)
@@ -647,16 +513,16 @@ int parse (cmd, ob_or_array, pattern, stack_args, num_arg)
 
     /* Loop through the pattern. Handle %s but not '/'
     */
-    for (six=0,cix=0,fail=0,pix=0; pix < VEC_SIZE(patvec); pix++)
+    for (six=0,cix=0,fail=0,pix=0; pix < patvec->size; pix++)
     {
 	pval = 0; 
 	fail = 0; 
 
 	if (EQ(patvec->item[pix].u.string,"%s")) {
-	    if (pix == (VEC_SIZE(patvec)-1))
+	    if (pix == (patvec->size-1))
 	    {
-		pval = slice_words(wvec,cix,VEC_SIZE(wvec)-1);
-		cix = VEC_SIZE(wvec);
+		pval = slice_words(wvec,cix,wvec->size-1);
+		cix = wvec->size;
 	    }
 	    else {
 		ocix = fword = cix; fpix = ++pix;
@@ -668,7 +534,7 @@ int parse (cmd, ob_or_array, pattern, stack_args, num_arg)
 			cix = ++ocix;
 			pix = fpix;
 		    }
-		} while ((fail) && (cix<VEC_SIZE(wvec)));
+		} while ((fail) && (cix<wvec->size));
 
 		if (!fail) {
 		    stack_put(pval,stack_args,six+1,num_arg);
@@ -693,10 +559,72 @@ int parse (cmd, ob_or_array, pattern, stack_args, num_arg)
     
     /* Also fail when there is words left to parse and pattern exhausted
     */
-    if (cix < VEC_SIZE(wvec))
+    if (cix < wvec->size)
 	fail = 1;
 
-    pop_stack();
+    /* Delete and free the id arrays
+    */
+    if (gId_list) 
+    {
+	gId_list->ref--;
+	free_vector(gId_list);
+    }
+    if (gPluid_list) 
+    {
+	gPluid_list->ref--;
+	free_vector(gPluid_list);
+    }
+    if (gAdjid_list) 
+    {
+	gAdjid_list->ref--;
+	free_vector(gAdjid_list);
+    }
+    if (gId_list_d) 
+    {
+	gId_list_d->ref--;
+	free_vector(gId_list_d); 
+    }
+    if (gPluid_list_d) 
+    {
+	gPluid_list_d->ref--;
+	free_vector(gPluid_list_d); 
+    }
+    if (gAdjid_list_d) 
+    {
+	gAdjid_list_d->ref--;
+	free_vector(gAdjid_list_d);
+    }
+    if (gPrepos_list) 
+    {
+	gPrepos_list->ref--;
+	free_vector(gPrepos_list);
+    }
+    if (gAllword)
+	free(gAllword);
+
+    gId_list_d 		= old_id_d;
+    gPluid_list_d	= old_plid_d;
+    gAdjid_list_d 	= old_adjid_d;
+    gPrepos_list 	= old_prepos;
+    gId_list 		= old_id;     
+    gPluid_list 	= old_plid; 
+    gAdjid_list 	= old_adjid;
+    gAllword 		= old_allword;
+
+    wvec->ref--; 
+    patvec->ref--;
+    obvec->ref--;
+    free_vector(wvec);
+    free_vector(patvec);
+
+    /*
+     * A vector we made should be freed
+     */
+    if (ob_or_array->type == T_OBJECT)
+    {
+	obvec->ref--;
+	free_vector(obvec); 
+    }
 
     return !fail;
 }
@@ -718,7 +646,7 @@ void stack_put(pval, sp, pos, max)
 	return;
 
     if ((pval) && (sp[pos].type == T_LVALUE))
-	transfer_svalue(sp[pos].u.lvalue, pval);
+	assign_svalue(sp[pos].u.lvalue, pval);
 }
 
 /*
@@ -742,7 +670,7 @@ struct svalue *slice_words(wvec, from, to)
     
     slice = slice_array(wvec, from, to);
 
-    if (VEC_SIZE(slice))
+    if (slice->size)
 	tx = implode_string(slice," ");
     else
 	tx = 0;
@@ -750,9 +678,8 @@ struct svalue *slice_words(wvec, from, to)
     free_vector(slice);
     if (tx) {
 	stmp.type = T_STRING;
-	stmp.x.string_type = STRING_SHARED;
+	stmp.string_type = STRING_SHARED;
 	stmp.u.string = make_shared_string(tx);
-	xfree(tx);
 	return &stmp;
     }
     else
@@ -779,7 +706,7 @@ struct svalue *sub_parse(obvec, patvec, pix_in, wvec, cix_in, fail, sp)
     struct svalue	*pval;
     struct svalue	*one_parse();
 
-    if (*cix_in == VEC_SIZE(wvec)) {
+    if (*cix_in == wvec->size) {
 	*fail = 1;
 	return 0;
     }
@@ -794,13 +721,13 @@ struct svalue *sub_parse(obvec, patvec, pix_in, wvec, cix_in, fail, sp)
 	pix++;
 	cix = *cix_in;
 
-	while ((pix < VEC_SIZE(patvec)) && (EQ(patvec->item[pix].u.string,"/")))
+	while ((pix < patvec->size) && (EQ(patvec->item[pix].u.string,"/")))
 	{
 	    subfail = 0;
 	    pix++;
 	}
 
-	if ((!subfail) && (pix<VEC_SIZE(patvec)))
+	if ((!subfail) && (pix<patvec->size))
 	    pval = one_parse(obvec, patvec->item[pix].u.string, wvec, &cix, 
 			     &subfail, sp);
 	else
@@ -812,14 +739,14 @@ struct svalue *sub_parse(obvec, patvec, pix_in, wvec, cix_in, fail, sp)
 
     /* If there is alternatives skip them
     */
-    if ((pix+1 < VEC_SIZE(patvec)) && (EQ(patvec->item[pix+1].u.string,"/"))) {
-	while ((pix+1 <VEC_SIZE(patvec)) &&
+    if ((pix+1 < patvec->size) && (EQ(patvec->item[pix+1].u.string,"/"))) {
+	while ((pix+1 <patvec->size) &&
 	       (EQ(patvec->item[pix+1].u.string,"/"))) {
 	       pix += 2;
 	}
 	pix++; /* Skip last alternate after last '/' */
-	if (pix>=VEC_SIZE(patvec))
-	    pix = VEC_SIZE(patvec)-1;
+	if (pix>=patvec->size)
+	    pix = patvec->size-1;
     }
 
     *cix_in = cix;
@@ -859,7 +786,7 @@ struct svalue *one_parse(obvec, pat, wvec, cix_in, fail, prep_param)
     struct svalue	*prepos_parse();
     struct svalue	*number_parse();
 
-    if (*cix_in == VEC_SIZE(wvec)) {
+    if (*cix_in == wvec->size) {
 	*fail = 1;
 	return 0;
     }
@@ -886,7 +813,7 @@ struct svalue *one_parse(obvec, pat, wvec, cix_in, fail, prep_param)
 
     case 'w':
 	stmp.type = T_STRING;
-	stmp.x.string_type = STRING_SHARED;
+	stmp.string_type = STRING_SHARED;
 	stmp.u.string = make_shared_string(wvec->item[*cix_in].u.string);
 	pval = &stmp;
 	(*cix_in)++;
@@ -1055,9 +982,10 @@ struct svalue *item_parse(obvec, wvec, cix_in, fail)
     static struct svalue stmp;
     int			cix, tix, obix, plur_flag, max_cix, match_all;
     int			match_object();
+    void		load_lpc_info();
 
 
-    tmp = allocate_array(VEC_SIZE(obvec) + 1);
+    tmp = allocate_array(obvec->size + 1);
     if (pval = number_parse(obvec, wvec, cix_in, fail))
 	assign_svalue_no_free(&tmp->item[0],pval);
 
@@ -1077,18 +1005,16 @@ struct svalue *item_parse(obvec, wvec, cix_in, fail)
 	match_all = 0;
     }
 
-    for (max_cix = *cix_in, tix=1, obix=0; obix < VEC_SIZE(obvec); obix++) {
+    for (max_cix = *cix_in, tix=1, obix=0; obix < obvec->size; obix++) {
 	*fail = 0; cix = *cix_in;
 	if (obvec->item[obix].type != T_OBJECT)
 	    continue;
-	if (cix == VEC_SIZE(wvec) && match_all)
+	if (cix == wvec->size && match_all)
 	{
 	    assign_svalue_no_free(&tmp->item[tix++],&obvec->item[obix]);
 	    continue;
 	}	    
 	load_lpc_info(obix,obvec->item[obix].u.ob);
-	if (obvec->item[obix].u.ob->flags & O_DESTRUCTED)
-	    continue;
 	if (match_object(obix, wvec, &cix, &plur_flag)) {
 	    assign_svalue_no_free(&tmp->item[tix++],&obvec->item[obix]);
 	    max_cix = (max_cix<cix)?cix:max_cix;
@@ -1103,7 +1029,7 @@ struct svalue *item_parse(obvec, wvec, cix_in, fail)
     }
     else
     {
-	if (*cix_in < VEC_SIZE(wvec))
+	if (*cix_in < wvec->size)
 	    *cix_in = max_cix + 1;
 	ret = slice_array(tmp,0,tix-1);
 	if (!pval) {
@@ -1151,14 +1077,11 @@ struct svalue *living_parse(obvec, wvec, cix_in, fail)
     struct object	*ob;
     int			obix, tix;
 
-    live = allocate_array(VEC_SIZE(obvec)); tix = 0; *fail = 0;
+    live = allocate_array(obvec->size); tix = 0; *fail = 0;
 
-    for (obix=0;obix<VEC_SIZE(obvec);obix++)  {
-	if (obvec->item[obix].type != T_OBJECT)
-	    continue;
+    for (obix=0;obix<obvec->size;obix++) 
 	if (obvec->item[obix].u.ob->flags & O_ENABLE_COMMANDS)
 	    assign_svalue_no_free(&live->item[tix++],&obvec->item[obix]);
-    }
 
     if (tix) {
 	pval = item_parse(live, wvec, cix_in, fail);
@@ -1179,7 +1102,6 @@ struct svalue *living_parse(obvec, wvec, cix_in, fail)
     if (ob) {
 	stmp.type = T_OBJECT;
 	stmp.u.ob = ob;
-	add_ref(ob, "living_parse");
 	(*cix_in)++;
 	return &stmp;
     }
@@ -1205,24 +1127,16 @@ struct svalue *single_parse(obvec, wvec, cix_in, fail)
 {
     int			cix, obix, plur_flag;
     int			match_object();
-    struct svalue *osvp;
+    void			load_lpc_info();
 
-    plur_flag = 0; /* Amylaar: I don't know if it's the right value,
-		    * but it is at least better than no initialization.
-		    */
-    osvp = obvec->item;
-    for (obix=0;obix<VEC_SIZE(obvec);obix++,osvp++)
+    for (obix=0;obix<obvec->size;obix++)
     {
-	if (osvp->type != T_OBJECT) continue;
 	*fail = 0; cix = *cix_in;
-	load_lpc_info(obix,osvp->u.ob);
-	/* load_lpc_info() might destruct the object in question */
-	if (osvp->u.ob->flags & O_DESTRUCTED) continue;
+	load_lpc_info(obix,obvec->item[obix].u.ob);
 	if (match_object(obix, wvec, &cix, &plur_flag))
 	{
 	    *cix_in = cix+1;
-	    add_ref(osvp->u.ob, "single_parse");
-	    return osvp;
+	    return &obvec->item[obix];
 	}
 	plur_flag = 0;
     }
@@ -1264,7 +1178,7 @@ struct svalue *prepos_parse(wvec, cix_in, fail, prepos)
       pvec = prepos->u.vec;
   }
 
-  for (pix = 0; pix < VEC_SIZE(pvec); pix++)
+  for (pix = 0; pix < pvec->size; pix++)
   {
       if (pvec->item[pix].type != T_STRING)
 	  continue;
@@ -1280,41 +1194,30 @@ struct svalue *prepos_parse(wvec, cix_in, fail, prepos)
       }
       else {
 	  tvec = explode_string(tmp, " ");
-	  for (tix=0;tix<VEC_SIZE(tvec);tix++)
+	  for (tix=0;tix<tvec->size;tix++)
 	  {
-	      if ((*cix_in+tix >= VEC_SIZE(wvec)) ||
+	      if ((*cix_in+tix >= wvec->size) ||
 		  (!EQ(wvec->item[*cix_in+tix].u.string,tvec->item[tix].u.string)))
 		  break;
 	  }
-	  if (tix = (tix == VEC_SIZE(tvec))?1:0)
-	      (*cix_in)+=VEC_SIZE(tvec);
+	  if (tix = (tix == tvec->size)?1:0)
+	      (*cix_in)+=tvec->size;
 	  free_vector(tvec);
 	  if (tix)
 	      break;
       }
   }
 
-  if (pix == VEC_SIZE(pvec))
+  if (pix == pvec->size)
   {
       *fail = 1;
   }
   else if (pvec != gPrepos_list)
   {
-      stmp = pvec->item[0];
-      pvec->item[0] = pvec->item[pix];
-      pvec->item[pix] = stmp;
+      assign_svalue_no_free(&stmp,&pvec->item[0]);
+      assign_svalue_no_free(&pvec->item[0],&pvec->item[pix]);
+      assign_svalue_no_free(&pvec->item[pix], &stmp);
       *fail = 0;
-  } else {
-      /* The original behaviour was to return the original value, which
-       * would replace then the original value. Since this bahavoir is
-       * sonewhat dubious, is in partial contradiction to a comment
-       * above (the original value might be a string, but need not),
-       * and not even the original author has retained this 'feature'
-       * in the CD version of parse.c , it is deemed to be accidential
-       * rather than a real feature.
-       */
-      assign_svalue_no_free(&stmp, &pvec->item[pix]);
-      return &stmp;
   }
   return prepos;
 
@@ -1330,7 +1233,6 @@ struct svalue *prepos_parse(wvec, cix_in, fail, prepos)
  *			wvec: Vector of words in the command to parse
  *			cix_in: Current word in commandword vector
  *			plur: This arg gets set if the noun was on pluralform
- *                            MUST be initialized by caller!
  * Returns:		True if object matches.
  */
 int match_object(obix, wvec, cix_in, plur)
@@ -1357,7 +1259,7 @@ int match_object(obix, wvec, cix_in, plur)
 
 	case 1:
 	    if (!gId_list || 
-		VEC_SIZE(gId_list) <= obix || 
+		gId_list->size <= obix || 
 		gId_list->item[obix].type != T_POINTER)
 		continue;
 	    ids = gId_list->item[obix].u.vec;
@@ -1371,21 +1273,18 @@ int match_object(obix, wvec, cix_in, plur)
 
 	case 3:
 	    if (!gPluid_list || 
-		VEC_SIZE(gPluid_list) <= obix || 
+		gPluid_list->size <= obix || 
 		gPluid_list->item[obix].type != T_POINTER)
 		continue;
 	    ids = gPluid_list->item[obix].u.vec;
 	    break;
 
 	default:
-	    fatal("match_object() called with invalid arguments\n");
+	    ids = 0;
 
 	}
 
-	if (!ids)
-	    fatal("match_object(): internal error\n");
-
-	for (il = 0; il < VEC_SIZE(ids); il++)
+	for (il = 0; il < ids->size; il++)
 	{
 	    if (ids->item[il].type == T_STRING)
 	    {
@@ -1432,7 +1331,7 @@ int find_string(str, wvec, cix_in)
     char *p1, *p2;
     struct vector *split;
 
-    for (; *cix_in < VEC_SIZE(wvec); (*cix_in)++)
+    for (; *cix_in < wvec->size; (*cix_in)++)
     {
 	p1 = wvec->item[*cix_in].u.string;
 	if (p1[0] != str[0])
@@ -1446,7 +1345,7 @@ int find_string(str, wvec, cix_in)
 
 	/* If str was multi word we need to make som special checks
         */
-	if (*cix_in == (VEC_SIZE(wvec) -1))
+	if (*cix_in == (wvec->size -1))
 	    continue;
 
 	split = explode_string(str," ");
@@ -1455,7 +1354,7 @@ int find_string(str, wvec, cix_in)
 	    wvec->size - *cix_in ==	2: One extra word
 				3: Two extra words
         */
-	if (!split || (VEC_SIZE(split) > (VEC_SIZE(wvec) - *cix_in))) 
+	if (!split || (split->size > (wvec->size - *cix_in))) 
 	{
 	    if (split) 
 		free_vector(split);
@@ -1463,13 +1362,13 @@ int find_string(str, wvec, cix_in)
 	}
 	
 	fpos = *cix_in;
-	for (; (*cix_in-fpos) < VEC_SIZE(split); (*cix_in)++)
+	for (; (*cix_in-fpos) < split->size; (*cix_in)++)
 	{
 	    if (strcmp(split->item[*cix_in-fpos].u.string, 
 		       wvec->item[*cix_in].u.string))
 		break;
 	}
-	if ((*cix_in - fpos) == VEC_SIZE(split))
+	if ((*cix_in - fpos) == split->size)
 	    return fpos;
 
 	*cix_in = fpos;
@@ -1541,11 +1440,11 @@ int check_adjectiv(obix, wvec, from, to)
 		il = back + 1;
 		break;
 	    }
-	    xfree(adstr);
+	    free(adstr);
 	    return 0;
 	}
     }
-    xfree(adstr);
+    free(adstr);
     return 1;
 }
 
@@ -1566,7 +1465,7 @@ int member_string(str, svec)
     if (!svec)
 	return -1;
 
-    for (il = 0; il < VEC_SIZE(svec); il++)
+    for (il = 0; il < svec->size; il++)
     {
 	if (svec->item[il].type != T_STRING)
 	    continue;
@@ -1599,22 +1498,22 @@ char *parse_to_plural(str)
 
     words = explode_string(str, " ");
     
-    for (changed = 0, il = 1; il < VEC_SIZE(words); il++) {
+    for (changed = 0, il = 1; il < words->size; il++) {
 	if ((EQ(words->item[il].u.string,"of")) ||
-	    (il+1 == VEC_SIZE(words)))  {
+	    (il+1 == words->size))  {
 	    sp = parse_one_plural(words->item[il-1].u.string);
 	    if (sp != words->item[il-1].u.string) {
 		stmp.type = T_STRING;
-		stmp.x.string_type = STRING_MALLOC;
+		stmp.string_type = STRING_MALLOC;
 		stmp.u.string = string_copy(sp);
-		transfer_svalue(&words->item[il-1],&stmp);
+		assign_svalue(&words->item[il-1],&stmp);
 		changed = 1;
 	    }
 	} 
     }
     if (!changed) {
 	free_vector(words);
-	return string_copy(str);
+	return str;
     }
     sp = implode_string(words, " ");
     free_vector(words);
@@ -1661,8 +1560,8 @@ char *parse_one_plural(str)
     }
     
     if (EQ(str,"corpse")) return "corpses";
-    if (EQ(str,"tooth")) return "teeth";
-    if (EQ(str,"foot")) return "feet";
+    if (EQ(str,"tooth")) return "tooth";
+    if (EQ(str,"foot")) return "foot";
     if (EQ(str,"man")) return "men";
     if (EQ(str,"woman")) return "women";
     if (EQ(str,"child")) return "children";
@@ -1678,14 +1577,12 @@ char *parse_one_plural(str)
    End of Parser
 
 ***************************************************************/
-#endif /* !COMPAT_MODE */
-#endif /* SUPPLY_PARSE_COMMAND */
+#endif
 
 /*
      ----- describe: This code is obsolete ------
 */
 
-#ifdef F_DESCRIBE
 char *describe_items (arr, func, live)
     struct svalue *arr;
     char *func;
@@ -1693,9 +1590,7 @@ char *describe_items (arr, func, live)
 {
     return "Not supported in 3.0";
 }
-#endif
 
-#ifdef F_PROCESS_STRING
 /* process_string
  *
  * Description:   Checks a string for the below occurences and replaces:
@@ -1720,14 +1615,12 @@ char *
 process_string(str)
     char *str;
 {
-    extern struct svalue *inter_sp;
-
     struct vector *vec;
+    struct svalue *ret;
     struct object *old_cur = current_object;
     int pr_start, il, changed, ch_last;
-    char *p0, *p1, *p2, *p3, *buf;
+    char *p1, *p2, *p3, *buf, *old_eff_user;
     char *process_part();
-    struct wiz_list *old_eff_user;
 
     if ((!str) || (!(p1=strchr(str,'@'))))
 	return str;
@@ -1739,71 +1632,71 @@ process_string(str)
 
     old_eff_user = 0;
 
-#ifdef EUIDS
     if (!current_object)
     {
-	struct svalue *ret;
-
 	current_object = command_giver;
 	ret = apply_master_ob("get_bb_uid",0);
 	if (!ret || ret->type != T_STRING)
 	    return str;
 	if (current_object->eff_user)
 	{
-	    old_eff_user = current_object->eff_user;
+	    old_eff_user = current_object->eff_user->name;
 	    current_object->eff_user = add_name(ret->u.string);
 	}
     }
-#endif
 	
     vec = explode_string(str,"@@");
     if (!vec)
 	return str;
-    push_referenced_vector(vec); /* free in case of errors */
 
     pr_start = ((str[0]=='@') && (str[1]=='@'))?0:1;
 
-    for (ch_last = 0, changed = 0, il = pr_start; il < VEC_SIZE(vec); il++) {
-	p0 = vec->item[il].u.string;
-	p1 = strchr(p0, ' ');
+    for (ch_last = 0, changed = 0, il = pr_start; il < vec->size; il++) {
+	p1 = strchr(vec->item[il].u.string,' ');
 	if (!p1) {
-	    p2 = process_part(p0);
-	    if (p2) {
-		p2 = string_copy(p2);
+	    p2 = process_part(vec->item[il].u.string);
+	    if (p2 != vec->item[il].u.string) 
 		ch_last = 1;
-	    }
 	}
 	else
 	{
-	    int len;
-
-	    len = p1 - p0;
-	    buf = xalloc(len + 1);
-	    strncpy(buf, p0, len);
-	    buf[len] = 0;
+	    buf = string_copy(vec->item[il].u.string);
+	    p1 = strchr(buf,' ');
+	    *p1=0;
 	    p2 = process_part(buf);
-	    if (p2) {
-		len = strlen(p2);
-		p3 = xalloc(len + strlen(p1) + 1);
+	    *p1=' ';
+	    if (p2 != buf)
+	    {
+		p3 = xalloc(1+strlen(p1)+strlen(p2));
 		strcpy(p3,p2);
-		strcpy(p3+len,p1);
+		strcat(p3,p1);
+		free(p2);
 		p2 = p3;
 	    }
-	    xfree(buf);
+	    else
+		p2 = vec->item[il].u.string;
+
+	    free(buf);
 	}
-	if (!p2) {
+	if (p2 == vec->item[il].u.string) {
 	    if(!ch_last) {		      /* get rid of the last snabels */
-		p2 = xalloc(3+strlen(p0));
-		strcpy(p2,"@@"); strcpy(p2+2,p0);
-	    } else {
-		ch_last = 0;
+		p3 = xalloc(3+strlen(p2));
+		strcpy(p3,"@@"); strcat(p3,p2);
+		p2 = p3;
 	    }
-	} else {
-	    changed = 1;
+	    else
+		ch_last = 0;
 	}
-	if (p2) {
-	    xfree(p0);
-	    vec->item[il].u.string = p2;
+	else
+	    changed = 1;
+
+	if (p2 != vec->item[il].u.string)
+	{
+	    free_svalue(&vec->item[il]);
+	    vec->item[il].u.string = string_copy(p2);
+	    vec->item[il].string_type = STRING_MALLOC;
+	    vec->item[il].type = T_STRING;
+	    free(p2);
 	}
     }
 
@@ -1812,14 +1705,12 @@ process_string(str)
     else
 	buf = 0;
 
-    inter_sp--;
     free_vector(vec);
 
-#ifdef EUIDS
-    if (old_eff_user) {
-	current_object->eff_user = old_eff_user;
+    if (old_eff_user)
+    {
+	current_object->eff_user = add_name(old_eff_user);
     }
-#endif
 
     current_object = old_cur;
 
@@ -1836,14 +1727,14 @@ char *process_part(str)
     struct svalue *process_value();
 
     if ((strlen(str)<1) || (str[0]<'A') || (str[0]>'z'))
-	return (char *)0;
+	return str;
 
     ret = process_value(str);
 
     if ((ret) && (ret->type == T_STRING))
-	return ret->u.string;
+	return string_copy(ret->u.string);
     else
-	return (char *)0;
+	return str;
 }
 
 /*
@@ -1858,7 +1749,7 @@ struct svalue *process_value(str)
 {
     struct svalue *ret;
     static struct svalue rval;
-    char *func,*func2,*obj,*arg,*narg;
+    char *func,*obj,*arg,*narg;
     int numargs;
     struct object *ob;
 
@@ -1882,7 +1773,7 @@ struct svalue *process_value(str)
 
     if (!ob)
     {
-	xfree(func);
+	free(func);
 	return &rval;
     }
 
@@ -1893,7 +1784,7 @@ struct svalue *process_value(str)
 	narg = strchr(arg,'|');
 	if (narg) 
 	    *narg = 0; 
-	push_string_malloced(arg); numargs++;
+	push_string(arg,STRING_MALLOC); numargs++;
 	if (narg) 
 	{
 	    *narg = '|'; narg++;
@@ -1902,21 +1793,15 @@ struct svalue *process_value(str)
     
     /* Apply the function and see if adequate answer is returned
     */
-    if ( func2 = findstring(func) ) {
-	xfree(func);
-	ret = apply(func2, ob, numargs);
-    } else {
-	xfree(func);
-	ret = (struct svalue *)0;
-    }
+    ret = apply(func, ob, numargs);
 
+    free(func);
 
     if (ret)
 	rval = *ret;
 
     return &rval;
 }
-#endif /* F_PROCESS_STRING */
   
 /*
  * Function name: break_string
@@ -1968,9 +1853,9 @@ break_string(str, width, indent)
     if (!lines)
 	return fstr;
 
-    xfree(fstr);
+    free(fstr);
 
-    for (nchar = 0, il = 0; il < VEC_SIZE(lines); il++)
+    for (nchar = 0, il = 0; il < lines->size; il++)
 	nchar += indent + strlen(lines->item[il].u.string) + 1;
     
     fstr = xalloc(nchar + 1);
@@ -1980,14 +1865,14 @@ break_string(str, width, indent)
     for (il = 0; il < indent; il++) 
 	istr[il] = ' ';
     
-    for (nchar = 0, il = 0; il < VEC_SIZE(lines); il++)
+    for (nchar = 0, il = 0; il < lines->size; il++)
     {
 	strcat(fstr, istr); 
 	strcat(fstr, lines->item[il].u.string);
 	strcat(fstr, "\n");
     }
 
-    xfree(istr);
+    free(istr);
     free_vector(lines);
 
     return fstr;

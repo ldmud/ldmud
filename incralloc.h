@@ -6,8 +6,8 @@
 
 struct mem_block {
     char *block;
-    mp_int current_size;
-    mp_int max_size;
+    int current_size;
+    int max_size;
 };
 
-#define START_BLOCK_SIZE	2048
+#define START_BLOCK_SIZE	4096

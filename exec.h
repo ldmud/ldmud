@@ -1,5 +1,3 @@
-#ifndef EXEC_H
-#define EXEC_H
 /*
  * A compiled program consists of several data blocks, all allocated
  * contiguos in memory to enhance the working set. At the compilation,
@@ -7,7 +5,7 @@
  * unknow. When compilation is done, the blocks will be copied into
  * the one big area.
  *
- * There are 8 different blocks of information for each program:
+ * There are 5 different blocks of information for each program:
  * 1. The program itself. Consists of machine code instructions for a virtual
  *    stack machine. The size of the program must not be bigger than
  *    65535 bytes, as 16 bit pointers are used. Who would ever need a bigger
@@ -27,73 +25,43 @@
  * 6. List of inherited objects.
  */
 
-#include "machine.h"
-
 /*
  * When an new object inherits from another, all function definitions
  * are copied, and all variable definitions.
- * Flags with NAME_ can't explicitly declared. Flags that can be declared,
+ * Flags below can't explicitly declared. Flags that can be declared,
  * are found with TYPE_ below.
  *
- * When an object is compiled with type testing (#pragma strict_types), all
+ * When an object is compiled with type testing NAME_STRICT_TYPES, all
  * types are saved of the arguments for that function during compilation.
  * If the #pragma save_types is specified, then the types are saved even
  * after compilation, to be used when the object is inherited.
  */
+#define NAME_INHERITED		0x1	/* Defined by inheritance */
+#define NAME_UNDEFINED		0x2	/* Not defined yet */
+#define NAME_STRICT_TYPES	0x4	/* Compiled with type testing */
+#define NAME_HIDDEN		0x8	/* Not visible for inheritance */
+#define NAME_PROTOTYPE		0x10	/* Defined by a prototype only */
 
-#define NAME_INHERITED		0x80000000 /* Defined by inheritance         */
-#define TYPE_MOD_STATIC		0x40000000 /* Static function or variable    */
-#define TYPE_MOD_NO_MASK	0x20000000 /* The nomask => not redefineable */
-#define TYPE_MOD_PRIVATE	0x10000000 /* Can't be inherited             */
-#define TYPE_MOD_PUBLIC		0x08000000 /* Force inherit through private  */
-#define TYPE_MOD_VARARGS 	0x04000000 /* Used for type checking         */
-#define NAME_INITIALIZED	0x04000000 /* only used for variables        */
-#define TYPE_MOD_VIRTUAL	0x02000000 /* can be re- and cross- defined  */
-#define TYPE_MOD_PROTECTED	0x01000000 /* cannot be called externally    */
-#define TYPE_MOD_XVARARGS	0x00800000 /* accepts optional arguments     */
-
-#define FUNSTART_MASK		0x000fffff
-#define NAME_CROSS_DEFINED	0x00080000
-#define INHERIT_MASK		0x0003ffff
-
-
-#define NAME_HIDDEN		0x00000800 /* Not visible for inheritance    */
-#define NAME_PROTOTYPE		0x00000400 /* Defined by a prototype only    */
-#define NAME_UNDEFINED		0x00000200 /* Not defined yet                */
-#define NAME_TYPES_LOST		0x00000100 /* inherited, no save_types       */
-
-/* function header in program:
-   name : shared string (4 bytes)
-   return type          (1)
--->num_arg              (1)
-   num_local            (1)
-   executable code
- */
 struct function {
-    char *name; /* This is needed very often, therefore it should be first */
-    union {
-        uint32 pc;		/* Address of function			*/
-        uint32 inherit;		/* inherit table index when inherited.	*/
-        /*signed*/ int32 func;	/* offset to first inherited function
-        			 * with this name.
-        			 * simul_efun also uses this field as a next
-        			 * index in the simul_efun function table for
-        			 * functions that have been discarded due to a
-        			 * change in the number of arguments.
-        			 */
-	struct function *next;	/* used for mergesort */
-    } offset;
-    uint32 flags;
+    char *name;
+    unsigned short offset;	/* Address of function,
+				 * or inherit table index when inherited. */
+    unsigned short flags;	/* NAME_ . See above. */
+    unsigned short num_local;	/* Number of local variables */
+    unsigned short num_arg;	/* Number of arguments needed.
+				   -1 arguments means function not defined
+				   in this object. Probably inherited */
+    unsigned short function_index_offset;
+    /* Used so that it is possible to quickly find this function
+     * in the inherited program.
+     */
     unsigned short type;	/* Return type of function. See below. */
-    unsigned char num_local;	/* Number of local variables */
-    unsigned char num_arg;	/* Number of arguments needed.
-				 * -1 arguments for a simul_efun means VARARGS.
-				 */
 };
 
 struct variable {
     char *name;
-    uint32 flags;		/* All flags, also type of variable. */
+    unsigned short type;	/* Type of variable. See below. TYPE_ */
+    unsigned short flags;	/* Facts found by the compiler. NAME_ */
 };
 
 struct inherit {
@@ -103,26 +71,22 @@ struct inherit {
 };
 
 struct program {
-    p_int ref;				/* Reference count */
-    p_int total_size;			/* Sum of all data in this struct */
+    int ref;				/* Reference count */
 #ifdef DEBUG
-    p_int extra_ref;			/* Used to verify ref count */
+    int extra_ref;			/* Used to verify ref count */
 #endif
     char *program;			/* The binary instructions */
     char *name;				/* Name of file that defined prog */
-    int32  id_number;			/* used to associate information with
+    int  id_number;			/* used to associate information with
 					  this prog block without needing to
 					   increase the reference count     */
-    int32  load_time;			/* When has it been compiled ? */
-    /*unsigned*/ char *line_numbers;	/* Line number information */
-    unsigned short *function_names;
-#define PROGRAM_END(program) ((char *)(program).function_names)
-    uint32 *functions;
+    unsigned short *line_numbers;	/* Line number information */
+    struct function *functions;
     char **strings;			/* All strings uses by the program */
     struct variable *variable_names;	/* All variables defined */
     struct inherit *inherit;		/* List of inherited prgms */
-    unsigned short flags;
-    short heart_beat;			/* Index of the heart beat function.
+    int total_size;			/* Sum of all data in this struct */
+    int heart_beat;			/* Index of the heart beat function.
 					 * -1 means no heart beat
 					 */
     /*
@@ -138,13 +102,10 @@ struct program {
     unsigned short *argument_types;
 #define INDEX_START_NONE		65535
     unsigned short *type_start;
-
-    p_int swap_num;		/* Swap file offset. -1 is not swapped yet. */
-
     /*
      * And now some general size information.
      */
-    unsigned short num_function_names;
+    unsigned short program_size;	/* size of this instruction code */
     unsigned short num_functions;
     unsigned short num_strings;
     unsigned short num_variables;
@@ -164,77 +125,19 @@ extern struct program *current_prog;
 #define TYPE_STRING	2
 #define TYPE_VOID	3
 #define TYPE_OBJECT	4
-#define TYPE_MAPPING	5
-#define TYPE_FLOAT	6
-#define TYPE_ANY	7	/* Will match any type */
-#define TYPE_SPACE	8
-#define TYPE_CLOSURE	9
-#define TYPE_SYMBOL    10
-#define TYPE_QUOTED_ARRAY 11
-#define TYPE_TERM      12
-#define TYPEMAP_SIZE   13
+#define TYPE_ANY	5	/* Will match any type */
 
 /*
  * These are or'ed in on top of the basic type.
  */
-#define TYPE_MOD_POINTER	0x0040	/* Pointer to a basic type        */
-#define TYPE_MOD_REFERENCE	0x0080
+#define TYPE_MOD_STATIC		0x0100	/* Static function or variable */
+#define TYPE_MOD_NO_MASK	0x0200	/* The nomask => not redefineable */
+#define TYPE_MOD_POINTER	0x0400	/* Pointer to a basic type */
+#define TYPE_MOD_PRIVATE	0x0800	/* Can't be inherited */
+#define TYPE_MOD_PROTECTED	0x1000
+#define TYPE_MOD_PUBLIC		0x2000  /* Force inherit through private */
+#define TYPE_MOD_VARARGS	0x4000	/* Used for type checking */
 
-#define TYPE_MOD_MASK		0x000000ff
-
-#define TYPE_MOD_RMASK		(TYPE_MOD_MASK & ~TYPE_MOD_REFERENCE)
-
-#define P_REPLACE_ACTIVE	0x0001
-
-#define H_MOVE_OBJECT0	0
-#define H_MOVE_OBJECT1	1
-#define H_LOAD_UIDS	2
-#define H_CLONE_UIDS	3
-#define H_CREATE_SUPER	4
-#define H_CREATE_OB	5
-#define H_CREATE_CLONE	6
-#define H_RESET		7
-#define H_CLEAN_UP	8
-#define H_MODIFY_COMMAND   9
-#define H_NOTIFY_FAIL	  10
-#define H_NO_IPC_SLOT	  11
-#define H_INCLUDE_DIRS	  12
-#define H_TELNET_NEG	  13
-#define H_NOECHO	  14
-#define H_ERQ_STOP	  15
-#define H_MODIFY_COMMAND_FNAME 16
-#define NUM_CLOSURE_HOOKS 17
-
-#include "interpret.h" /* net a real dependency */
-
-extern struct svalue closure_hook[NUM_CLOSURE_HOOKS];
-
-#define VIRTUAL_VAR_TAG 0x4000
-
-extern struct simul_efun_table_s {
-    unsigned char *funstart;
-    struct program *program;
-    p_int function_index_offset;
-    p_int variable_index_offset;
-} simul_efun_table[];
-
-#define F_ESCAPE_BITS 7
-
-/*
- * How the information about all instructions is stored . This information is
- * generated by make_func.
- */
-
-struct instr {
-    short		/* Can't use char to represent -1	*/
-      max_arg,		/* Maximum number of arguments. 	*/
-      min_arg;		/* Minimum number of arguments. 	*/
-    char type[2];	/* Types of arguments 1 and 2   	*/
-    short Default;	/* An efun to use as default for last argument.
-			 * -1 for internal stackmachine codes
-			 */
-    short ret_type;	/* The return type used by the compiler	*/
-    short arg_index;	/* Indexes the efun_arg_types[] array.	*/
-    char *name;
-};
-#endif /* EXEC_H */
+#define TYPE_MOD_MASK		(~(TYPE_MOD_STATIC | TYPE_MOD_NO_MASK |\
+				   TYPE_MOD_PRIVATE | TYPE_MOD_PROTECTED |\
+				   TYPE_MOD_PUBLIC | TYPE_MOD_VARARGS))

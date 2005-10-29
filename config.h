@@ -1,20 +1,8 @@
-#ifndef CONFIG_H
-#define CONFIG_H
-
-/* Should code for the external request demon be included?  */
-#define ERQ_DEMON
-#define ERQ_MAX_REPLY 256
-
-/* Only executables that are safe no matter what arguments/options
- * are supplied should be placed in ERQ_DIR. If you want something
- * different, consider writing a wrapper program or shell script.
+/*
+ * Define this if you want the MUDWHO-service. You have to configure it
+ * in mudwho.h.
  */
-#define ERQ_DIR "/user/src/mud/erq"
-
-/* #define ACCESS_CONTROL if you want the driver to do any access control,
- * either using the old style ACCESS.DENY or the new ACCESS.ALLOW .
- */
-#define ACCESS_CONTROL
+/* #define MUDWHO */
 
 /*
  * Define this if you want to use the improved access restriction system.
@@ -22,19 +10,6 @@
  * ACCESS.DENY.
  */
 #define ACCESS_RESTRICTED
-
-/* Some configurations for this system. Needn't be changed if you don't use
- * the new access restriction system.
- */
-
-/* file for access permissions data */
-#define ACCESS_FILE "ACCESS.ALLOW"
-
-/* logfile to show valid and rejected connections
- * simple not define this for NO logs
- */
-/* #define ACCESS_LOG "access.allow.log" */
-
 
 /*
  * Define the maximum size of log files (in bytes).
@@ -46,9 +21,9 @@
 #define READ_FILE_MAX_SIZE	50000
 
 /* Version of the game in the form xx.xx.xx (leading zeroes) gc.
- * A dot and two digits may be appended, that is the patch level.
+ * Two digits will be appended, that is the patch level.
  */
-#define GAME_VERSION "03.02"
+#define GAME_VERSION "03.01."
 
 /*
  * If an object is left alone for a certain time, then the
@@ -58,7 +33,7 @@
  *
  * This time should be substantially longer than the swapping time.
  */
-#define TIME_TO_CLEAN_UP	5400
+#define TIME_TO_CLEAN_UP	7200
 
 /*
  * How long time until an unused object is swapped out.
@@ -66,8 +41,7 @@
  * Machine with few players and lot of memory: 10000
  * Machine with infinite memory: 0 (never swap).
  */
-#define TIME_TO_SWAP		900
-#define TIME_TO_SWAP_VARIABLES	1800
+#define TIME_TO_SWAP	900
 
 /*
  * How many seconds until an object is reset again.
@@ -77,8 +51,15 @@
  */
 #define TIME_TO_RESET	3600	/* one hour */
 
-#define RESET_GRANULARITY 900	/* 15 minutes */
- 
+/*
+ * How to extract an unsigned char from a char *.
+ * If your compiler has the type 'unsigned char', then the cast-version
+ * is best. If you do not know, use the simple version, and the game will
+ * immediately terminate with a message if bad.
+#define EXTRACT_UCHAR(p) (*p < 0 ? *p + 0x100 : *p)
+ */
+#define EXTRACT_UCHAR(p) (*(unsigned char *)p)
+
 /*
  * Define the maximum stack size of the stack machine. This stack will also
  * contain all local variables and arguments.
@@ -87,11 +68,8 @@
 
 /*
  * Define the maximum call depth for functions.
- * MAX_USER_TRACE is used for for normal program execution, the full
- * MAX_TRACE is only available in error handling.
  */
-#define MAX_USER_TRACE		60
-#define MAX_TRACE		65
+#define MAX_TRACE		30
 
 /*
  * Define the size of the compiler stack. This defines how complex
@@ -100,45 +78,120 @@
 #define COMPILER_STACK_SIZE	200
 
 /*
+ * What is the value of the first constant defined by yacc ? If you do not
+ * know, compile, and look at y.tab.h.
+ */
+#define F_OFFSET		257
+
+/*
+ * Does the system have a getrusage call?
+ */
+/* #define RUSAGE */
+
+/*
  * Maximum number of bits in a bit field. They are stored in printable
  * strings, 6 bits per byte.
  */
 #define MAX_BITS		1200	/* 200 bytes */
 
 /*
+ * There is a hash table for living objects, used by find_living().
+ */
+#define LIVING_HASH_SIZE	100
+
+/*
  * Define what port number the game is to use.
  */
-#define PORTNO			7680
+#define PORTNO			3000
+
+/*
+ * This is the file which contains names of objects to be
+ * loaded initially. Do not normally change this.
+ */
+#define INIT_FILE		"room/init_file"
+
+/*
+ * This is the subdirectory where all wizards objects are defined.
+ */
+#define PLAYER_DIR		"w"
+
+/*
+ * If you want to put wizards in groups and give each group a subdirectory
+ * you should define this. Domain directorys must start witha capital
+ * letter, and wizards names must not.
+ */
+#define DOMAINS
+
+/*
+ * This is the subdirectory where all the domain directorys are placed.
+ */
+#define DOMAIN_DIR              "d"
+
+/*
+ * Undef this if your system doesn't support Berkley type symlinks.
+ */
+#define SYMLINKS
+
+/*
+ * This is the castle that a wiz gets a copy of.
+ */
+#define DEFAULT_CASTLE		"d/Standard/start/def_castle.c"
+
+/*
+ * This is the workroom that a wiz gets a copy of.
+ */
+#define DEFAULT_WORKROOM	"d/Standard/start/def_workroom.c"
+
+/*
+ * This is the room where the new castle should reside. If it is not
+ * defined, then it will be put in the same room as the player.
+ */
+#define CASTLE_ROOM		"room/new_castles"
 
 /*
  * Max number of local variables in a function.
  */
 #define MAX_LOCAL	20	
 
+/*
+ * Define what ioctl to use against tty's.
+ */
+
+#define USE_TIOCGETP		/* BSD */
+/* #define USE_TCGETA */ 	/* SYSV */
+
 /* Maximum number of evaluated nodes/loop.
- * If this is exceeded, the current function is halted.
- * ls() can take about 30000 for large directories.
+ * If this is exceeded, current function is halted.
+ * The worst case yet encountered is 3600	(dec 1989)
  */
 #define MAX_COST	100000
-/* to catch an eval_cost too big error in an object that called recursive
- * master functions, CATCH_RESERVED_COST should be greater than
- * MASTER_RESERVED_COST * 2.
- */
-#define CATCH_RESERVED_COST 2000
-#define MASTER_RESERVED_COST 0x200 /* must be power of 2 */
 
 /*
- * Where to swap out objects. This file is not used if TIME_TO_SWAP is 0.
- * If the mudlib is mounted via nfs but your /tmp isn't, and isn't purged
- * periodically either, it's a good idea to place the swap file there.
- * The hostname will be appended to the filename defined here.
+ * Where to swap out objects. This file is not used if NUM_RESET_TO_SWAP
+ * is 0.
  */
 #define SWAP_FILE		"LP_SWAP.3"
 
 /*
  * This is the maximum array size allowed for one single array.
  */
-#define MAX_ARRAY_SIZE 3000
+#define MAX_ARRAY_SIZE 1000
+
+/*
+ * Some LPmuds on sun4 and sparcstations have had problems with the
+ * call of inet_ntoa() in comm1.c.
+ * If the game crash in query_ip_number() wen using inet_ntoa(),
+ * then undefine the following symbol.
+ * The query_ip_number() is called when doing the 'people' command
+ * for example.
+ */
+/* #define INET_NTOA_OK */
+
+/*
+ * Define LOG_SHOUT if you want all shouts to be logged in
+ * mudlib/log/SHOUTS.
+ */
+#define LOG_SHOUT
 
 /*
  * Maximum number of players in the game.
@@ -149,7 +202,7 @@
  * When uploading files, we want fast response; however, normal players
  * shouldn't be able to hog the system in this way.  Define ALLOWED_ED_CMDS
  * to be the ratio of the no of ed cmds executed per player cmd, and
- * MAX_CMDS_PER_BEAT to be the max no of buffered player commands the
+ * MAX_CMDS_PER_BEAT to be the bax no of buffered player commands the
  * system will accept in each heartbeat interval.
  */
 
@@ -161,26 +214,18 @@
  * of memory to get some warning and start Armageddon.
  * If this value is 0, no area will be reserved.
  */
-#define RESERVED_USER_SIZE	800000
-#define RESERVED_MASTER_SIZE	 50000
-#define RESERVED_SYSTEM_SIZE	100000
+#define RESERVED_SIZE		800000
 
-/* Define the size of the shared string hash table.  This number needn't
- * be prime, probably between 1000 and 30000; if you set it to about 1/5
+/* Define the size of the shared string hash table.  This number should
+ * a prime, probably between 1000 and 30000; if you set it to about 1/5
  * of the number of distinct strings you have, you will get a hit ratio
  * (number of comparisons to find a string) very close to 1, as found strings
  * are automatically moved to the head of a hash chain.  You will never
  * need more, and you will still get good results with a smaller table.
- * If the size is a power of two, hashing will be faster.
+ * THIS IS NOT IMPLEMENTED YET.
  */
 
-#define	HTABLE_SIZE	4096
-
-/* Define the size of the table of defines, reserved words, identifiers
- * and efun names. Should be either several times smaller than HTABLE_SIZE
- * or identical with it.
- */
-#define ITABLE_SIZE  256    /* 256 is probably fastest */
+#define	HTABLE_SIZE	2203	/* there is a table of some primes too */
 
 /*
  * Object hash table size.
@@ -189,107 +234,35 @@
  * objects is somewhat more uniform than that of strings.
  */
 
-#define OTABLE_SIZE	1024
-
-#define DEFMAX         12000
-
-/* the number of apply_low cache entries will be 2^APPLY_CACHE_BITS */
-#define APPLY_CACHE_BITS 10
+#define OTABLE_SIZE	1009	/* we have several thousand obs usually */
 
 /*
- * Should newly defined LPC functions be aligned in memory? this costs 1.5
- * bytes on average, but saves some time when searching in case of an
- * apply_low cache function miss.
+ * Define SYSV if you are running system V with a lower release level than
+ * Sys V.4.
  */
-#define ALIGN_FUNCTIONS
+
+#undef SYSV
+
+/*
+ * Define FCHMOD_MISSING only if your system doesn't have fchmod().
+ */
+
+#undef FCHMOD_MISSING
 
 /*
  * Define COMPAT_MODE if you are using mudlib 2.4.6 or older. This
  * replaces the old command line option -o.
  */
 
-#define COMPAT_MODE
-#undef NATIVE_MODE
-#undef EUIDS
-
-/* Define OLD_PREVIOUS_OBJECT_BEHAVIOUR if the new behaviour gives problems
- * in your security system.
- */
-#undef OLD_PREVIOUS_OBJECT_BEHAVIOUR
-
-/* Define OLD_EXPLODE_BEHAVIOUR when you want to have explode geared towards a
- * subroutine of parse_command
- */
-#undef OLD_EXPLODE_BEHAVIOUR
-
-/* Define SUPPLY_PARSE_COMMAND if you want the efun parse_command.
- * If you don't need it, better #undef it, lest some new wiz can inadvertly
- * crash your mud or make it leak memory.
- */
-#define SUPPLY_PARSE_COMMAND
-
-/* Define INITIALIZATION_BY___INIT if you want all initializations of variables
- * to be suspended till the object is created ( as supposed to initialization
- * at compile time; the latter is more memory efficient for loading and faster
- * at cloning, while the former allows to use efuns, e.g. shutdown().
- */
-
-#undef INITIALIZATION_BY___INIT
-
-/* Define MASTER_NAME if you want something different from "obj/master" resp.
- * "secure/master" as default.
- */
-/* #define MASTER_NAME "kernel/master" */
+#undef COMPAT_MODE
 
 /*
  * Define MAX_BYTE_TRANSFER to the number of bytes you allow to be read
  * and written with read_bytes and write_bytes
  */
 
-#define MAX_BYTE_TRANSFER 50000
-
-/* Define FLOATS if you want code for the floating-point type
- */
-
-#define FLOATS
-#define TRANSCENDENT_FUNCTIONS
-
-/* Define NO_XVARARGS if you don't want variadic function support */
-/* #define NO_XVARARGS */
-
-/* Define MAPPINGS if you want a mappings */
-
-#define MAPPINGS
+#define MAX_BYTE_TRANSFER 10000
    
-/*
- * CATCH_UDP_PORT
- *
- * Define this if the mud are to catch incoming udp messages on a
- * specific port. If == -1 it will not be used unless the mud is started
- * with the -u### flag. Where ### is the portnumber for the udp port.
- * If undefined the -u flag will be ignored.
- */
-#define CATCH_UDP_PORT	4246
-#define UDP_SEND
-
-#define SET_BUFFER_SIZE_MAX 65536
-
-#define COMM_STAT
-#define APPLY_CACHE_STAT
-
-/* When smalloc is used without SBRK_OK, MIN_MALLOCED will lower large block
-   fragmentation.
- */
-/* #define MIN_MALLOCED	   0x1000000 */
-#define MAX_MALLOCED	   0x4000000
-#define MAX_SMALL_MALLOCED 0x1000000
-
-#undef SMALLOC_TRACE /* do 'make clean' after changing this... */
-#undef SMALLOC_LPC_TRACE /* do 'make clean' after changing this... */
-
-/* If using TRACE_CODE , how many instructions should be kept? */
-#define TOTAL_TRACE_LENGTH 0x1000
-
 /************************************************************************/
 /*	END OF CONFIG -- DO NOT ALTER ANYTHING BELOW THIS LINE		*/
 /************************************************************************/
@@ -303,32 +276,3 @@
 #define	P1		701	/* 3 large, different primes */
 #define	P2		14009	/* There's a file of them here somewhere :-) */
 #define	P3		54001
-
-#define BITNUM(n) ( \
-	 ((n)&010101010101)+\
-	(((n)&020202020202)>>1)+\
-	(((n)&000404040404)>>2)+\
-	(((n)&001010101010)>>3)+\
-	(((n)&002020202020)>>4)+\
-	(((n)&004040404040)>>5)\
-) %63
-
-#define BITNUM_IS_1(n) ( !( (n) & (n)-1 ) )
-
-#define CLEAR_EVAL_COST (assigned_eval_cost = eval_cost = initial_eval_cost)
-
-#ifndef MASTER_NAME
-#ifdef COMPAT_MODE
-#define MASTER_NAME "obj/master"
-#else
-#define MASTER_NAME "secure/master"
-#endif  
-#endif  
-
-#if defined(NATIVE_MODE) && !defined(EUIDS)
-#define EUIDS
-#endif
-
-#include "port.h"
-
-#endif /* CONFIG_H */

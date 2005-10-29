@@ -1,6 +1,4 @@
-/* $Source: regexp.c $
- *
- * $Revision: 1.2 $
+/* 
  *
  * regexp.c - regular expression matching
  *
@@ -41,9 +39,6 @@
  * regsub altered by amylaar to take an additional parameter specifying
  * maximum number of bytes that can be written to the memory region
  * pointed to by dest
- * Some prototypes removed and version variable renamed; take into account
- * that linux defines CHARBITS to 8 .
- * Free temporaries in case of error.
  *
  * 	Beware that some of this code is subtly aware of the way operator
  * 	precedence is structured in regular expressions.  Serious changes in
@@ -56,104 +51,15 @@
  *
  * Sponsored by The USENIX Association for public distribution. 
  *
- * $Log: regexp.c,v $
- * Revision 1.6  1997/10/25 14:01:19  amylaar
- * Disable interactive regsub error messages for regreplace.
- *
- * Revision 1.5  1996/11/29  23:55:55  amylaar
- * regcomp(): fixed memory leak (patch by Marcus)
- *
- * Revision 1.4  1995/08/19  11:52:18  amylaar
- * regcomp(): check for \\\0
- *
- * Revision 1.3  1995/05/09  05:47:25  amylaar
- * regexec(): third argument to specify the actual start of the string for
- *  use in ^ and \< searches
- *
- * Revision 1.2  1994/07/23  21:23:13  amylaar
- * Generalized handling of CHARBITS == 8 .
- *
- * Revision 1.1.1.2  1994/07/06  22:58:44  amylaar
- * Enter 3.2.1@22 into separate 3.2.1 depository.
- *
- * Revision 1.3.2.4  1994/05/15  23:42:57  amylaar
- * Give a better error message when there is a ']' without a previous '[' .
- *
- * Revision 1.3.2.3  1994/05/08  14:57:49  amylaar
- * regprop(): added cases for WORDSTART / WORDEND / NOTEDGE
- *
- * Revision 1.3.2.2  1994/02/18  08:38:28  amylaar
- * Replaced linux by __linux__ in #ifdefs for POSIX compliance.
- *
- * Revision 1.3.2.1  1994/02/17  08:44:30  amylaar
- * Merged in mainstream patches till 3.2@258
- *
- * Revision 1.4  1994/01/23  19:03:31  amylaar
- * New operator: \B : not at edge of a word. (supposed to be like the emacs
- *   compatibility one in gnu egrep)
- *
- * Revision 1.3  1993/08/08  23:19:14  amylaar
- * Include <string.h> and <bstring.h> in "lint.h"
- *
- * Revision 1.2  1993/08/08  17:29:30  amylaar
- * Fixed memory leak in regcomp() , in case of failure.
- *
- * Revision 1.1.1.1  1993/03/15  07:34:30  amylaar
- * Put 3.2@20 under cvs control.
- *
- * Revision 1.1.1.1  1992/08/23  20:44:04  tubmud
- * Amylaar's modified LPmud driver
- *
- * Revision 1.3  91/11/26  21:32:51  tubmud
- * this is supposed to be the merged 3.0.50
- * 
- * Revision 1.1.1.2  91/11/25  02:01:22  tubmud
- * Lars's 3.0.50
- * 
- * Revision 1.1.1.1  91/11/24  04:32:03  tubmud
- * lars`s release 49
- * 
- * Revision 1.1  91/11/24  04:32:01  tubmud
- * Initial revision
- * 
- * Revision 1.1.1.7  91/11/07  03:29:39  amylaar
- * Lars' 48'er
- * 
- * Revision 1.2  1991/11/01  21:47:20  lars
- * Bug fix by amylar
- *
- * Revision 1.1  1991/10/31  14:45:37  lars
- * Initial revision
- *
- * Revision 1.3  1991/09/10  18:34:32  lars
- * Fixed a *= operator.
- *
- * Revision 1.2  1991/09/08  06:36:17  lars
- * Fixed \< and \> for matching start and end of word.
- *
- * Revision 1.1  1991/05/24  16:33:38  wikh
- * Initial revision
- *
- * Revision 1.2  89/02/12  10:05:39  mark
- * 1.2 release fixes
- * 
- * Revision 1.1  88/12/23  18:02:32  mark
- * Initial revision
- * 
  */
 
 /* Headers */
 
 #include <stdio.h>
-#include "string.h"
+#include <string.h>
 #include <ctype.h>
 #include "regexp.h"
-#include "lint.h" /* for <string.h>, <values.h> and free() */
-
-#ifndef lint
-static char    *Ident = "$Id: regexp.c 1.2 Mon, 02 Nov 1998 15:49:18 -0700 baron $";
-#endif
-
+#include "lint.h" /* for free() */
 
 /*
  * The "internal use only" fields in regexp.h are present to pass info from
@@ -208,7 +114,6 @@ static char    *Ident = "$Id: regexp.c 1.2 Mon, 02 Nov 1998 15:49:18 -0700 baron
 				 * times. */
 #define WORDSTART 11		/* node matching a start of a word          */
 #define WORDEND 12		/* node matching an end of a word           */
-#define NOTEDGE 13		/* node matching anything not at word edge  */
 #define	OPEN	20		/* no	Mark this point in input as start of
 				 * #n. */
  /* OPEN+1 is number 1, etc. */
@@ -266,16 +171,16 @@ static char    *Ident = "$Id: regexp.c 1.2 Mon, 02 Nov 1998 15:49:18 -0700 baron
 #define RSQBRAC (']'|SPECIAL)
 #define LSHBRAC ('<'|SPECIAL)
 #define RSHBRAC ('>'|SPECIAL)
-#define SLASHB  ('B'|SPECIAL)
 #define	FAIL(m)	{ regerror(m); return(NULL); }
 #define	ISMULT(c)	((c) == ASTERIX)
 #define	META	"^$.[()|*\\"
 #ifndef CHARBITS
+#define CHARBITS	0xff
 #define	UCHARAT(p)	((int)*(unsigned char *)(p))
 #else
-#define	UCHARAT(p)	((int)*(p)&CHARBIT_MASK)
+#define	UCHARAT(p)	((int)*(p)&CHARBITS)
 #endif
-#define ISWORDPART(c) isalunum(c)
+#define ISWORDPART(c) ( isalnum(c) || (c) == '_' )
 
 /*
  * Flags to be passed up and down.
@@ -329,8 +234,8 @@ STATIC int      strcspn();
  * Beware that the optimization-preparation code in here knows about some
  * of the structure of the compiled regexp.
  */
-regexp *regcomp(expr,excompat)
-char           *expr;
+regexp *regcomp(exp,excompat)
+char           *exp;
 int		excompat;	/* \( \) operators like in unix ex */
 {
     register regexp *r;
@@ -338,17 +243,14 @@ int		excompat;	/* \( \) operators like in unix ex */
     register char  *longest;
     register int    len;
     int             flags;
-    short	   *expr2,*dest,c;
+    short	   *exp2,*dest,c;
+    extern char    *xalloc();
 
-    if (expr == (char *)NULL)
+    if (exp == (char *)NULL)
 	FAIL("NULL argument");
 
-    expr2 = (short*)
-      xalloc( (strlen(expr)+1) * (sizeof(short[8])/sizeof(char[8])) );
-    /* This might be slightly more than needed */
-    if (expr2 == (short *)NULL)
-	FAIL("out of space");
-    for ( scan=expr,dest=expr2; c= *scan++; ) {
+    exp2=(short*)xalloc( (strlen(exp)+1) * (sizeof(short[8])/sizeof(char[8])) );
+    for ( scan=exp,dest=exp2; c= *scan++; ) {
 	switch (c) {
 	    case '(':
 	    case ')':
@@ -371,17 +273,14 @@ int		excompat;	/* \( \) operators like in unix ex */
 			break;
 		    case '<':
 		    case '>':
-		    case 'B':
 			*dest++ = c | SPECIAL;
 			break;
 		    case '{':
 		    case '}':
-			xfree((char *)expr2);
 			FAIL("sorry, unimplemented operator");
 		    case 'b': *dest++ = '\b'; break;
 		    case 't': *dest++ = '\t'; break;
 		    case 'r': *dest++ = '\r'; break;
-		    case '\0': scan--;
 		    default:
 			*dest++ = c;
 		}
@@ -392,40 +291,30 @@ int		excompat;	/* \( \) operators like in unix ex */
     }
     *dest=0;
     /* First pass: determine size, legality. */
-    regparse = expr2;
+    regparse = exp2;
     regnpar = 1;
     regsize = 0L;
     regcode = &regdummy;
     regc(MAGIC);
-    if (reg(0, &flags) == (char *)NULL) {
-	xfree((char *)expr2);
+    if (reg(0, &flags) == (char *)NULL)
 	return ((regexp *)NULL);
-    }
 
     /* Small enough for pointer-storage convention? */
-    if (regsize >= 32767L)	/* Probably could be 65535L. */ {
-	/* Probably could be any amount of memory we could spare... */
-	xfree((char *)expr2);
+    if (regsize >= 32767L)	/* Probably could be 65535L. */
 	FAIL("regexp too big");
-    }
 
     /* Allocate space. */
     r = (regexp *) xalloc(sizeof(regexp) + (unsigned) regsize);
-    if (r == (regexp *) NULL) {
-	xfree((char *)expr2);
+    if (r == (regexp *) NULL)
 	FAIL("out of space");
-    }
 
     /* Second pass: emit code. */
-    regparse = expr2;
+    regparse = exp2;
     regnpar = 1;
     regcode = r->program;
     regc(MAGIC);
-    if (reg(0, &flags) == NULL) {
-	xfree((char *)r);
-	xfree((char *)expr2);
+    if (reg(0, &flags) == NULL)
 	return ((regexp *) NULL);
-    }
 
     /* Dig out information for optimizations. */
     r->regstart = '\0';		/* Worst-case defaults. */
@@ -462,7 +351,7 @@ int		excompat;	/* \( \) operators like in unix ex */
 	    r->regmlen = len;
 	}
     }
-    xfree((char*)expr2);
+    free((char*)exp2);
     return (r);
 }
 
@@ -652,9 +541,6 @@ int            *flagp;
     case RSHBRAC:
 	ret = regnode(WORDEND);
 	break;
-    case SLASHB:
-	ret = regnode(NOTEDGE);
-	break;
     case LSQBRAC:{
 	    register int    class;
 	    register int    classend;
@@ -672,8 +558,8 @@ int            *flagp;
 		    if (*regparse == RSQBRAC || *regparse == '\0')
 			regc('-');
 		    else {
-			class = (CHARBIT_MASK & *(regparse - 2)) + 1;
-			classend = (CHARBIT_MASK & *(regparse));
+			class = (CHARBITS & *(regparse - 2)) + 1;
+			classend = (CHARBITS & *(regparse));
 			if (class > classend + 1)
 			    FAIL("invalid [] range");
 			for (; class <= classend; class++)
@@ -713,9 +599,6 @@ int            *flagp;
 	        !(regparse[len]&SPECIAL) && regparse[len] != RSQBRAC; len++) ;
 	    if (len <= 0)
 		{
-		if (len == 0 && regparse[len] == RSQBRAC) {
-		    FAIL("unmatched []");
-		}
 		FAIL("internal disaster");
 		}
 	    ender = *(regparse + len);
@@ -873,10 +756,9 @@ STATIC char    *regprop();
 /*
  - regexec - match a regexp against a string
  */
-int regexec(prog, string, start)
+int regexec(prog, string)
 register regexp *prog;
 register char  *string;
-char *start;
 {
     register char  *s;
 
@@ -902,7 +784,7 @@ char *start;
 	    return (0);
     }
     /* Mark beginning of line for ^ . */
-    regbol = start;
+    regbol = string;
 
     /* Simplest case:  anchored match need be tried only once. */
     if (prog->reganch)
@@ -1028,15 +910,6 @@ char           *prog;
 	    if ( reginput == regbol ||
 	       !ISWORDPART( *(reginput-1) ) || ISWORDPART( *reginput ) )
 		return (0);
-	    break;
-	case NOTEDGE:
-	    if (reginput == regbol) {
-		if (ISWORDPART(*reginput))
-		    return 0;
-		break;
-	    }
-	    if ( ISWORDPART( *(reginput-1) ) != ISWORDPART( *reginput ) )
-		return 0;
 	    break;
 	case EXACTLY:{
 		register int    len;
@@ -1292,6 +1165,8 @@ regexp         *r;
     register char  *s;
     register char   op = EXACTLY;	/* Arbitrary non-END op. */
     register char  *nxt;
+    extern char    *strchr();
+
 
     s = r->program + 1;
     while (op != END) {		/* While that wasn't END last time... */
@@ -1401,15 +1276,6 @@ char           *op;
     case STAR:
 	p = "STAR";
 	break;
-    case WORDSTART:
-	p = "WORDSTART";
-	break;
-    case WORDEND:
-	p = "WORDEND";
-	break;
-    case NOTEDGE:
-	p = "NOTEDGE";
-	break;
     default:
 	regerror("corrupted opcode");
 	break;
@@ -1465,16 +1331,15 @@ char           *s2;
  */
 #ifdef __STDC__
 
-char *regsub(regexp *prog, char *source, char *dest, int n, int quiet)
+char *regsub(regexp *prog, char *source, char *dest, int n)
 
 #else
 
-char *regsub(prog, source, dest, n, quiet)
+char *regsub(prog, source, dest, n)
 regexp         *prog;
 char           *source;
 char           *dest;
 int		n;
-int		quiet;
 
 #endif
 {
@@ -1483,6 +1348,7 @@ int		quiet;
     register char   c;
     register int    no;
     register int    len;
+    extern char    *strncpy();
 
     if (prog == (regexp *)NULL || 
 	source == (char *)NULL || dest == (char *)NULL) {
@@ -1507,7 +1373,7 @@ int		quiet;
 	    if (c == '\\' && (*src == '\\' || *src == '&'))
 		c = *src++;
 	    if (--n < 0) {				/* amylaar */
-		if (!quiet) regerror("line too long");
+		regerror("line too long");
 		return NULL;
 	    }
 	    *dst++ = c;
@@ -1515,7 +1381,7 @@ int		quiet;
 		   prog->endp[no] != (char *)NULL) {
 	    len = prog->endp[no] - prog->startp[no];
 	    if ( (n-=len) < 0 ) {		/* amylaar */
-		if (!quiet) regerror("line too long");
+		regerror("line too long");
 		return NULL;
 	    }
 	    strncpy(dst, prog->startp[no], len);
@@ -1527,7 +1393,7 @@ int		quiet;
 	}
     }
     if (--n < 0) {			/* amylaar */
-    	if (!quiet) regerror("line too long");
+    	regerror("line too long");
     	return NULL;
     }
     *dst = '\0';

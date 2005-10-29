@@ -19,7 +19,6 @@ Frame pointer->	|	Argument number 0
 		|	Local variable number 0
 		|	Local variable number 1
 		|	etc.
-		|	break addresses for case
 		|	Temporary stack values
 		|	etc
 		v
@@ -39,19 +38,19 @@ Instruction format:
 
 b0 b1 b2 b3
 
-b0     = F_CALL_FUNCTION_BY_ADDRESS.
+b0 = F_FUNCTION.
 b1, b2 = The number of the function to be called.
-b3     = Number of arguments sent.
+b3 = Number of arguments sent.
 
-The F_CALL_FUNCTION_BY_ADDRESS instruction will also initiate the frame pointer
-to point to the first argument.
+The F_FUNCTION instruction will also initiate the frame pointer to point
+to the first argument.
 
 The number of arguments are stored in the 'struct function' which is found
 using the number of the function and indexing in ob->prog->functions[];
 The number of arguments will be adjusted to fit the called function.
 This is done by either pushing zeroes, or poping excessive
-arguments. F_CALL_FUNCTION_BY_ADDRESS will also initiate local variables, by
-pusing a 0 for each of them.
+arguments. F_FUNCTION will also initiate local variables, by pusing a 0
+for each of them.
 
 The called function must ensure that exactly one value remains on the
 stack when returning. The caller is responsible of deallocating the
@@ -72,15 +71,6 @@ b0
 
 b0 = F_RETURN.
 
-Format:
-
-b0 b1 b2 b3 b4 b5
-
-b0     = F_CALL_EXPLICIT_INHERITED
-b1, b2 = The index in the inherit table to find the struct program.
-b3, b4 = The number of the function to be called in the inherited program.
-b5     = number of arguments sent.
-
 
 2. CALLING PREDEFINED FUNCTIONS.
 
@@ -88,25 +78,18 @@ Arguments are pushed to the stack. A value is always returned (on the stack).
 
 Instruction format:
 
-b0
+b1
 
-b0 = The F_ code of the called function.
+b1 = The F_ code of the called function.
 
 If a variable number of arguments are allowed, then an extra byte will
 follow the instruction, that states number of actual arguments.
 
-The number of arguments has already been checked at compile time, if this was
-possible.
-The execution unit will check the types of the arguments.
-
-Instruction format:
-
-b0 b1
-
-b0 = F_ESCAPE
-b1 = the F_ code of the called function.
-
-See above.
+The execution unit will parse number of arguments immediately, regardless
+of which instruction it is when it is stated that a variable number of
+arguments are allowed. It will also check soem of the types of the
+arguments immediately, if it is possible. But never more than the types of
+the first two arguments.
 
 3. F_SSCANF
 
@@ -120,86 +103,37 @@ is given as a one byte code supplied to the F_SSCANF instruction.
 
 This command takes one argument, a byte which gives the number of arguments.
 
-b0, b1
+b1, b2
 
-b0 = F_CALL_OTHER, b1 = number of arguments.
+b1 = F_CALL_OTHER, b2 = number of arguments.
 
 5. F_AGGREGATE
 
 This command takes one argument, the size of the array. The elements of
 the array are picked from the top of stack.
 
-b0, b1, b2
+b1, b2, b3
 
-b0 = F_AGGREGATE, (b1,b2) = Size of the array (max 0xffff).
+b1 = F_AGGREGATE, (b2,b3) = Size of the array (max 0xffff).
 
 6. F_CATCH
 
 The compiler constructs a call to F_CATCH before the code to evaluate the
-argument of F_CATCH. After the code, a call to F_END_CATCH is made.
+argument of F_CATCH. After the code, a call to F_RETURN is made. Thus,
+it will look like a function call.
 
 F_CATCH will when executed do setjmp() and call eval_instruction()
 recursively. That means that a new frame has to be set up.
-It will also save some extra context information, which need to be cleaned
-up by F_END_CATCH if it isn't used up by F_THROW .
 
 F_THROW will do a longjmp().
 
 format:
 
-F_CATCH, b1, (instructions...), F_END_CATCH
+F_THROW, b1, b2, (instructions...), F_RETURN
 
-Where b1 is the an offset to the instruction after the return instruction.
+Where b1,b2 is the address of the instruction after the return instruction.
 
 7. F_RETURN
 
 Will deallocate the current frame, and restore the previous. If the flag
 extern_call is set, then a return from eval_instruction() will be done.
-
-8. F_SWITCH
-
-Corresponding to the LPC switch instruction. The address for break is
-pushed on the break stack, the given value searched and pc set to the
-destination adress.
-
-unaligned:
-
-   pc                                           pc+offset
-   v                                  range     v
-b0 b1 a2 b2 [b3[b4]] instructions lookup tables [c0[c1]] a0 a1 i0 v*n o*n [d0]
-
-i0: first byte of instructions.
-
-aligned:
-
-   pc                                        pc+offset         pc+offset+tablen
-   v                               range     v                 v
-b0 b1 b2 [b3[b4]] instructions lookup tables [c0[c1]] a0.. v*n o*n ..a2 [d0]
-
-b0: F_SWITCH - F_OFFSET
-b1: tablen lo (bits 7..2) | len(bits 1,0)
-  len == 0 ==> unaligned switch
-  len controls the length of offset, tablen, default offset, o*n and length
-   of lookup tables for lookup table ranges.
-b2: offset lo
-b3: offset mid
-b4: offset high
-c0: tablen mid
-c1: tablen high
-a0..a2: alignment area, will be (partially) moved behind v*n / o*n if
-  necessary to archive 4-byte-alignment for v*n / o*n .
-a0,a1: low 16 bits of default offset in host byte order
-a2: type :
-  bit 0..4: start position for search (dependent on search table size)
-  bit 5:  0: numeric  1: string
-  bit 6,7: value for len in unaligned switch
-v*n: case values, char */int, host byte order
-o*n: offsets : 1,2 or 3 bytes, network byte order
-  ordinary entries: jump destination offsets relative to pc, corresponding
-   to one case value.
-  ordinary range entries: first value 1, second value jump destination offset
-   relative to pc; the first of the corresponding case values is the range
-   start, the second the end. ranges are inclusive.
-  lookup table range entries: like above, but first value is 0, and second
-   value is an offset pointing to the lookup table.
-d0: high bits of default offset

@@ -1,7 +1,0 @@
-mixed *
-m_indices(mapping map)
-
-Return an array containing the indices of mapping 'map'.
-
-See also:
-    mappingp, mkmapping, m_values, m_delete, m_sizeof

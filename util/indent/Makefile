@@ -17,10 +17,7 @@
 #	@(#)Makefile	5.9 (Berkeley) 9/15/88
 #
 CFLAGS=	-g
-#LDFLAGS=	-g
-#LDFLAGS=
-#LIBC=	/lib/libc.a
-LIBC=	/usr/lib/libc.a
+LIBC=	/lib/libc.a
 SRCS=	indent.c io.c lexi.c parse.c pr_comment.c args.c globs.c
 OBJS=	indent.o io.o lexi.o parse.o pr_comment.o args.o globs.o
 HEADERS= indent_globs.h version.h
@@ -32,7 +29,7 @@ CC=gcc
 all: indent
 
 indent: ${OBJS} ${LIBC}
-	${CC} -o $@ ${LDFLAGS} ${OBJS}
+	${CC} -o $@ ${CFLAGS} ${OBJS}
 	cp indent $(BINDIR)/indent
 
 indent.tar.Z: ${SRCS} Makefile ${MAN} ${HEADERS}
@@ -45,5 +42,5 @@ clean:
 	rm -f ${OBJS} core indent
 
 install:	indent
-	$(INSTALL) -c -s indent $(BINDIR)
+	install -c -s indent $(BINDIR)
 
