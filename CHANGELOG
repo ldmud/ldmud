@@ -1,11 +1,19 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-26-Feb-2004 (Lars Duening)  (3.3.683)
+06-Mar-2005 (Lars Duening  (3.3.684)
+  - (slaballoc.c) Tuned the allocator: the partially-used slab lists
+      are now lazily order for better usage.
+  - (interpret.c) For an uncallable closure, the code forgot to clean
+      out the CSP before throwing the error (Bug #0000374).
+  - (doc/efun/snoop) Corrected the description of the return value (Bug
+      #0000372).
+
+26-Feb-2005 (Lars Duening)  (3.3.683)
   - (efuns.c) regreplace() didn't update the stack pointers properly,
       causing crashes down the road (reported by Bardioc).
 
-25-Feb-2004 (Lars Duening)  (3.3.682)
+25-Feb-2005 (Lars Duening)  (3.3.682)
   - (mapping.c) Indexing a mapping with strings didn't quite work yet: the
       hash computation didn't take into effect that strings are no longer
       tabled just to use them as rvalue indices.
@@ -18,18 +26,18 @@ See the file HISTORY for a user-oriented summary of all the changes.
       the regexp structure. I changed the whole thing to automatic
       cleanup (Bug #0000370).
 
-24-Feb-2004 (Lars Duening)  (3.3.681)
+24-Feb-2005 (Lars Duening)  (3.3.681)
   - (mstrings) Re-integrated the stringtable structures into the strings:
       on the whole, the majority of strings will be tabled so reducing
       the overhead for this case is beneficial.
 
-24-Feb-2004 (Lars Duening)  (3.3.680)
+24-Feb-2005 (Lars Duening)  (3.3.680)
   - (mstrings, closure.c, interpret.c) Debugging 3.3.679: reallocating a
       string 'under the hood' is no longer possible as the string data is now
       an integral part of the string structure. This disables the
       mstr_append() optimizations.
 
-21-Feb-2004 (Lars Duening)  (3.3.679)
+21-Feb-2005 (Lars Duening)  (3.3.679)
   - (mapping.c) get_map_lvalue() didn't correctly check the mapping size:
        it checked against the current and not the future size (Bug #0000369).
   - (mapping, simulate.c) Added a statistic for hash and hybrid mappings (for
@@ -37,46 +45,46 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - (mstrings, gcollect.c, array.c, closure.c, i-svalue_cmp.h, interpret.c,
      simulate.c) Simplified the string implementation to reduce the overhead.
 
-21-Feb-2004 (Lars Duening)  (3.3.678)
+21-Feb-2005 (Lars Duening)  (3.3.678)
   - (slaballoc.c, smalloc.c) I hate crashers which don't happen on my machine:
        the merging of the esbrk() result with adjacent free blocks crashed
        the driver (Bug #0000368).
 
-20-Feb-2004 (Lars Duening)  (3.3.677)
+20-Feb-2005 (Lars Duening)  (3.3.677)
   - (configure, mapping.c, simulate) It is now possible to determine
        the max number of mapping entries (keys) in addition to the total
        mapping size (Bug #0000360).
   - (main.c) New commandline option '--max-mapping-keys' to determine
        separately the maximum number of entries in a mapping.
 
-20-Feb-2004 (Lars Duening)  (3.3.676)
+20-Feb-2005 (Lars Duening)  (3.3.676)
   - (smalloc.c) Corrected a crasher in realloc().
   - (smalloc.c, slaballoc.c) New memory allocated with esbrk() is now
        coagulated with existing free memory if possible (Bug #0000364).
 
-20-Feb-2004 (Lars Duening)  (3.3.675)
+20-Feb-2005 (Lars Duening)  (3.3.675)
   - (pkg-tls.c) Removed compilation errors when using GnuTLS.
   - (comm.c) The charmode/noecho mode is changed in remove_input_to()
        only if the first pending input_to() is removed. Hopefully this
        fixes Bug #0000363.
 
-20-Feb-2004 (Lars Duening)  (3.3.674)
+20-Feb-2005 (Lars Duening)  (3.3.674)
   - (prolang, simulate.c) During the compilation of the master object, simul
        efuns are disabled.
 
-20-Feb-2004 (Lars Duening)  (3.3.673)
+20-Feb-2005 (Lars Duening)  (3.3.673)
   - (smalloc.c, slaballoc.c) The memory block size computation failed
        on large blocks, giving bad statistics.
 
-13-Feb-2004 (Lars Duening)  (3.3.672)
+13-Feb-2005 (Lars Duening)  (3.3.672)
   - (pkg-tls.c) Philip provided a tls_check_certificate() efun.
 
-12-Feb-2004 (Lars Duening)  (3.3.671)
+12-Feb-2005 (Lars Duening)  (3.3.671)
   - (pkg-tls.c) My change was premature.
   - (mstrings.c) The printing of percent values was missing a conversion
       to float in order to actually compute the percent values.
 
-11-Feb-2004 (Lars Duening)  (3.3.670)
+11-Feb-2005 (Lars Duening)  (3.3.670)
   - (mstrings.c) The extended string statistics didn't count the tabled
       comparisons correctly.
   - (lex.c) New macro __BOOT_TIME__ expands to the time() the driver
@@ -87,7 +95,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - (slaballoc.c, smalloc.c) When using brk() for core allocation, the
       returned memory address was one word too low.
 
-09-Feb-2004 (Lars Duening)  (3.3.669)
+09-Feb-2005 (Lars Duening)  (3.3.669)
   - (object, simulate.c, backend.c) The list of destructed-but-referenced
       objects is scanned for deallocatable objects only when a flag
       signals that there actually are candidates. This should reduce
@@ -96,7 +104,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
       shared string table actually helps performance. They are printed
       in the 'status tables' command.
 
-07-Feb-2004 (Lars Duening)  (3.3.668)
+07-Feb-2005 (Lars Duening)  (3.3.668)
   - (smalloc.c, slaballoc.c) The large block handler is now capable
       of handling blocks up to 2**32 words. This is especially useful
       on systems using malloc() instead of sbrk() for core memory
@@ -105,7 +113,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
       are now separate from 'status malloc' in 'status malloc extstats'
       (Bug #0000358).
 
-01-Feb-2004 (Lars Duening)  (3.3.667)
+01-Feb-2005 (Lars Duening)  (3.3.667)
   - (pkg-mccp.c) In start_mccp_compress(), the interactive pointer
       was used before being set. I moved the set&check forward
        (Bug #0000361).
@@ -113,7 +121,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
       was incorrect: on success, it was passed as '1' instead of '0'
        (reported by Philipp).
 
-31-Jan-2004 (Lars Duening)  (3.3.666)
+31-Jan-2005 (Lars Duening)  (3.3.666)
   - (xalloc.c) Forgot to remove a fatal() used to debug slaballoc (Bug
        #0000359).
   - (slaballoc.c) Removed compiler warnings (Bug #0000358).
@@ -131,24 +139,24 @@ See the file HISTORY for a user-oriented summary of all the changes.
        a suitable client program is used on the other end (suggested by
        Philipp).
 
-30-Jan-2004 (Lars Duening)  (3.3.665)
+30-Jan-2005 (Lars Duening)  (3.3.665)
   - (interpret.c) foreach(i: x..__INT_MAX__) never executed because
        of internal overflow. By changing the meaning of the internal 'count'
        from 'upper limit' to 'iterations left', this overflow was
        avoided (Bug #0000355).
 
-30-Jan-2004 (Lars Duening)  (3.3.664)
+30-Jan-2005 (Lars Duening)  (3.3.664)
   - (xalloc, slaballoc, configure, efuns.c) Added new 'slaballocator'
        which provides a better use of the free small block storage.
   - (interpret.c) When using foreach() on references, the protector
        structure was allocated too small - a stupid typo (Bug #0000353).
 
-22-Jan-2004 (Lars Duening)  (3.3.663)
+22-Jan-2005 (Lars Duening)  (3.3.663)
   - (actions, simulate, gcollect.c) Unused action and shadow sentences
        are no longer held in a freelist, but instead returned directly
        to the memory allocator.
 
-22-Jan-2004 (Lars Duening)  (3.3.662)
+22-Jan-2005 (Lars Duening)  (3.3.662)
   - (efuns.c) Deep-copying a mapping employing shared arrays as keys (e.g. ([
        arr, ([ arr ]) ])) prematurely freed the copied array as the code
        didn't keep track of the copied data itself, but of the svalues it was
@@ -158,14 +166,14 @@ See the file HISTORY for a user-oriented summary of all the changes.
        treating lineends as if in charmode, which the higher routines
        didn't expect (reported by Philip).
 
-19-Jan-2004 (Lars Duening)  (3.3.661)
+19-Jan-2005 (Lars Duening)  (3.3.661)
   - (gcollect.c) When a program was swapped out, the GC didn't clear the refs
        of its name (Bug #0000348).
   - (mregex.c) If a regexp function was asked to use both RE_TRADITIONAL
        and RE_PCRE, and the regexp doesn't compile for both, the resulting
        error leaked some structures (Bug #0000349).
 
-17-Jan-2004 (Lars Duening)  (3.3.660)
+17-Jan-2005 (Lars Duening)  (3.3.660)
   - (gcollect.c) The names of programs of destructed objects didn't
        get their references cleared properly in a GC, leaking the
        program names if the destructed object was held by
@@ -173,10 +181,10 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - (closure.c) Determining the closure location leaked the
        program's name (Bug  #0000347).
 
-16-Jan-2004 (Lars Duening)  (3.3.659)
+16-Jan-2005 (Lars Duening)  (3.3.659)
   - (configure) Corrected the mySQL library check (Bug #0000346).
 
-14-Jan-2004 (Lars Duening)  (3.3.658)
+14-Jan-2005 (Lars Duening)  (3.3.658)
   - (interpret, array.c, mapping.c, parse.c, simulate.c, files.c)
        The new function push_error_handler() simplifies the creation
        of T_ERROR_HANDLER values.
@@ -184,23 +192,23 @@ See the file HISTORY for a user-oriented summary of all the changes.
        (Bug #0000344).
   - (smalloc.c) The extended large-free statistics was still off.
 
-14-Jan-2004 (Lars Duening)  (3.3.657)
+14-Jan-2005 (Lars Duening)  (3.3.657)
   - (array.c) Efun unique_array() no longer leaks memory if aborted
        by an exception (Bug #0000345).
 
-14-Jan-2004 (Lars Duening)  (3.3.656)
+14-Jan-2005 (Lars Duening)  (3.3.656)
   - (gcollect.c, object.c) The GC forgot to clean out the refcounts
        of the names of the destructed objects, which meant that if
        the destructed object was held by a self-reference, the name
        would receive an extra reference count and leak until the
        next GC (Bug #0000343).
 
-14-Jan-2004 (Lars Duening)  (3.3.655)
+14-Jan-2005 (Lars Duening)  (3.3.655)
   - (backend.c) Tweak to the process_objects() loop: the loop now
        really allows to have a given number of objects being cleant
        per loop, not just checked for being cleanable.
 
-14-Jan-2004 (Lars Duening)  (3.3.654)
+14-Jan-2005 (Lars Duening)  (3.3.654)
   - (smalloc.c) Small block splits now make sure, that the remaining
        block has a minimum size. This size is currently configured
        to 3 words = 12 Bytes, as the driver doesn't need that many
@@ -211,49 +219,49 @@ See the file HISTORY for a user-oriented summary of all the changes.
        on the configured cleanup-time (or one hour if the cleanup-time
        is 0).
 
-13-Jan-2004 (Lars Duening)  (3.3.653)
+13-Jan-2005 (Lars Duening)  (3.3.653)
   - (util/xerq/erq.c) The erq didn't check if the calculated timeout
        for the next select() had become negative. (Bug #0000342).
 
-12-Jan-2004 (Lars Duening)  (3.3.652)
+12-Jan-2005 (Lars Duening)  (3.3.652)
   - (mapping.c) Indexing a 0-width mapping returned pointers to memory outside
        the mapping, causing weird crashes. The solution is to return pointers
        to the global const1 (when found), or to a local svalue-0 instance
        (when not found and a lvalue is requested) (Bug #0000341).
 
-10-Jan-2004 (Lars Duening)  (3.3.651)
+10-Jan-2005 (Lars Duening)  (3.3.651)
   - (configure) Added yet another path to the search for a mySQL installation.
 
-09-Jan-2004 (Lars Duening)  (3.3.650)
+09-Jan-2005 (Lars Duening)  (3.3.650)
   - (doc/efun/send_udp) Added a note about the blocking behaviour of 
        name lookups.
   - (configure) The mySQL test was not quite correct.
 
-09-Jan-2004 (Lars Duening)  (3.3.649)
+09-Jan-2005 (Lars Duening)  (3.3.649)
   - (configure) Added another path to the search for a mySQL installation.
 
-08-Jan-2004 (Lars Duening)  (3.3.648)
+08-Jan-2005 (Lars Duening)  (3.3.648)
   - (settings/timewarp) New settings file.
   - (mudlib/sys/files.h, files.c) Efun get_dir() can now return
         access times and file modes (suggested by Mats).
 
-08-Jan-2004 (Lars Duening)  (3.3.647)
+08-Jan-2005 (Lars Duening)  (3.3.647)
   - (configure, pkg-mysql.c) Adjusted the search for the mySQL include
         files to allow for local installations (Bug #0000338)
 
-08-Jan-2004 (Lars Duening)  (3.3.646)
+08-Jan-2005 (Lars Duening)  (3.3.646)
   - (func_spec, lex, prolang.y, interpret.c) New pragma 'range_check'
         allows to check the validity of array ranges at runtime - these
         are the range checks currently controlled by the warn_deprecated
         pragma.
 
-08-Jan-2004 (Lars Duening)  (3.3.645)
+08-Jan-2005 (Lars Duening)  (3.3.645)
   - (smalloc.c) Corrected some bugs in the extended statistics.
   - (comm, simulate.c, mudlib/sys/debug_info.h) Added statistics for
         the incoming network traffic, and also display the total
         amount of data sent/received in the 'status tables' command.
 
-04-Jan-2004 (Lars Duening)  (3.3.644)
+04-Jan-2005 (Lars Duening)  (3.3.644)
   - (main.c, doc/driver/invocation, INSTALL) Corrected the documentation
         (Bugs #0000333 and #0000335).
 

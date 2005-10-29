@@ -6,8 +6,8 @@ DESCRIPTION
         Starts a snoop from 'snooper' on 'snoopee', or if 'snoopee' is not
         given, terminates any snoop from 'snooper'.
 
-        Return 1 on success, -1 if a snooping loop would be caused, 0 for
-        any other failure.
+        Return <snoopee> on success, or 0 for a failure (including snooping
+        loops).
 
         The snoop is checked with the master object for validity.  It
         will also fail if a snoop would result in a recursive snoop

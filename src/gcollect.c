@@ -620,7 +620,7 @@ cleanup_object (object_t * obj)
  * to destructed objects and removes them. Also, untabled strings
  * are made tabled. The time for the next cleanup is set to 
  * a time in the interval [0.75*time_to_cleanup .. 1.25 * time_to_cleanup]
- * from now (if time_to_cleanup is 0, one hour is assumed).
+ * from now (if time_to_cleanup is 0, half an hour is assumed).
  *
  * This function is called by the backend.
  */
@@ -630,7 +630,7 @@ cleanup_object (object_t * obj)
     return;
 #else
     cleanup_t * context = NULL;
-    long        clean_delay = (time_to_cleanup > 0) ? time_to_cleanup : 3600;
+    long        clean_delay = (time_to_cleanup > 0) ? time_to_cleanup : 1800;
 
     context = cleanup_new(MY_FALSE);
     if (context != NULL)

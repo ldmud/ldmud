@@ -1973,9 +1973,6 @@ options (void)
 #       if defined(SLABALLOC_DYNAMIC_SLABS)
                               , "SLABALLOC_DYNAMIC_SLABS"
 #       endif
-#       if defined(MALLOC_ORDER_SMALL_FREELISTS)
-                              , "MALLOC_ORDER_SMALL_FREELISTS"
-#       endif
 #       if defined(MALLOC_ORDER_LARGE_FREELISTS)
                               , "MALLOC_ORDER_LARGE_FREELISTS"
 #       endif

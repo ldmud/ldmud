@@ -551,13 +551,6 @@
  */
 #define USE_AVL_FREELIST
 
-/* Order malloc small block freelists.
- * Supported by: MALLOC_slaballoc.
- * TODO: Remove if it doesn't help with the fragmentation, as it uses up
- * TODO:: a small, but measurable amount of time in the allocator.
- */
-#undef MALLOC_ORDER_SMALL_FREELISTS
-
 /* Order malloc large block freelists by address.
  * Supported by: MALLOC_smalloc, MALLOC_slaballoc.
  * TODO: Remove if it doesn't help with the fragmentation, as it uses up

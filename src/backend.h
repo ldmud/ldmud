@@ -14,7 +14,9 @@ extern uint32 total_player_commands;
 extern volatile mp_int total_alarms;
 extern uint num_listed_objs;
 extern uint num_last_processed;
+extern uint num_last_data_cleaned;
 extern long avg_last_processed;
+extern long avg_last_data_cleaned;
 extern long avg_in_list;
 
 extern Bool extra_jobs_to_do;

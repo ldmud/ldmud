@@ -17829,6 +17829,8 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
       }
 
     }
+
+    CLEAN_CSP
     error("Uncallable closure\n");
     /* NOTREACHED */
     return;

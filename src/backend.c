@@ -116,7 +116,12 @@ uint num_last_processed = 0;
   /* Number of object processed in last process_objects().
    */
 
+uint num_last_data_cleaned = 0;
+  /* Number of object data-cleaned in last process_objects().
+   */
+
 long avg_last_processed = 0;
+long avg_last_data_cleaned = 0;
 long avg_in_list = 0;
   /* Decaying average number of objects processed and objects in the list.
    */
@@ -767,6 +772,9 @@ process_objects (void)
  *    been used for quite some time, and if it was not reset in this
  *    very round.
  *
+ *  - If the object has been data-cleaned for a sufficient time, it
+ *    will be.
+ *
  *  - An object's program and/or its variables will be swapped if it exists
  *    for at least time_to_swap(_variables) seconds since the last reference.
  *    Since swapping of variables is costly, care is taken that variables
@@ -800,7 +808,7 @@ static Bool did_swap;
 
 static  mp_int num_data_cleanup;
   /* Number of objects to data-clean in this call. It is computed so that all
-   * objects are cleaned in one hour, but at least one per call.
+   * objects are cleaned in half an hour hour, but at least one per call.
    * static so that errors won't clobber it.
    */
 
@@ -812,12 +820,13 @@ static  mp_int num_data_cleanup;
     /* Housekeeping */
 
     num_last_processed = 0;
+    num_last_data_cleaned = 0;
     did_reset = MY_FALSE;
     did_swap = MY_FALSE;
 
-    num_data_cleanup = num_listed_objs / (3600 / ALARM_TIME);
-    if (num_data_cleanup < 1)
-        num_data_cleanup = 1;
+    num_data_cleanup = ALARM_TIME * num_listed_objs / 1800;
+    if (num_data_cleanup < 2)
+        num_data_cleanup = 2;
 
     error_recovery_info.rt.last = rt_context;
     error_recovery_info.rt.type = ERROR_RECOVERY_BACKEND;
@@ -1030,10 +1039,10 @@ no_clean_up:
         /* ------ Data Cleanup ------ */
 
         /* Objects are processed at a rate suitable to cover
-         * all listed objects in one hour; but at least one per call.
+         * all listed objects in half an hour; but at least one per call.
          *
          * The actual cleanup however is not undertaken unless
-         * time_to_clean_up seconds have passed until the last reference (or
+         * time_to_clean_up seconds have passed until the last cleanup (or
          * 3600 seconds if the time is 0).
          */
         if (num_data_cleanup > 0
@@ -1048,6 +1057,7 @@ no_clean_up:
 
             cleanup_object(obj);
             num_data_cleanup--;
+            num_last_data_cleaned++;
         }
 
 
@@ -1111,6 +1121,7 @@ no_clean_up:
     /* Update the processing averages
      */
     avg_last_processed += num_last_processed - (avg_last_processed >> 10);
+    avg_last_data_cleaned += num_last_data_cleaned - (avg_last_data_cleaned >> 10);
     avg_in_list += num_listed_objs - (avg_in_list >> 10);
 
     /* Restore the error recovery context */

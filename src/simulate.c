@@ -3185,6 +3185,17 @@ status_parse (strbuf_t * sbuf, char * buff)
                             : 100.0 * (float)avg_last_processed / avg_in_list
                            )
                        );
+            strbuf_addf(sbuf, "Objects data-cleaned in last cycle: "
+                               "%5ld (%5.1f%% - avg. %5.1f%%)\n"
+                       , (long)num_last_data_cleaned
+                       , (float)num_last_data_cleaned / (float)num_listed_objs * 100.0
+                       , !avg_in_list
+                         ? 0.0
+                         : ((avg_in_list || avg_last_data_cleaned > avg_in_list)
+                            ? 100.0
+                            : 100.0 * (float)avg_last_data_cleaned / avg_in_list
+                           )
+                       );
         }
         tot += show_otable_status(sbuf, verbose);
         tot += heart_beat_status(sbuf, verbose);
@@ -3290,6 +3301,7 @@ dinfo_data_status (svalue_t *svp, int value)
                   : (double)avg_last_processed / avg_in_list
                  )
              );
+    /* TODO: Maybe add number of objects data cleaned here as well. */
 
     ST_NUMBER(DID_ST_ARRAYS,         num_arrays);
     ST_NUMBER(DID_ST_ARRAYS_SIZE,    total_array_size());
