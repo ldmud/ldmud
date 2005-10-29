@@ -8,6 +8,9 @@ See the file HISTORY for a user-oriented summary of all the changes.
        didn't remove enough destructed objects, it is unlikely
        that immediately following ones will.
   - (pkg-tls.c) The OpenSSL read/writes are now retried when necessary.
+  - (configure) When searching for the mysqlclient library in the
+       usual places, the configure script forgot to clear out the 
+       cache flag.
 
 19-Oct-2005 (Lars Duening)
   - (pkg-tls.c) tls_check_certificate() now returns the low-level API

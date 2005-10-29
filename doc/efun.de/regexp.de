@@ -8,9 +8,9 @@ BESCHREIBUNG
 
         . Passt auf jedes beliebige Zeichen.
 
-        ^ Passt auf den Beginn einer Zeile.
+        ^ Passt auf den Beginn einer Zeichenkette.
 
-        $ Passt auf das Ende einer Zeile.
+        $ Passt auf das Ende einer Zeichenkette.
 
         \< Passt auf das Beginn eines Wortes.
 
