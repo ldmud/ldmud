@@ -54,20 +54,15 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 658)
-(Parent-Version lpmud 3-3 657)
+(Project-Version lpmud 3-3 659)
+(Parent-Version lpmud 3-3 658)
 (Version-Log "
-  - (interpret, array.c, mapping.c, parse.c, simulate.c, files.c)
-       The new function push_error_handler() simplifies the creation
-       of T_ERROR_HANDLER values.
-  - (object.c) Exceptions during a restore no longer leak values
-       (Bug #0000344).
-  - (smalloc.c) The extended large-free statistics was still off.
+  - (configure) Corrected the mySQL library check (Bug #0000346).
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Sat, 15 Jan 2005 00:02:33 -0700")
+(Checkin-Time "Mon, 17 Jan 2005 00:41:02 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -105,13 +100,13 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.12 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.85 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.721 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.385.1.10 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.722 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.385.1.11 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.21 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
   ;; Configuration
-  (src/configure (lpmud/d/0_configure 1.19.1.109.1.5 755))
+  (src/configure (lpmud/d/0_configure 1.19.1.109.1.6 755))
   (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.43 644))
   (src/machine.h.in (lpmud/b/9_machine.h. 1.9.1.14 644))
   (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.19.1.34.1.3 644))
@@ -119,7 +114,7 @@
   (src/install-sh (lpmud/c/5_install-sh 1.2 755))
   (src/ldmud-man.txt (lpmud/c/c/29_ldmud-man. 1.1 644))
 
-  (src/autoconf/configure.in (lpmud/d/7_configure. 1.20.1.9.1.104 644))
+  (src/autoconf/configure.in (lpmud/d/7_configure. 1.20.1.9.1.105 644))
   (src/autoconf/acconfig.h (lpmud/d/10_acconfig.h 1.6.1.14 644))
 
   (src/settings/README (lpmud/c/22_README 1.14.1.17 644))
@@ -166,7 +161,7 @@
   (src/actions.h (lpmud/d/11_actions.h 1.6.1.7 644))
   (src/actions.c (lpmud/d/12_actions.c 1.15.1.48 644))
   (src/array.h (lpmud/f/47_array.h 1.18.1.22 644))
-  (src/array.c (lpmud/d/12_array.c 1.46.1.47.1.20 644))
+  (src/array.c (lpmud/d/12_array.c 1.46.1.47.1.21 644))
   (src/backend.h (lpmud/f/46_backend.h 1.20.1.7 644))
   (src/backend.c (lpmud/d/6_backend.c 1.68.1.35.1.42 644))
   (src/bitstrings.h (lpmud/i/47_bitstrings 1.3 644))

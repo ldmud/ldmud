@@ -1048,7 +1048,7 @@ fi
 
 # --- iconv ---
 
-AC_CACHE_CHECK(for mySQL,lp_cv_has_iconv,
+AC_CACHE_CHECK(for iconv,lp_cv_has_iconv,
 for TESTPATH in "" "/usr/local/include"; do
     saveflags="$CFLAGS"
     if test "x$TESTPATH" != "x"; then
@@ -1074,14 +1074,6 @@ CFLAGS="$saveflags"
 done
 )
 
-AC_CACHE_CHECK(for iconv,lp_cv_has_iconv,
-    saveflags="$CFLAGS"
-    CFLAGS="$CFLAGS $EXTRA_CFLAGS"
-    AC_TRY_COMPILE([
-    ],,lp_cv_has_iconv=yes,
-    lp_cv_has_iconv=no
-    CFLAGS="$saveflags"
-))
 
 # The system has the include files - now perform further checks
 if test "x$lp_cv_has_iconv" = "xyes"; then
@@ -1212,20 +1204,21 @@ if test $lp_cv_has_mysql = yes; then
     tmp=""
 
     if test "x$mysql_path" = "x"; then
-        if test -d "/usr/local/mysql/lib/mysql"; then
-            CFLAGS="$saveflags -L/usr/local/mysql/lib/mysql"
-            AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -L/usr/local/mysql/lib/mysql -lmysqlclient")
-        elif test -d "/usr/local/mysql/lib"; then
-            CFLAGS="$saveflags -L/usr/local/mysql/lib"
-            AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -L/usr/local/mysql/lib -lmysqlclient")
-        elif test -d "/usr/local/lib"; then
-            CFLAGS="$saveflags -L/usr/local/lib"
-            AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -L/usr/local/lib -lmysqlclient")
-        elif test -d "/usr/lib/mysql/lib"; then
-            CFLAGS="$saveflags -L/usr/lib/mysql/lib"
-            AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -L/usr/lib/mysql/lib -lmysqlclient")
-        else
-            AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -lmysqlclient")
+        AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -lmysqlclient")
+        if test "x$tmp" = "x"; then
+            if test -d "/usr/local/mysql/lib/mysql"; then
+                CFLAGS="$saveflags -L/usr/local/mysql/lib/mysql"
+                AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -L/usr/local/mysql/lib/mysql -lmysqlclient")
+            elif test -d "/usr/local/mysql/lib"; then
+                CFLAGS="$saveflags -L/usr/local/mysql/lib"
+                AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -L/usr/local/mysql/lib -lmysqlclient")
+            elif test -d "/usr/local/lib"; then
+                CFLAGS="$saveflags -L/usr/local/lib"
+                AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -L/usr/local/lib -lmysqlclient")
+            elif test -d "/usr/lib/mysql/lib"; then
+                CFLAGS="$saveflags -L/usr/lib/mysql/lib"
+                AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -L/usr/lib/mysql/lib -lmysqlclient")
+            fi
         fi
     else
         if test -d "${mysql_path}/lib/mysql"; then

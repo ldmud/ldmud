@@ -65,6 +65,10 @@ For a detailed list of all changes see the file CHANGELOG.
        + write_file(): Allowed to remove the file before writing.
 
     - Corrected efuns:
+       + restore_object(): An exception during the restore no longer has the
+           danger of leaking values and memory.
+       + unique_array(): An exception during the process no longer has the
+           danger of leaking values and memory.
 
     - New efuns:
        + baseof(): Test the relation between two structs.

@@ -1,6 +1,9 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+16-Jan-2004 (Lars Duening)  (3.3.659)
+  - (configure) Corrected the mySQL library check (Bug #0000346).
+
 14-Jan-2004 (Lars Duening)  (3.3.658)
   - (interpret, array.c, mapping.c, parse.c, simulate.c, files.c)
        The new function push_error_handler() simplifies the creation

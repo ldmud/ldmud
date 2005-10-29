@@ -3030,8 +3030,6 @@ make_unique (vector_t *arr, callback_t *cb, svalue_t *skipnum)
 
     /* Get the memory for the arr_size unique-structures we're going
      * to need.
-     * TODO: Implement an automatic memory-cleanup in case of errors,
-     * TODO:: e.g. by adding a dedicated structure on the runtime stack.
      */
     pool = new_mempool(size_mempool(sizeof(*head)));
     if (!pool)
