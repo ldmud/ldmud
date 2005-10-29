@@ -1,11 +1,17 @@
 SYNOPSIS
-        void tell_object(object ob, string str)
+        void tell_object(object|string ob, string str)
+        void tell_object(object|string ob, mixed *|mapping|struct|object msg)
 
 DESCRIPTION
-        Send a message str to object ob. If it is an interactive
-        object (a user), then the message will go to him (her?),
-        otherwise the lfun catch_tell() of the living will be called
-        with the message as argument.
+        Send a message str to object ob (which is looked up and if necessary
+        loaded if given by name).
+        
+        If the second argument is a string, the message will be printed
+        to <ob> if it is an interactive user, otherwise it will be passed to
+        the lfun catch_tell() of the target living.
+
+        If the second argument is an array/mapping/struct/object, it will be
+        passed to the lfun catch_msg() in the target.
 
 EXAMPLES
         object who;
@@ -30,5 +36,10 @@ EXAMPLES
         This examples shows how tell_object() together with
         catch_tell() works.
 
+HISTORY
+        LDMud 3.2.11 introduced the 'mixed *' form for symmetry reasons.
+        LDMud 3.3.686 added the use of a mapping/struct/object as second
+        argument.
+
 SEE ALSO
-        write(E), say(E), catch_tell(A)
+        write(E), say(E), catch_tell(A), catch_msg(A)

@@ -1,14 +1,22 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-06-Mar-2005 (Lars Duening  (3.3.685)
+12-Mar-2005 (Lars Duening)  (3.3.686)
+  - (func_spec, object.c) The efun tell_object() can now take an array,
+        mapping, struct or object as second argument, calling catch_msg() in
+        the target in that case (Bug #0000354).
+  - (func_spec, object.c) The efuns tell_room() and say() can now take a
+        mapping, object or struct instead of an array as second argument for
+        the catch_msg() mechanism.
+
+09-Mar-2005 (Lars Duening)  (3.3.685)
   - (mapping.c) The hash/hybrid statistics were somewhat off.
   - (gcollect, backend.c, simulate.c) The default time interval for
       a data cleanup is now available as macro in gcollect.h . And
       since we have that time interval, the number-to-process limit
       in process_objects() didn't make much sense anymore.
 
-06-Mar-2005 (Lars Duening  (3.3.684)
+06-Mar-2005 (Lars Duening)  (3.3.684)
   - (slaballoc.c) Tuned the allocator: the partially-used slab lists
       are now lazily order for better usage.
   - (interpret.c) For an uncallable closure, the code forgot to clean

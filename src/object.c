@@ -3544,20 +3544,47 @@ f_tell_object (svalue_t *sp)
 
 /* EFUN tell_object()
  *
- *   void tell_object(object ob, string str)
+ *   void tell_object(object|string ob, string str)
+ *   void tell_object(object|string ob, mixed msg)
  *
  * Send a message str to object ob. If it is an interactive
  * object (a user), then the message will go to him (her?),
  * otherwise the lfun catch_tell() of the living will be called
  * with the message as argument.
+ * If the object is given as its filename, the driver
+ * looks up the object under that name, loading it if necessary.
+ *
+ * If the second arg is an array, catch_msg() will be called in
+ * the receiving living.
  */
 
 {
-    tell_object((sp-1)->u.ob, sp->u.str);
-    free_string_svalue(sp);
+    object_t * ob;
+    svalue_t *arg = sp - 1;
+
+    /* Get the arguments */
+    if (arg[0].type == T_OBJECT)
+        ob = arg[0].u.ob;
+    else if (arg[0].type == T_STRING)
+    {
+        ob = get_object(arg[0].u.str);
+        if (!ob)
+            error("Object not found: %s.\n", get_txt(arg[0].u.str));
+    }
+
+    if (arg[1].type == T_STRING)
+    {
+        tell_object(ob, sp->u.str);
+        free_svalue(sp);
+    }
+    else
+    {
+        apply(STR_CATCH_MSG, ob, 1);
+          /* Will pop the <msg> at sp from the stack. */
+    }
+
     sp--;
-    if (sp->type == T_OBJECT) /* not self-destructed */
-        free_object_svalue(sp);
+    free_svalue(sp);
     sp--;
 
     return sp;
@@ -4502,7 +4529,6 @@ e_say (svalue_t *v, vector_t *avoid)
     object_t *ob;
     object_t *save_command_giver = command_giver;
     object_t *origin;
-    char buff[256];
     char *message;
 #define INITIAL_MAX_RECIPIENTS 48
     int max_recipients = INITIAL_MAX_RECIPIENTS;
@@ -4630,18 +4656,12 @@ e_say (svalue_t *v, vector_t *avoid)
         break;
 
     case T_OBJECT:
-        xstrncpy(buff, get_txt(v->u.ob->name), sizeof buff);
-        buff[sizeof buff - 1] = '\0';
-        message = buff;
-        break;
-
-    case T_NUMBER:
-        sprintf(buff, "%ld", v->u.number);
-        message = buff;
-        break;
-
     case T_POINTER:
-        /* say()'s evil twin: send <v> to all recipients' catch_msg() lfun */
+    case T_MAPPING:
+#ifdef USE_STRUCTS
+    case T_STRUCT:
+#endif /* USE_STRUCTS */
+        /* tell_room()'s evil twin: send <v> to all recipients' catch_msg() lfun */
 
         for (curr_recipient = recipients; NULL != (ob = *curr_recipient++) ; )
         {
@@ -4650,7 +4670,14 @@ e_say (svalue_t *v, vector_t *avoid)
             stmp.u.ob = ob;
             if (lookup_key(&stmp, avoid) >= 0)
                 continue;
-            push_ref_array(inter_sp, v->u.vec);
+            switch (v->type) {
+            case T_OBJECT:  push_ref_object(inter_sp, v->u.ob, "say"); break;
+            case T_POINTER: push_ref_array(inter_sp, v->u.vec); break;
+            case T_MAPPING: psh_ref_mapping(inter_sp, v->u.map); break;
+#ifdef USE_STRUCTS
+            case T_STRUCT:  push_ref_struct(inter_sp, v->u.strct); break;
+#endif /* USE_STRUCTS */
+            }
             push_ref_object(inter_sp, origin, "say");
             sapply(STR_CATCH_MSG, ob, 2);
         }
@@ -4660,7 +4687,11 @@ e_say (svalue_t *v, vector_t *avoid)
 
     default:
         error("Invalid argument to say(): expected '%s', got '%s'.\n"
-              , efun_arg_typename(T_POINTER|T_NUMBER|T_STRING|T_OBJECT)
+#ifdef USE_STRUCTS
+              , efun_arg_typename(T_POINTER|T_MAPPING|T_STRUCT|T_STRING|T_OBJECT)
+#else
+              , efun_arg_typename(T_POINTER|T_MAPPING|T_STRING|T_OBJECT)
+#endif /* USE_STRUCTS */
               , typename(v->type));
     }
 
@@ -4797,7 +4828,7 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
     object_t *some_recipients[20];
     object_t **recipients;
     object_t **curr_recipient;
-    char buff[256], *message;
+    char *message;
     static svalue_t stmp = { T_OBJECT, } ;
 
     /* Like in say(), collect the possible recipients.
@@ -4845,17 +4876,11 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
         break;
 
     case T_OBJECT:
-        xstrncpy(buff, get_txt(v->u.ob->name), sizeof buff);
-        buff[sizeof buff - 1] = '\0';
-        message = buff;
-        break;
-
-    case T_NUMBER:
-        sprintf(buff, "%ld", v->u.number);
-        message = buff;
-        break;
-
     case T_POINTER:
+    case T_MAPPING:
+#ifdef USE_STRUCTS
+    case T_STRUCT:
+#endif /* USE_STRUCTS */
       {
         /* say()s evil brother: send <v> to all recipients'
          * catch_msg() lfun
@@ -4872,7 +4897,14 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
             stmp.u.ob = ob;
             if (lookup_key(&stmp, avoid) >= 0)
                 continue;
-            push_ref_array(inter_sp, v->u.vec);
+            switch (v->type) {
+            case T_OBJECT:  push_ref_object(inter_sp, v->u.ob, "tell_room"); break;
+            case T_POINTER: push_ref_array(inter_sp, v->u.vec); break;
+            case T_MAPPING: psh_ref_mapping(inter_sp, v->u.map); break;
+#ifdef USE_STRUCTS
+            case T_STRUCT:  push_ref_struct(inter_sp, v->u.strct); break;
+#endif /* USE_STRUCTS */
+            }
             push_ref_object(inter_sp, origin, "tell_room");
             sapply(STR_CATCH_MSG, ob, 2);
         }
@@ -4881,7 +4913,11 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
 
     default:
         error("Invalid argument to tell_room(): expected '%s', got '%s'.\n"
-              , efun_arg_typename(T_POINTER|T_NUMBER|T_STRING|T_OBJECT)
+#ifdef USE_STRUCTS
+              , efun_arg_typename(T_POINTER|T_MAPPING|T_STRUCT|T_STRING|T_OBJECT)
+#else
+              , efun_arg_typename(T_POINTER|T_MAPPING|T_STRING|T_OBJECT)
+#endif /* USE_STRUCTS */
               , typename(v->type));
     }
 

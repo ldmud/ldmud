@@ -54,19 +54,20 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 685)
-(Parent-Version lpmud 3-3 684)
+(Project-Version lpmud 3-3 686)
+(Parent-Version lpmud 3-3 685)
 (Version-Log "
-  - (mapping.c) The hash/hybrid statistics were somewhat off.
-  - (gcollect, backend.c, simulate.c) The default time interval for
-      a data cleanup is now available as macro in gcollect.h . And
-      since we have that time interval, the number-to-process limit
-      in process_objects() didn't make much sense anymore.
+  - (func_spec, object.c) The efun tell_object() can now take an array,
+        mapping, struct or object as second argument, calling catch_msg() in
+        the target in that case (Bug #0000354).
+  - (func_spec, object.c) The efuns tell_room() and say() can now take a
+        mapping, object or struct instead of an array as second argument for
+        the catch_msg() mechanism.
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Wed, 09 Mar 2005 21:57:19 -0700")
+(Checkin-Time "Sat, 12 Mar 2005 12:18:52 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -104,8 +105,8 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.12 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.86 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.748 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.385.1.19 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.749 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.385.1.20 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.21 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -215,7 +216,7 @@
   (src/my-rusage.h (lpmud/f/28_my-rusage. 1.7 644))
   (src/my-stdint.h (lpmud/u/b/39_my-stdint. 1.2 644))
   (src/object.h (lpmud/44_object.h 1.34.1.19.1.6.1.5 644))
-  (src/object.c (lpmud/45_object.c 1.62.1.88.1.53.1.6 644))
+  (src/object.c (lpmud/45_object.c 1.62.1.88.1.53.1.7 644))
   (src/otable.h (lpmud/f/27_otable.h 1.8.1.4 644))
   (src/otable.c (lpmud/43_otable.c 1.22.1.8 644))
   (src/parser.c (lpmud/l/13_parser.c 1.1 644))
@@ -365,7 +366,7 @@
   (src/xptmalloc.c (lpmud/d/b/10_xptmalloc. 1.6 644))
 
   ;; Build files
-  (src/func_spec (lpmud/c/31_func_spec 1.53.1.45.1.22.1.39.1.4 644))
+  (src/func_spec (lpmud/c/31_func_spec 1.53.1.45.1.22.1.39.1.5 644))
   (src/string_spec (lpmud/f/6_string_spe 1.14.1.17.1.3 644))
   (src/mkfunc.c (lpmud/l/14_mkfunc.c 1.1 644))
   (src/make_func.y (lpmud/b/7_make_func. 1.25.1.30.1.12 644))
@@ -536,7 +537,7 @@
   (mudlib/pgsql.c (lpmud/d/b/42_pgsql.c 1.1 644))
   (mudlib/telnetneg.h (lpmud/c/b/13_telnet.h 1.2 644))
   (mudlib/telnetneg.c (lpmud/c/b/14_telnetneg. 1.5 644))
-  (mudlib/test_master.c (lpmud/e/39_test_maste 1.10.1.10 644))
+  (mudlib/test_master.c (lpmud/e/39_test_maste 1.10.1.10.1.1 644))
   (mudlib/ACCESS.ALLOW (lpmud/b/4_ACCESS.ALL 1.3 644))
   (mudlib/dns_resolve.c (lpmud/f/b/9_dns_resolv 1.1 644))
   (mudlib/query_ip_name.c (lpmud/b/c/18_query_ip_n 1.1 644))
@@ -569,7 +570,7 @@
   (doc/applied/add_weight (lpmud/n/7_add_weight 1.4 644))
   (doc/applied/applied (lpmud/n/8_applied 1.2 644))
   (doc/applied/can_put_and_get (lpmud/n/9_can_put_an 1.3 644))
-  (doc/applied/catch_msg (lpmud/n/10_catch_msg 1.2 644))
+  (doc/applied/catch_msg (lpmud/n/10_catch_msg 1.3 644))
   (doc/applied/catch_tell (lpmud/n/11_catch_tell 1.6 644))
   (doc/applied/clean_up (lpmud/n/12_clean_up 1.4 644))
   (doc/applied/create (lpmud/n/13_create 1.4 644))
@@ -840,7 +841,7 @@
   (doc/efun/rusage (lpmud/q/1_rusage 1.3 644))
   (doc/efun/save_object (lpmud/q/2_save_objec 1.7 644))
   (doc/efun/save_value (lpmud/e/13_save_value 1.5 644))
-  (doc/efun/say (lpmud/q/3_say 1.6 644))
+  (doc/efun/say (lpmud/q/3_say 1.7 644))
   (doc/efun/send_erq (lpmud/q/4_send_erq 1.1.1.3 644))
   (doc/efun/send_udp (lpmud/q/5_send_imp 1.2.1.3 644))
   (doc/efun/set_bit (lpmud/q/7_set_bit 1.6 644))
@@ -886,8 +887,8 @@
   (doc/efun/symbolp (lpmud/q/34_symbolp 1.4 644))
   (doc/efun/tail (lpmud/q/35_tail 1.3 644))
   (doc/efun/tan (lpmud/q/36_tan 1.1.1.2 644))
-  (doc/efun/tell_object (lpmud/q/37_tell_objec 1.2.1.3 644))
-  (doc/efun/tell_room (lpmud/q/38_tell_room 1.2.1.2 644))
+  (doc/efun/tell_object (lpmud/q/37_tell_objec 1.2.1.4 644))
+  (doc/efun/tell_room (lpmud/q/38_tell_room 1.2.1.3 644))
   (doc/efun/test_bit (lpmud/q/39_test_bit 1.6 644))
   (doc/efun/this_interactive (lpmud/q/40_this_inter 1.2 644))
   (doc/efun/this_object (lpmud/q/41_this_objec 1.1.1.1 644))
@@ -967,8 +968,8 @@
   (doc/efun.de/this_interactive.de (lpmud/f/b/42_this_inter 1.1 640))
   (doc/efun.de/terminal_colour.de (lpmud/c/c/22_terminal_c 1.1 644))
   (doc/efun.de/test_bit.de (lpmud/f/b/43_test_bit.d 1.1 640))
-  (doc/efun.de/tell_room.de (lpmud/f/b/44_tell_room. 1.2 640))
-  (doc/efun.de/tell_object.de (lpmud/f/b/45_tell_objec 1.2 640))
+  (doc/efun.de/tell_room.de (lpmud/f/b/44_tell_room. 1.3 640))
+  (doc/efun.de/tell_object.de (lpmud/f/b/45_tell_objec 1.3 640))
   (doc/efun.de/tan.de (lpmud/s/36_tan.de 1.1 644))
   (doc/efun.de/tail.de (lpmud/f/b/46_tail.de 1.1 640))
   (doc/efun.de/symbolp.de (lpmud/t/6_symbolp.de 1.1 644))
@@ -1013,7 +1014,7 @@
   (doc/efun.de/send_udp.de (lpmud/g/b/28_send_udp.d 1.3 640))
   (doc/efun.de/send_imp.de (lpmud/g/b/29_send_imp.d 1.2 640))
   (doc/efun.de/send_erq.de (lpmud/g/b/30_send_erq.d 1.2 640))
-  (doc/efun.de/say.de (lpmud/g/b/31_say.de 1.2 640))
+  (doc/efun.de/say.de (lpmud/g/b/31_say.de 1.3 640))
   (doc/efun.de/save_value.de (lpmud/g/b/32_save_value 1.1 640))
   (doc/efun.de/save_object.de (lpmud/g/b/33_save_objec 1.2 640))
   (doc/efun.de/rusage.de (lpmud/g/b/34_rusage.de 1.1 640))

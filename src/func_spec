@@ -531,7 +531,11 @@ int     set_next_reset(int);
 void    set_this_object(object);
 object  shadow(object, int);
 int     snoop(object, void|object);
-void    tell_object(object, string);
+#ifdef USE_STRUCTS
+void    tell_object(object|string, string|mixed*|mapping|struct|object);
+#else
+void    tell_object(object|string, string|mixed*|mapping|object);
+#endif /* USE_STRUCTS */
 void    unshadow();
 string  variable_exists(string, void|int|object, void|int);
 mixed  *variable_list(object|string, int default: F_CONST1);
@@ -618,9 +622,17 @@ object  first_inventory(object|string default: F_THIS_OBJECT);
 object  next_inventory(object default: F_THIS_OBJECT);
 void    move_object(object|string, object|string);
 object  present(object|string, void|int|object, void|object);
-void    say(string|mixed *, void|object|object *);
+#ifdef USE_STRUCTS
+void    say(string|mixed *|object|mapping|struct, void|object|object *);
+#else
+void    say(string|mixed *|object|mapping, void|object|object *);
+#endif /* USE_STRUCTS */
 void    set_environment(object, null|object);
-void    tell_room(object|string, string|mixed *, void|object *);
+#ifdef USE_STRUCTS
+void    tell_room(object|string, string|mixed *|object|mapping|struct, void|object *);
+#else
+void    tell_room(object|string, string|mixed *|object|mapping, void|object *);
+#endif /* USE_STRUCTS */
 
 
         /* Verbs and Commands (TODO: should be optional) */

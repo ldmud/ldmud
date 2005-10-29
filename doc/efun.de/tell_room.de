@@ -1,9 +1,10 @@
-VERALTET
 SYNOPSIS
         void tell_room(string|object obj, string str);
         void tell_room(string|object obj, string str, object *exclude);
-        void tell_room(string|object obj, mixed *msg)
-        void tell_room(string|object obj, mixed *msg, object *exlcude);
+
+        void tell_room(string|object obj, mixed *|mapping|struct|object msg)
+        void tell_room(string|object obj, mixed *|mapping|struct|object  msg
+                                        , object *exlcude);
 
 BESCHREIBUNG
         Gibt einen Text <str> an den Raum <obj> aus. <obj> kann auch der
@@ -17,8 +18,9 @@ BESCHREIBUNG
         Wenn das Array <*exclude> angegeben ist, wird der Text an die
         Objekte in <*exclude> nicht ausgegeben.
 
-        Wenn das zweite Argument ein Array ist, wird in allen Lebewesen, die
-        den Text erhalten, catch_msg() aufgerufen (statt catch_tell()).
+        Wenn das zweite Argument ein nicht-String ist, wird in allen
+        Lebewesen, die den Text erhalten, catch_msg() aufgerufen (statt
+        catch_tell()).
 
 BEISPIELE
         An alle Lebewesen im Raum soll ein simples "Hi!" gesendet werden:
@@ -39,6 +41,10 @@ BEISPIELE
             {
                 tell_room(environment(this_player()), "Hallo Welt!\n");
             }
+
+GESCHICHTE
+        LDMud 3.3.686 erlaubt die Verwendung eines mapping/struct/object als
+        zweites Argument.
 
 SIEHE AUCH
         write(E), say(E), tell_object(E), catch_tell(A), catch_msg(A)

@@ -57,6 +57,9 @@ For a detailed list of all changes see the file CHANGELOG.
            a string instead of an array.
        + sprintf(), printf(): Formats %O and %Q print floats always
            with a decimal point.
+       + say(), tell_room(), tell_object(): The efuns can now take a mapping,
+           an object or a struct instead of an array to use with the
+           catch_msg() mechanism.
        + transfer(): Available (in compat mode) only when USE_DEPRECATED
            is in effect.
        + unique_array(): The separator function can now be a closure,
@@ -199,6 +202,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + input_to(): New flag INPUT_NO_TELNET to modify the INPUT_CHARMODE
            behaviour.
        + input_to(): New flag INPUT_APPEND to queue input_to()s.
+       + tell_object(): The efun can now take an array as second
+           argument, and then calls catch_msg() in the target.
        + present(): The argument form (str, n) allows for ids with embedded
            numbers.
        + shutdown(): Added an argument to set the process exit code.

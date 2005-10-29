@@ -1,12 +1,17 @@
-VERALTET
 SYNOPSIS
-        void tell_object(object obj, string str);
+        void tell_object(object|string obj, string str);
+        void tell_object(object|string obj, mixed *|mapping|struct|object msg);
 
 BESCHREIBUNG
-        Sendet einen Text <str> an das Objekt <obj>. Wenn <obj> ein
-        interaktives Objekt (ein User) ist, wird der Text an ihn (oder sie?)
-        ausgegeben, ansonsten wird die Lfun catch_tell() im Lebewesen
-        aufgerufen, mit dem Text als Argument.
+        Sendet einen Nachricht an das Objekt <obj> (das auch durch seinen
+        Namen angegeben werden kann).
+
+        Ist die Nachricht ein String, wird der Text an interaktive Objekte
+        direkt ausgegeben, fuer andere Objekte wird die lfun catch_tell()
+        aufgerufen.
+
+        Ist die Nachricht ein anderer Typ, wird die lfun catch_msg() im
+        Empfaenger aufgerufen.
 
 BEISPIEL
         Dies gibt ein einfaches "Hi!" an den Spieler Thomas aus:
@@ -34,5 +39,10 @@ BEISPIEL
                 ...
             }
 
+GESCHICHTE
+        LDMud 3.2.11 fuehrte die Arrayform aus Symmetriegruenden ein.
+        LDMud 3.3.686 erlaubt die Verwendung eines mapping/struct/object als
+        zweites Argument.
+
 SIEHE AUCH
-        write(E), say(E), catch_tell(A)
+        write(E), say(E), catch_tell(A), catch_msg(A)

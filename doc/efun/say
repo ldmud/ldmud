@@ -3,22 +3,23 @@ SYNOPSIS
         void say(string str, object exclude)
         void say(string str, object *excludes)
 
-        void say(mixed *arr)
-        void say(mixed *arr, object exclude)
-        void say(mixed *arr, object *excludes)
+        void say(mixed *|mapping|struct|object msg)
+        void say(mixed *|mapping|struct|object msg, object exclude)
+        void say(mixed *|mapping|struct|object msg, object *excludes)
 
 DESCRIPTION
         There are two major modes of calling:
 
         If the first argument is a string <str>, it will be send to
-        all livings in the current room        except to the initiator.
+        all livings in the current room except to the initiator.
 
-        If the first argument is an array <arr>, the lfun catch_msg()
-        of all living objects except the initiator will be called.
-        This array will be given as first argument to the lfun, and
+        If the first argument is an array/mapping/struct/object <msg>, the
+        lfun catch_msg() of all living objects except the initiator will be
+        called.
+        This <msg> will be given as first argument to the lfun, and
         the initiating object as the second.
-        CAVEAT: If the lfun catch_msg() modifies the <arr>, all subsequent
-        objects will receive the modified <arr>.
+        CAVEAT: If the lfun catch_msg() modifies the content of <msg>, all
+        subsequent objects will receive the modified <msg>.
 
         By specifying a second argument to the efun one can exclude
         more objects than just the initiator. If the second argument
@@ -74,6 +75,10 @@ EXAMPLES
         catch_msg() works. Here we also use a non living object to
         send the message so the who in catch_msg() will be the current
         user.
+
+HISTORY
+        LDMud 3.3.686 added the use of a mapping/struct/object as second
+        argument.
 
 SEE ALSO
         write(E), tell_object(E), tell_room(E)

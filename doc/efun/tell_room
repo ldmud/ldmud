@@ -1,11 +1,13 @@
 SYNOPSIS
         void tell_room(string|object ob, string str)
         void tell_room(string|object ob, string str, object *exclude)
-        void tell_room(string|object ob, mixed *msg)
-        void tell_room(string|object ob, mixed *msg, object *exclude)
+
+        void tell_room(string|object ob, mixed *|mapping|struct|object msg)
+        void tell_room(string|object ob, mixed *|mapping|struct|object msg
+                                       , object *exclude)
 
 DESCRIPTION
-        Send a message str to all living objects in the room ob. ob
+        Send a message <str> to all living objects in the room ob. ob
         can also be the name of the room given as a string. If a
         receiving object is not a interactive user the lfun
         catch_tell() of the object will be invoked with the message as
@@ -16,8 +18,8 @@ DESCRIPTION
         If array *exclude is given, all objects contained in
         *exclude are excluded from the message str.
 
-        If the second arg is an array, catch_msg() will be called in
-        all listening livings.
+        If the second arg is an array/mapping/struct/object, catch_msg() will
+        be called in all listening livings.
 
 EXAMPLES
         tell_object(environment(this_player()), "Hi!\n");
@@ -36,6 +38,10 @@ EXAMPLES
            }
 
         This examples shows how tell_room() together with catch_tell() works.
+
+HISTORY
+        LDMud 3.3.686 added the use of a mapping/struct/object as second
+        argument.
 
 SEE ALSO
         write(E), say(E), tell_object(E), catch_tell(A), catch_msg(A)

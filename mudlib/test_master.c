@@ -94,6 +94,7 @@ void flag (string arg)
 // Evaluate an argument given as option '-f' to the driver.
 
 {
+    debug_message(sprintf("%O: flag(%O)\n", this_object(), arg));
     if (arg == "test")
     {
         /* Insert your test code here */
