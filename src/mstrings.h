@@ -17,8 +17,13 @@
  * Untabled strings are marked by .tabled == MY_FALSE.
  *
  * Tabled strings are the ones managed in the string table and have .tabled
- * == TRUE. The table management structure itself is handled outside of the
- * string structure; the table reference is not counted.
+ * = TRUE. The table uses the .next pointer for the table handling.
+ * The table reference is not counted.
+ *
+ * (While the .next pointer is 'ballast' in untabled strings, in practice the
+ * majority of strings in a Mud end up being tabled, so not having the
+ * overhead of a separate table link structure outweights the overhead
+ * for untabled strings.)
  *
  * .refs counts the number of direct references by svalues. A stored refcount of 0 means that the
  * refcounter rolled over and that the string has to be considered a constant.
@@ -40,9 +45,10 @@ struct string_s
         Bool tabled      :  1;
         unsigned int ref : 31;
     } info;
-    size_t  size;    /* Length of the string */
-    whash_t hash;    /* 0, or the hash of the string */
-    char    txt[1];  /* In fact .size characters plus one '\0' */
+    string_t * next;    /* Linkpointer in string table. */
+    size_t     size;    /* Length of the string */
+    whash_t    hash;    /* 0, or the hash of the string */
+    char       txt[1];  /* In fact .size characters plus one '\0' */
       /* The string text follows here */
 };
 

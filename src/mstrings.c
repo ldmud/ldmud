@@ -25,18 +25,17 @@
  *
  * Strings are managed using a single structure: string_t.
  *
- * string_data_t holds the raw string data as explained above:
- *
  *    struct string_s
  *    {
  *        struct {
  *            Bool tabled      :  1;
  *            unsigned int ref : 31;
  *        } info;
- *        size_t  size;            Length of the string 
- *        whash_t hash;            0, or the hash of the string
- *        char    txt[1.. .size];
- *        char    null             Gratuituous terminator
+ *        string_t * next;            String table pointer.
+ *        size_t     size;            Length of the string 
+ *        whash_t    hash;            0, or the hash of the string
+ *        char       txt[1.. .size];
+ *        char       null             Gratuituous terminator
  *    }
  *
  * The hash of the string is computed on-demand. Should the string hash
@@ -51,7 +50,7 @@
  *
  * Tabled (shared) strings:
  *   .tabled is TRUE
- *   The table structures are external, and the reference from the
+ *   .next is the hash chain pointer, the reference from the
  *   table is not counted.
  *
  * TODO: Make functions mstr_add() resilient to receiving NULL
@@ -93,20 +92,8 @@
 #endif
 
 /*-------------------------------------------------------------------------*/
-/* The link datastructure used in the hash table.
- */
 
-typedef struct string_link_s string_link_t;
-
-struct string_link_s
-{
-    string_link_t * next;  /* Next entry in hash chain. */
-    string_t      * str;   /* The string itself. */
-};
-
-/*-------------------------------------------------------------------------*/
-
-static string_link_t ** stringtable = NULL;
+static string_t ** stringtable = NULL;
   /* The hashed string table: an array of pointers to the heads of
    * the string chains.
    */
@@ -247,7 +234,7 @@ find_and_move (const char * const s, size_t size, whash_t hash)
  */
 
 {
-    string_link_t *prev, *rover;
+    string_t *prev, *rover;
 
     int idx = HashToIndex(hash);
 
@@ -258,10 +245,10 @@ find_and_move (const char * const s, size_t size, whash_t hash)
     mstr_searchlen_byvalue++;
     for ( prev = NULL, rover = stringtable[idx]
         ;    rover != NULL
-          && get_txt(rover->str) != s
-          && !(   size == mstrsize(rover->str)
-               && hash == get_hash(rover->str)
-               && 0 == memcmp(get_txt(rover->str), s, size)
+          && get_txt(rover) != s
+          && !(   size == mstrsize(rover)
+               && hash == get_hash(rover)
+               && 0 == memcmp(get_txt(rover), s, size)
               )
         ; prev = rover, rover = rover->next
         )
@@ -280,7 +267,7 @@ find_and_move (const char * const s, size_t size, whash_t hash)
     if (rover)
         mstr_found_byvalue++;
 
-    return rover ? rover->str : NULL;
+    return rover;
 } /* find_and_move() */
 
 /*-------------------------------------------------------------------------*/
@@ -293,7 +280,7 @@ move_to_head (string_t *s, int idx)
  */
 
 {
-    string_link_t *prev, *rover;
+    string_t *prev, *rover;
 
     mstr_searches++;
 
@@ -301,7 +288,7 @@ move_to_head (string_t *s, int idx)
 
     mstr_searchlen++;
     for ( prev = NULL, rover = stringtable[idx]
-        ; rover != NULL && rover->str != s
+        ; rover != NULL && rover != s
         ; prev = rover, rover = rover->next
         )
     {
@@ -322,7 +309,7 @@ move_to_head (string_t *s, int idx)
     if (rover)
         mstr_found++;
 
-    return rover ? rover->str : NULL;
+    return rover;
 } /* move_to_head() */
 
 /*-------------------------------------------------------------------------*/
@@ -339,9 +326,8 @@ make_new_tabled (const char * const pTxt, size_t size, whash_t hash MTRACE_DECL)
  */
 
 {
-    string_t      * string;
-    string_link_t * lnk;
-    int             idx = HashToIndex(hash);
+    string_t * string;
+    int        idx = HashToIndex(hash);
 
     /* Get the memory for a new one */
 
@@ -349,13 +335,6 @@ make_new_tabled (const char * const pTxt, size_t size, whash_t hash MTRACE_DECL)
       /* sizeof(*string) includes the extra data byte */
     if (!string)
         return NULL;
-
-    lnk = xalloc_pass(sizeof(*lnk));
-    if (!lnk)
-    {
-        xfree(string);
-        return NULL;
-    }
 
     /* Set up the structures and table the string */
 
@@ -375,9 +354,8 @@ make_new_tabled (const char * const pTxt, size_t size, whash_t hash MTRACE_DECL)
     else
         mstr_collisions++;
 
-    lnk->str = string;
-    lnk->next = stringtable[idx];
-    stringtable[idx] = lnk;
+    string->next = stringtable[idx];
+    stringtable[idx] = string;
 
     {
         size_t msize;
@@ -416,6 +394,7 @@ mstring_alloc_string (size_t iSize MTRACE_DECL)
 
     /* Set up the structures */
     string->size = iSize;
+    string->next = NULL;
     string->hash = 0;
     string->txt[iSize] = '\0';
     string->info.tabled = MY_FALSE;
@@ -589,14 +568,8 @@ table_string (string_t * pStr MTRACE_DECL)
 
     if (!string)
     {
-        /* No: create a new entry in the table for this string.
+        /* No: add the string into the table.
          */
-        string_link_t * lnk;
-
-        lnk = xalloc_pass(sizeof(*lnk));
-        if (!lnk)
-            return NULL;
-
         pStr->info.tabled = MY_TRUE;
 
         mstr_added++;
@@ -605,9 +578,8 @@ table_string (string_t * pStr MTRACE_DECL)
         else
             mstr_collisions++;
 
-        lnk->str = pStr;
-        lnk->next = stringtable[idx];
-        stringtable[idx] = lnk;
+        pStr->next = stringtable[idx];
+        stringtable[idx] = pStr;
 
         mstr_tabled++;
         mstr_tabled_size += msize;
@@ -853,8 +825,7 @@ mstring_free (string_t *s)
     {
         /* A tabled string */
 
-        int             idx;
-        string_link_t * lnk;
+        int idx;
 
         mstr_tabled--;
         mstr_tabled_size -= msize;
@@ -867,9 +838,7 @@ mstring_free (string_t *s)
                  );
         }
 
-        lnk = stringtable[idx];
-        stringtable[idx] = lnk->next;
-        xfree(lnk);
+        stringtable[idx] = s->next;
 
         if (NULL == stringtable[idx])
             mstr_chains--;
@@ -1619,10 +1588,10 @@ mstring_clear_refs (void)
 
     for (x = 0; x < HTABLE_SIZE; x++)
     {
-        string_link_t *p;
+        string_t *p;
         for (p = stringtable[x]; p; p = p->next )
         {
-            p->str->info.ref = 0;
+            p->info.ref = 0;
         }
     }
 
@@ -1639,14 +1608,6 @@ mstring_note_refs (void)
     int x;
 
     note_malloced_block_ref(stringtable);
-    for (x = 0; x < HTABLE_SIZE; x++)
-    {
-        string_link_t *p;
-        for (p = stringtable[x]; p; p = p->next )
-        {
-            note_malloced_block_ref(p);
-        }
-    }
 
     for (x = 0; x < SHSTR_NOSTRINGS; x++)
     {
@@ -1669,10 +1630,10 @@ mstring_walk_table (void (*func) (string_t *))
 
     for (x = 0; x < HTABLE_SIZE; x++)
     {
-        string_link_t * p;
+        string_t * p;
         for (p = stringtable[x]; NULL != p; p = p->next)
         {
-            (*func)(p->str);
+            (*func)(p);
         }
     }
 } /* mstring_walk_table() */
@@ -1684,7 +1645,7 @@ mstring_gc_table (void)
 /* GC support: Remove all strings from the table which have a refcount
  * of 0.
  *
- * This can only happen during a GC.
+ * This can only happen in the last stage of a GC.
  */
 
 {
@@ -1692,12 +1653,12 @@ mstring_gc_table (void)
 
     for (x = 0; x < HTABLE_SIZE; x++)
     {
-        string_link_t * prev, * next;
+        string_t * prev, * next;
         for (prev = NULL, next = stringtable[x]; next != NULL; )
         {
-            if (next->str->info.ref == 0)
+            if (next->info.ref == 0)
             {
-                string_link_t * this = next;
+                string_t * this = next;
 
                 /* Unlink the string from the table, then free it. */
                 if (prev == NULL)
@@ -1712,15 +1673,14 @@ mstring_gc_table (void)
                 }
 
                 mstr_untabled++;
-                mstr_untabled_size += mstr_mem_size(this->str);
+                mstr_untabled_size += mstr_mem_size(this);
                 mstr_tabled--;
-                mstr_tabled_size += mstr_mem_size(this->str);
+                mstr_tabled_size += mstr_mem_size(this);
                 mstr_deleted++;
 
-                this->str->info.ref = 1;
-                this->str->info.tabled = MY_FALSE;
-                free_mstring(this->str);
-                xfree(this);
+                this->info.ref = 1;
+                this->info.tabled = MY_FALSE;
+                free_mstring(this);
             }
             else
             {
@@ -1744,19 +1704,16 @@ add_string_status (strbuf_t *sbuf, Bool verbose)
 
 {
 #   define STR_OVERHEAD (sizeof(string_t)+1)
-#   define LINK_OVERHEAD (sizeof(string_link_t))
 
     mp_uint stringtable_size;
     mp_uint distinct_strings;
     mp_uint distinct_size;
     mp_uint distinct_overhead;
-    mp_uint link_overhead;
 
     stringtable_size = HTABLE_SIZE * sizeof(string_t *);
     distinct_strings = mstr_tabled + mstr_untabled;
-    link_overhead = mstr_tabled * LINK_OVERHEAD;
-    distinct_size = mstr_tabled_size + mstr_untabled_size + link_overhead;
-    distinct_overhead = mstr_tabled * (STR_OVERHEAD + LINK_OVERHEAD)
+    distinct_size = mstr_tabled_size + mstr_untabled_size;
+    distinct_overhead = mstr_tabled * STR_OVERHEAD
                       + mstr_untabled * STR_OVERHEAD;
 
     if (!verbose)
@@ -1774,11 +1731,11 @@ add_string_status (strbuf_t *sbuf, Bool verbose)
         strbuf_add(sbuf,   "---------------\t  Strings     Bytes (Data+Overhead)\n");
         strbuf_addf(sbuf,  "Total asked for\t%9lu %9lu (%9lu+%9lu)\n"
                         , mstr_used
-                        , mstr_used_size + link_overhead
+                        , mstr_used_size
                         , mstr_used_size
                           ? mstr_used_size - mstr_used * STR_OVERHEAD
                           : 0
-                        , mstr_used * STR_OVERHEAD + link_overhead
+                        , mstr_used * STR_OVERHEAD
                         );
         strbuf_addf(sbuf,  "Total allocated\t%9lu %9lu (%9lu+%9lu)\n"
                         , distinct_strings
@@ -1788,12 +1745,11 @@ add_string_status (strbuf_t *sbuf, Bool verbose)
                         );
         strbuf_addf(sbuf,  " - tabled\t%9lu %9lu (%9lu+%9lu)\n"
                         , mstr_tabled
-                        , mstr_tabled_size + stringtable_size + link_overhead
+                        , mstr_tabled_size + stringtable_size
                         , mstr_tabled_size
                           ? mstr_tabled_size - mstr_tabled * STR_OVERHEAD
                           : 0
                         , mstr_tabled * STR_OVERHEAD + stringtable_size
-                                                     + link_overhead
                         );
         strbuf_addf(sbuf,  " - untabled\t%9lu %9lu (%9lu+%9lu)\n"
                         , mstr_untabled
@@ -1879,8 +1835,7 @@ string_dinfo_status (svalue_t *svp, int value)
     ST_NUMBER(DID_ST_STRINGS, mstr_used);
     ST_NUMBER(DID_ST_STRING_SIZE, mstr_used_size);
 
-    ST_NUMBER(DID_ST_STR_TABLE_SIZE, HTABLE_SIZE * sizeof(string_t *)
-                                     + mstr_tabled * sizeof(string_link_t*));
+    ST_NUMBER(DID_ST_STR_TABLE_SIZE, HTABLE_SIZE * sizeof(string_t *));
     ST_NUMBER(DID_ST_STR_OVERHEAD, sizeof(string_t)-1);
 
     ST_NUMBER(DID_ST_STR_CHAINS,     mstr_chains);

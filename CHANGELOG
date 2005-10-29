@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+24-Feb-2004 (Lars Duening)  (3.3.681)
+  - (mstrings) Re-integrated the stringtable structures into the strings:
+      on the whole, the majority of strings will be tabled so reducing
+      the overhead for this case is beneficial.
+
 24-Feb-2004 (Lars Duening)  (3.3.680)
   - (mstrings, closure.c, interpret.c) Debugging 3.3.679: reallocating a
       string 'under the hood' is no longer possible as the string data is now
