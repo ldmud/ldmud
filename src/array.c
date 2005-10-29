@@ -2976,6 +2976,30 @@ put_in (Mempool pool, struct unique **ulist
 
 
 /*-------------------------------------------------------------------------*/
+/* To facilitate automatic cleanup of the temporary structures in case
+ * of an error, the following structure will be pushed onto the VM stack
+ * as T_ERROR_HANDLER.
+ */
+
+struct unique_cleanup_s {
+    svalue_t   head;  /* The link to the error handler function */
+    Mempool    pool;  /* Pool for the unique structures */
+    vector_t * arr;   /* Protective reference to the array */
+};
+
+static void
+make_unique_cleanup (svalue_t * arg)
+{
+    struct unique_cleanup_s * data = (struct unique_cleanup_s *)arg;
+
+    if (data->pool)
+        mempool_delete(data->pool);
+    if (data->arr)
+        deref_array(data->arr);
+    xfree(arg);
+} /* make_unique_cleanup() */
+
+/*-------------------------------------------------------------------------*/
 static vector_t *
 make_unique (vector_t *arr, callback_t *cb, svalue_t *skipnum)
 
@@ -2994,6 +3018,7 @@ make_unique (vector_t *arr, callback_t *cb, svalue_t *skipnum)
     mp_int arr_size;      /* Size of the incoming <arr>ay */
     mp_int ant;           /* Number of distinct markers */
     mp_int cnt, cnt2;
+    struct unique_cleanup_s * ucp;
 
     head = NULL;
 
@@ -3013,8 +3038,22 @@ make_unique (vector_t *arr, callback_t *cb, svalue_t *skipnum)
         error("(unique_array) Out of memory: (%lu bytes) for mempool\n"
              , (unsigned long)arr_size * sizeof(*head));
 
-    ref_array(arr);  /* Prevent apply from freeing this */
+    /* Create the automatic cleanup structure */
+    ucp = xalloc(sizeof(*ucp));
+    if (!ucp)
+    {
+        mempool_delete(pool);
+        error("(unique_array) Out of memory: (%lu bytes) for cleanup structure\n"
+             , (unsigned long)sizeof(*ucp));
+    }
 
+    ucp->head.type = T_ERROR_HANDLER;
+    ucp->head.u.error_handler = make_unique_cleanup;
+    ucp->pool = pool;
+    ucp->arr = ref_array(arr);  /* Prevent apply from freeing this */
+    inter_sp++;
+    inter_sp->type = T_LVALUE;
+    inter_sp->u.lvalue = &(ucp->head);
 
     /* Build the comb structure.
      */
@@ -3045,8 +3084,6 @@ make_unique (vector_t *arr, callback_t *cb, svalue_t *skipnum)
         }
     }
 
-    deref_array(arr); /* Undo the protection from above */
-
     ret = allocate_array(ant);
 
     /* Copy the objects from the comb structure into the result vector,
@@ -3073,7 +3110,8 @@ make_unique (vector_t *arr, callback_t *cb, svalue_t *skipnum)
             break; /* It shouldn't but, to avoid skydive just in case */
     }
 
-    mempool_delete(pool);
+    /* Cleanup using the cleanup structure */
+    free_svalue(inter_sp--);
 
     return ret;
 } /* make_unique() */
