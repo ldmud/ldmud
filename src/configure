@@ -10845,7 +10845,7 @@ echo $ECHO_N "checking for mySQL... $ECHO_C" >&6
 if test "${lp_cv_has_mysql+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
 else
-  for TESTPATH in "" "${mysql_path}/include/mysql" "${mysql_path}/include" "${mysql_path}" "/usr/local/mysql/include/mysql" "/usr/local/mysql/include" "/usr/lib/mysql/mysql" "/usr/lib/mysql" "/usr/local/include/mysql" "/usr/local/include"; do
+  for TESTPATH in "" "${mysql_path}/include/mysql" "${mysql_path}/include" "${mysql_path}" "/usr/local/mysql/include/mysql" "/usr/local/mysql/include" "/usr/local/include/mysql" "/usr/local/include" "/usr/lib/mysql/include" "/usr/lib/mysql/mysql" "/usr/lib/mysql"; do
     saveflags="$CFLAGS"
     if test "x$TESTPATH" != "x"; then
         CFLAGS="-I$TESTPATH $saveflags"
@@ -11031,6 +11031,60 @@ if test $ac_cv_lib_mysqlclient_main = yes; then
 fi
 
         elif test -d "/usr/local/lib"; then
+            CFLAGS="$saveflags -L/usr/local/lib"
+            echo "$as_me:$LINENO: checking for main in -lmysqlclient" >&5
+echo $ECHO_N "checking for main in -lmysqlclient... $ECHO_C" >&6
+if test "${ac_cv_lib_mysqlclient_main+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lmysqlclient  $LIBS"
+cat >conftest.$ac_ext <<_ACEOF
+#line $LINENO "configure"
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+
+int
+main ()
+{
+main ();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+         { ac_try='test -s conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  ac_cv_lib_mysqlclient_main=yes
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+ac_cv_lib_mysqlclient_main=no
+fi
+rm -f conftest.$ac_objext conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+echo "$as_me:$LINENO: result: $ac_cv_lib_mysqlclient_main" >&5
+echo "${ECHO_T}$ac_cv_lib_mysqlclient_main" >&6
+if test $ac_cv_lib_mysqlclient_main = yes; then
+  tmp="$PKGLIBS -L/usr/local/lib -lmysqlclient"
+fi
+
+        elif test -d "/usr/lib/mysql/lib"; then
             CFLAGS="$saveflags -L/usr/local/lib"
             echo "$as_me:$LINENO: checking for main in -lmysqlclient" >&5
 echo $ECHO_N "checking for main in -lmysqlclient... $ECHO_C" >&6

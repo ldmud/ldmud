@@ -32,16 +32,18 @@ DESCRIPTION
         GETDIR_DATES    (0x04)  put the file modification dates (in seconds
                                 since 01/01/1970) unsorted into the
                                 returned array.
-        GETDIR_PATH     (0x10)  if this mask bit is set, the filenames with
-                                the full path will be returned
-                                (GETDIR_NAMES is implied).
         GETDIR_ACCESS   (0x40)  put the file access dates unsorted into
                                 the returned array.
         GETDIR_MODES    (0x80)  put the unix file modes unsorted into
                                 the returned array.
+
+        GETDIR_ALL      (0xDF)  Return all.
+
+        GETDIR_PATH     (0x10)  if this mask bit is set, the filenames with
+                                the full path will be returned
+                                (GETDIR_NAMES is implied).
         GETDIR_UNSORTED (0x20)  if this mask bit is set, the result of will
                                 _not_ be sorted.
-        GETDIR_ALL      (0xDF)  Return all.
 
         Note: You should use GETDIR_NAMES|GETDIR_UNSORTED to get the entries
         in the same order as with GETDIR_SIZES and GETDIR_DATES.

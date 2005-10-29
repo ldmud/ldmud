@@ -1174,7 +1174,7 @@ fi
 # like it if -lz precedes the -lmysqlclient in the link command.
 
 AC_CACHE_CHECK(for mySQL,lp_cv_has_mysql,
-for TESTPATH in "" "${mysql_path}/include/mysql" "${mysql_path}/include" "${mysql_path}" "/usr/local/mysql/include/mysql" "/usr/local/mysql/include" "/usr/lib/mysql/mysql" "/usr/lib/mysql" "/usr/local/include/mysql" "/usr/local/include"; do
+for TESTPATH in "" "${mysql_path}/include/mysql" "${mysql_path}/include" "${mysql_path}" "/usr/local/mysql/include/mysql" "/usr/local/mysql/include" "/usr/local/include/mysql" "/usr/local/include" "/usr/lib/mysql/include" "/usr/lib/mysql/mysql" "/usr/lib/mysql"; do
     saveflags="$CFLAGS"
     if test "x$TESTPATH" != "x"; then
         CFLAGS="-I$TESTPATH $saveflags"
@@ -1219,6 +1219,9 @@ if test $lp_cv_has_mysql = yes; then
             CFLAGS="$saveflags -L/usr/local/mysql/lib"
             AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -L/usr/local/mysql/lib -lmysqlclient")
         elif test -d "/usr/local/lib"; then
+            CFLAGS="$saveflags -L/usr/local/lib"
+            AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -L/usr/local/lib -lmysqlclient")
+        elif test -d "/usr/lib/mysql/lib"; then
             CFLAGS="$saveflags -L/usr/local/lib"
             AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -L/usr/local/lib -lmysqlclient")
         else

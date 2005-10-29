@@ -17,10 +17,12 @@
 #define GETDIR_NAMES     (0x01)  /* return the filenames */
 #define GETDIR_SIZES     (0x02)  /* return the file sizes */
 #define GETDIR_DATES     (0x04)  /* return the dates of last modification */
-#define GETDIR_PATH      (0x10)  /* with _NAMES: add the path to the filenames */
-#define GETDIR_UNSORTED  (0x20)  /* return the results unsorted */
+/*                       (0x08) unused */
 #define GETDIR_ACCESS    (0x40)  /* return the dates of last access */
 #define GETDIR_MODES     (0x80)  /* return the file mode */
+
+#define GETDIR_PATH      (0x10)  /* with _NAMES: add the path to the filenames */
+#define GETDIR_UNSORTED  (0x20)  /* return the results unsorted */
 
 #define GETDIR_ALL       (0xDF)  /* return all */
 

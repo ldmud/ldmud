@@ -5,8 +5,7 @@
 # configure will strip this part from the script.
 #
 #
-#--enable-use-pthreads=yes \
-#--with-malloc=ptmalloc \
+# --enable-malloc-sbrk=no \
 export EXTRA_CFLAGS="-mcpu=pentium4 -march=pentium4"
 
 exec ./configure \
@@ -33,7 +32,9 @@ exec ./configure \
 --enable-use-new-inlines=yes \
 --enable-opcprof=yes \
 --enable-filename-spaces=yes \
---enable-use-tls=ssl \
+--enable-use-tls=gnu \
+--enable-use-pthreads=yes \
+--with-malloc=ptmalloc \
 --with-optimize=high \
 --with-time-to-swap=0 \
 --with-time-to-swap-variables=0 \
@@ -46,5 +47,7 @@ exec ./configure \
 --with-udp-port=2347 \
 --with-max-cost=3000000 \
 --without-wizlist-file \
+--with-max-array-size=0 \
+--with-max-mapping-size=0 \
 --with-swap-file=AoH $*
 exit 1

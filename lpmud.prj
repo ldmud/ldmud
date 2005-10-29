@@ -54,17 +54,15 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 648)
-(Parent-Version lpmud 3-3 647)
+(Project-Version lpmud 3-3 649)
+(Parent-Version lpmud 3-3 648)
 (Version-Log "
-  - (settings/timewarp) New settings file.
-  - (mudlib/sys/files.h, files.c) Efun get_dir() can now return
-        access times and file modes (suggested by Mats).
+  - (configure) Added another path to the search for a mySQL installation.
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Sat, 08 Jan 2005 23:52:37 -0700")
+(Checkin-Time "Sun, 09 Jan 2005 13:49:04 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -102,13 +100,13 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.12 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.85 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.711 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.385.1.8 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.712 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.385.1.9 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.21 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
   ;; Configuration
-  (src/configure (lpmud/d/0_configure 1.19.1.109.1.2 755))
+  (src/configure (lpmud/d/0_configure 1.19.1.109.1.3 755))
   (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.43 644))
   (src/machine.h.in (lpmud/b/9_machine.h. 1.9.1.14 644))
   (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.19.1.34.1.2 644))
@@ -116,7 +114,7 @@
   (src/install-sh (lpmud/c/5_install-sh 1.2 755))
   (src/ldmud-man.txt (lpmud/c/c/29_ldmud-man. 1.1 644))
 
-  (src/autoconf/configure.in (lpmud/d/7_configure. 1.20.1.9.1.101 644))
+  (src/autoconf/configure.in (lpmud/d/7_configure. 1.20.1.9.1.102 644))
   (src/autoconf/acconfig.h (lpmud/d/10_acconfig.h 1.6.1.14 644))
 
   (src/settings/README (lpmud/c/22_README 1.14.1.17 644))
@@ -124,7 +122,7 @@
   (src/settings/native (lpmud/c/9_native 1.6 744))
   (src/settings/compat (lpmud/c/10_compat 1.7 744))
   (src/settings/alatia (lpmud/j/27_alatia 1.5 744))
-  (src/settings/aoh (lpmud/q/10_aoh 1.5 744))
+  (src/settings/aoh (lpmud/q/10_aoh 1.6 744))
   (src/settings/avalon (lpmud/d/9_avalon 1.3.1.2.1.16 744))
   (src/settings/bat (lpmud/q/5_bat 1.5 644))
   (src/settings/beutelland (lpmud/n/34_beutelland 1.3 744))
@@ -184,7 +182,7 @@
   (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.104.1.3 644))
   (src/exec.h (lpmud/c/32_exec.h 1.34.1.33.1.7 644))
   (src/files.h (lpmud/i/49_files.h 1.2 644))
-  (src/files.c (lpmud/i/50_files.c 1.27 644))
+  (src/files.c (lpmud/i/50_files.c 1.28 644))
   (src/filestat.h (lpmud/f/51_filestat.h 1.7 644))
   (src/gcollect.h (lpmud/f/33_gcollect.h 1.6.1.16 644))
   (src/gcollect.c (lpmud/c/30_gcollect.c 1.41.1.116.1.1 644))
@@ -502,7 +500,7 @@
   (mudlib/sys/driver_hook.h (lpmud/d/30_driver_hoo 1.2.1.7 644))
   (mudlib/sys/debug_message.h (lpmud/k/8_debug_mess 1.3 644))
   (mudlib/sys/erq.h (lpmud/d/29_erq.h 1.5.1.3 644))
-  (mudlib/sys/files.h (lpmud/t/7_files.h 1.1.1.3 644))
+  (mudlib/sys/files.h (lpmud/t/7_files.h 1.1.1.4 644))
   (mudlib/sys/include_list.h (lpmud/p/26_include_li 1.2 644))
   (mudlib/sys/inherit_list.h (lpmud/p/18_inherit_li 1.1 644))
   (mudlib/sys/functionlist.h (lpmud/49_functionli 1.4.1.9.1.4 644))
@@ -713,7 +711,7 @@
   (doc/efun/garbage_collection (lpmud/o/47_garbage_co 1.5 644))
   (doc/efun/get_combine_charset (lpmud/e/b/24_get_combin 1.1 644))
   (doc/efun/get_connection_charset (lpmud/e/b/25_get_connec 1.1 644))
-  (doc/efun/get_dir (lpmud/o/48_get_dir 1.3.1.6 644))
+  (doc/efun/get_dir (lpmud/o/48_get_dir 1.3.1.7 644))
   (doc/efun/get_error_file (lpmud/o/49_get_error_ 1.3 644))
   (doc/efun/get_eval_cost (lpmud/m/14_get_eval_c 1.7 644))
   (doc/efun/get_extra_wizinfo (lpmud/o/50_get_extra_ 1.4 644))
@@ -1131,7 +1129,7 @@
   (doc/efun.de/get_extra_wizinfo.de (lpmud/i/b/30_get_extra_ 1.2 640))
   (doc/efun.de/get_eval_cost.de (lpmud/i/b/31_get_eval_c 1.1 640))
   (doc/efun.de/get_error_file.de (lpmud/i/b/32_get_error_ 1.1 640))
-  (doc/efun.de/get_dir.de (lpmud/s/10_get_dir.de 1.3 644))
+  (doc/efun.de/get_dir.de (lpmud/s/10_get_dir.de 1.4 644))
   (doc/efun.de/get_connection_charset.de (lpmud/i/b/33_get_connec 1.1 640))
   (doc/efun.de/get_combine_charset.de (lpmud/i/b/34_get_combin 1.1 640))
   (doc/efun.de/garbage_collection.de (lpmud/i/b/35_garbage_co 1.2 640))
