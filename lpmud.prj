@@ -54,18 +54,16 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 646)
-(Parent-Version lpmud 3-3 645)
+(Project-Version lpmud 3-3 647)
+(Parent-Version lpmud 3-3 646)
 (Version-Log "
-  - (func_spec, lex, prolang.y, interpret.c) New pragma 'range_check'
-        allows to check the validity of array ranges at runtime - these
-        are the range checks currently controlled by the warn_deprecated
-        pragma.
+  - (configure, pkg-mysql.c) Adjusted the search for the mySQL include
+        files to allow for local installations (Bug #0000338)
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Sat, 08 Jan 2005 20:44:46 -0700")
+(Checkin-Time "Sat, 08 Jan 2005 22:11:37 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -103,13 +101,13 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.12 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.84 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.709 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.710 644))
   (HISTORY (lpmud/f/49_HISTORY 1.385.1.7 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.21 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
   ;; Configuration
-  (src/configure (lpmud/d/0_configure 1.19.1.109.1.1 755))
+  (src/configure (lpmud/d/0_configure 1.19.1.109.1.2 755))
   (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.43 644))
   (src/machine.h.in (lpmud/b/9_machine.h. 1.9.1.14 644))
   (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.19.1.34.1.2 644))
@@ -117,7 +115,7 @@
   (src/install-sh (lpmud/c/5_install-sh 1.2 755))
   (src/ldmud-man.txt (lpmud/c/c/29_ldmud-man. 1.1 644))
 
-  (src/autoconf/configure.in (lpmud/d/7_configure. 1.20.1.9.1.100 644))
+  (src/autoconf/configure.in (lpmud/d/7_configure. 1.20.1.9.1.101 644))
   (src/autoconf/acconfig.h (lpmud/d/10_acconfig.h 1.6.1.14 644))
 
   (src/settings/README (lpmud/c/22_README 1.14.1.16 644))
@@ -312,7 +310,7 @@
   (src/pkg-alists.h (lpmud/l/39_pkg-alists 1.3 644))
   (src/pkg-mccp.h (lpmud/d/b/48_pkg-mccp.h 1.2 644))
   (src/pkg-mccp.c (lpmud/d/b/49_pkg-mccp.c 1.10 644))
-  (src/pkg-mysql.c (lpmud/j/1_pkg-mysql. 1.22 644))
+  (src/pkg-mysql.c (lpmud/j/1_pkg-mysql. 1.23 644))
   (src/pkg-mysql.h (lpmud/j/2_pkg-mysql. 1.5 644))
   (src/pkg-odbc.h (lpmud/e/b/43_pkg-odbc.h 1.1 644))
   (src/pkg-odbc.c (lpmud/e/b/44_pkg-odbc.c 1.1 644))
@@ -1702,7 +1700,7 @@
   (mud/lp-245/obj/leo.c (lpmud/y/38_leo.c 1.2 644))
   (mud/lp-245/obj/key.c (lpmud/y/39_key.c 1.3 644))
   (mud/lp-245/obj/food.c (lpmud/y/40_food.c 1.3 644))
-  (mud/lp-245/obj/explore_xp.c (lpmud/y/41_explore_xp 1.4 644))
+  (mud/lp-245/obj/explore_xp.c (lpmud/y/41_explore_xp 1.5 644))
   (mud/lp-245/obj/drink.c (lpmud/y/42_drink.c 1.2 644))
   (mud/lp-245/obj/door.h (lpmud/y/43_door.h 1.2 644))
   (mud/lp-245/obj/door.c (lpmud/y/44_door.c 1.4 644))

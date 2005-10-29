@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+08-Jan-2004 (Lars Duening)  (3.3.647)
+  - (configure, pkg-mysql.c) Adjusted the search for the mySQL include
+        files to allow for local installations (Bug #0000338)
+
 08-Jan-2004 (Lars Duening)  (3.3.646)
   - (func_spec, lex, prolang.y, interpret.c) New pragma 'range_check'
         allows to check the validity of array ranges at runtime - these

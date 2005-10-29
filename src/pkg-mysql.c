@@ -28,9 +28,9 @@
 #include <string.h>
 #include <stdio.h>
 
-#include <mysql/mysql.h>
-#include <mysql/errmsg.h>
-#include <mysql/mysql_version.h>
+#include <mysql.h>
+#include <errmsg.h>
+#include <mysql_version.h>
 
 #include "pkg-mysql.h"
 

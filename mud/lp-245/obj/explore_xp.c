@@ -32,6 +32,7 @@ void set_name(string str)
 	!creator(this_object())&&!creator(previous_object())) {
 	write("Illegal usage, Savefile-path is illegal.\n");
 	destruct(this_object());
+        return;
     }
     if ( TmpString = creator( this_object()) || ( TmpString = creator( previous_object())))
       SaveName = "players/"+TmpString+"/";
