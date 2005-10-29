@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+10-Jun-2005 (Lars Duening)  (3.3.707)
+  - (gcollect, backend.c) If the number of destructed pending objects
+      exceeds the number of active objects, a cleanup of all objects
+      is triggered. Also, the incremental cleanup in each cycle
+      cleans at least the number of objects destructed in the cycle.
+
 06-Jun-2005 (Lars Duening)  (3.3.706)
   - (object.c, sprintf.c, structs.c) Removed a couple compilation warnings
       on x86-64.

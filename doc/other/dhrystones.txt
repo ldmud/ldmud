@@ -165,7 +165,7 @@ Tarkin: G4/800MHz/1GByte, Mac OS X 10.3.6, LDMud 3.3.704, gcc 3.3:
   D, TC, MC, MT, ML              2830.6    4808.6    5397.5    5061.2
 
   Dhrystone2
-  -                              6772.9   11673.5   11545.0   11721.3              
+  -                              6772.9   11673.5   11545.0   11721.3
   -  -   MC                      6850.2   12146.1   11719.1   11677.5
   -  -   MC, MT                  6834.0   11858.1   11583.4   11677.5
   -  -   MC, MT, ML              6787.6   11859.2   11364.6   11279.6
@@ -178,5 +178,53 @@ Legend:
   MC: MALLOC_CHECK
   MT: MALLOC_TRACE
   ML: MALLOC_LPC_TRACE
+
+
+Tarkin: G4/800MHz/1GByte, Mac OS X 10.4.1, LDMud 3.3.704, gcc 3.3:
+
+  Dhrystone                        o0        o1        o2        o4
+  -                              5016.0    9208.6    9085.8    9061.0
+  -  -   MC                      5049.0    9259.8    9042.2    9004.2
+  -  -   MC, MT                  4982.8    9044.9    9017.8    9012.5
+  -  -   MC, MT, ML              4946.0    8918.8    8943.1    8853.0
+  D  -   MC, MT, ML              4235.8    7703.2    7870.8    7657.8
+  D, TC, MC, MT, ML              2754.7    4861.4    5246.9    5155.8
+
+  Dhrystone2
+  -                              6863.4   11961.9   11737.2   11787.9
+  -  -   MC                      6934.8   12106.7   11862.6   11750.9
+  -  -   MC, MT                  6885.5   11853.1   11787.9   11677.2
+  -  -   MC, MT, ML              6843.1   11732.5   11709.8   11393.9
+  D  -   MC, MT, ML              5710.0    9842.7   10070.6    9609.4
+  D, TC, MC, MT, ML              3413.0    6443.7    6674.9    6368.7
+
+Legend:
+  D: DEBUG
+  TC: TRACE_CODE
+  MC: MALLOC_CHECK
+  MT: MALLOC_TRACE
+  ML: MALLOC_LPC_TRACE
+
+Tarkin: G4/800MHz/1GByte, Mac OS X 10.4.1, LDMud 3.3.704, gcc 4.0:
+
+  Dhrystone2 (slaballoc)           o0        o1        o2        o4
+  -                              ......    ......    ......    ......
+  -  -   MC, MT, ML              ......    ......    ......    ......
+  D  -   MC, MT, ML              ......    ......    ......    ......
+  D, TC, MC, MT, ML              ......    ......    ......    ......
+
+  Dhrystone. (sysmalloc)
+  -                              ......   .......   .......   .......
+  -  -   MC, MT, ML              ......   .......   .......   .......
+  D  -   MC, MT, ML              ......    ......   .......    ......
+  D, TC, MC, MT, ML              ......    ......    ......    ......
+
+Legend:
+  D: DEBUG
+  TC: TRACE_CODE
+  MC: MALLOC_CHECK
+  MT: MALLOC_TRACE
+  ML: MALLOC_LPC_TRACE
+
 
 

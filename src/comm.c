@@ -184,7 +184,7 @@ extern int select(int, fd_set *, fd_set *, fd_set *, struct timeval *);
 
 #if defined(_AIX)
 typedef unsigned long length_t;
-#elif defined(__INTEL_COMPILER)
+#elif defined(__INTEL_COMPILER) || defined (__GNUC__)
 typedef socklen_t length_t;
 #else
 typedef int length_t;
@@ -3663,11 +3663,7 @@ refresh_access_data(void (*add_entry)(struct sockaddr_in *, int, long*) )
         {
             struct sockaddr_in addr;
             int port;
-#           ifndef _AIX
-              int length;
-#           else
-              size_t length;
-#           endif
+            length_t length;
 
             length = sizeof(addr);
             getsockname(this->socket, (struct sockaddr *)&addr, &length);
