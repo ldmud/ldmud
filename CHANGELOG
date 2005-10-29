@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+15-May-2005 (Lars Duening)  (3.3.704)
+  - (object.c) Single-character operator closures like #'- couldn't
+      be restored in arrays due to some outdated hack in the parser
+      (Bug #0000384 and #0000386).
+
 15-May-2005 (Lars Duening)  (3.3.703)
   - (sprintf) sprintf("%c", 0) returned an empty string instead of a
       string with the 0 character, because the code used the system

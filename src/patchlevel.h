@@ -24,13 +24,13 @@
 #define RELEASE_TYPE "dev"
 
 /* $Format: "#define RELEASE_DATE \"$ProjectDate$\""$ */
-#define RELEASE_DATE "Sun, 15 May 2005 11:24:46 -0600"
+#define RELEASE_DATE "Sun, 15 May 2005 12:49:26 -0600"
 
 /* $Format: "#define PROJ_VERSION \"$ProjectVersion$\""$ */
-#define PROJ_VERSION "3-3.703"
+#define PROJ_VERSION "3-3.704"
 
 /* $Format: "#define DRIVER_VERSION \"$ReleaseVersion$\""$ */
-#define DRIVER_VERSION "3.3.703"
+#define DRIVER_VERSION "3.3.704"
 
 /* $Format: "#define VERSION_MAJOR \"$ReleaseMajor$\""$ */
 #define VERSION_MAJOR "3"
@@ -39,7 +39,7 @@
 #define VERSION_MINOR "3"
 
 /* $Format: "#define VERSION_MICRO \"$ReleaseMicro$\""$ */
-#define VERSION_MICRO "703"
+#define VERSION_MICRO "704"
 
 /* $Format: "#define LOCAL_LEVEL \"\""$ */
 #define LOCAL_LEVEL ""

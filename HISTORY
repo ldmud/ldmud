@@ -201,13 +201,15 @@ For a detailed list of all changes see the file CHANGELOG.
            the maxinum number of entries in a mapping.
 
 
-25-Feb-2005 (Lars Duening) -- Release 3.2.12
+15-May-2005 (Lars Duening) -- Release 3.2.12
 
     - Changed efuns:
 
     - Corrected efuns:
       + call_out(), input_to(): Local references are no longer
           accepted as extra arguments.
+      + restore_value(): Restoring one-character operator closures
+          in arrays works again.
 
     - New efuns:
 

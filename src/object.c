@@ -7419,12 +7419,7 @@ restore_size (char **str)
             pt2 = strchr(pt, ':');
             if (!pt2)
                 return -1;
-            pt = &pt2[2];
-              /* 'pt = &pt2[1]' is the logical statement, but
-               * would run afoul the '#e:,' operator closure.
-               * Because every closure has at least one character
-               * following the ':', this solution is safe.
-               */
+            pt = &pt2[1];
 
             /* Try parsing the closure as operator closure.
              * If it is, restart the scanning from the end

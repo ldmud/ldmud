@@ -59,18 +59,17 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 703)
-(Parent-Version lpmud 3-3 702)
+(Project-Version lpmud 3-3 704)
+(Parent-Version lpmud 3-3 703)
 (Version-Log "
-  - (sprintf) sprintf(\"%c\", 0) returned an empty string instead of a
-      string with the 0 character, because the code used the system
-      sprintf() for this formatting internally (Bug #0000378).
-
+  - (object.c) Single-character operator closures like #'- couldn't
+      be restored in arrays due to some outdated hack in the parser
+      (Bug #0000384 and #0000386).
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Sun, 15 May 2005 11:24:46 -0600")
+(Checkin-Time "Sun, 15 May 2005 12:49:26 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -109,8 +108,8 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.12 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.86 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.766 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.385.1.23 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.767 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.385.1.24 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.21 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -220,7 +219,7 @@
   (src/my-rusage.h (lpmud/f/28_my-rusage. 1.7 644))
   (src/my-stdint.h (lpmud/u/b/39_my-stdint. 1.2 644))
   (src/object.h (lpmud/44_object.h 1.34.1.19.1.6.1.6 644))
-  (src/object.c (lpmud/45_object.c 1.62.1.88.1.53.1.10 644))
+  (src/object.c (lpmud/45_object.c 1.62.1.88.1.53.1.11 644))
   (src/otable.h (lpmud/f/27_otable.h 1.8.1.4 644))
   (src/otable.c (lpmud/43_otable.c 1.22.1.8 644))
   (src/parser.c (lpmud/l/13_parser.c 1.1 644))
