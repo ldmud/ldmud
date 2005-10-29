@@ -174,7 +174,7 @@ object_t *destructed_objs = NULL;
    * Only the name and the program pointer are guarantueed to be valid.
    * The reference by this list is counted.
    * Objects with only the list reference left are finally freed by
-   * the function remove_destructed_objs() called from the backend.
+   * the function remove_destructed_objects() called from the backend.
 #ifdef GC_SUPPORT
    * They are also freed by a GC.
 #endif
@@ -2205,6 +2205,7 @@ clone_object (string_t *str1)
         error("Out of memory for new clone '%s'\n", get_txt(name));
 
     new_ob->name = make_new_name(name);
+
 #ifdef CHECK_OBJECT_STAT
     if (check_object_stat)
     {
@@ -3786,10 +3787,10 @@ callback_change_object (callback_t *cb, object_t *obj)
     }
     
     old = cb->function.named.ob;
-    cb->function.named.ob = ref_object(obj, "callback");
+    cb->function.named.ob = ref_object(obj, "change callback");
 
     if (old)
-        free_object(old, "callback");
+        free_object(old, "change_callback");
 } /* callback_change_object() */
 
 /*-------------------------------------------------------------------------*/
@@ -4219,7 +4220,9 @@ f_clone_object (svalue_t * sp)
     free_svalue(sp);
 
     if (ob)
+    {
         put_ref_object(sp, ob, "F_CLONE_OBJECT");
+    }
     else
         put_number(sp, 0);
 

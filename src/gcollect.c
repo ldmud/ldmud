@@ -1917,6 +1917,10 @@ garbage_collection(void)
                          , time_stamp(), get_txt(ob->name));
         }
 
+        if (ob->name)
+            clear_string_ref(ob->name);
+        if (ob->load_name)
+            clear_string_ref(ob->load_name);
         ob->prog->ref = 0;
         clear_program_ref(ob->prog, MY_FALSE);
         ob->ref = 0;

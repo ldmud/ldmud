@@ -160,8 +160,8 @@ struct replace_ob_s
 
 #    define ref_object(o,from) (\
      (o)->ref++,\
-     d_flag > 1 ? printf("Add ref to object %s: %ld (%s)\n" \
-                        , get_txt((o)->name), (o)->ref, from) : 0, \
+     d_flag > 1 ? printf("Add ref to object %s: %ld (%s) %s %d\n" \
+                        , get_txt((o)->name), (o)->ref, from, __FILE__, __LINE__) : 0, \
      (o))
 
 #endif
