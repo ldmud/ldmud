@@ -14818,7 +14818,7 @@ again:
          *
          *   sp[0]  -> number 'next':  index of the next value to assign (0).
          *             x.generic:      false: FOREACH, true: FOREACH_REF
-         *   sp[-1] -> number 'count': number of values to loop over.
+         *   sp[-1] -> number 'count': number of values left to loop over.
          *             x.generic:      <nargs>, or -<nargs> if the value
          *                             is mapping
          *   sp[-2] -> array 'm_indices': if the value is a mapping, this
@@ -14995,7 +14995,7 @@ again:
         }
 
         /* If this is a range foreach, drop the upper bound svalue
-         * from the stack (its value is stored in count) and
+         * from the stack and calculate the actual number of steps, and
          * get the lower bound svalue to be used as starting index.
          * Since this lower bound svalue is an integer as well, we can
          * then pretend to execute a normal foreach over an integer.
@@ -15008,7 +15008,10 @@ again:
                        , typename(sp->type)
                        ));
             start = sp->u.number;
-            count++; /* We want to reach the last given value as well */
+            if (count < start)
+                count = 0;
+            else
+                count = count - sp->u.number + 1;
         }
 
         /* Push the count and the starting index */
@@ -15049,11 +15052,12 @@ again:
         LOAD_SHORT(offset, pc);
 
         /* Is there something left to iterate? */
+        if (0 == sp[-1].u.number)
+            break; /* Nope */
+
         ix = sp->u.number;
         sp->u.number++;
-
-        if (ix >= sp[-1].u.number)
-            break; /* Nope */
+        sp[-1].u.number--;
 
         gen_refs = sp->x.generic;
 
