@@ -1174,7 +1174,7 @@ fi
 # like it if -lz precedes the -lmysqlclient in the link command.
 
 AC_CACHE_CHECK(for mySQL,lp_cv_has_mysql,
-for TESTPATH in "" "${mysql_path}/include/mysql" "${mysql_path}/include" "${mysql_path}" "/usr/local/mysql/include/mysql" "/usr/local/mysql/include" "/usr/local/include/mysql" "/usr/local/include" "/usr/lib/mysql/include" "/usr/lib/mysql/mysql" "/usr/lib/mysql"; do
+for TESTPATH in "" "${mysql_path}/include/mysql" "${mysql_path}/include" "${mysql_path}" "/usr/local/mysql/include/mysql" "/usr/local/mysql/include" "/usr/local/include/mysql" "/usr/local/include" "/usr/lib/mysql/include" "/usr/lib/mysql/mysql" "/usr/lib/mysql" "/usr/include/mysql"; do
     saveflags="$CFLAGS"
     if test "x$TESTPATH" != "x"; then
         CFLAGS="-I$TESTPATH $saveflags"
