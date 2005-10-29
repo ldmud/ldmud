@@ -3083,20 +3083,33 @@ status_parse (strbuf_t * sbuf, char * buff)
         }
         if (verbose) {
 #ifdef COMM_STAT
+            strbuf_add(sbuf, "\nNetwork IO:\n");
+            strbuf_add(sbuf,   "-----------\n");
             strbuf_addf(sbuf
-                       , "Calls to add_message: %d   Packets: %d   "
-                         "Average packet size: %.2f\n\n"
-                       , add_message_calls
+                       , "In:  Packets: %7lu - Sum: %7lu - "
+                         "Average packet size: %7.2f\n"
+                       , inet_packets_in
+                       , inet_volume_in
+                       , inet_packets_in ? (float)inet_volume_in/(float)inet_packets_in : 0.0
+            );
+            strbuf_addf(sbuf
+                       , "Out: Packets: %7lu - Sum: %7lu - "
+                         "Average packet size: %7.2f\n"
+                         "     Calls to add_message: %lu\n"
                        , inet_packets
+                       , inet_volume
                        , inet_packets ? (float)inet_volume/(float)inet_packets : 0.0
+                       , add_message_calls
             );
 #endif
 #ifdef APPLY_CACHE_STAT
+            strbuf_add(sbuf, "\nApply Cache:\n");
+            strbuf_add(sbuf,   "------------\n");
             strbuf_addf(sbuf
-                       , "Calls to apply_low: %ld    "
-                         "Cache hits: %ld (%.2f%%)\n\n"
-                       , (long)(apply_cache_hit+apply_cache_miss)
-                       , (long)apply_cache_hit
+                       , "Calls to apply_low: %7lu\n"
+                         "Cache hits:         %7lu (%.2f%%)\n"
+                       , (unsigned long)(apply_cache_hit+apply_cache_miss)
+                       , (unsigned long)apply_cache_hit
                        , 100.*(float)apply_cache_hit/
                          (float)(apply_cache_hit+apply_cache_miss) );
 #endif
@@ -3295,10 +3308,14 @@ dinfo_data_status (svalue_t *svp, int value)
     ST_NUMBER(DID_ST_ADD_MESSAGE, add_message_calls);
     ST_NUMBER(DID_ST_PACKETS,     inet_packets);
     ST_NUMBER(DID_ST_PACKET_SIZE, inet_volume);
+    ST_NUMBER(DID_ST_PACKETS_IN,     inet_packets_in);
+    ST_NUMBER(DID_ST_PACKET_SIZE_IN, inet_volume_in);
 #else
     ST_NUMBER(DID_ST_ADD_MESSAGE, -1);
     ST_NUMBER(DID_ST_PACKETS,     -1);
     ST_NUMBER(DID_ST_PACKET_SIZE, -1);
+    ST_NUMBER(DID_ST_PACKETS_IN,     -1);
+    ST_NUMBER(DID_ST_PACKET_SIZE_IN, -1);
 #endif
 #ifdef APPLY_CACHE_STAT
     ST_NUMBER(DID_ST_APPLY,      apply_cache_hit+apply_cache_miss);

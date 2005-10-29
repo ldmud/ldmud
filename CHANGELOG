@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+08-Jan-2004 (Lars Duening)  (3.3.645)
+  - (smalloc.c) Corrected some bugs in the extended statistics.
+  - (comm, simulate.c, mudlib/sys/debug_info.h) Added statistics for
+        the incoming network traffic, and also display the total
+        amount of data sent/received in the 'status tables' command.
+
 04-Jan-2004 (Lars Duening)  (3.3.644)
   - (main.c, doc/driver/invocation, INSTALL) Corrected the documentation
         (Bugs #0000333 and #0000335).

@@ -380,9 +380,11 @@ extern char *domain_name;
 extern long pthread_write_max_size;
 
 #ifdef COMM_STAT
-extern int add_message_calls;
-extern int inet_packets;
-extern int inet_volume;
+extern unsigned long add_message_calls;
+extern unsigned long inet_packets;
+extern unsigned long inet_volume;
+extern unsigned long inet_packets_in;
+extern unsigned long inet_volume_in;
 #endif
 
 /* --- Prototypes --- */

@@ -8,7 +8,7 @@ DESCRIPTION
         normal object_name().
 
 HISTORY
-        Renamed in LDMud 3.2.6 from printf_obj_name() due to the introduction
+        Renamed in LDMud 3.2.6 to printf_obj_name() due to the introduction
         of an efun with this name.
 
 SEE ALSO

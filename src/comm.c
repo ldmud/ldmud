@@ -245,14 +245,20 @@ long pthread_write_max_size = PTHREAD_WRITE_MAX_SIZE;
  * use.
  */
 
-int add_message_calls = 0;
+unsigned long add_message_calls = 0;
   /* Number of calls to add_message() */
 
-int inet_packets = 0;
+unsigned long inet_packets = 0;
   /* Number packets sent to the users */
 
-int inet_volume = 0;
+unsigned long inet_volume = 0;
   /* Amount of data sent to the users */
+
+unsigned long inet_packets_in = 0;
+  /* Number packets received from the users */
+
+unsigned long inet_volume_in = 0;
+  /* Amount of data received from the users */
 
 #endif
 
@@ -3098,6 +3104,11 @@ get_message (char *buff)
                         remove_interactive(ip->ob, MY_FALSE);
                     continue;
                 }
+#ifdef COMM_STAT
+                inet_packets_in++;
+                inet_volume_in += l;
+#endif
+
                 ip->text_end += l;
 
                 /* Here would be the place to send data through an

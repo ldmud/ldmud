@@ -482,22 +482,6 @@ static word_t *heap_end = NULL;
 
 /* --- Statistics --- */
 
-static long small_count[SMALL_BLOCK_NUM] = {INIT_SMALL_BLOCK};
-  /* Allocated number of small blocks of the various sizes.
-   */
-
-static long small_total[SMALL_BLOCK_NUM] = {INIT_SMALL_BLOCK};
-  /* Total number of small blocks of the various sizes.
-   */
-
-static long small_max[SMALL_BLOCK_NUM] = {INIT_SMALL_BLOCK};
-  /* Max number of small blocks allocated at any time.
-   */
-
-static long small_free[SMALL_BLOCK_NUM+1] = {INIT_SMALL_BLOCK, 0};
-  /* Number of free small blocks of the various sizes.
-   */
-
 static t_stat small_alloc_stat = {0,0};
   /* Number and size of small block allocations (incl overhead).
    */
@@ -854,19 +838,6 @@ mem_dump_data (strbuf_t *sbuf)
             strbuf_addf(sbuf, "  Oversize: ");
         else
             strbuf_addf(sbuf, "  Large:    ");
-#if 0
-        strbuf_addf(sbuf, "Alloc: %6.1lf req/s, %6lu current, %6lu max\n"
-                        , num_update_calls ? extstats[i].savg_xalloc / num_update_calls
-                                           : 0.0
-                        , extstats[i].cur_alloc, extstats[i].max_alloc
-                   );
-        strbuf_addf(sbuf, "            "
-                          "Free:  %6.1lf req/s, %6lu current, %6lu max\n"
-                        , num_update_calls ? extstats[i].savg_xfree / num_update_calls
-                                           : 0.0
-                        , extstats[i].cur_free, extstats[i].max_free
-                   );
-#else
         strbuf_addf(sbuf, "Alloc: %6.1lf /s - %7lu / %7lu  cur/max\n"
                         , num_update_calls ? extstats[i].savg_xalloc / num_update_calls
                                            : 0.0
@@ -878,7 +849,6 @@ mem_dump_data (strbuf_t *sbuf)
                                            : 0.0
                         , extstats[i].cur_free, extstats[i].max_free
                    );
-#endif
     }
 #endif /* MALLOC_EXT_STATISTICS */
 } /* mem_dump_data() */
@@ -1082,7 +1052,6 @@ UNLINK_SMALL_FREE (word_t * block)
             next[M_PLINK(next[M_SIZE] & M_MASK)] = (word_t)prev | flag;
         prev[M_LINK] = (word_t) next;
     }
-    small_free[ix]--;
     count_back(small_free_stat, bsize * SINT);
 
 } /* UNLINK_SMALL_FREE() */
@@ -1131,7 +1100,6 @@ void MAKE_SMALL_FREE (word_t *block, word_t bsize)
         block[M_PLINK(bsize)-1] = bsize;
 
     sfltable[ix] = block;
-    small_free[ix]++;
     count_up(small_free_stat, bsize * SINT);
 
 #ifdef MALLOC_CHECK
@@ -1457,18 +1425,12 @@ mem_alloc (size_t size)
 
     /* Update statistics */
     count_up(small_alloc_stat,size);
-    small_count[SIZE_INDEX(size)] += 1;
-    small_total[SIZE_INDEX(size)] += 1;
 #ifdef MALLOC_EXT_STATISTICS
     extstats[SIZE_INDEX(size)].num_xalloc++;
     extstats[SIZE_INDEX(size)].cur_alloc++;
     extstat_update_max(extstats + SIZE_INDEX(size));
 #endif /* MALLOC_EXT_STATISTICS */
 
-
-
-    if (small_count[SIZE_INDEX(size)] > small_max[SIZE_INDEX(size)])
-        small_max[SIZE_INDEX(size)] = small_count[SIZE_INDEX(size)];
 
     /* Try allocating the block from one of the free lists.
      *
@@ -1764,7 +1726,6 @@ sfree (POINTER ptr)
     count_back(small_alloc_stat, bsize * SINT);
     i -=  SMALL_BLOCK_MIN + T_OVERHEAD;
 
-    small_count[i] -= 1;
 #ifdef MALLOC_EXT_STATISTICS
     extstats[i].num_xfree++;
     extstats[i].cur_alloc--;
@@ -3047,6 +3008,9 @@ found_fit:
 
     remove_from_free_list(ptr);
     real_size = *ptr & M_MASK;
+#ifdef MALLOC_EXT_STATISTICS
+    extstats[SMALL_BLOCK_NUM+1].cur_free--;
+#endif /* MALLOC_EXT_STATISTICS */
 
     if (real_size - size)
     {
@@ -3097,6 +3061,9 @@ found_fit:
             add_to_free_list(ptr+size);
         }
         build_block(ptr, size);
+#ifdef MALLOC_EXT_STATISTICS
+        extstats[SMALL_BLOCK_NUM+1].cur_free++;
+#endif /* MALLOC_EXT_STATISTICS */
     }
 
     /* The block at ptr is all ours */
@@ -3133,7 +3100,7 @@ large_free (char *ptr)
     count_back(large_alloc_stat, size);
 #ifdef MALLOC_EXT_STATISTICS
     extstats[SMALL_BLOCK_NUM+1].num_xfree++;
-    extstats[SMALL_BLOCK_NUM+1].cur_free++;
+    extstats[SMALL_BLOCK_NUM+1].cur_alloc--;
 #endif /* MALLOC_EXT_STATISTICS */
 
 #ifdef MALLOC_CHECK
@@ -3163,6 +3130,9 @@ large_free (char *ptr)
         remove_from_free_list(p+size);
         size += (*(p+size) & M_MASK);
         *p = (*p & PREV_BLOCK) | size;
+#ifdef MALLOC_EXT_STATISTICS
+        extstats[SMALL_BLOCK_NUM+1].cur_free--;
+#endif /* MALLOC_EXT_STATISTICS */
     }
 
     /* If the previous block is free, coagulate */
@@ -3171,11 +3141,19 @@ large_free (char *ptr)
         remove_from_free_list(l_prev_block(p));
         size += (*l_prev_block(p) & M_MASK);
         p = l_prev_block(p);
+#ifdef MALLOC_EXT_STATISTICS
+        extstats[SMALL_BLOCK_NUM+1].cur_free--;
+#endif /* MALLOC_EXT_STATISTICS */
     }
 
     /* Mark the block as free and add it to the freelist */
     build_block(p, size);
     add_to_free_list(p);
+#ifdef MALLOC_EXT_STATISTICS
+    extstats[SMALL_BLOCK_NUM+1].cur_free++;
+    extstat_update_max(extstats+SMALL_BLOCK_NUM+1);
+#endif /* MALLOC_EXT_STATISTICS */
+
 } /* large_free() */
 
 /*-------------------------------------------------------------------------*/
@@ -3445,11 +3423,12 @@ mem_increment_size (void *vp, size_t size)
             malloc_increment_size_total += (start2 - start) - M_OVERHEAD;
 
             count_add(small_alloc_stat, wsize * SINT);
-            small_count[SIZE_INDEX(old_size * SINT)] -= 1;
-            small_total[SIZE_INDEX(old_size * SINT)] -= 1;
 
-            small_count[SIZE_INDEX(new_size)] += 1;
-            small_total[SIZE_INDEX(new_size)] += 1;
+#ifdef MALLOC_EXT_STATISTICS
+            extstats[SIZE_INDEX(old_size * SINT)].cur_alloc--;
+            extstats[SIZE_INDEX(new_size)].cur_alloc++;
+            extstat_update_max(extstats+SIZE_INDEX(new_size));
+#endif /* MALLOC_EXT_STATISTICS */
 
             return start2;
         }
@@ -3471,11 +3450,12 @@ mem_increment_size (void *vp, size_t size)
             malloc_increment_size_total += (start2 - start) - M_OVERHEAD;
 
             count_add(small_alloc_stat, wsize * SINT);
-            small_count[SIZE_INDEX(old_size * SINT)] -= 1;
-            small_total[SIZE_INDEX(old_size * SINT)] -= 1;
 
-            small_count[SIZE_INDEX(new_size)] += 1;
-            small_total[SIZE_INDEX(new_size)] += 1;
+#ifdef MALLOC_EXT_STATISTICS
+            extstats[SIZE_INDEX(old_size * SINT)].cur_alloc--;
+            extstats[SIZE_INDEX(new_size)].cur_alloc++;
+            extstat_update_max(extstats+SIZE_INDEX(new_size));
+#endif /* MALLOC_EXT_STATISTICS */
 
             return start2;
         }
@@ -3499,6 +3479,10 @@ mem_increment_size (void *vp, size_t size)
         malloc_increment_size_success++;
         malloc_increment_size_total += (start2 - start) - M_OVERHEAD;
         count_add(large_alloc_stat, wsize);
+#ifdef MALLOC_EXT_STATISTICS
+        extstats[SMALL_BLOCK_NUM+1].cur_free--;
+#endif /* MALLOC_EXT_STATISTICS */
+
         return start2;
     }
 

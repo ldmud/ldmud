@@ -227,6 +227,12 @@ DESCRIPTION
                   If the driver is not compiled with COMM_STAT, all three
                   values are returned as -1.
 
+              int DID_ST_PACKETS_IN
+              int DID_ST_PACKET_SIZE_IN
+                  Number and total size of received packets.
+                  If the driver is not compiled with COMM_STAT, all three
+                  values are returned as -1.
+
               int DID_ST_APPLY
               int DID_ST_APPLY_HITS
                   Number of calls to apply_low(), and how many of these
@@ -586,6 +592,8 @@ HISTORY
         LDMud 3.3.533 added DID_MEM_AVL_NODES for DINFO_DATA:DID_MEMORY.
         LDMud 3.3.603 added DID_MEM_EXT_STATISTICS for
           DINFO_DATA:DID_MEMORY.
+        LDMud 3.3.645 added DINFO_DATA:DID_ST_PACKETS_IN and
+            DID_ST_PACKET_SIZE_IN.
 
 
 SEE ALSO

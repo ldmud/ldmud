@@ -54,16 +54,18 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 644)
-(Parent-Version lpmud 3-3 643)
+(Project-Version lpmud 3-3 645)
+(Parent-Version lpmud 3-3 644)
 (Version-Log "
-  - (main.c, doc/driver/invocation, INSTALL) Corrected the documentation
-        (Bugs #0000333 and #0000335).
+  - (smalloc.c) Corrected some bugs in the extended statistics.
+  - (comm, simulate.c, mudlib/sys/debug_info.h) Added statistics for
+        the incoming network traffic, and also display the total
+        amount of data sent/received in the 'status tables' command.
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Tue, 04 Jan 2005 21:37:36 -0700")
+(Checkin-Time "Sat, 08 Jan 2005 01:57:17 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -101,8 +103,8 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.12 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.84 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.707 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.385.1.5 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.708 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.385.1.6 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.21 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -171,8 +173,8 @@
   (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.30 644))
   (src/closure.h (lpmud/f/44_closure.h 1.7.1.22.1.3 644))
   (src/closure.c (lpmud/d/4_closure.c 1.41.1.47.1.26.1.3 644))
-  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.104 644))
-  (src/comm.h (lpmud/d/3_comm.h 1.26.1.41 644))
+  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.105 644))
+  (src/comm.h (lpmud/d/3_comm.h 1.26.1.42 644))
   (src/driver.h (lpmud/f/36_driver.h 1.15.1.27 644))
   (src/dumpstat.h (lpmud/f/35_dumpstat.h 1.8 644))
   (src/dumpstat.c (lpmud/c/34_dumpstat.c 1.20.1.11.1.8 644))
@@ -336,9 +338,9 @@
   (src/simul_efun.h (lpmud/f/17_simul_efun 1.5.1.6 644))
   (src/simul_efun.c (lpmud/32_simul_efun 1.20.1.17.1.7 644))
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.37 644))
-  (src/simulate.c (lpmud/31_simulate.c 1.88.1.135.1.1 644))
+  (src/simulate.c (lpmud/31_simulate.c 1.88.1.135.1.2 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.14 644))
-  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.104 644))
+  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.105 644))
   (src/sysmalloc.h (lpmud/c/b/33_sysmalloc. 1.2 644))
   (src/sysmalloc.c (lpmud/c/b/34_sysmalloc. 1.7 644))
   (src/sprintf.h (lpmud/f/15_sprintf.h 1.3.1.4 644))
@@ -496,7 +498,7 @@
   ;; Driver-related include files for the mudlib
   (mudlib/sys/comm.h (lpmud/e/b/23_comm.h 1.1 644))
   (mudlib/sys/commands.h (lpmud/d/15_commands.h 1.3.1.4 644))
-  (mudlib/sys/debug_info.h (lpmud/t/6_debug_info 1.23 644))
+  (mudlib/sys/debug_info.h (lpmud/t/6_debug_info 1.24 644))
   (mudlib/sys/driver_hook.h (lpmud/d/30_driver_hoo 1.2.1.7 644))
   (mudlib/sys/debug_message.h (lpmud/k/8_debug_mess 1.3 644))
   (mudlib/sys/erq.h (lpmud/d/29_erq.h 1.5.1.3 644))
@@ -676,7 +678,7 @@
   (doc/efun/db_fetch (lpmud/e/27_db_fetch 1.2.1.4 644))
   (doc/efun/db_handles (lpmud/e/33_db_handles 1.1.1.5 644))
   (doc/efun/db_insert_id (lpmud/l/1_db_insert_ 1.3 644))
-  (doc/efun/debug_info (lpmud/o/22_debug_info 1.36 644))
+  (doc/efun/debug_info (lpmud/o/22_debug_info 1.37 644))
   (doc/efun/debug_message (lpmud/o/23_debug_mess 1.1.1.5 644))
   (doc/efun/deep_copy (lpmud/m/29_deep_copy 1.4 644))
   (doc/efun/deep_inventory (lpmud/o/24_deep_inven 1.4 644))
@@ -1364,7 +1366,7 @@
   (doc/obsolete/map_mapping (lpmud/b/b/14_map_mappin 1.1 644))
   (doc/obsolete/mapping_contains (lpmud/b/b/15_mapping_co 1.1 644))
   (doc/obsolete/member_array (lpmud/b/b/16_member_arr 1.2 644))
-  (doc/obsolete/object_name (lpmud/b/b/17_object_nam 1.1 644))
+  (doc/obsolete/object_name (lpmud/b/b/17_object_nam 1.2 644))
   (doc/obsolete/obsolete (lpmud/b/b/18_obsolete 1.1 644))
   (doc/obsolete/parse_command (lpmud/b/b/19_parse_comm 1.1 644))
   (doc/obsolete/query_imp_port (lpmud/b/b/20_query_imp_ 1.1 644))
