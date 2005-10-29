@@ -45,15 +45,18 @@ DESCRIPTION
         fun("foo", 1, 2, 3) -> arg3 == ({ 2, 3 })
 
     The type of the varargs argument has to be an array of the
-    expected type (int*, object*, string*, ...); in this case,
+    expected type (int*, object*, string*, ...); in this example,
     only integers are allowed. To accept arguments of any kind,
     define the parameter as 'varargs mixed' or 'varargs mixed*'.
 
     To 'flatten' the received argument array in your own function
     calls, use the efun apply(); e.g.:
 
-        apply(#'call_out, 1, arg3)
+        apply(#'call_out, "bar", 1, arg3)
 
+    or the 'flatten arguments' operator:
+
+       call_out("bar", 1, arg3...)
 
     The two varargs variants can of course be combined:
 

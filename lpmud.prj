@@ -59,23 +59,16 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 699)
-(Parent-Version lpmud 3-3 698)
+(Project-Version lpmud 3-3 700)
+(Parent-Version lpmud 3-3 699)
 (Version-Log "
-  - (config.h.in, gcollect.c) Added a specific define LOG_NEW_CLEANUP
-      to enable the logging of the automatic cleanup activity. This
-      is useful if the cleanup is suspicious of hogging the CPU.
-  - (main.c, pkg-tls.c) Improved the documentation for the TLS commandline
-      options, removed a crasher when only one of the two cert locations
-      is specified (thanks, Coogan!).
-  - (xalloc.c) Added warning if ptmalloc is used under FreeBSD.
-  - (configure) New configuration parameter '--with-tls-path' allows
-      to specifiy a non-standard location for the TLS installation.
+  - (lex.c) When adding strings in preprocessor conditionals, the lhs
+      string was freed twice, causing memory corruption (reported by Tobias).
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Sun, 24 Apr 2005 13:08:21 -0600")
+(Checkin-Time "Fri, 13 May 2005 22:38:10 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -114,7 +107,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.12 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.86 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.762 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.763 644))
   (HISTORY (lpmud/f/49_HISTORY 1.385.1.22 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.21 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -208,7 +201,7 @@
   (src/interpret.h (lpmud/b/13_interpret. 1.33.1.42 644))
   (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.54.1.95 644))
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.15.1.13 644))
-  (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.74.1.10 644))
+  (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.74.1.11 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.22 644))
   (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.81 644))
   (src/mapping.h (lpmud/f/30_mapping.h 1.12.1.22 644))
@@ -1296,7 +1289,7 @@
   (doc/LPC/structs (lpmud/a/b/16_structs 1.12 644))
   (doc/LPC/switch (lpmud/c/47_switch 1.7 644))
   (doc/LPC/types (lpmud/r/35_types 1.4.1.6 644))
-  (doc/LPC/varargs (lpmud/r/36_varargs 1.2 644))
+  (doc/LPC/varargs (lpmud/r/36_varargs 1.3 644))
   (doc/LPC/while (lpmud/r/37_while 1.3 644))
 
   (doc/man/ldmud.1 (lpmud/c/c/30_ldmud.1 1.1.1.4 644))

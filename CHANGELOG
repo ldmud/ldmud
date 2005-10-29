@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+13-May-2005 (Lars Duening)  (3.3.700)
+  - (lex.c) When adding strings in preprocessor conditionals, the lhs
+      string was freed twice, causing memory corruption (reported by Tobias).
+
 24-Apr-2005 (Lars Duening)  (3.3.699)
   - (config.h.in, gcollect.c) Added a specific define LOG_NEW_CLEANUP
       to enable the logging of the automatic cleanup activity. This

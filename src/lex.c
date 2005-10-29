@@ -7375,12 +7375,8 @@ cond_get_exp (int priority, svalue_t *svp)
             x = optab2[x+1];
             if (x == BPLUS)
             {
-                string_t *str;
-
-                str = mstr_append(svp->u.str, sv2.u.str);
-                free_string_svalue(svp);
+                svp->u.str = mstr_append(svp->u.str, sv2.u.str);
                 free_string_svalue(&sv2);
-                svp->u.str = str;
             }
             else
             {
