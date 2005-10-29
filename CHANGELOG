@@ -1,6 +1,17 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+11-Feb-2004 (Lars Duening)  (3.3.670)
+  - (mstrings.c) The extended string statistics didn't count the tabled
+      comparisons correctly.
+  - (lex.c) New macro __BOOT_TIME__ expands to the time() the driver
+      was booted.
+  - (comm, pkg-tls.c) New interactive_t flag 'outgoing_conn' is TRUE for
+      connections openened by net_connect(). This is used by TLS (OpenSSL)
+      to set the proper state for the session.
+  - (slaballoc.c, smalloc.c) When using brk() for core allocation, the
+      returned memory address was one word too low.
+
 09-Feb-2004 (Lars Duening)  (3.3.669)
   - (object, simulate.c, backend.c) The list of destructed-but-referenced
       objects is scanned for deallocatable objects only when a flag

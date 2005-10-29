@@ -796,7 +796,10 @@ v_tls_init_connection (svalue_t *sp, int num_arg)
             break;
         }
 
-        SSL_set_accept_state(session);
+        if (ip->outgoing_conn)
+            SSL_set_connect_state(session);
+        else
+            SSL_set_accept_state(session);
         ip->tls_session = session;
         
 #elif defined(HAS_GNUTLS)

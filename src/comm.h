@@ -186,6 +186,9 @@ struct interactive_s {
                                  * as some clients mix that up with DO SGA.
                                  * Other than that, this is of no concern.
                                  */
+    CBool outgoing_conn;        /* TRUE if the connection was created by 
+                                 * net_connect().
+                                 */
 
     short text_end;             /* first free char in buffer */
     short command_start;        /* used for charmode */

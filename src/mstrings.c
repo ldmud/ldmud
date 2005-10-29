@@ -209,6 +209,8 @@ unsigned long stNumTabledEqual = 0;
 unsigned long stNumComp = 0;
 unsigned long stNumTabledComp = 0;
 unsigned long stNumTabledChecked = 0;
+unsigned long stNumTabledCheckedTable = 0;
+unsigned long stNumTabledCheckedSearch = 0;
 #endif /* EXT_STRING_STATS */
 
 /*-------------------------------------------------------------------------*/
@@ -910,14 +912,27 @@ mstring_find_tabled (const string_t * pStr)
 
     /* If pStr is tabled, our work is done */
     if (pStr->info.tabled)
+    {
+#ifdef EXT_STRING_STATS
+        stNumTabledCheckedTable++;
+#endif /* EXT_STRING_STATS */
         return (string_t *)pStr;
+    }
 
     /* If pStr is indirectly tabled, return the tabled instance */
     if (pStr->link != NULL)
+    {
+#ifdef EXT_STRING_STATS
+        stNumTabledCheckedTable++;
+#endif /* EXT_STRING_STATS */
         return pStr->link;
+    }
 
     /* Worst case: an untabled string we have to look for */
 
+#ifdef EXT_STRING_STATS
+    stNumTabledCheckedSearch++;
+#endif /* EXT_STRING_STATS */
     size = mstrsize(pStr);
     hash = get_hash(pStr);
 
@@ -1067,7 +1082,7 @@ mstring_equal(const string_t * const pStr1, const string_t * const pStr2)
     if (pStr1 == pStr2 || get_txt(pStr1) == get_txt(pStr2))
     {
 #ifdef EXT_STRING_STATS
-        if (mstr_i_tabled(pStr1))
+        if (mstr_tabled(pStr1))
             stNumTabledEqual++;
 #endif /* EXT_STRING_STATS */
         return MY_TRUE;
@@ -1123,7 +1138,7 @@ mstring_compare (const string_t * const pStr1, const string_t * const pStr2)
     if (pStr1 == pStr2 || get_txt(pStr1) == get_txt(pStr2))
     {
 #ifdef EXT_STRING_STATS
-        if (mstr_i_tabled(pStr1))
+        if (mstr_tabled(pStr1))
             stNumTabledComp++;
 #endif /* EXT_STRING_STATS */
         return 0;
@@ -1910,8 +1925,12 @@ add_string_status (strbuf_t *sbuf, Bool verbose)
                         , stNumComp, stNumTabledComp
                         , stNumComp ? 100.0 * (stNumTabledComp/stNumComp) : 0.0
                         );
-        strbuf_addf(sbuf, "Table lookups for existence: %lu\n"
+        strbuf_addf(sbuf, "Table lookups for existence: %lu,"
+                          " %lu by table (%.1f%%),"
+                          " %lu by content (%.1f%%)\n"
                         , stNumTabledChecked
+                        , stNumTabledCheckedTable, stNumTabledChecked ? 100.0 * (stNumTabledCheckedTable/stNumTabledChecked) : 0.0
+                        , stNumTabledCheckedSearch, stNumTabledChecked ? 100.0 * (stNumTabledCheckedSearch/stNumTabledChecked) : 0.0
                         );
 #endif /* EXT_STRING_STATS */
     }

@@ -61,6 +61,7 @@ DESCRIPTION
       __LPC_INLINE_CLOSURES__: defined when the 'real' inline closures
                            are enabled.
       __LPC_ARRAY_CALLS__: call_other()s on arrays of objects enabled.
+      __BOOT_TIME__      : the time() the driver was started.
 
     If the driver is compiled for using the MS-DOS filesystem
     conventions, __MSDOS_FS__ is defined.
@@ -101,7 +102,7 @@ HISTORY
         and __FILENAME_SPACES__.
     3.3 made __LPC_NOSAVE__ always defined and added __ALISTS__,
         __MCCP__, __LPC_STRUCTS__, __LPC_INLINE_CLOSURES__, __PGSQL__,
-        __PTHREADS__, __TLS__ and __PCRE__.
+        __PTHREADS__, __TLS__, __BOOT_TIME__, and __PCRE__.
 
 SEE ALSO
     pragma(LPC), preprocessor(LPC)

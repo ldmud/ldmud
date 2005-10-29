@@ -3247,7 +3247,7 @@ esbrk (word_t size, size_t * pExtra)
     heap_end = (word_t*)((char *)heap_end + size);
     heap_end[-1] = THIS_BLOCK | M_MASK;
     heap_end[-2] = M_MASK;
-    return (char *)(heap_end - 2) - size; /* overlap old memory block */
+    return (char *)(heap_end - 1) - size; /* overlap old memory block */
 
 #else  /* not SBRK_OK */
 

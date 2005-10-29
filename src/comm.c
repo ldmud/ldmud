@@ -3857,6 +3857,7 @@ new_player ( object_t *ob, SOCKET_T new_socket
     O_GET_INTERACTIVE(master_ob) = new_interactive;
     master_ob->flags |= O_ONCE_INTERACTIVE;
     new_interactive->ob = ref_object(master_ob, "new_player");
+    new_interactive->outgoing_conn = (ob != NULL);
 
     /* Initialize the rest of the interactive structure */
 

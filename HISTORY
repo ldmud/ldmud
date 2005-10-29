@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-08-Jan-2005 (Lars Duening) -- Development Release 3.3
+11-Feb-2005 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -125,6 +125,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + Preprocessor symbol __PCRE__ is always defined.
        + Real inline closures; preprocessor symbol __LPC_INLINE_CLOSURES__ is
            defined.
+       + New macro __BOOT_TIME__ expands to the time() the driver was
+           started.
        + Blueprint variables are now always initialized using
            __INIT(). Clone variables are usually initialized the same
            way, however with the pragmas 'share_variables' and
