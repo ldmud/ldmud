@@ -178,6 +178,8 @@ static lambda_t *stale_lambda_closures;
 /*            Object clean up
  */
 
+#ifdef NEW_CLEANUP
+
 typedef struct cleanup_s cleanup_t;
 typedef struct cleanup_map_extra_s cleanup_map_extra_t;
 
@@ -489,11 +491,7 @@ cleanup_single_object (object_t * obj, cleanup_t * context)
  */
 
 {
-#ifndef NEW_CLEANUP
-    return MY_FALSE;
-#else
     int was_swapped = 0;
-/* DEBUG: */ struct timeval t_begin, t_end;
 
     /* Swap in the object if necessary */
     if ((obj->flags & O_SWAPPED)
@@ -528,7 +526,6 @@ cleanup_single_object (object_t * obj, cleanup_t * context)
     }
 
     return was_swapped != 0;
-#endif /* NEW_CLEANUP */
 } /* cleanup_single_object() */
 
 /*-------------------------------------------------------------------------*/
@@ -544,9 +541,6 @@ cleanup_structures (cleanup_t * context)
  */
 
 {
-#ifndef NEW_CLEANUP
-    return;
-#else
     /* Cleanup the wizlist */
     {
         wiz_list_t * wiz;
@@ -584,7 +578,6 @@ cleanup_structures (cleanup_t * context)
                 cleanup_vector(&driver_hook[i], 1, context);
         }
     }
-#endif /* NEW_CLEANUP */
 } /* cleanup_structures() */
 
 /*-------------------------------------------------------------------------*/
@@ -596,9 +589,6 @@ cleanup_compact_mappings (cleanup_t * context)
  */
 
 {
-#ifndef NEW_CLEANUP
-    return;
-#else
     mapping_t * m;
 
     for (m = context->mlist; m != NULL; m = context->mlist)
@@ -608,8 +598,9 @@ cleanup_compact_mappings (cleanup_t * context)
             compact_mapping(m, context->mcompact);
         free_mapping(m); /* Might deallocate it fully */
     }
-#endif /* NEW_CLEANUP */
 } /* cleanup_compact_mappings() */
+
+#endif /* NEW_CLEANUP */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -637,8 +628,7 @@ cleanup_object (object_t * obj)
     struct timeval   t_begin, t_end;
     Bool             didSwap;
     unsigned long    numValues = 0;
-    long             clean_delay = (time_to_cleanup > 0) ? time_to_cleanup
-                                                         : DEFAULT_CLEANUP_TIME;
+
     if (gettimeofday(&t_begin, NULL))
     {
         t_begin.tv_sec = t_begin.tv_usec = 0;
@@ -652,8 +642,8 @@ cleanup_object (object_t * obj)
         numValues = context->numValues;
         cleanup_free(context);
     }
-    obj->time_cleanup = current_time + (9*clean_delay)/10
-                                     + random_number((2*clean_delay)/10);
+    obj->time_cleanup = current_time + (9*time_to_data_cleanup)/10
+                                     + random_number((2*time_to_data_cleanup)/10);
 
     if (t_begin.tv_sec == 0
      || gettimeofday(&t_end, NULL))
@@ -714,8 +704,7 @@ cleanup_driver_structures (void)
     cleanup_t      * context = NULL;
     struct timeval   t_begin, t_end;
     unsigned long    numValues = 0;
-    long             clean_delay = (time_to_cleanup > 0) ? time_to_cleanup
-                                                         : DEFAULT_CLEANUP_TIME;
+
 static mp_int time_cleanup = 0;
     /* Time of the next regular cleanup. */
 
@@ -723,8 +712,8 @@ static mp_int time_cleanup = 0;
     if (time_cleanup != 0 && time_cleanup >= current_time)
         return;
 
-    time_cleanup = current_time + (9*clean_delay)/10
-                                + random_number((2*clean_delay)/10);
+    time_cleanup = current_time + (9*time_to_data_cleanup)/10
+                                + random_number((2*time_to_data_cleanup)/10);
 
     if (gettimeofday(&t_begin, NULL))
     {

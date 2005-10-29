@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+27-Mar-2005 (Lars Duening)  (3.3.694)
+  - (backend.c) I reintroduced the numeric limit on the number of objects
+       to data-clean, as even with the random factor it could happen
+       that the driver tries to cleanup hundreds of objects in one cycle.
+       The numeric limit is calculated such that all listed objects can
+       be cleaned in half of the configured cleanup cycle.
+
 27-Mar-2005 (Lars Duening)  (3.3.693)
   - (slaballoc.c) Corrected the free-steps statistics.
   - (backend.c) The data-cleanup didn't pay attention to the backend

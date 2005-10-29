@@ -886,7 +886,8 @@ static Bool did_swap;
    * processed per call, even if there is no time left to begin with.
    */
 
-    object_t *obj;          /* Current object worked on */
+    object_t *obj;               /* Current object worked on */
+    long      limit_data_clean;  /* Max number of objects to dataclean */
 
     struct error_recovery_info error_recovery_info;
       /* Local error recovery info */
@@ -915,6 +916,15 @@ static Bool did_swap;
      */
     if (!comm_time_to_call_heart_beat)
         cleanup_driver_structures();
+
+    /* Determine how many objects to data-clean at max in this cycle, since
+     * sometimes hundreds of objects can become eligible at a time (despite
+     * the random factor in the timing). The number is determined so that all
+     * objects are cleaned within half of the configured cleanup period.
+     */
+    limit_data_clean = 2 * num_listed_objs / time_to_data_cleanup;
+    if (limit_data_clean < 2)
+        limit_data_clean = 2;
 
     /* The processing loop, runs until either time or objects
      * run short.
@@ -1128,6 +1138,7 @@ no_clean_up:
          */
         if ( (num_last_data_cleaned == 0 || !comm_time_to_call_heart_beat)
          && (unsigned long)obj->time_cleanup < (unsigned long)current_time
+         && num_last_data_cleaned < limit_data_clean
            )
         {
 #ifdef DEBUG
