@@ -866,6 +866,8 @@ int privilege_violation (string op, mixed who, mixed arg, mixed arg2)
 //   execute_command   : Execute command string <arg2> for the object <arg>.
 //   input_to          : Object <who> issues an 'ignore-bang'-input_to() for
 //                       commandgiver <arg>; the exakt flags are <arg2>.
+//   mysql             : Object <who> attempted to execute mySQL efun <arg>.
+//   pgsql             : Object <who> attempted to execute Postgres efun <arg>.
 //   net_connect       : Attempt to open a connection to host <arg>,
 //                        port <arg2>.
 //   nomask simul_efun : Attempt to get an efun <arg> via efun:: when it
@@ -880,7 +882,7 @@ int privilege_violation (string op, mixed who, mixed arg, mixed arg2)
 //   set_driver_hook   : Set hook <arg> to <arg2>.
 //   set_max_commands  : Set the max. number of commands interactive
 //                       object <arg> can issue per second to <arg2>.
-//   limited:          : Execute <arg> with reduced/changed limits
+//   limited           : Execute <arg> with reduced/changed limits
 //                       <arg2> (as return by query_limits()).
 //   set_limits        : Set limits to <arg> (as returned by query_limits()).
 //   set_this_object   : Set this_object() to <arg>.

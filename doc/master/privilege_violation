@@ -27,8 +27,10 @@ DESCRIPTION
                           commandgiver <arg>, using <arg2> as value
                           for the flags. This is used for flag values
                           including the 'no bang' option.
-        limited:          Execute <arg> with reduced/changed limits
+        limited           Execute <arg> with reduced/changed limits
                           <arg2> (as return by query_limits()).
+        mysql             Object <who> attempted to execute mySQL efun <arg>.
+        pgsql             Object <who> attempted to execute Postgres efun <arg>.
         net_connect       Attempt to open a connection to host <arg>,
                           port <arg2>.
         nomask simul_efun Attempt to get an efun <arg> via efun:: when
@@ -78,10 +80,11 @@ HISTORY
            "set_max_commands" and "variable_list" violations.
         LDMud 3.3.563 added the passing of the limits to the "limited"
            and "set_limits".
+        LDMud 3.2.11/3.3.640 added the "mysql" violation.
 
 
 SEE ALSO
         net_connect(E), send_erq(E), set_this_object(E), rename_object(E),
         simul_efun(C), call_out_info(E), shadow(E), add_action(E),
         bind_lambda(E), send_udp(E), input_to(E), execute_command(E),
-        enable_telnet(E)
+        variable_list(E), enable_telnet(E), mysql(C)

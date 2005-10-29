@@ -36,9 +36,11 @@
 
 #include "array.h"
 #include "interpret.h"
+#include "instrs.h"
 #include "main.h"
 #include "mstrings.h"
 #include "simulate.h"
+#include "stdstrings.h"
 #include "svalue.h"
 #include "xalloc.h"
 
@@ -106,6 +108,39 @@ pkg_mysql_init (void)
     debug_message("%s mySQL %s\n", time_stamp(), client_version);
     return MY_TRUE;
 } /* pkg_mysql_init() */
+
+/*-------------------------------------------------------------------------*/
+static
+Bool check_privilege (const char * efun_name, Bool raise_error, svalue_t * sp)
+
+/* Check if the user has the privileges to execute efun <efun_name>.
+ * The function executes a call to master->privilege_violation("mysql",
+ * efun_name) and evaluates the result.
+ * If the master result is TRUE, the function returns TRUE.
+ * If the master result is FALSE, the function returns FALSE if <raise_error>
+ * is FALSE, and raises an error if <raise_error> is true.
+ */
+
+{
+    Bool rc;
+
+    inter_sp = sp+1;
+    put_c_string(inter_sp, efun_name);
+    rc = privilege_violation(STR_MYSQL, inter_sp, inter_sp);
+    free_svalue(inter_sp);
+    inter_sp--;
+
+    if (rc)
+        return MY_TRUE;
+
+    if (raise_error)
+    {
+        error("%s(): Privilege violation.\n", efun_name);
+        /* NOTREACHED */
+    }
+
+    return MY_FALSE;
+} /* check_privilege() */
 
 /*-------------------------------------------------------------------------*/
 static db_dat_t *
@@ -314,6 +349,7 @@ f_db_affected_rows (svalue_t *sp)
     int          rows;
     unsigned int handle;
 
+    check_privilege(instrs[F_DB_AFFECTED_ROWS].name, MY_TRUE, sp);
     handle = (unsigned int)sp->u.number;
     if ( !(dat = find_dat_by_handle(handle)) )
         error("Illegal handle for database.\n");
@@ -371,6 +407,7 @@ f_db_close (svalue_t *sp)
     p_int     handle;
     db_dat_t *dat;
 
+    check_privilege(instrs[F_DB_CLOSE].name, MY_TRUE, sp);
     handle = sp->u.number;
     if ( !(dat = find_dat_by_handle((unsigned int)handle)) )
     {
@@ -405,6 +442,7 @@ v_db_connect (svalue_t *sp, int num_args)
     p_int     sock;
     db_dat_t *tmp;
 
+    check_privilege(instrs[F_DB_CONNECT].name, MY_TRUE, sp);
     switch(num_args)
     {
     case 3:
@@ -491,6 +529,7 @@ f_db_error (svalue_t *sp)
     unsigned int  handle;
     const char   *errmsg;
 
+    check_privilege(instrs[F_DB_ERROR].name, MY_TRUE, sp);
     handle = (unsigned int)sp->u.number;
 
     if ( !(dat = find_dat_by_handle(handle)) )
@@ -538,6 +577,7 @@ f_db_exec (svalue_t *sp)
     handle = (unsigned int)sp[-1].u.number;
     s = sp->u.str;
 
+    check_privilege(instrs[F_DB_EXEC].name, MY_TRUE, sp);
     if ( !(dat = find_dat_by_handle(handle)) )
     {
         error("Illegal handle for database.\n");
@@ -618,6 +658,7 @@ f_db_fetch (svalue_t *sp)
     int           num_cols, i;
     unsigned int  handle;
 
+    check_privilege(instrs[F_DB_FETCH].name, MY_TRUE, sp);
     handle = (unsigned int)sp->u.number;
     if ( !(dat = find_dat_by_handle(handle)) )
     {
@@ -689,6 +730,7 @@ f_db_handles (svalue_t *sp)
     db_dat_t *tmp;
     vector_t *v;
 
+    check_privilege(instrs[F_DB_HANDLES].name, MY_TRUE, sp);
     tmp = my_dat;
 
     /* Maybe there's no open connection yet/anymore */
@@ -752,6 +794,7 @@ f_db_insert_id (svalue_t *sp)
     my_ulonglong  insertid;
     unsigned int  handle;
 
+    check_privilege(instrs[F_DB_INSERT_ID].name, MY_TRUE, sp);
     handle = (unsigned int)sp->u.number;
     if ( !(dat = find_dat_by_handle(handle)) )
         error("Illegal handle for database.\n");
@@ -781,6 +824,7 @@ f_db_coldefs (svalue_t *sp)
     unsigned int  handle;
     MYSQL_FIELD  *fields;
 
+    check_privilege(instrs[F_DB_COLDEFS].name, MY_TRUE, sp);
     handle = (unsigned int)sp->u.number;
     if ( !(dat = find_dat_by_handle(handle)) )
     {

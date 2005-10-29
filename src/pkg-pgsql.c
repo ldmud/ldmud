@@ -90,6 +90,7 @@
 #include "actions.h"
 #include "array.h"
 #include "gcollect.h"
+#include "instrs.h"
 #include "interpret.h"
 #include "main.h"
 #include "mapping.h"
@@ -909,6 +910,40 @@ pg_purge_connections (void)
     }
 } /* pg_purge_connections() */
 
+/*-------------------------------------------------------------------------*/
+static
+Bool check_privilege (const char * efun_name, Bool raise_error, svalue_t * sp)
+
+/* Check if the user has the privileges to execute efun <efun_name>.
+ * The function executes a call to master->privilege_violation("mysql",
+ * efun_name) and evaluates the result.
+ * If the master result is TRUE, the function returns TRUE.
+ * If the master result is FALSE, the function returns FALSE if <raise_error>
+ * is FALSE, and raises an error if <raise_error> is true.
+ */
+
+{
+    Bool rc;
+
+    inter_sp = sp+1;
+    put_c_string(inter_sp, efun_name);
+    rc = privilege_violation(STR_PGSQL, inter_sp, inter_sp);
+    free_svalue(inter_sp);
+    inter_sp--;
+
+    if (rc)
+        return MY_TRUE;
+
+    if (raise_error)
+    {
+        error("%s(): Privilege violation.\n", efun_name);
+        /* NOTREACHED */
+    }
+
+    return MY_FALSE;
+} /* check_privilege() */
+
+
 
 /*=========================================================================*/
 
@@ -950,6 +985,8 @@ v_pg_connect (svalue_t *sp, int num_arg)
     callback_t  cb;
     object_t   *cb_object;
     svalue_t   *arg = sp - num_arg + 1;
+
+    check_privilege(instrs[F_PG_CONNECT].name, MY_TRUE, sp);
 
     /* Get the callback information */
 
@@ -1021,6 +1058,8 @@ f_pg_pending (svalue_t *sp)
     dbconn_t *db;
     int       count = -1;
     
+    check_privilege(instrs[F_PG_PENDING].name, MY_TRUE, sp);
+
     db = find_current_connection(sp->u.ob);
     if (db)
     {
@@ -1060,6 +1099,8 @@ v_pg_query (svalue_t *sp, int numarg)
     query_queue_t *q;
     int flags = PG_RESULT_ARRAY;
     
+    check_privilege(instrs[F_PG_QUERY].name, MY_TRUE, sp);
+
     if (numarg == 2)
     {
         flags = sp->u.number;
@@ -1094,6 +1135,8 @@ f_pg_close (svalue_t *sp)
 {
     dbconn_t *db;
     
+    check_privilege(instrs[F_PG_CLOSE].name, MY_TRUE, sp);
+
     db = find_current_connection(current_object);
     if (db)
         pgclose(db);

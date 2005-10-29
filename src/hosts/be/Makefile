@@ -591,10 +591,10 @@ $(OBJ)/pkg-mccp.o : ../mudlib/sys/telnet.h xalloc.h svalue.h object.h \
     sent.h hash.h pkg-tls.h simulate.h port.h config.h bytecode.h \
     hosts/unix.h hosts/be/be.h machine.h
 
-$(OBJ)/pkg-mysql.o : xalloc.h svalue.h simulate.h mstrings.h main.h \
-    interpret.h array.h pkg-mysql.h my-alloca.h typedefs.h driver.h \
-    strfuns.h sent.h bytecode.h hash.h port.h config.h hosts/unix.h \
-    hosts/be/be.h machine.h
+$(OBJ)/pkg-mysql.o : xalloc.h svalue.h stdstrings.h simulate.h mstrings.h \
+    main.h instrs.h interpret.h array.h pkg-mysql.h my-alloca.h typedefs.h \
+    driver.h strfuns.h sent.h bytecode.h hash.h exec.h port.h config.h \
+    hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/pkg-pcre.o : pcre/study.c pcre/maketables.c pcre/get.c pcre/pcre.c \
     simulate.h interpret.h pkg-pcre.h driver.h pcre/internal.h \
@@ -603,9 +603,10 @@ $(OBJ)/pkg-pcre.o : pcre/study.c pcre/maketables.c pcre/get.c pcre/pcre.c \
     machine.h
 
 $(OBJ)/pkg-pgsql.o : ../mudlib/sys/pgsql.h xalloc.h stdstrings.h simulate.h \
-    mstrings.h mapping.h main.h interpret.h gcollect.h array.h actions.h \
-    pkg-pgsql.h my-alloca.h typedefs.h driver.h svalue.h strfuns.h sent.h \
-    bytecode.h hash.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
+    mstrings.h mapping.h main.h interpret.h instrs.h gcollect.h array.h \
+    actions.h pkg-pgsql.h my-alloca.h typedefs.h driver.h svalue.h \
+    strfuns.h sent.h bytecode.h hash.h exec.h port.h config.h hosts/unix.h \
+    hosts/be/be.h machine.h
 
 $(OBJ)/pkg-tls.o : ../mudlib/sys/tls.h xalloc.h svalue.h object.h \
     mstrings.h main.h interpret.h comm.h array.h actions.h pkg-tls.h \
@@ -729,7 +730,9 @@ $(OBJ)/parse.o : stdstrings.h
 
 $(OBJ)/parser.o : lang.c stdstrings.h instrs.h
 
-$(OBJ)/pkg-pgsql.o : stdstrings.h
+$(OBJ)/pkg-mysql.o : stdstrings.h instrs.h
+
+$(OBJ)/pkg-pgsql.o : stdstrings.h instrs.h
 
 $(OBJ)/simul_efun.o : stdstrings.h
 

@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-22-Dec-2004 (Lars Duening) -- Development Release 3.3
+28-Dec-2004 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -44,6 +44,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + member(), rmember(): The start position for the search can be
             specified.
        + mkmapping(): Convert structs to mappings, too.
+       + pg_*(): Postgres efuns trigger a privilege violation ("pgsql", "<efun
+           name>").
        + process_string(): Spaces are now allowed in function arguments
            and no longer terminate the function specification.
        + regexp(), regexplode(): Optionally take RE interpretation options.
@@ -178,9 +180,11 @@ For a detailed list of all changes see the file CHANGELOG.
            x509 key- and certfile for the TLS package.
 
 
-23-Dec-2004 (Lars Duening) -- Release 3.2.11
+28-Dec-2004 (Lars Duening) -- Release 3.2.11
 
     - Changed efuns:
+       + db_*(): mySQL efuns trigger a privilege violation ("mysql", "<efun
+           name>").
        + input_to(): New flag INPUT_NO_TELNET to modify the INPUT_CHARMODE
            behaviour.
        + input_to(): New flag INPUT_APPEND to queue input_to()s.

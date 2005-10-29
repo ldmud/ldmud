@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+28-Dec-2004 (Lars Duening)  (3.3.640)
+  - (pkg-mysql.c) Most mySQL efuns are now privileged as ("mysql", "<efun
+        name>") (Bug #0000318).
+  - (pkg-pgsql.c) All Postgres efuns are now privileged as ("pgsql", "<efun
+        name>").
+
 28-Dec-2004 (Lars Duening)  (3.3.639)
   - (interpret) inter_pc is now always visible, as it's needed by the
         closure origination tracking.

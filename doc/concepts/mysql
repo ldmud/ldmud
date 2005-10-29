@@ -82,6 +82,18 @@ DESCRIPTION
         with all open handles.
 
 
+        -- Security --
+
+        Most SQL efuns (unless execute by the master or the simul-efun object)
+        trigger a privilege_violation ("mysql", "<efun_name>"). If a more
+        finegrained control is desired, overload the individual efuns with a
+        nomask simul-efun.
+
+        The unprivileged efuns are:
+
+          db_conv_string()
+
+
 EXAMPLE
         A simple server to store aliases could be implemented like this:
 
@@ -185,8 +197,9 @@ AUTHOR
 HISTORY
         mySQL support was added as a package in 3.2.8 and became and
         integral driver part in 3.2.9.
+        LDMud 3.2.11 added a privilege_violation() call for each efun.
 
 SEE ALSO
         pgsql(C), db_affected_rows(E), db_conv_string(E), db_close(E),
         db_connect(E), db_exec(E), db_fetch(E), db_handles(E),
-        db_insert_id(E), db_coldefs(E), db_error(E)
+        db_insert_id(E), db_coldefs(E), db_error(E), privilege_violation(A)

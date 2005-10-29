@@ -11,6 +11,9 @@ BESCHREIBUNG
         mySQL-Unterstuetzung compiliert wurde. In diesem Fall ist das Makro
         __MYSQL__ definiert.
 
+GESCHICHTE
+        Eingefuehrt in LDMud 3.2.9.
+
 SIEHE AUCH
         db_affected_rows(E), db_close(E), db_coldefs(E), db_connect(E),
         db_exec(E), db_error(E), db_fetch(E), db_handles(E), db_insert_id(E),

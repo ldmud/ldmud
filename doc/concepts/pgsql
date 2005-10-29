@@ -69,12 +69,20 @@ DESCRIPTION
                               otherwise operate further on it.
                               <ret> is a dummy string.
 
+        -- Security --
+
+        All SQL efuns (unless execute by the master or the simul-efun object)
+        trigger a privilege_violation ("pgsql", "<efun_name>"). If a more
+        finegrained control is desired, overload the individual efuns with a
+        nomask simul-efun.
+
 AUTHOR
         Florian Heinz and others.
 
 HISTORY
         Added as package in LDMud 3.3.445.
+        LDMud 3.3.640 added a privilege_violation() call for each efun.
 
 SEE ALSO
         mysql(C), pg_connect(E), pg_query(E), pg_pending(E),
-        pg_close(E)
+        pg_close(E), privilege_violation(M)
