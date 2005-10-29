@@ -7,12 +7,10 @@
  *--------------------------------------------------------------------------
  */
 
-/* $Format: "#if $ReleaseMinor$ % 2 == 0"$ */
-#if 3 % 2 == 0
-#    define IS_STABLE_BRANCH 1
-#else
-#    define IS_DEV_BRANCH 1
-#endif
+/* $Format: "#define IS_STABLE_BRANCH ($ReleaseMinor$ % 2 == 0)"$ */
+#define IS_STABLE_BRANCH (3 % 2 == 0)
+
+#define IS_DEV_BRANCH    (!IS_STABLE_BRANCH)
 
 /* $Format: "#define IS_DEVELOPMENT (!strcmp(\"$ReleaseType$\", \"dev\"))"$ */
 #define IS_DEVELOPMENT (!strcmp("dev", "dev"))
@@ -24,13 +22,13 @@
 #define RELEASE_TYPE "dev"
 
 /* $Format: "#define RELEASE_DATE \"$ProjectDate$\""$ */
-#define RELEASE_DATE "Sun, 15 May 2005 13:57:25 -0600"
+#define RELEASE_DATE "Mon, 06 Jun 2005 19:43:42 -0600"
 
 /* $Format: "#define PROJ_VERSION \"$ProjectVersion$\""$ */
-#define PROJ_VERSION "3-3.705"
+#define PROJ_VERSION "3-3.706"
 
 /* $Format: "#define DRIVER_VERSION \"$ReleaseVersion$\""$ */
-#define DRIVER_VERSION "3.3.705"
+#define DRIVER_VERSION "3.3.706"
 
 /* $Format: "#define VERSION_MAJOR \"$ReleaseMajor$\""$ */
 #define VERSION_MAJOR "3"
@@ -39,7 +37,7 @@
 #define VERSION_MINOR "3"
 
 /* $Format: "#define VERSION_MICRO \"$ReleaseMicro$\""$ */
-#define VERSION_MICRO "705"
+#define VERSION_MICRO "706"
 
 /* $Format: "#define LOCAL_LEVEL \"\""$ */
 #define LOCAL_LEVEL ""

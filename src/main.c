@@ -1603,19 +1603,20 @@ drivertag (void)
  */
 
 {
-#if IS_STABLE_BRANCH
+    if (IS_STABLE_BRANCH)
+    {
+        if (IS_DEVELOPMENT)
+            return " (beta)";
 
-    if (IS_DEVELOPMENT)
-        return " (dev snapshot)";
+        return "";
+    }
+    else
+    {
+        if (IS_DEVELOPMENT)
+            return " (development)";
 
-    return "";
-
-#else
-    if (IS_DEVELOPMENT)
-        return " (development)";
-
-    return " (maintenance)";
-#endif
+        return " (maintenance)";
+    }
 } /* drivertag() */
 
 /*-------------------------------------------------------------------------*/

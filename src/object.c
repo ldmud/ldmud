@@ -1597,7 +1597,7 @@ v_function_exists (svalue_t *sp, int num_arg)
 
         default:
             fatal("function_exists(): flags value %ld (from %ld) not implemented.\n"
-                 , flags & ~NAME_HIDDEN, flags);
+                 , (long)(flags & ~NAME_HIDDEN), (long)flags);
             /* NOTREACHED */
         }
     }

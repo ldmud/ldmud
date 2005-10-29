@@ -312,7 +312,7 @@ add_type (struct_type_t * pSType)
          fatal("struct type %s (%s %ld) already in table.\n"
               , get_txt(struct_t_name(pSType))
               , get_txt(struct_t_pname(pSType))
-              , struct_t_pid(pSType)
+              , (long)struct_t_pid(pSType)
               );
 #endif
 
@@ -1026,7 +1026,7 @@ struct_t_unique_name (struct_type_t *pSType)
     sprintf(name, "%s %s #%ld"
                 , get_txt(struct_t_name(pSType))
                 , get_txt(struct_t_pname(pSType))
-                , struct_t_pid(pSType)
+                , (long)struct_t_pid(pSType)
            );
     pSType->unique_name = new_mstring(name);
 

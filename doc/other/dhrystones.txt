@@ -89,7 +89,7 @@ New Themis: IBM RS6000/?/?, AIX 3.4, LDMud 3.3.206
 
 
 
-Vader: PIII/766MHz/768MByte, Beos 5.0, LDMud 3.3.206:
+Needa: PIII/766MHz/768MByte, Beos 5.0, LDMud 3.3.206:
 
                                          o0        o1        o2        o4
   Gcc 2.95.2                           829.2    1067.2    1059.3    1082.3
@@ -152,4 +152,31 @@ ldmud -N -e -m. -Mtest_master.c -s-1 -f dhry -sv-1 6666
   S = enable-smalloc-trace
   L = enable-smalloc-lpc-trace
   O = with-optimize=high (- = med)
+
+
+Tarkin: G4/800MHz/1GByte, Mac OS X 10.3.6, LDMud 3.3.704, gcc 3.3:
+
+  Dhrystone                        o0        o1        o2        o4
+  -                              4967.7    8992.4    9037.3    8909.5
+  -  -   MC                      5069.0    9068.5    8937.3    9097.5
+  -  -   MC, MT                  4910.7    8609.7    8878.7    8855.6
+  -  -   MC, MT, ML              4870.6    8851.0    8798.3    8670.7
+  D  -   MC, MT, ML              4225.8    7444.8    7773.7    7501.8
+  D, TC, MC, MT, ML              2830.6    4808.6    5397.5    5061.2
+
+  Dhrystone2
+  -                              6772.9   11673.5   11545.0   11721.3              
+  -  -   MC                      6850.2   12146.1   11719.1   11677.5
+  -  -   MC, MT                  6834.0   11858.1   11583.4   11677.5
+  -  -   MC, MT, ML              6787.6   11859.2   11364.6   11279.6
+  D  -   MC, MT, ML              5736.3    9741.7    9901.0    9496.2
+  D, TC, MC, MT, ML              3533.7    6343.2    6727.3    6356.3
+
+Legend:
+  D: DEBUG
+  TC: TRACE_CODE
+  MC: MALLOC_CHECK
+  MT: MALLOC_TRACE
+  ML: MALLOC_LPC_TRACE
+
 
