@@ -187,7 +187,7 @@ For a detailed list of all changes see the file CHANGELOG.
            x509 key- and certfile for the TLS package.
 
 
-12-Jan-2004 (Lars Duening) -- Release 3.2.11
+22-Jan-2004 (Lars Duening) -- Release 3.2.11
 
     - Changed efuns:
        + db_*(): mySQL efuns trigger a privilege violation ("mysql", "<efun
@@ -203,6 +203,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + to_int(): The base prefixes '0x', '0o' and '0b' are supported.
 
     - Corrected efuns:
+       + deep_copy(): Deep-copying mappings with shared arrays as keys
+           could corrupt memory.
        + net_connect(): On multi-homed machines, the created socket
            is bound to the hostname given at program start.
        + save_object(): Matching the documentation, the efun really removes

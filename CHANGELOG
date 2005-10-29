@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+22-Jan-2004 (Lars Duening)  (3.3.663)
+  - (actions, simulate, gcollect.c) Unused action and shadow sentences
+       are no longer held in a freelist, but instead returned directly
+       to the memory allocator.
+
 22-Jan-2004 (Lars Duening)  (3.3.662)
   - (efuns.c) Deep-copying a mapping employing shared arrays as keys (e.g. ([
        arr, ([ arr ]) ])) prematurely freed the copied array as the code

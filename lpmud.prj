@@ -54,21 +54,17 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 662)
-(Parent-Version lpmud 3-3 661)
+(Project-Version lpmud 3-3 663)
+(Parent-Version lpmud 3-3 662)
 (Version-Log "
-  - (efuns.c) Deep-copying a mapping employing shared arrays as keys (e.g. ([
-    arr, ([ arr ]) ])) prematurely freed the copied array as the code didn't
-    keep track of the copied data itself, but of the svalues it was stored in
-    - and for mapping keys these svalues were local variables (Bug #0000351).
-  - (comm.c) If telnet-negs were turned off in linemode, the driver started
-       treating lineends as if in charmode, which the higher routines
-       didn't expect (reported by Philip).
+  - (actions, simulate, gcollect.c) Unused action and shadow sentences
+       are no longer held in a freelist, but instead returned directly
+       to the memory allocator.
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Sat, 22 Jan 2005 22:11:57 -0700")
+(Checkin-Time "Sat, 22 Jan 2005 22:56:55 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -106,8 +102,8 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.12 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.85 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.725 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.385.1.11 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.726 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.385.1.12 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.21 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -164,8 +160,8 @@
   (src/access_check.h (lpmud/f/48_access_che 1.4 644))
   (src/access_check.c (lpmud/d/14_access_che 1.15.1.5 644))
   (src/alloca.c (lpmud/d/13_alloca.c 1.11 644))
-  (src/actions.h (lpmud/d/11_actions.h 1.6.1.7 644))
-  (src/actions.c (lpmud/d/12_actions.c 1.15.1.48 644))
+  (src/actions.h (lpmud/d/11_actions.h 1.6.1.8 644))
+  (src/actions.c (lpmud/d/12_actions.c 1.15.1.49 644))
   (src/array.h (lpmud/f/47_array.h 1.18.1.22 644))
   (src/array.c (lpmud/d/12_array.c 1.46.1.47.1.21 644))
   (src/backend.h (lpmud/f/46_backend.h 1.20.1.7 644))
@@ -191,7 +187,7 @@
   (src/files.c (lpmud/i/50_files.c 1.29 644))
   (src/filestat.h (lpmud/f/51_filestat.h 1.7 644))
   (src/gcollect.h (lpmud/f/33_gcollect.h 1.6.1.16 644))
-  (src/gcollect.c (lpmud/c/30_gcollect.c 1.41.1.116.1.5 644))
+  (src/gcollect.c (lpmud/c/30_gcollect.c 1.41.1.116.1.6 644))
   (src/hash.h (lpmud/f/32_hash.h 1.6 644))
   (src/hash.c (lpmud/c/28_hash.c 1.17 644))
   (src/heartbeat.h (lpmud/m/41_heartbeat. 1.6.1.5 644))
@@ -341,8 +337,8 @@
   (src/sha1.c (lpmud/t/b/34_sha1.c 1.2 644))
   (src/simul_efun.h (lpmud/f/17_simul_efun 1.5.1.6 644))
   (src/simul_efun.c (lpmud/32_simul_efun 1.20.1.17.1.7 644))
-  (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.37 644))
-  (src/simulate.c (lpmud/31_simulate.c 1.88.1.135.1.4 644))
+  (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.38 644))
+  (src/simulate.c (lpmud/31_simulate.c 1.88.1.135.1.5 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.14 644))
   (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.107 644))
   (src/sysmalloc.h (lpmud/c/b/33_sysmalloc. 1.2 644))

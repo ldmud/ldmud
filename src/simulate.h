@@ -236,7 +236,6 @@ extern Bool catch_instruction (int flags, uint offset, volatile svalue_t ** vola
 #else
 extern Bool catch_instruction (int flags, uint offset, volatile svalue_t ** volatile i_sp, bytecode_p i_pc, svalue_t * i_fp, int32 reserve_cost, svalue_t *i_context);
 #endif /* USE_NEW_INLINES */
-extern void purge_shadow_sent(void);
 extern void check_shadow_sent (object_t *ob);
 extern void assert_shadow_sent (object_t *ob);
 extern void init_empty_callback (callback_t *cb);

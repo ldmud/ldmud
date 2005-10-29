@@ -156,10 +156,6 @@ p_int alloc_action_sent = 0;
   /* Statistic: how many action sentences have been allocated.
    */
 
-static sentence_t * free_sent = NULL;
-  /* List of allocated but unused action sentences.
-   */
-
 /*-------------------------------------------------------------------------*/
 void
 free_action_temporaries (void)
@@ -199,16 +195,9 @@ new_action_sent(void)
 {
     action_t *p;
 
-    if (free_sent == NULL)
-    {
-        xallocate(p, sizeof *p, "new action sentence");
-        alloc_action_sent++;
-    }
-    else
-    {
-        p = (action_t *)free_sent;
-        free_sent = free_sent->next;
-    }
+    xallocate(p, sizeof *p, "new action sentence");
+    alloc_action_sent++;
+
     p->verb = NULL;
     p->function = NULL;
     p->ob = NULL;
@@ -233,32 +222,14 @@ _free_action_sent (action_t *p)
         free_mstring(p->function);
     if (p->verb)
         free_mstring(p->verb);
-    p->sent.next = free_sent;
-    free_sent = (sentence_t *)p;
+    xfree(p);
+    alloc_action_sent--;
 } /* _free_action_sent() */
 
 void free_action_sent (action_t *p)
   {  _free_action_sent(p); }
 
 #define free_action_sent(p) _free_action_sent(p)
-
-/*-------------------------------------------------------------------------*/
-void
-purge_action_sent(void)
-
-/* Actually deallocate all action sentences held in the free list.
- * Called during a GC and shutdown.
- */
-
-{
-    sentence_t *p;
-
-    for (;free_sent; free_sent = p) {
-        p = free_sent->next;
-        xfree(free_sent);
-        alloc_action_sent--;
-    }
-} /* purge_action_sent() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE void

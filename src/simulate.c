@@ -149,10 +149,6 @@ static p_int alloc_shadow_sent = 0;
   /* Statistic: how many shadow sentences have been allocated.
    */
 
-static sentence_t * free_sent = NULL;
-  /* List of allocated but unused shadow sentences.
-   */
-
 object_t *obj_list = NULL;
   /* Head of the list of all objects. The reference by this list
    * is counted.
@@ -2913,16 +2909,9 @@ new_shadow_sent(void)
 {
     shadow_t *p;
 
-    if (free_sent == NULL)
-    {
-        xallocate(p, sizeof *p, "new shadow sentence");
-        alloc_shadow_sent++;
-    }
-    else
-    {
-        p = (shadow_t *)free_sent;
-        free_sent = free_sent->next;
-    }
+    xallocate(p, sizeof *p, "new shadow sentence");
+    alloc_shadow_sent++;
+
     p->sent.type = SENT_SHADOW;
     p->shadowing = NULL;
     p->shadowed_by = NULL;
@@ -2945,27 +2934,9 @@ free_shadow_sent (shadow_t *p)
              , p->sent.type);
 #endif
 
-    p->sent.next = free_sent;
-    free_sent = (sentence_t *)p;
+    xfree(p);
+    alloc_shadow_sent--;
 } /* free_shadow_sent() */
-
-/*-------------------------------------------------------------------------*/
-void
-purge_shadow_sent(void)
-
-/* Actually deallocate all shadow sentences held in the free list.
- * Called during a GC and shutdown.
- */
-
-{
-    sentence_t *p;
-
-    for (;free_sent; free_sent = p) {
-        p = free_sent->next;
-        xfree(free_sent);
-        alloc_shadow_sent--;
-    }
-} /* purge_shadow_sent() */
 
 /*-------------------------------------------------------------------------*/
 void
