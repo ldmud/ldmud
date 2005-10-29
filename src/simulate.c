@@ -708,6 +708,9 @@ errorf (const char *fmt, ...)
     string_t *object_name = NULL;
     char     *ts;
     svalue_t *svp;
+    Bool      error_caught;
+      /* TRUE: User catches this error.
+       */
     Bool      published_catch;
       /* TRUE: this is a catch which wants runtime_error to be called
        */
@@ -770,6 +773,7 @@ errorf (const char *fmt, ...)
 
     emsg_buf[0] = '*';  /* all system errors get a * at the start */
 
+    error_caught = MY_FALSE;
     published_catch = MY_FALSE;
 
     if (rt->type >= ERROR_RECOVERY_CATCH)
@@ -777,6 +781,8 @@ errorf (const char *fmt, ...)
         /* User catches this error */
 
         struct error_recovery_info * eri = (struct error_recovery_info *)rt;
+
+        error_caught = MY_TRUE;
 
         put_c_string(&catch_value, emsg_buf);
           /* always reallocate */
@@ -1025,6 +1031,9 @@ errorf (const char *fmt, ...)
             a++;
         }
 
+        push_number(inter_sp, error_caught ? 1 : 0);
+        a++;
+
         save_cmd = command_giver;
         apply_master(STR_RUNTIME, a);
         command_giver = save_cmd;
@@ -1048,6 +1057,9 @@ errorf (const char *fmt, ...)
                 push_number(inter_sp, line_number);
                 a += 3;
             }
+
+            push_number(inter_sp, error_caught ? 1 : 0);
+            a++;
 
             svp = apply_master(STR_HEART_ERROR, a);
             command_giver = save_cmd;
@@ -1135,11 +1147,27 @@ warnf (char *fmt, ...)
        * limit in xalloc.c!
        */
     mp_int    line_number = 0;
+    Bool      inside_catch;
+      /* TRUE: Code is executed inside a catch.
+       */
     va_list   va;
 
     num_warning++;
 
     ts = time_stamp();
+    
+    /* Check if this warning occurs inside a catch. */
+    inside_catch = MY_FALSE;
+
+    {
+        rt_context_t *rt;
+
+        for ( rt = rt_context
+            ; !ERROR_RECOVERY_CONTEXT(rt->type)
+            ; rt = rt->last) NOOP;
+
+        inside_catch = (rt->type >= ERROR_RECOVERY_CATCH);
+    }
 
     va_start(va, fmt);
 
@@ -1197,8 +1225,9 @@ warnf (char *fmt, ...)
         else
             push_number(inter_sp, 0);
         push_number(inter_sp, line_number);
+        push_number(inter_sp, inside_catch ? 1 : 0);
 
-        apply_master(STR_WARNING, 4);
+        apply_master(STR_WARNING, 5);
         command_giver = save_cmd;
     }
     else

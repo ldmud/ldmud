@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+15-May-2005 (Lars Duening)  (3.3.705)
+  - (simulate.c) runtime_error(), runtime_warning() and heart_beat_error()
+      received a new argument 'caught' (Bug #0000385).
+
 15-May-2005 (Lars Duening)  (3.3.704)
   - (object.c) Single-character operator closures like #'- couldn't
       be restored in arrays due to some outdated hack in the parser

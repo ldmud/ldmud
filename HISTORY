@@ -214,6 +214,8 @@ For a detailed list of all changes see the file CHANGELOG.
     - New efuns:
 
     - Master Object:
+       + runtime_error(), heart_beat_error(): A new argument 'caught'
+          signals if the error is caught or not.
 
     - Fixed Crashers:
 

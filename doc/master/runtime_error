@@ -1,6 +1,6 @@
 SYNOPSIS
         void runtime_error( string err, string prg, string curobj, int line
-                          , mixed culprit)
+                          , mixed culprit, int caught)
 
 DESCRIPTION
         This function has to announce a runtime error to the active
@@ -17,6 +17,9 @@ DESCRIPTION
         the error occured during a heartbeat and <culprit> is the object which
         heart_beat() function was executed. Also, in case of a heartbeat error,
         the heartbeat for the <culprit> has been turned off.
+
+        If the error is caught on a higher level, <caught> is non-zero;
+        otherwise it is 0.
 
         Note that any of the the objects or programs might be destructed, ie.
         might be passed as 0.
@@ -48,6 +51,7 @@ DESCRIPTION
 
 HISTORY
         LDMud 3.2.9 added the <culprit> argument.
+        LDMud 3.2.12/3.3.705 added the <caught> argument.
 
 
 SEE ALSO
