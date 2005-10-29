@@ -1,17 +1,16 @@
 /*---------------------------------------------------------------------------
- * SMalloc Memory Manager
+ * Slab-Alloc Memory Manager
  *
- * Written and put into the public domain by Sean T. "Satoria" Barrett.
- * FAST_FIT algorithm by Joern Rennecke.
- * Small block consolidation by Lars Duening.
+ * Written and put into the public domain by Lars Duening.
+ * Based on the 'SMalloc' allocator written and put into the public domain by
+ * Sean T. "Satoria" Barrett.
  *---------------------------------------------------------------------------
- * Satoria's malloc intended to be optimized for lpmud. This memory manager
+ * Slab-Alloc is intended to be optimized for lpmud. This memory manager
  * distinguishes between two sizes of blocks: small and large. It manages
  * them separately in the hopes of avoiding fragmentation between them.
- * It expects small blocks to mostly be temporaries. It expects an equal
- * number of future requests as small block deallocations.
+ * It expects small blocks to mostly be temporaries.
  *
- * smalloc IS NOT THREADSAFE. And the wrong way of fixing this would be
+ * slaballoc IS NOT THREADSAFE. And the wrong way of fixing this would be
  * to wrap all mem_alloc()/mem_free() calls into a mutex. The right way of doing
  * this would be to allocate a set of management structures for each thread
  * so that only the calls to system malloc()/sbrk() need to be guarded
@@ -27,58 +26,61 @@
  *  -- Small Blocks --
  *
  * Small blocks are allocations of up to (SMALL_BLOCK_NUM+1)*4 Bytes, currently
- * 68 Bytes. Such blocks are initially allocated from large memory blocks,
- * called "small chunks", of 16 or 32 KByte size.
+ * 68 Bytes. Such block are allocated from larger memory blocks ('slabs')
+ * sized rough multiples of 4KByte. The size is determined such that the slab
+ * holds at least 100 blocks.
  *
- * To reduce fragmentation, the initial small chunk (ok, the first small chunk
- * allocated after all arguments have been parsed) is of size
- * min_small_malloced, hopefully chosen to be a large multiple of the typical
- * small chunk size.
+ * A slab consists of a header, followed by the blocks themselves. Free blocks
+ * within a slab are linked together in a free list. When a slab is freshly
+ * created, it is filled in from the end and the allocator keeps an external
+ * pointer to the end of the yet unused space in the slab.
  *
- * When a small block is freed, it is entered in a free doubly-linked list
- * for blocks of its size, so that later allocations can use the
- * pre-allocated blocks in the free lists.  The free lists use the first
- * and last word in the "user area" for their link pointers; the small
- * chunks are themselves kept in a list and use their first word for the
- * list pointer. Small free blocks are defragmented as described below.
+ * For every possible block size, the allocator maintains three lists of
+ * slabs: a list of fully used slabs (single-ended), a list of partially
+ * used slabs (double-ended) and a list of fully free slabs (double-ended).
+ * In addition, the allocator maintains for each block size a 'fresh slab'
+ * which is only partially initialized.
+#ifdef MALLOC_ORDER_SMALL_FREELISTS
+ * The partially used slabs in the lists are rougly ordered by the ascending
+ * number of free blocks - 'roughly' meaning that whenever the freeing of
+ * a block causes a slab block to have more free blocks than the next one,
+ * the order of the two is switched. This is not as effective as maintaining
+ * a total order, but it can be done in constant time and is better
+ * than keeping no order at all.
+#else
+ * The partially used slabs in the lists are managed in a FIFO fashion
+ * to ensure that every partially used slab gets a chance of being
+ * filled up completely. Trying a LIFO approach led to a distinctly larger
+ * fragmentation.
+#endif
  *
- * If a small block can't be allocated from the appropriate free list nor
- * the small chunk, the system tries two more strategies before allocating
- * a new small chunk. First, it checks the list of oversized free small
- * blocks for a block large enough to be split.
- * If no such block exists,
- * the allocator then searches the freelists of larger block sizes for a
- * possible split.
- * If finally a new small chunk has to be allocated, the memory not used to
- * satisfy the allocation is entered as new oversized free small block into
- * the appropriate freelist.
+ * When allocating a new block, the allocator first tries to allocated the
+ * block from the freelist of the first partly filled slab. If there is none,
+ * it satisfies the request from the fresh slab (allocating one if necessary).
  *
- * When a small free block is split, the allocator makes sure that the
- * remaining block is of at least SMALL_BLOCK_SPLIT_MIN words size (currently
- * 3 words -> 12 Bytes).
- * Experience has shown that the gamedriver doesn't need that many blocks of
- * less than 12 Bytes. If the allocator's splits generated those small blocks,
- * they would never be used and just tie up free space.
+ * When a block is freed, the allocator determines which slab it belongs to
+ * and links it into the freelist. If it is the first free block for the slab,
+ * the slab is also moved at the beginning of the slab list for this block
+ * size. If the block was the last used block in the slab, the whole slab
+ * is tagged with a timestamp and moved into a separate list.
  *
- * To reduce memory fragmentation, the allocator implements a lazy
- * defragmentation scheme for the small blocks: if checking free lists doesn't
- * yield a suitable block, the allocator defragments the free lists and tries
- * again. Only if this second attempt fails, a new small chunk is allocated.
- * To save time, the defragmentation-on-allocation is terminated if a suitable
- * block is can be constructed (but not before the current list under
- * examination has been fully defragmented); a full defragmentation happens
- * only as part of a garbage collection.
+ * The backend (and the GC) in regular intervals call mem_consolidate() which
+ * will scan the lists of free slabs and remove those with a timestamp older
+ * than SLAB_RETENTION_TIME (currently 60 seconds). The intention is to
+ * keep a load-depending cache of free slabs around to avoid thrashing
+ * in the large allocator.
  *
- * Obviously the defragmenter can eat up a lot of time when the free lists
- * get long, especially since most blocks can't be defragmented. So as an
- * optimization the defragmenter sets the M_DEFRAG flag in each block it
- * visited and decided as non-defragmentable. Newly freed blocks don't have
- * this flag set and are also entered at the head of their free list; this way
- * the defragmenter can stop scanning a free list as soon as it reaches the
- * first block flagged to be non-defragmentable. And while it is possible
- * that a flagged block changes to be defragmentable after all, this can
- * happen only if another block is newly freed, and the defragmenter is
- * guaranteed to find that one.
+ * In order to determine the slab for a block, the distance to the slab begin
+ * is stored as number (counting in words) in the size field of the block.
+ * In addition, bit 27 (0x08000000) is set to mark the block as 'small'.
+ *
+ * This allocation system intents to achieve these goals:
+ *  - Allocations of small blocks of equal size are clustered for reduced
+ *    fragmentation. This applies in particular for allocations from the
+ *    free lists, which are partly decoupled from the order in which the
+ *    blocks are freed.
+ *  - No blocks of sizes not used by the driver are ever generated.
+ *  - Unused small block memory can be returned to the overall memory pool.
  *
  *  -- Large Blocks --
  *
@@ -151,15 +153,14 @@
  *
  *   THIS_BLOCK: small: set if this block is not allocated
  *               large: set if this block is allocated
- *   PREV_BLOCK: small: set if the previous block is not allocated
- *               large: set if the previous block is allocated
+ *   PREV_BLOCK: large: set if the previous block is allocated
  *   M_GC_FREE : set in allocated blocks if the GC may free this block if
  *               found lost
- *   M_DEFRAG  : set in small free blocks which can't be defragmented further
  *   M_REF     : set if this block is referenced (used during a GC)
+  *  M_SMALL   : set in small blocks
  *
- * Because of the PREV_BLOCK flag, all chunk allocations (either the
- * small chunks for the small block allocator, or the esbrk() chunks for the
+ * Because of the PREV_BLOCK flag, all large allocations (either the
+ * slabs for the small block allocator, or the esbrk() chunks for the
  * large block allocator) are initialized with a fake permanently allocatod
  * block at the end of the chunk, consisting of not much more than the
  * size field with THIS_BLOCK cleared.
@@ -174,21 +175,11 @@
  *
  * Small free blocks:
  *
+ *   The M_SIZE field in fact holds the offset to the slab holding this
+ *   block.
+ *
  *   The first word of the user area holds the 'next' link of the free
  *   list, which is NULL for the last block in the list.
- *
- *   The last word in the user area holds the 'prev' link of the free
- *   list, which for the first block in the list points to the block
- *   itself.
- *
- *   For an oversized small block, the 'prev' link has the lowest bit
- *   set, and the second-to-last word in the user area holds the size
- *   of the block in words.
- *
- *   This setup allows the allocator to determine the size of a preceeding
- *   free block by simply following the 'prev' link for normally sized
- *   blocks, and by directly reading the size for an oversize block. At the
- *   same time the management structure requires just two words at minimum.
  *
  * Large free blocks:
  *
@@ -212,7 +203,7 @@
 #    define MADVISE(new,old)  NOOP
 #endif
 
-#include "smalloc.h"
+#include "slaballoc.h"
 
 #include "mstrings.h"
 #include "stdstrings.h"
@@ -230,7 +221,7 @@
 
 /* If possible, request memory using sbrk(). But if using pthreads, do
  * not replace malloc() with our routines, even if the system allows it,
- * as smalloc is not threadsafe.
+ * as slaballoc is not threadsafe.
  */
 
 #if defined(SBRK_OK)
@@ -254,7 +245,6 @@
 /* Initialiser macros for the tables */
 
 #define INIT4  0, 0, 0, 0
-#define INIT4  0, 0, 0, 0
 #define INIT8  INIT4, INIT4
 #define INIT12 INIT8, INIT4
 #define INIT16 INIT8, INIT8
@@ -272,7 +262,7 @@
   /* Define this to debug the AVL tree.
    */
 
-/* The extra smalloc header fields.
+/* The extra slaballoc header fields.
  */
 
 #define M_SIZE 0  /* (word_t) Size in word_t, plus some flags */
@@ -287,21 +277,18 @@
 #define M_LINK  M_OVERHEAD
    /* Index of the 'next' link for the small free lists */
 
-#define M_PLINK(size) ((size)-1)
-   /* Index of the 'prev' link for the small free lists.
-    * <size> is the block size in words.
-    */
-
 #define BLOCK_NEXT(block) ((word_t *)(block[M_LINK]))
-   /* The 'next' link of free block <block>, properly typed */
-
-#define BLOCK_PREV(block,size) ((word_t *)(block[M_PLINK(size)]))
-   /* The 'prev' link of free block <block>, properly typed */
-
+   /* The 'next' link of free block <block>, properly typed.
+    * In fully free slab blocks, */
 
 #define T_OVERHEAD (M_OVERHEAD + XM_OVERHEAD)
-   /* Total overhead: it is used by smalloc to make smart decisions
+   /* Total overhead: it is used by slaballoc to make smart decisions
     * about when to split blocks.
+    */
+
+#define SLAB_RETENTION_TIME (60)
+   /* Retention time of a fully free slab, in seconds.
+    * If set as 0, slabs are deallocated immediately.
     */
 
 #define SMALL_BLOCK_MIN (2)
@@ -314,9 +301,6 @@
 #define INIT_SMALL_BLOCK INIT16
    /* The proper initializer macro for all tables sized SMALL_BLOCK_NUM.
     */
-
-#define SMALL_BLOCK_SPLIT_MIN (3)
-   /* Minimum size of a small block created by a split, in words */
 
 /* Derived values */
 
@@ -333,25 +317,17 @@
     */
 
 
-/* The chunk sizes.
- *   SMALL_CHUNK_SIZE: size of a chunk from which small blocks
- *       are allocated. The actual allocation size is
- *       SMALL_CHUNK_SIZE+sizeof(word_t*) to account for the block list
- *       pointer.
- *   CHUNK_SIZE: size of a chunk from which large blocks are allocated.
- */
+#define DESIRED_SLAB_SIZE 0x01000 /* 4 KByte */
+   /* Desired slab size (or a multiple thereof).
+    */
+
 
 #ifdef SBRK_OK
-#    define SMALL_CHUNK_SIZE    0x04000  /* 16 KByte */
 #    define CHUNK_SIZE          0x40000
 #else
     /* It seems to be advantagous to be just below a power of two
      * make sure that the resulting chunk sizes are SINT aligned.
      */
-#    define SMALL_CHUNK_SIZE  \
-        (0x8000 - (M_OVERHEAD+1)*SINT+SINT - EXTERN_MALLOC_OVERHEAD)
-      /* large_malloc overhead ^ */
-
 #    define CHUNK_SIZE    (0x40000 - SINT - EXTERN_MALLOC_OVERHEAD)
 #endif
 
@@ -363,8 +339,8 @@
 #define THIS_BLOCK  0x40000000  /* This block is allocated */
 #define M_REF       0x20000000  /* Block is referenced */
 #define M_GC_FREE   0x10000000  /* GC may free this block */
-#define M_DEFRAG    (M_GC_FREE) /* Non-defragmentable small block */
-#define M_MASK      0x0fffffff  /* Mask for the size, measured in word_t's */
+#define M_SMALL     0x08000000  /* Small block */
+#define M_MASK      0x07ffffff  /* Mask for the size, measured in word_t's */
 
 
 #ifdef MALLOC_CHECK
@@ -439,43 +415,83 @@ static word_t samagic[]
        dprintf2(gcollect_outfd, s, (p_int)(t1), (p_int)(t2))
 #    define ulog3f(s,t1,t2,t3) \
        dprintf3(gcollect_outfd, s, (p_int)(t1), (p_int)(t2), (p_int)(t3))
+#    define ulog4f(s,t1,t2,t3,t4) \
+       dprintf4(gcollect_outfd, s, (p_int)(t1), (p_int)(t2), (p_int)(t3), (p_int)t4)
 #else
-#    define ulog(s)             (void)0
-#    define ulog1f(s,t)         (void)0
-#    define ulog2f(s,t1,t2)     (void)0
-#    define ulog3f(s,t1,t2,t3)  (void)0
+#    define ulog(s)                (void)0
+#    define ulog1f(s,t)            (void)0
+#    define ulog2f(s,t1,t2)        (void)0
+#    define ulog3f(s,t1,t2,t3)     (void)0
+#    define ulog4f(s,t1,t2,t3,t4)  (void)0
 #endif
 
 /*-------------------------------------------------------------------------*/
 
-static size_t smalloc_size;
-  /* Size of the current smalloc() request.
+static size_t slaballoc_size;
+  /* Size of the current mem_alloc() request.
    * It is used to print a diagnostic when the memory is running out.
    */
 
+/* --- Small Block types --- */
+
+/* --- struct slab_s: Slab header
+ * This structure describes a slab, the block space follows immediately
+ * afterwards.
+ */
+
+typedef struct slab_s slab_t;
+
+struct slab_s
+{
+#ifdef MALLOC_CHECK
+    word_t   magic;         /* Magic 'small' word based on .size. */
+#endif
+    size_t   size;          /* Block size (incl. overhead) for this slab in
+                             * bytes. */
+    slab_t * prev, * next;  /* Link pointers for slab list. */
+    short    numAllocated;  /* Number of blocks allocated. */
+    short    numBlocks;     /* Number of blocks available total. */
+    word_t * freeList;      /* List of free blocks. */
+    word_t   blocks[1];     /* First word of the allocatable memory. */
+};
+
+#define SLAB_SIZE(slab) \
+    ( sizeof(struct slab_s) - SINT + (slab)->numBlocks * (slab)->size )
+  /* Actual size of a given slab.
+   */
+
+/*--- struct slabentry_s: Slab table entry
+ * This structure manages the slabs for a given block size.
+ */
+
+typedef struct slabentry_s slabentry_t;
+
+struct slabentry_s
+{
+    slab_t * first;          /* Head of the slab list. */
+    slab_t * last;           /* Last slab in the list. */
+    slab_t * fullSlabs;      /* Head of the full slab list. */
+    slab_t * firstFree;      /* Head of the free slab list. */
+    slab_t * lastFree;       /* Last free slab in the list. */
+    slab_t * fresh;          /* NULL, or the fresh slab. */
+    word_t * freshMem;       /* NULL, or the end of the free mem in the fresh
+                              * slab.
+                              */
+    unsigned long numSlabs;      /* Total Number of slabs for this size. */
+    unsigned long numFullSlabs;  /* Number of full slabs in the list. */
+    unsigned long numFreeSlabs;  /* Number of free slabs in the free list. */
+};
+
+#define INIT_SLABENTRY   { 0, 0, 0, 0, 0, 0, 0, 0, 0 }
+#define INIT_SLABENTRY2  INIT_SLABENTRY, INIT_SLABENTRY
+#define INIT_SLABENTRY4  INIT_SLABENTRY2, INIT_SLABENTRY2
+#define INIT_SLABENTRY8  INIT_SLABENTRY4, INIT_SLABENTRY4
+#define INIT_SLABENTRY16  INIT_SLABENTRY8, INIT_SLABENTRY8
+
 /* --- Small Block variables --- */
 
-#define DEFAULT_INITIAL_SC_SIZE (3 * SMALL_CHUNK_SIZE)
-  /* The default initial size of a small chunk. Currently the driver
-   * uses somewhat over 2*SMALL_CHUNK_SIZE for it's own tables.
-   */
-
-static word_t small_chunk_size = DEFAULT_INITIAL_SC_SIZE;
-  /* The size of a small chunk. Usually SMALL_CHUNK_SIZE, the first
-   * small chunk of all can be allocated of min_small_malloced size;
-   * the allocator will then reset the value to SMALL_CHUNK_SIZE.
-   */
-
-static word_t *last_small_chunk = NULL;
-  /* Pointer the most recently allocated small chunk.
-   * The first word of each chunk points to the previously allocated
-   * one.
-   */
-
-static word_t *sfltable[SMALL_BLOCK_NUM+1] = {INIT_SMALL_BLOCK, 0};
-  /* List of free small blocks of the various sizes.
-   * The blocks are linked through the first non-header word_t.
-   * The last list is special: it keeps the oversized free blocks.
+static slabentry_t slabtable[SMALL_BLOCK_NUM] = { INIT_SLABENTRY16 };
+  /* List of slabs of the various sizes.
    */
 
 /* --- Large Block variables --- */
@@ -498,13 +514,12 @@ static t_stat small_free_stat  = {0,0};
   /* Number and size of small blocks deallocations (incl overhead).
    */
 
-static t_stat small_chunk_stat = {0,0};
-  /* Number and size of allocated small chunks.
+static t_stat small_slab_stat = {0,0};
+  /* Number and size of allocated slabs (incl. fully unused slabs).
    */
 
-static t_stat small_chunk_wasted = {0,0};
-  /* Number and size of wasted blocks in small chunks.
-   * This includes the large-block overhead of the chunks themselves.
+static t_stat small_slab_free_stat = {0,0};
+  /* Number and size of allocated but completely unused slabs.
    */
 
 static t_stat large_free_stat = {0,0};
@@ -526,30 +541,6 @@ static t_stat sbrk_stat;
 static t_stat perm_alloc_stat = {0,0};
   /* Number and size of permanent allocations functions (incl overhead). This
    * figure is a subset of {small,large}_alloc_stat.
-   */
-
-static long defrag_calls_total = 0;
-  /* Total number of calls to defragment_small_lists().
-   */
-
-static long defrag_calls_req = 0;
-  /* Number of calls to defragment_small_lists() with a desired size.
-   */
-
-static long defrag_req_success = 0;
-  /* Number of times, a defragmentation for a desired size was successful.
-   */
-
-static long defrag_blocks_inspected = 0;
-  /* Number of blocks inspected during defragmentations.
-   */
-
-static long defrag_blocks_merged = 0;
-  /* Number of blocks merged during defragmentations.
-   */
-
-static long defrag_blocks_result = 0;
-  /* Number of defragmented blocks (ie. merge results).
    */
 
 static long malloc_increment_size_calls = 0;
@@ -616,9 +607,17 @@ static mp_int last_update_time = 0;
    */
 
 #define SIZE_EXTSTATS (SMALL_BLOCK_NUM+2)
+#define EXTSTAT_SLABS (SMALL_BLOCK_NUM)
+#define EXTSTAT_LARGE (SMALL_BLOCK_NUM+1)
 
 static extstat_t extstats[SIZE_EXTSTATS];
-  /* The statistics array. [SMALL_BLOCK_NUM+1] is for the large blocks.
+  /* The statistics array.
+   * [EXTSTAT_SLABS] is for the slabs combined; the semantics here are
+   *   a bit different: while cur/max give the number of slabs in the
+   *   used resp. free lists, the number of allocs/frees counts the
+   *   actual memory (de)allocations of slabs in the large pool - not
+   *   the transfers between the full and free lists.
+   * [EXTSTAT_LARGE] is for the large blocks.
    */
 
 /*-------------------------------------------------------------------------*/
@@ -679,8 +678,14 @@ mem_block_size (POINTER p)
  */
 
 {
-   word_t *q = (word_t *) p;
-   return ((q[-M_OVERHEAD] & M_MASK)-M_OVERHEAD)*SINT;
+   word_t *q = ((word_t *) p) - M_OVERHEAD;
+
+   if (q[M_SIZE] & M_SMALL)
+   {
+       slab_t * slab = (slab_t*)(q - (q[M_SIZE] & M_MASK));
+       return slab->size - M_OVERHEAD*SINT;
+   }
+   return ((q[M_SIZE] & M_MASK)-M_OVERHEAD)*SINT;
 } /* mem_block_size() */
 
 /*-------------------------------------------------------------------------*/
@@ -732,14 +737,15 @@ mem_update_stats (void)
 void
 mem_dump_data (strbuf_t *sbuf)
 
-/* For the status commands and functions: add the smalloc statistic
+/* For the status commands and functions: add the slaballoc statistic
  * to the buffer <sbuf>.
  */
 
 {
     t_stat sbrk_st, clib_st, perm_st, xalloc_st;
     t_stat l_alloc, l_free, l_wasted;
-    t_stat s_alloc, s_free, s_wasted, s_chunk;
+    t_stat s_alloc, s_free, s_slab, s_free_slab;
+    unsigned long s_overhead;
 #ifdef MALLOC_EXT_STATISTICS
     int i;
 #endif /* MALLOC_EXT_STATISTICS */
@@ -762,8 +768,10 @@ mem_dump_data (strbuf_t *sbuf)
     l_wasted = large_wasted_stat;
     s_alloc = small_alloc_stat;
     s_free = small_free_stat;
-    s_wasted = small_chunk_wasted;
-    s_chunk = small_chunk_stat;
+    s_slab = small_slab_stat; s_slab.size += s_slab.counter * M_OVERHEAD * SINT;
+    s_free_slab = small_slab_free_stat;
+
+    s_overhead = s_slab.counter * (sizeof(slab_t) - SINT + M_OVERHEAD * SINT);
 
 #   define dump_stat(str,stat) strbuf_addf(sbuf, str,stat.counter,stat.size)
 
@@ -777,16 +785,20 @@ mem_dump_data (strbuf_t *sbuf)
                );
     dump_stat("large free blocks: %8u        %10lu (c)\n",l_free);
     dump_stat("large wasted:      %8u        %10lu (d)\n\n",l_wasted);
-    dump_stat("small chunks:      %8u        %10lu (e)\n",s_chunk);
+    dump_stat("small slabs:       %8u        %10lu (e)\n",s_slab);
     dump_stat("small blocks:      %8u        %10lu (f)\n",s_alloc);
     strbuf_addf(sbuf
                , "small net avail:                   %10d\n"
                , s_alloc.size - s_alloc.counter * M_OVERHEAD * SINT
                );
     dump_stat("small free blocks: %8u        %10lu (g)\n",s_free);
-    dump_stat("small wasted:      %8u        %10lu (h)\n\n",s_wasted);
+    dump_stat("small free slabs:  %8u        %10lu    \n",s_free_slab);
+    strbuf_addf(sbuf
+               , "small overhead:                    %10lu (h)\n"
+               , s_overhead
+               );
 
-    dump_stat("permanent blocks:  %8u        %10lu\n", perm_st);
+    dump_stat("\npermanent blocks:  %8u        %10lu\n", perm_st);
 #ifdef SBRK_OK
     dump_stat("clib allocations:  %8u        %10lu\n", clib_st);
 #else
@@ -811,39 +823,35 @@ mem_dump_data (strbuf_t *sbuf)
                );
     strbuf_addf(sbuf
                , "Total small storage:  (f+g+h)     %10lu should equal (e) %10lu\n"
-               , s_alloc.size + s_free.size + s_wasted.size
-               , s_chunk.size
+               , s_alloc.size + s_free.size + s_overhead
+               , s_slab.size
                );
     strbuf_addf(sbuf
                , "Total storage in use: (b-g-h)     %10lu net available:   %10lu\n"
-               , l_alloc.size - s_free.size - s_wasted.size
-               , l_alloc.size - s_free.size - s_wasted.size
+               , l_alloc.size - s_free.size - s_overhead
+               , l_alloc.size - s_free.size - s_overhead
                  - l_alloc.counter * M_OVERHEAD * SINT
                  - s_alloc.counter * M_OVERHEAD * SINT
                  - xalloc_st.counter * XM_OVERHEAD_SIZE
                );
     strbuf_addf(sbuf
-               , "Total storage unused: (c+d+g+h)   %10lu\n\n"
-               , l_free.size + l_wasted.size
-                 + s_free.size + s_wasted.size
+               , "Total storage unused: (c+d+g)     %10lu\n\n"
+               , l_free.size + l_wasted.size + s_free.size
                );
 
-    strbuf_addf(sbuf,
-      "Defragmentation: %lu calls (%lu for size: %lu successful)\n"
-      "                 %lu blocks inspected: %lu merged yielding %lu blocks\n"
-    , defrag_calls_total, defrag_calls_req, defrag_req_success
-    , defrag_blocks_inspected, defrag_blocks_merged, defrag_blocks_result
-               );
 #ifdef MALLOC_EXT_STATISTICS
     strbuf_add(sbuf,
       "\nDetailed Block Statistics:\n\n"
               );
     for (i = 0; i < SIZE_EXTSTATS; ++i)
     {
+        if (i > 0)
+            strbuf_add(sbuf, "\n");
+
         if (i < SMALL_BLOCK_NUM)
             strbuf_addf(sbuf, "  Size %3u: ", (i + SMALL_BLOCK_MIN) * SINT);
-        else if (i == SMALL_BLOCK_NUM)
-            strbuf_addf(sbuf, "  Oversize: ");
+        else if (i == EXTSTAT_SLABS)
+            strbuf_addf(sbuf, "  Slabs:    ");
         else
             strbuf_addf(sbuf, "  Large:    ");
         strbuf_addf(sbuf, "Alloc: %7.1lf /s - %7lu / %7lu  cur/max\n"
@@ -857,6 +865,17 @@ mem_dump_data (strbuf_t *sbuf)
                                            : 0.0
                         , extstats[i].cur_free, extstats[i].max_free
                    );
+        if (i < SMALL_BLOCK_NUM)
+        {
+            strbuf_addf(sbuf, "            "
+                              "Slabs: %4lu partial, %4lu full, %4lu free = %4lu total\n"
+                            , slabtable[i].numSlabs
+                              - slabtable[i].numFullSlabs - slabtable[i].numFreeSlabs
+                            , slabtable[i].numFullSlabs
+                            , slabtable[i].numFreeSlabs
+                            , slabtable[i].numSlabs
+                       );
+        }
     }
 #endif /* MALLOC_EXT_STATISTICS */
 } /* mem_dump_data() */
@@ -870,14 +889,19 @@ mem_dinfo_data (svalue_t *svp, int value)
  */
 
 {
+    unsigned long small_overhead;
+
 #define ST_NUMBER(which,code) \
     if (value == -1) svp[which].u.number = code; \
     else if (value == which) svp->u.number = code
 
     if (value == -1)
-        put_ref_string(svp+DID_MEM_NAME, STR_SMALLOC);
+        put_ref_string(svp+DID_MEM_NAME, STR_SLABALLOC);
     else if (value == DID_MEM_NAME)
-        put_ref_string(svp, STR_SMALLOC);
+        put_ref_string(svp, STR_SLABALLOC);
+
+    small_overhead = small_slab_stat.counter
+                     * (sizeof(slab_t) - SINT + M_OVERHEAD * SINT);
 
     ST_NUMBER(DID_MEM_SBRK, sbrk_stat.counter);
     ST_NUMBER(DID_MEM_SBRK_SIZE, sbrk_stat.size);
@@ -887,14 +911,15 @@ mem_dinfo_data (svalue_t *svp, int value)
     ST_NUMBER(DID_MEM_LFREE_SIZE, large_free_stat.size * SINT);
     ST_NUMBER(DID_MEM_LWASTED, large_wasted_stat.counter);
     ST_NUMBER(DID_MEM_LWASTED_SIZE, large_wasted_stat.size);
-    ST_NUMBER(DID_MEM_CHUNK, small_chunk_stat.counter);
-    ST_NUMBER(DID_MEM_CHUNK_SIZE, small_chunk_stat.size);
+    ST_NUMBER(DID_MEM_SLAB, small_slab_stat.counter);
+    ST_NUMBER(DID_MEM_SLAB_SIZE, small_slab_stat.size + small_slab_stat.counter * M_OVERHEAD * SINT);
+    ST_NUMBER(DID_MEM_SLAB_FREE, small_slab_free_stat.counter);
+    ST_NUMBER(DID_MEM_SLAB_FREE_SIZE, small_slab_free_stat.size);
     ST_NUMBER(DID_MEM_SMALL, small_alloc_stat.counter);
     ST_NUMBER(DID_MEM_SMALL_SIZE, small_alloc_stat.size);
     ST_NUMBER(DID_MEM_SFREE, small_free_stat.counter);
     ST_NUMBER(DID_MEM_SFREE_SIZE, small_free_stat.size);
-    ST_NUMBER(DID_MEM_SWASTED, small_chunk_wasted.counter);
-    ST_NUMBER(DID_MEM_SWASTED_SIZE, small_chunk_wasted.size);
+    ST_NUMBER(DID_MEM_SMALL_OVERHEAD_SIZE, small_overhead);
     ST_NUMBER(DID_MEM_MINC_CALLS, malloc_increment_size_calls);
     ST_NUMBER(DID_MEM_MINC_SUCCESS, malloc_increment_size_success);
     ST_NUMBER(DID_MEM_MINC_SIZE, malloc_increment_size_total);
@@ -905,10 +930,10 @@ mem_dinfo_data (svalue_t *svp, int value)
     ST_NUMBER(DID_MEM_OVERHEAD, T_OVERHEAD * SINT);
     ST_NUMBER(DID_MEM_ALLOCATED, large_alloc_stat.size * SINT
                               - small_free_stat.size
-                              - small_chunk_wasted.size);
+                              - small_overhead);
     ST_NUMBER(DID_MEM_USED, large_alloc_stat.size * SINT
                               - small_free_stat.size
-                              - small_chunk_wasted.size
+                              - small_overhead
                               - large_alloc_stat.counter * M_OVERHEAD * SINT
                               - small_alloc_stat.counter * M_OVERHEAD * SINT
                               - xalloc_stat.counter * XM_OVERHEAD_SIZE
@@ -916,14 +941,7 @@ mem_dinfo_data (svalue_t *svp, int value)
     ST_NUMBER(DID_MEM_TOTAL_UNUSED, large_free_stat.size * SINT
                                     + large_wasted_stat.size
                                     + small_free_stat.size
-                                    + small_chunk_wasted.size
              );
-    ST_NUMBER(DID_MEM_DEFRAG_CALLS, defrag_calls_total);
-    ST_NUMBER(DID_MEM_DEFRAG_CALLS_REQ, defrag_calls_req);
-    ST_NUMBER(DID_MEM_DEFRAG_REQ_SUCCESS, defrag_req_success);
-    ST_NUMBER(DID_MEM_DEFRAG_BLOCKS_INSPECTED, defrag_blocks_inspected);
-    ST_NUMBER(DID_MEM_DEFRAG_BLOCKS_MERGED, defrag_blocks_merged);
-    ST_NUMBER(DID_MEM_DEFRAG_BLOCKS_RESULT, defrag_blocks_result);
 #ifdef USE_AVL_FREELIST
     ST_NUMBER(DID_MEM_AVL_NODES, num_avl_nodes);
 #else
@@ -936,7 +954,7 @@ mem_dinfo_data (svalue_t *svp, int value)
         Bool deallocate = MY_FALSE;
 
         mem_update_stats();
-        top = allocate_array(SMALL_BLOCK_NUM+2);
+        top = allocate_array(SIZE_EXTSTATS);
         
         if (!top)
             break;
@@ -959,6 +977,12 @@ mem_dinfo_data (svalue_t *svp, int value)
             {
                 put_float(&sub->item[DID_MEM_ES_AVG_XALLOC], extstats[i].savg_xalloc / num_update_calls);
                 put_float(&sub->item[DID_MEM_ES_AVG_XFREE], extstats[i].savg_xfree / num_update_calls);
+            }
+            if  (i < SMALL_BLOCK_NUM)
+            {
+                put_number(&sub->item[DID_MEM_ES_FULL_SLABS],  slabtable[i].numFullSlabs);
+                put_number(&sub->item[DID_MEM_ES_FREE_SLABS],  slabtable[i].numFreeSlabs);
+                put_number(&sub->item[DID_MEM_ES_TOTAL_SLABS], slabtable[i].numSlabs);
             }
 
             put_array(top->item + i, sub);
@@ -994,7 +1018,6 @@ available_memory(void)
 {
     return large_alloc_stat.size * SINT
            - small_free_stat.size
-           - small_chunk_wasted.size
            - large_alloc_stat.counter * M_OVERHEAD * SINT
            - small_alloc_stat.counter * M_OVERHEAD * SINT;
 } /* available_memory() */
@@ -1017,326 +1040,6 @@ available_memory(void)
     /* Index to the proper array entry for a small
      * block of <size> (including overhead), limited to the size of <table>.
      */
-
-/*-------------------------------------------------------------------------*/
-static INLINE void
-UNLINK_SMALL_FREE (word_t * block)
-
-/* Unlink the small free <block> from its freelist
- */
-
-{
-    const word_t bsize = block[M_SIZE] & M_MASK;
-    int ix;
-    word_t flag;
-
-    if (bsize <= SMALL_BLOCK_MAX)
-    {
-        ix = bsize - T_OVERHEAD - SMALL_BLOCK_MIN;
-        flag = 0;
-    }
-    else
-    {
-        ix = SMALL_BLOCK_NUM;
-        flag = 1;
-    }
-
-#ifdef MALLOC_EXT_STATISTICS
-    extstats[ix].cur_free--;
-#endif /* MALLOC_EXT_STATISTICS */
-
-    if (sfltable[ix] == block)
-    {
-        word_t * head = BLOCK_NEXT(block);
-        if (head)
-            head[M_PLINK(head[M_SIZE] & M_MASK)] = (word_t)head | flag;
-        sfltable[ix] = head;
-    }
-    else
-    {
-        word_t * prev = (word_t *)(block[M_PLINK(bsize)] & ~1);
-        word_t * next = BLOCK_NEXT(block);
-        if (next)
-            next[M_PLINK(next[M_SIZE] & M_MASK)] = (word_t)prev | flag;
-        prev[M_LINK] = (word_t) next;
-    }
-    count_back(small_free_stat, bsize * SINT);
-
-} /* UNLINK_SMALL_FREE() */
-
-/*-------------------------------------------------------------------------*/
-static INLINE
-void MAKE_SMALL_FREE (word_t *block, word_t bsize)
-
-/* The <bsize> words starting at <block> are a new free small block.
- * Set it up and insert it into the appropriate free list.
- */
-
-{
-    word_t * head;
-    int ix;
-    word_t flag;
-
-    if (bsize <= SMALL_BLOCK_MAX)
-    {
-        ix = bsize - T_OVERHEAD - SMALL_BLOCK_MIN;
-        flag = 0;
-    }
-    else
-    {
-        ix = SMALL_BLOCK_NUM;
-        flag = 1;
-    }
-
-#ifdef MALLOC_EXT_STATISTICS
-    extstats[ix].cur_free++;
-    extstat_update_max(extstats + ix);
-#endif /* MALLOC_EXT_STATISTICS */
-
-    block[M_SIZE] = bsize | (THIS_BLOCK|M_REF)
-                          | (block[M_SIZE] & PREV_BLOCK);
-    block[bsize] |= PREV_BLOCK;
-
-    head = sfltable[ix];
-    if (head)
-        head[M_PLINK(head[M_SIZE] & M_MASK)] = (word_t)block | flag;
-    block[M_LINK] = (word_t) head;
-    block[M_PLINK(bsize)] = (word_t)block | flag;
-      /* Let the PLINK point to block itself, to satisfy sanity checks */
-
-    if (flag)
-        block[M_PLINK(bsize)-1] = bsize;
-
-    sfltable[ix] = block;
-    count_up(small_free_stat, bsize * SINT);
-
-#ifdef MALLOC_CHECK
-    block[M_MAGIC] = sfmagic[SIZE_MOD_INDEX(bsize * SINT, sfmagic)];
-#endif
-} /* MAKE_SMALL_FREE() */
-
-/*-------------------------------------------------------------------------*/
-static Bool
-defragment_small_lists (int req)
-
-/* Defragment some or all of the small block free lists.
- *
- * req = 0: defragment all of the free lists; result is MY_FALSE.
- * req > 0: the routine is called from the allocator for a small block
- *          allocation for <req> words incl overhead. If the defragmentation
- *          creates a block of a suitable size, the defragmentation
- *          terminates at that point and the function returns MY_TRUE.  If
- *          all blocks are defragmented and no suitable block is found, the
- *          function returns MY_FALSE.
- */
-
-{
-    word_t split_size = 0;
-      /* Minimum blocksize for a block splittable into the requested
-       * size, incl. overhead in words; 0 for 'none'
-       */
-    int ix;  /* Freelist index */
-    Bool found = MY_FALSE; /* Set to TRUE if a suitable block is found */
-
-    defrag_calls_total++;
-
-    if (req > 0)
-    {
-        split_size = req + SMALL_BLOCK_MIN + T_OVERHEAD;
-        defrag_calls_req++;
-    }
-    else
-        req = 0; /* Just to make sure */
-
-    /* Loop over the freelists, starting at the largest.
-     */
-    for (ix = SMALL_BLOCK_NUM; ix >= 0 && !found; ix--)
-    {
-        word_t *list = NULL;
-          /* Local list of the defragmented blocks, linked through [M_LINK].
-           */
-        word_t *block;
-        word_t *pred;
-          /* <block> is the block currently analysed, <pred> the previously
-           * analyzed block or NULL for the list header.
-           */
-
-        /* Walk the current freelist and look for defragmentable blocks.
-         * If one is found, remove it from the freelist, defragment it
-         * and store the result in the local list.
-         * Since the check for defragmentation occurs on both sides of
-         * the free block, the defragmentation will never remove blocks from
-         * this freelist which have already been visited.
-         *
-         * It is important that the loop is not terminated before the end
-         * of the section of newly freed blocks (M_DEFRAG not set) is reached,
-         * as the loop sets the M_DEFRAG flag as it goes along.
-         */
-        for (block = sfltable[ix], pred = NULL
-            ; block != NULL && !(block[M_SIZE] & M_DEFRAG)
-            ; )
-        {
-            Bool   merged;
-            word_t bsize = block[M_SIZE] & M_MASK;
-
-            defrag_blocks_inspected++;
-
-            /* Can this block be defragmented? */
-            if ( !((block+bsize)[M_SIZE] & THIS_BLOCK)
-              && !(block[M_SIZE] & PREV_BLOCK)
-               )
-            {
-                /* No: flag this block as non-defragmentable and step to the
-                 * next block.
-                 */
-                block[M_SIZE] |= M_DEFRAG;
-                pred = block;
-                block = (word_t *)block[M_LINK];
-                continue;
-            }
-
-            /* Yes: remove it from the freelist */
-            UNLINK_SMALL_FREE(block);
-
-            /* Try to merge this free block with the following ones */
-            do {
-                word_t *next;
-
-                defrag_blocks_inspected++;
-
-                merged = MY_FALSE;
-                next = block + bsize;
-                if (next[M_SIZE] & THIS_BLOCK)
-                {
-                    UNLINK_SMALL_FREE(next);
-                    bsize += next[M_SIZE] & M_MASK;
-                    merged = MY_TRUE;
-
-                    defrag_blocks_merged++;
-                }
-
-                if (req > 0 && (bsize == (word_t)req || bsize >= split_size))
-                    found = MY_TRUE;
-
-            } while (merged);
-
-            /* Try to merge the block with the ones in front of it */
-            while ((block[M_SIZE] & PREV_BLOCK))
-            {
-                word_t *prev;
-
-                defrag_blocks_inspected++;
-
-                /* We use the 'prev' pointer first to get the size of previous
-                 * block, and from there we can determine it's address
-                 */
-                prev = (word_t *)(block[-1]);
-                if ((word_t)prev & 1)
-                    prev = block - block[-2];
-                else
-                    prev = block - (prev[M_SIZE] & M_MASK);
-
-#ifdef DEBUG
-                /* TODO: Remove this test once it's been proven stable */
-                if (!(prev[M_SIZE] & THIS_BLOCK))
-                {
-                    in_malloc = 0;
-                    fatal("Block %p marks previous %p as free, but it isn't.\n"
-                         , block, prev);
-                }
-#endif
-                UNLINK_SMALL_FREE(prev);
-                bsize += prev[M_SIZE] & M_MASK;
-
-                block = prev;
-
-                defrag_blocks_merged++;
-
-                if (req >= 0 && (bsize == (word_t)req || bsize >= split_size))
-                    found = MY_TRUE;
-            } /* while() */
-
-            /* Update the block's size and move it into the local list.
-             * Be careful not to clobber the flags in the size field.
-             */
-            block[M_SIZE] = bsize | (block[M_SIZE] & ~M_MASK);
-            block[M_LINK] = (word_t)list;
-            list = block;
-
-            defrag_blocks_result++;
-
-            /* Step to the next block using the still-value <pred> */
-            if (pred)
-                block = (word_t *)pred[M_LINK];
-            else
-                block = sfltable[ix];
-        } /* for (blocks in freelist) */
-
-        /* Move the defragmented blocks from list back into their freelist.
-         */
-        while (list != NULL)
-        {
-            block = list;
-            list = (word_t *)(list[M_LINK]);
-            MAKE_SMALL_FREE(block, block[M_SIZE] & M_MASK);
-              /* As we moved down the small block array, and the defragged
-               * blocks already visited have been sorted into a list, setting
-               * the M_DEFRAG flag would be possible here.
-               * However, by not setting it we make the algorithm a bit
-               * more robust, and lose only a few cycles the next time
-               * around.
-               */
-        }
-    } /* for (ix = SMALL_BLOCK_NUM..0 && !found) */
-
-    if (found)
-        defrag_req_success++;
-
-    return found;
-} /* defragment_small_lists() */
-
-/*-------------------------------------------------------------------------*/
-static INLINE void
-defragment_small_block (word_t *block)
-
-/* Try to merge the small free block <block> with any following free blocks.
- * This routine is used by mem_increment_size().
- */
-
-{
-    word_t  bsize = block[M_SIZE] & M_MASK;
-    Bool merged;
-    Bool defragged;
-
-    defragged = MY_FALSE;
-
-    UNLINK_SMALL_FREE(block);
-
-    /* Try to merge this free block with the following ones */
-    do {
-        word_t *next;
-
-        defrag_blocks_inspected++;
-
-        merged = MY_FALSE;
-        next = block + bsize;
-        if (next[M_SIZE] & THIS_BLOCK)
-        {
-            UNLINK_SMALL_FREE(next);
-            bsize += next[M_SIZE] & M_MASK;
-            merged = MY_TRUE;
-            defragged = MY_TRUE;
-
-            defrag_blocks_inspected++;
-        }
-    } while (merged);
-
-    if (defragged)
-        defrag_blocks_result++;
-
-    /* Reinsert the block into the freelists */
-    MAKE_SMALL_FREE(block, bsize);
-} /* defragment_small_block() */
 
 /*-------------------------------------------------------------------------*/
 /* Macro MAKE_SMALL_CHECK(block, size)
@@ -1369,6 +1072,202 @@ defragment_small_block (word_t *block)
 #endif
 
 /*-------------------------------------------------------------------------*/
+#ifdef MALLOC_ORDER_SMALL_FREELISTS
+
+static void
+keep_small_order (slab_t * slab, int ix)
+
+/* Slab <slab> is a partially used slab in slabtable entry <ix>.
+ * Check it's position and move it to a more approriate place
+ * if necessary.
+ */
+
+{
+    /*The threshold is if this slab has more free blocks than the next one.
+     */
+    if (slab->next
+     && slab->numAllocated < slab->next->numAllocated
+       )
+    {
+        /* Find new insertion position (pointing to the slab after
+         * which to insert).
+         * Since keeping a total order has linear complexity, we just
+         * keep a local order by switch the current slab and its successor.
+         * Kinda like a fuzzy incremental bubble sort :-)
+         */
+        slab_t * point = slab->next;
+
+        ulog4f("slaballoc: need reorder: this %x free %d, next %x free %d\n"
+              , slab, slab->numBlocks - slab->numAllocated
+              , slab->next, slab->next->numBlocks - slab->next->numAllocated
+              );
+#if 0
+#ifdef DEBUG_MALLOC_ALLOCS
+        {
+            slab_t * p = slabtable[ix].first;
+
+            ulog3f("slaballoc:   [%d]: %x (%d)"
+                 , ix, p, p->numBlocks - p->numAllocated
+                 );
+            while (p->next != NULL)
+            {
+                slab_t * prev = p;
+                p = p->next;
+                ulog2f(" -> %x (%d)"
+                     , p, p->numBlocks - p->numAllocated
+                     );
+                if (prev != p->prev)
+                    fatal("Inconsistent freelist pointer: prev %p should be %p\n"
+                         , p->prev, prev
+                        );
+            }
+            ulog("\n");
+        }
+#endif
+
+        while (point->next
+            && point->next->numAllocated > slab->numAllocated
+              )
+            point = point->next;
+
+#ifdef DEBUG_MALLOC_ALLOCS
+        if (point->next)
+            ulog4f("slaballoc:   point %x free %d, point->next %x free %d\n"
+                  , point, point->numBlocks - point->numAllocated
+                  , point->next, point->next->numBlocks - point->next->numAllocated
+                  );
+        else
+            ulog2f("slaballoc:   point %x free %d, no next\n"
+                  , point, point->numBlocks - point->numAllocated
+                  );
+#endif /* DEBUG_MALLOC_ALLOCS */
+#endif
+
+        /* Unlink slab */
+        if (slab->next)
+            slab->next->prev = slab->prev;
+        if (slab->prev)
+            slab->prev->next = slab->next;
+        if (slabtable[ix].first == slab)
+            slabtable[ix].first = slab->next;
+        if (slabtable[ix].last == slab)
+            slabtable[ix].last = slab->prev;
+
+        /* Relink slab */
+        slab->next = point->next;
+        slab->prev = point;
+        if (point->next)
+            point->next->prev = slab;
+        point->next = slab;
+        if (slabtable[ix].last == point)
+            slabtable[ix].last = slab;
+
+#ifdef DEBUG_MALLOC_ALLOCS
+        {
+            slab_t * p = slabtable[ix].first;
+
+            ulog3f("slaballoc:   [%d]: %x (%d)"
+                 , ix, p, p->numBlocks - p->numAllocated
+                 );
+            while (p->next != NULL)
+            {
+                slab_t * prev = p;
+                p = p->next;
+                ulog2f(" -> %x (%d)"
+                     , p, p->numBlocks - p->numAllocated
+                     );
+                if (prev != p->prev)
+                    fatal("Inconsistent freelist pointer: prev %p should be %p\n"
+                         , p->prev, prev
+                        );
+            }
+            ulog("\n");
+        }
+#endif
+    }
+#ifdef DEBUG_MALLOC_ALLOCS
+    else if (slab->next)
+        ulog4f("slaballoc: no reorder: this %x free %d, next %x free %d\n"
+              , slab, slab->numBlocks - slab->numAllocated
+              , slab->next, slab->next->numBlocks - slab->next->numAllocated
+              );
+    else
+        ulog2f("slaballoc: no reorder: this %x free %d, no next\n"
+              , slab, slab->numBlocks - slab->numAllocated
+              );
+#endif /* DEBUG_MALLOC_ALLOCS */
+} /* keep_small_order() */
+
+#else
+
+#define keep_small_order(slab,ix) NOOP
+
+#endif /* MALLOC_ORDER_SMALL_FREELISTS */
+
+/*-------------------------------------------------------------------------*/
+static void
+insert_partial_slab (slab_t * slab, int ix)
+
+/* Insert the given <slab> into the partially-used list of slabtable entry
+ * <ix>.
+ *
+ * No statistics or unlinking are handled, this is just the insertion itself.
+ */
+{
+    ulog4f("slaballoc: insert partial slab %x into [%d]: first %x, last %x\n"
+          , slab, ix, slabtable[ix].first, slabtable[ix].last
+          );
+    if (NULL == slabtable[ix].first)
+    {
+        slabtable[ix].first = slabtable[ix].last = slab;
+        slab->next = slab->prev = NULL;
+    }
+    else
+    {
+#ifdef MALLOC_ORDER_SMALL_FREELISTS
+        /* Insert at front and let the ordering mechanism kick in
+         * later.
+         */
+        slab->next = slabtable[ix].first;
+        slab->prev = NULL;
+        slabtable[ix].first->prev = slab;
+        slabtable[ix].first = slab;
+
+        keep_small_order(slab, ix);
+#else
+        /* Insert at back for FIFO handling. */
+        slab->prev = slabtable[ix].last;
+        slab->next = NULL;
+        slabtable[ix].last->next = slab;
+        slabtable[ix].last = slab;
+#endif
+    }
+} /* insert_partial_slab() */
+
+/*-------------------------------------------------------------------------*/
+static void
+free_slab (slab_t * slab, int ix)
+
+/* Free the <slab> which belongs to slabtable entry <ix>.
+ * The slab has already been unlinked, all there is left to do is
+ * adjusting the generic statistics and deallocating the memory.
+ */
+
+{
+    ulog2f("slaballoc: deallocate slab %x [%d]\n", slab, ix);
+    slabtable[ix].numSlabs--;
+    count_back(small_slab_stat, SLAB_SIZE(slab));
+    count_back_n(small_free_stat, slab->numBlocks, slab->size);
+#ifdef MALLOC_EXT_STATISTICS
+    extstats[SIZE_INDEX(slab->size)].cur_free -= slab->numBlocks;
+    extstats[EXTSTAT_SLABS].cur_free--;
+    extstats[EXTSTAT_SLABS].num_xfree++;
+    extstat_update_max(extstats + EXTSTAT_SLABS);
+#endif /* MALLOC_EXT_STATISTICS */
+    large_free((char*)slab);
+} /* free_slab() */
+
+/*-------------------------------------------------------------------------*/
 static POINTER
 mem_alloc (size_t size)
 
@@ -1377,15 +1276,15 @@ mem_alloc (size_t size)
  */
 
 {
-    word_t *temp;
-    Bool    retry;
-#if defined(HAVE_MADVISE) || defined(DEBUG_MALLOC_ALLOCS)
+    word_t *block = NULL;
+    int     ix;
+#if defined(HAVE_MADVISE)
     size_t orig_size = size;
 #endif
 
     assert_stack_gap();
 
-    smalloc_size = size;
+    slaballoc_size = size;
 
     if (size == 0)
     {
@@ -1407,8 +1306,8 @@ mem_alloc (size_t size)
     if (in_malloc++)
     {
         in_malloc = 0;
-        writes(1,"Multiple threads in smalloc()\n");
-        fatal("Multiple threads in smalloc()\n");
+        writes(1,"Multiple threads in slaballoc()\n");
+        fatal("Multiple threads in slaballoc()\n");
         /* NOTREACHED */
         return NULL;
     }
@@ -1428,274 +1327,266 @@ mem_alloc (size_t size)
     if (size < SMALL_BLOCK_MIN_BYTES + XM_OVERHEAD_SIZE)
         size = SMALL_BLOCK_MIN_BYTES + XM_OVERHEAD_SIZE;
 
+    ulog2f("slaballoc: alloc (%d + %d)", size, M_OVERHEAD*SINT);
     size = (size+M_OVERHEAD*SINT+SINT-1) & ~(SINT-1);
+    ix = SIZE_INDEX(size);
+
+    ulog2f(" %d bytes -> [%d]\n", size, ix);
 
     /* Update statistics */
     count_up(small_alloc_stat,size);
 #ifdef MALLOC_EXT_STATISTICS
     extstats[SIZE_INDEX(size)].num_xalloc++;
     extstats[SIZE_INDEX(size)].cur_alloc++;
-    extstat_update_max(extstats + SIZE_INDEX(size));
 #endif /* MALLOC_EXT_STATISTICS */
 
-
-    /* Try allocating the block from one of the free lists.
-     *
-     * This is done in a loop: if at the first attempt no block can be found,
-     * the small block lists will be defragmented and the allocation attempt
-     * is repeated. If that fails as well, the loop ends and we try to
-     * get a new small chunk.
+    /* Try allocating the block from the first partially used slab.
      */
+    if (NULL != slabtable[ix].first)
+    {
+        /* Yup, we can. */
 
-    retry = MY_FALSE;
-    do {
-        int ix;
+        slab_t * slab = slabtable[ix].first;
 
-        /* First, check if the free list for this block size has one */
+        ulog4f("slaballoc:   block %x from freelist (next %x), slab %x free %d\n"
+              , slab->freeList, BLOCK_NEXT(slab->freeList), slab, slab->numBlocks - slab->numAllocated
+              );
 
-        if ( NULL != (temp = sfltable[SIZE_INDEX(size)]))
+        block = slab->freeList;
+        slab->freeList = BLOCK_NEXT(slab->freeList);
+        count_back(small_free_stat, slab->size);
+
+#ifdef MALLOC_EXT_STATISTICS
+        extstats[ix].cur_free--;
+#endif /* MALLOC_EXT_STATISTICS */
+
+        slab->numAllocated++;
+
+        /* If the slab is now fully used, move it into the full slab list.
+         */
+        if (NULL == slab->freeList)
         {
-            /* allocate from the free list */
+            /* Unlink from partially-used list */
 
-            UNLINK_SMALL_FREE(temp);
+            ulog3f("slaballoc:   fully used: move from partial (next %x, last %x) to full (%x)\n"
+                  , slab->next, slabtable[ix].last, slabtable[ix].fullSlabs
+                  );
 
-            /* Fill in the header (M_SIZE is already mostly ok) */
-            MAKE_SMALL_CHECK(temp, size);
-            temp[M_SIZE] |= (M_GC_FREE|M_REF);
-            temp[M_SIZE] &= ~THIS_BLOCK;
-            temp[temp[M_SIZE] & M_MASK] &= ~PREV_BLOCK;
+            if (slabtable[ix].first == slabtable[ix].last)
+            {
+                /* Only one slab in the list */
+                slabtable[ix].first = slabtable[ix].last = NULL;
+            }
+            else
+            {
+                /* At least two slabs in the list. */
+                slabtable[ix].first = slab->next;
+                slabtable[ix].first->prev = NULL;
+            }
 
-            temp += M_OVERHEAD;
+            /* Link into fully-used list */
 
-            MADVISE(temp, orig_size);
-
-            in_malloc--;
-            return (POINTER)temp;
+            slab->prev = NULL;
+            slab->next = slabtable[ix].fullSlabs;
+            if (slab->next)
+                slab->next->prev = slab;
+            slabtable[ix].fullSlabs = slab;
+            slabtable[ix].numFullSlabs++;
         }
 
-        /* There is nothing suitable in the normal free list - next try
-         * allocating from the oversized block list.
-         */
-        {
-            word_t *this;
-            word_t wsize = size / SINT; /* size incl overhead in words */
+        /* Setup the block (M_SIZE) is mostly ok. */
+        MAKE_SMALL_CHECK(block, size);
+        block[M_SIZE] |= (M_GC_FREE|M_REF);
+        block[M_SIZE] &= ~THIS_BLOCK;
 
-            for (this = sfltable[SMALL_BLOCK_NUM] ; this; this = BLOCK_NEXT(this))
+        block += M_OVERHEAD;
+
+        MADVISE(block, orig_size);
+
+#ifdef MALLOC_EXT_STATISTICS
+        extstat_update_max(extstats + SIZE_INDEX(size));
+#endif /* MALLOC_EXT_STATISTICS */
+
+        in_malloc--;
+        return (POINTER)block;
+    }
+
+    /* If there is no fresh slab, allocate one. */
+    if (NULL == slabtable[ix].fresh)
+    {
+        slab_t * slab;
+
+        /* If there are slabs in the fully-free list, use
+         * the oldest one from there. Otherwise, allocated
+         * from the large memory pool.
+         */
+        if (NULL != slabtable[ix].firstFree)
+        {
+
+            /* Unlink the last (oldest) slab from the free list and hold it.
+             */
+            slab = slabtable[ix].lastFree;
+
+            ulog3f("slaballoc:   get fresh %x from free list (prev %x, first %x)\n"
+                  , slab, slab->prev, slabtable[ix].firstFree
+                  );
+
+            if (slabtable[ix].firstFree == slabtable[ix].lastFree)
             {
-                word_t bsize = *this & M_MASK;
-                word_t rsize = bsize - wsize;
-
-                /* Make sure that the split leaves a legal block behind */
-                if (bsize < wsize + T_OVERHEAD + SMALL_BLOCK_SPLIT_MIN)
-                    continue;
-
-                /* If the split leaves behind a normally sized small
-                 * block, move it over to the appropriate free list.
-                 * Otherwise, just update the size and magic header fields
-                 * but keep this block in the oversized list.
-                 */
-                if (rsize <= SMALL_BLOCK_MAX)
-                {
-                    /* Unlink it from this list */
-                    UNLINK_SMALL_FREE(this);
-
-                    /* Put it into the real free list */
-                    MAKE_SMALL_FREE(this, rsize);
-                }
-                else
-                {
-                    /* Just modify the size and move the .prev pointer
-                     * and size field.
-                     */
-                    count_back(small_free_stat, bsize * SINT);
-
-                    this[M_SIZE] &= (PREV_BLOCK|M_DEFRAG);
-                    this[M_SIZE] |= rsize | (THIS_BLOCK|M_REF);
-                    this[M_PLINK(rsize)] = this[M_PLINK(bsize)];
-                    this[M_PLINK(rsize)-1] =  rsize;
-
-#ifdef MALLOC_CHECK
-                    this[M_MAGIC] = sfmagic[SIZE_MOD_INDEX(rsize*SINT, sfmagic)];
-#endif
-
-                    count_up(small_free_stat, rsize * SINT);
-                }
-
-                /* Split off the allocated small block from the end
-                 * The front remains in the freelist.
-                 */
-                this += rsize;
-
-                /* Fill in the header */
-                this[M_SIZE] = wsize | (PREV_BLOCK|M_GC_FREE|M_REF);
-                this[wsize] &= ~PREV_BLOCK;
-                MAKE_SMALL_CHECK_UNCHECKED(this,size);
-
-                this += M_OVERHEAD;
-
-                MADVISE(this, orig_size);
-
-#ifdef DEBUG_MALLOC_ALLOCS
-                ulog2f("smalloc(%d / %d): Split oversized block "
-                      , orig_size, size);
-                dprintf2( gcollect_outfd, "(%d / %d bytes): left with block of "
-                        , (p_int)(bsize - T_OVERHEAD) * SINT, (p_int)bsize * SINT);
-                dprintf2( gcollect_outfd, "%d / %d bytes.\n"
-                        , (p_int)(rsize - T_OVERHEAD) * SINT
-                        , (p_int)rsize * SINT);
-#endif
-
-                in_malloc--;
-                return (POINTER)this;
+                slabtable[ix].firstFree = slabtable[ix].lastFree = NULL;
             }
-        } /* allocation from oversized lists */
+            else
+            {
+                slabtable[ix].lastFree = slab->prev;
+                slabtable[ix].lastFree->next = NULL;
+            }
 
-        /* Next, try splitting off the memory from one of the larger
-         * listed free small blocks.
-         * Search from the largest blocks, and stop when splits
-         * would result in too small blocks.
-         */
-        for ( ix = SMALL_BLOCK_NUM-1
-            ; ix >= (int)(SIZE_INDEX(size) + T_OVERHEAD + SMALL_BLOCK_SPLIT_MIN) 
-            ; ix--
-            )
-        {
-            word_t *pt, *split;
-            size_t wsize, usize;
+            slabtable[ix].numFreeSlabs--;
+            count_back(small_slab_free_stat, SLAB_SIZE(slab));
+#ifdef MALLOC_EXT_STATISTICS
+            extstats[EXTSTAT_SLABS].cur_free--;
+#endif /* MALLOC_EXT_STATISTICS */
+        }
 
-            if (!sfltable[ix]) /* No block available */
-                continue;
-
-            wsize = size / SINT; /* size incl. overhead in words */
-
-            /* Remove the block from the free list */
-            pt = sfltable[ix];
-            UNLINK_SMALL_FREE(pt);
-
-            /* Split off the unused part as new block */
-            split = pt + wsize;
-            usize = ix + T_OVERHEAD + SMALL_BLOCK_MIN - wsize;
-            split[M_SIZE] = 0; /* No PREV_BLOCK */
-            MAKE_SMALL_FREE(split, usize);
-
-            /* Initialize the header of the new block */
-            pt[M_SIZE] &= PREV_BLOCK;
-            pt[M_SIZE] |= wsize | (M_GC_FREE|M_REF);
-            MAKE_SMALL_CHECK_UNCHECKED(pt, size);
-
-            pt += M_OVERHEAD;
-
-            MADVISE(pt, orig_size);
-
-#ifdef DEBUG_MALLOC_ALLOCS
-            ulog2f("smalloc(%d / %d): Split block "
-                  , orig_size, size);
-            dprintf2( gcollect_outfd, "(%d / %d bytes): left with block of "
-                    , (p_int)(ix - T_OVERHEAD) * SINT, (p_int)ix * SINT);
-            dprintf2( gcollect_outfd, "%d / %d bytes.\n"
-                    , (p_int)(usize - T_OVERHEAD) * SINT, (p_int)usize * SINT);
-#endif
-
-            in_malloc--;
-            return (POINTER)pt;
-        } /* allocation from larger blocks */
-
-        /* At this point, there was nothing in the free lists.
-         * If this is the first pass, defragment the memory and try again
-         * (the defragmentation routine returns whether a retry is useful).
-         * If this is the second pass, force retry to be FALSE, thus
-         * terminating the loop.
-         */
-        if (!retry)
-            retry = defragment_small_lists(size / SINT);
         else
-            retry = MY_FALSE;
-    } while (retry);
+        {
+            /* Allocate a new slab from the large memory pool. */
 
-    /* At this point, we couldn't find a suitable block in the free lists,
-     * thus allocate a new small chunk.
-     * If this is the first small chunk of all, or if the small_chunk_size
-     * has been modified from the default (happens for the second small
-     * chunk allocation), try to get fresh memory from the system.
-     *
-     * Note: Changes here must be mirrored in mem_consolidate().
+            short numObjects;
+            size_t slabSize;
+
+            /* Determined the number of objects such that the slab
+             * is roughly a multiple of DESIRED_SLAB_SIZE large,
+             * and can hold at least 100 objects.
+             */
+            {
+#ifdef SLABALLOC_DYNAMIC_SLABS
+                size_t minSlabObjectSize = DESIRED_SLAB_SIZE / 128;
+                size_t sizeMultiplier = 1 + (size-1) / minSlabObjectSize;
+                size_t totalSlabSize = DESIRED_SLAB_SIZE * sizeMultiplier;
+                size_t effSlabSize = totalSlabSize - sizeof(slab_t) - SINT;
+#else
+                size_t totalSlabSize = DESIRED_SLAB_SIZE;
+                size_t effSlabSize = totalSlabSize - sizeof(slab_t) - SINT;
+#endif
+                numObjects = (short)(effSlabSize / size);
+            }
+
+            slabSize = sizeof(struct slab_s) - SINT + numObjects * size;
+
+            slab = (slab_t*)large_malloc_int(slabSize, MY_FALSE);
+
+            if (slab == NULL)
+            {
+                dprintf1(2, "Low on MEMORY: Failed to allocated small slab "
+                            "of %d bytes.\n"
+                          , (p_int)(slabSize)
+                        );
+                in_malloc--;
+                return NULL;
+            }
+
+            ulog4f("slaballoc:   allocated fresh %x size %d, objects %d size %d\n"
+                  , slab, slabSize, numObjects, size
+                  );
+
+            slab->size = size;
+            slab->numBlocks = numObjects;
+
+            slabtable[ix].numSlabs++;
+            count_up(small_slab_stat, slabSize);
+            count_up_n(small_free_stat, numObjects, size);
+#ifdef MALLOC_EXT_STATISTICS
+            extstats[ix].cur_free += numObjects;
+            extstats[EXTSTAT_SLABS].num_xalloc++;
+#endif /* MALLOC_EXT_STATISTICS */
+        }
+
+        /* (Re)initialize the remaining slab fields. */
+#ifdef MALLOC_CHECK
+        slab->magic = samagic[SIZE_MOD_INDEX(slab->size, samagic)];
+#endif
+        slab->next = slab->prev = NULL;
+        slab->freeList = NULL;
+        slab->numAllocated = 0;
+
+        slabtable[ix].fresh = slab;
+        slabtable[ix].freshMem = slab->blocks + (slab->numBlocks * slab->size / SINT);
+
+        ulog3f("slaballoc:   fresh %x mem %x..%x\n"
+              , slab, slab->blocks, slabtable[ix].freshMem
+              );
+
+#ifdef MALLOC_EXT_STATISTICS
+        extstats[EXTSTAT_SLABS].cur_alloc++;
+        extstat_update_max(extstats + EXTSTAT_SLABS);
+#endif /* MALLOC_EXT_STATISTICS */
+    }
+
+    /* Allocate a new block from the fresh slab's memory.
      */
     {
-        word_t * new_chunk;
-        word_t   chunk_size;
+        word_t wsize = size / SINT;
 
-        new_chunk = (word_t*)large_malloc_int(small_chunk_size + sizeof(word_t*)
-                                             ,    (last_small_chunk == NULL)
-                                              || (small_chunk_size != SMALL_CHUNK_SIZE)
-                                             );
+        slabtable[ix].freshMem -= wsize;
+        block = slabtable[ix].freshMem;
+        slabtable[ix].fresh->numAllocated++;
 
-        /* If this is the first small chunk allocation, it might fail because
-         * the driver was configured with a too big min_small_malloced value.
-         * If that happens, try again with the normal value.
-         */
-        if (new_chunk == NULL && small_chunk_size != SMALL_CHUNK_SIZE)
+        ulog3f("slaballoc:   freshmem %x from %x..%x\n"
+              , block, slabtable[ix].fresh->blocks, ((char *)slabtable[ix].fresh->blocks) + (slabtable[ix].fresh->numBlocks * slabtable[ix].fresh->size)
+              );
+        block[M_SIZE] =   (word_t)(block - (word_t *)(slabtable[ix].fresh))
+                        | (M_SMALL|M_GC_FREE|M_REF);
+        MAKE_SMALL_CHECK_UNCHECKED(block, size);
+        block += M_OVERHEAD;
+
+        MADVISE(block, orig_size);
+
+        count_back(small_free_stat, size);
+#ifdef MALLOC_EXT_STATISTICS
+        extstats[ix].cur_free--;
+#endif /* MALLOC_EXT_STATISTICS */
+    }
+
+    /* We have the block allocated, now check if the fresh slab has been used up.
+     * If yes, move the fresh slab into the appropriate slab: front if some
+     * of the blocks have already been freed, back if the slab is full.
+     */
+    if (slabtable[ix].freshMem == slabtable[ix].fresh->blocks)
+    {
+        slab_t * slab = slabtable[ix].fresh;
+
+        ulog2f("slaballoc:   fresh %x full, freelist %x\n"
+              , slab, slab->freeList
+              );
+        slabtable[ix].fresh = NULL;
+        slabtable[ix].freshMem = NULL;
+
+        if (NULL != slab->freeList)
         {
-            dprintf1(2, "Low on MEMORY: Failed to allocated MIN_SMALL_MALLOCED "
-                       "block of %d bytes.\n"
-                     , (p_int)(small_chunk_size)
-                   );
-            small_chunk_size = SMALL_CHUNK_SIZE;
-            new_chunk = (word_t*)large_malloc_int(small_chunk_size+sizeof(word_t*)
-                                                 , MY_TRUE);
+            insert_partial_slab(slab, ix);
         }
-
-        if (new_chunk == NULL)
+        else
         {
-            dprintf1(2, "Low on MEMORY: Failed to allocated small chunk "
-                        "block of %d bytes.\n"
-                      , (p_int)(small_chunk_size)
-                    );
-            in_malloc--;
-            return NULL;
+            /* Insert in fully-used list */
+            ulog2f("slaballoc:   fresh %x into full list (first %x)\n"
+                  , slab, slabtable[ix].fullSlabs
+                  );
+            slab->next = slabtable[ix].fullSlabs;
+            if (NULL != slabtable[ix].fullSlabs)
+                slabtable[ix].fullSlabs->prev = slab;
+            slabtable[ix].fullSlabs = slab;
+            slabtable[ix].numFullSlabs++;
         }
+    }
 
-        /* Enter the chunk into the chunk list and reset the small_cunk_size
-         * to the ongoing value.
-         */
+#ifdef MALLOC_EXT_STATISTICS
+    extstat_update_max(extstats + ix);
+#endif /* MALLOC_EXT_STATISTICS */
 
-        chunk_size = (new_chunk[-M_OVERHEAD] & M_MASK) - M_OVERHEAD - 2;
-          /* The payload size of the new chunk in words (ie. sans
-           * large block overhead, chunk link pointer and sentinel block).
-           */
-
-        *new_chunk = (word_t)last_small_chunk;
-        last_small_chunk = new_chunk++;
-
-        count_up(small_chunk_stat, (new_chunk[-M_OVERHEAD-1] & M_MASK) * SINT);
-        count_up(small_chunk_wasted, SINT*(M_OVERHEAD+2));
-
-        small_chunk_size = SMALL_CHUNK_SIZE;
-
-        /* The last word in the chunk is a fake permanently allocated small
-         * block, so that the block merging routine has something to put the
-         * PREV_BLOCK flag into.
-         */
-        new_chunk[chunk_size] = 1 | M_REF;
-
-        /* Use the end of the new chunk before the sentinel block to satisfy
-         * the allocation and enter the rest at the front as free block into
-         * the oversized free list.
-         */
-        chunk_size -= size / SINT;
-        new_chunk[M_SIZE] = 0;
-        MAKE_SMALL_FREE(new_chunk, chunk_size);
-
-        temp = new_chunk + chunk_size;
-
-        temp[M_SIZE] = (size / SINT) | (PREV_BLOCK|M_GC_FREE|M_REF);
-        MAKE_SMALL_CHECK_UNCHECKED(temp, size);
-
-        temp += M_OVERHEAD;
-
-        MADVISE(temp, orig_size);
-        in_malloc--;
-        return (POINTER)temp;
-    } /* allocate from a new small chunk */
+    /* Done! */
+    in_malloc--;
+    return (POINTER)block;
 } /* mem_alloc() */
 
 /*-------------------------------------------------------------------------*/
@@ -1710,53 +1601,182 @@ sfree (POINTER ptr)
 
 {
     word_t *block;
-    word_t bsize, i;
+    word_t ix;
+    slab_t *slab;
+    Bool   isFirstFree;
 
     if (!ptr)
         return;
 
     mem_mark_collectable(ptr);
 
-    /* Get the real block address and size */
+    /* Get the real block address and type */
     block = (word_t *) ptr;
     block -= M_OVERHEAD;
-    bsize = i = block[M_SIZE] & M_MASK;
 
-    if (bsize > SMALL_BLOCK_MAX)
+    ulog4f("slaballoc: free %x, %s %d, small %d\n"
+          , block
+          , (block[M_SIZE] & M_SMALL) ? "offset" : "size"
+          , block[M_SIZE] & M_MASK
+          , !!(block[M_SIZE] & M_SMALL)
+          );
+
+    if (!(block[M_SIZE] & M_SMALL))
     {
         /* It's a big block */
         large_free(ptr);
         return;
     }
 
-    /* It's a small block: put it back into the free list */
+    /* It's a small block: put it into the slab's free list */
 
-    count_back(small_alloc_stat, bsize * SINT);
-    i -=  SMALL_BLOCK_MIN + T_OVERHEAD;
+    slab = (slab_t*)(block - (block[M_SIZE] & M_MASK));
+    count_back(small_alloc_stat, slab->size);
+    ix =  SIZE_INDEX(slab->size);
 
+    ulog4f("slaballoc:   -> slab %x [%d], freelist %x, %d free\n"
+          , slab, ix, slab->freeList, slab->numBlocks - slab->numAllocated
+          );
 #ifdef MALLOC_EXT_STATISTICS
-    extstats[i].num_xfree++;
-    extstats[i].cur_alloc--;
+    extstats[ix].num_xfree++;
+    extstats[ix].cur_alloc--;
 #endif /* MALLOC_EXT_STATISTICS */
 
 #ifdef MALLOC_CHECK
-    if (block[M_MAGIC] == sfmagic[i % NELEM(sfmagic)])
+    if (slab->magic == sfmagic[ix % NELEM(sfmagic)])
+    {
+        in_malloc = 0;
+        fatal("mem_free: block %lx size %lu (user %lx) freed in free slab %lx\n"
+             , (unsigned long)block, (unsigned long)(ix * SINT)
+             , (unsigned long)ptr, (unsigned long) slab);
+    }
+    if (slab->magic != samagic[ix % NELEM(samagic)])
+    {
+        in_malloc = 0;
+        fatal("mem_free: block %p magic match failed for slab %lx: "
+              "size %lu, expected %lx, found %lx\n"
+             , block, (unsigned long)slab
+             , (unsigned long)(ix * SINT), samagic[ix], slab->magic);
+    }
+    if (block[M_MAGIC] == sfmagic[ix % NELEM(sfmagic)])
     {
         in_malloc = 0;
         fatal("mem_free: block %lx size %lu (user %lx) freed twice\n"
-             , (unsigned long)block, (unsigned long)(i * SINT)
+             , (unsigned long)block, (unsigned long)(ix * SINT)
              , (unsigned long)ptr);
     }
-    if (block[M_MAGIC] != samagic[i % NELEM(samagic)])
+    if (block[M_MAGIC] != samagic[ix % NELEM(samagic)])
     {
         in_malloc = 0;
         fatal("mem_free: block %p magic match failed: "
               "size %lu, expected %lx, found %lx\n"
-             , block, (unsigned long)(i * SINT), samagic[i], block[M_MAGIC]);
+             , block, (unsigned long)(ix * SINT), samagic[ix], block[M_MAGIC]);
     }
 #endif
 
-    MAKE_SMALL_FREE(block, bsize);
+    /* Insert the block into the slab's freelist */
+
+    isFirstFree = (slab->freeList == NULL);
+
+#ifdef MALLOC_EXT_STATISTICS
+    extstats[ix].cur_free++;
+    extstat_update_max(extstats + ix);
+#endif /* MALLOC_EXT_STATISTICS */
+
+    block[M_SIZE] |= (THIS_BLOCK|M_REF);
+    block[M_SIZE] &= ~(M_GC_FREE);
+#ifdef MALLOC_CHECK
+    block[M_MAGIC] = sfmagic[SIZE_MOD_INDEX(slab->size, sfmagic)];
+#endif
+
+    BLOCK_NEXT(block) = slab->freeList;
+    slab->freeList = block;
+    slab->numAllocated--;
+
+    count_up(small_free_stat, slab->size);
+
+    /* If this slab is not the fresh slab, handle possible list movements.
+     */
+    if (slab != slabtable[ix].fresh)
+    {
+        if (isFirstFree)
+        {
+            /* First free block: move slab into the partially-used
+             * list.
+             */
+
+            ulog2f("slaballoc:   first free: unlink %x from full (first %x)\n"
+                  , slab, slabtable[ix].fullSlabs
+                  );
+            if (slabtable[ix].fullSlabs == slab)
+                slabtable[ix].fullSlabs = slab->next;
+            if (slab->next)
+                slab->next->prev = slab->prev;
+            if (slab->prev)
+                slab->prev->next = slab->next;
+            slabtable[ix].numFullSlabs--;
+
+            insert_partial_slab(slab, ix);
+        }
+        else if (slab->numAllocated == 0)
+        {
+            /* Slab completely free: unlink from list and move over
+             * to free list (deallocate if retention time is 0).
+             */
+            ulog3f("slaballoc:   all free: unlink %x from partial (first %x, last %x)\n"
+                  , slab, slabtable[ix].first, slabtable[ix].last
+                  );
+            if (slab->next)
+                slab->next->prev = slab->prev;
+            if (slab->prev)
+                slab->prev->next = slab->next;
+
+            if (slabtable[ix].first == slab)
+                slabtable[ix].first = slab->next;
+            if (slabtable[ix].last == slab)
+                slabtable[ix].last = slab->prev;
+
+#           if SLAB_RETENTION_TIME > 0
+                ulog3f("slaballoc:   current time %d, free (first %x, last %x)\n"
+                      , current_time, slabtable[ix].firstFree, slabtable[ix].lastFree
+                      );
+#ifdef MALLOC_CHECK
+                slab->magic = sfmagic[SIZE_MOD_INDEX(slab->size, sfmagic)];
+#endif
+                slab->blocks[0] = (mp_int)current_time;
+                slab->prev = NULL;
+                slab->next = slabtable[ix].firstFree;
+                if (slab->next)
+                    slab->next->prev = slab;
+                else
+                    slabtable[ix].lastFree = slab;
+                slabtable[ix].firstFree = slab;
+
+                slabtable[ix].numFreeSlabs++;
+                count_up(small_slab_free_stat, SLAB_SIZE(slab));
+#ifdef MALLOC_EXT_STATISTICS
+                extstats[EXTSTAT_SLABS].cur_alloc--;
+                extstats[EXTSTAT_SLABS].cur_free++;
+                extstat_update_max(extstats + EXTSTAT_SLABS);
+#endif /* MALLOC_EXT_STATISTICS */
+#           else
+                free_slab(slab, ix);
+#           endif
+        }
+#ifdef MALLOC_ORDER_SMALL_FREELISTS
+        else
+        {
+            /* Another block freed in the slab: check if its position
+             * in the list needs to be updated.
+             */
+            keep_small_order(slab, ix);
+        }
+#endif /* MALLOC_ORDER_SMALL_FREELISTS */
+    } /* if (not fresh slab) */
+#ifdef DEBUG_MALLOC_ALLOCS
+    else
+        ulog("slaballoc:   is fresh slab\n");
+#endif /* DEBUG_MALLOC_ALLOCS */
 } /* sfree() */
 
 /*-------------------------------------------------------------------------*/
@@ -1811,6 +1831,15 @@ mem_realloc (POINTER p, size_t size)
     mem_free(p);
     return t;
 } /* mem_realloc() */
+
+#    undef ulog(s)           
+#    undef ulog1f(s,t)         
+#    undef ulog2f(s,t1,t2)     
+#    undef ulog3f(s,t1,t2,t3)  
+#    define ulog(s)             (void)0
+#    define ulog1f(s,t)         (void)0
+#    define ulog2f(s,t1,t2)     (void)0
+#    define ulog3f(s,t1,t2,t3)  (void)0
 
 /*=========================================================================*/
 
@@ -2062,7 +2091,7 @@ remove_from_free_list (word_t *ptr)
     p = (struct free_block *)(ptr+M_OVERHEAD);
     count_back(large_free_stat, p->size);
 #ifdef MALLOC_EXT_STATISTICS
-    extstats[SMALL_BLOCK_NUM+1].cur_free--;
+    extstats[EXTSTAT_LARGE].cur_free--;
 #endif /* MALLOC_EXT_STATISTICS */
 #ifdef USE_AVL_FREELIST
     /* Unlink from AVL freelist */
@@ -2451,8 +2480,8 @@ add_to_free_list (word_t *ptr)
     r = (struct free_block *)(ptr+M_OVERHEAD);
     count_up(large_free_stat, size);
 #ifdef MALLOC_EXT_STATISTICS
-    extstats[SMALL_BLOCK_NUM+1].cur_free++;
-    extstat_update_max(extstats+SMALL_BLOCK_NUM+1);
+    extstats[EXTSTAT_LARGE].cur_free++;
+    extstat_update_max(extstats+EXTSTAT_LARGE);
 #endif /* MALLOC_EXT_STATISTICS */
 
     r->size    = size;
@@ -2766,8 +2795,8 @@ large_malloc ( word_t size, Bool force_more)
  *
  * If <force_more> is TRUE, the function first tries to allocate
  * more memory directly from the system. If that fails, it tries a normal
- * allocation. This feature is used to allocate small chunks for the
- * small block allocator.
+ * allocation. This feature may be used to allocate small chunks for the
+ * small block allocator (currently it is not).
  *
  * If memory from the system is allocated and <force_more>
  * is not TRUE (or it is in the retry), the allocator allocates at least
@@ -2905,7 +2934,7 @@ found_fit:
 
         block_size = size*SINT;
 
-        /* If force_more is true (read: we have to allocate a SMALL_CHUNK)
+        /* If force_more is true (read: we have to allocate a small chunk)
          * or if the if the requested block would leave only a 'small'
          * block or no block in the usual CHUNK_SIZEd chunk, then allocate
          * exactly the block requested. Otherwise allocate a CHUNK_SIZEd
@@ -3073,9 +3102,9 @@ found_fit:
     mark_block(ptr);
     count_up(large_alloc_stat, size);
 #ifdef MALLOC_EXT_STATISTICS
-    extstats[SMALL_BLOCK_NUM+1].num_xalloc++;
-    extstats[SMALL_BLOCK_NUM+1].cur_alloc++;
-    extstat_update_max(extstats+SMALL_BLOCK_NUM+1);
+    extstats[EXTSTAT_LARGE].num_xalloc++;
+    extstats[EXTSTAT_LARGE].cur_alloc++;
+    extstat_update_max(extstats+EXTSTAT_LARGE);
 #endif /* MALLOC_EXT_STATISTICS */
 #ifdef MALLOC_CHECK
     ptr[M_MAGIC] = LAMAGIC;
@@ -3101,8 +3130,8 @@ large_free (char *ptr)
     size = *p & M_MASK;
     count_back(large_alloc_stat, size);
 #ifdef MALLOC_EXT_STATISTICS
-    extstats[SMALL_BLOCK_NUM+1].num_xfree++;
-    extstats[SMALL_BLOCK_NUM+1].cur_alloc--;
+    extstats[EXTSTAT_LARGE].num_xfree++;
+    extstats[EXTSTAT_LARGE].cur_alloc--;
 #endif /* MALLOC_EXT_STATISTICS */
 
 #ifdef MALLOC_CHECK
@@ -3377,84 +3406,18 @@ mem_increment_size (void *vp, size_t size)
     malloc_increment_size_calls++;
 
     start = (word_t*)p - M_OVERHEAD;
-
     old_size = start[M_SIZE] & M_MASK;
 
-    start2 = &start[old_size];
-    next = *start2;
-
-    if (old_size <= SMALL_BLOCK_MAX)
+    if (start[M_SIZE] & M_SMALL)
     {
-        /* Extend a small block */
-        
-        word_t new_size = (old_size + wsize) * SINT;
-
-        if (old_size + wsize > SMALL_BLOCK_MAX)
-            return NULL; /* New block would be too large */
-
-        if (!(next & THIS_BLOCK))
-            return NULL; /* no following free block */
-
-        /* Make sure the following free block is as large as possible */
-        defragment_small_block(start2);
-
-        next = start2[M_SIZE] & M_MASK; /* Might have changed */
-
-        if (next == wsize)
-        {
-            /* Next block fits perfectly */
-
-            UNLINK_SMALL_FREE(start2);
-            start2[next] &= ~PREV_BLOCK;
-
-            start[M_SIZE] += wsize;
-            MAKE_SMALL_CHECK_UNCHECKED(start, new_size);
-
-            malloc_increment_size_success++;
-            malloc_increment_size_total += (start2 - start) - M_OVERHEAD;
-
-            count_add(small_alloc_stat, wsize * SINT);
-
-#ifdef MALLOC_EXT_STATISTICS
-            extstats[SIZE_INDEX(old_size * SINT)].cur_alloc--;
-            extstats[SIZE_INDEX(new_size)].cur_alloc++;
-            extstat_update_max(extstats+SIZE_INDEX(new_size));
-#endif /* MALLOC_EXT_STATISTICS */
-
-            return start2;
-        }
-
-        if (next >= wsize + SMALL_BLOCK_SPLIT_MIN + T_OVERHEAD)
-        {
-            /* Next block is large enough to be split */
-
-            UNLINK_SMALL_FREE(start2);
-
-            start3 = start2 + wsize;
-            start3[M_SIZE] = 0; /* Clear PREV_BLOCK */
-            MAKE_SMALL_FREE(start3, next - wsize);
-
-            start[M_SIZE] += wsize;
-            MAKE_SMALL_CHECK_UNCHECKED(start, new_size);
-
-            malloc_increment_size_success++;
-            malloc_increment_size_total += (start2 - start) - M_OVERHEAD;
-
-            count_add(small_alloc_stat, wsize * SINT);
-
-#ifdef MALLOC_EXT_STATISTICS
-            extstats[SIZE_INDEX(old_size * SINT)].cur_alloc--;
-            extstats[SIZE_INDEX(new_size)].cur_alloc++;
-            extstat_update_max(extstats+SIZE_INDEX(new_size));
-#endif /* MALLOC_EXT_STATISTICS */
-
-            return start2;
-        }
-
-        return NULL; /* No success */
+        /* Can't extend small blocks. */
+        return NULL;
     }
 
     /* Extend a large block */
+
+    start2 = &start[old_size];
+    next = *start2;
 
     if (next & THIS_BLOCK)
         return NULL; /* no following free block */
@@ -3494,6 +3457,26 @@ mem_increment_size (void *vp, size_t size)
     return NULL;
 } /* mem_increment_size() */
 
+
+#    undef ulog(s)           
+#    undef ulog1f(s,t)         
+#    undef ulog2f(s,t1,t2)     
+#    undef ulog3f(s,t1,t2,t3)  
+#ifdef DEBUG_MALLOC_ALLOCS
+#    define ulog(s) \
+       write(gcollect_outfd, s, strlen(s))
+#    define ulog1f(s,t) \
+       dprintf1(gcollect_outfd, s, (p_int)(t))
+#    define ulog2f(s,t1,t2) \
+       dprintf2(gcollect_outfd, s, (p_int)(t1), (p_int)(t2))
+#    define ulog3f(s,t1,t2,t3) \
+       dprintf3(gcollect_outfd, s, (p_int)(t1), (p_int)(t2), (p_int)(t3))
+#else
+#    define ulog(s)             (void)0
+#    define ulog1f(s,t)         (void)0
+#    define ulog2f(s,t1,t2)     (void)0
+#    define ulog3f(s,t1,t2,t3)  (void)0
+#endif
 
 /*=========================================================================*/
 
@@ -3553,13 +3536,23 @@ mem_is_freed (void *p, p_uint minsize)
     if (block < heap_start || block + M_OVERHEAD >= heap_end)
         return MY_TRUE;
 
-    i = block[M_SIZE] & M_MASK;
+    if (block[M_SIZE] & M_SMALL)
+    {
+        i = ((slab_t *)(block - (block[M_SIZE] & M_MASK)))->size / SINT;
+    }
+    else
+    {
+        i = block[M_SIZE] & M_MASK;
+    }
+
     if (i < M_OVERHEAD + ((minsize + SINT - 1) / SINT)
      || block + i >= heap_end)
         return MY_TRUE;
 
     if (i >= SMALL_BLOCK_MAX)
     {
+        /* Large block */
+
         word_t* block2;
 
         block2 = block + i;
@@ -3570,8 +3563,50 @@ mem_is_freed (void *p, p_uint minsize)
              || !(*block2 & PREV_BLOCK);
     }
 
+    /* Small block */
     return (block[M_SIZE] & THIS_BLOCK) != 0;
 } /* mem_is_freed() */
+
+/*-------------------------------------------------------------------------*/
+static void
+mem_clear_slab_memory_flags (const char * tag,  slab_t * slab, word_t * startp)
+
+/* Set the flags for the memory of <slab>: the slab and the contained
+ * free list block are marked as referenced, the others as unreferenced.
+ * If <startp> is not NULL, it denotes the starting memory address
+ * for the scan, otherwise <slab>->blocks is the starting address (this is
+ * used for marking the fresh slab).
+ */
+
+{
+    word_t * p;
+
+    if (NULL != startp)
+        p = startp;
+    else
+        p = slab->blocks;
+
+    ulog2f("slaballoc: clear in %s slab %x,", tag, slab);
+
+    ulog3f(" mem %x/%x..%x\n"
+          , slab->blocks, startp, ((char *)slab->blocks) + (slab->numBlocks * slab->size)
+          );
+
+    mem_mark_ref(slab);
+
+    while (p < slab->blocks + slab->numBlocks * slab->size / SINT)
+    {
+        /* ulog1f("slaballoc:   clear block %x\n", p); */
+        *p &= ~M_REF;
+        p += slab->size / SINT;
+    }
+
+    for (p = slab->freeList; p != NULL; p = BLOCK_NEXT(p))
+    {
+        /* ulog1f("slaballoc:   mark free block %x\n", p); */
+        *p |= M_REF;
+    }
+} /* mem_clear_slab_memory_flags() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -3582,7 +3617,7 @@ mem_clear_ref_flags (void)
  */
 
 {
-    word_t *p, *q, *last;
+    word_t *p, *last;
     int i;
 
     /* Clear the large blocks */
@@ -3599,37 +3634,46 @@ mem_clear_ref_flags (void)
         p += *p & M_MASK;
     }
 
-    /* Now mark the memory used for the small chunks as ref'd,
-     * then clear the small blocks.
+    /* Now mark the memory used for the small slabs as ref'd,
+     * clear all contained small blocks, then mark all blocks in the free
+     * lists as ref'd.
      */
-    for (p = last_small_chunk; p; p = *(word_t**)p)
+    for  (i = 0; i < SMALL_BLOCK_NUM; ++i)
     {
-        word_t *end;
+        slab_t * slab;
 
-        mem_mark_ref(p);
-        end = p - M_OVERHEAD + (p[-M_OVERHEAD] & M_MASK);
-#ifdef DEBUG
-        dprintf2(gcollect_outfd, "clearing M_REF in chunk %x, end %x\n",
-          (word_t)(p - M_OVERHEAD), (word_t)end
-        );
-#endif
-        for (q = p+1; q < end; )
+        ulog1f("slaballoc: clear_ref [%d]\n", i);
+
+        /* Mark the fresh slab.
+         */
+        if (slabtable[i].fresh)
         {
-            word_t size = *q;
-
-            *q &= ~M_REF;
-            q += size & M_MASK;
+            mem_clear_slab_memory_flags( "fresh",  slabtable[i].fresh
+                                       , slabtable[i].freshMem);
         }
 
-        if (q > end)
+        /* Mark the partially used slabs.
+         */
+        for  (slab = slabtable[i].first; slab != NULL; slab = slab->next)
         {
-            /* pass some variables to fatal() so that the optimizer
-             * won't throw away the values, making them unreadable
-             * in the core.
-             */
-            in_malloc = 0;
-            fatal("Small block error, start: %lx, %lx vs. %lx\n",
-              (long)(p+1), (long)q, (long)end);
+            mem_clear_slab_memory_flags("partial", slab, NULL);
+        }
+
+        /* Mark the fully used slabs.
+         */
+        for  (slab = slabtable[i].fullSlabs; slab != NULL; slab = slab->next)
+        {
+            mem_clear_slab_memory_flags("full", slab, NULL);
+        }
+
+        /* Mark the fully free slabs.
+         */
+        for  (slab = slabtable[i].firstFree; slab != NULL; slab = slab->next)
+        {
+            ulog1f("slaballoc: clear in free slab %x\n" , slab);
+
+            mem_mark_ref(slab);
+            /* No internal freelist to scan */
         }
     }
 
@@ -3638,13 +3682,69 @@ mem_clear_ref_flags (void)
      * - if the block gets malloced by the swapper in pass 5, it needs
      *   M_REF to be already set.
      */
-    for (i=0; i < SMALL_BLOCK_NUM + 1; i++)
-    {
-        for (p = sfltable[i]; p; p = BLOCK_NEXT(p) ) {
-            *p |= M_REF;
-        }
-    }
 } /* mem_clear_ref_flags() */
+
+/*-------------------------------------------------------------------------*/
+static mp_int
+mem_free_unrefed_slab_memory (const char * tag, slab_t * slab, word_t * startp)
+
+/* Scan the memory of <slab> for unreferenced blocks and free them.
+ * If <startp> is not NULL, it denotes the starting memory address
+ * for the scan, otherwise <slab>->blocks is the starting address (this is
+ * used for scanning the fresh slab).
+ * Return the number of successfully recovered blocks.
+ *
+ * Note that this may move the slab into a different slab list.
+ */
+
+{
+    mp_int   success = 0;
+    word_t * p;
+
+    if (NULL != startp)
+        p = startp;
+    else
+        p = slab->blocks;
+
+    ulog2f("slaballoc: free unref in %s slab %x,", tag, slab);
+
+    ulog3f(" mem %x/%x..%x\n"
+          , slab->blocks, startp, ((char *)slab->blocks) + (slab->numBlocks * slab->size)
+          );
+
+    while (p < slab->blocks + slab->numBlocks * slab->size / SINT)
+    {
+        if ((*p & (M_REF|M_GC_FREE)) == M_GC_FREE)
+        {
+            /* Unref'd small blocks are definitely lost */
+            success++;
+            count_back(xalloc_stat, slab->size - (T_OVERHEAD * SINT));
+            dprintf2(gcollect_outfd, "freeing small block 0x%x (user 0x%x)"
+                    , (p_uint)p, (p_uint)(p+M_OVERHEAD));
+#ifdef MALLOC_TRACE
+            dprintf2(gcollect_outfd, " %s %d"
+                    , p[XM_FILE+M_OVERHEAD], p[XM_LINE+M_OVERHEAD]);
+#endif
+            writes(gcollect_outfd, "\n");
+#ifdef MALLOC_LPC_TRACE
+            write_lpc_trace(gcollect_outfd, p + M_OVERHEAD, MY_FALSE);
+#endif
+            print_block(gcollect_outfd, p + M_OVERHEAD);
+
+            /* Recover the block */
+            *p |= M_REF;
+            sfree(p+M_OVERHEAD);
+        }
+#if 0 && defined(DEBUG_MALLOC_ALLOCS)
+        else
+            ulog1f("slaballoc:   block %x is ref'd\n", p);
+#endif /* DEBUG_MALLOC_ALLOCS */
+
+        p += slab->size / SINT;
+    }
+
+    return success;
+} /* mem_free_unrefed_slab_memory() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -3655,7 +3755,8 @@ mem_free_unrefed_memory (void)
  */
 
 {
-    word_t *p, *q, *last;
+    word_t *p, *last;
+    int i;
     mp_int success = 0;
 
     /* Scan the heap for lost large blocks */
@@ -3702,48 +3803,144 @@ mem_free_unrefed_memory (void)
      * Remember that small blocks in the free-lists are marked as ref'd.
      */
     success = 0;
-    for (p = last_small_chunk; p; p = *(word_t**)p)
+    for  (i = 0; i < SMALL_BLOCK_NUM; ++i)
     {
-        word_t *end;
+        slab_t * slab, *next;
 
-        end = p - M_OVERHEAD + (p[-M_OVERHEAD] & M_MASK);
-#ifdef DEBUG
-        dprintf2(gcollect_outfd, "scanning chunk %x, end %x for unref'd blocks\n",
-          (word_t)(p - M_OVERHEAD), (word_t)end
-        );
-#endif
-        for (q = p+1; q < end; )
+        ulog1f("slaballoc: free_unrefed [%d]\n" , i);
+
+        /* Search the fresh slab for unreferenced blocks.
+         */
+        if (slabtable[i].fresh)
         {
-            word_t size = *q;
+            success += mem_free_unrefed_slab_memory("fresh", slabtable[i].fresh
+                                                   , slabtable[i].freshMem);
+        }
 
-            if ((*q & (M_REF|M_GC_FREE)) == M_GC_FREE)
-            {
-                /* Unref'd small blocks are definitely lost */
-                success++;
-                count_back(xalloc_stat, mem_block_size(q+M_OVERHEAD));
-                dprintf2(gcollect_outfd, "freeing small block 0x%x (user 0x%x)"
-                        , (p_uint)q, (p_uint)(q+M_OVERHEAD));
-#ifdef MALLOC_TRACE
-                dprintf2(gcollect_outfd, " %s %d"
-                        , q[XM_FILE+M_OVERHEAD], q[XM_LINE+M_OVERHEAD]);
-#endif
-                writes(gcollect_outfd, "\n");
-#ifdef MALLOC_LPC_TRACE
-                write_lpc_trace(gcollect_outfd, q + M_OVERHEAD, MY_FALSE);
-#endif
-                print_block(gcollect_outfd, q + M_OVERHEAD);
+        /* Search the partially used slabs for unreferenced blocks.
+         * Note that this may move individual slabs into a different list.
+         */
+        for  (slab = slabtable[i].first; slab != NULL; slab = next)
+        {
+            next = slab->next;
+            success += mem_free_unrefed_slab_memory("partial", slab, NULL);
+        }
 
-                /* Recover the block */
-                *q |= M_REF;
-                sfree(q+M_OVERHEAD);
-            }
-            q += size & M_MASK;
+        /* Search the fully used slabs for unreferenced blocks.
+         * Note that this may move individual slabs into a different list.
+         */
+        for  (slab = slabtable[i].fullSlabs; slab != NULL; slab = next)
+        {
+            next = slab->next;
+            success += mem_free_unrefed_slab_memory("full", slab, NULL);
         }
     }
-    if (success) {
+    if (success)
+    {
         dprintf1(gcollect_outfd, "%d small blocks freed\n", success);
     }
 } /* mem_free_unrefed_memory() */
+
+/*-------------------------------------------------------------------------*/
+#if 0
+static void
+mem_dump_slab_memory (int fd, const char * tag, int tableIx
+                     , slab_t * slab, word_t * startp)
+
+/* Dump the memory of <slab>.
+ * If <startp> is not NULL, it denotes the starting memory address
+ * for the dump, otherwise <slab>->blocks is the starting address (this is
+ * used for dumping the fresh slab).
+ */
+
+{
+    word_t * p;
+
+    dprintf4(fd, "\n--- %s Slab: %x .. %x size %x"
+               , (p_uint)tag
+               , (p_uint)slab, (p_uint)(slab + SLAB_SIZE(slab)) - 1
+               , (p_uint)SLAB_SIZE(slab)
+               );
+    dprintf2(fd, " (%d/%d byte blocks)\n"
+               , (p_int)(tableIx + SMALL_BLOCK_MIN) * SINT
+               , (p_int)(tableIx + T_OVERHEAD+SMALL_BLOCK_MIN) * SINT
+            );
+
+    /* No trace information for slabs */
+
+    if (NULL != startp)
+        p = startp;
+    else
+        p = slab->blocks;
+
+    while (p <= slab->blocks + slab->numBlocks * slab->size / SINT)
+    {
+        word_t size = *p;
+        if (!(*p & THIS_BLOCK))
+        {
+            dprintf4(fd, "%x .. %x %s offset %x "
+                       , (p_uint)p, (p_uint)(p + (size&M_MASK)) - 1
+                       , (p_uint)((size & M_GC_FREE) ? " " : "P")
+                       , (p_uint)(size & M_MASK) * SINT
+                       );
+
+#ifdef MALLOC_TRACE
+            if (p[XM_FILE+M_OVERHEAD])
+                dprintf2(fd, ": %s %d "
+                           , p[XM_FILE+M_OVERHEAD], q[XM_LINE+M_OVERHEAD]
+                );
+            else
+                writes(fd, ": - - ");
+#endif
+#ifdef MALLOC_LPC_TRACE
+            if (p[M_OVERHEAD + XM_OBJ])
+            {
+                writes(fd, ": ");
+                write_lpc_trace(fd, p + M_OVERHEAD, MY_TRUE);
+            }
+            else
+#endif
+            writes(fd, "\n");
+        }
+
+        p += slab->size / SINT;
+    }
+} /* mem_dump_slab_memory() */
+#endif
+
+/*-------------------------------------------------------------------------*/
+static Bool
+mem_identify_slab (int fd, const char * tag, int tableIx
+                  , slab_t * list, slab_t * slab)
+
+/* Check if <slab> is member of the list starting at <listStart>.
+ * If yes, print it's information preceeded by <tag> and return TRUE.
+ * Return FALSE otherwise.
+ */
+
+{
+    Bool isSlab = MY_FALSE;
+
+    for ( NOOP
+        ; !isSlab && list != NULL
+        ; list = list->next
+        )
+    {
+        if (slab == list)
+        {
+            dprintf4(fd, ": %s slab %x (%d/%d bytes)\n"
+                       , (p_int)tag
+                       , (p_int) slab
+                       , (p_int)(tableIx + SMALL_BLOCK_MIN) * SINT
+                       , (p_int)(tableIx + T_OVERHEAD+SMALL_BLOCK_MIN) * SINT
+                       );
+            isSlab = MY_TRUE;
+            break;
+        }
+    }
+
+    return isSlab;
+} /* mem_identify_slab() */
 
 /*-------------------------------------------------------------------------*/
 Bool
@@ -3760,6 +3957,7 @@ mem_dump_memory (int fd)
 
 {
     word_t *p, *q, *last;
+    int ix;
 
     if (fd < 0)
         return MY_TRUE;
@@ -3775,21 +3973,41 @@ mem_dump_memory (int fd)
         size = *p;
         if ( size & THIS_BLOCK )
         {
-            Bool isSmallChunk = MY_FALSE;
+            Bool isSlab = MY_FALSE;
 
             dprintf4(fd, "%x .. %x %s size %x "
                        , (p_uint)p, (p_uint)(p + (size&M_MASK)) - 1
                        , (p_uint)((size & M_GC_FREE) ? " " : "P")
                        , (p_uint)(size & M_MASK) * SINT
                        );
-            for (q = last_small_chunk; q && !isSmallChunk; q = *(word_t**)q)
-            {
-                isSmallChunk = (q - M_OVERHEAD == p);
-            }
 
-            if (isSmallChunk)
-                writes(fd, ": small chunk\n");
-            else
+            q = p + M_OVERHEAD;
+
+            for (ix = 0; !isSlab && ix < SMALL_BLOCK_NUM; ++ix)
+            {
+                if ((word_t *)slabtable[ix].fresh == q)
+                {
+                    dprintf2(fd, ": fresh slab (%d/%d bytes)\n"
+                               , (p_int)(ix + SMALL_BLOCK_MIN) * SINT
+                               , (p_int)(ix + T_OVERHEAD+SMALL_BLOCK_MIN) * SINT
+                               );
+                    isSlab = MY_TRUE;
+                }
+
+                if (!isSlab)
+                    isSlab = mem_identify_slab(fd, "partial", ix
+                                              , slabtable[ix].first
+                                              , (slab_t*)q);
+                if (!isSlab)
+                    isSlab = mem_identify_slab(fd, "full", ix
+                                              , slabtable[ix].fullSlabs
+                                              , (slab_t*)q);
+                if (!isSlab)
+                    isSlab = mem_identify_slab(fd, "free", ix
+                                              , slabtable[ix].firstFree
+                                              , (slab_t*)q);
+            }
+            if (!isSlab)
             {
 #ifdef MALLOC_TRACE
                 if (p[XM_FILE+M_OVERHEAD])
@@ -3813,69 +4031,28 @@ mem_dump_memory (int fd)
         p += size & M_MASK;
     }
 
-    /* Dump the small chunks and their small blocks.
+#if 0
+    /* Dump the slabs and their small blocks.
      */
-    for (p = last_small_chunk; p; p = *(word_t**)p)
+    for (ix = 0; ix < SMALL_BLOCK_NUM; ++ix)
     {
-        word_t *end;
+        slab_t * slab;
 
-        end = p - M_OVERHEAD + (p[-M_OVERHEAD] & M_MASK);
-
+        if (NULL != (slab = slabtable[ix].fresh))
         {
-            word_t size;
-
-            q = p - M_OVERHEAD;
-            size = *q;
-
-            dprintf4(fd, "\n--- Small Chunk: %x .. %x %s size %x\n"
-                       , (p_uint)q, (p_uint)(q + (size&M_MASK)) - 1
-                       , (p_uint)((size & M_GC_FREE) ? " " : "P")
-                       , (p_uint)(size & M_MASK) * SINT
-                       );
-            /* No trace information for small chunks */
+            mem_dump_slab_memory(fd, "Fresh", ix, slab, slabtable[ix].freshMem);
         }
 
-        for (q = p+1; q < end; )
-        {
-            word_t size = *q;
+        for (slab = slabtable[ix].first; slab != NULL; slab = slab->next)
+            mem_dump_slab_memory(fd, "Partial", ix, slab, NULL);
 
-            if (!(*q & THIS_BLOCK))
-            {
-                dprintf4(fd, "%x .. %x %s size %x "
-                           , (p_uint)q, (p_uint)(q + (size&M_MASK)) - 1
-                       , (p_uint)((size & M_GC_FREE) ? " " : "P")
-                           , (p_uint)(size & M_MASK) * SINT
-                           );
+        for (slab = slabtable[ix].fullSlabs; slab != NULL; slab = slab->next)
+            mem_dump_slab_memory(fd, "Full", ix, slab, NULL);
 
-                /* The sentinel blocks in a small chunk consist of just
-                 * the size byte - don't try to dump those.
-                 */
-                if ((size & M_MASK) > M_OVERHEAD)
-                {
-#ifdef MALLOC_TRACE
-                    if (q[XM_FILE+M_OVERHEAD])
-                        dprintf2(fd, ": %s %d "
-                                   , q[XM_FILE+M_OVERHEAD], q[XM_LINE+M_OVERHEAD]
-                        );
-                    else
-                        writes(fd, ": - - ");
-#endif
-#ifdef MALLOC_LPC_TRACE
-                    if (q[M_OVERHEAD + XM_OBJ])
-                    {
-                        writes(fd, ": ");
-                        write_lpc_trace(fd, q + M_OVERHEAD, MY_TRUE);
-                    }
-                    else
-#endif
-                        writes(fd, "\n");
-                }
-                else
-                    writes(fd, "\n");
-            }
-            q += size & M_MASK;
-        }
+        for (slab = slabtable[ix].firstFree; slab != NULL; slab = slab->next)
+            mem_dump_slab_memory(fd, "Free", ix, slab, NULL);
     }
+#endif
 
     return MY_TRUE;
 } /* mem_dump_memory() */
@@ -3886,49 +4063,67 @@ mem_consolidate (Bool force)
 
 /* Consolidate the memory.
  *
- * If <force> is TRUE, the small free blocks are defragmented first.
- * Then, the function walks the list of small chunks and free all which are
- * totally unused.
+ * If <force> is TRUE, all fully free slabs are deallocated.
+ * If <force> is FALSE, only the free slabs older than SLAB_RETENTION_TIME
+ * are deallocated.
  */
 
 {
-    word_t *prev, *this;
+    int ix;
 
-    if (force)
-        defragment_small_lists(0);
+    ulog1f("slaballoc: consolidate (%d)\n", force);
 
-    for (prev = NULL, this = last_small_chunk ; this != NULL ; )
+    for (ix = 0; ix < SMALL_BLOCK_NUM; ++ix)
     {
-        word_t chunk_size = this[-M_OVERHEAD] & M_MASK;
+        ulog1f("slaballoc:   consolidate [%d]\n", ix);
 
-        /* If the chunk holds only one free block, it can be freed
-         * altogether.
-         */
-        if ((this[1+M_SIZE] & THIS_BLOCK)
-         && (this[1+M_SIZE] & M_MASK) == chunk_size - M_OVERHEAD - 2
-           )
+        if (force)
         {
-            word_t * next = *(word_t **) this;
+            slab_t * slab;
 
-            if (!prev)
-                last_small_chunk = next;
-            else
-                *(word_t **)prev = next;
-
-            UNLINK_SMALL_FREE(this+1);
-            large_free((char *)this);
-
-            count_back(small_chunk_stat, chunk_size * SINT);
-            count_back(small_chunk_wasted, SINT*(M_OVERHEAD+2));
-
-            this = next;
+            while (NULL != (slab = slabtable[ix].firstFree))
+            {
+                slabtable[ix].firstFree = slab->next;
+                count_back(small_slab_free_stat, SLAB_SIZE(slab));
+                free_slab(slab, ix);
+            }
+            slabtable[ix].numFreeSlabs = 0;
+            slabtable[ix].lastFree = NULL;
         }
+#if SLAB_RETENTION_TIME > 0
         else
         {
-            prev = this;
-            this = *(word_t**)this;
+            slab_t * slab;
+
+            if ( NULL != (slab = slabtable[ix].lastFree)
+              && current_time - (mp_int)slab->blocks[0] > SLAB_RETENTION_TIME
+               )
+            {
+                ulog3f("slaballoc:   free slab %x (prev %x) delta-t %d\n"
+                      , slab, slab->prev, current_time - (mp_int)slab->blocks[0]);
+
+                slabtable[ix].lastFree = slab->prev;
+                if (slab->prev)
+                    slab->prev->next = NULL;
+                else
+                    slabtable[ix].firstFree = NULL;
+                slabtable[ix].numFreeSlabs--;
+                count_back(small_slab_free_stat, SLAB_SIZE(slab));
+                free_slab(slab, ix);
+            }
+#ifdef DEBUG_MALLOC_ALLOCS
+            else if (NULL != slab)
+            {
+                ulog3f("slaballoc:   keep slab %x (prev %x) delta-t %d\n"
+                      , slab, slab->prev, current_time - (mp_int)slab->blocks[0]);
+            }
+#endif /* DEBUG_MALLOC_ALLOCS */
         }
-    } /* for (all chunks) */
+#endif /* SLAB_RETENTION_TIME > 0 */
+    }
+#ifdef MALLOC_EXT_STATISTICS
+    extstat_update_max(extstats + EXTSTAT_SLABS);
+#endif /* MALLOC_EXT_STATISTICS */
 } /* mem_consolidate() */
 
 /***************************************************************************/

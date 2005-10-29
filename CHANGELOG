@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+30-Jan-2004 (Lars Duening)  (3.3.664)
+  - (xalloc, slaballoc, configure, efuns.c) Added new 'slaballocator'
+       which provides a better use of the free small block storage.
+  - (interpret.c) When using foreach() on references, the protector
+       structure was allocated too small - a stupid typo (Bug #0000353).
+
 22-Jan-2004 (Lars Duening)  (3.3.663)
   - (actions, simulate, gcollect.c) Unused action and shadow sentences
        are no longer held in a freelist, but instead returned directly

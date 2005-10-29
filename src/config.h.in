@@ -217,6 +217,8 @@
 /* Which memory manager to use. Possible defines are
  *   MALLOC_smalloc:   Satoria's malloc. Fastest, uses the least memory,
  *                     supports garbage collection.
+ *   MALLOC_slaballoc: Slab allocator. Fastest, reduces fragmentation,
+ *                     supports garbage collection, not threadsafe.
  *   MALLOC_sysmalloc: the normal system malloc()
  *   MALLOC_ptmalloc:  ptmalloc from www.malloc.de - threadsafe.
  */
@@ -226,25 +228,23 @@
 /* Define this to let the memory allocator request memory from the system
  * directly using sbrk() (assuming the system supports it).
  * If not defined, the memory allocator will use malloc().
- * Supported by: MALLOC_smalloc
+ * Supported by: MALLOC_smalloc, MALLOC_slaballoc.
  */
 @cdef_malloc_sbrk@ MALLOC_SBRK
 
 /* Define this to annotate all allocations with a magic word to find
  * simple misuses of memory (like multiple frees).
- * Supported by: MALLOC_smalloc
+ * Supported by: MALLOC_smalloc, MALLOC_slaballoc.
  */
 @cdef_malloc_check@ MALLOC_CHECK
 
 /* Define this to annotate all allocations with file:line of the driver
  * source responsible for it.
- * Supported by: MALLOC_smalloc
  */
 @cdef_malloc_trace@ MALLOC_TRACE
 
 /* Define this to annotate all allocations with file:line of the lpc program
  * responsible for it.
- * Supported by: MALLOC_smalloc
  */
 @cdef_malloc_lpc_trace@ MALLOC_LPC_TRACE
 
@@ -252,7 +252,7 @@
  * Works best if MALLOC_TRACE, or also MALLOC_LPC_TRACE, are defined.
  * This define is useful if your mud keeps growing in total memory size
  * instead of re-using the memory already allocated.
- * Supported by: MALLOC_smalloc
+ * Supported by: MALLOC_smalloc, MALLOC_slaballoc.
  */
 @cdef_malloc_sbrk_trace@ MALLOC_SBRK_TRACE
 
@@ -516,9 +516,10 @@
  */
 @cdef_debug_telnet@ DEBUG_TELNET
 
-/* Activate allocation debug prints in the smalloc module.
+/* Activate allocation debug prints in the malloc module.
+ * Supported by: MALLOC_smalloc, MALLOC_slaballoc.
  */
-@cdef_debug_smalloc_allocs@ DEBUG_SMALLOC_ALLOCS
+@cdef_debug_malloc_allocs@ DEBUG_MALLOC_ALLOCS
 
 /* The DEBUG level for the ERQ daemon:
  *  0 : no debug output
@@ -538,19 +539,34 @@
  */
 #define NEW_CLEANUP
 
-/* Enable the use of freelists in the smalloc AVL nodes.
+/* Enable the use of freelists in the malloc AVL nodes.
+ * Supported by: MALLOC_smalloc, MALLOC_slaballoc.
  * TODO: Remove this macro once it is proven stable or if the change
  * TODO:: didn't bring any advantages..
  */
 #define USE_AVL_FREELIST
 
-/* Order smalloc freelists by address.
+/* Order malloc small block freelists.
+ * Supported by: MALLOC_slaballoc.
  * TODO: Remove if it doesn't help with the fragmentation, as it uses up
  * TODO:: a small, but measurable amount of time in the allocator.
  */
-#define SMALLOC_ORDER_FREELISTS
+#undef MALLOC_ORDER_SMALL_FREELISTS
+
+/* Order malloc large block freelists by address.
+ * Supported by: MALLOC_smalloc, MALLOC_slaballoc.
+ * TODO: Remove if it doesn't help with the fragmentation, as it uses up
+ * TODO:: a small, but measurable amount of time in the allocator.
+ */
+#define MALLOC_ORDER_LARGE_FREELISTS
+
+/* Allow slaballoc to use multiples of DESIRED_SLAB_SIZE when creating
+ * new slabs.
+ */
+#define SLABALLOC_DYNAMIC_SLABS
 
 /* Collect extended malloc statistics.
+ * Supported by: MALLOC_smalloc, MALLOC_slaballoc.
  * TODO: Remove this macro or make it configurable.
  */
 #define MALLOC_EXT_STATISTICS

@@ -357,25 +357,15 @@ DESCRIPTION
                int DID_SW_RECYCLE_FREE
                    TRUE if the swapper is currently recycling free block.
 
-               int DID_MEM_PERM
-               int DID_MEM_PERM_SIZE
-                   Number and size of permanent (non-GCable) allocations
-                   (smalloc only).
-
-               int DID_MEM_CLIB
-               int DID_MEM_CLIB_SIZE
-                   Number and size of allocations done through the
-                   clib functions (smalloc only with SBRK_OK).
-
 
             <arg2> == DID_MEMORY (2): Returns the "status malloc" information:
 
                string DID_MEM_NAME
                    The name of the allocator: "sysmalloc", "smalloc",
-                   "ptmalloc".
+                   "ptmalloc", "slaballoc"
        
-               int DID_MEM_SBRK          (smalloc)
-               int DID_MEM_SBRK_SIZE     (smalloc, ptmalloc)
+               int DID_MEM_SBRK          (slaballoc, smalloc)
+               int DID_MEM_SBRK_SIZE     (slaballoc, smalloc, ptmalloc)
                    Number and size of memory blocks requested from the
                    operating system (non-mmapped memory).
        
@@ -383,16 +373,16 @@ DESCRIPTION
                int DID_MEM_MMAP_SIZE     (ptmalloc)
                    Number and size of mmapped regions.
        
-               int DID_MEM_LARGE         (smalloc)
-               int DID_MEM_LARGE_SIZE    (smalloc)
-               int DID_MEM_LFREE         (smalloc)
-               int DID_MEM_LFREE_SIZE    (smalloc)
+               int DID_MEM_LARGE         (slaballoc, smalloc)
+               int DID_MEM_LARGE_SIZE    (slaballoc, smalloc)
+               int DID_MEM_LFREE         (slaballoc, smalloc)
+               int DID_MEM_LFREE_SIZE    (slaballoc, smalloc)
                    Number and size of large allocated resp. free blocks.
                    smalloc: The large allocated blocks include the
                    small chunk blocks.
        
-               int DID_MEM_LWASTED       (smalloc)
-               int DID_MEM_LWASTED_SIZE  (smalloc)
+               int DID_MEM_LWASTED       (slaballoc, smalloc)
+               int DID_MEM_LWASTED_SIZE  (slaballoc, smalloc)
                    Number and size of unusable large memory fragments.
        
                int DID_MEM_FREE_CHUNKS   (ptmalloc)
@@ -406,113 +396,141 @@ DESCRIPTION
                int DID_MEM_CHUNK_SIZE    (smalloc)
                    Number and size of small chunk blocks.
        
-               int DID_MEM_SMALL         (smalloc)
-               int DID_MEM_SMALL_SIZE    (smalloc)
-               int DID_MEM_SFREE         (smalloc)
-               int DID_MEM_SFREE_SIZE    (smalloc)
+               int DID_MEM_SLAB          (slaballoc)
+               int DID_MEM_SLAB_SIZE     (slaballoc)
+                   Number and size of slabs (including fully free slabs).
+       
+               int DID_MEM_SLAB_FREE      (slaballoc)
+               int DID_MEM_SLAB_FREE_SIZE (slaballoc)
+                   Number and size of free slabs (part of DID_MEM_SLAB).
+       
+               int DID_MEM_SMALL         (slaballoc, smalloc)
+               int DID_MEM_SMALL_SIZE    (slaballoc, smalloc)
+               int DID_MEM_SFREE         (slaballoc, smalloc)
+               int DID_MEM_SFREE_SIZE    (slaballoc, smalloc)
                    Number and size of small allocated resp. free blocks.
        
                int DID_MEM_SWASTED       (smalloc)
                int DID_MEM_SWASTED_SIZE  (smalloc)
                    Number and size of unusably small memory fragments.
        
-               int DID_MEM_MINC_CALLS    (smalloc)
-               int DID_MEM_MINC_SUCCESS  (smalloc)
-               int DID_MEM_MINC_SIZE     (smalloc)
+               int DID_MEM_SMALL_OVERHEAD_SIZE  (slaballoc)
+                   Size of the slab management overhead (not including
+                   the overhead incurred by each allocated small block).
+       
+               int DID_MEM_MINC_CALLS    (slaballoc, smalloc)
+               int DID_MEM_MINC_SUCCESS  (slaballoc, smalloc)
+               int DID_MEM_MINC_SIZE     (slaballoc, smalloc)
                    Number of calls to malloc_increment(), the number
                    of successes and the size of memory allocated this
                    way.
        
-               int DID_MEM_PERM         (smalloc)
-               int DID_MEM_PERM_SIZE    (smalloc)
+               int DID_MEM_PERM         (slaballoc, smalloc)
+               int DID_MEM_PERM_SIZE    (slaballoc, smalloc)
                    Number and size of permanent (non-GCable) allocations.
        
-               int DID_MEM_CLIB         (smalloc)
-               int DID_MEM_CLIB_SIZE    (smalloc)
+               int DID_MEM_CLIB         (slaballoc, smalloc)
+               int DID_MEM_CLIB_SIZE    (slaballoc, smalloc)
                    Number and size of allocations done through the
                    clib functions (if supported by the allocator).
        
-               int DID_MEM_OVERHEAD     (smalloc, ptmalloc)
+               int DID_MEM_OVERHEAD     (slaballoc, smalloc, ptmalloc)
                    Overhead for every allocation.
        
-               int DID_MEM_ALLOCATED    (smalloc, ptmalloc)
+               int DID_MEM_ALLOCATED    (slaballoc, smalloc, ptmalloc)
                    The amount of memory currently allocated from the
                    allocator, including the overhead for the allocator.
        
                int DID_MEM_MAX_ALLOCATED (ptmalloc)
                    Maximum total allocated space.
        
-               int DID_MEM_USED         (smalloc, ptmalloc)
+               int DID_MEM_USED         (slaballoc, smalloc, ptmalloc)
                    The amount of memory currently used for driver data,
                    excluding the overhead from the allocator.
        
-               int DID_MEM_TOTAL_UNUSED (smalloc, ptmalloc)
+               int DID_MEM_TOTAL_UNUSED (slaballoc, smalloc, ptmalloc)
                    The amount of memory allocated from the system, but
                    not used by the driver.
        
                int DID_MEM_KEEP_COST    (ptmalloc)
                    Top-most releasable space.
 
-              int DID_MEM_DEFRAG_CALLS       (smalloc)
-                  Total number of calls to defragment_small_lists().
-
-              int DID_MEM_DEFRAG_CALLS_REQ   (smalloc)
-                  Number of calls to defragment_small_lists() with a
-                  desired size.
-
-              int DID_MEM_DEFRAG_REQ_SUCCESS (smalloc)
-                  Number of times, a defragmentation for a desired
-                  size was successful.
-
-              int DID_MEM_BLOCKS_INSPECTED   (smalloc)
-                  Number of blocks inspected during defragmentations.
-
-              int DID_MEM_BLOCKS_MERGED      (smalloc)
-                  Number of blocks merged during defragmentations.
-
-              int DID_MEM_BLOCKS_RESULT      (smalloc)
-                  Number of defragmented blocks (ie. merge results).
-
-              int DID_MEM_AVL_NODES          (smalloc)
-                  Number of AVL nodes used to manage the large free
-                  blocks. This value might go away again.
-
-              mixed * DID_MEM_EXT_STATISTICS (smalloc)
-                  If the driver was compiled with extended smalloc
-                  statistics, they are returned in this entry; if the
-                  driver was compiled without the statistics, 0 is
-                  returned.
-
-                  This value might go away again.
-
-                  The array contains NUM+2 entries, where NUM is the
-                  number of distinct small block sizes. Entry [NUM]
-                  describes the statistics of oversized small blocks,
-                  entry [NUM+1] summarizes all small blocks. Each
-                  entry is an array of these fields:
-
-                    int DID_MEM_ES_MAX_ALLOC:
-                      Max number of allocated blocks of this size.
-
-                    int DID_MEM_ES_CUR_ALLOC:
-                      Current number of allocated blocks of this size.
-
-                    int DID_MEM_ES_MAX_FREE:
-                      Max number of allocated blocks of this size.
-
-                    int DID_MEM_ES_CUR_FREE:
-                      Current number of allocated blocks of this size.
-
-                    float DID_MEM_ES_AVG_XALLOC:
-                      Number of explicit allocation requests per
-                      second.
-
-                    float DID_MEM_ES_AVG_XFREE:
-                      Number of explicit deallocation requests per
-                      second.
-
-                  The allocation/deallocation-per-second statistics do
-                  not cover internal shuffling of the freelists.
+               int DID_MEM_DEFRAG_CALLS       (smalloc)
+                   Total number of calls to defragment_small_lists().
+  
+               int DID_MEM_DEFRAG_CALLS_REQ   (smalloc)
+                   Number of calls to defragment_small_lists() with a
+                   desired size.
+  
+               int DID_MEM_DEFRAG_REQ_SUCCESS (smalloc)
+                   Number of times, a defragmentation for a desired
+                   size was successful.
+  
+               int DID_MEM_BLOCKS_INSPECTED   (smalloc)
+                   Number of blocks inspected during defragmentations.
+  
+               int DID_MEM_BLOCKS_MERGED      (smalloc)
+                   Number of blocks merged during defragmentations.
+  
+               int DID_MEM_BLOCKS_RESULT      (smalloc)
+                   Number of defragmented blocks (ie. merge results).
+  
+               int DID_MEM_AVL_NODES          (slaballoc, smalloc)
+                   Number of AVL nodes used to manage the large free
+                   blocks. This value might go away again.
+  
+               mixed * DID_MEM_EXT_STATISTICS (slaballoc, smalloc)
+                   If the driver was compiled with extended smalloc
+                   statistics, they are returned in this entry; if the
+                   driver was compiled without the statistics, 0 is
+                   returned.
+  
+                   This value might go away again.
+  
+                   The array contains NUM+2 entries, where NUM is the
+                   number of distinct small block sizes. Entry [NUM]
+                   describes the statistics of oversized small blocks
+                   (smalloc) resp. for all slabs (slaballoc),
+                   entry [NUM+1] summarizes all large blocks. Each
+                   entry is an array of these fields:
+  
+                     int DID_MEM_ES_MAX_ALLOC:
+                       Max number of allocated blocks of this size.
+  
+                     int DID_MEM_ES_CUR_ALLOC:
+                       Current number of allocated blocks of this size.
+  
+                     int DID_MEM_ES_MAX_FREE:
+                       Max number of allocated blocks of this size.
+  
+                     int DID_MEM_ES_CUR_FREE:
+                       Current number of allocated blocks of this size.
+  
+                     float DID_MEM_ES_AVG_XALLOC:
+                       Number of explicit allocation requests per
+                       second.
+  
+                     float DID_MEM_ES_AVG_XFREE:
+                       Number of explicit deallocation requests per
+                       second.
+  
+                     int DID_MEM_ES_FULL_SLABS:
+                       Number of fully used slabs (slaballoc only).
+  
+                     int DID_MEM_ES_FREE_SLABS:
+                       Number of fully free slabs (slaballoc only).
+  
+                     int DID_MEM_ES_TOTAL_SLABS:
+                       Total number of slabs: partially used, fully used
+                       and fully free (slaballoc only).
+  
+                   The allocation/deallocation-per-second statistics do
+                   not cover internal shuffling of the freelists.
+  
+                   The slab statistics (entry [NUM], slaballoc only)
+                   shows in the AVG statistics the frequence with which 
+                   slabs were allocated from resp. returned to the large
+                   memory pool.
 
 
         DINFO_TRACE (7): Return the call stack 'trace' information as specified

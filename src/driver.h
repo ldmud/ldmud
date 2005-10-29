@@ -35,14 +35,14 @@
 #  define YYDEBUG 1
 #endif
 
-#if !defined(MALLOC_smalloc) && !defined(MALLOC_sysmalloc) && !defined(MALLOC_ptmalloc)
-#  define MALLOC_smalloc
+#if !defined(MALLOC_smalloc) && !defined(MALLOC_sysmalloc) && !defined(MALLOC_ptmalloc) && ~defined(MALLOC_slaballoc)
+#  define MALLOC_slaballoc
 #endif
 
 
 /* Do we have full GC support? */
 
-#if defined(MALLOC_smalloc) || defined(MALLOC_ptmalloc)
+#if defined(MALLOC_smalloc) || defined(MALLOC_ptmalloc) || defined(MALLOC_slaballoc)
 #  define GC_SUPPORT 1
 #endif
 

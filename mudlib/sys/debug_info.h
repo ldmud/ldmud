@@ -167,6 +167,8 @@
 #define DID_MEM_KEEP_COST       (DID_MEM_LWASTED_SIZE)
 #define DID_MEM_CHUNK           9
 #define DID_MEM_CHUNK_SIZE     10
+#define DID_MEM_SLAB            (DID_MEM_CHUNK)
+#define DID_MEM_SLAB_SIZE       (DID_MEM_CHUNK_SIZE)
 #define DID_MEM_MAX_ALLOCATED   (DID_MEM_CHUNK_SIZE)
 #define DID_MEM_SMALL          11
 #define DID_MEM_SMALL_SIZE     12
@@ -176,6 +178,7 @@
 #define DID_MEM_FFREE_SIZE     (DID_MEM_SFREE_SIZE)
 #define DID_MEM_SWASTED        15
 #define DID_MEM_SWASTED_SIZE   16
+#define DID_MEM_SMALL_OVERHEAD_SIZE  (DID_MEM_SWASTED_SIZE)
 #define DID_MEM_MINC_CALLS     17
 #define DID_MEM_MINC_SUCCESS   19
 #define DID_MEM_MINC_SIZE      19
@@ -189,6 +192,8 @@
 #define DID_MEM_TOTAL_UNUSED   27
 #define DID_MEM_DEFRAG_CALLS             28
 #define DID_MEM_DEFRAG_CALLS_REQ         29
+#define DID_MEM_SLAB_FREE                 (DID_MEM_DEFRAG_CALLS)
+#define DID_MEM_SLAB_FREE_SIZE            (DID_MEM_DEFRAG_CALLS_REQ)
 #define DID_MEM_DEFRAG_REQ_SUCCESS       30
 #define DID_MEM_DEFRAG_BLOCKS_INSPECTED  31
 #define DID_MEM_DEFRAG_BLOCKS_MERGED     32
@@ -206,8 +211,11 @@
 #define DID_MEM_ES_CUR_FREE    3
 #define DID_MEM_ES_AVG_XALLOC  4
 #define DID_MEM_ES_AVG_XFREE   5
+#define DID_MEM_ES_FULL_SLABS  6
+#define DID_MEM_ES_FREE_SLABS  7
+#define DID_MEM_ES_TOTAL_SLABS 8
 
-#define DID_MEM_ES_MAX  6
+#define DID_MEM_ES_MAX  9
 
 /* Indices into the subarrays resulting from debug_info(DINFO_TRACE, 0)
  */

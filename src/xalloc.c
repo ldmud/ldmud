@@ -46,10 +46,12 @@
 typedef struct { unsigned long counter, size; } t_stat;
   /* A counter type for statistics and its functions: */
 
-#define count(a,b)      { a.size+=(b); if ((b)<0) --a.counter; else ++a.counter; }
-#define count_up(a,b)   { a.size+=(b); ++a.counter; }
-#define count_add(a,b)  { a.size+=(b); }
-#define count_back(a,b) { a.size-=(b); --a.counter; }
+#define count(a,b)           { a.size+=(b); if ((b)<0) --a.counter; else ++a.counter; }
+#define count_up(a,b)        { a.size+=(b); ++a.counter; }
+#define count_up_n(a,b,c)    { a.size+=(b)*(c); a.counter+=(b); }
+#define count_add(a,b)       { a.size+=(b); }
+#define count_back(a,b)      { a.size-=(b); --a.counter; }
+#define count_back_n(a,b,c)  { a.size-=(b)*(c); a.counter-=(b); }
 
 typedef p_uint word_t;
   /* Our 'word' type.
@@ -297,6 +299,8 @@ mdb_log_sbrk (p_int size)
 
 #if defined(MALLOC_smalloc)
 #  include "smalloc.c"
+#elif defined(MALLOC_slaballoc)
+#  include "slaballoc.c"
 #elif defined(MALLOC_sysmalloc)
 #  include "sysmalloc.c"
 #elif defined(MALLOC_ptmalloc)
@@ -406,6 +410,7 @@ retry_alloc (size_t size MTRACE_DECL)
 #endif
     writes(2, mess_nl);
 
+/* DEBUG: */ fatal("DEBUG: Low on memory.\n");
     /* Free the next reserve, the try again */
 
     if (gc_request == gcDont)

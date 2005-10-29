@@ -1768,8 +1768,9 @@ add_string_status (strbuf_t *sbuf, Bool verbose)
     if (!verbose)
     {
         strbuf_addf(sbuf
-                   , "Strings alloced\t\t\t%8lu %9lu + %lu overhead\n"
-                   , distinct_strings, distinct_size - distinct_overhead
+                   , "Strings alloced\t\t\t%8lu %9lu (%lu + %lu overhead)\n"
+                   , distinct_strings, distinct_size + stringtable_size
+                   , distinct_size - distinct_overhead
                    , distinct_overhead + stringtable_size
                    );
     }

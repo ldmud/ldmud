@@ -15,8 +15,8 @@ DESCRIPTION
 
 HISTORY
         The 'hostport' argument was added in 3.2.1.
-        LDMud 3.2.9 renamed this method from receive_imp(); this old version
-          is supported if the driver is compiled with USE_DEPRECATED.
+        LDMud 3.2.9 renamed this method to receive_udp(); this old version
+        is supported if the driver is compiled with USE_DEPRECATED.
         Removed in LDMud 3.3.
 
 SEE ALSO

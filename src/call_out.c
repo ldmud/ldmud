@@ -54,9 +54,9 @@
    */
 
 struct call {
+    struct call *next;   /* link to next structure */
     /* TODO: p_int or mp_int */ int delta;           /* Delay in relation to the previous structure */
     callback_t fun;
-    struct call *next;   /* link to next structure */
     object_t *command_giver;  /* the saved command_giver */
 };
 

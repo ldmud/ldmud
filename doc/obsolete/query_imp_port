@@ -7,8 +7,8 @@ DESCRIPTION
         protocol.
 
 HISTORY
-        LDMud 3.2.9 renamed this efun to query_udp_mud(). This version
-          is available if the driver is compiled with USE_DEPRECATED.
+        LDMud 3.2.9 renamed this efun to query_udp_port(). This version
+        is available if the driver is compiled with USE_DEPRECATED.
         Removed in LDMud 3.3.
 
 SEE ALSO

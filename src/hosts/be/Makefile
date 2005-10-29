@@ -684,11 +684,12 @@ $(OBJ)/wiz_list.o : xalloc.h svalue.h stdstrings.h simulate.h object.h \
     strfuns.h sent.h bytecode.h hash.h port.h config.h hosts/unix.h \
     hosts/be/be.h machine.h
 
-$(OBJ)/xalloc.o : xptmalloc.c sysmalloc.c smalloc.c mstrings.h object.h \
-    exec.h simulate.h interpret.h gcollect.h backend.h xalloc.h driver.h \
-    ../mudlib/sys/debug_info.h ptmalloc/malloc.h svalue.h stdstrings.h \
-    sysmalloc.h array.h smalloc.h typedefs.h hash.h sent.h bytecode.h \
-    strfuns.h main.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
+$(OBJ)/xalloc.o : xptmalloc.c sysmalloc.c slaballoc.c smalloc.c mstrings.h \
+    object.h exec.h simulate.h interpret.h gcollect.h backend.h xalloc.h \
+    driver.h ../mudlib/sys/debug_info.h ptmalloc/malloc.h svalue.h \
+    stdstrings.h sysmalloc.h array.h slaballoc.h typedefs.h smalloc.h \
+    hash.h sent.h bytecode.h strfuns.h main.h port.h config.h hosts/unix.h \
+    hosts/be/be.h machine.h
 
 # --- DO NOT MODIFY THIS LINE -- AUTO-DEPENDS PRECEDE ---
 # --- DO NOT MODIFY THIS LINE -- SELECTED AUTO-DEPENDS FOLLOW ---

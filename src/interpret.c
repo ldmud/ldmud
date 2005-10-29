@@ -15122,7 +15122,7 @@ again:
 
                     free_svalue(dest);
 
-                    prot = (struct protected_lvalue *)xalloc(sizeof *lvalue);
+                    prot = (struct protected_lvalue *)xalloc(sizeof *prot);
                     prot->v.type = T_PROTECTED_LVALUE;
                     prot->v.u.lvalue = values;
                     (void)ref_mapping(m);

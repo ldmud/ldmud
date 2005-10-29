@@ -1813,6 +1813,8 @@ options (void)
          "                 initial small alloc:   %8d\n"
 #ifdef MALLOC_sysmalloc
         , "system malloc"
+#elif defined(MALLOC_slaballoc)
+        , "slaballoc"
 #elif defined(MALLOC_smalloc)
         , "smalloc"
 #elif defined(MALLOC_ptmalloc)
@@ -1896,8 +1898,8 @@ options (void)
 #       if defined(DEBUG_TELNET)
                               , "DEBUG_TELNET"
 #       endif
-#       if defined(DEBUG_SMALLOC_ALLOCS)
-                              , "DEBUG_SMALLOC_ALLOCS"
+#       if defined(DEBUG_MALLOC_ALLOCS)
+                              , "DEBUG_MALLOC_ALLOCS"
 #       endif
 #       if defined(YYDEBUG)
                               , "YYDEBUG"
@@ -1944,8 +1946,14 @@ options (void)
 #       if defined(USE_AVL_FREELIST)
                               , "USE_AVL_FREELIST"
 #       endif
-#       if defined(SMALLOC_ORDER_FREELISTS)
-                              , "SMALLOC_ORDER_FREELISTS"
+#       if defined(SLABALLOC_DYNAMIC_SLABS)
+                              , "SLABALLOC_DYNAMIC_SLABS"
+#       endif
+#       if defined(MALLOC_ORDER_SMALL_FREELISTS)
+                              , "MALLOC_ORDER_SMALL_FREELISTS"
+#       endif
+#       if defined(MALLOC_ORDER_LARGE_FREELISTS)
+                              , "MALLOC_ORDER_LARGE_FREELISTS"
 #       endif
 #       if defined(MALLOC_EXT_STATISTICS)
                               , "MALLOC_EXT_STATISTICS"

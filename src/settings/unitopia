@@ -39,7 +39,7 @@ enable_use_mccp=yes
 #----------- Compilation Options ----------
 enable_malloc_trace=yes
 enable_malloc_lpc_trace=yes
-enable_use_pthreads=yes
+enable_use_pthreads=no
 
 # --- Wizlist ---
 with_wizlist_file=no
@@ -48,6 +48,7 @@ with_wizlist_file=no
 enable_access_control=no
 
 # --- Language ---
+enable_use_set_light=no
 enable_use_parse_command=no
 enable_use_mysql=no
 enable_use_deprecated=no

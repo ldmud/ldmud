@@ -230,8 +230,10 @@ enable_use_pthreads=no
 
 # Which memory manager to use. Possible defines are
 #   default:   Depending on the setting and support pthreads, either
-#              smalloc or ptmalloc is selected.
-#   smalloc:   Satoria's malloc. Fastest, uses the least memory,
+#              slaballoc or ptmalloc is selected.
+#   smalloc:   Satoria's malloc. Second fastest, uses the least memory,
+#              supports garbage collection, not threadsafe.
+#   slaballoc: Slab allocator. Fastest, reduces fragmentation,
 #              supports garbage collection, not threadsafe.
 #   ptmalloc:  ptmalloc from www.malloc.de, supports GC, threadsafe.
 #   sysmalloc: the normal system malloc()
@@ -241,33 +243,31 @@ with_malloc=default
 # Define this to let the memory allocator request memory from the system
 # directly using sbrk() (assuming the system supports it).
 # If not defined, the memory allocator will use malloc().
-# Supported by: MALLOC_smalloc
+# Supported by: MALLOC_smalloc, MALLOC_slaballoc
 
 enable_malloc_sbrk=yes
 
 # Define this to annotate all allocations with a magic word to find
 # simple misuses of memory (like multiple frees).
-# Supported by: MALLOC_smalloc
+# Supported by: MALLOC_smalloc, MALLOC_slaballoc
 
 enable_malloc_check=yes
 
 # Enable this to annotate all allocations with 'file:line' of the
 # driver source allocating it.
-# Supported by: MALLOC_smalloc
 
 enable_malloc_trace=no
 
 # Enable this in addition to SMALLOC_TRACE to also annotate all allocations
 # with file:line of the lpc program responsible for it.
-# Supported by: MALLOC_smalloc
 
-enable_malloc_lpc_trace=no
+enable_malloc_lpc_trace=no, MALLOC_slaballoc
 
 # Define this to log all calls to esbrk() (the system memory allocator).
 # Works best if MALLOC_TRACE, or also MALLOC_LPC_TRACE, are defined.
 # This define is useful if your mud keeps growing in total memory size
 # instead of re-using the memory already allocated.
-# Supported by: MALLOC_smalloc
+# Supported by: MALLOC_smalloc, MALLOC_slaballoc
 enable_malloc_sbrk_trace=no
 
 # --- Wizlist ---
@@ -546,8 +546,9 @@ enable_no_inlines=no
 # Activate debug prints in the telnet machine (lots of output).
 enable_debug_telnet=no
 
-# Activate allocation debug prints in the smalloc module (lots of output).
-enable_debug_smalloc_allocs=no
+# Activate allocation debug prints in the malloc module (lots of output).
+# Supported by: MALLOC_smalloc, MALLOC_slaballoc
+enable_debug_malloc_allocs=no
 
 # The DEBUG level for the ERQ daemon:
 #   0 : no debug output
