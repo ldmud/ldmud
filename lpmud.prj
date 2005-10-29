@@ -54,18 +54,19 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 640)
-(Parent-Version lpmud 3-3 639)
+(Project-Version lpmud 3-3 641)
+(Parent-Version lpmud 3-3 640)
 (Version-Log "
-  - (pkg-mysql.c) Most mySQL efuns are now privileged as (\"mysql\", \"<efun
-        name>\") (Bug #0000318).
-  - (pkg-pgsql.c) All Postgres efuns are now privileged as (\"pgsql\", \"<efun
-        name>\").
+  - (closure, object.c) The driver internally now uses the closure creation
+        functions as well - there were more places where lambdas were
+        initialized by hand than I expected to be.
+  - (closure.c) The location determination for closures didn't check
+        carefully enough if the pc was correct or not.
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Wed, 29 Dec 2004 00:22:07 -0700")
+(Checkin-Time "Wed, 29 Dec 2004 21:33:13 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -103,7 +104,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.12 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.84 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.703 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.704 644))
   (HISTORY (lpmud/f/49_HISTORY 1.385.1.4 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.20 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -171,8 +172,8 @@
   (src/bytecode.h (lpmud/a/b/26_bytecode.h 1.1.1.3 644))
   (src/call_out.h (lpmud/f/45_call_out.h 1.7.1.6 644))
   (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.30 644))
-  (src/closure.h (lpmud/f/44_closure.h 1.7.1.22.1.2 644))
-  (src/closure.c (lpmud/d/4_closure.c 1.41.1.47.1.26.1.2 644))
+  (src/closure.h (lpmud/f/44_closure.h 1.7.1.22.1.3 644))
+  (src/closure.c (lpmud/d/4_closure.c 1.41.1.47.1.26.1.3 644))
   (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.104 644))
   (src/comm.h (lpmud/d/3_comm.h 1.26.1.41 644))
   (src/driver.h (lpmud/f/36_driver.h 1.15.1.27 644))
@@ -213,7 +214,7 @@
   (src/my-rusage.h (lpmud/f/28_my-rusage. 1.7 644))
   (src/my-stdint.h (lpmud/u/b/39_my-stdint. 1.2 644))
   (src/object.h (lpmud/44_object.h 1.34.1.19.1.6.1.1 644))
-  (src/object.c (lpmud/45_object.c 1.62.1.88.1.53 644))
+  (src/object.c (lpmud/45_object.c 1.62.1.88.1.53.1.1 644))
   (src/otable.h (lpmud/f/27_otable.h 1.8.1.4 644))
   (src/otable.c (lpmud/43_otable.c 1.22.1.8 644))
   (src/parser.c (lpmud/l/13_parser.c 1.1 644))
@@ -338,7 +339,7 @@
   (src/simul_efun.h (lpmud/f/17_simul_efun 1.5.1.6 644))
   (src/simul_efun.c (lpmud/32_simul_efun 1.20.1.17.1.7 644))
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.37 644))
-  (src/simulate.c (lpmud/31_simulate.c 1.88.1.135 644))
+  (src/simulate.c (lpmud/31_simulate.c 1.88.1.135.1.1 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.14 644))
   (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.104 644))
   (src/sysmalloc.h (lpmud/c/b/33_sysmalloc. 1.2 644))

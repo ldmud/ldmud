@@ -114,20 +114,19 @@ struct lambda_s
 extern long      find_function(const string_t *name, const program_t *prog);
 extern Bool      closure_eq (svalue_t * left, svalue_t * right);
 extern int       closure_cmp (svalue_t * left, svalue_t * right);
-extern Bool      lambda_ref_replace_program(lambda_t *l, int type, p_int size, vector_t *args, svalue_t *block);
 extern void      set_closure_user(svalue_t *svp, object_t *owner);
 extern void      replace_program_lambda_adjust(replace_ob_t *r_ob);
 extern void      closure_init_lambda (lambda_t * l, object_t * obj);
 #ifndef USE_NEW_INLINES
 extern void      closure_literal(svalue_t *dest, int ix, unsigned short inhIndex);
-extern void      closure_lfun (svalue_t *dest, object_t *obj, int ix, unsigned short inhIndex);
-extern lambda_t *closure_new_lambda (object_t * obj);
+extern void      closure_lfun (svalue_t *dest, object_t *obj, int ix, unsigned short inhIndex, Bool raise_error);
+extern lambda_t *closure_new_lambda (object_t * obj, Bool raise_error);
 #else /* USE_NEW_INLINES */
-extern lambda_t *closure_new_lambda (object_t * obj, unsigned short context_size);
-extern void      closure_lfun (svalue_t *dest, object_t *obj, int ix, unsigned short inhIndex, unsigned short num);
+extern lambda_t *closure_new_lambda (object_t * obj, unsigned short context_size, Bool raise_error);
+extern void      closure_lfun (svalue_t *dest, object_t *obj, int ix, unsigned short inhIndex, unsigned short num, Bool raise_error);
 extern void      closure_literal(svalue_t *dest, int ix, unsigned short inhIndex, unsigned short num);
 #endif /* USE_NEW_INLINES */
-extern void      closure_identifier (svalue_t *dest, object_t * obj, int ix);
+extern void      closure_identifier (svalue_t *dest, object_t * obj, int ix, Bool raise_error);
 extern void      free_closure(svalue_t *svp);
 extern Bool      is_undef_closure (svalue_t *sp);
 extern void      closure_lookup_lfun_prog ( lambda_t * l , program_t ** pProg , string_t ** pName , Bool * pIsInherited);

@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+29-Dec-2004 (Lars Duening)  (3.3.641)
+  - (closure, object.c) The driver internally now uses the closure creation
+        functions as well - there were more places where lambdas were
+        initialized by hand than I expected to be.
+  - (closure.c) The location determination for closures didn't check
+        carefully enough if the pc was correct or not.
+
 28-Dec-2004 (Lars Duening)  (3.3.640)
   - (pkg-mysql.c) Most mySQL efuns are now privileged as ("mysql", "<efun
         name>") (Bug #0000318).

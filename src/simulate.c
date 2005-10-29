@@ -2007,7 +2007,7 @@ load_object (const char *lname, Bool create_super, int depth, namechain_t *chain
         object_t *save_current;
 
         save_current = current_object;
-        current_object = ob; /* for lambda_ref_replace_program */
+        current_object = ob; /* just in case */
         svp = ob->variables;
         for (j = ob->prog->num_variables;  --j >= 0; svp++)
         {

@@ -7720,7 +7720,6 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
         program_t *prog;
         int num_var;
         int n;
-        lambda_t *l;
 
         ob = current_object;
         if (!current_variables
@@ -7764,29 +7763,13 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
         }
 
         n = num_var - n - 1;
-#ifndef USE_NEW_INLINES
-        l = xalloc(sizeof *l);
-#else /* USE_NEW_INLINES */
-        l = xalloc(SIZEOF_LAMBDA(0));
-#endif /* USE_NEW_INLINES */
-        if (!l)
+        closure_identifier(svp, current_object
+                          , (unsigned short)(n + (current_variables - current_object->variables))
+                          , /* raise_error: */ MY_FALSE);
+        if (svp->type != T_CLOSURE)
         {
-            *svp = const0;
+            /* Out of memory: abort restoring this closure. */
             break; /* switch(ct) */
-        }
-
-        l->ob = ref_object(current_object, "symbol_variable");
-        l->ref = 1;
-        l->function.var_index = (unsigned short)(n + (current_variables - current_object->variables));
-        svp->type = T_CLOSURE;
-        svp->x.closure_type = CLOSURE_IDENTIFIER;
-        svp->u.lambda = l;
-
-        /* Handle replace_program() */
-        if ( !(current_object->prog->flags & P_REPLACE_ACTIVE)
-          || !lambda_ref_replace_program(l, svp->x.closure_type, 0, 0, 0) )
-        {
-            current_object->flags |= O_LAMBDA_REFERENCED;
         }
 
         break;
@@ -7852,15 +7835,15 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
          */
         if (i >= 0)
         {
-            lambda_t *l;
+            closure_lfun(svp, current_object, (unsigned short)i, inhIndex
 #ifdef USE_NEW_INLINES
-            l = xalloc(SIZEOF_LAMBDA(context_size));
-#else /* USE_NEW_INLINES */
-            l = xalloc(sizeof *l);
+                        , context_size
 #endif /* USE_NEW_INLINES */
-            if (!l)
+                        , /* raise_error: */ MY_FALSE);
+
+            if (svp->type != T_CLOSURE)
             {
-                *svp = const0;
+                /* Out of memory: abort restoring this closure. */
                 break; /* switch(ct) */
             }
 
@@ -7869,23 +7852,12 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
              * referring to this very closure will be restored
              * as '0'.
              */
-            svp->type = T_CLOSURE;
-            svp->x.closure_type = CLOSURE_LFUN;
-            svp->u.lambda = l;
-
-            l->ref = 1;
-            l->ob = ref_object(current_object, "restore_svalue");
-
-            l->function.lfun.ob
-              = ref_object(current_object, "restore_svalue");
-            l->function.lfun.index = (unsigned short)i;
-            l->function.lfun.inhIndex = inhIndex;
 #ifdef USE_NEW_INLINES
-            l->function.lfun.context_size = context_size;
             if (context_size > 0)
             {
                 svalue_t context = const0;
                 int j;
+                lambda_t * l = svp->u.lambda;
 
                 /* Parse the context information */
                 if (!restore_svalue(&context, str, delimiter)
@@ -7904,16 +7876,6 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
                 free_array(context.u.vec);
             }
 #endif /* USE_NEW_INLINES */
-
-            if (!(current_object->prog->flags & P_REPLACE_ACTIVE)
-             || !lambda_ref_replace_program( l
-                                           , CLOSURE_LFUN
-                                           , 0, NULL, NULL)
-               )
-            {
-                current_object->flags |= O_LAMBDA_REFERENCED;
-            }
-
         }
         else /* (i < 0) */
         {
