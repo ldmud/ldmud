@@ -54,25 +54,16 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 682)
-(Parent-Version lpmud 3-3 681)
+(Project-Version lpmud 3-3 683)
+(Parent-Version lpmud 3-3 682)
 (Version-Log "
-  - (mapping.c) Indexing a mapping with strings didn't quite work yet: the
-      hash computation didn't take into effect that strings are no longer
-      tabled just to use them as rvalue indices.
-  - (simulate.c) If a callback didn't have a valid object associated with
-      it (e.g. unbound_lambda()s), the code forgot to remove the arguments
-      from the stack (Bug #0000370).
-  - (simulate.c) Uncalleable closures given as callbacks are now detected
-      and cause a runtime error (Bug #0000370).
-  - (simulate.c) A runtime in a regreplace() substitution closure leaked
-      the regexp structure. I changed the whole thing to automatic
-      cleanup (Bug #0000370).
+  - (efuns.c) regreplace() didn't update the stack pointers properly,
+      causing crashes down the road (reported by Bardioc).
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Sat, 26 Feb 2005 00:55:06 -0700")
+(Checkin-Time "Sat, 26 Feb 2005 14:37:14 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -110,7 +101,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.12 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.85 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.745 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.746 644))
   (HISTORY (lpmud/f/49_HISTORY 1.385.1.19 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.21 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -189,7 +180,7 @@
   (src/ed.h (lpmud/f/34_ed.h 1.5.1.6 644))
   (src/ed.c (lpmud/c/33_ed.c 1.32.1.35 644))
   (src/efuns.h (lpmud/l/20_efuns.h 1.13.1.19.1.6 644))
-  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.104.1.10 644))
+  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.104.1.11 644))
   (src/exec.h (lpmud/c/32_exec.h 1.34.1.33.1.7 644))
   (src/files.h (lpmud/i/49_files.h 1.2 644))
   (src/files.c (lpmud/i/50_files.c 1.29 644))

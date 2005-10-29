@@ -898,6 +898,7 @@ f_regreplace (svalue_t *sp)
     rcp->matches = NULL;
 
     push_error_handler(regreplace_cleanup, &(rcp->head));
+    sp = inter_sp;
 
     /* Loop over <text>, repeatedly matching it against the pattern,
      * until all matches have been found and recorded.

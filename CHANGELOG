@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+26-Feb-2004 (Lars Duening)  (3.3.683)
+  - (efuns.c) regreplace() didn't update the stack pointers properly,
+      causing crashes down the road (reported by Bardioc).
+
 25-Feb-2004 (Lars Duening)  (3.3.682)
   - (mapping.c) Indexing a mapping with strings didn't quite work yet: the
       hash computation didn't take into effect that strings are no longer
