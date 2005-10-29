@@ -183,7 +183,7 @@ For a detailed list of all changes see the file CHANGELOG.
            x509 key- and certfile for the TLS package.
 
 
-08-Jan-2004 (Lars Duening) -- Release 3.2.11
+12-Jan-2004 (Lars Duening) -- Release 3.2.11
 
     - Changed efuns:
        + db_*(): mySQL efuns trigger a privilege violation ("mysql", "<efun
@@ -228,6 +228,7 @@ For a detailed list of all changes see the file CHANGELOG.
          closure values.
        + Specifying a fieldsize or precision beyond the numerical limits
          in sprintf()/printf().
+       + Indexing a 0-width mapping yielded invalid values.
 
     - Language:
        + The macros __FLOAT_MIN__ and __FLOAT_MAX__ gave a too-small range.

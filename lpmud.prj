@@ -54,15 +54,18 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 651)
-(Parent-Version lpmud 3-3 650)
+(Project-Version lpmud 3-3 652)
+(Parent-Version lpmud 3-3 651)
 (Version-Log "
-  - (configure) Added yet another path to the search for a mySQL installation.
+  - (mapping.c) Indexing a 0-width mapping returned pointers to memory outside
+       the mapping, causing weird crashes. The solution is to return pointers
+       to the global const1 (when found), or to a local svalue-0 instance
+       (when not found and a lvalue is requested) (Bug #0000341).
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Mon, 10 Jan 2005 07:20:54 -0700")
+(Checkin-Time "Wed, 12 Jan 2005 22:05:59 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -100,8 +103,8 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.12 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.85 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.714 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.385.1.9 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.715 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.385.1.10 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.21 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -198,7 +201,7 @@
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.19 644))
   (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.68 644))
   (src/mapping.h (lpmud/f/30_mapping.h 1.12.1.20 644))
-  (src/mapping.c (lpmud/b/6_mapping.c 1.36.1.82 644))
+  (src/mapping.c (lpmud/b/6_mapping.c 1.36.1.83 644))
   (src/md5.h (lpmud/l/18_md5.h 1.3 644))
   (src/md5.c (lpmud/l/19_md5.c 1.7 644))
   (src/mempools.h (lpmud/d/48_mempools.h 1.2.1.8 644))
@@ -603,7 +606,7 @@
   (doc/concepts/pgsql (lpmud/d/b/43_pgsql 1.2 644))
   (doc/concepts/rtfm (lpmud/n/39_rtfm 1.1 644))
   (doc/concepts/simul_efun (lpmud/n/40_simul_efun 1.2 644))
-  (doc/concepts/tls (lpmud/e/b/13_tls 1.3 644))
+  (doc/concepts/tls (lpmud/e/b/13_tls 1.4 644))
   (doc/concepts/uids (lpmud/n/41_uids 1.8 644))
 
   (doc/driver/codestyle (lpmud/h/1_codestyle 1.4 644))

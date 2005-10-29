@@ -881,11 +881,14 @@ _get_map_lvalue (mapping_t *m, svalue_t *map_index
                 , Bool need_lvalue, Bool check_size)
 
 /* Index mapping <m> with key value <map_index> and return a pointer to the
- * array of values stored for this key.
+ * array of values stored for this key. If the mapping has no values for a
+ * key, a pointer to const1 is returned.
  *
  * If the mapping does not contains the given index, and <need_lvalue> is
  * false, &const0 is returned. If <need_lvalue> is true, a new key/value
- * entry is created and returned (map_index is assigned for this).
+ * entry is created and returned (map_index is assigned for this). If the
+ * mapping doesn't have values for a key, a pointer to a local static
+ * instance of svalue-0 is returned.
  *
  * If check_size is true and the extension of the mapping would increase
  * its size over max_mapping_size, a runtime error is raised.
@@ -907,12 +910,16 @@ _get_map_lvalue (mapping_t *m, svalue_t *map_index
     mapping_hash_t * hm;
     svalue_t       * entry;
     mp_int           idx;
+static svalue_t local_const0;
 
     entry = find_map_entry(m, map_index, (p_int *)&idx, &mc);
 
     /* If we found the entry, return the values */
     if (entry != NULL)
     {
+        if (!m->num_values)
+            return &const1;
+
         if (mc != NULL)
             return entry+1;
 
@@ -1058,7 +1065,14 @@ _get_map_lvalue (mapping_t *m, svalue_t *map_index
     hm->used++;
     m->num_entries++;
 
-    return &(mc->data[1]);
+    if (m->num_values)
+        return &(mc->data[1]);
+
+    /* Return a reference to the local static svalue-0 instance, so that
+     * buggy code doesn't accidentally changes the global const0.
+     */
+    put_number(&local_const0, 0);
+    return &local_const0;
 } /* _get_map_lvalue() */
 
 /*-------------------------------------------------------------------------*/
