@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+20-Jun-2005 (Lars Duening)  (3.3.709)
+  - (xalloc.c) xalloc used REPLACE_MALLOC before it was defined,
+      leading to compilation errors on systems supporting it (Bug #0000393).
+
 19-Jun-2005 (Lars Duening)  (3.3.708)
   - (pkg-pgsql, func_spec) Added new efun pg_conv_string(), courtesy
       of Philipp.
@@ -11,7 +15,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - (closure.c) Since the operators #'&, #'|, #'^ and #'! are now considered
       efuns, the closure compiler skipped the special treatment of these.
       As an added bonus of the correction, #'| and #'^ can now take
-      an arbitrary number of arguments, too. (Bug #0000391)
+      an arbitrary number of arguments, too. (Bug #0000389)
 
 10-Jun-2005 (Lars Duening)  (3.3.707)
   - (gcollect, backend.c) If the number of destructed pending objects
