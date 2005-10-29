@@ -1,12 +1,23 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-20-Mar-2005 (Lars Duening)  (3.3.688)
+24-Mar-2005 (Lars Duening)  (3.3.691)
+  - (gcollect.c) Added a log output for the time it takes to data-clean
+       objects.
+  - (config.h.in, slaballoc.c) The sorting of the partial slab freelists
+       is now configurable by hand.
+  - (slaballoc.c) Added weighted-average statistics for number of steps
+       per freed block.
+  - (interpret, backend.c, call_out.c, efuns.c heart_beat.c, simulate.c)
+       Added a statistic (last and time-weighted average) about the total
+       execution ticks and time per LPC thread.
+
+20-Mar-2005 (Lars Duening)  (3.3.690)
   - (backend, main, simulate.c) Updated the last-data-cleaned statistics
        to be weighted over time; and generalized the statistics implementation
        in general.
 
-18-Mar-2005 (Lars Duening)  (3.3.687)
+18-Mar-2005 (Lars Duening)  (3.3.689)
   - (backend.c) Improved the synch heartbeat condition expression.
   - (heartbeat.c) I had forgotten to remove all remnants of an exploratory
        change.

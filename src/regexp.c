@@ -1158,7 +1158,8 @@ regmatch (unsigned char *prog)
                 /* Couldn't or didn't -- back up. */
                 no--;
                 reginput = save + no;
-                eval_cost += 1;
+                eval_cost ++;
+                total_evalcost++;
                 if (EVALUATION_TOO_LONG())
                     return RE_ERROR_BACKTRACK;
             }

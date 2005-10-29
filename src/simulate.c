@@ -3080,6 +3080,18 @@ status_parse (strbuf_t * sbuf, char * buff)
             strbuf_addf(sbuf, "Memory reserved:\t\t\t %9d\n", res);
         }
         if (verbose) {
+/* TODO: Add these numbers to the debug_info statistics. */
+            strbuf_add(sbuf, "\nVM Execution:\n");
+            strbuf_add(sbuf,   "-------------\n");
+            strbuf_addf(sbuf
+                      , "Last:    %7lu ticks, %3ld.%06ld s\n"
+                        "Average: %7.0lf ticks, %10.6lf s\n"
+                      , last_total_evalcost
+                      , last_eval_duration.tv_sec, last_eval_duration.tv_usec
+                      , stat_total_evalcost.weighted_avg
+                      , stat_eval_duration.weighted_avg / 1000000.0
+                      );
+
 #ifdef COMM_STAT
             strbuf_add(sbuf, "\nNetwork IO:\n");
             strbuf_add(sbuf,   "-----------\n");

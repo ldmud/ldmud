@@ -40,6 +40,7 @@
  * used slabs (double-ended) and a list of fully free slabs (double-ended).
  * In addition, the allocator maintains for each block size a 'fresh slab'
  * which is only partially initialized.
+#ifdef MALLOC_ORDER_SLAB_FREELISTS
  * The partially used slabs in the lists are rougly ordered by the ascending
  * number of free blocks - 'roughly' meaning that whenever the freeing of
  * a block causes a slab block to have twice the number of free blocks than
@@ -47,6 +48,7 @@
  *
  * This approach, as compared to a straight-forward FIFO handling , leads
  * to a better relation of fully used to partially used slabs.
+#endif
  *
  * When allocating a new block, the allocator first tries to allocated the
  * block from the freelist of the first partly filled slab. If there is none,
@@ -628,6 +630,7 @@ typedef struct extstat_s {
                                   * avg.
                                   */
     double        avg_sm_free;  /* Avg. number of free steps/small free req. */
+    statistic_t   stat_free;  /* Weighted small free search steps statistics. */
 
     unsigned long tot_sm_alloc;  /* Total number of small allocs requests. */
     unsigned long num_sm_alloc;  /* Number of small alloc's since last avg. */
@@ -823,6 +826,7 @@ mem_update_stats (void)
 
         if (extstats[i].num_sm_free)
         {
+            update_statistic(& extstats[i].stat_free, extstats[i].num_sm_free);   
             sum = (double)extstats[i].tot_sm_free;
             extstats[i].tot_sm_free += extstats[i].num_sm_free;
             sum /= (double)extstats[i].tot_sm_free;
@@ -1023,11 +1027,24 @@ mem_dump_extdata (strbuf_t *sbuf)
                             );
             }
 
+#ifdef MALLOC_ORDER_SLAB_FREELISTS
             strbuf_addf(sbuf, "            "
-                              "Small free: %7.2lf search steps / freed block\n"
+                              "Small free: %7.2lf search steps / freed block - %6.1lf steps/s\n"
                             , extstats[i].avg_sm_free
+                            , extstats[i].stat_free.weighted_avg
+                       );
+#endif /*  MALLOC_ORDER_LARGE_FREELISTS */
+        } /* if (i < SMALL_BLOCK_NUM) */
+#ifdef MALLOC_ORDER_SLAB_FREELISTS
+        if (EXTSTAT_LARGE == i)
+        {
+            strbuf_addf(sbuf, "            "
+                              "Large free: %7.2lf search steps / freed block - %6.1lf steps/s\n"
+                            , extstats[i].avg_sm_free
+                            , extstats[i].stat_free.weighted_avg
                        );
         }
+#endif /*  MALLOC_ORDER_LARGE_FREELISTS */
     }
 
     /* Print slaballoc options */
@@ -1050,6 +1067,9 @@ mem_dump_extdata (strbuf_t *sbuf)
 #       endif
 #       if defined(MALLOC_ORDER_LARGE_FREELISTS)
                               , "MALLOC_ORDER_LARGE_FREELISTS"
+#       endif
+#       if defined(MALLOC_ORDER_SLAB_FREELISTS)
+                              , "MALLOC_ORDER_SLAB_FREELISTS"
 #       endif
 #       if defined(MALLOC_EXT_STATISTICS)
                               , "MALLOC_EXT_STATISTICS"
@@ -1287,6 +1307,8 @@ available_memory(void)
 #endif
 
 /*-------------------------------------------------------------------------*/
+#ifdef MALLOC_ORDER_SLAB_FREELISTS
+
 static void
 keep_small_order (mslab_t * slab, int ix)
 
@@ -1419,6 +1441,8 @@ keep_small_order (mslab_t * slab, int ix)
 #endif /* DEBUG_MALLOC_ALLOCS */
 } /* keep_small_order() */
 
+#endif /*  MALLOC_ORDER_SLAB_FREELISTS */
+
 /*-------------------------------------------------------------------------*/
 static void
 insert_partial_slab (mslab_t * slab, int ix)
@@ -1439,6 +1463,7 @@ insert_partial_slab (mslab_t * slab, int ix)
     }
     else
     {
+#ifdef MALLOC_ORDER_SLAB_FREELISTS
         /* Insert at front and let the ordering mechanism kick in
          * later.
          */
@@ -1448,6 +1473,14 @@ insert_partial_slab (mslab_t * slab, int ix)
         slabtable[ix].first = slab;
 
         keep_small_order(slab, ix);
+#else
+        /* Insert at end.
+         */
+        slab->prev = slabtable[ix].last;
+        slab->next = NULL;
+        slabtable[ix].last->next = slab;
+        slabtable[ix].last = slab;
+#endif /*  MALLOC_ORDER_SLAB_FREELISTS */
 #if 0
         /* If no order is desired: Insert at back for FIFO handling. */
         slab->prev = slabtable[ix].last;
@@ -1960,6 +1993,7 @@ sfree (POINTER ptr)
                 free_slab(slab, ix);
 #           endif
         }
+#ifdef MALLOC_ORDER_SLAB_FREELISTS
         else
         {
             /* Another block freed in the slab: check if its position
@@ -1967,6 +2001,7 @@ sfree (POINTER ptr)
              */
             keep_small_order(slab, ix);
         }
+#endif /*  MALLOC_ORDER_SLAB_FREELISTS */
     } /* if (not fresh slab) */
 #ifdef DEBUG_MALLOC_ALLOCS
     else
@@ -2694,6 +2729,9 @@ add_to_free_list (word_t *ptr)
                 while (tail->next && tail->next < r)
                 {
                     tail = tail->next;
+#ifdef MALLOC_EXT_STATISTICS
+                    extstats[EXTSTAT_LARGE].num_sm_free++;
+#endif /* MALLOC_EXT_STATISTICS */
                 }
             }
 

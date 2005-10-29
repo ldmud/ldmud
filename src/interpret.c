@@ -198,7 +198,10 @@
 #include <stdio.h>
 #include <setjmp.h>
 #include <ctype.h>
+#ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
+#endif
+#include <time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #ifdef MARK
@@ -694,6 +697,21 @@ static struct pointer_table *ptable;
 
 #endif
 
+       unsigned long total_evalcost;
+static struct timeval eval_begin;
+  /* Current total evalcost counter, and start of the evaluation.
+   */
+
+unsigned long last_total_evalcost = 0;
+struct timeval last_eval_duration = { 0 };
+  /* Last total evaluation cost and duration.
+   */
+
+statistic_t stat_total_evalcost = { 0 };
+statistic_t stat_eval_duration = { 0 };
+  /* Weighted statistics of evaluation cost and duration.
+   */
+
 /*-------------------------------------------------------------------------*/
 /* Forward declarations */
 
@@ -745,6 +763,59 @@ static void check_extra_ref_in_vector(svalue_t *svp, size_t num);
     assigned_eval_cost = eval_cost;
 
 void assign_eval_cost(void) { ASSIGN_EVAL_COST }
+
+/*-------------------------------------------------------------------------*/
+void
+mark_start_evaluation (void)
+
+/* Called before a new evaluation; resets the current evaluation statistics.
+ */
+
+{
+    total_evalcost = 0;
+    if (gettimeofday(&eval_begin, NULL))
+    {
+        eval_begin.tv_sec = eval_begin.tv_usec = 0;
+    }
+} /* mark_start_evaluation() */
+
+/*-------------------------------------------------------------------------*/
+void
+mark_end_evaluation (void)
+
+/* Called after an evaluation; updates the evaluation statistics.
+ */
+
+{
+    if (total_evalcost == 0)
+        return;
+
+    last_total_evalcost = total_evalcost;
+
+    if (eval_begin.tv_sec == 0
+     || gettimeofday(&last_eval_duration, NULL))
+    {
+        last_eval_duration.tv_sec = last_eval_duration.tv_usec = 0;
+    }
+    else
+    {
+        last_eval_duration.tv_sec -= eval_begin.tv_sec;
+        last_eval_duration.tv_usec -= eval_begin.tv_usec;
+        
+        if (last_eval_duration.tv_usec < 0)
+        {
+            last_eval_duration.tv_sec--;
+            last_eval_duration.tv_usec += 1000000;
+        }
+
+        update_statistic_avg( &stat_eval_duration
+                            , last_eval_duration.tv_sec * 1000000L
+                              + last_eval_duration.tv_usec
+                            );
+    }
+
+    update_statistic_avg(&stat_total_evalcost, last_total_evalcost);
+} /* mark_end_evaluation() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -7523,6 +7594,7 @@ again:
      * wizards everything is possible.
      */
     ++eval_cost;
+    ++total_evalcost;
     if (max_eval_cost && (eval_cost >= max_eval_cost || eval_cost < 0))
     {
         rt_context_t * context;
@@ -16482,6 +16554,7 @@ retry_for_shadow:
             /* Yup, fun is a function _somewhere_ */
 
             eval_cost++;
+            total_evalcost++;
             fx = find_function(fun, progp);
             if (fx >= 0)
             {

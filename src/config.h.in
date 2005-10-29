@@ -572,6 +572,13 @@
  */
 #define MALLOC_ORDER_LARGE_FREELISTS
 
+/* Order slaballoc partial-slab freelists by number of free blocks.
+ * Supported by: MALLOC_slaballoc.
+ * TODO: Remove if it doesn't help with the fragmentation, as it uses up
+ * TODO:: a small, but measurable amount of time in the allocator.
+ */
+#define MALLOC_ORDER_SLAB_FREELISTS
+
 /* Allow slaballoc to use multiples of DESIRED_SLAB_SIZE when creating
  * new slabs.
  */

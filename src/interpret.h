@@ -2,10 +2,16 @@
 #define INTERPRET_H__ 1
 
 #include <setjmp.h>
+#ifdef HAVE_SYS_TIME_H
+#include <sys/time.h>
+#endif
+#include <time.h>
+#include <sys/types.h>
 
 #include "driver.h"
 #include "typedefs.h"
 
+#include "backend.h"
 #include "bytecode.h"
 #include "svalue.h"
 
@@ -110,9 +116,17 @@ extern p_int apply_cache_hit;
 extern p_int apply_cache_miss;
 #endif
 
+extern unsigned long total_evalcost;
+extern unsigned long last_total_evalcost;
+extern struct timeval last_eval_duration;
+extern statistic_t stat_total_evalcost;
+extern statistic_t stat_eval_duration;
+
 /* --- Prototypes --- */
 
 extern void assign_eval_cost(void);
+extern void mark_start_evaluation (void);
+extern void mark_end_evaluation(void);
 
 extern Bool eval_instruction(bytecode_p first_instruction, svalue_t *initial_sp);
 extern void free_string_svalue(svalue_t *v);

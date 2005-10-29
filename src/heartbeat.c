@@ -172,6 +172,7 @@ call_heart_beat (void)
         /* An error occured: recover. The guilt heartbeat has already
          * been removed by simulate::error().
          */
+        mark_end_evaluation();
         clear_state();
         debug_message("%s Error in heartbeat.\n", time_stamp());
     }
@@ -279,10 +280,12 @@ call_heart_beat (void)
                 trace_level = 0;
             }
 
+            mark_start_evaluation();
             obj->user->heart_beats++;
             CLEAR_EVAL_COST;
             RESET_LIMITS;
             call_function(obj->prog, obj->prog->heart_beat);
+            mark_end_evaluation();
 
         } /* if (object has heartbeat) */
 

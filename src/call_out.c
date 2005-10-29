@@ -270,6 +270,7 @@ call_out (void)
         object_t *ob;
         wiz_list_t *user;
 
+        mark_end_evaluation();
         clear_state();
         debug_message("%s Error in call out.\n", time_stamp());
         cop = current_call_out;
@@ -416,8 +417,10 @@ call_out (void)
         else
             assigned_eval_cost = eval_cost = user->call_out_cost;
 
+        mark_start_evaluation();
         (void)backend_callback(&(cop->fun), 0);
         user->call_out_cost = eval_cost;
+        mark_end_evaluation();
 
         /* The function call used up all the arguments, now free
          * the rest

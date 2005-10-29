@@ -630,19 +630,60 @@ cleanup_object (object_t * obj)
     return;
 #else
     cleanup_t * context = NULL;
+    struct timeval t_begin, t_end;
+    Bool didSwap;
     long        clean_delay = (time_to_cleanup > 0) ? time_to_cleanup
                                                     : DEFAULT_CLEANUP_TIME;
+    if (gettimeofday(&t_begin, NULL))
+    {
+        t_begin.tv_sec = t_begin.tv_usec = 0;
+    }
 
     context = cleanup_new(MY_FALSE);
     if (context != NULL)
     {
-        (void)cleanup_single_object(obj, context);
+        didSwap = cleanup_single_object(obj, context);
         cleanup_structures(context);
         cleanup_compact_mappings(context);
         cleanup_free(context);
     }
     obj->time_cleanup = current_time + (9*clean_delay)/10
                                      + random_number((2*clean_delay)/10);
+
+    if (t_begin.tv_sec == 0
+     || gettimeofday(&t_end, NULL))
+    {
+        debug_message("%s Data-Clean: /%s %s\n"
+                     , time_stamp(), get_txt(obj->name)
+                     , didSwap ? "(swapped)" : "");
+        printf("%s Data-Clean: /%s %s\n"
+              , time_stamp(), get_txt(obj->name)
+              , didSwap ? "(swapped)" : "");
+    }
+    else
+    {
+        t_end.tv_sec -= t_begin.tv_sec;
+        t_end.tv_usec -= t_begin.tv_usec;
+        if (t_end.tv_usec < 0)
+        {
+            t_end.tv_sec--;
+            t_end.tv_usec += 1000000;
+        }
+
+        debug_message("%s Data-Clean: %3ld.%06ld s : /%s%s\n"
+                     , time_stamp()
+                     , (long)t_end.tv_sec, (long)t_end.tv_usec
+                     , get_txt(obj->name)
+                     , didSwap ? " (swapped)" : ""
+                     );
+        printf("%s Data-Clean: %3ld.%06ld s : /%s%s\n"
+              , time_stamp()
+              , (long)t_end.tv_sec, (long)t_end.tv_usec
+              , get_txt(obj->name)
+              , didSwap ? " (swapped)" : ""
+              );
+    }
+
 #endif /* NEW_CLEANUP */
 } /* cleanup_object() */
 
@@ -659,6 +700,13 @@ cleanup_all_objects (void)
     return;
 #else
     cleanup_t * context = NULL;
+    struct timeval t_begin, t_end;
+    long numObjects = 0;
+
+    if (gettimeofday(&t_begin, NULL))
+    {
+        t_begin.tv_sec = t_begin.tv_usec = 0;
+    }
 
     context = cleanup_new(MY_TRUE);
     if (context != NULL)
@@ -676,11 +724,37 @@ cleanup_all_objects (void)
                 cleanup_free(context);
                 return;
             }
+            numObjects++;
         }
         cleanup_structures(context);
         cleanup_compact_mappings(context);
         cleanup_free(context);
     }
+
+    if (t_begin.tv_sec == 0
+     || gettimeofday(&t_end, NULL))
+    {
+        debug_message("%s Data-Cleaned %ld objects\n", time_stamp(), numObjects);
+        printf("%s Data-Cleaned %ld objects\n", time_stamp(), numObjects);
+    }
+    else
+    {
+        t_end.tv_sec -= t_begin.tv_sec;
+        t_end.tv_usec -= t_begin.tv_usec;
+        if (t_end.tv_usec < 0)
+        {
+            t_end.tv_sec--;
+            t_end.tv_usec += 1000000;
+        }
+
+        debug_message("%s Data-Cleaned %ld objects in %ld.%06ld s\n"
+                     , time_stamp(), numObjects
+                     , (long)t_end.tv_sec, (long)t_end.tv_usec);
+        printf("%s Data-Cleaned %ld objects in %ld.%06ld s\n"
+              , time_stamp(), numObjects
+              , (long)t_end.tv_sec, (long)t_end.tv_usec);
+    }
+
 #endif /* NEW_CLEANUP */
 } /* cleanup_all_objects() */
 

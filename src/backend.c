@@ -194,6 +194,22 @@ update_statistic (statistic_t * pStat, long number)
 } /* update_statistic() */
 
 /*-------------------------------------------------------------------------*/
+void
+update_statistic_avg (statistic_t * pStat, long number)
+
+/* Add the <number> to the statistics in <pStat> and update the weighted
+ * average by degrading the previous value.
+ */
+
+{
+    double c;
+
+    pStat->sum += number;
+    c = avg_consts[1];
+    pStat->weighted_avg = (1 - c) * pStat->weighted_avg + number * c;
+} /* update_statistic_avg() */
+
+/*-------------------------------------------------------------------------*/
 double
 relate_statistics (statistic_t sStat, statistic_t sRef)
 
@@ -631,6 +647,8 @@ backend (void)
             ip->set_input_to = MY_FALSE;
             tracedepth = 0;
 
+            mark_start_evaluation();
+
             if (buff[0] == input_escape
              && buff[1] != '\0'
              && command_giver->super
@@ -657,6 +675,8 @@ backend (void)
                 NOOP;
             else
                 execute_command(buff, command_giver);
+
+            mark_end_evaluation();
 
             /* ip might be invalid again here */
 
@@ -884,6 +904,7 @@ static Bool did_swap;
 
     if (setjmp(error_recovery_info.con.text))
     {
+        mark_end_evaluation();
         clear_state();
         debug_message("%s Error in process_objects().\n", time_stamp());
     }
@@ -962,6 +983,7 @@ static Bool did_swap;
                 if (d_flag)
                     fprintf(stderr, "%s RESET %s\n", time_stamp(), get_txt(obj->name));
 #endif
+                mark_start_evaluation();
                 if (obj->flags & O_SWAPPED
                  && load_ob_from_swap(obj) < 0)
                    continue;
@@ -973,6 +995,7 @@ static Bool did_swap;
                 previous_ob = NULL;
                 trace_level = 0;
                 reset_object(obj, H_RESET);
+                mark_end_evaluation();
                 if (obj->flags & O_DESTRUCTED)
                     continue;
 
@@ -1049,6 +1072,7 @@ static Bool did_swap;
             {
                 lambda_t *l;
 
+                mark_start_evaluation();
                 l = driver_hook[H_CLEAN_UP].u.lambda;
                 if (driver_hook[H_CLEAN_UP].x.closure_type == CLOSURE_LAMBDA)
                 {
@@ -1059,10 +1083,13 @@ static Bool did_swap;
                 call_lambda(&driver_hook[H_CLEAN_UP], 2);
                 svp = inter_sp;
                 pop_stack();
+                mark_end_evaluation();
             }
             else if (driver_hook[H_CLEAN_UP].type == T_STRING)
             {
+                mark_start_evaluation();
                 svp = apply(driver_hook[H_CLEAN_UP].u.str, obj, 1);
+                mark_end_evaluation();
             }
             else
             {

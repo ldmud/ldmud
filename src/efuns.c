@@ -557,6 +557,7 @@ f_regexp (svalue_t *sp)
                 continue;
 
             eval_cost++;
+            total_evalcost++;
             line = v->item[i].u.str;
             rc = rx_exec(reg, line, 0);
             if (rc == 0)
@@ -661,6 +662,7 @@ f_regexplode (svalue_t *sp)
     while ((rc = rx_exec(reg, text, start)) > 0)
     {
         eval_cost++;
+        total_evalcost++;
         match = (struct regexplode_match *)alloca(sizeof *match);
         if (!match)
         {
@@ -910,6 +912,7 @@ f_regreplace (svalue_t *sp)
     while ((rc = rx_exec(reg, text, start)) > 0)
     {
         eval_cost++;
+        total_evalcost++;
         xallocate(match, sizeof(*match), "regreplace match structure");
         rx_get_match(reg, text, &(match->start), &(match->end));
         match->sub = NULL;
@@ -3916,6 +3919,7 @@ v_clones (svalue_t *sp, int num_arg)
 
 #if defined(DYNAMIC_COSTS)
     eval_cost += checked / 100 + found / 256;
+    total_evalcost += checked / 100 + found / 256;
 #endif /* DYNAMIC_COSTS */
 
     /* Create the result and put it onto the stack */
@@ -5874,6 +5878,7 @@ copy_svalue (svalue_t *dest, svalue_t *src
             DYN_ARRAY_COST(size);
 #if defined(DYNAMIC_COSTS)
             eval_cost += (depth+1) / 10;
+            total_evalcost += (depth+1) / 10;
 #endif
 
             /* Create a new array, assign it to dest, and store
@@ -5936,6 +5941,7 @@ copy_svalue (svalue_t *dest, svalue_t *src
             DYN_ARRAY_COST(size);
 #if defined(DYNAMIC_COSTS)
             eval_cost += (depth+1) / 10;
+            total_evalcost += (depth+1) / 10;
 #endif
 
             /* Create a new array, assign it to dest, and store
@@ -5995,6 +6001,7 @@ copy_svalue (svalue_t *dest, svalue_t *src
             DYN_MAPPING_COST(size);
 #if defined(DYNAMIC_COSTS)
             eval_cost += (depth+1) / 10;
+            total_evalcost += (depth+1) / 10;
 #endif
             info.depth = depth+1;
             info.width = old->num_values;

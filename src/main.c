@@ -2022,6 +2022,9 @@ options (void)
 #       if defined(MALLOC_ORDER_LARGE_FREELISTS)
                               , "MALLOC_ORDER_LARGE_FREELISTS"
 #       endif
+#       if defined(MALLOC_ORDER_SLAB_FREELISTS)
+                              , "MALLOC_ORDER_SLAB_FREELISTS"
+#       endif
 #       if defined(MALLOC_EXT_STATISTICS)
                               , "MALLOC_EXT_STATISTICS"
 #       endif
