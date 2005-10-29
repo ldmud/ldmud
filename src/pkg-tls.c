@@ -240,8 +240,12 @@ void tls_global_init (void)
 {
     char * keyfile = tls_keyfile ? tls_keyfile : TLS_DEFAULT_KEYFILE;
     char * certfile = tls_certfile ? tls_certfile : TLS_DEFAULT_CERTFILE;
+#ifdef HAS_OPENSSL
     char * trustfile = tls_trustfile ? tls_trustfile : NULL;
     char * trustdirectory = tls_trustdirectory ? tls_trustdirectory : TLS_DEFAULT_TRUSTDIRECTORY;
+#elif defined(HAS_GNUTLS)
+    /* GNUTLS doesn't support certificate checking yet. */
+#endif
 
 #ifdef HAS_OPENSSL
 
@@ -941,7 +945,8 @@ f_tls_check_certificate(svalue_t *sp)
 	}
     } /* if (tls active) */
 #elif defined(HAS_GNUTLS)
-    error("%s TLS: GNUTLS does not provide certificate checking yet");
+    error( "%s TLS: GNUTLS does not provide certificate checking yet."
+          , time_stamp());
 #endif
 
     free_svalue(sp);

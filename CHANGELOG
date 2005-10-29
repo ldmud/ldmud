@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+20-Feb-2004 (Lars Duening)  (3.3.675)
+  - (pkg-tls.c) Removed compilation errors when using GnuTLS.
+  - (comm.c) The charmode/noecho mode is changed in remove_input_to()
+       only if the first pending input_to() is removed. Hopefully this
+       fixes Bug #0000363.
+
 20-Feb-2004 (Lars Duening)  (3.3.674)
   - (prolang, simulate.c) During the compilation of the master object, simul
        efuns are disabled.

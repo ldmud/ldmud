@@ -7139,7 +7139,7 @@ f_set_buffer_size (svalue_t *sp)
 #endif /* SO_SNDBUF */
 
     return sp;
-}
+} /* f_set_buffer_size() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -7665,7 +7665,7 @@ v_input_to (svalue_t *sp, int num_arg)
 	return arg;
     }
 
-    /* Try stetting the input_to. On success, return 1. */
+    /* Try setting the input_to. On success, return 1. */
 
     if (set_call( command_giver, it, (char)flags
                 , (iflags & INPUT_NO_TELNET) != 0
@@ -7895,6 +7895,7 @@ v_remove_input_to (svalue_t *sp, int num_arg)
     svalue_t      *arg;  /* Pointer to the arguments of the efun */
     int            rc;   /* Resultvalue */
     interactive_t *ip;
+    Bool           removedFirst;
 
     /* Get the arguments */
     arg = sp - num_arg + 1;
@@ -7921,6 +7922,8 @@ v_remove_input_to (svalue_t *sp, int num_arg)
         input_to_t * prev;
         input_to_t    *it;
 
+        removedFirst = MY_FALSE;
+
         /* Get the interactive object.
          * If there is none, or if it is closing down or doesn't have
          * an input_to set, fail.
@@ -7942,6 +7945,7 @@ v_remove_input_to (svalue_t *sp, int num_arg)
             ip->input_to = it->next;
             free_input_to(it);
             ip->set_input_to = (ip->input_to != NULL);
+            removedFirst = MY_TRUE;
             rc = 1;
             break;
         }
@@ -7997,7 +8001,10 @@ v_remove_input_to (svalue_t *sp, int num_arg)
         {
             /* We found the input_to: remove it */
             if (prev == NULL)
+            {
                 ip->input_to = it->next;
+                removedFirst = MY_TRUE;
+            }
             else
                 prev->next = it->next;
 
@@ -8011,8 +8018,10 @@ v_remove_input_to (svalue_t *sp, int num_arg)
         rc = 0;
     } while (0);
 
-    if (rc)
+    if (rc && removedFirst)
     {
+        if (ip->noecho)
+            ip->noecho |= NOECHO_STALE;
         set_noecho(ip, ip->input_to ? ip->input_to->noecho : ip->noecho
                      , ip->input_to ? ip->input_to->local : MY_FALSE
                   );
