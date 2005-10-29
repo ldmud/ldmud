@@ -459,7 +459,7 @@ static size_t slaballoc_size;
  * afterwards.
  */
 
-typedef struct slab_s slab_t;
+typedef struct slab_s mslab_t;
 
 struct slab_s
 {
@@ -468,7 +468,7 @@ struct slab_s
 #endif
     size_t   size;          /* Block size (incl. overhead) for this slab in
                              * bytes. */
-    slab_t * prev, * next;  /* Link pointers for slab list. */
+    mslab_t * prev, * next;  /* Link pointers for slab list. */
     short    numAllocated;  /* Number of blocks allocated. */
     short    numBlocks;     /* Number of blocks available total. */
     word_t * freeList;      /* List of free blocks. */
@@ -488,12 +488,12 @@ typedef struct slabentry_s slabentry_t;
 
 struct slabentry_s
 {
-    slab_t * first;          /* Head of the slab list. */
-    slab_t * last;           /* Last slab in the list. */
-    slab_t * fullSlabs;      /* Head of the full slab list. */
-    slab_t * firstFree;      /* Head of the free slab list. */
-    slab_t * lastFree;       /* Last free slab in the list. */
-    slab_t * fresh;          /* NULL, or the fresh slab. */
+    mslab_t * first;          /* Head of the slab list. */
+    mslab_t * last;           /* Last slab in the list. */
+    mslab_t * fullSlabs;      /* Head of the full slab list. */
+    mslab_t * firstFree;      /* Head of the free slab list. */
+    mslab_t * lastFree;       /* Last free slab in the list. */
+    mslab_t * fresh;          /* NULL, or the fresh slab. */
     word_t * freshMem;       /* NULL, or the end of the free mem in the fresh
                               * slab.
                               */
@@ -668,7 +668,7 @@ mem_block_total_size (POINTER p)
   
     if (q[M_SIZE] & M_SMALL)
     {
-        slab_t * slab = (slab_t*)(q - (q[M_SIZE] & M_MASK));
+        mslab_t * slab = (mslab_t*)(q - (q[M_SIZE] & M_MASK));
         return slab->size;
     }
     return q[M_LSIZE]*SINT;
@@ -805,7 +805,7 @@ mem_dump_data (strbuf_t *sbuf)
     s_slab = small_slab_stat; s_slab.size += s_slab.counter * M_OVERHEAD * SINT;
     s_free_slab = small_slab_free_stat;
 
-    s_overhead = s_slab.counter * (sizeof(slab_t) - SINT + M_OVERHEAD * SINT);
+    s_overhead = s_slab.counter * (sizeof(mslab_t) - SINT + M_OVERHEAD * SINT);
 
 #   define dump_stat(str,stat) strbuf_addf(sbuf, str,stat.counter,stat.size)
 
@@ -950,7 +950,7 @@ mem_dinfo_data (svalue_t *svp, int value)
         put_ref_string(svp, STR_SLABALLOC);
 
     small_overhead = small_slab_stat.counter
-                     * (sizeof(slab_t) - SINT + M_OVERHEAD * SINT);
+                     * (sizeof(mslab_t) - SINT + M_OVERHEAD * SINT);
 
     ST_NUMBER(DID_MEM_SBRK, sbrk_stat.counter);
     ST_NUMBER(DID_MEM_SBRK_SIZE, sbrk_stat.size);
@@ -1104,9 +1104,9 @@ available_memory(void)
         { \
             in_malloc = 0; \
             fatal("allocation from free list for %lu bytes: " \
-                  "block %p magic match failed, " \
+                  "block %p (user %p) magic match failed, " \
                   "expected %08lx, found %08lx\n" \
-                 , (unsigned long) size, block \
+                 , (unsigned long) size, block, block+T_OVERHEAD \
                  , sfmagic[SIZE_MOD_INDEX(size, sfmagic)] \
                  , block[M_MAGIC]); \
         } \
@@ -1124,7 +1124,7 @@ available_memory(void)
 #ifdef MALLOC_ORDER_SMALL_FREELISTS
 
 static void
-keep_small_order (slab_t * slab, int ix)
+keep_small_order (mslab_t * slab, int ix)
 
 /* Slab <slab> is a partially used slab in slabtable entry <ix>.
  * Check it's position and move it to a more approriate place
@@ -1144,7 +1144,7 @@ keep_small_order (slab_t * slab, int ix)
          * keep a local order by switch the current slab and its successor.
          * Kinda like a fuzzy incremental bubble sort :-)
          */
-        slab_t * point = slab->next;
+        mslab_t * point = slab->next;
 
         ulog4f("slaballoc: need reorder: this %x free %d, next %x free %d\n"
               , slab, slab->numBlocks - slab->numAllocated
@@ -1153,14 +1153,14 @@ keep_small_order (slab_t * slab, int ix)
 #if 0
 #ifdef DEBUG_MALLOC_ALLOCS
         {
-            slab_t * p = slabtable[ix].first;
+            mslab_t * p = slabtable[ix].first;
 
             ulog3f("slaballoc:   [%d]: %x (%d)"
                  , ix, p, p->numBlocks - p->numAllocated
                  );
             while (p->next != NULL)
             {
-                slab_t * prev = p;
+                mslab_t * prev = p;
                 p = p->next;
                 ulog2f(" -> %x (%d)"
                      , p, p->numBlocks - p->numAllocated
@@ -1213,14 +1213,14 @@ keep_small_order (slab_t * slab, int ix)
 
 #ifdef DEBUG_MALLOC_ALLOCS
         {
-            slab_t * p = slabtable[ix].first;
+            mslab_t * p = slabtable[ix].first;
 
             ulog3f("slaballoc:   [%d]: %x (%d)"
                  , ix, p, p->numBlocks - p->numAllocated
                  );
             while (p->next != NULL)
             {
-                slab_t * prev = p;
+                mslab_t * prev = p;
                 p = p->next;
                 ulog2f(" -> %x (%d)"
                      , p, p->numBlocks - p->numAllocated
@@ -1255,7 +1255,7 @@ keep_small_order (slab_t * slab, int ix)
 
 /*-------------------------------------------------------------------------*/
 static void
-insert_partial_slab (slab_t * slab, int ix)
+insert_partial_slab (mslab_t * slab, int ix)
 
 /* Insert the given <slab> into the partially-used list of slabtable entry
  * <ix>.
@@ -1295,7 +1295,7 @@ insert_partial_slab (slab_t * slab, int ix)
 
 /*-------------------------------------------------------------------------*/
 static void
-free_slab (slab_t * slab, int ix)
+free_slab (mslab_t * slab, int ix)
 
 /* Free the <slab> which belongs to slabtable entry <ix>.
  * The slab has already been unlinked, all there is left to do is
@@ -1395,7 +1395,7 @@ mem_alloc (size_t size)
     {
         /* Yup, we can. */
 
-        slab_t * slab = slabtable[ix].first;
+        mslab_t * slab = slabtable[ix].first;
 
         ulog4f("slaballoc:   block %x from freelist (next %x), slab %x free %d\n"
               , slab->freeList, BLOCK_NEXT(slab->freeList), slab, slab->numBlocks - slab->numAllocated
@@ -1463,7 +1463,7 @@ mem_alloc (size_t size)
     /* If there is no fresh slab, allocate one. */
     if (NULL == slabtable[ix].fresh)
     {
-        slab_t * slab;
+        mslab_t * slab;
 
         /* If there are slabs in the fully-free list, use
          * the oldest one from there. Otherwise, allocated
@@ -1513,17 +1513,17 @@ mem_alloc (size_t size)
                 size_t minSlabObjectSize = DESIRED_SLAB_SIZE / 128;
                 size_t sizeMultiplier = 1 + (size-1) / minSlabObjectSize;
                 size_t totalSlabSize = DESIRED_SLAB_SIZE * sizeMultiplier;
-                size_t effSlabSize = totalSlabSize - sizeof(slab_t) - SINT;
+                size_t effSlabSize = totalSlabSize - sizeof(mslab_t) - SINT;
 #else
                 size_t totalSlabSize = DESIRED_SLAB_SIZE;
-                size_t effSlabSize = totalSlabSize - sizeof(slab_t) - SINT;
+                size_t effSlabSize = totalSlabSize - sizeof(mslab_t) - SINT;
 #endif
                 numObjects = (short)(effSlabSize / size);
             }
 
             slabSize = sizeof(struct slab_s) - SINT + numObjects * size;
 
-            slab = (slab_t*)large_malloc_int(slabSize, MY_FALSE);
+            slab = (mslab_t*)large_malloc_int(slabSize, MY_FALSE);
 
             if (slab == NULL)
             {
@@ -1603,7 +1603,7 @@ mem_alloc (size_t size)
      */
     if (slabtable[ix].freshMem == slabtable[ix].fresh->blocks)
     {
-        slab_t * slab = slabtable[ix].fresh;
+        mslab_t * slab = slabtable[ix].fresh;
 
         ulog2f("slaballoc:   fresh %x full, freelist %x\n"
               , slab, slab->freeList
@@ -1651,7 +1651,7 @@ sfree (POINTER ptr)
 {
     word_t *block;
     word_t ix;
-    slab_t *slab;
+    mslab_t *slab;
     Bool   isFirstFree;
 
     if (!ptr)
@@ -1679,7 +1679,7 @@ sfree (POINTER ptr)
 
     /* It's a small block: put it into the slab's free list */
 
-    slab = (slab_t*)(block - (block[M_SIZE] & M_MASK));
+    slab = (mslab_t*)(block - (block[M_SIZE] & M_MASK));
     count_back(small_alloc_stat, slab->size);
     ix =  SIZE_INDEX(slab->size);
 
@@ -3574,7 +3574,7 @@ mem_is_freed (void *p, p_uint minsize)
 
     if (block[M_SIZE] & M_SMALL)
     {
-        i = ((slab_t *)(block - (block[M_SIZE] & M_MASK)))->size / SINT;
+        i = ((mslab_t *)(block - (block[M_SIZE] & M_MASK)))->size / SINT;
     }
     else
     {
@@ -3605,7 +3605,7 @@ mem_is_freed (void *p, p_uint minsize)
 
 /*-------------------------------------------------------------------------*/
 static void
-mem_clear_slab_memory_flags (const char * tag,  slab_t * slab, word_t * startp)
+mem_clear_slab_memory_flags (const char * tag,  mslab_t * slab, word_t * startp)
 
 /* Set the flags for the memory of <slab>: the slab and the contained
  * free list block are marked as referenced, the others as unreferenced.
@@ -3676,7 +3676,7 @@ mem_clear_ref_flags (void)
      */
     for  (i = 0; i < SMALL_BLOCK_NUM; ++i)
     {
-        slab_t * slab;
+        mslab_t * slab;
 
         ulog1f("slaballoc: clear_ref [%d]\n", i);
 
@@ -3722,7 +3722,7 @@ mem_clear_ref_flags (void)
 
 /*-------------------------------------------------------------------------*/
 static mp_int
-mem_free_unrefed_slab_memory (const char * tag, slab_t * slab, word_t * startp)
+mem_free_unrefed_slab_memory (const char * tag, mslab_t * slab, word_t * startp)
 
 /* Scan the memory of <slab> for unreferenced blocks and free them.
  * If <startp> is not NULL, it denotes the starting memory address
@@ -3843,7 +3843,7 @@ mem_free_unrefed_memory (void)
     success = 0;
     for  (i = 0; i < SMALL_BLOCK_NUM; ++i)
     {
-        slab_t * slab, *next;
+        mslab_t * slab, *next;
 
         ulog1f("slaballoc: free_unrefed [%d]\n" , i);
 
@@ -3883,7 +3883,7 @@ mem_free_unrefed_memory (void)
 #if 0
 static void
 mem_dump_slab_memory (int fd, const char * tag, int tableIx
-                     , slab_t * slab, word_t * startp)
+                     , mslab_t * slab, word_t * startp)
 
 /* Dump the memory of <slab>.
  * If <startp> is not NULL, it denotes the starting memory address
@@ -3949,7 +3949,7 @@ mem_dump_slab_memory (int fd, const char * tag, int tableIx
 /*-------------------------------------------------------------------------*/
 static Bool
 mem_identify_slab (int fd, const char * tag, int tableIx
-                  , slab_t * list, slab_t * slab)
+                  , mslab_t * list, mslab_t * slab)
 
 /* Check if <slab> is member of the list starting at <listStart>.
  * If yes, print it's information preceeded by <tag> and return TRUE.
@@ -4036,15 +4036,15 @@ mem_dump_memory (int fd)
                 if (!isSlab)
                     isSlab = mem_identify_slab(fd, "partial", ix
                                               , slabtable[ix].first
-                                              , (slab_t*)q);
+                                              , (mslab_t*)q);
                 if (!isSlab)
                     isSlab = mem_identify_slab(fd, "full", ix
                                               , slabtable[ix].fullSlabs
-                                              , (slab_t*)q);
+                                              , (mslab_t*)q);
                 if (!isSlab)
                     isSlab = mem_identify_slab(fd, "free", ix
                                               , slabtable[ix].firstFree
-                                              , (slab_t*)q);
+                                              , (mslab_t*)q);
             }
             if (!isSlab)
             {
@@ -4075,7 +4075,7 @@ mem_dump_memory (int fd)
      */
     for (ix = 0; ix < SMALL_BLOCK_NUM; ++ix)
     {
-        slab_t * slab;
+        mslab_t * slab;
 
         if (NULL != (slab = slabtable[ix].fresh))
         {
@@ -4118,7 +4118,7 @@ mem_consolidate (Bool force)
 
         if (force)
         {
-            slab_t * slab;
+            mslab_t * slab;
 
             while (NULL != (slab = slabtable[ix].firstFree))
             {
@@ -4132,7 +4132,7 @@ mem_consolidate (Bool force)
 #if SLAB_RETENTION_TIME > 0
         else
         {
-            slab_t * slab;
+            mslab_t * slab;
 
             if ( NULL != (slab = slabtable[ix].lastFree)
               && current_time - (mp_int)slab->blocks[0] > SLAB_RETENTION_TIME

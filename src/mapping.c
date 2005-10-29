@@ -964,20 +964,20 @@ static svalue_t local_const0;
         mp_int msize;
 
         msize = (mp_int)MAP_TOTAL_SIZE(m) + m->num_values + 1;
-        if (   (max_mapping_size && msize >= (mp_int)max_mapping_size)
+        if (   (max_mapping_size && msize > (mp_int)max_mapping_size)
             || (max_mapping_keys && MAP_SIZE(m)+1 > max_mapping_keys)
            )
         {
             check_map_for_destr(m);
             msize = (mp_int)MAP_TOTAL_SIZE(m) + m->num_values + 1;
         }
-        if (max_mapping_size && msize >= (mp_int)max_mapping_size)
+        if (max_mapping_size && msize > (mp_int)max_mapping_size)
         {
             error("Illegal mapping size: %ld elements (%ld x %ld)\n"
                  , msize, (long)MAP_SIZE(m)+1, (long)m->num_values);
             return NULL;
         }
-        if (max_mapping_keys && MAP_SIZE(m) >= (mp_int)max_mapping_keys)
+        if (max_mapping_keys && MAP_SIZE(m) > (mp_int)max_mapping_keys)
         {
             error("Illegal mapping size: %ld entries\n", msize+1);
             return NULL;

@@ -5485,18 +5485,10 @@ closure_location (lambda_t *l)
 
             sprintf(buf, "%d", lineno);
 
-            rc = mstr_append(STR_FROM, name);
+            rc = mstr_add(STR_FROM, name);
             free_mstring(name);
-            if (!rc) break;
-
             rc = mstr_append(rc, STR_LINE);
-            if (!rc) break;
-            free_mstring(rc);
-
             rc = mstr_append_txt(rc, buf, strlen(buf));
-            if (!rc) break;
-            free_mstring(rc);
-
         } while(0);
     }
 
@@ -5721,7 +5713,7 @@ closure_to_string (svalue_t * sp, Bool compact)
          * string rc such that an out of memory condition won't
          * destroy rc itself.
          */
-        rc3 = mstr_append(rc, rc2);
+        rc3 = mstr_add(rc, rc2);
         if (rc3)
         {
             free_mstring(rc);

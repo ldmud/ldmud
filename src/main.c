@@ -1218,6 +1218,7 @@ static Option aOptions[]
 
     , { 0,   "regexp",             cRegexp,         MY_TRUE
       , "  --regexp pcre|traditional\n"
+      , "  --regexp pcre|traditional\n"
         "    Select the default regexp package.\n"
       }
 

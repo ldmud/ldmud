@@ -235,7 +235,7 @@ insert_alist (svalue_t *key, svalue_t * /* TODO: bool */ key_data, vector_t *lis
     int new_member;            /* Flag if a new tuple is given */
 
     /* If key is a string, make it shared */
-    if (key->type == T_STRING && !mstr_d_tabled(key->u.str))
+    if (key->type == T_STRING && !mstr_tabled(key->u.str))
     {
         key->u.str = make_tabled(key->u.str);
     }

@@ -65,7 +65,6 @@ extern unsigned long stNumTabledChecked;
 extern void mstring_init (void);
 extern whash_t    mstring_get_hash (string_t * pStr);
 extern string_t * mstring_alloc_string (size_t iSize MTRACE_DECL);
-extern string_t * mstring_realloc_string (string_t *string, size_t iSize MTRACE_DECL);
 extern string_t * mstring_new_string (const char * const pTxt MTRACE_DECL);
 extern string_t * mstring_new_n_string (const char * const pTxt, size_t len MTRACE_DECL);
 extern string_t * mstring_new_tabled (const char * const pTxt MTRACE_DECL);
@@ -223,7 +222,6 @@ extern void   string_dinfo_status(svalue_t *svp, int value);
 /* A handful of shorthands for commonly used functions */
 
 #define alloc_mstring(iSize)     mstring_alloc_string(iSize MTRACE_ARG)
-#define realloc_mstring(pStr,iSize)  mstring_realloc_string(pStr,iSize MTRACE_ARG)
 #define new_mstring(pTxt)        mstring_new_string(pTxt MTRACE_ARG)
 #define new_n_mstring(pTxt,len)  mstring_new_n_string(pTxt,len MTRACE_ARG)
 #define new_tabled(pTxt)         mstring_new_tabled(pTxt MTRACE_ARG)
@@ -243,10 +241,10 @@ extern void   string_dinfo_status(svalue_t *svp, int value);
 #define mstrstr(pStr,pTxt)       mstring_mstr_n_str(pStr, 0, pTxt, strlen(pTxt))
 #define mstrrstr(pStr,pTxt)      mstring_mstr_rn_str(pStr, mstrsize(pStr)-1, pTxt, strlen(pTxt))
 #define mstr_add(pStr1,pStr2)     mstring_add(pStr1,pStr2 MTRACE_ARG)
-#define mstr_append(pStr1,pStr2)  mstring_append(pStr1,pStr2 MTRACE_ARG)
 #define mstr_add_txt(pStr1,pTxt2,len) mstring_add_txt(pStr1,pTxt2,len MTRACE_ARG)
-#define mstr_append_txt(pStr1,pTxt2,len) mstring_append_txt(pStr1,pTxt2,len MTRACE_ARG)
 #define mstr_add_to_txt(pTxt1,len,pStr2) mstring_add_to_txt(pTxt1, len, pStr2 MTRACE_ARG)
+#define mstr_append(pStr1,pStr2)  mstring_append(pStr1,pStr2 MTRACE_ARG)
+#define mstr_append_txt(pStr1,pTxt2,len) mstring_append_txt(pStr1,pTxt2,len MTRACE_ARG)
 #define mstr_repeat(pStr,num)    mstring_repeat(pStr,num MTRACE_ARG)
 #define mstr_extract(pStr,start,end) mstring_extract (pStr,start,end MTRACE_ARG)
 #define add_slash(pStr)          mstring_add_slash(pStr MTRACE_ARG)

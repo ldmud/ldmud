@@ -54,9 +54,9 @@
  *   The table structures are external, and the reference from the
  *   table is not counted.
  *
- * TODO: Make functions mstr_append() resilient to receiving NULL
+ * TODO: Make functions mstr_add() resilient to receiving NULL
  * TODO:: pointers as args. This way stuff like rc =
- * TODO:: mstr_append(rc,...) will always work and we need to check
+ * TODO:: mstr_add(rc,...) will always work and we need to check
  * TODO:: for rc != NULL only at the end.
  * TODO: Distinguish between the allocated size of a string and the
  * TODO:: used size. To use this efficiently, functions like mstr_insert()...
@@ -436,54 +436,6 @@ mstring_alloc_string (size_t iSize MTRACE_DECL)
 
     return string;
 } /* mstring_alloc_string() */
-
-/*-------------------------------------------------------------------------*/
-string_t *
-mstring_realloc_string (string_t *string, size_t iSize MTRACE_DECL)
-
-/* Aliased to: realloc_mstring(string, iSize)
- *
- * Change the space of the <string> to <iSize> characters, keeping
- * the old content as far as possible. Return the pointer to the
- * new string on success, or NULL if memory runs out.
- *
- * The string must not be tabled.
- */
-
-{
-    string_t *sdata;
-    size_t    old_msize;
-
-    if (string->info.tabled)
-    {
-        fatal("mstring_realloc_string: String %p (%s) must not be tabled.\n"
-             , string, string->txt
-             );
-    }
-
-    old_msize = mstr_mem_size(string);
-
-    /* Get the memory */
-
-    sdata = rexalloc_pass(string, iSize + sizeof(*sdata));
-    if (!sdata)
-        return NULL;
-
-    /* Update the structure */
-    sdata->size = iSize;
-    sdata->hash = 0;
-    sdata->txt[iSize] = '\0';
-
-    {
-        size_t msize;
-
-        msize = mstr_mem_size(sdata);
-        mstr_used_size += msize - old_msize;
-        mstr_untabled_size += msize - old_msize;
-    }
-
-    return sdata;
-} /* mstring_realloc_string() */
 
 /*-------------------------------------------------------------------------*/
 string_t *
@@ -930,7 +882,6 @@ mstring_free (string_t *s)
 
         mstr_untabled--;
         mstr_untabled_size -= msize;
-
     }
 
     /* The deallocation of the string itself is the same in either case. */
@@ -1371,45 +1322,6 @@ mstring_add (const string_t *left, const string_t *right MTRACE_DECL)
 
 /*-------------------------------------------------------------------------*/
 string_t *
-mstring_append (string_t *left, const string_t *right MTRACE_DECL)
-
-/* Aliased to: mstr_append(left,right)
- *
- * If <left> is singular (ie. untabled with only one reference):
- * Append the data from <right> to the string <left>, and return the
- * modified <left> with an additional reference.
- *
- * If <left> is not singular:
- * Create and return a new string with the data of <left> concatenated
- * with the data of <right>.
- * The result string is untabled and has one reference,
- * the old strings <left> and <right> are not changed.
- *
- * If memory runs out, NULL is returned.
- */
-
-{
-    size_t lleft, lright;
-
-    if (!mstr_singular(left))
-        return mstring_add(left, right MTRACE_PASS);
-
-    lleft = mstrsize(left);
-    lright = mstrsize(right);
-    left = mstring_realloc_string(left, lleft+lright MTRACE_PASS);
-    if (left)
-    {
-        char * txt;
-
-        txt = get_txt(left);
-        memcpy(get_txt(left)+lleft, get_txt(right), lright);
-        ref_mstring(left);
-    }
-    return left;
-} /* mstring_append() */
-
-/*-------------------------------------------------------------------------*/
-string_t *
 mstring_add_txt (const string_t *left, const char *right, size_t len MTRACE_DECL)
 
 /* Aliased to: mstr_add_txt(left,right,len)
@@ -1440,44 +1352,6 @@ mstring_add_txt (const string_t *left, const char *right, size_t len MTRACE_DECL
 
 /*-------------------------------------------------------------------------*/
 string_t *
-mstring_append_txt (string_t *left, const char *right, size_t len MTRACE_DECL)
-
-/* Aliased to: mstr_append_txt(left,right,len)
- *
- * If <left> is singular (ie. untabled with only one reference):
- * Append the <len> bytes of data in buffer <right> to the string <left>, and
- * return the modified <left> with an additional reference.
- *
- * If <left> is not singular:
- * Create and return a new string with the data of <left> concatenated
- * with the <len> bytes of data in buffer <right>.
- * The result string is untabled and has one reference,
- * the old string <left> is not changed.
- *
- * If memory runs out, NULL is returned.
- */
-
-{
-    size_t lleft;
-
-    if (!mstr_singular(left))
-        return mstring_add_txt(left, right, len MTRACE_PASS);
-
-    lleft = mstrsize(left);
-    left = mstring_realloc_string(left, lleft+len MTRACE_PASS);
-    if (left)
-    {
-        char * txt;
-
-        txt = get_txt(left);
-        memcpy(get_txt(left)+lleft, right, len);
-        ref_mstring(left);
-    }
-    return left;
-} /* mstring_append_txt() */
-
-/*-------------------------------------------------------------------------*/
-string_t *
 mstring_add_to_txt (const char *left, size_t len, const string_t *right MTRACE_DECL)
 
 /* Aliased to: mstr_add_to_txt(left,len,right)
@@ -1505,6 +1379,57 @@ mstring_add_to_txt (const char *left, size_t len, const string_t *right MTRACE_D
     }
     return tmp;
 } /* mstring_add_to_txt() */
+
+/*-------------------------------------------------------------------------*/
+string_t *
+mstring_append (string_t *left, const string_t *right MTRACE_DECL)
+
+/* Aliased to: mstr_append(left,right)
+ *
+ * Create and return a new string with the data of <left> concatenated
+ * with the data of <right>.
+ * The result string is untabled and has one reference,
+ * <left> is dereferenced once (if not NULL).
+ * the old strings <right> is not changed.
+ *
+ * If memory runs out or if <left> is already NULL, NULL is returned.
+ */
+
+{
+    string_t *tmp;
+
+    if (left == NULL)
+        return NULL;
+
+    tmp = mstring_add(left, right MTRACE_PASS);
+    free_mstring(left);
+    return tmp;
+} /* mstring_append() */
+
+/*-------------------------------------------------------------------------*/
+string_t *
+mstring_append_txt (string_t *left, const char *right, size_t len MTRACE_DECL)
+
+/* Aliased to: mstr_append_txt(left,right,len)
+ *
+ * Create and return a new string with the data of <left> concatenated
+ * with the <len> bytes of data in buffer <right>.
+ * The result string is untabled and has one reference,
+ * <left> is dereferenced once (if not NULL).
+ *
+ * If memory runs out or if <left> is already NULL, NULL is returned.
+ */
+
+{
+    string_t *tmp;
+
+    if (left == NULL)
+        return NULL;
+
+    tmp = mstring_add_txt(left, right, len MTRACE_PASS);
+    free_mstring(left);
+    return tmp;
+} /* mstring_append_txt() */
 
 /*-------------------------------------------------------------------------*/
 string_t *

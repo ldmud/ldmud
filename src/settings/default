@@ -233,14 +233,13 @@ enable_use_pthreads=no
 # --- Memory ---
 
 # Which memory manager to use. Possible defines are
-#   default:   Depending on the setting and support pthreads, either
-#              slaballoc or ptmalloc is selected.
+#   default:   slaballoc is selected.
 #   smalloc:   Satoria's malloc. Second fastest, uses the least memory,
-#              supports garbage collection, not threadsafe.
+#              supports garbage collection, not fully threadsafe.
 #   slaballoc: Slab allocator. Fastest, reduces fragmentation,
-#              supports garbage collection, not threadsafe.
+#              supports garbage collection, not fully threadsafe.
 #   ptmalloc:  ptmalloc from www.malloc.de, supports GC, threadsafe.
-#   sysmalloc: the normal system malloc()
+#   sysmalloc: the normal system malloc(), threadsafe.
 
 with_malloc=default
 

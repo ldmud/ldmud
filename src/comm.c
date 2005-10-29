@@ -2843,7 +2843,7 @@ get_message (char *buff)
                                 current_object = NULL;
                                 push_array(inter_sp, v);
                                 push_number(inter_sp, rest);
-                                cp = rp + 8;
+                                cp = (unsigned char *)rp + 8;
                                 for (svp = v->item; --rest >=0; svp++)
                                 {
                                     svp->u.number = *cp++;

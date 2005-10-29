@@ -1398,9 +1398,9 @@ defragment_small_block (word_t *block)
         { \
             in_malloc = 0; \
             fatal("allocation from free list for %lu bytes: " \
-                  "block %p magic match failed, " \
+                  "block %p (user %p) magic match failed, " \
                   "expected %08lx, found %08lx\n" \
-                 , (unsigned long) size, block \
+                 , (unsigned long) size, block, block+T_OVERHEAD \
                  , sfmagic[SIZE_MOD_INDEX(size, sfmagic)] \
                  , block[M_MAGIC]); \
         } \
