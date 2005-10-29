@@ -188,6 +188,8 @@ For a detailed list of all changes see the file CHANGELOG.
     - Changed efuns:
        + db_*(): mySQL efuns trigger a privilege violation ("mysql", "<efun
            name>").
+       + get_dir(): New flags GETDIR_ACCESS and GETDIR_MODES to return
+           the file access times and file modes.
        + input_to(): New flag INPUT_NO_TELNET to modify the INPUT_CHARMODE
            behaviour.
        + input_to(): New flag INPUT_APPEND to queue input_to()s.

@@ -41,9 +41,14 @@ BESCHREIBUNG
         GETDIR_PATH     (0x10)  Dateinamen werden als volle Pfade geliefert.
                                 (ein ev. fehlendes GETDIR_NAMES wird als
                                 vorhanden angenommen).
+        GETDIR_ACCESS   (0x40)  liefert die unsortierten Zeiten des jeweils
+                                letzten Zugriffes in Sekunden seit dem
+                                01.01.1970.
+        GETDIR_ACCESS   (0x80)  liefert die Filemode-Maske
+
         GETDIR_UNSORTED (0x20)  Das Ergebnis wird nicht sortiert.
-        GETDIR_ALL      (0x07)  GETDIR_NAMES|GETDIR_SIZES|GETDIR_DATES
-                                (siehe Beispiele).
+
+        GETDIR_ALL      (0xDF)  Liefert all Werte zurueck.
 
         Wichtig: Man muss GETDIR_NAMES|GETDIR_UNSORTED verwenden, wenn man
         die Eintraege in der selben Reihenfolge wie bei GETDIR_SIZES und

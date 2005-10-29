@@ -315,6 +315,8 @@ struct xdirect
     char  *d_name;
     int   size;
     int   time;
+    int   atime;
+    int   mode;
 };
 
 #define XOPENDIR(dest, path) (\
@@ -333,8 +335,8 @@ xreaddir (XDIR *dir_ptr, int mask)
 
 /* Read the next entry from <dir_ptr> and return it via a pointer
  * to a static xdirect structure.
- * <mask> is tested for GETDIR_SIZES and GETDIR_DATES - only the data
- * for requested items is returned.
+ * <mask> is tested for GETDIR_SIZES, GETDIR_DATES, GETDIR_ACCESS,
+ * GETDIR_MODES - only the data for requested items is returned.
  */
 
 {
@@ -349,12 +351,14 @@ xreaddir (XDIR *dir_ptr, int mask)
     namelen = DIRENT_NLENGTH(de);
     xde.d_namlen = namelen;
     xde.d_name   = de->d_name;
-    if (mask & (GETDIR_SIZES|GETDIR_DATES) )
+    if (mask & (GETDIR_SIZES|GETDIR_DATES|GETDIR_ACCESS|GETDIR_MODES) )
     {
         if (ixstat(xde.d_name, &st) == -1) /* who knows... */
         {
             xde.size = FSIZE_NOFILE;
             xde.time = 0;
+            xde.atime = 0;
+            xde.mode = 0;
         }
         else
         {
@@ -363,6 +367,8 @@ xreaddir (XDIR *dir_ptr, int mask)
             else
                 xde.size = st.st_size;
             xde.time = st.st_mtime;
+            xde.atime = st.st_atime;
+            xde.mode = st.st_mode;
         }
     }
     return &xde;
@@ -716,10 +722,13 @@ f_get_dir (svalue_t *sp)
  * GETDIR_PATH     (0x10)  if this mask bit is set, the filenames with
  *                         the full path will be returned
  *                         (GETDIR_NAMES is implied).
+ * GETDIR_ACCESS   (0x40)  put the file access dates unsorted into
+ *                         the returned array.
+ * GETDIR_MODES    (0x80)  put the unix file modes unsorted into
+ *                         the returned array.
  * GETDIR_UNSORTED (0x20)  if this mask bit is set, the result of will
  *                         _not_ be sorted.
- * GETDIR_ALL      (0x07)  GETDIR_NAMES|GETDIR_SIZES|GETDIR_DATES (see
- *                         examples).
+ * GETDIR_ALL      (0xDF)  Return all.
  *
  * Note: You should use GETDIR_NAMES|GETDIR_UNSORTED to get the entries
  * in the same order as with GETDIR_SIZES and GETDIR_DATES.
@@ -795,7 +804,10 @@ f_get_dir (svalue_t *sp)
         /* Number of data items per file */
         nqueries =   ((mask & GETDIR_NAMES) != 0)
                    + ((mask & GETDIR_SIZES) != 0)
-                   + ((mask & GETDIR_DATES) != 0);
+                   + ((mask & GETDIR_DATES) != 0)
+                   + ((mask & GETDIR_ACCESS) != 0)
+                   + ((mask & GETDIR_MODES) != 0)
+                   ;
 
         if (strchr(p, '*') || ixstat(path, &st) < 0)
         {
@@ -853,6 +865,16 @@ f_get_dir (svalue_t *sp)
             if (mask & GETDIR_DATES)
             {
                 put_number(stmp, st.st_mtime);
+                stmp++;
+            }
+            if (mask & GETDIR_ACCESS)
+            {
+                put_number(stmp, st.st_atime);
+                stmp++;
+            }
+            if (mask & GETDIR_MODES)
+            {
+                put_number(stmp, st.st_mode);
                 stmp++;
             }
             break;
@@ -990,6 +1012,16 @@ f_get_dir (svalue_t *sp)
             if (mask & GETDIR_DATES)
             {
                 put_number(w->item + j, de->time);
+                j++;
+            }
+            if (mask & GETDIR_ACCESS)
+            {
+                put_number(w->item + j, de->atime);
+                j++;
+            }
+            if (mask & GETDIR_MODES)
+            {
+                put_number(w->item + j, de->mode);
                 j++;
             }
             i++;

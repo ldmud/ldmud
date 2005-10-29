@@ -13,13 +13,15 @@
 /* Flag values for get_dir().
  */
 
-#define GETDIR_EMPTY      0  /* return an empty array (not very useful) */
-#define GETDIR_NAMES      1  /* return the filenames */
-#define GETDIR_SIZES      2  /* return the file sizes */
-#define GETDIR_DATES      4  /* return the dates of last modification */
-#define GETDIR_PATH      16  /* with _NAMES: add the path to the filenames */
-#define GETDIR_UNSORTED  32  /* return the results unsorted */
+#define GETDIR_EMPTY       (0)  /* return an empty array (not very useful) */
+#define GETDIR_NAMES     (0x01)  /* return the filenames */
+#define GETDIR_SIZES     (0x02)  /* return the file sizes */
+#define GETDIR_DATES     (0x04)  /* return the dates of last modification */
+#define GETDIR_PATH      (0x10)  /* with _NAMES: add the path to the filenames */
+#define GETDIR_UNSORTED  (0x20)  /* return the results unsorted */
+#define GETDIR_ACCESS    (0x40)  /* return the dates of last access */
+#define GETDIR_MODES     (0x80)  /* return the file mode */
 
-#define GETDIR_ALL        7  /* return names, sizes and dates */
+#define GETDIR_ALL       (0xDF)  /* return all */
 
 #endif /* LPC_FILES_H_ */
