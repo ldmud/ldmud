@@ -28,7 +28,7 @@ extern void store_line_number_info(void);
 extern void store_line_number_backward(int offset);
 extern mp_uint store_include_info(char *name, char *file, char delim, int inc_depth);
 extern void store_include_end(mp_uint inc_offset, int include_line);
-extern void compile_file(int fd, const char * fname);
+extern void compile_file(int fd, const char * fname, Bool isMasterObj);
 extern Bool is_undef_function (fun_hdr_p fun);
 extern short find_inherited_function (const char * super_name, const char * real_name , unsigned short * pInherit);
 

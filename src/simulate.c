@@ -1638,13 +1638,16 @@ load_object_error(const char *msg, const char *name, namechain_t *chain)
 #define MAX_LOAD_DEPTH 60 /* Make this a configurable constant */
 
 static object_t *
-load_object (const char *lname, Bool create_super, int depth, namechain_t *chain)
+load_object (const char *lname, Bool create_super, int depth
+            , Bool isMasterObj, namechain_t *chain)
 
 /* Load (compile) an object blueprint from the file <lname>.
  * <create_super> is true if the object has to be
  * initialized with CREATE_SUPER, and false if CREATE_OB is to be used.
  * <depth> is the current recursive load depth and is checked
  * against MAX_LOAD_DEPTH.
+ * <isMasterObj> is TRUE if the top-level object to be compiled is the master
+ * object.
  * <chain> is the pointer to the calling frame's namechain structure.
  *
  * If the object can't be loaded because it inherits some other unloaded
@@ -1847,7 +1850,7 @@ load_object (const char *lname, Bool create_super, int depth, namechain_t *chain
         /* The file name is needed before compile_file(), in case there is
          * an initial 'line too long' error.
          */
-        compile_file(fd, fname);
+        compile_file(fd, fname, isMasterObj);
         if (comp_flag)
         {
             if (NULL == inherit_file)
@@ -1911,7 +1914,7 @@ load_object (const char *lname, Bool create_super, int depth, namechain_t *chain
                 load_object_error("Too deep inheritance", name, chain);
             }
 
-            ob = load_object(pInherited, MY_TRUE, depth+1, &nlink);
+            ob = load_object(pInherited, MY_TRUE, depth+1, isMasterObj, &nlink);
             free_mstring(inter_sp->u.str);
             inter_sp--;
             if (!ob || ob->flags & O_DESTRUCTED)
@@ -2267,6 +2270,10 @@ lookfor_object (string_t * str, Bool bLoad)
 {
     object_t *ob;
     const char * pName;
+    Bool isMasterObj = MY_FALSE;
+
+    if (mstreq(str, master_name_str))
+        isMasterObj = MY_TRUE;
 
     /* TODO: It would be more useful to check all callers of lookfor()
      * TODO:: and move the make_name_sane() into those where it can
@@ -2276,13 +2283,16 @@ lookfor_object (string_t * str, Bool bLoad)
     if (!pName)
         pName = get_txt(str);
 
+    if (!isMasterObj && !strcmp(pName, get_txt(master_name_str)))
+        isMasterObj = MY_TRUE;
+
     ob = lookup_object_hash_str(pName);
     if (!bLoad)
         return ob;
 
     if (!ob)
     {
-        ob = load_object(pName, 0, 0, NULL);
+        ob = load_object(pName, 0, 0, isMasterObj, NULL);
     }
     if (!ob || ob->flags & O_DESTRUCTED)
         return NULL;

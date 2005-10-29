@@ -30,7 +30,7 @@
  *---------------------------------------------------------------------------
  * To compile a file, open the file  to yield a filedescriptor 'fd', then call
  *
- *     compile_file(fd, <filename>);
+ *     compile_file(fd, <filename>, <isMasterObj>);
  *
  * then close the file again. The compiled program is 'returned' in
  * the global compiled_prog - on error, this variable is returned as NULL.
@@ -694,6 +694,10 @@ static unsigned int inline_closure_id;
 
 /*-------------------------------------------------------------------------*/
 /* Other Variables */
+
+static Bool disable_sefuns;
+  /* TRUE: Sefuns will be ignored.
+   */
 
 static char *last_yalloced = NULL;
   /* Head of blocklist allocated with yalloc().
@@ -12191,7 +12195,8 @@ function_call:
           }
           else if (!$1.super
                 && real_name->u.global.function < 0
-                && real_name->u.global.sim_efun >= 0)
+                && real_name->u.global.sim_efun >= 0
+                && !disable_sefuns)
           {
               /* It's a real simul-efun */
 
@@ -12251,7 +12256,8 @@ function_call:
                * afterwards
                */
 
-              if ( (simul_efun = $<function_call_head>2.simul_efun) >= 0)
+              if ( !disable_sefuns
+               && (simul_efun = $<function_call_head>2.simul_efun) >= 0)
               {
                   /* SIMUL EFUN */
 
@@ -12798,7 +12804,8 @@ function_call:
            * however yields a faulty grammar.
            */
 
-          if (call_other_sefun >= 0
+          if (!disable_sefuns
+           && call_other_sefun >= 0
            && call_other_sefun & ~0xff)
           {
               /* The simul-efun has to be called by name:
@@ -12888,7 +12895,7 @@ function_call:
           has_ellipsis = got_ellipsis[argument_level];
           ap_needed = MY_TRUE;
 
-          if (call_other_sefun >= 0)
+          if (!disable_sefuns && call_other_sefun >= 0)
           {
               /* SIMUL EFUN */
 
@@ -15779,10 +15786,12 @@ store_include_end (mp_uint inc_offset, int include_line)
 
 /*-------------------------------------------------------------------------*/
 static void
-prolog (const char * fname)
+prolog (const char * fname, Bool isMasterObj)
 
 /* Initialize the compiler environment prior to a compile.
  * <fname> is the name of the top LPC file to be compiled.
+ * <isMasterObj> is TRUE if this compile is part of the compilation of
+ * the master object (in which case sefuns are disabled).
  */
 
 {
@@ -15799,6 +15808,7 @@ prolog (const char * fname)
 
     /* Initialize all the globals */
     variables_defined = MY_FALSE;
+    disable_sefuns   = isMasterObj;
     last_expression  = -1;
     compiled_prog    = NULL;  /* NULL means fail to load. */
     heart_beat       = -1;
@@ -15857,30 +15867,33 @@ printf("DEBUG: prolog: type ptrs: %p, %p\n", type_of_locals, type_of_context );
      */
     call_other_sefun = -1;
 
-    id = make_shared_identifier(get_txt(STR_CALL_OTHER), I_TYPE_UNKNOWN, 0);
-
-    if (!id)
-        fatal("Out of memory: identifier '%s'.\n", get_txt(STR_CALL_OTHER));
-
-    if (id->type == I_TYPE_UNKNOWN)
+    if (!disable_sefuns)
     {
-        /* No such identifier, therefor no such sefun */
-        free_shared_identifier(id);
-    }
-    else
-    {
-        /* This shouldn't be necessary, but just in case... */
-        while (id && id->type > I_TYPE_GLOBAL)
-            id = id->inferior;
+        id = make_shared_identifier(get_txt(STR_CALL_OTHER), I_TYPE_UNKNOWN, 0);
 
-        if ( id
-          && id->u.global.function < 0
-          && id->u.global.sim_efun >= 0)
+        if (!id)
+            fatal("Out of memory: identifier '%s'.\n", get_txt(STR_CALL_OTHER));
+
+        if (id->type == I_TYPE_UNKNOWN)
         {
-            /* There is a sefun for call_other() */
-            call_other_sefun = id->u.global.sim_efun;
+            /* No such identifier, therefor no such sefun */
+            free_shared_identifier(id);
         }
-    }
+        else
+        {
+            /* This shouldn't be necessary, but just in case... */
+            while (id && id->type > I_TYPE_GLOBAL)
+                id = id->inferior;
+
+            if ( id
+              && id->u.global.function < 0
+              && id->u.global.sim_efun >= 0)
+            {
+                /* There is a sefun for call_other() */
+                call_other_sefun = id->u.global.sim_efun;
+            }
+        }
+    } /* if (!disable_sefuns) */
 
 } /* prolog() */
 
@@ -16609,13 +16622,13 @@ epilog (void)
 
 /*-------------------------------------------------------------------------*/
 void
-compile_file (int fd, const char * fname)
+compile_file (int fd, const char * fname,  Bool isMasterObj)
 
 /* Compile an LPC file. See the head comment for instructions.
  */
 
 {
-    prolog(fname);
+    prolog(fname, isMasterObj);
     start_new_file(fd, fname);
     yyparse();
     /* If the parse failed, either num_parse_error != 0

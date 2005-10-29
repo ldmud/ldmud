@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-11-Feb-2005 (Lars Duening) -- Development Release 3.3
+20-Feb-2005 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -94,6 +94,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + Function runtime_warning() is called for runtime warnings.
        + privilege_violation(): For "set_limits" and "limited" the resulting
            limits are passed as argument.
+       + During the compilation of the master object, simul-efuns are disabled
+           (so they won't be used by accident).
 
     - Fixed Crashers:
        + The driver crashed when a private lfun shadowing
