@@ -59,16 +59,17 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 700)
-(Parent-Version lpmud 3-3 699)
+(Project-Version lpmud 3-3 701)
+(Parent-Version lpmud 3-3 700)
 (Version-Log "
-  - (lex.c) When adding strings in preprocessor conditionals, the lhs
-      string was freed twice, causing memory corruption (reported by Tobias).
+  - (configure) Added a check to see if the system is using a broken iconv
+      (part of glibc 2.0-2.2) - this iconv can throw the driver into an
+      endless loop (Bug #0000377).
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Fri, 13 May 2005 22:38:10 -0600")
+(Checkin-Time "Fri, 13 May 2005 23:38:38 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -107,13 +108,13 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.12 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.86 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.763 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.764 644))
   (HISTORY (lpmud/f/49_HISTORY 1.385.1.22 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.21 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
   ;; Configuration
-  (src/configure (lpmud/d/0_configure 1.19.1.109.1.11 755))
+  (src/configure (lpmud/d/0_configure 1.19.1.109.1.12 755))
   (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8.1.43.1.7 644))
   (src/machine.h.in (lpmud/b/9_machine.h. 1.9.1.14 644))
   (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.39.1.19.1.34.1.6 644))
@@ -121,7 +122,7 @@
   (src/install-sh (lpmud/c/5_install-sh 1.2 755))
   (src/ldmud-man.txt (lpmud/c/c/29_ldmud-man. 1.1 644))
 
-  (src/autoconf/configure.in (lpmud/d/7_configure. 1.20.1.9.1.110 644))
+  (src/autoconf/configure.in (lpmud/d/7_configure. 1.20.1.9.1.111 644))
   (src/autoconf/acconfig.h (lpmud/d/10_acconfig.h 1.6.1.14 644))
 
   (src/settings/README (lpmud/c/22_README 1.14.1.17 644))
