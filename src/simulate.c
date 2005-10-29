@@ -3199,7 +3199,7 @@ status_parse (strbuf_t * sbuf, char * buff)
 
         if (!verbose) {
             strbuf_add(sbuf, "\t\t\t\t\t ---------\n");
-            strbuf_addf(sbuf, "Total:\t\t\t\t\t %9d\n", tot);
+            strbuf_addf(sbuf, "Total: \t\t\t\t\t %9d\n", tot);
         }
         return MY_TRUE;
     }

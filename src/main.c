@@ -1397,12 +1397,13 @@ static Option aOptions[]
     , { 0,      "tls-trustfile",       cTLStrustfile,     MY_TRUE
       , "  --tls-trustfile <pathname>\n"
       , "    Use <pathname> as the directory where your trusted certificate PEM resides.\n"
-	"    If relative, <pathname> is interpreted relative to <mudlib>.\n"
+        "    If relative, <pathname> is interpreted relative to <mudlib>.\n"
       }
     , { 0,      "tls-trustdirectory",  cTLStrustdir,      MY_TRUE
       , "  --tls-trustdirectory <pathname>\n"
-      , "    Use <pathname> as the directory where your trusted certificates reside '" TLS_DEFAULT_TRUSTDIRECTORY "'.\n"
-	"    If relative, <pathname> is interpreted relative to <mudlib>.\n"
+      , "    Use <pathname> as the directory where your trusted certificates reside,\n"
+        "    default is '" TLS_DEFAULT_TRUSTDIRECTORY "'.\n"
+        "    If relative, <pathname> is interpreted relative to <mudlib>.\n"
       }
 #endif /* USE_TLS */
 
@@ -2464,16 +2465,18 @@ eval_arg (int eOption, const char * pValue)
             free(tls_certfile);
         tls_certfile = strdup(pValue);
         break;
+
     case cTLStrustdir:
-	if (tls_trustdirectory != NULL)
-	    free(tls_trustdirectory);
-	tls_trustdirectory = strdup(pValue);
-	break;
+        if (tls_trustdirectory != NULL)
+            free(tls_trustdirectory);
+        tls_trustdirectory = strdup(pValue);
+        break;
+
     case cTLStrustfile:
-	if (tls_trustfile != NULL)
-	    free(tls_trustfile);
-	tls_trustfile = strdup(pValue);
-	break;
+        if (tls_trustfile != NULL)
+            free(tls_trustfile);
+        tls_trustfile = strdup(pValue);
+        break;
 #endif
 
 #ifdef GC_SUPPORT

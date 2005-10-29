@@ -15,8 +15,6 @@ typedef struct mapping_cond_s mapping_cond_t;
 /* --- struct mapping_s: the mapping datatypes --- */
 
 /* The main structure of a mapping
- *
- * Note that .num_values includes the key value!
  */
 
 struct mapping_s {

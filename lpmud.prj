@@ -54,15 +54,16 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 672)
-(Parent-Version lpmud 3-3 671)
+(Project-Version lpmud 3-3 673)
+(Parent-Version lpmud 3-3 672)
 (Version-Log "
-  - (pkg-tls.c) Philip provided a tls_check_certificate() efun.
+  - (smalloc.c, slaballoc.c) The memory block size computation failed
+       on large blocks, giving bad statistics.
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Sun, 13 Feb 2005 21:13:02 -0700")
+(Checkin-Time "Sun, 20 Feb 2005 11:58:27 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -100,7 +101,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.12 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.85 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.735 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.736 644))
   (HISTORY (lpmud/f/49_HISTORY 1.385.1.17 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.21 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -196,8 +197,8 @@
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.15.1.13 644))
   (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.74.1.7 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.19 644))
-  (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.71 644))
-  (src/mapping.h (lpmud/f/30_mapping.h 1.12.1.20 644))
+  (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.72 644))
+  (src/mapping.h (lpmud/f/30_mapping.h 1.12.1.21 644))
   (src/mapping.c (lpmud/b/6_mapping.c 1.36.1.85 644))
   (src/md5.h (lpmud/l/18_md5.h 1.3 644))
   (src/md5.c (lpmud/l/19_md5.c 1.7 644))
@@ -206,7 +207,7 @@
   (src/mregex.h (lpmud/e/29_rxcache.h 1.7.1.16 644))
   (src/mregex.c (lpmud/e/30_rxcache.c 1.11.1.44 644))
   (src/mstrings.h (lpmud/i/35_mstrings.h 1.29 644))
-  (src/mstrings.c (lpmud/i/36_mstrings.c 1.21.1.37 644))
+  (src/mstrings.c (lpmud/i/36_mstrings.c 1.21.1.38 644))
   (src/my-alloca.h (lpmud/f/29_my-alloca. 1.3.1.2 644))
   (src/my-rusage.h (lpmud/f/28_my-rusage. 1.7 644))
   (src/my-stdint.h (lpmud/u/b/39_my-stdint. 1.2 644))
@@ -319,7 +320,7 @@
   (src/pkg-pgsql.c (lpmud/d/b/39_pkg-pgsql. 1.4 644))
   (src/pkg-pgsql.h (lpmud/d/b/40_pkg-pgsql. 1.2 644))
   (src/pkg-tls.h (lpmud/e/b/10_pkg-tls.h 1.8 644))
-  (src/pkg-tls.c (lpmud/e/b/11_pkg-tls.c 1.20 644))
+  (src/pkg-tls.c (lpmud/e/b/11_pkg-tls.c 1.21 644))
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.20 644))
   (src/port.c (lpmud/39_port.c 1.17.1.9 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.17.1.5 644))
@@ -336,11 +337,11 @@
   (src/simul_efun.h (lpmud/f/17_simul_efun 1.5.1.6 644))
   (src/simul_efun.c (lpmud/32_simul_efun 1.20.1.17.1.7 644))
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.39 644))
-  (src/simulate.c (lpmud/31_simulate.c 1.88.1.135.1.8 644))
+  (src/simulate.c (lpmud/31_simulate.c 1.88.1.135.1.9 644))
   (src/slaballoc.h (lpmud/d/c/16_slaballoc. 1.2 644))
-  (src/slaballoc.c (lpmud/d/c/17_slaballoc. 1.4 644))
+  (src/slaballoc.c (lpmud/d/c/17_slaballoc. 1.5 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.16 644))
-  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.110 644))
+  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.111 644))
   (src/sysmalloc.h (lpmud/c/b/33_sysmalloc. 1.2 644))
   (src/sysmalloc.c (lpmud/c/b/34_sysmalloc. 1.7 644))
   (src/sprintf.h (lpmud/f/15_sprintf.h 1.3.1.4 644))

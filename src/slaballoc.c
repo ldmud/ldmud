@@ -657,6 +657,41 @@ extstat_update_max (extstat_t * pStat)
 /*                       ASSOCIATED ROUTINES                               */
 
 /*-------------------------------------------------------------------------*/
+static INLINE size_t
+mem_block_total_size (POINTER p)
+
+/* Return the size of block <p> (including internal overhead) in bytes.
+ */
+
+{
+    word_t *q = ((word_t *) p) - M_OVERHEAD;
+  
+    if (q[M_SIZE] & M_SMALL)
+    {
+        slab_t * slab = (slab_t*)(q - (q[M_SIZE] & M_MASK));
+        return slab->size;
+    }
+    return q[M_LSIZE]*SINT;
+} /* mem_block_total_size() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE size_t
+mem_block_size (POINTER p)
+
+/* Return the size of block <p> (sans internal overhead) in bytes.
+ */
+
+{
+    word_t * q = ((word_t *)p) - M_OVERHEAD;
+
+    if (q[M_SIZE] & M_SMALL)
+    {
+        return mem_block_total_size(p) - M_OVERHEAD*SINT;
+    }
+    return mem_block_total_size(p) - ML_OVERHEAD*SINT;
+} /* mem_block_size() */
+
+/*-------------------------------------------------------------------------*/
 static INLINE void
 mem_mark_permanent (POINTER p)
 
@@ -669,7 +704,7 @@ mem_mark_permanent (POINTER p)
     if (q[-M_OVERHEAD] & M_GC_FREE)
     {
         q[-M_OVERHEAD] &= ~M_GC_FREE;
-        count_up(perm_alloc_stat, (q[-M_OVERHEAD] & M_MASK)*SINT);
+        count_up(perm_alloc_stat, mem_block_total_size(q));
     }
 } /* mem_mark_permanent() */
 
@@ -686,27 +721,9 @@ mem_mark_collectable (POINTER p)
     if (!(q[-M_OVERHEAD] & M_GC_FREE))
     {
         q[-M_OVERHEAD] |= (M_REF|M_GC_FREE);
-        count_back(perm_alloc_stat, (q[-M_OVERHEAD] & M_MASK)*SINT);
+        count_back(perm_alloc_stat, mem_block_total_size(q));
     }
 } /* mem_mark_collectable() */
-
-/*-------------------------------------------------------------------------*/
-static INLINE size_t
-mem_block_size (POINTER p)
-
-/* Return the size of block <p> (sans internal overhead) in bytes.
- */
-
-{
-   word_t *q = ((word_t *) p) - M_OVERHEAD;
-
-   if (q[M_SIZE] & M_SMALL)
-   {
-       slab_t * slab = (slab_t*)(q - (q[M_SIZE] & M_MASK));
-       return slab->size - M_OVERHEAD*SINT;
-   }
-   return (q[M_LSIZE]-ML_OVERHEAD)*SINT;
-} /* mem_block_size() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE size_t

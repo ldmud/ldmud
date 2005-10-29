@@ -691,8 +691,8 @@ mstring_make_tabled (string_t * pStr, Bool deref_arg MTRACE_DECL)
         /* The string is tabled indirectly, return the directly tabled
          * instance.
          */
-        string = ref_mstring(pStr->link); /* Must come first! */
-        if (deref_arg) free_mstring(pStr); /* Might delete *pStr */
+        string = ref_mstring(pStr->link);   /* Must come first! */
+        if (deref_arg) free_mstring(pStr);  /* Might delete *pStr */
     }
 
     /* That's all */

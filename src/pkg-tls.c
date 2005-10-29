@@ -37,9 +37,9 @@
 #include "main.h"
 #include "mstrings.h"
 #include "object.h"
+#include "sha1.h"
 #include "svalue.h"
 #include "xalloc.h"
-#include "sha1.h"
      
 #include "../mudlib/sys/tls.h"
 
@@ -186,7 +186,7 @@ initialize_tls_session (gnutls_session *session)
      * are adequate.
      */
     gnutls_set_default_priority( *session);   
-	    
+    
     gnutls_credentials_set( *session, GNUTLS_CRD_CERTIFICATE, x509_cred);
 
     gnutls_dh_set_prime_bits( *session, DH_BITS);
@@ -251,9 +251,9 @@ void tls_global_init (void)
                  , time_stamp(), keyfile, certfile);
     if (trustfile != NULL || trustdirectory != NULL)
     {
-	printf("%s TLS: (OpenSSL) trusted x509 certificates from '%s' and '%s'\n"
+        printf("%s TLS: (OpenSSL) trusted x509 certificates from '%s' and '%s'\n"
               , time_stamp(), trustfile, trustdirectory);
-	debug_message("%s TLS: (OpenSSL) trusted x509 certificates from '%s' and '%s'\n"
+        debug_message("%s TLS: (OpenSSL) trusted x509 certificates from '%s' and '%s'\n"
                      , time_stamp(), trustfile, trustdirectory);
     }
 
@@ -261,9 +261,9 @@ void tls_global_init (void)
     ERR_load_BIO_strings();
     if (!SSL_library_init())
     {
-	printf("%s TLS: Initialising the SSL library failed.\n"
+        printf("%s TLS: Initialising the SSL library failed.\n"
               , time_stamp());
-	debug_message("%s TLS: Initialising the SSL library failed.\n"
+        debug_message("%s TLS: Initialising the SSL library failed.\n"
                      , time_stamp());
         return;
     }
@@ -308,9 +308,9 @@ void tls_global_init (void)
     context = SSL_CTX_new (SSLv23_method());
     if (!context)
     {
-	printf("%s TLS: Can't get SSL context:\n"
+        printf("%s TLS: Can't get SSL context:\n"
               , time_stamp());
-	debug_message("%s TLS: Can't get SSL context:\n"
+        debug_message("%s TLS: Can't get SSL context:\n"
                      , time_stamp());
         
         goto ssl_init_err;
@@ -321,37 +321,37 @@ void tls_global_init (void)
 
     if (!SSL_CTX_use_PrivateKey_file(context, keyfile, SSL_FILETYPE_PEM))
     {
-	printf("%s TLS: Error setting x509 keyfile:\n"
+        printf("%s TLS: Error setting x509 keyfile:\n"
               , time_stamp());
-	debug_message("%s TLS: Error setting x509 keyfile:\n"
+        debug_message("%s TLS: Error setting x509 keyfile:\n"
               , time_stamp());
         goto ssl_init_err;
     }
 
     if (!SSL_CTX_use_certificate_file(context, certfile, SSL_FILETYPE_PEM))
     {
-	printf("%s TLS: Error setting x509 certfile:\n"
+        printf("%s TLS: Error setting x509 certfile:\n"
               , time_stamp());
-	debug_message("%s TLS: Error setting x509 certfile:\n"
+        debug_message("%s TLS: Error setting x509 certfile:\n"
               , time_stamp());
         goto ssl_init_err;
     }
 
     if (!SSL_CTX_load_verify_locations(context, trustfile, trustdirectory))
     {
-	printf("%s TLS: Error preparing x509 verification certificates\n",
-	       time_stamp());
-	debug_message("%s TLS: Error preparing x509 verification certificates\n",
-	       time_stamp());
+        printf("%s TLS: Error preparing x509 verification certificates\n",
+               time_stamp());
+        debug_message("%s TLS: Error preparing x509 verification certificates\n",
+               time_stamp());
     }
     
     if (!set_dhe1024()
      || !SSL_CTX_set_tmp_dh(context, dhe1024)
        )
     {
-	printf("%s TLS: Error setting Diffie-Hellmann parameters:\n"
+        printf("%s TLS: Error setting Diffie-Hellmann parameters:\n"
               , time_stamp());
-	debug_message("%s TLS: Error setting Diffie-Hellmann parameters:\n"
+        debug_message("%s TLS: Error setting Diffie-Hellmann parameters:\n"
               , time_stamp());
         goto ssl_init_err;
     }
@@ -423,9 +423,9 @@ ssl_init_err:
     f = gnutls_certificate_set_x509_key_file(x509_cred, certfile, keyfile, GNUTLS_X509_FMT_PEM);
     if (f < 0)
     {
-	printf("%s TLS: Error setting x509 keyfile: %s\n"
+        printf("%s TLS: Error setting x509 keyfile: %s\n"
               , time_stamp(), gnutls_strerror(f));
-	debug_message("%s TLS: Error setting x509 keyfile: %s\n"
+        debug_message("%s TLS: Error setting x509 keyfile: %s\n"
                      , time_stamp(), gnutls_strerror(f));
     }
     else
@@ -842,6 +842,7 @@ v_tls_init_connection (svalue_t *sp, int num_arg)
     put_number(sp, ret);
     return sp;
 } /* f_tls_init_connection() */
+
 /*-------------------------------------------------------------------------*/
 svalue_t *
 f_tls_check_certificate(svalue_t *sp)

@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+20-Feb-2004 (Lars Duening)  (3.3.673)
+  - (smalloc.c, slaballoc.c) The memory block size computation failed
+       on large blocks, giving bad statistics.
+
 13-Feb-2004 (Lars Duening)  (3.3.672)
   - (pkg-tls.c) Philip provided a tls_check_certificate() efun.
 
