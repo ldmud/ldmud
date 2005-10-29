@@ -192,6 +192,10 @@ Bool pragma_warn_deprecated;
   /* True: warn if deprecated efuns are used.
    */
 
+Bool pragma_range_check;
+  /* True: warn (at runtime) if array ranges are invalid.
+   */
+
 Bool pragma_share_variables;
   /* TRUE: Share the blueprint's variables with its clones.
    */
@@ -3425,6 +3429,16 @@ handle_pragma (char *str)
             pragma_warn_deprecated = MY_FALSE;
             validPragma = MY_TRUE;
         }
+        else if (strncmp(base, "range_check", namelen) == 0)
+        {
+            pragma_range_check = MY_TRUE;
+            validPragma = MY_TRUE;
+        }
+        else if (strncmp(base, "no_range_check", namelen) == 0)
+        {
+            pragma_range_check = MY_FALSE;
+            validPragma = MY_TRUE;
+        }
         else if (strncmp(base, "warn_empty_casts", namelen) == 0)
         {
             pragma_warn_empty_casts = MY_TRUE;
@@ -5751,6 +5765,7 @@ start_new_file (int fd, const char * fname)
     pragma_pedantic = MY_FALSE;
     pragma_warn_missing_return = MY_TRUE;
     pragma_warn_deprecated = MY_FALSE;
+    pragma_range_check = MY_FALSE;
     pragma_warn_empty_casts = MY_TRUE;
     pragma_combine_strings = MY_TRUE;
     pragma_share_variables = share_variables;

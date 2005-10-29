@@ -249,6 +249,7 @@
         breakn_continue
         jump
         no_warn_deprecated
+        array_range_check
 
 /*---------------------------------------------------------------------------
  * efuns with a single-byte code.

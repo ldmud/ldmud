@@ -593,11 +593,18 @@ struct control_stack *csp;
    * way (Standard C disallows indexing before an array).
    */
 
-static Bool runtime_no_warn_deprecated;
+static Bool runtime_no_warn_deprecated = MY_FALSE;
   /* Set to TRUE if the current instruction is not to warn about usage
    * of deprecated features; reset at the end of the instruction.
    * This flag is set by the NO_WARN_DEPRECATED instruction, generated
    * by the bytecode compiler in response to the warn-deprecated pragma.
+   */
+
+static Bool runtime_array_range_check = MY_FALSE;
+  /* Set to TRUE if the current instruction is to warn about using
+   * an illegal range.
+   * This flag is set by the ARRAY_RANGE_CHECK instruction, generated
+   * by the bytecode compiler in response to the range-check pragma.
    */
 
 #ifdef APPLY_CACHE_STAT
@@ -7412,6 +7419,7 @@ eval_instruction (bytecode_p first_instruction
     ap = inter_fp; /* so that call_lambda() can call us for efun closures */
     use_ap = MY_FALSE;
     runtime_no_warn_deprecated = MY_FALSE;
+    runtime_array_range_check = MY_FALSE;
     SET_TRACE_EXEC;
 
     /* ------ The evaluation loop ------ */
@@ -11118,23 +11126,25 @@ again:
             else
                 i2 = size - sp[0].u.number;
 
-            if (!runtime_no_warn_deprecated)
+            if (runtime_array_range_check)
             {
                 if (i1 < 0 || i1 >= size)
                 {
-                    WARNF(("Warning: Out-of-bounds lower range limits are deprecated: %ld, size %ld.\n"
-                          , (long)i1, (long)size));
+                    if (i2 < 0 || i2 >= size)
+                        WARNF(("Warning: Out-of-bounds range limits: [%ld..%ld], size %ld.\n"
+                              , (long)i1, (long)i2, (long)size));
+                    else
+                        WARNF(("Warning: Out-of-bounds lower range limits: %ld, size %ld.\n"
+                              , (long)i1, (long)size));
                 }
-
-                if (i2 < 0 || i2 >= size)
+                else if (i2 < 0 || i2 >= size)
                 {
-                    WARNF(("Warning: Out-of-bounds upper range limits are deprecated: %ld, size %ld.\n"
+                    WARNF(("Warning: Out-of-bounds upper range limits: %ld, size %ld.\n"
                           , (long)i2, (long)size));
                 }
-
-                if (i1 > i2)
+                else if (i1 > i2)
                 {
-                    WARNF(("Warning: Ranges of negative size are deprecated: %ld..%ld .\n"
+                    WARNF(("Warning: Ranges of negative size: %ld..%ld .\n"
                           , (long)i1, (long)i2));
                 }
             }
@@ -15334,6 +15344,16 @@ again:
         break;
     }
 
+    CASE(F_ARRAY_RANGE_CHECK);       /* --- array_range_check  --- */
+    {
+        /* Set the runtime_array_range_check flag for the next
+         * instruction.
+         */
+
+        runtime_array_range_check = MY_TRUE;
+        break;
+    }
+
     /* --- Efuns: Miscellaneous --- */
 
     CASE(F_CLONEP);                 /* --- clonep              --- */
@@ -16138,6 +16158,10 @@ again:
     /* Reset the no-warn-deprecated flag */
     if (instruction != F_NO_WARN_DEPRECATED)
         runtime_no_warn_deprecated = MY_FALSE;
+
+    /* Reset the no-warn-deprecated flag */
+    if (instruction != F_ARRAY_RANGE_CHECK)
+        runtime_array_range_check = MY_FALSE;
 
     /* Even intermediate results could exceed the stack size.
      * We better check for that.

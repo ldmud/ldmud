@@ -113,6 +113,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + 'nosave' is now an official feature.
        + New indexing method '[>]' to index either from the beginning or
            the end, depending on the sign of the index value.
+       + New pragma 'range_check' allows to check array range indexing at
+           runtime.
        + If a value of the wrong type is passed to switch(), the driver
            no longer throws a runtime error, but instead jumpgs to
            the default case.
@@ -120,10 +122,9 @@ For a detailed list of all changes see the file CHANGELOG.
        + Operators '^' and '^=' can compute the symmetric difference of
            two arrays.
        + Support for structs; preprocessor symbol __LPC_STRUCTS__ is defined.
+       + Preprocessor symbol __PCRE__ is always defined.
        + Real inline closures; preprocessor symbol __LPC_INLINE_CLOSURES__ is
            defined.
-       + Preprocessor symbol __PCRE__ is defined if the driver is configured
-           to use PCRE for regular expressions.
        + Blueprint variables are now always initialized using
            __INIT(). Clone variables are usually initialized the same
            way, however with the pragmas 'share_variables' and

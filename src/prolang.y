@@ -11593,9 +11593,9 @@ index_range :
           CURRENT_PROGRAM_SIZE++;
           $3.end++;
 
-          if (!pragma_warn_deprecated)
+          if (pragma_range_check)
           {
-              ins_byte(F_NO_WARN_DEPRECATED);
+              ins_byte(F_ARRAY_RANGE_CHECK);
               $3.end++;
           }
 
@@ -11636,9 +11636,9 @@ index_range :
           CURRENT_PROGRAM_SIZE++;
           $4.end++;
 
-          if (!pragma_warn_deprecated)
+          if (pragma_range_check)
           {
-              ins_byte(F_NO_WARN_DEPRECATED);
+              ins_byte(F_ARRAY_RANGE_CHECK);
               $4.end++;
           }
 
@@ -11679,9 +11679,9 @@ index_range :
           CURRENT_PROGRAM_SIZE++;
           $4.end++;
 
-          if (!pragma_warn_deprecated)
+          if (pragma_range_check)
           {
-              ins_byte(F_NO_WARN_DEPRECATED);
+              ins_byte(F_ARRAY_RANGE_CHECK);
               $4.end++;
           }
 
@@ -11697,9 +11697,9 @@ index_range :
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | '['     expr0 L_RANGE     expr0 ']'
       {
-          if (!pragma_warn_deprecated)
+          if (pragma_range_check)
           {
-              ins_byte(F_NO_WARN_DEPRECATED);
+              ins_byte(F_ARRAY_RANGE_CHECK);
               $4.end++;
           }
 
@@ -11713,9 +11713,9 @@ index_range :
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | '['     expr0 L_RANGE '<' expr0 ']'
       {
-          if (!pragma_warn_deprecated)
+          if (pragma_range_check)
           {
-              ins_byte(F_NO_WARN_DEPRECATED);
+              ins_byte(F_ARRAY_RANGE_CHECK);
               $5.end++;
           }
 
@@ -11729,9 +11729,9 @@ index_range :
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | '[' '<' expr0 L_RANGE     expr0 ']'
       {
-          if (!pragma_warn_deprecated)
+          if (pragma_range_check)
           {
-              ins_byte(F_NO_WARN_DEPRECATED);
+              ins_byte(F_ARRAY_RANGE_CHECK);
               $5.end++;
           }
 
@@ -11745,9 +11745,9 @@ index_range :
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | '[' '<' expr0 L_RANGE '<' expr0 ']'
       {
-          if (!pragma_warn_deprecated)
+          if (pragma_range_check)
           {
-              ins_byte(F_NO_WARN_DEPRECATED);
+              ins_byte(F_ARRAY_RANGE_CHECK);
               $6.end++;
           }
 
@@ -11761,9 +11761,9 @@ index_range :
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | '['     expr0 L_RANGE '>' expr0 ']'
       {
-          if (!pragma_warn_deprecated)
+          if (pragma_range_check)
           {
-              ins_byte(F_NO_WARN_DEPRECATED);
+              ins_byte(F_ARRAY_RANGE_CHECK);
               $5.end++;
           }
 
@@ -11777,9 +11777,9 @@ index_range :
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | '[' '>' expr0 L_RANGE     expr0 ']'
       {
-          if (!pragma_warn_deprecated)
+          if (pragma_range_check)
           {
-              ins_byte(F_NO_WARN_DEPRECATED);
+              ins_byte(F_ARRAY_RANGE_CHECK);
               $5.end++;
           }
 
@@ -11793,9 +11793,9 @@ index_range :
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | '[' '<' expr0 L_RANGE '>' expr0 ']'
       {
-          if (!pragma_warn_deprecated)
+          if (pragma_range_check)
           {
-              ins_byte(F_NO_WARN_DEPRECATED);
+              ins_byte(F_ARRAY_RANGE_CHECK);
               $6.end++;
           }
 
@@ -11809,9 +11809,9 @@ index_range :
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | '[' '>' expr0 L_RANGE '<' expr0 ']'
       {
-          if (!pragma_warn_deprecated)
+          if (pragma_range_check)
           {
-              ins_byte(F_NO_WARN_DEPRECATED);
+              ins_byte(F_ARRAY_RANGE_CHECK);
               $6.end++;
           }
 
@@ -11825,9 +11825,9 @@ index_range :
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | '[' '>' expr0 L_RANGE '>' expr0 ']'
       {
-          if (!pragma_warn_deprecated)
+          if (pragma_range_check)
           {
-              ins_byte(F_NO_WARN_DEPRECATED);
+              ins_byte(F_ARRAY_RANGE_CHECK);
               $6.end++;
           }
 
@@ -11841,9 +11841,9 @@ index_range :
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | '['     expr0 L_RANGE           ']'
       {
-          if (!pragma_warn_deprecated)
+          if (pragma_range_check)
           {
-              ins_byte(F_NO_WARN_DEPRECATED);
+              ins_byte(F_ARRAY_RANGE_CHECK);
               $2.end++;
           }
 
@@ -11861,9 +11861,9 @@ index_range :
            * We pretend that it's part of the lower bound expr.
            */
 
-          if (!pragma_warn_deprecated)
+          if (pragma_range_check)
           {
-              ins_byte(F_NO_WARN_DEPRECATED);
+              ins_byte(F_ARRAY_RANGE_CHECK);
               $3.end++;
           }
 
@@ -11881,9 +11881,9 @@ index_range :
            * We pretend that it's part of the lower bound expr.
            */
 
-          if (!pragma_warn_deprecated)
+          if (pragma_range_check)
           {
-              ins_byte(F_NO_WARN_DEPRECATED);
+              ins_byte(F_ARRAY_RANGE_CHECK);
               $3.end++;
           }
 

@@ -53,6 +53,11 @@ DESCRIPTION
                 - failure to pass enough arguments to simul efuns
         sloppy: Turns off pedantic (the default).
 
+        range_check: Use of questionable ranges (ranges of negative sizes,
+                or with bounds beyond the array's size) cause a runtime
+                warning.
+        no_range_check: Turns off range_check (the default).
+
         warn_deprecated: Use of deprecated efuns or indexing operations
                 causes the compiler to issue a warning.
         no_warn_deprecated: Turns off warn_deprecated (the default).
@@ -114,6 +119,7 @@ HISTORY
         LDMud 3.2.11 added (no_)warn_function_inconsistent.
         LDMud 3.3.378 added init_variables, share_variables.
         LDMud 3.3.357 added (no_)warn_missing_return.
+        LDMud 3.3.646 added (no_)range_check.
 
 SEE ALSO
         inheritance(LPC), initialisation(LPC), objects(C),
