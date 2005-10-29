@@ -857,8 +857,7 @@ clear_program_ref (program_t *p, Bool clear_ref)
 
 /* Clear the refcounts of all inherited programs and other associated
  * data of of <p> .
- * If <clear_ref> is TRUE, the refcount of <p> itself and of <p>->name
- * are cleared, too.
+ * If <clear_ref> is TRUE, the refcount of <p> itself is cleared, too.
  */
 
 {
@@ -867,9 +866,10 @@ clear_program_ref (program_t *p, Bool clear_ref)
     if (clear_ref)
     {
         p->ref = 0;
-        if (p->name)
-            clear_string_ref(p->name);
     }
+
+    if (p->name)
+        clear_string_ref(p->name);
 
     /* Variables */
     for (i = p->num_variables; --i >= 0;)

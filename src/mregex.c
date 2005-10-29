@@ -330,6 +330,7 @@ rx_compile_re (string_t * expr, int opt, Bool from_ed, regdata_t * rdata)
                         , &pErrmsg, &erridx);
     if (NULL == pRegexp)
     {
+        rx_free_subdata(rdata); /* Might have PCRE data in it already */
         if (from_ed)
             add_message("re: %s at offset %d\n", pErrmsg, erridx);
         else
@@ -387,6 +388,7 @@ rx_compile_pcre (string_t * expr, int opt, Bool from_ed, regdata_t * rdata)
 
     if (NULL == pProg)
     {
+        rx_free_subdata(rdata); /* Might have HS data in it already */
         if (from_ed)
             add_message("pcre: %s at offset %d\n", pErrmsg, erridx);
         else
@@ -516,12 +518,16 @@ rx_compile_data (string_t * expr, int opt, Bool from_ed)
     {
         pcre_size = rx_compile_pcre(expr, opt, from_ed, &rdata);
         if (!pcre_size)
+        {
             return NULL;
+        }
     }
     if (opt & RE_TRADITIONAL)
     {
         if (!rx_compile_re(expr, opt, from_ed, &rdata))
+        {
             return NULL;
+        }
     }
 
 #ifndef RXCACHE_TABLE

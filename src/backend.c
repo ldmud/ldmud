@@ -1036,6 +1036,7 @@ no_clean_up:
          */
         if (num_data_cleanup > 0
          && (unsigned long)obj->time_cleanup < (unsigned long)current_time
+         && 0
            )
         {
 #ifdef DEBUG

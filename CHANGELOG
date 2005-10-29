@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+19-Jan-2004 (Lars Duening)  (3.3.661)
+  - (gcollect.c) When a program was swapped out, the GC didn't clear the refs
+       of its name (Bug #0000348).
+  - (mregex.c) If a regexp function was asked to use both RE_TRADITIONAL
+       and RE_PCRE, and the regexp doesn't compile for both, the resulting
+       error leaked some structures (Bug #0000349).
+
 17-Jan-2004 (Lars Duening)  (3.3.660)
   - (gcollect.c) The names of programs of destructed objects didn't
        get their references cleared properly in a GC, leaking the
