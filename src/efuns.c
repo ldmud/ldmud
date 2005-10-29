@@ -5872,7 +5872,8 @@ copy_svalue (svalue_t *dest, svalue_t *src
                 dest->type = T_QUOTED_ARRAY;
                 dest->x.quotes = src->x.quotes;
             }
-            rec->data = dest;
+            rec->id_number = (src->type << 16) | (src->x.quotes & 0xFFFF);
+            rec->data = new;
 
             /* Copy the values */
             for (i = 0; i < size; i++)
@@ -5893,7 +5894,12 @@ copy_svalue (svalue_t *dest, svalue_t *src
         }
         else /* shared array we already encountered */
         {
-            assign_svalue_no_free(dest, (svalue_t *)rec->data);
+            svalue_t sv;
+
+            sv.type = rec->id_number >> 16;
+            sv.x.quotes = rec->id_number & 0xFFFF;
+            sv.u.vec = (vector_t *)rec->data;
+            assign_svalue_no_free(dest, &sv);
         }
         break;
       }
@@ -5923,7 +5929,7 @@ copy_svalue (svalue_t *dest, svalue_t *src
              */
             new = struct_new(old->type);
             put_struct(dest, new);
-            rec->data = dest;
+            rec->data = new;
 
             /* Copy the values */
             for (i = 0; i < size; i++)
@@ -5942,7 +5948,10 @@ copy_svalue (svalue_t *dest, svalue_t *src
         }
         else /* shared struct we already encountered */
         {
-            assign_svalue_no_free(dest, (svalue_t *)rec->data);
+            svalue_t sv;
+
+            put_struct(&sv, (struct_t *)rec->data);
+            assign_svalue_no_free(dest, &sv);
         }
         break;
       }
@@ -5980,7 +5989,7 @@ copy_svalue (svalue_t *dest, svalue_t *src
                 error("(copy) Out of memory: new mapping[%lu, %u].\n"
                      , size, info.width);
             put_mapping(dest, new);
-            rec->data = dest;
+            rec->data = new;
 
             /* It is tempting to use copy_mapping() and then just
              * replacing all array/mapping references, but since this
@@ -5993,7 +6002,10 @@ copy_svalue (svalue_t *dest, svalue_t *src
         }
         else /* shared mapping we already encountered */
         {
-            assign_svalue_no_free(dest, (svalue_t *)rec->data);
+            svalue_t sv;
+
+            put_mapping(&sv, (mapping_t *)rec->data);
+            assign_svalue_no_free(dest, &sv);
         }
         break;
       }

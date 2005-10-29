@@ -1,6 +1,16 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+22-Jan-2004 (Lars Duening)  (3.3.662)
+  - (efuns.c) Deep-copying a mapping employing shared arrays as keys (e.g. ([
+       arr, ([ arr ]) ])) prematurely freed the copied array as the code
+       didn't keep track of the copied data itself, but of the svalues it was
+       stored in - and for mapping keys these svalues were local variables
+       (Bug #0000351).
+  - (comm.c) If telnet-negs were turned off in linemode, the driver started
+       treating lineends as if in charmode, which the higher routines
+       didn't expect (reported by Philip).
+
 19-Jan-2004 (Lars Duening)  (3.3.661)
   - (gcollect.c) When a program was swapped out, the GC didn't clear the refs
        of its name (Bug #0000348).

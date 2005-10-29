@@ -3366,6 +3366,7 @@ get_message (char *buff)
              * the beginning of .text[] and terminated with a '\0'. Whenever
              * a command is complete, the tn_state is TS_READY.
              */
+            DTN(("tn complete, telnet machine state: %d\n", ip->tn_state));
             if (ip->tn_state == TS_READY)
             {
                 /* We have a command: copy it into buff, handle a
@@ -5239,6 +5240,22 @@ mudlib_telopts (void)
 } /* mudlib_telopts() */
 
 /*-------------------------------------------------------------------------*/
+static INLINE Bool
+is_charmode (interactive_t * ip)
+
+/* Return TRUE if <ip> has charmode enabled, and FALSE if not.
+ */
+
+{
+    return (ip->noecho & CHARMODE_REQ)
+            && (   ip->text[0] != input_escape
+                || find_no_bang(ip) & IGNORE_BANG
+               )
+               
+    ;
+} /* is_charmode() */
+
+/*-------------------------------------------------------------------------*/
 static void
 telnet_neg (interactive_t *ip)
 
@@ -5473,15 +5490,9 @@ telnet_neg (interactive_t *ip)
                 goto ts_data;
 
             case '\r':
-                /* In Charmode or with telnet disabled, we have to return
-                 * the \r
+                /* In Charmode we have to return the \r.
                  */
-                if (!ip->tn_enabled
-                 || (ip->noecho & CHARMODE_REQ
-                     && (   ip->text[0] != input_escape
-                         || find_no_bang(ip) & IGNORE_BANG)
-                    )
-                   )
+                if (is_charmode(ip))
                 {
                     *to++ = (char)ch;
                     goto ts_data;
@@ -5523,15 +5534,9 @@ telnet_neg (interactive_t *ip)
                 }
 
             case '\n':
-                /* In Charmode or with telnet disabled, we have to return
-                 * the \n
+                /* In Charmode we have to return the \n.
                  */
-                if (!ip->tn_enabled
-                 || (ip->noecho & CHARMODE_REQ
-                     && (   ip->text[0] != input_escape
-                         || find_no_bang(ip) & IGNORE_BANG)
-                    )
-                   )
+                if (is_charmode(ip))
                 {
                     *to++ = (char)ch;
                     goto ts_data;
