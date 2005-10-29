@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+20-Feb-2004 (Lars Duening)  (3.3.676)
+  - (smalloc.c) Corrected a crasher in realloc().
+  - (smalloc.c, slaballoc.c) New memory allocated with esbrk() is now
+       coagulated with existing free memory if possible (Bug #0000364).
+
 20-Feb-2004 (Lars Duening)  (3.3.675)
   - (pkg-tls.c) Removed compilation errors when using GnuTLS.
   - (comm.c) The charmode/noecho mode is changed in remove_input_to()
