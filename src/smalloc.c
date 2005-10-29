@@ -51,6 +51,13 @@
  * memory not used to satisfy the allocation is entered as new oversized
  * free small block into the appropriate freelist.
  *
+ * When a small free block is split, the allocator makes sure that the
+ * remaining block is of at least SMALL_BLOCK_SPLIT_MIN words size (currently
+ * 3 words -> 12 Bytes), as experience had showed that the gamedriver doesn't
+ * need that many blocks of less than 12 Bytes. If the allocator's splits
+ * generated those small blocks, they would never be used and just
+ * tie up free space.
+ *
  * To reduce memory fragmentation, the allocator implements a lazy
  * defragmentation scheme for the small blocks: if checking free lists doesn't
  * yield a suitable block, the allocator defragments the free lists and tries
@@ -305,6 +312,9 @@
 #define INIT_SMALL_BLOCK INIT16
    /* The proper initializer macro for all tables sized SMALL_BLOCK_NUM.
     */
+
+#define SMALL_BLOCK_SPLIT_MIN (3)
+   /* Minimum size of a small block created by a split, in words */
 
 /* Derived values */
 
@@ -1478,7 +1488,7 @@ mem_alloc (size_t size)
                 word_t rsize = bsize - wsize;
 
                 /* Make sure that the split leaves a legal block behind */
-                if (bsize < wsize + T_OVERHEAD + SMALL_BLOCK_MIN)
+                if (bsize < wsize + T_OVERHEAD + SMALL_BLOCK_SPLIT_MIN)
                     continue;
 
                 /* If the split leaves behind a normally sized small
@@ -1548,7 +1558,7 @@ mem_alloc (size_t size)
          * would result in too small blocks.
          */
         for ( ix = SMALL_BLOCK_NUM-1
-            ; ix >= (int)(SIZE_INDEX(size) + T_OVERHEAD + SMALL_BLOCK_MIN) 
+            ; ix >= (int)(SIZE_INDEX(size) + T_OVERHEAD + SMALL_BLOCK_SPLIT_MIN) 
             ; ix--
             )
         {
@@ -3433,7 +3443,7 @@ mem_increment_size (void *vp, size_t size)
             return start2;
         }
 
-        if (next >= wsize + SMALL_BLOCK_MIN + T_OVERHEAD)
+        if (next >= wsize + SMALL_BLOCK_SPLIT_MIN + T_OVERHEAD)
         {
             /* Next block is large enough to be split */
 

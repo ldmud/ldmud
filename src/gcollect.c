@@ -112,6 +112,7 @@
 #include "pkg-pgsql.h"
 #include "prolang.h"
 #include "ptrtable.h"
+#include "random.h"
 #include "sent.h"
 #include "simulate.h"
 #include "simul_efun.h"
@@ -617,7 +618,9 @@ cleanup_object (object_t * obj)
  *
  * The function checks all variables of this object for references
  * to destructed objects and removes them. Also, untabled strings
- * are made tabled.
+ * are made tabled. The time for the next cleanup is set to 
+ * a time in the interval [0.75*time_to_cleanup .. 1.25 * time_to_cleanup]
+ * from now (if time_to_cleanup is 0, one hour is assumed).
  *
  * This function is called by the backend.
  */
@@ -627,6 +630,7 @@ cleanup_object (object_t * obj)
     return;
 #else
     cleanup_t * context = NULL;
+    long        clean_delay = (time_to_cleanup > 0) ? time_to_cleanup : 3600;
 
     context = cleanup_new(MY_FALSE);
     if (context != NULL)
@@ -636,6 +640,8 @@ cleanup_object (object_t * obj)
         cleanup_compact_mappings(context);
         cleanup_free(context);
     }
+    obj->time_cleanup = current_time + (3*clean_delay)/4
+                                     + random_number(clean_delay/2);
 #endif /* NEW_CLEANUP */
 } /* cleanup_object() */
 

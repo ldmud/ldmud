@@ -4067,6 +4067,7 @@ v_object_info (svalue_t *sp, int num_args)
         ST_NUMBER(OIB_TOTAL_LIGHT,       0);
 #endif
         ST_NUMBER(OIB_NEXT_RESET,        o->time_reset);
+        ST_NUMBER(OIB_NEXT_CLEANUP,      o->time_cleanup);
         ST_NUMBER(OIB_TIME_OF_REF,       o->time_of_ref);
         ST_NUMBER(OIB_REF,               o->ref);
         ST_NUMBER(OIB_GIGATICKS,         (p_int)o->gigaticks);

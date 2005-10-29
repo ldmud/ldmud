@@ -24,6 +24,7 @@ struct object_s
 #endif
     mp_int time_reset;    /* Time of next reset, or 0 if none */
     mp_int time_of_ref;   /* Time when last referenced. Used by swap */
+    mp_int time_cleanup;  /* Time when the next variable cleanup is due. */
     mp_int load_time;     /* Time when the object was created. */
     p_int  load_id;       /* Load-ID within the time the object was created */
 #ifdef DEBUG

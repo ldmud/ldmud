@@ -1,6 +1,17 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+14-Jan-2004 (Lars Duening)  (3.3.654)
+  - (smalloc.c) Small block splits now make sure, that the remaining
+       block has a minimum size. This size is currently configured
+       to 3 words = 12 Bytes, as the driver doesn't need that many
+       of the even smaller blocks.
+  - (object, gcollect.c, backend.c) The data cleanup is now timed
+       independent of the time of the last reference: similar to
+       reset the cleanup takes place in random intervals based
+       on the configured cleanup-time (or one hour if the cleanup-time
+       is 0).
+
 13-Jan-2004 (Lars Duening)  (3.3.653)
   - (util/xerq/erq.c) The erq didn't check if the calculated timeout
        for the next select() had become negative. (Bug #0000342).

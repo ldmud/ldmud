@@ -40,8 +40,9 @@ DESCRIPTION
                                       0 else.
           int [OIB_TOTAL_LIGHT]:  the amount of light <ob> is emitting.
             This entry is always 0 when set_light() is not available.
-          int [OIB_NEXT_RESET]:   time of the next reset.
+          int [OIB_NEXT_RESET]:   time of the next reset
           int [OIB_TIME_OF_REF]:  time of the last call to <ob>
+          int [OIB_NEXT_CLEANUP]: time of the next data cleanup
           int [OIB_REF]:          number of references to <ob>
           int [OIB_GIGATICKS] and [OIB_TICKS]: together, these numbers
             give the accumulated evaluation cost spend in <ob>
@@ -123,6 +124,7 @@ HISTORY
           of OINFO_MEMORY.
         LDMud 3.3.378 added the OIM_SHARE_VARIABLES to the result
           of OINFO_MEMORY.
+        LDMud 3.3.654 added the OIB_NEXT_CLEANUP to the result of OINFO_BASIC.
 
 SEE ALSO
         debug_info(E)

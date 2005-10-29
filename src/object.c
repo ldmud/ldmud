@@ -24,6 +24,7 @@
 #endif
  *       mp_int          time_reset;
  *       mp_int          time_of_ref;
+ *       mp_int          time_cleanup;
  *       mp_int          load_time;
  *       p_int           load_id;
  *       p_int           extra_ref;            (ifdef DEBUG)
@@ -71,6 +72,8 @@
  *
  * .time_of_ref is the time() of the last apply on this object. The swapper
  * uses this timestamp to decide whether to swap the object or not.
+ *
+ * .time_cleanup is the time() when the next variable cleanup is due.
  *
  * Similar, .time_reset is the time() when the object should be reset
  * again. A time of 0 means: never.
@@ -416,6 +419,9 @@ static mp_int last_id = 0;
     ob->extra_num_variables = num_var;
 #endif
     ob->variables = ob_vars;
+
+    ob->time_cleanup = current_time + (time_to_cleanup > 0) ? time_to_cleanup
+                                                            : 3600;
 
     /* Initialize the variables */
 

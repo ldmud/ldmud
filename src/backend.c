@@ -939,20 +939,17 @@ static  mp_int num_cleanup; /* Number of objects to data-clean in this
          * time_to_clean_up seconds have passed until the last reference (or
          * 3600 seconds if the time is 0).
          */
-        if ((mp_int)num_last_processed <= num_cleanup)
+        if ((mp_int)num_last_processed <= num_cleanup
+         && obj->time_cleanup >= current_time
+           )
         {
-            mp_int delay = time_to_cleanup ? time_to_cleanup : 3600;
-
-            if (delay <= time_since_ref)
-            {
 #ifdef DEBUG
-                if (d_flag)
-                    fprintf(stderr, "%s DATA CLEANUP %s\n"
-                                  , time_stamp(), get_txt(obj->name));
+            if (d_flag)
+                fprintf(stderr, "%s DATA CLEANUP %s\n"
+                              , time_stamp(), get_txt(obj->name));
 #endif
 
-                cleanup_object(obj);
-            }
+            cleanup_object(obj);
         }
 
         /* ------ Clean Up ------ */
