@@ -778,16 +778,8 @@ init_lexer(void)
     add_permanent_define("__VERSION__", -1, (void *)get_version, MY_TRUE);
     add_permanent_define("__VERSION_MAJOR__", -1, string_copy(VERSION_MAJOR), MY_FALSE);
     add_permanent_define("__VERSION_MINOR__", -1, string_copy(VERSION_MINOR), MY_FALSE);
-#if IS_STABLE
     add_permanent_define("__VERSION_MICRO__", -1, string_copy(VERSION_MICRO), MY_FALSE);
-    if (IS_RELEASE())
-        add_permanent_define("__VERSION_PATCH__", -1, string_copy("0"), MY_FALSE);
-    else
-        add_permanent_define("__VERSION_PATCH__", -1, string_copy(VERSION_PATCH), MY_FALSE);
-#else
-    add_permanent_define("__VERSION_MICRO__", -1, string_copy(VERSION_PATCH), MY_FALSE);
     add_permanent_define("__VERSION_PATCH__", -1, string_copy("0"), MY_FALSE);
-#endif
 
     add_permanent_define("__HOST_NAME__", -1, (void *)get_hostname, MY_TRUE);
     add_permanent_define("__DOMAIN_NAME__", -1, (void *)get_domainname, MY_TRUE);
@@ -7611,20 +7603,12 @@ get_version(char ** args UNUSED)
 #endif
     char *buf;
     size_t len;
-    short bIsRelease;
 
-    bIsRelease = IS_RELEASE();
-    if (bIsRelease)
-        len = strlen(GAME_VERSION LOCAL_LEVEL);
-    else
-        len = strlen(LONG_VERSION LOCAL_LEVEL);
+    len = strlen(DRIVER_VERSION LOCAL_LEVEL);
     buf = xalloc(3 + len);
     if (!buf) return 0;
     buf[0] = '"';
-    if (bIsRelease)
-        strcpy(buf+1, GAME_VERSION LOCAL_LEVEL);
-    else
-        strcpy(buf+1, LONG_VERSION LOCAL_LEVEL);
+    strcpy(buf+1, DRIVER_VERSION LOCAL_LEVEL);
     buf[len+1] = '"';
     buf[len+2] = '\0';
     return buf;

@@ -9,37 +9,28 @@
 
 /* $Format: "#if $ReleaseMinor$ % 2 == 0"$ */
 #if 3 % 2 == 0
-#    define IS_STABLE 1
+#    define IS_STABLE_BRANCH 1
 #else
-#    define IS_DEVELOPMENT 1
+#    define IS_DEV_BRANCH 1
 #endif
 
-/* $Format: "#define IS_RELEASE() (!strcmp(\"$ReleaseType$\", \"rel\"))"$ */
-#define IS_RELEASE() (!strcmp("dev", "rel"))
+/* $Format: "#define IS_DEVELOPMENT (!strcmp(\"$ReleaseType$\", \"dev\"))"$ */
+#define IS_DEVELOPMENT (!strcmp("dev", "dev"))
+
+/* $Format: "#define IS_MAINTENANCE (!strcmp(\"$ReleaseType$\", \"maint\"))"$ */
+#define IS_MAINTENANCE (!strcmp("dev", "maint"))
+
+/* $Format: "#define RELEASE_TYPE \"$ReleaseType$\""$ */
+#define RELEASE_TYPE "dev"
 
 /* $Format: "#define RELEASE_DATE \"$ProjectDate$\""$ */
-#define RELEASE_DATE "Sun, 27 Mar 2005 14:46:34 -0700"
+#define RELEASE_DATE "Sun, 27 Mar 2005 15:48:26 -0700"
 
 /* $Format: "#define PROJ_VERSION \"$ProjectVersion$\""$ */
-#define PROJ_VERSION "3-3.694"
+#define PROJ_VERSION "3-3.695"
 
-#if IS_STABLE
-
-/* $Format: "#define GAME_VERSION \"$ReleaseVersion$\""$ */
-#define GAME_VERSION "3.3.0"
-
-/* $Format: "#define LONG_VERSION \"$ReleaseVersion$-$ReleaseType$.$ProjectMinorVersion$\""$ */
-#define LONG_VERSION "3.3.0-dev.694"
-
-#else
-
-/* $Format: "#define GAME_VERSION \"$DevelopmentVersion$\""$ */
-#define GAME_VERSION "3.3.694"
-
-/* $Format: "#define LONG_VERSION \"$DevelopmentVersion$\""$ */
-#define LONG_VERSION "3.3.694"
-
-#endif
+/* $Format: "#define DRIVER_VERSION \"$ReleaseVersion$\""$ */
+#define DRIVER_VERSION "3.3.695"
 
 /* $Format: "#define VERSION_MAJOR \"$ReleaseMajor$\""$ */
 #define VERSION_MAJOR "3"
@@ -48,16 +39,10 @@
 #define VERSION_MINOR "3"
 
 /* $Format: "#define VERSION_MICRO \"$ReleaseMicro$\""$ */
-#define VERSION_MICRO "0"
-
-/* $Format: "#define VERSION_PATCH \"$ProjectMinorVersion$\""$ */
-#define VERSION_PATCH "694"
+#define VERSION_MICRO "695"
 
 /* $Format: "#define LOCAL_LEVEL \"\""$ */
 #define LOCAL_LEVEL ""
-
-/* $Format: "#define RELEASE_TYPE \"$ReleaseType$\""$ */
-#define RELEASE_TYPE "dev"
 
 /* TODO: Add something like the perl local patchlevel management. */
 /* TODO: Add LPC defines for the various version number parts */

@@ -217,6 +217,10 @@ int exit_code = 0; /* TODO: There are constants for this */
 
 /*-------------------------------------------------------------------------*/
 
+/* Forward declarations */
+
+static const char * drivertag (void);
+
 /* Forward declarations for the argument parser in the lower half */
 
 static int getargs (int argc, char ** argv, int (*opt_eval)(int, const char *) );
@@ -354,8 +358,9 @@ main (int argc, char **argv)
         /* Print the driver tag line to stdout. The output to the debug.log
          * will follow when we opened it.
          */
-        printf("%s LDMud %s" LOCAL_LEVEL " (" PROJ_VERSION ")\n"
-              , time_stamp(), IS_RELEASE() ? GAME_VERSION : LONG_VERSION
+        printf("%s LDMud " DRIVER_VERSION LOCAL_LEVEL
+               " (" PROJ_VERSION ")%s\n"
+              , time_stamp(), drivertag()
               );
 
         /* Setup comm::host_name, so that we can open the debug.log file
@@ -400,9 +405,10 @@ main (int argc, char **argv)
             lpc_predefs = tmp;
         }
 
-        debug_message("%s LDMud %s" LOCAL_LEVEL " (" PROJ_VERSION ")\n"
-              , time_stamp(), IS_RELEASE() ? GAME_VERSION : LONG_VERSION
-              );
+        debug_message("%s LDMud " DRIVER_VERSION LOCAL_LEVEL
+                      " (" PROJ_VERSION ")%s\n"
+                     , time_stamp(), drivertag()
+                     );
           /* This also assures the existance of the fd for the debug log */
 
         time_to_data_cleanup = (time_to_cleanup > 0) ? time_to_cleanup
@@ -1590,6 +1596,29 @@ typedef struct InputSource {
 } InputSource;
 
 /*-------------------------------------------------------------------------*/
+static const char *
+drivertag (void)
+
+/* Return the driver's type tag string.
+ */
+
+{
+#if IS_STABLE_BRANCH
+
+    if (IS_DEVELOPMENT)
+        return " (dev snapshot)";
+
+    return "";
+
+#else
+    if (IS_DEVELOPMENT)
+        return " (development)";
+
+    return " (maintenance)";
+#endif
+} /* drivertag() */
+
+/*-------------------------------------------------------------------------*/
 static void
 version (void)
 
@@ -1599,13 +1628,15 @@ version (void)
 {
   fputs("LDMud ", stdout);
 
-  if (IS_RELEASE())
-      fputs(GAME_VERSION, stdout);
-  else
-      fputs(LONG_VERSION, stdout);
+  fputs(DRIVER_VERSION, stdout);
 
   fputs(LOCAL_LEVEL " - a LPMud Game Driver.\n"
-        "\nRelease:  " PROJ_VERSION "; " RELEASE_DATE
+        "\nRelease:  " PROJ_VERSION
+       , stdout);
+
+  fputs(drivertag(), stdout);
+
+  fputs("; " RELEASE_DATE
         "\nCompiled: " __DATE__
 #ifdef __TIME__
         " " __TIME__
