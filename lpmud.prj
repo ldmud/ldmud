@@ -59,17 +59,15 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 696)
-(Parent-Version lpmud 3-3 695)
+(Project-Version lpmud 3-3 697)
+(Parent-Version lpmud 3-3 696)
 (Version-Log "
-  - (port.c) Corrected a C99 incompatibility (thanks, Ralph!)
-  - (simulate.c, backend) The commands/s and compiled lines/s statistics
-       are part of the 'status tables' output.
+  - (gcollect.c) Added a missing variable initialisation (thanks, Ralph!).
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Fri, 01 Apr 2005 21:08:11 -0700")
+(Checkin-Time "Fri, 01 Apr 2005 21:11:10 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -108,7 +106,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.12 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.86 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.759 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.760 644))
   (HISTORY (lpmud/f/49_HISTORY 1.385.1.22 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.21 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -193,7 +191,7 @@
   (src/files.c (lpmud/i/50_files.c 1.29 644))
   (src/filestat.h (lpmud/f/51_filestat.h 1.7 644))
   (src/gcollect.h (lpmud/f/33_gcollect.h 1.6.1.18 644))
-  (src/gcollect.c (lpmud/c/30_gcollect.c 1.41.1.116.1.13 644))
+  (src/gcollect.c (lpmud/c/30_gcollect.c 1.41.1.116.1.14 644))
   (src/hash.h (lpmud/f/32_hash.h 1.6 644))
   (src/hash.c (lpmud/c/28_hash.c 1.17 644))
   (src/heartbeat.h (lpmud/m/41_heartbeat. 1.6.1.5 644))

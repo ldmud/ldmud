@@ -626,7 +626,7 @@ cleanup_object (object_t * obj)
 #else
     cleanup_t      * context = NULL;
     struct timeval   t_begin, t_end;
-    Bool             didSwap;
+    Bool             didSwap = MY_FALSE;
     unsigned long    numValues = 0;
 
     if (gettimeofday(&t_begin, NULL))
