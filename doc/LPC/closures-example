@@ -70,7 +70,7 @@ DESCRIPTION
         room by 10, unless the result would be negative.
         Selecting all livings in a room is simply
 
-          filter_array(all_inventory(room), #'living)
+          filter(all_inventory(room), #'living)
 
         The tricky part is to reduce the HP. Again, first the
         lfun-closure solution:
@@ -83,24 +83,24 @@ DESCRIPTION
           }
             ...
 
-          map_array( filter_array(all_inventory(room), #'living)
+          map( filter(all_inventory(room), #'living)
                    , #'_reduce_hp)
 
         or as an inline closure:
 
-          map_array( filter_array(all_inventory(room), #'living)
+          map( filter(all_inventory(room), #'living)
                    , (: int hp;
                         hp = liv->QueryHP();
                         if (hp > 10)
                           liv->SetHP(hp - 10);
                       :) );
 
-        Both filter_array() and map_array() pass the actual array item
+        Both filter() and map() pass the actual array item
         being filtered/mapped as first argument to the closure.
 
         Now, the lambda-closure solution:
 
-          map_array( filter_array(all_inventory(room), #'living)
+          map( filter(all_inventory(room), #'living)
           , lambda( ({ 'liv })
             , ({'#, , ({#'=, 'hp, ({#'call_other, 'liv, "QueryHP" }) })
                     , ({#'?, ({#'>, 'hp, 10 })

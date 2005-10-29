@@ -48,30 +48,30 @@ Table of Contents
   turn value of the example above will be 0.)
 
   What are closures good for? With closures you can make much more univer-
-  sally usable functions. A good example is the function filter_array().
+  sally usable functions. A good example is the function filter().
   It gets an array and a closure as arguments. Then it calls the function
   the closure points to for each element of the array:
 
-    filter_array(({ "bla","foo","bar" }),#'write);
+    filter(({ "bla","foo","bar" }),#'write);
 
   This will call write("bla"), write("foo") and write("bar") in any order;
   the order is undefined.
   (In the current implementation the given closure is evaluated for all
   elements from the first to the last, so the output will be "blafoobar".)
 
-  Furthermore the efun filter_array() examines the return value of each
+  Furthermore the efun filter() examines the return value of each
   call of the function the closure points to (the return value of the
   write()s). If the value is true (not 0) then this element is put into
-  another array which filter_array() builds up. If the return value is
+  another array which filter() builds up. If the return value is
   false (== 0) then this element is _not_ put into this array. When all
   calls are done the slowly built up array is returned. Thus,
-  filter_array() filters from the given array all elements that the given
+  filter() filters from the given array all elements that the given
   closure evaluates "true" for and returns an array of those. (The array
-  given to filter_array() itself is _not_ changed!)
+  given to filter() itself is _not_ changed!)
 
-  A senseful example for filter_array would be this:
+  A more sensical example for filterwould be this:
 
-    x = filter_array(users(),#'query_is_wizard);
+    x = filter(users(),#'query_is_wizard);
 
   users() is an efun that gets no arguments and returns an array of all
   logged in players (wizards and players). query_is_wizard() is a
@@ -87,19 +87,19 @@ Table of Contents
   Another example: We want to filter out all numbers that are greater than
   42 from the array a of integers:
 
-    x = filter_array(({ 10,50,30,70 }),#'>,42);
+    x = filter(({ 10,50,30,70 }),#'>,42);
 
   (x will now be ({ 50,70 }).)
 
   Here two things are new: first: we create a closure that points to an
   operator; second: we use the possibility to give extra arguments to
-  filter_array().
+  filter().
 
   Like all efuns the usual operators can be pointed to with a closure by
   prepending #' to them. funcall(#'>,4,5) is exactly the same as (4>5).
 
   The extra arguments given as third to last argument (as many as you
-  like) to filter_array() are given as second to last argument to the
+  like) to filter() are given as second to last argument to the
   function pointed to by the closure each time it is called.
 
   Thus we now call (({ 10,50,30,70 })[0]>42), (({ 10,50,30,70 })[1]>42) ...
@@ -136,7 +136,7 @@ Table of Contents
       }
 
       int *bar() {
-        return filter_array(({ 10,50,30,70 }),#'foo);
+        return filter(({ 10,50,30,70 }),#'foo);
       }
 
     Thus, #'foo is used like there was an efun of this name and doing the
@@ -153,13 +153,13 @@ Table of Contents
     above example would read:
 
       int * bar() {
-        return filter_array(({ 10,50,30,70 }), (: ($1 * 2) > 42 :));
+        return filter(({ 10,50,30,70 }), (: ($1 * 2) > 42 :));
       }
 
     or alternatively:
 
       int * bar() {
-        return filter_array(({ 10,50,30,70 }), (: return ($1 * 2) > 42; :));
+        return filter(({ 10,50,30,70 }), (: return ($1 * 2) > 42; :));
       }
 
     The difference between the two versions is that in the first form the text
@@ -171,9 +171,9 @@ Table of Contents
     Inline closures may also nested, so that the following (not very useful)
     example is legal, too:
 
-      return filter_array( ({ 10, 50, 30, 70 })
+      return filter( ({ 10, 50, 30, 70 })
                          , (: string *s;
-                              s = map_array(users(), (: $1->query_name() :));
+                              s = map(users(), (: $1->query_name() :));
                               return s[random(sizeof(s))] + ($1 * 2);
                             :));
 
@@ -248,11 +248,11 @@ Table of Contents
         return environment(o)->query_level()>WL_APPRENTICE;
       }
 
-      x=filter_array(a,#'foo);
+      x=filter(a,#'foo);
 
     does the same as
 
-      x=filter_array(a,lambda(({ 'o }),
+      x=filter(a,lambda(({ 'o }),
                               ({ (#'>),
                                  ({ (#'call_other),
                                     ({ (#'environment),'o }),
@@ -268,7 +268,7 @@ Table of Contents
     This example also demonstrates the two disadvantages of lambda closures.
     First, they are very difficult to read, even for a simple example like
     this. Second, the lambda closure is re-created everytime the
-    filter_array() is executed, even though the created code is always the
+    filter() is executed, even though the created code is always the
     same.
 
     'Why use lambdas at all then?' you may ask now. Well, read on.
@@ -530,7 +530,7 @@ Table of Contents
 
     #'negate is the unary minus that returns -x for the argument x.
 
-             map_array(({ 1,2,3 }),#'negate)
+             map(({ 1,2,3 }),#'negate)
 
              This returns ({ -1,-2,-3 }).
 
@@ -625,7 +625,7 @@ Table of Contents
     given below.
 
     These closures cannot be called directly using funcall() or apply() (or
-    other efuns like filter_array()), but must appear only in lambda-con-
+    other efuns like filter()), but must appear only in lambda-con-
     structs.
 
       funcall(#'return,4);  // does not work! This will raise an

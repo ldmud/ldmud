@@ -2823,12 +2823,13 @@ mark_block (word_t *ptr)
 } /* mark_block() */
 
 /*-------------------------------------------------------------------------*/
-static void
+static word_t *
 add_large_free (word_t *ptr, word_t block_size)
 
 /* The large memory block <ptr> with size <block_size> is free:
  * add it to the free list after trying to coagulate it with adjacent
  * ones.
+ * Result is the resulting pointer to the (possibly coagulated) free block.
  */
 
 {
@@ -2850,6 +2851,8 @@ add_large_free (word_t *ptr, word_t block_size)
     /* Mark the block as free and add it to the freelist */
     build_block(ptr, block_size);
     add_to_free_list(ptr);
+
+    return ptr;
 } /* add_large_free() */
 
 /*-------------------------------------------------------------------------*/
@@ -3089,7 +3092,7 @@ found_fit:
         block_size = chunk_size / SINT;
 
         /* Add block to free memory. */
-        add_large_free(ptr, block_size);
+        ptr = add_large_free(ptr, block_size);
     } /* end of creating a new chunk */
 
     /* ptr is now a pointer to a free block in the free list */
@@ -3218,7 +3221,7 @@ large_free (char *ptr)
     }
 #endif
 
-    add_large_free(p, size);
+    (void)add_large_free(p, size);
 } /* large_free() */
 
 /*-------------------------------------------------------------------------*/

@@ -54,19 +54,17 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 677)
-(Parent-Version lpmud 3-3 676)
+(Project-Version lpmud 3-3 678)
+(Parent-Version lpmud 3-3 677)
 (Version-Log "
-  - (configure, mapping.c, simulate) It is now possible to determine
-       the max number of mapping entries (keys) in addition to the total
-       mapping size (Bug #0000360).
-  - (main.c) New commandline option '--max-mapping-keys' to determine
-       separately the maximum number of entries in a mapping.
+  - (slaballoc.c, smalloc.c) I hate crashers which don't happen on my machine:
+       the merging of the esbrk() result with adjacent free blocks crashed
+       the driver (Bug #0000368).
 ")
 (New-Version-Log 
 ""
 )
-(Checkin-Time "Sun, 20 Feb 2005 18:57:57 -0700")
+(Checkin-Time "Mon, 21 Feb 2005 02:29:03 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -104,7 +102,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.12 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.85 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.740 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.741 644))
   (HISTORY (lpmud/f/49_HISTORY 1.385.1.19 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.21 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -342,9 +340,9 @@
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.40 644))
   (src/simulate.c (lpmud/31_simulate.c 1.88.1.135.1.11 644))
   (src/slaballoc.h (lpmud/d/c/16_slaballoc. 1.2 644))
-  (src/slaballoc.c (lpmud/d/c/17_slaballoc. 1.6 644))
+  (src/slaballoc.c (lpmud/d/c/17_slaballoc. 1.7 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.16 644))
-  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.112 644))
+  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.113 644))
   (src/sysmalloc.h (lpmud/c/b/33_sysmalloc. 1.2 644))
   (src/sysmalloc.c (lpmud/c/b/34_sysmalloc. 1.7 644))
   (src/sprintf.h (lpmud/f/15_sprintf.h 1.3.1.4 644))
@@ -1263,10 +1261,10 @@
   (doc/LPC/alists (lpmud/c/51_alists 1.5 644))
   (doc/LPC/arrays (lpmud/r/13_arrays 1.5 644))
   (doc/LPC/block (lpmud/r/14_block 1.9 644))
-  (doc/LPC/closures (lpmud/r/15_closures 1.9 644))
+  (doc/LPC/closures (lpmud/r/15_closures 1.10 644))
   (doc/LPC/closures-abstract (lpmud/c/50_closures 1.4.1.4 644))
-  (doc/LPC/closures-example (lpmud/r/16_closures-e 1.8 644))
-  (doc/LPC/closure_guide (lpmud/r/17_closure_gu 1.7.1.8 644))
+  (doc/LPC/closures-example (lpmud/r/16_closures-e 1.9 644))
+  (doc/LPC/closure_guide (lpmud/r/17_closure_gu 1.7.1.9 644))
   (doc/LPC/comments (lpmud/m/35_comments 1.3 644))
   (doc/LPC/do-while (lpmud/r/18_do-while 1.3 644))
   (doc/LPC/ed0 (lpmud/r/19_ed0 1.2 644))

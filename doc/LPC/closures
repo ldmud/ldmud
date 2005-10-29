@@ -124,16 +124,16 @@ DESCRIPTION
         a) How do I write down an array within a lambda closure to
            avoid interpretation as a subclosure?
 
-           ({ #'member_array, 'x, ({ "abc", "xyz" }) }) will obviously
+           ({ #'member, ({ "abc", "xyz" }), 'x }) will obviously
            result in an error as soon as lambda() tries to interpret
            "abc" as a closure operator. The solution is to quote the
-           array, as in: ({ #'member_array, 'x, '({ "abc", "xyz" }) }).
+           array, as in: ({ #'member, '({ "abc", "xyz" }), 'x }).
            Applying lambda() to this will not result in an error.
            Instead, the quote will be stripped from the array and the
            result regarded as a normal array literal. The same can be
            achieved by using the efun quote(), e.g.:
 
-           ({ #'member_array, 'x, quote( ({ "abc", "xyz" }) ) })
+           ({ #'member, quote( ({ "abc", "xyz" }), 'x ) })
 
         b) Isn't it a security risk to pass, say, a closure to the
            master object which then evaluates it with all the
@@ -224,7 +224,7 @@ DESCRIPTION
 
            Lots. For example, you can use them within almost all of
            the efuns where you give a function as an argument, like
-           filter_array(), sort_array() or walk_mapping().
+           filter(), sort_array() or walk_mapping().
            sort_array(array,#'>) does indeed what is expected. Another
            application is set_prompt(), where a closure can output
            your own prompt based on the current time and other stuff

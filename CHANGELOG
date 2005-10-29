@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+21-Feb-2004 (Lars Duening)  (3.3.678)
+  - (slaballoc.c, smalloc.c) I hate crashers which don't happen on my machine:
+       the merging of the esbrk() result with adjacent free blocks crashed
+       the driver (Bug #0000368).
+
 20-Feb-2004 (Lars Duening)  (3.3.677)
   - (configure, mapping.c, simulate) It is now possible to determine
        the max number of mapping entries (keys) in addition to the total
