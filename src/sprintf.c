@@ -2252,6 +2252,8 @@ add_table_now:
                        */
                     double value;   /* The value to print */
                     int    numdig;  /* (Estimated) number of digits before the '.' */
+                    Bool zeroCharHack = MY_FALSE;
+
                     int tmpl;
                     p_uint i = 1;
 
@@ -2298,6 +2300,17 @@ add_table_now:
                         {
                             ERROR1(ERR_INCORRECT_ARG, format_char);
                         }
+
+                        /* System sprintf() can handle ("%c", 0), but LDMud
+                         * strings can. So in that case we format with
+                         * character 0x01 and convert to 0 afterwards.
+                         */
+                        if (format_char == 'c' && carg->u.number == 0)
+                        {
+                            carg->u.number = 1;
+                            zeroCharHack = MY_TRUE;
+                        }
+
                         cheat[i++] = format_char;
                         cheat[i] = '\0';
                         sprintf(temp, cheat, carg->u.number);
@@ -2306,6 +2319,16 @@ add_table_now:
                             fatal("Local buffer overflow in sprintf() for int.\n");
                         if (pres && tmpl > pres)
                             tmpl = pres; /* well.... */
+
+                        if (zeroCharHack)
+                        {
+                            int pos;
+                            for (pos = 0; pos < tmpl; ++pos)
+                            {
+                                if (temp[pos] == 0x01)
+                                    temp[pos] = 0x00;
+                            }
+                        }
                     }
                     if ((unsigned int)tmpl < fs)
                     {

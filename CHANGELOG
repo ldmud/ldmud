@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+15-May-2005 (Lars Duening)  (3.3.703)
+  - (sprintf) sprintf("%c", 0) returned an empty string instead of a
+      string with the 0 character, because the code used the system
+      sprintf() for this formatting internally (Bug #0000378).
+
 14-May-2005 (Lars Duening)  (3.3.702)
   - (sprintf) Printing structures with "%O" or "%Q" in non-compact
       mode also prints the names of the structure members (Bug #0000380).
