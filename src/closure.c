@@ -6228,9 +6228,6 @@ f_symbol_variable (svalue_t *sp)
              */
             string_t *str;
 
-#ifdef EXT_STRING_STATS
-        stNumTabledChecked++;
-#endif /* EXT_STRING_STATS */
             str = find_tabled(sp->u.str);
             if (!str)
             {

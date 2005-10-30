@@ -1526,7 +1526,12 @@ get_type_name (fulltype_t type)
     {
         strcat(buff, " ");
         if (type.t_struct)
+        {
+            char buff2[100];
             strcat(buff, get_txt(type.t_struct->name));
+            sprintf(buff2, " %p", type.t_struct);
+            strcat(buff, buff2);
+        }
     }
 #endif /* USE_STRUCTS */
 
@@ -4385,7 +4390,7 @@ static void
 struct_epilog (void)
 
 /* After a successful parse, make sure that all structs are defined,
- * try to reactive existing structs, and publish the new ones.
+ * try to reactivate existing structs, and publish the new ones.
  *
  * If an error occures, num_parse_error will be incremented.
  */
@@ -10355,7 +10360,7 @@ expr4:
               {
                   s_index = get_struct_index($1.type.t_struct);
                   if (s_index == -1)
-                      yyerrorf("Unknown type: %s\n"
+                      yyerrorf("Unknown type in struct dereference: %s\n"
                               , get_type_name($1.type)
                               );
               }
@@ -10451,7 +10456,7 @@ expr4:
               {
                   s_index = get_struct_index($3.type.t_struct);
                   if (s_index == -1)
-                      yyerrorf("Unknown type: %s\n"
+                      yyerrorf("Unknown type in lvalue struct derefence: %s\n"
                               , get_type_name($3.type)
                               );
               }
@@ -11312,7 +11317,7 @@ lvalue:
               {
                   s_index = get_struct_index($1.type.t_struct);
                   if (s_index == -1)
-                      yyerrorf("Unknown type: %s\n"
+                      yyerrorf("Unknown type in lvalue struct dereference: %s\n"
                               , get_type_name($1.type)
                               );
               }
@@ -13749,7 +13754,7 @@ lvalue_list:
               {
                   s_index = get_struct_index($3.type.t_struct);
                   if (s_index == -1)
-                      yyerrorf("Unknown type: %s\n"
+                      yyerrorf("Unknown type in lvalue struct dereference: %s\n"
                               , get_type_name($3.type)
                               );
               }
@@ -14277,9 +14282,6 @@ lookup_inherited (const char *super_name, string_t *real_name
     {
         string_t *tmp;
 
-#ifdef EXT_STRING_STATS
-        stNumTabledChecked++;
-#endif /* EXT_STRING_STATS */
         tmp = find_tabled(real_name);
 
 #ifdef DEBUG
@@ -14416,9 +14418,6 @@ find_inherited_function ( const char * super_name
     funflag_t flags;
     short     ix;
 
-#ifdef EXT_STRING_STATS
-        stNumTabledChecked++;
-#endif /* EXT_STRING_STATS */
     rname = find_tabled_str(real_name);
 
     ix =  rname ? lookup_inherited(super_name, rname, &ip, &flags) : -1;

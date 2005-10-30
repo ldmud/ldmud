@@ -633,7 +633,7 @@ Bool
 struct_type_equivalent (struct_type_t * pSType1, struct_type_t *pSType2)
 
 /* Check if the two types <pSType1> and <pSType2> are of equivalent
- * shallow structure.
+ * structure.
  */
 
 {
@@ -662,16 +662,27 @@ struct_type_equivalent (struct_type_t * pSType1, struct_type_t *pSType2)
            )
             return MY_FALSE;
 
-        /* For structs members, conformance by name should
-         * be sufficient.
+        /* For structs members, a deep comparison is necessary.
          */
         if ((pMember1->type.type & PRIMARY_TYPE_MASK) == TYPE_STRUCT)
         {
-            if (!mstreq( struct_t_name(pMember1->type.t_struct)
-                       , struct_t_name(pMember2->type.t_struct))
-             || !mstreq( struct_t_pname(pMember1->type.t_struct)
-                       , struct_t_pname(pMember2->type.t_struct))
-               )
+            Bool rc;
+            vartype_t t_member1 = pMember1->type;
+            vartype_t t_member2 = pMember2->type;
+
+            /* Prevent recursion by blocking out the structs */
+            pMember1->type.type = TYPE_NUMBER;
+            pMember2->type.type = TYPE_NUMBER;
+
+            rc = struct_type_equivalent( t_member1.t_struct
+                                       , t_member2.t_struct
+                                       );
+
+            /* Restore the original member types */
+            pMember1->type = t_member1;
+            pMember2->type = t_member2;
+
+            if (!rc)
                 return MY_FALSE;
         }
     }

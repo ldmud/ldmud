@@ -604,6 +604,7 @@
   (doc/concepts/native (lpmud/n/36_native 1.9 644))
   (doc/concepts/negotiation (lpmud/n/37_negotiatio 1.3.1.4 644))
   (doc/concepts/objects (lpmud/n/38_objects 1.5 644))
+  (doc/concepts/overloading ())
   (doc/concepts/regexp (lpmud/v/29_regexp 1.5 644))
   (doc/concepts/hsregexp (lpmud/v/30_hsregexp 1.4 644))
   (doc/concepts/pcre (lpmud/v/31_pcre 1.7 644))

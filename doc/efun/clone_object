@@ -23,6 +23,17 @@ DESCRIPTION
         If strict euids are enforced, the cloning object must have
         a non-zero euid.
 
+
+        -- Variable Initialization --
+
+        In general, variables are initialized for blueprints and clones alike
+        with a call to the internal lfun __INIT(). However, if #pragma
+        share_variables is in effect (either explicitely given in the source
+        or implicitely as runtime option), the values for a clone's variables
+        are taken from the _current_ variables of the object's blueprint.
+
+        Variables without explicit initializers are always initialized to 0.
+
 EXAMPLE
         // Clone a torch (filename in non-compat format)
         object torch;
@@ -33,16 +44,25 @@ EXAMPLE
         key1 = clone_object(load_object("obj/key"));
         key2 = clone_object(key1);
 
-BUGS
-        If variable initialization is not done with __INIT(), the initializers
-        are copied from the _current_ variables of the blueprint. This is in
-        line with the meaning of 'blueprint', but can lead to hard-to-find
-        errors. Variables without initializer are unaffected and always
-        initialized to 0.
+        // Create a specialized weapons blueprint.
+        --- std/weapon.c: --- 
+        #pragma share_variables
+        int weapon_class = 1;
+
+        --- broadsword.c: ---
+        inherit "/std/weapon";
+
+        int create() {
+            weapon_class = 2;
+            replace_program("/std/weapon");
+        }
+
 
 HISTORY
         Modified in LDMud 3.2.6 to take an object as argument.
+        LDMud 3.3.378 consolidated the variable initialization with the
+        share_variables pragma.
 
 SEE ALSO
         blueprint(E), clonep(E), destruct(E), clones(E), load_name(E),
-        load_object(E), move_object(E), uids(C), program_name(E)
+        load_object(E), move_object(E), uids(C), program_name(E), pragma(LPC)

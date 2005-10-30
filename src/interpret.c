@@ -2646,7 +2646,7 @@ put_c_n_string (svalue_t *sp, const char *p, size_t len)
 
     memsafe(str = new_n_mstring(p, len), len, "string");
     put_string(sp, str);
-} /* put_c_string() */
+} /* put_c_n_string() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -8723,9 +8723,6 @@ again:
                  * that twin.
                  */
                 s = (mp_int)find_tabled(sp->u.str);
-#ifdef EXT_STRING_STATS
-        stNumTabledChecked++;
-#endif /* EXT_STRING_STATS */
             }
             else
             {
@@ -16456,9 +16453,6 @@ retry_for_shadow:
     if (!mstr_tabled(fun))
     {
         fun = find_tabled(fun);
-#ifdef EXT_STRING_STATS
-        stNumTabledChecked++;
-#endif /* EXT_STRING_STATS */
         if (!fun)
             goto failure2;
     }

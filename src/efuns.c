@@ -1875,9 +1875,6 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                 str = NULL;
             else
             {
-#ifdef EXT_STRING_STATS
-        stNumTabledChecked++;
-#endif /* EXT_STRING_STATS */
                 str = find_tabled_str_n(parts[i], lens[i]);
             }
             if (str != NULL && map != NULL)
@@ -2587,9 +2584,6 @@ process_value (const char *str, Bool original)
     /* Check if the function exists at all. apply() will be delighted
      * over the shared string anyway.
      */
-#ifdef EXT_STRING_STATS
-        stNumTabledChecked++;
-#endif /* EXT_STRING_STATS */
     if ( NULL == (func2 = find_tabled_str(func)) )
     {
         return NULL;
@@ -4312,9 +4306,6 @@ f_present_clone (svalue_t *sp)
         /* Now make the name sane */
         sane_name = (char *)make_name_sane(name0, !compat_mode);
 
-#ifdef EXT_STRING_STATS
-        stNumTabledChecked++;
-#endif /* EXT_STRING_STATS */
         if (sane_name)
             name = find_tabled_str(sane_name);
         else

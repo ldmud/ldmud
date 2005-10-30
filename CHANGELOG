@@ -1,6 +1,56 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+30-Oct-2005 (Lars Duening)  (3.3.711)
+  - Created snapshot.
+
+29-Oct-2005 (Lars Duening)
+  - (backend.c) The backend call to cleanup_all_objects() is now
+       controlled with a low/high watermark logic, to prevent
+       repeated calls in consecutive backend cycles: if one cleanup
+       didn't remove enough destructed objects, it is unlikely
+       that immediately following ones will.
+  - (pkg-tls.c) The OpenSSL read/writes are now retried when necessary.
+  - (configure) When searching for the mysqlclient library in the
+       usual places, the configure script forgot to clear out the 
+       cache flag.
+  - (smalloc.c) Removed a compilation error when SBRK_OK wasn't defined.
+  - (mstrings, many files) The find-in-table statistics were done
+       incompletely.
+  - (structs.c) The test for struct equivalence now recurses through
+       member structs; otherwise changes in an contained struct wouldn't
+       be reflected in the containing struct.
+  - (prolang.y) Clarified the 'Unknown type' error messages when
+       derefencing structs.
+
+19-Oct-2005 (Lars Duening)
+  - (pkg-tls.c) tls_check_certificate() now returns the low-level API
+      values, and throws an error if the connection is not secure.
+
+11-Oct-2005 (Lars Duening)
+  - (erq/erq.c, xerq/socket.c) Corrected compilation warnings.
+  - (lex.c) to_int() no longer accepts "x<num>" as valid sedecimal
+       notation (Bug #0000402).
+
+10-Oct-2005 (Lars Duening)
+  - (backend.c) Added a clear_state() at the beginning of the
+    process_objects() loop, so that errors during the cleanup find
+    a consistent machine state (Bug #0000405).
+
+09-Oct-2005 (Lars Duening)
+  - (simulate.c) If the catch() handling notices an out-of-memory
+      situation, the catch() is ignored. This also fixes an endless
+      recursion (Bug #0000406).
+
+04-Oct-2005 (Lars Duening)
+  - (doc/concepts/overloading) New man page (thanks, Coogan!).
+
+28-Sep-2005 (Lars Duening)
+  - (doc/efun/clone_object) Clarified the variable initialisation.
+
+23-Aug-2005 (Lars Duening)
+  - (Makefile.in) The PRCS rules first check if PRCS is available.
+
 20-Jun-2005 (Lars Duening)  (3.3.710)
   - (patchlevel.h.in, version.sh, mk-patchlevel.sh, Makefiles)
       Modified the version numbering system to be compatible between
@@ -584,7 +634,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
 
 13-Nov-2004 (Lars Duening)  (3.3.613)
   - (lex.c, efuns.c) Embarassing: the number parsing method assumed that the
-       string at least started with a digit - this broken to_int().
+       string at least started with a digit - this broke to_int().
        (Bug #0000141)
 
 12-Nov-2004 (Lars Duening)  (3.3.612)

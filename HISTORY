@@ -202,15 +202,18 @@ For a detailed list of all changes see the file CHANGELOG.
            the maxinum number of entries in a mapping.
 
 
-15-May-2005 (Lars Duening) -- Release 3.2.12
+19-Oct-2005 (Lars Duening) -- Release 3.2.12
 
     - Changed efuns:
+      + tls_check_certificate(): Return the low-level API results, and throw
+          an error if the connection is not secure.
 
     - Corrected efuns:
       + call_out(), input_to(): Local references are no longer
           accepted as extra arguments.
       + restore_value(): Restoring one-character operator closures
           in arrays works again.
+      + to_int(): No longer accepts "x<num>" as valid sedecimal notation.
 
     - New efuns:
 
