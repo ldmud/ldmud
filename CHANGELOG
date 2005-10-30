@@ -14,6 +14,11 @@ See the file HISTORY for a user-oriented summary of all the changes.
   - (smalloc.c) Removed a compilation error when SBRK_OK wasn't defined.
   - (mstrings, many files) The find-in-table statistics were done
        incompletely.
+  - (structs.c) The test for struct equivalence now recurses through
+       member structs; otherwise changes in an contained struct wouldn't
+       be reflected in the containing struct.
+  - (prolang.y) Clarified the 'Unknown type' error messages when
+       derefencing structs.
 
 19-Oct-2005 (Lars Duening)
   - (pkg-tls.c) tls_check_certificate() now returns the low-level API
