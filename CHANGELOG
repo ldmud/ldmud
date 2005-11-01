@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+31-Oct-2005 (Philipp Hancke)
+  - (pkg-tls.c) When accepting a SSL connection, request a client
+       certificate. The driver itself won't check the correctness,
+       but the result will be available in the connection status.
+
 30-Oct-2005 (Lars Duening)  (3.3.711)
   - Created snapshot.
 

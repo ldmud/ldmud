@@ -232,6 +232,20 @@ tls_xfree (void *p)
 #endif /* SSL Package */ 
 
 /*-------------------------------------------------------------------------*/
+static int
+tls_verify_callback(int preverify_ok, X509_STORE_CTX *ctx) 
+
+/* This function will be called if the client did present a certificate.
+ * Always returns MY_TRUE so that the handshake will succeed
+ * and the verification status can later be checked on mudlib level
+ * See also: SSL_set_verify(3)
+ */
+
+{
+    return MY_TRUE;
+} /* tls_verify_callback() */
+
+/*-------------------------------------------------------------------------*/
 void tls_global_init (void)
 
 /* Initialise the TLS package; to be called once at program startup.
@@ -851,7 +865,11 @@ v_tls_init_connection (svalue_t *sp, int num_arg)
         if (ip->outgoing_conn)
             SSL_set_connect_state(session);
         else
+        {
             SSL_set_accept_state(session);
+            /* request a client certificate */
+            SSL_set_verify(session, SSL_VERIFY_PEER, tls_verify_callback);
+        }
         ip->tls_session = session;
         
 #elif defined(HAS_GNUTLS)
