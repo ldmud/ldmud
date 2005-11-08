@@ -1,6 +1,14 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+08-Oct-2005  (Lars Duening)
+  - (closure.c) When freeing bound unbound_lambdas, the code forgot to
+       remove the reference to the creator object of the unbound_lambda.
+  - (closure.c) Efun symbol_function() leaked an object reference (Bug
+       #0000412).
+  - (closure.c, object.h) Made the object reference logs a bit more
+       expressive.
+
 31-Oct-2005 (Philipp Hancke)
   - (pkg-tls.c) When accepting a SSL connection, request a client
        certificate. The driver itself won't check the correctness,
