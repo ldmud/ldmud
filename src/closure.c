@@ -1002,6 +1002,10 @@ replace_program_lambda_adjust (replace_ob_t *r_ob)
             memcpy(l->function.code, l2->function.code, (size_t)code_size2);
 
             /* Free the (now empty) memory */
+            if  (l2->ob)
+                free_object(l2->ob, "replace_program_lambda_adjust");
+            if  (l2->prog_ob)
+                free_object(l2->prog_ob, "replace_program_lambda_adjust");
             xfree(svp2);
             free_array(lrpp->args);
             free_svalue(&lrpp->block);
