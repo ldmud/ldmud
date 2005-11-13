@@ -1,0 +1,12 @@
+Subject: to_int()
+From: Lars Duening <duening@ibr.cs.tu-bs.de>
+Date: Mon, 28 Sep 1998 12:21:26 +0200 (MET DST)
+
+Heya!
+
+to_int() sollte auch int als arg akzeptieren, to_object() ein object,
+etc.
+Note by Zwirch@carledon.
+
+	Lars
+
