@@ -1,0 +1,9 @@
+SYNOPSIS
+        string *parse_command_prepos_list(void)
+
+DESCRIPTION
+        Used by parse_command(). Return an array of common
+        prepositions in the installations native language.
+
+SEE ALSO
+        parse_command(E)

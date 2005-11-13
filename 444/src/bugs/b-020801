@@ -1,0 +1,20 @@
+Short: nmap crashes LDMud
+From: Kees Leune (C.J.Leune@kub.nl)
+Date: 2002-08-01
+Type: Bug
+State: New
+
+When a collegue of mine ran an nmap scan over our mud's box, it caused the 
+driver to crash. This behaviour can be reproduced on demand. We are running 
+LDMud 3.2.8 (with local modifications) on a Linux-i386 box. The 
+modifications we made relate to adding ANSI support to the driver at string 
+creation time.
+
+Is this a known problem? If so, are there any patches available? I was not 
+able to find this on your LDMud site.
+
+Some info:
+  MUD name: Hyperborea
+  Address : hyperborea.net 2000 (137.56.40.93 2000)
+  Driver  : ldmud 3.2.8 (-hyperborea1) in COMPAT mode
+  Platform: Linux-i386

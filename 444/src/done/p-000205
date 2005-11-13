@@ -1,0 +1,28 @@
+From: Michael Fedrowitz <mfedrowi@talknet.de>
+Date: Sat, 5 Feb 2000 17:53:39 +0100
+Short: prolang.y (.164) for bison
+Type: Patch
+State: Done - applied in 3.2.8-dev.175
+
+
+ Hi,
+
+anbei 'n kleiner Patch für prolang.y, der es möglich macht, auch bison statt
+byacc zu benutzen. Btw. das bringt keinerlei Lizenzprobleme mit sich, bison
+zu benutzen; aus der Dokumentation von bison: "As of Bison version 1.24, we
+have changed the distribution terms for `yyparse' to permit using Bison's
+output in non-free programs."
+
+-Michael (Rhodry@ForgottenDreams)
+
+--- prolang.y.orig	Wed Dec 22 15:39:34 1999
++++ prolang.y	Sat Feb  5 15:48:23 2000
+@@ -2581,6 +2581,8 @@
+ %type <fulltype>     inheritance_modifier_list inheritance_modifier
+ %type <type>         decl_cast cast
+ %type <lrvalue>      note_start comma_expr expr0 expr4
++%type <lrvalue>      expr_decl comma_expr_decl
++%type <lrvalue>      for_expr for_init_expr
+ %type <lrvalue>      function_call inline_fun
+ %type <lrvalue>      catch catch_no_log sscanf
+ %ifdef SUPPLY_PARSE_COMMAND

@@ -1,0 +1,81 @@
+There is a generic weapon avaliable. To set up do :
+	object wobj;
+
+	wobj = clone_object("obj/weapon");
+
+For customization the following routines are available :
+
+You should call these functions:
+set_name(n)
+    string n. Sets the name and short description to n.
+    Sets long description to "You see nothing special.\n"
+
+set_class(c)
+    int c. Sets how much damaged it will do.
+
+set_weight(w)
+    int w. Sets the weight.
+
+set_value(v)
+    int v. Sets the value.
+
+These are the optional functions:
+set_alt_name(n)
+    string n. Adds an alternate name to weapon.
+
+set_alias(n)
+    string n. Adds another alternate name to weapon.
+
+set_short(sh)
+    string sh. Sort description is set to sh. Long to short + "\n"
+
+set_long(long)
+    string long. Long description is set to long.
+
+set_read(str)
+    string str. str will be returned if it's read.
+
+set_hit_func(ob)
+    object ob. Sets up a call to function 'weapon_hit' in object 'ob'.
+    'weapon_hit' is called every time the weapon strikes someone.
+    The argument given to 'weapon_hit' is the target of the attack.
+    The return value of 'weapon_hit' adds to the weapons wc for this hit.
+    Returning the string "miss" will cause the weapon to miss.
+
+set_wield_func(ob)
+    object ob. Sets up a call to function 'wield' in object 'ob'.
+    'wield' is called every time the weapon is wielded.
+    A return value of 0 form 'wield' means that the weapon will not
+    be wielded. 1 that it's okey to wield it.
+
+EXAMPLE
+	/*
+	 * This is a magic sword is has a wc of 9 as base
+	 * and a wc of 19 if it's attacking an orc.
+	 */
+	orc_slayer = clone_object("obj/weapon");
+	call_other(orc_slayer, "set_name", "short sword");
+	call_other(orc_slayer, "set_alias", "sword");
+	call_other(orc_slayer, "set_short", "Short sword");
+	call_other(orc_slayer, "set_alt_name", "orc slayer");
+	call_other(orc_slayer, "set_long", "This is a very fine blade.\n"+
+		"It's covered with ancient runes.\n" +
+		"Engraved on it is a picture of the sword slicing an orc.\n");
+	call_other(orc_slayer, "set_read",
+		"The only thing you can read is the word 'orc'.\n");
+	call_other(orc_slayer, "set_class", 9);
+	call_other(orc_slayer, "set_weight", 2);
+	call_other(orc_slayer, "set_value", 200);
+	call_other(orc_slayer, "set_hit_func", this_object());
+	.
+	.
+	.
+
+weapon_hit(attacker)
+{
+    if(call_other(attacker,"id","orc")){
+	write("Ziiing\n");
+	return 10;
+    }
+    return 0;
+}
