@@ -1,0 +1,11 @@
+#!/bin/sh
+MUDLIB=/user/mud/mudlib
+case $1 in
+  /* | *..*)
+    echo illegal ;;
+  *)
+  if test -n "`echo $1 | sed 's/[a-zA-Z0-9._#%/]//g'`"; then
+    echo illegal; exit 1
+  fi
+  /user/mud/bin/indent ${MUDLIB}/$1 -lpc;;
+esac
