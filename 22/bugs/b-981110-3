@@ -1,0 +1,4 @@
+Short: 'comparison always zero' warnings in closure.c
+
+When compiling under Linux, the above mentioned warnings occur.
+For now, I added 'TODO:' comments to the referenced places.
