@@ -1,0 +1,18 @@
+SYNOPSIS
+        int get_eval_time()
+
+DESCRIPTION
+        Returns the remaining time for the current execution (the current
+        command) before an 'evaluation too long' error would occur.
+
+        It starts at a driver-given high value (__MAX_EVAL_TIME__) and
+        is reduced every two seconds.
+
+	Only available if the driver was compiled with MAX_TIME.
+
+HISTORY
+	Introduced in LDMud 3.2.6.
+
+SEE ALSO
+        get_eval_cost(E)
+
