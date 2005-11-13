@@ -1,0 +1,9 @@
+Short: Recursive unlimited includes crash the driver
+Date: 981208
+Type: Bug
+State: Unclassified
+From: Chameloid
+
+This should be caught by now, but a test won't hurt.
+It doesn't crash on Be.
+
