@@ -1,0 +1,457 @@
+Subject: DNS Problem 2
+From: Freaky <Freaky@UNItopia.rus.uni-stuttgart.de>
+Date: Sun, 7 Mar 1999 18:20:53 +0100
+Type: Patch
+State: Done - applied in 3.2-dev.51
+
+
+--+QahgC5+KEYLbs62
+Content-Type: text/plain; charset=us-ascii
+
+Hi,
+
+Lars Duening:
+> > Lars Duening:
+> > > The change done in 3.2-dev.43 was a bit too well-meaning: I had to undo
+> > > part of it as it collided with an earlier bugfix. Fortunately the actual
+> > > bugfix could stay.
+> >
+> > Ich konnte den Driver nicht compilieren.
+> > Folgende Fehler traten auf:
+>
+> Vergiss meine letzte Mail - ich habs grad auf einer Sun ausprobiert und
+> dieselben Meldungen bekommen. Wirds heute wohl noch eine Korrektur geben
+> :-)
+
+Ich habe noch etwas gefunden:
+__DOMAIN_NAME__ liefert die NIS-Domain und nicht die DNS-Domain, wie
+eigentlich beschrieben.
+Ich habe einen Patch geschrieben, der die DNS-Domain liefert.
+Ausserdem habe ich alle Buffer fuer Host-Namen per define alloziiert, und
+nicht einfach irgendeine Zahl von Bytes.
+Das entsprechende Define (MAXHOSTNAMELEN) ist in <sys/param.h> zu finden.
+Ich weiss nicht, ob das auf allen Systemen vorhanden ist. Evtl. muesste man
+es im configure (genauso wie HAVE_NETDB_H) testen.
+
+Durch das neue get_domainname braucht man dafuer den Test auf
+'HAVE_GETDOMAINNAME' im configure nicht mehr.
+
+Schaue dir bitte auch das neue get_domainname mal an. Ich habe nicht sooo
+viel Erfahrung in C und weiss deswegen nicht, ob es so sinnvoll ist, oder
+ob man da was besser machen kann.
+Ein Problem besteht auch noch: es wird ja ein gethostbyname aufgerufen. Das
+kann zu ziemlich langen Wartezeiten fuehren, wenn der DNS down ist.
+Man sollte das ganze vielleicht besser im Startup einmal machen, und sich
+die Domain merken, und sie nicht jedesmal auswerten.
+Oder man wertet die Domain nur beim ersten Aufruf aus, und merkt sich in
+einer statischen Variable, ob man die Auswertung schon gemacht hat.
+
+Dieselbe Auswertung wird uebrigens auch in comm::f_send_imp() und in
+comm::initialize_host_ip_number() gemacht.
+Gerade in comm::initialize_host_ip_number() wird genau das gemacht, was man
+in get_domainname braucht (comm.c Zeile 491). Hier koennte man sich die
+Domain gleich in einer globalen Variable merken.
+Den entsprechenden Patch habe ich auch drangehaengt.
+
+Ich persoenlich tendiere eher zum zweiten Patch, aber ich weiss nicht, ob
+der wirklich so funktionert, und ob man malloc so aufrufen darf...
+Schau es dir an, und nimm eines von beiden ;)
+
+Hier der 1. Patch (und als Attachment) ohne globale Variable:
+
+-SCHNIPP-----------------------------------------------------------------------
+diff -u -r src.org/comm.c src.neu/comm.c
+--- src.org/comm.c	Tue Feb 23 01:05:44 1999
++++ src.neu/comm.c	Sun Mar  7 17:18:29 1999
+@@ -79,6 +79,8 @@
+ #ifdef HAVE_NETDB_H
+ #    include <netdb.h>
+ #endif
++
++#include <sys/param.h>
+
+ #ifndef AMIGA
+ #    include <signal.h>
+@@ -478,7 +480,7 @@
+  */
+
+ {
+-    char host_name[100];
++    char host_name[MAXHOSTNAMELEN + 1];
+     struct hostent *hp;
+     int tmp;
+
+@@ -4138,7 +4140,7 @@
+  */
+
+ {
+-    static char name[20];
++    static char name[MAXHOSTNAMELEN + 1];
+     char *p;
+
+     gethostname(name, sizeof name);
+diff -u -r src.org/lex.c src.neu/lex.c
+--- src.org/lex.c	Wed Mar  3 01:18:02 1999
++++ src.neu/lex.c	Sun Mar  7 17:18:29 1999
+@@ -32,6 +32,10 @@
+ #include <string.h>
+ #include <sys/types.h>
+ #include <sys/stat.h>
++#ifdef HAVE_NETDB_H
++#    include <netdb.h>
++#endif
++#include <sys/param.h>
+ #ifdef OS2
+ #include <io.h>
+ #endif
+@@ -4898,6 +4902,7 @@
+ /* Dynamic macro __DOMAINNAME__: return the domainname.
+  */
+
++#if 0
+ {
+     char tmp[256], *buf;
+
+@@ -4912,6 +4917,30 @@
+     sprintf(buf, "\"%s\"", tmp);
+     return buf;
+ }
++#else
++{
++    static char myname[MAXHOSTNAMELEN + 1] = { 0 };
++    char *buf;
++    struct hostent *hp;
++    register char *p;
++
++    if (!gethostname(myname, sizeof(myname)) && (hp = gethostbyname(myname))
++            && (p = strchr(hp->h_name, '.')))
++    {
++        p++;
++    }
++    else
++    {
++        strcpy(myname, "unknown");
++        p = myname;
++    }
++    buf = xalloc(strlen(p) + 3);
++    if (!buf)
++	return 0;
++    sprintf(buf, "\"%s\"", p);
++    return buf;
++}
++#endif
+
+ /*-------------------------------------------------------------------------*/
+ static char *
+-SCHNAPP-----------------------------------------------------------------------
+
+Hier Patch2 (merkt sich den Domain-Name in domain_name):
+
+-SCHNIPP-----------------------------------------------------------------------
+diff -u -r src.org/comm.c src.neu/comm.c
+--- src.org/comm.c	Tue Feb 23 01:05:44 1999
++++ src.neu/comm.c	Sun Mar  7 18:12:52 1999
+@@ -79,6 +79,8 @@
+ #ifdef HAVE_NETDB_H
+ #    include <netdb.h>
+ #endif
++
++#include <sys/param.h>
+
+ #ifndef AMIGA
+ #    include <signal.h>
+@@ -277,6 +279,9 @@
+    * TODO: Can't this be local?
+    */
+
++char *domain_name;
++  /* This computer's domain-name. Is needed for lex.c::get_domainname() */
++
+ static int min_nfds = 0;
+   /* The number of fds used by the driver's sockets (udp, erq, login).
+    * It is the number of the highest fd plus one.
+@@ -478,9 +483,10 @@
+  */
+
+ {
+-    char host_name[100];
++    char host_name[MAXHOSTNAMELEN + 1];
+     struct hostent *hp;
+     int tmp;
++    register char *p;
+
+     if (gethostname(host_name, sizeof host_name) == -1) {
+         perror("gethostname");
+@@ -495,6 +501,19 @@
+     memcpy(&host_ip_addr.sin_addr, hp->h_addr, hp->h_length);
+     host_ip_addr.sin_family = hp->h_addrtype;
+     host_ip_number = host_ip_addr.sin_addr;
++
++    /* save domainname for lex.c::get_domainname() in domain_name */
++    if (p = strchr(hp->h_name, '.'))
++    {
++        p++;
++        domain_name = malloc(strlen(p));
++        strcpy(domain_name, p);
++    }
++    else
++    {
++        domain_name = malloc(8);
++        strcpy(domain_name, "unknown");
++    }
+
+ #ifdef CATCH_UDP_PORT
+     /* Initialize upd at an early stage so that the master object can use
+@@ -4138,7 +4157,7 @@
+  */
+
+ {
+-    static char name[20];
++    static char name[MAXHOSTNAMELEN + 1];
+     char *p;
+
+     gethostname(name, sizeof name);
+diff -u -r src.org/lex.c src.neu/lex.c
+--- src.org/lex.c	Wed Mar  3 01:18:02 1999
++++ src.neu/lex.c	Sun Mar  7 18:12:52 1999
+@@ -4899,17 +4899,12 @@
+  */
+
+ {
+-    char tmp[256], *buf;
++    char *buf;
+
+-#ifdef HAVE_GETDOMAINNAME
+-    getdomainname(tmp, sizeof(tmp));
+-    tmp[sizeof(tmp)-1] = '\0';
+-#else
+-    strcpy(tmp, "unknown");
+-#endif
+-    buf = xalloc(strlen(tmp)+3);
+-    if (!buf) return 0;
+-    sprintf(buf, "\"%s\"", tmp);
++    buf = xalloc(strlen(domain_name) + 3);
++    if (!buf)
++        return 0;
++    sprintf(buf, "\"%s\"", domain_name);
+     return buf;
+ }
+
+diff -u -r src.org/lex.h src.neu/lex.h
+--- src.org/lex.h	Thu Dec 10 03:37:36 1998
++++ src.neu/lex.h	Sun Mar  7 18:14:59 1999
+@@ -143,6 +143,7 @@
+ extern /* TODO: BOOL */ int pragma_verbose_errors;
+ extern char *last_lex_string;
+ extern struct ident *all_efuns;
++extern char *domain_name;
+
+ /* Values of pragma_strict_types */
+
+-SCHNAPP-----------------------------------------------------------------------
+
+
+Ciao
+		Freaky
+
+--
+Frank 'Freaky' Kirschner
+UNItopia Admin                          http://UNItopia.uni-stuttgart.de/
+Freaky@UNItopia.Uni-Stuttgart.DE      telnet://UNItopia.uni-stuttgart.de/
+
+--+QahgC5+KEYLbs62
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: attachment; filename="domainname.patch"
+
+diff -u -r src.org/comm.c src.neu/comm.c
+--- src.org/comm.c	Tue Feb 23 01:05:44 1999
++++ src.neu/comm.c	Sun Mar  7 17:18:29 1999
+@@ -79,6 +79,8 @@
+ #ifdef HAVE_NETDB_H
+ #    include <netdb.h>
+ #endif
++
++#include <sys/param.h>
+
+ #ifndef AMIGA
+ #    include <signal.h>
+@@ -478,7 +480,7 @@
+  */
+
+ {
+-    char host_name[100];
++    char host_name[MAXHOSTNAMELEN + 1];
+     struct hostent *hp;
+     int tmp;
+
+@@ -4138,7 +4140,7 @@
+  */
+
+ {
+-    static char name[20];
++    static char name[MAXHOSTNAMELEN + 1];
+     char *p;
+
+     gethostname(name, sizeof name);
+diff -u -r src.org/lex.c src.neu/lex.c
+--- src.org/lex.c	Wed Mar  3 01:18:02 1999
++++ src.neu/lex.c	Sun Mar  7 17:18:29 1999
+@@ -32,6 +32,10 @@
+ #include <string.h>
+ #include <sys/types.h>
+ #include <sys/stat.h>
++#ifdef HAVE_NETDB_H
++#    include <netdb.h>
++#endif
++#include <sys/param.h>
+ #ifdef OS2
+ #include <io.h>
+ #endif
+@@ -4898,6 +4902,7 @@
+ /* Dynamic macro __DOMAINNAME__: return the domainname.
+  */
+
++#if 0
+ {
+     char tmp[256], *buf;
+
+@@ -4912,6 +4917,30 @@
+     sprintf(buf, "\"%s\"", tmp);
+     return buf;
+ }
++#else
++{
++    static char myname[MAXHOSTNAMELEN + 1] = { 0 };
++    char *buf;
++    struct hostent *hp;
++    register char *p;
++
++    if (!gethostname(myname, sizeof(myname)) && (hp = gethostbyname(myname))
++            && (p = strchr(hp->h_name, '.')))
++    {
++        p++;
++    }
++    else
++    {
++        strcpy(myname, "unknown");
++        p = myname;
++    }
++    buf = xalloc(strlen(p) + 3);
++    if (!buf)
++	return 0;
++    sprintf(buf, "\"%s\"", p);
++    return buf;
++}
++#endif
+
+ /*-------------------------------------------------------------------------*/
+ static char *
+
+--+QahgC5+KEYLbs62
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: attachment; filename="domainname.patch2"
+
+diff -u -r src.org/comm.c src.neu/comm.c
+--- src.org/comm.c	Tue Feb 23 01:05:44 1999
++++ src.neu/comm.c	Sun Mar  7 18:12:52 1999
+@@ -79,6 +79,8 @@
+ #ifdef HAVE_NETDB_H
+ #    include <netdb.h>
+ #endif
++
++#include <sys/param.h>
+
+ #ifndef AMIGA
+ #    include <signal.h>
+@@ -277,6 +279,9 @@
+    * TODO: Can't this be local?
+    */
+
++char *domain_name;
++  /* This computer's domain-name. Is needed for lex.c::get_domainname() */
++
+ static int min_nfds = 0;
+   /* The number of fds used by the driver's sockets (udp, erq, login).
+    * It is the number of the highest fd plus one.
+@@ -478,9 +483,10 @@
+  */
+
+ {
+-    char host_name[100];
++    char host_name[MAXHOSTNAMELEN + 1];
+     struct hostent *hp;
+     int tmp;
++    register char *p;
+
+     if (gethostname(host_name, sizeof host_name) == -1) {
+         perror("gethostname");
+@@ -495,6 +501,19 @@
+     memcpy(&host_ip_addr.sin_addr, hp->h_addr, hp->h_length);
+     host_ip_addr.sin_family = hp->h_addrtype;
+     host_ip_number = host_ip_addr.sin_addr;
++
++    /* save domainname for lex.c::get_domainname() in domain_name */
++    if (p = strchr(hp->h_name, '.'))
++    {
++        p++;
++        domain_name = malloc(strlen(p));
++        strcpy(domain_name, p);
++    }
++    else
++    {
++        domain_name = malloc(8);
++        strcpy(domain_name, "unknown");
++    }
+
+ #ifdef CATCH_UDP_PORT
+     /* Initialize upd at an early stage so that the master object can use
+@@ -4138,7 +4157,7 @@
+  */
+
+ {
+-    static char name[20];
++    static char name[MAXHOSTNAMELEN + 1];
+     char *p;
+
+     gethostname(name, sizeof name);
+diff -u -r src.org/lex.c src.neu/lex.c
+--- src.org/lex.c	Wed Mar  3 01:18:02 1999
++++ src.neu/lex.c	Sun Mar  7 18:12:52 1999
+@@ -4899,17 +4899,12 @@
+  */
+
+ {
+-    char tmp[256], *buf;
++    char *buf;
+
+-#ifdef HAVE_GETDOMAINNAME
+-    getdomainname(tmp, sizeof(tmp));
+-    tmp[sizeof(tmp)-1] = '\0';
+-#else
+-    strcpy(tmp, "unknown");
+-#endif
+-    buf = xalloc(strlen(tmp)+3);
+-    if (!buf) return 0;
+-    sprintf(buf, "\"%s\"", tmp);
++    buf = xalloc(strlen(domain_name) + 3);
++    if (!buf)
++        return 0;
++    sprintf(buf, "\"%s\"", domain_name);
+     return buf;
+ }
+
+diff -u -r src.org/lex.h src.neu/lex.h
+--- src.org/lex.h	Thu Dec 10 03:37:36 1998
++++ src.neu/lex.h	Sun Mar  7 18:14:59 1999
+@@ -143,6 +143,7 @@
+ extern /* TODO: BOOL */ int pragma_verbose_errors;
+ extern char *last_lex_string;
+ extern struct ident *all_efuns;
++extern char *domain_name;
+
+ /* Values of pragma_strict_types */
+
+
+--+QahgC5+KEYLbs62--
+
+

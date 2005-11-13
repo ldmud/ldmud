@@ -1,0 +1,30 @@
+Short: Make telnet negotiation options more configurable
+From: Markus Peter
+Date: 2001 09 28
+Type: Feature
+State: New
+
+I recently wanted to implement support for the MSP and MXP protocols into
+my mudlib. The specifications on those protocols allow to negotiate their
+availability in the client using telnet negotiations via the inofficial
+options 90 and 91.
+
+The problem I ran now into is: H_TELNET_NEG will only allow my mudlib
+handling stuff like NAWS, TTYPE etc. I could now of course also set
+H_NOECHO and handle all negotiations myself, but this seems like a little
+bit overkill to re-develop the echo part of the negotiations myself when
+it already works perfectly ok in the driver.
+
+So my request basically is: Could options 90 and 91 be added to the list
+of options which are handled through H_TELNET_NEG or can the list of
+options be made configurable without patching the driver ?
+
+--- I added the options 90 and 91 explicitely, the generic configuration (e.g.
+via map set in driver hook) would be a nice idea.
+
+From: Lars Duening <lars@bearnip.com>
+Date: Mon, 04 Feb 2002 21:43:51 -0700
+
+Allow a driver hook to specify which telnet hooks are to be piped through the 
+mudlib - not this all-or-nothing like now.
+

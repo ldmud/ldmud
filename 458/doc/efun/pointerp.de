@@ -1,0 +1,9 @@
+SYNOPSIS
+        int pointerp(mixed arg)
+
+BESCHREIBUNG
+        Liefert 1, wenn das Argument ein Feld (Array) ist, ansonsten 0.
+
+SIEHE AUCH
+        closurep(E), floatp(E), mappingp(E), objectp(E), intp(E),
+        referencep(E), stringp(E), symbolp(E), clonep(E)

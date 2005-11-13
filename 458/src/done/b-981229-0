@@ -1,0 +1,18 @@
+Short: Strings are freed under dubious circumstances
+From: Freaky <Freaky@UNItopia.rus.uni-stuttgart.de>
+Date: Sat, 28 Nov 1998 02:41:54 +0100
+Type: Bug
+State: Done - fixed in 3.2.6-dev.35
+
+Momentan laeuft in UNItopia der 3.2.5-dev20. Laeuft ziemlich stabil :)
+Einen Effekt habe ich noch, den ich damals auch Amylaar schon beschrieben
+habe: Es gibt ein Living, das in einem Objekt eine Closure setzt. Wenn man
+das Living und das Objekt zerstoert, und dann eine garbage_collection
+ausloest, werden die Strings des Objektes von der garbage_collection
+gefreed. Die Frage ist nur, wieso das passiert.
+Ich habe es dann mal so gemacht, dass ich nach jedem destruct (von Hand)
+eine garbage_collection gemacht habe, Dabei wurde dann nichts gefreed.
+Alles sehr seltsam. Wenn Du Lust hast, sowas zu debuggen, wuerde ich dir
+gerne dabei helfen.
+
+Note: This was caused by the memory leak in terminal_colour.
