@@ -1,0 +1,6 @@
+Command: stat
+argument: name
+
+Give status about a player or a monster.
+
+See also: w/snoop

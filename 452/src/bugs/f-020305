@@ -1,0 +1,8 @@
+Short: Constructor and Destructor
+Date: 2002-03-05
+Type: Feature
+State: New
+
+LPC should feature a destructor which automatically calls inherited
+destructores, similar to __INIT or the C++ behaviour.
+

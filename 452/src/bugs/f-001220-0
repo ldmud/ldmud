@@ -1,0 +1,9 @@
+Short: Extend the debug_info() method to handle interactives.
+From: Lars
+Date: 2000-12-20
+Type: Feature
+State: New
+
+Let debug_info(this_interactive()) return information about the 
+interactive structure, especially about the charmode/noecho settings.
+

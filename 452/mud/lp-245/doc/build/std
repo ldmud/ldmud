@@ -1,0 +1,19 @@
+Do '#include "../../room/std.h" first in your file.
+
+You now have access to 4 simlar macros, that will define a simple
+room for you. They are ONE_EXIT, TWO_EXIT, THREE_EXIT and FOUR_EXIT.
+ONE_EXIT is used this way:
+
+ONE_EXIT("/players/peter/room", "west",
+	 "Funny room",
+	 "You are in the funny room",
+	 1)
+
+Arguments:
+1	Where you come, using the exit command "west" in this example.
+2	Exit directions from this room.
+3	Short description of the room. No newline !
+4	Long description. Must have newlines.
+5	Lighted or dark room. 1 = light.
+
+See std2 how a room with three exits look like.
