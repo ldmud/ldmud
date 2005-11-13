@@ -1,0 +1,634 @@
+Subject: GnuWin32 patches
+From: Sebastian Niesen <sniesen@mail.isis.de>
+Date: Wed, 12 Aug 1998 23:34:23 +0200
+X-Mailer: Mozilla 4.5b1 [en] (WinNT; I)
+
+This is a multi-part message in MIME format.
+--------------52AAD593310EEB3066A71FE0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+
+Hi Lars!
+
+Here are is the promised patch file. Good luck!
+
+
+Sebastian (aka Elvenstar@TubMUD)
+--------------52AAD593310EEB3066A71FE0
+Content-Type: text/plain; charset=us-ascii;
+ name="GnuWin32-patches"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline;
+ filename="GnuWin32-patches"
+
+diff -c adriver/Makefile.in:1.4 adriver/Makefile.in:1.5
+*** adriver/Makefile.in:1.4	Mon Dec  2 04:29:38 1996
+--- adriver/Makefile.in	Mon Dec  2 04:29:38 1996
+***************
+*** 103,110 ****
+  	lint *.c
+  
+  clean:
+! 	$(RM) $(YACCTAB)h $(YACCTAB)c make_func.c *.o make_func efun_defs.c lang.y
+! 	$(RM) lang.h lang.c y.output tags TAGS
+  	$(RM) parse core mudlib/core mudlib/debug.log lpmud.log
+  	(cd util ; echo "Cleaning in util." ; $(MAKE) clean)
+  
+--- 103,110 ----
+  	lint *.c
+  
+  clean:
+! 	$(RM) $(YACCTAB)h $(YACCTAB)c make_func.c *.o make_func@EXEEXT@
+! 	$(RM) efun_defs.c lang.y lang.h lang.c y.output tags TAGS
+  	$(RM) parse core mudlib/core mudlib/debug.log lpmud.log
+  	(cd util ; echo "Cleaning in util." ; $(MAKE) clean)
+  
+***************
+*** 122,134 ****
+  	@MOVE_YACC_TAB@ make_func.c
+  	@CLEAN_YACC_TAB@
+  
+! make_func: make_func.o hash.o exec.h
+! 	$(CC) @OPTIMIZE_LINKING@ $(LDFLAGS) make_func.o hash.o -o make_func
+  
+! lang.y efun_defs.c instrs.h: func_spec make_func prolang.y config.h
+  	$(RM) efun_defs.c
+  	$(RM) lang.y
+! 	./make_func > efun_defs.c
+  
+  lang.c lang.h: lang.y
+  	$(YACC) -d -v lang.y
+--- 122,134 ----
+  	@MOVE_YACC_TAB@ make_func.c
+  	@CLEAN_YACC_TAB@
+  
+! make_func@EXEEXT@: make_func.o hash.o exec.h
+! 	$(CC) @OPTIMIZE_LINKING@ $(LDFLAGS) make_func.o hash.o -o make_func@EXEEXT@
+  
+! lang.y efun_defs.c instrs.h: func_spec make_func@EXEEXT@ prolang.y config.h
+  	$(RM) efun_defs.c
+  	$(RM) lang.y
+! 	./make_func@EXEEXT@ > efun_defs.c
+  
+  lang.c lang.h: lang.y
+  	$(YACC) -d -v lang.y
+diff -c adriver/backend.c:1.45 adriver/backend.c:1.46
+*** adriver/backend.c:1.45	Mon Dec  2 04:29:38 1996
+--- adriver/backend.c	Mon Dec  2 04:29:38 1996
+***************
+*** 45,51 ****
+  
+  struct object *current_heart_beat;
+  
+! void call_heart_beat(), catch_alarm();
+  void load_first_objects(), prepare_ipc(),
+      shutdowngame(), ed_cmd PROT((char *)),
+      print_prompt(), call_out(),
+--- 45,51 ----
+  
+  struct object *current_heart_beat;
+  
+! void call_heart_beat();
+  void load_first_objects(), prepare_ipc(),
+      shutdowngame(), ed_cmd PROT((char *)),
+      print_prompt(), call_out(),
+***************
+*** 152,158 ****
+      (void)signal(SIGHUP,  (RETSIGTYPE(*)PROT((int)))f_shutdown);
+      (void)signal(SIGUSR1, (RETSIGTYPE(*)PROT((int)))startmasterupdate);
+      if (!t_flag) {
+! 	catch_alarm();
+  	call_heart_beat();
+      }
+  #ifdef AMIGA
+--- 152,158 ----
+      (void)signal(SIGHUP,  (RETSIGTYPE(*)PROT((int)))f_shutdown);
+      (void)signal(SIGUSR1, (RETSIGTYPE(*)PROT((int)))startmasterupdate);
+      if (!t_flag) {
+! 	ALARM_HANDLER_FIRST_CALL(catch_alarm)
+  	call_heart_beat();
+      }
+  #ifdef AMIGA
+***************
+*** 487,501 ****
+      
+      time_to_call_heart_beat = 0; /* interrupt loop if we take too long */
+      comm_time_to_call_heart_beat = 0;
+- #ifndef MSDOS
+      /* If the host is swapping madly, it can be too late here to reinstate
+       * the SIGALRM handler here.
+       */
+      alarm(2);
+  
+- #else
+-     start_timer(2);
+- #endif
+      current_time = get_current_time();
+      current_interactive = 0;
+  
+--- 487,497 ----
+***************
+*** 762,777 ****
+   * it has completed the current round of player commands.
+   */
+  
+! void catch_alarm() {
+! #ifndef MSDOS
+!     (void)signal(SIGALRM, (RETSIGTYPE(*)PROT((int)))catch_alarm);
+! #endif
+! #ifdef OS2
+!     (void)signal(SIGALRM, SIG_ACK);
+! #endif
+!     comm_time_to_call_heart_beat = 1;
+!     total_alarms++;
+! }
+  
+  /*
+   * All destructed objects are moved int a sperate linked list,
+--- 758,764 ----
+   * it has completed the current round of player commands.
+   */
+  
+! ALARM_HANDLER(catch_alarm, comm_time_to_call_heart_beat = 1; total_alarms++;)
+  
+  /*
+   * All destructed objects are moved int a sperate linked list,
+diff -c adriver/comm.h:1.17 adriver/comm.h:1.18
+*** adriver/comm.h:1.17	Mon Dec  2 04:29:38 1996
+--- adriver/comm.h	Mon Dec  2 04:29:38 1996
+***************
+*** 5,28 ****
+  
+  #include "sent.h"
+  
+! #ifdef atarist
+! #include "hosts/atari/socket.h"
+! #define SOCKET_INC "hosts/atari/socket.c"
+! #endif /* atarist */
+! 
+! #ifdef AMIGA
+! #include "hosts/amiga/socket.h"
+! #define SOCKET_LIB 1
+! #endif /* AMIGA */
+! 
+! #ifdef OS2
+! #include "hosts/os2/socket.h"
+! #define SOCKET_INC "hosts/os2/socket.c"
+! #endif /* OS2 */
+! 
+! #ifdef MSDOS
+! #include "hosts/msdos/comm.h"
+! #define SOCKET_INC "hosts/msdos/netdb.h"
+  #endif
+  
+  #if !defined (SOCKET_LIB) && !defined(SOCKET_INC)
+--- 5,12 ----
+  
+  #include "sent.h"
+  
+! #ifdef SOCKET_HEADER
+! #include SOCKET_HEADER
+  #endif
+  
+  #if !defined (SOCKET_LIB) && !defined(SOCKET_INC)
+diff -c adriver/comm1.c:1.120 adriver/comm1.c:1.121
+*** adriver/comm1.c:1.120	Mon Dec  2 04:29:38 1996
+--- adriver/comm1.c	Mon Dec  2 04:29:38 1996
+***************
+*** 68,75 ****
+  
+  struct interactive *all_players[MAX_PLAYERS];
+  
+- extern int errno;
+- 
+  void new_player();
+  
+  void flush_all_player_mess();
+--- 68,73 ----
+diff -c adriver/configure:1.27 adriver/configure:1.28
+*** adriver/configure:1.27	Mon Dec  2 04:29:38 1996
+--- adriver/configure	Mon Dec  2 04:29:38 1996
+***************
+*** 2521,2526 ****
+--- 2521,2542 ----
+  if test -z "${CONFIG_SHELL}"; then
+    CONFIG_SHELL='/bin/sh'
+  fi
++ if test "${OSTYPE}" = 'win32'; then
++   EXEEXT='.exe'
++   
++ {
++ test -n "$verbose" && \
++ echo "	defining" HOST_INCLUDE to be \"hosts/GnuWin32/GnuWin32.h\"
++ echo "#define" HOST_INCLUDE \"hosts/GnuWin32/GnuWin32.h\" >> confdefs.h
++ DEFS="$DEFS -DHOST_INCLUDE=\"hosts/GnuWin32/GnuWin32.h\""
++ SEDDEFS="${SEDDEFS}\${SEDdA}HOST_INCLUDE\${SEDdB}HOST_INCLUDE\${SEDdC}\"hosts/GnuWin32/GnuWin32.h\"\${SEDdD}
++ \${SEDuA}HOST_INCLUDE\${SEDuB}HOST_INCLUDE\${SEDuC}\"hosts/GnuWin32/GnuWin32.h\"\${SEDuD}
++ \${SEDeA}HOST_INCLUDE\${SEDeB}HOST_INCLUDE\${SEDeC}\"hosts/GnuWin32/GnuWin32.h\"\${SEDeD}
++ "
++ }
++ 
++ fi
++ 
+  
+  
+  
+***************
+*** 2593,2598 ****
+--- 2609,2615 ----
+  CLEAN_YACC_TAB='$CLEAN_YACC_TAB'
+  YACCTAB='$YACCTAB'
+  CONFIG_SHELL='$CONFIG_SHELL'
++ EXEEXT='$EXEEXT'
+  LIBS='$LIBS'
+  srcdir='$srcdir'
+  prefix='$prefix'
+***************
+*** 2636,2641 ****
+--- 2653,2659 ----
+  s%@CLEAN_YACC_TAB@%$CLEAN_YACC_TAB%g
+  s%@YACCTAB@%$YACCTAB%g
+  s%@CONFIG_SHELL@%$CONFIG_SHELL%g
++ s%@EXEEXT@%$EXEEXT%g
+  s%@LIBS@%$LIBS%g
+  s%@srcdir@%$srcdir%g
+  s%@DEFS@%-DHAVE_CONFIG_H%" $top_srcdir/${file}.in >> $file
+diff -c adriver/machine.h.in:1.18 adriver/machine.h.in:1.19
+*** adriver/machine.h.in:1.18	Mon Dec  2 04:29:38 1996
+--- adriver/machine.h.in	Mon Dec  2 04:29:38 1996
+***************
+*** 110,115 ****
+--- 110,118 ----
+  
+  #undef inline
+  
++ /* A host specific include file.  */
++ #define HOST_INCLUDE "hosts/unix.h"
++ 
+  /* Define if you have _crypt.  */
+  #undef HAVE__CRYPT
+  
+diff -c adriver/main.c:1.36 adriver/main.c:1.37
+*** adriver/main.c:1.36	Mon Dec  2 04:29:38 1996
+--- adriver/main.c	Mon Dec  2 04:29:38 1996
+***************
+*** 150,162 ****
+  #endif /* DRAND48 */
+      current_time = get_current_time();
+  
+! #if defined(AMIGA)
+!     { extern void amiga_init(void), amiga_end(void);
+!       amiga_init();  /* Will exit(20) on wrong OS */
+!       atexit (amiga_end);
+!       no_erq_demon++; /* Amiga has no fork(), thus no auto-erq */
+!     }
+! #endif
+  
+      /*
+       * The flags are parsed twice !
+--- 150,156 ----
+  #endif /* DRAND48 */
+      current_time = get_current_time();
+  
+!     HOST_DEPENDENT_INIT
+  
+      /*
+       * The flags are parsed twice !
+diff -c adriver/port.h:1.15 adriver/port.h:1.16
+*** adriver/port.h:1.15	Mon Dec  2 04:29:38 1996
+--- adriver/port.h	Mon Dec  2 04:29:38 1996
+***************
+*** 158,175 ****
+  #define strchr rindex
+  #endif
+  
+- #if defined(AMIGA)
+- #include "hosts/amiga/ixfile.h"
+- #define NO_IP_DEMON
+- #ifndef AMIGA_TCP
+- #undef CATCH_UDP_PORT
+- #undef UDP_SEND
+- #endif
+- #else
+  #define ixstat stat
+  #define ixopen ((int(*)PROT((char *, int)))open)
+  #define ixopen3 open
+! #endif
+  
+  #ifndef MSDOS
+  #define O_BINARY 0
+--- 158,182 ----
+  #define strchr rindex
+  #endif
+  
+  #define ixstat stat
+  #define ixopen ((int(*)PROT((char *, int)))open)
+  #define ixopen3 open
+! 
+! #define HOST_DEPENDENT_INIT
+! 
+! #define ALARM_HANDLER(name, body)				\
+! void name() {							\
+!     (void)signal(SIGALRM, (RETSIGTYPE(*)PROT((int)))name);	\
+!     {body}							\
+! }
+! 
+! #define ALARM_HANDLER_FIRST_CALL(name)	\
+! {					\
+!     void name();			\
+!     name();				\
+! }
+! 
+! #include HOST_INCLUDE
+  
+  #ifndef MSDOS
+  #define O_BINARY 0
+diff -c adriver/autoconf/acconfig.h:1.5 adriver/autoconf/acconfig.h:1.6
+*** adriver/autoconf/acconfig.h:1.5	Mon Dec  2 04:29:38 1996
+--- adriver/autoconf/acconfig.h	Mon Dec  2 04:29:38 1996
+***************
+*** 65,67 ****
+--- 65,70 ----
+  #undef RANDOM
+  #undef DRAND48
+  #undef RAND
++ 
++ /* A host specific include file.  */
++ #define HOST_INCLUDE "hosts/unix.h"
+diff -c adriver/autoconf/configure.in:1.27 adriver/autoconf/configure.in:1.28
+*** adriver/autoconf/configure.in:1.27	Mon Dec  2 04:29:38 1996
+--- adriver/autoconf/configure.in	Mon Dec  2 04:29:38 1996
+***************
+*** 719,724 ****
+--- 719,728 ----
+  if test -z "${CONFIG_SHELL}"; then
+    CONFIG_SHELL='/bin/sh'
+  fi
++ if test "${OSTYPE}" = 'win32'; then
++   EXEEXT='.exe'
++   AC_DEFINE(HOST_INCLUDE,"hosts/GnuWin32/GnuWin32.h")
++ fi
+  AC_SUBST(OCFLAGS)
+  AC_SUBST(MCFLAGS)
+  AC_SUBST(DCFLAGS)
+***************
+*** 729,732 ****
+--- 733,737 ----
+  AC_SUBST(CLEAN_YACC_TAB)
+  AC_SUBST(YACCTAB)
+  AC_SUBST(CONFIG_SHELL)
++ AC_SUBST(EXEEXT)
+  AC_OUTPUT(Makefile)
+diff -c /dev/null adriver/hosts/GnuWin32/GnuWin32.h:1.1
+*** /dev/null	Mon Dec  2 04:29:38 1996
+--- adriver/hosts/GnuWin32/GnuWin32.h	Mon Dec  2 04:29:38 1996
+***************
+*** 0 ****
+--- 1,35 ----
++ #include <windows.h>
++ 
++ #define SOCKET_HEADER "hosts/GnuWin32/socket.h"
++ #define SOCKET_INC "hosts/GnuWin32/socket.c"
++ 
++ #undef HOST_DEPENDENT_INIT
++ #define HOST_DEPENDENT_INIT
++   win32osi.dwOSVersionInfoSize = sizeof(OSVERSIONINFO); \
++   GetVersionEx(&win32osi); \
++   GetSystemInfo(&win32si); \
++ 
++ extern OSVERSIONINFO win32osi;
++ extern SYSTEM_INFO win32si;
++ 
++ #define alarm(n)
++ 
++ #undef ALARM_HANDLER
++ #define ALARM_HANDLER(name, body)				\
++ VOID CALLBACK catch_alarm(UINT uID,   UINT uMsg, DWORD dwUser,	\
++ 			  DWORD dw1, DWORD dw2) {		\
++     WSACancelBlockingCall();					\
++     {body}                                                      \
++ }
++ 
++ #undef ALARM_HANDLER_FIRST_CALL
++ #define ALARM_HANDLER_FIRST_CALL(name) {			\
++     VOID CALLBACK name(UINT uID,   UINT uMsg,			\
++ 		       DWORD dwUser, DWORD dw1, DWORD dw2);	\
++ 								\
++     if(!timeSetEvent(2000,0,name,NULL,TIME_PERIODIC)) {		\
++ 	perror("SetTimer()"); 					\
++ 	return;		/* Abort */				\
++     }								\
++     name(0,0,0,0,0);						\
++ }
+diff -c /dev/null adriver/hosts/GnuWin32/socket.c:1.1
+*** /dev/null	Mon Dec  2 04:29:38 1996
+--- adriver/hosts/GnuWin32/socket.c	Mon Dec  2 04:29:38 1996
+***************
+*** 0 ****
+--- 1,50 ----
++ #include <errno.h>
++ #include <winsock.h>
++ #include <windows.h>
++ 
++ void set_socket_errno()
++ {
++     switch(WSAGetLastError())
++       {
++ 	case WSAEWOULDBLOCK:		errno = EWOULDBLOCK; return;
++ 	case WSAEINPROGRESS:		errno = EINPROGRESS; return;
++ 	case WSAEALREADY:		errno = EALREADY; return;
++ 	case WSAENOTSOCK:		errno = ENOTSOCK; return;
++ 	case WSAEDESTADDRREQ:		errno = EDESTADDRREQ; return;
++ 	case WSAEMSGSIZE:		errno = EMSGSIZE; return;
++ 	case WSAEPROTOTYPE:		errno = EPROTOTYPE; return;
++ 	case WSAENOPROTOOPT:		errno = ENOPROTOOPT; return;
++ 	case WSAEPROTONOSUPPORT:	errno = EPROTONOSUPPORT; return;
++ 	case WSAESOCKTNOSUPPORT:	errno = ESOCKTNOSUPPORT; return;
++ 	case WSAEOPNOTSUPP:		errno = EOPNOTSUPP; return;
++ 	case WSAEPFNOSUPPORT:		errno = EPFNOSUPPORT; return;
++ 	case WSAEAFNOSUPPORT:		errno = EAFNOSUPPORT; return;
++ 	case WSAEADDRINUSE:		errno = EADDRINUSE; return;
++ 	case WSAEADDRNOTAVAIL:		errno = EADDRNOTAVAIL; return;
++ 	case WSAENETDOWN:		errno = ENETDOWN; return;
++ 	case WSAENETUNREACH:		errno = ENETUNREACH; return;
++ 	case WSAENETRESET:		errno = ENETRESET; return;
++ 	case WSAECONNABORTED:		errno = ECONNABORTED; return;
++ 	case WSAECONNRESET:		errno = ECONNRESET; return;
++ 	case WSAENOBUFS:		errno = ENOBUFS; return;
++ 	case WSAEISCONN:		errno = EISCONN; return;
++ 	case WSAENOTCONN:		errno = ENOTCONN; return;
++ 	case WSAESHUTDOWN:		errno = ESHUTDOWN; return;
++ 	case WSAETOOMANYREFS:		errno = ETOOMANYREFS; return;
++ 	case WSAETIMEDOUT:		errno = ETIMEDOUT; return;
++ 	case WSAECONNREFUSED:		errno = ECONNREFUSED; return;
++ 	case WSAELOOP:			errno = ELOOP; return;
++ 	case WSAENAMETOOLONG:		errno = ENAMETOOLONG; return;
++ 	case WSAEHOSTDOWN:		errno = EHOSTDOWN; return;
++ 	case WSAEHOSTUNREACH:		errno = EHOSTUNREACH; return;
++ 	case WSAENOTEMPTY:		errno = ENOTEMPTY; return;
++ 	case WSAEPROCLIM:		errno = EPROCLIM; return;
++ 	case WSAEUSERS:			errno = EUSERS; return;
++ 	case WSAEDQUOT:			errno = EDQUOT; return;
++ 	case WSAESTALE:			errno = ESTALE; return;
++ 	case WSAEREMOTE:		errno = EREMOTE; return;
++       }
++ }
++ 
++ OSVERSIONINFO win32osi;
++ SYSTEM_INFO win32si;
+diff -c /dev/null adriver/hosts/GnuWin32/socket.h:1.1
+*** /dev/null	Mon Dec  2 04:29:38 1996
+--- adriver/hosts/GnuWin32/socket.h	Mon Dec  2 04:29:39 1996
+***************
+*** 0 ****
+--- 1,51 ----
++ #include <winsock.h>
++ 
++ #include <winbase.h>
++ 
++ extern void set_socket_errno();
++ 
++ #define SOCKET_T int
++ #define socket_number(s) (s)
++ 
++ socket_select(a,b,c,d,e) ({	\
++   int tmp=select(a,b,c,d,e);	\
++   if (tmp < 0)			\
++     set_socket_errno();		\
++   tmp;				\
++ })
++ 
++ #define socket_read(a,b,c) ({	\
++   int tmp = recv(a,b,c,0);	\
++   if (tmp < 0)			\
++     set_socket_errno();		\
++   tmp;				\
++ })
++ 
++ #define socket_write(a,b,c) ({	\
++   int tmp = send(a,b,c,0)	\
++   if (tmp < 0)			\
++     set_socket_errno();		\
++   tmp;				\
++ })
++ 
++ #define socket_ioctl(a,b,c)	\
++   int tmp = ioctlsocket(a,b,c);	\
++   if (tmp < 0)			\
++     set_socket_errno();		\
++   tmp;				\
++ })
++ 
++ #define socket_close(s)  {					\
++   int tmp = 0;							\
++   struct linger ling = { 1, 5 };				\
++   socket_ioctl(s, FIONBIO, &tmp);				\
++   setsockopt (s,SOL_SOCKET,SO_LINGER,&ling,sizeof(struct linger));\
++   closesocket(s);						\
++ }
++ 
++ #define       SIGURG  NSIG+1  /* urgent condition on IO channel */
++ 
++ #define shutdown(s, i) 0
++ 
++ extern OSVERSIONINFO win32osi;
++ extern SYSTEM_INFO win32si;
+diff -c /dev/null adriver/hosts/amiga/amiga.h:1.1
+*** /dev/null	Mon Dec  2 04:29:39 1996
+--- adriver/hosts/amiga/amiga.h	Mon Dec  2 04:29:39 1996
+***************
+*** 0 ****
+--- 1,20 ----
++ #define SOCKET_HEADER "hosts/amiga/socket.h"
++ #define SOCKET_LIB 1
++ 
++ #undef ixstat
++ #undef ixopen
++ #undef ixopen3
++ #include "hosts/amiga/ixfile.h"
++ #define NO_IP_DEMON
++ #ifndef AMIGA_TCP
++ #undef CATCH_UDP_PORT
++ #undef UDP_SEND
++ #endif
++ 
++ #undef HOST_DEPENDENT_INIT
++ #define HOST_DEPENDENT_INIT
++     { extern void amiga_init(void), amiga_end(void);		\
++       amiga_init();  /* Will exit(20) on wrong OS */		\
++       atexit (amiga_end);					\
++       no_erq_demon++; /* Amiga has no fork(), thus no auto-erq */\
++     }
+diff -c adriver/hosts/amiga/machine.h:1.10 adriver/hosts/amiga/machine.h:1.11
+*** adriver/hosts/amiga/machine.h:1.10	Mon Dec  2 04:29:39 1996
+--- adriver/hosts/amiga/machine.h	Mon Dec  2 04:29:39 1996
+***************
+*** 229,232 ****
+--- 229,234 ----
+  /* Define if you have the ucb library (-lucb).  */
+  /* #undef HAVE_LIBUCB */
+  
++ #define HOST_INCLUDE "hosts/amiga/amiga.h"
++ 
+  #endif /* MACHINE_H */
+diff -c /dev/null adriver/hosts/atari/atari.h:1.1
+*** /dev/null	Mon Dec  2 04:29:39 1996
+--- adriver/hosts/atari/atari.h	Mon Dec  2 04:29:39 1996
+***************
+*** 0 ****
+--- 1,2 ----
++ #define SOCKET_HEADER "hosts/atari/socket.h"
++ #define SOCKET_INC "hosts/atari/socket.c"
+diff -c adriver/hosts/atari/machine.h:1.2 adriver/hosts/atari/machine.h:1.3
+*** adriver/hosts/atari/machine.h:1.2	Mon Dec  2 04:29:39 1996
+--- adriver/hosts/atari/machine.h	Mon Dec  2 04:29:39 1996
+***************
+*** 186,189 ****
+--- 186,190 ----
+  /* needs the first argument of strtol be declared as const ? */
+  #define STRTOL_CONST_CHARP 1
+  
++ #define HOST_INCLUDE "hosts/atari/atari.h"
+  #endif /* MACHINE_H */
+diff -c /dev/null adriver/hosts/msdos/msdos.h:1.1
+*** /dev/null	Mon Dec  2 04:29:39 1996
+--- adriver/hosts/msdos/msdos.h	Mon Dec  2 04:29:39 1996
+***************
+*** 0 ****
+--- 1,4 ----
++ #define SOCKET_HEADER "hosts/msdos/comm.h"
++ #define SOCKET_INC "hosts/msdos/netdb.h"
++ 
++ #define alarm start_timer
+diff -c adriver/hosts/os2/machine.h:1.2 adriver/hosts/os2/machine.h:1.3
+*** adriver/hosts/os2/machine.h:1.2	Mon Dec  2 04:29:39 1996
+--- adriver/hosts/os2/machine.h	Mon Dec  2 04:29:39 1996
+***************
+*** 184,187 ****
+--- 184,189 ----
+  /* needs the first argument of strtol be declared as const ? */
+  #define STRTOL_CONST_CHARP 1
+  
++ #define HOST_INCLUDE "hosts/os2/os2.h"
++ 
+  #endif /* MACHINE_H */
+diff -c /dev/null adriver/hosts/os2/os2.h:1.1
+*** /dev/null	Mon Dec  2 04:29:39 1996
+--- adriver/hosts/os2/os2.h	Mon Dec  2 04:29:39 1996
+***************
+*** 0 ****
+--- 1,11 ----
++ #define SOCKET_HEADER "hosts/os2/socket.h"
++ #define SOCKET_INC "hosts/os2/socket.c"
++ 
++ #undef ALARM_HANDLER
++ #define ALARM_HANDLER(name, body)				\
++ void name() {							\
++     (void)signal(SIGALRM, (RETSIGTYPE(*)PROT((int)))name);	\
++     (void)signal(SIGALRM, SIG_ACK);				\
++     {body}							\
++ }
++ 
+
+--------------52AAD593310EEB3066A71FE0--
+
