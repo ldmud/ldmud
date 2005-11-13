@@ -1,0 +1,11 @@
+DEPRECATED
+SYNOPSIS
+	int m_sizeof(mapping map)
+
+DESCRIPTION
+	Return the number of indices (or values) in mapping 'map'.
+	This function is in fact an alias for sizeof().
+
+SEE ALSO
+	mappingp(E), mkmapping(E), m_indices(E), m_values(E),
+	m_delete(E), sizeof(E), widthof(E).
