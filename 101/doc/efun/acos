@@ -1,0 +1,5 @@
+SYNOPSIS
+	float acos(float)
+
+DESCRIPTION
+	Returns the arcus cosine of the argument.

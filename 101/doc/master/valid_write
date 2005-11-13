@@ -1,0 +1,33 @@
+SYNOPSIS
+	string valid_write(string path, string uid, string func, object ob)
+
+DESCRIPTION
+	This function is called to check if the object ob with the
+	user-id uid has write permissions to the file given by path
+	for the operation named by func. It should return 0 if
+	permission is denied, or the normalized path if permission is
+	granted. You can also return 1 to indicate that the path can
+	be used unchanged.
+
+	The returned pathname must not contain ``..'', a leading /
+	will be stripped by the interpreter.
+
+	Func denotes the efun call or other operation that caused
+	valid_write() to be called:
+	cindent,
+	do_rename (efun rename(), for the old and then for the new name),
+	ed_start (whenever the builtin ed tries to write to a file),
+	mkdir,
+	remove_file (efun rm()),
+	rmdir,
+	save_object,
+	write_bytes,
+	write_file.
+
+	Note that this function is called in compat mode as well. If
+	you need to be compatible with the old 2.4.5-mudlib, redirect
+	these calls to the valid_read/valid_write in the user
+	object.
+
+SEE ALSO
+	valid_read(M), make_path_absolute(M)

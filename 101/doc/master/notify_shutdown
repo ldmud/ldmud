@@ -1,0 +1,17 @@
+SYNOPSIS
+	void notify_shutdown (void)
+
+DESCRIPTION
+	Notify the master about an immediate shutdown.
+
+	If the gamedriver shuts down, this is the last function called
+	before the mud shuts down the udp connections and the
+	accepting socket for new players.
+	The function has the opportunity to perform any cleanup
+	operation, like informing the mudwho server that the mud is
+	down. This can not be done when remove_player() is called
+	because the udp connectivity is already gone then.
+
+SEE ALSO
+	slow_shut_down(M), remove_player(M),
+

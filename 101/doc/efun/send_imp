@@ -1,0 +1,15 @@
+SYNOPSIS
+	int send_imp(string host, int port, string message)
+	int send_imp(string host, int port, int * message)
+
+DESCRIPTION
+	Sends The message in an UDP packet to the given host and port
+	number. Causes a privilege violation.
+	The message can be given either as string, or as array of
+	bytes. The latter variant allows to send binary data as well.
+
+	Returns 1 on success, 0 on failure.
+
+SEE ALSO
+	receive_imp(M)
+
