@@ -1,0 +1,17 @@
+SYNOPSIS
+	string *regexplode (string text, string pattern)
+
+DESCRIPTION
+	This function is similar to explode but accepts a regular
+	expression as delimiter. Every second part of the returned
+	array is a delimiter.
+
+HISTORY
+	Introduced in 3.2@61
+
+SEE ALSO
+	explode(E), regexp(E), regreplace(E)
+
+
+
+

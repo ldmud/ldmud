@@ -1,0 +1,9 @@
+NAME
+	malloc
+
+DESCRIPTION
+	This command is hardcoded into the driver's input parser.
+	It shows the statistics of the memory management module.
+
+SEE ALSO
+	status(D), memory(C), debug_info(E)

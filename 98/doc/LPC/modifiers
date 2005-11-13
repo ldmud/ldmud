@@ -1,0 +1,133 @@
+CONCEPT
+	modifiers
+
+DESCRIPTION
+        A modifier changes the syntactic and/or semantic behaviour of
+        an object-global variable or a function in an object.
+        The existing modifiers are described below.
+        To use a modifier just prepend it to the declaration. If several
+        modifiers are to be used their order does not matter:
+
+        private int bar;                      // example for a variable
+        static nomask int foo() { return 3; } // example for a function
+
+        For functions:
+        ~~~~~~~~~~~~~~
+        private   -- such functions can only be called with an internal
+                     call from within this file. Not even inheriting
+                     objects can call these functions. You can nevertheless
+                     build an lfun-closure with #' out of a private function.
+        static    -- such functions can be called from within the object
+                     in either way (internal call or with call_other()).
+                     Inheriting objects can call such functions.
+                     But it is not possible to call static functions from
+                     other objects via call_other().
+                     Note that an add_action() is treated like a call
+                     from within the object except the player who got the
+                     add_action() was forced (thus it is a simple way to
+                     secure an add_action() against forces, although this
+                     method has the severe disadvantages of raising an error
+                     at the force so better use the security system).
+                     Also efuns like call_out() or input_to() can call
+                     these functions if given as a string.
+        public    -- this is the default type. Such functions can be called
+                     from within the file as well as from inheriting objects
+                     and other objects via call_other().
+                     To declare a function public only results in the
+                     impossibility to change the accessibility at the
+                     inherit statement (see below). No error will occur,
+                     only the type will not be modified by the inherit
+                     statement.
+        protected -- not yet documented, sorry. But rumours say that
+                     protected is nowadays not necessary for normal objects
+                     and only used in system objects like the master or
+                     simul_efun.
+                     Amylaar thought yesterday, that protected was build
+                     analog to C++ which means in praxis it is like static
+                     but call_other()s from this_object() will fail, too.
+                     He also said that he thinks it has been introduced
+                     because of VBFC (value by function call,
+                     process_string()).  Alfe 97-Feb-5
+        nomask    -- such functions cannot be overridden by inheriting
+                     objects. If you have the fun foo() defined in your
+                     object and inherit an object which also has declared
+                     a function foo() and this nomask, you will get an
+                     compile error if you try to load your object.
+                     Furthermore a shadow will fail if it tries to shadow
+                     a nomask declared function.
+        varargs   -- this changes the syntax of the function in a way that
+                     not all of the arguments in the declaration must be
+                     given at the call. This is often very usefull if some
+                     of the arguments shall be omitable (the omitted
+                     arguments are set to 0 if the function is called with
+                     fewer arguments than specified).
+                     This is mainly within the object really necessary;
+                     call_other()s usually (that is if they do not have a
+                     certain pragma ('man pragma')) do not need the called
+                     function to be declared varargs to omit any arguments,
+                     but it is good style to use this modifier to document
+                     the code by this.
+
+        For object-global variables:
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        private   -- such variables can only be accessed from within the
+                     same object. Not even inheriting objects can access
+                     private variables.
+                     It is a good style to declare all internal variables
+                     private to prevent inheriting objects from accessing
+                     the variables directly without using functions.
+        static    -- such variables are neither stored with save_object()
+                     nor restored with restore_object(). This can be very
+                     useful if you want a room to use save_object() and
+                     restore_object() to save your own defined variables
+                     but not the hundreds of variables inherited from the
+                     room-class (/complex/room). You then use the modifier
+                     at the inherit statement (see below).
+                     Note that static and private do not include each other
+                     in any way. They are absolutely independant.
+        public    -- declares the variable public. It cannot be declared
+                     private or static by inheriting. No error will occur,
+                     only the type will not be modified by the inherit
+                     statement.
+
+        It is no good style to let inheriting objects have access to
+        internal variables so declare them as private and offer functions
+        to query and change the variables if possible.
+
+        It is also possible to redeclare all variables and/or functions
+        of an inherited object for the own object at the inheriting
+        statement:
+
+        private functions static variables inherit "complex/room";
+        public variables inherit "complex/room";
+        private functions inherit "complex/room";
+
+        To redeclare a function or a variable declared public in the
+        inherited object to be private or static is not possible.
+
+        There also exists a modifier explicitly for the inherit statement:
+
+        virtual   -- inherits the given object virtually. This only makes
+                     sense in a complex inherit tree.
+                     If an object is inherited normally (not virtually)
+                     twice somewhere in the inherit tree the intern
+                     variables exist twice. If inherited virtually they
+                     exist only once.
+                     Example:
+                     A inherits B and C.
+                     B inherits D.
+                     C inherits D.
+                     If the inheritance of D is virtual in B and C
+                     D's variables exist only once in A. If A changes
+                     D's variables via functions of B this also changes
+                     the variables of D as known by C.
+
+                     virtual:               non-virtual:
+                        A                        A
+                       / \                      / \
+                      B   C                    B   C
+                       \ /                     |   |
+                        D                      D   D
+
+SEE ALSO
+	closures(LPC), inheritance(LPC), functions(LPC), types(LPC)

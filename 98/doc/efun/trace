@@ -1,0 +1,55 @@
+SYNOPSIS
+	int trace(int traceflags)
+
+DESCRIPTION
+	Sets the trace flags and returns the old trace flags. When
+	tracing is on, a lot of information is printed during
+	execution and too much output can crash your connection or
+	even the whole driver.
+	Tracing is done on a per-connection basis: each interactive(!)
+	user may specifiy its own tracelevel and -prefix. Each gets the
+	traceoutput for just the code executed during the evaluation
+	of the commands he entered.
+	
+	The trace bits are:
+	
+	1 Trace all function calls to lfuns.
+	
+	2 Trace all calls to call_other
+	
+	4 Trace all function returns.
+	
+	8 Print argunents at function calls and return values.
+	
+	16 Print all executed stack machine instructions (Avoid this
+	flag, it produces massive output!).
+	
+	32 Enable trace in heart beat functions (Avoid this flag, it
+	constantly produces a lot of output!).
+	
+	64 Trace calls to apply (Applies are driver internal
+	call_others).
+	
+	128 Show object name in tracing (Avoid this flag when you know
+	what you are tracing!).
+
+
+	The master-lfun query_player_level() is called to verify the
+	usage of this efun.
+
+EXAMPLE
+	object obj;
+	string prefix;
+	obj=find_player("deepthought");
+	prefix=file_name(obj);
+	prefix=prefix[1..strlen(prefix)-1]; /* cut off the leading "/" */
+	traceprefix(prefix);
+	  /* From here on, only code in the object "std/player#69"
+	   * will be traced.
+           */
+	trace(1|2|4|8);
+	...
+	trace(0);
+	
+SEE ALSO
+	traceprefix(E)
