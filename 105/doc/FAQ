@@ -1,0 +1,53 @@
+Q: I get something like:
+
+   lang.y:2191:  warning:  type clash ('' 'lrvalue') on default action
+   "lang.y", line 2449: ill-formed rule
+   make: *** [lang.c] Error 1
+
+A: It looks like you have installed bison as a yacc-substitute. This is
+   ill-advised, because bison is NOT really compatible to yacc. Moreover,
+   if you managed to compile an LPmud that contains code governed by Lars'
+   license, giving away a binary to anyone would constitute a copyright
+   infringement, because anything produced with byacc gets GPLed, and Lars'
+   licence is incompatible with the GPL.
+
+   Get byacc (berkely yacc) instead.
+
+Q: When configuring or compiling the driver with the Cygwin package under
+   Windows, I get an error message like 
+     configure: /bin/sh: No such file or directory
+
+A: The installation of the Cygwin package is incomplete. Create a directory
+   C:\bin and copy the file 'sh.exe' into it.
+
+Q: Since our mud runs on linux, the title screen is sometimes not appearing.
+
+A: This seems to be some bug in the linux networking. You can circumvent it
+   by setting the buffer size to a very high value, like 32 KB . You can do
+   this with the efun set_buffer_size() .
+
+Q: Where can I get further documentation?
+
+A: ftp://heute.cs.tu-berlin.de 7681 driver*.ps.gz
+   http://UNItopia.uni-stuttgart.de/doc/
+
+Q: mudlibs?
+
+A: ftp://ftp.cs.tu-berlin.de/pub/games/mud/lp/ftp/tub-mudlib.*.tar.gz
+   ftp://heute.cs.tu-berlin.de 7681 tub-mudlib.*.tar.gz
+   ftp://quest.tat.physik.uni-tuebingen.de/MUD/backups/
+   ftp://mud.uni-muenster.de/Software/MudLib/			(German)
+   ftp://UNItopia.uni-stuttgart.de:3336/pub/mudlib.tar.gz	(German)
+   ftp://ftp.tu-bs.de/pub/games/lpmud/2.4.5.tar.z
+
+   The ViKaR mudlib (3.2.1 compat) is available upon request, ask
+   vikar@unix-ag.uni-kl.de .
+   Offical releases will be made available via ftp on vikar.unix-ag.uni-kl.de
+   8888.  WWW homepage : http://www.unix-ag.uni-kl.de/~europa/vikar
+
+
+Q: Add-on packages?
+A: ftp://heute.cs.tu-berlin.de 7681 intermud*.tar.gz
+   ftp://ftp.tu-bs.de/pub/games/lpmud/intermud-0.7beta.tar.gz
+   ftp://heute.cs.tu-berlin.de 7681 ftpd*.tar.gz
+   ftp://ftp.tu-bs.de/pub/games/lpmud/naserftpd-1.6.tar.gz

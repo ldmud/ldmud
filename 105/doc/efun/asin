@@ -1,0 +1,5 @@
+SYNOPSIS
+	float asin(float)
+
+DESCRIPTION
+	Returns the arcus sine of its argument.

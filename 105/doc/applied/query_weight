@@ -1,0 +1,9 @@
+SYNOPSIS
+	int query_weight(void)
+
+DESCRIPTION
+	In compat mode this lfun is used by the efun transfer().
+	Not that no set_weight() is required by the parser.
+
+SEE ALSO
+	transfer(E), add_weight(A)
