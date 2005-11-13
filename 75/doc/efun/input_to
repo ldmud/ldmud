@@ -1,0 +1,69 @@
+SYNOPSIS
+	void input_to(string fun)
+	void input_to(string fun, int flag, ...)
+
+DESCRIPTION
+	Enable next line of user input to be sent to the local
+	function fun as an argument. The input line will not be
+	parsed, only when it starts with a "!" (like a kind of shell
+	escape) (this feature may be disabled).
+	The function <fun> may be static, but must not be private (or
+	it won't be found).
+	
+	Note that fun is not called immediately but after pressing the
+	RETURN key.
+	
+	If input_to() is called more than once in the same execution,
+	only the first call has any effect.
+	
+	The optional argument <flag> may be a binary-OR ('|') of the
+	following option values:
+
+	    1 'noecho': 
+	      The line given by the player will not be echoed, and is
+	      not seen if snooped.
+
+	    2 'charmode': 
+	      The connection is switched from line- into charmode to
+	      retrieve a single character(!) from the player; newlines
+	      read as two characters, "\r" followed by "\n".
+	      After execution of <fun>, the connection is switched
+	      back into linemode unless a subsequent input_to( , 2)
+	      has been issued.
+	      Note that the players frontend is free to stay in
+	      linemode all the time: even if you request a single
+	      character, the player might be forced to type (and send)
+	      that character plus the return key.
+
+          128 'ignore bang': 
+	      Input lines starting with '!' will _not_ be parsed as
+	      commands, but are given to the function as well. Usage
+	      of this option is privileged.
+
+	The optional 3rd and following args will be passed as second and
+	subsequent args to the function fun. (This feature is was
+	added only recently, to avoid the need for global variables)
+
+EXAMPLE
+	void func() {
+	   ...
+	   write("Please enter your name:");
+	   input_to("enter_name");
+	   ...
+	}
+	enter_name(string str) {
+	   write("Is '"+str+"' really your name?? *giggle*\n");
+	   ...
+	}
+	
+	When reaching the input_to() statement the driver
+	continues the function func() but also asks the user for
+	input. If you entered whatever is asked and press RETURN the
+	driver will invoke the enter_name() function with the
+	string you entered as argument to it.
+
+HISTORY
+	The meaning of the flag parameter was extended in 3.2.1@93.
+
+SEE ALSO
+	call_other(E), sscanf(E), privilege_violation(M)

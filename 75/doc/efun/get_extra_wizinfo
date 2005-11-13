@@ -1,0 +1,19 @@
+SYNOPSIS
+	mixed get_extra_wizinfo(object|string|int arg)
+
+DESCRIPTION
+	Returns the extra information that was set for the given
+	argument in the	wizlist. 
+	If the argument is an object, then the data set in the creator
+	entry for this object is returned.
+	If the argument is a string, it is the name of the entry to be
+	queried, e.g. a uid.
+	If the argument is a number (should be 0 then), the data set
+	in the default wizlist entry is returned. It can be used to
+	store data for the lifetime of this driver run, like the time
+	of the last reboot.
+
+	The function causes a privilege violation.
+
+SEE ALSO
+	add_worth(E), wizlist(E), set_extra_wizinfo(E)

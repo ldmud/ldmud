@@ -1,0 +1,78 @@
+SYNOPSIS
+	void say(string str)
+	void say(string str, object exclude)
+	void say(string str, object *excludes)
+	void say(mixed *arr)
+	void say(mixed *arr, object exclude)
+	void say(mixed *arr, object *excludes)
+
+DESCRIPTION
+	There are two major modes of calling:
+	
+	If the first argument is a string and no second argument is
+	given, str will be send to all livings in the current room
+	except to the initiating object which called the say() function.
+	If the second argument is an object the str also won't be sent
+	to this on. If the second argument is an array of objects the
+	message won't be sent to the objects in the array. If the
+	receiving object(s) is not interactive, the lfun catch_tell()
+	will be applied to the object, with str as argument.
+	
+	If the first argument is an array, the applied lfun catch_msg() 
+	of all living objects (except the initiating one which invoked
+	the say() function) will be called. This array will be given as
+	first argument and the one who invoked say() as second argument to
+	lfun catch_msg(). If the second argument to say() is an object
+	or an array of objects then those objects will also be
+	excluded from the call of catch_msg().
+	
+	The 'initiating object' determines according to these rules:
+	  - if the say() is called from within a living object, this
+	    becomes the initiator
+	  - if the say() is called from within a dead object as result
+	    of a user action (i.e. this_player() is valid), this_player()
+	    becomes the initiator.
+	  - Else the object calling the say() becomes the initiator.
+
+EXAMPLES
+	say("Hi!\n");
+	say("Hi!\n", this_player());
+	Both calls are equal when called by a not living object.
+	
+	Object 1 (living):
+	   void catch_tell(string str) {
+	      write("Received: "+str+"\n");
+	   }
+	Object 2 (not living):
+	   void func() {
+	      ...
+	      say("HiHo!\n");
+	      ...
+	   }
+	
+	This examples shows how say() together with catch_tell()
+	works. The 2nd object must not be living so the write() will
+	go to the current user.
+	
+	
+	Object 1 (living):
+	   void catch_msg(mixed *arr, object who) {
+	      int i;
+	      if(!arr) return;
+	      for(i=0;i<sizeof(arr);i++)
+		 tell_object(who, (stringp(arr[i]) ? arr[i] : "-/-")+"\n");
+	   }
+	Object 2 (not living):
+	   void func() {
+	      ...
+	      say( ({ "Hello", "there!" }) );
+	      ...
+	   }
+	
+	This is a bit complex example to demonstrate how say() and
+	catch_msg() works. Here we also use a non living object to
+	send the message so the who in catch_msg() will be the current
+	user.
+
+SEE ALSO
+	write(E), shout(E), tell_object(E), tell_room(E)

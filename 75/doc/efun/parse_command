@@ -1,0 +1,331 @@
+SYNOPSIS
+	int parse_command(string, object|object*, string, destargs...)
+
+DESCRIPTION
+    The parse_command() efun was written to allow a more comfortable
+    parsing of commands. Unfortunately it was ever since buggy and
+    complicated to use, so almost nobody used it.
+    Therefore this 'doc' is just a copy of the comments in the source.
+
+/*
+
+  Pattern Parser package for LPmud, JnA 1990
+
+  Ver 2.0
+
+  If you have questions or complaints about this code please refer them
+  to jna@cd.chalmers.se
+
+  This is the old version of parse_command() used in compatibility mode.
+
+*/
+#ifdef COMPAT_MODE
+/*****************************************************
+
+  This is the parser
+
+
+  Left to do 910723:
+
+  Fix so alternatives possible after %s in a pattern 
+
+*/
+/*
+  Doc for LPC function
+
+int parse_command(string,ob/arr,string,destargs...)
+
+	parse		Returns 1 if pattern matches
+
+	string		Given command
+	ob/arr		if arr 
+				array holding the accessible objects
+			if ob
+				object from which to recurse and create
+				the list of accessible objects, normally
+				ob = environment(this_player())
+	string		Parsepattern as list of words and formats:
+			Example string = " 'get' / 'take' %i "
+			Syntax:
+				'word'		obligatory text
+				[word]		optional text
+				/		Alternative marker
+				%o		Single item, object
+				%l		Single living object
+				%s		Any text
+				%w		Any word
+				%p		Preposition
+				%i		Any items
+				%d		Number 0- or tx(0-99)
+
+	destargs	This is the list of result variables as in sscanf
+			One variable is needed for each %_
+			The return types of different %_ is:
+			%o	Returns an object
+			%l	Returns an object
+			%s	Returns a string of words
+			%w	Returns a string of one word
+			%p	Can on entry hold a list of word in array
+				or an empty variable
+				Returns:
+				   if empty variable: a string
+				   if array: array[0]=matched word
+			%i	Returns a special array on the form:
+				[0] = (int) +(wanted) -(order) 0(all)
+				[1..n] (object) Objectpointers
+			%d	Returns a number
+			
+EXAMPLE
+
+ parse_command("take apple",environment(this_player()),
+ " 'get' / 'take' %i ",items);
+
+
+*/ 
+
+/* Hardcoded function names to call in LPC objects
+*/
+#define QIDFUNC "id"		    /* Func to query in objects to ack name */
+#define QPLURIDFUNC "plural_id"	    /* As Id but pluralform of name */
+#define QADJFUNC "adjectiv_id"	    /* As Id but ack adjectiv not name */
+#define QSHORTFUNC "short"	    /* Objects shortdescription */
+
+
+
+
+DESCRIPTION
+/*
+
+  Pattern Parser package for LPmud, JnA 1991
+
+  Ver 3.1
+
+  If you have questions or complaints about this code please refer them
+  to jna@cd.chalmers.se
+
+*/
+
+#ifndef COMPAT_MODE
+/*****************************************************
+
+  This is the parser used by the efun parse_command
+
+*/
+/*
+
+  General documentation:
+
+  parse_command() is one of the most complex efun in LPmud to use. It takes
+  some effort to learn and use, but when mastered, very powerfull constructs
+  can be implemented.
+
+  Basically parse_command() is a piffed up sscanf operating on word basis. It
+  works similar to sscanf in that it takes a pattern and a variable set of
+  destination arguments. It is together with sscanf the only efun to use
+  pass by reference for other variables than arrays.
+
+  To make the efun usefull it must have a certain support from the mudlib,
+  there is a set of functions that it needs to call to get relevant
+  information before it can parse in a sensible manner.
+
+  In earlier versions it used the normal id() lfun in the LPC objects to
+  find out if a given object was identified by a certain string. This was
+  highly inefficient as it could result in hundreds or maybe thousands of
+  calls when very long commands were parsed. 
+  
+  The new version relies on the LPC objects to give it three lists of 'names'.
+
+       1 - The normal singular names.
+       2 - The plural forms of the names.
+       3 - The acknowledged adjectives of the object.
+
+  These are fetched by calls to the functions:
+
+       1 - string *parse_command_id_list();
+       2 - string *parse_command_plural_id_list();
+       3 - string *parse_command_adjectiv_id_list();
+
+  The only really needed list is the first. If the second does not exist
+  than the efun will try to create one from the singluar list. For 
+  grammatical reasons it does not always succeed in a perfect way. This is
+  especially true when the 'names' are not single words but phrases.
+
+  The third is very nice to have because it makes constructs like
+  'get all the little blue ones' possible.
+
+  Apart from these functions that should exist in all objects, and which
+  are therefore best put in /std/object.c there is also a set of functions
+  needed in /secure/master.c These are not absolutely necessary but they
+  give extra power to the efun.
+
+  Basically these /secure/master.c lfuns are there to give default values
+  for the lists of names fetched from each object.
+
+  The names in these lists are applicable to any and all objects, the first
+  three are identical to the lfun's in the objects:
+
+       string *parse_command_id_list()
+		- Would normally return: ({ "one", "thing" })
+
+       string *parse_command_plural_id_list()
+		- Would normally return: ({ "ones", "things", "them" })
+
+       string *parse_command_adjectiv_id_list()
+		- Would normally return ({ "iffish" })
+
+  The last two are the default list of the prepositions and a single so called
+  'all' word. 
+
+       string *parse_command_prepos_list()
+		 - Would normally return: ({ "in", "on", "under" })
+
+       string parse_command_all_word()
+		 - Would normally return: "all"
+
+  IF you want to use a different language than English but still want the
+  default pluralform maker to work, you need to replace parse.c with the
+  following file:
+
+#if 0
+    * Language configured parse.c
+    *
+    #define PARSE_FOREIGN
+   
+    char *parse_to_plural(str)
+	char *str;
+    {
+
+	* Your own plural converter for your language *
+     
+    }
+
+      * The numberwords below should be replaced for the new language *
+
+    static char *ord1[] = {"", "first", "second", "third", "fourth", "fifth",
+			   "sixth", "seventh", "eighth", "nineth", "tenth",
+			   "eleventh", "twelfth", "thirteenth", "fourteenth",
+			   "fifteenth", "sixteenth", "seventeenth", 
+			   "eighteenth","nineteenth"};
+
+    static char *ord10[] = {"", "", "twenty","thirty","forty","fifty","sixty",
+			    "seventy", "eighty","ninety"};
+    
+    static char *sord10[] = {"", "", "twentieth", "thirtieth", "fortieth",
+			     "fiftieth", "sixtieth","seventieth", "eightieth",
+			     "ninetieth"};
+
+    static char *num1[] = {"", "one","two","three","four","five","six",
+			   "seven","eight","nine","ten",
+			   "eleven","twelve","thirteen","fourteen","fifteen",
+			   "sixteen", "seventeen","eighteen","nineteen"};
+
+    static char *num10[] = {"", "", "twenty","thirty","forty","fifty","sixty",
+			   "seventy", "eighty","ninety"};
+
+    #include "parse_english.c"	    * This parse.c file *
+
+#endif
+  
+  When all these things are defined parse_command() works best and most
+  efficient. What follows is the docs for how to use it from LPC:
+
+
+  Doc for LPC function
+
+int parse_command(string, object/object*, string, destargs...)
+
+			Returns 1 if pattern matches
+
+	string		Given command
+
+	object*		if arr 
+	object			array holding the accessible objects
+			if ob
+				object from which to recurse and create
+				the list of accessible objects, normally
+				ob = environment(this_player())
+	string		Parsepattern as list of words and formats:
+			Example string = " 'get' / 'take' %i "
+			Syntax:
+				'word'		obligatory text
+				[word]		optional text
+				/		Alternative marker
+				%o		Single item, object
+				%l		Living objects
+				%s		Any text
+				%w		Any word
+				%p		One of a list (prepositions)
+				%i		Any items
+				%d		Number 0- or tx(0-99)
+
+	destargs	This is the list of result variables as in sscanf
+			One variable is needed for each %_
+			The return types of different %_ is:
+			%o	Returns an object
+			%s	Returns a string of words
+			%w	Returns a string of one word
+			%p	Can on entry hold a list of word in array
+				or an empty variable
+				Returns:
+				   if empty variable: a string
+				   if array: array[0]=matched word
+			%i	Returns a special array on the form:
+				[0] = (int) +(wanted) -(order) 0(all)
+				[1..n] (object) Objectpointers	
+			%l	Returns a special array on the form:
+				[0] = (int) +(wanted) -(order) 0(all)
+				[1..n] (object) Objectpointers
+						These are only living objects.
+			%d	Returns a number
+
+  The only types of % that uses all the loaded information from the objects
+  are %i and %l. These are in fact identical except that %l filters out
+  all nonliving objects from the list of objects before trying to parse.
+
+  The return values of %i and %l is also the most complex. They return an
+  array consisting of first a number and then all possible objects matching.
+  As the typical string matched by %i/%l looks like: 'three red roses',
+  'all nasty bugs' or 'second blue sword' the number indicates which 
+  of these numerical constructs was matched:
+
+	 if numeral >0 then three, four, five etc were matched
+	 if numeral <0 then second, twentyfirst etc were matched
+	 if numeral==0 then 'all' or a generic plural form such as 'apples'
+			    were matched.
+
+  NOTE!
+       The efun makes no semantic implication on the given numeral. It does
+       not matter if 'all apples' or 'second apple' is given. A %i will
+       return ALL possible objects matching in the array. It is up to the
+       caller to decide what 'second' means in a given context.
+
+       Also when given an object and not an explicit array of objects the
+       entire recursive inventory of the given object is searched. It is up
+       to the caller to decide which of the objects are actually visible
+       meaning that 'second' might not at all mean the second object in
+       the returned array of objects.
+			
+EXAMPLE
+
+ if (parse_command("spray car",environment(this_player()),
+		      " 'spray' / 'paint' [paint] %i ",items))	
+ {
+      If the pattern matched then items holds a return array as described
+	under 'destargs' %i above.
+     
+ }
+
+BUGS
+ / Features:
+
+ Patterns of type: "%s %w %i"
+   Might not work as one would expect. %w will always succeed so the arg
+   corresponding to %s will always be empty.
+
+ Patterns of the type: 'word' and [word]
+   The 'word' can not contain spaces. It must be a single word. This is so
+   because the pattern is exploded on " " (space) and a pattern element can
+   therefore not contain spaces.
+	    This will be fixed in the future
+
+	

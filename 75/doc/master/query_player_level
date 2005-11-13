@@ -1,0 +1,15 @@
+SYNOPSIS
+	int query_player_level(string what)
+
+DESCRIPTION
+	Check if the user is of high enough level for several things.
+
+	The argument denotes the action for which permission is to be
+	checked:
+
+	"trace"		Is the user allowed to use tracing?
+	"inspect memory" Is the user allowed to issue the
+			special command "showsmallnewmalloced"? 
+
+SEE ALSO
+	trace(E), showsmallnewmalloced(D), malloc(D), status(D), memory(C)

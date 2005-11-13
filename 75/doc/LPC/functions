@@ -1,0 +1,64 @@
+CONCEPT
+	functions
+
+DESCRIPTION
+	A locally defined function (a member function of an object)
+	can have any number of arguments.
+	All types can be sent in the argument. A return value is
+	sent with the 'return' statement.
+
+	Uninitialized arguments are set to 0.
+
+	Functions are reentrant.
+
+	If there is no return statement, the number 0 will be returned.
+
+	function_name(argument1, argument2 ...) {
+	    statements;
+	    ...
+	    return value;
+	}
+
+	Functions in other objects can be called with 'call_other(ob,
+	"fun", arg...)'. 
+	This an also be written 'ob->fun(arg...)', which is nicer
+	syntax.
+
+	A function can have the type 'static', and it will not be
+	possible to call with call_other() from another object.
+
+NOTE
+	The above descrition seems to from the very beginning of LPC.
+	Nowadays functions can also be declared and defined with full
+	argument protoypes, like in ANSI C.
+
+	Global variables and functions in an object can have the type
+	modifiers 'public', 'static', 'private', 'protected'.
+
+	Private variables and functions can not be accessed by
+	objects that inherit the object where the variable is defined
+	(this actually works since 3.2@258).
+
+	Static functions cannot be called via call_other(), filter_*()
+	or map_*() from other objects. Static variables will not be
+	saved by save_object(), or restored by restore_object().
+
+	Functions and Variables that are declared as public cannot be
+	made static or private by inheriting objects.
+
+	It is also possible to specify the treatmet of the inherited
+	variables and functions in the inherit statement, e.g.:
+
+		private variables static functions inherit "/foo/bar";
+
+	The type modfifier 'protected' is currently unused.
+
+	Functions that are declared as ``nomask'' cannot be overloaded
+	by a inheriting program.
+	
+	Functions which are declared as 'varargs' can accept a variable
+	number of arguments
+
+SEE ALSO
+	types(LPC), modifiers(LPC), varargs(LPC), call_other(E),
+	simul_efun(C)

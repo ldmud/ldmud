@@ -1,0 +1,19 @@
+SYNOPSIS
+	mixed set_extra_wizinfo(object|string|int arg, mixed extra)
+
+DESCRIPTION
+	Sets the extra information that was set for the given
+	argument in the	wizlist. 
+	If the argument is an object, then the data is set in the creator
+	entry for this object.
+	If the argument is a string, it is the name of the entry to be
+	set, e.g. a uid.
+	If the argument is a number (should be 0 then), the data is set
+	in the default wizlist entry. It can be used to	store data for
+	the lifetime of this driver run, like the time of the last
+	reboot.
+
+	The function causes a privilege violation.
+
+SEE ALSO
+	get_extra_wizinfo(E), set_extra_wizinfo_size(E), wizlist_info(E)

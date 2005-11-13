@@ -1,0 +1,10 @@
+Short: inherit with relative inherit paths.
+Date: 990323
+From: Robert Reither
+Type: Feature
+State: Unclassified
+
+Allow inherits of the form
+
+  inherit "../r/stdcaveroom.c"
+

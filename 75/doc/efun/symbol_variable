@@ -1,0 +1,28 @@
+SYNOPSIS
+	closure symbol_variable(string arg)
+	closure symbol_variable(symbol arg)
+	closure symbol_variable(int arg)
+
+DESCRIPTION
+	Constructs an identifier (lfun) closure from the global
+	variable arg of this_object(). The variable may be given as a
+	symbol, by name or by its ordinal number in the objects
+	variable table.
+	If there is no such variable, or if it is not visible outside
+	the object, 0 is returned.
+
+	If the argument is an integer, and the variable is inherited
+	and private in the inherited object (i.e. hidden), then a
+	privilege violation will occur.
+
+HISTORY
+	Enabled since 3.2.1@8
+
+EXAMPLES
+	int base;
+	int var;
+	symbol_variable("var")		-> #'<this_object>->var
+	symbol_variable(0)		-> #'<this_object>->base
+
+SEE ALSO
+	lambda(E), quote(E), symbol_function(E)

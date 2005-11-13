@@ -1,0 +1,21 @@
+Short: New efun clones()
+From: Logic, Daniel von Dincklage <vondincklage@usa.net>
+Date: Mon, 22 Jun 1998 00:53:36 +0200
+Type: Feature
+State: Unclassified
+
+> Excellent idea. This, and a clones(object) efun which returned all clones
+> of a particular object, would be very handy (example: a particular object
+> is found to be problematic while the game is in progress, and you want to
+> pull it out of circulation without overly disrupting gameplay...how do
+> you eliminate every copy that's loaded, without a lot of work or
+> shutting down the server?).
+
+I don't know wether a clones()-efun is very useful. Especially in big
+muds with lots of objects this would produce quite a substantial
+amount of lag. I think a better idea would be to use debug_info to
+walk through the object-list in small slices. Aiding in this would be
+a program_name()-efun that returns the name of the program of a
+object. (ob->prog->name) That would make it possible to detect renamed
+objects, too.
+

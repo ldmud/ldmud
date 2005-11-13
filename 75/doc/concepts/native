@@ -1,0 +1,269 @@
+CONCEPT
+	driver modes / native driver mode
+
+DESCRIPTION
+	During the evolution of LPMud there has been a hiatus as the
+	old driver became too restricting for the demands of modern
+	muds: it did a lot of things the mudlib could do better or
+	completely different. Removing these things from the driver
+	weren't a problem, but to keep compatible with the existing
+	mudlibs (namely the well-known 2.4.5 lib), it was possible to
+	undo these changes. First by setting a runtime option, then
+	by compiling the driver either in 'compat' or in 'native'
+	mode.
+	Starting with 3.2.1, the distinction between compat and native
+	mode is more and more transferred into the mudlib, to finally
+	have a modeless driver.
+
+	For 3.2 and 3.2.1, the mode of the driver is determined by
+	three preprocessor symbols to be defined/undefined in
+	config.h:
+
+	  COMPAT_MODE: when defined, the compat mode specifics are activated.
+	  NATIVE_MODE: when defined, the native mode specifics are activated.
+	  EUIDS      : when defined, the euid handling is activated
+	               (3.2.1 only)
+
+	Almost any combination is possible. While defining COMPAT_MODE
+	and undefining NATIVE_MODE configures the driver to run in
+	true compat mode, it is possible to e.g. undefine both _MODEs
+	and just define EUIDS to get an unspecific driver with euid
+	handling, or to have both NATIVE_ and COMPAT_MODE defined (not
+	that this would make much sense).
+	Note that NATIVE_MODE is only possible together with EUIDS.
+
+	Following is the description of the changes (de) activated by
+	these defines. A shorthand notation is used: 'compat' means
+	'if COMPAT_MODE is defined' and '!compat' means 'if
+	COMPAT_MODE is not defined' (same for 'native' and 'euids').
+
+
+	Predefined Preprocessor Symbols
+	  If compat, the symbols COMPAT_FLAG and __COMPAT_MODE__ are
+          defined for all LPC programs.
+          If native, the symbol __NATIVE_MODE__ is defined for all
+          LPC programs.
+          If euids, the symbol __EUIDS__ is defined for all
+          LPC programs.
+
+
+	Preloading Of Objects
+	  The driver has the possibility to preload objects before the
+	  game is actually opened to the world. This is done by
+	  calling master->epilog(), which has to return 0 or an array.
+	  If its an array, its elements (as long as they are strings)
+	  are given one by one as argument to master->preload() which
+	  may now preload the objects (or do anything else).
+	  Up to 3.2, compat mode used a different scheme: the file
+	  INIT_FILE (defined in config.h) was read and each line
+	  interpreted as filename of an object to preload. After this
+	  was done, master->epilog() was called. This was dumped in
+	  3.2.1 as it can be simulated by the master.
+
+
+	Initialisation Of Objects
+	  Since 3.2.1, it is task of the mudlib to call the
+	  initialisation lfuns in newly created objects, so the
+	  following table applies only up to 3.2:
+
+	          mode        : init call : reset call
+           --------------------------------------------
+	    !compat & !native :  create() :  reset(1)
+	    !compat &  native :  create() :  reset()
+	     compat & !native :  reset(0) :  reset(1)
+	     compat &  native :  reset(0) :  reset(1)
+	  
+	  If INITIALIZATION_BY___INIT was defined, the lfun __INIT()
+	  is called first on creation to initialize the objects
+	  variables.
+
+
+	Movement Of Objects
+	  Since 3.2.1, the efun move_object() is implemented in the
+	  mudlib. 
+	  Before, move_object() could applied only to this_object() as
+	  the object to move if in native mode, and called the lfun
+	  exit() in the old environment if in compat mode. As a side
+	  effect, the lfun exit() may not be target of add_action()s
+	  in compat mode.
+
+	  In !native mode, objects may be moved using the transfer()
+	  efun. It does make assumptions about the design of the
+	  mudlib, though, as it calls the lfuns query_weight(),
+	  can_put_and_get(), get(), prevent_insert() and add_weight().
+
+
+	Efuns In General
+	  command()
+	    In native mode, this may just take the command string,
+	    which is always applied to this_object(). In !native mode,
+	    an object to apply the command to may be optionally
+	    specified.
+
+	  creator(), transfer()
+	    These are existing only in !native mode (creator() is
+	    identical with getuid()).
+
+	  getuid()
+	    Exists only in !compat mode (getuid() is identical with
+	    creator()).
+
+	  export_uid(), geteuid(), seteuid()
+	    These exist only in euids mode.
+
+	  file_name(),function_exists() 
+	    In !compat mode, the returned filenames start with a
+	    leading '/', in compat mode they don't.
+
+	  parse_command()
+	    This command exists in two versions: the old is used with
+	    compat, the new with !compat. However,
+	    SUPPLY_PARSE_COMMAND must be defined in config.h in both
+	    cases (this efun is not very useful at all).
+
+	  process_string()
+	    In native & euids mode, if this_object() doesn't exist, it
+	    defaults to this_player() and gets the backbone uid
+	    (returned by master->get_bb_uid()) as euid.
+
+	  snoop()
+	    Besides that the call is verified with a call to
+	    master->verify_snoop(), up to 3.2 the snooper has to have
+	    a non-zero euid.
+
+	Userids and Effective Userids
+	  This is probably the most important difference between the
+	  modes.
+
+	  LPMud always had userids (uids) attributing the objects,
+	  though they were called 'creator names' in compat mode.
+	  Internally, the compat mode uses the 'creator names' as
+	  (e)uid.
+
+	  With the introduction of native mode, additionally
+	  'effective userids' (euids) were introduced to improve
+	  security handling (which was only a partial success). 
+	  The hardcoded handling of euids and uids was quite complex
+	  and too mudlib-insensitive, so most of it got moved from the
+	  driver into the mudlib with 3.2.1.
+
+	  In euids mode, the euids are managed at all, thus every
+	  following mention of 'euid' implies the activation of euid
+	  mode. Remember that native mode implies euids mode as well.
+
+	  In native mode, only objects with a non-zero euid may load
+	  or create new objects.
+
+	  --- 3.2.1 ---
+
+	    Userids of the Master
+	      The masters (e)uid is determined by a call to
+	      master->get_master_uid().
+	      In native mode, the result has to be a 0 or a string,
+	        else the driver won't start up at all. If the result is
+	        valid it is set as the masters uid (and also euid if in
+	        native && euids mode).
+	      In !native mode, the result may be any value: 0 or a
+	        string are treated as the uid to set, a non-zero integer
+	        leads to the use of the uid set in the default 'global'
+	        wizlist entry, and any other value defaults to 0. 
+	        In !native && euids mode, the euid is either set to the
+	        returned string (if any), or to 0.
+	      The masters uid is determined only on startup this way,
+	      at runtime the uids of a reloaded master determined as
+	      for every object by a call to the appropriate driver
+	      hooks.
+
+	    Userids of New Objects
+	      To determine the (e)uids for a new object (loaded or
+	      inherited, or cloned), the appropriate driver hook is
+	      evaluated (H_LOAD_UIDS, H_CLONE_UIDS) and the result set
+	      as (e)uid. In euids mode the result may be a single
+	      value, then the euid is set to 0, or an array ({ uid,
+	      euid }). 
+	      In native mode, both uid and must be 0 or a string, any
+	        other value causes the load/clone to fail.
+	      In !native mode, the uid (however returned) may also be
+	        a non-zero integer to use the uid of the global
+	        wizlist entry as uid. In euids mode, the euid is then
+	        set to either 0 or the second entry of the returned
+	        array if it's a string.
+
+	  --- 3.2 ---
+
+	    LPMud <= 3.2 in !compat mode has the algorithm deciding _which_
+	    (e)uid to set hardcoded into the driver. For this it
+	    features two builtin uids: the root uid (queried by a call
+	    to master->get_root_uid()) and the backbone uid
+	    (master->get_bb_uid()). Both uids should be a string: if
+	    not, the driver in native mode will terminate, else print
+	    a warning to stderr. The backbone uid is queried just once
+	    at startup.
+
+	    Userids of the Master
+	      In compat mode, the master's (e)uid is the (e)uid as
+	      determined for every other object as well. The following
+	      therefore applies only to !compat mode.
+
+	      The initial (e)uid is those determined using the normal
+	      algorithm for newly created objects (see below).
+	      After the master being loaded, master->get_root_uid() is
+	      called to query the (e)uid to use for real. If the
+	      result is a string, it is used as real (e)uid, else the
+	      default setting. In native mode, get_root_uid() must
+	      return a string, else the driver will terminate.
+
+	    Userids of New Objects
+	      If an object has been newly created, it is equipped with
+	      a default uid: 0 in !native mode, "NONAME" in native
+	      mode. The default euid (if needed) is equal to the uid,
+	      or 0 if no master object exists.
+
+	      The basic idea is simple: the master is asked, which (e)uid
+	      the new object should have. 
+	      Objects loaded by the game, in compat model, or by an
+	      object of the same creator will get the suggested e/uid.
+	      Backbone objects will get the euid of the loader.
+	      Other objects will get 0 as euid.
+	      The details are a bit more complicated...:
+
+	      Then master->creator_file() is asked for the 'creator
+	      uid' (cuid) of this object. If the lfun doesn't exist,
+	      the new object is destructed.
+	      The cuid must be a string, the number 0 or an array of
+	      two elements, !native mode also allows other non-array
+	      values. If the cuid is non of these (native mode
+	      restricts this further to the string or array), the
+	      object is destructed again.
+
+	      If the cuid is an array of two elements ({ uid, euid }),
+	      these are set as e/uid (non-strings are treated as 0).
+	      If the cuid is neither string, array or the number 0,
+	      the object gets 0 as e/uid (!native mode only).
+
+	      If the cuid is a string (all other cases are treated
+	      above) is it always set as the objects uid. The objects
+	      euid needs further treatment. If all following cases
+	      (checked in the order listed here) fail, it is set to 0.
+
+	      In compat mode, the euid is set to the uid.
+
+	      In !native mode, if the object is loaded (not cloned) or
+	      the loader has as 0 uid, the euid is set to the cuid. 
+              Also in !native mode, if the loader has a 0 euid, the
+              objects euid is set to 0.
+
+	      If the cuid is equal to the loaders uid, the objects
+	      euid is set to the cuid == uid.
+
+	      If the cuid is the backbone uid (and in !native mode the
+	      loader has a non-zero euid), the objects e/uid are both
+	      set to the loaders euid.
+
+	  ------
+
+	  Now you know another reason why 'effective userids' are a
+	  bad idea.
+
+SEE ALSO
+	hooks(C), uids(C), move_object(E), initialisation(LPC)

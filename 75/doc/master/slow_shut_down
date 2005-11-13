@@ -1,0 +1,40 @@
+SYNOPSIS
+	void slow_shut_down(int minutes)
+
+DESCRIPTION
+	Schedule a shutdown for the near future. minutes is the
+	desired time in minutes till the shutdown:
+	 six, if just the user reserve has been put into use.
+	 one, if the (smaller) master reserve has been put into use as
+	      well.
+
+	The interpreter calls this function when it runs low on
+	memory. At this time, it has freed its reserve, but since it
+	won't last long, the interpreter needs to be shut down. The
+	delay is to give the users the opportunity to finish their
+	current tasks, but don't take the 'minutes' for granted, just
+	deduce the urgency from it. 
+	It is possible that the driver may reallocate some memory
+	after the function has been called, and then run again into a
+	low memory situation, calling this function again.
+	This function might load an 'Armageddon' object and tell it
+	what to do. It is the Armageddon object then which performs
+	the shutdown.
+
+	Technical: The memory handling of the interpreter includes
+	three reserved areas: user, system and master. All three are
+	there to insure that the system shuts down gracefully when the
+	memory runs out: the user area to give the users time to
+	quit normally, the others to enable emergency-logouts when the
+	user reserve is used up as well.
+	The areas are allocated at start of the interpreter, and
+	released when no more memory could be obtained from the host.
+	In such a case, one of the remaining areas is freed (so the
+	operation can continue a short while) and a garbage collection
+	is initiated. If the garbage collection recycles enough memory
+	(either true garbage or by the aid of the quota_demon) to
+	reallocate the areas, all is fine, else the system shut down
+	is invoked by a call to this function. 
+
+SEE ALSO
+	quota_demon(M), notify_shutdown(M), shutdown(E), malloc(D), memory(C)

@@ -1,0 +1,199 @@
+CONCEPT
+	uids (user ids)
+
+NOTE
+	This description is only half the truth for 3.2.1, please
+	referto the pages that are mentioned in the SEE ALSO section
+	for more accurate information.
+
+DESCRIPTION
+
+	This seems to be a thing for the lpFAQ, until someone sums it
+	up I'll just dump the Genesis docs (/doc/man/general/userids).
+
+	---------------------------------------------------------------
+	This file documents how the system with userids work:
+
+
+	Basics
+	======
+
+	The system with userids is used to know who is responsible for
+	each object in the system. The rights of an object depends on
+	the rights of the userids it carries. This includes read,
+	write, snoop, possess and many other things.
+
+	Every object in the system have two separate userids. 
+
+	uid	- This indicates who is responsible for a specific instance
+		  of an object.
+
+	euid	- This indicates who is currently responsible for the
+		  objects actions (also see below: 'Driver variants').
+
+	There is a third indirect userid, which is not stored in the
+	object but is a direct function of the filename.
+
+	cuid	- This indicates who is responsible for the sourcecode of
+		  the object.
+
+	Userids are strings, normally wizard or domain names. The
+	driver has no concept of what these strings are. The name
+	system is entirely up to the master object. 
+
+	There is five efuns that is used to set and check userids:
+
+	getuid(object)		- Get the uid of an object.
+
+	geteuid(object)		- Get the euid of an object.
+
+	setuid()		- Set uid = cuid for the current
+				  object. The master object is queried
+				  by calling 'creator_file', for the
+				  cuid of the current objects filename.
+	
+	seteuid(userid)		- Set the euid = userid.
+				  The master object is queried by
+				  calling 'valid_seteuid' to see if
+				  the current object has the right to
+				  set its euid to the given name.
+
+	export_uid(object)	- Set the uid of 'object' to the euid
+				  of the current object. This is only
+				  possible if the euid of the
+				  recieving object is 0.
+
+
+	Creation of objects and userids
+	===============================
+
+	When an object is loaded or cloned it is given a uid and an
+	euid. There are two main rules:
+
+	1) If getuid(creator) == cuid
+		uid = euid = geteuid(creator);
+
+	2) If getuid(creator) != cuid
+		uid = cuid
+		euid = 0
+
+	Where 'creator' is the object that forces the clone/load and
+	cuid is the the name returned by masters 'creator_file' for
+	the new object.
+
+	There are some specific exceptions:
+
+	- The 'creator' must have a euid. If the euid of the creator
+	  is 0 than it is not possible to load/clone new objects.
+
+	- To be allowed to be loaded/cloned the object must have a
+	  cuid. This means that the master object is queried for
+	  'creator_file' and if the master does not return a string,
+	  than the object is denied to be loaded/cloned.
+
+	- If the cuid is a specific 'backbone' userid, then rule 1
+	  above is applied. The 'backbone' userid is a name supplied
+	  by master through the function 'get_bb_uid()'
+
+	- When the master object is loaded, there is no creator. The
+	  uid and euid of the master object is set after the object is
+	  loaded and the function 'get_root_uid()' is called. The name
+	  returned is used as uid and euid. This is normally the
+	  string "root".
+
+	- When the simul_efun object is loaded, there is no master
+	  object loaded yet. The uid is therefore set to the string
+	  "NONAME". This is the only hardcoded userid in the driver.
+	  The uid and euid of the simul_efun object must be set to
+	  something correct by the master object as soon as it loads.
+  
+	Driver variants
+	===============
+
+	Uids and euids are invented together with the NATIVE_MODE.
+	If the driver is compiled for COMPAT_MODE, no uids at all are
+	available. Vanilla NATIVE_MODE uses both uids and euids. If
+	the driver uses neither COMPAT_ and NATIVE_MODE, just the uids
+	may be used.
+	However, starting with 3.2.1@47, the usage of euids has been
+	decoupled from NATIVE_MODE: you can use non-NATIVE_MODE
+	together with euids (it is not possible to use NATIVE_MODE
+	without euids).
+
+
+	*** The last is specific to Genesis not in vanilla 3.00.53 ***
+
+	Changing of userids
+	===================
+
+	An object can change its uid and its euid. It can also change
+	the uid of another object if that object has no euid.
+
+	The following rules apply:
+
+	1)	An object can always change its own uid to its cuid.
+		This is done by the efun: setuid().
+
+	2)	An object can always set its euid to its uid or to 0.
+		This is done by: seteuid(userid)
+
+	3)	An object can set its euid to anything that the master
+		object allows. 
+		This is done by: seteuid(userid), the driver then
+		calls the master objects 'valid_seteuid' which returns
+		true or false depending on if the operation is allowed
+		or not.
+
+	4)	An object can always set the uid of another object to
+		its own euid if the other objects euid is 0. This is
+		done with: export_uid(object). 
+
+
+	Special considerations
+	======================
+
+	These rules are not coded into the driver but they are
+	implemented in the login object and in the master object. They
+	are part of the userid design but might be done differently.
+
+	- All wizards, when logging in, gets their own name as uid and
+	  euid.
+
+	- All mortals, when logging in, gets the 'backbone' userid as
+	  uid and euid.
+
+	As objects 'inherits' their userids from the object that
+	forces their load or clone some special situations may occur.
+
+	When rooms are loaded because they are entered for the first
+	time they could be loaded by any object. Normally a 'user' or
+	another room. As there are 'border' cases between areas and as
+	users have the 'backbone' uid, most rooms will be given
+	userids according to rule 2 above. That is their uid will be
+	equal to their cuid and their euid will be 0. 
+
+	This is problematic because rooms often clone objects. To make
+	this possible all rooms use the combination: 
+	
+		setuid(); seteuid(geteuid(this_object())); 
+
+	to ensure that they are always capable of loading and cloning
+	with the rights of the wizard who wrote the room.
+
+	When a wizard clones or forces an object to load from another
+	wizards directory rule two above applies, the same as for
+	rooms. This means that if the object is to be used with the
+	cloning wizards rights, the cloning wizard must actively set
+	the userids in the loaded/cloned object.
+
+	There is normally a command 'trust <ob>' for this purpose.
+
+AUTHOR
+  Johan Andersson	   | "You don`t have conversations with microprocessors
+  Chalmers, Sweden	   | you tell them what to do, and then you helplessly
+  Email:		   | watch the disaster when they take you literally."
+  d8andjo@dtek.chalmers.se |	Sah`ot in David Brins "Startide Rising"
+
+SEE ALSO
+	native(C), creator_file(M), get_root_uid(M), valid_seteuid(M),
+	objects(C), clone_object(E), geteuid(E), getuid(E), seteuid(E)

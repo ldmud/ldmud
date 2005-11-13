@@ -1,0 +1,62 @@
+CONCEPT
+    types
+
+DESCRIPTION
+
+    Variables can have the following types:
+
+    o int       An integer. Normally full 32 bits signed; ranges
+                are -2,147,483,648 to 2,147,483,648.
+
+    o status    OUTDATED - Status was planned to be an optimized
+                boolean format, but this was never actually 
+                implemented. Statas does work; however, since it
+                is only an alias for type 'int', just use int.
+
+    o string    Strings in lpc are true strings, not arrays of characters
+                as in C (and not pointers to strings). Strings are 
+                mutable -- that is, the contents of a string can be
+                modified as needed. Strings are automatically concatenated
+                by the gamedriver at runtime, so the + operator is no
+                longer strictly necessary to combine two strings. 
+
+    o object    Pointer to an object. Objects are always passed by
+                reference.
+
+    o array     Pointer to a vector of values, which could also
+                be an alist. Arrays take the form ({ n1, n2, n3 })
+                and may contain any type or a mix of types. Arrays
+                are always passed by reference. Note that the size
+                of arrays in LPC, unlike most programming languages, 
+                CAN be changed at run-time.
+
+    o mapping   An 'associative array' consisting of values indexed by
+                keys. The indices can be any kind of datatype.
+                Mappings take the form ([ key1: value1, key2: value2 ]).
+                By default, mappings are passed by reference.
+
+    o closure   References to executable code, both to local
+                functions, efuns and to functions compiled at 
+                run-time ("lambda closures").
+    
+    o float     A floating point number. The interpreter must have the
+                floats enabled at compile time.
+
+    o mixed     A variable allowed to take a value of any type (int, 
+                string, object, array, mapping, float or closure).
+
+    All uninitialized variables have the value 0. 
+    
+    The type of a variable is really only for documentation. Unless
+    you define #pragma strict_types, variables can actually be of
+    any type and has no effect at all on the program. However, it's
+    extremely bad style to declare one type but use another, so
+    please try to avoid this.
+    
+    A pointer to a destructed object will always have the value 0. 
+
+
+SEE ALSO
+    alists(LPC), arrays(LPC), mappings(LPC), closures(LPC),
+    typeof(E), get_type_info(E), inheritance(lpc), pragma(LPC),
+    strings(LPC), modifiers(LPC)

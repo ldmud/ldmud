@@ -1,0 +1,48 @@
+NAME
+	pragma
+
+DESCRIPTION
+	The preprocessor directive #pragma can be used to select
+	several compilation options.
+
+	combine_strings: Perform the addition of string literals at
+		compile time instead of run time, e.g. "foo"+"bar"
+		will be compiled as "foobar". Like the concatenation
+		of adjacent string literals ("foo" "bar" is compiled
+		as "foobar" as well) already done by the preprocessor,
+		the combine_strings will save memory, because the combined
+		strings can be shared betweena blueprint and it's clones,
+		and the strings also have a good chance to be entered
+		into the global shared-string-table.
+	no_combine_string: Contrary to combine_strings, may be used to
+		deactivate a combine_strings pragma.
+	strict_types: all functions must be declared with argument
+		prototypes, and the return values of call_other() must
+		be casted.
+	strong_types: all functions must be declared with complete
+		types of returnvalue and parameters.
+	save_types: the declaration data is kept after compilation and
+		checked at runtime. This is important for type-safe
+		inheritance.
+	verbose_errors: upon a compilation error, the driver displays
+		the actual context of the errorenous text. This is
+		helpful with errors within long expressions.
+	
+	When an object is compiled with type testing (#pragma
+	strict_types), all types are saved of the arguments for that
+	function during compilation.  If the #pragma save_types is
+	specified, then the types are saved even after compilation, to
+	be used when the object is inherited.
+
+	The following two pragmas are available if the driver was
+	compiled with DEBUG and TRACE_CODE options:
+
+	set_code_window: Sets an offset to the current program writing
+		position. Use this BEFORE a piece of code where you
+		want to check to what bytecodes it is compiled. 
+	show_code_window: shows some bytes starting at or near the
+		last point set_code_window was called.
+
+SEE ALSO
+	inheritance(LPC), initialization(LPC), objects(C),
+	operators(LPC)

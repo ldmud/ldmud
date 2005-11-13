@@ -1,0 +1,36 @@
+SYNOPSIS
+	mixed get_type_info(mixed arg, int flag)
+
+DESCRIPTION
+	Returns info about the type of arg, as controlled by the flag.
+
+	If the optional argument flag is not a number, an array is
+	returned, whose first element is an integer denoting the data
+	type, as defined in <lpctypes.h>. The second entry can contain
+	additional information about arg.
+	If flag is the number 0, only the first element of that array
+	(i.e. the data type) is returned (as int). If flag is 1, the
+	second element is returned. 
+	If <arg> is a closure, the <flag> setting 2 lets the efun
+	return the object the closure is bound to.
+	For every other <flag> setting, -1 is returned.
+
+	For mappings, the second entry is the width (i.e. number of
+	data items per key).
+
+	For closures, symbols and quoted arrays a the number of quotes
+	is returned as additional info about arg.
+
+	For all other data types, -1 is returned as additional info.
+
+BUGS
+	This function seems to be due to frequent changes as the
+	driver develops resp. is debugged.
+
+HISTORY
+	Introduced in 3.2@127
+	Flag setting 2 was introduced in 3.2.1@84.
+
+SEE ALSO
+	debug_info(E), typeof(E)
+
