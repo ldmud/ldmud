@@ -1,0 +1,5 @@
+SYNOPSIS
+	float sqrt(float)
+
+DESCRIPTION
+	Returns the square root of the argument.

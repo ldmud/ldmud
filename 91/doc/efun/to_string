@@ -1,0 +1,11 @@
+SYNOPSIS
+	string to_string(mixed)
+
+DESCRIPTION
+	The argument is converted to a string. Works with int, float,
+	object, arrays, symbols, strings, and closures.
+
+	Converts variable/lfun closure to the appropriate names.
+
+SEE ALSO
+	to_array(E), to_int(E), to_object(E), sprintf(E)

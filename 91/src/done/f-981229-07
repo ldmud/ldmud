@@ -1,0 +1,17 @@
+Short: m_values() vs. Multivalue mappings
+From: alfebtcd <alfebtcd@cs.tu-berlin.de>
+Date: Wed, 16 Dec 1998 21:11:51 +0100 (MET)
+Type: Feature
+State: Done - implemented in 3.2-dev.55.
+
+mixed *m_values(mapping m, int index = 0)
+
+Returns the data ({ m[..] }), resp. ({ m[..,<index>] }) for multi-value mappings.
+If m is a multi-value mapping and index is < 0, the result is an array of all
+mapping values. In other words:
+
+  mkmapping(m_indices(m), m_values(m, -1)) == m
+
+The '-1' index method was dropped in favour of unmkmapping() or
+m_all_values() (don't know yet).
+

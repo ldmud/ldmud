@@ -1,0 +1,10 @@
+Short: New efun: object_time()
+From: Daniel Sloan <sloand@alphalink.com.au>
+Date: Tue, 23 Mar 1999 15:29:14 +0000
+Type: Feature
+State: Unclassified
+
+A 'object_time' efun, that shows when the object was cloned/loaded.  This is
+more useful than program_time() in my opinion.  It can be used to work out
+whether an object is older than the file that defines its blueprint, and
+other such things.
