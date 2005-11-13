@@ -1,0 +1,83 @@
+Short: terminal_colour() revisited
+From: Christian 'Chameloid' Kirschbaum <chrissy@cs.tu-berlin.de>
+Date: Tue, 9 Feb 1999 19:51:47 +0100 (MET)
+Type: Bug
+State: Fixed.
+
+---------- Forwarded message ----------
+Date: Mon, 8 Feb 1999 21:19:40 +0100 (MET)
+From: Christian 'Chameloid' Kirschbaum <chrissy@cs.tu-berlin.de>
+To: amylaar-users@nightfall.org
+Subject: terminal_colour() revisited
+
+Hi Lars et al.,
+
+After a memory problem in terminal_colour() has been found (it left
+strings unreferenced), I'd like to point out another dysfunction IMO
+of this very recently introduced new efun, that being the indentation
+not working properly under certain circumstances.  The syntax of
+terminal_colour() is given as
+
+
+        varargs string terminal_colour( string str, mapping map, 
+                                        int wrap, int indent )
+
+
+with 'str' being the string to work on, 'map' being the color-key
+mapping, 'wrap' denoting the column to linewrap the string at, and
+'indent' denoting the number of blanks with which to indent wrapped
+lines.  As long as 'wrap' is smaller or greater than the length of
+'str' minus 1, everything works fine:
+
+
+        terminal_color("foobar bla",([ ]),7,2)
+        --
+        "foobar\n  bla"
+
+        terminal_color("foobar bla",([ ]),10,2)
+        --
+        "foobar bla"
+
+        terminal_color("foobar bla",([ ]),12,2)
+        --
+        "foobar bla"
+
+
+However, if 'wrap' equals the length of 'str' minus 1, the following
+is the outcome:
+
+
+        terminal_color("foobar bla",([ ]),9,2)
+        --
+        "foobar\nbla"
+
+
+As you can see, the one wrapped line does not get indented.  This
+behavior seems independent of whatever 'indent' is.  I played a little
+more with special characters such as '\n', and the following happens:
+
+
+        terminal_color("foobar bla\n",([ ]),9,2)
+        --
+        "foobar\n  bla"
+
+
+And no problem here although 'wrap' equals the length of 'str' minus 1:
+
+
+        terminal_color("foobar bla\n",([ ]),10,2)
+        --
+        "foobar bla\n"
+
+
+I think this behavior (non-indentation of the one wrapped line when
+'wrap' equals the length of 'str' minus 1 and the last character is
+not a special character such as '\n') is not desired and should be
+fixed, which - I'm sure - is easy to do.
+
+
+Cheers,
+Chris a.k.a. Chameloid@Tubmud.
+
+
+

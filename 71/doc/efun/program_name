@@ -1,0 +1,29 @@
+SYNOPSIS
+	string program_name()
+	string program_name(object obj)
+
+DESCRIPTION
+        Return the name of the program of <obj>, resp. the name of the
+        program of the current object if <obj> is omitted.
+
+        The returned name is usually the name from which the blueprint
+        of <obj> was compiled (the 'load name'), but changes if an object
+        replaces its programs with the efun replace_programs().
+
+        The name always ends in '.c'. It starts with a '/' unless the
+        driver is running in COMPAT mode.
+
+	CAVEAT: This efun swaps in the program if it is swapped out.
+
+EXAMPLE
+	object o;
+	o = clone_object("/std/thing");
+	write(program_name(o));  --> writes "/std/thing.c" in !compat mode
+	                                and "std/thing.c"  in compat mode
+
+HISTORY
+	Introduced in LDMud 3.2.6.
+
+SEE ALSO
+	clone_object(E), clonep(E), load_name(E), load_object(E),
+        object_name(E), replace_programs(E)

@@ -1,0 +1,87 @@
+SYNOPSIS
+        #include <objectinfo.h>
+        mixed * object_info (object ob, int what)
+
+DESCRIPTION
+        Return some internal information about object <ob>, collected
+        in an array. Argument <what> determines which information is
+        returned.
+
+        The possible values of <what>, and the indices of the returned
+        arrays are defined in the include file <objectinfo.h>, and may
+        change in future versions of the driver.
+
+
+        <what> == OINFO_BASIC:
+
+          This call returns basic information about <ob>:
+          
+          int [OIB_HEART_BEAT]:       1 if <ob> has a heart_beat, 0 else.
+          int [OIB_IS_WIZARD]:        1 if <ob> has the wizard flag set,
+                                        0 else.
+          int [OIB_ENABLE_COMMANDS]:  1 if <ob> can give commands, 0 else.
+          int [OIB_CLONE]:            1 if <ob> is a clone, 0 else.
+          int [OIB_DESTRUCTED]:       1 if <ob> is destructed, 0 else.
+          int [OIB_SWAPPED]:          1 if <ob> is swapped, 0 else.
+          int [OIB_ONCE_INTERACTIVE]: 1 if <ob> was once interactive, 0 else.
+          int [OIB_APPROVED]:         1 if <ob> descends from /std/object,
+                                        0 else.
+          int [OIB_RESET_STATE]:      1 if <ob> is (still) reset, 0 else.
+          int [OIB_WILL_CLEAN_UP]:    1 if <ob> will call clean_up(), 0 else.
+          int [OIB_LAMBDA_REFERENCED]: 1 if <ob> has lambdas, 0 else.
+          int [OIB_SHADOW]:           1 if <ob> is shadowed, 0 else.
+          int [OIB_TOTAL_LIGHT]:  the amount of light <ob> is emitting.
+          int [OIB_NEXT_RESET]:   time of the next reset.
+          int [OIB_TIME_OF_REF]:  time of the last call to <ob>
+          int [OIB_REF]:          number of references to <ob>
+          int [OIB_GIGATICKS] and [OIB_TICKS]: together, these numbers
+            give the accumulated evaluation cost spend in <ob>
+          int [OIB_SWAP_NUM]:     the swap number for <ob>s program, 
+                                  or -1 if not swapped.
+          int [OIB_PROG_SWAPPED]: 1 if <ob>'s program is swapped, 0 else.
+          int [OIB_VAR_SWAPPED]:  1 if <ob>'s variables are swapped, 0 else.
+          int [OIB_NAME]:         <ob>'s object name.
+          int [OIB_LOAD_NAME]:    <ob>'s load name.
+          object [OIB_NEXT_ALL]:  next object in the object list.
+          object [OIB_PREV_ALL]:  previous object in the object list.
+    
+    
+        <what> == OINFO_POSITION:
+
+          This call returns information about <ob>'s position in the
+          global list of objects:
+          
+          object [OIP_NEXT]: next object in the object list.
+          object [OIP_PREV]: previous object in the object list.
+          int    [OIP_POS]:  position of <ob> in list, counting from 0 up.
+
+          This call can be expensive in computing time.
+
+          
+        <what> == OINFO_MEMORY:
+
+          This call returns information about the program <ob> uses:
+          
+          int    [OIM_REF]:            number of references to the program.
+          string [OIM_NAME]:           name of program.
+          int    [OIM_PROG_SIZE]:      size of the program.
+          int    [OIM_NUM_FUNCTIONS]:  number of functions in the program.
+          int    [OIM_SIZE_FUNCTIONS]: size needed for the function structs.
+          int    [OIM_NUM_VARIABLES]:  number of variables in the program.
+          int    [OIM_SIZE_VARIABLES]: size needed for the variable structs.
+          int    [OIM_NUM_STRINGS]:    number of strings in the program.
+          int    [OIM_SIZE_STRINGS]:   size needed for the string pointers.
+          int    [OIM_NUM_INHERITED]:  number of inherited programs.
+          int    [OIM_SIZE_INHERITED]: size needed for the inherit structs.
+          int    [OIM_TOTAL_SIZE]:     total size of the program.
+
+          This call swaps in the program if necessary.
+          Note that the OIM_SIZE_xxx entries only give the size spent on
+          the structures and pointers, not the size of the variable data,
+          function code, and strings themselves.
+
+HISTORY
+        Introduced in LDMud 3.2.6
+
+SEE ALSO
+        debug_info(E)

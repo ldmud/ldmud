@@ -1,0 +1,25 @@
+Short: modified set_environment()
+From: Tatu P Saloranta <doomdark@cc.hut.fi>
+Date: Fri, 18 Dec 1998 14:47:26 +0200 (EET)
+Type: Feature
+State: Unclassified
+
+I just compiled LDMud, and noticed there were actually few other efuns
+I had hacked into Amylaar GD... Some aren't probably useful for anyone
+else out there, but others might be. Although I don't want to add yet
+another dozen of esoteric efuns to GD, I think it'd be good to discuss
+about possible useful new additions anyway. So, here's my list:
+
+- 3rd (optional) argument to efun308() (ie. "set_environment()"). As the mudlib
+  of the mud in question sorts the inventories (putting 'similar' items
+  next to each other), it needs to be able to decide where in the linked
+  list to put objects to. This is done by supplying an optional argument,
+  the object after which the 'moved' object is to be put. Although
+  in the perfect world inventory-handling probably should be completely
+  done by objects (rooms, containers), there's no built-in linked list
+  datatype, and array-handling in LPC introduces significant overhead...
+  Thus driver-handled inventory handling still has its uses IMO. I won't
+  include code here, but it's a trivial addition and I can mail the
+  changes necessary if need be.
+
+
