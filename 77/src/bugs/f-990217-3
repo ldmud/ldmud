@@ -1,0 +1,7 @@
+Short: new efun all_previous_object()
+From: Holger@Wunderland
+Date: 990217
+Type: Feature
+State: Unclassified
+
+Returns the current callstack.

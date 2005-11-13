@@ -1,0 +1,41 @@
+Short: new efun receive()
+From: Dave Setty <garpoz@locallink.net>
+Date: Thu, 10 Dec 1998 02:03:04 -0500
+Type: Feature
+State: Unclassified
+
+4) I don't know if this would be generally desirable or not, but I've
+   also got a patch that removes the various comm efuns (write, say,
+   tell_object, tell_room etc) and puts in the single efun
+   send_message() (which is called from inside an interactive to send
+   a message out). The idea is to give the lib more control over how
+   messages are passed around, and get rid of the hardcoded applies
+   catch_tell() and catch_msg(). The problem is, for compatibility
+   there'd have to be a switch to support this stuff in the driver (or
+   at least a lot of supplied simuls, which can be a problem itself).
+
+This is what MudOS does, too, and quite a big change. Eventually,
+it will come, but it is better to implement generic TCP support first.
+
+Date: Fri, 8 Jan 1999 02:02:30 -0500 (EST)
+From: ak853@cleveland.Freenet.Edu (Eric Blade)
+
+
+    The fewer driver called applies, the better, IMHO.  Similar to the
+    message() efun in MudOS.  If you ask me, it's a great idea.  I think
+    there should effectively b e, just tell_object().  Use send_message() as
+    a simul, tell_object() tells just that object, and that object
+    determines what to do with it.  catch_tell() is still a fine name to use
+    as an apply.  SOmewhere or other, You almost have to have an apply, so
+    the mudlib can figure out what to do with the message.
+
+    hell, I giuess you don't even need send_message()...
+
+    So you tell_object() a room.  The room decides that it should send
+    everything to everyone inside it.  So, it figures out what is in the
+    room and could possibly listen to what it's saying, and it in turn
+    tell_object()s all the objects that should hear it.  The player object
+    has a catch_tell() which decides if that message is worth display to the
+    user or not.  And so on.
+
+

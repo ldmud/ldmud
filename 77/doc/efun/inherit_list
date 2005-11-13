@@ -1,0 +1,14 @@
+SYNOPSIS
+	string *inherit_list(object ob)
+
+DESCRIPTION
+	Returns the names of all files currently inherited by <ob>, including
+        <ob>s own filename. If <ob> is omitted, it defaults to the current
+        object.
+
+        'Currently' in the above sentence means that after a replace_program()
+        <ob>s 'own filename' is that of the object providing the replacement
+        program.
+
+SEE ALSO
+	debug_info(E)

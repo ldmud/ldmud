@@ -1,0 +1,22 @@
+SYNOPSIS
+	int restore_object(string name)
+
+DESCRIPTION
+	Restore values of variables for current object from file name.
+	If name ends in ``.c'', this suffix is stripped of by the parser.
+
+	The master object will probably append a .o to the name.
+	
+	Variables that has the type modifer 'static' will not be saved.
+	Example: static int xxx;
+	
+	If inheritance is used, then it might be possible that a variable
+	will exist with the same name in more than one place. When
+	restoring, only one of these variables will be restored if
+	encountered in the save file.
+	A good practice is to have verbose and unique name on non-static
+	variables, which also will make it more easy to read or patch the
+	save file manually.
+
+SEE ALSO
+	save_object(E), valid_read(M)

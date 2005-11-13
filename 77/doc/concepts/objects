@@ -1,0 +1,45 @@
+CONCEPT
+	objects
+
+LAST UPDATED
+	never
+
+DESCRIPTION
+        An object consists of a collection of functions (also called
+        'methods') and data (variables) on which the functions operate.
+        The only way to manipulate the data contained in an object is
+        via one of the functions defined by the object.
+
+        Every single thing in a mud is an object.  Rooms are objects.
+        Weapons are objects.  Even your character is an object (a special
+        kind of object called "interactive" but still an object in most
+        every respect).  Each object (except possibly virtual objects) in
+        the mud is associated with some file written in LPC (in the mud's
+        directory structure) that describes how the object is to interact
+        with the gamedriver and the rest of the objects in the mud.
+
+	Since 3.2.1@94, objects can have more than 256 global variables.
+	Since 3.2.1@117, inherited functions may be specified by
+	wildcards '*' and '?'. Example:
+
+	  inherit "foo";
+	  inherit "bar";
+	  inherit "baz";
+	  inherit "ball";
+
+	  reset() {
+	    "ba?"::reset();
+	    // calls bar::reset() and baz::reset()
+
+	    "ba*"::reset();
+	    // calls bar::reset(), baz::reset() and ball::reset()
+
+	    "*"::reset();
+	    // calls every inherited reset() function.
+	  }
+
+AUTHOR
+	Someone
+
+SEE ALSO
+	files(C), inheritance(C), create(A), reset(A)

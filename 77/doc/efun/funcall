@@ -1,0 +1,13 @@
+SYNOPSIS
+	mixed funcall(closure cl, mixed arg ...)
+
+DESCRIPTION
+	Evaluates the closure. The extra args will be passed as args
+	to the closure.	If cl is not a closure, it will simply be
+	returned (in 3.2 only if no extra args are passed).
+
+HISTORY
+	Introduced in 3.2@70
+
+SEE ALSO
+	apply(E), quote(E)
