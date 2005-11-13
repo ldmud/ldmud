@@ -1,0 +1,10 @@
+Subject: Driverbug
+From: Lars Duning <lduning@mdisystems.com>
+Reply-To: <lars@cableinet.co.uk>
+Date: Fri, 25 Sep 1998 13:35:27 +0100
+Organization: MDi Systems
+X-Mailer: Mozilla 4.04 [en] (Win95; I)
+
+Omission of value for option -f leads to the error message
+'Option 'N' expects a value'.
+
