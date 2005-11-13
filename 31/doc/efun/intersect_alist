@@ -1,0 +1,13 @@
+SYNOPSIS
+    mixed * intersect_alist (mixed * list1, mixed * list2)
+
+DESCRIPTION
+    Does a fast set intersection on alist key vectors (NOT on full alists!).
+    The operator '&' does set intersection on arrays in general.
+
+EXAMPLE
+    new_list = intersect_alist(list1, list2);
+
+SEE ALSO
+    filter_array(E), assoc(E), insert_alist(E), map_array(E),
+    member_array(E), order_alist(E), sort_array(E), unique_array(E)
