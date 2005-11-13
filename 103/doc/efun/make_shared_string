@@ -1,0 +1,16 @@
+SYNOPSIS
+	string make_shared_string (string str)
+
+DESCRIPTION
+	Puts <str> in _the_ list of shared strings of the game.
+
+	If the string is used by several variables/objects this
+	saves memory. Keys of alists and mappings are always shared
+	strings.
+
+BUGS
+	A better string handling in the driver should make this
+	efun unnecessary.
+
+HISTORY
+	Introduced in LDMud 3.2.6; following a suggestion from TubMud.
