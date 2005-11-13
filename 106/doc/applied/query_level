@@ -1,0 +1,14 @@
+SYNOPSIS
+	int query_level(void)
+
+DESCRIPTION
+	In former times this function was used by the parser when
+	executing set_living_name() to check if the calling object
+	should be marked as being a wizard.
+
+	Mentioned here only for hysterical raisins, not used by the
+	parser anymore.
+
+SEE ALSO
+	query_player_level(M), wizlist(E)
+	

@@ -1,0 +1,8 @@
+Short: New efun m_add()
+From: Lars
+Date: 990310
+Type: Feature
+State: Unclassified
+
+m_add(m, key, data...) in addition to m + ([ ])
+
