@@ -1,0 +1,10 @@
+Short: Don't swap objects which are due for reset
+From: Michael Sporn
+Date: 990501
+Type: Feature
+State: Unclassified
+
+In process_objects(), don't swap objects which will soon be called for reset()
+or clean_up().
+
+But what is 'soon'? Definable in config.h?

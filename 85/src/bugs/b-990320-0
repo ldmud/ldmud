@@ -1,0 +1,11 @@
+Short: vararg tefun recognition faulty
+Date: 990320
+From: Lars
+Type: Bug
+State: Acknowledged
+
+In the %tefun part of func_spec, a definition of the form
+
+    type foo(void|type)
+
+is not recognized as varargs tefun.
