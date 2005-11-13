@@ -1,0 +1,13 @@
+Short: ACCESS.ALLOW should take ports into account
+Date: 981211
+Type: Feature
+State: Acknowledged
+From: Gokhan Moral <gm@Bilkent.EDU.TR>
+
+I noticed that the multiport support is already there, this is fine.
+hmm, but, how can i say... is it possible to change/patch the driver so
+that we can define individual access lists for each port?
+here, in my university, students do not have permission to log into the
+mud using some specific labratories. I have fingerd-like thing running on
+port 79, i want them to be able to use finger in those labratories at
+least.

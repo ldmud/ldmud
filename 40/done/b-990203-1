@@ -1,0 +1,24 @@
+Short: Massive Problems with GC
+From: Christian 'Chameloid' Kirschbaum <chrissy@cs.tu-berlin.de>
+Date: Sat, 16 Jan 1999 03:18:02 +0100 (MET)
+Type: Bug
+State: Fixed by p-990203-0
+
+bei uns gibt es arge Probleme mit der GC des 3.2.5er GD.  Nach bereits 
+zwei GCs waechst unser /lpmud.log file auf ueber 50Mb an, weil saemtliche 
+Strings von scheinbar allen, die im Mud waren, als unreferenced 'entfernt'
+und in dieses Log geschrieben werden.  Dies betrifft Raumbeschreibungen, 
+saemtliche Kommandos, und was besonders arg ist, saemtliche Kommunikation 
+(!) im Mud.  Dies ist besonders heikel bei privaten Sachen ('privacy' 
+halten wir recht hoch) oder administrativen Infos (eine gesamte Archconf 
+wurde sozusagen mit in dieses oeffentliche File 'geloggt').  Mal von
+diesem Umstand und den entstehenden Lags abgesehen, muss der Driver dann 
+letztendlich alle zwei Tage abgeschossen werden (oder er crashed von 
+allein), weil die GC mehrere Stunden (!) dauert und/oder die Platte voll 
+ist.  Not ist also am Mann.  Kannst du was schnellstmoeglich machen?
+
+
+This looks like it is caused by the memory leak in the terminal_colour()
+efun (see p-990203-0).
+
+
