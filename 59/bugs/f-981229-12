@@ -1,0 +1,16 @@
+Short: new efun copy()
+Date: 981229
+Type: Feature
+State: Acknowledged
+
+the efun
+
+  mixed copy(mixed data, bool all = false)
+  
+creates and returns a value copy of data for mappings and arrays,
+and returns data for everything else.
+
+mappings and arrays are value copys (like data+({})), and if all is true,
+all containing mappings and arrays are copied as well.
+
+This efun would then replace copy_mapping(), too.

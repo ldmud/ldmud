@@ -1,0 +1,21 @@
+SYNOPSIS
+	int clonep()
+	int clonep(object obj)
+
+DESCRIPTION
+	If <obj> is a clone, the efun returns 1, else it returns 0.
+        If <obj> is omitted, the current object is tested.
+        
+	Objects with a replaced program count as clones.
+
+EXAMPLE
+	object o;
+	o = clone_object("/std/thing");
+	write(clonep(o));                   --> writes "1"
+	write(find_object("/std/thing"));   --> writes "0"
+
+HISTORY
+	Introduced in LDMud 3.2.6.
+        
+SEE ALSO
+	blueprint(E), clone_object(E)

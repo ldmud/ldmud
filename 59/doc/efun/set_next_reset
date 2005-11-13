@@ -1,0 +1,23 @@
+SYNOPSIS
+	int set_next_reset (int delay)
+
+DESCRIPTION
+	Instruct the gamedriver to reset this object not earlier than
+	in <delay> seconds. If a negative value is given as delay, the object
+	will never reset (useful for blueprints).
+
+	Result is the former delay to the objects next reset (which can be
+	negative if the reset was overdue).
+
+	Note that the actual time the reset occurs depends on when
+	the object will be used after the given time delay, and on the
+	granularity with which the driver checks for resettable objects
+	(typically every 3..5 minutes).
+
+EXAMPLE
+	set_next_reset(15*60); // Next reset in 15 Minutes or later
+
+HISTORY
+	Introduced in LDMud 3.2.6, adapted from Morgengrauen.
+
+SEE ALSO
