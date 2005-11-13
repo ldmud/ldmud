@@ -1,0 +1,21 @@
+Subject: x-erq doesnt work
+From: Gokhan Moral <gm@Bilkent.EDU.TR>
+Date: Sat, 12 Dec 1998 21:26:26 +0200 (EET)
+Type: Bug
+State: Unclassified
+
+sorry to bother you again, but i want to ask a question.
+I was using xerq-1.4 with amylaar driver
+I noticed that I cannot recompile it by giving the ldmud directory path,
+so I used the precompiled binary.
+But it crashes more frequent than before. 
+Is it possible for you to put "adding socket functions to erq daemon" into
+your to-do list?
+We really need it.
+Thank you.
+
+Gokhan Moral
+Bilkent University
+Network Administrator
+(try telnetting "buces.bbs.tr 3000")
+

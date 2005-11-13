@@ -1,0 +1,315 @@
+# The following is for easier adaptation on your machine. See also README.Amiga .
+# It is a derivate of the original 'Makefile' adapted for SAS' own smake.
+#
+# I (Reinhard) used SAS/C 6.55 to compile the driver with the smake utility
+# and a port of BYacc.
+# SAS/C supports a generic startup with common macro definitions, so for me
+# the following macros are defined automatically:
+#
+# Note that SMake does not support conditional makes, thus explicite
+# out-commenting has been used instead.
+
+CC = sc:c/sc
+LD = sc:c/sc link
+AS = sc:c/sc asm
+CFLAGS=
+SCFLAGS=
+
+YTAB= y.tab
+CP= c:copy
+RM= c:delete
+MV= c:rename
+
+#
+# The original makefile had 'CC= gcc' in it...
+# The CFLAGS- and YFLAGS-values are modified for Mud-Stuff below.
+# There is also a section below where you can add your own pet compiler.
+#-----------------------------------------------------------------------------
+
+# What type of net package do we use? Known by this Makefile are:
+#   AS225  : Commodores AS225 software
+#   AMITCP : The AmiTCP package from hut.fi, version < 3.0
+#   AMITCP3: The AmiTCP package from hut.fi, version >= 3.0
+#
+# Leave it empty for the simulation (the default).
+
+NETTYPE= AMITCP3
+
+# DMake's default-yacc 'Bison' won't work with Amylaars lang.y,
+# but byacc will.
+
+YACC= c:byacc
+YFLAGS=
+
+# Unix has an option '-f' for it's 'rm' - not the Amiga, so I define
+#   RMF= $(RM) -f
+# and modify it for Amiga as:
+
+RMF= $(RM)
+
+# Compiling on a plain Amiga is slow, so keep some intermediate files:
+
+# PREC= .PRECIOUS
+
+# -- Compiler specifics --
+#
+# Set CCOPTS to any options you need to compile LPMud, what includes
+# warning- and optimization options!
+#
+# If your compiler doesn't define the cpp-symbol AMIGA, it's a good idea
+# to add it here.
+# If your compiler doesn't have own code for float maths, you must
+# define _NO_OWN_FLOATS so OS 1.3-versions will compile properly.
+#
+# interpret.c and lang.c need lots of RAM to compile, thus it might be wise
+# to put the temporaries somewhere else than into T: in RAM:.
+# Use these macros to insert the needed compiler-options, including any
+# non-standard code-model options.
+#   LOPT: The options for lang.c
+#   IOPT: The options for interpret.c
+#
+# To compile the hosts/amiga/signal, your compiler must be able to
+# generate C-Code with registerized parameters. If it needs a special
+# option to do this, put it into ROPT.
+#
+# If your compiler needs additional sources, put them into XSRC, and
+# the object files to generate into XOBJ.
+# If your compiler doesn't have alloca(), add alloca.c/alloca.o to
+# the additional sources.
+
+# afp tells SAS/C to generate 32-bit references to functions
+# Data=FAR tells SAS/C to use 32-bit references (no force)
+# Code=FAR tells SAS/C to use 32-bit references to functions not declared in current file
+# lib=scmffpnb.lib tells SAS/C to generate code to call the FFP shared library
+# SAS/C uses the OS' math libraries
+# AMIGA is defined automatically
+
+CCOPTS = def=_NO_OWN_FLOATS afp Data=FAR Code=FAR math=ffp ign=55+100+154+161
+
+LOPT=
+IOPT=
+
+# option for SAS/C registered parameters
+
+ROPT= parms=registers
+
+# -- Net specifics --
+#
+# Set NETDEF to define the appropriate symbol selecting the special
+# interface code.
+# Set NETLIB to specify any additionally needed linker library.
+#
+# Default first...
+
+# NETDEF=
+# NETLIB=
+
+# .IF $(NETTYPE) == AS225
+# NETDEF= def=AMIGA_TCP def=AMITCP
+# NETLIB= lib=lib:netnb.lib
+# NETDEF= def=DAMIGA_TCP def=AS255
+# NETLIB= lib=lib:socket.lib
+# .END
+
+# .IF $(NETTYPE) == AMITCP
+# NETDEF= def=AMIGA_TCP def=AMITCP="2"
+# NETLIB= lib=lib:netnb.lib
+# .END
+
+# .IF $(NETTYPE) == AMITCP
+NETDEF= def=AMIGA_TCP def=AMITCP=3
+NETLIB= lib=lib:netnb.lib
+# .END
+
+# ---------------- Now for the real, the Mud stuff ----------------------
+
+# Chose one of these mallocs:
+#
+# Satoria's malloc, tries to prevent fragmentation.
+# Uses little memory. With FAST_FIT, it is also one of the fastest.
+# Required for garbage collection.
+
+MALLOC=smalloc
+
+# Use the standard malloc on your system.
+# MALLOC=sysmalloc
+
+# Set MUD_LIB to the directory which contains the mud data.
+
+MUD_LIB = mudlib:
+
+#
+# Set BINDIR to the directory where you want to install the executables.
+
+BINDIR = mudbin:
+
+# Profiling is mostly useless for us.
+#   PROFIL= -DOPCPROF -DVERBOSE_OPCPROF
+#     would enable the profiling of the virtual stackmachine.
+
+PROFIL=
+
+# Debugging options: [-DDEBUG] [-DYYDEBUG|-DYYDEBUG=1] [-DTRACE_CODE]
+# Defining DEBUG enables run time debugging. It will use more time and space.
+# When the flag is changed, be sure to recompile everything.
+# Simply comment out this line if not wanted.
+# If you change anything in the source, you are strongly encouraged to have
+# DEBUG defined.
+# If you will not change anything, you are still encouraged to have
+# it defined, if you want to locate any game driver bugs.
+
+DEBUG= def=DEBUG def=TRACE_CODE Debug=symbolflush
+
+# Extra object files and libraries.
+
+
+XOBJ = hosts/amiga/signal.o hosts/amiga/signal_rr.o\
+hosts/amiga/socket.o hosts/amiga/amiga.o alloca.o ixfile.o
+XSRC =	hosts/amiga/signal.c hosts/amiga/signal_rr.c\
+hosts/amiga/socket.c hosts/amiga/amiga.c alloca.c
+
+LIBS= $(NETLIB) lib=lib:scmffpnb.lib
+
+# ----------------------- The Rules -------------------------------------
+
+MPATH=def=MUD_LIB="\"$(MUD_LIB)\"" def=BINDIR="\"$(BINDIR)\""
+LDFLAGS= afp Data=FAR Code=FAR link
+DEFINES= $(DEBUG) $(PROFIL) def=MALLOC_$(MALLOC) $(MPATH) $(NETDEF)
+CFLAGS= $(CCOPTS) $(DEFINES)
+YFLAGS= -d
+
+SRC=lex.c main.c interpret.c simulate.c object.c backend.c array.c\
+    comm.c ed.c regexp.c mapping.c wiz_list.c swap.c $(MALLOC).c\
+    call_out.c otable.c dumpstat.c stralloc.c hash.c port.c\
+    access_check.c parse_old.c parse.c prolang.y rxcache.c\
+    simul_efun.c sprintf.c gcollect.c closure.c random.c \
+    efuns.c $(XSRC)
+OBJ=lang.o lex.o main.o interpret.o simulate.o object.o backend.o array.o\
+comm.o ed.o regexp.o mapping.o wiz_list.o swap.o $(MALLOC).o\
+call_out.o otable.o dumpstat.o stralloc.o hash.o port.o\
+access_check.o parse_old.o parse.o simul_efun.o sprintf.o\
+rxcache.o efuns.o gcollect.o closure.o random.o $(XOBJ)
+
+driver: $(OBJ)
+	$(CC) $(LDFLAGS) $(LIBS) $(OBJ) to=$@
+
+# Utils and auto installation are not supported
+# install: driver
+#	 install csrc=$? $(BINDIR)/parse
+#
+# install.utils:
+#	 (cd util; $(MAKE) $(MFLAGS) install)
+#
+# utils:
+#	  (cd util; $(MAKE) $(MFLAGS))
+
+parse: driver
+	+-$(MV) parse parse.old
+	$(CP) driver parse
+
+clean:
+	-$(RMF) *.o *.a lang.c lang.h lang.y instrs.h efun_defs.c y.output
+	-$(RMF) make_func.c make_func driver PlayMud
+
+tags: $(SRC)
+	ctags $(SRC)
+
+TAGS: $(SRC)
+	etags $(SRC)
+
+make_func.c: make_func.y
+	$(YACC) $(YFLAGS) make_func.y
+	-$(RM) make_func.c
+	$(MV) $(YTAB).c make_func.c
+
+make_func: make_func.o hash.o ixfile.o alloca.o exec.h
+	$(CC) $(LDFLAGS) alloca.o make_func.o hash.o ixfile.o to=make_func $(LIBS)
+
+# was:	./make_func > efun_defs.c
+# Byacc will warn a 'shift/reduce' conflict.
+# This is a known wart in the C-grammar.
+#
+# lang.y efun_defs.c instrs.h: 
+#  Separate rule deleted to avoid double compiling with SAS/C
+#  Always after an Compiler-Error smake starts right here and 
+#  so compiles lang.c, interpret.c and lex.c :-(, so I changed it.
+#  inserted right here (and so changed the dependencies !)
+
+lang.c lang.h: func_spec make_func prolang.y config.h
+	-$(RMF) efun_defs.c
+	-$(RMF) lang.y
+	-$(RMF) instrs.h
+	make_func 
+	$(YACC) $(YFLAGS) -v lang.y
+	-$(RMF) lang.c
+	-$(RMF) lang.h
+	$(MV) $(YTAB).c lang.c
+	$(MV) $(YTAB).h lang.h
+
+$(MALLOC).o: $(MALLOC).c driver.h config.h machine.h port.h
+	-$(RMF) smalloc.o
+	-$(RMF) sysmalloc.o
+	$(CC) $(CFLAGS) csrc=$(MALLOC).c
+
+#--------------------------------------------------------
+# Dependencies, manual and automatic.
+
+array.o : instrs.h lang.h
+
+closure.o : instrs.h lang.h
+
+dumpstat.o : instrs.h lang.h
+
+gcollect.o : instrs.h lang.h
+
+interpret.o : instrs.h lang.h
+
+lang.o : driver.h config.h machine.h lex.h interpret.h object.h \
+    instrs.h port.h switch.h stralloc.h
+
+lex.o : instrs.h lang.h efun_defs.c
+
+simul_efun.o : instrs.h lang.h
+
+simulate.o : instrs.h
+
+sprintf.o : instrs.h
+
+#--------------------------------------------------------------------
+# Rules for extra object files.
+#
+#   PlayMud  : a simple client to access the running mud.
+#   netclean : removes all object files containing communication-specific code.
+#   osclean  : removes all object files which contain OS-specific code.
+#   amiga.o  : some amiga specific routines.
+#   signal.o : timers and interruption. It uses interrupt code and therefore
+#	       needs fully registered args.
+#   socket.o : includes the appropriate socket-code.
+
+PlayMud: hosts/amiga/mudmsgs.h
+PlayMud: hosts/amiga/PlayMud.c
+	$(CC) $< to=$@
+
+netclean:
+	-$(RM) access_check.o comm.o main.o swap.o socket.o amiga.o
+
+osclean:
+	-$(RM) $(XOBJ)
+	-$(RM) backend.o interpret.o object.o otable.o simulate.o stralloc.o
+	-$(RM) PlayMud driver
+
+amiga.o : hosts/amiga/amiga.c
+	$(CC) $(CFLAGS) idir=hosts/amiga csrc=$< to=$@
+
+ixfile.o: hosts/amiga/ixfile.c
+   $(CC) $(CFLAGS) idir=hosts/amiga csrc=$< to=$@
+
+signal.o : hosts/amiga/signal.c
+	$(CC) $(CFLAGS) idir=hosts/amiga csrc=$< to=$@
+
+signal_rr.o : hosts/amiga/signal_rr.c
+	$(CC) $(CFLAGS) $(ROPT) idir=hosts/amiga csrc=$< to=$@
+
+socket.o : hosts/amiga/socket.c
+	$(CC) $(CFLAGS) idir=hosts/amiga csrc=$< to=$@
+

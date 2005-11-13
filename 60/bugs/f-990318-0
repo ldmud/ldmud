@@ -1,0 +1,17 @@
+Short: Better management of objects
+From: Padreic and Lars
+Date: 990318
+Type: Feature
+State: Acknowledged
+
+look_for_objs_to_swap() suffers from the unstructured way objects
+are kept: in a linear list. For large muds, scanning the list becomes
+a time consuming event.
+
+Objects should be kept in two sorted tables of lists: the first
+table is sorted by .next_reset, the second by .time_since_ref. Every
+table entry collects all objects within the given granularity
+(RESET_GRANULARITY, min(time_to_swap, time_to_swap_vars)).
+
+Reset table: after an object was reset, it can be removed from
+the table until its RESET_STATE is cleared?
