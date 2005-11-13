@@ -1,0 +1,58 @@
+Short: Inline-Closures with runtime arguments
+From: d-chat
+Date: 2002-05-28 (actually one year earlier)
+Type: Feature
+State: New
+
+[d-chat:Alfe@Tubmud] nee, im ernst mal mateese: die smiley-notation fuer
+  closures hat noch einen grossen nachteil: man kann keine werte in eine
+  solche closure reinnehmen, die zur laufzeit erst bekannt werden.  dafuer
+  muss man dann doch immer wieder lambdas bauen.  kannst du daran nicht mal
+  was aendern?
+[d-chat:Alfe@Tubmud] beispiel: closure adder(int x) { return (: $1 + x :); }
+[d-chat:Dan@GueldenLand] Das was Alfe will geht prinzipiell nicht weil
+  Inlines zur Compilezeit uebersetzt werden, wie alle anderen lfuns auch.
+[d-chat:Alfe@Tubmud] und ugh@tubmud meinte sofort, als er die smiley-notation
+  gesehen hat, die sei ja nicht rekursiv einsetzbar (also eine closure, die
+  eine closure liefert), weil dann innen drin nicht klar sei, auf welchen
+  scope sich ein $1 usw. bezoege.
+[d-chat:Mateese@OSB-aquarius] closure adder (int i) { return lambda(({'x}),
+  ({ (: $1 + $2 :), 'x, i }) ); }
+[d-chat:Alfe@Tubmud] das liefert ja ne closure, die dann erst noch ne closure
+  liefern wuerde, die nen int liefert.  das will ich auch nicht.  ich will
+  nur ein smiley-equivalent fuer
+[d-chat:Alfe@Tubmud] closure adder (int i) { return lambda(({'x}),({ #'+,'x,i
+  })); }
+[d-chat:Perle@Tubmud] wenn man argumentnamen festlegt, ist man doch genau
+  wieder bei lambda.
+[d-chat:Alfe@Tubmud] ugh schlug was in der art vor: (: a,b,c; a+b+c :)
+[d-chat:Alfe@Tubmud] also namen vergeben statt $1 usw.
+[d-chat:Alfe@Tubmud] (waere ja ohnehin schoener)(
+[d-chat:Dan@GueldenLand] Alfe, denk doch mal drueber nach was Du willst: Du
+  willst eine Closure auf einen *Clon einer LFUN*. Wie soll das ins Konzept
+  passen?
+[d-chat:Alfe@Tubmud] wenn man das dann noch mit der version von
+  python-lambdas kombiniert, dann koennte man auch closure adder(int i) {
+  return (: a,b=i; a+b :); }  schreiben und haette dadurch auch noch mein
+  erstes problem erschlagen.
+[d-chat:Alfe@Tubmud] oh, dan, glaub mir, ich weiss, wovon ich rede, ich weiss
+  das es geht und dass es ins konzept passt.  es ist nur nicht so trivial
+  umzusetzen, da geb ich dir recht.
+[d-chat:Dan@GueldenLand] Man muesste die Inlines teileweise neu
+  implementieren (das allerdings wuerde ich unterstuetzen ;)
+[d-chat:Perle@Tubmud] mixing declarations with initializations considered
+  harmful.
+[d-chat:Alfe@Tubmud] perle, du schwarzmaler ;-)
+[d-chat:Mateese@OSB-aquarius] Perle, huh?
+[d-chat:Alfe@Tubmud] ich haette auch nichts dagegen, wenn smiley-notierte
+  closures keine lfun-closure, sondern eine lambda-closure wuerden (wohl
+  zwangslaeufig, wenn laufzeit-werte reingebracht werden sollen).
+[d-chat:Dan@GueldenLand] das meine ich mit nicht ins Konzept passen (und ich
+  bin auch dafuer dass sie wie lambdas gehandhabt werden, aber dann muesste
+  man die zur Laufzeit uebersetzen...)
+[d-chat:Alfe@Tubmud] nein, dan, das nicht, man muesste ihnen nur argument
+  versteckt uebergeben koennen.  der code kann zur compile-zeit gebaut
+  werden.
+[d-chat:Dan@GueldenLand] du kannst ne lambda closure bauen die die argumente
+  weitergibt + ein paar versteckte ;) das geht alles mit nem macro wenn Du
+  Glueck hast ;)

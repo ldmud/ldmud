@@ -1,0 +1,8 @@
+Short: Ordered Arrays
+From: Lars
+Date: 2002-02-03
+Type: Feature
+State: New
+ 
+Add an 'ordered' flag to arrays to avoid frequent ordering. Indexed
+assignments unset the flag.
