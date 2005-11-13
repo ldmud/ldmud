@@ -1,0 +1,9 @@
+SYNOPSIS
+	int query_imp_port(void)
+
+DESCRIPTION
+	Returns the port number that is used for the inter mud
+	protocol.
+
+SEE ALSO
+	send_imp(E), receive_imp(M)
