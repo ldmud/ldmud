@@ -1,0 +1,6 @@
+SYNOPSIS
+	float tan(float)
+
+DESCRIPTION
+	Returns the tangent of the argument.
+

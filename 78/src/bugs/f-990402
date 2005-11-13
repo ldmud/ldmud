@@ -1,0 +1,51 @@
+Subject: New efun: int *to_intarr(string|int)
+From: Matthew Julius <julius.2@wright.edu>
+Date: Fri, 02 Apr 1999 14:11:34 -0500
+Type: Feature
+State: Unclassified
+
+I was a little annoyed by the inability to explode a string into characters
+(not one char long strings) without using an (int*) typecast.  Such a thing
+as (string)(int *)"foo" is impossible as closures.  Moreover, the closest
+equivalent to (int *)"foo" is something like the following,
+
+  ({ #'map_array, ({ #'explode, "foo", "" }), #'[, 0 })
+
+This is a little less than ideal, I think.
+If there's an easier way of doing this please let me know...
+
+If I'm not mistaken, however, and what I came up with is the optimal
+solution at this time, then perhaps it may not be unwise to create an efun
+for the (int*) typecast.  Something like,
+
+  int *to_intarr(string)
+
+I was trying to think of other uses for this efun and could only think up
+the added ability to explode an integer into an array of 1's and 0's (in
+binary) as appropriate--LSB first; possibly trailing 0's omitted.  With this
+behavior, and a small patch to to_int() to accept (int*), the following
+would hold true, (int)(int *)11 == 11, and to_int(to_intarr(11)) == 11.
+A non integer value in the array would cause a 'bad arg 1 to to_intarr()'
+error, I guess.  Or perhaps some other more descriptive error.
+
+What to_int(int *) would do is represented by the pseudocode.
+
+  index = 0, result = 0
+  foreach(value in <int *>)
+    result |= (value << index++)
+
+Any array of integers of any size and containing any number would work
+with this logic.  Such as,
+  to_int(({ 5, 7, 83, 1, 0, 1, 170800 }) == 10931567
+
+
+Not terribly important really, but some food for thought at least.  I'll
+probably consider making these as simul efuns for the time being, however.
+I'd patch the driver myself but I'd probably end up doing more harm than
+good, teehee.
+
+--
+Matthew Julius                     o_o
+                                  ( _ )
+julius.2@wright.edu              ( | | )
+
