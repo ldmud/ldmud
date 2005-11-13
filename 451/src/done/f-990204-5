@@ -1,0 +1,9 @@
+Short: Change notify_fail() for livings
+From: Daniel von Dincklage <vondincklage@usa.net>
+Date: Fri, 19 Jun 1998 13:17:34 +0200
+Type: Feature
+State: Done - implemented in 3.2.7-dev.126
+See also: p-990204-1
+
+- Let the notify-fail be evaluated for living objects, too.
+

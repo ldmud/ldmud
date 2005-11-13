@@ -1,0 +1,39 @@
+Short: bug in order_alist()
+Type: Bug
+State: Abandoned - no longer reported.
+From: Christian Mudra <c_mudra@informatik.uni-kl.de>
+Date: Wed, 2 Dec 1998 10:22:52 +0100
+
+Ach ja, eines faellt mir grad noch ein. Es gibt noch einen Bug, der
+sehr unregelmaessig auftritt (mal 1x pro Woche, andermal 2 Monate nicht)
+und nicht gezielt reproduzierbar ist. Er tritt bei uns immer mal im
+event-server auf, und zwar bei folgendem Code:
+
+  mixed *ev_prios;
+  closure *ev_calls;
+  int i,j,n;
+
+  ev_prios = allocate(n);
+  ev_calls = allocate(n);
+  for (i=j=0; i<sizeof(prios); i++) {
+    n = sizeof(prios[i]);
+    ev_prios[j..j+n-1] = prios[i];
+    ev_calls[j..j+n-1] = callbacks[i];
+    j += n;
+  }
+  ev_prios = order_alist(ev_prios,ev_calls);
+
+ev_prios und ev_calls sollten ja gleich lang sein. Leider sind sie das
+nach der for()-Schleife nicht immer. Der darauffolgende Crash in order_alist()
+[bad data array 1 in call to order_alist] scheint ja mit dem
+September-Release von LDMud behoben zu sein, zumindest hab ich da was von
+einer Aenderung bei order_alist() gelesen. Dennoch bleibt bleibt ein
+ungutes Gefuehl. Ich habe auch versucht, das mal mitzuloggen (if-Abfragen
+ueber die sizeof(ev_*)), aber dann wird das System derart instabil, dass der
+kleinste Event es zum Crash bringen kann (was eigentlich nicht sein sollte).
+Unter SunOS 4.1.3 ist er _viel_ seltener als unter Linux (libc 5.4.33);
+ist vielleicht ein System-Problem, je nachdem, welches allocate() benutzt
+wird? Das mal noch fuer die far-away-to-do-liste.
+
+One object to trigger the bug is ~foslay/obj/dino.c. See bugs/order_alist
+for a log and the object files.

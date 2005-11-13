@@ -1,0 +1,19 @@
+SYNOPSIS
+        int copy_file(string from, string to)
+
+DESCRIPTION
+        The efun copy_file() will copy the file <from> to the new name <to>.
+        If <to> exists and is a directory, then <from> will be placed in that
+        directory and keep its original name.
+        
+        You must have read permission for <from> and write permission for
+        the target file to copy the file.
+        
+        On successfull completion copy_file() will return 0. If any error
+        occurs, 1 is returned, or a runtime is generated.
+
+EXAMPLE
+        copy_file("/players/wizard/obj.c", "/players/wizard/newobj.c");
+
+SEE ALSO
+        mkdir(E), rmdir(E), rm(E), rename(E)

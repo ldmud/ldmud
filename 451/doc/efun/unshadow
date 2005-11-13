@@ -1,0 +1,9 @@
+SYNOPSIS
+        void unshadow(void)
+
+DESCRIPTION
+        The calling object stops shadowing any other object.
+        If the calling object is being shadowed, that is also stopped.
+
+SEE ALSO
+        shadow(E), query_shadowing(E)
