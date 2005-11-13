@@ -1,0 +1,595 @@
+Im Gegensatz zu meiner ersten Aussage ergab naemlich ein Check, dass gewisse
+grundlegende Mudlibfiles von Tub noch parse_command() benutzen, und die wollen
+erstmal umgeschrieben werden ... ansonsten buggt jeder look-Befehl.
+
+
+Dann noch ein paar Anmerkungen zum letzten Treiberpaket
+- Bei der clonep()-manpage ist noch ein Fehler drin. Durch die
+  unterschiedlichen Treiber-Modi bedingt, muesste das Beispiel genaugenommen
+  so heissen:
+
+  #if __COMPAT_MODE__
+
+    o = clone_object("std/thing");
+    write(clonep(o));                   --> writes "std/thing"
+
+  #else  // __NATIVE_MODE__
+
+    o = clone_object("/std/thing");
+    write(clonep(o));                   --> writes "/std/thing"
+
+  #endif
+
+  Man beachte den Unterschied mit '/' am Anfang bzw. eben nicht. Aehnliches
+  ist in noch mehr manpages zu finden.
+
+
+varargs int LIB_STRINGS->difference(string s1, string s2,
+                                            int less_than);
+          If the third argument is omited then the difference between
+          the two string is returned. If the third argument is given
+          then the return value is boolean and says whether the number
+          of differences is smaller than the third argument (this can
+          be cheaper than the first version).
+          The "difference" between two strings is the number of changes
+          which has to be done to the first string to make both equal.
+          A "change" in this meaning can be one of this:
+          - insert any one letter
+          - remove any one letter
+          - exchange two neighbour letters
+        NOTE
+        difference() is a rather costy function and should not be called
+        too often. Additionally, it is likely to raise a too-long-evalua-
+        tion error if the strings are too long.
+
+==> Alfe is looking into it.
+
+string LIB_STRINGS->upper_case(string str);
+          This function is the opposite of the efun lower_case().
+          It will convert all characters in str to upper case, and
+          return the new string. If str is 0 then 0 is returned.
+
+==> Yup
+
+
+varargs string LIB_STRINGS->quote_string(string s,
+                                                 status for_symbol);
+          This function returns the given string with quoted special
+          characters. For a string containing a newline character
+          it will return a string containing a backslash followed by
+          an 'n' at the place of the newline in the original.
+          For symbols (if the second argument is true) spaces are
+          treated as special, for strings (second argument is 0)
+          doublequotes are.
+          For both special are the characters described in "strings".
+          Characters below 32 (space) and above 126 (~) are represented
+          as "\xhh" wherein HH stands for a hex number.
+
+string LIB_STRINGS->unquote_string(string s);
+          This function is the opposite to quote_string(), it replaces
+          all quoted characters by their special meaning. It understands
+          the normal special characters described in "strings" and the
+          octal notation "\OOO" (OOO is an octal number of at most three
+          digits) and the hex notation "\xHH" (HH is a hex number of at
+          most two digits, capitalization does not matter).
+          Of course with unquote_string() also strings which contains
+          the notation of quoted symbols can be unquoted. No flag is
+          necessary though.
+
+==> Better as part of 'save/restore value' package?
+
+
+SYNOPSIS
+        varargs mixed apply_function(mixed func, mixed arg, ...);
+
+DESCRIPTION
+        apply_function() is a version of apply() which additionally to
+        closures can call lfuns in objects.
+
+        func can take the following forms:
+        - closure (then the behaviour is the same as of apply())
+        - a string (then this is interpreted as a function name in the
+          calling object and the function is called via call_other())
+        - array where the first element is an object or a file name of
+          an object, the second element is a function name and the
+          remaining elements (if any) are passed to the lfun as
+          arguments via call_other().
+
+        Any other form of func results in no call to any function and
+        func is returned as result.
+
+        If a function is called then all additional arguments given to
+        apply_function() are passed to this function. If the last argument
+        to apply_function() was an array then all its elements are passed
+        as arguments to the function.
+
+SEE ALSO
+        apply(E), call_other(E)
+
+==> Better implement the 'args...' expansion?
+
+
+#if 0 ==> Some look quite special to me
+
+SYNOPSIS
+        mixed *merge_array(mixed *arr);
+        mixed *split_array(mixed *arr,int mod);
+        varargs mixed *flatten_array(mixed *m,status recursive);
+        mixed *turn_array(mixed *arr);
+        mixed *shuffle_array(mixed *arr);
+        varargs int find_element(mixed m,closure c,int i,mixed extra);
+        varargs int find_last_element(mixed m,closure c,int i,mixed extra);
+        varargs mixed find_extreme(mixed *m,closure c,mixed extra);
+        varargs mixed find_map_extreme(mixed *m,closure_map,closure c,
+                                       mixed extra);
+        varargs mixed *sort_map_array(mixed *arr,
+                                      (closure map |
+                                       string map_lfun,object map_ob),
+                                      (closure sort |
+                                       string sort_lfun,object sort_ob)
+                                      [,extra_args]);
+
+        obsolete:
+        mixed *exclude_element(mixed *arr,int index);
+
+DESCRIPTION
+        A collection of useful simul_efuns concerning arrays are described
+        here.
+
+        mixed *exclude_element(mixed *arr,int index);
+          is obsolete;
+          use arr[index..index]=({}) to erase one element from an array now.
+
+        mixed *merge_array(mixed *arr);
+          gets an array of arrays and merges then into each other:
+          merge_array(({ ({ 1,2,3 }),({ 4,5,6 }),({ 7,8,9 }) }))
+          ==> ({ 1,4,7,2,5,8,3,6,9 })
+
+        mixed *split_array(mixed *arr,int mod);
+          splits an array into an array of arrays using mod to determine
+          how many arrays the result shall contain:
+          split_array(({ 1,2,3,4,5,6,7,8 }),4)
+          ==> ({ ({ 1,5 }),({ 2,6 }),({ 3,7 }),({ 4,8 }) })
+
+          If the number of elements in arr is not dividable by mod, the
+          _first_ N elements of arr are left away, so that sizeof(arr)-N
+          is dividable by mod:
+          split_array(({ 1,2,3,4,5,6,7,8,9,10 }),4)
+          ==> ({ ({ 3,7 }),({ 4,8 }),({ 5,9 }),({ 6,10 }) })
+
+          This behaviour is sometimes a problem, sometimes it comes in
+          quite handy. If it does not fit your task, you could add
+          allocate(mod-1-(sizeof(arr)-1)%mod) to the array to make its
+          number of elements be a multiple of mod.
+
+        object *object_array(string *arr);
+          loads all object that are given as filenames in arr and returns
+          the array of objects.
+
+        varargs mixed *flatten_array(mixed *m,status recursive);
+          flattens any array, if recursive is != 0 even recursive:
+          flatten_array(({ 1,({ 2,3,({ 4 }),5 }),({ ({ ({ 6 }),7,8 }) }) }))
+          ==> ({ 1,2,3,({ 4 }),5,({ ({ 6 }),7,8 }) })
+          flatten_array(({ 1,({ 2,3,({ 4 }),5 }),({ ({ ({ 6 }),7,8 }) }) }),1)
+          ==> ({ 1,2,3,4,5,6,7,8 })
+
+        mixed *turn_array(mixed *arr);
+          turns the contents of the array (changes it indeed!) and returns
+          it:
+          int *a;
+          a = ({ 1,2,3,4 });
+          b = turn_array(a);
+          return ({ a,b });
+          ==> ({ ({ 4,3,2,1 }),({ 4,3,2,1 }) })
+
+          If you want to keep the old array unchanged, use [0..] to copy
+          the array before you give it to turn_array():
+          a = ({ 1,2,3,4 });
+          b = turn_array(a[0..]);
+          return ({ a,b });
+          ==> ({ ({ 1,2,3,4 }),({ 4,3,2,1 }) })
+
+        mixed *shuffle_array(mixed *arr);
+          shuffles the array randomly and returns the result:
+          shuffle_array(({ 1,2,3,4 }))
+          ==> ({ 4,1,3,2 })  (when I tested)
+
+        shuffle_array() and turn_array() also work for strings.
+
+        varargs int find_element(mixed m,closure c,int i,mixed extra);
+          returns the index of the first element which's index is greater
+          than or equal to i, for which the closure, applied to it with the
+          given extra-arguments, returns true.
+          If it returns false for all elements with an index greater than
+          or equal to i, -1 is returned.
+
+        varargs int find_last_element(mixed m,closure c,int i,mixed extra);
+          returns the index of the last element which's index is less than
+          i, for which the closure, applied to it with the given extra-
+          arguments, returns true. If i is not given or 0, it defaults to the
+          size of the array (and all elements from the last on are checked).
+          If it returns false for all elements with an index less than i,
+          -1 is returned.
+
+        varargs mixed find_extreme(mixed *m,closure c,mixed extra);
+          applies the closure to pairs of the array (the extra arguments are
+          passed as third to last argument) and keeps the first if the closure
+          returns true, otherwise the second. If the array contains exactly
+          one element, this element is returned and the closure is never
+          applied. If the array contains no argument, an error is raised.
+          After applying the closure to all elements one time, the result
+          is returned.
+          With this function the extreme can be found. Usually #'> or #'<
+          are given as closure to find the maximum or the minimum.
+          Example:
+            find_extreme(({ 5,2,6,3,10 }),#'>) will return 10 because 10
+            is the greatest number in the given array.
+
+        varargs mixed find_map_extreme(mixed m,closure map,closure c,
+                                       mixed extra);
+          does the same as find_extreme(), but before it compares two
+          elements using the compare-closure c, it applies the map-closure
+          map to both elements. The original value (before applying the
+          map-closure) is returned.
+          Example:
+            find_map_extreme(({ "bla","bloh","blu","b" }),#'strlen,#'>)
+            will return "bloh" because "bloh" is the longest string in
+            the given array.
+
+        varargs mixed *sort_map_array(mixed *arr,
+                                      (closure map |
+                                       string map_lfun,object map_ob),
+                                      (closure sort |
+                                       string sort_lfun,object sort_ob)
+                                      [,mixed *extra_args]);
+          returns the given array in a sorted way. The array will
+          first be mapped over the given map function (here the extra
+          arguments will be applied, if given; if not given they will
+          default to the empty array; give ({ 0 }) if you want to give
+          a 0 explicitly). Then the original array (not the map
+          result!) will be sorted after the given sort function which
+          will be applied to the map result to find out which of two
+          elements of the original array is the greater one. The
+          result of this sorting will be returned. The result of the
+          map will be ignored:
+          return sort_map_array(({ ({ 5,3,2 }),({}),({ 1 }) }),
+                                (#'sizeof),(#'>));
+          /* this will return ({ ({}),({ 1 }),({ 5,3,2 }) }), namely the
+           * elements of the given array sorted after their result of
+           * the function sizeof().
+           */
+
+SEE ALSO 
+        arrays(LPC), map_array(EFUN), filter_array(EFUN)
+
+#endif
+
+SYNOPSIS
+        int count_bits(mixed flag_list);
+        mixed combine_bits(closure operator,mixed a,mixed b);
+
+DESCRIPTION
+        A collection of useful simul_efuns concerning bit fields are
+        described here. The functions all work on bit fields of the type
+        the efuns set_bit(), clear_bit() and so on are using.
+
+        int count_bits(mixed flag_list);
+          This returns the number of set bits in the given bit field.
+
+        mixed combine_bits(closure operator,mixed a,mixed b);
+          The closure shout be one of #'| , #'& and #'^ which are used
+          to express the OR, the AND and the XOR operation. See manpage
+          for operators and for closures for details.
+          The parameters a and b are two bit fields which are combined
+          using the given closure. The return value is the result of
+          this combination.
+
+==> and_bits(), or_bits(), xor_bits()
+    also: invert_bits()
+    All bit functions should allow runlength limitations:
+    a la (string a, int index, int length = 1)
+
+SEE ALSO
+        set_bit(E), clear_bit(E), test_bit(E)
+
+
+SYNOPSIS
+	varargs object *caller_stack(status include_interactive)
+
+DESCRIPTION
+	Returns an array of the previous_object()s who caused the
+	call_other() to this_object(). 
+	previous_object(i) equals caller_stack()[i].
+	
+	If you pass the optional argument include_interactive (as true value)
+	this_interactive(), if existing is appended to the array.
+
+EXAMPLE
+	interactive object A enters a command which causes 
+	a call to a function in object B, that one calls a 
+	function in object C and that, in turn, in object D
+
+	If D now calls caller_stack() the result would be: ({C,B}).
+	If it calls caller_stack(1) the result is: ({C,B,A}).
+
+SEE ALSO
+	caller_stack_depth(E), previous_object(E), this_interactive(E),
+	call_other(E)
+
+==> Yup.
+
+
+
+
+SYNOPSIS
+        varargs mixed fold_left(closure c,mixed *a,mixed d);
+        varargs mixed fold_right(closure c,mixed *a,mixed d);
+
+          or
+
+        varargs mixed fold_left(closure c,string s,mixed d);
+        varargs mixed fold_right(closure c,string s,mixed d);
+
+DESCRIPTION
+        fold_left() and fold_right() receive an array as input and return
+        a value that is computed by combining a start value (which can be
+        given as third element or defaults to 0 otherwise) with an element
+        of the array, computing an intermediate value which is combined
+        with the next element (computing another intermediate value) and
+        so on. When all elements are used, the last computed value is the
+        result. The examples may make this clearer :-)
+
+        The closure given as first argument will describe how each two
+        values are combined, of course. (That means that this closure must
+        expect exactly two values and return the next value.)
+
+        With fold_left() and fold_right() the sum of a list of integers can
+        easily be computed, for example.
+
+        fold_left() takes the elements from the leftmost (the first) to
+        the rightmost (list last) element of the array, and fold_right()
+        uses the opposite order.
+
+NOTE
+        If the given array is empty, the start value given as third argument
+        (or 0 if none was given) is returned as result.
+
+EXAMPLES
+        return fold_left(#'+,({ 1,2,3,4,5,6 }));
+        /* return (((((0+1)+2)+3)+4)+5)+6;
+         * This will return 21. The 0 added to the 1 in the innermost
+         * parantheses results from the omitted third parameter to
+         * fold_left().
+         */
+
+        return fold_right(#'+,({ "Hel","lo, ","wo","rld!" }),"");
+        /* return "Hel"+("lo, "+("wo"+("rld!"+"")));
+         * This will return "Hello, world!" of course.
+         * To use implode(({ "Hel","lo, ","wo","rld!" }),"") instead is
+         * cheaper though.
+         */
+
+        return fold_left(#'+,"<w`","");
+        /* return '<' +  ('w' + ('`' + ""));
+         * Because characters in LPC are ints, in the innermost paranthesis
+         * an int is added to an empty string. The ascii-value of the back-
+         * tick (`) is 96, so the result of the innermost parantheses will
+         * be the string "96" (if an int is added to a string, the int is
+         * converted to a string which will contain its decimal representa-
+         * tion). Then 119 ('w') will be prepended to this string and final-
+         * ly 60 ('<'). The result will be "6011996" which is my phone num-
+         * ber ;-)
+         */
+
+        mixed max(mixed a,mixed b) { return a>b? a : b; }
+        return fold_left(#'max,({ 7,2,5 }),4);
+        /* return max(max(max(4,7),2),5);
+         * This will return the maximum of the array but at least 4.
+         * The simul_efun find_extreme() would fit better for this task
+         * though.
+         */
+
+SEE ALSO
+        implode(), find_extreme(), arrays, strings
+
+==> Cute
+
+
+SYNOPSIS
+        varargs mapping factorize(mixed *tokens,closure f,mixed *args);
+
+DESCRIPTION
+        The simul_efuns collected here are thought to help when creating
+        output that contains lists of anything (e.g. items).
+
+        varargs mapping factorize(mixed *tokens,closure f,mixed *args);
+          This function receives an array of things (strings, objects, ...),
+          a closure that is applied to each of the elements of the array
+          and omittable extra arguments for the closure. It returns a
+          mapping which's keys are the results of the calls to the closure
+          and which's values are arrays of the elements of the input that
+          all gave the same result.
+
+EXAMPLES
+
+        return factorize(all_inventory(this_player()),#'creator);
+        /* returns ([ 0: ({ obj/tools/robe#1723,obj/tools/test/stack#1265 }),
+         *            "alfe": ({ players/alfe/obj/cloak#1423 }) ]).
+         * This returns a mapping of all items this_player() carries and
+         * factorizes them after their creator (using the efun creator()).
+         */
+
+==> Useful. Similar to Unique-Array. Call it m_unique?
+
+
+SYNOPSIS
+        inherit "basic/mapping";
+
+        int widthof(mapping m);
+        varargs mixed *m_values(mapping m,int i);
+        varargs mapping filter_whole_mapping(mapping m,closure f,...);
+        varargs mapping filter_whole_mapping(mapping m,string f,object o,...);
+        varargs mapping filter_whole_mapping(mapping m,string f,...);
+        varargs mapping map_whole_mapping(mapping m,closure f,....);
+        varargs mapping map_whole_mapping(mapping m,string f,object o,....);
+        varargs mapping map_whole_mapping(mapping m,string f,....);
+        varargs mapping invert_mapping(mapping m, int dimension);
+        mapping rewidth_mapping(mapping m,int new_width);
+        mapping tidy_mapping(mapping m);
+
+DESCRIPTION
+        In this basic class a couple of useful routines concerning mappings
+        are collected. The functions are described below:
+
+        int widthof(mapping m);
+          This returns the number of values each key points to (also called
+          the "width" of the mapping):
+	    widthof(([ "key1": "value1"; "value2" ])) == 2,
+	    widthof(([ "bla","blo","blu" ])) == 0.
+==> Yup
+
+        mixed *unmkmapping(mapping m);
+          This returns an array of arrays and is thought to do aproximately
+          the reverse of the efun mkmapping(). The first element of the
+          returned array is the result of the efun m_indices(m), which
+          returns an array of all keys of the given mapping, the following
+          elements are the arrays of the values corresponding to the keys:
+            unmkmapping(([ "key1": "value11";"value12",
+                           "key2": "value21";"value22" ])) ==
+            ({ ({ "key1",   "key2"    }),
+               ({ "value11","value21" }),
+               ({ "value12","value22" }) }).
+          The following equation is true for all mappings m:
+            apply(#'mkmapping,unmkmapping(m)) == m.
+==> Yup
+
+        varargs mixed *m_values(mapping m,int i);
+          This is an extended version of the efun m_values() and returns
+          an array of the i-th values of the mapping:
+            m_values(([ "key1": "value11";"value12",
+                        "key2": "value21";"value22" ]),1) ==
+            ({ "value12","value22" }).
+==> Yup, with -1 meaning: all values, returned as ({ ({}) })
+    So that unmkmapping(m) == ({ m_indices(m) }) + m_values(m, -1)
+
+        varargs mapping filter_whole_mapping(mapping m,closure f,...);
+        varargs mapping filter_whole_mapping(mapping m,string f,object o,...);
+        varargs mapping filter_whole_mapping(mapping m,string f,...);
+          This is an extended version of the efun filter_mapping(); its
+          extension lies within the fact that all values of the mapping
+          are passed to the given function, not only the keys one by one.
+          All entries for which the function returns 0 are removed from
+          the mapping.
+          If additional arguments are given (the ... in the prototypes
+          above) they are given as additional arguments to the function:
+            filter_whole_mapping(([ "key1": "value11";"value12",
+                                    "key2": "value21";"value22" ]),
+                                 #'foo,arg1,arg2) -->
+            foo("key1","value11","value12",arg1,arg2)    and
+            foo("key2","value21","value22",arg1,arg2)    are called.
+
+        varargs mapping map_whole_mapping(mapping m,closure f,....);
+        varargs mapping map_whole_mapping(mapping m,string f,object o,....);
+        varargs mapping map_whole_mapping(mapping m,string f,....);
+          Like filter_whole_mapping() above, this is an extended version
+          of an efun, in this case of the efun map_mapping(). All values
+          of each entry in the mapping are passed to the given function;
+          additional arguments (...) are appended in the calls.
+          The first value of each entry is used to keep the results of
+          the calls.
+
+==> I'd call these two map() and filter(), and let them take arrays as well.
+    filter/map(array) would then be identical to map_array/filter_array.
+    No need in having lots of efuns with long names.
+
+        varargs mapping invert_mapping(mapping m, int dimension);
+          This function returns a mapping where the keys are the former
+          values of the given mapping m. 
+          Each value v is mapped to an array of those keys of m that
+          m mapped to v.
+          If m has more dimensions then you can also choose a different
+          dimension of values to become the keys. The arrays will always
+          contain the former keys, though.
+
+==> Yup. Maybe the dimension == -1 rule as well?
+
+        mapping rewidth_mapping(mapping m,int new_width);
+          This functions creates and returns a copy of the given mapping
+          which has the given width. If the new width is greater than
+          the width of the given mapping then additional values are ap-
+          pended and initialized with 0. If the given width is less than
+          the width of the original mapping then only the first values
+          of it are used:
+            rewidth_mapping(([ "key1": "value11";"value12",
+                               "key2": "value21";"value22" ]),4) -->
+            ([ "key1": "value11";"value12";0;0,
+               "key2": "value21";"value22";0;0 ]).
+            rewidth_mapping(([ "key1": "value11";"value12",
+                               "key2": "value21";"value22" ]),1) -->
+            ([ "key1": "value11",
+               "key2": "value21" ]).
+
+==> Yup, but the name sounds odd.
+
+        mapping tidy_mapping(mapping m);
+          This function probably does nothing more than copy_mapping()
+          but is supposed to remove unwanted empty entries which waste
+          memory. You shouldn't use it since its benefit isn't proven
+          but it definitely takes time to call.
+
+SEE ALSO 
+        mappings(LPC)
+
+						written by Foslay 06/94
+
+SYNOPSIS
+	string mprintf (string fmt, mapping ins)
+
+DESCRIPTION
+	Every "%c" string in the fmt string is replaced by
+	funcall (ins['c']) in the returned string, where 'c' can be
+	any character except '%' ("%%" is replaced by "%").
+	
+EXAMPLE
+	taken from /basic/doorhandle.c:
+
+	mprintf ("%p locks the %d with %k.\n", ([ 'p' : player_name_closure,
+						  'd' : door_id_closure,
+						  'k' : key_short_closure ]));
+
+	could return "Harry locks the green door with a tiny key"
+
+SEE ALSO
+	printf(E), sprintf(E), write(E), funcall(E), closures(LPC)
+
+==> Maybe
+
+						    written by Ugh Nov-7-1996
+SYNOPSIS
+	varargs void update_actions(object ob)
+
+DESCRIPTION
+	Call this function if you want to update the actions that object 'ob'
+	defines for the livings that are 'present' to it (i.e. in its
+	environment, inventory and the environment itself).
+
+	If you omit the optional argument ob, this_object() is taken
+	as default. (This is the old semantic of update_actions() which,
+	it seems, nobody ever got around to document.)
+
+	The updating process is done as follows:
+
+	First, the object is moved into its own environment - provided it
+	has one, of course - which results in a call to ob->init() for
+	every living in the environment (plus the environment itself, if
+	it is living) with living == this_player().
+	Afterwards, all the livings in the inventory of ob are moved into 
+	ob, thus calling ob->init() for them, too.
+	The moving is done via efun::move_object().
+
+SEE ALSO
+	add_action (2EFUN), init (2LFUN), move_object (2EFUN), 
+	remove_action (2EFUN)
+
+==> Yup
+

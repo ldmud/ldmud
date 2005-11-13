@@ -1,0 +1,36 @@
+Short: modify efun implode()
+From: Matthew Julius <julius.2@wright.edu>
+Date: Fri, 08 Jan 1999 16:29:08 -0500
+Type: Feature
+State: Unclassified
+
+varargs mixed implode(mixed*|string*, closure|string, mixed)
+  The optional third argument is the value to start with if the second
+  argument is a closure.
+  For example,
+    implode(({ 1, 2, 4 }), #'|) == 7
+    implode(({ 2, 4, 7 }), #'|, 8) == 15
+    implode(({ "a", "b", "c" }), #'+, "  ") == "  abc"
+  The Timewarp mudlib has historically called this feature sum_array().
+  varargs mixed *sum_array(mixed*, closure), to be precise.
+
+alfebtcd wrote:
+
+> actually, there should be two versions.  in TubMud we call them
+> fold_left() and fold_right().  the difference is in parenthesizing:
+> 
+>   fold_left(#'-,({ 0,1,2 }),3) == (((3 - 0) - 1) - 2) == 0
+>   fold_right(#'-,({ 0,1,2 }),3) == (0 - (1 - (2 - 3))) == -2
+> 
+> since both versions make sense and are in use in TubMud, i propose to
+> implement both.  to name them something with "implode" seems not too
+> unlogical; implode() and implode_right() on the other hand seem odd in my
+> eyes.
+
+With respect to compatibility again, MudOS allows this use of implode().
+However, the ability to implode in either direction is nice... 
+
+Note that right or left doesn't matter with MudOS functionals, for example,
+(: $1 - $2 :) and (: $2 - $1 :) do not differ at all really.  However, #'-
+and lambda(({ 'a, 'b }), ({ #'-, 'b, 'a })) are two very different things.
+

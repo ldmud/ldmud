@@ -1,0 +1,15 @@
+Short: Driver hook for add_action()
+From: Matthew Julius <julius.2@wright.edu>
+Date: Fri, 08 Jan 1999 16:29:08 -0500
+Type: Feature
+State: Unclassified
+
+Driver hook to store the name of the function to call in an interactive
+object after modify_command() has been called.  This function actually
+executes the command with query_verb() defined appropriately.
+This allows the mudlib to determine whether or not to eliminate add_action().
+add_action("cmd_hook", "", 1) is no longer needed in living objects for
+those that choose not to use add_action().
+The function name could also be an unbound lambda closure I suppose, but
+I would not use this myself.
+
