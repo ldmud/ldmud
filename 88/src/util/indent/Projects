@@ -1,0 +1,24 @@
+Make it so that the line numbers indent reports are the real line
+numbers (currently it is often off by a few).
+
+Error recover should probably be enhanced.  At a minimum, "indent
+foo.c" should not overwrite foo.c when it gets an error.  Fancy error
+recover is probably not worth the effort because indent is pretty
+fast.  Stopping after the first error might be more helpful than the
+current error cascades.
+
+Also, there is a bug in that indent flags the following as illegal:
+enum bar { a = 1, b = 2 };
+
+Make the -nss option cause
+  while (foo)
+    ;
+This is the real alternative to
+  while (foo) ;
+
+Look at all the undocumented options, and determine which of them are
+bug-free enough that they should be documented.
+
+Look at termcap interface from Berkeley (and other recent enhancements
+not in 4.3-tahoe) and see whether it is worth merging those changes
+into our indent or our indent into Berkeley's.

@@ -1,0 +1,13 @@
+SYNOPSIS
+	int time()
+
+DESCRIPTION
+	Return number of seconds ellapsed since 1. Jan 1970, 0.0:0 GMT
+
+EXAMPLE
+	write(ctime(time())+"\n");
+	
+	Print out the current date and time.
+
+SEE ALSO
+	ctime(E)
