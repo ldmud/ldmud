@@ -1,0 +1,10 @@
+Short: struct{} datatype
+Date: Mon, 14 Dec 1998 11:33:40 +0100
+Type: Feature
+State: Unclassified
+
+> 2. We lack a struct/class-ish data type. This is a big win in MudOS.
+>    Essentially, a fixed-size type-checked array, with the ability to
+>    recursively reference itself, ie:
+> 
+>    struct foo { int datum; struct foo next; };

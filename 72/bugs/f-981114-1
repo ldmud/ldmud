@@ -1,0 +1,8 @@
+Short: Write driver-include files.
+Date: 981114
+State: Feature
+Long:
+
+The driver should write include files like lpctypes.h on its own; e.g. with
+a commandline option '--write-includes <dir>', <dir> interpreted relative
+to the mudlibs top directory.

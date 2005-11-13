@@ -1,0 +1,19 @@
+SYNOPSIS
+	object environment(void)
+	object environment(object obj)
+
+DESCRIPTION
+	Return the surrounding object of obj. If no argument are
+	given, it returns the surrounding of the current object.
+	
+	Destructed objects do not have an environment.
+
+EXAMPLE
+	object room;
+	room = environment(this_player());
+	
+	This will return the current room you are in.
+
+SEE ALSO
+	first_inventory(E), next_inventory(E), all_inventory(E),
+	all_environment(E)

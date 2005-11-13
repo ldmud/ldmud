@@ -1,0 +1,31 @@
+SYNOPSIS
+	string load_name()
+	string load_name(object obj)
+
+DESCRIPTION
+        If <obj> is a clone, return the load_name() of <obj>'s blueprint.
+        If <obj> is a blueprint, return the filename from which the
+        blueprint was compiled.
+        
+        For virtual objects this efun of course returns the virtual filename.
+        If <obj> is omitted, the name for the current object is returned.
+
+        In contrast to the object_name(), the load name can not be changed
+        by with rename_object(). However, if an object uses replace_programs()
+        the load name no longer reflects the actual behaviour of an object.
+
+        The returned name starts with a '/', unless the driver is running
+        in COMPAT mode.
+
+EXAMPLE
+	object o;
+	o = clone_object("/std/thing");
+	write(load_name(o));  --> writes "/std/thing" in !compat mode
+	                             and "std/thing"  in compat mode
+
+HISTORY
+	Introduced in LDMud 3.2.6.
+
+SEE ALSO
+	clone_object(E), clonep(E), object_name(E), load_object(E),
+        replace_programs(E), program_name(E)
