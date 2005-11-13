@@ -1,0 +1,260 @@
+*** access_check.c-dist	Tue Jul 09 02:42:22 1996
+--- access_check.c	Wed Nov 05 22:09:11 1997
+***************
+*** 89,94 ****
+--- 89,95 ----
+      char message[MAX_MESSAGE_LENGTH];
+      int i;
+      int32 addr, mask;
++     int j;
+  
+      for (aap = all_access_addresses; aap; aap = next_aap) {
+  	next_aap = aap->next;
+***************
+*** 107,113 ****
+--- 108,118 ----
+  
+  	addr <<= 8;
+  	mask <<= 8;
++ #ifndef _DCC
+  	if (fscanf(infp, "%9[^.:\n]%[.:]", message, message+12) != 2 ||
++ #else
++ 	if ((j=fscanf(infp, "%9[^.:]%[.:]", message, message+12)) != 2 ||
++ #endif
+  	    *message == '#')
+  	{
+  	    do {
+***************
+*** 152,166 ****
+  	    }
+  	} else if (i == 2) {
+  	    char c, c2[2];
+  
+  	    for (;;) {
+  		c = 'm';
+  		fscanf(infp, "%c %1[=]", &c, c2);
+  		switch(c) {
+  		  case 'w':
+- 		  {
+- 		    int32 *maskp;
+- 
+  		    maskp = &aap->wday_mask;
+  		    goto get_mask;
+  		  case 'h':
+--- 157,169 ----
+  	    }
+  	} else if (i == 2) {
+  	    char c, c2[2];
++ 	    int32 *maskp;
+  
+  	    for (;;) {
+  		c = 'm';
+  		fscanf(infp, "%c %1[=]", &c, c2);
+  		switch(c) {
+  		  case 'w':
+  		    maskp = &aap->wday_mask;
+  		    goto get_mask;
+  		  case 'h':
+***************
+*** 188,194 ****
+  		    *maskp = mask;
+  		    aap->wday_mask &= 0x7f; /* make sure it's not negative */
+  		    continue;
+- 		  }
+  		  default:
+  		    ungetc(c, infp);
+  		  case 'm':
+--- 191,196 ----
+*** ed.c-dist	Wed Nov 05 21:55:29 1997
+--- ed.c	Wed Nov 05 22:09:15 1997
+***************
+*** 235,256 ****
+  	int	t_and_mask;
+  	int	t_or_mask;
+  } *t, tbl[] = {
+! 	{  "number",		~FALSE,		NFLG_MASK,	},
+! 	{  "nonumber",		~NFLG_MASK,	FALSE,		},
+! 	{  "list",		~FALSE,		LFLG_MASK,	},
+! 	{  "nolist",		~LFLG_MASK,	FALSE,		},
+! 	{  "print",		~FALSE, 	PFLG_MASK,	},
+! 	{  "noprint",		~PFLG_MASK,	FALSE,		},
+! 	{  "eightbit",		~FALSE,		EIGHTBIT_MASK,	},
+! 	{  "noeightbit",	~EIGHTBIT_MASK,	FALSE,		},
+! 	{  "autoindent",	~FALSE,		AUTOINDFLG_MASK,},
+! 	{  "noautoindent",	~AUTOINDFLG_MASK, FALSE,	},
+! 	{  "excompatible",	~FALSE,		EXCOMPAT_MASK,	},
+! 	{  "noexcompatible",	~EXCOMPAT_MASK,	FALSE,		},
+! 	{  "tabindent", 	~FALSE,		TABINDENT_MASK,	},
+! 	{  "notabindent",	~TABINDENT_MASK,FALSE,		},
+! 	{  "smallnumber", 	~FALSE,		SMALLNUMBER_MASK,},
+! 	{  "nosmallnumber",	~SMALLNUMBER_MASK,FALSE,	},
+  	{  0							},
+  };
+  
+--- 235,256 ----
+  	int	t_and_mask;
+  	int	t_or_mask;
+  } *t, tbl[] = {
+! 	{  "number",		~FALSE,		NFLG_MASK	},
+! 	{  "nonumber",		~NFLG_MASK,	FALSE		},
+! 	{  "list",		~FALSE,		LFLG_MASK	},
+! 	{  "nolist",		~LFLG_MASK,	FALSE		},
+! 	{  "print",		~FALSE, 	PFLG_MASK	},
+! 	{  "noprint",		~PFLG_MASK,	FALSE		},
+! 	{  "eightbit",		~FALSE,		EIGHTBIT_MASK	},
+! 	{  "noeightbit",	~EIGHTBIT_MASK,	FALSE		},
+! 	{  "autoindent",	~FALSE,		AUTOINDFLG_MASK },
+! 	{  "noautoindent",	~AUTOINDFLG_MASK, FALSE 	},
+! 	{  "excompatible",	~FALSE,		EXCOMPAT_MASK	},
+! 	{  "noexcompatible",	~EXCOMPAT_MASK,	FALSE		},
+! 	{  "tabindent", 	~FALSE,		TABINDENT_MASK	},
+! 	{  "notabindent",	~TABINDENT_MASK,FALSE		},
+! 	{  "smallnumber", 	~FALSE,		SMALLNUMBER_MASK},
+! 	{  "nosmallnumber",	~SMALLNUMBER_MASK,FALSE 	},
+  	{  0							},
+  };
+  
+*** lex.c-dist	Wed Nov 05 21:54:59 1997
+--- lex.c	Wed Nov 05 22:09:21 1997
+***************
+*** 117,156 ****
+  static char *outp;
+  
+  static struct s_reswords reswords[] = {
+! { "break",		F_BREAK, },
+! { "case",		F_CASE, },
+! { "catch",		F_CATCH, },
+! { "closure",		F_CLOSURE_DECL, },
+! { "continue",		F_CONTINUE, },
+! { "default",		F_DEFAULT, },
+! { "do",			F_DO, },
+! { "else",		F_ELSE, },
+! { "float",		F_FLOAT_DECL, },
+! { "for",		F_FOR, },
+! { "if",			F_IF, },
+! { "inherit",		F_INHERIT, },
+! { "int",		F_INT, },
+! { "mapping",		F_MAPPING, },
+! { "mixed",		F_MIXED, },
+! { "nomask",		F_NO_MASK, },
+! { "object",		F_OBJECT, },
+  #ifdef SUPPLY_PARSE_COMMAND
+! { "parse_command",	F_PARSE_COMMAND, },
+  #endif
+! { "private",		F_PRIVATE, },
+! { "protected",		F_PROTECTED, },
+! { "public",		F_PUBLIC, },
+! { "return",		F_RETURN, },
+! { "sscanf",		F_SSCANF, },
+! { "static",		F_STATIC, },
+! { "status",		F_STATUS, },
+! { "string",		F_STRING_DECL, },
+! { "switch",		F_SWITCH, },
+! { "symbol",		F_SYMBOL_DECL, },
+! { "varargs",		F_VARARGS, },
+! { "virtual",		F_VIRTUAL, },
+! { "void",		F_VOID, },
+! { "while",		F_WHILE, },
+  };
+  
+  struct ident *ident_table[ITABLE_SIZE];
+--- 117,156 ----
+  static char *outp;
+  
+  static struct s_reswords reswords[] = {
+! { "break",		F_BREAK },
+! { "case",		F_CASE },
+! { "catch",		F_CATCH },
+! { "closure",		F_CLOSURE_DECL },
+! { "continue",		F_CONTINUE },
+! { "default",		F_DEFAULT },
+! { "do",			F_DO },
+! { "else",		F_ELSE },
+! { "float",		F_FLOAT_DECL },
+! { "for",		F_FOR },
+! { "if",			F_IF },
+! { "inherit",		F_INHERIT },
+! { "int",		F_INT },
+! { "mapping",		F_MAPPING },
+! { "mixed",		F_MIXED },
+! { "nomask",		F_NO_MASK },
+! { "object",		F_OBJECT },
+  #ifdef SUPPLY_PARSE_COMMAND
+! { "parse_command",	F_PARSE_COMMAND },
+  #endif
+! { "private",		F_PRIVATE },
+! { "protected",		F_PROTECTED },
+! { "public",		F_PUBLIC },
+! { "return",		F_RETURN },
+! { "sscanf",		F_SSCANF },
+! { "static",		F_STATIC },
+! { "status",		F_STATUS },
+! { "string",		F_STRING_DECL },
+! { "switch",		F_SWITCH },
+! { "symbol",		F_SYMBOL_DECL },
+! { "varargs",		F_VARARGS },
+! { "virtual",		F_VIRTUAL },
+! { "void",		F_VOID },
+! { "while",		F_WHILE },
+  };
+  
+  struct ident *ident_table[ITABLE_SIZE];
+***************
+*** 1892,1897 ****
+--- 1892,1900 ----
+      for(n=0; n<NELEM(instrs); n++) {
+  	struct ident *p;
+  
++ #if defined(AMIGA) && defined(_DCC) && defined(DICE30)
++ 	if (n >= NELEM(instrs)-1) continue;
++ #endif
+  	if (instrs[n].Default == -1) continue;
+  	p = make_shared_identifier(instrs[n].name, I_TYPE_GLOBAL);
+  	if (!p)
+***************
+*** 1907,1912 ****
+--- 1910,1918 ----
+      for (i=0; i<NELEM(reswords); i++) {
+          struct ident *p;
+  
++ #if defined(AMIGA) && defined(_DCC) && defined(DICE30)
++ 	if (n >= NELEM(reswords)-1) continue;
++ #endif
+          p = make_shared_identifier(reswords[i].name, I_TYPE_RESWORD);
+  	if (!p)
+  	    fatal("Out of memory\n");
+*** smalloc.c-dist	Wed Nov 05 21:54:36 1997
+--- smalloc.c	Wed Nov 05 22:09:25 1997
+***************
+*** 512,518 ****
+--- 512,522 ----
+          if (q = p->right) {
+  	    fake("two childs");
+  	    s = q;
++ #if !defined(AMIGA) || !defined(DICE30)
+  	    for ( ; r = q, q = r->left; );
++ #else 
++ 	    do { r = q; q = r->left; } while(q);
++ #endif
+  	    if (r == s) {
+  		r->left = s = p->left;
+  		s->parent = r;
+*** wiz_list.c-dist	Tue Jul 09 11:20:50 1996
+--- wiz_list.c	Wed Nov 05 22:09:27 1997
+***************
+*** 206,212 ****
+  0, /* error linue_number */
+  0, /* last_call_out */
+  0, /* int call_out_cost */
+! 0, /* quota_state */
+  };
+  
+  #ifdef MALLOC_smalloc
+--- 206,212 ----
+  0, /* error linue_number */
+  0, /* last_call_out */
+  0, /* int call_out_cost */
+! 0  /* quota_state */
+  };
+  
+  #ifdef MALLOC_smalloc
