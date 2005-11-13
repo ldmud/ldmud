@@ -1,0 +1,28 @@
+Subject: docs
+From: Christian Mudra <c_mudra@informatik.uni-kl.de>
+Date: Wed, 6 Jan 1999 21:27:07 +0100
+X-Mailer: Mutt 0.93.2i
+
+Hi Lars,
+
+schau doch mal in Tubmud
+/doc/LPC/initialisation  bzw.
+/doc/LPC/closures
+an. Das erste ist nichts weiter als ein nett formatiertes doc-File vom
+letzten Treiberpaket (fixed a typo), das zweite eine in meinen Augen
+etwas bessere Erlaeuterung von closures, nicht ganz so abstrakt wie
+die von Dir mitgelieferte. Falls Du Lust hast, uebernimm sie ruhig ...
+
+Zur Zeit waere mir wirklich an bugfixes fuer die virtual bugs gelegen,
+ich renne immer wieder darein. Und ich hab den Eindruck, dass es sogar
+noch schlimmer wird, je mehr man inherittet ...
+
+Viele Gruesse,
+
+  Coogan.
+
+----------------------------------------------------------------------------
+Christian Mudra                         Just remember what your mother
+c_mudra@informatik.uni-kl.de                   always told you:
+Universitaet Kaiserslautern        "When you open windows you let in bugs".
+

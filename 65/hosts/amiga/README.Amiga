@@ -1,0 +1,506 @@
+ adr321 - A port of Amylaar's LPMud to the Amiga
+-----------------------------------------------------------------------------
+
+adr321 is an implementation of Amylaar's variant of LPMud for the Amiga.
+To run it you need at least 2 MB RAM and two floppies, more RAM and
+a harddisk are highly recommended; a faster processor is not desperately
+needed, but _very_ useful.
+adr321 runs from shell only.
+
+adr321's main purpose is to write and test LPC code at home.
+It is able to do true net communication by using the AmiTCP package, but also
+has provisions to simulate net communication by using Amiga message ports.
+This way, multi-using the mud via serial lines is possible at least (but
+you would have to write your own clients and line watchers).
+
+
+System Requirements
+-------------------
+
+To run the mud:
+
+  2 MB RAM at least
+  Harddisk, or at least two floppies
+  optionally a faster processor
+  optionally AmiTCP 2
+
+
+To compile the mud:
+
+  at least 5 MB RAM
+  Harddisk
+  optionally a faster processor
+
+
+Installation and Usage
+----------------------
+
+  [ See also: 'Types of net communication' ]
+  [ See also the 'INSTALL' files ]
+
+To run adr321, you need the driver, a program to play mud (depending on its
+communication method) and a mudlib.
+Mudlibs are available via anonymous ftp (e.g. from ftp.imaginary.com,
+ftp.cd.chalmers.se or ftp.cs.tu-berlin.de).
+
+ - copy the appropriate driver (compat or native) to a decent place in your
+   command path.
+ - copy the mudlib into a directory, and assign 'mudlib:' to that dir.
+   Copy the additional files from the 'doc' and 'sys' directory to
+   'mudlib:doc' and 'mudlib:sys'. The include util/erq.h also goes into
+   'mudlib:sys'.
+   The access check of the driver assumes to find the file 'ACCESS.ALLOW'
+   from the distributions 'mudlib' directory in the top directory of the
+   mudlib.
+   Amylaar's driver needs more functionality in the objects 'master.c'
+   and 'simul_efun.c', so if you are using a mudlib written for an other
+   LPMud driver, you'll have merge both included files into the existing
+   ones of your mudlib.
+   In case of an unmodified 2.4.5-lib, a simple copy of the supplied
+   'master.c' and 'simul_efun.c' into the directory 'mudlib:obj' should
+   suffice.
+ - assign 'swap:' to a non-ramdisk-directory. LPMud will put its swapfile
+   there when swapping out LPC code to preserve memory.
+ - set your stacksize to at least 50K.
+   DICE offers dynamic stacks, so the stacksize set isn't that important.
+   The shell stacksize is instead used to parametrize DICE own stack code.
+   Note that the efun restore_object() eats stack like an electronic
+   cow - the larger the savefile, the more stack it needs. In cases
+   of 'stack panic' on such occasion truncate the savefile and/or give
+   the driver more stack.
+
+To start the mud, simply run the driver. When the message 'setting up ipc'
+is printed, the mud is ready for access.
+
+When running, the mud recognizes following keypresses from the console:
+  Ctrl-C: shutdown all connections and stop the program.
+  Ctrl-E: abort the current query round for input (simulated net comm. only)
+  Ctrl-F: reload the master object.
+
+To access the driver, use the program 'PlayMud' for simulated net communication
+and a vanilla 'telnet' on 'localhost 8888' for true net communication.
+
+Please note that Amylaar's gamedriver is an extension of the plain
+gamedriver (see the DONE file), so existing mudlibs will need appropriate
+patches in some places.
+Especially with version 3.1.2k a new syntax for specifying rangelimits counted
+from the end of the array is used: 'array[0..<4]' is now what 'array[0..-4]'
+was before.
+
+The driver uses an external process 'erq' to look up hostnames and start
+external programs from within the mud. For Amiga, erq support is restricted
+in that the driver can't start the erq process by itself - it has to be
+started externally, log in as 'player' and get established as erq by usage
+of the attach_erq_demon() efun.
+The 'erq' program must located in 'mudbin:', and the external utility programs
+in the directory 'mudbin:erq'
+
+
+Types of net communication
+--------------------------
+
+The driver comes in two flavours concerning the network communication: True TCP
+or Simulation. The simulation is the default mode in any driver: either the
+driver knows nothing else, or it falls back into it if the external TCP
+libraries can't be accessed. A nice sideeffect is the limitation on the number
+of different binaries.
+
+Simulated net communications:
+  Socket simulation uses the plain Exec MessagePorts, and is the default mode
+  if true TCP can't be setup.
+  It also simulates a bit hostname resolution, using a hardcoded host-
+  and domainname.
+  If you want to override that hostname, create a file 'etc:hosts'. Its first
+  line specifies the IP-Address and -Name adr321 will use, and has to look
+  like this:
+     49.34.56.93 amoeba
+  To override the hardcoded domainname, create a file 'etc:domain', and put
+  the desired domainname as first line into it.
+  'etc:' has to be assigned to a directory suitable for miscellaneous files.
+  Putting this into assign into the system startup will also make programs
+  happy which use the ixemul.library.
+  To access the driver, use the 'PlayMud' access program which is distributed
+  with the driver. PlayMud already knows the drivers default port 8888.
+  Note: Under OS-1.3, simulated net communications are the only mode available!
+
+
+True TCP:
+  This is implemented using the AmiTCP package version 2.
+  The query of the name server by the automatic 'erq' process is not yet
+  implemented, but can be retrofitted by starting the 'erq' manually.
+  OOB data handling is not supported.
+
+  If AmiTCP is properly set up, the driver will happily start up. It can then
+  accessed using any telnet on 'localhost', port 8888.
+  If AmiTCP is not running or not installed, the driver will fall back into
+  simulated net communications.
+  Note: AmiTCP needs at least OS-2.0 to run.
+
+  The drivers source has provisions for compilation for Commodore's AS225
+  package. Due to the lack of availability of the AS225 package, these
+  provisions are just there, but not supported.
+
+
+Compiling
+---------
+
+Before compiling, check the definitions in 'config.h'.
+The most important defines are:
+
+  COMPAT_MODE  : define this for a compat mode driver.
+  NATIVE_MODE  : define this for a native mode driver.
+  EUIDS        : define this for euids (default under native mode),
+  NO_XVARARGS  : define this if the support for variadic arguments is
+                 _not_ desired.
+  PORTNO       : the portnumber the driver will use (normally 8888).
+  MAX_COST     : the max allowed cost of one single LPC-program thread.
+                 True muds need about 10000000.
+  RESERVED_USER_SIZE:
+                 the amount of memory reserved for clean shutdowns.
+                 True muds should have >500K, for a simple Testmud 50K
+                 should be sufficient.
+  RESERVED_MASTER_SIZE,
+  RESERVED_SYSTEM_SIZE:
+                 additional reserved memory released to complete a shutdown.
+  MIN_MALLOCED : the initial workspace allocated on startup.
+                 True muds should have 1M, for a simple Testmud 256K
+                 should be sufficient (which is the granularity given by
+                 smallocs large chunks anyway).
+
+Where hosts/amiga/config.h as just a suggestion, you must use the hosts/amiga-
+replacements for 'machine.h' and 'Makefile'. Copy them into into the
+main directory prior to compilation.
+Check the Makefile for compiler specials:
+
+  CCFAMILY     : the family of the compiler (known so far: DICE)
+  WHATCC       : the specific compiler, for subtle differences
+                 (known so far: DICE206, DICE207, DICE30, DICE32)
+  NETTYPE      : the type of net communications. When undefined, only
+                 simulated net communications are compiled
+                 (known so far: <undefined>, AMITCP, AMITCP3, AS225)
+
+To recompile then, just start your make utility and see your new
+'driver' compile. You'll need at least 100kByte stack.
+
+The Makefile has been written for Dennis Vadura's 'DMake' (v 3.8p4), but
+should be understood by any Unix-compatible make utility (the DMake of
+DICE doesn't belong to that group!). It is the 'main' Makefile of this
+distribution - any compiler specific makefiles are just derivates.
+
+For DICE' dmake, 'DMakefile' has been derived from the original Makefile.
+As DICE' dmake offers no conditional makes, a bit more manual work is
+needed to adapt the makefile to ones configuration. See the comments
+in the 'DMakefile'.
+
+For SAS/C and its own quirky command syntax and 'smake' utility, a
+separate 'SMakefile' exists. It is a SASed derivate of the original
+Makefile. When in doubt, the 'Makefile' rules.
+
+For compilation of the LPC parser you'll need BYacc (Berkeley Yacc) - the
+GNU Yacc 'Bison' is not compatible enough.
+
+Note that compiling on a plain Amiga using DICE takes about 4 hours,
+up to 5 MB RAM (+ 1 MB temporaries) for the largest modules (interpret.c
+and lang.c), and about 1.5 MB each for the others.
+
+In the current version, the Makefile just knows DICE 2.06, 2.07 and 3.0 as
+compiler (and SAS/C by supplying a special SMakefile).
+Since DICE already implements many Unixisms on its own,
+recompilation with other compilers might need some more patches in the
+sources.
+If you add the support for a new compiler, you also have to adapt
+'machine.h' and 'Makefile'.
+
+
+Compiling with DICE 2.06/2.07/3.0:
+  DICE automatically defines AMIGA and _DCC.
+  DICE implements an alloca(), but needs special (dynamic) stack code for
+    this. Thus the compiler option -gs must be used.
+    The _fudge and _chunk parameters are specified in amiga.c
+  When compiling for OS-1.3, single precision maths can't be used.
+    Therefore all floats are either typedef'ed into doubles or compiled
+    using FFP math. If the latter is the case, scanf() can't be used.
+    Same applies when compiling for 68040 machines.
+
+  Problems in DICE not yet fixed:
+    - Interleaving of the switch() statement with other control structures
+      like blocks '{..}' won't compile in most cases.
+    - interpret.c and lang.c contain switch-statements with more than 32K code,
+      but though the compiler uses the large code model, it compiles the
+      switches using short branches. This is hacked around by compiling the
+      source into assembler code, catching the error messages from an assembly
+      attempt and patching the errorenous branches in the asm-source into jumps.
+      Currently this has to be iterated thrice for lang.c and twice for
+      interpret.c.
+      For DICE 3.0, the assembler source must not contain 'debug' statements
+      else it would return the line numbers given in these statements for the
+      errors it finds :-(. astrip takes care of this.
+    - The assembler sources of interpret.c and lang.c needs to be stripped from
+      comments to be assembled with not more than 5 MB RAM total.
+    - The implementation of sscanf()/fscanf()/scanf() does not treat whitespace
+      in charset conversions right (they are treated as termination characters).
+
+  Problems in DICE before 3.0:
+    - DICE couldn't compile the statement
+      'if (<variable_expression>, <constant>)'. Where this was used, an
+      equivalent construct using && and || has been used as replacement.
+    - DICE's preprocessor couldn't handle complex macro arithmetic.
+    - Differences of constant pointers were always folded into a zero difference.
+
+  DICE 3.0 contains several annoying features and some severe bugs:
+    - The compiler is quite picky about prototype/non-prototype conversions
+      and structure initialisation. The generated warnings confuse DMake in
+      versions below 3.8p4 such that DMake believes the compiling has failed.
+      As this was a fault of DMake, countermeasures are not supported.
+    - structs need to be defined before they are used in declarations.
+    - An extra element is added when the initializer of an array of structs
+      ends with a trailing ',', thus breaking 'sizeof(arr)/sizeof(arr[0])'
+      computations. Especially efun_defs.c/lex.c are victims of this.
+      This has been fixed in DICE 3.2.
+    - The compiler forgets to generate condition checks and branches if the
+      control expression of an if(), for(), or (do-)while() is a 'comma'
+      expression, like in 'for (; r = q, q = r->left; )'.
+      This has been fixed in DICE 3.2.
+    - The expression '(int) char_var = value' is compiled
+      as '(int)char_var, value'. Proper bracketing '(int)(char_var = value)'
+      helps as stopgap cure.
+    - structure aggregate initialisations may not end with a trailing ','.
+    The changes necessary due to these bugs are NOT part of the distributed
+    sources to keep them clean. Instead, hosts/amiga/dice30.diff contains
+    the necessary changes and has to be applied using 'patch' prior to
+    compilation. The file was meant to vanish as soon as DICE would get
+    fixed, but it's unlikely now that that is ever going to happen.
+
+
+Compiling with SAS/C 6.55:
+  SAS/C automatically defines AMIGA and __SASC.
+  The static initializer of the apply cache in interpret.c can't be compiled
+    for more than 9 APPLY_CACHE_BITS. The hosts/amiga/config.h should take
+    care of this.
+  The smake is incompatible with standard make syntax, especially with
+    conditional structures.
+  Up to version 6.54, SAS/C contains several bugs which make a successful
+    compilation more or less impossible. Manual changes to the code may
+    cause miracles in some cases.
+
+
+Porting Issues
+--------------
+
+Besides inserting a lot of #ifdef's, the following needed special care.
+
+The driver assumes Unix-style filenames. In the port all file-functions
+are forced to pipe their name arguments through a conversion routine,
+which converts them into Amiga-style filenames.
+
+The timer function alarm() had to be implemented. It was done using
+the timer.device in conjunction with special task.exception_code.
+Note that this exception code is called by the OS as interrupt code
+with arguments in registers and A4 undefined.
+
+In effect, a complete own signal handling has been implemented.
+To avoid interferences with the system supplied by the compiler - especially
+the checking for Ctrl-C - the code in amiga.c and signal.c has to overlay
+the routines supplied by the standard libraries.
+
+The crypt() function was implemented using the free BSD-crypt().
+As alternative, fcrypt() from the 'Crack' package by Alec Muffet is also
+available, but may not run on some machine-compiler combinations.
+
+The implementation of floats in the driver uses a special storage format
+of 48 bits, which is then mapped onto the compiler's double format.
+For the Amiga, the conversion from/to IEEE-double is simply done by
+ignoring the last 16 bits of the mantissa.
+
+Some compilers implement floating point math by using the OS' IEEE libraries.
+This can cause problems when compiling for OS 1.3 since that version of
+the OS don't have libraries for single precision math.
+A similar problem arises when compiling for OS 2.0/3.0 running on
+68040 machines: here the single precision libraries are broken, thus crashing
+the machine.
+So, if the compiler doesn't provide special code to handle that situation,
+the symbol _NO_OWN_FLOATS need to be defined, causing any floats to be replaced
+by doubles.
+Some of such compilers (like DICE or SAS/C) allow the replacement of float math
+by ffp math or proprietary routines. In that case leave _NO_OWN_FLOATS defined,
+but add the necessary provisions to patchfloat.h.
+
+The compiled source is modified by several of preprocessor symbols:
+
+  AMIGA :
+    Has to be defined for all the Amiga specifics.
+  _DCC, DICE206, DICE207, DICE30, DICE32 :
+    Encloses specials of the DICE compiler.
+  __SASC
+    Encloses specials of the SAS/C compiler.
+  AMIGA_TCP :
+    Activates the code for true TCP communication.
+  AMITCP :
+    Has to be defined for AmiTCP-support to the version number of the AmiTCP
+    package used for compiling. Mutual exclusive to AS225.
+  AS225 :
+    Has to be defined for AS225-support. Mutual exclusive to AMITCP.
+  _NO_OWN_FLOATS :
+    Has to be defined for compilers with no own single-precision float maths.
+
+The Makefile offers these main targets (for macros see above):
+
+  driver :
+    Compiles and links the driver (default).
+  playmud :
+    Compiles and links the 'PlayMud' program.
+  clean :
+    Removes all rebuildable files.
+  osclean :
+    Removes all files containing OS-specific code.
+  netclean :
+    Removes all files containing communication-dependend code.
+
+
+Simulated net communication
+---------------------------
+
+This simulation uses Amiga message ports: each socket is implemented by an
+own port. This makes interfacing to adr321 easy, but limits the amount of
+sockets (each socket-port allocates a task signal), and therefore disables
+'true' net communication.
+The driver opens a global messageport with the name "PORT_NUMBER" (where
+PORT_NUMBER is the value defined in config.h) and waits at this port
+for connect messages which contains the name of the port at which the client
+will accept messages from the mud.
+On arrival of a connect message, the driver will create a new messageport
+with a unique name (e.g. "parser00004") at which it will accept messages from
+the client. This name is replied with the connect message to the client.
+All further communication is then carried out between these two ports.
+Since the ports are defined by name and not by pointers, a restart of driver
+or client is safe. A shutdown of such a connection besides of the server
+is announced by sending the codesequence IAC DO TELOPT_ECHO prior to
+removal of the port.
+In contrast to the original implementation by E.v. Roode, a redefinition
+of the FD-stuff (fd_set, FD_SET() etc.) is no longer necessary.
+
+With version k the gamedriver is able to send and receive UDP packets, but
+this is not simulated.
+
+
+True TCP using AmiTCP
+---------------------
+
+Using AmiTCP is quite simple, since AmiTCP implements all those BSD-calls
+the driver uses. You just have to link in the net.lib.
+However, the gamedriver couldn't be allowed to call the AmiTCP-package
+directly since if the package isn't running or not installed, the calls need
+to be redirected to the simulating code.
+To achieve this, hosts/amiga/socket_tcp.h defines macros for all socket
+related calls which first check if the AmiTCP package could be accessed and
+then dispatch approbiately.
+
+The name server query is not (yet?) implemented, since the gamedriver uses
+fork() to spawn off a separate process doing the lookup. This means you won't
+get the ip names for incoming connections, just their numbers.
+
+For DICE, the AmiTCP support uses my own interface to the package. It is
+available on AmiNet.
+
+
+True TCP using AS225
+--------------------
+
+Contributed by Martin Brenner (Deepthought, the Nightfall Sourcerer):
+
+  True TCP communication is done via Commodore TCP/IP software AS225,
+  including 'socket.library'.
+
+  So far, TCP/IP seems to work, although certain network problems might not
+  be handled correctly by Commodore's software. I found one bug with the
+  socket function accept() not returning a correct error code when used
+  on a non-blocking socket. Name server query is not yet implemented.
+  The gamedriver uses fork() to spawn off a seperate process which does
+  the actual lookup. This means you won't get ip names, if you have your
+  Mud running on the Internet. Too Bad :-) Sending and receiving UDP
+  packets (imp) works (we have reimplemented the mudwho interface by
+  sending UDP messages from the mudlib in Nightfall).
+
+Deepthought's implementation was modified to allow the same fallback into
+simulation as the AmiTCP support does.
+
+Note: AS225/2 hasn't been published by Commodore for years, thus the
+  the gamedriver just offers the option to be compiled for it - it has not
+  been tested yet!
+
+
+PlayMud
+-------
+
+PlayMud is a simple program to access the running LPMud using simulated net
+communication. To compile it just let your make utility make 'PlayMud'.
+See 'README.PlayMud' for more informations.
+
+This distribution contains only a subset of the original PlayMud distribution.
+The complete PlayMud package is available via FTP, probably on the same servers
+carrying ready-compiled gamedrivers.
+
+
+Problems
+--------
+
+I am developing on a simple unnetworked 68030 machine, so I have just limited
+means for bug search. Detailed reports are welcome.
+
+The single precision IEEE libraries of OS 2.0/3.0 are broken for 68040 machines
+and will crash the driver if it accidentally uses them.
+
+
+Credits
+-------
+
+The simulated socket communication and the signal handling are developed
+  from the PD 'unix.lib' by Erik van Roode.
+The first implementation of true TCP using AS225 was done by Martin Brenner.
+Marge pointed out the problems of simple floats under OS 1.3.
+Reinhard 'Suamor' Katzmann ported the gamedriver to SAS/C and helped
+  remote debugging the 68040 problem.
+John Fehr <umfehr06@ccu.UManitoba.CA> contributed for 'PlayMud' the stable
+  handling of 'No Echo' as well as the SAS/C specifics in 'PlayMud'.
+bod@mtek.chalmers.se spent a good deal of encouragement.
+The AmiTCP group at hut.fi wrote the (once freeware) TCP/IP implementation
+  for Amiga.
+
+A lot of people use the port despite of all the problems arising so far.
+  Thank you!
+
+
+Copyright
+---------
+
+The sources needed to port LPmud to Amiga are copyrighted by their
+authors as mentioned in the sources or under 'Credits'.
+The rules here do not apply to the driver proper.
+
+Sources herein refers to the source code, and any executables
+created from the same source code.
+
+All rights reserved.
+Permission is granted to extend and modify the sources provided subject
+to the restriction that the sources may not be used in any way whatsoever
+for monetary gain.
+Permission is granted to use the sources as part of other programs subject
+to the restriction that the sources themselves as well as their provided
+additional functionality may not be used in any way whatsoever for
+monetary gain.
+Permission is granted to distribute the sources as "one part among many"
+of (even commercial) software collections.
+
+In short: Give credit where credit is due, and don't make money from
+sources not written by you.
+
+
+Contact
+-------
+
+  Lars Düning; EMail: duening@ibr.cs.tu-bs.de
+  Maintainer of the Amiga port up to 3.2.1@139.
+
+
+                         Share and enjoy!
+                         ----------------
