@@ -1,0 +1,144 @@
+Subject: Fehler mit __INIT() und bei virtuellen Inherits
+From: vondincklage <daniel@ozet.de>
+Date: Mon, 22 Feb 1999 17:03:52 +0100 (CET)
+Type: Patch
+State: Done - Applied.
+See also: f-990228
+
+Note: The follwing patch works, but not really as described.
+
+The complicated thing:
+Something is still wrong with the virtual inheritance, but since there is
+hardly any documentation, I can just guess how it should be.
+
+The original problem:
+
+Files a la
+
+------ c.c -----
+striing bar = "foo";
+
+------ b.c -----
+virtual inherit "c.c";
+
+------ a.c -----
+inherit "b.c";
+virtual inherit "c.c";
+
+------ d.c -----
+inherit "a.c";
+
+If d.c is cloned or loaded, the driver crashes in the __INIT(). During
+the investigation I found some strange things, but as I said above, I'm
+not completely sure if they are really wrong. But somehow I doubt it.
+
+First, the behaviour I consider correct:
+
+---- c.c ----
+string bar;
+
+void foo() {
+}
+
+---- b.c ----
+inherit "c.c";
+
+---- a.c ----
+inherit "b.c";
+virtual inherit "c.c";
+
+After compilation, a.c got two inherits: c.c and b.c, once each. b.c has
+one inherit, c.c. The variable 'bar' appears twice.
+
+Change b.c to:
+
+---- b.c ----
+virtual inherit "c.c";
+
+Suddenly a.c has 3 inherts: two copies of c.c and b.c once, and one
+variable. Furthermore the whole thing has only two functions. It seems
+contradictory to me to put two copies of c.c into a.c, especially since
+it confuses __INIT() enough to crash the driver.
+
+The following patch prohibits the addition of a virtual inherit if the
+same object already was inherit virtually. Additionally it inserts the
+__INIT() after inserting any virtual variables, else the computations
+for the inherited __INIT() are done wrong.
+
+***************
+*** 1424,1429 ****
+--- 1423,1429 ----
+   */
+                      struct object *ob;
+                      struct inherit inherit;
++                     int found;
+  %ifdef INITIALIZATION_BY___INIT
+                      int initializer;
+  %endif /* INITIALIZATION_BY___INIT */
+***************
+*** 1457,1468 ****
+                      if (ob->flags & O_APPROVED)
+                          approved_object = 1;
+                      inherit.prog = ob->prog;
+                      inherit.function_index_offset =
+                          mem_block[A_FUNCTIONS].current_size /
+                            sizeof(struct function);
+  %ifdef INITIALIZATION_BY___INIT
+                      initializer = copy_functions(ob->prog, $1[0]);
+!                     if (initializer > 0) {
+                          transfer_init_control();
+                          ins_f_byte(F_CALL_EXPLICIT_INHERITED);
+                          ins_short(mem_block[A_INHERITS].current_size /
+--- 1457,1488 ----
+                      if (ob->flags & O_APPROVED)
+                          approved_object = 1;
+                      inherit.prog = ob->prog;
++        /* Wir haben das Prog. Wenn es virtaul inherited wird, und es
++           schon einmal vritual vorhanden ist, nicht einfuegen. */
++                      found = 0;
++                     if ($1[1] & TYPE_MOD_VIRTUAL) {
++                      struct inherit *c_inh;
++                      c_inh = (struct inherit *)(mem_block[A_INHERITS].block) +
++                              mem_block[A_INHERITS].current_size;
++               for (; c_inh >= (struct inherit *)(mem_block[A_INHERITS].block) ;
++                    c_inh--) {
++                 /* $FIXME$: Is das mit dem v_i_o auch dann gegeben wenn 
++                    keine Variablen deklariert werden ? */
++                if ((c_inh->prog == inherit.prog) &&  
++                     !(c_inh->variable_index_offset & NON_VIRTUAL_OFFSET_TAG)) {
++                        found = 1;
++                       }
++                     }
++                    }
++                     if (!found) {
+                      inherit.function_index_offset =
+                          mem_block[A_FUNCTIONS].current_size /
+                            sizeof(struct function);
+  %ifdef INITIALIZATION_BY___INIT
+                      initializer = copy_functions(ob->prog, $1[0]);
+! //                    if (initializer > 0) {
+!                     copy_variables(ob->prog, $1[1]);
+!                     if (initializer > -1) {
+                          transfer_init_control();
+                          ins_f_byte(F_CALL_EXPLICIT_INHERITED);
+                          ins_short(mem_block[A_INHERITS].current_size /
+***************
+*** 1472,1478 ****
+                          ins_f_byte(F_POP_VALUE);
+                          add_new_init_jump();
+                      }
+-                     copy_variables(ob->prog, $1[1]);
+  %else  /* INITIALIZATION_BY___INIT */
+                      copy_functions(ob->prog, $1[0]);
+                      copy_variables(ob->prog, $1[1], ob->variables);
+--- 1492,1497 ----
+***************
+*** 1495,1500 ****
+--- 1514,1520 ----
+                      num_virtual_variables =
+                        mem_block[A_VIRTUAL_VAR].current_size /
+                          sizeof (struct variable);
++                     }                    
+                  }
+  optional_star: /* empty */ { $$ = 0; } | '*' { $$ = TYPE_MOD_POINTER; } ;
+  
