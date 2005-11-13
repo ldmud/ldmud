@@ -1,0 +1,17 @@
+NAME
+	dumpallobj
+
+DESCRIPTION
+	Write a list of all loaded or cloned objects into the file
+	OBJ_DUMP in the root directory of the mudlib.
+
+	Warning: this file can be very large, and if the driver is low
+	on memory there is a certain crash probability.
+
+        If the O_IS_WIZARD flag is used in the mudlib (i.e. if
+        set_is_wizard() was called), this command is allowed only for
+        users that have this flag set.
+
+SEE ALSO
+        malloc(D), status(D), memory(C), objects(C), debug_info(E),
+        set_is_wizard(E)

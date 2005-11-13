@@ -1,0 +1,49 @@
+SYNOPSIS
+	string *get_dir(string str, int mask)
+
+DESCRIPTION
+	This function takes a path as argument and returns an array of
+	file names and attributes in that directory.
+
+	The filename part of the path may contain '*' or '?' as
+	wildcards: every '*' matches an arbitrary amount of characters
+	(or just itself). Thus get_dir ("/path/*") would return an
+	array of all files in directory "/path/", or just ({ "/path/*"
+	}) if this file happens to exist.
+
+	The optional second argument mask can be used to get
+	information about the specified files.
+
+	0x00	get_dir returns an emtpy array (not very useful)
+	0x01	put the file names into the returned array.
+	0x02	put the file sizes into the returned array.
+	0x04	put the file modification dates into the returned
+		array.
+	0x20	if this mask bit is set, the result of get_dir() will
+		_not_ be sorted.
+	The values of mask can be added together.
+
+EXAMPLES
+	get_dir("/w") returns ({ "w" }) (if /w exists)
+	get_dir("/w/") and get_dir("/w/.") also both return ({ "w" })
+	get_dir("/") and get_dir("/.") return contents of directory "/".
+	get_dir(".") returns the base name of the current directory.
+	
+	get_dir("/path/*") would return an array of all files in
+	directory "/path/", or just ({ "/path/*" }) if this file
+	happens to exist.
+
+	get_dir("/", 1) is equivalent to get_dir("/")
+	get_dir("/", 2) returns an array with the sizes of the files
+	in the root directory.
+	get_dir("/", 7) returns an one-dimensional array that contains
+	for each file in the root directory its name, its size and its
+	modification date.
+
+	transpose_array(({ get_dir(str, 0x21), get_dir(str, 2),
+			   get_dir(str, 4) }));
+	This returns an array of arrays, with filename, size and
+	filetime as elements.
+
+SEE ALSO
+	cat(E), mkdir(E), rmdir(E), file_size(E)

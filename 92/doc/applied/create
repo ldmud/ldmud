@@ -1,0 +1,24 @@
+SYNOPSIS
+	void create()
+
+DESCRIPTION
+	In native mode, this function will be called only once on
+	creation of the object (this is when the object will be loaded
+	or cloned). Inside this function all major initialization can
+	be done. The current user and the previous object are
+	defined but the object has no environment.
+
+EXAMPLE
+	object cloner;
+	void create() {
+	   cloner=this_player();
+	}
+	
+	Initialize the global variable to hold the one who
+	created/cloned the object.
+
+	For 3.2.1, the mudlib may be programmed to call other lfuns
+	than create() on an objects creation.
+	
+SEE ALSO
+	reset(A), init(A), __INIT(A), initialisation(LPC), hooks(C), native(C)
