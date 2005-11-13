@@ -1,0 +1,25 @@
+SYNOPSIS
+	string query_verb(void)
+
+DESCRIPTION
+	Give the name of the current command, or 0 if not executing
+	from a command. This allows add_action() of several commands
+	to the same function. query_verb() returns 0 when invoked by a
+	function which was started by a call_out or the heart beat.
+	Also when a user logs in query_verb() returns 0.
+
+EXAMPLE
+	void init() {
+	   ...
+	   add_action("sing","sing");
+	   ...
+	}
+	int sing(string str) {
+	   write("Your command was:"+query_verb()+(str ? str : "")+"\n");
+	   return 1;
+	}
+	
+	When ever you type "sing ..." you get "Your command was: sing ...".
+
+SEE ALSO
+	add_action(E)

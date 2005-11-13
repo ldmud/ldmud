@@ -1,0 +1,15 @@
+SYNOPSIS
+	int to_int(string)
+	int to_int(float)
+	int to_int(int)
+
+DESCRIPTION
+	Floats are truncated to integer values, strings with leadings
+	digits are converted to integers up to the first non-digit.
+	Integers are just returned.
+
+HISTORY
+	Introduced in 3.2.1@2
+
+SEE ALSO
+	to_string(E), sscanf(E)

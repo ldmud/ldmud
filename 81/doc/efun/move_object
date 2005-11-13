@@ -1,0 +1,22 @@
+SYNOPSIS
+	void move_object(mixed item, mixed dest)
+
+	item->move(object dest, string methods)
+
+DESCRIPTION
+	The item, which can be a file_name or an object, is moved into
+	it's new environment dest, which can also be file_name or an
+	object.	
+
+	In native mode, the only object that can be moved with
+	move_object() is the calling object itself. This function is
+	only used to implement an appropriate lfun, traditionally
+	called move(). To actually move an object in native mode, use
+	its lfun instead, usually by inheriting standard objects.
+	This way the moved object has full control over its movement.
+
+	Since 3.2.1, the innards of move_object() are implemented in
+	the mudlib, using the M_MOVE_OBJECT driver hooks.
+
+SEE ALSO
+	remove(A), init(A), transfer(E), native(C), hooks(C), efun308(E)

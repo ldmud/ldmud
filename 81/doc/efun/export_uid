@@ -1,0 +1,15 @@
+SYNOPSIS
+	void export_uid(object ob)
+
+DESCRIPTION
+	Set the uid of object ob to the current object's effective uid.
+	It is only possible when object ob has an effective uid of 0.
+
+	Uids are not available in compat mode, or when the GD was
+	compiled to not use EUIDS.
+
+HISTORY
+	Since 3.2.1@47, this efun is availabe only when using euids.
+
+SEE ALSO
+	seteuid(E), getuid(E), geteuid(E), uids(C), native(C)
