@@ -1,0 +1,43 @@
+Short: new efun query_micros()
+From: Tatu P Saloranta <doomdark@cc.hut.fi>
+Date: Fri, 18 Dec 1998 14:47:26 +0200 (EET)
+Type: Feature
+State: Unclassified
+
+I just compiled LDMud, and noticed there were actually few other efuns
+I had hacked into Amylaar GD... Some aren't probably useful for anyone
+else out there, but others might be. Although I don't want to add yet
+another dozen of esoteric efuns to GD, I think it'd be good to discuss
+about possible useful new additions anyway. So, here's my list:
+
+- query_micros(); for performance optimizations I wrote a simple efun
+  that returns a microsecond-resolution counter. It is of course affected
+  by all kinds of overhead from OS scheduling to whatnot, but in any case
+  it makes performance optimizations easier:
+
+  #ifdef F_QUERY_MICROS
+    CASE(F_QUERY_MICROS);
+    {
+	int i;
+	struct timeval tv;
+	gettimeofday(&tv, 0);
+	i = tv.tv_usec % 1000000;
+	push_number(i);
+	break;
+    }
+  #endif
+
+From: ak853@cleveland.Freenet.Edu (Eric Blade) and Doomdark
+Date: Fri, 8 Jan 1999 01:45:54 -0500 (EST)
+
+Reply to message from doomdark@cc.hut.fi of Fri, 18 Dec
+
+>- query_micros(); for performance optimizations I wrote a simple efun
+>  that returns a microsecond-resolution counter. It is of course affected
+>  by all kinds of overhead from OS scheduling to whatnot, but in any case
+>  it makes performance optimizations easier:
+    
+  If time() returned to the millisecond or microsecond resolution, that
+would be more than sufficient.  I remember that Genocide had to add in a
+hack so that time could be reported in hundredths of seconds... 
+
