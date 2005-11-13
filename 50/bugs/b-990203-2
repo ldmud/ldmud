@@ -1,0 +1,12 @@
+Subject: Virtual inherited variables
+From: Coogan@Tubmud
+Date: Fri, 15 Jan 1999 17:52:23 +0000
+Type: Bug
+State: Acknowledged
+
+> Coogan@TubMud tells you: weil virtual von Treiber zu Treiber immer schlechter
+   funktioniert. Mit 3.2.5 fast gar nicht mehr - wir haben unser Playerobject
+   umstellen muessen, weil variablen, die ueber virtual inherittete files
+   definiert sind, nicht richtig gespeichert
+Coogan@TubMud tells you: werden.
+

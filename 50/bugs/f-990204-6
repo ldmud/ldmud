@@ -1,0 +1,11 @@
+Short: Persistent object names
+From: Daniel von Dincklage <vondincklage@usa.net>
+Date: Fri, 19 Jun 1998 13:17:34 +0200
+Type: Feature
+State: Unclassified
+
+- Persistent object-names. E.g. append to the clone-number the 
+  time() of driver-startup. Then all clones would have a name 
+  like /foo/bar.c#1234567.890 - Then one could write the obnames
+  in the savefiles, and could restore those dependancies on restoring. 
+

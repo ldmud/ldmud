@@ -1,0 +1,42 @@
+SYNOPSIS
+	unknown call_other(object ob, string str, mixed arg, ...)
+	ob->fun(mixed arg, ...)
+
+DESCRIPTION
+	Call a member function in another object with an argument. The
+	return value is returned from the other object. The object can
+	be given directly or via a string (i.e. its file_name). If it
+	is given by a string and the object does not exist yet, it
+	will be loaded.
+	
+	ob->fun(args) and "ob_name"->fun(args) is equivalent to
+	call_other(ob, "fun", args). Nowadays the ob_name string can
+	also be a variable.
+
+	If ob does not define a publicly accessible function of the
+	specified name, call_other() will return 0, which is
+	indistinguishable from a function returning 0.
+
+	The return type of call_other() is 'any' be default. However,
+	if your LPC code uses #pragma strict_types, the return type is
+	'unknown', and the result of call_other() must be casted to
+	the appropriate type before you can use it for anything.
+
+EXAMPLES
+	string str;
+	str = (string)this_player()->QueryProp(P_SHORT);
+	
+	You have to do explicit type casting because of the unknown
+	return type, if you have set #pragma strict_types.
+	
+	call_other("/users/luser/thing", "???", 0);
+	
+	This looks a bit weird but it was used very often to just load
+	the object by calling a not existing function like "???".
+        Fortunately nowadays there is an efun load_object() for this
+        purpose.
+
+SEE ALSO
+	function_exists(E), call_resolved(E), create(E), pragma(LPC),
+	extern_call(E)
+
