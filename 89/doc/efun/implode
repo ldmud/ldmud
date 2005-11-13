@@ -1,0 +1,16 @@
+SYNOPSIS
+	string implode(mixed *arr, string del)
+
+DESCRIPTION
+	Concatenate all strings found in array arr, with the string
+	del between each element. Only strings are used from the array.
+
+EXAMPLE
+	string str;
+	str = implode( ({"foo", "bar", ""}), "*");
+	
+	str will now look like "foo*bar*". This can be used as a
+	search&replace function of strings.
+
+SEE ALSO
+	explode(E)

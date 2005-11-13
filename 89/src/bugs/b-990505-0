@@ -1,0 +1,43 @@
+Short: Memoryleak in call_lambda()/send_erq()?
+Date: Wed, 5 May 1999 18:15:53 +0200
+From: Freaky <Freaky@UNItopia.rus.uni-stuttgart.de>
+Type: Bug
+State: Unclassified
+
+Note: Fixed by the call_lambda() change in dev.86?
+
+Hi,
+
+Ich habe hier noch ein Memory Leak, das immer wieder auftritt:
+
+Program: apps/emaild.c line:66
+^B^@^@^@<82><BA>^@^@^A^@^@^@||!^L^A^A^A^_^@`^@,^@^@^B^F
+small block 0x0a493694 closure.c 2228
+Object: apps/emaild
+
+
+(/apps/emaild.c ist in der Mudlib, die du hast)
+
+Zeile 66 rum:
+static int send_mail(int id)
+{   
+    if (file_size(MAIL_FILE(id)) > 0)
+    {   
+        pending[id,E_RESENT]++;
+        return send_erq(ERQ_EXECUTE,"mailrelay "+id+" "+pending[id,E_FROM]+
+                " "+pending[id,E_TO],lambda(({'x}),({#'callback, 'x, id})));
+    }
+    else
+        m_delete(pending,id);
+}
+
+Zeile 66 ist die Zeile:
+" "+pending[id,E_TO],lambda(({'x}),({#'callback, 'x, id})));
+
+Ciao
+		Freaky
+
+-- 
+Frank 'Freaky' Kirschner
+UNItopia Admin                          http://UNItopia.uni-stuttgart.de/
+Freaky@UNItopia.Uni-Stuttgart.DE      telnet://UNItopia.uni-stuttgart.de/

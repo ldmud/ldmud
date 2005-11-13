@@ -1,0 +1,13 @@
+SYNOPSIS
+	int typeof(mixed)
+
+DESCRIPTION
+	Returns a code for the type of the argument, as defined in
+	<sys/lpctypes.h>
+
+HISTORY
+	Introduced in 3.2@63
+
+SEE ALSO
+	get_type_info(E), intp(E), objectp(E), floatp(E), pointerp(E),
+	closurep(E), symbolp(E), stringp(E), mappingp(E)
