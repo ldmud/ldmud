@@ -1,0 +1,22 @@
+PRELIMINARY
+SYNOPSIS
+	string blueprint(object obj)
+
+DESCRIPTION
+	Return the load name of the blueprint of <obj> if <obj> is a clone,
+	else the load name of <obj> itself.
+
+	The 'load name' is the name under which the blueprint was initially
+	compiled. If a blueprint changes its file_name() with rename_object(),
+        the load name still remains the same.
+
+EXAMPLE
+	object o;
+	o = clone_object("/std/thing");
+	write(blueprint(o));  --> writes "/std/thing" in !compat mode
+	                             and "std/thing"  in compat mode
+HISTORY
+	Introduced in LDMud 3.2.6.
+
+SEE ALSO
+	file_name(E), clone_object(E), clonep(E), load_object(E)

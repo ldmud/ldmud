@@ -1,0 +1,10 @@
+Short: slow_shut_down is not used
+Date: 981209
+Type: Bug
+State: Unclassified
+
+When the driver runs out of memory, it rapidly uses
+up all reserves and then aborts. Something somehow eats
+memory fast enough to prevent slow_shut_down from being
+reached at all.
+

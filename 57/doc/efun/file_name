@@ -1,0 +1,34 @@
+SYNOPSIS
+	string file_name()
+	string file_name(object ob)
+
+DESCRIPTION
+	Get the file name of an object or if no argument is given of
+	the current object. 
+
+	For blueprints, the returned name is the filename from which
+	the object was compiled (without a trailing '.c'), for cloned
+	objects it is the name of the blueprint, extended by '#'
+	followed by a unique non-negative number.
+
+	Note that the newly introduced virtual objects and the efun
+	rename_object() may give an object a name which does not
+	conform the rules given above.
+	
+	The returned name always begins with '/' (absolute path),
+	except when the parser runs in COMPAT (-o) mode.
+
+EXAMPLES
+		find_object(file_name(ob)) == ob
+	
+	This is guaranteed to be true for all objects ob that are not
+	destructed.
+	
+		sizeof(explode(file_name(ob), "#")) == 1
+	
+	This is true if ob is a blue print (note that this is not
+	necessarily true anymore since the introduction of
+	rename_object()).
+	
+SEE ALSO
+	blueprint(E), find_object(E), rename_object(E)

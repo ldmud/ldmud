@@ -1,0 +1,205 @@
+Short: Optimisation of subtract_array()
+To: Lars Duening <lars@cableinet.co.uk>
+From: Michael Sporn <sporn@mathematik.hu-berlin.de>
+Date: Wed, 3 Mar 1999 14:19:25 +0100 (MET)
+Type: Patch
+State: Done - Applied.
+
+Hi Lars,
+
+ich hatte dir eine Optimierung fuer array.c versprochen, es betrifft 
+subtract_array(). Ich hatte gemerkt, dass array1-array2 hauptsaechlich
+mit kleinem array2 aufgerufen wird (in tubmud), z.B um zerstoerte Objekte
+aus array1 zu loeschen. In solchen Faellen war subtract_array recht
+uneffektiv. Jetzt versucht die Funktion, moeglichst viel Speicher
+wiederzuverwenden und vermeidet auch - wenn moeglich - das order_alist.
+Wenn alle optimierungen zum Tragen kommen, stieg bei mir die Geschwindigkeit 
+auf das 4-fache, im Normalfall (Subtrahend hat Groesse 1 und nichts wird 
+abgezogen) auf gut das Doppelte.
+
+Was noch zu erwaehnen waere, ist, dass subtract_array jetzt beide
+Argumente freigibt (vorher war's nur das zweite), so dass das jetzt nicht
+mehr in interpret passiert, und dass ich die globale Variable 
+subtract_array_tmp_vec herausgenommen hab.
+
+Ciao, Michael / Sunblood@Tubmud
+-- 
+Michael Sporn <sporn@mathematik.hu-berlin.de>
+
+
+diff -ur ldmud-dev42/array.c ldmud-dev/array.c
+--- ldmud-dev42/array.c	Thu Dec 10 03:37:36 1998
++++ ldmud-dev/array.c	Wed Mar  3 12:08:35 1999
+@@ -150,12 +150,6 @@
+    * swapping in an object.
+    */
+ 
+-struct vector *subtract_array_tmp_vec;  /* TODO: Remove me */
+-  /* Ordered version of the last subtrahend passed to subtract_array().
+-   * At the moment, this value is not used and could as well be
+-   * freed immediately in subtract_array().
+-   */
+-
+ char *last_insert_alist_shared_string = 0; /* TODO: Remove me */
+   /* The last key string inserted into an alist.
+    * gcollect needs to know this.
+@@ -349,6 +343,8 @@
+ {
+     struct vector *res;
+ 
++    if (p->ref == 1 && VEC_SIZE(p)==n)
++        return p;
+     res = slice_array(p, 0, n-1);
+     free_vector(p);
+     return res;
+@@ -812,19 +808,35 @@
+     return p;
+ }
+ 
++static INLINE alist_canonify(struct svalue *svp)
++{
++    if (svp->type == T_STRING) {
++        if (svp->x.string_type != STRING_SHARED) {
++            char *str = make_shared_string(svp->u.string);
++            free_string_svalue(svp);
++            svp->x.string_type = STRING_SHARED;
++            svp->u.string = str;
++        }
++    } else if (svp->type == T_OBJECT) {
++        if (svp->u.ob->flags & O_DESTRUCTED) {
++            free_object_svalue(svp);
++            svp->type = T_NUMBER;
++            svp->u.number = 0;
++        }
++    }
++}
++
+ /*-------------------------------------------------------------------------*/
+ struct vector *
+ subtract_array (struct vector *minuend, struct vector *subtrahend)
+ 
+ /* Subtract all elements in <subtrahend> from the vector <minuend>
+  * and return the resulting difference vector.
+- * <subtrahend> and <minuend> are not modified.
++ *
++ * <subtrahend> and <minuend> are freed.
+  *
+  * The function uses order_alist()/assoc() on <subtrahend> for
+  * faster operation.
+- *
+- * The ordered version of <subtrahend> is assigned to the global
+- * variable subtract_array_tmp_vec.
+  */
+ 
+ {
+@@ -838,20 +850,53 @@
+     struct vector *vtmpp;         /* {( Ordered <subtrahend> }) */
+     struct svalue *source, *dest; /* Pointers into minuend
+                                      and difference vector */
+-    mp_int i, minuend_size;
++    mp_int i, minuend_size = VEC_SIZE(minuend);
++    mp_int subtrahend_size = VEC_SIZE(subtrahend);
++
++    if (minuend_size == 0) {
++        free_vector(subtrahend);
++        return minuend;
++    } else if (subtrahend_size == 0) {
++        free_vector(subtrahend);
++        return shrink_array(minuend, minuend_size);
++    }
+ 
+     /* Order the subtrahend */
+-    ltmp.u.vec = subtrahend;
+-    vtmpp = order_alist(&ltmp, 1, 1);
+-    free_vector(subtrahend);
+-    subtrahend = vtmpp->item[0].u.vec;
+ 
+-    /* The difference can be equal to minuend in the worst case */
+-    difference = allocate_array(minuend_size = VEC_SIZE(minuend));
++    if (subtrahend_size == 1) {
++        alist_canonify( &subtrahend->item[0] );
++        vtmpp = subtrahend;
++    } else {
++        ltmp.u.vec = subtrahend;
++        vtmpp = order_alist(&ltmp, 1, 1);
++        free_vector(ltmp.u.vec);
++        subtrahend = vtmpp->item[0].u.vec;
++    }
+ 
+     /* Scan minuend and look up every element in the ordered subtrahend.
+      * If it's not there, add the element to the difference vector.
++     * If minuend is referenced only once, reuse the memory.
+      */
++
++    if (minuend->ref == 1) {
++        for (source = minuend->item, i = minuend_size ; i-- ; source++) {
++            if (source->type == T_OBJECT && source->u.ob->flags & O_DESTRUCTED)
++                assign_svalue(source, &const0);
++            if ( assoc(source, subtrahend) >-1 ) break;
++        }
++        for (dest = source++; i-->0 ; source++) {
++            if (source->type == T_OBJECT && source->u.ob->flags & O_DESTRUCTED)
++                assign_svalue(source, &const0);
++            if ( assoc(source, subtrahend) < 0 ) 
++                assign_svalue(dest++, source);
++        }
++        free_vector(vtmpp);
++        return shrink_array(minuend, dest - minuend->item);
++    }
++
++    /* The difference can be equal to minuend in the worst case */
++    difference = allocate_array(minuend_size);
++
+     for (source = minuend->item, dest = difference->item, i = minuend_size
+         ; i--
+         ; source++) {
+@@ -860,7 +905,9 @@
+         if ( assoc(source, subtrahend) < 0 )
+             assign_svalue_no_free(dest++, source);
+     }
+-    subtract_array_tmp_vec = vtmpp;
++
++    free_vector(vtmpp);
++    free_vector(minuend);
+ 
+     /* Shrink the difference vector to the needed size and return it. */
+     return shrink_array(difference, dest-difference->item);
+diff -ur ldmud-dev42/array.h ldmud-dev/array.h
+--- ldmud-dev42/array.h	Wed Dec  2 23:28:27 1998
++++ ldmud-dev/array.h	Wed Mar  3 13:49:51 1999
+@@ -69,8 +69,6 @@
+ extern struct null_vector_aggregate_struct null_vector_aggregate;
+ #define null_vector null_vector_aggregate.v
+ 
+-extern struct vector *subtract_array_tmp_vec;
+-
+ extern int num_arrays;
+ extern char *last_insert_alist_shared_string;
+ extern void (*allocate_array_error_handler) (char *, ...);
+diff -ur ldmud-dev42/interpret.c ldmud-dev/interpret.c
+--- ldmud-dev42/interpret.c	Mon Mar  1 11:53:55 1999
++++ ldmud-dev/interpret.c	Tue Mar  2 10:21:10 1999
+@@ -5392,8 +5392,8 @@
+             sp--;
+             /* subtract_array already takes care of destructed objects */
+             v = subtract_array(sp->u.vec, v);
+-            free_vector(subtract_array_tmp_vec);
+-            free_vector(sp->u.vec);
++           // free_vector(subtract_array_tmp_vec);
++           // free_vector(sp->u.vec);
+             sp->u.vec = v;
+             break;
+ #ifdef MAPPINGS
+@@ -7948,8 +7948,8 @@
+             v_old = argp->u.vec;
+             v = subtract_array(v_old, v);
+             argp->u.vec = v;
+-            free_vector(subtract_array_tmp_vec);
+-            free_vector(v_old);
++           // free_vector(subtract_array_tmp_vec);
++           // free_vector(v_old);
+             put_vector(v);
+             break;
+           }
+
+

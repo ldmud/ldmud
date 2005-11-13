@@ -1,0 +1,12 @@
+SYNOPSIS
+	mixed socket_address(int fd)
+
+DESCRIPTION
+	Returns an array holding the remote host and port (connected tcp
+	sockets) or the local host and port (listening and udp sockets).
+
+SEE_ALSO
+	sockets
+
+
+	
