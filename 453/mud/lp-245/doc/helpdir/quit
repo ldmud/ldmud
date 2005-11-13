@@ -1,0 +1,9 @@
+command: quit
+no arguments.
+
+Immediately quit the game. All objects are dropped. When you enter
+the game again next time, you always start at the village church.
+
+The stats about your character will be saved.
+
+See also 'save'.
