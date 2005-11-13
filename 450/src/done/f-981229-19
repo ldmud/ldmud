@@ -1,0 +1,26 @@
+Short: {save,restore}_variable()
+From: Dave Setty <garpoz@locallink.net>
+Date: Thu, 10 Dec 1998 02:03:04 -0500
+Type: Feature
+State: Done - implemented in 3.2.8-dev.150
+
+3) Something like the MudOS functions save_variable() and
+   restore_variable(). (I like save_value() and restore_value() better,
+   but that's just me...).  It would make the Intermud3 implementation
+   a bit less ugly, although I think there's some kinda incompatibility
+   between MudOS and Amylaar save format. I might even have code for
+   this stuff laying around someplace, if I can find it.
+
+Matthew Julius advocates:
+
+string save_value(mixed)
+  Return the string equivalent of the lpc value.  Similar to how
+  save_object() saves data.
+
+mixed restore_value(string)
+  restore_value(save_value(([ 1: ({ }), ]))) returns ([ 1: ({ }), ])
+
+I dislike the names save_variable() and restore_variable() for various
+reasons.  The two following functions are just a more thorough version of
+save_value() and restore_value() ...
+

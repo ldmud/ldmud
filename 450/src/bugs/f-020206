@@ -1,0 +1,14 @@
+Short: Use OpenSSL or sshwrapper with the driver.
+From: Lars and Freaky
+Date: 2002-02-06
+Type: Feature
+State: New
+
+OpenSSL with option TSL could be linked to the driver and provide transparent
+socket layer encryption.
+
+Alternatively, look how sshwrap implements its stuff and integrate it into the
+driver (might be simpler for starters). As client for testing you can use
+openssl: 'openssl s_client -host HOSTNAME -port PORT'.
+
+Also take a look at ssl tunnel: www.stunnel.org

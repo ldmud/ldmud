@@ -1,0 +1,174 @@
+Date:    28.09.99 07:07
+From:    sark@oberon.krans.com
+To:      lars@bearnip.com
+Short: Various bugs
+Type: Bug
+State: New
+
+These are bugs/features which exists in the LPmud Amylaar driver 03.02@316
+and 03.02.1@130 running in COMPAT MODE.
+
+--------------------------------<7>---------------------------------------
+Here are two routines. They both :
+
+    (1) declare a first variable,
+    (2) assign a second variable to the first,
+    (3) add an empty set to the second variable,
+    (4) modify the second variable and
+    (5) return the contents of the first variable.
+
+The first routine uses a mapping, the second an array e.g.
+
+    // Routine 1.
+    func_1() {
+    mapping a, b;
+
+        a =([ "a":1, "b":2, "c":3 ]);
+        b =a;
+        b+=([ ]);
+        b-=([ "b" ]);
+        return a;
+    }
+
+    // Routine 2.
+    func_2() {
+    mixed a, b;
+
+        a =({ "a", "b", "c" });
+        b =a;
+        b+=({ });
+        b-=({ "b" });
+        return a;
+    }
+
+When both were compiled and run, this were the results. The first ro
+    // Routine 2.
+
+    func_2() {
+
+    mixed a, b;
+
+
+
+        a =({ "a", "b", "c" });
+
+        b =a;
+
+        b+=({ });
+
+        b-=({ "b" });
+
+        return a;
+
+    }
+
+
+
+When both were compiled and run, this were the results. The first routine,
+func_1(), returned:
+
+    ([
+      "c": 3,
+      "a": 1,
+    ])
+
+The second routine, func_2(), returned:
+
+    ({ /* sizeof() == 3 */
+      "a",
+      "b",
+      "c"
+    })
+
+As you can see, adding an empty mapping to a mapping variable when
+using the '+=' operator, does NOT cause the mapping to be copied.
+However, using the same operator for an array does.
+
+This does not seem consistent, especially if consider that when
+you use the '+' operator instead in Routine 1 i.e.
+
+    b=b+([ ]);      instead of    b+=([ ]);
+
+the two routines behave the same i.e. the second variable copies the
+contents of the first mapping, and the original contents are unchanged.
+Thus the routine returns as you would expect:
+
+    ([
+      "c": 3,
+      "a": 1,
+      "b": 2,
+    ])
+
+Of course, modifying the '+=' operator, so that it extends a copy of the
+contents of the mapping would upset some existing MUDs, not least our own.
+It would also probably take up more processing time and memory, because you
+would have to copy the contents each time, rather than just extend them.
+
+But perhaps, this is a small price to pay for having a consistent system.
+You could also add an add_mapping() efun to extend a mapping's contents,
+without copying it. You could also add an add_array() efun to extend an
+array, without copying it.
+--------------------------------<10>---------------------------------------
+This is not a bug, but it is probably worth noting that if you try and
+overload an efun, in module which inherits another module, then inherited
+module will not use the overloaded function unless you declare a prototype
+for the function in it.
+
+For example, if you have 2 modules A and B:
+
+    // Module A
+    // File: /obj/modules/a
+
+    wake_cmd(str) {
+    object ob;
+
+        if (!str || !(ob=find_living(str)))
+            return notify_fail("Usage: wake <player>\n");
+
+        tell_object(ob, "BEEP! BEEP!\n");
+        write("Ok.\n");
+        return 1;
+    }
+
+    // Module B
+    // File: /obj/modules/b
+
+    inherit "obj/modules/a";
+
+    notify_fail(string msg) {
+        write(msg);
+    }
+
+    echo_cmd(str) {
+        if (!str)
+            return notify_fail("Usage: echo <message>\n");
+
+        say(str);
+        write("Ok.\n");
+        return 1;
+    }
+
+    init() {
+        add_action("wake_cmd", "wake");
+        add_action("echo_cmd", "echo");
+    }
+
+Now if you clone module B, and you use the WAKE command, without any
+arguments, you will get the error message:
+
+     Usage: wake <player>
+
+However when you use the ECHO command, without any arguments, you will
+get the error message:
+
+     Usage: echo <message>
+
+follow by a 'What?'
+
+In order to use the overloaded efun consistently in both modules, you
+should declare at the top of module A
+
+     void notify_fail();
+
+If notify_fail() was not an efun, however, you would not need to do this,
+and the commands, in both modules, would behave in the same way
