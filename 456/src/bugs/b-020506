@@ -1,0 +1,32 @@
+Short: Small block  statistics wrong in OSB
+Date: Mon, 06 May 2002 12:43:38 -0600
+From: Lars Duening <c-lars.duening@wcom.com>
+Type: Bug
+State: New
+Driver: 3.2.9-dev.434
+
+> malloc                                                                        
+Type                   Count      Space (bytes)                       
+          
+sbrk requests:          201           5975620 (a)                     
+large blocks:           824           5134940 (b)                     
+large net avail:                      5111868                         
+large free blocks:      369            840676 (c)                     
+large wasted:             1                 4 (d)                     
+          
+small chunks:           188           3086208 (e)                     
+small blocks:         35524           1777836 (f)                     
+small net avail:                       783164                         
+small free blocks:    16652           1301644 (g)                     
+small wasted:           233              6672 (h)                     
+unused from current chunk                  28 (i)                     
+          
+permanent blocks:       311            195224                         
+clib allocations:        10             44904                         
+          
+malloc_increment_size: calls 78543 success 1079 total 221232          
+          
+Total storage:        (b+c+d)        5975620 should equal (a)    5975620        
+Total small storage:  (f+g+h+i)      3086180 should equal (e)    3086208        
+Total storage in use: (b-g-h-i)      3826596 net available:      2808852        
+Total storage unused: (c+d+g+h+i)    2149024                          

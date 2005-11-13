@@ -1,0 +1,24 @@
+Short: References MudOS vs. Amylaar
+Date: Mon, 21 Dec 1998 20:08:04 +0200 (EET)
+Type: Feature
+State: Unclassified
+
+The MudOS way of specifying reference arguments in the function signatures
+make more sense than the Amylaar way of modifying the actual arguments.
+Beek gives a good reason:
+
+> Amylaar pass-by-reference is a real kludge, which is why it works
+> differently in MudOS: consider the fact that you can expose internal
+> modifications of function arguments by passing a reference to a
+> function that didn't expect one!  That's certainly wierd, and possibly
+> even a security problem in poorly code functions ...
+
+It can be argued if requiring the 'ref' in the function call is a good
+thing or not, but it is a reminder to the programmer.
+
+It can even be used to pass constant variables/literals for such arguments:
+
+  void foo(ref int x);
+
+  foo(5)  -> GD creates a temporary int, assigns 5 and passes it as argument
+  foo(ref 5) -> compile-time error
