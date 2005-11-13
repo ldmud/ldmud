@@ -1,0 +1,71 @@
+This files documents what is incompatible between game driver 2.4.5 and 3.0.
+
+If you find anything that is not listed here, then please mail me a note
+(lars@cd.chalmers.se)
+
+To have game driver 3.0 be (almost) compatible with game driver 2.4.5,
+you have to compile it with the symbol COMPAT_MODE defined (found in
+config.h).
+
+Changes:
+
+* The efun combine_free_list() was defined when malloc.c (no longer
+  supported nor supplied) was used. It may be called from /room/church.c
+  in the 2.4.5 mudlib. Simply remove the call !
+
+* The file /room/void.c is no longer loaded automatically used. The
+  result is that when a wizard destructs a room with players in it,
+  they will also be destructed.
+
+* reset() is called in a different way. Always when the object is
+  loaded, but then also at irregular intervals. reset() will never be called
+  just when the object is referenced (by a call_other() or move_object() as
+  in 2.4.5). reset() will be called even if noone is there. That means that
+  more memory is used.
+
+* clean_up() is a function that is called now and then (as specified
+  in config.h). The idea is that this function should destruct the object if
+  the object doesn't feel it is needed (empty rooms for example). This will
+  make the game use less memory.
+
+* The LPC compiler is more restrictive. Functions are not allowed to be
+  double defined etc.
+
+* A symbol LPC3 will always be defined, to be used by '#ifdef LPC3' in
+  LPC code. The idea is to make it possible to conditionally compile code
+  for the 2.4.5 game driver or 3.0 game driver.
+
+* A symbol COMPAT_FLAG will be defined when in compatibility mode.
+
+* New efuns: version(), member_array() ...
+
+* A lot of hardcoded tests in the game driver has been moved to a new file,
+  /obj/master.c. An example of this file is provided. It may have to be
+  edited.
+
+* A lot of new constants has to be defined correctly in config.h and Makefile.
+  However, there is a script, 'configure', that will help you configure
+  Makefile.
+
+* call_out() now saves the value from this_player(). That means that a 'write'
+  will reach the correct person when done from call_out(). The problem is
+  that say() not will reach the player that initiated the call_out().
+
+* In 2.4.5 you could move_object(this_object(), this_object()). Nothing would
+  actually be moved and no error was generated. In 3.0, an error will be
+  generated.
+
+* The usage of the escape character '\' now works as expected.
+
+* previous_object() will now change it's value when also when an object
+  call_others itself, or an implicit extern function call is made to
+  the current object.
+  To give wizards their current path instead of their home directory as a base
+  for interactive file commands, you have to change the valid_write() in
+  /obj/player .
+  The test for the home-directory based expansion for relative path names was
+  formerly :
+	if (previous_object()) {
+  It should read now :
+	if (previous_object() && previous_object() != this_object()) {
+

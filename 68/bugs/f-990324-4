@@ -1,0 +1,68 @@
+Short: Better solution for the objectlist
+Date: 990324
+From: Lars, based on suggestions of Macbeth
+Type: Feature
+State: Acknowledged
+
+The current handling of reset/cleanup/swapping is not bad, but still suffers
+from the single-linked nature of the object list:
+  - the whole list must be traversed to get rid of destructed objects
+  - swapping can take time away from reset/heartbeats.
+
+If one is willing to use a bit more memory on the list structure (skiplists
+would come in handy), these problems can be solved. A better list structure
+would allow to remove destructed objects on the spot, removing the need
+to walk the entire list all the time.
+
+During a commute home I came up with the following scenario. It's just
+food for thought, but here it goes:
+
+<ideas type="brainstorm">
+
+All objects are member in up to three lists: one list for objects with
+a heart beat, one list to organize 'events', ie. the calls to reset and
+callouts, and one list for the swapper.
+
+The heartbeat list is not sorted at all; the event list is sorted by the
+time of the next event (callout or reset, whatever is earlier); and the
+swapper list is sorted by the initial time-of-ref. This time-of-ref is
+determined once when the object is inserted into the list and stays the
+same even while the actual time-of-ref changes. This way the often
+changes of the actual time-of-ref cause no excessive overhead.
+
+During a backend cycle, the driver walks the heartbeat and event list
+in parallel, calling objects which are due. Parallel so that heartbeats
+and other events get an equal chance of execution. If this phase is
+complete and there is some time left, the swapper can do some cleanup
+and swapping.
+
+---
+
+Another idea which is a similar to the handling like it was before (but
+also assumes sorted lists):
+
+The backend has one tick time to execute the commands from the interactive
+users. This process ends when either the time runs out or when all users
+have been considered once. After this, the backend has a second tick time
+to do the pending jobs.
+
+First, the backend executes as many evens (heartbeat/callout/resets)
+as possible - at least one of each, but no longer until the time runs out.
+One might even want to process the heartbeats/callouts first, then the
+resets.
+
+If no more events are pending, the backend executes as many swaps and
+cleanups as it can - at least one, but no longer until the time runs out.
+One exception: if a garbage_collection is requested, the swapper processes
+all due objects. All objects which are pending for more than one
+swap-interval time are processed regardless of time constraints, or at
+least at higher rate.
+
+Using this scheme, interactive commands and heartbeats/callouts, and to
+a lesser degree resets, have the same chance of timely execution, while
+cleanups/swaps are preferred in times when not much else is happening. The
+'at least one' rules make sure that all objects will be processed
+eventually.
+
+<\ideas>
+

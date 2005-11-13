@@ -1,0 +1,11 @@
+Short: COMPAT+__INIT crasht TubMud
+From: Coogan
+Date: 990323
+Type: Bug
+State: Not reproducible?
+
+When the driver is compiled with COMPAT and __INIT, the parser starts to
+malfunction/crash while preloading Tubmud.
+
+The effect seems to appear only on Intel machines under Linux.
+

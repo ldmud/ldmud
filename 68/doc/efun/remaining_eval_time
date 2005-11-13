@@ -1,0 +1,28 @@
+SYNOPSIS
+        int remaining_eval_time()
+
+DESCRIPTION
+        Returns the remaining time for the current execution (the current
+        command) before an 'evaluation too long' error would occur.
+
+        It starts at a driver-given high value (__MAX_EVAL_TIME__) and
+        is reduced every two seconds.
+
+	Only available if the driver was compiled with MAX_TIME. If this
+        is the case, but the driver was started with this feature turned
+        off (the default), the macro __MAX_EVAL_TIME__ is unavailable,
+        and this efun always returns 1.
+
+HISTORY
+	Introduced in LDMud 3.2.6.
+
+BUGS
+	The whole idea of a real-time limit on evaluations is ugly ugly
+        ugly. At least it must be possible to suspend the limit
+	for certain parts of code, because the real-time behaviour
+	of LPC is very unpredictable. Better yet, a completely different
+        approach.
+
+SEE ALSO
+        get_eval_cost(E)
+
