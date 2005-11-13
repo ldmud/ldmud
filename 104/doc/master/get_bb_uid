@@ -1,0 +1,20 @@
+SYNOPSIS
+	string get_bb_uid(void)
+
+DESCRIPTION
+	Is called to get the ``backbone id''. Objects whose creator is
+	the backbone id are ``trusted'', and will automagically get
+	the uid and euid of the object that caused to load or clone
+	them.
+
+	The backbone id is also temporary given to objects while being
+	called via process_string().
+
+        If strict-euids, this function must exist and return a string.
+
+HISTORY
+	Since 3.2.1, get_bb_uid() is needed just for process_string()
+	if no this_object() is present.
+
+SEE ALSO
+	uids(C), creator_file(M), creator(E), get_root_id(M)

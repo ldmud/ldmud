@@ -1,0 +1,33 @@
+SYNOPSIS
+        #include <sys/debug_info.h>
+        
+        mixed debug_info(int flag, object obj)
+
+DESCRIPTION
+        Print out some driver internal debug information according
+        to the setting of flag:
+
+        DINFO_OBJECT (0): Information like heart_beat, enable_commands
+        etc. of the specified object will be printed, and 0 returned.
+
+        DINFO_MEMORY (1): Memory usage information like how many strings,
+        variables, inherited files, object size etc. will be printed
+        about the specified object, and 0 returned.
+
+        DINFO_OBJLIST (2): Objects from the global object list are
+        returned.  If the optional second arg is omitted, the first
+        element (numbered 0) is returned. If the second arg is a
+        number n, the n'th element of the object list returned. If the
+        second arg is an object, it's successor in the object list is
+        returned.
+
+        DINFO_MALLOC (3): Equivalent to typing ``malloc'' at the command
+        line. No second arg must be given. Returns 0.
+
+        DINFO_STATUS (4): Equivalent to typing 'status' at the command
+        line. The required second arg can be 0, "tables", "swap", or any
+        other argument accepted by the 'status' command.
+        Returns 1 if a valid argument was given, 0 otherwise.
+
+SEE ALSO
+        trace(E), traceprefix(E), malloc(D), status(D), dumpallobj(D)

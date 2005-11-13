@@ -1,0 +1,16 @@
+Short: call_out returns ID number
+From: Daniel Sloan <sloand@alphalink.com.au>
+Date: Fri, 23 Apr 1999 17:09:55 +0000
+Type: Feature
+State: Unclassified
+
+I'd like to be able to do a call out and have it return an ID value.  This is
+an idea shamelessly ripped off from the CD driver ;-)  Essentially, you remove
+the need to do find_call_out(<string-value-to-search-for>), and change it to
+query_call_out(<numerical-id>) or something, which is more efficient to
+use...of course, the efficiency increase depends on how you implement the
+search system and the call outs to work with it.  The old string-search system
+could be emulated very easily.  Just a thought - it might not even be
+beneficial.
+
+This might even be used in parallel to the old search-by-name system.

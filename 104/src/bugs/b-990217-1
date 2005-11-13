@@ -1,0 +1,12 @@
+Subject: virtual implementation
+From: Michael Sporn <sporn@mathematik.hu-berlin.de>
+Date: Wed, 17 Feb 1999 21:56:37 +0100 (MET)
+Type: Bug
+State: Acknowledged.
+See also: p-990217.
+
+Eine Sache, die man vielleicht ins Auge fassen kann ist, die inherit
+liste ein wenig sauberer zu machen (vielleicht alle extra virtual zuerst
+und die dann auch nicht mehr als einmal). Man koennte den lookup zur
+Laufzeit optimieren und f_inherit_list() verbessern (die gibt naemlich
+auch die extra inherits aus).

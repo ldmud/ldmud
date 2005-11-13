@@ -1,0 +1,17 @@
+SYNOPSIS
+	int to_int(string)
+	int to_int(float)
+	int to_int(int)
+        int to_int(closure)
+
+DESCRIPTION
+	Floats are truncated to integer values, strings with leadings
+	digits are converted to integers up to the first non-digit.
+        lfun-closures are converted into their function index.
+	Integers are just returned.
+
+HISTORY
+	Introduced in 3.2.1@2
+
+SEE ALSO
+	to_string(E), sscanf(E)

@@ -1,0 +1,14 @@
+Short: Warning 'comparison always zero'
+Date: 981110
+Type: Bug
+State: Fixed
+Author: lars
+Long:
+
+When compiling under Linux, the above mentioned warnings occur, but
+only if compiling with optimization and if svalue.type and svalue.x
+share the same longword in memory. Assigning one of the two fields
+to a local variable fixes the problem.
+
+I suspect a compiler error and noted it in C_COMPILER_BUGS.
+

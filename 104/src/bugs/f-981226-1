@@ -1,0 +1,173 @@
+Short: TCP Support
+Type: Feature
+State: Unclassified
+From: Marcus Meissner <marcus@jet.franken.de>
+From: Lars
+Date: Tue, 22 Dec 1998 11:57:41 +0100 (MET)
+
+Ich meine damit, erstmal genau ueberlegen, wie die API aussehen soll
+und nicht einfach die UNIX socket* functions nachbilden, sonder etwas
+LPC bezogenes basteln.
+
+Ich hab mal drueber nachgedacht, einige Punkte, die wir beachten muessen:
+
+- Wir muessen immer nonblocking arbeiten.
+  -> Writes muessen wir wohl im Driver buffern, weil das zu kompliziert fuer
+     LPC Benutzer ist.
+  -> Reads sollten als Callbacks durchgegeben werden.
+  -> accept/connect Behandlung braucht extra callbacks.
+
+- Kein neuer LPC Variablentyp, das wuerde nur den Driver komplizieren.
+
+Soweit ich mit Gedanken gekommen bin:
+- Sockets werden in LPC spezifiziert durch die lokale Portnummer (die ist
+  fuer TCP unique auf dem Rechner, nur wird der Portnummer Adressraum von UDP
+  ueberlappt...Sprich, man muesste UDP anders behandeln. Und UNIX Domain
+  sockets, und IPX ... )
+- Wer darf write ausfuehren? Nur der Master, der dann evt. dieses Privileg
+  per closure/functionptr weitergibt? Oder sollten wir nen Socket an ein Objekt
+  binden?
+-> Generell Privileg Vergabe abklaeren.
+
+Insgesamt hatte ich ungefaehre folgende API im Kopf entwickelt erstmal,
+die noch einige unklare Stellen hat:
+
+# Macht socket/bind/listen/ socket-> select auf readability
+tcp_accept(int localport,closure _accept_fun); // eventuell hostmask ?
+
+# Wenn der accept socket readable wird ... accept und dann diese Funktion
+# aufrufen.
+_accept_fun(int localportnr,string remotehost,int remoteport) {
+	/* Problem: Wir muessen dem GD jetzt irgendwie sagen, wem dieser
+	 * socket gehoert und wo er readcallbacks aufrufen soll
+	 */
+}
+
+# write(2) ... Mit buffering im driver. Schreibt immer soviel wie angegeben aus
+# LPC sicht, wirft NICHTS weg.
+void tcp_write(localport,int*|string);
+
+# close(2) ... sollte den rest des obigen writebuffers leeren und dann erst
+# den socket schliessen. Bzw. das durch evt. zusaetzliches Flag machen.
+void tcp_close(localport);
+
+# socket(2)/(connect(2) nonblocking). Ruft _connect_fun auf, wenn select(2)
+# Schreibbarkeit oder Lesbarkeit signalisiert.
+void tcp_connect(string remotehost,int remoteport,closure _connect_fun);
+
+# bei readable/writeable connect aufgerufen. (remotehost/remoteport evt.
+# unnoetig)
+_connect_fun(int localportnr,string remotehost,int remoteport) {
+	/* sollte irgendwie jetzt auch dem GD sagen, wem der Socket gehoert
+	 * und wo er readcallbacks aufrufen soll
+	 */
+}
+
+Dass Problem ist jetzt das spezifizieren von readcallbacks. Evt. kann man
+die closure als returnwert von _connect_fun oder _accept_fun zurueckgeben,
+oder noch eine API function verwenden, wie zB
+
+tcp_bind(int localportnr,closure _socket_callback);
+
+_socket_callback(int localport,int type,mixed stuff) {
+	/*type: SOCKET_READ
+	 *   stuff enthaelt entweder int* oder string (je nach intelligenter
+	 *   binary detection.
+	 *type: SOCKET_ERROR
+	 *   hmm
+	 *type: SOCKET_CLOSE
+	 *   hmm
+	 */
+}
+
+Ueber besonders das letztere bin ich mir noch nicht ganz klar.
+
+Vielleiocht sollte ich mir auch erstmal die MudOS implementation ansehen, bevor
+ich mir NIH vorwerfen lasse :)
+
+And lars wrote:
+
+> Sprich, es spricht kaum was gegen ans Objekte binden.
+> Ausser, wie genau man das nun machen sollte.
+
+Driverintern relativ einfach, da mit der interactive-sentence die
+notwendige Basisarchitektur vorhanden ist.
+
+> Problem gibts wohl nur bei den leidigen Referencecounter.
+
+?
+
+> > > # write(2) ... Mit buffering im driver. Schreibt immer soviel wie
+> > > # angegeben aus LPC sicht, wirft NICHTS weg.
+> > > void tcp_write(localport,int*|string);
+> >
+> > Das wuerde ich socket_write() nennen, und zumindest einen Fehlercode
+> > zurueckgeben lassen. Prinzipiell koennte der Socket ja auch ein UDP-
+> > oder sonstwas Socket sein, 'tcp_' waere dann irrefuehrend.
+>
+> Hmm. Dann sollte man aber mit mehr als localport arbeiten, weil sich
+> die portnummerraeume von TCP und UDP ueberschneiden.
+> Oder man nimmt als Unique ID einen string mit "tcp:nr" oder "udp:nr".
+
+Wenn ich mich nicht taeusche, kann jeder Port zu einer Zeit nur zu einem
+Socket und Protokoll gehoeren. Evtl. ist es sogar moeglich, ueber einen
+Socket/Port gleichzeitig TCP und UDP zu machen (habs noch nie probiert
+und die TCP/IP-Buecher sind in der Bibliothek) - oder iaW: TCP und UDP
+sind keine Namensraeume an sich.
+
+Eine Unique-ID eruebrigt sich, da der Socket durch das Objekt definiert
+ist. Funktionen wie socket_write() wuerden dann entweder ein
+Socketobjekt als erstes Argument erwarten, oder nur funktionieren wenn
+this_object() ein Socketobject ist.
+
+query_mud_port(socket_object) wuerde die Portnummer liefern,
+query_socket_type(socket_object) das Protokoll ("tcp", "udp", oder
+"player" fuer normale Playerobjekte), query(_once)_interactive() koennte
+sowas wie 'tcp:4242' zurueckgeben. Fuer die Remoteadressen hats bereits
+query_ip_name(), man koennte da noch query_ip_port() hinzufuegen.
+
+Ich schreib jetzt mal Funktionsideen auf wie sie mir gerade einfallen
+(oder in deiner vorigen Mail stehen). Wenn nicht anders gesagt, setzen
+die Funktionen voraus, dass this_object() das betroffene socketobjekt
+ist.
+
+void net_bind(int portno, string protocol)
+  erzeugt einen Socket fuer Port <portno> (0 fuer 'any') und <protocol>
+  ("udp", "tcp",...) und bindet ihn an this_object().
+
+void net_accept(object obj, mixed extra...)
+void net_accept(int portno, object obj, mixed extra...)
+  Akzeptiert eine TCP-Verbindung, bindet sie an <obj> und ruft
+  <obj>::_accepted(mixed extra...) auf. In der zweiten Form fuehrt
+  accept() erstmal ein bind(portno, "tcp") wenn this_object kein
+  socketobject ist, bzw. wirft einen Fehler wenn die Portnummer des
+  gebundenen Sockets nicht mit <portno> uebereinstimmt.
+
+void net_connect(string remotehost,int remoteport, mixed extra...);
+void net_connect(int portno, string remotehost,int remoteport, mixed
+extra...);
+  Versucht eine Verbindung mit der gegebenen Adresse herzustellen.
+  Klappt das, wird this_object::_connected(mixed extra...) aufgerufen.
+  Ist this_object noch kein Socketobjekt, wird vorher noch ein
+  bind(any, "tcp") ausgefuehrt etc.
+
+void net_write(string|int* data)
+  Schreibt <data> auf den Socket.
+
+void net_read(int amount, mixed extra...)
+  Liest den naechsten Block Daten, max. amount bytes, vom Socket und
+  ruft this_object::_read(int* data, mixed extra...) auf.
+
+void net_close(bool noflush)
+  Schliesst den Socket, optional ohne die noch anhaengigen Daten
+  wegzuschreiben.
+
+Es braeuchte dann noch einen Fehlercallback, der asynchrone Fehler
+meldet:
+
+void _error(int(string?) type, int errcode, mixed additional...)
+  wobei <type> zwischen connect, accept, read und unexpected close
+  (z.B. durch destruct des Socketobjektes) unterscheidet.
+
+Synchrone Fehler in der Ausfuehrung der efuns selber erzeugen ganz
+normale runtime errors.
