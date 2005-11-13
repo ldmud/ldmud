@@ -1,0 +1,37 @@
+Subject: Driverbug - to_int()
+From: Lars Duening <duening@ibr.cs.tu-bs.de>
+Date: Tue, 22 Sep 1998 15:40:41 +0200 (MET DST)
+
+Heya!
+
+mixed x;
+x=1.0;
+to_int(x*1);    -> bug
+to_int(x+1);    -> ok
+to_int(1.0*1);  -> ok
+
+naja, dieser 'fehler' lohnt sich wohl kaum zum rausmachen, aber ich schick
+trotzdem mal die mail, wie versprochen ;)
+                                                            Zora
+
+
+	Lars
+
+
+--------------------------------------------------------------------------------
+
+Subject: Driverbug 2
+From: Lars Duning <lduning@mdisystems.com>
+Reply-To: <lars@cableinet.co.uk>
+Date: Tue, 22 Sep 1998 16:37:44 +0100
+Organization: MDi Systems
+X-Mailer: Mozilla 4.04 [en] (Win95; I)
+
+- #pragma strong_types for the to_int() problem.
+- mapping_contains(&x, &y, &z, ..., ([ key:val1;val2;val3;... }]), key)
+  returns garbage in x.
+  This only for
+   - mappings with 3 or more data elements per key
+   - mapping literals which are not assigned to a variable
+     (i.e. mapping_contains(&x, &y, &z, m=([...])...) works )
+

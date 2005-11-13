@@ -1,0 +1,197 @@
+This file lists all changes made to the game driver in all gory detail.
+See the file HISTORY for a user-oriented summary of all the changes.
+
+23-Sep-1998 (Lars Duening) -- Release 3.2.4
+    - (simulate.c) load_object() The code cleaning up the filename did
+        not check if an object with the 'sane' filename already exists.
+        This lead to duplicate entries in the object table and thus
+        fatal driver aborts. Furthermore, the code carelessly modified
+        the string passed, causing disruptions in the shared string
+        table.
+    - (doc/efun/terminal_colour, doc/efun/query_mud_port) added.
+
+22-Sep-1998 (Lars Duening)
+    - (filestat.*) Oops, the one statistic necessary to detect multiple
+        uses of a file in one command was missing. Corrected that.
+
+21-Sep-1998 (Lars Duening) -- Release 3.2.3
+    - (array.c) Changed order_alist() to use Standard conformant pointer
+        arithmetics.
+    - (backend) Added the statistic 'total_player_commands'.
+    - (filestat.*) Statistics module counting the number and type of
+        file usages (read, write, delete, read for compilation, read
+        for inclusion, read for restore_object, write for save_object).
+        The statistic is enabled by defining FILE_STAT in config.h.
+        The statistic is appended to the file /FILESTAT when the
+        special command 'status files' is given.
+    - (access_check.c, backend.c, comm1.c, dumpstat.c, main.c, gcollect.c,
+       lex.c, main.c, object.c, simulate.c, various Makefiles)
+         Adapted for filestat.
+    - (main.c) Beautified the --options output.
+    - (swap.*, main.c) New commandline option '--swap-compact' to put
+         the swapper in the "compact mode". In this mode, free space in
+         the swapfile is reused immediately; in contrast to the default
+         mode in which the reuse is determined by low/high watermarks.
+
+20-Sep-1998 (Lars Duening)
+    - (interpret.c) F_MAPPING_CONTAINS returned destructed objects since
+        it didn't check the results of get_map_lvalue() properly (thanks,
+        Fiona and Zora!).
+    - (backend.c) Reallocation of the heartbeat array now conforms more
+        to the standard.
+
+14-Sep-1998 (Lars Duening) -- Release 3.2.2
+    - (array.c) One statement was at the wrong place in order_alist(), 
+        causing a malfunction in explode().
+    - (closure.c) store_case_labels(): another crasher removed, this
+        time two loops assumed that the variables local to their body
+        keep their values between two iterations.
+    - (interpret.c) As in closure.c, loop body variables are moved
+        outside their loops if they are meant to be persistant.
+    - (interpret.c) A misplaced cast broke sscanf().
+    - (backend.*, hash.*) Beautified and commented.
+    - (main.*) Marked the boolean commandline parameters as such.
+         The gamedriver announces itself as 'LDMud'.
+    - (patchlevel.h) Changed version number from 03.02.1@<patchlevel>
+        to 3.2.<patchlevel> (note the missing leading zeroes!).
+    - (CHANGELOG) renamed from CHANGELOG.OSB.
+    - (HISTORY) new file for a user-oriented summary of the changes.
+    
+10-Sep-1998 (Lars Duening)
+    - (alloca.c) Beautified.
+    - (simulate.c) load_object: Extended the sanity checks for filenames
+        a bit: multiple '/' are collapsed into just one (thanks for the
+        idea, Zora!).
+
+05-Sep-1998 (Lars Duening)
+    - (main.c) Oops, small typo in options() (thanks, Woody!).
+        And the short command options are now case sensitive as they
+        should be.
+    - (closure.c) Omission of a seemlingly harmless cast caused
+        the driver to core when compiling a switch. Unfortunately, my
+        simple test_master.c didn't catch this. *sigh* We need a proper
+        testsuite...
+    - (ed.c, interpret.c, lex.c, mapping.c, parse.c, prolang.y, sprintf.c)
+        Checked for and corrected similar casts.
+    - (swap.c) Re-added Macbeth's watermark handling for the reusage
+        of free-space, though for now it's deactivated .
+    - (*.c, *.y) Added some parentheses as suggested by gcc to make the
+        code clearer.
+    - (comm.*, interpret.c) Replace the define MESSAGE_FLUSH by the
+        variable message_flush, keeping gcc happier.
+    - (prolang.y) Bugfix from mubo@silicondream: If a program defined
+        __INIT() but didn't implement it, later inheriting of this
+        program crashed the driver.
+    - (port.h, interpret.*, prolang.*, stralloc.*) New macro LOCAL_INLINE
+        for compilers which can inline a function locally while at the
+        same time offering it for external linkage.
+
+02-Sep-1998 (Lars Duening)
+    - (array.*) Commented and converted function defs to STD-C style.
+    - (array.c) Small improvements to unique_array() (boy, that code
+        is really old!).
+    - (main.c) Some warnings about unused variables prevented.
+
+18-Aug-1998 (Lars Duening)
+    - (datatypes.h) New include file declaring all commonly used
+        datatypes of the virtual machine (svalue, vector, etc).
+        interpret.h keeps the interpreter related declarations only.
+        This also unclutters the struct svalue/smalloc.h relationship
+        a bit.
+
+17-Aug-1998 (Lars Duening)
+    - (main.c) --options prints all the compilation options, --version
+        just the version. --help shortened to just list all commandline
+        options, --longhelp prints an elaborate description of these.
+
+16-Aug-1998 (Lars Duening)
+    - (access_check.*) Commented, converted function defs to ansi style.
+    - The old access control using the ACCESS.DENY file is gone.
+    - (patchlevel.h) The GAME_VERSION define moved from config.h into here.
+    - (main.*) Commented, converted function defs to ansi style.
+        Rewrote the commandline argument parser. Most options are now
+        available in a short and long version; --version prints all
+        sorts of compilation options as well. New option --help.
+    - (driver/invocation) New documentation: driver invocation.
+
+13-Aug-1998 (Lars Duening)
+    - Updated the hosts/*/config.h files.
+    - (hosts/be/be.h) The host dependent init makes sure that the erq
+        is not started automatically, even if the option to do so is
+        set in config.h
+    - (my-rusage.h) new, a wrapper for the rusage related stuff.
+    - (hosts/unix.h) received all the Unix specific portability
+        definitions from driver.h (this includes the cygnus win32
+        environment).
+      (port.h) received the remaining host dependent definitions, so that
+      (driver.h) can be dedicated to provide global definitions.
+    - (port.*, random.*) Commented, converted function defs to ansi style.
+
+12-Aug-1998 (Lars Duening)
+    - (driver.h) Created from the old lint.h, it defines some macros and
+        includes config.h, machine.h and port.h. The system-dependent stuff
+        will move into port.h eventually. All sources changed to use
+        driver.h instead of lint.h.
+    - (my-alloca.h) new, a wrapper for <alloca.h>.
+    - (cruft/) New directory for code snippets which are no longer
+        useful, but interesting enough to keep around.
+    - (hosts/be/Makefile) New target 'dependall' updates the
+        dependencies in Makefile, Makefile.in, and the Makefiles
+        for Be, Amiga and OS/2.
+
+11-Aug-1998 (Lars Duening)
+    - Compiled the sources with gcc on a high warning level and
+      removed as many warnings as possible. Added some patches
+      for compiling under Win32 with Cygwin32.
+
+09-Aug-1998 (Lars Duening)
+    - 'Modularized' the sources: the exports of every .c file are
+      listed in an associated .h file, and only there. The liberal
+      sprinkling of 'extern' statements is gone.
+
+10-Jul-1998 (Lars Duening)
+    - Release 3.2.1@141-osb.16
+    - (prolang.y) Fixed a pointer mixup which caused '"*"::' to end
+        in an endless loop. Bugfix provided by Daniel von Dincklage
+        (<vonDincklage@ozet.de> aka Sunblade@sd.mud.de)
+    - Updated the BeOS support: small tweaks to machine.h, the Makefile
+        now supports cross-compilation, a small hack in comm1.c.
+ 
+04-Jul-1998 (Lars Duening)
+    - (prolang.y) In case of a 'Program too large' compilation error,
+        random memory was freed due to an uninitalized variable.
+    - (mudlib/test_master.c) Added this minimal master for simple
+        driver tests.
+        
+17-May-1998 (Lars Duening)
+    - Release 3.2.1@141-osb.14
+    - (interpret.c) The apply cache is initialized on driver startup, not
+      statically at compilation time. This allows compilers with less
+      capable preprocessors (line length limitations) to use big caches
+      as well.
+
+16-May-1998 and before (Lars Duening)
+    - added rxcache.[ch]: cache for compiled regular expression patterns.
+    - added support for BeOS.
+    - (backend.c) Automatic garbage collections are kept at least 5 minutes
+      apart. Every garbage collection is logged on stdout.
+    - (backend.c) Variables are swapped independantly from program code.
+    - (comm1.c, main.c) Multiple login ports may be used in parallel. The
+      port numbers are given on the commandline, efun query_mud_port()
+      was extended to return the appropriate port number.
+    - (interpret.c) MudOS-efun terminal_colour() added by Mica.
+    - (interpret.c) this_object() in destructed objects does not print a
+      diagnostic anymore.
+    - (lex.c) more informative diagnostics about defbuf allocations. Too
+      big defbufs are deallocated again to conserve memory.
+    - (main.c) reallocation of system reserves prints diagnostics.
+    - (regexp.ch) NSUBEXP may take values different from 10 (OSB uses 50).
+    - (swap.c) Free space is reused immediately.
+    - (stralloc.ch, interpret.c) All the names of the lfuns applied by
+      the driver are stored in the shared string table on startup.
+      Together with some modifications to the apply cache for faster
+      processing of applys on shared strings, this should make a mud
+      a wee bit faster. Also added some comments in these areas (with
+      no guarantee for correctness!).
+    - (simulate.c) 'status tables' prints the number of cache hits both
+      absolute and as percentage.

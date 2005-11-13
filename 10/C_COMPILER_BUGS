@@ -1,0 +1,29 @@
+gcc 1.36 on Next / NextStep 2.1 with flags '-g' / '-g -fomit_frame_pointer' :
+  The calculated offset to a6 for parameter access in free_svalue() is wrong.
+  Symptom: mud crashes early.
+  Makeshift solution: use '-O -fomit-frame-pointer'
+gcc 2.2.2 , when told to optimize interpret.c , usually dies with a segv
+  or currupted internal data structures in cc1.
+gcc 2.3.3 , when told to optimize lex.c , will garble the code for #include.
+  Symptom: load_object will fail when #include is used, saying it can't
+  #include the file.
+gcc 2.x on 680x0 hardware: the large interpret.c switch table is built with
+  unsigned short words, but is processed like signed short words.
+  The special thing about 680x0 is that the switch in interpret.c is
+  shorter than 64 KB.
+  Symptoms: when LPC instructions are to be executed the code to which
+  lies beyond the first 32 KB of the switch(), there is weird behaviour,
+  a C-level illegal intruction or a crash with undetermined, although most
+  times quite short, latency.
+  Makeshift solution: fix the assembler code in interpret.s to handle
+  unsigned short offsets.
+
+NeXTStep 3.2 has a broken memcmp(), that will give different return values
+depending on alignment.
+The library that contained this broken memcmp() looks like this:
+-r-xr-xr-x  1 root     1012100 Sep  1  1993 libsys_s.B.shlib*
+
+quickfix: #define memcmp(a,b,l) (*(int*)(a) - *(int*)(b)) in closure.c and
+  prolang.y, or a file included by these.
+
+ULTRIX dec1 4.3 0 RISC needs <sys/types.h> to be included before <sys/stat.h>
