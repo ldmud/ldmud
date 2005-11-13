@@ -1,0 +1,12 @@
+Short: Why exactly is #'([ an uncallable closure?
+Date: 981202
+Type: Feature
+State: Unclassified
+From: Zwirch
+
+Zwirch@PK-Mud tells you: ich bin vorher mal ueber einen operator #'([
+gestolpert
+(macht etwas aehnliches wie mkmapping): funcall(lambda(0, ({#'([,
+({1,2,3}),({4,5,6})}) )) klappt, aber apply(#'([,({ ({1,2,3}),({4,5,6}) }))
+buggt mit 'Uncallable closure'. woran liegt das?
+
