@@ -1,0 +1,6120 @@
+# 1 "smalloc.c"
+ 
+
+
+
+
+
+
+
+ 
+
+
+# 1 "driver.h" 1
+
+
+
+ 
+
+
+
+
+
+
+
+
+# 1 "config.h" 1
+
+
+
+ 
+
+
+
+ 
+
+
+
+
+
+ 
+
+
+
+ 
+
+
+ 
+
+
+ 
+
+ 
+
+
+
+ 
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+ 
+ 
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+ 
+
+
+
+
+ 
+
+
+
+
+
+ 
+
+
+
+
+ 
+
+
+
+
+ 
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+ 
+
+
+
+
+ 
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+ 
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+ 
+
+
+
+
+ 
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+ 
+
+
+ 
+
+ 
+
+
+
+
+
+
+ 
+
+
+
+
+
+ 
+ 
+
+ 
+
+
+   
+ 
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+ 
+
+
+
+
+
+
+
+
+ 
+
+
+ 
+
+
+
+ 
+
+
+
+
+ 
+
+
+
+
+ 
+
+
+
+# 13 "driver.h" 2
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# 1 "machine.h" 1
+ 
+
+
+
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+
+ 
+
+
+ 
+ 
+
+ 
+ 
+
+ 
+ 
+
+ 
+
+
+ 
+ 
+
+ 
+
+
+
+
+
+
+ 
+
+ 
+ 
+
+ 
+ 
+
+ 
+ 
+
+ 
+ 
+
+ 
+
+
+ 
+
+
+
+
+ 
+
+
+
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+ 
+
+ 
+
+
+ 
+ 
+
+ 
+
+
+
+
+ 
+
+
+ 
+
+
+
+ 
+
+
+ 
+
+
+
+
+
+
+ 
+
+
+
+
+ 
+
+ 
+
+
+ 
+
+
+ 
+
+
+ 
+
+
+ 
+
+
+ 
+
+
+ 
+
+
+ 
+
+
+ 
+
+
+ 
+
+
+ 
+
+
+ 
+ 
+
+ 
+ 
+
+ 
+
+
+ 
+
+
+ 
+
+
+ 
+
+
+ 
+
+
+ 
+
+
+ 
+
+
+ 
+ 
+
+ 
+ 
+
+ 
+ 
+
+ 
+
+
+ 
+
+
+ 
+
+
+ 
+
+
+ 
+ 
+
+ 
+
+
+ 
+
+
+ 
+
+
+ 
+
+
+ 
+ 
+
+ 
+
+
+ 
+ 
+
+ 
+ 
+
+ 
+ 
+
+
+# 33 "driver.h" 2
+
+# 1 "port.h" 1
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+# 1 "/usr/local/lib/gcc-lib/sparc-sun-sunos4.1.3_U1/2.7.2/include/errno.h" 1 3
+ 
+
+ 
+
+
+
+
+
+
+# 1 "/usr/include/sys/errno.h" 1 3
+ 
+
+ 
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+ 
+
+
+
+ 
+
+	 
+
+
+
+
+
+
+
+
+
+
+
+
+
+	 
+
+
+
+
+
+
+
+
+
+
+
+
+
+	 
+
+
+
+ 
+
+
+
+
+ 
+
+
+
+
+ 
+
+
+
+ 
+
+
+
+
+
+
+ 
+
+
+ 
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+# 10 "/usr/local/lib/gcc-lib/sparc-sun-sunos4.1.3_U1/2.7.2/include/errno.h" 2 3
+
+extern int errno;
+
+extern int errno;
+
+# 52 "port.h" 2
+
+
+
+
+
+
+
+# 1 "/usr/local/lib/gcc-lib/sparc-sun-sunos4.1.3_U1/2.7.2/include/unistd.h" 1 3
+ 
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# 1 "/usr/local/lib/gcc-lib/sparc-sun-sunos4.1.3_U1/2.7.2/include/sys/types.h" 1 3
+ 
+
+ 
+
+
+
+
+
+
+
+
+ 
+
+
+
+# 1 "/usr/local/lib/gcc-lib/sparc-sun-sunos4.1.3_U1/2.7.2/include/sys/stdtypes.h" 1 3
+ 
+
+ 
+
+
+
+
+
+
+
+
+
+
+typedef	int		sigset_t;	 
+
+typedef	unsigned int	speed_t;	 
+typedef	unsigned long	tcflag_t;	 
+typedef	unsigned char	cc_t;		 
+typedef	int		pid_t;		 
+
+typedef	unsigned short	mode_t;		 
+typedef	short		nlink_t;	 
+
+typedef	long		clock_t;	 
+typedef	long		time_t;		 
+
+
+
+
+
+
+typedef long unsigned int size_t;		 
+
+
+
+
+
+
+typedef int ptrdiff_t;	 
+
+
+
+
+
+
+
+
+typedef short unsigned int wchar_t;	 
+
+
+
+
+# 16 "/usr/local/lib/gcc-lib/sparc-sun-sunos4.1.3_U1/2.7.2/include/sys/types.h" 2 3
+
+
+
+# 1 "/usr/include/sys/sysmacros.h" 1 3
+ 
+
+ 
+
+
+
+
+
+
+ 
+
+
+ 
+
+
+ 
+
+
+
+# 19 "/usr/local/lib/gcc-lib/sparc-sun-sunos4.1.3_U1/2.7.2/include/sys/types.h" 2 3
+
+
+
+
+
+typedef	unsigned char	u_char;
+typedef	unsigned short	u_short;
+typedef	unsigned int	u_int;
+typedef	unsigned long	u_long;
+typedef	unsigned short	ushort;		 
+typedef	unsigned int	uint;		 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+typedef	struct  _physadr_t { int r[1]; } *physadr_t;
+typedef	struct label_t {
+	int	val[2];
+} label_t;
+
+
+
+
+
+
+
+typedef	struct	_quad_t { long val[2]; } quad_t;
+typedef	long	daddr_t;
+typedef	char *	caddr_t;
+typedef	unsigned long	ino_t;
+typedef	short	dev_t;
+typedef	long	off_t;
+typedef	unsigned short	uid_t;
+typedef	unsigned short	gid_t;
+typedef	long	key_t;
+typedef	char *	addr_t;
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+typedef	long	fd_mask;
+
+
+
+
+
+
+
+
+
+typedef	struct fd_set {
+	fd_mask	fds_bits[((( 256  )+((  (sizeof (fd_mask) * 8 )  )-1))/(  (sizeof (fd_mask) * 8 )  )) ];
+} fd_set;
+
+
+
+
+
+
+
+# 113 "/usr/local/lib/gcc-lib/sparc-sun-sunos4.1.3_U1/2.7.2/include/sys/types.h" 3
+
+
+
+# 80 "/usr/local/lib/gcc-lib/sparc-sun-sunos4.1.3_U1/2.7.2/include/unistd.h" 2 3
+
+
+extern void	_exit  (int)  ;
+extern int	access  (const char *, int)  ;
+extern unsigned	alarm  (unsigned int)  ;
+extern int	chdir  (const char *)  ;
+extern int	chmod  (const char *, unsigned short )  ;
+extern int	chown  (const char *, unsigned short , unsigned short )  ;
+extern int	close  (int)  ;
+extern char	*ctermid  (char *)  ;
+extern char	*cuserid  (char *)  ;
+extern int	dup  (int)  ;
+extern int	dup2  (int, int)  ;
+extern int	execl  (const char *, const char *, ...)  ;
+extern int	execle  (const char *, const char *, ...)  ;
+extern int	execlp  (const char *, const char *, ...)  ;
+extern int	execv  (const char *, char *const *)  ;
+extern int	execve  (const char *, char *const *, char *const *)  ;
+extern int	execvp  (const char *, char *const *)  ;
+extern pid_t	fork( );
+extern long	fpathconf  (int, int)  ;
+extern char	*getcwd  (char *, long unsigned int )  ;
+extern gid_t	getegid( );
+extern uid_t	geteuid( );
+extern gid_t	getgid( );
+extern int	getgroups  (int, unsigned short *)  ;
+extern char	*getlogin( );
+extern pid_t	getpgrp( );
+extern pid_t	getpid( );
+extern pid_t	getppid( );
+extern uid_t	getuid( );
+extern int	isatty  (int)  ;
+extern int	link  (const char *, const char *)  ;
+extern off_t	lseek  (int, long , int)  ;
+extern long	pathconf  (const char *, int)  ;
+extern int	pause( );
+extern int	pipe  (int *)  ;
+extern int	read  (int, void *, long unsigned int )  ;
+extern int	rmdir  (const char *)  ;
+extern int	setgid  (unsigned short )  ;
+extern int	setpgid  (int , int )  ;
+extern pid_t	setsid( );
+extern int	setuid  (unsigned short )  ;
+extern unsigned	sleep  (unsigned int)  ;
+extern long	sysconf  (int)  ;
+extern pid_t	tcgetpgrp  (int)  ;
+extern int	tcsetpgrp  (int, int )  ;
+extern char	*ttyname  (int)  ;
+extern int	unlink  (const char *)  ;
+extern int	write  (int, const void *, long unsigned int )  ;
+
+
+
+
+
+
+# 59 "port.h" 2
+
+
+
+
+
+
+# 1 "/usr/local/lib/gcc-lib/sparc-sun-sunos4.1.3_U1/2.7.2/include/memory.h" 1 3
+ 
+
+
+
+
+
+
+
+
+
+
+
+extern void *memccpy  (void *, const void *, int, long unsigned int )  ;
+extern void *memchr  (const void *, int, long unsigned int )  ;
+extern void *memcpy  (void *, const void *, long unsigned int )  ;
+extern void *memset  (void *, int, long unsigned int )  ;
+
+
+
+
+
+
+
+extern int memcmp  (const void *, const void *, long unsigned int )  ;
+
+
+# 65 "port.h" 2
+
+
+
+# 1 "/usr/local/lib/gcc-lib/sparc-sun-sunos4.1.3_U1/2.7.2/include/values.h" 1 3
+ 
+
+
+
+
+ 
+
+
+ 
+
+
+
+
+
+
+
+ 
+
+
+
+
+ 
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# 78 "/usr/local/lib/gcc-lib/sparc-sun-sunos4.1.3_U1/2.7.2/include/values.h" 3
+
+# 89 "/usr/local/lib/gcc-lib/sparc-sun-sunos4.1.3_U1/2.7.2/include/values.h" 3
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# 68 "port.h" 2
+
+
+
+# 1 "/usr/local/lib/gcc-lib/sparc-sun-sunos4.1.3_U1/2.7.2/include/stdlib.h" 1 3
+ 
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+extern unsigned int _mb_cur_max;
+
+
+
+
+ 
+extern void	abort( );
+extern int	abs  (int)  ;
+extern double	atof  (const char *)  ;
+extern int	atoi  (const char *)  ;
+extern long int	atol  (const char *)  ;
+extern char *	bsearch  (const void *, const void *, long unsigned int , long unsigned int , int (*) (const void *, const void *))  ;
+extern void *	calloc  (long unsigned int , long unsigned int )  ;
+extern void	exit  (int)  ;
+extern void	free  (void *)  ;
+extern char *	getenv  (const char *)  ;
+extern void *	malloc  (long unsigned int )  ;
+extern int	qsort  (void *, long unsigned int , long unsigned int , int (*) (const void *, const void *))  ;
+extern int	rand( );
+extern void *	realloc  (void *, long unsigned int )  ;
+extern int	srand  (unsigned int)  ;
+
+extern int    mbtowc  (short unsigned int *, const char *, long unsigned int )  ;
+extern int    wctomb  (char *, short unsigned int )  ;
+extern size_t mbstowcs  (short unsigned int *, const char *, long unsigned int )  ;
+extern size_t wcstombs  (char *, const short unsigned int *, long unsigned int )  ;
+
+# 54 "/usr/local/lib/gcc-lib/sparc-sun-sunos4.1.3_U1/2.7.2/include/stdlib.h" 3
+
+
+# 71 "port.h" 2
+
+
+
+# 1 "/usr/local/lib/gcc-lib/sparc-sun-sunos4.1.3_U1/2.7.2/include/string.h" 1 3
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+extern char *	strcat  (char *, const char *)  ;
+extern char *	strchr  (const char *, int)  ;
+extern int	strcmp  (const char *, const char *)  ;
+extern char *	strcpy  (char *, const char *)  ;
+extern size_t	strcspn  (const char *, const char *)  ;
+
+extern char *	strdup  (const char *)  ;
+
+extern size_t	strlen  (const char *)  ;
+extern char *	strncat  (char *, const char *, long unsigned int )  ;
+extern int	strncmp  (const char *, const char *, long unsigned int )  ;
+extern char *	strncpy  (char *, const char *, long unsigned int )  ;
+extern char *	strpbrk  (const char *, const char *)  ;
+extern char *	strrchr  (const char *, int)  ;
+extern size_t	strspn  (const char *, const char *)  ;
+extern char *	strstr  (const char *, const char *)  ;
+extern char *	strtok  (char *, const char *)  ;
+
+# 49 "/usr/local/lib/gcc-lib/sparc-sun-sunos4.1.3_U1/2.7.2/include/string.h" 3
+
+
+# 74 "port.h" 2
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# 1 "/usr/local/lib/gcc-lib/sparc-sun-sunos4.1.3_U1/2.7.2/include/math.h" 1 3
+ 
+
+ 
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+extern double	__infinity();
+extern double	acos  (double)  ;
+extern double	asin  (double)  ;
+extern double	atan  (double)  ;
+extern double	atan2  (double, double)  ;
+extern double	ceil  (double)  ;
+extern double	cos  (double)  ;
+extern double	cosh  (double)  ;
+extern double	exp  (double)  ;
+extern double	fabs  (double)  ;
+extern double	floor  (double)  ;
+extern double	fmod  (double, double)  ;
+extern double	frexp  (double, int *)  ;
+extern double	ldexp  (double, int)  ;
+extern double	log  (double)  ;
+extern double	log10  (double)  ;
+extern double	modf  (double, double *)  ;
+extern double	pow  (double, double)  ;
+extern double	sin  (double)  ;
+extern double	sinh  (double)  ;
+extern double	sqrt  (double)  ;
+extern double	tan  (double)  ;
+extern double	tanh  (double)  ;
+
+
+# 1 "/usr/local/lib/gcc-lib/sparc-sun-sunos4.1.3_U1/2.7.2/include/floatingpoint.h" 1 3
+ 
+
+ 
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# 1 "/usr/local/lib/gcc-lib/sparc-sun-sunos4.1.3_U1/2.7.2/include/sys/ieeefp.h" 1 3
+ 
+
+ 
+
+
+
+ 
+
+
+
+
+
+
+
+ 
+
+
+enum fp_direction_type 		 
+	{
+	fp_nearest	= 0,
+	fp_tozero	= 1,
+	fp_positive	= 2,
+	fp_negative	= 3
+	} ;
+
+# 34 "/usr/local/lib/gcc-lib/sparc-sun-sunos4.1.3_U1/2.7.2/include/sys/ieeefp.h" 3
+
+# 43 "/usr/local/lib/gcc-lib/sparc-sun-sunos4.1.3_U1/2.7.2/include/sys/ieeefp.h" 3
+
+
+# 53 "/usr/local/lib/gcc-lib/sparc-sun-sunos4.1.3_U1/2.7.2/include/sys/ieeefp.h" 3
+
+enum fp_precision_type		 
+	{
+	fp_extended	= 0,
+	fp_single	= 1,
+	fp_double	= 2,
+	fp_precision_3	= 3
+	} ;
+
+
+# 73 "/usr/local/lib/gcc-lib/sparc-sun-sunos4.1.3_U1/2.7.2/include/sys/ieeefp.h" 3
+
+enum fp_exception_type		 
+	{
+	fp_inexact	= 0,
+	fp_division	= 1,
+	fp_underflow	= 2,
+	fp_overflow	= 3,
+	fp_invalid	= 4
+	} ;
+
+
+enum fp_class_type		 
+	{
+	fp_zero		= 0,
+	fp_subnormal	= 1,
+	fp_normal	= 2,
+	fp_infinity   	= 3,
+	fp_quiet	= 4,
+	fp_signaling	= 5
+	} ;
+
+
+# 25 "/usr/local/lib/gcc-lib/sparc-sun-sunos4.1.3_U1/2.7.2/include/floatingpoint.h" 2 3
+
+
+ 
+
+typedef float   single;
+typedef unsigned long extended[3];	 
+
+typedef long double quadruple;	 
+
+
+
+
+
+
+
+
+typedef unsigned fp_exception_field_type;
+ 
+
+
+
+typedef int     sigfpe_code_type;	 
+
+typedef void    (*sigfpe_handler_type) ();
+ 
+
+
+
+
+
+ 
+
+extern enum fp_direction_type fp_direction;
+ 
+
+
+
+extern enum fp_precision_type fp_precision;
+ 
+
+
+
+extern fp_exception_field_type fp_accrued_exceptions;
+ 
+
+
+
+
+
+ 
+
+
+ 
+
+typedef char    decimal_string[512 ];
+ 
+
+typedef struct {
+	enum fp_class_type fpclass;
+	int             sign;
+	int             exponent;
+	decimal_string  ds;	 
+
+
+	int             more;	 
+
+
+	int             ndigits; 
+
+
+}
+                decimal_record;
+
+enum decimal_form {
+	fixed_form,		 
+
+
+
+	floating_form		 
+
+};
+
+typedef struct {
+	enum fp_direction_type rd;
+	 
+	enum decimal_form df;	 
+	int             ndigits; 
+}
+                decimal_mode;
+
+enum decimal_string_form {	 
+	invalid_form,		 
+	whitespace_form,	 
+	fixed_int_form,		 
+	fixed_intdot_form,	 
+	fixed_dotfrac_form,	 
+	fixed_intdotfrac_form,	 
+	floating_int_form,	 
+	floating_intdot_form,	 
+	floating_dotfrac_form,	 
+	floating_intdotfrac_form,	 
+	inf_form,		 
+	infinity_form,		 
+	nan_form,		 
+	nanstring_form		 
+};
+
+ 
+
+extern void     double_to_decimal();
+extern void     quadruple_to_decimal();
+extern char    *econvert();
+extern char    *fconvert();
+extern char    *gconvert();
+extern char    *qeconvert();
+extern char    *qfconvert();
+extern char    *qgconvert();
+
+ 
+
+
+
+extern sigfpe_handler_type ieee_handlers[5 ];
+ 
+
+
+
+
+
+
+extern sigfpe_handler_type sigfpe();
+
+extern void     single_to_decimal();
+extern void     extended_to_decimal();
+
+extern void     decimal_to_single();
+extern void     decimal_to_double();
+extern void     decimal_to_extended();
+extern void     decimal_to_quadruple();
+
+extern char    *seconvert();
+extern char    *sfconvert();
+extern char    *sgconvert();
+
+extern void     string_to_decimal();
+extern void     file_to_decimal();
+extern void     func_to_decimal();
+
+ 
+
+extern double   atof  (const char *)  ;
+
+ 
+
+extern int      errno;
+
+extern double   strtod  (const char *, char **)  ;
+
+
+# 56 "/usr/local/lib/gcc-lib/sparc-sun-sunos4.1.3_U1/2.7.2/include/math.h" 2 3
+
+extern double	acosh  (double)  ;
+extern double	asinh  (double)  ;
+extern double	atanh  (double)  ;
+extern double	cbrt  (double)  ;
+extern double	copysign  (double, double)  ;
+extern double	erf  (double)  ;
+extern double	erfc  (double)  ;
+extern double	expm1();
+extern int	finite  (double)  ;
+extern double	hypot  (double, double)  ;
+extern double	j0  (double)  ;
+extern double	j1  (double)  ;
+extern double	jn  (int, double)  ;
+extern double	lgamma  (double)  ;
+extern double	log1p();
+extern double	rint  (double)  ;
+extern double	y0  (double)  ;
+extern double	y1  (double)  ;
+extern double	yn  (int, double)  ;
+
+ 
+
+
+
+ 
+
+
+enum fp_pi_type {
+	fp_pi_infinite	= 0,	 
+	fp_pi_66	= 1,	 
+	fp_pi_53	= 2	 
+};
+
+ 
+
+
+extern enum	fp_pi_type fp_pi;
+
+ 
+
+
+
+extern enum	fp_class_type fp_class();
+
+extern int	ieee_flags();
+extern int	ieee_handler();
+extern void	ieee_retrospective();
+extern int	ilogb();
+extern double	infinity();
+extern int	irint();
+extern int	isinf  (double)  ;
+extern int	isnan  (double)  ;
+extern int	isnormal();
+extern int	issubnormal();
+extern int	iszero();
+extern double	logb  (double)  ;
+extern double	max_normal();
+extern double	max_subnormal();
+extern double	min_normal();
+extern double	min_subnormal();
+extern double	nextafter  (double, double)  ;
+extern void	nonstandard_arithmetic();
+extern double	quiet_nan();
+extern double	remainder  (double, double)  ;
+extern double	scalb  (double, double)  ;
+extern double	scalbn();
+extern double	signaling_nan();
+extern int	signbit();
+extern double	significand();
+extern void	standard_arithmetic();
+
+ 
+
+
+extern double	acospi();
+extern double	aint();
+extern double	anint();
+extern double	annuity();
+extern double	asinpi();
+extern double	atan2pi();
+extern double	atanpi();
+extern double	compound();
+extern double	cospi();
+extern double	exp10();
+extern double	exp2();
+extern double	log2();
+extern int	nint();
+extern void	sincos();
+extern void	sincospi();
+extern double	sinpi();
+extern double	tanpi();
+struct exception;
+extern int	matherr  (struct exception *)  ;
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+ 
+
+
+
+
+extern int		 ir_finite_();
+extern enum fp_class_type ir_fp_class_();
+extern int		 ir_ilogb_();
+extern int		 ir_irint_();
+extern int		 ir_isinf_();
+extern int		 ir_isnan_();
+extern int		 ir_isnormal_();
+extern int		 ir_issubnormal_();
+extern int		 ir_iszero_();
+extern int		 ir_nint_();
+extern int		 ir_signbit_();
+extern void		 r_sincos_();
+extern void		 r_sincospi_();
+extern double  r_acos_();
+extern double  r_acosh_();
+extern double  r_acospi_();
+extern double  r_aint_();
+extern double  r_anint_();
+extern double  r_annuity_();
+extern double  r_asin_();
+extern double  r_asinh_();
+extern double  r_asinpi_();
+extern double  r_atan2_();
+extern double  r_atan2pi_();
+extern double  r_atan_();
+extern double  r_atanh_();
+extern double  r_atanpi_();
+extern double  r_cbrt_();
+extern double  r_ceil_();
+extern double  r_compound_();
+extern double  r_copysign_();
+extern double  r_cos_();
+extern double  r_cosh_();
+extern double  r_cospi_();
+extern double  r_erf_();
+extern double  r_erfc_();
+extern double  r_exp10_();
+extern double  r_exp2_();
+extern double  r_exp_();
+extern double  r_expm1_();
+extern double  r_fabs_();
+extern double  r_floor_();
+extern double  r_fmod_();
+extern double  r_hypot_();
+extern double  r_infinity_();
+extern double  r_j0_();
+extern double  r_j1_();
+extern double  r_jn_();
+extern double  r_lgamma_();
+extern double  r_log10_();
+extern double  r_log1p_();
+extern double  r_log2_();
+extern double  r_log_();
+extern double  r_logb_();
+extern double  r_max_normal_();
+extern double  r_max_subnormal_();
+extern double  r_min_normal_();
+extern double  r_min_subnormal_();
+extern double  r_nextafter_();
+extern double  r_pow_();
+extern double  r_quiet_nan_();
+extern double  r_remainder_();
+extern double  r_rint_();
+extern double  r_scalb_();
+extern double  r_scalbn_();
+extern double  r_signaling_nan_();
+extern double  r_significand_();
+extern double  r_sin_();
+extern double  r_sinh_();
+extern double  r_sinpi_();
+extern double  r_sqrt_();
+extern double  r_tan_();
+extern double  r_tanh_();
+extern double  r_tanpi_();
+extern double  r_y0_();
+extern double  r_y1_();
+extern double  r_yn_();
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+struct exception {
+	int type;
+	char *name;
+	double arg1;
+	double arg2;
+	double retval;
+};
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+extern int	signgam;
+ 
+
+
+
+
+extern double cabs();	 
+
+
+
+extern double drem  (double, double)  ;	 
+
+
+extern double gamma  (double)  ;	 
+
+
+
+
+
+
+# 89 "port.h" 2
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+ 
+ 
+
+
+
+# 159 "port.h"
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+ 
+
+typedef long		p_int;
+typedef unsigned long	p_uint;
+# 195 "port.h"
+
+
+ 
+
+
+
+
+
+ 
+ 
+typedef short		ph_int;
+typedef unsigned short	ph_uint;
+
+
+
+ 
+typedef p_int	mp_int;
+typedef p_uint	mp_uint;
+
+
+ 
+
+typedef long		int32;
+typedef unsigned long	uint32;
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+# 256 "port.h"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+# 1 "hosts/unix.h" 1
+
+
+
+ 
+
+
+
+
+
+
+
+extern void bzero(char *, int);
+
+
+
+ 
+
+
+extern char *_crypt(char *, char *);
+extern int ioctl(int, ...);  
+
+
+
+extern int gethostname(char *, int);
+extern char *getdomainname(char *, int);
+
+
+
+extern int rename(const char *, const char *);
+extern void perror(const char *);
+extern long int strtol(const char *, char **, int);
+
+
+
+extern time_t time(time_t *tloc);
+
+
+
+
+
+
+
+# 315 "port.h" 2
+
+
+
+ 
+
+
+
+extern mp_int get_current_time(void);
+extern char * time_string(int);
+
+
+extern char *memmem(char *, size_t, char *, size_t);
+
+
+
+
+
+
+
+
+extern char *crypt(const char *, const char *);
+
+
+
+
+
+
+
+# 34 "driver.h" 2
+
+
+ 
+
+
+
+
+
+
+
+
+extern unsigned char _my_ctype[];
+
+
+
+
+
+
+
+
+ 
+
+
+
+ 
+
+
+ 
+
+
+
+
+
+
+
+
+# 79 "driver.h"
+
+     void xfree  (void * )  ;
+     void *  rexalloc  (void * , size_t)  ;
+
+
+
+         void  pfree  (void * )  ;
+
+
+
+
+
+     void *  permanent_xalloc  (size_t)  ;
+     void  pfree  (void * )  ;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+     void *  xalloc  (size_t)  ;
+
+
+ 
+
+
+
+
+
+# 12 "smalloc.c" 2
+
+
+# 1 "smalloc.h" 1
+
+
+
+
+
+# 1 "datatypes.h" 1
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+ 
+
+union u {
+    char *string;
+    p_int number;           
+       
+
+
+    struct object *ob;
+    struct vector *vec;
+    struct mapping *map;
+    struct lambda *lambda;
+    p_int mantissa;
+    struct svalue *lvalue;
+    struct protected_lvalue *protected_lvalue;
+    struct protected_char_lvalue *protected_char_lvalue;
+    struct protected_range_lvalue *protected_range_lvalue;
+    void (*error_handler)  (struct svalue *)  ;
+    struct const_list_svalue *const_list;
+};
+
+ 
+
+
+
+
+struct svalue {
+    ph_int type;
+    union {
+        ph_int string_type;
+        ph_int exponent;
+	ph_int closure_type;
+	ph_int quotes;
+	ph_int num_arg;  
+	ph_int generic;
+    } x;
+    union u u;
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+struct vector {
+
+
+
+    p_int ref;         
+
+    p_int extra_ref;   
+
+    struct wiz_list *user;	 
+    struct svalue item[1];
+};
+
+struct mapping {
+    p_int ref;
+    struct hash_mapping *hash;
+    struct condensed_mapping *condensed;
+    struct wiz_list *user;
+    int num_values;  
+};
+
+struct hash_mapping {
+    p_int mask;
+    p_int used;
+    p_int condensed_deleted;
+    p_int ref;
+    struct map_chain *deleted;
+    struct mapping *next_dirty;
+    struct map_chain *chains[1];
+};
+
+struct condensed_mapping {
+     
+
+     
+    p_int misc_size;
+    p_int string_size;
+
+     
+     
+};
+
+struct lambda {
+    p_int ref;
+    struct object *ob;
+    union {
+	unsigned short index;	 
+	char code[1];	 
+	struct lambda *lambda;
+	struct {
+	    struct object *ob;
+	    unsigned short index;
+	} alien;	 
+    } function;
+};
+
+struct map_chain {
+    struct map_chain *next;
+    struct svalue key;
+    struct svalue data[1];  
+};
+
+
+
+
+
+
+ 
+
+# 223 "datatypes.h"
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+# 6 "smalloc.h" 2
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+# 100 "smalloc.h"
+
+
+
+
+
+
+ 
+extern int debugmalloc;
+
+ 
+
+
+
+
+extern void *  smalloc  (size_t size)  ;
+
+
+extern void xfree  (void *  ptr)  ;  
+ 
+
+extern void *  malloc   (size_t size)  ;
+extern void *  permanent_xalloc  (size_t size)  ;
+
+extern void  pfree  (void *  p)  ;
+
+
+
+extern void  free   (void *  p)  ;
+
+
+extern void *  rexalloc  (void *  p, size_t size)  ;
+
+extern char *dprintf_first  (int fd, char *s, p_int a)  ;
+extern void dprintf1  (int fd, char *s, p_int a)  ;
+extern void dprintf2  (int fd, char *s, p_int a, p_int b)  ;
+extern void dprintf3  (int fd, char *s, p_int a, p_int b, p_int c)  ;
+
+extern int resort_free_list  (void)  ;  
+extern int malloc_size_mask  (void)  ;
+extern void dump_malloc_data  (void)  ;
+extern void *  calloc  (size_t nelem, size_t sizel)  ;
+extern void clear_M_REF_flags  (void)  ;
+extern void free_unreferenced_memory  (void)  ;
+extern char *malloc_increment_size  (char *p, p_int size)  ;
+extern void walk_new_small_malloced  ( void (*func)(void * , long) )  ;
+
+
+
+
+
+
+
+
+
+# 14 "smalloc.c" 2
+
+
+# 1 "comm.h" 1
+
+
+
+
+
+
+# 1 "interpret.h" 1
+
+
+
+# 1 "/usr/local/lib/gcc-lib/sparc-sun-sunos4.1.3_U1/2.7.2/include/setjmp.h" 1 3
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+
+
+
+# 1 "/usr/local/lib/gcc-lib/sparc-sun-sunos4.1.3_U1/2.7.2/include/machine/setjmp.h" 1 3
+ 
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+typedef	int jmp_buf[9 ];
+
+ 
+
+
+typedef	int sigjmp_buf[9 +1];
+
+int	setjmp  (jmp_buf)  ;
+int	_setjmp  (jmp_buf)  ;
+int	sigsetjmp  (sigjmp_buf, int)  ;
+void	longjmp  (jmp_buf, int)  ;
+void	_longjmp  (jmp_buf, int)  ;
+void	siglongjmp  (sigjmp_buf, int)  ;
+
+ 
+
+
+
+
+
+#pragma unknown_control_flow(sigsetjmp, setjmp, _setjmp)
+
+
+# 19 "/usr/local/lib/gcc-lib/sparc-sun-sunos4.1.3_U1/2.7.2/include/setjmp.h" 2 3
+
+
+# 49 "/usr/local/lib/gcc-lib/sparc-sun-sunos4.1.3_U1/2.7.2/include/setjmp.h" 3
+
+
+ 
+
+
+
+
+
+
+# 4 "interpret.h" 2
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+ 
+
+
+ 
+
+
+
+
+
+struct control_stack {
+    struct object *ob;		 
+    struct object *prev_ob;	 
+    struct program *prog;	 
+    char *pc;
+    struct svalue *fp;
+    char *funstart;
+    int num_local_variables;	 
+    int function_index_offset;	 
+
+    struct svalue *current_variables;	 
+    short extern_call;		 
+    short dummy;
+    char **break_sp;
+    struct object *pretend_to_be;
+};
+
+struct con_struct { jmp_buf text; };
+
+extern struct error_recovery_info {
+    struct error_recovery_info *last;
+    int type;
+    struct con_struct con;
+} *error_recovery_pointer;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+extern struct program *current_prog;
+extern struct error_recovery_info *error_recovery_pointer;
+extern int tracedepth;
+extern int trace_level;
+extern struct svalue *inter_sp;
+extern int function_index_offset;
+extern struct svalue *current_variables;
+extern struct svalue apply_return_value;
+extern struct svalue catch_value;
+extern struct svalue last_indexing_protector;
+
+
+
+
+
+
+extern int apply_cache_hit, apply_cache_miss;
+
+
+ 
+
+extern void init_interpret  (void)  ;
+extern void assign_eval_cost  (void)  ;
+extern void push_object  (struct object *ob)  ;
+extern void push_number  (p_int n)  ;
+extern void push_shared_string  (char *p)  ;
+extern void push_referenced_shared_string  (char *p)  ;
+extern  void free_string_svalue  (struct svalue *v)  ;
+extern void free_object_svalue  (struct svalue *v)  ;
+extern void zero_object_svalue  (struct svalue *v)  ;
+extern void free_svalue  (struct svalue *v)  ;
+extern  void assign_svalue_no_free  (struct svalue *to, struct svalue *from)  ;
+extern void assign_svalue  (struct svalue *dest, struct svalue *v)  ;
+extern  void transfer_svalue_no_free  (struct svalue *dest, struct svalue *v)  ;
+extern void transfer_svalue  (struct svalue *dest, struct svalue *v)  ;
+extern void push_svalue  (struct svalue *v)  ;
+extern void push_svalue_block  (int num, struct svalue *v)  ;
+extern  void pop_stack  (void)  ;
+extern void drop_stack  (void)  ;
+extern void bad_efun_arg  (int arg, int instr, struct svalue *sp)   __attribute__ ((noreturn)) ;
+extern void bad_xefun_arg  (int arg, struct svalue *sp)   __attribute__ ((noreturn)) ;
+extern void bad_xefun_vararg  (int arg, struct svalue *sp)   __attribute__ ((noreturn)) ;
+extern void push_vector  (struct vector *v)  ;
+extern void push_referenced_vector  (struct vector *v)  ;
+extern void push_string_malloced  (char *p)  ;
+extern void push_string_shared  (char *p)  ;
+extern  void push_malloced_string  (char *p)  ;
+extern void push_volatile_string  (char *p)  ;
+extern int _privilege_violation  (char *what, struct svalue *where, struct svalue *sp)  ;
+extern int privilege_violation4  (char *what, struct object *whom, char *how_str, int how_num, struct svalue *sp)  ;
+extern void check_for_destr  (struct vector *v)  ;
+extern void push_apply_value  (void)  ;
+extern void pop_apply_value   (void)  ;
+extern struct svalue *sapply  (char *fun, struct object *ob, int num_arg)  ;
+extern struct svalue *apply  (char *fun, struct object *ob, int num_arg)  ;
+extern char *function_exists  (char *fun, struct object *ob)  ;
+extern void call_function  (struct program *progp, int fx)  ;
+extern int get_line_number  (char *p, struct program *progp, char **namep)  ;
+extern char *dump_trace  (int how)  ;
+extern int get_line_number_if_any  (char **name)  ;
+extern void reset_machine  (int first)  ;
+extern struct svalue *secure_apply  (char *fun, struct object *ob, int num_arg)  ;
+extern struct svalue *apply_master_ob  (char *fun, int num_arg)  ;
+extern void assert_master_ob_loaded  (void)  ;
+extern struct svalue *secure_call_lambda  (struct svalue *closure, int num_arg)  ;
+extern void remove_object_from_stack  (struct object *ob)  ;
+extern void call_lambda  (struct svalue *lsvp, int num_arg)  ;
+extern void free_interpreter_temporaries  (void)  ;
+extern void invalidate_apply_low_cache  (void)  ;
+extern void add_eval_cost  (int num)  ;
+
+
+extern void push_referenced_mapping  (struct mapping *m)  ;
+extern void m_indices_filter  (struct svalue *key, struct svalue *data, char *extra)  ;
+
+
+
+
+
+
+
+extern int last_instructions  (int length, int verbose, struct svalue **svpp)  ;
+
+
+
+extern int check_state  (void)  ;
+extern void count_inherits  (struct program *progp)  ;
+extern void count_extra_ref_in_object  (struct object *ob)  ;
+extern void count_extra_ref_in_vector  (struct svalue *svp, mp_int num)  ;
+extern void check_a_lot_ref_counts  (struct program *search_prog)  ;
+
+
+
+extern void clear_interpreter_refs  (void)  ;
+extern void count_interpreter_refs  (void)  ;
+
+
+
+
+
+
+# 7 "comm.h" 2
+
+# 1 "object.h" 1
+
+
+
+
+
+# 1 "exec.h" 1
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+struct function {
+    char *name;  
+    union {
+        uint32 pc;		 
+        uint32 inherit;		 
+          int32 func;	 
+
+
+
+
+
+
+	struct function *next;	 
+    } offset;
+    uint32 flags;
+    unsigned short type;	 
+    unsigned char num_local;	 
+    unsigned char num_arg;	 
+
+
+};
+
+struct variable {
+    char *name;
+    uint32 flags;		 
+};
+
+struct inherit {
+    struct program *prog;
+    unsigned short function_index_offset;
+    unsigned short variable_index_offset;
+};
+
+struct program {
+    p_int ref;				 
+    p_int total_size;			 
+
+    p_int extra_ref;			 
+
+    char *program;			 
+    char *name;				 
+    int32  id_number;			 
+
+
+    int32  load_time;			 
+      char *line_numbers;	 
+    unsigned short *function_names;
+
+    uint32 *functions;
+    char **strings;			 
+    struct variable *variable_names;	 
+    struct inherit *inherit;		 
+    unsigned short flags;
+    short heart_beat;			 
+
+
+     
+
+
+
+
+
+
+
+
+
+    unsigned short *argument_types;
+
+    unsigned short *type_start;
+
+    p_int swap_num;		 
+
+     
+
+
+    unsigned short num_function_names;
+    unsigned short num_functions;
+    unsigned short num_strings;
+    unsigned short num_variables;
+    unsigned short num_inherited;
+};
+
+extern struct program *current_prog;
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+extern struct svalue closure_hook[17 ];
+
+
+
+extern struct simul_efun_table_s {
+    unsigned char *funstart;
+    struct program *program;
+    p_int function_index_offset;
+    p_int variable_index_offset;
+} simul_efun_table[];
+
+
+
+ 
+
+
+
+
+struct instr {
+    short		 
+      max_arg,		 
+      min_arg;		 
+    char type[2];	 
+    short Default;	 
+
+
+    short ret_type;	 
+    short arg_index;	 
+    char *name;
+};
+
+# 6 "object.h" 2
+
+
+
+ 
+
+struct pointer_record;
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+struct object {
+    unsigned short flags;	 
+    short total_light;
+    int next_reset;		 
+    int time_of_ref;		 
+    p_int ref;			 
+
+    p_int extra_ref;		 
+
+    struct program *prog;
+    char *name;
+    struct object *next_all, *next_inv, *next_hash;
+    struct object *contains;
+    struct object *super;		 
+    struct sentence *sent;
+    struct wiz_list *user;		 
+
+    struct wiz_list *eff_user;		 
+
+
+    int extra_num_variables;
+     
+
+    struct svalue *variables;		 
+};
+
+struct replace_ob {
+    struct object *ob;
+    struct program *new_prog;
+    int var_offset;
+    int fun_offset;
+    struct replace_ob *next;
+    struct lambda_replace_program_protector *lambda_rpp;
+};
+
+
+ 
+
+extern struct object *obj_list;
+extern p_int new_destructed;
+extern struct object *current_object;
+extern struct object *command_giver;
+extern struct replace_ob *obj_list_replace;
+extern struct object *previous_ob;
+extern int tot_alloc_object, tot_alloc_object_size;
+
+
+ 
+extern int restore_object  (struct object *, char *)  ;
+extern void remove_destructed_objects  (void)  ;
+extern void save_object  (struct object *, char *)  ;
+extern void move_object  (void)  ;
+extern void tell_object  (struct object *, char *)  ;
+extern void tell_npc  (struct object *, char *)  ;
+extern void reference_prog  (struct program *, char *)  ;
+extern int register_pointer  (char *)  ;
+extern void init_pointer_table  (struct pointer_record **space)  ;
+extern void free_pointer_table  (void)  ;
+extern void remove_all_objects  (void)  ;
+extern void do_free_sub_strings  (int num_strings, char ** strings, int num_variables, struct variable *variable_names)  ;
+extern void free_prog  (struct program *progp, int free_sub_strings)  ;
+extern void reset_object  (struct object *ob, int arg)  ;
+extern void replace_programs  (void)  ;
+extern int shadow_catch_message  (struct object *ob, char *str)  ;
+
+
+extern struct object *get_empty_object  (int num_var, struct variable * variables)  ;
+
+
+
+
+
+extern void add_ref  (struct object *, char *)  ;
+extern void _free_object  (struct object *, char *)  ;
+
+
+
+
+
+
+
+
+
+
+
+
+
+# 8 "comm.h" 2
+
+# 1 "sent.h" 1
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+struct sentence {
+    char *verb;
+    struct object *ob;
+    char *function;
+    struct sentence *next;
+    unsigned short short_verb;	 
+    unsigned char type;
+};
+
+struct shadow_sentence {
+    struct object *shadowing;
+    struct ed_buffer *ed_buffer;
+    struct object *shadowed_by;
+    struct sentence *next;
+    unsigned short dummy;
+    unsigned char type;
+};
+
+
+
+
+struct input_to {
+    struct object *ob;
+    char *function;
+    int num_arg;
+    struct svalue arg[1];
+};
+
+extern void free_shadow_sent  (struct shadow_sentence *)  ;
+extern void free_input_to  (struct input_to *)  ;
+struct sentence *alloc_sentence  (void)  ;
+
+
+
+# 9 "comm.h" 2
+
+
+
+
+
+
+
+
+# 1 "/usr/include/sys/socket.h" 1 3
+ 
+
+ 
+
+
+
+
+
+
+
+
+ 
+
+
+
+ 
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+struct	linger {
+	int	l_onoff;		 
+	int	l_linger;		 
+};
+
+ 
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+struct sockaddr {
+	u_short	sa_family;		 
+	char	sa_data[14];		 
+};
+
+ 
+
+
+
+struct sockproto {
+	u_short	sp_family;		 
+	u_short	sp_protocol;		 
+};
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+ 
+
+
+struct msghdr {
+	caddr_t	msg_name;		 
+	int	msg_namelen;		 
+	struct	iovec *msg_iov;		 
+	int	msg_iovlen;		 
+	caddr_t	msg_accrights;		 
+	int	msg_accrightslen;
+};
+
+
+
+
+
+
+
+
+# 17 "comm.h" 2
+
+
+
+
+# 1 "/usr/local/lib/gcc-lib/sparc-sun-sunos4.1.3_U1/2.7.2/include/netinet/in.h" 1 3
+ 
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+struct in_addr {
+	union {
+		struct { unsigned char s_b1,s_b2,s_b3,s_b4; } S_un_b;
+		struct { unsigned short s_w1,s_w2; } S_un_w;
+		unsigned long S_addr;
+	} S_un;
+
+
+
+
+
+
+};
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+ 
+
+
+struct sockaddr_in {
+	short	sin_family;
+	unsigned short	sin_port;
+	struct	in_addr sin_addr;
+	char	sin_zero[8];
+};
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+struct ip_mreq {
+	struct in_addr	imr_multiaddr;	 
+	struct in_addr	imr_interface;	 
+};
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# 21 "comm.h" 2
+
+# 1 "/usr/include/arpa/inet.h" 1 3
+ 
+ 
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+unsigned long inet_addr();
+char	*inet_ntoa();
+struct	in_addr inet_makeaddr();
+unsigned long inet_network();
+
+
+# 22 "comm.h" 2
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+struct interactive {
+    struct shadow_sentence sent;
+    int  socket;
+    struct object *ob;		 
+    struct input_to *input_to;	 
+    struct object *modify_command;
+    struct svalue prompt;
+    struct sockaddr_in addr;
+    char closing;		 
+    char do_close;		 
+    char noecho;		 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    char tn_state;
+    char save_tn_state;
+    char supress_go_ahead;
+    short text_end;		 
+    short command_start;	 
+    short command_end;		 
+    short tn_start;		 
+    short tn_end;		 
+    int32 chars_ready;		 
+    struct interactive *snoop_on;
+    struct object      *snoop_by;
+    struct svalue default_err_message;	 
+    int last_time;		 
+    int trace_level;		 
+    char *trace_prefix;		 
+    int message_length;
+    struct object *next_player_for_flush, *previous_player_for_flush;
+
+
+
+
+
+    long access_class;		 
+    char charset[32];
+    char quote_iac;
+    char catch_tell_activ;
+    char gobble_char;
+    char ts_data;
+     
+
+
+    char text[2048 +2];
+    char message_buf[1024 ];
+};
+
+ 
+extern struct interactive *all_players[50 ];
+extern int num_player;
+extern char *message_flush;
+
+
+extern int add_message_calls;
+extern int inet_packets;
+extern int inet_volume;
+
+
+ 
+extern void  initialize_host_ip_number  (void)  ;
+extern void  prepare_ipc  (void)  ;
+extern void  ipc_remove  (void)  ;
+extern void  add_message  (char *, ...)  __attribute__ ((format (   printf  ,   1  ,   2  )))  ;
+extern void  flush_all_player_mess  (void)  ;
+extern int   get_message  (char *buff)  ;
+extern void  remove_interactive  (struct object *ob)  ;
+extern struct vector *users  (void)  ;
+extern void  set_noecho  (struct interactive *i, char noecho)  ;
+extern int   call_function_interactive  (struct interactive *i, char *str)  ;
+extern int   set_call  (struct object *ob, struct input_to *it, int noecho)  ;
+extern void  remove_all_players  (void)  ;
+extern void  set_prompt  (char *str)  ;
+extern struct svalue *query_prompt  (struct object *ob)  ;
+extern void  print_prompt  (void)  ;
+extern int   new_set_snoop  (struct object *me, struct object *you)  ;
+extern void  init_telopts  (void)  ;
+extern void  mudlib_telopts  (void)  ;
+extern struct svalue *query_ip_name  (struct svalue *sp, int lookup)  ;
+
+
+extern void  start_erq_demon  (char *suffix)  ;
+extern struct svalue *f_attach_erq_demon  (struct svalue *sp)  ;
+extern struct svalue *f_send_erq  (struct svalue *sp)  ;
+
+
+
+extern void  clear_comm_refs  (void)  ;
+extern void  count_comm_refs  (void)  ;
+
+
+
+
+
+
+
+extern char *query_host_name  (void)  ;
+extern char *get_host_ip_number  (void)  ;
+extern struct svalue *f_query_snoop  (struct svalue *sp)  ;
+extern struct svalue *f_query_idle  (struct svalue *sp)  ;
+extern struct svalue *f_remove_interactive  (struct svalue *sp)  ;
+extern void  notify_no_command  (char *command)  ;
+extern void  clear_notify  (void)  ;
+extern void  set_notify_fail_message  (struct svalue *svp)  ;
+extern void  free_notifys  (void)  ;
+extern int   replace_interactive  (struct object *ob, struct object *obfrom,   char *name)  ;
+
+
+extern void  count_comm_extra_refs  (void)  ;
+
+
+
+extern struct svalue *f_send_imp  (struct svalue *sp)  ;
+
+
+extern struct svalue *f_set_buffer_size  (struct svalue *sp)  ;
+extern struct svalue *f_binary_message  (struct svalue *sp)  ;
+extern struct svalue *f_set_connection_charset  (struct svalue *sp)  ;
+
+
+extern struct svalue *query_ip_port  (struct svalue *sp)  ;
+
+
+
+extern void refresh_access_data(void (*add_entry)(struct sockaddr_in *, long*) );
+
+
+
+# 16 "smalloc.c" 2
+
+# 1 "backend.h" 1
+
+
+
+
+
+
+
+ 
+
+ 
+
+
+
+ 
+
+extern struct error_recovery_info toplevel_error_recovery_info;
+extern struct error_recovery_info *error_recovery_pointer;
+extern struct object *current_heart_beat;
+extern int    current_time;
+extern   int    time_to_call_heart_beat;
+extern volatile   int    comm_time_to_call_heart_beat;
+extern uint32 total_player_commands;
+extern volatile mp_int total_alarms;
+extern int32  initial_eval_cost;
+extern int32  eval_cost;
+extern int32  assigned_eval_cost;
+extern   int    extra_jobs_to_do;
+extern   int    garbage_collect_to_do;
+
+ 
+
+extern void  clear_state (void);
+extern void  logon (struct object *ob);
+extern int   parse_command (char *str, struct object *ob);
+extern void  backend (void);
+extern int   set_heart_beat (struct object *ob, int to);
+extern int   heart_beat_status (int   verbose);
+extern void  preload_objects (int eflag);
+extern struct svalue *f_debug_message (struct svalue *sp);
+extern void   catch_alarm   (int)   ;
+extern void  remove_destructed_objects (void);
+extern int   write_file (char *file, char *str);
+extern char *read_file (char *file, int start, int len);
+extern char *read_bytes (char *file, int start, int len);
+extern int   write_bytes (char *file, int start, char *str);
+extern int   file_size (char *file);
+extern void  update_compile_av (int lines);
+extern char *query_load_av (void);
+extern struct svalue *f_heart_beat_info (struct svalue *sp);
+extern struct svalue* f_regreplace (struct svalue *sp);
+
+
+extern void  count_heart_beat_refs (void);
+
+
+
+# 17 "smalloc.c" 2
+
+# 1 "gcollect.h" 1
+
+
+
+
+
+
+
+
+
+
+
+ 
+extern int gcollect_outfd;
+extern time_t time_last_gc;
+extern int garbage_collection_in_progress;
+extern struct object *gc_obj_list_destructed;
+extern struct lambda *stale_misc_closures;
+extern struct mapping *stale_mappings;
+
+
+ 
+extern void clear_memory_reference  (char *p)  ;
+extern void clear_inherit_ref  (struct program *p)  ;
+extern void mark_program_ref  (struct program *p)  ;
+extern void reference_destructed_object  (struct object *ob)  ;
+extern void note_malloced_block_ref  (char *p)  ;
+extern void count_ref_from_string  (char *p)  ;
+extern void count_ref_in_vector  (struct svalue *svp, int num)  ;
+extern void clear_ref_in_vector  (struct svalue *svp, int num)  ;
+
+
+
+extern void garbage_collection  (void)  ;
+extern int32 renumber_programs  (void)  ;
+extern void setup_print_block_dispatcher  (void)  ;
+
+
+# 18 "smalloc.c" 2
+
+# 1 "main.h" 1
+
+
+
+
+
+
+
+ 
+
+extern int d_flag;
+extern   int t_flag;
+extern int e_flag;
+extern   int comp_flag;
+extern long time_to_swap;
+extern long time_to_swap_variables;
+extern struct svalue const0, const1;
+extern double consts[5];
+extern char *mud_lib;
+extern char master_name[];
+extern char *debug_file;
+extern struct object dummy_current_object_for_loads;
+extern int slow_shut_down_to_do;
+
+ 
+extern   int out_of_memory;
+extern int malloc_privilege;
+extern char *reserved_user_area;
+extern char *reserved_master_area;
+extern char *reserved_system_area;
+extern mp_int reserved_user_size;
+extern mp_int reserved_master_size;
+extern mp_int reserved_system_size;
+
+extern mp_int max_malloced;
+extern mp_int max_small_malloced;
+
+
+
+extern   int check_a_lot_ref_counts_flag;
+
+
+
+
+
+
+
+
+
+
+extern int port_numbers[];
+extern int numports;
+
+
+
+extern int udp_port;
+
+
+ 
+
+extern int main(int argc, char **argv);
+extern void initialize_master_uid(void);
+extern void debug_message(char *, ...) __attribute__ ((format ( printf ,  1 ,  2 ))) ;
+
+
+
+
+
+extern char *string_copy(char *str);
+
+
+
+ 
+
+
+
+
+void reallocate_reserved_areas(void);
+
+extern void writex(int d, p_uint i);
+extern void writed(int d, p_uint i);
+
+
+# 19 "smalloc.c" 2
+
+# 1 "simulate.h" 1
+
+
+
+
+
+
+# 1 "instrs.h" 1
+
+
+
+
+
+extern struct instr instrs[519];
+extern short efun_aliases[3];
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# 7 "simulate.h" 2
+
+
+
+
+ 
+
+extern char *last_verb;
+extern char *inherit_file;
+extern int is_wizard_used;
+
+extern struct object *obj_list;
+extern struct object *master_ob;
+extern p_int new_destructed;
+
+extern struct object *current_object;
+extern struct object *command_giver;
+extern struct object *current_interactive;
+
+extern int num_parse_error;
+
+extern struct svalue closure_hook[];
+
+extern int first_showsmallnewmalloced_call;
+
+extern int num_error;
+extern char *current_error;
+extern char *current_error_file;
+extern char *current_error_object_name;
+extern mp_int current_error_line_number;
+
+extern int game_is_being_shut_down;
+extern int master_will_be_updated;
+
+ 
+
+extern void set_svalue_user  (struct svalue *svp, struct object *owner)  ;
+extern struct object *clone_object  (char *str1)  ;
+extern struct svalue *f_rename_object  (struct svalue *sp)  ;
+extern struct object *environment  (struct svalue *arg)  ;
+extern int command_for_object  (char *str, struct object *ob)  ;
+extern struct object *object_present  (struct svalue *v, struct object *ob)  ;
+extern void destruct_object  (struct svalue *v)  ;
+extern void emergency_destruct  (struct object *ob)  ;
+extern void destruct2  (struct object *ob)  ;
+extern void say  (struct svalue *v, struct vector *avoid)  ;
+extern void tell_room  (struct object *room, struct svalue *v, struct vector *avoid)  ;
+extern struct object *first_inventory  (struct svalue *arg)  ;
+extern void enable_commands  (int num)  ;
+extern struct svalue *input_to  (struct svalue *sp, int num_arg)  ;
+extern void free_input_to  (struct input_to *it)  ;
+extern struct vector *get_dir  (char *path, int mask)  ;
+extern int tail  (char *path)  ;
+extern int print_file  (char *path, int start, int len)  ;
+extern int remove_file  (char *path)  ;
+extern void print_svalue  (struct svalue *arg)  ;
+extern void do_write  (struct svalue *arg)  ;
+extern struct object *lookfor_object  (char *str,   int bLoad)  ;
+
+
+extern void move_object  (void)  ;
+extern struct svalue *f_efun308  (struct svalue *sp)  ;
+extern struct svalue *f_set_this_player  (struct svalue *sp)  ;
+extern void add_light  (struct object *p, int n)  ;
+extern struct sentence *alloc_sentence  (void)  ;
+extern void free_all_sent  (void)  ;
+extern void free_shadow_sent  (struct shadow_sentence *p)  ;
+extern int player_parser  (char *buff)  ;
+extern int add_action  (struct svalue *func, struct svalue *cmd, int flag)  ;
+extern struct svalue *f_add_verb  (struct svalue *sp)  ;
+extern struct svalue *f_add_xverb  (struct svalue *sp)  ;
+extern struct svalue *f_remove_action  (struct svalue *sp)  ;
+extern int status_parse  (char *buff)  ;
+extern struct vector *get_action  (struct object *ob, char *verb)  ;
+extern struct vector *get_all_actions  (struct object *ob, int mask)  ;
+extern struct vector *get_object_actions  (struct object *ob1, struct object *ob2)  ;
+extern void error  (char *, ...)  __attribute__ ((format (   printf  ,   1  ,   2  )))   __attribute__ ((noreturn)) ;
+extern void fatal  (char *, ...)  __attribute__ ((format (   printf  ,   1  ,   2  )))   __attribute__ ((noreturn)) ;
+extern void throw_error  (void)  ;
+extern char *limit_error_format  (char *fixed_fmt, char *fmt)  ;
+extern int legal_path  (char *path)  ;
+extern void smart_log  (char *error_file, int line, char *what, char *context)  ;
+extern char *check_valid_path  (char *path, struct object *caller, char *call_fun, int writeflg)  ;
+extern struct svalue *f_shutdown  (struct svalue *sp)  ;
+extern void startmasterupdate  (void)  ;
+extern void shutdowngame  (void)  ;
+
+extern void slow_shut_down  (int minutes)  ;
+extern int match_string  (char *match, char *str, mp_int len)  ;
+
+extern struct svalue *f_set_driver_hook  (struct svalue *sp)  ;
+extern void init_closure_hooks  (void)  ;
+extern struct svalue *f_shadow  (struct svalue *sp)  ;
+extern struct svalue *f_query_shadowing  (struct svalue *sp)  ;
+extern struct svalue *f_unshadow  (struct svalue *sp)  ;
+
+
+extern int transfer_object  (struct svalue *svp)  ;
+
+
+
+extern int do_rename  (char *fr, char *t)  ;
+
+
+
+# 20 "smalloc.c" 2
+
+
+
+
+
+
+
+typedef p_uint u;
+
+void dprintf1 (int, char *, p_int);
+void dprintf2 (int, char *, p_int, p_int);
+void dprintf3 (int, char *, p_int, p_int, p_int);
+
+
+static char *esbrk  (u)  ;
+
+
+
+
+
+
+
+# 54 "smalloc.c"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# 88 "smalloc.c"
+
+
+
+
+
+
+
+
+
+ 
+
+static u *last_small_chunk = 0;
+static u *sfltable[(8) ]={0,0,0,0,0,0,0,0};	 
+static u *sys_sfltable[(8) ]={0,0,0,0,0,0,0,0};
+static u *next_unused=0;
+static u unused_size=0;			 
+
+# 130 "smalloc.c"
+
+
+ 
+
+
+
+
+
+static u *heap_start=0;
+static u *heap_end=0;
+
+
+
+
+
+
+
+ 
+
+static long small_count[(8) ]={0,0,0,0,0,0,0,0};
+static long small_total[(8) ]={0,0,0,0,0,0,0,0};
+static long small_max[(8) ]  ={0,0,0,0,0,0,0,0};
+static long small_free[(8) ] ={0,0,0,0,0,0,0,0};
+static long sys_small_missing[(8) ] ={0,0,0,0,0,0,0,0};
+
+typedef struct { unsigned counter, size; } t_stat;
+
+
+
+
+
+static t_stat sbrk_stat;
+
+int debugmalloc=0;	 
+
+ 
+ 
+ 
+
+
+
+
+
+static char *large_malloc();
+
+static void large_free  (char *)  ;
+
+
+
+
+static t_stat small_alloc_stat={0,0};
+static t_stat small_free_stat={0,0};
+static t_stat small_chunk_stat={0,0};
+
+
+
+
+
+
+void *  xalloc (size)
+  size_t size;
+
+{
+   
+  u *temp;
+
+
+  if (size <= 0)
+      fatal("Malloc size <= 0.\n");
+
+  if (size> ((8) * (4 ) ) )
+    return large_malloc(size,0);
+
+  size = (size+ (1) * (4 ) + (4 ) -1) & ~((4 ) -1);  
+
+
+
+
+   
+  {  small_alloc_stat .size+=( size ); ++ small_alloc_stat .counter; } ;
+
+  (*(u*) ((char*) small_count - (1) * (4 ) - (4 ) +  size ))  += 1;			 
+  (*(u*) ((char*) small_total - (1) * (4 ) - (4 ) +  size ))  += 1;
+  if ((*(u*) ((char*) small_count - (1) * (4 ) - (4 ) +  size ))  > (*(u*) ((char*) small_max - (1) * (4 ) - (4 ) +  size )) )
+    (*(u*) ((char*) small_max - (1) * (4 ) - (4 ) +  size ))  = (*(u*) ((char*) small_count - (1) * (4 ) - (4 ) +  size )) ;
+
+  if ( 0  != (temp = (*(u**)((char*) sfltable - (1) * (4 ) - (4 ) +  size )) ) ) 
+    {					 
+      {  small_free_stat .size-=(  size ); -- small_free_stat .counter; } ;
+
+
+
+
+
+
+
+
+
+
+
+
+      temp += (1) ;
+      (*(u**)((char*) sfltable - (1) * (4 ) - (4 ) +  size ))  = * (u **) temp;
+(void)0 ;
+      return (char *) temp;
+    }					 
+
+  if (unused_size<size)			 
+    {
+      (void)0 ;
+      if (unused_size) {
+        if (unused_size < (4 )  + (1) * (4 ) ) {
+          * ( next_unused )  = 0;
+        } else {
+          * ( next_unused )  = unused_size / (4 )  | (0x10000000 | 0x20000000 );
+          * ((u **) ( next_unused + (1) ))  = (*(u**)((char*) sfltable - (1) * (4 ) - (4 ) +  unused_size )) ;
+
+
+
+          (*(u**)((char*) sfltable - (1) * (4 ) - (4 ) +  unused_size ))  = next_unused;
+          {  small_free_stat .size+=(  unused_size ); ++ small_free_stat .counter; } ;
+        }
+      }
+      next_unused = (u *) large_malloc(0x4000  + sizeof(u*), 1);
+      if (next_unused == 0) {
+	unused_size = 0;
+	if (malloc_privilege < (2) )
+	    return 0;
+	(*(u*) ((char*) sys_small_missing - (1) * (4 ) - (4 ) +  size ))  ++;
+	if ( 0  != (temp = (*(u**)((char*) sys_sfltable - (1) * (4 ) - (4 ) +  size )) ) ) {
+
+
+
+
+
+
+
+
+
+
+
+
+	    temp += (1) ;
+	    (*(u**)((char*) sys_sfltable - (1) * (4 ) - (4 ) +  size ))  = * (u **) temp;
+	    return (char *)temp;
+	}
+	next_unused = (u *) large_malloc(0x4000  + sizeof(u*), 0);
+      }
+      *next_unused = (u)last_small_chunk;
+      last_small_chunk = next_unused++;
+      {  small_chunk_stat .size+=(  0x4000 + (4 ) * (1) +sizeof(u*) ); ++ small_chunk_stat .counter; } ;
+      unused_size = 0x4000 ;
+    }
+else (void)0 ;
+
+
+  temp = (u *) ((u **) ( next_unused + (1) )) ; 
+
+  * ( next_unused )  = size / (4 )  | (0x10000000 | 0x20000000 );
+
+
+
+
+
+
+
+
+
+
+  next_unused += size / (4 ) ;
+  unused_size -= size;
+
+(void)0 ;
+  return (char *) temp;
+}
+
+
+static char *debug_free_ptr;
+
+
+void xfree (ptr)
+void *  ptr;
+{
+    u *block;
+    u i;
+
+
+    debug_free_ptr = ptr;
+
+    block = (u *) ptr;
+    block -= (1) ;
+    i = (* ( block )  & 0x0fffffff );
+    if (i > (8)  + (1) ) {
+	(void)0 ;
+	large_free(ptr);
+	return;
+    }
+
+  {  small_alloc_stat .size-=(  i * (4 )  ); -- small_alloc_stat .counter; } ;
+  {  small_free_stat .size+=(  i * (4 )  ); ++ small_free_stat .counter; } ;
+  i -=  1 + (1) ;
+
+
+
+
+
+  * ((u **) ( block + (1) ))  = sfltable[i];
+  sfltable[i] = block;
+  small_free[i] += 1;
+(void)0 ;
+  return;
+}
+
+ 
+ 
+ 
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+    typedef   char balance_t;
+
+
+
+
+
+
+     
+
+
+
+struct free_block {
+    u size;
+    struct free_block *parent, *left, *right;
+    balance_t balance;
+    short align_dummy;
+};
+
+ 
+
+ 
+extern struct free_block dummy2;   
+static struct free_block dummy =
+	{  0,  &dummy2,  0,  0,  0 };
+       struct free_block dummy2 =
+	{  0,  0,  &dummy,  0,  -1 };
+
+static struct free_block *free_tree = &dummy2;
+
+
+
+# 496 "smalloc.c"
+
+
+
+
+static t_stat large_free_stat;     
+static void remove_from_free_list(ptr)
+u *ptr;
+{
+    struct free_block *p, *q, *r, *s, *t;
+
+
+
+
+
+    (void)0 ;
+    p = (struct free_block *)(ptr+ (1) );
+    {  large_free_stat .size-=(  p->size ); -- large_free_stat .counter; } ;
+
+
+
+
+    if (p->left) {
+        if ( 0  != (q = p->right) ) {
+	    (void)0 ;
+	    s = q;
+	    for ( ; 0  != (r = q, q = r->left); )  ;
+	    if (r == s) {
+		r->left = s = p->left;
+		s->parent = r;
+		if ( 0  != (r->parent = s = p->parent) ) {
+		    if (p == s->left) {
+			s->left  = r;
+		    } else {
+			s->right = r;
+		    }
+		} else {
+		    free_tree = r;
+		}
+		r->balance = p->balance;
+		p = r;
+		goto balance_right;
+	    } else {
+		t = r->parent;
+		if ( 0  != (t->left = s = r->right) ) {
+		    s->parent  = t;
+		}
+		r->balance = p->balance;
+		r->left  = s = p->left;
+		s->parent = r;
+		r->right = s = p->right;
+		s->parent = r;
+		if ( 0  != (r->parent = s = p->parent) ) {
+		    if (p == s->left) {
+			s->left  = r;
+		    } else {
+			s->right = r;
+		    }
+		} else {
+		    free_tree = r;
+		}
+		p = t;
+		goto balance_left;
+	    }
+        } else   {
+             
+
+
+            (void)0 ;
+	    s = p;
+	    p = s->parent;
+            r = s->left;
+            r->parent = p;
+	    if (s == p->left) {
+	        p->left  = r;
+	        goto balance_left;
+	    } else {
+	        p->right = r;
+	        goto balance_right;
+	    }
+        }
+    } else   {
+         
+
+	(void)0 ;
+	s = p;
+	p = s->parent;
+        if ( 0  != (q = r = s->right) ) {
+            r->parent = p;
+        }
+	if (s == p->left) {
+	    p->left  = r;
+	    goto balance_left;
+	} else {
+	    p->right = r;
+	    goto balance_right;
+	}
+    }
+balance_q:
+    r = p;
+    p = q;
+    if (r == p->right) {
+        balance_t b;
+balance_right:
+        b = p->balance;
+        if (b > 0) {
+            p->balance = 0;
+            if (0  != (q = p->parent)) goto balance_q;
+            return;
+        } else if (b < 0) {
+	    r = p->left;
+	    b = r->balance;
+	    if (b <= 0) {
+		 
+
+
+
+
+		if ( 0  != (p->left = s = r->right) ) {
+		    s->parent = p;
+		}
+		r->right = p;
+		s = p->parent;
+		p->parent = r;
+		b += 1;
+		r->balance = b;
+		b = -b;
+
+
+
+
+
+
+
+
+		if ( 0  != (r->parent = s) ) {
+		    if ( 0 != (p->balance = b) ) {
+		        if (p == s->left) {
+			    s->left  = r;
+			    return;
+		        } else {
+			    s->right = r;
+			    return;
+		        }
+		    }
+		    if (p == s->left) {
+			(void)0 ;
+			goto balance_left_s;
+		    } else {
+			(void)0 ;
+			p = s;
+			p->right = r;
+			goto balance_right;
+		    }
+		}
+		p->balance = b;
+		free_tree = r;
+		return;
+	    } else   {
+	         
+	        balance_t b2;
+
+	        (void)0 ;
+	        t = r->right;
+	        b = t->balance;
+	        if ( 0  != (p->left  = s = t->right) ) {
+	            s->parent = p;
+	        }
+	        if ( 0  != (r->right = s = t->left) ) {
+	            s->parent = r;
+	        }
+	        t->left  = r;
+	        t->right = p;
+	        r->parent = t;
+	        s = p->parent;
+	        p->parent = t;
+
+		b = -b;
+		b2 = b >> 1;
+		r->balance = b2;
+		b -= b2;
+		p->balance = b;
+
+
+
+
+
+
+	        t->balance = 0;
+
+
+
+	        if ( 0  != (t->parent = s) ) {
+	            if (p == s->left) {
+	                p = s;
+	                s->left  = t;
+                        goto balance_left;
+	            } else {
+	                p = s;
+                        s->right = t;
+                        goto balance_right;
+	            }
+	        }
+	        free_tree = t;
+	        return;
+	    }
+        } else   {
+            p->balance = -1;
+            return;
+        }
+    } else   {
+        balance_t b;
+
+	goto balance_left;
+balance_left_s:
+	p = s;
+	s->left  = r;
+balance_left:
+        b = p->balance;
+        if (b < 0) {
+            p->balance = 0;
+            if ( 0  != (q = p->parent) ) goto balance_q;
+            return;
+        } else if (b > 0) {
+	    r = p->right;
+	    b = r->balance;
+	    if (b >= 0) {
+		 
+
+
+
+
+		if ( 0  != (p->right = s = r->left) ) {
+		    s->parent = p;
+		}
+		(void)0 ;
+		r->left = p;
+		s = p->parent;
+		p->parent = r;
+		b -= 1;
+		r->balance = b;
+		b = -b;
+# 745 "smalloc.c"
+
+		if ( 0  != (r->parent = s) ) {
+		    if ( 0 != (p->balance = b) ) {
+		        if (p == s->left) {
+			    s->left  = r;
+			    return;
+		        } else {
+			    s->right = r;
+			    return;
+		        }
+		    }
+		    if (p == s->left) {
+			(void)0 ;
+			goto balance_left_s;
+		    } else {
+			(void)0 ;
+			p = s;
+			p->right = r;
+			goto balance_right;
+		    }
+		}
+		p->balance = b;
+		free_tree = r;
+		return;
+	    } else   {
+	         
+	        balance_t b2;
+
+	        (void)0 ;
+	        t = r->left;
+	        b = t->balance;
+	        if ( 0  != (p->right = s = t->left) ) {
+	            s->parent = p;
+	        }
+	        if ( 0  != (r->left  = s = t->right) ) {
+	            s->parent = r;
+	        }
+	        t->right = r;
+	        t->left  = p;
+	        r->parent = t;
+	        s = p->parent;
+	        p->parent = t;
+
+		b = -b;
+		b2 = b >> 1;
+		p->balance = b2;
+		b -= b2;
+		r->balance = b;
+
+
+
+
+
+
+	        t->balance = 0;
+	        if ( 0  != (t->parent = s) ) {
+	            if (p == s->left) {
+	                p = s;
+	                s->left  = t;
+                        goto balance_left;
+	            } else {
+                        s->right = t;
+	                p = s;
+                        goto balance_right;
+	            }
+	        }
+	        free_tree = t;
+	        return;
+	    }
+        } else   {
+            p->balance++;
+            return;
+        }
+    }
+}
+
+static void add_to_free_list(ptr)
+u *ptr;
+{
+    u size;
+    struct free_block *p, *q, *r;
+     
+
+
+
+
+    (void)0 ;
+
+
+
+    size = *ptr & 0x0fffffff ;
+
+
+
+    q = (struct free_block *)size;  
+
+    r = (struct free_block *)(ptr+ (1) );
+    {  large_free_stat .size+=(  size ); ++ large_free_stat .counter; } ;
+    q = free_tree;
+    for ( ; ;  ) {
+        p = (struct free_block *)q;
+
+
+
+        if (size < p->size) {
+            if ( 0  != (q = p->left) ) {
+                continue;
+            }
+            (void)0 ;
+            p->left = r;
+            break;
+        } else   {
+            if ( 0  != (q = p->right) ) {
+                continue;
+            }
+            (void)0 ;
+            p->right = r;
+            break;
+        }
+    }
+    r->size    = size;
+    r->parent  = p;
+    r->left    = 0;
+    r->right   = 0;
+    r->balance = 0;
+
+
+
+
+    do {
+        struct free_block *s;
+
+        if (r == p->left) {
+            balance_t b;
+
+            if ( !(b = p->balance) ) {
+
+
+
+
+
+
+
+		p->balance = -1;
+            } else if (b < 0) {
+
+
+
+                if (r->balance < 0) {
+                     
+                    (void)0 ;
+                    if ( 0  != (p->left = s = r->right) ) {
+                        s->parent = p;
+                    }
+                    r->right = p;
+                    p->balance = 0;
+                    r->balance = 0;
+                    s = p->parent;
+                    p->parent = r;
+                    if ( 0  != (r->parent = s) ) {
+			if ( s->left == p) {
+			    s->left  = r;
+			} else {
+			    s->right = r;
+			}
+                    } else {
+                        free_tree = r;
+                    }
+                } else   {
+                     
+		    balance_t b2;
+                    struct free_block *t = r->right;
+
+
+
+
+
+
+                    if ( 0  != (p->left  = s = t->right) ) {
+                        s->parent = p;
+                    }
+                    (void)0 ;
+                    t->right = p;
+                    if ( 0  != (r->right = s = t->left) ) {
+                        s->parent = r;
+                    }
+                    (void)0 ;
+                    t->left  = r;
+		    b = t->balance;
+
+		    b = -b;
+		    b2 = b >> 1;
+		    r->balance = b2;
+		    b -= b2;
+		    p->balance = b;
+
+
+
+
+
+
+                    t->balance = 0;
+                    (void)0 ;
+                    s = p->parent;
+                    p->parent = t;
+                    r->parent = t;
+                    if ( 0  != (t->parent = s) ) {
+			if ( s->left == p) {
+			    s->left  = t;
+			} else {
+			    s->right = t;
+			}
+                    } else {
+                        free_tree = t;
+                    }
+
+
+
+
+
+
+                }
+                break;
+            } else   {
+                p->balance = 0;
+                (void)0 ;
+                break;
+            }
+        } else   {
+            balance_t b;
+
+            if ( !(b = p->balance) ) {
+		(void)0 ;
+		p->balance++;
+            } else if (b > 0) {
+                if (r->balance > 0) {
+                     
+                    (void)0 ;
+                    if ( 0  != (p->right = s = r->left) ) {
+                        s->parent = p;
+                    }
+                    r->left  = p;
+                    p->balance = 0;
+                    r->balance = 0;
+                    s = p->parent;
+                    p->parent = r;
+                    if ( 0  != (r->parent = s) ) {
+			if ( s->left == p) {
+			    s->left  = r;
+			} else {
+			    s->right = r;
+			}
+                    } else {
+                        free_tree = r;
+                    }
+                } else   {
+                     
+		    balance_t b2;
+                    struct free_block *t = r->left;
+
+
+
+
+
+
+                    if ( 0  != (p->right = s = t->left) ) {
+                        s->parent = p;
+                    }
+                    (void)0 ;
+                    t->left  = p;
+                    if ( 0  != (r->left  = s = t->right) ) {
+                        s->parent = r;
+                    }
+                    (void)0 ;
+                    t->right = r;
+		    b = t->balance;
+
+		    b = -b;
+		    b2 = b >> 1;
+		    p->balance = b2;
+		    b -= b2;
+		    r->balance = b;
+
+
+
+
+
+
+                    t->balance = 0;
+                    s = p->parent;
+                    p->parent = t;
+                    r->parent = t;
+                    if ( 0  != (t->parent = s) ) {
+			if ( s->left == p) {
+			    s->left  = t;
+			} else {
+			    s->right = t;
+			}
+                    } else {
+                        free_tree = t;
+                    }
+                    (void)0 ;
+                }
+                break;
+            } else   {
+
+
+
+
+
+                p->balance = 0;
+                (void)0 ;
+                break;
+            }
+        }
+        r = p;
+        p = p->parent;
+    } while ( 0  != (q = p) );
+    (void)0 ;
+}
+
+# 1116 "smalloc.c"
+
+
+static void build_block(ptr, size)	 
+u *ptr;
+u size;
+{
+  u tmp;
+
+  tmp = (*ptr & 0x80000000 ) | size;
+  *(ptr+size-1) = size;
+  *(ptr) = tmp;		 
+  *(ptr+size) &= ~0x80000000 ;  
+}
+
+static void mark_block(ptr)		 
+u *ptr;
+{
+  * (( ptr ) + (0x0fffffff  & (*( ptr ))) )  |= 0x80000000 ;
+  *ptr |= 0x40000000  | 0x10000000  | 0x20000000 ;
+}
+
+static t_stat large_alloc_stat;
+
+
+
+
+
+
+static char *large_malloc(size, force_more)
+    u size;
+    int force_more;
+
+{
+    u real_size;
+    u *ptr;
+
+(void)0 ;
+
+
+
+    size = (size + (4 ) * (1)  + (4 ) -1) / (4 ) ;  
+    {  large_alloc_stat .size+=(  size ); ++ large_alloc_stat .counter; } ;
+
+retry:
+    ptr = 0;
+    if (!force_more) {
+
+
+	struct free_block *p, *q, *r;
+	u minsplit;
+	u tempsize;
+
+	ptr += (1) ;
+	minsplit = size + (8)  + (1) ;
+	q = free_tree;
+	for ( ; ; ) {
+	    p = q;
+
+
+
+	    tempsize = p->size;
+	    if (minsplit < tempsize) {
+		ptr = (u*)p;  
+		if ( 0  != (q = p->left) ) {
+		    continue;
+		}
+		 
+		break;
+	    } else if (size > tempsize) {
+		if ( 0  != (q = p->right) ) {
+		    continue;
+		}
+		break;
+	    } else   {
+		if (size == tempsize) {
+		    ptr = (u*)p;
+		    break;
+		}
+		 
+		if ( 0  != (q = p->left) ) {
+		    r = p;
+		     
+
+
+
+		    for (;;) {
+			p = q;
+			tempsize = p->size;
+			if (size < tempsize) {
+			    if ( 0  != (q = p->left) ) {
+				continue;
+			    }
+			    break;
+			} else if (size > tempsize ) {
+			    if ( 0  != (q = p->right) ) {
+			        continue;
+			    }
+			    break;
+			} else {
+			    ptr = (u*)p;
+			    goto found_fit;
+			}
+		    }
+		    p = r;
+		}
+		tempsize = p->size;
+		if (minsplit > tempsize) {
+		    if ( 0  != (q = p->right) ) {
+			for (;;) {
+			    p = q;
+			    tempsize = p->size;
+			    if (minsplit <= tempsize) {
+				ptr = (u*)p;  
+				if ( 0  != (q = p->left) ) {
+				    continue;
+				}
+				break;
+			    } else   {
+				if ( 0  != (q = p->right) ) {
+				    continue;
+				}
+				break;
+			    }
+			}  
+			break;
+		    }
+		    break;  
+		}
+		 
+		ptr = (u*)p;
+		break;
+	    }
+	}  
+found_fit:
+	ptr -= (1) ;
+# 1304 "smalloc.c"
+
+    }  
+    if (!ptr)		 
+    {
+      u chunk_size, block_size;
+      block_size = size* (4 ) ;
+      if (force_more ||
+	  block_size > 0x40000  - ((8) * (4 ) )  - (1) * (4 )  )
+      {
+	chunk_size = block_size;
+      } else {
+	chunk_size = 0x40000 ;
+      }
+
+      {
+
+	if ((mp_int)(sbrk_stat.size + chunk_size) > max_malloced &&
+	    (chunk_size = max_malloced - sbrk_stat.size - (heap_start?0: (4 ) ) )
+	    < block_size)
+	{
+	  ptr = 0;
+	}
+	else
+
+	{
+	  ptr = (u *) esbrk(chunk_size);
+	}
+      }
+      if (ptr == 0) {
+	static int going_to_exit=0;
+	static char mess1[] =
+	  "Temporary out of MEMORY. Freeing user reserve.\n";
+	static char mess2[] =
+	  "Temporary out of MEMORY. Freeing master reserve.\n";
+	static char mess3[] =
+	  "Temporary out of MEMORY. Freeing system reserve.\n";
+	static char mess4[] =
+	  "Totally out of MEMORY.\n";
+
+	if (going_to_exit)
+	  exit(3);
+	if (force_more && (mp_int)small_chunk_stat.size < max_small_malloced) {
+	     
+
+
+
+	    force_more = 0;
+	    goto retry;
+	} else {
+	    garbage_collect_to_do = (1) ;
+	    extra_jobs_to_do = (1) ;
+	    if (reserved_user_area) {
+		xfree (reserved_user_area);
+		reserved_user_area = 0;
+		write(2, mess1, sizeof(mess1)-1);
+		goto retry;
+	    }
+	    if (malloc_privilege >= (1)  && reserved_master_area) {
+		xfree (reserved_master_area);
+		reserved_master_area = 0;
+		write(2, mess2, sizeof(mess2)-1);
+		goto retry;
+	    }
+	    if (malloc_privilege >= (2)  && reserved_system_area) {
+		xfree (reserved_system_area);
+		reserved_system_area = 0;
+		write(2, mess3, sizeof(mess3)-1);
+		goto retry;
+	    }
+	}
+	if (malloc_privilege < (2) ) {
+	    {  large_alloc_stat .size-=(  size ); -- large_alloc_stat .counter; } ;
+	    out_of_memory = 1;
+	    return 0;
+	}
+	going_to_exit = 1;
+	write(2, mess4, sizeof(mess4)-1);
+	(void)dump_trace(0);
+
+	fatal("Out of memory\n");
+
+
+
+      }
+
+
+
+      block_size = chunk_size / (4 ) ;
+
+			 
+      
+      build_block(ptr,block_size);
+if (force_more)
+(void)0 ;
+else
+(void)0 ;
+      add_to_free_list(ptr);
+    }     
+  remove_from_free_list(ptr);
+  real_size = *ptr & 0x0fffffff ;
+
+  if (real_size - size) {
+	 
+    build_block(ptr+size, real_size-size);
+(void)0 ;
+# 1418 "smalloc.c"
+
+    {
+	add_to_free_list(ptr+size);
+    }
+    build_block(ptr, size);
+  }
+
+  mark_block(ptr);
+(void)0 ;
+
+
+
+
+
+
+
+
+
+
+  return (char *) (ptr + (1) );
+}
+
+static void large_free(ptr)
+char *ptr;
+{
+  u size, *p;
+  p = (u *) ptr;
+  p -= (1) ;
+  size = *p & 0x0fffffff ;
+  {  large_alloc_stat .size-=(  size ); -- large_alloc_stat .counter; } ;
+
+
+
+
+
+  if (!(*(p+size) & 0x40000000 )) {
+    remove_from_free_list(p+size);
+    size += (*(p+size) & 0x0fffffff );
+    *p = (*p & 0x80000000 ) | size;
+  }
+
+  if ((!(* p  & 0x80000000 )) ) {
+    remove_from_free_list((( p ) - (0x0fffffff  & (*(( p )-1))) ) );
+    size += (* (( p ) - (0x0fffffff  & (*(( p )-1))) )  & 0x0fffffff );
+    p = (( p ) - (0x0fffffff  & (*(( p )-1))) ) ;
+  }
+
+  build_block(p, size);
+
+  add_to_free_list(p);
+}
+
+void *  malloc (size)
+size_t size;
+{
+    u* temp;
+
+    temp = (u*)xalloc(size+(8 - (4 ) ));
+    if (!temp) {
+	int save_privilege = malloc_privilege;
+	malloc_privilege = (2) ;
+	temp = (u*)xalloc(size+(8 - (4 ) ));
+	malloc_privilege = save_privilege;
+	if (!temp)
+	    return 0;
+    }
+    temp[- (1) ] &= ~0x10000000 ;
+
+    while ((u)temp & (8 -1)) *temp++ = 0;
+
+    return (char*)temp;
+}
+
+void *  permanent_xalloc(size)
+size_t size;
+{
+    u* temp;
+
+    temp = (u*)xalloc(size);
+    if (temp)
+	temp[- (1) ] &= ~0x10000000 ;
+    return (char*)temp;
+}
+
+void  pfree(p)
+void *  p;
+{
+    ((u*)p)[- (1) ] |= (0x20000000 | 0x10000000 );
+    xfree (p);
+    return; ;
+}
+
+
+void  free (p)
+void *  p;  
+{
+    u*q = (u*)p;
+
+    if (!q) return;
+
+    while (!*--q)  ;
+    q[1- (1) ] |= (0x20000000 | 0x10000000 );
+    xfree ((char *)(q+1));
+    return; 
+}
+
+
+
+static void *  realloc (p, size)
+void *  p; size_t size;
+{
+   u *q, old_size;
+   char *t;
+   
+   q = (u *) p;
+
+
+   if (!q)			 
+	return malloc (size);
+
+	
+
+   while ( !(old_size = *--q) );
+
+
+
+   old_size = ((old_size & 0x0fffffff )-1)* (4 ) ;
+
+
+
+
+
+   if (old_size >= size)
+      return p;
+
+   t = malloc (size);
+   if (t == 0) return (char *) 0;
+
+   memcpy(t, p, old_size);
+   free (p);
+   return t;
+}
+
+
+void *  rexalloc(p, size)
+void *  p; size_t size;
+{
+   u *q, old_size;
+   char *t;
+   
+   q = (u *) p;
+	
+   q -= (1) ;
+   old_size = ((*q & 0x0fffffff )- (1) )* (4 ) ;
+   if (old_size >= size)
+      return p;
+
+   t = xalloc(size);
+   if (t == 0) return (char *) 0;
+
+   memcpy(t, p, old_size);
+   xfree(p);
+   return t;
+}
+
+ 
+
+
+
+static char *esbrk(size)
+u size;
+{
+
+
+  extern char *sbrk();
+  extern int brk();
+
+
+  if (!heap_end) {
+    heap_start = heap_end = (u*)sbrk(0);
+    if (!esbrk((4 ) ))
+      fatal("Couldn't malloc anything\n");
+    *heap_start = 0x80000000 ;
+    (void)0 ;
+  }
+  if (brk((char *)heap_end + size) == -1)
+    return 0;
+  {  sbrk_stat .size+=( size ); ++ sbrk_stat .counter; } ;
+  heap_end = (u*)((char *)heap_end + size);
+  heap_end[-1] = 0x40000000 ;
+  return (char *)(heap_end - 1) - size;	 
+# 1674 "smalloc.c"
+
+}
+
+int resort_free_list() { return 0; }
+
+int malloc_size_mask() { return 0x0fffffff ; }
+
+static long malloc_increment_size_calls = 0;
+static long malloc_increment_size_success = 0;
+static long malloc_increment_size_total = 0;
+
+
+
+void dump_malloc_data()
+{
+  add_message("Type                   Count      Space (bytes)\n");
+  add_message( "sbrk requests:     %8d        %10d (a)\n" , sbrk_stat .counter, sbrk_stat .size) ;
+  add_message ( "large blocks:      %8d        %10d (b)\n" , large_alloc_stat .counter, large_alloc_stat .size * (4 ) ) ;
+  add_message ( "large free blocks: %8d        %10d (c)\n\n" , large_free_stat .counter, large_free_stat .size * (4 ) ) ;
+  add_message( "small chunks:      %8d        %10d (d)\n" , small_chunk_stat .counter, small_chunk_stat .size) ;
+  add_message( "small blocks:      %8d        %10d (e)\n" , small_alloc_stat .counter, small_alloc_stat .size) ;
+  add_message( "small free blocks: %8d        %10d (f)\n" , small_free_stat .counter, small_free_stat .size) ;
+  add_message(
+"unused from current chunk          %10ld (g)\n\n",unused_size);
+  add_message(
+"    Small blocks are stored in small chunks, which are allocated as\n");
+  add_message(
+"large blocks.  Therefore, the total large blocks allocated (b) plus\n");
+  add_message(
+"the large free blocks (c) should equal total storage from sbrk (a).\n");
+  add_message(
+"Similarly, (e) + (f) + (g) equals (d).  The total amount of storage\n");
+  add_message(
+"wasted is (c) + (f) + (g); the amount allocated is (b) - (f) - (g).\n");
+  add_message(
+    "malloc_increment_size: calls %ld success %ld total %ld\n",
+    malloc_increment_size_calls,
+    malloc_increment_size_success,
+    malloc_increment_size_total
+  );
+}
+
+ 
+
+
+void *  calloc(nelem, sizel)
+    size_t nelem, sizel;
+{
+    char *p;
+
+    if (nelem == 0 || sizel == 0)
+	return 0;
+    p = malloc (nelem * sizel);
+    if (p == 0)
+	return 0;
+    (void)memset(p, '\0', nelem * sizel);
+    return p;
+}
+
+# 1783 "smalloc.c"
+
+# 1825 "smalloc.c"
+
+
+static void print_block(d, block)
+    int d;
+    u *block;
+{
+    u size;
+# 1845 "smalloc.c"
+
+    size = ((*block & 0x0fffffff ) - (1) )* (4 ) ;
+    if (d > 70)
+	return;
+    write(d, (char *)(block+ (1) ), size);
+    write(d, "\n", 1);
+}
+
+void clear_M_REF_flags() {
+    u *p, *q, *last;
+    int i;
+
+    last = heap_end - 1;
+    for (p = heap_start; p < last; ) {
+	*p &= ~0x20000000 ;
+	if (p + (*p & 0x0fffffff ) > heap_end) fatal("pointer larger than break\n");
+	p += *p & 0x0fffffff ;
+    }
+    for (p = last_small_chunk; p; p = *(u**)p) {
+	u *end;
+
+	note_malloced_block_ref((char *)p);
+	end = p - (1)  + (p[- (1) ] & 0x0fffffff );
+
+	dprintf2(gcollect_outfd , "scanning chunk %x, end %x\n",
+	  (u)(p - (1) ), (u)end
+	);
+
+	 
+
+
+	if (unused_size)
+	    *next_unused = 0;
+	for (q = p+1; q < end; ) {
+	    u size = *q;
+
+	    if (!size) break;
+	    *q &= ~0x20000000 ;
+	    q += size & 0x0fffffff ;
+	}
+	if (q > end) {
+	     
+
+
+
+	    fatal("Small block error, start: %lx, %lx vs. %lx\n",
+	      (long)(p+1), (long)q, (long)end);
+	}
+    }
+
+     
+
+
+
+
+    for (i=0; i < (8) ; i++) {
+	for (p = sfltable[i]; p; p = * (u **) (p + (1) ) ) {
+	    *p |= 0x20000000 ;
+	}
+    }
+    first_showsmallnewmalloced_call = 1;
+}
+
+# 1930 "smalloc.c"
+
+
+void free_unreferenced_memory() {
+    u *p, *q, *last;
+    mp_int success = 0;
+
+    last = heap_end - 1;
+    for (p = heap_start; p < last; ) {
+	u size;
+
+	size = *p;
+	if ( (size & (0x20000000 | 0x40000000 | 0x10000000 )) == (0x40000000 | 0x10000000 ) ) {
+	    u size2;
+
+	    success++;
+
+
+
+
+
+
+
+
+
+
+
+	    print_block(gcollect_outfd , p);
+	    size2 = p[size & 0x0fffffff ];
+	    large_free((char *)(p+ (1) ));
+	    if ( !(size2 & 0x40000000 ) )
+		size += size2;
+	}
+	p += size & 0x0fffffff ;
+    }
+    if (success) {
+	dprintf1(gcollect_outfd , "%d large blocks freed\n", success);
+    }
+    success = 0;
+    for (p = last_small_chunk; p; p = *(u**)p) {
+	u *end;
+
+	end = p - (1)  + (p[- (1) ] & 0x0fffffff );
+
+	dprintf2(gcollect_outfd , "scanning chunk %x, end %x\n",
+	  (u)(p - (1) ), (u)end
+	);
+
+	if (unused_size)
+	    *next_unused = 0;
+	for (q = p+1; q < end; ) {
+	    u size = *q;
+
+	    if (!size) break;
+	    if ((*q & (0x20000000 | 0x10000000 )) == 0x10000000 ) {
+		success++;
+		dprintf1(gcollect_outfd , "small block 0x%x", (p_uint)q);
+
+
+
+		write(( gcollect_outfd  ), (  "\n" ), strlen(  "\n" )) ;
+
+
+
+		print_block(gcollect_outfd , q);
+		*q |= 0x20000000 ;
+		xfree ((char *)(q+ (1) ));
+	    }
+	    q += size & 0x0fffffff ;
+	}
+    }
+    if (success) {
+	dprintf1(gcollect_outfd , "%d small blocks freed\n", success);
+    }
+}
+char *malloc_increment_size(p, size)
+    char *p;
+    p_int size;
+{
+    p_uint *start, *start2, *start3, old_size, next;
+
+    malloc_increment_size_calls++;
+    start = (p_uint*)p - (1) ;
+    old_size = start[0] & 0x0fffffff ;
+    if (old_size <= (8)  + (1) )
+	return 0;
+    start2 = &start[old_size];
+    next = *start2;
+    if (next & 0x40000000 )
+	return 0;
+    next &= 0x0fffffff ;
+    if (next == (p_uint)size) {
+	remove_from_free_list(start2);
+	start2[next] |= 0x80000000 ;
+	start[0] += size;
+	malloc_increment_size_success++;
+	malloc_increment_size_total += (start2 - start) - (1) ;
+	{  large_alloc_stat .size+=(  size ); } ;
+	return (char*)start2;
+    }
+    if (next >= (p_uint)size + (8)  + (1) ) {
+	remove_from_free_list(start2);
+	start2[next-1] -= size;
+	start3 = start2 + size;
+	start3[0] = (next-size) | 0x80000000 ;
+	add_to_free_list(start3);
+	start[0] += size;
+	malloc_increment_size_success++;
+	malloc_increment_size_total += (start2 - start) - (1) ;
+	{  large_alloc_stat .size+=(  size ); } ;
+	return (char*)start2;
+    }
+    return 0;
+}
+
+
+ 
+
+
+
+void walk_new_small_malloced(func)
+    void (*func)  (void * , long)  ;
+{
+    int i;
+    u *p, *q;
+
+    for (i=0; i < (8) ; i++) {
+	for (p = sfltable[i]; p; p = * (u **) (p + (1) ) ) {
+	    * ( p )  &= ~0x20000000 ;
+	}
+    }
+    for (p = last_small_chunk; p; p = *(u**)p) {
+	u *end = p - (1)  + (p[- (1) ] & 0x0fffffff );
+
+	dprintf2(2, "scanning chunk %x, end %x\n", (u)(p - (1) ), (u)end);
+	if (unused_size)
+	    *next_unused = 0;
+	for (q = p+1; q < end; ) {
+	    u size = * ( q ) ;
+
+	    if (!size) break;
+	    if (size & 0x20000000 ) {
+		(*func)( (char*)((u **) ( q + (1) )) , (size & 0x0fffffff ) * (4 ) );
+		* ( q )  &= ~0x20000000 ;
+	    }
+	    q += size & 0x0fffffff ;
+	}
+    }
+    for (i=0; i < (8) ; i++) {
+	for (p = sfltable[i]; p; p = * (u **) (p + (1) ) ) {
+	    * ( p )  |= 0x20000000 ;
+	}
+    }
+}
+
+# 2165 "smalloc.c"
+
+
+ 
+char *dprintf_first(fd, s, a)
+    int fd;
+    char *s;
+    p_int a;
+{
+    char *p;
+
+    do {
+	if ( !(p = strchr(s, '%')) ) {
+	    write(( fd ), (  s ), strlen(  s )) ;
+	    return "";
+	}
+	write(fd, s, p - s);
+	switch(p[1]) {
+	  case '%':
+	    write(fd, p+1, 1);
+	    continue;
+	  case 's':
+	    write(( fd ), (  (char *)a ), strlen(  (char *)a )) ;
+	    break;
+	  case 'd':
+	    writed(fd, a);
+	    break;
+	  case 'x':
+	    writex(fd, a);
+	    break;
+	}
+	return p+2;
+    } while (1);
+}
+
+ 
+void dprintf1(fd, s, a)
+    int fd;
+    char *s;
+    p_int a;
+{
+    s = dprintf_first(fd, s, a);
+    write(( fd ), (  s ), strlen(  s )) ;
+}
+
+ 
+void dprintf2(fd, s, a, b)
+    int fd;
+    char *s;
+    p_int a, b;
+{
+    s = dprintf_first(fd, s, a);
+    dprintf1(fd, s, b);
+}
+
+ 
+void dprintf3(fd, s, a, b, c)
+    int fd;
+    char *s;
+    p_int a, b, c;
+{
+    s = dprintf_first(fd, s, a);
+    dprintf2(fd, s, b, c);
+}
+
+

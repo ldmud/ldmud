@@ -1,0 +1,7 @@
+Short: Compilation warning for smalloc.c on SunOS4.
+
+When compiling smalloc.c, gcc warns about a redefinition of realloc().
+See wk/machine.h- and wk/smalloc.i-sunos4.
+
+-> No bug; just an artifact caused by the extensive renaming of the
+   malloc functions.
