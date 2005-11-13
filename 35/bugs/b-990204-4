@@ -1,0 +1,8 @@
+Short: CYGWIN vs CYGWIN32
+Date: 990204
+From: Stefan (Peng@FinalFrontier)
+Type: Bug
+State: Acknowledged
+
+Newer cygwin versions define __CYGWIN__ instead of __CYGWIN32__
+

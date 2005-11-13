@@ -1,0 +1,212 @@
+Short: Crasher in call_out() on efun-closures
+From: Michael Sporn
+Date: 990121
+Type: Patch
+State: Applied
+See also: b-990207
+
+Also: das erste Problem tritt in call_outs auf efun closures auf. Folgendes
+object verursacht einen core dump:
+
+/*************************/
+
+t() { raise_error("testerror\n"); }
+
+reset() {
+    int i;
+    i=2; // einen call_out verkraftet er noch
+    while (i--)
+            call_out(#'call_other, 0, this_object(), "t");
+}
+
+/*************************/
+
+Der Grund is, dass current_prog nich gesetzt wird beim Ausfuehren von efun
+closures (bei 2 aufeinanderfolgenden fehlern im call_out is beim zweiten 
+call_out current_prog 0) und bei runtime error in csp->prog dann ein falscher 
+Wert steht. 
+
+First solution, probably the correct one:
+------------------------------
+Hallo Lars, neulich hatte ich dir einen bug im driver beschrieben mit einem
+kleinen patch. Nun hab ich noch ein bisschen geschaut und den eigentlichen
+Fehler gefunden. Es liegt daran, dass current_prog zu Beginn des call_outs
+unsinninge Werte annimmt (es sind programme aus vorhergehenden call_outs oder
+aus dem letzten heart_beat ... wenn ein runtime error auftrat, ist 
+current_prog 0). Den letzten patch kannst du also vergessen.
+
+
+*** ldmud-3.2.5.orig/call_out.c	Thu Dec 10 03:37:36 1998
+--- ldmud-3.2.5/call_out.c	Sun Jan 17 12:20:11 1999
+***************
+*** 607,612 ****
+--- 607,619 ----
+              else
+              {
+                  current_object = ob;
++ 		current_prog = ob->prog; 
++ 		    /* sunblood: you have to set current_prog, else it is 
++ 		     * something left from a previous heart_beat or call_out 
++ 		     * or even NULL. I don't know if ob->prog is ok or if 
++ 		     * it's even necessary to save the prog where the 
++ 		     * call_out actually came from
++ 		     */ 
+                  user = ob->user;
+                  if (user->last_call_out != current_time)
+                  {
+***************
+*** 637,642 ****
+--- 644,650 ----
+                  struct wiz_list *user;
+  
+                  current_object = ob;
++ 		current_prog = ob->prog; 	/* see above */
+                  user = ob->user;
+                  if (user->last_call_out != current_time)
+                  {
+------------------------------
+
+Second solution, might contain some general elements:
+------------------------------
+Ich habe versucht, current_prog auf einen festen Pointer zu 
+setzen, der dann auch gleich efun-closures als solche kennzeichnet, was es 
+auch moeglich macht, im trace von runtime errors diese als solche auszugeben 
+(und nicht mehr als lambda-closure).
+
+
+*** ldmud-3.2.5.orig/interpret.c	Thu Dec 10 03:37:36 1998
+--- ldmud-3.2.5/interpret.c	Wed Jan 20 03:08:33 1999
+***************
+*** 79,84 ****
+--- 79,85 ----
+  static void call_simul_efun PROT((int code, struct object *ob, int num_arg));
+  
+  struct program *current_prog;
++ static struct program efun_closure_marker;
+  
+  /* A function call can cause an eval_cost overflow linear to the number of
+   * shadows. Well, adding more than a million is likely to cause memory
+***************
+*** 10697,10730 ****
+              goto name_computed;
+          }
+  not_catch:
+!             if (p[0].funstart == SIMUL_EFUN_FUNSTART) {
+!                 /* prog is undefined */
+!                 (void)printf("<simul_efun closure> bound to '%20s' ('%20s')\n",
+!                     ob->prog->name, ob->name);
+!                 debug_message("<simul_efun closure> bound to '%20s' ('%20s')\n",
+!                     ob->prog->name, ob->name);
+!                 continue;
+!             } else if (p[0].funstart < prog->program ||
+!                        p[0].funstart > PROGRAM_END(*prog))
+!             {
+!                 (void)printf("<lambda 0x%6lx> in '%20s' ('%20s')offset %ld\n",
+!                     (long)p[0].funstart, ob->prog->name, ob->name,
+                      dump_pc - p[0].funstart - 2L );
+!                 debug_message("<lambda 0x%6lx> in '%20s' ('%20s')offset %ld\n",
+!                     (long)p[0].funstart, ob->prog->name, ob->name,
+                      dump_pc - p[0].funstart - 2L );
+!                 continue;
+!             }
+!             else if (!dump_pc)
+!             {
+!                 printf("<function symbol> in '%20s' ('%20s')\n"
+!                       , ob->prog->name, ob->name);
+!                 debug_message("<function symbol> in '%20s' ('%20s')\n"
+!                              , ob->prog->name, ob->name);
+!                 continue;
+!             }
+!             line = get_line_number(dump_pc, prog, &file);
+!             memcpy((char*)&name, p[0].funstart - 1 - sizeof name, sizeof name);
+  name_computed:
+          if (strcmp(name, "heart_beat") == 0 && p != csp)
+              ret = p->extern_call ? (p->ob?p->ob->name:0) : ob->name;
+--- 10703,10747 ----
+              goto name_computed;
+          }
+  not_catch:
+!         if ((ob->flags & O_SWAPPED) && load_ob_from_swap(ob) < 0)
+!             file = "(swapped out)";
+!         else
+!             file = ob->prog->name;
+! 
+!         if (p[0].funstart == SIMUL_EFUN_FUNSTART) {
+!             /* prog is undefined */
+!             (void)printf("<simul_efun closure> bound to '%20s' ('%20s')\n",
+!                          file, ob->name);
+!             debug_message("<simul_efun closure> bound to '%20s' ('%20s')\n",
+!                     file, ob->name);
+!             continue;
+!         } else if (prog == &efun_closure_marker) {
+!             (void)printf("<efun closure> bound to '%20s' ('%20s')\n",
+!                          file, ob->name);
+!             debug_message("<efun closure> bound to '%20s' ('%20s')\n",
+!                     file, ob->name);
+!             continue;
+!         } else if (p[0].funstart < prog->program ||
+!                 p[0].funstart > PROGRAM_END(*prog))
+!         {
+!             (void)printf("<lambda 0x%6lx> in '%20s' ('%20s')offset %ld\n",
+!                     (long)p[0].funstart, file, ob->name,
+                      dump_pc - p[0].funstart - 2L );
+!             debug_message("<lambda 0x%6lx> in '%20s' ('%20s')offset %ld\n",
+!                     (long)p[0].funstart, file, ob->name,
+                      dump_pc - p[0].funstart - 2L );
+!             continue;
+!         }
+!         else if (!dump_pc)
+!         {
+!             printf("<function symbol> in '%20s' ('%20s')\n"
+!                     ,file, ob->name);
+!             debug_message("<function symbol> in '%20s' ('%20s')\n"
+!                     ,file, ob->name);
+!             continue;
+!         }
+!         line = get_line_number(dump_pc, prog, &file);
+!         memcpy((char*)&name, p[0].funstart - 1 - sizeof name, sizeof name);
+  name_computed:
+          if (strcmp(name, "heart_beat") == 0 && p != csp)
+              ret = p->extern_call ? (p->ob?p->ob->name:0) : ob->name;
+***************
+*** 10743,10748 ****
+--- 10760,10771 ----
+          *name = "<simul_efun closure>";
+          return 0;
+      }
++ 
++     if (current_prog == &efun_closure_marker) {
++         *name = "<efun closure>";
++         return 0;
++     }
++ 
+      if (current_prog) {
+          if (csp->funstart < current_prog->program ||
+              csp->funstart > PROGRAM_END(*current_prog))
+***************
+*** 12880,12886 ****
+--- 12903,12916 ----
+                   * valid else the driver will think on F_RETURN that
+                   * it encountered the bottom of the cs stack and
+                   * forget to update current_strings. At least.
++                  *
++                  * sunblood: you have to set current_prog, not csp->prog.
++                  *      (efun_closurer_marker is initialized to 0 except
++                  *      its name ... i hope that's no problem)
++                  *      and this avoids a crash which could occur when
++                  *      current_prog was 0 (in a call_out to an efun closure)
+                   */
++                 current_prog = &efun_closure_marker;
+                  csp->funstart = code - 2;
+                  csp->num_local_variables = 0;
+                  inter_fp = sp - num_arg + 1;
+***************
+*** 13097,13100 ****
+--- 13127,13131 ----
+     */
+    memset(cache_id, 0, sizeof cache_id);
+    memset(cache_progp, 1, sizeof cache_progp);
++   efun_closure_marker.name == "efun closure";
+  }
+------------------------------
+
