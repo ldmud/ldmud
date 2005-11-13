@@ -1,0 +1,87 @@
+sysmalloc (|| make_func):
+  xfree            -> free
+  rexalloc         -> realloc
+  amalloc          -> xalloc
+  permanent_xalloc -> xalloc
+  afree            -> free
+  pfree            -> free
+  !def(xalloc): xalloc(size)
+  main.c implements:
+    xalloc() using malloc()
+
+smalloc:
+   sbrkok: malloc() undef'd
+           calloc() undef'd
+   sbrkok: amalloc -> malloc
+   sbrkok: afree   -> free
+  !sbrkok: amalloc(), smalloc_calloc(), afree()
+  !sbrkok: calloc  -> smalloc_calloc()
+  !sbrkok: free    -> afree
+  !sbrkok && !SMALLOC: malloc -> amalloc
+           xfree()
+           rexalloc()
+    align||free_null:  pfree(), def PFREE-defs
+  !(align||free_null): pfree -> afree, def PFREE-defs
+           permanent_xalloc()
+           pfree() // might be def'd to afree or free
+   trace:  xalloc(size) -> smalloc(size, file, line)
+  !def(xalloc): xalloc(size)
+
+  smalloc.c implements:
+    smalloc() , if !trace def'd to xalloc()
+    sfree()   def'd to xfree
+    srealloc  def'd to realloc using amalloc()/afree()
+    amalloc()
+    permanent_xalloc()
+    pfree() which might be def'd to afree() or free()
+    afree() if align||free_null, which might be def'd to free()
+    rexalloc() using xalloc/xfree()
+    calloc() using amalloc()
+    malloc_increment_size()
+
+
+How the mem-function calls are resolved:
+
+-----------------------------------------------------------------------------------------+
+           : sysmalloc    : smalloc                                                      :
+           :              : sbrkok                          : !sbrkok                    :
+           :              : align          : !align         : align    : !align          :
+-----------+--------------:----------------+----------------+----------+-----------------+
+malloc()   :  malloc      : sm:malloc(amalloc)              : sm:amalloc                 :
+calloc()   :  calloc      : sm:calloc                       : sm:smalloc_calloc(calloc)  :
+realloc()  :  realloc     : sm:realloc(srealloc)                                         :
+free()     :  free        : sm:free(afree) : sm:free(pfree) : sm:afree : sm:afree(pfree) :
+           :              :                                                              :
+xalloc()   :  main:xalloc : sm:xalloc(smalloc                                            :
+rexalloc() :  realloc     : sm:rexalloc(rexalloc)                                        :
+xfree()    :  free        : sm:xfree(sfree)                                              :
+           :              :                                                              :
+pxalloc()  :  main:xalloc : sm:pxalloc                                                   :
+pfree()    :  free        : sm:pfree       : sm:free(pfree) : sm:pfree : sm:free(pfree)  :
+           :              :                                                              :
+amalloc()  :  main:xalloc : sm:malloc(amalloc)              : sm:amalloc                 :
+afree()    :  free        : sm:free(afree) : sm:free(pfree) : sm:afree : sm:afree(pfree) :
+-----------+--------------+--------------------------------------------------------------+
+Notation: file:function_name(written_function_name) 
+          Omitted file means libc.
+          Omitted written_function_name if not different.
+
+
+As what the functions in smalloc are compiled:
+
+-----------------------------------------------------------------------------------------+
+           : sbrkok                          : !sbrkok                    : uses         :
+           : align          : !align         : align    : !align          :              :
+-----------+----------------+----------------+----------+-----------------+--------------+
+smalloc    : smalloc/xalloc                                               :              :
+sfree      : xfree                                                        :              :
+srealloc   : realloc                                                      : amalloc      :
+amalloc    : malloc                          : amalloc                    : xalloc       :
+pxalloc    : pxalloc                                                      : xalloc       :
+pfree      : pfree          : free           : pfree    : free            : s(x)free     :
+afree      : free           :  -             : free     :  -              : s(x)free     :
+rexalloc   : rexalloc                                                     : xalloc/xfree :
+calloc     : calloc                          : smalloc_calloc             : amalloc      :
+-----------------------------------------------------------------------------------------+
+
+amallocs() are automatically permanent.

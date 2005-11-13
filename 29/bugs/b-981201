@@ -1,0 +1,53 @@
+Short: bug with virtual variables
+Type: Bug
+State: Unclassified
+From: Christian Mudra <c_mudra@informatik.uni-kl.de>
+
+Hiho,
+
+I want to point out to a bug in the virtual inheritance, which lead to
+some nasty bugs. Because I found that bug still remaining in the
+3.2.5.dev25-release, I report it ...
+
+Although I discovered the bug (in TubMud), Alfe@Tubmud worked it out to make 
+a minimal version, which is now following:
+
+We have four files, [a-d].c:
+
+a.c:
+inherit "players/alfe/2virtual/b";
+inherit "players/alfe/2virtual/c";
+
+b.c:
+private mixed one = "this is b::one";
+
+c.c:
+virtual inherit "players/alfe/2virtual/d";
+void bar() { "players/alfe/2virtual/d"::foo(); }
+
+d.c:
+private mixed two;
+void foo() { printf("output of d::two: %O\n",two); }
+
+Now we call a->bar() and receive:
+output of d::two: "this is b::one"
+
+Something is wrong with the access to variables with virtual inheritance.
+Up to now there is only a workaround possible; to make private query-functions
+for all variables. In that example, the workaround would be a
+  private mixed query_two() { return two; }
+in d.c, and of course usage of query_two() instead of direct access of 'two'.
+I'm not a C-wizard (nor C++), so I can only send an LPC-example.
+
+I'm glad too to here, that you (and some other) are going to cleanup
+and debugging Amylaar's driver. Good decision :-)
+
+Many greetings,
+
+  Christian alias Coogan@TubMud.
+
+----------------------------------------------------------------------------
+Christian Mudra                         Just remember what your mother
+c_mudra@informatik.uni-kl.de                   always told you:
+Universitaet Kaiserslautern        "When you open windows you let in bugs".
+
