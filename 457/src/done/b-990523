@@ -1,0 +1,21 @@
+Short: regexp( ({""}), "[]")
+From:    Zora@PK-Mud
+Date:    Mon May 17 17:28:14 1999
+Type: Bug
+State: Done - implemented in 3.2.8-dev.152
+
+Bei solch einer Eingabe kommt eine direkte Fehlerausgabe an mich:
+ed: unmatched []
+(Also wenn ich diese Zeile per MGtool/PKtool eingebe (innerhalb eines
+catch)).
+
+Also, regexp sollte keine Meldungen Spieler senden. Naja, ed
+moechte es so wohl haben, aber damit kann man regexp kaum fuer andere
+Sachen verwenden. Wenn ich hier im PK z.B. 'man []' mache, kommen mehrere
+hundert Zeilen mit 'ed: unmatched []' weil man mit regexp arbeitet ;)
+
+---------- Analysis ----------
+
+Together with the program, the regexp() functions store a flag whether
+they were called from ed or from somewhere else. Depending on this flag,
+the errors passed to regerror() are handled.

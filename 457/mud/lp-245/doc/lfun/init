@@ -1,0 +1,7 @@
+void init()
+
+This function is called everytime a living objects can "see" the object.
+It is good to the set up of add_action() and add_verb() in the init()
+routine.
+
+See also lfun/exit

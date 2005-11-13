@@ -1,0 +1,93 @@
+Short: Better Inline closure syntax
+Date: 2001-07-13
+From: Alfe
+Type: Feature
+State: Duplicate of f-020528
+
+[d-chat] Alfe@Tubmud: nee, im ernst mal mateese: die smiley-notation fuer
+   closures hat noch einen grossen nachteil: man kann keine werte in eine      
+   solche closure reinnehmen, die zur laufzeit erst bekannt werden.  dafuer    
+   muss man dann doch immer wieder lambdas bauen.  kannst du daran nicht mal   
+   was aendern?                                                                
+.                                                                              
+> =d-chat Knifflig.[d-chat] Alfe@Tubmud: beispiel: closure adder(int x) { retur
+ (: $1 + x :); }.                                                              
+[d-chat] Perle@Tubmud: algol60-erbschaft, vermutlich.                          
+^R                                                                             
+=d-chat Knifflig.                                                              
+[d-chat] Mateese: Knifflig.                                                    
+> [d-chat] Alfe@Tubmud: und ugh@tubmud meinte sofort, als er die smiley-notatio
+   gesehen hat, die sei ja nicht rekursiv einsetzbar (also eine closure, die   
+   eine closure liefert), weil dann innen drin nicht klar sei, auf welchen     
+   scope sich ein $1 usw. bezoege.                                             
+[d-chat] Alfe@Tubmud: largo: du lieferst aber keine closure, sondern einen     
+   wert damit.                                                                 
+==d-chat hoert Largo nicht.                                                    
+[d-chat] Mateese hoert Largo nicht.                                            
+> =d-chat Inline-CLo[d-chat] Alfe@Tubmud: ja, mateese, dass es knifflig ist und
+wieso kann ich mir                                                             
+   auch denken ;-)  aber schoen waere es dennoch.                              
+^R                                                                             
+[d-chat] Alfe@Tubmud: largo schlug vor: int i = 3; return funcall((: $1 + $1   
+   :), i); nat.                                                                
+=d-chat closure adder (int i) { return lambda([d-chat] Alfe@Tubmud: largo-quote
+ jo, das ist nicht von der Hand zu weisen.                                     
+   Das Du ne Closure haben wolltest, ist mir auch erst danach aufgegangen.     
+({'x}), ({ (: $1 + $2 :), 'x, i }) ); }                                        
+[d-chat] Mateese: closure adder (int i) { return lambda(({'x}), ({ (: $1 + $2  
+   :), 'x, i }) ); }.                                                          
+> [d-chat] Alfe@Tubmud: ha ha ;-).                                             
+[d-chat] Alfe@Tubmud: das liefert ja ne closure, die dann erst noch ne closure 
+   liefern wuerde, die nen int liefert.  das will ich auch nicht.  ich will    
+   nur ein smiley-equivalent fuer.                                             
+[general] Joan: urgs thunder rolling in.                                       
+[d-chat] Alfe@Tubmud: closure adder (int i) { return lambda(({'x}),({ #'+,'x,i 
+   })); }.                                                                     
+=d-chat Wie wuerdest du denn die Namen fuer die (::) Argument definieren?      
+=d-chat (Ich werd etwas sti[d-chat] Mateese: Wie wuerdest du denn die Namen fue
+ die (::) Argument                                                             
+   definieren?                                                                 
+> lle werden - meine Klasse geht weiter. Ich logge aber mit)                   
+[d-chat] Mateese: (Ich werd etwas stille werden - meine Klasse geht weiter.    
+   Ich logge aber mit).                                                        
+> [d-chat] Perle@Tubmud: wenn man argumentnamen festlegt, ist man doch genau   
+   wieder bei lambda.                                                          
+[d-chat] Alfe@Tubmud: ugh schlug was in der art vor: (: a,b,c; a+b+c :).       
+[d-chat] Alfe@Tubmud: also namen vergeben statt $1 usw.                        
+[d-chat] Alfe@Tubmud: (waere ja ohnehin schoener)(.                            
+[d-chat] Perle@Tubmud: smilies werden von deinem frontend unuebersichtlich     
+   gefaerbt?                                                                   
+[d-chat] Alfe@Tubmud: wenn man das dann noch mit der version von               
+   python-lambdas kombiniert, dann koennte man auch closure adder(int i) {     
+   return (: a,b=i; a+b :); }  schreiben und haette dadurch auch noch mein     
+   erstes problem erschlagen.                                                  
+[d-chat] Alfe@Tubmud: oh, dan, glaub mir, ich weiss, wovon ich rede, ich weiss 
+   das es geht und dass es ins konzept passt.  es ist nur nicht so trivial     
+   umzusetzen, da geb ich dir recht.                                           
+[d-chat] Perle@Tubmud: mixing declarations with initializations considered     
+   harmful.                                                                    
+[d-chat] Alfe@Tubmud: perle, du schwarzmaler ;-).                              
+=d-chat Perle, huh?                                                            
+[d-chat] Mateese: Perle, huh?                                                  
+> [d-chat] Alfe@Tubmud: das mit dem default-wert-initialisieren von argumenten 
+   waere natuerlich auch bei normalen lfuns ganz nett:  int inc(int x,int      
+   offset=1) { return x+offset; }  ....                                        
+==d-chat hat da offensichtlich wieder was verpasst                             
+[d-chat] Mateese hat da offensichtlich wieder was verpasst.                    
+> [d-chat] Alfe@Tubmud: aber nicht in smileys, largo ;-).                      
+Dafire@FinalFrontier tells you: *knuddel* :)                                   
+Another hour has passed. You hear the Silvere clocktower in the distance.      
+It's now 4pm and early morning.                                                
+[d-chat] Alfe@Tubmud: ich haette auch nichts dagegen, wenn smiley-notierte     
+   closures keine lfun-closure, sondern eine lambda-closure wuerden (wohl      
+   zwangslaeufig, wenn laufzeit-werte reingebracht werden sollen).             
+[general] Gwenderon: And the thunder rolls......                               
+[d-chat] Alfe@Tubmud: nein, dan, das nicht, man muesste ihnen nur argument     
+   versteckt uebergeben koennen.  der code kann zur compile-zeit gebaut        
+   werden.                                                                     
+[d-chat] Perle@Tubmud: laufzeit: mit algol60 waer' das nicht passiert.         
+[general] Joan: will probably have to log out.                                 
+[general] Joan: getting bad.                                                   
+[d-chat] Alfe@Tubmud: ja, ich kann das hinfriemeln.  aber das ist keine        
+   schoene loesung.                                                            
+[general] Gwenderon nods.                                                      
