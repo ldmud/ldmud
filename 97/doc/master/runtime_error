@@ -1,0 +1,16 @@
+SYNOPSIS
+	void runtime_error(string err, string prg, string curobj, int line)
+
+DESCRIPTION
+	This function has to announce a runtime error to the active
+	user. If the user has enough privileges, it might give him the
+	full error message together with the source line. Else it
+	should issue a decent message ("Your sensitive mind notices a
+	wrongness in the fabric of space").
+
+	Note that prg denotes the program actually executed (which
+	might be an inherited one) whereas curobj is just the
+	offending object.
+
+SEE ALSO
+	log_error(M), heart_beat_error(M), raise_error(E), expand_define(E)

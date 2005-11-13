@@ -1,0 +1,5 @@
+If you send too much data out at once, the driver->erq socket may
+block, causing the erq demon to hang.  This also appears with the
+standard erq demon.  The only way to fix this seems to be to restart
+the erq demon. (fixed as of v1.3)
+

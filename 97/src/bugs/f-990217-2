@@ -1,0 +1,11 @@
+Short: new efuns query_notify_fail(), query_notify_fail_object()
+From: Holger@Wunderland
+Date: 990217
+Type: Feature
+State: Unclassified
+
+Returns the last string set as notify_fail string, resp. the object which
+set it.
+
+Note: I don't really like this: this is better done on mudlib level via
+      sefuns.
