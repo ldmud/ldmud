@@ -1,0 +1,9 @@
+SYNOPSIS
+	mixed *m_values(mapping map)
+
+DESCRIPTION
+	Return an array with the values of mapping 'map'.
+
+SEE ALSO
+	mappingp(E), mkmapping(E), m_indices(E), m_delete(E),
+	m_sizeof(E)

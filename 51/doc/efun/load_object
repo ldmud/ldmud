@@ -1,0 +1,17 @@
+SYNOPSIS
+	object load_object(string name)
+
+DESCRIPTION
+	Load the object from the file <name> and return it. If the
+	object already exists, just return it.
+
+	This efun can be used only to load blueprints - for clones, use
+	the efun clone_object().
+
+EXAMPLE
+	// Update and reload the standard player object
+	destruct(find_object("/std/player"));
+	load_object("/std/player");
+
+SEE ALSO
+	clone_object(E)
