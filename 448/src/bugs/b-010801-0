@@ -1,0 +1,27 @@
+Short: #' recognition in lexer insufficient
+From: Bardioc
+Date: 2001-08-01
+Type: Bug
+State: Acknowledged
+
+2. Wenn ich innerhalb einer Closure eine Funktion aufrufe,
+   z.b. #'add_daemon_command aus einer abgeleiteten Klasse
+   /std/daemon, dann funktioniert ein #'daemon::add_daemon_command
+   nicht.
+
+   Fehlermeldung:
+
+   2001.07.28 10:25:06 daemons/playerd.c: Undefined function: daemon line 71
+near end of line
+
+   Das finde ich nicht wünschenswert, oder muss man sowas bei closures
+   anders machen? Bei Inline closures funktioniert das.
+
+---------
+The reason is that the #'foo resolution is fully done in the lexer, which doesn't know about inheritance.
+
+One solution would be move the symbol recognition into the parser: let the lexer return L_SYMBOL_QUOTE for #', and replace the terminals L_CLOSURE by a literal_closure production, which could be evaluated like the function calls:
+
+  literal_closure : function_name
+
+(of course, the plain function_name production is not sufficient)

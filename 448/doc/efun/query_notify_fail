@@ -1,0 +1,20 @@
+SYNOPSIS
+        mixed query_notify_fail()
+        mixed query_notify_fail(int flag)
+
+DESCRIPTION
+        If <flag> is not given or 0: return the string or closure which
+        was last set as error message for this command (with notify_fail()).
+
+        If <flag> is given and 1: return the object which issued the last
+        notify_fail().
+
+        If nothing was set yet, return 0.
+
+HISTORY
+        Introduced in LDMud 3.2.7.
+        LDMud 3.2.8 added the <flag> parameter.
+
+SEE ALSO
+        add_action(E), query_verb(E), query_command(E), notify_fail(E),
+        hooks(C)

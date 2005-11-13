@@ -1,0 +1,11 @@
+SYNOPSIS
+        float cos(int|float)
+
+BESCHREIBUNG
+        Liefert den Kosinus des Argumentes.
+
+AENDERUNGEN
+        LDMud 3.2.9: Ganzzahlen (Integers) als Argument hinzugefuegt.
+
+SIEHE AUCH
+        sin(E), asin(E), acos(E), tan(E), atan(E), atan2(E)

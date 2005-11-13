@@ -1,0 +1,27 @@
+SYNOPSIS
+        int|string modify_command(string cmd)
+
+DESCRIPTION
+        After set_modify_command(mob) was called for an interactive
+        object iob, all commands for that user will be passed to
+        mob->modify_command(), and the return will then be checked for
+        actions.
+
+        If the result is a string, it is the new command to execute
+        instead of the given one. Note that it is not possible to
+        make several commands from one this way!
+        If the result is a non-zero number, the given command is to
+        be ignored. In case of the closure/lfun setting this may
+        mean that the closure/lfun already executed it.
+        If the result is 0, the originally given command is to be
+        used.
+
+HISTORY
+        In 3.2.1@109 the name of the lfun to call must be specified
+        using the H_MODIFY_COMMAND_FNAME driver hook.
+        'modify_command' in the above text is therefore to read as
+        placeholder for the real name.
+
+
+SEE ALSO
+        set_modify_command(E), hooks(C)
