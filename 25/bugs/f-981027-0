@@ -1,0 +1,36 @@
+Subject: Re: Amylaar->Mudos
+From: <tim@wfn-shop.princeton.edu>
+Date: 13 Oct 1998 19:31:36 GMT
+Organization: Chemistry Department, Princeton University
+
+
+In article <361DE471.B3B75F6E@mdisystems.com>, Lars Duning <lduning@mdisystems.com> writes:
+> You don't happen to have any information why MudOS is faster than
+> Amylaar?
+
+The short answer is because I spent quite a bit of my time working my
+ass off to make it that way :-)  6 years ago, the biggest complaint
+about MudOS was it was slower than Amylaar, so it was one of the
+things we worked the hardest on.
+
+Seriously, It's a combination of quite a number of things.  The
+bytecode is somewhat more efficient, common operations are more
+aggressively optimized, etc.
+
+One thing that probably helps the most is that MudOS actually compiles
+to parse trees then generates the code from that, while Amylaar still
+uses the "direct to bytecode" approach, which makes it much tougher
+to generate good bytecode.
+
+Amylaar also still duplicates nonshared strings whenever the svalues
+are copied; that makes string operations quite slow.
+
+The compiler scratchbad speeds up the compiler quite a bit, since it
+doesn't have to call malloc() every time it sees a symbol.  This
+optimization alone can be as much as a factor of two in compiler
+speed.
+
+---------------------------------------------------------------------------
+Tim Hollebeek                           | "Everything above is a true
+email: tim@wfn-shop.princeton.edu       |  statement, for sufficiently
+URL: http://wfn-shop.princeton.edu/~tim |  false values of true."
