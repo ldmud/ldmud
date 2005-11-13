@@ -1,0 +1,10 @@
+Short: virtual inherit vs. inherit_list
+Date: 981208
+Type: Bug
+State: Unclassified
+From: Coogan
+
+Files which are inherited virtually are listed at least twice in the lists
+of inherits. This makes (non-virtual) nomask functions in this file impossible.
+
+The change made in p-990217 might help here.

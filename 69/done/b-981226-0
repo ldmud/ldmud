@@ -1,0 +1,99 @@
+Short: Apply destructed in heart_beat_error
+Date: 981222
+Type: Bug
+State: Fixed in 3.2-dev.36
+From: Christian 'Chameloid' Kirschbaum <chrissy@cs.tu-berlin.de>
+
+Reason: calls to apply_master_ob() did not check if argument objects were
+destructed or not.
+
+Bei uns gab es vor ein paar Stunden einen recht boesen Crash, der auch 
+nochvollziehbar ist.  Hier ein Auszug aus dem debug log:
+
+[...]
+calling select
+'     heart_beat' in 'players/hepp/mymo/lfox.c' ('players/hepp/mymo/lfox')line 250
+'      lair_beat' in 'players/hepp/mymo/lfox.c' ('players/hepp/mymo/lfox')line 171
+Time: Mon Dec 21 21:59:24 1998
+apply() on destructed object 'players/hepp/mymo/lfox' function 'handle_heart_beat_error'
+Current object was kernel/master
+kernel/master kernel/master.c line 367
+18a359:  17          assign                    (2)      line 367
+18a35a:  41          !                         (1)
+18a35b:  16 63803177 ||                        (1)
+18a360:  65        4 branch_when_zero          (1)
+18a362: 203          this_interactive          (0)      line 368
+18a363:  52        4 push_local_variable_lvalue (1)
+18a365:  81          void_assign               (2)
+18a366:  32        4 local                     (0)      line 370
+18a368:  15          &&                        (1)
+18a380:  65          branch_when_zero          (1)      line 371
+18a3b5:  40        8 catch                     (0)      line 379
+18a3b7:  32        4 local                     (0)
+18a3b9:  75       52 cstring0                  (1)      line 380
+18a3bb: 199          tell_object               (2)
+18a3bf:  43          pop_value                 (1)
+18a3c0:  75       53 cstring0                  (0)      line 381
+18a3c2: 134          find_object               (1)
+18a3c3:  65          branch_when_zero          (1)
+18a411:   5        2 identifier                (0)      line 393
+18a413: 207          time                      (1)
+18a414:  79       60 clit                      (2)
+18a416:  19          subtract                  (3)
+18a417:  22          <                         (2)
+18a418:  65       34 branch_when_zero          (1)
+18a41a: 207          time                      (0)      line 394
+18a41b:  47        2 push_identifier_lvalue    (1)
+18a41d:  81          void_assign               (2)
+18a41e:  40       17 catch                     (0)      line 395
+18a420:  11    -3795 closure                   (0)
+18a423:  59          const0                    (1)
+18a424:  75       46 cstring0                  (2)
+18a426: 207          time                      (3)
+18a427: 120          ctime                     (4)
+18a428:  18          +                         (4)
+18a429:  75        3 cstring0                  (3)
+18a42b:  18          +                         (4)
+18a42c: 110        3 call_out                  (3)
+18a42e:  59          const0                    (0)
+18a42f: 258        2 end_catch                 (1)
+18a431:  43          pop_value                 (1)
+18a432:  75       46 cstring0                  (0)      line 396
+18a434: 207          time                      (1)
+18a435: 120          ctime                     (2)
+18a436:  18          +                         (2)
+18a437:  75        3 cstring0                  (1)
+18a439:  18          +                         (2)
+18a43a: 389     -123 debug_message             (1)
+18a43c:  70          return0                   (0)      line 398
+18aa53:  32        0 local                     (0)      line 930
+18aa55: 298       42 query_ip_number           (1)
+18aa57:  65          branch_when_zero          (1)
+18aa5e:  32        0 local                     (0)      line 937
+18aa60:  15       14 &&                        (1)
+18aa62:  32        0 local                     (0)      line 938
+18aa64:  75     -114 cstring0                  (1)
+18aa66:  32        1 local                     (2)
+18aa68:  32        2 local                     (3)
+18aa6a:  32        3 local                     (4)      line 939
+18aa6c:  32        4 local                     (5)
+18aa6e: 109          call_other                (6)
+18aa70:   6  70   0   0   0  16 -76 -122
+'heart_beat_error' in '     kernel/master.c' ('       kernel/master')line 939
+Floating exception (core dumped)
+tubmud 5 (~): select returns 1
+queried all childs
+read: EOF
+Read 0, should be 9!
+External Request Demon gives up.
+read: EOF
+read 0, should be 9!
+External Request Demon subserver gives up.
+
+Hier trat also wohl ein Fehler in einem zerstoerten Objekt waerend der
+Ausfuehrung von heart_beat() auf.  Kannst du was damit anfangen?
+
+Und was merkwuerdig ist: Im Code des Drivers wird das Objekt noch auf 
+Existenz abgetestet, denn da steht etwas wie:
+
+	return ob && call_other(ob,"handle_heart_beat_error");

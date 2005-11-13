@@ -1,0 +1,7 @@
+Short: efun308() should be renamed
+Date: Mon, 14 Dec 1998 11:33:40 +0100
+Type: Feature
+State: Done: implemented.
+
+The efun efun308() should finally get a proper name, set_environment()
+sounds best.
