@@ -1,0 +1,5 @@
+SYNOPSIS
+	float exp(float)
+
+DESCRIPTION
+	The exponential function.

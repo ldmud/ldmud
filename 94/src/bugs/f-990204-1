@@ -1,0 +1,14 @@
+Short: New hook: notify_success
+From: Daniel von Dincklage <vondincklage@usa.net>
+Date: Fri, 19 Jun 1998 13:17:34 +0200
+Type: Feature
+State: Unclassified
+See also: p-990204-1
+
+- A "notify_success"-Hook
+  A driverhook that will be called if the processing of a command has
+  successfully been completed, as a counterpart to the notify-fail-Hook.
+
+Note: if the command handling is removed from the driver, it won't
+be necessary anymore. Else, better make it 'notify_command_complete'.
+

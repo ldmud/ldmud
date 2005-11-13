@@ -1,0 +1,16 @@
+Subject: b-990113-0
+From: Zora
+Date: Wed, 13 Jan 1999 12:46:11 +0000
+Type: Bug
+State: Unclassified
+
+mixed va(varargs mixed x) { return x; }
+diese funktion in einem objekt: va() liefert dann ({})
+diese funktion in simul_efun: va() liefert ({0})
+wenn ich aber in simul_efun schreibe:
+varargs mixed va(varargs mixed x) { return x; }
+dann liefert va() wieder korrekt ({})
+
+waere es schwer, das zu verbessern, dass es auch ohne varargs ganz am anfang
+geht?
+

@@ -1,0 +1,24 @@
+Short: ++ vs multi-value mappings
+From: Zora@carledon
+Date: Mon, 11 Jan 1999 13:07:48 +0000
+Type: Bug
+State: Acknowledged
+
+x=([0:1;2]);
+++x[0,0] oder x[0,0]++ oder ++x[0,1] oder ++x[0,1] liefert syntax-error
+++x[0] liefert keinen syntax-error (danach ist x ([0:2;2]))
+offenbar klappt ++ nur mit mappings mit breite 1 (von der syntax her)
+                                                          Zora
+
+----------
+Note: only ++x[0,0] is an error, x[0,0]++ is ok.
+
+The syntax rule for pre-inc/dec is:
+  expr0: pre_inc_dec expr4 '[' expr0 ']'
+
+whereas post-inc/dec is handled by:
+
+  expr0: lvalue F_INC/F_DEC
+
+It should be possible to use lvalue for the former rule, too (but that
+requires more knowledge into the innards of the compiler from my side).
