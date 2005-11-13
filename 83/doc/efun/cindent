@@ -1,0 +1,12 @@
+SYNOPSIS
+	int cindent(string file)
+
+DESCRIPTION
+	Indent a file using an LPC-enhanced version of the GNU indent
+	program, which is modelled after the Berkeley indent(1).
+
+HISTORY
+	Since 3.2.1@61 this is a simulated efun.
+
+SEE ALSO
+	ed(E)

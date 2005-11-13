@@ -1,0 +1,19 @@
+SYNOPSIS
+	mixed *allocate(int size)
+
+DESCRIPTION
+	Allocate an array of size elements. The number of elements
+	must be >= 0 and not bigger than a system maximum (usually
+	1000).
+
+	Note that this function is hardly needed anymore, because
+	arrays can be added by the + operator, and can be constructed
+	and initialized by the ({ }) operator. The function's only
+	use to construct big empty arrays.
+
+EXAMPLE
+	string *buffer;
+	buffer = allocate(50);
+
+SEE ALSO
+	sizeof(E)

@@ -1,0 +1,67 @@
+NAME
+	3.2vs3.2.1
+
+LAST UPDATE
+	Mon Apr 08 21:35:00 MET 1996
+
+AUTHOR
+	Lars Duening, collecting from various snippets and fragments.
+
+DESCRIPTION
+	There exists no real '3.2 vs 3.2.1' doc and the paragraphs in
+	the DONE file says only half the truth (it seems that Amylaar
+	still does not believe in docs besides those ending on .[chly]
+	:-)
+
+	Miscellaneous features:
+	 - Variables are swapped.
+	 - Telnet negotiation is done by the mudlib.
+	 - IP name lookup is done by an external 'erq demon' which is
+	   also able to perform other tasks.
+	 - New predefined #defines:
+	    __DOMAIN_NAME__, __HOST_IP_NUMBER__, __HOST_NAME__,
+	    __MAX_RECURSION__, NO_NATIVE_MODE, __EFUN_DEFINED__()
+	 - The master object has new/modified functions.
+
+	Quite a lot of functionality moved from the driver into the
+	mudlib by the use of driver hooks:
+	 - move_object() and with it the call of init() and exit().
+	 - Object initialisation (create() resp. reset()).
+	 - Part of the command parsing.
+	 - Nearly all native/compat mode differences.
+	 - Uid handling.
+
+	New efuns:
+	  attach_erq_demon(),   binary_message(),   debug_message(),
+	  efun308(),            expand_define(),    extern_call(),
+	  set_connection_charset(),                 get_type_info()
+	  last_instructions(),  query_shadowing(),  regreplace(),
+	  remove_action(),
+	  send_erq(),           set_buffer_size(),  set_connection_charset(),
+	  set_driver_hook(),    set_this_player(),  symbol_variable(),
+	  to_int(),             to_object(),
+
+
+	Modified efuns:
+	  add_action(),         creator(),          export_uid(),
+	  filter_array(),       find_call_out(),    functionlist(),
+	  geteuid(),            input_to(),         move_object(),
+	  process_string(),     query_ip_number(),  remove_call_out(),
+	  set_modify_command(), seteuid(),          shadow(),
+	  snoop()
+
+	Removed efuns:
+	  cindent(),            find_living(),      find_player(),
+	  query_host_name(),    set_living_name(),  shout(),
+	  wiz_list().
+
+	Modified Lfuns:
+	  create(),             init(),             modify_command(),
+	  reset(),              query_real_name()
+
+
+BUGS
+	Surely some.
+
+SEE ALSO
+	native(C), applied(A), efun(E).

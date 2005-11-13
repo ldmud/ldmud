@@ -1,0 +1,61 @@
+SYNOPSIS
+	void add_action(string fun, string cmd)
+	void add_action(string fun, string cmd, int flag)
+	void add_action(string fun)	/* historical */
+
+DESCRIPTION
+	Set up a local function fun to be called when user input
+	matches the command cmd. Functions called by a user command
+	will get the arguments as a string. It must then return 0 if
+	it was the wrong command, otherwise 1.
+	
+	If it was the wrong command, the parser will continue
+	searching for another command, until one returns 1 or give an
+	error message to the user.
+	
+	For example, there can be a wand and a rod. Both of these
+	objects define as command "wave". One of them will be randomly
+	called first, and it must look at the argument, and match
+	against "wand" or "rod" respectively.
+	
+	If second argument cmd is not given, it must be given by
+	add_verb(). Support of add_verb() is for historical reasons.
+	
+	The function associated to a command will be called with a
+	string as argument which stands for the given words behind the
+	typed command.
+	
+	Always have add_action() called only from an init() routine.
+	The object defining these commands must be present to the
+	user, either being the user, being carried by the user,
+	being the room around the user, or being an object in the
+	same room as the user.
+	
+	If argument flag is 1, then only the leading characters of the
+	command has to match the verb cmd.
+	
+	If the flag is 2, add_verb() is equivalent to add_xerb().
+
+	Never use one of the functions 'create' 'reset' 'init' 'exit'
+	'heart_beat' etc as the first argument to add_action(). In
+	general, a function with a name defined in /doc/applied should
+	have the behaviour defined there.
+
+EXAMPLES
+	add_action("GoInside", "enter");
+	
+	When typing "enter" the function GoInside() will be invoked.
+	
+	add_action("DisFunc", "dis", 1);
+	
+	Whenever you type in a command which starts with "dis" the
+	function DisFunc() will be called. To get the real word which
+	was typed in (because until now you only know that it was a
+	command beginning with "dis") you have to call the efun
+	query_verb().
+
+HISTORY
+	The flag==2 argument is supported since 3.2@127
+
+SEE ALSO
+	query_verb(E), add_verb(E), add_xverb(E), init(A)
