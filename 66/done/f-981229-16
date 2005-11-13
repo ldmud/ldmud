@@ -1,0 +1,15 @@
+Short: Change the way values are passed to xxx_mapping()
+From: Dave Setty <garpoz@locallink.net>
+Date: Thu, 10 Dec 1998 02:03:04 -0500
+Type: Feature
+State: Done - implemented in 3.2-dev.56
+
+One thing I'd definitely like to change in mapping behavior is to pass
+the keys of a mapping to filter_mapping() and map_mapping(), the way they
+are passed to walk_mapping(). There's a couple places where I'd like to be
+able to deal with these values without either indexing the original mapping
+inside filter_mapping(), or deleting bits of it inside walk_mapping(). The
+problem is allowing it to be compatible to code that uses the extra
+arguments to map_ or filter_mapping(). (map_mapping() will probably still
+only be able to return a width-1 mapping, but that's not a big deal...)
+

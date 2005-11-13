@@ -1,0 +1,31 @@
+*** machine.h-leander-created	Wed Aug 12 22:23:30 1998
+--- machine.h-leander	Wed Aug 12 22:23:30 1998
+***************
+*** 115,127 ****
+  #define HOST_INCLUDE "hosts/unix.h"
+  
+  /* Define if you have _crypt.  */
+! #define HAVE__CRYPT 1
+  
+  /* Define if you have bzero.  */
+  #define HAVE_BZERO 1
+  
+  /* Define if you have crypt.  */
+! #define HAVE_CRYPT 1
+  
+  /* Define if you have fchmod.  */
+  #define HAVE_FCHMOD 1
+--- 115,127 ----
+  #define HOST_INCLUDE "hosts/unix.h"
+  
+  /* Define if you have _crypt.  */
+! /* #undef HAVE__CRYPT */
+  
+  /* Define if you have bzero.  */
+  #define HAVE_BZERO 1
+  
+  /* Define if you have crypt.  */
+! /* #undef HAVE_CRYPT */
+  
+  /* Define if you have fchmod.  */
+  #define HAVE_FCHMOD 1
