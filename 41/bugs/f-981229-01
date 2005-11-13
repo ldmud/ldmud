@@ -1,0 +1,8 @@
+Short: Drop 2.4.5 compatibility functions
+Date: Mon, 14 Dec 1998 11:33:40 +0100
+Type: Feature
+State: Acknowledged
+
+In a similar manner, the old behaviour of explode() and such could be
+removed, and floats and mappings could be made non-optional. And... does
+anybody use the efun parse_command() _at_all_? Answer: No.
