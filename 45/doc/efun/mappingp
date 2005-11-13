@@ -1,0 +1,8 @@
+int
+mappingp(mixed arg)
+
+Return 1 if the argument 'map' is a mapping, or 0 if it is not.
+
+see also:
+    intp, stringp, objectp, pointerp
+    mkmapping, m_indices, m_values, m_delete, m_sizeof

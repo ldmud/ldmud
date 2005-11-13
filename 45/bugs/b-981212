@@ -1,0 +1,44 @@
+Subject: an idea about ldmud
+From: Gokhan Moral <gm@Bilkent.EDU.TR>
+Date: Sat, 12 Dec 1998 11:30:31 +0200 (EET)
+
+hi,
+I downloaded ldmud couple of hours ago, and started using it.
+I noticed that the multiport support is already there, this is fine.
+hmm, but, how can i say... is it possible to change/patch the driver so
+that we can define individual access lists for each port?
+here, in my university, students do not have permission to log into the
+mud using some specific labratories. I have fingerd-like thing running on
+port 79, i want them to be able to use finger in those labratories at
+least.
+this is just an example of course. i can patch the driver to have that.
+but i still need that flexibility for some other purposes.
+If you have time, and like the idea of course...
+Thanks in advance
+
+Gokhan Moral
+Bilkent University
+Network Administrator
+
+
+--------------------------------------------------------------------------------
+
+Subject: a question
+From: Gokhan Moral <gm@Bilkent.EDU.TR>
+Date: Sat, 12 Dec 1998 21:26:26 +0200 (EET)
+
+sorry to bother you again, but i want to ask a question.
+I was using xerq-1.4 with amylaar driver
+I noticed that I cannot recompile it by giving the ldmud directory path,
+so I used the precompiled binary.
+But it crashes more frequent than before. 
+Is it possible for you to put "adding socket functions to erq daemon" into
+your to-do list?
+We really need it.
+Thank you.
+
+Gokhan Moral
+Bilkent University
+Network Administrator
+(try telnetting "buces.bbs.tr 3000")
+
