@@ -1,0 +1,65 @@
+Short: new efun find_objects()
+From: Paul Duran <pauld@titan.hutch.com.au>
+Date: Mon, 21 Dec 1998 13:48:36 +1100
+Type: Feature
+State: Unclassified
+
+This efun could be generalized into finding objects with a certain
+sourcename pattern.
+
+The mud that I play on (EOTL) has hacked in a find_objects efun. 
+I'll paste the source here coz I dont think they'll mind.
+
+If its used in LDMud, pls give credit to Xurbax from EotL (Richard Postgate
+- postgate@cafe.net).
+
+/* [Xurbax] 91-05-09
+** Returns an array of objects cloned from file 'name' starting at element
+** 1, and the number of objects remaining after the last one in the array,
+** in element 0. 'offset' specifies how many objects of 'name' to
+** skip. (So all the objects can eventually be found even if there are more
+** than will fit in MAX_ARRAY_SIZE-1 elements.)
+*/
+#define MIN(a, b) ((a)<(b)?(a):(b))
+#define MAX(a, b) ((a)>(b)?(a):(b))
+struct vector *find_objects(name, offset)
+    char *name;                                   
+    int offset;
+{
+    int i, l, count;
+    struct vector *p;
+    struct object *o, **obs;
+		
+    if (offset < 0) offset = 0;
+    obs = (struct object **)xalloc((MAX_ARRAY_SIZE - 1) * sizeof(struct object *));
+    count = 0;
+    o = obj_list;
+    l = strlen(name);
+    while (o) {
+        if (!strncmp(o->name, name, l)) {
+            if (count >= offset && count - offset < MAX_ARRAY_SIZE - 1)
+                obs[count - offset] = o;
+            count++;
+        }
+	o = o->next_all;
+    }
+    p = ALLOC_VECTOR(MIN(MAX(count - offset, 0), MAX_ARRAY_SIZE - 1) + 1,
+    __FILE__, __LINE__);
+#ifndef MALLOC_smalloc
+    p->size = MIN(MAX(count - offset, 0), MAX_ARRAY_SIZE - 1) + 1;
+#endif
+    p->user = current_object->user;
+    num_arrays++;
+/*    total_array_size += sizeof (struct vector) + sizeof (struct svalue) * (VEC_SIZE(p) - 1);*/
+    if (p->user)
+        p->user->size_array += VEC_SIZE(p);
+    for (i=1; i < VEC_SIZE(p); i++) {
+        p->item[i].type = T_OBJECT;
+        p->item[i].u.ob = obs[i-1];
+        obs[i-1]->ref++;
+    }
+    xfree(obs);
+    p->item[0].type = T_NUMBER;
+    p->item[0].u.number = MAX(count - offset - MAX_ARRAY_SIZE - 1, 0);
+    return p;
+}                        

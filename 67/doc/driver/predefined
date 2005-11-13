@@ -1,0 +1,46 @@
+NAME
+    predefined - predefined #defines by the parser
+
+DESCRIPTION
+    Several preprocessor macros are pre#defined by the parser,
+    to provide information about parser version, compile time
+    options and parser invocation options:
+
+      LPC3            : always defined.
+      COMPAT_FLAG     : defined if the driver runs in compat mode.
+      __COMPAT_MODE__ : ditto
+      __NATIVE_MODE__ : defined if the driver runs in native mode.
+      __EUIDS__       : defined if the driver uses euids.
+
+      __MASTER_OBJECT__ : the name of the master object.
+      __FILE__          : the name of the compiled file.
+      __LINE__          : the actual line number.
+      __VERSION__       : the version string of the driver.
+
+      __DOMAIN_NAME__    : the domain the host is part of.
+      __HOST_IP_NUMBER__ : the hosts IP number (as a string).
+      __HOST_NAME__      : the full hostname.
+      __MAX_RECURSION__  : the max count of nested function calls
+                           (this is config.h:MAX_USER_TRACE).
+      __MAX_EVAL_COST__  : the max evaluation cost.
+      __MAX_EVAL_TIME__  : the max evaluation time (if compiled
+                           with MAX_TIME and if the feature is
+                           activated).
+      __EFUN_DEFINED__(name) : if the efun 'name' exists, this
+                               macro evaluates to " 1 ", else to " 0 ".
+
+    If the ERQ is supported, the following macros are defined:
+
+      __ERQ_MAX_SEND__  : the max size of the send buffer
+      __ERQ_MAX_REPLY__ : the max size of the reply buffer
+
+
+HISTORY
+    3.2.1 added __DOMAIN_NAME__, __HOST_IP_NUMBER__, __HOST_NAME__,
+        __MAX_RECURSION__, __EFUN_DEFINED__().
+    3.2.5 added __COMPAT_MODE__, __NATIVE_MODE__, __EUIDS__,
+        __ERQ_MAX_SEND__ and __ERQ_MAX_REPLY__.
+    3.2.6 added __MAX_EVAL_TIME__, __MAX_EVAL_COST__.
+
+SEE ALSO
+    query_host_name(E), version(E), pragma(LPC), preprocessor(LPC)
