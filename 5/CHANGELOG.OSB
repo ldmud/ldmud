@@ -1,0 +1,32 @@
+17-May-1998 (Lars Duening)
+    - Release 3.2.1@141-osb.14
+    - (interpret.c) The apply cache is initialized on driver startup, not
+      statically at compilation time. This allows compilers with less
+      capable preprocessors (line length limitations) to use big caches
+      as well.
+
+16-May-1998 and before (Lars Duening)
+    - added rxcache.[ch]: cache for compiled regular expression patterns.
+    - added support for BeOS.
+    - (backend.c) Automatic garbage collections are kept at least 5 minutes
+      apart. Every garbage collection is logged on stdout.
+    - (backend.c) Variables are swapped independantly from program code.
+    - (comm1.c, main.c) Multiple login ports may be used in parallel. The
+      port numbers are given on the commandline, efun query_mud_port()
+      was extended to return the appropriate port number.
+    - (interpret.c) MudOS-efun terminal_colour() added by Mica.
+    - (interpret.c) this_object() in destructed objects does not print a
+      diagnostic anymore.
+    - (lex.c) more informative diagnostics about defbuf allocations. Too
+      big defbufs are deallocated again to conserve memory.
+    - (main.c) reallocation of system reserves prints diagnostics.
+    - (regexp.ch) NSUBEXP may take values different from 10 (OSB uses 50).
+    - (swap.c) Free space is reused immediately.
+    - (stralloc.ch, interpret.c) All the names of the lfuns applied by
+      the driver are stored in the shared string table on startup.
+      Together with some modifications to the apply cache for faster
+      processing of applys on shared strings, this should make a mud
+      a wee bit faster. Also added some comments in these ares (with
+      no guarantee for correctness!).
+    - (simulate.c) 'status tables' prints the number of cache hits both
+      absolute and as percentage.

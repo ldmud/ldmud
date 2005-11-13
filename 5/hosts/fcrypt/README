@@ -1,0 +1,18 @@
+The fcrypt() routine is taken from the security package 'cops' by Dan Farmer.
+It origins from the 'Crack' package by Alec Muffett.
+
+The includes in this directory have been cleaned from all stuff other parts
+of 'Crack' needed. Get the original if you still want it :-)
+
+ -- Lars Düning
+
+Original Disclaimer in 'Cops':
+---------------------------------------------------------------------------
+ This program is copyright Alec Muffett 1991 except for some portions of
+ code in "crack-fcrypt.c" which are copyright Robert Baldwin, Icarus
+ Sparry and Alec Muffett.  The author(s) disclaims all responsibility or
+ liability with respect to it's usage or its effect upon hardware or
+ computer systems, and maintain copyright as set out in the "LICENCE"
+ document which accompanies distributions of Crack v4.0 and upwards.
+---------------------------------------------------------------------------
+
