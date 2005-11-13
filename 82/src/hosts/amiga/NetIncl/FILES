@@ -1,0 +1,10 @@
+README
+FILES
+errno.h
+netdb.h
+netinet
+sys/errno.h
+sys/ioctl.h
+sys/socket.h
+sys/types.h
+netinet/in.h

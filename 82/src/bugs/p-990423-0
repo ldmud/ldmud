@@ -1,0 +1,95 @@
+Short: New efun previous_program()
+From: Daniel Sloan
+Date: 990423
+Type: Patch
+State: Unclassified
+
+diff -c -r ldmud-3.2.6/src/func_spec ldmud-dev/src/func_spec
+*** ldmud-3.2.6/src/func_spec	Sat Mar 27 14:27:43 1999
+--- ldmud-dev/src/func_spec	Sat Apr 24 00:59:52 1999
+***************
+*** 360,365 ****
+--- 361,367 ----
+  string extract(string, int, int);
+  int extern_call();
+  object previous_object(int);
++ string previous_program(int default: F_CONST0);
+  int strstr(string, string, int default: F_CONST0);
+  int program_time(object default: F_THIS_OBJECT);
+  string program_name(object default: F_THIS_OBJECT);
+diff -c -r ldmud-3.2.6/src/interpret.c ldmud-dev/src/interpret.c
+*** ldmud-3.2.6/src/interpret.c	Wed Mar 31 12:28:11 1999
+--- ldmud-dev/src/interpret.c	Sat Apr 24 00:59:47 1999
+***************
+*** 9478,9483 ****
+--- 9545,9614 ----
+                  put_object(prev_ob);
+              break;
+            }
++ #ifdef F_PREVIOUS_PROGRAM
++           XCASE(F_PREVIOUS_PROGRAM);
++           {
++             int i;
++             struct control_stack *p;
++             char *name;
++ 
++             if (sp->type != T_NUMBER) goto xbad_arg_1;
++ 
++             i = sp->u.number;
++             sp->u.number = 0;
++ 
++             if (i > MAX_TRACE)
++             {
++                 break; /* returning 0 */
++             }
++             p = csp;
++             do {
++                 do {
++                     if (p == control_stack)
++                         goto again; /* returning 0 */
++                 } while ( !(--p)[1].extern_call );
++             } while (--i >= 0);
++ 
++             if (p[1].extern_call & 0x80)
++             {
++                if (p[1].pretend_to_be->flags & O_DESTRUCTED)
++                   break; /* returning 0 */
++                else
++                {
++                   if (O_PROG_SWAPPED(p[1].pretend_to_be))
++                   {
++                      if (load_ob_from_swap(p[1].pretend_to_be) < 0)
++                      {
++                         ERROR("Out of memory\n");
++                      }
++                   }
++                   name = p[1].pretend_to_be->prog->name;
++                }
++             }
++             else
++             {
++                if (p[1].ob->flags & O_DESTRUCTED)
++                   break; /* returning 0 */
++                name = p[1].prog->name;
++             }
++ 
++             if (!name)
++             {
++                break; /* returning 0 */
++             }
++ 
++ #ifdef COMPAT_MODE
++             name = string_copy(name);
++ #else
++             name = add_slash(name);
++ #endif
++             if (!name)
++                ERROR("Out of memory\n")
++             put_malloced_string(name, sp);
++ 
++             break;
++           }
++ #endif
+            XCASE(F_CALLER_STACK_DEPTH);
+            {
+              int i;
