@@ -1,0 +1,147 @@
+This file lists all changes to the game driver which have a visible
+impact on its behaviour both towards the mudlib as well as towards
+the host system.
+
+For a detailed list of all changes see the file CHANGELOG.
+
+05-Mar-1999 (Lars Duening) -- Release 3.2.6-dev.48
+    - During logon, this_interactive() points to the login object.
+    - to_int(), to_object() and to_float() accept their target data type
+        as argument.
+    - Master applies like inaugurate_master() can be static.
+    - efun308() renamed to set_environment(), the old name is still
+        recognized as alias for now.
+    - New efuns set_next_reset(), load_object() and clonep().
+    - Efun clone_object() accepts objects as templates.
+    - The old behaviour of explode() and previous_object() is no longer
+        available. Floats, transcendent functions, mappings and extended
+        varargs are now permanent features of the driver.
+    - Bugfix: sprintf() of float values < 1.0 no longer causes a SING
+        error.
+    - Bugfix: fixed memory leak in terminal_colour().
+    - Bugfix: errors in a callout to an efun closure no longer crash
+        the driver in the dump phase.
+    - Bugfix: adding arrays up to the upper limit no longer causes
+        accesses to invalid memory.
+    - Bugfix: terminal_colour() correctly wraps strings with a length
+        one less than the wrap limit.
+    - Bugfix: if the command giver for a call_out() destructs, this_player()
+        is made sure to be 0.
+    - Bugfix: #'++/#'-- in closures work.
+    - Bugfix: Destructing non-interactive snoopers no longer crashes
+        the game.
+    - Bugfix: funcall()/apply() on a swapped variable no longer
+        crashes the GD.
+    - Bugfix: master functions like privilege_violation() or
+        heart_beat_error() are no longer passed destructed objects.
+    - Bugfix: (virtual) inheritance of variable-only objects with
+        variable initialisation doesn't crash the driver anymore.
+    - Bugfix: sizeof(mapping) no longer counts destructed objects in
+        the mapping to the size.
+    - Bugfix: if a command disconnects, but not quits a player, the prompt
+        is no longer printed (ending up on stdout).
+
+10-Dec-1998 (Lars Duening) -- Release 3.2.5
+    - Collapsing of '/' in object names also used for inherits.
+    - Default limit for bitstrings is 6144 bits.
+    - The efuns break_point() and swap() are disabled by default.
+    - Pre-release versions have an extended version number of
+        the form '3.2.5-dev.16'.
+    - Compat mode drivers define __COMPAT_MODE__ (meant to replace
+        COMPAT_FLAG eventually); native mode drivers define
+        __NATIVE_MODE__.
+        Similar, a driver using euids defines __EUIDS__.
+    - New defines __ERQ_MAX_SEND__ and __ERQ_MAX_REPLY__ when the
+        driver supports the ERQ. The values are the max sizes of
+        the send and receive buffers (taken from x-erq by Brian Gerst).
+    - MSDOS support removed (the MSDOS filesystem however is still
+        supported).
+    - It is now possible to use '..' in filenames as long as it
+        doesn't has the 'parent directory' meaning (that means, 'foo..bar'
+        is ok, bug 'foo/../bar' is not).
+    - When a connection is closed, the driver no longer sends
+        'Closing down' as last text.
+    - Bugfix: branches in bigger lambda() closures use the correct
+        branch offsets. I am not completely sure if the bugfix is
+        correct, so I left in two 'DEBUG:' diagnostics with information
+        needed to debug the code further if necessary.
+    - Bugfix: the commandline parser printed a faulty error message
+        if a required value was missing.
+    - Bugfix: mapping_contains() freed the wrong values, clobbering
+        passed mapping literals.
+    - Bugfix: After an UDP packet was processed, the evaluation costs
+        are restored (provided by Tucita).
+    - Bugfix: The LPC compiler now accepts only regular files for includes.
+    - Bugfix: If a npc was destructed between to command() calls, and
+        the H_MODIFY_COMMAND hook was set to a string, the driver called
+        the named modify-command function on the destructed npc.
+    - Bugfix: During the execution of a closure, an extra refcount is
+        added to protect it from destruction while it is executed. This
+        is primarily a safety measure for the driver hooks which only
+        have 1 refcount and are thus very sensitive against master object
+        updates.
+    - Bugfix: Under some OS like Linux, the normal SIG_IGN handler is
+        just one-shot. To reliably ignore signals (ie SIGPIPE), a homemade
+        handler is used.
+    - Bugfix: regreplace("acc", "a*", "yy",1) trashed memory.
+    - Bugfix: runtime errors in an alien-lfun-closure (as created by
+        symbol_function() calls) no longer crash the driver during the
+        error handling.
+    - Bugfix: sprintf() on big floats or in long fields no longer causes
+        a buffer overrun (and should it happen nevertheless, a proper
+        fatal() is generated).
+
+
+24-Sep-1998 (Lars Duening) -- Release 3.2.4
+    - Bugfix for the collapsing of '/' in object names.
+
+21-Sep-1998 (Lars Duening) -- Release 3.2.3
+    - Bugfix: mapping_contains() no longer returns destructed objects.
+        (found by Zora).
+    - New special command 'status files' to append file usage statistics
+        from within the mud to the file /FILESTAT.
+    - New commandline option:
+        --swap-compact: reuse free space in the swapfile immediately.
+      Giving this option results in smaller, but also more fragmented
+      swapfiles, and the swap performance may degrade.
+
+14-Sep-1998 (Lars Duening) -- Release 3.2.2
+    - Version number pattern changed from 03.02.1@<patchlevel>
+      to 3.2.<patchlevel>. This affects all uses of the __VERSION__
+      lpc predefine.
+    - Objects may be loaded/inherited with filenames containing two or
+      more consecutive '/'es, these are collapsed into just one.
+      However, it is not possible to find objects using the wrong
+      names. (suggested by Zora)
+    - The dreaded __INIT() bug is fixed (provided by mubo).
+    - New commandline options:
+        --options : prints all options used in compiling the driver
+        --version : prints the game driver version
+        --help    : prints a short help of the commandline options
+        --longhelp: prints an elaborate description of the commandline
+                    options
+    - The commandline option handling was renovated, most options now
+      exist in a short and long form. This caused slight changes in
+      name and syntax for well-known options (.e.g '--gcollect_out_fd<file>'
+      is now '--gcollect-out-fd <file>'). Please see doc/driver/invocation
+      for further information. 
+
+10-Jul-1998 (Lars Duening) -- Release 3.2.1@141-osb.16
+    - Bugfix for the "*":: problem (provided by Daniel von Dincklage).
+    - Added a minimal master for simple driver tests.
+        
+17-May-1998 (Lars Duening) -- Release 3.2.1@141-osb.14 and before
+    - Small speedup for regexps through usage of a cache. Also increased
+      the complexity limit for regexps.
+    - Added support for BeOS.
+    - Automatic garbage collections are kept at least 5 minutes
+      apart. Every garbage collection is logged on stdout.
+    - Variables are swapped independantly from program code.
+    - Multiple login ports may be used in parallel. The
+      port numbers are given on the commandline, efun query_mud_port()
+      was extended to return the appropriate port number.
+    - MudOS-efun terminal_colour() added by Mica.
+    - this_object() in destructed objects does not print a
+      diagnostic anymore.
+    - 'status tables' prints the number of cache hits both
+      absolute and as percentage.
