@@ -1,0 +1,157 @@
+Short: 3.2.4 crashes on Solaris
+Date: 981028
+Type: Bug
+State: Stalled
+Author: Frank Stolze
+Long:
+
+Subject: LDMud 3.2.4 core dump
+From: Frank Stolze <fstolze@iName.com>
+Date: Wed, 28 Oct 1998 15:52:33 -0500
+X-Mailer: exmh version 2.0.2
+
+Hi Lars,
+
+LPMud 3.2.4 just dumpled a core at me. OS is Solaris 2.6, HW is Sun 
+Ultra 5, compiler is egcs, this is the stack trace:
+
+#0  0x49e70 in fatal (fmt=0x8c410 "Free string: string didnt hash to the same spot!") at simulate.c:3142
+#1  0x6a90c in checked () at stralloc.c:329
+#2  0x6a988 in free_string (str=0x2bec8e "03Q.n36wODiqs") at stralloc.c:362
+#3  0x4862c in free_sentence (p=0x4dbdd4) at simulate.c:2202
+#4  0x49140 in remove_environment_sent (player=0x40cfb0) at simulate.c:2670
+#5  0x48374 in f_efun308 (sp=0xa4350) at simulate.c:2103
+#6  0x3e004 in eval_instruction (first_instruction=0x164b9b " ", sp=0xa4350) at interpret.c:9010
+#7  0x44a68 in call_lambda (lsvp=0x123d50, num_arg=2) at interpret.c:12777
+#8  0x48204 in move_object () at simulate.c:2060
+#9  0x39ac8 in eval_instruction (first_instruction=0x18f253 "`À ", sp=0xa4328) at interpret.c:6558
+#10 0x38d78 in eval_instruction (first_instruction=0x269b57 "\005+B\005K\004/+Q;²;\027\017\003\005%)\017\002 ", sp=0xa4308) at interpret.c:6019
+#11 0x40088 in apply_low (fun=0xac800 "", ob=0x40cfb0, num_arg=2) at interpret.c:10181
+#12 0x38b58 in eval_instruction (first_instruction=0x197217 "\005", sp=0xa42d8) at interpret.c:5953
+#13 0x40088 in apply_low (fun=0xac800 "", ob=0x413dfc, num_arg=0) at interpret.c:10181
+#14 0x40488 in sapply (fun=0x25857e "exit_command", ob=0xa42a0, num_arg=0) at interpret.c:10347
+#15 0x489bc in player_parser (buff=0xefffe080 "north") at simulate.c:2385
+#16 0x4ea7c in parse_command (str=0xefffe080 "north", ob=0x40cfb0) at backend.c:258
+#17 0x46148 in command_for_object (str=0x5913f0 "north", ob=0x40cfb0) at simulate.c:749
+#18 0x3ac04 in eval_instruction (first_instruction=0x18fa07 " \001\017\004 \001\002,\017\001ê\017\bê-", sp=0xa42a0) at interpret.c:7194
+#19 0x38d78 in eval_instruction (first_instruction=0x28801f " ", sp=0xa4288) at interpret.c:6019
+#20 0x40088 in apply_low (fun=0xac800 "", ob=0x40cfb0, num_arg=1) at interpret.c:10181
+#21 0x38b58 in eval_instruction (first_instruction=0x1 "O", sp=0xa4280) at interpret.c:5953
+#22 0x40088 in apply_low (fun=0xac800 "", ob=0x40cfb0, num_arg=0) at interpret.c:10181
+#23 0x40488 in sapply (fun=0x2a3556 "do_movement", ob=0xa4240, num_arg=0) at interpret.c:10347
+#24 0x68f54 in call_out () at call_out.c:402
+#25 0x4f4e0 in call_heart_beat () at backend.c:789
+#26 0x4ee74 in backend () at backend.c:482
+#27 0x2db44 in main (argc=1, argv=0xeffffc44) at main.c:313
+
+
+Regards,
+Frank
+
+
+-- 
+Frank Stolze
+Systems Architect
+iName, Inc.
+212-425-4200 x319
+212-425-3487 fax
+Personalized, lifetime email.
+"Got your iName yet?"
+http://www.iName.com
+
+
+
+--------------------------------------------------------------------------------
+
+Subject: LDMud 3.2.4 coredump II
+From: Frank Stolze <fstolze@iName.com>
+Date: Wed, 28 Oct 1998 15:56:49 -0500
+X-Mailer: exmh version 2.0.2
+
+And here we've got a second one:
+
+#0  0x793c0 in des_crypt ()
+#1  0x39f8c in eval_instruction (first_instruction=0x274b4f "K\031Í\005\005B\005K>Í@ \005\f)\017\b\005\005 ", sp=0xa4260) at interpret.c:6701
+#2  0x40088 in apply_low (fun=0xac800 "", ob=0x381d58, num_arg=1) at interpret.c:10181
+#3  0x40488 in sapply (fun=0x2bf5ea "check_password", ob=0xa4240, num_arg=1) at interpret.c:10347
+#4  0x4051c in apply (fun=0x2bf5ea "check_password", ob=0x381d58, num_arg=1) at interpret.c:10366
+#5  0x564a0 in call_function_interactive (i=0x3f23b4, str=0xefffef50 "bazooka") at comm1.c:1686
+#6  0x4ee04 in backend () at backend.c:457
+#7  0x2db44 in main (argc=1, argv=0xeffffc44) at main.c:313
+
+
+I will recompile LDMud with gcc 2.8.1 with no optimizations and see if that
+improves the situation.
+
+Regards,
+Frank
+
+
+
+-- 
+Frank Stolze
+Systems Architect
+iName, Inc.
+212-425-4200 x319
+212-425-3487 fax
+Personalized, lifetime email.
+"Got your iName yet?"
+http://www.iName.com
+
+
+
+--------------------------------------------------------------------------------
+
+Subject: LDMud 3.2.4 coredump III
+From: Frank Stolze <fstolze@iName.com>
+Date: Wed, 28 Oct 1998 16:04:22 -0500
+X-Mailer: exmh version 2.0.2
+
+I just used a version of LDMud that was compiled with gcc 2.8.1 with
+no optimizations enabled. This is the stacktrace:
+
+#0  0xa65bc in free_string (str=0x7300d660 <Address 0x7300d660 out of bounds>) at stralloc.c:343
+#1  0x92650 in free_mapping (m=0x371670) at mapping.c:127
+#2  0x3a500 in free_svalue (v=0x371650) at interpret.c:514
+#3  0x92868 in free_mapping (m=0x316278) at mapping.c:160
+#4  0x3a500 in free_svalue (v=0x2e89e8) at interpret.c:514
+#5  0x71b2c in restore_object (ob=0x2d0f14, file=0x42f199 "save/mail/mail") at object.c:1197
+#6  0x4636c in eval_instruction (first_instruction=0xefffdfc8 "¦\006ŠÝ", sp=0xfdbf8) at interpret.c:4500
+#7  0x614c8 in call_lambda (lsvp=0xfdbf0, num_arg=1) at interpret.c:12837
+#8  0x54b2c in eval_instruction (first_instruction=0x1e41ab "K(`\214K)\eA\001F`K( \002o\003B\001F\002\0324\004Q ", sp=0xfdbf8) at interpret.c:8861
+#9  0x58bac in apply_low (fun=0x29f826 "call_unguarded", ob=0x1aacbc, num_arg=3) at interpret.c:10181
+#10 0x4b454 in eval_instruction (first_instruction=0x2d2a87 " ", sp=0xfdbd8) at interpret.c:5953
+#11 0x58bac in apply_low (fun=0x31311a "show_mail", ob=0x2d0f14, num_arg=1) at interpret.c:10181
+#12 0x4b454 in eval_instruction (first_instruction=0x2e0db7 "ë`\e\017\n`\203^", sp=0xfdb98) at interpret.c:5953
+#13 0x58bac in apply_low (fun=0x308f56 "start_player", ob=0x444910, num_arg=2) at interpret.c:10181
+#14 0x4b454 in eval_instruction (first_instruction=0x2b7f8b "K\031Í\005\005B\005K>Í@ \005\f)\017\b\005\005 ", sp=0xfdb78) at interpret.c:5953
+#15 0x58bac in apply_low (fun=0x308ed2 "check_password", ob=0x3f7c14, num_arg=1) at interpret.c:10181
+#16 0x5931c in sapply (fun=0x308ed2 "check_password", ob=0x3f7c14, num_arg=1) at interpret.c:10347
+#17 0x593ec in apply (fun=0x308ed2 "check_password", ob=0x3f7c14, num_arg=1) at interpret.c:10366
+#18 0x81078 in call_function_interactive (i=0x41e71c, str=0xefffef50 "bazooka") at comm1.c:1686
+#19 0x7366c in backend () at backend.c:457
+#20 0x37b44 in main (argc=1, argv=0xeffffc44) at main.c:313
+
+
+As it turns out, all three core dumps happened when I tried to log in a
+second player. Let me know if I can be of any assistance. I will be on
+business travel in CA until Friday, but should be available starting Friday
+night.
+
+
+Regards,
+Frank
+
+
+
+-- 
+Frank Stolze
+Systems Architect
+iName, Inc.
+212-425-4200 x319
+212-425-3487 fax
+Personalized, lifetime email.
+"Got your iName yet?"
+http://www.iName.com
+
+
