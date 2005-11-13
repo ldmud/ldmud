@@ -1,0 +1,256 @@
+Short: save_object() on mappings fails
+From: Bill Andrulonis
+Date: 2002-08-26
+Type: Bug
+Driver: 3.2.9-dev.450
+State: New
+
+-- So far unreproducible.
+
+So we've got another problem, this one dealing with mappings being saved
+in an object.  It has to do with mappings of a certain size, but we're not
+quite sure what size bugs them out.
+
+I'm attaching 2 .o files, the before is the .o file after it bugged out,
+the after is the restored, correct file (we had to edit it by hand).
+
+I'm not quite sure how reproducible it is yet.  We've had it happen a couple
+of times.  It looks like it has to do with the size, but we're not quite
+sure exactly what size it freaks at.
+
+The last version of the driver that this didn't happen would have been 446,
+but I'm not exactly sure.  I did a mass update to 450.
+
+We're running Redhat 7.3
+
+And Craig Venz noticed it, too:
+
+We've noticed ever since we upgraded to dev450 that using save_object and 
+restore_object with mappings has become rather flaky - some kind of 
+strange string limit seems to be imposed on loading mappings, .o files 
+which used to work just fine now give Illegal Format errors - this would 
+happen more often than not on mappings of larger size, while smaller ones 
+have no problem loading. Also, we had an instance of a strange corruption 
+while saving a large object file containing a mapping - the mapping itself 
+saved about the first 3 entries, then ended, later on in the text of the 
+file the rest of the mapping appeared during a string variable.
+My guess would be there's some kind of memory overwrite bug in the save 
+mapping code, but I havent dived into the driver code itself yet to check 
+it out and see if I could get any more specifics.
+
+If you'd like examples of said corruptions and such give me a yell and 
+I'll mail appropriate files to you.
+
+Thanks again for the continued work and support.
+Kilan@Realmsmud / Craig Venz
+
+
+-------------------- before.txt ------------------
+#0:0
+name "roadrunner"
+msgin "arrives"
+msgout "leaves"
+msghome "goes home"
+msgclone "fetches something from another dimension"
+mmsgout "disappears in a puff of smoke"
+mmsgin "arrives in a puff of smoke"
+house_name 0
+auto_load "/players/caleb/utils/whiteball:^!/guild/fighter/fighter_soul:^!/guild/mage/mage_soul:^!/players/grant/skins/skinbag:^!/players/warlocks/trades/_blacksmithing/kit:^!/guild/priest/priest_soul:^!/players/caleb/animal/houses/house_key:players/caleb/animal/houses/house#1525^!/players/caleb/animal/houses/house_ninvite:^!/players/gor/militia/main_badge:^!"
+race "human"
+class_name "mage"
+class_name2 "priest"
+class_name3 "fighter"
+born_on "Day Dec 99 00:00:00 1993"
+born_int 0
+borg 1
+donor 0
+ps_play 0
+size "medium"
+stamina 0
+max_stamina 0
+exp_converted 2
+number_of_deaths 0
+total_deaths 9
+time_to_heal 10
+money 38713
+is_npc 0
+brief 1
+ghost 0
+level 99
+level2 81
+level3 80
+alignment 991
+num_logins 991
+hit_point 1616
+max_hp 1602
+spell_points 1155
+busy 0
+max_sp 1155
+age 10352976
+wimpy 60
+on_kill_list 1
+dead 0
+is_invis 9
+experience 1487858125
+exp2 273456551
+exp3 249115731
+exp_rolled 1
+exp2_rolled 0
+exp3_rolled 0
+exp_roll 1573999058
+exp2_roll 0
+exp3_roll 0
+gender 1
+Str 99
+Int 99
+Con 99
+Dex 99
+Chr 99
+Wis 99
+combat_delay 0
+pose_time 1030131176
+test_guy 0
+scar 144
+info_line "Reimbursed for bugged monster death. -Ender 06/15/02"
+map_quests (["save_ursh":1029695944,"the_abyss":1029695944,"orc_slayer":1029695944,])
+intoxicated 0
+stuffed 0
+soaked 0
+headache 0
+max_headache 8
+called_from_ip "68.34.218.140"
+quests ""
+quest_converted 1
+called_from_name "pcp661653pcs.indpnd01.mo.comcast.net"
+mailaddr "the007guy@netzero.net"
+points 0
+tot_value 6000
+stats_is_updated 0
+listen_to_shouts_from_level 1
+start_ob 0
+last_login 1030129711
+last_logout 1030129693
+bankacc 210062
+title "the Master of Decay"
+pretitle 0
+al_title "good"
+description ""
+subclass "paladin"
+start_room "/guild/mage/mage_guild"
+access_list 0
+channels -1
+altype "__good_resistance"
+rtypes ([6:"__undead_resistance",10:"__fire_resistance",])
+termtype "ansi"
+url_strageddon":1029712918,"rat_infestation":1029712918,"dragon_slayer":1029712918,"bigfoot":1029712918,"Trial_of_Champions":1029712918,"missionary_cannibal":1029712918,"ki_rin":1029712918,])
+intoxicated 0
+stuffed 0
+soaked 0
+headache 0
+max_headache 0
+called_from_ip "21
+-------------------- after.txt -------------------
+#0:0
+name "roadrunner"
+msgin "arrives"
+msgout "leaves"
+msghome "goes home"
+msgclone "fetches something from another dimension"
+mmsgout "disappears in a puff of smoke"
+mmsgin "arrives in a puff of smoke"
+house_name 0
+auto_load "/guild/mage/mage_soul:^!/players/caleb/utils/whiteball:^!/players/gor/militia/main_badge:^!/players/caleb/animal/houses/house_ninvite:^!/players/caleb/animal/houses/house_key:players/caleb/animal/houses/house#1926^!/guild/priest/priest_soul:^!/players/warlocks/trades/_blacksmithing/kit:^!/players/grant/skins/skinbag:^!/guild/fighter/fighter_soul:^!"
+race "human"
+class_name "mage"
+class_name2 "priest"
+class_name3 "fighter"
+born_on "Day Dec 99 00:00:00 1993"
+born_int 0
+borg 1
+donor 0
+ps_play 0
+size "medium"
+stamina 0
+max_stamina 0
+exp_converted 2
+number_of_deaths 0
+total_deaths 9
+time_to_heal 2
+money 0
+is_npc 0
+brief 1
+ghost 0
+level 99
+level2 81
+level3 80
+alignment -1446
+num_logins 994
+hit_point 1602
+max_hp 1602
+spell_points 1155
+busy 0
+max_sp 1155
+age 10433386
+wimpy 60
+on_kill_list 1
+dead 0
+is_invis 9
+experience 1487858125
+exp2 279451318
+exp3 255036184
+exp_rolled 1
+exp2_rolled 0
+exp3_rolled 0
+exp_roll 1603325321
+exp2_roll 0
+exp3_roll 0
+gender 1
+Str 99
+Int 99
+Con 99
+Dex 99
+Chr 99
+Wis 99
+combat_delay 0
+pose_time 1030371497
+test_guy 0
+scar 144
+info_line "Reimbursed for bugged monster death. -Ender 06/15/02"
+map_quests (["orc_slayer":1029695944,"the_abyss":1029695944,"Trial_of_Champions":1029712918,"armageddon":1029712918,"save_ursh":1029695944,"rat_infestation":1029712918,"bigfoot":1029712918,"ki_rin":1029712918,"dragon_slayer":1029712918,"missionary_cannibal":1029712918,])
+intoxicated 0
+stuffed 0
+soaked 0
+headache 0
+max_headache 0
+called_from_ip "68.34.218.140"
+quests ""
+quest_converted 1
+called_from_name "pcp661653pcs.indpnd01.mo.comcast.net"
+mailaddr "the007guy@netzero.net"
+points 0
+tot_value 13060
+stats_is_updated 0
+listen_to_shouts_from_level 1
+start_ob 0
+last_login 1030366329
+last_logout 1030129693
+bankacc 210062
+title "the Master of Decay"
+pretitle 0
+al_title "demonic"
+description ""
+subclass "barbarian"
+start_room "/guild/mage/mage_guild"
+access_list 0
+channels -1
+altype "__evil_resistance"
+rtypes ([6:"__undead_resistance",10:"__fire_resistance",])
+termtype "ansi"
+url_string ""
+graphics_mode "dumb"
+colors_bv 0
+colors ({7,7,7,7,14,7,7,7,7,11,13,7,12,7,7,7,6,6,2,6,8,7,7,7,0,0,7,7,7,1,0,1,1,2,5,6,3,5,4,1,2,5,6,3,7,7,1,2,5,6,7,7,7,})
+term_rows 50
+block_user_tells_level 0
+blocked_tells ({})
+--------------------------------------------------

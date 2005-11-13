@@ -1,0 +1,5 @@
+Command: heal
+argument: name
+
+Heal a player or a monster totally. Spell points are restored.
+Excessive use of this is considered cheating.

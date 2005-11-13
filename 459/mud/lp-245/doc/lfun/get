@@ -1,0 +1,9 @@
+int get(str)
+string str;
+
+If an object wants control over when it is possible to pick it up,
+then it must define get(), and return 1 if ok to pick up.
+
+The "str" is comes from "get str" from the player command.
+
+id() has been called before this to identify the object.

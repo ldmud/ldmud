@@ -1,0 +1,68 @@
+Short: dev.209 crashes during autoload/player login
+From: <hkopp@informatik.uni-rostock.de>
+Date: Sun, 25 Jun 2000 19:07:24 +0200
+Type: Bug
+State: Done - fixed in 3.2.8-dev.213
+
+Hallo Lars,
+
+bei der Ausfuehrung unseres neuen Autoload System kommt es zu 
+einem reproduzierbaren Problem. Da die Treiberausgabe so
+gross ist, habe ich sie als Datei angehaengt.
+
+ich sende Dir hier als Attachment die EverLIB1.4N sowie das 
+configure script fuer Evermore (du brauchst ein neues fuer
+native).
+Die Lib solltest du dann wie folgt starten:
+	driver -DEVERMORE (moeglicherweise noch den pfad zur lib)
+Standardport ist 23.
+
+Es ist ein Archwizard "lars" mit Password "lars" eingerichtet.
+Sowie Du Dich anmeldest, also nach dem Password enter drueckst,
+kommt diese ellenlange Ausgabe in der Shell. 
+
+Es ist NICHT wie ich vermutete das Autoload sondern generell
+beim einloggen reproduzierbar und passiert bei jedem Spieler
+der sich einloggt.
+
+Wenn Du fragen hast, einfach mailen. 
+
+Gruesse
+
+Heiko
+
+PS: Es kann passieren das der Treiber meckert weil bestimmte
+o-files nicht funktionieren. Dann musst du auf alle Dateien
+im save Verzeichnis und in den Unterverzeichnissen der Lib 
+ein dos2unix ausfuehren. Leider sind die o-files von wenn 
+unter Windows gearbeitet wird nicht kompatibel :(
+
+
+2000.06.25 17:01:22 LDMud 3.2.8-dev.209 (3-2-dev.209)
+Loading init file /etc/init_file
+Preloading: /basic/living __________________________ 0.40 ( 16887)
+Preloading: /lib/grammar ___________________________ 0.02 (   363)
+Preloading: /lib/language __________________________ 0.01 (   207)
+Preloading: /lib/colour ____________________________ 0.01 (   199)
+Preloading: /lib/guild _____________________________ 0.01 (   199)
+Preloading: /lib/herbs _____________________________ 0.04 ( 26207)
+Preloading: /std/login _____________________________ 0.05 (  1098)
+Preloading: /std/player ____________________________ 0.51 ( 10095)
+Preloading: /std/item ______________________________ 0.10 (  2061)
+Preloading: /std/room ______________________________ 0.19 (  7627)
+Preloading: /std/monster ___________________________ 0.01 (   188)
+Preloading: /std/npc _______________________________ 0.00 (   286)
+Preloading: /server/events _________________________ 0.00 (    12)
+Preloading: /server/skill __________________________ 0.08 ( 17467)
+Preloading: /server/magic __________________________ 0.00 (    12)
+Preloading: /server/banish _________________________ 0.01 (   376)
+Preloading: /server/herbs __________________________ 0.00 (    12)
+Preloading: /server/rooms __________________________ 0.00 (    12)
+2000.06.25 17:01:24 Setting up ipc.
+2000.06.25 17:01:30 sp inconsistent: 0x4adb70 instead of 0x4adb68
+ --> Inconsistency in main loop:     inter_sp            st_o_s - 1
+No trace.
+
+Analysis:
+  The problem was in h_telnet_neg() in comm.c: it always removed just two
+  values from the stack even if called with more.
