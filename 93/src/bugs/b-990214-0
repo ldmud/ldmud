@@ -1,0 +1,209 @@
+Short: Problems with negative times in call-outs
+From: Freaky <Freaky@UNItopia.rus.uni-stuttgart.de>
+Date: Thu, 4 Feb 1999 17:30:00 +0100
+Type: Bug
+State: Unclassified.
+
+Note: I have no idea how this can happen. If this effect shows up again,
+putting a sanity check into new_call_out() might give us a clue.
+
+after 60 online days UNItopia had some problems with call-outs:
+The call-outs are negative. Had someone the same problmems?
+How can this happen? I tested some time-changing on my private system, but
+it didn't affect the driver.
+
+Here is an output of call_out_info():
+
+Object                                 Function             Time   Args
+/d/Kokosinsel/mammi/hexe/npc/touch/bithra parse_conversation      1 0
+/obj/hlptool#2221307                   landung                   2 1
+/d/Doerrland/kickaha/obj/wechsler      suche                     3
+/obj/fackel#2223446                    burn                      4
+/obj/fackel#2223820                    burn                      4
+/z/Gilden/Hexenvolk/obj/kerze#2225445  burn                      6
+/obj/hlptool#2224589                   meldung                  10 "Du naeherst Dich einer Insel mit hohen Klippen, grossen Sandstraenden und viel
+/obj/hlptool#2224589                   landung                  16
+/obj/virus#2225037                     disease                  16
+/obj/fackel#2224505                    burn                     18
+/obj/fackel#2224517                    burn                     18
+/obj/fackel#2225038                    burn                     18
+/obj/fackel#2225238                    burn                     18
+/obj/leiche#2225337                    skelettiere              20
+/p/zandru/obj/braten/kadaver#2225309   decay                    44
+/d/Mittelerde/AmonSul/fizban/npc/soldat#2225325 heal_slowly     66
+/d/Mittelerde/AmonSul/fizban/npc/soldat#2225329 heal_slowly     66
+/p/zandru/obj/braten/kadaver#2225360   decay                   122
+/p/zandru/obj/braten/kadaver#2225274   decay                   164
+/p/mammi/obj/fteufel#2225428           shut_fteufel            500
+/obj/player#2195251                    ende_statue             692
+/obj/player#2224131                    ende_statue             934
+/obj/player#2221755                    ende_statue             990
+/obj/player#2224031                    ende_statue            1234
+/z/Spiele/Plakatspiel/d/Gallien/mon/klebfix do_laufen        -3003
+/d/Arktis/nadomir/china/obj/eiswuerfel#2218882 schmelz_check  -3003
+/d/Arktis/nadomir/china/obj/eiswuerfel#2218881 schmelz_check  -3003
+/d/Arktis/nadomir/china/obj/eiswuerfel#2218880 schmelz_check  -3003
+/z/Gilden/Hexenvolk/obj/vertraut/cat#2222363 parse_conversation  -3002 0
+/secure/simul_efun/simul_efun          clean_name_living_m   -3002 ({"idefix","bedienung","nampfdudel","steinriese","armageddon","P","kurdel","gri 234
+/d/Doerrland/tom/faehre/willy          logge                 -3002
+/d/Gallien/malimarc/faehre/epidemais   gib_kommando          -3002
+/d/Mittelerde/sissi/npc/dieb           flucht                -3002
+/d/Gallien/lole/i/masterroom           master_c_o            -3002
+/d/Mittelerde/caradhras/faehre/faehre1/pilger kreuze         -3002
+/d/Kokosinsel/Faehren/Samos/herzas     gib_kommando          -3001
+/d/Arktis/faehren/krabbi/amundsen      gib_kommando          -3001
+/d/Maerchenland/salto/faehre/yasmina   kreuze                -3001
+/z/Gilden/Alchemistengilde/d/Vaniorh/room/schnaps stimmung   -3001
+/d/Campus/khan/s-bahn/linie4           fahre                 -3000
+/d/Vaniorh/garthan/enair/tarakaja      tk_handle             -3000
+/d/Vaniorh/garthan/nacht_wache         move_one_step         -3000
+/d/Gallien/torin/faehre/kap            gib_kommando          -2999
+/d/Mittelerde/caradhras/faehre/faehre3/amandil gib_kommando  -2999
+/w/kingkong/Kueche                     meldung               -2998
+/obj/nahrung#2223994                   weiter_essen          -2998 27
+/d/Doerrland/tom/faehre/willy          gib_kommando          -2997
+/d/Campus/khan/s-bahn/linie2           kuendige_verlasse_an  -2997
+/obj/leiche#2223977                    decay                 -2997
+/d/Mittelerde/Tharbad/merry/boot       kuendige_verlasse_an  -2996
+/d/Kokosinsel/Faehren/Raptor/ash       gib_kommando          -2995
+/d/Arktis/nadomir/china/obj/eiswuerfel#2218877 schmelz_check  -2995
+/d/Doerrland/parzival/faehre/patty     gib_kommando          -2995
+/d/Gallien/Annonay/karl/ballon/ballon  kuendige_verlasse_an  -2995
+/z/Raetsel/Anfaengerpraktikum/d/Campus/obj/kurt weiter       -2995
+/d/Campus/khan/s-bahn/linie1           kuendige_verlasse_an  -2994
+/d/Vaniorh/garthan/obj/nw_laterne#2115052 burn               -2993
+/obj/fackel#2221820                    burn                  -2993
+/d/Ebenen/gnomi/Unterwasser/obj/leuchtfisch#2222767 schwimme  -2991
+/z/Raetsel/Tal_des_Todes/d/Doerrland/obj/lampe#1004257 burn  -2990
+/d/Vaniorh/garthan/enair/obj/mobile#2213436 perpetuum        -2988
+/obj/player#2222024                    wp_meldung            -2987
+/obj/virus#2223829                     disease               -2987
+/d/Mittelerde/caradhras/adler/adler    kuendige_verlasse_an  -2985
+/obj/fackel#2223168                    burn                  -2985
+/obj/fackel#2223172                    burn                  -2985
+/obj/fackel#2223173                    burn                  -2985
+/obj/fackel#2223494                    burn                  -2985
+/obj/fackel#2222797                    burn                  -2985
+/obj/fackel#2223830                    burn                  -2985
+/obj/fackel#2223831                    burn                  -2985
+/d/Kokosinsel/Knossos/Ballon/zeppelin  kuendige_verlasse_an  -2985
+/obj/leiche#2223968                    skelettiere           -2981
+/d/Mittelerde/kingkong/room/sandmann_o test                  -2975
+/d/Kokosinsel/Knossos/Ballon/ballon1   kuendige_verlasse_an  -2975
+/w/gnomi/priv/Stadt/gnomi/room/hohlraum zerplatze_blase      -2975
+/w/gnomi/meer/Stadt/gnomi/room/hohlraum zerplatze_blase      -2975
+/d/Kokosinsel/Faehren/Argo/janus       fahr_los              -2974 "tadmor"
+/d/Vaniorh/garthan/enair/obj/mobile#2208888 perpetuum        -2972
+/d/Gallien/ivanhoe/galeere/kapitaen    fahr_los              -2965 "nordgallien"
+/p/zandru/obj/braten/feuer#2184377     burn                  -2963
+/d/Campus/maulwurf/s_bahn_tief         geraeusch             -2963
+/d/Arktis/faehren/wappen/larsen        fahr_los              -2958 "veldergautland"
+/d/Mittelerde/caradhras/adler/tadmor/ladler kuendige_verlasse_an  -2957
+/d/Ebenen/gnomi/Unterwasser/obj/nixe#2222770 schwimme        -2951
+/d/Ebenen/gnomi/Unterwasser/obj/nixe#2222768 schwimme        -2951
+/d/Arktis/faehren/seeteufel/erik       fahr_los              -2948 "phexcaer"
+/w/sin/Orklager/obj/kochtopf#1812152   start_burn            -2947
+/w/sin/Orklager/room/master            tick                  -2947
+/p/bert/obj/sessel#2117267             heal                  -2947 1
+/d/Vaniorh/Orkberge/Orklager/room/master tick                -2947
+/d/Vaniorh/Orkberge/Orklager/obj/kochtopf#2118930 start_burn  -2947
+/d/Ebenen/gnomi/Unterwasser/Stadt/gnomi/room/hohlraum zerplatze_blase  -2945
+/p/Item/Moebel/Sessel/obj/sessel#2223687 heal                -2937 1
+/obj/monster#2222371                   heal_slowly           -2925
+/p/kurdel/obj/wache_monster#2223847    heal_slowly           -2925
+/obj/leiche#2223991                    decay                 -2925
+/d/Vaniorh/Tadmor/Anfaengerpark/npc/enten steuerung          -2918
+/d/Kokosinsel/Knossos/Ballon/ballon3   kuendige_verlasse_an  -2917
+/d/Kokosinsel/Knossos/Ballon/ballon2   kuendige_verlasse_an  -2917
+/p/kurdel/obj/wache_monster#2223859    heal_slowly           -2917
+/d/Mittelerde/Hobbingen/merry/schmied  schiebe               -2913 "westen"
+/p/kurdel/obj/wache_monster#2223864    heal_slowly           -2909
+/obj/monster#165394                    heal_slowly           -2887
+/z/Gilden/Hexenvolk/obj/buche#2119911  heal_slowly           -2887
+/z/Gilden/Vampyrgilde/obj/fledermaus   monster_move          -2887
+/d/Doerrland/onit/mon/geier#2073900    heal_slowly           -2887
+/apps/statistik                        do_save               -2877
+/obj/leiche#2224008                    decay                 -2867
+/apps/gildenskills                     save_data             -2843
+/obj/player#2219961                    ende_statue           -2835
+/d/Vaniorh/mozart/theater/obj/theaserver#1381206 marketing_manager  -2779
+/d/Maerchenland/sissi/muschel/muschel_innere ankunft_terqa   -2769
+/z/Gilden/Magiergilde/d/Vaniorh/Tadmor/Turm/mplatz next_event  -2755
+/d/Kokosinsel/Knossos/Armenhaus/npc/frau_motates starte_rolle  -2753 "/d/Kokosinsel/Knossos/Armenhaus/npc/abend_sie"
+/d/Vaniorh/Tadmor/Anfaengerpark/obj/maulwurfhuegel#2223516 ende  -2743
+/d/Mittelerde/Hobbingen/merry/schmied  schiebe               -2733 "westen"
+/d/Vaniorh/Tadmor/Anfaengerpark/obj/maulwurfhuegel#2223987 mweg  -2711
+/d/Kokosinsel/Knossos/Armenhaus/npc/herr_motates starte_rolle  -2681 "/d/Kokosinsel/Knossos/Armenhaus/npc/abend_er"
+/d/Mittelerde/map_util/klimaraum       change_weather        -2579
+/d/Mittelerde/Hobbingen/merry/schmied  schiebe               -2553 "nordwesten"
+/d/Mittelerde/Hobbingen/merry/schmied  schiebe               -2373 "westen"
+/obj/player#2221548                    ende_statue           -2369
+/d/Vaniorh/Tadmor/Anfaengerpark/obj/maulwurfhuegel#2223694 ende  -2327
+/obj/player#2218394                    ende_statue           -2143
+/d/Mittelerde/map_util/cron_master     notify                -1955 "midnight"
+/apps/cron                             job                   -1955 4
+/d/Vaniorh/Tadmor/Anfaengerpark/obj/maulwurfhuegel#2223987 ende  -1911
+/d/Mittelerde/Hobbingen/merry/schmied  ostweg                -1653
+/d/Kokosinsel/Knossos/Affe/obj/aeffchen langeweile           -1607
+/d/Gallien/wetter/master_room          umschwung              -771 0
+/obj/player#2223202                    ende_statue            -527
+/apps/cron                             job                    -355 640
+/secure/simul_efun/simul_efun          clean_simul_efun       -321
+/d/Vaniorh/garthan/sw/wache            start_shift            -289
+/w/mammi/Hexenvolk/npc/bithra          move_to_gr             -289
+/d/Kokosinsel/mammi/hexe/npc/touch/bithra move_to_gr          -289
+/apps/cron                             job                    -289 637
+/apps/cron                             job                    -289 245
+/apps/cron                             job                    -289 7
+/d/Mittelerde/Mithlond/merry/faehre2   kuendige_verlasse_an    -45
+/obj/player#2221583                    ende_statue              41
+/p/artus/obj/schwamm#2220109           verdunsten              167 0
+/apps/cron                             job                     245 19
+/apps/cron                             job                     845 607
+/apps/cron                             job                     845 611
+/apps/cron                             job                    1045 633
+/z/Gilden/Hexenvolk/apps/verwaltung    daily_save             1923
+/w/mammi/Hexenvolk/apps/verwaltung     daily_save             1923
+/apps/statistik                        do_day                 1923
+/obj/player#2193478                    ende_statue            1987
+/obj/player#2224372                    ende_statue            2011
+/apps/cron                             job                    2845 638
+/apps/cron                             job                    2845 634
+/apps/cron                             job                    2845 5
+/apps/cron                             job                    2845 3
+/apps/cron                             job                    2845 1
+/obj/player#2224460                    ende_statue            3342
+/apps/cron                             job                    3645 635
+/d/Ebenen/gnomi/Unterwasser/obj/leuchtfisch#2222767 sterbe    4329
+/d/Ebenen/gnomi/Unterwasser/obj/nixe#2222768 sterbe           4335
+/d/Ebenen/gnomi/Unterwasser/obj/nixe#2222770 sterbe           4345
+/apps/cron                             job                    5245 636
+/apps/cron                             job                    5245 2
+/apps/cron                             job                    5245 6
+/apps/cron                             job                    5645 608
+/apps/cron                             job                    5645 20
+/apps/cron                             job                    5645 612
+/apps/cron                             job                    6245 16
+/d/Mittelerde/Mithlond/merry/faehre1   kuendige_verlasse_an   6272
+/apps/cron                             job                    6445 641
+/apps/cron                             job                    6445 639
+/apps/cron                             job                    6445 246
+/p/ACCESS/clean_tmp                    daily_clean           19923
+/p/zap/wetter/bsp/wetter               scenario_control      41946 "festland"
+/p/zap/wetter/bsp/wetter               scenario_control      49276 "insel"
+/d/Campus/i/wetter                     scenario_control      80431 "domain"
+/z/Raetsel/Anfaengerpraktikum/d/Campus/master clean_praktikum_db 254827
+
+Driver was LDMud 3.2.5-dev.28.U07.
+
+Lars: Is it possible to patch the driver, so negative call-outs will be set
+to 0?
+
+Ciao
+		Freaky
+
+--
+Frank 'Freaky' Kirschner
+UNItopia Admin                          http://UNItopia.uni-stuttgart.de/
+Freaky@UNItopia.Uni-Stuttgart.DE      telnet://UNItopia.uni-stuttgart.de/
+

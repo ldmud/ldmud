@@ -1,0 +1,9 @@
+Subject: assoc und co wegschmeissen?
+From: Freaky <Freaky@UNItopia.rus.uni-stuttgart.de>
+Date: Wed, 31 Mar 1999 15:07:34 +0200
+Type: Feature
+State: Unclassified
+
+Wie waere es, wenn man im config.h per define angeben koennte, ob man die
+Funktionen fuer die Alists (assoc usw.) haben moechte, oder nicht.
+Ich denke durch die Mappings braucht die kein Mensch mehr.
