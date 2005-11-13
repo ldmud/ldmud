@@ -1,0 +1,44 @@
+*** simulate.c-orig	Fri Oct 30 00:11:35 1998
+--- simulate.c	Fri Oct 30 00:23:08 1998
+***************
+*** 279,284 ****
+--- 279,285 ----
+      char name[200];
+      struct program *prog;
+  
++ fprintf(stderr, "DEBUG: load_object('%s', %d, %d)\n", lname, dont_reset, depth); fflush(stderr);
+      /* Massage the filename a bit to bring it into a sane format:
+       *  - Remove leading '/'
+       *  - Remove a trailing '.c'
+***************
+*** 314,319 ****
+--- 315,321 ----
+       * object. In that case, simply return that object.
+       */
+      ob = lookup_object_hash(name);
++ fprintf(stderr, "DEBUG: lookup '%s' yields %p '%s'\n", name, ob, ob ? ob->name : "<null>"); fflush(stderr);
+      if (ob)
+          return ob;
+  
+***************
+*** 433,438 ****
+--- 435,441 ----
+      if (inherit_file) {
+  	char *tmp, *tmp2;
+  
++ fprintf(stderr, "DEBUG: inherit_file '%s'\n", inherit_file); fflush(stderr);
+  	tmp = tmp2 = inherit_file;
+  	inherit_file = 0;
+  	push_referenced_shared_string(tmp2);
+*** otable.c-orig	Fri Oct 30 00:11:40 1998
+--- otable.c	Fri Oct 30 00:15:31 1998
+***************
+*** 108,113 ****
+--- 108,114 ----
+  #endif
+  	int h = ObjHash(ob->name);
+  
++ fprintf(stderr, "DEBUG: enter object %p '%s'\n", ob, ob->name); fflush(stderr);
+  #ifdef DEBUG
+  	s = find_obj_n(ob->name);
+  	if (s) {

@@ -1,0 +1,147 @@
+If you are using 3.2 with an old mudlib (2.4.5 and older), then read
+the file COMPAT for compatibility information.
+
+Read the file INSTALL for information about how to install the game.
+
+Mail bugs or info about problems to amylaar@cs.tu-berlin.de
+Other possible addresses: amylaar@mail.cs.tu-berlin.de (same account as above)
+
+Currently, new versions of this software are made available at
+ftp://ftp.nightfall.org/amylaar/ .
+
+mirrors
+    ftp.lysator.liu.se:/pub/lpmud/drivers/Amylaar/...
+					(updated automatically every night)
+    marble.bu.edu:/pub/lp		(updated manually):
+    ftp://lostsouls.desertmoon.com/pub/lpmud
+	(updated automatically from lysator around midnight)
+
+Don't forget the -p option for patch if you are applying a diff.
+
+There is a mailing list that informs about new versions when there are made
+available. Try a mail to majordomo@nightfall.org with ``help'' in the body
+Commands in the "Subject:" line NOT processed.
+
+
+Here is some information about 3.2:
+
+Flags accepted by debug:
+
+-D'MACRO'	define MACRO for all compiled lpc files. -DMACRO=expansion is
+		also valid.
+
+-E'cost'	set the maximum eval_cost to 'cost'.
+
+-M'name'	set the filename of the master object to 'name'.
+
+-N		Don't start the erq demon
+
+-c		Print to stdout every time a file is compiled.
+
+-d		Debug information. Prints nothing interesting.
+
+-e		Start without loading any wizard file.
+
+-f'arg'		Send 'arg' as argument to function 'flag()' in obj/master.c.
+
+-m'dir'		Specify 'dir' as the directory to use as mudlib.
+
+-r'size'	set the amount of reserved user memory to 'size'.
+-ru'size'	set the amount of reserved user memory to 'size'.
+-rm'size'	set the amount of reserved master memory to 'size'.
+-rs'size'	set the amount of reserved system memory to 'size'.
+
+-s'sec'		Delay in seconds before swap
+-sv'sec'	Delay in seconds before swapping variables
+		A negative value means no swapping.
+-sf'name'	Make 'name' the name of the swap file.
+
+-t		Don't call any heart beats. Makes it easier to debug.
+
+-u'port'	Set the udp port number to 'port'
+
+-y		If compiled with YYDEBUG, set yydebug to 1.
+
+'port'		set the ipc port number to 'port'.
+
+--max_malloced'size'		Set the maximum amount of memory for malloc.
+--max_small_malloced'size'	Set the maximum total of small blocks.
+--gcollect_outfd'num'		Set the descriptor number where garbage
+				    collector output goes.
+--gcollect_outfd'file'		Specifies a filename for garbage
+				    collector output.
+--version			print version and exit.
+--debug_file'file'		set the name of the debug file
+
+DEBUG specific options:
+
+--check_a_lot_ref_counts
+--gobble_descriptors'num'
+
+
+To reload the master without rebooting, while a buggy master is blocking
+updates, send a SIGUSR1 signal to the process.
+This will also increase the eval_cost by MAX_COST/8 , so you can prematurely
+finish an extremely long lpc loop.
+
+Compiler directives recognized by the preprocessor:
+#pragma strict_types
+  require functions to be declared with the return type, which will in turn
+  result in the function body to be strictly type checked.
+#pragma strong_types
+  Like the above, but call_other() is considered to return mixed, not unknown,
+  thus you needn't cast values obtained by call_other() .
+#pragma combine_strings
+  Add string literals at compile time when they are added with '+' . Good code
+  will use the ansi string concatenation where compile time literal addition 
+  is wanted, and want '+' to be executed at run time, and thus suffer
+  increased memory usage. But it will improve bad old code, most notably
+  from old roommakers.
+#pragma no_combine_strings
+  Turns off the above option. This is the default.
+#pragma verbose_errors
+  For compile time errors, add a bit of context from the source to the
+  error message. This is useful when there is an error in a long line and
+  you have no idea where it is.
+#echo
+  emits the (unexpanded) argument.
+
+
+If you debug 3.2 internals:
+
+Read the file STACKMACHINE for some
+information about how it works. To debug instruction execution, you have to
+single step execution in the function eval_instruction(). The value on top
+of stack can be accessed by 'sp[0]'. The value before that, is 'sp[-1]' etc.
+
+The first argument to a function is found at 'fp[0]'. The next at 'fp[1]'.
+The local arguments follows immediately after the arguments. If there are
+3 arguments to a function, then the first local variable will be found
+with 'fp[3]'.
+
+The function last_instructions(n, verbose) will print out the n last executed
+instructions. It is now called automatically at fatal error.
+
+There is a variable 'current_object'. This is the object that is given
+by 'this_object()'. The variable 'current_prog', is a pointer to
+the program current being executed. This is normally the same as
+'current_object->prog->program', but can differ when executing code
+defined by inheritance.
+
+The structure 'struct program' (pointed to by ob->prog) defines program
+information for object 'ob'. It can be shared by several objects (when
+cloned and inherited).
+
+Inheritance by 'a' from 'b' is implemented by copying info from 'b->prog'
+into 'a->prog'. All functions and variables, for example.
+
+There are a lot of comments in the source code. For information
+about the stackmachine, read prolang.y and interpret.c.
+
+defined(DEBUG) && defined(TRACE_CODE) only:
+#pragma set_code_window
+  Sets an offset to the current program writing position. Use this BEFORE a
+  piece of code where you wnat to check to what bytecodes it is compiled.
+#pragma show_code_window
+  shows some bytes starting at or near the last point set_code_window was
+  called.
