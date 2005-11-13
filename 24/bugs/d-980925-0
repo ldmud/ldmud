@@ -1,0 +1,10 @@
+Subject: Bitstrings and a strange error message
+From: Lars Duening <duening@ibr.cs.tu-bs.de>
+Date: Fri, 25 Sep 1998 14:11:25 +0200 (MET DST)
+
+Heya!
+
+And why the limit?
+
+[d-code] Woody@SilberLand: ab 1201 macht er: Error: set_bit: too big bit
+   number: 136374082.

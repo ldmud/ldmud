@@ -1,0 +1,141 @@
+   Oct-92 [lars]
+    dr312j ported to Amiga using DICE 2.06.
+
+   Dec-92 [lars]
+    dr312k ported to Amiga using DICE 2.06.
+
+   Jan-92 [lars]
+    Merged Deepthought's TCP-code into the beta-l-driver.
+
+   Feb-92 [lars]
+    Added a minimal getrusage() to support some wiztools.
+    Some reorganisation for easier compilation for OS 1.3
+    Switched from DICE 2.06 to DICE 2.07.
+
+09-Apr-93 [lars]
+    Started this log (didn't thought that I'd need it :-)
+    Merged in patch @31.
+    Made signal handling (esp. of Ctrl-C) more reliable. This also
+     fixed a bug left over from the DICE update.
+    Added provision for DICE' ffp-instead-of-float math to patchfloat.h
+    Replaced the original (Oberon written) PlayMud by its C version.
+     This also cut off the PlayMud/ tree and removed the last binary
+     from the source archive.
+
+03-May-93 [lars]
+    Merged in PlayMud.c patches by John Fehr <umfehr06@ccu.UManitoba.CA>.
+      Also fixed some problems around PlayMud and its Makefile entry.
+
+04-Jun-93 [lars]
+    BSD'ed the error codes in socket_sim.h
+
+18-Jun-93 [lars]
+    Created an own machine.h.
+    Renamed config.h-Amiga and Makefile-Amiga into config.h resp. Makefile.
+    Added support for AmiTCP.
+
+16-Aug-93 [lars]
+    Upgraded TCP support to AmiTCP-2.0 .
+    Cleaned out some Unixisms from the Makefile.
+
+08-Sep-93 [lars]
+    Upgraded PlayMud to version 1.5.
+
+04-Oct-93 [lars]
+    Upgraded PlayMud to version 1.6.
+
+15-Nov-93 [lars]
+    Upgraded PlayMud to version 1.7.
+
+06-Jan-94 [lars]
+    sim_socket() didn't care if a socket had no to_client, thus causing
+      Enforcerhits by deref'ing a NULL pointer.
+
+11-Jan-94 [lars]
+    Fixed a small but lethal bug in PlayMud.
+
+06-Feb-94..11-Feb-94 [lars]
+    Included support for SAS/C.
+
+13-Feb-94 [lars]
+    PlayMud now properly ignores IAC GA ("Make my day!").
+
+25-Feb-94 [lars]
+    PlayMud did still do synchronous writes to the console. Changed that.
+
+05-Jun-94 [lars]
+    cleanup_alarm() added to signal.c, else the messageport of the
+      alarm timer wouldn't be deallocated, thus causing a tasksignal loss.
+    68040 machines crash using the single precision libraries up to OS 3.0,
+      so all 'floats' are now compiled as 'double's.
+
+25-Jul-94..04-Aug-94 [lars]
+    Upgraded to DICE 3.0
+
+31-Aug-94 [lars]
+    Wrote DMakefile for DICE' dmake.
+
+25-Sep-94 [lars]
+    Migrated port 3.2.1@60 from 3.2@301.
+
+19-Nov-94 [lars]
+    PlayMud now closes its read socket faster on shutdown, preventing
+    lockups on abortions.
+
+11-Apr-95 [lars]
+    Merged in newest SAS diffs from Suamor.
+
+11-Aug-95 [lars]
+    nsignal.h, signal.c: Resolved __sigfunc-definition conflict between
+      DICE and SAS/C by replacing all useages by a properly defined SIGFUNC.
+    amiga.c: Added check for enough stack on startup.
+
+18-Aug-95 [lars]
+    Some more changes for SAS/C:
+    nsignal.h: sigfunc-typedef now for all versions.
+    amiga.c: Added stub for fcntl().
+    socket_tcp.c: For AmiTCP >= 3, the existance of bsdsocket.library
+      is checked manually.
+    port.c: rusage() and struct time emulation no longer needed.
+    config.h: Added check that SAS/C 6.55 or better is used.
+
+20-Aug-95 [lars]
+    socket_tcp.c: SAS/C: the netlib autoinit function is removed from the
+      list of autofunctions on startup as it would exit if AmiTCP is not
+      available.
+    socket_tcp.h: SAS/C: Includes pragmas for AmiTCP.
+
+01-Nov-95 [lars]
+    amiga.c: DICE: added a dup() simulation to enable main.c to gobble
+      up filedescriptors. The fds returned by dup() can't be used, though.
+    config.h-compat: new.
+
+06-Nov-95 [lars]
+    main.c: disables auto-start of erq demon in any case.
+    config.h, -compat: ERQ_DEMON defined, making efuns send_erq() and
+      attach_erq_demon() available.
+
+09-Nov-95 [lars]
+    INSTALL: rewritten, added direct hints for various mudlibs.
+
+11-Nov-95 [lars]
+    socket{,_tcp,_sim}.c: amiga_sockinit/exit() now dispatches to
+      amiga_tcpinit/exit() resp. amiga_siminit/exit().
+    amiga.c: amiga_sockinit/exit() are now always called.
+    Together this avoids a dangling simulated UDP socket if the driver
+      is aborted before initialising ipc.
+
+01-May-96 [lars]
+    Upgraded PlayMud to version 1.9.
+    Made check of SAS/C __VERSION__ and __REVISION__ in config.h more
+      reliable.
+    amiga.c: The parameters for DICE' dynamic stack routines are derived
+      from the actual stacksize.
+
+09-Jul-96  [lars]
+    Upgraded for DICE 3.2 (no big deal).
+
+28-Sep-94..05-Nov-97 [lars]
+    Merged in patches for @60..@139.
+    3.2.1@139 is also the last release I am going to adapt/compile for
+    Amiga.
