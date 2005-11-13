@@ -1,0 +1,13 @@
+Short: to_int()
+Date: 980928
+Type: Feature
+State: Proposed
+Author: Zwirch
+Long:
+
+to_int() sollte auch int als arg akzeptieren, to_object() ein object,
+etc.
+Note by Zwirch@carledon.
+
+	Lars
+
