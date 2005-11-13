@@ -1,0 +1,511 @@
+# LPMud-Makefile for DICE 3.0s dmake -- 01-Nov-95
+#   See also README.Amiga.
+#
+# This makefile is derived from the generic Makefile and is useable only
+# with DICE.
+# As dmake is not able of conditional makes, any compiler/net dependent
+# change must be made by hand.
+#
+# The first three parts of the makefile define the standard macros, the
+# compiler specifics, and the net communication.
+# The fourth part contains the generic LPMud rules, the fifth any additional
+# rules. There should be no need for modifications in both.
+
+#-----------------------------------------------------------------------------
+#			    Standard Configuration
+#-----------------------------------------------------------------------------
+
+# The GNU-yacc 'Bison' won't work with Amylaars lang.y, but byacc will.
+
+YACC= byacc
+YFLAGS=
+
+# Standard macros
+
+YTAB= y.tab
+CP= c:copy
+RM= c:delete
+MV= c:rename
+
+# Unix has an option '-f' for it's 'rm' - not the Amiga, so I define
+#   RMF= $(RM) -f
+# and modify it for Amiga as:
+
+RMF= $(RM)
+
+#-----------------------------------------------------------------------------
+#			    Compiler Specifics
+#-----------------------------------------------------------------------------
+
+# What Amiga-compiler do we use?
+#   Compiler versions (WHATCC, for more subtle differences):
+#     DICE 2.06.40
+#     DICE207: DICE 2.07.53
+#     DICE30 : DICE 3.0
+#     DICE32 : DICE 3.2
+
+WHATCC= DICE32
+
+# Set CC,LD,AS and CFLAGS to the values needed by your configuration. Note
+# the CFLAGS might be further modified.
+
+CC= dcc
+LD= dlink
+AS= das
+CFLAGS= -O ""
+
+# Set CCOPTS to any options you need to compile LPMud, what includes
+# warning- and optimization options!
+#
+# As dcc has problems with float maths, you must define _NO_OWN_FLOATS.
+#
+# -gs: dynamic stack code (needed for its alloca)
+# -mC: large code model
+# -mD: the large data model.
+# -s : include symbolic information into the executable.
+# -d1: include line number information.
+# DICE uses the OS' math libraries, so OS-1.3/68040 versions can't use simple
+# floats.
+# AMIGA is defined automatically.
+
+CCOPTS= -s -gs -mC -mD -D_NO_OWN_FLOATS
+
+# To compile the hosts/amiga/signal, the compiler has to generate C-Code
+# with registerized parameters. The special options are put into ROPT.
+
+ROPT= -mRR
+
+# Any additionally needed sources are put into XSRC, and the object files
+# to generate into XOBJ.
+# You have to supply specific rules for these at the end of the makefile.
+
+XSRC=
+XOBJ=
+
+# interpret.c and lang.c need lots of RAM to compile, so it might be
+# wise to put the temporaries somewhere else than into T: in RAM:.
+# Set IOPT/LOPT to the options to do so for interpret.c resp. lang.c.
+
+IOPT= -T DTMP:
+LOPT= -T DTMP:
+
+# DICE 2.xx/3.0 has problems in compiling the switch() in interpret.c and
+# lang.c (it insists on using branches even in the large code model)
+# and thus needs some afterpatching.
+# The proper rules are selected by the filenames of the object files to
+# generate. If no afterpatching is needed, the filenames end with '.o', else
+# with '.ox' .
+# Set the next to macros appropriately.
+
+INTERPRET= interpret.ox
+LANG= lang.ox
+
+# The special rules for afterpatching put the intermediate assembler
+# files into the directory defined by DTMP.
+# Set IOPT2/LOPT2 to speed up the compiling of interpret.c/lang.c if
+# possible or necessary. AOPT2 holds extra options for the assembler.
+
+DTMP= DTMP:
+IOPT2=
+LOPT2=
+AOPT2= -s
+
+#-----------------------------------------------------------------------------
+#			      Net Specifics
+#-----------------------------------------------------------------------------
+
+# What type of net package do we use? Uncomment the lines of your selection.
+#
+# NETTYPE identifies the type.
+# Set NETDEF to define the appropriate symbol selecting the special
+# interface code.
+# Set NETLIB to specify any additionally needed linker library.
+
+# -- Simulated networking --
+
+# NETTYPE=
+# NETDEF=
+# NETLIB=
+
+# -- AmiTCP package from hut.fi, version < 3.0 --
+
+NETTYPE= AMITCP
+NETDEF= -DAMIGA_TCP -DAMITCP=2
+NETLIB= -l net
+
+# -- AmiTCP package from hut.fi, version >= 3.0 --
+
+# NETTYPE= AMITCP
+# NETDEF= -DAMIGA_TCP -DAMITCP=3
+# NETLIB= -l net
+
+# -- AS225 package from Commodore Inc. --
+
+# NETTYPE= AS225
+# NETDEF= -DAMIGA_TCP -DAS225
+# NETLIB= -l socket
+
+#-----------------------------------------------------------------------------
+#			    LPMud Generic Rules
+#-----------------------------------------------------------------------------
+
+# Chose one of these mallocs:
+#
+# Satoria's malloc, tries to prevent fragmentation.
+# Uses little memory. With FAST_FIT, it is also one of the fastest.
+# Required for garbage collection.
+
+MALLOC=smalloc
+
+# Gnu malloc, fastest but uses most memory.
+# MALLOC=gmalloc
+#
+# Use the standard malloc on your system.
+# MALLOC=sysmalloc
+
+# Set MUD_LIB to the directory which contains the mud data.
+
+MUD_LIB= mudlib:
+
+#
+# Set BINDIR to the directory where you want to install the executables.
+
+BINDIR = mudbin:
+
+# Profiling is mostly useless for us.
+#   PROFIL= -DOPCPROF -DVERBOSE_OPCPROF
+#     would enable the profiling of the virtual stackmachine.
+
+PROFIL=
+
+# Debugging options: [-DDEBUG] [-DYYDEBUG|-DYYDEBUG=1] [-DTRACE_CODE]
+# Defining DEBUG enables run time debugging. It will use more time and space.
+# When the flag is changed, be sure to recompile everything.
+# Simply comment out this line if not wanted.
+# If you change anything in the source, you are strongly encouraged to have
+# DEBUG defined.
+# If you will not change anything, you are still encouraged to have
+# it defined, if you want to locate any game driver bugs.
+
+DEBUG=-DDEBUG -DTRACE_CODE
+
+# Extra object files and libraries.
+
+TMP= $(XOBJ) signal.o signal_rr.o socket.o amiga.o ixfile.o
+XOBJ= $(TMP)
+
+TMP= $(XSRC) hosts/amiga/signal.c hosts/amiga/signal_rr.c\
+      hosts/amiga/socket.c hosts/amiga/amiga.c hosts/amiga/ixfile.c
+XSRC= $(TMP)
+
+LIBS= $(NETLIB) -lm
+
+
+# ----------------------- The Rules -------------------------------------
+
+MPATH=-DMUD_LIB="$(MUD_LIB)" -DBINDIR="$(BINDIR)"
+
+TMP= $(CCOPTS) -D$(WHATCC)
+CCOPTS= $(TMP)
+
+LDFLAGS= $(CCOPTS)
+
+DEFINES= $(DEBUG) $(PROFIL) -DMALLOC_$(MALLOC) $(MPATH) $(NETDEF)
+
+TMP= $(CFLAGS) $(CCOPTS) $(DEFINES)
+CFLAGS= $(TMP)
+
+TMP= $(YFLAGS) -d
+YFLAGS= $(TMP)
+
+SRC=lex.c main.c simulate.c object.c backend.c array.c \
+    comm1.c ed.c regexp.c mapping.c wiz_list.c swap.c \
+    call_out.c otable.c dumpstat.c stralloc.c hash.c port.c \
+    access_check.c parse_old.c parse.c random.c rxcache.c \ 
+    simul_efun.c sprintf.c gcollect.c closure.c
+OBJ= $(SRC:*.?:%1.o)
+
+TMP= $(MALLOC).c $(XSRC)
+XSRC= $(TMP)
+
+TMP= $(MALLOC).o $(XOBJ)
+XOBJ= $(TMP)
+
+driver: $(INTERPRET) $(LANG) $(OBJ) $(XOBJ)
+	$(CC) $(LDFLAGS) %(right) -o %(left) $(LIBS)
+
+clean:
+	$(RMF) *.o *.ox *.a lang.c lang.h lang.y instrs.h efun_defs.c y.output
+	$(RMF) make_func.c make_func
+	$(RMF) driver astrip dstol PlayMud
+
+
+# Automatic rules for normal sources.
+
+$(OBJ) : $(SRC)
+	$(CC) $(CFLAGS) -c %(right) -o %(left)
+
+
+# Making of lang.o
+
+make_func.c: make_func.y
+	$(RM) make_func.c
+	$(YACC) $(YFLAGS) make_func.y
+	$(MV) $(YTAB).c make_func.c
+
+make_func.o : make_func.c lint.h config.h machine.h
+	$(CC) $(CFLAGS) -DYACC="$(YACC)" -c make_func.c
+
+make_func: make_func.o hash.o ixfile.o exec.h
+	$(CC) make_func.o hash.o ixfile.o -o make_func $(LIBS)
+
+lang.y efun_defs.c instrs.h: make_func
+	$(RMF) efun_defs.c
+	$(RMF) lang.y
+	$(RMF) instrs.h
+	make_func > efun_defs.c
+
+lang.y efun_defs.c instrs.h: func_spec
+
+lang.y efun_defs.c instrs.h: prolang.y
+
+lang.y efun_defs.c instrs.h: config.h
+
+#   Byacc will warn a 'shift/reduce' conflict.
+#   This is a known wart in the C-grammar.
+lang.c lang.h: lang.y
+	$(RM) lang.c lang.h
+	$(YACC) $(YFLAGS) -v lang.y
+	$(MV) $(YTAB).c lang.c
+	$(MV) $(YTAB).h lang.h
+
+
+#  Normal rule for lang.o
+
+lang.o: lang.c lint.h config.h machine.h lex.h interpret.h object.h exec.h \
+  instrs.h incralloc.h switch.h stralloc.h
+	$(CC) $(LOPT) $(CFLAGS) -c lang.c -o %(left)
+
+#  Rules for lang.o with afterpatching
+#  I prefer compiling lang.c in two steps, in case the three iterations
+#  over the assembler source aren't enough.
+
+lang.a: lang.c lint.h config.h machine.h lex.h interpret.h object.h exec.h \
+  instrs.h incralloc.h switch.h stralloc.h \
+  astrip
+	$(CC) $(LOPT2) $(CFLAGS) -a lang.c -o $(DTMP)lang.x
+	astrip $(DTMP)lang.x lang.a
+	$(RM) $(DTMP)lang.x
+
+lang.ox: lang.a dstol
+	echo ".key letter*Nfailat 21*Ndelete $(DTMP)lang.err >NIL:" >T:tryasm
+	echo "$(AS) $(DTMP)lang.<letter> -o lang.ox -E $(DTMP)lang.err" >>T:tryasm
+	echo "echo *"..to ignore the failure of das*" >NIL:" >>T:tryasm
+	$(CP) lang.a $(DTMP)
+	execute T:tryasm a ``
+	$(RM) $(DTMP)lang.a
+	dstol lang.a $(DTMP)lang.err $(DTMP)lang.d z
+	execute T:tryasm d ``
+	dstol $(DTMP)lang.d $(DTMP)lang.err $(DTMP)lang.e y
+	$(RM) $(DTMP)lang.d
+	execute T:tryasm e ``
+	dstol $(DTMP)lang.e $(DTMP)lang.err $(DTMP)lang.f x
+	$(RM) $(DTMP)lang.err $(DTMP)lang.e
+	astrip $(DTMP)lang.f $(DTMP)lang.g redebug
+	$(AS) $(DTMP)lang.g -o lang.ox $(AOPT2)
+	$(RM) $(DTMP)lang.f $(DTMP)lang.g T:tryasm
+
+
+# Making of interpret.o
+
+#  Normal rule.
+interpret.o: interpret.c lint.h config.h machine.h interpret.h lang.h exec.h \
+  object.h wiz_list.h instrs.h comm.h sent.h switch.h smalloc.h stralloc.h \
+  hosts/amiga/patchfloat.h
+	$(CC) $(IOPT) $(CFLAGS) -c interpret.c -o interpret.o $(LIBS)
+
+#  Rules for interpret.ox with afterpatching.
+#  I prefer compiling interpret.c in two steps, in case the three iterations
+#  over the assembler source aren't enough.
+
+interpret.a: interpret.c lint.h config.h machine.h interpret.h lang.h exec.h \
+  object.h wiz_list.h instrs.h comm.h sent.h switch.h smalloc.h stralloc.h \
+  astrip hosts/amiga/patchfloat.h
+	$(CC) $(IOPT2) $(CFLAGS) -a interpret.c -o $(DTMP)interpret.x
+	astrip $(DTMP)interpret.x interpret.a
+	$(RM) $(DTMP)interpret.x
+
+interpret.ox: interpret.a dstol
+	echo ".key letter*Nfailat 21*Ndelete $(DTMP)interpret.err >NIL:" >T:tryasm
+	echo "$(AS) $(DTMP)interpret.<letter> -o interpret.ox -E $(DTMP)interpret.err" >>T:tryasm
+	echo "echo *"..to ignore the failure of das*" >NIL:" >>T:tryasm
+	$(CP) interpret.a $(DTMP)
+	execute T:tryasm a ``
+	$(RM) $(DTMP)interpret.a
+	dstol interpret.a $(DTMP)interpret.err $(DTMP)interpret.d z
+	execute T:tryasm d ``
+	dstol $(DTMP)interpret.d $(DTMP)interpret.err $(DTMP)interpret.e y
+	$(RM) $(DTMP)interpret.d $(DTMP)interpret.err
+	astrip $(DTMP)interpret.e $(DTMP)interpret.f redebug
+	$(AS) $(DTMP)interpret.f -o interpret.ox $(AOPT2)
+	$(RM) $(DTMP)interpret.e $(DTMP)interpret.f T:tryasm
+
+
+# Memory allocator.
+
+$(MALLOC).o: $(MALLOC).c lint.h config.h machine.h
+	$(RMF) smalloc.o
+	$(RMF) gmalloc.o
+	$(RMF) sysmalloc.o
+	$(RMF) malloc.o
+	$(CC) $(CFLAGS) -c $(MALLOC).c
+
+# Dependencies.
+# The normal .c->.o dependencies are already done above.
+
+access_check.o : lint.h config.h machine.h comm.h interpret.h
+
+array.o: config.h machine.h lint.h interpret.h object.h wiz_list.h \
+  regexp.h rxcache.h exec.h lang.h instrs.h stralloc.h
+
+backend.o: lint.h config.h machine.h interpret.h object.h \
+  stralloc.h rxcache.h wiz_list.h exec.h comm.h hosts/amiga/patchfloat.h
+
+call_out.o: lint.h config.h machine.h interpret.h object.h comm.h \
+  stralloc.h exec.h wiz_list.h
+
+closure.o: lint.h config.h machine.h lex.h exec.h interpret.h \
+  object.h stralloc.h lang.h instrs.h
+
+comm1.o: config.h machine.h lint.h interpret.h comm.h object.h \
+  sent.h stralloc.h wiz_list.h
+
+dumpstat.o: lint.h config.h machine.h interpret.h object.h exec.h \
+  smalloc.h lang.h instrs.h
+
+ed.o: lint.h config.h machine.h regexp.h rxcache.h interpret.h object.h \
+  stralloc.h comm.h
+
+gcollect.o : lint.h config.h machine.h interpret.h object.h exec.h \
+  rxcache.h sent.h comm.h smalloc.h instrs.h lang.h wiz_list.h stralloc.h
+
+lex.o : lint.h config.h machine.h interpret.h lang.h exec.h lex.h \
+  instrs.h patchlevel.h stralloc.h efun_defs.c
+
+main.o : lint.h config.h machine.h interpret.h object.h lex.h \
+  stralloc.h rxcache.h patchlevel.h
+
+mapping.o : config.h machine.h lint.h interpret.h \
+  object.h wiz_list.h regexp.h stralloc.h smalloc.h
+
+object.o : lint.h config.h machine.h comm.h interpret.h object.h \
+  sent.h stralloc.h wiz_list.h exec.h hosts/amiga/patchfloat.h
+
+otable.o : lint.h config.h machine.h interpret.h object.h \
+  hosts/amiga/patchfloat.h
+
+parse.o : lint.h config.h machine.h interpret.h object.h \
+  stralloc.h wiz_list.h
+
+parse_old.o : lint.h config.h machine.h interpret.h object.h \
+  wiz_list.h
+
+port.o : lint.h config.h machine.h
+
+regexp.o : regexp.h lint.h config.h machine.h
+
+rxcache.o : rxcache.c rxcache.h lint.h config.h machine.h smalloc.h stralloc.h
+
+simul_efun.o : lint.h config.h machine.h interpret.h object.h \
+  exec.h lex.h lang.h instrs.h stralloc.h
+
+simulate.o : lint.h config.h machine.h interpret.h instrs.h \
+  object.h rxcache.h sent.h wiz_list.h exec.h comm.h stralloc.h hosts/amiga/patchfloat.h
+
+sprintf.o : config.h machine.h lint.h interpret.h lang.h instrs.h \
+  exec.h object.h sent.h stralloc.h
+
+stralloc.o : stralloc.h config.h machine.h lint.h \
+  hosts/amiga/patchfloat.h
+
+swap.o : lint.h config.h machine.h interpret.h object.h exec.h
+
+wiz_list.o : config.h machine.h lint.h interpret.h object.h \
+  wiz_list.h stralloc.h
+
+# It's not that easy under AmigaOS...
+#
+# timestamp:
+#	  echo '#define RELEASE_DATE "'`date`'"' > tmp
+#	  tail +1 patchlevel.h >> tmp
+#	  $(MV) tmp patchlevel.h
+
+#-----------------------------------------------------------------------------
+#			    Extra Rules
+#-----------------------------------------------------------------------------
+
+#   crypt.o  : BSD-implementation of crypt()
+#   fcrypt.o : Crack-implementation of crypt() (just in case)
+#   PlayMud  : a simple client to access the running mud.
+#   netclean : removes all object files containing communication-specific code.
+#   osclean  : removes all object files which contain OS-specific code.
+#   amiga.o  : some amiga specific routines.
+#   ixfile.o : Unix-filesystem disguise.
+#   signal.o : timers and interruption. It uses interrupt code and therefore
+#	       needs fully registered args.
+#   socket.o : includes the appropriate socket-code.
+#
+# DICE 2.xx also needs:
+#   astrip: to strip comments from intermediate assembler files
+#   dstol : to patch assembler files with large switch()es
+
+fcrypt.o :
+	$(CC) $(CFLAGS) -Dfcrypt=crypt -Ihosts/fcrypt -c hosts/fcrypt/crack-fcrypt.c -o fcrypt.o
+
+crypt.o :
+	$(CC) $(CFLAGS) -c hosts/crypt.c -o crypt.o
+
+playmud: PlayMud
+
+PlayMud: hosts/amiga/PlayMud.c
+	$(CC) %(right) -o %(left)
+
+PlayMud: hosts/amiga/mudmsgs.h
+
+netclean:
+	-$(RM) access_check.o comm1.o main.o swap.o socket.o amiga.o
+
+osclean:
+	-$(RM) $(XOBJ)
+	-$(RM) backend.o interpret.o object.o otable.o simulate.o stralloc.o
+	-$(RM) interpret.a lang.a astrip dstol PlayMud driver
+
+amiga.o : hosts/amiga/amiga.c
+	$(CC) $(CFLAGS) -Ihosts/amiga -c %(right) -o %(left)
+
+amiga.o : patchlevel.h config.h hosts/amiga/nsignal.h
+
+ixfile.o : hosts/amiga/ixfile.c
+	$(CC) $(CFLAGS) -Ihosts/amiga -c %(right) -o %(left)
+
+signal.o : hosts/amiga/signal.c
+	$(CC) $(CFLAGS) -Ihosts/amiga -c %(right) -o %(left)
+
+signal.o : hosts/amiga/nsignal.h
+
+signal_rr.o : hosts/amiga/signal_rr.c
+	$(CC) $(CFLAGS) $(ROPT) -Ihosts/amiga -c %(right) -o %(left)
+
+signal_rr.o : hosts/amiga/nsignal.h
+
+socket.o : hosts/amiga/socket.c
+	$(CC) $(CFLAGS) -Ihosts/amiga -c %(right) -o %(left)
+
+socket.o : hosts/amiga/nsignal.h hosts/amiga/socket_sim.c hosts/amiga/socket_tcp.c \
+	   hosts/amiga/mudmsgs.h
+
+astrip: hosts/amiga/astrip.c
+	$(CC) %(right) -o %(left)
+
+dstol: hosts/amiga/dstol.c
+	$(CC) %(right) -o %(left)
