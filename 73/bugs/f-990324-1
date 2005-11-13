@@ -1,0 +1,10 @@
+Short: New efun: previous_program()
+From: Daniel Sloan <sloand@alphalink.com.au>
+Date: Tue, 23 Mar 1999 15:29:14 +0000
+Type: Feature
+State: Unclassified
+
+A 'previous_program' efun, parallel to previous_object().  Real handy for
+tracing certain things and working out where a call was *really* made from.
+I've not implemented this in the current driver I use, only an old 3.1.2
+driver =-)

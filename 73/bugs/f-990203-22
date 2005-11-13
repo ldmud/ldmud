@@ -1,0 +1,26 @@
+Short: New efun member_values()
+From: Matthew Julius <julius.2@wright.edu>
+Date: Fri, 08 Jan 1999 16:29:08 -0500
+Type: Feature
+State: Unclassified
+
+mixed *member_values(mapping, closure|mixed, int, mixed...)
+  Return the indices of a mapping that have a specific value.
+  Second argument is the value to find or the closure to call.
+  Third argument is the nth set of values to search in.
+  Fourth argument and beyond are the extra arguments to send to the closure.
+  Examples,
+    mapping map;
+    map = ([
+      1: "a"; ({ 1, 2 }); 4,
+      2: "b"; ({ 2 });    5,
+      3: "c"; ({ });      12,
+      ]);
+    member_values(map, "a") returns ({ 1 })
+    member_values(map, 8, 2) returns ({ })
+    member_values(map,
+     lambda(({ 'arr }), ({ #'!=, ({ #'member_array, 2, 'arr }), -1 })), 1)
+       returns ({ 1, 2 })
+    member_values(map, #'|, 2, 4) returns ({ 1, 2, 3 })
+    member_values(map, 0) returns ({ })
+
