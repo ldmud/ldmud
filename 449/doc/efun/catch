@@ -1,0 +1,35 @@
+SYNOPSIS
+        mixed catch (expr, expr, ...)
+        mixed catch (expr, expr, ... ; nolog)  EXPERIMENTAL
+
+DESCRIPTION
+        Evaluate the expressions. If there is no error, 0 is returned.
+        If there is an error, the evaluation of the expressions stops at
+        that point, and a string with the error message is returned.
+        
+        System error messages start with a leading '*', user-defined
+        error values (other than 0) as given to throw() and raise_error() are
+        returned as they are.
+
+        If at the time the catch() is encountered less than
+        __CATCH_EVAL_COST__ eval ticks are left, a runtime error will be
+        thrown and the expressions will not be executed.
+
+        Normally, the caught error will be logged in the error logs for easier
+        debugging. If the keyword 'nolog' is given, this log is suppressed.
+        This is an experimental feature which might not survive for all
+        times.
+
+        Catch is not really an efun, but a compiler directive.
+
+EXAMPLE
+        object obj;
+        string err;
+        if (err = catch(obj = clone_object("/foo/bar/baz")))
+           write("Cannot clone object, reason:"+err"+\n");
+
+HISTORY
+        LDMud 3.2.9 introduced the 'nolog' catch() as experimental feature.
+
+SEE ALSO
+        throw(E), raise_error(E), predefined(D)

@@ -1,0 +1,477 @@
+#!/bin/sh
+#
+#-------------------------------------------------------------------------
+# Example configuration settings file
+#-------------------------------------------------------------------------
+# configure --with-<foo> allows to specify a lot of options in one go by
+# evaluation the file settings/<foo>. Since configure provides defaults
+# for all options, the file needs to list only those options which are
+# to set differently.
+#
+# This file documents the available options and their default values.
+#
+# On/off options must be specified like this:
+#     enable_<option>=yes   to enable it
+#     enable_<option>=no
+#  or disable_<option>      to disable it
+#
+# Value options must be specified like this:
+#     with_<option>=<value>
+#
+# Number values can be given in decimal or sedecimal. Strings must
+# be given without surrounding quotes.
+#
+# In both cases no whitespace is allowed around the '=' and nothing
+# else may appear on the line, except a trailing comment!
+#
+# Configure will strip everything from this file which doesn't match one
+# of its option specification patterns, allowing us to make the files
+# self-executable.
+#-------------------------------------------------------------------------
+
+exec ./configure --with-setting=default $*
+
+exit 1
+
+#----------- Commandline Argument Defaults ----------
+# These options provide default settings for those options which can
+# also be set on the commandline.
+
+
+# --- Runtime limits ---
+
+# Maximum size of array. If 0, any size is allowed.
+
+with_max_array_size=3000
+
+# Maximum size of mapping. If 0, any size is allowed.
+
+with_max_mapping_size=5000
+
+# Maximum size of a file to be read with read_file()
+# If 0, any size is allowed.
+
+with_read_file_max_size=50000
+
+# Maximum number of bytes read or written with read/write_bytes().
+# If 0, any size is allowed.
+
+with_max_byte_transfer=50000
+
+# Maximum number of callouts at one time.
+# If 0, any number is allowed.
+
+with_max_callouts=0
+
+# --- Timing ---
+
+# If an object is left alone for this time, it will be 'cleaned up'.
+# The time should be substantially longer than the swapping time.
+
+with_time_to_clean_up=3600
+
+# If an object is left alone for this time, its program and variables
+# are swapped into a file to conserve memory.
+# The time to swap variables should be longer than the time to swap
+# programs, because swapping variables is quite expensive.
+# Both times should be shorter than the cleanup time and are given
+# in seconds.
+# A swapping time <= 0 disables that particular swapping feature.
+
+with_time_to_swap=900
+with_time_to_swap_variables=1800
+
+# This time determines the interval before an object is reset again.
+# The actual length of the intervals is determined somewhat randomly
+# to make the game less predictable.
+
+with_time_to_reset=1800 # seconds
+
+
+# --- Memory ---
+
+# Which memory manager to use. Possible defines are
+#   MALLOC_smalloc:   Satoria's malloc. Fastest, uses the least memory,
+#                     supports garbage collection.
+#   MALLOC_sysmalloc: the normal system malloc()
+
+with_malloc=smalloc
+
+# These three options determine how much memory is held in reserve.
+# There must be enough memory to allow the garbage collector to swap
+# in all objects one at a time.
+
+with_reserved_user_size=700000
+with_reserved_master_size=100000
+with_reserved_system_size=200000
+
+# This value gives the upper limits for the total allocated memory.
+# A value of 0 means 'unlimited'.
+
+with_max_malloced=0x4000000 
+
+# If these values are >0, the driver will reserve this amount of memory
+# on startup for large resp. small blocks, reducing the block fragmentation.
+# The value should be a significantly large multiple of the large resp.
+# small chunk size.
+# As a rule of thumb, reserve enough memory for the first couple of days
+# of uptime.
+
+with_min_malloced=0
+with_min_small_malloced=0
+
+# --- Interpreter ---
+
+# If strict-euids is enabled, the driver enforces the (correct) use
+# of euids, ie. load_object() and clone_object() require the current
+# object to have a non-zero euid.
+
+enable_strict_euids=no
+
+# The maximum number of eval-ticks for one execution. If this
+# is exceeded, the execution is aborted.
+
+with_max_cost=1000000
+
+
+# --- Communication ---
+
+# The TCP port to listen for connections on.
+# This value is used only when no ports are given on the commandline.
+
+with_portno=4242
+
+# This is the number of the UDP port to use.
+# If set to -1, and no number is given on the commandline, the port will
+# not be created.
+
+with_udp_port=4246
+
+# The maximum number of ports to listen for connections on.
+
+with_maxnumports=20
+
+# Select the ERQ service to use.
+#   'no':   the driver is compiled without erq support.
+#   'erq':  the driver is compiled with erq support, the Makefiles
+#           are set up to compile the standard erq.
+#   'xerq': the driver is compiled with erq support, the Makefiles
+#           are set up to compile Brian's xerq.
+
+enable_erq=erq
+
+# Max size of a packet received from/send to the ERQ.
+# TODO: Do the current erqs compile this in?
+
+with_erq_max_reply=1024 
+with_erq_max_send=1024 
+
+# Enable support for IPv6 (assuming your system supports it).
+
+enable_use_ipv6=no
+
+#----------- Compilation Options ----------
+# To change these options, the config.h must be recreated and the
+# driver recompiled.
+
+# Enable this if you are using a 2.4.5 mudlib or one of its derivates.
+
+enable_compat_mode=no
+
+# The name of the master object.
+
+with_master_name=secure/master
+
+# Enable this to annotate all allocations with 'file:line' of the
+# driver source allocating it.
+# Supported by: MALLOC_smalloc
+
+enable_malloc_trace=no
+
+# Enable this in addition to SMALLOC_TRACE to also annotate all allocations
+# with file:line of the lpc program responsible for it.
+# Supported by: MALLOC_smalloc
+
+enable_malloc_lpc_trace=no
+
+# If TRACE_CODE is enable, the driver keeps a log of TOTAL_TRACE_LENGTH
+# most recently execute bytecode instructions.
+
+enable_trace_code=yes
+with_total_trace_length=4096
+
+# Enable these for runtime statistics:
+#    COMM_STAT: number and size of outgoing packets
+#    APPLY_CACHE_STAT: number of hits and misses in the apply cache
+
+enable_comm_stat=yes
+enable_apply_cache_stat=yes
+
+# The name of the swapfile used by the driver to swap out objects (if
+# enabled), relative to the mudlib directory. The driver will append
+# '.<hostname>' to the file.
+
+with_swap_file=LP_SWAP.3
+
+# --- Wizlist ---
+
+# The name of the file (relative to the mudlib) to hold the Wizlist
+# information. The driver reads it on startup.
+# If disabled ('with_wizlist_file=no'), a wizlist file can still be
+# given on the commandline.
+
+with_wizlist_file=WIZLIST
+
+# --- Access Control ---
+
+# Enable this to have access control.
+
+enable_access_control=yes
+
+# The name of the file from where the access permissions are read.
+
+with_access_file=ACCESS.ALLOW
+
+# Enable this to log all connection attempts.
+
+enable_access_log=no
+
+# The name of the file where all connections are logged.
+
+with_access_log=access.allow.log
+
+# --- Language ---
+
+# Enable this if you want the efun parse_command().
+
+enable_supply_parse_command=yes
+
+# Enable INITIALIZATION_BY___INIT if you want all initializations of
+# variables be suspended until the object is created. This variant is
+# slower and needs extra (hidden) bytecode, but allows you to use functions
+# in the initialisations.
+
+enable_initialization_by___init=yes
+
+# Define USE_SYSTEM_CRYPT if you want crypt() to be implemented by your
+# operating system (assuming it offers this function). This makes your
+# programm smaller and may even let you take advantage of improvements
+# of your OS, but may also prohibit transporting encrypted date like
+# passwords between different systems.
+# Undefine USE_SYSTEM_CRYPT if you want to use the driver's portable
+# crypt() implementation.
+
+enable_use_system_crypt=yes
+
+# Define USE_LPC_NOSAVE if you want to use the keyword 'nosave' to
+# specify variables not be save by save_object(). The old keyword 'static'
+# works in either case.
+
+enable_lpc_nosave=yes
+
+# Enable support for mySQL (assuming your system supports it).
+#
+#  'no'  : mySQL support is not compiled in
+#  'yes' : mySQL support is compiled in, the libmysqlclient is expected
+#          in the normal library search path.
+#  <path>: mySQL support is compiled in, <path> is added to the link paths
+#          and should be the path to libmysqlclient, 
+#          e.g. enable_use_mysql=/usr/local/lib/mysql .
+#          The include files are searched in /usr/local/include, <path>,
+#          and <path>/include.
+#          The libraries are searched in the default path, <path>/lib/mysql,
+#          <path>/lib and <path>, in this order.
+
+enable_use_mysql=no
+
+# Enable obsolete and deprecated efuns.
+
+enable_use_deprecated=yes
+
+
+# --- Runtime limits ---
+
+# Maximum size of a socket send buffer.
+
+with_set_buffer_size_max=65536 
+
+# CATCH_RESERVED_COST is added to the eval cost for the time executing
+# code guarded by a catch() statement, so that an eval_cost-too-big error
+# can still be caught and handled.
+# To catch an evalcost-too-big in an object that called (recursive)
+# master functions, CATCH_RESERVED_COST should be greater than
+# MASTER_RESERVED_COST * 2.
+
+with_catch_reserved_cost=2000
+
+# MASTER_RESERVED_COST is the total reserve available for master applies.
+# It is halved for every descent into another master apply.
+
+with_master_reserved_cost=512
+
+# With this option enable, expensive operations like string additions
+# have additional evalcosts depending on the amount of data handled.
+
+enable_dynamic_costs=no
+
+# Define the maximum stack size of the virtual machine. It must be big
+# enough to hold all local variables, arguments and temporary values.
+
+with_evaluator_stack_size=2000
+
+# Maximum function call depth for normal program execution
+
+with_max_user_trace=60
+
+# Maximum function call depth during error handling.
+# It must be bigger than MAX_USER_TRACE (TODO: Check this at runtime)
+
+with_max_trace=65
+
+# Maximum number of bits in a bit string.
+# The limit is more based on considerations of speed than memory consumption.
+
+with_max_bits=6144
+
+# Maximum number of players in the game
+
+with_max_players=50
+
+# Allowed number of ed commands per backend cycle (for faster file upload).
+
+with_allowed_ed_cmds=20
+
+
+# --- Compiler ---
+
+# Compiler stack size. This value affects the complexity the compiler can
+# parse.
+
+with_compiler_stack_size=400
+
+# Maximum number of local variables
+
+with_max_local=50
+
+# Maximum size of an expanded preprocessor definition.
+
+with_defmax=65000
+
+# Align LPC functions in memory? This costs on average 1.5 bytes per function,
+# but saves some time when searching in case of an apply cache miss.
+
+enable_align_functions=yes
+
+
+# --- Internal Tables ---
+
+# Define the size of the shared string hash table (max: 65536).
+# If you set it to about 1/5 of the number of distinct strings, you will
+# get a hit ratio very close to 1. If the size is a power of two,
+# hashing will be faster.
+
+with_htable_size=4096
+
+# Size of the object hash table (max: 65536). Set it to about 1/4 of
+# the number of objects in the game, though this value is not very critical.
+
+with_otable_size=1024
+
+# Size of the hash table for defines, reserved words, identifiers, and
+# efun names. This should be several times smaller than HTABLE_SIZE.
+# Max: 65536.
+
+with_itable_size=256
+
+# Size of the apply cache, expressed in the bitsize of its indices.
+# The number of entries is 2**cache_bits.
+
+with_apply_cache_bits=12 
+
+# Select whether compiled regular expressions shall be cached, and
+# how big the cache shall be (max: 65536).
+
+enable_rxcache_table=yes
+with_rxcache_table=8192
+
+# --- Profiling ---
+# For profiling of the VM instruction implementations, refer to the Makefile
+
+# Enable usage statistics of VM instructions.
+enable_opcprof=no
+
+# If opcprof is enabled, this option includes the instruction names
+# into the statistic.
+enable_verbose_opcprof=no
+
+# --- Standard Debugging ---
+# These options are 'standard' debugging options.
+
+# Enable basic run time sanity checks. This will use more time
+# and space, but nevertheless you are strongly encouraged to keep
+# it defined.
+enable_debug=yes
+
+# Enable debug output from the LPC compiler.
+enable_yydebug=no
+
+# Disable inlining. Use this to debug obscure crashes, or for
+# speed tests.
+enable_no_inlines=no
+
+# Enable the shared string sanity checking (enables commandline option
+# --check-strings).
+enable_check_strings=yes
+
+# Shared strings are never really freed.
+enable_keep_strings=no
+
+# Activate debug prints in the telnet machine (lots of output).
+enable_debug_telnet=no
+
+# Activate allocation debug prints in the smalloc module (lots of output).
+enable_debug_smalloc_allocs=no
+
+# --- Specific Debugging ---
+# These options have been introduced to debug specific problems and will
+# be removed again later.
+
+# Trace changes to the tot_alloc_object and tot_alloc_object_size statistics,
+# in order to find the status bugs (enables commandline option
+# --check-object-stat). Will produce a decent amount of output on stderr.
+enable_check_object_stat=yes
+
+# Activate Mapping consistency check code. It slows the mapping activities
+# down and was used to find the notorious FinalFrontier mapping bug.
+enable_check_mappings=no
+
+# Activate total mapping size consistency check code. It has a small impact on
+# the execution speed. This define was used to find the inaccuracy in the
+# mapping statistic.
+enable_check_mapping_total=no
+
+# Activate object refcount check code. It will produce a decent amount of log
+# output. It will also fatal() the driver as soon as it detects an
+# inconsistency in the list of destructed objects.
+enable_check_object_ref=no
+
+# Activate object referencing checking code during the GC. It will print error
+# messages to gcout when an object or program is referenced as something else.
+# No penalty for using.  Requires MALLOC_TRACE to work. Incompatible with
+# DUMP_GC_REFS.
+enable_check_object_gc_ref=yes
+
+# Deactivate the tracking of blueprints. This will disable the
+# efuns blueprint(), but probably avoid the object refcount bug.
+enable_no_blueprint=no
+
+# Activate total smalloc size consistency check code. This will produce
+# a lot of output in the GC log.
+enable_check_smalloc_total=no
+
+# Sometimes the GC stumbles over invalid references to memory blocks (namely
+# 'Program referenced as something else'). Define this macro to get a detailed
+# dump of all found references (Warning: LOTS of output!).
+# Incompatible with CHECK_OBJECT_GC_REF.
+enable_dump_gc_refs=no
+

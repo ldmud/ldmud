@@ -1,0 +1,17 @@
+Short: Controlled reopening of the logfile
+Date: Wed, 29 Mar 2000 01:27:56 +0200
+From: Freaky <Freaky@UNItopia.RUS.Uni-Stuttgart.DE>
+Type: Feature
+State: New
+
+Weil es mir gerade dummerweise passiert ist:
+
+Wie waere es mit der Moeglichkeit, das Log-File (/HOST.debug.log) neu
+anlegen lassen zu koennen.
+
+Ich habe es gerade geloescht und muesste jetzt (so wie z.B. beim syslogd
+ein killall -1 syslogd den syslogd dazubringt seine Filehandles zu
+schliessen und neu zu oeffnen) den Driver dazu bringen, dieses File neu
+anzulegen....
+
+Ginge als Efun oder wirklich mit kill -1 PID_of_driver

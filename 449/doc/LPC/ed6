@@ -1,0 +1,32 @@
+NAME
+        ed6
+
+DESCRIPTION
+        This is the list of extended ed commands that Xio unearthed
+        somewhere, thanks!
+
+        a) never use 1,$p to print out an editfile, because you will
+          be thrown out 'cause of too much text transfereed to you.
+
+        b) $: jump to end of file.
+
+        c) ?anything? and ?? : search from bottom to up. (like '/'
+           from beginning to end of file. (also with substitutions,
+           try out..)
+
+        d) ( g/xxx/p search global xxx and print corresponding lines,
+           /xxx/s/new/old/p : search xxx, substitute new to old in this
+           line and print out. (try this concatenations with other
+           commands)
+
+        e) 1,nmx ( see ed5 ) , but also: 1,ntx : don't move the lines,
+           but make a copy of them.
+
+        f) x,y w name : save lines x to y to file name (if you don't
+           know the line numbers : '=' current line number)
+
+        g) s/$/text/p : append text to the end of current LINE and
+           print line
+
+        h) s/^/text/p : insert text at beginning og current LINE and
+           print line

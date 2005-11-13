@@ -1,0 +1,7 @@
+Short: sprintf() on non-efun-symbols
+From: Lars Duning <lduning@peopledoc.com>
+Date: Wed, 03 Mar 1999 13:32:34 +0000
+Type: Feature
+State: Unclassified.
+
+sprintf("%O", #'({) -> "#'aggregate", but should be "#'({"

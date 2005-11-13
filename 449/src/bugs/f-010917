@@ -1,0 +1,11 @@
+Short: default arguments for functions
+Date: 2001-09-17
+From: Dafire
+Type: Feature
+State: New
+
+Allow default arguments in function definitions, e.g.
+
+mixed foo (string test, string *data = ({}) )
+
+.
