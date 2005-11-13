@@ -1,0 +1,125 @@
+The program was originally written by
+
+Lars Pensj|, April 1989 (lars@cd.chalmers.se (no longer valid)).
+
+Lars gives the following credit:
+
+  The regexp package was made by Henry Spencer.
+
+  The ed package was not done by me. See the file ed.c for information.
+
+  Bit manipulations was implemented by pell@lysator.liu.se who also found
+  several bugs that had eluded me for months.
+
+  Valuable help and hints from: Mark Nagel, James Seidman, Moonchilde and more.
+
+  Roland Dunkerley III fixed for-loops, do-while and the operators ++ and --.
+
+  Sean T Barrett made smalloc.c.
+
+  Lennart Augustsson convinced me to implement a compiler for a virtual
+  stack machine. He also implemented the built-in preprocessor.
+
+  John S. Price found and fixed many bugs.
+
+  The shadow idea was "forwarded" to me by John S. Price from Team Cthulhu
+  (Bill Burdick, Roy Riggs, Mitch Adler).
+
+  Michael Malone, Michael O'Reilly, Klaus Rennecke, J|rn Rennecke and
+  Germano Caronni found and fixed a large amount of bugs.
+
+  Petri Wessman fixed changes for SCO unix and AIX.
+
+ -----------------------------------------------------------------------------
+
+Joern Rennecke ( amylaar@cs.tu-berlin.de ) gives this credit:
+
+  The non-corrupting indentation code for ed was written by Felix A. Croes,
+  aka Dworkin (<felix@dworkin.nl>) and originates from his DGD.
+
+  Mud-sprintf() is from Lynscar (Sean A Reith, <gusar@uniwa.oz.au> and
+  was donated into the Public Domain.
+
+  The alist based mapping implementation was supplied by Dworkin.
+
+  The idea for query_actions and an implementation that has been partially used
+  is from Peter Eriksson (aka lpd) pen@lysator.liu.se
+
+  The port to Amiga was done by Mateese ( Lars Duening )
+
+  The udp connectivity is from the CD driver, and was fitted in by deepthought.
+
+  Demos, Freaky, Hurl, Hyp, Mateese, Pepel and Jof did a lot of alpha
+  testing.
+
+  Reimer Behrends located a lot of bugs. He also supplied a portable macro to
+  test numbers for having but a single bit set, a mergesort based
+  sort_array() and variadic function support.
+
+  get_object_actions() was supplied by herp.
+
+  Marcus Meissner found and fixed many bugs.
+
+  Carl White, Mark (ec179@city.ac.uk), Archimedes (Robert Fuller), Eric Blade,
+  Mitchell Brandsma, Sam Bobroff, Jim Cogbill, Ben Fennema,
+  Sorva (Ed Zielinski), Loke@Wonderland (Solem), Claus S. Jensen, Nils Magnus,
+  samo@MorgenGrauen, Frobozz (Bryan Schuler), Sique@Nightfall, APJ,
+  Deathknight, Tero Jyri Michael Pelander (tpeland@utu.fi),
+  Willem van der Oord (willem@marble.dcr.net), Hate@MorgenGrauen,
+  Bob Farmer, Randor@EoP, Trevor Phillips, Robert M. Zigweid, Inspiral,
+  Brian Gerst, Rasmus H. Hansen, Demodian (John Kurtz), William J. Burton,
+  Patrick Li, Niilo Paasivirta, Frank Stolze, Penelope@Avalon,
+  Nathan@Unholy Lands, mubo@SiliconDream, Sunblood@Tubmud, Alfe@Tubmud,
+  Tatu Saloranta, Chameloid@Tubmud and Martin Brenner (deepthought) reported bugs.
+
+  Foslay did the OS/2 port.
+
+  Ray Gilbert originally did the MSDOS port, which was modified later by
+  Rasmus Hellbug Hansen.
+
+  Marcus Meissner contributed regreplace().
+
+  Slider@Tubmud supplied GnuWin32 patches.
+
+ -----------------------------------------------------------------------------
+
+Lars Duening thanks:
+
+ - Dana Durkee and the magnificient Wessex for enhancing my life (though
+     I had to look up that 'l'-word first).
+ - the citizens of One Step Beyond, PK-Mud and UNItopia for enduring my
+     driver experiments.
+ - the MudOS programmers for the efun terminal_colour() and Michael Schaefer
+     for adapting it for LDMud.
+ - Martin Brenner: initial multi-port implementation, inetd compatibility
+     code.
+ - Brian Gerst (bgerst@quark.vpplus.com) for the xerq daemon.
+ - for bug reports, fixes, patches and other support from:
+     Alexander Fetke (alfebtcd@cs.tu-berlin.de, Alfe@Tubmud)
+     Andreas Grammlich (andreas.grammlich@prepress.de, Gum@Wunderland)
+     Andres Cvitkovich (ac@twig.mond.at, Woody@Silberland)
+     Blackcat@PK-Mud (amuelle1@htwm.de)
+     Cendor (mtmaki@pultti.ttaol.fi)
+     Christian Kirschbaum (chrissy@cs.tu-berlin.de, Chameloid@Tubmud)
+     Christian Mudra (c_mudra@informatik.uni-kl.de, Coogan@Tubmud)
+     Daniel von Dincklage (daniel@ozet.de, Sunblade@SiliconDream), 
+     Frank Kirschner (freaky@unitopia.uni-stuttgart.de)
+     Frank Stolze (fstolze@iName.com)
+     Fiona@Wunderland
+     Holger Kremss (jur94ewp@studserv.uni-leipzig.de, Holger@Wunderland)
+     Joern Rennecke (amylaar@cygnus.co.uk)
+     Logic (logic@logic.net)
+     Matthew Julius (julius.2@wright.edu)
+     Michael Sporn (sporn@mathematik.hu-berlin.de, sunblood@tubmud)
+     Nepomuck@UNItopia
+     Patrick May (patrick.may@cedelgroup.com)
+     Ralph (ralphi@vkr.k-net.dk)
+     Reinhard Pfau (reinhard@netlab1.hrz.uni-siegen.de, mubo@SiliconDream), 
+     Robert Reither (e8925573@student.tuwien.ac.at, Nathan@Unholy.Lands)
+     Juergen Weickert (Sissi@UNItopia)
+     Sieni (sampsa@netsonic.fi)
+     Stefan Riemer (stefan.riemer@bauing.uni-weimar.de, Peng@FinalFrontier)
+     Thomas Feldmeier (tfeldmei@student.informatik.uni-ulm.de, Zora@Carledon)
+     Tmm@UNItopia? (Tmm@gmx.de)
+     Tucita@UNItopia
+
