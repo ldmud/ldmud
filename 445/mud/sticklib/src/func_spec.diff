@@ -1,0 +1,13 @@
+--- src/func_spec	Sun Oct 31 03:10:52 1999
++++ src-stick/func_spec	Fri Nov 12 17:25:10 1999
+@@ -352,6 +352,10 @@
+ 
+ int     set_light(int);
+ 
++	/* StickLib support: */
++
++string substitute_string(string,string *,string *,int,int);
++
+         /* Backwards compatibility */
+ 
+ mixed  *slice_array F_RANGE (mixed *,int,int);

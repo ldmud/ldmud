@@ -1,0 +1,933 @@
+Short: GC crashes on 'object referenced as something else'
+From: Heiko Kopp
+Date: 2002-04-25
+Type: Bug
+State: New
+
+3.2.9-dev.433: The swap changes did not fully help. Augmented the GC
+         to check all non-object memory references if they indeed
+         don't point to a object memory block. Requires MALLOC_TRACE to work.
+
+----------------------------------------------------------------------------
+2002.04.23 18:22:00 LDMud 3.2.9-dev.432 (3-2-dev.432)
+2002.04.23 18:22:00 Random seed: 0x3cc58a28
+2002.04.24 07:00:05 Garbage collection, slow_shut to do: 0
+DEBUG: GC frees destructed 'std/player#48556'
+DEBUG: GC frees destructed 'std/player#8009'
+DEBUG: GC frees destructed 'domains/races/elf/elfcamp/obj/other/engagement_ring#12785'
+DEBUG: GC frees destructed 'players/dakkon/forest/weapon/white_sword#12792'
+DEBUG: GC frees destructed 'players/dakkon/forest/weapon/white_sword#12791'
+DEBUG: GC frees destructed 'std/player#5987'
+DEBUG: GC frees destructed 'domains/races/elf/orc_camp/npc/orc_guard#44078'
+DEBUG: GC frees destructed 'domains/races/elf/orc_camp/npc/orc_guard#44076'
+DEBUG: GC frees destructed 'obj/login_items/staff#39724'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/mine/npc/dragonchild#49067'
+DEBUG: GC frees destructed 'players/dakkon/forest/weapon/pitchfork#16696'
+DEBUG: GC frees destructed 'domains/races/elf/park/obj/hazelnut#8575'
+DEBUG: GC frees destructed 'domains/races/elf/park/obj/hazelnut#8574'
+DEBUG: GC frees destructed 'domains/races/elf/park/obj/hazelnut#8567'
+DEBUG: GC frees destructed 'domains/races/elf/park/obj/hazelnut#8566'
+DEBUG: GC frees destructed 'domains/races/elf/park/obj/hazelnut#8565'
+DEBUG: GC frees destructed 'domains/races/elf/park/obj/hazelnut#8564'
+DEBUG: GC frees destructed 'domains/races/elf/park/obj/hazelnut#8563'
+DEBUG: GC frees destructed 'domains/races/elf/park/obj/hazelnut#8561'
+DEBUG: GC frees destructed 'domains/races/elf/park/obj/hazelnut#8560'
+DEBUG: GC frees destructed 'domains/races/elf/park/obj/hazelnut#8536'
+DEBUG: GC frees destructed 'std/player#6174'
+DEBUG: GC frees destructed 'std/combat/wound#28435'
+DEBUG: GC frees destructed 'std/items/fur#27642'
+DEBUG: GC frees destructed 'domains/races/human/area/north/obj/club#28287'
+DEBUG: GC frees destructed 'std/item#28639'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/mine/level2(15,6)'
+DEBUG: GC frees destructed 'std/player#380'
+DEBUG: GC frees destructed 'std/player#412'
+DEBUG: GC frees destructed 'domains/races/drow/quest/erayan/obj/mtwohander#43300'
+DEBUG: GC frees destructed 'domains/khamar/cail/armour/plaid_kilt#15358'
+DEBUG: GC frees destructed 'domains/khamar/cail/armour/plaid_kilt#10705'
+DEBUG: GC frees destructed 'domains/races/human/town/obj/armour/gold_ring#10708'
+DEBUG: GC frees destructed 'domains/races/human/town/obj/armour/gold_ring#6961'
+DEBUG: GC frees destructed 'domains/races/human/town/palace/obj/ring#10717'
+DEBUG: GC frees destructed 'domains/races/human/town/palace/obj/ring#6971'
+DEBUG: GC frees destructed 'domains/khamar/cail/out/road12'
+DEBUG: GC frees destructed 'domains/races/elf/town/obj/armour/signet_ring#3833'
+DEBUG: GC frees destructed 'domains/races/elf/town/obj/armour/signet_ring#5534'
+DEBUG: GC frees destructed 'players/gunther/stonevillage/obj/pick_axe#5536'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/mine/obj/sabre#10582'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/mine/obj/sabre#9391'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/mine/obj/sabre#10581'
+DEBUG: GC frees destructed 'players/scripture/forest/weapon/club#5541'
+DEBUG: GC frees destructed 'players/koldun/butchery/obj/butcherknife#5542'
+DEBUG: GC frees destructed 'players/bakhrum/forest/weapon/sword#5543'
+DEBUG: GC frees destructed 'domains/khamar/area/weapon/pebbles#43180'
+DEBUG: GC frees destructed 'domains/khamar/area/weapon/pebbles#43179'
+DEBUG: GC frees destructed 'domains/khamar/area/weapon/pebbles#43178'
+DEBUG: GC frees destructed 'domains/khamar/area/npc/sandora#42776'
+DEBUG: GC frees destructed 'std/rev_corpse#49555'
+DEBUG: GC frees destructed 'std/player#28078'
+DEBUG: GC frees destructed 'domains/races/elf/town/obj/armour/hleather_armour#43296'
+DEBUG: GC frees destructed 'std/player#312'
+DEBUG: GC frees destructed 'domains/kyllavalley/town/arm/platemail#48595'
+DEBUG: GC frees destructed 'domains/races/elf/town/obj/armour/steel_helmet#13678'
+DEBUG: GC frees destructed 'domains/races/elf/town/obj/armour/steel_chainmail#13675'
+DEBUG: GC frees destructed 'domains/races/elf/town/obj/armour/steel_gloves#13677'
+DEBUG: GC frees destructed 'domains/races/elf/town/obj/weapon/steel_lsword#13679'
+DEBUG: GC frees destructed 'domains/races/elf/town/obj/weapon/steel_lsword#13676'
+DEBUG: GC frees destructed 'domains/races/drow/park/weapon/stick#10279'
+DEBUG: GC frees destructed 'domains/races/drow/park/weapon/stick#10955'
+DEBUG: GC frees destructed 'std/player#20246'
+DEBUG: GC frees destructed 'std/items/potliquid#10119'
+DEBUG: GC frees destructed 'std/items/potliquid#10118'
+DEBUG: GC frees destructed 'domains/races/kender/town/armour/leathergloves#28898'
+DEBUG: GC frees destructed 'domains/races/kender/town/armour/leathertrousers#28900'
+DEBUG: GC frees destructed 'domains/races/kender/town/armour/ironhelmet#28925'
+DEBUG: GC frees destructed 'std/items/potliquid#10099'
+DEBUG: GC frees destructed 'std/items/potliquid#10098'
+DEBUG: GC frees destructed 'std/items/potliquid#10097'
+DEBUG: GC frees destructed 'std/items/potliquid#10096'
+DEBUG: GC frees destructed 'std/items/potliquid#10095'
+DEBUG: GC frees destructed 'std/items/potliquid#10094'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/dwarfpark/dwarf_park_entrance(7,10)'
+DEBUG: GC frees destructed 'domains/races/elf/town/obj/armour/hleather_gloves#43280'
+DEBUG: GC frees destructed 'players/atabersk/nabbach/abbey/obj/frock#10580'
+DEBUG: GC frees destructed 'players/raistlin/sceptre/obj/red_sword#28084'
+DEBUG: GC frees destructed 'players/raistlin/sceptre/obj/red_sword#19090'
+DEBUG: GC frees destructed 'domains/khamar/cail/armour/gold_chainmail#10591'
+DEBUG: GC frees destructed 'domains/races/drow/obj/weapon/crossbow#28929'
+DEBUG: GC frees destructed 'domains/races/human/town/river/room/river2(0,1)'
+DEBUG: GC frees destructed 'domains/races/human/town/river/room/river2(2,3)'
+DEBUG: GC frees destructed 'domains/races/human/town/river/room/river2(2,1)'
+DEBUG: GC frees destructed 'domains/races/human/town/river/room/river3(2,2)'
+DEBUG: GC frees destructed 'domains/races/human/town/river/room/river3(0,2)'
+DEBUG: GC frees destructed 'domains/races/human/town/river/room/river1(1,3)'
+DEBUG: GC frees destructed 'domains/races/human/town/river/room/river1(1,1)'
+DEBUG: GC frees destructed 'domains/races/human/town/river/room/river2(0,3)'
+DEBUG: GC frees destructed 'std/player#8915'
+DEBUG: GC frees destructed 'players/badsoul/tower/obj/dagger#28933'
+DEBUG: GC frees destructed 'domains/races/elf/town/obj/armour/leather_boots#12510'
+DEBUG: GC frees destructed 'players/verse/forest/armour/gbutterfly#12512'
+DEBUG: GC frees destructed 'domains/races/elf/town/obj/armour/wgossamer_mantle#12514'
+DEBUG: GC frees destructed 'domains/races/drow/quest/erayan/obj/platemail#16326'
+DEBUG: GC frees destructed 'std/player#28274'
+DEBUG: GC frees destructed 'domains/races/drow/park/armour/uniform_trousers#10280'
+DEBUG: GC frees destructed 'domains/races/drow/park/armour/uniform_trousers#10952'
+DEBUG: GC frees destructed 'domains/races/drow/park/armour/uniform_trousers#3725'
+DEBUG: GC frees destructed 'domains/races/drow/park/armour/work_shoes#5486'
+DEBUG: GC frees destructed 'domains/races/drow/park/armour/work_shoes#10281'
+DEBUG: GC frees destructed 'domains/races/drow/park/armour/work_shoes#10953'
+DEBUG: GC frees destructed 'domains/races/drow/park/armour/work_shoes#5443'
+DEBUG: GC frees destructed 'domains/races/drow/park/weapon/broom#6353'
+DEBUG: GC frees destructed 'domains/races/drow/park/obj/fallenleaf#48954'
+DEBUG: GC frees destructed 'domains/races/drow/park/weapon/rake#48602'
+DEBUG: GC frees destructed 'domains/races/drow/quest/erayan/obj/platemail#12691'
+DEBUG: GC frees destructed 'domains/races/drow/quest/erayan/obj/mtwohander#12690'
+DEBUG: GC frees destructed 'players/toshiro/tampopo/swamp/obj/chainmail#12802'
+DEBUG: GC frees destructed 'obj/login_items/axe#12801'
+DEBUG: GC frees destructed 'std/player#11341'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl4'
+DEBUG: GC frees destructed 'std/combat/wound#13942'
+DEBUG: GC frees destructed 'room/skeleton/obj/hobg_skin#13025'
+DEBUG: GC frees destructed 'std/items/fur#13040'
+DEBUG: GC frees destructed 'domains/races/drow/quest/cl/obj/magic_staff#13442'
+DEBUG: GC frees destructed 'domains/races/drow/obj/armour/gauntlet#26919'
+DEBUG: GC frees destructed 'domains/races/drow/park/obj/grassclip#48976'
+DEBUG: GC frees destructed 'domains/races/drow/park/obj/fallenleaf#48882'
+DEBUG: GC frees destructed 'domains/races/drow/park/obj/grassclip#48788'
+DEBUG: GC frees destructed 'domains/races/drow/park/obj/grassclip#48897'
+DEBUG: GC frees destructed 'domains/races/drow/park/obj/grassclip#48753'
+DEBUG: GC frees destructed 'domains/races/elf/town/obj/armour/mage_hat#913'
+DEBUG: GC frees destructed 'domains/races/elf/town/obj/armour/linen_shirt#28080'
+DEBUG: GC frees destructed 'domains/races/gnome/town/armor/green_chainmail#28090'
+DEBUG: GC frees destructed 'domains/races/gnome/quests/daddyn/obj/green_knife#28301'
+DEBUG: GC frees destructed 'domains/races/gnome/quests/daddyn/obj/green_knife#28114'
+DEBUG: GC frees destructed 'players/atabersk/nabbach/valley/lair/smokeroom#14664'
+DEBUG: GC frees destructed 'domains/races/drow/obj/armour/lightmail#9458'
+DEBUG: GC frees destructed 'domains/khamar/area/npc/medaro#45287'
+DEBUG: GC frees destructed 'domains/khamar/area/npc/tuvhal#45284'
+DEBUG: GC frees destructed 'domains/khamar/area/npc/f_treasury_guard#45278'
+DEBUG: GC frees destructed 'domains/khamar/area/npc/m_treasury_guard#45275'
+DEBUG: GC frees destructed 'domains/khamar/area/weapon/short_lance#45289'
+DEBUG: GC frees destructed 'domains/khamar/area/npc/female_olorenth#44367'
+DEBUG: GC frees destructed 'domains/khamar/area/npc/male_olorenth#44364'
+DEBUG: GC frees destructed 'domains/races/drow/obj/armour/leathervest#15351'
+DEBUG: GC frees destructed 'domains/races/kender/area/maze/rooms/feeder.c(17,15)'
+DEBUG: GC frees destructed 'domains/races/kender/area/maze/rooms/feeder.c(0,6)'
+DEBUG: GC frees destructed 'domains/races/kender/area/maze/rooms/feeder.c(0,3)'
+DEBUG: GC frees destructed 'domains/races/kender/area/maze/rooms/feeder.c(10,15)'
+DEBUG: GC frees destructed 'domains/races/kender/area/maze/rooms/feeder.c(13,15)'
+DEBUG: GC frees destructed 'domains/races/kender/area/maze/rooms/feeder.c(7,15)'
+DEBUG: GC frees destructed 'domains/races/kender/area/maze/rooms/start.c(22,14)'
+DEBUG: GC frees destructed 'domains/races/kender/area/maze/rooms/feeder.c(22,15)'
+DEBUG: GC frees destructed 'domains/races/kender/area/maze/rooms/feeder.c(0,11)'
+DEBUG: GC frees destructed 'domains/races/kender/area/maze/rooms/feeder.c(21,15)'
+DEBUG: GC frees destructed 'domains/races/kender/area/maze/rooms/feeder.c(14,15)'
+DEBUG: GC frees destructed 'domains/races/kender/area/maze/rooms/feeder.c(2,15)'
+DEBUG: GC frees destructed 'domains/races/kender/area/maze/rooms/feeder.c(0,13)'
+DEBUG: GC frees destructed 'domains/races/kender/area/maze/rooms/feeder.c(8,15)'
+DEBUG: GC frees destructed 'domains/races/kender/area/maze/rooms/feeder.c(0,14)'
+DEBUG: GC frees destructed 'domains/races/kender/area/maze/rooms/feeder.c(12,15)'
+DEBUG: GC frees destructed 'domains/races/kender/area/maze/rooms/feeder.c(18,15)'
+DEBUG: GC frees destructed 'domains/races/kender/area/maze/rooms/feeder.c(11,15)'
+DEBUG: GC frees destructed 'domains/races/kender/area/maze/rooms/feeder.c(9,15)'
+DEBUG: GC frees destructed 'domains/races/kender/area/maze/rooms/feeder.c(0,4)'
+DEBUG: GC frees destructed 'domains/races/kender/area/maze/rooms/feeder.c(0,8)'
+DEBUG: GC frees destructed 'domains/races/kender/area/maze/rooms/feeder.c(23,14)'
+DEBUG: GC frees destructed 'domains/races/kender/area/maze/rooms/feeder.c(20,15)'
+DEBUG: GC frees destructed 'domains/races/kender/area/maze/rooms/feeder.c(19,15)'
+DEBUG: GC frees destructed 'domains/races/kender/area/maze/rooms/feeder.c(3,15)'
+DEBUG: GC frees destructed 'domains/races/kender/area/maze/rooms/end(0,0)'
+DEBUG: GC frees destructed 'domains/races/kender/area/maze/rooms/feeder.c(0,9)'
+DEBUG: GC frees destructed 'domains/races/kender/area/maze/rooms/feeder(0,3)'
+DEBUG: GC frees destructed 'domains/races/kender/area/maze/rooms/feeder.c(1,15)'
+DEBUG: GC frees destructed 'domains/races/kender/area/maze/rooms/feeder.c(0,5)'
+DEBUG: GC frees destructed 'domains/races/kender/area/maze/rooms/start(22,14)'
+DEBUG: GC frees destructed 'domains/races/kender/area/maze/rooms/feeder.c(0,10)'
+DEBUG: GC frees destructed 'domains/races/kender/area/maze/rooms/feeder.c(0,12)'
+DEBUG: GC frees destructed 'domains/races/kender/area/maze/rooms/feeder.c(0,7)'
+DEBUG: GC frees destructed 'domains/races/kender/area/maze/rooms/path.c(21,14)'
+DEBUG: GC frees destructed 'domains/races/kender/area/maze/rooms/feeder.c(15,15)'
+DEBUG: GC frees destructed 'domains/races/kender/area/maze/rooms/feeder.c(5,15)'
+DEBUG: GC frees destructed 'domains/races/kender/area/maze/rooms/feeder.c(16,15)'
+DEBUG: GC frees destructed 'domains/races/kender/area/maze/rooms/feeder.c(6,15)'
+DEBUG: GC frees destructed 'domains/races/kender/area/maze/rooms/feeder.c(4,15)'
+DEBUG: GC frees destructed 'domains/races/kender/area/maze/rooms/feeder.c(23,15)'
+DEBUG: GC frees destructed 'domains/races/kender/area/maze/rooms/feeder.c(0,15)'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/obj/sells/hammer#19236'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/obj/sells/tong#19237'
+DEBUG: GC frees destructed 'std/items/potliquid#16667'
+DEBUG: GC frees destructed 'std/items/potliquid#16666'
+DEBUG: GC frees destructed 'std/items/potliquid#16665'
+DEBUG: GC frees destructed 'std/items/potliquid#16664'
+DEBUG: GC frees destructed 'std/items/potliquid#16663'
+DEBUG: GC frees destructed 'std/items/potliquid#16662'
+DEBUG: GC frees destructed 'domains/races/elf/town/out/out5'
+DEBUG: GC frees destructed 'domains/races/drow/obj/weapon/pickaxe#28914'
+DEBUG: GC frees destructed 'domains/races/drow/obj/weapon/pickaxe#16624'
+DEBUG: GC frees destructed 'domains/races/elf/orc_camp/obj/fire_sword#43302'
+DEBUG: GC frees destructed 'std/player#905'
+DEBUG: GC frees destructed 'domains/khamar/area/armour/leatherjacket#17815'
+DEBUG: GC frees destructed 'std/player#26906'
+DEBUG: GC frees destructed 'domains/races/drow/town/mines/v01(4,6)'
+DEBUG: GC frees destructed 'domains/races/drow/town/mines/v01(3,10)'
+DEBUG: GC frees destructed 'domains/races/drow/town/mines/v01(2,8)'
+DEBUG: GC frees destructed 'domains/races/drow/town/mines/v03(9,0)'
+DEBUG: GC frees destructed 'domains/races/drow/town/mines/v01(5,3)'
+DEBUG: GC frees destructed 'domains/races/drow/town/mines/v01(2,9)'
+DEBUG: GC frees destructed 'domains/races/drow/town/mines/v01(10,5)'
+DEBUG: GC frees destructed 'domains/races/drow/town/mines/v01(10,3)'
+DEBUG: GC frees destructed 'domains/races/drow/town/mines/v01(4,4)'
+DEBUG: GC frees destructed 'domains/races/drow/town/mines/v01(10,6)'
+DEBUG: GC frees destructed 'domains/races/drow/town/mines/v01(2,10)'
+DEBUG: GC frees destructed 'domains/races/drow/town/mines/v01(2,14)'
+DEBUG: GC frees destructed 'domains/races/drow/town/mines/v01(1,9)'
+DEBUG: GC frees destructed 'domains/races/drow/town/mines/v01(5,8)'
+DEBUG: GC frees destructed 'domains/races/drow/town/mines/v01(5,4)'
+DEBUG: GC frees destructed 'domains/races/drow/town/mines/v01(10,4)'
+DEBUG: GC frees destructed 'domains/races/drow/town/mines/v01(3,6)'
+DEBUG: GC frees destructed 'domains/races/drow/town/mines/v01(1,10)'
+DEBUG: GC frees destructed 'domains/races/drow/town/mines/v01(6,7)'
+DEBUG: GC frees destructed 'domains/races/drow/town/mines/v01(3,9)'
+DEBUG: GC frees destructed 'domains/races/drow/town/mines/v01(4,0)'
+DEBUG: GC frees destructed 'std/combat/wound#48484'
+DEBUG: GC frees destructed 'domains/races/drow/town/mines/v11(5,0)'
+DEBUG: GC frees destructed 'domains/races/drow/town/mines/v11(11,4)'
+DEBUG: GC frees destructed 'domains/races/drow/town/mines/v11(12,0)'
+DEBUG: GC frees destructed 'domains/races/drow/town/mines/v11(3,1)'
+DEBUG: GC frees destructed 'domains/races/drow/town/mines/v11(3,0)'
+DEBUG: GC frees destructed 'domains/races/drow/town/mines/v11(13,0)'
+DEBUG: GC frees destructed 'domains/races/drow/town/mines/v11(10,2)'
+DEBUG: GC frees destructed 'domains/races/drow/town/mines/v11(11,2)'
+DEBUG: GC frees destructed 'domains/races/drow/town/mines/v12(3,3)'
+DEBUG: GC frees destructed 'domains/races/drow/town/mines/v11(0,5)'
+DEBUG: GC frees destructed 'domains/races/drow/town/mines/v11(0,4)'
+DEBUG: GC frees destructed 'domains/races/drow/town/mines/v11(7,1)'
+DEBUG: GC frees destructed 'domains/races/drow/town/mines/v11(11,3)'
+DEBUG: GC frees destructed 'std/items/ore#43023'
+DEBUG: GC frees destructed 'std/items/ore#43019'
+DEBUG: GC frees destructed 'std/items/ore#43013'
+DEBUG: GC frees destructed 'std/items/ore#42978'
+DEBUG: GC frees destructed 'std/items/ore#41820'
+DEBUG: GC frees destructed 'std/items/ore#29764'
+DEBUG: GC frees destructed 'std/items/ore#29209'
+DEBUG: GC frees destructed 'std/items/ore#16827'
+DEBUG: GC frees destructed 'std/player#1092'
+DEBUG: GC frees destructed 'players/atabersk/nabbach/abbey/ins/winetofield#18556'
+DEBUG: GC frees destructed 'std/player#517'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/mine/level0(6,6)'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/mine/level0(18,3)'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/mine/level0(12,6)'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/mine/level0(8,2)'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/mine/level0(17,3)'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/mine/level0(15,5)'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/mine/level0(14,5)'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/mine/lev0entr(10,4)'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/mine/level0(11,5)'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/mine/level0(16,0)'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/mine/lev0exit(11,3)'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/mine/level0(11,0)'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/mine/level1(5,6)'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/mine/level1(6,3)'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/mine/level1(14,4)'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/mine/level1(12,4)'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/mine/level1(4,6)'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/mine/level1(6,6)'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/mine/level1(9,2)'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/mine/level1(6,4)'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/mine/level1(12,3)'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/mine/level1(12,5)'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/mine/level1(5,4)'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/mine/level1(7,3)'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/mine/level1(4,4)'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/mine/level1(13,3)'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/mine/level1(11,7)'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/mine/level1(5,5)'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/mine/level1(7,4)'
+DEBUG: GC frees destructed 'std/combat/wound#1802'
+DEBUG: GC frees destructed 'obj/login_items/mace#1957'
+DEBUG: GC frees destructed 'domains/races/gnome/town/armor/leather_boots#28278'
+DEBUG: GC frees destructed 'domains/races/gnome/town/armor/leather_cap#9511'
+DEBUG: GC frees destructed 'domains/races/gnome/town/armor/leather_gloves#28277'
+DEBUG: GC frees destructed 'domains/races/gnome/town/armor/leather_trousers#1961'
+DEBUG: GC frees destructed 'domains/races/gnome/town/armor/leather_trousers#2036'
+DEBUG: GC frees destructed 'std/player#14562'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/dwarfpark/dwarf_park_entrance'
+DEBUG: GC frees destructed 'domains/races/elf/elfcamp/obj/other/handsome_ring#2029'
+DEBUG: GC frees destructed 'domains/races/human/town/obj/armour/gold_helmet#2031'
+DEBUG: GC frees destructed 'domains/khamar/area/weapon/sword#42779'
+DEBUG: GC frees destructed 'domains/khamar/area/weapon/sword#42778'
+DEBUG: GC frees destructed 'domains/races/elf/town/obj/armour/llinen_skirt#10265'
+DEBUG: GC frees destructed 'domains/races/kender/town/armour/thieves_armour#28926'
+DEBUG: GC frees destructed 'std/player#6258'
+DEBUG: GC frees destructed 'domains/races/elf/town/obj/weapon/knife#4799'
+DEBUG: GC frees destructed 'std/player#9965'
+DEBUG: GC frees destructed 'obj/login_items/dagger#43273'
+DEBUG: GC frees destructed 'domains/races/human/area/north/mon/troll1#5565'
+DEBUG: GC frees destructed 'domains/races/human/area/north/room/ruin_path4'
+DEBUG: GC frees destructed 'domains/khamar/cail/ins/healer/h3_4'
+DEBUG: GC frees destructed 'domains/races/drow/obj/misc/kelainos_ring#49319'
+DEBUG: GC frees destructed 'domains/races/drow/obj/misc/kelainos_ring#48597'
+DEBUG: GC frees destructed 'domains/races/drow/obj/misc/kelainos_ring#48596'
+DEBUG: GC frees destructed 'domains/races/kender/town/armour/mantle_silver#9438'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/obj/evergreen_branch#7845'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/obj/evergreen_branch#7838'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/obj/evergreen_branch#7851'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/obj/evergreen_branch#7818'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/obj/evergreen_branch#7903'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/obj/evergreen_branch#7862'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/obj/evergreen_branch#7875'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/obj/evergreen_branch#7805'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/obj/evergreen_branch#7860'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/obj/evergreen_branch#7905'
+DEBUG: GC frees destructed 'domains/races/gnome/town/armor/iron_gauntlets#2301'
+DEBUG: GC frees destructed 'domains/races/gnome/town/guild/weapon/golden_sickle#26926'
+DEBUG: GC frees destructed 'domains/races/gnome/town/guild/weapon/golden_sickle#28085'
+DEBUG: GC frees destructed 'domains/races/gnome/town/guild/weapon/golden_sickle#19091'
+DEBUG: GC frees destructed 'players/atabersk/nabbach/abbey/secr/shaft1#20531'
+DEBUG: GC frees destructed 'std/player#27137'
+DEBUG: GC frees destructed 'domains/khamar/cail/armour/rags#48643'
+DEBUG: GC frees destructed 'domains/khamar/cail/armour/rags#43278'
+DEBUG: GC frees destructed 'std/player#42899'
+DEBUG: GC frees destructed 'std/player#7184'
+DEBUG: GC frees destructed 'std/player#15313'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/mine/npc/dragonchild#49358'
+DEBUG: GC frees destructed 'domains/races/elf/orc_camp/npc/orc_guard#17860'
+DEBUG: GC frees destructed 'domains/races/elf/orc_camp/npc/orc_guard#17858'
+DEBUG: GC frees destructed 'std/player#24539'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/obj/black_scale#24585'
+DEBUG: GC frees destructed 'std/items/ore#15055'
+DEBUG: GC frees destructed 'std/player#10559'
+DEBUG: GC frees destructed 'domains/races/gnome/area/demon/obj/scythe#49314'
+DEBUG: GC frees destructed 'std/player#43260'
+DEBUG: GC frees destructed 'domains/races/drow/park/npc/pike#49209'
+DEBUG: GC frees destructed 'domains/races/drow/park/npc/carp#49208'
+DEBUG: GC frees destructed 'domains/races/drow/park/npc/perch#48893'
+DEBUG: GC frees destructed 'domains/races/drow/park/npc/octopus#48892'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/mine/npc/eelemental#17864'
+DEBUG: GC frees destructed 'domains/kyllavalley/m/lgoblin#49473'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/mine/npc/dragonchild#49810'
+DEBUG: GC frees destructed 'domains/kyllavalley/m/stonegiant#43978'
+DEBUG: GC frees destructed 'domains/races/drow/obj/armour/pants#26917'
+DEBUG: GC frees destructed 'domains/races/human/town/obj/weapon/steel_shortsword#26928'
+DEBUG: GC frees destructed 'std/player#2558'
+DEBUG: GC frees destructed 'domains/khamar/quest/yhonaz/drum#43270'
+DEBUG: GC frees destructed 'domains/races/kender/quests/imp/obj/imp_flute#33965'
+DEBUG: GC frees destructed 'std/items/instrument#33963'
+DEBUG: GC frees destructed 'domains/races/kender/quests/imp/obj/imp_flute#28299'
+DEBUG: GC frees destructed 'domains/races/kender/quests/imp/obj/imp_flute#28298'
+DEBUG: GC frees destructed 'domains/khamar/quest/yhonaz/bagpipe#43268'
+DEBUG: GC frees destructed 'players/branitar/cthar/item/misc/violin#28917'
+DEBUG: GC frees destructed 'domains/races/kender/quests/imp/obj/imp_flute#48565'
+DEBUG: GC frees destructed 'global/magic/add/dcancel#16126'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/q1/obj/red_book#15172'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/q1/obj/red_book#15054'
+DEBUG: GC frees destructed 'domains/races/drow/town/outside/lp006'
+DEBUG: GC frees destructed 'domains/races/drow/town/outside/lp015'
+DEBUG: GC frees destructed 'domains/races/drow/town/outside/lp003'
+DEBUG: GC frees destructed 'domains/races/drow/town/outside/lp014'
+DEBUG: GC frees destructed 'domains/races/drow/town/outside/lp005'
+DEBUG: GC frees destructed 'domains/races/drow/town/outside/lp002'
+DEBUG: GC frees destructed 'domains/races/drow/town/outside/lp016'
+DEBUG: GC frees destructed 'domains/races/drow/town/outside/lp011'
+DEBUG: GC frees destructed 'domains/races/drow/town/outside/lp017'
+DEBUG: GC frees destructed 'domains/races/drow/town/outside/lp012'
+DEBUG: GC frees destructed 'domains/races/drow/town/outside/lp009'
+DEBUG: GC frees destructed 'domains/races/drow/town/outside/lp007'
+DEBUG: GC frees destructed 'domains/races/drow/town/outside/lp013'
+DEBUG: GC frees destructed 'domains/races/drow/town/outside/lp008'
+DEBUG: GC frees destructed 'domains/races/drow/town/outside/lp004'
+DEBUG: GC frees destructed 'global/magic/add/skinprotect#49744'
+DEBUG: GC frees destructed 'players/toshiro/tampopo/swamp/obj/chest#42921'
+DEBUG: GC frees destructed 'domains/races/kender/area/maze/rooms/door'
+DEBUG: GC frees destructed 'domains/races/human/town/out/alley10'
+DEBUG: GC frees destructed 'domains/races/elf/town/obj/armour/g_blindfold#48561'
+DEBUG: GC frees destructed 'std/items/blindfold#48563'
+DEBUG: GC frees destructed 'obj/login_items/blindfold#33971'
+DEBUG: GC frees destructed 'std/items/blindfold#33969'
+DEBUG: GC frees destructed 'std/items/blindfold#33968'
+DEBUG: GC frees destructed 'std/items/blindfold#48562'
+DEBUG: GC frees destructed 'std/items/blindfold#48560'
+DEBUG: GC frees destructed 'obj/login_items/blindfold#26916'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/deadend(0,9)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(0,8)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(2,2)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/deadend(1,5)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(9,9)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/deadend(12,14)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(13,14)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl3(14,13)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(13,12)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(13,13)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(4,9)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(2,9)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(3,9)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(10,14)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(0,6)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(2,6)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(1,6)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl2(1,7)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl2(9,13)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl2(0,13)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(0,12)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/deadend(0,10)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(0,11)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(1,10)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(1,11)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/deadend(6,14)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(5,14)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(3,13)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(5,2)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(4,3)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(4,4)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(2,10)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/deadend(2,11)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(4,1)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(2,0)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(4,8)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(0,2)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(3,0)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(3,4)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/deadend(4,0)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl2(10,12)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(6,11)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(5,1)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(4,2)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(0,0)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl3(1,13)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(5,10)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(7,5)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(6,5)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(1,14)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/deadend(2,14)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(0,14)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl2(2,3)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(1,2)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(0,3)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/deadend(3,2)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(2,1)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(3,12)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(1,0)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(5,9)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(13,11)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(5,11)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(11,11)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(9,11)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(4,11)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(3,3)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/deadend(5,6)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/deadend(6,8)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl2(5,5)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(10,10)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/deadend(8,5)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(1,8)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(8,11)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(9,10)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/deadend(9,12)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(3,10)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(6,10)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(10,11)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(1,9)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(9,14)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(0,1)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(4,5)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(8,9)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/deadend(1,4)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(3,5)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/deadend(7,10)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(11,13)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(10,13)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/deadend(6,9)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(2,13)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(4,12)'
+DEBUG: GC frees destructed 'domains/races/gnome/town/maze/room/lvl1(1,3)'
+DEBUG: GC frees destructed 'std/player#19082'
+DEBUG: GC frees destructed 'domains/races/human/town/obj/armour/briff_ring#10588'
+DEBUG: GC frees destructed 'domains/races/human/town/obj/armour/briff_ring#11365'
+DEBUG: GC frees destructed 'domains/races/human/town/obj/armour/briff_ring#9395'
+DEBUG: GC frees destructed 'domains/races/human/town/obj/weapon/centuryaxe#11381'
+DEBUG: GC frees destructed 'domains/races/drow/obj/armour/undershirt#12777'
+DEBUG: GC frees destructed 'domains/races/drow/obj/armour/undershirt#15352'
+DEBUG: GC frees destructed 'domains/races/human/town/obj/armour/centurywaistcoat#48594'
+DEBUG: GC frees destructed 'domains/races/kender/town/armour/lshirt#15347'
+DEBUG: GC frees destructed 'domains/races/kender/town/armour/cshorts#15353'
+DEBUG: GC frees destructed 'domains/races/drow/obj/weapon/wprototype#9445'
+DEBUG: GC frees destructed 'domains/races/drow/obj/weapon/wprototype#9443'
+DEBUG: GC frees destructed 'domains/races/drow/harbour/npc/harpy#3378'
+DEBUG: GC frees destructed 'std/weapon#48599'
+DEBUG: GC frees destructed 'domains/races/human/town/guild/obj/priestcloak#3843'
+DEBUG: GC frees destructed 'std/player#3825'
+DEBUG: GC frees destructed 'std/player#3853'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/mine/npc/dragonchild#49103'
+DEBUG: GC frees destructed 'domains/races/kender/area/maze/obj/machete#6'
+DEBUG: GC frees destructed 'domains/races/kender/town/weapon/knife#28291'
+DEBUG: GC frees destructed 'room/chargen/cg_room#38381'
+DEBUG: GC frees destructed 'std/player#1899'
+DEBUG: GC frees destructed 'players/kavu/snowvillage/room/sv1'
+DEBUG: GC frees destructed 'players/drizzt/graveyard/obj/robe#17969'
+DEBUG: GC frees destructed 'domains/races/drow/harbour/npc/harpy#4118'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/mine/npc/dragonchild#49014'
+DEBUG: GC frees destructed 'std/player#10653'
+DEBUG: GC frees destructed 'std/player#424'
+DEBUG: GC frees destructed 'domains/races/drow/obj/weapon/scimitar#1962'
+DEBUG: GC frees destructed 'std/combat/wound#11235'
+DEBUG: GC frees destructed 'players/toshiro/boundary/items/silverstiletto#28854'
+DEBUG: GC frees destructed 'players/toshiro/boundary/items/miyusham1#28855'
+DEBUG: GC frees destructed 'domains/races/drow/obj/armour/leather_boots#26918'
+DEBUG: GC frees destructed 'std/items/potliquid#28940'
+DEBUG: GC frees destructed 'std/items/potliquid#28939'
+DEBUG: GC frees destructed 'domains/khamar/cail/weapon/warbow#11362'
+DEBUG: GC frees destructed 'etc/fingerd#49280'
+DEBUG: GC frees destructed 'etc/fingerd#49207'
+DEBUG: GC frees destructed 'etc/fingerd#49188'
+DEBUG: GC frees destructed 'players/shathira/workroom'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/obj/sells/money_belt#43285'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/obj/sells/money_belt#48587'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/obj/sells/money_belt#48586'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/obj/sells/money_belt#28922'
+DEBUG: GC frees destructed 'domains/races/elf/town/obj/armour/lleather_skirt#6223'
+DEBUG: GC frees destructed 'domains/races/elf/town/obj/armour/satin_panties#6226'
+DEBUG: GC frees destructed 'players/varda/other/diamondcloak#6227'
+DEBUG: GC frees destructed 'domains/races/drow/obj/armour/metal_bra#6229'
+DEBUG: GC frees destructed 'domains/races/drow/obj/armour/metal_bra#5180'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/obj/sells/mithril_axe#28089'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/obj/sells/mithril_axe#19096'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/obj/sells/mithril_axe#28088'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/obj/sells/mithril_axe#19095'
+DEBUG: GC frees destructed 'domains/races/human/town/obj/weapon/centurybattleaxe#6232'
+DEBUG: GC frees destructed 'players/varda/savannah/obj/armour/wooden_beads#6234'
+DEBUG: GC frees destructed 'domains/kyllavalley/town/wea/pick-axe#49474'
+DEBUG: GC frees destructed 'players/achaiarn/forest/obj/slippers#16693'
+DEBUG: GC frees destructed 'players/achaiarn/forest/obj/slippers#6237'
+DEBUG: GC frees destructed 'players/achaiarn/forest/obj/nicerobe#16691'
+DEBUG: GC frees destructed 'players/achaiarn/forest/obj/nicerobe#6238'
+DEBUG: GC frees destructed 'std/player#16605'
+DEBUG: GC frees destructed 'domains/races/human/area/north/obj/club#49184'
+DEBUG: GC frees destructed 'domains/races/human/area/north/obj/club#49064'
+DEBUG: GC frees destructed 'domains/races/human/area/north/obj/club#48938'
+DEBUG: GC frees destructed 'domains/races/human/area/north/obj/club#49215'
+DEBUG: GC frees destructed 'domains/races/human/area/north/obj/club#49267'
+DEBUG: GC frees destructed 'domains/races/human/area/north/obj/club#48828'
+DEBUG: GC frees destructed 'domains/races/human/area/north/obj/club#49140'
+DEBUG: GC frees destructed 'domains/races/human/area/north/obj/club#49088'
+DEBUG: GC frees destructed 'domains/races/human/area/north/obj/club#49355'
+DEBUG: GC frees destructed 'domains/races/human/area/north/obj/club#49156'
+DEBUG: GC frees destructed 'domains/races/human/area/north/obj/club#48903'
+DEBUG: GC frees destructed 'domains/races/human/area/north/obj/club#49125'
+DEBUG: GC frees destructed 'domains/races/human/area/north/obj/club#49020'
+DEBUG: GC frees destructed 'domains/races/human/area/north/obj/bone#48862'
+DEBUG: GC frees destructed 'domains/races/human/area/north/obj/bone#49253'
+DEBUG: GC frees destructed 'domains/races/human/area/north/obj/bone#49233'
+DEBUG: GC frees destructed 'domains/races/human/area/north/obj/bone#48916'
+DEBUG: GC frees destructed 'domains/races/human/area/north/obj/bone#48875'
+DEBUG: GC frees destructed 'domains/races/human/area/north/obj/bone#49107'
+DEBUG: GC frees destructed 'domains/races/human/area/north/obj/bone#48849'
+DEBUG: GC frees destructed 'std/player#90'
+DEBUG: GC frees destructed 'domains/races/elf/elfcamp/npc/pig#34156'
+DEBUG: GC frees destructed 'std/monster/hobgoblin#28873'
+DEBUG: GC frees destructed 'domains/khamar/area/arena/weapon/hammer#49261'
+DEBUG: GC frees destructed 'players/achaiarn/forest/armour/dwarfring#33959'
+DEBUG: GC frees destructed 'players/achaiarn/forest/armour/drowring#33960'
+DEBUG: GC frees destructed 'players/achaiarn/forest/armour/kenring#33961'
+DEBUG: GC frees destructed 'players/achaiarn/forest/armour/gnomering#33962'
+DEBUG: GC frees destructed 'std/player#33946'
+DEBUG: GC frees destructed 'std/player#12500'
+DEBUG: GC frees destructed 'players/varda/other/jewelled_sword#4796'
+DEBUG: GC frees destructed 'players/varda/other/jewelled_sword#4809'
+DEBUG: GC frees destructed 'players/varda/other/jewelled_sword2#4810'
+DEBUG: GC frees destructed 'players/varda/other/dewdress#4815'
+DEBUG: GC frees destructed 'players/varda/other/silverbarrette#4821'
+DEBUG: GC frees destructed 'players/varda/other/diamondslippers#4823'
+DEBUG: GC frees destructed 'std/player#4789'
+DEBUG: GC frees destructed 'domains/races/human/town/palace/obj/ladder#4881'
+DEBUG: GC frees destructed 'std/player#4622'
+DEBUG: GC frees destructed 'domains/races/gnome/town/armor/iron_boots#42853'
+DEBUG: GC frees destructed 'domains/races/gnome/town/armor/leather_jacket#42861'
+DEBUG: GC frees destructed 'domains/races/gnome/town/armor/leather_jacket#42858'
+DEBUG: GC frees destructed 'domains/races/gnome/town/armor/leather_jacket#42854'
+DEBUG: GC frees destructed 'domains/races/gnome/town/armor/iron_helmet#42855'
+DEBUG: GC frees destructed 'domains/races/gnome/town/armor/iron_shield#42862'
+DEBUG: GC frees destructed 'obj/login_items/scimitar#28307'
+DEBUG: GC frees destructed 'std/player#6905'
+DEBUG: GC frees destructed 'domains/races/human/town/obj/weapon/rolling_pin#16695'
+DEBUG: GC frees destructed 'std/player#6157'
+DEBUG: GC frees destructed 'std/player#9506'
+DEBUG: GC frees destructed 'std/combat/wound#48853'
+DEBUG: GC frees destructed 'std/combat/wound#48512'
+DEBUG: GC frees destructed 'std/items/torch#43778'
+DEBUG: GC frees destructed 'domains/kyllavalley/m/btroll#42579'
+DEBUG: GC frees destructed 'std/combat/wound#49146'
+DEBUG: GC frees destructed 'std/combat/wound#49539'
+DEBUG: GC frees destructed 'std/combat/wound#48943'
+DEBUG: GC frees destructed 'std/combat/wound#48966'
+DEBUG: GC frees destructed 'domains/races/elf/orc_camp/obj/ice_sword#43301'
+DEBUG: GC frees destructed 'players/obarskyr/pub_street/obj/amulet#28918'
+DEBUG: GC frees destructed 'std/player#28894'
+DEBUG: GC frees destructed 'domains/khamar/cail/weapon/d_stiletto#43298'
+DEBUG: GC frees destructed 'domains/khamar/cail/weapon/d_stiletto#43297'
+DEBUG: GC frees destructed 'domains/khamar/area/weapon/battle_staff#45286'
+DEBUG: GC frees destructed 'domains/khamar/area/weapon/butcher_axe#44366'
+DEBUG: GC frees destructed 'players/kavu/forest/armour/kavclaw#42914'
+DEBUG: GC frees destructed 'players/kavu/forest/armour/kavarm#42915'
+DEBUG: GC frees destructed 'players/kavu/forest/armour/kavhelm#42916'
+DEBUG: GC frees destructed 'domains/races/human/town/obj/armour/centurypants#48591'
+DEBUG: GC frees destructed 'domains/races/human/town/obj/weapon/centurysword#12515'
+DEBUG: GC frees destructed 'domains/races/human/town/obj/weapon/centurysword#16694'
+DEBUG: GC frees destructed 'players/kavu/forest/armour/kavboot#42917'
+DEBUG: GC frees destructed 'domains/races/gnome/town/armor/iron_leggings#42918'
+DEBUG: GC frees destructed 'players/kavu/forest/weapon/claw#42920'
+DEBUG: GC frees destructed 'players/kavu/forest/weapon/claw#42919'
+DEBUG: GC frees destructed 'players/caeryd/obj/globe#8225'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/mine/lev1entr(10,4)'
+DEBUG: GC frees destructed 'std/player#5529'
+DEBUG: GC frees destructed 'std/player#10237'
+DEBUG: GC frees destructed 'domains/races/human/town/obj/weapon/stiletto#15452'
+DEBUG: GC frees destructed 'std/player#176'
+DEBUG: GC frees destructed 'domains/races/elf/town/obj/armour/jeans#28095'
+DEBUG: GC frees destructed 'domains/races/elf/town/obj/armour/hat#219'
+DEBUG: GC frees destructed 'std/player#10012'
+DEBUG: GC frees destructed 'std/player#209'
+DEBUG: GC frees destructed 'domains/khamar/area/arena/weapon/knife#49264'
+DEBUG: GC frees destructed 'domains/khamar/area/arena/weapon/knife#49263'
+DEBUG: GC frees destructed 'domains/races/gnome/town/weapon/steel_sword#42860'
+DEBUG: GC frees destructed 'domains/races/gnome/town/weapon/steel_sword#42857'
+DEBUG: GC frees destructed 'domains/races/gnome/town/weapon/steel_sword#42852'
+DEBUG: GC frees destructed 'domains/races/gnome/town/weapon/steel_sword#26929'
+DEBUG: GC frees destructed 'std/food#49753'
+DEBUG: GC frees destructed 'domains/races/elf/town/obj/weapon/mage_staff#10697'
+DEBUG: GC frees destructed 'domains/races/elf/town/obj/weapon/mage_staff#20258'
+DEBUG: GC frees destructed 'domains/races/human/town/palace/obj/necklace#20264'
+DEBUG: GC frees destructed 'players/drizzt/graveyard/obj/gscimitar#11357'
+DEBUG: GC frees destructed 'players/drizzt/graveyard/obj/gscimitar#15335'
+DEBUG: GC frees destructed 'players/drizzt/graveyard/obj/gscimitar#15334'
+DEBUG: GC frees destructed 'players/drizzt/graveyard/obj/gscimitar#20267'
+DEBUG: GC frees destructed 'players/drizzt/graveyard/obj/gscimitar#15324'
+DEBUG: GC frees destructed 'players/drizzt/graveyard/obj/gscimitar#15323'
+DEBUG: GC frees destructed 'domains/races/elf/town/obj/armour/silk_bra#12506'
+DEBUG: GC frees destructed 'domains/races/elf/town/obj/armour/silk_bra#20269'
+DEBUG: GC frees destructed 'domains/races/kender/town/armour/wsock#28121'
+DEBUG: GC frees destructed 'domains/races/kender/town/armour/wsock#28093'
+DEBUG: GC frees destructed 'domains/races/kender/town/armour/wsock#20270'
+DEBUG: GC frees destructed 'domains/races/kender/town/armour/wsock#20271'
+DEBUG: GC frees destructed 'domains/races/kender/town/armour/mail_dblue#20274'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/obj/sells/g_arm#20276'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/obj/sells/g_arm#28079'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/obj/sells/g_arm#28107'
+DEBUG: GC frees destructed 'domains/races/elf/elfcamp/obj/other/dragontooth#12784'
+DEBUG: GC frees destructed 'domains/races/elf/elfcamp/obj/other/dragontooth#17971'
+DEBUG: GC frees destructed 'domains/races/elf/elfcamp/obj/other/dragontooth#20279'
+DEBUG: GC frees destructed 'domains/races/human/town/obj/armour/silver_gauntlets#20280'
+DEBUG: GC frees destructed 'domains/khamar/cail/armour/iron_dragonhelmet#28098'
+DEBUG: GC frees destructed 'domains/khamar/cail/armour/iron_dragonhelmet#20281'
+DEBUG: GC frees destructed 'domains/races/elf/town/obj/armour/mage_robe#20282'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/mine/obj/crossbow#15161'
+DEBUG: GC frees destructed 'domains/races/drow/park/armour/uniform_jacket#15163'
+DEBUG: GC frees destructed 'domains/races/drow/park/armour/uniform_jacket#10954'
+DEBUG: GC frees destructed 'domains/races/elf/elfcamp/obj/tools/apple_peeler#28297'
+DEBUG: GC frees destructed 'obj/login_items/sword#26921'
+DEBUG: GC frees destructed 'players/raistlin/sceptre/obj/frost_axe#15176'
+DEBUG: GC frees destructed 'players/raistlin/sceptre/obj/frost_axe#10696'
+DEBUG: GC frees destructed 'players/raistlin/sceptre/obj/faxe#28104'
+DEBUG: GC frees destructed 'players/raistlin/sceptre/obj/faxe#28102'
+DEBUG: GC frees destructed 'players/raistlin/sceptre/obj/faxe#28912'
+DEBUG: GC frees destructed 'players/raistlin/sceptre/obj/faxe#16622'
+DEBUG: GC frees destructed 'players/raistlin/sceptre/obj/faxe#10695'
+DEBUG: GC frees destructed 'players/raistlin/sceptre/obj/faxe#28913'
+DEBUG: GC frees destructed 'players/raistlin/sceptre/obj/faxe#16623'
+DEBUG: GC frees destructed 'domains/races/elf/town/obj/armour/leather_gloves#15180'
+DEBUG: GC frees destructed 'domains/races/elf/town/obj/armour/leather_gloves#17966'
+DEBUG: GC frees destructed 'domains/races/kender/town/armour/leatherboots#28921'
+DEBUG: GC frees destructed 'std/items/bandagekit#42635'
+DEBUG: GC frees destructed 'std/items/bandagekit#42634'
+DEBUG: GC frees destructed 'std/items/bandagekit#48570'
+DEBUG: GC frees destructed 'std/items/bandagekit#48569'
+DEBUG: GC frees destructed 'std/items/bandagekit#48702'
+DEBUG: GC frees destructed 'std/items/bandagekit#48701'
+DEBUG: GC frees destructed 'std/items/bandagekit#48654'
+DEBUG: GC frees destructed 'std/items/bandagekit#42632'
+DEBUG: GC frees destructed 'std/items/bandagekit#42631'
+DEBUG: GC frees destructed 'std/items/bandagekit#42630'
+DEBUG: GC frees destructed 'domains/races/gnome/town/armor/leather_armor#15189'
+DEBUG: GC frees destructed 'domains/races/dwarf/town/mine/npc/dragonchild#49476'
+DEBUG: GC frees destructed 'domains/races/elf/orc_camp/obj/c_bolts#49396'
+DEBUG: GC frees destructed 'domains/races/elf/orc_camp/obj/crossbow#49395'
+DEBUG: GC frees destructed 'domains/races/elf/orc_camp/obj/c_bolts#49525'
+DEBUG: GC frees destructed 'domains/races/elf/orc_camp/obj/c_bolts#49529'
+DEBUG: GC frees destructed 'domains/races/elf/orc_camp/obj/c_bolts#42740'
+DEBUG: GC frees destructed 'domains/races/elf/orc_camp/obj/crossbow#42739'
+DEBUG: GC frees destructed 'domains/races/elf/orc_camp/obj/c_bolts#49610'
+DEBUG: GC frees destructed 'domains/races/elf/orc_camp/obj/crossbow#49609'
+DEBUG: GC frees destructed 'domains/races/elf/orc_camp/obj/c_bolts#49619'
+DEBUG: GC frees destructed 'domains/races/elf/orc_camp/obj/crossbow#49618'
+DEBUG: GC frees destructed 'domains/races/elf/orc_camp/obj/c_bolts#45197'
+DEBUG: GC frees destructed 'domains/races/elf/orc_camp/obj/crossbow#45196'
+DEBUG: GC frees destructed 'domains/races/elf/orc_camp/obj/crossbow#44274'
+DEBUG: GC frees destructed 'domains/races/drow/quest/erayan/npc/mangyworm#18851'
+DEBUG: GC frees destructed 'domains/races/drow/obj/armour/boots_urunuqui#12778'
+DEBUG: GC frees destructed 'domains/races/drow/obj/armour/shinymail#12779'
+DEBUG: GC frees destructed 'domains/races/drow/obj/armour/tigermask#12780'
+DEBUG: GC frees destructed 'domains/races/drow/obj/armour/gloves#12783'
+2002.04.24 07:00:14 Consolidation merged 60964 blocks, freed 0 chunks holding 0 blocks.
+2002.04.24 07:00:14 GC freed 692 destructed objects.
+DEBUG: 2002.04.24 07:00:14 GC found 21995 malloced strings using 828376 bytes.
+2002.04.25 07:00:06 Garbage collection, slow_shut to do: 0
+No malloc trace.
+2002.04.25 07:00:10 Destructed object 0x125805e0 'std/money#92698' referenced as something else
+kernel/simul_efun kernel/simul/message.c line 1256
+82c6e85: 117          foreach_next               (0: 43)	line 1256
+82c6e60:  26        1 local                      (0: 43)	line 1252
+82c6e62:  26        2 local                      (1: 44)
+82c6e64:  13          const0                     (2: 45)
+82c6e65: 310       54 strstr                     (3: 46)
+82c6e67:  94        3 push_local_variable_lvalue (1: 44)
+82c6e69:  38          (void)=                    (2: 45)
+82c6e6a:  26        3 local                      (0: 43)	line 1253
+82c6e6c:  15          nconst1                    (1: 44)
+82c6e6d:  49          !=                         (2: 45)
+82c6e6e:  83          branch_when_zero           (1: 44)
+82c6e85: 117          foreach_next               (0: 43)	line 1256
+82c6e60:  26        1 local                      (0: 43)	line 1252
+82c6e62:  26        2 local                      (1: 44)
+82c6e64:  13          const0                     (2: 45)
+82c6e65: 310       54 strstr                     (3: 46)
+82c6e67:  94        3 push_local_variable_lvalue (1: 44)
+82c6e69:  38          (void)=                    (2: 45)
+82c6e6a:  26        3 local                      (0: 43)	line 1253
+82c6e6c:  15          nconst1                    (1: 44)
+82c6e6d:  49          !=                         (2: 45)
+82c6e6e:  83          branch_when_zero           (1: 44)
+82c6e85: 117          foreach_next               (0: 43)	line 1256
+82c6e60:  26        1 local                      (0: 43)	line 1252
+82c6e62:  26        2 local                      (1: 44)
+82c6e64:  13          const0                     (2: 45)
+82c6e65: 310       54 strstr                     (3: 46)
+82c6e67:  94        3 push_local_variable_lvalue (1: 44)
+82c6e69:  38          (void)=                    (2: 45)
+82c6e6a:  26        3 local                      (0: 43)	line 1253
+82c6e6c:  15          nconst1                    (1: 44)
+82c6e6d:  49          !=                         (2: 45)
+82c6e6e:  83          branch_when_zero           (1: 44)
+82c6e85: 117          foreach_next               (0: 43)	line 1256
+82c6e60:  26        1 local                      (0: 43)	line 1252
+82c6e62:  26        2 local                      (1: 44)
+82c6e64:  13          const0                     (2: 45)
+82c6e65: 310       54 strstr                     (3: 46)
+82c6e67:  94        3 push_local_variable_lvalue (1: 44)
+82c6e69:  38          (void)=                    (2: 45)
+82c6e6a:  26        3 local                      (0: 43)	line 1253
+82c6e6c:  15          nconst1                    (1: 44)
+82c6e6d:  49          !=                         (2: 45)
+82c6e6e:  83          branch_when_zero           (1: 44)
+82c6e85: 117          foreach_next               (0: 43)	line 1256
+82c6e60:  26        1 local                      (0: 43)	line 1252
+82c6e62:  26        2 local                      (1: 44)
+82c6e64:  13          const0                     (2: 45)
+82c6e65: 310       54 strstr                     (3: 46)
+82c6e67:  94        3 push_local_variable_lvalue (1: 44)
+82c6e69:  38          (void)=                    (2: 45)
+82c6e6a:  26        3 local                      (0: 43)	line 1253
+82c6e6c:  15          nconst1                    (1: 44)
+82c6e6d:  49          !=                         (2: 45)
+82c6e6e:  83       21 branch_when_zero           (1: 44)
+82c6e70:  26        1 local                      (0: 43)	line 1254
+82c6e72:  13          const0                     (1: 44)
+82c6e73:  26        3 local                      (2: 45)
+82c6e75:  14          const1                     (3: 46)
+82c6e76:  40          -                          (4: 47)
+82c6e77:  58          ..                         (3: 46)
+82c6e78:  26        1 local                      (1: 44)
+82c6e7a:  26        3 local                      (2: 45)
+82c6e7c:  26        2 local                      (3: 46)
+82c6e7e: 217          strlen                     (4: 47)
+82c6e7f:  39          +                          (4: 47)
+82c6e80:  62          nx_range                   (3: 46)
+82c6e81:  39          +                          (2: 45)
+82c6e82:  94        1 push_local_variable_lvalue (1: 44)
+82c6e84:  38          (void)=                    (2: 45)
+82c6e85: 117          foreach_next               (0: 43)	line 1256
+82c6e60:  26        1 local                      (0: 43)	line 1252
+82c6e62:  26        2 local                      (1: 44)
+82c6e64:  13          const0                     (2: 45)
+82c6e65: 310       54 strstr                     (3: 46)
+82c6e67:  94        3 push_local_variable_lvalue (1: 44)
+82c6e69:  38          (void)=                    (2: 45)
+82c6e6a:  26        3 local                      (0: 43)	line 1253
+82c6e6c:  15          nconst1                    (1: 44)
+82c6e6d:  49          !=                         (2: 45)
+82c6e6e:  83          branch_when_zero           (1: 44)
+82c6e85: 117          foreach_next               (0: 43)	line 1256
+82c6e60:  26        1 local                      (0: 43)	line 1252
+82c6e62:  26        2 local                      (1: 44)
+82c6e64:  13          const0                     (2: 45)
+82c6e65: 310       54 strstr                     (3: 46)
+82c6e67:  94        3 push_local_variable_lvalue (1: 44)
+82c6e69:  38          (void)=                    (2: 45)
+82c6e6a:  26        3 local                      (0: 43)	line 1253
+82c6e6c:  15          nconst1                    (1: 44)
+82c6e6d:  49          !=                         (2: 45)
+82c6e6e:  83          branch_when_zero           (1: 44)
+82c6e85: 117       40 foreach_next               (0: 43)	line 1256
+82c6e88: 118          foreach_end                (0: 43)
+82c6e89:  26        1 local                      (0: 39)	line 1258
+82c6e8b: 217          strlen                     (1: 40)
+82c6e8c:  21          return                     (1: 40)
+82c6f69:  84     5633 branch_when_non_zero       (1: 36)	line 1328
+82c6f6c:  26        7 local                      (0: 35)	line 1334
+82c6f6e:  14          const1                     (1: 36)
+82c6f6f:  99          index                      (2: 37)
+82c6f70:  94        8 push_local_variable_lvalue (1: 36)
+82c6f72:  38          (void)=                    (2: 37)
+82c6f73:   7      136 cstring0                   (0: 35)	line 1337
+82c6f75:   7      137 cstring0                   (1: 36)
+82c6f77:  26        1 local                      (2: 37)
+82c6f79:  26        3 local                      (3: 38)
+82c6f7b:  26        0 local                      (4: 39)
+82c6f7d:  26        4 local                      (5: 40)
+82c6f7f: 126          call_other                 (6: 41)
+global/server/tongue global/server/tongue.c line 117
+831b8ef:  78     3588 clear_locals               (0: 55)	line 117
+831b8f2:  26        2 local                      (0: 55)	line 124
+831b8f4:  57          !                          (1: 56)
+831b8f5:  36        3 ||                         (1: 56)
+831b8f7:  26        1 local                      (0: 55)
+831b8f9:  57          !                          (1: 56)
+831b8fa:  36          ||                         (1: 56)
+831b901:  36          ||                         (1: 56)
+831b909:  83        3 branch_when_zero           (1: 56)	line 125
+831b90b:  26        0 local                      (0: 55)	line 126
+831b90d:  21          return                     (1: 56)
+kernel/simul_efun kernel/simul/message.c line 1337
+82c6f81:  94        1 push_local_variable_lvalue (1: 36)	line 1337
+82c6f83:  38          (void)=                    (2: 37)
+82c6f84:  26        0 local                      (0: 35)	line 1340
+82c6f86:   7       83 cstring0                   (1: 36)
+82c6f88:   7      138 cstring0                   (2: 37)
+82c6f8a: 126          call_other                 (3: 38)
+domains/races/drow/guardserver/patrol2 basic/property.c line 39
+82ca2b3:  26        0 local                      (0: 38)	line 39
+82ca2b5:  84          branch_when_non_zero       (1: 39)
+82ca2bf:   5        0 identifier                 (0: 38)	line 40
+82ca2c1:  35        7 &&                         (1: 39)
+82ca2c3:   5        0 identifier                 (0: 38)
+82ca2c5:  26        0 local                      (1: 39)
+82ca2c7:  99          index                      (2: 40)
+82ca2c8: 154        1 funcall                    (1: 39)
+82ca2ca:  21          return                     (1: 39)
+kernel/simul_efun kernel/simul/message.c line 1340
+82c6f8c:  94        9 push_local_variable_lvalue (1: 36)	line 1340
+82c6f8e:  38          (void)=                    (2: 37)
+82c6f8f:  26        9 local                      (0: 35)	line 1342
+82c6f91:  83          branch_when_zero           (1: 36)
+82c6fac:   7      134 cstring0                   (0: 35)	line 1348
+82c6fae:  94        1 push_local_variable_lvalue (1: 36)
+82c6fb0:  64          (void)+=                   (2: 37)
+82c6fb1:  94        7 push_local_variable_lvalue (0: 35)	line 1350
+82c6fb3:  26        0 local                      (1: 36)
+82c6fb5:   7      135 cstring0                   (2: 37)
+82c6fb7:  26        1 local                      (3: 38)
+82c6fb9: 279          call_resolved              (4: 39)
+domains/races/drow/guardserver/patrol2 std/npc.c line 65
+831e847:  26        0 local                      (0: 39)	line 65
+831e849:  88          call_explicit_inherited    (1: 40)
+domains/races/drow/guardserver/patrol2 basic/living/reaction.c line 115
+8318d2f:   5        3 identifier                 (0: 40)	line 115
+8318d31:  83          branch_when_zero           (1: 41)
+8318d3e: 226          this_object                (0: 40)	line 117
+8318d3f: 161          interactive                (1: 41)
+8318d40:  83          branch_when_zero           (1: 41)
+8318d46:  22          return0                    (0: 40)	line 119
+domains/races/drow/guardserver/patrol2 std/npc.c line 65
+831e84f:  76          pop_value                  (1: 40)	line 65
+831e850:  22          return0                    (0: 39)	line 67
+kernel/simul_efun kernel/simul/message.c line 1350
+82c6fbc:  84          branch_when_non_zero       (1: 36)	line 1350
+82c6fc3:  22          return0                    (0: 35)	line 1357
+82c7535:  76          pop_value                  (1: 22)	line 1769
+82c7536:  22          return0                    (0: 21)	line 1771
+lib/combat/wound lib/combat/wound.c line 201
+847c195:  76          pop_value                  (1:  8)	line 201
+847c196:   7       32 cstring0                   (0:  7)
+847c198:  13          const0                     (1:  8)
+847c199:  26        0 local                      (2:  9)
+847c19b: 127        3 call_out                   (3: 10)
+847c19d:  23          break                      (0:  7)
+847c2bb:  22          return0                    (0:  7)	line 236
+std/combat/wound#93634 std/combat/wound.c line 60
+847b95d:  76          pop_value                  (1:  1)	line 60
+847b95e:  22          return0                    (0:  0)	line 61
+847b9cc:  76          pop_value                  (1:  1)	line 91
+847b9cd:  82          branch                     (0:  0)	line 92
+847b9d4:  22          return0                    (0:  0)	line 94
+domains/races/gnome/town/maze/mon/pygmy_owl#56158 <lambda ?> line 0
+101d6b3b:  26        1 local                      (0:  3)	line 0
+101d6b3d: 152          first_inventory            (1:  4)
+101d6b3e:  84       10 branch_when_non_zero       (1:  4)
+101d6b40:  26        1 local                      (0:  3)
+101d6b42: 112        0 lambda_cconstant           (1:  4)
+101d6b44:  26        0 local                      (2:  5)
+101d6b46: 126        3 call_other                 (3:  6)
+101d6b48:  82     3329 branch                     (1:  4)
+101d6b4b:  21          return                     (1:  4)
+domains/races/human/area/north/obj/bone#92809 basic/create.c line 70
+8298e6b:  26        0 local                      (0:  0)	line 70
+8298e6d:  84          branch_when_non_zero       (1:  1)
+8298e7f:  89        0 push_identifier_lvalue     (0:  0)	line 78
+8298e81:  33          ++x                        (1:  1)
+8298e82:  87          call_function_by_address   (1:  1)
+8298e57:  22          return0                    (0:  1)	line 49
+8298e86:  76          pop_value                  (1:  1)	line 78
+8298e87:  22          return0                    (0:  0)	line 80
+domains/races/drow/park/npc/snail#69416 <lambda ?> line 0
+101d6b3b:  26        1 local                      (0:  3)	line 0
+101d6b3d: 152          first_inventory            (1:  4)
+101d6b3e:  84       10 branch_when_non_zero       (1:  4)
+101d6b40:  26        1 local                      (0:  3)
+101d6b42: 112        0 lambda_cconstant           (1:  4)
+101d6b44:  26        0 local                      (2:  5)
+101d6b46: 126        3 call_other                 (3:  6)
+101d6b48:  82     3329 branch                     (1:  4)
+101d6b4b:  21          return                     (1:  4)
+82ce19a:  94   0  38  26   0  21  22  26
+No program to trace.
+2002.04.25 07:00:10 LDMud aborting on fatal error.
+2002.04.25 07:00:11 [erq] read: EOF
+2002.04.25 07:00:11 [erq] Read 0, should be 9!
+2002.04.25 07:00:11 [erq] Giving up.
+
