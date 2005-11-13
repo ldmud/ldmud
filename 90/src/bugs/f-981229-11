@@ -1,0 +1,27 @@
+Short: new efun limited()
+From: alfebtcd <alfebtcd@cs.tu-berlin.de>
+Date: Wed, 16 Dec 1998 21:11:51 +0100 (MET)
+Type: Feature
+State: Acknowledged
+
+speaking of limitation: how about a privileged efun with which you can
+execute code with some limitations switched off?  at least the corelib
+coders should know what they do and should not be limited by the driver
+and thus forced to use ugly workarounds which are tricky and likely to
+contain bugs.
+
+	mixed limited(closure c, mapping limits);
+    mixed limited(closure c, int eval_cost_limit);
+
+this function should execute the given closure c with <limits> specifying
+the limits, like read/size limits, eval-cost, etc.
+
+This would need the various limits be stored in variables instead of
+preprocessor symbols, with special 'no-limit limit' values, which are
+just big enough to appear limitless while still being real limits. This
+would also go a step into the direction of configuration files which are
+evaluated at driver startup.
+
+The function must be privileged.
+
+How to handle the preprocessor symbols?

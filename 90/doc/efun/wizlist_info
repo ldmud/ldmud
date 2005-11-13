@@ -1,0 +1,18 @@
+SYNOPSIS
+	mixed *wizlist_info()
+
+DESCRIPTION
+	Returns an array with all entries of the wizlist.
+	Needs to be privileged by the master object.
+
+	w[0] = Name of the wizard.
+	w[1] = Number of commands execute by objects of this wizard.
+	w[2] = Total sum of eval_costs.
+	w[3] = Total count of heart_beats.
+	w[4] = Reserved for call_out() (unused yet).
+	w[5] = Total size of arrays in elements.
+	w[6..] = Extra wizlist-info if set.
+
+SEE ALSO
+	wizlist(E), privilege_violation(M), set_extra_wizinfo_size(E)
+	get_extra_wizinfo(E), set_extra_wizinfo(E)

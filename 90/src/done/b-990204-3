@@ -1,0 +1,10 @@
+Short: Fix for #'++/#'-- ?
+From:    Zwirch@PK-Mud
+Date:    Mon Jan 11 13:14:19 1999
+Type: Bug
+State: Fixed.
+
+2. #'++/#'-- in lambda-closures geht nicht, weil in closure.c
+   Zeile 1117/1118 steht: case F_POST_INC:
+   das muss               case F_POST_INC-F_OFFSET:   heissen.
+

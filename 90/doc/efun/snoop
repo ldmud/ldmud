@@ -1,0 +1,34 @@
+SYNOPSIS
+	Compat:	void   snoop()
+		void   snoop(object snoopee)
+	Native:	object snoop(object snooper)
+		object snoop(object snooper, object snoopee)
+
+DESCRIPTION
+	Compatibility Mode:
+
+	When given w/o argument, any actual snoop is terminated,
+	else a snoop on object 'snoopee' is started.
+
+	If 'snoopee' is snooped already by someone else, or this snoop
+	would result in a recursive snoop action, the snoop fails.
+	The success is written to this_player(), but not returned as a
+	result.
+
+	Native Mode:
+
+	Starts a snoop from 'snooper' on 'snoopee', or if 'snoopee' is not
+	given, terminates any snoop from 'snooper'.
+	On success, 'snoopee' is returned, else 0.
+
+	The snoop is checked with the master object for validity.
+	It will also fail if the 'snoopee' is being snooped already or
+	if a snoop would result in a recursive snoop action.
+	Up to 3.2, the current object also has to have a non-zero uid.
+
+HISTORY
+	Since 3.2.1, the native mode description also applies for the
+	compatibility mode, except for the checking of this_object()s uid.
+
+SEE ALSO
+	query_snoop(E)
