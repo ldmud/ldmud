@@ -1,0 +1,9 @@
+Short: random() is not random enough
+From: Holger@Wunderland
+Date: 990217
+Type: Bug
+State: Unclassified
+
+random() % something small is apparently not random enough. Linux' srand()
+and rand() seem to deliver better results.
+

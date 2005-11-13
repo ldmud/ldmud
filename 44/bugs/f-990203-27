@@ -1,0 +1,14 @@
+Short: New efun clonep()
+From: Daniel von Dincklage <vondincklage@usa.net>
+Date: Mon, 22 Jun 1998 00:53:36 +0200
+Type: Feature
+State: Unclassified
+See also: p-990204-1
+
+On Fri, 19 Jun 1998, Daniel von Dincklage wrote:
+
+> - A clonep-efun
+>   It's not complicated to implement, but quite useful, as all those
+>   sefuns that work with explode( , "#") will fail if the object was
+>   renamed. 
+
