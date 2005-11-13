@@ -1,0 +1,75 @@
+
+
+USAGE
+  printf(fmt, ...);
+    string fmt;
+
+  string s;
+  s = sprintf(fmt, ...);
+    string fmt;
+
+Most of the characters in the format string (FMT) get passed straight
+through to the output (ie: printed or put in the return string), to
+format the arguments into the string it's nessasary to include an
+argument format string (AFS) in the FMT.  An AFS is a series of
+characters starting with a percent sign "%" and terminated with a
+argument type specifier.  To include a "%" sign in the output, it is
+nessasary to include a double percent sign "%%".
+
+Valid argument type specifiers are:
+  "s" : the argument is a string.
+  "d" : the argument is an integer to be included in decimal
+        representation.
+  "i" : same as "d".
+  "o" : the argument is an integer to be included in octal
+        representation.
+  "x" : the argument is an integer to be included in hexidecimal
+        representation.
+  "X" : as "x" except letters are capitalised.
+   e,E,f,F,g,G like in c.
+  "O" : the argument is an LPC datatype to be printed in an arbituary
+        format, this is for debugging purposes.  If the argument is an
+        object then the function object_name() on the master object
+        is called with the object as a parameter, the string returned
+        is included in brackets at the end of object file name.  If 
+        0 is returned then nothing is appended after the file name.
+
+Between the percent sign and the argument type specifier in the AFS, the
+following modifiers can be included to specify the formatting
+information.  Order is not important unless otherwise specified.  "n" is
+used to specify a integer, which can be a "*" in which case the next argument
+is used as the number.
+
+Modifiers:
+   n    specifys the field size, if prepended with a zero then the pad
+        string is set to "0".
+  "."n  specifies the presision, for simple (not columns or tables)
+        strings specifies the truncation length.
+  ":"n  n specifies the fs _and_ the presision, if n is prepended by a zero
+        then the pad string is set to "0".
+  "'X'" the pad string is set to the char(s) between the single quotes,
+        if the field size is also prepended with a zero then which ever
+        is specified last will overrule.
+        NOTE:  to include "'" in the pad string, you must use "\\'"
+        (as the backslash has to be escaped past the interpreter),
+        similarly, to include "\" requires "\\\\".
+  " "   pad positive integers with a space.
+  "+"   pad positive integers with a plus sign.
+  "-"   left adjusted within field size.
+        NB: std (s)printf() defaults to right justification, which is
+            unnatural in the context of a mainly string based language
+            but has been retained for "compatability" ;)
+  "|"   centered within field size.
+  "="   column mode.  Ignored unless the argument type specifier is s.
+        Field size must be specified, if presision is specified then it
+        specifies the width for the string to be wordwrapped in, if not
+        then the field size is.  The field size specifies the width of
+        the column.
+  "#"   table mode.  Ignored unless the argument type specifier is s.
+        Field size must be specified, if presision is specified then it
+        specifys the number of columns in the table, otherwise the
+        number is "optimally" generated.  Table mode is passed a list
+        of slash-n separated 'words' which are put in a format similar
+        to that of ls.
+  "@"   the argument is an array.  the corresponding AFS (minus all
+        "@") is applyed to each element of the array.
