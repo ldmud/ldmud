@@ -1,0 +1,14 @@
+Subject: Driverbug 2
+From: Lars Duning <lduning@mdisystems.com>
+Reply-To: <lars@cableinet.co.uk>
+Date: Tue, 22 Sep 1998 16:37:44 +0100
+Organization: MDi Systems
+X-Mailer: Mozilla 4.04 [en] (Win95; I)
+
+- mapping_contains(&x, &y, &z, ..., ([ key:val1;val2;val3;... }]), key)
+  returns garbage in x.
+  This only for
+   - mappings with 3 or more data elements per key
+   - mapping literals which are not assigned to a variable
+     (i.e. mapping_contains(&x, &y, &z, m=([...])...) works )
+

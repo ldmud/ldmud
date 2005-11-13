@@ -1,0 +1,37 @@
+LDMud, a LPmud gamedriver.
+Copyright 1997-1998 by Lars Duening.
+
+LDMud is based on LPmud, which is
+Copyright 1989-1991 by Lars Pensj|, and, starting with version 3.1.2,
+Copyright 1991-1997 by Joern Rennecke.
+
+Source code herein refers to the source code, and any executables
+created from the same source code.
+
+All rights reserved.  Permission is granted to extend and modify the
+source code provided subject to the restriction that the source code may
+not be used in any way whatsoever for monetary gain.
+
+ ------------------------------------------------------------------------
+
+LDMud contains contributions of many volunteers as listed in the file CREDITS.
+Of these, the following packages are subject of their own copyright when
+used outside the context of this gamedriver; please refer to the appropriate
+files for details.
+
+The regexp package is based on the code written by Henry Spencer.
+
+The smalloc allocator was written by Sean T. Barrett and put into the
+public domain.
+
+The 'ed' editor (with the exception of the indentation code) is Copyright
+by Brian Beattie, Kees Bot and others.
+
+The non-corrupting indentation code for the 'ed' editor was written and
+contributed by Felix A. Croes (<felix@dworkin.nl>) from his DGD gamedriver.
+
+The sprintf() efun was written by Sean A. Reith and put into the public
+domain.
+
+The crypt() implementation is based on the code written by Eric Young.
+

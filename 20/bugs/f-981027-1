@@ -1,0 +1,5 @@
+Short: Better handling of \<nl>
+Date: 981027
+Long:
+Spaces after \ on a multi-line define should give a better error
+message than just 'syntax error'.
