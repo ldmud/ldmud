@@ -1,0 +1,956 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+
+
+
+<html>
+
+<head>
+
+<link rev=made href="mailto:icecube$ihug.co.nz">
+
+<title>Mud Client Compression Protocol - sample code</title>
+
+</head>
+
+
+
+<body>
+
+<h1 align="center">mccp - sample code</h1>
+
+
+
+<p>These code fragments come from
+
+   <a href="http://www.abandoned.org">Abandoned Reality</a>. They will only
+
+   really be useful as a guideline for implementing compression in another
+
+   mud server.
+
+
+
+<p>AR is written in C++ - so expect C++ syntax.
+
+
+
+<p><hr>
+
+
+
+<h2>Descriptor modifications</h2>
+
+
+
+<p>The Descriptor class represents a client connection. First, the easy bits
+
+   - class data definitions, destructor. Note that out_compress /
+
+   out_compress_buf are set to NULL on construction (not shown).
+
+
+
+<pre>
+
+#include &lt;zlib.h&gt;
+
+
+
+class Descriptor
+
+{
+
+    // ...
+
+
+
+    z_stream *out_compress;
+
+    unsigned char *out_compress_buf;
+
+};
+
+
+
+Descriptor::~Descriptor()
+
+{
+
+    // ...
+
+
+
+    if (out_compress_buf)
+
+        free_mem(out_compress_buf);
+
+
+
+    if (out_compress) {
+
+        deflateEnd(out_compress);
+
+        free_mem(out_compress);
+
+    }
+
+}
+
+</pre>
+
+
+
+<p><hr>
+
+
+
+<p>Now for the actual output code.
+
+
+
+<pre>
+
+/*
+
+ * Low level output function.
+
+ */
+
+bool Descriptor::processOutput (bool fPrompt)
+
+{
+
+    char *buf;
+
+
+
+    // ...
+
+
+
+    // At this point, 'buf' contains 'outtop' bytes of uncompressed data to
+
+    // write to the client.
+
+
+
+    /*
+
+     * OS-dependent output.
+
+     *
+
+     * Now behaves a bit more nicely  -Nemon
+
+     *
+
+     */
+
+    if (outtop)
+
+    {
+
+        int count= write (buf, outtop);
+
+        
+
+        if (!count)
+
+        {
+
+            outtop = 0;
+
+            last_errno = errno;
+
+            return false;
+
+        }
+
+        
+
+        if (count &lt; outtop)
+
+            memmove(outbuf, outbuf+count, outtop - count);
+
+        
+
+        outtop -= count;
+
+    }
+
+
+
+    // Maybe do some compressed output too
+
+    if (!processCompressed()) {
+
+        return false;
+
+    }
+
+    
+
+    return true;
+
+}
+
+
+
+// Since compression has another buffer effectively invisible to the
+
+// main system, this gets called whenever a compressed connection is
+
+// writable but has no "normal" pending output - to try to flush any
+
+// partial compression bits
+
+bool Descriptor::processCompressed(void)
+
+{
+
+    if (!out_compress)
+
+        return true;
+
+    
+
+    int iStart, nBlock, nWrite;
+
+
+
+    // Try to write out some data..
+
+    int len = out_compress->next_out - out_compress_buf;
+
+    if (len > 0) {
+
+        // we have some data to write
+
+
+
+        for (iStart = 0; iStart &lt; len; iStart += nWrite)
+
+        {
+
+            nBlock = UMIN (len - iStart, 4096);
+
+            if ((nWrite = ::write (descriptor, out_compress_buf + iStart, nBlock)) &lt; 0)
+
+            {
+
+                if (errno == EAGAIN ||
+
+                    errno == ENOSR)
+
+                    break;
+
+
+
+                last_errno = errno;
+
+                return false; // write error
+
+            }
+
+
+
+            if (!nWrite)
+
+                break;
+
+
+
+            stats.reboot.bytes_out += nWrite;
+
+            stats.ever.bytes_out += nWrite;
+
+
+
+            stats.reboot.comp_out += nWrite;
+
+            stats.ever.comp_out += nWrite;
+
+        }
+
+
+
+        if (iStart) {
+
+            // We wrote "iStart" bytes
+
+            if (iStart &lt; len)
+
+                memmove(out_compress_buf, out_compress_buf+iStart, len - iStart);
+
+
+
+            out_compress->next_out = out_compress_buf + len - iStart;
+
+        }
+
+    }
+
+
+
+    return true;
+
+}
+
+
+
+/*
+
+ * Lowest level output function.
+
+ * Write a block of text to the file descriptor.
+
+ * If this gives errors on very long blocks (like 'ofind all'),
+
+ *   try lowering the max block size.
+
+ *
+
+ * Now behaves more nicely  -Nemon
+
+ */
+
+int Descriptor::write (const char *txt, int length)
+
+{
+
+    int     iStart;
+
+    int     nWrite;
+
+    int     nBlock;
+
+    
+
+    if (length &lt;= 0)
+
+        length = strlen(txt);
+
+
+
+    // Check for output compression
+
+
+
+    if (out_compress) {
+
+        out_compress->next_in = (unsigned char *)txt;
+
+        out_compress->avail_in = length;
+
+
+
+        while (out_compress->avail_in) {
+
+            out_compress->avail_out = COMPRESS_BUF_SIZE - (out_compress->next_out - out_compress_buf);
+
+            
+
+            if (out_compress->avail_out) {
+
+                int status = deflate(out_compress, Z_SYNC_FLUSH);
+
+
+
+                if (status != Z_OK) {
+
+                    // Boom
+
+                    return 0;
+
+                }
+
+            }
+
+
+
+            // Try to write out some data..
+
+            int len = out_compress->next_out - out_compress_buf;
+
+            if (len > 0) {
+
+                // we have some data to write
+
+
+
+                for (iStart = 0; iStart &lt; len; iStart += nWrite)
+
+                {
+
+                    nBlock = UMIN (len - iStart, 4096);
+
+                    if ((nWrite = ::write (descriptor, out_compress_buf + iStart, nBlock)) &lt; 0)
+
+                    {
+
+                        if (errno == EAGAIN ||
+
+                            errno == ENOSR)
+
+                            break;
+
+
+
+                        return 0; // write error
+
+                    }
+
+
+
+                    if (!nWrite)
+
+                        break;
+
+
+
+                    stats.reboot.bytes_out += nWrite;
+
+                    stats.ever.bytes_out += nWrite;
+
+
+
+                    stats.reboot.comp_out += nWrite;
+
+                    stats.ever.comp_out += nWrite;
+
+                }
+
+
+
+                if (!iStart)
+
+                    break; // Can't write any more
+
+                    
+
+                // We wrote "iStart" bytes
+
+                if (iStart &lt; len)
+
+                    memmove(out_compress_buf, out_compress_buf+iStart, len - iStart);
+
+
+
+                out_compress->next_out = out_compress_buf + len - iStart;
+
+            }
+
+
+
+            // Loop
+
+        }
+
+
+
+        // Done.
+
+        stats.reboot.uncomp_out += length - out_compress->avail_in;
+
+        stats.ever.uncomp_out += length - out_compress->avail_in;
+
+        return length - out_compress->avail_in;
+
+    }
+
+
+
+    for (iStart = 0; iStart &lt; length; iStart += nWrite)
+
+    {
+
+        nBlock = UMIN (length - iStart, 4096);
+
+        if ((nWrite = ::write (descriptor, txt + iStart, nBlock)) &lt; 0)
+
+        {
+
+            if (errno == EAGAIN ||
+
+                errno == ENOSR)
+
+                return iStart;
+
+            
+
+            return 0;
+
+        }
+
+        
+
+        if (!nWrite)
+
+            return iStart;
+
+
+
+        if (connected != CON_INTERCOM) {
+
+            stats.reboot.bytes_out += nWrite;
+
+            stats.ever.bytes_out += nWrite;
+
+        }
+
+    }
+
+    
+
+    return iStart;
+
+}
+
+</pre>
+
+
+
+<p><hr>
+
+
+
+<p>Next, methods to start and end compression, and a user command to force
+
+   the change.
+
+
+
+<pre>
+
+// zlib alloc/free stuff
+
+
+
+void *zlib_alloc(void *opaque, unsigned int items, unsigned int size)
+
+{
+
+    return alloc_mem(items * size);
+
+}
+
+
+
+void zlib_free(void *opaque, void *address)
+
+{
+
+    free_mem(address);
+
+}
+
+
+
+void do_compress(Character *ch, const char *argument, Character *vic)
+
+{
+
+    if (!ch->desc) {
+
+        ch->printf("What descriptor?!\n");
+
+        return;
+
+    }
+
+
+
+    if (!ch->desc->out_compress) {
+
+        if (!ch->desc->startCompression()) {
+
+            ch->printf("Failed.\n");
+
+            return;
+
+        }
+
+
+
+        ch->printf("Ok, compression enabled.\n");
+
+    } else {
+
+        if (!ch->desc->endCompression()) {
+
+            ch->printf("Failed.\n");
+
+            return;
+
+        }
+
+
+
+        ch->printf("Ok, compression disabled.\n");
+
+    }
+
+}
+
+    
+
+// Start compression
+
+bool Descriptor::startCompression(void)
+
+{
+
+    char enable[] = { IAC, SB, TELOPT_COMPRESS, WILL, SE, 0 };
+
+    
+
+    if (out_compress)
+
+        return true;
+
+
+
+    z_stream *s = (z_stream *)alloc_mem(sizeof(*s));
+
+    out_compress_buf = (unsigned char *)alloc_mem(COMPRESS_BUF_SIZE);
+
+    
+
+    s->next_in = NULL;
+
+    s->avail_in = 0;
+
+
+
+    s->next_out = out_compress_buf;
+
+    s->avail_out = COMPRESS_BUF_SIZE;
+
+
+
+    s->zalloc = zlib_alloc;
+
+    s->zfree  = zlib_free;
+
+    s->opaque = NULL;
+
+
+
+    if (deflateInit(s, 9) != Z_OK) {
+
+        free_mem(out_compress_buf);
+
+        free_mem(s);
+
+        return false;
+
+    }
+
+    
+
+    write(enable, 0);
+
+    out_compress = s;
+
+
+
+    flags.set(DESC_COMPRESS);
+
+
+
+    return true;
+
+}
+
+
+
+// .. and end it
+
+bool Descriptor::endCompression(void)
+
+{
+
+    unsigned char dummy[1];
+
+    
+
+    if (!out_compress)
+
+        return true;
+
+
+
+    out_compress->avail_in = 0;
+
+    out_compress->next_in = dummy;
+
+
+
+    // No terminating signature is needed - receiver will get Z_STREAM_END
+
+    
+
+    if (deflate(out_compress, Z_FINISH) != Z_STREAM_END)
+
+        return false;
+
+
+
+    if (!processCompressed()) // try to send any residual data
+
+        return false;
+
+
+
+    deflateEnd(out_compress);
+
+    free_mem(out_compress_buf);
+
+    free_mem(out_compress);
+
+    out_compress = NULL;
+
+    out_compress_buf = NULL;
+
+
+
+    flags.clear(DESC_COMPRESS);
+
+
+
+    return true;
+
+}
+
+</pre>
+
+
+
+<p><hr>
+
+
+
+<h2>Main loop modifications</h2>
+
+
+
+<p>Compression negotiation, and ensuring that compression output gets flushed,
+
+   is done in the main i/o loop. AR's i/o loop is complex, to say the least,
+
+   so this is greatly simplified.
+
+
+
+<pre>
+
+// On connection, we send to the client:
+
+
+
+  d->printf("%c%c%c", IAC, WILL, TELOPT_EOR);       // EOR for prompts
+
+  d->printf("%c%c%c", IAC, WILL, TELOPT_COMPRESS);  // Offer to compress
+
+
+
+// We handle negotiation here..
+
+
+
+/*
+
+ * Transfer one line from input buffer to input line.
+
+ */
+
+void    read_from_buffer (Descriptor * d)
+
+{
+
+    int     i;
+
+
+
+    // ...
+
+
+
+    /*
+
+     * Look for at least one new line.
+
+     */
+
+    for (i = 0; d->inbuf[i] &amp;&amp; d->inbuf[i] != '\n' &amp;&amp; d->inbuf[i] != '\r'; i++)
+
+    {
+
+        /* Not the best way. oh well */
+
+        if (d->inbuf[i] == (signed char)IAC &amp;&amp;
+
+            i &lt; MAX_INPUT_LENGTH-3 &amp;&amp;
+
+            (d->inbuf[i+1] == (signed char)DO ||
+
+             d->inbuf[i+1] == (signed char)DONT)) {
+
+            
+
+            if (d->inbuf[i+1] == (signed char)DO) {
+
+                if (d->inbuf[i+2] == (signed char)TELOPT_EOR) {
+
+                    /* wants EOR */
+
+                    d->flags.set(DESC_EOR);
+
+                } else if (d->inbuf[i+2] == (signed char)TELOPT_COMPRESS) {
+
+                    /* wants compression. fire it up */
+
+                    d->flags.set(DESC_COMPRESS);
+
+                    d->startCompression();
+
+                }
+
+            }
+
+            
+
+            memmove(&amp;d->inbuf[i], &amp;d->inbuf[i+3], d->intop - &amp;d->inbuf[i+3]);
+
+            d->intop -= 3;
+
+            *d->intop = 0;
+
+            i--;
+
+            continue;
+
+        }
+
+    }
+
+
+
+    // ...
+
+
+
+}
+
+
+
+// Within the main loop, we select() on our client connections to check for
+
+// output.
+
+
+
+    /* I don't know how much good this will do, but heck */			
+
+    if (!FD_ISSET(d->descriptor, &amp;out_set))
+
+            sysdata.delayed_writes++;
+
+
+
+    if ((d->fcommand || d->outtop > 0 ||
+
+         (ch &amp;&amp; ch->hasConfig(CFG_UPDATE) &amp;&amp;
+
+          !process_all_pulse &amp;&amp; d->connected == CON_PLAYING &amp;&amp;
+
+          !d->editPtr()))
+
+        &amp;&amp; FD_ISSET (d->descriptor, &amp;out_set))
+
+    {
+
+        if (!d->processOutput (TRUE))
+
+        {
+
+            char buf [MSL];
+
+            if (d->character &amp;&amp; d->connected >= 0)
+
+                save_char_obj (d->character);
+
+            d->outtop = 0;
+
+#if defined(unix)
+
+            sprintf (buf, "Write error: %s", strerror(last_errno));
+
+#else
+
+            sprintf (buf, "Write error");
+
+#endif
+
+            d->close(buf);
+
+        }
+
+    }
+
+    // Check for compressed stuff
+
+    if (FD_ISSET (d->descriptor, &amp;out_set) &amp;&amp;
+
+        !d->processCompressed())
+
+    {
+
+        char buf [MSL];
+
+        if (d->character &amp;&amp; d->connected >= 0)
+
+            save_char_obj (d->character);
+
+        d->outtop = 0;
+
+        sprintf (buf, "Write error: %s", strerror(last_errno));
+
+        d->close(buf);
+
+    }
+
+</pre>
+
+
+
+<hr>
+
+
+
+<p><a href="http://validator.w3.org">
+
+   <img border=0 src="http://validator.w3.org/images/vh32.gif"
+
+    alt="Valid HTML 3.2!" height=31 width=88 align=left></a>
+
+
+
+<p align="right"><a href="http://vancouver-webpages.com/CacheNow/">
+
+<img src="../cache_now.gif" alt="Cache Now!" width=100 height=31></a>
+
+
+
+<p align="center">
+
+  <a href="mailto:icecube$ihug.co.nz">[Mail me]</a>  
+
+  <a href="index.html">[Up]</a>
+
+
+
+</body>
+
+</html>
+

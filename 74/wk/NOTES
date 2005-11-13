@@ -1,0 +1,70 @@
+ - NOn-shared strings should be refcounted in order to implement
+   copy-on-write. At the moment, the strings are copied with every
+   assignment of svalue :-( See MudOS.
+
+ - A temporary malloc (scratchpad) to reduce fragementation and
+   number of free()s. See MudOS.
+   
+ - It is tempting to put flags into bitfields (like the flags describing
+   lfuns), but that has two disadvantages:
+     + Depending on the compiler, the code can be really bad. Some compiler
+       are smart enough to use AND and OR, others shift like mad.
+     + Flagwords with variant fields can't be implemented reliably.
+       Imagine a structure like this:
+         struct flags { union {
+           struct var1 { int common_flags : 2; int special_flags : 3; } v1;
+           struct var2 { int common_flags : 2; int offset : 3; } v2;
+         }}
+       While the idea is that common_flags determine which variant this
+       flagword is, the standard does not guarantee that the two common_flags
+       fields are put into the same bits of the whole structure.
+       And as this is the only way to get variant packed bitfields without
+       any unwanted alignment, the whole idea dies at this point.
+   
+   Hmm, if the flags are defined as unsigned char, the generated code is good.
+   We just have to add a runtime test to see if the layout is ok.
+   Test the following on PPC:
+
+struct {
+  unsigned char flag1 : 1;
+  unsigned char flag2 : 1;
+} flags;
+      
+void foo (void) {
+  extern int i;
+
+  if (flags.flag2)
+    i = 1;
+}
+
+   x86-gcc produces:
+
+	.file	"xxx.c"
+/ GNU C version egcs-2.90.27 980315 (egcs-1.0.2 release) (i386-cygwin32) compiled by GNU C version egcs-2.90.27 980315 (egcs-1.0.2 release).
+/ options passed: 
+/ options enabled:  -fpeephole -ffunction-cse -fkeep-static-consts
+/ -fpcc-struct-return -fsjlj-exceptions -fcommon -fverbose-asm -fgnu-linker
+/ -fargument-alias -m80387 -mhard-float -mno-soft-float -mieee-fp
+/ -mfp-ret-in-387 -mschedule-prologue -mstack-arg-probe -mcpu=i386
+/ -march=pentium
+
+gcc2_compiled.:
+___gnu_compiled_c:
+.text
+	.align 4
+.globl _foo
+_foo:
+	pushl %ebp
+	movl %esp,%ebp
+	movb _flags,%al
+	andb $2,%al
+	testb %al,%al
+	je L2
+	movl $1,_i
+L2:
+L1:
+	leave
+	ret
+.comm _flags,4
+
+

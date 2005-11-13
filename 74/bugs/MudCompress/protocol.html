@@ -1,0 +1,152 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+
+
+
+<html>
+
+<head>
+
+<link rev=made href="mailto:icecube$ihug.co.nz">
+
+<title>Mud Client Compression Protocol - Specificotian</title>
+
+</head>
+
+
+
+<body>
+
+<h1 align="center">The Mud Client Compression Protocol - Specification</h1>
+
+
+
+<p>The protocol used by mcclient is based on 'telnet' option negotiation. See
+
+RFCs <a href="http://www.freesoft.org/CIE/RFC/854/index.htm">854</a> and
+
+<a href="http://www.freesoft.org/CIE/RFC/855/index.htm">855</a> for an
+
+overview of the mechanism used.
+
+
+
+<p>Compression is currently unidirectional - only output from the mud server
+
+is compressed. This simplifies the implementation, and also avoids potential
+
+problems with hostile clients sending data intended to cause problems (via
+
+crashing or excessive memory/cpu use) with the decompressor. The compressor
+
+is entirely controlled by the server. While attacks on the client are
+
+potentially possible, this seems less of a problem as the client is not a
+
+shared resource.
+
+
+
+<p>To indicate it supports compression, the server sends an
+
+<code><em>IAC WILL COMPRESS</em></code> sequence. The
+
+<code><em>COMPRESS</em></code> option (unofficial and completely arbitary) is
+
+option 85.
+
+
+
+<p>The client, if it wishes to enable compression, responds with
+
+<code><em>IAC DO COMPRESS</em></code>.
+
+
+
+<p>The server, once <code><em>IAC DO COMPRESS</em></code> is received, may then
+
+turn on compression. Since the start point of the compression stream needs to
+
+be known, the server prefixes the start of the stream with a suboption
+
+negotiation packet - <code><em>IAC SB COMPRESS WILL SE</em></code>.
+
+Immediately following this, a zlib stream (as defined in
+
+<a href="http://www.freesoft.org/CIE/RFC/Orig/rfc1950.txt">RFC 1950</a> - see
+
+also the <a href="http://www.cdrom.com/pub/infozip/zlib/">zlib home page</a>)
+
+begins.
+
+
+
+<p>Compression can only be terminated by the server - a normal end to the
+
+compression stream is assumed to mean "revert to uncompressed mode". It may
+
+be desirable for the server to automatically terminate compression when
+
+an <code><em>IAC DONT COMPRESS</em></code> sequence is received from the
+
+client.
+
+
+
+<p>Any decompression errors are unrecoverable, and should result in a
+
+disconnection. Given that TCP is a reliable transport mechanism, bug-free
+
+implementations should never encounter compression errors, so this should
+
+not affect normal operation. When an error _is_ encountered, something has
+
+gone badly wrong, and it seems hard to recover. Allowing raw (uncompressed)
+
+telnet negotiation to reset compression is one possibility, but requires
+
+escaping of all compressed data sent.
+
+
+
+<p>Feel free to contact me with any questions about the protocol.
+
+
+
+<p><address>Oliver Jowett
+
+   &lt;<a href="mailto:icecube$ihug.co.nz">icecube$ihug.co.nz</a>&gt;,
+
+   98/12/03.</address>
+
+
+
+<hr>
+
+
+
+<p><a href="http://validator.w3.org">
+
+   <img border=0 src="http://validator.w3.org/images/vh32.gif"
+
+    alt="Valid HTML 3.2!" height=31 width=88 align=left></a>
+
+
+
+<p align="right"><a href="http://vancouver-webpages.com/CacheNow/">
+
+<img src="../cache_now.gif" alt="Cache Now!" width=100 height=31></a>
+
+
+
+<p align="center">
+
+  <a href="mailto:icecube$ihug.co.nz">[Mail me]</a>  
+
+  <a href="index.html">[Up]</a>
+
+
+
+</body>
+
+</html>
+

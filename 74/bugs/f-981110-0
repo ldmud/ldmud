@@ -1,0 +1,17 @@
+Short: static master functions aren't called.
+Date: 981110
+Type: Bug
+State: Unclassified
+Author: Lars
+Long:
+
+Subject: inaugurate_master()
+From: Lars Duning <lduning@mdisystems.com>
+Reply-To: <lars@cableinet.co.uk>
+Date: Tue, 10 Nov 1998 15:43:57 +0000
+Organization: PeopleDoc Inc.
+X-Mailer: Mozilla 4.04 [en] (Win95; I)
+
+If inaugurate_master() is static, it is not called on a manual update.
+Shouldn't the mode be irrelevant for master calls?
+
