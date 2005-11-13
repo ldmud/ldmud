@@ -1,0 +1,7 @@
+mixed *
+m_values(mapping map)
+
+Return an array with the values of mapping 'map'.
+
+See also:
+    mappingp, mkmapping, m_indices, m_delete, m_sizeof
