@@ -1,0 +1,152 @@
+diff -u -r --ignore-space-change driver/func_spec driver.140/func_spec
+--- driver/func_spec	Mon Nov  2 22:49:18 1998
++++ driver.140/func_spec	Sat Feb  6 22:42:16 1999
+@@ -181,6 +181,7 @@
+ mixed *filter_array(mixed *, string|closure|mapping, ...);
+ int find_call_out(string|closure);
+ object find_object(string);
++mixed *object_info(object);
+ string function_exists(string, object default: F_THIS_OBJECT);
+ string implode(string *, string);
+ int input_to(string, void|int, ...);
+@@ -220,6 +221,7 @@
+ string set_bit(string, int);
+ int set_heart_beat(int);
+ int set_light(int);
++void set_next_reset(int);
+ void set_this_object(object);
+ int sizeof(mixed *|mapping);
+ mixed *slice_array F_RANGE (mixed *,int,int);
+@@ -433,6 +435,7 @@
+ int attach_erq_demon(object|string, int default: F_CONST0);
+ int send_erq(int, int*|string, closure default: F_CONST0);
+ #endif
++int absolute_hb_count();
+ #ifdef UDP_SEND
+ int send_imp(string, int, string|int*);
+ #endif
+diff -u -r --ignore-space-change driver/interpret.c driver.140/interpret.c
+--- driver/interpret.c	Mon Nov  2 22:49:18 1998
++++ driver.140/interpret.c	Sat Feb  6 22:58:16 1999
+@@ -3403,6 +3405,10 @@
+     CASE(F_POP_VALUE);
+ 	pop_stack();
+ 	break;
++    CASE(F_SET_NEXT_RESET);
++        TYPE_TEST1(sp, T_NUMBER)
++        set_next_reset(sp->u.number);
++        break;
+     CASE(F_DUP);
+ 	sp++;
+ 	assign_svalue_no_free(sp, sp-1);
+@@ -7888,6 +7894,70 @@
+ 	pc++;
+ 	break;
+     }
++#ifdef F_OBJECT_INFO
++    CASE(F_OBJECT_INFO);
++    {
++	struct vector *oi;
++	struct svalue *v;
++	int flags, i;
++	struct object *ob, *prev, *obj2;
++	char xtmp[1024];
++
++	TYPE_TEST1(sp,T_OBJECT);
++	ob=sp->u.ob;
++	oi = allocate_array(20);
++	v = oi->item;
++	flags=ob->flags;
++
++	v[ 0].u.number = (flags & O_HEART_BEAT ? 1 : 0);
++	v[ 1].u.number = (flags & O_IS_WIZARD ? 1 : 0);
++	v[ 2].u.number = (flags & O_ENABLE_COMMANDS ? 1 : 0);
++	v[ 3].u.number = (flags & O_CLONE ? 1 : 0);
++	v[ 4].u.number = (flags & O_DESTRUCTED ? 1 : 0);
++	v[ 5].u.number = (flags & O_SWAPPED ? 1 : 0);
++	v[ 6].u.number = (flags & O_ONCE_INTERACTIVE ? 1 : 0);
++	v[ 7].u.number = (flags & O_APPROVED ? 1 : 0);
++	v[ 8].u.number = (flags & O_RESET_STATE ? 1 : 0);
++	v[ 9].u.number = (flags & O_WILL_CLEAN_UP ? 1 : 0);
++	v[10].u.number = ob->total_light;
++	v[11].u.number = ob->next_reset;
++	v[12].u.number = ob->time_of_ref;
++	v[13].u.number = ob->ref;
++	v[14].u.number = (int)ob->_my_cost;
++	v[15].u.number = O_SWAP_NUM(ob);
++
++	v[16].type = T_STRING;
++	v[16].x.string_type = STRING_MALLOC;
++	v[16].u.string = string_copy(ob->name);
++	
++	v[17].type = T_STRING;
++	v[17].x.string_type = STRING_MALLOC;
++	for (obj2=ob->next_all; obj2 && obj2->flags & O_DESTRUCTED;)
++	    obj2=obj2->next_all;
++	sprintf(xtmp,"%s",obj2->next_all?obj2->name:"NULL");
++	v[17].u.string = string_copy(xtmp);
++	
++	v[18].type = T_STRING;
++	v[18].x.string_type = STRING_MALLOC;
++	sprintf(xtmp,"NULL");
++	for (prev=0,obj2=obj_list,i=0;obj2;obj2=obj2->next_all) {
++	    if ( !(obj2->flags & O_DESTRUCTED) )
++		prev = obj2, i++;
++	    if (obj2->next_all == ob) {
++		if (prev) 
++		    sprintf(xtmp,"%s",prev->name);
++		else 
++		    i=-1;
++		break;
++	    }
++	}
++	v[18].u.string = string_copy(xtmp);
++	v[19].u.number = i;
++	
++	push_referenced_vector(oi);
++	break;
++    }
++#endif /* F_OBJECT_INFO */
+ #ifdef F_RUSAGE
+     CASE(F_RUSAGE);
+     {
+@@ -12049,6 +12124,14 @@
+     return sp;
+ }
+ 
++struct svalue *f_absolute_hb_count(sp)
++   struct svalue *sp;
++{   
++    sp++;
++    put_number(absolute_hb_num);
++    return sp;
++}
++
+ struct svalue *f_set_modify_command(sp)
+     struct svalue *sp;
+ {
+diff -u -r --ignore-space-change driver/simulate.c driver.140/simulate.c
+--- driver/simulate.c	Mon Nov  2 22:49:18 1998
++++ driver.140/simulate.c	Sat Feb  6 22:44:46 1999
+@@ -4383,4 +4385,21 @@
+ 	}
+     }
+     return sp;
++}
++
++void set_next_reset(num)
++    int num;
++{
++    extern int current_time;
++
++    if (current_object->flags & O_DESTRUCTED) return;
++    if (num>=0) {
++        int oldnum;
++
++        oldnum=num;
++        num+=current_time;
++        if (num<oldnum) num=MAXINT;
++    }
++    else num=MAXINT;
++    current_object->next_reset = num;
+ }
