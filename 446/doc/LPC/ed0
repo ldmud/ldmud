@@ -1,0 +1,39 @@
+NAME
+        ed0
+
+DESCRIPTION
+        When in 'ed', the prompt is ':'.
+
+        Ed has two modes, command mode and insert mode. The insert
+        mode has no prompt. You exit the insert mode by typing a
+        single '.' on a line.
+
+        All commands have the following syntax:
+
+        X,Ycmd
+
+        or
+
+        Xcmd
+
+        For example:
+
+        1,10p
+        Will print line 1 to 10.
+        1,5d
+        Will delete line 1 to 5.
+        8p
+        Will print line 8.
+        A '.' is the "current line". The current line is the last line
+        referenced. If you want to print last line + 10 more:
+        .,.+10p
+
+NOTE
+        These manpages seem a bit antique, though still correct. For a
+        better detailed help, invoke ed and use the ``h'' command.
+        Also you could look into the man page for ed(1) on you nearest
+        Unix box. And for a bit of fun you can try the good old
+        quiz(6), invoke as ``quiz function ed-command''.
+
+SEE ALSO
+        ed1(LPC), ed(E)
