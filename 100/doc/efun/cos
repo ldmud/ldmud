@@ -1,0 +1,5 @@
+SYNOPSIS
+	float cos(float)
+
+DESCRIPTION
+	Returns the cosinus of the argument.

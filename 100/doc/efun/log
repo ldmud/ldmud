@@ -1,0 +1,5 @@
+SYNOPSIS
+	float log(float arg)
+
+DESCRIPTION
+	Returns the natural logarithm of its argument.

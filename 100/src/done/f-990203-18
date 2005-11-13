@@ -1,0 +1,10 @@
+Short: notify_fail() returns int
+From: Matthew Julius <julius.2@wright.edu>
+Date: Fri, 08 Jan 1999 16:29:08 -0500
+Type: Feature
+State: Done - implemented in 3.2-dev.59
+
+int notify_fail(closure|string)
+  Returns 0 by default.
+  If I ever see return notify_fail(msg), 0; again it will be too soon.
+

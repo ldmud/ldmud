@@ -1,0 +1,9 @@
+SYNOPSIS
+	void set_extra_wizinfo_size(int)
+
+DESCRIPTION
+	Indicate that the wizlist should contain an array of this size
+	with extra info foreach wizard. Causes a privilege violation.
+
+SEE ALSO
+	get_extra_wizinfo(E), set_extra_wizinfo(E), wizlist_info(E)

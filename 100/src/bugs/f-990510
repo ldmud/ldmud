@@ -1,0 +1,16 @@
+Short: Namespace correction
+Date: Tue, 4 May 1999 09:08:15 +0200 (MET DST)
+From: Fini <ujastrow@mail.desy.de>
+Type: Feature
+State: Unclassified
+
+Hmm, mir ist grade aufgefallen, dass es in Lpc anscheinend nicht getrennte
+Namensraeume fuer Variablen und Funktionen gibt? Also es ist nicht
+moeglich etwas der Art
+  string name;  name=ob->name();
+zu machen. Ist das einfach zu beheben?
+
+Fini
+
+Note: This could be done because ->name() was actually the short form of
+->"foo"(). But better check if that is still the case.
