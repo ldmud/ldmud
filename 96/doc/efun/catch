@@ -1,0 +1,22 @@
+SYNOPSIS
+	mixed catch(string expr)
+
+DESCRIPTION
+	Evaluate expr. If there is no error, 0 is returned. If there
+	is an error, a string (with a leading '*') will be
+	returned. The functions throw(value) and raise_error(value)
+	can also be used to immediately return any value, except 0.
+	The catch() is somewhat costly, and should not be used
+	anywhere. Rather, use it at places where an error would
+	destroy consistency.
+
+	Catch is not really an efun, but a compiler directive.
+
+EXAMPLE
+	object obj;
+	string err;
+	if (err = catch(obj = clone_object("/foo/bar/baz")))
+	   write("Cannot clone object, reason:"+err"+\n");
+
+SEE ALSO
+	throw(E), raise_error(E)

@@ -1,0 +1,172 @@
+NAME
+    driver/invocation
+
+PURPOSE
+    Description of the invocation of the gamedriver, especially of the command
+    arguments. This document describes the commandline version of the driver
+    only; non-commandline versions are platform specific and described in
+    the related documentation.
+
+DESCRIPTION
+    The driver is invoked from the commandline as other normal programs. Neither
+    the current directory nor the directory the executable is in need to be
+    in any special relation the directory of the mudlib. Once the driver
+    is running, it emits two streams of outputs:
+
+      - driver-related messages on stderr; this unfortunately includes
+        LPC compiler diagnostics
+      - LPC runtime-related messages in the logfile <mudlib>/<host>.parse.log
+        (the name can be changed).
+
+    It is possible to start the driver without any commandline arguments as
+    suitable defaults are specified at compile time. The invocation syntax
+    is:
+
+        driver [options] [<portnumber>]...
+
+    <portnumber> the number of the port the driver shall use to accept
+    connections. The maximum number of ports is determined by MAXNUMPORTS
+    in the source file config.h.
+
+    The options modify the behaviour of the gamedriver. Some of them are only
+    available if a certain compile-time option was enabled (typically in
+    the source file config.h). The following options are recognized:
+
+      -P|--inherit <fd-number>
+        Inherit filedescriptor <fd-number> from the parent process
+        as socket to listen for connections.
+        Only available if compiled with MAXNUMPORTS.
+
+      -u|--udp <portnumber>
+        Specify the <portnumber> for the UDP port, overriding the compiled-in
+        default.
+        Only available if compiled with CATCH_UDP_PORT.
+
+      -D|--define <macro>[=<text>]
+        Add <macro> (optionally to be expanded to <text>) to the list of
+        predefined macros known by the LPC compiler.
+
+      -E|--eval-cost <ticks>
+        Set the number of <ticks> available for one evaluation thread.
+
+      -M|--master <filename>
+        Use <filename> for the master object.
+
+      -m|--mudlib <pathname>
+        Use <pathname> as the top directory of the mudlib.
+
+      --debug-file <filename>
+        Log all debug output in <filename> instead of <mudlib>/<host>.debug.log .
+
+      -d|--debug
+        Generate debug output; repeat the argument for even more output:
+          >= 1: log resets, clean ups, swaps, reception of urgend data,
+                   telnet negotiation states.
+                check_a_lot_of_refcounts() on startup when swapping of
+                   variables is disabled.
+          >= 2: log all add_message()s, name lookup failures, new players.
+          >= 3: progress of garbage collection
+          >= 4: even more junk from garbage collection
+
+      -c|--list-compiles
+        List the name of every compiled file on stderr.
+
+      -e|--no-preload
+        Pass a non-zero argument (the number of occurences of this option)
+        to master->preload(), which usually inhibits all preloads of castles
+        and other objects.
+
+      -N|--no-erq
+        Don't start the erq demon (if it would be started at all).
+
+      -t|--no-heart
+        Disable heartbeats and call_outs.
+
+      -f|--funcall <word>
+        The lfun master->flag() is called with <word> as argument before the
+        gamedriver accepts netword connections.
+
+      -s <time>  | --swap-time <time>
+      -s v<time> | --swap-variables <time>
+        Time in seconds before an object (or its variables) are swapped out.
+        A time less or equal 0 disables swapping.
+        Only available if compiled with TIME_TO_SWAP > 0.
+
+      -s f<name> | --swap-file <name>
+        Swap into file <name> instead of <mudlib>/LP_SWAP.<host> .
+        Only available if compiled with TIME_TO_SWAP > 0.
+
+      -s c       | --swap-compact
+        Reuse free space in the swap file immediately.
+        Giving this option results in smaller, but also more fragmented
+        swapfiles, and the swap performance may degrade.
+
+
+      --max-malloc <size>
+        Restrict total memory allocations to <size> bytes.
+        Only available if compiled with MAX_MALLOCED.
+
+      --max-small-malloc <size>
+        Restrict total small block allocations to <size> bytes.
+        Only available if compiled with MAX_MALLOCED.
+
+      -r u<size> | --reserve-user <size>
+      -r m<size> | --reserve-master <size>
+      -r s<size> | --reserve-system <size>
+        Reserve <size> amount of memory for user/master/system allocations to
+        be held until main memory runs out.
+
+      --gcollect-outfd <filename>|<num>
+        Garbage collector output (like a log of all reclaimed memory blocks)
+        is sent to <filename> (or inherited fd <num>) instead of stderr.
+        Only available if compiled with MALLOC_smalloc.
+
+      --y|--yydebug
+        Enable debugging of the LPC compiler.
+        Only available if compiled with YYDEBUG.
+
+      --check-refcounts
+        Every backend cycle, all refcounts in the system are checked.
+        SLOW! Only available if compiled with DEBUG.
+
+      --gobble-descriptors <num>
+        <num> (more) filedescriptors are used up. You'll know when you need it.
+        Only available if compiled with DEBUG.
+
+      -V|--version
+        Print the version of the driver and exit.
+
+      --options
+        Print the version and compilation options of the driver and exit.
+
+      -h|-?|--help
+        Display a command help and exit.
+
+      --longhelp
+        Display a long command help and exit.
+
+
+DESCRIPTION -- Argument Parser
+    The parser analyses the commandline arguments given with the driver
+    invocation and distinguishes 'options', which start with a '-', from
+    proper arguments. Options are further distinguished by their name and
+    may take an additional value. In general, options and arguments can be
+    givein in any order.
+
+    Options are recognized in two forms. In the short form the option must
+    be given as a single '-' followed by a single letter. In the long form,
+    options start with '--' followed by a string of arbitrary length. The
+    short options are case sensitive, the long options aren't.
+    Most options can be specified in both the short and long form, but that
+    is not mandatory. Examples: '-r' and '--recursive'.
+
+    If an option takes a value, it must follow the option immediately after
+    a separating space or '='. Additionally, the value for a short option
+    may follow the option without separator. Examples are: '-fMakefile',
+    '-f Makefile', '--file=Makefile' and '--file Makefile'.
+
+    Short options may be collated into one argument, e.g. '-rtl', but
+    of these only the last may take a value.
+
+    The option '--' marks the end of options. All following command arguments
+    are considered proper arguments even if they start with a '-' or '--'.
