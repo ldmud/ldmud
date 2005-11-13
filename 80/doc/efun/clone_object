@@ -1,0 +1,35 @@
+SYNOPSIS
+	object clone_object(string name)
+	object clone_object(object template)
+
+DESCRIPTION
+	Clone a new object from definition <name>, or alternatively from
+	the object <template>. In both cases, the new object is given
+	an unique name and returned.
+	
+	The original, called blueprint, used for cloning, should not be
+	used in the system, only be used for cloning. The cloned objects
+	contain only the data but the blueprint also the function code.
+	The blueprint is the one without a unique number at the end of
+	the object's name. The clone_object() function never
+	returns a blue print.
+	
+	Note that the pathname must be complete, which means there are no
+	relative paths allowed.
+
+EXAMPLE
+	// Clone a torch (filename in non-compat format)
+	object torch;
+	torch = clone_object("/obj/torch");
+
+	// Clone two keys (filename in compat format)
+	object key1, key2;
+	key1 = clone_object(load_object("obj/key"));
+	key2 = clone_object(key1);
+
+HISTORY
+	Modified in LDMud 3.2.6 to take an object as argument.
+
+SEE ALSO
+	clonep(E), destruct(E), load_name(E), load_object(E), move_object(E),
+        uids(C), program_name(E)

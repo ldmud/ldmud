@@ -1,0 +1,8 @@
+Subject: Neue efun csprintf()
+From: Lars Duning <lduning@peopledoc.com>
+Date: Tue, 09 Mar 1999 18:30:40 +0000
+Type: Feature
+State: Acknowledged.
+
+Merge terminal_colour() into sprintf(), creating a new efun
+  csprintf(mapping cntl, string format, mixed args...)

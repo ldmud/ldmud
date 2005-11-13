@@ -1,0 +1,223 @@
+     -=[ Ms-dos LPmud 3.2.1@xx Driver ]=-
+
+Using John Olson's msdos47.zip source package, I was able to
+hack a port for the amylaar3.2@286 driver.  I have been
+waiting for someone else to do it, but it appeared that noone
+was willing to do it.  I wanted the Amylaar driver as stable
+platform for my mudlib (Heaven7) to run on ms-dos, so creator's
+could develop home.  It is not pretty as I am not a wizard at C.
+There is a compiled version of a compat-mode amylaar driver in
+the file, HVN7_DOS.ZIP.  If you want another configuration you
+will have to compile it yourself (It is compiled with
+COMPAT_MODE and INITIALIZATION_BY___INIT).
+
+I compiled it with DJ Delories port (DJGPP) of GCC 2.5.7 with
+maintenances to 5, BYACC19.zip, and NDMAKE45.zip - I still
+can't get the GNU MAKE to work.  These are all available on
+any simtel-20 archive site.  The home ftp site for simtel-20
+is 'oak.oakland.edu'.  For those in Australia try
+'archie.oz.au', /micros/pc.
+
+
+          Zilanthius
+          Ray Gilbert
+          Email: c8435802@wombat.newcastle.edu.au
+
+I merged the changed in the general 3.2.1 distribution, but
+changed them again to make it fit better in the rest of the code,
+and left out some parts I deemed unnecessary.
+I couldn't test it. If it doesn't work as is, plaese point it out
+to me what is not working.
+
+	Joern Rennecke
+	Email: amylaar@mail.cs.tu-berlin.de
+
+
+
+Based on  John Olson's Readme 
+______________________________________________________________
+README of LPmud for MS-DOS         4-NOV-1991, 20-JULY-1994, 1-Aug-1994
+==========================
+
+Overview
+--------
+
+Amylaar3.2@286 for MS-DOS is a version of LPmud which has been
+modified to run on 386/486-based MS-DOS machines. It has been
+compiled with DJ Delorie's excellent port of GNU C++. Sessions
+on up to ten virtual consoles and both "standard" serial lines
+are supported.
+
+
+Restrictions
+------------
+
+File names have to obey MS-DOS naming conventions.
+
+Text files which contain CRs aren't processed correctly. CRLFs
+are okay. 
+
+Old style object files which contain the character RS (30dec) aren't
+processed correctly. (This is to work around the CR bug.)
+
+Virtual consoles run synchronously to the game. This means
+that long computations (e.g. compilation of a larger object)
+will cause noticable delays in input processing.
+
+There is no network support, sorry.
+Look at Linux, NetBSD or FreeBSD if you want some.
+
+
+
+Documentation files
+-------------------
+
+  README       (this file) describes how to set up an LPmud on
+               MS-DOS using HVN7_DOS.ZIP
+
+  BUILDING     describes how to set up the source to compile LPmud 3.2.1@xx
+
+
+Requirements
+------------
+
+LPmud for MS-DOS *requires* a 386SX, 386DX, 486SX, 487SX or
+486 CPU. Anything less than a 386 won't do - don't bother
+trying.
+
+Memory shouldn't be critical because LPmud can page to disk
+(and the game driver implements swapping of unused objects as
+well), but performance will drop considerably if LPmud has to
+page excessively.
+
+You should have about 5-10 MB of free disk space for LPmud
+binaries and support files, at least 1 MB for page/swap files
+(more if your MUDLIB is large) and as much space as you need
+for your MUDLIB.
+
+
+Installation
+------------
+
+CONFIG.SYS and AUTOEXEC.BAT should be stripped down as much as
+possible. Especially memory managers, RAM disks, disk caches,
+FPU emulators and other programs which use special 386/486
+features should be avoided. (QEMM and VDISK should work, but
+this hasn't been tested.) It's a good idea to main- tain two
+sets of config/autoexec files: one with all your TSRs for
+normal operation and one which gives the 'raw' machine to
+LPmud.
+
+The only programs that really should go into AUTOEXEC.BAT are
+DOS' file sharing support SHARE.EXE, the serial communication
+drivers (see below) and possibly keyboard and disk drivers.
+
+(The emulator isn't necessary if a co-processor is available
+but this hasn't been tested.)
+
+LPmud files should go to the following directories (on C:): 
+ \LPMUD        LINES, AM32_SRC.ZIP (Source Patches)
+ \LPMUD\BIN    AMYLAAR.EXE, EMU387, COMDRV.COM, MUD.BAT
+ \LPMUD\DOC    all documentation files
+ \LPMUD\MUDLIB Heaven7 Mudlib
+
+Add the directory C:\lpmud\bin to your path in autoexec.bat.
+
+To unpack the binary distribution, just create a directory
+\LPMUD, CD to it, get PKUNZIP and type,
+     PKUNZIP -d HVN7_DOS \lpmud
+
+Create a directory C:\TMP. The page file of the virtual memory
+system will go there.
+
+If you plan to support connections over serial lines, you have
+to load a communications driver for each port. The following
+command loads a driver for COM2 with local line editing (79
+characters buffer) enabled: 
+    \LPMUD\BIN\COMDRV -C2 -E79
+
+In addition to that, \LPMUD\LINES has to be edited to reflect
+the configuration, e.g.:
+
+    # line bps carrier
+    1     2400 y
+    2    38400 n
+
+\LPMUD\LINES has to be present and the environment variable
+SERIAL has to point to it even if no serial lines support is
+desired. Lines can be commented out by prefixing them with a
+'#'.
+
+
+MUDLIB
+------
+
+The heaven7 mudlib comes with the package, it uses MS-DOS naming
+conventions for 95% of lib. The file xnames is a script for
+unix to convert the msdos names to unix.
+
+  - the following names aren't valid base names for
+directories and files:     AUX COM1 COM2 COM3 COM4 CON LPT1
+LPT2 LPT3 LPT4 NUL PRN   - names must not contain more than
+one dot (e.g. monster.shout.c)   - names must not start with a
+dot (e.g. .foorc)
+
+While those restrictions rarely affect directory names and
+files which are created by the MUDLIB, they usually cause
+problems with a large number of the files which constitute the
+MUDLIB. Their names and all references to them have to be
+changed to transform a UNIX MUDLIB to an MS-DOS MUDLIB. 
+
+Files which contain CRs without LFs aren't read correctly. To
+work around the most common occurence of isolated CRs, NLs in
+objects save files were dumped as RS' (0x1e) in previous ports.
+This old format can still be read.
+Unfortunately, this breaks old style object save files
+copied from a unix system which contain RS characters.
+
+You need to have a least one wizard character in order to be
+able to shoot the game down smoothly once you're brought it
+up. Because encrypted passwords are different between LPmuds
+on MS-DOS and UNIX, you have to edit a player file (e.g.
+\lpmud\mudlib\usr\creators\admin.o) manually and delete the
+password line.
+
+It is highly recommended that you change the password
+immediately after bringing up the game if you plan to allow
+outside access to the game ! 
+
+
+Running LPmud
+-------------
+
+BEFORE you start LPmud, make sure 
+        - you've loaded SHARE.EXE, if you want to allow logins from 
+        the serial lines - the communication driver(s) 
+        - have \lpmud\bin in your autoexec.bat path. 
+        - edit mud.bat if your default drive is not c:\
+
+To run type 'mud' to run mud.bat
+
+After a few seconds, LPmud will begin to pre-compile a few
+objects and a virtual console will pop up. Hit [Enter] to
+connect to the game driver. (It takes a few seconds until
+LPmud shows the login prompt.)
+
+The following keys are interpreted by the console driver:
+
+     F1 ... F10   switch to the respective console
+     Alt-H        ("hangup") disconnects the currently active     
+         
+                  console
+     Alt-S        suspends LPmud and spawns a DOS shell.          
+          
+                  EXIT returns to LPmud.
+
+The game is shut down with the  'shutdown'  command which can
+be issued by any wizard.
+
+The  people  command shows the connection type in the "IP
+address": 
+    0.0.0.100 to 0.0.0.109  are virtual consoles
+    0.0.0.110 to 0.0.0.113  are COM1 ... COM4
+

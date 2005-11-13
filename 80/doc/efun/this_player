@@ -1,0 +1,20 @@
+SYNOPSIS
+	object this_player(void)
+
+DESCRIPTION
+	Return the current command giver.  This can be an interactive
+	user or a living object like a npc.
+	
+	If called from inside the heart_beat() of a not living object
+	0 will be returned.
+
+	this_player() does not any more take an argument, use
+	this_interactive() instead of this_player(1).
+
+EXAMPLE
+	if (this_player() != this_interactive())
+	   write("Hey, somebody must have forced us to do a
+	   command!\n");
+
+SEE ALSO
+	this_object(E), previous_object(E), interactive(E), living(E)
