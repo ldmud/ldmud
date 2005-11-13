@@ -1,0 +1,21 @@
+SYNOPSIS
+        int remove_call_out(string fun)
+        int remove_call_out(closure fun)
+
+DESCRIPTION
+        Remove next pending call-out for function fun in this object.
+        The time left is returned.
+        
+        -1 is returned if there were no call-outs pending to this
+        function.
+
+EXAMPLE
+        To remove every pending call-out to MyTimer() :
+
+        while (remove_call_out("MyTimer") != -1) /* continue */ ;
+
+HISTORY
+        Removing a call_out to a closure was introduced in 3.2.1@45.
+
+SEE ALSO
+        call_out(E), call_out_info(E), find_call_out(E)
