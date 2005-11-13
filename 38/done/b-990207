@@ -1,0 +1,68 @@
+Short: crash in call_out() on efun closure
+From: Logic <logic@logic.net>
+Date: Sat, 6 Feb 1999 23:46:05 -0600 (CST)
+Type: Bug
+State: Fixed
+See also: p-990203-1 and b-990211
+
+Good evening,
+
+Found a reproducable crash in 3.2.5 (and also tested and reproduced with
+3.2.1@141). First, the gdb traceback:
+
+Program received signal SIGSEGV, Segmentation fault.
+0x8085949 in dump_trace (how=0) at interpret.c:10707
+10707               } else if (p[0].funstart < prog->program ||
+(gdb) where
+#0  0x8085949 in dump_trace (how=0) at interpret.c:10707
+#1  0x808fd5a in error (fmt=0xbfffde24 "%.200s") at simulate.c:3291
+#2  0x80840fe in eval_instruction (first_instruction=0x819788f "\005\003\037",
+    sp=0x80edcd4) at interpret.c:9864
+#3  0x8084ba3 in apply_low (fun=0x828e57e "log", ob=0x8198500, num_arg=1)
+    at interpret.c:10198
+#4  0x8074899 in eval_instruction (
+    first_instruction=0xbfffe3a4 "l\003\006al", sp=0x80edcc4)
+    at interpret.c:5961
+#5  0x808a022 in call_lambda (lsvp=0x82a9d10, num_arg=3) at interpret.c:12888
+#6  0x80b3e8e in call_out () at call_out.c:620
+#7  0x8095b7e in call_heart_beat () at backend.c:795
+#8  0x809550f in backend () at backend.c:492
+#9  0x80634dc in main (argc=1, argv=0xbffffcd4) at main.c:313
+#10 0x8049dbe in ___crt_dummy__ ()
+
+The problem is with this chunk of code in master.c:
+
+void log_error( string file, string err )
+{
+    object who;
+
+    call_out( #'call_other, 1, find_object( LOG_D ), "log",
+      sprintf( "log_error(): compile-time error in `%s': %s", file,
+      err[ 0..<2 ] ) );
+    who = this_interactive();
+    if( !who ) return;
+    catch( who->receive_message( MSG_ERROR, err[ 0..<2 ], ({ ERR_COMPILE,
+      file }) ) );
+}
+
+The problem lies with the call_out() (since the interactive message does
+arrive prior to the crash). Originally, I was calling LOG_D->log(...)
+directly, but I discovered that it was failing when the logging object
+wasn't loaded (since the compiler was busy with the failing code).
+
+Hence, I tried the call_out() (since I wanted to retain the functionality
+of a central logging object, and don't mind logs being delayed a second),
+thinking that this would ensure the compiler was freed up to load it if
+necessary. This resulted in the above crash, regardless of whether the
+logging object is loaded.
+
+If anyone needs additional information about this, I'll be more than happy
+to provide it.
+
+-- 
+  _ ____ ____________________________________________________________________
+ / /___/\__                                                                  \
+/  \   \ \/\  logic@logic.net                                                 \
+\   \   \  /  http://www.logic.net/~logic/                                    /
+ \___\___\/__________________________________________________________________/
+
