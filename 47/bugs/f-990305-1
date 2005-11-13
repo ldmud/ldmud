@@ -1,0 +1,7 @@
+Short: clone_object() should accept objects
+From: Lars
+Date: 990305
+Type: Feature
+State: Acknowledged
+
+clone_object(<object>) == clone_object(<load_name of object>)

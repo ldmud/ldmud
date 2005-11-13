@@ -1,0 +1,23 @@
+Short: sizeof(mapping) after destructing of key objects
+From: Holger Kremss <jur94ewp@studserv.uni-leipzig.de>
+Date: Wed, 17 Feb 1999 18:33:30 +0100 (MEZ)
+Type: Bug
+State: Fixed
+
+Bug originally found by Elric and Fiona in Wunderland.
+
+If you use objects as keys in a mapping and destruct these, an immediately
+following sizeof() will still count them to the size.
+
+foo() {
+  mapping x;
+  object a, b;
+  a=clone_object("obj/fackel");
+  b=clone_object("obj/fackel");
+  x=([ a : "blabla" , b : "blublu" ]);
+  destruct(a);
+  destruct(b);
+  return ({x, sizeof(x)});
+}
+Evaluation time: 10 ms.
+Result: ({([]),2})

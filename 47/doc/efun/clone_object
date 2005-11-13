@@ -1,0 +1,23 @@
+SYNOPSIS
+	object clone_object(string name)
+
+DESCRIPTION
+	Clone a new object from definition name, and give it a new unique
+	name. Return the new object.
+	
+	The original, called blue print, used for cloning, should not be
+	used in the system, only be used for cloning. The cloned objects
+	contain only the data but the blue print also the function code.
+	The blue print is the one without a unique number at the end of
+	the object's file_name(). The clone_object() function never
+	returns a blue print.
+	
+	Note that the pathname must be complete, which means there are no
+	relative paths allowed.
+
+EXAMPLE
+	object torch;
+	torch = clone_object("/obj/torch");
+
+SEE ALSO
+	clonep(E), destruct(E), move_object(E), uids(C)
