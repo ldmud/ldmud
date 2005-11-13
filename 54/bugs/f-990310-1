@@ -1,0 +1,11 @@
+Short: Handling of 0-dimension mappings
+From: Lars
+Date: 990310
+Type: Feature
+State: Acknowledged
+
+There must be an easy way to add/remove keys from
+0-dimension mappings. With that, order_alist() is no
+longer necessary for lookup-the-key stuff.
+
+Oh, and allocate_mapping() should be m_allocate().
