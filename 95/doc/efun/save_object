@@ -1,0 +1,11 @@
+SYNOPSIS
+	void save_object(string name)
+
+DESCRIPTION
+	Save values of variables of this object in the file name.
+	
+	Variables that have the type modifer 'static' will not be
+	saved.
+
+SEE ALSO
+	restore_object(E)

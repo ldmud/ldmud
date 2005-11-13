@@ -1,0 +1,63 @@
+Short: Add. args to load_object(), clone_object(), allocate()
+From: Alfe
+Date: Wed, 16 Dec 1998 21:11:51 +0100 (MET)
+Type: Feature
+State: Acknowledged
+
+ah, another thing: i'd like an optional second argument to allocate(),
+which should be the value to initially fill the array with.  e.g.:
+allocate(5,3.1) ==> ({ 3.1, 3.1, 3.1, 3.1, 3.1 }).
+
+varargs mixed *allocate(int i,mixed m) {
+  return (m?
+          map_array(efun::allocate(i),lambda(0,({ #'return,m }))) :
+          allocate(i));
+}
+
+Implement something similar for clone_object() and (new) load_object(),
+with the additional args passed to create().
+
+Date: Fri, 8 Jan 1999 01:45:54 -0500 (EST)
+From: ak853@cleveland.Freenet.Edu (Eric Blade)
+
+Reply to message from doomdark@cc.hut.fi of Fri, 18 Dec
+>
+>  of functional 'ob = new("/std/object", arg1, arg2, arg3, ...)'
+>  implementation MudOS has. In any case, this was necessary to be able to
+>  efficiently and somewhat cleanly to implement persisten objects, ie.
+>  object's state can be dumped and later on given as the argument to
+>  clone_object().
+
+Matthew Julius also writes:
+
+> > mixed *allocate(int, closure|mixed)
+> >   Same as allocate() but with additional argument to initialize values
+> >   in the array.  If the argument is a closure it is funcall()'d with the
+> >   index of the value and the returned value is inserted into the array
+> >   at that position.  Otherwise, all values are initialized to the second
+> >   argument.
+>
+> yes, nice.
+
+Yeah, your last note about this convinced me.  It can be simulated but at
+the cost of being very difficult to have symbols, quoted arrays, and unquoted
+arrays.  For example,
+
+#include <lpctypes.h>
+varargs mixed *allocate(int i, mixed m) {
+  if (m) {
+    int type;
+    type = get_type_info(m, 0);
+    if (type == T_POINTER || type == T_SYMBOL || type == T_QUOTED_ARRAY)
+     return map_array(efun::allocate(i), lambda(0, quote(m)));
+    return map_array(efun::allocate(i), lambda(0, m));
+  }
+  return efun::allocate(i);
+}
+
+I'm still undecided on allocate(int, closure|mixed) or allocate(int, mixed).
+If the second argument had the use I specified then you could not initialize
+an array with a closure value.  Probably better not to have this double
+meaning.  The usefulness of applying the closure to the index did seem useful
+at the time though...
+

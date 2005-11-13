@@ -1,0 +1,8 @@
+Short: set_auto_include_string()
+From: Lars Duning <lduning@peopledoc.com>
+Date: Mon, 15 Mar 1999 12:20:15 +0000
+Type: Feature
+State: Unclassified
+
+set_auto_include_string() should also accept a closure
+Maybe make it a hook anyway?

@@ -1,0 +1,8 @@
+SYNOPSIS
+	int objectp(mixed arg)
+
+DESCRIPTION
+	Return 1 if arg is an object.
+
+SEE ALSO
+	intp(E), stringp(E), pointerp(E)
