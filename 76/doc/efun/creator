@@ -1,0 +1,14 @@
+SYNOPSIS
+	string creator(object ob)
+
+DESCRIPTION
+	This functions is not available in native mode, which uses
+	user-ids instead.
+	Returns the creator (i.e. the name of the wizard or domain) of
+	the object. Default for ob is this_object().
+
+HISTORY
+	Since 3.2.1@47, this efun is an alias for getuid().
+
+SEE ALSO
+	getuid(E), native(C), uids(C)

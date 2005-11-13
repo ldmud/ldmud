@@ -1,0 +1,8 @@
+Short: debug_info() doesn't print position in object list
+From: Lars
+Date: 990305
+Type: Bug
+State: Acknowledged
+
+When doing a debug_info(0, ob), the last line(s) regarding the position
+in the object list are wrong or missing.

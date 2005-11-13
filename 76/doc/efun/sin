@@ -1,0 +1,5 @@
+SYNOPSIS
+	float sin(float)
+
+DESCRIPTION
+	Returns the sinus of the argument.
