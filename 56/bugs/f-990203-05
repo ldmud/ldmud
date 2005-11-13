@@ -1,0 +1,8 @@
+Short: Scope of variables
+Date: 990203
+From: Lars
+Type: Feature
+State: Unclassified
+
+The scope of variables should respect the block limits
+set by {...}.
