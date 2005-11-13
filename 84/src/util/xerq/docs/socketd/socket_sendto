@@ -1,0 +1,8 @@
+SYNOPSIS
+	int socket_sendto(int fd, string host, int port, int*|string mesg)
+
+DESCRIPTION
+	Sends a datagram to the remote host.
+
+SEE ALSO
+	sockets, socket_udp(), socket_close()

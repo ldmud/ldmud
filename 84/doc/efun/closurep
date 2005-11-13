@@ -1,0 +1,11 @@
+SYNOPSIS
+	int closurep(mixed)
+
+DESCRIPTION
+	Returns 1 if the argument is a closure.
+
+HISTORY
+	Introduced in 3.2@70
+
+SEE ALSO
+	intp(E)

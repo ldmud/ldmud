@@ -1,0 +1,13 @@
+NAME
+	efun
+
+DESCRIPTION
+	This directory contains descriptions for the efuns of
+	Amylaar's version of the LPC parser.
+
+	These are functions that are supplied by the parser and can be
+	called by any LPC object (somewhat similar to system calls in the
+	C library).
+
+SEE ALSO
+	efuns(LPC), applied(A), master(M), lpc(LPC), concepts(C), driver(D)

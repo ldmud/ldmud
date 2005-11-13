@@ -1,0 +1,12 @@
+Short: Ed changes
+From: MudOS via Matthew Julius <julius.2@wright.edu>
+Date: Fri, 08 Jan 1999 16:29:08 -0500
+Type: Feature
+State: Unclassified
+
+Straight from the MudOS CHANGELOG,
+        . ed ranges can now extend past the end of the file; any line #
+          larger than the last one refers to the last line
+	  . hitting return to get the next line at the end of a file
+	    now prints 'End of file.' and not 'Bad line range.'
+
