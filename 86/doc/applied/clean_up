@@ -1,0 +1,38 @@
+SYNOPSIS
+	int clean_up(int refcount)
+
+DESCRIPTION
+	clean_up() is applied by the parser when an object hasn't been
+	used for a long time, to give it a possibility to
+	self-destruct. The refcount passed as argument will be 0 for
+	clone objects, 1 for a simple loaded object, and greater when
+	the object is cloned or inherited by some existing object.  It
+	is recommended not to self_destruct the object when the
+	reference count is greater than one.
+	By convention, a refcount < 0 is used if some other object
+	asks the called object to clean_up.
+
+	If clean_up returns 0, it will not be called again in that
+	object until it is swapped out and in again.
+
+	Returning a non-zero value is only recommended when the reason
+	why the object can't self-destruct is likely to vanish without
+	the object being touched, that is, when no local function is
+	called in it, (and in compat mode also when the object is not
+	being moved around).
+
+	A typical mud configuration defines the time to wait for
+	clean_up() so long that you can assert reset() has been
+	called since the object has been touched last time.
+
+EXAMPLES
+	A clone of /std/drink defines clean_up() to self-destruct if
+	it is empty, not carried a living being and not touched for
+	a long time.
+
+	A room that inherits /std/room defines clean_up() to
+	self-destruct if it is neither inherited nor used as a
+	blueprint, is empty and was not entered for a long time.
+
+SEE ALSO
+	reset(A), heart_beat(A), call_out(A), destruct(E), remove(A)

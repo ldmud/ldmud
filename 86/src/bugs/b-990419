@@ -1,0 +1,15 @@
+From:    Fiona@Wunderland
+Short: der [] operator
+Date:    Fri Apr  9 14:41:25 1999
+Type: Bug
+State: Unclassified
+
+Hi Mateese!
+Also laut Manpage soll der [] Operator auch sowas annehmen wie [..x].
+Allerdings geht seit ich denken kann nur [x..] und [x..y].
+Cheasy@AnderLand meint '[..x] geht nicht in allen drivern.'
+
+In der Manpage
+In der Manpage zu 325 stehts drin, geht aber nicht (bei uns). Kannst du
+dazu was sagen?
+ 

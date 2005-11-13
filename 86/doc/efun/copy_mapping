@@ -1,0 +1,10 @@
+SYNOPSIS
+	mapping copy_mapping(mapping)
+
+DESCRIPTION
+	This efun is needed to create copies of mappings instead of
+	just passing a reference, like adding/subtraction from a
+	mapping do.
+
+SEE ALSO
+	mappings(LPC)
