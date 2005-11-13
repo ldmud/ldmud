@@ -1,0 +1,16 @@
+Command: people
+
+List fact of all players:
+
+What internet number they call from.
+The current name.
+The level of the player.
+The age of the player (m=minutes, h=hours, D=days).
+Idle flag 'I' if the player has been idle for more than 5 minutes.
+Where they are.
+
+There is also shown the number of active players, number of commandes per
+second executed (averaged over the last 15 minutes) and number of
+lines compiled per second (averaged of the last 15 minutes).
+
+See also: w/wizlist

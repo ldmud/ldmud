@@ -1,0 +1,95 @@
+Short: struct{} datatype
+Date: Mon, 14 Dec 1998 11:33:40 +0100
+Type: Feature
+State: Unclassified
+
+> 2. We lack a struct/class-ish data type. This is a big win in MudOS.
+>    Essentially, a fixed-size type-checked array, with the ability to
+>    recursively reference itself, ie:
+>
+>    struct foo { int datum; struct foo next; };
+
+MudOS implements it using arrays, letting the compiler translate
+the member names into the indices.
+Question: Are these copied by ref or by value? MudOS copies by ref.
+
+-------------------------------------------------------------
+
+Date sent:      	Fri, 2 Jun 2000 15:50:08 -0700 (PDT)
+From:           	David Gibby <oop_apprentice@yahoo.com>
+Subject:        	Structs Enums and stuff
+To:             	lars@bearnip.com
+
+Okay, I heard a rumor speaking of you doing up a class
+data-type after some bug fixing, and I was wondering,
+if this is true, maybe you could name them 'struct',
+since they will probally consist only of variables?
+Oh, and because in MudOS you have to use the classic C
+style declaration:
+
+class <classname> <varname>;
+
+But, classes weren't in C, they were in C++, and in
+C++ you don't have to put 'class' or 'struct' in
+special typed variables, you could simply say:
+
+<classname> <varname>;
+
+So I think that 'struct' would be a more appropriate
+name for a structure like class filled with variables.
+Oh, and there's got to be some way for objects with
+the EXACT same class definition, eg:
+
+// [this.c]
+
+struct blah {
+    string name;
+    int    number;
+    int    other_number;
+};
+
+void create( void )
+{
+    struct blah temp;
+    temp.name = "hello";
+    temp.number = 3;
+
+    "/std/that.c"->SetMyBlah( temp );
+}
+
+
+// [that.c]
+
+struct blah {
+    string name;
+    int    number;
+    int    other_number;
+} aBlah;
+
+void SetMyBlah( struct blah val )
+{
+    aBlah = val;
+}
+
+
+To send a structure in its whole data through a call
+other. Yes, it would be messy, but it would be a nice
+feature to have.
+
+One final thing, in C/C++ you can initialize a
+structure by using { val1, val2 } following a '=', eg,
+
+struct MyStruct = { "Hello", 3, 27 };
+
+Maybe one should be able to pass a virtual instance of
+this structure by saying:
+
+"/std/that.c"->SetMyBlah( { "Hello", 3, 27 } );
+
+Then, the argument would be a constant struct which
+was compatible with the blah structure.
+
+--------------------------------------------------------------------------
+When doing structs, offer an 'embed' keyword for sub-structs and 
+arrays, to embed them in their full length. This would introduce 
+'fixed length' arrays.

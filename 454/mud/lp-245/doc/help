@@ -1,0 +1,20 @@
+COMMUNICATIONS:
+
+say <msg>, shout <msg>, tell <player> <msg>, converse
+
+INFO:
+
+score, help, who, i (inventory), email
+
+OTHER:
+
+password <old>, bug <msg>, typo <msg>, idea <msg>, save, quit, brief, wimpy,
+give <obj> to <obj>, get <obj> [from <obj>]
+
+ATTACKS:
+
+kill <name>, stop (hunting), <spell> <monster>
+
+OTHER TOPICS:
+
+spell feelings syntax levels

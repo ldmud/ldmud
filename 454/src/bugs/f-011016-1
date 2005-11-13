@@ -1,0 +1,10 @@
+Short: Make negative range assignments switchable
+Date: 2001-10-16
+From: Coogan, Lars
+Type: Feature
+State: New
+
+Assignments to negative ranges ([5..3]) can cause errors, but can also be
+used usefully. Ideally a special syntactic construct, and/or a #pragma (the
+latter for backwarts compatibility), could be used to let the programmer
+clearly state their intentions.
