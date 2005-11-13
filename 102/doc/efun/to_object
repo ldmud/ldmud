@@ -1,0 +1,15 @@
+SYNOPSIS
+        object to_object(string arg)
+        object to_object(closure arg)
+        object to_object(object arg)
+
+DESCRIPTION
+        The argument is converted into an object, if possible.
+        For strings, the object with a matching file_name() is
+        returned, or 0 if there is none, as find_object() does.
+        For (bound!) closures, the object holding the closure is
+        returned.
+        Objects and the number 0 return themselves.
+
+SEE ALSO
+        find_object(E), to_array(E), to_int(E), to_string(E)

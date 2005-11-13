@@ -1,0 +1,61 @@
+Short: New efun: previous_program()
+From: Daniel Sloan <sloand@alphalink.com.au>
+From: Michael <virus@mpinet.net>
+Date: Tue, 23 Mar 1999 15:29:14 +0000
+Type: Feature
+State: Unclassified
+
+Daniel writes:
+
+A 'previous_program' efun, parallel to previous_object().  Real handy for
+tracing certain things and working out where a call was *really* made from.
+I've not implemented this in the current driver I use, only an old 3.1.2
+driver =-)
+
+Michael writes:
+
+After looking through a DGD driver source code, there is something
+similar to the previous_object() function, but called
+previous_program(). I don't have that much knowledge of the DGD driver,
+but from what I found, this previous_program() could be used as a good
+base for making a better security system for alot of mudlibs.
+
+Excerpt from kfun/std.c under the DGD src directory:
+
+/*
+ * NAME:        kfun->previous_program()
+ * DESCRIPTION: return the previous program in the function call chain
+ */
+int kf_previous_program(nargs)
+int nargs;
+{
+    char *prog;
+    register string *str;
+
+    if (nargs == 0) {
+        (--sp)->type = T_INT;
+        sp->u.number = 0;
+    } else if (sp->u.number < 0) {
+        return 1;
+    }
+
+    prog = i_prev_program((int) sp->u.number);
+    if (prog != (char *) NULL) {
+        sp->type = T_STRING;
+        str = str_new((char *) NULL, strlen(prog) + 1L);
+        str->text[0] = '/';
+        strcpy(str->text + 1, prog);
+        str_ref(sp->u.string = str);
+    } else {
+        sp->u.number = 0;
+    }
+    return 0;
+}
+
+Think something like this would be viable for the LD project/driver?
+I found the DGD driver from ftp.imaginary.com server if you wish to
+follow up on it more.
+
+-- Michael
+
+

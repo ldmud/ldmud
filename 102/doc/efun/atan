@@ -1,0 +1,5 @@
+SYNOPSIS
+	float atan(float)
+
+DESCRIPTION
+	Returns the argument's arcus tangent.

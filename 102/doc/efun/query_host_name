@@ -1,0 +1,12 @@
+SYNOPSIS
+	string query_host_name(void)
+
+DESCRIPTION
+	Return the name of the machine the mud is running on.
+
+HISTORY
+	Since, 3.2.1@8, query_host_name() is superseeded by the
+	pre#defined Macro __HOST_NAME__, and not an efun anymore.
+
+SEE ALSO
+	query_mud_port(E), predefined(D)

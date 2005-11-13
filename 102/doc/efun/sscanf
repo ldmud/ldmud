@@ -1,0 +1,54 @@
+SYNOPSIS
+        int sscanf(string str, string fmt, mixed var1, mixed var2, ...)
+
+DESCRIPTION
+
+        Parse a string str using the format fmt. fmt can contain
+        strings seperated by %d and %s. Every %d and %s corresponds to
+        one of var1, var2, ... .
+
+        The match operators in the format string have one of these
+        formats:
+          %[!|~][<size>[.<minmatch>]]<type>	
+
+        <type> may be:
+           d: matches any number.
+           D: matches any number.
+           U: matches any unsigned number.
+           s: matches any string.
+           %: matches the % character.
+           t: matches whitespace (spaces and tab characters), but does
+              not store them (the simple ' ' matches just spaces and
+              can't be given a size specification).
+
+        <size> is the expected field size, <minmatch> the demanded
+        minimal match length (defaults are 0 for strings and 1 for
+        numbers). Each of these both may be specified numerically, or
+        as '*' - then the value of the variable at the current place
+        in the argument list is used.
+        Specifying ! will perform the match, but neither store the
+        result nor count the match.
+        Specifying ~ will perform and count the match, but not store
+        the result.
+
+        The difference between %d and %D/%U is that the latter will abort
+        an immediately preceeding %s as soon as possible, whereas the
+        former will attempt to make largest match to %s first.
+        %D/%U will still not skip whitespace, use %.0t%D to skip optional
+        whitespace.
+
+        The number of matched arguments will be returned.
+        
+        The function sscanf is special, in that arguments are passed
+        by reference automatically.
+
+EXAMPLE
+        string who, what;
+        if (sscanf("throw frisbee to rover",
+           "throw %s to %s", what, who) != 2)
+           write("Usage: throw <what> to <who>\n");
+        else
+           write("You throw a "+what+" to "+who+" to get his attention.\n");
+
+SEE ALSO
+        extract(E), explode(E), regexp(E)

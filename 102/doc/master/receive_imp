@@ -1,0 +1,15 @@
+SYNOPSIS
+	void receive_imp(string host, string msg, int hostport)
+
+DESCRIPTION
+	Handle a received IMP message.
+
+	This function is called for every message received on the IMP
+	port. Usually it is passed on to some object that handles
+	inter mud communications.
+
+HISTORY
+	The 'hostport' argument was added in 3.2.1.
+
+SEE ALSO
+	send_imp(E), query_imp_port(E)
