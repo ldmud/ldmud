@@ -1,0 +1,28 @@
+SYNOPSIS
+    string clonep(object obj)
+
+DESCRIPTION
+    If <obj> is a clone, the name of the blueprint is returned. Otherwise
+    the result is 0.
+
+    The returned name is the filename of the blueprint at the time the <obj>
+    was cloned. If the blueprint changed its name in the meantime, which
+    is the case for all virtual objects for example, this filename may have
+    nothing in common with the blueprints object name.
+
+EXAMPLE
+    object o;
+    o = clone_object("/std/thing");
+    write(clonep(o));                   --> writes "/std/thing"
+    write(find_object("/std/thing"));   --> writes "0"
+
+    // Assume that all /p/virtual/*** objects are in fact
+    //   cloned from /p/master/***
+    o = clone_object("/p/virtual/foo");
+    write(clonep(o));                   --> writes "/p/master/foo"
+
+BUG
+    The handling of virtual object clones might be considered a bug.
+
+SEE ALSO
+    clone_object(E)

@@ -1,0 +1,17 @@
+#!/bin/sh
+#works with the original sh as well as with bash .
+#This script fixes all #include statements with doublequoted argument that
+#  end in a semicolon.
+#Replace the directory name 'mudlib' below if your name differs.
+#
+#This script has been developed using the SLS linux distribution.
+#
+#Note: Trailing whitespace is removed.
+#      The substitution is not anchored to the start of the line.
+#      Double quotes inside the #include filename will cause the substitution
+#        to fail, or maybe even remove a ; (and possibly whitespace) from the
+#        filename.
+#      Mixing /* with // comments will cause the substitution to fail.
+find mudlib -type f -name "*.[hc]" \! -name "*[^ 	'\"]*" -print |
+ xargs egrep -l "^#include[ 	]*\"[^\"]*\"[ 	]*;" |
+  xargs -n1 -i sh -c "(echo '1,\$s/\\(#include[ 	]*\"[^\"]*\"\\)[ 	]*;[ 	]*\$/\\1/';echo '1,\$s/\\(#include[ 	]*\"[^\"]*\"[ 	]*\\);\\([ 	]*\\/\\*.*\\*\\/\\)[ 	]*\$/\\1 \\2/';echo '1,\$s/\\(#include[ 	]*\"[^\"]*\"[ 	]*\\);\\([ 	]*\\/\\/.*\\)\$/\\1 \\2/';echo w;echo q) | ed {}"
