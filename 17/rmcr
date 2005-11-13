@@ -1,0 +1,4 @@
+for file in *; do
+  echo $file
+  (echo '1,$s/$//'; echo w; echo q) | ed $file
+done
