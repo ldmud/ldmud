@@ -1,0 +1,737 @@
+AC_INIT(prolang.y)
+AC_PROG_CC
+AC_COMPILE_CHECK(["gcc/assembler float/branch incompatibility, e.g. on AIX"],
+[int foo(), bar(), foobar();
+#define x1 foobar();
+#define x4 x1 x1 x1 x1
+#define x10 x4 x4 x4 x4
+#define x40 x10 x10 x10 x10
+#define x100 x40 x40 x40 x40
+#define x400 x100 x100 x100 x100
+#define x1000 x400 x400 x400 x400
+int long_branch(i)
+    int i;
+{
+    if (i > 1) {
+        x1000
+    } else foo();
+    return bar();
+}
+int foo(){ return 0; }
+int bar(){ return 0; }
+int foobar(){ return 0; }
+double d = 4.5;],
+[double e = 1.3; e/= 0.2;],,
+echo "falling back to cc"
+CC="cc"
+GCC=""
+)
+AC_PROG_INSTALL
+AC_CONFIG_HEADER(machine.h)
+dnl bison -y is incompatible in functionality & Copyright
+AC_PROGRAMS_CHECK(YACC, byacc, yacc)
+AC_PROG_CPP
+AC_HAVE_HEADERS(sys/rusage.h sys/time.h unistd.h stdlib.h libc.h memory.h)
+AC_HAVE_HEADERS(values.h string.h bstring.h netdb.h crypt.h sys/termios.h)
+AC_STDC_HEADERS
+AC_DIR_HEADER
+AC_COMPILE_CHECK(["sizeof(char *) == 4"],
+[int i = 8/(sizeof(char *) - 4);],,
+  AC_COMPILE_CHECK(["sizeof(char *) == 8"],
+  [int i = 8/(sizeof(char *) - 8);],,
+  ,AC_DEFINE(SIZEOF_P_INT, 8))
+,AC_DEFINE(SIZEOF_P_INT, 4))
+AC_COMPILE_CHECK(["sizeof(int) == 2"],
+[int i = 8/(sizeof(int) - 2);],
+, AC_DEFINE(SIZEOF_INT, 4) ,AC_DEFINE(SIZEOF_INT, 2))
+AC_COMPILE_CHECK(["sizeof(long) == 8"],
+[int i = 8/(sizeof(long) - 8);],
+, AC_DEFINE(SIZEOF_LONG, 4),AC_DEFINE(SIZEOF_LONG, 8))
+AC_COMPILE_CHECK(["needed malloc() alignment"],
+[struct ts {double d; char *p; double e;};
+int i = 96/(sizeof(struct ts)-20);
+],, AC_DEFINE(MALLOC_ALIGN, 8), AC_DEFINE(MALLOC_ALIGN, 4))
+AC_COMPILE_CHECK(["long long"],
+[long long i;],
+, AC_DEFINE(HAVE_LONG_LONG),)
+AC_INLINE
+AC_SIZE_T
+AC_PID_T
+AC_RETSIGTYPE
+AC_HAVE_LIBRARY(m)
+AC_HAVE_LIBRARY(socket)
+AC_HAVE_LIBRARY(ucb, LIBS="$LIBS -lc -lucb")
+AC_HAVE_LIBRARY(crypt, LIBS="$LIBS -lcrypt")
+case "$DEFS" in
+  *HAVE_LIBSOCKET* | *HAVE_LIBUCB*)
+      AC_HAVE_LIBRARY(nsl) ;;
+esac
+AC_ALLOCA
+AC_HAVE_FUNCS(fchmod getrusage bzero memset memcpy memmem strcspn crypt _crypt)
+AC_HAVE_FUNCS(strchr strrchr getcwd memmove sysconf gettimeofday wait3 waitpid)
+AC_HAVE_FUNCS(fcntl getdomainname)
+AC_TEST_PROGRAM([
+#include <sys/types.h> /* needed for netinet/in.h */
+#include <netinet/in.h>
+#include <arpa/inet.h>
+main() {
+    char addr1[] = "176.88.1.16";
+    char addr2[] = "88.176.128.2";
+    struct in_addr tmp;
+
+#if SIZEOF_INT == 4
+#define ADDR_TYPE unsigned int
+#else
+#define ADDR_TYPE unsigned long
+#endif
+    *((ADDR_TYPE *)&tmp) = inet_addr(addr1);
+    if (strcmp(addr1, inet_ntoa(tmp)))
+        exit(1);
+    *((ADDR_TYPE *)&tmp) = inet_addr(addr2);
+    if (strcmp(addr2, inet_ntoa(tmp)))
+        exit(1);
+    exit(0);
+}
+], AC_DEFINE(INET_NTOA_OK),,AC_COMPILE_CHECK("inet_ntoa()",[
+#if defined(sun) && !defined(__svr4__)
+#include <sys/types.h> /* needed for netinet/in.h */
+#include <netinet/in.h>
+#include <arpa/inet.h>
+char *inet_ntoa(ad)
+    struct in_addr ad;
+{
+    static char addr[20];
+    return addr;
+}
+#else
+use inet_ntoa() from the library.
+#endif
+],, AC_DEFINE(INET_NTOA_OK)))
+AC_TEST_PROGRAM([
+main() {
+    mkdir("conftestdirfrom", 0770);
+    exit(rename("conftestdirfrom", "conftestdirto"));
+}
+], AC_DEFINE(RENAME_HANDLES_DIRECTORIES) [(echo "rename ok")],
+, AC_DEFINE(RENAME_HANDLES_DIRECTORIES))
+case "$DEFS" in
+  *HAVE_GETRUSAGE*)
+AC_COMPILE_CHECK("full availability of struct rusage members", [
+#include <sys/types.h> /* BSDI 2.0.1 / 2.1 needs this for resource.h */
+#include <sys/time.h>
+#ifdef HAVE_SYS_RUSAGE_H
+#include <sys/rusage.h>
+#endif
+#include <sys/resource.h>
+#ifndef RUSAGE_SELF
+#define RUSAGE_SELF     0
+#endif
+],[
+    struct rusage rus;
+    long *v = (long *)main;
+    getrusage(RUSAGE_SELF, &rus);
+    *v++ = rus.ru_maxrss;
+    *v++ = rus.ru_ixrss;
+    *v++ = rus.ru_idrss;
+    *v++ = rus.ru_isrss;
+    *v++ = rus.ru_minflt;
+    *v++ = rus.ru_majflt;
+    *v++ = rus.ru_nswap;
+    *v++ = rus.ru_inblock;
+    *v++ = rus.ru_oublock;
+    *v++ = rus.ru_msgsnd;
+    *v++ = rus.ru_msgrcv;
+    *v++ = rus.ru_nsignals;
+    *v++ = rus.ru_nvcsw;
+    *v++ = rus.ru_nivcsw;
+],, AC_DEFINE(GETRUSAGE_RESTRICTED))
+AC_COMPILE_CHECK("struct rusage timeval members with tv_usec", [
+#include <sys/types.h> /* BSDI 2.0.1 / 2.1 needs this for resource.h */
+#include <sys/time.h>
+#ifdef HAVE_SYS_RUSAGE_H
+#include <sys/rusage.h>
+#endif
+#include <sys/resource.h>
+#ifndef RUSAGE_SELF
+#define RUSAGE_SELF     0
+#endif
+],[
+    struct rusage rus;
+    long *v = (long *)main;
+    getrusage(RUSAGE_SELF, &rus);
+    *v++ = rus.ru_utime.tv_sec * 1000 + rus.ru_utime.tv_usec / 1000;
+    *v++ = rus.ru_stime.tv_sec * 1000 + rus.ru_stime.tv_usec / 1000;
+], AC_DEFINE(RUSAGE_USEC),) ;;
+  *)
+AC_COMPILE_CHECK("getrusage() via syscall()", [
+#include <sys/types.h> /* BSDI 2.0.1 / 2.1 needs this for resource.h */
+#include <sys/syscall.h>
+#include <sys/resource.h>
+#ifndef RUSAGE_SELF
+#define RUSAGE_SELF     0
+#endif
+],[
+struct rusage rus;
+syscall(SYS_GETRUSAGE, RUSAGE_SELF, rus);
+], AC_DEFINE(GETRUSAGE_VIA_SYSCALL) AC_DEFINE(HAVE_GETRUSAGE)) ;;
+esac
+dnl I have seen malloc() being declared in <memory.h> on some machines.
+AC_COMPILE_CHECK("return type of free", [
+#ifdef HAVE_STDLIB_H
+#include <stdlib.h>
+#endif
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+#if !defined(STDC_HEADERS) && defined(HAVE_MEMORY_H)
+#include <memory.h>
+#endif
+void free();
+],, AC_DEFINE(FREE_RETURNS_VOID))
+AC_COMPILE_CHECK([void* or char* from malloc],[
+#include <sys/types.h>
+#ifdef HAVE_STDLIB_H
+#include <stdlib.h>
+#endif
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+#if !defined(STDC_HEADERS) && defined(HAVE_MEMORY_H)
+#include <memory.h>
+#endif
+#ifdef __STDC__
+#define PROT(x) x
+#else
+#define PROT(x) ()
+#endif
+#define POINTER void *
+POINTER malloc(size_t);
+#ifdef FREE_RETURNS_VOID
+void free PROT((POINTER));
+#else
+int free PROT((POINTER));
+#endif
+],,AC_DEFINE(POINTER, void *), AC_DEFINE(POINTER, char *))
+AC_COMPILE_CHECK([CHARBITS == 8 or undef],[
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
+#ifdef HAVE_VALUES_H
+#include <values.h>
+#endif
+int i[1/(CHARBITS-8)];
+],,AC_DEFINE(CHARBIT_MASK, CHARBITS), AC_DEFINE(CHARBIT_MASK, 0xff))
+AC_TEST_PROGRAM([
+#ifdef HAVE_STDLIB_H
+#include <stdlib.h>
+#endif
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+int main() {
+]changequote(,)]
+    if (strtol("1]", (char **)0, 10) != 1) exit(1);
+[changequote([,])[
+    exit(0);
+}
+],, AC_DEFINE(STRTOL_BROKEN))
+dnl the following three tests would better be nested, but it seems to overflow
+dnl internal buffers of m4
+AC_TEST_PROGRAM([
+#include <sys/types.h> /* needed for netinet/in.h */
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <errno.h>
+#include <sys/ioctl.h>
+#include <stdio.h>
+main() {
+    int port, tmp, s;
+    struct sockaddr_in my_sin;
+    struct hostent *hp;
+    char *host_name;
+
+    host_name = malloc(100);
+    if (gethostname(host_name, 100) == -1) exit(1);
+    hp = gethostbyname(host_name);
+    if (hp == 0) exit(1);
+    memset((char *)&my_sin, '\0', sizeof my_sin);
+    memcpy((char *)&my_sin.sin_addr, hp->h_addr, hp->h_length);
+    my_sin.sin_family = hp->h_addrtype;
+    my_sin.sin_addr.s_addr = INADDR_ANY;
+    alarm(10);
+    for (port = 2000; port < 10000; port++) {
+        my_sin.sin_port = htons((u_short)port);
+        s = socket(hp->h_addrtype, SOCK_STREAM, 0);
+        if (s == -1) exit(1);
+        tmp = 1;
+        if (setsockopt (s, SOL_SOCKET, SO_REUSEADDR,
+                        (char *) &tmp, sizeof (tmp)) < 0)
+            exit (1);
+        if (bind(s, (struct sockaddr *)&my_sin, sizeof my_sin) == -1) {
+            if (errno == EADDRINUSE) {
+                close(s);
+		continue;
+            } 
+            exit(1);
+        }
+	if (listen(s, 5) == -1) exit(1);
+	tmp = 1;
+	if (ioctl(s, FIONBIO, &tmp) == -1) exit(1);
+        tmp = sizeof my_sin;
+        s = accept(s, (struct sockaddr *)&my_sin, &tmp);
+	if (s == -1) {
+	    if (errno == EWOULDBLOCK ||
+		errno == EAGAIN)
+	    {
+		/* hpux has special problems with sockets from pipe() */
+		int sockets[2];
+		FILE *fp_read;
+
+		if(pipe(sockets) < 0)
+		    exit(1);
+		fp_read = fdopen(sockets[0], "r");
+		if (fp_read == NULL)
+		    exit(1);
+		if (ioctl(fileno(fp_read) , FIONBIO, &tmp) == -1)
+		    exit(1);
+		exit(0);
+	    }
+	    if (errno == EINTR) { close(s); continue; }
+	}
+	break;
+    }
+    exit(1);
+}
+], AC_DEFINE(USE_IOCTL_FIONBIO),,
+echo "You have to supply the correct way to set sockets non-blocking by hand.")
+AC_TEST_PROGRAM([
+#include <sys/types.h> /* needed for netinet/in.h */
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <errno.h>
+#include <fcntl.h>
+main() {
+    int port, tmp, s;
+    struct sockaddr_in my_sin;
+    struct hostent *hp;
+    char *host_name;
+
+    host_name = malloc(100);
+    if (gethostname(host_name, 100) == -1) exit(1);
+    hp = gethostbyname(host_name);
+    if (hp == 0) exit(1);
+    memset((char *)&my_sin, '\0', sizeof my_sin);
+    memcpy((char *)&my_sin.sin_addr, hp->h_addr, hp->h_length);
+    my_sin.sin_family = hp->h_addrtype;
+    my_sin.sin_addr.s_addr = INADDR_ANY;
+    alarm(10);
+    for (port = 2000; port < 10000; port++) {
+        my_sin.sin_port = htons((u_short)port);
+        s = socket(hp->h_addrtype, SOCK_STREAM, 0);
+        if (s == -1) exit(1);
+        tmp = 1;
+        if (setsockopt (s, SOL_SOCKET, SO_REUSEADDR,
+                        (char *) &tmp, sizeof (tmp)) < 0)
+            exit (1);
+        if (bind(s, (struct sockaddr *)&my_sin, sizeof my_sin) == -1) {
+            if (errno == EADDRINUSE) {
+                close(s);
+		continue;
+            } 
+            exit(1);
+        }
+	if (listen(s, 5) == -1) exit(1);
+	if (fcntl(s, F_SETFL, O_NDELAY) == -1) exit(1);
+        tmp = sizeof my_sin;
+        s = accept(s, (struct sockaddr *)&my_sin, &tmp);
+	if (s == -1) {
+	    if (errno == EWOULDBLOCK) exit(0);
+	    if (errno == EAGAIN) exit(0);
+	    if (errno == EINTR) { close(s); continue; }
+	}
+	break;
+    }
+    exit(1);
+}
+], AC_DEFINE(USE_FCNTL_O_NDELAY))
+AC_TEST_PROGRAM([
+#include <sys/types.h> /* needed for netinet/in.h */
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <errno.h>
+#include <fcntl.h>
+main() {
+    int port, tmp, s;
+    struct sockaddr_in my_sin;
+    struct hostent *hp;
+    char *host_name;
+
+    host_name = malloc(100);
+    if (gethostname(host_name, 100) == -1) exit(1);
+    hp = gethostbyname(host_name);
+    if (hp == 0) exit(1);
+    memset((char *)&my_sin, '\0', sizeof my_sin);
+    memcpy((char *)&my_sin.sin_addr, hp->h_addr, hp->h_length);
+    my_sin.sin_family = hp->h_addrtype;
+    my_sin.sin_addr.s_addr = INADDR_ANY;
+    alarm(10);
+    for (port = 2000; port < 10000; port++) {
+        my_sin.sin_port = htons((u_short)port);
+        s = socket(hp->h_addrtype, SOCK_STREAM, 0);
+        if (s == -1) exit(1);
+        tmp = 1;
+        if (setsockopt (s, SOL_SOCKET, SO_REUSEADDR,
+                        (char *) &tmp, sizeof (tmp)) < 0)
+            exit (1);
+        if (bind(s, (struct sockaddr *)&my_sin, sizeof my_sin) == -1) {
+            if (errno == EADDRINUSE) {
+                close(s);
+		continue;
+            } 
+            exit(1);
+        }
+	if (listen(s, 5) == -1) exit(1);
+	if (fcntl(s, F_SETFL, FNDELAY) == -1) exit(1);
+        tmp = sizeof my_sin;
+        s = accept(s, (struct sockaddr *)&my_sin, &tmp);
+	if (s == -1) {
+	    if (errno == EWOULDBLOCK) exit(0);
+	    if (errno == EAGAIN) exit(0);
+	    if (errno == EINTR) { close(s); continue; }
+	}
+	break;
+    }
+    exit(1);
+}
+], AC_DEFINE(USE_FCNTL_FNDELAY))
+AC_TEST_PROGRAM([
+main(){
+]changequote(,)
+    char str[99] = "hello world";
+changequote([,])[
+    bcopy(str, str+2, 12);
+    if(strcmp("hehello world", str))
+	exit(1);
+    bcopy(str+2, str, 11);
+    if(strcmp("hello worldld", str))
+	exit(1);
+    exit(0);
+}
+], AC_DEFINE(OVERLAPPING_BCOPY))
+dnl AC_COMPILE_CHECK([random],[long random();],[return random() % 7;]
+dnl , AC_DEFINE(RANDOM),
+dnl AC_COMPILE_CHECK([rand],[],[return rand() % 7;]
+dnl , AC_DEFINE(RAND),
+dnl AC_COMPILE_CHECK([drand48],[double drand48();],
+dnl [return (int)(drand48() * 7);], AC_DEFINE(DRAND48))))
+AC_COMPILE_CHECK([strtol prototype],[#ifdef HAVE_STDLIB_H
+#include <stdlib.h>
+#endif
+long strtol(str, ptr, base) char *str; char **ptr; int base; { return 0; }
+],,,AC_DEFINE(STRTOL_CONST_CHARP))
+tcomp='${CC-cc} ${CFLAGS} ${TESTFLAG} -o conftest conftest.c >${DEV_NULL} 2>&1'
+tcomp2='${CC-cc} ${CFLAGS} ${TESTFLAG} -o conftest conftest.c 2>&1'
+tcomp3='${CC-cc} ${CFLAGS} ${TESTFLAG} -c conftest.c >${DEV_NULL} 2>&1'
+${CAT} > conftest.c <<EOF
+#include <stdio.h>
+double d = 4.5;
+main() { printf("hello world\n"); }
+EOF
+changequote(,)dnl
+for TESTFLAG in -O4 -O3 -xO2 -O2 -O; do 
+  if eval $tcomp; then
+    if echo `eval $tcomp2` | egrep '[uU]nrecognized [oO]ption' >${DEV_NULL}; then
+      :
+      #the [e]grep option -v will not give a failure exit status on the atari
+    else
+      if eval $tcomp; then
+        CFLAGS=$TESTFLAG
+        break
+      fi
+    fi
+  fi
+done
+changequote([,])dnl
+for TESTFLAG in -g -fstrength-reduce -fno-force-mem -fno-force-addr -fomit-default-branch; do
+  if eval $tcomp; then
+    CFLAGS="$CFLAGS $TESTFLAG"
+  fi
+done
+#if using gcc, inlining is already handled explicit. When explicit inlining
+#is left out, this is usually done for a good reason. Use
+# -print-libgcc-filename to test for gcc.
+TESTFLAG='-print-libgcc-filename -O3 -fno-inline-functions'
+if eval $tcomp; then
+  if echo `eval $tcomp2` | egrep '[uU]nrecognized [oO]ption' >${DEV_NULL}; then
+    :
+  else
+    if eval $tcomp; then
+      CFLAGS="$CFLAGS -fno-inline-functions"
+    fi
+  fi
+fi
+MCFLAGS=$CFLAGS
+echo medium optimization CFLAGS: $MCFLAGS
+for TESTFLAG in -fomit-frame-pointer; do
+  if eval $tcomp; then
+    CFLAGS="$CFLAGS $TESTFLAG"
+  fi
+done
+OCFLAGS=$CFLAGS
+echo highest optimization CFLAGS: $OCFLAGS
+if ${CC-cc} -g -c conftest.c ; then
+  DCFLAGS='-g'
+else
+  DCFLAGS=''
+fi
+OPTIMIZE_LINKING=''
+if ${CC-cc} $OFLAGS -o conftest conftest.c ; then
+  OPTIMIZE_LINKING='$(OPTIMIZE)'
+fi
+rm -f conftest.c
+case "$DEFS" in
+  *HAVE_LIBSOCKET*)
+AC_PROGRAM_EGREP(yes,[
+#if defined(sun)
+yes
+#endif
+],
+[ EXTRA_CFLAGS='-Dsolaris' ]) ;;
+esac
+AC_WITH(target, EXTRA_CFLAGS="-D${withval}")
+echo "checking if ${YACC} includes bogus malloc prototypes"
+${CAT} > conftest.y <<EOF
+%{
+#include "confdefs.h"
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+#if !defined(STDC_HEADERS) && defined(HAVE_MEMORY_H)
+#include <memory.h>
+#endif
+#ifdef HAVE_STDLIB_H
+#include <stdlib.h>
+#endif
+%}
+%%
+all: 'a';
+%%
+int main(){ return 0; }
+void yyerror(){}
+int yylex(){ return 0; }
+EOF
+rm -f y.tab.c y_tab.c
+${YACC} conftest.y
+if mv y.tab.c conftest.c > ${DEV_NULL} 2>&1; then
+  YACCTAB=y.tab.
+else
+  mv y_tab.c conftest.c
+  YACCTAB=y_tab.
+fi
+if eval $compile; then
+  MOVE_YACC_TAB='$(MV) $(YACCTAB)c'
+  CLEAN_YACC_TAB=''
+else
+  MOVE_YACC_TAB='tail +2 $(YACCTAB)c >'
+  CLEAN_YACC_TAB='$(RM) $(YACCTAB)c'
+fi
+rm -f conftest*
+echo "checking for ${YACC} / <malloc.h> / -DSGI_SOURCE / afree name clash"
+${CAT} > conftest.y <<EOF
+%{
+#include "confdefs.h"
+#define afree free
+%}
+%%
+all: 'a';
+%%
+int main(){ return 0; }
+void yyerror(){}
+int yylex(){ return 0; }
+EOF
+rm -f y.tab.c y_tab.c
+${YACC} conftest.y
+if mv y.tab.c conftest.c > ${DEV_NULL} 2>&1; then
+  YACCTAB=y.tab.
+else
+  mv y_tab.c conftest.c
+  YACCTAB=y_tab.
+fi
+if eval $compile; then
+  :
+else
+  EXTRA_CFLAGS="${EXTRA_CFLAGS} -U_SGI_SOURCE"
+fi
+rm -f conftest*
+SAVE_LIBS="${LIBS}"
+SAVE_CFLAGS="${CFLAGS}"
+CFLAGS=''
+for TESTFLAG in '' -static -Bstatic -n; do
+echo "checking malloc redefinition with linking flag ${TESTFLAG}"
+LIBS="${SAVE_LIBS} ${TESTFLAG}"
+${CAT} > conftest.data <<EOF
+42
+EOF
+AC_TEST_PROGRAM([
+#include <sys/types.h>
+#include <stdio.h>
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+#ifdef HAVE_STDLIB_H
+#include <stdlib.h>
+#endif
+#ifdef HAVE_STRING_H
+#include <string.h>
+#else
+#include <strings.h>
+#endif
+#if !defined(STDC_HEADERS) && defined(HAVE_MEMORY_H)
+#include <memory.h>
+#endif
+#undef malloc
+#undef calloc
+int my_malloc_used;
+int main() {
+    int i, j;
+    FILE *f;
+
+    alarm(10); /* a crash can be an infinite loop... */
+    for (i = 0; i < 100; i++) {
+	my_malloc_used = 0;
+	/* strdup seems to be partially unavailable */
+	f = fopen("conftest.data", "r");
+	fscanf(f, "%d", &j);
+	fclose(f);
+	if (!my_malloc_used || j != 6*7) exit(1);
+    }
+    /* linking in printf called with variable format makes shared libs
+     * worthwhile. Moreover, calling it is a good test
+     */
+    printf(f?"Redefinition of malloc() %f%% successful\n":(char*)f, 100.);
+    exit(0);
+}
+POINTER malloc(size)
+    size_t size;
+{
+    size_t size2;
+    static char *current_break = 0;
+    char *q;
+
+    my_malloc_used = 1;
+    if (!current_break)
+      current_break = sbrk(0);
+    size2 = sizeof size + size+7 & ~7;
+    q = current_break;
+    if (brk(current_break+=size2)) exit(1);
+    *(size_t *)q = size;
+    return q + sizeof size;
+}
+POINTER calloc(size, num)
+    size_t size, num;
+{
+    char *q;
+    q = malloc(size*num);
+    memset(q, 0, size);
+}
+POINTER realloc(p, size)
+    POINTER p;
+    size_t size;
+{
+    char *q;
+    if (*(size_t *)p >= size)
+        return p;
+    q = malloc(size);
+#ifdef HAVE_MEMCPY
+    memcpy(q, p, size);
+#else
+    bcopy(p, q, size);
+#endif
+    *(size_t *)q = size;
+    return q + sizeof size;
+}
+#ifdef FREE_RETURNS_VOID
+void free(p)
+    POINTER p;
+{}
+#else
+int free(p)
+    POINTER p;
+{ return 1; }
+#endif
+],SBRK_OK=1)
+if test -n "${SBRK_OK}"; then
+  if test -z "${TESTFLAG}"; then
+    AC_DEFINE(SBRK_OK)
+  else
+    LDFLAGS="${LDFLAGS} ${TESTFLAG}"
+    EXTRA_CFLAGS="${EXTRA_CFLAGS} -DSBRK_OK"
+  fi
+  break
+fi
+done
+LIBS="${SAVE_LIBS}"
+CFLAGS="${SAVE_CFLAGS}"
+case "$EXTRA_CFLAGS" in
+ *-Dsolaris*)
+  case "$DEFS" in
+    *HAVE_LIBUCB*)
+      LIBS="${LDFLAGS} -lm -lgcc -lc -lnsl -lgcc -lc -ldl_stubs\
+        -lnswnis -lnswnisplus -lnswfiles -lnswcompat -lstraddr -lswitch\
+        -ltcpip -lsocket -lnsl -lgcc -lc /usr/ucblib/libucb.a"
+      LDFLAGS= "-u dgettext -lintl" ;;
+  esac ;;
+esac
+AC_TEST_PROGRAM([
+#include <sys/types.h>
+#include <stdio.h>
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+#ifdef HAVE_STDLIB_H
+#include <stdlib.h>
+#endif
+#ifdef HAVE_STRING_H
+#include <string.h>
+#else
+#include <strings.h>
+#endif
+#if !defined(STDC_HEADERS) && defined(HAVE_MEMORY_H)
+#include <memory.h>
+#endif
+int main(){
+    free((char *)0); /* linux libc 4.5.19 does this in fclose() */
+    exit(0);
+    return 0;
+}
+],AC_DEFINE(FREE_NULL_POINTER,1))
+echo "checking malloc overhead"
+${CAT} > conftest.c <<EOF
+#include "confdefs.h"
+#include "util/overhead.c"
+EOF
+${CC-cc} -o conftest conftest.c
+AC_DEFINE_UNQUOTED(EXTERN_MALLOC_OVERHEAD,`./conftest --terse`)
+rm -f conftest*
+if test -z "${CONFIG_SHELL}"; then
+  CONFIG_SHELL='/bin/sh'
+fi
+if test "${OSTYPE}" = 'win32'; then
+  EXEEXT='.exe'
+  AC_DEFINE(HOST_INCLUDE,"hosts/GnuWin32/GnuWin32.h")
+fi
+AC_SUBST(OCFLAGS)
+AC_SUBST(MCFLAGS)
+AC_SUBST(DCFLAGS)
+AC_SUBST(LDFLAGS)
+AC_SUBST(EXTRA_CFLAGS)
+AC_SUBST(OPTIMIZE_LINKING)
+AC_SUBST(MOVE_YACC_TAB)
+AC_SUBST(CLEAN_YACC_TAB)
+AC_SUBST(YACCTAB)
+AC_SUBST(CONFIG_SHELL)
+AC_SUBST(EXEEXT)
+AC_OUTPUT(Makefile)
