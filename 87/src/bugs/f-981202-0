@@ -1,0 +1,11 @@
+Short: Extension of the capabilities of closure operators.
+Date: 981202
+Type: Feature
+State: Unclassified
+From: Zwirch
+
+Zwirch@PK-Mud tells you: noch eine andere idee zu closures: ist es moeglich,
+die binaeren operatoren #'+, #'&& usw. auf beliebig viele parameter zu erweitern,
+so dann man zb mit apply(#'+, array) ein array von zahlen aufsummieren koennte
+oder etwas in der art ({#'+,"text1",'x,"text2"}) klappen wuerde
+

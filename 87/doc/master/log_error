@@ -1,0 +1,11 @@
+SYNOPSIS
+	void log_error(string file, string err)
+
+DESCRIPTION
+	Announce a compiler-time error in the named file. Whenever the
+	LPC compiler detects an error, this function is called. It
+	should at least log the error in a file, and also announce it
+	to the active user.
+
+SEE ALSO
+	runtime_error(M)
