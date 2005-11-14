@@ -1,0 +1,7 @@
+int add_weight(w)
+int w;
+
+An object that can contain other objects must define this function.
+It is called with the extra weight of the new object. If this is ok,
+then it has to increment the local weight count, and return true. Otherwise,
+return false, and the new object can not be entered into this object.
