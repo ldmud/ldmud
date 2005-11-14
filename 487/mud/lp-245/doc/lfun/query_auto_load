@@ -1,0 +1,29 @@
+string query_auto_load()
+
+An object that wants to be loaded automatically when the player
+logs in, should define this function. There are some important rules about
+how to use it:
+
+1. It must not have any weight.
+
+2. It must prevent the player from dropping it.
+
+3. It must be loaded before the player logs in. Otherwise, it will not
+   be given as a copy to the player.
+
+4. query_auto_load() must return a string that is:    file:arg
+   The 'file' is the definition that will be cloned. The 'arg' is a string
+   that will be sent as argument to the function 'init_arg()'. The 'arg'
+   can be an empty string.
+
+5. It must not be an actively usable item, like weapon or armour.
+
+6. It must not help the player in combats.
+
+The idea with this feature is that a player can get a curse or membership,
+that will stick with him, even if he quits.
+The idea is not that the player will save his weapons etc.
+
+Look at /obj/shout_curse.c for an example.
+
+See also lfun/extra_look

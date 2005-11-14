@@ -1,0 +1,1924 @@
+dnl ##define([AC_CACHE_LOAD], )dnl
+dnl---------------------------------------------------------------------------
+dnl configure-script template
+dnl
+dnl---------------------------------------------------------------------------
+dnl TODO: allow the use of hosts/<foo>/machine.h.in resp Makefile.in
+dnl TODO:: when existing instead of the normal ones.
+
+dnl
+dnl some helper macros
+dnl
+
+AC_DEFUN(AC_UPDATE_VAR,
+[if test "x$[$1]" = "x" && test "x$DEFAULT[$1]" != "x"; then
+  [$1]=$DEFAULT[$1]
+fi]
+)
+
+AC_DEFUN(AC_CDEF_FROM_ENABLE,
+[AC_UPDATE_VAR(enable_[$1])
+if test "x$enable_[$1]" = "xyes"; then
+  cdef_[$1]="#define"
+else
+  cdef_[$1]="#undef"
+fi]
+)
+
+AC_DEFUN(AC_INT_VAL_FROM_WITH,
+[if test "x$with_[$1]" != "x"; then
+  with_[$1]=`echo $with_[$1]|
+changequote(, )dnl
+             sed -e 's/^\(-\?\(0x[0-9a-fA-F]\+\)\?[0-9]*\)[^0-9]\?.*$/\1/'`
+changequote([, ])dnl
+fi
+AC_UPDATE_VAR(with_[$1])
+val_[$1]=$with_[$1]]
+)
+
+AC_DEFUN(AC_STRING_VAL_FROM_WITH,
+[if test "x$with_[$1]" != "x"; then
+  with_[$1]=`echo $with_[$1]|
+changequote(, )dnl
+             sed -e 's/^\([^"]*\)\?.*$/\1/'`
+changequote([, ])dnl
+fi
+AC_UPDATE_VAR(with_[$1])
+val_[$1]="\"$with_[$1]\""]
+)
+
+AC_DEFUN(AC_FORM_HELP,[  --$1[]dnl
+ifelse([$2],,,dnl
+builtin(format,%[]builtin(eval,(len([$1])<32)*(32-len([$1])))s,)  [default=$2])[]dnl
+ifelse([$3],,,[
+]patsubst([$3],[^],[        ]))[]dnl
+])
+
+
+AC_DEFUN(AC_MY_ARG_ENABLE,
+[DEFAULTenable_[]translit([$1],[-],[_])=ifelse($2,,no,[$2])
+AC_ARG_ENABLE([$1],AC_FORM_HELP([enable-$1]ifelse($3,,,[=($3)]),
+ifelse([$2],,[disabled],[$2],no,[disabled],[$2],yes,[enabled],[enabled($2)]),
+[$4]),[$5],[$6])
+])
+
+AC_DEFUN(AC_MY_ARG_WITH,
+[DEFAULTwith_[]translit([$1],[-],[_])=ifelse($2,,no,[$2])
+AC_ARG_WITH([$1],AC_FORM_HELP([with-$1]ifelse($3,,[=VALUE],[=$3]),
+[$2],
+[$4]),[$5],[$6])
+])
+
+AC_DEFUN(AC_NOT_AVAILABLE,
+[if test "x$not_available" = "x"; then
+    not_available="$1"
+else
+    not_available="[$not_available], $1"
+fi])
+
+dnl
+dnl let's start
+AC_INIT(prolang.y)
+
+dnl set the default prefix
+AC_PREFIX_DEFAULT(/usr/local/mud)
+
+dnl
+dnl This variable collects those requested features for which the system
+dnl doesn't offer the right support.
+
+not_available=""
+
+dnl
+dnl define default values for package arguments
+dnl and declare the package arguments
+dnl
+
+AC_MY_ARG_ENABLE(erq,erq,[no/erq/xerq],[Enables and or selects ERQ demon])
+AC_MY_ARG_ENABLE(access-control,yes,,)
+AC_MY_ARG_ENABLE(access-log,no,,)
+AC_MY_ARG_ENABLE(align-functions,yes,,)
+AC_MY_ARG_ENABLE(compat-mode,no,,)
+AC_MY_ARG_ENABLE(strict-euids,no,,)
+AC_MY_ARG_ENABLE(supply-parse-command,yes,,)
+AC_MY_ARG_ENABLE(initialization-by-__init,yes,,)
+AC_MY_ARG_ENABLE(use-system-crypt,yes,,)
+AC_MY_ARG_ENABLE(udp-send,yes,,)
+AC_MY_ARG_ENABLE(use-ipv6,no,,)
+AC_MY_ARG_ENABLE(use-mysql,no,,)
+AC_MY_ARG_ENABLE(use-pthreads,no,,[enable using of threads for socket writes])
+AC_MY_ARG_ENABLE(use-pcre,no,,[enable using of perl compatible regexp (requires Fiona's pcre-patch)])
+AC_MY_ARG_ENABLE(lpc-nosave,yes,,[Enables the 'nosave' keyword])
+AC_MY_ARG_ENABLE(use-deprecated,yes,,[Enables obsolete and deprecated efuns])
+AC_MY_ARG_ENABLE(comm-stat,yes,,)
+AC_MY_ARG_ENABLE(apply-cache_stat,yes,,)
+AC_MY_ARG_ENABLE(malloc-trace,no,,)
+AC_MY_ARG_ENABLE(malloc-lpc-trace,no,,)
+AC_MY_ARG_ENABLE(dynamic-costs,no,,)
+AC_MY_ARG_ENABLE(trace-code,yes,,[trace the most recently executed bytecode])
+
+AC_MY_ARG_ENABLE(rxcache_table,yes,,)
+
+AC_MY_ARG_ENABLE(opcprof,no,,[create VM instruction usage statistics])
+AC_MY_ARG_ENABLE(verbose-opcprof,no,,[with opcprof: include instruction names])
+AC_MY_ARG_ENABLE(debug,yes,,[enable sanity checks])
+AC_MY_ARG_ENABLE(yydebug,no,,[enable LPC compiler debug output])
+AC_MY_ARG_ENABLE(no-inlines,no,,[disable inlining])
+AC_MY_ARG_ENABLE(check-strings,yes,,[allow shared string sanity checks])
+AC_MY_ARG_ENABLE(keep-strings,no,,[don't free shared strings])
+AC_MY_ARG_ENABLE(debug-telnet,no,,[enable telnet machine diagnostics])
+AC_MY_ARG_ENABLE(debug-smalloc-allocs,no,,[enable small block diagnostics])
+
+AC_MY_ARG_ENABLE(check-object-stat,no,,[trace changes to the object statistics])
+AC_MY_ARG_ENABLE(check-mappings,no,,[check mappings for consistency])
+AC_MY_ARG_ENABLE(check-mapping-total,no,,[check the mapping statistic])
+AC_MY_ARG_ENABLE(check-object-ref,no,,[check object references])
+AC_MY_ARG_ENABLE(check-object-gc-ref,yes,,[check object references in GC])
+AC_MY_ARG_ENABLE(no-blueprint,no,,[disable blueprint tracking])
+AC_MY_ARG_ENABLE(check-smalloc-total,no,,[trace smalloc statistics])
+AC_MY_ARG_ENABLE(dump-gc-refs,no,,[trace GC references])
+
+AC_MY_ARG_WITH(access-file,ACCESS.ALLOW,,[access permissions file])
+AC_MY_ARG_WITH(access-log,access.allow.log,,[access log file])
+
+AC_MY_ARG_WITH(pthreads-write-max-size,100000,,[max size of write buffer per thread])
+
+AC_MY_ARG_WITH(erq-max-reply,1024,,)
+AC_MY_ARG_WITH(erq-max-send,1024,,)
+AC_MY_ARG_WITH(erq-debug,0,,[ERQ debug level])
+
+AC_MY_ARG_WITH(read-file-max-size,50000,[BYTES],
+  [maximum size of a file allowed to be read by 'read_file()'])
+
+AC_MY_ARG_WITH(master-name,secure/master,,[name of the master object])
+AC_MY_ARG_WITH(time-to-clean_up,3600,[SECONDS],)
+AC_MY_ARG_WITH(time-to-swap,900,[SECONDS],)
+AC_MY_ARG_WITH(time-to-swap-variables,1800,[SECONDS],)
+AC_MY_ARG_WITH(time-to-reset,1800,[SECONDS],)
+AC_MY_ARG_WITH(evaluator-stack-size,2000,,)
+AC_MY_ARG_WITH(max-user-trace,60,,)
+AC_MY_ARG_WITH(max-trace,65,,)
+AC_MY_ARG_WITH(compiler-stack-size,400,,)
+AC_MY_ARG_WITH(max-bits,6144,,)
+AC_MY_ARG_WITH(portno,4242,,)
+AC_MY_ARG_WITH(udp_port,4246,,)
+AC_MY_ARG_WITH(maxnumports,20,,)
+AC_MY_ARG_WITH(max-cost,1000000,,)
+AC_MY_ARG_WITH(catch-reserved-cost,2000,,)
+AC_MY_ARG_WITH(master-reserved-cost,0x200,,)
+AC_MY_ARG_WITH(swap-file,LP_SWAP.3,,[name of the swap file])
+AC_MY_ARG_WITH(max-array-size,3000,,)
+AC_MY_ARG_WITH(max-mapping-size,5000,,)
+AC_MY_ARG_WITH(max-callouts,0,,)
+AC_MY_ARG_WITH(max-players,50,,)
+AC_MY_ARG_WITH(max-local,50,,)
+AC_MY_ARG_WITH(allowed-ed-cmds,20,,[number of ed commands per backend cycle])
+AC_MY_ARG_WITH(reserved-user-size,700000,,)
+AC_MY_ARG_WITH(reserved-master-size,100000,,)
+AC_MY_ARG_WITH(reserved-system-size,200000,,)
+AC_MY_ARG_WITH(htable-size,4096,,)
+AC_MY_ARG_WITH(itable-size,256,,)
+AC_MY_ARG_WITH(otable-size,1024,,)
+AC_MY_ARG_WITH(defmax,65000,,)
+AC_MY_ARG_WITH(apply-cache-bits,12,,)
+AC_MY_ARG_WITH(rxcache-table,8192,,)
+AC_MY_ARG_WITH(max-byte-transfer,50000,,)
+AC_MY_ARG_WITH(catch-udp-port,4246,,)
+AC_MY_ARG_WITH(set-buffer-size-max,65536,,)
+AC_MY_ARG_WITH(malloc,smalloc,[smalloc/sysmalloc],[memory manager to use])
+AC_MY_ARG_WITH(min-malloced,0,,)
+AC_MY_ARG_WITH(min-small-malloced,0,,)
+AC_MY_ARG_WITH(max-malloced,0x4000000,,)
+AC_MY_ARG_WITH(total-trace-length,0x1000,,)
+AC_MY_ARG_WITH(wizlist-file,WIZLIST,,[name of the wizlist file])
+
+AC_ARG_WITH(setting,[  --with-setting=SETTING  include a predefined setting],[
+if test -f "settings/$withval" ; then
+cat >conftest.sed <<\EOF
+/^#.*/ d
+/^[[ \t]]*$/ d
+s/#.*$//
+s/disable_\([[^= \t]]*\)/enable_\1=no/
+/^enable_/ s/^/DEFAULT/p
+/^with_/ s/^/DEFAULT/p
+[]
+EOF
+eval `sed -n -f conftest.sed <settings/$withval`
+rm conftest.sed
+else
+AC_MSG_ERROR(Setting \"$withval\" not available)
+fi
+])
+
+dnl
+dnl process package arguments
+dnl (here the variable names are used; with a "_" instead of a dash "-" !)
+dnl
+
+AC_UPDATE_VAR(enable_erq)
+if test "x$enable_erq" = "xerq" || test "x$enable_erq" = "xyes"; then
+  cdef_erq_demon="#define"
+  erq_sub=erq
+  AC_DEFINE(ERQ_INCLUDE,"util/erq/erq.h")
+elif test "x$enable_erq" = "xxerq"; then
+  cdef_erq_demon="#define"
+  erq_sub=xerq
+  AC_DEFINE(ERQ_INCLUDE,"util/xerq/erq.h")
+else
+  cdef_erq_demon="#undef"
+  erq_sub=
+fi
+
+AC_UPDATE_VAR(enable_use_mysql)
+if test "x$enable_use_mysql" = "x" || test "x$enable_use_mysql" = "xyes"; then
+  cdef_use_mysql="#define"
+  mysql_path=
+  enable_use_mysql="yes"
+elif test "x$enable_use_mysql" = "xno"; then
+  cdef_use_mysql="#undef"
+  mysql_path=
+else
+  cdef_use_mysql="#define"
+  mysql_path="$enable_use_mysql"
+  enable_use_mysql="yes"
+fi
+
+AC_CDEF_FROM_ENABLE(access_control)
+AC_CDEF_FROM_ENABLE(access_log)
+AC_CDEF_FROM_ENABLE(align_functions)
+AC_CDEF_FROM_ENABLE(compat_mode)
+AC_CDEF_FROM_ENABLE(strict_euids)
+AC_CDEF_FROM_ENABLE(supply_parse_command)
+AC_CDEF_FROM_ENABLE(initialization_by___init)
+AC_CDEF_FROM_ENABLE(use_system_crypt)
+AC_CDEF_FROM_ENABLE(use_ipv6)
+AC_CDEF_FROM_ENABLE(use_pthreads)
+AC_CDEF_FROM_ENABLE(use_pcre)
+AC_CDEF_FROM_ENABLE(lpc_nosave)
+AC_CDEF_FROM_ENABLE(use_deprecated)
+AC_CDEF_FROM_ENABLE(comm_stat)
+AC_CDEF_FROM_ENABLE(apply_cache_stat)
+AC_CDEF_FROM_ENABLE(malloc_trace)
+AC_CDEF_FROM_ENABLE(malloc_lpc_trace)
+AC_CDEF_FROM_ENABLE(dynamic_costs)
+AC_CDEF_FROM_ENABLE(trace_code)
+
+AC_CDEF_FROM_ENABLE(rxcache_table)
+
+AC_CDEF_FROM_ENABLE(opcprof)
+AC_CDEF_FROM_ENABLE(verbose_opcprof)
+AC_CDEF_FROM_ENABLE(debug)
+AC_CDEF_FROM_ENABLE(yydebug)
+AC_CDEF_FROM_ENABLE(no_inlines)
+AC_CDEF_FROM_ENABLE(check_strings)
+AC_CDEF_FROM_ENABLE(keep_strings)
+AC_CDEF_FROM_ENABLE(debug_telnet)
+AC_CDEF_FROM_ENABLE(debug_smalloc_allocs)
+
+AC_CDEF_FROM_ENABLE(check_object_stat)
+AC_CDEF_FROM_ENABLE(check_mappings)
+AC_CDEF_FROM_ENABLE(check_mapping_total)
+AC_CDEF_FROM_ENABLE(check_object_ref)
+AC_CDEF_FROM_ENABLE(check_object_gc_ref)
+AC_CDEF_FROM_ENABLE(no_blueprint)
+AC_CDEF_FROM_ENABLE(check_smalloc_total)
+AC_CDEF_FROM_ENABLE(dump_gc_refs)
+
+AC_STRING_VAL_FROM_WITH(access_file)
+AC_STRING_VAL_FROM_WITH(access_log)
+AC_STRING_VAL_FROM_WITH(swap_file)
+AC_STRING_VAL_FROM_WITH(wizlist_file)
+AC_STRING_VAL_FROM_WITH(master_name)
+
+AC_INT_VAL_FROM_WITH(pthreads_write_max_size)
+AC_INT_VAL_FROM_WITH(erq_max_reply)
+AC_INT_VAL_FROM_WITH(erq_max_send)
+AC_INT_VAL_FROM_WITH(erq_debug)
+AC_INT_VAL_FROM_WITH(read_file_max_size)
+AC_INT_VAL_FROM_WITH(time_to_clean_up)
+AC_INT_VAL_FROM_WITH(time_to_swap)
+AC_INT_VAL_FROM_WITH(time_to_swap_variables)
+AC_INT_VAL_FROM_WITH(time_to_reset)
+AC_INT_VAL_FROM_WITH(evaluator_stack_size)
+AC_INT_VAL_FROM_WITH(max_user_trace)
+AC_INT_VAL_FROM_WITH(max_trace)
+AC_INT_VAL_FROM_WITH(compiler_stack_size)
+AC_INT_VAL_FROM_WITH(max_bits)
+AC_INT_VAL_FROM_WITH(portno)
+AC_INT_VAL_FROM_WITH(maxnumports)
+AC_INT_VAL_FROM_WITH(max_cost)
+AC_INT_VAL_FROM_WITH(catch_reserved_cost)
+AC_INT_VAL_FROM_WITH(master_reserved_cost)
+AC_INT_VAL_FROM_WITH(max_array_size)
+AC_INT_VAL_FROM_WITH(max_mapping_size)
+AC_INT_VAL_FROM_WITH(max_callouts)
+AC_INT_VAL_FROM_WITH(max_players)
+AC_INT_VAL_FROM_WITH(max_local)
+AC_INT_VAL_FROM_WITH(allowed_ed_cmds)
+AC_INT_VAL_FROM_WITH(reserved_user_size)
+AC_INT_VAL_FROM_WITH(reserved_master_size)
+AC_INT_VAL_FROM_WITH(reserved_system_size)
+AC_INT_VAL_FROM_WITH(htable_size)
+AC_INT_VAL_FROM_WITH(itable_size)
+AC_INT_VAL_FROM_WITH(otable_size)
+AC_INT_VAL_FROM_WITH(defmax)
+AC_INT_VAL_FROM_WITH(apply_cache_bits)
+AC_INT_VAL_FROM_WITH(rxcache_table)
+AC_INT_VAL_FROM_WITH(max_byte_transfer)
+AC_INT_VAL_FROM_WITH(udp_port)
+AC_INT_VAL_FROM_WITH(set_buffer_size_max)
+AC_INT_VAL_FROM_WITH(malloc)
+AC_INT_VAL_FROM_WITH(min_malloced)
+AC_INT_VAL_FROM_WITH(min_small_malloced)
+AC_INT_VAL_FROM_WITH(max_malloced)
+AC_INT_VAL_FROM_WITH(total_trace_length)
+
+if test "x$cdef_access_control" = "x#undef"; then
+  cdef_access_log="#undef"
+  val_access_log=
+fi
+
+if test "x$cdef_access_log" = "x#undef"; then
+  val_access_log=
+fi
+
+if test "x$cdef_rxcache_table" = "x#undef"; then
+  val_rxcache_table=
+fi
+
+if test "x$with_wizlist_file" != "xno"; then
+  cdef_wizlist_file="#define"
+  if test "x$with_wizlist_file" = "xyes"; then
+    with_wizlist_file=""
+  fi
+else
+  cdef_wizlist_file="#undef"
+fi
+
+if test "x$cdef_wizlist_file" = "x#undef"; then
+  val_wizlist_file=
+fi
+
+if test "x$cdef_opcprof" = "x#undef"; then
+  cdef_verbose_opcprof="#undef"
+fi
+
+
+dnl
+dnl select a C-Compiler
+dnl
+AC_PROG_CC
+
+# The newer versions of gcc/egcs running on SunOS fall into catatonia when
+# asked to compile this test with any optimisation. To be able to run
+# configure at all, we fudge the CFLAGS a bit.
+
+save_cflags=$CFLAGS
+echo "For this test, I use '-g' instead of '$CFLAGS' as compiler flags."
+CFLAGS="-g"
+
+AC_CACHE_CHECK([gcc/assembler float/branch incompatibility, e.g. on AIX],
+lp_cv_sys_float_branch_incompatible,
+AC_TRY_LINK([int foo(), bar(), foobar();
+#define x1 foobar();
+#define x4 x1 x1 x1 x1
+#define x10 x4 x4 x4 x4
+#define x40 x10 x10 x10 x10
+#define x100 x40 x40 x40 x40
+#define x400 x100 x100 x100 x100
+#define x1000 x400 x400 x400 x400
+int long_branch(i)
+    int i;
+{
+    if (i > 1) {
+        x1000
+    } else foo();
+    return bar();
+}
+int foo(){ return 0; }
+int bar(){ return 0; }
+int foobar(){ return 0; }
+double d = 4.5;],
+[double e = 1.3; e/= 0.2;],
+lp_cv_sys_float_branch_incompatible=no,
+lp_cv_sys_float_branch_incompatible=yes
+))
+if test $lp_cv_sys_float_branch_incompatible = yes ; then
+  CC="cc"
+  GCC=""
+  AC_MSG_WARN(falling back to cc)
+fi
+
+# Restore the CFLAGS
+CFLAGS=$save_cflags
+
+dnl check for ANSI-C  (for compiling LDMUD project)
+dnl TODO: check for 'c89' if CC="cc" and 'cc' not ANSI-C
+dnl
+AC_TRY_COMPILE([
+#ifndef __STDC__
+#error need STDC
+guarantee an compiling error here...
+#endif
+],,
+:,
+AC_MSG_ERROR(You need an ANSI-C compiler! sorry..)
+)
+
+
+dnl Checking for programs
+
+AC_PROG_INSTALL
+AC_CONFIG_HEADER(machine.h)
+AC_CHECK_PROGS(YACC, byacc "bison -y", yacc)
+AC_PROG_CPP
+
+dnl Recognize some unusual systems.
+dnl Not all checks happen here - the check for solaris for example requires
+dnl some library checks first.
+
+AC_EGREP_CPP(yes,[
+#if defined(__EMX__)
+yes
+#endif
+],
+[ EXTRA_CFLAGS="${EXTRA_CFLAGS} -DOS2" ])
+
+AC_EGREP_CPP(yes,[
+#if defined(__CYGWIN32__) || defined(__CYGWIN__)
+yes
+#endif
+],
+[ EXTRA_CFLAGS="${EXTRA_CFLAGS} -DMSWIN" ])
+
+dnl Checking for headers
+
+AC_CHECK_HEADERS(sys/rusage.h sys/time.h unistd.h stdlib.h libc.h memory.h)
+AC_CHECK_HEADERS(values.h string.h bstring.h netdb.h crypt.h sys/param.h sys/termios.h)
+AC_HEADER_STDC
+dnl extra check for <limits.h>; must be there!
+AC_CHECK_HEADERS(limits.h)
+AC_HEADER_DIRENT
+
+AC_CHECK_SIZEOF(char *)
+AC_CHECK_SIZEOF(int)
+AC_CHECK_SIZEOF(short)
+AC_CHECK_SIZEOF(long)
+
+AC_CACHE_CHECK(for needed malloc() alignment,lp_cv_sys_malloc_align,
+AC_TRY_COMPILE([struct ts {double d; char *p; double e;};
+int i = 96/(sizeof(struct ts)-20);
+],,
+lp_cv_sys_malloc_align=8,
+lp_cv_sys_malloc_align=4))
+AC_DEFINE_UNQUOTED(MALLOC_ALIGN,$lp_cv_sys_malloc_align)
+
+AC_CACHE_CHECK(for ssize_t,lp_cv_type_ssize_t,
+AC_TRY_COMPILE([#include <sys/types.h>
+ssize_t i;],,
+lp_cv_type_ssize_t=yes,
+lp_cv_type_ssize_t=no))
+if test $lp_cv_type_ssize_t = yes; then
+  AC_DEFINE(HAVE_SSIZE_T)
+fi
+
+AC_CHECK_SIZEOF(long long) dnl Also checks for the existance
+if test $ac_cv_type_long_long = yes; then
+  AC_DEFINE(HAVE_LONG_LONG)
+fi
+
+AC_CACHE_CHECK(for bool,lp_cv_type_bool,
+AC_TRY_COMPILE([bool b;],,
+lp_cv_type_bool=yes,
+lp_cv_type_bool=no))
+if test $lp_cv_type_bool = yes; then
+  AC_DEFINE(HAVE_BOOL)
+fi
+
+AC_C_INLINE
+if test "x$ac_cv_c_inline" != "xno"; then
+  AC_DEFINE(HAS_INLINE)
+fi
+
+AC_TYPE_SIZE_T
+AC_TYPE_PID_T
+AC_TYPE_SIGNAL
+
+if test "x$ac_cv_type_signal" = "xvoid"; then
+  cat >> confdefs.h <<EOF
+#define RETSIGTYPE_VOID 1
+EOF
+fi
+
+# --- Check for common system libraries ---
+
+AC_CHECK_LIB(m,main)
+AC_CHECK_LIB(socket,main)
+
+ERQ_LIBS="$LIBS"
+
+AC_CHECK_LIB(ucb,main, LIBS="$LIBS -lc -lucb")
+
+if test $ac_cv_lib_socket_main = "yes" || test $ac_cv_lib_ucb_main = "yes"; then
+      AC_CHECK_LIB(nsl,main)
+fi
+
+AC_CACHE_CHECK(if -lresolv is needed, lp_cv_need_lib_resolv,
+    AC_TRY_RUN([
+#include <netdb.h>
+void t (void)
+{
+    herror("foo");
+}
+int main(void)
+{
+    return 0;
+}
+    ],
+    lp_cv_need_lib_resolv=no,
+    lp_cv_need_lib_resolv=yes
+))
+if test "$lp_cv_need_lib_resolv" = "yes"; then
+    AC_CHECK_LIB(resolv,main, LIBS="$LIBS -lresolv")
+fi
+
+# --- Check if we need the crypto libraries ---
+
+if test "x$enable_use_system_crypt" = "x" || test "x$enable_use_system_crypt" = "xyes"; then
+    AC_CHECK_FUNCS(crypt _crypt)
+    AC_CACHE_CHECK(if -lcrypt is needed, lp_cv_need_lib_crypto,
+        AC_TRY_RUN([
+void t (void)
+{
+#ifdef HAS_CRYPT
+    crypt("foo", "bar");
+#endif
+#ifdef HAS__CRYPT
+    _crypt("foo", "bar");
+#endif
+}
+int main(void)
+{
+    return 0;
+}
+        ],
+        lp_cv_need_lib_crypto=no,
+        lp_cv_need_lib_crypto=yes
+    ))
+    if test "$lp_cv_need_lib_crypto" = "yes"; then
+        AC_CHECK_LIB(crypto,main, LIBS="$LIBS -lcrypto")
+        AC_CHECK_LIB(crypt,main, LIBS="$LIBS -lcrypt")
+    fi
+fi
+
+# --- Check for functions ---
+
+AC_FUNC_ALLOCA
+AC_CHECK_FUNCS(fchmod getrusage bzero memset memcpy memmem strdup strcspn)
+AC_CHECK_FUNCS(strchr strrchr getcwd memmove sysconf gettimeofday wait3 waitpid)
+AC_CHECK_FUNCS(fcntl getdomainname)
+
+AC_CACHE_CHECK(if inet_ntoa() ok,lp_cv_func_inet_ntoa_ok,
+AC_TRY_RUN([
+#include <sys/types.h> /* needed for netinet/in.h */
+#include <netinet/in.h>
+#include <arpa/inet.h>
+main() {
+    char addr1[[]] = "176.88.1.16";
+    char addr2[[]] = "88.176.128.2";
+    struct in_addr tmp;
+
+#if SIZEOF_INT == 4
+#define ADDR_TYPE unsigned int
+#else
+#define ADDR_TYPE unsigned long
+#endif
+    *((ADDR_TYPE *)&tmp) = inet_addr(addr1);
+    if (strcmp(addr1, inet_ntoa(tmp)))
+        exit(1);
+    *((ADDR_TYPE *)&tmp) = inet_addr(addr2);
+    if (strcmp(addr2, inet_ntoa(tmp)))
+        exit(1);
+    exit(0);
+}
+],lp_cv_func_inet_ntoa_ok=yes,
+lp_cv_func_inet_ntoa_ok=no,
+AC_TRY_COMPILE([
+#if defined(sun) && !defined(__svr4__)
+#include <sys/types.h> /* needed for netinet/in.h */
+#include <netinet/in.h>
+#include <arpa/inet.h>
+char *inet_ntoa(ad)
+    struct in_addr ad;
+{
+    static char addr[[[20]]];
+    return addr;
+}
+#else
+use inet_ntoa() from the library.
+#endif
+],,lp_cv_func_inet_ntoa_ok=no,
+lp_cv_func_inet_ntoa_ok=yes
+)))
+if test $lp_cv_func_inet_ntoa_ok = yes ; then
+  AC_DEFINE(INET_NTOA_OK)
+fi
+
+# --- IPV6 ---
+
+AC_CACHE_CHECK(for IPv6 support,lp_cv_has_ipv6,
+    saveflags="$CFLAGS"
+    CFLAGS="$CFLAGS -I/usr/inet6/include"
+    AC_TRY_COMPILE([
+#include <sys/types.h>
+#include <netinet/in.h>
+
+struct sockaddr_in6 foo(void)
+{
+    static struct sockaddr_in6 ad;
+    
+    return ad;
+}
+        ],,lp_cv_has_ipv6=yes,
+        lp_cv_has_ipv6=no
+        CFLAGS="$saveflags"
+))
+if test $lp_cv_has_ipv6 = yes; then
+    AC_DEFINE(HAS_IPV6)
+    if test $enable_use_ipv6 = yes; then
+        AC_CACHE_CHECK(if -linet6 is needed, lp_cv_need_lib_inet6,
+            AC_TRY_RUN([
+#include <sys/types.h>
+#include <netinet/in.h>
+void t (void)
+{
+    struct sockaddr_in6 ad;
+    inet6_ntoa(ad.sin_addr);
+}
+int main(void)
+{
+    return 0;
+}
+            ],
+            lp_cv_need_lib_inet6=no,
+            lp_cv_need_lib_inet6=yes
+        ))
+        if test "$lp_cv_need_lib_inet6" = "yes"; then
+            AC_CHECK_LIB(inet6,main, LIBS="$LIBS -linet6")
+        fi
+    fi
+else
+    if test $enable_use_ipv6 = yes; then
+        echo "IPV6 not supported - disabling IPV6 support."
+        AC_NOT_AVAILABLE(use-ipv6)
+    fi
+    cdef_use_ipv6="#undef"
+    enable_use_ipv6=no
+fi
+
+# --- PThreads ---
+
+AC_CACHE_CHECK(for pthreads support,lp_cv_has_pthreads,
+    saveflags="$CFLAGS"
+    CFLAGS="$CFLAGS -I/usr/include"
+    AC_TRY_COMPILE([
+#include <pthread.h>
+
+void foo(void)
+{
+    int i = PTHREAD_CREATE_JOINABLE;
+}
+    ],,lp_cv_has_pthreads=yes,
+    lp_cv_has_pthreads=no
+    CFLAGS="$saveflags"
+))
+
+if test $lp_cv_has_pthreads = yes; then
+    AC_DEFINE(HAS_PTHREADS)
+    if test $enable_use_pthreads = yes; then
+        AC_CACHE_CHECK(if -lpthread is needed, lp_cv_need_lib_pthread,
+            AC_TRY_RUN([
+#include <pthread.h>
+void t (void)
+{
+    pthread_t pid;
+    pthread_cancel(pid);
+}
+int main(void)
+{
+    return 0;
+}
+            ],
+            lp_cv_need_lib_pthread=no,
+            lp_cv_need_lib_pthread=yes
+        ))
+        if test "$lp_cv_need_lib_pthread" = "yes"; then
+            AC_CHECK_LIB(pthread,main, LIBS="$LIBS -lpthread")
+        fi
+    fi
+else
+    if test $enable_use_pthreads = yes; then
+        echo "pthreads not supported - disabling pthreads support."
+        AC_NOT_AVAILABLE(use-pthreads)
+    fi
+    cdef_use_pthreads="#undef"
+    enable_use_pthreads=no
+fi
+
+# --- PCRE ---
+
+AC_CACHE_CHECK(for pcre support,lp_cv_has_pcre,
+    saveflags="$CFLAGS"
+    CFLAGS="$CFLAGS -I/usr/include"
+    AC_TRY_COMPILE([
+#include <pcre.h>
+
+pcre_extra foo(void)
+{
+    return;
+}
+    ],,lp_cv_has_pcre=yes,
+    lp_cv_has_pcre=no
+    CFLAGS="$saveflags"
+))
+if test $lp_cv_has_pcre = yes; then
+    AC_DEFINE(HAS_PCRE)
+    if test $enable_use_pcre = yes; then
+        AC_CHECK_LIB(pcre,main, LIBS="$LIBS -lpcre")
+    fi
+else
+    enable_use_pcre=no
+fi
+
+# --- mySQL ---
+
+AC_CACHE_CHECK(for mySQL,lp_cv_has_mysql,
+for TESTPATH in "" "$mysql_path" "$mysql_path/include" "/usr/local/include" "/usr/include" "/usr/lib/mysql"; do
+    saveflags="$CFLAGS"
+    if test "x$TESTPATH" != "x"; then
+        CFLAGS="$CFLAGS -I$TESTPATH"
+    fi
+AC_TRY_COMPILE([
+#include <sys/types.h>
+#include <mysql/mysql.h>
+#include <mysql/errmsg.h>
+
+struct MYSQL * foo(void)
+{
+    static MYSQL var;
+    
+    return &var;
+}
+],,
+lp_cv_has_mysql=yes
+if test "x$TESTPATH" != "x"; then
+    EXTRA_CFLAGS="-I$TESTPATH $EXTRA_CFLAGS"
+fi
+break;
+,
+lp_cv_has_mysql=no
+CFLAGS="$saveflags"
+)
+done
+)
+
+# The system has the include files - now search for the libraries.
+if test $lp_cv_has_mysql = yes; then
+  saveflags="$CFLAGS"
+  AC_DEFINE(HAS_MYSQL)
+
+  if test $enable_use_mysql = yes; then
+    if test "x$mysql_path" = "x"; then
+        AC_CHECK_LIB(mysqlclient,main, PKGLIBS="$PKGLIBS -lmysqlclient")
+    else
+        tmp=""
+
+        if test -d "${mysql_path}/lib/mysql"; then
+            CFLAGS="$saveflags -L${mysql_path}/lib/mysql"
+            AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -L${mysql_path}/lib/mysql -lmysqlclient")
+        elif test -d "${mysql_path}/lib"; then
+            CFLAGS="$saveflags -L${mysql_path}/lib"
+            AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -L${mysql_path}/lib -lmysqlclient")
+        else
+            CFLAGS="$saveflags -L$mysql_path"
+            AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -L$mysql_path -lmysqlclient")
+        fi
+
+        if test "x$tmp" = "x"; then
+            echo "mysqlclient library not found - disabling mySQL support"
+            AC_NOT_AVAILABLE(use-mysql)
+            cdef_use_mysql="#undef"
+            enable_use_mysql="no"
+            mysql_path=
+            lp_cv_has_mysql="no"
+        else
+            PKGLIBS="$tmp"
+        fi
+    fi
+  fi
+
+  if test $enable_use_mysql = yes; then
+      # Some systems need additional libraries
+      savelibs="$LIBS"
+      LIBS="$LIBS $PKGLIBS"
+
+      AC_CACHE_CHECK(if -lz is needed, lp_cv_need_lib_z,
+          AC_TRY_RUN([
+#include <mysql/mysql.h>
+void t (void)
+{
+    MYSQL *dat;
+
+    mysql_real_connect(dat, "localhost", "user", "pwd", "db", 0, 0, 0);
+}
+int main(void)
+{
+    return 0;
+}
+          ],
+          lp_cv_need_lib_z=no,
+          lp_cv_need_lib_z=yes
+      ))
+      if test "$lp_cv_need_lib_z" = "yes"; then
+          AC_CHECK_LIB(z,main, PKGLIBS="$PKGLIBS -lz")
+      fi
+
+      AC_CACHE_CHECK(if -lnsl is needed, lp_cv_need_lib_nsl,
+          AC_TRY_RUN([
+#include <mysql/mysql.h>
+void t (void)
+{
+    MYSQL *dat;
+
+    mysql_real_connect(dat, "localhost", "user", "pwd", "db", 0, 0, 0);
+}
+int main(void)
+{
+    return 0;
+}
+          ],
+          lp_cv_need_lib_nsl=no,
+          lp_cv_need_lib_nsl=yes
+      ))
+      if test "$lp_cv_need_lib_nsl" = "yes"; then
+          AC_CHECK_LIB(nsl,main, PKGLIBS="$PKGLIBS -lnsl")
+      fi
+
+      LIBS="$savelibs"
+  fi
+
+  CFLAGS="$saveflags"
+else
+  if test $enable_use_mysql = yes; then
+      AC_NOT_AVAILABLE(use-mysql)
+  fi
+fi
+
+# ---
+
+AC_CACHE_CHECK(if rename handles directories,
+lp_cv_sys_rename_handles_directories,
+AC_TRY_RUN([
+main() {
+    mkdir("conftestdirfrom", 0770);
+    exit(rename("conftestdirfrom", "conftestdirto"));
+}
+],
+lp_cv_sys_rename_handles_directories=yes,
+lp_cv_sys_rename_handles_directories=no))
+if test $lp_cv_sys_rename_handles_directories = yes; then
+  AC_DEFINE(RENAME_HANDLES_DIRECTORIES)
+fi
+rmdir conftestdirfrom conftestdirto 2> /dev/null
+
+if test $ac_cv_func_getrusage = "yes" ; then
+AC_CACHE_CHECK(full availability of struct rusage members,
+lp_cv_struct_rusage_full,
+AC_TRY_COMPILE([
+#include <sys/types.h> /* BSDI 2.0.1 / 2.1 needs this for resource.h */
+#include <sys/time.h>
+#ifdef HAVE_SYS_RUSAGE_H
+#include <sys/rusage.h>
+#endif
+#include <sys/resource.h>
+#ifndef RUSAGE_SELF
+#define RUSAGE_SELF     0
+#endif
+],[
+    struct rusage rus;
+    long *v = (long *)main;
+    getrusage(RUSAGE_SELF, &rus);
+    *v++ = rus.ru_maxrss;
+    *v++ = rus.ru_ixrss;
+    *v++ = rus.ru_idrss;
+    *v++ = rus.ru_isrss;
+    *v++ = rus.ru_minflt;
+    *v++ = rus.ru_majflt;
+    *v++ = rus.ru_nswap;
+    *v++ = rus.ru_inblock;
+    *v++ = rus.ru_oublock;
+    *v++ = rus.ru_msgsnd;
+    *v++ = rus.ru_msgrcv;
+    *v++ = rus.ru_nsignals;
+    *v++ = rus.ru_nvcsw;
+    *v++ = rus.ru_nivcsw;
+],lp_cv_struct_rusage_full=yes,lp_cv_struct_rusage_full=no))
+if test $lp_cv_struct_rusage_full = no; then
+  AC_DEFINE(GETRUSAGE_RESTRICTED)
+fi
+AC_CACHE_CHECK(struct rusage timeval members with tv_usec,
+lp_cv_struct_rusage_usec,
+AC_TRY_COMPILE([
+#include <sys/types.h> /* BSDI 2.0.1 / 2.1 needs this for resource.h */
+#include <sys/time.h>
+#ifdef HAVE_SYS_RUSAGE_H
+#include <sys/rusage.h>
+#endif
+#include <sys/resource.h>
+#ifndef RUSAGE_SELF
+#define RUSAGE_SELF     0
+#endif
+],[
+    struct rusage rus;
+    long *v = (long *)main;
+    getrusage(RUSAGE_SELF, &rus);
+    *v++ = rus.ru_utime.tv_sec * 1000 + rus.ru_utime.tv_usec / 1000;
+    *v++ = rus.ru_stime.tv_sec * 1000 + rus.ru_stime.tv_usec / 1000;
+], lp_cv_struct_rusage_usec=yes, lp_cv_struct_rusage_usec=no))
+if test $lp_cv_struct_rusage_usec = yes; then
+  AC_DEFINE(RUSAGE_USEC)
+fi
+else
+AC_CACHE_CHECK(for getrusage() via syscall(),
+lp_cv_func_getrusage_via_syscall,
+AC_TRY_COMPILE([
+#include <sys/types.h> /* BSDI 2.0.1 / 2.1 needs this for resource.h */
+#include <sys/syscall.h>
+#include <sys/resource.h>
+#ifndef RUSAGE_SELF
+#define RUSAGE_SELF     0
+#endif
+],[
+struct rusage rus;
+syscall(SYS_GETRUSAGE, RUSAGE_SELF, rus);
+], lp_cv_func_getrusage_via_syscall=yes, lp_cv_func_getrusage_via_syscall=no))
+if test $lp_cv_func_getrusage_via_syscall=yes; then
+  AC_DEFINE(GETRUSAGE_VIA_SYSCALL) AC_DEFINE(HAVE_GETRUSAGE)
+fi
+fi
+
+dnl I have seen malloc() being declared in <memory.h> on some machines.
+AC_CACHE_CHECK(if return type of free is void,
+lp_cv_prop_free_returns_void,
+AC_TRY_COMPILE([
+#ifdef HAVE_STDLIB_H
+#include <stdlib.h>
+#endif
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+#if !defined(STDC_HEADERS) && defined(HAVE_MEMORY_H)
+#include <memory.h>
+#endif
+void free();
+],, lp_cv_prop_free_returns_void=yes, lp_cv_prop_free_returns_void=no))
+if test $lp_cv_prop_free_returns_void = yes; then
+  AC_DEFINE(FREE_RETURNS_VOID)
+fi
+
+AC_CACHE_CHECK(if void* or char* from malloc,
+lp_cv_prop_malloc_return_type,
+AC_TRY_COMPILE([
+#include <sys/types.h>
+#ifdef HAVE_STDLIB_H
+#include <stdlib.h>
+#endif
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+#if !defined(STDC_HEADERS) && defined(HAVE_MEMORY_H)
+#include <memory.h>
+#endif
+#ifdef __STDC__
+#define PROT(x) x
+#else
+#define PROT(x) ()
+#endif
+#define POINTER void *
+POINTER malloc(size_t);
+#ifdef FREE_RETURNS_VOID
+void free PROT((POINTER));
+#else
+int free PROT((POINTER));
+#endif
+],,lp_cv_prop_malloc_return_type="void *",
+lp_cv_prop_malloc_return_type="char *"))
+AC_DEFINE_UNQUOTED(POINTER,$lp_cv_prop_malloc_return_type)
+
+AC_CACHE_CHECK(if CHAR_BIT == 8 or undef,
+lp_cv_prop_charbits_eq_8,
+AC_TRY_COMPILE([
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
+#include <limits.h>
+#ifdef HAVE_VALUES_H
+#include <values.h>
+#endif
+int i=[1/(CHAR_BIT-8)];
+],,lp_cv_prop_charbits_eq_8=no, lp_cv_prop_charbits_eq_8=yes))
+if test $lp_cv_prop_charbits_eq_8 = yes; then
+  AC_DEFINE(CHARBIT_MASK, 0xff)
+else
+dnl TODO: this is something I don't really understand... am I too stupid?
+dnl TODO:: bitmask set to number of bits ?????? *shudder* [Mubo]
+  AC_DEFINE(CHARBIT_MASK, CHAR_BIT)
+fi
+
+AC_CACHE_CHECK(if strtol broken, lp_cv_prop_strtol_broken,
+dnl the quoting hell wants two start quotes here, but only one end quote...
+dnl M4 can be wonderful... :-(  [Mubo]
+AC_TRY_RUN([[
+#ifdef HAVE_STDLIB_H
+#include <stdlib.h>
+#endif
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+int main() {
+    if (strtol("1]", (char **)0, 10) != 1) exit(1);
+    exit(0);
+}
+], lp_cv_prop_strtol_broken=no,
+lp_cv_prop_strtol_broken=yes))
+if test $lp_cv_prop_strtol_broken = yes; then
+  AC_DEFINE(STRTOL_BROKEN)
+fi
+
+dnl the following three tests would better be nested, but it seems to overflow
+dnl internal buffers of m4
+AC_CACHE_CHECK(nonblocking using ioctl with FIONBIO,
+lp_cv_prop_use_ioctl_fionbio,
+AC_TRY_RUN([
+#include <sys/types.h> /* needed for netinet/in.h */
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <errno.h>
+#include <sys/ioctl.h>
+#include <stdio.h>
+#include <stdlib.h>
+main() {
+    int port, tmp, s;
+    struct sockaddr_in my_sin;
+    struct hostent *hp;
+    char *host_name;
+
+    host_name = malloc(100);
+    if (gethostname(host_name, 100) == -1) exit(1);
+    hp = gethostbyname(host_name);
+    if (hp == 0) exit(1);
+    memset((char *)&my_sin, '\0', sizeof my_sin);
+    memcpy((char *)&my_sin.sin_addr, hp->h_addr, hp->h_length);
+    my_sin.sin_family = hp->h_addrtype;
+    my_sin.sin_addr.s_addr = INADDR_ANY;
+    alarm(10);
+    for (port = 2000; port < 10000; port++) {
+        my_sin.sin_port = htons((u_short)port);
+        s = socket(hp->h_addrtype, SOCK_STREAM, 0);
+        if (s == -1) exit(1);
+        tmp = 1;
+        if (setsockopt (s, SOL_SOCKET, SO_REUSEADDR,
+                        (char *) &tmp, sizeof (tmp)) < 0)
+            exit (1);
+        if (bind(s, (struct sockaddr *)&my_sin, sizeof my_sin) == -1) {
+            if (errno == EADDRINUSE) {
+                close(s);
+		continue;
+            }
+            exit(1);
+        }
+	if (listen(s, 5) == -1) exit(1);
+	tmp = 1;
+	if (ioctl(s, FIONBIO, &tmp) == -1) exit(1);
+        tmp = sizeof my_sin;
+        s = accept(s, (struct sockaddr *)&my_sin, &tmp);
+	if (s == -1) {
+	    if (errno == EWOULDBLOCK ||
+		errno == EAGAIN)
+	    {
+		/* hpux has special problems with sockets from pipe() */
+		int sockets[[2]];
+		FILE *fp_read;
+
+		if(pipe(sockets) < 0)
+		    exit(1);
+		fp_read = fdopen(sockets[[0]], "r");
+		if (fp_read == NULL)
+		    exit(1);
+		if (ioctl(fileno(fp_read) , FIONBIO, &tmp) == -1)
+		    exit(1);
+		exit(0);
+	    }
+	    if (errno == EINTR) { close(s); continue; }
+	}
+	break;
+    }
+    exit(1);
+}
+],
+lp_cv_prop_use_ioctl_fionbio=yes,
+lp_cv_prop_use_ioctl_fionbio=no,
+lp_cv_prop_use_ioctl_fionbio=unknown
+AC_MSG_WARN(You have to supply the correct way to set sockets non-blocking by hand.)
+))
+if test $lp_cv_prop_use_ioctl_fionbio = yes; then
+  AC_DEFINE(USE_IOCTL_FIONBIO)
+fi
+
+AC_CACHE_CHECK(nonblocking using fcntl with O_NDELAY,
+lp_cv_prop_use_fnctl_o_ndelay,
+AC_TRY_RUN([
+#include <sys/types.h> /* needed for netinet/in.h */
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <stdlib.h>
+main() {
+    int port, tmp, s;
+    struct sockaddr_in my_sin;
+    struct hostent *hp;
+    char *host_name;
+
+    host_name = malloc(100);
+    if (gethostname(host_name, 100) == -1) exit(1);
+    hp = gethostbyname(host_name);
+    if (hp == 0) exit(1);
+    memset((char *)&my_sin, '\0', sizeof my_sin);
+    memcpy((char *)&my_sin.sin_addr, hp->h_addr, hp->h_length);
+    my_sin.sin_family = hp->h_addrtype;
+    my_sin.sin_addr.s_addr = INADDR_ANY;
+    alarm(10);
+    for (port = 2000; port < 10000; port++) {
+        my_sin.sin_port = htons((u_short)port);
+        s = socket(hp->h_addrtype, SOCK_STREAM, 0);
+        if (s == -1) exit(1);
+        tmp = 1;
+        if (setsockopt (s, SOL_SOCKET, SO_REUSEADDR,
+                        (char *) &tmp, sizeof (tmp)) < 0)
+            exit (1);
+        if (bind(s, (struct sockaddr *)&my_sin, sizeof my_sin) == -1) {
+            if (errno == EADDRINUSE) {
+                close(s);
+		continue;
+            }
+            exit(1);
+        }
+	if (listen(s, 5) == -1) exit(1);
+	if (fcntl(s, F_SETFL, O_NDELAY) == -1) exit(1);
+        tmp = sizeof my_sin;
+        s = accept(s, (struct sockaddr *)&my_sin, &tmp);
+	if (s == -1) {
+	    if (errno == EWOULDBLOCK) exit(0);
+	    if (errno == EAGAIN) exit(0);
+	    if (errno == EINTR) { close(s); continue; }
+	}
+	break;
+    }
+    exit(1);
+}
+], lp_cv_prop_use_fnctl_o_ndelay=yes,
+lp_cv_prop_use_fnctl_o_ndelay=no,
+lp_cv_prop_use_fnctl_o_ndelay=unknown))
+if test $lp_cv_prop_use_fnctl_o_ndelay = yes; then
+  AC_DEFINE(USE_FCNTL_O_NDELAY)
+fi
+
+AC_CACHE_CHECK(nonblocking using fcntl with FNDELAY,
+lp_cv_prop_use_fcntl_fndelay,
+AC_TRY_RUN([
+#include <sys/types.h> /* needed for netinet/in.h */
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <stdlib.h>
+main() {
+    int port, tmp, s;
+    struct sockaddr_in my_sin;
+    struct hostent *hp;
+    char *host_name;
+
+    host_name = malloc(100);
+    if (gethostname(host_name, 100) == -1) exit(1);
+    hp = gethostbyname(host_name);
+    if (hp == 0) exit(1);
+    memset((char *)&my_sin, '\0', sizeof my_sin);
+    memcpy((char *)&my_sin.sin_addr, hp->h_addr, hp->h_length);
+    my_sin.sin_family = hp->h_addrtype;
+    my_sin.sin_addr.s_addr = INADDR_ANY;
+    alarm(10);
+    for (port = 2000; port < 10000; port++) {
+        my_sin.sin_port = htons((u_short)port);
+        s = socket(hp->h_addrtype, SOCK_STREAM, 0);
+        if (s == -1) exit(1);
+        tmp = 1;
+        if (setsockopt (s, SOL_SOCKET, SO_REUSEADDR,
+                        (char *) &tmp, sizeof (tmp)) < 0)
+            exit (1);
+        if (bind(s, (struct sockaddr *)&my_sin, sizeof my_sin) == -1) {
+            if (errno == EADDRINUSE) {
+                close(s);
+		continue;
+            }
+            exit(1);
+        }
+	if (listen(s, 5) == -1) exit(1);
+	if (fcntl(s, F_SETFL, FNDELAY) == -1) exit(1);
+        tmp = sizeof my_sin;
+        s = accept(s, (struct sockaddr *)&my_sin, &tmp);
+	if (s == -1) {
+	    if (errno == EWOULDBLOCK) exit(0);
+	    if (errno == EAGAIN) exit(0);
+	    if (errno == EINTR) { close(s); continue; }
+	}
+	break;
+    }
+    exit(1);
+}
+],lp_cv_prop_use_fcntl_fndelay=yes,
+lp_cv_prop_use_fcntl_fndelay=no,
+lp_cv_prop_use_fcntl_fndelay=unknown))
+if test $lp_cv_prop_use_fcntl_fndelay = yes; then
+  AC_DEFINE(USE_FCNTL_FNDELAY)
+fi
+
+
+AC_CACHE_CHECK(if fcntl with SETOWN works,
+lp_cv_prop_use_fcntl_setown,
+AC_TRY_RUN([
+#include <sys/types.h> /* needed for netinet/in.h */
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <stdlib.h>
+main() {
+    int port, tmp, s;
+    struct sockaddr_in my_sin;
+    struct hostent *hp;
+    char *host_name;
+
+    host_name = malloc(100);
+    if (gethostname(host_name, 100) == -1) exit(1);
+    hp = gethostbyname(host_name);
+    if (hp == 0) exit(1);
+    memset((char *)&my_sin, '\0', sizeof my_sin);
+    memcpy((char *)&my_sin.sin_addr, hp->h_addr, hp->h_length);
+    my_sin.sin_family = hp->h_addrtype;
+    my_sin.sin_addr.s_addr = INADDR_ANY;
+    alarm(10);
+    for (port = 2000; port < 10000; port++) {
+        my_sin.sin_port = htons((u_short)port);
+        s = socket(hp->h_addrtype, SOCK_STREAM, 0);
+        if (s == -1) exit(1);
+        tmp = 1;
+        if (setsockopt (s, SOL_SOCKET, SO_REUSEADDR,
+                        (char *) &tmp, sizeof (tmp)) < 0)
+            exit (1);
+        if (bind(s, (struct sockaddr *)&my_sin, sizeof my_sin) == -1) {
+            if (errno == EADDRINUSE) {
+                close(s);
+		continue;
+            }
+            exit(1);
+        }
+	if (listen(s, 5) == -1) exit(1);
+#ifndef F_SETOWN
+        exit(1);
+#else
+	if (fcntl(s, F_SETOWN, getpid()) == -1) exit(1);
+        exit(0);
+#endif
+    }
+    exit(1);
+}
+],lp_cv_prop_use_fcntl_setown=yes,
+lp_cv_prop_use_fcntl_setown=no,
+lp_cv_prop_use_fcntl_setown=unknown))
+if test $lp_cv_prop_use_fcntl_setown = yes; then
+  AC_DEFINE(USE_FCNTL_SETOWN)
+fi
+
+AC_CACHE_CHECK(if OOBINLINE works,
+lp_cv_prop_use_oobinline,
+AC_TRY_RUN([
+#include <sys/types.h> /* needed for netinet/in.h */
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <stdlib.h>
+main() {
+    int port, tmp, s;
+    struct sockaddr_in my_sin;
+    struct hostent *hp;
+    char *host_name;
+
+    host_name = malloc(100);
+    if (gethostname(host_name, 100) == -1) exit(1);
+    hp = gethostbyname(host_name);
+    if (hp == 0) exit(1);
+    memset((char *)&my_sin, '\0', sizeof my_sin);
+    memcpy((char *)&my_sin.sin_addr, hp->h_addr, hp->h_length);
+    my_sin.sin_family = hp->h_addrtype;
+    my_sin.sin_addr.s_addr = INADDR_ANY;
+    alarm(10);
+    for (port = 2000; port < 10000; port++) {
+        int on;
+        my_sin.sin_port = htons((u_short)port);
+        s = socket(hp->h_addrtype, SOCK_STREAM, 0);
+        if (s == -1) exit(1);
+        tmp = 1;
+        if (setsockopt (s, SOL_SOCKET, SO_REUSEADDR,
+                        (char *) &tmp, sizeof (tmp)) < 0)
+            exit (1);
+        if (bind(s, (struct sockaddr *)&my_sin, sizeof my_sin) == -1) {
+            if (errno == EADDRINUSE) {
+                close(s);
+		continue;
+            }
+            exit(1);
+        }
+	if (listen(s, 5) == -1) exit(1);
+#ifndef SO_OOBINLINE
+        exit(1);
+#else
+        on = 1;
+        if (setsockopt(s, SOL_SOCKET, SO_OOBINLINE, (char *)&on, sizeof on) == -1)
+            exit(1);
+        exit(0);
+#endif
+    }
+    exit(1);
+}
+],lp_cv_prop_use_oobinline=yes,
+lp_cv_prop_use_oobinline=no,
+lp_cv_prop_use_oobinline=unknown))
+if test $lp_cv_prop_use_oobinline = yes; then
+  AC_DEFINE(USE_OOBINLINE)
+fi
+
+
+AC_CACHE_CHECK(for overlapping bcopy,
+lp_cv_prop_overlapping_bcopy,
+AC_TRY_RUN([
+main(){
+    char str[[99]] = "hello world";
+    bcopy(str, str+2, 12);
+    if(strcmp("hehello world", str))
+	exit(1);
+    bcopy(str+2, str, 11);
+    if(strcmp("hello worldld", str))
+	exit(1);
+    exit(0);
+}
+], lp_cv_prop_overlapping_bcopy=yes,
+lp_cv_prop_overlapping_bcopy=no,
+lp_cv_prop_overlapping_bcopy=yes))
+if test $lp_cv_prop_overlapping_bcopy = yes; then
+  AC_DEFINE(OVERLAPPING_BCOPY)
+fi
+
+AC_CACHE_CHECK(if strtol needs const char*,
+lp_cv_prop_strtol_const_charp,
+AC_TRY_COMPILE([#ifdef HAVE_STDLIB_H
+#include <stdlib.h>
+#endif
+long strtol(str, ptr, base) char *str; char **ptr; int base; { return 0; }
+],,lp_cv_prop_strtol_const_charp=no,
+lp_cv_prop_strtol_const_charp=yes))
+if test $lp_cv_prop_strtol_const_charp = yes; then
+  AC_DEFINE(STRTOL_CONST_CHARP)
+fi
+
+
+tcomp='${CC-cc} ${CFLAGS} ${TESTFLAG} -o conftest conftest.c >/dev/null 2>&1'
+tcomp2='${CC-cc} ${CFLAGS} ${TESTFLAG} -o conftest conftest.c 2>&1'
+tcomp3='${CC-cc} ${CFLAGS} ${TESTFLAG} -c conftest.c >/dev/null 2>&1'
+cat > conftest.c <<EOF
+#include <stdio.h>
+double d = 4.5;
+main() { printf("hello world\n"); }
+EOF
+AC_MSG_CHECKING(low optimization CFLAGS)
+changequote(,)dnl
+for TESTFLAG in -O; do
+  if eval $tcomp; then
+    if echo `eval $tcomp2` | egrep '[uU]n(recognized|known) [oO]ption' >/dev/null; then
+      :
+      #the [e]grep option -v will not give a failure exit status on the atari
+    else
+      if eval $tcomp; then
+        CFLAGS=$TESTFLAG
+        break
+      fi
+    fi
+  fi
+done
+for TESTFLAG in -qmaxmem=65536; do
+  if eval $tcomp; then
+    if echo `eval $tcomp2` | egrep '[uU]n(recognized|known) [oO]ption' >/dev/null; then
+      :
+      #the [e]grep option -v will not give a failure exit status on the atari
+    else
+      if eval $tcomp; then
+        CFLAGS="$CFLAGS $TESTFLAG"
+        break
+      fi
+    fi
+  fi
+done
+changequote([,])dnl
+for TESTFLAG in -g; do
+  if eval $tcomp; then
+    CFLAGS="$CFLAGS $TESTFLAG"
+  fi
+done
+LCFLAGS=$CFLAGS
+AC_MSG_RESULT($LCFLAGS)
+
+AC_MSG_CHECKING(medium optimization CFLAGS)
+changequote(,)dnl
+for TESTFLAG in -O2 -O; do
+  if eval $tcomp; then
+    if echo `eval $tcomp2` | egrep '[uU]n(recognized|known) [oO]ption' >/dev/null; then
+      :
+      #the [e]grep option -v will not give a failure exit status on the atari
+    else
+      if eval $tcomp; then
+        CFLAGS=$TESTFLAG
+        break
+      fi
+    fi
+  fi
+done
+for TESTFLAG in -qmaxmem=97204; do
+  if eval $tcomp; then
+    if echo `eval $tcomp2` | egrep '[uU]n(recognized|known) [oO]ption' >/dev/null; then
+      :
+      #the [e]grep option -v will not give a failure exit status on the atari
+    else
+      if eval $tcomp; then
+        OPTFLAGS="$OPTFLAGS $TESTFLAG"
+        CFLAGS="$CFLAGS $TESTFLAG"
+        break
+      fi
+    fi
+  fi
+done
+changequote([,])dnl
+for TESTFLAG in -g -fstrength-reduce -fno-force-mem -fno-force-addr -fomit-default-branch; do
+  if eval $tcomp; then
+    OPTFLAGS="$OPTFLAGS $TESTFLAG"
+    CFLAGS="$CFLAGS $TESTFLAG"
+  fi
+done
+#if using gcc, inlining is already handled explicit. When explicit inlining
+#is left out, this is usually done for a good reason. Use
+# -print-libgcc-filename to test for gcc.
+TESTFLAG='-print-libgcc-filename -O3 -fno-inline-functions'
+if eval $tcomp; then
+  if echo `eval $tcomp2` | egrep '[uU]n(recognized|known) [oO]ption' >/dev/null; then
+    :
+  else
+    if eval $tcomp; then
+      OPTFLAGS="$OPTFLAGS -fno-inline-functions"
+      CFLAGS="$CFLAGS -fno-inline-functions"
+    fi
+  fi
+fi
+MCFLAGS=$CFLAGS
+AC_MSG_RESULT($MCFLAGS)
+
+AC_MSG_CHECKING(highest optimization CFLAGS)
+changequote(,)dnl
+for TESTFLAG in -O4 -O3 -O2 -O; do
+  if eval $tcomp; then
+    if echo `eval $tcomp2` | egrep '[uU]n(recognized|known) [oO]ption' >/dev/null; then
+      :
+      #the [e]grep option -v will not give a failure exit status on the atari
+    else
+      if eval $tcomp; then
+        CFLAGS=$TESTFLAG
+        break
+      fi
+    fi
+  fi
+done
+for TESTFLAG in -qstrict -qipa -ipo; do
+  if eval $tcomp; then
+    if echo `eval $tcomp2` | egrep '[uU]n(recognized|known) [oO]ption' >/dev/null; then
+      :
+      #the [e]grep option -v will not give a failure exit status on the atari
+    else
+      if eval $tcomp; then
+        CFLAGS="$CFLAGS $TESTFLAG"
+        break
+      fi
+    fi
+  fi
+done
+changequote([,])dnl
+# -funroll-all-loops causes some versions of gcc to produce buggy code
+for TESTFLAG in -fomit-frame-pointer; do
+  if eval $tcomp; then
+    CFLAGS="$CFLAGS $TESTFLAG"
+  fi
+done
+OCFLAGS="$CFLAGS $OPTFLAGS"
+AC_MSG_RESULT($OCFLAGS)
+if ${CC-cc} -g -c conftest.c ; then
+  DCFLAGS='-g'
+else
+  DCFLAGS=''
+fi
+OPTIMIZE_LINKING=''
+if ${CC-cc} $OFLAGS -o conftest conftest.c ; then
+  OPTIMIZE_LINKING='$(OPTIMIZE)'
+fi
+rm -f conftest.c
+
+if test $ac_cv_lib_socket_main = "yes"; then
+AC_EGREP_CPP(yes,[
+#if defined(sun)
+yes
+#endif
+],
+[ EXTRA_CFLAGS="${EXTRA_CFLAGS} -Dsolaris" ])
+fi
+
+AC_ARG_WITH(target,[  --with-target    ??], EXTRA_CFLAGS="${EXTRA_CFLAGS} -D${withval}")
+
+AC_MSG_CHECKING(if ${YACC} includes bogus malloc prototypes)
+cat > conftest.y <<EOF
+%{
+#include "confdefs.h"
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+#if !defined(STDC_HEADERS) && defined(HAVE_MEMORY_H)
+#include <memory.h>
+#endif
+#ifdef HAVE_STDLIB_H
+#include <stdlib.h>
+#endif
+%}
+%%
+all: 'a';
+%%
+int main(){ return 0; }
+void yyerror(){}
+int yylex(){ return 0; }
+EOF
+rm -f y.tab.c y_tab.c
+${YACC} conftest.y
+if mv y.tab.c conftest.c > /dev/null 2>&1; then
+  YACCTAB=y.tab.
+else
+  mv y_tab.c conftest.c
+  YACCTAB=y_tab.
+fi
+if eval $ac_compile 2>&5 ; then
+  MOVE_YACC_TAB='$(MV) $(YACCTAB)c'
+  CLEAN_YACC_TAB=''
+  AC_MSG_RESULT(no)
+else
+  MOVE_YACC_TAB='tail +2 $(YACCTAB)c >'
+  CLEAN_YACC_TAB='$(RM) $(YACCTAB)c'
+  AC_MSG_RESULT(yes)
+fi
+rm -f conftest*
+
+AC_MSG_CHECKING(for ${YACC} / <malloc.h> / -DSGI_SOURCE / afree name clash)
+cat > conftest.y <<EOF
+%{
+#include "confdefs.h"
+#define afree free
+%}
+%%
+all: 'a';
+%%
+int main(){ return 0; }
+void yyerror(){}
+int yylex(){ return 0; }
+EOF
+rm -f y.tab.c y_tab.c
+${YACC} conftest.y
+if mv y.tab.c conftest.c > /dev/null 2>&1; then
+  YACCTAB=y.tab.
+else
+  mv y_tab.c conftest.c
+  YACCTAB=y_tab.
+fi
+if eval $ac_compile 2>&5; then
+  AC_MSG_RESULT(no)
+else
+  EXTRA_CFLAGS="${EXTRA_CFLAGS} -U_SGI_SOURCE"
+  AC_MSG_RESULT(yes)
+fi
+rm -f conftest*
+
+
+SAVE_LIBS="${LIBS}"
+SAVE_CFLAGS="${CFLAGS}"
+CFLAGS=''
+for TESTFLAG in '' -static -Bstatic -n; do
+AC_MSG_CHECKING(malloc redefinition with linking flag ${TESTFLAG})
+LIBS="${SAVE_LIBS} ${TESTFLAG}"
+cat > conftest.data <<EOF
+42
+EOF
+AC_TRY_RUN([
+#include <sys/types.h>
+#include <stdio.h>
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+#ifdef HAVE_STDLIB_H
+#include <stdlib.h>
+#endif
+#ifdef HAVE_STRING_H
+#include <string.h>
+#else
+#include <strings.h>
+#endif
+#if !defined(STDC_HEADERS) && defined(HAVE_MEMORY_H)
+#include <memory.h>
+#endif
+#undef malloc
+#undef calloc
+int my_malloc_used;
+int main() {
+    int i, j;
+    FILE *f;
+
+    alarm(10); /* a crash can be an infinite loop... */
+    for (i = 0; i < 100; i++) {
+	my_malloc_used = 0;
+	/* strdup seems to be partially unavailable */
+	f = fopen("conftest.data", "r");
+	fscanf(f, "%d", &j);
+	fclose(f);
+	if (!my_malloc_used || j != 6*7) exit(1);
+    }
+    /* linking in printf called with variable format makes shared libs
+     * worthwhile. Moreover, calling it is a good test
+     */
+    printf(f?"%f%% successful\n":(char*)f, 100.);
+    exit(0);
+}
+POINTER malloc(size)
+    size_t size;
+{
+    size_t size2;
+    static char *current_break = 0;
+    char *q;
+
+    my_malloc_used = 1;
+    if (!current_break)
+      current_break = sbrk(0);
+    size2 = sizeof size + size+7 & ~7;
+    q = current_break;
+    if (brk(current_break+=size2)) exit(1);
+    *(size_t *)q = size;
+    return q + sizeof size;
+}
+POINTER calloc(size, num)
+    size_t size, num;
+{
+    char *q;
+    q = malloc(size*num);
+    memset(q, 0, size);
+}
+POINTER realloc(p, size)
+    POINTER p;
+    size_t size;
+{
+    char *q;
+    if (*(size_t *)p >= size)
+        return p;
+    q = malloc(size);
+#ifdef HAVE_MEMCPY
+    memcpy(q, p, size);
+#else
+    bcopy(p, q, size);
+#endif
+    *(size_t *)q = size;
+    return q + sizeof size;
+}
+#ifdef FREE_RETURNS_VOID
+void free(p)
+    POINTER p;
+{}
+#else
+int free(p)
+    POINTER p;
+{ return 1; }
+#endif
+],SBRK_OK=1)
+if test -n "${SBRK_OK}"; then
+  if test -z "${TESTFLAG}"; then
+    AC_DEFINE(SBRK_OK)
+  else
+    LDFLAGS="${LDFLAGS} ${TESTFLAG}"
+    EXTRA_CFLAGS="${EXTRA_CFLAGS} -DSBRK_OK"
+  fi
+  break
+  AC_MSG_RESULT(ok)
+else
+  AC_MSG_RESULT(failed)
+fi
+done
+
+LIBS="${SAVE_LIBS}"
+CFLAGS="${SAVE_CFLAGS}"
+
+case "$EXTRA_CFLAGS" in
+ *-Dsolaris*)
+  if test $ac_cv_lib_ucb_main = "yes"; then
+      LIBS="${LDFLAGS} -lm -lgcc -lc -lnsl -lgcc -lc -ldl_stubs\
+        -lnswnis -lnswnisplus -lnswfiles -lnswcompat -lstraddr -lswitch\
+        -ltcpip -lsocket -lnsl -lgcc -lc /usr/ucblib/libucb.a"
+      LDFLAGS= "-u dgettext -lintl"
+  fi ;;
+ *-DOS2*)
+      LDFLAGS= "$LDFLAGS -Zbsd-signals -Zexe"
+      ;;
+ *-MSWIN*)
+      LDFLAGS= "$LDFLAGS -luser32 -lwinmm -lkernel32 -lwsock32"
+      ;;
+esac
+
+AC_CACHE_CHECK(malloc overhead,lp_cv_sys_malloc_overhead,
+cat > conftest.c <<EOF
+#include "confdefs.h"
+#include "${srcdir}/util/overhead.c"
+EOF
+${CC-cc} -o conftest conftest.c
+lp_cv_sys_malloc_overhead=`./conftest --terse`
+rm -f conftest*
+)
+AC_DEFINE_UNQUOTED(EXTERN_MALLOC_OVERHEAD,$lp_cv_sys_malloc_overhead)
+
+if test -z "${CONFIG_SHELL}"; then
+  CONFIG_SHELL='/bin/sh'
+fi
+if test "${OSTYPE}" = 'win32'; then
+  EXEEXT='.exe'
+  AC_DEFINE(HOST_INCLUDE,"hosts/GnuWin32/GnuWin32.h")
+fi
+
+
+dnl
+
+AC_SUBST(OCFLAGS)
+AC_SUBST(LCFLAGS)
+AC_SUBST(MCFLAGS)
+AC_SUBST(DCFLAGS)
+AC_SUBST(LDFLAGS)
+AC_SUBST(EXTRA_CFLAGS)
+AC_SUBST(OPTIMIZE_LINKING)
+AC_SUBST(MOVE_YACC_TAB)
+AC_SUBST(CLEAN_YACC_TAB)
+AC_SUBST(YACCTAB)
+AC_SUBST(CONFIG_SHELL)
+AC_SUBST(EXEEXT)
+
+dnl
+dnl additional replacements:
+dnl
+
+dnl first: the conditional defines:
+dnl
+AC_SUBST(cdef_erq_demon)
+AC_SUBST(cdef_access_control)
+AC_SUBST(cdef_access_log)
+AC_SUBST(cdef_align_functions)
+AC_SUBST(cdef_compat_mode)
+AC_SUBST(cdef_strict_euids)
+AC_SUBST(cdef_supply_parse_command)
+AC_SUBST(cdef_initialization_by___init)
+AC_SUBST(cdef_use_system_crypt)
+AC_SUBST(cdef_use_ipv6)
+AC_SUBST(cdef_use_mysql)
+AC_SUBST(cdef_use_pthreads)
+AC_SUBST(cdef_use_pcre)
+AC_SUBST(cdef_lpc_nosave)
+AC_SUBST(cdef_use_deprecated)
+AC_SUBST(cdef_comm_stat)
+AC_SUBST(cdef_trace_code)
+AC_SUBST(cdef_apply_cache_stat)
+AC_SUBST(cdef_malloc_trace)
+AC_SUBST(cdef_malloc_lpc_trace)
+AC_SUBST(cdef_dynamic_costs)
+
+AC_SUBST(cdef_rxcache_table)
+AC_SUBST(cdef_wizlist_file)
+
+AC_SUBST(cdef_opcprof)
+AC_SUBST(cdef_verbose_opcprof)
+AC_SUBST(cdef_debug)
+AC_SUBST(cdef_yydebug)
+AC_SUBST(cdef_no_inlines)
+AC_SUBST(cdef_check_strings)
+AC_SUBST(cdef_keep_strings)
+AC_SUBST(cdef_debug_telnet)
+AC_SUBST(cdef_debug_smalloc_allocs)
+
+AC_SUBST(cdef_check_object_stat)
+AC_SUBST(cdef_check_mappings)
+AC_SUBST(cdef_check_mapping_total)
+AC_SUBST(cdef_check_object_ref)
+AC_SUBST(cdef_check_object_gc_ref)
+AC_SUBST(cdef_no_blueprint)
+AC_SUBST(cdef_check_smalloc_total)
+AC_SUBST(cdef_dump_gc_refs)
+
+dnl second: valued defines
+dnl
+AC_SUBST(val_access_file)
+AC_SUBST(val_access_log)
+AC_SUBST(val_erq_max_reply)
+AC_SUBST(val_erq_max_send)
+AC_SUBST(val_erq_debug)
+AC_SUBST(val_pthreads_write_max_size)
+AC_SUBST(val_read_file_max_size)
+AC_SUBST(val_time_to_clean_up)
+AC_SUBST(val_time_to_swap)
+AC_SUBST(val_time_to_swap_variables)
+AC_SUBST(val_time_to_reset)
+AC_SUBST(val_evaluator_stack_size)
+AC_SUBST(val_max_user_trace)
+AC_SUBST(val_max_trace)
+AC_SUBST(val_compiler_stack_size)
+AC_SUBST(val_max_bits)
+AC_SUBST(val_portno)
+AC_SUBST(val_maxnumports)
+AC_SUBST(val_max_cost)
+AC_SUBST(val_max_local)
+AC_SUBST(val_catch_reserved_cost)
+AC_SUBST(val_master_reserved_cost)
+AC_SUBST(val_swap_file)
+AC_SUBST(val_max_array_size)
+AC_SUBST(val_max_mapping_size)
+AC_SUBST(val_max_callouts)
+AC_SUBST(val_max_players)
+AC_SUBST(val_allowed_ed_cmds)
+AC_SUBST(val_reserved_user_size)
+AC_SUBST(val_reserved_master_size)
+AC_SUBST(val_reserved_system_size)
+AC_SUBST(val_htable_size)
+AC_SUBST(val_itable_size)
+AC_SUBST(val_otable_size)
+AC_SUBST(val_defmax)
+AC_SUBST(val_apply_cache_bits)
+AC_SUBST(val_rxcache_table)
+AC_SUBST(val_master_name)
+AC_SUBST(val_max_byte_transfer)
+AC_SUBST(val_udp_port)
+AC_SUBST(val_set_buffer_size_max)
+AC_SUBST(val_malloc)
+AC_SUBST(val_min_malloced)
+AC_SUBST(val_min_small_malloced)
+AC_SUBST(val_max_malloced)
+AC_SUBST(val_total_trace_length)
+AC_SUBST(val_wizlist_file)
+
+dnl finally: some remaining stuff
+dnl
+AC_SUBST(erq_sub)
+AC_SUBST(ERQ_LIBS)
+AC_SUBST(PKGLIBS)
+
+dnl
+dnl Ok. now lets make the Makefiles; also these in subdirs! [Mubo]
+dnl make config.h, too. [Mubo]
+dnl
+AC_OUTPUT(Makefile config.h util/Makefile util/indent/Makefile
+util/xerq/Makefile util/erq/Makefile)
+
+dnl
+dnl At last, warn if any feature could not be enabled
+dnl
+if test "x$not_available" != "x"; then
+    echo ""
+    echo "WARNING: The following options were disabled because the system"
+    echo "lacked the necessary support: $not_available."
+    exit 1
+fi

@@ -1,0 +1,13 @@
+Command: load
+Argument: file
+
+If the object defined in 'file' isn't loaded, it will be. 'reset()' will
+also be called in the object. If the object was loaded, nothing will happen.
+
+This command is implemented by teleporting the wizard to the object, which
+will force the object to load, and then teleporting the wizard back again.
+
+Rooms can also be loaded by just walking to them. That has exactly the
+same effect.
+
+See also w/clone.

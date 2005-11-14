@@ -1,0 +1,14 @@
+#
+# List of objects to load automatically at reboot.
+#
+obj/quicktyper.c
+room/adv_guild
+obj/living
+obj/monster
+obj/treasure
+obj/weapon
+obj/armour
+room/death/death_mark
+#
+# All lines below this comments are for loading wizard castles.
+#

@@ -1,0 +1,24 @@
+Short: Let query_verb() return the action verb as defined.
+From: Bastian Hoyer <dafire@dafire.de>
+Date: Mon, 11 Mar 2002 15:32:19 +0100
+Type: Feature
+State: Done - implemented in 3.2.9-dev.423/3.3.188 .
+
+Hmm.. wenn ich im moment sowas hab:
+
+add_action("action","fknuddel",-3)
+add_action("action","ftret",-3)
+add_action("action","fich")
+
+dann faende ich es praktisch wenn query_verb() mir "fknuddel" 
+zurueckgeben wuerde, auch wenn ich nur "fknud" eingeben habe..=
+ oder 
+wenn die add_action so lautete:
+
+add_action("action","fknud",1) 
+
+wenn query_verb() dann "fknud" liefern wuerde selbst wenn der=
+ spieler 
+"fknuddelegal" eingegeben haette :)
+
+Vielleicht geht das mit einem Flag oder so ?
