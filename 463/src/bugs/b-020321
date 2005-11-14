@@ -1,0 +1,81 @@
+Short: Strange crasher: bus error on existing variables
+Date: Thu, 21 Mar 2002 21:30:10 +0100
+From: Christian Mudra <mudra@informatik.uni-kl.de>
+Type: Bug
+State: New
+Driver: 3.2.9-dev.408
+
+Hi Lars,
+
+hab nen neuen crasher (:-|) gefunden:
+
+Program terminated with signal 10, Bus error.
+#0  0x23bcc in call_out () at call_out.c:428
+428             if (user->last_call_out != current_time)
+(gdb) bt
+#0  0x23bcc in call_out () at call_out.c:428
+#1  0x21ac0 in backend () at backend.c:631
+#2  0x7be38 in main (argc=-268438400, argv=0xeffff90c) at main.c:428
+
+(gdb) frame 0
+#0  0x23bcc in call_out () at call_out.c:428
+428             if (user->last_call_out != current_time)
+(gdb) print user
+$1 = (wiz_list_t *) 0x20002
+(gdb) print user->last_call_out
+$2 = 1073717764
+(gdb) print current_time
+$3 = 1016737874
+
+Sehr komisch - wenn alle variablen existieren, wieso crashts dann?
+
+Viele Gruesse,
+
+  Coogan.
+
+----------------------------------------------------------------------------
+Date: Fri, 25 Jan 2002 18:41:31 +0100
+From: Christian Mudra <mudra@informatik.uni-kl.de>
+To: Lars Duening <lars@bearnip.com>
+
+Hi Lars,
+
+gerade ist Tub hart bei dev389 gecrasht.
+
+Program terminated with signal 10, Bus error.
+#0  0xa8434 in swap_free (offset=14395115) at swap.c:577
+577         }
+(gdb) bt
+#0  0xa8434 in swap_free (offset=14395115) at swap.c:577
+#1  0xa840c in swap_free (offset=894108) at swap.c:574
+#2  0x7f65c in add_mapping (m1=0x1fb6aa3, m2=0x0) at mapping.c:3019
+#3  0xa88c0 in swap_svalues (svp=0x12bbce8, num=4, block=0x1fb6ab5)
+    at swap.c:871
+#4  0xa840c in swap_free (offset=894108) at swap.c:574
+#5  0x7f65c in add_mapping (m1=0x1fb65ba, m2=0xf026934c) at mapping.c:3019
+#6  0xa88c0 in swap_svalues (svp=0x1a85380, num=2, block=0x1fb65cf)
+    at swap.c:871
+#7  0xa840c in swap_free (offset=894108) at swap.c:574
+#8  0x7f65c in add_mapping (m1=0x1fb5c2c, m2=0xefffea2e) at mapping.c:3019
+#9  0xa88c0 in swap_svalues (svp=0x17cc068, num=22, block=0x1fb5c90)
+    at swap.c:871
+#10 0xa8e28 in free_swapped_svalues (svp=0xca34c, num=24951648, 
+    p=0x1170610 "\a$") at swap.c:1044
+#11 0x221d8 in process_objects () at backend.c:1027
+#12 0x21a48 in backend () at backend.c:637
+#13 0x7a890 in main (argc=-268438400, argv=0xeffff90c) at main.c:411
+(gdb) 
+
+Koennte dieser bug durch das condense_mapping() bei dev390 gefixt sein?
+Falls nein, welche Werte willst Du noch wissen?
+
+Viele Gruesse,
+
+  Coogan.
+
+----------------------------------------------------------------------------
+Christian Mudra              Just remember what your mother always told you:
+mudra@informatik.uni-kl.de       "When you open windows you let in bugs".
+TubMud Admin (telnet morgen.cs.tu-berlin.de 7680)
+Systembetreuer AG Wiehagen, Universitaet Kaiserslautern
+

@@ -1,0 +1,33 @@
+Date: Mon, 7 Feb 2000 21:18:03 +0200 (EET)
+From: =?ISO-8859-1?Q?Manu_M=E4ki?= <mtmaki@students.turkuai.fi>
+Short: query_notify_fail() fails
+Type: Bug
+State: Abandoned - not reproducible
+
+Hi, I had a chat you a while ago and you asked me to mail you these two
+probelsm I'm facing when using H_COMMAND hook. The hook looks like this:
+
+    set_driver_hook(H_COMMAND,
+     unbound_lambda( ({ 'cmd, 'cmd_giver }),
+       ({ #',,
+         ({ #'=, 'cmd, ({ #'call_other, 'cmd_giver, "modify_command", 'cmd }) }),
+         ({ #'=, 'res,
+           ({ #'execute_command, 'cmd, 'cmd_giver, ({ #'this_object }) }),
+         }),
+         ({ #'?!, 'res,
+           ({ #'write, ({ #'+, ({ #'query_notify_fail, 0 }), "\n" }) })
+         }),
+         ({ #'return, 'res }),
+       })));
+
+Though it isn't really what it will be after it works ;). There is a
+problem. The query_notify_fail() keeps returning 0, I bet I'm doing
+something wrong or not? And the another problem is: I have
+add_action("CommandParser", "", 1); which isn't parsed at all with this
+hook. Some of the commands tho work ok w/o problems but notify_fail() and
+this add_action() aren't working.
+
+  Thanks in advance, Manu aka Cendor@Winterkill
+
+Analysis:
+  Not reproducible so far.

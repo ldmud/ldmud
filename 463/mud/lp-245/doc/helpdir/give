@@ -1,0 +1,6 @@
+command: give
+first argument: An item
+second argument 'to'
+third argument: A player
+
+Give an item to a living object.
