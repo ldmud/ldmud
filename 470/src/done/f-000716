@@ -1,0 +1,35 @@
+Short: New efun 'call_trace()' or so
+Date: Sun, 16 Jul 2000 01:12:33 +0200
+From: Freaky <Freaky@UNItopia.RUS.Uni-Stuttgart.DE>
+State: Done - implemented in 3.2.9-dev.242
+See also: f-990203-28
+
+
+--- Or maybe put this functionality into debug_info().
+
+Hi,
+
+Waere es moeglich, eine Funktion 'function_trace()' oder wie auch immer sie
+heissen koennte, einzubauen, die aehnliche Informationen liefert, wie
+die, die ins Log-File geschrieben werden, wenn ein Runtime-Error passiert.
+
+Also ein Feld in der Art:
+
+({
+    "Funktion", "Filename", Objekt, Zeile,
+    ...
+})
+
+Evtl. anstelle von Objekt den Filenamen des Objektes.
+
+Oder auch ein Array of Arrays, wenn dir das lieber ist.
+
+Das ganze waere fuer Debugging-Zwecke gut und auch fuer Fehlermeldungen,
+die nicht per raise_error() passieren sollen, da sie nicht
+System-Kritisch sind (wie z.B.:
+
+  "Achtung: dieses Objekt bitte nicht mehr benutzen, da es durch ...
+   ersetzt wurde")
+
+Ciao
+		Freaky

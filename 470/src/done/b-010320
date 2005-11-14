@@ -1,0 +1,114 @@
+Short: Refcount reach maximum, but don't decrease
+Date: Wed, 21 Mar 2001 23:59:10 +0100
+From: Bastian Hoyer <dafire@dafire.de>
+Type: Done - implemented in 3.2.9-dev.314
+State: New
+
+Hallo Lars,
+
+nachdem wir auf dem neuen Rechner nun wieder seeehr viel Platz auf den Platten
+haben, hab ich DEBUG_STRINGS mal wieder angemacht.
+Ich hatte dir ja dazu schon mal ne Mail geschrieben, und du meinstest, ich
+sollte das im Homemud mal testen wenn ich das Mud dann an den stellen anhalte.
+Leider tritt das Phänomen im Homemud nicht auf, ich vermute weil da zu wenig
+los ist. Und die letzten Monate hatten wir weniger als 100 MB auf der Platte
+frei, so das ich das Debug ausgemacht hatte ;)
+
+(Beginn des Logfiles)
+2001.03.17 19:27:15 d/Sol/kawajoe/slums/npc/bulle.c: syntax error line 111 
+DEBUG: ref_string(): 089ba876 'find_player' refcount reaches max!
+DEBUG: ref_string(): 089ba876 'find_player' has 0 refs.
+.
+.
+
+das wiederholt sich dann noch ungefaehr 2000 mal, dann war ein restart ;)
+
+Am 17.3. um 19:30 wurde das Mud dann neu gestartet.
+(Logfile Zeile 2112)
+
+2001.03.17 23:02:52 [xerq] select()
+DEBUG: ref_string(): 089ba876 'find_player' refcount reaches max!
+.
+.
+unterbrochen von verschiedenen normalen "mud" debugmeldungen hat sich die
+Meldung am 19.3. um 21 uhr schon 460000 mal wiederholt ... dann:
+DEBUG: ref_string(): 089ba876 'find_player' has 0 refs.
+DEBUG: ref_string(): 08a7ef36 'tritt' refcount reaches max!
+DEBUG: ref_string(): 08a7ef36 'tritt' has 0 refs.
+.
+.
+jetzt wechseln sich die beiden meldungen von 'tritt' und 'find_player' ab..
+immer ein paar mal dies, ein paar mal jenes....
+.
+.
+(das stderr file ist jetzt bei Zeile 722583)
+DEBUG: ref_string(): 089b75f2 'playerp' refcount reaches max!
+DEBUG: ref_string(): 089b75f2 'playerp' has 0 refs.
+.
+.
+.
+DEBUG: ref_string(): 08a7ef36 'tritt' has 0 refs.
+DEBUG: ref_string(): 089b75f2 'playerp' has 0 refs.
+DEBUG: ref_string(): 08a7ef36 'tritt' has 0 refs.
+DEBUG: ref_string(): 08a7ef36 'tritt' has 0 refs.
+
+Das waren die letzten Zeilen (um Zeile 1208274) wenn ich Dir diese Mail schreibe ;)
+
+
+
+Mir ist aufgefallen das wir ziemlich oft im Master sowas verwenden:
+
+  if(funcall(symbol_function('find_player), "bert"))
+
+Der andere String, bei dem mir das selbe aufgefallen ist, ist "playerp",
+der in der gleichen Form oft im Master gebraucht wird.
+
+Fuer 'tritt' trifft das leider nicht zu.. ich denke das stammt aus dem Kampfsystem
+( der ... TRIFFT den ... ), auch ein string der wohl ziemlich oft verwendet wird ;)
+
+
+Vielleicht auch interessant das der 'find_player' String bei beiden Starts
+die gleiche Speicheradresse hatte ? 
+
+Ich hoffe du kannst damit was anfangen ;)
+
+Bastian
+
+> Verwunderlich aber dass es keine deref_string()-Meldungen gibt - ein Leck?
+
+also, in stdout hab ich noch solche Meldungen gefunden:
+DEBUG: free_string(): 0x89ba876 'find_player' has 0 refs.
+DEBUG: make_shared_string(): found 0x89ba876 'find_player' has 0 refs.
+DEBUG: free_string(): 0x89ba876 'find_player' has 0 refs.
+
+aber weder in stdout noch in stderr kommt ein deref vor.
+
+> In welchem Kontext wird denn
+>
+> >  if(funcall(symbol_function('find_player), "bert"))
+>
+> und playerp verwendet?
+
+
+naja.. playerp ist eigentlich eine simul_efun, die prüft ob das objekt eine
+playershell ist und in dem fall den level zurück gibt ;) Im Master steht sie
+noch mal so. Ich denke also das so Simul_efuns aus dem Master aufgerufen
+werden sollen.
+
+string playerp(mixed ob)
+{
+  return funcall(symbol_function('playerp),ob)+"";
+}
+
+oder
+
+valid_socket (object cur, string what, mixed * info)
+{
+  if (funcall(symbol_function('find_player), "dans"))
+    tell_object (funcall(symbol_function('find_player), "dans"),
+                 sprintf ("current object: %O; what: %s; socket: %d; owner:
+%O; addr: %s; port: %d\n",
+                          cur, what, info[0], info[1], info[2], info[3]));
+  return 1;
+}
+

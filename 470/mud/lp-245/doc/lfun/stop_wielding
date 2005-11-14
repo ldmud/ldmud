@@ -1,0 +1,6 @@
+void stop_wielding()
+
+Objects able to wield weapons, should have this function. It is called
+by the weapon when it is not possible to continue wielding the weapon.
+
+It should adjust the weapon class of the current object.

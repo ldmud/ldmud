@@ -1,0 +1,9 @@
+Short: New efun: reset_object()
+From: Daniel von Dincklage <vondincklage@usa.net>
+Date: Fri, 19 Jun 1998 13:17:34 +0200
+Type: Feature
+State: Unclassified
+
+- A reset_object() efun that updates the last-reset.
+
+Note: add object argument to set_next_reset(), but make that priviledged.
