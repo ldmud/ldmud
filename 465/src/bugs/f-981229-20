@@ -1,0 +1,25 @@
+Short: modified regexp()
+From: Dave Setty <garpoz@locallink.net>
+Date: Thu, 10 Dec 1998 02:03:04 -0500
+Type: Feature
+State: Unclassified
+
+5) A change to regexp() to let it take a single string as argument,
+   returning either status, or the string if matched or 0 if not.
+   This will make it more useful with map_ and filter_ array, etc.
+   Since there's now a cache for compiled regexp patterns, this should
+   work fairly efficiently now.
+
+Matthew Julius explains:
+
+varargs string *regexp(string *, string, int)
+  Allow an optional third argument to return non matching strings, or return
+  an array of 1's and 0's, with 1's representing matching strings in the
+  array.
+  For examples,
+    string *arr;
+    arr = ({ "abc", "def", "abbot", "lab" });
+    regexp(arr, "ab.") returns ({ "abc", "abbot" })
+    regexp(arr, "ab.", 1) returns ({ "def", "lab" })
+    regexp(arr, "ab.", 2) returns ({ 1, 0, 1, 0 })
+
