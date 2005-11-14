@@ -1,0 +1,11 @@
+SYNOPSIS
+        float tan(int|float)
+
+DESCRIPTION
+        Returns the tangent of the argument.
+
+HISTORY
+        LDMud 3.2.9 added integers as arguments.
+
+SEE ALSO
+        sin(E), asin(E), cos(E), acos(E), atan(E), atan2(E)

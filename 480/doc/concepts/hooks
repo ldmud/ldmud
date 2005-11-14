@@ -1,0 +1,495 @@
+CONCEPT
+        driver hooks
+
+DESCRIPTION
+        To allow a greater flexibility of the muds, the gamedrivers
+        since 3.2.1 moved several once hardcoded 'underground'
+        activities from the driver into the mudlib. This includes for
+        example the differences between compat and native mode.
+
+        The hooks are set with the privileged efun set_driver_hook().
+        Some of the hooks are mandatory, some not. Most hooks accept
+        unbound lambda closures as values, some also lfun closures or
+        even strings.
+        The hooks are identified by an ordinal number, for which
+        symbolic names are defined in /sys/driverhooks.h.
+
+        H_MOVE_OBJECT0
+        H_MOVE_OBJECT1
+          Mandatory hooks to implement the efun void move_object().
+          Hook setting must be an unbound lambda closure:
+
+            void <closure>(object item, object dest)
+
+          Upon call, the hook has to perform the move itself (by using
+          set_environment()) and all depending actions (like the calls to
+          init() to add actions).
+
+          The difference lies in the binding of the set hook prior to
+          the call: the H_MOVE_OBJECT0 closure is bound to the current
+          object, the H_MOVE_OBJECT1 to 'item'.
+          If both hooks are set, H_MOVE_OBJECT0 is ignored.
+
+
+        H_LOAD_UIDS
+        H_CLONE_UIDS
+          Mandatory hooks to determine the uid and euid of loaded or cloned
+          objects.  Hook settings can be any closure:
+
+            mixed <load_uids closure> (string objectname)
+            mixed <clone_uids closure>(object blueprint, string objectname)
+
+          When an object is newly loaded, the H_LOAD_UIDS hook is
+          called with the object name as argument.
+          When an object is cloned, the H_CLONE_UIDS hook is called
+          with the blueprint object as first and the clone's designated
+          name as second argument.
+          In both cases the new object already exists, but has 0 uids.
+
+          For the result, the following possibilities exist (<num> is
+          a non-zero number, <no-string> is anything but a string):
+
+             "<uid>"                    -> uid = "<uid>", euid = "<uid>"
+             ({ "<uid>", "<euid>" })    -> uid = "<uid>", euid = "<euid>"
+             ({ "<uid>", <no-string> }) -> uid = "<uid>", euid = 0
+
+          If strict-euids is not active, the following results are
+          possible, too:
+
+             <num>                      -> uid = 0, euid = 0
+             ({ <num>, "<euid>" })      -> uid = 0, euid = "<euid>"
+             ({ <num>, <no-string> })   -> uid = 0, euid = 0
+
+
+        H_CREATE_SUPER
+        H_CREATE_OB
+        H_CREATE_CLONE
+          Optional hooks to initialize an object after creation.
+          Hook setting can be unbound lambda closures, or the name of
+          the function to call in the object.
+
+          H_CREATE_SUPER is called for blueprints implicitely loaded
+          by inheritance, H_CREATE_OB for explicitely loaded
+          blueprints/objects, and H_CREATE_CLONE for cloned objects.
+
+          If the hook is a closure expecting an argument, it is bound
+          to the current object and called as
+
+            int <closure> (object obj_to_init)
+
+          If the hook as a closure without arguments, it is bound to
+          the object to be initalized and called as
+
+            int <closure> ( void )
+
+          If the result of the call is a non-zero number, it is used
+          as the interval to wait before the first reset(), else the default
+          interval computed from TIME_TO_RESET is used.
+
+          If the hook is defined as the name of an lfun in the object,
+          it is called in the object as
+
+            void <name>(0)
+
+          and any result is ignored.
+          In this call the previous_object() is the object initiating
+          the load.
+
+
+        H_RESET
+          Optional hook to reset an object.
+          Hook setting can be unbound lambda closures, or the name of
+          the function to call in the object.
+
+          This hook is called to reset the object after a certain time
+          since its creation/last reset.
+
+          If the hook is a closure, it is bound to the object to be
+          reset and called with no argument:
+
+            void|int <closure> ( void )
+
+          If the result of the call is a positive number, it is used
+          as the interval to wait before the next reset().
+          If the result is 0, the default interval computed from
+          TIME_TO_RESET is used.
+          If the result is a negative number, the object will not be
+          reset again, unless directed otherwise by set_next_reset().
+
+          If the hook is defined as the name of an lfun in the object,
+          it is called in the object as
+
+            void <name>(1)
+
+          and any result is ignored.
+          In this call the previous_object() is the object initiating
+          the reset.
+          If the function does not exist, the object won't be reset
+          again.
+
+
+        H_CLEAN_UP
+          Optional hook to clean up an object.
+          Hook setting can be any closure, or the name of the function
+          to call in the object.
+
+          This hook is called for an object if it hasn't been used
+          for at least TIME_TO_CLEAN_UP seconds, to give it the
+          opportunity to self destruct.
+
+          If the hook is a closure, it is called as
+
+            int <closure>(int ref, object ob)
+
+          with the object to clean up as first, and its refcount as
+          second argument. Lambda closures are also bound to the
+          object prior to the call.
+
+          If the hook is the name of an lfun, it is called in the
+          object with its refcount as argument:
+
+            void|int <name>(int ref)
+
+          In both calls, the refcount is constructed as:
+
+            ref = 0: the object is a clone, or a blueprint with
+                     replaced program.
+            ref = 1: the object is a swapped or unused blueprint.
+            ref > 1: the object is a used blueprint with <ref> references.
+
+          The cleanup method has the possibility to destruct the
+          object. To survive this time, but try again some time later,
+          the call has to result in a non-zero value.
+
+          If the hook specifies a non-existing lfun, or if the call
+          returns 0, no further attempt to clean up this object will be done.
+
+
+        H_COMMAND
+          Optional hook to parse and execute commands. If this hook is used,
+          it bypasses the normal command parsing done by the driver (including
+          the MODIFY_COMMAND and NOTIFY_FAIL hooks).
+
+          The hook is called with two parameters: the command received
+          from the living (interactive user or NPC), and the living object
+          (the 'command giver') itself. The hook has to return non-0 if the
+          command was found and executed, and 0 otherwise.
+
+          At the time the hook is called, query_command() returns the command
+          string and this_player() returns the living object. query_verb() and
+          query_notify_fail() return 0.
+
+          If the hook is a string, it is the name of an lfun in the command
+          giver:
+
+              int <name>(string command, object command_giver)
+
+          If the hook is a closure, it is called as:
+
+              int <closure>(string command, object command_giver)
+
+          Lambda-closures are additionally bound to the command_giver.
+
+
+        H_MODIFY_COMMAND
+          Optional hook to modify commands (both entered or given by a
+          call to command()) before the parser sees them (this includes
+          special commands like 'status').
+
+          Hook setting can be any closure, the name of the function
+          to call in the object, or a mapping.
+
+          For interactives this hook is used only if the interactive
+          object has no command modifier already set by the efun
+          set_modify_command().
+
+          If the hook is a closure, it is called as
+
+            int|string <closure>(string cmd, object player)
+
+          with the entered command as first, and the command giving
+          player as second argument.
+
+          If the hook is a string, it is used as the name of an lfun
+          in the command giving player, which is called as
+
+            int|string <name>(string cmd)
+
+          If the hook is a mapping, it is queried with the given
+          command as index, and the data retrieved is used (defaults
+          to 0 if no data is stored for a given command). If an entry
+          is a closure, it is called as
+
+            int|string <closure>(string cmd, object player)
+
+          and the result from the call is used as 'the' result.
+
+          The result is treated equal in all three cases.
+          If the result is a string, it is the new command to execute
+          instead of the given one. Note that it is not possible to
+          make several commands from one this way!
+          If the result is a non-zero number, the given command is to
+          be ignored. In case of the closure/lfun setting this may
+          mean that the closure/lfun already executed it.
+          If the result is 0, the originally given command is to be
+          used.
+
+          It is possible for the hook to change the command giver
+          (this_player()) for the execution of the command. This means that
+          even though the commands are execute for the original commandgiver,
+          this_player() will return the changed commandgiver.
+
+
+        H_MODIFY_COMMAND_FNAME
+          Mandatory hook specifying the name of the 'modify_command'
+          function to call for newly entered commands as result of a
+          set_modify_command().
+
+          Hook setting must be a string.
+
+          If set_modify_command() is used for an interactive user, all
+          newly entered commands are first passed to the function
+          named by this hook.
+
+          The function is called as
+
+            int|string <name>(string cmd)
+
+          If the result is a string, it is the new command to execute
+          instead of the given one. Note that it is not possible to
+          make several commands from one this way!
+          If the result is a non-zero number, the given command is to
+          be ignored. In case of the closure/lfun setting this may
+          mean that the closure/lfun already executed it.
+          If the result is 0, the originally given command is to be
+          used.
+
+          It is possible for the hook to change the command giver
+          (this_player()) for the execution of the command. This means that
+          even though the commands are execute for the original commandgiver,
+          this_player() will return the changed commandgiver.
+
+
+        H_NOTIFY_FAIL
+          Mandatory hook to issue the default message if an entered
+          command couldn't be parsed and no notify_fail() command is
+          in effect.
+          Hook setting can be a any closure, or a string.
+
+          If set to a string, it is the message returned to the
+          player.
+          If set to a closure, it is called as
+
+            string <closure>(string entered_command, object cmd_giver)
+
+          and the result is used as failure message. Lambda closures
+          are bound to this_player() prior to execution.
+
+          <cmd_giver> is the object which received the command in
+          the first place. It is usually identical with this_player(),
+          unless the H_MODIFY_COMMAND hook changed it.
+
+
+        H_SEND_NOTIFY_FAIL
+          Optional hook to send the notify fail message, regardless
+          of how it was determined, to the player. If the hook is not
+          set, the message is delivered using tell_object() internally.
+          Hook setting can be a string or a closure.
+
+          If the hook is a string, it is the name of a (possibly static)
+          function to call in the current command giver. If the hook
+          is a closure, it is the function to be called. Lambda closures
+          are bound to the current command giver first.
+
+          The function is called as
+
+            void <function>(string msg, object msgobj, object orig_cmd_giver)
+
+          <msg> is the notify fail message to be delivered.
+          <msgobj> is the object which set the message. It is 0 for the
+          default message.
+          <orig_cmd_giver> is the object for which the original command
+          was first received. It is usually identical with the current
+          command giver this_player().
+
+
+        H_NO_IPC_SLOT
+          Optional hook specifying the message given to logins
+          rejected due to space limitations (MAX_PLAYER).
+          Hook setting has to be string.
+          If set to 0, the default message "Lpmud is full. Come back
+          later." is issued.
+
+
+        H_INCLUDE_DIRS
+          Semi-mandatory hook specifying the directories where <>-type
+          include files are searched (this includes ""-includes not
+          found as specified).
+          Hook setting may be any closure or a string array.
+          If not set, only ""-type includes may be used in LPC
+          programs.
+
+          If the hook setting is a string array, it has to contain the
+          path names of those directories where <>-type includes are
+          to be searched. The directories are searched in the order
+          they appear in the array. The directory name and the name of
+          the actual include file are concatenated, therefore the
+          directory names have to end in '/'. Leading slashes may be
+          omitted.
+
+          If the setting is a closure, it is called as
+
+            string <closure>(string include_name, string current_file)
+
+          with the name of the desired include file as first, and the
+          name of the compiled LPC file as second argument.
+          Result has to be the complete path name of the include file
+          to use (leading slashes may be omitted).
+          If the closure is a lambda closure, it is bound to
+          this_object() prior to execution.
+
+          See also: master apply include_file()
+
+
+        H_AUTO_INCLUDE
+          Optional hook specifying a string to be included before
+          the source of every compiled LPC object.
+          Hook setting can be a string or a closure.
+
+          If the setting is a string, it will be automatically included before
+          the source of every compiled LPC object.
+
+          If the setting is a closure, it is called as
+            
+            string <closure>(string base_file, string current_file
+                            , int sys_include)
+
+          for every file opened by the compiler. <base_file> will be the
+          filename of the compiled object, <current_file> the name of a file
+          included directly or indirectly by the <base_file>. When the
+          <base_file> itself is opened, <current_file> will be 0. For an
+          included file, <sys_include> will be TRUE if it is a <>-type
+          include.
+
+          If the result is a string, it will be included before the actual
+          text of the file.
+
+
+        H_TELNET_NEG
+          Optional hook to specifiy how to perform a single telnet
+          negotiation.
+          Hook setting may be any closure or a string.
+          If not set, most telnet options are rejected (read: only a
+          very minimal negotiation takes place).
+
+          The hook is called whenever the driver receives a demand for
+          option negotiation for:
+
+            SB:               Suboption negotiation
+            TELOPT_LINEMODE:  linemode
+            TELOPT_NAWS:      window size
+            TELOPT_TTYPE:     terminal type
+            TELOPT_TM:        timing mark
+            TELOPT_NEWENV:    remote environment variables
+            TELOPT_ENVIRON:   remote environment variables
+            TELOPT_XDISPLOC:  remote X display address
+            TELOPT_TSPEED:    terminal speed
+            TELOPT_BINARY:    binary data, needed for non-ASCII charsets
+            TELOPT_EOR:       TinyFugue prompt marker (together with EOR)
+
+            TELOPT_COMPRESS:  Mud Compression Protocol
+            TELOPT_COMPRESS2: Mud Compression Protocol
+            TELOPT_MSP:       Mud Sound Protocol
+            TELOPT_MXP:       Mud Extension Protocol
+
+          The hook has then to perform the negotiation using the efun
+          binary_message().
+
+          Alternatively, if H_NOECHO is set, this hook is called
+          for all telnet data received.
+
+          If the setting is a string, it used as name of an lfun to
+          call in this_player():
+
+            void|mixed <name>(int action, int option [, int * opts ] )
+
+          Similar, if the setting is a closure, it is called as:
+
+            void|mixed <closure>(int action, int option [, int * opts ] )
+
+          with unbound lambda-closures being bound to this_player()
+          prior to execution.
+
+          The hook is called for a 'DO/DONT/WILL/WONT <opt>' with the action
+          (DO/DONT/...) as the first, and <opt> as the second argument.
+
+          If the driver receives the sequence
+
+            IAC SB <opt> <opts>...
+          
+          followed by IAC SB/SE,  the hook is called with 'SB' as first
+          argument, <opt> as second, and <opts> as an array of integers as
+          third argument.
+
+
+        H_NOECHO
+          Optional hook to specifiy how to perform the telnet actions
+          to switch the echo mode (used for e.g. password input_to()s).
+          Hook setting may be any closure or a string.
+          If not set, a default handling is performed.
+
+          If the setting is a string, it used as name of an lfun to
+          call in the intercative <user>:
+
+            void <name>(int flag, object user)
+
+          where <flag> is the echo-flag passed to the input_to()
+          statement.
+          Similar, if the setting is a closure, it is called as:
+
+            void <closure>(int flag, object user)
+
+          with unbound lambda-closures being bound to this_player()
+          prior to execution.
+
+          When set, the hook is called whenever the driver needs to
+          change the echo mode, thus you can negotiate about things
+          that are coupled with it, like LINEMODE or
+          character-at-a-time.
+          
+          IMPORTANT: If this hook is used, the control of all telnet
+          negotiation is transferred to the mudlib (you must combine it
+          with H_TELNET_NEG to conform to the telnet protocol).
+
+
+        H_ERQ_STOP
+          Optional hook to notify the mudlib about the termination of
+          the erq demon.
+          Hook setting may be any closure.
+
+          The closure is called without arguments:
+
+            void <closure>()
+
+          and may do whatever it likes to clean-up after the erq.
+
+
+HISTORY
+        H_NOTIFY_FAIL recevied the new 'command_giver' argument in 3.2.7.
+        The hooks concept was introduced in 3.2.1
+        The hook for moving was introduced in 3.2.1@1
+        The hook for clean up was introduced in 3.2.1@34
+        The hook for modifying commands was introduced in 3.2.1@51,
+            the evaluation of mapping as hooks was extended in 3.2.1@54.
+            The lfun called as result of set_modify_command() was
+            'hooked' in 3.2.1@109.
+        The hooks for notify_fail and full muds were introduced in 3.2.1@55.
+        The hook for include dirs was introduced in 3.2.1@57.
+        The hook for telnet negotiation was introduced in 3.2.1@60.
+        The hooks for no-echo negotiation and erq-lossage notification
+            were introduced in 3.2.1@85.
+        H_COMMAND was introduced in 3.2.7.
+        H_SEND_NOTIFY_FAIL and H_AUTO_INCLUDE were introduced in 3.2.9.
+
+SEE ALSO
+        native(C), set_driver_hook(E)
