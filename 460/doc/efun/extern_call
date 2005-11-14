@@ -1,0 +1,15 @@
+SYNOPSIS
+        int extern_call();
+
+DESCRIPTION
+        Returns zero, if the function that is currently being executed
+        was called by a local call, non-zero for call_other(), driver
+        applies, closure calls, etc. Currently the only return value
+        for them is 1, but later the various methods may be
+        distinguished by means of the return value.
+
+HISTORY
+        Introduced in 3.2@263 resp. 3.2.1@12
+
+SEE ALSO
+        call_other(E), previous_object(E)
