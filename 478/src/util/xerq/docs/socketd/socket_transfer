@@ -1,0 +1,9 @@
+SYNOPSIS
+	int socket_transfer(int fd, closure transfer_func)
+
+DESCRIPTION
+	Transfers a socket to another object/callback.
+	Transfer_func has to return the new callback or the transfer fails.
+
+SEE_ALSO
+	sockets

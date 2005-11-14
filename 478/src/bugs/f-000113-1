@@ -1,0 +1,28 @@
+Date: Thu, 13 Jan 2000 09:08:04 -0500 (EST)
+From: ldmud <ldmud@www.lpmud.com>
+Short: LDmud: efun reverse()
+Type: Feature
+State: New
+
+From:    Zora@PK-Mud
+Cc:
+Subject: reverse
+Date:    Thu Jan 13 12:31:26 2000
+
+member, sscanf, strstr usw. arbeiten linksorientiert. mit einer neuen efun,
+die strings umdreht, koennte man auch rechtsorientiert effizient arbeiten.
+
+z.B.
+  sscanf(file,"%s\n%s\n%s\n%s\n",z[0],z[1],z[2],z[3],z[4])
+  liefert die ersten 5 zeilen von file (am effizientesten bei sehr grossen
+Dateien)
+
+  sscanf(reverse(file), ""%s\n%s\n%s\n%s\n", z[0],z[1],z[2],z[3],z[4]);
+  dann steht in reverse(implode(z,"\n")) die letzten 5 zeilen vom file
+=== More: (64%) Page 1, 1..16 [CR,u,f,l,q,/<regexp>,<page>,?]
+
+                                                        Zora
+P.S. ich wuerde mich freuen, wenn du eine solche Funktion zur verfuegung
+stellen koenntest. insbesondere waere dies bei dem zeichenorientierten,
+mud-internem Editor, den Zwirch gerade schreibt, eine deutliche Beschleunigung
+
