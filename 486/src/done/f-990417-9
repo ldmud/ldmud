@@ -1,0 +1,296 @@
+Short: '...' syntax element
+From: Lars, Daniel Schild, Stefan
+Type: Feature
+State: Rejected - Implemented in 3.3.37 .
+
+The implementation in 3.3 takes advantage of that drivers regular efun
+structure, which doesn't exist in 3.2. For that reason, this feature
+won't be implemented in this branch.
+
+---------------------------------------------------------------------------
+Alternative varargs declaration: foo(a,b, c...) ?
+
+New function call syntax: foo(a,b,c...): if c is an array, it is flattened
+so that the actual call is foo(a,b,c[0], c[1], ... c[n]).
+
+Look at the patch below for hints on how to implement the compiler, but encode
+the calling scheme in the number of arguments. This of course makes it
+impossible to use efuns this way.
+
+
+Daniels approach, in the implementation for 3.2.5 by Stefan:
+
+	  . introduced additionaly varargs handling.
+	    enhanced LPC with operator '...' for function definitions:
+	    string foo (string bar1, int bar2, mixed * rest...) {
+	       return sprintf ("bar1: %s\nbar2: %d\nrest: %O", bar1, bar2, rest);
+	    }
+	    the call:
+	       foo ("first",3,1,2,3,4,5,6,7,8,9,0);
+	    will result in:
+	        bar1: first
+	        bar2: 3
+	        rest: ({ 1, 2, 3, 4, 5, 6, 7, 8, 9, 0 })
+            watch out for further enhancements.
+	    Idea and some semantics are taken from the MudOS development project.
+	* introduced new functionality for the '...' operator
+	  it now expands function arguments:
+	    void test (int x, int y, int z) {}
+	  the call
+	    a = ({ 1, 2, 3 });
+	    test(a...);
+	  results in:
+	    x = 1;
+	    y = 2
+	    z = 3;
+	  Idea and some semantics are taken from the MudOS development project.
+	  (thanks to Markus@TAPPMud for some hints)
+
+Index: func_spec
+===================================================================
+RCS file: /usr/src/cvs/ldmud/func_spec,v
+retrieving revision 3.2.5.1
+retrieving revision 3.2.5.2
+diff -c -2 -r3.2.5.1 -r3.2.5.2
+*** func_spec	1998/12/30 20:17:25	3.2.5.1
+--- func_spec	1998/12/31 11:39:43	3.2.5.2
+***************
+*** 91,94 ****
+--- 91,97 ----
+  "!"     not
+  ".."    range
++ #ifdef EXPAND_ARRAY
++ "..."	expand
++ #endif /* EXPAND_ARRAY */
+
+    /* These values are used by the stack machine, and can not be directly
+Index: interpret.c
+===================================================================
+RCS file: /usr/src/cvs/ldmud/interpret.c,v
+retrieving revision 3.2.5.1
+retrieving revision 3.2.5.2
+diff -c -2 -r3.2.5.1 -r3.2.5.2
+*** interpret.c	1998/12/30 20:17:25	3.2.5.1
+--- interpret.c	1998/12/31 11:39:43	3.2.5.2
+***************
+*** 159,162 ****
+--- 159,170 ----
+  #define STACK_OVERFLOW(sp, fp, pc) stack_overflow(sp, fp, pc)
+
++ #ifdef EXPAND_ARRAY
++ static int f_expand = 0;
++ #endif /* EXPAND_ARRAY */
++
++ #ifdef F_GET_NUM_ARGS
++ static unsigned short num_args_for_function;
++ #endif /* F_GET_NUM_ARGS */
++
+  /* defines and a helpfun for F_TERMINAL_COLOUR */
+
+***************
+*** 2872,2875 ****
+--- 2880,2887 ----
+      int num_arg;
+
++ #ifdef EXPAND_ARRAY
++     f_expand = 0;
++ #endif
++
+      inter_fp = sp - csp->num_local_variables + 1;
+      num_arg = EXTRACT_SCHAR(&funstart[0]);
+***************
+*** 3981,3984 ****
+--- 4005,4011 ----
+           */
+          csp->num_local_variables = EXTRACT_UCHAR(pc);
++ #ifdef EXPAND_ARRAY
++       	csp->num_local_variables += f_expand;
++ #endif /* EXPAND_ARRAY */
+          flags = setup_new_frame1(func_offset, 0, 0);
+          funstart = current_prog->program + (flags & FUNSTART_MASK);
+***************
+*** 6017,6020 ****
+--- 6044,6050 ----
+              csp->funstart = funstart;
+              csp->num_local_variables = num_arg;
++ #ifdef EXPAND_ARRAY
++       	    csp->num_local_variables += f_expand;
++ #endif /* EXPAND_ARRAY */
+              current_prog = prog = entry->program;
+              function_index_offset = entry->function_index_offset;
+***************
+*** 10182,10185 ****
+--- 10305,10311 ----
+              csp->prev_ob = previous_ob;
+              csp->num_local_variables = num_arg;
++ #ifdef EXPAND_ARRAY
++       	    csp->num_local_variables += f_expand;
++ #endif /* EXPAND_ARRAY */
+              csp->funstart = funstart = cache_funstart[ix];
+              current_prog = cache_progp[ix];
+***************
+*** 10245,10248 ****
+--- 10371,10377 ----
+                  cache_name[ix] = shared_name;
+                  csp->num_local_variables = num_arg;
++ #ifdef EXPAND_ARRAY
++           	    csp->num_local_variables += f_expand;
++ #endif /* EXPAND_ARRAY */
+                  current_prog = progp;
+                  flags = setup_new_frame1(fx, 0, 0);
+***************
+*** 12677,12680 ****
+--- 12860,12866 ----
+      csp->prev_ob = previous_ob;
+      csp->num_local_variables = num_arg;
++ #ifdef EXPAND_ARRAY
++     csp->num_local_variables += f_expand;
++ #endif /* EXPAND_ARRAY */
+      previous_ob = current_object;
+
+***************
+*** 12746,12749 ****
+--- 12932,12938 ----
+          csp->prev_ob = previous_ob;
+          csp->num_local_variables = num_arg;
++ #ifdef EXPAND_ARRAY
++    	    csp->num_local_variables += f_expand;
++ #endif /* EXPAND_ARRAY */
+          previous_ob = current_object;
+          current_object = l->function.alien.ob;
+Index: lex.c
+===================================================================
+RCS file: /usr/src/cvs/ldmud/lex.c,v
+retrieving revision 3.2.5.1
+retrieving revision 3.2.5.2
+diff -c -2 -r3.2.5.1 -r3.2.5.2
+*** lex.c	1998/12/30 20:17:25	3.2.5.1
+--- lex.c	1998/12/31 11:39:43	3.2.5.2
+***************
+*** 643,646 ****
+--- 643,656 ----
+          add_permanent_define("__EUIDS__", -1, string_copy(""), MY_FALSE);
+  #endif
++ #ifdef EXPAND_ARRAY
++ 	      add_permanent_define("EXPAND_ARRAY", -1, string_copy(""), 0);
++ #endif
++ #if defined(RESET_IF_SWAPPED) && RESET_IF_SWAPPED
++ 	      sprintf(mtext, "%d", RESET_IF_SWAPPED);
++ 	      add_permanent_define("RESET_IF_SWAPPED", -1, string_copy(mtext), 0);
++ #endif
++ #ifdef XTENDED_DEBUG_INFO
++ 	      add_permanent_define("XTENDED_DEBUG_INFO", -1, string_copy(""), 0);
++ #endif
+      mtext[0] = '"';
+      mtext[1] = '/';
+Index: prolang.y
+===================================================================
+RCS file: /usr/src/cvs/ldmud/prolang.y,v
+retrieving revision 3.2.5.1
+retrieving revision 3.2.5.2
+diff -c -2 -r3.2.5.1 -r3.2.5.2
+*** prolang.y	1998/12/30 20:17:25	3.2.5.1
+--- prolang.y	1998/12/31 11:39:44	3.2.5.2
+***************
+*** 192,195 ****
+--- 192,199 ----
+  static struct efun_shadow *all_efun_shadows = 0;
+
++ %ifdef EXPAND_ARRAY
++ static char f_expand;
++ %endif
++
+  #ifdef __STDC__
+  void yyerrorf(char *format, ...)
+***************
+*** 684,687 ****
+--- 688,694 ----
+      variables_initialized = 0;
+  %endif
++ %ifdef EXPAND_ARRAY
++     f_expand = 0;
++ %endif
+  }
+
+***************
+*** 1400,1403 ****
+--- 1407,1413 ----
+  %right '~' F_NOT
+  %nonassoc F_INC F_DEC
++ %ifdef EXPAND_ARRAY
++ %left F_EXPAND
++ %endif /* EXPAND_ARRAY */
+  %left F_ARROW '['
+  %%
+***************
+*** 3940,3944 ****
+  expr_list3: /* empty */                { $$ = 0; }
+           | expr0                { $$ = 1; add_arg_type($1.type); }
+!          | expr_list2 ',' expr0        { $$ = $1 + 1; add_arg_type($3.type); } ;
+
+  %ifdef MAPPINGS
+--- 3950,3971 ----
+  expr_list3: /* empty */                { $$ = 0; }
+           | expr0                { $$ = 1; add_arg_type($1.type); }
+!          | expr_list2 ',' expr0        { $$ = $1 + 1; add_arg_type($3.type); }
+! %ifdef EXPAND_ARRAY
+!          | expr0 F_EXPAND
+! 	{
+! 	    $$ = 1;
+! 	    add_arg_type($1.type);
+!  	    ins_f_byte (F_EXPAND);
+! 	    f_expand = 1;
+!   	}
+!        	 | expr_list2 ',' expr0 F_EXPAND
+!         {
+! 	    $$ = $1 + 1;
+! 	    add_arg_type($3.type);
+! 	    ins_f_byte (F_EXPAND);
+! 	    f_expand = 1;
+!         }
+! %endif /* EXPAND_ARRAY */
+! ;
+
+  %ifdef MAPPINGS
+***************
+*** 4976,4980 ****
+               * Check the argument types.
+               */
+!             if (exact_types && first_arg != INDEX_START_NONE)
+              {
+                  int i;
+--- 5003,5011 ----
+               * Check the argument types.
+               */
+!             if (exact_types && first_arg != INDEX_START_NONE
+! %ifdef EXPAND_ARRAY
+!         	       && !f_expand
+! %endif
+!             )
+              {
+                  int i;
+Index: lex.c
+===================================================================
+RCS file: /usr/src/cvs/ldmud/lex.c,v
+retrieving revision 3.2.5.1
+retrieving revision 3.2.5.2
+diff -c -2 -r3.2.5.1 -r3.2.5.2
+*** lex.c	1998/12/30 20:17:25	3.2.5.1
+--- lex.c	1998/12/31 11:39:43	3.2.5.2
+***************
+*** 643,646 ****
+--- 643,656 ----
+          add_permanent_define("__EUIDS__", -1, string_copy(""), MY_FALSE);
+  #endif
++ #ifdef EXPAND_ARRAY
++ 	      add_permanent_define("EXPAND_ARRAY", -1, string_copy(""), 0);
++ #endif
++ #if defined(RESET_IF_SWAPPED) && RESET_IF_SWAPPED
++ 	      sprintf(mtext, "%d", RESET_IF_SWAPPED);
++ 	      add_permanent_define("RESET_IF_SWAPPED", -1, string_copy(mtext), 0);
++ #endif
++ #ifdef XTENDED_DEBUG_INFO
++ 	      add_permanent_define("XTENDED_DEBUG_INFO", -1, string_copy(""), 0);
++ #endif
+      mtext[0] = '"';
+      mtext[1] = '/';

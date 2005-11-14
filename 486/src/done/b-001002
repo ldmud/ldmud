@@ -1,0 +1,32 @@
+Short: filter() clobbers a svalue
+Date: Mon, 2 Oct 2000 17:44:05 -0500
+From: Casey Zacek <cz@800hosting.com>
+Type: Bug
+State: Done - fixed in 3.2.9-dev.235
+
+
+Well, from reading the changelogs and such, I thought this one might
+have been fixed in dev.233, but I guess not:
+
+create() {
+    int *i = ({ 1 });
+    filter( ({ 2, 3, 4 }), "f", &(i[0]) );
+}
+
+void f( int x, int ref ) {
+    printf( "ref: %O\n", ref );
+}
+
+yields:
+
+ref: 1
+ref: !ERROR: GARBAGE SVALUE (816)!
+ref: !ERROR: GARBAGE SVALUE (816)!
+
+Analysis:
+Protected lvalues don't have a refcount, so on the first return from the
+callback, the lvalue was freed even though it was still needed.
+
+A real solution would require a major rewrite of the lvalue system, so for
+now protected lvalues are verboten for multiple callbacks.
+
