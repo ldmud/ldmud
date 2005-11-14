@@ -1,0 +1,119 @@
+SYNOPSIS
+        varargs string terminal_colour( string str
+                                      , null|mapping|closure map
+                                      , int wrap, int indent )
+
+DESCRIPTION
+        If <map> is given as a non-0 value, this efun expands all
+        colour-defines of the form "%^KEY%^" (see below for details) from the
+        input-string and replaces them by the apropriate values found
+        for the color-key specified by <map>.
+        
+        If <map> is a mapping, the entries queries have the
+        format "KEY" : "value", non-string contents are ignored with one
+        exception: if the mapping contains an entry 0:value, it is used
+        for all otherwise unrecognized keys. The value in this case can be
+        a string, or a closure. If it is a closure, it takes the key as
+        argument and has to return the replacement string.
+
+        If <map> is given as a closure, it is called with the KEYs to
+        replace, and has to return the replacement string.
+
+        The special keys "%^%^" and "%%^^" are always replaced with the
+        literal "%^".
+
+        The parameters wrap and indent are both optional, if only wrap is
+        given then the str will be linewrapped at the column given with
+        wrap. If indent is given too, then all wrapped lines will be
+        indented with the number of blanks specified with indent.
+
+        The wrapper itself ignores the length of the color macros and that
+        what they contain, it wraps the string based on the length of the
+        other chars inside. Therefore it is color-aware.
+
+        If <map> is given as 0, the efun does no colour-define detection
+        and replacement at all, but still does linewrapping and indentation
+        if requested. This way terminal_colour() doubles as a simple
+        line wrapping function, duplicating the functionality also
+        provided by sprintf("%-=s").
+
+
+        KEY RECOGNITION STRATEGY
+
+        As mentioned above, the special keys "%^%^" and "%%^^" are always
+        replaced with the literal "%^" and play no role in the following
+        considerations.
+
+        The input string is supposed to follow this syntax:
+
+          text { '%^' colorkey '%^' text } [ '%^' colorkey ]
+
+        or in words: the efun splits up the string at every '%^' it finds
+        and then treats every second substring as color key.
+
+
+        Note that this is different from the way MudOS treats the
+        input string. MudOS uses this syntax:
+
+          key_or_text { '%^' key_or_text }
+
+        or in words: the MudOS efun splits the string at every '%^' and
+        then tries to treat every substring as color key. One can achieve
+        the MudOS behaviour with this LPC function:
+
+          string mudos_terminal_colour(string str, mapping ext, int w, int i)
+          {
+            return terminal_colour("%^"+implode(explode(str, "%^")-({""})
+                                               ,"%^%^")
+                                  , ext, w, i);
+          }
+
+
+EXAMPLES
+        mapping trans;
+        string str;
+
+        trans = ([ "GREEN" : "ansi-green", "RED" : "", "BLUE" : 1 ]);
+
+        str = terminal_colour( "%^GREEN%^ and %^RED%^ and %^BLUE%^", trans );
+
+        This will result in str == "ansi-green and  and BLUE"
+
+        %^GREEN%^ is expanded to ansi-green because trans defines that,
+        %^RED%^ is stripped because trans defines that as "" and
+        %^BLUE%^ gets the %^'s removed because the contents of trans are
+        not valid (i.e. no string). The same would happen to %^DEFINES%^
+        where the key is not found inside the trans mapping.
+
+        Caveat: to replace adjacent keys, use the efun like this:
+
+            str = terminal_colour( "%^GREEN%^%^RED%^", trans );
+
+        A command like
+
+            str = terminal_colour( "%^GREEN%^RED%^", trans );
+
+        will return the logical but sometimes unexpected "ansi-greenRED".
+
+
+        Some words about wrapping:
+
+        a string wrapped without indent would look like this:
+
+            "this is the first line\nand this is the second line"
+
+        a string wrapped with indent 3 would look like:
+        
+            "this is the first line\n   and this is the indented second one"
+
+
+HISTORY
+        Efun idea and initial implementation taken from MudOS; the key
+        recognition strategy (including pure wrapping mode) was straightened
+        out in LDMud 3.2.8.
+        LDMud 3.2.9 added the use of closures to specify the colour mappings,
+        and officialized the "%%^^" replacement pattern for better MudOS
+        compatibility.
+        
+SEE ALSO
+        sprintf(E)

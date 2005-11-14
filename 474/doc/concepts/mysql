@@ -1,0 +1,192 @@
+CONCEPT
+            mysql - mySQL support
+
+DESCRIPTION
+        On hosts with the mySQL package installed, the driver can be
+        configured to interface with the mySQL database. If that is done,
+        the driver defines the macro __MYSQL__ for LPC programs and
+        activates a number of efuns.
+
+        -- Configuration --
+        
+        Create a dedicated user in the mySQL database for the driver.
+        Enter this username and password in the file pkg-mysql.c, function
+        mysql_real_connect(), and compile the driver (the username and
+        password are built into the driver for security reasons).
+        If you chose to not create either a username and/or a password,
+        leave the corresponding entry at 0.
+
+        Use mysqladmin to create any databases you want to provide - the
+        names are later used in the efun db_connect() to connect to
+        the databases.
+
+
+        -- Usage --
+
+        The idea behind SQL-support is that you can swap large amounts of
+        data into a database where it can be accessed very easily.
+        As mySQL "limits" the number of connections to 100 and as every
+        connection to the mySQL-server takes time, you should use
+        database serverobjects in your MUD which constantly keep the
+        connection to the mySQL-server.
+
+        To connect to your mySQL-server, use the efun db_connect(). It
+        takes only one argument which is the name of the database (which
+        must exist).  The return-value of db_connect() is an integer
+        representing the unique handle to the database with which you will
+        identify your connection later.
+
+        To send or retrieve data from this connection, use db_exec(). The
+        first parameter for all efuns dealing with an open connection is
+        always the handle and so is the first argument the handle and the
+        second one the command you want to issue. The return-value is
+        either 0 if there was an error in your command (this can have
+        various reasons), otherwise your handle is returned again. A typical
+        SQL-statement to retrieve data would be like this:
+        
+                select aliases.command from aliases where (name = 'mario' AND
+                  alias regexp 'l.*')
+
+        As you know, mySQL accepts either " or ' to classify strings for
+        parameters.  Most likely, you will pass variables and don't know
+        whether they contain one or more of these key-chars (or even other
+        chars that need to be converted). mySQL provides a function for
+        converting just any string into an acceptable argument and this is
+        implemented in db_conv_string().
+
+        So the above example with variables looks like this:
+
+                select aliases.command from aliases where (name ='"+
+                  db_conv_string(name)+"' AND alias regexp '"+
+                  db_conv_string(mask)+"')
+
+        I left out the db_exec()-stuff, more complete examples will follow.
+
+        After you initiated a statement that should return rows from the
+        database, use db_fetch() to retrieve the data. db_fetch() returns
+        the data row by row and not all at once. You need to call it until
+        it returns 0. THIS IS IMPORTANT! If stop calling db_fetch() before
+        it reaches the end of data, serious inconsistencies can happen.
+
+        If you used a DELETE- or UPDATE-statement, you cannot call db_fetch(),
+        but you might be interested in the number of deleted/changed rows
+        which can be queried with db_affected_rows().
+
+        After all operations are done in the database, you should use
+        db_close() to close the connection again. If you are using a
+        database-server-concept, place it in the remove()-function.
+
+        The SQL-efuns have some built-in optimization-features to speed up
+        often used connections. To get a list of all open connections to the
+        mySQL-server, use db_handles() which returns an array of integers
+        with all open handles.
+
+
+EXAMPLE
+        A simple server to store aliases could be implemented like this:
+
+        /*
+        **  CREATION:
+        **
+        **  create table aliases (
+        **      name varchar(15) not NULL,
+        **      alias varchar(20) not NULL,
+        **      command varchar(255) not NULL,
+        **      primary key (name, alias));
+        */
+
+        #define DATABASE "mud"
+
+        private int handle;
+
+        public void create()
+        {
+            handle = db_connect(DATABASE);
+        }
+
+        public int remove()
+        {
+            if ( handle )
+                db_close(handle);
+            destruct(ME);
+            return !ME;
+        }
+
+        public int AddAlias(string alias, string command, object ob)
+        {
+            if ( !handle )
+                handle = db_connect(DATABASE);
+            if ( !db_exec(handle,
+                          "insert into aliases (name, alias, command) values "
+                          "('" + getuid(ob) + "','" + db_conv_string(alias)
+                               + "','"+
+                          db_conv_string(command) + "')") )
+                return -1;
+            return 1;
+        }
+
+        public int RemoveAlias(string alias, object ob)
+        {
+            int res;
+
+            if ( !handle )
+                handle = db_connect(DATABASE);
+            res = db_exec(handle,
+                          "delete from aliases where (name = '"+
+                          getuid(ob) + "' AND alias = '"
+                                     + db_conv_string(alias)+
+                          "')");
+            if ( !res )
+                return 0;
+            res = db_affected_rows(handle);
+            return (res > 0)?1:-1;
+        }
+
+        public mixed *QueryAliases(string mask, object ob)
+        {
+            mixed *result;
+            string *tmp;
+
+            if ( !handle )
+                handle = db_connect(DATABASE);
+            if ( !db_exec(handle,
+                          "select aliases.alias, aliases.command from aliases where "
+                          "(name = '" + getuid(ob)+
+                          "' AND alias regexp '" + db_conv_string(mask) + "')") )
+                return ({ });
+            result = ({ });
+            while ( sizeof(tmp = db_fetch(handle)) )
+                result += ({ tmp });
+            return result;
+        }
+
+        public string QueryAlias(string alias, object ob)
+        {
+            mixed *result;
+            string *tmp;
+
+            if ( !handle )
+                handle = db_connect(DATABASE);
+            if ( !db_exec(handle,
+                          "select aliases.command from aliases where "
+                          "(name = '" + getuid(ob)+
+                          "' AND alias = '" + db_conv_string(alias) + "')") )
+                return 0;
+            result = ({ });
+            while ( sizeof(tmp = db_fetch(handle)) )
+                result += tmp;
+            return sizeof(result)?result[0]:0;
+        }
+
+
+AUTHOR
+        Mark Daniel Reidel and others.
+
+HISTORY
+        mySQL support was added as a package in 3.2.8 and became and
+        integral driver part in 3.2.9.
+
+SEE ALSO
+        db_affected_rows(E), db_conv_string(E), db_close(E),
+        db_connect(E), db_exec(E), db_fetch(E), db_handles(E),
+        db_insert_id(E), db_coldefs(E), db_error(E)

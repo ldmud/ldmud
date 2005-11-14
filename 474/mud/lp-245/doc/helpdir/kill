@@ -1,0 +1,7 @@
+command: kill
+argument: a monster
+
+Start attacking a monster. It is possible to run away anytime from a fight.
+If you catch up with a fleeing person, you will get one attack for free.
+
+See also 'stop'.
