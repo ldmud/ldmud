@@ -1,0 +1,28 @@
+Date: Mon, 21 Feb 2000 22:56:35 +0100
+Short: Crash im array-call_other
+From: gnomi@UNItopia.rus.uni-stuttgart.de (Gnomi)
+Type: Bug
+State: Done - fixed in 3.2.8-dev.173
+
+
+Hallo!
+
+Also ich habe heute einen Driver-Bug entdeckt, der das MUD crasht (und das
+MUD, das dabei gecrasht ist, war dummerweise Unitopia, da ich nix boeses
+ahnte.) Und zwar verarbeitet das neue call_other auch Arrays. Es verhaelt
+sich dann (fast) genauso wie das map_objects. Wenn man dem call_other dabei
+aber ein leeres Array uebergibt und noch mindestens einen Parameter, dann
+crashed der Driver.
+Beispiel: ({})->x(1);
+Ich habe ab und zu (im HomeMUD dann) vorher noch die Fehlermeldung
+"Bad stack after evaluation." bekommen.
+Vielleicht waere vorerst ein Hinweis in der Enzy angebracht, dass man
+call_other nicht mit Arrays nutzen sollte.
+
+Gruss
+Gnomi
+
+P.S.: Aus diesem Grunde lautet mein Aenderungsvorschlag fuer /i/move nun:
+    map_objects(followers, "notify_follow", this_object(), old_room,
+          new_room, dir ,way, explizit_out, explizit_in);
+
