@@ -1,0 +1,42 @@
+SYNOPSIS
+        void destruct(object ob)
+
+DESCRIPTION
+        Completely destroy and remove object ob (if not already done so).
+        After the call to destruct(), no global variables will exist any
+        longer, only local ones, and arguments.
+        
+        If an object self-destructs, it will not immediately terminate
+        execution. If the efun this_object() will be called by the
+        destructed object, the result will be 0. Furthermore, all
+        calls to other objects and to simul-efuns will be ignored, instead
+        the driver will return 0 als 'call' result.
+        
+        To keep things consistent, most mudlibs frown upon the
+        destruct()ion of other objects, and instead demand call_others
+        to a specific lfun in the object to destruct (traditionally
+        named "remove"). This will then ensure correct update of e.g.
+        weights, volumes etc.
+
+        The interpreter does not really destruct the object
+        immediately, but marks it as deleted, removes it from the list
+        of all objects, and puts it onto a list of to-be-destructed
+        objects. The actual freeing occurs only when all references to
+        a destructed object have gone. Thus it is possible, that an
+        object occupies memory long after it has been destructed,
+        although the object is not visible anywhere anymore from
+        outside.
+
+EXAMPLE
+        ob->remove();
+        if(ob)        /* still there, probably ob does not provide remove() */
+           destruct(ob);
+        
+        This is a way of destructing an object but giving it a chance
+        to do it by itself.
+
+HISTORY
+        Changed in 3.2.7 to accept destructed objects as argument, too.
+
+SEE ALSO
+        clone_object(E), remove(A)
