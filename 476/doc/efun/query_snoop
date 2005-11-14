@@ -1,0 +1,9 @@
+SYNOPSIS
+        object query_snoop(object victim)
+
+DESCRIPTION
+        Returns the user who currently snoops victim. The calling
+        object must be privileged by the master object.
+
+SEE ALSO
+        snoop(E)

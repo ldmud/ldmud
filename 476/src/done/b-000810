@@ -1,0 +1,33 @@
+Short: bug mit ++
+Date: Fri, 11 Aug 2000 00:00:38 +0200
+From: mammi@UNItopia.rus.uni-stuttgart.de (Mammi)
+Type: Bug
+State: Done - fixed in 3.2.8-dev.223
+Driver: 3.2.8-dev.216
+
+Huhu!
+
+Der fehler tritt auf, wenn man ein objekt mit heartbeat versieht
+
+int global_var;
+
+void heart_beat()
+{
+    if (++global_var >= 42)
+        <in obiger zeile tritt dann der fehler auf>
+}
+
+global_var wird nicht initiallisiert. heart_beat wird im create
+eines Inherits des Files gesetzt.
+
+Ich kann dir das komplette File samt Inherits schicken. 
+global_var++ gibt halt keinen Fehler. 
+
+
+Datei:
+/z/Gilden/Hexenvolk/obj/vertraut/vertraut.c
+bzw. 
+/z/Gilden/Hexenvolk/obj/vertraute/cat.c beispielsweise
+
+Nutzt aber auch noch einige includedateien...
+**

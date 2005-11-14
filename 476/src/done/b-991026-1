@@ -1,0 +1,182 @@
+Short: Crash in Inline Closures
+Date: Tue, 26 Oct 1999 17:25:16 +0200
+From: Andreas Weller <aw6@informatik.uni-ulm.de>
+Type: Bug
+State: Done - already fixed in 3.2.8-dev.144
+
+Ich hatte nochmal nen Crasher bei Inline-Closures, der
+vermutlich nicht mit dem andern zusammenhaengt:
+---------------------------------
+inherit "/std/thing"; /* or add to the test_master.c */
+
+void init()
+{
+  add_action("crash","crash"); // direkt im create() hats 
+                               // nicht gecrasht
+}
+
+int crash(string arg)
+{
+ object *anwesende;
+
+ anwesende=users();  // ein Array muss beteiligt sein
+
+ switch(arg)         // ausserdem ein switch 
+ {
+   case "XXX":
+   default:
+     (: :);          // mit einer closure drin
+ }
+ return 1;
+}
+----------------
+crasht mit 
+Program received signal SIGSEGV, Segmentation fault.
+0x8088709 in _free_vector (p=0x0) at array.c:369
+array.c:369: No such file or directory.
+(gdb) bt
+#0  0x8088709 in _free_vector (p=0x0) at array.c:369
+#1  0x80e0cac in start_of_stack ()
+#2  0x807bdd4 in apply_low (fun=0x0, ob=0x8287e62, num_arg=135922608,
+    b_ign_prot=127) at interpret.c:18450
+
+-----------------------------------
+
+Der Crash trat auch mit dem test_master auf, allerdings
+auf etwas ungewoehnliche Art. 
+
+Ich hab als Attachments das Log vom gdb und das Log vom Telnet
+angehaengt.
+
+Erst beim 3. Aufruf des Befehls 'crash' (add_action auf
+die bekannte Funktion) kommt es zum crash, das allerdings
+bei mehreren Versuchen regelmaessig.
+Aber schon beim 2.Versuch ist das Verhalten nicht mehr 
+korrekt, die Funktion crash() macht ein return 0 statt
+dem return 1 (last_instructions ab 819a6f1 im gdb_log).
+Scheinbar wird da der Code selbst ueberschrieben, was
+dann beim 3. Aufruf fatale Auswirkungen hat...
+
+Tja, ich hoff mal das ganze ist nicht systemabhaengig
+so dass Du es bei Dir auch hinkriegst.
+
+Gruss, Andreas
+
+--------------BE7772D3F0A7F9A9A11BF515
+telnet.log:
+
+ws02:~> telnet pk.mud.de 4242    
+Trying 141.55.225.26...
+Connected to uwhome.mpi.htwm.de.
+Escape character is '^]'.
+LDMud 3.2.7
+---------
+Sentences:                             1       20
+Objects:                               2      184 (0 swapped, 0 Kbytes)
+Arrays:                                0        0
+Mappings:                              0        0
+Prog blocks:                           1      764 (0 swapped, 0 Kbytes)
+Memory reserved:                           950000
+hash table overhead                         16384
+Strings malloced                     376     6612 + 67792 overhead
+call out:                              0        0 (current length 0)
+Regexp cache:                          0        0 --------
+Total:                                    1041756
+----------
+> crash
+> crash
+What?
+> crash
+Connection closed by foreign host.
+
+--------------
+
+gdb_log:
+
+(gdb) r
+Starting program: /u/mud/src/ldmud/ldmud-3.2.7/mudlib/driver -N -e -m.
+-Mtest_master.c -s-1 -sv-1 4242
+No simul_efun
+Setting up ipc.
+test_master: connect()
+test_master#0: logon()
+Illegal instruction
+Current object was test_master#0
+test_master#0 test_master.c line 78
+819a604: 233          write                     (1)     line 78
+819a605:  14        4 clit                      (0)     line 79
+819a607:  12          const0                    (1)
+819a608: 512      512 debug_info                (2)
+819a60b: 233          write                     (1)
+819a60c:   7        9 cstring0                  (0)     line 80
+819a60e: 233          write                     (1)
+819a60f: 133          enable_commands           (0)     line 81
+819a610:   7       10 cstring0                  (0)     line 83
+819a612:   7       11 cstring0                  (1)
+819a614: 109        2 add_action                (2)
+819a616:   7       12 cstring0                  (0)     line 84
+819a618:   7        2 cstring0                  (1)
+819a61a: 109        2 add_action                (2)
+819a61c:   7       13 cstring0                  (0)     line 85
+819a61e:   7       14 cstring0                  (1)
+819a620: 109        2 add_action                (2)
+819a622:   7       15 cstring0                  (0)     line 86
+819a624:   7       16 cstring0                  (1)
+819a626: 109        2 add_action                (2)
+819a628:   7       17 cstring0                  (0)     line 87
+819a62a:   7       18 cstring0                  (1)
+819a62c: 109        2 add_action                (2)
+819a62e:   7       19 cstring0                  (0)     line 88
+819a630:   7       19 cstring0                  (1)
+819a632: 109        2 add_action                (2)
+819a634:  13          const1                    (0)     line 90
+819a635:  19          return                    (1)
+819a6db: 231          users                     (0)     line 173
+819a6dc:  87        1 push_local_variable_lvalue (1)
+819a6de:  35          (void)=                   (2)
+819a6df:  24        0 local                     (0)     line 175
+819a6e1:  22     1797 switch                    (1)
+819a6e4:  17       13 closure                   (0)     line 179
+819a6e7:  69          pop_value                 (1)
+819a6e8:  21          break                     (0)     line 180
+819a6f1:  13          const1                    (0)     line 181
+819a6f2:  19          return                    (1)
+819a6db: 231          users                     (0)     line 173
+819a6dc:  87        1 push_local_variable_lvalue (1)
+819a6de:  35          (void)=                   (2)
+819a6df:  24        0 local                     (0)     line 175
+819a6e1:  22     1797 switch                    (1)
+819a6e4:  17       13 closure                   (0)     line 179
+819a6e7:  69          pop_value                 (1)
+819a6e8:  21          break                     (0)     line 180
+819a6f1:  12          const0                    (0)     line 181
+819a6f2:  19          return                    (1)
+819a6db: 231          users                     (0)     line 173
+819a6dc:  87        1 push_local_variable_lvalue (1)
+819a6de:  35          (void)=                   (2)
+19a6df:  24        0 local                     (0)     line 175
+819a6e1:  22     1797 switch                    (1)
+819a6e4:  17       13 closure                   (0)     line 179
+819a6e7:  69          pop_value                 (1)
+819a6e8:  21          break                     (0)     line 180
+819a6f1:  11 -1219881965 number                    (0)  line 181
+819a6f6:  25        8 catch                     (1)     line 183
+819a6f8:   7        9 cstring0                  (1)
+819a6fb:  20  20   0   0   0   8   0  12
+'          crash' in '       test_master.c' ('       test_master#0')line 187
+'          crash' in '       test_master.c' ('       test_master#0')line 183
+Program received signal SIGSEGV, Segmentation fault.
+fatal (fmt=0x80e8984 "е\031\b") at simulate.c:2571
+2571        *((char*)0) = 0/0;
+(gdb) bt
+#0  fatal (fmt=0x80e8984 "е\031\b") at simulate.c:2571
+#1  0x8 in ?? ()
+#2  0x807b8f8 in apply_low (fun=Cannot access memory at address 0x35.
+) at interpret.c:18348
+Cannot access memory at address 0x1.
+
+---------- Analysis ----------
+
+Another example of the inline closure bug fixed in .144.
+Under Cygwin it is sufficient to have the "crash()" lfun called from
+the flag() apply - no interactive user needed.
