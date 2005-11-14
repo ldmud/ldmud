@@ -1,0 +1,4 @@
+void show_stats()
+
+Living objects should define this function. It should print
+all important stats about the object.

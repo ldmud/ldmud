@@ -1,0 +1,76 @@
+Short: Memory Leaks in Darkwind
+Date: Mon, 04 Mar 2002 12:41:46 -0500
+From: Scott Anderson <scott@chapman-anderson.org>
+Type: Bug
+State: New
+See also: ferrycode/ subdirectory
+
+
+Is this what you're looking for?
+
+I trimmed the log considerably... this is representative of what it 
+contains.
+
+Thanks,
+-scott
+
+Lars Duening wrote:
+
+>Scott Anderson wrote on Sunday, March 03 2002, 10:08:00:
+>
+>>How can the total from status be 3 times the malloc? :-)
+>>
+>
+>There is an accounting error with the arrays and mappings - I don't quite 
+>know where it is though. In the 3.2.9 line I added some diagnostic code for 
+>this, seems that I need to add it to 3.3 as well.
+>
+>>GC seems to work well... the free small blocks size (g) went through the 
+>>roof.
+>>
+>
+>A bit too well - the driver must have leaked a lot of memory. Did you use 
+>MALLOC_TRACE and MALLOC_LPC_TRACE when configuring the driver? If yes, it 
+>would be nice if you could send me a copy of the GC log so that I can take a 
+>closer look at the leaks.
+>
+
+  -------------------------
+tabled string 08343d34 '/room/' was left unreferenced, freeing now.
+tabled string 083448ac '/obj/' was left unreferenced, freeing now.
+tabled string 08343ca8 '/secure/include/' was left unreferenced, freeing now.
+scanning chunk 08b57b20, end 08b5bb40 for unref'd blocks
+scanning chunk 08b53a20, end 08b57a40 for unref'd blocks
+scanning chunk 08b4f920, end 08b53940 for unref'd blocks
+
+freeing small block 0x08b50010 (user 0x08b5002c) interpret.c::allocate_uninit_array 13163
+By object: objects/ships/ferry/maru#24
+By program: Not found at old address.
+
+ -- All leaked blocks in ferries at this line.
+
+scanning chunk 082f23e0, end 082f6400 for unref'd blocks
+scanning chunk 082ee2e0, end 082f2300 for unref'd blocks
+scanning chunk 082ea1e0, end 082ee200 for unref'd blocks
+scanning chunk 081a2ae0, end 081a6b00 for unref'd blocks
+509 small blocks freed
+2002.03.04 09:22:00 Consolidation merged 3640 blocks, freed 0 chunks holding 0 blocks.
+2002.03.04 09:22:00 GC freed 0 destructed objects.
+
+-------------------------------------------------------
+Date: Tue, 05 Mar 2002 14:16:15 -0500
+From: Scott Anderson <scott@chapman-anderson.org>
+
+>Since all these allocations happen in the same, otherwise 
+>unremarkable spot, I wonder if this might be a problem with the 
+>mudlib code (self-referential array or the like).
+>
+>Can you give me a copy of the ferry code?
+>
+
+This should have all the relevant files.
+
+Also, if you want, log on (darkwind.org 3000) and I'll make you a 
+wizard. We've got two muds, dev and live, and if it helps you to debug 
+things you can recompile the driver on dev and bounce it pretty much as 
+you wish.
