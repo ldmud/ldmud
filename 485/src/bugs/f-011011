@@ -1,0 +1,10 @@
+Short: Another sort of deep_call_other() ?
+From: Alfe
+Date: 2001-10-11
+Type: Feature
+State: New
+See also: f-990203-17
+
+Mir wuerde schon reichen, wenn ich irgendwie einstellen kann, dass man
+alle lfuns ver-||-ern soll oder ver-,-en oder ver-&&-en (also alle
+aufrufen bis true kommt, bis false kommt oder unabhaengig vom ergebnis)

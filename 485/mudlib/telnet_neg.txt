@@ -1,0 +1,189 @@
+Hiya, guys!
+
+Okay, here is for your attention few bits  of LPC code, that could help  you
+to determine: player terminal screen size and player connection lag.
+
+With the NAWS option everything is quite clear - your terminal reports it's
+size to the driver every time, the driver requests for that (or not, if this
+is  some dumb telnet client, like windows' one). In case you change terminal
+size  during gameplay, terminal reports it's new size to the driver by itself.
+That's it!
+
+With the TM (Timing Mark) lag  measuring  accuracy,  everything  is a little
+bit more complicated. In  fact  every  player receives the  value,  that is
+actually the sum of the two values: the server lag (load), and the telnet
+connection lag. 
+
+Whether this is suitable for your own mudlib or not, you should decide.
+
+While writing these funs, the main target was to get such a  functionality,
+that is why the code and even algorythms definitely could be optimized  and
+improved.  If you'll get any ideas how to improve this code, do not hesitate
+to do that ;)
+
+DiEHARD.
+
+Note: Setting H_NOECHO is no longer required in order to negotiate NAWS
+  or TM - both options are now handed over to H_TELNET_NEG - but I kept
+  the code as example. Also note that the handling of both options here
+  is very minimal and does not completely conform to the corresponding
+  RFCs.
+
+--------------------------------------------------------------------------------
+
+This is a part of the code we use in the master.c file:
+
+#include <telnet.h>
+/*
+            .
+            .
+            .
+*/
+void inaugurate_master (int arg) {
+/*
+            .
+            .
+            .
+*/
+  set_driver_hook(H_TELNET_NEG, "telnet_neg");
+  set_driver_hook(H_NOECHO, unbound_lambda( 
+    ({ 'flag, 'user }), ({ #',,({ #'?, ({ #'==, 'flag, 1 }), 
+      ({ #'binary_message, quote( ({ IAC, WILL, TELOPT_ECHO }) ), 3 }),
+      ({ #'binary_message, quote( ({ IAC, WONT, TELOPT_ECHO }) ), 3 })
+    }) }) ) );
+/*
+            .
+            .
+            .
+*/
+
+This is the part of the living.c code:
+
+
+#include <telnet.h>
+/*
+            .
+            .
+            .
+*/
+//------------- Functions Prototypes ----------
+query_user_lag(void);
+int set_naws_flag(void);
+int measure_lag();
+//---------------------------------------------
+
+// ------- Lag Measurement Variables ----------
+mixed  start_time;  // Lag measurement variable
+mixed  end_time;    // Lag measurement variable
+float  lag=-1.0;    // Current player lag
+int    snt;         // special flag
+// --------------------------------------------
+
+// --------------- NAWS Variables -------------
+nosave int do_naws_sent, will_naws_rcvd;
+// --------------------------------------------
+
+
+
+//////////////////////////////////////////////////////
+//                                                  //
+//       These lines shuold be put somewhere        //
+//       where  you'd   like   to  determine        //
+//       terminal screen size.                      //
+//                                                  //
+// binary_message( ({ IAC, DO, TELOPT_NAWS }), 3 ); //
+// do_naws_sent=1;                                  //
+//                                                  //
+//////////////////////////////////////////////////////
+
+
+// ----------------------- Lag Measurement Function -----------------------
+int measure_lag() {
+    if(!snt) {                                       // If Timing Mark was
+                                                     // received, send it again
+
+      start_time = utime();                          // Mark the time, 
+                                                     // we sent Timing Mark
+
+      binary_message( ({ IAC, DO, TELOPT_TM }), 3 ); // Send Timing Mark
+    }
+    snt++;                                           // Increase snt flag by 1
+    if(snt>4) {                                      // every time we calling
+      lag=-1.00;                                     // measure_lag(). If fun
+      snt=0;                                         // was called more than 4
+    }                                                // times, and there are
+    call_out("measure_lag",2);                       // still no answer - set
+                                                     // the value of lag to -1
+                                                     // this will return to the
+                                                     // requesting user the 
+                                                     // string value of "?.??"
+}
+// ------------------------------------------------------------------------
+
+float  query_lag (){ return lag; }
+string query_user_lag() { return lag==-1.00?"?.??":sprintf("%.2f",lag); }
+
+
+// ------------------ Telnet Negotiations Handler ------------------
+
+void telnet_neg( int action, int option, mixed *sb) {
+  switch(option) {
+                    // --------------------------------
+    case TELOPT_TM: // TM (Timing Mark) Handling
+                    // According to RFC-860
+                    // --------------------------------
+            {
+            end_time = utime();                      // Mark the time, answer
+                                                     // was received
+
+            snt=0;                                   // reset snt flag
+
+            lag = (end_time[0]-start_time[0]) +      // calculate actual lag
+                  (end_time[1]-start_time[1]+500)/1000000.0;
+            break;
+            }
+                     // --------------------------------
+   case TELOPT_NAWS: // NAWS (Terminal size) Handling 
+                     // According to RFC-1073
+                     // --------------------------------
+            {
+            switch(action) {
+
+              case SB: // IAC SB NAWS
+                        {
+                        do_naws_sent=0;
+                        will_naws_rcvd=0;
+                        printf("\nYour terminal screen size is %dx%d...\n",
+                                (sb[0]*256)+sb[1],(sb[2]*256)+sb[3]);
+                        break;
+                        }
+                            
+              case WILL: // IAC WILL NAWS
+                        {
+                        will_naws_rcvd=1;
+                        if(!do_naws_sent)
+                          {
+                          binary_message( ({ IAC, DO, TELOPT_NAWS }), 3 );
+                          do_naws_sent=1;
+                          }
+                        break;
+                        }
+
+              case WONT: // IAC WONT NAWS
+                        {
+                        do_naws_sent=0;
+                        printf("I'm unable to determine your terminal screen size...\n");
+                        break;
+                        }
+
+               default:  // Some unexpected answer received
+                        break;
+              }
+            }
+   default: 
+            break;
+    }
+  }
+// -----------------------------------------------------------------
+
+

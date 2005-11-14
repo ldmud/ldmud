@@ -1,0 +1,34 @@
+SYNOPSIS
+        void tell_object(object ob, string str)
+
+DESCRIPTION
+        Send a message str to object ob. If it is an interactive
+        object (a user), then the message will go to him (her?),
+        otherwise the lfun catch_tell() of the living will be called
+        with the message as argument.
+
+EXAMPLES
+        object who;
+        who=find_player("wessex");
+        tell_object(who, "Hi!\n");
+        
+        Just tell Wessex a simple "Hi!".
+        
+        
+        Object 1 (living with the name "dummymonster"):
+           void catch_tell(string str) {
+              write("Received: "+str+"\n");
+           }
+        Object 2:
+           void func() {
+              object who;
+              who=find_living("dummymonster");
+              tell_object(who, "Follow me, mortal one!\n");
+              ...
+           }
+        
+        This examples shows how tell_object() together with
+        catch_tell() works.
+
+SEE ALSO
+        write(E), say(E), catch_tell(A)

@@ -1,0 +1,13 @@
+Short: Preprocessor is not Standard-C compatible
+Date: Tue, 22 Dec 1998 13:36:24 +0200 (EET)
+Type: Feature
+State: Acknowledged
+
+Points in question:
+ - macro substitution in strings shouldn't be done
+ - no # or ## operators
+ - this
+     #define FUNCTION(func) #'func
+   doesn't work as expected
+
+Maybe use the lcc preprocessor?

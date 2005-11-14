@@ -1,0 +1,43 @@
+These are the rules for a wizard.
+
+1. You may not help other players, even if they lost points due to
+   lost connection. They have to go to the post office and ask Lars,
+   or use bug.
+
+2. Never attack a player or kill him. If a player behaves badly, file
+   the complaint to Lars.
+
+3. Do not make 'deadly' trapps. A player must never die because he didn't
+   know what happens in the next room. If some room is very dangerous,
+   make some hint (like the giant footprints beside the giant lair).
+
+4. Never initialize the destination of an object outside your castle. If you
+   make a monster that can walk out of the castle, be sure that it is a
+   very nice monster.
+
+5. Never generate messages that looks like something it isn't (good and precise
+   rule :-). That is, don't try to fool the player that someone says something
+   when it isn't true etc.
+
+6. If you have a "test" character, make sure is isn't seen in the top score
+   list. He must no be wizard either.
+
+7. Try to avoid making devices, situations which makes the players loose
+   experience if they are adventuring or examining objects. Players should be
+   rewarded for adventuring and discovering things. If they get killed...
+   Well, they will then loose some experience, but this is a special case!
+
+8. The game is supposed to be in the "long distant past", and thus no
+   modern things should exist. If you want some kind of airplane, use a
+   flying horse in stead etc.
+
+9. If you make available some kind of restaurant that sells food that
+   heals, then the healing must cost on average 4 gp/hp (or more). The amount
+   of healing must also be limited per reset. Generating healing items for
+   free is only allowed if they heal at most 20 points, and are destructed.
+   Not more than one such item may be generated per room and reset.
+
+10.Teleporting items should be VERY restricted, and very rare. They must
+   not allow teleportations to anywhere, but only to one or more predefined
+   room. Never to a specific player. It must cost at least 50 spell points
+   to use each time.

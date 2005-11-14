@@ -1,0 +1,11 @@
+SYNOPSIS
+        int closurep(mixed arg)
+
+BESCHREIBUNG
+        Liefert 1, wenn das Argument eine Closure ist, ansonsten 0.
+
+AENDERUNGEN
+        Eingefuehrt in 3.2@70.
+
+SIEHE AUCH
+        intp(E), referencep(E), symbolp(E)
