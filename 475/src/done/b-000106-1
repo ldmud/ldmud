@@ -1,0 +1,29 @@
+From: "Bastian Hoyer" <hoyer@wisc.de>
+Short: bug mit #'[..
+Date: Thu, 6 Jan 2000 14:08:12 +0100
+Type: Bug
+State: Done - fixed in 3.2.8-dev.177
+
+also... wir benutzten map_array(s,#'[..,1); um aus einem stringarray immer
+den fuehrenden slash zu entfernen, um die mud-pfade dann per erq an den tar
+zu uebergeben
+
+zlpc string *s; s=({"/w/dafire","/p/dafire/"}); return map_array(s,#'[..,1);
+
+erzeugt beim neuen driver nun aber :
+
+----------------------------------------------------------------------------
+----
+File:   /<lambda 0x8319e45>  Zeile: 39522143
+Objekt: /w/dafire/LPC_zst
+Fehler: Uncallable closure
+----------------------------------------------------------------------------
+----
+
+Analysis:
+The constructs [x..] and [<x..] didn't have their own bytecodes, so a change
+in the operator assignment broke the special case code handling these
+two operators.
+
+The solution was to introduce 6 more byte codes: F_NX_RANGE, F_RX_RANGE
+and their F_.._LVALUE and F_PROTECTED_.._LVALUE counterparts.
