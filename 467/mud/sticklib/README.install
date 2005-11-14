@@ -1,0 +1,215 @@
+This installation document explains how to setup a mud based on
+StickLib, provided:
+
+a) You have a posix-compliant system (usually a unix such as
+   Linux, *BSD, Solaris etc).
+b) You have a C-compiler (preferably gcc), lexical scanner
+  (such as lex, flex) and yacc-compatible compiler compiler.
+   Usually you need not worry about them; auto-configure
+   script takes care of figuring out whether you have them,
+   and if so, where they are located.
+
+If you have experience on installing software on unix-systems
+installation should be a breeze, and you can probably just
+quickly browse through this document to see what really needs to
+be done.
+
+This installation document has been tested on linux 2.0 and 2.2
+on x86 platform; we will try to check out whether it is adequate
+for other platforms as well. Comments and suggestions are welcome; if
+you find things that need to be changed send email to
+sticklib@stickmud.jyu.fi (sticklib developers mailing list).
+
+First create suitable directory structure for your mud. One possible
+directory structure is:
+
+		<mud_root_dir>
+	 ---------------------------------
+	 |		 |		 |
+	src/		bin/		lib/
+
+<mud_root_dir> is the root directory for all the mud-related stuff;
+it could be something like /home/user/mud/ (or /usr/local/mud/).
+In this example, we assume the mud_root_dir to be '/home/sticklib/'.
+Ff you want to have a different hierarchy modify the instructions
+appropriately. :-)
+
+The first step in installing the mud is to get source code for
+the mud gamedriver. StickLib uses a slightly modified LD-3.2.1
+gamedriver (LdMud is a derivative of so-called 'Amylaar'-gamedrivers,
+both are descend from the original LpMud-GDs... read rec.games.mud.lp
+FAQ for more information)
+You can obtain the standard LD-3.2.1 (preferably a new version)
+from <ftp://ftp.bearnip.com/> (subdirectory 'pub/mud' or so).
+
+Once you have gotten the gamedriver archive, the installation goes
+as follows:
+
+a) Unpack the archive to the directory to an installation directory.
+   Usually, <mud_root_dir> is ok, as most of the stuff goes to various
+   sub-directories (GD sources to src/, an example mudlib to mudlib/
+   and so on).
+   As the archive is a gzipped tar-archive, you can use
+   gnu-tar like:
+
+   cd <mud_root_dir>
+   tar xzf <archive-name>
+
+   So, something like:
+
+   cd src
+   tar xzf ldmud-326.tar.gz
+
+   Alternatively you can unpack the archive using zcat
+   and tar. Check out documentation (man-pages) your
+   system has about them.
+
+b) Go to the source sub-directory unless you are already in
+   there (cd src).
+
+c) StickLib requires one extra efun (see LPC documentation that
+   comes with the gamedriver for an explanation of efuns),
+   'substitute_string()', that does not come as default with
+   Ld GDs (at least not at the time of writing). To add it,
+   you need to modify two files; 'func_spec' and 'interpret.c'.
+   Patch files ('func_spec.diff', 'interpret.c.diff') exist
+   for doing this, and they shouls be downloadable from the
+   place where you got the StickLib-package.
+
+   To apply the patches you need to use 'patch' program (a
+   GNU-utility):
+
+   patch func_spec < func_spec.diff
+   patch interpret.c < interpret.c.diff
+
+   Alternatively, if you don't have 'patch' available, you
+   can manually do the modifications; although this requires
+   that you understand the notation of diff-files (which shouldn't
+   be too difficult but...)
+
+d) Configure gamedriver compilation. The configuration is done via
+   a configuration file. If the version of GD you
+   downloaded has a sticklib-specific settings file
+   ('src/settings/sticklib'), you will need to edit this file.
+   If you don't have that file, it should be downloadable
+   from the place you got your StickLib-package, usually named
+   'settings.sticklib'. Rename this file as 'settings/sticklib'
+   (in the same directory you should see other settings files
+   such as 'default', 'tubmud' and so on).
+
+   Now you need to modify the settings-file to specify certain
+   mud-dependant properties such as <mud_root_dir> and port number
+   the mud should be connected through. This means that the
+   line:
+
+   ./configure --prefix=/home/sticklib --with-setting=sticklib $*
+
+   should be modified, unless your <mud_root_dir> is /home/sticklib.
+   If so, replace /home/sticklib with your real <mud_root_dir>.
+
+   Line
+
+   with_portno=7690
+
+   should be changed unless you want to use port 7690 for connecting
+   to your mud.
+
+   If you know what you are doing, you can also edit the other lines,
+   especially those that define interaction with ERQ daemon
+   (read GD documentation if you want to what ERQ is).
+
+   Once the configuration file has been configured (:-))
+   enter
+
+   settings/sticklib
+
+   which will actually run the configuration script
+
+e) Compile the gamedriver by entering:
+
+   make
+
+   Compile the utility binary executables by entering:
+
+   make utils
+
+   Install the gamedriver, either manually ('mv driver ../bin/driver-sticklib')
+   or by entering:
+
+   make install
+
+   (the install script actually renames the gamedriver executable
+   as 'parse')
+
+   Install the utility executables either manually
+   ('mv util/erq ../bin', 'mv util/indent ../bin',
+   'mv util/fundesc ../bin') or by entering:
+
+   make install-utils
+
+f) Go to the mudlib directory; in the example case:
+
+   cd ../lib
+
+g) Unpack the mudlib source to the directory:
+
+   tar xzf <mudlib-archive>
+
+h) Check out whether the mud works without any modifications. :-)
+   Start up the gamedriver manually:
+
+   ../bin/parse
+
+   (or, ../bin/driver-sticklib; depending on under which name
+   gamedriver was moved earlier on).
+
+   Note that all the error messages are in this case output
+   directory to the shell window. You can redirect them to
+   a file using a shell dependant redirection
+   (../bin/parse >& lpmud.log under csh for example).
+
+   If all goes well, there will be output like:
+
+   ]About to preload 32 objects.
+   Setting up ipc.
+
+   (these messages indicate that the mudlib is preloading
+   certain important objects; after
+   compiling all the code succesfully the interprocess
+   communication is initialized)
+
+   And then you should be able to log in to the mud (unless
+   you started the gd on the background you now have to open
+   up a new shell window or change the virtual console, or,
+   if you don't mind getting possible error messages as output,
+   just make the driver be run on the background with ctrl+z
+   and 'bg' or whatever your favourite shell uses for that
+   purpose):
+
+   telnet localhost 7690
+
+   (or, if you changed the port number earlier on, use the appropriate
+   port number here)
+
+   Now a default login window should be displayed, and the mud
+   should ask your name and password. For testing purposes
+   the StickLib comes with one default administrator character.
+   Name is 'admin' and password 'password'.
+
+   Thus:
+
+   Give your name: admin
+
+   Password: <enter 'password' here, it will not be echoed>
+
+   And now you should be logged in.
+
+i) Fix up all the problems in the mud and build the areas. Well,
+   to help you a bit, here are things you need to pretty soon:
+
+   - Configure mud-dependant login-messages. It doesn't really
+     give a good impression about your Brand New Excellent
+     Mud if you still have the default login screen(s)...
+     So, go to /data/login/ (inside the mud) and edit the
+     files as you see fit.
+

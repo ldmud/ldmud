@@ -1,0 +1,80 @@
+# ACCESS.ALLOW - Game access allowance rules
+#----------------------------------------------------------------------------
+# Access to the game is based on the user's IP address and the current time.
+# These are matched against a set of rules and if a match is detected, a
+# proper message is sent back and the connection is shutdown.
+#
+# This facility is active only if ACCESS_CONTROL has been defined in config.h
+# If ACCESS_LOG is defined in config.h, all checks and their results are
+# logged in the specified file.
+#
+# The rules are read from the file ACCESS_FILE (defined in config.h,
+# typically "ACCESS.ALLOW" with a name relative to the mudlib directory).
+# Every line specifies one rule and has to follow the syntax given below.
+# Lines with a '#' as first character count as comments and are ignored, as
+# are lines which do not conform to the rule syntax (but except for empty
+# lines this should be relied upon).
+#
+# The rule file is (re)read whenever the gamedriver detects a change in its
+# timestamp.
+#
+# The syntax for a rule is (no leading whitespace allowed!):
+#
+#   <ipnum>:[p<port>]:<class>:<max>:<start>:<end>:<text>
+#   <ipnum>:[p<port>]:<class>:<max>:h<hours>:w<days>:m=<text>
+#
+# where
+#   ipnum:  <byte>.<byte>.<byte>.<byte>, with byte = * or number
+#             There is only loose error checking - specifying an illegal
+#             address will have interesting consequences, but would
+#             most likely cause no error to occur.
+#   port:   the port number to which the connection is made. Omission
+#             means 'any port'.
+#   class:  number
+#   max:    the maximum number of users, a number. The value -1 allows
+#             an unlimited number of users.
+#   start:  hour this rule starts to be valid (0..23).
+#   end:    hour this rule ceases to be valid (0..23).
+#             Setting both start and end to 0 skips any time check.
+#   hours:  hours this rule is valid.
+#             This form allows several entries, separated with a ','.
+#             Every entry can be a single hour (0..23), or a range in the
+#             form '<start>-<end>'
+#             Omitting the entry skips any time check.
+#   days:   the days this rule is valid.
+#             The syntax is similar to <hours> except for the
+#             allowable values: the days Sunday..Saturday are given as
+#             the numbers 0..6.
+#             Omitting the entry skips any day check.
+#   text:   string to send if the rule matches.
+#
+# A class is defined by the first rule using it's number. This
+# definition specifies the allowable <max>imum of users and the <text>
+# to send. Subsequent rules for the same class just add new ipnumber/
+# time rules, but don't change <max> or <text>
+#
+# ORDER MATTERS. That means if you allow 129.*.*.*, you have to put
+# any restrictions on 129.132.*.* BEFORE this rule.
+#
+# Addresses not matching any rule at all are not allowed to connect.  To get
+# around this, add an appropriate 'allow-all' rule *.*.*.* at the very end.
+#
+# A typical rulefile would look like this one:
+
+# SPARC cluster has access denied. Class 1
+129.132.122.*:1:0:0:0:LPMUD access denied for your cluster.
+
+# CALL-1A0 has access limited to some maximum, for now 5 logins. Class 2
+129.132.106.*:2:5:8:20:Sorry, LPMUD is currently full.
+
+# CALL-1A0 at all other times, its a 10 limit.
+#   Due to the rule order, this is effectively limited to times
+#   outside 8-20.
+129.132.106.*:3:10:0:0:Sorry, LPMUD is currently full.
+
+# No more than 5 users allowed from localhost while working hours :-)
+127.0.0.1:42:5:h8-12,13-18:w1-5:m=Pick a better time.
+
+# Everybody else is welcome.
+*.*.*.*:0:-1:0:0:This message should never be printed.
+
