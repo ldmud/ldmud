@@ -1,0 +1,8 @@
+void shout(str)
+string str;
+
+Send a string "str" to all players. This function is also used by the
+"shout" command.
+
+See also write(), tell_object(), say().
+

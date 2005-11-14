@@ -1,0 +1,5 @@
+void add_money(m)
+int m;
+
+Objects that can pick up the special "money" object, should have this
+function. It will be called with the amount of gold coins.

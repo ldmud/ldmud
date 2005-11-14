@@ -1,0 +1,9 @@
+Short: New pragmas: no_clone, no_inherit
+From: Daniel Sloan <sloand@alphalink.com.au>
+Date: Tue, 23 Mar 1999 15:29:14 +0000
+Type: Feature
+State: Done - implemented in 3.2.7-dev.120
+
+#pragma no_clone, #pragma no_inherit
+Obviously, these prevent cloning, inheriting of the object that sets them.
+The code is pretty simple.
