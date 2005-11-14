@@ -1,0 +1,11 @@
+SYNOPSIS
+        float sin(int|float)
+
+BESCHREIBUNG
+        Liefert den Sinus des Argumentes.
+
+AENDERUNGEN
+        LDMud 3.2.9: Ganzzahlen (Integers) als Argument hinzugefuegt.
+
+SIEHE AUCH
+        asin(E), cos(E), acos(E), tan(E), atan(E), atan2(E)
