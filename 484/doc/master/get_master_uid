@@ -1,0 +1,12 @@
+SYNOPSIS
+        string get_master_uid(void)
+
+DESCRIPTION
+        Return the string to be used as root-uid.
+        Under !strict_euids, the function is expendable.
+
+HISTORY
+        Introduced in 3.2.1@40 replacing get_root_uid().
+
+SEE ALSO
+        get_bb_uid(M), get_master_uid(M), uids(C), creator_file(M), creator(E)

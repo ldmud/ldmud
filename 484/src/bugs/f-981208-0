@@ -1,0 +1,9 @@
+Short: read_bytes()/write_bytes() should handle 0x0 as well
+Date: 981208
+Type: Feature
+State: Unclassified
+From: coogan
+
+read_bytes()/write_bytes() should use int* instead of/in
+addition to strings so that they can handle 0x0 bytes
+as well.
