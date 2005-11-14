@@ -1,0 +1,19 @@
+SYNOPSIS
+        object *deep_inventory(void)
+        object *deep_inventory(object ob)
+
+DESCRIPTION
+        Returns an array of the objects contained in the inventory of
+        ob (or this_object() if no arg given) and in the inventories
+        of these objects, climbing down recursively.
+        
+        ob
+           ob1
+           ob2
+              ob21  deep_inventory(ob) => ({ob1, ob2, ob3, ob4, ob21, ob31})
+           ob3
+              ob31
+           ob4
+
+SEE ALSO
+        first_inventory(E), next_inventory(E), all_inventory(E)

@@ -1,0 +1,18 @@
+From: "Gnomi" <gnomi@UNItopia.rus.uni-stuttgart.de>
+Short: #'++ doesn't work
+Date: Mon, 28 Feb 2000 19:20:04 +0100
+Type: Bug
+State: Done - fixed in 3.2.8-dev.175
+
+Ausserdem existiert ein Fehler beim #'++, es dekrementiert anstatt zu
+inkrementieren. Ich vermute nach einem Einblick in die closure.c, dass in
+der Funktion compile_value im switch beim Fall F_POST_DEC die Abfrage
+ if (type == F_POST_INC)
+besser
+ if ((type - CLOSURE_OPERATOR) == F_POST_INC)
+heissen sollte, da beim switch diese Konstante auch vom type abgezogen wird.
+
+Gruss
+Gnomi
+
+

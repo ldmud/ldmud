@@ -1,0 +1,78 @@
+Short: bug in virtual inheritance...
+Date: Tue, 11 Apr 2000 06:43:47 -0500
+From: Casey Zacek <cz@800hosting.com>
+Type: Bug
+State: Done - fixed in 3.2.8-dev.186
+See also: b-000207-4
+
+
+Problem was that the compiler used the first inherited function it
+could find. With normal inherits this is the topmost one, with virtual
+inherits this is not guaranteed.
+
+
+Description:
+/* a.c --------------------------------------------------------- */
+inherit "b.c";
+
+func1() {
+   write("a::func1 1 ---------------------------------------\n");
+   ::func1();
+   write("a::func1 2 ---------------------------------------\n");
+}
+/* ------------------------------------------------------------- */
+
+/* b.c --------------------------------------------------------- */
+virtual inherit "c.c";
+
+func1() {
+   write("b::func1 1 ---------------------------------------\n");
+   ::func1();
+   write("b::func1 2 ---------------------------------------\n");
+}
+/* ------------------------------------------------------------- */
+
+/* c.c --------------------------------------------------------- */
+int var;
+
+create() {
+   write("c::create 1 ++++++++++++++++++++++++++++++++++++++\n");
+   func1();
+   write("c::create 2 ++++++++++++++++++++++++++++++++++++++\n");
+}
+
+func1() {
+   write("c::func1 -----------------------------------------\n");
+}
+/* ------------------------------------------------------------- */
+
+If the "int var;" line doesn't exist in c.c, and a.c is loaded (after
+c.c and b.c to spare you spurious output), it looks like this:
+
+c::create 1 ++++++++++++++++++++++++++++++++++++++
+a::func1 1 ---------------------------------------
+b::func1 1 ---------------------------------------
+c::func1 -----------------------------------------
+b::func1 2 ---------------------------------------
+a::func1 2 ---------------------------------------
+c::create 2 ++++++++++++++++++++++++++++++++++++++
+
+However, if it is there, it looks like this:
+
+c::create 1 ++++++++++++++++++++++++++++++++++++++
+a::func1 1 ---------------------------------------
+c::func1 -----------------------------------------
+a::func1 2 ---------------------------------------
+c::create 2 ++++++++++++++++++++++++++++++++++++++
+
+func1() doesn't get called in b.c!
+
+I haven't tried to track it down at the driver level yet, and I don't
+know where I'd start with it, but it took us a long time to get down
+to this much LPC.  Enjoy! :)
+
+-- 
+-- Casey Zacek
+   Senior Staff Engineer
+   1-800-Hosting.com
+

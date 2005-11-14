@@ -1,0 +1,16 @@
+Short: Driver should pass signals to the mudlib
+Date: Wed, 29 Mar 2000 01:27:56 +0200
+From: Freaky <Freaky@UNItopia.RUS.Uni-Stuttgart.DE>
+Type: Feature
+State: New
+
+
+Ein besserer Signal-Handler wuerde auch gut tun, so dass man z.B. vor einem
+Crash noch was machen kann, oder besser auf Signale reagieren kann.
+(see f-000327-0 for an application)
+
+Ausserdem sollte sie evt. ein
+Signal-Handling bekommen, dass man z.B. SIG_USR2 einer Master-Funktion
+zuweisen kann, die dann z.B. das MUD sauber runterfahren kann.
+Momentan mache ich das ueber den external-Master-reload (SIG_USR1)
+
