@@ -1,0 +1,31 @@
+Short: Bug with ++ and >=
+Date: Thu, 3 Aug 2000 01:42:39 +0200
+From: Freaky <Freaky@UNItopia.RUS.Uni-Stuttgart.DE>
+Type: Duplicate Bug: b-000810
+State: Done - fixed in 3.2.8-dev.223
+
+Hi,
+
+if (++variable >= constante)
+
+    Liefert einen Runtime-Error der Form 
+    Arguments to >= don't match
+
+if (variable++ >=  konstante) 
+
+    hingegen nicht. 
+
+variable ist ein integer. 
+
+Tritt beim 3.2.8-dev.216.U46 auf
+
+(sagt zumindest Mammi@UNItopia)
+
+Ciao
+		Freaky
+
+-- 
+Frank 'Freaky' Kirschner
+UNItopia Admin                          http://UNItopia.uni-stuttgart.de/
+Freaky@UNItopia.Uni-Stuttgart.DE      telnet://UNItopia.uni-stuttgart.de/
+
