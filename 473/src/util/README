@@ -1,0 +1,12 @@
+This directory holds a few utilities for the gamedriver.
+
+  README     : this file
+  Makefile.in: the Makefile template to generate all utilities.
+  fixinclude : a script file to fix '#include "file";' statements in
+               the mudlib.
+  overhead.c : a program used by configure to determine the overhead
+               malloc() introduces.
+  erq/       : the standard implementation of the ERQ.
+  xerq/      : Brian Gerst's implementation of the ERQ.
+  indent/    : the 'indent' utility modified to handle LPC.
+

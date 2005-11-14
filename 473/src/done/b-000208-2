@@ -1,0 +1,17 @@
+Short: Mazemaster in OSB stopped working in 164
+From: Nostradamus (RZ@zitz.dk)
+Date: 000208
+Type: Bug
+State: Done - not a bug.
+
+The rooms used incorrect pathnames.
+
+Description:
+
+You wrote a 'maze' here using the mazemaster I believe, 
+compile_object() etc
+/p/school/examples/lpc/xmace0.c
+for some reason the small area seems to work ok with dev156 but not 
+with dev164
+it looks like it doesn't compile the virtual rooms as it should
+either way I get errors about destination object being 0

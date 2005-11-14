@@ -1,0 +1,5 @@
+Here are some example lpc files using the socket capabilities of tw-erq.
+
+The socketd is an easy interface from lpc to the erq.  I will write some
+docs sometime soon, but the examples here should be fairly easy to
+understand.
