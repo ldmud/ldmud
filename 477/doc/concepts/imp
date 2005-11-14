@@ -1,0 +1,63 @@
+CONCEPT
+        imp
+
+LAST UPDATED
+        Deepthought, 10-Nov-92
+        Pepel,             18-Nov-93
+
+DESRIPTION
+        This document describes IMP, the intermud message protocol,
+        also known as Intermud-1.
+
+        Imp messages are exchanged between muds using UDP
+        (unreliable datagram protocol) packets. Each mud provides
+        a connection endpoint which is given by the ip host address
+        and the UDP port number. Muds may then send messages to
+        this port by using the efun send_imp(). The applied function
+        receive_imp will be called by the driver in the master
+        object if a imp message arrives at the mud's UDP port.
+
+        Imp message packets have the following format:
+
+        password@objectname@functionname[[@argument]...]
+
+        <password> is the connection password to verify incoming
+        imp packets. It is encoded using crypt(E) and compared to
+        the stored password. Each mud participating in the imp
+        network has a secret password which is encoded by the
+        admin and distributed to remote muds with which the mud
+        should have direct connection. Encryted passwords may also
+        propagated to other muds over already secure channels.
+
+        <objectname> is a logical name which is not to be confused
+        with mudlib object filenames. It is used by receive_msg in
+        the master object to route the message to another object by
+        associating the logical object name with a real mudlib file
+        name. A good idea would be to reserve a special directory
+        for imp objects, e.g. /secure/net/<objectname>.
+
+        <functionname> is the function which is called by the master
+        object in the object described by <objectname>.
+
+        <argument> are additional arguments which are handed to the
+        function <functionname>. The exact definition of functions
+        and arguments are left to the imp applications.
+
+AUTHOR
+        originally Deepthought
+
+NOTE
+        The above is only particularly correct nowadays. Recently a
+        package name ``inetd'' was published, that is based on the IMP
+        mechanism in the driver (send_imp() and receive_imp()), but
+        it uses a different message format. That package seems to
+        enjoy much publicity and is installed in a number of muds. For
+        details look into the inetd description.
+
+        An other method of inter mud connection is the Mudlink
+        package, which uses a normal user connection that is connected
+        to a special user object, and an auxiliary process that does
+        the connection to other muds.
+
+SEE ALSO
+        send_imp(E), receive_imp(M), intermud(C)
