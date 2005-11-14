@@ -1,0 +1,9 @@
+Short: Range operators on 2d mappings
+From: Lars
+Date: 2002-05-07
+Type: Feature
+State: New
+
+m = ([ "foo": 2; 3; 4, "spot": 7; 8; 9 ]);
+
+m["spot",0..1] --> ({ 7, 8 })
