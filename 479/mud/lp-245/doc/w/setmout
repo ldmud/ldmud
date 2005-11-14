@@ -1,0 +1,7 @@
+Command: setmout
+Argument: mess
+
+Set the message given when you leave a room.
+The message will have your name prepended.
+
+See also: w/setmin, w/setmmin, w/setmmout

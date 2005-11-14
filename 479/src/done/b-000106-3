@@ -1,0 +1,38 @@
+Date: Thu, 6 Jan 2000 17:30:12 +0100
+From: Freaky <Freaky@UNItopia.rus.uni-stuttgart.de>
+Short: sort_array destroys alists
+Type: Bug
+State: Done - fixed in 3.2.8-dev.179.
+
+
+Folgendes Programm zeigt, dass sort_array den Hash von Alists zerstoert.
+Warum das passiert ist mir nicht klar, da sort_array eigentlich am zu
+sortierenden Feld nichts veraendern duerfte...
+Das ganze funktioniert aber nur, wenn man Strings als Key verwendet fuer
+die Alist. (Driver: 3.2.1-dev164)
+
+mixed *high;
+
+void test()
+{   
+    int i;
+    string *ii;
+
+    high = ({ ({}), ({}) });
+
+    for (i = 0; i < 10; i++)
+        high = insert_alist(to_string(i),i,high);
+
+    for (i = 0; i < sizeof(high[0]); i++)
+        printf("AS:%O %O\n",high[0][i],assoc(high[0][i],high));
+
+    ii = sort_array(high[0],#'>);
+    /* Or use #'<, depending on how the driver creates high */
+
+    for (i = 0; i < sizeof(high[0]); i++)
+        printf("AS:%O %O\n",high[0][i],assoc(high[0][i],high));
+}
+
+Analysis:
+  When sort_array() was made a table efun, it lost the ability
+  to copy the incoming array - a clear bug.

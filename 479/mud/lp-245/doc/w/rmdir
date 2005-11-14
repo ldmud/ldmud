@@ -1,0 +1,10 @@
+Command: rmdir
+Argument: file
+
+Remove the directory 'file'.
+
+The file will be searched for in the current directory.
+
+Only arch wizards and higher can remove directories from other wizards.
+
+See also w/ls, w/ed, w/cat w/rm
