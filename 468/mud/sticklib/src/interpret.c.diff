@@ -1,0 +1,145 @@
+--- src/interpret.c	Fri Nov 12 02:05:32 1999
++++ src-stick/interpret.c	Fri Nov 12 17:25:20 1999
+@@ -16552,6 +16552,142 @@
+     }
+ #endif /* F_SET_LIGHT */
+ 
++#ifdef F_SUBSTITUTE_STRING
++ /* Added to support StickLib: */
++     CASE(F_SUBSTITUTE_STRING);
++     {
++#define	MAX_REC_DEPTH	8
++#define STR_BUF_LENGTH	4096
++#define	MY_ALNUM(x)	(isalnum(x) || x == '_')
++
++       static char *rec_stack[MAX_REC_DEPTH];
++       static char strbuf[STR_BUF_LENGTH + 1];
++       svalue_t *arg;
++       char *ret, *src;
++       vector_t *aliases, *repl_strings;
++       int min_len, max_len;
++       int a_size;
++       int rec_count = 0, replaced = 0;
++       char *dest = strbuf;
++       char *end = &strbuf[STR_BUF_LENGTH - 1];
++       char *a, *b, *tmp;
++       char x;
++       int i, str_len, low, high, curr, bingo;
++
++       arg = sp - 4;
++       if (arg[0].type != T_STRING)
++	 goto bad_arg_1;
++       if (arg[1].type != T_POINTER)
++	 goto bad_arg_2;
++       if (arg[2].type != T_POINTER)
++	 goto bad_arg_3;
++       if (arg[3].type != T_NUMBER)
++	 goto bad_arg_4;
++       if (arg[4].type != T_NUMBER)
++	 goto bad_arg_4;
++       /* Hmmh, last is incorrect of course but I don't want to
++	* add a new label to the other place. :-)
++	*/
++
++       src = arg[0].u.string;
++       aliases = arg[1].u.vec;
++       repl_strings = arg[2].u.vec;
++       min_len = arg[3].u.number;
++       max_len = arg[4].u.number;
++       a_size = VEC_SIZE(aliases);
++
++       /* The core substitute_string() code: */
++
++       do { /* Main substitute_string loop... */
++
++	 /* First we'll skip through the separators (non-letters) */
++	 while ((x = *src) && !(MY_ALNUM(x))) {
++	   /* Let's skip all non-letters */
++	   *dest = x;
++	   if (++dest >= end) {
++	     ret = replaced ? (*dest = '\0', strbuf) : NULL;
++	     goto subst_string_done;
++	   }
++	   src++;
++	 }
++
++	 /* If we ran to the end of the string we'll 'return from
++	  * recursions', or, if at the top level, end substitution:
++	  */
++	 if (!x) {
++	   if (!rec_count) {
++	     ret = replaced ? (*dest = '\0', strbuf) : NULL;
++ 	     goto subst_string_done;
++	   }
++	   src = rec_stack[--rec_count];
++	   continue;
++	 }
++	 tmp = src;
++	 while ((x = *tmp) && MY_ALNUM(x))
++	   tmp++;	/* Let's search last char of the word. */
++	 str_len = tmp - src;
++	 if (str_len >= min_len && str_len <= max_len &&
++	     rec_count < MAX_REC_DEPTH) {
++	   bingo = low = -1;
++	   high = a_size;
++	   while ((curr = (low + high) / 2) > low) {
++	     a = src;
++	     b = aliases -> item[curr].u.string;
++	     i = 1;
++	     while ((x = *b) && !(i = *a - x)) {
++	       a++;
++	       b++;
++	     }
++	     if (!i && a == tmp) {
++	       bingo = curr;
++	       break;
++	     }
++	     if (i < 0) {
++	       if (!curr) break;
++	       high = curr;
++	     } else {
++	       low = curr;
++	     }
++	   }
++	   if (bingo >= 0) {
++	     rec_stack[rec_count++] = tmp;
++	     src = repl_strings -> item[bingo].u.string;
++	     replaced++;
++	     continue;
++	   }
++	 }
++	 if (str_len > (end - dest + 1)) {
++	   while (dest < end) {
++	     *dest = *src;
++	     dest++;
++	     src++;
++	   }
++	   ret = replaced ? (*dest = '\0', strbuf) : NULL;
++	   goto subst_string_done;
++	 }
++	 do {
++	   *dest = *src;
++	   dest++;
++	 } while (++src < tmp);
++       } while (1);
++
++     subst_string_done:
++
++/*********/
++
++       if (!ret) {
++	 pop_n_elems(4);
++       } else {
++	 pop_n_elems(5);
++fprintf(stderr, "Result = %s.\n", ret);
++	 push_string_malloced(ret);
++       }
++       break;
++     }
++
++ /* ... end of StickLib-extra-func */
++#endif
++
+     /* --- XEfun and XCodes --- */
+ 
+     CASE(F_ESCAPE);                  /* --- escape <instr> ... --- */
