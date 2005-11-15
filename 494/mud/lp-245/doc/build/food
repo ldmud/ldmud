@@ -1,0 +1,22 @@
+These are the rules concerning portable food:
+
+The total amount of sold healing per reset must not exceed 3000 hp.
+A maximum of 200 hp may be sold to one customer per reset. The cost
+of such healing is calculated using this formula:
+
+x = The amount of healing sold.
+
+Cost = 4*x + x^2/10
+
+This means that the more healing an item contains, the more expensive
+it gets. These items must have a weight of at least 1.
+
+The "strength" of the food is equal to the amount of healing it makes to
+the player when he eats it. Typically this strength should not exceed 50.
+
+Use the file "obj/food" for cloning and inherting purposes. Please read
+the file find out which functions to call.
+
+Examples of food and drink and an inn selling these items can be found in
+/doc/examples/apple_juice.c, /doc/examples/apple_cider.c and
+/doc/examples/inn.c . Type "goto /doc/examples/inn" just to visit it.
