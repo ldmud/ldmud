@@ -1,0 +1,15 @@
+int drop(silently)
+int silently;
+
+This function must be defined by all objects that want to control when they
+can be dropped. if 'silently' is true, then don't write any messages.
+
+drop() should return 1 to prevent dropping. This is the opposit
+of the get() function. That is because if drop() is not defined, it will
+always be possible to drop an object.
+
+If the object self-destructs when drop() is called, be sure to return 1,
+as the destructed item surely not can be dropped.
+
+Similarly, if drop() is called in another object, always test if the object
+did self-destruct, as the object variable will turn to 0.
