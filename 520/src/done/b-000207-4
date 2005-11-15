@@ -1,0 +1,82 @@
+From: Holger Kremss
+Date: 000207
+Short: Bug in virtual inherits
+Type: Bug
+State: Done - fixed in 3.2.8-dev.186
+See also: b-000411-1
+
+Problem was that the compiler used the first inherited function it
+could find. With normal inherits this is the topmost one, with virtual
+inherits this is not guaranteed.
+
+
+Description:
+Hi Lars.
+
+Also hier in /tmp/mateese/* liegen 4 Files:
+
+a.c    - mit nem create() und einer Variable 'foo'
+b.c    - nur mit einem create()
+c.c    - inheritet a.c virtuell und b.c normal und ruft in beiden
+         ::create() auf
+test.c - das inheritet nur c.c und macht ::create()
+
+Normalerweise sollte jetzt in jedem File das create() aufgerufen
+werden. Wenn man test.c laedt, dann kommen da aber nur die printfs von
+test.s und a.c. die restlichen create() werden nicht mehr aufgerufen.
+
+Wenn man das virtual inherit aus c.c rausnimmt, funktioniert es
+perfekt.
+
+Wenn man die Variable aus a.c rausnimmt, funktioniert es auch perfekt.
+
+Mit Driver 327 funktionierte das ganze noch. Mit 328-164 kommen die
+angesprochenen Fehler. 
+
+Wenn man nur c.c laedt, dann funktioniert es auch. Aber beim Laden
+von test.c geht es nicht. Nur zur Information, das test.c ist ein
+beliebiger Raum bei uns, c.c ist die room-Standardklasse. a und b
+stehen fuer thing und container. Daher kommen die Bugs schon beim
+hochfahren des MUDs, da alle moeglichen Variablen mangels create()
+der anderen Subklassen nicht initialisiert werden.
+
+Ich hoffe, das hilft Dir weiter. Die Files hab ich bis aufs 
+notwendigstes zusammengeschrumpft.
+
+Ciao!
+
+Holger
+
+--- a.c ---
+mixed foo;
+
+void create()
+{
+	printf("File 'a.c' create()\n");
+}
+
+--- b.c ---
+create()
+{
+	printf("File 'b.c' create()\n");
+}
+
+--- c.c ---
+virtual inherit "tmp/mateese/a";
+inherit "tmp/mateese/b";
+
+create()
+{
+	printf("File 'c.c' create()\n");
+	a::create();
+	b::create();
+}
+
+--- test.c ---
+inherit "/tmp/mateese/c";
+
+create()
+{
+	printf("File 'test.c' create()\n");
+	::create();
+}

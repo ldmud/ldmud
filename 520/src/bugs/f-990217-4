@@ -1,0 +1,8 @@
+Short: new efun strcount()
+From: Holger@Wunderland
+Date: 990217
+Type: Feature
+State: Unclassified
+
+strcount(text, pattern) counts how often pattern appears in text.
+Think sizeof(explode(text, pattern)).

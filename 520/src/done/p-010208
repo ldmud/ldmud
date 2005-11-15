@@ -1,0 +1,268 @@
+Short: Large shared string refcounts
+From: Lars
+Date: 2001-02-08
+Type: Feature
+State: Done - implemented in 3.2.9-dev.260, activated in 3.2.10
+
+Increases the string refcounter from ushort to ulong.
+
+----------------------------------------
+Index: 0.67/src/stralloc.h
+--- 0.67/src/stralloc.h Tue, 22 Aug 2000 14:14:00 -0600 lduening (lddev/b/27_stralloc.h 1.2 644)
++++ 0.67(w)/src/stralloc.h Tue, 06 Feb 2001 11:54:20 -0700 lduening (lddev/b/27_stralloc.h 1.2 644)
+@@ -12,26 +12,26 @@
+ 
+ /* --- Macros --- */
+ 
+-#define SHSTR_OVERHEAD  (sizeof(unsigned short) + sizeof(char *))
++#define SHSTR_OVERHEAD  (sizeof(unsigned long) + sizeof(char *))
+   /* Overhead of a shared string, used in interpret:apply_low()
+    * for a heuristic.
+    */
+ 
+ #define SHSTR_NEXT(str) \
+-  (*(char **)((char *) (str) - sizeof(unsigned short) - sizeof(char *)))
++  (*(char **)((char *) (str) - sizeof(unsigned long) - sizeof(char *)))
+ 
+   /* char* SHSTR_NEXT(char*): return the pointer to the next string
+    * in the same hash chain.
+    */
+ 
+ #define SHSTR_REFS(str) \
+-  (*(unsigned short *)((char *) (str) - sizeof(unsigned short)))
++  (*(unsigned long *)((char *) (str) - sizeof(unsigned long)))
+ 
+-  /* ushort SHSTR_REFS(char*): return the number of refs to this string.
++  /* ulong SHSTR_REFS(char*): return the number of refs to this string.
+    */
+ 
+ #define SHSTR_BLOCK(str) \
+-  ((char *)(str) - sizeof(unsigned short) - sizeof(char *))
++  ((char *)(str) - sizeof(unsigned long) - sizeof(char *))
+ 
+   /* char* SHSTR_BLOCK(char*): return a pointer to the first byte
+    * of the memory area of this string.
+@@ -40,14 +40,14 @@
+ #ifdef MALLOC_smalloc
+ 
+ #define shstr_malloced_length(str) ( *( \
+-        (p_uint *)(str-sizeof(char*)-sizeof(unsigned short))\
++        (p_uint *)(str-sizeof(char*)-sizeof(unsigned long))\
+         - SMALLOC_OVERHEAD) - SMALLOC_OVERHEAD )
+ #else
+ 
+ #define malloc_size_mask() (~0)
+ 
+ #define shstr_malloced_length(str) (\
+-        (sizeof(char*) + sizeof(char *) + sizeof(short) +\
++        (sizeof(char*) + sizeof(char *) + sizeof(unsigned long) +\
+         strlen(str) + 1 + sizeof(char *) - 1) / sizeof(char *) - 1)
+ 
+ #endif
+Index: 0.67/src/stralloc.c
+--- 0.67/src/stralloc.c Tue, 22 Aug 2000 14:14:00 -0600 lduening (lddev/b/28_stralloc.c 1.3 644)
++++ 0.67(w)/src/stralloc.c Tue, 06 Feb 2001 11:31:43 -0700 lduening (lddev/b/28_stralloc.c 1.3 644)
+@@ -8,7 +8,7 @@
+  * safely be deallocated again.
+  *
+  * To convert non-shared strings into shared strings quickly, the shared
+- * strings are hashed over their first 20 characters and arranged in
++ * strings are hashed over their first 100 characters and arranged in
+  * a hash table with HTABLE_SIZE entries. Every entry points to the head
+  * of a chain of strings with equal hash. To make access even faster,
+  * the chains are rearranged after every search so that the recently found
+@@ -22,7 +22,7 @@
+  *    struct shared_string
+  *    {
+  *        char   * next;
+- *        ushort   refs;
++ *        ulong    refs;
+  *        char     str[];
+  *    }
+  *
+@@ -145,7 +145,7 @@
+ struct str_shadow_s {
+     str_shadow_t   *next;  /* Next shadow in hash chain */
+     char           *str;   /* The shadowed string */
+-    unsigned short  ref;   /* The shadowed refcount */
++    unsigned long   ref;   /* The shadowed refcount */
+     char           *snext; /* The "next" pointer of the shadowed string */
+ };
+ 
+@@ -173,19 +173,19 @@
+         fatal("check_string: String %p vs shadow %p\n", s, sh);
+ 
+     if (!s && sh)
+-        fatal("check_string: String %p vs shadow %p (s %p, r%hu, n %p)\n"
++        fatal("check_string: String %p vs shadow %p (s %p, r%lu, n %p)\n"
+              , s, sh, sh->str, sh->ref, sh->snext);
+ 
+ #ifdef VERBOSE_CS
+-    printf("DEBUG: compare sh %p (s %p, r %hu, n %p)\n", sh, sh->str, sh->ref, sh->snext);
+-    printf("DEBUG:   with  s  %p (r %hu, n %p)\n", s, REFS(s), NEXT(s));
++    printf("DEBUG: compare sh %p (s %p, r %lu, n %p)\n", sh, sh->str, sh->ref, sh->snext);
++    printf("DEBUG:   with  s  %p (r %lu, n %p)\n", s, REFS(s), NEXT(s));
+ #endif
+     if (sh->str != s)
+         fatal("check_string: String %p '%s', shadow expected string %p '%s'\n"
+              , s, s, sh->str, sh->str);
+ 
+     if (sh->ref != REFS(s))
+-        fatal("check_string: String %p '%s' has %hu refs, shadow expected %hu refs\n", s, s, REFS(s), sh->ref);
++        fatal("check_string: String %p '%s' has %lu refs, shadow expected %lu refs\n", s, s, REFS(s), sh->ref);
+ 
+     if (sh->snext != NEXT(s))
+         fatal("check_string: String %p '%s's next is %p, shadow expected %p\n", s, s, NEXT(s), sh->snext);
+@@ -280,7 +280,7 @@
+         sh->ref++;
+     check_string(s, sh);
+ #ifdef VERBOSE_CS
+-    printf("DEBUG: ref'd s %p (%hu, %p) and sh %p (%p, %hu, %p)\n", s, REFS(s), NEXT(s), sh, sh->str, sh->ref, sh->snext);
++    printf("DEBUG: ref'd s %p (%lu, %p) and sh %p (%p, %lu, %p)\n", s, REFS(s), NEXT(s), sh, sh->str, sh->ref, sh->snext);
+ #endif
+ } /* ref_shadow_string() */
+ 
+@@ -443,7 +443,7 @@
+ #endif
+             }
+ #ifdef VERBOSE_CS
+-            printf("DEBUG: found s %p (%hu, %p) and sh %p (%p, %hu, %p)\n", curr, REFS(curr), NEXT(curr), scurr, scurr->str, scurr->ref, scurr->snext);
++            printf("DEBUG: found s %p (%lu, %p) and sh %p (%p, %lu, %p)\n", curr, REFS(curr), NEXT(curr), scurr, scurr->str, scurr->ref, scurr->snext);
+ #endif
+             return curr;
+         }
+@@ -672,7 +672,7 @@
+         sh = find_shadow(str);
+         check_string(str, sh);
+ #ifdef VERBOSE_CS
+-        printf("DEBUG: free s %p (%hu-1, %p) and sh %p (%p, %hu, %p)\n", str, REFS(str), NEXT(str), sh, sh->str, sh->ref, sh->snext);
++        printf("DEBUG: free s %p (%lu-1, %p) and sh %p (%p, %lu, %p)\n", str, REFS(str), NEXT(str), sh, sh->str, sh->ref, sh->snext);
+ #endif
+     }
+ #endif
+Index: 0.67/src/smalloc.h
+--- 0.67/src/smalloc.h Mon, 29 Jan 2001 10:05:27 -0700 lduening (lddev/b/31_smalloc.h 1.1.1.3 644)
++++ 0.67(w)/src/smalloc.h Tue, 06 Feb 2001 11:52:14 -0700 lduening (lddev/b/31_smalloc.h 1.1.1.3 644)
+@@ -77,9 +77,9 @@
+     {
+         i = (long)
+             ((*(p_uint*)
+-                 (p - sizeof(short) - (SMALLOC_OVERHEAD+1) * SIZEOF_CHAR_P) &
++                 (p - sizeof(unsigned long) - (SMALLOC_OVERHEAD+1) * SIZEOF_CHAR_P) &
+                 MASK) * SIZEOF_CHAR_P -
+-               sizeof(short) -
++               sizeof(unsigned long) -
+                (SMALLOC_OVERHEAD+2) * SIZEOF_CHAR_P
+             );
+         if (i >= 0)
+Index: 0.67/src/interpret.c
+--- 0.67/src/interpret.c Thu, 01 Feb 2001 13:40:13 -0700 lduening (lddev/c/41_interpret. 1.4.1.18 644)
++++ 0.67(w)/src/interpret.c Tue, 06 Feb 2001 11:37:26 -0700 lduening (lddev/c/41_interpret. 1.4.1.18 644)
+@@ -19146,22 +19146,17 @@
+              );
+ #endif
+ 
+-    if ( ((p_int)fun & 2) != ((p_int)SHSTR_OVERHEAD & 2) )
+-    {
+-        /* Heuristic to find out if fun is an unshared string,
+-         * building on the six-byte-overhead of shared strings.
+-         * This means that every shared string has a set bit 1,
+-         * whereas other strings have no overhead and thus bit 1
+-         * cleared. Function names are always shared, so if there
+-         * is no shared string twin for fun, the called function does
+-         * not exist anywhere. As a side effect, we get the shared
+-         * string for fun which makes the cache-lookup much faster.
+-         */
+-        fun = findstring(fun);
+-        if (!fun)
+-            goto failure2;
+-    }
+-    /* *fun is now (more or less) guaranteed to be a shared string */
++    /* Lookup the shared string for <fun>. Function names are always
++     * shared, so if there is no shared string twin for <fun>, the
++     * called function does not exist anywhere. As a side effect,
++     * we get the shared string for <fun> which makes the cache-lookup
++     * much faster.
++     */
++    fun = findstring(fun);
++    if (!fun)
++        goto failure2;
++
++    /* *fun is now guaranteed to be a shared string */
+ 
+     /* Get the hashed index into the cache */
+     ix =
+@@ -19240,11 +19235,12 @@
+ #ifdef APPLY_CACHE_STAT
+         apply_cache_miss++;
+ #endif
++
+         /* This call to findstring() is not really necessary, but serves
+          * as safeguard should a non-shared string escape the attention
+          * of the 'heuristic' filter before.
+          */
+-        shared_name = (cache[ix].name == fun) ? fun : findstring(fun);
++        shared_name = fun;
+         if ( NULL != shared_name)
+         {
+             int fx;
+Index: 0.67/src/gcollect.c
+--- 0.67/src/gcollect.c Mon, 29 Jan 2001 10:05:27 -0700 lduening (lddev/e/51_gcollect.c 1.1.1.5 644)
++++ 0.67(w)/src/gcollect.c Tue, 06 Feb 2001 11:39:29 -0700 lduening (lddev/e/51_gcollect.c 1.1.1.5 644)
+@@ -171,8 +171,8 @@
+    * Return TRUE if the marker was not set, FALSE else.
+    */
+ 
+-#define STRING_REFS(str)  (*(unsigned short *)((char *) (str)\
+-                           - sizeof(unsigned short)))
++#define STRING_REFS(str)  (*(unsigned long *)((char *) (str)\
++                           - sizeof(unsigned long)))
+   /* Return the refcount of shared string <str>
+    */
+ 
+@@ -180,7 +180,7 @@
+ 
+ #define MARK_STRING_REF(str) ((void)(\
+     STRING_REFS(str)++ || (\
+-        CHECK_REF( (str)-sizeof(short)-sizeof(char *) ) ||\
++        CHECK_REF( (str)-sizeof(unsigned long)-sizeof(char *) ) ||\
+             /* reached max ref count, which is given as 0... */ \
+             STRING_REFS(str)--\
+     ))\
+@@ -195,7 +195,7 @@
+ 
+ static void MARK_STRING_REF (char * str)
+ {
+-    if (CHECK_REF( (str)-sizeof(short)-sizeof(char *) ) )
++    if (CHECK_REF( (str)-sizeof(unsigned long)-sizeof(char *) ) )
+     {
+         /* First visit to this block */
+         STRING_REFS(str)++;
+@@ -1468,12 +1468,12 @@
+             }
+             if (svp->x.string_type == STRING_SHARED &&
+                 is_freed(SHSTR_BLOCK(svp->u.string),
+-                         sizeof(char *) + sizeof(short) + 1) )
++                         sizeof(char *) + sizeof(unsigned long) + 1) )
+             {
+ 
+                 WRITES(d, "Shared string in freed block 0x");
+                 write_x(d, (p_uint)(
+-                  (unsigned *)(block-sizeof(char *)-sizeof(short))
++                  (unsigned *)(block-sizeof(char *)-sizeof(unsigned long))
+                   - SMALLOC_OVERHEAD
+                 ));
+                 WRITES(d, "\n");
+Index: 0.67/CHANGELOG
+--- 0.67/CHANGELOG Tue, 06 Feb 2001 11:01:01 -0700 lduening (lddev/E/25_CHANGELOG 1.16.1.46 644)
++++ 0.67(w)/CHANGELOG Tue, 06 Feb 2001 12:03:55 -0700 lduening (lddev/E/25_CHANGELOG 1.16.1.46 644)
+@@ -5,6 +5,8 @@
+     - (strfuns.c) When (re)allocating the strbuf buffer, the length was
+         accidentally casted down to unsigned short, causing the program
+         to write outside the allocated memory (reported by Sebastian).
++    - (gcollect.c, stralloc, smalloc.h) Changed the shared string refcounter
++        from unsigned short to unsigned long.
+ 
+ 05-Feb-2001 (Lars Duening)
+     - (smalloc.c) Using the time_stamp() from within the allocation routines
+----------------------------------------

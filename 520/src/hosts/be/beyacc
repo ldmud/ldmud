@@ -1,0 +1,10 @@
+#!/bin/sh
+#
+# Wrapper to call the proper parser generator: byacc if it is installed,
+# otherwise bison.
+
+if [ $(type -p byacc) ]; then
+    exec byacc $*
+else
+    exec bison -y $*
+fi

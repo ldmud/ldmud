@@ -1,0 +1,28 @@
+SYNOPSIS
+	int socket_accept(int fd, closure callback, int|void opts)
+
+	void callback(int fd, int action, mixed a, mixed b)
+
+DESCRIPTION
+	Acknowledges an incoming tcp connection to a listening port.
+	Returns the file descriptor for the new socket.
+	
+CALLBACK
+	SOCKET_READY
+	  The socket is connected and ready to be written to/read from.
+
+	SOCKET_READ
+	  Output from the socket
+	  A contains the data from the socket either as an int* or a string
+	  depending on the option SOCKET_BINARY
+
+	SOCKET_CLOSE
+	  The socket has closed.
+
+	SOCKET_ERROR
+	  An error has been detected on the socket.
+	  A contains the error code obtained from the erq daemon.
+	  B contains the value of errno in most cases.
+
+SEE ALSO
+	sockets, socket_listen(), socket_write(), socket_close()
