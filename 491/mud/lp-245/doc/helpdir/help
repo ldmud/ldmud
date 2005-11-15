@@ -1,0 +1,4 @@
+command: help
+argument: any command.
+
+Show verbose information about any command.

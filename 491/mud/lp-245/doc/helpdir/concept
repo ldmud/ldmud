@@ -1,0 +1,46 @@
+IDEA BEHIND THIS GAME.
+
+I played Abermud a lot, and wanted to do something better (who doesn't).
+
+1. A wizard can extend the game.
+
+2. The game can be extended on fly, without rebooting the mud.
+
+3. There is no difference between objects. Rooms, players and things
+   are just objects.
+
+4. All objects are specified in interpreted C. The specifications are
+   compiled (loaded) first time they are referenced.
+
+5. There is no player parser. All commands are defined by the objects.
+   For example, the knife defines the command 'wield', and the
+   leather jacket defines 'wear'. An object defines a command by
+   associating it with a local function, defined in the object. When
+   the user types that command, the corresponding function will be called.
+   If the user types 'wear jacket', then "jacket" will be sent as an
+   argument to the wear function in the jacket object. If the user
+   types 'wear plate', the jacket wear function will detect that
+   "plate" != "jacket", and return false. Then, another 'wear' command
+   is tried, until success. When the user drops the jacket, all commands
+   are removed that were associated with that object.
+
+6. The rooms are just objects that define some commands like 'look',
+   'east', 'north' and such things. When the user then types 'north',
+   the room function will do something to the player.
+
+7. An object may define a function "heart_beat". It will be called every
+   third second. This can be used for automoving monsters, torches burning
+   down and time delayed traps...
+
+8. The most complex object is the player object. It defines commands like
+   "get", "smile" and "kill".
+
+9. When a player becomes wizard, he will get a small portable castle.
+   He can drop this anywhere, and it will grow and become a full scale
+   castle. He can then rename it and extend it. It is okey to rename it
+   to "entrance to hell" or anything.
+
+10. The language that defines objects are similar to C. It is interpreted.
+
+11. There is a builtin ed-compatible editor for wizards creating objects.
+    There is also 'ls' and 'cat'.

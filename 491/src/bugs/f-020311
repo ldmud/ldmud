@@ -1,0 +1,7 @@
+Short: Add Berkeley DB to the driver
+From: Lars
+Date: 2002-02-11
+Type: Feature
+State:
+
+It might even be used by the driver to store the swap data.
