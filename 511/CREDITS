@@ -1,0 +1,243 @@
+The program was originally written by
+
+Lars Pensj|, April 1989 (lars@cd.chalmers.se (no longer valid)).
+
+Lars gives the following credit:
+
+  The regexp package was made by Henry Spencer.
+
+  The ed package was not done by me. See the file ed.c for information.
+
+  Bit manipulations was implemented by pell@lysator.liu.se who also found
+  several bugs that had eluded me for months.
+
+  Valuable help and hints from: Mark Nagel, James Seidman, Moonchilde and more.
+
+  Roland Dunkerley III fixed for-loops, do-while and the operators ++ and --.
+
+  Sean T Barrett made smalloc.c.
+
+  Lennart Augustsson convinced me to implement a compiler for a virtual
+  stack machine. He also implemented the built-in preprocessor.
+
+  John S. Price found and fixed many bugs.
+
+  The shadow idea was "forwarded" to me by John S. Price from Team Cthulhu
+  (Bill Burdick, Roy Riggs, Mitch Adler).
+
+  Michael Malone, Michael O'Reilly, Klaus Rennecke, J|rn Rennecke and
+  Germano Caronni found and fixed a large amount of bugs.
+
+  Petri Wessman fixed changes for SCO unix and AIX.
+
+ -----------------------------------------------------------------------------
+
+Joern Rennecke ( amylaar@cs.tu-berlin.de ) gives this credit:
+
+  The non-corrupting indentation code for ed was written by Felix A. Croes,
+  aka Dworkin (<felix@dworkin.nl>) and originates from his DGD.
+
+  Mud-sprintf() is from Lynscar (Sean A Reith, <gusar@uniwa.oz.au> and
+  was donated into the Public Domain.
+
+  The alist based mapping implementation was supplied by Dworkin.
+
+  The idea for query_actions and an implementation that has been partially used
+  is from Peter Eriksson (aka lpd) pen@lysator.liu.se
+
+  The port to Amiga was done by Mateese ( Lars Duening )
+
+  The udp connectivity is from the CD driver, and was fitted in by deepthought.
+
+  Demos, Freaky, Hurl, Hyp, Mateese, Pepel and Jof did a lot of alpha
+  testing.
+
+  Reimer Behrends located a lot of bugs. He also supplied a portable macro to
+  test numbers for having but a single bit set, a mergesort based
+  sort_array() and variadic function support.
+
+  get_object_actions() was supplied by herp.
+
+  Marcus Meissner found and fixed many bugs.
+
+  Carl White, Mark (ec179@city.ac.uk), Archimedes (Robert Fuller), Eric Blade,
+  Mitchell Brandsma, Sam Bobroff, Jim Cogbill, Ben Fennema,
+  Sorva (Ed Zielinski), Loke@Wonderland (Solem), Claus S. Jensen, Nils Magnus,
+  samo@MorgenGrauen, Frobozz (Bryan Schuler), Sique@Nightfall, APJ,
+  Deathknight, Tero Jyri Michael Pelander (tpeland@utu.fi),
+  Willem van der Oord (willem@marble.dcr.net), Hate@MorgenGrauen,
+  Bob Farmer, Randor@EoP, Trevor Phillips, Robert M. Zigweid, Inspiral,
+  Brian Gerst, Rasmus H. Hansen, Demodian (John Kurtz), William J. Burton,
+  Patrick Li, Niilo Paasivirta, Frank Stolze, Penelope@Avalon,
+  Nathan@Unholy Lands, mubo@SiliconDream, Sunblood@Tubmud, Alfe@Tubmud,
+  Tatu Saloranta, Chameloid@Tubmud and Martin Brenner (deepthought) reported bugs.
+
+  Foslay did the OS/2 port.
+
+  Ray Gilbert originally did the MSDOS port, which was modified later by
+  Rasmus Hellbug Hansen.
+
+  Marcus Meissner contributed regreplace().
+
+  Slider@Tubmud supplied GnuWin32 patches.
+
+ -----------------------------------------------------------------------------
+
+Lars Duening thanks:
+
+ - Dana Durkee and the magnificient Wessex for enhancing my life.
+ - the citizens of One Step Beyond, PK-Mud and UNItopia for enduring my
+     driver experiments.
+ - Malc (mehbisdokutie@geocities.com) for providing me with access to
+     a Solaris system for testing.
+ - Elric (elric@lpmud.com) for providing me with access to
+     a FreeBSD system for testing.
+ - Blackcat (?) for providing me with access to a Linux system for testing.
+ - Freaky for providing me with access to an Irix system for testing, numerous
+     bug reports, and lots of patience when new versions crashed even faster
+     than the old ones.
+ - Kees Leune for providing me with access to a Linux/Sparc system for
+     testing.
+ - Stefan Petri and contributors for the extensive documentation of the
+     Amylaar driver (see also doc/README).
+ - the MudOS programmers for the efun terminal_colour() and Michael Schaefer
+     for adapting it for LDMud.
+ - Martin Brenner: initial multi-port implementation, inetd compatibility
+     code.
+ - Brian Gerst (bgerst@quark.vpplus.com) for the xerq daemon.
+ - Reinhard Pfau (Reinhard.Pfau@unix-ag.org, Mubo@SiliconDream) brought
+     the autoconf mechanism up to date.
+ - Ron Koerner (ron.koerner@gmx.de, Righ@FinalFrontier) provided the
+     initial implementation of inline closures modelled after MudOS' syntax.
+ - Uwe (mai94cch@studserv.uni-leipzig.de) provided the basic IPv6 support.
+ - Mark Daniel Reidel (Karm@Nightfall) did the first implementation of
+     the mySQL efuns.
+ - Dennis VanHoey (devanhoe@usol.com) did the compiling and testing for the
+     Darwin port.
+ - Bart van Driessche (bart@multi.franken.de, Hunter@FinalFrontier) did the
+     new OS/2 port.
+ - Menaures added the tab character conversion to the editor, and gleefully
+     found new ways to crash the driver.
+ - Acius donated the LPC implementation of the A* pathfinding algorithm.
+ - for bug reports, critics, fixes, patches and other support:
+     Acius (acius@bigfoot.com)
+     Alex@TubMud (at16@st-andrews.ac.uk)
+     Alexander Fetke (alfebtcd@cs.tu-berlin.de, Alfe@Tubmud)
+     Alexander Dobrinescu (ad@artifacts.de, Lev@FinalFrontier)
+     Anders Strandloev Elkjaer (ase@cs.auc.dk)
+     Andre Meiske (guandalug@magellan.tat.physik.uni-tuebingen.de)
+     Andreas Grammlich (andreas.grammlich@prepress.de, Gum@Wunderland)
+     Andre Grosse (ag17@irz.inf.tu-dresden.de, Patryn@Morgengrauen)
+     Andreas Fischer (andreas.fischer@physik.tu-chemnitz.de)
+     Andreas Klauer (Andreas.Klauer@epost.de, Menaures@Unitopia)
+     Andreas Weller (aw6@informatik.uni-ulm.de, Zwirch@Carledon)
+     Andres Cvitkovich (ac@twig.mond.at, ac@zwerg.at, Woody@Silberland)
+     Andrew Weisz (elarke01@snet.net)
+     Andy Zeneski (jaz@zsolv.com)
+     Athanasia Steele (azurite@mail1.nai.net)
+     Bastian Hoyer (hoyer@wisc.de, dafire@dafire.de)
+     Ben Fennema (bfennema@ix.netcom.com)
+     Bertram Felgenhauer (bf3@irz.inf.uni-dresden.de, Fuchur@Nightfall)
+     Bill Andrulonis (bill.andrulonis@citrix.com, Bofin@Realmsmud)
+     Blackcat@PK-Mud (amuelle1@htwm.de)
+     Brandon (pothole@darkspyre.quad.net)
+     Brandon Mathis (brandon.mathis@medsolutions.com)
+     Bruce Mitchell (mitchell@manly.delconet.com, Klahn@Manly Mud)
+     Carlo von Loesch (cvl@symlynX.com, lynx@high.impact.pages.de)
+     Casey Zacek (cz@netspire.net, zippo@eotl)
+     Christian "Leonidas" Becker (cbecker@informatik.hu-berlin.de)
+     Christian Kirschbaum (chrissy@cs.tu-berlin.de, Chameloid@Tubmud)
+     Christian Mudra (c_mudra@informatik.uni-kl.de, Coogan@Tubmud)
+     Christian Welzel (Sir_Gawain@gmx.de, Gawain@Regenbogen)
+     Collin Baillie (sanac@optushome.com.au)
+     Craig Venz (Craig Venz@citrix.com, Kilan@Realmsmud)
+     croft@UNItopia.rus.uni-stuttgart.de
+     Dale "Elric" Perkins (dale_perkins@mac.com, dale@lpmud.com)
+     Daniel von Dincklage (daniel@ozet.de, Sunblade@SiliconDream),
+     Daniel Fischer (dfischer@gmx.de, Dan@Gueldenland)
+     Daniel Sloan (sloand@alphalink.com.au)
+     Daryth Kendrickson (stavros@deadofnight.com)
+     David Gibbs (ishara@btinternet.com)
+     David 'Greyelk' Gibby (oop_apprentice@yahoo.com)
+     Dennis VanHoey (dvanhoe@usol.com)
+     Dominik Zanettin (zhan@opossum.htu.tuwien.ac.at, Zhan@Beutelland)
+     Enrico Bauermeister (ebauermeister@t-online.de, Enrico@FinalFrontier)
+     Eivind (ekj@ekj.vestdata.no)
+     Erik Meusel (emeusel@prinz-atm.CS.Uni-Magdeburg.De)
+     Fini Jastrow (Fiona@Wunderland, ujastrow@mail.desy.de)
+     Florian Heinz (ctx@amail.dereference.de)
+     Frank Kirschner (freaky@unitopia.uni-stuttgart.de)
+     Frank Stolze (fstolze@iName.com)
+     Frank Syse (syseworks@mac.com)
+     Gerhard Schmidt (estartu@augusta.de)
+     Gimli@Unitopa (gimli@schlumpf.net)
+     "Gnomi" (gnomi@UNItopia.rus.uni-stuttgart.de)
+     Gunnar Kreitz (gunnark@chello.se)
+     Heiko Kopp (hkopp@informatik.uni-rostock.de, bardioc@bardioc.com,
+       Bardioc@Evermore)
+     Henk Stokhorst (Tha@wxs.nl)
+     Holger Kremss (jur94ewp@studserv.uni-leipzig.de, Holger@web.de,
+       Holger@Wunderland)
+     Joern Rennecke (amylaar@cygnus.co.uk)
+     Jose Manuel Roman (roman@wol.es, Theuzifan uzi@simauria.upv.es)
+     Juergen Weickert (Sissi@UNItopia)
+     Karl N. Matthias (karmat@matthias.org)
+     Kathrin Paschen (paschen@ira.uka.de)
+     Kees Leune (c.j.leune@kub.nl)
+     Kirnan@Avalon
+     Krystal-Anne Rubenstein (punkette@hotmail.com)
+     Largo@Wunderland (emeusel@csmd.cs.uni-magdeburg.de)
+     Lasse Fuglsang Pedersen (volmer@qeep.dk, Zordiac@DeeperTrouble2)
+     Logic (logic@logic.net)
+     "Mammi" (mammi@unitopia.uni-stuttgart.de)
+     Manu Mäki (mtmaki@pultti.turkuai.fi, Cendor@Winterkill)
+     Mark Daniel Reidel (Karm@Nightfall,
+       reidelm@rbg.informatik.tu-darmstadt.de)
+     Markus Peter (warp@spin.de, warp@hip.spin.de)
+     Martin (mandragon@morgengrauen)
+     Mat@Maethos
+     Matthew Julius (julius.2@wright.edu)
+     Michael Fedrowitz (mfedrowi@ix.urz.uni-heidelberg.de,
+       Michael_Fedrowiz@gmx.net, Rhodry@ForgottenDreams)
+     Michael Sporn (sporn@mathematik.hu-berlin.de, sunblood@tubmud)
+     Mike Conley (mpc@sgi.net, Tamarindo@Sovereign)
+     mudder@Furtual.ORG
+     "Nathan@Unholy Lands" (mud@pc181.iaee.tuwien.ac.at)
+     Nepomuck@UNItopia
+     Nick Derewianka (nickd@e-media.com.au)
+     Nico Ehemann (n.ehemann@wzl.rwth-aachen.de)
+     Niels Boehm (bohmmrwc@minet.uni-jena.de, Mariko@Regenbogen)
+     Oskar Linde (d98-oli@nada.kth.se)
+     Parsec
+     Patrick May (patrick.may@cedelgroup.com)
+     Paul Apgar (tiresius@usa.net, tiresius@Cosmos)
+     Rajko Albrecht (ral@alwins-word.de, Alwin@Avalon)
+     Ralph (ralphi@vkr.k-net.dk)
+     Ralph Zitz (RZ@zitz.dk, Nostradamus@OSB)
+     Reimer Behrends (Macbeth@Tubmud)
+     Reinhard Pfau (reinhard@netlab1.hrz.uni-siegen.de, mubo@SiliconDream),
+     Robb Townsend (meecham@infonline.net)
+     Robert Reither (mud@klein.htu.tuwien.ac.at, Nathan@Unholy.Lands)
+     Rodney Quaye (sark@oberon.krans.com)
+     Ron Dawson (rondawson@syd.eastlink.ca, rdawson@cgc.ns.ca, Caper@PixieMud)
+     Sebastian Huss (huss@informatik.hu-berlin.de, baba@avalon)
+     Slava "DieHARD" Ignatjev (root@impar.com, slava@intersfera.lt)
+     Sieni (sampsa@netsonic.fi)
+     Simon Fischer (firebat@redcrown.de)
+     Stefan Budweiser (Stefan.Budweiser@compaq.com)
+     Stefan Riemer (stefan.riemer@bauing.uni-weimar.de, Peng@FinalFrontier)
+     Stephan Lichtenhagen (lichti@amethyst.chemie.uni-dortmund.de,
+       stephan@lichtenhagen.de, Tiamak@Morgengrauen)
+     Steve Willoughby (steve@alchemy.com, Ragnarok)
+     Tatu P. Saloranta (doomdark@cc.hut.fi)
+     Terry Penn (terry@simaril.net)
+     TheFinn (thefinn@ar.com.au)
+     Thomas Feldmeier (tfeldmei@student.informatik.uni-ulm.de, Zora@Carledon,
+       zora@alpha.universalware.de)
+     Thorsten Klose (Thorsten.Klose@infineon.com, Avatar@avalon)
+     Tmm@UNItopia? (Tmm@gmx.de)
+     Tomas (Vandergnome@aol.com)
+     Tomi Valkeinen (tomi.valkeinen@taikatech.com, Tomba@Batmud)
+     Tucita@UNItopia
+     Wolf Dieter Dallinger (wolf.dieter@dallinger.de)
+     Zonk@FinalFrontier (zonk@finalfrontier.mud.de)
