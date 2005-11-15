@@ -1,0 +1,318 @@
+Short: Fast Callouts
+From: Elric
+Date: 010707
+Type: Patch
+State: New
+
+diff -u -r ldmud-191/src/backend.c ldmud-elric/src/backend.c
+--- ldmud-191/src/backend.c	Thu Apr 20 15:20:39 2000
++++ ldmud-elric/src/backend.c	Thu Apr 20 16:09:27 2000
+@@ -87,10 +87,14 @@
+ 
+ /*-------------------------------------------------------------------------*/
+ 
+-#define ALARM_TIME  2  /* The granularity of alarm() calls */
+-
++#define ALARM_MICROSECS  100000  /* The granularity of setitimer() calls */
++#define ALARMS_IN_HEARTBEAT 20  /* how many alarms to wait to do heartbeat */
+ /*-------------------------------------------------------------------------*/
++struct itimerval alarm_time;
++int alarm_count;
++
+ mp_int current_time;
++mp_int big_time;
+   /* The current time, updated every heart beat.
+    * TODO: Should be time_t if it is given that time_t is always a skalar.
+    */
+@@ -215,7 +219,7 @@
+  */
+ 
+ {
+-    alarm(0);
++    setitimer(ITIMER_REAL, NULL, NULL);
+ }
+ 
+ #endif
+@@ -290,7 +294,9 @@
+         /* Start the first alarm */
+         comm_time_to_call_heart_beat = MY_FALSE;
+         time_to_call_heart_beat = MY_FALSE;
+-        alarm(ALARM_TIME);
++        alarm_time.it_interval.tv_usec = ALARM_MICROSECS;
++        alarm_time.it_value.tv_usec = ALARM_MICROSECS;
++        setitimer(ITIMER_REAL, &alarm_time, NULL);
+     }
+ #ifdef AMIGA
+     atexit(exit_alarm_timer);
+@@ -523,10 +529,13 @@
+             /* Start the next alarm */
+             comm_time_to_call_heart_beat = MY_FALSE;
+             time_to_call_heart_beat = MY_FALSE;
+-            alarm(ALARM_TIME);
+ 
+             /* Do the timed events */
+-            call_heart_beat();
++            if(alarm_count >= ALARMS_IN_HEARTBEAT){
++                call_heart_beat();
++                alarm_count = 0;
++            }
++            alarm_count++;                
+             call_out();
+ 
+             /* Reset/cleanup/swap objects.
+diff -u -r ldmud-191/src/backend.h ldmud-elric/src/backend.h
+--- ldmud-191/src/backend.h	Sun Apr  2 23:36:57 2000
++++ ldmud-elric/src/backend.h	Thu Apr 20 13:28:26 2000
+@@ -8,6 +8,7 @@
+ /* --- Variables --- */
+ 
+ extern mp_int current_time;
++extern mp_int big_time;
+ extern Bool time_to_call_heart_beat;
+ extern volatile Bool comm_time_to_call_heart_beat;
+ extern uint32 total_player_commands;
+diff -u -r ldmud-191/src/call_out.c ldmud-elric/src/call_out.c
+--- ldmud-191/src/call_out.c	Mon Apr 17 01:42:47 2000
++++ ldmud-elric/src/call_out.c	Thu Apr 20 14:54:43 2000
+@@ -211,6 +211,7 @@
+     /* Adjust the stack and get the delay */
+     sp = arg - 1;
+     delay = arg[1].u.number;
++    delay = delay * 10;
+     if (delay < 1)
+         delay = 1;
+ 
+@@ -240,6 +241,143 @@
+ } /* new_call_out() */
+ 
+ /*-------------------------------------------------------------------------*/
++
++svalue_t *
++new_fast_call_out (svalue_t *sp, short num_arg)
++
++/* EFUN: call_out()
++ *
++ *   void call_out(string fun, int delay, mixed arg, ...)
++ *   void call_out(closure cl, int delay, mixed arg, ...)
++ *
++ * Set up a call to function fun or closure cl in the current
++ * object. The call will take place in delay seconds, with the
++ * remaining argument list provided. References in the argument list
++ * will be passed as number 0, though.
++ */
++
++{
++    svalue_t       *arg;    /* Pointer to efun arguments */
++    int             delay;
++    struct call    *cop;    /* New callout structure */
++    struct call   **copp;   /* Auxiliary pointers for list insertion */
++    struct call    *cop2;
++    int             error_index;
++
++    arg = sp - num_arg + 1;
++
++    /* First, find a new call structure.
++     * If possible from the free list, else allocate a new chunk of them.
++     * Note that we don't yet remove the structure from the freelist - in
++     * case errors happen.
++     */
++
++    if ( !(cop = call_list_free) )
++    {
++        int i;
++
++        cop = call_list_free = pxalloc(CHUNK_SIZE * sizeof (struct call));
++        for ( i = 0; i < CHUNK_SIZE - 1; i++)
++            call_list_free[i].next = &call_list_free[i+1];
++        call_list_free[CHUNK_SIZE-1].next = NULL;
++        call_out_nil_object.flags |= O_DESTRUCTED;
++        num_call += CHUNK_SIZE;
++    }
++
++    /* Test if the expected arguments are on the stack */
++
++    if (arg[0].type != T_STRING && arg[0].type != T_CLOSURE)
++    {
++        bad_efun_vararg(1, sp);
++        /* NOTREACHED */
++    }
++
++    if (arg[1].type != T_NUMBER)
++    {
++        bad_efun_vararg(2, sp);
++        /* NOTREACHED */
++    }
++
++    /* If the current object is destructed, free everything on the stack
++     * and return.
++     */
++
++    if (current_object->flags & O_DESTRUCTED)
++    {
++        do {
++            free_svalue(sp--);
++        } while (--num_arg);
++        return sp;
++    }
++
++    /* Get the function designation from the stack */
++
++    if (arg[0].type == T_STRING)
++    {
++        error_index = setup_function_callback(&(cop->fun), current_object
++                                             , arg[0].u.string
++                                             , num_arg-2, arg+2
++                                             , MY_TRUE
++                                             );
++        free_string_svalue(arg);
++    }
++    else
++        error_index = setup_closure_callback(&(cop->fun), arg
++                                             , num_arg-2, arg+2
++                                             , MY_TRUE
++                                             );
++
++    if (error_index >= 0)
++    {
++        /* call structure is still in the free list, and the
++         * callback structure was invalidated automatically.
++         */
++        bad_efun_vararg(error_index, arg - 1);
++        /* NOTREACHED */
++    }
++
++    /* We can do the callout, so lets remove it from the freelist and
++     * store the missing data.
++     */
++
++    call_list_free = cop->next;
++    cop->command_giver = command_giver; /* save current player context */
++    if (command_giver)
++        ref_object(command_giver, "new_call_out");  /* Bump its ref */
++
++    /* Adjust the stack and get the delay */
++    sp = arg - 1;
++    delay = arg[1].u.number;
++    if (delay < 1)
++        delay = 1;
++
++    /* Insert the new structure at its proper place in the list */
++
++    for (copp = &call_list; NULL != (cop2 = *copp); copp = &cop2->next)
++    {
++        int delta;
++        if ((delta = cop2->delta) >= delay)
++        {
++            cop2->delta -= delay;
++            cop->delta = delay;
++            cop->next = *copp;
++            *copp = cop;
++            return sp;
++        }
++        delay -= (delta >= 0 ? delta : 0);
++          /* Especially when called from within a call_out, delta may be
++           * negative.
++           */
++    }
++    *copp = cop;
++    cop->delta = delay;
++    cop->next = NULL;
++
++    return sp;
++} /* new_call_out() */
++
++/*-------------------------------------------------------------------------*/
++
+ void
+ call_out (void)
+ 
+diff -u -r ldmud-191/src/comm.c ldmud-elric/src/comm.c
+--- ldmud-191/src/comm.c	Thu Apr 20 15:20:39 2000
++++ ldmud-elric/src/comm.c	Thu Apr 20 16:35:09 2000
+@@ -4570,7 +4570,7 @@
+         return sp;
+     }
+ 
+-    i = current_time - O_GET_INTERACTIVE(ob)->last_time;
++    i = (current_time - O_GET_INTERACTIVE(ob)->last_time)/10;
+     deref_object(ob, "query_idle");
+     put_number(sp, i);
+     return sp;
+diff -u -r ldmud-191/src/func_spec ldmud-elric/src/func_spec
+--- ldmud-191/src/func_spec	Thu Mar 30 23:00:44 2000
++++ ldmud-elric/src/func_spec	Thu Apr 20 14:43:18 2000
+@@ -243,6 +243,7 @@
+ closure symbol_function(symbol|string, string|object default: F_CONST0);
+ 
+ void    call_out(string|closure, int, void|mixed, ...);
++void    fast_call_out(string|closure, int, void|mixed, ...);
+ mixed  *call_out_info();
+ int     find_call_out(string|closure);
+ int     remove_call_out(string|closure);
+diff -u -r ldmud-191/src/interpret.c ldmud-elric/src/interpret.c
+--- ldmud-191/src/interpret.c	Thu Apr 20 15:20:39 2000
++++ ldmud-elric/src/interpret.c	Thu Apr 20 14:52:49 2000
+@@ -11361,7 +11361,7 @@
+          * Actually the time is updated only once in every backend cycle.
+          */
+ 
+-        push_number(current_time);
++        push_number((current_time/10) + big_time);
+         break;
+ 
+     /* --- Efuns: Strings --- */
+@@ -13662,6 +13662,23 @@
+         GET_NUM_ARG
+         inter_pc = pc;
+         sp = new_call_out(sp, (short)num_arg);
++        break;
++
++    CASE(F_FAST_CALL_OUT);               /* --- call_out <nargs>    --- */
++        /* EFUN fast_call_out()
++         *
++         *     void fast_call_out(string fun, int delay, mixed arg, ...)
++         *     void fast_call_out(closure cl, int delay, mixed arg, ...)
++         *
++         * Set up a call to function fun or closure cl in the current
++         * object. The call will take place in delay deciseconds, with the
++         * remaining argument list provided. delay can be a minimum time
++         * of one decisecond (.1 of a second).
++         */
++
++        GET_NUM_ARG
++        inter_pc = pc;
++        sp = new_fast_call_out(sp, (short)num_arg);
+         break;
+ 
+     CASE(F_CALL_OUT_INFO);          /* --- call_out_info       --- */
+diff -u -r ldmud-191/src/port.c ldmud-elric/src/port.c
+--- ldmud-191/src/port.c	Fri Apr 14 00:10:44 2000
++++ ldmud-elric/src/port.c	Thu Apr 20 13:24:15 2000
+@@ -20,6 +20,7 @@
+ #include <sys/time.h>
+ #endif
+ #include <time.h>
++#include <sys/timeb.h>
+ 
+ #include "backend.h"
+ #include "main.h"
+@@ -45,6 +46,7 @@
+     /* Don't write ever to total_alarms outside the interrupt, to avoid
+      * race conditions.
+      */
++    static struct timeb micro_time;
+     static mp_int last_time = 0;
+     static mp_int noted_alarms = 0;
+ 
+@@ -61,7 +63,9 @@
+      * anomaly.
+      */
+     last_time += offset;
+-    now = (mp_int)time(NULL);        /* Just use the old time() for now */
++    ftime(&micro_time);
++    big_time = (micro_time.time/100000000)*100000000;
++    now = ((micro_time.time - big_time) * 10) + (micro_time.millitm/100);       
+     if (now >= last_time) {
+         last_time = now;
+         return now;
+Only in ldmud-elric/src/settings: lpmud

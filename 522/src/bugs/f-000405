@@ -1,0 +1,9 @@
+Short: sort_array(&arr) sorts in-place
+From: Freaky
+Date: 000405
+Type: Feature
+State: New
+
+While sort_array(arr) sorts a copy of the array, sort_array(&arr)
+might sort the arr in place. This would allow the wizard to chose
+whatever is best.

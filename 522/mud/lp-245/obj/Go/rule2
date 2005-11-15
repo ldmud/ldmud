@@ -1,0 +1,6 @@
+The winner, is the player with the highest score on the board when the game
+ends.
+
+The game ends when both players have passed.
+
+The score is the number of stones + number of surrounded empty intersections.

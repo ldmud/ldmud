@@ -1,0 +1,17 @@
+SYNOPSIS
+        int sgn (int|float arg)
+
+DESCRIPTION
+        Return the sign of the argument.
+
+        arg  sgn(arg)
+        --------------
+        > 0   1
+          0   0
+        < 0  -1
+
+HISTORY
+        Introduced in LDMud 3.2.9.
+
+SEE ALSO
+        abs(E)
