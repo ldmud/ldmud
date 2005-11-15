@@ -1,0 +1,7 @@
+Short: Top for LDMud
+Date: 990211
+Type Feature
+State: Unclassified
+
+Having a efun returning a 'top' like statistic, both per-object and per-user,
+would be nice. Major undertaking, though.
