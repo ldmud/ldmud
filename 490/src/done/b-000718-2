@@ -1,0 +1,47 @@
+Short: Indirect virtual inherits clobber global variables
+Date: Tue, 18 Jul 2000 16:55:13 +0200 (MEST)
+From: Erzmagier des Wunderlandes <mud@hurrikap.rz.uni-leipzig.de>
+Type: Bug
+State: Not reproducible with 3.2.8-dev.217+
+
+Hallo Mateese!
+
+So, mal wieder ein Bug von mir ;o) diesmal ist die Konstellation etwas
+komplexer, es ist ein 'virtual inherit', 'replace_program' und eine
+globale Variable vor einem Inherit noetig.
+
+Aufgetreten ist das beim 3.2.7, und ich habe wie immer keinen der
+Dev-Driver parat. Ich hab das ganze mal auf drei Files reduziert:
+
+---- a.c ----
+int fasel;
+
+create() { fasel=1; }
+blah() { return fasel; }
+
+---- c.c ----
+virtual inherit "/players/fiona/a";
+
+create() {
+  if (file_name()=="/players/fiona/d")
+    replace_program("/players/fiona/a");
+  ::create();
+}
+
+---- d.c ----
+string menno;
+inherit "/players/fiona/c";
+
+create() { ::create() }
+
+
+Ein call_other() auf "/players/fiona/d"->blah() liefert dann Null. Will
+sagen: alle globalen Variablen, die waehrend des create()s erstellt
+werden, werden zu Null.
+
+Nicht auftreten tut der Fehler, wenn man menno nach dem inherit definiert.
+
+*knuddels*
+
+   Fiona @ Wunderland
+

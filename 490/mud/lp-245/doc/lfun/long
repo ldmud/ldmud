@@ -1,0 +1,15 @@
+void long(str)
+string str;
+
+This function prints out a elaborate description of it self. Minimum
+requirement is to print the value of short().
+
+If there is an argument, then print description of that argument. An argument
+can only be passed to long() if id() has agreed. For example, a room with
+a door can allow id("door") to be true. Then it is possible to do
+"look at door". The long command will then have to print info about the door.
+
+To prevent the listing of all things in this room when "look at door", let
+can_put_and_get("door") return false.
+
+See also lfun/short(), lfun/can_put_and_get(), lfun/id().

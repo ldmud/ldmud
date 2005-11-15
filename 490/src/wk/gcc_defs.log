@@ -1,0 +1,19 @@
+Reading specs from d:\SYS\CYGNUS\B19\H-I386~1\lib\gcc-lib\i386-cygwin32\egcs-2.90.27\specs
+gcc version egcs-2.90.27 980315 (egcs-1.0.2 release)
+ d:\SYS\CYGNUS\B19\H-I386~1\lib\gcc-lib\i386-cygwin32\egcs-2.90.27\cpp.exe -lang-c -v
+  -iprefix d:\SYS\CYGNUS\B19\H-I386~1\lib\gcc-lib\i386-cygwin32\egcs-2.90.27\ -undef
+  -D__GNUC__=2 -D__GNUC_MINOR__=90 -Di386 -D_WIN32 -D__CYGWIN32__
+  -DWINNT -D_X86_=1 -D__STDC__=1 -D__stdcall=__attribute__((__stdcall__))
+  -D__cdecl=__attribute__((__cdecl__)) -D__i386__ -D_WIN32
+  -D__CYGWIN32__ -D__WINNT__ -D_X86_=1 -D__STDC__=1 -D__stdcall=__attribute__((__stdcall__))
+  -D__cdecl=__attribute__((__cdecl__)) -D__i386 -D__WINNT -Asystem(winnt) -Acpu(i386) -Amachine(i386)
+  -Di386 -Asystem(unix) -Acpu(i386) -Amachine(i386) -D__i386__ -Asystem(unix) -Acpu(i386) -Amachine(i386)
+   make_func.c c:\windows\TEMP\cc001010.i
+GNU CPP version egcs-2.90.27 980315 (egcs-1.0.2 release) (80386, BSD syntax)
+#include "..." search starts here:
+#include <...> search starts here:
+ d:\SYS\CYGNUS\B19\H-I386~1\lib\gcc-lib\i386-cygwin32\egcs-2.90.27\../../../../../include
+ d:\SYS\CYGNUS\B19\H-I386~1\lib\gcc-lib\i386-cygwin32\egcs-2.90.27\../../../../i386-cygwin32/include
+ d:\SYS\CYGNUS\B19\H-I386~1\lib\gcc-lib\i386-cygwin32\egcs-2.90.27\include
+End of search list.
+make_func.y:959: for each function it appears in.)

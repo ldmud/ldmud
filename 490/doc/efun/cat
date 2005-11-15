@@ -1,0 +1,29 @@
+SYNOPSIS
+        int cat(string path, int start, int num)
+
+DESCRIPTION
+        List the file found at path.
+
+        In most installations it is not legal to have '..' or spaces
+        in the path. This commands is normally connected to the "cat"
+        command that wizards have. It is also used by the "help"
+        command. The optional arguments start and num are start line
+        number and number of lines. If they are not given the whole
+        file is printed from the beginning.
+
+        The total number of lines will not exceed a system limit, which
+        normally is 50 lines.
+
+        cat() returns the number of lines read and printed if success,
+        0 if no such file or no lines to read (if start or len is < 0,
+        or if the file has less than start lines).
+
+EXAMPLE
+        cat("/doc/efun/cat", 5, 9);
+
+        This will print out the file "/doc/efun/cat" begining at line
+        5 and ending with line 13.
+
+SEE ALSO
+        get_dir(E), file_size(E), read_file(E), read_bytes(E),
+        valid_read(M)

@@ -1,0 +1,31 @@
+Short: OSB shows inconsistent malloc statistics
+From: Lars
+Date: 2001-07-13
+Type: Bug
+State: Done - fixed in 3.2.9-dev.330
+
+Total:                                    2542658                              
+> malloc                                                                       
+Type                   Count      Space (bytes)                                
+sbrk requests:           78           3683396 (a)                              
+large blocks:           460           3102840 (b)                              
+large net avail:                      3101000                                  
+large free blocks:      212            580552 (c)                              
+large wasted:             1                 4 (d)                              
+                                                                               
+small chunks:            69           1131048 (e)                              
+small blocks:         28158            719064 (f)                              
+small net avail:                       606432                                  
+small free blocks:     9246            399544 (g)                              
+small wasted:            83               608 (h)                              
+unused from current chunk               11856 (i)                              
+                                                                               
+permanent blocks:       219            172064                                  
+clib allocations:         9             36468                                  
+                                                                               
+malloc_increment_size: calls 17495 success 1242 total 98652                    
+                                                                               
+Total storage:        (b+c+d)        3683396 should equal (a)    3683396       
+Total small storage:  (f+g+h+i)      1131072 should equal (e)    1131048       
+Total storage in use: (b-g-h-i)      2690832 net available:      2576360       
+Total storage unused: (c+d+g+h+i)     992564                                   
