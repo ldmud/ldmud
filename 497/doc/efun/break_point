@@ -1,0 +1,11 @@
+OPTIONAL
+SYNOPSIS
+        void break_point()
+
+DESCRIPTION
+        This function is for system internal use and should never be called by
+        user objects. It is supposed to check the stack integrity and aborts
+        the driver when it detects corruption.
+
+SEE ALSO
+        shutdown(E), swap(E)

@@ -1,0 +1,17 @@
+Do 'cat /doc/w/<topic>' for more information.
+
+Wizard commands:
+
+ls <path>	cat <path>	load <file>	destruct <object>
+ed <path>	clone <obj>	update <file>	rm <file>
+cd <path>	more <path>	pwd		echo
+echoall
+
+Apprentice wizard commands:
+
+wizlist		stat <name>	heal <name>	title <string>
+goto <obj>	in <obj> <cmd>	emote <msg>	people
+setmin <msg>	setmout <msg>	setmmin <msg>	setmmout <msg>
+review		shutdown	trans		force <player> to <cmd>
+
+General info about creating rooms and objects: Look in /doc/build
