@@ -1,0 +1,39 @@
+To get an container do:
+    object cobj;
+
+    cobj = clone_object("obj/container");
+
+For customization the following routines are available :
+
+You must call these functions (use call_other()):
+
+set_name(n)
+    string n. Sets the name and short description to n.
+    Sets long description to short + ".\n"
+
+These are the optional functions:
+
+set_short(s)
+    string s. Sets the short description to s and the long to short + ".\n"
+
+set_long(l)
+    string l. Sets the long description to l.
+
+set_read(r)
+    string r. Sets the read string to r. It is read with the command "read <id>"
+    where <id> is the name, alias, or alt_name of the container.
+
+set_value(v)
+    int v. Sets the selling value to v.
+
+set_weight(w)
+    int w. Sets the empty weight to w.
+
+set_max_weight(m)
+    int m. Sets the maximum weight that the container can contain to m.
+
+set_alias(a) { alias = a; }
+    string a. Sets an alias name to a.
+
+set_alt_name(t) { alt_name = t; }
+    string t. Sets an alternate name to t.
