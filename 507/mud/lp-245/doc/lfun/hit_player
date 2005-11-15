@@ -1,0 +1,13 @@
+int hit_player(dam)
+int dam;
+
+If the object can fight and get hit by other objects, it must have
+a hit_player function. The "dam" is the maximum damage the other
+object wants to give. Return the actual damage.
+
+This function should also tell other players in the current room
+that someone got hit (using say()).
+
+See example in player.c.
+
+See also efun/enable_commands, efun/living, lfun/attacked_by.

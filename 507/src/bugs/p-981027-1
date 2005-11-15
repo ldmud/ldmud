@@ -1,0 +1,13 @@
+Short: New string efun by Doomdark
+Date: 981027
+State: Patch
+Long:
+The string efun allows the quick replacement of aliases in strings.
+Some testings is needed, but this could be faster than the generic
+regreplace.
+
+The other efun (make_string_shared) is better be done as a sefun.
+It is better to improve the string-sharing policy of the driver
+than to make mudlibs depending on it.
+
+For code, see bugs/doomdark/*
