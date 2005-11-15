@@ -1,0 +1,8 @@
+SYNOPSIS
+        float sqrt(int|float)
+
+DESCRIPTION
+        Returns the square root of the argument.
+
+HISTORY
+        LDMud 3.2.9 added integers as arguments.
