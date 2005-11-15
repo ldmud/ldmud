@@ -1,0 +1,6 @@
+int query_npc()
+
+This function is defined by all living objects and monsters. It will return
+1 for monsters, and 0 for players. NPC = Non Player Character.
+
+See also: lfun/query_gender_string

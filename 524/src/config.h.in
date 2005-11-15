@@ -1,0 +1,505 @@
+/* DO NOT EDIT!
+ *
+ * This file is created automatically by configure from the template
+ * in config.h.in.
+ */
+
+#ifndef CONFIG_H__
+#define CONFIG_H__ 1
+
+/* ----------- Commandline Argument Defaults ----------
+ * These options provide default settings for those options which can
+ * also be set on the commandline.
+ */
+
+
+/* --- Runtime limits --- */
+
+/* This is the maximum array size allowed for one single array.
+ * If 0, any size is allowed.
+ */
+#define MAX_ARRAY_SIZE            @val_max_array_size@
+
+/* This is the maximum array size allowed for one single mapping.
+ * If 0, any size is allowed.
+ */
+#define MAX_MAPPING_SIZE            @val_max_mapping_size@
+
+/* Max size of a file allowed to be read by 'read_file()'.
+ */
+#define READ_FILE_MAX_SIZE        @val_read_file_max_size@
+
+/* Define MAX_BYTE_TRANSFER to the number of bytes you allow to be read
+ * and written with read_bytes and write_bytes
+ */
+#define MAX_BYTE_TRANSFER        @val_max_byte_transfer@
+
+/* This is the maximum number of callouts allowed at one time.
+ * If 0, any number is allowed.
+ */
+#define MAX_CALLOUTS              @val_max_callouts@
+
+
+/* --- Timing --- */
+
+/* If an object is left alone for a certain time, then the
+ * function clean_up will be called. This function can do anything,
+ * like destructing the object. If the function isn't defined by the
+ * object, then nothing will happen.
+ *
+ * This time should be substantially longer than the swapping time.
+ */
+#define TIME_TO_CLEAN_UP          @val_time_to_clean_up@
+
+/* How long time until an unused object is swapped out.
+ * Machine with too many players and too little memory: 900 (15 minutes)
+ * Machine with few players and lot of memory: 10000
+ * Machine with infinite memory: 0 (never swap).
+ */
+#define TIME_TO_SWAP              @val_time_to_swap@
+#define TIME_TO_SWAP_VARIABLES    @val_time_to_swap_variables@
+
+/* How many seconds until an object is reset again.
+ * Set this value high if big system, otherwise low.
+ */
+#define TIME_TO_RESET             @val_time_to_reset@
+
+
+/* --- Memory --- */
+
+/* Which memory manager to use. Possible defines are
+ *   MALLOC_smalloc:   Satoria's malloc. Fastest, uses the least memory,
+ *                     supports garbage collection.
+ *   MALLOC_sysmalloc: the normal system malloc()
+ */
+
+#define MALLOC_@val_malloc@
+
+/* Reserve an extra memory area from malloc(), to free when we run out
+ * of memory to get some warning and start Armageddon.
+ * If this value is 0, no area will be reserved.
+ */
+#define RESERVED_USER_SIZE      @val_reserved_user_size@
+#define RESERVED_MASTER_SIZE    @val_reserved_master_size@
+#define RESERVED_SYSTEM_SIZE    @val_reserved_system_size@
+
+/* If MIN_MALLOCED is > 0, the gamedriver will reserve this amount of
+ * memory on startup for large blocks, thus reducing the large block
+ * fragmentation. The value therefore should be a significantly large
+ * multiple of the large chunk size.
+ * As a rule of thumb, reserve enough memory to cover the first couple
+ * of days of uptime.
+ */
+#define MIN_MALLOCED  @val_min_malloced@
+
+/* If MIN_SMALL_MALLOCED is > 0, the gamedriver will reserve this
+ * amount of memory on startup for small blocks, thus reducing the small block
+ * fragmentation. The value therefore should be a significantly large
+ * multiple of the small chunk size.
+ * As a rule of thumb, reserve enough memory to cover the first couple
+ * of days of uptime.
+ */
+#define MIN_SMALL_MALLOCED  @val_min_small_malloced@
+
+/* This value gives the upper limit for the total allocated memory
+ * (useful for systems with no functioning process limit).
+ * A value of 0 means 'unlimited'.
+ */
+#define MAX_MALLOCED         @val_max_malloced@
+
+
+/* --- Interpreter --- */
+
+/* Define STRICT_EUIDS if the driver is to enforce the use of euids,
+ * ie. load_object() and clone_object() require the current object to
+ * have a non-zero euid.
+ */
+@cdef_strict_euids@ STRICT_EUIDS
+
+/* Maximum number of evaluated nodes/loop.
+ * If this is exceeded, the current function is halted.
+ */
+#define MAX_COST             @val_max_cost@
+
+
+/* --- Communication --- */
+
+/* Define what port number the game is to use.
+ */
+#define PORTNO               @val_portno@
+
+/* Define this to the port on which the driver can receive UDP message.
+ * If set to -1, the port will not be opened unless the mud is given a valid
+ * port number on startup with the -u commandline option.
+ */
+#define UDP_PORT             @val_udp_port@
+
+/* Maximum numbers of ports the GD accepts connections to.
+ */
+#define MAXNUMPORTS          @val_maxnumports@
+
+/* Should code for the external request demon be included?
+ */
+@cdef_erq_demon@ ERQ_DEMON
+
+/* Maximum sizes for an erq send or reply.
+ */
+#define ERQ_MAX_REPLY @val_erq_max_reply@
+#define ERQ_MAX_SEND  @val_erq_max_send@
+
+/* Define this if you want IPv6 support (assuming that your host
+ * actually offers this.
+ */
+@cdef_use_ipv6@ USE_IPV6
+
+/* If you want to use threads to write the data to the sockets 
+ * define USE_PTHREADS.
+ * WARNING: This feature is HIGHLY ALPHA and can crash the driver!
+ */
+ 
+@cdef_use_pthreads@ USE_PTHREADS
+
+/* When USE_PTHREADS is used, define this to the maximum amount of data
+ * to be held pending for writing.
+ * A value of 0 means 'unlimited'.
+ */
+#define PTHREAD_WRITE_MAX_SIZE @val_pthreads_write_max_size@
+
+
+/* ----------- Compilation Options ----------
+ * To change these options, the config.h must be recreated and the
+ * driver recompiled.
+ */
+
+/* Define COMPAT_MODE if you are using the 2.4.5 mudlib or one of its
+ * derivatives.
+ * TODO: Make this a runtime option.
+ */
+@cdef_compat_mode@ COMPAT_MODE
+
+/* The name of the master object.
+ */
+#define MASTER_NAME              @val_master_name@
+
+/* Define this to annotate all allocations with file:line of the driver
+ * source responsible for it.
+ * Supported by: MALLOC_smalloc
+ */
+@cdef_malloc_trace@ MALLOC_TRACE
+
+/* Define this to annotate all allocations with file:line of the lpc program
+ * responsible for it.
+ * Supported by: MALLOC_smalloc
+ */
+@cdef_malloc_lpc_trace@ MALLOC_LPC_TRACE
+
+/* Trace the most recently executed bytecode instructions?
+ */
+@cdef_trace_code@ TRACE_CODE
+
+/* If using TRACE_CODE , how many instructions should be kept?
+ */
+#define TOTAL_TRACE_LENGTH      @val_total_trace_length@
+
+/* Runtime statistics:
+ *  COMM_STAT: count number and size of outgoing packets.
+ *  APPLY_CACHE_STAT: count number of hits and misses in the apply cache.
+ */
+@cdef_comm_stat@ COMM_STAT
+@cdef_apply_cache_stat@ APPLY_CACHE_STAT
+
+/* The name of the swapfile used by the driver to swap out objects (if
+ * enabled), relative to the mudlib directory. The driver will append
+ * '.<hostname>' to the file.
+ */
+#define SWAP_FILE                 @val_swap_file@
+
+
+/* --- Wizlist --- */
+
+/* Where to save the WIZLIST information.
+ * If not defined, and neither given on the commandline, the driver will
+ * not read the WIZLIST file.
+ */
+@cdef_wizlist_file@ WIZLIST_FILE  @val_wizlist_file@
+
+
+/* --- Access Control --- */
+/* #define ACCESS_CONTROL if you want the driver to do any access control.
+ * TODO: Make this a runtime option.
+ */
+@cdef_access_control@ ACCESS_CONTROL
+
+/* file for access permissions data */
+/* TODO: Make this a runtime option */
+#define ACCESS_FILE               @val_access_file@
+
+/* logfile to show valid and rejected connections
+ * simple not define this for NO logs
+ * TODO: Make this a runtime option.
+ */
+@cdef_access_log@ ACCESS_LOG      @val_access_log@
+
+
+/* --- Language --- */
+
+/* Define SUPPLY_PARSE_COMMAND if you want the efun parse_command.
+ * If you don't need it, better #undef it, lest some new wiz can inadvertly
+ * crash your mud or make it leak memory.
+ */
+@cdef_supply_parse_command@ SUPPLY_PARSE_COMMAND
+
+/* Define INITIALIZATION_BY___INIT if you want all initializations of variables
+ * to be suspended till the object is created ( as supposed to initialization
+ * at compile time; the latter is more memory efficient for loading and faster
+ * at cloning, while the former allows to use efuns, e.g. shutdown().
+ */
+@cdef_initialization_by___init@ INITIALIZATION_BY___INIT
+
+/* Define USE_SYSTEM_CRYPT if you want crypt() to be implemented by your
+ * operating system (assuming it offers this function). This makes your
+ * programm smaller and may even let you take advantage of improvements
+ * of your OS, but may also prohibit transporting encrypted date like
+ * passwords between different systems.
+ * Undefine USE_SYSTEM_CRYPT if you want to use the driver's portable
+ * crypt() implementation.
+ */
+@cdef_use_system_crypt@ USE_SYSTEM_CRYPT
+
+/* Define this if you want the 'nosave' keyword.
+ */
+@cdef_lpc_nosave@ USE_LPC_NOSAVE
+
+/* Define this if you want mySQL support (assuming that your host
+ * actually offers this.
+ */
+@cdef_use_mysql@ USE_MYSQL
+
+/* Define this if you want the obsolete and deprecated efuns.
+ */
+@cdef_use_deprecated@ USE_DEPRECATED
+
+/* Define USE_PCRE if you want to use perl compatible regexp with
+ * your driver. This feature requires Fiona@Wunderland's pcre driver patch
+ * and PCRE installed on the machine.
+ */
+@cdef_use_pcre@ USE_PCRE
+
+/* Define USE_SET_LIGHT if you want to use the efun set_light() and the
+ * driver-provided light system.
+ */
+@cdef_use_set_light@ USE_SET_LIGHT
+
+/* Define USE_SET_IS_WIZARD if you want to use the efun set_is_wizard().
+ */
+@cdef_use_set_is_wizard@ USE_SET_IS_WIZARD
+
+/* Define USE_PROCESS_STRING if you want to use the efun process_string().
+ */
+@cdef_use_process_string@ USE_PROCESS_STRING
+
+
+/* --- Runtime limits --- */
+
+/* Maximum size of a socket send buffer.
+ */
+#define SET_BUFFER_SIZE_MAX      @val_set_buffer_size_max@
+
+/* CATCH_RESERVED_COST is added to the eval cost for the time executing code
+ * guarded by a catch() statement, so that an eval_cost-too-big error can
+ * still be caught and handled.
+ *
+ * To catch an eval_cost too big error in an object that called recursive
+ * master functions, CATCH_RESERVED_COST should be greater than
+ * MASTER_RESERVED_COST * 2.
+ * TODO: Check that at runtime.
+ */
+#define CATCH_RESERVED_COST       @val_catch_reserved_cost@
+
+/* MASTER_RESERVED_COST is the total reserve available for master applies.
+ * It is halved for every recursion into another master apply.
+ */
+#define MASTER_RESERVED_COST    @val_master_reserved_cost@ /* must be power of 2 */
+/* TODO: Check that at runtime */
+
+/* If this is defined, expensive operations like string additions
+ * receive additional evalcosts depending on the amount of data handled.
+ */
+@cdef_dynamic_costs@ DYNAMIC_COSTS
+
+/* Define the maximum stack size of the stack machine. This stack will also
+ * contain all local variables and arguments.
+ */
+#define EVALUATOR_STACK_SIZE      @val_evaluator_stack_size@
+
+/* Define the maximum call depth for functions.
+ * MAX_USER_TRACE is used for for normal program execution, the full
+ * MAX_TRACE is only available in error handling.
+ */
+#define MAX_USER_TRACE              @val_max_user_trace@
+#define MAX_TRACE                   @val_max_trace@
+
+/* Maximum number of bits in a bit field. They are stored in printable
+ * strings, 6 bits per byte.
+ * The limit is more based on considerations of speed than memory
+ * consumption.
+ */
+#define MAX_BITS                  @val_max_bits@
+
+/* Maximum number of players in the game.
+ */
+#define MAX_PLAYERS                @val_max_players@
+
+/* When uploading files, we want fast response; however, normal players
+ * shouldn't be able to hog the system in this way.  Define ALLOWED_ED_CMDS
+ * to be the ratio of the no of ed cmds executed per player cmd, and
+ * MAX_CMDS_PER_BEAT to be the max no of buffered player commands the
+ * system will accept in each heartbeat interval.
+ */
+#define ALLOWED_ED_CMDS           @val_allowed_ed_cmds@
+/* TODO: ALLOWED_ED_CMDS: make this a runtime option */
+
+
+/* --- Compiler --- */
+
+/* Define the size of the compiler stack. This defines how complex
+ * expressions the compiler can parse. The value should be big enough.
+ */
+#define COMPILER_STACK_SIZE        @val_compiler_stack_size@
+
+/* Max number of local variables in a function.
+ */
+#define MAX_LOCAL                   @val_max_local@
+
+/* Maximum size of an expanded preprocessor definition.
+ */
+#define DEFMAX                   @val_defmax@
+
+/* Should newly defined LPC functions be aligned in memory? this costs 1.5
+ * bytes on average, but saves some time when searching in case of an
+ * apply_low cache function miss.
+ */
+@cdef_align_functions@ ALIGN_FUNCTIONS
+
+
+/* --- Internal Tables --- */
+
+/* Define the size of the shared string hash table.  This number needn't
+ * be prime, probably between 1000 and 30000; if you set it to about 1/5
+ * of the number of distinct strings you have, you will get a hit ratio
+ * (number of comparisons to find a string) very close to 1, as found strings
+ * are automatically moved to the head of a hash chain.  You will never
+ * need more, and you will still get good results with a smaller table.
+ * If the size is a power of two, hashing will be faster.
+ */
+#define HTABLE_SIZE               @val_htable_size@
+
+/* Object hash table size.
+ * Define this like you did with the strings; probably set to about 1/4 of
+ * the number of objects in a game, as the distribution of accesses to
+ * objects is somewhat more uniform than that of strings.
+ */
+#define OTABLE_SIZE               @val_otable_size@
+
+/* Define the size of the table of defines, reserved words, identifiers
+ * and efun names. Should be either several times smaller than HTABLE_SIZE
+ * or identical with it.
+ */
+#define ITABLE_SIZE               @val_itable_size@
+
+/* the number of apply_low cache entries will be 2^APPLY_CACHE_BITS.
+ */
+#define APPLY_CACHE_BITS            @val_apply_cache_bits@
+
+/* The parameters of the regular expression/result cache.
+ * The expression cache uses a hashtable of RXCACHE_TABLE entries.
+ * Undefine RXCACHE_TABLE to disable the all regexp caching.
+ */
+@cdef_rxcache_table@ RXCACHE_TABLE            @val_rxcache_table@
+
+/* --- Profiling ---
+ * For profiling of the VM instruction implementations, refer to the Makefile
+ */
+
+/* Enable usage statistics of VM instructions.
+ * For profiling of the VM instructions themselves, see the Profiling
+ * Options in the Makefile.
+ */
+@cdef_opcprof@ OPCPROF
+
+#ifdef OPCPROF
+/* With OPCPROF, the dump of the statistics include the names
+ * of the instructions.
+ */
+@cdef_verbose_opcprof@ VERBOSE_OPCPROF
+#endif
+
+
+/* --- Standard Debugging --- */
+
+/* Enable basic run time sanity checks. This will use more time
+ * and space, but nevertheless you are strongly encouraged to keep
+ * it defined.
+ */
+@cdef_debug@ DEBUG
+
+/* Enable debug output from the LPC compiler.
+ */
+@cdef_yydebug@ YYDEBUG
+
+/* Disable inlining.
+ */
+@cdef_no_inlines@ NO_INLINES
+
+/* Enable the shared string checking (enables commandline option
+ * --check-strings).
+ */
+@cdef_check_strings@ CHECK_STRINGS
+
+/* Shared strings are never really freed.
+ */
+@cdef_keep_strings@ KEEP_STRINGS
+
+/* Activate debug prints in the telnet machine.
+ */
+@cdef_debug_telnet@ DEBUG_TELNET
+
+/* Activate allocation debug prints in the smalloc module.
+ */
+@cdef_debug_smalloc_allocs@ DEBUG_SMALLOC_ALLOCS
+
+/* The DEBUG level for the ERQ daemon:
+ *  0 : no debug output
+ *  1 : standard debug output
+ *  2 : verbose debug output
+ */
+#define ERQ_DEBUG @val_erq_debug@
+
+
+/* --- Specific Debugging ---
+ * These options have been introduced to debug specific problems and will
+ * be removed again later.
+ */
+
+/* Activate object referencing checking code during the GC. It will
+ * print error messages to gcout when an object or program is
+ * referenced as something else. No penalty for using.
+ * Requires MALLOC_TRACE to work. Incompatible with DUMP_GC_REFS.
+ */
+#ifdef MALLOC_TRACE
+@cdef_check_object_gc_ref@ CHECK_OBJECT_GC_REF
+#endif
+
+/* Activate total smalloc size consistency check code. This will produce
+ * a lot of output in the GC log.
+ */
+@cdef_check_smalloc_total@ CHECK_SMALLOC_TOTAL
+
+/* Sometimes the GC stumbles over invalid references to memory
+ * blocks (namely 'Program referenced as something else'). Define
+ * this macro to get a detailed dump of all found references
+ * (Warning: LOTS of output!). Incompatible with CHECK_OBJECT_GC_REF.
+ */
+@cdef_dump_gc_refs@ DUMP_GC_REFS
+
+#endif /* CONFIG_H__ */

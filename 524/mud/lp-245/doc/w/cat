@@ -1,0 +1,14 @@
+Command: cat
+Argument: file
+
+Print the file 'file'. If it is big, characters will be lost because all of
+the file is written to the socket, without delay.
+
+The file will be searched for in the current directory. 'cat castle.c' will
+print the castle of the wizard. 'cat' isn't really good for
+lookin at game files, but rather better for reading documentation.
+
+Only Arch wizards and higher can read files from other wizards. Files from the
+basic adventure can be read by all wizards.
+
+See also w/ls, w/ed, w/rm
