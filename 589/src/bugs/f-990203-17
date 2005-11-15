@@ -1,0 +1,40 @@
+Short: New efun deep_call_other()
+From: Daniel von Dincklage <vondincklage@usa.net>
+Date: Mon, 22 Jun 1998 00:53:36 +0200
+Type: Feature
+State: Unclassified
+See also: p-990204-1, f-011011
+
+(Sorry for taking that long to reply)
+
+On Fri, 19 Jun 1998, Daniel von Dincklage wrote:
+>> - A deep_call_other efun
+>>   Calls the function in all inherits, this is esp. useful for the
+>>   Move-Object-driverhooks - You could use deep_call_other,"init"
+>>   there and never have to worry about people forgetting the ::init
+>>   in their files again.
+
+On Sat, 16 Jan 1999, Logic wrote:
+>
+> I can see a problem here; what happens when you have an init() that looks
+> like:
+>
+> void init()
+> {
+>       initialize_things();
+>       do_stuff();
+>       ::init();
+> }
+>
+> In the case of deep_call_other(), you don't have an opportunity to do any
+> initialization before going up the inheritance chain.
+Of course, that could lead to some confusion. In addition, my current
+implementation calls the functions in the inherits in a more or less
+random manner. Please note that the ::init() in your example will
+still work, providing quite a big level of additional confusion.
+The simple solution to this problem is simply to only use
+code/variables declared in the same class, as the current init() was
+declared. Adding this restriction to init() would be a bit too
+much, so one could have a second "deep_init" function. This works
+quite well, as I use the deep_pre_create-Hooks here quite often.
+
