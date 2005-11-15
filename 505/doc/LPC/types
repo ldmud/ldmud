@@ -1,0 +1,134 @@
+CONCEPT
+    types
+
+DESCRIPTION
+
+    Variables can have the following types:
+
+    o int       An integer. Typically full 32 bits signed, yielding a
+                range of at least -2,147,483,648 to 2,147,483,647. The
+                exact available range is given by the predefined
+                macros __INT_MIN__ and __INT_MAX__.
+
+                Integer values can be specified in decimal, in
+                sedecimal when preceeded by '0x' (e.g. 0x11), binary
+                when preceeded by '0b' (e.g. 0b00010001), octal when
+                preceeded by '0o' (e.g. 0o21) and as character
+                yielding the charset value for the character as the number
+                to use (e.g. '0' yields 48 on ASCII machines).
+
+                Character values are enclosed in single-quotes ('),
+                with the sequence ''' returning the single-quote
+                itself. Instead of the literal character an
+                escape-sequence can be written between the
+                single-quotes:
+                  \N   : the character code N in decimal
+                  \0xN : the character code N in sedecimal
+                  \xN  : the character code N in sedecimal
+                  \0oN : the character code N in octal
+                  \0bN : the character code N in binary
+                  \a   : BEL (0x07)
+                  \b   : Backspace (0x08)
+                  \t   : Tab (0x09)
+                  \e   : Escape (0x1b)
+                  \n   : Newline (0x0a)
+                  \f   : Formfeed (0x0c)
+                  \r   : Carriage Return (0x0d)
+                  \<other character>: the given character
+
+    o status    OUTDATED - status was planned to be an optimized
+                boolean format, but this was never actually
+                implemented. status does work; however, since it
+                is only an alias for type 'int', just use int.
+
+    o string    Strings in lpc are true strings, not arrays of characters
+                as in C (and not pointers to strings). Strings are
+                mutable -- that is, the contents of a string can be
+                modified as needed.
+
+                The text of a string is written between double-quotes
+                ("). A string can written over several lines when the
+                lineends are escaped (like a macro), however a better
+                solution is to write one string per line and let the
+                gamedriver concatenate them.
+
+                String text typically consists of literal characters,
+                but escape-sequences can be used instead of
+                characters:
+                  \<CR>     : Carriage Return (0x0d)
+                  \<CR><LF> : ignored
+                  \<LF>     : ignored
+                  \<LF><CR> : ignored
+
+                  \N   : the character code N in decimal
+                  \0xN : the character code N in sedecimal
+                  \xN  : the character code N in sedecimal
+                  \0oN : the character code N in octal
+                  \0bN : the character code N in binary
+                  \a   : BEL (0x07)
+                  \b   : Backspace (0x08)
+                  \t   : Tab (0x09)
+                  \e   : Escape (0x1b)
+                  \n   : Newline (0x0a)
+                  \f   : Formfeed (0x0c)
+                  \r   : Carriage Return (0x0d)
+                  \"   : The double quote (")
+                  \<other character>: the given character
+                
+                Adjacent string literals are automatically
+                concatenated by the driver when the LPC program is
+                compiled. String literals joined with '+' are
+                concatenated by the LPC compiler if the #pragma
+                combine_strings is set (the default); if the pragma is
+                not set, the string literals are conacatenated at run
+                time.
+
+    o object    Pointer to an object. Objects are always passed by
+                reference.
+
+    o array     Pointer to a vector of values, which could also
+                be an alist. Arrays take the form ({ n1, n2, n3 })
+                and may contain any type or a mix of types. Arrays
+                are always passed by reference. Note that the size
+                of arrays in LPC, unlike most programming languages,
+                CAN be changed at run-time.
+
+    o mapping   An 'associative array' consisting of values indexed by
+                keys. The indices can be any kind of datatype.
+                Mappings take the form ([ key1: value1, key2: value2 ]).
+                By default, mappings are passed by reference.
+
+    o closure   References to executable code, both to local
+                functions, efuns and to functions compiled at
+                run-time ("lambda closures").
+
+    o symbol    Identifier names, which in essence are quoted strings.
+                They are used to compute lambda closures, e.g. instead
+                of ({..., 'ident, ... }) you can write declare a
+                'symbol' variable foo, compute a value for it, and then
+                create the closure as ({ ..., foo, ... })
+
+    o float     A floating point number in the absolute range
+                __FLOAT_MIN__ to __FLOAT_MAX__ (typically 1e-38 to 1e+38).
+                Floating point numbers are signified by a '.'
+                appearing, e.g. '1' is integer 1, but '1.' is
+                floating-point 1 .
+
+    o mixed     A variable allowed to take a value of any type (int,
+                string, object, array, mapping, float or closure).
+
+    All uninitialized variables have the value 0.
+
+    The type of a variable is really only for documentation. Unless
+    you define #pragma strict_types, variables can actually be of
+    any type and has no effect at all on the program. However, it's
+    extremely bad style to declare one type but use another, so
+    please try to avoid this.
+
+    A pointer to a destructed object will always have the value 0.
+
+
+SEE ALSO
+    alists(LPC), arrays(LPC), mappings(LPC), closures(LPC),
+    typeof(E), get_type_info(E), inheritance(LPC), pragma(LPC),
+    modifiers(LPC), escape(LPC)

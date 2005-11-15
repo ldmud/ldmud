@@ -1,0 +1,23 @@
+Short: Modify efun get_dir()
+From: Matthew Julius <julius.2@wright.edu>
+Date: Fri, 08 Jan 1999 16:29:08 -0500
+Type: Feature
+State: Unclassified
+
+varargs mixed *get_dir(string, int, closure|int...)
+  First, two additional options for the bitfield,
+    Return program times
+    Return the full file name
+  Second, the third and additional arguments are funcall()'d with the file
+  name of each file and the returned value added to that respective file's
+  data.
+  Assume that get_dir(path, 1) returns ({ "a.c", "b.c" }).  Furthermore,
+  assume that the new options have bit numbers of 0x08, 0x10 respectively.
+  Examples,
+    get_dir(path, 1, 1, 0) returns ({ "a.c", 1, 0, "b.c", 1, 0 })
+    get_dir(path, 1|8) returns ({ "a.c", "/std/a.c", "b.c", "/std/b.c" })
+    Better examples require too much writing/reading ...
+  Other possible options include file access times, and data returned in
+  a mapping or alist.  Another possibility is an option to include "." and
+  "..".  I like lots of options...
+

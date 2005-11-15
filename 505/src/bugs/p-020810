@@ -1,0 +1,914 @@
+Short: Hyperborea patches for ANSI support
+From: Hyperborea
+Date: 2002-08-10
+Type: Patch
+State: New
+
+NAME    Color supportDESCRIPTION    Hyperborea has color support built into the driver itself. This makes    it extremely easy to generate output containing colors.    This tutorial will be short because this color stuff is    really simple.    Quoted below is a slightly edited version of Vawn's quick color    tutorial (qct)    A Hyperborea Ascii Color Code (HACC) looks like this:            \cCP    The capital 'C' is a letter that stands for a color.    The capital 'P' is a number or a letter that stands for    what special properties you would like turned on, i.e.    blinking or underline or bold or inverse display.    Valid values for 'C' are:    k/K - Foreground or Background is black, respectively    w/W - Foreground or Background is white    r/R - Foreground or Background is red    g/G - Foreground or Background is green    b/B - Foreground or Background is blue    y/Y - Foreground or Background is yellow    m/M - Foreground or Background is magenta    c/C - Foreground or Background is cyan     X  - Do not change the color    'P' is a bitfield. The bits are enumerated thusly:        Bit Position      Effect    ==================================        1              Bold        2              Underline        4              Blink        8              Inverse    ==================================    Given the fact that P is a bitfield, properties can be combined by    simply adding the values. E.g., creating inverted bold text, P would    have a value of 8 (inverse) + 1 (bold) = 9.    Similarly, bold, blinking, inverted text is 1+4+8 = D.      The reason the value is 'D' and not 13 is because P must    be exactly one character long. If the result of your addition    is ten or greater, then count from 'A'. I.e.,    'A' = 10    'B' = 11    'C' = 12    ...and so forth. The largest possible value is 'F', so this is    not as daunting as it may appear.    'P' may also be the special value of 'X', which means 'do not change the    properties.EXAMPLES      '\cG5' means a bold green background with blinking text.      '\cx1' means do not change the color, just make current one bold      '\cx4' means do not change the color, just make the text blink      '\cb0' means make the text blue.      '\cx0' means return the terminal to normalNOTES    Players can choose to activate ANSI color by using the command 'setenv    ansi 1' or disable it by using the command 'setenv ansi 0'. This means    that you should *NEVER* assume that players have color enabled.AUTHOR    VawnDATE    January 2001CHANGES    none
+
+diff -N -u -r ldmud-328/src/color_parse.c ldmud-328-hyperborea/src/color_parse.c
+--- ldmud-328/src/color_parse.c	Wed Dec 31 17:00:00 1969
++++ ldmud-328-hyperborea/src/color_parse.c	Fri Aug  9 11:18:34 2002
+@@ -0,0 +1,337 @@
++/* 
++ * File:       color_parse.c
++ * Purpose:    Implementation of methods described in color_parse.h
++ * Programmer: Vawn (taylor@tcnj.edu, vawn@hyperborea.net)
++ * Notes:
++*/
++#ident "@(#) color_parse.c V0.60  09-Jan-2000"
++
++#include <ctype.h>
++#include <limits.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include "color_parse.h"
++#include "xalloc.h"
++
++static char * ANSI_HEADER = "\x1b[";
++static int    ANSI_HEADER_LEN = 2;
++static char * ANSI_FOOTER = "m";
++static int    ANSI_FOOTER_LEN = 1;
++
++/*
++ * http://www.geocities.com/TimesSquare/Alley/8802/manual-ansilist.htm
++ *
++ * ESC code sequence Function 
++ *
++ *  Set Graphics Rendition:   
++ *  ESC[#;#;....;#m Set display attributes where # is  
++ * 0 for normal display  
++ * 1 for bold on  
++ * 4 underline (mono only)  
++ * 5 blink on  
++ * 7 reverse video on  
++ * 8 nondisplayed (invisible)  
++ * 30 black foreground  
++ * 31 red foreground  
++ * 32 green foreground  
++ * 33 yellow foreground  
++ * 34 blue foreground  
++ * 35 magenta foreground  
++ * 36 cyan foreground  
++ * 37 white foreground  
++ * 40 black background  
++ * 41 red background  
++ * 42 green background  
++ * 43 yellow background  
++ * 44 blue background  
++ * 45 magenta background  
++ * 46 cyan background  
++ * 47 white background
++ */
++static char * ansi_properties[] =
++{ "0;", "1;", "4;", "4;1;", "5;", "5;1;", "5;4;", "5;4;1;", "7;", 
++  "7;1;", "7;4;", "7;4;1;", "7;5;", "7;5;1;", "7;5;4;", "7;5;4;1;",
++};
++static const char e = ' ';
++static char ansi_colors[] =
++{ ' ', '4', '6', ' ', ' ', ' ', '2', ' ', ' ', ' ', '0', ' ', '5', 
++  ' ', ' ', ' ', ' ', '1', ' ', ' ', ' ', ' ', '7', '\0', '3',
++};
++
++int parse_for_color( char * to_parse, char ** out, int * ansi_bytes )
++{
++   *out 	= NULL;
++   *ansi_bytes  = 0;
++   if( strstr(to_parse, "\\c") != NULL )
++   {
++      char 	* previous = to_parse, 
++	   	* token = strstr(to_parse, "\\c");
++      const int grow = 256;
++      int	is_upper;
++
++      *out = (char *)xalloc(strlen(to_parse)+grow);
++      memset(*out, '\0', strlen(to_parse)+grow);
++      do
++      {
++         char 	color_code[3], 
++		* property_code = NULL;
++	 int  	color_index;
++	 strncat(*out, previous, token-previous);
++         token += 2; // skip the leading '\c'
++         if( strlen(token) < 2 ) { break; }
++         is_upper = isupper(*token);
++         color_index = tolower(*(token++))-'a';
++
++	 if( *token >= '0' && *token <= '9' )
++	    property_code = ansi_properties[*(token++)-'0'];
++	 else if( isalpha(*token) )
++	 { 
++	    char c = tolower(*token);
++	    if( c <= 'f' ) 
++               property_code = ansi_properties[tolower(*(token++))-'a'+10];
++	    else if( c == 'x' )
++	    {
++	       property_code = "";
++	       token++;
++	    }
++         }
++	 
++	 if( ansi_colors[color_index] != ' ' && property_code != NULL )
++	 {
++            if( color_index != 23 ) // If the color was not 'x or X'
++	       sprintf(color_code, "%c%c", is_upper ? '4' : '3', ansi_colors[color_index]);
++	    else color_code[0] = '\0';
++	    sprintf(*out+strlen(*out), "%s%s%s%s", ANSI_HEADER, property_code, color_code, ANSI_FOOTER);
++	    *ansi_bytes += ANSI_HEADER_LEN+strlen(color_code)+strlen(property_code)+
++			   ANSI_FOOTER_LEN;
++            previous = token;
++         }
++	 else previous = token-4; // Was not a valid color code, do not gobble
++      }
++      while( (token = strstr(token, "\\c")) != NULL );
++      strcat(*out, previous);
++   }
++   return 0;
++} // function parse_for_color
++
++int valid_color_escape( char * seq )
++{
++   int c;
++   return (strlen(seq) == 4)  &&
++          (!strncmp(seq, "\\c", 2)) &&
++          (strchr("xwkrgbymc", tolower(seq[2]))) &&
++          (isdigit(seq[3]) || (isalpha(seq[3]) && (c=tolower(seq[3])) <= 'f'
++			       || 'x' == c));
++} // function valid_color_escape
++
++int ansi_color_properties( char * s )
++{
++   int ansi_properties = 0;
++   s = strstr(s, ANSI_HEADER);
++
++   if( s != NULL )
++   {
++      char 	* cur;
++      int	ok = 1;
++      cur = s+2;
++      ok  = 1;
++      while( *cur != '\0' && ok )
++      {
++         if( isdigit(*cur) )
++	 {
++            char * prop      = "01457xX",
++	         * tmp;
++	    int prop_codes[] = { CJM_NORMAL, CJM_BOLD, CJM_UNDERLINE,
++		                 CJM_BLINK, CJM_REVERSE,
++			       };
++
++	    switch( cur[1] )
++	    {
++	       case 'm' : // End of sequence
++		  if( tmp = strchr(prop, *cur) )
++		  {
++		     if( tolower(*cur) != 'x' )
++	                ansi_properties |= prop_codes[tmp-prop];
++		     cur += 2;
++	          }
++	          ok = 0;
++	          break;
++               case ';' : // Rendering property
++		  if( tmp = strchr(prop, *cur) )
++                  {
++		     if( tolower(*cur) != 'x' )
++	                ansi_properties |= prop_codes[tmp-prop];
++		     cur += 2;
++ 	          }
++	          else ok = 0;
++		  break;
++	       default :  // Possibly a color sequence
++	          if( strchr("34", *cur) && cur[1] >= '0' && cur[1] <= '7' &&
++		      cur[2] == 'm' )
++		  {
++	             ansi_properties |= (*cur == '3' ? CJM_FG_COLOR :
++						       CJM_BG_COLOR) |
++				        (((cur[1]-'0')+1) << 7);
++	             cur += 2;
++			
++	          }
++	          else ok = 0;
++	    }
++	 }
++         else if( *cur == 'm' )
++         {
++/*
++	    fprintf(stderr, "^[");
++	    {
++	       char * t = s+1;
++	       do { fprintf(stderr, "%c", *t++); } while( *t != 'm' );
++	       fprintf(stderr, "m\n");
++	    }
++*/
++            ok = 0;
++         }
++         else ok = 0;
++      }
++   }
++   return ansi_properties;
++} // function ansi_properties
++
++void ansi_properties_to_ansi( int prop, char * ansi )
++{
++   int p = prop&CJM_PROP;
++   strcpy(ansi, ANSI_HEADER);
++   //strcpy(ansi, "[");
++   if( p ) { strcat(ansi, ansi_properties[p>>1]); }
++
++   {
++     int i = ((prop&CJM_COLOR)>>7)-1;
++     if( i >= 0 )
++     {
++        int len = strlen(ansi);
++        ansi[len++] = ansi_is_fgcolor(prop) ? '3' : '4';
++        ansi[len++] = '0'+i;
++        ansi[len] = '\0';
++     }
++   }
++   strcat(ansi, ANSI_FOOTER);
++} // function ansi_properties_to_ansi
++
++int ansi_color_nbytes( char * str, int len )
++{
++   int ansi_bytes = 0;
++   char * s = str;
++   // We will check the value of length against 'cur-str'
++   // however we have reached the threshold when cur-str >= len-1.
++   // Let's just do the '-1' now.
++   len--; 
++   s = strstr(s, ANSI_HEADER);
++
++   while( s != NULL )
++   {
++      char      * cur;
++      int       ok;
++      cur = s+2;
++      ok  = 1;
++      while( *cur != '\0' && ok )
++      {
++         if( isdigit(*cur) )
++         {
++            switch( cur[1] )
++            {
++               case 'm' : // End of sequence
++                  if( strchr("75410", *cur) && cur-str < len )
++                  {
++                     ansi_bytes += cur-s+2;
++                     cur += 2;
++                  }
++                  ok = 0;
++                  break;
++               case ';' : // Rendering property
++                  if( strchr("75410", *cur) )
++                     cur += 2;
++                  else ok = 0;
++                  break;
++               default :  // Possibly a color sequence
++                  if( strchr("34", *cur) && cur[1] >= '0' && cur[1] <= '7' &&
++                      cur[2] == 'm' )
++                     cur += 2;
++                  else ok = 0;
++            }
++         }
++         else if( 'm' == *cur )
++         {
++            if( cur-str <= len ) 
++               ansi_bytes += cur-s+1;
++/*
++            fprintf(stderr, "^[");
++            {
++               char * t = s+1;
++               do { fprintf(stderr, "%c", *t++); } while( *t != 'm' );
++               fprintf(stderr, "m\n");
++            }
++*/
++            ok = 0;
++         }
++         else ok = 0;
++
++	 if( cur-str > len ) { ok = 0; }
++      }
++      s = strstr(cur, ANSI_HEADER);
++      if( s != NULL && s-str > len ) { s = NULL; }
++   }
++   return ansi_bytes;
++} // function ansi_color_nbytes
++
++int ansi_color_bytes( char * s )
++{
++   return ansi_color_nbytes(s, INT_MAX);
++} // function ansi_color_bytes
++
++char * stransi( char * s )
++{
++   char * ansi_at = NULL;
++
++   while( (s = strchr(s, '\x1b')) != NULL && ansi_at == NULL )
++   {
++      char * end = strchr(s, 'm');
++      if( end != NULL )
++      {
++	 int len = end-s+2;
++	 char tmp[len];
++         strncpy(tmp, s, len);
++         if( ansi_color_bytes(tmp) ) 
++            ansi_at = s; 
++         else s = end+1;
++      }
++      else break;
++   }
++   return ansi_at;
++} // function stransi
++
++char * strip_ansi( char * s )
++{
++   char * cur = strstr(s, ANSI_HEADER);
++   if( NULL == cur ) { return s; }
++
++   {
++      int len = strlen(s)+1, n = 0;
++      char * tmp = (char *)xalloc(len), * prev = s;
++      memset(tmp, '\0', len);
++      len = 0;
++      while( NULL != cur )
++      {
++         char * tmp_prev;
++         len += n = cur-prev;
++         strncat(tmp, prev, n);
++         tmp_prev = strstr(cur, ANSI_FOOTER);
++         if( tmp_prev != NULL && stransi(cur) == cur ) { prev = tmp_prev+1; }
++	 else prev = cur;
++         cur  = strstr(cur+1, ANSI_HEADER);
++      }
++      strcat(tmp, prev);
++      return tmp;
++   }
++} // function strip_ansi
++
++// parse_color.c
+diff -N -u -r ldmud-328/src/color_parse.h ldmud-328-hyperborea/src/color_parse.h
+--- ldmud-328/src/color_parse.h	Wed Dec 31 17:00:00 1969
++++ ldmud-328-hyperborea/src/color_parse.h	Fri Aug  9 11:18:35 2002
+@@ -0,0 +1,137 @@
++/* 
++ * File:       color_parse.h
++ * Purpose:    Prototypes for color parsing routines
++ * Programmer: Vawn (taylor@tcnj.edu, vawn@hyperborea.net)
++ * Notes:
++*/
++
++#ifndef _COLOR_PARSE_H
++#define _COLOR_PARSE_H
++/*
++ *  Color code format:
++ *    \cCP
++ *  The leading '\c' is literal.
++ *  'C' is the color code
++ *  P is a 4-bit number given as an ascii digit or letter (0..f). Those 
++ *  four 'bits' are a bitfield. The bitfield determines the additional
++ *  properties specified by the color code. Positions that are on 
++ *  indicate the property is on. The rightmost bit is the least significant.
++ *
++ *  'C' Values
++ *   k/K - Foreground or Background is black, respectively
++ *   w/W - Foreground or Background is white
++ *   r/R - Foreground or Background is red
++ *   g/G - Foreground or Background is green
++ *   b/B - Foreground or Background is blue
++ *   y/Y - Foreground or Background is yellow
++ *   m/M - Foreground or Background is magenta
++ *   c/C - Foreground or Background is cyan
++ *   x/X  - Do not change the color
++ *
++ *  'P' bitfield
++ *  0000  - Properties Off (Return the terminal to normal)
++ *  000x  - Bold
++ *  00x0  - Underline
++ *  0x00  - Blink
++ *  x000  - Reverse
++ *
++ *  Examples:
++ *     \cR2   = underlined red background 
++ *     \cca   = inversed and blinking cyan foreground
++ *     \cg0   = green foreground 
++ *     \cX5   = Blinking and bold.
++ *     \cx0   = Return the terminal to normal
++ */
++
++/* int parse_for_color( char * to_parse, char ** output_handle, int * bytes_used )
++ *
++ * The string 'to_parse' is scanned for color escape sequences. If no color
++ * sequences are found in the string, then 'bytes_used' is zero and the 
++ * string pointed to by 'output_handle' (*output_handle) is NULL. Otherwise, 
++ * 'bytes_used' will contain the number of bytes in the string that are part 
++ * of ANSI color sequences, and '*output_handle' contains the parsed version  
++ * of 'to_parse', containing the ANSI color sequence for all valid color 
++ * codes found in 'to_parse'.  * '*output_handle' is dynamically allocated 
++ * by this routine and will need to be freed by the caller.
++ *
++ * The return value indicates nothing (at the moment) 
++ */
++extern int parse_for_color( char *, char **, int * );
++
++/* If the return value is nonzero, then the string is a valid
++ * color (not ANSI) escape sequence,
++ */
++extern int valid_color_escape( char * );
++
++/*
++ * Returns the properties of the ansi sequence in 'ansi_properties'
++ * 
++ * Returns nonzero if the string 'ansi' was a valid ansi sequence
++ *
++ * 
++ * Returns the number of bytes in a string that are part of valid ANSI
++ * color escape sequence generated by parse_for_color() in 'ansi_bytes'.
++ *
++ * NOTE: Right now this is only guaranteed to work with ansi color
++ *       sequences generated by parse_for_color(). Moreover, this
++ *       is known not to work for the general case.
++ */
++extern int ansi_color_properties( char * );
++#define MAX_ANSI_LEN 	14
++extern void ansi_properties_to_ansi( int, char * );
++
++/*
++ * Returns the encoded properties of an ansi sequence 
++ * 
++ * NOTE: Right now this is only guaranteed to work with ansi color
++ *       sequences generated by parse_for_color(). Moreover, this
++ *       is known not to work for the general case.
++ */
++extern int ansi_color_bytes( char * );
++extern int ansi_color_nbytes( char *, int );
++
++/*
++ *    0000 0000 000x xxxx   -> Properties field
++ *    0000 0000 0xx0 0000   -> Background or Foreground flag (if either)
++ *    0000 0xxx x000 0000   -> The color (if any)
++ */
++// Field masks
++#define CJM_PROP        (0x001F)
++#define CJM_FGORBG      (0x0060)
++#define CJM_COLOR       (0x0780)
++
++#define CJM_NORMAL      (0x0001)
++#define CJM_BOLD        (0x0002)
++#define CJM_UNDERLINE   (0x0004)
++#define CJM_BLINK       (0x0008)
++#define CJM_REVERSE     (0x0010)
++#define CJM_BG_COLOR    (0x0020)
++#define CJM_FG_COLOR    (0x0040)
++#define CJM_BLACK       (0x0080)
++#define CJM_RED         (0x0100)
++#define CJM_GREEN       (0x0180)
++#define CJM_YELLOW      (0x0200)
++#define CJM_BLUE        (0x0280)
++#define CJM_MAGENTA     (0x0300)
++#define CJM_CYAN        (0x0380)
++#define CJM_WHITE       (0x0400)
++
++#define ansi_is_normal(p)      ((p&CJM_PROP)&CJM_NORMAL)
++#define ansi_is_bold(p)        ((p&CJM_PROP)&CJM_BOLD)
++#define ansi_is_underline(p)   ((p&CJM_PROP)&CJM_UNDERLINE)
++#define ansi_is_blink(p)       ((p&CJM_PROP)&CJM_BLINK)
++#define ansi_is_reverse(p)     ((p&CJM_PROP)&CJM_REVERSE)
++#define ansi_is_bgcolor(p)     ((p&CJM_FGORBG)&CJM_BG_COLOR)
++#define ansi_is_fgcolor(p)     ((p&CJM_FGORBG)&CJM_FG_COLOR)
++#define ansi_is_black(p)       ((p&CJM_COLOR)==CJM_BLACK)
++#define ansi_is_red(p)         ((p&CJM_COLOR)==CJM_RED)
++#define ansi_is_green(p)       ((p&CJM_COLOR)==CJM_GREEN)
++#define ansi_is_yellow(p)      ((p&CJM_COLOR)==CJM_YELLOW)
++#define ansi_is_blue(p)        ((p&CJM_COLOR)==CJM_BLUE)
++#define ansi_is_magenta(p)     ((p&CJM_COLOR)==CJM_MAGENTA)
++#define ansi_is_cyan(p)        ((p&CJM_COLOR)==CJM_CYAN)
++#define ansi_is_white(p)       ((p&CJM_COLOR)==CJM_WHITE)
++
++extern char * stransi( char * );
++extern char * strip_ansi( char * );
++#endif
+diff -N -u -r ldmud-328/src/comm.c ldmud-328-hyperborea/src/comm.c
+--- ldmud-328/src/comm.c	Sun Aug 20 00:00:00 2000
++++ ldmud-328-hyperborea/src/comm.c	Fri Aug  9 11:18:13 2002
+@@ -56,6 +56,7 @@
+  *---------------------------------------------------------------------------
+  */
+ 
++#include "color_parse.h"
+ #include "driver.h"
+ #include "typedefs.h"
+ 
+@@ -910,6 +911,7 @@
+     interactive_t *ip;       /* The interactive user */
+     object_t      *snooper;  /* Snooper of <ip> */
+     int   n;
++    char * decolorized = NULL;  /* Decolorized version of output string */
+ 
+     va_start(va, fmt);
+ 
+@@ -973,10 +975,26 @@
+             vsprintf(buff+1,fmt,va);
+             va_end(va);
+             if (buff[(sizeof buff) - 1])
+-                fatal("To long message!\n");
++                fatal("Too long message!\n");
+             source = buff+1;
+         }
+ 
++	/* If the player does not wish to use color, then strip
++	 * out any embedded color
++	 */
++	if( function_exists("query_pref", command_giver) )
++        {
++	   push_volatile_string("ansi");
++	   {
++	      svalue_t * result = secure_apply("query_pref", command_giver, 1);
++	      if( T_NUMBER == result->type && result->u.number ) {}
++	      else 
++	      { 
++		 char * tmp = strip_ansi(source); 
++	         if( tmp != source ) { decolorized = source = tmp; }
++	      }
++	   }
++        }
+         /* If we're not sending a telnet command with this message,
+          * pass on the new data to any snooper and/or shadow
+          */
+@@ -1245,6 +1263,7 @@
+     {
+         remove_flush_entry(ip);
+     }
++    if( decolorized != NULL ) xfree(decolorized);
+ }
+ 
+ /*-------------------------------------------------------------------------*/
+diff -N -u -r ldmud-328/src/lex.c ldmud-328-hyperborea/src/lex.c
+--- ldmud-328/src/lex.c	Tue Aug 15 00:00:00 2000
++++ ldmud-328-hyperborea/src/lex.c	Fri Aug  9 11:18:25 2002
+@@ -23,6 +23,7 @@
+  */
+ 
+ #include "driver.h"
++#include "color_parse.h"
+ #include "typedefs.h"
+ 
+ #include "my-alloca.h"
+@@ -2940,11 +2941,16 @@
+                 /* Did we find a suitable identifier? */
+                 if (!p || p->type < I_TYPE_GLOBAL)
+                 {
++/*
++	            yyerrorf("P: %ld TYPE: %d I_TYPE_GLOBAL: %d\n",
++			    p, p->type, I_TYPE_GLOBAL);
++*/
++
+                     if (p && p->type == I_TYPE_UNKNOWN)
+                         free_shared_identifier(p);
+                     c = *yyp;
+                     *yyp = '\0';
+-                    yyerrorf("Undefined function: %s", wordstart);
++                    yyerrorf("1Undefined function: %s", wordstart);
+                     *yyp = c;
+                     yylval.closure.number = CLOSURE_EFUN_OFFS;
+                     return L_CLOSURE;
+@@ -3053,7 +3059,7 @@
+                     /* None of these all */
+                     c = *yyp;
+                     *yyp = 0;
+-                    yyerrorf("Undefined function: %s", wordstart);
++                    yyerrorf("2Undefined function: %s", wordstart);
+                     *yyp = c;
+                     yylval.closure.number = CLOSURE_EFUN_OFFS;
+ 
+@@ -3551,6 +3557,25 @@
+                     case 'n': *yyp++ = '\n'; break;
+                     case 'r': *yyp++ = '\r'; break;
+                     case 't': *yyp++ = '\t'; break;
++                    case 'c': 
++		      if( p[0] != CHAR_EOF && p[1] != CHAR_EOF )
++		      {
++		          char color_code[5];
++			  sprintf(color_code, "%cc%c%c", '\\', p[0], p[1]);
++			  if( valid_color_escape(color_code) )
++			  { // Replace the sequence with the ansi color code
++		            char	* parsed;
++		            int		bytes;
++			    parse_for_color(color_code, &parsed, &bytes);
++		            memcpy(yyp, parsed, bytes*sizeof(char));
++			    xfree(parsed);
++		            yyp += bytes;
++			    p   +=2;
++			  }
++			  else { *yyp++ = c; }
++		      }
++		      else *yyp++ = c;
++		      break;
+                     default : *yyp++ = c;
+                     }
+                 }
+diff -N -u -r ldmud-328/src/sprintf.c ldmud-328-hyperborea/src/sprintf.c
+--- ldmud-328/src/sprintf.c	Thu Jul 20 00:00:00 2000
++++ ldmud-328-hyperborea/src/sprintf.c	Fri Aug  9 11:18:29 2002
+@@ -55,6 +55,7 @@
+ 
+ #include "driver.h"
+ #include "typedefs.h"
++#include "color_parse.h"
+  
+ #include <stdio.h>
+ #include <setjmp.h>
+@@ -162,6 +163,7 @@
+ #define ERROR1(e,a)              ERROR((e) | (a)<<16)
+ #define EXTRACT_ERR_ARGUMENT(i)  ((i)>>16)
+ 
++#define ANSI_OFF	"\x1b[0m"
+ /*-------------------------------------------------------------------------*/
+ /* Types */
+ 
+@@ -200,10 +202,26 @@
+     size_t          size;    /* column/table width */
+     int             pres;    /* precision */
+     format_info     info;    /* formatting data */
++    int		   ansi_fg,  /* Ansi carried from previous row */
++		   ansi_bg;
++    size_t	   ansi_size;/* Bytes allocated to *ansi  */
+     cst            *next;    /* next column structure */
+ };
+ 
+ 
++void dumpColumn( struct ColumnSlashTable * t )
++{
++   fprintf(stderr, "nocols   %hd\n"
++	  "col      %s\n"
++          "pad      '%s'\n"
++          "start    %d\n"
++          "size     %d\n"
++          "pres     %d\n"
++	  "info     %X\n"
++          "next     %ld\n",
++          t->nocols, t->d.col, t->pad, t->start, t->size,
++          t->pres, t->info, t->next);
++}
+ /* --- struct sprintf_buffer: dynamic string buffer
+  *
+  * The structure implements a dynamic string buffer. The structure
+@@ -1063,20 +1081,67 @@
+  */
+ 
+ {
++/* Implementation reference note by Vawn
++ * 1) Prepend the current 'active' ansi escape characters to the front of
++ *    the current column.
++ * 2) When calculating the characters to insert in the current column,
++ * skip over ansi sequences
++ * 3) Save the active ansi escape sequences. Clear it when a 'reset' is 
++ *    encountered.
++ * 4) When 'backing up', skip backwards over ansi sequences. 
++ *    As each ansi sequence is 'backed up over', remove it from the list 
++ *    of accumulated ansi sequences
++ * 5) Append the 'reset' ansi sequence to the end of the column.
++ *
++ * Idealab! (the exclamation point is part of their name, of course.)
++ */
++
+ #define COL (*column)
+ 
+     unsigned int done;
+     mp_int length;
+     unsigned int save;
++    int ansi_bytes = 0;
+     char *COL_D = COL->d.col;
++    int ansi_fg = COL->ansi_fg, 
++	ansi_bg = COL->ansi_bg;
+     char *p;
+ 
+     /* Set done to the actual number of characters to copy.
+      */
+     length = COL->pres;
+-    for (p = COL_D; length && *p && *p !='\n'; p++, length--) NOOP;
++    for( p = COL_D; length && *p && *p !='\n'; )
++    {
++       // If this is the beginning of an ansi escape, then
++       // we need to skip it. We also need to save the
++       // sequence here as well or 'clear' if it is the reset sequence
++       if( *p == '\x1b' && stransi(p) == p )
++       {
++          char * tmp = p;
++	  int ansi_prop, len;
++          p = strchr(p, 'm')+1;
++	  len = p-tmp;
++	  ansi_bytes += len;
++	
++	  if( (ansi_prop = ansi_color_properties(tmp)) == CJM_NORMAL )
++	  {
++	     COL->ansi_bg = COL->ansi_fg = 0;
++	  }
++	  else
++	  {
++	     if( ansi_is_fgcolor(ansi_prop) )
++	        COL->ansi_fg = ((ansi_prop|COL->ansi_fg)&CJM_PROP) |
++			       CJM_FG_COLOR | (ansi_prop&CJM_COLOR);
++	     else
++	        COL->ansi_bg = ((ansi_prop|COL->ansi_bg)&CJM_PROP) |
++			       CJM_BG_COLOR | (ansi_prop&CJM_COLOR);
++	  }
++       }
++       else { length--;  p++; }
++    }
++
+     done = p - COL_D;
+-    if (*p && *p !='\n')
++    if (*p && *p != '\n')
+     {
+         /* Column data longer than the permitted size: find a
+          * a space to do wordwrapping.
+@@ -1097,7 +1162,34 @@
+         }
+     }
+ 
+-    add_justified(st, COL_D, p - COL_D, COL->pad, COL->size, COL->info);
++    if( ansi_bytes || (ansi_fg|ansi_bg) )
++    {
++       int len = p-COL->d.col;
++       if( len > ansi_bytes )
++       {
++	  char active_fg[MAX_ANSI_LEN],
++	       active_bg[MAX_ANSI_LEN];
++
++	  active_fg[0] = active_bg[0] = '\0';
++
++          if( ansi_fg ) { ansi_properties_to_ansi(ansi_fg, active_fg); }
++	  if( ansi_bg ) { ansi_properties_to_ansi(ansi_bg, active_bg); }
++	  
++          {
++             char tmp[strlen(active_fg)+strlen(active_bg)+
++		      len+strlen(ANSI_OFF)+1];
++             memset(tmp, '\0', sizeof(tmp));
++             ansi_fg && strcpy(tmp, active_fg);
++             ansi_bg && strcat(tmp, active_bg);
++             strncat(tmp, COL->d.col, len);
++             strcat(tmp, ANSI_OFF);
++             add_justified(st, tmp, strlen(tmp), COL->pad, 
++                     COL->size+strlen(active_fg)+strlen(active_bg)+ansi_bytes+
++                     strlen(ANSI_OFF), COL->info);
++          }
++       }
++    }
++    else add_justified(st, COL_D, p - COL_D, COL->pad, COL->size, COL->info);
+     COL_D += done; /* inc'ed below ... */
+ 
+     /* if this or the next character is a '\0' then take this column out
+@@ -1137,6 +1229,7 @@
+ 
+ {
+     unsigned int done, i;
++    int ansi_off_len = strlen(ANSI_OFF);
+ 
+ #define TAB (*table)
+ #define TAB_D (TAB->d.tab[i])
+@@ -1144,10 +1237,13 @@
+     /* Loop over all columns of the table */
+     for (i = 0; i < TAB->nocols && TAB_D; i++)
+     {
++        int ansi_bytes;
+         /* Get the length to add */
+         for (done = 0; (TAB_D[done]) && (TAB_D[done] != '\n'); done++) NOOP;
+-
+-        add_justified(st, TAB_D, done, TAB->pad, TAB->size, TAB->info);
++        ansi_bytes = ansi_color_nbytes(TAB_D, done);
++        add_justified(st, TAB_D, done, TAB->pad, TAB->size+ansi_bytes, TAB->info);
++	if( ansi_bytes )
++          add_justified(st, ANSI_OFF, ansi_off_len, " ", ansi_off_len, TAB->info);
+ 
+         TAB_D += done; /* inc'ed next line ... */
+         if (!(*TAB_D) || !(*(++TAB_D)))
+@@ -1395,22 +1491,33 @@
+                 while (*temp)
+                 {
+                     p_int i;
++	            //dumpColumn(*temp);
+                     if ((*temp)->info & INFO_COLS)
+                     {
++		        // discard leading spaces at the column head
+                         if (*((*temp)->d.col-1) != '\n')
++		        {
+                             while (*((*temp)->d.col) == ' ')
+                                 (*temp)->d.col++;
+-                        i = (*temp)->start - (st->bpos - st->line_start);
+-                        ADD_CHARN(' ', i);
++		        }
++	                st->buff[st->bpos] = '\0';
++			{
++			   int ansi_bytes = 
++			    ansi_color_bytes(&st->buff[st->line_start]);
++                           i = (*temp)->start - (st->bpos - st->line_start) + ansi_bytes;
++		        }
++                        if (i > 0) { ADD_CHARN(' ', i); }
+                         column_stat = add_column(st, temp);
+                         if (!column_stat)
+                             temp = &((*temp)->next);
+                     }
+                     else
+                     {
+-                        i = (*temp)->start - (st->bpos - st->line_start);
+-                        if (i > 0)
+-                            ADD_CHARN(' ', i);
++			int ansi_bytes;
++	                st->buff[st->bpos] = '\0';
++			ansi_bytes = ansi_color_bytes(&st->buff[st->line_start]);
++                        i = (*temp)->start - (st->bpos - st->line_start) + ansi_bytes;
++                        if (i > 0) { ADD_CHARN(' ', i); }
+                         if (!add_table(st, temp))
+                             temp = &((*temp)->next);
+                     }
+@@ -1688,19 +1795,33 @@
+                             (*temp)->size = fs;
+                             (*temp)->pres = (pres) ? pres : fs;
+                             (*temp)->info = finfo;
+-                            (*temp)->start = st->bpos - st->line_start;
++                            (*temp)->ansi_fg = 0;
++                            (*temp)->ansi_bg = 0;
++                            //(*temp)->start = st->bpos - st->line_start;
++			    // The start position might get goofed by
++			    // ansi color bytes on the line.
++			    {
++			       int      len = st->bpos-st->line_start;
++
++                               (*temp)->start = st->bpos - st->line_start -
++			         ansi_color_nbytes(&st->buff[st->line_start], len);
++		               
++			    }
+ 
+                             /* Format the first line from the column */
+-                            if (2 == add_column(st, temp)
+-                              && !format_str[fpos])
++                            if (2 == add_column(st, temp) )
+                             {
++                              if( !format_str[fpos] )
++			      {
+                                 ADD_CHAR('\n');
++			      }
+                             }
+                         }
+                         else
+                         {
+                             /* (finfo & INFO_TABLE) */
+                             unsigned int n, len, max;
++			    int ansi_bytes;
+                             char c, *s, *start;
+                             p_uint i;
+ 
+@@ -1712,7 +1833,16 @@
+                                 ERROR(ERR_NOMEM);
+                             (*temp)->pad = pad;
+                             (*temp)->info = finfo;
+-                            (*temp)->start = st->bpos - st->line_start;
++                            //(*temp)->start = st->bpos - st->line_start;
++			    // The start position might get goofed by
++			    // ansi color bytes on the line.
++			    {
++			       int      len = st->bpos-st->line_start;
++
++                               (*temp)->start = st->bpos - st->line_start -
++			         ansi_color_nbytes(&st->buff[st->line_start], len);
++		               
++			    }
+                             (*temp)->next = NULL;
+ 
+                             /* Determine the size of the table */
+@@ -1729,6 +1859,8 @@
+                                         break;
+                                 }
+                                 len = s - start;
++				len -= ansi_color_nbytes(start, len);
++
+                                 if (len > max)
+                                     max = len;
+                                 n++;
+@@ -1751,6 +1883,8 @@
+                             else
+                             {
+                                 len = s - start;
++			        len -= ansi_color_nbytes(start, len);
++
+                                 if (len > max)
+                                     max = len; /* the null terminated word */
+                                 pres = fs/(max+2);
+@@ -1806,9 +1940,14 @@
+                             add_table(st, temp);
+                         }
+                     }
+-                    else
++                    else /* not column or table */
+                     {
+-                        /* not column or table */
++	                {
++		           int ansi_bytes = ansi_color_bytes(carg->u.string);
++		           //pres += ansi_bytes;
++			   fs   += ansi_bytes;
++		        }
++
+                         if (pres && pres < slen)
+                         {
+                             slen = pres;
