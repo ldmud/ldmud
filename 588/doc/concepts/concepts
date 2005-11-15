@@ -1,0 +1,9 @@
+NAME
+        concepts
+
+DESCRIPTION
+        This directory contains man pages about basic concepts of the
+        LPC language as it is provided by Amylaars parser/interpreter.
+
+SEE ALSO
+        driver(D), efun(E), applied(A), master(M), lpc(LPC)

@@ -1,0 +1,9 @@
+Short: COMPAT+__INIT crasht TubMud
+From: Coogan
+Date: 990323
+Driver: 3.2-dev.38
+Type: Bug
+State: Done - fixed in 3.2-dev.43
+
+When the driver is compiled with COMPAT and __INIT, the parser starts to
+malfunction/crash while preloading Tubmud.

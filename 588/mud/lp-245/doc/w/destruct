@@ -1,0 +1,13 @@
+Command: destruct
+Argument: object
+
+If there is an object named "object" in the same room, it can be destroyed
+with 'destruct object'. If it is a cloned object, the original blue print will
+still remain loaded. If it is a singular object (not cloned), like a castle,
+then all data about the object will be discared.
+
+An 'update' of a castle will have the same effect.
+
+Never 'destruct' a player.
+
+See also w/clone, w/update, w/load.

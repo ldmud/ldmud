@@ -1,0 +1,278 @@
+Date: Fri, 31 Dec 1999 01:19:54 +0100
+From: Freaky <Freaky@UNItopia.rus.uni-stuttgart.de>
+Short: add_action() problem and possible fix
+Type: Bug
+State: Done - corrected in 3.2.8-dev.171
+
+
+Die Doku zu add_action:
+If argument <flag> is 1, then the arguments my follow the verb
+
+Was soll das 'my' dort?
+
+Ausserdem funktioniert add_xverb jetzt anders...
+Bisher wurde dann der Funktion das Verb und die Eingabe uebergeben..
+das ist jetzt nicht mehr so:
+add_xverb() geht also nicht mehr...
+Ausserdem waere ein add_action(fun,verb,-1) fuer das add_xverb() ganz gut
+
+Und entsprechende Defines in einem .h-File
+
+void init()
+{
+        add_action("tes"); add_xverb("X");
+        add_action("tes","Y");
+        add_action("tes","Z",1);
+        add_action("tes","AAAAA",2);
+        add_action("tes","BBBBB",3);
+}
+
+int tes(string str)
+{   
+    printf("VERB:%O STR:%O\n",query_verb(),str);
+    return 1;
+}
+
+Bisher:
+> Xabc   
+VERB:"Xabc" STR:"abc"
+> AAAAAabc
+VERB:"AAAAAabc" STR:"abc"
+> AAAAA abc
+VERB:"AAAAA" STR:" abc"
+> AAA abc
+Wie bitte?
+> BBBBBabc
+VERB:"BBBBBabc" STR:0
+
+Jetzt:
+> Xabc
+VERB:"Xabc" STR:0			nicht ok
+> AAAAAabc
+Wie bitte?				ok
+> AAAAA abc
+VERB:"AAAAA" STR:"abc"			ok
+> AAA abc
+VERB:"AAA" STR:"abc"			ok
+> BBBBBabc
+Wie bitte?				ok
+
+
+Das mit dem add_action ist wirklich ein Problem:
+Man kann so keine Kommandos mehr machen, die einfach nur mit einem
+Buchstaben beginnen...
+Bestes Beispiel dafuer ist der say_command mit einem Hochkomma als Befehl:
+    'ich sage was
+
+Man kann natuerlich query_verb() auswerten, aber dann muss man ziemlich
+viel an der Mudlib anpassen, deswegen waere das add_xverb() echt gut oder
+halt ein add_action(fun,verb,-1)
+
+
+Mhh.. du hast bei add_action() die Bedeutung von flag geaendert...
+bei flag==1 war es bisher so, dass es ein short-verb ist, d.h. man kann
+hinter das Verb noch beliebiges schreiben und die Funktion wird trotzdem
+aufgerufen..
+
+jetzt bedeutet 1 (zumindest laut Doku):
+        If argument <flag> is 1, then the arguments my follow the verb
+	without separating space.
+
+Also das, was bisher flag==2 war (add_xverb())
+
+Das sollte man wieder aendern, da das add_action(fun,verb,1) ziemlich oft
+genutzt wird.
+
+Ich habe mal ein diff angehaengt, das das behebt.
+
+----------------
+--- ldmud-164/src/actions.c	Tue Dec 14 17:09:18 1999
++++ ldmud-164a/src/actions.c	Fri Dec 31 02:28:20 1999
+@@ -741,12 +741,21 @@
+              * but not shorter than .short_verb.
+              */
+             size_t len;
+-            len = strlen(last_verb);
+-            if (len < sa->short_verb
+-             || len > strlen(sa->verb)
+-             || (   sa->verb != last_verb
+-                 && strncmp(sa->verb, last_verb, len) != 0))
+-                continue;
++	    if (sa->short_verb)
++	    {
++		len = strlen(last_verb);
++		if (len < sa->short_verb
++		 || len > strlen(sa->verb)
++		 || (   sa->verb != last_verb
++		     && strncmp(sa->verb, last_verb, len) != 0))
++		    continue;
++	    }
++	    else
++	    {
++		len = strlen(sa->verb);
++		if (strncmp(buff, sa->verb, len) != 0)
++		    continue;
++	    }
+         }
+         else if (type == SENT_NO_SPACE)
+         {
+@@ -844,7 +853,12 @@
+          * actual verb part from the first word and add it to the arguments,
+          * but this would break all existing mudlibs.
+          */
+-        if (buff[length] == ' ')
++	if (s->type == SENT_NO_SPACE)
++	{
++	    push_volatile_string(&buff[strlen(sa->verb)]);
++	    ret = sapply(sa->function, sa->ob, 1);
++	}
++	else if (buff[length] == ' ')
+         {
+             push_volatile_string(&buff[length+1]);
+             ret = sapply(sa->function, sa->ob, 1);
+@@ -1158,10 +1172,16 @@
+ 
+         if (flag)
+         {
+-            p->sent.type = SENT_NO_SPACE;
+-            p->short_verb = (unsigned short)flag;
+-            if (flag > 1)
++	    if (flag == -1)
++		p->sent.type = SENT_NO_SPACE;
++	    else
++	    {
++		if (flag == 1)
++		    p->short_verb = 0;
++		else
++		    p->short_verb = (unsigned short)flag;
+                 p->sent.type = SENT_SHORT_VERB;
++	    }
+         }
+     }
+     else
+----------------
+
+Das mit dem add_action() ist doch ein groesseres Problem, als ich dachte.
+
+Wie waere es, wenn man die Funktionsweise des Flags fuer 1 und 2 so laesst
+wie bisher, und die neue Funktionalitaet auf negative Flags setzt:
+
+add_action(fun,verb,flag):
+fun ist so definiert:
+int fun(string str)
+VERB ist das eingegebene Verb.
+
+flag == 0   VERB muss == verb sein
+flag == 1   VERB muss mit verb anfangen. query_verb() liefert VERB
+		str ist der Rest des Kommandos oder 0 wenn nur VERB
+		eingegeben wurde.
+flag == 2   VERB muss mit verb anfangen. query_verb() liefert verb
+		str ist der Rest von VERB ohne verb und der Rest des
+		Kommandos oder 0 wenn nur verb eingegeben wurde.
+Also flag >= 0 wie bisher.
+
+Neu:
+flag < 0    VERB muss mindestens -flag Buchstaben lang sein und
+		verb muss mit VERB anfangen. query_verb() liefert VERB
+		str ist der Rest des Kommandos oder 0 wenn nur VERB
+		eingegeben wurde.
+
+Dann waere es kompatibel zu bestehenden Mudlibs und das neue Feature waere
+auch eingebaut.
+
+
+Fuer meinen vorherigen Vorschlag habe ich mal ein diff erstellt, das das
+implementiert.
+
+Es sollte evtl. fuer Werte > 2 noch ein Fehler 'Bad arg 3 to add_action'
+geworfen werden. Es ist da ein entsprechendes TODO drin.
+Ich wusste gerade nicht, wie man das macht.
+
+Schaue es dir mal an.
+
+---------------------
+--- ldmud-164.org/src/actions.c	Tue Dec 14 17:09:18 1999
++++ ldmud-164/src/actions.c	Sun Jan  2 02:40:15 2000
+@@ -741,12 +741,21 @@
+              * but not shorter than .short_verb.
+              */
+             size_t len;
+-            len = strlen(last_verb);
+-            if (len < sa->short_verb
+-             || len > strlen(sa->verb)
+-             || (   sa->verb != last_verb
+-                 && strncmp(sa->verb, last_verb, len) != 0))
+-                continue;
++	    if (sa->short_verb)
++	    {
++		len = strlen(last_verb);
++		if (len < sa->short_verb
++		 || len > strlen(sa->verb)
++		 || (   sa->verb != last_verb
++		     && strncmp(sa->verb, last_verb, len) != 0))
++		    continue;
++	    }
++	    else
++	    {
++		len = strlen(sa->verb);
++		if (strncmp(buff, sa->verb, len) != 0)
++		    continue;
++	    }
+         }
+         else if (type == SENT_NO_SPACE)
+         {
+@@ -844,7 +853,19 @@
+          * actual verb part from the first word and add it to the arguments,
+          * but this would break all existing mudlibs.
+          */
+-        if (buff[length] == ' ')
++	if (s->type == SENT_NO_SPACE)
++	{
++	    if (strlen(buff) > strlen(sa->verb))
++	    {
++		push_volatile_string(&buff[strlen(sa->verb)]);
++		ret = sapply(sa->function, sa->ob, 1);
++	    }
++	    else
++	    {
++		ret = sapply(sa->function, sa->ob, 0);
++	    }
++	}
++	else if (buff[length] == ' ')
+         {
+             push_volatile_string(&buff[length+1]);
+             ret = sapply(sa->function, sa->ob, 1);
+@@ -1155,13 +1176,29 @@
+         }
+         p->verb = str;
+         p->sent.type = SENT_PLAIN;
++	p->short_verb = 0;
+ 
+         if (flag)
+         {
+-            p->sent.type = SENT_NO_SPACE;
+-            p->short_verb = (unsigned short)flag;
+-            if (flag > 1)
++	    if (flag == 1)
++	    {
++		p->sent.type = SENT_SHORT_VERB;
++	    }
++	    else if (flag == 2)
++	    {
++		p->sent.type = SENT_NO_SPACE;
++	    }
++	    else if (flag < 0)
++	    {
+                 p->sent.type = SENT_SHORT_VERB;
++		p->short_verb = 0 - (unsigned short)flag;
++	    }
++	    /*
++	    else
++	    {
++		TODO: hier muss bad arg 3 to add_action kommen
++	    }
++	    */
+         }
+     }
+     else
+---------------------
