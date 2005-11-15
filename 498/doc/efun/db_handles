@@ -1,0 +1,22 @@
+OPTIONAL
+SYNOPSIS
+        int *db_handles()
+
+DESCRIPTION
+        Returns an array with all open handles to the SQL-server.
+        As mySQL is most of the time limited to 100 connections, you
+        should not let this number grow too big. The handles are sorted
+        in a special order: The last used handle is the first one and
+        the handle that hasn't been used for the longest time is
+        the last one. If no handles are open, an empty array is returned.
+
+        The function is available only if the driver is compiled with
+        mySQL support. In that case, __MYSQL__ is defined.
+
+HISTORY
+        Added in 3.2.9 .
+
+SEE ALSO
+        db_affected_rows(E), db_conv_string(E), db_close(E), db_coldefs(E),
+        db_connect(E), db_error(E), db_exec(E), db_fetch(E), db_insert_id(E),
+        mysql(C)

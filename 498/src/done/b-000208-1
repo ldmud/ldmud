@@ -1,0 +1,17 @@
+From: Dafire@finalfrontier
+Short: pragma strict types overeager?
+Date: 000208
+Type: Bug
+State: Done - fixed in 3.2.8-dev.186
+
+The problem was the lack of a pragma 'weak_types' to counter the
+pragma 'strict types' in the auto-include string.
+
+
+Description:
+
+Dafire@FinalFrontier tells you: wenn ich eine datei test.c mache wo nur drin
+   steht ; main() { ; } sagt der /w/dafire/test.c line 2 :"#pragma
+   strict_types" requires type of function
+
+Adding #pragma weak_types doesn't help.

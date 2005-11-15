@@ -1,0 +1,13 @@
+SYNOPSIS
+        int strstr (string str, string str2, int pos)
+
+DESCRIPTION
+        Returns the index of str2 in str searching from position pos.
+        If str2 is not found in str, -1 is returned. The returned
+        index is relativ to the beginning of the string.
+
+        If pos is negativ, it designates the start position relative
+        to the end of the string.
+
+SEE ALSO
+        strlen(E), sscanf(E), sprintf(E), explode(E)

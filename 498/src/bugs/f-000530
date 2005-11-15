@@ -1,0 +1,23 @@
+Short: New input_to() efuns
+Date: Tue, 30 May 2000 13:37:42 -0700 (PDT)
+From: David Gibby <oop_apprentice@yahoo.com>
+Type: Feature
+State: New
+See also: f-010825-2
+
+An efun that would be quite useful, 
+
+clear_input_to()
+
+would display the prompt to this_player(), and cancel
+the call to the function specified by the last
+input_to(), provided that this_player() has been given
+an input_to(), thus returning them to there regular
+command-giving selves.
+
+Note:
+  Better would be something like
+    remove_input_to(void|string|closre) (implemented in 3.2.9-dev.355)
+  and of course
+    input_to_list()
+
