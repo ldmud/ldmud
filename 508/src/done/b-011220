@@ -1,0 +1,298 @@
+Short: LDMud instability in Alatia
+Date: Thu, 20 Dec 2001 15:01:57 -0800 (PST)
+From: Frank Stolze <fstolze@yahoo.com>
+Type: Bug
+State: Abandoned.
+Driver: 3.2.9-dev.378
+
+Hi Lars,
+
+
+At Alatia we are running LDMud for quite some time. We have had quite
+impressive uptimes for a while too. However, recently we are experiencing a lot
+of driver crashes, at least daily at this point. I have followed the "Current"
+branch hoping that those bug fixes would solve the problems. dev377 crashed
+last night, dev378 crashed just now.
+
+Is there anything I could do to help in this case? Send core files, backtraces,
+anything? We are running on FreeBSD 4.4.
+
+Regards,
+Frank / Phylax
+
+
+I have the backtraces and logfile tails of our two most recent crashes
+attached. Please let me know if I can provide anything else.
+
+
+Regards,
+Frank / Phylax
+
+--0-538466317-1009028257=:24158
+==> debuglog.011222.014200 <==
+2001.12.21 04:20:39 Error in loading object 'domains/paraya/Keyquest/obj/jewelry'
+2001.12.21 04:20:39 program: domains/paraya/Keyquest/room/110.c, object: domains/paraya/Keyquest/room/110 line 371
+'      empty_box' in 'domains/paraya/Keyquest/room/110.c' ('domains/paraya/Keyquest/room/110') line 371
+2001.12.21 04:22:39 Error in loading object 'domains/paraya/Keyquest/obj/jewelry'
+2001.12.21 04:22:39 program: domains/paraya/Keyquest/room/110.c, object: domains/paraya/Keyquest/room/110 line 371
+'      empty_box' in 'domains/paraya/Keyquest/room/110.c' ('domains/paraya/Keyquest/room/110') line 371
+2001.12.21 05:00:27 Error in loading object 'domains/paraya/Keyquest/obj/jewelry'
+2001.12.21 05:00:27 program: domains/paraya/Keyquest/room/110.c, object: domains/paraya/Keyquest/room/110 line 371
+'      empty_box' in 'domains/paraya/Keyquest/room/110.c' ('domains/paraya/Keyquest/room/110') line 371
+2001.12.21 05:08:58 Connection timed out detected.
+2001.12.21 11:06:10 Bad argument 1 to strstr()
+2001.12.21 11:06:10 program: players/brandy/seasons/enter.c, object: players/brandy/seasons/enter line 145
+'         wander' in 'players/brandy/seasons/enter.c' ('players/brandy/seasons/enter') line 145
+2001.12.21 11:06:10 Error in call out.
+2001.12.21 13:00:00 Connection reset by peer detected.
+2001.12.21 13:14:05 Connection reset by peer detected.
+2001.12.21 18:48:46 Bad argument 2 to present()
+2001.12.21 18:48:46 program: domains/mythos/Silk/npc/fog/elf_guard.c, object: domains/mythos/Silk/npc/fog/elf_guard line 53
+'   equip_myself' in 'domains/mythos/Silk/npc/fog/elf_guard.c' ('domains/mythos/Silk/npc/fog/elf_guard') line 53
+2001.12.21 18:48:46 Error in call out.
+2001.12.21 19:02:32 Bad argument 2 to present()
+2001.12.21 19:02:32 program: domains/mythos/Silk/npc/fog/builder.c, object: domains/mythos/Silk/npc/fog/builder line 63
+'   equip_myself' in 'domains/mythos/Silk/npc/fog/builder.c' ('domains/mythos/Silk/npc/fog/builder') line 63
+2001.12.21 19:02:32 Error in call out.
+2001.12.21 19:24:33 Bad argument 2 to present()
+2001.12.21 19:24:33 program: domains/mythos/Silk/npc/fog/labourer.c, object: domains/mythos/Silk/npc/fog/labourer line 55
+'   equip_myself' in 'domains/mythos/Silk/npc/fog/labourer.c' ('domains/mythos/Silk/npc/fog/labourer') line 55
+2001.12.21 19:24:33 Error in call out.
+2001.12.21 19:24:39 Bad argument 2 to present()
+2001.12.21 19:24:39 program: domains/mythos/Silk/npc/fog/jarmi.c, object: domains/mythos/Silk/npc/fog/jarmi line 57
+'   equip_myself' in 'domains/mythos/Silk/npc/fog/jarmi.c' ('domains/mythos/Silk/npc/fog/jarmi') line 57
+2001.12.21 19:24:39 Error in call out.
+2001.12.21 19:34:10 Connection reset by peer detected.
+2001.12.21 21:05:51 Connection reset by peer detected.
+2001.12.21 21:10:55 Bad argument 2 to present()
+2001.12.21 21:10:55 program: domains/mythos/Silk/npc/fog/vash.c, object: domains/mythos/Silk/npc/fog/vash line 58
+'   equip_myself' in 'domains/mythos/Silk/npc/fog/vash.c' ('domains/mythos/Silk/npc/fog/vash') line 58
+2001.12.21 21:10:55 Error in call out.
+2001.12.21 22:15:48 Connection reset by peer detected.
+2001.12.21 22:19:02 Connection reset by peer detected.
+2001.12.21 22:22:52 Connection reset by peer detected.
+2001.12.21 22:52:02 Bad argument 2 to present()
+2001.12.21 22:52:02 program: domains/mythos/Silk/npc/fog/ciilge.c, object: domains/mythos/Silk/npc/fog/ciilge line 53
+'   equip_myself' in 'domains/mythos/Silk/npc/fog/ciilge.c' ('domains/mythos/Silk/npc/fog/ciilge') line 53
+2001.12.21 22:52:02 Error in call out.
+2001.12.21 23:10:46 Connection reset by peer detected.
+2001.12.21 23:21:19 Connection reset by peer detected.
+2001.12.21 23:36:15 Connection reset by peer detected.
+2001.12.21 23:37:48 Connection reset by peer detected.
+2001.12.22 00:23:02 Connection reset by peer detected.
+
+==> lplog.011222.014200 <==
+scanning chunk 083deae8, end 083e2af0 for unref'd blocks
+scanning chunk 083da9e8, end 083de9f0 for unref'd blocks
+scanning chunk 083d68e8, end 083da8f0 for unref'd blocks
+scanning chunk 083d27e8, end 083d67f0 for unref'd blocks
+scanning chunk 083ce6e8, end 083d26f0 for unref'd blocks
+scanning chunk 083ca5e8, end 083ce5f0 for unref'd blocks
+scanning chunk 083c64e8, end 083ca4f0 for unref'd blocks
+scanning chunk 083c23e8, end 083c63f0 for unref'd blocks
+scanning chunk 083be2e8, end 083c22f0 for unref'd blocks
+scanning chunk 083ba1e8, end 083be1f0 for unref'd blocks
+scanning chunk 083b60e8, end 083ba0f0 for unref'd blocks
+scanning chunk 083b1fe8, end 083b5ff0 for unref'd blocks
+scanning chunk 083adee8, end 083b1ef0 for unref'd blocks
+scanning chunk 083a9de8, end 083addf0 for unref'd blocks
+scanning chunk 083a5ce8, end 083a9cf0 for unref'd blocks
+scanning chunk 083a1be8, end 083a5bf0 for unref'd blocks
+scanning chunk 0839dae8, end 083a1af0 for unref'd blocks
+scanning chunk 083999e8, end 0839d9f0 for unref'd blocks
+scanning chunk 083958e8, end 083998f0 for unref'd blocks
+scanning chunk 083517e8, end 083557f0 for unref'd blocks
+scanning chunk 0834d6e8, end 083516f0 for unref'd blocks
+scanning chunk 083495e8, end 0834d5f0 for unref'd blocks
+scanning chunk 083454e8, end 083494f0 for unref'd blocks
+scanning chunk 083413e8, end 083453f0 for unref'd blocks
+scanning chunk 0833d2e8, end 083412f0 for unref'd blocks
+scanning chunk 083391e8, end 0833d1f0 for unref'd blocks
+scanning chunk 083350e8, end 083390f0 for unref'd blocks
+scanning chunk 08330fe8, end 08334ff0 for unref'd blocks
+scanning chunk 0832cee8, end 08330ef0 for unref'd blocks
+scanning chunk 08328de8, end 0832cdf0 for unref'd blocks
+scanning chunk 08324ce8, end 08328cf0 for unref'd blocks
+scanning chunk 08320be8, end 08324bf0 for unref'd blocks
+scanning chunk 0831cae8, end 08320af0 for unref'd blocks
+scanning chunk 082d89e8, end 082dc9f0 for unref'd blocks
+scanning chunk 082d48e8, end 082d88f0 for unref'd blocks
+scanning chunk 081a58a8, end 081a98b0 for unref'd blocks
+2001.12.21 06:02:12 Consolidation merged 26333 blocks, freed 2 chunks holding 219 blocks.
+2001.12.21 06:02:12 GC freed 40 destructed objects.
+DEBUG: 2001.12.21 06:02:12 GC found 1686 malloced strings using 79191 bytes.
+]SELFDESTRUCT ROOM: room/mine/tunnel4
+]SELFDESTRUCT ROOM: room/mine/tunnel2
+]==> 0
+] An expansive veldt. To the west is a stout tree stump. 
+There are five obvious exits: church, snail, east, bored and west.
+2001.12.22 01:30:12 [erq] read: EOF
+2001.12.22 01:30:12 [erq] Read 0, should be 9!
+2001.12.22 01:30:12 [erq] Giving up.
+2001.12.22 01:30:12 [erq] read: EOF
+2001.12.22 01:30:12 [erq] read 0, should be 9!
+2001.12.22 01:30:12 [erq] Subserver giving up.
+
+
+alatia@mux:~/cores> gdb ../bin/driver core.011222.014200
+GNU gdb 4.18
+Copyright 1998 Free Software Foundation, Inc.
+GDB is free software, covered by the GNU General Public License, and you are
+welcome to change it and/or distribute copies of it under certain conditions.
+Type "show copying" to see the conditions.
+There is absolutely no warranty for GDB.  Type "show warranty" for details.
+This GDB was configured as "i386-unknown-freebsd"...
+Core was generated by `driver'.
+Program terminated with signal 11, Segmentation fault.
+Reading symbols from /usr/lib/libm.so.2...done.
+Reading symbols from /usr/lib/libcrypt.so.2...done.
+Reading symbols from /usr/lib/libc.so.4...done.
+Reading symbols from /usr/libexec/ld-elf.so.1...done.
+#0  assign_svalue (dest=0x841e7e8, v=0x2) at interpret.c:1213
+1213              if ( !(ob->flags & O_DESTRUCTED) )
+(gdb) where
+#0  assign_svalue (dest=0x841e7e8, v=0x2) at interpret.c:1213
+#1  0x810a9e8 in start_of_stack ()
+#2  0x808e544 in apply_low (fun=0x0, ob=0x836d0ae, num_arg=135309760,
+    b_ign_prot=137352873) at interpret.c:20252
+#3  0x0 in ?? ()
+(gdb) print ob
+$1 = (object_t *) 0x2
+
+
+--0-538466317-1009028257=:24158
+==> debuglog.011220.175700 <==
+'      translate' in '    obj/tools/robe.c' ('  obj/tools/robe#568') line 553
+'translate_phrase' in '    obj/tools/robe.c' ('  obj/tools/robe#568') line 597
+'       get_type' in '    obj/tools/robe.c' ('  obj/tools/robe#568') line 404
+'      translate' in '    obj/tools/robe.c' ('  obj/tools/robe#568') line 553
+'translate_phrase' in '    obj/tools/robe.c' ('  obj/tools/robe#568') line 627
+'     get_object' in '    obj/tools/robe.c' ('  obj/tools/robe#568') line 272
+'    load_object' in ' kernel/simul_efun.c' ('   kernel/simul_efun') line 480
+2001.12.20 12:26:27 Error in loading object 'players/dragonlady/yipe/trousers'
+2001.12.20 12:26:27 program: kernel/simul_efun.c, object: kernel/simul_efun line 480
+'         Update' in '    obj/tools/robe.c' ('  obj/tools/robe#568') line 2627
+'     get_object' in '    obj/tools/robe.c' ('  obj/tools/robe#568') line 242
+'      translate' in '    obj/tools/robe.c' ('  obj/tools/robe#568') line 553
+'translate_phrase' in '    obj/tools/robe.c' ('  obj/tools/robe#568') line 597
+'       get_type' in '    obj/tools/robe.c' ('  obj/tools/robe#568') line 404
+'      translate' in '    obj/tools/robe.c' ('  obj/tools/robe#568') line 553
+'translate_phrase' in '    obj/tools/robe.c' ('  obj/tools/robe#568') line 627
+'     get_object' in '    obj/tools/robe.c' ('  obj/tools/robe#568') line 272
+'    load_object' in ' kernel/simul_efun.c' ('   kernel/simul_efun') line 480
+2001.12.20 12:41:17 Error in loading object 'players/dragonlady/yipe/trousers'
+2001.12.20 12:41:17 program: kernel/simul_efun.c, object: kernel/simul_efun line 480
+'         Update' in '    obj/tools/robe.c' ('  obj/tools/robe#568') line 2673
+'    load_object' in ' kernel/simul_efun.c' ('   kernel/simul_efun') line 480
+2001.12.20 12:44:12 Error in loading object 'players/dragonlady/yipe/trousers'
+2001.12.20 12:44:12 program: kernel/simul_efun.c, object: kernel/simul_efun line 480
+'         Update' in '    obj/tools/robe.c' ('  obj/tools/robe#568') line 2673
+'    load_object' in ' kernel/simul_efun.c' ('   kernel/simul_efun') line 480
+2001.12.20 13:43:51 Connection reset by peer detected.
+2001.12.20 13:53:33 cannot move 'players/dragonlady/yipe/rhat.c' to 'players/dragonlady/clothes/rhat.c'
+2001.12.20 13:53:33 program: bin/shell.c, object: bin/shell#579 line 318
+'   post_command' in 'basic/player/command.c' ('      obj/player#567') line 722
+'run_daemon_command' in 'basic/player/command.c' ('      obj/player#567') line 138
+'       dispatch' in '      basic/daemon.c' ('       bin/shell#579') line 79
+'          shell' in '         bin/shell.c' ('       bin/shell#579') line 318
+2001.12.20 13:56:59 Failed to load file 'players/dragonlady/yipe/hpants'.
+2001.12.20 13:56:59 program: bin/shell.c, object: bin/shell#579 line 543
+'   post_command' in 'basic/player/command.c' ('      obj/player#567') line 722
+'run_daemon_command' in 'basic/player/command.c' ('      obj/player#567') line 138
+'       dispatch' in '      basic/daemon.c' ('       bin/shell#579') line 79
+'          shell' in '         bin/shell.c' ('       bin/shell#579') line 543
+2001.12.20 13:59:28 Connection reset by peer detected.
+2001.12.20 14:20:41 Failed to load file 'players/dragonlady/room/hpants'.
+2001.12.20 14:20:41 program: bin/shell.c, object: bin/shell#579 line 543
+'   post_command' in 'basic/player/command.c' ('      obj/player#567') line 722
+'run_daemon_command' in 'basic/player/command.c' ('      obj/player#567') line 138
+'       dispatch' in '      basic/daemon.c' ('       bin/shell#579') line 79
+'          shell' in '         bin/shell.c' ('       bin/shell#579') line 543
+2001.12.20 14:29:01 Connection reset by peer detected.
+2001.12.20 14:55:13 Connection reset by peer detected.
+2001.12.20 15:36:16 Connection reset by peer detected.
+2001.12.20 16:17:52 Connection reset by peer detected.
+
+==> lplog.011220.175700 <==
+2001.12.20 12:44:12 players/dragonlady/yipe/trousers.c: Illegal character (hex 2e) '.' line 47 
+2001.12.20 12:44:12 players/dragonlady/yipe/trousers.c: Illegal character (hex 5c) '\' line 47 
+2001.12.20 12:44:12 players/dragonlady/yipe/trousers.c: Newline in string line 47 
+2001.12.20 12:44:12 players/dragonlady/yipe/trousers.c: syntax error line 51 
+]The plains stretch away to the north and east.  Some hilly country
+rises to the west, while the forest broods to the south.  The sky is
+totally hung with clouds and the sun can barely be seen through them
+on this cold winter day.
+There are seven obvious exits: north, northwest, northeast, west, 
+    east, southwest and southeast.
+]Mansion of Kantele is to the south.
+2001.12.20 13:56:59 Could not load descr for 'players/dragonlady/yipe/hpants'
+]SELFDESTRUCT ROOM: players/kantele/kitiaras_sleepingroom
+]SELFDESTRUCT ROOM: players/kantele/kitiaras_hall
+]SELFDESTRUCT ROOM: players/kantele/kitiaras_anteroom
+2001.12.20 14:20:41 Could not load descr for 'players/dragonlady/room/hpants'
+]SELFDESTRUCT ROOM: players/kantele/snake_room
+]SELFDESTRUCT ROOM: players/kantele/stairway_up
+]SELFDESTRUCT ROOM: players/kantele/stairway
+]SELFDESTRUCT ROOM: players/kantele/inner_courtyard
+]The portal of the village church is wide open. Dozens of tiny lights
+illuminate a dome at the far end of the church. The tower of the
+church lies east of the entrance. The place in front of the church is
+bordered by a pit to the west and the main road, crossing the meadow
+to the south. A note is pinned to the signpost beside the portal. 
+There are several clouds in the sky and the sun is shining upon you on
+this cold winter day.
+There are two obvious exits: southeast and north.
+]Chelle is well....just Chelle! [13] (nice).
+]Ailis killed poor, defenseless Harry [29] (nice).
+]A somewhat decayed statue of Duron.
+]A sign.
+]A newbie package dispenser.
+]Herzlich willkommen im Heim von Daviel.   Du befindest dich
+gerade im Wohnzimmer neben einem offenen Kamin, in dem ein angenehm
+wärmendes Feuer brennt.   Vor dem Kamin liegt ein Schaffell, das zum
+Niedersitzen und Anwärmen verführt.   An der Wand darüber hängt ein
+Bild.   Im anderen Teil des Zimmers steht ein gemütliches Sofa und ein
+kleiner Tisch für den Nachmittagstee.   
+There are five obvious exits: church, door, north, west and pub.
+]Rebel  (9.11.01).
+]Phylax is coding again (Watch out!).
+]Schaffell (unoccupied).
+]Bild.
+]Sofa (unoccupied).
+]SELFDESTRUCT ROOM: room/mine/tunnel4
+2001.12.20 17:21:37 players/zogaric/theater/booth_room.c: Warning: Redefinition of #define TP line 30 
+2001.12.20 17:52:21 [erq] read: EOF
+2001.12.20 17:52:21 [erq] Read 0, should be 9!
+2001.12.20 17:52:21 [erq] Giving up.
+
+
+alatia@mux:~/cores> gdb ../bin/driver core.011220.175700
+GNU gdb 4.18
+Copyright 1998 Free Software Foundation, Inc.
+GDB is free software, covered by the GNU General Public License, and you are
+welcome to change it and/or distribute copies of it under certain conditions.
+Type "show copying" to see the conditions.
+There is absolutely no warranty for GDB.  Type "show warranty" for details.
+This GDB was configured as "i386-unknown-freebsd"...
+Core was generated by `driver'.
+Program terminated with signal 11, Segmentation fault.
+Reading symbols from /usr/lib/libm.so.2...done.
+Reading symbols from /usr/lib/libcrypt.so.2...done.
+Reading symbols from /usr/lib/libc.so.4...done.
+Reading symbols from /usr/libexec/ld-elf.so.1...done.
+#0  0x808963b in eval_instruction (first_instruction=0x82f18af "M\001\002\005", initial_sp=0x810aa08) at interpret.c:17217
+17217           if (command_giver && !(command_giver->flags & O_DESTRUCTED))
+(gdb) directory /home/alatia/ldmud-3.2.9-dev/src
+Source directories searched: /home/alatia/ldmud-3.2.9-dev/src:$cdir:$cwd
+(gdb) directory /home/alatia/ldmud-3.2.9-dev
+Source directories searched: /home/alatia/ldmud-3.2.9-dev:/home/alatia/ldmud-3.2.9-dev/src:$cdir:$cwd
+(gdb) where
+#0  0x808963b in eval_instruction (first_instruction=0x82f18af "M\001\002\005", initial_sp=0x810aa08) at interpret.c:17217
+#1  0x808e544 in apply_low (fun=0x0, ob=0x82f192c, num_arg=135309856, b_ign_prot=137384149) at interpret.c:20252
+#2  0x83c50fc in ?? ()
+#3  0x49 in ?? ()
+Cannot access memory at address 0x200.
+
+
+--0-538466317-1009028257=:24158--
+

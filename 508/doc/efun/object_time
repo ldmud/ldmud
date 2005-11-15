@@ -1,0 +1,10 @@
+SYNOPSIS
+        int object_time()
+        int object_time(object ob)
+
+DESCRIPTION
+        Returns the creation time of the given object.
+        Default is for this_object(), if no arg is given.
+
+SEE ALSO
+        program_time(E), program_name(E)
