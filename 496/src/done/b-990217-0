@@ -1,0 +1,52 @@
+Subject: "*":: vs virtually inherited functions
+From: Lars
+Date: Wed, 17 Feb 1999 21:56:37 +0100 (MET)
+Type: Bug
+State: Done - corrected in 3.2.8-dev.151.
+See also: p-990217.
+
+If function 'f' is inherited in object o virtually several times, using
+parallel parent lines, a "*"::f in o may call f repeatedly. This may
+be C++ like, but imo consitutes a bug.
+
+Sunblood writes on this topic in p-990217:
+
+Eine Sache war mich nicht 100% klar, und zwar in dem "*":: fall (in
+insert_inherited()). Da steht weiter unter ein continue, das ich recht
+unlogisch fand, selbst bei dem alten verhalten. Lies dir bitte den kommentar
+durch und schau, ob ich recht hab oder nicht.
+
+diff -rc ldmud-dev-37/prolang.y ldmud-dev/prolang.y
+*** 6036,6044 ****
+--- 6050,6080 ----
+                    !(prog2->variable_names[numvar2-1].flags & TYPE_MOD_VIRTUAL) )
+                  {
+                      /* Inherited from a virtually inherited program */
++ #if 0
+                      /* The call for the virtually program itself should
+                       * be sufficent. */
++             /* wieso???? ich hab wirklich keine ahnung wozu das gut sein soll
++              *
++              * wenn man verhindern will, dass mehrfach virtuell inheritete
++              * funktionen mehrfach aufgerufen werden, sollte man
++              * das selbst in lpc machen (is ja auch in c++ so)
++              *
++              * ausserdem: wenn ein programm mehrmals virtuell
++              * inherited wird, gibt es hier 2 alternativen: entweder man
++              * macht meinen neuen obigen test, was zur folge hat, dass
++              * die funktion in der klasse ueberhaupt nicht aufgerufen wird,
++              * oder man macht ihn nicht und ruft somit die funktion in
++              * allen zusaetzlichen inherits auf (also potentiell
++              * mehrfach) UND hat den bug a la ::f(), d.h. eigentlich
++              * ueberladene funktionen werden auch aufgerufen
++              *
++              * wenn ich mich jedoch irren sollte, nimm es wieder rein
++              */
+                      continue;
++ #else
++                     do --ip; while (ip->prog != prog2);
++                     i -= ip2->function_index_offset;
++ #endif
+                  }
+              }
+              add_f_byte(F_CALL_EXPLICIT_INHERITED);

@@ -1,0 +1,265 @@
+Short: Unitopia crashes on invalid string in reset()
+Date: Mon, 16 Oct 2000 02:11:43 +0200
+From: Freaky <Freaky@UNItopia.RUS.Uni-Stuttgart.DE>
+Type: Bug
+State: Abandoned - no longer reported.
+
+UNItopia ist gecrashed:
+
+2000.10.14 12:01:16 Error in process_objects().
+2000.10.14 12:04:10 check_string: String 0x12b7d30a 'will_kamm: will && kamm || moechte && kamm || gib && kamm' has 1025 refs, shadow expected 1 refs
+2000.10.14 12:04:10 Current object was obj/player#758290
+2000.10.14 12:04:10 Dump of the call chain:
+'   betretaktion' in '    map/m-249_1224.c' ('      map/m-249_1224')line 54
+'           move' in '   i/player/player.c' ('   obj/player#758290')line 2086
+'           move' in '            i/move.c' ('   obj/player#758290')line 320
+'          touch' in 'secure/simul_efun/simul_efun.c (map.inc)' (' obj/player#758290')line 185
+
+
+STDOUT/STDERR:
+----------------------------------------------------------------------
+2000.10.14 12:01:16 d/Mittelerde/caradhras/obj/gandalf.c: Variable AH_CRITICAL_M
+ESSAGE not declared ! line 148
+'          reset' in 'd/Mittelerde/Hobbingen/caradhras/rooms/pfadb4.c' ('d/Mitte
+lerde/Hobbingen/caradhras/rooms/pfadb4')line 7
+'          touch' in 'secure/simul_efun/simul_efun.c (map.inc)' ('d/Mittelerde/H
+obbingen/caradhras/rooms/pfadb4')line 185
+2000.10.14 12:04:10 check_string: String 0x12b7d30a 'will_kamm: will && kamm ||
+moechte && kamm || gib && kamm' has 1025 refs, shadow expected 1 refs
+2000.10.14 12:04:10 Current object was obj/player#758290
+secure/master secure/master.c (/secure/master/include_file.inc) line 59
+110b33e7:  14        2 clit                       (1: 41)       line 59
+110b33e9:  41          >                          (2: 42)
+110b33ea:  83          bbranch_when_non_zero      (1: 41)
+110b33cd:  24        3 local                      (0: 40)       line 60
+110b33cf:  12          const0                     (1: 41)
+110b33d0:  24        4 local                      (2: 42)
+110b33d2:  55          ..                         (3: 43)
+110b33d3:   7       19 cstring0                   (1: 41)
+110b33d5: 156          implode                    (2: 42)
+110b33d6:  24        0 local                      (1: 41)
+110b33d8:  36          +                          (2: 42)
+110b33d9:  91        2 push_local_variable_lvalue (1: 41)
+110b33db:  34          =                          (2: 42)
+110b33dc: 146          file_size                  (1: 41)
+secure/master secure/master.c (/secure/master/valid_read.inc) line 22
+110b1697:  75     1028 clear_locals               (0: 50)       line 22
+110b169a:  24        0 local                      (0: 50)       line 42
+110b169c:  54          !                          (1: 51)
+110b169d:  33        7 ||                         (1: 51)
+110b169f:  24        0 local                      (0: 50)
+110b16a1:  14       32 clit                       (1: 51)
+110b16a3: 173          member                     (2: 52)
+110b16a4:  12          const0                     (1: 51)
+110b16a5:  42          >=                         (2: 52)
+110b16a6:  33        3 ||                         (1: 51)
+110b16a8:  24        1 local                      (0: 50)
+110b16aa:  54          !                          (1: 51)
+110b16ab:  80     5121 branch_when_zero           (1: 51)
+110b16ae:  24        1 local                      (0: 50)       line 47
+110b16b0:   7       10 cstring0                   (1: 51)
+110b16b2:  45          ==                         (2: 52)
+110b16b3:  33          ||                         (1: 51)
+110b16ba:  80        2 branch_when_zero           (1: 51)
+110b16bc:  13          const1                     (0: 50)       line 48
+110b16bd:  19          return                     (1: 51)
+secure/master secure/master.c (/secure/master/include_file.inc) line 60
+110b33dd:  12          const0                     (1: 41)       line 60
+110b33de:  42          >=                         (2: 42)
+110b33df:  80 318904323 branch_when_zero           (1: 41)
+110b33e4:  91        4 push_local_variable_lvalue (0: 40)       line 59
+110b33e6:  29          x--                        (1: 41)
+110b33e7:  14        2 clit                       (1: 41)
+110b33e9:  41          >                          (2: 42)
+110b33ea:  83          bbranch_when_non_zero      (1: 41)
+110b33cd:  24        3 local                      (0: 40)       line 60
+110b33cf:  12          const0                     (1: 41)
+110b33d0:  24        4 local                      (2: 42)
+110b33d2:  55          ..                         (3: 43)
+110b33d3:   7       19 cstring0                   (1: 41)
+110b33d5: 156          implode                    (2: 42)
+110b33d6:  24        0 local                      (1: 41)
+110b33d8:  36          +                          (2: 42)
+110b33d9:  91        2 push_local_variable_lvalue (1: 41)
+110b33db:  34          =                          (2: 42)
+110b33dc: 146          file_size                  (1: 41)
+secure/master secure/master.c (/secure/master/valid_read.inc) line 22
+110b1697:  75     1028 clear_locals               (0: 50)       line 22
+110b169a:  24        0 local                      (0: 50)       line 42
+110b169c:  54          !                          (1: 51)
+110b169d:  33        7 ||                         (1: 51)
+110b169f:  24        0 local                      (0: 50)
+110b16a1:  14       32 clit                       (1: 51)
+110b16a3: 173          member                     (2: 52)
+110b16a4:  12          const0                     (1: 51)
+110b16a5:  42          >=                         (2: 52)
+110b16a6:  33        3 ||                         (1: 51)
+110b16a8:  24        1 local                      (0: 50)
+110b16aa:  54          !                          (1: 51)
+110b16ab:  80     5121 branch_when_zero           (1: 51)
+110b16ae:  24        1 local                      (0: 50)       line 47
+110b16b0:   7       10 cstring0                   (1: 51)
+110b16b2:  45          ==                         (2: 52)
+110b16b3:  33          ||                         (1: 51)
+110b16ba:  80        2 branch_when_zero           (1: 51)
+110b16bc:  13          const1                     (0: 50)       line 48
+110b16bd:  19          return                     (1: 51)
+secure/master secure/master.c (/secure/master/include_file.inc) line 60
+110b33dd:  12          const0                     (1: 41)       line 60
+110b33de:  42          >=                         (2: 42)
+110b33df:  80        3 branch_when_zero           (1: 41)
+110b33e1:  24        2 local                      (0: 40)       line 61
+110b33e3:  19          return                     (1: 41)
+110b345f:  33          ||                         (1: 36)       line 111
+110b3463:  91        3 push_local_variable_lvalue (1: 36)
+110b3465:  35          (void)=                    (2: 37)
+110b3466:  79          branch                     (0: 35)       line 112
+110b3473:  24        3 local                      (0: 35)       line 116
+110b3475:  84          call_function_by_address   (1: 36)
+110b33ff:  75      257 clear_locals               (0: 37)       line 72
+110b3402:  91        1 push_local_variable_lvalue (0: 37)
+110b3404:   7       65 cstring0                   (1: 38)
+110b3406:   7       66 cstring0                   (2: 39)
+110b3408:   7       67 cstring0                   (3: 40)
+110b340a:   7       68 cstring0                   (4: 41)
+110b340c:   7       69 cstring0                   (5: 42)
+110b340e:   7       70 cstring0                   (6: 43)
+110b3410:   7       71 cstring0                   (7: 44)
+110b3412:   7       72 cstring0                   (8: 45)
+110b3414: 105        8 aggregate                  (9: 46)
+110b3417: 113          foreach                    (2: 39)
+110b3428: 114          foreach_next               (0: 41)       line 75
+110b341b:  24        0 local                      (0: 41)       line 73
+110b341d:  24        1 local                      (1: 42)
+110b341f:  12          const0                     (2: 43)
+110b3420: 310       54 strstr                     (3: 44)
+110b3422:  12          const0                     (1: 42)
+110b3423:  42          >=                         (2: 43)
+110b3424:  80          branch_when_zero           (1: 42)
+110b3428: 114          foreach_next               (0: 41)       line 75
+110b341b:  24        0 local                      (0: 41)       line 73
+110b341d:  24        1 local                      (1: 42)
+110b341f:  12          const0                     (2: 43)
+110b3420: 310       54 strstr                     (3: 44)
+110b3422:  12          const0                     (1: 42)
+110b3423:  42          >=                         (2: 43)
+110b3424:  80          branch_when_zero           (1: 42)
+110b3428: 114          foreach_next               (0: 41)       line 75
+110b341b:  24        0 local                      (0: 41)       line 73
+110b341d:  24        1 local                      (1: 42)
+110b341f:  12          const0                     (2: 43)
+110b3420: 310       54 strstr                     (3: 44)
+110b3422:  12          const0                     (1: 42)
+110b3423:  42          >=                         (2: 43)
+110b3424:  80          branch_when_zero           (1: 42)
+110b3428: 114          foreach_next               (0: 41)       line 75
+110b341b:  24        0 local                      (0: 41)       line 73
+110b341d:  24        1 local                      (1: 42)
+110b341f:  12          const0                     (2: 43)
+110b3420: 310       54 strstr                     (3: 44)
+110b3422:  12          const0                     (1: 42)
+110b3423:  42          >=                         (2: 43)
+110b3424:  80          branch_when_zero           (1: 42)
+110b3428: 114          foreach_next               (0: 41)       line 75
+110b341b:  24        0 local                      (0: 41)       line 73
+110b341d:  24        1 local                      (1: 42)
+110b341f:  12          const0                     (2: 43)
+110b3420: 310       54 strstr                     (3: 44)
+110b3422:  12          const0                     (1: 42)
+110b3423:  42          >=                         (2: 43)
+110b3424:  80          branch_when_zero           (1: 42)
+110b3428: 114          foreach_next               (0: 41)       line 75
+110b341b:  24        0 local                      (0: 41)       line 73
+110b341d:  24        1 local                      (1: 42)
+110b341f:  12          const0                     (2: 43)
+110b3420: 310       54 strstr                     (3: 44)
+110b3422:  12          const0                     (1: 42)
+110b3423:  42          >=                         (2: 43)
+110b3424:  80          branch_when_zero           (1: 42)
+110b3428: 114          foreach_next               (0: 41)       line 75
+110b341b:  24        0 local                      (0: 41)       line 73
+110b341d:  24        1 local                      (1: 42)
+110b341f:  12          const0                     (2: 43)
+110b3420: 310       54 strstr                     (3: 44)
+110b3422:  12          const0                     (1: 42)
+110b3423:  42          >=                         (2: 43)
+110b3424:  80          branch_when_zero           (1: 42)
+110b3428: 114          foreach_next               (0: 41)       line 75
+110b341b:  24        0 local                      (0: 41)       line 73
+110b341d:  24        1 local                      (1: 42)
+110b341f:  12          const0                     (2: 43)
+110b3420: 310       54 strstr                     (3: 44)
+110b3422:  12          const0                     (1: 42)
+110b3423:  42          >=                         (2: 43)
+110b3424:  80          branch_when_zero           (1: 42)
+110b3428: 114       16 foreach_next               (0: 41)       line 75
+110b342b: 115          foreach_end                (0: 41)
+110b342c:  20          return0                    (0: 37)
+110b3479:  80          branch_when_zero           (1: 36)       line 116
+110b3489:  24        3 local                      (0: 35)       line 122
+110b348b:  19          return                     (1: 36)
+secure/master secure/master.c (/secure/master/inherit_file.inc) line 44
+110b34cf:  75      258 clear_locals               (0: 34)       line 44
+110b34d2:  24        0 local                      (0: 34)       line 51
+110b34d4:  12          const0                     (1: 35)
+110b34d5:  96          index                      (2: 36)
+110b34d6:  14       37 clit                       (1: 35)
+110b34d8:  45          ==                         (2: 36)
+110b34d9:  80          branch_when_zero           (1: 35)
+110b3504:  24        0 local                      (0: 34)       line 61
+110b3506:  24        1 local                      (1: 35)
+110b3508:  84          call_function_by_address   (2: 36)
+secure/master secure/master.c (/secure/master/include_file.inc) line 13
+110b32f3:  75     1026 clear_locals               (0: 40)       line 13
+110b32f6:  24        0 local                      (0: 40)       line 17
+110b32f8:  12          const0                     (1: 41)
+110b32f9:  96          index                      (2: 42)
+110b32fa:  14       47 clit                       (1: 41)
+110b32fc:  45          ==                         (2: 42)
+110b32fd:  80        3 branch_when_zero           (1: 41)
+110b32ff:  24        0 local                      (0: 40)       line 18
+110b3301:  19          return                     (1: 41)
+secure/master secure/master.c (/secure/master/inherit_file.inc) line 61
+110b350c:  91        2 push_local_variable_lvalue (1: 35)       line 61
+110b350e:  35          (void)=                    (2: 36)
+110b350f:  24        2 local                      (0: 34)       line 63
+110b3511:  84          call_function_by_address   (1: 35)
+110b3497:  24        0 local                      (0: 36)       line 35
+110b3499:   7       75 cstring0                   (1: 37)
+110b349b:  12          const0                     (2: 38)
+110b349c: 310       54 strstr                     (3: 39)
+110b349e:  12          const0                     (1: 37)
+110b349f:  42          >=                         (2: 38)
+110b34a0:  80        1 branch_when_zero           (1: 37)
+110b34a2:  20          return0                    (0: 36)       line 36
+110b3515:  80          branch_when_zero           (1: 35)       line 63
+110b3525:  24        2 local                      (0: 34)       line 69
+110b3527:  19          return                     (1: 35)
+10cabdb3:  91   2  35  24   3 208  24   2
+'   betretaktion' in '    map/m-249_1224.c' ('      map/m-249_1224')line 54
+'           move' in '   i/player/player.c' ('   obj/player#758290')line 2086
+'           move' in '            i/move.c' ('   obj/player#758290')line 320
+'          touch' in 'secure/simul_efun/simul_efun.c (map.inc)' ('   obj/player#
+758290')line 185
+read: Success
+Erq demon exiting.
+
+----------------------------------------------------------------------
+
+Core habe ich komischerweise keines.
+
+Ciao
+		Freaky
+
+-- 
+Frank 'Freaky' Kirschner
+UNItopia Admin                          http://UNItopia.uni-stuttgart.de/
+Freaky@UNItopia.Uni-Stuttgart.DE      telnet://UNItopia.uni-stuttgart.de/
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.0.3 (GNU/Linux)
+Comment: For info see http://www.gnupg.org
+
+iD8DBQE56ke/8UXMXiC+9cQRAmMQAKC02ooLQyZAXYOCCLCQqQutO6O/PwCbBrb9
+iHpGrrOb6wIR9d6ET5wo7Jo=
+=CFTH
+-----END PGP SIGNATURE-----
