@@ -1,0 +1,17 @@
+The file obj/quest_obj.c can be cloned when setting up a quest. Look at the
+file for initializations. Every wizard may set up one quest. It
+must be approved by an arch wizard.
+
+The quests are not supposed to be very dangerous, just some kind of
+puzzle to solve. Even very easy quests are good, especially for the
+beginners.
+
+The quest object should be initialized into the room room/quest_room. Look
+in this room for more documentation.
+
+The quest must be documented how to solve, and with the name of an
+archwizard that approved of it.
+This documentation should be moved to /players/quests/. 'quests' is not
+the name of a player, but this directory is use to make it impossible
+for normal players to read the docs. If you have documentation ready
+to move, ask an archwizard.

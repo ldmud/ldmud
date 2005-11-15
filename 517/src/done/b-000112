@@ -1,0 +1,38 @@
+Date: Wed, 12 Jan 2000 14:33:26 +0100 (CET)
+From: Stephan Lichtenhagen <stephan@lichtenhagen.de>
+Subject: test_bit() & Co may crash
+Type: Bug
+State: Done - fixed in 3.2.8-dev.171
+
+
+Hiho!
+
+Da das MorgenGrauen gerade mal wieder gecrasht ist, wollte ich Dir mal die
+eben behobenen Driverbugs schicken. Keine Ahnung, ob die in Deinem Driver
+noch existieren (wahrscheinlich sind sie schon laaaange raus ;-), aber
+rein vorsichtshalber:
+
+Die Funktion test_bit() (wie sich dann herausstellte ebenfalls auch
+clear_bit() und set_bit() ) prueft zwar brav, ob die uebergebene Zahl auch
+wirklich eine Zahl ist und ob sie auch nicht zu gross fuer den
+uebergebenen String ist - aber leider wurde nicht getestet, ob die Zahl
+vielleicht _negativ_ ist ...
+
+Daher liess sich das Mud z.B. mit einem test_bit("_______",-5028462984)
+crashen.
+
+Fuer den Fall, dass das schon lange ausgebaut ist in Deiner Version:
+weisst Du rein zufaellig noch, in welchen Funktionen entsprechende
+Abfragen auch noch dringend eingebaut werden muessen? 
+
+Ich glaub zwar nicht dran, aber es koennte mir u.U. ein bisschen Arbeit
+ersparen. ;-)
+
+
+Ciao, Stephan
+tiamak@mg.mud.de
+
+---
+Ask me for my              Stephan Lichtenhagen              Projekt Bovine
+   PGP-Key               <stephan@lichtenhagen.de>              RC5 NOW!
+

@@ -1,0 +1,104 @@
+Short: New efun replace_string()
+From: Daniel Sloan
+Date: 990410
+Type: Patch
+State Unclassified
+
+diff-replace : A diff for the efun 'replace_string()', which does the same as
+               implode(explode(X, Y), Z);, but does it faster and without
+               creating an array, of course :-)
+
+MudOS uses a very efficient algorithm for it.
+
+diff -rc ldmud-dev/src/func_spec ldmud-dev-rep/src/func_spec
+*** ldmud-dev/src/func_spec	Sat Mar 27 14:27:43 1999
+--- ldmud-dev-rep/src/func_spec	Sat Apr 10 15:45:03 1999
+***************
+*** 374,379 ****
+--- 375,381 ----
+  void  set_extra_wizinfo_size(int);
+  int caller_stack(int default: F_CONST0);
+  int caller_stack_depth();
++ string replace_string(string, string, string);
+
+  /* A few interesting comm functions for the internet mud protocol */
+  #ifdef MAXNUMPORTS
+diff -rc ldmud-dev/src/interpret.c ldmud-dev-rep/src/interpret.c
+*** ldmud-dev/src/interpret.c	Wed Mar 31 12:28:11 1999
+--- ldmud-dev-rep/src/interpret.c	Sat Apr 10 15:44:55 1999
+***************
+*** 9338,9343 ****
+--- 9338,9410 ----
+              pc = current_prog->program + offset[0];
+              break;
+            }
++ #ifdef F_REPLACE_STRING
++ 	  XCASE(F_REPLACE_STRING);
++ 	  {
++ 	      int slen, dlen, rlen;
++ 	      char *str, *del, *rep;
++ 	      char *buff, *ptr;
++ 	      int n, i;
++
++ 	      TYPE_TEST1(sp-2, T_STRING)
++ 	      TYPE_TEST2(sp-1, T_STRING)
++ 	      TYPE_TEST3(sp, T_STRING)
++
++ 	      str = (sp-2)->u.string;
++ 	      del = (sp-1)->u.string;
++ 	      rep = (sp)->u.string;
++
++ 	      slen = strlen(str);
++ 	      dlen = strlen(del);
++ 	      rlen = strlen(rep);
++
++ 	      if (!slen || !dlen)
++ 	      {
++ 		  buff = string_copy(str);
++ 		  goto replace_string_end; /* I hate goto :-/ */
++ 	      }
++
++ 	      for (n = i = 0; i < slen;)
++ 	      {
++ 		  if (i + dlen <= slen && !memcmp(str + i, del, dlen))
++ 		  {
++ 		      n++;
++ 		      i += dlen;
++ 		  }
++ 		  else
++ 		  {
++ 		      i++;
++ 		  }
++ 	      }
++ 	      if (!n)
++ 	      {
++ 		  buff = string_copy(str);
++ 		  goto replace_string_end;
++ 	      }
++
++ 	      ptr = buff = (char *)xalloc(slen + n * (rlen - dlen) + 1);
++
++ 	      for (i = 0; i < slen;)
++ 	      {
++ 		  if (i + dlen <= slen && !memcmp(str + i, del, dlen))
++ 		  {
++ 		      memcpy(ptr, rep, rlen);
++ 		      i += dlen;
++ 		      ptr += rlen;
++ 		  }
++ 		  else
++ 		  {
++ 		      *(ptr++) = str[i++];
++ 		  }
++ 	      }
++ 	      buff[slen + n * (rlen - dlen)] = '\0';
++
++ replace_string_end:
++ 	      pop_n_elems(3);
++ 	      push_malloced_string(buff);
++ 	      break;
++ 	  }
++ #endif
+            XCASE(F_PROGRAM_NAME);
+            {
+                char *name, *res;
