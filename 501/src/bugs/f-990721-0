@@ -1,0 +1,82 @@
+Short: Stackable input_to()s.
+From: Lars, ugh, Tatu, Logic
+Date: 990721
+Type: Feature
+State: Acknowledged.
+
+Note: input_to()s can be sort-of-stacked since 3.2.8-dev.151, but that
+is no replacement for the stacked input system described below.
+
+Once the command handling is a hook, it is time to make input_to()s stacked,
+too.
+
+Think of it as a stack of input handlers, with the command-handler being the
+default: used if no other handler is active.
+
+'!'-inputs would fall through to higher handlers until a NO_BANG-handler or
+the command handler is encountered.
+
+This also means that prompts should be associated with the input_to()s, and
+functions to query the input-stack must be avaiable.
+
+Tatu says:
+
+In the mudlib I have been developing, we are using so-called modes; when
+player
+goes swimming, for example, most commands aren't really available (or
+give some error message(s) indicating why the command couldn't be done).
+As we do not use add_action() (except for catching all commands to
+the centralized parser), it's quite easy to ask the mode-supervisor
+object to check whether the command is ok. Still, stacked input-handlers
+could perhaps be used for making system more elegant. =)
+Usually there won't be much of a stack, though, but I can think of
+examples of a 3-level stack... A player has gone swimming and then gotten
+into a fight, for example. Also, having to use input_to() is IMO
+inferior to having cleaner ways of 'catching' the input for a while,
+so stacked input-handlers could easily replace input_to() altogether.
+I guess input_to() was a quick hack originally, for situations where
+some creature asks player for a password or such. 8-)
+
+Logic says:
+
+Probably the canonical example for this: you're editing a file and want to
+look at another one really quickly, without interrupting your editing
+session. So, "!more /path/to/other/file", and when you're done, you're
+back in the editor. Or you're more'ing a file, and want to pause that for
+a moment and work on something else for a second.
+
+Also, consider menus: stacked input lends itself almost perfectly to how a
+nested menu is designed...you select an option, you move one level deeper,
+you add one more input handler. When you back out to the previous menu,
+you just pop the last handler off the stack.
+
+It's all doable in other ways, but stacked input handling provides a
+generic, consistant mechanism for doing it, instead of adding support for
+such tasks to each and every command you'd want to escape from.
+
+Stackable input is already doable at the mudlib level, though, so I'm not
+too concerned about it being a driver-based feature, since I get more
+control over it this way. ;-)
+
+Alfe says:
+
+in tubmud we have a mail system which sets the player into an
+input_to-loop when he starts reading mail.  e.g. the command 'r 5' will
+let the player read the mail with number 5.  after reading the mail he
+will return into that input_to-loop in which the mail commands are
+handled.
+
+during the reading of the mail another system in tubmud will be active:
+the more-feature.  it will stop the output after a certain number of
+lines and wait for a press of [return].  this is also realized by using
+the input_to feature.
+
+so, a nice implementation is as follows: the mailbox does an input_to()
+to the mailbox-command handler function and then calls the function which
+displays the mail.  this function displays a part of the mail, then
+prints 'press [return] for more', does an input_to() to itself (with some
+info about where it is in the to-be-displayed mail).  if the end of the
+mail is reached, this function simply does no input_to() anymore; then
+the old stacked input_to() should become active again and the player is
+lead back into the command loop of the mailbox.
+

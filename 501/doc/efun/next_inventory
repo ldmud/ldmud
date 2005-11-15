@@ -1,0 +1,14 @@
+SYNOPSIS
+        object next_inventory()
+        object next_inventory(object ob)
+
+DESCRIPTION
+        Get next object in the same inventory as ob. If ob is not
+        given, the current object will be used.
+
+        This efun is mostly used together with the efun
+        first_inventory().
+
+SEE ALSO
+        first_inventory(E), all_inventory(E), environment(E),
+        deep_inventory(E)
