@@ -1,0 +1,27 @@
+Short: efun rewidth_mapping()
+From: alfebtcd <alfebtcd@cs.tu-berlin.de>
+Date: Wed, 16 Dec 1998 21:11:51 +0100 (MET)
+Type: Feature
+State: Done - implemented in 3.2-dev.56
+
+Maybe implement this (now) sefun:
+
+int widthof(mapping m) { return get_type_info(m,1); }
+
+mapping rewidth_mapping(mapping m,int new_width) {
+  mixed h,g;
+  int i,old_width;
+  h = allocate(new_width);
+  old_width = widthof(m);
+  if (old_width > new_width)    // shrink the mapping?
+    for (i=new_width; i-->0; )  // fill all values fro the original
+      h[i] = m_values(m,i);
+  else {                        // no, expand it.
+    for (i=old_width; i-->0; )  // use all values from the original...
+      h[i] = m_values(m,i);
+    g = allocate(sizeof(m));    // ... create a dummy for the rest ...
+    for (i=old_width; i<new_width; i++)  // and fill the rest with the dummy
+      h[i] = g;
+  }
+  return apply(#'mkmapping,m_indices(m),h);
+}

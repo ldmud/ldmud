@@ -1,0 +1,22 @@
+SYNOPSIS
+        string save_value (mixed value)
+
+DESCRIPTION
+        Encode the <value> into a string suitable for restoration with
+        restore_value() and return it.
+
+        The created string consists of two lines, each terminated with
+        a newline character: the first line describes the format used to
+        save the value in the '#x:y' notation; the second line is the
+        representation of the value itself.
+
+        The format of the encoded value and of the format line matches
+        the format used by save_object() and restore_object().
+
+HISTORY
+        Introduced in LDMud 3.2.8.
+        LDMud 3.2.9 added the saving of non-lambda closures, symbols,
+        and quoted arrays, using a new savefile format version.
+
+SEE ALSO
+        restore_value(E), restore_object(E), save_object(E)
