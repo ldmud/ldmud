@@ -1,0 +1,7 @@
+Short: Allow add_actions() on closures
+Date: 2001-05-16
+From: Gnomi
+Type: Feature
+State: New
+
+Allow to add actions to closures.
