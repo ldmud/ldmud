@@ -1,0 +1,5 @@
+stop_fight()
+
+Defined by all monster and player objects. If you call this function,
+that player or monster will stop fighting. If you want to stop a fight,
+you have to call stop_fight() in both opponents.

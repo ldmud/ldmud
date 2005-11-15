@@ -1,0 +1,11 @@
+Subject: Efuns from Tubmud
+From: Lars Duning <lduning@peopledoc.com>
+Date: Tue, 09 Mar 1999 18:30:40 +0000
+Type: Feature
+State: Acknowledged
+
+In Tubmud, look at /basic/strings, /lib/strings, /kernel/simul/mapping.c
+and look for the array efuns.
+
+Alfe would like to see lib/strings/difference hardcoded, too :-)
+

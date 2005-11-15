@@ -1,0 +1,40 @@
+Version 1.1
+~~~~~~~~~~~
+Bug fixes.
+Added ERQ_LOOKUP, hostname => ipnumber resolving (opposite of ERQ_RLOOKUP)
+Added an lpc socket daemon
+
+Version 1.2
+~~~~~~~~~~~
+Fixed DETACH
+Fixed small problem with ifinger
+Added random interval for sequential part of erq tickets.
+Added socket_transfer and socket_address to socketd
+Changed socketd to bind sockets to object the callback closure is bound to.
+Added some docs for the socketd.
+
+Version 1.2a
+~~~~~~~~~~~~
+Fixed crasher and wrong return value in remove_child()
+
+Version 1.3
+~~~~~~~~~~~
+Fixed driver -> erq socket blocking.
+Increased driver -> erq buffer size. (optional driver diff)
+Rewrote lpc ifinger and telnet.
+Fixed error reply from socketd.
+
+Version 1.3a
+~~~~~~~~~~~~
+Fixed problems with alignment of integers on some platforms (hpux, solaris,
+ probably more).
+New configure script.
+Properly handles change in 3.2.1@120 with random.c
+
+Version 1.4
+~~~~~~~~~~~
+Now operates fully asynchronously.  Instead of returning EWOULDBLOCK, data
+ is queued and sent when socket unblocks.
+Erq->driver socket is nonblocking now, uses queue mechanism described above.
+Rewrote erq->driver reply routines.
+Reincluded driver patch (oops ;)
