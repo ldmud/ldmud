@@ -1,0 +1,10 @@
+Date: Thu, 6 Jan 2000 10:27:25 -0500 (EST)
+From: ldmud <ldmud@www.lpmud.com>
+Short: Check strstr()
+Type: Bug
+State: Done - checked in 3.2.8-dev.174.
+
+
+Check implementation and doc of strstr() for negative start indices again.
+
+

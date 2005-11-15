@@ -1,0 +1,7 @@
+int id(str)
+string str;
+
+This function is used to identify an object. If it identifies with the
+string "str", then return 1, else 0.
+
+See also lfun/long(), lfun/can_put_and_get().
