@@ -1,0 +1,71 @@
+
+# These lines are needed on some machines.
+MAKE=make
+SHELL=@CONFIG_SHELL@
+INSTALL=@INSTALL@
+mkinstalldirs=$(SHELL) @top_srcdir@/mkinstalldirs
+#
+CC=@CC@
+
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+
+SUBDIRS = 
+SED = sed
+
+BINDIR=@bindir@
+MUD_LIB=@libdir@
+ERQ_DIR=@libexecdir@
+
+
+#PROFIL= -DOPCPROF -DVERBOSE_OPCPROF
+#PROFIL=-p -DMARK
+#PROFIL=-pg
+PROFIL=
+#Enable warnings from the compiler, if wanted.
+WARN= # no warning options - will work with all compilers :-)
+#WARN= -Wall -Wshadow -Dlint
+#WARN= -Wall -Wshadow -Wno-parentheses # gcc settings
+#
+# Optimization and source level debugging options.
+# adding a -fomit-frame-pointer on the NeXT (gcc version 1.93 (68k, MIT syntax))
+# will corrupt the driver.
+OPTIMIZE = @OCFLAGS@ # high optimization
+#OPTIMIZE= @MCFLAGS@ # medium optimization
+#OPTIMIZE= @LCFLAGS@ # minimal optimization
+#OPTIMIZE= @DCFLAGS@ # no optimization; for frequent recompilations.
+#
+# The main debugging level is define in config.h 
+# Add additional options here.
+DEBUG=
+#
+MPATH=-I../.. -DMUD_LIB='"$(MUD_LIB)"' -DBINDIR='"$(BINDIR)"' -DERQ_DIR='"$(ERQ_DIR)"'
+#
+CFLAGS= @EXTRA_CFLAGS@ $(OPTIMIZE) $(DEBUG) $(WARN) $(MPATH) $(PROFIL)
+#
+LIBS=@ERQ_LIBS@
+#
+LDFLAGS=@LDFLAGS@
+
+OBJ = erq.o execute.o socket.o lookup.o
+
+erq@EXEEXT@:	$(OBJ)
+	$(CC) $(CFLAGS) $(LDFLAGS) $(OBJ) -o $@ $(LIBS)
+
+%.o : %.c
+	$(CC) -I@top_srcdir@ $(CFLAGS) -c $< -o $@
+
+*.o: erq.h defs.h \
+	@top_srcdir@/config.h \
+	@top_srcdir@/machine.h \
+	@top_srcdir@/port.h
+
+install: erq@EXEEXT@
+	$(mkinstalldirs) $(BINDIR) $(ERQ_DIR)
+	$(INSTALL) erq@EXEEXT@ $(BINDIR)/erq@EXEEXT@
+
+clean:
+	rm -f erq@EXEEXT@ *.o *~
+
+realclean: clean
+	

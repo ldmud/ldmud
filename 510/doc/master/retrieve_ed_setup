@@ -1,0 +1,9 @@
+SYNOPSIS
+        int retrieve_ed_setup(object command_giver)
+
+DESCRIPTION
+        Should return an integer that gives the ed setup flags for the
+        user that is denoted by command_giver.
+
+SEE ALSO
+        save_ed_setup(M)

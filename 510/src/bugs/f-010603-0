@@ -1,0 +1,17 @@
+Short: Efun to count the number of lines in a file
+Date: Sun, 27 May 2001 14:29:22 -0400
+From: AirAzurite <azurite@mail1.nai.net>
+Type: Feature
+State: New
+
+This may already exist, and I may have missed it, being a novice,
+but I can't find an efun that returns the number of lines in a file
+without returning the contents of the file. I was looking for this
+because I was trying to write a version of tail which would take
+the number of lines as a numeric argument. I'm making a logging
+device for RP sessions, and it's handy for someone who gets
+disconnected to be able to reconnect and tail the RP session log
+file to see what they missed. Right now the closest I can come to
+getting the function of tail with number of lines as an argument
+is to write a version of cat that takes a starting line and an
+ending line.

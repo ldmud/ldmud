@@ -1,0 +1,6 @@
+command: converse
+no arguments.
+
+Stay in conversation mode until stoped by '**'.
+
+See also 'say'.
