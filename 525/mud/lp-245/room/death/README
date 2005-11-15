@@ -1,0 +1,10 @@
+Death consists of three files, death.c, death_mark.c and death_room.c.
+
+When a player dies, he gets a clone of death_mark. This object moves him to
+death_room. The object is autoloaded, so that he can't escape.
+
+The deat_room will have a clone of death himself. Heart beat will be used
+to send a list of messages to each player in death_room. Any number of players
+can be handled.
+
+The 'death' monster will not say or do anything, just be there to look at.

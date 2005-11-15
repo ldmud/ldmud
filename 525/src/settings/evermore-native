@@ -1,0 +1,79 @@
+#!/bin/sh    
+#
+# Settings for the Evermore mudlib greater v 1.4.0 (Native Mode)
+#
+# configure will strip this part from the script.
+#-------------------------------------------------------------------------
+
+exec ./configure --prefix=/home/evermore/ --bindir=/home/evermore/bin/native --libdir=/home/evermore/lib/nativelib --libexec=/home/evermore/bin/native/erq_dir --with-setting=evermore-native $*
+exit 1
+
+# --- The actual settings ---
+
+# we do not want a limit on those sizes
+with_max_array_size=0
+with_max_mapping_size=0
+with_read_file_max_size=0
+with_max_byte_transfer=0
+
+# we clean up every hour
+with_time_to_clean_up=3600
+
+# we reset every 45 minutes
+with_time_to_reset=2700
+
+# default eval cost maximum is 2 000 000
+with_max_cost=2000000
+
+# default port is telnet
+with_portno=23
+
+# our udp port is 7780
+with_udp_port=7780
+
+# we have only 2 ports at max
+with_maxnumports=2
+
+# we use the extended erq
+enable_erq=xerq
+
+# we are no longer operating at compat moe
+enable_compat_mode=no
+
+# but our master resides in a non standard dir
+with_master_name=kernel/master
+
+# our swap file is in tmp
+with_swap_file=tmp/LP_SWAP.3
+
+# we do not use the WIZLIST
+with_wizlist_file=no
+
+# our ACCESS.ALLOW file is in etc
+with_access_file=etc/ACCESS.ALLOW
+
+# we initialize using the __INIT() function
+enable_initialization_by___init=yes
+
+# we do not need those old commands
+enable_supply_parse_command=no
+
+# its better as getting errors
+enable_dynamic_costs=yes
+
+# we want mysql 
+enable_use_mysql=yes
+
+# but we do not want old names for efuns
+enable_use_deprecated=no
+
+# we need the alists
+enable_use_alists=yes
+
+# this is far in the future
+with_max_players=70
+
+# this not
+with_max_local=100
+
+

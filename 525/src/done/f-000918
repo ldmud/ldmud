@@ -1,0 +1,24 @@
+Short: Add a path spec to --use-mysql on configuration.
+From: "Bastian Hoyer" <dafire@dafire.de>
+Date: Mon, 18 Sep 2000 12:53:03 +0200
+Type: Feature
+State: Done - implemented in 3.2.9-dev.258
+
+
+Hallo Lars,
+
+ich hoffe du hast (hattest?) einen schoenen Urlaub ;). Da MySQL ja jetzt
+offiziell mit drin ist schick ich dir demnächst mal meine zusätzlichen
+funktionen/modifikationen...
+
+könntest du vielleicht einbauen das man beim configure einen anderen pfad
+für mysql angeben kann ? Bei einer binary installation liegt das alles unter
+einen verzeichnis..
+
+bspw: --use-mysql=/usr/local/mud/
+die libs laegen dann in /usr/local/mud/lib/mysql/*.so
+und die incs: /usr/local/mud/include/mysql/*.h
+
+Bastian
+
+Markus Peter suggests the same.

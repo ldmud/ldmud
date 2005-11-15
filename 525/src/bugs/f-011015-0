@@ -1,0 +1,8 @@
+Short: Long Ints on LPC Level
+From: Lars
+Date: 2001-10-15
+Type: Feature
+State: New
+
+Implement multi-precision numbers (see GNU MP Library gmp) on LPC level.
+Righ's version for FinalFrontier currently uses efuns.
