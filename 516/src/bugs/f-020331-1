@@ -1,0 +1,24 @@
+Short: Hook for input_to()
+Date: Sun, 31 Mar 2002 15:40:53 +0200 (CEST)
+From: Markus Peter <warp@spin.de>
+Type: Feature
+State: New
+
+Hallo
+
+Ich haette mal wieder eine Idee fuer ein Feature was mit input_to
+zusammenhaengt (naja - vielleicht waers langsam besser ich override
+input_to in der simulefun statt den Driver immer weiter zu belasten...)
+
+Ich hab in mein MUD support fuer MCP eingebaut. MCP sieht vor, dass alle
+Zeilen die mit $#" und $#$ gestartet werden besonders behandelt werden.
+Das funktioniert soweit auch so gut, falls der MCP client nicht gerade auf
+die Idee kommt, Zeilen dieser Art zu senden, waehrend gerade ein input_to
+laeuft. Es gibt jetzt prinzipiell 2 Moeglichkeiten, wie ich das Problem
+reparieren kann: Entweder ich bau in der Lib mein komplett eigenes input
+System oder man baut evtl. einen Hook, der es mir erlaubt, an jeden Input
+ranzukommen, bevor er in das "normale" Input System kommt. Der Hook waer
+dem H_MODIFY_COMMAND hook recht aehnlich (string => kommando wird ersetzt,
+0 use unchanged, andere zahl - ignorieren) aber eben mit dem unterschied,
+dass auch input_to Eingaben darueber laufen.
+

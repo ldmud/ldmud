@@ -1,0 +1,10 @@
+Short: Make the driver 'dumb'
+From: various
+Date: Mon, 22 Jun 1998 00:53:36 +0200
+Type: Feature
+State: Unclassified
+
+Make all the extras (command parsing, inventories, light) optional
+so that mudlibs can replace them.
+
+Note: light is optional in 3.2.7.
