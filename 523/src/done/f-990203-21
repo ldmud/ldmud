@@ -1,0 +1,26 @@
+Short: New efun pow()
+From: Matthew Julius <julius.2@wright.edu>
+Date: Fri, 08 Jan 1999 16:29:08 -0500
+Type: Feature
+State: Done - implemented in 3.2-dev.120
+
+int|float pow(int|float, int|float)
+  The ability to return an integer when possible is highly desirable.
+    pow(2, 31) returns 2147483648
+    pow(2, 1.5) returns 2.82843
+    pow(2, 32) returns 4.29497e+09
+    pow(2.5, 1.5) returns 3.95285
+    pow(2.5, 1) returns 2.5
+
+alfebtcd wrote:
+
+> please refrain from returning unpredictable types.  it seems ok to me to
+> return an int when the input was ints; raise an error when the result is
+> too great for an int then.  the user should know whether the results can
+> become that great, and in case use to_float().
+
+*chuckle*  I really must not have been thinking in this case.  Yes, raise
+an error when the result cannot be stored in an integer--when two integers
+are passed that is.  If either argument is a float the result is a float,
+of course.
+

@@ -1,0 +1,23 @@
+Short: New efun turn_array()
+From: Tubmud
+Type: Feature
+State: Unclassified
+See also: f-990203-15
+
+        mixed *turn_array(mixed *arr);
+          turns the contents of the array (changes it indeed!) and returns
+          it:
+          int *a;
+          a = ({ 1,2,3,4 });
+          b = turn_array(a);
+          return ({ a,b });
+          ==> ({ ({ 4,3,2,1 }),({ 4,3,2,1 }) })
+
+          If you want to keep the old array unchanged, use [0..] to copy
+          the array before you give it to turn_array():
+          a = ({ 1,2,3,4 });
+          b = turn_array(a[0..]);
+          return ({ a,b });
+          ==> ({ ({ 1,2,3,4 }),({ 4,3,2,1 }) })
+
+Works also on strings.

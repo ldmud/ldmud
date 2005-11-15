@@ -1,0 +1,127 @@
+<html>
+<head>
+<title>The Natural Way to Handle Commands</title>
+</head>
+<body background="bchalk.jpg">
+<a href="index.html">Back to the index</a>
+<center>
+<h1>MudOS under Cygwin</h1>
+</center>
+Below are instructions for compiling MudOS using the Cygwin-32
+suite of tools under Windows and a small patch file with the
+needed changes to the MudOS files. I'm hoping this can be merged into
+the MudOS distribution, with the instructions as a 'Readme.Cygwin' 
+file or similar.
+<p>
+I've tried to do the changes in a way that this can easily be 
+merged into the normal MudOS distribution. There are changes to
+the build.MudOS script and the GNUMakefile.in because the
+gnu compiler under Cygwin does not produce 'a.out' as the
+default program output - instead it produces 'a.exe'. Therefore,
+the build.MudOS script has been changed to check for a CYGWIN
+environment variable and if present use 'a.exe' instead of
+'a.out' through the use of an A_OUT variable. This A_OUT setting
+is written to Makefile.tmp and incorporated into the generated
+makefile. The GNUMakefile.in has therefore been modifed to
+use $(A_OUT) where it previously used a.out. (This means that
+users of other unixes will need to make sure they DON'T have a
+CYGWIN environment variable!).
+<p>
+The 'arch.h' file has been changed to detect Cygwin and set
+definitions appropriately. Note when it detects Cygwin it
+will undef things like WIN95, WIN32, WINNT etc. otherwise the
+existing Windows port code conflicts with Cygwin.
+<p>
+The only other changes are just a couple of conditional
+compilation tweaks to 'efuns_port.c' and 'socket_ctrl.c'.
+<p>
+The resulting driver appears to be stable and will load and
+run the testsuite and my own mudlib ok. 
+<p>
+The patch was created from v22.2a25 but will probably apply just
+as well to other versions. Built and tested using Cygwin-b20
+under Win95 and Windows NT 4. 
+<p>
+<h2>Instructions for compiling MudOS under Windows using Cygwin 32</h2>
+
+Note: paths given below starting '/cygnus/cygwin-b20/' assume
+that the Cygwin package is installed in C:\cygnus\ and was the
+b20 version. If you have another version or installed in a different
+place, you'll need to use paths appropriate to your system.
+You will need a FULL Cygwin installation to compile MudOS.
+<p>
+<a href="cygwin-mudos.patch">Save this patch</a> to a new file
+called cygwin-mudos.patch.
+<p>
+Start the Cygwin bash shell. All the rest of these instructions
+should be done from the bash shell.
+<p>
+Unpack the MudOS archive using 'tar -zxvf <filename>' from the
+bash shell under Cygwin. Do not use WinZip or other Windows
+programs to unpack it as they will do helpful things like converting
+unix line-endings to DOS line-endings which breaks certain 
+header files. Create a local_option file from options.h as
+normal. Note that Cygwin does not come with a crypt library, so if
+you have not installed one seperately you should make sure that
+CUSTOM_CRYPT is defined in your local_options file. This option
+makes MudOS use it's own internal crypt system.
+<p>
+Copy the patch file into the MudOS source directory, and then
+apply it with the command:
+<pre>
+  patch < cygwin-mudos.patch
+</pre>
+<p>
+Check your environment variables. In the bash shell you can list
+the current ones using 'set' or 'set | less' and change them using
+'export <name>=<value>' though this will only affect the current
+session. The easiest way to permanently change environment 
+variables is to change the .bat file Cygwin uses to run bash
+(/cygnus/cygwin-b20/cygnus.bat).
+<p>
+The CYGWIN environment variable must be set to 'binmode' whilst 
+compiling and running MudOS, to force Cygwin to treat files in the 
+normal unix manner. Check the contents of the INCLUDE environment 
+variable - the build.MudOS script will pick up the contents of this, 
+so make sure it does not contain any DOS style filenames. Finally, 
+make sure the BISONLIB environment variable is set to the directory 
+containing bison.simple and bison.hairy (normally something like 
+'/cygnus/cygwin-b20/share').
+<p>
+Make sure that '/bin/sh.exe' exists - if it doesn't, create a /bin
+directory and copy 'sh.exe' there from 
+'/cygnus/cygwin-b20/H-i586-cywin32/bin'.
+<p>
+Copy your local_options file into the MudOS source directory, or
+create one from options.h as appropriate for your lib. Cygwin
+does not come with a crypt library so you will need to make sure
+that you install one separately, or that CUSTOM_CRYPT is defined 
+in the local_options file.
+<p>
+Now issue the command 'sh build.MudOS'. Make sure there is nothing
+obviously wrong in the final report it gives (e.g. DOS style filenames 
+present, it doesn't identify Cygwin-32 etc.) and that it
+is using GNUMakefile rather than Makefile.
+<p>
+Issue the command 'make'.
+<p>
+MudOS will now be built. You should end up with:
+<pre>
+  driver.exe       - the MudOS driver
+  addr_server.exe  - the address server
+  portmap.exe      - the portmap program
+</pre>
+<p>
+Note that the driver.exe program needs the CYGWIN environment
+variable set to 'binmode' to be able to save and load files
+correctly. With this in mind, it's probably easiest to set up a
+.bat file to run it and set that variable there.
+<p>
+<center>
+<hr width="75%">
+&copy; Copyright 1999 by Scatter. 
+<IMG SRC="http://www.tcp.co.uk/cgi-bin/Count.cgi?df=kipper605.dat&ft=0&dd=E&pad=N&tr=Y&trgb=255;255;255" ALIGN=right ALT="">
+</center>
+</BODY>
+</HTML>
+
