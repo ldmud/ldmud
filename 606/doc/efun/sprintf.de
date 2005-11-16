@@ -1,0 +1,145 @@
+SYNOPSIS
+        string sprintf(string fmt, ...)
+
+BESCHREIBUNG
+        Mit dieser Funktion kann man auf einfache Weise aus dem Inhalt
+        von Variablen einen String bauen; und dies effektiver als
+        mit der ueblichen "Du hast "+anzahl+" Punkt(e)"-Methode.
+
+        Die Funktion bekommt als erstes Argument einen Formatstring fmt,
+        der Informationen darueber enthaelt, wie die weiteren beliebigen
+        Argumente in den Ergebnisstring eingebaut werden sollen.
+        Die meisten Zeichen gelangen vom Formatstring unveraendert in
+        den Ausgabestring. Die Regeln zum Einbau eines Arguments werden
+        immer mit '%' eingeleitet. Moechte man ein '%' in die Ausgabe
+        bringen, so muss man im Formatstring "%%" verwenden.
+
+        Ein einfaches Beispiel ist erg=sprintf("%s %d", str, i);
+        '%' leitet einen Argumentformatstring (AFS) ein. Das 's' schliesst
+        ihn ab und besagt, dass ein String eingebaut werden soll. Das
+        folgende Leerzeichen wird unveraendert uebernommen. '%' leitet
+        wieder einen neuen Formatstring ein, wobei 'd' eine Ganzzahl
+        bezeichnet (eine Variable von Typ int).
+        Dies ist ein allerdings nur ein sehr einfaches Beispiel.
+
+        Jeder Argumentformatstring kennzeichnet also, auf welche Art
+        ein Argument in das Ergebnis eingebaut werden soll. Der erste
+        AFS ist fuer das zweite Argument der Funktion, der zweite AFS
+        fuer das dritte Argument u.s.w. (das erste Argument der Funktion
+        ist ja der Formatstring selbst).
+
+        Jeder AFS beginnt mit einem '%' und endet mit einem der
+        folgenden Zeichen (Argumenttyp-Kennzeichner):
+        Zeichen    Argumenttyp    Bemerkung
+        's'        string
+        'd' 'i'    integer        Dezimalschreibweise
+        'o'        integer        Oktalschreibweise
+        'x' 'X'    integer        Hexadezimalschreibweise
+        'e' 'E'    float          Exponentialschreibweise
+        'f' 'F'    float          Gleitkommadarstellung
+        'g' 'G'    float          Gleitkommadarstellung
+        'O'        mixed          Gibt fuer Debugging alles irgendwie
+                                  lesbar aus, auch Arrays und Mappings
+        'Q'        mixed          Wie 'O', gibt jedoch Sonderzeichen in
+                                  Strings in der LPC-Notation aus
+        
+        Zwischen dem '%' und dem Argumenttyp-Kennzeichner kann man
+        noch mehrere Modifikatoren setzen, die das Verhalten
+        beeinflussen.
+        Hier eine Uebersicht. n steht hier fuer eine Ganzzahl, also
+        zum Beispiel "12".
+        Modifikator  Bedeutung
+        n            Minimale Stringlaenge, die fuer dieses Argument
+                     verwendet werden soll. Fehlende Zeichen werden mit
+                     einem Fuellzeichen aufgefuellt. Beginnt n mit einer
+                     '0' (etwa "08") so ist das Fuellzeichen '0' sonst
+                     ist es per Default ' '. (sogenannte 'Feldbreite')
+        .n           Bei Ganzzahlen die Maxanzahl der Stellen, bei Gleit-
+                     kommazahlen die Maximalzahl der Nachkommastellen.
+                     Bei (einfachen) Strings die Maximallaenge.
+        :n           Ist dasselbe wie n.n - setzt also beide Werte auf
+                     dieselbe Zahl.
+        'X'          Als Fuellzeichen wird X genutzt. X koennen dabei
+                     auch mehrere Zeichen sein, etwa fuehrt '-=' zu
+                     Fuellungen der Art "-=-=-=-=". Um mit Hochkommas
+                     zu fuellen ist '\\'' anzugeben. Rueckwaerts-
+                     schraegstrich entsprechend mit '\\\\'.
+        <Space>      Vor positive Zahlen wird ein Leerzeichen gefuegt.
+        +            Vor positive Zahlen wird ein '+' gefuegt.
+        -            Der Wert wird linksbuendig in das fuer dieses Argument
+                     vorgesehene Feld eingefuegt (Standard ist rechts-
+                     buendig). Bei Strings wird meistens diese Ausrichtung
+                     die sinnvollste sein.
+        |            Der Wert wird zentriert in das Feld eingefuegt.
+                     (Siehe Modifikator n, Feldbreite)
+        $            Blocksatz. Benoetigt eine Feldbreite, funktioniert nur
+                     bei Strings (auch im Spaltenmodus).
+        =            Spaltenmodus (siehe unten).
+        #            Fuer Strings: Tabellenmodus (siehe unten).
+                     Fuer '%O'/'%Q': kompakte Ausgabe.
+        @            Arraymodus (siehe unten).
+        *            Ein Stern kann immer dort eingesetzt werden, wo
+                     hier weiter oben ein n fuer eine Ganzzahl steht.
+                     Der Wert der Zahl muss dann als weiterer Parameter
+                     an die Funktion uebergeben werden.
+
+BEISPIELE
+        Mit den bis jetzt erwaehnten Moeglichkeiten kann man zB machen:
+
+        sprintf("%d (dec) == %o (octal) == %x (hex)", 20, 20, 20);
+        => "20 (dec) == 24 (octal) == 14 (hex)"
+
+        sprintf("Du drehst den Knopf um %.3f Umdrehungen", 12.3456);
+        => "Du drehst den Knopf um 12.345 Umdrehungen"
+
+        sprintf("Du liest %|'*':9s", "Fiona");
+        => "Du liest **Fiona**"
+
+        sprintf("Auf dem Zettelstueck steht: %-.*s...", 7, "Hallo Du da");
+        => "Auf dem Zettelstueck steht: Hallo D...
+
+ERWEITERTE MODI
+        Mit dem Modifikatoren = # und @ stehen maechtige Werkzeuge zur
+        Verfuegung. Mit ein wenig Ueberlegung kann man sich oft viele
+        Zeilen Code ersparen.
+        Arraymodus (@):
+          sprintf("%@s", arr_of_string);
+          Der Argumentformatstring (allerdings ohne das @) wird sooft
+          hintereinandergereiht, wieviele Elemente das Array hat.
+          Jeder AFS wird dann fuer ein Element des Arrays benutzt.
+          sprintf("%@s", ({"aaa","bbb"})) ist somit dasselbe wie
+          sprintf("%s%s", "aaa", "bbb"). Allerdings passt es sich
+          immer an die Elementzahl der uebergebenden Arrays an.
+          Dies ist nuetzlich um Ergebnisse von map() oder aehnlich
+          auszugeben.
+          sprintf("%@s", map_objects(all_inventory(), "short"));
+          Der Argumenttyp-Kennzeichner muss hierbei immer dem Typen
+          eines Elementes des Arrays entsprechen.
+        Spaltenmodus (=):
+          Diese Funktion bricht Text um. Die Feldbreite muss angegeben
+          werden. Wird neben der Feldbreite auch eine maximale String-
+          laenge angegeben, so wird die letztere fuer die Breite des
+          Umbrechens verwendet, die Feldbreite wird mit Fuellzeichen
+          aufgefuellt.
+          sprintf("%=-20s", str); bricht den String str 'wordwrap'end
+          auf 20 Zeichen Laenge um. sprintf("%=-*s", len, str);
+          ist schon eine einfache break_string() Variante.
+        Tabellenmodus (#):
+          Diese Funktion gibt Strings tabellenartig aus. Die Teilstrings
+          muessen mit \n getrennt als ein String als Argument uebergeben
+          werden. Die Feldbreite muss angegeben werden und bezeichnet
+          die (maximale) Gesamtbreite der Tabelle.
+          Die Anzahl der Spalten der Tabelle wird moeglichst optimal
+          bestimmt (lies: klein), und ist fuer alle Zeilen gleich. Wird ein
+          Wert als 'Praezision' angegeben, so ist dies die Anzahl von
+          Spalten, die verwendet werden soll.
+          sprintf("%#30.4s", str) erzeugt eine Tabelle, die maximal
+          30 Zeichen breit ist und 4 Spalten enthaelt.
+          sprintf("%#30s", str) legt die Spaltenzahl dynamisch anhand
+          der Einzelstringlaengen fest, so dass der laengste String
+          noch genau in die Tabelle passt.
+          Wenn string* worte die in die Tabelle einzubettenden Worte
+          enthaelt, so muss str=implode(worte,"\n") sein.
+
+SIEHE AUCH:
+        printf(E)

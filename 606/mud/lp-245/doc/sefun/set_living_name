@@ -1,0 +1,15 @@
+SYNOPSIS
+	void set_living_name(string name)
+
+DESCRIPTION
+	Set a living name on an object. The name will be entered into
+	the hash table for the living names, but find_living() will
+	only find it after the object has actually been marked as
+	``being alive'' by calling enable_commands(). When this is done,
+	the object can be found with find_living().
+	
+	An object can only have one name that can be searched for with
+	find_living().
+
+SEE ALSO
+	find_living(E), find_player(E), enable_commands(E)

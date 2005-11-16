@@ -1,0 +1,10 @@
+Heaven7  --  <URL:http://users.hunterlink.net.au/~demrh/heaven7/>
+
+Last tested: v 3.1.1 'Redemption' on LDMud-3.2.9-dev.255
+
+The main problem with the mudlib are inconsistent function definitions. The
+supplied patches are sufficient to allow players to create a character and log
+in; additional corrections for all the areas might be necessary.
+
+The driver changes mentioned in the release notes are not necessary for
+LDMud - just configure it with the provided settings/heaven7 file.
