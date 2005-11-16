@@ -1,0 +1,97 @@
+Short: Redesigning arrays and mappings, and lvalues.
+From: Lars
+Date: 2002-08-13
+Type: Feature
+State: New
+
+The current problem with arrays and mappings is that even though they are
+by-reference objects, they implement it differently. This is most visible
+in the construct lhs += rhs, which for arrays creates a copy of lhs, but not
+for mappings. Reason is that in arrays the data is stored in the array header
+structure, whereas mappings store the data in a separate memory block.
+
+Strings again act like arrays even though they use a separate memory block for
+the data, but otoh they are easy to duplicate and it would be unnatural
+for them to be by-reference datatyps.
+
+Having a by-reference type may feel unusual for programmers coming from other
+languages, but is no functional problem.
+
+Solution 1: Implement the by-reference semantics consequentially
+
+  This means:
+
+  'lhs = rhs1 + rhs2' always creates a new item, copies the content of rhs1
+  and rhs2 into it and then assigns the new item to lhs, freeing whatever
+  was in lhs before.
+
+  'lhs += rhs' takes the contents of rhs and adds them to the existing lhs.
+
+  LPC already has the semantic that lhs[] works directly on the given
+  array/mapping, but it might help if programmers could specify directly
+  that the lhs is to be made duplicated if referenced by more than one
+  owner. For example:
+
+    'unique lhs += rhs' would act like 'lhs = lhs + rhs'
+    'unique lhs[i] = j' would act like 'lhs = copy(lhs); lhs[i] = j'
+
+  'unique' could also be used in a rhs context and would act like copy().
+  The special form 'unique lhs1, lhs2, lhs3,...' would act like
+  'lhs1 = copy(lhs1); lhs2 = copy(lhs2);  lhs3 = lhs(3);'
+
+  In order to implement this efficiently, it might be useful to have a
+  separate svalue type for arrays with fixed number of elements (structs,
+  tuples). Another idea would be to store the initial elements in the array
+  header structure, and let later changes to the array replace the first
+  svalue entry with a special svalue (T_ARRAY_EXTENSION) pointing to the
+  additional data.
+
+  The disadvantage would be that ({}) != ({}) (but ([]) != ([]) already
+  anyway).
+
+Solution 2: Implement a by-value semantics.
+
+  Both 'lhs = rhs1 + rhs2' and 'lhs += rhs' create a new item, copy the
+  content of rhs1 and rhs2 into it and then assigns the new item to lhs,
+  freeing whatever was in lhs before. The advantage of using the '+='
+  operator would be that the interpreter can avoid duplicating lhs
+  if it doesn't have more than one reference.
+
+  To implement this efficiently, the driver would have to implement
+  a copy-on-write semantic.
+
+  To allow the sharing of arrays and mappings, programs would explicitely
+  create references to it, like 'return &foo'. A good implementation of
+  these references would be to use indirection like this:
+
+    type a = value;
+
+      a = (T_TYPE, value)
+
+    type b = &a;
+    type c = &b;
+
+      a = (T_LVALUE)\
+      b = (T_LVALUE)- (3 refs, (T_TYPE, value))
+      c = (T_LVALUE)/
+
+    The lvalue-resolution code would then detect and collapse lvalue
+    holders with only one ref left.
+
+  Handling references to subranges or single elements would require
+  some more effort - views maybe? One view would cache the referenced
+  element and write it back to the underlying structure when the
+  underlying structure as a whole is read, or when another view
+  to the same structure is about to be changed. This would imply a back-
+  pointer from the lvalue-holder to the list of views.
+
+  With this, the language would need a way to ignore the lvalue mode:
+
+    type a = value; type b = &a;
+
+    b = 0; --> removes value from a and b
+    &b = 0; --> removes value from b, but not from a
+    &b = 1; --> just assigns '1' to b, ignores the '&' as b is not an lvalue.
+
+  Another modification would be to allow only read access to the
+  reference: type b = const ref a;

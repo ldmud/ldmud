@@ -1,0 +1,43 @@
+SYNOPSIS
+        *object clones();
+        *object clones(int what);
+        *object clones(string|object obj [, int what]);
+
+BESCHREIBUNG
+        Diese Efun liefert ein Array mit allen Clones eines bestimmten
+        Blueprints. Dabei unterliegt das Array den normalen Systemlimiten.
+
+        Wenn <obj> angegeben ist, werden alle Clones des Blueprints von <obj>
+        (oder von <obj> selbst, falls <obj> ein Blueprint ist) ausgegeben,
+        sonst die Clone des aktuellen Objekts bzw. die Clone des Blueprints
+        des aktuellen Objekts. Wenn <obj> als String angegeben ist, muss es
+        der Name eines existierenden Objekts sein.
+
+        <what> waehlt aus, wie Clone von aelteren Versionen des Blueprints
+        zu behandeln sind:
+            == 0: liefert nur die Clone des aktuellen Blueprints (Standard)
+            == 1: liefert nur die Clone der alten Blueprint-Version
+            == 2: liefert alle Clones aller Blueprint-Versionen
+
+        Wenn der Treiber mit DYNAMIC_COSTS kompiliert wurde, sind die Kosten
+        fuer diese Funktion proportional zur Anzahl Objekte im Spiel.
+
+BEISPIEL
+        object o, p;
+        o = clone_object("/std/thing"); /* oder "std/thing" im COMPAT_MODE */
+        destruct(find_object("/std/thing"));
+        p = clone_object("/std/thing");
+
+        clones("/std/thing")    --> ergibt ({ p })
+        clones("/std/thing", 0) --> ergibt ({ p })
+        clones("/std/thing", 1) --> ergibt ({ o })
+        clones("/std/thing", 2) --> ergibt ({ o, p })
+
+AENDERUNGEN
+        Eingefuehrt in LDMud 3.2.8.
+        LDMud 3.2.9 fuehrte die dynamischen Kosten ein.
+
+ANMERKUNGEN
+        DIESE FUNKTION SOLLTE NUR ZU DEBUGGINGZWECKEN GENUTZT WERDEN.
+        Diese Funktion ist SEHR rechenaufwendig und sollte daher nur zum
+        Zwecke der Fehlerfindung eingesetzt werden.
