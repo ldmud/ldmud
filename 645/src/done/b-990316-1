@@ -1,0 +1,15 @@
+Short: Heaven7 vs. valid_write()
+From: Lars Duning <lduning@peopledoc.com>
+Date: Mon, 15 Mar 1999 12:20:15 +0000
+Type: Bug
+State: Done - pilot error.
+
+2. Is valid_write()/valid_read() really called with the 'caller'
+   argument? Cendor has problems with Heaven7 in this respect -
+   caller is always 0.
+
+Problem not reproducible with OSB mudlib.
+
+Note: 'caller' is the euid of the calling object. In compat mode, there
+  was no such thing.
+

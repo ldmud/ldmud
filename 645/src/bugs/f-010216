@@ -1,0 +1,5 @@
+Short: Possible implementation of T_ERROR
+From: Lars
+Date: 2001-02-16
+
+Use T_NUMBER and set x.code to something != 0.
