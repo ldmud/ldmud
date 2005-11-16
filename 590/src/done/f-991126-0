@@ -1,0 +1,19 @@
+Short: Collation mode for Charmode
+Date: 991126
+From: Freaky
+Type: Feature
+State: Done - implemented in 3.2.8-dev.158
+
+Kann man evtl. die Eingaben des Charmodes auf x pro Sekunde
+beschraenken? Das waere praktisch.
+
+Oder den Charmode so erweitern, dass man sagen kann: Diese Zeichen als
+String uebergeben und die anderen direkt uebergeben.
+Beim Editor waeren das z.B. alle Zeichen ausser den Kontroll-Zeichen.
+ 
+Lars> Da gefaellt mir der zweite Vorschlag schon besser - du denkst an ein
+Lars> Gegenstueck zum set_connection_charset()?
+
+Sowas in der Art. Dann wird die Funktion halt manchmal mit einem String
+aufgerufen und manchmal mit einem einzelnen Zeichen.
+

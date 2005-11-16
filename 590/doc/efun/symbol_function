@@ -1,0 +1,30 @@
+SYNOPSIS
+        closure symbol_function(symbol arg)
+        closure symbol_function(string arg)
+        closure symbol_function(string arg, object|string ob)
+
+DESCRIPTION
+        Constructs a lfun closure, efun closure or operator closure
+        from the first arg (string or symbol). For lfuns, the second
+        arg is the object that the lfun belongs to, specified by
+        the object itself or by its name (the object will be loaded
+        in the second case)
+
+        If the closure is created for an lfun in an object other than
+        the current object, the result is an 'alien lfun closure'. Such
+        closures are bound to the object executing the symbol_function()
+        (this is what to_object() will return), even though the actual
+        code is in that other object (which get_type_info() will return).
+
+        Private lfuns can never be accessed this way, static and
+        protected lfuns only if <ob> is the current object.
+
+EXAMPLES
+        symbol_function("efun::users")          -> #'users
+        symbol_function("QueryProp", other_obj) -> other_obj->QueryProp()
+
+HISTORY
+        Introduced in 3.2@70
+
+SEE ALSO
+        lambda(E), quote(E)

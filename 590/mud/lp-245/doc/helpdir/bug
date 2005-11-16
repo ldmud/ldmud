@@ -1,0 +1,11 @@
+command: bug
+argument: a string
+
+Store a bug message. The game master will examine it.
+
+All bug messages are very welcome, so do not hesitate.
+
+If you are in a room created by a wizard, he will also get a copy of
+the message in a .rep file in /log.
+
+See also 'typo', 'idea'.

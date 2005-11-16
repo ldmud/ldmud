@@ -1,0 +1,17 @@
+command: any spell
+argument: optional name of a player
+
+Cast a spell. If no argument, then cast spell on current fighting opponent.
+
+Spell		level		Spell points	Max damage
+
+missile		5		10		2 x good
+shock		10		15		3 x good
+fireball	15		20		4 x good
+
+You have to have enough experience points to be able to use the spells,
+but then they will work 100 %.
+
+If you cast a spell on an idle player, a fight will start.
+
+See also 'kill'.
