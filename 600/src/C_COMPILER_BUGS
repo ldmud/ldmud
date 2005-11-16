@@ -1,0 +1,69 @@
+gcc 2.9, 3.2 - Cygwin
+  Highest optimization creates buggy code when the total size of local
+  variables gets too big (>= 8KBytes).
+
+gcc 3.0
+  Optimization option -funroll-all-loops seems to create buggy code.
+
+gcc 2.91.66 19990314/Linux (egcs-1.1.2) on Linux/x86:
+  Computing MIN_LONG % -1 causes a floating point exception.
+
+xlc on AIX 3.4:
+  Optimization level -O4 -qipa crashes in the code generation if a void
+  returning function is casted to a value returning one.
+
+egcs 2.91.66 on Linux 2.2.15 on Sun SparcStation4:
+  The optimizer neglects to reload CPU registers after a setjmp() in
+  complex functions (namely eval_instruction() in interpret.c). The
+  workaround is to put the setjmp()-recover branch into a separate function
+  and making sure that it can't be inlined (e.g. by calling it indirectly).
+
+gcc 2.8.1 on Solaris 5.7; egcs 2.91.16 on SunOS 4.1.3_U1, and probably
+others:
+  Compiling with optimization causes the compiler (not the assembler!) to
+  fall into catatonia for the configuration test for a float/branch
+  incompatibility. Workaround is to make sure that configure compiles this
+  test without optimization.
+
+gcc 2.9-beos-980929 on BeOS/x86:
+  Compiling without optimization causes the compiler to crash on simulate.c
+
+gcc 2.7.2.1-i486-linux on Linux 2.0.33:
+  Optimizing compiles may pessimize the expression
+    (svalue.type == x && svalue.x.closure_type == y)
+  to 'comparison is always zero' if both fields share the same longword
+  in memory (closure.c is one victim).
+  Makeshift solution: Assigning one of the fields to a local variable
+  causes the expression to produce the correct result.
+
+gcc 1.36 on Next / NextStep 2.1 with flags '-g' / '-g -fomit_frame_pointer' :
+  The calculated offset to a6 for parameter access in free_svalue() is wrong.
+  Symptom: mud crashes early.
+  Makeshift solution: use '-O -fomit-frame-pointer'
+
+gcc 2.2.2 , when told to optimize interpret.c , usually dies with a segv
+  or currupted internal data structures in cc1.
+
+gcc 2.3.3 , when told to optimize lex.c , will garble the code for #include.
+  Symptom: load_object will fail when #include is used, saying it can't
+  #include the file.
+
+gcc 2.x on 680x0 hardware: the large interpret.c switch table is built with
+  unsigned short words, but is processed like signed short words.
+  The special thing about 680x0 is that the switch in interpret.c is
+  shorter than 64 KB.
+  Symptoms: when LPC instructions are to be executed the code to which
+  lies beyond the first 32 KB of the switch(), there is weird behaviour,
+  a C-level illegal intruction or a crash with undetermined, although most
+  times quite short, latency.
+  Makeshift solution: fix the assembler code in interpret.s to handle
+  unsigned short offsets.
+
+NeXTStep 3.2 has a broken memcmp(), that will give different return values
+  depending on alignment.
+  The library that contained this broken memcmp() looks like this:
+    -r-xr-xr-x  1 root     1012100 Sep  1  1993 libsys_s.B.shlib*
+  quickfix: #define memcmp(a,b,l) (*(int*)(a) - *(int*)(b)) in closure.c and
+  prolang.y, or a file included by these.
+
+ULTRIX dec1 4.3 0 RISC needs <sys/types.h> to be included before <sys/stat.h>
