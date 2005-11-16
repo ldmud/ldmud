@@ -1,0 +1,60 @@
+Short: telnet-Options
+Type: Feature
+State: Unclassified
+From: Freaky <Freaky@UNItopia.rus.uni-stuttgart.de>
+Date: Wed, 16 Dec 1998 01:53:59 +0100
+X-Mailer: Mutt 0.95i
+
+Hi,
+
+Waere es in comm.c Zeile 77 nicht sinnvoller '#include <arpa/telnet.h>' zu
+verwenden?
+Eine Kopie irgendeines Telnet-Headerfiles mitzuliefern, ist wohl nicht die
+beste Idee...
+Weiterhin, wuerden dadurch auch wesentlich weniger 'Unknown telnet option'
+Fehlermeldungen kommen.
+
+Lars Duening:
+> > Waere es in comm.c Zeile 77 nicht sinnvoller '#include <arpa/telnet.h>' zu
+> > verwenden?
+>
+> Gekoppelt mit einem Test in configure, ob telnet.h auch wirklich dort zu
+> finden ist.
+>
+> Die Kopie des telnet.h koennte dann nach hosts/ wandern fuer die
+> Extremfaelle.
+
+Im UNItopia-Logfile taucht sowas dauernd auf:
+
+ Anzahl Fehlermeldung
+    726 Unknown telnet option Will 39
+    619 Unknown telnet option Will 36
+    564 Unknown telnet option Will 35
+    157 Unknown telnet option Do 200
+     76 Unknown telnet option Wont 35
+     74 Unknown telnet option Will 37
+     26 Unknown telnet option Will 38
+     26 Unknown telnet option Do 38
+     25 Unknown telnet option Dont 200
+      2 Unknown telnet option Wont 36
+      2 Unknown telnet option Wont 170
+
+Ciao
+		Freaky
+
+--
+Frank 'Freaky' Kirschner
+UNItopia Admin                          http://UNItopia.uni-stuttgart.de/
+Freaky@UNItopia.Uni-Stuttgart.DE      telnet://UNItopia.uni-stuttgart.de/
+
+
+Nur so eine Idee ;)
+
+Ciao
+		Freaky
+
+--
+Frank 'Freaky' Kirschner
+UNItopia Admin                          http://UNItopia.uni-stuttgart.de/
+Freaky@UNItopia.Uni-Stuttgart.DE      telnet://UNItopia.uni-stuttgart.de/
+

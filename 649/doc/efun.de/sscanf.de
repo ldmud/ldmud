@@ -1,0 +1,70 @@
+SYNOPSIS
+        int sscanf(string str, string fmt, mixed var1, mixed var2, ...);
+
+BESCHREIBUNG
+        Wertet einen String <str> unter Beruecksichtigung des Formats
+        <fmt>. <fmt> kann Strings beinhalten, die durch %d und %s getrennt
+        werden. Jedes %d und %s entspricht einer der Variablen <var1>,
+        <var2> etc.
+
+        Die Operatoren im Format-String <fmt> haben eines der folgenden
+        Formate:
+
+            %[!|~][<size>[, <minmatch>]]<type>
+
+        <type> kann folgendes sein:
+            d: meldet eine Zahl
+            D: meldet eine Zahl
+            U:
+            s: meldet ein Zeichen
+            %: meldet das %-Zeichen
+            t: meldet Whitespaces (also Leerschlaege und Tabulatoren),
+               speichert diese aber nicht.
+
+        <size> ist die erwartete Feldgroesse, <minmatch> die verlangte
+        minimale Laenge fuer einen Treffer (Standardwerte sind 0 fuer
+        Strings und 1 fuer Nummern). Sowohl <size> als auch <minmatch> kann
+        entweder numerisch oder mit '*' angegeben werden - im zweiten Fall
+        wird die gueltige Variable in der Liste der Argumente benutzt.
+
+        Wird ! angegeben, wird zwar die Suche durchgefuehrt, aber Treffer
+        werden weder gespeichert noch gezaehlt. Mit ~ als Argument wird
+        zwar die Suche durchgefuehrt und die Treffer gezaehlt, das Resultat
+        wird aber nicht gespeichert.
+
+        Wenn %s nicht am Ende von <fmt> steht, wird nur ein Treffer
+        registriert, wenn auch der nachfolgende String bzw. das
+        nachfolgende Format gefunden wird. Weiter unten gibt es dazu
+        ein Beispiel.
+
+        Der Unterschied zwischen %d und %D %U ist, dass letzteres ein
+        unmittelbar vorausgehendes %s so bald als moeglich abbricht,
+        waehrend ersteres zuerst versucht, einen moeglichst grossen Treffer
+        fuer %s zu erzielen. Trotzdem ueberspringt %D/%U keine Whitespaces,
+        dazu muss %.0t%D gesetzt werden.
+
+        Zurueck gegeben wird die Anzahl Treffer.
+
+        Die Funktion sscanf() ist insofern ein Spezialfall, als dass
+        Argumente automatisch nach Referenz uebergeben werden.
+
+BEISPIEL
+        string who, what;
+            if (sscanf("wirf frisbee zu rex",
+                "wirf %s zu %s", what, who) != 2)
+                write("Usage: Wirf <what> zu <who>\n");
+            else
+                write("Du wirfst einen "+what+" zu "+who+" um auf dich "
+                    "aufmerksam zu machen.\n");
+
+        sscanf("ab", "%s%s", who, what)
+            ==> liefert 2, who = "", what = "ab"
+
+        sscanf("ab", "%s %s", who, what)
+            ==> liefert 0, who = 0, what = 0
+
+        sscanf("ab ", "%s %s", who, what)
+            ==> liefert 2, who = "ab", what = ""
+
+SIEHE AUCH
+        extract(E), explode(E), regexp(E)

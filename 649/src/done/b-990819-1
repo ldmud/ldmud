@@ -1,0 +1,65 @@
+Short: Type checking malfunctions in 3.2.6
+From: Malcolm  Tester <MTester@cambric.com>
+To: "Lars Duening (E-mail)" <lars@bearnip.com>
+Date: Wed, 18 Aug 1999 13:54:53 -0600
+Type: Bug
+State: Done - Pilot error.
+
+Heya Lars,
+
+Woo, I guess today is my day to find problems.  I copied a file to
+/tmp/playernew.c if you want to look at it.  Basically, lines 215 and 216
+(for starters) give an error on loading for "Incorrect number of arguments".
+These two lines are prototype functions.  Their full functions also give
+that error.  The file uses #pragma strong_types, but it also gives that
+error without using pragma at all.
+
+Again, I uploaded it to Alatia (using 3.2.6), and it loaded fine with the
+pragma.
+
+To give you a quick view, line 215 is:
+int drink_alcohol(int strength);
+and 216 is:
+int drink_soft(int strength);
+
+and of course, the real fucntions look like:
+int
+drink_alcohol(int strength) {.......}
+etc.
+
+Regards,
+Malc
+
+Ok... I have a strange problem.  While cleaning up code in player.c, I've run
+across an error that just won't go away.  The error is "Incorrect number of
+arguments", and it occurs both on the prototype line of a functions, as
+well as
+the opening function line.  The simplest one looks like:
+
+int drink_alcohol(int strength);
+
+for the prototype.  I KNOW the code is right.  There are no problems in it,
+there are no previous declarations of the function, nothing.  But it just
+refuses to compile with that error.  Now for the really weird part.  The place
+I've been testing it is a test lib I use for development.  When I uploaded the
+file to the real mud, it compiled fine!  So then I started looking at the
+driver for errors.  Both muds are 3.2.6 (though it also occurs on later
+versions of the driver), both compiled using byacc (though I tried yacc too). 
+The test mud, I used both gcc 2.8.1 and gcc 2.7.2.3.  The real mud was
+compiled
+with gcc 2.7.2.1.  The only other difference I see that could make a
+difference
+is that the real mud was compiled on and runs under Free BSD, while the test
+mud is on Solaris 2.7.
+
+I'm completely bewildered at this point.  Anyone who's run across this before
+or knows a possible solution, it'd be welcome!
+
+Malc@Alatia
+
+---------- Analysis ----------
+
+The error message is correct: the player.c lfun drink_alcohol(int) tried
+to redefine the living/nutrition lfun drink_alcohol(int,int) (Alatia uses
+a modified TubMud lib). 3.2.6 shows the same behaviour.
+
