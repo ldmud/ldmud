@@ -1,0 +1,27 @@
+GESCHUETZT
+SYNOPSIS
+        string query_ip_number(object ob);
+        string query_ip_number(mixed & ob);
+
+BESCHREIBUNG
+        Liefert die IP-Nummer des Benutzers <ob> oder des aktuellen Benutzers,
+        wenn <ob> nicht angegeben wurde.
+
+        Wenn <ob> als Referenz angegeben wird (dann muss es ein gueltiges
+        Objekt sein), wird dieses bei der Ausgabe auf die struct sockaddr_in
+        gesetzt. struct sockaddr_in ist ein Integer-Array, mit einem Integer
+        pro Adressbyte:
+
+            ob[0 .. 1] : sin_family
+            ob[2 .. 3] : sin_port
+            ob[4 .. 7] : sin_addr
+            ob[8 ..15] : nicht definiert.
+
+AENDERUNGEN
+        Die Rueckgabe von struct sockaddr_in wurd in 3.2.1@81 eingefuehrt.
+
+ANMERKUNG
+        Diese Funktion ist geschuetzt und liefert deshalb immer "0.0.0.0".
+
+SIEHE AUCH
+        query_ip_name(E)

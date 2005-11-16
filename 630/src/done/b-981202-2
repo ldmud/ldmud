@@ -1,0 +1,23 @@
+Short: Crasher in regreplace()
+Date: 981202
+Type: Bug
+State: Fixed.
+
+Zora@PK-Mud tells you: pk ist grad gecrashed, wegen
+regreplace("acc", "a*", "yy",1).
+
+It crashes after several calls (90..100) in smalloc.c with
+a messed up stack, apparently trying to free memory which was
+never allocated. Using c-alloca() doesn't help.
+
+Compiling with SMALLOC_TRACE (and _LPC_TRACE) causes a
+fatal error on the second call:
+
+  remove_from_free_list: magic match failed
+
+at various places.
+
+Unreproducible under BeOS and SunOS.
+
+Reason: the reallocation-on-the-fly in f_regreplace() was
+triggered one byte too late.

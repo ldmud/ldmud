@@ -1,0 +1,47 @@
+SYNOPSIS
+        void replace_program();
+        void replace_program(string program);
+
+BESCHREIBUNG
+        Ersetzt ein Programm mit dem geerbten Programm (inherit) <program>.
+        Das Argument <program> kann weggelassen werden, wenn nur ein Programm
+        geerbt wird. In diesem Fall waehlt der Treiber automatisch dieses eine
+        geerbte Programm.
+
+        Diese Efun ist nuetzlich, wenn es um Leistung und Speicherverbrauch
+        des Treibers geht. Ein Programm, welches keine zusaetzlichen Variablen
+        oder Funktionen braucht (ausser waehrend der Erstellung), kann
+        replace_program() aufrufen, um die Trefferquote des Treibers auf den
+        Funktionen-Caches zu erhoehen. Dies verringert die Anzahl Programme
+        im System.
+
+        Raeume sind ein gutes Beispiel fuer die Anwendung dieser Funktion, da
+        viele Raeume nur aus einem Inherit und einer Konfigurationsfunktion
+        bestehen. Jedes Objekt kann replace_program() aufrufen, verliert dabei
+        jedoch alle Variablen und Funktionen, die nicht im geerbten Programm
+        definiert sind.
+
+        Wenn replace_program() angewendet wird, werden Shadows vom Objekt
+        entfernt, in dem replace_program() stattfindet. Dies ist so seit
+        3.2@166.
+
+        Es ist nicht moeglich, replace_program() aufzurufen, wenn es an das
+        Objekt gebundene (Lambda-) Closures gibt. Hingegen ist es moeglich,
+        zuerst das Programm des Objekts zu ersetzen und dann Lambdaclosures
+        daran zu binden.
+
+        Das Ersetzen des Programms findet erst statt, wenn das Objekt
+        vollstaendig abgearbeitet wurde, nicht schon beim Aufruf der Funktion
+        replace_program(). Das kann dazu fuehren, dass Closures auf inzwischen
+        verschwundene Lfuns des Objekts referenzieren. Das stellt allerdings
+        kein Problem dar, solange diese Referenzen nicht ausgefuehrt werden.
+
+BUGS
+        Wenn ein ersetzendes Programm virtuell geerbte Variablen enthaelt,
+        muss dieses Programm als erstes geerbt werden. Ohne diese
+        Einschraenkung ueberleben die falschen Variablen den
+        Ersetzungsprozess.
+
+AENDERUNGEN
+        LDMud 3.2.9 liess zu, dass das Argument <program> weggelassen wird,
+        wenn nur ein Inherit existiert.

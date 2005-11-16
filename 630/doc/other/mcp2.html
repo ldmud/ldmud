@@ -1,0 +1,1158 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<HTML>
+<HEAD>
+<LINK REV=MADE HREF="mailto:mcp-dev@research.att.com"> 
+<TITLE>MCP 2.1</TITLE>
+</HEAD>
+<BODY>
+<P><STRONG>NOTE</STRONG>: <EM>The MCP 2.1 Specification has moved to
+<A HREF="http://www.moo.mud.org/mcp/">http://www.moo.mud.org/mcp/</A>.
+This copy is maintained for archival purposes only and may be removed
+or out-of-date.</EM> </P>
+
+<P><EM>See also the
+<A HREF="http://www.research.att.com/~davek/mcp-dev/">mailing list
+archive</A>, the
+<A HREF="http://jhm.ccs.neu.edu:7043/help/subject!mcp">MCP 1.0 spec at
+JHM</A>, and
+<A HREF="http://www.research.att.com/~davek/mcp-slides.ppt">Dave's
+powerpoint slides from a talk on MCP</A> (or the <A HREF="http://www.research.att.com/~davek/mcp-slides/">HTML version of
+those slides</A>) for background information
+about this specification.</EM></P>
+
+<H1>The MUD Client Protocol, Version 2.1</H1>
+
+<H2>Contents</H2>
+<OL>
+<LI><A HREF="#intro">Introduction</A><BR>
+<OL>
+  <LI><A HREF="#motivation">Motivation and goals</A>
+  <LI><A HREF="#terms">Terms and concepts</A>
+  <LI><A HREF="#historical">A historical note on versions</A>
+  <LI><A HREF="#overview">An overview of this specification</A>
+  <LI><A HREF="#model">A model for an MCP implementation</A>
+</OL>
+<LI><A HREF="#msgspecintro">MCP Message Specification</A><BR>
+<OL>
+  <LI><A HREF="#netlintran">Network line translation</A>
+  <LI><A HREF="#msgfmt">Message format</A>
+  <LI><A HREF="#errors">Error handling</A>
+  <LI><A HREF="#startup">Startup sequence</A>
+  <LI><A HREF="#packages">Packages</A>
+</OL>
+<LI><A HREF="#stdpkg">Standard packages</A><BR>
+<OL>
+  <LI><A HREF="#mcpnegot"><SAMP>mcp-negotiate</SAMP></A>
+  <LI><A HREF="#cords"><SAMP>mcp-cord</SAMP></A>
+</OL>
+<LI TYPE="A" VALUE=1><A HREF="#appendix">Appendix: BNF Grammar</A>
+</OL>
+
+<H2><A NAME="intro">1. Introduction</A></H2>
+<P>Advances in MUD server design, particularly the development of
+in-server programming languages, coupled with the replacement of
+terminals and telnet sessions by personal computers and customized
+(and frequently user-programmable) clients have given rise to a demand
+for MUD-based applications which make use of modern client
+capabilities such as windowing systems, local file storage, and richer
+text display.  At the same time, many MUD servers have retained the
+model of a single 7-bit ASCII channel per client, constraining the
+application author's ability to design protocols.</P>
+
+<P>The MUD Client Protocol (MCP) defines a simple and standard message
+format for the protocols used in constructing these applications.  It
+is designed to be readily distinguished from the normal stream of MUD
+output and user commands and easily parsed.</P>
+
+<H2><A NAME="motivation">1.1 Motivation and Goals</A></H2>
+<P>MCP is an attempt to provide a standard message format on which to build
+MUD-based client-server applications.  As described above, many MUDs
+place restrictions on the user's I/O channel.  Given these, a survey
+of MCP's goals is in order:</P>
+<UL>
+<LI>MCP is simple and open-ended.  Rather than attempting to define
+the messages which implement applications built on MCP, it defines the
+format these messages should follow, and leaves the details of protocol
+message design to application authors.
+<LI>It is expressed in 7-bit ASCII, permitting it to be carried over
+channels with restricted character sets.
+<LI>Its messages have a distinctive format; they may be carried on
+the same channel with, and readily recognized and removed from, the
+stream of "in-band" MUD commands and output.
+<LI>MCP makes only minimal distinctions between clients and servers.
+In this respect, it is applicable both to traditional client-server
+communications and to server-to-server communications.
+<LI>MCP has little notion of state; instead, maintenance of state
+beyond the existence of a MCP-capable connection between the server
+and client is assumed to be the job of application-specific protocols.
+</UL>
+
+<H2><A NAME="terms">1.2 Terms and concepts</A></H2>
+<P>Much of MCP is described in terms which require some understanding
+of the typical MUD architecture (that is, a central server reflecting
+messages among, and generating messages to, multiple clients).  For
+the reader who is unfamiliar with MUDs, the terms used may be somewhat
+unclear.  This section attempts to document some of the terms used in
+this specification.</P>
+
+<DL>
+<DT> MUD
+<DD> A generic term for a networked, shared virtual environment.
+
+<DT> Server
+<DD> The MUD "world".
+A network service which implements the MUD's shared space.
+
+<DT> Client
+<DD> A program used to connect to a MUD server.
+
+<DT> Connection Endpoint
+<DD> Since, for most part, MCP is peer-to-peer and has no built-in
+concept of "client" or "server",
+we use <EM>connection endpoint</EM> to refer to either a 
+client or a server.  
+
+Likewise "implementations" should be taken to mean
+either client or server implementations of MCP.
+Where clients and servers need to behave distinctly, the specification
+will refer to "clients" or "servers" specifically.
+
+<DT> Session
+<DD> A <EM>session</EM> is a bidirectional stream of
+<EM>network lines</EM>.
+MCP requires that each direction of this stream guarantee ordered,
+reliable message delivery, but there need not be synchronization
+between the two directions.
+The standard implementation of a session is a TCP connection;
+however, any protocol which meets the session requirements may be used.
+
+The term "session" is also used to refer to the
+bidirectional stream of MCP <EM>messages</EM>
+derivable from a given stream of network lines.
+
+<DT> Network Lines
+<DD> A <EM>network line</EM> consists of a sequence of (ASCII) bytes
+terminated by a network newline.  MCP does not impose a line-length
+restriction, and the definition of "network newline" depends on
+the
+network over which MCP is carried (and consequently is not specified
+here).  A connection endpoint receiving a network line must
+interpret the line as an <EM>in-band</EM> or <EM>out-of-band</EM>
+line.
+
+<DT> In-band lines
+<DD>
+<EM>In-band</EM> lines are those that are to be processed by a
+connection endpoint in the default manner, e.g., being interpreted as
+ordinary (MUD) command input by a server or being immediately
+displayed to a user by a client in its default window.
+
+MCP places no restriction on the form/contents of in-band data apart
+from their division into lines and the quoting requirements
+described <a href="#netlintran">below</a>.
+
+All network lines not beginning with the literal string <SAMP>#$#</SAMP>
+are interpreted as in-band lines.
+
+<DT> Out-of-band lines, message lines
+<DD>
+<EM>Out-of-band</EM> lines are those that are to be processed in some
+non-default manner, e.g., lines sent to a client that are directed at
+some specific client facility, or lines sent to a server that are not
+part of the main command stream.
+
+MCP is a standard for the format/transmission of these out-of-band
+lines.
+Out-of-band lines are also referred to as MCP <EM>message lines</EM>.
+
+All network lines beginning with the literal string
+<SAMP>#$#</SAMP> are interpreted as out-of-band lines.
+
+<DT> Messages
+<DD> An MCP <EM>message</EM> is a structured entity consisting of a
+<EM>message name</EM> identifying the class (kind) of the message
+(usually indicating an action to be taken),
+an <EM>authentication key</EM>, and 
+a keyword-to-value mapping that comprises the <EM>arguments</EM> 
+of the message.
+
+How a given MCP message is formatted as a sequence of out-of-band
+lines is described <a href="#msgfmt">below</a>.
+
+The term "message" can refer to the entire class of
+messages having a given message name as well as to particular
+instances of that class.
+
+<DT> Packages
+<DD> MCP <EM>packages</EM> (or <EM>protocols</EM>) are suites of
+MCP messages (i.e., message classes) used to implement an application.
+Typical packages include the MCP version negotiation and cords
+packages, which are described later in this document.
+</DL>
+
+<H2><A NAME="historical">1.3 A historical note on versions</A></H2>
+<P>This document describes version 2.1 of MCP; version 1.0 is
+described in the form of
+<A HREF="http://jhm.ccs.neu.edu:7043/help/subject!mcp">online help at
+JHM</A> (<KBD>telnet://jhm.ccs.neu.edu:1709</KBD>), and written by
+Erik Ostrom, Dave Van Buren, Pavel Curtis, David Nichols, and Jay
+Carlson.  A number of implementations revised and
+extended this specification, and some of those implementations
+advertised themselves as version 2.0.  This specification includes
+features from some of those existing systems.  Because, however, there
+are significant departures from these implementations, it was decided
+to number this specification 2.1 to avoid conflicts. </P>
+
+<H2><A NAME="overview">1.4 An overview of this specification</A></H2>
+<P>MCP 2.1 consists of a number of cooperating parts.  Some of the
+parts specified here are required for any compliant MCP 2.1
+implementation.  Others are optional; however, implementations are
+<EM>strongly</EM> encouraged to implement the optional parts of MCP
+2.1.  Experience has shown that these optional components are extremely
+useful.  The components covered by this specification and their status
+(required or optional) are:</P>
+
+<UL>
+<LI><A HREF="#netlintran">Network Line Translation</A>: <EM>required</EM>
+<LI>MCP Message format
+  <UL>
+  <LI><A HREF="#msgfmt">Simple Message format</A>: <EM>required</EM>
+  <LI><A HREF="#multiline">Multiline message format</A>: <EM>optional</EM>
+  </UL>
+<LI><A HREF="#errors">Error Handling</A>: <EM>required</EM>
+<LI><A HREF="#startup">Startup sequence</A>
+  <UL>
+  <LI><A HREF="#mcpmsg">The <SAMP>mcp</SAMP> message</A>: <EM>required</EM>
+  <LI><A HREF="#versioning">The versioning algorithm</A>: <EM>required</EM>
+  </UL>
+<LI><A HREF="#packages">Packages</A>: <EM>required (implementations
+must comply with naming standards)</EM>
+<LI> <A HREF="#stdpkg">Standard Packages</A>
+  <UL>
+  <LI><A HREF="#mcpnegot">The <SAMP>mcp-negotiate</SAMP> package</A>:
+       <EM>required</EM>
+  <LI><A HREF="#cords">The <SAMP>mcp-cord</SAMP> Package</A>:
+       <EM>optional</EM>
+    <UL>
+    <LI><A HREF="#cordmsg">Cord-related MCP messages</A>:
+      <EM>required</EM> for cord implementations
+    </UL>
+  </UL>
+</UL>
+<P>
+Implementations which choose not to implement the optional parts of
+this specification <EM>must not</EM> provide features which conflict
+with the optional parts.  In particular, implementations which choose
+not to implement cords or multiline messages are forbidden from using
+the following messages in other packages: <SAMP>#$#*</SAMP>,
+<SAMP>#$#:</SAMP>, <SAMP>#$#mcp-cord-open</SAMP>, <SAMP>#$#mcp-cord</SAMP>,
+and <SAMP>#$#mcp-cord-closed</SAMP>.  Implementations which do not
+implement multilines should treat a parameter with an asterisk at the
+end of its name as an error.
+</P>
+
+<H2><A NAME="model">1.5 A Model for an MCP Implementation</A></H2>
+<P>MCP is intended to solve the problem of identifying and routing
+out-of-band information in a single network stream.  This suggests a
+model for implementations to follow consisting of three active
+components and four data flows, reflected on either end of the network
+stream.  A graphic view of this model is shown here: </P>
+<HR>
+<P>
+<IMG SRC="flows.gif" ALT="MCP data flow diagram">
+</P>
+<HR>
+<P>Network lines are transmitted between <EM>network translation</EM>
+layers, which identify the lines as either <EM>in-band</EM> lines
+(which, modulo quoting, are exchanged directly between the MUD client
+and server and the network), or <EM>out-of-band</EM> lines.
+Out-of-band lines are handled by an MCP parser, which turns them into
+messages to be handled by the client or server.</P>
+
+<P>This specification is primarily concerned with the details of
+messages entering and leaving the MCP parser.  The job of the network
+line translation layer will be dealt with briefly, followed by the
+details of parsing an MCP message.  Finally, the specification
+presents the details of version negotiation and presents a typical MCP
+<EM>package</EM>, a protocol built on MCP.</P>
+
+<H2><A NAME="msgspecintro">2. MCP Message Specification</A></H2>
+
+<H2><A NAME="netlintran">2.1 Network Line Translation</A></H2>
+
+<P>MCP implementations require a translation layer between their
+message-handling system (which processes out-of-band message lines)
+and the network to which the system is attached.  The job of this
+translation layer is to translate <EM>network lines</EM> into
+<EM>in-band lines</EM> and <EM>out-of-band lines</EM>, and route
+these lines appropriately.</P>
+
+<P>When receiving a network line, the translation layer should
+apply the following rules:</P>
+<UL>
+<LI>A received network line that begins with the characters
+<SAMP>#$#</SAMP> is translated to an out-of-band (MCP message) line
+consisting of exactly the same characters.
+<LI>A received network line that begins with the characters
+<SAMP>#$"</SAMP> must be translated to an in-band line consisting of
+the network line with the prefix <SAMP>#$"</SAMP> removed.  This
+method is used to quote lines beginning with <SAMP>#$#</SAMP> or
+<SAMP>#$"</SAMP>.  For example, the network line:
+<PRE>
+    #$"#$#this isn't: really an: "out-of-band message"
+</PRE>
+must be translated to:
+<PRE>
+    #$#this isn't: really an: "out-of-band message"
+</PRE>
+and treated as an in-band line by the implementing MUD or client.
+<LI>Any other received network line translates to an in-band line
+consisting of exactly the same characters.
+</UL>
+
+<P>When sending lines to the network, the translation layer should
+apply the following rules:</P>
+<UL>
+<LI>Every in-band line to be sent must be quoted before sending by
+prefixing it with the string <SAMP>#$"</SAMP>, if the line begins
+with either the characters <SAMP>#$#</SAMP> or the characters
+<SAMP>#$"</SAMP>.
+<LI>In-band lines which do <EM>not</EM> begin with the strings
+mentioned above, as well as all out-of-band messages, require no
+quoting.
+</UL>
+
+<H2><A NAME="msgfmt">2.2 Message Format</A></H2>
+<HR>
+<PRE>
+&lt;message&gt; ::= &lt;message-start&gt;
+           | &lt;message-continue&gt;
+           | &lt;message-end&gt;
+&lt;message-start&gt; ::= &lt;message-name&gt; &lt;space&gt; &lt;auth-key&gt; &lt;keyvals&gt;
+</PRE>
+<HR>
+<P>An MCP message consists of three parts: the name of the message, the
+authentication key, and a set of keywords and their associated values.
+The message name indicates what action is to be performed; if the
+given message name is unknown, the message should be ignored.  The
+authentication key is generated at the beginning of the session; if it
+is incorrect, the message should be ignored.  The keyword-value pairs
+specify the arguments to the message.  These arguments may occur in
+any order, and the ordering of the arguments does not affect the
+semantics of the message.  There is no limit on the number of
+keyword-value pairs which may appear in a message, or on the lengths
+of message names, keywords, or values.</P>
+
+<H3><A NAME="keywrd">2.2.1 Keywords</A></H3>
+<HR>
+<PRE>
+&lt;keyvals&gt; ::= '' |  &lt;space&gt; &lt;keyval&gt; &lt;keyvals&gt;
+&lt;keyval&gt; ::= &lt;key&gt; ':' &lt;space&gt; &lt;value&gt;
+&lt;key&gt; ::= &lt;simple-key&gt; | &lt;multiline-key&gt;
+&lt;simple-key&gt; ::= &lt;ident&gt; 
+&lt;multiline-key&gt; ::= &lt;ident&gt; '*'
+</PRE>
+<HR>
+<P>Each argument to a message is named by a <EM>keyword</EM>.  The
+keyword consists of an identifier (a string matching the
+<KBD>&lt;ident&gt;</KBD> nonterminal), optionally followed by an
+asterisk; if the asterisk is present, the value to follow is a
+multiline value.  If no asterisk is present, the value is simple.
+Messages may contain a mixture of simple and multiline values.</P>
+
+<P>Implementations should never send a simple message with duplicate
+argument keywords on the same line; for example, the message</P>
+<PRE>
+    #$#say 12345 what: "Hi there!" WHAT: "Hey there..." from: Biff to: Betty
+</PRE>
+<P>should not be generated, and should be dropped as an error if received.</P>
+
+<H3><A NAME="simpval">2.2.2 Simple values</A></H3>
+<HR>
+<PRE>
+&lt;value&gt; ::= &lt;unquoted-string&gt; | &lt;quoted-string&gt;
+</PRE>
+<HR>
+<P>The <EM>value</EM> associated with a keyword may be either
+<EM>simple</EM> or <EM>multiline</EM>.  A simple value is an
+<KBD>&lt;unquoted-string&gt</KBD> or <KBD>&lt;quoted-string&gt;</KBD>
+supplied entirely in the same MCP message line as its keyword, and
+separated from the keyword by a colon and one or more spaces.  Every
+keyword has an associated simple value, even if the keyword names a
+multiline value.</P>
+
+<P>For example, the message</P>
+<PRE>
+    #$#say 12345 what: "Hi there!" from: Biff to: Betty
+</PRE>
+<P>contains 3 keyword-value pairs, all with simple values.  The message
+name is <SAMP>say</SAMP>, and the authentication key is
+<SAMP>12345</SAMP>.  The keywords are <SAMP>what</SAMP>, <SAMP>from</SAMP>,
+and <SAMP>to</SAMP>; the values associated with these keywords are
+<SAMP>Hi there!</SAMP>, <SAMP>Biff</SAMP> and <SAMP>Betty</SAMP>
+respectively.</P>
+
+<P>Simple values containing no spaces, quotation marks, backslashes,
+colons, or asterisks (in other words, those values matching the
+<KBD>&lt;unquoted-string&gt;</KBD> nonterminal in the grammar given in
+the <A HREF="#appendix">appendix</A>) may be sent without quoting;
+other values (for example, those that contain spaces) must be quoted
+as strings.  However, values have no inherent type.  The values
+<SAMP>3</SAMP> and <SAMP>"3"</SAMP> are equivalent.  It is up to the
+handler for a given message to determine whether the value is to be
+treated as a number or as a string.</P>
+
+<P>Message names and keywords are case-insensitive.  The message name
+<SAMP>mcp-negotiate-can</SAMP> is exactly equivalent to the message name
+<SAMP>MCP-Negotiate-Can</SAMP>, and the argument keyword
+<SAMP>what:</SAMP> is identical to <SAMP>WHAT:</SAMP>.  Authentication
+keys <EM>are</EM> case sensitive, however, and implementations must
+preserve the case of argument values.</P>
+
+<H3><A NAME="multiline">2.2.3 Multiline values</A></H3>
+<HR>
+<PRE>
+&lt;message-continue&gt; ::= '*' &lt;space&gt; &lt;datatag&gt; &lt;space&gt; &lt;simple-key&gt; ':' ' ' &lt;line&gt;
+&lt;message-end&gt; ::= ':' &lt;space&gt; &lt;datatag&gt;
+&lt;datatag&gt; ::= &lt;unquoted-string&gt;
+&lt;line&gt; ::= &lt;string-char&gt;*
+</PRE>
+<HR>
+<P>A <EM>multiline</EM> value is one which is spread over a series of
+MCP message lines; these values are frequently used to represent
+blocks of data conveniently represented as lists; for example, the
+source code to a program, or a block of text lines.</P>
+
+<P>Compliant MCP 2.1 implementations are <EM>not</EM> required to
+implement multiline values if they are not necessary to the
+application for which the implementation is to be used.  Specifically,
+if an implementation is designed to support a fixed set of packages,
+none of which use multiline values, there is no need to provide
+support for multilines.  If, however, the implementation may at some
+point be extended to provide support for packages beyond those it was
+originally designed to support, implementation of multilines is
+encouraged.</P>
+
+<P>If there is an asterisk after the keyword in a keyword-value pair,
+the value is multiline.  Although a simple value is required
+syntactically, it will be ignored. (Typically the empty string,
+<SAMP>""</SAMP>, is used.)</P>
+
+<P>The real value is sent as a series of lines after the first one (hence
+the name).  These lines <EM>need not</EM> be consecutive; they may be
+interspersed with other text, including other MCP messages, and lines
+from different multiline values in the same message may be
+interspersed.  However, the lines within each value must be sent in
+order.  There is no limit on the number of lines in a multiline value.</P>
+
+<P>If there are any multiline values, the message must include a keyword
+named <SAMP>_data-tag</SAMP>.  This, in combination with the value's keyword,
+will be used to flag subsequent lines.  Data tags are case-sensitive
+(implementations must not vary the case of any alphabetic characters
+in the tag between the <SAMP>_data-tag</SAMP> argument and the
+multiline value, or within the multiline value itself), and may be any
+string of characters matching the <KBD>&lt;unquoted-string&gt;</KBD>
+nonterminal in the MCP grammar.</P>
+
+<P>The values of multiline arguments are supplied in
+<EM>continuation</EM> messages, which begin with the literal string
+<SAMP>#$#*</SAMP>.  While these messages have a syntax similar to
+typical MCP messages, they have some peculiarities:</P>
+
+<UL>
+<LI>The value supplied in the <SAMP>_data-tag</SAMP> argument is used
+in place of the authentication key.
+<LI>Each continuation message has only one keyword-value pair,
+which supplies a portion of the multiline value for the keyword;
+everything after the keyword is considered part of the value, and
+should not be parsed for additional keywords or quoting.
+</UL>
+
+<P>Once all value lines have been sent for all multiline values in the
+message, the implementation sends the <EM>message-end</EM> message:
+the literal string <SAMP>#$#:</SAMP> followed by the data tag.</P>
+
+<P>Here is an example of a message with a multiline value: </P>
+<PRE>
+    #$#spam 12345 from: Biff text*: "" _data-tag: 9b76
+    #$#* 9b76 text: This is some sample text.
+    #$#* 9b76 text: 
+    #$#* 9b76 text: Note that you don't need to quote strings
+    #$#* 9b76 text: in multiline data.  Also, you can include "special"
+    #$#* 9b76 text: characters like quotes.  Everything after the
+    #$#* 9b76 text: space after the keyword and colon is considered
+    #$#* 9b76 text: part of the value.
+    #$#* 9b76 text:     This means that spaces can also be part of the value.
+    #$#: 9b76 
+</PRE>
+
+<P>Multiline values lack authentication keys; the data tags are
+roughly as secure as the authentication key argument on regular
+MCP messages (that is, not very), and their lifetime is only the
+length of a multiline message.  For this reason, however,
+implementations should use some care in the choice of multiline value
+data tags (specifically, the same care taken in selecting
+authentication keys.  See the <A HREF="#authkeys">authentication
+keys</A> for some guidelines), and should ignore messages for which no
+matching <SAMP>_data-tag</SAMP> argument has been seen.</P>
+
+<P>Moreover, implementations must ensure that data tags are unique
+over their lifetimes; that is, an implementation must not generate a
+new tag matching a previously-generated tag before the
+<EM>message-end</EM> message for that tag has been sent.</P>
+
+<P>Multiline values are generally used to represent lists of items;
+for example, lines of code or quoted text.  Implementations should
+preserve the line divisions implicit in multiline messages so that
+package implementations may make use of this information.</P>
+
+<H2><A NAME="errors">2.3 Error Handling</A></H2>
+<P>In general, MCP implementations should be as unobtrusive as possible.
+If an unrecognized or mangled MCP request is received, the
+implementation should either silently drop it on the floor, or notify
+the user in some reasonably unobtrusive way.  Similarly, applications
+should be prepared to handle (by ignoring) unexpected
+additional arguments on messages.  "Mangled" messages here include
+multiline value messages for which a <EM>message-end</EM> message has
+already been seen, or with a keyword whose initial occurrence (in the
+message having the <SAMP>_data-tag</SAMP> argument) was not followed
+by an asterisk.  Implementations may (and are encouraged to) provide
+debugging modes which are more verbose than the default silent mode
+specified here.</P>
+
+<H2><A NAME="startup">2.4 Startup Sequence</A></H2>
+<P>In initializing MCP communications, the server and client negotiate
+version and package support.  The negotiation makes use of 2
+messages: <SAMP>mcp</SAMP> and <SAMP>mcp-negotiate-can</SAMP>.  The
+former message is sent at the beginning of the session; it must
+precede ALL other MCP communication.  The latter message is used to
+indicate support for MCP packages.</P>
+
+<H3><A NAME="mcpmsg">2.4.1 The <SAMP>mcp</SAMP> message</A></H3>
+
+<P>The <SAMP>mcp</SAMP> message should be the first message sent by
+the recipient of a connection (usually a MUD server) when a connection
+initiator (usually a client) connects or reconnects.  It
+indicates that the server is capable of supporting MCP and the MCP
+versions supported.  The message has two arguments:
+<VAR>version</VAR> indicates the minimum protocol version
+supported by the server and <VAR>to</VAR> indicates the
+maximum protocol version supported by the server.  In both cases, the
+argument value is in the form <VAR>major</VAR>.<VAR>minor</VAR>, where
+<VAR>major</VAR> and <VAR>minor</VAR> should be read as unsigned
+integers with no leading zeroes. Both arguments are required.  Note
+that MCP 1.0 also supported version advertisement, but not of a range
+of versions; the names of the arguments for the <SAMP>mcp</SAMP>
+message were chosen to allow version handshake between version 2.1 and
+1.0 implementations (which will simply discard the <SAMP>to</SAMP>
+argument and decide whether to use MCP based on the
+<SAMP>version</SAMP> argument).</P>
+
+<P>When a client disconnects from, or reconnects to the server, all
+stored MCP information about the client should be reset, and a new
+<SAMP>mcp</SAMP> message sent.</P>
+
+<P>Example:</P>
+<PRE>
+    #$#mcp version: 2.1 to: 2.1
+</PRE>
+<P>This message indicates the server supports MCP, version 2.1 only.</P>
+
+<H4>2.4.1.1 A note on version ranges</H4>
+<P>In this and all version ranges, advertising a range of versions
+indicates that <EM>all</EM> versions in the range are supported.  For
+example, a server sending an <SAMP>mcp</SAMP> message with the
+<SAMP>version</SAMP> parameter set to <SAMP>1.0</SAMP> and a
+<SAMP>to</SAMP> of <SAMP>2.1</SAMP> <EM>must</EM> support MCP
+version <SAMP>1.5</SAMP> if such a version existed; (it doesn't; the
+only released versions of the MCP specification have versions 1.0 and
+2.1; see the historical note in the introduction for more information
+about implemented versions).  If there is any doubt about whether an
+intermediate version exists or is supported, an implementation should
+advertise a range including only those versions <EM>known</EM> to be
+supported.</P>
+
+<P>On receipt of the <SAMP>mcp</SAMP> message, the client sends an
+<SAMP>mcp</SAMP> message in reply, with slightly different arguments
+(the client should <EM>not</EM> attempt to send any MCP message to the
+server, including the <SAMP>mcp</SAMP> message itself, until after an
+<SAMP>mcp</SAMP> message has been received from the server).  The
+message from client to server has 3 arguments:
+<VAR>authentication-key</VAR>, a string to be used as a key on later
+messages, and <VAR>version</VAR> and <VAR>to</VAR>, which
+are defined as above.  All three arguments are required.</P>
+
+<H3><A NAME="authkeys">2.4.2 Authentication keys</A></H3>
+<P>The <VAR>authentication-key</VAR> argument value is a string which
+is to be stored as a secret on the server and used to tag any further
+messages from the server to the client.  While the level of security
+provided by this scheme is minimal (especially since the
+authentication key will be repeatedly transferred across the wire in
+cleartext), it provides a simple and fairly basic protection against
+"spoofed" MCP messages.  Once the authentication key has been chosen,
+it is used as the <VAR>authentication-key</VAR> argument on all
+subsequent messages.  Implementations should reject any message
+containing a key which does not match their stored copy.  The only
+messages which may be transmitted without an
+<VAR>authentication-key</VAR> argument are the initial
+<SAMP>mcp</SAMP> message and the <SAMP>mcp</SAMP> message which sets
+the authentication key.</P>
+
+<P>Example:</P>
+<PRE>
+    #$#mcp authentication-key: 18972163558 version: 1.0 to: 2.1
+</PRE>
+<P>This message indicates that the client supports MCP, versions 1.0
+through 2.1, and indicates that the authentication key for the session
+is 18972163558.  Note that while this particular key is composed
+entirely of digits, the <VAR>authentication-key</VAR> argument need
+not be numeric, and may be any value which matches the syntax of an
+<KBD>&lt;unquoted-string&gt;</KBD>.</P>
+
+<P>In choosing an authentication key, the client should take care to
+ensure that the key is not easily guessed, as possession of the
+authentication key (along with the ability to send lines of text to
+the implementation, an ability possessed by all users on some MUDs)
+permits the spoofing of MCP messages.  In most cases, a spoofed
+message should be an annoyance at worst.  However, it is easy to
+envision packages based upon MCP in which a spoofed message could be
+disastrous.</P>
+
+<H3><A NAME="versioning">2.4.3 Versioning Algorithm</A></H3>
+<P>Each side of the connection, once it knows the MCP version range
+supported by the other, should compare the protocol versions supported
+by the implementation and the other side; if the supported ranges
+overlap, the highest version from that overlap should be used.  If
+there is no overlap, the implementations cannot communicate using MCP.
+Algorithmically:</P>
+<HR>
+<P>
+<B>function</B> <I>mcp-version</I>(<VAR>client-min</VAR>,
+<VAR>client-max</VAR>, <VAR>server-min</VAR>,
+<VAR>server-max</VAR>)<BR>
+</P>
+<OL>
+<LI><B>if</B>(<VAR>client-max</VAR> &gt;= <VAR>server-min</VAR>
+<B>and</B> <VAR>server-max</VAR> &gt;= <VAR>client-min</VAR>) <B>then</B>
+<OL>
+<LI><B>return</B> <I>min</I>(<VAR>server-max</VAR>, <VAR>client-max</VAR>)
+</OL>
+<LI><B>else</B>
+<OL>
+<LI><B>return</B> <SAMP>NONE</SAMP>
+</OL>
+</OL>
+<HR>
+<P>Where <VAR>client-min</VAR>, <VAR>client-max</VAR>,
+<VAR>server-min</VAR>, and <VAR>server-max</VAR> are the minimum and
+maximum versions from the client and server <SAMP>mcp</SAMP> messages.
+Version numbers are compared for magnitude by comparing first the
+major, then the minor part:</P>
+<HR>
+<P>
+<B>function</B> <I>version-geq</I>(<VAR>v1</VAR>, <VAR>v2</VAR>)
+</P>
+<OL>
+<LI><B>if</B>(<VAR>v1.major</VAR> &gt; <VAR>v2.major</VAR>) <B>then</B>
+<OL>
+<LI><B>return</B> <SAMP>TRUE</SAMP>
+</OL>
+<LI><B>else if</B>(<VAR>v1.major</VAR> = <VAR>v2.major</VAR> <B>and</B> <VAR>v1.minor</VAR> &gt;= <VAR>v2.minor</VAR>) <B>then</B>
+<OL>
+<LI><B>return</B> <SAMP>TRUE</SAMP>
+</OL>
+<LI><B>else</B>
+<OL>
+<LI><B>return</B> <SAMP>FALSE</SAMP>
+</OL>
+</OL>
+<HR>
+
+<P>Once a version has been negotiated (and not before), both sides may
+send other MCP messages.  The client may proceed as soon it sends its
+<SAMP>mcp</SAMP> message, since it has already received the server's
+<SAMP>mcp</SAMP> message.  The server must wait to send any other MCP
+messages until an <SAMP>mcp</SAMP> message is received from the
+client.  </P>
+
+<H2><A NAME="packages">2.5 Packages</A></H2>
+
+<P>MCP groups messages into <EM>packages</EM>.  A package is simply a
+group of messages with a name and version.  Generally, a package will
+be used to implement a particular application: for example,
+client-local editing of server text.  A package name is a
+hyphen-separated sequence of valid MCP identifiers.  While this name
+is interpreted hierarchically with the leftmost identifier being the
+most significant, the administration of package naming is, with the
+exception of the rules below, currently <EM>unspecified</EM>.
+As such, package designers must exercise caution in choosing package
+names so as not to conflict with existing packages (especially for
+common names, such as <SAMP>edit</SAMP>, for which a number of
+conflicting implementations can be imagined.)  To alleviate this
+problem, some rules and suggestions apply to package and message
+names:</P>
+
+<UL>
+<LI>MCP messages in a package should be created by prefixing the
+package name to the message; for example, the <SAMP>send</SAMP>
+message in the (hypothetical) <SAMP>mcp-edit</SAMP> package is
+<SAMP>mcp-edit-send</SAMP>.  The null message is permissible here:
+<SAMP>mcp-edit</SAMP> may also be a message in the
+<SAMP>mcp-edit</SAMP> package.
+<LI>Package names beginning with the identifier <SAMP>mcp</SAMP> are
+reserved for packages required or recommended in this and future
+versions of the MCP specification.
+<LI>Package names beginning with the string 'dns', followed by a
+valid DNS name, reversed and having periods replaced by dashes, are
+reserved for use by the organization controlling the DNS name.  These
+organizations are free to further subdivide this namespace: package
+names beginning with the string <SAMP>dns-com-yoyodyne</SAMP> are
+reserved for use by the organization controlling the domain
+<SAMP>yoyodyne.com</SAMP>.  This organization may choose to further
+subdivide this space into "package spaces": If the FuzzySpace project
+at Yoyodyne Industries developed an <SAMP>edit</SAMP> package, they
+may be assigned the <SAMP>dns-com-yoyodyne-fuzzyspace-edit</SAMP> package
+name by their company.  The details of, and policies for these
+assignments are not specified here.  Experimental package
+implementations should use this naming scheme, rather than the
+traditional (but flat, and hence prone to collision,)
+<SAMP>x-packagename</SAMP>-style names.
+<LI>The remainder of the top-level namespace is left unassigned;
+package implementations should not use these names.  The authors
+anticipate the creation of a naming authority for these top-level
+names.  These names differ from the names prefixed with
+<SAMP>mcp</SAMP> in that the latter is reserved for packages required
+or recommended as part of the MCP specification, while the remainder
+of the top-level hierarchy is to be assigned according to the policies
+of the naming authority.
+</UL>
+
+<H2><A NAME="stdpkg">3.  Standard Packages</A></H2>
+<P>Most MCP packages will be application-specific suites of messages to
+solve a particular problem.  However, MCP defines two
+<EM>standard</EM> packages.  The first of these, the
+<SAMP>mcp-negotiate</SAMP> package, is a critical part of the MCP
+startup sequence, and all MCP implementations are required to
+implement it.  The second, the <SAMP>mcp-cord</SAMP> package, allows
+the creation of multiple communications channels within MCP's single
+channel.  Implementations are strongly suggested, but not required,
+to provide support for cords.  Its presence in the standard reflects
+this suggestion, and serves as an example of a package built on top of
+MCP.</P>
+
+<H3><A NAME="mcpnegot">3.1 The <SAMP>mcp-negotiate</SAMP> package</A></H3>
+
+<P>Once the server and client have agreed on MCP 2.1 as described in
+<A HREF="#startup">Section 2.4</A>, they negotiate the packages
+supported by each side and their versions.  The server and client
+inform each other of package capabilities using the
+<SAMP>mcp-negotiate</SAMP> package, which is itself an MCP package.
+All MCP 2.1 implementations are assumed to implement at least version
+1.0 of this package; they may implement later versions (this document
+describes version 2.0).</P>
+
+<P>The <SAMP>mcp-negotiate</SAMP> package consists of two messages:</P>
+<UL>
+<LI><SAMP>mcp-negotiate-can</SAMP>, which is used to inform the
+other side of a connection of the packages supported by an 
+implementation, and the range of versions supported.
+<LI><SAMP>mcp-negotiate-end</SAMP>, which indicates that an
+implementation has sent <SAMP>mcp-negotiate-can</SAMP> messages
+for all packages it supports.
+</UL>
+
+<P>The <SAMP>mcp-negotiate-can</SAMP> message has three arguments:
+<VAR>package</VAR>, a string naming the package, and
+<VAR>min-version</VAR> and <VAR>max-version</VAR>, version numbers as
+above.  On receipt of an <SAMP>mcp-negotiate-can</SAMP> message, an
+implementation should check the package: argument against the
+implementation's list of supported packages.  If the package is
+known by the implementation, it should compare the
+<VAR>min-version</VAR> and <VAR>max-version</VAR> arguments against the
+versions of the package supported, picking the highest version from
+the overlap, if any, as in the versioning algorithm described
+above.</P>
+
+<P>Example:</P>
+<PRE>
+    #$#mcp-negotiate-can 1234 package: edit min-version: 1.0 max-version: 1.0
+</PRE>
+<P>This message indicates that the sender supports the <SAMP>edit</SAMP>
+package, version 1.0 only.  If the receiver also supports version 1.0
+of this package, it may immediately begin sending messages in that
+package (assuming it has already sent an
+<SAMP>mcp-negotiate-can</SAMP> message for that package).</P>
+
+<P>Because the <SAMP>mcp-negotiate</SAMP> package is itself a
+package (the version described here is 2.0) an
+<SAMP>mcp-negotiate-can</SAMP> message should be sent for the
+<SAMP>mcp-negotiate</SAMP> package.  For a 2.0 implementation,
+this message should be: </P>
+<PRE>
+    #$#mcp-negotiate-can 1234 package: mcp-negotiate min-version: 1.0 max-version: 2.0
+</PRE>
+<P>(With the appropriate authentication key, of course.)</P>
+
+<P>Note that no ordering is necessary or imposed on the transmission of
+<SAMP>mcp-negotiate-can</SAMP> messages.  The messages may be thought
+of as being transmitted in parallel and simultaneously from both the
+client and the server.  Neither need wait for the other to express its
+ability to perform a particular package before expressing its own
+ability to perform that package.  The reason for this is simple: an
+implementation knows which packages it supports, and the purpose of
+the <SAMP>mcp-negotiate-can</SAMP> is to simply inform the other
+participant of that ability, so that it may begin making use of that
+package in transmission.</P>
+
+<P>Once an <SAMP>mcp-negotiate-can</SAMP> message has been received
+for a particular package, an implementation may begin sending
+messages in that package.  An implementation should send
+<SAMP>mcp-negotiate-can</SAMP> messages for all packages it supports,
+and may begin sending these messages immediately upon completion of
+the MCP version negotiation phase.  With the exception of the
+<SAMP>mcp-negotiate</SAMP> package, neither the client nor the
+server should assume that any package is available on the other until
+an <SAMP>mcp-negotiate-can</SAMP> message is received for that
+package.  
+</P>
+
+<P>The <SAMP>mcp-negotiate-end</SAMP> message indicates that
+<SAMP>mcp-negotiate-can</SAMP> messages have been sent for all
+packages supported by the endpoint sending the message.  The message
+takes no argument. </P>
+
+<P>Example:</P>
+<PRE>
+    #$#mcp-negotiate-end 1234
+</PRE>
+<P>This message indicates that the sending endpoint is done sending
+<SAMP>mcp-negotiate-can</SAMP> messages; that is, it has sent these
+messages for all packages it supports, and will not send any
+more.  Implementations should ignore any <SAMP>mcp-negotiate</SAMP>
+messages received after the <SAMP>mcp-negotiate-end</SAMP> message as
+errors.</P>
+
+<P>To avoid some of the significant potential race conditions lurking
+in package negotiation, implementations are <STRONG>not</STRONG>
+permitted to wait for receipt of an <SAMP>mcp-negotiate-end</SAMP>
+message before sending <SAMP>mcp-negotiate-can</SAMP> messages for
+packages they support.  Implementations <EM>are</EM> permitted to
+wait for receipt of <SAMP>mcp-negotiate-end</SAMP> before making use
+of a package for which the implementation sending
+<SAMP>mcp-negotiate-end</SAMP> has advertised support, or before
+processing any MCP messages <EM>except</EM>
+<SAMP>mcp-negotiate-can</SAMP>.  This permits an implementation to
+"prefer" some packages over others which support similar, but more
+limited, functionality.  For example, consider an implementation which
+supports the hypothetical <SAMP>edit</SAMP>, <SAMP>superedit</SAMP>,
+and <SAMP>gonzoedit</SAMP> packages, and which "prefers"
+<SAMP>gonzoedit</SAMP> to <SAMP>superedit</SAMP>, and
+<SAMP>superedit</SAMP> to <SAMP>edit</SAMP>.  On receiving this message:</P>
+<PRE>
+    #$#mcp-negotiate-can 1234 package: edit min-version: 1.0 max-version: 1.0
+</PRE>
+<P>it may wish to wait for a better package before sending a message in
+the <SAMP>edit</SAMP> package.  Since the implementation has not yet
+received the <SAMP>mcp-negotiate-end</SAMP> message, it's still
+possible the sending implementation supports <SAMP>superedit</SAMP> or
+<SAMP>gonzoedit</SAMP>.   On receiving a second message, </P>
+<PRE>
+    #$#mcp-negotiate-can 1234 package: superedit min-version: 1.0 max-version: 1.0
+</PRE>
+<P>it has a better package available, but may still wish to wait.
+However, on receiving this message:</P>
+<PRE>
+    #$#mcp-negotiate-end 1234
+</PRE>
+<P>it knows the <SAMP>gonzoedit</SAMP> package will not be available, and
+it should settle for <SAMP>superedit</SAMP>.  Note that while the
+implementation may wait to send any messages in these packages until
+receipt of the <SAMP>mcp-negotiate-end</SAMP> message, it may
+<STRONG>not</STRONG> wait for this message before advertising support
+for <SAMP>edit</SAMP>, <SAMP>superedit</SAMP>, <SAMP>gonzoedit</SAMP>,
+and any other packages it supports.</P>
+
+<P>The preceding discussion describes version 2.0 of the
+<SAMP>mcp-negotiate</SAMP> package, but only version 1.0 of the package
+is required for MCP 2.1 compliance.  There are two differences between
+version 1.0 and version 2.0 of the <SAMP>mcp-negotiate</SAMP>
+package:</P>
+<OL>
+<LI>In version 2.0, an <SAMP>mcp-negotiate-can</SAMP> message is
+sent for the <SAMP>mcp-negotiate</SAMP> package.  No such message is
+sent for version 1.0.  Support for it is implicit.
+<LI>Version 1.0 has no <SAMP>mcp-negotiate-end</SAMP> message.
+</OL>
+
+<P>In general, it is safe for an implementation to assume that an
+MCP 2.1 implementation with which it is communicating supports version
+2.0 of the <SAMP>mcp-negotiate</SAMP> package: because of the way the
+versioning and error handling for MCP are specified, the additional
+messages will simply be ignored by a compliant implementation.</P>
+
+<H3>3.1.1 Example</H3>
+<P>A complete startup, between a client supporting the
+<SAMP>edit</SAMP>, <SAMP>mcp-cord</SAMP>, and <SAMP>spam</SAMP>
+packages, and a server supporting the <SAMP>edit</SAMP> and
+<SAMP>mcp-cord</SAMP> packages:<BR>
+
+(<B>&gt;</B> : server-to-client, <B>&lt;</B> : client-to-server)<BR></P>
+<UL>
+<LI><B>&gt;</B><SAMP> #$#mcp version: 2.1  to: 2.1</SAMP>
+<P><EM>The client compares these versions against its supported
+versions, 1.0 and 2.1, and chooses 2.1, the maximum of the overlapping
+version numbers.</EM></P>
+<P><EM>The client chooses an authentication key.</EM> </P>
+<LI><B>&lt;</B><SAMP> #$#mcp authentication-key: 3487 version: 1.0
+to: 2.1</SAMP>
+<P><EM>The server compares these versions against its supported
+versions and chooses 2.1, the maximum of the overlapping version
+numbers.</EM></P>
+<LI><B>&gt;</B> <SAMP>#$#mcp-negotiate-can 3487 package: mcp-negotiate
+min-version: 1.0 max-version: 2.0</SAMP>
+<P><EM>The client notes that the server supports the <SAMP>mcp-negotiate</SAMP>
+package.</EM></P>
+<LI><B>&gt;</B> <SAMP>#$#mcp-negotiate-can 3487 package: edit
+min-version: 1.0 max-version: 1.0</SAMP>
+<P><EM>The client notes that the server supports the <SAMP>edit</SAMP>
+package.</EM></P>
+<LI><B>&lt;</B> <SAMP>#$#mcp-negotiate-can 3487 package: mcp-negotiate
+min-version: 1.0 max-version: 2.0</SAMP>
+<P><EM>The server notes that the client supports the <SAMP>mcp-negotiate</SAMP>
+package.</EM></P>
+<LI><B>&lt;</B> <SAMP>#$#mcp-negotiate-can 3487 package: mcp-cord
+min-version: 1.0 max-version: 1.0</SAMP>
+<P><EM>The server notes that the client supports the <SAMP>mcp-cord</SAMP>
+package</EM></P>
+<LI><B>&lt;</B><SAMP> #$#mcp-negotiate-can 3487 package: spam
+min-version: 1.0 max-version: 2.0</SAMP>
+<P><EM>The server, which does not support the <SAMP>spam</SAMP>
+package, ignores this.</EM></P>
+<LI><B>&lt;</B> <SAMP>#$#mcp-negotiate-can 3487 package: edit
+min-version: 1.0 max-version: 1.0</SAMP>
+<P><EM>The server notes that the client supports the <SAMP>edit</SAMP>
+package.</EM></P>
+<LI><B>&lt;</B> <SAMP>#$#mcp-negotiate-end 3487</SAMP>
+<P><EM>The client is done sending <SAMP>mcp-negotiate-can</SAMP>
+messages.</EM></P>
+<LI><B>&gt;</B><SAMP>#$#mcp-negotiate-can 3487 package: mcp-cord
+min-version: 1.0 max-version: 1.0</SAMP>
+<P><EM>The client notes that the server supports the <SAMP>mcp-cord</SAMP>
+package.</EM></P>
+<LI><B>&gt;</B><SAMP>#$#mcp-negotiate-end 3487</SAMP>
+<P><EM>The server is done sending <SAMP>mcp-negotiate-can</SAMP>
+messages.</EM></P>
+</UL>
+
+<H3><A NAME="cords">3.2 The <SAMP>mcp-cord</SAMP> Package</A></H3>
+<P>Cords are a mechanism for multiplexing additional communications
+channels over a single MCP channel.  Cords are frequently used to
+"tie" a server object to a client object.  For example, a cord may be
+used to direct communications between a server object and a window on
+the client display.  Ideally, the plumbing work to deliver cord
+messages to the appropriate object is invisible to the applications
+programmer, who should only be concerned with the messages to be sent,
+not the mechanism involved in assuring that the arrive at the
+appropriate destination.  While cords provide no user-visible
+functionality, they are an extremely useful tool in implementing
+applications for which some amount of state is shared between the
+server and client.  The version of the <SAMP>mcp-cord</SAMP> package
+described here is 1.0; its package name for use in the MCP negotiation
+process is <SAMP>mcp-cord</SAMP>.</P>
+
+<P>Cords are not, strictly speaking, part of MCP 2.1, and compliant
+implementations are not required to support them.  However, experience
+has shown that they are generally very useful as a protocol design
+tool, that many extensions are made significantly easier to
+construct by the presence of cords, and that they benefit from a fast,
+low-level implementation.  As such, compliant implementations are
+encouraged to support the <SAMP>mcp-cord</SAMP> package.</P>
+
+<P>Three operations are possible on cords: they may be created, have
+messages sent along them, and they may be destroyed.  Each cord has an
+associated unique (to the opening participant) identifier and a type.
+The type is similar to an MCP package name -- it determines the messages
+which may be sent along a cord, and is used by the recipient of an
+open request to attach the cord to an appropriate object.</P>
+
+<P>Cords are bidirectional: once a cord is open, messages may be sent
+along that cord in either direction, and either endpoint may close the
+cord at any time Implementations should <EM>not</EM> expect to
+necessarily receive a cord closed message for a closed cord;
+this may happen in the case where an implementation disconnects
+unexpectedly.  If an implementation receives a message on a cord
+which was closed, it should treat the message as an unrecognized MCP
+message, silently dropping it, or unobtrusively notifying the
+user.</P>
+
+<P>One MCP message is defined for each cord operation.  Any message may
+be sent from either the server or the client.</P>
+
+<H3><A NAME="cordmsg">3.2.1 Cord-related MCP messages</A></H3>
+<DL>
+<DT> <B>mcp-cord-open</B>(<VAR>_id</VAR>, <VAR>_type</VAR>)
+<DD> The mcp-cord-open message requests that a new cord be created
+between the source and recipient of the message, having the specified
+identifier and type.  On receipt of this message, an implementation
+should check if the specified type is understood.  The semantics of
+"is understood" are fuzzy and up to the implementation -- most
+implementations will presumably provide some way for code to indicate
+its support of a particular cord type.
+<P>Example:</P>
+<PRE>
+    #$#mcp-cord-open 3487 _id: I12345 _type: whiteboard
+</PRE>
+<P>The <VAR>_id</VAR> here, when combined with the connection endpoint which
+opened this cord, uniquely identifies the cord; however, since the
+connection endpoint will <STRONG>not</STRONG> be reflected in messages
+sent on the cord, implementations must take steps to ensure that the
+identifier provided is unique to a session.  To this end,
+implementations should construct the <VAR>_id</VAR> argument using
+some variation on the following algorithm:</P>
+<HR>
+<P><B>function</B> <I>new-mcp-cord-id</I>()</P>
+<OL>
+<LI><B>pick</B> <VAR>n</VAR>, a value unique for this session
+<LI><B>if</B> this implementation is a server
+<OL>
+<LI><B>return</B> <I>concat</I>(<SAMP>"I"</SAMP>, <VAR>n</VAR>)
+</OL>
+<LI><B>else</B>
+<OL>
+<LI><B>return</B> <I>concat</I>(<SAMP>"R"</SAMP>, <VAR>n</VAR>)
+</OL>
+</OL>
+<HR>
+<P>The goal here is to produce IDs which are guaranteed to be different
+for a given pair of connection endpoints.  As long as the
+connection endpoints generate IDs in some locally-unique (for the
+session) fashion, as required in line 1, and noting that any
+connection supported by MCP has only two endpoints, we need only
+distinguish the endpoints as "initiator" (<SAMP>"I"</SAMP>) and
+"responder" (<SAMP>"R"</SAMP>) to ensure that the transmitted IDs are
+unique for a session.  The definition of "server" and "client" here is
+based on the position the connection endpoints took in the initial MCP
+startup process: the server (or "initiator") is the endpoint which sent
+the first MCP message.  Some variation is allowed on this algorithm;
+as long as an implementation can strictly guarantee that no
+duplication will occur over the course of a session, it is free to
+choose any alphanumeric value for the <VAR>n</VAR> in the algorithm.
+Implementations must not assume anything about a received
+<VAR>_id</VAR> value other than that it is unique to a session.</P>
+
+<DT><B>mcp-cord</B>(<VAR>_id</VAR>, <VAR>_message</VAR>,
+<VAR>msgarg1</VAR>... <VAR>msgargn</VAR>)
+<DD> Send a message along the open cord.  Note that cord messages,
+like MCP messages, are permitted to have arguments, and that these
+arguments depend on the definition of the message.  The <VAR>_id</VAR>
+argument specifies the cord to which the message belongs, the
+<VAR>_message</VAR> argument specifies the message being sent along
+the cord, and all other arguments are considered arguments to the
+message being sent.  There may be any number of arguments to the cord
+message, and the arguments may be either simple or multiline.
+<P>Example:</P>
+<PRE>
+    #$#mcp-cord 3487 _id: I12345 _message: delete-stroke stroke-id: 12321
+</PRE>
+<P>In this example, the <VAR>stroke-id</VAR> argument is an argument to
+the <SAMP>delete-stroke</SAMP> cord message.</P>
+
+<DT><B>mcp-cord-closed</B>(<VAR>_id</VAR>)
+<DD> Indicates that one end of a connection closed the cord.
+Implementations should send this when the cord is to be disposed by
+the recipient.
+<P>Example:</P>
+<PRE>
+    #$#mcp-cord-closed 3487 _id: I12345
+</PRE>
+<P>Note that <SAMP>mcp-cord-closed</SAMP> messages need only be sent in one
+direction, by the endpoint closing the cord, and once the message has
+been sent, the cord should be assumed to be closed.  Implementations
+should not expect to receive a <SAMP>mcp-cord-closed</SAMP> message in
+reply. However, due to potential race conditions, an
+<SAMP>mcp-cord-closed</SAMP> message <EM>may</EM> be received by an
+endpoint which has already sent a <SAMP>mcp-cord-closed</SAMP> message
+for the same cord.  As with any message on a closed cord, these
+messages should be ignored.</P> 
+</DL>
+
+<H2>Authors</H2>
+<P><EM>Jay Carlson, Roger Crew, Ken Fox, Richard Godard, Dave
+Kormann, Erik Ostrom, John Ramsdell, Vijay Saraswat, Andrew Wilson</EM></P>
+<P>Substantial additional contributions and critical comments by
+Michael Brundage, William Drury, and Chris Rath.</P>
+
+<H2><A NAME="appendix">Appendix: BNF Grammar</A></H2>
+
+<P>The following is a somewhat extended BNF grammar for the MCP
+message format.  Terminals in this BNF are quoted
+(i.e. <SAMP>'#$#'</SAMP>), and nonterminals appear in angle-brackets
+(i.e. <KBD>&lt;message&gt;</KBD>). The special (unquoted) terminal EOL
+represents an end-of-line, usually a carriage return and newline.  The
+metacharacter <KBD>|</KBD> is used to signify alternation, and
+<KBD>::=</KBD> is used to signify nonterminal expansion.  Unquoted
+spaces in the BNF are for formatting purposes only, and are not
+syntactically significant.
+
+<PRE>
+&lt;message-line&gt; ::= '#$#' &lt;message&gt; EOL
+
+&lt;message&gt; ::= &lt;message-start&gt;
+           | &lt;message-continue&gt;
+           | &lt;message-end&gt;
+
+&lt;message-start&gt; ::= &lt;message-name&gt; &lt;space&gt; &lt;auth-key&gt; &lt;keyvals&gt;
+&lt;message-continue&gt; ::= '*' &lt;space&gt; &lt;datatag&gt; &lt;space&gt; &lt;simple-key&gt; ':' ' ' &lt;line&gt;
+&lt;message-end&gt; ::= ':' &lt;space&gt; &lt;datatag&gt;
+
+&lt;message-name&gt; ::= &lt;ident&gt;
+&lt;auth-key&gt; ::= &lt;unquoted-string&gt;
+&lt;datatag&gt; ::= &lt;unquoted-string&gt;
+
+&lt;keyvals&gt; ::= '' |  &lt;space&gt; &lt;keyval&gt; &lt;keyvals&gt;
+&lt;keyval&gt; ::= &lt;key&gt; ':' &lt;space&gt; &lt;value&gt;
+&lt;key&gt; ::= &lt;simple-key&gt; | &lt;multiline-key&gt;
+&lt;simple-key&gt; ::= &lt;ident&gt; 
+&lt;multiline-key&gt; ::= &lt;ident&gt; '*'
+&lt;value&gt; ::= &lt;unquoted-string&gt; | &lt;quoted-string&gt;
+
+&lt;ident&gt; ::= &lt;alpha&gt; &lt;ident-chars&gt;
+&lt;unquoted-string&gt; ::= &lt;simple-char&gt; | &lt;simple-char&gt; &lt;unquoted-string&gt;
+&lt;quoted-string&gt; ::= '"' &lt;string-chars&gt; '"'
+
+&lt;ident-chars&gt; ::= '' | &lt;ident-char&gt; &lt;ident-chars&gt;
+&lt;string-chars&gt; ::= '' | &lt;string-char&gt; &lt;string-chars&gt;
+&lt;line&gt; ::= '' | &lt;line-char&gt; &lt;line&gt;
+
+&lt;space&gt; ::= ' ' | ' '&lt;space&gt;
+
+&lt;ident-char&gt; ::= &lt;alpha&gt; | &lt;digit&gt; | '-'
+&lt;string-char&gt; ::= &lt;simple-char&gt; | &lt;space&gt; | '\' &lt;quote-char&gt; | ':' | '*'
+&lt;line-char&gt; ::= &lt;simple-char&gt; | &lt;quote-char&gt; | &lt;space&gt; | ':' | '*'
+&lt;quote-char&gt; ::= '"' | '\'
+&lt;simple-char&gt; ::= &lt;alpha&gt; | &lt;digit&gt; | &lt;other-simple&gt;
+&lt;other-simple&gt; ::= '-' | '~' | '`' | '!' | '@' | '#' | '$' | '%' | '^'
+	| '&amp;' | '(' | ')' | '=' | '+' | '{' | '}' | '[' | ']' | '|'
+	| ''' | ';' | '?' | '/' | '&gt;' | '&lt;' | '.' | ','
+&lt;digit&gt; ::= '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'
+&lt;alpha&gt; ::= 'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' | 'h' | 'i' | 'j'
+        | 'k' | 'l' | 'm' | 'n' | 'o' | 'p' | 'q' | 'r' | 's' | 't'
+        | 'u' | 'v' | 'w' | 'x' | 'y' | 'z'
+        | 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H' | 'I' | 'J'
+        | 'K' | 'L' | 'M' | 'N' | 'O' | 'P' | 'Q' | 'R' | 'S' | 'T'
+        | 'U' | 'V' | 'W' | 'X' | 'Y' | 'Z' | '_'
+</PRE>
+
+<P>Note that whitespace is required in many places, but the amount of
+whitespace doesn't matter except in
+<KBD>&lt;message-continue&gt;</KBD>, in which any whitespace after
+the first space after the colon will be considered part of the
+<KBD>&lt;line&gt;</KBD>.</P>
+</BODY>
+<!-- CHANGELOG -->
+<!--
+Mon Mar 16 12:37:41 1998: fixed line-char to include : and *
+Mon Mar 16 12:36:40 1998: added this changelog, per discussion on mcp-dev
+-->
+</HTML>
+

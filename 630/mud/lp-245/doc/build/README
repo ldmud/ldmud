@@ -1,0 +1,20 @@
+This directory describes how to start building your own castle and add
+objects.
+
+If you have any problem, mail them to me: lars@myab.se, or in the
+post office in this game (not as good). Please tell me if you would want more
+documentation about something.
+
+Files:
+
+RULES			Read these !
+general			Easy start.
+error			What happens when error.
+ed0,ed1,ed2,ed3,ed4	Documentation about ed.
+castle			Hints about extending your castle.
+std,std2		How to make simple rooms.
+door			How to make doors.
+monster			How to make monsters.
+weapon			How to make weapons.
+armour			How to make armour.
+quest_obj		For setting up a quest.

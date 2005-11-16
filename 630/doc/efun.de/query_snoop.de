@@ -1,0 +1,13 @@
+GESCHUETZT
+SYNOPSIS
+        object query_snoop(object opfer);
+
+BESCHREIBUNG
+        Liefert den Benutzer, der momentan <opfer> beobachtet. Das aufrufende
+        Objekt muss durch das Masterobjekt privilegiert sein.
+
+ANMERKUNG
+        Diese Funktion ist geschuetzt.
+
+SIEHE AUCH
+        snoop(E)

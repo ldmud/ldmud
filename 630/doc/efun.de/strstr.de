@@ -1,0 +1,17 @@
+SYNOPSIS
+        int strstr(string str, string muster);
+        int strstr(string str, string muster, int pos);
+
+BESCHREIBUNG
+        Liefert den Index des ersten Auftretens von <muster> in <str>,
+        ausgehend von der Position <pos>, wobei in <str> vorwaerts gesucht
+        wird. Wird <pos> nicht angegeben, wird als Standardwert 0 gesetzt,
+        also vom Beginn von <str> her gesucht.
+
+        Wenn <muster> nicht gefunden wird, wird -1 zurueck geliefert.
+
+        Wenn <pos> negativ ist, bezeichnet <pos> die Startposition der Suche
+        relativ zum Ende von <str>, es wird aber weiterhin vorwaerts gesucht.
+
+SIEHE AUCH
+        strrstr(E), strlen(E), sscanf(E), sprintf(E), explode(E)

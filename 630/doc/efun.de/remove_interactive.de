@@ -1,0 +1,14 @@
+SYNOPSIS
+        void remove_interactive(object obj);
+
+BESCHREIBUNG
+        Schliesst die Verbindung zum interaktiven Objekt <obj>.
+
+        Waehrend der Ausfuehrung der LPC Anweisung ist das Objekt intern als
+        'about to be closed' ('wird geschlossen') markiert. Das heisst, dass
+        der Output an stdout umgeleitet wird, waehrend die eigentliche
+        Netzwerkverbindung bestehen bleibt, bis die LPC Anweisung vollstaendig
+        abgearbeitet wurde.
+
+SIEHE AUCH
+        connect(M), logon(A), disconnect(M)
