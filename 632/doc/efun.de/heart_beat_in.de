@@ -1,0 +1,13 @@
+GESCHUETZT
+SYNOPSIS
+        object *heart_beat_in();
+
+BESCHREIBUNG
+        Diese Funktion liefert ein Array mit allen Objekten, deren
+        heart_beat() eingeschaltet ist.
+
+ANMERKUNG
+        Diese Funktion ist geschuetzt und macht deshalb garnix.
+
+SIEHE AUCH
+        set_heart_beat(E), heart_beat(A), call_out_info(E)

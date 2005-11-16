@@ -1,0 +1,9 @@
+void exit(ob)
+object ob;
+
+This function is called in rooms everytime a living object 'ob' leaves.
+
+The function this_player() will return a random value, don't use it at this
+point.
+
+See also: lfun/init

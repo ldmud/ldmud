@@ -1,0 +1,23 @@
+VORLAEUFIG
+SYNOPSIS
+        object blueprint()
+        object blueprint(string|object ob);
+
+BESCHREIBUNG
+        Die Efun liefert den Blueprint fuer das angegeben Objekt <ob> oder
+        fuer this_object(), wenn nicht angegeben.
+
+        Wenn der Blueprint zerstoert wurde, liefert die Funktion 0. Fuer
+        Objekte mit replace_program() liefert die Funktion den Blueprint des
+        ersetzenden Programs.
+
+BEISPIEL
+        blueprint("/obj/ding");                 -> liefert /obj/ding
+        blueprint(find_object("/obj/ding"));    -> liefert /obj/ding
+        blueprint(clone_object("/obj/ding"));   -> liefert /obj/ding
+
+AENDERUNGEN
+        Eingefuehrt in LDMud 3.2.9.
+
+SIEHE AUCH
+        clones(E), clone_object(E)
