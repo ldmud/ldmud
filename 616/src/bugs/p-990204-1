@@ -1,0 +1,1070 @@
+Short: SiliconDream-patches
+From: vondincklage <daniel@ozet.de>
+Date: Thu, 28 Jan 1999 20:30:42 +0100 (CET)
+Type: Patch
+State: Unclassified
+See also: f-990203-17, f-990203-28, f-990203-27, f-990204-0, f-990204-1,
+          f-990204-5
+
+Hallo !
+Ich habe hier einmal einge Patches zusammengestellt, die ich heute morgen
+von 3.2.1@141 auf den LD-Driver portiert habe. Da sind auch einige der
+Sachen dabei die ich auf der ML vorgeschlagen habe. Allerdings sind die
+patches recht "unordentlich", da sie von mir eignetlich nur SD-Intern
+gedacht waren. Falls du Interesse haben solltest die einzubaun, kann ich
+sie auch gerne nochmal aufraeumen.
+Eine Frage zu der ganzen LD-Sache nochmal -
+Ich habe vor laengerfristig (D.h. wenn bei uns die Libumbauten fertig
+sind und ich etwas Zeit habe) einige groessere (allerdings teilw. auch
+inkompatible) Aenderungen am GD zu machen. Wie saehe das aus mit dem
+Integrieren in den Haupt-Baum des GDs ?
+
+Hier sind die Patches:
+
+Only in ldmud-3.2.5sp1: Makefile
+Only in ldmud-3.2.5sp1: Makefile~
+Only in ldmud-3.2.5sp1: access_check.o
+diff -cr ldmud-3.2.5/array.c ldmud-3.2.5sp1/array.c
+*** ldmud-3.2.5/array.c	Thu Dec 10 03:37:36 1998
+--- ldmud-3.2.5sp1/array.c	Mon Jan 25 14:54:13 1999
+***************
+*** 3095,3099 ****
+--- 3095,3191 ----
+      return ret;
+  }
+
+Note: seems to be the equivalent to walk_mapping()
++
++
++ struct svalue *f_walk_array ( struct svalue *sp, int num_arg) {
++  struct vector *my_array;
++  struct svalue *array_pointer;
++  struct svalue *arg;
++  struct svalue *extra;
++  int array_size;
++  int lauf1;
++  int extra_num;
++  struct svalue *sp2, *data;
++
++
++  extern struct svalue *inter_sp;
++
++  char *func;
++  struct svalue *arguments;
++  struct vector *r;
++  struct svalue *v, *w, *x;
++  int cnt;
++  struct object *ob;
++  int size;
++
++  arg = sp - num_arg + 1;
++
++  inter_sp = sp;
++
++  if (arg[0].type != T_POINTER) bad_xefun_vararg(1, sp);
++  if (arg[1].type == T_CLOSURE) {
++    ob = 0;
++    func = (char *)&arg[1];
++    extra_num = num_arg - 2;
++    extra = &arg[2];
++   } else if (arg[1].type != T_STRING) {
++    bad_xefun_vararg(2, sp);
++   } else {
++    if (num_arg >= 3 /* && arg[1].type == T_STRING */) {
++       if (arg[2].type == T_OBJECT) ob = arg[2].u.ob; else
++       if (arg[2].type != T_STRING || !(ob = find_object(arg[2].u.string)) )
++     		                   bad_xefun_vararg(3, sp);
++       extra_num = num_arg - 3;
++       extra = &arg[3];
++      } else {
++       ob = current_object;
++       extra_num = 0;
++      }
++    func = arg[1].u.string;
++   }
++
++
++  my_array = arg[0].u.vec;
++ // array_size = VEC_SIZE(my_array);
++
++  array_pointer = my_array->item;
++
++  /* Vec-Size inner Schleife ermitteln, da bestimmt jemand da ein
++     Element mal loeschen will. */
+
+Note: better check if the array was changed and adapt the indices
+properly.
+
++
++  for (lauf1 = 0; lauf1 < VEC_SIZE(my_array) ; lauf1++, array_pointer++ ) {
++
++    //   assign_svalue_no_free( (sp2 = sp+1), array_pointer );
++
++
++    sp2 = sp+1;
++    sp2->type = T_NUMBER;
++    sp2->u.number = lauf1;
++
++    sp2++;
++
++    data = array_pointer;
++    sp2->type = T_LVALUE;
++    sp2->u.lvalue = data;
++
++
++    inter_sp = sp2;
++    push_svalue_block(extra_num, extra);
++    if (ob) {
++      if (ob->flags & O_DESTRUCTED)
++ 		error("Object used by walk_array destructed");
++      apply( func, ob, 2 + extra_num);
++     } else {
++      call_lambda( (struct svalue *)func, 2 + extra_num);
++      free_svalue(inter_sp--);
++     }
++  }
++  free_svalue(sp);
++  lauf1 = num_arg;
++  do free_svalue(--sp); while (--lauf1 > 0);
++  return sp-1;
++ }
++
++
+  /***************************************************************************/
+
+Only in ldmud-3.2.5sp1: array.c~
+Only in ldmud-3.2.5sp1: array.o
+diff -cr ldmud-3.2.5/backend.c ldmud-3.2.5sp1/backend.c
+*** ldmud-3.2.5/backend.c	Thu Dec 10 03:37:36 1998
+--- ldmud-3.2.5sp1/backend.c	Mon Jan 25 15:57:24 1999
+***************
+*** 1787,1791 ****
+--- 1787,1841 ----
+  #undef XREALLOC
+  }
+
++ /*
++  * like ctime(), but the result is GMT
++  */
++ struct svalue *f_gmctime(sp)
++   struct svalue *sp;
++ {
++   struct tm *ts;
++   char *buf;
++   size_t si;
++
++   if (sp->type!=T_NUMBER) {
++     bad_xefun_arg(1, sp);
++   }
++   ts = gmtime((time_t*)&(sp->u.number));
++   free_svalue(sp);
++   buf = string_copy(asctime(ts));
++   if (!buf) {
++     error("Out of memory\n");
++   }
++   if (buf[si=(strlen(buf)-1)]=='\n') buf[si]=0;
++   sp->type = T_STRING;
++   sp->x.string_type = STRING_MALLOC;
++   sp->u.string = string_copy(buf);
++   xfree(buf);
++
++   return sp;
++ }
++
++ /*
++  * Resets eval_cost if called by the master object
++  * (Usefull when a lot of evals are needed, for example for
++  *  saving all player items on shutdown!)
++  */
++ struct svalue *f_reset_eval_cost(sp)
++     struct svalue *sp;
++ {
++   extern int32 assigned_eval_cost, eval_cost;
++
++   sp++;
++   sp->type = T_NUMBER;
++   if (current_object != master_ob) {
++     sp->u.number = 0;
++   } else {
++     CLEAR_EVAL_COST;
++     sp->u.number = 1;
++   }
++   return sp;
++ }
++
+  /***************************************************************************/
++
+
+Only in ldmud-3.2.5sp1: backend.c~
+Only in ldmud-3.2.5sp1: backend.o
+Only in ldmud-3.2.5sp1: call_out.o
+Only in ldmud-3.2.5sp1: closure.o
+diff -cr ldmud-3.2.5/comm.c ldmud-3.2.5sp1/comm.c
+*** ldmud-3.2.5/comm.c	Thu Dec 10 03:37:36 1998
+--- ldmud-3.2.5sp1/comm.c	Mon Jan 25 15:06:06 1999
+***************
+*** 2257,2262 ****
+--- 2257,2264 ----
+          return;
+      }
+      command_giver = master_ob;
++     current_interactive = ob;
++
+      add_message(message_flush);
+
+      /* There was an object returned from connect(). Use this as the
+diff -cr ldmud-3.2.5/config.h ldmud-3.2.5sp1/config.h
+*** ldmud-3.2.5/config.h	Thu Dec 10 03:37:36 1998
+--- ldmud-3.2.5sp1/config.h	Mon Jan 25 16:05:03 1999
+***************
+*** 14,20 ****
+   * are supplied should be placed in ERQ_DIR. If you want something
+   * different, consider writing a wrapper program or shell script.
+   */
+! #define ERQ_DIR "/boot/home/mud/erq"
+
+  /* #define ACCESS_CONTROL if you want the driver to do any access control.
+   */
+--- 14,20 ----
+   * are supplied should be placed in ERQ_DIR. If you want something
+   * different, consider writing a wrapper program or shell script.
+   */
+! #define ERQ_DIR "/usr/local/mud/erq"
+
+  /* #define ACCESS_CONTROL if you want the driver to do any access control.
+   */
+***************
+*** 77,84 ****
+   * MAX_USER_TRACE is used for for normal program execution, the full
+   * MAX_TRACE is only available in error handling.
+   */
+! #define MAX_USER_TRACE              60
+! #define MAX_TRACE                   65
+
+  /*
+   * Define the size of the compiler stack. This defines how complex
+--- 77,85 ----
+   * MAX_USER_TRACE is used for for normal program execution, the full
+   * MAX_TRACE is only available in error handling.
+   */
+! #define MAX_USER_TRACE              100
+! #define MAX_TRACE                   110
+! /* for SiliconDream : We need a LOT of stack */
+
+  /*
+   * Define the size of the compiler stack. This defines how complex
+***************
+*** 97,103 ****
+  /*
+   * Define what port number the game is to use.
+   */
+! #define PORTNO                    4242
+
+  /* Maximum numbers of ports the GD accepts connections to.
+   * If this is not defined, the original one-port-code takes effect.
+--- 98,104 ----
+  /*
+   * Define what port number the game is to use.
+   */
+! #define PORTNO                    3333
+
+  /* Maximum numbers of ports the GD accepts connections to.
+   * If this is not defined, the original one-port-code takes effect.
+***************
+*** 108,114 ****
+  /*
+   * Max number of local variables in a function.
+   */
+! #define MAX_LOCAL                   20
+
+  /* Maximum number of evaluated nodes/loop.
+   * If this is exceeded, the current function is halted.
+--- 109,115 ----
+  /*
+   * Max number of local variables in a function.
+   */
+! #define MAX_LOCAL                   32
+
+  /* Maximum number of evaluated nodes/loop.
+   * If this is exceeded, the current function is halted.
+Only in ldmud-3.2.5sp1: config.h~
+Only in ldmud-3.2.5sp1: config.status
+Only in ldmud-3.2.5sp1: driver
+Only in ldmud-3.2.5sp1: dumpstat.o
+Only in ldmud-3.2.5sp1: ed.o
+Only in ldmud-3.2.5sp1: efun_defs.c
+Only in ldmud-3.2.5sp1: everse
+diff -cr ldmud-3.2.5/exec.h ldmud-3.2.5sp1/exec.h
+*** ldmud-3.2.5/exec.h	Thu Dec 10 03:37:36 1998
+--- ldmud-3.2.5sp1/exec.h	Mon Jan 25 15:10:09 1999
+***************
+*** 211,217 ****
+  #define H_NOECHO          14
+  #define H_ERQ_STOP          15
+  #define H_MODIFY_COMMAND_FNAME 16
+! #define NUM_CLOSURE_HOOKS 17
+
+  extern struct svalue closure_hook[NUM_CLOSURE_HOOKS];
+
+--- 211,232 ----
+  #define H_NOECHO          14
+  #define H_ERQ_STOP          15
+  #define H_MODIFY_COMMAND_FNAME 16
+!
+! // For SilicondDream : We've got some additional closurehooks...
+! #define H_PRE_CREATE_DEEP_HOOK                  17
+! #define H_POST_CREATE_DEEP_HOOK                 18
+!
+! /* The first one is dangerous (undestructable obs), the second one
+!    is rather pointless.
+!   $FIXME$ : Add an automatic catch() before evaluating the pre-remove-hook.
+!             Then it could prove quite useful.
+!             */
+! #define H_PRE_REMOVE_DEEP_HOOK                  19
+! #define H_POST_REMOVE_DEEP_HOOK                 20
+!
+! #define NUM_CLOSURE_HOOKS 21
+!
+
+  extern struct svalue closure_hook[NUM_CLOSURE_HOOKS];
+
+diff -cr ldmud-3.2.5/func_spec ldmud-3.2.5sp1/func_spec
+*** ldmud-3.2.5/func_spec	Thu Dec 10 03:37:36 1998
+--- ldmud-3.2.5sp1/func_spec	Mon Jan 25 15:12:54 1999
+***************
+*** 299,305 ****
+  mapping mkmapping(mixed *, ...);
+  #endif /* MAPPINGS */
+
+! string process_string(string);
+
+  object first_inventory(object|string default: F_THIS_OBJECT);
+  object next_inventory(object default: F_THIS_OBJECT);
+--- 306,323 ----
+  mapping mkmapping(mixed *, ...);
+  #endif /* MAPPINGS */
+
+!
+! /*
+!  * not activated for SiliconDream...
+!  * string process_string(string);
+!  */
+!
+! /*
+!  * new efuns for SiliconDream
+!  * by Sunbalde:
+!  */
+! void deep_call_other(object|string, string );
+!
+
+  object first_inventory(object|string default: F_THIS_OBJECT);
+  object next_inventory(object default: F_THIS_OBJECT);
+***************
+*** 399,404 ****
+--- 417,429 ----
+  int call_resolved(mixed &, object|string, string, ...);
+  int referencep(mixed &);
+  void raise_error(string);
++
++ /*
++  * new efuns for SiliconDream
++  * by Sunbalde:
++  */
++ void raise_caller_error(string, int );
++
+  int get_eval_cost();
+  void garbage_collection();
+  int typeof(mixed);
+***************
+*** 473,476 ****
+--- 498,517 ----
+  void walk_mapping(mapping, string|closure, ...);
+  string regreplace(string,string,string,int);
+
++
++ /*
++  * new efuns for SiliconDream
++  * by Sunblade:
++  */
++ void walk_array(mixed *, string|closure, ...);
++
++ /*
++  * new efuns for SiliconDream
++  * by Mubo:
++  */
++ int reset_eval_cost();
++ string gmctime(int default: F_TIME);
++
++
+  /***************************************************************************/
++
+Only in ldmud-3.2.5sp1: func_spec~
+Only in ldmud-3.2.5sp1: gcollect.o
+Only in ldmud-3.2.5sp1: hash.o
+Only in ldmud-3.2.5sp1: instrs.h
+diff -cr ldmud-3.2.5/interpret.c ldmud-3.2.5sp1/interpret.c
+*** ldmud-3.2.5/interpret.c	Thu Dec 10 03:37:36 1998
+--- ldmud-3.2.5sp1/interpret.c	Mon Jan 25 15:44:17 1999
+***************
+*** 132,140 ****
+   * will return. That means that control_stack[0] will have almost no
+   * interesting values, as it will terminate execution.
+   */
+- #ifndef SMALLOC_LPC_TRACE
+- static
+- #endif
+  char *inter_pc;                        /* Program pointer. */
+  static struct svalue *inter_fp;        /* Pointer to first argument. */
+  struct svalue *inter_sp;        /* Points to value of last push. */
+--- 132,137 ----
+***************
+*** 152,158 ****
+                                  /* Used to throw an error to a catch */
+
+  static struct control_stack control_stack[MAX_TRACE];
+! static struct control_stack *csp;        /* Points to last element pushed */
+
+  #define ERRORF(s) {inter_pc = pc; inter_sp = sp; error s ;}
+  #define ERROR(s) ERRORF((s))
+--- 149,155 ----
+                                  /* Used to throw an error to a catch */
+
+  static struct control_stack control_stack[MAX_TRACE];
+! struct control_stack *csp;        /* Points to last element pushed */
+
+  #define ERRORF(s) {inter_pc = pc; inter_sp = sp; error s ;}
+  #define ERROR(s) ERRORF((s))
+***************
+*** 5919,5924 ****
+--- 5916,5960 ----
+          ERROR("-- of non-numeric argument\n")
+          break;
+      }
++     CASE(F_DEEP_CALL_OTHER);
++     {
++ 	struct svalue *arg;
++ 	struct object *ob;
++ 	
++ 	inter_pc = pc;
++ 	inter_sp = sp;
++         arg = sp - 1;
++ 	if (arg[0].type == T_OBJECT)
++ 	    ob = arg[0].u.ob;
++ 	else if (arg[0].type == T_STRING) {
++ 	    ob = find_object(arg[0].u.string);
++ 	    if (ob == 0) ERROR("deep_call_other() failed\n")
++ 	} else goto bad_arg_1;
++
++ 	TYPE_TEST2(arg+1, T_STRING)
++ 	if (current_object->flags & O_DESTRUCTED) {
++ 	    pop_n_elems(num_arg);
++ 	    push_number(0);
++ 	    break;
++ 	}
++
++ 	if (arg[1].u.string[0] == ':')
++ 	    ERRORF(("Illegal function name in deep_call_other: %s\n",
++ 		  arg[1].u.string))
++ 	if (TRACEP(TRACE_CALL_OTHER)) {
++ 	    if (!++traceing_recursion) {
++ 		do_trace("Deep Call other ", arg[1].u.string, "\n");
++ 	    }
++ 	    traceing_recursion--;
++ 	}
++         apply_low(arg[1].u.string, ob, 0);
++         pop_stack();
++         sun_call_all_inherits( ob, arg[1].u.string );
++         pop_n_elems(2);
++         push_number(0);
++ 	break;
++     }
++
+      CASE(F_CALL_OTHER);
+      {
+          struct svalue *arg;
+***************
+*** 9862,9868 ****
+--- 9908,9925 ----
+            {
+              if (sp->type != T_STRING) goto xbad_arg_1;
+              ERRORF(("%s", sp->u.string));
++             break;
+            }
++           XCASE(F_RAISE_CALLER_ERROR);
++           {
++            if ((sp-1)->type != T_STRING) goto xbad_arg_1;
++            if (sp->type != T_NUMBER) goto xbad_arg_2;
++            inter_pc = pc;
++            inter_sp = sp;
++            new_error(sp->u.number,"%s",sp[-1].u.string);
++            break;
++ 	  }
++
+            XCASE(F_GET_EVAL_COST);
+            {
+              push_number(-eval_cost);
+***************
+*** 13098,13100 ****
+--- 13155,13231 ----
+    memset(cache_id, 0, sizeof cache_id);
+    memset(cache_progp, 1, sizeof cache_progp);
+  }
++
++
++ /* $FIXME$ : Think of better names for those functions */
++ void sun_rec_call_all_inherits( struct object *ob, struct program *prog ,
++                       char *name ) {
++
++  int old_vio;
++  int old_fio;
++  int lauf1;
++  struct inherit *curr_inherit;
++  struct program *tmpprog;
++  struct object *old;
++  struct svalue *old_current_variables;
++  static char **old_current_strings;
++  int func_idx;
++
++  old = current_object;
++  current_object = ob;
++
++  old_current_variables = current_variables;
++  old_current_strings = current_strings;
++
++
++
++  for (lauf1 = 0; lauf1 < prog->num_inherited ; lauf1++ ) {
++   curr_inherit = &(struct inherit)(prog->inherit[lauf1]);
++   tmpprog = curr_inherit->prog;
++
++   old_fio = function_index_offset;
++   old_vio = variable_index_offset;
++   function_index_offset += curr_inherit->function_index_offset;
++   variable_index_offset += curr_inherit->variable_index_offset;
++
++
++   if (tmpprog->num_inherited) {
++    sun_rec_call_all_inherits(ob,tmpprog,name);
++   }
++
++   //  current_variables = current_object->variables + variable_index_offset;
++   current_variables = current_object->variables;
++   current_strings = current_prog->strings;
++
++   if ((func_idx = find_function(name,tmpprog)) >= 0) {
++    if (!(tmpprog->functions[func_idx] & NAME_INHERITED))
++        call_function(tmpprog,func_idx);
++   }
++
++   function_index_offset = old_fio;
++   variable_index_offset = old_vio;
++  }
++
++  current_object = old;
++  current_variables = old_current_variables;
++  current_strings = old_current_strings;
++ }
++
++ int sun_do_call_all_inherits( struct object *ob, struct program *prog ,
++                       char *name ) {
++  int func_idx;
++
++   if ((func_idx = find_function(name,prog)) >= 0) {
++    if (!(prog->functions[func_idx] & NAME_INHERITED))
++       call_function(prog,func_idx);
++   }
++
++   sun_rec_call_all_inherits(ob,prog,name);
++ }
++
++ int sun_call_all_inherits( struct object *ob, char *name ) {
++  if (privilege_violation4("deep_call_other", ob, name, 0, inter_sp)) {
++   sun_rec_call_all_inherits(ob,ob->prog,name);
++  }
++ }
++
+Only in ldmud-3.2.5sp1: interpret.c~
+Only in ldmud-3.2.5sp1: interpret.o
+Only in ldmud-3.2.5sp1: lang.c
+Only in ldmud-3.2.5sp1: lang.h
+Only in ldmud-3.2.5sp1: lang.o
+Only in ldmud-3.2.5sp1: lang.y
+Only in ldmud-3.2.5sp1: lcmdiff.diff
+Only in ldmud-3.2.5sp1: lcmdiff.diff~
+Only in ldmud-3.2.5sp1: lex.o
+Only in ldmud-3.2.5sp1: machine.h
+Only in ldmud-3.2.5sp1: main.o
+Only in ldmud-3.2.5sp1: make_func
+Only in ldmud-3.2.5sp1: make_func.c
+Only in ldmud-3.2.5sp1: make_func.o
+diff -cr ldmud-3.2.5/make_func.y ldmud-3.2.5sp1/make_func.y
+*** ldmud-3.2.5/make_func.y	Thu Dec 10 03:37:36 1998
+--- ldmud-3.2.5sp1/make_func.y	Mon Jan 25 15:22:06 1999
+***************
+*** 1188,1193 ****
+--- 1188,1203 ----
+          return H_ERQ_STOP;
+      if ( !strcmp(name, "MODIFY_COMMAND_FNAME") )
+          return H_MODIFY_COMMAND_FNAME;
++     if (!strcmp(name,"PRE_CREATE_DEEP_HOOK"))
++         return H_PRE_CREATE_DEEP_HOOK;
++     if (!strcmp(name,"POST_CREATE_DEEP_HOOK"))
++         return H_POST_CREATE_DEEP_HOOK;
++     if (!strcmp(name,"PRE_REMOVE_DEEP_HOOK"))
++        return H_PRE_REMOVE_DEEP_HOOK;
++     if (!strcmp(name,"POST_REMOVE_DEEP_HOOK"))
++        return H_POST_REMOVE_DEEP_HOOK;
+      return -1;
+  }
+
+Only in ldmud-3.2.5sp1: make_func.y~
+Only in ldmud-3.2.5sp1: mapping.o
+diff -cr ldmud-3.2.5/object.c ldmud-3.2.5sp1/object.c
+*** ldmud-3.2.5/object.c	Thu Dec 10 03:37:36 1998
+--- ldmud-3.2.5sp1/object.c	Mon Jan 25 15:24:23 1999
+***************
+*** 1546,1551 ****
+--- 1546,1569 ----
+
+  struct replace_ob *obj_list_replace = (struct replace_ob *)0;
+
++
++ void deep_reset_object(ob, arg)
++     struct object *ob;
++     int arg;
++ {
++   struct object *foo;
++  if (closure_hook[arg].type == T_STRING) {
++   foo = current_object;
++   current_object = ob;
++ // Falls die Funktion in dem Objekt selber auch aufgerufen werden soll:
++   sun_do_call_all_inherits(ob,ob->prog, closure_hook[arg].u.string);
++   //    sun_rec_call_all_inherits(ob,ob->prog, closure_hook[arg].u.string);
++   current_object = foo;
++  }
++  /* Als closuehook auch ne closure ? Dann koennte man den deep_pre_rem
++    in der clsoure catchen... Imho aber eher was fuer den Driver. */
++ }
++
+  void replace_programs() {
+      struct replace_ob *r_ob, *r_next;
+      int i,j;
+Only in ldmud-3.2.5sp1: object.c~
+Only in ldmud-3.2.5sp1: object.o
+Only in ldmud-3.2.5sp1: otable.o
+Only in ldmud-3.2.5sp1: parse.o
+Only in ldmud-3.2.5sp1: parse_old.o
+Only in ldmud-3.2.5sp1: port.o
+diff -cr ldmud-3.2.5/prolang.y ldmud-3.2.5sp1/prolang.y
+*** ldmud-3.2.5/prolang.y	Thu Dec 10 03:37:36 1998
+--- ldmud-3.2.5sp1/prolang.y	Mon Jan 25 15:25:55 1999
+***************
+*** 7006,7011 ****
+--- 7007,7019 ----
+  H_NOECHO:         SH(T_CLOSURE) SH(T_STRING), \
+  H_ERQ_STOP:       SH(T_CLOSURE), \
+  H_MODIFY_COMMAND_FNAME: SH(T_STRING), \
++ H_MODIFY_COMMAND_FNAME:         SH(T_STRING), \
++ H_PRE_CREATE_DEEP_HOOK:         SH(T_STRING), \
++ H_POST_CREATE_DEEP_HOOK:        SH(T_STRING), \
++ H_PRE_REMOVE_DEEP_HOOK:         SH(T_STRING), \
++ H_POST_REMOVE_DEEP_HOOK:        SH(T_STRING), \
++
+
+  #if defined( DEBUG ) && defined ( TRACE_CODE )
+
+Only in ldmud-3.2.5sp1: prolang.y~
+Only in ldmud-3.2.5sp1: random.o
+Only in ldmud-3.2.5sp1: regexp.o
+Only in ldmud-3.2.5sp1: rxcache.o
+Only in ldmud-3.2.5sp1: simul_efun.o
+diff -cr ldmud-3.2.5/simulate.c ldmud-3.2.5sp1/simulate.c
+*** ldmud-3.2.5/simulate.c	Thu Dec 10 03:37:36 1998
+--- ldmud-3.2.5sp1/simulate.c	Mon Jan 25 16:11:06 1999
+***************
+*** 565,577 ****
+--- 565,583 ----
+          if (save_current == &dummy_current_object_for_loads) {
+              /* The master object is loaded with no current object */
+              current_object = 0;
++             deep_reset_object(ob,H_PRE_CREATE_DEEP_HOOK);
+              reset_object(ob, H_CREATE_OB - dont_reset);
+              /* If the master inherits anything -Ugh- we have to have
+                 some object to attribute initialized variables to again */
+              current_object = save_current;
++             if (!(ob->flags & O_DESTRUCTED))
++                deep_reset_object(ob,H_POST_CREATE_DEEP_HOOK);
+          } else {
+              current_object = save_current;
++             deep_reset_object(ob,H_PRE_CREATE_DEEP_HOOK);
+              reset_object(ob, H_CREATE_OB - dont_reset);
++             if (!(ob->flags & O_DESTRUCTED))
++                deep_reset_object(ob,H_POST_CREATE_DEEP_HOOK);
+          }
+      }
+      if ( !(ob->flags & O_DESTRUCTED) && function_exists("clean_up",ob) )
+***************
+*** 699,705 ****
+--- 705,714 ----
+      push_object(ob);
+      push_volatile_string(new_ob->name);
+      give_uid_to_object(new_ob, H_CLONE_UIDS, 2);
++     deep_reset_object(new_ob,H_PRE_CREATE_DEEP_HOOK);
+      reset_object(new_ob, H_CREATE_CLONE);
++     if (!(new_ob->flags & O_DESTRUCTED))
++       deep_reset_object(new_ob,H_POST_CREATE_DEEP_HOOK);
+      command_giver = check_object(save_command_giver);
+      /* Never know what can happen ! :-( */
+      if (new_ob->flags & O_DESTRUCTED)
+***************
+*** 969,975 ****
+          }
+          command_giver=save;
+      }
+!     emergency_destruct(ob);
+  }
+
+  /*
+--- 978,987 ----
+          }
+          command_giver=save;
+      }
+!
+!   deep_reset_object(ob,H_PRE_REMOVE_DEEP_HOOK);
+!   emergency_destruct(ob);
+!   deep_reset_object(ob,H_POST_REMOVE_DEEP_HOOK);
+  }
+
+  /*
+***************
+*** 1432,1446 ****
+          struct interactive *ip;
+
+          current_object->flags |= O_ENABLE_COMMANDS;
+!         command_giver = current_object;
+!         if (NULL != (ip = O_GET_INTERACTIVE(command_giver)) &&
+              ip->sent.type == SENT_INTERACTIVE)
+          {
+              trace_level |= ip->trace_level;
+          }
+      } else {
+          current_object->flags &= ~O_ENABLE_COMMANDS;
+!         command_giver = 0;
+      }
+  }
+
+--- 1444,1460 ----
+          struct interactive *ip;
+
+          current_object->flags |= O_ENABLE_COMMANDS;
+!         // SiliconDream: musn't change this... (sun)
+!         //        command_giver = current_object;
+!
+!         if (NULL != (ip = O_GET_INTERACTIVE(current_object)) &&
+              ip->sent.type == SENT_INTERACTIVE)
+          {
+              trace_level |= ip->trace_level;
+          }
+      } else {
+          current_object->flags &= ~O_ENABLE_COMMANDS;
+!         //        command_giver = 0;
+      }
+  }
+
+***************
+*** 2122,2131 ****
+      struct object *ob;
+      struct interactive *ip;
+
+!     if (sp->type != T_OBJECT)
+          bad_xefun_arg(1, sp);
+      ob = sp->u.ob;
+      command_giver = ob;
+      if (NULL != (ip = O_GET_INTERACTIVE(ob)) &&
+          ip->sent.type == SENT_INTERACTIVE)
+      {
+--- 2136,2148 ----
+      struct object *ob;
+      struct interactive *ip;
+
+!     if ((sp->type != T_OBJECT) &&
+!        !((sp->type == T_NUMBER) && (sp->u.number == 0)))
+          bad_xefun_arg(1, sp);
+      ob = sp->u.ob;
+      command_giver = ob;
++     if (!ob) return sp - 1;
++
+      if (NULL != (ip = O_GET_INTERACTIVE(ob)) &&
+          ip->sent.type == SENT_INTERACTIVE)
+      {
+***************
+*** 2240,2247 ****
+              break;
+          *p = '\0';
+      }
+!     if (buff[0] == '\0')
+!         return 0;
+      clear_notify();
+      if (special_parse(buff))
+          return 1;
+--- 2257,2264 ----
+              break;
+          *p = '\0';
+      }
+!     /* for Silicondream (sunblade)  if (buff[0] == '\0')
+!         return 0; */
+      clear_notify();
+      if (special_parse(buff))
+          return 1;
+***************
+*** 3204,3209 ****
+--- 3222,3454 ----
+  }
+
+  static char emsg_buf[2000];
++
++
++ /* $FIXME$ : merge the two functions when ive got time
++    new-error does the handling for raise-caller-error.
++    For the time being, ive just copied the whole thing and made
++    it work like desired. */
++ #ifdef __STDC__
++ void new_error(int to_blame, char *fmt, ...)
++ #else
++ #if SIZEOF_P_INT != 4
++ You need an Ansi C compiler to get this right.
++ #endif
++ /*VARARGS1*/
++ void new_error( int to_blame, fmt, a, b, c, d, e, f, g, h)
++     char *fmt;
++     int a, b, c, d, e, f, g, h;
++ #endif
++ {
++     char *object_name;
++     struct object *save_cmd;
++     struct svalue *svp;
++     int do_save_error;
++     char *file, *malloced_error, *malloced_file = 0, *malloced_name = 0;
++     char fixed_fmt[200];
++     mp_int line_number = 0;
++ #ifdef __STDC__
++     int a;
++     va_list va;
++ #endif
++
++     fmt = limit_error_format(fixed_fmt, fmt);
++ #ifdef __STDC__
++     va_start(va, fmt);
++ #endif
++     if (current_object)
++         assign_eval_cost();
++     remove_command_giver_markers();
++     if (num_error && error_recovery_pointer->type <= ERROR_RECOVERY_APPLY) {
++         static char *times_word[] = {
++           "",
++           "Double",
++           "Triple",
++           "Quadruple",
++         };
++         debug_message(
++           "%s fault, last error was: %s",
++           times_word[num_error],
++           emsg_buf + 1
++         );
++     }
++ #ifdef __STDC__
++     vsprintf(emsg_buf+1, fmt, va);
++     va_end(va);
++ #else
++     sprintf(emsg_buf+1, fmt, a, b, c, d, e, f, g, h);
++ #endif
++     emsg_buf[0] = '*';  /* all system errors get a * at the start */
++     if (error_recovery_pointer->type >= ERROR_RECOVERY_CATCH) {
++         /* user catches this error */
++         catch_value.type = T_STRING;
++         catch_value.x.string_type = STRING_MALLOC;        /* Always reallocate */
++         catch_value.u.string = string_copy(emsg_buf);
++         longjmp(error_recovery_pointer->con.text, 1);
++         fatal("Catch() longjump failed");
++     }
++     num_error++;
++     if (num_error > 3)
++         fatal("Too many simultaneous errors.\n");
++     debug_message("%s", emsg_buf+1);
++     do_save_error = 0;
++     if ( NULL != (malloced_error = xalloc(strlen(emsg_buf)/* -1 for *, +1 for \0 */)) ) {
++         strcpy(malloced_error, emsg_buf+1);
++     }
++     if (current_object) {
++         struct control_stack *old_csp;
++         struct object *old_ob;
++         struct program *old_prog;
++         char *old_pc;
++         char *old_funstart;
++
++ extern struct control_stack *csp;
++ extern struct program *current_prog;
++ extern char *inter_pc;
++
++         old_ob = current_object;
++         old_csp = csp;
++         old_prog = current_prog;
++         old_pc = inter_pc;
++         old_funstart = csp->funstart;
++
++         //        csp -= to_blame;
++         if (to_blame != 0) {
++          current_object = csp->ob;
++          current_prog = csp->prog;
++          inter_pc = csp->pc;
++          csp->funstart = csp[-1].funstart;
++         }
++
++         line_number = get_line_number_if_any(&file);
++         debug_message("program: %s, object: %s line %ld\n",
++                     file,
++                     current_object->name,
++                     line_number);
++         if (current_prog && num_error < 3) {
++             do_save_error = 1;
++         }
++         if ( NULL != (malloced_file = xalloc(strlen(file) + 1)) ) {
++             strcpy(malloced_file, file);
++         }
++         if ( NULL != (malloced_name = xalloc(strlen(current_object->name) + 1)) ) {
++             strcpy(malloced_name, current_object->name);
++         }
++
++       inter_pc = old_pc;
++       csp->funstart = old_funstart;
++       csp = old_csp; /* damit korrekt gepoppt wird */
++       current_object = old_ob;
++       current_prog = old_prog;
++
++
++     }
++     object_name = dump_trace(num_error == 3);
++     fflush(stdout);
++     if (error_recovery_pointer->type == ERROR_RECOVERY_APPLY) {
++         printf("error in function call: %s", emsg_buf+1);
++         if (current_object) {
++             printf("program: %s, object: %s line %ld\n",
++               file,
++               current_object->name,
++               line_number
++             );
++         }
++         current_error = malloced_error;
++         current_error_file = malloced_file;
++         current_error_object_name = malloced_name;
++         current_error_line_number = line_number;
++         if (out_of_memory) {
++             if (malloced_error)
++                 xfree(malloced_error);
++             if (malloced_file)
++                 xfree(malloced_file);
++             if (malloced_name)
++                 xfree(malloced_name);
++         }
++         longjmp(error_recovery_pointer->con.text, 1);
++     }
++     /*
++      * The stack must be brought in a usable state. After the
++      * call to reset_machine(), all arguments to error() are invalid,
++      * and may not be used any more. The reason is that some strings
++      * may have been on the stack machine stack, and have been deallocated.
++      */
++     reset_machine (0);
++     if (do_save_error) {
++         save_error(emsg_buf, file, line_number);
++     }
++     if (object_name) {
++         struct object *ob;
++         ob = find_object(object_name);
++         if (!ob) {
++             if (command_giver && num_error < 2)
++                 add_message("error when executing program in destroyed object %s\n",
++                             object_name);
++             debug_message("error when executing program in destroyed object %s\n",
++                         object_name);
++         }
++     }
++     if (num_error == 3) {
++         debug_message("Master failure: %s", emsg_buf+1);
++     } else if (!out_of_memory) {
++         assigned_eval_cost = eval_cost -= MASTER_RESERVED_COST;
++         push_volatile_string(malloced_error);
++         a = 1;
++         if (current_object) {
++             push_volatile_string(malloced_file);
++             push_volatile_string(malloced_name);
++             push_number(line_number);
++             a += 3;
++         }
++         save_cmd = command_giver;
++         apply_master_ob(STR_RUNTIME, a);
++         command_giver = save_cmd;
++         if (current_heart_beat) {
++             struct object *culprit;
++
++             culprit = current_heart_beat;
++             current_heart_beat = 0;
++             set_heart_beat(culprit, 0);
++             debug_message("Heart beat in %s turned off.\n",
++                           culprit->name);
++             push_object(culprit);
++             push_volatile_string(malloced_error);
++             a = 2;
++             if (current_object) {
++                 push_volatile_string(malloced_file);
++                 push_volatile_string(malloced_name);
++                 push_number(line_number);
++                 a += 3;
++             }
++             svp = apply_master_ob(STR_HEART_ERROR, a);
++             command_giver = save_cmd;
++             if (svp && (svp->type != T_NUMBER || svp->u.number) ) {
++                 set_heart_beat(culprit, 1);
++             }
++         }
++         assigned_eval_cost = eval_cost += MASTER_RESERVED_COST;
++     }
++     if (malloced_error)
++         xfree(malloced_error);
++     if (malloced_file)
++         xfree(malloced_file);
++     if (malloced_name)
++         xfree(malloced_name);
++     num_error--;
++     if (current_interactive) {
++         struct interactive *i;
++
++         i = O_GET_INTERACTIVE(current_interactive);
++         if (i && i->sent.type == SENT_INTERACTIVE && i->noecho & NOECHO_STALE) {
++             set_noecho(i, 0);
++         }
++     }
++     if (error_recovery_pointer->type != ERROR_RECOVERY_NONE)
++         longjmp(error_recovery_pointer->con.text, 1);
++     abort();
++ }
++
+
+  #ifdef __STDC__
+  void error(char *fmt, ...)
+Only in ldmud-3.2.5sp1: simulate.c~
+Only in ldmud-3.2.5sp1: simulate.o
+Only in ldmud-3.2.5sp1: smalloc.o
+Only in ldmud-3.2.5sp1: sprintf.o
+Only in ldmud-3.2.5sp1: stralloc.o
+Only in ldmud-3.2.5sp1: swap.o
+Only in ldmud-3.2.5sp1: wiz_list.o
+Only in ldmud-3.2.5sp1: xjr
+Only in ldmud-3.2.5sp1: y.output
+
+Daniel von Dincklage (vonDincklage@ozet.de)
+Windows95 (noun): 32 bit extensions and a graphical shell for a 16 bit
+patch to an 8 bit operating system originally coded for a 4 bit micro
+processor, written by a 2 bit company that can't stand 1 bit of competition.
+
+

@@ -1,0 +1,16 @@
+CONCEPT
+        efuns
+
+DESCRIPTION
+        Efuns are "system calls" in the LPC driver, the C program
+        which compiles and executes the LPC programs of the mudlib.
+        These are hardcoded functions which perform basic tasks which
+        would be ineffective or impossible to be implemented in the
+        mudlib.
+
+        There are efuns for accessing the underlying filesystem, for
+        creating, moving and destructing objects, for writing
+        messages to users, for manipulation of LPC data types.
+
+SEE ALSO
+        efun(E), lfuns(LPC), applied(A), master(M)
