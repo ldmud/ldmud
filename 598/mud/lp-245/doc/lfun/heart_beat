@@ -1,0 +1,16 @@
+void heart_beat()
+
+This function will be called automatically every 2 seconds. The start and
+stop of heart beat is controlled by set_heart_beat().
+
+Be careful not to have objects with heart beat running all the time, is it
+uses a lot of resources.
+
+If there is an error in the heart beat routine, the heart beat will be turned
+off until this object is recompiled, and can not be restarted with
+set_heart_beat.
+
+The function this_player() will return this object, but only if it is living.
+Otherwise, this_player() will return 0.
+
+See also: efun/set_heart_beat efun/call_out efun/enable_commands

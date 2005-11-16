@@ -1,0 +1,1574 @@
+? Makefile
+
+? xtush
+
+Index: Imakefile
+
+===================================================================
+
+RCS file: /usr/local/cvsroot/xtush/Imakefile,v
+
+retrieving revision 1.1.1.1
+
+retrieving revision 1.3
+
+diff -c -r1.1.1.1 -r1.3
+
+*** Imakefile	1998/10/24 21:00:10	1.1.1.1
+
+--- Imakefile	1998/12/03 11:59:13	1.3
+
+***************
+
+*** 25,30 ****
+
+--- 25,36 ----
+
+  #GRAPHICS = -DGRAPHICS
+
+  #GRAPHLIBS =  -lm $(XLIB)
+
+
+
++ # Support compression?
+
++ COMPRESSION = -DCOMPRESSION
+
++ COMPLIBS = -lz
+
++ COMPSRC = mccpDecompress.c
+
++ COMPOBJ = mccpDecompress.o
+
++
+
+
+
+  # Swap the LOCAL_LIBRARIES definitions around if you're trying to compile this
+
+  # on Solaris 2.2
+
+***************
+
+*** 37,48 ****
+
+  #LOCAL_LIBRARIES =	-ltermcap $(GRAPHLIBS)
+
+
+
+  #And another line for linux systems
+
+! LOCAL_LIBRARIES =	-ltermcap -lbsd $(GRAPHLIBS)
+
+
+
+! SRCS =	alias.c command.c main.c socket.c vscreen.c graphics.c bsxgraphics.c
+
+! OBJS =	alias.o command.o main.o socket.o vscreen.o graphics.o bsxgraphics.o
+
+
+
+! DEFINES = $(SYSTEM) $(MALL) $(GRAPHICS) -DHELPPATH='"$(HELPFILEDIR)/tush.doc"'
+
+
+
+  ComplexProgramTarget(xtush)
+
+
+
+--- 43,54 ----
+
+  #LOCAL_LIBRARIES =	-ltermcap $(GRAPHLIBS)
+
+
+
+  #And another line for linux systems
+
+! LOCAL_LIBRARIES =	-ltermcap -lbsd $(GRAPHLIBS) $(COMPLIBS)
+
+
+
+! SRCS =	alias.c command.c main.c socket.c vscreen.c graphics.c bsxgraphics.c $(COMPSRC)
+
+! OBJS =	alias.o command.o main.o socket.o vscreen.o graphics.o bsxgraphics.o $(COMPOBJ)
+
+
+
+! DEFINES = $(SYSTEM) $(MALL) $(GRAPHICS) $(COMPRESSION) -DHELPPATH='"$(HELPFILEDIR)/tush.doc"'
+
+
+
+  ComplexProgramTarget(xtush)
+
+
+
+Index: Makefile.std
+
+===================================================================
+
+RCS file: /usr/local/cvsroot/xtush/Makefile.std,v
+
+retrieving revision 1.1.1.1
+
+retrieving revision 1.3
+
+diff -c -r1.1.1.1 -r1.3
+
+*** Makefile.std	1998/10/24 21:00:10	1.1.1.1
+
+--- Makefile.std	1998/12/03 11:59:14	1.3
+
+***************
+
+*** 36,41 ****
+
+--- 36,47 ----
+
+  #GRAPHICS = -DGRAPHICS
+
+  #EXTRALIBS =  -lm -lX11
+
+
+
++ # Support compression?
+
++ COMPRESSION = -DCOMPRESSION
+
++ EXTRALIBS = $(EXTRALIBS) -lz
+
++ COMPSRC = mccpDecompress.c
+
++ COMPOBJ = mccpDecompress.o
+
++
+
+  # Swap the LIBS definitions around if you're trying to compile this on
+
+  # Solaris 2.2
+
+  # The -L and -R should point to where your ucb libs are.
+
+***************
+
+*** 51,57 ****
+
+  #######################################################################
+
+  # You shouldn't need to alter anything below here.
+
+
+
+! DEFS = $(SYSTEM) $(MALL) $(GRAPHICS) -DHELPPATH='"$(HELPFILEDIR)/tush.doc"'
+
+
+
+
+
+  HDRS          = clist.h \
+
+--- 57,63 ----
+
+  #######################################################################
+
+  # You shouldn't need to alter anything below here.
+
+
+
+! DEFS = $(SYSTEM) $(MALL) $(GRAPHICS) $(COMPRESSION) -DHELPPATH='"$(HELPFILEDIR)/tush.doc"'
+
+
+
+
+
+  HDRS          = clist.h \
+
+***************
+
+*** 63,69 ****
+
+  		socket.o \
+
+  		vscreen.o \
+
+                  graphics.o \
+
+! 		bsxgraphics.o
+
+
+
+  SRCS          = alias.c \
+
+  		command.c \
+
+--- 69,76 ----
+
+  		socket.o \
+
+  		vscreen.o \
+
+                  graphics.o \
+
+! 		bsxgraphics.o \
+
+!                 $(COMPOBJ)
+
+
+
+  SRCS          = alias.c \
+
+  		command.c \
+
+***************
+
+*** 71,77 ****
+
+  		socket.c \
+
+  		vscreen.c \
+
+                  graphics.c \
+
+! 		bsxgraphics.c
+
+
+
+  all:            $(PROGRAM)
+
+
+
+--- 78,85 ----
+
+  		socket.c \
+
+  		vscreen.c \
+
+                  graphics.c \
+
+! 		bsxgraphics.c \
+
+!                 $(COMPSRC)
+
+
+
+  all:            $(PROGRAM)
+
+
+
+Index: config.h
+
+===================================================================
+
+RCS file: /usr/local/cvsroot/xtush/config.h,v
+
+retrieving revision 1.1.1.1
+
+retrieving revision 1.3
+
+diff -c -r1.1.1.1 -r1.3
+
+*** config.h	1998/10/24 21:00:10	1.1.1.1
+
+--- config.h	1998/12/03 11:59:14	1.3
+
+***************
+
+*** 108,113 ****
+
+--- 108,117 ----
+
+
+
+  #include <stdio.h>
+
+
+
++ #ifdef COMPRESSION
+
++ #include "mccpDecompress.h"
+
++ #endif
+
++
+
+  /* the shell structure definition */
+
+
+
+  struct shs {
+
+***************
+
+*** 148,153 ****
+
+--- 152,161 ----
+
+    int bsxgraphics;
+
+    char inputgraphics[MAXGRAPHICSLEN];
+
+    int graphicslen;
+
++ #endif
+
++
+
++ #ifdef COMPRESSION
+
++   mc_state *compress;
+
+  #endif
+
+  };
+
+
+
+Index: mccpDecompress.c
+
+===================================================================
+
+RCS file: mccpDecompress.c
+
+diff -N mccpDecompress.c
+
+*** /dev/null	Wed May  6 08:32:27 1998
+
+--- /tmp/04108aaa	Fri Dec  4 01:02:01 1998
+
+***************
+
+*** 0 ****
+
+--- 1,374 ----
+
++ /*
+
++  * Client decompression module for the mud client compression protocol.
+
++  * See http://homepages.ihug.co.nz/~icecube/compress/ for more details.
+
++  *
+
++  * mccpDecompress.c - module code. Link this with your client code.
+
++  *
+
++  * Oliver Jowett <icecube$ihug.co.nz>. Demangle address as needed.
+
++  *
+
++  * This code is placed in the public domain.
+
++  *
+
++  */
+
++
+
++ /* Modified: 981203 */
+
++
+
++ /* See mccpDecompress.h for API information */
+
++
+
++ #include <stdlib.h>
+
++ #include <stdio.h>
+
++ #include <string.h>
+
++
+
++ #include <zlib.h>
+
++
+
++ #include "mccpDecompress.h"
+
++
+
++ /* Telnet values we're interested in */
+
++
+
++ #define IAC             255
+
++ #define DONT            254
+
++ #define DO              253
+
++ #define WONT            252
+
++ #define WILL            251
+
++ #define SB              250
+
++ #define SE              240
+
++
+
++ #define TELOPT_COMPRESS 85
+
++
+
++ /* Server sends  IAC WILL COMPRESS
+
++  * We reply with IAC DO COMPRESS
+
++  *
+
++  * Later the server sends IAC SB COMPRESS WILL SE, and immediately following
+
++  * that, begins compressing
+
++  *
+
++  * Compression ends on a Z_STREAM_END, no other marker is used
+
++  */
+
++
+
++ static char will_sig[] = { IAC, WILL, TELOPT_COMPRESS, 0 };
+
++ static char do_sig[] =   { IAC, DO, TELOPT_COMPRESS, 0 };
+
++ static char on_sig[] =   { IAC, SB, TELOPT_COMPRESS, WILL, SE, 0 };
+
++
+
++ /* this is used on every call to mudcompress_receive */
+
++ #define will_sig_len 3
+
++ #define on_sig_len 5
+
++
+
++ /* "Opaque" state object */
+
++
+
++ struct mc_state_s {
+
++     z_stream *stream;      /* stream we're using */
+
++
+
++     unsigned char *inbuf;  /* input buffer (data from mud) */
+
++     unsigned int insize;   /* .. and how much is used */
+
++     unsigned int inalloc;  /* .. and how much is allocated */
+
++
+
++     unsigned char *outbuf; /* output buffer (data to user) */
+
++     unsigned int outsize;  /* .. and how much is used */
+
++     unsigned int outalloc; /* .. and how much is allocated */
+
++
+
++     int error;
+
++     int response;
+
++
+
++     unsigned long comp;
+
++     unsigned long uncomp;
+
++ };
+
++
+
++ /* Initialise a new state object */
+
++ mc_state *mudcompress_new(void)
+
++ {
+
++     mc_state *state;
+
++
+
++     state = malloc(sizeof(*state));
+
++     state->stream   = NULL;   /* Not decompressing */
+
++     state->inalloc  = 2048;
+
++     state->outalloc = 2048;
+
++     state->inbuf    = malloc(state->inalloc);
+
++     state->outbuf   = malloc(state->outalloc);
+
++     state->insize   = 0;
+
++     state->outsize  = 0;
+
++     state->error    = 0;
+
++     state->comp     = 0;
+
++     state->uncomp   = 0;
+
++     state->response = 0;
+
++
+
++     return state;
+
++ }
+
++
+
++ /* Clean up a state object */
+
++ void mudcompress_delete(mc_state *state)
+
++ {
+
++     if (state->stream) {
+
++         inflateEnd(state->stream);
+
++         free(state->stream);
+
++     }
+
++
+
++     free(state->inbuf);
+
++     free(state->outbuf);
+
++     free(state);
+
++ }
+
++
+
++ /* zlib helpers */
+
++
+
++ static void *zlib_alloc(void *opaque, unsigned int items, unsigned int size)
+
++ {
+
++     return calloc(items, size);
+
++ }
+
++
+
++ static void zlib_free(void *opaque, void *address)
+
++ {
+
++     free(address);
+
++ }
+
++
+
++ static void grow_inbuf(mc_state *state, int needed)
+
++ {
+
++     int old = state->inalloc;
+
++
+
++     while (state->inalloc < state->insize + needed)
+
++         state->inalloc *= 2;
+
++
+
++     if (old != state->inalloc)
+
++         state->inbuf = realloc(state->inbuf, state->inalloc);
+
++ }
+
++
+
++ static void grow_outbuf(mc_state *state, int needed)
+
++ {
+
++     int old = state->outalloc;
+
++
+
++     while (state->outalloc < state->outsize + needed)
+
++         state->outalloc *= 2;
+
++
+
++     if (old != state->outalloc)
+
++         state->outbuf = realloc(state->outbuf, state->outalloc);
+
++ }
+
++
+
++ static void decompress_inbuf(mc_state *state)
+
++ {
+
++     int status;
+
++
+
++     /* We are now decompressing from inbuf to outbuf */
+
++
+
++     if (!state->insize)
+
++         return; /* nothing to decompress? */
+
++
+
++     state->stream->next_in = state->inbuf;
+
++     state->stream->next_out = state->outbuf + state->outsize;
+
++     state->stream->avail_in = state->insize;
+
++     state->stream->avail_out = state->outalloc - state->outsize;
+
++
+
++     status = inflate(state->stream, Z_PARTIAL_FLUSH);
+
++
+
++     if (status == Z_OK || status == Z_STREAM_END) {
+
++         /* Successful decompression */
+
++
+
++         /* Remove used data from inbuf */
+
++         state->comp += state->insize - state->stream->avail_in;
+
++         state->uncomp += state->stream->next_out - state->outbuf;
+
++
+
++         memmove(state->inbuf, state->stream->next_in, state->stream->avail_in);
+
++         state->insize = state->stream->avail_in;
+
++
+
++         /* Update outbuf pointers */
+
++         state->outsize = state->stream->next_out - state->outbuf;
+
++
+
++         /* Done */
+
++
+
++         if (status == Z_STREAM_END) {
+
++             /* Turn off compression too */
+
++
+
++             grow_outbuf(state, state->insize);
+
++
+
++             memcpy(state->outbuf + state->outsize, state->inbuf, state->insize);
+
++             state->outsize += state->insize;
+
++             state->insize = 0;
+
++
+
++             inflateEnd(state->stream);
+
++             free(state->stream);
+
++             state->stream = NULL;
+
++         }
+
++
+
++         return;
+
++     }
+
++
+
++     if (status == Z_BUF_ERROR) {
+
++         /* Full buffers? Maybe we need more output space.. */
+
++
+
++         if (state->outsize * 2 > state->outalloc) {
+
++             grow_outbuf(state, state->outalloc);
+
++             decompress_inbuf(state);
+
++         }
+
++
+
++         return;
+
++     }
+
++
+
++     /* Error */
+
++     state->error = 1;
+
++ }
+
++
+
++ /* We received some data */
+
++ void mudcompress_receive(mc_state *state, const char *data, unsigned len)
+
++ {
+
++     int i;
+
++
+
++     if (state->error)
+
++         return;
+
++
+
++     if (!state->stream) {
+
++         int residual = -1;
+
++         int clen;
+
++
+
++         /* Just copy to outbuf. Also copy any residual inbuf */
+
++
+
++         grow_outbuf(state, len + state->insize);
+
++         memcpy(state->outbuf + state->outsize, data, len);
+
++         state->outsize += len;
+
++         memcpy(state->outbuf + state->outsize, state->inbuf, state->insize);
+
++         state->outsize += state->insize;
+
++         state->insize = 0;
+
++
+
++         /* Check for Magic Marker. ugh this is messy */
+
++         for (i=0; i < state->outsize; i++) {
+
++             if (state->outbuf[i] == IAC) {
+
++                 if (i + 1 < state->outsize && state->outbuf[i+1] == IAC) {
+
++                     /* IAC IAC - ignore */
+
++                     i++;
+
++                     continue;
+
++                 }
+
++
+
++                 clen = (i + will_sig_len < state->outsize) ? will_sig_len : state->outsize - i;
+
++
+
++                 if (!memcmp(&state->outbuf[i], will_sig, clen)) {
+
++                     if (clen != will_sig_len) {
+
++                         /* Partial match. Save it. */
+
++                         residual = i;
+
++                         break;
+
++                     }
+
++
+
++                     /* Say we'll do compression. remove sig from inbuf */
+
++
+
++                     state->response = 1;
+
++
+
++                     memmove(&state->outbuf[i],
+
++                             &state->outbuf[i + will_sig_len],
+
++                             state->outsize - will_sig_len);
+
++                     state->outsize -= strlen(will_sig);
+
++                     i--;
+
++                     continue;
+
++                 }
+
++
+
++                 clen = (i + on_sig_len < state->outsize) ? on_sig_len : state->outsize - i;
+
++
+
++                 if (!memcmp(&state->outbuf[i], on_sig, clen)) {
+
++                     if (clen != on_sig_len) {
+
++                         /* Partial match. Save it. */
+
++                         residual = i;
+
++                         break;
+
++                     }
+
++
+
++                     /* Switch to compression */
+
++                     /* copy any compressible bits to our inbuf */
+
++
+
++                     grow_inbuf(state, state->outsize - i - strlen(on_sig));
+
++
+
++                     memcpy(state->inbuf,
+
++                            state->outbuf + i + strlen(on_sig),
+
++                            state->outsize - i - strlen(on_sig));
+
++
+
++                     state->insize = state->outsize - i - strlen(on_sig);
+
++
+
++                     /* clean up our output buffer */
+
++                     state->outsize = i;
+
++
+
++                     /* init stream */
+
++                     state->stream = malloc(sizeof(z_stream));
+
++                     state->stream->zalloc = zlib_alloc;
+
++                     state->stream->zfree = zlib_free;
+
++                     state->stream->opaque = NULL;
+
++
+
++                     if (inflateInit(state->stream) != Z_OK) {
+
++                         state->error = 1;
+
++                         free(state->stream);
+
++                         state->stream = NULL;
+
++                         return;
+
++                     }
+
++
+
++                     /* Continue with decompression */
+
++                     break;
+
++                 }
+
++             }
+
++         }
+
++
+
++         if (!state->stream) { /* didn't start decompressing? */
+
++             /* We might have some residual, copy to inbuf for later checking */
+
++
+
++             if (residual != -1) {
+
++                 grow_inbuf(state, state->outsize - residual);
+
++                 memcpy(state->inbuf + state->insize, state->outbuf + residual, state->outsize - residual);
+
++                 state->outsize = residual;
+
++             }
+
++
+
++             return;
+
++         }
+
++     } else {
+
++         /* New data to decompress. Copy to inbuf */
+
++         grow_inbuf(state, len);
+
++         memcpy(state->inbuf + state->insize, data, len);
+
++         state->insize += len;
+
++     }
+
++
+
++     decompress_inbuf(state);
+
++ }
+
++
+
++ /* How much data is available? */
+
++ int mudcompress_pending(mc_state *state)
+
++ {
+
++     return state->error ? 0 : state->outsize;
+
++ }
+
++
+
++ /* Was there an error? */
+
++ int mudcompress_error(mc_state *state)
+
++ {
+
++     return state->error;
+
++ }
+
++
+
++ /* Get some data */
+
++ int mudcompress_get(mc_state *state, char *buf, int size)
+
++ {
+
++     int copied;
+
++
+
++     if (state->error || !state->outsize)
+
++         return 0;
+
++
+
++     if (size > state->outsize)
+
++         copied = state->outsize;
+
++     else
+
++         copied = size;
+
++
+
++     memcpy(buf, state->outbuf, copied);
+
++     state->outsize -= copied;
+
++     if (state->outsize)
+
++         memmove(state->outbuf, state->outbuf + copied, state->outsize);
+
++
+
++     /* Do some more decompression */
+
++     decompress_inbuf(state);
+
++
+
++     return copied;
+
++ }
+
++
+
++ void mudcompress_stats(mc_state *state, unsigned long *comp, unsigned long *uncomp)
+
++ {
+
++     *comp = state->comp;
+
++     *uncomp = state->uncomp;
+
++ }
+
++
+
++ const char *mudcompress_response(mc_state *state)
+
++ {
+
++     if (state->response) {
+
++         state->response = 0;
+
++         return do_sig;
+
++     }
+
++
+
++     return NULL;
+
++ }
+
++
+
++ int mudcompress_compressing(mc_state *state)
+
++ {
+
++     return (state->stream != NULL);
+
++ }
+
+Index: mccpDecompress.h
+
+===================================================================
+
+RCS file: mccpDecompress.h
+
+diff -N mccpDecompress.h
+
+*** /dev/null	Wed May  6 08:32:27 1998
+
+--- /tmp/04108baa	Fri Dec  4 01:02:01 1998
+
+***************
+
+*** 0 ****
+
+--- 1,141 ----
+
++ /*
+
++  * Client decompression module for the mud client compression protocol.
+
++  * See http://homepages.ihug.co.nz/~icecube/compress/ for more details.
+
++  *
+
++  * mccpDecompress.h - header definitions. #include this in your client code.
+
++  *
+
++  * Oliver Jowett <icecube$ihug.co.nz>. Demangle address as needed.
+
++  *
+
++  * This code is placed in the public domain.
+
++  *
+
++  */
+
++
+
++ /* Modified: 981203 */
+
++
+
++ /*
+
++  *
+
++  * mc_state is an opaque type representing the current compression state of
+
++  * a connection. You should include a (mc_state *) in the information you
+
++  * store for a server connection.
+
++  *
+
++  * Initialization / cleanup:
+
++  *
+
++  *   When a connection is initiated, call mudcompress_new, and store the
+
++  *   resulting pointer in your server connection information. This pointer is
+
++  *   used as a handle for all other functions. This does NOT begin compression
+
++  *   - it just initialises various internal structures.
+
++  *
+
++  *   When a connection is terminated, call mudcompress_delete with the handle
+
++  *   to delete all memory allocated by the decompressor for the connection.
+
++  *
+
++  * Reading / writing:
+
++  *
+
++  *   Reading from the server connection must go through the decompressor at
+
++  *   all times. The decompressor handles both negotiation and decompression
+
++  *   transparently - it receives input directly from the server, then provides
+
++  *   the main client code with decompressed data, hiding all protocol details.
+
++  *
+
++  *   When data is received from the mud server, call mudcompress_receive,
+
++  *   passing it the handle for the connection, a pointer to the data read,
+
++  *   and the length of data read. It is VITAL that ALL data read is passed
+
++  *   to the decompressor - including data with embedded NULs!
+
++  *
+
++  *   After mudcompress_receive has been called, call mudcompress_pending() to
+
++  *   see if any decompressed data is available. It returns the number of
+
++  *   bytes pending.
+
++  *
+
++  *   If there is pending data waiting, call mudcompress_get to retrieve it.
+
++  *   This fills up to "size" bytes in the provided buffer "buf", and returns
+
++  *   the number of bytes copied. Your client can now process this data as if
+
++  *   it had been directly read from the server.
+
++  *
+
++  *   Be sure to check mudcompress_pending again after calling mudcompress_get!
+
++  *   Removing some data from the decompress buffer may have allowed the
+
++  *   decompressor to decompress some more data - in which case, you want to
+
++  *   process it immediately, rather than waiting for another read from the
+
++  *   mud server.
+
++  *
+
++  *   Regularly call mudcompress_response. If non-NULL, you need to write the
+
++  *   returned string to the mud server. This is needed when the decompressor
+
++  *   is negotiating compression with the server. When called,
+
++  *   mudcompress_response clears any pending string, so be sure to save its
+
++  *   return value!
+
++  *
+
++  * Status information:
+
++  *
+
++  *   mudcompress_error returns non-0 if there has been a (fatal) decompression
+
++  *   error. In this case, all you can do is tell the user that something went
+
++  *   wrong and close the connection.
+
++  *
+
++  *   mudcompress_stats fills in the two (unsigned long *) values passed, with
+
++  *   the number of compressed bytes read, and the number of bytes that they
+
++  *   decompressed to.
+
++  *
+
++  *   mudcompress_compressing returns non-0 if the connection is currently
+
++  *   using compression.
+
++  *
+
++  */
+
++
+
++ #ifndef MUDCOMPRESS_H
+
++ #define MUDCOMPRESS_H
+
++
+
++ #ifdef __cplusplus
+
++ extern "C" {
+
++ #endif
+
++
+
++     /*  Opaque handle for a decompressor. Details defined in Compress.c - you
+
++      *  should never need to see them externally.
+
++      */
+
++     struct mc_state_s;
+
++     typedef struct mc_state_s mc_state;
+
++
+
++     /*  Create a new decompressor. Return a handle to it.
+
++      */
+
++     mc_state *mudcompress_new(void);
+
++
+
++     /*  Deallocate a decompressor and associated data. 'state' is invalid
+
++      *  afterthis call.
+
++      */
+
++     void mudcompress_delete(mc_state *state);
+
++
+
++     /*  Perform decompression and negotiation on some received data.
+
++      *  'data' is a pointer to the received data, 'len' is its length.
+
++      */
+
++     void mudcompress_receive(mc_state *state, const char *data, unsigned len);
+
++
+
++     /*  Return the number of pending decompressed bytes that can currently
+
++      *  be read by mudcompress_get
+
++      */
+
++     int mudcompress_pending(mc_state *state);
+
++
+
++     /*  Return true (non-0) if this decompressor encountered a fatal error.
+
++      */
+
++     int mudcompress_error(mc_state *state);
+
++
+
++     /*  Read decompressed data from the decompressor into 'buf', up to a
+
++      *  maximum of 'size' bytes. Returns the number of bytes actually copied.
+
++      */
+
++     int mudcompress_get(mc_state *state, char *buf, int size);
+
++
+
++     /*  Set *comp to the number of compressed bytes read, and *uncomp to the
+
++      *  number of bytes they expanded to, for this decompressor.
+
++      */
+
++     void mudcompress_stats(mc_state *state, unsigned long *comp, unsigned long *uncomp);
+
++
+
++     /*  Check for a negotiation response. If this returns NULL, no output is
+
++      *  needed. If it returns non-NULL, it points to a NUL-terminated string
+
++      *  that should be sent to the mud server. Calling this function clears
+
++      *  the pending string (so be sure to save the result).
+
++      */
+
++     const char *mudcompress_response(mc_state *state);
+
++
+
++     /*  Return true (non-0) if this decompressor has successfully negotiated
+
++      *  compression and is currently performing decompression.
+
++      */
+
++     int mudcompress_compressing(mc_state *state);
+
++
+
++ #ifdef __cplusplus
+
++ }
+
++ #endif
+
++
+
++ #endif
+
+Index: socket.c
+
+===================================================================
+
+RCS file: /usr/local/cvsroot/xtush/socket.c,v
+
+retrieving revision 1.1.1.1
+
+diff -c -r1.1.1.1 socket.c
+
+*** socket.c	1998/10/24 21:00:10	1.1.1.1
+
+--- socket.c	1998/12/03 12:02:00
+
+***************
+
+*** 33,39 ****
+
+--- 33,41 ----
+
+
+
+  extern void print();
+
+  extern void *scratch;
+
++ #ifndef LINUX
+
+  extern char *sys_errlist[];
+
++ #endif
+
+  extern shell *current_shell, *first_shell;
+
+
+
+  #ifdef GRAPHICS
+
+***************
+
+*** 64,69 ****
+
+--- 66,76 ----
+
+      sh->grmode = GRNONE;
+
+      redisplay();
+
+  #endif
+
++
+
++ #ifdef COMPRESSION
+
++     mudcompress_delete(sh->compress);
+
++     sh->compress = NULL;
+
++ #endif
+
+      if (sh->flags&AUTODIE) kill_shell(sh,str);
+
+    }
+
+  }
+
+***************
+
+*** 541,550 ****
+
+--- 548,590 ----
+
+    m = malloc(chars_ready+1);
+
+    if (read(sd, m, chars_ready) == -1)
+
+      handle_error("Reading from socket.");
+
++
+
++ #ifdef COMPRESSION
+
++   /* Filter through mudcompress */
+
++   mudcompress_receive(sh->compress, m, chars_ready);
+
++   free(m);
+
++
+
++   /* maybe send out a response */
+
++   m = mudcompress_response(sh->compress);
+
++   if (m)
+
++     write(sd, m, strlen(m));
+
++
+
++   while (mudcompress_pending(sh->compress)) {
+
++       int count;
+
++
+
++       m = malloc(mudcompress_pending(sh->compress));
+
++       count = mudcompress_get(sh->compress, m, mudcompress_pending(sh->compress));
+
++
+
++       for (i = 0; i < count; i++)
+
++           parse_input(sh, m[i], 0);
+
++
+
++       free(m);
+
++   }
+
++
+
++   parse_input(sh, '\0', 1);
+
++
+
++   if (mudcompress_error(sh->compress)) {
+
++       shell_print(sh,"Compression error");
+
++       close_com(sh,0);
+
++       update(sh);
+
++       return;
+
++   }
+
++ #else
+
+    for (i = 0; i < chars_ready; i++)
+
+      parse_input(sh, m[i], 0);
+
+    parse_input(sh, '\0', 1);
+
+    free(m);
+
++ #endif
+
+
+
+    if (sh != current_shell) {
+
+      if ((sh->flags&MONITOR) && !(sh->flags&MONITOR_GONEOFF)) {
+
+***************
+
+*** 617,622 ****
+
+--- 657,666 ----
+
+    shell_print(sh,"Connected to server ...");
+
+    sh->flags |= CONNECTED;
+
+    sh->flags &= ~COMMAND;
+
++
+
++ #ifdef COMPRESSION
+
++   sh->compress = mudcompress_new();
+
++ #endif
+
+  }
+
+
+
+  /* the open command */
+

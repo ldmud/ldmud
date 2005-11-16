@@ -1,0 +1,14 @@
+SYNOPSIS
+        string *parse_command_id_list(void)
+
+DESCRIPTION
+        Used by parse_command(). Return an array of common
+        singular 'thing' ids in the installations native language.
+
+EXAMPLE
+        string *parse_command_id_list() {
+            return ({ "one", "thing" });
+        }
+
+SEE ALSO
+        parse_command(E)

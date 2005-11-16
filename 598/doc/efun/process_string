@@ -1,0 +1,40 @@
+OPTIONAL
+SYNOPSIS
+        string process_string(string str)
+
+DESCRIPTION
+        Searches string str for occurences of a "value by function
+        call", which is @@ followed by an implicit function call. See
+        "value_by_function_call" in the principles section.
+
+        The value should contain a string like this:
+        @@function[:filename][|arg|arg]@@
+
+        function must return a string or else the string which should be
+        processed will be returned unchanged.
+
+        Note that process_string() does not recurse over returned
+        replacement values. If a function returns another function
+        description, that description will not be replaced.
+
+        Note that both filename and args are optional.
+
+EXAMPLE
+        string foo(string str) {
+           return "ab"+str+"ef";
+        }
+        void func() {
+           write(process_string("@@foo|cd@@")+"\n");
+        }
+
+        The function func() will print out the string "abcdef".
+
+BUGS
+        Using process_string() can lead to severe security problems.
+
+HISTORY
+        Because of the security problems, process_string() is an
+        optional efun since 3.2.1@34
+
+SEE ALSO
+        notify_fail(E), closures(LPC), get_bb_uid(M)

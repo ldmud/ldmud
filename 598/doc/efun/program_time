@@ -1,0 +1,13 @@
+SYNOPSIS
+        int program_time()
+        int program_time(object ob)
+
+DESCRIPTION
+        Returns the creation (compilation) time of the object's
+        program. Default is this_object(), if no arg is given.
+
+        CAVEAT: If the objects program is swapped out, this efun
+          swaps it back in.
+
+SEE ALSO
+        object_time(E), program_name(E)

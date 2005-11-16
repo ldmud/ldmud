@@ -1,0 +1,85 @@
+NAME
+        pragma
+
+DESCRIPTION
+        The preprocessor directive #pragma can be used to select
+        several compilation options. Multiple options can be selected
+        in one #pragma directive by separating them with commas.
+
+        combine_strings: Perform the addition of string literals at
+                compile time instead of run time, e.g. "foo"+"bar"
+                will be compiled as "foobar". Like the concatenation
+                of adjacent string literals ("foo" "bar" is compiled
+                as "foobar" as well) already done by the preprocessor,
+                the combine_strings will save memory, because the combined
+                strings can be shared between a blueprint and it's clones,
+                and the strings also have a good chance to be entered
+                into the global shared-string-table.
+        no_combine_strings: Contrary to combine_strings, may be used to
+                deactivate a combine_strings pragma.
+
+        no_clone: The blueprint object can't be cloned.
+        no_inherit: The program can't be inherited.
+        no_shadow: The program can't be shadowed (similar to declaring
+                all functions as 'nomask').
+
+        weak_types: no type checking (this is the default).
+        strict_types: all functions must be declared with argument
+                prototypes, and the return values of call_other() must
+                be casted.
+        strong_types: all functions must be declared with complete
+                types of returnvalue and parameters.
+        save_types: the declaration data is kept after compilation and
+                checked at runtime. This is important for type-safe
+                inheritance.
+
+        verbose_errors: upon a compilation error, the driver displays
+                the actual context of the errorenous text. This is
+                helpful with errors within long expressions.
+
+        no_local_scopes, local_scopes: when local scoping is turned
+                off, local variables are visible even outside
+                their defining blocks. The setting of this pragma is
+                considered upon entry into a function only. By default,
+                local scoping is on.
+        local_scopes: local variables are visible only inside their
+                defining blocks.
+
+        pedantic: Certain warnings are treated as errors:
+                - failure to pass enough arguments to simul efuns
+        sloppy: Turns off pedantic (the default).
+
+        warn_deprecated: Use of deprecated efuns causes the compiler
+                to issue a warning.
+        no_warn_deprecated: Turns off warn_deprecated (the default).
+
+        When an object is compiled with type testing (#pragma
+        strict_types), all types are saved of the arguments for that
+        function during compilation.  If the #pragma save_types is
+        specified, then the types are saved even after compilation, to
+        be used when the object is inherited.
+
+        The following two pragmas are available if the driver was
+        compiled with DEBUG and TRACE_CODE options:
+
+        set_code_window: Sets an offset to the current program writing
+                position. Use this BEFORE a piece of code where you
+                want to check to what bytecodes it is compiled.
+        show_code_window: shows some bytes starting at or near the
+                last point set_code_window was called.
+
+EXAMPLES
+        #pragma strict_types
+        #pragma no_clone, no_inherit
+
+HISTORY
+        LDMud 3.2.7 added local_scopes, no_local_scopes, no_clone
+        and no_inherit.
+        LDMud 3.2.8 added weak_types, pedantic and sloppy.
+        LDMud 3.2.9 added (no_)warn_deprecated.
+        LDMud 3.2.9 allowed to specify multiple pragmas in one directive,
+          and added (no_)warn_deprecated.
+
+SEE ALSO
+        inheritance(LPC), initialisation(LPC), objects(C),
+        operators(LPC)
