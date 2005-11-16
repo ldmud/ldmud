@@ -1,0 +1,4 @@
+object query_attack()
+
+All objects that can come under attack should define this function.
+It shall return the attacking object or 0.

@@ -1,0 +1,345 @@
+Index: 0.1/secure/simul_efun.c
+--- 0.1/secure/simul_efun.c Mon, 05 Feb 2001 11:41:52 -0700 lduening (heaven7/f/5_simul_efun 1.1 600)
++++ 0.3(w)/secure/simul_efun.c Mon, 05 Feb 2001 12:50:50 -0700 lduening (heaven7/f/5_simul_efun 1.2 600)
+@@ -147,7 +147,7 @@
+     write("\n");
+ }
+
+-mixed *unique_array(mixed *arr,string func,mixed skipnum) {
++varargs mixed *unique_array(mixed *arr,string func,mixed skipnum) {
+     mixed *al, last;
+     int i, j, k, *ordinals;
+
+@@ -177,7 +177,7 @@
+ }
+
+ #ifdef COMPAT_FLAG
+-mixed snoop(mixed snoopee) {
++varargs mixed snoop(mixed snoopee) {
+     int result;
+
+     if (snoopee && query_snoop(snoopee)) {
+@@ -258,7 +258,7 @@
+
+ nomask void efun308() {}
+
+-nomask void set_this_player() {}
++nomask void set_this_player(object ob) {}
+ /*********************************************************************/
+ /* Force an object to become 'this_player()'. Only callable by       */
+ /* valid player objects                                              */
+@@ -364,7 +364,7 @@
+         set_extra_wizinfo(ob, old + value);
+ }
+
+-void wizlist(string name) {
++varargs void wizlist(string name) {
+     int i, pos, total_cmd;
+     int *cmds;
+     mixed *a;
+Index: 0.1/secure/security.c
+--- 0.1/secure/security.c Mon, 05 Feb 2001 11:41:52 -0700 lduening (heaven7/f/9_security.c 1.1 600)
++++ 0.3(w)/secure/security.c Mon, 05 Feb 2001 12:58:28 -0700 lduening (heaven7/f/9_security.c 1.2 600)
+@@ -13,7 +13,7 @@
+ #include "/include/cfg/levels.h"
+ #include "/include/cfg/help.cfg"
+
+-#if !defined(AMYLAAR)
++#if !defined(AMYLAAR) && !defined(__LDMUD__)
+ #define this_interactive() this_player(1)
+ #endif
+
+Index: 0.1/secure/master.c
+--- 0.1/secure/master.c Mon, 05 Feb 2001 11:41:52 -0700 lduening (heaven7/f/13_master.c 1.1 600)
++++ 0.3(w)/secure/master.c Mon, 05 Feb 2001 12:25:03 -0700 lduening (heaven7/f/13_master.c 1.2 600)
+@@ -1079,8 +1079,8 @@
+  */
+ {
+ #ifdef COMPAT_FLAG
++    int res;
+     do {
+-        int res;
+         if (catch( res = transfer(what, to) )) res = 5;
+         if ( !(res && what) ) return;
+     } while( (res == 1 || res == 4 || res == 5) && (to = environment(to)) );
+Index: 0.1/obj/weather.c
+--- 0.1/obj/weather.c Mon, 05 Feb 2001 11:41:52 -0700 lduening (heaven7/l/14_weather.c 1.1 600)
++++ 0.3(w)/obj/weather.c Mon, 05 Feb 2001 12:49:04 -0700 lduening (heaven7/l/14_weather.c 1.2 600)
+@@ -31,7 +31,6 @@
+ static string *magia_age;          /* array of each 1000 that pass */
+
+
+-
+ /********************************************************************/
+ /* fn specs */
+
+@@ -46,8 +45,8 @@
+ /* time & light */
+
+ static void cycle_light();                          /* day->night->day-> */
+-void change_time(status arg);                     /* cycle */
+-void mud_time();                                    /* 'mud' clock time */
++void change_time(status arg);                       /* cycle */
++string mud_time();                                  /* 'mud' clock time */
+
+ status query_night();
+ status query_day();
+Index: 0.1/obj/player.c
+--- 0.1/obj/player.c Mon, 05 Feb 2001 11:41:52 -0700 lduening (heaven7/m/40_player.c 1.1 600)
++++ 0.3(w)/obj/player.c Mon, 05 Feb 2001 13:00:54 -0700 lduening (heaven7/m/40_player.c 1.2 600)
+@@ -1889,7 +1889,7 @@
+ 	    other_copy = this_object();
+ #ifdef LOG_RENEWALS
+ 	    log(LOG_RENEWALS, fname, ((security_level) ? WIZARD : PLAYER));
+-#endif LOG_RENEWALS
++#endif /* LOG_RENEWALS */
+ 	    if(security_level)
+ 		clone_object(WIZARD);
+ 	    else
+@@ -2179,7 +2179,7 @@
+ 	nomask status secure(int sec_level) {
+ 	    object user;
+
+-#ifdef AMYLAAR
++#if defined(AMYLAAR) || defined(__LDMUD__)
+ 	    if(!(user = (this_interactive()) ? this_interactive() : this_player())) {
+ 		return 0;
+ 	    }
+@@ -2327,9 +2327,9 @@
+ 	    return soaked = (soaked + i < 0) ? soaked + i : 0;
+ 	}
+
+-	void add_alignment(int a) {  /* This happens when you kill something! */
+-	    if(secure(SEC1)) return;
+-	    if(!intp(a)) return;
++	int add_alignment(int a) {  /* This happens when you kill something! */
++	    if(secure(SEC1)) return 0;
++	    if(!intp(a)) return 0;
+ 	    if(!intp(alignment)) alignment = 0;
+ 	    alignment = a + (alignment * 9)/10;
+ 	    al_title = (alignment > NEUTRAL_AL * 100)
+@@ -2345,6 +2345,7 @@
+ 	    : (alignment > - NEUTRAL_AL * 100)
+ 	    ? "(Neutral Evil)"
+ 	    : "(Chaotic Evil)";
++        return alignment;
+ 	}
+
+
+@@ -2578,7 +2579,7 @@
+   return (status)CHANNEL_D -> chat_channel(sChannel, sMessage);
+ }
+
+-	void add_channel(string channel) {
++	status add_channel(string channel) {
+ 	    int s;
+ 	    object ob;
+ 	    ob = previous_object();
+@@ -2592,6 +2593,7 @@
+ 	    }
+ 	    if(channel == "ooc") channel = "OOC";
+ 	    if(!query_channel(channel) && channel) channels += ({ channel, });
++        return 1;
+ 	}
+
+ 	void add_affiliation(string str) {
+@@ -2704,7 +2706,7 @@
+ 	}
+
+
+-#ifdef AMYLAAR /* this is slightly better */
++#if defined(AMYLAAR) || defined(__LDMUD__) /* this is slightly better */
+
+ 	varargs
+ 	status move_player(string dir_dest,mixed optional_dest_ob,status safe) {
+@@ -2855,4 +2857,4 @@
+ 	    return 1;
+ 	}
+
+-#endif PING_PONG
++#endif /* PING_PONG */
+Index: 0.1/obj/mail_rdr.c
+--- 0.1/obj/mail_rdr.c Mon, 05 Feb 2001 11:41:52 -0700 lduening (heaven7/m/49_mail_rdr.c 1.1 600)
++++ 0.3(w)/obj/mail_rdr.c Mon, 05 Feb 2001 13:11:57 -0700 lduening (heaven7/m/49_mail_rdr.c 1.2 600)
+@@ -90,7 +90,7 @@
+ int new_mail(string who);                /* used by finger */
+ static status pmail(string str);         /* private mail */
+ static status mail(string str);          /* mail someone */
+-static status reply(int i);              /* reply to existing mail */
++static status reply(string str);         /* reply to existing mail */
+ static status forward(string str);       /* forward existing mail */
+ static void mail_editor(string str);     /* clone mail editor */
+ void end_editor(string str);             /* editor calls on save quit */
+Index: 0.1/obj/bulletin.c
+--- 0.1/obj/bulletin.c Mon, 05 Feb 2001 11:41:52 -0700 lduening (heaven7/n/2_bulletin.c 1.1 600)
++++ 0.3(w)/obj/bulletin.c Mon, 05 Feb 2001 12:53:22 -0700 lduening (heaven7/n/2_bulletin.c 1.2 600)
+@@ -88,7 +88,8 @@
+     move_object(pager_ob, this_player());
+ #endif /* NATIVE_MODE */
+     pager_ob->page(tmp);
+-#else    write(tmp);
++#else
++    write(tmp);
+ #endif
+ }
+
+Index: 0.1/inherit/monster.c
+--- 0.1/inherit/monster.c Mon, 05 Feb 2001 11:41:52 -0700 lduening (heaven7/n/19_monster.c 1.1 600)
++++ 0.3(w)/inherit/monster.c Mon, 05 Feb 2001 12:52:50 -0700 lduening (heaven7/n/19_monster.c 1.2 600)
+@@ -126,7 +126,7 @@
+ /*** set level will automatically set monster to bare minimum requirements ***/ 
+   
+ 
+-void set_level(int l) {  
++int set_level(int l) {  
+    int *monster_exp; 
+  
+    if(!intp(l) || l < 1) l = 1; 
+@@ -234,6 +234,8 @@
+     SPELL_COST   = 2; * spell strength runs out eventually *
+   } 
+   ****/
++
++   return level;
+ }  
+   
+ 
+Index: 0.1/include/fn_specs/wizard.spc
+--- 0.1/include/fn_specs/wizard.spc Mon, 05 Feb 2001 11:41:52 -0700 lduening (heaven7/o/47_wizard.spc 1.1 600)
++++ 0.3(w)/include/fn_specs/wizard.spc Mon, 05 Feb 2001 12:51:32 -0700 lduening (heaven7/o/47_wizard.spc 1.2 600)
+@@ -53,7 +53,7 @@
+ static varargs object *FIND_OBJECT(string str, object who);
+ static object *PROCESS_ARG(string arg);
+ object *PROCESS_ARG_OB(mixed *ob_list, object *ob);
+-void copy_file(string in, string out, status overwrite);
++status copy_file(string in, string out, status overwrite);
+ static void add_date(string file);
+ static string read_date(string file);
+ string parse_msg(string msg, object ob);
+Index: 0.1/include/fn_specs/room.spc
+--- 0.1/include/fn_specs/room.spc Mon, 05 Feb 2001 11:41:52 -0700 lduening (heaven7/o/49_room.spc 1.1 600)
++++ 0.3(w)/include/fn_specs/room.spc Mon, 05 Feb 2001 12:48:39 -0700 lduening (heaven7/o/49_room.spc 1.2 600)
+@@ -16,12 +16,12 @@
+ 
+ string set_day_desc(string str);
+ string set_night_desc(string str);
+-void   set_exits(string *arr);
+-void   set_extra_objects(string *arr);
+-void   set_items(string *arr);
++string* set_exits(string *arr);
++string* set_extra_objects(string *arr);
++string* set_items(string *arr);
+ int    set_climb(int i);
+ int    set_fall_dam(int i);
+-void   set_doors(mixed *arr);
++string* set_doors(mixed *arr);
+ varargs void set_sign_message(string sign_msg, string sign_lang);
+ int set_no_summon(int i);
+ int set_no_fight(int i);
+@@ -89,8 +89,8 @@
+ status open(string str);
+ status close(string str);
+ status disarm_door_trap(string str);
+-varargs status set_door_trap(string dest_filename,status on,string door_id);
+-varargs status set_door_closed(string dest_filename,status close,string id);
++varargs status set_door_trap(string dest_filename,status on,int door_num);
++varargs status set_door_closed(string dest_filename,status close,int door_num);
+ void reset_doors(status arg);
+ int get_id_index(string arg, string *arg1);
+ 
+Index: 0.1/include/fn_specs/player.spc
+--- 0.1/include/fn_specs/player.spc Mon, 05 Feb 2001 11:41:52 -0700 lduening (heaven7/o/50_player.spc 1.1 600)
++++ 0.3(w)/include/fn_specs/player.spc Mon, 05 Feb 2001 12:44:22 -0700 lduening (heaven7/o/50_player.spc 1.2 600)
+@@ -32,7 +32,7 @@
+ static void change_password2(string str);
+ static status suicide();
+ static void pass1(string str);
+-static status suicide_note(string arg);
++static void suicide_note(string arg);
+ static void do_suicide(string note);
+ static status describe();
+ static status get_desc(string arg);
+@@ -87,7 +87,7 @@
+ string set_email(string s);
+ string set_description(string s);
+ string set_plan(string s);
+-string set_time_to_save(int i);
++int    set_time_to_save(int i);
+ status set_edit_on(status i);
+ status set_informed(status i);
+ status set_start();
+@@ -136,9 +136,9 @@
+ int add_intoxication(int i);
+ int add_stuffed(int i);
+ int add_soaked(int i);
+-void add_alignment(int a);
++int add_alignment(int a);
+ status add_channel(string str);
+-status remove_channel(string str);
++void remove_channel(string str);
+
+
+ varargs void shout_tell(string str, string lang);
+@@ -153,7 +153,7 @@
+ status examine(string str);
+ status look(string str, status extra);
+ status help(string what, string dir);
+-void second_life();
++status second_life();
+ int drink_alcohol(int drink_strength);
+ status drink_soft(int drink_strength);
+ status eat_food(int food_strength);
+@@ -166,7 +166,7 @@
+ status secure(int sec_level);
+ int query_security();
+ int query_security_level();
+-int set_security_level(string domain);
++int set_security_level(int new_level);
+ string make_path(string file);
+ status pwd();
+ status toggle_invis();
+Index: 0.1/include/fn_specs/monster.spc
+--- 0.1/include/fn_specs/monster.spc Mon, 05 Feb 2001 11:41:52 -0700 lduening (heaven7/o/51_monster.sp 1.1 600)
++++ 0.3(w)/include/fn_specs/monster.spc Mon, 05 Feb 2001 12:51:52 -0700 lduening (heaven7/o/51_monster.sp 1.2 600)
+@@ -16,7 +16,7 @@
+
+ /*** set level will automatically set monster to bare minimum requirements ***/
+
+-void set_level(int l);
++int set_level(int l);
+
+ void set_wander(int chance, int time);
+
+Index: 0.1/include/fn_specs/living.spc
+--- 0.1/include/fn_specs/living.spc Mon, 05 Feb 2001 11:41:52 -0700 lduening (heaven7/p/0_living.spc 1.1 600)
++++ 0.3(w)/include/fn_specs/living.spc Mon, 05 Feb 2001 12:31:41 -0700 lduening (heaven7/p/0_living.spc 1.2 600)
+@@ -15,7 +15,7 @@
+ 
+ status set_speak_language(string str);
+ 
+-string *set_weapon_prof(string *arr);
++mapping set_weapon_prof(mapping arr);
+ string *set_classes(string *arr);
+ 
+ status set_ghost(status i);
+@@ -95,7 +95,7 @@
+ string *query_classes();
+ 
+ mapping query_weapon_prof();
+-mapping query_weapon_proficiency(string str);
++int     query_weapon_proficiency(string str);
+ 
+ status query_ghost();
+ status query_dead();
+Index: 0.1/d/coronos/w/angel/city/monst/aurora.c
+--- 0.1/d/coronos/w/angel/city/monst/aurora.c Mon, 05 Feb 2001 11:41:52 -0700 lduening (heaven7/k/b/35_aurora.c 1.1 600)
++++ 0.3(w)/d/coronos/w/angel/city/monst/aurora.c Mon, 05 Feb 2001 13:13:54 -0700 lduening (heaven7/k/b/35_aurora.c 1.2 600)
+@@ -166,7 +166,7 @@
+   string tmp1, tmp2;
+
+   if(this_object()->query_attack()) return;
+-  if(environment(this_player()) != environment()) {
++  if(this_player() && environment(this_player()) != environment()) {
+     if(sscanf(str, "%stell%s", tmp1, tmp2)) {
+       write("Aurora says: I hear you. But my powers can only be given "+
+             "in my presence.\n");
