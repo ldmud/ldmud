@@ -1,0 +1,6 @@
+StickLib  --  <URL:http://www.hut.fi/~doomdark/proj/sticklib/sticklib.html>
+
+Last tested: v 0.99c on LDMud-3.2.7-dev.155
+
+The mudlib uses an additional string efun 'substitute_string()', just
+apply the provided patches.

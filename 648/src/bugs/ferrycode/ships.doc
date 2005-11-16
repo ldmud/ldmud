@@ -1,0 +1,64 @@
+ 
+Ships:
+- Ship Inheritable
+  - 3d Hull array, where things can go, cannot go, and are.
+  - Setup for vehicle speed, for combat.
+  - Setup for specific combat.
+  - Setup for many ship classes.
+  - Repair Method.
+  - Statistics
+    - Ballista Class - aimable weapon, less damage
+    - Catapult Class - less accurate, more damage
+    - Sails - speed
+    - Hull - hit points
+    - Ammunition - for combat
+    - Provisions - When moving, the ship uses provisions, based on Sails, and
+                 - Crew Sailing ability.
+    - Wood - Hull repair
+    - Rope - Rigging repair (speed)
+    - Crew Fight - Combat
+    - Crew Sail - Provision usage when moving
+    - Ship Mode - Full Sail / Battle Stations
+    - # of Crew - Keep track of crew
+- Rooms:
+  - Cargo Hold 
+    - Storage area
+    - Lockable room
+    - Limit total # of items in hold
+  - Gunnery Rooms
+    - Come in pairs (port/starboard)
+    - Ballista and Catapults
+  - Observation Deck
+    - Spy (terrain check)
+    - Crow's nest effectively
+  - Bridge
+    - Control room
+    - Signal to all on ship
+  - Crew Quarters 
+    - Check crew status (happy/mad/etc)
+    - Order around crew 
+  - Captain's Cabin
+    - Player emotes 
+    - Change Long Desc Capability
+  - Ship's Stores 
+    - Handle ship status
+    - Correspond to crew quarters
+- Crew inheritable
+  - A basic monster for crew types for the ships.
+- Captain/Admiral system
+- Events:  (Hayden)
+  - The method that controls a player's ownership of vehicles.
+- Ship Daemon:  (Hayden)
+  - Controls the setup of ships as they are created.
+- Ship Docks:  
+  - The stores where players will come to buy their ships and set them up.
+  - This may include 'remodeling' of the interior, and repair to the ships.
+- Ship Inheritable:  (Hayden & Malachai)
+- Ship Rooms Inheritable:  (Hayden & Blade)
+- Ship Skills:  (Malachai - Hayden)
+  - The skills required for sailing a ship with skill, well you get the point.
+  - Repair skills
+- Documentaion:
+  - Completely document the entire ship system, as its done.
+  - So anyone can understand the code.
+ 

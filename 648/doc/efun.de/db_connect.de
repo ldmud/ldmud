@@ -1,0 +1,26 @@
+OPTIONAL
+SYNOPSIS
+        int db_connect(string database)
+        int db_connect(string database, string user)
+        int db_connect(string database, string user, string password)
+
+BESCHREIBUNG
+        Stelle eine Verbindung zur SQL-Datenbank <database> des
+        lokalen SQL-Servers her. Das Ergebnis ist die Handle-Nummer fuer diese
+        Verbindung und muss fuer alle Anfragen zu dieser Datenbank verwendet
+        werden.
+
+        Existiert die Datenbank nicht, oder kann der lokale SQL-Server nicht
+        gefunden werden, wird ein Laufzeitfehler erzeugt.
+
+        Wenn angegeben, wird die Verbindung fuer <user> mit <password>
+        erzeugt.
+
+        Die Funktion ist nur verfuegbar wenn der Driver mit
+        mySQL-Unterstuetzung compiliert wurde. In diesem Fall ist das Makro
+        __MYSQL__ definiert.
+
+SIEHE AUCH
+        db_affected_rows(E), db_conv_string(E), db_close(E), db_coldefs(E),
+        db_exec(E), db_error(E), db_fetch(E), db_handles(E),
+        db_insert_id(E), mysql(C)

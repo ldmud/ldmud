@@ -1,0 +1,10 @@
+Do '#include "../../room/std.h" first in your file.
+
+THREE_EXIT("/players/peter/room", "west",
+	 "/players/peter/another_room", "east",
+	 "/room/church", "sesam",
+	 "Funny room",
+	 "You are in the funny room",
+	 1)
+
+The command 'sesam' will move the player back to church.
