@@ -1,0 +1,136 @@
+Short: Wunderland crashes after 0-ref string
+Date: Mon, 16 Oct 2000 17:55:25 +0200 (MEST)
+From: Erzmagier des Wunderlandes <mud@hurrikap.rz.uni-leipzig.de>
+Type: Bug
+State: Abandoned - no longer reported (we also increased the ref counter)
+
+Hallo Mateese!
+
+Hmm, folgende Meldung tauchte bei uns ueber die letzten Tage vor einem
+extrem oft auf:
+DEBUG: make_shared_string(): found 0x82eec8a '_cl' has 0 refs.
+
+Driver ist ein 3.2.8 rel mit den ersten beiden Patches oder so (die
+hattest du mir 'nur so' gegeben ohne echte dev-Nummern). Das Mud war
+etwa 45 Tage up.
+
+Woran der Crash lag kann ich nicht nachvollziehen kann. Zumindest findet 
+man noch den Eintrag, dass der Erq sich beendet; H_ERQ_STOP wurde in
+derselben Sekunde ausgefuehrt wie der Reboot stattfand.
+
+"_cl" heisst bei uns eine zentrale Funktion in jedem Objekt, die die
+Kommandos abfaengt. Also fast jedes Objekt hat ein oder mehrere
+add_action() auf diese Funktion. Ein typischer Spieler hat auf diese Art
+etwa 500 Actions (bei 50 beteiligten Objekten).
+
+Ich habe keine Ahnung, woraus so eine Debugmeldung resultieren kann,
+weswegen ich das schlecht mit der Situation im Mud/der Lib korrelieren
+kann. Das einzige was mir dazu einfaellt, einen Monat vorher gab es genau
+drei Eintraege mit 'find_player' - ich benutzte die Funktion mal im Master
+obwohl sie eine Sefun ist, das buggte dann irgendwie *grins*. Aber '_cl'
+wird nicht im Master aufgerufen.
+
+Hast du eventuell eine Idee zu der Meldung?
+
+
+Cheers,
+
+   Fiona @ Wunderland
+
+
+
+
+-- End --
+Return-Path: <mud@hurrikap.rz.uni-leipzig.de>
+Delivered-To: bearnip-bearnip.com-lars@bearnip.com
+Received: (qmail 4182 invoked from network); 16 Oct 2000 17:06:03 -0000
+Received: from hurrikap.rz.uni-leipzig.de (139.18.11.86)
+  by mail.csoft.net with SMTP; 16 Oct 2000 17:06:03 -0000
+Received: from localhost (mud@localhost)
+	by hurrikap.rz.uni-leipzig.de (8.9.3/8.9.3) with ESMTP id TAA18795
+	for <lars@bearnip.com>; Mon, 16 Oct 2000 19:06:02 +0200
+Date: Mon, 16 Oct 2000 19:06:02 +0200 (MEST)
+From: Erzmagier des Wunderlandes <mud@hurrikap.rz.uni-leipzig.de>
+To: Lars Duening <lars@bearnip.com>
+Subject: Re: LDmud, Debugmeldung
+In-Reply-To: <200010161647.SAA00498@news.uni-leipzig.de>
+Message-ID: <Pine.LNX.4.10.10010161858370.18700-100000@hurrikap.rz.uni-leipzig.de>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+X-PMFLAGS: 34078848 0 1 P16380.CNM
+
+
+On Mon, 16 Oct 2000, Lars Duening wrote:
+
+> > DEBUG: make_shared_string(): found 0x82eec8a '_cl' has 0 refs.
+> 
+> Habt ihr den Driver mit KEEP_STRINGS oder dergleichem compiliert? 
+
+Ich denke nicht jedoch benutzen wie make_shared_string(E) in der Lib
+(beim Erzeugen von Details ggf).
+
+
+Wie der Driver kompiliert ist, ist mir gerade ein Raetsel, im Makefile
+steht was von: DEBUG = -DDEBUG -DTRACE_CODE -DCHECK_STRINGS # -DKEEP_
+STRINGS -DDEBUG_TELNET
+aber `driver --options` sagt: Other options: COMM_STAT, APPLY_CACHE_STAT.
+
+und ich denke -ddebug usw tauchten da immer auf.
+
+Fi
+
+
+
+-- End --
+Return-Path: <mud@hurrikap.rz.uni-leipzig.de>
+Delivered-To: bearnip-bearnip.com-lars@bearnip.com
+Received: (qmail 974 invoked from network); 2 Nov 2000 14:48:57 -0000
+Received: from hurrikap.rz.uni-leipzig.de (139.18.11.86)
+  by mail.csoft.net with SMTP; 2 Nov 2000 14:48:57 -0000
+Received: from localhost (mud@localhost)
+	by hurrikap.rz.uni-leipzig.de (8.9.3/8.9.3) with ESMTP id PAA24516
+	for <lars@bearnip.com>; Thu, 2 Nov 2000 15:49:07 +0100
+Date: Thu, 2 Nov 2000 15:49:06 +0100 (MET)
+From: Fini Jastrow <mud@hurrikap.rz.uni-leipzig.de>
+To: Lars Duening <lars@bearnip.com>
+Subject: Re: LDmud, Debugmeldung
+In-Reply-To: <00037511188e0140_mailit@mail.eskimo.com>
+Message-ID: <Pine.LNX.4.10.10011021542360.24454-100000@hurrikap.rz.uni-leipzig.de>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+X-PMFLAGS: 35127424 0 1 P11550.CNM
+
+
+Hallo!
+
+> Das ist jetzt zwar schon etwas her, aber wenn ihr die Logs noch habt, schaut 
+> doch mal nach, ob es voher eine Meldung der Art 'make_shared_string(): found 
+> 0x82eec8a '_cl' refcount reaches max!' auftaucht.
+Wir heben alle Logs auf *g* Wunderland.log ist die stdout-Ausgabe, die
+Zeit ist die von dem Reboot (bzw wann das Logfile ins Archiv bewegt
+wurde):
+
+grep make_shared 00.10.14-02:46:26.Wunderland.log | sort | uniq
+
+DEBUG: make_shared_string(): found 0x82e8042 'find_player' has 0 refs.
+DEBUG: make_shared_string(): found 0x82eec8a '_cl' has 0 refs.
+
+----
+
+Vielleicht sollten wir den Driver mal mit DEBUG an laufen lassen? Bringt
+sowas eigentlich viel Hilfe? Wir hatten letztens einen voellig unklaren
+Bug, der Erq wird (korrekt?) beendet und dann reboot:
+
+2000.10.29 20:16:35 [xerq] Demon exiting.
+
+Das ist die letzte Zeile, kein Hinweis kein Bug, nix. In der Sekunde dann
+auch Reboot.
+
+
+Naja, so ist das Leben!
+
+
+*knuddels*
+
+  Fiona @ Wunderland
+
