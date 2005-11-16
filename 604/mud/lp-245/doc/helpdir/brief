@@ -1,0 +1,9 @@
+command: brief
+no arguments.
+
+Toggle brief mode. If you are in brief mode, you will only see short
+descriptions of all rooms. Use the 'look' command to get the long.
+
+Default for a new player is verbose mode.
+
+See also 'wimpy'.

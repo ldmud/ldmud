@@ -1,0 +1,17 @@
+Short: to_int()
+Date: 980928
+Type: Feature
+State: Done.
+Author: Zwirch
+Long:
+
+See also: b-980922-0
+
+to_int() sollte auch int als arg akzeptieren, to_object() ein object,
+etc.
+
+3. Ich hatte mal vorgeschlagen, dass to_int(),to_float() und
+   to_object() auch ihre eigenen Typen als Argument akzeptieren sollten.
+   Der Code dafuer ist bereits in interpret.c enthalten, es muessten
+   nur in func_spec die Typen eingefuegt werden.
+

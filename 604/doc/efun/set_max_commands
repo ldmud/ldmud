@@ -1,0 +1,38 @@
+SYNOPSIS
+        void set_max_commands (int num)
+        void set_max_commands (int num, object obj)
+
+DESCRIPTION
+        Set the max number of commands the interactive <obj> is
+        allowed to execute per second to <num>. A negative value means
+        'unlimited' and is the setting for newly created connections.
+
+        If <obj> is not given, the current interactive is queried.
+        For non-interactive objects the result is 0.
+
+        The function raises a privilege_violation ("set_max_commands",
+        obj, num).  If the privilege is denied, the call is ignored.
+
+        A 'command' in this context means every received data packet
+        which causes a LPC call - actions and calls to input_to()
+        alike.
+
+HISTORY
+        Introduced in LDMud 3.2.10.
+
+EXAMPLE
+        To establish a mud-wide default for the maximum command rate,
+        write master::connect() like this:
+
+        object connect ()
+        {
+            object obj;
+
+            ...
+            set_max_commands(100, obj);
+            return obj;
+        }
+
+
+SEE ALSO
+        set_max_commands(E), privilege_violation(M)

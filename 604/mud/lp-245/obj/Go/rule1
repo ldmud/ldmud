@@ -1,0 +1,8 @@
+There are two players, black and white. They take turns, playing one stone
+each. Black starts with one or more stones, depending on the handicap.
+
+The stones are played in a matrix on the intersections. It is allowed to
+play on the outer border.
+
+The normal game size is 19 x 19 (that is 18 x 18 squares), but the game
+can also be player on smaller boards.
