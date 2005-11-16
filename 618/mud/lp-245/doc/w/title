@@ -1,0 +1,5 @@
+Command: title
+argument: new title
+
+Without arguments, print your old title.
+With arguments, set a new title.

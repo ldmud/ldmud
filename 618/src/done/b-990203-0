@@ -1,0 +1,10 @@
+Short: call_lambda()/CLOSURE_IDENTIFIER dumps core
+From: Michael Sporn <sporn@mathematik.hu-berlin.de>
+Date: Mon, 1 Feb 1999 19:11:40 +0100 (MET)
+Type: Bug
+State: Fixed.
+
+Hi Lars, ich hab einen weiteren bug im driver gefunden: Es gibt einen
+coredump in call_lambda(), case CLOSURE_IDENTIFIER, wenn die variablen des
+betroffenen objekts ausgeswappt sind. Sollte man abchecken.
+

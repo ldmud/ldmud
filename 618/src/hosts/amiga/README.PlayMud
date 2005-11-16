@@ -1,0 +1,166 @@
+Short: Simple interface to Amiga-LPMud
+Author: Lars Düning
+Type: game/role
+
+        PlayMud - A quick'n'dirty interface to Amiga-LPmud
+
+          Copyright © 1992-1996 by Lars Duening (Mateese @ Nightfall).
+          All rights reserved.
+          Permission granted for non-commercial use.
+
+
+  This program is a replacement for the original 'telnet' delivered with
+van-Roode's AMud to play it. It can be used to play any mud port using
+a socket simulation compatible to van-Roode's one, like Amylaar's enhanced
+LPMud, DGD, MudOS or CircleMud.
+
+  PlayMud interfaces the Mud to the player either by a vanilla interactive
+DOS handler (telnet used the console.device directly), or by running as door
+to the 'AmiExpress' BBS program.
+
+  Since PlayMud should work with any stream handler, playing via the
+serial or AUX: handler should be possible (couldn't try it though).
+
+  If a BBS provides similar handlers to subprograms (like CNet does),
+PlayMud can run under them as well. In such cases it might be necessary to
+specify explicitely that the 'Current' console is to be used.
+
+  PlayMud assumes that the handler understands ANSI, or at least the
+ANSI sequences for normal and invisible display (<ESC>[0m and <ESC>[8m).
+PlayMud liberately does not switch the handler into raw mode to let the user
+profit from the advanced features of modern console handlers, like command
+histories or scroll buffers.
+
+  Please note that PlayMud is just a simple interface between one IO handler
+and the running LPMud. If you need more advanced fancy like multi-line serial
+connections, you have to expand PlayMud on your own (or write your own
+IO handler).
+
+
+Usage
+-----
+
+CLI-Usage: PlayMud ?
+           PlayMud [<console> | Current] [Port <portname>] [Noecho]
+                   [Quiet|Verbose|Debug]
+AmiExpress:
+           PlayMud <nodeno>
+
+  Args   : <console>  : Consolename, e.g. 'CON:0/11/640/220'
+           <portname> : Portname of the LPmud to connect to, default is "8888"
+           <nodeno>   : AmiExpress-Node to use.
+           Current    : use the console PlayMud is running in
+  Options: ?       : prints some help
+           Noecho  : lines input won't be echoed even if output came inbetween
+                     This is needed for 'blocking' handlers like CON:
+           Quiet   : no messages from the pgm
+           Verbose : more messages from the pgm
+           Debug   : even more messages from the pgm
+
+    Result:  0: ok
+            20: illegal arg or something similar deadly
+
+WB-Usage: FRONTEND= [DOS|STANDARD|AMIEXPRESS]
+          TYPE= [NOECHO] [QUIET|VERBOSE|DEBUG]
+          CON=  [<console>]
+          PORT= [<portname>]
+
+  Icons may be of type TOOL or (fileless) PROJECT.
+  Errors will cause a DisplayBeep.
+
+
+General Operation
+-----------------
+  When started from shell, PlayMud nevertheless searches for some icon files
+to scan first, using them as a sort of configuration files. The arguments
+specified on commandline override those in the files, of course.
+The file are searched in this order in these directories:
+ - the directory where the executable lies (OS 2.0 and above only)
+ - MUDBIN: (you'll see no requester if this isn't found!)
+ - the current directory
+  The files searched are '<basename>.info', with <basename> being the command
+used to invoke PlayMud. So if you rename your copy of PlayMud to 'MudClient',
+you'll also have to rename the icon files to 'MudClient.info'.
+  I provided an empty icon file 'icons/PlayMud.info' with the archive as
+playground (it even doesn't even have a nice picture in it as well :-)
+
+  The type of the handler to use is determined by the FRONTEND tooltype.
+If not specified, or specified to DOS or STANDARD, the normal console handler
+is used. If specified as AMIEXPRESS, PlayMud assumes to be running as door
+to AmiExpress (see below).
+
+  If no console handler is specified, PlayMud tries CON:. If it fails, no play
+is possible.
+You can tell PlayMud to use the actual shell window by specifying the console
+as '*' or 'Current' (in the latter case Input() and Output() will be tried).
+
+  PlayMud may be aborted by typing Ctrl-C, Ctrl-E (preferred), or clicking on
+the windows close gadget (if available).
+
+  By default, PlayMud searches the message port named "8888", assuming it
+is the muds connect-port. With the 'Port' argument you can change this.
+Btw.: since the mud runs locally, PlayMud does not prepend to do a real net
+connection (as 'telnet' did).
+
+
+Usage with AmiExpress
+---------------------
+  It is possible to run PlayMud as XIM-type door under AmiExpress. To do
+this, put an approbiate icon into the BBS:Commands/BBSCmd directory (you
+can use the included icons/PlayMud.BBSCmd.info for this) to make PlayMud
+known to AmiExpress.
+  When run as door, PlayMud takes no cli arguments (except for the node
+number supplied by AmiExpress) - it must be configured by icons only (see
+'General Operation' for the search path), especially the FRONTEND tooltype!
+It is advisable to set the verbosity to QUIET as well. You can use the
+included 'icons/PlayMud.Door.info' for this purpose.
+
+  The interface to AmiExpress is a bit tricky, since AmiExpress does not
+feature real asynchronous read/write operations. As replacement, PlayMud
+uses a 1-second-timeout on its reads, but this could hinder the detection
+of lost carriers (AmiExpress does also not feature meaningful return
+codes :-(.
+
+  Additionally, PlayMud implements a simple backspace-editing on the input
+line, and ignores Linefeeds after Carriage returns.
+
+  NOTE: I don't own AmiExpress on my own, nor do I have access to an AmiExpress
+run BBS myself, so the functionality of PlayMud in this area may be insufficient.
+
+
+About the program
+-----------------
+  PlayMud was written first in Amiga-Oberon v2.14 (the only compiler I owned
+that days, nevertheless quite useful even for bytemangling) and updated in
+April '93 to Amiga-Oberon v3.00 (no big deal, though).
+
+  I also derived a functionally equivalent C version from the Oberon source,
+esp. for all those source-only distributions, so you have a greater chance to
+recompile it on your own. The binary I supply will nevertheless continue to be
+the Oberon version due to the more secure runtime system and the more
+comfortable language.
+
+  The Oberon source consists of the files PlayMud.mod, FrontEnd.mod,
+DosHndlFront.mod, AmiExpressFront.mod, Global.mod and StringConv.mod (this was
+written by Nicolas Benezan). It should be compiled as small code/data with
+_no garbagecollector_. To compile it with an pre-3.0 Amiga-Oberon, replace all
+UNTRACED POINTERs in the source by POINTERs.
+
+  The C source consists of PlayMud.c and the additional includes mudmsgs.h
+and telnet.h. It was written for and compiled with DICE 3.01 -- if you manage
+to port it to other compilers (which shouldn't be difficult), please send me the
+necessary modifications if any. (Note: having just one .c-source made the
+distribution with the gamedriver source archive easier, esp. since C's
+modularisation support is quite insufficient.)
+
+  John Fehr (umfehr06@ccu.UManitoba.CA) compiled it successfully with SAS/C 6.2,
+and also improved the handling of input with no local echo. To compile under SAS,
+just do 'sc link ign=all opt PlayMud.c'.
+
+  Bowen (bowen@kazak.nmsu.edu) helped creating the AmiExpress frontend and did
+the test runs.
+
+  If you don`t have OS 2.0, I advise you to get it...
+
+
+Hope you like it. -- Mateese (01-May-96)

@@ -1,0 +1,11 @@
+command: save
+no arguments.
+
+Save all data about your character. This is also done automatically
+when quiting the game.
+
+Thus, 'save' is only for paranoid players.
+
+A restore is done when you log into the game, and only then.
+
+See also 'quit'.
