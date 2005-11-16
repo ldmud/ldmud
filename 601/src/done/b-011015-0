@@ -1,0 +1,106 @@
+Short: status for mappings wrong 
+From: Christian Mudra
+Date: 2001-10-10
+Type: Bug
+State: Done.
+
+3.3.197/3.2.9-dev.427: The problem was probably that the statistics code
+assumed the .hash member to be valid during a GC.
+
+(02-03-26) This happened  in FinalFrontier in a GC:
+
+DEBUG: map 'Root' 20 (num values 1) + 19776 (string 0, misc 9880) + 3753960892 (hash 4, mask 2, used 187698044) = 3753980688
+DEBUG: (mapping.c : 4268) Invalid total mapping size 3757063176 (avail 83942192), was 3082488
+
+I added more stringent checking  to the mapping size in mapping.c wherever
+hash->used is modified.
+
+----------------------------------------------------------------------------
+
+Apropos status: Ich glaube dem heutigen status nicht:
+
+> status
+Actions:                            4167   116676
+Shadows:                              24      576
+Objects:                            4727  3909997 (2560 swapped, 4859 Kbytes)
+Arrays:                            70797  2713912
+Mappings:                          37235 -924067248
+Prog blocks:                        2303  6683590 (1075 swapped, 2920 Kbytes)
+Memory reserved:                          1100000
+hash table overhead                          4096
+Strings malloced                   76145  2761524 + 1958552 overhead
+call out:                            260     9360 (current length 40)
+Regexp cache:                        248   121088
+Lexer structures                           245913
+Comm structures                             16220
+Other structures                            69426
+                                         --------
+Total:                                   -907346186
+
+Sieht doch nett aus, sowas negatives bei Mappings .. :-) *sowasfuerBughaltend*
+
+----------------------------------------------------------------------------
+
+Date: Fri, 19 Oct 2001 20:29:50 +0200
+From: Freaky <Freaky@UNItopia.RUS.Uni-Stuttgart.DE>
+To: Lars Duening <lars@bearnip.com>
+Subject: orbit verwendet mehr Arbeitsspeicher als der Rechner hat (fwd)
+
+
+
+Hi,
+
+Das ist der dev-351
+Da scheint die Berechnung der Mapping-Groessen nicht zu stimmen.
+
+Ciao
+		Freaky
+
+From: =?iso-8859-1?Q?J=FCrgen_Weickert?= <juergen.weickert@datadesign.de>
+To: mudadm@UNItopia.bera.rus.Uni-Stuttgart.DE
+Subject: orbit verwendet mehr Arbeitsspeicher als der Rechner hat
+Date: Fri, 19 Oct 2001 15:57:36 +0200
+
+
+> status
+Actions:                           26134   731752
+Shadows:                               3       72
+Objects:                            2060  1184790 (0 swapped, 0 Kbytes)
+Arrays:                            68140  3606272
+Mappings:                           9394 586347592
+Prog blocks:                        1105  4845604 (0 swapped, 0 Kbytes)
+Memory reserved:                                0
+hash table overhead                         65536
+Strings malloced                   99290  4781480 + 1056464 overhead
+call out:                            140     5040 (current length 56)
+Regexp cache:                        466   253906
+Lexer structures                           220887
+Comm structures                              6488
+Other structures                            52362
+                                         --------
+Total:                                   603159277
+
+> malloc
+Type                   Count      Space (bytes)
+sbrk requests:          547          42317572 (a)
+large blocks:         15807          29870088 (b)
+large net avail:                     29427492
+large free blocks:      825          12447480 (c)
+large wasted:             1                 4 (d)
+
+small chunks:           533          18973344 (e)
+small blocks:        239183          15659884 (f)
+small net avail:                      8962760
+small free blocks:    30970           3293472 (g)
+small wasted:           721             19980 (h)
+unused from current chunk                   8 (i)
+
+permanent blocks:        71            141300
+clib allocations:        62              6008
+
+malloc_increment_size: calls 4440780 success 9806 total 1938570
+
+Total storage:        (b+c+d)       42317572 should equal (a)   42317572
+Total small storage:  (f+g+h+i)     18973344 should equal (e)   18973344
+Total storage in use: (b-g-h-i)     26556628 net available:     19416908
+Total storage unused: (c+d+g+h+i)   15760944

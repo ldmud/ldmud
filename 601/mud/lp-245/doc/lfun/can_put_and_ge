@@ -1,0 +1,20 @@
+int can_put_and_get(str)
+string str;
+
+Define this function if you want to make it possible to put something
+into current object.
+
+Return true if ok, otherwise 0. That means that default is that it is not
+possible to put something into an object.
+
+When a player does "look at xxx", then "xxx" will be sent to can_put_and_get(),
+to test if the player can look at the inventory. Otherwise, 'str' will be 0.
+
+This is trivial for containers. If the are open, they return 1.
+
+If id() accepts other things, like "lock" (in a chest for example).
+Then "lock" will be sent to can_put_and_get(), which should return false,
+because the lock has no inventory (of course).
+
+See also lfun/id(), lfun/long().
+

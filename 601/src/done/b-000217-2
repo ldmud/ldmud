@@ -1,0 +1,22 @@
+From: Dafire
+Short: terminal_colour() fails
+Date: 000217
+Type: Bug
+State: Done - fixed in 3.2.8-dev.175.
+
+Dafire@FinalFrontier tells you: qlpc return
+   terminal_colour("test123REPtest123",(["REP":"REPLACED"]),4,3); 
+crasht den
+   driver.. der sagt dann noch: 2000.02.17 17:24:23 Length 
+miscalculated in
+   terminal_colour(); Expected: 62 Was: 59;  String: 
+test123REPtest123;
+   Indent: 3 Wrap: 4
+
+3.2.8-dev.164
+
+Analysis:
+  The problem was the indentation combined with the wrapping in the
+  middle of the word 'test123': the code didn't expect the last line
+  to show up and omitted the indentation space, which then accounted
+  for the missing but expected space in the sanity check.
