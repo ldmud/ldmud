@@ -1,0 +1,40 @@
+GESCHUETZT
+SYNOPSIS
+        int attach_erq_demon(object ob, int do_close);
+        int attach_erq_demon(string obname, int do_close);
+
+BESCHREIBUNG
+        Diese geschuetzte Funktion setzt oder aendert die die Verbindung des
+        Treibers zum externen Erq-Demon, aendert also effektiv die Demons.
+
+        Die Verbindung wird dabei vom interaktiven Objekt <ob> entfernt (!)
+        und als Erq-Verbindung gespeichert. Das Objekt <ob> wird anschliessend
+        nicht mehr benoetigt, es kann aber als (nicht interaktives) Objekt
+        weiter existieren.
+
+        In der zweiten Form wird der String an den Dateinamen ERQFILE<obname>
+        angehaengt, das dann als Binary als neuer Erq-Demon aufgespalten wird.
+        Die Kommunikation mit diesem Erq verlaeuft ueber Unix Domainsockets.
+        ERQFILE greift standardmaessig auf BINDIR/erq zu, wobei BINDIR der
+        konfigurierte Wert fuer das ausfuehrbare Verzeichnis ist.
+
+        Besteht bereits eine Verbindung zu einem Erq-Demon, schlaegt die
+        Funktion fehl, wenn nicht do_close auf 1 gesetzt ist (Standard ist
+        do_close == 0). In diesem Fall wird die alte Verbindung geschlossen,
+        bevor zum neuen Demon verbunden wird.
+
+        Die Efun liefert 1 bei Erfolg, 0 sonst.
+
+BEISPIEL
+        Um den (Standard-) Erq neu zu starten, muss in
+        master.c::stale_erq(closure c) geschrieben werden:
+        attach_erq_demon("", 0);
+
+AENDERUNGEN
+        Eingefuehrt in 3.2.1@61.
+
+ANMERKUNG
+        Diese Funktion ist geschuetzt und erzeugt bei Benutzung einen Fehler.
+
+SIEHE AUCH
+        send_erq(E), erq(C)

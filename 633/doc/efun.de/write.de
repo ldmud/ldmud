@@ -1,0 +1,38 @@
+VERALTET
+SYNOPSIS
+        void write(mixed msg);
+
+BESCHREIBUNG
+        Gibt etwas an den aktuellen Benutzer aus. Was genau ausgegeben wird,
+        haengt vom Typ der Meldung <msg> ab.
+
+        Folgende Ausgaben erfolgen abhaengig vom Typ von <msg>:
+            String oder Zahl    <msg> wird ausgegeben
+            Objekt              "OBJ("+object_name((object)msg)+")"
+            Array               "<ARRAY>"
+            Mapping             "<MAPPING>"
+            Closure             "<CLOSURE>"
+
+        Wenn write() von einem Kommando eines Lebewesens aufgerufen wird,
+        dieses Lebewesen aber nicht interaktiv ist, und <msg> einen String
+        enthaelt, wird im Lebewesen die Lfun catch_tell() mit <msg> als
+        Argument aufgerufen.
+
+BEISPIELE
+        write("Hello world!\n");
+        Dies gibt den String an den Benutzer aus.
+
+        write(this_player());
+        Dies erzeugt etwas wie: "OBJ(/std/player#1234)".
+
+        write( ({"blubb"}) );
+        Dies erzeugt "<ARRAY>".
+
+ANMERKUNGEN
+        DIESE FUNKTION IST VERALTET UND SOLLTE NICHT MEHR GENUTZT WERDEN.
+        Stattdessen gibt es die Lfun send_message_to, welche mit this_player()
+        als ersten Parameter dieselbe Funktionalitaet bietet. Es sollte in
+        dem Objekt aufgerufen werden, welches der Ursprung der Meldung ist.
+
+SIEHE AUCH
+        say(E), tell_object(E), tell_room(E), catch_tell(A)

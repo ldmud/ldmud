@@ -1,0 +1,21 @@
+Subject: LDMud 3.2.5
+From: Freaky <Freaky@UNItopia.rus.uni-stuttgart.de>
+Date: Mon, 23 Nov 1998 02:18:23 +0100
+X-Mailer: Mutt 0.94.15i
+
+Das naechste waere ein Style-Guide fuer den Driver-Code.
+Ich habe an deinen Diffs z.B. gesehen, dass du die Tabs durch Spaces
+ersetzt. Da sollte man sich mal auf eines einigen, damit alle Debugger sich
+daran halten koennen. Wo es keinen Style-Guide gibt, macht halt jeder, was
+er will. Auch fuer Klammersetzung, Einrueckung, Spaces zwischen
+Terminal-Symbolen, Funktionskoepfe usw. muessen darin definiert werden.
+Falls du ein Beispiel eines solchen Style-Guides haben willst, sag bescheid.
+
+Ciao
+		Freaky
+
+--
+Frank 'Freaky' Kirschner
+UNItopia Admin                          http://UNItopia.uni-stuttgart.de/
+Freaky@UNItopia.Uni-Stuttgart.DE      telnet://UNItopia.uni-stuttgart.de/
+

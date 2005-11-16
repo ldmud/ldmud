@@ -1,0 +1,30 @@
+Short: Extension to command_stack()
+Date: Tue, 29 Feb 2000 10:39:23 -0700
+From: Lars Duening <lars@bearnip.com>
+Type: Feature
+State: New
+
+
+On 29 Feb 00, at 11:21, Casey Zacek wrote:
+
+> 
+> Regarding the command_stack() additions I suggested, one of my Arches
+> came up with this:
+> 
+> 
+> oh and I realized that if command_stack() returned the object
+> calling command(), that'd almost certainly solve our problems
+> cuz we can test that against the command_giver element of the
+> corresponding stack item and if they match up, then the object
+> is forcing itself and its okay to let it through the only
+> problem is that i envisioned the offending object element to
+> return 0 if command() wasn't used that might not work because
+> what if the offending object got dested then it'd still be
+> "insecure" or whatever, but 0 would be in there you'd need to
+> come up with some other value for a "secure" command
+
+How about the object name instead of the object itself?
+
+-- 
+Lars Duening; lars@bearnip.com
+

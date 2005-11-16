@@ -1,0 +1,12 @@
+Date: Thu, 6 Jan 2000 10:16:35 -0500 (EST)
+From: fiona
+Short: Special -> for array calls
+Type: Feature
+State: New
+
+
+>From Fiona: invent a second -> just for arr->fun() calls, and add
+a pragma or cmdline option to make it mandatory for this type of call.
+Other wise something like m[i][j][k]->fun() may fall badly over a
+missing index.
+

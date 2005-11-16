@@ -1,0 +1,5 @@
+Command: emote
+argument: string
+
+Give a message 'string' to all in room. Your name willbe prepended to
+the message.
