@@ -1,0 +1,63 @@
+GESCHUETZT
+SYNOPSIS
+        void set_this_object(object objekt-an-stelle-von-originalobjekt);
+
+BESCHREIBUNG
+        Dies ist eine geschuetzte Funktion, die nur vom Master-Objekt und im
+        Simul-Efun-Objekt genutzt werden darf. Bei sonstiger Benutzung
+        erzeugt diese Funktion einen Fehler.
+
+        Die Funktion aendert das Resultat von this_object() in der laufenden
+        Funktion, ebenso das Resultat von previous_object() in Funktionen in
+        anderen Objekten, die einen call_other() Aufruf machen.
+
+        Der Effekt von set_this_object() bleibt bestehen, bis ein externer
+        Funktionsaufruf abgeschlossen ist oder bis zu einem erneuten
+        set_this_object(). Waehrend der Ausfuehrung von Code im Master-Objekt
+        oder im Simul-Efun-Objekt ist set_this_object() garantiert, auch wenn
+        this_object() durch set_this_object() veraendert wird. Die gilt
+        nicht fuer Funktionen, die aus anderen Programmen inheritet werden.
+
+        Diese Funktion darf nur mit hoechster Sorgfalt verwendet werden, um
+        Inkonsistenzen zu vermeiden. Nach einem Aufruf von set_this_object()
+        koennen sich gewisse LPC-Konstrukte merkwuerdig verhalten oder gar
+        das System zum Absturz bringen. Insbesondere die Verwendung von
+        globalen Variablen oder der Aufruf von lokalen Funktionen (ausser
+        durch call_other()) ist unzulaessig und wird aktiv verhindert.
+
+        Erlaubt sind call_other(), map(), der Zugriff auf lokale Variablen
+        (die auch Pointers auf globale Arrays enthalten duerfen), einfache
+        Arithmetik und der Zuweisungs-Operator.
+
+BUGS
+        Es ist momentan nicht moeglich, das originale gueltige Objekt wieder
+        herzustellen. Anstelle von:
+
+            object ich = this_object();
+            set_this_object(dings);
+            <irgendwelcher Code>
+            set_this_object(ich);
+            <mehr Code>
+
+        muss das ueber einen Umweg geloest werden:
+
+            private void tuwas(object dings)
+            {
+                set_this_object(dings);
+                <irgendwelcher code>
+            }
+
+            funcall(#'tuwas, dings);
+            <mehr Code>
+
+        Manche Leute bezeichnen das als Feature.
+
+AENDERUNGEN
+        LDMud 3.2.10 verhindert aktiv die Referenz auf globale Variablen und
+            Funktionsaufrufe nach Adresse, waehren set_this_object() gilt.
+
+ANMERKUNG
+        Diese Funktion ist geschuetzt und erzeugt bei Benutzung einen Fehler.
+
+SIEHE AUCH
+        this_object(E), set_this_player(E)

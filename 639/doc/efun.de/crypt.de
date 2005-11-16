@@ -1,0 +1,16 @@
+SYNOPSIS
+        string crypt(string str, int seed);
+        string crypt(string str, string seed);
+
+BESCHREIBUNG
+        Verschluesselt den String <str> mit dem Schluessel <seed>. <seed> kann
+        entweder ein Integer sein oder zwei Zeichen aus dem String <seed>.
+        Wenn <seed> 0 ist, wird ein zufaelliger Schluessel erzeugt.
+
+        Das Resultat enthaelt den Schluessel als die ersten beiden Zeichen.
+
+        Fuer Passwortabfragen, die ohne Echo eingegeben werden koennen sollen,
+        bietet input_to() ein spezielles Flag.
+
+SIEHE AUCH
+        md5(E), input_to(E)

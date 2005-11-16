@@ -1,0 +1,28 @@
+SYNOPSIS
+        int clonep ()
+        int clonep (object obj)
+        int clonep (string obj)
+        int clonep (mixed  arg)
+
+BESCHREIBUNG
+        Liefert 1, wenn das angegebene Objekt ein Klon ist, ansonsten 0.
+        Das Objekt kann dabei auch durch seinen Objekt-Namen angegeben werden.
+        Wird kein Argument uebergeben, so wird this_object() getestet.
+        Liefert 0, wenn das Argument von einem anderen Typ.
+        Ein Objekt, dessen Programm mittels replace_program() ersetzt wurde,
+        zaehlt nicht als Klon.
+
+BEISPIEL
+        object o;
+        o = clone_object("/obj/ding");
+        write(clonep(o));                          --> schreibt "1"
+        write(clonep("/obj/ding"))                 --> schreibt "0"
+
+        (Im COMPAT_MODE "obj/ding" als Dateinahmen benutzen)
+
+AENDERUNGEN
+        Eingefuehrt in LDMud 3.2.6, geaendert in 3.2.7, so dass Objekte mit
+        ersetzten Programmen nicht mehr als Klone zaehlen.
+
+SIEHE AUCH
+        load_name(E), clone_object(E), clones(E)

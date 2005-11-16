@@ -1,0 +1,25 @@
+Short: make distclean is incomplete
+Date: Tue, 29 Feb 2000 14:23:59 -0600
+From: Casey Zacek <cz@800hosting.com>
+Type: Bug
+State: Done - fixed in 3.2.8-dev.175
+
+
+The 'make distclean' target fails to remove a few files.  these are:
+
+config.h
+config.status
+config.status.old (or .bak? something like that, i think its .old)
+util/Makefile
+util/erq/Makefile
+util/xerq/Makefile
+
+Not a big deal, but I use distclean a lot to compare various versions
+of the source tree (I have about 10 of them right now).  Ah, I really
+should just import the stuff into a CVS repository or something.
+
+-- 
+-- Casey Zacek
+   Senior Staff Engineer
+   1-800-Hosting.com
+

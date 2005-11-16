@@ -1,0 +1,45 @@
+SYNOPSIS
+        object present(mixed str);
+        object present(mixed str, object ob);
+
+BESCHREIBUNG
+        Wenn ein Objekt mit der Id <str> sich im Inventar oder in der Umgebung
+        von this_object() befindet, wird es zurueck geliefert. Wenn <str> die
+        Form "<id> <n>" hat, wird das n-te Objekt mit Namen <id> zurueck
+        geliefert. Das heisst, der Driver fuehrt fuer alle Objekte im Inventar
+        und in der Umgebung von this_object() die Funktion id(str) aus, bis
+        ein Treffer erzielt wird (wenn ueberhaupt).
+
+        Es ist: id(str) { return str == <name>; }
+
+        <str> kann auch ein Objekt (anstatt einem object_name()) sein, was den
+        Test schneller und einfacher macht.
+
+        Das Argument <ob> ist optional. <ob> gibt an, wo nach <str> gesucht
+        wird. Nur das Inventory von <ob> wird durchsucht, nicht jedoch dessen
+        Umgebung. Oftmals wird fuer <ob> this_player() gesetzt.
+
+        Wenn ein Objekt die Forum "<id> <n>" in Verbindung mit einem selbst
+        ueber add_action() gesetzten Verb unterstuetzen soll (damit z. B.
+        "oeffne Kiste 3" funktioniert), kann das folgendermassen geloest
+        werden:
+
+        init() { add_action("oeffne_kiste", "oeffne"); }
+
+        oeffne_kiste(str)
+        {
+            if(present(str) != this_object() )
+            {
+                return 0; /* nicht diese Kiste */
+                ...
+            }
+        }
+
+ANMERKUNG
+        Wenn das n-te Objekt <str> in this_object() UND in der Umgebung von
+        this_object() gefunden wird, so liefert present() das n-te Objekt aus
+        der Umgebung, nicht beide.
+
+SIEHE AUCH
+        move_object(E), environment(E), this_object(E), present_clone(E),
+        id(A), init(A)

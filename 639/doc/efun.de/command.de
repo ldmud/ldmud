@@ -1,0 +1,34 @@
+GESCHUETZT
+SYNOPSIS
+        int command(string str);
+        int command(string str, object ob);
+
+BESCHREIBUNG
+        Wertet <str> wie ein Kommando aus, das direkt von einem interaktiven
+        Benutzer gegeben wurde. Das Kommando wird auf das aktuelle Objekt
+        angewendet oder, falls angegeben, auf das Objekt <obj>.
+
+        Der Rueckgabewert ist 0 bei Fehlschlag. Bei Erfolg wird ein
+        numerischer Wert zurueckgegeben, der die Eval Kosten darstellt. Ein
+        hoeherer Rueckgabewert bedeutet hoehere Kosten. Die Eval Kosten
+        entsprechen ungefaehr der Anzahl ausgefuehrter LPC Maschinencode
+        Instruktionen.
+
+        Wenn command() auf auf ein anderes Objekt angewedet wird, koennen auf
+        diesem Wege keine "static" deklarierten Funktionen aufgerufen werden,
+        um etwas Schutz vor unerlaubten Aufrufen zu geben.
+
+        Kommandi werden gestapelt, das heisst, nach der Ausfuehrung von <str>
+        werden die alten Werte fuer this_player(), query_verb() etc. wieder
+        hergestellt.
+
+AENDERUNGEN
+        Bis 3.2.6 im Native-Modus konnten Kommandi nur auf das aktuelle Objekt
+            angewendet werden.
+        Seit 3.2.7 werden Kommandi gestapelt.
+
+ANMERKUNG
+        Diese Funktion ist geschuetzt und macht deshalb gar nix.
+
+SIEHE AUCH
+        command_stac(E), notify_fail(E), enable_commands(E), get_eval_cost(E)

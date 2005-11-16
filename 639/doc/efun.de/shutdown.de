@@ -1,0 +1,18 @@
+SYNOPSIS
+        void shutdown();
+
+BESCHREIBUNG
+        Faehrt das Mud herunter. Diese Funktion darf nie verwendet werden!
+        Wenn das Mud heruntergefahren werden muss, so hat dies ueber den
+        Shutdownbefehl zu erfolgen.
+
+        Man fragt sich nun vielleicht, wozu es dann diese Funktion gibt,
+        wenn man sie nicht verwenden darf. Sorry, das darf hier nicht
+        bekannt gegeben werden. Streng geheim.
+
+ANMERKUNG
+        In Unitopia ist diese Funktion geschuetzt und macht deshalb gar
+        nichts.
+
+SIEHE AUCH
+        break_point(E), swap(E)
