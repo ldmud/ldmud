@@ -1,0 +1,8 @@
+Mudadm ~/orbit/bin > ./driver-3.2.5.03 -DUNItopia -DTestMUD -DOrbit -E300000 -DMESSAGE_SYSTEM \
+mudadm@UNItopia 2>  -m/UNItopia/mudadm/orbit/lib \
+mudadm@UNItopia 2>  -ru0 -rm0 -rs0 \
+mudadm@UNItopia 2>  -s-1 -sv-1 -sf../UNItopia.swp \
+mudadm@UNItopia 2>  -u-1 9876 8765 7654 97531 \
+mudadm@UNItopia 2>  --gcollect-outfd ../gcollect.out \
+mudadm@UNItopia 2>  --debug-file UNItopia.debug.log \
+mudadm@UNItopia 2>  --max-malloc 67108864 "$@"

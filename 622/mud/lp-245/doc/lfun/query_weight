@@ -1,0 +1,10 @@
+int query_weight()
+
+This function is called to query the weight of this object.
+A design choise TAKEN, is that objects inside another objects, does not
+change the weight of that object.
+
+This makes it possible for a player to carry more if he puts it into
+a bag or something.
+
+Note that objects doesn't have a size, only weight.

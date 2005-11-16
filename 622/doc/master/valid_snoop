@@ -1,0 +1,8 @@
+SYNOPSIS
+        int valid_snoop(object me, object you)
+
+DESCRIPTION
+        Should return 1 if me is allowed to snoop you, 0 if not.
+
+SEE ALSO
+        snoop(E), query_snoop(E), valid_query_snoop(M)
