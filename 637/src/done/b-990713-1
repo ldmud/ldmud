@@ -1,0 +1,21 @@
+Short: shadow on destructed object with heartbeat
+Date: Mon, 12 Jul 1999 23:04:45 +0200
+From: Thorsten Klose <Thorsten.Klose@gmx.de>
+Type: Abandoned - Not reproducible
+See also: b-990305-01 and b-981028.
+
+Momentan laeuft Avalon mit der dev-110. Was uns (bis auf den bereits
+gemeldeten Bugs) aufgefallen ist:
+
+   - Vorgestern ist folgendes passiert: ein Shadow ueberlagerte eine
+     Funktion im Player, die vom HeartBeat aufgerufen wird. Per
+     Call Other wurde eine Funktion in einem Objekt aufgerufen, das
+     bereits zerstoert war.
+     Bei jedem Heart Beat entstand ein Runtime-Error.
+     Jedenfalls passierten danach im MUD ziemlich ungewoehnliche
+     Dinge: voellig sporadisch wurde init() in den Livings aufgerufen.
+     Call-Outs gingen verloren. Manche Raeume konnten nicht mehr
+     betreten werden. Das MUD mussten wir runterfahren...
+
+     Leider kann ich auch diesen Fehler nicht reproduzieren. Deshalb
+     an dieser stelle "for the records". ;)

@@ -1,0 +1,29 @@
+SYNOPSIS
+        int seteuid(string str);
+
+BESCHREIBUNG
+        Setzt die effektive UID auf <str>. Das aufrufende Objekt muss dazu
+        vom Masterobjekt berechtigt sein. In den meisten Installationen
+        kann die effektive UID jederzeit auf die momentane UID des Objekts,
+        auf die UID des Erschaffers des Objekts oder auf 0 gesetzt werden.
+
+        Nur wenn dieser Wert 0 ist, kann die UID des Objekts durch
+        export_uid() veraendert werden.
+
+        Unter strikten eUID Regeln koennen Objekte mit UID 0 keine anderen
+        Objekte laden oder clonen.
+
+AENDERUNGEN
+        Seit 3.2.1@47 ist die Efun nur verfuegbar, wenn eUIDs verwendet
+            werden.
+        Seti 3.2.7 ist diese Efun immer verfuegbar.
+
+ANMERKUNG
+        Ein Objekt mit der UID user darf sich die eUID user und die
+        NOBODY_UID (definiert in /sys/uids.h) setzen.
+
+        Jedes Objekt bekommt seine UID automatisch als eUID gesetzt. Daher
+        ist der einzige Sinn dieser Funktion, sich die NOBODY_UID zu setzen.
+
+SIEHE AUCH
+        export_uid(E), getuid(E), geteuid(E), native(C)

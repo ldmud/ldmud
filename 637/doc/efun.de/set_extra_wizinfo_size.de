@@ -1,0 +1,13 @@
+SYNOPSIS
+        void set_extra_wizinfo_size (int num)
+
+BESCHREIBUNG
+        Die Wizlist wird dahingehend geaendert, dass fuer jeden neuen Eintrag
+        als 'extra info' ein Feld von <num> Werten zur Verfuegung steht. Ist
+        <num> negativ, dann wird 'extra info' als ein Nicht-Array-Wert
+        betrachtet.
+
+        Die Funktion erzeugt eine privilege violation.
+
+SIEHE AUCH
+        get_extra_wizinfo(E), set_extra_wizinfo(E), wizlist_info(E)
