@@ -1,0 +1,15 @@
+Short: Allow to set a certain umask
+From: Kees Leune
+Date: 000616
+Type: Feature
+State: New
+See also: f-000326
+
+Also, a related question. In object.c, line 1655, the function that
+saves objects has a hard code umask in it (currently 0640). Would it be
+possible to make this option configurable? Since we want our player save
+files to be accessible by the web server, we needed to either put the
+server in group mud, or allow mud to be read the rest. Since we are
+running dedicated, I decided to take the easy way :) It would even be
+more beautiful is we could have a umask efun, since i really only would
+like to have the player.o files 644, but the rest 640 :)

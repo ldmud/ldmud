@@ -1,0 +1,35 @@
+Short: Crash on array addition
+From:    Zora@PK-Mud
+Subject: crash
+Date:    Mon Feb  1 18:30:22 1999
+Type: Bug
+State: Fixed by p-990203-2
+
+
+Could this be related to  p-990203-2?
+
+mixed x;
+
+void fill()
+{
+  int i;
+  mixed ignore;
+
+  x=({ ({}) });
+
+  for(i=6000;i--;)
+  {
+    ignore=x[0];
+    ignore+=({i});
+    x[0]=ignore;
+  }
+}
+
+das fuehrt dazu, dass (nach dem bug) x dennoch total falsch werte enthaelt.
+vorraussetzung ist, dass ignore eine lokale variable ist, und dass vorher
+ignore=x[0] gemacht wird, wobei x ein array oder mapping sein kann. zwirch hat
+ne theorie: speicherfreigabe passiert nur beim lokalen ignore, aber das x[0]
+wird net angepasst.
+
+kannst du das beheben?
+

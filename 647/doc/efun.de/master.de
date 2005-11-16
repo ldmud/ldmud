@@ -1,0 +1,17 @@
+SYNOPSIS
+        object master();
+        object master(int dont_load);
+
+BESCHREIBUNG
+        Die Funktion liefert das Masterobjekt.
+
+        Wenn <dont_load> nicht wahr ist, stellt master() zuerst sicher, dass
+        das Masterobjekt auf existiert. Wenn <dont_load> wahr ist, liefert
+        master() nur das Masterobjekt oder 0, falls das aktuelle Masterobjekt
+        zerstoert wurde.
+
+AENDERUNGEN
+        Eingefuehrt in LDMud 3.2.10
+
+SIEHE AUCH
+        master(M)

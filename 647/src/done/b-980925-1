@@ -1,0 +1,10 @@
+Short: Omission of option values prints wrong error message
+Date: 980925
+Type: Bug
+State: Fixed
+Author: Lars
+Long:
+
+Omission of value for option -f leads to the error message
+'Option 'N' expects a value'.
+
