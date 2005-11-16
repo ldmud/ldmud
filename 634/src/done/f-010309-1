@@ -1,0 +1,7 @@
+Short: foreach() should allow dummy variables
+From: Lars
+Date: 2001-03-09
+Type: Feature
+State: Rejected : Featuritis.
+
+E.g. foreach (string, int, string used_by : <mapping>) ...

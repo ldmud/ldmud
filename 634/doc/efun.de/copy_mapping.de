@@ -1,0 +1,18 @@
+VERALTET
+SYNOPSIS
+        mapping copy_mapping(mapping map);
+
+BESCHREIBUNG
+        Diese Efun war notwendig, um echte Kopien eines Mappings zu erzeugen
+        und nicht bloss eine Referenz auf das Original, wie bei der Addition
+        / Subtraktion bei Mappings.
+
+AENDERUNGEN
+        Diese Funktion wurde durch copy() abgeloest.
+
+ANMERKUNG
+        DIESE FUNKTION IST VERALTET.
+        Die gleiche Funktionalitaet bietet copy().
+
+SIEHE AUCH
+        mappings(LPC), copy(E)

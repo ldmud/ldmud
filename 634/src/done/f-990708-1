@@ -1,0 +1,40 @@
+Short: Mapping limits
+From: Holger Kremss <jur94ewp@studserv.uni-leipzig.de>
+Date: 990708
+Type: Feature
+State: Done - implemented in 3.2.7-dev.116
+
+Mappings are not limited in size. Additionally, following error occured:
+
+Unsere Array-Groesse ist auf maximal 5000 festgesetzt. Wenn ich folgendes
+mache (mit unserem Xtool):
+
+xlpc int i; mixed a; for(a=({});i<6000;i++) a+=({i});
+
+kommt folgerichtig der Fehler:
+
+Error: Illegal array size: 5001.
+
+Bisher glaaubte ich immer Mappings seien intern auch wieder nur alists und
+die Groessenbegrenzung traefe auch auf sie zu. Dem ist aber nicht so:
+
+xlpc int i; mapping a; for(a=([]);i<6000;i++) a+=([ i: -i ]);
+
+KEIN Fehler. Erst wenn ich return a; am Ende noch mache kommt dabei:
+
+[Debug:] !<holger> obj/tools/xtool.c (xtool/toollib.c) obj/tools/xtool#10168
+       Illegal array size: 6000.
+------------------------------------------------------------------------------
+file: obj/tools/xtool.c (xtool/toollib.c) line: 168 object: obj/tools/xtool#10
+error: Illegal array size: 6000.
+-----------------------------------------------------------------------------
+
+Also bringt der Driver das Mapping auf 6000 Elemente ohne zu murren. Wir
+sind dadurch heute Opfer eines boesen Spielerstreichs geworden, der sich
+mal eben 100.000 Alis angelegt hat. Natuerlich haette das auch von der Lib
+geprueft werden muessen, aber wenn Mappings sich genauso verhalten wuerden
+wie Arrays, waer auch nichts passiert. Naja ich wollts dir nur mailen. Ich
+hab leider keine Zeit den Fehler im Code selbst zu suchen...
+
+Holger@Wunderland
+
