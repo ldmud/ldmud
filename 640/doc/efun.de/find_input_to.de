@@ -1,0 +1,30 @@
+SYNOPSIS
+        int find_input_to (object player, string fun);
+        int find_input_to (object player, closure fun);
+        int find_input_to (object player, object fun);
+        int find_input_to (object player, object ob, string fun);
+
+BESCHREIBUNG
+        Findet den zuletzt fuer <player> gestarteten input_to(), abhaengig vom
+        Argument <fun>:
+          - <fun> ist ein String: der Funktionsname des input_to() muss passen
+          - <fun> ist ein Objekt: das Objekt, an welches die Funktion des
+            input_to() gebunden ist, muss passen
+          - <fun> ist eine Closure: die input_to() Closure muss passen
+          - <ob> und <fun> sind angegeben: sowohl Objekt als auch
+            Funktionsname muessen passen.
+
+        Die Funktion liefert -1, wenn kein input_to() gefunden wurde, sonst
+        die Position im input_to() Stack (wobei 0 den als letztes
+        hinzugefuegten input_to() bezeichnet).
+
+AENDERUNGEN
+        Eingefuehrt in LDMud 3.2.9
+
+ANMERKUNG
+        Diese Funktion ist in der Regel wirkungslos, da input_to()-Funktionen
+        aufgrund der Umlautkonvertierung nicht direkt angemeldet werden.
+
+SIEHE AUCH
+        input_to(E), input_to_info(E), remove_input_to(E),
+        query_input_pending(E)

@@ -1,0 +1,5 @@
+Command: review
+
+Show all messages given when you leave or enter a room.
+
+See also w/setmin, w/setmout, w/setmmin, w/setmmout

@@ -1,0 +1,15 @@
+SYNOPSIS
+        int write_bytes(string file, int start, string str);
+
+BESCHREIBUNG
+        Schreibt den String <str> ins File <file> und ueberschreibt dabei die
+        alten Bytes ab Position <start>. Wenn <start> eine negative Zahl ist,
+        werden die Zeichen vom Ende von <file> an gezaehlt. write_bytes()
+        liefert 1 bei Erfolg, 0 bei Misserfolg.
+
+ANMERKUNG
+        Seit Version 3.2@232 ist write_bytes() in der Lage, ueberlange Zeichen
+        aus <str> ans File <file> anzuhaengen.
+
+SIEHE AUCH
+        save_object(E), write_file(E)

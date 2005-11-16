@@ -1,0 +1,13 @@
+SYNOPSIS
+        string md5(string arg)
+
+BESCHREIBUNG
+        Resultat ist ein MD5-Digest fuer String <arg>.
+
+BEISPIEL
+        string s;
+
+        s = md5("Hello, world!");
+
+SIEHE AUCH
+        crypt(E)

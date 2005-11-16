@@ -1,0 +1,42 @@
+VERALTET
+SYNOPSIS
+        string file_name();
+        string file_name(object ob);
+
+BESCHREIBUNG
+        Liefert den Namen des Objekts <ob> oder, wenn <ob> nicht angegeben
+        wurde, den Namen des aktuellen Objekts.
+
+        Der Name ist jener Name, unter dem das Objekt in der Objekttabelle des
+        Muds gespeichert ist. Er wird bei Erzeugung des Objekts festgelegt.
+        Blueprints erhalten den Namen der Datei, aus der sie kompiliert wurden
+        (ohne das .c am Schluss). Clone erhalten den Namen ihres Blueprints,
+        gefolgt von einem '#' und einer eindeutigen, nicht negativen Nummer.
+        Die gleichen Regeln gelten fuer virtuelle Objekte - der wahre Name
+        oder Typ von virtuellen Objekten ist irrelevant.
+
+        Der Name eines Objekts kann mit der geschuetzten Funktion
+        rename_object() veraendert werden. file_name() beruecksichtigt
+        solche Veraenderungen.
+
+        Der Name, den die Funktion liefert, beginnt immer mit '/', ausser der
+        Treiber laeuft im COMPAT-Modus.
+
+BEISPIEL
+        find_object(file_name(ob)) == ob;
+
+        Diese Beziehung gilt fuer alle Objekte ob, die nicht zerstoert wurden.
+
+AENDERUNGEN
+        Die Funktion wurde in LDMud 3.2.6 umbenannt zu object_name(). Der
+            alte Name file_name() kann als Alias verwendet werden.
+        Seit LDMud 3.2.9 ist die Funktion nur noch verfuegbar, wenn der Driver
+            mit USE_DEPRECATED kompiliert wurde.
+
+ANMERKUNG
+        DIESE FUNKTION IST VERALTET.
+        Die gleiche Funktionalitaet bietet object_name().
+
+SIEHE AUCH
+        clone_object(E), load_name(E), load_object(E), find_object(E),
+        program_name(E), rename_object(E), object_name(E)
