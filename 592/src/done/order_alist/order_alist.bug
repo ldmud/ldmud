@@ -1,0 +1,39 @@
+04.03.98:
+bad data array 1 in call to order_alist
+program: global/server/events.c, object: global/server/events line 292
+'           walk' in 'domains/avalon/mallorn/monster/dorilys.c'
+                            ('domains/avalon/mallorn/monster/dorilys') line 604
+'        command' in ' kernel/simul/game.c' ('   kernel/simul_efun') line 558
+'   exit_command' in '        basic/exit.c' ('players/fangorn/rooms/forest4')
+                                                                       line 104
+'       use_exit' in '        basic/exit.c' ('players/fangorn/rooms/forest4')
+                                                                       line 94
+'    move_living' in ' basic/living/move.c'
+                            ('domains/avalon/mallorn/monster/dorilys') line 88
+'     send_event' in 'kernel/simul/events.c'  ('   kernel/simul_efun') line 57
+<lambda 0xbfffcac2> in 'domains/avalon/mallorn/monster/dorilys.c'
+                            ('domains/avalon/mallorn/monster/dorilys') offset 2
+'           send' in 'global/server/events.c' ('global/server/events') line 292
+
+
+16.01.98 && 24.10.97:
+bad data array 1 in call to order_alist
+program: global/server/events.c, object: global/server/events line 291
+'move_dino_callout' in 'domains/escoryn/bog/dino.c'
+                                      ('domains/escoryn/bog/dino#462') line 134
+'      move_dino' in 'domains/escoryn/bog/dino.c'
+                                      ('domains/escoryn/bog/dino#462') line 152
+'    move_normal' in 'domains/escoryn/bog/dino.c'
+                                      ('domains/escoryn/bog/dino#462') line 225
+'    move_player' in ' basic/living/move.c'
+                                      ('domains/escoryn/bog/dino#463') line 94
+'    move_living' in ' basic/living/move.c'
+                                      ('domains/escoryn/bog/dino#463') line 88
+'     send_event' in 'kernel/simul/events.c'
+                                      ('   kernel/simul_efun') line 56
+<lambda 0xbfffda0a> in 'domains/escoryn/bog/dino.c'
+                                      ('domains/escoryn/bog/dino#463') offset 2
+'           send' in 'global/server/events.c' ('global/server/events') line 291
+Error in call out.
+
+

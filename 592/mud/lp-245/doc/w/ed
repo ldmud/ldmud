@@ -1,0 +1,25 @@
+Command: ed
+Argument: file
+
+Edit the file 'file'. For documentations about how to use 'ed', look
+at /doc/build.
+
+You can leave 'ed' with the command 'q', or 'Q' if the file has been
+modified.
+
+When in 'ed', the prompr will change to ':'.
+
+The file will be searched for in the current directory. 'ed castle.c' will
+edit the castle of the wizard.
+
+A wizard can only edit files in his home directory, /open, /ftp and in
+/log.
+
+If 'ed' is started without argument, it will edit the file where you
+last had an error message, and print that message.
+
+'ed' without arguments will edit the last file with an error in, either
+run time error, or compile time error. So, when you log in to the game,
+start with 'ed' to see if you have had any errors.
+
+See also w/ls, w/cat, w/rm

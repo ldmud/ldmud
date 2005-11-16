@@ -1,0 +1,11 @@
+Short: efun query_input_to() or query_input_pending()
+From: Tomba@Batmud
+Date: 2001-08-25
+Type: Feature
+State: New
+See also: f-000530
+
+query_input_to() returns the name of the function, or the closure
+respectively, to which input_to() was set.
+
+Fiona suggest to use query_input_pending() for this.

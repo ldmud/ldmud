@@ -1,0 +1,28 @@
+Short: More functionality for inherit_list() 
+Date: 991020
+Type: Feature
+State: Done - implemented in 3.2.9 and 3.3.
+From: Lars
+See also: b-981028-3.
+
+inherit_list() should offer options which control which data is returned
+how: flat/depth/width search, flat or nested result, with or without flags.
+This may require a redesign in the handling of inherit structures.
+
+--- LDMud 3.2.9-dev.355 and 3.3.111 implements the return of a tree structure.
+--- LDMud 3.2.9-dev.362 and 3.3.125 implement the tagging of virtual inherits.
+
+A particular nasty scenario is:
+
+  ------ c.c ------
+  int j;
+  ------ b.c ------
+  virtual inherit "c";
+  ------ a.c ------
+  inherit "b";
+  virtual inherit "c";
+
+inherit_list("a") returns ({ "a.c", "c.c", "b.c", "c.c" })
+The last "c.c" is the same as the first "c.c", but is found when doing
+the search in "b.c" - the connection is not visible there.
+
