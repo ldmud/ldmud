@@ -1,0 +1,15 @@
+Command: goto
+argument: obj
+
+Teleport directly to a room or a player. If 'obj' is a room, the go to that
+room. If 'obj' is a player, then go to the same room as his.
+
+Bugs:
+
+If the player isn't in the game, or the name of the room doesn't exist,
+the teleport will fail, and move you into the void.
+
+When teleporting to a player or monster, you will not get a description
+of the contents of that room.
+
+See also: w/trans, w/in

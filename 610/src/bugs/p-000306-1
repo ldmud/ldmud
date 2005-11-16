@@ -1,0 +1,1772 @@
+Date: Tue, 29 Feb 2000 04:25:09 -0600
+From: Casey Zacek <cz@800hosting.com>
+Short: EotL Additions
+Type: Feature
+State: New
+
+Original changes (pre-177):
+
+I think I'll go ahead and include the EotL hacks to the driver here,
+so that you can ponder them, and possibly even include them so that we
+don't have to hack them in with each update anymore!
+
+(+ means it's a desired feature)
+(- means I don't want it, but have to deal with it for legacy reasons
+   but don't want it in the driver)
+
++ input_to has priority over editor
+
+    This is a pretty easy hack.  I agree with Xurbax that it's nice to
+    be able to more a file while you're in the editor.  If you decided
+    to add this one to the stock driver, I don't foresee it causing any
+    major problems for other muds.
+
++ took hostname off debug.log
+
+    I've always thought it should be a compile- or run-time directive
+    as to what you name your debug log, and I think I remember reading
+    comments from you along those lines as well...  We basically have
+    all our "system" logs named with capital letters in our /
+    directory so that they're easily seen at the beginning of a
+    directory listing, and we don't really want the hostname on there.
+
++? added remote_command()
+
+    I think Xurbax added this one because he didn't like leaving
+    add_action()'ed functions non-static and not being able to force
+    people to do stuff.  I haven't hacked it into 3.2.7 because I don't
+    think it's really that necessary, but it can be a nice thing from
+    a coding standpoint.  What it did was return 1 anywhere in the
+    stack from the time command() with two arguments was invoked until
+    that command execution finished.  I'd rather have it return an
+    object (the one that issued the command() call, probably) than
+    just 1, but as it is, we don't have it at all.
+    
+    What'd *really* be cool, now that I'm discussing it with the EotL
+    Arches, is if command_stack() had an extra element in the list that
+    said whether there was a command() call to invoke the command or
+    not.
+
++? one second call_out granularity
+
+    I haven't really had a chance to look at this.  I haven't patched
+    it into 3.2.7, and it's not yet a priority.  It's nice to have.
+    Heartbeats still have 2-second-ish intervals.
+    
+    What we'd *really* like is a way to do a call_out(func, 0, args...)
+    so that func(args) would be called immediately after the current
+    execution stack was finished.
+
+- added privilege_violation check for shutdown() efun
+
+    This is like a 2-line hack, but I really don't see much point
+    in adding it.  We can use nomask simul_efuns instead.  What we
+    really want is a way to define what functions cause privilege
+    violations through a driver hook or something.
+
++? added __BFILE__ preprocessor define
+
+    Base file... The .c file being compiled, even if you're within a
+    .h file, basically.  Kinda handy, but not necessary... I didn't
+    hack it into 3.2.7.
+
+
+---------------------------
+We still crash a whole lot.  I rebuilt a couple times using more and
+more debugging-friendly options, and we're now running with these:
+
+PROFIL=
+OPTIMIZE= -O2 -g -fstrength-reduce -fno-force-mem -fno-force-addr
+    -fno-inline-functions # for better debugging
+DEBUG = -DDEBUG -DTRACE_CODE -DCHECK_STRINGS
+
+What's amusing is that when I added -DCHECK_STRINGS, the stability
+seems to have increased a lot.  sigh.
+
+Oh, well.  I do have a diff that includes the features I've added to
+dev.159, and then "fixes(?)" to go up to (just about) dev.164 (without
+the add_action() change).  The patches only apply to the src/
+directory.  I have rewritten our find_objects() efun, modeling it
+after clones() (sort of) in hopes that we'll quit going into a
+frozen-up state.  I think it might have worked.  Basically, the diff
+is from your dev.164 to our dev.164 (I call it dev.164.Z... I use the
+letter z to signify my versions).
+
+I haven't really documented find_objects() yet, so here's a little blurb:
+
+  varargs mixed *find_objects(string partial_path, int|object start)
+
+    finds all objects whose names begin with partial_path.  returns an
+    array like such: ({ num_left, ob1, ... obN }).  num_left is the
+    number of objects in the chain that would be returned but weren't
+    returned due to max_array_size.  start is either an integer or an
+    object to start with.  object is preferred.  int is legacy, and
+    will be phased out as soon as possible on EotL, and support will
+    be removed.  using an int can result in unreliable results if
+    objects are destructed between calls.  so long as the object chain
+    is always in the same order, using an object for the start
+    argument will always yeild consistent results.  it's worth noting,
+    i guess, that the <object start> will *not* be returned, even if
+    it matches partial_path.  the actual searching will start on the
+    *next* object in the chain.  I was considering adding another
+    parameter, <int limit>, that would be the max # of objects to be
+    returned, but, although it would speed up some calls to
+    find_objects(), I don't think it'd really come in handy enough to
+    be worth it.
+
+We've implemented simul_efuns for my previously mentioned
+set_variable() and query_variable() efuns, but have no way to
+implement query_variables() (that we can think of...).  What we'd like
+to see is an efun like functionlist() called variablelist() or the
+like, that would return various information about the variables in an
+object (static, private, ... all those goodies).  Once we have that,
+we can get rid of query_variables() because the values can be obtained
+(if not through variablelist()) via the query_variable() sefun.
+
+Going through these diffs, I notice that my formatting differs from
+yours in a lot of places, but I tried to keep to your style.  I figure
+if you want to use some code, you'll go ahead and reformat it anyway.  :)
+
+Also, the patches to add query_variables() went in
+cleanly, so I never bothered to check to see if they are buggy at all.
+If you see any glaring stupidity in there, please let me know.
+---------------------------
+
+Lars Duening spoke forth with the blessed manuscript:
+> > The problem with the
+> > add_action() change was that we could not for the life of us get the
+> > old functionality out of it anymore in any way.
+> 
+> *nod* best describe to me which behaviour you expect, and which 
+> you got.
+
+Ok, I got it working like I want.
+
+The only change to vanilla dev.164 I had to make before adding in the
+EotL additions was this one:
+
+:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+I think the only problem we really had was that query_verb() didn't
+return what it used to return anymore.  We had a lot of add_xverb()
+stuff, and that's the stuff that broke.  I've changed that stuff to
+use add_action(blah, blah, 1), and, with this patch, it works as
+desired, like the add_xverb() stuff worked.
+
+Does this make enough sense to you?  I want to make sure I'm
+explaining in clear English, but I'm stumbling over words.
+
+Now I'm going to go through the "EotL hacks" and see if I can make
+them fit better with the rest of the code, and perhaps that'll help
+our stability.
+
+-- 
+-- Casey Zacek
+   Senior Staff Engineer
+   1-800-Hosting.com
+
+---------------------------
+My stupid ass wrote this crap:
+>
+> I do have a diff that includes the features I've added to
+> dev.159, and then "fixes(?)" to go up to (just about) dev.164 (without
+> the add_action() change).  The patches only apply to the src/
+> directory.
+
+Perhaps it'd help if I actually attach what I intend to attach...
+I have slept since then. :)  Here you go.
+
+I have a weird feeling, after looking at this patch again, that my
+member() code has a memory leak of some sort in it, but I'm not sure
+why...
+
+Also note that the settings/eotl file is probably different (updated)
+from what I sent you already.  I'd be much obliged if you included it
+with the distribution. :)
+
+-----------------
+Patches left for dev-177:
+
+I'm trying to make changes to the mudlib that will allow me to remove
+more of my patches, but it's getting more and more difficult.
+
+The patches I have left are:
+
+- find_objects() efun.
+
+    This is a lot like your clones() efun, except that it works like
+    this:
+
+        mixed *find_objects(string str, int offset)
+
+    Basically, str can be a partial filename (not a regex, that'd be
+    sooooo slow!) like "/obj/daemon" or whatnot, and it'll return any
+    object who's file_name() (oh, that's object_name() now, huh) has a
+    leading substring of "/obj/daemon".  The mixed * return type is
+    necessary because the first element of the array is the number of
+    objects that find_objects() couldn't return due to array size
+    limitations.   find_objects() can be called repeatedly with the
+    same str, using the offset returned from each call in the
+    subsequent call to get the next bunch of objects to be returned.
+
+    Currently, our driver is hanging sometimes during the execution of
+    this efun, probably because I didn't take as much care as I should
+    have when I patched it in.  What I'd really like to see is an
+    extension of clones() so that we can replace all our uses of
+    find_objects().  Not that there are many, but it sure comes in
+    handy sometimes.
+
+- cp() alias for copy_file(), along with "reversed" return values.
+  I'm working right now to elimitate the need for the cp() hacks.
+
+- extra arguments to efun member().
+  added 'step' and 'start_index' params to member()
+
+    Basically I made member() work like so:
+
+        varargs mixed member(mixed var, mixed val, int start_i, int step)
+
+    start_i works for arrays and strings.  step works with arrays
+    only.  start_i is the index where you want the search to start
+    (negative values count from the end), and step is the number to
+    increment the counter each time you test (negative values are
+    accepted.  Fairly straightforward, and very handy.  I could make
+    step work for strings too, if I thought it'd be worth it to write
+    a loop instead of just using strchr().
+
+    By the way, we're glad you're getting rid of member_array(). :)
+
+- query_variable()
+- set_variable()
++? query_variables()
+
+    These are functions to set and query variable values in one object
+    from another (the master object).  We've recently found (thanks to
+    Bardioc@Evermore) a set_variable() replacement, and probably
+    therefore a query_variable() replacement, although I don't know
+    about query_variables() just yet.  They are priviledged functions.
+
+  I'm pretty sure I mentioned a possible variablelist() efun that'd act
+  much like functionlist().  This would allow me to remove the
+  query_variables() efun.
+
+- int return type to move_object() efun.
+
+    Basically, if the H_MOVE_OBJECT0 hook returns an integer,
+    move_object() will return that number.  Very handy to see if a
+    move actually succeeded.  We don't use transfer(), as we have lots
+    of stuff in place that deals with moving objects, and we're not in
+    COMPAT_MODE.  It's a really easy hack, and quite useful.  We never
+    understood why move_object() would be a void function.
+
+- ed.c patches for MAX_ED_SIZE to prevent crashes.
+
+    Well, this started out with Xurbax adding various checks upon
+    opening files (whether it's a directory and a huge file size
+    check), but I went ahead and extended it to fix the Ominous Ed
+    Crasher Bug [tm].  Basically, I kept his file-is-a-directory
+    check, and I added a #define MAX_ED_BUFF_SIZE (and thus a size
+    measurement to the ed buffer struct) so that the ed buffer can
+    never exceed the size you #define that macro as.  This prevents
+    people from using the 'r' and/or 't' commands to run the mud out
+    of memory.  Also, I'm going to make 'q!' work like 'Q' in ed,
+    since that works in every normal editor out there except for stock
+    UNIX ed.
+
+- catch_tell() modifying "told" string.
+  catch_tell() returns a replacement string
+
+    Basically, catch_tell() is now defined (optionally) as a
+    string-returning function, and, if it returns a string, the
+    original string that was sent to it is replaced with that return
+    value.  It's very handy.  Also, we made just about every message
+    a player/other object receives go through catch_tell().
+
+I'll attach my most recent diff, which I'm running now.  It's a diff
+against the dev.177 src/ subdirectory.  I would *really* appreciate it
+if you could browse it and tell me if there are any braindead things
+in there that could be causing my crashes.  I've already worked
+several of our hacks into simul_efuns instead of builtin efuns.
+
+My brain isn't working exactly right because I'm sick, so if any of
+this doesn't make sense, just ignore it or something. :)
+
+-- 
+-- Casey Zacek
+   Senior Staff Engineer
+   1-800-Hosting.com
+
+-----------------
+diff -urN lsrc-dev.177/config.h.in zsrc-dev.177/config.h.in
+--- lsrc-dev.177/config.h.in	Mon Feb 28 06:30:55 2000
++++ zsrc-dev.177/config.h.in	Fri Mar 31 13:49:52 2000
+@@ -7,6 +7,18 @@
+ #ifndef __CONFIG_H__
+ #define __CONFIG_H__ 1
+ 
++/* ZippoHacks [tm] */
++#define Z_MAX_ED_SIZE 1000000
++
++/* XurbaxHacks [tm] */
++#define X_FIND_OBJECTS
++#define X_CP
++#define X_MEMBER_EXTRA_ARGS
++#define X_QUERY_VARS
++#define X_INT_MOVE_OBJECT
++#define X_ED_FILE_STUFF
++#define X_CATCH_TELL_STUFF
++
+ /* Should code for the external request demon be included?
+  */
+ @cdef_erq_demon@ ERQ_DEMON
+diff -urN lsrc-dev.177/efuns.c zsrc-dev.177/efuns.c
+--- lsrc-dev.177/efuns.c	Mon Mar 27 22:22:11 2000
++++ zsrc-dev.177/efuns.c	Fri Mar 31 13:49:52 2000
+@@ -18,6 +18,7 @@
+  * Objects:
+  *    xefun: all_environment()
+  *    vefun: clones()
++ *    vefun: find_objects()
+  *    tefun: object_info()
+  *    tefun: present_clone() (preliminary)
+  *    tefun: present()
+@@ -2472,6 +2473,153 @@
+ } /* f_clones() */
+ 
+ /*-------------------------------------------------------------------------*/
++#ifdef X_FIND_OBJECTS
++svalue_t *
++f_find_objects (svalue_t *sp, int num_arg)
++
++/* VEFUN find_objects()
++ * [Xurbax] 91-05-09
++ * -- Zippo 19981221, 20000301
++ */
++
++{
++    char      *name;     /* Object name prefix to search for */
++    size_t     len;      /* Length of name */
++    size_t     offset;   /* Offset from start of matches to return */
++    object_t **ores;     /* Table pointing to the found objects */
++    size_t     found;    /* Number of objects found */
++    size_t     ret;      /* Number found that will be returned */
++    size_t     extra;    /* Number left after offset + ret */
++    size_t     osize;    /* Size of ores[] */
++    vector_t  *res;      /* Result vector */
++    svalue_t  *svp;
++    object_t  *ob;
++
++    /* Setup defaults */
++    offset = 0;
++    ob = obj_list;
++
++    /* Evaluate the arguments */
++    {
++        if (num_arg == 2) {
++            if (sp->type == T_NUMBER) {
++                offset = sp->u.number;
++                if (offset < 0)
++                {
++                    bad_xefun_vararg(2, sp);
++                    /* NOTREACHED */
++                    return sp;
++                }
++                free_svalue(sp--);
++            }
++            else if (sp->type == T_OBJECT) {
++                ob = sp->u.ob->next_all;
++                free_object_svalue(sp--);
++            }
++            else {
++                bad_xefun_vararg(2, sp);
++                /* NOTREACHED */
++                return sp;
++            }
++            inter_sp = sp;
++        }
++        if (sp->type != T_STRING) {
++            bad_xefun_vararg(1, sp);
++            /* NOTREACHED */
++            return sp;
++        }
++        name = sp->u.string;
++    } /* evaluation of arguments */
++
++    /* Allow name to contain a leading / */
++    if (*name == '/')
++        ++name;
++    len = strlen(name);
++
++    /* Prepare the table with the object pointers */
++    osize = 256;
++    found = 0;
++    ret = 0;
++    extra = 0;
++    ores = xalloc(sizeof(*ores) * osize);
++    if (!ores)
++    {
++        error("Out of memory.\n");
++        /* NOTREACHED */
++        return sp;
++    }
++
++    /* Loop through the object list */
++    for (; ob; ob = ob->next_all)
++    {
++        if ((ob->flags & O_DESTRUCTED) != O_DESTRUCTED
++         && !strncmp(ob->name, name, len))
++        {
++            /* Got one */
++            if( found++ >= offset ) {
++                if( extra ) {
++                    ++extra;
++                    continue;
++                }
++                else if( ret == osize ) {
++                    if( max_array_size ) {
++                        if( osize == max_array_size - 1 ) {
++                            ++extra;
++                            continue;
++                        }
++                        else {
++                            if( max_array_size > osize + 257 ) {
++                                osize = max_array_size - 1;
++                            }
++                            else {
++                                osize += 256;
++                            }
++                        }
++                    }
++                    else {
++                        osize += 256;
++                    }
++                    ores = rexalloc(ores, sizeof(*ores) * osize);
++                    if (!ores)
++                    {
++                        error("Out of memory.\n");
++                        /* NOTREACHED */
++                        return sp;
++                    }
++                }
++                ores[ret++] = ob;
++            }
++        }
++    }
++
++    /* Create the result and put it onto the stack */
++    res = allocate_uninit_array(ret + 1);
++    if (!res)
++    {
++        xfree(ores);
++        error("Out of memory.\n");
++        /* NOTREACHED */
++        return sp;
++    }
++
++    res->item->type = T_NUMBER;
++    res->item->u.number = extra;
++    osize = ret;
++    for (found = 0, svp = res->item + 1; found < osize; found++, svp++)
++    {
++        put_ref_object(svp, ores[found], "find_objects");
++    }
++
++    free_svalue(sp);
++    put_array(sp, res);
++
++    xfree(ores);
++    
++    return sp;
++} /* f_find_objects() */
++#endif /* X_FIND_OBJECTS */
++
++/*-------------------------------------------------------------------------*/
+ static object_t *
+ object_present_in (char *str, object_t *ob)
+ 
+@@ -3370,6 +3518,9 @@
+         stmp.u.ob = ob;
+         if (assoc(&stmp, avoid) >= 0)
+             continue;
++#ifdef X_CATCH_TELL_STUFF
++        tell_object(ob, message);
++#else /* X_CATCH_TELL_STUFF */
+         if (!(O_SET_INTERACTIVE(ip, ob)))
+         {
+             tell_npc(ob, message);
+@@ -3379,6 +3530,7 @@
+         command_giver = ob;
+         add_message("%s", message);
+         command_giver = save_again;
++#endif /* X_CATCH_TELL_STUFF */
+     }
+ 
+     pop_stack(); /* free avoid alist */
+@@ -3498,6 +3650,9 @@
+         if (ob->flags & O_DESTRUCTED) continue;
+         stmp.u.ob = ob;
+         if (assoc(&stmp, avoid) >= 0) continue;
++#ifdef X_CATCH_TELL_STUFF
++        tell_object(ob, message);
++#else /* X_CATCH_TELL_STUFF */
+         if (!(O_SET_INTERACTIVE(ip, ob)))
+         {
+             tell_npc(ob, message);
+@@ -3507,6 +3662,7 @@
+         command_giver = ob;
+         add_message("%s", message);
+         command_giver = save_command_giver;
++#endif /* X_CATCH_TELL_STUFF */
+     }
+ } /* e_tell_room() */
+ 
+diff -urN lsrc-dev.177/efuns.h zsrc-dev.177/efuns.h
+--- lsrc-dev.177/efuns.h	Mon Feb 28 06:52:49 2000
++++ zsrc-dev.177/efuns.h	Fri Mar 31 13:49:52 2000
+@@ -28,6 +28,9 @@
+ 
+ extern svalue_t *x_all_environment(svalue_t *, int);
+ extern svalue_t *f_clones (svalue_t *sp, int num_args);
++#ifdef X_FIND_OBJECTS
++extern svalue_t *f_find_objects (svalue_t *sp, int num_args);
++#endif /* X_FIND_OBJECTS */
+ extern svalue_t *f_object_info (svalue_t *sp);
+ extern object_t *e_object_present(svalue_t *v, object_t *ob);
+ extern svalue_t *f_present_clone (svalue_t *sp);
+diff -urN lsrc-dev.177/func_spec zsrc-dev.177/func_spec
+--- lsrc-dev.177/func_spec	Thu Mar 30 21:00:44 2000
++++ zsrc-dev.177/func_spec	Fri Mar 31 13:49:52 2000
+@@ -218,7 +218,11 @@
+ 
+ mixed  *allocate(int);
+ int     member_array(mixed, mixed *|string);
++#ifdef X_MEMBER_EXTRA_ARGS
++int     member(mixed *|string|mapping, mixed, void|int, void|int);
++#else /* X_MEMBER_EXTRA_ARGS */
+ int     member(mixed *|string|mapping, mixed);
++#endif /* X_MEMBER_EXTRA_ARGS */
+ mapping mkmapping(mixed *, ...);
+ mapping m_delete(mapping, mixed);
+ mixed  *m_indices(mapping);
+@@ -297,7 +301,11 @@
+ object *deep_inventory(object default: F_THIS_OBJECT);
+ object  environment(void|object|string);
+ object  first_inventory(object|string default: F_THIS_OBJECT);
++#ifdef X_INT_MOVE_OBJECT
++int     move_object(object|string, object|string);
++#else /* X_INT_MOVE_OBJECT */
+ void    move_object(object|string, object|string);
++#endif /* X_INT_MOVE_OBJECT */
+ object  next_inventory(object default: F_THIS_OBJECT);
+ object  present(object|string, void|object);
+ void    say(string|mixed *, void|object|object *);
+@@ -523,6 +531,9 @@
+         /* Objects */
+ 
+ object *clones(void|int|string|object, void|int);
++#ifdef X_FIND_OBJECTS
++mixed  *find_objects(string, void|int|object);
++#endif /* X_FIND_OBJECTS */
+ mixed  *filter_objects(mixed *, string, ...);
+ mixed  *functionlist(object|string, int default: F_CONST1);
+ string *inherit_list(object default: F_THIS_OBJECT);
+@@ -562,6 +573,9 @@
+         /* Files */
+ 
+ int     copy_file(string, string);
++#ifdef X_CP
++int     cp F_COPY_FILE (string, string);
++#endif /* X_CP */
+ 
+         /* Driver and System functions */
+ 
+@@ -617,3 +631,7 @@
+ int     set_is_wizard(object, int default: F_CONST1);
+ 
+ /***************************************************************************/
++
++#ifdef X_QUERY_VARS
++mixed *query_variables(object, int);
++#endif /* X_QUERY_VARS */
+diff -urN lsrc-dev.177/interpret.c zsrc-dev.177/interpret.c
+--- lsrc-dev.177/interpret.c	Thu Mar 30 21:00:44 2000
++++ zsrc-dev.177/interpret.c	Fri Mar 31 13:49:53 2000
+@@ -12424,16 +12424,58 @@
+ 
+         /* --- Search an array --- */
+ 
++#ifdef X_MEMBER_EXTRA_ARGS
++        long start, step;
++        GET_NUM_ARG
++        start = 0;
++        step = 1;
++        if( num_arg >= 4 ) {
++            if( sp->type != T_NUMBER ) {
++                error( "Bad type to arg 4 of member()\n" );
++            }
++            step = sp->u.number;
++            pop_stack();
++        }
++        if( num_arg >= 3 ) {
++            if( sp->type != T_NUMBER ) {
++                error( "Bad type to arg 3 of member()\n" );
++            }
++            start = sp->u.number;
++            pop_stack();
++        }
++#endif /* X_MEMBER_EXTRA_ARGS */
+         if (sp[-1].type == T_POINTER)
+         {
+ 
+             vector_t *vec;
+             union  u       sp_u;
+             long cnt;
++#ifdef X_MEMBER_EXTRA_ARGS
++            long vsize;
++#endif /* X_MEMBER_EXTRA_ARGS */
+ 
+             vec = sp[-1].u.vec;
+             cnt = (signed)VEC_SIZE(vec);
+             sp_u = sp->u;
++#ifdef X_MEMBER_EXTRA_ARGS
++            if((!start && !cnt) || start >= cnt) {
++                pop_stack();
++                free_svalue(sp);
++                put_number(sp, -1);
++                break;
++            }
++            if(start < 0) {
++                start = cnt + start;
++            }
++            if(start < 0) {
++                error( "Bad start index to member()\n" );
++            }
++            if(!step) {
++                error( "Bad step to member()\n" );
++            }
++            vsize = cnt;
++            cnt = vsize - start - 1;
++#endif /* X_MEMBER_EXTRA_ARGS */
+ 
+             switch(sp->type)
+             {
+@@ -12443,12 +12485,32 @@
+                 svalue_t *item;
+ 
+                 str = sp_u.string;
++#ifdef X_MEMBER_EXTRA_ARGS
++#define X_MEMBER_DO_COMPARE(comparison_code) \
++                if( step > 0 ) { \
++                    for(item = vec->item + start; \
++                     cnt >= 0; cnt -= step, item += step) { \
++                        comparison_code \
++                    } \
++                } else { \
++                    for(item = vec->item + start; \
++                     cnt < vsize; cnt -= step, item += step) { \
++                        comparison_code \
++                    } \
++                }
++                X_MEMBER_DO_COMPARE(
++                    if (item->type == T_STRING
++                     && !strcmp(sp_u.string, item->u.string))
++                        break;
++                )
++#else /* X_MEMBER_EXTRA_ARGS */
+                 for(item = vec->item; --cnt >= 0; item++)
+                 {
+                     if (item->type == T_STRING
+                      && !strcmp(sp_u.string, item->u.string))
+                         break;
+                 }
++#endif /* X_MEMBER_EXTRA_ARGS */
+                 break;
+               }
+ 
+@@ -12463,6 +12525,14 @@
+ 
+                 type = sp->type;
+                 x_generic = sp->x.generic;
++#ifdef X_MEMBER_EXTRA_ARGS
++                X_MEMBER_DO_COMPARE(
++                    if (sp_u.string == item->u.string
++                     && x_generic == item->x.generic
++                     && item->type == type)
++                        break;
++                )
++#else /* X_MEMBER_EXTRA_ARGS */
+                 for(item = vec->item; --cnt >= 0; item++)
+                 {
+                     if (sp_u.string == item->u.string
+@@ -12470,6 +12540,7 @@
+                      && item->type == type)
+                         break;
+                 }
++#endif /* X_MEMBER_EXTRA_ARGS */
+                 break;
+               }
+ 
+@@ -12483,6 +12554,23 @@
+                     svalue_t *item;
+                     short type;
+ 
++#ifdef X_MEMBER_EXTRA_ARGS
++                    X_MEMBER_DO_COMPARE(
++                        if ( (type = item->type) == T_NUMBER)
++                        {
++                            if ( !item->u.number )
++                                break;
++                        }
++                        else if (type == T_OBJECT)
++                        {
++                            if (item->u.ob->flags & O_DESTRUCTED)
++                            {
++                                assign_svalue(item, &const0);
++                                break;
++                            }
++                        }
++                    )
++#else /* X_MEMBER_EXTRA_ARGS */
+                     for (item = vec->item; --cnt >= 0; item++)
+                     {
+                         if ( (type = item->type) == T_NUMBER)
+@@ -12499,6 +12587,7 @@
+                             }
+                         }
+                     }
++#endif /* X_MEMBER_EXTRA_ARGS */
+                     break;
+                 }
+ 
+@@ -12511,12 +12600,20 @@
+                 svalue_t *item;
+                 short type = sp->type;
+ 
++#ifdef X_MEMBER_EXTRA_ARGS
++                X_MEMBER_DO_COMPARE(
++                    if (sp_u.number == item->u.number
++                     && item->type == type)
++                        break;
++                )
++#else /* X_MEMBER_EXTRA_ARGS */
+                 for (item = vec->item; --cnt >= 0; item++)
+                 {
+                     if (sp_u.number == item->u.number
+                      && item->type == type)
+                         break;
+                 }
++#endif /* X_MEMBER_EXTRA_ARGS */
+                 break;
+               }
+ 
+@@ -12530,6 +12627,12 @@
+             {
+                 cnt = (signed)VEC_SIZE(vec) - cnt - 1;
+             }
++#ifdef X_MEMBER_EXTRA_ARGS
++            else
++            {
++                cnt = -1;
++            }
++#endif /* X_MEMBER_EXTRA_ARGS */
+             /* else return -1 for failure */
+ 
+             pop_stack();
+@@ -12543,13 +12646,41 @@
+         if (sp[-1].type == T_STRING)
+         {
+             char *str, *str2;
++#ifdef X_MEMBER_EXTRA_ARGS
++            int cnt, i;
++#else /* X_MEMBER_EXTRA_ARGS */
+             int i;
++#endif /* X_MEMBER_EXTRA_ARGS */
+ 
++#ifdef X_MEMBER_EXTRA_ARGS
++            if(step != 1) {
++                ERROR( "Step not supported for member() on a string\n" );
++            }
++#endif /* X_MEMBER_EXTRA_ARGS */
+             if (sp->type != T_NUMBER)
+                 goto bad_arg_2;
+             str = sp[-1].u.string;
++#ifdef X_MEMBER_EXTRA_ARGS
++            cnt = strlen(str);
++            if((!start && !cnt) || start >= cnt) {
++                pop_stack();
++                free_svalue(sp);
++                put_number(sp, -1);
++                break;
++            }
++            if(start < 0) {
++                start = cnt + start;
++            }
++            if(start < 0) {
++                ERROR( "Bad start index to member()\n" );
++            }
++#endif /* X_MEMBER_EXTRA_ARGS */
+             i = sp->u.number;
++#ifdef X_MEMBER_EXTRA_ARGS
++            str2 = i & ~0xff ? NULL : strchr(str + start, i);
++#else /* X_MEMBER_EXTRA_ARGS */
+             str2 = i & ~0xff ? NULL : strchr(str, i);
++#endif /* X_MEMBER_EXTRA_ARGS */
+             i = str2 ? str2 - str : -1;
+             pop_stack();
+             free_svalue(sp);
+@@ -15125,6 +15256,9 @@
+          */
+ 
+         object_t *item, *dest;
++#ifdef X_INT_MOVE_OBJECT
++        int i;
++#endif /* X_INT_MOVE_OBJECT */
+ 
+         ASSIGN_EVAL_COST
+         inter_pc = pc;
+@@ -15155,10 +15289,15 @@
+         }
+         else
+             goto bad_arg_2;
+-
++#ifdef X_INT_MOVE_OBJECT
++        i = move_object();
++        sp -= 2;
++        push_number( i );
++#else /* X_INT_MOVE_OBJECT */
+         /* move_object() reads its arguments directly from the stack */
+         move_object();
+         sp -= 2;
++#endif /* X_INT_MOVE_OBJECT */
+         break;
+     }
+ 
+diff -urN lsrc-dev.177/object.c zsrc-dev.177/object.c
+--- lsrc-dev.177/object.c	Thu Mar 23 22:33:00 2000
++++ zsrc-dev.177/object.c	Fri Mar 31 20:22:44 2000
+@@ -829,16 +829,33 @@
+ {
+     object_t *save_command_giver;
+     interactive_t *ip;
++#ifdef X_CATCH_TELL_STUFF
++    svalue_t *ret;
++#endif /* X_CATCH_TELL_STUFF */
+ 
+     if (ob->flags & O_DESTRUCTED)
+         return;
+ 
+     if (O_SET_INTERACTIVE(ip, ob))
+     {
++#ifdef X_CATCH_TELL_STUFF
++      push_volatile_string(str);
++      ret = sapply(STR_CATCH_TELL, ob, 1);
++      if (!ret || ret->type != T_STRING) {
++#endif /* X_CATCH_TELL_STUFF */
+         save_command_giver = command_giver;
+         command_giver = ob;
+         add_message("%s", str);
+         command_giver = save_command_giver;
++#ifdef X_CATCH_TELL_STUFF
++      } else {
++        if (!ret->u.string) return;
++        save_command_giver = command_giver;
++        command_giver = ob;
++        add_message("%s", ret->u.string);
++        command_giver = save_command_giver;
++      }
++#endif /* X_CATCH_TELL_STUFF */
+         return;
+     }
+     tell_npc(ob, str);
+@@ -880,9 +897,11 @@
+         return MY_FALSE;
+ 
+     trace_level |= ip->trace_level;
++#ifndef X_CATCH_TELL_STUFF
+     push_volatile_string(str);
+     if (sapply(STR_CATCH_TELL, ob, 1))
+         return MY_TRUE;
++#endif /* X_CATCH_TELL_STUFF */
+ 
+     /* The call failed, thus, current_object wasn't changed
+      * (e.g. destructed and set to 0 ) .
+diff -urN lsrc-dev.177/simulate.c zsrc-dev.177/simulate.c
+--- lsrc-dev.177/simulate.c	Thu Mar 30 21:00:44 2000
++++ zsrc-dev.177/simulate.c	Fri Mar 31 19:12:23 2000
+@@ -4086,7 +4086,11 @@
+ /*                          INVENTORY EFUNS                                */
+ 
+ /*-------------------------------------------------------------------------*/
++#ifdef X_INT_MOVE_OBJECT
++int
++#else /* X_INT_MOVE_OBJECT */
+ void
++#endif /* X_INT_MOVE_OBJECT */
+ move_object (void)
+ 
+ /* Move the object inter_sp[-1] into object inter_sp[0]; both objects
+@@ -4097,19 +4101,33 @@
+  */
+ 
+ {
++#ifdef X_INT_MOVE_OBJECT
++    int i;
++#endif /* X_INT_MOVE_OBJECT */
+     lambda_t *l;
+     object_t *save_command = command_giver;
+ 
+     if (NULL != ( l = closure_hook[H_MOVE_OBJECT1].u.lambda) ) {
+         l->ob = inter_sp[-1].u.ob;
+         call_lambda(&closure_hook[H_MOVE_OBJECT1], 2);
++#ifdef X_INT_MOVE_OBJECT
++        i = ( inter_sp->type == T_NUMBER && inter_sp->u.number );
++        pop_stack();
++#endif /* X_INT_MOVE_OBJECT */
+     } else if (NULL != ( l = closure_hook[H_MOVE_OBJECT0].u.lambda) ) {
+         l->ob = current_object;
+         call_lambda(&closure_hook[H_MOVE_OBJECT0], 2);
++#ifdef X_INT_MOVE_OBJECT
++        i = ( inter_sp->type == T_NUMBER && inter_sp->u.number );
++        pop_stack();
++#endif /* X_INT_MOVE_OBJECT */
+     }
+     else
+         error("Don't know how to move objects.\n");
+     command_giver = check_object(save_command);
++#ifdef X_INT_MOVE_OBJECT
++    return i;
++#endif /* X_INT_MOVE_OBJECT */
+ } /* move_object() */
+ 
+ /*-------------------------------------------------------------------------*/
+@@ -5225,3 +5243,62 @@
+ 
+ /***************************************************************************/
+ 
++/* BaxHax -- Zippo 19981221 (3.2.5), 20000126 (3.2.7) */
++
++#ifdef X_QUERY_VARS
++svalue_t *f_query_variables( svalue_t *sp )
++{
++    int i, count, maskstatic;
++    vector_t *v;
++    object_t *ob;
++    char *name;
++    extern svalue_t *inter_sp;
++
++    if( sp[ -1 ].type != T_OBJECT || sp[ -1 ].u.ob->flags & O_DESTRUCTED ) {
++        bad_xefun_arg( 1, sp );
++    }
++    if( sp[ 0 ].type != T_NUMBER ) {
++        bad_xefun_arg( 2, sp );
++    }
++    ob = sp[ -1 ].u.ob;
++    maskstatic = sp[ 0 ].u.number;
++    free_svalue( --sp );
++    if( ob != current_object ) {
++        inter_sp = sp;
++        assert_master_ob_loaded();
++        if( _privilege_violation( "query_variables", sp - 1, sp ) <= 0 ) {
++            sp->type = T_NUMBER;
++            sp->u.number = 0;
++            return( sp );
++        }
++    }
++    if( ob->flags & O_SWAPPED ) {
++        load_ob_from_swap( ob );
++    }
++    if( maskstatic ) {
++        for( i = 0, count = 0; i < ob->prog->num_variables; i++ ) {
++            if( !( ob->prog->variable_names[ i ].flags & TYPE_MOD_STATIC )) {
++                ++count;
++            }
++        }
++    } else {
++        count = ob->prog->num_variables;
++    }
++    v = allocate_array( count * 2 );
++    for( i = 0, count = 0; i < ob->prog->num_variables; i++ ) {
++        if( maskstatic &&
++          ( ob->prog->variable_names[ i ].flags & TYPE_MOD_STATIC )) {
++            continue;
++        }
++        v->item[ count * 2 ].type = T_STRING;
++        v->item[ count * 2 ].x.string_type = STRING_SHARED;
++        v->item[ count * 2 ].u.string =
++          make_shared_string( ob->prog->variable_names[ i ].name );
++        assign_svalue_no_free( &v->item[ count * 2 + 1 ], &ob->variables[ i ] );
++        ++count;
++    }
++    sp->type = T_POINTER;
++    sp->u.vec = v;
++    return( sp );
++}
++#endif /* X_QUERY_VARS */
+diff -urN lsrc-dev.177/simulate.h zsrc-dev.177/simulate.h
+--- lsrc-dev.177/simulate.h	Tue Mar 28 23:37:00 2000
++++ zsrc-dev.177/simulate.h	Fri Mar 31 13:49:53 2000
+@@ -211,7 +211,11 @@
+ extern object_t *lookfor_object(char *str, Bool bLoad);
+ #define find_object(str) lookfor_object((str), MY_FALSE)
+ #define get_object(str) lookfor_object((str), MY_TRUE)
++#ifdef X_INT_MOVE_OBJECT
++extern int move_object(void);
++#else /* X_INT_MOVE_OBJECT */
+ extern void move_object(void);
++#endif /* X_INT_MOVE_OBJECT */
+ extern Bool status_parse(strbuf_t * sbuf, char *buff);
+ extern void dinfo_data_status(svalue_t * svp);
+ extern void error VARPROT((char *, ...), printf, 1, 2) NORETURN;
+-----------------
+From ???@??? Tue Apr 11 09:03:47 2000
+Received: from tuba.internal.800hosting.com ([216.62.48.176])
+	by mail.csoft.net (8.9.3/8.9.3) with ESMTP id IAA28327
+	for <lars@bearnip.com>; Tue, 11 Apr 2000 08:41:32 -0500
+Received: (from cz@localhost)
+	by tuba.internal.800hosting.com (8.9.3/8.9.3) id IAA51983
+	for lars@bearnip.com; Tue, 11 Apr 2000 08:49:34 -0500 (CDT)
+	(envelope-from cz)
+Date: Tue, 11 Apr 2000 08:49:34 -0500
+From: Casey Zacek <cz@800hosting.com>
+To: Lars Duening <lars@bearnip.com>
+Subject: some patches
+Message-ID: <20000411084934.A51655@800hosting.com>
+Mime-Version: 1.0
+Content-Type: multipart/mixed; boundary="r5Pyd7+fXNt84Ff3"
+X-Mailer: Mutt 1.0i
+X-PMFLAGS: 571998336 0 1 P75FE0.CNM
+
+
+--r5Pyd7+fXNt84Ff3
+Content-Type: text/plain; charset=us-ascii
+
+
+Hi, it's me yet again.
+
+I've reorganized all of my patches, and I'd like to send you some of
+them in hopes that you'll use them.  I'm pretty certain that none of
+them would break any existing implementations.
+
+Here are the details:
+
+----------------------------------------------------------------------
+1.cmd-source.diff
+1.mudlib-sys-commands.h
+
+The diff adds a 7th element to the return of the command_stack() efun,
+the filename of the source of the command (the object that called the
+command() efun) or 0 for "real commands" or calls to execute_command().
+
+1.mudlib-sys-commands.h is the modified mudlib/sys/commands.h file
+that defines CMD_SOURCE.
+----------------------------------------------------------------------
+2.ed.diff
+
+This one does 2 things.  First, it fixes the nasty out of memory
+crasher for ed() by imposing a MAX_ED_SIZE macro (should probably be
+reworked into a configure-variable) which limits the size of the ed
+buffer.  Second, it gives more detailed error messages when failing to
+open a file.
+----------------------------------------------------------------------
+3.member-args.diff
+
+This one allows member() to take 2 more arguments: start and step.
+start is the index in the array or string where the search should
+begin (negative counts from the end), and step is the size of the
+increment when stepping through an array (unsupported for strings).
+----------------------------------------------------------------------
+4.int-move-object.diff
+
+This one allows H_MOVE_OBJECT[01] to return an integer value which
+will then be returned by calls to the move_object() efun.
+----------------------------------------------------------------------
+5.catch-tell.diff
+
+This is the trickiest of the 5.  It allows catch_tell() to return a
+string value which will then be told to the target object in place of
+the original string.  I'm not entirely sure about its implementation,
+though, and it may cause some different behavior on other mudlibs (but
+again I'm not sure of this).
+----------------------------------------------------------------------
+
+Hopefully this time I'l remember to attach the files... :)
+
+-- 
+-- Casey Zacek
+   Senior Staff Engineer
+   1-800-Hosting.com
+
+--r5Pyd7+fXNt84Ff3
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: attachment; filename="1.cmd-source.diff"
+
+diff -urN lsrc-dev.182/actions.c src.new/actions.c
+--- lsrc-dev.182/actions.c	Mon Mar 27 22:22:11 2000
++++ src.new/actions.c	Sun Apr  9 19:24:12 2000
+@@ -96,6 +96,7 @@
+     char * verb;             /* the shared verb */
+     svalue_t errmsg;         /* the error message */
+     object_t * errobj;       /* object which set the error message */
++    char * source;           /* the source of the command */
+ };
+ 
+ /*-------------------------------------------------------------------------*/
+@@ -109,6 +110,11 @@
+    * The reference is not counted.
+    */
+ 
++char *command_source;
++  /* The filename of the object from which the current command originated.
++   * This will be NULL for "real commands" or calls to execute_command().
++   */
++
+ char *last_verb = NULL;
+   /* During a command execution, this is the shared string with the
+    * command verb.
+@@ -266,6 +272,7 @@
+     context->marker = command_marker;
+     transfer_svalue_no_free(&(context->errmsg), &error_msg);
+     context->errobj = error_obj;
++    context->source = command_source;
+ 
+     command_giver = NULL;
+     last_verb = NULL;
+@@ -274,6 +281,7 @@
+     command_marker = NULL;
+     error_msg.type = T_INVALID;
+     error_obj = NULL;
++    command_source = NULL;
+ } /* save_command_context() */
+ 
+ /*-------------------------------------------------------------------------*/
+@@ -308,6 +316,7 @@
+     if (error_obj)
+         free_object(error_obj, "_restore_command_context");
+     error_obj = context->errobj;
++    command_source = context->source;
+ } /* _restore_command_context() */
+ 
+ 
+@@ -1009,6 +1018,8 @@
+     command_giver = ob;
+     marked_command_giver = ob;
+     last_command = str;
++    if (current_object)
++        command_source = current_object->name;
+ 
+     /* Execute the command */
+     if (closure_hook[H_COMMAND].type == T_STRING)
+@@ -1780,6 +1791,7 @@
+  *   object [CMD_PLAYER]:  the current command giver
+  *   mixed  [CMD_FAIL]:    the notify_fail setting
+  *   mixed  [CMD_FAILOBJ]: the object which set the notify_fail
++ *   string [CMD_SOURCE];  the source of the command execution
+  */
+ 
+ {
+@@ -1811,6 +1823,7 @@
+         object_t * t_player, * t_mplayer; /* current command givers */
+         svalue_t * t_errmsg;  /* current error message */
+         object_t * t_errobj;  /* current error message giver */
++        char * t_source; /* command source */
+ 
+         /* Create the entry array */
+         sub = allocate_array(CMD_SIZE);
+@@ -1830,6 +1843,7 @@
+             t_mplayer = check_object(marked_command_giver);
+             t_errmsg = &error_msg;
+             t_errobj = check_object(error_obj);
++            t_source = command_source;
+         }
+         else
+         {
+@@ -1847,6 +1861,7 @@
+             t_mplayer = check_object(cmd->mark_player);
+             t_errmsg = &(cmd->errmsg);
+             t_errobj = check_object(cmd->errobj);
++            t_source = cmd->source;
+         }
+ 
+         /* Now put the data into the array */
+@@ -1867,6 +1882,13 @@
+ 
+         if (t_errobj)
+             put_ref_object(svp+CMD_FAILOBJ, t_errobj, "command_stack");
++
++        if (t_source)
++#ifdef COMPAT_MODE
++            put_malloced_string(svp+CMD_SOURCE, string_copy(t_source));
++#else /* COMPAT_MODE */
++            put_malloced_string(svp+CMD_SOURCE, add_slash(t_source));
++#endif /* COMPAT_MODE */
+ 
+     }
+ 
+
+--r5Pyd7+fXNt84Ff3
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: attachment; filename="1.mudlib-sys-commands.h"
+
+#ifndef _COMMANDS_H_
+#define _COMMANDS_H_
+
+/* Flags accepted by add_action(fun, verb, flag).
+ * (Below, VERB is what the player enters).
+ * Negative flag values allow VERB to be just the first -<flag>
+ * characters of <verb> (abbreviated verb).
+ */
+
+#define AA_VERB     0  /* VERB must be <verb> */
+#define AA_SHORT    1  /* VERB must start with <verb>,
+                        * args do not include extra characters */
+#define AA_NOSPACE  2  /* VERB must start with <verb>,
+                        * args do include extra characters */
+
+/* Indices in the arrays returned from command_stack()
+ */
+
+#define CMD_VERB     0
+#define CMD_TEXT     1
+#define CMD_ORIGIN   2
+#define CMD_PLAYER   3
+#define CMD_FAIL     4
+#define CMD_FAILOBJ  5
+#define CMD_SOURCE   6
+
+#define CMD_SIZE     7
+
+#endif /* _COMMANDS_H_ */
+
+--r5Pyd7+fXNt84Ff3
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: attachment; filename="2.ed.diff"
+
+diff -urN lsrc-dev.194/ed.c zsrc-dev.194/ed.c
+--- lsrc-dev.194/ed.c	Sun Apr 16 23:42:47 2000
++++ zsrc-dev.194/ed.c	Wed Apr 26 05:54:37 2000
+@@ -41,12 +41,14 @@
+  */
+ 
+ #define ED_VERSION 5        /* used only in the "set" function, for id */
++#define MAX_ED_SIZE 1000000
+ 
+ #include "driver.h"
+ #include "typedefs.h"
+ 
+ #include <stdio.h>
+ #include <ctype.h>
++#include <sys/stat.h>
+ 
+ #define NO_REF_STRING
+ #include "ed.h"
+@@ -159,6 +161,7 @@
+ 
+ struct line
+ {
++    int          len;       /* length of line */
+     int          l_stat;    /* Status of the line */
+     struct line *l_prev;    /* previous line */
+     struct line *l_next;    /* next line */
+@@ -181,6 +184,7 @@
+     Bool    diag;              /* True: diagnostic-output?*/
+     Bool    truncflg;          /* True: truncate long line flag
+                                 * Note: not used anywhere */
++    int     size;              /* total size of chars in buffer */
+     int     nonascii;          /* count of non-ascii chars read */
+     int     nullchar;          /* count of null chars read */
+     int     truncated;         /* count of lines truncated */
+@@ -232,6 +236,7 @@
+ 
+ #define P_DIAG          (ED_BUFFER->diag)
+ #define P_TRUNCFLG      (ED_BUFFER->truncflg)
++#define P_SIZE          (ED_BUFFER->size)
+ #define P_NONASCII      (ED_BUFFER->nonascii)
+ #define P_NULLCHAR      (ED_BUFFER->nullchar)
+ #define P_TRUNCATED     (ED_BUFFER->truncated)
+@@ -595,6 +600,7 @@
+     while(next != last && next != &P_LINE0)
+     {
+         tmp = next->l_next;
++        P_SIZE -= next->len;
+         xfree((char *)next);
+         next = tmp;
+     }
+@@ -830,17 +836,27 @@
+     int            err;
+     unsigned long  bytes;
+     unsigned int   lines;
+-    char    str[MAXLINE];
++    char           str[MAXLINE];
++    struct stat    st;
+ 
+     err = 0;
+     P_NONASCII = P_NULLCHAR = P_TRUNCATED = 0;
+ 
+-    if (P_DIAG) add_message("\"%s\" ",fname);
+-    if ((fp = fopen(fname, "r")) == NULL )
+-    {
+-        if (!P_DIAG) add_message("\"%s\" ",fname);
+-        add_message(" isn't readable.\n");
+-        return ERR ;
++    if (stat(fname, &st) == -1) {
++        add_message("/%s doesn't exist.\n", fname);
++        return ERR;
++    }
++    if (st.st_size > MAX_ED_SIZE) {
++        add_message("/%s is too large!\n", fname);
++        return ERR;
++    }
++    if (S_ISDIR(st.st_mode)) {
++        add_message("/%s is a directory.\n", fname);
++        return ERR;
++    }
++    if ((fp = fopen(fname, "r")) == NULL) {
++        add_message("/%s isn't readable.\n", fname);
++        return ERR;
+     }
+     FCOUNT_READ(fname);
+     _setCurLn( lin );
+@@ -1400,9 +1416,13 @@
+         len = (size_t)(cp - str);
+         /* cp now points to end of first or only line */
+ 
++        if ((P_SIZE + len + 1) > MAX_ED_SIZE) {
++            return MEM_FAIL;
++        }
+         if ((new = (LINE *)xalloc(sizeof(LINE)+len)) == NULL)
+-            return( MEM_FAIL );     /* no memory */
++            return MEM_FAIL;     /* no memory */
+ 
++        P_SIZE += (new->len = len + 1); /* 1 for newline */
+         new->l_stat = 0;
+         strncpy(new->l_buff, str, len);    /* build new line */
+         new->l_buff[len] = EOS;
+@@ -2744,6 +2764,7 @@
+  */
+ 
+ {
++    int i = ERR;
+     char *new_path;
+     svalue_t *setup, *prompt;
+     ed_buffer_t *old_ed_buffer;
+@@ -2814,7 +2835,7 @@
+      * shadow_catch_message(), thus new_path needs to stay pushed.
+      */
+ 
+-    if (new_path && !doread(0, new_path))
++    if (new_path && !(i = doread(0, new_path)))
+     {
+         _setCurLn( 1 );
+     }
+@@ -2823,7 +2844,10 @@
+     {
+         strncpy(P_FNAME, new_path, MAXFNAME);
+         P_FNAME[MAXFNAME] = 0;
+-        add_message("/%s, %d lines\n", new_path, P_LASTLN);
++        if(!i) {
++            add_message("/%s, %d line%s\n", new_path, P_LASTLN,
++              P_LASTLN == 1 ? "" : "s");
++        }
+     }
+     else
+     {
+
+--r5Pyd7+fXNt84Ff3
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: attachment; filename="3.member-args.diff"
+
+diff -urN lsrc-dev.182/func_spec src.new/func_spec
+--- lsrc-dev.182/func_spec	Thu Mar 30 21:00:44 2000
++++ src.new/func_spec	Mon Apr 10 04:35:01 2000
+@@ -218,7 +218,7 @@
+ 
+ mixed  *allocate(int);
+ int     member_array(mixed, mixed *|string);
+-int     member(mixed *|string|mapping, mixed);
++int     member(mixed *|string|mapping, mixed, void|int, void|int);
+ mapping mkmapping(mixed *, ...);
+ mapping m_delete(mapping, mixed);
+ mixed  *m_indices(mapping);
+diff -urN lsrc-dev.182/interpret.c src.new/interpret.c
+--- lsrc-dev.182/interpret.c	Sun Apr  9 17:34:09 2000
++++ src.new/interpret.c	Sun Apr  9 20:55:30 2000
+@@ -12424,16 +12424,52 @@
+ 
+         /* --- Search an array --- */
+ 
++        long start, step;
++        GET_NUM_ARG
++        start = 0;
++        step = 1;
++        if( num_arg >= 4 ) {
++            if( sp->type != T_NUMBER ) {
++                error( "Bad type to arg 4 of member()\n" );
++            }
++            step = sp->u.number;
++            pop_stack();
++        }
++        if( num_arg >= 3 ) {
++            if( sp->type != T_NUMBER ) {
++                error( "Bad type to arg 3 of member()\n" );
++            }
++            start = sp->u.number;
++            pop_stack();
++        }
+         if (sp[-1].type == T_POINTER)
+         {
+ 
+             vector_t *vec;
+             union  u       sp_u;
+             long cnt;
++            long vsize;
+ 
+             vec = sp[-1].u.vec;
+             cnt = (signed)VEC_SIZE(vec);
+             sp_u = sp->u;
++            if((!start && !cnt) || start >= cnt) {
++                pop_stack();
++                free_svalue(sp);
++                put_number(sp, -1);
++                break;
++            }
++            if(start < 0) {
++                start = cnt + start;
++            }
++            if(start < 0) {
++                error( "Bad start index to member()\n" );
++            }
++            if(!step) {
++                error( "Bad step to member()\n" );
++            }
++            vsize = cnt;
++            cnt = vsize - start - 1;
+ 
+             switch(sp->type)
+             {
+@@ -12443,12 +12479,23 @@
+                 svalue_t *item;
+ 
+                 str = sp_u.string;
+-                for(item = vec->item; --cnt >= 0; item++)
+-                {
++#define Z_MEMBER_DO_COMPARE(comparison_code) \
++                if( step > 0 ) { \
++                    for(item = vec->item + start; \
++                     cnt >= 0; cnt -= step, item += step) { \
++                        comparison_code \
++                    } \
++                } else { \
++                    for(item = vec->item + start; \
++                     cnt < vsize; cnt -= step, item += step) { \
++                        comparison_code \
++                    } \
++                }
++                Z_MEMBER_DO_COMPARE(
+                     if (item->type == T_STRING
+                      && !strcmp(sp_u.string, item->u.string))
+                         break;
+-                }
++                )
+                 break;
+               }
+ 
+@@ -12463,13 +12510,12 @@
+ 
+                 type = sp->type;
+                 x_generic = sp->x.generic;
+-                for(item = vec->item; --cnt >= 0; item++)
+-                {
++                Z_MEMBER_DO_COMPARE(
+                     if (sp_u.string == item->u.string
+                      && x_generic == item->x.generic
+                      && item->type == type)
+                         break;
+-                }
++                )
+                 break;
+               }
+ 
+@@ -12483,8 +12529,7 @@
+                     svalue_t *item;
+                     short type;
+ 
+-                    for (item = vec->item; --cnt >= 0; item++)
+-                    {
++                    Z_MEMBER_DO_COMPARE(
+                         if ( (type = item->type) == T_NUMBER)
+                         {
+                             if ( !item->u.number )
+@@ -12498,7 +12543,7 @@
+                                 break;
+                             }
+                         }
+-                    }
++                    )
+                     break;
+                 }
+ 
+@@ -12511,12 +12556,11 @@
+                 svalue_t *item;
+                 short type = sp->type;
+ 
+-                for (item = vec->item; --cnt >= 0; item++)
+-                {
++                Z_MEMBER_DO_COMPARE(
+                     if (sp_u.number == item->u.number
+                      && item->type == type)
+                         break;
+-                }
++                )
+                 break;
+               }
+ 
+@@ -12530,6 +12574,10 @@
+             {
+                 cnt = (signed)VEC_SIZE(vec) - cnt - 1;
+             }
++            else
++            {
++                cnt = -1;
++            }
+             /* else return -1 for failure */
+ 
+             pop_stack();
+@@ -12543,13 +12591,29 @@
+         if (sp[-1].type == T_STRING)
+         {
+             char *str, *str2;
+-            int i;
++            int cnt, i;
+ 
++            if(step != 1) {
++                ERROR( "Step not supported for member() on a string\n" );
++            }
+             if (sp->type != T_NUMBER)
+                 goto bad_arg_2;
+             str = sp[-1].u.string;
++            cnt = strlen(str);
++            if((!start && !cnt) || start >= cnt) {
++                pop_stack();
++                free_svalue(sp);
++                put_number(sp, -1);
++                break;
++            }
++            if(start < 0) {
++                start = cnt + start;
++            }
++            if(start < 0) {
++                ERROR( "Bad start index to member()\n" );
++            }
+             i = sp->u.number;
+-            str2 = i & ~0xff ? NULL : strchr(str, i);
++            str2 = i & ~0xff ? NULL : strchr(str + start, i);
+             i = str2 ? str2 - str : -1;
+             pop_stack();
+             free_svalue(sp);
+
+--r5Pyd7+fXNt84Ff3
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: attachment; filename="4.int-move-object.diff"
+
+diff -urN lsrc-dev.182/func_spec src.new/func_spec
+--- lsrc-dev.182/func_spec	Tue Apr 11 06:04:31 2000
++++ src.new/func_spec	Tue Apr 11 06:05:58 2000
+@@ -297,7 +297,7 @@
+ object *deep_inventory(object default: F_THIS_OBJECT);
+ object  environment(void|object|string);
+ object  first_inventory(object|string default: F_THIS_OBJECT);
+-void    move_object(object|string, object|string);
++int     move_object(object|string, object|string);
+ object  next_inventory(object default: F_THIS_OBJECT);
+ object  present(object|string, void|object);
+ void    say(string|mixed *, void|object|object *);
+diff -urN lsrc-dev.182/interpret.c src.new/interpret.c
+--- lsrc-dev.182/interpret.c	Tue Apr 11 06:04:31 2000
++++ src.new/interpret.c	Tue Apr 11 06:05:59 2000
+@@ -15189,6 +15189,7 @@
+          */
+ 
+         object_t *item, *dest;
++        int i;
+ 
+         ASSIGN_EVAL_COST
+         inter_pc = pc;
+@@ -15219,10 +15220,10 @@
+         }
+         else
+             goto bad_arg_2;
+-
+         /* move_object() reads its arguments directly from the stack */
+-        move_object();
++        i = move_object();
+         sp -= 2;
++        push_number(i);
+         break;
+     }
+ 
+diff -urN lsrc-dev.182/simulate.c src.new/simulate.c
+--- lsrc-dev.182/simulate.c	Sun Apr  9 17:34:36 2000
++++ src.new/simulate.c	Tue Apr 11 06:05:59 2000
+@@ -4089,7 +4089,7 @@
+ /*                          INVENTORY EFUNS                                */
+ 
+ /*-------------------------------------------------------------------------*/
+-void
++int
+ move_object (void)
+ 
+ /* Move the object inter_sp[-1] into object inter_sp[0]; both objects
+@@ -4100,19 +4100,25 @@
+  */
+ 
+ {
++    int i;
+     lambda_t *l;
+     object_t *save_command = command_giver;
+ 
+     if (NULL != ( l = closure_hook[H_MOVE_OBJECT1].u.lambda) ) {
+         l->ob = inter_sp[-1].u.ob;
+         call_lambda(&closure_hook[H_MOVE_OBJECT1], 2);
++        i = (inter_sp->type == T_NUMBER && inter_sp->u.number);
++        pop_stack();
+     } else if (NULL != ( l = closure_hook[H_MOVE_OBJECT0].u.lambda) ) {
+         l->ob = current_object;
+         call_lambda(&closure_hook[H_MOVE_OBJECT0], 2);
++        i = (inter_sp->type == T_NUMBER && inter_sp->u.number);
++        pop_stack();
+     }
+     else
+         error("Don't know how to move objects.\n");
+     command_giver = check_object(save_command);
++    return i;
+ } /* move_object() */
+ 
+ /*-------------------------------------------------------------------------*/
+diff -urN lsrc-dev.182/simulate.h src.new/simulate.h
+--- lsrc-dev.182/simulate.h	Sun Apr  9 17:34:10 2000
++++ src.new/simulate.h	Tue Apr 11 06:05:59 2000
+@@ -211,7 +211,7 @@
+ extern object_t *lookfor_object(char *str, Bool bLoad);
+ #define find_object(str) lookfor_object((str), MY_FALSE)
+ #define get_object(str) lookfor_object((str), MY_TRUE)
+-extern void move_object(void);
++extern int move_object(void);
+ extern Bool status_parse(strbuf_t * sbuf, char *buff);
+ extern void dinfo_data_status(svalue_t * svp);
+ extern void error VARPROT((char *, ...), printf, 1, 2) NORETURN;
+
+--r5Pyd7+fXNt84Ff3
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: attachment; filename="5.catch-tell.diff"
+
+diff -urN lsrc-dev.182/object.c src.new/object.c
+--- lsrc-dev.182/object.c	Sun Apr  9 17:34:30 2000
++++ src.new/object.c	Mon Apr 10 06:13:10 2000
+@@ -829,16 +829,27 @@
+ {
+     object_t *save_command_giver;
+     interactive_t *ip;
++    svalue_t *ret;
+ 
+     if (ob->flags & O_DESTRUCTED)
+         return;
+ 
+     if (O_SET_INTERACTIVE(ip, ob))
+     {
++      push_volatile_string(str);
++      ret = sapply(STR_CATCH_TELL, ob, 1);
++      if (!ret || ret->type != T_STRING) {
+         save_command_giver = command_giver;
+         command_giver = ob;
+         add_message("%s", str);
+         command_giver = save_command_giver;
++      } else {
++        if (!ret->u.string) return;
++        save_command_giver = command_giver;
++        command_giver = ob;
++        add_message("%s", ret->u.string);
++        command_giver = save_command_giver;
++      }
+         return;
+     }
+     tell_npc(ob, str);
+@@ -880,9 +891,6 @@
+         return MY_FALSE;
+ 
+     trace_level |= ip->trace_level;
+-    push_volatile_string(str);
+-    if (sapply(STR_CATCH_TELL, ob, 1))
+-        return MY_TRUE;
+ 
+     /* The call failed, thus, current_object wasn't changed
+      * (e.g. destructed and set to 0 ) .
+diff -urN lsrc-dev.182/efuns.c src.new/efuns.c
+--- lsrc-dev.182/efuns.c	Sun Apr  9 17:34:35 2000
++++ src.new/efuns.c	Mon Apr 10 18:26:37 2000
+@@ -3219,7 +3590,6 @@
+                  &first_recipients[INITIAL_MAX_RECIPIENTS-1];
+       /* Last entry in the current table.
+        */
+-    object_t *save_again;
+ 
+     /* Determine the command_giver to use */
+     if (current_object->flags & O_ENABLE_COMMANDS)
+@@ -3364,22 +3734,12 @@
+     
+     for (curr_recipient = recipients; NULL != (ob = *curr_recipient++); )
+     {
+-        interactive_t *ip;
+-
+         if (ob->flags & O_DESTRUCTED)
+             continue;
+         stmp.u.ob = ob;
+         if (assoc(&stmp, avoid) >= 0)
+             continue;
+-        if (!(O_SET_INTERACTIVE(ip, ob)))
+-        {
+-            tell_npc(ob, message);
+-            continue;
+-        }
+-        save_again = command_giver;
+-        command_giver = ob;
+-        add_message("%s", message);
+-        command_giver = save_again;
++        tell_object(ob, message);
+     }
+ 
+     pop_stack(); /* free avoid alist */
+@@ -3399,7 +3759,6 @@
+ 
+ {
+     object_t *ob;
+-    object_t *save_command_giver;
+     int num_recipients = 0;
+     object_t *some_recipients[20];
+     object_t **recipients;
+@@ -3494,20 +3853,10 @@
+     
+     for (curr_recipient = recipients; NULL != (ob = *curr_recipient++); )
+     {
+-        interactive_t *ip;
+-
+         if (ob->flags & O_DESTRUCTED) continue;
+         stmp.u.ob = ob;
+         if (assoc(&stmp, avoid) >= 0) continue;
+-        if (!(O_SET_INTERACTIVE(ip, ob)))
+-        {
+-            tell_npc(ob, message);
+-            continue;
+-        }
+-        save_command_giver = command_giver;
+-        command_giver = ob;
+-        add_message("%s", message);
+-        command_giver = save_command_giver;
++        tell_object(ob, message);
+     }
+ } /* e_tell_room() */
+ 
+
+--r5Pyd7+fXNt84Ff3--
+
+
+-- End --
