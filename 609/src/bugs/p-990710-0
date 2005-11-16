@@ -1,0 +1,2917 @@
+Short: Patch for handles
+Date: Tue, 6 Jul 1999 21:57:09 +0200 (CEST)
+From: vondincklage <daniel@ozet.de>
+Type: Patch
+State: Unclassified
+
+
+> Dann ist dev.110 nichts fuer dich :-)
+Das hatte ich mir schon fast so gedacht. Naja, bei mir sind eh genug
+Aenderungen drin, das es mit den "offiziellen" Versionen nicht laeuft.
+
+> Was macht dieser Typ denn?
+Hm. Was macht der Typ. Ich verwende den z.zt. fuer zwei "sub"-Datentypen.
+Vitems (Details) und Messagegruppen.
+Beide haben die Eigenschaft, das sie von externen Servern ziemlich oft
+durch die Gegend geschoben werden. Und da ist es etwas aufwendig und
+Fehleranfaellig, dann immer ein Array ({objekt,ident in dem jeweiligen
+Objekt}) zu verwenden.
+Insofern ist es praktisch, da gleich einen Datentyp zu haben den man per
+== vergleichen kann, den man kopieren kann usw.
+Und ein anderer Sinn (Der zwar nicht so furchtbar elegant, aber trotzdem
+praktisch ist ;-)) is, ne Art "Multiple-Dispatch fuer Arme". Will sagen,
+es geht dann z.B:
+ vitem pong;
+ pong = add_vitem( ([ V_GENDER : "maennlich", V_LONG: "blah",
+                      V_NAME : "blubb" ]));
+
+ pong->set_long("foo");
+
+... und schon aendert man die Long des Vitems. Intern wird im call_other
+ das set_long in ein vitem_set_long( vitem who, ... );
+ umgewandelt, so das man auch weiss wer/was gemeint ist ;-)
+In naeherer Zukunft will ich dann auch die Count-Items auf die Art und
+Weise machen.
+Ich gebe gerne zu, das das weder elegant noch irgendwas anderes ist, aber
+es raeumt teilw. den Code enorm auf.
+
+
+Daniel von Dincklage (vonDincklage@ozet.de)
+Windows95 (noun): 32 bit extensions and a graphical shell for a 16 bit
+patch to an 8 bit operating system originally coded for a 4 bit micro
+processor, written by a 2 bit company that can't stand 1 bit of competition.
+
+Only in ldmud-dev/: CHANGELOG
+Only in /home/daniel/src: Makefile
+diff -c ldmud-dev/Makefile.in /home/daniel/src/Makefile.in
+*** ldmud-dev/Makefile.in	Sat Dec 12 02:12:36 1998
+--- /home/daniel/src/Makefile.in	Tue May 11 12:07:34 1999
+***************
+*** 24,33 ****
+  #
+  # Set MUD_LIB to the directory which contains the mud data. Was formerly
+  # defined in config.h !
+! MUD_LIB = /users/phil/osb/mudlib
+  #
+  # Set BINDIR to the directory where you want to install the executables.
+! BINDIR = /users/phil/osb/bin
+  #
+  #PROFIL= -DOPCPROF -DVERBOSE_OPCPROF
+  #PROFIL=-p -DMARK
+--- 24,33 ----
+  #
+  # Set MUD_LIB to the directory which contains the mud data. Was formerly
+  # defined in config.h !
+! MUD_LIB = /usr/local/mud/lib
+  #
+  # Set BINDIR to the directory where you want to install the executables.
+! BINDIR = /usr/local/mud/bin
+  #
+  #PROFIL= -DOPCPROF -DVERBOSE_OPCPROF
+  #PROFIL=-p -DMARK
+***************
+*** 41,49 ****
+  # Optimization and source level debugging options.
+  # adding a -fomit-frame-pointer on the NeXT (gcc version 1.93 (68k, MIT syntax))
+  # will corrupt the driver.
+! OPTIMIZE = @OCFLAGS@ # high optimization
+  #OPTIMIZE= @MCFLAGS@ # for better debugging
+! #OPTIMIZE= @DCFLAGS@ # no optimization; for frequent recompilations.
+  #
+  # debugging options: [-DDEBUG] [-DYYDEBUG|-DYYDEBUG=1] [-DTRACE_CODE]
+  # -DDEBUG: Enable run time debugging. It will use more time and space.
+--- 41,49 ----
+  # Optimization and source level debugging options.
+  # adding a -fomit-frame-pointer on the NeXT (gcc version 1.93 (68k, MIT syntax))
+  # will corrupt the driver.
+! #OPTIMIZE = @OCFLAGS@ # high optimization
+  #OPTIMIZE= @MCFLAGS@ # for better debugging
+! OPTIMIZE= @DCFLAGS@ # no optimization; for frequent recompilations.
+  #
+  # debugging options: [-DDEBUG] [-DYYDEBUG|-DYYDEBUG=1] [-DTRACE_CODE]
+  # -DDEBUG: Enable run time debugging. It will use more time and space.
+***************
+*** 74,85 ****
+      call_out.c otable.c dumpstat.c stralloc.c hash.c port.c\
+      access_check.c parse_old.c parse.c prolang.y\
+      simul_efun.c sprintf.c gcollect.c closure.c random.c rxcache.c \
+!     filestat.c
+  OBJ=lang.o lex.o main.o interpret.o simulate.o object.o backend.o array.o\
+      comm.o ed.o regexp.o mapping.o wiz_list.o swap.o $(MALLOC).o\
+      call_out.o otable.o dumpstat.o stralloc.o hash.o port.o\
+      access_check.o parse_old.o parse.o simul_efun.o sprintf.o\
+!     gcollect.o closure.o random.o rxcache.o filestat.o @ALLOCA@
+
+  driver: $(OBJ)
+  	$(CC) @OPTIMIZE_LINKING@ $(LDFLAGS) $(OBJ) -o $@ $(LIBS)
+--- 74,85 ----
+      call_out.c otable.c dumpstat.c stralloc.c hash.c port.c\
+      access_check.c parse_old.c parse.c prolang.y\
+      simul_efun.c sprintf.c gcollect.c closure.c random.c rxcache.c \
+!     filestat.c handle.c
+  OBJ=lang.o lex.o main.o interpret.o simulate.o object.o backend.o array.o\
+      comm.o ed.o regexp.o mapping.o wiz_list.o swap.o $(MALLOC).o\
+      call_out.o otable.o dumpstat.o stralloc.o hash.o port.o\
+      access_check.o parse_old.o parse.o simul_efun.o sprintf.o\
+!     gcollect.o closure.o random.o rxcache.o filestat.o handle.o @ALLOCA@
+
+  driver: $(OBJ)
+  	$(CC) @OPTIMIZE_LINKING@ $(LDFLAGS) $(OBJ) -o $@ $(LIBS)
+diff -c ldmud-dev/array.c /home/daniel/src/array.c
+*** ldmud-dev/array.c	Thu Dec 10 03:37:36 1998
+--- /home/daniel/src/array.c	Sat Mar  6 13:57:50 1999
+***************
+*** 1254,1259 ****
+--- 1254,1264 ----
+      register int d;
+
+      /* Avoid a numeric overflow by first comparing the values halfed. */
++     if (p1->type == T_HANDLE) {
++       /* Argh. Musn't use the fast check here, otherwise it would
++        * break. */
++      if ((d = (compare_handles(p1,p2))) == 1) return 0;
++     }
+      if ( 0 != (d = (p1->u.number >> 1) - (p2->u.number >> 1)) ) return d;
+      if ( 0 != (d = p1->u.number - p2->u.number) ) return d;
+      if ( 0 != (d = p1->type - p2->type) ) return d;
+***************
+*** 3094,3099 ****
+--- 3099,3196 ----
+
+      return ret;
+  }
++
++
++
++ struct svalue *f_walk_array ( struct svalue *sp, int num_arg) {
++  struct vector *my_array;
++  struct svalue *array_pointer;
++  struct svalue *arg;
++  struct svalue *extra;
++  int array_size;
++  int lauf1;
++  int extra_num;
++  struct svalue *sp2, *data;
++
++
++  extern struct svalue *inter_sp;
++
++  char *func;
++  struct svalue *arguments;
++  struct vector *r;
++  struct svalue *v, *w, *x;
++  int cnt;
++  struct object *ob;
++  int size;
++
++  arg = sp - num_arg + 1;
++
++  inter_sp = sp;
++
++  if (arg[0].type != T_POINTER) bad_xefun_vararg(1, sp);
++  if (arg[1].type == T_CLOSURE) {
++    ob = 0;
++    func = (char *)&arg[1];
++    extra_num = num_arg - 2;
++    extra = &arg[2];
++   } else if (arg[1].type != T_STRING) {
++    bad_xefun_vararg(2, sp);
++   } else {
++    if (num_arg >= 3 /* && arg[1].type == T_STRING */) {
++       if (arg[2].type == T_OBJECT) ob = arg[2].u.ob; else
++       if (arg[2].type != T_STRING || !(ob = find_object(arg[2].u.string)) )
++     		                   bad_xefun_vararg(3, sp);
++       extra_num = num_arg - 3;
++       extra = &arg[3];
++      } else {
++       ob = current_object;
++       extra_num = 0;
++      }
++    func = arg[1].u.string;
++   }
++
++
++  my_array = arg[0].u.vec;
++ // array_size = VEC_SIZE(my_array);
++
++  array_pointer = my_array->item;
++
++  /* Vec-Size inner Schleife ermitteln, da bestimmt jemand da ein
++     Element mal loeschen will. */
++
++  for (lauf1 = 0; lauf1 < VEC_SIZE(my_array) ; lauf1++, array_pointer++ ) {
++
++    //   assign_svalue_no_free( (sp2 = sp+1), array_pointer );
++
++
++    sp2 = sp+1;
++    sp2->type = T_NUMBER;
++    sp2->u.number = lauf1;
++
++    sp2++;
++
++    data = array_pointer;
++    sp2->type = T_LVALUE;
++    sp2->u.lvalue = data;
++
++
++    inter_sp = sp2;
++    push_svalue_block(extra_num, extra);
++    if (ob) {
++      if (ob->flags & O_DESTRUCTED)
++ 		error("Object used by walk_array destructed");
++      apply( func, ob, 2 + extra_num);
++     } else {
++      call_lambda( (struct svalue *)func, 2 + extra_num);
++      free_svalue(inter_sp--);
++     }
++  }
++  free_svalue(sp);
++  lauf1 = num_arg;
++  do free_svalue(--sp); while (--lauf1 > 0);
++  return sp-1;
++ }
++
+
+  /***************************************************************************/
+
+Common subdirectories: ldmud-dev/autoconf and /home/daniel/src/autoconf
+diff -c ldmud-dev/backend.c /home/daniel/src/backend.c
+*** ldmud-dev/backend.c	Wed Feb 17 01:46:17 1999
+--- /home/daniel/src/backend.c	Wed Feb 24 15:27:29 1999
+***************
+*** 1788,1792 ****
+--- 1788,1842 ----
+  #undef XREALLOC
+  }
+
++ /*
++  * like ctime(), but the result is GMT
++  */
++ struct svalue *f_gmctime(sp)
++   struct svalue *sp;
++ {
++   struct tm *ts;
++   char *buf;
++   size_t si;
++
++   if (sp->type!=T_NUMBER) {
++     bad_xefun_arg(1, sp);
++   }
++   ts = gmtime((time_t*)&(sp->u.number));
++   free_svalue(sp);
++   buf = string_copy(asctime(ts));
++   if (!buf) {
++     error("Out of memory\n");
++   }
++   if (buf[si=(strlen(buf)-1)]=='\n') buf[si]=0;
++   sp->type = T_STRING;
++   sp->x.string_type = STRING_MALLOC;
++   sp->u.string = string_copy(buf);
++   xfree(buf);
++
++   return sp;
++ }
++
++ /*
++  * Resets eval_cost if called by the master object
++  * (Usefull when a lot of evals are needed, for example for
++  *  saving all player items on shutdown!)
++  */
++ struct svalue *f_reset_eval_cost(sp)
++     struct svalue *sp;
++ {
++   extern int32 assigned_eval_cost, eval_cost;
++
++   sp++;
++   sp->type = T_NUMBER;
++   if (current_object != master_ob) {
++     sp->u.number = 0;
++   } else {
++     CLEAR_EVAL_COST;
++     sp->u.number = 1;
++   }
++   return sp;
++ }
++
+  /***************************************************************************/
++
+
+Only in ldmud-dev/: bugs
+diff -c ldmud-dev/closure.c /home/daniel/src/closure.c
+*** ldmud-dev/closure.c	Mon Feb 15 02:12:14 1999
+--- /home/daniel/src/closure.c	Wed Apr  7 20:39:42 1999
+***************
+*** 1997,2011 ****
+                              current.code_left -= 2;
+                              *current.codep++ = F_ESCAPE - F_OFFSET;
+                              *current.codep++ =
+!                               argp->x.closure_type == F_RINDEX-F_OFFSET ?
+                                  F_PROTECTED_RINDEX_LVALUE - F_OFFSET - 0x100 :
+                                  F_PROTECTED_INDEX_LVALUE  - F_OFFSET - 0x100;
+                          } else {
+                              current.code_left--;
+                              *current.codep++ =
+!                               argp->x.closure_type == F_RINDEX-F_OFFSET ?
+                                  F_RINDEX_LVALUE - F_OFFSET :
+!                                 F_INDEX_LVALUE - F_OFFSET;
+                          }
+                          return;
+                      }
+--- 1997,2011 ----
+                              current.code_left -= 2;
+                              *current.codep++ = F_ESCAPE - F_OFFSET;
+                              *current.codep++ =
+!                 argp->x.closure_type == F_RINDEX-F_OFFSET+CLOSURE_EFUN ?
+                                  F_PROTECTED_RINDEX_LVALUE - F_OFFSET - 0x100 :
+                                  F_PROTECTED_INDEX_LVALUE  - F_OFFSET - 0x100;
+                          } else {
+                              current.code_left--;
+                              *current.codep++ =
+!                   argp->x.closure_type == F_RINDEX-F_OFFSET + CLOSURE_EFUN ?
+                                  F_RINDEX_LVALUE - F_OFFSET :
+!                                 F_INDEX_LVALUE - F_OFFSET;
+                          }
+                          return;
+                      }
+diff -c ldmud-dev/comm.c /home/daniel/src/comm.c
+*** ldmud-dev/comm.c	Thu Feb 11 01:45:11 1999
+--- /home/daniel/src/comm.c	Sat Jul  3 13:36:49 1999
+***************
+*** 1602,1608 ****
+           *   tricky, we check if the socket is actually ready, to prevent
+           *   freezing.
+           */
+! #ifndef __BEOS__
+          if (udp_s >= 0)
+  #else
+          if (udp_s >= 0 && FD_ISSET(udp_s, &readfds))
+--- 1602,1608 ----
+           *   tricky, we check if the socket is actually ready, to prevent
+           *   freezing.
+           */
+! #if !defined(__BEOS__) && !defined(__CYGWIN32__)
+          if (udp_s >= 0)
+  #else
+          if (udp_s >= 0 && FD_ISSET(udp_s, &readfds))
+***************
+*** 2259,2264 ****
+--- 2259,2266 ----
+          return;
+      }
+      command_giver = master_ob;
++     current_interactive = ob;
++
+      add_message(message_flush);
+
+      /* There was an object returned from connect(). Use this as the
+***************
+*** 3107,3112 ****
+--- 3109,3119 ----
+      telopts_dont[TELOPT_TTYPE] = reply_h_telnet_neg;
+      telopts_will[TELOPT_TTYPE] = reply_h_telnet_neg;
+      telopts_wont[TELOPT_TTYPE] = reply_h_telnet_neg;
++     telopts_do[TELOPT_LINEMODE] = reply_h_telnet_neg;
++     telopts_dont[TELOPT_LINEMODE] = reply_h_telnet_neg;
++     telopts_will[TELOPT_LINEMODE] = reply_h_telnet_neg;
++     telopts_wont[TELOPT_LINEMODE] = reply_h_telnet_neg;
++
+      /* Go Ahead does not make any sense when coupling multiple
+       * interactive users. It is debatable if we are sending
+       * Go Ahead every time it is appropriate (i.e. , never),
+***************
+*** 4286,4292 ****
+
+  /*-------------------------------------------------------------------------*/
+  void
+! notify_no_command (char *command)
+
+  /* No action could be found for <command>, thus print a failure notice
+   * to the command_giver.
+--- 4293,4299 ----
+
+  /*-------------------------------------------------------------------------*/
+  void
+! notify_no_command (char *command, struct object *real_command_giver)
+
+  /* No action could be found for <command>, thus print a failure notice
+   * to the command_giver.
+***************
+*** 4300,4311 ****
+      struct svalue *svp;
+      struct interactive *ip;
+
+      if (!(ip = O_GET_INTERACTIVE(command_giver))
+       || ip->sent.type != SENT_INTERACTIVE)
+      {
+          return;
+!     }
+
+      svp = &ip->default_err_message;
+      if (svp->type == T_STRING)
+      {
+--- 4307,4327 ----
+      struct svalue *svp;
+      struct interactive *ip;
+
++     /*  Patch for SiliconDream:
++        If no command is found, eval the notify-fail-Hook regardless wether
++        the ob is interactive or not. I believe this is a better handling
++        than the original one (only for interactive obs). The new handling
++        could be used to e.g. control monsters (We need it for the
++        command-handling between different shells.
+      if (!(ip = O_GET_INTERACTIVE(command_giver))
+       || ip->sent.type != SENT_INTERACTIVE)
+      {
+          return;
+!     } */
+
++     /*  Special Patch for SiliconDream - notify_fail is handled in softcode.
++      $FIXME$ : Make a #define in config.h to take notifyfails completly out
++                of the driver.
+      svp = &ip->default_err_message;
+      if (svp->type == T_STRING)
+      {
+***************
+*** 4316,4336 ****
+      else if (svp->type == T_CLOSURE)
+      {
+          call_lambda(svp, 0);
+-         /* add_message might cause an error, thus, we free the closure first. */
+          free_svalue(svp);
+          svp->type = T_INVALID;
+          if (inter_sp->type == T_STRING)
+              add_message("%s", inter_sp->u.string);
+          pop_stack();
+      }
+!     else if (closure_hook[H_NOTIFY_FAIL].type == T_STRING)
+      {
+          add_message("%s", closure_hook[H_NOTIFY_FAIL].u.string);
+      }
+      else if (closure_hook[H_NOTIFY_FAIL].type == T_CLOSURE)
+      {
+          if (closure_hook[H_NOTIFY_FAIL].x.closure_type == CLOSURE_LAMBDA)
+!             closure_hook[H_NOTIFY_FAIL].u.lambda->ob = command_giver;
+          push_volatile_string(command);
+          call_lambda(&closure_hook[H_NOTIFY_FAIL], 1);
+          if (inter_sp->type == T_STRING)
+--- 4332,4353 ----
+      else if (svp->type == T_CLOSURE)
+      {
+          call_lambda(svp, 0);
+          free_svalue(svp);
+          svp->type = T_INVALID;
+          if (inter_sp->type == T_STRING)
+              add_message("%s", inter_sp->u.string);
+          pop_stack();
+      }
+!     else */
+!
+!     if (closure_hook[H_NOTIFY_FAIL].type == T_STRING)
+      {
+          add_message("%s", closure_hook[H_NOTIFY_FAIL].u.string);
+      }
+      else if (closure_hook[H_NOTIFY_FAIL].type == T_CLOSURE)
+      {
+          if (closure_hook[H_NOTIFY_FAIL].x.closure_type == CLOSURE_LAMBDA)
+!       closure_hook[H_NOTIFY_FAIL].u.lambda->ob = real_command_giver;
+          push_volatile_string(command);
+          call_lambda(&closure_hook[H_NOTIFY_FAIL], 1);
+          if (inter_sp->type == T_STRING)
+***************
+*** 4338,4343 ****
+--- 4355,4383 ----
+          pop_stack();
+      }
+  }
++
++ /* Modified for Silicondream:
++   If a command is successfully completed the NOTIFY_SUCC-Hook will be
++   evaluated. We use this for the handling of the notify-fails in
++   combination with our shell-handling
++   */
++ void notify_succ_command( char *command, struct object *real_command_giver )
++ {
++     extern struct svalue *inter_sp;
++
++  if (closure_hook[H_NOTIFY_SUCC].type == T_STRING) {
++ 	add_message("%s", closure_hook[H_NOTIFY_SUCC].u.string);
++     } else if (closure_hook[H_NOTIFY_SUCC].type == T_CLOSURE) {
++ 	if (closure_hook[H_NOTIFY_SUCC].x.closure_type == CLOSURE_LAMBDA)
++ 	    closure_hook[H_NOTIFY_SUCC].u.lambda->ob = real_command_giver;
++ 	push_volatile_string(command);
++ 	call_lambda(&closure_hook[H_NOTIFY_SUCC], 1);
++ 	if (inter_sp->type == T_STRING)
++ 	    add_message("%s", inter_sp->u.string);
++ 	pop_stack();
++     }
++ }
++
+
+  /*-------------------------------------------------------------------------*/
+  void
+diff -c ldmud-dev/comm.h /home/daniel/src/comm.h
+*** ldmud-dev/comm.h	Thu Dec 10 03:37:36 1998
+--- /home/daniel/src/comm.h	Sat Jul  3 13:38:36 1999
+***************
+*** 238,244 ****
+  extern struct svalue *f_query_snoop(struct svalue *sp);
+  extern struct svalue *f_query_idle(struct svalue *sp);
+  extern struct svalue *f_remove_interactive(struct svalue *sp);
+! extern void  notify_no_command(char *command);
+  extern void  clear_notify(void);
+  extern void  set_notify_fail_message(struct svalue *svp);
+  extern void  free_notifys(void);
+--- 238,244 ----
+  extern struct svalue *f_query_snoop(struct svalue *sp);
+  extern struct svalue *f_query_idle(struct svalue *sp);
+  extern struct svalue *f_remove_interactive(struct svalue *sp);
+! extern void  notify_no_command(char *command, struct object *real_command_giver );
+  extern void  clear_notify(void);
+  extern void  set_notify_fail_message(struct svalue *svp);
+  extern void  free_notifys(void);
+diff -c ldmud-dev/config.h /home/daniel/src/config.h
+*** ldmud-dev/config.h	Thu Dec 10 03:37:36 1998
+--- /home/daniel/src/config.h	Tue Feb 23 00:47:42 1999
+***************
+*** 14,20 ****
+   * are supplied should be placed in ERQ_DIR. If you want something
+   * different, consider writing a wrapper program or shell script.
+   */
+! #define ERQ_DIR "/boot/home/mud/erq"
+
+  /* #define ACCESS_CONTROL if you want the driver to do any access control.
+   */
+--- 14,20 ----
+   * are supplied should be placed in ERQ_DIR. If you want something
+   * different, consider writing a wrapper program or shell script.
+   */
+! #define ERQ_DIR "/usr/local/mud/erq"
+
+  /* #define ACCESS_CONTROL if you want the driver to do any access control.
+   */
+***************
+*** 77,84 ****
+   * MAX_USER_TRACE is used for for normal program execution, the full
+   * MAX_TRACE is only available in error handling.
+   */
+! #define MAX_USER_TRACE              60
+! #define MAX_TRACE                   65
+
+  /*
+   * Define the size of the compiler stack. This defines how complex
+--- 77,85 ----
+   * MAX_USER_TRACE is used for for normal program execution, the full
+   * MAX_TRACE is only available in error handling.
+   */
+! #define MAX_USER_TRACE              100
+! #define MAX_TRACE                   110
+! /* for SiliconDream : We need a LOT of stack */
+
+  /*
+   * Define the size of the compiler stack. This defines how complex
+***************
+*** 97,103 ****
+  /*
+   * Define what port number the game is to use.
+   */
+! #define PORTNO                    4242
+
+  /* Maximum numbers of ports the GD accepts connections to.
+   * If this is not defined, the original one-port-code takes effect.
+--- 98,104 ----
+  /*
+   * Define what port number the game is to use.
+   */
+! #define PORTNO                    3333
+
+  /* Maximum numbers of ports the GD accepts connections to.
+   * If this is not defined, the original one-port-code takes effect.
+***************
+*** 108,114 ****
+  /*
+   * Max number of local variables in a function.
+   */
+! #define MAX_LOCAL                   20
+
+  /* Maximum number of evaluated nodes/loop.
+   * If this is exceeded, the current function is halted.
+--- 109,115 ----
+  /*
+   * Max number of local variables in a function.
+   */
+! #define MAX_LOCAL                   32
+
+  /* Maximum number of evaluated nodes/loop.
+   * If this is exceeded, the current function is halted.
+***************
+*** 215,221 ****
+   */
+
+  #undef COMPAT_MODE
+! #undef NATIVE_MODE
+  #define EUIDS
+
+  /* Define OLD_PREVIOUS_OBJECT_BEHAVIOUR if the new behaviour gives problems
+--- 216,222 ----
+   */
+
+  #undef COMPAT_MODE
+! #define NATIVE_MODE
+  #define EUIDS
+
+  /* Define OLD_PREVIOUS_OBJECT_BEHAVIOUR if the new behaviour gives problems
+Only in /home/daniel/src: config.status
+Only in /home/daniel/src: conftest
+Only in /home/daniel/src: conftest.c
+Common subdirectories: ldmud-dev/cruft and /home/daniel/src/cruft
+diff -c ldmud-dev/datatypes.h /home/daniel/src/datatypes.h
+*** ldmud-dev/datatypes.h	Sat Dec 12 02:12:36 1998
+--- /home/daniel/src/datatypes.h	Sun Feb 28 19:01:10 1999
+***************
+*** 26,31 ****
+--- 26,32 ----
+      struct object *ob;
+      struct vector *vec;
+      struct mapping *map;
++     struct handle *handle;
+      struct lambda *lambda;
+      p_int mantissa;
+      struct svalue *lvalue;
+***************
+*** 80,85 ****
+--- 81,87 ----
+  #define T_PROTECTOR_MAPPING        0x12
+
+  #define T_ERROR_HANDLER         0x13
++ #define T_HANDLE                 0x14
+
+  #define T_MOD_SWAPPED                0x80
+
+***************
+*** 126,131 ****
+--- 128,138 ----
+  #endif
+      struct wiz_list *user;    /* Save who made the vector */
+      struct svalue item[1];
++ };
++
++ struct handle {
++  struct svalue obval;
++  struct svalue idval;
+  };
+
+  /* --- struct mapping: the mapping datatypes --- */
+Common subdirectories: ldmud-dev/doc and /home/daniel/src/doc
+Common subdirectories: ldmud-dev/done and /home/daniel/src/done
+diff -c ldmud-dev/exec.h /home/daniel/src/exec.h
+*** ldmud-dev/exec.h	Thu Dec 10 03:37:36 1998
+--- /home/daniel/src/exec.h	Sun Feb 28 19:03:04 1999
+***************
+*** 180,186 ****
+  #define TYPE_SYMBOL    10
+  #define TYPE_QUOTED_ARRAY 11
+  #define TYPE_TERM      12
+! #define TYPEMAP_SIZE   13
+
+  /*
+   * These are or'ed in on top of the basic type.
+--- 180,187 ----
+  #define TYPE_SYMBOL    10
+  #define TYPE_QUOTED_ARRAY 11
+  #define TYPE_TERM      12
+! #define TYPE_HANDLE      13
+! #define TYPEMAP_SIZE   14
+
+  /*
+   * These are or'ed in on top of the basic type.
+***************
+*** 211,217 ****
+  #define H_NOECHO          14
+  #define H_ERQ_STOP          15
+  #define H_MODIFY_COMMAND_FNAME 16
+! #define NUM_CLOSURE_HOOKS 17
+
+  extern struct svalue closure_hook[NUM_CLOSURE_HOOKS];
+
+--- 212,233 ----
+  #define H_NOECHO          14
+  #define H_ERQ_STOP          15
+  #define H_MODIFY_COMMAND_FNAME 16
+!
+! // For SilicondDream : We've got some additional closurehooks...
+! #define H_PRE_CREATE_DEEP_HOOK                  17
+! #define H_POST_CREATE_DEEP_HOOK                 18
+!
+! /* The first one is dangerous (undestructable obs), the second one
+!    is rather pointless.
+!   $FIXME$ : Add an automatic catch() before evaluating the pre-remove-hook.
+!             Then it could prove quite useful.
+!             */
+! #define H_PRE_REMOVE_DEEP_HOOK                  19
+! #define H_POST_REMOVE_DEEP_HOOK                 20
+!
+! #define H_NOTIFY_SUCC                           21
+! #define NUM_CLOSURE_HOOKS 22
+!
+
+  extern struct svalue closure_hook[NUM_CLOSURE_HOOKS];
+
+diff -c ldmud-dev/func_spec /home/daniel/src/func_spec
+*** ldmud-dev/func_spec	Thu Feb 11 01:45:11 1999
+--- /home/daniel/src/func_spec	Mon May 24 12:43:30 1999
+***************
+*** 25,31 ****
+  if else
+  case default
+  while do for continue
+! int status string_decl float_decl object closure_decl symbol_decl void mixed
+  static private no_mask protected public varargs virtual
+  inherit colon_colon
+  arrow quoted_aggregate
+--- 25,31 ----
+  if else
+  case default
+  while do for continue
+! int status string_decl float_decl object closure_decl symbol_decl void mixed handle
+  static private no_mask protected public varargs virtual
+  inherit colon_colon
+  arrow quoted_aggregate
+***************
+*** 173,179 ****
+  mixed assoc(mixed, mixed *, mixed|void, mixed|void);
+  /* void break_point(); */ /* debugging only */
+  closure bind_lambda(closure, object default: F_CONST1);
+! unknown call_other(object|string, string, ...);
+  void call_out(string|closure, int, void|mixed, ...);
+  mixed *call_out_info();
+  string capitalize(string);
+--- 173,181 ----
+  mixed assoc(mixed, mixed *, mixed|void, mixed|void);
+  /* void break_point(); */ /* debugging only */
+  closure bind_lambda(closure, object default: F_CONST1);
+! /* Modified for SiliconDream - Accepts handles */
+! unknown call_other(object|string|handle, string, ...);
+! unknown interval_call_other(object|string, string, ...);
+  void call_out(string|closure, int, void|mixed, ...);
+  mixed *call_out_info();
+  string capitalize(string);
+***************
+*** 214,219 ****
+--- 216,229 ----
+  mixed negate(int|float);
+  void notify_fail(string|closure);
+  int objectp(mixed);
++
++ /*
++  * new efuns for SiliconDream
++  * by sunblade
++  */
++ int clonep(mixed);
++ int handlep(mixed);
++
+  mixed *order_alist(mixed *, void|mixed *, ...);
+  int pointerp(mixed);
+  object present(object|string, void|object);
+***************
+*** 299,305 ****
+  mapping mkmapping(mixed *, ...);
+  #endif /* MAPPINGS */
+
+! string process_string(string);
+
+  object first_inventory(object|string default: F_THIS_OBJECT);
+  object next_inventory(object default: F_THIS_OBJECT);
+--- 309,326 ----
+  mapping mkmapping(mixed *, ...);
+  #endif /* MAPPINGS */
+
+!
+! /*
+!  * not activated for SiliconDream...
+!  * string process_string(string);
+!  */
+!
+! /*
+!  * new efuns for SiliconDream
+!  * by Sunbalde:
+!  */
+! void deep_call_other(object|string, string );
+!
+
+  object first_inventory(object|string default: F_THIS_OBJECT);
+  object next_inventory(object default: F_THIS_OBJECT);
+***************
+*** 355,361 ****
+  object previous_object(int);
+  int strstr(string, string, int default: F_CONST0);
+  int program_time(object default: F_THIS_OBJECT);
+! /* void swap(object); */ /* Only used for debugging */
+  string query_ip_name(object default: F_THIS_PLAYER);
+  string query_ip_number(object|mixed &  default: F_THIS_PLAYER);
+  int query_once_interactive(object);
+--- 376,382 ----
+  object previous_object(int);
+  int strstr(string, string, int default: F_CONST0);
+  int program_time(object default: F_THIS_OBJECT);
+! void swap(object);  /* Only used for debugging */
+  string query_ip_name(object default: F_THIS_PLAYER);
+  string query_ip_number(object|mixed &  default: F_THIS_PLAYER);
+  int query_once_interactive(object);
+***************
+*** 399,404 ****
+--- 420,432 ----
+  int call_resolved(mixed &, object|string, string, ...);
+  int referencep(mixed &);
+  void raise_error(string);
++
++ /*
++  * new efuns for SiliconDream
++  * by Sunbalde:
++  */
++ void raise_caller_error(string, int );
++
+  int get_eval_cost();
+  void garbage_collection();
+  int typeof(mixed);
+***************
+*** 473,476 ****
+--- 501,525 ----
+  void walk_mapping(mapping, string|closure, ...);
+  string regreplace(string,string,string,int);
+
++
++ /*
++  * new efuns for SiliconDream
++  * by Sunblade:
++  */
++ void walk_array(mixed *, string|closure, ...);
++ handle create_handle( object, string|int, int );
++ object object_value( handle );
++ mixed ident_value( handle );
++ int handle_type( handle );
++ int num_variables(object);
++
++ /*
++  * new efuns for SiliconDream
++  * by Mubo:
++  */
++ int reset_eval_cost();
++ string gmctime(int default: F_TIME);
++
++
+  /***************************************************************************/
++
+Common subdirectories: ldmud-dev/gcc and /home/daniel/src/gcc
+diff -c ldmud-dev/gcollect.c /home/daniel/src/gcollect.c
+*** ldmud-dev/gcollect.c	Thu Dec 10 03:37:36 1998
+--- /home/daniel/src/gcollect.c	Wed May 12 13:05:08 1999
+***************
+*** 409,414 ****
+--- 409,418 ----
+      {
+          switch(p->type)
+          {
++         case T_HANDLE : {
++          clear_ref_in_vector(&(p->u.handle->obval),1);
++          continue;
++         }
+          case T_OBJECT:
+              /* this might be a destructed object, which has it's ref not
+               * cleared by the obj_list because it is no longer a member
+***************
+*** 481,486 ****
+--- 485,494 ----
+      for (p = svp; p < svp+num; p++) {
+          switch(p->type)
+          {
++         case T_HANDLE : {
++          count_ref_in_vector(&(p->u.handle->obval),1);
++          continue;
++         }
+          case T_OBJECT:
+            {
+              struct object *ob;
+***************
+*** 1380,1385 ****
+--- 1388,1394 ----
+              show_object(d, (char *)svp->u.ob, 1);
+              break;
+
++             /* $FIMXE$ : Hier was fuer Handles rein ? */
+          default:
+              WRITES(d, "Svalue type ");writed(d, svp->type);WRITES(d, "\n");
+              break;
+Only in /home/daniel/src: handle.c
+Common subdirectories: ldmud-dev/hosts and /home/daniel/src/hosts
+Only in /home/daniel/src: install.how
+diff -c ldmud-dev/interpret.c /home/daniel/src/interpret.c
+*** ldmud-dev/interpret.c	Thu Feb 18 00:46:49 1999
+--- /home/daniel/src/interpret.c	Mon May 24 13:19:33 1999
+***************
+*** 131,139 ****
+   * will return. That means that control_stack[0] will have almost no
+   * interesting values, as it will terminate execution.
+   */
+- #ifndef SMALLOC_LPC_TRACE
+- static
+- #endif
+  char *inter_pc;                        /* Program pointer. */
+  static struct svalue *inter_fp;        /* Pointer to first argument. */
+  struct svalue *inter_sp;        /* Points to value of last push. */
+--- 131,136 ----
+***************
+*** 151,157 ****
+                                  /* Used to throw an error to a catch */
+
+  static struct control_stack control_stack[MAX_TRACE];
+! static struct control_stack *csp;        /* Points to last element pushed */
+
+  #define ERRORF(s) {inter_pc = pc; inter_sp = sp; error s ;}
+  #define ERROR(s) ERRORF((s))
+--- 148,154 ----
+                                  /* Used to throw an error to a catch */
+
+  static struct control_stack control_stack[MAX_TRACE];
+! struct control_stack *csp;        /* Points to last element pushed */
+
+  #define ERRORF(s) {inter_pc = pc; inter_sp = sp; error s ;}
+  #define ERROR(s) ERRORF((s))
+***************
+*** 471,476 ****
+--- 468,478 ----
+        case T_SYMBOL:
+          free_string(v->u.string);
+          break;
++      case T_HANDLE:
++        free_handle(v->u.handle);
++       v->type = T_NUMBER;
++        break;
++
+        case T_CLOSURE:
+          free_closure(v);
+          break;
+***************
+*** 664,669 ****
+--- 666,674 ----
+          else
+              add_ref(to->u.ob, "ass to var");
+          break;
++     case T_HANDLE :
++      assign_handle(from,to);
++       break;
+  #ifdef MAPPINGS
+        case T_MAPPING:
+          to->u.map->ref++;
+***************
+*** 714,719 ****
+--- 719,727 ----
+          to->u.map->ref++;
+          break;
+  #endif
++      case T_HANDLE:
++         assign_handle(from,to);
++         break;
+        case T_LVALUE:
+          to->u.lvalue = from;
+          break;
+***************
+*** 764,769 ****
+--- 772,780 ----
+            case T_CLOSURE:
+              free_closure(dest);
+              break;
++         case T_HANDLE :
++           free_handle(dest->u.handle);
++               break;
+            case T_CHAR_LVALUE:
+              if (v->type == T_NUMBER)
+                  *dest->u.string = v->u.number;
+***************
+*** 892,897 ****
+--- 903,911 ----
+            case T_CLOSURE:
+              free_closure(dest);
+              break;
++         case T_HANDLE :
++             free_handle(dest->u.handle);
++             break;
+            case T_CHAR_LVALUE:
+              if (v->type == T_NUMBER) {
+                  *dest->u.string = v->u.number;
+***************
+*** 1276,1282 ****
+          from->u.map->ref++;
+          break;
+  #endif
+!     }
+      *to = *from;
+  }
+
+--- 1290,1301 ----
+          from->u.map->ref++;
+          break;
+  #endif
+!     case T_HANDLE :
+!      assign_checked_handle(from,to);
+!      return;
+!        // check_handle_ob_destructed(from);
+!  break;
+!      }
+      *to = *from;
+  }
+
+***************
+*** 1352,1357 ****
+--- 1371,1379 ----
+          from->u.map->ref++;
+          break;
+  #endif
++     case T_HANDLE:  /* $FIXME$ */
++      assign_local_checked_svalue_handle(from,to,sp,pc);
++     return;
+        case T_LVALUE:
+        case T_PROTECTED_LVALUE:
+          from = from->u.lvalue;
+***************
+*** 2343,2348 ****
+--- 2365,2377 ----
+                  free_object_svalue(p);
+                  tmp.type = T_NUMBER;
+                  tmp.u.number = 0;
++             } else
++               if (p->type == T_HANDLE &&
++                   ((p->u.handle->obval.type == T_OBJECT) &&
++                    (p->u.handle->obval.u.ob->flags & O_DESTRUCTED))) {
++               free_object_svalue(&(p->u.handle->obval));
++               p->u.handle->obval.type = T_NUMBER;
++               p->u.handle->obval.u.number = 0;
+              } else {
+                  tmp = *p;
+              }
+***************
+*** 2430,2435 ****
+--- 2459,2471 ----
+                  free_object_svalue(p);
+                  tmp.type = T_NUMBER;
+                  tmp.u.number = 0;
++             } else
++              if (p->type == T_HANDLE &&
++                   ((p->u.handle->obval.type == T_OBJECT) &&
++                    (p->u.handle->obval.u.ob->flags & O_DESTRUCTED))) {
++               free_object_svalue(&(p->u.handle->obval));
++               p->u.handle->obval.type = T_NUMBER;
++               p->u.handle->obval.u.number = 0;
+              } else {
+                  tmp = *p;
+              }
+***************
+*** 3607,3613 ****
+          if (sp->type == T_OBJECT && (sp->u.ob->flags & O_DESTRUCTED)) {
+              free_svalue(sp);
+              *sp = const0;
+!         }
+          break;
+  #endif /* F_INDIRECT */
+      CASE(F_IDENTIFIER);
+--- 3643,3656 ----
+          if (sp->type == T_OBJECT && (sp->u.ob->flags & O_DESTRUCTED)) {
+              free_svalue(sp);
+              *sp = const0;
+!         } else
+!         if (sp->type == T_HANDLE &&
+!                   ((sp->u.handle->obval.type == T_OBJECT) &&
+!                    (sp->u.handle->obval.u.ob->flags & O_DESTRUCTED))) {
+!               free_svalue(sp->u.handle->obval);
+!               sp->u.handle->obval.type = T_NUMBER;
+!               sp->u.handle->obval.u.number = 0;
+!             }
+          break;
+  #endif /* F_INDIRECT */
+      CASE(F_IDENTIFIER);
+***************
+*** 5775,5780 ****
+--- 5818,5843 ----
+              i = (sp-1)->u.map == sp->u.map;
+              break;
+  #endif
++         case T_HANDLE:  /* Handle vergleichen */
++           /*           i = (((sp-1)->u.handle->obval.u.ob == sp->u.handle->obval.u.ob) &&
++                   ((sp-1)->x.generic == sp->x.generic));
++              if (i) {
++               if ((sp-1)->u.handle->idval.type == sp->u.handle->idval.type) {*/
++         /* Als ID is nur String//Int zulaessig. */
++           /*
++                if (sp->u.handle->idval.type == T_NUMBER) {
++                 i = (sp-1)->u.handle->idval.u.number ==
++                         sp->u.handle->idval.u.number;
++                 } else
++                if (sp->u.handle->idval.type == T_STRING) {
++                i = strcmp((sp-1)->u.handle->idval.u.string,
++                                sp->u.handle->idval.u.string) == 0;
++                 } else i = 0;
++                } else i = 0;
++               } */
++       i = compare_handles((sp-1), sp);
++             break;
++
+            default:
+              i = 0;
+              break;
+***************
+*** 5794,5799 ****
+--- 5857,5865 ----
+              break;
+          }
+          switch(sp->type) {
++          case T_HANDLE :
++             i = !compare_handles((sp-1),sp);
++             break;
+            case T_NUMBER:
+              i = (sp-1)->u.number != sp->u.number;
+              break;
+***************
+*** 6019,6024 ****
+--- 6085,6129 ----
+          ERROR("-- of non-numeric argument\n")
+          break;
+      }
++     CASE(F_DEEP_CALL_OTHER);
++     {
++ 	struct svalue *arg;
++ 	struct object *ob;
++ 	
++ 	inter_pc = pc;
++ 	inter_sp = sp;
++         arg = sp - 1;
++ 	if (arg[0].type == T_OBJECT)
++ 	    ob = arg[0].u.ob;
++ 	else if (arg[0].type == T_STRING) {
++ 	    ob = find_object(arg[0].u.string);
++ 	    if (ob == 0) ERROR("deep_call_other() failed\n")
++ 	} else goto bad_arg_1;
++
++ 	TYPE_TEST2(arg+1, T_STRING)
++ 	if (current_object->flags & O_DESTRUCTED) {
++ 	    pop_n_elems(num_arg);
++ 	    push_number(0);
++ 	    break;
++ 	}
++
++ 	if (arg[1].u.string[0] == ':')
++ 	    ERRORF(("Illegal function name in deep_call_other: %s\n",
++ 		  arg[1].u.string))
++ 	if (TRACEP(TRACE_CALL_OTHER)) {
++ 	    if (!++traceing_recursion) {
++ 		do_trace("Deep Call other ", arg[1].u.string, "\n");
++ 	    }
++ 	    traceing_recursion--;
++ 	}
++         apply_low(arg[1].u.string, ob, 0,MY_FALSE);
++         pop_stack();
++         sun_call_all_inherits( ob, arg[1].u.string );
++         pop_n_elems(2);
++         push_number(0);
++ 	break;
++     }
++
+      CASE(F_CALL_OTHER);
+      {
+          struct svalue *arg;
+***************
+*** 6035,6041 ****
+              ob = get_object(arg[0].u.string);
+              if (ob == 0)
+                  ERROR("call_other() failed\n")
+!         } else goto bad_arg_1;
+          TYPE_TEST2(arg+1, T_STRING)
+          if (current_object->flags & O_DESTRUCTED) {
+              /*
+--- 6140,6194 ----
+              ob = get_object(arg[0].u.string);
+              if (ob == 0)
+                  ERROR("call_other() failed\n")
+!         } else
+!         if (arg[0].type == T_HANDLE) {
+!           /* Bei Handles folgendermassen vorgehen -
+!            * Den Funktionsnamen mit dem jeweiligen Handle-Subtyp-Prefix
+!            * ausstatten, dann das Handle als ersten Parameter pushen,
+!            * und die Funktion erst dann aufrufen.
+!            */
+!          int temp;
+!          char *oldstr;
+!          char *newstr;
+!          char *newstr_2;
+!
+!          ob = arg[0].u.handle->obval.u.ob;
+!          inter_sp++;     /* Platz auf dem Stack machen */
+!          sp = inter_sp; /* Damit das Ding mir auch den Stack abnimmt... */
+!          temp = num_arg - 1;
+!          /* Platz schaffen. */
+!          while (temp >= 2) {
+!           transfer_svalue_no_free(&(arg[temp+1]),&(arg[temp]));
+!           temp--;
+!          }
+!          /* Und das Handle als ersten Parameter rinne. */
+!          assign_svalue_no_free(&(arg[2]),&(arg[0]));
+!          num_arg++;
+!          /* Jetze den String herumschieben. */
+!
+!          oldstr = arg[1].u.string;
+!          switch (arg[0].x.generic) {
+!            /* $FIXME$ : Die Prefixe in ein Master-Apply|Hook stecken. */
+!           case 1 : {
+!                 newstr_2 = "vitem_";
+!                 break;
+!                }
+!           case 2 : {
+!                 newstr_2 = "mgroup_";
+!                 break;
+!                }
+!            default : newstr_2 = "hoppla_";
+!           }
+!          temp = strlen(newstr_2);
+!          newstr = xalloc(temp + strlen(oldstr) + 1);
+!          strncpy(newstr,newstr_2,temp);
+!          strcpy(newstr + temp, oldstr);
+!          free_svalue(&(arg[1])); /* Wegdamittig. */
+!          arg[1].u.string = newstr;
+!          arg[1].x.string_type = STRING_MALLOC;
+!         } else {
+!          goto bad_arg_1;
+!         }
+          TYPE_TEST2(arg+1, T_STRING)
+          if (current_object->flags & O_DESTRUCTED) {
+              /*
+***************
+*** 6076,6081 ****
+--- 6229,6350 ----
+          *sp = *arg;           /* Re-insert function result */
+          break;
+      }
++
++     CASE(F_INTERVAL_CALL_OTHER);
++     {
++         struct svalue *arg;
++         struct object *ob;
++         char *oldstr;
++         int found;
++           char *xptr, *oldxptr;
++         int sst;
++         int res;
++         int lauf1;
++         struct svalue *saved_svalues;
++
++         ASSIGN_EVAL_COST
++         GET_NUM_ARG
++         inter_pc = pc;
++         inter_sp = sp;
++         arg = sp - num_arg + 1;
++         if (arg[0].type == T_OBJECT)
++             ob = arg[0].u.ob;
++         else if (arg[0].type == T_STRING) {
++             ob = get_object(arg[0].u.string);
++             if (ob == 0)
++                 ERROR("call_other() failed\n")
++         } else goto bad_arg_1;
++         TYPE_TEST2(arg+1, T_STRING)
++         if (current_object->flags & O_DESTRUCTED) {
++             /*
++              * No external calls may be done when this object is
++              * destructed.
++              */
++             pop_n_elems(num_arg);
++             push_number(0);
++             break;
++         }
++         if (arg[1].u.string[0] == ':')
++             ERRORF(("Illegal function name in call_other: %s\n",
++                   arg[1].u.string))
++         /*
++          * Send the remaining arguments to the function.
++          */
++         if (TRACEP(TRACE_CALL_OTHER)) {
++             if (!++traceing_recursion) {
++                 do_trace("Call other ", arg[1].u.string, "\n");
++             }
++             traceing_recursion--;
++         }
++
++         oldstr = arg[1].u.string;
++         sst = arg[1].x.string_type;
++
++         // + strlen(arg[1].u.string) + 1;
++         oldxptr = arg[1].u.string + strlen(arg[1].u.string) + 1;
++         arg[1].u.string = xalloc(strlen(oldstr) + 1);
++         arg[1].x.string_type = STRING_MALLOC;
++         strcpy(arg[1].u.string,oldstr);
++
++         saved_svalues = xalloc( sizeof (struct svalue) * (num_arg - 2));
++         for (lauf1 = (num_arg - 3) ; lauf1 >= 0; lauf1-- ) {
++          assign_svalue_no_free(&(saved_svalues[
++                (num_arg - 3) - lauf1]),&(sp[ -(lauf1) ]));
++         }
++         //        xptr = oldstr;
++         oldxptr = 0;
++         xptr = 0;
++         found = 0;
++         while (!found) {
++       if (((res = apply_low(arg[1].u.string, ob, num_arg-2, MY_FALSE)) == 0) ||
++           ((inter_sp[0].type == T_NUMBER) && (inter_sp[0].u.number == 0)))  {
++           oldxptr = xptr;
++           xptr = rindex(arg[1].u.string,'_');
++           if (xptr) {
++            if (oldxptr) *oldxptr = '_';
++            *xptr = 0;
++            if (res) drop_stack();
++            for (lauf1 = 0; lauf1 < num_arg - 2; lauf1++ ) {
++             push_svalue(&(saved_svalues[lauf1]));
++            }
++           } else {
++             /* Ende und Funktion nicht gefunden. */
++            found = 1;
++           }
++          } else {
++           /* Ende und Funktion gefunden. */
++           found = 2;
++          }
++         }
++         xfree(arg[1].u.string);
++         arg[1].u.string = oldstr;
++         arg[1].x.string_type = sst;
++         for (lauf1 = 0; lauf1 < num_arg - 2; lauf1++ ) {
++          free_svalue(&(saved_svalues[lauf1]));
++         }
++         xfree(saved_svalues);
++
++         if (found == 1) {
++          /* Function not found */
++          pop_n_elems(num_arg);
++          push_number(0);
++          break;
++         } else
++         if (found == 2) {
++          sp -= num_arg - 3;
++          /*
++           * The result of the function call is on the stack. But, so
++           * is the function name and object that was called.
++           * These have to be removed.
++           */
++          arg = sp;           /* Remember where the function call result is */
++          free_string_svalue(--sp);
++          free_svalue(--sp); /* Remove old arguments to call_other */
++          *sp = *arg;           /* Re-insert function result */
++         }
++         break;
++     }
++
+      CASE(F_SIMUL_EFUN);
+      {
+          int code;
+***************
+*** 6166,6171 ****
+--- 6435,6457 ----
+          put_number(i);
+          break;
+      }
++   CASE(F_CLONEP); {
++       int i;
++       i = sp->type == T_OBJECT;
++       if (i) i = ((sp->u.ob->flags & O_CLONE) != 0);
++       free_svalue(sp);
++       put_number(i);
++       break;
++      }
++
++   CASE(F_HANDLEP); {
++       int i;
++       i = sp->type == T_HANDLE;
++       free_svalue(sp);
++       put_number(i);
++       break;
++      }
++
+  #ifdef F_FLOATP
+      CASE(F_FLOATP);
+      {
+***************
+*** 6328,6334 ****
+          TYPE_TEST2(sp,   T_OBJECT)
+          inter_sp = sp;
+          inter_pc = pc;
+!         i = replace_interactive((sp-1)->u.ob, sp->u.ob, current_prog->name);
+          pop_stack();
+          free_svalue(sp); /* object might have been destructed */
+          put_number(i);
+--- 6614,6621 ----
+          TYPE_TEST2(sp,   T_OBJECT)
+          inter_sp = sp;
+          inter_pc = pc;
+!         i = replace_interactive((sp-1)->u.ob, sp->u.ob,
+!                                 current_object->prog->name);
+          pop_stack();
+          free_svalue(sp); /* object might have been destructed */
+          put_number(i);
+***************
+*** 6594,6599 ****
+--- 6881,6898 ----
+                  }
+                  break;
+                }
++             case T_HANDLE:
++               {
++                struct svalue *svp;
++                for(svp = UP_TO_SVP(item_u_p); --cnt >= 0; svp++) {
++                  if (svp->type == T_HANDLE) {
++                    if (svp->x.generic == sp->x.generic) {
++                     if (compare_handles(svp,sp)) break;
++                    }
++                  }
++                  }
++                break;
++               }
+                default:
+                  if (sp->type == T_LVALUE)
+                      error("Reference passed to member()\n");
+***************
+*** 7610,7615 ****
+--- 7909,7918 ----
+              free_object(ob, "void_assign");
+              break;
+            }
++         case T_HANDLE:{
++          free_handle(argp->u.handle);
++          break;
++         }
+            case T_QUOTED_ARRAY:
+            case T_POINTER:
+            {
+***************
+*** 9968,9974 ****
+--- 10271,10288 ----
+            {
+              if (sp->type != T_STRING) goto xbad_arg_1;
+              ERRORF(("%s", sp->u.string));
++             break;
+            }
++           XCASE(F_RAISE_CALLER_ERROR);
++           {
++            if ((sp-1)->type != T_STRING) goto xbad_arg_1;
++            if (sp->type != T_NUMBER) goto xbad_arg_2;
++            inter_pc = pc;
++            inter_sp = sp;
++            new_error(sp->u.number,"%s",sp[-1].u.string);
++            break;
++ 	  }
++
+            XCASE(F_GET_EVAL_COST);
+            {
+              push_number(-eval_cost);
+***************
+*** 10553,10560 ****
+      csp->ob = current_object;
+      csp->prev_ob = previous_ob;
+  #ifdef DEBUG
+!     if (csp != control_stack)
+!         fatal("call_function with bad csp\n");
+  #endif
+      csp->num_local_variables = 0;
+      current_prog = progp;
+--- 10867,10874 ----
+      csp->ob = current_object;
+      csp->prev_ob = previous_ob;
+  #ifdef DEBUG
+!     /*     if (csp != control_stack)
+!         fatal("call_function with bad csp\n"); */
+  #endif
+      csp->num_local_variables = 0;
+      current_prog = progp;
+***************
+*** 13213,13215 ****
+--- 13527,13698 ----
+    memset(cache_id, 0, sizeof cache_id);
+    memset(cache_progp, 1, sizeof cache_progp);
+  }
++
++
++ void sun_call_function(progp, fx)
++     struct program *progp;
++     int fx;
++ {
++     uint32 flags;
++     unsigned char *funstart;
++
++     push_control_stack(inter_sp, inter_pc, inter_fp);
++     csp->ob = current_object;
++     csp->prev_ob = previous_ob;
++ #ifdef DEBUG
++     /*     if (csp != control_stack)
++         fatal("call_function with bad csp\n"); */
++ #endif
++     csp->num_local_variables = 0;
++     current_prog = progp;
++
++     flags = setup_new_frame1(fx, 0, variable_index_offset);
++
++     inter_sp = setup_new_frame2(
++       current_prog->program + (flags & FUNSTART_MASK), inter_sp
++     );
++     current_variables = current_object->variables + variable_index_offset;
++     current_strings = current_prog->strings;
++
++     funstart = current_prog->program + (flags & FUNSTART_MASK);
++     csp->funstart = funstart;
++     previous_ob = current_object;
++     tracedepth = 0;
++     eval_instruction(funstart + 2, inter_sp);
++     free_svalue(inter_sp--);        /* Throw away the returned result */
++ }
++
++
++ /* $FIXME$ : Think of better names for those functions */
++ void sun_rec_call_all_inherits( struct object *ob, struct program *prog ,
++                       char *name ) {
++
++  int old_vio;
++  int old_fio;
++  int lauf1;
++  struct inherit *curr_inherit;
++  struct program *tmpprog;
++  struct object *old;
++  struct svalue *old_current_variables;
++  static char **old_current_strings;
++  int func_idx;
++
++  old = current_object;
++  current_object = ob;
++
++  old_current_variables = current_variables;
++  old_current_strings = current_strings;
++
++
++
++  for (lauf1 = 0; lauf1 < prog->num_inherited ; lauf1++ ) {
++   curr_inherit = &(struct inherit)(prog->inherit[lauf1]);
++
++   old_fio = function_index_offset;
++   old_vio = variable_index_offset;
++
++   /* $FIXME$ */
++         if (prog != ob->prog
++              && curr_inherit->prog->num_variables
++          && (prog->variable_names[
++               curr_inherit->variable_index_offset
++              +curr_inherit->prog->num_variables-1
++                                          ].flags & TYPE_MOD_VIRTUAL)
++          && !(curr_inherit->prog->variable_names[
++                                   curr_inherit->prog->num_variables-1
++                                             ].flags & TYPE_MOD_VIRTUAL)
++            )
++         {
++             /* now lookup the inheritp of the virtually inherited program
++              * in the inherit list of the topmost program.
++              */
++             int i = ob->prog->num_inherited;
++             struct inherit *inh = ob->prog->inherit;
++
++             while (i)
++             {
++                 if (inh->prog == curr_inherit->prog
++                  && ob->prog->variable_names[inh->variable_index_offset
++                                                   +inh->prog->num_variables-1
++                                                   ].flags&TYPE_MOD_VIRTUAL
++                    )
++                     break;
++                 inh++;
++                 i--;
++             }
++             if (i)
++             {
++                 /* found, so adjust the inheritp and the offsets
++                  * to start with
++                  */
++               curr_inherit                 = inh;
++                 current_variables = current_object->variables;
++                 //                function_index_offset = 0;
++             }
++ #ifdef DEBUG
++             else { /* this shouldn't happen! */
++                 fprintf(stderr,
++                         "[X0] Adjusting variable offsets because of virtual "
++                         "inheritance for call from %s into %s (topmost "
++                         "program %s) FAILED, please check the inherit "
++                         "tree and report it.\n",
++                         current_prog->name, curr_inherit->prog->name,
++                         current_object->prog->name);
++             }
++ #endif
++         }
++
++   tmpprog = curr_inherit->prog;
++   function_index_offset += curr_inherit->function_index_offset;
++   variable_index_offset += curr_inherit->variable_index_offset;
++
++   if (tmpprog->num_inherited) {
++    sun_rec_call_all_inherits(ob,tmpprog,name);
++   }
++
++   //  current_variables = current_object->variables + variable_index_offset;
++   current_variables = current_object->variables;
++   current_strings = current_prog->strings;
++
++   if ((func_idx = find_function(name,tmpprog)) >= 0) {
++    if (!(tmpprog->functions[func_idx] & NAME_INHERITED))
++        sun_call_function(tmpprog,func_idx);
++   }
++
++   function_index_offset = old_fio;
++   variable_index_offset = old_vio;
++  }
++
++  current_object = old;
++  current_variables = old_current_variables;
++  current_strings = old_current_strings;
++ }
++
++ int sun_do_call_all_inherits( struct object *ob, struct program *prog ,
++                       char *name ) {
++  int func_idx;
++  struct program *save_current_prog;
++  save_current_prog = current_prog;
++  // current_prog = prog;
++  /* $FIXME$ : Eine Liste mit den aufgerufenen virtuellen Inerhtis anlegen,
++    damit wir in einem virtuell geerbten File nicht mehrmals die Funktion
++    aufrufen. */
++   if ((func_idx = find_function(name,prog)) >= 0) {
++    if (!(prog->functions[func_idx] & NAME_INHERITED))
++       call_function(prog,func_idx);
++   }
++
++   sun_rec_call_all_inherits(ob,prog,name);
++  current_prog = save_current_prog;
++ }
++
++ int sun_call_all_inherits( struct object *ob, char *name ) {
++  if (privilege_violation4("deep_call_other", ob, name, 0, inter_sp)) {
++  struct program *save_current_prog;
++  save_current_prog = current_prog;
++  // current_prog = ob->prog;
++   sun_rec_call_all_inherits(ob,ob->prog,name);
++  current_prog = save_current_prog;
++  }
++ }
++
+diff -c ldmud-dev/lex.c /home/daniel/src/lex.c
+*** ldmud-dev/lex.c	Thu Dec 10 03:37:36 1998
+--- /home/daniel/src/lex.c	Wed Apr  7 15:07:39 1999
+***************
+*** 393,398 ****
+--- 393,399 ----
+     , { "symbol",         F_SYMBOL_DECL,  }
+     , { "varargs",        F_VARARGS,      }
+     , { "virtual",        F_VIRTUAL,      }
++    , { "handle",          F_HANDLE,        }
+     , { "void",           F_VOID,         }
+     , { "while",          F_WHILE,        }
+     };
+***************
+*** 2850,2856 ****
+                  /* If the first non-quote is not an alnum, it must
+                   * be a quoted aggregrate or an error.
+                   */
+!                 if (!isalpha((unsigned char)*yyp))
+                  {
+                      if (*yyp == '(' && yyp[1] == '{')
+                      {
+--- 2851,2858 ----
+                  /* If the first non-quote is not an alnum, it must
+                   * be a quoted aggregrate or an error.
+                   */
+!                 if (!isalpha((unsigned char)*yyp) &&
+!                     (*yyp != '_'))
+                  {
+                      if (*yyp == '(' && yyp[1] == '{')
+                      {
+Only in /home/daniel/src: machine.h
+diff -c ldmud-dev/make_func.y /home/daniel/src/make_func.y
+*** ldmud-dev/make_func.y	Sat Dec 12 02:12:36 1998
+--- /home/daniel/src/make_func.y	Sun Feb 28 19:03:19 1999
+***************
+*** 422,436 ****
+
+  %token NAME ID
+
+! %token VOID INT STRING OBJECT MAPPING FLOAT CLOSURE SYMBOL QUOTED_ARRAY
+! %token MIXED UNKNOWN
+
+  %token DEFAULT
+
+  %token TOKENS CODES EFUNS XCODES XEFUNS TCODES TEFUNS END
+
+  %type <number> VOID MIXED UNKNOWN
+! %type <number> INT STRING OBJECT MAPPING FLOAT CLOSURE SYMBOL QUOTED_ARRAY
+  %type <number> basic arg_type
+    /* Value is the basic type value
+     */
+--- 422,436 ----
+
+  %token NAME ID
+
+! %token VOID INT STRING OBJECT MAPPING FLOAT CLOSURE SYMBOL QUOTED_ARRAY
+! %token HANDLE MIXED UNKNOWN
+
+  %token DEFAULT
+
+  %token TOKENS CODES EFUNS XCODES XEFUNS TCODES TEFUNS END
+
+  %type <number> VOID MIXED UNKNOWN
+! %type <number> INT STRING OBJECT MAPPING HANDLE FLOAT CLOSURE SYMBOL QUOTED_ARRAY
+  %type <number> basic arg_type
+    /* Value is the basic type value
+     */
+***************
+*** 602,608 ****
+
+  type: basic opt_star opt_ref { $$ = $1 | $2 | $3; };
+
+! basic: VOID | INT | STRING | MAPPING | FLOAT | MIXED | OBJECT | CLOSURE |
+          UNKNOWN | SYMBOL | QUOTED_ARRAY ;
+
+  opt_star : '*' { $$ = MF_TYPE_MOD_POINTER; }
+--- 602,608 ----
+
+  type: basic opt_star opt_ref { $$ = $1 | $2 | $3; };
+
+! basic: VOID | INT | STRING | MAPPING | HANDLE | FLOAT | MIXED | OBJECT | CLOSURE |
+          UNKNOWN | SYMBOL | QUOTED_ARRAY ;
+
+  opt_star : '*' { $$ = MF_TYPE_MOD_POINTER; }
+***************
+*** 663,668 ****
+--- 663,669 ----
+      , { "string",       STRING }
+      , { "object",       OBJECT }
+      , { "mapping",      MAPPING }
++     , { "handle",        HANDLE }
+      , { "float",        FLOAT }
+      , { "closure",      CLOSURE }
+      , { "symbol",       SYMBOL }
+***************
+*** 1132,1137 ****
+--- 1133,1140 ----
+          return TYPE_OBJECT;
+      if ( !strcmp(name, "MAPPING") )
+          return TYPE_MAPPING;
++     if ( !strcmp(name, "HANDLE") )
++         return TYPE_HANDLE;
+      if ( !strcmp(name, "CLOSURE") )
+          return TYPE_CLOSURE;
+      return -1;
+***************
+*** 1186,1191 ****
+--- 1189,1204 ----
+          return H_ERQ_STOP;
+      if ( !strcmp(name, "MODIFY_COMMAND_FNAME") )
+          return H_MODIFY_COMMAND_FNAME;
++     if (!strcmp(name,"PRE_CREATE_DEEP_HOOK"))
++         return H_PRE_CREATE_DEEP_HOOK;
++     if (!strcmp(name,"POST_CREATE_DEEP_HOOK"))
++         return H_POST_CREATE_DEEP_HOOK;
++     if (!strcmp(name,"PRE_REMOVE_DEEP_HOOK"))
++        return H_PRE_REMOVE_DEEP_HOOK;
++     if (!strcmp(name,"POST_REMOVE_DEEP_HOOK"))
++        return H_POST_REMOVE_DEEP_HOOK;
++     if ( !strcmp(name, "NOTIFY_SUCC") )
++        return H_NOTIFY_SUCC;
+      return -1;
+  }
+
+***************
+*** 1907,1912 ****
+--- 1920,1927 ----
+          return "T_STRING";
+      case MAPPING:
+          return "T_MAPPING";
++     case HANDLE:
++         return "T_HANDLE";
+      case FLOAT:
+          return "T_FLOAT";
+      case CLOSURE:
+***************
+*** 1998,2003 ****
+--- 2013,2019 ----
+        case INT:     p = "TYPE_NUMBER";  break;
+        case OBJECT:  p = "TYPE_OBJECT";  break;
+        case MAPPING: p = "TYPE_MAPPING"; break;
++       case HANDLE: p = "TYPE_HANDLE";     break;
+        case FLOAT:   p = "TYPE_FLOAT";   break;
+        case CLOSURE: p = "TYPE_CLOSURE"; break;
+        case SYMBOL:  p = "TYPE_SYMBOL";  break;
+diff -c ldmud-dev/mapping.c /home/daniel/src/mapping.c
+*** ldmud-dev/mapping.c	Sat Dec 12 02:12:36 1998
+--- /home/daniel/src/mapping.c	Sat Apr 17 19:06:52 1999
+***************
+*** 485,490 ****
+--- 485,542 ----
+          /* don't search if there are no string keys */
+          break;
+        }
++     case T_HANDLE: { /* Handle braucht eine spezialbehandlung
++                      * $FIXME$ -> per cut&paste gemacht... Aufraemen. */
++         p_int offset;
++         char *key; /* means a char **, but pointer arithmetic wants char * */
++         char *keystart, *keyend;
++         ph_int index_type = map_index->u.handle->obval.type;
++         ph_int index_x = map_index->u.handle->obval.x.generic;
++         p_int index_u = map_index->u.handle->obval.u.number, u_d;
++
++         keyend = (char *)CM_MISC(cm);
++         size = cm->misc_size;
++         keystart = keyend - size;
++         offset = size | size >> 1;
++         offset |= offset >> 2;
++         offset |= offset >> 4;
++         if (offset & ~0xff) {
++             offset |= offset >> 8;
++             offset |= offset >> 16;
++         }
++         offset = (offset+1) >> 1;
++         key = keyend - offset;
++         while ( (offset >>= 1) >= (p_int)(sizeof svp)/2) {
++          if (((struct svalue *)key)->type == T_HANDLE) {
++           if ( !(u_d = (((struct svalue *)key)->u.handle->
++               obval.u.number >> 1) - (index_u >> 1))) {
++               if ( !(u_d = ((struct svalue *)key)->u.handle->
++             obval.x.generic - index_x) &&
++            (compare_handles((struct svalue *)key,map_index)))
++ #ifndef FAST_MULTIPLICATION
++                     if (num_values == 1) /* speed up this case */
++                         return (struct svalue *) (key - size);
++                     else
++ #endif/*FAST_MULTIPLICATION*/
++                         return (struct svalue *)
++                           (keystart - ( num_values * (keyend - key) ) );
++                 }
++             }
++             if (u_d > 0) {
++                 key += offset;
++             } else {
++                 /* u_d < 0 */
++                 key -= offset;
++                 while (key < keystart) {
++                     if ( (offset >>= 1) < (p_int)(sizeof svp) )
++                         break;
++                     key += offset;
++                 }
++             }
++         }
++         /* not found */
++         break;
++     }
+        default:
+          map_index->x.generic = map_index->u.number << 1;
+        case T_FLOAT:
+***************
+*** 582,597 ****
+          p_int index_type = *SVALUE_FULLTYPE(map_index);
+          p_int index_u = map_index->u.number;
+          mp_int i;
+!
+          i = index_u ^ index_type;
+          i = i ^ i >> 16;
+          i = i ^ i >> 8;
+          i &= hm->mask;
+!         for (mc = hm->chains[i];mc; mc = mc->next){
+!             if (mc->key.u.number != index_u ||
+!                 *SVALUE_FULLTYPE(&mc->key) != index_type)
+!                 continue;
+!             return mc->data;
+          }
+          if (!need_lvalue)
+              return &const0;
+--- 634,662 ----
+          p_int index_type = *SVALUE_FULLTYPE(map_index);
+          p_int index_u = map_index->u.number;
+          mp_int i;
+!         if (map_index->type == T_HANDLE) {
+!               index_u = map_index->u.handle->obval.u.number;
+!               index_type = *SVALUE_FULLTYPE(&(map_index->u.handle->obval));
+!         }
+          i = index_u ^ index_type;
+          i = i ^ i >> 16;
+          i = i ^ i >> 8;
+          i &= hm->mask;
+!         if (map_index->type == T_HANDLE) {
+!          p_int c_index_type = *SVALUE_FULLTYPE(map_index);
+!          for (mc = hm->chains[i];mc; mc = mc->next){
+!           if (*SVALUE_FULLTYPE(&mc->key) != c_index_type) continue;
+!           if (mc->key.u.handle->obval.u.number != index_u) continue;
+!           if (!compare_handles(&(mc->key),map_index)) continue;
+!           return mc->data;
+!          }
+!         } else {
+!          for (mc = hm->chains[i];mc; mc = mc->next){
+!              if (mc->key.u.number != index_u ||
+!                  *SVALUE_FULLTYPE(&mc->key) != index_type)
+!                  continue;
+!              return mc->data;
+!          }
+          }
+          if (!need_lvalue)
+              return &const0;
+***************
+*** 629,634 ****
+--- 694,703 ----
+              }
+              m->hash = hm;
+              xfree((char *)hm2);
++             if (map_index->type == T_HANDLE) {
++             i = map_index->u.handle->
++                   obval.u.number ^ *SVALUE_FULLTYPE(map_index);
++             } else
+              i = map_index->u.number ^ *SVALUE_FULLTYPE(map_index);
+              i = i ^ i >> 16;
+              i = i ^ i >> 8;
+***************
+*** 760,765 ****
+--- 829,835 ----
+      struct mapping *m;
+      struct svalue *map_index;
+  {
++   /* $FIXME$ : Fuer Handle anpassen. */
+      mp_int size;
+      struct condensed_mapping *cm = m->condensed;
+      struct hash_mapping *hm;
+***************
+*** 845,850 ****
+--- 915,1022 ----
+          /* don't search if there are no string keys */
+          break;
+        }
++
++
++       case T_HANDLE:
++       {
++         /* $FIXME$ : Ordentlich proggen. */
++         p_int offset;
++         char *key; /* means a char **, but pointer arithmetic wants char * */
++         char *keystart, *keyend;
++         ph_int index_type = map_index->u.handle->obval.type;
++         ph_int index_x = map_index->u.handle->obval.x.generic;
++         p_int index_u = map_index->u.handle->obval.u.number, u_d;
++
++         keyend = (char *)CM_MISC(cm);
++         size = cm->misc_size;
++         keystart = keyend - size;
++         offset = size | size >> 1;
++         offset |= offset >> 2;
++         offset |= offset >> 4;
++         if (offset & ~0xff) {
++             offset |= offset >> 8;
++             offset |= offset >> 16;
++         }
++         offset = (offset+1) >> 1;
++         key = keyend - offset;
++
++         while ( (offset >>= 1) >= (p_int)(sizeof svp)/2) {
++          if (((struct svalue *)key)->type == T_HANDLE) {
++
++           if ( !(u_d = (((struct svalue *)key)->u.handle->
++               obval.u.number >> 1) -
++                          (index_u >> 1)) ) {
++               if ( !(u_d = ((struct svalue *)key)->u.handle->
++             obval.x.generic - index_x) )
++
++  {
++                     /* found */
++
++                     int i;
++
++                     free_svalue( (struct svalue *)key );
++                     svp = (struct svalue *)
++                       (keystart - ( num_values * (keyend - key) ) );
++                     for (i = num_values; --i >= 0 ;svp++) {
++                         free_svalue(svp);
++                         svp->type = T_NUMBER;
++                         svp->u.number = 0;
++                     }
++
++                     /* it's harmless to read misc/string_size as an svalue */
++                     while ( ((struct svalue *)key+1)->u.number == index_u &&
++                             ((struct svalue *)key+1)->x.generic == index_x &&
++                             (key + sizeof(struct svalue) < keyend) &&
++                      (compare_handles((struct svalue *)key,map_index)))
++                     {
++                         struct svalue *svp2;
++
++                         *((struct svalue *)key) = *((struct svalue *)key+1);
++                         key += sizeof(struct svalue);
++                         svp2 = svp - num_values;
++                         for (i = num_values; --i >= 0 ;svp++, svp2++) {
++                             *svp2 = *svp;
++                             svp->type = T_NUMBER;
++                             svp->u.number = 0;
++                         }
++                     }
++                     ((struct svalue *)key)->type = T_INVALID;
++                     if ( !(hm = m->hash) ) {
++                         hm = (struct hash_mapping *)xalloc(sizeof *hm);
++                         m->hash = hm;
++                         hm->mask = hm->used = hm->condensed_deleted = 0;
++                         hm->chains[0] = 0;
++                         last_dirty_mapping->hash->next_dirty = m;
++                         last_dirty_mapping = m;
++ #ifdef DEBUG
++                         hm->next_dirty = 0;
++                         hm->deleted = 0;
++ #endif
++                         hm->ref = 0;
++                         num_dirty_mappings++;
++                         extra_jobs_to_do = MY_TRUE;
++                     }
++                     hm->condensed_deleted++;
++                     return;
++                 }
++             }
++          }
++             if (u_d > 0) {
++                 key += offset;
++             } else {
++                 /* u_d < 0 */
++                 key -= offset;
++                 while (key < keystart) {
++                     if ( (offset >>= 1) < (p_int)(sizeof svp) )
++                         break;
++                     key += offset;
++                 }
++             }
++         }
++         /* not found */
++         break;
++       }
++
+        default:
+          map_index->x.generic = map_index->u.number << 1;
+        case T_FLOAT:
+***************
+*** 944,949 ****
+--- 1116,1187 ----
+        }
+      }
+      if ( NULL != (hm = m->hash) ) {
++       if (map_index->type == T_HANDLE) {
++         /* $FIXME$ */
++         struct map_chain **mcp, *mc;
++         p_int index_type = *SVALUE_FULLTYPE(map_index);
++         p_int index_u = map_index->u.number;
++         mp_int i;
++
++         if (map_index->type == T_HANDLE) {
++               index_u = map_index->u.handle->obval.u.number;
++               index_type = *SVALUE_FULLTYPE(&(map_index->u.handle->obval));
++         }
++         i = index_u ^ index_type;
++         i = i ^ i >> 16;
++         i = i ^ i >> 8;
++         i &= hm->mask;
++
++         if (map_index->type == T_HANDLE) {
++          for(mcp = &hm->chains[i]; NULL != (mc = *mcp); ) {
++           if ((mc->key.type == T_HANDLE) &&
++               (*SVALUE_FULLTYPE(&mc->key.u.handle->obval) == index_type) &&
++               (compare_handles(&(mc->key),map_index))) {
++                 int j;
++
++                 *mcp = mc->next;
++                 if (hm->ref) {
++                     mc->next = hm->deleted;
++                     hm->deleted = mc;
++                 } else {
++                     svp = &mc->key;
++                     j = num_values;
++                     do {
++                         free_svalue(svp++);
++                     } while (--j >= 0);
++                     xfree( (char *)mc );
++                 }
++                 hm->used--;
++                 return;
++             }
++             mcp = &mc->next;
++           }
++         } else {
++          for(mcp = &hm->chains[i]; NULL != (mc = *mcp); ) {
++             if (mc->key.u.number == index_u &&
++                 *SVALUE_FULLTYPE(&mc->key) == index_type)
++             {
++                 int j;
++
++                 *mcp = mc->next;
++                 if (hm->ref) {
++                     mc->next = hm->deleted;
++                     hm->deleted = mc;
++                 } else {
++                     svp = &mc->key;
++                     j = num_values;
++                     do {
++                         free_svalue(svp++);
++                     } while (--j >= 0);
++                     xfree( (char *)mc );
++                 }
++                 hm->used--;
++                 return;
++             }
++             mcp = &mc->next;
++           }
++         }
++       } else {
+          struct map_chain **mcp, *mc;
+          p_int index_type = *SVALUE_FULLTYPE(map_index);
+          p_int index_u = map_index->u.number;
+***************
+*** 976,981 ****
+--- 1214,1220 ----
+              }
+              mcp = &mc->next;
+          }
++       }
+      }
+  }
+
+***************
+*** 1492,1500 ****
+
+      data2 = get_map_lvalue((struct mapping *)extra, key, 1);
+      for (i = ((struct mapping *)extra)->num_values; --i >= 0;) {
+!         if (data2->type != T_NUMBER)
+!             free_svalue(data2);
+!         assign_svalue_no_free(data2++, data++);
+      }
+  }
+
+--- 1731,1740 ----
+
+      data2 = get_map_lvalue((struct mapping *)extra, key, 1);
+      for (i = ((struct mapping *)extra)->num_values; --i >= 0;) {
+!       /*        if (data2->type != T_NUMBER)
+!             free_svalue(data2); */
+!       //        assign_svalue_no_free(data2++, data++);
+!         assign_svalue(data2++, data++);
+      }
+  }
+
+Only in /home/daniel/src: mapping.d
+Common subdirectories: ldmud-dev/mudlib and /home/daniel/src/mudlib
+diff -c ldmud-dev/object.c /home/daniel/src/object.c
+*** ldmud-dev/object.c	Thu Dec 10 03:37:36 1998
+--- /home/daniel/src/object.c	Sun Feb 21 13:23:53 1999
+***************
+*** 1546,1551 ****
+--- 1546,1569 ----
+
+  struct replace_ob *obj_list_replace = (struct replace_ob *)0;
+
++
++ void deep_reset_object(ob, arg)
++     struct object *ob;
++     int arg;
++ {
++   struct object *foo;
++  if (closure_hook[arg].type == T_STRING) {
++   foo = current_object;
++   current_object = ob;
++ // Falls die Funktion in dem Objekt selber auch aufgerufen werden soll:
++   sun_do_call_all_inherits(ob,ob->prog, closure_hook[arg].u.string);
++   //    sun_rec_call_all_inherits(ob,ob->prog, closure_hook[arg].u.string);
++   current_object = foo;
++  }
++  /* Als closuehook auch ne closure ? Dann koennte man den deep_pre_rem
++    in der clsoure catchen... Imho aber eher was fuer den Driver. */
++ }
++
+  void replace_programs() {
+      struct replace_ob *r_ob, *r_next;
+      int i,j;
+Common subdirectories: ldmud-dev/pkg and /home/daniel/src/pkg
+diff -c ldmud-dev/prolang.y /home/daniel/src/prolang.y
+*** ldmud-dev/prolang.y	Thu Feb 18 00:46:49 1999
+--- /home/daniel/src/prolang.y	Sat Apr 24 13:09:10 1999
+***************
+*** 1057,1062 ****
+--- 1057,1063 ----
+        case T_SYMBOL:                return TYPE_SYMBOL;
+        case T_QUOTED_ARRAY:        return TYPE_QUOTED_ARRAY;
+        case T_MAPPING:                return TYPE_MAPPING;
++       case T_HANDLE:                return TYPE_HANDLE;
+        default:                        fatal("Bad svalue type at compile time.\n");
+          return TYPE_ANY; /* gag the compiler warning ... */
+      }
+***************
+*** 1083,1094 ****
+--- 1084,1097 ----
+        case T_MAPPING:
+          svp->u.map->ref++;
+          break;
++
+        case T_CLOSURE:
+          if (CLOSURE_MALLOCED(svp->x.closure_type))
+              svp->u.lambda->ref++;
+          else
+              add_ref(svp->u.ob, "ass to var");
+          break;
++      case T_HANDLE: /* $FIXME$ */
+        default:
+          return &const0;
+      }
+***************
+*** 1423,1428 ****
+--- 1426,1432 ----
+   */
+                      struct object *ob;
+                      struct inherit inherit;
++                     int found;
+  %ifdef INITIALIZATION_BY___INIT
+                      int initializer;
+  %endif /* INITIALIZATION_BY___INIT */
+***************
+*** 1456,1467 ****
+                      if (ob->flags & O_APPROVED)
+                          approved_object = 1;
+                      inherit.prog = ob->prog;
+                      inherit.function_index_offset =
+                          mem_block[A_FUNCTIONS].current_size /
+                            sizeof(struct function);
+  %ifdef INITIALIZATION_BY___INIT
+                      initializer = copy_functions(ob->prog, $1[0]);
+!                     if (initializer > 0) {
+                          transfer_init_control();
+                          ins_f_byte(F_CALL_EXPLICIT_INHERITED);
+                          ins_short(mem_block[A_INHERITS].current_size /
+--- 1460,1492 ----
+                      if (ob->flags & O_APPROVED)
+                          approved_object = 1;
+                      inherit.prog = ob->prog;
++        /* Wir haben das Prog. Wenn es virtaul inherited wird, und es
++           schon einmal vritual vorhanden ist, nicht einfuegen. */
++                      found = 0;
++                     if ($1[1] & TYPE_MOD_VIRTUAL) {
++                      struct inherit *c_inh;
++                      c_inh = (struct inherit *)(mem_block[A_INHERITS].block) +
++                              mem_block[A_INHERITS].current_size;
++               for (; c_inh >= (struct inherit *)(mem_block[A_INHERITS].block) ;
++                    c_inh--) {
++                 /* $FIXME$: Is das mit dem v_i_o auch dann gegeben wenn
++                    keine Variablen deklariert werden ? */
++                if ((c_inh->prog == inherit.prog) &&
++                     !(c_inh->variable_index_offset & NON_VIRTUAL_OFFSET_TAG)) {
++                        found = 1;
++                       }
++                     }
++                    }
++                     //                    if (!found) {
++                     if (1) {
+                      inherit.function_index_offset =
+                          mem_block[A_FUNCTIONS].current_size /
+                            sizeof(struct function);
+  %ifdef INITIALIZATION_BY___INIT
+                      initializer = copy_functions(ob->prog, $1[0]);
+!                     copy_variables(ob->prog, $1[1]);
+! //                    if (initializer > 0) {
+!                     if (initializer > -1) {
+                          transfer_init_control();
+                          ins_f_byte(F_CALL_EXPLICIT_INHERITED);
+                          ins_short(mem_block[A_INHERITS].current_size /
+***************
+*** 1471,1477 ****
+                          ins_f_byte(F_POP_VALUE);
+                          add_new_init_jump();
+                      }
+-                     copy_variables(ob->prog, $1[1]);
+  %else  /* INITIALIZATION_BY___INIT */
+                      copy_functions(ob->prog, $1[0]);
+                      copy_variables(ob->prog, $1[1], ob->variables);
+--- 1496,1501 ----
+***************
+*** 1494,1499 ****
+--- 1518,1524 ----
+                      num_virtual_variables =
+                        mem_block[A_VIRTUAL_VAR].current_size /
+                          sizeof (struct variable);
++                     }
+                  }
+  optional_star: /* empty */ { $$ = 0; } | '*' { $$ = TYPE_MOD_POINTER; } ;
+
+***************
+*** 1717,1724 ****
+--- 1742,1751 ----
+  %ifdef MAPPINGS
+          | F_MAPPING { $$ = TYPE_MAPPING; current_type = $$; };
+  %endif
++         | F_HANDLE {$$ = TYPE_HANDLE; current_type = $$; };
+          | F_VOID {$$ = TYPE_VOID; current_type = $$; }
+          | F_MIXED { $$ = TYPE_ANY; current_type = $$; } ;
++
+
+  name_list: new_name
+           | name_list ',' new_name;
+***************
+*** 6908,6914 ****
+      static char buff[100];
+      static char *type_name[] = { "unknown", "int", "string", "void", "object",
+                                   "mapping", "float", "mixed", 0, "closure",
+!                                  "symbol", "quoted_array", };
+      int pointer = 0, reference = 0;
+
+      buff[0] = 0;
+--- 6935,6941 ----
+      static char buff[100];
+      static char *type_name[] = { "unknown", "int", "string", "void", "object",
+                                   "mapping", "float", "mixed", 0, "closure",
+!                 "symbol", "quoted_array", 0, "handle"};
+      int pointer = 0, reference = 0;
+
+      buff[0] = 0;
+***************
+*** 7037,7042 ****
+--- 7064,7076 ----
+  H_NOECHO:         SH(T_CLOSURE) SH(T_STRING), \
+  H_ERQ_STOP:       SH(T_CLOSURE), \
+  H_MODIFY_COMMAND_FNAME: SH(T_STRING), \
++ H_MODIFY_COMMAND_FNAME:         SH(T_STRING), \
++ H_PRE_CREATE_DEEP_HOOK:         SH(T_STRING), \
++ H_POST_CREATE_DEEP_HOOK:        SH(T_STRING), \
++ H_PRE_REMOVE_DEEP_HOOK:         SH(T_STRING), \
++ H_POST_REMOVE_DEEP_HOOK:        SH(T_STRING), \
++ H_NOTIFY_SUCC:    SH(T_CLOSURE) SH(T_STRING), \
++
+
+  #if defined( DEBUG ) && defined ( TRACE_CODE )
+
+diff -c ldmud-dev/simulate.c /home/daniel/src/simulate.c
+*** ldmud-dev/simulate.c	Mon Feb 15 02:12:14 1999
+--- /home/daniel/src/simulate.c	Sat Jul  3 13:37:04 1999
+***************
+*** 32,40 ****
+  #include <ndir.h>
+  #endif /* NDIR */
+  #endif /* not (DIRENT or _POSIX_VERSION) */
+- #if defined(__CYGWIN32__)
+- extern int lstat PROT((char *, struct stat *));
+- #endif
+
+  #include "simulate.h"
+
+--- 32,37 ----
+***************
+*** 565,577 ****
+--- 562,580 ----
+          if (save_current == &dummy_current_object_for_loads) {
+              /* The master object is loaded with no current object */
+              current_object = 0;
++             deep_reset_object(ob,H_PRE_CREATE_DEEP_HOOK);
+              reset_object(ob, H_CREATE_OB - dont_reset);
+              /* If the master inherits anything -Ugh- we have to have
+                 some object to attribute initialized variables to again */
+              current_object = save_current;
++             if (!(ob->flags & O_DESTRUCTED))
++                deep_reset_object(ob,H_POST_CREATE_DEEP_HOOK);
+          } else {
+              current_object = save_current;
++             deep_reset_object(ob,H_PRE_CREATE_DEEP_HOOK);
+              reset_object(ob, H_CREATE_OB - dont_reset);
++             if (!(ob->flags & O_DESTRUCTED))
++                deep_reset_object(ob,H_POST_CREATE_DEEP_HOOK);
+          }
+      }
+      if ( !(ob->flags & O_DESTRUCTED) && function_exists("clean_up",ob) )
+***************
+*** 699,705 ****
+--- 702,711 ----
+      push_object(ob);
+      push_volatile_string(new_ob->name);
+      give_uid_to_object(new_ob, H_CLONE_UIDS, 2);
++     deep_reset_object(new_ob,H_PRE_CREATE_DEEP_HOOK);
+      reset_object(new_ob, H_CREATE_CLONE);
++     if (!(new_ob->flags & O_DESTRUCTED))
++       deep_reset_object(new_ob,H_POST_CREATE_DEEP_HOOK);
+      command_giver = check_object(save_command_giver);
+      /* Never know what can happen ! :-( */
+      if (new_ob->flags & O_DESTRUCTED)
+***************
+*** 969,975 ****
+          }
+          command_giver=save;
+      }
+!     emergency_destruct(ob);
+  }
+
+  /*
+--- 975,984 ----
+          }
+          command_giver=save;
+      }
+!
+!   deep_reset_object(ob,H_PRE_REMOVE_DEEP_HOOK);
+!   emergency_destruct(ob);
+!   deep_reset_object(ob,H_POST_REMOVE_DEEP_HOOK);
+  }
+
+  /*
+***************
+*** 1432,1446 ****
+          struct interactive *ip;
+
+          current_object->flags |= O_ENABLE_COMMANDS;
+!         command_giver = current_object;
+!         if (NULL != (ip = O_GET_INTERACTIVE(command_giver)) &&
+              ip->sent.type == SENT_INTERACTIVE)
+          {
+              trace_level |= ip->trace_level;
+          }
+      } else {
+          current_object->flags &= ~O_ENABLE_COMMANDS;
+!         command_giver = 0;
+      }
+  }
+
+--- 1441,1457 ----
+          struct interactive *ip;
+
+          current_object->flags |= O_ENABLE_COMMANDS;
+!         // SiliconDream: musn't change this... (sun)
+!         //        command_giver = current_object;
+!
+!         if (NULL != (ip = O_GET_INTERACTIVE(current_object)) &&
+              ip->sent.type == SENT_INTERACTIVE)
+          {
+              trace_level |= ip->trace_level;
+          }
+      } else {
+          current_object->flags &= ~O_ENABLE_COMMANDS;
+!         //        command_giver = 0;
+      }
+  }
+
+***************
+*** 2122,2131 ****
+      struct object *ob;
+      struct interactive *ip;
+
+!     if (sp->type != T_OBJECT)
+          bad_xefun_arg(1, sp);
+      ob = sp->u.ob;
+      command_giver = ob;
+      if (NULL != (ip = O_GET_INTERACTIVE(ob)) &&
+          ip->sent.type == SENT_INTERACTIVE)
+      {
+--- 2133,2145 ----
+      struct object *ob;
+      struct interactive *ip;
+
+!     if ((sp->type != T_OBJECT) &&
+!        !((sp->type == T_NUMBER) && (sp->u.number == 0)))
+          bad_xefun_arg(1, sp);
+      ob = sp->u.ob;
+      command_giver = ob;
++     if (!ob) return sp - 1;
++
+      if (NULL != (ip = O_GET_INTERACTIVE(ob)) &&
+          ip->sent.type == SENT_INTERACTIVE)
+      {
+***************
+*** 2240,2247 ****
+              break;
+          *p = '\0';
+      }
+!     if (buff[0] == '\0')
+!         return 0;
+      clear_notify();
+      if (special_parse(buff))
+          return 1;
+--- 2254,2261 ----
+              break;
+          *p = '\0';
+      }
+!     /* for Silicondream (sunblade)  if (buff[0] == '\0')
+!         return 0; */
+      clear_notify();
+      if (special_parse(buff))
+          return 1;
+***************
+*** 2265,2277 ****
+          struct marked_command_giver *new_marked;
+
+          new_marked = (struct marked_command_giver *)xalloc(sizeof *new_marked);
+!         new_marked->object = command_giver;
+          new_marked->erp = error_recovery_pointer;
+          new_marked->marker = 0;
+          new_marked->next = last_marked;
+          last_marked = new_marked;
+      }
+!     for (s = command_giver->sent; s; s = s->next) {
+          struct svalue *ret;
+          struct object *command_object;
+          unsigned char type;
+--- 2279,2291 ----
+          struct marked_command_giver *new_marked;
+
+          new_marked = (struct marked_command_giver *)xalloc(sizeof *new_marked);
+!         new_marked->object = save_command_giver;
+          new_marked->erp = error_recovery_pointer;
+          new_marked->marker = 0;
+          new_marked->next = last_marked;
+          last_marked = new_marked;
+      }
+!     for (s = save_command_giver->sent; s; s = s->next) {
+          struct svalue *ret;
+          struct object *command_object;
+          unsigned char type;
+***************
+*** 2423,2432 ****
+      free_sentence(mark_sentence);
+      pop_marked_command_giver();
+      if (s == 0) {
+!         notify_no_command(buff);
+          return 0;
+      }
+!     return 1;
+  }
+
+  /*
+--- 2437,2447 ----
+      free_sentence(mark_sentence);
+      pop_marked_command_giver();
+      if (s == 0) {
+!         notify_no_command(buff,save_command_giver);
+          return 0;
+      }
+!   notify_succ_command(buff,save_command_giver);
+!   return 1;
+  }
+
+  /*
+***************
+*** 3205,3210 ****
+--- 3220,3452 ----
+
+  static char emsg_buf[2000];
+
++
++ /* $FIXME$ : merge the two functions when ive got time
++    new-error does the handling for raise-caller-error.
++    For the time being, ive just copied the whole thing and made
++    it work like desired. */
++ #ifdef __STDC__
++ void new_error(int to_blame, char *fmt, ...)
++ #else
++ #if SIZEOF_P_INT != 4
++ You need an Ansi C compiler to get this right.
++ #endif
++ /*VARARGS1*/
++ void new_error( int to_blame, fmt, a, b, c, d, e, f, g, h)
++     char *fmt;
++     int a, b, c, d, e, f, g, h;
++ #endif
++ {
++     char *object_name;
++     struct object *save_cmd;
++     struct svalue *svp;
++     int do_save_error;
++     char *file, *malloced_error, *malloced_file = 0, *malloced_name = 0;
++     char fixed_fmt[200];
++     mp_int line_number = 0;
++ #ifdef __STDC__
++     int a;
++     va_list va;
++ #endif
++
++     fmt = limit_error_format(fixed_fmt, fmt);
++ #ifdef __STDC__
++     va_start(va, fmt);
++ #endif
++     if (current_object)
++         assign_eval_cost();
++     remove_command_giver_markers();
++     if (num_error && error_recovery_pointer->type <= ERROR_RECOVERY_APPLY) {
++         static char *times_word[] = {
++           "",
++           "Double",
++           "Triple",
++           "Quadruple",
++         };
++         debug_message(
++           "%s fault, last error was: %s",
++           times_word[num_error],
++           emsg_buf + 1
++         );
++     }
++ #ifdef __STDC__
++     vsprintf(emsg_buf+1, fmt, va);
++     va_end(va);
++ #else
++     sprintf(emsg_buf+1, fmt, a, b, c, d, e, f, g, h);
++ #endif
++     emsg_buf[0] = '*';  /* all system errors get a * at the start */
++     if (error_recovery_pointer->type >= ERROR_RECOVERY_CATCH) {
++         /* user catches this error */
++         catch_value.type = T_STRING;
++         catch_value.x.string_type = STRING_MALLOC;        /* Always reallocate */
++         catch_value.u.string = string_copy(emsg_buf);
++         longjmp(error_recovery_pointer->con.text, 1);
++         fatal("Catch() longjump failed");
++     }
++     num_error++;
++     if (num_error > 3)
++         fatal("Too many simultaneous errors.\n");
++     debug_message("%s", emsg_buf+1);
++     do_save_error = 0;
++     if ( NULL != (malloced_error = xalloc(strlen(emsg_buf)/* -1 for *, +1 for \0 */)) ) {
++         strcpy(malloced_error, emsg_buf+1);
++     }
++     if (current_object) {
++         struct control_stack *old_csp;
++         struct object *old_ob;
++         struct program *old_prog;
++         char *old_pc;
++         char *old_funstart;
++
++ extern struct control_stack *csp;
++ extern struct program *current_prog;
++ extern char *inter_pc;
++
++         old_ob = current_object;
++         old_csp = csp;
++         old_prog = current_prog;
++         old_pc = inter_pc;
++         old_funstart = csp->funstart;
++
++         //        csp -= to_blame;
++         if (to_blame != 0) {
++          current_object = csp->ob;
++          current_prog = csp->prog;
++          inter_pc = csp->pc;
++          csp->funstart = csp[-1].funstart;
++         }
++
++         line_number = get_line_number_if_any(&file);
++         debug_message("program: %s, object: %s line %ld\n",
++                     file,
++                     current_object->name,
++                     line_number);
++         if (current_prog && num_error < 3) {
++             do_save_error = 1;
++         }
++         if ( NULL != (malloced_file = xalloc(strlen(file) + 1)) ) {
++             strcpy(malloced_file, file);
++         }
++         if ( NULL != (malloced_name = xalloc(strlen(current_object->name) + 1)) ) {
++             strcpy(malloced_name, current_object->name);
++         }
++
++       inter_pc = old_pc;
++       csp->funstart = old_funstart;
++       csp = old_csp; /* damit korrekt gepoppt wird */
++       current_object = old_ob;
++       current_prog = old_prog;
++
++
++     }
++     object_name = dump_trace(num_error == 3);
++     fflush(stdout);
++     if (error_recovery_pointer->type == ERROR_RECOVERY_APPLY) {
++         printf("error in function call: %s", emsg_buf+1);
++         if (current_object) {
++             printf("program: %s, object: %s line %ld\n",
++               file,
++               current_object->name,
++               line_number
++             );
++         }
++         current_error = malloced_error;
++         current_error_file = malloced_file;
++         current_error_object_name = malloced_name;
++         current_error_line_number = line_number;
++         if (out_of_memory) {
++             if (malloced_error)
++                 xfree(malloced_error);
++             if (malloced_file)
++                 xfree(malloced_file);
++             if (malloced_name)
++                 xfree(malloced_name);
++         }
++         longjmp(error_recovery_pointer->con.text, 1);
++     }
++     /*
++      * The stack must be brought in a usable state. After the
++      * call to reset_machine(), all arguments to error() are invalid,
++      * and may not be used any more. The reason is that some strings
++      * may have been on the stack machine stack, and have been deallocated.
++      */
++     reset_machine (0);
++     if (do_save_error) {
++         save_error(emsg_buf, file, line_number);
++     }
++     if (object_name) {
++         struct object *ob;
++         ob = find_object(object_name);
++         if (!ob) {
++             if (command_giver && num_error < 2)
++                 add_message("error when executing program in destroyed object %s\n",
++                             object_name);
++             debug_message("error when executing program in destroyed object %s\n",
++                         object_name);
++         }
++     }
++     if (num_error == 3) {
++         debug_message("Master failure: %s", emsg_buf+1);
++     } else if (!out_of_memory) {
++         assigned_eval_cost = eval_cost -= MASTER_RESERVED_COST;
++         push_volatile_string(malloced_error);
++         a = 1;
++         if (current_object) {
++             push_volatile_string(malloced_file);
++             push_volatile_string(malloced_name);
++             push_number(line_number);
++             a += 3;
++         }
++         save_cmd = command_giver;
++         apply_master_ob(STR_RUNTIME, a);
++         command_giver = save_cmd;
++         if (current_heart_beat) {
++             struct object *culprit;
++
++             culprit = current_heart_beat;
++             current_heart_beat = 0;
++             set_heart_beat(culprit, 0);
++             debug_message("Heart beat in %s turned off.\n",
++                           culprit->name);
++             push_object(culprit);
++             push_volatile_string(malloced_error);
++             a = 2;
++             if (current_object) {
++                 push_volatile_string(malloced_file);
++                 push_volatile_string(malloced_name);
++                 push_number(line_number);
++                 a += 3;
++             }
++             svp = apply_master_ob(STR_HEART_ERROR, a);
++             command_giver = save_cmd;
++             if (svp && (svp->type != T_NUMBER || svp->u.number) ) {
++                 set_heart_beat(culprit, 1);
++             }
++         }
++         assigned_eval_cost = eval_cost += MASTER_RESERVED_COST;
++     }
++     if (malloced_error)
++         xfree(malloced_error);
++     if (malloced_file)
++         xfree(malloced_file);
++     if (malloced_name)
++         xfree(malloced_name);
++     num_error--;
++     if (current_interactive) {
++         struct interactive *i;
++
++         i = O_GET_INTERACTIVE(current_interactive);
++         if (i && i->sent.type == SENT_INTERACTIVE && i->noecho & NOECHO_STALE) {
++             set_noecho(i, 0);
++         }
++     }
++     if (error_recovery_pointer->type != ERROR_RECOVERY_NONE)
++         longjmp(error_recovery_pointer->con.text, 1);
++     abort();
++ }
++
++
+  #ifdef __STDC__
+  void error(char *fmt, ...)
+  #else
+***************
+*** 4356,4359 ****
+--- 4598,4617 ----
+          }
+      }
+      return sp;
++ }
++
++
++ struct svalue *f_num_variables (struct svalue *sp) {
++  int lauf1;
++  struct object *ob;
++
++  if (sp->type != T_OBJECT)  {
++   bad_xefun_arg(1, sp);
++  }
++
++  ob = sp->u.ob;
++  decr_object_ref(ob, "num_var");
++  sp->type = T_NUMBER;
++  sp->u.number = ob->prog->num_variables;
++  return sp;
+  }
+diff -c ldmud-dev/swap.c /home/daniel/src/swap.c
+*** ldmud-dev/swap.c	Thu Dec 10 03:37:36 1998
+--- /home/daniel/src/swap.c	Sat May  1 14:40:20 1999
+***************
+*** 605,610 ****
+--- 605,653 ----
+              rest = tmp->rest;
+              break;
+            }
++
++         case T_HANDLE: {
++                  mp_int len, size;
++
++                if (!(swapping_alist || svp->u.handle->idval.type != T_STRING)) {
++                   len = strlen(svp->u.handle->idval.u.string) + 1;
++                   size = 1 + sizeof svp->u.handle->idval.x + len;
++                 } else {
++                   size = sizeof(*svp);
++                 }
++
++
++                  CHECK_SPACE(sizeof(svp->x) + 1 + sizeof(*svp) + size)
++                    /* handle + obval  + idval */
++                  *p++ = svp->type;
++                  rest--;
++                  ADD_TO_BLOCK(svp->x)
++
++                 /* $FIXME$ */
++                 /* Den Obval swappen */
++
++                 *p++ = svp->u.handle->obval.type;
++                 rest--;
++                 ADD_TO_BLOCK(svp->u.handle->obval.x)
++                 ADD_TO_BLOCK(svp->u.handle->obval.u)
++
++                 if (swapping_alist || svp->u.handle->idval.type != T_STRING) {
++                  *p++ = svp->u.handle->idval.type;
++                  rest--;
++                  ADD_TO_BLOCK(svp->u.handle->idval.x)
++                  ADD_TO_BLOCK(svp->u.handle->idval.u)
++                 } else {
++                  *p++ = svp->u.handle->idval.type | T_MOD_SWAPPED;
++                  memcpy((char *)p, &svp->u.handle->idval.x,
++                          sizeof(svp->u.handle->idval.x));
++                  p += sizeof svp->u.handle->idval.x;
++                  memcpy((char *)p, svp->u.handle->idval.u.string, len);
++                  p += len;
++                  rest -= size;
++                 }
++                 break;
++                }
++
+            case T_NUMBER:
+            case T_FLOAT:
+            case T_OBJECT:
+***************
+*** 670,675 ****
+--- 713,725 ----
+  {
+      for (; --num >= 0; svp++) {
+          switch(*p) {
++           case T_HANDLE : {
++             /* $FIXME$ */
++            p += 1 + sizeof svp->x ;
++            p = free_swapped_svalues(&(svp->u.handle->obval),1,p);
++            p = free_swapped_svalues(&(svp->u.handle->idval),1,p);
++            break;
++           }
+            case T_STRING | T_MOD_SWAPPED:
+              if (svp->x.string_type == STRING_MALLOC) {
+                  if (!garbage_collection_in_progress)
+***************
+*** 680,685 ****
+--- 730,736 ----
+                  break;
+              }
+              /* else fall through */
++
+            case T_SYMBOL | T_MOD_SWAPPED:
+              if (!garbage_collection_in_progress)
+                  free_string(svp->u.string);
+***************
+*** 867,872 ****
+--- 918,937 ----
+      for (;--num >= 0; svp++) {
+          svp->type = *p & ~T_MOD_SWAPPED;
+          switch(*p++) {
++           case T_HANDLE : {
++            svp->type = T_HANDLE;
++            /* den generic-Content wiiederherstellen */
++            memcpy((char *)&svp->x, p, sizeof svp->x);
++            p += sizeof svp->x;
++            svp->u.handle = xalloc(sizeof(struct handle));
++            /* $FIXME$ : Out Of Memory is nicht gut hier.
++            * $FIXME$: Da unten wird clear_svalues benutzt. Irgendwie scheint
++                       mir das nicht ganz korrekt.*/
++            p = read_unswapped_svalues(&(svp->u.handle->obval),1,p);
++            p = read_unswapped_svalues(&(svp->u.handle->idval),1,p);
++            break;
++           }
++
+            case T_STRING | T_MOD_SWAPPED:
+            case T_SYMBOL | T_MOD_SWAPPED:
+            {
+Common subdirectories: ldmud-dev/util and /home/daniel/src/util
+Common subdirectories: ldmud-dev/wk and /home/daniel/src/wk

@@ -1,0 +1,12 @@
+SYNOPSIS
+        string capitalize(string str)
+
+DESCRIPTION
+        Convert the first character in str to upper case, and return
+        the new string.
+
+EXAMPLES
+        capitalize("heya!") -> "Heya!"
+
+SEE ALSO
+        lower_case(E), upper_case(E)

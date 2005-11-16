@@ -1,0 +1,41 @@
+Short: Get rid of the hardcoded status... commands
+Date: Mon, 14 Dec 1998 11:33:40 +0100
+Type: Feature
+State: Acknowledged
+
+Freaky suggested to add a privilege check to the user commands
+'dumpallobj', 'malloc' and 'status', like it is done already for
+'showsmallnewmalloced'. However, he'd like to see all the checks done in
+the master function privilege_violation(), so that the master object
+does not need to know about wizards at all. The efun set_is_wizard()
+would become useless, too.
+
+--- Freaky wrote: ---
+Die Driver-Befehle 'dumpallobj' 'malloc' 'status' und 'status <parameter>'
+sollten alle (wie auch schon showsmallnewmalloced) im Master abgefragt
+werden, ob derjenige, der das eingibt, das ueberhaupt darf.
+Dazu gibt es ja schon 'master::query_player_level(string what, object ob)'
+Momentan kann man nicht verhindern, dass jemand ein 'dumpallobj' ausfuehrt.
+
+Die Master-Funktion ist meiner Meinung nach allerdings etwas ungluecklich
+gewaehlt. Man koennte das auch ueber die privilege_violation regeln, wo die
+ganze Sache besser aufgehoben waere.
+------
+
+The functionality should be put into debug_info(), which is modified to
+return a string for these functions.
+
+In order to be compatible with MudOS, the sefuns
+
+    string malloc_status();
+    string mud_status(int default: 0);
+    void dumpallobj(string | void);
+
+should be provided.
+-----
+Logic says:
+
+Agreed 100%. MHO, but I really think efuns should only be returning
+machine-parsable data. It's up to the programmer to decide how a
+human-readable presentation should be produced.
+

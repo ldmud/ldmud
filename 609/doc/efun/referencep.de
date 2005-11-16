@@ -1,0 +1,13 @@
+SYNOPSIS
+        int referencep(mixed arg)
+
+BESCHREIBUNG
+        Liefert 1, wenn das Argument an die aktuelle Funktion per Referenz
+        uebergeben wurde, ansonsten 0.
+
+        Man beachte, dass das Argument als Referenz an referencep()
+        uebergeben werden muss, z. B. referencep(&x).
+
+SIEHE AUCH
+        closurep(E), floatp(E), mappingp(E), objectp(E), intp(E),
+        pointerp(E), stringp(E), symbolp(E), clonep(E), references(LPC)
