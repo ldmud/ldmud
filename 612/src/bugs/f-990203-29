@@ -1,0 +1,22 @@
+Short: Some sort if 'idle' detection
+From: Daniel von Dincklage <vondincklage@usa.net>
+Date: Mon, 22 Jun 1998 00:53:36 +0200
+Type: Feature
+State: Unclassified
+
+> - An idle-loop that gets called in the master if the driver has nothing
+>   better to do [no input arriving for e.g. .5 sec].
+>   Could be used to perform resetting of objects or GC while nobody is
+>   looking.
+
+Already doable, sorta. ;-) A combination of a master call_out() and
+something like if( sizeof( filter_array( users(), #'query_idle ) ) ) could
+probably pull off the desired effect.
+
+I can't imagine a mud with regular call_out()'s scheduled ever being
+completely idle though...daemon objects will certainly keep things awake.
+Just doing a call_out() every so often should be sufficient, I would
+think...
+
+
+Maybe an efun giving the time since the last action?

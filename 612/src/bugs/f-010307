@@ -1,0 +1,450 @@
+Short: LDMUD - Driver - Idea: Short(est) Path Algorithms
+From: Andy <Andreas.Klauer@epost.de>
+To: lars@bearnip.com
+Date: Wed, 7 Mar 2001 23:11:03 +0100
+Type: Feature
+State: New
+
+Hi Lars,
+
+for a long time, finding a short(est) path from one point to another was a
+great problem for many computer games. Today it isn't a problem anymore for
+games, since fast and efficient algorithms for almost every situation can be
+found on the net, and newer machines are fast enough to compute those paths in
+real-time.
+
+In MUDs, finding a short(est) path is still a great problem, but it becomes (at
+least I think so) more and more important, because players want to have more
+intelligent NPCs, Monsters that follow and hunt players, NPCs in towns who
+arent always in the same room... and also special units, like horses who follow
+a road by themselves, or ships which connect different continents.
+
+Some wizards in UNItopia had these problems and tried to do these shortest path
+algorithms in LPC. It works, but its very slow... some load all rooms and make
+a database of all exits of the rooms once, which takes loads of RAM... others
+load and check rooms in runtime, thats very slow.
+
+Other problems, like the ships, can't be solved at all... in UNItopia, the
+ships make large 'hops' (because its not the best thing to load 1000 rooms for
+every player who wants to drive 1000 sea-miles with his ship...). But that has
+the effect, that on some places players can 'hop' with their ships over land.
+
+LPC is just not fast enough to make a really efficient short(est) path
+algorithm... additionally, in LPC you normally have (as long as you don't have
+a master which saves a whole database...) to load a whole room first before you
+can see wether a unit (ship, for example) can enter the room or not.
+
+So, my idea was, that it could be possible to implement a short(est) path
+routine into the driver. Because most muds use the standard 8 directions:
+north, west, south, east, northeast, ..., and most of the time there are
+just 2 cases: something can move there oder not, something like a 2dimensional
+bitmatrix would be a great thing, and useable in most muds for most of these
+problems.
+
+A map of a town could then look like the following:
+00000000000000000000000
+00001001001000000000000
+00011111111000010000000
+00000000001111110000000
+01000000110000011111111
+01010001100010010000000  (the 1 are the positions where players can walk on...)
+11111111100011110000000
+00010001000010010000000
+00010001110000011111111 
+00000001000000000000000
+00000001000000000000000
+
+Or, for an island a ship cant drive on, it could look like this:
+00001000000000000000000
+00111001100000100000000 
+00011111110000111110000
+00000011110101111111000
+00000001111111111100000
+00011111111111111111000  (the 1 are land mass where ships can't drive on)
+01111111110000000000000
+00011111111111000000000
+00000011111100000000000 
+00000000001111110000000
+00000000000011110000000
+
+In UNItopia, such continents are up to 1000*1000 fields large (which would make
+it somewhat inefficient to save it in another format than bits...)
+
+As you may already have noticed, I'm not an Informatician at all. I don't know
+how fast something like this would be if it was implemented in the driver (and
+some new bitmatrixlike-datatype for LPC), or if something like that can be
+implemented in the driver at all. It's just one of my crazy ideas...
+
+With such a matrix, there could be functions which cut out submatrixes of a
+large matrix, a line function that tells if on a line from (x1|y1) to (x2|y2)
+are just 0's or just 1's or some 0's and 1's, and of course a short(est) path
+from point A to B, or from point A to a border of the matrix, or something
+similar... in this function one should be able to specify which of the 8
+directions are possible, if 0's or 1's can be walked on and so on...
+
+So, thats my idea. Something that may be possible and may be useful for many
+muds.
+
+You know the driver - of course - much better than I do. And certainly you know
+muds better than I do. And you are a much better programmer than I am.
+
+What do you think - is there a possibility to implement something like this?
+
+Greetings,
+
+Menaures@UNItopia (I'm not an admin, just a little wizard who doesn't know
+much 'bout all this stuff;)
+
+---------------------------------------------------------------------------
+Date: Tue, 13 Mar 2001 00:54:29 -0700
+From: Acius <helpsfamily@home.com>
+
+Yeah I like this idea. Path finding on a 2d grid is good, My only 
+suggestion would be to use 1 byte per cell (0 = no passage, any other 
+number = cost) so that you can have variable-cost maps (allows NPC's to 
+favor roads over dark and dangerous forests, for example). For more info 
+on that, look up A-star (A*), which is probably the best algorithm for 
+this kind of problem.
+
+A-star info, and pathfinding in general can be found at:
+http://theory.stanford.edu/~amitp/GameProgramming/
+
+As for arbitrary n-dimensional maps, it's a different problem -- 
+basically a more general version of the 2d plane problem, and with no 
+cheap way to find out if you are closer or further from your 
+destination. Since rooms on most MUDs are usually implemented as 
+connected graphs with an arbitrary number of exits which can connect to 
+anywhere, solving the problem by modelling the rooms as a connected 
+graph is useful.
+
+The main problem is that the driver has to be "exit-aware". So far, 
+exits are implemented at the MUDlib level, and the driver doesn't know 
+about them. Because the driver needs to know exits for lots of rooms all 
+at once, and because pathfinding may be used often, it is not efficient 
+to query exits from the rooms each time you try to find a path. It is 
+better, I believe, if the rooms proactively tell the driver what their 
+exits are in advance with a call to an efun (set_exit_connections, 
+perhaps) which passes an array of objects and/or filenames to the 
+driver, so it can trace from room to room. This would be stored with a 
+pointer in the object structure probably.
+
+Here is some quick pseudocode on how a pathfinder might work:
+
+Queue q;
+           // A queue of nodes we have visited and which
+           // we need to recurse outward from.
+Object curr;  // The current node we're focusing on.
+Mapping visited;
+           // Tracks nodes you've visited; also provides
+           // a backward trace so you can figure out the
+           // path when you're done.
+
+QueuePush( q, starting_room );
+visited = EMPTY_MAPPING;
+MappingAdd( visited, starting_room, NULL );
+while( !q.empty() ) {
+    curr = QueuePop( q );
+    if( curr = destination ) break;
+    for (Loop "i" through each exit attached to curr)
+    if( !MappingMember(visited, curr.exit[i]) ) {
+       QueuePush( q, curr.exit[i] );
+       MappingAdd(visited, curr.exit[i], curr);
+    }
+}
+
+if( curr == destination ) {
+    // Figure out the path by tracing it backward through
+    // the mapping we made.
+}
+
+This algorithm is a breadth-first search. So it examines all rooms that 
+are one exit away, then all rooms that are two exits away, then three 
+exits, etc. It keeps doing this until it finds the final room. Each room 
+remembers the room before it in the recursion, so you can trace a path 
+backward. I think of this like an "expanding balloon" of rooms starting 
+at the beginning place, and stopping when the balloon reaches the 
+destination.
+
+Another good technique is to make TWO expanding balloons, one from the 
+starting point and one from the destination point. You accomplish this 
+by putting both the starting and ending points on the queue. As soon as 
+one of them runs into a node from the other balloon, you trace paths 
+backwards through both and connect them together for the final path. 
+This is much harder to code, but would probably be more efficient (maybe 
+2-4x as fast?). The trick is testing for intersection between the 
+"balloons", probably with a special mapping again.
+
+That's all I have. It's late, so I apologize for any incoherency or 
+oversights. Best of luck to Lars with this feature, I'm hoping to use it 
+already :).
+
+-- Acius (Adam Helps)
+
+---------------------------------------------------------------------------
+Date: Tue, 13 Mar 2001 08:58:00 +0100 (MET)
+From: Fini <ujastrow@hasyl04.desy.de>
+To: amylaar-users@nightfall.org
+Subject: Re: [amylaar-users]: Fwd: Idea: Short(est) Path Algorithms
+
+
+> A map of a town could then look like the following:
+> 00000000000000000000000
+> 00001001001000000000000
+Somewhere you need to assign pathnames to the 0s and 1s. Thats the
+same problem you have in LPC. We have some differend path machines
+running in our mud - speed is ok (but we aren't as large as unitopia)
+but what really bothers is the memory usage for all those pathnames.
+The speed to find the shortest path (with one of the well known algos)
+is no problem here (for distances of maybe 100 rooms).
+
+If you just implement 2d or 3d bitmaps and some path algorithm I cannot
+see any improvement on lpc solutions.
+
+And to be frank - I think there are more important things to do that
+this ;o)
+
+
+
+  Fiona @ Wunderland
+
+
+---------------------------------------------------------------------------
+Date: Tue, 13 Mar 2001 09:35:58 +0100 (MET)
+From: Fini <ujastrow@hasyl04.desy.de>
+To: acius@bigfoot.com
+Cc: amylaar-users@nightfall.org
+Subject: Re: [amylaar-users]: Re: Short(est) Path Algorithms
+
+> This algorithm is a breadth-first search. So it examines all rooms that 
+> are one exit away, then all rooms that are two exits away, then three 
+> exits, etc.
+> [...] an "expanding balloon"
+
+In my experiance rooms in muds are not that much connected, you have some
+paths with no extra exits at all for 5 rooms and so on. So this very
+basic approach is really slow compared to more intelligent algos which
+take the room graph into account - means having nodes and interconnecting
+bows.
+
+While the baloon-method needs different and more and more time heres a
+snippet of http://ciips.ee.uwa.edu.au/~morris/Year2/PLDS210/dijkstra.html
+(just the first I found an yahoo with 'djikstra' as search keyword).
+
+> Djikstra's algorithm (named after its discover, E.W. Dijkstra) solves
+> the problem of finding the shortest path from a point in a graph
+> (the source) to a destination. It turns out that one can find the
+> shortest paths from a given source to all points in a graph in the
+> same time, hence this problem is sometimes called the single-source
+> shortest paths problem. 
+>
+> The somewhat unexpected result that all the paths can be found as
+> easily as one further demonstrates the value of reading the literature
+> on algorithms! 
+
+The last sentence is the most important :*)
+
+
+   Fiona @ Wunderland
+
+
+---------------------------------------------------------------------------
+Date: Tue, 13 Mar 2001 19:31:25 +0100 (MET)
+From: Fini <ujastrow@hasyl04.desy.de>
+To: acius@bigfoot.com
+Subject: Re: [amylaar-users]: Re: Short(est) Path Algorithms
+
+Hi!
+
+> The "balloon" algorithm I described does not mean a balloon-shaped object
+I know your algo well enough ;o) its normally the first approch to that
+kind of problem.
+
+> compute per node, however it does handle edge cost (the method I gave
+> assumes all edges are the same cost).
+No problem to introduce edge cost in your algo, is it ;o)
+
+> in O(n) time [...]
+Btw complexity of the balloon in light graphs should be O((E+V)log V) ;o)
+
+> Yes, very true, but be careful that you understand my algorithm before 
+> picking it apart. It is the same order of time.
+There are some different algorithms for different types of typical or
+expected data. Choosing the right algorithm for the given situation is
+the problem - not the implementation of some well known algorithm.
+
+I dont pick your balloon apart, I just state that there is another algo
+which performes better with the given data (at least in our mud and our
+typical interconnections of rooms). No offence intended.
+
+Fini
+
+---------------------------------------------------------------------------
+Date: Tue, 13 Mar 2001 10:37:54 +0100 (MET)
+From: Jacob 'Ugh' Wieland <ughosage@cs.tu-berlin.de>
+To: acius@bigfoot.com
+Cc: amylaar-users@nightfall.org
+Subject: Re: [amylaar-users]: Re: Short(est) Path Algorithms
+
+Maybe the problem should be approached from
+the same angle as in reality (where the same problem exists).
+
+There, the 'world' is organized hierarchically into 'regions'
+(graphically speaking kinds of 'strongly connected components')
+for which there exist
+ - local maps (connecting actual locations),
+ - country-maps (connecting the cities),
+ - continent-maps (connecting the countries) and
+ - world-maps (connecting the continents).
+
+Each node needs some connection-points for the next-higher level
+(city exits, borders-stations/mountain-passes, ports).
+
+Thus, the complexity of the path-finding-problem to be solved
+depends on the 'locality' of the source and destination (and possible
+means of travel, of course :-)) meaning which hierarchical
+boundaries have to be traversed.
+
+Normally, the amount of actual nodes in each graph isn't that
+high and the path-density decreases with each level. Thus, it
+should neither be a problem to either compute the local
+connections at runtime or once and for all for a database which
+shouldn't be so large, either.
+
+Thus, you (pre-)compute only the connections between nodes of the
+same hierarchy and compute the global path from these by finding
+the paths to the different connection points from the lower
+and the higher hierarchy.
+
+If you want to find the routes from a tavern in one city to a tavern in a
+city on another continent
+- look for paths to exits of that city
+- look for paths from exits of that city to exits of the country of the city
+- look for paths from exits of the country to exits of the continent of the country
+- look for paths from exits of the continent to entries of the continent of
+  the country of the other city
+- look for paths from entries of the target-continent to entries of
+  the target-country
+- look for paths from entries of the target-country to entries of the
+  target-city
+- look for paths from entries of the target-city to the target tavern
+--> compute the different routes (shortest paths or whatever) on this
+    probably very small subgraph (you can rule out unacceptable paths
+    - too long, too expensive, wrong means of travel, etc. - on each level
+    to cut down the complexity of the overall problem)
+
+For shortest/all paths (and related) problems, the Floyd-Warshall-Algorithm
+has a good complexity (though not the best).
+
+for all bridge(s) in nodes
+  for all start(s) in nodes
+    if there are paths from start to bridge
+      for all goal(s) in nodes
+        if there are paths from bridge to goal
+          connect the paths from start to bridge with the paths from
+          brige to goal and add them to the paths from start to goal
+
+Ugh, the Lib Orang-Utan of TubMud
+
+---------------------------------------------------------------------------
+Date: Tue, 13 Mar 2001 19:59:18 -0700
+From: Acius <helpsfamily@home.com>
+
+Oops, sorry to send this to Jacob twice. I meant to post it to the 
+mailing list the first time.
+
+Jacob 'Ugh' Wieland wrote:
+ > Maybe the problem should be approached from
+ > the same angle as in reality (where the same problem exists).
+ >
+ > There, the 'world' is organized hierarchically into 'regions'
+ > (graphically speaking kinds of 'strongly connected components')
+ > for which there exist
+ >  - local maps (connecting actual locations),
+ >  - country-maps (connecting the cities),
+ >  - continent-maps (connecting the countries) and
+ >  - world-maps (connecting the continents).
+ >
+ > Each node needs some connection-points for the next-higher level
+ > (city exits, borders-stations/mountain-passes, ports).
+
+<snip>
+
+Yes, this is a good idea. The method I gave (where each room reports its
+exits) can work for this problem, if you make an object for each area,
+an object for each country, an object for each continent, etc. You would
+implement it like this:
+
+Rooms only report connections to other rooms in their area.
+
+The area stores which rooms are connected to other areas, and reports
+connections to other areas (as if they were rooms).
+
+The country stores which areas have connections to other countries,
+and reports its connections to other countries.
+
+... same goes for countries connected on continents, and continents
+connected on the world. There might be some interesting messing around
+when you hit oceans, but the same principle can be used.
+
+Then, at the MUDlib level when you want to find a path, you would
+start by querying the path between the two continents, then between
+the areas and the edges of the continent where they are connected,
+then between the rooms connecting each area object (these can be
+cached), and also the rooms in the endpoint area objects. You can do
+this all in the MUDlib without extra driver support.
+
+Also, Fiona points out that Dijkstra gives a better solution to path 
+finding if you have edge costs. Since edge costs are very useful (they 
+help persuade NPC's to stick to roads, etc.) it is probably better to do 
+it this way. Perhaps you can do it this way:
+
+set_connections( borders, costs );
+
+Where borders is an array of objects, and costs is an array of integers. 
+The two arrays would be in parallel. If an array of costs is not 
+included, you can assume ({ 1, 1, 1, ... }) to match the number of borders.
+
+-- Acius
+
+---------------------------------------------------------------------------
+Date: Thu, 22 Mar 2001 11:49:58 +0800
+From: Trevor Phillips <phillips@central.murdoch.edu.au>
+
+Eeek! Have I ignored/missed interesting discussion on this list? Or has it been
+on some other list I'm not on??
+
+I dabbled with path finding years ago (assuming we're talking the auto-routing
+from one room to another room, useful for Monster navigation, etc...), and had
+a working model, but it was computationally intensive such that on the server
+at the time it'd give "too long eval" too often to be practical.
+
+Rooms is probably the most developed std object on our Mud, with rooms having
+dimensions (rough NS/EW/Height), as well as properties like indoors/outdoors,
+etc... The dimensions allowed an auto-mapper to fairly accurately map an area,
+keeping in perspective (given that some rooms are tiny, and others are huge),
+so it all matched up and actually looked reasonable on an auto-generated ASCII
+map. The World Co-ordinates were set at particular rooms, and then coords for
+each room were calculated based on the adjacent rooms, and room dimensions.
+
+But, I digress. As I said, path-finding held great interest to me, but was too
+slow. I planned to experiment with ERQ and an external process for calculating
+the routes in a non-realtime manner. eg; Each room's properties are logged to a
+MySQL table, and an external program uses the data to calculate a possible
+shortest route from one room to another. I never got the time to get it up and
+going, though...
+
+Anyway, I'm interested in this topic, so'd be most appreciative if you can
+forward any info on plans, etc...
+
+Thanks. ^_^
+
+-- 
+. Trevor Phillips             -           http://jurai.murdoch.edu.au/ . 
+: CWIS Systems Administrator     -           T.Phillips@murdoch.edu.au : 
+| IT Services                       -               Murdoch University | 
+ >------------------- Member of the #SAS# & #CFC# --------------------<
+| On nights such as this, evil deeds are done. And good deeds, of     /
+| course. But mostly evil, on the whole.                             /
+ \      -- (Terry Pratchett, Wyrd Sisters)                          /
+---------------------------------------------------------------------------
+
