@@ -1,0 +1,19 @@
+VERALTET
+SYNOPSIS
+        int query_imp_port();
+
+BESCHREIBUNG
+        Liefert die Port Nummer, die fuer das InterMud-Protokoll genutzt wird.
+
+AENDERUNGEN
+        LDMud 3.2.9 benannte diese Efun zu query_udp_port() um.
+            query_imp_port() ist nur verfuegbar, wenn der Treiber mit
+            USE_DEPRECATED kompiliert wurde.
+
+ANMERKUNG
+        DIESE FUNKTION IST VERALTET UND SOLLTE NICHT MEHR GENUTZT WERDEN!
+        Die gleiche Funktionalitaet bietet query_udp_port(), diese Funktion
+        hat aber fuer die normale MUD-Programmierung keinen Nutzen.
+
+SIEHE AUCH
+        send_udp(E), receive_udp(M)

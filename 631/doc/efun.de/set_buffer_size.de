@@ -1,0 +1,19 @@
+GESCHUETZT
+SYNOPSIS
+        int set_buffer_size(int size);
+
+BESCHREIBUNG
+        Veraendert die Groesse des Socket Puffers fuer this_interactive() auf
+        <size>, solange <size> ein vorkonfigueriertes Maximum nicht
+        ueberschreitet. Die Funktion liefert die alte Puffergroesse zurueck
+        oder -1 auf Systemen, die die Groesse des Socket Puffers nicht
+        veraendern koennen.
+
+        Eine Veraenderung der Puffergroesse kann eine Verbesserung des IO
+        Durchsatzes bringen, diesen aber auch verschlechtern.
+
+AENDERUNGEN
+        Eingefuehrt in 3.2.1@34.
+
+ANMERKUNG
+        Diese Funktion ist geschuetzt und macht deshalb gar nix.

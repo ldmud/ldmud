@@ -1,0 +1,9 @@
+SYNOPSIS
+        void printf(string format, ...);
+
+BESCHREIBUNG
+        Eine Mischung aus sprintf() und write(). Gibt void zurueck und den
+        String an den Benutzer aus.
+
+SIEHE AUCH
+        sprintf(E), write(E), terminal_colour(E)
