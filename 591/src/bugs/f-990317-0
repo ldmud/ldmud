@@ -1,0 +1,49 @@
+Subject: H_MODIFY_OUTPUT
+From: Thomas Feldmeier <tf4@informatik.uni-ulm.de>
+Date: Wed, 17 Mar 1999 17:26:50 +0100 (MET)
+Type: Feature
+State: Acknowledged.
+
+H_MODIFY_OUTPUT
+
+Optionaler Hook zum Modifizieren jeder Textausgabe,
+bevor der Spieler sie sieht.
+Kann eine unbound closure oder ein String sein.
+
+Ist der Hook eine Closure, wird er aufgerufen als
+  string <closure>(string output).
+
+Ist der Hook ein String, wird eine Funktion mit diesem Namen
+in dem Spieler aufgerufen:
+  string <name>(string output).
+
+this_player() enthaelt den Spieler, der die Textausgabe sieht.
+
+Bevor ein Text an einen Spieler gesendet wird, wird der Hook
+mit diesem Text als Paramter aufgerufen. Ist der Rueckgabewert
+des Hooks ein String, so wird dieser String anstelle des Textes
+an den Spieler gesendet.
+
+--------------------------------------
+Als Vorlage zum H_MODIFY_HOOK koennte man H_MODIFY_COMMAND nehmen
+(aehnliche Parameteruebergabe)
+
+Ich habe mir gedacht, dass in comm.c, add_message() geaendert wird:
+bevor die message umgewandelt wird (also die /n zu /r/n geaendert usw.),
+wird ein Hook aufgerufen, der die Message aendern koennte.
+(vielleicht an der gleichen stelle, an der auch gesnoopt wird?)
+
+Damit wird wohl jedes printf(), write() usw. auch einen eigenen Aufruf des
+Hooks bewirken. Nur binary_message( ,0) nicht.
+
+Der Hook ist ja gedacht, um alle ausgaben automatisch umzubrechen, bei
+beruecksichtigung der ansi-steuerzeichen. pro write usw. wuerde also
+zusaetzlich ein hook ausgefuehrt werden, der dann ein paar mapping-
+operationen macht und ein aufruf von terminal_colour. ich schaetze, die
+cpu-last waere noch ok.
+
+                                                     Zora
+
+
+
+

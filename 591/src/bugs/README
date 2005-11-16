@@ -1,0 +1,12 @@
+This directory holds know bugs, patches and feature requests, one per file.
+
+The filenames follow the pattern 'f-yymmdd-x' for features, 'b-yymmdd-x'
+for bugs, and 'p-yymmdd-x' for contributed patches. Complete issues are
+moved over to the directory ../done.
+
+<yymmdd> is the date when the original issue was raised.
+<x> is an arbitrary number to distinguish requests raised on the same day
+    and may be omitted.
+
+f-summary summarizes most(!) of the feature and patch submissions.
+b-summary summarizes all bug reports.

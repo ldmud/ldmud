@@ -1,0 +1,6 @@
+This directory holds solved bugs, patches and feature requests, one per file.
+
+The filenames follow the pattern 'f-yymmdd' for features, 'b-yymmdd' for bugs,
+and 'p-yymmdd' for contributed patches.
+
+<yymmdd> is the date when the original issue was raised.
