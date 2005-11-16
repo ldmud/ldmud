@@ -1,0 +1,8 @@
+SYNOPSIS
+        int strlen(string str)
+
+DESCRIPTION
+        Returns the length of the string str.
+
+SEE ALSO
+        sizeof(E), extract(E)

@@ -1,0 +1,3 @@
+This dierctory contains the names of all monster names that can not be used
+by players. When a new monster is designed, go to adventurers guild and do
+'banish monster_name'.
