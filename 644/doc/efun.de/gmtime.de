@@ -1,0 +1,38 @@
+SYNOPSIS
+        #include <sys/time.h>
+
+        int *gmtime(int clock);
+        int *gmtime(int *uclock);
+
+BESCHREIBUNG
+        Interpretiert <clock> als Anzahl Sekunden seit dem 01. Januar 1970,
+        00:00:00 Uhr und gibt die Zeit in UTC in einer schoenen Struktur
+        aus. Wird <clock> nicht angegeben, wird stattdessen time() verwendet.
+
+        Alternativ kann auch ein Array mit zwei Elementen angegeben werden,
+        wie es von uclock() geliefert wird: das erste Element wird
+        interpretiert wie <clock>, das zweite Element bezeichnet die
+        Mikrosekunden in der aktuellen Sekunde. Dieses zweite Element wird
+        ignoriert.
+
+        Das Resultat von gmtime() ist ein Array, das folgende Werte beinhaltet:
+            int TM_SEC   (0) : Sekunden (0..59)
+            int TM_MIN   (1) : Minuten (0..59)
+            int TM_HOUR  (2) : Stunden (0..23)
+            int TM_MDAY  (3) : Tag im Monat (1..31)
+            int TM_MON   (4) : Monat im Jahr (0..11)
+            int TM_YEAR  (5) : Jahr (z.B.  2001)
+            int TM_WDAY  (6) : Wochentag (Sunday = 0)
+            int TM_YDAY  (7) : Tag im Jahr (0..365)
+            int TM_ISDST (8) : TRUE: Daylight saving time
+
+BEISPIEL
+        printf("Heute ist %s\n", ({ "Sonntag", "Montag", "Dienstag",
+            "Mittwoch",        "Donnerstag", "Freitag", "Samstag"})
+            [gmtime()[TM_WDAY]]);
+
+AENDERUNGEN
+        Eingefuehrt in LDMud 3.2.9.
+
+SIEHE AUCH
+    ctime(E), localtime(E), time(E), utime(E), timearray(E)

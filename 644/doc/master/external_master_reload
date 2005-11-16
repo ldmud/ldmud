@@ -1,0 +1,10 @@
+SYNOPSIS
+        void external_master_reload()
+
+DESCRIPTION
+        Master was reloaded on external request by SIGUSR1.
+        It will be called after inaugurate_master() of course.
+        If you plan to do additional magic here, you're welcome.
+
+SEE ALSO
+        inaugurate_master(M)

@@ -1,0 +1,28 @@
+VERALTET
+SYNOPSIS
+        mapping allocate_mapping(int size, int width);
+
+BESCHREIBUNG
+        Reserviert Speicherplatz fuer ein Mapping.
+
+        <size> ist die Anzahl Eintraege (d.h. Keys), die reserviert werden,
+        <width> ist die Anzahl Werte pro Key. Wird <width> weggelassen, wird
+        standardmaessig 1 gesetzt.
+
+        Diese Funktion ist nur sinnvoll, wenn im Vornherein die ungefaehre
+        Groesse eines Mappings bekannt ist. Mit ihr kann der Overhead der
+        Speicherallokation verringert werden. Werden nicht alle allozierten
+        Elemente mit Daten bestueckt, so wird der uebrig gebliebene Speicher
+        am Ende der Verarbeitung der laufenden Funktion freigegeben.
+
+        Weiter ist allocate_mapping() geeignet, um ein Mapping mit einer
+        bestimmten Groesse zu erzeugen, dem aber im Moment der Erzeugung
+        noch keine Daten zu den Keys zugewiesen werden.
+
+AENDERUNGEN
+        Umbenannt zu m_allocate() in LDMud 3.2.6.
+        Seit 3.2.9 ist die Funktion nicht mehr verfuegbar, wenn der Treiber
+            nicht mit USE_DEPRECATED kompiliert wurde.
+
+SIEHE AUCH
+        mappings(LPC), walk_mapping(E), get_type_info(E)

@@ -1,0 +1,1849 @@
+From:    Dafire@FinalFrontier
+Short: Finalfrontier: illegal mapping size
+Date:    Fri Feb 18 17:43:10 2000
+Type: Bug
+State: Done - fixed in 3.2.9-dev.353
+See also: b-000822, b-000207
+
+The mapping code had a bug which clobbered memory when a mapping was added to
+itself using 'm += m', corrected in 3.2.9-dev.320, but that wasn't responsible
+for this bug.
+
+Generous augmentation with diagnostic code finally pointed to the removal of
+misc-keys in remove_mapping(), specifically to the condensed_deleted count. As
+the trace shows:
+
+DEBUG: remove_mapping from 3: map 0x1238bd0c, index 0x140b2414 type (2:0) 0
+searching for type (2:0) 0
+cmstart 0xa3b37d0, keystart 0xa3b3920, keyend 0xa3b3958
+  offset 16, key 0xa3b3938 type (0:8) 4
+  offset 8, key 0xa3b3948 type (0:4) 2
+  offset 4, key 0xa3b3950 type (0:0) 0
+  offset 2, key 0xa3b394c type (2:0) 0
+  used 2, cond_deleted 6, misc_deleted 6, string_deleted 0
+invalidating key 0xa3b394c type (2:0) 0
+  used 2, cond_deleted 6, misc_deleted 6, string_deleted 0
+
+the search for the key didn't terminate soon enough and the code managed to
+'find' the key value halfway in a real svalue. This explains why the bug went
+undetected for so long, as it needs to right combination of svalues to be
+triggered - in most cases the final invalid match would fail anyway.
+
+Since this error (the loop also shows up in get_map_lvalue() ) accesses and
+even modifies random memory, it could have been the cause for a number of
+strange crashes over the last years.
+
+----------------------------------------------------------------------------
+
+The critical line(s) seem to be:
+
+212:      contact_list[C_DATA_LIST] += ([c_nr:0;0;0;0;0;0]);
+213:      contact_list[C_DATA_LIST][c_nr,CONTACT_TYPE] = otab[c_obj,_TYPE];
+              
+---------------------------------------------------------------------------
+
+das war das letze was ich vom mud gesehen hab:
+
+[Debug:Unbekannt] RUNTIME-ERROR:
+                  Wer:    /0   Command: '0'
+                  File:   
+/d/Quornitum/imar/univers/raumschiff/sensor.c
+                  Zeile: 213
+                  Objekt: 
+/d/Quornitum/imar/univers/ships/cpic.shuttle0
+                  Fehler: Illegal mapping size: 1073741829
+                                              0x40000005
+
+---------------------------------------------------------------------------
+
+From:           	"Bastian Hoyer" <bastian.hoyer@uni-essen.de>
+To:             	"Lars Duening" <lars@bearnip.com>
+Subject:        	crash.txt
+Date sent:      	Sat, 3 Jun 2000 01:10:30 +0200
+
+  
+ hmm.. crash mit dem 206er 
+
+also .. eine weile vor dem crash hatten wir :
+
+02.06.00 22:06:02 [Debug:Unbekannt] RUNTIME-ERROR:
+                  Wer:    /0   Command: '0'
+                  File:   /d/Quornitum/imar/univers/raumschiff/sensor.c  
+                  Zeile: 223
+                  Objekt: /d/Quornitum/imar/univers/ships/eshiala.shuttle0
+                  Fehler: Illegal mapping size: 1073741826
+                                              0x40000002
+
+das ist schon ein gutes zeichen fuer einen bevorstehenden crash...
+
+02.06.00 23:06:04 [Debug:Unbekannt] RUNTIME-ERROR:
+                  Wer:    /0   Command: '0'
+                  File:   /<lambda 0x     0>   Zeile: 153476280
+                                                      0x925dcb8
+                  Objekt: /d/Sol/overlord/show/obj/stuhl#13339
+                  Fehler: Out of memory
+gdb:
+
+#0  fatal (fmt=0x736d6574 <Address 0x736d6574 out of bounds>) at simulate.c:435
+                                   'smet'
+435             *((char*)0) = 0/a;
+
+bt:
+#0  fatal (fmt=0x736d6574 <Address 0x736d6574 out of bounds>) at simulate.c:435
+#1  0x8 in ?? ()
+#2  0x72616720 in ?? ()
+      'rag '
+Cannot access memory at address 0x63706c71.
+                                  'cplq'
+
+stdout:
+
+2000.06.02 23:07:53 Garbage collection, slow_shut: 0
+2000.06.02 23:07:49 Caught error: Error in loading object 'w/dafire/LPC_zst'
+' modify_command' in '   i/player/tippse.c' ('      obj/paksi#7421')line 753
+'          q_lpc' in 'i/Qbrain/Qbrain.c (/i/Qbrain/Qmarker.inc)' ('     obj/Qbrain#7446')line 404
+'      start_lpc' in 'i/Qbrain/Qbrain.c (/i/Qbrain/Qmarker.inc)' ('     obj/Qbrain#7446')line 270
+'          CATCH' in 'i/Qbrain/Qbrain.c (/i/Qbrain/Qmarker.inc)' ('     obj/Qbrain#7446')line 270
+'          touch' in 'secure/simul_efun/simul_efun.c (map.inc)' ('     obj/Qbrain#7446')line 179
+2000.06.02 23:07:49 ... execution continues.
+DEBUG: 2000.06.02 23:07:53 GC start: 6862 objects in list, 7363 allocated
+DEBUG: 2000.06.02 23:07:53 GC pass 1: 6862 objects in list, 7356 allocated
+No trace.
+********************************************************************************
+
+stderr:
+
+...
+scanning chunk 0a785c88, end 0a789c90
+2000.06.02 23:07:53 Small block error, start: a785c90, 2ba37250 vs. a789c90
+                                                       found end,   exp. end
+read: Die Wartezeit für die Verbindung ist abgelaufen
+Erq demon exiting.
+
+---------------------------------------------------------------------------
+
+From:           	"Bastian Hoyer" <bastian.hoyer@uni-essen.de>
+To:             	<lars@bearnip.com>
+Subject:        	sensor
+Date sent:      	Wed, 7 Jun 2000 02:31:03 +0200
+
+Hallo Lars,
+
+ich hab gesehen du hast ein paar Sachen implementiert um diesen Mapping Bug
+zu finden... ich schick dir hier nochmal das Source-File.. das ganze
+Raumschiff-System ist ziemlich kompliziert und ich weiss nicht ob es dir
+ueberhaupt was nützt.. aber der Fehler ist immer in diesem File an dieser
+Zeile 213.
+Alle unsere Wizards die was auf sich halten ;) haben sich das schon
+angeguckt und versucht das zu verstehen oder einen Fehler zu finden.. aber
+Fehlanzeige...
+Möglicherweise wird das Raumschiff System in Zukunft auf eine SQL Datenbank
+umgestellt.. ich weiss nicht ob der Fehler dann überhaupt noch auftaucht..
+wäre vielleicht besser wenn das vorher aufgedeckt wird.
+Leider lässt sich der Fehler nicht richtig reproduzieren... die Raumschiffe
+sind eigentlich ständig im Einsatz, und es ist eher selten das ein solches
+Bugt...
+
+Bastian
+
+---------------------------------------------------------------------------
+>From bearnip  Sat Jun 10 08:10:51 2000
+Received: from eins.teaw.de (h-213.61.12.14.host.de.colt.net [213.61.12.14])
+	by csoft.net (8.10.2/8.10.1) with SMTP id e5ADAob15310
+	for <lars@bearnip.com>; Sat, 10 Jun 2000 08:10:51 -0500
+Received: (qmail 6659 invoked from network); 10 Jun 2000 13:08:00 -0000
+Received: from p3e9bf075.dip0.t-ipconnect.de (HELO dabook) (62.155.240.117)
+  by h-213.61.12.14.host.de.colt.net with SMTP; 10 Jun 2000 13:08:00 -0000
+From: "Bastian Hoyer" <bastian.hoyer@zitronentee.de>
+To: "Lars Duening" <lars@bearnip.com>
+Subject: RE: AW: crash.txt
+Date: Sat, 10 Jun 2000 15:09:41 +0200
+Message-ID: <FNEEIDFHGKHHPALBGMHCOECCCAAA.bastian.hoyer@zitronentee.de>
+MIME-Version: 1.0
+Content-Type: text/plain;
+	charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+X-Priority: 3 (Normal)
+X-MSMail-Priority: Normal
+X-Mailer: Microsoft Outlook IMO, Build 9.0.2416 (9.0.2910.0)
+X-MimeOLE: Produced By Microsoft MimeOLE V5.00.2919.6700
+Importance: Normal
+In-Reply-To: <0FVW00FAXU5OSA@dgismtp04.wcomnet.com>
+
+
+> Hmm, ich denke hier hast du ein Attachment vergessen (das mit den
+> Speicherinhalten) :-). Aber warte mit dem Schicken etwas - bearnip
+> leidet gerade unter einem Hardwarecrash.
+
+ehrlich gesagt wusste ich nicht wie das geht.. aber hier nu das zeugs :
+(also schreib mir sowas nachste mal besser dazu ;)))
+
+(gdb) x/256xb 0xA785C90-128
+0xa785c10:      0x20    0x4f    0x73    0x74    0x65    0x6e    0x20    0x64
+0xa785c18:      0x61    0x76    0x6f    0x6e    0x2e    0x0a    0x00    0x00
+0xa785c20:      0x10    0x00    0x00    0x30    0xa0    0x0c    0xa3    0x0a
+0xa785c28:      0x61    0x6c    0x74    0x65    0x20    0x43    0x6c    0x65
+0xa785c30:      0x61    0x6e    0x2d    0x4f    0x2d    0x42    0x6f    0x74
+0xa785c38:      0x20    0x73    0x63    0x68    0x77    0x65    0x62    0x74
+0xa785c40:      0x20    0x68    0x6f    0x6c    0x70    0x72    0x69    0x67
+0xa785c48:      0x20    0x6e    0x61    0x63    0x68    0x20    0x4e    0x6f
+0xa785c50:      0x72    0x64    0x65    0x6e    0x20    0x64    0x61    0x76
+0xa785c58:      0x6f    0x6e    0x2e    0x0a    0x00    0x0a    0x00    0x00
+0xa785c60:      0x0a    0x00    0x00    0x30    0x2f    0x64    0x2f    0x53
+0xa785c68:      0x6f    0x6c    0x2f    0x6f    0x76    0x65    0x72    0x6c
+0xa785c70:      0x6f    0x72    0x64    0x2f    0x72    0x75    0x65    0x73
+0xa785c78:      0x74    0x75    0x6e    0x67    0x2f    0x65    0x73    0x62
+0xa785c80:      0x65    0x69    0x6e    0x65    0x00    0x00    0x00    0x00
+0xa785c88:      0x02    0x10    0x00    0xf0    0x84    0x1c    0x78    0x0a
+0xa785c90:      0x10    0x00    0x00    0x10    0x20    0x61    0x75    0x66
+0xa785c98:      0x7a    0x75    0x73    0x63    0x68    0x6c    0x69    0x65
+0xa785ca0:      0x73    0x73    0x65    0x6e    0x2c    0x20    0x68    0x61
+0xa785ca8:      0x74    0x20    0x61    0x62    0x65    0x72    0x20    0x6e
+0xa785cb0:      0x69    0x63    0x68    0x74    0x20    0x64    0x65    0x6e
+0xa785cb8:      0x20    0x72    0x69    0x63    0x68    0x74    0x69    0x67
+0xa785cc0:      0x65    0x6e    0x20    0x53    0x63    0x68    0x6c    0x75
+0xa785cc8:      0x65    0x73    0x73    0x65    0x6c    0x2e    0x00    0x00
+0xa785cd0:      0x10    0x00    0x00    0x10    0x4d    0x6f    0x63    0x74
+0xa785cd8:      0x65    0x7a    0x75    0x6d    0x61    0x20    0x6b    0x72
+0xa785ce0:      0x61    0x62    0x62    0x65    0x6c    0x74    0x20    0x77
+0xa785ce8:      0x69    0x65    0x20    0x65    0x69    0x6e    0x20    0x6b
+0xa785cf0:      0x6c    0x65    0x69    0x6e    0x65    0x73    0x20    0x42
+0xa785cf8:      0x61    0x62    0x79    0x20    0x6e    0x61    0x63    0x68
+0xa785d00:      0x20    0x4f    0x73    0x74    0x65    0x6e    0x20    0x64
+0xa785d08:      0x61    0x76    0x6f    0x6e    0x2e    0x0a    0x00    0x00
+
+
+(gdb) x/64xw 0xA785C90-128
+0xa785c10:      0x74734f20      0x64206e65      0x6e6f7661      0x00000a2e
+0xa785c20:      0x30000010      0x0aa30ca0      0x65746c61      0x656c4320
+0xa785c30:      0x4f2d6e61      0x746f422d      0x68637320      0x74626577
+0xa785c40:      0x6c6f6820      0x67697270      0x63616e20      0x6f4e2068
+0xa785c50:      0x6e656472      0x76616420      0x0a2e6e6f      0x00000a00
+0xa785c60:      0x3000000a      0x532f642f      0x6f2f6c6f      0x6c726576
+0xa785c70:      0x2f64726f      0x73657572      0x676e7574      0x6273652f
+0xa785c80:      0x656e6965      0x00000000      0xf0001002      0x0a781c84
+0xa785c90:      0x10000010      0x66756120      0x6373757a      0x65696c68
+0xa785ca0:      0x6e657373      0x6168202c      0x62612074      0x6e207265
+0xa785cb0:      0x74686369      0x6e656420      0x63697220      0x67697468
+0xa785cc0:      0x53206e65      0x756c6863      0x65737365      0x00002e6c
+0xa785cd0:      0x10000010      0x74636f4d      0x6d757a65      0x726b2061
+0xa785ce0:      0x65626261      0x7720746c      0x65206569      0x6b206e69
+0xa785cf0:      0x6e69656c      0x42207365      0x20796261      0x6863616e
+0xa785d00:      0x74734f20      0x64206e65      0x6e6f7661      0x00000a2e
+
+x/256sb 0xA785C90-128
+0xa785c10:         " Osten davon.\n"
+0xa785c1f:       ""
+0xa785c20:       "\020"
+0xa785c22:       ""
+0xa785c23:       "0 \f?\nalte Clean-O-Bot schwebt holprig nach Norden
+davon.\n"
+0xa785c5d:       "\n"
+0xa785c5f:       ""
+0xa785c60:       "\n"
+0xa785c62:       ""
+0xa785c63:       "0/d/Sol/overlord/ruestung/esbeine"
+0xa785c85:       ""
+0xa785c86:       ""
+0xa785c87:       ""
+0xa785c88:       "\002\020"
+0xa785c8b:       "?\204\034x\n\020"
+0xa785c92:       ""
+0xa785c93:       "\020 aufzuschliessen, hat aber nicht den richtigen
+Schluessel."
+0xa785ccf:       ""
+0xa785cd0:       "\020"
+0xa785cd2:       ""
+0xa785cd3:       "\020Moctezuma krabbelt wie ein kleines Baby nach Osten
+davon.\n"
+0xa785d0f:       ""
+0xa785d10:       "\020"
+0xa785d12:       ""
+0xa785d13:
+"\020(\\<will\\>.*\\<lichtschild\\>.*)|(\\<will\\>.*\\<lichtkugel\\>.*)"
+0xa785d4f:       ""
+0xa785d50:       "\022"
+0xa785d52:       ""
+0xa785d53:       "\020"
+0xa785d55:       ""
+0xa785d56:       ""
+0xa785d57:       ""
+0xa785d58:       "\024"
+0xa785d5a:       ""
+0xa785d5b:       ""
+0xa785d5c:       ":R9\beR9\b\236?9\beY9\b>?9\b\002"
+0xa785d72:       "\002"
+0xa785d74:       "\005"
+0xa785d76:       ""
+0xa785d77:       ""
+0xa785d78:       "\002"
+0xa785d7a:       "\002"
+0xa785d7c:       "\005"
+0xa785d7e:       ""
+0xa785d7f:       ""
+0xa785d80:       "\002"
+0xa785d82:       "\002"
+0xa785d84:       "\005"
+0xa785d86:       ""
+0xa785d87:       ""
+0xa785d88:       "\002"
+0xa785d8a:       "\002"
+0xa785d8c:       "\005"
+0xa785d8e:       ""
+0xa785d8f:       ""
+0xa785d90:       "\002"
+0xa785d92:       "\002"
+0xa785d94:       "\005"
+0xa785d96:       ""
+0xa785d97:       ""
+0xa785d98:       "\022"
+0xa785d9a:       ""
+0xa785d9b:       "\020"
+0xa785d9d:       ""
+0xa785d9e:       ""
+0xa785d9f:       ""
+0xa785da0:       "\024"
+0xa785da2:       ""
+0xa785da3:       ""
+0xa785da4:       ":R9\beR9\b\236?9\beY9\b>?9\b\002"
+0xa785dba:       ""
+0xa785dbb:       ""
+0xa785dbc:       "\a"
+0xa785dbe:       ""
+0xa785dbf:       ""
+0xa785dc0:       "\002"
+0xa785dc2:       ""
+0xa785dc3:       ""
+0xa785dc4:       "\005"
+0xa785dc6:       ""
+0xa785dc7:       ""
+0xa785dc8:       "\002"
+0xa785dca:       ""
+0xa785dcb:       ""
+0xa785dcc:       "\004"
+0xa785dce:       ""
+0xa785dcf:       ""
+0xa785dd0:       "\002"
+0xa785dd2:       ""
+0xa785dd3:       ""
+0xa785dd4:       "\f"
+0xa785dd6:       ""
+0xa785dd7:       ""
+0xa785dd8:       "\002"
+0xa785dda:       ""
+0xa785ddb:       ""
+0xa785ddc:       "\a"
+0xa785dde:       ""
+0xa785ddf:       ""
+0xa785de0:       "\022"
+0xa785de2:       ""
+0xa785de3:
+"\020#'d/Akaardan/quillian/gegenstaende/chronokom#13245->long_display"
+0xa785e25:       "\n"
+0xa785e27:       ""
+0xa785e28:       "\022"
+0xa785e2a:       ""
+0xa785e2b:       "\020"
+0xa785e2d:       ""
+0xa785e2e:       ""
+0xa785e2f:       ""
+0xa785e30:       "\024"
+0xa785e32:       ""
+0xa785e33:       ""
+0xa785e34:       ":R9\beR9\b\236?9\beY9\b>?9\b\002"
+0xa785e4a:       ""
+0xa785e4b:       ""
+0xa785e4c:       "\003"
+0xa785e4e:       ""
+0xa785e4f:       ""
+0xa785e50:       "\002"
+0xa785e52:       ""
+0xa785e53:       ""
+0xa785e54:       "\003"
+0xa785e56:       ""
+0xa785e57:       ""
+0xa785e58:       "\002"
+0xa785e5a:       ""
+0xa785e5b:       ""
+0xa785e5c:       "\003"
+0xa785e5e:       ""
+0xa785e5f:       ""
+0xa785e60:       "\002"
+0xa785e62:       ""
+0xa785e63:       ""
+0xa785e64:       "\003"
+0xa785e66:       ""
+0xa785e67:       ""
+0xa785e68:       "\002"
+0xa785e6a:       ""
+0xa785e6b:       ""
+0xa785e6c:       "\003"
+0xa785e6e:       ""
+0xa785e6f:       ""
+0xa785e70:       "\022"
+0xa785e72:       ""
+0xa785e73:       "\020"
+0xa785e75:       ""
+0xa785e76:       ""
+0xa785e77:       ""
+0xa785e78:       "\024"
+0xa785e7a:       ""
+0xa785e7b:       ""
+0xa785e7c:       "e\211\032\b\236w/\b\202'4\b?\2369\bz|9\b\004"
+0xa785e92:       "\002"
+0xa785e94:       "\004\ba\b\003"
+0xa785e9a:       "\002"
+0xa785e9c:       "\036\0324\b\003"
+0xa785ea2:       "\002"
+0xa785ea4:       "\"-A\b\003"
+0xa785eaa:       ""
+0xa785eab:       ""
+0xa785eac:       "d&Q\n\003"
+0xa785eb2:       ""
+0xa785eb3:       ""
+0xa785eb4:       "\234Ix\n\022"
+0xa785eba:       ""
+0xa785ebb:       "\020"
+0xa785ebd:       ""
+0xa785ebe:       ""
+0xa785ebf:       ""
+0xa785ec0:       "\024"
+0xa785ec2:       ""
+0xa785ec3:       ""
+0xa785ec4:       ":R9\beR9\b\236?9\beY9\b>?9\b\002"
+0xa785eda:       "\002"
+0xa785edc:       "\002"
+0xa785ede:       ""
+0xa785edf:       ""
+0xa785ee0:       "\002"
+0xa785ee2:       "\002"
+0xa785ee4:       "\002"
+0xa785ee6:       ""
+0xa785ee7:       ""
+0xa785ee8:       "\002"
+0xa785eea:       "\002"
+0xa785eec:       "\001"
+0xa785eee:       ""
+0xa785eef:       ""
+0xa785ef0:       "\002"
+0xa785ef2:       "\002"
+0xa785ef4:       "\004"
+0xa785ef6:       ""
+0xa785ef7:       ""
+0xa785ef8:       "\002"
+0xa785efa:       "\002"
+0xa785efc:       "\003"
+0xa785efe:       ""
+0xa785eff:       ""
+0xa785f00:       "\020"
+0xa785f02:       ""
+0xa785f03:
+"\020#'d/Akaardan/quillian/kor/fstat/ebene0/halle->regen_long"
+0xa785f3d:       ""
+0xa785f3e:       "?"
+0xa785f40:       "\022"
+0xa785f42:       ""
+0xa785f43:       "\020"
+0xa785f45:       ""
+0xa785f46:       ""
+0xa785f47:       ""
+0xa785f48:       "\024"
+0xa785f4a:       ""
+0xa785f4b:       ""
+0xa785f4c:       ":R9\beR9\b\236?9\beY9\b>?9\b\002"
+0xa785f62:       ""
+0xa785f63:       ""
+0xa785f64:       "\002"
+0xa785f66:       ""
+0xa785f67:       ""
+0xa785f68:       "\002"
+0xa785f6a:       ""
+0xa785f6b:       ""
+0xa785f6c:       "\002"
+0xa785f6e:       ""
+0xa785f6f:       ""
+0xa785f70:       "\002"
+0xa785f72:       ""
+0xa785f73:       ""
+0xa785f74:       ""
+0xa785f75:       ""
+0xa785f76:       ""
+0xa785f77:       ""
+0xa785f78:       "\002"
+0xa785f7a:       ""
+0xa785f7b:       ""
+0xa785f7c:       "\004"
+0xa785f7e:       ""
+0xa785f7f:       ""
+0xa785f80:       "\002"
+0xa785f82:       ""
+0xa785f83:       ""
+0xa785f84:       "\002"
+0xa785f86:       ""
+0xa785f87:       ""
+0xa785f88:       "\022"
+0xa785f8a:       ""
+0xa785f8b:       "\020"
+0xa785f8d:       ""
+0xa785f8e:       ""
+0xa785f8f:       ""
+0xa785f90:       "\024"
+0xa785f92:       ""
+0xa785f93:       ""
+0xa785f94:       "e\211\032\b\236w/\b\202'4\b?\2369\b\226-9\b\004"
+0xa785faa:       "\002"
+0xa785fac:       "DA,\n\003"
+0xa785fb2:       "\002"
+---------------------------------------------------------------------------
+Date: Mon, 13 Aug 2001 18:25:03 +0200 (CEST)
+From: "Peng (Stefan Riemer)" <peng@finalfrontier.mud.de>
+To: <lars@bearnip.com>
+Subject: Die lpc-files
+Message-ID: <Pine.LNX.4.33.0108131819110.20949-300000@finalfrontier.mud.de>
+
+Huhu,
+
+hier erstmal der letzte rest im debug.log..
+
+2001.08.11 17:27:24 DEBUG: Illegal mapping size: 1073741826
+2001.08.11 17:27:24 Current object was
+d/Quornitum/imar/univers/ships/seliona.shuttle0
+2001.08.11 17:27:24 Dump of the call chain:
+'     heart_beat' in 'd/Quornitum/imar/univers/raumschiff/raumschiff.c'
+('d/Quornitum/imar/univers/ships/seliona.shuttle0') line 329
+'      do_sensor' in 'd/Quornitum/imar/univers/raumschiff/sensor.c'
+('d/Quornitum/imar/univers/ships/seliona.shuttle0') line 304
+'   do_lr_sensor' in 'd/Quornitum/imar/univers/raumschiff/sensor.c'
+('d/Quornitum/imar/univers/ships/seliona.shuttle0') line 213
+
+und vielleicht noch der backtrace, auch wenn ich da nicht viel sehe
+
+(gdb) bt
+#0  0x80d10e1 in fatal (fmt=3D0x80fae40 "DEBUG: Illegal mapping size: %ld\n=
+") at simulate.c:573
+#1  0x80a9764 in _get_map_lvalue (m=3D0x11e952dc, map_index=3D0x1342fb10, n=
+eed_lvalue=3D1, check_size=3D0)
+    at mapping.c:1021
+#2  0x80ad7b7 in add_to_mapping_filter (key=3D0x1342fb10, data=3D0x1342fb18=
+, extra=3D0x11e952dc)
+    at mapping.c:3796
+#3  0x80abc5a in walk_mapping (m=3D0x12fd4180, func=3D0x80ad7a0 <add_to_map=
+ping_filter>, extra=3D0x11e952dc)
+    at mapping.c:2511
+#4  0x80ad88d in add_to_mapping (m1=3D0x11e952dc, m2=3D0x12fd4180) at mappi=
+ng.c:3841
+#5  0x8083ba9 in eval_instruction (first_instruction=3D0x8b19a67 "W\005", i=
+nitial_sp=3D0x812cd10)
+    at interpret.c:9415
+#6  0x8097072 in call_function (progp=3D0x8b195fc, fx=3D289) at interpret.c=
+:20992
+#7  0x8078a87 in call_heart_beat () at heartbeat.c:282
+#8  0x80542b0 in backend () at backend.c:598
+#9  0x80a6482 in main (argc=3D7, argv=3D0xbffff8fc) at main.c:418
+#10 0x400d8baf in __libc_start_main () from /lib/libc.so.6
+(gdb) f 6
+#6  0x8097072 in call_function (progp=3D0x8b195fc, fx=3D289) at interpret.c=
+:20992
+20992       eval_instruction(FUNCTION_CODE(funstart), inter_sp);
+(gdb) p *progp
+$1 =3D {ref =3D 43, total_size =3D 10852, extra_ref =3D 0, program =3D 0x8b=
+19650 "T=FC \b\a",
+  name =3D 0x108ffd94 "d/Quornitum/imar/univers/raumschiff/raumschiff.c", b=
+lueprint =3D 0x108ffde4,
+  id_number =3D 164, load_time =3D 997185085,
+  line_numbers =3D 0x8b1be78 "=EA\021v=F1\004v\003=FD\t\006\b=FF\f\004\b=C3=
+\005R\001=FE\t\003=FD\rE\b\b=C0\005=FE\t\001N\b\001C\001=FE\n\003O\016\017\=
+001=C1\nI\001=FE\n\003=FD\020=FE\022G=FF\013DMG\006\006\002I\n\001=FE\n=FE\=
+nE\002A\n\001\016=FE\n\001O\006\001=FE\t\a\001W\n\006\001v\003NGDE=FF\f=C5\=
+005Q\001^\003=FD\t\b\026=C0\005@w\003S\001=FF\t\b=FF\tEB=FE\t\003=FF\f=FF\f=
+=FE\f=FF\nAA\025\022I=FF\016\013AF\bH=FE\016\f\013\f=FF\024A=FF\020\t\004IG=
+=FF\013A=FF\020\b\004P\022?",
+  function_names =3D 0x8b1a230, functions =3D 0x8b1a4e8, strings =3D 0x8b1b=
+918, variable_names =3D 0x8b1baf8,
+  inherit =3D 0x8b1bdb8, flags =3D 0, heart_beat =3D 289, argument_types =
+=3D 0x0, type_start =3D 0x0,
+  swap_num =3D -1, num_function_names =3D 347, num_functions =3D 1292, num_=
+strings =3D 120,
+  num_variables =3D 88, num_inherited =3D 16}
+
+-------------------------------------------------------
+/*****************************************************************************
+ * Final Frontier              - = = * = = -                 U N I V E R S   *
+ *****************************************************************************
+ * File:        raumschiff/sensor.c                                          *
+ * Description: 
+ * Author:      Imar@FF                                                      *
+ *****************************************************************************/
+
+#include <inherit.h>
+#include PROPERTIES_H
+
+
+#include <univers.h>
+
+//#define DEBUGGER "peng"
+#include <debug.h>
+
+#include "/d/Quornitum/imar/univers/include/univers_prototypes.h"
+
+/*
+ mapping contact = ([Object: ({X,Y,Z}); ({BEAR,ELEV}); DISTANCE;
+ 				ARCS; NAME; TYPE; NR])
+ 
+ Zugriff mittels:
+ CONTACT_POS		0
+ CONTACT_MOTION		1
+ CONTACT_SPEED		2
+ CONTACT_DIST		3
+ CONTACT_ARCS		4
+ CONTACT_TYPE		5
+ CONTACT_NAME		6
+ CONTACT_NR		7
+*/
+
+
+  
+private void do_lr_sensor(float range)
+{
+  mapping otab;		// ObjTabelle des Sektors
+  int i,j;
+  int c_siz;
+  float *p;
+  object *idx;
+
+  string work_around;
+
+  /*
+   * ref_list ist so gross wie die contact_list. Kontakte, die
+   * angesprochen wurden, werden als TRUE vermerkt, alle anderen
+   * werden zum Ende rausgeschmissen
+   */
+  int *ref_list; 
+ 
+  /* Aufbau der contact_list :
+   *
+   * contact_list = ({ ({obj1, obj2, ...}), ([ 0: pos, motion, speed, dist,
+   * 					 	 arcs, type, name;
+   *					      1: ... ]) })
+   *
+   * Der erste Teil besteht aus Array von Objekten. Die Position eines Obj.
+   * im Array ist der Key fuer die Obj-Daten im Mapping
+   *
+   * Zugriff auf DatenStruktur:
+   * contact_list[C_OBJ_LIST] und contact_list[C_DATA_LIST]
+   *
+   * Zugriff auf Obj-Daten mittels der Defines:
+   * CONTACT_POS			0
+   * CONTACT_MOTION		1
+   * CONTACT_DIST		2
+   * CONTACT_ARCS		3
+   * CONTACT_TYPE		4
+   * CONTACT_NAME		5
+   * CONTACT_NR			6
+   */
+
+  mixed *contact_list;
+
+  DEBUG("senso");
+ 
+  if(!environment() || 
+     !sizeof(otab=UNIVERSD->query_object_table(pos2sector(QueryProp(P_POSITION)))))
+    return 0;
+
+  /*righ*/
+  DEBUG(V(otab));
+  /*end*/
+  
+  p = QueryProp(P_POSITION);
+  contact_list = QueryProp(P_CONTACT_LIST);
+  c_siz = sizeof(contact_list[C_OBJ_LIST]);
+  ref_list = allocate(c_siz);
+ 
+  idx = m_indices(otab);
+  for(i=sizeof(idx);i--;)
+    {
+      int c_nr;		        // Kontakt-Nr
+      float ship_distance;	// Abstand zum anderen Object
+      float *c_motion;	        // Kontakt-Motion
+      int c_arc;		// Kontakt-Arc
+      object c_obj;		// Kontakt-Obj
+  
+#define _POS	0
+#define _MOTION  1
+#define _TYPE   2
+ 
+      c_obj = idx[i];
+      if(c_obj==this_object()) continue;
+ 
+      c_nr = member(contact_list[C_OBJ_LIST],c_obj);
+      if(c_nr != -1)
+	ref_list[c_nr] = TRUE;
+   
+      ship_distance = distance( p , otab[c_obj, _POS] );
+
+      /*
+	DEBUG(sprintf("Dist: %s -> %s = %10.3f",
+	query_name(),
+	c_obj->query_name(),
+	ship_distance));
+	*/
+  	
+      if(range && ship_distance > range )
+	{
+	  if(c_nr != -1)  // Kontakt verloren
+	    {  
+	      work_around = TYPE_TEXT[otab[c_obj, _TYPE]];
+	      if(!stringp(work_around))
+		work_around = "???";
+
+  
+	      tell_console(P_NAV_CON,
+			   wrap_string("[Achtung]",
+				       sprintf("Kontakt (%d) verloren. "
+					       " Typ: %s.\n",
+					       c_nr+1,
+					       work_around)));
+  
+	      /* Kontakt verloren:
+	       * Ist die Position des c_nr im Array, so wird ein leerer Index
+	       * gesetzt, aber nicht das Array verkuerzt. So verschieben sich
+	       * die c_nr der Objekte nicht
+	       */
+	      contact_list[C_OBJ_LIST][c_nr] = 0;
+  
+	      /* Ist c_nr letztes ArrayElem gewesen ?, dann wird das Array von
+	       * hinten nach freien Plaetzen untersucht und um diese gekuerzt
+	       */
+	      if(c_nr == c_siz - 1)
+		{    
+		  for(j=c_siz;j--;)
+		    if(contact_list[C_OBJ_LIST][j] == 0)
+		      c_siz--;
+     
+		  contact_list[C_OBJ_LIST]=contact_list[C_OBJ_LIST][0..c_siz];
+		  ref_list = ref_list[0..c_siz]; 
+		}
+  
+	      /* vielleicht rette ich die Werte in einer spaeteren Version */
+	      contact_list[C_DATA_LIST] -= ([c_nr]);
+
+	      /* moegliche Locks killen*/
+	      check_laser_lock(c_nr);
+   
+	    } /* Kontakt verloren */
+	}
+      else  // Kontakt in Range oder neu
+	{
+	  /*
+	   * Hier muss noch eine Sortierung der Contact-List eingebaut werden 
+	   */
+    
+	  if(c_nr == -1)	// neuer Kontakt
+	    {    
+	      float *sph;
+     
+	      sph = xyz2sph( ({ p[X]-otab[c_obj, _POS][X],
+				p[Y]-otab[c_obj, _POS][Y],
+				p[Z]-otab[c_obj, _POS][Z] }) );
+	      
+	      /* Freien Platz in der Contact-List finden */
+	      for(c_nr=0;c_nr<c_siz;c_nr++)
+		if(contact_list[C_OBJ_LIST][c_nr] == 0)
+		  break;
+       
+	      work_around = TYPE_TEXT[otab[c_obj, _TYPE]];
+	      if(!stringp(work_around))
+		work_around = "???";
+
+	      tell_console(P_NAV_CON,
+			   wrap_string("[Achtung]",
+				       sprintf("Neuer Sensor Kontakt (%d)"
+					       " auf %3.3f|%3.3f\nEntf.: %s"
+					       " Type: %s.",
+					       c_nr+1,
+					       sph[BEARING],
+					       sph[ELEVATION],
+					       write_su2pc(ship_distance),
+					       work_around)));
+     
+	      if(c_nr < c_siz)
+		{
+		  contact_list[C_OBJ_LIST][c_nr] = c_obj;
+		  ref_list[c_nr] = TRUE;
+		}
+	      else   
+		{
+		  contact_list[C_OBJ_LIST] += ({ c_obj });
+		  ref_list += ({ TRUE });
+		  c_siz++;
+		}
+     
+	      contact_list[C_DATA_LIST] += ([c_nr:0;0;0;0;0;0]);
+	      contact_list[C_DATA_LIST][c_nr,CONTACT_TYPE] = otab[c_obj,_TYPE];
+	      contact_list[C_DATA_LIST][c_nr,CONTACT_NAME] = c_obj->query_name();
+   
+	    } /* neuer Kontakt */
+   
+	  // Kontakt updaten
+   
+	  c_arc = arc(otab[c_obj,_POS], otab[c_obj, _MOTION], p);
+   
+	  contact_list[C_DATA_LIST][c_nr,CONTACT_POS]    = otab[c_obj,_POS];
+	  contact_list[C_DATA_LIST][c_nr,CONTACT_MOTION] = otab[c_obj,_MOTION];
+	  contact_list[C_DATA_LIST][c_nr,CONTACT_DIST]   = ship_distance;
+	  contact_list[C_DATA_LIST][c_nr,CONTACT_ARCS]   = c_arc;
+	} /* Kontakt in Range*/
+    }
+#undef _TYPE
+#undef _MOTION
+#undef _POS
+
+  /* 
+   * jetzt muessen alle Kontakts rausgeschmissen, die nicht referenziert
+   * wurden. Dabei nur noch bis zum aktuellen c_siz gehen!!
+   */
+  /*
+    DEBUG(sprintf("c_siz %d\nref_list %s\nobj_list %s\n---",
+    c_siz,array2str(ref_list),array2str(contact_list[C_OBJ_LIST])
+    ));
+    */	
+  for(i=c_siz-1;i>=0;i--)
+    if(!ref_list[i] && contact_list[C_DATA_LIST][i])
+      {
+	contact_list[C_OBJ_LIST][i] = 0;
+	work_around = TYPE_TEXT[contact_list[C_DATA_LIST][i, CONTACT_TYPE]];
+ 
+	if(!stringp(work_around))
+	  work_around = "???";
+	  
+	tell_console(P_NAV_CON,
+		     wrap_string("[Achtung]",
+				 sprintf("Kontakt (%d) verloren. Typ: %s.\n",
+					 i+1,
+					 work_around
+					 )));
+
+	contact_list[C_DATA_LIST] -= ([ i ]);
+   
+	/* moegliche Locks killen */
+	check_laser_lock(i);
+   
+	/* Letzter Eintrag gewesen ? Dann wie oben verkuerzen */
+	if(i == c_siz - 1)
+	  {  
+	    /*
+	      DEBUG(sprintf("Letzter Eintrag:\n c_siz %d\nref_list %s\nobj_list %s\n---",
+	      c_siz,array2str(ref_list),array2str(contact_list[C_OBJ_LIST])
+	      ));
+	      */
+	    for(j=c_siz;j--;)
+	      if(contact_list[C_OBJ_LIST][j] == 0)
+		i--;
+         
+	    contact_list[C_OBJ_LIST]=contact_list[C_OBJ_LIST][0..i];
+     
+	    /* 
+	       DEBUG(sprintf("Letzter EintragEnde:\n c_siz %d\ni %d\nref_list %s\nobj_list %s\n---",
+	       c_siz,i,array2str(ref_list),array2str(contact_list[C_OBJ_LIST])
+	       ));
+	       */
+	  }
+      }
+ 
+  DEBUG(sprintf("c_siz %d\nref_list %s\nobj_list %s\n---",
+		c_siz,array2str(ref_list),array2str(contact_list[C_OBJ_LIST])
+		));
+  
+  SetProp(P_CONTACT_LIST,contact_list);
+}
+
+
+private void do_sr_sensor(int range)
+{
+}
+
+
+// Wird vom HeartBeat des raumschiff aufgerufen
+void do_sensor() 
+{
+  if(!environment() || !QueryProp(P_RAW_SENSOR))
+    return 0;
+
+  if(query_system_damage(SYSTEM_LR_SENSOR) != DT_INOPERATIVE)
+    do_lr_sensor(QueryProp(P_SENSOR_LR_RANGE));
+
+  if(query_system_damage(SYSTEM_SR_SENSOR) != DT_INOPERATIVE)
+    do_sr_sensor(QueryProp(P_SENSOR_SR_RANGE));
+}
+
+private void display_sensor_info(int contact_nr)
+{
+  float *xyz;
+  float *sph;
+  float *c_pos;
+  float *c_motion;
+  float *m_pos;
+  float *m_motion;
+  int i, size;
+  
+  string c_arc;
+  string out;
+  
+  mixed *contact_list;  
+  out = "\n"+TRENNLINIE+center("Sensor - Report\n",S_WIDTH)+TRENNLINIE+
+    "Nr. Typ    Peilung   Entf.   Arc  Peilung Geschw. Arc Name\n"+
+    TRENNLINIE;
+
+  contact_list = QueryProp(P_CONTACT_LIST);
+  if(!sizeof(contact_list[C_OBJ_LIST]))
+    {
+      tell_console(P_NAV_CON,out+center("Keine Kontakte\n",78)+TRENNLINIE,
+		   DOER);
+      return;
+    }
+  
+  m_pos    = QueryProp(P_POSITION);
+  m_motion = QueryProp(P_MOTION);
+  	
+  for(size = sizeof(contact_list[C_OBJ_LIST]),i=0;i<size;i++)
+    {
+      if(contact_list[C_OBJ_LIST][i] == 0)
+	continue;
+    
+      if(contact_nr && contact_nr != (i+1))
+	continue;
+  
+      c_pos = contact_list[C_DATA_LIST][i,CONTACT_POS];
+   
+      /* calculate relative positions */
+      xyz = ({0.0 ,0.0 ,0.0}); 
+DEBUG("X ist"+X+"\n");
+DEBUG("Y ist"+Y+"\n");
+DEBUG("Z ist"+Z+"\n");
+      xyz[X] = c_pos[X] - m_pos[X];
+      xyz[Y] = c_pos[Y] - m_pos[Y];
+      xyz[Z] = c_pos[Z] - m_pos[Z];
+      
+      sph = xyz2sph( xyz );
+      c_motion = contact_list[C_DATA_LIST][i,CONTACT_MOTION];
+      c_arc = arc_text(contact_list[C_DATA_LIST][i,CONTACT_ARCS]);
+   
+      out += right((i+1),3)+" "+
+	left(TYPE_TEXT[contact_list[C_DATA_LIST][i,CONTACT_TYPE]],6)+" "+
+	left(sph[BEARING],4)+" "+
+	left(sph[ELEVATION],4)+" "+
+	left(write_su2pc(sph[RANGE]),7)+" "+
+	right(arc_text(arc( m_pos, m_motion, c_pos)),3)+"  "+
+	left(c_motion[BEARING],4)+" "+
+	left(c_motion[ELEVATION],4)+" "+
+	right(write_su2pc(c_motion[RANGE]),5)+" "+
+	right(c_arc,3)+" "+
+	left(contact_list[C_DATA_LIST][i,CONTACT_NAME],24)+"\n";
+  
+      if(contact_nr)
+   	break;
+    } 	  
+  
+  out += TRENNLINIE;
+  
+  tell_console(P_NAV_CON,out, DOER);
+}
+
+
+
+/*
+ * Allen Objekten im Sector, die einen Kontakt auf uns haben str schicken 
+ */
+void tell_contacts(string str)
+{ 
+  mapping otab;
+  mixed *contact_list;
+  int i;
+  object *iobj;
+ 
+  if(!environment()) return;
+ 
+  otab=(mapping)UNIVERSD->query_object_table(pos2sector(QueryProp(P_POSITION)));
+ 
+  if(!otab) return;
+ 
+  iobj = m_indices(otab);
+  for(i=sizeof(iobj);i--;)
+    if(contact_list = iobj[i]->QueryProp(P_CONTACT_LIST))
+      if(member(contact_list[C_OBJ_LIST],this_object()))
+	iobj[i]->tell_console(P_NAV_CON,str);
+}
+
+int sensor_parse(string str)
+{
+  string *exp;
+  int c_nr;
+ 
+  
+  if(!QueryProp(P_SYSTEM_ACTIVATE))
+    {
+      tell_console(P_NAV_CON,"[Kein System ist aktiviert.]\n", DOER);
+      return OK;
+    }
+
+  exp = explode(lower_case(str||"")," ")-({""});
+ 
+  if(sizeof(exp) > 0)
+    {
+      if(exp[0] == "status" || exp[0] == "report")
+	{
+	  if(sizeof(exp) > 1)
+	    c_nr = to_int(exp[1]);
+	  else
+	    c_nr = 0;
+    
+	  display_sensor_info(c_nr);
+	}
+    }
+  else
+    {
+      notify_fail("sensor <report|status> <kontakt-nr>\n");
+      return 0;
+    }
+ 
+  return 1;
+}
+ 
+void create()
+{
+  SetProp(P_CONTACT_LIST,({ ({}), ([]) }) );
+
+  Set(P_RAW_SENSOR,		SAVE, F_MODE); 
+  Set(P_SENSOR_NAME,		SAVE, F_MODE);
+  Set(P_SENSOR_GENDER,		SAVE, F_MODE);
+  Set(P_SENSOR_LONG,		SAVE, F_MODE);
+  Set(P_SENSOR_ID,		SAVE, F_MODE);
+  Set(P_SENSOR_LR_RANGE,	SAVE, F_MODE);
+  Set(P_SENSOR_SR_RANGE,	SAVE, F_MODE);
+  Set(P_CONTACT_LIST,		SAVE, F_MODE);
+}
+
+-------------------------------------------------------
+/*****************************************************************************
+ * Final Frontier              - = = * = = -                 U N I V E R S   *
+ *****************************************************************************
+ * File:        raumschiff/raumschiff.c                                      *
+ * Description: 
+ * Author:      Imar@FF                                                      *
+ * Modified:	16.05.2001 Simulacron	Meldung, wenn jemand das Schiff	     *
+ * 					betritt 
+ *****************************************************************************/
+
+#include <inherit.h>
+#include PROPERTIES_H
+
+#include <univers.h>
+#include <move.h>
+#include <level.h>
+
+#define DEBUGGER "shaman" 
+#include <debug.h>
+
+LIB_INHERIT CONTAIN_I;
+inherit MESSAGE_I;
+inherit INHERIT+"atom";
+
+//inherit RAUMSCHIFF+"fight";
+inherit RAUMSCHIFF+"weapon";
+
+inherit RAUMSCHIFF+"shield";
+inherit RAUMSCHIFF+"reactor";
+inherit RAUMSCHIFF+"tank";
+inherit RAUMSCHIFF+"wire";
+inherit RAUMSCHIFF+"damage";
+//inherit RAUMSCHIFF+"scanner";
+inherit RAUMSCHIFF+"nav";
+inherit RAUMSCHIFF+"sensor";
+inherit RAUMSCHIFF+"engine";
+inherit RAUMSCHIFF+"jump";
+inherit RAUMSCHIFF+"equip";
+//inherit RAUMSCHIFF+"script";
+//inherit RAUMSCHIFF+"pilot";
+inherit RAUMSCHIFF+"cargo";
+inherit RAUMSCHIFF+"rcargo";
+
+#include "/d/Quornitum/imar/univers/include/univers_prototypes.h"
+
+
+static int eta_count = 0;
+
+
+#define _SHIP_PATH_SIZE	2
+#define _LOAD_SHIP	1
+#define _SAVE_SHIP	2
+
+object *getLoadedShipRooms()
+{
+  string *rs;
+  object *obs, r;
+  int i;
+
+  rs = QueryProp(P_SHIP_ROOMS);
+  obs = ({});
+  for(i=sizeof(rs);i--;)
+  {
+    r = find_object(SHIPS+rs[i]);
+    if(r)
+      obs += ({ r });
+  }
+
+  return obs;
+}
+
+object *getPassenger()
+{
+  mixed *inv;
+  object *tmp;
+  int i;
+
+  inv = map_array(getLoadedShipRooms(),#'all_inventory);
+
+  tmp = ({});
+  for(i=sizeof(inv);i--;)
+    tmp += inv[i];
+
+  return filter_array(tmp,#'living);
+}
+
+void set_heart_beat_flag(int i)
+{
+  if(QueryProp(P_SCRIPT))
+    return;
+
+  set_heart_beat(i);
+}
+
+private int check_path(string path)
+{
+  string *e;
+  int i,siz;
+  
+  e = explode(path,"/");
+  for(i=0,siz=sizeof(e)-1;i<siz;i++)
+    if(file_size(implode(e[0..i],"/")) == -1)
+      return FALSE;
+   
+  return TRUE;
+}
+
+private int IO(int job)
+{
+  string *ship_path;
+  string ship_name;
+  object *r;
+
+  ship_path = explode(QueryProp(P_SHIP_PATH)||"",PATH_CUT);
+ 
+  DEBUG(sprintf("IO: Job %d (1=L,2=S) Shippath %s",
+		job,array2str(ship_path)));
+ 
+  if(sizeof(ship_path) == _SHIP_PATH_SIZE)
+    {
+      ship_name = SHIPS+implode(ship_path,"/");
+  
+      switch(job)
+	{
+	case _LOAD_SHIP:
+	  if(restore_object(ship_name))
+          {
+             if (QueryProp(P_SYSTEM_ACTIVATE))
+                set_heart_beat_flag(1);
+             set_eigen(1);
+             return 1;
+          }
+          
+	  else
+	    raise_error("Load-Error : "+ship_name+"\n");
+	  break;
+ 	
+	case _SAVE_SHIP:
+	  if(check_path(ship_name) == TRUE)
+	    {
+	      // Jetzt werden alle geladenen Raeume abgespeichert
+	      map_objects(getLoadedShipRooms(),"Save");
+	      
+	      save_object(ship_name);
+	      return 1;
+	    }
+	  else
+	    raise_error("Save-Error : "+ship_name+"\n");
+	  break; 
+	}
+    }
+   
+  DEBUG("IO: Fehler aufgetreten");
+}
+
+int Load()
+{
+  return IO(_LOAD_SHIP);
+}
+
+int Save()
+{
+  return IO(_SAVE_SHIP);
+}
+
+/* Wird von Werft aufgerufen, da bei jedem Einbau SaveShip aufgerufen wird */
+void QueueSave()
+{
+  while(remove_call_out("Save") != -1);
+  call_out("Save",10);
+}
+  
+#undef _SHIP_PATH_SIZE
+#undef _LOAD_SHIP
+#undef _SAVE_SHIP
+
+
+int notaus()
+{
+  object *obs;
+  int i;
+
+  obs = getPassenger();
+
+  for(i=sizeof(obs);i--;)
+    {
+      tell_object(obs[i],
+		  "\n\nDas Schiff wird evakuiert. Du betritts eine "
+		  "Rettungskapsel.\n\n");
+
+      obs[i]->move(PLANETS+"akaardan_kor");
+    }
+
+  return 1;
+}
+
+/************************************************************************/
+
+varargs void tell_console(string console, string message, string doer)
+{
+  int i;
+  string *rs;
+  object r;
+
+  rs = QueryProp(P_SHIP_ROOMS);
+  for(i=sizeof(rs);i--;)
+    touch(SHIPS+rs[i])->tell_console(console, message, doer);
+}
+
+/*
+ * Ueberprueft, ob ein Planet oder Jumper in der Naehe ist.
+ */
+ 
+private void check_near_objects()
+/* modified righ */
+{
+  mixed *contact_list;
+  int size,i;
+  string orbit,chk;
+  
+  if(!environment())
+    return;
+
+  contact_list = QueryProp(P_CONTACT_LIST);
+  size=sizeof(contact_list[C_OBJ_LIST]);
+
+  orbit=QueryProp(P_IN_ORBIT);
+  
+  for(i=0;i<size;i++)
+    {
+      float dist;
+      string name;
+  
+      if(!contact_list[C_OBJ_LIST][i])
+	continue;
+   
+      dist = contact_list[C_DATA_LIST][i,CONTACT_DIST];
+  
+      switch(contact_list[C_DATA_LIST][i,CONTACT_TYPE])
+	{
+	case T_JUMPER:
+	  if(dist < JUMPER_RADIUS)
+	    {        
+	      if(QueryProp(P_IN_JUMPER) == FALSE)
+		{
+		  tell_console(P_NAV_CON,
+			       wrap(sprintf("[Das Schiff befindet sich in der "
+					    " Naehe des Sprungloches %s.]\n",
+					    contact_list[C_OBJ_LIST][i]->query_name())));
+		  SetProp(P_IN_JUMPER,contact_list[C_OBJ_LIST][i]->query_id());
+		}
+	    }
+	  else
+	    {             
+	      name = contact_list[C_OBJ_LIST][i]->query_id();
+	      if(QueryProp(P_IN_JUMPER) == name)
+		{
+		  tell_console(P_NAV_CON,
+			       "[Das Schiff verlaesst jetzt die Umgebung des "
+			       "Sprunglochs.]\n");
+		  SetProp(P_IN_JUMPER,FALSE);
+		}
+	    }
+	  break;   
+
+	case T_PLANET:
+          name = contact_list[C_OBJ_LIST][i]->query_name();
+          chk= implode(explode(lower_case(name)," "),"_");
+          if (chk==orbit) orbit=0;
+	  if(dist < PLANET_ORBIT)
+	    {
+	      if(QueryProp(P_IN_ORBIT) == FALSE && QueryProp(P_DOCKED) == FALSE)
+		{
+		  tell_console(P_NAV_CON,
+			       wrap("[Das Schiff befindet sich jetzt im Orbit "
+				    "um "+name+".]\n"));
+		  SetProp(P_IN_ORBIT,chk);
+                  orbit=0;
+		}
+	    }
+	  else
+	    {
+	      if(QueryProp(P_IN_ORBIT))
+		{
+		  if(QueryProp(P_IN_ORBIT)==chk)
+		    {
+		      tell_console(P_NAV_CON,
+				   wrap("[Das Schiff verlaesst jetzt den "
+					"Orbit um "+name+".]\n"));
+		      SetProp(P_IN_ORBIT,FALSE);
+                      orbit=0;
+		    }
+		}
+	    }  
+	  break;
+	}
+    }
+  if (orbit)
+  {
+     tell_console(P_NAV_CON,
+                  wrap("[Das Schiff hat den Orbit verlassen.]\n"));
+     SetProp(P_IN_ORBIT,FALSE);
+  }
+}
+
+void crash_with(object ob, int first_call)
+{
+  // Kein Crash mit Objecten, wenn sich das Raumschiff im Orbit befindet
+  if(QueryProp(P_IN_ORBIT))
+    return;
+   
+  if(ob->QueryProp(P_TYPE) == T_JUMPER)
+    return;
+
+ // ob->add_damage(QueryProp(P_SPEED),0,this_object());
+
+  if(ob) 
+    atom::crash_with(ob,first_call);
+}
+  
+ 
+/*
+ * Im HeartBeat wird das Raumschiff bewegt. Desweitern wird ueberprueft,
+ * ob das Raumschiff den Sektor verlassen hat.
+ */
+void heart_beat()
+{ 
+  reactor::do_generate();  // Energy vom Generator  
+  sensor::do_sensor();     // Umgebung ueberpruefen
+
+  check_near_objects();
+
+  shield::reload_shield();  
+  weapon::reload_weapon();
+  damage::do_repair();
+  nav::autopilot();
+  //script::do_scripting();
+
+  atom::heart_beat();	     // Bewegung allgemein
+    
+  if(QueryProp(P_NAV_DEST_POS) 
+     && QueryProp(P_SPEED) 
+     && (++eta_count % QueryProp(P_NAV_ETA_COUNT)) == 0)
+    {
+      int eta;
+      string eta_out;
+     
+      eta = to_int(distance(QueryProp(P_POSITION),QueryProp(P_NAV_DEST_POS)) 
+		   / QueryProp(P_MOTION)[RANGE]);
+     
+      switch(eta)
+	{
+	case 0..60:
+	  eta_out = eta+"s.]\n";
+      
+	  SetProp(P_NAV_ETA_COUNT,1);
+	  break;
+      	
+	case 61..3600:
+	  eta_out = eta/60+"min.]\n";
+	  SetProp(P_NAV_ETA_COUNT,60);
+	  break;
+        
+	case 3601..86400:
+	  eta_out = eta/3600+"h.]\n";
+	  SetProp(P_NAV_ETA_COUNT,3600);
+	  break;
+          
+	default:
+	  eta_out = "vergiss es.]\n";
+	  SetProp(P_NAV_ETA_COUNT,86400);
+	  break;
+	}
+     
+      switch(QueryProp(P_NAV_ETA))
+	{
+	default: 
+	  break;
+       
+	case ETA_WARP:
+	  if(QueryProp(P_SPEED)[0] == SPEED_WARP) 
+	    tell_console(P_NAV_CON,"[Eta - "+QueryProp(P_SPEED)[1]+" Warp: "+
+			  eta_out);
+	  break;
+       
+	case ETA_IMPULSE:
+	  if(QueryProp(P_SPEED)[0] == SPEED_IMPULSE)
+	    tell_console(P_NAV_CON,"[Eta - "+QueryProp(P_SPEED)[1]*100+"% : "
+			 +eta_out); 
+	  break;
+       
+	case ETA_IMPULSE|ETA_WARP:
+	  if(QueryProp(P_SPEED)[0] == SPEED_WARP) 
+	    tell_console(P_NAV_CON,"[Eta - "+QueryProp(P_SPEED)[1]+" Warp: "+
+			  eta_out);
+	  else
+	    tell_console(P_NAV_CON,"[Eta - "+QueryProp(P_SPEED)[1]*100+"% : "
+			 +eta_out);  
+	}
+    }  
+   
+#if FLIGHT_DEBUG
+  {
+    int *p;
+    int px,py,pz;
+
+    p = QueryProp(P_POSITION);
+    px = p[X];
+    py = p[Y];
+    pz = p[Z];
+
+    write_file(FLIGHT_DEBUG,sprintf("%d %d %d\n",px,py,pz));
+  }
+#endif
+
+}
+
+void open_entrance()
+{
+  string *ent;
+  string shppath;
+  object r;
+  int i;
+
+  if(!environment())                        
+    return;
+  
+  if(!shppath = QueryProp(P_SHIP_PATH)) 	   
+    return;
+
+  ent = QueryProp(P_ENTRANCE);
+  if(!pointerp(ent))
+    ent = ({ ent });
+  
+  if((i = sizeof(ent)) == 0)          
+    return;
+ 
+  for(;i--;)
+    if(r = SHIPD->LoadObject(SHIPS+shppath + PATH_CUT + ent[i]))
+      r->add_exit( file_name(environment()), "raus" );
+}
+
+void close_entrance()
+{
+  string *ent;
+  string shppath;
+  object r;
+  int i;
+
+  if(!environment()) return;
+ 
+  if(!shppath = QueryProp(P_SHIP_PATH))
+    return;
+
+  ent = QueryProp(P_ENTRANCE);
+  if(!pointerp(ent))
+    ent = ({ ent });
+
+  i = sizeof(ent);
+
+  for(;i--;)
+    if(r = SHIPD->LoadObject(SHIPS+shppath + PATH_CUT + ent[i]))
+      r->forbid_exit( "raus" );
+}
+    
+void init()
+{ 
+  string *ent;
+  string ship_path;
+  
+  if(QueryProp(P_REMOVE)) return;
+
+  // Der Spieler muss zuerst in das Schiff und dann in den Raum gemoved
+  // werden, weil sonst landing_area nicht entscheiden kann, ob der Spieler
+  // das Schiff betreten hat oder so den Raum verlassen hat.
+
+  if( environment(this_player()) == this_object() )
+    {
+      ent = QueryProp(P_ENTRANCE);
+      if(!pointerp(ent))
+	ent = ({ ent });
+
+      if((ship_path = QueryProp(P_SHIP_PATH)) 
+	 && sizeof(ent))
+	{  		
+	  open_entrance();
+	  DEBUG("Player wird in Raum gemoved");
+	  this_player()->move(SHIPS+ship_path + PATH_CUT + ent[0],
+		MOVE_NORMAL, 
+		"verschwindet im Schiff",
+		"betritt "+den( this_object() ));
+	}
+      else
+	SPACE_ERR(sprintf("Schiff hat keinen Eingangsraum %O\n",ship_path));
+    }
+  else 
+  if( environment() 
+      && ( environment()->QueryProp(P_TYPE) == T_LANDING_AREA
+	   || environment()->QueryProp(P_TYPE) == T_HOLO_ROOM ))
+    {
+      SetProp(P_DOCKED, TRUE);  
+      // Dies ist nen Hack, da sonst Schiffe, die
+      // aus dem All geholt wurden, nicht betretbar
+      // sind
+      
+      add_action("betrete_parse","betret",1);
+      add_action("betrete_parse","betritt");
+    }
+}
+
+static int docked()
+{
+  return 0;
+ 
+  if( QueryProp(P_DOCKED) == TRUE )
+    {
+      notify_fail("[Das Raumschiff muss erst noch gestartet werden.]\n");
+      return 1;
+    }
+  return 0;
+}
+
+/*--------------------------------------------------------------------------*/
+/* Kommandos */
+
+int notaus_parse()
+{
+  notaus();
+  return 1;
+}
+
+int system_parse(string str)
+{
+  string *exp;
+ 
+  exp = explode(lower_case(str||"")," ")-({""})+({"dummy"});
+ 
+  switch(exp[0])
+    {
+    case "aktiviere":
+  	
+      if(!QueryProp(P_RAW_REACTOR))
+	{
+	  tell_console(P_NAV_CON,
+		       "[Kein Reaktor an Bord - System kann nicht"
+		       " aktiviert werden.]\n",
+		       DOER);
+	  set_heart_beat_flag(0);
+	}
+      else
+	{
+	  SetProp(P_SYSTEM_ACTIVATE,TRUE);
+	  set_heart_beat_flag(1);
+	  if(QueryProp(P_HANGAR_ROOM))
+	    move(QueryProp(P_HANGAR_ROOM));
+
+	  tell_console(P_NAV_CON,"[System aktiviert]\n", DOER);
+	}
+      break;
+  
+    case "deaktiviere":
+      SetProp(P_SYSTEM_ACTIVATE,FALSE);
+      SetProp(P_REACTOR_ENERGY,0);
+      set_heart_beat_flag(0);
+      tell_console(P_NAV_CON,"[System deaktiviert]\n", DOER);
+      break;
+  	
+    case "status":
+      tell_console(P_NAV_CON,"[Kein Status]\n", DOER);
+      break;
+  
+    default:  
+      notify_fail("system <aktiviere>|<deaktiviere>|<status>\n");
+      return 0;
+    }
+  
+  return 1;
+}
+
+
+int betrete_parse(string str)
+{
+  if( me(str) )
+    {
+      if(this_player()->move(this_object(), MOVE_SECRET ) != MOVE_OK )
+	write("Du kannst "+den()+" nicht betreten.\n");    
+      else if( environment() )
+        environment()->rtell( Der( this_player() )+" betritt "+
+		den()+"." );
+      return 1;
+    }
+  else
+    return 0;
+}
+
+
+/*--------------------------------------------------------------------------*/
+/* Wiz-Kommandos */
+
+int pos_parse(string str)
+{
+  int x,y,z;
+  mixed *contact_list;
+  int c_siz;
+    
+  if(sscanf(str||"","%d %d %d",x,y,z) == 3)
+    {
+      SetProp(P_POSITION,({x,y,z}));
+      write("[Ok.]\n");
+      SetProp(P_DOCKED,FALSE);
+    }
+  else
+    if(sscanf(str||"","%d:%d:%d",x,y,z) == 3)
+      {
+    	SetProp(P_POSITION,sector2pos(xyz2sector( ({x,y,z}) )));
+    	write("[Ok.]\n");
+    	SetProp(P_DOCKED,FALSE);
+      }
+    else
+      if(sscanf(str||"","%d",x) == 1)
+	{
+	  contact_list = QueryProp(P_CONTACT_LIST);
+	  c_siz = sizeof(contact_list[C_OBJ_LIST]);
+	  if(!c_siz)
+	    write("[Keine Kontakte zur Wahl vorhanden.]\n");
+	  else
+	    if(x < 1 || x > c_siz)
+	      write(sprintf("[Bitte einen Kontakt zwischen 1 und %d waehlen.]"
+			    "\n",
+			    c_siz));
+	    else
+	      { 
+		x--;
+		if(!contact_list[C_OBJ_LIST][x])
+		  write(sprintf("[Kontakt (%d) unbekannt.]\n",(x+1)));
+		else
+		  {
+		    SetProp(P_POSITION,contact_list[C_DATA_LIST][x,CONTACT_POS]);
+		    write(sprintf("[Position auf Ziel %s gesetzt.]\n",
+				  contact_list[C_DATA_LIST][x,CONTACT_NAME]));
+		    SetProp(P_DOCKED,FALSE);
+		  }
+	      }
+	}
+      else
+        write("[position <x> <y> <z>|<x:y:z>|<ziel>.]\n");
+
+  return 1;
+}
+
+string* _set_ship_name(string s)
+{
+  s = lower_case(s);
+  Set(P_SHIP_NAME, s, F_VALUE);
+  set_id( ({ s, "raumschiff", "schiff"}) );
+
+  if(QueryProp(P_SHIP_CLASS))        // Falls es eine Klasse hat, wird
+    add_id(QueryProp(P_SHIP_CLASS)); // diese in der ID gesetzt
+
+  set_name( s );          // Schiff benennen
+  set_gender("weiblich"); // Sobald das Schiff einen Namen hat, ist es
+                          // weiblich 
+  set_short(0);      // Falls noch gesetzt; Ausgegeben wird 'Eine <s>'
+  return query_id();
+}
+
+int remove()
+{
+  Save();	
+
+  /* muss gesetzt werden, damit im init() nicht wieder in den SHIP_ROOM
+   * gesprungen wird
+   */
+  SetProp(P_REMOVE, TRUE);	
+  damage::remove();
+
+  return ::remove();
+}
+
+void create()
+{
+  atom::create();
+  tank::create();
+  sensor::create();
+  wire::create();
+  reactor::create();
+  //  scanner::create();
+  shield::create();
+  nav::create();
+  engine::create();
+  weapon::create();
+  damage::create();
+  equip::create();
+  cargo::create();       
+  rcargo::create();
+  
+  set_name("raumschiff");
+  set_long("Ein schoenes Raumschiff.\n");
+  set_gender("saechlich");
+  set_eigen(1);
+  SetProp(P_TYPE,T_SHIP);
+  SetProp(P_DOCKED,TRUE);
+   
+  set_own_light(1);
+
+  set_msg_in("$Der() landet gerade");
+  set_msg_out("$Der() startet gerade"); 
+ 
+  set_weight(10000000);
+  
+  set_max_internal_encumbrance(0);
+  set_max_internal_size(100000);
+      
+  open_con();
+    
+  Set(P_SHIP_NAME, #'_set_ship_name, F_SET_METHOD);
+  SetProp(P_SHIP_NAME,"NoName");
+    
+  SetProp(P_ENTRANCE,({"room1"}));
+
+  Set(P_SHIP_NR,          	SAVE, F_MODE);
+  Set(P_TEXTURE,          	SAVE, F_MODE);
+  Set(P_TYPE,	                SAVE, F_MODE);
+  Set(P_ROOM_NR,	        SAVE, F_MODE);
+  Set(P_OWNER,     	        SAVE, F_MODE);
+  Set(P_SYSTEM_ACTIVATE,	SAVE, F_MODE);
+  Set(P_IN_JUMPER,		SAVE, F_MODE);
+  Set(P_IN_ORBIT,		SAVE, F_MODE);
+  Set(P_SHIP_NAME,		SAVE, F_MODE);
+  Set(P_SHIP_CLASS,		SAVE, F_MODE);
+  Set(P_DAM_CON,		SAVE, F_MODE);
+  Set(P_ENG_CON,		SAVE, F_MODE);
+  Set(P_WEAPON_CON,		SAVE, F_MODE);
+  Set(P_NAV_CON,		SAVE, F_MODE);
+
+  Set(P_DAM_CON+P_LISTENER,	SAVE, F_MODE);
+  Set(P_ENG_CON+P_LISTENER,	SAVE, F_MODE);
+  Set(P_WEAPON_CON+P_LISTENER,	SAVE, F_MODE);
+  Set(P_NAV_CON+P_LISTENER,	SAVE, F_MODE);
+
+  Set(P_SHIP_PATH,		SAVE, F_MODE);
+  Set(P_ENTRANCE,		SAVE, F_MODE);
+  Set(P_SHIP_ROOMS,		SAVE, F_MODE);
+  Set(P_HANGAR_NAME,     	SAVE, F_MODE);
+  Set(P_DOCKED,             	SAVE, F_MODE);
+
+  SetProp(P_CARGO_QUAN,0);
+  SetProp(P_CARGO_MAX_QUAN,20);
+}
+-----------------------------------------------------------------------------
+
+2001.08.30 17:49:53 sensor.c: contact-list: ({({OBJ(/d/Quornitum/imar/univers/inherit/planet#1857),
+    OBJ(/d/Quornitum/imar/univers/inherit/jumper#1858), 
+    OBJ(/d/Quornitum/imar/univers/ships/seppelp.shuttle0), 
+    OBJ(/d/Quornitum/imar/univers/inherit/planet#1485), 
+    OBJ(/d/Quornitum/imar/univers/inherit/planet#1484), 
+    OBJ(/d/Quornitum/imar/univers/inherit/jumper#1486), 
+    OBJ(/d/Quornitum/imar/univers/inherit/jumper#1487), 
+    OBJ(/d/Quornitum/imar/univers/inherit/jumper#1488) }), 
+  ([3: 
+      ({131025, 532340, 252850 }); 
+      ({0, 0, 0 }); 7007.73; 41; 8; "Mond Ai~Hai", 
+    4: 
+      ({130500, 532500, 253000 }); 
+      ({0, 0, 0 }); 7174.58; 41; 8; "Ch~Rihan", 
+    5: 
+      ({128900, 535200, 250300 }); 
+      ({0, 0, 0 }); 11027.6; 41; 64; "Taladon -> Quornitum", 
+    6: 
+      ({126678, 531002, 243766 }); 
+      ({0, 0, 0 }); 16900.5; 41; 64; "Taladon -> Endymion", 
+    7: 
+      ({134242, 530815, 258888 }); 
+      ({0, 0, 0 }); 41.6951; 42; 64; "Taladon -> Sol", 
+    1: 
+      ({511777, 570604, 250664 }); 
+      ({0, 0, 0 }); 0; 22; 64; "Sol -> Taladon", 
+    0: ({515000,571400,254000});({0,0,0});4706.4;42;8;"Sol"])}) 
+
+          c_nr: 2
+2001.08.30 17:49:55 DEBUG: Illegal original mapping size: 1073741826
+  --- And it's always same illegal mapping size!
+
+2001.08.30 17:49:55 Current object was d/Quornitum/imar/univers/ships/seppelp.shuttle0
+2001.08.30 17:49:55 Dump of the call chain:
+' modify_command' in '   i/player/tippse.c' ('      obj/mensch#942') line 782
+'            cmd' in 'd/Quornitum/imar/univers/room/ship_room.c' ('d/Quornitum/imar/univers/ships/seppelp.shuttle0.room1') line 247
+'      nav_parse' in 'd/Quornitum/imar/univers/raumschiff/nav.c' ('d/Quornitum/imar/univers/ships/seppelp.shuttle0') line 1334
+'nav_intercept_course' in 'd/Quornitum/imar/univers/raumschiff/nav.c' ('d/Quornitum/imar/univers/ships/seppelp.shuttle0') line 470
+-----------------------------------------------------------------------------
+With some instrumentation:
+
+2001.09.02 23:40:50 DEBUG: (original) Illegal mapping size 1073741831:
+map 0x132f9ea4 cond 0x9b4eb48 string -4 misc 64
+2001.09.02 23:40:50 Current object was
+d/Quornitum/imar/univers/ships/highwind.shuttle0
+2001.09.02 23:40:50 Dump of the call chain:
+'     heart_beat' in 'd/Quornitum/imar/univers/raumschiff/raumschiff.c'
+('d/Quornitum/imar/univers/ships/highwind.shuttle0') line 329
+'      do_sensor' in 'd/Quornitum/imar/univers/raumschiff/sensor.c'
+('d/Quornitum/imar/univers/ships/highwind.shuttle0') line 309
+'   do_lr_sensor' in 'd/Quornitum/imar/univers/raumschiff/sensor.c'
+('d/Quornitum/imar/univers/ships/highwind.shuttle0') line 228
+
+8c5e73f:  25        2 local                      (0: 29)        line 143
+8c5e741:  25        4 local                      (1: 30)
+8c5e743:  16          float                      (2: 31)
+8c5e74a:  41          /                          (3: 32)
+8c5e74b:  16          float                      (2: 31)
+8c5e752:  40          *                          (3: 32)
+8c5e753: 284       28 cos                        (2: 31)
+..
+..
+..
+8c659a7: 113          map_index                  (3: 21)
+8c659a8:  25        9 local                      (1: 19)
+8c659aa:  13          const1                     (2: 20)
+8c659ab:  98          index                      (3: 21)
+8c659ac:  25       10 local                      (2: 20)
+8c659ae:  12          const0                     (3: 21)
+8c659af: 114          push_indexed_map_lvalue    (4: 22)        line 228
+8c659b0:  37  25   1  25  14  13 113  25                                    
+
