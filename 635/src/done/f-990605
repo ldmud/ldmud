@@ -1,0 +1,9 @@
+Short: Computed call_other
+Date: 990605
+From: Lars
+Type: Feature
+State: Done - implemented in 3.2.8-dev.152
+
+Use the special notation <expr> '->' '(' <expr> ')' for computed call others,
+and <expr> '->' <ident> for normal ones.
+

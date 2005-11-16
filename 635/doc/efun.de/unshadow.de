@@ -1,0 +1,14 @@
+SYNOPSIS
+        void unshadow();
+
+BESCHREIBUNG
+        Das aufrufende Objekt wird als Shadow von allen anderen Objekten
+        entfernt, denen es uebergeworfen war. Wenn dem aufrufenden Objekt
+        selbst ein Shadow uebergeworfen war, wird dieser entfernt.
+
+ANMERKUNG
+        Diese Funktion sollte nicht genutzt werden, stattdessen gibt es die
+        Lfun remove_shadow().
+
+SIEHE AUCH
+        shadow(E), query_shadowing(E)

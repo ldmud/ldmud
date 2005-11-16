@@ -1,0 +1,16 @@
+OPTIONAL
+SYNOPSIS
+        int set_is_wizard(object obj, int n);
+
+BESCHREIBUNG
+        Setzt das Wizard-Flag des Objekts. Wenn n = 0, wird das Flag
+        geloescht. Wenn n <> 0 ist, wird das Flag gesetzt. Wenn n = -1,
+        wird der momentane Wert des Flags zurueck geliefert. Der
+        Rueckgabewert ist immer der alte Wert des Flags.
+
+        Diese Funktion setzt ein Flag im Parser, das Berechtigungen fuer
+        dumpallobj etc. beeinflusst, die standardmaessig fuer alle Benutzer
+        freigegeben sind.
+
+AENDERUNGEN
+        Seit 3.2.7 ist diese Efun optional.
