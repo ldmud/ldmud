@@ -1,0 +1,8 @@
+Short: Runtime query of driver compilation options.
+Date: 981114
+Type: Feature
+State: Proposed
+Long:
+
+The driver should offer a way to query compilation options (like MAX_BITSTRING)
+at runtime, either via LPC-Predefines, or by an efun returning a mapping.

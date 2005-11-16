@@ -1,0 +1,38 @@
+SYNOPSIS
+        void call_out(string fun, int delay, mixed arg, ...)
+        void call_out(closure cl, int delay, mixed arg, ...)
+
+BESCHREIBUNG
+        Ein Aufruf einer Funktion fun im aktuellen Objekt, oder der
+        Closure cl. Der Aufruf geschieht zeitverzoegert mit der
+        Parameterliste arg. Die Zeitverzoegerung wird in delay
+        Sekunden angegeben. Die minimale Verzoegerung betraegt eine
+        Sekunde. 
+
+        call_out() speichert den this_player(). So ist es auch
+        moeglich Funktionen wie write() und say() zu benutzen, die
+        darauf vertrauen.
+
+        Per call_out() koennen nur Funktionen mit der Funktionssicherheit
+        "public" oder "static" aufgerufen werden. "private" oder "protected"
+        deklarierte Funktionen koennen nicht aufgerufen werden.
+
+        Die Ausfuehrungskosten (evals) aller call_out()s fuer eine UID
+        werden aufsummiert und loesen einen "too long evaluation" Fehler
+        aus, wenn die aufsummierten Kosten das Maximum uebersteigen.
+        In diesem Fall werden die noch ausstehenden call_outs()s verworfen.
+
+BEISPIEL
+        call_out("RefreshMe", 10);
+
+        Dieses Statement ruft die Funktion RefreshMe() in 10 Sekunden
+        ohne irgendwelche Parameter auf. Diese Funktion kann sich dann
+        selbst wieder per call_out() aufrufen, so dass eine Schleife
+        (keine Rekursion) entsteht und kann verwendet werden, um in einem
+        Objekt einen gewissen Zustand herzustellen.
+        Achtung, call_outs werden in einer linearen Liste gespeichert und
+        sind so etwas "teuer" fuer den Treiber.
+
+SIEHE AUCH
+        remove_call_out(E), call_out_info(E), find_call_out(E),
+        this_player(E), reset(A), heart_beat(A)

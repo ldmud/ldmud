@@ -1,0 +1,5 @@
+int query_level()
+
+All mobile (living) objects must define this. The lowest level is 1.
+An apprentice wizard have level 20, and a full wizard with a castle
+have level 21.
