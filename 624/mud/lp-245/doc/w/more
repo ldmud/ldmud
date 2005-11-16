@@ -1,0 +1,9 @@
+Command: more
+Argument: file
+
+Print the file 'file' 16 lines and wait for input.
+space: 16 lines more.
+'q':   Stop printing.
+'u':   Backup 16 lines.
+
+See also w/ls, w/ed, w/rm, w/cat

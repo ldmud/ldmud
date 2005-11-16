@@ -1,0 +1,17 @@
+NAME
+        debugmalloc
+
+DESCRIPTION
+        This command is hardcoded into the driver.
+
+        Toggles the debug mode for the memory managment.
+        If the O_IS_WIZARD flag is used in the mudlib (i.e. if
+        set_is_wizard() was called), this command is allowed only for
+        users that have this flag set.
+
+HISTORY
+        Deactivated in 3.2.7 by default, it was effectless before anyway.
+
+SEE ALSO
+        malloc(D), status(D), memory(C), objects(C), debug_info(E),
+        set_is_wizard(E)
