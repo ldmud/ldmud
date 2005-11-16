@@ -1,0 +1,1201 @@
+This file lists all changes to the game driver which have a visible
+impact on its behaviour both towards the mudlib as well as towards
+the host system.
+
+For a detailed list of all changes see the file CHANGELOG.
+
+27-Sep-2003 (Lars Duening) -- upcoming Release 3.2.10
+
+    - Changed efuns:
+       + debug_info(): Removed the DID_MEM_UNUSED value from the DINFO_DATA:
+           DID_MEMORY result.
+       + debug_info(): Added the DID_ST_MB_ values to the DINFO_DATA:
+           DID_STATUS result.
+       + debug_info(): The DINFO_DATA:"objects" dump also lists the object
+           creation times.
+       + debug_info(): Added DID_ST_BOOT_TIME to the DINFO_DATA:DID_STATUS
+           result.
+       + debug_info(): Added a third argument to DINFO_OBJLIST to return
+           multiple objects.
+       + remove_action(): It is now possible to remove all actions
+           an object defines.
+       + save_object(), save_value(): The format of the saved data can
+           be specified with an function argument.
+       + set_connection_charset(), set_combine_charset(): Passing 0 as
+           argument re-establishes the default charset.
+       + sprintf(), printf(): Modifier '#' for '%O'/'%Q' prints the values
+           in a compact format.
+       + wizlist_info(): The evalcost statistic is now split into 'ticks'
+           and 'gigaticks', and a second non-decaying evalcost statistic
+           has been added.
+
+    - Corrected efuns:
+       + find_call_out(): No longer throws an error when passed an unbound
+           lambda to look for.
+       + m_add(): Fixed a memory leak when existing entries were overwritten.
+       + remove_input_to(): The proper noecho state is restored after
+           removing a pending input handler.
+       + restore_object(): The function leaked memory when restoring from
+           a MALLOCed string.
+       + to_array(): When converting a string, the characters are treated
+           as unsigned.
+
+    - New efuns:
+       + get_combine_charset(), get_connection_charset(): Query the
+           combine resp. connection charset.
+       + get_max_commands(): Query the allowed command rate of an
+           interactive object.
+       + m_entry(): Return all values for mapping entry at once.
+       + rmember(): Search arrays and strings from the end.
+       + set_max_commands(): Set the allowed command rate of an
+           interactive object.
+       + strrstr(): Search a string within a string backwards.
+       + variable_exists(): Check the existance of a named variable.
+       + variable_list(): Return all variable names of an object.
+
+    - Master Object:
+
+    - Fixed Crashers:
+       + Using 'break' or 'continue' in large programs caused bytecode
+           corruption.
+       + Function calls by address and global variable accesses are no
+           longer possible after set_this_object().
+       + Overflowing the value stack during a secure_apply() could
+           crash the driver in the error recovery.
+       + walk_mapping(): If the callback object was destructed
+           before the first call, the efun crashed in the error handling.
+       + Swapping of volatile strings could crash the driver.
+
+    - Language:
+       + catch(; nolog) is now an official feature.
+       + New modifier catch(; publish).
+       + Constrained the switch() grammar so that only blocks are
+           suitable as bodies.
+       + Operator '&' can intersect mappings with other mappings and arrays.
+       + Macro __MAX_MALLOC__ is defined to the internal upper limit for
+           total memory usage.
+       + Macro __MSDOS_FS__ is defined on systems using the MS-DOS
+           filesystem conventions.
+       + Preprocessor symbol __FILENAME_SPACES__ is defined if the driver is
+           instructed to allow spaces in filenames.
+       + A cast of a value to its own type, or a cast not resulting in a
+           conversion operation generates a warning. The pragma
+           no_warn_empty_casts can turn this warning off.
+       + The strong_types/strict_types pragmas now persist beyond the
+           end of an include file (as does every other pragma).
+       + call_other()s on arrays of objects is now configurable; if enabled,
+           the macro __LPC_ARRAY_CALLS__ is defined.
+       + Bugfix: Characters with the 8th bit set are now treated as positive
+           when entered as literal character constants.
+       + Bugfix: Illegal case ranges like '100..50' now generate
+           an error message.
+
+    - Runtime:
+       + Mapping are now compacted (apart from a GC) only, if a certain
+           amount of time has elapsed since the last addition/removal
+           of a key, and if either more than half of the condensed entries
+           have been deleted, or if the number of hashed entries exceeds
+           the number of (non-deleted) condensed entries.
+       + A heart-beat error now longer aborts the heartbeat cycle.
+       + The operators -=, *= and /= can now operate on <int> x <float>,
+           yielding a <float> result.
+       + Bugfix: Subtracting arrays of closures from each other now actually
+           identifies identical closures.
+       + Bugfix: The smalloc allocator now re-uses free 'large' memory for
+           small block chunks instead of always allocating them from the
+           system.
+
+    - Other Changes:
+       + Editor: Consecutive 'z' or 'Z' commands no longer repeat
+          the previous current line.
+       + Configuration option '--enable-malloc-sbrk-trace' to enable
+          a log of all system memory requests including the stats of
+          the memory allocation request causing it. The intention is
+          to help debugging muds with high system memory usage.
+       + Configuration option '--with-optimize' to set the optimization
+          level in the generated Makefiles.
+       + New commandline option '--filename-spaces'/'--no-filename-spaces'
+           to allow or disallow space characters in filenames (default is to
+           disallow them).
+
+
+02-Feb-2003 (Lars Duening) -- Release 3.2.9
+
+    - Changed efuns:
+       + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
+           handling.
+       + allocate(): Accepts an optional initialisation value and can
+           create multi-dimensional arrays.
+       + ceil(), floor(): Also accept integer argument values.
+       + clones(): If the driver is compiled with DYNAMIC_COSTS, the cost
+           is proportional to the number of objects in the game.
+       + ctime(): Accepts the output of new efun utime() as well.
+       + debug_info(): New argument DINFO_TRACE to return the current
+            or the last error call stack.
+            Argument (DINFO_DATA, DID_MEMORY) also returns the number
+            and size of permanent and clib allocations, the amount of
+            memory allocated and available, and the amount of memory
+            unused (where applicable).
+            Argument (DINFO_DATA, DID_STATUS) also returns the number
+            of destructed objects and the total number of heartbeat calls.
+            Single values of (DINFO_DATA) can be returned instead of the
+            whole array.
+            Argument (DINFO_DUMP, "destructed") creates a dump
+            of all destructed objects, by default in <mudlib>/DEST_OBJ_DUMP.
+       + debug_message(): New second argument determines where to
+            log the message, and if to prepend a timestamp.
+       + deep_copy(): If DYNAMIC_COST is active, the evaluation cost
+            depends on size and nesting depth of copied arrays, structs
+            and mappings.
+       + exec(): If this_interactive() points to one of the involved
+            objects, it is switched over as well, like this_player().
+       + filter(), map(), sort_array(), walk_mapping(): Protected lvalues
+            (e.g. &(i[0])) are not allowed as callback parameters.
+       + garbage_collection(): An optional filename argument specifies
+            the filename for the next and only the next GC.
+       + get_dir(): New flag GETDIR_PATH to return the full pathnames.
+       + get_type_info(): now returns the bound object for efun,
+            simul-efun and operator closures as well.
+       + inherit_list(): the inherited objects can be returned in a 
+           tree reflecting the inheritance structure. Virtual inherits
+           can be returned tagged as such.
+       + input_to(): New option INPUT_PROMPT to specify a prompt for this
+           input_to.
+       + lambda(): Simul efuns with extended varargs weren't compiled
+            correctly.
+       + load_name(), object_name(), program_name(): 0 is now accepted
+            as argument, the efuns returns 0 in that case.
+       + object_info(): OINFO_MEMORY also returns the program flags
+           NO_INHERIT, NO_SHADOW and NO_CLONE, and gives a better account
+           of the memory used for strings and variables.
+           Single values can be returned instead of the whole array.
+       + printf(), sprintf(): A leading zero in the field size will now print
+           only leading zeros and not interfere with the pad string option.
+       + printf(), sprintf(): If an explicite pad string is defined, even
+           if it is space, the efuns won't remove white space before a line
+           end.
+       + printf(), sprintf(): Printing numbers with leading zeroes and a
+           sign character printed the sign in the wrong place.
+       + printf(), sprintf(): When printing closures with %O, the program name
+           for inherited lfun closures is printed as well.
+       + printf(), sprintf(): New format specifier 'Q' act like 'O', but quotes
+           special characters in strings.
+       + printf(), sprintf(): New format modifier '$' implements flush
+           formatting for strings and columns of strings.
+       + printf(), sprintf(): In justified column formatting, when a word is
+           too long to fit on a line by itself and there are at least two
+           characters space left on the current line, the long word is begun
+           immediately.  Previously, such long words were always printed on a
+           line of their own.
+       + query_udp_port(), send_udp(): Renamed from query_imp_port() and
+           send_imp().
+       + query_verb(): Added an optional flag argument to return the
+           verb as given in the add_action() statement.
+       + regexp functions: more compatible with 8-bit characters.
+       + regexp functions: New metacharacters '+' allows to specifiy 'at
+           least one match'.
+       + regreplace(): Accepts a closure to produce the replacement string
+           instead of just a constant string.
+       + regreplace(): Pattern which could match on the
+           empty string matched once too often at string end.
+       + replace_program(): Argument can be omitted if only one inherit
+           exists.
+       + replace_program(): If the object alread has closures bound, the
+           efun will issue a debug_message() and fail, instead of raising
+           a full runtime error.
+       + replace_program(): If the replacement program has virtually
+           inherited variables, it must be the first inherited program.
+       + restore_{object,value}(), save_{object,value}(): Non-lambda
+           closures, symbols and quoted arrays can now be saved and restored.
+           This required a new savefile format, though.
+       + sin(), cos(), tan(), atan(), atan2(), log(), exp(), sqrt(), pow():
+           Integers are accepted as arguments, too.
+       + sizeof(): Now also returns the length of strings.
+       + terminal_colour(): Colour keys can now be mapped using a closure.
+           The pattern "%%^^" is recognized as second notation for literal
+           "%^" besides "%^%^".
+       + terminal_colour(): In wrapped formatting, when a word is
+           too long to fit on a line by itself and there are at least two
+           characters space left on the current line, the long word is begun
+           immediately.  Previously, such long words were always printed on a
+           line of their own.
+       + add_verb(), add_xverb(), efun308(), file_name(), map_array(),
+         filter_array(), filter_mapping(), map_mapping(), m_sizeof(),
+         send_imp(), set_auto_include_string():
+           Available only if driver is compiled with support for
+           deprecated efuns.
+
+    - Corrected efuns:
+       + and_bits(), or_bits(), xor_bits(): The bits 5, 11, 17,... were
+           mishandled.
+       + call_out(): In release 3.2.8 lvalues were not allowed as arguments -
+           now they are again.
+       + call_out_info(): Did not return the target object for closure
+           call outs.
+       + call_resolved(): Now accepts a destructed object as second parameter
+           as it should.
+       + copy_file(), rename(): Just return a non-0 value on errors, but
+           don't throw a runtime error.
+       + deep_copy(): Didn't handle quoted arrays properly.
+       + filter(), map(): When used on multi-value mappings, the driver did
+           not recognize when the called closure kept a reference to the
+           array with the values, overwriting the values in the next
+           iteration.
+       + functionlist(): The filter flags didn't really work.
+       + input_to(): The option IGNORE_BANG didn't work. In charmode, !-escapes
+           after the first received data are now recognized. 
+       + map() and other efuns taking callbacks arguments: The pattern
+           'function, object, extra' was parsed such that 'object' became
+           part of the 'extra' arguments.
+       + notify_fail(): When used by an object which is not an
+            undestructed command_giver, this efun no longer leaks memory.
+       + object_info(): The returned OIB_NAME now starts with a '/' in plain
+           mode.
+       + printf(), sprintf(): The formatter "%^" will print "%^", for
+           compatibility with terminal_colour().
+       + printf(), sprintf(): Column-formatting a string with one
+           newline printed one newline too few if the formatstring didn't
+           end immediately.
+       + printf(), sprintf(): A format instruction '%#=s' is now rejected.
+       + printf(), sprintf(): Max length of a result is now 128 KByte.
+       + printf(), sprintf(): One-line columns ending with a newline now
+           behave like multi-line columns and delay adding the newline
+           until the end of the line and only if no other columns are
+           pending.
+       + printf(), sprintf(): The formatter %O/%Q stumbled over really large
+           arrays and mappings (this was actually a potential crasher).
+       + sscanf(): the format '%s%d' failed to parse 'ab1cd' correctly.
+       + to_string(): Can handle operator closures now.
+       + unquote(): Unquoting symbols no longer adds a quote level.
+
+    - New efuns:
+       + blueprint(): Return the blueprint object.
+       + copy_bits(): To copy ranges of bitstrings.
+       + db_affected_rows(), db_conv_string(), db_close(), db_connect(),
+         db_exec(), db_fetch(), db_handles(), db_coldefs(), db_insert_id(),
+         db_error():
+           Optional: mySQL support.
+       + gmtime(), localtime(): Return the time broken up into its
+           constituents.
+       + find_input_to(): Find a pending input_to.
+       + include_list(): Return the files included in a program file.
+       + input_to_info(): Return information about all pending input_to's
+           for a player.
+       + m_add(): To add a new entry to a mapping and assign all values
+           in one go.
+       + md5(): Compute the MD5 message digest for a string.
+       + min(), max(): To select the minimum resp. maximum among a bunch
+           of numbers or strings.
+       + remove_input_to(): Remove a pending input_to.
+       + sgn(): Return the sign of a numeric argument.
+       + unquote(): Remove a quote from a quoted array or symbol.
+       + utime(): Return the current time in microsecond resolution.
+
+    - Master Object:
+       + receive_udp(): Renamed from receive_imp().
+       + privilege_violation(): Privilege "send_udp" replaced "send_imp".
+       + valid_trace(): New second argument to receives the argument
+           passed to the efun.
+       + runtime_error(): Receives an extra argument to distinguish between
+           normal runtime errors, and those occuring during a heartbeat.
+       + include_file(), H_INCLUDE_DIRS: The pathnames can now start
+           with leading slashes.
+       + If a master is forced to reload via SIGUSR1, all inherited objects
+           (if any) are reloaded as well.
+       + notify_shutdown(): Is now called too when the driver crashes.
+           In that case it is passed a string denoting the type of crash.
+       + Bugfix: slow_shut_down() was not called with previous_object(),
+           this_player() and this_interactive() being 0.
+       + Bugfix: When reactivating a destructed master, the lfuns
+           inaugurate_master() and reactivate_destructed_master() are found
+           even when static.
+
+    - Fixed Crashers:
+       + Catching errors with catch() did not work reliably when the
+           driver was compiled with gcc.
+       + Unlucky combinations of heart_beat() definitions or declarations
+           (e.g. private and public inheritance in this order) crashed
+           the driver when the heart_beat() was called.
+       + When creating long value save strings, the driver crashed on
+           corrupted memory.
+       + If the object for a prompt-closure is destructed, the driver
+           could crash under extremely unlucky circumstances.
+       + #define'ing the name of an inline closure was not detected.
+       + Assignments of computed strings sometimes crashed the driver.
+       + Pre-increment or -decrement on an undefined variable, where
+           the result was used in a typechecked context.
+       + Adding a mapping to itself with '+='.
+       + The MAX_MALLOCED limit check was faulty, sometimes allowing
+           the driver to clobber memory.
+       + Tracing active when the control flow changes the current player
+           to a non-interactive object.
+       + Mapping lookups would under rare circumstances return a subtly
+           invalid result, causing random memory reads and clobbered
+           memory. This bug has been in the driver since before
+           3.2.1@136 (the oldest version I could find).
+       + Allowing adding an action between two objects with no environment.
+       + "stack overflow" runtime errors freed svalues twice.
+       + It was possible to instruct sprintf to format a string
+         as both columns and as a table. sprintf() then formatted it as
+         columns, but any error (like buffer overflow) would crash the
+         driver.
+       + Formatting sprintf("%#9999999999999@s", ({ "bla" }) * 2) clobbered
+           its internal precision information on the first line, and thus
+           crashed on the second.
+       + Remove a couple crashers when handling numbers at the numerical
+           limits.
+       + Using set_this_object() before the simul-efun object was loaded.
+       + Updating the simul-efun object could crash the driver when the
+           update changed the signature of sefuns which had already been
+           used by objects: executing the calls after the update could
+           mess up the interpreter stack or cause it to execute garbage
+           bytecode.
+       + Too long error messages overwrote the stack.
+       + When players were already destructed in notify_shutdown(),
+           the following remove_player() was passed the destructed objects.
+       + If call_other() was implemented by a sefun which required
+           call_other() to be called itself, the compiler generated
+           invalid bytecode.
+       + If a method in a virtual inherit is rendered invisible, but also made
+         available again through a parallel inherit of the same program, the
+         compiler resolved the visible function to the wrong inheritance.
+       + Calling a self-destructing closure from limited().
+       + Runtime errors in a catch occasionally crashed in the traceback
+         collection.
+       + LPC tracing with lambda closures or call_resolved().
+
+    - Language:
+       + New operators '>>>' and '>>>=' for logical right shifts.
+       + New operators '&&=' and '||=' for logical assignments.
+       + New LPC define __LDMUD__ to identify this driver branch.
+       + New LPC defines __VERSION_MAJOR__, __VERSION_MINOR__,
+         __VERSION_MICRO__, __VERSION_PATCH__ expand to the various parts
+         of the driver version.
+       + New LPC define __WIZLIST__ specifies from where the driver read the
+           initial wizlist information.
+       + New LPC defines __INT_MAX__ and __INT_MIN__ give the integer number
+           limits.
+       + New LPC defines __FLOAT_MAX__ and __FLOAT_MIN__ give the float number
+           limits.
+       + Numbers can also be specified as binary patterns with the '0b'
+           prefix, and as octals with the '0o' prefix.
+       + Floating point numbers can now also be specified in the
+           exponential notation, e.g. '3.14E-5'.
+       + Character escape sequences can now specify the character code
+           directly in decimal ('\[1-9]...'), octal ('\0o...'), sedecimal
+           ('\x...' and '\0x...') and binary ('\0b...').
+       + The operators '++' and '--' can now be used on floats, too.
+       + Closures bound to destructed objects are now treated uniformly
+           like destructed objects and are replaced by 0s where required.
+       + Lfun and variable closures can now be compared with '==' and '!=',
+           and are treated correctly in alist and array operations.
+       + Inline closures inherit the visibility of their defining function.
+       + Experimental: Extended the construct catch() with the keyword
+           'nolog', which suppresses logging the caught error in the logfiles.
+           It is meant for objects like wizard tools.
+       + It is no longer possible to prematurely end an inline closure
+           function by inserting a free '}'.
+       + Global functions are no longer hidden by local variables.
+       + It is now possible to cast to '(mixed)'.
+       + If operands of different types are given to '?:', the result
+           will have the type 'mixed'.
+       + Integers and floats can now be compared against each other.
+       + Identifier names can use the extended alpha characters from the
+           ISO 8859-1 alphabet.
+       + Experimental: The 'default' statement allows to set a default
+           visibility for variables and functions. It is meant to make
+           the re-engineering of existing code easier.
+       + It is possible to specify multiple pragmas in one '#pragma'
+           directive, separated by comma.
+       + Additions, subtractions and multiplications now check for
+           numeric overflows.
+       + The wildcarded supercall "*":: no longer throws an
+         error if none of the inherited objects defines the called function.
+       + In a for() statement, variables may now be declared without
+          initialisation (e.g. 'for (int i; ...)').
+       + Definitions of local variables can appear anywhere in a block. The
+          variables are defined from the point of definition onward.
+       + If a value of the wrong type is passed to switch(), the driver
+           no longer throws a runtime error, but instead jumpgs to
+           the default case.
+       + If pragma 'pedantic' is in effect, the compiler warns about
+           calls to undefined functions even if typechecking is off.
+       + The notation ([:<expr>]) can be used to create empty mappings
+           of the given width.
+       + Duplicate inherits of a program on the toplevel raise a warning,
+           resp. an error if pragma 'pedantic' is in effect.
+       + New preprocessor macros __CATCH_EVAL_COST__ and
+           __MASTER_EVAL_COST__ for the corresponding evalcost
+           limits.
+       + If the driver uses the default debug.log file, its (mudlib)
+           name is available in the predefined macro __DEBUG_LOG__.
+       + Pragma warn_deprecated causes the compiler to print a warning
+           when a deprecated efun is used.
+       + Lfun closures can now explicitely name inherited lfuns (#'inh::fun).
+       + Bugfix: Adding mappings of different width throws an error, unless
+           one of the mappings if empty.
+       + Bugfix: Right shift by 32 or more bits was computed incorrectly.
+       + Bugfix: The type tracking of multiplications can returns the right
+           type when seeing 'mixed' operands.
+       + Bugfix: All <op>= assignment can now operate on indexed strings
+           on the left hand side.
+       + Bugfix: Additions of floats to 0 yielded the wrong type.
+       + Bugfix: For closely consecutive switch case ranges (e.g. 'case
+           -2..-1: case 1..2:') the compiler generated faulty lookup
+           tables.
+       + Bugfix: Improved the typetracking for operator '&' when used with
+           mixed variables.
+       + Bugfix: A cast of an expression to its own type now longer inserts
+           a conversion operation.
+       + Bugfix: Global variables can no longer be redefined in the same
+           scope.
+       + Bugfix: It is now possible to use symbols in inline closures, ie.
+           "(: 'a :)".
+       + Bugfix: Escaped character constants are now only parsed up to a
+           maximum length. If no valid digits are found, the whole item
+           is simply treated as escaped character.
+       + Bugfix: When defining a function of the same name as an inherited
+           private function, the latter is no longer redefined.
+       + Bugfix: Multi-dimensional mapping indices in macro calls are no
+           longer confused with multiple macro arguments.
+       + Bugfix: Prototypes could modify the definition of inherited
+           functions in strange ways.
+       + Bugfix: Termination of a macro definition with End-of-file in
+           an include file confused the lexer.
+       + Bugfix: Inherited private functions no longer hide (simul-)efuns.
+       + Bugfix: Inheriting two private functions with the same name caused
+           the compiler to cross-define the second to the first. Invisible
+           to the user, this messed up any use by __INIT and other local
+           calls.
+       + Bugfix: The '::' operator did not recognize the separate namespaces
+           of variables and functions: void foo(string id) { ::id(id); }
+           lead to a syntax error.
+       + Bugfix: Using auto-includes no longer generate wrong line numbers
+           in error messages.
+       + Bugfix: "*"::foo() checks just the directly inherited programs.
+
+    - Runtime:
+       + New runtime limit LIMIT_CALLOUTS (commandline option
+           '--max-callouts') for the maximum number of callouts at one time.
+       + Attempts to set a single string character to 0 now raise
+           a runtime error.
+       + The internal alarm timing is monitored and restarted in case the
+           alarm gets lost (happens often on Cygwin).
+       + Normal runtime errors are no longer reported on the console.
+       + New optional driver hook H_SEND_NOTIFY_FAIL to send a notify fail
+           message to the proper receiver.
+       + For the first 255 simul efuns, it is now permissible to catch
+           reference parameters in a varargs parameter. However, the only
+           permitted use is to pass them flat in a function call (using
+           apply())!
+       + The protocols MCP, MSP and MXP can now be negotiated through
+           the H_TELNET_NEG hook.
+       + New optional driver hook  H_AUTO_INCLUDE to set a string or
+           closure for auto-include information.
+       + Errors while loading objects now include the inheritance chain.
+       + 'Too long evaluation' errors during a compilation (caused by too many
+           master calls) are considered compilation errors.
+       + Signal USR2 forces the driver to reopen the host.debug.log file.
+       + On systems with pthread support, the driver may be compiled to
+         use background threads to send the data to the network, thus
+         avoiding EWOULDBLOCK problems.
+       + External master calls (like for ERQ messages) get the same eval-cost
+           benefits during error handling as normal call-others.
+       + Lfun closures left danging by a replace_program() are now converted
+           into alien-lfun closures, so that the error handler has a chance
+           to determine the originating object.
+       + Bugfix: When logging on players, the initial prompt wasn't printed.
+       + Bugfix: IPv6 name lookup works again, and also with both xerq and erq.
+       + Bugfix: The driver now longer gets a confused when a client like
+           TinyFugue refuses to use CHARMODE.
+       + Bugfix: On mapping addition or element assignment, invalid keys (like
+           destructed objects) were still counted against the allowed mapping
+           size.
+       + Bugfix: Most reference loops as created by for example
+           'b = 0 || &a; b = 0 || &a;' are detected.
+       + Bugfix: When destructing an object, references through closures
+           are removed from the local variables as well.
+       + Bugfix: Removing or destructing a shadow now properly
+           removes all associated actions.
+       + Bugfix: The tracing checks weren't done against the current
+           interactive as documented, but instead against the current
+           commandgiver.
+       + Bugfix: The automatic mapping compaction did not remove destructed
+           objects and closures.
+       + Bugfix: If H_INCLUDE_DIRS was set to an array of directory names,
+           the names couldn't have leading '/'.
+       + Bugfix: Before calling reset() or clean_up() from the backend, the
+           previous_object is cleared.
+
+    - Other Changes:
+       + Renamed the driver executable to 'ldmud'.
+       + New driver option '--pidfile <filename>' to write the pid of the
+          driver process into a file.
+       + New driver option '--erq <filename>' to choose a different name
+          for the ERQ executable (default is 'erq'). The option can also
+          be used to specify the full pathname of the executable, and pass
+          simple arguments to the erq.
+       + The driver mode (plain or compat) can be selected with a commandline
+           option ('--no-compat' resp. '--compat').
+       + New driver options '--min-malloced' and '--min-small-malloced' to
+           specify the size of the initial block allocations.
+       + New driver options '--wizlist-file <filename>' and
+           '--no-wizlist-file' to control from where the driver reads the
+           initial wizlist information.
+       + New driver option '--args <filename>' reads the commandline
+           arguments from a textfile. These argument files can be nested.
+       + New driver option '--random-seed <num>' sets the seed value
+           for the random number generator for debugging purposes.
+           If not given, the driver chooses a seed value on its own.
+       + New driver option '--hostname <name>' to specify the hostname,
+           overriding the value returned by the system.
+       + New driver option '--hostaddr <addr>' to specify the hosts address,
+           overriding the value returned by the system. In particular
+           this address will be used to open the driver ports under.
+       + Removed a couple of fatal race-conditions in the xerq.
+       + New configuration option 'trace-code' enables the bytecode
+           tracing.
+       + New configuration option 'use-deprecated' allows
+           to disable obsolete and deprecated efuns. If enabled, the macro
+           __DEPRECATED__ is defined.
+       + New configuration options 'use-set-is-wizard', 'use-set-light'
+           and 'use-process-string' to configure the corresponding optional
+           efuns.
+       + The UDP port is now a standard feature. The option has been renamed
+           from 'catch_udp_port' to just 'udp_port'.
+       + Swapping is now a standard feature, though it still can be
+           disabled by specifying swapping times of 0.
+       + The ERQ_EXECUTE command now recognizes quoted arguments.
+       + The special command "malloc" is now under the control of the
+           IS_WIZARD flag, too.
+       + The erq/xerq commandline argument '--execdir <dir>' allows the
+           to override the default ERQ_DIR specification for the directory
+           with the callable executables.
+       + New editor command 'T' to perform Tab <-> Whitespace conversion.
+       + Builtin command 'dumpallobj' now also creates a dump of all
+           destructed objects in the file <mudlib>/DEST_OBJ_DUMP.
+       + Character conversions are now done with regards to the locale
+           selected by the LANG environment variable.
+       + The xerq now sends an ERQ_OK message when a queued write
+           is finally completed.
+
+
+20-Aug-2000 (Lars Duening) -- Release 3.2.8
+
+    - Changed efuns:
+       + add_action(): Implemented the 'abbreviated verb' feature associated
+           with negative flag values.
+       + apply(): Just returns the first argument if it is not a closure.
+       + clonep(): Accepts arguments of all types.
+       + command_stack(): Also returns which objects did the notify_fail()s.
+       + debug_info(): DINFO_MEMORY also prints the datasize of an object.
+       + debug_info(): New request DINFO_DATA.
+       + debug_info(): DINFO_MALLOC also returns the size of the wasted
+           memory (where available).
+       + inherit_list(): in non-COMPAT mode, the returned program names
+           start with a '/'.
+       + input_to(): input_to()s can now be stacked, and also accept
+           closures for the function (this is not yet a real stacked
+           input handling, though).
+       + load_name(): also accepts strings as object designators.
+       + map(): can now map an array through a mapping.
+       + object_info(): OINFO_MEMORY also returns the datasize of an object.
+       + present(): present(object) returns the object found, not its
+            environment.
+       + printf(): prints to NPCs are sent to catch_tell().
+       + (s)printf(): object names printed in plain mode with %O now
+            start with a leading "/".
+       + (s)printf(): fields are now always padded to their full size,
+            even if no more data is following in the format string.
+       + query_notify_fail(): A flag allows to query which object set
+           the current error message.
+       + restore_object(): Preliminary: optionally restore the object
+           variables from a string.
+       + save_object(): Preliminary: optionally return the saved object
+           variables in a string.
+       + set_connection_charset(): Now also accepts a string as charset
+           specificator.
+       + sort_array(): Now accepts extra arguments to pass to the sorting
+           function.
+       + terminal_colour(): Straightened the key recognition, and added
+           a wrapping-only mode.
+       + to_string(): Now also accepts lambda closures and returns a string
+           suitable for debugging purposes.
+
+    - Corrected efuns:
+       + get_type_info(): The object a lambda closure is bound to is now
+           returned properly.
+       + limited(): When calling closures with limited eval ticks, the
+           efun didn't make the full amount of ticks available.
+       + terminal_colour(): When removing spaces due to wrapping, the
+           efun sometimes falsely reported a "partial string too long".
+       + random(): distributes the random numbers more evenly, especially
+           over small ranges.
+       + regexp(), regexplode(), regreplace(): Errors in the regular
+           expression are raised as normal errors, and no longer printed
+           to the user.
+       + sprintf(): Is now reentrant.
+       + strstr(): When given negative starting offsets, the efun no
+           longer returns negative results.
+       + transpose_array(): Can now handle variable sized sub-arrays.
+       + typeof(): Now accepts literal references.
+       + unique_array(): When applied on an empty array, it no longer
+           raises an assertion.
+
+    - New efuns:
+       + clones(): find and return the clones of an object.
+       + copy_file(): copies a file.
+       + save_value(): encodes a value into a string.
+       + restore_value(): decodes a value from a string generated by
+           save_value().
+       + set_combine_charset(): Define characters to combine into strings
+           when received in charmode.
+
+    - Master Object:
+       + valid_read(), valid_write(): new function code "copy_file" to cater
+           for the new efun.
+       + valid_write(): the old function code "do_rename" (used twice) was
+           replaced by "rename_from" and "rename_to".
+       + log_error(): New argument "warn" determines if the message
+           passed to the lfun is an error or just a warning.
+       + New include_file(): generates the full pathname of a filename
+           given in an #include directive.
+       + New inherit_file(): generates the full pathname of a filename
+           given in an inherit directive.
+
+    - Fixed Crashers:
+       + Unaligned pointer access in efun functionlist(), caused
+         by unaligned function stand-ins.
+       + Multiplication of an array of allocated strings with an integer.
+       + Replacing a prompt-closure from within the closure.
+       + Comparison "#'f == other_type" (also !=).
+       + It is no longer possible to pass destructed objects to
+           input_to() handlers.
+       + When apply() was called with an array as last argument, it didn't
+           check the array elements for destructed objects.
+       + When creating lambda closures with more than 254 constants, the
+           compiler stored the number of values at the wrong place,
+           clobbering one of the constants.
+       + Evalstack overflows caused by intermediate results went
+           unnoticed.
+       + Calling functions with more than 255 arguments triggered
+           a sanity check.
+       + Replacing a notify-fail closure while it is executed.
+       + The default handling of telnet negotiations (answering DONT/WONT)
+           for unsupported options like NAWS if no hooks are specified,
+           leaked LPC stack entries, eventually overwriting memory.
+       + The lambda block ({ #'return }) was compiled incorrectly,
+           causing a 'Bad stack at F_RETURN' at the end of the lambda
+           closure latest.
+       + Efun write_file() running out of fds outside of a compilation
+           no longer tries to raise a compilation error.
+       + A failing include statement at the end of the internal lex buffer
+           no longer causes the driver to lex invalid data, sometimes
+           crashing while doing so.
+
+    - Language:
+       + The preincrement/-decrement operators can now be applied
+           to wide mappings ('++m[x,y]').
+       + If an object is inherited virtually multiple times,
+           a wildcarded super call ("*::") calls it only once.
+       + The ->() operator also accepts the following forms:
+           + x->y()    where y is the name of a local variable
+           + x->"y"()  where "y" is a constant string
+           + x->(y)()  where y is an expression returning a string.
+       + New loop-construct: foreach().
+       + call_others (ie. ->()) can be applied on arrays of objects, the
+           single call results are collected in one result array.
+       + <int> += <type> now works for <type> being string and float as well.
+       + The operator "&" (and "&=") can now be used to intersect strings.
+       + The operator "-" (and "-=") can now be used to remove characters
+           from a string.
+       + <mapping1> -= <mapping2>  now works for <mapping2> of any width,
+           like the normal subtraction already does.
+       + Indexing [..x] and [..<x] are allowed as short form of [0..x]
+           and [0..<x].
+       + When enabled, the modifier 'nosave' replaces the modifier 'static'
+           for variables - the latter is still recognized, but its use
+           is deprecated. Similar, 'nosave' should be used instead
+           of 'static' as inheritance modifier.
+       + New pragma "weak_types" to turn off type checking.
+       + New pragmas "pedantic" and "sloppy" turn on resp. off the
+           treatment of certain warnings as errors.
+       + Inherited functions are looked up using a breadth search.
+       + Local variables can be initialized in their definition, for example:
+             int i = 3;
+             int j = 3*i, k;
+       + New preprocessor macros __DIR__ and __PATH__() to retrieve the
+           path of the currently compiled file.
+       + '(void)' is now accepted as empty function argument list.
+       + Failure to pass enough arguments to a non-vararg simul_efun
+           generates a warning (error in pedantic mode).
+       + Redefinition of a function now checks the types of the arguments and
+           of the return type for consistency. Same for the
+           consistency between a function and a preceeding prototype. If a
+           difference is detected, a warning (error in pedantic mode for
+           arguments) is issued.
+       + Preprocessor statements #else and #endif no longer accept uncommented
+           text after the keyword. In pedantic mode, an error is raised,
+           otherwise a warning is generated.
+       + Preprocessor statement #define requires a definition after the
+           keyword.
+       + New predefined macro __RESET_TIME__ and __CLEANUP_TIME__
+           to return the default reset and cleanup interval time.
+       + Bugfix: Newlines in literal strings in inline closures are now
+           rejected.
+       + Bugfix: #'parse_command wasn't implemented.
+       + Bugfix: The expressions &(expr4[x]) and &(expr4[<x]) could
+           generate invalid code (causing a "(lvalue) Indexing on illegal
+           type" error) in extreme circumstances.
+       + Bugfix: Compiler typechecks for "int * string" yielded "int"
+           instead of "string" (the generated code was correct).
+       + Bugfix: objects with "nomask" functions can be inherited virtually
+           multiple times.
+       + Bugfix: "*"::foo() failed if the last inherited object checked did
+           not contain the function - even if it has been found in other
+           objects.
+       + Bugfix: ::foo() didn't find the topmost definition when
+           confronted with virtual inherits.
+       + Bugfix: In the expression '++<ident>' the opcode for '++' was
+           overwritten if the <ident> required a 2-Byte index internally.
+           Same for '--'.
+       + Bugfix: The preprocessor properly ignores a '//'-comment in
+           the argument list for a function macro.
+       + Bugfix: copy()ing or subtracting mappings did not remove destructed
+           elements first.
+
+    - Runtime:
+       + If the driver is compiled for IPv6 support, the macro '__IPV6__'
+           is defined in LPC compiles.
+       + Simul-efuns can now take "varargs" arguments, like
+           in "foo(varargs mixed arg)".
+       + A simul-efun "call_other()" finally catches ->() calls as well.
+       + New pragma "no_shadow" to disallow shadows on a program.
+
+    - Other Changes:
+       + The standard erq now supports the socket requests (actually it
+           does so for some time now, it just hasn't been published).
+       + Where supported, the erq supports lookup of IPv6 addresses.
+       + When compiled with DEBUG and CHECK_STRINGS, the commandline option
+           "--check-strings" checks the consistency of the shared string
+           table with every backend cycle.
+       + When compiled with DEBUG, the commandline option "--check-state"
+           controls the simplistic state checks of the virtual machine
+           in the backend loop.
+       + The driver can be compiled with bison as well as with byacc.
+       + New editor command 'M' to strip ^Ms from lineends.
+       + The commandline argument "--max-small-malloc" and the corresponding
+           configuration parameter are gone.
+
+
+19-Aug-1999 (Lars Duening) -- Release 3.2.7
+
+    - Changed efuns:
+        + command():
+            + native-mode restriction to the current object
+              is gone since there is no native mode anymore.
+            + commands are now stacked, meaning that after a
+              command finishes, the previous this_player(), verb, etc,
+              are restored.
+        + debug_info():
+            +  debug_info(DINFO_STATUS): now returns the status information
+               instead of printing it. debug_info(DINFO_STATUS, "malloc")
+               returns the malloc information usually connected with the
+               'malloc' command.
+            +  debug_info(DINFO_DUMP): allows to dump object information
+               and (if compiled) opcode usage information into a file.
+        + destruct(): accepts an already destructed object as argument.
+        + get_type_info(): returns for strings whether they are shared
+            or not.
+        + inherit_list(), debug_info(), object_info(): duplicate virtual
+            inherits are no longer listed.
+        + notify_fail(): calls to notify_fail() only affect the current
+            command. Also, NPCs can see 'their' notify_fail messages.
+        + object_info(): OINFO_BASIC result 'OIB_APPROVED' is gone.
+        + replace_program(): no longer flags objects as 'clones', but
+            instead uses the new flag 'O_REPLACED'.
+        + set_light(): is optional (though by default active)
+        + sprintf(), printf(): if an error occurs, the filename and line
+            are included in all error messages, not just the one printed
+            to stderr.
+        + symbol_function(): can't make closures from protected lfuns of
+            other objects anymore.
+        + trace(), traceprefix() are validated with the master-lfun
+            valid_trace().
+
+    - Corrected efuns:
+        + caller_stack(): is now declared to return 'object *' as it
+            indeed does.
+        + query_mud_port(): now accepts 'int' arguments as documented.
+        + restore_object(): protected against negative '([:<width>])'
+            specifications.
+        + (s)printf(): prints variable closures properly even if the
+            variable vanished in a program replacement.
+        + symbol_variable(): recognizes objects with pending program
+            replacements.
+        + terminal_colour(): when wrapping is active, keywords were
+            replaced even when no '%^' was present. Not any more.
+        + to_object(): returns 0 for closures bound to a destructed
+            object.
+        + to_string(): converts variable closures properly even if the
+            variable vanished in a program replacement.
+        + to_string(): in compat mode, object names are no longer prepended
+            with a slash.
+        + unmkmapping(): now handles key-only mappings as it should.
+
+    - New efuns:
+        + atan2(): alternative way to calculate the inverse tangens.
+        + ceil(): rounds a float up to the nearest whole number.
+        + floor(): rounds a float down to the nearest whole number.
+        + pow(): raises a float to the power of another float.
+
+        + and_bits(): binary-ands two bitstrings.
+        + or_bits(): binary-ors two bitstrings.
+        + xor_bits(): binary-xors two bitstrings.
+        + invert_bits(): negates a bitstring.
+        + next_bit(): finds the next set (cleared) bit in a bitstring.
+        + last_bit(): returns the last set bit in a bitstring.
+        + count_bits(): count the number of bits in a bitstring.
+
+        + (preliminary) command_stack(): returns the current command stack.
+        + command_stack_depth(): returns the depth of the command stack.
+        + (preliminary) execute_command(): low-level access to the
+            command parser.
+        + query_command(): returns the full command seen by the parser.
+        + query_notify_fail(): returns the current notify-fail setting.
+
+        + object_time(): return the time an object was created.
+        + (preliminary) present_clone(): find objects with a specific
+            blueprint in a given environment.
+        + trim(): trim a certain character from a string.
+
+        + (preliminary) limited(): executes a closure with changed runtime
+          limits
+        + query_limits(): queries the current/default runtime limits
+        + (preliminary) set_limits(): sets new default runtime limits.
+
+    - Master Object:
+        + valid_write(): New call_funs 'objdump' and 'opcdump', passed
+            when attempting to dump the object and opcode information
+            into a file. This applies to the special commands 'dumpallobj'
+            and 'opcdump' as well as for the debug_info() uses.
+        + query_player_level(): obsolete and gone.
+        + valid_trace(): New lfun to validate uses of trace() and
+            traceprefix() (query_player_level() did this before).
+
+    - Fixed Crashers:
+        + A heart_beat() removing all remaining objects on the hb list.
+        + An error during a (s)efun bound to a swapped out object could
+          crash the dump_trace.
+        + An error during macro expansion crashed the driver if the error
+          handling itself required macro expansion again.
+        + to_string() on a lfun of a swapped program.
+        + call_lambda() on not-inherited variable closures.
+        + replace_program() on a program of which one variable is referenced
+          by a symbol_variable().
+        + Swap in of a closure variable which was invalidated during
+          a garbage collection.
+        + Failure to swap in an object during a garbage collection.
+        + Binding an unbound lambda to two objects and destructing
+          the originating object freed the lambda.
+
+    - Language:
+        + '+=' now allows to add an int onto a float (before only floats
+            were allowed). Similar for '-=', '*=' and '/='.
+        + '*'/'*=' may multiply strings or arrays with positive numbers. The
+            result is the string/array <number>times repeated.
+        + Scope of variables defined in nested local blocks ends with the
+            defining local block. The limit MAX_LOCAL applies only to the
+            variables which are in scope at the same time. Variables in
+            inner scopes can hide variables in outer scopes. Unchanged is that
+            local variables are initialised to 0 when their scope is
+            (re)entered.
+        + The pragmas 'no_local_scopes' and 'local_scopes' turn the local
+            scoping of variables off resp. back on.
+        + in 'for(<init>, <init>, ..., <init>; ...)' each <init> can either
+            be a normal expression, or a definition of a local variable
+            with assignment, e.g. 'int i = <expr>'. The scope of such
+            variables is the whole for() statement.
+        + added inline closures as alternative to lfun closures: instead
+            of
+                int foo(int arg ) { return arg * 2; }
+                map_array(arr, #'foo);
+            you can write
+                map_array(arr, (: return $1 * 2; :) );
+            or just
+                map_array(arr, (: $1 * 2 :) );
+            The syntax is modelled after MudOS functionals.
+        + Support for alien-lfun closures was incomplete.
+        + New pragma 'no_clone': disallows clones of a program.
+        + New pragma 'no_inherit': disallows inheriting a program.
+        + Bugfix: Variables in closures may start with '_'.
+        + Bugfix: *::f() did not call all inherited functions (and others
+            multiple times).
+        + Bugfix: '#[<] indexing corrected.
+
+    - Runtime:
+        + If hook H_RESET is a closure, and the closure returns a negative
+            value, the object will not be reset again, as
+            if set_next_reset(-1) had been used.
+        + New optional driver hook H_COMMAND allows to replace the driver
+            command parsing with your own. When used, the H_MODIFY_COMMAND
+            and H_NOTIFY_FAIL hooks are ignored.
+        + The H_MODIFY_COMMAND hooks may now change the commandgiver. The
+            change remains active during the execution of the command, and
+            the original commandgiver is passed to the NOTIFY_FAIL hook.
+        + Mappings have an upper limit of MAX_MAPPING_SIZE keys (default
+            is 5000).
+        + Special commands 'dumpallobj' and 'opcdump' are verified through
+            master->valid_write().
+        + Driver can be compiled for DYNAMIC_COSTS, causing increased
+            eval-costs for computationally expensive operations. For
+            now, this applies only to string additions with an additional
+            cost of strlen(result)/1000 .
+
+    - Other Changes:
+        + Tweaks to the timing of swapping, cleanup() and reset() to
+            achieve a smoother operation.
+        + On loading errors, the name of the affected object is printed
+            in the error message.
+        + The multiport feature is no longer optional.
+        + Corrections to the manpages of clone_object, clonep, filter_mapping,
+            filter_indices.
+        + Added the include files mudlib/sys/{trace.h,input_to.h,files.h,
+            debug_info.h} with definitions for the efuns trace(), input_to(),
+            file_size(), get_dir(), and debug_info().
+        + NATIVE_MODE is gone.
+        + Euids are now a standard feature (the LPC macro __EUIDS__ stays
+            defined, though).
+        + Use of euids (loading or cloning other objects requires a non-zero
+            euid) can be enforced with the commandline option
+            '--strict-euids'. If defined, the LPC macro '__STRICT_EUIDS__'
+            is defined.
+            If your mud ran in NATIVE_MODE, this is the option you'll want
+            to use.
+        + The commandline options '--reset-time' and '--cleanup-time' specify
+            the cleanup and reset times. The old config.h symbols
+            TIME_TO_RESET and TIME_TO_CLEAN_UP just give the default values.
+        + The commandline options '--max-array' and '--max-mapping' can set
+            the max limits for arrays and mappings. For both, a setting of 0
+            disables the limit checks.
+        + The commandline options '--max-bytes' and '--max-file' can set
+            the max IO limits for file reads and writes.
+        + Efun closures are printed with full name in error tracebacks.
+        + The ACCESS.ALLOW file can specify portnumbers.
+        + Special command 'status malloc' is now identical to 'malloc'.
+        + Special commands 'debugmalloc' and 'showsmallnewmalloced' are
+            deactivated.
+        + Bugfix: Reset of swapped objects did not work properly.
+        + Bugfix: Errors during the execution of closures no longer leak
+            memory.
+        + Bugfix: Switching driver hooks from within themselves no longer
+            leaks memory.
+        + Bugfix: New callouts added from within a callout with odd delay
+            resulted in the new callouts called at the wrong time. If the
+            new callout had a MAX_INT delay, the existing callout list
+            was effectively disabled.
+
+
+
+01-Apr-1999 (Lars Duening) -- Release 3.2.6
+    - Changed efuns:
+        + allocate_mapping() renamed to m_allocate(). The old name
+            is still available as alias.
+        + clone_object() accepts objects as templates.
+        + efun308() renamed to set_environment(). The old name is
+            still available as alias.
+        + file_name() renamed to object_name(). The old name is still
+            available as alias.
+        + filter_mapping() renamed to filter_indices(). The old name
+            is still available as alias.
+        + mapping_contains() renamed to m_contains(). The old name is
+            still available as alias.
+        + map_mapping() renamed to map_indices(). The old name
+            is still available as alias.
+        + mapping_contains() renamed to m_contains(). The old name is
+        + m_values() can return any column of a mapping.
+        + notify_fail() returns 0.
+        + set_this_player() accepts 0 as argument.
+        + to_int(), to_object() and to_float() accept their result
+            type as argument.
+
+    - Corrected efuns:
+        + call_out(): if the command_giver destructs before the callout
+            is activated, this_player() is made sure to be 0.
+        + map_array() stumbled when objects in the array in question
+            were destructed during the operation.
+        + sizeof(mapping) no longer counts destructed objects in
+            the mapping to the size.
+        + sprintf() of float values < 1.0 no longer causes a SING error.
+        + terminal_colour() correctly wraps strings with a length one less
+            than the wrap limit.
+        + this_interactive(): during login it points to the login object.
+
+    - New efuns:
+        + abs(): return the absolute value of the argument.
+        + all_environment(): return all environments of an object.
+        + caller_stack(): return the call stack.
+        + clonep(): test if an object is a clone.
+        + copy(): produce a shallow copy of the argument.
+        + deep_copy(): produce a shallow copy of the argument.
+        + filter(): filter an array or fill-width mapping.
+        + load_name(): returns the filename of an objects blueprint.
+        + load_object(): loads an object.
+        + make_shared_string(): enters a string into the shared string table.
+        + map(): map an array or full-width mapping.
+        + m_reallocate(): changes the width of a mapping.
+        + object_info(): returns internal information about an object.
+        + program_name(): returns the name of an objects program.
+        + set_next_reset(): set the time of the next reset.
+        + unmkmapping(): deconstruct a mapping to arrays.
+        + upper_case(): make a string all upper case.
+        + widthof(): return the width of a mapping.
+
+    - Master Object:
+        + All functions can be static.
+        + Functions like privilege_violation() or heart_beat_error(), but
+            also valid_read() and valid_write() no longer receive destructed
+            objects as arguments.
+        + Apply 'object_name()' renamed to 'printf_obj_name()'.
+
+    - Compiler:
+        + New predefined macro __MAX_EVAL_COST__ expands to the evaluation
+            cost limit.
+        + Bugfix: __DOMAIN_NAME__ on some machines returned the NIS, not the
+            DNS domain.
+        + Bugfix: __MASTER_OBJECT__ could be set to a non-canonic name.
+        + Bugfix: __FILE__ and __MASTER_OBJECT__ returned names with leading
+            '/' in compat mode.
+        + Bugfix: (virtual) inheritance of variable-only objects with
+            variable initialisation doesn't crash the driver anymore.
+        + Bugfix: #'++/#'-- in closures work.
+
+    - Fixed Crashers:
+        + Errors in a callout to an efun closure.
+        + Adding arrays up to and over the upper limit.
+        + Destruction of non-interactive snoopers.
+        + funcall()/apply() on a swapped variable.
+
+    - Other Changes:
+        + The old behaviour of explode() and previous_object() is no longer
+            available. Floats, transcendent functions, mappings and extended
+            varargs are now permanent features of the driver.
+        + Re-implemented the handling of heartbeats, resets, cleanups and
+            swapping in order to avoid caused lags. This also makes
+            the config parameter RESET_GRANULARITY unnecessary.
+        + If used, the __INIT() function is protected instead of global, and
+            can't be called from outside the objects anymore (it shouldn't be
+            callable at all anyway).
+        + When subtracting mappings from each other, the subtrahend may
+            be of any width, but only its keys count.
+        + The 'status tables' command has an additional entry 'Object status'.
+        + Bugfix: fixed an eval cost leak in catch().
+        + Bugfix: fixed memory leak in terminal_colour().
+        + Bugfix: if a command disconnects, but not quits a player, the prompt
+            is no longer printed (before it ended up on stdout, cluttering
+            the logfiles).
+
+
+10-Dec-1998 (Lars Duening) -- Release 3.2.5
+    - Collapsing of '/' in object names also used for inherits.
+    - Default limit for bitstrings is 6144 bits.
+    - The efuns break_point() and swap() are disabled by default.
+    - Pre-release versions have an extended version number of
+        the form '3.2.5-dev.16'.
+    - Compat mode drivers define __COMPAT_MODE__ (meant to replace
+        COMPAT_FLAG eventually); native mode drivers define
+        __NATIVE_MODE__.
+        Similar, a driver using euids defines __EUIDS__.
+    - New defines __ERQ_MAX_SEND__ and __ERQ_MAX_REPLY__ when the
+        driver supports the ERQ. The values are the max sizes of
+        the send and receive buffers.
+    - MSDOS support removed (the MSDOS filesystem however is still
+        supported).
+    - It is now possible to use '..' in filenames as long as it
+        doesn't has the 'parent directory' meaning (that means, 'foo..bar'
+        is ok, bug 'foo/../bar' is not).
+    - When a connection is closed, the driver no longer sends
+        'Closing down' as last text.
+    - Bugfix: branches in bigger lambda() closures use the correct
+        branch offsets. I am not completely sure if the bugfix is
+        correct, so I left in two 'DEBUG:' diagnostics with information
+        needed to debug the code further if necessary.
+    - Bugfix: the commandline parser printed a faulty error message
+        if a required value was missing.
+    - Bugfix: mapping_contains() freed the wrong values, clobbering
+        passed mapping literals.
+    - Bugfix: After an UDP packet was processed, the evaluation costs
+        are restored.
+    - Bugfix: The LPC compiler now accepts only regular files for includes.
+    - Bugfix: If a npc was destructed between to command() calls, and
+        the H_MODIFY_COMMAND hook was set to a string, the driver called
+        the named modify-command function on the destructed npc.
+    - Bugfix: During the execution of a closure, an extra refcount is
+        added to protect it from destruction while it is executed. This
+        is primarily a safety measure for the driver hooks which only
+        have 1 refcount and are thus very sensitive against master object
+        updates.
+    - Bugfix: Under some OS like Linux, the normal SIG_IGN handler is
+        just one-shot. To reliably ignore signals (ie SIGPIPE), a homemade
+        handler is used.
+    - Bugfix: regreplace("acc", "a*", "yy",1) trashed memory.
+    - Bugfix: runtime errors in an alien-lfun-closure (as created by
+        symbol_function() calls) no longer crash the driver during the
+        error handling.
+    - Bugfix: sprintf() on big floats or in long fields no longer causes
+        a buffer overrun (and should it happen nevertheless, a proper
+        fatal() is generated).
+
+
+24-Sep-1998 (Lars Duening) -- Release 3.2.4
+    - Bugfix for the collapsing of '/' in object names.
+
+21-Sep-1998 (Lars Duening) -- Release 3.2.3
+    - Bugfix: mapping_contains() no longer returns destructed objects.
+    - New special command 'status files' to append file usage statistics
+        from within the mud to the file /FILESTAT.
+    - New commandline option:
+        --swap-compact: reuse free space in the swapfile immediately.
+      Giving this option results in smaller, but also more fragmented
+      swapfiles, and the swap performance may degrade.
+
+14-Sep-1998 (Lars Duening) -- Release 3.2.2
+    - Version number pattern changed from 03.02.1@<patchlevel>
+      to 3.2.<patchlevel>. This affects all uses of the __VERSION__
+      lpc predefine.
+    - Objects may be loaded/inherited with filenames containing two or
+      more consecutive '/'es, these are collapsed into just one.
+      However, it is not possible to find objects using the wrong
+      names.
+    - The dreaded __INIT() bug is fixed.
+    - New commandline options:
+        --options : prints all options used in compiling the driver
+        --version : prints the game driver version
+        --help    : prints a short help of the commandline options
+        --longhelp: prints an elaborate description of the commandline
+                    options
+    - The commandline option handling was renovated, most options now
+      exist in a short and long form. This caused slight changes in
+      name and syntax for well-known options (.e.g '--gcollect_out_fd<file>'
+      is now '--gcollect-out-fd <file>'). Please see doc/driver/invocation
+      for further information.
+
+10-Jul-1998 (Lars Duening) -- Release 3.2.1@141-osb.16
+    - Bugfix for the "*":: problem.
+    - Added a minimal master for simple driver tests.
+
+17-May-1998 (Lars Duening) -- Release 3.2.1@141-osb.14 and before
+    - Small speedup for regexps through usage of a cache. Also increased
+      the complexity limit for regexps.
+    - Added support for BeOS.
+    - Automatic garbage collections are kept at least 5 minutes
+      apart. Every garbage collection is logged on stdout.
+    - Variables are swapped independantly from program code.
+    - Multiple login ports may be used in parallel. The
+      port numbers are given on the commandline, efun query_mud_port()
+      was extended to return the appropriate port number.
+    - MudOS-efun terminal_colour() added by Mica.
+    - this_object() in destructed objects does not print a
+      diagnostic anymore.
+    - 'status tables' prints the number of cache hits both
+      absolute and as percentage.

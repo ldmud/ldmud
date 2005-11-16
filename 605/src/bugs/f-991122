@@ -1,0 +1,17 @@
+Short: Filenames in master-apply in !compat mode
+From: Freaky
+Date: 991122
+Type: Feature
+State: Unclassified
+
+Im non-compat-mode sind ja normalerweise Filenamen mit leading slash. Aber
+manche Master-Aufrufe werden ohne leading slash gemacht (z.B. imclude_file
+und privilege_violation)
+
+Willst du das evtl. aendern?
+Ich faende das sinnvoll, da es momentan nicht eindeutig ist.
+Wir haben irgendwie ziemlich oft sowas in der Art:
+
+    if (arg == MY_FILENAME_DEFINE[1..])
+
+
