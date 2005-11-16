@@ -1,0 +1,58 @@
+SYNOPSIS
+        string *regexp(string *list, string pattern)
+
+DESCRIPTION
+        Match the pattern pattern against all strings in list, and
+        return a new array with all strings that matched. This
+        function uses the same syntax for regular expressions as ed():
+
+        . Match any character.
+
+        ^ Match begin of line.
+
+        $ Match end of line.
+
+        \< Match begin of word.
+
+        \> Match end of word.
+
+        \B not at edge of a word (supposed to be like the emacs
+           compatibility one in gnu egrep), since 3.2@249
+
+        x|y Match regexp x or regexp y.
+
+        () Match enclosed regexp like a 'simple' one.
+
+        x* Match any number (0 or more) of regexp x.
+
+        x+ Match any number (1 or more) of regexp x.
+
+        [..] Match one of the characters enclosed.
+
+        [^ ..] Match none of the characters enclosed. The .. are to
+        replaced by single characters or character ranges:
+        [abc] matches a, b or c.
+        [ab0-9] matches a, b or any digit.
+        [^a-z] does not match any lowercase character.
+
+        \c match character c even if it's one of the special characters.
+
+        If there is an error in the regular expression, a runtime
+        error will be raised.
+
+EXAMPLE
+        string strs;
+        if (strs = regexp( ({"please, help me Sir John."}),
+                                 "\\<help\\>.*\\<me\\>"))
+           if (sizeof(strs)
+              write("It matches.\n");
+
+        The regular expression will test the given string (which is
+        packed into an array) if there is something like "help ... me"
+        inside of it.
+
+HISTORY
+        LDMud 3.2.9 added metacharacter '+'.
+
+SEE ALSO
+        regexplode(E), regreplace(E), sscanf(E)
