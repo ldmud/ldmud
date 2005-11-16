@@ -1,0 +1,7 @@
+Short: new efun all_environment()
+From: Holger@Wunderland
+Date: 990217
+Type: Feature
+State: Done - implemented in 3.2-dev.53
+
+Returns all environments of an object.
