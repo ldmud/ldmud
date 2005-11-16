@@ -1,0 +1,47 @@
+NAME
+        ed5
+
+DESCRIPTION
+        = : prints current line
+        a : append lines
+        c : change, that is, delate, than insert
+        d : delete line(s)
+        E <filename> :  discard current buffer and edit the file named
+                        <filename>
+        e <filename> : like e, but refuse if file has been changed
+        f : print current filename
+        f <filename> : set filename
+        i : insert line(s)
+        j : with no or one argument: join line with following line
+        j : with two arguments : join line range given
+        k<letter> : set mark <letter> to current line. <letter> must
+                be in the range [a-z] . The mark can be used
+                thereinafter as a line address, with a leading slash.
+                (e.g. ka to set mark a, /ap to print marked line)
+        l : print line with control characters
+        <start>,<end>m<dest> : move block (lines from start to end)
+                                behind line # dest
+        <line>m<dest>        : move single line
+        m<dest>                : move current line
+        M : remove Ctrl-M (CR) characters.
+        p : print line
+        P : print line
+        Q : quit, discarding the buffer
+        q : the same, but refuse if file has been changed since last
+            write
+        r : read in file. If no adress is given, at the last insert
+            position, if also nothing was inserted, at the end of the
+            buffer
+        s : substitute
+        <start>,<end>t<dest>        : copy block ( lines from start to end )
+                                  behind line position dest
+        <line>t<dest>                : copy single line
+        t<dest>                        : copy current line
+        w : write file
+        W : write file
+        x : write file if buffer has been changed since last change,
+            then quit
+        z : show approx. a screenful of lines
+
+SEE ALSO
+        ed6(LPC)
