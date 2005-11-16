@@ -1,0 +1,106 @@
+SYNOPSIS
+        #include <sys/input_to.h>
+
+        void input_to(string|closure fun)
+        void input_to(string|closure fun, int flag, ...)
+        void input_to(string|closure fun, int flag, string|closure prompt, ...)
+
+DESCRIPTION
+        Enable next line of user input to be sent to the function <fun>
+        as an argument. Exception: if the next input
+        line starts with a "!", it will be parsed as a command resp.
+        passed to the most recent input_to() given with the
+        INPUT_IGNORE_BANG flag.
+        The function <fun> may be static, but must not be private (or
+        it won't be found).
+
+        Note that fun is not called immediately but after pressing the
+        RETURN key.
+
+        If input_to() is called more than once in the same execution,
+        only the first call has any effect. On the other hand, if
+        a command given during an input_to() (using the "!" escape)
+        issues its own input_to(), the previous input_to() is suspended
+        until the new input_to() has been handled, then the previous
+        one becomes active again.
+
+        The optional argument <flag> may be a binary-OR ('|') of the
+        following option values:
+
+          INPUT_NOECHO  (1):
+              The line given by the player will not be echoed, and is
+              not seen if snooped.
+
+          INPUT_CHARMODE  (2):
+              The connection is switched from line- into charmode to
+              retrieve a single character(!) from the player.
+
+              After execution of <fun>, the connection is switched
+              back into linemode unless a subsequent input_to( , 2)
+              has been issued.
+
+              Lineends are received depending on how the client sends
+              them: either as "", as "\r" followed by "", or (happens
+              with Windows clients) as just "\r".
+
+              Note that the players frontend is free to stay in
+              linemode all the time: even if you request a single
+              character, the player might be forced to type (and send)
+              that character plus the return key. Usually your function
+              will then receive the complete input in one call.
+
+              If you plan to stay in charmode a longer time , you can
+              reduce the call overhead by using set_combine_charset()
+              to retrieve sequences of certain characters as one string
+              instead of one-by-one. In a screen-oriented editor for
+              example this would be most of the printable characters.
+
+          INPUT_PROMPT (4):
+              The argument following the <flag> argument is used as
+              prompt for the input. If this flag is not given, and thus
+              no prompt specified, nothing will be printed.
+
+          INPUT_IGNORE_BANG  (128):
+              Input lines starting with '!' will _not_ be parsed as
+              commands, but are given to the function as well. Usage
+              of this option is privileged.
+
+        The optional trailing args will be passed as second and
+        subsequent args to the function fun.
+
+EXAMPLE
+        void func() {
+           ...
+           input_to("enter_name", INPUT_PROMPT, "Please enter your name:");
+           /* The traditional way of doing this was:
+            *   write("Please enter your name:");
+            *   input_to("enter_name");
+            */
+           ...
+        }
+        enter_name(string str) {
+           write("Is '"+str+"' really your name?? *giggle*\n");
+           ...
+        }
+
+        When reaching the input_to() statement the driver
+        continues the function func() but also asks the user for
+        input. If you entered whatever is asked and press RETURN the
+        driver will invoke the enter_name() function with the
+        string you entered as argument to it.
+
+HISTORY
+        The meaning of the flag parameter was extended in 3.2.1@93.
+        The limited "stacking" of input_to()s issued from !-commands
+        was implemented in LDMud 3.2.8.
+        Since LDMud 3.2.8 the function can be given as a closure.
+        LDMud 3.2.9 introduced the INPUT_PROMPT flag and argument.
+
+BUGS
+        In CHARMODE, newlines should really be returned as "\n"; however,
+        this might break existing code.
+
+SEE ALSO
+        call_other(E), sscanf(E), privilege_violation(M),
+        set_combine_charset(E), query_input_pending(E), find_input_to(E),
+        input_to_info(E), remove_input_to(E)

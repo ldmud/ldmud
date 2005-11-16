@@ -1,0 +1,12 @@
+SYNOPSIS
+        int command_stack_depth(void)
+
+DESCRIPTION
+        Return the number of nested commands, ie. the depth of the command
+        stack
+
+HISTORY
+        Introduced in LDMud 3.2.7.
+
+SEE ALSO
+        command(E), command_stack(E)
