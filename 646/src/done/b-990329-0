@@ -1,0 +1,16 @@
+Short: Apply on destructed object
+From: Righ
+Date: 990329
+Driver: 3.2-dev.50
+Type: Bug
+State: Done - fixed in dev.74
+
+The driver got a fatal "Apply on destructed object, function 'remove'" when
+executing
+
+  map_array(inv - ({0}), lambda( ({'x}), ({',, ({#'call_other, 'x, "remove" })
+                                             , ({ #'?, 'x ({ #'destruct, 'x })
+                                               })}) ) );
+
+Typical case of 'this shouldn't happen'. The bug is not clearly reproducible
+and doesn't seem to appear with newer drivers.
