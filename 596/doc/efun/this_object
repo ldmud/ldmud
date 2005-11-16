@@ -1,0 +1,10 @@
+SYNOPSIS
+        object this_object(void)
+
+DESCRIPTION
+        Return the object pointer for this object. This is not to be
+        confused with the internal name of an object, which is used by
+        the id() function.
+
+SEE ALSO
+        this_player(E), previous_object(E), object_name(E), find_object(E)

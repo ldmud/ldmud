@@ -1,0 +1,21 @@
+Short: foreach() construct
+From: Dave Setty <garpoz@locallink.net>
+Date: Thu, 10 Dec 1998 02:03:04 -0500
+Type: Feature
+State: Done - implemented in 3.2.8-dev.153.
+
+2) So long as we're swiping stuff from MudOS, grab the foreach()
+   loop. Very handy in a lot of places. It shouldn't be too hard
+   to make it handle variable mapping widths properly, at least to
+   someone who can code it in the first place...
+
+From: ak853@cleveland.Freenet.Edu (Eric Blade)
+Date: Fri, 8 Jan 1999 02:02:30 -0500 (EST)
+
+    incredibly more simple for looping over some specific known data..
+    especially if the foreach() condition doesn't get totally reevaluated
+    every time you run through it.  ie, foreach(x in users()) would only
+    actually call the users() efun once.  But that' sprobably obvious.  Also
+    handy for this is variable creation on the fly.  I don't remember if 3.2
+    or 3.2.1 could do this or not...
+

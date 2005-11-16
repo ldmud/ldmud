@@ -1,0 +1,17 @@
+SYNOPSIS
+        int sgn (int|float arg)
+
+BESCHREIBUNG
+        Liefert das Vorzeichen des Argumentes.
+
+        arg  sgn(arg)
+        --------------
+        > 0   1
+          0   0
+        < 0  -1
+
+AENDERUNGEN
+        Eingefuehrt in LDMud 3.2.9.
+
+SIEHE AUCH
+        abs(E)
