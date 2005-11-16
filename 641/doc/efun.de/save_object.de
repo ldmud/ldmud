@@ -1,0 +1,42 @@
+SYNOPSIS
+        int save_object(string name [, int format]);
+        string save_object([int format]);
+
+BESCHREIBUNG
+        Codiert die speicherbaren Variablen des aktuellen Objekts in einen
+        String.
+
+        In der ersten Form wir der String in die Date <name> geschrieben. Eine
+        Endung ".c" in <name> wird entfernt, dafuer kann eine Endung ".o"
+        durch das Masterobjekt angefuegt werden, waehrend der Ueberpruefung
+        durch valid_read(). Die Efun save_object() liefert 0, wenn die
+        Speicherdatei erfolgreich erstellt wurde, sonst eine Zahl ungleich 0,
+        wenn ein nicht schwerwiegendee Fehler aufgetreten ist (die Datei
+        konnte nicht geschrieben werden oder das aktuelle Objekt wurde
+        inzwischen zerstoert).
+
+        In der zweiten Form wird der String direkt zurueck gegeben. Wenn das
+        Objekt zerstoert wurde, wird 0 zurueck gegeben. In beiden Faellen kann
+        durch das optionale Argument <format> das Format der Speicherdatei
+        angegeben werden:
+
+            -1: das normale Format des Treibers (Standard)
+             0: das Originalformat nach Amylaar's LPMud und LDMud <=3.2.8
+             1: LDMud >= 3.2.9: Non-Lambda Closures, Symbole und gequotete
+                Arrays koennen gespeichert werden
+
+        Eine Variable wird als 'speicherbar' betrachtet, wenn sie nicht als
+        'nosave' oder 'static' deklariert ist.
+
+AENDERUNGEN
+        Seit LDMud 3.2.8 liefert save_object() einen fixen Wert bei Erfolg.
+        Das direkte Abspeichern in einen String wurde in LDMud 3.2.8
+            eingefuehrt, wird aber in Zukunft eventuell in eine separate Efun
+            umgezogen.
+        LDMud 3.2.9 ergaenzte die Funktion um das Speichern von Non-Lambda
+            Closures, Symbolen und gequoteten Arrays. Dazu wurde ein neues
+            Format fuer die Speicherdatei eingefuehrt.
+        LDMud 3.2.10 fuehrte das Argument <format> ein.
+
+SIEHE AUCH
+        restore_object(E), save_value(E)

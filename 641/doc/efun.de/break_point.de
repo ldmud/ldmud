@@ -1,0 +1,11 @@
+OPTIONAL, GESCHUETZT
+SYNOPSIS
+        void break_point();
+
+BESCHREIBUNG
+        Diese Funktion ist fuer interne Benutzung und sollte niemals von einem
+        Userobjekt aufgerufen werden. Die Funktion prueft die Integritaet des
+        Stacks und faehrt den Driver herunter, falls sie Schaeden feststellt.
+
+SIEHE AUCH
+        shutdown(E), swap(E)

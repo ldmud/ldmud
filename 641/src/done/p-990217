@@ -1,0 +1,280 @@
+Subject: virtual bug
+From: Michael Sporn <sporn@mathematik.hu-berlin.de>
+Date: Wed, 17 Feb 1999 21:56:37 +0100 (MET)
+Type: Patch
+State: Done: applied.
+See also: b-981201, b-981208-4, b-990217-0, b-990217-1.
+
+Hallo Lars, ich hoffe du hast den 40-minuetigen Weg gut ueberstanden...
+
+Also zur Erlaeuterung:
+
+Der erste Bug is der in b-981201 beschriebene. Es liegt an dem expliziten
+call in die virtuelle basisklasse. In dem Beispiel tritt das Problem
+in der Funktion bar() auf: ruft sie explizit d::foo() auf, setzt der inter-
+preter current_variables falsch. Das liegt daran, dass normalerweise d's
+variablen direkt vor denen von c liegen, aber da die inheritance virtual
+ist, der variablenblock von d an den anfang der variablen von a geschoben wird.
+Das dumme is, dass man bei kompilation von c nicht wissen kann, an welchem
+ort die variablen von d letzten endes stehen werden, so dass man den
+index in der inherit-liste von a (zur Laufzeit) jedesmal neu bestimmen muss.
+Genau das ist nicht gemacht worden.
+Wenn also ein expliziter call in eine virtuelle Basisklasse gemacht wird,
+durchsucht der interpreter jetzt jedesmal die inherit liste des objekts in
+dem das programm grade laeuft. Die Art und Weise, wie er das tut, is die
+trivialste; wenn es sehr grosse inheritbaeume mit vielen virtual klassen
+sind, is es vermutlich nich sehr effektiv. Aber ich denke, normalerweise
+is es ausreichend.
+
+Der zweite is in b-981208-4 beschrieben. Der effekt entsteht dadurch, dass
+virtual geerbte klassen in die inheritliste uebernommen werden auch wenn sie
+nicht direkt geerbt werden. Das wird gemacht, um die offsets fuer die
+virtuellen variablen bei funktionsaufrufen in diese klassen extra abzulegen.
+Wird ein :: bearbeitet, ignoriert der compiler aber, dass es keine direkt
+geerbten klassen sind. Im Beispiel ist die inherit liste von c 'ab' und nich
+'b', so dass :: zuerst in a nach foo sucht und auch findet.
+Ich hab nun in prolang.y einen weiteren mem_block dazu genommen, um jedesmal
+wenn eine klasse in die inherit liste uebernommen wird, ein flag zu setzen, ob
+das ein richtiges inherit is oder eins wegen virtual.  Das flag wird dann in
+:: abgetestet.
+
+Eine Sache war mich nicht 100% klar, und zwar in dem "*":: fall (in
+insert_inherited()). Da steht weiter unter ein continue, das ich recht
+unlogisch fand, selbst bei dem alten verhalten. Lies dir bitte den kommentar
+durch und schau, ob ich recht hab oder nicht.
+
+Eine Sache, die man vielleicht ins Auge fassen kann ist, die inherit
+liste ein wenig sauberer zu machen (vielleicht alle extra virtual zuerst
+und die dann auch nicht mehr als einmal). Man koennte den lookup zur
+Laufzeit optimieren und f_inherit_list() verbessern (die gibt naemlich
+auch die extra inherits aus).
+
+Mein Gott, ich haette nich gedacht, dass ich so viel schreiben wuerde.
+Ich hoffe, der text hat mehr zur klaerung als zur verwirrung beigetragen.;)
+
+Das diff bezieht sich auch schon auf dev-37.
+
+Ciao, Michael
+
+--
+Michael Sporn <sporn@mathematik.hu-berlin.de>
+
+
+diff -rc ldmud-dev-37/interpret.c ldmud-dev/interpret.c
+*** ldmud-dev-37/interpret.c	Wed Feb 17 01:46:17 1999
+--- ldmud-dev/interpret.c	Wed Feb 17 20:28:30 1999
+***************
+*** 4056,4061 ****
+--- 4056,4105 ----
+          /* Save all important global stack machine registers */
+          push_control_stack(sp, pc+1, fp);
+
++         /* if we do an explicit call into a virtually inherited base class we
++          * have to look up the position of the virtual variables anew, this
++          * cannot be done at compile time because it depends on the _object_
++          * (i.e. the runtime environment) in which current_prog is running
++          */
++         if (current_prog != current_object->prog &&
++                 inheritp->prog->num_variables &&
++                 (current_prog->variable_names
++                  [inheritp->variable_index_offset +
++                  inheritp->prog->num_variables-1].flags & TYPE_MOD_VIRTUAL) &&
++                 !(inheritp->prog->variable_names
++                     [inheritp->prog->num_variables-1].flags & TYPE_MOD_VIRTUAL))
++         {
++             /* now lookup the inheritp of the virtually inherited program
++                in the inherit list of the topmost program */
++             int i = current_object->prog->num_inherited;
++             struct inherit *inh = current_object->prog->inherit;
++             while (i) {
++                 if (inh->prog == inheritp->prog &&
++                         current_object->prog->variable_names[
++                         inh->variable_index_offset +
++                         inh->prog->num_variables-1].flags&TYPE_MOD_VIRTUAL)
++                     break;
++                 inh++;
++                 i--;
++             }
++             if (i) { /* found, so adjust the inheritp and the offsets
++                         to start with */
++                 inheritp = inh;
++                 current_variables = current_object->variables;
++                 function_index_offset = 0;
++             } else { /* this shouldn't happen ! */
++ #ifdef DEBUG
++                 fprintf(stderr,
++                         "Adjusting variable offsets because of virtual "
++                         "inheritance for call from %s into %s (topmost "
++                         "program %s) FAILED, please check the inherit "
++                         "tree and report it.\n",
++                         current_prog->name, inheritp->prog->name,
++                         current_object->prog->name);
++ #endif
++             }
++         }
++
+          /* This assigment must be done after push_control_stack() */
+          current_prog = inheritp->prog;
+          /*
+diff -rc ldmud-dev-37/prolang.y ldmud-dev/prolang.y
+*** ldmud-dev-37/prolang.y	Mon Feb 15 02:12:14 1999
+--- ldmud-dev/prolang.y	Wed Feb 17 20:30:23 1999
+***************
+*** 58,64 ****
+  %endif /* INITIALIZATION_BY___INIT */
+  #define A_STRING_NEXT               11
+  #define A_INCLUDE_NAMES        12
+! #define NUMAREAS               13
+
+  #define CURRENT_PROGRAM_SIZE (mem_block[A_PROGRAM].current_size)
+
+--- 58,66 ----
+  %endif /* INITIALIZATION_BY___INIT */
+  #define A_STRING_NEXT               11
+  #define A_INCLUDE_NAMES        12
+! #define A_INHERIT_FLAG         13  /* is 1 if the corresponding inherit
+!                                       is additional due to virtual */
+! #define NUMAREAS               14
+
+  #define CURRENT_PROGRAM_SIZE (mem_block[A_PROGRAM].current_size)
+
+***************
+*** 1488,1493 ****
+--- 1490,1496 ----
+                        (char *)&inherit,
+                        sizeof inherit
+                      );
++                     byte_to_mem_block(A_INHERIT_FLAG, 0);
+                      num_virtual_variables =
+                        mem_block[A_VIRTUAL_VAR].current_size /
+                          sizeof (struct variable);
+***************
+*** 5932,5937 ****
+--- 5935,5941 ----
+  {
+      struct inherit *ip;
+      int num_inherits, super_length;
++     int ix;
+
+      while(*super_name == '/')
+          super_name++;
+***************
+*** 5940,5951 ****
+          sizeof (struct inherit);
+      real_name = findstring(real_name);
+      ip = (struct inherit *)mem_block[A_INHERITS].block;
+!     for (; num_inherits > 0; ip++, num_inherits--) {
+          short i;
+          uint32 flags;
+          char *__PREPARE_INSERT__p = __prepare_insert__p;
+          short __ADD_SHORT__s[2];
+
+          if (*super_name) {
+              /* ip->prog->name includes .c */
+              int l = strlen(ip->prog->name + 2);
+--- 5944,5960 ----
+          sizeof (struct inherit);
+      real_name = findstring(real_name);
+      ip = (struct inherit *)mem_block[A_INHERITS].block;
+!     ix = 0;
+!     for (; num_inherits > 0; ix++, ip++, num_inherits--) {
+          short i;
+          uint32 flags;
+          char *__PREPARE_INSERT__p = __prepare_insert__p;
+          short __ADD_SHORT__s[2];
+
++         if (mem_block[A_INHERIT_FLAG].block[ix] != 0) /* this is an
++                                                          additional inherit */
++             continue;
++
+          if (*super_name) {
+              /* ip->prog->name includes .c */
+              int l = strlen(ip->prog->name + 2);
+***************
+*** 6006,6022 ****
+      if (strpbrk(super_name, "*?") && !num_arg) {
+          int calls = 0;
+          short i = -1;
+          *super_p = 0;
+          num_inherits = mem_block[A_INHERITS].current_size /
+              sizeof (struct inherit);
+          ip = (struct inherit *)mem_block[A_INHERITS].block;
+!         for (; num_inherits > 0; ip++, num_inherits--) {
+              uint32 flags;
+              PREPARE_S_INSERT(6)
+
+              /* ip->prog->name includes .c */
+              int l = strlen(ip->prog->name + 2);
+
+              if ( !match_string(super_name, ip->prog->name, l) )
+                  continue;
+              if ( (i = find_function(real_name, ip->prog)) < 0)
+--- 6015,6036 ----
+      if (strpbrk(super_name, "*?") && !num_arg) {
+          int calls = 0;
+          short i = -1;
++         int ix;
+          *super_p = 0;
+          num_inherits = mem_block[A_INHERITS].current_size /
+              sizeof (struct inherit);
+          ip = (struct inherit *)mem_block[A_INHERITS].block;
+!         ix = 0;
+!         for (; num_inherits > 0; ip++, ix++, num_inherits--) {
+              uint32 flags;
+              PREPARE_S_INSERT(6)
+
+              /* ip->prog->name includes .c */
+              int l = strlen(ip->prog->name + 2);
+
++             if (mem_block[A_INHERIT_FLAG].block[ix] != 0) /*additional
++                                                             inherit */
++                 continue;
+              if ( !match_string(super_name, ip->prog->name, l) )
+                  continue;
+              if ( (i = find_function(real_name, ip->prog)) < 0)
+***************
+*** 6036,6044 ****
+--- 6050,6080 ----
+                    !(prog2->variable_names[numvar2-1].flags & TYPE_MOD_VIRTUAL) )
+                  {
+                      /* Inherited from a virtually inherited program */
++ #if 0
+                      /* The call for the virtually program itself should
+                       * be sufficent. */
++             /* wieso???? ich hab wirklich keine ahnung wozu das gut sein soll
++              *
++              * wenn man verhindern will, dass mehrfach virtuell inheritete
++              * funktionen mehrfach aufgerufen werden, sollte man
++              * das selbst in lpc machen (is ja auch in c++ so)
++              *
++              * ausserdem: wenn ein programm mehrmals virtuell
++              * inherited wird, gibt es hier 2 alternativen: entweder man
++              * macht meinen neuen obigen test, was zur folge hat, dass
++              * die funktion in der klasse ueberhaupt nicht aufgerufen wird,
++              * oder man macht ihn nicht und ruft somit die funktion in
++              * allen zusaetzlichen inherits auf (also potentiell
++              * mehrfach) UND hat den bug a la ::f(), d.h. eigentlich
++              * ueberladene funktionen werden auch aufgerufen
++              *
++              * wenn ich mich jedoch irren sollte, nimm es wieder rein
++              */
+                      continue;
++ #else
++                     do --ip; while (ip->prog != prog2);
++                     i -= ip2->function_index_offset;
++ #endif
+                  }
+              }
+              add_f_byte(F_CALL_EXPLICIT_INHERITED);
+***************
+*** 6644,6649 ****
+--- 6680,6686 ----
+                     sizeof(struct inherit) - 1;
+                  inherit.function_index_offset += fun_index_offset;
+                  add_to_mem_block(A_INHERITS, (char *)&inherit, sizeof inherit);
++                 byte_to_mem_block(A_INHERIT_FLAG, 1);
+                  /* If a function is directly inherited from a program that
+                   * introduces a virtual variable, the code therein is not
+                   * aware of virtual inheritance. For this reason, there are
+
+

@@ -1,0 +1,11 @@
+SYNOPSIS
+        float atan(int|float)
+
+BESCHREIBUNG
+        Liefert den Arkustangens des Argumentes.
+
+AENDERUNGEN
+        LDMud 3.2.9: Ganzzahlen (Integers) als Argument hinzugefuegt.
+
+SIEHE AUCH
+        atan2(E), sin(E), cos(E), tan(E), asin(E), acos(E)

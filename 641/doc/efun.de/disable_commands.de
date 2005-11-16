@@ -1,0 +1,10 @@
+SYNOPSIS
+        void disable_commands();
+
+BESCHREIBUNG
+        Verbietet dem Objekt, Kommandi zu verwenden, die normalerweise Usern
+        zugaenglich sind. Diese Funktion ist das Gegenteil von
+        enable_commands().
+
+SIEHE AUCH
+        enable_commands(E)

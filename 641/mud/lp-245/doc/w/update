@@ -1,0 +1,14 @@
+Command: update
+Argument: file
+
+Remove the definition of an object. If the object was cloned, all copies
+of it will remain. Use full path name if the file is not in your home
+directory.
+
+If it is a room, the room will be destroyed. The next refernce of the room
+will load it again from the file.
+
+The 'update' command is implemented as an LPC function that simply calls
+'destruct()' on the object.
+
+See also w/clone w/destruct w/load efun/destruct

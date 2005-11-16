@@ -1,0 +1,18 @@
+Short: Get rid of the light handling
+From: Daniel von Dincklage <vondincklage@usa.net>
+Date: Mon, 22 Jun 1998 00:53:36 +0200
+Type: Feature
+State: Done - optional in 3.2.7
+
+> - Get rid of the light-handling in the driver
+
+Absolutely. If there was anything that the driver doesn't need to know
+about, it's light. This can be trivially simulated in the mudlib if
+necessary. The only reason I could think of for keeping it would be to
+rename it to something generic, and use it as a "programmer-specific"
+object property. Delphi has something like this (forget what it's called,
+but it's a generic value that all objects have which was specifically put
+there for use by the programmer in any manner they saw fit).
+
+But even that sounds like a hack to me. ;-)
+

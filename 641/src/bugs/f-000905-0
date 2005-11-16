@@ -1,0 +1,11 @@
+Short: Graceful charmode recovery.
+Date: 20000905
+From: Lars
+Type: Feature
+State: New
+
+If the driver requests charmode, but the client rejects it, the driver should
+at least remember that the mudlib still expects it and treat the received
+lines as if received byte by byte ("collated into one string").
+
+Alternatively/Additionally allow to check the state of the socket.
