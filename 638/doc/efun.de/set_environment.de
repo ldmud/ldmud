@@ -1,0 +1,21 @@
+GESCHUETZT
+SYNOPSIS
+        void set_environment(objet was, object env);
+
+BESCHREIBUNG
+        Das Objekt <was> wird in die Umgebung <env> bewegt, welche auch 0
+        sein kann. Diese Efun wird im move_object() Hook verwendet. Sie macht
+        nichts, ausser das Objekt <was> zu bewegen - kein Aufruf von init()
+        oder sonstiges.
+
+        Sprich: nicht in eigenen Objekten verwenden!
+
+AENDERUNGEN
+        Eingefuehrt in 3.2.1.@1 als 'efun308()'.
+        In 3.2.6 umbenannt zu 'set_environment()'.
+
+ANMERKUNG
+        Diese Funktion ist geschuetzt und macht deshalb gar nix.
+
+SIEHE AUCH
+        remove(A), init(A), move_object(E), transfer(E), hooks(C), native(C)

@@ -1,0 +1,14 @@
+SYNOPSIS
+        string read_file(string file, int start, int number)
+
+DESCRIPTION
+        Reads lines from file.
+        If <start> is not given or 0, the file is read from the
+        beginning, else from the numbered line on.
+        If <number> is not given or 0, the whole file is read, else
+        just the given amount of lines.
+        If <start> would be outside the actual size of the file, 0 is
+        returned instead of a string.
+
+SEE ALSO
+        read_bytes(E), write_file(E)

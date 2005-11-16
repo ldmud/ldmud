@@ -1,0 +1,49 @@
+VERALTET
+SYNOPSIS
+        mixed *filter_array(mixed *arr, string fun, string|object ob,
+            mixed extra, ...);
+        mixed *filter_array(mixed *arr, closure cl, mixed extra, ... );
+        mixed *filter_array(mixed *arr, mapping map, mixed extra, ... );
+
+BESCHREIBUNG
+        Liefert ein Array, das alle Elemente von <arr> enthaelt, fuer die
+        ob->fun(Element, extra, ...) bzw. die Closure cl TRUE (d.h. einen
+        Wert != 0) ergeben hat, oder die ein Key des Mappings <map> sind.
+
+        Die Funktion <fun> im Objekt <ob> bzw. die Closure <cl> wird einzeln
+        mit jedem Element von <arr> als erstem Parameter und den <extra>
+        Argumenten als folgende Parameter aufgerufen. Wenn ob->fun[arr[index],
+        extra) einen Wert != 0 liefert, bzw. wenn map[arr[index]] existiert,
+        wird das Element von <arr> ins Ergebnisarray aufgenommmen.
+
+        Wenn <arr> kein Array ist, erzeugt die Funktion einen Fehler.
+
+        Die <extra> Argumente sind optional. <extra> duerfen keine
+        geschuetzten Referenzen (wie &(i[0])) enthalten.
+
+        Ist <ob> nicht angegeben oder weder ein String noch ein Objekt, wird
+        stattdessen this_object() verwendet.
+
+        Seit 3.2.1@36 kann das zweite Argument auch ein Mapping sein. Es
+        werden nur jene Elemente von <arr> ins Ergebnis aufgenommen, die ein
+        Key von <map> sind (d.h. map[arr[index]] != 0).
+
+BEISPIEL
+        int check_if_idle(object user) { return query_idle(user); }
+        ...
+        object *idle_users;
+        idle_users = filter_array(users(), "check_if_idle");
+        /* gleichwertig, aber kuerzer und schneller */
+        idle_users = filter_array(users(), #'query_idle );
+
+        Das Array *idle_users enthaelt jetzt alle User, die fuer mehr als
+        1 Sekunde idle waren.
+
+AENDERUNGEN
+        Seit LDMud 3.2.6 abgeloest von filter().
+        Seit LDMud 3.2.9 ist die Funktion nur noch verfuegbar, wenn der
+            Treiber mit USE_DEPRECATED kompiliert wurde.
+
+ANMERKUNG
+        DIESE FUNKTION IST VERALTET.
+        Die gleiche Funktionalitaet (und mehr) bietet filter().

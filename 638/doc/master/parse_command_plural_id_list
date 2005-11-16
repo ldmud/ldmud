@@ -1,0 +1,14 @@
+SYNOPSIS
+        string *parse_command_plural_id_list(void)
+
+DESCRIPTION
+        Used by parse_command(). Return an array of common
+        plural 'thing' ids in the installations native language.
+
+EXAMPLE
+        string *parse_command_pural_id_list() {
+            return: ({ "ones", "things", "them" });
+        }
+
+SEE ALSO
+        parse_command(E)

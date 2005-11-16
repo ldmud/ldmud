@@ -1,0 +1,56 @@
+/*  Another efun...   /Gwendolyn@nannymud.lysator.liu.se 2000  */
+
+-----------------------------------------------------------------
+
+NAME
+	get_spec_obj - return an array with objects matching pattern
+		       with consideration to mask
+
+SYNOPSIS
+	object *get_spec_obj(int mask, int pattern)
+
+DESCRIPTION
+	Scans through all objects in the mud searching for objects
+	which match pattern with consideration to mask. Found objects
+	are returned in an array. These bytevalues are legal:
+	
+		   1  ->  object with heart_beat running
+		   4  ->  living object
+		   8  ->  cloned from a master copy
+		  32  ->  swapped to file
+
+WARNING
+	DON'T use it to find all swapped objects and then reference
+	them since that is very costly! A good idea is to restrict
+	usage of this function to arches, master.c or whatever.
+
+---------------------------------------------------------------
+
+struct vector *get_spec_obj(int mask, int choice)
+{
+   struct vector *spec_obj;
+   struct object *obj;
+   int flag, number = 0;
+   mask = (mask & (O_HEART_BEAT | O_ENABLE_COMMANDS | O_CLONE | O_SWAPPED));
+   choice = (choice & mask);
+   for(obj = obj_list; obj; obj = obj->next_all)
+   {
+      flag = (obj->flags & mask);
+      if(!(obj->flags & O_DESTRUCTED) && flag == choice)
+         number++;
+   }
+   if(!number)
+      return allocate_array(0);
+   spec_obj = allocate_array(number);
+   for(obj = obj_list; obj; obj = obj->next_all)
+   {
+      flag = (obj->flags & mask);
+      if(obj->flags & O_DESTRUCTED || flag != choice)
+         continue;
+      --number;
+      spec_obj->item[number].type = T_OBJECT;
+      spec_obj->item[number].u.ob = obj;
+      add_ref(obj, "get_spec_obj");
+   }
+   return spec_obj;
+}
