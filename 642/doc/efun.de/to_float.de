@@ -1,0 +1,19 @@
+SYNOPSIS
+        float to_float(int arg);
+        float to_float(string arg);
+        float to_flaot(float arg);
+
+        (float)<value>
+
+BESCHREIBUNG
+        Integers werden zu Floats erweitert, Strings werden in Floats
+        konvertiert bis zum ersten Zeichen, das nicht mehr zum Float
+        gehoert. Floats werden direkt zurueck gegeben.
+
+BUGS
+        Die Cast-Schreibweise funktioniert nur, wenn der genaue Wert von
+        <value> zum Zeitpunkt der Kompilierung bekannt ist. Dies wird nicht
+        geaendert werden, da die Funktionsform verwendet werden kann.
+
+SIEHE AUCH
+        to_string(E), to_int(E), sscanf(E)

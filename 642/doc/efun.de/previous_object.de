@@ -1,0 +1,44 @@
+SYNOPSIS
+        object previous_object();
+        object previous_object(int i);
+
+BESCHREIBUNG
+        Liefert einen Pointer auf das letzte Objekt, das einen Aufruf (mittels
+        call_other(), funcall() etc.) auf das aktuelle Objekt this_object()
+        gemacht hat. Wenn dieses aufrufende Objekt inzwischen zerstoert wurde,
+        liefert previous_object() 0.
+
+        Wird das Argument <i> angegeben, so verfolgt previous_object() den
+        Aufruf <i> Stufen zurueck. Zum Beispiel liefert previous_object(2) das
+        aufrufende Objekt des aufrufenden Objekts. Fuer <i> muss gelten:
+        0 <= i <= call_stack_depth()-1.
+
+        Es gibt einen wichtigen Spezialfall: in Funktionen, die vom Gamedriver
+        auf Grund eines externen Ereignises aufgerufen wurden (zum Beispiel
+        Kommandi, die mit add_action() definiert wurden), liefert
+        previous_object() this_object(), previous_object(0) hingegen 0.
+
+BEISPIEL
+        int sicherheitscheck()
+        {
+            object prev;
+            if(!(prev=previous_object()));
+            else if(getuid(prev)!=getuid(this_object()));
+            else if(geteuid(prev)!=geteuid(this_object()));
+            else return 1;
+            return 0;
+        }
+        void sensible_funktion()
+        {
+            if(!sicherheitscheck())
+            return;
+            ...
+        }
+
+        Diese Funktion zeigt, wie man ueberpruefen kann, ob der letzte Aufruf
+        einer Funktion im aktuellen Objekt sicher war, oder ob die
+        Verarbeitung abgebrochen werden sollte.
+
+SIEHE AUCH
+        call_other(E), this_object(E), this_player(E), caller_stack(E),
+        caller_stack_depth(E), extern_call(E)

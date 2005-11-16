@@ -1,0 +1,5 @@
+void attacked_by(ob)
+object ob;
+
+This routine is called by the object attacking this object. Define it if this
+object wants to know who the attacker is.

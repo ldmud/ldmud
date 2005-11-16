@@ -1,0 +1,33 @@
+VERALTET
+SYNOPSIS
+        mapping map_indices(mapping m, string fun, string|object ob,
+            mixed extra, ...);
+        mapping map_indices(mapping m, closure cl, mixed extra, ...);
+
+BESCHREIBUNG
+        Fuer jedes Element des Mappings wird ob->func() bzw. die Closure <cl>
+        aufgerufen. Dabei wird zuerst der Key des Mappings, dann das
+        Datenelement und schliesslich die <extra> Argumente uebergeben.
+        Die <extra> Argumente duerfen keine geschuetzten Referenzen wie z.B.
+        &(i[0]) enthaelten. Der Dateneintrag im Mapping wird durch den
+        Rueckgabewert der Funktion ersetzt. <ob> kann auch der Dateiname
+        eines Objektes sein.
+
+        Wird <ob> nicht angegeben oder weder ein String noch ein Objekt,
+        wird standardmaessig this_object() verwendet.
+
+        Verfuegt das Mapping ueber mehr als ein Datenelement pro Key, so
+        wird nur das erste Element beachtet, alle andern Datenelemente
+        werden ignoriert. Das Verhalten von map_indices() unterscheidet sich
+        also vom Verhalten von map_array().
+
+BEISPIEL
+        m = mkmapping(users());
+        m = map_indices(m, #'envrionment);
+
+AENDERUNGEN
+        In LDMud 3.2.6 umbenannt von map_mapping() und durch map() ergaenzt.
+
+SIEHE AUCH
+        map(E), filter(E), filter_indices(E), walk_mappin(E), member(E),
+        m_contains(E)

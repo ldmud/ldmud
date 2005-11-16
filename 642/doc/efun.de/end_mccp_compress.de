@@ -1,0 +1,17 @@
+OPTIONAL
+SYNOPSIS
+        int end_mccp_compress()
+
+BESCHREIBUNG
+        Diese Funktion muss von innerhalb eines interaktiven Objektes
+        aufgerufen werden und beendet die Komprimierung des Driver->Client
+        Netzverkehrs.
+
+        Resultat is ungleich 0 bei Erfolg, und 0 bei Misserfolg.
+
+        Die Funktion ist nur verfuegbar wenn der Driver mit
+        MCCP-Unterstuetzung compiliert wurde. In diesem Fall ist das Makro
+        __MCCP__ definiert.
+
+SIEHE AUCH
+        start_mccp_compress(E), query_mccp(E), query_mccp_stats(E), mccp(C)
