@@ -1,0 +1,29 @@
+SYNOPSIS
+	int socket_udp(int port, closure callback, int|void opts)
+
+	void callback(int fd, int action, mixed a, mixed b, mixed c)
+
+DESCRIPTION
+	Opens a udp datagram port.  Returns the file descriptor for
+	the socket.
+
+CALLBACK
+	SOCKET_READY
+	  The socket is open and awaiting connections.
+
+	SOCKET_READ
+	  An incoming datagram has been received.
+	  A contains the message.
+	  B contains the remote host.
+	  C contains the remote port.
+
+	SOCKET_CLOSE
+	  The socket has closed.
+
+	SOCKET_ERROR
+	  An error has been detected on the socket.
+	  A contains the error code obtained from the erq daemon.
+	  B contains the value of errno in most cases.
+
+SEE ALSO
+	sockets, socket_sendto(), socket_close()

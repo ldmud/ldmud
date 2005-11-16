@@ -1,0 +1,8 @@
+SYNOPSIS
+	int socket_write(int fd, int*|string mesg)
+
+DESCRIPTION
+	Sends the message out onto a tcp connection.
+
+SEE ALSO
+	sockets, socket_listen(), socket_connect(), socket_close()
