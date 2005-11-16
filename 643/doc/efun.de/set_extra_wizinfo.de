@@ -1,0 +1,25 @@
+GESCHUETZT
+SYNOPSIS
+        void set_extra_wizinfo(object wiz, mixed extra);
+        void set_extra_wizinfo(string wiz, mixed extra);
+        void set_extra_wizinfo(int    wiz, mixed extra);
+
+BESCHREIBUNG
+        Setzt den Wert <extra> als Eintrag im 'Extra' Feld in der Wizlist fuer
+        den Gott <wiz>.
+
+        Ist <wiz> ein Objekt, wird der Eintrag vom Erzeuger des Objekts (also
+        dessen UID) verwendet.
+        Ist <wiz> ein String (ein Erzeuger bzw. eine UID), bezeichnet dieser
+        den Eintrag, dem <extra> zugewiesen wird.
+        Ist <wiz> 0, wird <extra> im Standardeintrag der Wizlist gesetzt.
+        Diese Funktion kann man verwenden, um Daten fuer die gesamte Laufzeit
+        des Treibers bis zum naechsten Shutdown zu speichern, zum Beispiel den
+        Zeitpunkt des letzten Reboot.
+
+        Das Argument <extra> kann jeden Wert enthalten.
+
+        Die Funktion verursacht eine Schutzverletzung.
+
+SIEHE AUCH
+        get_extra_wizifno(E), set_extra_wizinfo_size(E), wizlist_info(E)

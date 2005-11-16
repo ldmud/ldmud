@@ -1,0 +1,16 @@
+SYNOPSIS
+        float atan2 (int|float y, int|float x)
+
+DESCRIPTION
+        Returns the angle part of the polar coordinates of the point (x, y)
+        in the range (-pi, pi].
+
+        Note the exchange of the coordinates x and y in the parameter list
+        reflecting the sequenz in the gradient to angle transformation
+        atan(y / x).
+
+HISTORY
+        LDMud 3.2.9 added integers as arguments.
+
+SEE ALSO
+        sin(E), cos(E), tan(E), asin(E), acos(E), atan(E)

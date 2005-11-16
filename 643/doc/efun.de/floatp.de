@@ -1,0 +1,10 @@
+SYNOPSIS
+        int floatp(mixed arg)
+
+BESCHREIBUNG
+        Liefert 1, wenn das Argument eine Fliesskommazahl (float) ist,
+        ansonsten 0.
+
+SIEHE AUCH
+        intp(E), mappingp(E), stringp(E), closurep(E), objectp(E),
+        referencep(E), pointerp(E), symbolp(E), clonep(E)

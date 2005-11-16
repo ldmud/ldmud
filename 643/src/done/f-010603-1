@@ -1,0 +1,12 @@
+Short: Specify commandline options in a file
+From: "Dale Perkins" <elric@lpmud.com>
+Date: Tue, 22 May 2001 14:24:32 -0500
+Type: Feature
+State: Done - 3.2.9-dev.300
+
+Lars, there are lots of command line options, is there anyway to make it
+where we can store these options in a file and pass like --file driver.cfg
+to the driver and it reads all the command line options from that file?
+
+Elric
+elric@lpmud.com

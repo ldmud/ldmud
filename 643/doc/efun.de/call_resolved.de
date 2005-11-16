@@ -1,0 +1,18 @@
+SYNOPSIS
+        int call_resolved(mixed result, object ob, string func, mixed arg,...);
+
+BESCHREIBUNG
+        Die Funktion ist aehnlich zu call_other(). Wenn obj->func() definiert
+        und oeffentlich ist, werden alle Argumente <arg> an obj->func()
+        uebergeben. Das Resultat dieses Funktionsaufrufes wird in <result>
+        gespeichert und muss deshalb als Referenz uebergeben werden.
+
+        Wenn <ob> zerstoert wurde oder keine oeffentlich zugaengliche Funktion
+        <func> definiert, liefert call_resolved() 0 fuer Fehler, 1 bei Erfolg.
+
+        <ob> kann auch ein object_name() sein. Wenn <ob> ein String ist und
+        das Objekt mit diesem Namen nicht gefunden oder geladen werden kann,
+        tritt ein Fehler auf.
+
+SIEHE AUCH
+        call_other(E), function_exists(E), find_object(E)
