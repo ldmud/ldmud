@@ -1,0 +1,11 @@
+SYNOPSIS
+        float sin(int|float)
+
+DESCRIPTION
+        Returns the sinus of the argument.
+
+HISTORY
+        LDMud 3.2.9 added integers as arguments.
+
+SEE ALSO
+        asin(E), cos(E), acos(E), tan(E), atan(E), atan2(E)

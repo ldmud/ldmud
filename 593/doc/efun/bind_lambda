@@ -1,0 +1,16 @@
+SYNOPSIS
+        closure bind_lambda(closure, object ob)
+
+DESCRIPTION
+        Binds an unbound lambda closure to an object and return it.
+        The efun can also be used to rebind an efun-, simul-efun
+        or operator closure to a different object.
+
+        If the optional argument ob is not this_object(), the privilege
+        violation ("bind_lambda", this_object(), ob) occurs.
+
+HISTORY
+        Introduced in 3.2@82.
+
+SEE ALSO
+        lambda(E), unbound_lambda(E), apply(E), funcall(E), closures(LPC)

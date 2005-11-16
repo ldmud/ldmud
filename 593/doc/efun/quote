@@ -1,0 +1,16 @@
+SYNOPSIS
+        mixed quote(mixed)
+
+DESCRIPTION
+        Converts arrays to quoted arrays and strings to symbols.
+        Symbols and quoted arrays get quoted once more.
+
+EXAMPLES
+        quote("foo") -> 'foo
+        quote(({1,2,3})) -> '({1,2,3})
+
+HISTORY
+        Introduced in 3.2@70
+
+SEE ALSO
+        symbolp(E), unquote(E)
