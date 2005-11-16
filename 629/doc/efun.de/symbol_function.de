@@ -1,0 +1,35 @@
+SYNOPSIS
+        closure symbol_function(symbol arg);
+        closrue symbol_function(string arg);
+        closure symbol_function(string arg, object|string obj);
+
+BESCHREIBUNG
+        Erzeugt eine Lfun-, Efun- oder Opeartor-Closure aus <arg>, wobei
+        <arg> entweder ein string oder ein symbol sein muss. Fuer
+        Lfun-Closures gibt <obj> an, zu welchem Objekt die Lfun gehoert,
+        entweder angegeben durch das Objekt selbst (bzw. einen pointer
+        darauf) oder durch den Objektnamen als String. Wenn ein String
+        angegeben wird, wird das Objekt beim Aufruf geladen.
+
+        Wenn die Closure fuer eine Lfun in einem anderen als dem momentanen
+        Objekt erzeugt wird, ergibt dies eine "alien lfun closure". Solche
+        Closures sind an das Objekt gebunden, das symbol_function()
+        aufgerufen hat (dieses Objekt wird von to_object() geliefert),
+        obwohl der eigentliche Code in einem anderen Objekt steht (das mit
+        get_type_info() gefunden werden kann).
+
+        Als "private" deklarierte Funktionen koennen auf diese Weise nie
+        aufgerufen werden, "static" und "protected" deklarierte Lfuns nur
+        dann, wenn <obj> das gueltige Objekt ist.
+
+BEISPIELE
+        symbol_function("efun::users");
+            --> ergibt: #'users
+        symbol_function("QueryProp", other_obj);
+            --> ergibt: other_obj->QueryProp()
+
+AENDERUNGEN
+        Eingefuehrt in 3.2@70.
+
+SIEHE AUCH
+        lambda(E), quote(E)

@@ -1,0 +1,10 @@
+From: Lars
+Short: String Table topics
+Type: Feature
+Date: 000301
+State: New
+
+Statistics like average chain length and collision count.
+
+Die Cutoff-Grenze von 20 fuer die Hashfunktion ist viel zu klein.
+Erinnere Freaky's Problem - 80..100 waere gut.
