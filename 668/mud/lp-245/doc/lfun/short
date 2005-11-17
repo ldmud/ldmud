@@ -1,0 +1,7 @@
+string short()
+
+All objects must have a short() function. This function returns
+a short message describing what it is. Invisible object will return the
+value 0.
+
+See also: long().

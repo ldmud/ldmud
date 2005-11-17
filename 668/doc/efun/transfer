@@ -1,0 +1,29 @@
+SYNOPSIS
+        int transfer(object item, object dest)
+
+DESCRIPTION
+        This efun is for backward compatibility only. It is only
+        available in compat mode.
+
+        Move the object "item" to the object "dest". All kinds of
+        tests are done, and a number is returned specifying the
+        result:
+
+        0: Success.
+        1: To heavy for destination.
+        2: Can't be dropped.
+        3: Can't take it out of it's container.
+        4: The object can't be inserted into bags etc.
+        5: The destination doesn't allow insertions of objects.
+        6: The object can't be picked up.
+
+        If an object is transfered to a newly created object, make
+        sure that the new object first is transfered to it's
+        destination.
+
+        The efun calls add_weight(), drop(), get(), prevent_insert(),
+        add_weight(), and can_put_and_get() where needed.
+
+SEE ALSO
+         move_object(E), drop(A), get(A), prevent_insert(A),
+         can_put_and_get(A), add_weight(A)
