@@ -1,0 +1,36 @@
+GESCHUETZT
+SYNOPSIS
+        int binary_message(int *|string messages, int flags);
+
+BESCHREIBUNG
+        Liest den Output aus und sendet diesen direkt mit write() OHNE IAC
+        QUOTING. Die Nachricht kann Nullen enthalten, wenn sie als
+        int * angegeben sind. Die Nachricht wird an this_object() ausgegeben,
+        aber nur, wenn dieses interaktiv ist.
+
+        Der Rueckgabewert ist die Anzahl tatsaechlich gedruckter Zeichen. Eine
+        allfaellige "allowed charset" Einstellung wird uebergangen.
+
+        <flags> werden bitweise interpretiert und koennen ueber das binaere
+        Oder verbunden werden.
+
+        Bit 0 (Wert 1): wenn gesetzt, wird add_message() anstelle von
+            write() verwendet. So muss der Output nicht zuerst ausgelesen
+            werden, allerdings erfolgt die Ausgabe nicht sofort. Auch kann
+            dann die Anzahl effektiv uebertragener Zeichen nicht bestimmt
+            werden - der Rueckgabewert ist nicht definiert.
+
+        Bit 1 (Wert 2): Der Puffer wird ausgelesen, _nachdem_ die Nachricht
+            angefuegt wurde. Macht nur in Verbindung mit Bit 0 Sinn.
+
+            Die Idee hinter den Flags ist, dass das Senden von Kommandocodes
+            zum Beispiel fuer Farben an den vorhandenen Filtern fuer erlaubte
+            Zeichen vorbeigeschleust werden muss, jedoch nicht wichtig genug
+            ist, um die Verschweundung von Bandbreite mittels einer
+            synchronen Uebertragung zu rechtfertigen.
+
+AENDERUNGEN
+        Eingefuehrt in 3.2.1@40.
+
+SIEHE AUCH
+        set_connection_charset(E)

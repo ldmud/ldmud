@@ -1,0 +1,95 @@
+NAME
+    predefined - predefined #defines by the parser
+
+DESCRIPTION
+    Several preprocessor macros are pre#defined by the parser,
+    to provide information about parser version, compile time
+    options and parser invocation options:
+
+      LPC3            : always defined.
+      __LDMUD__       : always defined.
+      __EUIDS__       : always (for compatibility).
+      COMPAT_FLAG     : defined if the driver runs in compat mode.
+      __COMPAT_MODE__ : ditto
+      __STRICT_EUIDS__: defined if strict euid usage is enforced.
+      __FILENAME_SPACES__: defined if filenames may contain spaces.
+
+      __MASTER_OBJECT__ : the name of the master object (in compat mode
+                          without leading '/').
+      __FILE__          : the name of the compiled file (in compat mode
+                          without leading '/').
+      __LINE__          : the actual line number.
+      __DIR__           : the directory path of the compiled file (in
+                          compat mode without leading '/').
+      __PATH__(n)       : the <n> leading directory path elements of the
+                          compiled file (in compat mode without leading '/').
+      __VERSION__       : the version string of the driver.
+      __VERSION_MAJOR__ : the major version number of the driver.
+      __VERSION_MINOR__ : the minor version number of the driver.
+      __VERSION_MICRO__ : the micro version number of the driver.
+      __VERSION_PATCH__ : the patchlevel of the driver; a 0 here means
+                          'no patchlevel'.
+
+      __DOMAIN_NAME__    : the domain the host is part of.
+      __HOST_IP_NUMBER__ : the hosts IP number (as a string).
+      __HOST_NAME__      : the full hostname.
+      __MAX_RECURSION__  : the max count of nested function calls
+                           (this is config.h:MAX_USER_TRACE).
+      __MAX_EVAL_COST__  : the max evaluation cost.
+      __CATCH_EVAL_COST__ : the min amount of eval cost which needs to
+                            be available to execute a catch().
+      __MASTER_EVAL_COST__: the eval cost reserve for master applies.
+      __RESET_TIME__     : default interval time between object resets.
+      __CLEANUP_TIME__   : default interval time between object cleanups.
+      __EFUN_DEFINED__(name) : if the efun 'name' exists, this
+                               macro evaluates to " 1 ", else to " 0 ".
+      __DRIVER_LOG__     : the name of the default debug.log file (within
+                             the mudlib); undefined if a different name
+                             has been specified on the commandline.
+      __WIZLIST__        : the name of the (mudlib) file from where the
+                           driver read the initial WIZLIST information.
+                           It is undefined if the driver was configured
+                           to not read the information.
+      __MAX_MALLOC__     : the internal upper limit for total memory
+                           usage.
+      __INT_MAX__        : the largest integer number
+      __INT_MIN__        : the smallest integer number
+      __FLOAT_MAX__      : the largest (positive) float number
+      __FLOAT_MIN__      : the smallest (positive) float number
+
+    If the ERQ is supported, the following macros are defined:
+
+      __ERQ_MAX_SEND__  : the max size of the send buffer
+      __ERQ_MAX_REPLY__ : the max size of the reply buffer
+
+    If the driver is compiled for using the MS-DOS filesystem
+    conventions, __MSDOS_FS__ is defined.
+
+    The following macros are defined if their associated package
+    has been compiled into the driver:
+
+      __IPV6__ :      support for IP v.6
+      __MYSQL__ :     support for mySQL
+      __LPC_NOSAVE__: support for the 'nosave' keyword
+      __LPC_ARRAY_CALLS__: call_other()s on arrays of objects enabled.
+      __DEPRECATED__: support for obsolete and deprecated efuns.
+
+
+HISTORY
+    3.2.1 added __DOMAIN_NAME__, __HOST_IP_NUMBER__, __HOST_NAME__,
+        __MAX_RECURSION__, __EFUN_DEFINED__().
+    3.2.5 added __COMPAT_MODE__, __NATIVE_MODE__, __EUIDS__,
+        __ERQ_MAX_SEND__ and __ERQ_MAX_REPLY__.
+    3.2.6 added __MAX_EVAL_COST__.
+    3.2.7 added __STRICT_EUIDS__ and made __EUIDS__ standard.
+    3.2.8 added __IPV6__, __LPC_NOSAVE__, __DIR__, __PATH__().
+    3.2.9 added __LDMUD__, __MYSQL__, __DEPRECATED__, __VERSION_MAJOR__,
+        __VERSION_MINOR__, __VERSION_MICRO__, __VERSION_PATCH__,
+        __INT_MAX__, __INT_MIN__, __FLOAT_MIN__, __FLOAT_MAX__,
+        __CATCH_EVAL_COST__, __MASTER_EVAL_COST__, __RESET_TIME__,
+        __CLEANUP_TIME__, __DRIVER_LOG__, and __WIZLIST__.
+    3.2.10 added __MAX_MALLOC__, __MSDOS_FS__, __LPC_ARRAY_CALLS__
+        and __FILENAME_SPACES__.
+
+SEE ALSO
+    pragma(LPC), preprocessor(LPC)

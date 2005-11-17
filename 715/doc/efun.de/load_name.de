@@ -1,0 +1,46 @@
+SYNOPSIS
+        string load_name();
+        string load_name(object|string obj);
+
+BESCHREIBUNG
+        Die Funktion liefert den Namen, mit dem <obj> geladen wurde. <obj>
+        kann direkt als Objekt oder als String mit seinem Namen angegeben
+        werden.
+
+        Wenn <obj> ein Clon ist, liefert die Funktion den Namen des Blueprints.
+        Wenn <obj> ein Blueprint ist, liefert die Funktion den Namen des Files,
+        aus dem der Blueprint kompiliert wurde.
+
+        Wenn <obj> ueber seinen Namen angegeben wurde, aber nicht / nicht mehr
+        existiert, generiert die Funktion den Namen, wie er sein muesste und
+        gibt diesen zurueck. Wenn der angegebene Name ungueltig ist, liefert
+        die Funktion 0.
+
+        Als Spezialfall liefert die Funktion 0, wenn <ob> 0 ist.
+
+        Fuer virtuelle Objekte liefert load_name() den virtuellen Dateinamen.
+
+        Wird <obj> nicht angegeben, wird der Name fuer das momentan gueltige
+        Objekt angegeben.
+
+        Im Gegensatz zum object_name() kann der load_name() nicht durch
+        rename_object() veraendert werden. Ist ein <obj> jedoch einem
+        replace_program() unterworfen, spiegelt der load_name() nicht mehr
+        das effektive Verhalten des Objekts wider.
+
+BEISPIEL
+        object o;
+        o = clone_object("/std/thing");
+        write(load_name(o));  --> liefert "/std/thing" in !Compat Modus
+                                  und "std/thing"  im Compat Modus
+        write(load_name("/std/thing"));  --> gleich wie oben
+        write(load_name("/std/thing#4n5")); --> liefert 0
+
+AENDERUNGEN
+        Eingefuehrt in LDMud 3.2.6.
+        Strings als Argumente sind moeglich seit 3.2.8.
+        0 ist zulaessig seit 3.2.9.
+
+SIEHE AUCH
+        clone_object(E), clonep(E), object_name(E), load_object(E),
+        replace_program(E), program_name(E), present_clone(E)
